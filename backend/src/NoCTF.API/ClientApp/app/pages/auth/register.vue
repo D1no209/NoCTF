@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { registerEndpoint } from '~/api'
+import { authenticationRequestEmailVerification, registerEndpoint } from '~/api'
 
 definePageMeta({ middleware: 'guest' })
 
@@ -11,7 +11,13 @@ const password = ref('')
 const confirmPassword = ref('')
 const error = ref<string | null>(null)
 const pending = ref(false)
-const registered = ref<{ requiresEmailVerification?: boolean } | null>(null)
+const registered = ref<{
+  requiresEmailVerification?: boolean
+  verificationEmailQueued?: boolean
+} | null>(null)
+const resendPending = ref(false)
+const resendDone = ref(false)
+const resendError = ref<string | null>(null)
 
 async function submit() {
   error.value = null
@@ -34,6 +40,24 @@ async function submit() {
     pending.value = false
   }
 }
+
+async function resendVerification() {
+  resendError.value = null
+  resendPending.value = true
+  try {
+    const { error: apiError } = await authenticationRequestEmailVerification({
+      body: { email: email.value },
+    })
+    if (apiError) throw parseApiError(apiError)
+    resendDone.value = true
+  }
+  catch (e) {
+    resendError.value = parseApiError(e).message
+  }
+  finally {
+    resendPending.value = false
+  }
+}
 </script>
 
 <template>
@@ -50,9 +74,31 @@ async function submit() {
       <CardHeader>
         <CardTitle>{{ $t('注册成功') }}</CardTitle>
         <CardDescription>
-          {{ registered.requiresEmailVerification ? $t('验证邮件已发送,请查收邮箱完成验证后登录。') : $t('现在可以登录了。') }}
+          {{ registered.requiresEmailVerification
+            ? registered.verificationEmailQueued
+              ? $t('验证邮件已提交发送,请检查收件箱和垃圾邮件。')
+              : $t('验证邮件暂未提交,请使用下方按钮重新发送。')
+            : $t('现在可以登录了。') }}
         </CardDescription>
       </CardHeader>
+      <CardContent v-if="registered.requiresEmailVerification" class="space-y-3">
+        <Alert v-if="resendDone">
+          <AlertDescription>{{ $t('如果该邮箱对应未验证账户,系统会再次提交验证邮件。') }}</AlertDescription>
+        </Alert>
+        <Alert v-if="resendError" variant="destructive">
+          <AlertDescription>{{ resendError }}</AlertDescription>
+        </Alert>
+        <Button
+          type="button"
+          variant="outline"
+          class="w-full"
+          :disabled="resendPending"
+          @click="resendVerification"
+        >
+          <Spinner v-if="resendPending" data-icon="inline-start" />
+          {{ $t('重新发送验证邮件') }}
+        </Button>
+      </CardContent>
       <CardFooter>
         <Button as-child class="w-full">
           <NuxtLink to="/auth/login">{{ $t('前往登录') }}</NuxtLink>

@@ -19,6 +19,7 @@ POST /api/v1/auth/register
 POST /api/v1/auth/login
 POST /api/v1/auth/refresh
 POST /api/v1/auth/logout
+POST /api/v1/auth/email-verification/request
 POST /api/v1/auth/email-verification/verify
 POST /api/v1/auth/email-verification/resend
 POST /api/v1/auth/password-reset/request

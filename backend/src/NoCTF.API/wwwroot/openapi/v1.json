@@ -4202,6 +4202,54 @@
         }
       }
     },
+    "/api/v1/auth/email-verification/request": {
+      "post": {
+        "tags": [
+          "Auth"
+        ],
+        "summary": "Requests an email verification message",
+        "description": "Always accepts a valid email-shaped request without revealing account existence.",
+        "operationId": "AuthenticationRequestEmailVerification",
+        "requestBody": {
+          "x-name": "RequestEmailVerificationRequest",
+          "description": "",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsAuthenticationRequestEmailVerificationRequest"
+              }
+            }
+          },
+          "required": true,
+          "x-position": 1
+        },
+        "responses": {
+          "202": {
+            "description": "Accepted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsAuthenticationRequestEmailVerificationAcceptedResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests"
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcValidationProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/auth/password-reset/request": {
       "post": {
         "tags": [
@@ -17072,6 +17120,32 @@
             "type": "string",
             "maxLength": 1024,
             "minLength": 8,
+            "nullable": false
+          }
+        }
+      },
+      "NoCTFAPIEndpointsAuthenticationRequestEmailVerificationAcceptedResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "accepted": {
+            "type": "boolean"
+          }
+        }
+      },
+      "NoCTFAPIEndpointsAuthenticationRequestEmailVerificationRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "email"
+        ],
+        "properties": {
+          "email": {
+            "type": "string",
+            "format": "email",
+            "maxLength": 320,
+            "minLength": 0,
+            "pattern": "^[^@]+@[^@]+$",
             "nullable": false
           }
         }

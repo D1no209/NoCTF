@@ -96,6 +96,7 @@ public static class ServiceRegistration
             services.AddScoped<GetPublicUserProfile>();
             services.AddScoped<ChangePassword>();
             services.AddScoped<LogoutAll>();
+            services.AddScoped<RequestEmailVerification>();
             services.AddScoped<ResendEmailVerification>();
             services.AddScoped<VerifyEmail>();
             services.AddScoped<RequestPasswordReset>();
@@ -138,6 +139,10 @@ public static class ServiceRegistration
             services.AddScoped<IPasswordResetStore, SwaggerPasswordResetStore>();
             services.AddScoped<RequestPasswordReset>();
             services.AddScoped<CompletePasswordReset>();
+            services.AddScoped<IEmailVerificationStore, SwaggerEmailVerificationStore>();
+            services.AddScoped<RequestEmailVerification>();
+            services.AddScoped<ResendEmailVerification>();
+            services.AddScoped<VerifyEmail>();
         }
         var redis = configuration.GetConnectionString("Redis");
         var signalR = services.AddSignalR();
@@ -207,6 +212,15 @@ public static class ServiceRegistration
                         QueueLimit = 0
                     }));
             options.AddPolicy("password-reset-request", context =>
+                RateLimitPartition.GetFixedWindowLimiter(
+                    context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+                    _ => new FixedWindowRateLimiterOptions
+                    {
+                        PermitLimit = 5,
+                        Window = TimeSpan.FromMinutes(15),
+                        QueueLimit = 0
+                    }));
+            options.AddPolicy("email-verification-request", context =>
                 RateLimitPartition.GetFixedWindowLimiter(
                     context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
                     _ => new FixedWindowRateLimiterOptions
