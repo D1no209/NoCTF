@@ -21,6 +21,34 @@ Frontend/reverse proxy
 `deploy/docker-compose.single.yml` 为全合一。生产环境可按负载运行单 API、N Worker、N Runner，
 或组合 API+Worker/Worker+Runner 等；N 表示多个进程或容器，不是在一个进程中重复注册角色。
 
+## CI 容器镜像
+
+推送到 `main` 时，GitHub Actions 先运行唯一的 `test` Job。测试通过后，
+`publish-images` Job 使用仓库根目录作为构建上下文和 `backend/Dockerfile` 发布以下镜像：
+
+- `ghcr.io/<owner>/<repo>-api`
+- `ghcr.io/<owner>/<repo>-worker`
+- `ghcr.io/<owner>/<repo>-runner`
+- `ghcr.io/<owner>/<repo>-host`
+
+每个镜像同时发布 `latest`、程序集预发布版本（例如 `0.1.0-alpha.97`）和
+`sha-<完整提交哈希>` 标签。API 与 Host target 会先执行 Nuxt 静态生成，再把
+`.output/public` 放入发布目录的 `wwwroot`；Worker 与 Runner 镜像不携带无用的前端文件。
+部署清单应固定版本或提交标签，不能以 `latest` 作为供应链身份。
+
+GHCR 使用工作流内置的 `GITHUB_TOKEN`。若仓库配置了以下 Actions Variables 与 Secrets，
+同一构建还会推送到自定义 Registry；未配置 `CUSTOM_REGISTRY` 时相关校验、登录和推送均跳过：
+
+| 类型 | 名称 | 用途 |
+| --- | --- | --- |
+| Variable | `CUSTOM_REGISTRY` | Registry 主机名和可选端口，不含协议或路径 |
+| Variable | `CUSTOM_REGISTRY_NAMESPACE` | 可选命名空间；未配置时使用 GitHub 仓库所有者 |
+| Secret | `CUSTOM_REGISTRY_USERNAME` | 自定义 Registry 用户名 |
+| Secret | `CUSTOM_REGISTRY_PASSWORD` | 自定义 Registry 密码或访问令牌 |
+
+自定义 Registry 镜像名为
+`<registry>/<namespace>/<repo>-{api,worker,runner,host}`，标签与 GHCR 完全一致。
+
 仓库中的第三方构建基础镜像、PostgreSQL、Redis、MinIO 与 MinIO Client 均同时固定可读版本标签和
 多架构 manifest digest；Kompose 固定版本下载后必须以官方发布的 SHA-256 校验通过才能执行。依赖更新
 必须在一次审阅中同时替换版本与 digest，并通过部署架构门禁，禁止 `latest` 或只有可变 tag 的外部镜像。
