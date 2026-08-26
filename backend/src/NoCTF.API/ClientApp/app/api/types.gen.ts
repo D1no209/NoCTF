@@ -802,6 +802,7 @@ export type NoCtfapiEndpointsChallengesChallengeResponse = {
     maximumFlagAttempts?: number | null;
     acceptedFlagAttempts?: number | null;
     remainingFlagAttempts?: number | null;
+    usesDynamicFlag?: boolean;
 };
 
 export type NoCtfapiEndpointsChallengesGetChallengeRequest = {

@@ -31,7 +31,8 @@ public sealed record ChallengeResponse(
     LeaderboardDataScopeProtocol DataScope = LeaderboardDataScopeProtocol.Live,
     int? MaximumFlagAttempts = null,
     int? AcceptedFlagAttempts = null,
-    int? RemainingFlagAttempts = null);
+    int? RemainingFlagAttempts = null,
+    bool UsesDynamicFlag = false);
 
 public sealed record ChallengeListResponse(
     IReadOnlyList<ChallengeResponse> Items,
@@ -66,7 +67,8 @@ internal static class ChallengeMapper
             ScoreboardProtocolMapper.ToProtocol(dataScope),
             attemptBudget?.Maximum,
             attemptBudget?.Accepted,
-            attemptBudget?.Remaining);
+            attemptBudget?.Remaining,
+            view.UsesDynamicFlag);
 
     public static ChallengeListResponse ToListResponse(
         IReadOnlyList<ChallengeView> views,
