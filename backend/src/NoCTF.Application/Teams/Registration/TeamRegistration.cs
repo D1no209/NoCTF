@@ -171,8 +171,8 @@ public sealed class GetTeam(ITeamRegistrationStore store)
 
 public sealed class GetMyTeam(ITeamRegistrationStore store)
 {
-    public Task<TeamView?> ExecuteAsync(Guid competitionId, Guid userId, bool includePending, CancellationToken ct = default) =>
-        store.FindForUserAsync(competitionId, userId, includePending, ct);
+    public Task<TeamView?> ExecuteAsync(Guid competitionId, Guid userId, CancellationToken ct = default) =>
+        store.FindForUserAsync(competitionId, userId, includePending: true, ct);
 }
 
 public sealed class UpdateTeam(ITeamRegistrationStore store)
