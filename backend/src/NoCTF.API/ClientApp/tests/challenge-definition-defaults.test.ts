@@ -31,7 +31,7 @@ describe('challenge definition defaults', () => {
     expect(editPage).toContain('form.definitionJson = value.definitionJson ??')
     expect(editPage).toContain("form.mode = value.mode ?? 'Ctf'")
     expect(createPage).toContain('normalizeDefinitionJson(mode.value, definitionJson.value)')
-    expect(editPage).toContain('normalizeDefinitionJson(form.mode, form.definitionJson)')
+    expect(editPage).toContain('normalizeDefinitionJson(form.mode, currentDefinition)')
   })
 
   test('normalizes submission JSON with the active schema version', () => {
@@ -65,7 +65,7 @@ describe('challenge definition defaults', () => {
     expect(submit).not.toContain("definitionJson.value = ''")
   })
 
-  test('offers explicit current-mode repair actions without silently saving', async () => {
+  test('offers explicit repair and in-place save actions for definition editors', async () => {
     const competitionEditor = await Bun.file(
       new URL('../app/components/admin/CompetitionModeConfigEditor.vue', import.meta.url),
     ).text()
@@ -79,7 +79,10 @@ describe('challenge definition defaults', () => {
     expect(templatePage).toContain('function resetDefinitionToCurrentMode(): void')
     expect(templatePage).toContain('form.definitionJson = defaultDefinitionJson(form.mode)')
     expect(templatePage).toContain("$t('重置为当前模式默认题目定义')")
-    expect(templatePage).toContain("$t('重置后请返回基本信息保存修改')")
+    expect(templatePage).toContain('data-testid="runtime-definition-save"')
+    expect(templatePage).toContain('data-testid="mode-definition-save"')
+    expect(templatePage).toContain('serializeDefinition(form.mode, definitionModel.value)')
+    expect(templatePage).not.toContain("$t('重置后请返回基本信息保存修改')")
   })
 
   test('localizes legacy start-gate schema failures and retains challenge navigation', async () => {

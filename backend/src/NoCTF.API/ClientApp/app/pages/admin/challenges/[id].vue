@@ -30,7 +30,7 @@ import type {
   NoCtfapiEndpointsAdministrationChallengeBankRandomAttachmentBatchFailureResponse,
 } from '~/api'
 import { challengeTemplateWriteErrorMessage } from '~/lib/challenge-template-error'
-import { defaultDefinitionJson, FlagSource, normalizeDefinitionJson } from '~/utils/game-config'
+import { defaultDefinitionJson, FlagSource, normalizeDefinitionJson, serializeDefinition } from '~/utils/game-config'
 
 definePageMeta({ middleware: 'auth' })
 
@@ -128,7 +128,13 @@ async function loadTemplate(): Promise<void> {
 
 async function save(): Promise<void> {
   if (!template.value) return
-  const normalizedDefinition = normalizeDefinitionJson(form.mode, form.definitionJson)
+  // Read directly from the structured editor model. Its JSON bridge is watched,
+  // so relying only on form.definitionJson can miss the latest edit when Save is
+  // clicked in the same interaction cycle.
+  const currentDefinition = definitionModel.value
+    ? serializeDefinition(form.mode, definitionModel.value)
+    : form.definitionJson
+  const normalizedDefinition = normalizeDefinitionJson(form.mode, currentDefinition)
   if (!normalizedDefinition) {
     toast.error(translate('题目定义格式无效,请检查题目定义配置'))
     return
@@ -683,11 +689,13 @@ onMounted(() => {
                   </AlertDescription>
                 </Alert>
                 <FieldGroup v-else-if="definitionModel">
-                  <div v-if="!isDeleted" class="flex flex-wrap items-center gap-2">
+                  <div v-if="!isDeleted" class="flex flex-wrap items-center justify-between gap-2">
                     <Button type="button" variant="outline" size="sm" @click="resetDefinitionToCurrentMode">
                       <RotateCcw data-icon="inline-start" /> {{ $t('重置为当前模式默认题目定义') }}
                     </Button>
-                    <span class="text-xs text-muted-foreground">{{ $t('重置后请返回基本信息保存修改') }}</span>
+                    <Button data-testid="runtime-definition-save" type="button" size="sm" :disabled="saving" @click="save">
+                      <Spinner v-if="saving" data-icon="inline-start" /> {{ $t('保存修改') }}
+                    </Button>
                   </div>
                   <DefinitionRuntimeSection :model="definitionModel" :mode="form.mode" :disabled="isDeleted" />
                   <FieldDescription>{{ $t('Runtime 定义修改对未来启动的实例生效。') }}</FieldDescription>
@@ -708,11 +716,13 @@ onMounted(() => {
                   </AlertDescription>
                 </Alert>
                 <FieldGroup v-else-if="definitionModel">
-                  <div v-if="!isDeleted" class="flex flex-wrap items-center gap-2">
+                  <div v-if="!isDeleted" class="flex flex-wrap items-center justify-between gap-2">
                     <Button type="button" variant="outline" size="sm" @click="resetDefinitionToCurrentMode">
                       <RotateCcw data-icon="inline-start" /> {{ $t('重置为当前模式默认题目定义') }}
                     </Button>
-                    <span class="text-xs text-muted-foreground">{{ $t('重置后请返回基本信息保存修改') }}</span>
+                    <Button data-testid="mode-definition-save" type="button" size="sm" :disabled="saving" @click="save">
+                      <Spinner v-if="saving" data-icon="inline-start" /> {{ $t('保存修改') }}
+                    </Button>
                   </div>
                   <Alert v-if="hasModeDefinition && runtimeDisabled">
                     <AlertDescription>{{ $t('运行环境未启用时,以下配置不会生效。') }}</AlertDescription>

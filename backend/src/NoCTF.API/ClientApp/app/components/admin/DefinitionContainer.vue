@@ -150,6 +150,7 @@ const hasSecurity = computed(() => {
             :disabled="disabled"
             @update:model-value="definition.security.capDrop = $event"
           />
+          <FieldDescription>{{ $t('启用任意安全选项时,平台会自动加入 ALL 以满足容器能力基线。') }}</FieldDescription>
         </Field>
         <Field>
           <FieldLabel>{{ $t('增加的能力(cap-add)') }}</FieldLabel>
