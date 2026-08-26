@@ -583,21 +583,30 @@ onMounted(() => {
           </div>
         </div>
 
-        <Tabs default-value="basic">
-          <TabsList>
-            <TabsTrigger value="basic">{{ $t('基本信息') }}</TabsTrigger>
-            <TabsTrigger value="runtime">{{ $t('运行环境') }}</TabsTrigger>
-            <TabsTrigger value="definition">{{ $t('模式定义') }}</TabsTrigger>
-            <TabsTrigger value="attachments"> {{ $t('附件') }} <Badge variant="secondary" class="ml-1">{{ attachments.length }}</Badge>
-            </TabsTrigger>
-            <TabsTrigger value="flags">
-              Flags
-              <Badge variant="secondary" class="ml-1">{{ flags.length }}</Badge>
-            </TabsTrigger>
-            <TabsTrigger value="permissions">{{ $t('权限') }}</TabsTrigger>
-          </TabsList>
+        <Tabs
+          default-value="basic"
+          orientation="vertical"
+          class="grid items-start gap-6 lg:grid-cols-[14rem_minmax(0,1fr)]"
+        >
+          <aside class="border-b pb-4 lg:sticky lg:top-20 lg:border-r lg:border-b-0 lg:pr-4 lg:pb-0">
+            <TabsList class="grid h-auto w-full grid-cols-2 items-stretch gap-1 bg-transparent p-0 sm:grid-cols-3 lg:flex lg:flex-col">
+              <TabsTrigger value="basic" class="w-full justify-start px-3 py-2">{{ $t('基本信息') }}</TabsTrigger>
+              <TabsTrigger value="runtime" class="w-full justify-start px-3 py-2">{{ $t('运行环境') }}</TabsTrigger>
+              <TabsTrigger value="definition" class="w-full justify-start px-3 py-2">{{ $t('模式定义') }}</TabsTrigger>
+              <TabsTrigger value="attachments" class="w-full justify-start px-3 py-2">
+                {{ $t('附件') }}
+                <Badge variant="secondary" class="ml-auto">{{ attachments.length }}</Badge>
+              </TabsTrigger>
+              <TabsTrigger value="flags" class="w-full justify-start px-3 py-2">
+                Flags
+                <Badge variant="secondary" class="ml-auto">{{ flags.length }}</Badge>
+              </TabsTrigger>
+              <TabsTrigger value="permissions" class="w-full justify-start px-3 py-2">{{ $t('权限') }}</TabsTrigger>
+            </TabsList>
+          </aside>
 
-          <TabsContent value="basic">
+          <div class="min-w-0">
+          <TabsContent value="basic" class="mt-0">
             <Card>
               <CardContent class="pt-6">
                 <form @submit.prevent="save">
@@ -662,7 +671,7 @@ onMounted(() => {
             </Card>
           </TabsContent>
 
-          <TabsContent value="runtime">
+          <TabsContent value="runtime" class="mt-0">
             <Card>
               <CardContent class="pt-6">
                 <Alert v-if="definitionParseFailed" variant="destructive">
@@ -687,7 +696,7 @@ onMounted(() => {
             </Card>
           </TabsContent>
 
-          <TabsContent value="definition">
+          <TabsContent value="definition" class="mt-0">
             <Card>
               <CardContent class="pt-6">
                 <Alert v-if="definitionParseFailed" variant="destructive">
@@ -734,7 +743,7 @@ onMounted(() => {
             </Card>
           </TabsContent>
 
-          <TabsContent value="attachments">
+          <TabsContent value="attachments" class="mt-0">
             <Card>
               <CardHeader class="gap-4">
                 <div class="flex flex-wrap items-center justify-between gap-4">
@@ -863,7 +872,7 @@ onMounted(() => {
             </Card>
           </TabsContent>
 
-          <TabsContent value="flags">
+          <TabsContent value="flags" class="mt-0">
             <Card>
               <CardHeader class="flex flex-row items-center justify-between gap-4">
                 <div class="flex items-center gap-2">
@@ -971,7 +980,7 @@ onMounted(() => {
             </Card>
           </TabsContent>
 
-          <TabsContent value="permissions">
+          <TabsContent value="permissions" class="mt-0">
             <div class="grid gap-6 lg:grid-cols-2">
               <Card>
                 <CardHeader>
@@ -1028,6 +1037,7 @@ onMounted(() => {
               </Card>
             </div>
           </TabsContent>
+          </div>
         </Tabs>
       </template>
     </template>
