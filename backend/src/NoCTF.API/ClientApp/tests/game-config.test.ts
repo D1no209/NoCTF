@@ -160,6 +160,20 @@ describe('container security drafts', () => {
     if (parsed?.runtime?.definition.kind !== 'container') throw new Error('Expected parsed container definition')
     expect(parsed.runtime.definition.security).toEqual(model.runtime.definition.security)
   })
+
+  test('adds the required capability baseline to explicit security drafts', () => {
+    const model = emptyDefinition('Ctf')
+    model.runtime = emptyRuntimeTemplate('Ctf')
+    if (model.runtime.definition.kind !== 'container') throw new Error('Expected container definition')
+    model.runtime.definition.security.noNewPrivileges = true
+
+    const serialized = JSON.parse(serializeDefinition('Ctf', model))
+
+    expect(serialized.runtime.definition.security).toEqual({
+      noNewPrivileges: true,
+      capDrop: ['ALL'],
+    })
+  })
 })
 
 describe('AWDP patch upload limits', () => {

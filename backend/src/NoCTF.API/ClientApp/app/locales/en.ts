@@ -1136,6 +1136,7 @@ export const englishMessages: Record<string, string> = {
   "移除第 {index} 项": "Remove item {index}",
   "移除成员失败": "Failed to remove member",
   "移除的能力(cap-drop)": "Capability to remove (cap-drop)",
+  "启用任意安全选项时,平台会自动加入 ALL 以满足容器能力基线。": "When any security option is enabled, the platform automatically adds ALL to satisfy the container capability baseline.",
   "已保存": "saved",
   "已驳回": "Dismissed",
   "已驳回作弊事件": "Cheating incident dismissed",

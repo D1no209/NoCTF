@@ -471,13 +471,27 @@ function serializeUrlBinding(binding: UrlBindingModel): JsonObject {
 }
 
 function serializeSecurity(security: SecurityModel): JsonObject | null {
+  const capDrop = security.capDrop.map(value => value.trim()).filter(Boolean)
+  const capAdd = security.capAdd.map(value => value.trim()).filter(Boolean)
+  const hasExplicitSecurity = security.noNewPrivileges
+    || security.readonlyRootfs
+    || security.runAsNonRoot
+    || capDrop.length > 0
+    || capAdd.length > 0
+  if (!hasExplicitSecurity) return null
+
+  // The backend accepts an explicit security object only when the complete
+  // capability baseline is present. Keep the compatibility default omitted,
+  // but make every explicitly configured security draft valid by construction.
+  if (!capDrop.some(value => value.toUpperCase() === 'ALL')) capDrop.unshift('ALL')
+
   const obj: JsonObject = {}
   if (security.noNewPrivileges) obj.noNewPrivileges = true
   if (security.readonlyRootfs) obj.readonlyRootfs = true
   if (security.runAsNonRoot) obj.runAsNonRoot = true
-  putStringArray(obj, 'capDrop', security.capDrop)
-  putStringArray(obj, 'capAdd', security.capAdd)
-  return Object.keys(obj).length > 0 ? obj : null
+  putStringArray(obj, 'capDrop', capDrop)
+  putStringArray(obj, 'capAdd', capAdd)
+  return obj
 }
 
 function serializeRuntimeDefinition(definition: RuntimeDefinitionModel): JsonObject {
