@@ -47,7 +47,7 @@ function audienceLabel(notification: Notification): string {
 function categoryLabel(notification: Notification): string {
   if (notification.kind === 'QuestionOpened' || notification.kind === 'QuestionStatusChanged' || notification.kind === 'Message')
     return translate("咨询")
-  if (notification.kind === 'TeamBanned' || notification.kind === 'TeamBanCorrected' || notification.kind === 'TeamRegistrationChanged')
+  if (notification.kind === 'TeamBanned' || notification.kind === 'TeamBanCorrected' || notification.kind === 'TeamBanAppealSubmitted' || notification.kind === 'TeamRegistrationChanged')
     return translate("队伍")
   if (notification.kind === 'GameplayFactAdjudicated') return translate("评测")
   if (notification.kind === 'RuntimeStateChanged') return translate("环境")

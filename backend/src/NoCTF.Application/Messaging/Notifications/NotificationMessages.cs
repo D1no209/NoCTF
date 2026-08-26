@@ -56,6 +56,13 @@ public sealed record TeamBanCorrected(
     Guid BanEventId,
     DateTimeOffset CorrectedAt);
 
+public sealed record TeamBanAppealSubmitted(
+    Guid CompetitionId,
+    Guid AppealEventId,
+    Guid TeamId,
+    string TeamName,
+    DateTimeOffset SubmittedAt);
+
 public sealed record DeliverCompetitionQuestionNotification(
     Guid CompetitionId,
     Guid ThreadRootId,

@@ -12824,6 +12824,7 @@
           "TeamNotFound",
           "CompetitionFinished",
           "TeamLocked",
+          "TeamBanned",
           "TeamConflict",
           "TeamReviewConflict",
           "CompetitionActive",
@@ -12841,6 +12842,7 @@
           "TeamNotFound",
           "CompetitionFinished",
           "TeamLocked",
+          "TeamBanned",
           "TeamConflict",
           "TeamReviewConflict",
           "CompetitionActive",
@@ -13526,6 +13528,7 @@
           "TeamBanned",
           "CheatIncidentDetected",
           "TeamBanCorrected",
+          "TeamBanAppealSubmitted",
           "PlatformAuditExported",
           "UserAccountLifecycleChanged",
           "CompetitionForceDeleted"
@@ -13547,6 +13550,7 @@
           "TeamBanned",
           "CheatIncidentDetected",
           "TeamBanCorrected",
+          "TeamBanAppealSubmitted",
           "PlatformAuditExported",
           "UserAccountLifecycleChanged",
           "CompetitionForceDeleted"

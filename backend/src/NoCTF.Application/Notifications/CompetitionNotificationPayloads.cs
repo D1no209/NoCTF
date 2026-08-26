@@ -48,6 +48,13 @@ public sealed record TeamBanCorrectedPayload(
     string TeamName,
     DateTimeOffset CorrectedAt);
 
+public sealed record TeamBanAppealSubmittedPayload(
+    Guid CompetitionId,
+    Guid AppealEventId,
+    Guid TeamId,
+    string TeamName,
+    DateTimeOffset SubmittedAt);
+
 public sealed record CompetitionQuestionActivityPayload(
     Guid CompetitionId,
     Guid ThreadRootId,

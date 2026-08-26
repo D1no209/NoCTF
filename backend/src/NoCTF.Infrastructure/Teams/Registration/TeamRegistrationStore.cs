@@ -334,6 +334,7 @@ public sealed class TeamRegistrationStore(
         var entity = await db.Teams.SingleOrDefaultAsync(x => x.Id == command.TeamId
             && x.CompetitionId == command.CompetitionId && x.DeletedAt == null, ct);
         if (entity is null) return new(null, TeamRegistrationFailure.TeamNotFound);
+        if (entity.IsBanned) return new(null, TeamRegistrationFailure.TeamBanned);
         if (entity.IsLocked) return new(null, TeamRegistrationFailure.TeamLocked);
         entity.Name = name;
         await events.RecordAsync(new(
@@ -364,6 +365,7 @@ public sealed class TeamRegistrationStore(
         var entity = await db.Teams.SingleOrDefaultAsync(x => x.Id == teamId
             && x.CompetitionId == competitionId && x.DeletedAt == null, ct);
         if (entity is null) return TeamRegistrationFailure.TeamNotFound;
+        if (entity.IsBanned) return TeamRegistrationFailure.TeamBanned;
         entity.DeletedAt = deletedAt;
         await events.RecordAsync(new(
             competitionId,

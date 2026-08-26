@@ -29,6 +29,7 @@ const registrationMessages = {
   TeamNotFound: '队伍不存在。',
   CompetitionFinished: '比赛已结束。',
   TeamLocked: '队伍当前已锁定。',
+  TeamBanned: '队伍封禁期间不可变更组织信息。',
   TeamConflict: '队伍信息已被更新，请重试。',
   TeamReviewConflict: '队伍审核状态已发生变化。',
   CompetitionActive: '比赛进行中，不能执行此队伍操作。',

@@ -351,6 +351,10 @@ function setAppealOpen(open: boolean) {
         </CardContent>
       </Card>
 
+      <Alert v-if="team.isBanned" variant="destructive">
+        <AlertDescription>{{ $t('队伍封禁期间不可修改队名、成员、队长、邀请码或解散队伍。') }}</AlertDescription>
+      </Alert>
+
       <Card>
         <CardHeader>
           <CardTitle class="text-base">{{ $t('成员（{count}）', { count: team.memberIds?.length ?? 0 }) }}</CardTitle>
@@ -360,13 +364,13 @@ function setAppealOpen(open: boolean) {
           <TeamMembers
             :competition-id="competitionId"
             :team="team"
-            :can-manage="isCaptain"
+            :can-manage="isCaptain && !team.isBanned"
             @changed="load"
           />
         </CardContent>
       </Card>
 
-      <Card v-if="isCaptain">
+      <Card v-if="isCaptain && !team.isBanned">
         <CardHeader>
           <CardTitle class="text-base">{{ $t('邀请成员') }}</CardTitle>
         </CardHeader>
@@ -384,7 +388,7 @@ function setAppealOpen(open: boolean) {
         </CardContent>
       </Card>
 
-      <Card>
+      <Card v-if="!team.isBanned">
         <CardHeader>
           <CardTitle class="text-base">{{ $t('队伍管理') }}</CardTitle>
         </CardHeader>

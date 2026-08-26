@@ -42,6 +42,8 @@ public sealed class TeamMembershipStore(
             ct);
         if (team is null)
             return TeamMembershipFailure.TeamNotFound;
+        if (team.IsBanned)
+            return TeamMembershipFailure.TeamBanned;
         if (!await db.Users.AsNoTracking().AnyAsync(user => user.Id == userId, ct))
             return TeamMembershipFailure.MemberNotFound;
         if (team.MemberIds.Contains(userId))
@@ -93,6 +95,8 @@ public sealed class TeamMembershipStore(
         var team = await LoadAsync(competitionId, teamId, ct);
         if (team is null)
             return (null, TeamMembershipFailure.TeamNotFound);
+        if (team.IsBanned)
+            return (null, TeamMembershipFailure.TeamBanned);
         if (team.CaptainId != actorId && !IsManager(competition, actorId))
             return (null, TeamMembershipFailure.TeamForbidden);
 
@@ -130,6 +134,8 @@ public sealed class TeamMembershipStore(
         var team = await LoadAsync(competitionId, teamId, ct);
         if (team is null)
             return TeamMembershipFailure.TeamNotFound;
+        if (team.IsBanned)
+            return TeamMembershipFailure.TeamBanned;
         if (team.CaptainId == targetUserId)
             return TeamMembershipFailure.CaptainCannotBeRemoved;
         if (team.CaptainId != actorId && !IsManager(competition, actorId))
@@ -174,6 +180,8 @@ public sealed class TeamMembershipStore(
             ct);
         if (team is null)
             return TeamMembershipFailure.MembershipNotFound;
+        if (team.IsBanned)
+            return TeamMembershipFailure.TeamBanned;
         if (team.CaptainId == userId)
             return TeamMembershipFailure.CaptainMustTransfer;
 
@@ -212,6 +220,8 @@ public sealed class TeamMembershipStore(
         var team = await LoadAsync(competitionId, teamId, ct);
         if (team is null)
             return TeamMembershipFailure.TeamNotFound;
+        if (team.IsBanned)
+            return TeamMembershipFailure.TeamBanned;
         if (team.CaptainId != actorId)
             return TeamMembershipFailure.CaptainOnly;
         if (!team.MemberIds.Contains(newCaptainId))

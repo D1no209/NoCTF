@@ -66,6 +66,9 @@ public sealed class TeamBanAppealPersistenceTests
                 "We request a private review of the moderation decision.",
                 fixture.Now.AddMinutes(2)), cancellationToken);
             await Assert.That(submitted.Succeeded).IsTrue();
+            var appealMessage = outbox.Published.OfType<TeamBanAppealSubmitted>().Single();
+            await Assert.That(appealMessage.TeamId).IsEqualTo(fixture.TeamId);
+            await Assert.That(appealMessage.CompetitionId).IsEqualTo(fixture.CompetitionId);
             var duplicate = await store.SubmitAsync(new(
                 fixture.CompetitionId,
                 fixture.CaptainId,

@@ -170,6 +170,28 @@ public sealed class CompetitionNotificationDeliveryPersistenceTests
                 && item.ContentJson.Contains($"cheat-incident:{message.GameplayFactId:N}")
                 && !item.ContentJson.Contains("flag", StringComparison.OrdinalIgnoreCase)))
                 .IsTrue();
+
+            var appeal = new TeamBanAppealSubmitted(
+                competitionId,
+                Guid.CreateVersion7(),
+                Guid.CreateVersion7(),
+                "Appealing team",
+                now.AddSeconds(1));
+            await CompetitionNotificationMessageHandlers.Handle(appeal, db, delivery, ct);
+            await CompetitionNotificationMessageHandlers.Handle(appeal, db, delivery, ct);
+            var appealNotifications = await db.Notifications.AsNoTracking()
+                .Where(item => item.Kind == NotificationKind.TeamBanAppealSubmitted)
+                .ToArrayAsync(ct);
+            await Assert.That(appealNotifications).Count().IsEqualTo(4);
+            await Assert.That(appealNotifications.Select(item => item.TargetId)).IsEquivalentTo([
+                administratorId,
+                ownerId,
+                managerId,
+                judgeId
+            ]);
+            await Assert.That(appealNotifications.All(item =>
+                item.ContentJson.Contains($"team-ban-appeal:{appeal.AppealEventId:N}")))
+                .IsTrue();
         });
     }
 

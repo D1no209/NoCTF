@@ -214,6 +214,7 @@ interface NotificationTargetContext {
   challengeId: string | null
   questionId: string | null
   gameplayFactId: string | null
+  appealEventId: string | null
 }
 
 type NotificationTargetResolver = (context: NotificationTargetContext) => string
@@ -274,6 +275,9 @@ const notificationTargetResolvers = {
   TeamBanCorrected: context => context.competitionId
     ? `/competitions/${context.competitionId}/my/team#ban-appeal`
     : context.detailPath,
+  TeamBanAppealSubmitted: context => context.competitionId
+    ? `/admin/competitions/${context.competitionId}/teams?appeal=${context.appealEventId ?? ''}#ban-appeals`
+    : context.detailPath,
   PlatformAuditExported: context => context.detailPath,
   UserAccountLifecycleChanged: context => context.detailPath,
   CompetitionForceDeleted: context => context.detailPath,
@@ -299,6 +303,7 @@ export function notificationTargetPath(
       ?? notificationContentId(notification, 'threadRootId')
       ?? (kind === 'QuestionOpened' ? notification.id ?? null : null),
     gameplayFactId: notificationContentId(notification, 'gameplayFactId'),
+    appealEventId: notificationContentId(notification, 'appealEventId'),
   }
   return notificationTargetResolvers[kind]?.(context) ?? detailPath
 }
@@ -362,6 +367,7 @@ export function notificationActionLabel(
     TeamBanned: '查看封禁与申诉',
     CheatIncidentDetected: '查看作弊事件',
     TeamBanCorrected: '查看封禁与申诉',
+    TeamBanAppealSubmitted: '查看封禁申诉',
     PlatformAuditExported: '查看通知详情',
     UserAccountLifecycleChanged: '查看通知详情',
     CompetitionForceDeleted: '查看通知详情',
@@ -387,7 +393,7 @@ export function notificationText(
     RuntimeStateChanged: translate('{challenge}的运行环境状态已变更', { challenge }), StartGateFailed: translate('竞赛{title}启动检查未通过', { title }), ManagementFailure: translate('竞赛{title}出现管理侧故障', { title }),
     BloodAwarded: translate('恭喜，你在{challenge}拿下了血榜名次', { challenge }), ChallengePublished: translate('竞赛{title}发布了新题目{challenge}', { title, challenge }), HintPublished: translate('{challenge}发布了新提示', { challenge }),
     TeamBanned: translate('你的队伍{team}已被封禁', { team }), QuestionOpened: translate('竞赛{title}有新的咨询', { title }), Message: translate('你的咨询已有新回复'),
-    QuestionStatusChanged: translate("你的咨询状态已变更"), CheatIncidentDetected: translate("检测到疑似作弊行为"), TeamBanCorrected: translate("队伍封禁已被纠正"), PlatformAuditExported: translate("平台审计归档已导出"),
+    QuestionStatusChanged: translate("你的咨询状态已变更"), CheatIncidentDetected: translate("检测到疑似作弊行为"), TeamBanCorrected: translate("队伍封禁已被纠正"), TeamBanAppealSubmitted: translate('队伍{team}提交了封禁申诉', { team }), PlatformAuditExported: translate("平台审计归档已导出"),
     UserAccountLifecycleChanged: translate("用户账号状态已变更"), CompetitionForceDeleted: translate("竞赛已被强制删除"), CompetitionAnnouncement: announcement,
   }
   return notification.kind ? templates[notification.kind] ?? translate('你有一条新通知') : translate('你有一条新通知')

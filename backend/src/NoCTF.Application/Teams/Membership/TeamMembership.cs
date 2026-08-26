@@ -8,6 +8,7 @@ public enum TeamMembershipFailure
     CompetitionNotFound,
     TeamNotFound,
     TeamForbidden,
+    TeamBanned,
     MembershipLocked,
     UserAlreadyRegistered,
     TeamFull,
