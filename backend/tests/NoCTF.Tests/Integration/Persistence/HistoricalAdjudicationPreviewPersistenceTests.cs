@@ -445,7 +445,6 @@ public sealed class HistoricalAdjudicationPreviewPersistenceTests
             Id = competitionChallengeId,
             CompetitionId = competitionId,
             ChallengeId = challengeId,
-            BaseScore = 100,
             IsPublished = true,
             RulesJson = "{}",
             UpdatedAt = now
@@ -716,7 +715,6 @@ public sealed class HistoricalAdjudicationPreviewPersistenceTests
             Id = competitionChallengeId,
             CompetitionId = competitionId,
             ChallengeId = challengeId,
-            BaseScore = 100,
             IsPublished = true,
             RulesJson = "{}",
             UpdatedAt = now

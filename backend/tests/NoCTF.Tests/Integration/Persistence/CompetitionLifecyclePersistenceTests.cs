@@ -26,7 +26,7 @@ public sealed class CompetitionLifecyclePersistenceTests
 {
     [Test]
     [Timeout(300_000)]
-    public async Task Start_gate_rejects_persisted_base_score_and_hint_cost_above_the_limit(
+    public async Task Start_gate_rejects_persisted_hint_cost_above_the_limit(
         CancellationToken cancellationToken)
     {
         await DockerIntegrationTest.RunAsync(async () =>
@@ -91,7 +91,6 @@ public sealed class CompetitionLifecyclePersistenceTests
                     Id = competitionChallengeId,
                     CompetitionId = competitionId,
                     ChallengeId = challengeId,
-                    BaseScore = ScoreValueLimits.MaximumConfiguredValue + 1,
                     IsPublished = true,
                     RulesJson = configurations.GetDefaultJson(GameMode.Ctf),
                     Hints =
@@ -128,10 +127,6 @@ public sealed class CompetitionLifecyclePersistenceTests
 
             await Assert.That(errors).IsNotNull();
             await Assert.That(errors!.Any(error =>
-                    error.Code == StartGateFailureCode.ChallengeRulesInvalid
-                    && error.Message.Contains("BaseScore", StringComparison.Ordinal)))
-                .IsTrue();
-            await Assert.That(errors.Any(error =>
                     error.Code == StartGateFailureCode.ChallengeRulesInvalid
                     && error.Message.Contains("Hint cost", StringComparison.Ordinal)))
                 .IsTrue();

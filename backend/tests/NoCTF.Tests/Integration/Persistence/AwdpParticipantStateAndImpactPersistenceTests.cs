@@ -120,7 +120,6 @@ public sealed class AwdpParticipantStatePersistenceTests
             CompetitionId = competitionId,
             ChallengeId = challengeId,
             IsPublished = true,
-            BaseScore = 100,
             RulesJson = "{\"schemaVersion\":4}",
             UpdatedAt = now
         });

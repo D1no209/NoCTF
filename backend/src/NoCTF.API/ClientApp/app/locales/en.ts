@@ -424,7 +424,6 @@ export const englishMessages: Record<string, string> = {
   "积分变化趋势": "Points change trend",
   "基本设置": "Basic settings",
   "基本信息": "Basic information",
-  "基础分": "Basic points",
   "基础信息": "Basic information",
   "基础信息已保存": "Basic information has been saved",
   "级别": "Level",

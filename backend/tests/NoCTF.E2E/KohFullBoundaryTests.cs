@@ -79,7 +79,7 @@ public sealed class KohFullBoundaryTests
             admin,
             HttpMethod.Post,
             $"/api/v1/admin/competitions/{competitionId}/challenges",
-            new { challengeId = template.GetProperty("id").GetGuid(), baseScore = 0, order = 0 },
+            new { challengeId = template.GetProperty("id").GetGuid(), order = 0 },
             HttpStatusCode.Created,
             cancellationToken);
         var competitionChallengeId = challenge.GetProperty("id").GetGuid();
@@ -100,7 +100,7 @@ public sealed class KohFullBoundaryTests
             admin,
             HttpMethod.Put,
             $"/api/v1/admin/competitions/{competitionId}/challenges/{competitionChallengeId}",
-            new { customTitle = (string?)null, baseScore = 0, order = 0, isPublished = true },
+            new { customTitle = (string?)null, order = 0, isPublished = true },
             HttpStatusCode.OK,
             cancellationToken);
 

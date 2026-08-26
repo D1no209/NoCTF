@@ -8,24 +8,9 @@ namespace NoCTF.Tests.Unit.Application;
 public sealed class CompetitionStartGateScoreLimitTests
 {
     [Test]
-    public async Task Start_rejects_a_persisted_base_score_above_the_configured_maximum()
-    {
-        var errors = await ValidateAsync(
-            ScoreValueLimits.MaximumConfiguredValue + 1,
-            [ScoreValueLimits.MaximumConfiguredValue]);
-
-        await Assert.That(errors.Any(error =>
-                error.Code == StartGateFailureCode.ChallengeRulesInvalid
-                && error.Message.Contains("BaseScore", StringComparison.Ordinal)))
-            .IsTrue();
-    }
-
-    [Test]
     public async Task Start_rejects_a_persisted_hint_cost_above_the_configured_maximum()
     {
-        var errors = await ValidateAsync(
-            ScoreValueLimits.MaximumConfiguredValue,
-            [ScoreValueLimits.MaximumConfiguredValue + 1]);
+        var errors = await ValidateAsync([ScoreValueLimits.MaximumConfiguredValue + 1]);
 
         await Assert.That(errors.Any(error =>
                 error.Code == StartGateFailureCode.ChallengeRulesInvalid
@@ -34,11 +19,9 @@ public sealed class CompetitionStartGateScoreLimitTests
     }
 
     [Test]
-    public async Task Start_accepts_base_score_and_hint_cost_at_the_configured_maximum()
+    public async Task Start_accepts_hint_cost_at_the_configured_maximum()
     {
-        var errors = await ValidateAsync(
-            ScoreValueLimits.MaximumConfiguredValue,
-            [ScoreValueLimits.MaximumConfiguredValue]);
+        var errors = await ValidateAsync([ScoreValueLimits.MaximumConfiguredValue]);
 
         await Assert.That(errors.Any(error =>
                 error.Code == StartGateFailureCode.ChallengeRulesInvalid))
@@ -46,7 +29,6 @@ public sealed class CompetitionStartGateScoreLimitTests
     }
 
     private static async Task<IReadOnlyList<StartGateError>> ValidateAsync(
-        long baseScore,
         IReadOnlyList<long> hintCosts)
     {
         var competitionId = Guid.CreateVersion7();
@@ -64,7 +46,6 @@ public sealed class CompetitionStartGateScoreLimitTests
                     configurations.GetDefaultJson(GameMode.Ctf),
                     configurations.GetDefaultDefinitionJson(GameMode.Ctf),
                     true,
-                    baseScore,
                     hintCosts)],
                 ApprovedTeamCount: 1,
                 MaxConcurrentRuntimeInstancesPerTeam: 0)),

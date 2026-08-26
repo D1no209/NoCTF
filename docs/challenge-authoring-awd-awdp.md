@@ -12,7 +12,7 @@ NoCTF 将“可复用题目模板”和“某场比赛中的题目”严格分�
 | --- | --- | --- |
 | 题库模板 `Challenge` | 题面、方向、附件、静态 Flag、Runtime 镜像与启动方式、Checker、动态 Flag 注入位置、AWDP 补丁入口 | 比赛 ID、队伍 ID、题目顺序、题目分值、比赛专属 Flag 前缀、Runner Pool |
 | 比赛配置 `Competition` | 轮次长度、硬化期、全局计分、默认 Checker 周期、AWDP 默认 Break/Fix 规则 | 镜像、容器命令、Checker 镜像、补丁脚本 |
-| 比赛题目 `CompetitionChallenge` | 自定义题目名称、顺序、发布状态、基础分、题目规则覆盖、比赛专属 Flag 模板 | Runtime Provider、Runner Pool、平台内部 UUID |
+| 比赛题目 `CompetitionChallenge` | 自定义题目名称、顺序、发布状态、题目规则覆盖、比赛专属 Flag 模板 | Runtime Provider、Runner Pool、平台内部 UUID |
 
 关键结论：
 

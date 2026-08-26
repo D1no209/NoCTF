@@ -90,7 +90,6 @@ public sealed class CompetitionHardDeletePersistenceTests
                     Id = competitionChallengeId,
                     CompetitionId = historicalCompetitionId,
                     ChallengeId = challengeId,
-                    BaseScore = 500,
                     IsPublished = true,
                     RulesJson = "{}",
                     UpdatedAt = now

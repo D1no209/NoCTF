@@ -85,7 +85,6 @@ public sealed class CompetitionEventPersistenceTests
                     Id = ids.CompetitionChallengeId,
                     CompetitionId = ids.CompetitionId,
                     ChallengeId = ids.ChallengeId,
-                    BaseScore = 500,
                     IsPublished = true,
                     RulesJson = "{}",
                     UpdatedAt = now,

@@ -26,7 +26,6 @@ definePageMeta({ middleware: 'auth' })
 const route = useRoute()
 const ccId = route.params.ccId as string
 const { competitionId, competition, canWrite } = useCompetitionAdmin()
-const isAwdp = computed(() => competition.value?.mode === 'Awdp')
 
 // ---- Challenge detail ----
 const challenge = ref<NoCtfapiEndpointsChallengesChallengeResponse | null>(null)
@@ -45,7 +44,6 @@ async function loadChallenge() {
 }
 
 // ---- Edit form ----
-const editBaseScore = ref(0)
 const editCustomTitle = ref('')
 const editOrder = ref(0)
 const editPublished = ref(false)
@@ -54,7 +52,6 @@ const savingEdit = ref(false)
 watch(challenge, (c) => {
   if (!c) return
   editCustomTitle.value = c.customTitle ?? ''
-  editBaseScore.value = c.baseScore ?? 0
   editOrder.value = c.order ?? 0
   editPublished.value = c.isPublished ?? false
 }, { immediate: true })
@@ -67,7 +64,6 @@ async function saveEdit() {
       path: { competitionId, competitionChallengeId: ccId },
       body: {
         customTitle: editCustomTitle.value.trim() || null,
-        baseScore: isAwdp.value ? 0 : editBaseScore.value,
         order: editOrder.value,
         isPublished: editPublished.value,
       },
@@ -286,16 +282,10 @@ onMounted(() => {
                     />
                     <FieldDescription>{{ $t('只修改本场比赛中的展示名称,不会更改题库模板') }}</FieldDescription>
                   </Field>
-                  <div class="grid gap-4 sm:grid-cols-2">
-                    <Field v-if="!isAwdp">
-                      <FieldLabel for="cc-score">{{ $t('基础分') }}</FieldLabel>
-                      <Input id="cc-score" v-model.number="editBaseScore" type="number" min="0" :readonly="!canWrite" />
-                    </Field>
-                    <Field>
-                      <FieldLabel for="cc-order">{{ $t('顺序') }}</FieldLabel>
-                      <Input id="cc-order" v-model.number="editOrder" type="number" min="0" :readonly="!canWrite" />
-                    </Field>
-                  </div>
+                  <Field>
+                    <FieldLabel for="cc-order">{{ $t('顺序') }}</FieldLabel>
+                    <Input id="cc-order" v-model.number="editOrder" type="number" min="0" :readonly="!canWrite" />
+                  </Field>
                   <Field orientation="horizontal">
                     <Switch id="cc-published" v-model="editPublished" :disabled="!canWrite" />
                     <FieldLabel for="cc-published" class="font-normal">{{ $t('发布该题目(对选手可见)') }}</FieldLabel>

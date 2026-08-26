@@ -406,7 +406,6 @@ public sealed class SynchronousArchivePersistenceTests
             Id = ids.CompetitionChallengeId,
             CompetitionId = ids.CompetitionId,
             ChallengeId = ids.ChallengeId,
-            BaseScore = 500,
             Order = 1,
             IsPublished = true,
             RulesJson = "{}",

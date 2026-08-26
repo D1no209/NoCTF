@@ -98,7 +98,6 @@ public sealed class UserAccountDeletionPersistenceTests
                     Id = competitionChallengeId,
                     CompetitionId = competitionId,
                     ChallengeId = challengeId,
-                    BaseScore = 100,
                     IsPublished = true,
                     RulesJson = "{}",
                     UpdatedAt = now

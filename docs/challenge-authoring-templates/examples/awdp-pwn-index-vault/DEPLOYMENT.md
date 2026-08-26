@@ -56,7 +56,7 @@ Runtime UUID 生成精确 Flag，并在 Provider 创建前覆盖注入 `FLAG`。
 ## 3. 添加到比赛
 
 1. 创建 AWDP 比赛并设置逻辑轮次与默认 Break/Fix 规则。
-2. 添加 `Index Vault`，可自定义本场显示名、顺序和基础分。
+2. 添加 `Index Vault`，可自定义本场显示名和顺序；Break/Fix 分值在比赛题目规则中配置。
 3. 在比赛题目规则中配置本场 Flag 模板与 `RequireBreakBeforeFix`。
 4. 确认 Worker/Runner 可以拉取两个镜像，再发布并开始比赛。
 

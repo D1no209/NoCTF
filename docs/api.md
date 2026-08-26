@@ -103,8 +103,8 @@ POST /api/v1/competitions/{competitionId}/challenges/{competitionChallengeId}/hi
 Hint unlock 返回 `202 Accepted`，响应只包含 `gameplayFactId`、`state` 和状态 URL；客户端通过 GameplayFact 状态与 Hint 查询获取最终结果。成功结果为 `Unlocked`，重复/拒绝使用强类型 Result/FailureCode。
 
 玩家 Challenge 列表/详情绝不返回 FlagId、正确答案、Flag 数量、RandomOne 候选附件数量/文件名、内部 Runtime 配置或 ObjectKey。All 的列表返回 AttachmentId、显示名、MIME、字节数；RandomOne 首次单数下载请求完成原子抽取后直接 302/stream 被选文件，客户端不能选择，之后固定返回同一附件。
-Blackout 不隐藏题面、附件、Runtime 或提交入口，但 Challenge 的 `baseScore` 返回 null，并随列表/
-详情返回同一 `leaderboardVisibility` 与 `dataScope`。
+Blackout 不隐藏题面、附件、Runtime 或提交入口；列表与详情返回同一
+`leaderboardVisibility` 与 `dataScope`，题目当前分值由模式规则和排行榜投影提供。
 
 ## Questions and announcements
 
@@ -340,7 +340,7 @@ GET  /api/v1/admin/competitions/{competitionId}/challenges/{competitionChallenge
 
 CompetitionChallenge create/update/delete/restore 的业务冲突统一返回强类型
 `CompetitionChallengeConflictResponse`。create/update 可携带最长 160 字符的 `customTitle`；
-空白值会规范化为 null，并回退显示题库模板标题。update body 必须包含完整的 BaseScore、Order、
+空白值会规范化为 null，并回退显示题库模板标题。update body 必须包含完整的 Order、
 IsPublished；delete/restore 不携带 expectedRevision。删除状态方向错误返回
 `LifecycleStateConflict`。restore 还会在同一事务内重验活动 Challenge
 template、Competition mode 与活动唯一约束。稳定 conflict code 为 `ResourceIdConflict`、

@@ -57,7 +57,6 @@ public sealed class ChallengeManagementStore(
             CompetitionId = command.CompetitionId,
             ChallengeId = command.ChallengeId,
             CustomTitle = command.CustomTitle,
-            BaseScore = command.BaseScore,
             Order = command.Order,
             RulesJson = configurationJson,
             UpdatedAt = command.CreatedAt
@@ -136,7 +135,6 @@ public sealed class ChallengeManagementStore(
             return new(null, ChallengeMutationFailure.ChallengeNotFound);
         var wasPublished = entity.IsPublished;
         var becamePublished = !wasPublished && command.IsPublished;
-        entity.BaseScore = command.BaseScore;
         entity.CustomTitle = command.CustomTitle;
         entity.Order = command.Order;
         entity.IsPublished = command.IsPublished;
@@ -322,7 +320,6 @@ public sealed class ChallengeManagementStore(
                 item.Instance.CustomTitle,
                 item.Template.Description,
                 item.Template.Direction,
-                item.Instance.BaseScore,
                 item.Instance.Order,
                 item.Instance.IsPublished,
                 item.Instance.DeletedAt,
@@ -341,7 +338,6 @@ public sealed class ChallengeManagementStore(
             instance.CustomTitle,
             template.Description,
             template.Direction,
-            instance.BaseScore,
             instance.Order,
             instance.IsPublished,
             instance.DeletedAt,
@@ -358,7 +354,6 @@ public sealed class ChallengeManagementStore(
             projection.CustomTitle,
             projection.Description,
             projection.Direction,
-            projection.BaseScore,
             projection.Order,
             projection.IsPublished,
             projection.DeletedAt,
@@ -374,7 +369,6 @@ public sealed class ChallengeManagementStore(
         string? CustomTitle,
         string? Description,
         string Direction,
-        long BaseScore,
         int Order,
         bool IsPublished,
         DateTimeOffset? DeletedAt,

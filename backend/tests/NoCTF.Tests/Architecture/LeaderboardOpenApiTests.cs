@@ -247,9 +247,7 @@ public sealed class LeaderboardOpenApiTests
             root,
             listProperties.GetProperty("items").GetProperty("items"));
         var challengeProperties = challenge.GetProperty("properties");
-        await Assert.That(challengeProperties.GetProperty("baseScore")
-                .GetProperty("nullable").GetBoolean())
-            .IsTrue();
+        await Assert.That(challengeProperties.TryGetProperty("baseScore", out _)).IsFalse();
         await Assert.That(challengeProperties.TryGetProperty("title", out _)).IsTrue();
         await Assert.That(challengeProperties.TryGetProperty("description", out _)).IsTrue();
         await Assert.That(challengeProperties.TryGetProperty("urls", out _)).IsTrue();

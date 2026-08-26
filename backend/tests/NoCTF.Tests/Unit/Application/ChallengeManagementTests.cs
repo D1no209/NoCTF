@@ -1,6 +1,5 @@
 using NoCTF.Application.Challenges.Configuration;
 using NoCTF.Application.Challenges.Management;
-using NoCTF.Application.Scoring;
 using NoCTF.Domain.Competitions;
 
 namespace NoCTF.Tests.Unit.Application;
@@ -23,20 +22,15 @@ public class ChallengeManagementTests
     }
 
     [Test]
-    [Arguments(-1L, 0, ChallengeMutationFailure.InvalidBaseScore)]
-    [Arguments(ScoreValueLimits.MaximumConfiguredValue + 1, 0, ChallengeMutationFailure.InvalidBaseScore)]
-    [Arguments(100L, -1, ChallengeMutationFailure.InvalidOrder)]
-    public async Task CreateChallenge_InvalidDefinition_ReturnsTypedFailure(
-        long baseScore,
-        int order,
-        ChallengeMutationFailure expectedFailure)
+    [Arguments(-1)]
+    public async Task CreateChallenge_InvalidOrder_ReturnsTypedFailure(int order)
     {
         var store = new Store();
 
         var result = await new CreateChallenge(store, new Catalog()).ExecuteAsync(
-            CreateCommand() with { BaseScore = baseScore, Order = order });
+            CreateCommand() with { Order = order });
 
-        await Assert.That(result.Failure).IsEqualTo(expectedFailure);
+        await Assert.That(result.Failure).IsEqualTo(ChallengeMutationFailure.InvalidOrder);
         await Assert.That(result.Challenge).IsNull();
         await Assert.That(store.CreateCalls).IsEqualTo(0);
     }
@@ -56,21 +50,6 @@ public class ChallengeManagementTests
         var result = await new CreateChallenge(store, new Catalog()).ExecuteAsync(CreateCommand());
 
         await Assert.That(result.Failure).IsEqualTo(expectedFailure);
-    }
-
-    [Test]
-    [Arguments(-1L)]
-    [Arguments(ScoreValueLimits.MaximumConfiguredValue + 1)]
-    public async Task UpdateChallenge_InvalidBaseScore_IsRejectedBeforeStore(long baseScore)
-    {
-        var store = new Store();
-
-        var result = await new UpdateChallenge(store).ExecuteAsync(
-            UpdateCommand() with { BaseScore = baseScore });
-
-        await Assert.That(result.Failure)
-            .IsEqualTo(ChallengeMutationFailure.InvalidBaseScore);
-        await Assert.That(store.MutationCalls).IsEqualTo(0);
     }
 
     [Test]
@@ -225,14 +204,12 @@ public class ChallengeManagementTests
         null,
         competitionId ?? Guid.NewGuid(),
         Guid.NewGuid(),
-        100,
         1,
         DateTimeOffset.UtcNow);
 
     private static UpdateCompetitionChallengeCommand UpdateCommand(Guid? competitionId = null) => new(
         competitionId ?? Guid.NewGuid(),
         Guid.NewGuid(),
-        100,
         2,
         true,
         DateTimeOffset.UtcNow);
@@ -247,7 +224,6 @@ public class ChallengeManagementTests
             null,
             "Description",
             "Web",
-            100,
             1,
             false,
             null,

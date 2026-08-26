@@ -14,14 +14,12 @@ public sealed class CompetitionChallengeProtocolTests
         await Assert.That(validator.Validate(new UpdateChallengeRequest
         {
             CustomTitle = "Finals Web",
-            BaseScore = 500,
             Order = 1,
             IsPublished = false
         }).IsValid).IsTrue();
         await Assert.That(validator.Validate(new UpdateChallengeRequest
         {
             CustomTitle = new string('x', 161),
-            BaseScore = 500,
             Order = 1,
             IsPublished = false
         }).IsValid).IsFalse();
@@ -35,7 +33,6 @@ public sealed class CompetitionChallengeProtocolTests
         var request = new CreateChallengeRequest
         {
             ChallengeId = Guid.NewGuid(),
-            BaseScore = 100,
             Order = 1
         };
 

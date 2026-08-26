@@ -425,7 +425,6 @@ public sealed class OwnershipTransferPersistenceTests
                     Guid.CreateVersion7(),
                     competitionId,
                     challengeId,
-                    500,
                     1,
                     now.AddMinutes(1)),
                 """{"schemaVersion":1}""",

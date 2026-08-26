@@ -15995,11 +15995,6 @@
           "direction": {
             "type": "string"
           },
-          "baseScore": {
-            "type": "integer",
-            "format": "int64",
-            "nullable": true
-          },
           "order": {
             "type": "integer",
             "format": "int32"
@@ -19945,11 +19940,6 @@
             "minLength": 0,
             "nullable": true
           },
-          "baseScore": {
-            "type": "integer",
-            "format": "int64",
-            "minimum": 0.0
-          },
           "order": {
             "type": "integer",
             "format": "int32",
@@ -20226,7 +20216,6 @@
         "additionalProperties": false,
         "required": [
           "customTitle",
-          "baseScore",
           "order",
           "isPublished"
         ],
@@ -20236,12 +20225,6 @@
             "maxLength": 160,
             "minLength": 0,
             "nullable": true
-          },
-          "baseScore": {
-            "type": "integer",
-            "format": "int64",
-            "minimum": 0.0,
-            "nullable": false
           },
           "order": {
             "type": "integer",

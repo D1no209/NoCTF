@@ -1,5 +1,4 @@
 using NoCTF.Application.Challenges.Configuration;
-using NoCTF.Application.Scoring;
 using NoCTF.Domain.Competitions;
 
 namespace NoCTF.Application.Challenges.Management;
@@ -8,7 +7,6 @@ public sealed record CreateCompetitionChallengeCommand(
     Guid? CompetitionChallengeId,
     Guid CompetitionId,
     Guid ChallengeId,
-    long BaseScore,
     int Order,
     DateTimeOffset CreatedAt,
     string? CustomTitle = null);
@@ -16,7 +14,6 @@ public sealed record CreateCompetitionChallengeCommand(
 public sealed record UpdateCompetitionChallengeCommand(
     Guid CompetitionId,
     Guid CompetitionChallengeId,
-    long BaseScore,
     int Order,
     bool IsPublished,
     DateTimeOffset UpdatedAt,
@@ -30,7 +27,6 @@ public sealed record ChallengeView(
     string? CustomTitle,
     string? Description,
     string Direction,
-    long BaseScore,
     int Order,
     bool IsPublished,
     DateTimeOffset? DeletedAt,
@@ -42,7 +38,6 @@ public enum ChallengeMutationFailure
 {
     InvalidChallengeId,
     InvalidTitle,
-    InvalidBaseScore,
     InvalidOrder,
     CompetitionNotFound,
     TemplateNotFound,
@@ -122,8 +117,6 @@ public sealed class CreateChallenge(
         var customTitle = CompetitionChallengeTitle.Normalize(command.CustomTitle);
         if (customTitle is { Length: > CompetitionChallengeTitle.MaximumLength })
             return new(null, ChallengeMutationFailure.InvalidTitle);
-        if (command.BaseScore is < 0 or > ScoreValueLimits.MaximumConfiguredValue)
-            return new(null, ChallengeMutationFailure.InvalidBaseScore);
         if (command.Order < 0)
             return new(null, ChallengeMutationFailure.InvalidOrder);
 
@@ -173,8 +166,6 @@ public sealed class UpdateChallenge(IChallengeManagementStore store)
         var customTitle = CompetitionChallengeTitle.Normalize(command.CustomTitle);
         if (customTitle is { Length: > CompetitionChallengeTitle.MaximumLength })
             return new(null, ChallengeMutationFailure.InvalidTitle);
-        if (command.BaseScore is < 0 or > ScoreValueLimits.MaximumConfiguredValue)
-            return new(null, ChallengeMutationFailure.InvalidBaseScore);
         if (command.Order < 0)
             return new(null, ChallengeMutationFailure.InvalidOrder);
         var result = await store.UpdateAsync(command with { CustomTitle = customTitle }, ct);
