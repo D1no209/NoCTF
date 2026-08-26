@@ -54,7 +54,12 @@ let unwatch: (() => void) | undefined
 
 const entries = computed(() => controlScreenPublicEntries(board.snapshot.value))
 const rankedEntries = computed(() => entries.value)
-const challenges = computed(() => controlScreenChallenges(board.catalog.value, board.schema.value, entries.value))
+const challenges = computed(() => controlScreenChallenges(
+  board.catalog.value,
+  board.schema.value,
+  entries.value,
+  board.snapshot.value?.currentChallengeScores,
+))
 const solveFeed = computed(() => controlScreenSolveFeed(board.catalog.value, board.schema.value, entries.value).slice(0, 10))
 const solvedChallengeCount = computed(() => challenges.value.filter(challenge => challenge.solveCount > 0).length)
 const totalSolveCount = computed(() => challenges.value.reduce((sum, challenge) => sum + challenge.solveCount, 0))
@@ -127,7 +132,7 @@ const bloodsByChallenge = computed(() => {
         : solve.bloodRank === 'Second' ? 'second' : 'third'
       const key = challengeKey(solve.competitionChallengeId)
       const list = map.get(key) ?? []
-      list.push({ label: bloodLabel(solve.bloodRank), teamName: solve.teamName, tone })
+      list.push({ label: bloodLabel(solve.bloodRank), teamName: solve.teamName, tone, points: solve.awardPoints })
       map.set(key, list)
   }
   for (const list of map.values()) list.sort((left, right) => bloodToneOrder[left.tone] - bloodToneOrder[right.tone])

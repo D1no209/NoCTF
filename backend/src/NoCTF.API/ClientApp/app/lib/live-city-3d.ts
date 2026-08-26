@@ -14,6 +14,7 @@ export interface LiveCityBlood {
   label: string
   teamName: string
   tone: 'first' | 'second' | 'third'
+  points: number
 }
 
 export interface LiveCityChallengeState {
@@ -219,7 +220,12 @@ export class LiveCityScene {
   private readonly comets: Comet[] = []
   private readonly dataColumns: DataColumn[] = []
   private readonly backdropGroup = new THREE.Group()
-  private readonly silhouetteMaterial = new THREE.MeshBasicMaterial({ color: '#0a0616' })
+  private readonly silhouetteMaterial = new THREE.MeshBasicMaterial({
+    color: '#0a0616',
+    transparent: true,
+    opacity: 0.96,
+    depthWrite: false,
+  })
   private readonly silhouetteEdgeMaterial = new THREE.LineBasicMaterial({
     color: COLOR_PURPLE,
     transparent: true,
@@ -531,7 +537,7 @@ export class LiveCityScene {
   ): BuildingRecord {
     const group = new THREE.Group()
     const variant = Math.floor(rand() * 3)
-    const height = 7 + (state.score / maxScore) * 26
+    const height = 12 + (state.score / maxScore) * 42
     const baseWidth = 4.6 + rand() * 2.4
     const baseDepth = 4.6 + rand() * 2.4
 
@@ -666,7 +672,7 @@ export class LiveCityScene {
     for (const blood of state.bloods.slice(0, 3)) {
       const badge = document.createElement('span')
       badge.className = `live-label-blood live-label-blood-${blood.tone}`
-      badge.textContent = `${blood.label} ${blood.teamName}`
+      badge.textContent = `${blood.label} ${blood.teamName} +${blood.points} pts`
       els.labelBloods.appendChild(badge)
     }
   }
@@ -1047,6 +1053,12 @@ export class LiveCityScene {
       this.rig.lookZ + Math.cos(this.rig.azimuth) * this.rig.radius,
     )
     this.camera.lookAt(this.rig.lookX, this.rig.lookY, this.rig.lookZ)
+
+    const backdropOpacity = this.focusing ? 0.08 : 0.96
+    const backdropEdgeOpacity = this.focusing ? 0.04 : 0.3
+    const backdropEase = Math.min(1, dt * 7)
+    this.silhouetteMaterial.opacity += (backdropOpacity - this.silhouetteMaterial.opacity) * backdropEase
+    this.silhouetteEdgeMaterial.opacity += (backdropEdgeOpacity - this.silhouetteEdgeMaterial.opacity) * backdropEase
 
     for (const building of this.buildings.values()) {
       const pulse = 0.72 + Math.sin(time * 2.4 + building.blinkPhase) * 0.28
