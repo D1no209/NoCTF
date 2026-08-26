@@ -9,6 +9,7 @@ import type {
   NoCtfapiEndpointsCompetitionsScoreboardRankingStateProtocol,
   NoCtfapiEndpointsCompetitionsScoreboardOperationStateProtocol,
   NoCtfapiEndpointsCompetitionsScoreboardSchemaResponse,
+  NoCtfapiEndpointsCompetitionsScoreboardSnapshotResponse,
   NoCtfapiEndpointsCompetitionsScoreboardSlotResponse,
   NoCtfapiEndpointsCompetitionsScoreboardTeamResponse,
 } from '~/api'
@@ -185,11 +186,14 @@ export function scoreboardChallengeColumnGroups(
 export function scoreboardTeamChallengeScore(
   team: NoCtfapiEndpointsCompetitionsScoreboardTeamResponse,
   group: ScoreboardChallengeColumnGroup,
+  mode?: NoCtfapiEndpointsCompetitionsGameModeProtocol | null,
 ): number {
-  const aggregate = (team.challengeScores ?? []).find(
-    item => item.competitionChallengeId === group.competitionChallengeId,
-  )
-  if (aggregate) return (aggregate.attackScore ?? 0) + (aggregate.defenseScore ?? 0)
+  if (mode === 'Awdp') {
+    const aggregate = (team.challengeScores ?? []).find(
+      item => item.competitionChallengeId === group.competitionChallengeId,
+    )
+    if (aggregate) return (aggregate.attackScore ?? 0) + (aggregate.defenseScore ?? 0)
+  }
 
   return group.columns.reduce((total, column) => {
     if (column.index === undefined) return total
@@ -229,10 +233,34 @@ export function scoreboardTeamDirectionScore(
       defense += Math.max(0, aggregate?.defenseScore ?? 0)
     }
     else {
-      total += Math.max(0, scoreboardTeamChallengeScore(team, group))
+      total += Math.max(0, scoreboardTeamChallengeScore(team, group, mode))
     }
   }
   return { attack, defense, total: mode === 'Awdp' ? attack + defense : total }
+}
+
+export function scoreboardCurrentChallengeScore(
+  snapshot: NoCtfapiEndpointsCompetitionsScoreboardSnapshotResponse | null | undefined,
+  competitionChallengeId: string | null | undefined,
+): number | null {
+  if (!competitionChallengeId) return null
+  const score = (snapshot?.currentChallengeScores ?? []).find(
+    item => item.competitionChallengeId === competitionChallengeId,
+  )?.score
+  return score ?? null
+}
+
+export function scoreboardBloodAward(
+  slot: NoCtfapiEndpointsCompetitionsScoreboardSlotResponse | null | undefined,
+): { label: string; points: number } | null {
+  const entry = slot?.entries?.find(item => item.award)
+  if (!entry?.award) return null
+  const labels = {
+    FirstBlood: '一血',
+    SecondBlood: '二血',
+    ThirdBlood: '三血',
+  } as const
+  return { label: translate(labels[entry.award]), points: entry.awardPoints ?? 0 }
 }
 
 export function scoreboardTeamChallengeSignals(

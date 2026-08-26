@@ -20,6 +20,8 @@ describe('participant challenge progress', () => {
     expect(navigator).toContain('已解出')
     expect(navigator).toContain('<Flag')
     expect(navigator).toContain('useScoreboardMatrix(props.competitionId)')
+    expect(navigator).toContain('scoreboardCurrentChallengeScore(board.snapshot.value, challengeId)')
+    expect(navigator).toContain('{{ currentScore(challenge.id) }} pts')
     expect(navigator).toContain('v-if="board.error.value"')
   })
 
