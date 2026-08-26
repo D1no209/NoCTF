@@ -92,7 +92,9 @@ describe('competition broadcast projection', () => {
     expect(shell).toContain('v-else-if="competition"')
     expect(shell).not.toContain("label: '公告/通知'")
     expect(panel).toContain('kinds: competitionBroadcastKinds')
-    expect(panel).toContain('competitionEventChanged: () => void load()')
+    expect(panel).toContain('competitionEventChanged: () => void refreshLatest()')
+    expect(panel).toContain('const refreshLatest = createTrailingRefresh(load)')
+    expect(panel).toContain('const initialLoad = !initialized.value')
   })
 })
 
