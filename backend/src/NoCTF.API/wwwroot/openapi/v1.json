@@ -14694,6 +14694,12 @@
               "$ref": "#/components/schemas/NoCTFAPIEndpointsCompetitionsScoreboardTrackResponse"
             }
           },
+          "currentChallengeScores": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NoCTFAPIEndpointsCompetitionsScoreboardCurrentChallengeScoreResponse"
+            }
+          },
           "visibility": {
             "$ref": "#/components/schemas/NoCTFAPIEndpointsCompetitionsLeaderboardVisibilityProtocol"
           },
@@ -15137,6 +15143,31 @@
           },
           "isViewerTrack": {
             "type": "boolean"
+          }
+        }
+      },
+      "NoCTFAPIEndpointsCompetitionsScoreboardCurrentChallengeScoreResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "competitionChallengeId": {
+            "type": "string",
+            "format": "guid"
+          },
+          "score": {
+            "type": "integer",
+            "format": "int64",
+            "nullable": true
+          },
+          "breakScore": {
+            "type": "integer",
+            "format": "int64",
+            "nullable": true
+          },
+          "fixScore": {
+            "type": "integer",
+            "format": "int64",
+            "nullable": true
           }
         }
       },
@@ -15994,11 +16025,6 @@
           },
           "direction": {
             "type": "string"
-          },
-          "baseScore": {
-            "type": "integer",
-            "format": "int64",
-            "nullable": true
           },
           "order": {
             "type": "integer",
@@ -19945,11 +19971,6 @@
             "minLength": 0,
             "nullable": true
           },
-          "baseScore": {
-            "type": "integer",
-            "format": "int64",
-            "minimum": 0.0
-          },
           "order": {
             "type": "integer",
             "format": "int32",
@@ -20226,7 +20247,6 @@
         "additionalProperties": false,
         "required": [
           "customTitle",
-          "baseScore",
           "order",
           "isPublished"
         ],
@@ -20236,12 +20256,6 @@
             "maxLength": 160,
             "minLength": 0,
             "nullable": true
-          },
-          "baseScore": {
-            "type": "integer",
-            "format": "int64",
-            "minimum": 0.0,
-            "nullable": false
           },
           "order": {
             "type": "integer",

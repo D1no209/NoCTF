@@ -287,6 +287,12 @@ public sealed record ScoreboardTrack(
     bool VisibleOnLeaderboard,
     bool IsViewerTrack = false);
 
+public sealed record ScoreboardCurrentChallengeScore(
+    Guid CompetitionChallengeId,
+    long? Score,
+    long? BreakScore,
+    long? FixScore);
+
 public sealed record ScoreboardSnapshot(
     Guid CompetitionId,
     long Version,
@@ -297,6 +303,7 @@ public sealed record ScoreboardSnapshot(
     IReadOnlyList<ScoreboardTeam> Teams)
 {
     public IReadOnlyList<ScoreboardTrack> Tracks { get; init; } = [];
+    public IReadOnlyList<ScoreboardCurrentChallengeScore> CurrentChallengeScores { get; init; } = [];
     public CompetitionLeaderboardVisibility Visibility { get; init; }
     public LeaderboardDataScope DataScope { get; init; }
     public DateTimeOffset? DataAsOf { get; init; }

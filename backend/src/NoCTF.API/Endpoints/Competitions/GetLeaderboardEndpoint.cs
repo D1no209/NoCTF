@@ -128,6 +128,12 @@ public sealed record ScoreboardTrackResponse(
     bool VisibleOnLeaderboard,
     bool IsViewerTrack);
 
+public sealed record ScoreboardCurrentChallengeScoreResponse(
+    Guid CompetitionChallengeId,
+    long? Score,
+    long? BreakScore,
+    long? FixScore);
+
 public sealed record ScoreboardSnapshotResponse(
     Guid CompetitionId,
     string Version,
@@ -138,6 +144,7 @@ public sealed record ScoreboardSnapshotResponse(
     IReadOnlyList<ScoreboardTeamResponse> Teams)
 {
     public IReadOnlyList<ScoreboardTrackResponse> Tracks { get; init; } = [];
+    public IReadOnlyList<ScoreboardCurrentChallengeScoreResponse> CurrentChallengeScores { get; init; } = [];
     public LeaderboardVisibilityProtocol Visibility { get; init; }
     public LeaderboardDataScopeProtocol DataScope { get; init; }
     public DateTimeOffset? DataAsOf { get; init; }
@@ -163,6 +170,12 @@ internal static class ScoreboardProtocolMapper
         Tracks = value.Tracks.Select(track => new ScoreboardTrackResponse(
             track.Key, track.Name, track.IsInternal, track.VisibleOnLeaderboard,
             track.IsViewerTrack)).ToArray(),
+        CurrentChallengeScores = value.CurrentChallengeScores.Select(score =>
+            new ScoreboardCurrentChallengeScoreResponse(
+                score.CompetitionChallengeId,
+                score.Score,
+                score.BreakScore,
+                score.FixScore)).ToArray(),
         Visibility = CompetitionProtocolMapper.ToProtocol(value.Visibility),
         DataScope = ToProtocol(value.DataScope),
         DataAsOf = value.DataAsOf

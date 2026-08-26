@@ -211,7 +211,15 @@ internal static class NormalizedScoreboardProjection
             compacted.Teams)
         {
             DataScope = LeaderboardDataScope.Live,
-            DataAsOf = projectedAt
+            DataAsOf = projectedAt,
+            CurrentChallengeScores = legacy.Challenges
+                .OrderBy(challenge => challenge.CompetitionChallengeId)
+                .Select(challenge => new ScoreboardCurrentChallengeScore(
+                    challenge.CompetitionChallengeId,
+                    challenge.CurrentScore,
+                    challenge.CurrentBreakScore,
+                    challenge.CurrentFixScore))
+                .ToArray()
         };
         return new(catalog, schema, snapshot)
         {

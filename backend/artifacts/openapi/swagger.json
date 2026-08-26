@@ -14694,6 +14694,12 @@
               "$ref": "#/components/schemas/NoCTFAPIEndpointsCompetitionsScoreboardTrackResponse"
             }
           },
+          "currentChallengeScores": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NoCTFAPIEndpointsCompetitionsScoreboardCurrentChallengeScoreResponse"
+            }
+          },
           "visibility": {
             "$ref": "#/components/schemas/NoCTFAPIEndpointsCompetitionsLeaderboardVisibilityProtocol"
           },
@@ -15137,6 +15143,31 @@
           },
           "isViewerTrack": {
             "type": "boolean"
+          }
+        }
+      },
+      "NoCTFAPIEndpointsCompetitionsScoreboardCurrentChallengeScoreResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "competitionChallengeId": {
+            "type": "string",
+            "format": "guid"
+          },
+          "score": {
+            "type": "integer",
+            "format": "int64",
+            "nullable": true
+          },
+          "breakScore": {
+            "type": "integer",
+            "format": "int64",
+            "nullable": true
+          },
+          "fixScore": {
+            "type": "integer",
+            "format": "int64",
+            "nullable": true
           }
         }
       },

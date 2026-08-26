@@ -473,6 +473,7 @@ export type NoCtfapiEndpointsCompetitionsScoreboardSnapshotResponse = {
     actors?: Array<NoCtfapiEndpointsCompetitionsScoreboardActorResponse>;
     teams?: Array<NoCtfapiEndpointsCompetitionsScoreboardTeamResponse>;
     tracks?: Array<NoCtfapiEndpointsCompetitionsScoreboardTrackResponse>;
+    currentChallengeScores?: Array<NoCtfapiEndpointsCompetitionsScoreboardCurrentChallengeScoreResponse>;
     visibility?: NoCtfapiEndpointsCompetitionsLeaderboardVisibilityProtocol;
     dataScope?: NoCtfapiEndpointsCompetitionsLeaderboardDataScopeProtocol;
     dataAsOf?: string | null;
@@ -575,6 +576,13 @@ export type NoCtfapiEndpointsCompetitionsScoreboardTrackResponse = {
     isInternal?: boolean;
     visibleOnLeaderboard?: boolean;
     isViewerTrack?: boolean;
+};
+
+export type NoCtfapiEndpointsCompetitionsScoreboardCurrentChallengeScoreResponse = {
+    competitionChallengeId?: string;
+    score?: number | null;
+    breakScore?: number | null;
+    fixScore?: number | null;
 };
 
 export type NoCtfapiEndpointsCompetitionsLeaderboardDataScopeProtocol = 'Live' | 'Frozen' | 'Hidden';
