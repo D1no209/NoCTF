@@ -60,7 +60,7 @@
 
 | 工作人员样例 | 路径 | 预期结果 |
 | --- | --- | --- |
-| 合法修复 | `examples/fixes/valid/fix.sh` | DefenseSucceeded |
+| 合法修复 | `examples/fixes/defense-succeeded/fix.sh` | DefenseSucceeded |
 | 仍有漏洞 | `examples/fixes/exploit-succeeded/fix.sh` | ExploitSucceeded |
 | 服务异常或禁止绕过 | `examples/fixes/service-abnormal-bypass/fix.sh` 或 `examples/fixes/service-abnormal-down/fix.sh` | ServiceAbnormal |
 | 非零退出 | `examples/fixes/nonzero/fix.sh` | AwdpPatchFailed |

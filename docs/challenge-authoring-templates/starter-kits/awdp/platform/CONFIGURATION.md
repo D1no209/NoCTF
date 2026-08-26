@@ -21,8 +21,8 @@
 - Checker 目标端口：`8080`
 - Checker 超时：`待填写`
 
-公开端口和 URL 只用于 Player Runtime。一次性 Fix target 无 TeamId、无公开入口，
-只通过隔离内部网络连接 Checker。比赛专属 Flag 模板在比赛题目规则中配置。
+公开端口和 URL 只用于 Player Runtime。一次性 Fix target 绑定申请队伍但无公开入口，
+只通过隔离内部网络连接 Checker。比赛专属 Flag 模板在比赛默认配置或比赛题目规则中配置，题目规则优先。
 
 ## 比赛题目规则
 

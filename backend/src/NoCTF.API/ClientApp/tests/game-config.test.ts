@@ -79,6 +79,15 @@ describe('dynamic flag templates', () => {
     expect(challengeRuleFields('Awd').some(field => field.key === 'flagTemplate')).toBeTrue()
   })
 
+  test('exposes AWDP Break Flag templates only in competition configuration and rules', () => {
+    const model = emptyDefinition('Awdp')
+    model.flagTemplate = { header: 'NOCTF', bodyTemplate: '[GUID]', leetLiteralText: false }
+
+    expect(competitionConfigFields('Awdp').some(field => field.key === 'flagTemplate')).toBeTrue()
+    expect(challengeRuleFields('Awdp').some(field => field.key === 'flagTemplate')).toBeTrue()
+    expect(JSON.parse(serializeDefinition('Awdp', model)).flagTemplate).toBeUndefined()
+  })
+
   test('creates CTF runtimes with per-team environment injection by default', () => {
     const runtime = emptyRuntimeTemplate('Ctf')
 

@@ -401,7 +401,7 @@ challenges:
         publishedAt: null
 
     rules:
-      schemaVersion: 1
+      schemaVersion: 2
 ```
 
 `competition.yml` 是 CompetitionChallenge 的完整期望集合。它不能覆盖：
@@ -479,7 +479,6 @@ CTF 的计分曲线、血奖、最大尝试次数、错误提交惩罚等只放�
 AWD Challenge Definition 管理：
 
 - PerTeam Container 或 Compose Runtime；
-- AWD 轮换 Flag 模板；
 - Flag injection；
 - Checker one-shot Job。
 
@@ -510,11 +509,6 @@ runtime:
     memoryBytes: 536870912
     nanoCpus: 1000000000
     pidsLimit: 256
-
-flagTemplate:
-  header: flag
-  bodyTemplate: "[TEAMHASH:32]"
-  leetLiteralText: false
 
 flagInjection:
   command: /app/set-flag '${FLAG}'
@@ -550,13 +544,23 @@ Checker 通过平台指定的 Internal API 回报状态，不能用进程退出�
 - 超时：`CheckerTimedOut`；
 - 后写的同一执行序列结果覆盖先写结果。
 
-Checker interval、攻击计分、防守计分、轮次等放在 `competition.yml.rules`。
+Checker interval、攻击计分、防守计分、轮次和 AWD 轮换 Flag 模板等放在 `competition.yml.rules`。
+
+```yaml
+rules:
+  schemaVersion: 4
+  flagTemplate:
+    header: flag
+    bodyTemplate: "[TEAMHASH:32]"
+    leetLiteralText: false
+```
 
 ### AWDP
 
 AWDP Challenge Definition 管理：
 
-- disposable Container Runtime；
+- 队伍攻击实例使用的 PerTeam Container Runtime；
+- 一次性 Fix target 复用同一 target 定义，但不公开 Player endpoint；
 - Patch 入口和执行限制；
 - Checker one-shot Job。
 
@@ -576,15 +580,22 @@ build:
 
 runtime:
   allocation: PerTeam
+  flagSource: PerTeam
   definition:
     kind: Container
     image:
       build: target
+    flagEnvironmentVariableName: FLAG
     internalPorts: [8080]
   limits:
     memoryBytes: 536870912
     nanoCpus: 1000000000
     pidsLimit: 256
+  endpoints:
+    - name: web
+      protocol: Http
+      containerPort: 8080
+      exposure: OwnerOnly
 
 patch:
   entrypoint: fix.sh
@@ -600,9 +611,18 @@ checker:
   timeoutSeconds: 30
 ```
 
-AWDP 只允许 Container Runtime，禁止公开 endpoint，并且必须声明且只声明一个 `internalPort`。Checker 不配置目标 URL/host/port；Runner 根据 disposable target 的唯一 internal port 建立内部访问。
+AWDP 只允许 Container Runtime。Player / AwdpAttack Runtime 可以声明 OwnerOnly endpoint 供本队攻击使用；一次性 Fix target 忽略公开 endpoint，只通过内部网络给 Checker 访问。定义中必须声明且只声明一个 `internalPort`。Checker 不配置目标 URL/host/port；Runner 根据一次性 target 的唯一 internal port 建立内部访问。
 
-Break/Fix 分值、尝试次数、惩罚、轮次结算方式和调度方式放在 `competition.yml.rules`。
+Break/Fix 分值、尝试次数、惩罚、轮次结算方式、调度方式和 AWDP Break Flag 模板放在 `competition.yml.rules`。
+
+```yaml
+rules:
+  schemaVersion: 4
+  flagTemplate:
+    header: flag
+    bodyTemplate: "[GUID]"
+    leetLiteralText: false
+```
 
 ### KoH
 
