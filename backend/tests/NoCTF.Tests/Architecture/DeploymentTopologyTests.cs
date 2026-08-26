@@ -273,18 +273,13 @@ public sealed class DeploymentTopologyTests
     }
 
     [Test]
-    public async Task Ci_deployment_validation_keeps_standard_schemas_strict_and_supplies_required_secrets()
+    public async Task Ci_validation_keeps_standard_schemas_strict_and_supplies_required_secrets()
     {
         var ci = await ReadAsync(".github", "workflows", "ci.yml");
 
         await Assert.That(ci).Contains(
             "-strict -ignore-missing-schemas -summary /manifests");
         await Assert.That(ci).DoesNotContain("-skip");
-        await Assert.That(ci).Contains("-o ServerAliveInterval=30");
-        await Assert.That(ci).Contains("-o ServerAliveCountMax=20");
-        await Assert.That(ci).Contains("kompose-linux-amd64");
-        await Assert.That(ci).Contains(
-            "echo \"$kompose_sha256  $kompose_asset\" | sha256sum -c -");
 
         var standardApiVersions = new HashSet<string>(StringComparer.Ordinal)
         {
@@ -319,6 +314,35 @@ public sealed class DeploymentTopologyTests
         await Assert.That(encryptionKeyMatch.Success).IsTrue();
         await Assert.That(Convert.FromBase64String(
             encryptionKeyMatch.Groups["key"].Value).Length).IsEqualTo(32);
+    }
+
+    [Test]
+    public async Task Ci_publishes_tested_role_images_to_configured_registries()
+    {
+        var ci = (await ReadAsync(".github", "workflows", "ci.yml"))
+            .ReplaceLineEndings("\n");
+
+        await Assert.That(ci).Contains("  publish-images:\n");
+        await Assert.That(ci).Contains("    needs: test\n");
+        await Assert.That(ci).Contains(
+            "    if: github.event_name == 'push' && github.ref == 'refs/heads/main'\n");
+        await Assert.That(ci).Contains("      packages: write\n");
+        await Assert.That(ci).Contains("ghcr.io/$repository_owner/$repository_name-${{ matrix.image }}");
+        await Assert.That(ci).Contains("CUSTOM_REGISTRY: ${{ vars.CUSTOM_REGISTRY }}");
+        await Assert.That(ci).Contains("if: env.CUSTOM_REGISTRY != ''");
+        await Assert.That(ci).Contains("push: true");
+
+        foreach (var role in new[] { "api", "worker", "runner", "host" })
+        {
+            await Assert.That(ci).Contains($"          - image: {role}\n            target: {role}\n");
+        }
+
+        foreach (var webRole in new[] { "api", "host" })
+        {
+            await Assert.That(ci).Contains($"test -f artifacts/{webRole}/wwwroot/index.html");
+            await Assert.That(ci).Contains($"test -f artifacts/{webRole}/wwwroot/200.html");
+            await Assert.That(ci).Contains($"test -f artifacts/{webRole}/wwwroot/404.html");
+        }
     }
 
     [Test]
@@ -383,11 +407,9 @@ public sealed class DeploymentTopologyTests
     {
         var deployScript = await ReadAsync("deploy", "ci", "deploy.sh");
         var observabilityCompose = await ReadAsync("deploy", "docker-compose.observability.yml");
-        var ci = await ReadAsync(".github", "workflows", "ci.yml");
 
         await Assert.That(deployScript).Contains("pull_observability_images()");
         await Assert.That(deployScript).DoesNotContain("load_grafana_image");
-        await Assert.That(ci).DoesNotContain("grafana-image.tar.gz");
         await Assert.That(observabilityCompose).Contains(
             "image: quay.io/prometheus/prometheus:v3.14.0");
         await Assert.That(observabilityCompose).Contains(
@@ -402,9 +424,6 @@ public sealed class DeploymentTopologyTests
             "NOCTF_OBSERVABILITY_PULL_ATTEMPTS:-5");
         await Assert.That(deployScript).Contains("NOCTF_BUILD_ATTEMPTS:-3");
         await Assert.That(deployScript).Contains("Docker registry request failed transiently.");
-        await Assert.That(ci).Contains("cached_kompose=");
-        await Assert.That(ci).Contains(
-            "Reused the verified Kompose asset from the current server release.");
         await Assert.That(deployScript).Contains(
             "ensure_build_space\nif ! pull_observability_images; then\n    exit 1\nfi\nbackup_database");
         await Assert.That(deployScript).Contains("--pull never");
