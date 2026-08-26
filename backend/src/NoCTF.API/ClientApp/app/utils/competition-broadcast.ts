@@ -17,6 +17,23 @@ export const competitionBroadcastKinds = [
   'AwdpFixAttempted',
 ] satisfies NoCtfapiEndpointsCompetitionsEventsCompetitionEventKindProtocol[]
 
+export function deduplicateCompetitionBroadcasts(
+  events: readonly NoCtfapiEndpointsCompetitionsEventsCompetitionEventResponse[],
+): NoCtfapiEndpointsCompetitionsEventsCompetitionEventResponse[] {
+  const seen = new Set<string>()
+  return events.filter((event) => {
+    const key = [
+      event.kind,
+      event.teamId,
+      event.competitionChallengeId,
+      event.occurredAt,
+    ].join(':')
+    if (seen.has(key)) return false
+    seen.add(key)
+    return true
+  })
+}
+
 export function competitionBroadcastText(
   event: NoCtfapiEndpointsCompetitionsEventsCompetitionEventResponse,
 ): string {

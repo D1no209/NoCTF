@@ -2,6 +2,7 @@ import { describe, expect, test } from 'bun:test'
 import type { NoCtfapiEndpointsCompetitionsEventsCompetitionEventResponse } from '../app/api'
 import {
   competitionBroadcastKinds,
+  deduplicateCompetitionBroadcasts,
   competitionBroadcastTargetPath,
   competitionBroadcastText,
 } from '../app/utils/competition-broadcast'
@@ -63,6 +64,15 @@ describe('competition broadcast projection', () => {
     expect(competitionBroadcastTargetPath(event('HintPublished', {
       competitionChallengeId: 'challenge-1',
     }))).toBe('/competitions/competition-1/challenges?challenge=challenge-1')
+  })
+
+  test('collapses the staff and public copy of one ban broadcast', () => {
+    const occurredAt = '2026-08-26T23:50:25Z'
+    const duplicated = [
+      event('TeamBanned', { id: 'staff', teamId: 'team-1', occurredAt }),
+      event('TeamBanned', { id: 'public', teamId: 'team-1', occurredAt }),
+    ]
+    expect(deduplicateCompetitionBroadcasts(duplicated).map(item => item.id)).toEqual(['staff'])
   })
 
   test('mounts the compact panel beside challenges and removes the overlapping tab', async () => {
