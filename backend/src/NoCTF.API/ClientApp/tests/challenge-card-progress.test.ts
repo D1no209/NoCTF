@@ -46,6 +46,10 @@ describe('participant challenge progress', () => {
     expect(submit).toContain('🎉')
     expect(submit).toContain('@media (prefers-reduced-motion: reduce)')
     expect(submit).toContain("if (wasPending && !isGameplayFactPending(data.state) && !toasted.has(id))")
+    expect(submit).toContain('resultDialog')
+    expect(submit).toContain("$t('剩余 {count} 次提交'")
+    expect(submit).toContain(':disabled="submitting || !input.trim() || attemptsExhausted"')
+    expect(submit).not.toContain('v-for="item in tracked"')
   })
 
   test('uses the generated no-score practice judgement after a CTF competition finishes', async () => {

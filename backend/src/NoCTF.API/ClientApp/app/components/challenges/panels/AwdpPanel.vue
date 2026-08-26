@@ -118,6 +118,8 @@ onUnmounted(() => {
           :competition-challenge-id="challenge.id!"
           :title="state?.breakActivation ? $t('验证 Flag') : $t('提交 Flag')"
           :read-only-judgement="!!state?.breakActivation"
+          :maximum-attempts="challenge.maximumFlagAttempts"
+          :remaining-attempts="challenge.remainingFlagAttempts"
           @evaluated="refreshAndPoll"
         />
       </section>

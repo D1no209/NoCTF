@@ -25,6 +25,8 @@ defineProps<{
       :competition-id="competition.id!"
       :competition-challenge-id="challenge.id!"
       :practice="competition.status === 'Finished' && competition.practiceModeEnabled === true"
+      :maximum-attempts="challenge.maximumFlagAttempts"
+      :remaining-attempts="challenge.remainingFlagAttempts"
     />
   </div>
 </template>
