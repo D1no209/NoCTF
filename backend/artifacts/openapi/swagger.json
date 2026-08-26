@@ -16065,6 +16065,21 @@
           },
           "dataScope": {
             "$ref": "#/components/schemas/NoCTFAPIEndpointsCompetitionsLeaderboardDataScopeProtocol"
+          },
+          "maximumFlagAttempts": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "acceptedFlagAttempts": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "remainingFlagAttempts": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
           }
         }
       },

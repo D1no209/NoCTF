@@ -29,6 +29,7 @@ internal static class GameplayFactInfrastructure
     {
         services.AddScoped<GameplayFactAttemptCriticalSection>();
         services.AddScoped<IGameplayFactIntakeStore, GameplayFactIntakeStore>();
+        services.AddScoped<GetFlagAttemptBudget>();
         services.AddScoped<IPracticeFlagJudge, PracticeFlagJudge>();
         services.AddScoped<JudgePracticeFlag>();
         services.AddScoped<IAwdpParticipantStateReader, AwdpParticipantStateReader>();

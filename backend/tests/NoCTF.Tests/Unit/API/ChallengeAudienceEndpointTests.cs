@@ -11,7 +11,9 @@ using NoCTF.Application.Challenges.Management;
 using NoCTF.Application.Competitions.Koh;
 using NoCTF.Application.Competitions.Visibility;
 using NoCTF.Application.Scoring.Leaderboard;
+using NoCTF.Application.GameplayFacts.Intake;
 using NoCTF.Domain.Competitions;
+using NSubstitute;
 
 namespace NoCTF.Tests.Unit.API;
 
@@ -73,8 +75,11 @@ public sealed class ChallengeAudienceEndpointTests
         builder.Services.AddSingleton<ICompetitionVisibilityAccess>(new RunningVisibilityAccess());
         builder.Services.AddSingleton<IKohChallengeAccessReader>(new EmptyKohAccess());
         builder.Services.AddSingleton<IChallengeManagementStore>(store);
+        builder.Services.AddSingleton(Substitute.For<IGameplayFactIntakeStore>());
+        builder.Services.AddSingleton(Substitute.For<IGameplayFactAdmissionModePolicy>());
         builder.Services.AddScoped<ListChallenges>();
         builder.Services.AddScoped<GetChallenge>();
+        builder.Services.AddScoped<GetFlagAttemptBudget>();
 
         var app = builder.Build();
         app.UseNoCtfEndpoints();

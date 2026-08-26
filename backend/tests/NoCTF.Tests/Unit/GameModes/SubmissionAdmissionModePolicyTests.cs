@@ -1,10 +1,35 @@
 using NoCTF.Domain.Competitions;
+using NoCTF.Application.GameplayFacts.Intake;
 using NoCTF.GameModes.Registration;
+using NSubstitute;
 
 namespace NoCTF.Tests.Unit.GameModes;
 
 public class GameplayFactAdmissionModePolicyTests
 {
+    [Test]
+    public async Task Flag_attempt_budget_reports_the_remaining_accepted_attempts()
+    {
+        var competitionId = Guid.NewGuid();
+        var challengeId = Guid.NewGuid();
+        var userId = Guid.NewGuid();
+        var store = Substitute.For<IGameplayFactIntakeStore>();
+        var policy = Substitute.For<IGameplayFactAdmissionModePolicy>();
+        store.LoadAdmissionAsync(competitionId, challengeId, userId, Arg.Any<CancellationToken>())
+            .Returns(new GameplayFactAdmissionSnapshot(
+                competitionId, Guid.NewGuid(), challengeId, GameMode.Ctf,
+                "{}", "{}", 2, 0, CompetitionStatus.Running,
+                DateTimeOffset.UtcNow.AddHours(-1), DateTimeOffset.UtcNow.AddHours(1),
+                false, false, true, false, false, true, true));
+        policy.GetRules(GameMode.Ctf, "{}", "{}")
+            .Returns(new GameplayFactAdmissionRules(true, false, 5, null));
+
+        var budget = await new GetFlagAttemptBudget(store, policy)
+            .ExecuteAsync(competitionId, challengeId, userId);
+
+        await Assert.That(budget).IsEqualTo(new FlagAttemptBudget(5, 2, 3));
+    }
+
     [Test]
     public async Task Koh_DoesNotAcceptManualSubmissions()
     {
