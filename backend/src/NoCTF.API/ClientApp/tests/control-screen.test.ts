@@ -39,6 +39,10 @@ const snapshot: NoCtfapiEndpointsCompetitionsScoreboardSnapshotResponse = {
   schemaRevision: 1,
   generatedAt: '2026-08-12T12:10:00Z',
   currentRoundId: null,
+  currentChallengeScores: [
+    { competitionChallengeId: webId, score: 444, breakScore: null, fixScore: null },
+    { competitionChallengeId: pwnId, score: 333, breakScore: null, fixScore: null },
+  ],
   tracks: [
     { key: 'open', name: 'Open', visibleOnLeaderboard: true, isInternal: false },
     { key: 'junior', name: 'Junior', visibleOnLeaderboard: false, isInternal: false },
@@ -106,10 +110,11 @@ describe('CTF control screen projection', () => {
     const entries = controlScreenPublicEntries(snapshot)
     expect(entries.map(entry => entry.teamName)).toEqual(['Alpha', 'Beta'])
 
-    const challenges = controlScreenChallenges(catalog, schema, entries)
+    const challenges = controlScreenChallenges(catalog, schema, entries, snapshot.currentChallengeScores)
     expect(challenges.map(challenge => ({ title: challenge.title, solves: challenge.solveCount })))
       .toEqual([{ title: 'web-100', solves: 1 }, { title: 'pwn-200', solves: 1 }])
     expect(challenges[0]?.completionPercent).toBe(50)
+    expect(challenges.map(challenge => challenge.currentScore)).toEqual([444, 333])
 
     const feed = controlScreenSolveFeed(catalog, schema, entries)
     expect(feed).toHaveLength(2)
@@ -120,6 +125,7 @@ describe('CTF control screen projection', () => {
     const feed = controlScreenSolveFeed(catalog, schema, controlScreenPublicEntries(snapshot))
     expect(feed.map(item => item.teamName)).toEqual(['Beta', 'Alpha'])
     expect(feed.map(item => item.challengeTitle)).toEqual(['pwn-200', 'web-100'])
+    expect(feed.map(item => item.awardPoints)).toEqual([25, 50])
   })
 
   test('baselines historical solves and queues every new solve in occurrence order', () => {
@@ -177,9 +183,14 @@ describe('CTF control screen projection', () => {
     expect(scene).toContain("els.labelPts.textContent = `${state.score} pts`")
     expect(scene).toContain('els.labelSolves.textContent = state.solvesText')
     expect(page).toContain('bloodToneOrder[left.tone] - bloodToneOrder[right.tone]')
+    expect(page).toContain('points: solve.awardPoints')
+    expect(scene).toContain('`${blood.label} ${blood.teamName} +${blood.points} pts`')
     expect(page).toContain('const sameChallengeUpdates = activeChallengeId')
     expect(page).toContain('if (sameChallengeUpdates.length) focusSolve(sameChallengeUpdates.at(-1)!)')
     expect(scene).toContain('minHeight: 6, maxHeight: 24')
     expect(scene).toContain('minHeight: 4, maxHeight: 18')
+    expect(scene).toContain('const height = 12 + (state.score / maxScore) * 42')
+    expect(scene).toContain('const backdropOpacity = this.focusing ? 0.08 : 0.96')
+    expect(scene).toContain('depthWrite: false')
   })
 })
