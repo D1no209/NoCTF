@@ -691,6 +691,7 @@ export const englishMessages: Record<string, string> = {
   "赛道配置无效，请检查赛道设置。": "The track configuration is invalid. Check the track settings.",
   "存在队伍使用了已不存在的赛道，请调整队伍赛道。": "A team references a track that no longer exists. Reassign the team track.",
   "启动实例前必须全部填写,用于隔离队伍环境。": "All must be filled in before starting the instance to isolate the team environment.",
+  "留空时使用平台默认资源限制与生命周期。": "Blank values use the platform default resource limits and lifecycle.",
   "启用邮件发送": "Enable email sending",
   "启用运行环境时,AWD 必须配置 Flag 注入。": "When enabling the runtime environment, AWD must configure Flag injection.",
   "启用周期性服务检查": "Enable periodic service checks",

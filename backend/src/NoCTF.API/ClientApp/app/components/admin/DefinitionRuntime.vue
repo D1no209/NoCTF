@@ -143,7 +143,7 @@ watch(
           <NullableNumberInput
             :model-value="bytesToMib(runtime.limits.memoryBytes)"
             :min="1"
-            :placeholder="$t('如 512')"
+            placeholder="256"
             :disabled="disabled"
             @update:model-value="runtime.limits.memoryBytes = mibToBytes($event)"
           />
@@ -154,7 +154,7 @@ watch(
             :model-value="nanoCpusToCores(runtime.limits.nanoCpus)"
             :min="0"
             step="0.1"
-            :placeholder="$t('如 1')"
+            placeholder="0.5"
             :disabled="disabled"
             @update:model-value="runtime.limits.nanoCpus = coresToNanoCpus($event)"
           />
@@ -164,7 +164,7 @@ watch(
           <NullableNumberInput
             :model-value="runtime.limits.pidsLimit"
             :min="1"
-            :placeholder="$t('如 256')"
+            placeholder="128"
             :disabled="disabled"
             @update:model-value="runtime.limits.pidsLimit = $event"
           />
@@ -175,7 +175,7 @@ watch(
             :model-value="runtime.ttlSeconds"
             :min="1"
             :max="604800"
-            :placeholder="$t('到点自动回收')"
+            placeholder="3600"
             :disabled="disabled"
             @update:model-value="runtime.ttlSeconds = $event"
           />
@@ -186,13 +186,13 @@ watch(
             :model-value="runtime.operationTimeoutSeconds"
             :min="1"
             :max="300"
-            :placeholder="$t('启动/停止操作超时')"
+            placeholder="60"
             :disabled="disabled"
             @update:model-value="runtime.operationTimeoutSeconds = $event"
           />
         </Field>
       </div>
-      <FieldDescription>{{ $t('启动实例前必须全部填写,用于隔离队伍环境。') }}</FieldDescription>
+      <FieldDescription>{{ $t('留空时使用平台默认资源限制与生命周期。') }}</FieldDescription>
     </DefinitionSection>
 
     <DefinitionSection :title="$t('Flag 与访问')" :collapsible="false">

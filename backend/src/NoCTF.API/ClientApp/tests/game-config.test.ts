@@ -4,6 +4,11 @@ import {
   BloodRewardPolicy,
   ScoreDecayMode,
   FlagSource,
+  DEFAULT_RUNTIME_MEMORY_BYTES,
+  DEFAULT_RUNTIME_NANO_CPUS,
+  DEFAULT_RUNTIME_OPERATION_TIMEOUT_SECONDS,
+  DEFAULT_RUNTIME_PIDS_LIMIT,
+  DEFAULT_RUNTIME_TTL_SECONDS,
   challengeRuleFields,
   competitionConfigFields,
   ctfPointsAtSolveCount,
@@ -99,6 +104,27 @@ describe('dynamic flag templates', () => {
 })
 
 describe('container security drafts', () => {
+  test('fills the platform security defaults when the definition omits security', () => {
+    const parsed = parseDefinition(JSON.stringify({
+      schemaVersion: 2,
+      runtime: {
+        allocation: 1,
+        definition: { kind: 'container', image: 'example/image:latest' },
+        flagSource: 0,
+      },
+    }))
+
+    expect(parsed?.runtime?.definition.kind).toBe('container')
+    if (parsed?.runtime?.definition.kind !== 'container') throw new Error('Expected parsed container definition')
+    expect(parsed.runtime.definition.security).toEqual({
+      noNewPrivileges: false,
+      readonlyRootfs: false,
+      runAsNonRoot: false,
+      capDrop: [],
+      capAdd: [],
+    })
+  })
+
   test('omits the trusted compatibility defaults', () => {
     const model = emptyDefinition('Ctf')
     model.runtime = emptyRuntimeTemplate('Ctf')
@@ -166,5 +192,60 @@ describe('AWDP patch upload limits', () => {
 
     expect(model?.flagInjection).toBeNull()
     expect(JSON.parse(serializeDefinition('Awdp', model!)).flagInjection).toBeUndefined()
+  })
+})
+
+describe('runtime resource and lifecycle defaults', () => {
+  test('creates new runtime forms with the platform defaults', () => {
+    const runtime = emptyRuntimeTemplate('Ctf')
+
+    expect(runtime.limits).toEqual({
+      memoryBytes: DEFAULT_RUNTIME_MEMORY_BYTES,
+      nanoCpus: DEFAULT_RUNTIME_NANO_CPUS,
+      pidsLimit: DEFAULT_RUNTIME_PIDS_LIMIT,
+    })
+    expect(runtime.ttlSeconds).toBe(DEFAULT_RUNTIME_TTL_SECONDS)
+    expect(runtime.operationTimeoutSeconds).toBe(DEFAULT_RUNTIME_OPERATION_TIMEOUT_SECONDS)
+  })
+
+  test('fills and persists defaults for legacy definitions with unset values', () => {
+    const parsed = parseDefinition(JSON.stringify({
+      schemaVersion: 2,
+      runtime: {
+        allocation: 1,
+        definition: { kind: 'container', image: 'example/image:latest' },
+        limits: {},
+        ttlSeconds: null,
+        operationTimeoutSeconds: null,
+        flagSource: 0,
+      },
+    }))
+    if (!parsed?.runtime) throw new Error('Expected parsed runtime')
+
+    const serialized = JSON.parse(serializeDefinition('Ctf', parsed))
+    expect(serialized.runtime.limits).toEqual({
+      memoryBytes: DEFAULT_RUNTIME_MEMORY_BYTES,
+      nanoCpus: DEFAULT_RUNTIME_NANO_CPUS,
+      pidsLimit: DEFAULT_RUNTIME_PIDS_LIMIT,
+    })
+    expect(serialized.runtime.ttlSeconds).toBe(DEFAULT_RUNTIME_TTL_SECONDS)
+    expect(serialized.runtime.operationTimeoutSeconds).toBe(DEFAULT_RUNTIME_OPERATION_TIMEOUT_SECONDS)
+  })
+
+  test('uses defaults when cleared values are serialized', () => {
+    const model = emptyDefinition('Ctf')
+    model.runtime = emptyRuntimeTemplate('Ctf')
+    model.runtime.limits = { memoryBytes: null, nanoCpus: null, pidsLimit: null }
+    model.runtime.ttlSeconds = null
+    model.runtime.operationTimeoutSeconds = null
+
+    const serialized = JSON.parse(serializeDefinition('Ctf', model))
+    expect(serialized.runtime.limits).toEqual({
+      memoryBytes: DEFAULT_RUNTIME_MEMORY_BYTES,
+      nanoCpus: DEFAULT_RUNTIME_NANO_CPUS,
+      pidsLimit: DEFAULT_RUNTIME_PIDS_LIMIT,
+    })
+    expect(serialized.runtime.ttlSeconds).toBe(DEFAULT_RUNTIME_TTL_SECONDS)
+    expect(serialized.runtime.operationTimeoutSeconds).toBe(DEFAULT_RUNTIME_OPERATION_TIMEOUT_SECONDS)
   })
 })
