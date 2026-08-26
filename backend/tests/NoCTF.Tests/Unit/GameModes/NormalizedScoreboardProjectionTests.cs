@@ -57,6 +57,10 @@ public sealed class NormalizedScoreboardProjectionTests
         await Assert.That(first.Snapshot.Actors).HasSingleItem();
         await Assert.That(first.Snapshot.Actors[0].UserId).IsEqualTo(actorId);
         await Assert.That(first.Snapshot.Teams.Sum(team => team.Slots.Count)).IsEqualTo(2);
+        var currentScores = first.Snapshot.CurrentChallengeScores
+            .ToDictionary(score => score.CompetitionChallengeId);
+        await Assert.That(currentScores[challengeA.Id].Score).IsEqualTo(495L);
+        await Assert.That(currentScores[challengeB.Id].Score).IsEqualTo(500L);
 
         var alpha = first.Snapshot.Teams.Single(team => team.TeamId == teamA.Id);
         var alphaSlot = alpha.Slots.Single();
