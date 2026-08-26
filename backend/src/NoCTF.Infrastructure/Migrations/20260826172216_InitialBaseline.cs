@@ -288,7 +288,6 @@ namespace NoCTF.Infrastructure.Migrations
                     competition_id = table.Column<Guid>(type: "uuid", nullable: false),
                     challenge_id = table.Column<Guid>(type: "uuid", nullable: false),
                     custom_title = table.Column<string>(type: "character varying(160)", maxLength: 160, nullable: true),
-                    base_score = table.Column<long>(type: "bigint", nullable: false),
                     order = table.Column<int>(type: "integer", nullable: false),
                     is_published = table.Column<bool>(type: "boolean", nullable: false),
                     rules_json = table.Column<string>(type: "jsonb", nullable: false),

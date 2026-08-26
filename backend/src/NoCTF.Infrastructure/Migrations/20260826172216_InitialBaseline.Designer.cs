@@ -12,7 +12,7 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace NoCTF.Infrastructure.Migrations
 {
     [DbContext(typeof(NoCtfDbContext))]
-    [Migration("20260824060413_InitialBaseline")]
+    [Migration("20260826172216_InitialBaseline")]
     partial class InitialBaseline
     {
         /// <inheritdoc />
@@ -227,10 +227,6 @@ namespace NoCTF.Infrastructure.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid")
                         .HasColumnName("id");
-
-                    b.Property<long>("BaseScore")
-                        .HasColumnType("bigint")
-                        .HasColumnName("base_score");
 
                     b.Property<Guid>("ChallengeId")
                         .HasColumnType("uuid")

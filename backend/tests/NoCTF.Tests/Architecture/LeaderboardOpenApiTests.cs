@@ -41,6 +41,7 @@ public sealed class LeaderboardOpenApiTests
             "actors",
             "teams",
             "tracks",
+            "currentChallengeScores",
             "visibility",
             "dataScope",
             "dataAsOf"
