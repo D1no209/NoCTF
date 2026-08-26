@@ -1818,39 +1818,6 @@ export type NoCtfapiEndpointsAdministrationChallengesCreateChallengeRequest = {
     order?: number;
 };
 
-export type NoCtfapiEndpointsAdministrationChallengeBankChallengeFlagResponse = {
-    id?: string;
-    challengeId?: string | null;
-    competitionChallengeId?: string | null;
-    teamId?: string | null;
-    flag?: string;
-    matchKind?: NoCtfapiEndpointsAdministrationChallengeBankChallengeFlagMatchKindProtocol;
-    specificationKind?: NoCtfapiEndpointsAdministrationChallengeBankSpecificationKindProtocol | null;
-    specificationId?: string | null;
-    validStart?: string | null;
-    validUntil?: string | null;
-    deletedAt?: string | null;
-    createdAt?: string;
-    systemManaged?: boolean;
-};
-
-export type NoCtfapiEndpointsAdministrationChallengeBankChallengeFlagMatchKindProtocol = 'Exact' | 'RegularExpression';
-
-export type NoCtfapiEndpointsAdministrationChallengeBankSpecificationKindProtocol = 'Attachment' | 'AwdRound' | 'RuntimeDefinition' | 'Hint' | 'RuntimeInstance';
-
-export type NoCtfapiEndpointsAdministrationChallengeBankChallengeFlagFailureResponse = {
-    code?: NoCtfapiEndpointsAdministrationChallengeBankChallengeFlagFailureCodeProtocol;
-    message?: string;
-};
-
-export type NoCtfapiEndpointsAdministrationChallengeBankChallengeFlagFailureCodeProtocol = 'InvalidFlag' | 'InvalidRegularExpression' | 'RegularExpressionNotSupported' | 'InvalidSpecification' | 'InvalidValidityWindow' | 'InvalidTemplateFlagScope' | 'ResourceIdConflict' | 'ManualFlagNotSupported' | 'SystemManagedFlag' | 'DeliveryModeConflict';
-
-export type NoCtfapiEndpointsAdministrationChallengeBankSaveChallengeFlagRequest = {
-    id?: string | null;
-    flag: string;
-    matchKind?: NoCtfapiEndpointsAdministrationChallengeBankChallengeFlagMatchKindProtocol;
-};
-
 export type NoCtfapiEndpointsAdministrationChallengesChallengeHintResponse = {
     id?: string;
     competitionChallengeId?: string;
@@ -1885,6 +1852,26 @@ export type NoCtfapiEndpointsAdministrationChallengesChallengeConfigurationRespo
 export type NoCtfapiEndpointsAdministrationChallengesGetAdminChallengeRequest = {
     [key: string]: never;
 };
+
+export type NoCtfapiEndpointsAdministrationChallengeBankChallengeFlagResponse = {
+    id?: string;
+    challengeId?: string | null;
+    competitionChallengeId?: string | null;
+    teamId?: string | null;
+    flag?: string;
+    matchKind?: NoCtfapiEndpointsAdministrationChallengeBankChallengeFlagMatchKindProtocol;
+    specificationKind?: NoCtfapiEndpointsAdministrationChallengeBankSpecificationKindProtocol | null;
+    specificationId?: string | null;
+    validStart?: string | null;
+    validUntil?: string | null;
+    deletedAt?: string | null;
+    createdAt?: string;
+    systemManaged?: boolean;
+};
+
+export type NoCtfapiEndpointsAdministrationChallengeBankChallengeFlagMatchKindProtocol = 'Exact' | 'RegularExpression';
+
+export type NoCtfapiEndpointsAdministrationChallengeBankSpecificationKindProtocol = 'Attachment' | 'AwdRound' | 'RuntimeDefinition' | 'Hint' | 'RuntimeInstance';
 
 export type NoCtfapiEndpointsAdministrationChallengesGetCompetitionChallengeFlagRequest = {
     [key: string]: never;
@@ -1928,6 +1915,19 @@ export type NoCtfapiEndpointsAdministrationChallengesUpdateChallengeRequest = {
     baseScore: number;
     order: number;
     isPublished: boolean;
+};
+
+export type NoCtfapiEndpointsAdministrationChallengeBankChallengeFlagFailureResponse = {
+    code?: NoCtfapiEndpointsAdministrationChallengeBankChallengeFlagFailureCodeProtocol;
+    message?: string;
+};
+
+export type NoCtfapiEndpointsAdministrationChallengeBankChallengeFlagFailureCodeProtocol = 'InvalidFlag' | 'InvalidRegularExpression' | 'RegularExpressionNotSupported' | 'InvalidSpecification' | 'InvalidValidityWindow' | 'InvalidTemplateFlagScope' | 'ResourceIdConflict' | 'ManualFlagNotSupported' | 'SystemManagedFlag' | 'DeliveryModeConflict';
+
+export type NoCtfapiEndpointsAdministrationChallengeBankSaveChallengeFlagRequest = {
+    id?: string | null;
+    flag: string;
+    matchKind?: NoCtfapiEndpointsAdministrationChallengeBankChallengeFlagMatchKindProtocol;
 };
 
 export type NoCtfapiEndpointsAdministrationChallengeBankChallengeTemplateResponse = {
@@ -7833,83 +7833,6 @@ export type AdminCreateCompetitionChallengeResponses = {
 
 export type AdminCreateCompetitionChallengeResponse = AdminCreateCompetitionChallengeResponses[keyof AdminCreateCompetitionChallengeResponses];
 
-export type AdminListCompetitionChallengeFlagsData = {
-    body?: never;
-    path: {
-        competitionId: string;
-        competitionChallengeId: string;
-    };
-    query: {
-        includeDeleted: boolean;
-    };
-    url: '/api/v1/admin/competitions/{competitionId}/challenges/{competitionChallengeId}/flags';
-};
-
-export type AdminListCompetitionChallengeFlagsErrors = {
-    /**
-     * Unauthorized
-     */
-    401: unknown;
-    /**
-     * Forbidden
-     */
-    403: unknown;
-    /**
-     * Not Found
-     */
-    404: unknown;
-};
-
-export type AdminListCompetitionChallengeFlagsResponses = {
-    /**
-     * Success
-     */
-    200: NoCtfapiEndpointsAdministrationChallengeBankChallengeFlagListResponse;
-};
-
-export type AdminListCompetitionChallengeFlagsResponse = AdminListCompetitionChallengeFlagsResponses[keyof AdminListCompetitionChallengeFlagsResponses];
-
-export type AdminCreateCompetitionChallengeFlagData = {
-    body: NoCtfapiEndpointsAdministrationChallengeBankSaveChallengeFlagRequest;
-    path: {
-        competitionId: string;
-        competitionChallengeId: string;
-    };
-    query?: never;
-    url: '/api/v1/admin/competitions/{competitionId}/challenges/{competitionChallengeId}/flags';
-};
-
-export type AdminCreateCompetitionChallengeFlagErrors = {
-    /**
-     * Bad Request
-     */
-    400: MicrosoftAspNetCoreMvcValidationProblemDetails;
-    /**
-     * Unauthorized
-     */
-    401: unknown;
-    /**
-     * Forbidden
-     */
-    403: unknown;
-    /**
-     * Not Found
-     */
-    404: unknown;
-    409: NoCtfapiEndpointsAdministrationChallengeBankChallengeFlagFailureResponse;
-};
-
-export type AdminCreateCompetitionChallengeFlagError = AdminCreateCompetitionChallengeFlagErrors[keyof AdminCreateCompetitionChallengeFlagErrors];
-
-export type AdminCreateCompetitionChallengeFlagResponses = {
-    /**
-     * Created
-     */
-    201: NoCtfapiEndpointsAdministrationChallengeBankChallengeFlagResponse;
-};
-
-export type AdminCreateCompetitionChallengeFlagResponse = AdminCreateCompetitionChallengeFlagResponses[keyof AdminCreateCompetitionChallengeFlagResponses];
-
 export type AdminListCompetitionChallengeHintsData = {
     body?: never;
     path: {
@@ -8100,123 +8023,6 @@ export type AdminUpdateCompetitionChallengeResponses = {
 
 export type AdminUpdateCompetitionChallengeResponse = AdminUpdateCompetitionChallengeResponses[keyof AdminUpdateCompetitionChallengeResponses];
 
-export type AdminDeleteCompetitionChallengeFlagData = {
-    body?: never;
-    path: {
-        competitionId: string;
-        competitionChallengeId: string;
-        flagId: string;
-    };
-    query?: never;
-    url: '/api/v1/admin/competitions/{competitionId}/challenges/{competitionChallengeId}/flags/{flagId}';
-};
-
-export type AdminDeleteCompetitionChallengeFlagErrors = {
-    /**
-     * Unauthorized
-     */
-    401: unknown;
-    /**
-     * Forbidden
-     */
-    403: unknown;
-    /**
-     * Not Found
-     */
-    404: unknown;
-    409: NoCtfapiEndpointsAdministrationChallengeBankChallengeFlagFailureResponse;
-};
-
-export type AdminDeleteCompetitionChallengeFlagError = AdminDeleteCompetitionChallengeFlagErrors[keyof AdminDeleteCompetitionChallengeFlagErrors];
-
-export type AdminDeleteCompetitionChallengeFlagResponses = {
-    /**
-     * No Content
-     */
-    204: void;
-};
-
-export type AdminDeleteCompetitionChallengeFlagResponse = AdminDeleteCompetitionChallengeFlagResponses[keyof AdminDeleteCompetitionChallengeFlagResponses];
-
-export type AdminGetCompetitionChallengeFlagData = {
-    body?: never;
-    path: {
-        competitionId: string;
-        competitionChallengeId: string;
-        flagId: string;
-    };
-    query: {
-        includeDeleted: boolean;
-    };
-    url: '/api/v1/admin/competitions/{competitionId}/challenges/{competitionChallengeId}/flags/{flagId}';
-};
-
-export type AdminGetCompetitionChallengeFlagErrors = {
-    /**
-     * Unauthorized
-     */
-    401: unknown;
-    /**
-     * Forbidden
-     */
-    403: unknown;
-    /**
-     * Not Found
-     */
-    404: unknown;
-};
-
-export type AdminGetCompetitionChallengeFlagResponses = {
-    /**
-     * Success
-     */
-    200: NoCtfapiEndpointsAdministrationChallengeBankChallengeFlagResponse;
-};
-
-export type AdminGetCompetitionChallengeFlagResponse = AdminGetCompetitionChallengeFlagResponses[keyof AdminGetCompetitionChallengeFlagResponses];
-
-export type AdminUpdateCompetitionChallengeFlagData = {
-    body: NoCtfapiEndpointsAdministrationChallengeBankSaveChallengeFlagRequest;
-    path: {
-        competitionId: string;
-        competitionChallengeId: string;
-        flagId: string;
-    };
-    query?: never;
-    url: '/api/v1/admin/competitions/{competitionId}/challenges/{competitionChallengeId}/flags/{flagId}';
-};
-
-export type AdminUpdateCompetitionChallengeFlagErrors = {
-    /**
-     * Bad Request
-     */
-    400: MicrosoftAspNetCoreMvcValidationProblemDetails;
-    /**
-     * Unauthorized
-     */
-    401: unknown;
-    /**
-     * Forbidden
-     */
-    403: unknown;
-    /**
-     * Not Found
-     */
-    404: unknown;
-    409: NoCtfapiEndpointsAdministrationChallengeBankChallengeFlagFailureResponse;
-};
-
-export type AdminUpdateCompetitionChallengeFlagError = AdminUpdateCompetitionChallengeFlagErrors[keyof AdminUpdateCompetitionChallengeFlagErrors];
-
-export type AdminUpdateCompetitionChallengeFlagResponses = {
-    /**
-     * Success
-     */
-    200: NoCtfapiEndpointsAdministrationChallengeBankChallengeFlagResponse;
-};
-
-export type AdminUpdateCompetitionChallengeFlagResponse = AdminUpdateCompetitionChallengeFlagResponses[keyof AdminUpdateCompetitionChallengeFlagResponses];
-
 export type AdminDeleteCompetitionChallengeHintData = {
     body?: never;
     path: {
@@ -8405,6 +8211,79 @@ export type AdminChallengeConfigurationUpdateResponses = {
 
 export type AdminChallengeConfigurationUpdateResponse = AdminChallengeConfigurationUpdateResponses[keyof AdminChallengeConfigurationUpdateResponses];
 
+export type AdminGetCompetitionChallengeFlagData = {
+    body?: never;
+    path: {
+        competitionId: string;
+        competitionChallengeId: string;
+        flagId: string;
+    };
+    query: {
+        includeDeleted: boolean;
+    };
+    url: '/api/v1/admin/competitions/{competitionId}/challenges/{competitionChallengeId}/flags/{flagId}';
+};
+
+export type AdminGetCompetitionChallengeFlagErrors = {
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+    /**
+     * Not Found
+     */
+    404: unknown;
+};
+
+export type AdminGetCompetitionChallengeFlagResponses = {
+    /**
+     * Success
+     */
+    200: NoCtfapiEndpointsAdministrationChallengeBankChallengeFlagResponse;
+};
+
+export type AdminGetCompetitionChallengeFlagResponse = AdminGetCompetitionChallengeFlagResponses[keyof AdminGetCompetitionChallengeFlagResponses];
+
+export type AdminListCompetitionChallengeFlagsData = {
+    body?: never;
+    path: {
+        competitionId: string;
+        competitionChallengeId: string;
+    };
+    query: {
+        includeDeleted: boolean;
+    };
+    url: '/api/v1/admin/competitions/{competitionId}/challenges/{competitionChallengeId}/flags';
+};
+
+export type AdminListCompetitionChallengeFlagsErrors = {
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+    /**
+     * Not Found
+     */
+    404: unknown;
+};
+
+export type AdminListCompetitionChallengeFlagsResponses = {
+    /**
+     * Success
+     */
+    200: NoCtfapiEndpointsAdministrationChallengeBankChallengeFlagListResponse;
+};
+
+export type AdminListCompetitionChallengeFlagsResponse = AdminListCompetitionChallengeFlagsResponses[keyof AdminListCompetitionChallengeFlagsResponses];
+
 export type AdminRestoreCompetitionChallengeData = {
     body?: never;
     path: {
@@ -8441,44 +8320,6 @@ export type AdminRestoreCompetitionChallengeResponses = {
 };
 
 export type AdminRestoreCompetitionChallengeResponse = AdminRestoreCompetitionChallengeResponses[keyof AdminRestoreCompetitionChallengeResponses];
-
-export type AdminRestoreCompetitionChallengeFlagData = {
-    body?: never;
-    path: {
-        competitionId: string;
-        competitionChallengeId: string;
-        flagId: string;
-    };
-    query?: never;
-    url: '/api/v1/admin/competitions/{competitionId}/challenges/{competitionChallengeId}/flags/{flagId}/restore';
-};
-
-export type AdminRestoreCompetitionChallengeFlagErrors = {
-    /**
-     * Unauthorized
-     */
-    401: unknown;
-    /**
-     * Forbidden
-     */
-    403: unknown;
-    /**
-     * Not Found
-     */
-    404: unknown;
-    409: NoCtfapiEndpointsAdministrationChallengeBankChallengeFlagFailureResponse;
-};
-
-export type AdminRestoreCompetitionChallengeFlagError = AdminRestoreCompetitionChallengeFlagErrors[keyof AdminRestoreCompetitionChallengeFlagErrors];
-
-export type AdminRestoreCompetitionChallengeFlagResponses = {
-    /**
-     * No Content
-     */
-    204: void;
-};
-
-export type AdminRestoreCompetitionChallengeFlagResponse = AdminRestoreCompetitionChallengeFlagResponses[keyof AdminRestoreCompetitionChallengeFlagResponses];
 
 export type AdminRestoreCompetitionChallengeHintData = {
     body?: never;

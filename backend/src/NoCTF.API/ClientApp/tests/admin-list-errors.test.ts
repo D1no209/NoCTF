@@ -41,18 +41,14 @@ describe('admin list error presentation', () => {
     expect(catchBody).not.toContain('exportReason.value = \'\'')
   })
 
-  test('challenge flags and hints keep loaded rows visible beside load failures', async () => {
+  test('competition challenge hints keep loaded rows visible beside load failures', async () => {
     const source = await pageSource('admin/competitions/[id]/challenges/[ccId].vue')
 
-    for (const section of ['flags', 'hints']) {
-      expect(source).toContain(`${section}LoadError.value = parseApiError(error).message`)
-      expect(source).toContain(`<Alert v-if="${section}LoadError" variant="destructive">`)
-    }
-    expect(source).toContain('!flagsLoadError && staticFlags.length === 0 && systemFlags.length === 0')
-    expect(source).toContain('!flagsLoading && staticFlags.length > 0')
-    expect(source).toContain('!flagsLoading && systemFlags.length > 0')
+    expect(source).toContain('hintsLoadError.value = parseApiError(error).message')
+    expect(source).toContain('<Alert v-if="hintsLoadError" variant="destructive">')
     expect(source).toContain('!hintsLoadError && hints.length === 0')
     expect(source).toContain('v-else-if="hints.length > 0"')
+    expect(source).not.toContain('flagsLoadError')
   })
 
   test('platform audit archives download directly without an asynchronous task list', async () => {

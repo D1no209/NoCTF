@@ -3003,6 +3003,7 @@
 ## 已落地的主要能力
 
 - 题库详情的“基本信息 / 运行环境 / 模式定义 / 附件 / Flags / 权限”已从顶部横向标签改为左侧设置导航；桌面端与正文并列，窄屏自动折叠为紧凑网格，附件和 Flag 数量继续显示在对应入口。平台版本递增至 `0.1.0-alpha.95`。
+- 竞赛题目管理不再提供 Flag 新增、编辑、删除或恢复入口，并从 HTTP/OpenAPI/TypeScript SDK 契约删除对应四个写操作；竞赛作用域仅保留系统动态 Flag 的只读查询和平台内部生成链路。静态及附件 Flag 继续由出题人在题库模板中维护。KoH E2E 改为断言竞赛 Flag 写路由不存在。平台版本递增至 `0.1.0-alpha.96`。验证通过：前端 283 项测试、typecheck 与 production build；后端 Release build 为 0 警告/0 错误，TUnit 925 通过、178 项因本机未提供 Docker/Testcontainers 或外部集群而按既定条件跳过，无失败；SDK 重新生成幂等，`git diff --check` 通过。
 
 - `CompetitionEvent` 合并生命周期与排行榜可见性事实。
 - `platform_settings` 合并邮件设置；`account_tokens` 合并验证与重置 Token。
