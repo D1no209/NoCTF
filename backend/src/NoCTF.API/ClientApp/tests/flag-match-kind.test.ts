@@ -80,6 +80,6 @@ describe('attachment delivery editor', () => {
     expect(page).toContain("attachmentDeliveryPolicy === 'RandomOnePerTeam'")
     expect(page).toContain('downloadRandomChallengeAttachmentEndpoint')
     expect(page).toContain('v-for="attachment in attachments"')
-    expect(page).toContain('首次下载会为本队随机分配一个附件')
+    expect(page).not.toContain('首次下载会为本队随机分配一个附件')
   })
 })

@@ -171,10 +171,7 @@ const mode = computed(() => ctx.competition.value?.mode)
               <Dice5 data-icon="inline-start" /> {{ $t('下载附件') }}
             </Button>
         </div>
-          <p v-if="attachmentDeliveryPolicy === 'RandomOnePerTeam'" class="mt-3 text-sm text-muted-foreground">
-            {{ $t('首次下载会为本队随机分配一个附件，之后始终获得同一文件。') }}
-          </p>
-          <ul v-else class="mt-3 divide-y border-y">
+          <ul v-if="attachmentDeliveryPolicy !== 'RandomOnePerTeam'" class="mt-3 divide-y border-y">
             <li
               v-for="attachment in attachments"
               :key="attachment.id"
