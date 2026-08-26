@@ -746,7 +746,6 @@ public sealed class CompetitionQuestionLimitsPersistenceTests
                 Id = id,
                 CompetitionId = competitionId,
                 ChallengeId = challengeId,
-                BaseScore = 500,
                 Order = order,
                 IsPublished = published,
                 RulesJson = """{"schemaVersion":1}""",

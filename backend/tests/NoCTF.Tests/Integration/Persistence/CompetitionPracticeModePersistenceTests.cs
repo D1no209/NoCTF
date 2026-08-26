@@ -254,7 +254,6 @@ public sealed class CompetitionPracticeModePersistenceTests
             Id = competitionChallengeId,
             CompetitionId = competitionId,
             ChallengeId = challengeId,
-            BaseScore = 500,
             IsPublished = true,
             RulesJson = """{"schemaVersion":2}""",
             UpdatedAt = now

@@ -48,7 +48,7 @@ Attachment 策略：
 
 ## 动态题值
 
-CTF 题值完全来自有效 `ScoreCurve`，不再以 CompetitionChallenge.BaseScore 作为曲线初始分。内置 Fixed、Linear、Quadratic、Exponential、Logarithmic 五种模式，也可以使用受限的 DynamicExpresso 自定义公式。变量、取整、安全与错误行为见 [计分规范](../scoring-projection.md#共享分值衰减曲线)。
+CTF 题值完全来自有效 `ScoreCurve`。内置 Fixed、Linear、Quadratic、Exponential、Logarithmic 五种模式，也可以使用受限的 DynamicExpresso 自定义公式。变量、取整、安全与错误行为见 [计分规范](../scoring-projection.md#共享分值衰减曲线)。
 
 当前所有有效 solve 共享同一当前题值。配置变更立即使榜单 dirty，但不重判 GameplayFact。
 

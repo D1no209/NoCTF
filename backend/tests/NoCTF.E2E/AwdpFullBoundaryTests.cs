@@ -104,7 +104,7 @@ public sealed class AwdpFullBoundaryTests
             admin,
             HttpMethod.Post,
             $"/api/v1/admin/competitions/{competitionId}/challenges",
-            new { challengeId = templateId, baseScore = 0, order = 0 },
+            new { challengeId = templateId, order = 0 },
             HttpStatusCode.Created,
             cancellationToken);
         var competitionChallengeId = challenge.GetProperty("id").GetGuid();
@@ -134,7 +134,7 @@ public sealed class AwdpFullBoundaryTests
             admin,
             HttpMethod.Put,
             $"/api/v1/admin/competitions/{competitionId}/challenges/{competitionChallengeId}",
-            new { customTitle = (string?)null, baseScore = 0, order = 0, isPublished = true },
+            new { customTitle = (string?)null, order = 0, isPublished = true },
             HttpStatusCode.OK,
             cancellationToken);
 

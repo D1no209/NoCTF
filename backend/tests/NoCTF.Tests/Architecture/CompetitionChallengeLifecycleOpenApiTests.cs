@@ -79,9 +79,9 @@ public sealed class CompetitionChallengeLifecycleOpenApiTests
                 .GetProperty("schema"));
 
         await Assert.That(PropertyNames(request))
-            .IsEquivalentTo(["customTitle", "baseScore", "order", "isPublished"]);
+            .IsEquivalentTo(["customTitle", "order", "isPublished"]);
         await Assert.That(RequiredPropertyNames(request))
-            .IsEquivalentTo(["customTitle", "baseScore", "order", "isPublished"]);
+            .IsEquivalentTo(["customTitle", "order", "isPublished"]);
     }
 
     [Test]

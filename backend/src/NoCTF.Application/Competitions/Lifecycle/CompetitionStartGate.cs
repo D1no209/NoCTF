@@ -12,7 +12,6 @@ public sealed record StartGateChallenge(
     string RulesJson,
     string DefinitionJson,
     bool Published,
-    long BaseScore,
     IReadOnlyList<long> HintCosts);
 
 public sealed record CompetitionStartGateSnapshot(
@@ -130,13 +129,6 @@ public sealed class CompetitionStartGate(
         }
         foreach (var challenge in snapshot.Challenges.Where(item => item.Published))
         {
-            if (challenge.BaseScore is < 0 or > ScoreValueLimits.MaximumConfiguredValue)
-            {
-                errors.Add(new(
-                    StartGateFailureCode.ChallengeRulesInvalid,
-                    challenge.CompetitionChallengeId,
-                    $"BaseScore must be between zero and {ScoreValueLimits.MaximumConfiguredValue}."));
-            }
             if (challenge.HintCosts.Any(cost =>
                     cost is < 0 or > ScoreValueLimits.MaximumConfiguredValue))
             {

@@ -44,7 +44,7 @@ NoCTF 不解析 Git 仓库、不执行 Docker build，也不承担仓库级差�
 NoCTF 题目模型分为两个层次：
 
 - `Challenge` 是全局题库模板，绑定一种 GameMode，拥有标题、题面、方向、可见性、模板附件、模板静态 Flag、Runtime、Checker 和动态 Flag 注入定义；
-- `CompetitionChallenge` 是某场比赛对 Challenge 的一次引用，拥有可选比赛内展示名称、比赛内排序、发布状态、BaseScore、Rules 和 Hint；比赛内展示名称不会修改 Challenge 模板标题。
+- `CompetitionChallenge` 是某场比赛对 Challenge 的一次引用，拥有可选比赛内展示名称、比赛内排序、发布状态、Rules 和 Hint；比赛内展示名称不会修改 Challenge 模板标题，分值完全由模式规则决定。
 
 仓库协议与领域模型直接对应：
 
@@ -257,7 +257,6 @@ Issue Form 至少收集：
 - slug；
 - GameMode；
 - Runtime 类型：None、Container 或 Compose；
-- 初始 BaseScore；
 - 初始 Order；
 - 题目负责人；
 - 简短说明。
@@ -278,7 +277,7 @@ slug 只允许小写 ASCII 字母、数字和单个连字符，不能以连字�
 - 目录不存在；
 - slug 在该 direction 下没有重复；
 - GameMode 是 CTF、AWD、AWDP、KoH 之一；
-- BaseScore 与 Order 合法；
+- Order 与模式专属计分规则合法；
 - Issue 创建者是允许创建题目的仓库成员。
 
 Issue 的自由文本不得直接拼接为 shell 命令、分支命令或文件路径。结构化字段必须先解析和规范化。
@@ -391,7 +390,6 @@ challenges:
   - id: 215e53e6-a17f-4052-9327-a89a602a26f1
     challenge: web/sql-notes
     order: 20
-    baseScore: 500
     published: false
 
     hints:
@@ -1042,7 +1040,7 @@ PR 必须检查：
 - KoH Shared Runtime 和 Control Check；
 - Docker build；
 - 题目 `tests/`；
-- `competition.yml` 的 Order、BaseScore、发布状态和 Hint。
+- `competition.yml` 的 Order、模式专属计分规则、发布状态和 Hint。
 
 无镜像的纯静态题应让 build job 正常跳过，最终 required check 仍然成功。最终提供一个固定名称的汇总 job，供 branch protection 使用。
 
@@ -1271,7 +1269,7 @@ Action 先调用 list API，再按 Manifest ID 比较：
 5. 创建新 Attachment，再删除不需要的旧 Attachment；
 6. 创建或更新模板静态 Flag；
 7. 创建或恢复 CompetitionChallenge，保持 `published: false`；
-8. 更新 BaseScore、Order 和 Rules；
+8. 更新 Order 和 Rules；
 9. 创建或更新 Hint；
 10. 删除 Manifest 中已移除的 Hint、Flag 和 Attachment；
 11. 软删除已移除的 CompetitionChallenge；
@@ -1317,7 +1315,7 @@ apply job 在 GitHub Job Summary 中输出：
 允许完整更新：
 
 - Challenge 题面、附件、静态 Flag和 Definition；
-- CompetitionChallenge BaseScore、Order、Rules、Hint 和发布状态；
+- CompetitionChallenge Order、Rules、Hint 和发布状态；
 - 新增、恢复和软删除。
 
 ### Running、Paused

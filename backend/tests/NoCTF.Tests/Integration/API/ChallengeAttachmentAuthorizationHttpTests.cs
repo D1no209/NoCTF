@@ -386,7 +386,6 @@ public sealed class ChallengeAttachmentAuthorizationHttpTests
             Id = id,
             CompetitionId = competitionId,
             ChallengeId = challengeId,
-            BaseScore = 500,
             Order = order,
             IsPublished = isPublished,
             RulesJson = JsonSerializer.Serialize(new

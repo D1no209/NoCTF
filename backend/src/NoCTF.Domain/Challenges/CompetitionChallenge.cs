@@ -10,7 +10,6 @@ public sealed class CompetitionChallenge
     public Guid ChallengeId { get; set; }
     [MaxLength(160)]
     public string? CustomTitle { get; set; }
-    public long BaseScore { get; set; }
     public int Order { get; set; }
     public bool IsPublished { get; set; }
     public string RulesJson { get; set; } = string.Empty;

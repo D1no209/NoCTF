@@ -39,7 +39,6 @@ public sealed class CompetitionStartGateStore(NoCtfDbContext db)
                     item.RulesJson,
                     template.DefinitionJson,
                     item.IsPublished,
-                    item.BaseScore,
                     item.Hints.Select(hint => hint.Cost).ToArray()))
             .ToArrayAsync(ct);
         var teamTracks = await db.Teams.AsNoTracking()

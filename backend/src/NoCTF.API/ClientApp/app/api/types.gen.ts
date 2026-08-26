@@ -781,7 +781,6 @@ export type NoCtfapiEndpointsChallengesChallengeResponse = {
     customTitle?: string | null;
     description?: string | null;
     direction?: string;
-    baseScore?: number | null;
     order?: number;
     isPublished?: boolean;
     deletedAt?: string | null;
@@ -1814,7 +1813,6 @@ export type NoCtfapiEndpointsAdministrationChallengesCreateChallengeRequest = {
     id?: string | null;
     challengeId: string;
     customTitle?: string | null;
-    baseScore?: number;
     order?: number;
 };
 
@@ -1912,7 +1910,6 @@ export type NoCtfapiEndpointsAdministrationChallengesUpdateChallengeConfiguratio
 
 export type NoCtfapiEndpointsAdministrationChallengesUpdateChallengeRequest = {
     customTitle: string | null;
-    baseScore: number;
     order: number;
     isPublished: boolean;
 };

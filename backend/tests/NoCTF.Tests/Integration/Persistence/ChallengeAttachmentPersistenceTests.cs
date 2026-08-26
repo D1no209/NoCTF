@@ -261,7 +261,6 @@ public sealed class ChallengeAttachmentPersistenceTests
                     Id = competitionChallengeId,
                     CompetitionId = competitionId,
                     ChallengeId = challengeId,
-                    BaseScore = 500,
                     Order = 1,
                     IsPublished = true,
                     RulesJson = "{\"schemaVersion\":1}",

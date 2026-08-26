@@ -122,7 +122,6 @@ public sealed class ChallengeAudienceEndpointTests
             null,
             "statement",
             "PWN",
-            500,
             1,
             true,
             null,

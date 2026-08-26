@@ -130,7 +130,6 @@ public sealed class GitOpsPersistenceContractTests
                     competitionChallengeId,
                     competitionId,
                     challengeId,
-                    500,
                     1,
                     now,
                     "Finals Web"),
@@ -273,7 +272,6 @@ public sealed class GitOpsPersistenceContractTests
                 new(
                     competitionId,
                     competitionChallengeId,
-                    beforeTitleReset.BaseScore,
                     beforeTitleReset.Order,
                     beforeTitleReset.IsPublished,
                     now.AddSeconds(1),

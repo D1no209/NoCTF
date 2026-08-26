@@ -91,7 +91,6 @@ public sealed class HintUnlockLifecyclePersistenceTests
                     Id = competitionChallengeId,
                     CompetitionId = competitionId,
                     ChallengeId = challengeId,
-                    BaseScore = 100,
                     IsPublished = true,
                     RulesJson = """{"schemaVersion":1}""",
                     UpdatedAt = now,

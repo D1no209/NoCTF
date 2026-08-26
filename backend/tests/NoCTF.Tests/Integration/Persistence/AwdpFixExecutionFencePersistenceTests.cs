@@ -210,7 +210,6 @@ public sealed class AwdpFixExecutionFencePersistenceTests
             Id = competitionChallengeId,
             CompetitionId = competitionId,
             ChallengeId = challengeId,
-            BaseScore = 100,
             IsPublished = true,
             RulesJson = new GameModeChallengeConfigurationCatalog()
                 .GetDefaultJson(GameMode.Awdp),

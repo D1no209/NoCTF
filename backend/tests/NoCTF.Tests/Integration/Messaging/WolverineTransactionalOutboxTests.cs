@@ -872,7 +872,6 @@ public sealed class WolverineTransactionalOutboxTests
             Id = fixture.CompetitionChallengeId,
             CompetitionId = competitionId,
             ChallengeId = challengeId,
-            BaseScore = 100,
             IsPublished = true,
             RulesJson = "{}",
             UpdatedAt = now

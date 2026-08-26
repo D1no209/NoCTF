@@ -768,7 +768,6 @@ public sealed class AwdpAttackRuntimePersistenceTests
             CompetitionId = competitionId,
             ChallengeId = challengeId,
             IsPublished = true,
-            BaseScore = 100,
             RulesJson = JsonSerializer.Serialize(new AwdpChallengeConfiguration(
                 AwdpChallengeConfiguration.CurrentSchemaVersion,
                 null,

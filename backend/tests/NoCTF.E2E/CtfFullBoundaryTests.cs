@@ -89,7 +89,7 @@ public sealed class CtfFullBoundaryTests
             admin,
             HttpMethod.Post,
             $"/api/v1/admin/competitions/{competitionId}/challenges",
-            new { challengeId = templateId, baseScore = 500, order = 0 },
+            new { challengeId = templateId, order = 0 },
             HttpStatusCode.Created,
             cancellationToken);
         var competitionChallengeId = challenge.GetProperty("id").GetGuid();
@@ -112,7 +112,7 @@ public sealed class CtfFullBoundaryTests
             admin,
             HttpMethod.Put,
             $"/api/v1/admin/competitions/{competitionId}/challenges/{competitionChallengeId}",
-            new { customTitle = (string?)null, baseScore = 500, order = 0, isPublished = true },
+            new { customTitle = (string?)null, order = 0, isPublished = true },
             HttpStatusCode.OK,
             cancellationToken);
 
@@ -147,7 +147,6 @@ public sealed class CtfFullBoundaryTests
             new
             {
                 challengeId = composeTemplate.GetProperty("id").GetGuid(),
-                baseScore = 250,
                 order = 1
             },
             HttpStatusCode.Created,
@@ -177,7 +176,6 @@ public sealed class CtfFullBoundaryTests
             new
             {
                 customTitle = (string?)null,
-                baseScore = 250,
                 order = 1,
                 isPublished = true
             },

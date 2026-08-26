@@ -393,7 +393,6 @@ public sealed class GameplayFactOrderingPersistenceTests
                     CompetitionId = fixture.CompetitionId,
                     ChallengeId = otherTemplateId,
                     Order = 1,
-                    BaseScore = 100,
                     IsPublished = true,
                     RulesJson = """{"schemaVersion":2}""",
                     UpdatedAt = fixture.Now
@@ -543,7 +542,6 @@ public sealed class GameplayFactOrderingPersistenceTests
             Id = competitionChallengeId,
             CompetitionId = competitionId,
             ChallengeId = challengeId,
-            BaseScore = 100,
             IsPublished = true,
             RulesJson = mode == GameMode.Awdp
                 ? """{"schemaVersion":4}"""
