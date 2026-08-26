@@ -358,7 +358,7 @@ async function submitDelete() {
         </Alert>
 
         <div v-if="canWrite && !isDeleted" class="flex flex-wrap items-center gap-2">
-          <Button variant="outline" size="sm" :disabled="validating" @click="validateStart">
+          <Button v-if="status === 'Published'" variant="outline" size="sm" :disabled="validating" @click="validateStart">
             <Spinner v-if="validating" data-icon="inline-start" /> {{ $t('启动前检查') }} </Button>
           <Button
             v-for="a in actions.filter(a => a.visible)"
@@ -377,8 +377,7 @@ async function submitDelete() {
         <div v-if="validationErrors && validationErrors.length > 0" class="flex flex-col gap-2">
           <Alert v-for="(ve, i) in validationErrors" :key="i" variant="destructive">
             <AlertDescription>
-              <span class="font-mono text-xs">{{ ve.code }}</span>
-              · {{ startGateErrorMessage(ve) }}
+              {{ startGateErrorMessage(ve) }}
               <NuxtLink
                 v-if="ve.competitionChallengeId"
                 class="underline"

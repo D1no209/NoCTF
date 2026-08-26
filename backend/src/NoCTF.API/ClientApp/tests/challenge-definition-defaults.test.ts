@@ -103,6 +103,31 @@ describe('challenge definition defaults', () => {
     expect(page).toContain('v-if="ve.competitionChallengeId"')
     expect(page).toContain("$t('查看题目')")
   })
+
+  test('localizes every stable start-gate failure and only offers validation before start', async () => {
+    const failures = [
+      ['CompetitionNotPublished', '比赛必须处于已发布状态才能执行启动前检查。'],
+      ['CompetitionConfigurationInvalid', '比赛模式配置无效，请检查比赛配置。'],
+      ['PublishedChallengeRequired', '至少需要发布一道题目。'],
+      ['ApprovedTeamRequired', '至少需要一支审核通过的队伍。'],
+      ['RuntimeQuotaInsufficient', '每队并发运行环境上限不足以承载全部已发布的 AWD 题目。'],
+      ['ChallengeModeMismatch', '题目模式与比赛模式不一致。'],
+      ['ChallengeRulesInvalid', '题目规则无效，请检查比赛题目配置。'],
+      ['RuntimeDefinitionInvalid', '题目运行环境定义无效，请检查题目模板。'],
+      ['TrackConfigurationInvalid', '赛道配置无效，请检查赛道设置。'],
+      ['TeamTrackInvalid', '存在队伍使用了已不存在的赛道，请调整队伍赛道。'],
+    ] as const
+
+    for (const [code, expected] of failures) {
+      expect(startGateErrorMessage({ code, message: 'Unlocalized backend detail.' })).toBe(expected)
+    }
+
+    const page = await Bun.file(
+      new URL('../app/pages/admin/competitions/[id]/index.vue', import.meta.url),
+    ).text()
+    expect(page).toContain('v-if="status === \'Published\'"')
+    expect(page).not.toContain('{{ ve.code }}')
+  })
 })
 
 describe('CTF score decay preview', () => {
