@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'bun:test'
 
 describe('challenge flag match kind editor', () => {
-  test('uses the generated match-kind contract in template and competition editors', async () => {
+  test('uses the generated match-kind contract only in the challenge-bank editor', async () => {
     const templatePage = await Bun.file(
       new URL('../app/pages/admin/challenges/[id].vue', import.meta.url),
     ).text()
@@ -9,21 +9,21 @@ describe('challenge flag match kind editor', () => {
       new URL('../app/pages/admin/competitions/[id]/challenges/[ccId].vue', import.meta.url),
     ).text()
 
-    for (const page of [templatePage, competitionPage]) {
-      expect(page).toContain('NoCtfapiEndpointsAdministrationChallengeBankChallengeFlagMatchKindProtocol')
-      expect(page).toContain('matchKind: flagForm')
-      expect(page).toContain('supportsRegularExpression')
-      expect(page).toContain('value="RegularExpression"')
-      expect(page).toContain('usesRuntimeFlagInjection')
-      expect(page).toContain('无需维护精确或正则 Flag')
-      expect(page).toContain('systemManaged')
-      expect(page).toContain('系统生成的动态 Flag')
-      expect(page).not.toContain('flagForm.teamId')
-      expect(page).not.toContain('flagForm.specificationKind')
-      expect(page).not.toContain('flagForm.specificationId')
-      expect(page).not.toContain('flagForm.validStart')
-      expect(page).not.toContain('flagForm.validUntil')
-    }
+    expect(templatePage).toContain('NoCtfapiEndpointsAdministrationChallengeBankChallengeFlagMatchKindProtocol')
+    expect(templatePage).toContain('matchKind: flagForm')
+    expect(templatePage).toContain('supportsRegularExpression')
+    expect(templatePage).toContain('value="RegularExpression"')
+    expect(templatePage).toContain('usesRuntimeFlagInjection')
+    expect(templatePage).toContain('无需维护精确或正则 Flag')
+    expect(templatePage).not.toContain('flagForm.teamId')
+    expect(templatePage).not.toContain('flagForm.specificationKind')
+    expect(templatePage).not.toContain('flagForm.specificationId')
+    expect(templatePage).not.toContain('flagForm.validStart')
+    expect(templatePage).not.toContain('flagForm.validUntil')
+
+    expect(competitionPage).not.toContain('ChallengeFlagMatchKindProtocol')
+    expect(competitionPage).not.toContain('flagForm')
+    expect(competitionPage).not.toContain('TabsTrigger value="flags"')
   })
 
   test('uses generated typed flag failures and preserves the open form on failure', async () => {
@@ -34,10 +34,10 @@ describe('challenge flag match kind editor', () => {
       new URL('../app/pages/admin/competitions/[id]/challenges/[ccId].vue', import.meta.url),
     ).text()
 
-    for (const page of [templatePage, competitionPage]) {
-      expect(page).toContain('NoCtfapiEndpointsAdministrationChallengeBankChallengeFlagFailureResponse')
-      expect(page).toContain('challengeFlagErrorMessage')
-    }
+    expect(templatePage).toContain('NoCtfapiEndpointsAdministrationChallengeBankChallengeFlagFailureResponse')
+    expect(templatePage).toContain('challengeFlagErrorMessage')
+    expect(competitionPage).not.toContain('ChallengeFlagFailureResponse')
+    expect(competitionPage).not.toContain('challengeFlagErrorMessage')
     const create = templatePage.slice(
       templatePage.indexOf('async function createFlag'),
       templatePage.indexOf('async function confirmDeleteFlag'),

@@ -335,11 +335,7 @@ PUT  /api/v1/admin/competitions/{competitionId}/challenges/{competitionChallenge
 DELETE /api/v1/admin/competitions/{competitionId}/challenges/{competitionChallengeId}/hints/{hintId}
 POST /api/v1/admin/competitions/{competitionId}/challenges/{competitionChallengeId}/hints/{hintId}/restore
 GET  /api/v1/admin/competitions/{competitionId}/challenges/{competitionChallengeId}/flags
-POST /api/v1/admin/competitions/{competitionId}/challenges/{competitionChallengeId}/flags
 GET  /api/v1/admin/competitions/{competitionId}/challenges/{competitionChallengeId}/flags/{flagId}
-PUT  /api/v1/admin/competitions/{competitionId}/challenges/{competitionChallengeId}/flags/{flagId}
-DELETE /api/v1/admin/competitions/{competitionId}/challenges/{competitionChallengeId}/flags/{flagId}
-POST /api/v1/admin/competitions/{competitionId}/challenges/{competitionChallengeId}/flags/{flagId}/restore
 ```
 
 CompetitionChallenge create/update/delete/restore 的业务冲突统一返回强类型

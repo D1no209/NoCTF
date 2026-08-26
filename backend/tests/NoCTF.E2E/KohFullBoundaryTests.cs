@@ -193,12 +193,12 @@ public sealed class KohFullBoundaryTests
         await SetFixtureAsync(fixtureUrl, "wrong", null, cancellationToken);
 
         const string attemptedReplacement = "flag{koh-manual-replacement}";
-        await AssertSystemManagedFlagRejectedAsync(
+        await AssertCompetitionFlagMutationUnavailableAsync(
             admin, competitionId, competitionChallengeId,
-            byTeam[red.TeamId], attemptedReplacement, cancellationToken);
-        await AssertSystemManagedFlagRejectedAsync(
+            byTeam[red.TeamId], cancellationToken);
+        await AssertCompetitionFlagMutationUnavailableAsync(
             admin, competitionId, competitionChallengeId,
-            byTeam[blue.TeamId], attemptedReplacement, cancellationToken);
+            byTeam[blue.TeamId], cancellationToken);
         await SetFixtureAsync(fixtureUrl, "flag", attemptedReplacement, cancellationToken);
         await AssertScoresStableAsync(
             anonymous, competitionId, TimeSpan.FromSeconds(5), cancellationToken);
@@ -300,29 +300,19 @@ public sealed class KohFullBoundaryTests
             }
         }, JsonOptions);
 
-    private static async Task AssertSystemManagedFlagRejectedAsync(
+    private static async Task AssertCompetitionFlagMutationUnavailableAsync(
         HttpClient admin,
         Guid competitionId,
         Guid competitionChallengeId,
         JsonElement original,
-        string flag,
         CancellationToken cancellationToken)
     {
-        var response = await SendJsonAsync(
-            admin,
-            HttpMethod.Put,
+        using var response = await admin.PutAsJsonAsync(
             $"/api/v1/admin/competitions/{competitionId}/challenges/{competitionChallengeId}/flags/{original.GetProperty("id").GetGuid()}",
-            new
-            {
-                teamId = original.GetProperty("teamId").GetGuid(),
-                flag,
-                specificationKind = "RuntimeDefinition",
-                specificationId = competitionChallengeId
-            },
-            HttpStatusCode.Conflict,
+            new { flag = "flag{koh-manual-replacement}", matchKind = "Exact" },
+            JsonOptions,
             cancellationToken);
-        await Assert.That(response.GetProperty("code").GetString())
-            .IsEqualTo("SystemManagedFlag");
+        await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.NotFound);
     }
 
     private static async Task SetFixtureAsync(

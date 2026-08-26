@@ -10478,155 +10478,6 @@
         ]
       }
     },
-    "/api/v1/admin/competitions/{competitionId}/challenges/{competitionChallengeId}/flags": {
-      "post": {
-        "tags": [
-          "Admin"
-        ],
-        "summary": "Creates a competition-scoped flag.",
-        "description": "Creates a protected flag answer scoped to one CompetitionChallenge.",
-        "operationId": "AdminCreateCompetitionChallengeFlag",
-        "parameters": [
-          {
-            "name": "competitionId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "competitionChallengeId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "x-name": "SaveChallengeFlagRequest",
-          "description": "",
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationChallengeBankSaveChallengeFlagRequest"
-              }
-            }
-          },
-          "required": true,
-          "x-position": 1
-        },
-        "responses": {
-          "201": {
-            "description": "Created",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationChallengeBankChallengeFlagResponse"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Not Found"
-          },
-          "409": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationChallengeBankChallengeFlagFailureResponse"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Unauthorized"
-          },
-          "403": {
-            "description": "Forbidden"
-          },
-          "400": {
-            "description": "Bad Request",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcValidationProblemDetails"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "Bearer": []
-          }
-        ]
-      },
-      "get": {
-        "tags": [
-          "Admin"
-        ],
-        "summary": "Lists competition-scoped flags.",
-        "description": "Returns protected flag records for one CompetitionChallenge to authorized observers.",
-        "operationId": "AdminListCompetitionChallengeFlags",
-        "parameters": [
-          {
-            "name": "competitionId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "guid"
-            }
-          },
-          {
-            "name": "competitionChallengeId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "guid"
-            }
-          },
-          {
-            "name": "includeDeleted",
-            "in": "query",
-            "required": true,
-            "schema": {
-              "type": "boolean"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Success",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationChallengeBankChallengeFlagListResponse"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Not Found"
-          },
-          "401": {
-            "description": "Unauthorized"
-          },
-          "403": {
-            "description": "Forbidden"
-          }
-        },
-        "security": [
-          {
-            "Bearer": []
-          }
-        ]
-      }
-    },
     "/api/v1/admin/competitions/{competitionId}/challenges/{competitionChallengeId}/hints": {
       "post": {
         "tags": [
@@ -10944,235 +10795,6 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationChallengesCompetitionChallengeConflictResponse"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Unauthorized"
-          },
-          "403": {
-            "description": "Forbidden"
-          },
-          "400": {
-            "description": "Bad Request",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcValidationProblemDetails"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "Bearer": []
-          }
-        ]
-      }
-    },
-    "/api/v1/admin/competitions/{competitionId}/challenges/{competitionChallengeId}/flags/{flagId}": {
-      "delete": {
-        "tags": [
-          "Admin"
-        ],
-        "summary": "Deletes a competition-scoped flag.",
-        "description": "Soft-deletes one protected flag from the CompetitionChallenge scope.",
-        "operationId": "AdminDeleteCompetitionChallengeFlag",
-        "parameters": [
-          {
-            "name": "competitionId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "competitionChallengeId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "flagId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "204": {
-            "description": "No Content"
-          },
-          "404": {
-            "description": "Not Found"
-          },
-          "409": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationChallengeBankChallengeFlagFailureResponse"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Unauthorized"
-          },
-          "403": {
-            "description": "Forbidden"
-          }
-        },
-        "security": [
-          {
-            "Bearer": []
-          }
-        ]
-      },
-      "get": {
-        "tags": [
-          "Admin"
-        ],
-        "summary": "Gets a competition-scoped flag.",
-        "description": "Returns protected flag material to authorized competition observers.",
-        "operationId": "AdminGetCompetitionChallengeFlag",
-        "parameters": [
-          {
-            "name": "competitionId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "guid"
-            }
-          },
-          {
-            "name": "competitionChallengeId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "guid"
-            }
-          },
-          {
-            "name": "flagId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "guid"
-            }
-          },
-          {
-            "name": "includeDeleted",
-            "in": "query",
-            "required": true,
-            "schema": {
-              "type": "boolean"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Success",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationChallengeBankChallengeFlagResponse"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Not Found"
-          },
-          "401": {
-            "description": "Unauthorized"
-          },
-          "403": {
-            "description": "Forbidden"
-          }
-        },
-        "security": [
-          {
-            "Bearer": []
-          }
-        ]
-      },
-      "put": {
-        "tags": [
-          "Admin"
-        ],
-        "summary": "Updates a competition-scoped flag.",
-        "description": "Replaces protected flag material and validity metadata within one CompetitionChallenge.",
-        "operationId": "AdminUpdateCompetitionChallengeFlag",
-        "parameters": [
-          {
-            "name": "competitionId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "competitionChallengeId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "flagId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "x-name": "SaveChallengeFlagRequest",
-          "description": "",
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationChallengeBankSaveChallengeFlagRequest"
-              }
-            }
-          },
-          "required": true,
-          "x-position": 1
-        },
-        "responses": {
-          "200": {
-            "description": "Success",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationChallengeBankChallengeFlagResponse"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Not Found"
-          },
-          "409": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationChallengeBankChallengeFlagFailureResponse"
                 }
               }
             }
@@ -11549,6 +11171,143 @@
         ]
       }
     },
+    "/api/v1/admin/competitions/{competitionId}/challenges/{competitionChallengeId}/flags/{flagId}": {
+      "get": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "Gets a competition-scoped flag.",
+        "description": "Returns protected flag material to authorized competition observers.",
+        "operationId": "AdminGetCompetitionChallengeFlag",
+        "parameters": [
+          {
+            "name": "competitionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          },
+          {
+            "name": "competitionChallengeId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          },
+          {
+            "name": "flagId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          },
+          {
+            "name": "includeDeleted",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationChallengeBankChallengeFlagResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/admin/competitions/{competitionId}/challenges/{competitionChallengeId}/flags": {
+      "get": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "Lists competition-scoped flags.",
+        "description": "Returns protected flag records for one CompetitionChallenge to authorized observers.",
+        "operationId": "AdminListCompetitionChallengeFlags",
+        "parameters": [
+          {
+            "name": "competitionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          },
+          {
+            "name": "competitionChallengeId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          },
+          {
+            "name": "includeDeleted",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationChallengeBankChallengeFlagListResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ]
+      }
+    },
     "/api/v1/admin/competitions/{competitionId}/challenges/{competitionChallengeId}/restore": {
       "post": {
         "tags": [
@@ -11590,71 +11349,6 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationChallengesCompetitionChallengeConflictResponse"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Unauthorized"
-          },
-          "403": {
-            "description": "Forbidden"
-          }
-        },
-        "security": [
-          {
-            "Bearer": []
-          }
-        ]
-      }
-    },
-    "/api/v1/admin/competitions/{competitionId}/challenges/{competitionChallengeId}/flags/{flagId}/restore": {
-      "post": {
-        "tags": [
-          "Admin"
-        ],
-        "summary": "Restores a deleted competition-scoped flag.",
-        "description": "Restores a soft-deleted flag owned by the selected competition challenge.",
-        "operationId": "AdminRestoreCompetitionChallengeFlag",
-        "parameters": [
-          {
-            "name": "competitionId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "competitionChallengeId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "flagId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "204": {
-            "description": "No Content"
-          },
-          "404": {
-            "description": "Not Found"
-          },
-          "409": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationChallengeBankChallengeFlagFailureResponse"
                 }
               }
             }
@@ -20263,165 +19957,6 @@
           }
         }
       },
-      "NoCTFAPIEndpointsAdministrationChallengeBankChallengeFlagResponse": {
-        "type": "object",
-        "additionalProperties": false,
-        "properties": {
-          "id": {
-            "type": "string",
-            "format": "guid"
-          },
-          "challengeId": {
-            "type": "string",
-            "format": "guid",
-            "nullable": true
-          },
-          "competitionChallengeId": {
-            "type": "string",
-            "format": "guid",
-            "nullable": true
-          },
-          "teamId": {
-            "type": "string",
-            "format": "guid",
-            "nullable": true
-          },
-          "flag": {
-            "type": "string"
-          },
-          "matchKind": {
-            "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationChallengeBankChallengeFlagMatchKindProtocol"
-          },
-          "specificationKind": {
-            "nullable": true,
-            "oneOf": [
-              {
-                "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationChallengeBankSpecificationKindProtocol"
-              }
-            ]
-          },
-          "specificationId": {
-            "type": "string",
-            "format": "guid",
-            "nullable": true
-          },
-          "validStart": {
-            "type": "string",
-            "format": "date-time",
-            "nullable": true
-          },
-          "validUntil": {
-            "type": "string",
-            "format": "date-time",
-            "nullable": true
-          },
-          "deletedAt": {
-            "type": "string",
-            "format": "date-time",
-            "nullable": true
-          },
-          "createdAt": {
-            "type": "string",
-            "format": "date-time"
-          },
-          "systemManaged": {
-            "type": "boolean"
-          }
-        }
-      },
-      "NoCTFAPIEndpointsAdministrationChallengeBankChallengeFlagMatchKindProtocol": {
-        "type": "string",
-        "description": "",
-        "x-enumNames": [
-          "Exact",
-          "RegularExpression"
-        ],
-        "enum": [
-          "Exact",
-          "RegularExpression"
-        ]
-      },
-      "NoCTFAPIEndpointsAdministrationChallengeBankSpecificationKindProtocol": {
-        "type": "string",
-        "description": "",
-        "x-enumNames": [
-          "Attachment",
-          "AwdRound",
-          "RuntimeDefinition",
-          "Hint",
-          "RuntimeInstance"
-        ],
-        "enum": [
-          "Attachment",
-          "AwdRound",
-          "RuntimeDefinition",
-          "Hint",
-          "RuntimeInstance"
-        ]
-      },
-      "NoCTFAPIEndpointsAdministrationChallengeBankChallengeFlagFailureResponse": {
-        "type": "object",
-        "additionalProperties": false,
-        "properties": {
-          "code": {
-            "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationChallengeBankChallengeFlagFailureCodeProtocol"
-          },
-          "message": {
-            "type": "string"
-          }
-        }
-      },
-      "NoCTFAPIEndpointsAdministrationChallengeBankChallengeFlagFailureCodeProtocol": {
-        "type": "string",
-        "description": "",
-        "x-enumNames": [
-          "InvalidFlag",
-          "InvalidRegularExpression",
-          "RegularExpressionNotSupported",
-          "InvalidSpecification",
-          "InvalidValidityWindow",
-          "InvalidTemplateFlagScope",
-          "ResourceIdConflict",
-          "ManualFlagNotSupported",
-          "SystemManagedFlag",
-          "DeliveryModeConflict"
-        ],
-        "enum": [
-          "InvalidFlag",
-          "InvalidRegularExpression",
-          "RegularExpressionNotSupported",
-          "InvalidSpecification",
-          "InvalidValidityWindow",
-          "InvalidTemplateFlagScope",
-          "ResourceIdConflict",
-          "ManualFlagNotSupported",
-          "SystemManagedFlag",
-          "DeliveryModeConflict"
-        ]
-      },
-      "NoCTFAPIEndpointsAdministrationChallengeBankSaveChallengeFlagRequest": {
-        "type": "object",
-        "additionalProperties": false,
-        "required": [
-          "flag"
-        ],
-        "properties": {
-          "id": {
-            "type": "string",
-            "format": "guid",
-            "nullable": true
-          },
-          "flag": {
-            "type": "string",
-            "maxLength": 4096,
-            "minLength": 0,
-            "nullable": false
-          },
-          "matchKind": {
-            "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationChallengeBankChallengeFlagMatchKindProtocol"
-          }
-        }
-      },
       "NoCTFAPIEndpointsAdministrationChallengesChallengeHintResponse": {
         "type": "object",
         "additionalProperties": false,
@@ -20525,6 +20060,102 @@
         "type": "object",
         "additionalProperties": false
       },
+      "NoCTFAPIEndpointsAdministrationChallengeBankChallengeFlagResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "guid"
+          },
+          "challengeId": {
+            "type": "string",
+            "format": "guid",
+            "nullable": true
+          },
+          "competitionChallengeId": {
+            "type": "string",
+            "format": "guid",
+            "nullable": true
+          },
+          "teamId": {
+            "type": "string",
+            "format": "guid",
+            "nullable": true
+          },
+          "flag": {
+            "type": "string"
+          },
+          "matchKind": {
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationChallengeBankChallengeFlagMatchKindProtocol"
+          },
+          "specificationKind": {
+            "nullable": true,
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationChallengeBankSpecificationKindProtocol"
+              }
+            ]
+          },
+          "specificationId": {
+            "type": "string",
+            "format": "guid",
+            "nullable": true
+          },
+          "validStart": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "validUntil": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "deletedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "systemManaged": {
+            "type": "boolean"
+          }
+        }
+      },
+      "NoCTFAPIEndpointsAdministrationChallengeBankChallengeFlagMatchKindProtocol": {
+        "type": "string",
+        "description": "",
+        "x-enumNames": [
+          "Exact",
+          "RegularExpression"
+        ],
+        "enum": [
+          "Exact",
+          "RegularExpression"
+        ]
+      },
+      "NoCTFAPIEndpointsAdministrationChallengeBankSpecificationKindProtocol": {
+        "type": "string",
+        "description": "",
+        "x-enumNames": [
+          "Attachment",
+          "AwdRound",
+          "RuntimeDefinition",
+          "Hint",
+          "RuntimeInstance"
+        ],
+        "enum": [
+          "Attachment",
+          "AwdRound",
+          "RuntimeDefinition",
+          "Hint",
+          "RuntimeInstance"
+        ]
+      },
       "NoCTFAPIEndpointsAdministrationChallengesGetCompetitionChallengeFlagRequest": {
         "type": "object",
         "additionalProperties": false
@@ -20621,6 +20252,69 @@
           "isPublished": {
             "type": "boolean",
             "nullable": false
+          }
+        }
+      },
+      "NoCTFAPIEndpointsAdministrationChallengeBankChallengeFlagFailureResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "code": {
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationChallengeBankChallengeFlagFailureCodeProtocol"
+          },
+          "message": {
+            "type": "string"
+          }
+        }
+      },
+      "NoCTFAPIEndpointsAdministrationChallengeBankChallengeFlagFailureCodeProtocol": {
+        "type": "string",
+        "description": "",
+        "x-enumNames": [
+          "InvalidFlag",
+          "InvalidRegularExpression",
+          "RegularExpressionNotSupported",
+          "InvalidSpecification",
+          "InvalidValidityWindow",
+          "InvalidTemplateFlagScope",
+          "ResourceIdConflict",
+          "ManualFlagNotSupported",
+          "SystemManagedFlag",
+          "DeliveryModeConflict"
+        ],
+        "enum": [
+          "InvalidFlag",
+          "InvalidRegularExpression",
+          "RegularExpressionNotSupported",
+          "InvalidSpecification",
+          "InvalidValidityWindow",
+          "InvalidTemplateFlagScope",
+          "ResourceIdConflict",
+          "ManualFlagNotSupported",
+          "SystemManagedFlag",
+          "DeliveryModeConflict"
+        ]
+      },
+      "NoCTFAPIEndpointsAdministrationChallengeBankSaveChallengeFlagRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "flag"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "guid",
+            "nullable": true
+          },
+          "flag": {
+            "type": "string",
+            "maxLength": 4096,
+            "minLength": 0,
+            "nullable": false
+          },
+          "matchKind": {
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationChallengeBankChallengeFlagMatchKindProtocol"
           }
         }
       },
