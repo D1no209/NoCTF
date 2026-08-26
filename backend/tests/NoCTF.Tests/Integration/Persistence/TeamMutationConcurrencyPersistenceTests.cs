@@ -44,6 +44,7 @@ public sealed class TeamMutationConcurrencyPersistenceTests
             await SameUserCreatesTwiceAsync(options, cancellationToken);
             await CreateWhileJoiningAsync(options, cancellationToken);
             await DifferentUsersJoinAsync(options, cancellationToken);
+            await BannedTeamRejectsOrganizationMutationsAsync(options, cancellationToken);
         });
     }
 
@@ -206,6 +207,55 @@ public sealed class TeamMutationConcurrencyPersistenceTests
         await Assert.That(memberIds).Contains(firstParticipant.Id);
         await Assert.That(memberIds).Contains(secondParticipant.Id);
         await Assert.That(memberIds.Length).IsEqualTo(3);
+    }
+
+    private static async Task BannedTeamRejectsOrganizationMutationsAsync(
+        DbContextOptions<NoCtfDbContext> options,
+        CancellationToken ct)
+    {
+        var now = DateTimeOffset.UtcNow.AddMinutes(40);
+        var owner = User(Guid.CreateVersion7(now), "banned-owner", now);
+        var captain = User(Guid.CreateVersion7(now.AddTicks(1)), "banned-captain", now);
+        var member = User(Guid.CreateVersion7(now.AddTicks(2)), "banned-member", now);
+        var outsider = User(Guid.CreateVersion7(now.AddTicks(3)), "banned-outsider", now);
+        var competition = Competition(
+            Guid.CreateVersion7(now.AddTicks(4)), owner.Id, "Banned team", now);
+        const string invitationToken = "BANDBANDBANDBANDBANDBANDBANDBAND";
+        var team = Team(
+            Guid.CreateVersion7(now.AddTicks(5)),
+            competition.Id,
+            captain.Id,
+            "Frozen",
+            invitationToken,
+            now);
+        team.MemberIds = [captain.Id, member.Id];
+        team.IsBanned = true;
+        await SeedAsync(options, [owner, captain, member, outsider], [competition], [team], ct);
+
+        await using var db = new NoCtfDbContext(options);
+        var membership = new TeamMembershipStore(db, new NoopOutbox());
+        var registration = new TeamRegistrationStore(db, new NoopOutbox());
+        await Assert.That(await membership.JoinByInvitationAsync(
+            competition.Id, invitationToken, outsider.Id, now, ct))
+            .IsEqualTo(TeamMembershipFailure.TeamBanned);
+        await Assert.That((await membership.RotateInvitationAsync(
+            competition.Id, team.Id, captain.Id,
+            "FROZFROZFROZFROZFROZFROZFROZFROZ", ct)).Failure)
+            .IsEqualTo(TeamMembershipFailure.TeamBanned);
+        await Assert.That(await membership.RemoveMemberAsync(
+            competition.Id, team.Id, member.Id, captain.Id, ct))
+            .IsEqualTo(TeamMembershipFailure.TeamBanned);
+        await Assert.That(await membership.LeaveAsync(competition.Id, member.Id, ct))
+            .IsEqualTo(TeamMembershipFailure.TeamBanned);
+        await Assert.That(await membership.TransferCaptainAsync(
+            competition.Id, team.Id, captain.Id, member.Id, ct))
+            .IsEqualTo(TeamMembershipFailure.TeamBanned);
+        await Assert.That((await registration.UpdateAsync(new(
+            competition.Id, team.Id, "Renamed"), ct)).Failure)
+            .IsEqualTo(TeamRegistrationFailure.TeamBanned);
+        await Assert.That(await registration.SoftDeleteAsync(
+            competition.Id, team.Id, captain.Id, now, ct))
+            .IsEqualTo(TeamRegistrationFailure.TeamBanned);
     }
 
     private static async Task<TeamCreateStoreResult> CreateAsync(

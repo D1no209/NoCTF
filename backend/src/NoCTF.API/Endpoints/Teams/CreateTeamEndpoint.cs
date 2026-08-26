@@ -45,6 +45,7 @@ public enum TeamRegistrationFailureCodeProtocol
     TeamNotFound,
     CompetitionFinished,
     TeamLocked,
+    TeamBanned,
     TeamConflict,
     TeamReviewConflict,
     CompetitionActive,

@@ -41,6 +41,7 @@ public enum TeamRegistrationFailure
     TeamNotFound,
     CompetitionFinished,
     TeamLocked,
+    TeamBanned,
     TeamConflict,
     TeamReviewConflict,
     CompetitionActive,

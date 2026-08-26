@@ -25,6 +25,9 @@ describe('participant copy density', () => {
 
     expect(teamPage).not.toContain('邀请码在创建队伍时生成')
     expect(teamPage).toContain("$t('轮换邀请码')")
+    expect(teamPage).toContain('v-if="isCaptain && !team.isBanned"')
+    expect(teamPage).toContain(':can-manage="isCaptain && !team.isBanned"')
+    expect(teamPage).toContain('v-if="!team.isBanned"')
   })
 
   test('uses one continuous challenge work surface instead of nested floating cards', async () => {

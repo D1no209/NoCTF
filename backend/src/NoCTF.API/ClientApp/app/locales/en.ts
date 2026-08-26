@@ -1,5 +1,9 @@
 /** English UI resources keyed by the canonical Simplified Chinese source text. */
 export const englishMessages: Record<string, string> = {
+  "队伍封禁期间不可变更组织信息。": "A banned team cannot change its organization details.",
+  "查看封禁申诉": "Review ban appeal",
+  "队伍{team}提交了封禁申诉": "Team {team} submitted a ban appeal",
+  "队伍封禁期间不可修改队名、成员、队长、邀请码或解散队伍。": "A banned team cannot change its name, membership, captain, invitation token, or disband.",
   "确定": "OK",
   ",可在「我的队伍」页修改信息后重新提交": ", you can modify the information on the \"My Team\" page and resubmit.",
   "· 继承竞赛默认": "· Inherit contest defaults",

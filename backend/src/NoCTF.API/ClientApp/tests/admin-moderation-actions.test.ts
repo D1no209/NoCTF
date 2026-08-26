@@ -12,11 +12,13 @@ describe('administrator destructive action wiring', () => {
     expect(page).not.toMatch(/<AlertDialogAction[\s\S]*?@click="submit(?:Force)?Termination"/)
   })
 
-  test('opens a confirmation before unbanning and validates correction reasons', async () => {
+  test('uses correction as the only reversal action and validates its reason', async () => {
     const page = await readPage('teams')
 
-    expect(page).toContain("@click.stop=\"openUnban(t)\"")
-    expect(page).toContain('const unbanDialog = ref<')
+    expect(page).not.toContain('adminUnbanTeam')
+    expect(page).not.toContain('openUnban')
+    expect(page).not.toContain("$t('解封')")
+    expect(page).toContain("@click.stop=\"openBan(t, 'correct')\"")
     expect(page).toContain("mode === 'correct' ? length >= 8")
     expect(page).toContain('至少 8 个字符')
   })

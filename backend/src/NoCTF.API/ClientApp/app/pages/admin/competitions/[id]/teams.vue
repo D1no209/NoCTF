@@ -9,7 +9,6 @@ import {
   adminListTeamBanAppeals,
   adminListTeams,
   adminRejectTeam,
-  adminUnbanTeam,
   adminUpholdTeamBanAppeal,
   adminTeamTrackAssign,
   userProfileGet,
@@ -26,6 +25,7 @@ import { competitionTrackErrorMessage } from '~/lib/competition-track'
 definePageMeta({ middleware: 'auth' })
 
 const { competitionId, canJudge, canWrite } = useCompetitionAdmin()
+const route = useRoute()
 
 const teams = ref<NoCtfapiEndpointsTeamsTeamResponse[]>([])
 const loading = ref(true)
@@ -106,37 +106,6 @@ async function simpleAction(team: NoCtfapiEndpointsTeamsTeamResponse, action: 'a
   }
 }
 
-// ---- Unban with explicit confirmation ----
-const unbanDialog = ref<NoCtfapiEndpointsTeamsTeamResponse | null>(null)
-
-function openUnban(team: NoCtfapiEndpointsTeamsTeamResponse) {
-  unbanDialog.value = team
-}
-
-async function submitUnban() {
-  const team = unbanDialog.value
-  if (!team?.id) {
-    toast.error(translate("队伍标识缺失，请刷新后重试"))
-    return
-  }
-  pendingId.value = team.id
-  try {
-    const { error } = await adminUnbanTeam({
-      path: { competitionId, teamId: team.id },
-    })
-    if (error) throw error
-    toast.success(translate('已解除「{team}」的封禁', { team: team.name ?? translate('该队伍') }))
-    unbanDialog.value = null
-    await Promise.all([load(), loadAppeals()])
-  }
-  catch (e) {
-    toast.error(parseApiError(e).message)
-  }
-  finally {
-    pendingId.value = null
-  }
-}
-
 // ---- Ban / correct-ban with reason ----
 const banDialog = ref<{ team: NoCtfapiEndpointsTeamsTeamResponse; mode: 'ban' | 'correct' } | null>(null)
 const banReason = ref('')
@@ -198,6 +167,9 @@ async function loadAppeals() {
   else {
     appealsError.value = null
     appeals.value = data.items ?? []
+    await nextTick()
+    const appealId = typeof route.query.appeal === 'string' ? route.query.appeal : null
+    if (appealId) document.getElementById(`appeal-${appealId}`)?.scrollIntoView({ block: 'center' })
   }
   appealsLoading.value = false
 }
@@ -239,7 +211,7 @@ onMounted(() => {
 
 <template>
   <div class="flex flex-col gap-8">
-    <div class="flex flex-col gap-4">
+    <div id="ban-appeals" class="flex scroll-mt-24 flex-col gap-4">
       <h2 class="text-lg font-semibold">{{ $t('团队管理') }}</h2>
       <Alert v-if="error" variant="destructive">
         <AlertDescription>{{ error }}</AlertDescription>
@@ -310,7 +282,6 @@ onMounted(() => {
                   <Button variant="outline" size="sm" :disabled="pendingId === t.id" @click="openBan(t, 'ban')">{{ $t('封禁') }}</Button>
                 </template>
                 <template v-else-if="canWrite">
-                  <Button type="button" variant="outline" size="sm" :disabled="pendingId === t.id" @click.stop="openUnban(t)">{{ $t('解封') }}</Button>
                   <Button type="button" variant="ghost" size="sm" :disabled="pendingId === t.id" @click.stop="openBan(t, 'correct')">{{ $t('纠正封禁') }}</Button>
                 </template>
               </div>
@@ -377,7 +348,7 @@ onMounted(() => {
         </EmptyHeader>
       </Empty>
       <div v-else-if="appeals.length > 0" class="flex flex-col gap-3">
-        <Card v-for="a in appeals" :key="a.banEventId">
+        <Card v-for="a in appeals" :id="`appeal-${a.appeal?.id ?? a.banEventId}`" :key="a.banEventId" class="scroll-mt-24">
           <CardHeader>
             <div class="flex items-center justify-between gap-2">
               <CardTitle class="text-base">{{ teamDisplayName(a, teamDisplayNames) }}</CardTitle>
@@ -405,26 +376,6 @@ onMounted(() => {
         </Card>
       </div>
     </div>
-
-    <Dialog :open="unbanDialog !== null" @update:open="(v) => { if (!v && pendingId === null) unbanDialog = null }">
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>{{ $t('解除队伍封禁？') }}</DialogTitle>
-          <DialogDescription>
-            {{ $t('将立即恢复「{team}」的参赛资格、历史计分资格和正常运行时生命周期。', { team: unbanDialog?.name ?? '-' }) }}
-          </DialogDescription>
-        </DialogHeader>
-        <DialogFooter>
-          <Button type="button" variant="outline" :disabled="pendingId !== null" @click="unbanDialog = null">{{ $t('取消') }}</Button>
-          <Button
-            type="button"
-            :disabled="pendingId !== null"
-            @click="submitUnban"
-          >
-            <Spinner v-if="pendingId === unbanDialog?.id" data-icon="inline-start" /> {{ $t('确认解封') }} </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
 
     <Dialog :open="banDialog !== null" @update:open="(v) => { if (!v) banDialog = null }">
       <DialogContent>

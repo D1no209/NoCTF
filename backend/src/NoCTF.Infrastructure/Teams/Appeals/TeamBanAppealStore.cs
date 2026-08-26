@@ -162,7 +162,7 @@ public sealed class TeamBanAppealStore(
         if (alreadySubmitted)
             return new(Failure: TeamBanAppealFailure.AppealAlreadySubmitted);
 
-        await events.RecordAsync(new(
+        var appealEventId = await events.RecordAsync(new(
             command.CompetitionId,
             CompetitionEventKind.TeamBanAppealSubmitted,
             CompetitionEventLevel.Information,
@@ -172,6 +172,12 @@ public sealed class TeamBanAppealStore(
             TeamId: team.Id,
             ParentEventId: ban.Id,
             Reason: command.Statement), cancellationToken);
+        await outbox.PublishAsync(new TeamBanAppealSubmitted(
+            command.CompetitionId,
+            appealEventId,
+            team.Id,
+            team.Name,
+            command.SubmittedAt));
         await db.SaveChangesAsync(cancellationToken);
         await transaction.CommitAsync(cancellationToken);
         await outbox.FlushOutgoingMessagesAsync();

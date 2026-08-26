@@ -69,6 +69,10 @@ describe('notificationTargetPath', () => {
       teamId: 'team-1',
     })))
       .toBe('/competitions/competition-1/my/team#ban-appeal')
+    expect(notificationTargetPath(notification('TeamBanAppealSubmitted', 'competition-1', {
+      appealEventId: 'appeal-1',
+    })))
+      .toBe('/admin/competitions/competition-1/teams?appeal=appeal-1#ban-appeals')
   })
 
   test('routes ordinary lifecycle messages to the competition event stream', () => {

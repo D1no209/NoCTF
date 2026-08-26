@@ -58,6 +58,7 @@ public enum NotificationKind : short
     TeamBanned,
     CheatIncidentDetected,
     TeamBanCorrected,
+    TeamBanAppealSubmitted,
     PlatformAuditExported,
     UserAccountLifecycleChanged,
     CompetitionForceDeleted
