@@ -3002,6 +3002,8 @@
 
 ## 已落地的主要能力
 
+- 题库详情的“基本信息 / 运行环境 / 模式定义 / 附件 / Flags / 权限”已从顶部横向标签改为左侧设置导航；桌面端与正文并列，窄屏自动折叠为紧凑网格，附件和 Flag 数量继续显示在对应入口。平台版本递增至 `0.1.0-alpha.95`。
+
 - `CompetitionEvent` 合并生命周期与排行榜可见性事实。
 - `platform_settings` 合并邮件设置；`account_tokens` 合并验证与重置 Token。
 - Notification 使用 Source/Target/Kind/Content/Related/ReplyTo，并以动态受众和线性线程承载 Question/Announcement。
