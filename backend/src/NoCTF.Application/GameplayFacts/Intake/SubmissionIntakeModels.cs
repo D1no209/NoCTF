@@ -55,6 +55,8 @@ public sealed record GameplayFactAcceptanceResult(
 
 public sealed record GameplayFactAccepted(Guid GameplayFactId, DateTimeOffset OccurredAt);
 
+public sealed record FlagAttemptBudget(int Maximum, int Accepted, int Remaining);
+
 public sealed record FlagGameplayFactCommand(
     Guid CompetitionId,
     Guid CompetitionChallengeId,

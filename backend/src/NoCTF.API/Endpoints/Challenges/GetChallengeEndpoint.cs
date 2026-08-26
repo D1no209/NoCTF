@@ -7,6 +7,7 @@ using NoCTF.Application.Competitions.Visibility;
 using NoCTF.Application.Scoring.Leaderboard;
 using NoCTF.Domain.Competitions;
 using NoCTF.API.Endpoints.Competitions;
+using NoCTF.Application.GameplayFacts.Intake;
 
 namespace NoCTF.API.Endpoints.Challenges;
 
@@ -27,7 +28,10 @@ public sealed record ChallengeResponse(
     string? ControlFlag = null,
     IReadOnlyList<string>? Urls = null,
     LeaderboardVisibilityProtocol LeaderboardVisibility = LeaderboardVisibilityProtocol.Normal,
-    LeaderboardDataScopeProtocol DataScope = LeaderboardDataScopeProtocol.Live);
+    LeaderboardDataScopeProtocol DataScope = LeaderboardDataScopeProtocol.Live,
+    int? MaximumFlagAttempts = null,
+    int? AcceptedFlagAttempts = null,
+    int? RemainingFlagAttempts = null);
 
 public sealed record ChallengeListResponse(
     IReadOnlyList<ChallengeResponse> Items,
@@ -40,7 +44,8 @@ internal static class ChallengeMapper
         ChallengeView view,
         KohChallengeAccessView? koh = null,
         CompetitionLeaderboardVisibility visibility = CompetitionLeaderboardVisibility.Normal,
-        LeaderboardDataScope dataScope = LeaderboardDataScope.Live) =>
+        LeaderboardDataScope dataScope = LeaderboardDataScope.Live,
+        FlagAttemptBudget? attemptBudget = null) =>
         new(
             view.Id,
             view.CompetitionId,
@@ -58,7 +63,10 @@ internal static class ChallengeMapper
             koh?.ControlFlag,
             koh?.Urls,
             CompetitionProtocolMapper.ToProtocol(visibility),
-            ScoreboardProtocolMapper.ToProtocol(dataScope));
+            ScoreboardProtocolMapper.ToProtocol(dataScope),
+            attemptBudget?.Maximum,
+            attemptBudget?.Accepted,
+            attemptBudget?.Remaining);
 
     public static ChallengeListResponse ToListResponse(
         IReadOnlyList<ChallengeView> views,
@@ -84,6 +92,7 @@ public sealed class GetChallengeEndpoint(
     IKohChallengeAccessReader kohAccess,
     ICompetitionChallengeAudienceAccess audienceAccess,
     ICompetitionVisibilityAccess visibilityAccess,
+    GetFlagAttemptBudget getAttemptBudget,
     IUserContext user) : Endpoint<GetChallengeRequest, Results<Ok<ChallengeResponse>, NotFound>>
 {
     public override void Configure()
@@ -123,10 +132,18 @@ public sealed class GetChallengeEndpoint(
             item.Id,
             user.UserId,
             ct);
+        var attemptBudget = user.UserId == Guid.Empty
+            ? null
+            : await getAttemptBudget.ExecuteAsync(
+                item.CompetitionId,
+                item.Id,
+                user.UserId,
+                ct);
         return TypedResults.Ok(ChallengeMapper.ToResponse(
             item,
             access,
             visibility.Visibility,
-            visibility.DataScope));
+            visibility.DataScope,
+            attemptBudget));
     }
 }

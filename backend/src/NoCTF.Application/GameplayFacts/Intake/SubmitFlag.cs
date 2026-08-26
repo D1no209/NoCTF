@@ -7,6 +7,33 @@ using NoCTF.Domain.Gameplay;
 
 namespace NoCTF.Application.GameplayFacts.Intake;
 
+public sealed class GetFlagAttemptBudget(
+    IGameplayFactIntakeStore store,
+    IGameplayFactAdmissionModePolicy modePolicy)
+{
+    public async Task<FlagAttemptBudget?> ExecuteAsync(
+        Guid competitionId,
+        Guid competitionChallengeId,
+        Guid userId,
+        CancellationToken cancellationToken = default)
+    {
+        var snapshot = await store.LoadAdmissionAsync(
+            competitionId, competitionChallengeId, userId, cancellationToken);
+        if (snapshot is null)
+            return null;
+        var rules = modePolicy.GetRules(
+            snapshot.Mode,
+            snapshot.CompetitionConfigurationJson,
+            snapshot.ChallengeConfigurationJson);
+        if (rules.MaxFlagAttempts is not > 0)
+            return null;
+        return new(
+            rules.MaxFlagAttempts.Value,
+            snapshot.AcceptedFlagAttempts,
+            Math.Max(0, rules.MaxFlagAttempts.Value - snapshot.AcceptedFlagAttempts));
+    }
+}
+
 public sealed class SubmitFlag(IGameplayFactIntakeStore store, IGameplayFactAdmissionModePolicy modePolicy)
 {
     public async Task<OperationResult<GameplayFactAccepted, GameplayFactAdmissionFailureCode>> ExecuteAsync(

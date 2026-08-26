@@ -799,6 +799,9 @@ export type NoCtfapiEndpointsChallengesChallengeResponse = {
     urls?: Array<string> | null;
     leaderboardVisibility?: NoCtfapiEndpointsCompetitionsLeaderboardVisibilityProtocol;
     dataScope?: NoCtfapiEndpointsCompetitionsLeaderboardDataScopeProtocol;
+    maximumFlagAttempts?: number | null;
+    acceptedFlagAttempts?: number | null;
+    remainingFlagAttempts?: number | null;
 };
 
 export type NoCtfapiEndpointsChallengesGetChallengeRequest = {
