@@ -13,6 +13,8 @@ import type {
 import { medalRankClass } from '~/components/leaderboard/types'
 import {
   scoreboardChallengeColumnGroups,
+  scoreboardBloodAward,
+  scoreboardBreakdown,
   scoreboardEntryKindLabel,
   scoreboardEntryOutcomeLabel,
   scoreboardRankingStateLabel,
@@ -59,6 +61,7 @@ const columnGroups = computed(() => scoreboardChallengeColumnGroups(
   board.schema.value,
   board.catalog.value?.items,
 ))
+const isCtf = computed(() => board.schema.value?.mode === 'Ctf')
 const missingChallengeIds = computed(() => columnGroups.value
   .filter(group => !group.challenge)
   .map(group => group.competitionChallengeId))
@@ -90,6 +93,11 @@ function slotTitle(slot: NoCtfapiEndpointsCompetitionsScoreboardSlotResponse | N
   if (slot.scoreState === 'Pending') return translate('本轮待结算')
   if (slot.scoreState === 'Provisional') return translate('结算中')
   return translate('已结算')
+}
+
+function ctfScore(slot: NoCtfapiEndpointsCompetitionsScoreboardSlotResponse | null): number | null {
+  if ((scoreboardBreakdown(slot, 'Solve')?.successfulCount ?? 0) < 1) return null
+  return slot?.netPoints ?? 0
 }
 
 function exportCsv(): void {
@@ -354,14 +362,14 @@ function adjustmentKind(entry: NoCtfapiEndpointsCompetitionsScoreboardAdjustment
             <Table class="table-fixed">
               <TableHeader>
                 <TableRow>
-                  <TableHead rowspan="2" class="w-14">{{ $t('名次') }}</TableHead>
-                  <TableHead rowspan="2" class="sticky left-0 z-20 w-44 min-w-44 max-w-44 border-r bg-card">{{ $t('参赛队伍') }}</TableHead>
-                  <TableHead rowspan="2" class="w-24 text-right">{{ $t('总分') }}</TableHead>
+                  <TableHead :rowspan="isCtf ? 1 : 2" class="w-14">{{ $t('名次') }}</TableHead>
+                  <TableHead :rowspan="isCtf ? 1 : 2" class="sticky left-0 z-20 w-44 min-w-44 max-w-44 border-r bg-card">{{ $t('参赛队伍') }}</TableHead>
+                  <TableHead :rowspan="isCtf ? 1 : 2" class="w-24 text-right">{{ $t('总分') }}</TableHead>
                   <TableHead v-for="group in columnGroups" :key="group.competitionChallengeId" :colspan="group.columns.length" class="border-l text-center">
                     <span class="inline-flex items-center gap-1.5"><component :is="directionIcon(group.challenge?.direction)" class="size-4" :class="directionTextClass(group.challenge?.direction)" />{{ group.challenge?.title ?? $t('未知题目') }}</span>
                   </TableHead>
                 </TableRow>
-                <TableRow><template v-for="group in columnGroups" :key="`${group.competitionChallengeId}-rounds`"><TableHead v-for="column in group.columns" :key="column.index" class="min-w-20 border-l text-center">{{ roundLabel(column) }}</TableHead></template></TableRow>
+                <TableRow v-if="!isCtf"><template v-for="group in columnGroups" :key="`${group.competitionChallengeId}-rounds`"><TableHead v-for="column in group.columns" :key="column.index" class="min-w-20 border-l text-center">{{ roundLabel(column) }}</TableHead></template></TableRow>
               </TableHeader>
               <TableBody>
                 <TableRow v-for="team in visibleTeams" :key="team.teamId" :class="(team.rank ?? 99) <= 3 ? 'bg-primary/5' : ''">
@@ -377,7 +385,17 @@ function adjustmentKind(entry: NoCtfapiEndpointsCompetitionsScoreboardAdjustment
                   <template v-for="group in columnGroups" :key="`${team.teamId}-${group.competitionChallengeId}`">
                     <TableCell v-for="column in group.columns" :key="column.index" class="border-l p-1 text-center">
                       <button v-if="column.index !== undefined && scoreboardSlot(team, column.index)" type="button" class="flex min-h-12 w-full items-center justify-center rounded-md px-1 py-1 transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" :aria-label="$t('查看 {team} 在 {challenge} {round} 的详情', { team: displayTeamName(team), challenge: group.challenge?.title ?? $t('未知题目'), round: roundLabel(column) })" @click="openDetail(team, column)">
-                        <ScoreboardSlotStatus :mode="board.schema.value.mode" :slot="scoreboardSlot(team, column.index!)!" />
+                        <template v-if="isCtf">
+                          <span v-if="ctfScore(scoreboardSlot(team, column.index!)) !== null" class="flex flex-col items-center gap-0.5">
+                            <span class="font-mono font-semibold tabular-nums">{{ ctfScore(scoreboardSlot(team, column.index!)) }} pts</span>
+                            <span v-if="scoreboardBloodAward(scoreboardSlot(team, column.index!))" class="text-[0.6875rem] font-medium text-primary">
+                              {{ scoreboardBloodAward(scoreboardSlot(team, column.index!))?.label }}
+                              +{{ scoreboardBloodAward(scoreboardSlot(team, column.index!))?.points }} pts
+                            </span>
+                          </span>
+                          <span v-else class="font-mono text-sm text-muted-foreground/60">-</span>
+                        </template>
+                        <ScoreboardSlotStatus v-else :mode="board.schema.value.mode" :slot="scoreboardSlot(team, column.index!)!" />
                       </button>
                       <span v-else class="font-mono text-sm text-muted-foreground/60">-</span>
                     </TableCell>

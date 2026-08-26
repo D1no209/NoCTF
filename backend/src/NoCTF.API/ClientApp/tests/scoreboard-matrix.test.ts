@@ -5,9 +5,11 @@ import type {
 } from '../app/api'
 import {
   latestSettledScore,
+  scoreboardBloodAward,
   scoreboardBreakdown,
   scoreboardChallengeColumnGroups,
   scoreboardColumnsForChallenge,
+  scoreboardCurrentChallengeScore,
   scoreboardDirectionGroups,
   scoreboardEntryKindLabel,
   scoreboardEntryOutcomeLabel,
@@ -302,15 +304,15 @@ describe('normalized scoreboard matrix', () => {
     const aggregateGroup = { competitionChallengeId: challengeA, challenge: null, columns: [] }
     const settledGroup = { competitionChallengeId: challengeB, challenge: null, columns: [{ index: 0 }, { index: 1 }] }
 
-    expect(scoreboardTeamChallengeScore(team, aggregateGroup)).toBe(400)
-    expect(scoreboardTeamChallengeScore(team, settledGroup)).toBe(300)
+    expect(scoreboardTeamChallengeScore(team, aggregateGroup, 'Awdp')).toBe(400)
+    expect(scoreboardTeamChallengeScore(team, settledGroup, 'Ctf')).toBe(300)
     expect(scoreboardTeamChallengeSignals(team, settledGroup, 'Ctf').flagSucceeded).toBeTrue()
     const directions = scoreboardDirectionGroups([
       { ...aggregateGroup, challenge: { direction: 'PWN' } },
       { ...settledGroup, challenge: { direction: 'pwn' } },
     ])
     expect(directions).toHaveLength(1)
-    expect(scoreboardTeamDirectionScore(team, directions[0]!, 'Ctf').total).toBe(700)
+    expect(scoreboardTeamDirectionScore(team, directions[0]!, 'Ctf').total).toBe(300)
     expect(scoreboardTeamDirectionScore(team, directions[0]!, 'Awdp')).toEqual({
       attack: 240,
       defense: 160,
@@ -327,6 +329,20 @@ describe('normalized scoreboard matrix', () => {
     expect(scoreboardTeamDetailDialog).toContain("name: translate('防御分')")
     expect(scoreboardTeamDetailDialog).toContain("areaStyle: { color: '#ef4444', opacity: 0.2 }")
     expect(scoreboardTeamDetailDialog).toContain("areaStyle: { color: '#0ea5e9', opacity: 0.2 }")
+  })
+
+  test('uses authoritative current challenge scores and renders CTF score cells with blood bonuses', () => {
+    const challengeId = crypto.randomUUID()
+    expect(scoreboardCurrentChallengeScore({
+      currentChallengeScores: [{ competitionChallengeId: challengeId, score: 444 }],
+    }, challengeId)).toBe(444)
+    expect(scoreboardBloodAward({
+      entries: [{ award: 'FirstBlood', awardPoints: 25 }],
+    })).toEqual({ label: '一血', points: 25 })
+    expect(leaderboardPage).toContain('v-if="!isCtf"')
+    expect(leaderboardPage).toContain('ctfScore(scoreboardSlot(team, column.index!))')
+    expect(leaderboardPage).toContain('scoreboardBloodAward(scoreboardSlot(team, column.index!))?.label')
+    expect(leaderboardPage).not.toContain('<TableRow><template v-for="group in columnGroups"')
   })
 
   test('keeps page-local detail actors stable while appending cursor pages', () => {

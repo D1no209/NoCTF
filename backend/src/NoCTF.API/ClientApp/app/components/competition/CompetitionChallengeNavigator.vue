@@ -6,7 +6,7 @@ import type {
   NoCtfapiEndpointsCompetitionsLeaderboardDataScopeProtocol,
 } from '~/api'
 import { bloodRankLabel } from '~/components/leaderboard/types'
-import { scoreboardBreakdown, scoreboardColumnsForChallenge, scoreboardSlot } from '~/utils/scoreboard'
+import { scoreboardBreakdown, scoreboardColumnsForChallenge, scoreboardCurrentChallengeScore, scoreboardSlot } from '~/utils/scoreboard'
 
 type Challenge = NoCtfapiEndpointsChallengesChallengeResponse
 
@@ -148,6 +148,10 @@ function awdpProgressLabel(progress: ChallengeProgress | null): string | null {
   return null
 }
 
+function currentScore(challengeId?: string): number | null {
+  return scoreboardCurrentChallengeScore(board.snapshot.value, challengeId)
+}
+
 const groups = computed(() => {
   const grouped = new Map<string, Challenge[]>()
   for (const item of items.value) {
@@ -226,7 +230,12 @@ const groups = computed(() => {
           @click="emit('select', challenge.id!)"
         >
           <span class="min-w-0 flex-1">
-            <span class="block truncate text-sm font-medium">{{ challenge.title }}</span>
+            <span class="flex min-w-0 items-baseline gap-2 text-sm font-medium">
+              <span class="truncate">{{ challenge.title }}</span>
+              <span v-if="currentScore(challenge.id) !== null" class="shrink-0 font-mono text-xs tabular-nums text-primary">
+                {{ currentScore(challenge.id) }} pts
+              </span>
+            </span>
             <span v-if="isAwdp && progressFor(challenge.id)" class="mt-1 flex items-center gap-2 text-[0.6875rem]">
               <span class="flex items-center gap-1"><Swords class="size-3" /><span class="font-mono">{{ progressFor(challenge.id)?.attackCount ?? 0 }}</span></span>
               <span class="flex items-center gap-1"><ShieldCheck class="size-3" /><span class="font-mono">{{ progressFor(challenge.id)?.defenseCount ?? 0 }}</span></span>

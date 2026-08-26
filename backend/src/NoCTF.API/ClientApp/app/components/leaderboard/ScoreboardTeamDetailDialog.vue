@@ -41,7 +41,7 @@ const rows = computed(() => props.columnGroups.map((group) => {
   return {
     group,
     title: group.challenge?.title ?? translate('未知题目'),
-    score: props.team ? scoreboardTeamChallengeScore(props.team, group) : 0,
+    score: props.team ? scoreboardTeamChallengeScore(props.team, group, props.mode) : 0,
     attackScore: split.attack,
     defenseScore: split.defense,
     signals: props.team
