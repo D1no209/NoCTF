@@ -46,7 +46,7 @@ async function load(): Promise<void> {
     loading.value = false
     return
   }
-  items.value = data.items ?? []
+  items.value = deduplicateCompetitionBroadcasts(data.items ?? [])
   initialized.value = true
   loading.value = false
   error.value = null
