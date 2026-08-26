@@ -22,7 +22,7 @@ public sealed class GetMyTeamEndpoint(GetMyTeam get, IUserContext user, LinkGene
         CancellationToken cancellationToken)
     {
         request.CompetitionId = Route<Guid>("competitionId");
-        var team = await get.ExecuteAsync(request.CompetitionId, user.UserId, false, cancellationToken);
+        var team = await get.ExecuteAsync(request.CompetitionId, user.UserId, cancellationToken);
         return team is null
             ? TypedResults.NotFound()
             : TypedResults.Ok(TeamMapper.ToResponse(team, links, HttpContext));

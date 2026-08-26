@@ -36,16 +36,34 @@ const competition = computed(() => ctx.competition.value)
 // 我的参赛状态
 const myTeam = ref<NoCtfapiEndpointsTeamsTeamResponse | null>(null)
 const teamLoaded = ref(false)
+const teamLoadError = ref<string | null>(null)
 
 async function loadMyTeam() {
+  teamLoaded.value = false
+  teamLoadError.value = null
   if (!isLoggedIn.value) {
     myTeam.value = null
     teamLoaded.value = true
     return
   }
-  const { data, error } = await getMyTeamEndpoint({ path: { competitionId } })
-  teamLoaded.value = true
-  myTeam.value = error || !data ? null : data
+  try {
+    const { data, error, response } = await getMyTeamEndpoint({ path: { competitionId } })
+    if (response?.status === 404) {
+      myTeam.value = null
+      return
+    }
+    if (error || !data) {
+      myTeam.value = null
+      teamLoadError.value = parseApiError(error, translate('加载报名状态失败，请重试。')).message
+      return
+    }
+    myTeam.value = data
+  } catch (error: unknown) {
+    myTeam.value = null
+    teamLoadError.value = parseApiError(error, translate('加载报名状态失败，请重试。')).message
+  } finally {
+    teamLoaded.value = true
+  }
 }
 
 onMounted(loadMyTeam)
@@ -54,18 +72,41 @@ watch(isLoggedIn, loadMyTeam)
 // 已报名队伍数
 const approvedTeamCount = ref<number | null>(null)
 const selectableTracks = ref<NoCtfapiEndpointsCompetitionsTracksCompetitionTrackResponse[]>([])
-onMounted(async () => {
-  const [teamResult, trackResult] = await Promise.all([
-    listCompetitionTeamsEndpoint({ path: { competitionId } }),
-    listCompetitionTracks({ path: { competitionId } }),
-  ])
-  if (!teamResult.error && teamResult.data) approvedTeamCount.value = (teamResult.data.items ?? []).filter(
-    (team) => team.registrationStatus === 'Approved',
-  ).length
-  if (!trackResult.error && trackResult.data) {
-    selectableTracks.value = (trackResult.data.items ?? []).filter(track => track.isPublicSelectable)
+const tracksLoaded = ref(false)
+const trackLoadError = ref<string | null>(null)
+
+async function loadRegistrationOptions() {
+  tracksLoaded.value = false
+  trackLoadError.value = null
+  try {
+    const [teams, tracks] = await Promise.all([
+      listCompetitionTeamsEndpoint({ path: { competitionId } }),
+      listCompetitionTracks({ path: { competitionId } }),
+    ])
+    if (!teams.error && teams.data) approvedTeamCount.value = (teams.data.items ?? []).filter(
+      (team) => team.registrationStatus === 'Approved',
+    ).length
+    if (tracks.error || !tracks.data) {
+      selectableTracks.value = []
+      trackLoadError.value = parseApiError(
+        tracks.error,
+        translate('加载参赛赛道失败，请重试。'),
+      ).message
+    } else {
+      selectableTracks.value = (tracks.data.items ?? []).filter(track => track.isPublicSelectable)
+    }
+  } catch (error: unknown) {
+    selectableTracks.value = []
+    trackLoadError.value = parseApiError(
+      error,
+      translate('加载参赛赛道失败，请重试。'),
+    ).message
+  } finally {
+    tracksLoaded.value = true
   }
-})
+}
+
+onMounted(loadRegistrationOptions)
 
 // 倒计时
 const now = ref(Date.now())
@@ -109,37 +150,68 @@ const createName = ref('')
 const createTrackKey = ref('')
 const createTrackInvitationCode = ref('')
 const createPending = ref(false)
+const createValidationError = ref<string | null>(null)
 const selectedCreateTrack = computed(() => selectableTracks.value.find(
   track => track.key === createTrackKey.value,
 ))
 
 watch(createTrackKey, () => {
   createTrackInvitationCode.value = ''
+  createValidationError.value = null
+})
+
+watch(createOpen, (open) => {
+  if (!open) createValidationError.value = null
 })
 
 async function submitCreate() {
-  if (!createName.value.trim() || !createTrackKey.value) return
-  createPending.value = true
-  const { data, error } = await createTeamEndpoint({
-    path: { competitionId },
-    body: {
-      name: createName.value.trim(),
-      trackKey: createTrackKey.value,
-      trackInvitationCode: selectedCreateTrack.value?.requiresInvitationCode
-        ? createTrackInvitationCode.value.trim()
-        : null,
-    },
-  })
-  createPending.value = false
-  if (error || !data) {
-    toast.error(teamRegistrationErrorMessage(error, translate('创建队伍失败')))
+  createValidationError.value = null
+  if (!createName.value.trim()) {
+    createValidationError.value = translate('请输入队伍名称。')
     return
   }
-  toast.success(translate("队伍创建成功"))
-  createOpen.value = false
-  createName.value = ''
-  createTrackInvitationCode.value = ''
-  await loadMyTeam()
+  if (!createTrackKey.value) {
+    createValidationError.value = translate('请选择参赛赛道。')
+    return
+  }
+  if (selectedCreateTrack.value?.requiresInvitationCode
+    && !createTrackInvitationCode.value.trim()) {
+    createValidationError.value = translate('请输入赛道邀请码。')
+    return
+  }
+  createPending.value = true
+  try {
+    const { data, error } = await createTeamEndpoint({
+      path: { competitionId },
+      body: {
+        name: createName.value.trim(),
+        trackKey: createTrackKey.value,
+        trackInvitationCode: selectedCreateTrack.value?.requiresInvitationCode
+          ? createTrackInvitationCode.value.trim()
+          : null,
+      },
+    })
+    if (error || !data) {
+      createValidationError.value = teamRegistrationErrorMessage(
+        error,
+        translate('创建队伍失败'),
+      )
+      return
+    }
+    toast.success(translate('队伍创建成功'))
+    createOpen.value = false
+    createName.value = ''
+    createTrackKey.value = ''
+    createTrackInvitationCode.value = ''
+    await loadMyTeam()
+  } catch (error: unknown) {
+    createValidationError.value = teamRegistrationErrorMessage(
+      error,
+      translate('创建队伍失败'),
+    )
+  } finally {
+    createPending.value = false
+  }
 }
 
 // 凭邀请 token 加入
@@ -210,6 +282,17 @@ const isCaptain = computed(
               </Button>
             </template>
 
+            <template v-else-if="teamLoadError">
+              <Alert variant="destructive" class="w-auto">
+                <AlertDescription class="flex items-center gap-3">
+                  <span>{{ teamLoadError }}</span>
+                  <Button type="button" size="sm" variant="outline" @click="loadMyTeam">
+                    {{ $t('重试') }}
+                  </Button>
+                </AlertDescription>
+              </Alert>
+            </template>
+
             <template v-else-if="!myTeam">
               <Dialog v-if="teamRegistrationOpen" v-model:open="createOpen">
                 <DialogTrigger as-child>
@@ -221,13 +304,27 @@ const isCaptain = computed(
                     <DialogTitle>{{ $t('创建队伍') }}</DialogTitle>
                     <DialogDescription>{{ $t('队伍创建后你就是队长,可邀请成员加入') }}</DialogDescription>
                   </DialogHeader>
-                  <form @submit.prevent="submitCreate">
+                  <form novalidate @submit.prevent="submitCreate">
                     <FieldGroup>
                       <Field>
                         <FieldLabel for="team-name">{{ $t('队伍名称') }}</FieldLabel>
                         <Input id="team-name" v-model="createName" required maxlength="64" />
                       </Field>
-                      <Field v-if="selectableTracks.length > 0">
+                      <Field v-if="!tracksLoaded">
+                        <Skeleton class="h-10 w-full" />
+                        <FieldDescription>{{ $t('正在加载可报名赛道…') }}</FieldDescription>
+                      </Field>
+                      <Field v-else-if="trackLoadError">
+                        <Alert variant="destructive">
+                          <AlertDescription class="flex items-center justify-between gap-3">
+                            <span>{{ trackLoadError }}</span>
+                            <Button type="button" size="sm" variant="outline" @click="loadRegistrationOptions">
+                              {{ $t('重试') }}
+                            </Button>
+                          </AlertDescription>
+                        </Alert>
+                      </Field>
+                      <Field v-else-if="selectableTracks.length > 0">
                         <FieldLabel for="team-track">{{ $t('参赛赛道') }}</FieldLabel>
                         <Select v-model="createTrackKey" required>
                           <SelectTrigger id="team-track"><SelectValue :placeholder="$t('选择赛道')" /></SelectTrigger>
@@ -238,6 +335,11 @@ const isCaptain = computed(
                           </SelectContent>
                         </Select>
                         <FieldDescription>{{ $t('请选择队伍参加的赛道；创建后比赛管理员仍可调整。') }}</FieldDescription>
+                      </Field>
+                      <Field v-else>
+                        <Alert variant="destructive">
+                          <AlertDescription>{{ $t('当前没有可报名的赛道。') }}</AlertDescription>
+                        </Alert>
                       </Field>
                       <Field v-if="selectedCreateTrack?.requiresInvitationCode">
                         <FieldLabel for="track-invitation-code">{{ $t('赛道邀请码') }}</FieldLabel>
@@ -250,11 +352,14 @@ const isCaptain = computed(
                           maxlength="128"
                         />
                       </Field>
+                      <p v-if="createValidationError" role="alert" class="text-sm text-destructive">
+                        {{ createValidationError }}
+                      </p>
                       <Field>
                         <Button
                           type="submit"
                           class="w-full"
-                          :disabled="createPending || !createTrackKey || selectedCreateTrack?.requiresInvitationCode && !createTrackInvitationCode.trim()"
+                          :disabled="createPending || !tracksLoaded || Boolean(trackLoadError) || selectableTracks.length === 0"
                         >
                           <Spinner v-if="createPending" data-icon="inline-start" /> {{ $t('创建') }} </Button>
                       </Field>

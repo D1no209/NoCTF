@@ -123,10 +123,21 @@ public class TeamRegistrationTests
         await Assert.That(store.ReviewWriteCount).IsEqualTo(0);
     }
 
+    [Test]
+    public async Task GetMyTeam_Includes_pending_and_rejected_registration_states()
+    {
+        var store = new Store(new(CompetitionStatus.Published, false, false));
+
+        await new GetMyTeam(store).ExecuteAsync(Guid.NewGuid(), Guid.NewGuid());
+
+        await Assert.That(store.LastFindForUserIncludedPending).IsTrue();
+    }
+
     private sealed class Store(TeamRegistrationPolicy policy) : ITeamRegistrationStore
     {
         public TeamRegistrationStatus? Status { get; private set; }
         public int ReviewWriteCount { get; private set; }
+        public bool? LastFindForUserIncludedPending { get; private set; }
         public Task<TeamRegistrationPolicy?> GetPolicyAsync(Guid competitionId, CancellationToken cancellationToken) => Task.FromResult<TeamRegistrationPolicy?>(policy);
         public Task<TeamCreateStoreResult> TryCreateAsync(CreateTeamCommand command, TeamRegistrationStatus status, CancellationToken cancellationToken)
         {
@@ -153,6 +164,11 @@ public class TeamRegistrationTests
             return Task.FromResult(new TeamReviewStoreResult(true));
         }
         public Task<TeamView?> FindAsync(Guid competitionId, Guid teamId, bool includePending, CancellationToken cancellationToken) => Task.FromResult<TeamView?>(null);
+        public Task<TeamView?> FindForUserAsync(Guid competitionId, Guid userId, bool includePending, CancellationToken cancellationToken)
+        {
+            LastFindForUserIncludedPending = includePending;
+            return Task.FromResult<TeamView?>(null);
+        }
         public Task<bool> CanManageAsync(Guid actorId, Guid competitionId, Guid teamId, CancellationToken cancellationToken) => Task.FromResult(true);
         public Task<TeamUpdateStoreResult> UpdateAsync(UpdateTeamCommand command, CancellationToken cancellationToken) => Task.FromResult(new TeamUpdateStoreResult(null, TeamRegistrationFailure.TeamNotFound));
         public Task<TeamRegistrationFailure?> SoftDeleteAsync(Guid competitionId, Guid teamId, Guid actorId, DateTimeOffset deletedAt, CancellationToken cancellationToken) => Task.FromResult<TeamRegistrationFailure?>(null);
