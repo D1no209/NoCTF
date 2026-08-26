@@ -1,5 +1,6 @@
 /** English UI resources keyed by the canonical Simplified Chinese source text. */
 export const englishMessages: Record<string, string> = {
+  "确定": "OK",
   ",可在「我的队伍」页修改信息后重新提交": ", you can modify the information on the \"My Team\" page and resubmit.",
   "· 继承竞赛默认": "· Inherit contest defaults",
   "· 有未保存的修改": "· There are unsaved changes",
@@ -1406,6 +1407,7 @@ export const englishMessages: Record<string, string> = {
   "Flag 已删除": "Flag has been deleted",
   "Flag 已添加": "Flag added",
   "Flag 正确": "Flag correct",
+  "本次 Flag 验证正确": "This Flag is correct",
   "Flag 注入": "Flag injection",
   "AWDP 动态 Flag 注入": "AWDP dynamic Flag injection",
   "为每支队伍的攻击实例注入独立 Flag": "Inject an independent Flag into each team's attack runtime",
@@ -1920,6 +1922,8 @@ export const englishMessages: Record<string, string> = {
   "当前模式不支持 Fix 提交": "This mode does not support Fix submissions",
   "Break 提交次数已用尽": "Break submission attempts are exhausted",
   "Fix 提交次数已用尽": "Fix submission attempts are exhausted",
+  "提交次数已用尽": "No submission attempts remain",
+  "剩余 {count} 次提交": "{count} submissions remaining",
   "需要先完成 Break": "Break must be completed first",
   "Fix 归档验证不可用": "Fix archive validation is unavailable",
   "缺少 Fix 归档": "Fix archive is missing",

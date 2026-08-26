@@ -78,6 +78,8 @@ onMounted(async () => {
       :competition-challenge-id="challenge.id!"
       multiple
       :title="$t('批量提交 Flag')"
+      :maximum-attempts="challenge.maximumFlagAttempts"
+      :remaining-attempts="challenge.remainingFlagAttempts"
     />
   </div>
 </template>

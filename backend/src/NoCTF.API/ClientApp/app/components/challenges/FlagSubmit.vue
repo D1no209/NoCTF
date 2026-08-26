@@ -23,18 +23,37 @@ const props = withDefaults(
     description?: string
     practice?: boolean
     readOnlyJudgement?: boolean
+    maximumAttempts?: number | null
+    remainingAttempts?: number | null
   }>(),
   { multiple: false, title: translate("提交 Flag"), description: '', practice: false, readOnlyJudgement: false },
 )
 
-const emit = defineEmits<{ evaluated: [] }>()
+const emit = defineEmits<{ evaluated: [result: TrackedSubmission['result']] }>()
 
 const input = ref('')
 const submitting = ref(false)
 const tracked = ref<TrackedSubmission[]>([])
 const toasted = new Set<string>()
 const celebrating = ref(false)
+const resultDialog = ref<{ correct: boolean; title: string; message: string } | null>(null)
+const remainingAttempts = ref<number | null>(props.remainingAttempts ?? null)
 let celebrationTimer: ReturnType<typeof setTimeout> | undefined
+
+watch(() => props.remainingAttempts, value => {
+  remainingAttempts.value = value ?? null
+})
+
+const attemptsExhausted = computed(() =>
+  !props.practice && !props.readOnlyJudgement && remainingAttempts.value === 0)
+
+function showResult(correct: boolean, message: string): void {
+  resultDialog.value = {
+    correct,
+    title: correct ? translate('Flag 正确') : translate('Flag 错误'),
+    message,
+  }
+}
 
 function celebrateCorrectFlag(): void {
   celebrating.value = false
@@ -78,17 +97,18 @@ async function refreshOne(id: string): Promise<void> {
   if (wasPending && !isGameplayFactPending(data.state) && !toasted.has(id)) {
     toasted.add(id)
     if (data.result === 'Correct') {
-      toast.success(translate("提交评测完成:正确"))
+      showResult(true, translate('本次 Flag 验证正确'))
       celebrateCorrectFlag()
     }
     else {
       const result = gameplayFactResultLabel(data.result)
       const reason = data.failureCode ? gameplayFactFailureCodeLabel(data.failureCode) : null
-      toast.error(reason
+      showResult(false, reason
         ? translate('提交评测完成：{result}（{reason}）', { result, reason })
         : translate('提交评测完成：{result}', { result }))
     }
-    emit('evaluated')
+    emit('evaluated', data.result)
+    tracked.value = tracked.value.filter(item => item.id !== id)
   }
 }
 
@@ -123,15 +143,15 @@ async function submit() {
             : parsed.status === 403
               ? translate('当前账号没有可参与本题的已审核队伍')
               : parsed.message
-      toast.error(message)
+      showResult(false, message)
       return
     }
     if (data.result === 'Correct') {
-      toast.success(translate('Flag 正确；本次验证不产生任何比赛记录'))
+      showResult(true, translate('Flag 正确；本次验证不产生任何比赛记录'))
       celebrateCorrectFlag()
     }
     else {
-      toast.error(translate('Flag 错误'))
+      showResult(false, translate('Flag 错误'))
     }
     return
   }
@@ -155,16 +175,16 @@ async function submit() {
             : parsed.status === 403
               ? translate('当前账号没有可参与练习的已审核队伍')
               : parsed.message
-      toast.error(message)
+      showResult(false, message)
       return
     }
     if (data.result === 'Correct') {
       input.value = ''
-      toast.success(translate('Flag 正确；本次练习不计分'))
+      showResult(true, translate('Flag 正确；本次练习不计分'))
       celebrateCorrectFlag()
     }
     else {
-      toast.error(translate('Flag 错误'))
+      showResult(false, translate('Flag 错误'))
     }
     return
   }
@@ -176,7 +196,8 @@ async function submit() {
   if (error || !data) {
     const parsed = parseApiError(error, translate("提交失败"))
     const code = parsed.code as NoCtfapiEndpointsGameplayFactsGameplayFactAdmissionFailureCodeProtocol | undefined
-    toast.error(code === 'AchievementAlreadySucceeded'
+    if (code === 'AttemptsExhausted') remainingAttempts.value = 0
+    showResult(false, code === 'AchievementAlreadySucceeded'
       ? translate('本题攻击已成功，请使用验证模式确认 Flag 正误。')
       : parsed.message)
     return
@@ -191,6 +212,8 @@ async function submit() {
     }
   }
   input.value = ''
+  if (remainingAttempts.value !== null)
+    remainingAttempts.value = Math.max(0, remainingAttempts.value - ids.length)
   toast.success(translate('已受理 {count} 条提交，评测中', { count: ids.length }))
   startPolling()
 }
@@ -213,10 +236,6 @@ onUnmounted(() => {
   if (celebrationTimer) clearTimeout(celebrationTimer)
 })
 
-function resultVariant(result?: string | null) {
-  if (result === 'Correct') return 'default' as const
-  return 'destructive' as const
-}
 </script>
 
 <template>
@@ -233,7 +252,12 @@ function resultVariant(result?: string | null) {
       </div>
     </Transition>
     <header class="flex flex-col gap-1">
-      <h3 id="flag-submit-title" class="text-sm font-semibold">{{ title }}</h3>
+      <div class="flex flex-wrap items-center justify-between gap-2">
+        <h3 id="flag-submit-title" class="text-sm font-semibold">{{ title }}</h3>
+        <Badge v-if="remainingAttempts !== null && !readOnlyJudgement && !practice" :variant="attemptsExhausted ? 'destructive' : 'secondary'">
+          {{ attemptsExhausted ? $t('提交次数已用尽') : $t('剩余 {count} 次提交', { count: remainingAttempts }) }}
+        </Badge>
+      </div>
       <p v-if="description" class="text-sm text-muted-foreground">{{ description }}</p>
       <p v-else-if="practice" class="text-sm text-muted-foreground">{{ $t('练习模式只验证 Flag 正误，不会产生分数、血榜或排行榜变化。') }}</p>
     </header>
@@ -261,36 +285,29 @@ function resultVariant(result?: string | null) {
             />
           </Field>
           <Field>
-            <Button type="submit" :disabled="submitting || !input.trim()">
+            <Button type="submit" :disabled="submitting || !input.trim() || attemptsExhausted">
               <Spinner v-if="submitting" data-icon="inline-start" /> {{ $t('提交') }} </Button>
           </Field>
         </FieldGroup>
       </form>
 
-      <div v-if="tracked.length" class="mt-4 flex flex-col gap-2">
-        <Alert v-if="timedOut">
-          <AlertDescription>{{ $t('评测结果等待超时,可稍后在「我的提交」查看结果。') }}</AlertDescription>
-        </Alert>
-        <Alert
-          v-for="item in tracked"
-          :key="item.id"
-          :variant="isGameplayFactPending(item.state) ? 'default' : resultVariant(item.result)"
-        >
-          <AlertDescription class="flex items-center gap-2">
-            <Spinner v-if="isGameplayFactPending(item.state)" class="size-3" />
-            <span v-if="isGameplayFactPending(item.state)">
-              {{ gameplayFactStateLabel(item.state) }}…
-            </span>
-            <span v-else> {{ $t('评测结果:') }}<strong>{{ gameplayFactResultLabel(item.result) }}</strong>
-              <span v-if="item.failureCode" class="text-muted-foreground">
-                · {{ gameplayFactFailureCodeLabel(item.failureCode) }}
-              </span>
-            </span>
-          </AlertDescription>
-        </Alert>
-      </div>
+      <Alert v-if="timedOut" class="mt-4">
+        <AlertDescription>{{ $t('评测结果等待超时,可稍后在「我的提交」查看结果。') }}</AlertDescription>
+      </Alert>
     </div>
   </section>
+
+  <Dialog :open="resultDialog !== null" @update:open="open => { if (!open) resultDialog = null }">
+    <DialogContent class="sm:max-w-md">
+      <DialogHeader>
+        <DialogTitle>{{ resultDialog?.title }}</DialogTitle>
+        <DialogDescription>{{ resultDialog?.message }}</DialogDescription>
+      </DialogHeader>
+      <DialogFooter>
+        <Button @click="resultDialog = null">{{ $t('确定') }}</Button>
+      </DialogFooter>
+    </DialogContent>
+  </Dialog>
 </template>
 
 <style scoped>
