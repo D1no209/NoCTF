@@ -166,6 +166,29 @@ export interface DefinitionModel {
 
 export const DEFAULT_MAXIMUM_PATCH_UPLOAD_BYTES = 256 * 1024 * 1024
 export const HARD_MAXIMUM_PATCH_UPLOAD_BYTES = 1024 * 1024 * 1024
+export const DEFAULT_RUNTIME_MEMORY_BYTES = 256 * 1024 * 1024
+export const DEFAULT_RUNTIME_NANO_CPUS = 500_000_000
+export const DEFAULT_RUNTIME_PIDS_LIMIT = 128
+export const DEFAULT_RUNTIME_TTL_SECONDS = 3600
+export const DEFAULT_RUNTIME_OPERATION_TIMEOUT_SECONDS = 60
+
+export function defaultContainerSecurity(): SecurityModel {
+  return {
+    noNewPrivileges: false,
+    readonlyRootfs: false,
+    runAsNonRoot: false,
+    capDrop: [],
+    capAdd: [],
+  }
+}
+
+export function defaultRuntimeLimits(): RuntimeLimitsModel {
+  return {
+    memoryBytes: DEFAULT_RUNTIME_MEMORY_BYTES,
+    nanoCpus: DEFAULT_RUNTIME_NANO_CPUS,
+    pidsLimit: DEFAULT_RUNTIME_PIDS_LIMIT,
+  }
+}
 
 export function emptyContainerDefinition(withFlagInjection = false): ContainerDefinitionModel {
   return {
@@ -175,7 +198,7 @@ export function emptyContainerDefinition(withFlagInjection = false): ContainerDe
     environment: {},
     labels: {},
     containerPorts: [],
-    security: { noNewPrivileges: false, readonlyRootfs: false, runAsNonRoot: false, capDrop: [], capAdd: [] },
+    security: defaultContainerSecurity(),
     flagEnvironmentVariableName: withFlagInjection ? 'FLAG' : '',
     internalPorts: [],
   }
@@ -193,9 +216,9 @@ export function emptyRuntimeTemplate(mode: GameModeValue): RuntimeTemplateModel 
   return {
     allocation: mode === 'Koh' ? RuntimeAllocation.Shared : RuntimeAllocation.PerTeam,
     definition: emptyContainerDefinition(mode === 'Ctf' || mode === 'Awdp'),
-    limits: { memoryBytes: null, nanoCpus: null, pidsLimit: null },
-    ttlSeconds: null,
-    operationTimeoutSeconds: null,
+    limits: defaultRuntimeLimits(),
+    ttlSeconds: DEFAULT_RUNTIME_TTL_SECONDS,
+    operationTimeoutSeconds: DEFAULT_RUNTIME_OPERATION_TIMEOUT_SECONDS,
     urlBindings: [],
     flagSource: mode === 'Ctf' || mode === 'Awdp'
       ? FlagSource.PerTeam
@@ -281,12 +304,13 @@ export function parseJsonObject(json: string | null | undefined): JsonObject | n
 
 function parseSecurity(raw: unknown): SecurityModel {
   const obj = asObject(raw)
+  const defaults = defaultContainerSecurity()
   return {
-    noNewPrivileges: asBool(obj?.noNewPrivileges),
-    readonlyRootfs: asBool(obj?.readonlyRootfs),
-    runAsNonRoot: asBool(obj?.runAsNonRoot),
-    capDrop: asStringArray(obj?.capDrop),
-    capAdd: asStringArray(obj?.capAdd),
+    noNewPrivileges: typeof obj?.noNewPrivileges === 'boolean' ? obj.noNewPrivileges : defaults.noNewPrivileges,
+    readonlyRootfs: typeof obj?.readonlyRootfs === 'boolean' ? obj.readonlyRootfs : defaults.readonlyRootfs,
+    runAsNonRoot: typeof obj?.runAsNonRoot === 'boolean' ? obj.runAsNonRoot : defaults.runAsNonRoot,
+    capDrop: Array.isArray(obj?.capDrop) ? asStringArray(obj.capDrop) : defaults.capDrop,
+    capAdd: Array.isArray(obj?.capAdd) ? asStringArray(obj.capAdd) : defaults.capAdd,
   }
 }
 
@@ -361,16 +385,17 @@ function parseFlagTemplate(raw: unknown): FlagTemplateModel {
 function parseRuntimeTemplate(raw: unknown): RuntimeTemplateModel {
   const obj = asObject(raw) ?? {}
   const limits = asObject(obj.limits) ?? {}
+  const defaultLimits = defaultRuntimeLimits()
   return {
     allocation: asNumber(obj.allocation) ?? RuntimeAllocation.PerTeam,
     definition: parseRuntimeDefinition(obj.definition),
     limits: {
-      memoryBytes: asNumber(limits.memoryBytes),
-      nanoCpus: asNumber(limits.nanoCpus),
-      pidsLimit: asNumber(limits.pidsLimit),
+      memoryBytes: asNumber(limits.memoryBytes) ?? defaultLimits.memoryBytes,
+      nanoCpus: asNumber(limits.nanoCpus) ?? defaultLimits.nanoCpus,
+      pidsLimit: asNumber(limits.pidsLimit) ?? defaultLimits.pidsLimit,
     },
-    ttlSeconds: asNumber(obj.ttlSeconds),
-    operationTimeoutSeconds: asNumber(obj.operationTimeoutSeconds),
+    ttlSeconds: asNumber(obj.ttlSeconds) ?? DEFAULT_RUNTIME_TTL_SECONDS,
+    operationTimeoutSeconds: asNumber(obj.operationTimeoutSeconds) ?? DEFAULT_RUNTIME_OPERATION_TIMEOUT_SECONDS,
     urlBindings: Array.isArray(obj.urlBindings) ? obj.urlBindings.map(parseUrlBinding) : [],
     flagSource: asNumber(obj.flagSource) ?? FlagSource.Static,
     controlCheckUrlBinding: obj.controlCheckUrlBinding ? parseUrlBinding(obj.controlCheckUrlBinding) : null,
@@ -503,13 +528,14 @@ function serializeRuntimeTemplate(runtime: RuntimeTemplateModel): JsonObject {
     allocation: runtime.allocation,
     definition,
   }
+  const defaultLimits = defaultRuntimeLimits()
   const limits: JsonObject = {}
-  putNumber(limits, 'memoryBytes', runtime.limits.memoryBytes)
-  putNumber(limits, 'nanoCpus', runtime.limits.nanoCpus)
-  putNumber(limits, 'pidsLimit', runtime.limits.pidsLimit)
-  if (Object.keys(limits).length > 0) obj.limits = limits
-  putNumber(obj, 'ttlSeconds', runtime.ttlSeconds)
-  putNumber(obj, 'operationTimeoutSeconds', runtime.operationTimeoutSeconds)
+  putNumber(limits, 'memoryBytes', runtime.limits.memoryBytes ?? defaultLimits.memoryBytes)
+  putNumber(limits, 'nanoCpus', runtime.limits.nanoCpus ?? defaultLimits.nanoCpus)
+  putNumber(limits, 'pidsLimit', runtime.limits.pidsLimit ?? defaultLimits.pidsLimit)
+  obj.limits = limits
+  putNumber(obj, 'ttlSeconds', runtime.ttlSeconds ?? DEFAULT_RUNTIME_TTL_SECONDS)
+  putNumber(obj, 'operationTimeoutSeconds', runtime.operationTimeoutSeconds ?? DEFAULT_RUNTIME_OPERATION_TIMEOUT_SECONDS)
   const bindings = runtime.urlBindings
     .filter(b => b.urlTemplate.trim())
     .map(serializeUrlBinding)
