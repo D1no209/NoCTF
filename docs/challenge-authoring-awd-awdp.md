@@ -450,4 +450,4 @@ dotnet test backend/NoCTF.slnx -c Release
 
 ### 计分与预期不一致
 
-先确认比赛配置和单题规则覆盖的有效值，再检查 GameplayFact 的 kind/result/failureCode、轮次和排行榜投影。配置修改只会把排行榜标脏，不会自动重判历史 GameplayFact；需要修正历史结果时使用管理端显式重判/纠正流程，不得修改不可变比赛事件。
+先确认比赛配置和单题规则覆盖的有效值，再检查 GameplayFact 的 kind/result/failureCode、轮次和排行榜投影。配置修改只会触发事件驱动的排行榜失效与重新投影，不会自动重判历史 GameplayFact；需要修正历史结果时使用管理端显式重判/纠正流程，不得修改不可变比赛事件。

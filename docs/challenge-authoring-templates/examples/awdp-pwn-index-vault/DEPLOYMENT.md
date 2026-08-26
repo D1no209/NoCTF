@@ -61,7 +61,7 @@ Runtime UUID 生成精确 Flag，并在 Provider 创建前覆盖注入 `FLAG`。
 4. 确认 Worker/Runner 可以拉取两个镜像，再发布并开始比赛。
 
 公开端口和 URL 只用于 Player attack Runtime。Runner 为 Fix 自动建立
-`Purpose=AwdpTarget` 的无 TeamId 一次性实例，忽略公开端口和 URL，Checker 只访问内部
+`Purpose=AwdpTarget` 的一次性实例，绑定申请队伍和 Fix GameplayFact，忽略公开端口和 URL，Checker 只访问内部
 `31337`，验证结束后清理全部资源。
 
 ## 4. 双队闭环
@@ -82,6 +82,6 @@ Runtime UUID 生成精确 Flag，并在 Provider 创建前覆盖注入 `FLAG`。
 ## 5. 故障定位
 
 - Player `InvalidConfiguration`：检查 PerTeam、`FLAG`、31337 端口、OwnerOnly URL 以及资源正数。
-- Fix 长期 Processing：检查 Wolverine 死信、一次性 target、Patch 退出码和 Checker callback。
+- Fix 长时间停留 Processing：检查 Wolverine 死信、一次性 target、Patch 退出码和 Checker callback。
 - `ServiceAbnormal`：确认服务监听 `0.0.0.0:31337`，Fix 未删除或停止服务，且 `READ 0` 仍返回 `VALUE:training-service-online`。
 - Checker 非零：按平台失败处理；日志只能记录阶段和稳定错误，不得打印回调地址或敏感值。

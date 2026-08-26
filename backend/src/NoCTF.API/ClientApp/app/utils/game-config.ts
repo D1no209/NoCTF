@@ -690,6 +690,7 @@ export function competitionConfigFields(mode: GameModeValue): ConfigFieldDef[] {
         { key: 'exploitSucceededPenalty', label: translate("EXP 成功扣分"), type: 'int', min: 0, defaultValue: 0 },
         { key: 'serviceAbnormalPenalty', label: translate("服务异常扣分"), type: 'int', min: 0, defaultValue: 0 },
         { key: 'evaluationDispatchMode', label: translate("评测调度方式"), type: 'select', options: EVALUATION_DISPATCH_MODES, defaultValue: EvaluationDispatch.Automatic },
+        { key: 'flagTemplate', label: translate("Break Flag 模板"), type: 'flagTemplate', description: translate("可选;用于生成每队攻击实例的动态 Flag") },
       ]
     case 'Koh':
       return [
@@ -731,6 +732,7 @@ export function challengeRuleFields(mode: GameModeValue): ConfigFieldDef[] {
         { key: 'exploitSucceededPenalty', label: translate("EXP 成功扣分"), type: 'int', min: 0 },
         { key: 'serviceAbnormalPenalty', label: translate("服务异常扣分"), type: 'int', min: 0 },
         { key: 'evaluationDispatchMode', label: translate("评测调度方式"), type: 'select', options: EVALUATION_DISPATCH_MODES },
+        { key: 'flagTemplate', label: translate("Break Flag 模板"), type: 'flagTemplate', description: translate("仅用于本场比赛该题目今后生成的每队攻击实例 Flag；未覆盖时继承竞赛默认") },
       ]
     case 'Koh':
       return [
