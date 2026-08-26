@@ -33,6 +33,7 @@ const loadError = ref<string | null>(null)
 const acting = ref(false)
 const extendMinutes = ref(30)
 const now = ref(Date.now())
+const forceUntilStopped = ref(false)
 
 async function load(): Promise<PlayerRuntimeLookupOutcome> {
   const { data, error, response } = await getRuntimeEndpoint({
@@ -63,10 +64,29 @@ onMounted(async () => {
 const { polling, timedOut, start: startPolling } = usePolling(
   async () => {
     const outcome = await load()
+    if (forceUntilStopped.value) {
+      if (outcome === 'failed' || runtime.value?.state !== 'Running') {
+        forceUntilStopped.value = false
+        return true
+      }
+      return false
+    }
     return outcome === 'failed' || !shouldPollPlayerRuntime(runtime.value, now.value)
   },
   { interval: 2000, timeout: 120_000 },
 )
+
+async function refreshUntilStopped(): Promise<void> {
+  forceUntilStopped.value = true
+  const outcome = await load()
+  if (outcome === 'failed' || runtime.value?.state !== 'Running') {
+    forceUntilStopped.value = false
+    return
+  }
+  startPolling()
+}
+
+defineExpose({ refreshUntilStopped })
 
 watch(
   () => shouldPollPlayerRuntime(runtime.value, now.value),

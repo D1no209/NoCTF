@@ -17,6 +17,7 @@ const loading = ref(true)
 const route = useRoute()
 const router = useRouter()
 const fixHistoryOpen = ref(route.query.fixHistory === '1')
+const attackRuntimeCard = ref<{ refreshUntilStopped: () => Promise<void> } | null>(null)
 
 watch(() => route.query.fixHistory, value => {
   fixHistoryOpen.value = value === '1'
@@ -74,6 +75,11 @@ async function refreshAndPoll(): Promise<void> {
   if (defenseTransitionInProgress.value) startStatePolling()
 }
 
+async function handleBreakEvaluation(result?: string | null): Promise<void> {
+  await refreshAndPoll()
+  if (result === 'Correct') await attackRuntimeCard.value?.refreshUntilStopped()
+}
+
 let unwatch: (() => void) | undefined
 onMounted(() => {
   void refreshAndPoll()
@@ -106,6 +112,7 @@ onUnmounted(() => {
         </header>
 
         <RuntimeCard
+          ref="attackRuntimeCard"
           class="border-b pb-5"
           :competition-id="competition.id!"
           :competition-challenge-id="challenge.id!"
@@ -120,7 +127,7 @@ onUnmounted(() => {
           :read-only-judgement="!!state?.breakActivation"
           :maximum-attempts="challenge.maximumFlagAttempts"
           :remaining-attempts="challenge.remainingFlagAttempts"
-          @evaluated="refreshAndPoll"
+          @evaluated="handleBreakEvaluation"
         />
       </section>
 
