@@ -1,5 +1,11 @@
 # NoCTF 数据模型重构交接
 
+## 2026-08-26 alpha.91 AWDP 出题模板与 Break Flag 配置对齐
+
+- AWDP Break 动态 Flag 模板现在只在比赛模式配置和比赛题目规则中提供结构化字段，题库 Runtime 定义继续只负责注入位置，不再要求题目作者维护比赛专属 Flag 格式或旧版 `flagInjection` 对象。
+- 已同步英文资源、默认配置序列化回归测试，以及 AWD/AWDP 出题规范、GitOps 规范、PWN 示例题和可直接交付的 starter kit 文档。平台版本递增为 `0.1.0-alpha.91`；没有数据库、migration、OpenAPI、生成 TypeScript SDK 或后端契约变化。
+- 验证：`bun test tests/game-config.test.ts` 通过（12/12）；`bun run typecheck` 通过；工作区提交前无未跟踪临时产物。
+
 ## 2026-08-26 alpha.90 CI 管理员并发测试确定性同步
 
 - 修复 `LastAdministratorConcurrencyPersistenceTests` 偶发等待不到 `pg_sleep` 的 CI 抖动。测试不再依赖一秒瞬时观察窗口，改用可显式释放的 PostgreSQL advisory lock 屏障，并在释放前确认两个并发账户变更都已进入数据库锁等待，从而稳定验证“最后一个有效人工平台管理员”约束。
