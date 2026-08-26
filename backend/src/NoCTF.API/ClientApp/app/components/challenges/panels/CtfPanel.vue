@@ -8,12 +8,19 @@ defineProps<{
   competition: NoCtfapiEndpointsCompetitionsCompetitionResponse
   challenge: NoCtfapiEndpointsChallengesChallengeResponse
 }>()
+
+const runtimeCard = ref<{ refreshUntilStopped: () => Promise<void> } | null>(null)
+
+function handleEvaluation(result?: string | null): void {
+  if (result === 'Correct') void runtimeCard.value?.refreshUntilStopped()
+}
 </script>
 
 <template>
   <div class="flex flex-col divide-y">
     <RuntimeCard
       v-if="challenge.hasRuntime === true && (competition.status === 'Running' || competition.status === 'Finished' && competition.practiceModeEnabled === true)"
+      ref="runtimeCard"
       class="pb-5"
       :competition-id="competition.id!"
       :competition-challenge-id="challenge.id!"
@@ -27,6 +34,7 @@ defineProps<{
       :practice="competition.status === 'Finished' && competition.practiceModeEnabled === true"
       :maximum-attempts="challenge.maximumFlagAttempts"
       :remaining-attempts="challenge.remainingFlagAttempts"
+      @evaluated="handleEvaluation"
     />
   </div>
 </template>

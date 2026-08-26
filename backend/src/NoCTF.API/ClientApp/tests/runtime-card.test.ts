@@ -47,6 +47,8 @@ describe('player runtime presentation', () => {
     expect(source).toContain('classifyPlayerRuntimeLookup(response?.status')
     expect(source).toContain('<Alert v-if="loadError" variant="destructive">')
     expect(source).toContain('<div v-if="!loadError" class="flex flex-wrap items-center gap-2">')
+    expect(source).toContain('defineExpose({ refreshUntilStopped })')
+    expect(source).toContain('if (forceUntilStopped.value)')
   })
 
   test('does not render or request a runtime for static CTF challenges', async () => {
@@ -55,5 +57,6 @@ describe('player runtime presentation', () => {
     ).text()
 
     expect(source).toContain('v-if="challenge.hasRuntime === true &&')
+    expect(source).toContain('@evaluated="handleEvaluation"')
   })
 })
