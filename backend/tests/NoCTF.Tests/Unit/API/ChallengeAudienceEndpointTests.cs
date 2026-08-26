@@ -1,4 +1,5 @@
 using System.Net;
+using System.Net.Http.Json;
 using FastEndpoints;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
@@ -51,6 +52,8 @@ public sealed class ChallengeAudienceEndpointTests
 
         await Assert.That(list.StatusCode).IsEqualTo(HttpStatusCode.OK);
         await Assert.That(detail.StatusCode).IsEqualTo(HttpStatusCode.OK);
+        var response = await detail.Content.ReadFromJsonAsync<ChallengeResponse>();
+        await Assert.That(response?.UsesDynamicFlag).IsTrue();
         await Assert.That(store.ListCalls).IsEqualTo(1);
         await Assert.That(store.FindCalls).IsEqualTo(1);
     }
@@ -132,7 +135,10 @@ public sealed class ChallengeAudienceEndpointTests
             null,
             false,
             DateTimeOffset.UtcNow,
-            DateTimeOffset.UtcNow);
+            DateTimeOffset.UtcNow)
+        {
+            UsesDynamicFlag = true
+        };
 
         public int ListCalls { get; private set; }
         public int FindCalls { get; private set; }

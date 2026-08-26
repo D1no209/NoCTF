@@ -32,7 +32,10 @@ public sealed record ChallengeView(
     DateTimeOffset? DeletedAt,
     bool HasRuntime,
     DateTimeOffset CreatedAt,
-    DateTimeOffset UpdatedAt);
+    DateTimeOffset UpdatedAt)
+{
+    public bool UsesDynamicFlag { get; init; }
+}
 
 public enum ChallengeMutationFailure
 {

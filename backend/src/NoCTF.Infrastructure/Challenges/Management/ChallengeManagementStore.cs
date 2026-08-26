@@ -329,8 +329,10 @@ public sealed class ChallengeManagementStore(
                 item.Instance.UpdatedAt));
     }
 
-    private ChallengeView Map(CompetitionChallenge instance, Challenge template) =>
-        new(
+    private ChallengeView Map(CompetitionChallenge instance, Challenge template)
+    {
+        var runtime = runtimeTemplates.Get(template.Mode, template.DefinitionJson);
+        return new(
             instance.Id,
             instance.CompetitionId,
             instance.ChallengeId,
@@ -341,12 +343,18 @@ public sealed class ChallengeManagementStore(
             instance.Order,
             instance.IsPublished,
             instance.DeletedAt,
-            runtimeTemplates.Get(template.Mode, template.DefinitionJson) is not null,
+            runtime is not null,
             template.CreatedAt,
-            instance.UpdatedAt);
+            instance.UpdatedAt)
+        {
+            UsesDynamicFlag = runtime is { FlagSource: not RuntimeFlagSource.Static }
+        };
+    }
 
-    private ChallengeView Map(ChallengeProjection projection) =>
-        new(
+    private ChallengeView Map(ChallengeProjection projection)
+    {
+        var runtime = runtimeTemplates.Get(projection.Mode, projection.DefinitionJson);
+        return new(
             projection.Id,
             projection.CompetitionId,
             projection.ChallengeId,
@@ -357,9 +365,13 @@ public sealed class ChallengeManagementStore(
             projection.Order,
             projection.IsPublished,
             projection.DeletedAt,
-            runtimeTemplates.Get(projection.Mode, projection.DefinitionJson) is not null,
+            runtime is not null,
             projection.CreatedAt,
-            projection.UpdatedAt);
+            projection.UpdatedAt)
+        {
+            UsesDynamicFlag = runtime is { FlagSource: not RuntimeFlagSource.Static }
+        };
+    }
 
     private sealed record ChallengeProjection(
         Guid Id,
