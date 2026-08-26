@@ -11,17 +11,20 @@ const props = withDefaults(defineProps<{
   readonly?: boolean
   loading?: boolean
   saving?: boolean
+  hiddenKeys?: string[]
 }>(), {
   json: null,
   inheritedJson: null,
   readonly: false,
   loading: false,
   saving: false,
+  hiddenKeys: () => [],
 })
 
 const emit = defineEmits<{ save: [json: string] }>()
 
-const fields = computed(() => challengeRuleFields(props.mode))
+const fields = computed(() => challengeRuleFields(props.mode)
+  .filter(field => !props.hiddenKeys.includes(field.key)))
 const values = ref<ConfigValues>({})
 const overridden = ref<Record<string, boolean>>({})
 const parseFailed = ref(false)

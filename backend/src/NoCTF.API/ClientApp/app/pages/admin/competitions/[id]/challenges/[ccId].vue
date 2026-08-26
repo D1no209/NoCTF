@@ -257,10 +257,10 @@ onMounted(() => {
       </div>
 
       <Tabs default-value="general">
-        <TabsList>
-          <TabsTrigger value="general">{{ $t('基本设置') }}</TabsTrigger>
-          <TabsTrigger value="config">{{ $t('题目配置') }}</TabsTrigger>
-          <TabsTrigger value="hints">{{ $t('提示') }}</TabsTrigger>
+        <TabsList class="h-12 p-1.5">
+          <TabsTrigger value="general" class="h-9 px-5 text-sm">{{ $t('基本设置') }}</TabsTrigger>
+          <TabsTrigger value="config" class="h-9 px-5 text-sm">{{ $t('题目配置') }}</TabsTrigger>
+          <TabsTrigger value="hints" class="h-9 px-5 text-sm">{{ $t('提示') }}</TabsTrigger>
         </TabsList>
 
         <TabsContent value="general" class="mt-4">
@@ -314,6 +314,7 @@ onMounted(() => {
                 :readonly="!canWrite"
                 :loading="configLoading"
                 :saving="savingConfig"
+                :hidden-keys="challenge.usesDynamicFlag ? [] : ['flagTemplate']"
                 @save="saveConfig"
               />
             </CardContent>
