@@ -1,5 +1,12 @@
 # NoCTF 数据模型重构交接
 
+## 2026-08-26 alpha.90 CI 管理员并发测试确定性同步
+
+- 修复 `LastAdministratorConcurrencyPersistenceTests` 偶发等待不到 `pg_sleep` 的 CI 抖动。测试不再依赖一秒瞬时观察窗口，改用可显式释放的 PostgreSQL advisory lock 屏障，并在释放前确认两个并发账户变更都已进入数据库锁等待，从而稳定验证“最后一个有效人工平台管理员”约束。
+- 本次只调整集成测试同步方式，没有修改管理员角色、删除账户或事务锁业务逻辑；平台版本递增为 `0.1.0-alpha.90`，没有数据库、migration、OpenAPI、生成 TypeScript SDK 或前端契约变化。
+- 验证：Release 测试项目构建通过（0 warnings / 0 errors）；非 Integration 测试 `916/916` 通过；`git diff --check` 通过。本机 Docker 当前不可用，因此目标 PostgreSQL Testcontainers 用例被明确跳过，需由 CI 的真实 PostgreSQL 集成测试完成最终复验。
+- 当前修复仅保存在本地提交，尚未推送或部署。工作区内另有协作者的 AWDP Flag 模板前端/文档修改，未纳入本次提交。
+
 ## 2026-08-25 alpha.89 账号生命周期通知正文汉化
 
 - 已修复消息中心在中文界面直接显示 `manual_verify_email` 等内部原因代码的问题。根因是 `UserAccountLifecycleChanged` 通知此前走通用 `reason` 正文回退逻辑，把仅供系统追踪的原因码当成了用户文案。
