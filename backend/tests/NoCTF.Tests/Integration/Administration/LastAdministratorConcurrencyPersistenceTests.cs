@@ -1,6 +1,7 @@
 using System.Text.Json;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
+using Npgsql;
 using NoCTF.Application.Administration;
 using NoCTF.Application.Administration.UserAccounts;
 using NoCTF.Domain.Identity;
@@ -42,7 +43,10 @@ public sealed class LastAdministratorConcurrencyPersistenceTests
                 options,
                 postgres.GetConnectionString(),
                 cancellationToken);
-            await DeleteBothAsync(options, cancellationToken);
+            await DeleteBothAsync(
+                options,
+                postgres.GetConnectionString(),
+                cancellationToken);
             await DowngradeBothAsync(
                 options,
                 postgres.GetConnectionString(),
@@ -70,13 +74,14 @@ public sealed class LastAdministratorConcurrencyPersistenceTests
             ],
             ct);
 
+        await using var mutationGate = await AcquireMutationGateAsync(connectionString, ct);
         var downgradeTask = UpdateRoleAsync(
             options,
             connectionString,
             firstId,
             now.AddMinutes(1),
             ct);
-        await WaitForPostgresSleepAsync(options, ct);
+        await WaitForBlockedMutationsAsync(options, 1, ct);
         var deletionTask = DeleteAsync(
             options,
             secondId,
@@ -84,6 +89,8 @@ public sealed class LastAdministratorConcurrencyPersistenceTests
             UserDeletionMode.HardDelete,
             now.AddMinutes(1),
             ct);
+        await WaitForBlockedMutationsAsync(options, 2, ct);
+        await ReleaseMutationGateAsync(mutationGate, ct);
         await Task.WhenAll(deletionTask, downgradeTask);
 
         await Assert.That((await deletionTask).State)
@@ -116,6 +123,7 @@ public sealed class LastAdministratorConcurrencyPersistenceTests
             ],
             ct);
 
+        await using var mutationGate = await AcquireMutationGateAsync(connectionString, ct);
         var anonymizeTask = DeleteAsync(
             options,
             secondId,
@@ -123,13 +131,15 @@ public sealed class LastAdministratorConcurrencyPersistenceTests
             UserDeletionMode.Anonymize,
             now.AddMinutes(1),
             ct);
-        await WaitForPostgresSleepAsync(options, ct);
+        await WaitForBlockedMutationsAsync(options, 1, ct);
         var downgradeTask = UpdateRoleAsync(
             options,
             connectionString,
             firstId,
             now.AddMinutes(1),
             ct);
+        await WaitForBlockedMutationsAsync(options, 2, ct);
+        await ReleaseMutationGateAsync(mutationGate, ct);
         await Task.WhenAll(anonymizeTask, downgradeTask);
 
         await Assert.That((await anonymizeTask).State)
@@ -156,6 +166,7 @@ public sealed class LastAdministratorConcurrencyPersistenceTests
 
     private static async Task DeleteBothAsync(
         DbContextOptions<NoCtfDbContext> options,
+        string connectionString,
         CancellationToken ct)
     {
         var now = DateTimeOffset.UtcNow;
@@ -169,6 +180,7 @@ public sealed class LastAdministratorConcurrencyPersistenceTests
             ],
             ct);
 
+        await using var mutationGate = await AcquireMutationGateAsync(connectionString, ct);
         var firstTask = DeleteAsync(
             options,
             secondId,
@@ -176,7 +188,7 @@ public sealed class LastAdministratorConcurrencyPersistenceTests
             UserDeletionMode.HardDelete,
             now.AddMinutes(1),
             ct);
-        await WaitForPostgresSleepAsync(options, ct);
+        await WaitForBlockedMutationsAsync(options, 1, ct);
         var secondTask = DeleteAsync(
             options,
             firstId,
@@ -184,6 +196,8 @@ public sealed class LastAdministratorConcurrencyPersistenceTests
             UserDeletionMode.HardDelete,
             now.AddMinutes(1),
             ct);
+        await WaitForBlockedMutationsAsync(options, 2, ct);
+        await ReleaseMutationGateAsync(mutationGate, ct);
         await Task.WhenAll(firstTask, secondTask);
 
         await Assert.That((await firstTask).State)
@@ -218,19 +232,22 @@ public sealed class LastAdministratorConcurrencyPersistenceTests
             ],
             ct);
 
+        await using var mutationGate = await AcquireMutationGateAsync(connectionString, ct);
         var firstTask = UpdateRoleAsync(
             options,
             connectionString,
             firstId,
             now.AddMinutes(1),
             ct);
-        await WaitForPostgresSleepAsync(options, ct);
+        await WaitForBlockedMutationsAsync(options, 1, ct);
         var secondTask = UpdateRoleAsync(
             options,
             connectionString,
             secondId,
             now.AddMinutes(1),
             ct);
+        await WaitForBlockedMutationsAsync(options, 2, ct);
+        await ReleaseMutationGateAsync(mutationGate, ct);
         await Task.WhenAll(firstTask, secondTask);
 
         await Assert.That((await firstTask).State).IsEqualTo(UpdatePlatformRoleState.Updated);
@@ -321,12 +338,14 @@ public sealed class LastAdministratorConcurrencyPersistenceTests
             AS $$
             BEGIN
                 IF TG_OP = 'DELETE' THEN
-                    PERFORM pg_sleep(1);
+                    PERFORM pg_advisory_xact_lock(
+                        hashtextextended('noctf-last-administrator-concurrency-gate', 0));
                     RETURN OLD;
                 END IF;
                 IF NEW.role IS DISTINCT FROM OLD.role
                     OR NEW.account_status IS DISTINCT FROM OLD.account_status THEN
-                    PERFORM pg_sleep(1);
+                    PERFORM pg_advisory_xact_lock(
+                        hashtextextended('noctf-last-administrator-concurrency-gate', 0));
                 END IF;
                 RETURN NEW;
             END;
@@ -377,26 +396,52 @@ public sealed class LastAdministratorConcurrencyPersistenceTests
             ct);
     }
 
-    private static async Task WaitForPostgresSleepAsync(
+    private static async Task<NpgsqlConnection> AcquireMutationGateAsync(
+        string connectionString,
+        CancellationToken ct)
+    {
+        var connection = new NpgsqlConnection(connectionString);
+        await connection.OpenAsync(ct);
+        await using var command = connection.CreateCommand();
+        command.CommandText =
+            "SELECT pg_advisory_lock(hashtextextended('noctf-last-administrator-concurrency-gate', 0))";
+        await command.ExecuteNonQueryAsync(ct);
+        return connection;
+    }
+
+    private static async Task ReleaseMutationGateAsync(
+        NpgsqlConnection connection,
+        CancellationToken ct)
+    {
+        await using var command = connection.CreateCommand();
+        command.CommandText =
+            "SELECT pg_advisory_unlock(hashtextextended('noctf-last-administrator-concurrency-gate', 0))";
+        if (await command.ExecuteScalarAsync(ct) is not true)
+            throw new InvalidOperationException("The administrator mutation gate was not held.");
+    }
+
+    private static async Task WaitForBlockedMutationsAsync(
         DbContextOptions<NoCtfDbContext> options,
+        int expectedCount,
         CancellationToken ct)
     {
         await using var db = new NoCtfDbContext(options);
-        for (var attempt = 0; attempt < 200; attempt++)
+        for (var attempt = 0; attempt < 600; attempt++)
         {
-            var sleepers = await db.Database.SqlQuery<int>(
+            var blockedMutations = await db.Database.SqlQuery<int>(
                     $"""
                      SELECT count(*)::integer AS "Value"
                      FROM pg_stat_activity
-                     WHERE datname = current_database() AND wait_event = 'PgSleep'
+                     WHERE datname = current_database() AND wait_event_type = 'Lock'
                      """)
                 .SingleAsync(ct);
-            if (sleepers > 0)
+            if (blockedMutations >= expectedCount)
                 return;
-            await Task.Delay(25, ct);
+            await Task.Delay(50, ct);
         }
 
-        throw new TimeoutException("The administrator mutation did not enter pg_sleep.");
+        throw new TimeoutException(
+            $"Expected {expectedCount} administrator mutation(s) to wait on PostgreSQL locks.");
     }
 
     private static async Task AssertActiveHumanAdministratorCountAsync(
