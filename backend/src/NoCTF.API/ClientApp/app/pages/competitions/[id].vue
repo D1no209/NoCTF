@@ -1,9 +1,14 @@
 <script setup lang="ts">
 import { LayoutDashboard, MessageCircleQuestion, Puzzle, Trophy, UserRound } from '@lucide/vue'
-import { getCompetitionEndpoint, getMyTeamEndpoint } from '~/api'
-import type { NoCtfapiEndpointsCompetitionsCompetitionResponse, NoCtfapiEndpointsTeamsTeamResponse } from '~/api'
+import { getCompetitionEndpoint, getLeaderboardEndpoint, getMyTeamEndpoint } from '~/api'
+import type {
+  NoCtfapiEndpointsCompetitionsCompetitionResponse,
+  NoCtfapiEndpointsCompetitionsScoreboardTeamResponse,
+  NoCtfapiEndpointsTeamsTeamResponse,
+} from '~/api'
 import { competitionWorkspaceNavigationKey } from '~/components/app/workspace-nav'
 import type { WorkspaceNavGroup } from '~/components/app/workspace-nav'
+import { createTrailingRefresh } from '~/lib/latest-page-refresh'
 
 const route = useRoute()
 const competitionId = computed(() => route.params.id as string)
@@ -13,6 +18,8 @@ const isControlScreen = computed(() => [
 ].includes(route.path))
 const competition = ref<NoCtfapiEndpointsCompetitionsCompetitionResponse | null>(null)
 const myTeam = ref<NoCtfapiEndpointsTeamsTeamResponse | null>(null)
+const myStanding = ref<NoCtfapiEndpointsCompetitionsScoreboardTeamResponse | null>(null)
+const standingLoading = ref(false)
 const loading = ref(true)
 const error = ref<string | null>(null)
 const { user } = useAuth()
@@ -24,13 +31,37 @@ const hasParticipantChallengeAccess = computed(() =>
 async function refreshMyTeam() {
   if (!user.value || hasCompetitionStaffAccess.value) {
     myTeam.value = null
+    myStanding.value = null
     return
   }
   const { data, error: teamError } = await getMyTeamEndpoint({
     path: { competitionId: competitionId.value },
   })
   myTeam.value = teamError || !data ? null : data
+  await refreshMyStanding()
 }
+
+async function refreshMyStanding(): Promise<void> {
+  if (myTeam.value?.registrationStatus !== 'Approved' || myTeam.value.isBanned || !myTeam.value.id) {
+    myStanding.value = null
+    standingLoading.value = false
+    return
+  }
+  standingLoading.value = myStanding.value === null
+  const { data, error: requestError, response } = await getLeaderboardEndpoint({
+    path: { competitionId: competitionId.value },
+    query: { endingRound: null },
+  })
+  standingLoading.value = false
+  if (response?.status === 404) {
+    myStanding.value = null
+    return
+  }
+  if (requestError || !data || !('teams' in data)) return
+  myStanding.value = data.teams?.find(team => team.teamId === myTeam.value?.id) ?? null
+}
+
+const refreshStandingLatest = createTrailingRefresh(refreshMyStanding)
 
 async function refresh() {
   const { data, error: err } = await getCompetitionEndpoint({
@@ -57,7 +88,12 @@ watch(
 let unwatch: (() => void) | undefined
 onMounted(() => {
   unwatch = watchCompetition(competitionId.value, {
-    competitionLifecycleChanged: () => void refresh(),
+    competitionLifecycleChanged: () => {
+      void refresh()
+      void refreshStandingLatest()
+    },
+    scoreboardUpdated: () => void refreshStandingLatest(),
+    onReconnected: () => void refreshStandingLatest(),
   })
 })
 onUnmounted(() => unwatch?.())
@@ -104,23 +140,40 @@ provide(competitionWorkspaceNavigationKey, navGroups)
     v-else-if="competition"
     class="mx-auto flex w-full max-w-[120rem] flex-col gap-4 px-3 py-4 md:px-5"
   >
-    <div class="flex flex-col gap-1 border-b pb-4">
-      <div class="flex flex-wrap items-center gap-x-3 gap-y-2">
-        <h1 class="text-display text-2xl md:text-3xl">{{ competition.title }}</h1>
-        <ModeBadge :mode="competition.mode" />
-        <LifecycleBadge :status="competition.status" />
+    <div class="flex flex-col justify-between gap-3 border-b pb-4 sm:flex-row sm:items-start">
+      <div class="flex flex-col gap-1">
+        <div class="flex flex-wrap items-center gap-x-3 gap-y-2">
+          <h1 class="text-display text-2xl md:text-3xl">{{ competition.title }}</h1>
+          <ModeBadge :mode="competition.mode" />
+          <LifecycleBadge :status="competition.status" />
+        </div>
+        <div class="flex flex-wrap items-center gap-x-3 gap-y-1 font-mono text-xs tabular-nums md:text-sm">
+          <span class="text-muted-foreground">
+            {{ formatDateTime(competition.startTime) }} ~ {{ formatDateTime(competition.endTime) }}
+          </span>
+          <CompetitionCountdown
+            :start-time="competition.startTime"
+            :end-time="competition.endTime"
+            :status="competition.status"
+            class="font-medium text-primary"
+          />
+        </div>
       </div>
-      <div class="flex flex-wrap items-center gap-x-3 gap-y-1 font-mono text-xs tabular-nums md:text-sm">
-        <span class="text-muted-foreground">
-          {{ formatDateTime(competition.startTime) }} ~ {{ formatDateTime(competition.endTime) }}
-        </span>
-        <CompetitionCountdown
-          :start-time="competition.startTime"
-          :end-time="competition.endTime"
-          :status="competition.status"
-          class="font-medium text-primary"
-        />
+
+      <div v-if="standingLoading" class="flex shrink-0 gap-2" :aria-label="$t('本队排名加载中')">
+        <Skeleton class="h-12 w-24" />
+        <Skeleton class="h-12 w-28" />
       </div>
+      <dl v-else-if="myStanding" class="flex shrink-0 divide-x rounded-lg border bg-card/60">
+        <div class="min-w-24 px-4 py-2 text-right">
+          <dt class="text-xs text-muted-foreground">{{ $t('本队排名') }}</dt>
+          <dd class="font-mono text-lg font-semibold tabular-nums">{{ myStanding.rank ? `#${myStanding.rank}` : '-' }}</dd>
+        </div>
+        <div class="min-w-28 px-4 py-2 text-right">
+          <dt class="text-xs text-muted-foreground">{{ $t('本队积分') }}</dt>
+          <dd class="font-mono text-lg font-semibold tabular-nums text-primary">{{ myStanding.totalScore ?? 0 }} pts</dd>
+        </div>
+      </dl>
     </div>
     <NuxtPage />
   </div>

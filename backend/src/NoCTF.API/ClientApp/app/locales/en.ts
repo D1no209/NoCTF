@@ -2201,4 +2201,7 @@ export const englishMessages: Record<string, string> = {
   "本题提交记录": "Challenge submission history",
   "暂无本题提交记录": "No submissions for this challenge yet",
   "评测结果等待超时，可在本题提交记录中继续查看。": "The evaluation is taking longer than expected. Continue tracking it in this challenge's submission history.",
+  "本队排名": "Team rank",
+  "本队积分": "Team points",
+  "本队排名加载中": "Loading team standing",
 }
