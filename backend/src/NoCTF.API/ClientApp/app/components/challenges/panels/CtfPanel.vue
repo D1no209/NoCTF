@@ -9,6 +9,8 @@ defineProps<{
   challenge: NoCtfapiEndpointsChallengesChallengeResponse
 }>()
 
+const emit = defineEmits<{ submitted: [] }>()
+
 const runtimeCard = ref<{ refreshUntilStopped: () => Promise<void> } | null>(null)
 
 function handleEvaluation(result?: string | null): void {
@@ -35,6 +37,7 @@ function handleEvaluation(result?: string | null): void {
       :maximum-attempts="challenge.maximumFlagAttempts"
       :remaining-attempts="challenge.remainingFlagAttempts"
       @evaluated="handleEvaluation"
+      @submitted="emit('submitted')"
     />
   </div>
 </template>

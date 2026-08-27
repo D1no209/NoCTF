@@ -69,4 +69,27 @@ describe('participant challenge progress', () => {
     expect(submit).not.toContain('judgePracticeFlagEndpoint')
     expect(create).toContain("practiceModeEnabled: mode.value === 'Ctf' && practiceModeEnabled.value")
   })
+
+  test('embeds challenge-filtered submission history and refreshes it after acceptance', async () => {
+    const detail = await Bun.file(
+      new URL('../app/components/challenges/CompetitionChallengeDetail.vue', import.meta.url),
+    ).text()
+    const history = await Bun.file(
+      new URL('../app/components/challenges/ChallengeSubmissionHistory.vue', import.meta.url),
+    ).text()
+    const submit = await Bun.file(
+      new URL('../app/components/challenges/FlagSubmit.vue', import.meta.url),
+    ).text()
+
+    expect(detail).toContain('<ChallengeSubmissionHistory')
+    expect(detail).toContain(':competition-challenge-id="competitionChallengeId"')
+    expect(detail).toContain('@submitted="refreshSubmissionHistory"')
+    expect(history).toContain('listGameplayFactsEndpoint({')
+    expect(history).toContain('competitionChallengeId: props.competitionChallengeId')
+    expect(history).toContain('createLatestPageRefresh')
+    expect(history).toContain('gameplayFactStateChanged: payload => {')
+    expect(history).toContain('onReconnected: () => void refreshLatest()')
+    expect(submit).toContain("emit('submitted', ids)")
+    expect(submit).toContain("$t('评测结果等待超时，可在本题提交记录中继续查看。')")
+  })
 })

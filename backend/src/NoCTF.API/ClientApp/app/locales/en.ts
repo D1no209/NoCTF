@@ -2197,4 +2197,8 @@ export const englishMessages: Record<string, string> = {
   "为队伍「{team}」记录本题正负分修正。": "Record a positive or negative score correction for team “{team}” on this challenge.",
   "当前本题得分": "Current challenge score",
   "调整后": "After adjustment",
+  "加载提交记录失败": "Failed to load submission history",
+  "本题提交记录": "Challenge submission history",
+  "暂无本题提交记录": "No submissions for this challenge yet",
+  "评测结果等待超时，可在本题提交记录中继续查看。": "The evaluation is taking longer than expected. Continue tracking it in this challenge's submission history.",
 }

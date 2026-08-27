@@ -52,4 +52,12 @@ describe('participant competition workspace layout', () => {
     expect(leaderboard).not.toContain('<CompetitionParticipantWorkspace')
     expect(leaderboard).toContain("$t('返回比赛')")
   })
+
+  test('removes the standalone submissions navigation item', async () => {
+    const parent = await page('../app/pages/competitions/[id].vue')
+
+    expect(parent).not.toContain('`${base}/my/submissions`')
+    expect(parent).not.toContain('label: translate("我的提交")')
+    expect(parent).not.toContain('FileCheck')
+  })
 })

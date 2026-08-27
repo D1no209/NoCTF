@@ -27,7 +27,12 @@ const error = ref<string | null>(null)
 const attachments = ref<NoCtfapiEndpointsAdministrationChallengeBankChallengeAttachmentResponse[]>([])
 const attachmentDeliveryPolicy = ref<NoCtfapiEndpointsAdministrationChallengeBankAttachmentDeliveryPolicyProtocol>('All')
 const downloading = ref(false)
+const historyRefreshKey = ref(0)
 let loadSequence = 0
+
+function refreshSubmissionHistory(): void {
+  historyRefreshKey.value += 1
+}
 
 async function loadChallenge(): Promise<void> {
   const sequence = ++loadSequence
@@ -200,18 +205,21 @@ const mode = computed(() => ctx.competition.value?.mode)
           :key="challenge.id"
           :competition="ctx.competition.value"
           :challenge="challenge"
+          @submitted="refreshSubmissionHistory"
         />
         <AwdPanel
           v-else-if="mode === 'Awd'"
           :key="challenge.id"
           :competition="ctx.competition.value"
           :challenge="challenge"
+          @submitted="refreshSubmissionHistory"
         />
         <AwdpPanel
           v-else-if="mode === 'Awdp'"
           :key="challenge.id"
           :competition="ctx.competition.value"
           :challenge="challenge"
+          @submitted="refreshSubmissionHistory"
         />
         <KohPanel
           v-else-if="mode === 'Koh'"
@@ -220,6 +228,15 @@ const mode = computed(() => ctx.competition.value?.mode)
           :challenge="challenge"
         />
       </div>
+
+      <ChallengeSubmissionHistory
+        v-if="isLoggedIn"
+        :key="challenge.id"
+        class="mt-5"
+        :competition-id="competitionId"
+        :competition-challenge-id="competitionChallengeId"
+        :refresh-key="historyRefreshKey"
+      />
     </div>
   </section>
 </template>

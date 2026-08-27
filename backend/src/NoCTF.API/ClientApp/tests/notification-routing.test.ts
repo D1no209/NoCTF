@@ -36,6 +36,14 @@ describe('notificationTargetPath', () => {
       .toBe('/competitions/competition-1/challenges?challenge=challenge-1')
   })
 
+  test('routes adjudicated submissions to the matching challenge history', () => {
+    expect(notificationTargetPath(notification('GameplayFactAdjudicated', 'competition-1', {
+      competitionChallengeId: 'challenge-1',
+      gameplayFactId: 'fact-1',
+    })))
+      .toBe('/competitions/competition-1/challenges?challenge=challenge-1')
+  })
+
   test('routes question activity to the matching consultation and reads its root thread', () => {
     const item = notification('Message', 'competition-1', { threadRootId: 'question-1' })
     expect(notificationTargetPath(item))

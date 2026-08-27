@@ -29,7 +29,10 @@ const props = withDefaults(
   { multiple: false, title: translate("提交 Flag"), description: '', practice: false, readOnlyJudgement: false },
 )
 
-const emit = defineEmits<{ evaluated: [result: TrackedSubmission['result']] }>()
+const emit = defineEmits<{
+  evaluated: [result: TrackedSubmission['result']]
+  submitted: [gameplayFactIds: string[]]
+}>()
 
 const input = ref('')
 const submitting = ref(false)
@@ -215,6 +218,7 @@ async function submit() {
   if (remainingAttempts.value !== null)
     remainingAttempts.value = Math.max(0, remainingAttempts.value - ids.length)
   toast.success(translate('已受理 {count} 条提交，评测中', { count: ids.length }))
+  emit('submitted', ids)
   startPolling()
 }
 
@@ -292,7 +296,7 @@ onUnmounted(() => {
       </form>
 
       <Alert v-if="timedOut" class="mt-4">
-        <AlertDescription>{{ $t('评测结果等待超时,可稍后在「我的提交」查看结果。') }}</AlertDescription>
+        <AlertDescription>{{ $t('评测结果等待超时，可在本题提交记录中继续查看。') }}</AlertDescription>
       </Alert>
     </div>
   </section>

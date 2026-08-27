@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { FileCheck, LayoutDashboard, MessageCircleQuestion, Puzzle, Trophy, UserRound } from '@lucide/vue'
+import { LayoutDashboard, MessageCircleQuestion, Puzzle, Trophy, UserRound } from '@lucide/vue'
 import { getCompetitionEndpoint, getMyTeamEndpoint } from '~/api'
 import type { NoCtfapiEndpointsCompetitionsCompetitionResponse, NoCtfapiEndpointsTeamsTeamResponse } from '~/api'
 import { competitionWorkspaceNavigationKey } from '~/components/app/workspace-nav'
@@ -89,7 +89,6 @@ const navGroups = computed<WorkspaceNavGroup[]>(() => {
       label: translate("我的"),
       items: [
         { to: `${base}/my/team`, label: translate("我的队伍"), icon: UserRound },
-        { to: `${base}/my/submissions`, label: translate("我的提交"), icon: FileCheck },
       ],
     },
   ]
