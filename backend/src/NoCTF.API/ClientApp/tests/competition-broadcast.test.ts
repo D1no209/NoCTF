@@ -34,6 +34,7 @@ describe('competition broadcast projection', () => {
       'ChallengePublished',
       'AwdpBreakAttempted',
       'AwdpFixAttempted',
+      'AnnouncementPublished',
     ])
   })
 
@@ -58,12 +59,20 @@ describe('competition broadcast projection', () => {
       .toBe('队伍「Alpha」对题目「Web 100」进行了一次攻击操作')
     expect(competitionBroadcastText(event('AwdpFixAttempted')))
       .toBe('队伍「Alpha」对题目「Web 100」提交了一次防御操作')
+    expect(competitionBroadcastText(event('AnnouncementPublished')))
+      .toBe('赛事发布了新通知')
   })
 
   test('links challenge broadcasts to the matching challenge', () => {
     expect(competitionBroadcastTargetPath(event('HintPublished', {
       competitionChallengeId: 'challenge-1',
     }))).toBe('/competitions/competition-1/challenges?challenge=challenge-1')
+  })
+
+  test('links published notices to their notification detail', () => {
+    expect(competitionBroadcastTargetPath(event('AnnouncementPublished', {
+      questionId: 'notification-1',
+    }))).toBe('/notifications?notification=notification-1')
   })
 
   test('collapses the staff and public copy of one ban broadcast', () => {

@@ -83,6 +83,9 @@ public sealed class CompetitionNotificationDeliveryPersistenceTests
                 .IsEqualTo(CompetitionEventKind.AnnouncementPublished);
             await Assert.That(permanentEvent.Visibility)
                 .IsEqualTo(CompetitionEventVisibility.Public);
+            await Assert.That(permanentEvent.SubjectType)
+                .IsEqualTo(EntityReferenceKind.Notification);
+            await Assert.That(permanentEvent.SubjectId).IsEqualTo(notification.Id);
             await Assert.That(permanentEvent.PayloadJson)
                 .DoesNotContain("完整公告正文");
         });
