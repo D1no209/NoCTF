@@ -18,21 +18,48 @@ export const competitionBroadcastKinds = [
   'AnnouncementPublished',
 ] satisfies NoCtfapiEndpointsCompetitionsEventsCompetitionEventKindProtocol[]
 
+const competitionBroadcastKindSet: ReadonlySet<NoCtfapiEndpointsCompetitionsEventsCompetitionEventKindProtocol>
+  = new Set(competitionBroadcastKinds)
+
+export function isCompetitionBroadcastKind(
+  kind: NoCtfapiEndpointsCompetitionsEventsCompetitionEventKindProtocol,
+): boolean {
+  return competitionBroadcastKindSet.has(kind)
+}
+
+export function competitionBroadcastIdentity(
+  event: NoCtfapiEndpointsCompetitionsEventsCompetitionEventResponse,
+): string {
+  return [
+    event.kind,
+    event.teamId,
+    event.competitionChallengeId,
+    event.occurredAt,
+  ].join(':')
+}
+
 export function deduplicateCompetitionBroadcasts(
   events: readonly NoCtfapiEndpointsCompetitionsEventsCompetitionEventResponse[],
 ): NoCtfapiEndpointsCompetitionsEventsCompetitionEventResponse[] {
   const seen = new Set<string>()
   return events.filter((event) => {
-    const key = [
-      event.kind,
-      event.teamId,
-      event.competitionChallengeId,
-      event.occurredAt,
-    ].join(':')
+    const key = competitionBroadcastIdentity(event)
     if (seen.has(key)) return false
     seen.add(key)
     return true
   })
+}
+
+export function mergeCompetitionBroadcasts(
+  current: readonly NoCtfapiEndpointsCompetitionsEventsCompetitionEventResponse[],
+  incoming: readonly NoCtfapiEndpointsCompetitionsEventsCompetitionEventResponse[],
+): NoCtfapiEndpointsCompetitionsEventsCompetitionEventResponse[] {
+  const currentByIdentity = new Map(current.map(event => [
+    competitionBroadcastIdentity(event),
+    event,
+  ]))
+  return deduplicateCompetitionBroadcasts(incoming).map(event =>
+    currentByIdentity.get(competitionBroadcastIdentity(event)) ?? event)
 }
 
 export function competitionBroadcastText(
