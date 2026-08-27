@@ -319,9 +319,9 @@ internal static class ScoreboardAudienceProjection
     public static ScoreboardProjection FilterTracks(
         ScoreboardProjection projection,
         CompetitionTracksView tracks,
-        bool canObserve)
+        bool canViewInternalTracks)
     {
-        if (canObserve)
+        if (canViewInternalTracks)
             return projection;
         var visibleKeys = tracks.Tracks
             .Where(track => !track.IsInternal && track.VisibleOnLeaderboard)
@@ -329,9 +329,9 @@ internal static class ScoreboardAudienceProjection
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
         // Keep one response internally consistent when an administrator changes
         // a team's track after the projection (especially a frozen projection).
-        var viewerKeys = projection.Snapshot.Teams
-            .Where(team => team.TeamId == tracks.ViewerTeamId)
-            .Select(team => team.TrackKey)
+        var viewerKeys = tracks.Tracks
+            .Where(track => track.IsViewerTrack && !track.IsInternal)
+            .Select(track => track.Key)
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
         var teams = projection.Snapshot.Teams
             .Where(team => visibleKeys.Contains(team.TrackKey)
@@ -477,16 +477,21 @@ public sealed class GetLeaderboardEndpoint(
         {
             var canObserve = user.UserId != Guid.Empty
                 && await authorizer.CanObserveAsync(user.UserId, request.CompetitionId, cancellationToken);
+            var canViewInternalTracks = user.UserId != Guid.Empty
+                && await authorizer.CanJudgeAsync(user.UserId, request.CompetitionId, cancellationToken);
             var tracks = await getTracks.ExecuteAsync(
                 request.CompetitionId,
                 user.UserId == Guid.Empty ? null : user.UserId,
-                canObserve,
+                canViewInternalTracks,
                 includeInvitationCodes: false,
                 cancellationToken);
             if (tracks is null)
                 return TypedResults.NotFound();
             projection = ScoreboardAudienceProjection.Filter(projection, canObserve);
-            projection = ScoreboardAudienceProjection.FilterTracks(projection, tracks, canObserve);
+            projection = ScoreboardAudienceProjection.FilterTracks(
+                projection,
+                tracks,
+                canViewInternalTracks);
             var snapshot = projection.Snapshot with
             {
                 Visibility = visibility.Visibility,

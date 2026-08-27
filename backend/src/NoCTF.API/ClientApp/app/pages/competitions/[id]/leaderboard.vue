@@ -27,29 +27,35 @@ const ctx = inject(competitionContextKey)!
 const board = useScoreboardMatrix(competitionId)
 const { isAdministrator } = useAuth()
 
-const selectedTrackKey = ref('')
+const allTracksKey = '__all_tracks__'
+const selectedTrackKey = ref(allTracksKey)
 const visibleTeamCount = ref(50)
-const canObserveAllTracks = computed(() =>
-  isAdministrator.value || Boolean(ctx.competition.value?.administrationRole))
+const canViewInternalTracks = computed(() => {
+  const role = ctx.competition.value?.administrationRole
+  return isAdministrator.value || role === 'Owner' || role === 'Manager' || role === 'Judge'
+})
 const availableTracks = computed(() => (board.snapshot.value?.tracks ?? [])
-  .filter(track => canObserveAllTracks.value
-    || track.isViewerTrack
-    || (track.visibleOnLeaderboard && !track.isInternal)))
+  .filter(track => canViewInternalTracks.value
+    || !track.isInternal && (track.isViewerTrack || track.visibleOnLeaderboard)))
+const selectedAllTracks = computed(() => selectedTrackKey.value === allTracksKey)
+const trackNames = computed(() => new Map(availableTracks.value.map(track => [track.key, track.name])))
+const trackName = (trackKey: string | undefined) => trackNames.value.get(trackKey) ?? trackKey ?? '-'
 
 watch(availableTracks, (tracks) => {
   if (!tracks.length) {
-    selectedTrackKey.value = ''
+    selectedTrackKey.value = allTracksKey
     return
   }
+  if (selectedAllTracks.value) return
   if (!tracks.some(track => track.key === selectedTrackKey.value))
-    selectedTrackKey.value = tracks.find(track => track.isViewerTrack)?.key ?? tracks[0]?.key ?? ''
+    selectedTrackKey.value = allTracksKey
 }, { immediate: true })
 
 const teams = computed(() => {
   const all = board.snapshot.value?.teams ?? []
-  return selectedTrackKey.value
-    ? all.filter(team => team.trackKey === selectedTrackKey.value)
-    : all
+  return selectedAllTracks.value
+    ? all
+    : all.filter(team => team.trackKey === selectedTrackKey.value)
 })
 const visibleTeams = computed(() => teams.value.slice(0, visibleTeamCount.value))
 const teamDisplayNames = computed(() => buildTeamDisplayNames(teams.value))
@@ -104,14 +110,20 @@ function exportCsv(): void {
   const snapshot = board.snapshot.value
   if (!snapshot) return
   const header = [
-    translate('名次'), translate('队伍'), translate('总分'),
+    selectedAllTracks.value ? translate('赛道名次') : translate('名次'),
+    translate('队伍'),
+    ...(selectedAllTracks.value ? [translate('赛道')] : []),
+    translate('总分'),
     ...flatColumns.value.map((column) => {
       const challenge = board.challengesById.value.get(column.competitionChallengeId ?? '')
       return `${challenge?.title ?? translate('未知题目')} · ${roundLabel(column)}`
     }),
   ]
   const rows = teams.value.map(team => [
-    team.rank ?? '', displayTeamName(team), team.totalScore ?? 0,
+    team.rank ?? '',
+    displayTeamName(team),
+    ...(selectedAllTracks.value ? [trackName(team.trackKey)] : []),
+    team.totalScore ?? 0,
     ...flatColumns.value.map((column) => {
       if (column.index === undefined) return ''
       const slot = scoreboardSlot(team, column.index)
@@ -347,7 +359,10 @@ function adjustmentKind(entry: NoCtfapiEndpointsCompetitionsScoreboardAdjustment
           </div>
           <Select v-if="availableTracks.length > 1" v-model="selectedTrackKey">
             <SelectTrigger class="min-w-40" :aria-label="$t('选择排行榜赛道')"><SelectValue /></SelectTrigger>
-            <SelectContent><SelectItem v-for="track in availableTracks" :key="track.key" :value="track.key!">{{ track.name }}</SelectItem></SelectContent>
+            <SelectContent>
+              <SelectItem :value="allTracksKey">{{ $t('所有赛道') }}</SelectItem>
+              <SelectItem v-for="track in availableTracks" :key="track.key" :value="track.key!">{{ track.name }}</SelectItem>
+            </SelectContent>
           </Select>
           <Button variant="outline" :disabled="!teams.length" @click="exportCsv"><Download data-icon="inline-start" />{{ $t('下载为Excel') }}</Button>
         </div>
@@ -362,7 +377,7 @@ function adjustmentKind(entry: NoCtfapiEndpointsCompetitionsScoreboardAdjustment
             <Table class="table-fixed">
               <TableHeader>
                 <TableRow>
-                  <TableHead :rowspan="isCtf ? 1 : 2" class="w-14">{{ $t('名次') }}</TableHead>
+                  <TableHead :rowspan="isCtf ? 1 : 2" class="w-14">{{ selectedAllTracks ? $t('赛道名次') : $t('名次') }}</TableHead>
                   <TableHead :rowspan="isCtf ? 1 : 2" class="sticky left-0 z-20 w-44 min-w-44 max-w-44 border-r bg-card">{{ $t('参赛队伍') }}</TableHead>
                   <TableHead :rowspan="isCtf ? 1 : 2" class="w-24 text-right">{{ $t('总分') }}</TableHead>
                   <TableHead v-for="group in columnGroups" :key="group.competitionChallengeId" :colspan="group.columns.length" class="border-l text-center">
@@ -374,7 +389,7 @@ function adjustmentKind(entry: NoCtfapiEndpointsCompetitionsScoreboardAdjustment
               <TableBody>
                 <TableRow v-for="team in visibleTeams" :key="team.teamId" :class="(team.rank ?? 99) <= 3 ? 'bg-primary/5' : ''">
                   <TableCell><Medal v-if="(team.rank ?? 99) <= 3" class="size-5" :class="medalRankClass[team.rank ?? 0]" /><span v-else class="font-mono tabular-nums">{{ team.rank ?? '—' }}</span></TableCell>
-                  <TableCell class="sticky left-0 z-10 w-44 min-w-44 max-w-44 border-r bg-card"><div class="flex min-w-0 items-center gap-2"><button type="button" class="min-w-0 flex-1 truncate rounded-sm text-left font-medium underline-offset-4 hover:text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" :title="displayTeamName(team)" :aria-label="$t('查看队伍 {team} 详情', { team: displayTeamName(team) })" @click="openTeamDetail(team)">{{ displayTeamName(team) }}</button><Badge v-if="team.rankingState !== 'Eligible'" variant="destructive" class="shrink-0">{{ scoreboardRankingStateLabel(team.rankingState) }}</Badge></div></TableCell>
+                  <TableCell class="sticky left-0 z-10 w-44 min-w-44 max-w-44 border-r bg-card"><div class="flex min-w-0 items-center gap-2"><button type="button" class="min-w-0 flex-1 truncate rounded-sm text-left font-medium underline-offset-4 hover:text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" :title="displayTeamName(team)" :aria-label="$t('查看队伍 {team} 详情', { team: displayTeamName(team) })" @click="openTeamDetail(team)">{{ displayTeamName(team) }}</button><Badge v-if="selectedAllTracks && availableTracks.length > 1" variant="outline" class="max-w-24 shrink-0 truncate" :title="trackName(team.trackKey)">{{ trackName(team.trackKey) }}</Badge><Badge v-if="team.rankingState !== 'Eligible'" variant="destructive" class="shrink-0">{{ scoreboardRankingStateLabel(team.rankingState) }}</Badge></div></TableCell>
                   <TableCell class="text-right">
                     <button v-if="(team.globalAdjustmentCount ?? 0) > 0" type="button" class="w-full rounded-md px-2 py-1 text-right transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" @click="openAdjustments(team)">
                       <span class="block font-mono font-semibold tabular-nums">{{ team.totalScore ?? 0 }} pts</span>

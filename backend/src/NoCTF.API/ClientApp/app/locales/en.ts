@@ -2209,4 +2209,6 @@ export const englishMessages: Record<string, string> = {
   "本队排名": "Team rank",
   "本队积分": "Team points",
   "本队排名加载中": "Loading team standing",
+  "所有赛道": "All tracks",
+  "赛道名次": "Track rank",
 }

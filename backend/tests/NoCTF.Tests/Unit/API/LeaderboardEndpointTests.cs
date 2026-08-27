@@ -826,7 +826,84 @@ public sealed class LeaderboardEndpointTests
     }
 
     [Test]
-    public async Task Participant_snapshot_marks_and_includes_only_the_viewers_hidden_track()
+    public async Task Observer_snapshot_hides_internal_tracks_while_judge_snapshot_includes_them()
+    {
+        var competitionId = Guid.CreateVersion7();
+        var challengeId = Guid.CreateVersion7();
+        var publicTeamId = Guid.CreateVersion7();
+        var internalTeamId = Guid.CreateVersion7();
+        var staffUserId = Guid.CreateVersion7();
+        var internalSlot = new ScoreboardSlot(
+            0, ScoreboardScoreState.Settled, 0, 0, 0, 1, [], []);
+        var projection = CreateProjection(
+            competitionId,
+            [new(challengeId, "Challenge", "PWN", "PWN", 1, true)],
+            [new(0, challengeId, null)],
+            [
+                new(publicTeamId, "Public", "default", 1, ScoreboardRankingState.Eligible, 1, 0, [], []),
+                new(internalTeamId, "Internal", "staff", null, ScoreboardRankingState.Disqualified,
+                    0, 0, [], [internalSlot])
+            ]);
+        projection = projection with
+        {
+            Snapshot = projection.Snapshot with
+            {
+                Tracks =
+                [
+                    new("default", "Default", false, true),
+                    new("staff", "Staff", true, false)
+                ]
+            }
+        };
+
+        await using var observerApp = await CreateApplicationAsync(
+            competitionId,
+            new CachedLeaderboard(projection: projection),
+            new RecordingMessagePublisher(),
+            trackStore: new InternalTrackStore(competitionId),
+            authorizer: new StaffAccess(canJudge: false),
+            userContext: new AuthenticatedUserContext(staffUserId));
+        using var observerResponse = await observerApp.GetTestClient().GetAsync(
+            $"/api/v1/competitions/{competitionId}/leaderboard");
+        var observerSnapshot = await observerResponse.Content
+            .ReadFromJsonAsync<ScoreboardSnapshotResponse>();
+        using var observerSlotResponse = await observerApp.GetTestClient().GetAsync(
+            $"/api/v1/competitions/{competitionId}/leaderboard/teams/{internalTeamId}/columns/0");
+        using var observerAdjustmentResponse = await observerApp.GetTestClient().GetAsync(
+            $"/api/v1/competitions/{competitionId}/leaderboard/teams/{internalTeamId}/adjustments");
+
+        await using var judgeApp = await CreateApplicationAsync(
+            competitionId,
+            new CachedLeaderboard(projection: projection),
+            new RecordingMessagePublisher(),
+            trackStore: new InternalTrackStore(competitionId),
+            authorizer: new StaffAccess(canJudge: true),
+            userContext: new AuthenticatedUserContext(staffUserId));
+        using var judgeResponse = await judgeApp.GetTestClient().GetAsync(
+            $"/api/v1/competitions/{competitionId}/leaderboard");
+        var judgeSnapshot = await judgeResponse.Content
+            .ReadFromJsonAsync<ScoreboardSnapshotResponse>();
+        using var judgeSlotResponse = await judgeApp.GetTestClient().GetAsync(
+            $"/api/v1/competitions/{competitionId}/leaderboard/teams/{internalTeamId}/columns/0");
+        using var judgeAdjustmentResponse = await judgeApp.GetTestClient().GetAsync(
+            $"/api/v1/competitions/{competitionId}/leaderboard/teams/{internalTeamId}/adjustments");
+
+        await Assert.That(observerSnapshot!.Teams.Select(team => team.TeamId))
+            .IsEquivalentTo([publicTeamId]);
+        await Assert.That(observerSnapshot.Tracks.Select(track => track.Key))
+            .IsEquivalentTo(["default"]);
+        await Assert.That(observerSlotResponse.StatusCode).IsEqualTo(HttpStatusCode.NotFound);
+        await Assert.That(observerAdjustmentResponse.StatusCode).IsEqualTo(HttpStatusCode.NotFound);
+        await Assert.That(judgeSnapshot!.Teams.Select(team => team.TeamId))
+            .IsEquivalentTo([publicTeamId, internalTeamId]);
+        await Assert.That(judgeSnapshot.Tracks.Select(track => track.Key))
+            .IsEquivalentTo(["default", "staff"]);
+        await Assert.That(judgeSlotResponse.StatusCode).IsEqualTo(HttpStatusCode.OK);
+        await Assert.That(judgeAdjustmentResponse.StatusCode).IsEqualTo(HttpStatusCode.OK);
+    }
+
+    [Test]
+    public async Task Participant_snapshot_does_not_expose_the_viewers_internal_track()
     {
         var competitionId = Guid.CreateVersion7();
         var challengeId = Guid.CreateVersion7();
@@ -858,7 +935,7 @@ public sealed class LeaderboardEndpointTests
             competitionId,
             new CachedLeaderboard(projection: projection),
             new RecordingMessagePublisher(),
-            trackStore: new ViewerHiddenTrackStore(competitionId, viewerTeamId));
+            trackStore: new ViewerInternalTrackStore(competitionId, viewerTeamId));
 
         using var response = await app.GetTestClient().GetAsync(
             $"/api/v1/competitions/{competitionId}/leaderboard");
@@ -866,17 +943,15 @@ public sealed class LeaderboardEndpointTests
 
         await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.OK);
         await Assert.That(snapshot!.Teams.Select(team => team.TeamId))
-            .IsEquivalentTo([publicTeamId, viewerTeamId]);
+            .IsEquivalentTo([publicTeamId]);
         await Assert.That(snapshot.Tracks.Select(track => track.Key))
-            .IsEquivalentTo(["default", "hidden"]);
+            .IsEquivalentTo(["default"]);
         await Assert.That(snapshot.Tracks.Single(track => track.Key == "default").IsViewerTrack)
             .IsFalse();
-        await Assert.That(snapshot.Tracks.Single(track => track.Key == "hidden").IsViewerTrack)
-            .IsTrue();
     }
 
     [Test]
-    public async Task Frozen_participant_snapshot_uses_the_frozen_team_track_after_reassignment()
+    public async Task Frozen_participant_snapshot_does_not_restore_an_internal_track_after_reassignment()
     {
         var competitionId = Guid.CreateVersion7();
         var challengeId = Guid.CreateVersion7();
@@ -913,7 +988,7 @@ public sealed class LeaderboardEndpointTests
             new RecordingMessagePublisher(),
             CompetitionLeaderboardVisibility.Frozen,
             LeaderboardDataScope.Frozen,
-            trackStore: new ViewerHiddenTrackStore(competitionId, viewerTeamId, "other"));
+            trackStore: new ViewerInternalTrackStore(competitionId, viewerTeamId, "other"));
         using var client = app.GetTestClient();
 
         using var response = await client.GetAsync(
@@ -924,12 +999,10 @@ public sealed class LeaderboardEndpointTests
 
         await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.OK);
         await Assert.That(snapshot!.Teams.Select(team => team.TeamId))
-            .IsEquivalentTo([publicTeamId, viewerTeamId]);
+            .IsEquivalentTo([publicTeamId]);
         await Assert.That(snapshot.Tracks.Select(track => track.Key))
-            .IsEquivalentTo(["default", "hidden"]);
-        await Assert.That(snapshot.Tracks.Single(track => track.Key == "hidden").IsViewerTrack)
-            .IsTrue();
-        await Assert.That(detailResponse.StatusCode).IsEqualTo(HttpStatusCode.OK);
+            .IsEquivalentTo(["default"]);
+        await Assert.That(detailResponse.StatusCode).IsEqualTo(HttpStatusCode.NotFound);
     }
 
     [Test]
@@ -997,7 +1070,9 @@ public sealed class LeaderboardEndpointTests
         GameMode gameMode = GameMode.Ctf,
         ICompetitionTrackStore? trackStore = null,
         IScoreboardDetailReader? detailReader = null,
-        ILeaderboardSnapshotFactory? snapshotFactory = null)
+        ILeaderboardSnapshotFactory? snapshotFactory = null,
+        ICompetitionModerationAuthorizer? authorizer = null,
+        IUserContext? userContext = null)
     {
         var builder = WebApplication.CreateBuilder();
         builder.WebHost.UseTestServer();
@@ -1029,8 +1104,9 @@ public sealed class LeaderboardEndpointTests
         builder.Services.AddSingleton<GetCompetitionTracks>();
         builder.Services.AddSingleton<ICompetitionTrackStore>(
             trackStore ?? new DefaultTrackStore(competitionId));
-        builder.Services.AddSingleton<ICompetitionModerationAuthorizer>(new NoStaffAccess());
-        builder.Services.AddSingleton<IUserContext>(new AnonymousUserContext());
+        builder.Services.AddSingleton<ICompetitionModerationAuthorizer>(
+            authorizer ?? new NoStaffAccess());
+        builder.Services.AddSingleton<IUserContext>(userContext ?? new AnonymousUserContext());
         builder.Services.AddSingleton(detailReader ?? new StaticScoreboardDetailReader());
         builder.Services.AddSingleton<NoCTF.API.Pagination.SignedKeysetCursor>();
 
@@ -1066,6 +1142,30 @@ public sealed class LeaderboardEndpointTests
     {
         public Guid UserId => Guid.Empty;
         public bool IsAdministrator => false;
+    }
+
+    private sealed class AuthenticatedUserContext(Guid userId) : IUserContext
+    {
+        public Guid UserId => userId;
+        public bool IsAdministrator => false;
+    }
+
+    private sealed class StaffAccess(bool canJudge) : ICompetitionModerationAuthorizer
+    {
+        public Task<bool> CanModerateAsync(
+            Guid userId,
+            Guid competitionId,
+            CancellationToken cancellationToken) => Task.FromResult(canJudge);
+
+        public Task<bool> CanJudgeAsync(
+            Guid userId,
+            Guid competitionId,
+            CancellationToken cancellationToken) => Task.FromResult(canJudge);
+
+        public Task<bool> CanObserveAsync(
+            Guid userId,
+            Guid competitionId,
+            CancellationToken cancellationToken) => Task.FromResult(true);
     }
 
     private sealed class DefaultTrackStore(Guid competitionId) : ICompetitionTrackStore
@@ -1286,7 +1386,7 @@ public sealed class LeaderboardEndpointTests
             CancellationToken cancellationToken) => throw new NotSupportedException();
     }
 
-    private sealed class ViewerHiddenTrackStore(
+    private sealed class ViewerInternalTrackStore(
         Guid competitionId,
         Guid viewerTeamId,
         string viewerTrackKey = "hidden")

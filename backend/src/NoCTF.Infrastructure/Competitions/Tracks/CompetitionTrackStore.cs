@@ -54,8 +54,10 @@ public sealed class CompetitionTrackStore(
             competition.TrackConfigurationJson);
         var tracks = configuration.Tracks
             .Where(track => includeInternal
-                || !track.IsInternal && (track.IsPublicSelectable || track.VisibleOnLeaderboard)
-                || string.Equals(track.Key, viewerTrackKey, StringComparison.OrdinalIgnoreCase))
+                || !track.IsInternal
+                && (track.IsPublicSelectable
+                    || track.VisibleOnLeaderboard
+                    || string.Equals(track.Key, viewerTrackKey, StringComparison.OrdinalIgnoreCase)))
             .Select(track => Map(track, includeInvitationCodes) with
             {
                 IsViewerTrack = string.Equals(

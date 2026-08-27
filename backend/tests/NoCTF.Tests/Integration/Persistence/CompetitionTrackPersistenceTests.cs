@@ -158,8 +158,9 @@ public sealed class CompetitionTrackPersistenceTests
                     includeInvitationCodes: false,
                     cancellationToken);
                 await Assert.That(participant!.ViewerTeamId).IsEqualTo(teamId);
-                await Assert.That(participant.Tracks.Single(track => track.Key == "internal").IsViewerTrack)
-                    .IsTrue();
+                await Assert.That(participant.Tracks.Select(track => track.Key))
+                    .IsEquivalentTo(["default", "invite"]);
+                await Assert.That(participant.Tracks.Any(track => track.IsInternal)).IsFalse();
                 await Assert.That(participant.Tracks.All(track => track.InvitationCode is null))
                     .IsTrue();
 
