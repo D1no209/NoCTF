@@ -28,6 +28,8 @@ const loading = ref(true)
 const error = ref<string | null>(null)
 const dataScope = ref<NoCtfapiEndpointsCompetitionsLeaderboardDataScopeProtocol>('Live')
 const myTeamId = ref<string | null>(null)
+const hideSolved = ref(false)
+const collapsedDirections = ref<Set<string>>(new Set())
 const board = useScoreboardMatrix(props.competitionId)
 
 async function loadMyTeam(): Promise<void> {
@@ -165,6 +167,40 @@ const groups = computed(() => {
     challenges: challenges.sort((left, right) => (left.order ?? 0) - (right.order ?? 0)),
   }))
 })
+
+const visibleGroups = computed(() => groups.value
+  .map(group => ({
+    ...group,
+    challenges: hideSolved.value
+      ? group.challenges.filter(challenge => !progressFor(challenge.id)?.solvedByMyTeam)
+      : group.challenges,
+  }))
+  .filter(group => group.challenges.length > 0))
+
+const visibleChallengeIds = computed(() => visibleGroups.value
+  .flatMap(group => group.challenges)
+  .map(challenge => challenge.id)
+  .filter((id): id is string => Boolean(id)))
+
+watch(
+  [hideSolved, visibleChallengeIds],
+  ([hidden, challengeIds]) => {
+    if (!hidden || !challengeIds.length || !props.selectedChallengeId) return
+    if (!challengeIds.includes(props.selectedChallengeId)) emit('ready', challengeIds[0]!)
+  },
+  { flush: 'post' },
+)
+
+function isDirectionCollapsed(direction: string): boolean {
+  return collapsedDirections.value.has(direction)
+}
+
+function toggleDirection(direction: string): void {
+  const next = new Set(collapsedDirections.value)
+  if (next.has(direction)) next.delete(direction)
+  else next.add(direction)
+  collapsedDirections.value = next
+}
 </script>
 
 <template>
@@ -175,6 +211,12 @@ const groups = computed(() => {
     <header class="border-b px-4 py-3">
       <h2 class="text-sm font-semibold">{{ $t('题目列表') }}</h2>
       <p class="mt-1 text-xs text-muted-foreground">{{ $t('按方向选择题目并在中间查看详情') }}</p>
+      <div class="mt-3 flex items-center justify-between gap-3 border-t pt-3">
+        <label :for="`hide-solved-${competitionId}`" class="cursor-pointer text-xs font-medium">
+          {{ $t('隐藏已解出') }}
+        </label>
+        <Switch :id="`hide-solved-${competitionId}`" v-model="hideSolved" />
+      </div>
     </header>
 
     <div v-if="loading" class="flex flex-col gap-2 p-3">
@@ -206,8 +248,18 @@ const groups = computed(() => {
         <AlertDescription>{{ $t('排行榜已冻结,题目分数显示为冻结时快照。') }}</AlertDescription>
       </Alert>
 
-      <section v-for="group in groups" :key="group.direction" class="flex flex-col gap-2">
-        <h3 class="flex items-center gap-2 px-1 text-xs font-semibold">
+      <Empty v-if="hideSolved && !visibleGroups.length" class="border-0 py-8">
+        <EmptyHeader><EmptyTitle>{{ $t('没有未解出的题目') }}</EmptyTitle></EmptyHeader>
+      </Empty>
+
+      <section v-for="(group, groupIndex) in visibleGroups" :key="group.direction" class="flex flex-col gap-2">
+        <button
+          type="button"
+          class="flex w-full items-center gap-2 rounded-sm px-1 py-0.5 text-left text-xs font-semibold hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          :aria-expanded="!isDirectionCollapsed(group.direction)"
+          :aria-controls="`challenge-direction-${competitionId}-${groupIndex}`"
+          @click="toggleDirection(group.direction)"
+        >
           <component
             :is="directionIcon(group.direction)"
             class="size-4"
@@ -216,51 +268,62 @@ const groups = computed(() => {
           />
           <span class="truncate">{{ group.direction }}</span>
           <span class="ml-auto font-mono text-[0.6875rem] tabular-nums text-muted-foreground">{{ group.challenges.length }}</span>
-        </h3>
+          <ChevronRight
+            class="size-3.5 shrink-0 transition-transform"
+            :class="!isDirectionCollapsed(group.direction) && 'rotate-90'"
+            aria-hidden="true"
+          />
+        </button>
 
-        <button
-          v-for="challenge in group.challenges"
-          :key="challenge.id"
-          type="button"
-          class="group flex w-full items-center gap-2 rounded-md border px-3 py-2.5 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-          :class="selectedChallengeId === challenge.id
-            ? 'border-primary bg-primary/10 text-foreground'
-            : 'border-border bg-background text-muted-foreground hover:border-primary/40 hover:text-foreground'"
-          :aria-current="selectedChallengeId === challenge.id ? 'true' : undefined"
-          @click="emit('select', challenge.id!)"
+        <div
+          :id="`challenge-direction-${competitionId}-${groupIndex}`"
+          v-show="!isDirectionCollapsed(group.direction)"
+          class="flex flex-col gap-2"
         >
-          <span class="min-w-0 flex-1">
-            <span class="flex min-w-0 items-baseline gap-2 text-sm font-medium">
-              <span class="truncate">{{ challenge.title }}</span>
-              <span v-if="currentScore(challenge.id) !== null" class="shrink-0 font-mono text-xs tabular-nums text-primary">
-                {{ currentScore(challenge.id) }} pts
+          <button
+            v-for="challenge in group.challenges"
+            :key="challenge.id"
+            type="button"
+            class="group flex w-full items-center gap-2 rounded-md border px-3 py-2.5 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            :class="selectedChallengeId === challenge.id
+              ? 'border-primary bg-primary/10 text-foreground'
+              : 'border-border bg-background text-muted-foreground hover:border-primary/40 hover:text-foreground'"
+            :aria-current="selectedChallengeId === challenge.id ? 'true' : undefined"
+            @click="emit('select', challenge.id!)"
+          >
+            <span class="min-w-0 flex-1">
+              <span class="flex min-w-0 items-baseline gap-2 text-sm font-medium">
+                <span class="truncate">{{ challenge.title }}</span>
+                <span v-if="currentScore(challenge.id) !== null" class="shrink-0 font-mono text-xs tabular-nums text-primary">
+                  {{ currentScore(challenge.id) }} pts
+                </span>
+              </span>
+              <span v-if="isAwdp && progressFor(challenge.id)" class="mt-1 flex items-center gap-2 text-[0.6875rem]">
+                <span class="flex items-center gap-1"><Swords class="size-3" /><span class="font-mono">{{ progressFor(challenge.id)?.attackCount ?? 0 }}</span></span>
+                <span class="flex items-center gap-1"><ShieldCheck class="size-3" /><span class="font-mono">{{ progressFor(challenge.id)?.defenseCount ?? 0 }}</span></span>
+                <span v-if="board.snapshot.value?.currentRoundId" class="truncate text-muted-foreground">{{ $t('本轮待结算') }}</span>
+              </span>
+              <span v-else-if="progressFor(challenge.id)" class="mt-1 flex items-center gap-1 text-[0.6875rem]">
+                <Users class="size-3" />
+                <span>{{ $t('{count} 支队伍已解出', { count: progressFor(challenge.id)?.solveCount ?? 0 }) }}</span>
               </span>
             </span>
-            <span v-if="isAwdp && progressFor(challenge.id)" class="mt-1 flex items-center gap-2 text-[0.6875rem]">
-              <span class="flex items-center gap-1"><Swords class="size-3" /><span class="font-mono">{{ progressFor(challenge.id)?.attackCount ?? 0 }}</span></span>
-              <span class="flex items-center gap-1"><ShieldCheck class="size-3" /><span class="font-mono">{{ progressFor(challenge.id)?.defenseCount ?? 0 }}</span></span>
-              <span v-if="board.snapshot.value?.currentRoundId" class="truncate text-muted-foreground">{{ $t('本轮待结算') }}</span>
-            </span>
-            <span v-else-if="progressFor(challenge.id)" class="mt-1 flex items-center gap-1 text-[0.6875rem]">
-              <Users class="size-3" />
-              <span>{{ $t('{count} 支队伍已解出', { count: progressFor(challenge.id)?.solveCount ?? 0 }) }}</span>
-            </span>
-          </span>
-          <Flag
-            v-if="progressFor(challenge.id)?.solvedByMyTeam"
-            class="size-4 shrink-0 text-primary"
-            :aria-label="progressFor(challenge.id)?.bloodRank
-              ? bloodRankLabel(progressFor(challenge.id)?.bloodRank)
-              : $t('已解出')"
-          />
-          <component
-            :is="progressFor(challenge.id)?.attackSucceeded ? Swords : ShieldCheck"
-            v-else-if="isAwdp && awdpProgressLabel(progressFor(challenge.id))"
-            class="size-4 shrink-0 text-primary"
-            :aria-label="awdpProgressLabel(progressFor(challenge.id)) ?? undefined"
-          />
-          <ChevronRight class="size-4 shrink-0 transition-transform group-hover:translate-x-0.5" aria-hidden="true" />
-        </button>
+            <Flag
+              v-if="progressFor(challenge.id)?.solvedByMyTeam"
+              class="size-4 shrink-0 text-primary"
+              :aria-label="progressFor(challenge.id)?.bloodRank
+                ? bloodRankLabel(progressFor(challenge.id)?.bloodRank)
+                : $t('已解出')"
+            />
+            <component
+              :is="progressFor(challenge.id)?.attackSucceeded ? Swords : ShieldCheck"
+              v-else-if="isAwdp && awdpProgressLabel(progressFor(challenge.id))"
+              class="size-4 shrink-0 text-primary"
+              :aria-label="awdpProgressLabel(progressFor(challenge.id)) ?? undefined"
+            />
+            <ChevronRight class="size-4 shrink-0 transition-transform group-hover:translate-x-0.5" aria-hidden="true" />
+          </button>
+        </div>
       </section>
     </div>
   </aside>
