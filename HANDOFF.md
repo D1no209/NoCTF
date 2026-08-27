@@ -1,5 +1,13 @@
 # NoCTF 数据模型重构交接
 
+## 2026-08-27 alpha.112 推送与手动部署
+
+- 本地 `main` 的 alpha.108–alpha.112 五个提交已快进推送到远程 `main@413fb795`。GitHub Actions run `33081866848` 因托管 Runner/额度不可用在任何 step 启动前失败，没有产生 CI 镜像；本地与真实 PostgreSQL 门禁结果见各版本节。
+- 使用 `git archive` 生成 `413fb795c6f6845383979212c48b8ef8b1b18535` 的只读发布归档，传输前后 SHA-256 均为 `fea5b3725086d627d43ff205982b70b8f6a6ccd93eae73da13585fcf5d9b89dc`。服务器部署脚本完成限定资源清理、数据库 custom-format 备份与校验、镜像构建、migration 检查和滚动切换；migration 明确报告数据库已是最新、没有应用迁移。
+- 当前 release symlink 指向 `/root/noctf-releases/413fb795c6f6845383979212c48b8ef8b1b18535`，API 程序集确认为 `0.1.0-alpha.112`。API、Worker、Runner 全部 healthy、RestartCount 为 0；PostgreSQL 与 Redis 未重建并保持原连续运行。
+- `https://noctf.qaq-love.cn/`、`/health`、`/health/ready` 及 IP `/health` 均返回 HTTP 200；生产 OpenAPI 已包含 CTF 趋势接口和 `TeamMembershipFailureCodeProtocol`。Worker 仅在 Singular Agent 启动选主前出现两次预期的 readiness 失败，随后恢复 healthy，没有持续错误。
+- 部署后清除未被容器引用的 Docker build cache，根分区占用从 81% 降至 68%，剩余约 13GB；未删除题目容器、活动平台镜像、业务卷或生产对象。
+
 ## 2026-08-27 alpha.112 邀请加入队伍修复
 
 - 修复比赛运行中已开启“允许运行中报名”但邀请加入仍被无条件拒绝的问题。创建队伍与邀请加入现在共享同一生命周期语义：Visible/Published 可加入，Running 仅在 `AllowTeamRegistrationWhileRunning` 开启时可加入，Paused/Finished 保持锁定。
