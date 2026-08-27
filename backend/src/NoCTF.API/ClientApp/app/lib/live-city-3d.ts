@@ -537,9 +537,9 @@ export class LiveCityScene {
   ): BuildingRecord {
     const group = new THREE.Group()
     const variant = Math.floor(rand() * 3)
-    const height = 10 + (state.score / maxScore) * 30
-    const baseWidth = 4.6 + rand() * 2.4
-    const baseDepth = 4.6 + rand() * 2.4
+    const height = 8 + (state.score / maxScore) * 20
+    const baseWidth = 6.8 + rand() * 3.2
+    const baseDepth = 6.8 + rand() * 3.2
 
     const podium = new THREE.Mesh(
       new THREE.BoxGeometry(baseWidth + 3, 1.1, baseDepth + 3),
