@@ -49,7 +49,7 @@ public sealed class CreateManualAdjustmentEndpoint(
         CancellationToken ct)
     {
         var competitionId = Route<Guid>("competitionId");
-        if (!await authorizer.CanModerateAsync(user.UserId, competitionId, ct))
+        if (!await authorizer.CanJudgeAsync(user.UserId, competitionId, ct))
             return TypedResults.Forbid();
         var result = await create.ExecuteAsync(new(
             competitionId,

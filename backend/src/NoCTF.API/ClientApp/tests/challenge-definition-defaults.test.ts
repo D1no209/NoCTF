@@ -168,6 +168,6 @@ describe('CTF score decay preview', () => {
     expect(page).toContain(':inherited-json="inheritedConfigJson"')
     expect(editor).toContain(".filter(field => !props.hiddenKeys.includes(field.key))")
     expect(page).toContain(":hidden-keys=\"challenge.usesDynamicFlag ? [] : ['flagTemplate']\"")
-    expect(page).toContain('class="h-12 p-1.5"')
+    expect(page).toContain('lg:grid-cols-[minmax(0,1fr)_14rem]')
   })
 })
