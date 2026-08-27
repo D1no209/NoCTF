@@ -1,5 +1,6 @@
 /** English UI resources keyed by the canonical Simplified Chinese source text. */
 export const englishMessages: Record<string, string> = {
+  "赛事发布了新通知": "A new competition notice was published",
   "队伍封禁期间不可变更组织信息。": "A banned team cannot change its organization details.",
   "查看封禁申诉": "Review ban appeal",
   "队伍{team}提交了封禁申诉": "Team {team} submitted a ban appeal",

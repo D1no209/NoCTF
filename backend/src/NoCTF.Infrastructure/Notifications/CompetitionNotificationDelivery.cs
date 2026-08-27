@@ -146,7 +146,8 @@ public sealed class CompetitionNotificationDelivery(
                 ? CompetitionEventVisibility.Public
                 : CompetitionEventVisibility.Staff,
             command.PublishedAt,
-            ActorUserId: command.ActorUserId), ct);
+            ActorUserId: command.ActorUserId,
+            QuestionId: notification.Id), ct);
         await db.SaveChangesAsync(ct);
         return new(
             notification.Id,

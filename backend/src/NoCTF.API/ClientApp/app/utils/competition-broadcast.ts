@@ -15,6 +15,7 @@ export const competitionBroadcastKinds = [
   'ChallengePublished',
   'AwdpBreakAttempted',
   'AwdpFixAttempted',
+  'AnnouncementPublished',
 ] satisfies NoCtfapiEndpointsCompetitionsEventsCompetitionEventKindProtocol[]
 
 export function deduplicateCompetitionBroadcasts(
@@ -51,6 +52,7 @@ export function competitionBroadcastText(
     ChallengePublished: translate('题目「{challenge}」已开放', { challenge }),
     AwdpBreakAttempted: translate('队伍「{team}」对题目「{challenge}」进行了一次攻击操作', { team, challenge }),
     AwdpFixAttempted: translate('队伍「{team}」对题目「{challenge}」提交了一次防御操作', { team, challenge }),
+    AnnouncementPublished: translate('赛事发布了新通知'),
   }
   return messages[event.kind] ?? translate('赛事状态已更新')
 }
@@ -63,5 +65,7 @@ export function competitionBroadcastTargetPath(
   }
   if (event.kind === 'TeamBanned' || event.kind === 'TeamBanCorrectionPublished')
     return `/competitions/${event.competitionId}/teams`
+  if (event.kind === 'AnnouncementPublished' && event.questionId)
+    return `/notifications?notification=${event.questionId}`
   return null
 }
