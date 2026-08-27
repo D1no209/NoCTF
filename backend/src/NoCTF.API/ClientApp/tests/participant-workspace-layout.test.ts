@@ -60,4 +60,18 @@ describe('participant competition workspace layout', () => {
     expect(parent).not.toContain('label: translate("我的提交")')
     expect(parent).not.toContain('FileCheck')
   })
+
+  test('shows the approved participant team rank and points from the live scoreboard snapshot', async () => {
+    const parent = await page('../app/pages/competitions/[id].vue')
+
+    expect(parent).toContain('getLeaderboardEndpoint({')
+    expect(parent).toContain("myTeam.value?.registrationStatus !== 'Approved'")
+    expect(parent).toContain('myStanding.value = data.teams?.find(team => team.teamId === myTeam.value?.id) ?? null')
+    expect(parent).toContain('scoreboardUpdated: () => void refreshStandingLatest()')
+    expect(parent).toContain('onReconnected: () => void refreshStandingLatest()')
+    expect(parent).toContain("$t('本队排名')")
+    expect(parent).toContain("$t('本队积分')")
+    expect(parent).toContain('{{ myStanding.totalScore ?? 0 }} pts')
+    expect(parent).toContain("myStanding.rank ? `#${myStanding.rank}` : '-'")
+  })
 })
