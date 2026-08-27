@@ -43,7 +43,11 @@ describe('participant challenge progress', () => {
     ).text()
 
     expect(submit).toContain('celebrateCorrectFlag()')
-    expect(submit).toContain('🎉')
+    expect(submit).toContain('celebrationParticles')
+    expect(submit).toContain('<PartyPopper')
+    expect(submit).toContain('flag-celebration-particle')
+    expect(submit).toContain('resultTimer = setTimeout(closeResultDialog, 3200)')
+    expect(submit).toContain('@pointer-down-outside="closeResultDialog"')
     expect(submit).toContain('@media (prefers-reduced-motion: reduce)')
     expect(submit).toContain("if (wasPending && !isGameplayFactPending(data.state) && !toasted.has(id))")
     expect(submit).toContain('resultDialog')
