@@ -212,6 +212,19 @@ public sealed class GameplayFactIntakeStore(
         };
         db.GameplayFacts.Add(entity);
         await outbox.PublishAsync(new GameplayFactStateChanged(entity.Id, entity.State));
+        await events.RecordAsync(new(
+            entity.CompetitionId,
+            CompetitionEventKind.ScoringRecorded,
+            CompetitionEventLevel.Information,
+            CompetitionEventVisibility.Staff,
+            entity.OccurredAt,
+            ActorUserId: entity.ActorUserId,
+            TeamId: entity.TeamId,
+            CompetitionChallengeId: entity.CompetitionChallengeId,
+            GameplayFactId: entity.Id,
+            GameplayFactKind: entity.Kind,
+            GameplayFactState: entity.State,
+            GameplayFactResult: entity.Result), cancellationToken);
         await db.SaveChangesAsync(cancellationToken);
         await transaction.CommitAsync(cancellationToken);
         await outbox.FlushOutgoingMessagesAsync();
