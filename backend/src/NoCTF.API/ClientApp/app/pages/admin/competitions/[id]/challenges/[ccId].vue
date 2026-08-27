@@ -256,14 +256,14 @@ onMounted(() => {
         <Badge variant="secondary">{{ challenge.direction }}</Badge>
       </div>
 
-      <Tabs default-value="general">
-        <TabsList class="h-12 p-1.5">
-          <TabsTrigger value="general" class="h-9 px-5 text-sm">{{ $t('基本设置') }}</TabsTrigger>
-          <TabsTrigger value="config" class="h-9 px-5 text-sm">{{ $t('题目配置') }}</TabsTrigger>
-          <TabsTrigger value="hints" class="h-9 px-5 text-sm">{{ $t('提示') }}</TabsTrigger>
+      <Tabs default-value="general" class="grid gap-6 lg:grid-cols-[minmax(0,1fr)_14rem] lg:items-start">
+        <TabsList class="h-auto w-full justify-start overflow-x-auto p-1.5 lg:sticky lg:top-24 lg:col-start-2 lg:row-start-1 lg:flex-col lg:overflow-visible">
+          <TabsTrigger value="general" class="h-10 flex-1 px-4 text-sm lg:w-full lg:flex-none lg:justify-start">{{ $t('基本设置') }}</TabsTrigger>
+          <TabsTrigger value="config" class="h-10 flex-1 px-4 text-sm lg:w-full lg:flex-none lg:justify-start">{{ $t('题目配置') }}</TabsTrigger>
+          <TabsTrigger value="hints" class="h-10 flex-1 px-4 text-sm lg:w-full lg:flex-none lg:justify-start">{{ $t('提示') }}</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="general" class="mt-4">
+        <TabsContent value="general" class="mt-0 lg:col-start-1 lg:row-start-1">
           <Card>
             <CardHeader>
               <CardTitle>{{ $t('基本设置') }}</CardTitle>
@@ -300,7 +300,7 @@ onMounted(() => {
           </Card>
         </TabsContent>
 
-        <TabsContent value="config" class="mt-4">
+        <TabsContent value="config" class="mt-0 lg:col-start-1 lg:row-start-1">
           <Card>
             <CardHeader>
               <CardTitle>{{ $t('题目规则') }}</CardTitle>
@@ -321,7 +321,7 @@ onMounted(() => {
           </Card>
         </TabsContent>
 
-        <TabsContent value="hints" class="mt-4">
+        <TabsContent value="hints" class="mt-0 lg:col-start-1 lg:row-start-1">
           <div class="flex flex-col gap-3">
             <div class="flex items-center justify-between">
               <div class="flex items-center gap-2">
