@@ -29,7 +29,7 @@ const hasParticipantChallengeAccess = computed(() =>
 )
 
 async function refreshMyTeam() {
-  if (!user.value || hasCompetitionStaffAccess.value) {
+  if (!user.value) {
     myTeam.value = null
     myStanding.value = null
     return
@@ -80,7 +80,7 @@ await refresh()
 await refreshMyTeam()
 
 watch(
-  [() => user.value?.userId, hasCompetitionStaffAccess],
+  () => user.value?.userId,
   () => void refreshMyTeam(),
 )
 

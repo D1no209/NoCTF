@@ -95,6 +95,30 @@ public sealed class GameplayFactManagementStore(
         }).ToArray();
     }
 
+    public Task<PlayerGameplayFactValue?> ReadPlayerValueAsync(
+        Guid competitionId,
+        Guid gameplayFactId,
+        Guid userId,
+        CancellationToken ct) =>
+        db.GameplayFacts.AsNoTracking()
+            .Where(fact => fact.Id == gameplayFactId
+                && fact.CompetitionId == competitionId
+                && fact.TeamId != null
+                && fact.Value != null
+                && (fact.Kind == GameplayFactKind.FlagAttempt
+                    || fact.Kind == GameplayFactKind.BreakAttempt))
+            .Join(
+                db.Teams.AsNoTracking()
+                    .Where(team => team.CompetitionId == competitionId
+                        && team.MemberIds.Contains(userId)),
+                fact => fact.TeamId,
+                team => (Guid?)team.Id,
+                (fact, _) => new PlayerGameplayFactValue(
+                    fact.Id,
+                    fact.Kind,
+                    fact.Value!))
+            .SingleOrDefaultAsync(ct);
+
     public async Task QueueDrainAsync(
         Guid competitionId,
         Guid competitionChallengeId,

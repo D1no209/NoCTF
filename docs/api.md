@@ -139,8 +139,13 @@ POST /api/v1/competitions/{competitionId}/challenges/{competitionChallengeId}/aw
 POST /api/v1/competitions/{competitionId}/challenges/{competitionChallengeId}/awdp-defense-targets
 POST /api/v1/competitions/{competitionId}/challenges/{competitionChallengeId}/awdp-defense-targets/{runtimeInstanceId}/fix
 GET  /api/v1/competitions/{competitionId}/gameplay-facts/{gameplayFactId}
+GET  /api/v1/competitions/{competitionId}/gameplay-facts/{gameplayFactId}/value
 GET  /api/v1/competitions/{competitionId}/gameplay-facts
 ```
+
+玩家提交列表不返回明文 Value。`value` 路由仅允许当前比赛中该 GameplayFact 所属队伍的成员
+按需读取自己的 FlagAttempt/BreakAttempt 原文；跨队、其他事实类型和错误比赛统一返回 404，
+成功响应禁止缓存。
 
 Flag request：
 

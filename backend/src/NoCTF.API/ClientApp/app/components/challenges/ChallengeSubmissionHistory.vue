@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { listGameplayFactsEndpoint } from '~/api'
+import { getGameplayFactValueEndpoint, listGameplayFactsEndpoint } from '~/api'
 import type { NoCtfapiEndpointsGameplayFactsGameplayFactListItemResponse } from '~/api'
 import { createLatestPageRefresh } from '~/lib/latest-page-refresh'
 
@@ -12,6 +12,13 @@ const props = withDefaults(defineProps<{
 }>(), {
   refreshKey: 0,
 })
+
+const valueDialogOpen = ref(false)
+const valueSubmission = ref<Submission | null>(null)
+const submittedValue = ref<string | null>(null)
+const valueLoading = ref(false)
+const valueError = ref<string | null>(null)
+let valueRequestGeneration = 0
 
 const { items, loading, error, hasMore, initialized, loadMore, reset } =
   useCursorPagination<Submission>(async (cursor) => {
@@ -79,6 +86,46 @@ function resultText(submission: Submission): string {
     ? `${result} · ${gameplayFactFailureCodeLabel(submission.failureCode)}`
     : result
 }
+
+function canReadSubmittedValue(submission: Submission): boolean {
+  return submission.kind === 'FlagAttempt' || submission.kind === 'BreakAttempt'
+}
+
+function closeValueDialog(): void {
+  valueRequestGeneration += 1
+  valueDialogOpen.value = false
+  valueSubmission.value = null
+  submittedValue.value = null
+  valueError.value = null
+  valueLoading.value = false
+}
+
+async function openSubmittedValue(submission: Submission): Promise<void> {
+  if (!submission.id || !canReadSubmittedValue(submission) || valueLoading.value) return
+  const generation = ++valueRequestGeneration
+  valueDialogOpen.value = true
+  valueSubmission.value = submission
+  submittedValue.value = null
+  valueError.value = null
+  valueLoading.value = true
+  const { data, error: requestError } = await getGameplayFactValueEndpoint({
+    path: {
+      competitionId: props.competitionId,
+      gameplayFactId: submission.id,
+    },
+  })
+  if (generation !== valueRequestGeneration) return
+  valueLoading.value = false
+  if (requestError || !data) {
+    valueError.value = parseApiError(requestError, translate('加载 Flag 原文失败')).message
+    return
+  }
+  submittedValue.value = data.value ?? null
+}
+
+function setValueDialogOpen(open: boolean): void {
+  if (!open) closeValueDialog()
+}
 </script>
 
 <template>
@@ -103,6 +150,7 @@ function resultText(submission: Submission): string {
           <TableHead class="w-36">{{ $t('类型') }}</TableHead>
           <TableHead>{{ $t('结果') }}</TableHead>
           <TableHead class="w-44 text-right">{{ $t('提交时间') }}</TableHead>
+          <TableHead class="w-28 text-right">{{ $t('操作') }}</TableHead>
         </TableRow>
       </TableHeader>
       <TableBody>
@@ -117,6 +165,19 @@ function resultText(submission: Submission): string {
           <TableCell class="text-right font-mono text-xs text-muted-foreground tabular-nums">
             {{ formatDateTime(submission.occurredAt) }}
           </TableCell>
+          <TableCell class="text-right">
+            <Button
+              v-if="canReadSubmittedValue(submission)"
+              variant="outline"
+              size="sm"
+              :disabled="valueLoading && valueSubmission?.id === submission.id"
+              @click="openSubmittedValue(submission)"
+            >
+              <Spinner v-if="valueLoading && valueSubmission?.id === submission.id" data-icon="inline-start" />
+              {{ $t('查看 Flag') }}
+            </Button>
+            <span v-else class="text-muted-foreground">-</span>
+          </TableCell>
         </TableRow>
       </TableBody>
     </Table>
@@ -124,5 +185,32 @@ function resultText(submission: Submission): string {
     <Button v-if="hasMore" variant="outline" size="sm" class="mt-3" :disabled="loading" @click="loadMore">
       <Spinner v-if="loading" data-icon="inline-start" />{{ $t('加载更多') }}
     </Button>
+
+    <Dialog :open="valueDialogOpen" @update:open="setValueDialogOpen">
+      <DialogContent class="sm:max-w-xl">
+        <DialogHeader>
+          <DialogTitle>{{ $t('提交的 Flag 原文') }}</DialogTitle>
+          <DialogDescription>
+            {{ $t('仅本队成员可以查看本队提交的 Flag 原文。') }}
+          </DialogDescription>
+        </DialogHeader>
+
+        <div v-if="valueLoading" class="flex min-h-20 items-center justify-center">
+          <Spinner class="size-5" />
+        </div>
+        <Alert v-else-if="valueError" variant="destructive">
+          <AlertDescription>{{ valueError }}</AlertDescription>
+        </Alert>
+        <pre
+          v-else-if="submittedValue"
+          class="max-h-64 overflow-auto whitespace-pre-wrap break-all rounded-md border bg-muted/40 p-4 font-mono text-sm select-text"
+        >{{ submittedValue }}</pre>
+        <p v-else class="text-sm text-muted-foreground">{{ $t('暂无可显示的 Flag 原文') }}</p>
+
+        <DialogFooter>
+          <Button variant="outline" @click="closeValueDialog">{{ $t('关闭') }}</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   </section>
 </template>
