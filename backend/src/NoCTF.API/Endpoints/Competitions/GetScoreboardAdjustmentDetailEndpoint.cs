@@ -77,16 +77,21 @@ public sealed class GetScoreboardAdjustmentDetailEndpoint(
 
         var canObserve = user.UserId != Guid.Empty
             && await authorizer.CanObserveAsync(user.UserId, request.CompetitionId, cancellationToken);
+        var canViewInternalTracks = user.UserId != Guid.Empty
+            && await authorizer.CanJudgeAsync(user.UserId, request.CompetitionId, cancellationToken);
         var tracks = await getTracks.ExecuteAsync(
             request.CompetitionId,
             user.UserId == Guid.Empty ? null : user.UserId,
-            canObserve,
+            canViewInternalTracks,
             includeInvitationCodes: false,
             cancellationToken);
         if (tracks is null)
             return TypedResults.NotFound();
         projection = ScoreboardAudienceProjection.Filter(projection, canObserve);
-        projection = ScoreboardAudienceProjection.FilterTracks(projection, tracks, canObserve);
+        projection = ScoreboardAudienceProjection.FilterTracks(
+            projection,
+            tracks,
+            canViewInternalTracks);
         var team = projection.Snapshot.Teams.SingleOrDefault(item => item.TeamId == request.TeamId);
         if (team is null)
             return TypedResults.NotFound();
