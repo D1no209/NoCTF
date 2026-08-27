@@ -537,7 +537,7 @@ export class LiveCityScene {
   ): BuildingRecord {
     const group = new THREE.Group()
     const variant = Math.floor(rand() * 3)
-    const height = 12 + (state.score / maxScore) * 42
+    const height = 10 + (state.score / maxScore) * 30
     const baseWidth = 4.6 + rand() * 2.4
     const baseDepth = 4.6 + rand() * 2.4
 
