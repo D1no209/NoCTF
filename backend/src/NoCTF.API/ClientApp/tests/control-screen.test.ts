@@ -189,7 +189,7 @@ describe('CTF control screen projection', () => {
     expect(page).toContain('if (sameChallengeUpdates.length) focusSolve(sameChallengeUpdates.at(-1)!)')
     expect(scene).toContain('minHeight: 6, maxHeight: 24')
     expect(scene).toContain('minHeight: 4, maxHeight: 18')
-    expect(scene).toContain('const height = 12 + (state.score / maxScore) * 42')
+    expect(scene).toContain('const height = 10 + (state.score / maxScore) * 30')
     expect(scene).toContain('const backdropOpacity = this.focusing ? 0.08 : 0.96')
     expect(scene).toContain('depthWrite: false')
   })
