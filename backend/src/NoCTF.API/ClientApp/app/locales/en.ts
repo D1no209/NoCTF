@@ -2200,6 +2200,8 @@ export const englishMessages: Record<string, string> = {
   "加载提交记录失败": "Failed to load submission history",
   "本题提交记录": "Challenge submission history",
   "暂无本题提交记录": "No submissions for this challenge yet",
+  "隐藏已解出": "Hide solved",
+  "没有未解出的题目": "No unsolved challenges",
   "查看 Flag": "View Flag",
   "提交的 Flag 原文": "Submitted Flag value",
   "加载 Flag 原文失败": "Failed to load the submitted Flag value",
