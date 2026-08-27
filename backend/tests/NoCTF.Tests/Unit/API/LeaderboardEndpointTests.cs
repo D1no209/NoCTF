@@ -810,6 +810,9 @@ public sealed class LeaderboardEndpointTests
         using var leaderboardResponse = await client.GetAsync(
             $"/api/v1/competitions/{competitionId}/leaderboard");
         var leaderboard = await leaderboardResponse.Content.ReadFromJsonAsync<ScoreboardSnapshotResponse>();
+        using var trendsResponse = await client.GetAsync(
+            $"/api/v1/competitions/{competitionId}/leaderboard/trends");
+        var trends = await trendsResponse.Content.ReadFromJsonAsync<ScoreboardTrendsResponse>();
         using var detailResponse = await client.GetAsync(
             $"/api/v1/competitions/{competitionId}/leaderboard/teams/{publicTeamId}/columns/0");
         var detail = await detailResponse.Content.ReadFromJsonAsync<ScoreboardSlotDetailResponse>();
@@ -817,7 +820,9 @@ public sealed class LeaderboardEndpointTests
             $"/api/v1/competitions/{competitionId}/leaderboard/teams/{internalTeamId}/columns/0");
 
         await Assert.That(leaderboardResponse.StatusCode).IsEqualTo(HttpStatusCode.OK);
+        await Assert.That(trendsResponse.StatusCode).IsEqualTo(HttpStatusCode.OK);
         await Assert.That(leaderboard!.Teams.Select(team => team.TeamId)).IsEquivalentTo([publicTeamId]);
+        await Assert.That(trends!.Teams.Select(team => team.TeamId)).IsEquivalentTo([publicTeamId]);
         await Assert.That(leaderboard.Actors.Select(actor => actor.UserId)).IsEquivalentTo([publicActorId]);
         await Assert.That(leaderboard.Teams.Single().Slots.Single().Entries.Single().TargetTeamId).IsNull();
         await Assert.That(detailResponse.StatusCode).IsEqualTo(HttpStatusCode.OK);
@@ -1086,6 +1091,7 @@ public sealed class LeaderboardEndpointTests
             options.DisableAutoDiscovery = true;
             options.Assemblies = [typeof(GetLeaderboardEndpoint).Assembly];
             options.Filter = type => type == typeof(GetLeaderboardEndpoint)
+                || type == typeof(GetLeaderboardTrendsEndpoint)
                 || type == typeof(GetScoreboardChallengeCatalogEndpoint)
                 || type == typeof(GetScoreboardSchemaEndpoint)
                 || type == typeof(GetLeaderboardValidator)
@@ -1108,6 +1114,8 @@ public sealed class LeaderboardEndpointTests
             authorizer ?? new NoStaffAccess());
         builder.Services.AddSingleton<IUserContext>(userContext ?? new AnonymousUserContext());
         builder.Services.AddSingleton(detailReader ?? new StaticScoreboardDetailReader());
+        builder.Services.AddSingleton<IScoreboardTrendFactReader>(new StaticScoreboardTrendFactReader());
+        builder.Services.AddSingleton<BuildScoreboardTrends>();
         builder.Services.AddSingleton<NoCTF.API.Pagination.SignedKeysetCursor>();
 
         var app = builder.Build();
@@ -1324,6 +1332,16 @@ public sealed class LeaderboardEndpointTests
             .ThenByDescending(item => item.Id)
             .Take(query.Limit)
             .ToArray());
+    }
+
+    private sealed class StaticScoreboardTrendFactReader : IScoreboardTrendFactReader
+    {
+        public Task<IReadOnlyList<ScoreboardTrendAdjustment>> ReadManualAdjustmentsAsync(
+            Guid competitionId,
+            IReadOnlyList<Guid> teamIds,
+            DateTimeOffset dataAsOf,
+            CancellationToken cancellationToken) =>
+            Task.FromResult<IReadOnlyList<ScoreboardTrendAdjustment>>([]);
     }
 
     private sealed class SwitchingLeaderboard(

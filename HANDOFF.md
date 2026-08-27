@@ -1,5 +1,14 @@
 # NoCTF 数据模型重构交接
 
+## 2026-08-27 alpha.109 CTF 排行榜得分趋势
+
+- CTF 排行榜上半部分新增两张 ECharts 阶梯折线图：左侧同时展示当前获授权赛道视图内全部队伍的累计总分变化，右侧可选择单支队伍查看独立趋势；赛道筛选会同步作用于矩阵和两张图，排行榜 SignalR 版本更新后自动重取。
+- 新增强类型 `GET /competitions/{competitionId}/leaderboard/trends`。后端从未压缩的权威 Scoreboard allocation 与 PostgreSQL 中已应用的 ManualAdjustment 构建曲线，不让前端从压缩快照猜测历史；末点对齐同一快照的权威总分，覆盖动态分值重算、封禁与纠正带来的总分变化。
+- 趋势接口复用排行榜完全相同的 participant projection、内部赛道 Judge 级权限、Frozen 截止时间及 Hidden 空数据语义。普通用户和 Observer 不会通过曲线读取内部赛道，平台 Administrator、Owner、Manager、Judge 可按既有规则查看。
+- OpenAPI、API 文档与生成 TypeScript SDK 已同步且二次生成幂等。没有新增数据表、持久化字段或 EF migration；平台版本递增为 `0.1.0-alpha.109`。
+- 验证：Release solution build 0 warning/0 error；后端非 Integration 完整测试 921/921、排行榜 Endpoint 19/19、OpenAPI 路由漂移 1/1、真实 PostgreSQL 调分读取 1/1 通过；前端完整测试 297/297、typecheck、production build、SDK 幂等及 `git diff --check` 通过。
+- 本节仅创建本地提交；未推送、未部署、未操作服务器数据。
+
 ## 2026-08-27 alpha.108 CTF 计分详情语义修正
 
 - CTF 排行榜题目详情不再显示轮次型模式的“状态/结算中”卡片，改为两列展示权威得分与净分；弹窗说明同步改为“分值来自服务端权威计分结果”。

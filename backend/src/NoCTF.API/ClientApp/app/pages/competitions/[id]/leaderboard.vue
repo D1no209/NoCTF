@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ArrowLeft, ChevronLeft, ChevronRight, Download, History, Medal, Trophy } from '@lucide/vue'
-import { getScoreboardAdjustmentDetailEndpoint, getScoreboardSlotDetailEndpoint } from '~/api'
+import { getLeaderboardTrendsEndpoint, getScoreboardAdjustmentDetailEndpoint, getScoreboardSlotDetailEndpoint } from '~/api'
 import type {
   NoCtfapiEndpointsCompetitionsScoreboardAdjustmentDetailResponse,
   NoCtfapiEndpointsCompetitionsScoreboardAdjustmentResponse,
@@ -9,8 +9,10 @@ import type {
   NoCtfapiEndpointsCompetitionsScoreboardSlotDetailResponse,
   NoCtfapiEndpointsCompetitionsScoreboardSlotResponse,
   NoCtfapiEndpointsCompetitionsScoreboardTeamResponse,
+  NoCtfapiEndpointsCompetitionsScoreboardTrendsResponse,
 } from '~/api'
 import { medalBloodRankClass, medalRankClass } from '~/components/leaderboard/types'
+import type { TrendSeries } from '~/components/leaderboard/types'
 import {
   scoreboardChallengeColumnGroups,
   scoreboardBloodAward,
@@ -68,6 +70,92 @@ const columnGroups = computed(() => scoreboardChallengeColumnGroups(
   board.catalog.value?.items,
 ))
 const isCtf = computed(() => board.schema.value?.mode === 'Ctf')
+const trends = ref<NoCtfapiEndpointsCompetitionsScoreboardTrendsResponse | null>(null)
+const trendsLoading = ref(false)
+const trendsError = ref<string | null>(null)
+const selectedTrendTeamId = ref<string | null>(null)
+let trendsGeneration = 0
+let trendsRetryTimer: ReturnType<typeof setTimeout> | null = null
+
+const visibleTrendSeries = computed<TrendSeries[]>(() => {
+  const trendsByTeamId = new Map((trends.value?.teams ?? [])
+    .filter(team => team.teamId)
+    .map(team => [team.teamId!, team]))
+  return teams.value
+    .filter(team => team.teamId && trendsByTeamId.has(team.teamId))
+    .map((team) => {
+      const trend = trendsByTeamId.get(team.teamId!)!
+      return {
+        teamId: team.teamId,
+        teamName: displayTeamName(team),
+        points: trend.points ?? [],
+      }
+    })
+})
+const selectedTrendSeries = computed(() => {
+  const selected = visibleTrendSeries.value.find(team => team.teamId === selectedTrendTeamId.value)
+  return selected ? [selected] : []
+})
+const trendRangeStart = computed(() => ctx.competition.value?.startTime ?? null)
+const trendRangeEnd = computed(() => trends.value?.dataAsOf ?? trends.value?.generatedAt ?? null)
+
+watch(visibleTrendSeries, (series) => {
+  if (!series.some(team => team.teamId === selectedTrendTeamId.value))
+    selectedTrendTeamId.value = series[0]?.teamId ?? null
+}, { immediate: true })
+
+async function loadTrends(): Promise<void> {
+  if (trendsRetryTimer) clearTimeout(trendsRetryTimer)
+  trendsRetryTimer = null
+  if (!isCtf.value || board.snapshot.value?.dataScope === 'Hidden') {
+    trendsGeneration += 1
+    trends.value = null
+    trendsError.value = null
+    trendsLoading.value = false
+    return
+  }
+  const requestGeneration = ++trendsGeneration
+  trendsLoading.value = true
+  try {
+    const result = await getLeaderboardTrendsEndpoint({ path: { competitionId } })
+    if (requestGeneration !== trendsGeneration) return
+    if (result.error) {
+      trendsError.value = parseApiError(result.error, translate('加载得分趋势失败')).message
+      return
+    }
+    if (result.response?.status === 202) {
+      trendsRetryTimer = setTimeout(() => {
+        trendsRetryTimer = null
+        void loadTrends()
+      }, 2000)
+      return
+    }
+    if (result.data) {
+      trends.value = result.data as NoCtfapiEndpointsCompetitionsScoreboardTrendsResponse
+      trendsError.value = null
+    }
+  }
+  catch (error) {
+    if (requestGeneration === trendsGeneration)
+      trendsError.value = parseApiError(error, translate('加载得分趋势失败')).message
+  }
+  finally {
+    if (requestGeneration === trendsGeneration)
+      trendsLoading.value = false
+  }
+}
+
+watch(
+  [isCtf, () => board.snapshot.value?.version ?? null, () => board.snapshot.value?.dataScope ?? null],
+  () => void loadTrends(),
+  { immediate: true },
+)
+
+onBeforeUnmount(() => {
+  trendsGeneration += 1
+  if (trendsRetryTimer) clearTimeout(trendsRetryTimer)
+  trendsRetryTimer = null
+})
 const missingChallengeIds = computed(() => columnGroups.value
   .filter(group => !group.challenge)
   .map(group => group.competitionChallengeId))
@@ -370,7 +458,39 @@ function adjustmentKind(entry: NoCtfapiEndpointsCompetitionsScoreboardAdjustment
       <Alert v-if="board.processing.value"><AlertDescription>{{ $t('记分板数据投影中,请稍候…') }}</AlertDescription></Alert>
       <Alert v-if="board.snapshot.value.dataScope === 'Frozen'"><AlertDescription>{{ $t('排行榜已冻结，以下为截至 {time} 的快照。', { time: formatDateTime(board.snapshot.value.dataAsOf) }) }}</AlertDescription></Alert>
       <Empty v-if="board.snapshot.value.dataScope === 'Hidden'" class="border py-12"><EmptyHeader><EmptyTitle>{{ $t('排行榜暂不公开') }}</EmptyTitle><EmptyDescription>{{ $t('主办方当前隐藏了排行榜数据') }}</EmptyDescription></EmptyHeader></Empty>
-      <Card v-else>
+      <template v-else>
+        <Alert v-if="isCtf && trendsError" variant="destructive"><AlertDescription class="flex items-center justify-between gap-3"><span>{{ trendsError }}</span><Button variant="outline" size="sm" @click="loadTrends">{{ $t('重试') }}</Button></AlertDescription></Alert>
+        <div v-if="isCtf" class="grid gap-4 xl:grid-cols-2">
+          <Card>
+            <CardHeader class="pb-0">
+              <CardTitle class="text-base">{{ $t('总分趋势') }}</CardTitle>
+              <CardDescription>{{ $t('当前赛道全部队伍的累计分值变化') }}</CardDescription>
+            </CardHeader>
+            <CardContent class="pt-2">
+              <Skeleton v-if="trendsLoading && !trends" class="h-[320px] w-full" />
+              <Empty v-else-if="!visibleTrendSeries.length" class="h-[320px]"><EmptyHeader><EmptyTitle>{{ $t('暂无得分趋势') }}</EmptyTitle></EmptyHeader></Empty>
+              <ScoreTrendChart v-else :series="visibleTrendSeries" :range-start="trendRangeStart" :range-end="trendRangeEnd" height="320px" />
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader class="gap-3 pb-0 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <CardTitle class="text-base">{{ $t('队伍得分趋势') }}</CardTitle>
+                <CardDescription>{{ $t('查看单支队伍的累计分值变化') }}</CardDescription>
+              </div>
+              <Select v-if="visibleTrendSeries.length" v-model="selectedTrendTeamId">
+                <SelectTrigger class="w-full sm:w-52" :aria-label="$t('选择队伍')"><SelectValue :placeholder="$t('选择队伍')" /></SelectTrigger>
+                <SelectContent><SelectItem v-for="team in visibleTrendSeries" :key="team.teamId" :value="team.teamId!">{{ team.teamName }}</SelectItem></SelectContent>
+              </Select>
+            </CardHeader>
+            <CardContent class="pt-2">
+              <Skeleton v-if="trendsLoading && !trends" class="h-[320px] w-full" />
+              <Empty v-else-if="!selectedTrendSeries.length" class="h-[320px]"><EmptyHeader><EmptyTitle>{{ $t('暂无得分趋势') }}</EmptyTitle></EmptyHeader></Empty>
+              <ScoreTrendChart v-else :series="selectedTrendSeries" :range-start="trendRangeStart" :range-end="trendRangeEnd" height="320px" />
+            </CardContent>
+          </Card>
+        </div>
+      <Card>
         <CardContent class="pt-6">
           <Empty v-if="!teams.length" class="border py-8"><EmptyHeader><EmptyTitle>{{ $t('还没有队伍得分') }}</EmptyTitle></EmptyHeader></Empty>
           <div v-else class="overflow-x-auto">
@@ -431,6 +551,7 @@ function adjustmentKind(entry: NoCtfapiEndpointsCompetitionsScoreboardAdjustment
           <div v-if="visibleTeams.length < teams.length" class="mt-4 flex justify-center"><Button variant="outline" @click="visibleTeamCount += 50">{{ $t('加载更多') }}</Button></div>
         </CardContent>
       </Card>
+      </template>
     </template>
 
     <ScoreboardTeamDetailDialog v-model:open="teamDetailOpen" :mode="board.schema.value?.mode" :team="teamDetailTeam" :teams="teams" :column-groups="columnGroups" />

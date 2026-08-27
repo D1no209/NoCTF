@@ -52,4 +52,15 @@ describe('leaderboard progressive display', () => {
     expect(page).not.toContain('entry.attackScore')
     expect(page).not.toContain('entry.defenseScore')
   })
+
+  test('renders server-authoritative CTF score trends above the matrix', () => {
+    expect(page).toContain('getLeaderboardTrendsEndpoint')
+    expect(page).toContain("const visibleTrendSeries = computed<TrendSeries[]>")
+    expect(page).toContain("teams.value")
+    expect(page).toContain("$t('总分趋势')")
+    expect(page).toContain("$t('队伍得分趋势')")
+    expect(page).toContain('<ScoreTrendChart v-else :series="visibleTrendSeries"')
+    expect(page).toContain('<ScoreTrendChart v-else :series="selectedTrendSeries"')
+    expect(page).toContain('v-if="isCtf" class="grid gap-4 xl:grid-cols-2"')
+  })
 })

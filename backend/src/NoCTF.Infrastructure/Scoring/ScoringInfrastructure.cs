@@ -18,6 +18,8 @@ internal static class ScoringInfrastructure
         services.AddScoped<ILeaderboardCache, FusionLeaderboardCache>();
         services.AddScoped<ILeaderboardSnapshotFactory, FusionLeaderboardCache>();
         services.AddScoped<IScoreboardDetailReader, ScoreboardDetailReader>();
+        services.AddScoped<IScoreboardTrendFactReader, ScoreboardTrendFactReader>();
+        services.AddScoped<BuildScoreboardTrends>();
         if (!development)
             services.AddSingleton<ILeaderboardPublicationFence, RedisLeaderboardPublicationFence>();
         return services;
