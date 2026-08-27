@@ -1,5 +1,13 @@
 # NoCTF 数据模型重构交接
 
+## 2026-08-27 alpha.110 人工调分实时刷新
+
+- 修复人工修正分数成功后排行榜仍保留旧缓存的问题。根因是 ManualAdjustment 直接以 `Completed/Applied` 写入，只发布本人提交状态通知，没有写入任何会触发排行榜失效的比赛事件。
+- 调分事实与 Staff 可见的 `ScoringRecorded` 事件现在在同一 PostgreSQL 事务中提交；事件通过既有 Wolverine durable outbox/fan-out 到排行榜 Sticky 订阅者，立即使缓存失效并进入 500ms 合并窗口，随后派发完整 PostgreSQL 重投影和 SignalR 更新。
+- 失败事务不会发布失效事件；没有引入直接修改缓存、前端伪刷新、业务脏字段或周期扫描。没有数据表、字段、EF migration、OpenAPI 或 SDK 变化；平台版本递增为 `0.1.0-alpha.110`。
+- 验证：Release solution build 0 warning/0 error；真实 PostgreSQL 事务测试验证事实、事件和 outbox 同时提交 1/1；排行榜即时失效与 500ms 合并派发测试 4/4；`git diff --check` 通过。
+- 本节仅创建本地提交；未推送、未部署、未操作服务器数据。
+
 ## 2026-08-27 alpha.109 CTF 排行榜得分趋势
 
 - CTF 排行榜上半部分新增两张 ECharts 阶梯折线图：左侧同时展示当前获授权赛道视图内全部队伍的累计总分变化，右侧可选择单支队伍查看独立趋势；赛道筛选会同步作用于矩阵和两张图，排行榜 SignalR 版本更新后自动重取。
