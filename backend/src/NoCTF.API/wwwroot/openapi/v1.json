@@ -1738,6 +1738,60 @@
         ]
       }
     },
+    "/api/v1/competitions/{competitionId}/gameplay-facts/{gameplayFactId}/value": {
+      "get": {
+        "tags": [
+          "Competitions"
+        ],
+        "summary": "Reads one submitted Flag value owned by the current team.",
+        "description": "Only FlagAttempt and BreakAttempt values from the authenticated user's team are available.",
+        "operationId": "GetGameplayFactValueEndpoint",
+        "parameters": [
+          {
+            "name": "competitionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "gameplayFactId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsGameplayFactsGetGameplayFactValueResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ]
+      }
+    },
     "/api/v1/competitions/{competitionId}/gameplay-facts/{gameplayFactId}": {
       "get": {
         "tags": [
@@ -14035,6 +14089,22 @@
             "type": "string",
             "format": "date-time",
             "nullable": true
+          }
+        }
+      },
+      "NoCTFAPIEndpointsGameplayFactsGetGameplayFactValueResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "gameplayFactId": {
+            "type": "string",
+            "format": "guid"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsGameplayFactsGameplayFactKindProtocol"
+          },
+          "value": {
+            "type": "string"
           }
         }
       },

@@ -35,6 +35,11 @@ public sealed record GameplayFactListItem(
     DateTimeOffset OccurredAt,
     DateTimeOffset UpdatedAt);
 
+public sealed record PlayerGameplayFactValue(
+    Guid GameplayFactId,
+    GameplayFactKind Kind,
+    string Value);
+
 public interface IGameplayFactManagementStore
 {
     Task<IReadOnlyList<GameplayFactListItem>> ListAdminAsync(
@@ -52,6 +57,11 @@ public interface IGameplayFactManagementStore
         Guid? beforeId,
         int limit,
         CancellationToken cancellationToken);
+    Task<PlayerGameplayFactValue?> ReadPlayerValueAsync(
+        Guid competitionId,
+        Guid gameplayFactId,
+        Guid userId,
+        CancellationToken cancellationToken);
     Task QueueDrainAsync(
         Guid competitionId,
         Guid competitionChallengeId,
@@ -59,6 +69,20 @@ public interface IGameplayFactManagementStore
         bool rejudge,
         Guid? gameplayFactId,
         CancellationToken cancellationToken);
+}
+
+public sealed class ReadPlayerGameplayFactValue(IGameplayFactManagementStore store)
+{
+    public Task<PlayerGameplayFactValue?> ExecuteAsync(
+        Guid competitionId,
+        Guid gameplayFactId,
+        Guid userId,
+        CancellationToken cancellationToken = default) =>
+        store.ReadPlayerValueAsync(
+            competitionId,
+            gameplayFactId,
+            userId,
+            cancellationToken);
 }
 
 public sealed class ListGameplayFacts(IGameplayFactManagementStore store)

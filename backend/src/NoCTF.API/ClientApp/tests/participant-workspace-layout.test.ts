@@ -64,6 +64,8 @@ describe('participant competition workspace layout', () => {
   test('shows the approved participant team rank and points from the live scoreboard snapshot', async () => {
     const parent = await page('../app/pages/competitions/[id].vue')
 
+    expect(parent).toContain('if (!user.value)')
+    expect(parent).not.toContain('if (!user.value || hasCompetitionStaffAccess.value)')
     expect(parent).toContain('getLeaderboardEndpoint({')
     expect(parent).toContain("myTeam.value?.registrationStatus !== 'Approved'")
     expect(parent).toContain('myStanding.value = data.teams?.find(team => team.teamId === myTeam.value?.id) ?? null')

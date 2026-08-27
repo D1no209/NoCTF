@@ -1,5 +1,14 @@
 # NoCTF 数据模型重构交接
 
+## 2026-08-27 alpha.103 本队 Flag 原文按需查看与双重身份排名
+
+- 选手题目内提交记录为 Flag/Break 事实增加按需“查看 Flag”入口。列表响应继续隐藏 Value；新增强类型读取接口只允许当前比赛中该事实所属队伍的成员读取本队 FlagAttempt/BreakAttempt 原文，跨队、非 Flag 类型及错误比赛统一返回 404，成功响应带 `Cache-Control: no-store`。
+- Flag 原文仅在点击后通过生成 SDK 加载，并在独立对话框中显示；请求期间防重复，关闭时使在途响应失效，失败时保留对话框并显示本地化错误，不写入日志或常驻列表状态。
+- 修复比赛工作人员同时也是参赛队员时，本队排名与积分被前端主动清空的问题。所有已登录用户均尝试读取本人队伍；无队伍仍保持空白，已审核且未封禁的队伍继续使用权威排行榜快照并响应 SignalR 更新。
+- OpenAPI、生成 TypeScript SDK 与 API 文档已同步；未新增数据表、EF migration 或持久化字段。平台版本递增为 `0.1.0-alpha.103`。
+- 验证：后端 Release build 0 warning/0 error；真实 PostgreSQL 权限边界集成测试通过；OpenAPI 路由漂移测试通过；前端完整测试 296/296、typecheck、production build、OpenAPI/SDK 二次生成幂等及 `git diff --check` 通过。
+- 本节仅创建本地提交；未推送、未部署、未操作服务器数据。
+
 ## 2026-08-27 alpha.102 题目判分、提交历史与实时赛事界面
 
 - 管理端队伍页补齐人工得分修正入口；题目详情导航改为右侧纵向栏，并新增覆盖全部报名队伍的本题完成状态、题目得分和人工修正视图。Owner、Manager、Judge 可通过强类型 `ManualAdjustment` 事实修正本题分值，Observer 保持只读；本题 GameplayFact 使用签名游标遍历完整历史，不做固定数量截断。

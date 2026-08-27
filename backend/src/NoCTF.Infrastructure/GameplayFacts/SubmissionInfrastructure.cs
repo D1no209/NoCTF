@@ -46,6 +46,7 @@ internal static class GameplayFactInfrastructure
         services.AddScoped<IAdminGameplayFactStatusReader, AdminGameplayFactStatusReader>();
         services.AddScoped<IGameplayFactManagementStore, GameplayFactManagementStore>();
         services.AddScoped<ListGameplayFacts>();
+        services.AddScoped<ReadPlayerGameplayFactValue>();
         services.AddScoped<QueueGameplayFactWork>();
         services.AddScoped<ICheatIncidentStore, CheatIncidentStore>();
         services.AddScoped<ListCheatIncidents>();

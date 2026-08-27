@@ -311,6 +311,12 @@ export type NoCtfapiEndpointsGameplayFactsAwdpDefenseProgressResponse = {
     updatedAt?: string | null;
 };
 
+export type NoCtfapiEndpointsGameplayFactsGetGameplayFactValueResponse = {
+    gameplayFactId?: string;
+    kind?: NoCtfapiEndpointsGameplayFactsGameplayFactKindProtocol;
+    value?: string;
+};
+
 export type NoCtfapiEndpointsGameplayFactsGetGameplayFactStatusRequest = {
     [key: string]: never;
 };
@@ -3109,6 +3115,40 @@ export type GetAwdpParticipantStateEndpointResponses = {
 };
 
 export type GetAwdpParticipantStateEndpointResponse = GetAwdpParticipantStateEndpointResponses[keyof GetAwdpParticipantStateEndpointResponses];
+
+export type GetGameplayFactValueEndpointData = {
+    body?: never;
+    path: {
+        competitionId: string;
+        gameplayFactId: string;
+    };
+    query?: never;
+    url: '/api/v1/competitions/{competitionId}/gameplay-facts/{gameplayFactId}/value';
+};
+
+export type GetGameplayFactValueEndpointErrors = {
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+    /**
+     * Not Found
+     */
+    404: unknown;
+};
+
+export type GetGameplayFactValueEndpointResponses = {
+    /**
+     * Success
+     */
+    200: NoCtfapiEndpointsGameplayFactsGetGameplayFactValueResponse;
+};
+
+export type GetGameplayFactValueEndpointResponse = GetGameplayFactValueEndpointResponses[keyof GetGameplayFactValueEndpointResponses];
 
 export type GetGameplayFactStatusEndpointData = {
     body?: never;
