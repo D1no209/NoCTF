@@ -58,7 +58,7 @@ const scoreAdjustmentValid = computed(() =>
 )
 
 async function openScoreAdjustment(team: NoCtfapiEndpointsTeamsTeamResponse): Promise<void> {
-  if (!team.id || !canWrite.value) return
+  if (!team.id || !canJudge.value) return
   scoreAdjustmentTeam.value = team
   scoreAdjustmentChallenges.value = []
   scoreAdjustmentChallengeId.value = ''
@@ -354,7 +354,7 @@ onMounted(() => {
                   <Button size="sm" :disabled="pendingId === t.id" @click="simpleAction(t, 'approve')">{{ $t('通过') }}</Button>
                   <Button variant="outline" size="sm" :disabled="pendingId === t.id" @click="simpleAction(t, 'reject')">{{ $t('拒绝') }}</Button>
                 </template>
-                <Button v-if="canWrite" variant="outline" size="sm" :disabled="pendingId === t.id" @click="openScoreAdjustment(t)">
+                <Button v-if="canJudge" variant="outline" size="sm" :disabled="pendingId === t.id" @click="openScoreAdjustment(t)">
                   {{ $t('调整分数') }}
                 </Button>
                 <template v-if="canJudge && !t.isBanned">

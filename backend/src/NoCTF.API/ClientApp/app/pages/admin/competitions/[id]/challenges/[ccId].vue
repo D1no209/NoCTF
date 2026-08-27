@@ -5,18 +5,28 @@ import {
   adminChallengeConfigurationGet,
   adminChallengeConfigurationUpdate,
   adminCompetitionConfigurationGet,
+  adminCreateManualAdjustment,
   adminCreateCompetitionChallengeHint,
   adminDeleteCompetitionChallengeHint,
   adminGetCompetitionChallenge,
+  adminListGameplayFacts,
   adminListCompetitionChallengeHints,
+  adminListTeams,
   adminRestoreCompetitionChallengeHint,
   adminUpdateCompetitionChallenge,
   adminUpdateCompetitionChallengeHint,
+  getLeaderboardEndpoint,
+  getScoreboardSchemaEndpoint,
 } from '~/api'
 import type {
   NoCtfapiEndpointsAdministrationChallengesChallengeConfigurationResponse,
   NoCtfapiEndpointsAdministrationChallengesChallengeHintResponse,
   NoCtfapiEndpointsChallengesChallengeResponse,
+  NoCtfapiEndpointsCompetitionsScoreboardSchemaResponse,
+  NoCtfapiEndpointsCompetitionsScoreboardSnapshotResponse,
+  NoCtfapiEndpointsGameplayFactsGameplayFactListResponse,
+  NoCtfapiEndpointsGameplayFactsGameplayFactListItemResponse,
+  NoCtfapiEndpointsTeamsTeamResponse,
 } from '~/api'
 import { useCompetitionAdmin } from '~/lib/admin-competition'
 import type { GameModeValue } from '~/utils/game-config'
@@ -25,12 +35,13 @@ definePageMeta({ middleware: 'auth' })
 
 const route = useRoute()
 const ccId = route.params.ccId as string
-const { competitionId, competition, canWrite } = useCompetitionAdmin()
+const { competitionId, competition, canWrite, canJudge } = useCompetitionAdmin()
 
 // ---- Challenge detail ----
 const challenge = ref<NoCtfapiEndpointsChallengesChallengeResponse | null>(null)
 const loading = ref(true)
 const loadError = ref<string | null>(null)
+const activeSection = ref('general')
 
 async function loadChallenge() {
   loading.value = true
@@ -229,10 +240,197 @@ async function restoreHint(h: NoCtfapiEndpointsAdministrationChallengesChallenge
   }
 }
 
+// ---- Per-team challenge scoring ----
+interface ChallengeTeamScoringRow {
+  team: NoCtfapiEndpointsTeamsTeamResponse
+  score: number
+  adjustment: number
+  progressLabel: string
+  progressVariant: 'default' | 'secondary' | 'outline'
+}
+
+const scoringTeams = ref<NoCtfapiEndpointsTeamsTeamResponse[]>([])
+const scoringFacts = ref<NoCtfapiEndpointsGameplayFactsGameplayFactListItemResponse[]>([])
+const scoringSnapshot = ref<NoCtfapiEndpointsCompetitionsScoreboardSnapshotResponse | null>(null)
+const scoringSchema = ref<NoCtfapiEndpointsCompetitionsScoreboardSchemaResponse | null>(null)
+const scoringLoading = ref(true)
+const scoringError = ref<string | null>(null)
+let scoringLoadGeneration = 0
+
+async function loadAllChallengeFacts(): Promise<NoCtfapiEndpointsGameplayFactsGameplayFactListItemResponse[]> {
+  const facts: NoCtfapiEndpointsGameplayFactsGameplayFactListItemResponse[] = []
+  const seenCursors = new Set<string>()
+  let cursor: string | null = null
+  do {
+    const response: {
+      data?: NoCtfapiEndpointsGameplayFactsGameplayFactListResponse
+      error?: unknown
+    } = await adminListGameplayFacts({
+      path: { competitionId },
+      query: { competitionChallengeId: ccId, cursor, limit: 200 },
+    })
+    if (response.error || !response.data)
+      throw response.error ?? new Error(translate('加载本题判分记录失败'))
+    facts.push(...(response.data.items ?? []))
+    cursor = response.data.nextCursor ?? null
+    if (cursor && seenCursors.has(cursor)) throw new Error(translate('判分记录分页游标重复'))
+    if (cursor) seenCursors.add(cursor)
+  } while (cursor)
+  return facts
+}
+
+async function loadChallengeTeamScoring(): Promise<void> {
+  const generation = ++scoringLoadGeneration
+  scoringLoading.value = true
+  scoringError.value = null
+  try {
+    const [teamsResult, facts, leaderboardResult, schemaResult] = await Promise.all([
+      adminListTeams({ path: { competitionId } }),
+      loadAllChallengeFacts(),
+      getLeaderboardEndpoint({ path: { competitionId } }),
+      getScoreboardSchemaEndpoint({ path: { competitionId } }),
+    ])
+    if (generation !== scoringLoadGeneration) return
+    if (teamsResult.error || !teamsResult.data) throw teamsResult.error ?? new Error(translate('加载队伍失败'))
+    scoringTeams.value = teamsResult.data.items ?? []
+    scoringFacts.value = facts
+    scoringSnapshot.value = leaderboardResult.data && 'teams' in leaderboardResult.data
+      ? leaderboardResult.data
+      : null
+    scoringSchema.value = schemaResult.data && 'columns' in schemaResult.data
+      ? schemaResult.data
+      : null
+  }
+  catch (requestError) {
+    if (generation === scoringLoadGeneration)
+      scoringError.value = parseApiError(requestError, translate('加载本题队伍判分失败')).message
+  }
+  finally {
+    if (generation === scoringLoadGeneration) scoringLoading.value = false
+  }
+}
+
+function teamFacts(teamId?: string): NoCtfapiEndpointsGameplayFactsGameplayFactListItemResponse[] {
+  return teamId ? scoringFacts.value.filter(fact => fact.teamId === teamId) : []
+}
+
+function hasSuccessfulFact(
+  facts: NoCtfapiEndpointsGameplayFactsGameplayFactListItemResponse[],
+  kind: NoCtfapiEndpointsGameplayFactsGameplayFactListItemResponse['kind'],
+): boolean {
+  return facts.some(fact => fact.kind === kind
+    && (fact.result === 'Correct' || fact.result === 'Controlled'))
+}
+
+function progressForTeam(teamId?: string): Pick<ChallengeTeamScoringRow, 'progressLabel' | 'progressVariant'> {
+  const facts = teamFacts(teamId)
+  switch (competition.value?.mode) {
+    case 'Awdp': {
+      const attack = hasSuccessfulFact(facts, 'BreakAttempt')
+      const defense = hasSuccessfulFact(facts, 'FixAttempt')
+      if (attack && defense) return { progressLabel: translate('攻击与防御成功'), progressVariant: 'default' }
+      if (attack) return { progressLabel: translate('攻击成功'), progressVariant: 'secondary' }
+      if (defense) return { progressLabel: translate('防御成功'), progressVariant: 'secondary' }
+      return { progressLabel: translate('尚未成功'), progressVariant: 'outline' }
+    }
+    case 'Awd':
+      return hasSuccessfulFact(facts, 'FlagAttempt')
+        ? { progressLabel: translate('攻击成功'), progressVariant: 'default' }
+        : { progressLabel: translate('尚未攻击成功'), progressVariant: 'outline' }
+    case 'Koh':
+      return hasSuccessfulFact(facts, 'KohControlObservation')
+        ? { progressLabel: translate('已取得控制'), progressVariant: 'default' }
+        : { progressLabel: translate('尚未取得控制'), progressVariant: 'outline' }
+    default:
+      return hasSuccessfulFact(facts, 'FlagAttempt')
+        ? { progressLabel: translate('已解出'), progressVariant: 'default' }
+        : { progressLabel: translate('尚未解出'), progressVariant: 'outline' }
+  }
+}
+
+function manualAdjustmentForTeam(teamId?: string): number {
+  return teamFacts(teamId)
+    .filter(fact => fact.kind === 'ManualAdjustment' && fact.result === 'Applied')
+    .reduce((total, fact) => total + (Number.parseInt(fact.value ?? '0', 10) || 0), 0)
+}
+
+function projectedChallengeScore(teamId?: string): number {
+  if (!teamId) return 0
+  const snapshotTeam = scoringSnapshot.value?.teams?.find(team => team.teamId === teamId)
+  if (!snapshotTeam) return manualAdjustmentForTeam(teamId)
+  const adjustment = manualAdjustmentForTeam(teamId)
+  if (competition.value?.mode === 'Awdp') {
+    const score = snapshotTeam.challengeScores?.find(item => item.competitionChallengeId === ccId)
+    return (score?.attackScore ?? 0) + (score?.defenseScore ?? 0) + adjustment
+  }
+  const indexes = new Set(scoringSchema.value?.columns
+    ?.filter(column => column.competitionChallengeId === ccId)
+    .map(column => column.index)
+    .filter((index): index is number => index !== undefined) ?? [])
+  const slotScore = snapshotTeam.slots
+    ?.filter(slot => slot.columnIndex !== undefined && indexes.has(slot.columnIndex))
+    .reduce((total, slot) => total + (slot.netPoints ?? 0), 0) ?? 0
+  return slotScore + adjustment
+}
+
+const scoringDisplayNames = computed(() => buildTeamDisplayNames(scoringTeams.value))
+const scoringRows = computed<ChallengeTeamScoringRow[]>(() => scoringTeams.value
+  .map((team) => {
+    const adjustment = manualAdjustmentForTeam(team.id)
+    return {
+      team,
+      score: projectedChallengeScore(team.id),
+      adjustment,
+      ...progressForTeam(team.id),
+    }
+  })
+  .sort((left, right) => teamDisplayName(left.team, scoringDisplayNames.value)
+    .localeCompare(teamDisplayName(right.team, scoringDisplayNames.value))))
+
+const adjustmentTarget = ref<ChallengeTeamScoringRow | null>(null)
+const adjustmentDelta = ref(0)
+const adjustmentPending = ref(false)
+const adjustmentError = ref<string | null>(null)
+const adjustmentValid = computed(() => Number.isInteger(adjustmentDelta.value) && adjustmentDelta.value !== 0)
+
+function openAdjustment(row: ChallengeTeamScoringRow): void {
+  adjustmentTarget.value = row
+  adjustmentDelta.value = 0
+  adjustmentError.value = null
+}
+
+function closeAdjustment(open: boolean): void {
+  if (!open && !adjustmentPending.value) adjustmentTarget.value = null
+}
+
+async function submitAdjustment(): Promise<void> {
+  const teamId = adjustmentTarget.value?.team.id
+  if (!teamId || !adjustmentValid.value || adjustmentPending.value) return
+  adjustmentPending.value = true
+  adjustmentError.value = null
+  try {
+    const { error } = await adminCreateManualAdjustment({
+      path: { competitionId },
+      body: { teamId, competitionChallengeId: ccId, delta: adjustmentDelta.value },
+    })
+    if (error) throw error
+    toast.success(translate('本题判分已修正'))
+    adjustmentTarget.value = null
+    await loadChallengeTeamScoring()
+  }
+  catch (requestError) {
+    adjustmentError.value = parseApiError(requestError, translate('修正本题判分失败')).message
+  }
+  finally {
+    adjustmentPending.value = false
+  }
+}
+
 onMounted(() => {
   void loadChallenge()
   void loadConfig()
   void loadHints()
+  void loadChallengeTeamScoring()
 })
 </script>
 
@@ -256,11 +454,12 @@ onMounted(() => {
         <Badge variant="secondary">{{ challenge.direction }}</Badge>
       </div>
 
-      <Tabs default-value="general" class="grid gap-6 lg:grid-cols-[minmax(0,1fr)_14rem] lg:items-start">
+      <Tabs v-model="activeSection" default-value="general" class="grid gap-6 lg:grid-cols-[minmax(0,1fr)_14rem] lg:items-start">
         <TabsList class="h-auto w-full justify-start overflow-x-auto p-1.5 lg:sticky lg:top-24 lg:col-start-2 lg:row-start-1 lg:flex-col lg:overflow-visible">
           <TabsTrigger value="general" class="h-10 flex-1 px-4 text-sm lg:w-full lg:flex-none lg:justify-start">{{ $t('基本设置') }}</TabsTrigger>
           <TabsTrigger value="config" class="h-10 flex-1 px-4 text-sm lg:w-full lg:flex-none lg:justify-start">{{ $t('题目配置') }}</TabsTrigger>
           <TabsTrigger value="hints" class="h-10 flex-1 px-4 text-sm lg:w-full lg:flex-none lg:justify-start">{{ $t('提示') }}</TabsTrigger>
+          <TabsTrigger value="scoring" class="h-10 flex-1 px-4 text-sm lg:w-full lg:flex-none lg:justify-start">{{ $t('队伍判分') }}</TabsTrigger>
         </TabsList>
 
         <TabsContent value="general" class="mt-0 lg:col-start-1 lg:row-start-1">
@@ -375,7 +574,99 @@ onMounted(() => {
             </Table>
           </div>
         </TabsContent>
+
+        <TabsContent value="scoring" class="mt-0 lg:col-start-1 lg:row-start-1">
+          <div class="flex flex-col gap-4">
+            <div class="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <h3 class="text-lg font-semibold">{{ $t('本题队伍判分') }}</h3>
+                <p class="text-sm text-muted-foreground">{{ $t('查看所有报名队伍的完成状态与本题得分。') }}</p>
+              </div>
+              <Button variant="outline" size="sm" :disabled="scoringLoading" @click="loadChallengeTeamScoring">
+                <Spinner v-if="scoringLoading" data-icon="inline-start" />{{ $t('刷新') }}
+              </Button>
+            </div>
+
+            <Alert v-if="scoringError" variant="destructive">
+              <AlertDescription>{{ scoringError }}</AlertDescription>
+            </Alert>
+            <Skeleton v-if="scoringLoading" class="h-48 w-full" />
+            <Empty v-else-if="!scoringError && scoringRows.length === 0" class="border border-dashed py-12">
+              <EmptyHeader><EmptyTitle>{{ $t('暂无注册队伍') }}</EmptyTitle></EmptyHeader>
+            </Empty>
+            <Table v-else-if="scoringRows.length > 0">
+              <TableHeader>
+                <TableRow>
+                  <TableHead>{{ $t('队伍') }}</TableHead>
+                  <TableHead class="w-28">{{ $t('注册状态') }}</TableHead>
+                  <TableHead class="w-32">{{ $t('完成状态') }}</TableHead>
+                  <TableHead class="w-32 text-right">{{ $t('本题得分') }}</TableHead>
+                  <TableHead class="w-32 text-right">{{ $t('人工修正') }}</TableHead>
+                  <TableHead v-if="canJudge" class="w-28 text-right">{{ $t('操作') }}</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                <TableRow v-for="row in scoringRows" :key="row.team.id">
+                  <TableCell>
+                    <div class="flex items-center gap-2">
+                      <span class="font-medium">{{ teamDisplayName(row.team, scoringDisplayNames) }}</span>
+                      <Badge v-if="row.team.isBanned" variant="destructive">{{ $t('已封禁') }}</Badge>
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    <Badge :variant="row.team.registrationStatus === 'Approved' ? 'default' : row.team.registrationStatus === 'Rejected' ? 'destructive' : 'secondary'">
+                      {{ enumLabel(TeamRegistrationStatusLabel, row.team.registrationStatus) }}
+                    </Badge>
+                  </TableCell>
+                  <TableCell><Badge :variant="row.progressVariant">{{ row.progressLabel }}</Badge></TableCell>
+                  <TableCell class="text-right font-mono font-semibold tabular-nums">{{ row.score }} pts</TableCell>
+                  <TableCell class="text-right font-mono tabular-nums" :class="row.adjustment < 0 ? 'text-destructive' : row.adjustment > 0 ? 'text-emerald-600' : 'text-muted-foreground'">
+                    {{ row.adjustment > 0 ? '+' : '' }}{{ row.adjustment }} pts
+                  </TableCell>
+                  <TableCell v-if="canJudge" class="text-right">
+                    <Button variant="outline" size="sm" @click="openAdjustment(row)">{{ $t('修正判分') }}</Button>
+                  </TableCell>
+                </TableRow>
+              </TableBody>
+            </Table>
+          </div>
+        </TabsContent>
       </Tabs>
+
+      <Dialog :open="adjustmentTarget !== null" @update:open="closeAdjustment">
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{{ $t('修正本题判分') }}</DialogTitle>
+            <DialogDescription>
+              {{ $t('为队伍「{team}」记录本题正负分修正。', { team: adjustmentTarget ? teamDisplayName(adjustmentTarget.team, scoringDisplayNames) : '-' }) }}
+            </DialogDescription>
+          </DialogHeader>
+          <FieldGroup>
+            <Alert v-if="adjustmentError" variant="destructive"><AlertDescription>{{ adjustmentError }}</AlertDescription></Alert>
+            <dl v-if="adjustmentTarget" class="grid grid-cols-2 gap-3 rounded-md border p-3 text-sm">
+              <div>
+                <dt class="text-muted-foreground">{{ $t('当前本题得分') }}</dt>
+                <dd class="font-mono text-lg font-semibold tabular-nums">{{ adjustmentTarget.score }} pts</dd>
+              </div>
+              <div>
+                <dt class="text-muted-foreground">{{ $t('调整后') }}</dt>
+                <dd class="font-mono text-lg font-semibold tabular-nums">{{ adjustmentTarget.score + adjustmentDelta }} pts</dd>
+              </div>
+            </dl>
+            <Field>
+              <FieldLabel for="challenge-score-delta">{{ $t('修正分值') }}</FieldLabel>
+              <Input id="challenge-score-delta" v-model.number="adjustmentDelta" type="number" step="1" />
+              <FieldDescription>{{ $t('请输入非零整数，例如 25 或 -10。') }}</FieldDescription>
+            </Field>
+          </FieldGroup>
+          <DialogFooter>
+            <Button variant="outline" :disabled="adjustmentPending" @click="adjustmentTarget = null">{{ $t('取消') }}</Button>
+            <Button :disabled="adjustmentPending || !adjustmentValid" @click="submitAdjustment">
+              <Spinner v-if="adjustmentPending" data-icon="inline-start" />{{ $t('确认调整') }}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Dialog v-model:open="hintDialogOpen">
         <DialogContent>

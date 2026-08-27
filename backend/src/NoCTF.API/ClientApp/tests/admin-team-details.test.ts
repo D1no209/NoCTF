@@ -17,6 +17,8 @@ describe('admin competition team details', () => {
 
     expect(source).toContain('adminCreateManualAdjustment')
     expect(source).toContain('adminListCompetitionChallenges')
+    expect(source).toContain('if (!team.id || !canJudge.value) return')
+    expect(source).toContain('<Button v-if="canJudge" variant="outline" size="sm"')
     expect(source).toContain('@click="openScoreAdjustment(t)"')
     expect(source).toContain('if (!teamId || !scoreAdjustmentValid.value || scoreAdjustmentPending.value) return')
     expect(source).toContain('competitionChallengeId: scoreAdjustmentChallengeId.value')
