@@ -2213,4 +2213,5 @@ export const englishMessages: Record<string, string> = {
   "本队排名加载中": "Loading team standing",
   "所有赛道": "All tracks",
   "赛道名次": "Track rank",
+  "分值来自服务端权威计分结果。": "Scores come from the authoritative server-side scoring result.",
 }
