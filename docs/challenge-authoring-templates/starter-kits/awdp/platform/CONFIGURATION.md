@@ -8,6 +8,7 @@
 - Break Flag：平台按比赛题目、队伍和 Runtime UUID 生成的精确 Flag
 - 分配语义 / FlagSource：`PerTeam` / `PerTeam`
 - Flag 环境变量：`FLAG` 或题目采用的合法变量名
+- Flag 容量：目标服务、漏洞读取路径和作者 EXP 必须完整支持 1～4096 UTF-8 字节
 - Runtime：Container；不使用 Compose 或 OVA
 - 目标镜像：`待填写`
 - Player 公网端口 / URL：容器端口映射到 host `0`；OwnerOnly URL

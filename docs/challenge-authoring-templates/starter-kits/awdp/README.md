@@ -34,6 +34,7 @@ awdp/
 2. 执行 `./tests/smoke.sh`，确认目标、Checker 和合法 Fix 的最小闭环。
 3. 用正式漏洞服务替换 `target/`，保持一个内部端口，并让 Player Runtime 通过 host port `0`
    和 OwnerOnly URL 对本队开放；Fix target 会自动忽略公开入口。
+   目标服务、漏洞读取路径和作者 EXP 必须完整承载平台允许的 1～4096 UTF-8 字节动态 Flag。
 4. 用真实漏洞、正常业务与规则校验替换 `checker/check.sh`。
 5. 把六类 Fix 样例替换为本题真实资产，并填完 `NOCTF-DELIVERY.md`。
 6. 按 `platform/CONFIGURATION.md` 配置题库与比赛规则，再运行完整 AWDP E2E。

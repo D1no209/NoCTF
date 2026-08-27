@@ -381,6 +381,7 @@ Checker 成功回调后以 0 退出。Runner 级验证超时会判为 `ServiceAb
 
 - Break 通过普通 Flag 提交进入，但只允许单个 Flag，不支持 AWD 式批量。
 - AWDP Runtime 生成/使用的 Flag始终精确比较，不使用正则匹配。
+- 目标服务、漏洞读取路径和作者 EXP 必须完整承载 1～4096 UTF-8 字节动态 Flag；不得因固定缓冲区、固定读取长度或截断导致已注入 Flag 无法被提交。
 - 本队当前活动 Runtime UUID 的 Flag 才能产生 Break；错误、外队、已停止或旧 Runtime UUID Flag 按模式规则拒绝。
 - Reset 为新 Runtime UUID 生成新 Flag，并立刻使旧 Runtime UUID 的 Flag 失效；Flag 不通过 URL、事件或普通日志返回。
 - 开启“先 Break 后 Fix”后，未满足当前规则时上传可以保留，但触发 Fix 会稳定拒绝，不创建 Fix GameplayFact，也不会错误消耗补丁。

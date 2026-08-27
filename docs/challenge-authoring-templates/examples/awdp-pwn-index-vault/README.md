@@ -4,6 +4,9 @@
 平台按 Runtime UUID 生成精确 Flag 并注入 `FLAG` 环境变量；Fix 则在独立的
 `AwdpTarget` 中只执行和检查一次。
 
+靶机和作者 EXP 均完整支持平台允许的 1～4096 字节 UTF-8 动态 Flag；不依赖固定
+`flag{GUID}` 长度。
+
 服务是一个存在越界读的 TCP note vault：
 
 - `PING` 返回 `PONG`；

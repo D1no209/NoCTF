@@ -11,6 +11,7 @@
 | 漏洞 | 越界读 |
 | Player 服务端口 | `31337/tcp` |
 | Flag 注入 | `PerTeam`，环境变量 `FLAG` |
+| Flag 容量 | 1～4096 UTF-8 字节，靶机与 EXP 均完整读取 |
 | Patch 入口 | `fix.sh` |
 
 ## 题面摘要
@@ -48,7 +49,7 @@ Runtime UUID 的动态 Flag。Break 必须从本队 Player 实例中取得；Fix
 | 字段 | 建议 |
 | --- | --- |
 | 轮次 | `300` 秒 |
-| Break / Fix 分值曲线 | 以 `50` 为初始分的比赛默认曲线 |
+| Break / Fix 分值曲线 | 平台默认曲线：初始 `500`、最低 `100`、衰减队伍数 `10` |
 | RequireBreakBeforeFix | 按比赛需求开启或关闭 |
 | 最大 Break / Fix | `10` / `10` |
 | Flag 错误 / EXP 成功 / 服务异常罚分 | `0` / `0` / `0` |

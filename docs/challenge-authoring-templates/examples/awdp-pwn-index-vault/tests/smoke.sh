@@ -10,7 +10,7 @@ target_image="noctf-awdp-pwn-target:${suffix}"
 checker_image="noctf-awdp-pwn-checker:${suffix}"
 callback_image="noctf-awdp-pwn-callback:${suffix}"
 token="smoke-token-${suffix}"
-injected_value="TRAINING_DYNAMIC_SECRET_${suffix}"
+injected_value="flag{$(dd if=/dev/zero bs=1 count=4090 2>/dev/null | tr '\000' 'A')}"
 
 cleanup() {
     docker rm -f "${target}" "${callback}" >/dev/null 2>&1 || true
@@ -69,6 +69,10 @@ apply_fix_archive() {
 }
 
 sh "${root}/scripts/build-fix-packages.sh" >/dev/null
+[ "$(printf '%s' "${injected_value}" | wc -c | tr -d ' ')" = '4096' ] || {
+    printf '%s\n' 'boundary Flag length is not 4096 bytes' >&2
+    exit 1
+}
 docker build -q -t "${target_image}" "${root}/target" >/dev/null
 docker build -q -t "${checker_image}" "${root}/checker" >/dev/null
 docker build -q -t "${callback_image}" "${root}/tests/callback" >/dev/null
