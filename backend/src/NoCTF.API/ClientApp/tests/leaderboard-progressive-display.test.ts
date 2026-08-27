@@ -28,6 +28,7 @@ describe('leaderboard progressive display', () => {
 
   test('keeps the participant team column compact while challenge columns use the remaining width', () => {
     expect(page).toContain('<Table class="table-fixed">')
+    expect(page).toContain('w-20 min-w-20 whitespace-nowrap')
     expect(page).toContain('w-44 min-w-44 max-w-44 border-r bg-card')
     expect(page).toContain(':title="displayTeamName(team)"')
     expect(page).toContain('min-w-0 flex-1 truncate')
