@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { PartyPopper } from '@lucide/vue'
 import { toast } from 'vue-sonner'
 import { getGameplayFactStatusEndpoint, judgeAwdpBreakFlag, judgePracticeFlag, submitFlagEndpoint } from '~/api'
 import type {
@@ -42,6 +43,17 @@ const celebrating = ref(false)
 const resultDialog = ref<{ correct: boolean; title: string; message: string } | null>(null)
 const remainingAttempts = ref<number | null>(props.remainingAttempts ?? null)
 let celebrationTimer: ReturnType<typeof setTimeout> | undefined
+let resultTimer: ReturnType<typeof setTimeout> | undefined
+
+const celebrationParticles = Array.from({ length: 20 }, (_, index) => ({
+  id: index,
+  angle: `${index * 18}deg`,
+  distance: `-${3.5 + (index % 4) * 0.45}rem`,
+  delay: `${(index % 5) * 18}ms`,
+  tone: index % 3 === 0
+    ? 'text-destructive'
+    : index % 3 === 1 ? 'text-primary' : 'text-foreground',
+}))
 
 watch(() => props.remainingAttempts, value => {
   remainingAttempts.value = value ?? null
@@ -51,11 +63,19 @@ const attemptsExhausted = computed(() =>
   !props.practice && !props.readOnlyJudgement && remainingAttempts.value === 0)
 
 function showResult(correct: boolean, message: string): void {
+  if (resultTimer) clearTimeout(resultTimer)
   resultDialog.value = {
     correct,
     title: correct ? translate('Flag 正确') : translate('Flag 错误'),
     message,
   }
+  resultTimer = setTimeout(closeResultDialog, 3200)
+}
+
+function closeResultDialog(): void {
+  if (resultTimer) clearTimeout(resultTimer)
+  resultTimer = undefined
+  resultDialog.value = null
 }
 
 function celebrateCorrectFlag(): void {
@@ -65,7 +85,7 @@ function celebrateCorrectFlag(): void {
     celebrating.value = true
     celebrationTimer = setTimeout(() => {
       celebrating.value = false
-    }, 650)
+    }, 1000)
   })
 }
 
@@ -238,6 +258,7 @@ onUnmounted(() => {
   unwatch?.()
   stopPolling()
   if (celebrationTimer) clearTimeout(celebrationTimer)
+  if (resultTimer) clearTimeout(resultTimer)
 })
 
 </script>
@@ -249,10 +270,25 @@ onUnmounted(() => {
         v-if="celebrating"
         role="status"
         aria-live="polite"
-        class="pointer-events-none absolute inset-0 z-10 grid place-items-center bg-background/70"
+        class="pointer-events-none absolute inset-0 z-10 grid place-items-center overflow-hidden"
       >
         <span class="sr-only">{{ $t('Flag 正确') }}</span>
-        <span aria-hidden="true" class="flag-celebration-mark">🎉</span>
+        <span aria-hidden="true" class="flag-celebration-burst">
+          <span
+            v-for="particle in celebrationParticles"
+            :key="particle.id"
+            class="flag-celebration-particle"
+            :class="particle.tone"
+            :style="{
+              '--particle-angle': particle.angle,
+              '--particle-distance': particle.distance,
+              '--particle-delay': particle.delay,
+            }"
+          />
+          <span class="flag-celebration-core">
+            <PartyPopper class="size-10" />
+          </span>
+        </span>
       </div>
     </Transition>
     <header class="flex flex-col gap-1">
@@ -301,23 +337,51 @@ onUnmounted(() => {
     </div>
   </section>
 
-  <Dialog :open="resultDialog !== null" @update:open="open => { if (!open) resultDialog = null }">
-    <DialogContent class="sm:max-w-md">
+  <Dialog :open="resultDialog !== null" @update:open="open => { if (!open) closeResultDialog() }">
+    <DialogContent class="sm:max-w-md" @pointer-down-outside="closeResultDialog">
       <DialogHeader>
         <DialogTitle>{{ resultDialog?.title }}</DialogTitle>
         <DialogDescription>{{ resultDialog?.message }}</DialogDescription>
       </DialogHeader>
       <DialogFooter>
-        <Button @click="resultDialog = null">{{ $t('确定') }}</Button>
+        <Button @click="closeResultDialog">{{ $t('确定') }}</Button>
       </DialogFooter>
     </DialogContent>
   </Dialog>
 </template>
 
 <style scoped>
-.flag-celebration-mark {
-  font-size: 4rem;
-  animation: flag-celebration-mark 420ms cubic-bezier(0.16, 1, 0.3, 1) both;
+.flag-celebration-burst {
+  position: relative;
+  display: grid;
+  width: 10rem;
+  height: 10rem;
+  place-items: center;
+}
+
+.flag-celebration-core {
+  display: grid;
+  width: 4rem;
+  height: 4rem;
+  place-items: center;
+  border: 1px solid var(--border);
+  border-radius: 9999px;
+  color: var(--primary);
+  background: var(--background);
+  animation: flag-celebration-core 720ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.flag-celebration-particle {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 0.3rem;
+  height: 0.8rem;
+  border-radius: 9999px;
+  background: currentColor;
+  opacity: 0;
+  transform-origin: 50% 0;
+  animation: flag-celebration-particle 760ms cubic-bezier(0.16, 1, 0.3, 1) var(--particle-delay) both;
 }
 
 .flag-celebration-leave-active {
@@ -328,14 +392,27 @@ onUnmounted(() => {
   opacity: 0;
 }
 
-@keyframes flag-celebration-mark {
-  0% { opacity: 0; transform: translateY(0.75rem) scale(0.72) rotate(-8deg); }
-  45% { opacity: 1; transform: translateY(0) scale(1.05) rotate(3deg); }
-  100% { opacity: 1; transform: translateY(-0.25rem) scale(1) rotate(0); }
+@keyframes flag-celebration-core {
+  0% { opacity: 0; transform: scale(0.55) rotate(-12deg); }
+  45% { opacity: 1; transform: scale(1.08) rotate(4deg); }
+  100% { opacity: 1; transform: scale(1) rotate(0); }
+}
+
+@keyframes flag-celebration-particle {
+  0% {
+    opacity: 0;
+    transform: rotate(var(--particle-angle)) translateY(-0.6rem) scaleY(0.45);
+  }
+  18% { opacity: 1; }
+  100% {
+    opacity: 0;
+    transform: rotate(var(--particle-angle)) translateY(var(--particle-distance)) scaleY(1);
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .flag-celebration-mark {
+  .flag-celebration-core,
+  .flag-celebration-particle {
     animation: none;
   }
 
