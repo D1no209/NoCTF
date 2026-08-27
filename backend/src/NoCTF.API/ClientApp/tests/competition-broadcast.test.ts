@@ -105,6 +105,9 @@ describe('competition broadcast projection', () => {
     expect(panel).toContain('competitionEventChanged: () => void refreshLatest()')
     expect(panel).toContain('const refreshLatest = createTrailingRefresh(load)')
     expect(panel).toContain('const initialLoad = !initialized.value')
+    expect(panel).toContain("now < startAt || status === 'Draft' || status === 'Visible' || status === 'Published'")
+    expect(panel).toContain("status === 'Finished' && initialized.value && loadedStatus === status")
+    expect(panel).toContain('const queryEnd = status === \'Finished\' && competition.endTime')
   })
 })
 
