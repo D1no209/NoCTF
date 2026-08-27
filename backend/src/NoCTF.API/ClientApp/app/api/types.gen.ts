@@ -81,21 +81,12 @@ export type NoCtfapiEndpointsTeamsGetTeamRequest = {
     [key: string]: never;
 };
 
-export type NoCtfapiEndpointsTeamsJoinTeamByInvitationRequest = {
-    invitationToken?: string;
+export type NoCtfapiEndpointsTeamsTeamMembershipFailureResponse = {
+    code?: NoCtfapiEndpointsTeamsTeamMembershipFailureCodeProtocol;
+    message?: string;
 };
 
-export type NoCtfapiEndpointsTeamsTeamListResponse = {
-    items?: Array<NoCtfapiEndpointsTeamsTeamResponse>;
-};
-
-export type NoCtfapiEndpointsTeamsListCompetitionTeamsRequest = {
-    [key: string]: never;
-};
-
-export type NoCtfapiEndpointsTeamsRotateTeamInvitationResponse = {
-    invitationToken?: string;
-};
+export type NoCtfapiEndpointsTeamsTeamMembershipFailureCodeProtocol = 'CompetitionNotFound' | 'TeamNotFound' | 'TeamForbidden' | 'TeamBanned' | 'MembershipLocked' | 'UserAlreadyRegistered' | 'TeamFull' | 'MembershipConflict' | 'CaptainCannotBeRemoved' | 'MemberNotFound' | 'MembershipNotFound' | 'CaptainMustTransfer' | 'CaptainOnly';
 
 export type MicrosoftAspNetCoreMvcValidationProblemDetails = MicrosoftAspNetCoreHttpHttpValidationProblemDetails & {
     errors?: {
@@ -118,6 +109,22 @@ export type MicrosoftAspNetCoreMvcProblemDetails = {
     detail?: string | null;
     instance?: string | null;
     [key: string]: unknown;
+};
+
+export type NoCtfapiEndpointsTeamsJoinTeamByInvitationRequest = {
+    invitationToken: string;
+};
+
+export type NoCtfapiEndpointsTeamsTeamListResponse = {
+    items?: Array<NoCtfapiEndpointsTeamsTeamResponse>;
+};
+
+export type NoCtfapiEndpointsTeamsListCompetitionTeamsRequest = {
+    [key: string]: never;
+};
+
+export type NoCtfapiEndpointsTeamsRotateTeamInvitationResponse = {
+    invitationToken?: string;
 };
 
 export type NoCtfapiEndpointsTeamsSubmitTeamBanAppealRequest = {
@@ -2408,6 +2415,10 @@ export type JoinTeamByInvitationEndpointData = {
 
 export type JoinTeamByInvitationEndpointErrors = {
     /**
+     * Bad Request
+     */
+    400: MicrosoftAspNetCoreMvcValidationProblemDetails;
+    /**
      * Unauthorized
      */
     401: unknown;
@@ -2415,7 +2426,10 @@ export type JoinTeamByInvitationEndpointErrors = {
      * Forbidden
      */
     403: unknown;
+    409: NoCtfapiEndpointsTeamsTeamMembershipFailureResponse;
 };
+
+export type JoinTeamByInvitationEndpointError = JoinTeamByInvitationEndpointErrors[keyof JoinTeamByInvitationEndpointErrors];
 
 export type JoinTeamByInvitationEndpointResponses = {
     /**

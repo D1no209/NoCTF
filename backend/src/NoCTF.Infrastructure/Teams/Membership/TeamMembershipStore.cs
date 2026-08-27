@@ -55,7 +55,9 @@ public sealed class TeamMembershipStore(
                 ct))
             return TeamMembershipFailure.UserAlreadyRegistered;
 
-        if (TeamMembershipPolicy.IsMembershipChangeLocked(competition.Status))
+        if (TeamMembershipPolicy.IsInvitationJoinLocked(
+                competition.Status,
+                competition.AllowTeamRegistrationWhileRunning))
             return TeamMembershipFailure.MembershipLocked;
         if (team.MemberIds.Length >= competition.MaxTeamMembers)
             return TeamMembershipFailure.TeamFull;

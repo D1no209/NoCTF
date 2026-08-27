@@ -54,8 +54,11 @@ public sealed class RotateTeamInvitation(ITeamMembershipStore store)
 
 public static class TeamMembershipPolicy
 {
-    public static bool IsMembershipChangeLocked(CompetitionStatus status) =>
-        status is CompetitionStatus.Running or CompetitionStatus.Paused or CompetitionStatus.Finished;
+    public static bool IsInvitationJoinLocked(
+        CompetitionStatus status,
+        bool allowTeamRegistrationWhileRunning) =>
+        status is CompetitionStatus.Paused or CompetitionStatus.Finished
+        || status == CompetitionStatus.Running && !allowTeamRegistrationWhileRunning;
 
 }
 

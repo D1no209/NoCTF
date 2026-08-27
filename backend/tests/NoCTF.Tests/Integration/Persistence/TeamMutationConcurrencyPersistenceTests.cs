@@ -44,6 +44,7 @@ public sealed class TeamMutationConcurrencyPersistenceTests
             await SameUserCreatesTwiceAsync(options, cancellationToken);
             await CreateWhileJoiningAsync(options, cancellationToken);
             await DifferentUsersJoinAsync(options, cancellationToken);
+            await JoinWhileRunningFollowsRegistrationSettingAsync(options, cancellationToken);
             await BannedTeamRejectsOrganizationMutationsAsync(options, cancellationToken);
         });
     }
@@ -207,6 +208,71 @@ public sealed class TeamMutationConcurrencyPersistenceTests
         await Assert.That(memberIds).Contains(firstParticipant.Id);
         await Assert.That(memberIds).Contains(secondParticipant.Id);
         await Assert.That(memberIds.Length).IsEqualTo(3);
+    }
+
+    private static async Task JoinWhileRunningFollowsRegistrationSettingAsync(
+        DbContextOptions<NoCtfDbContext> options,
+        CancellationToken ct)
+    {
+        var now = DateTimeOffset.UtcNow.AddMinutes(35);
+        var owner = User(Guid.CreateVersion7(now), "running-owner", now);
+        var allowedCaptain = User(Guid.CreateVersion7(now.AddTicks(1)), "running-allowed-captain", now);
+        var allowedParticipant = User(Guid.CreateVersion7(now.AddTicks(2)), "running-allowed-player", now);
+        var blockedCaptain = User(Guid.CreateVersion7(now.AddTicks(3)), "running-blocked-captain", now);
+        var blockedParticipant = User(Guid.CreateVersion7(now.AddTicks(4)), "running-blocked-player", now);
+        var allowedCompetition = Competition(
+            Guid.CreateVersion7(now.AddTicks(5)), owner.Id, "Running registration allowed", now);
+        allowedCompetition.Status = CompetitionStatus.Running;
+        allowedCompetition.AllowTeamRegistrationWhileRunning = true;
+        var blockedCompetition = Competition(
+            Guid.CreateVersion7(now.AddTicks(6)), owner.Id, "Running registration blocked", now);
+        blockedCompetition.Status = CompetitionStatus.Running;
+        blockedCompetition.AllowTeamRegistrationWhileRunning = false;
+        const string allowedToken = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA";
+        const string blockedToken = "BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB";
+        var allowedTeam = Team(
+            Guid.CreateVersion7(now.AddTicks(7)),
+            allowedCompetition.Id,
+            allowedCaptain.Id,
+            "Allowed Team",
+            allowedToken,
+            now);
+        var blockedTeam = Team(
+            Guid.CreateVersion7(now.AddTicks(8)),
+            blockedCompetition.Id,
+            blockedCaptain.Id,
+            "Blocked Team",
+            blockedToken,
+            now);
+        await SeedAsync(
+            options,
+            [owner, allowedCaptain, allowedParticipant, blockedCaptain, blockedParticipant],
+            [allowedCompetition, blockedCompetition],
+            [allowedTeam, blockedTeam],
+            ct);
+
+        await using var db = new NoCtfDbContext(options);
+        var membership = new TeamMembershipStore(db, new NoopOutbox());
+        var allowed = await membership.JoinByInvitationAsync(
+            allowedCompetition.Id,
+            allowedToken,
+            allowedParticipant.Id,
+            now,
+            ct);
+        var blocked = await membership.JoinByInvitationAsync(
+            blockedCompetition.Id,
+            blockedToken,
+            blockedParticipant.Id,
+            now,
+            ct);
+
+        await Assert.That(allowed).IsNull();
+        await Assert.That(blocked).IsEqualTo(TeamMembershipFailure.MembershipLocked);
+        var allowedMembers = await db.Teams.AsNoTracking()
+            .Where(team => team.Id == allowedTeam.Id)
+            .Select(team => team.MemberIds)
+            .SingleAsync(ct);
+        await Assert.That(allowedMembers).Contains(allowedParticipant.Id);
     }
 
     private static async Task BannedTeamRejectsOrganizationMutationsAsync(

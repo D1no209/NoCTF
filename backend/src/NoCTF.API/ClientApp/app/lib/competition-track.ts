@@ -3,6 +3,8 @@ import type {
   NoCtfapiEndpointsAdministrationCompetitionsCompetitionTrackFailureResponse,
   NoCtfapiEndpointsTeamsTeamRegistrationFailureCodeProtocol,
   NoCtfapiEndpointsTeamsTeamRegistrationFailureResponse,
+  NoCtfapiEndpointsTeamsTeamMembershipFailureCodeProtocol,
+  NoCtfapiEndpointsTeamsTeamMembershipFailureResponse,
 } from '../api'
 import { parseApiError } from '../utils/api-error'
 import { translate } from '../utils/i18n'
@@ -39,6 +41,22 @@ const registrationMessages = {
   TrackInvitationInvalid: '赛道邀请码错误。',
 } satisfies Record<NoCtfapiEndpointsTeamsTeamRegistrationFailureCodeProtocol, string>
 
+const membershipMessages = {
+  CompetitionNotFound: '比赛不存在。',
+  TeamNotFound: '邀请码无效或已被轮换。',
+  TeamForbidden: '你没有权限执行该队伍操作。',
+  TeamBanned: '队伍封禁期间不可变更组织信息。',
+  MembershipLocked: '当前比赛阶段不允许加入队伍。',
+  UserAlreadyRegistered: '你已经加入本场比赛的其他队伍。',
+  TeamFull: '队伍人数已满。',
+  MembershipConflict: '队伍成员信息已发生变化，请重试。',
+  CaptainCannotBeRemoved: '队长不能被移出队伍。',
+  MemberNotFound: '用户不存在。',
+  MembershipNotFound: '未找到队伍成员关系。',
+  CaptainMustTransfer: '队长需要先转让队长身份。',
+  CaptainOnly: '仅队长可以执行此操作。',
+} satisfies Record<NoCtfapiEndpointsTeamsTeamMembershipFailureCodeProtocol, string>
+
 export function competitionTrackErrorMessage(error: unknown, fallback: string): string {
   const payload = error as Partial<NoCtfapiEndpointsAdministrationCompetitionsCompetitionTrackFailureResponse> | null
   return payload?.code ? translate(trackMessages[payload.code]) : parseApiError(error, fallback).message
@@ -47,4 +65,9 @@ export function competitionTrackErrorMessage(error: unknown, fallback: string): 
 export function teamRegistrationErrorMessage(error: unknown, fallback: string): string {
   const payload = error as Partial<NoCtfapiEndpointsTeamsTeamRegistrationFailureResponse> | null
   return payload?.code ? translate(registrationMessages[payload.code]) : parseApiError(error, fallback).message
+}
+
+export function teamMembershipErrorMessage(error: unknown, fallback: string): string {
+  const payload = error as Partial<NoCtfapiEndpointsTeamsTeamMembershipFailureResponse> | null
+  return payload?.code ? translate(membershipMessages[payload.code]) : parseApiError(error, fallback).message
 }

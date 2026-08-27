@@ -1,5 +1,14 @@
 # NoCTF 数据模型重构交接
 
+## 2026-08-27 alpha.112 邀请加入队伍修复
+
+- 修复比赛运行中已开启“允许运行中报名”但邀请加入仍被无条件拒绝的问题。创建队伍与邀请加入现在共享同一生命周期语义：Visible/Published 可加入，Running 仅在 `AllowTeamRegistrationWhileRunning` 开启时可加入，Paused/Finished 保持锁定。
+- 加入接口从无结构 409 ProblemDetails 改为强类型 `TeamMembershipFailureCodeProtocol` 冲突响应，并增加 32 位 Token Validator。无效/已轮换邀请码、已加入其他队伍、队伍已满、封禁和阶段锁定均返回稳定失败码。
+- 前端加入表单增加 32 位行内校验、完整中英文失败映射、loading 防重复和 try/catch/finally。失败后保留邀请码与对话框并显示明确原因，网络异常后恢复按钮；成功后才清空并刷新本人队伍状态。
+- OpenAPI 与生成 TypeScript SDK 已同步且二次生成幂等。没有数据表、字段或 EF migration 变化；平台版本递增为 `0.1.0-alpha.112`。
+- 验证：Release solution build 0 warning/0 error；后端非 Integration 完整测试 924/924、真实 PostgreSQL 运行中报名策略测试 1/1、OpenAPI 路由漂移 1/1；前端完整测试 298/298、typecheck、production build 及 SDK 幂等通过。
+- 本节仅创建本地提交；未推送、未部署、未操作服务器数据。
+
 ## 2026-08-27 alpha.111 当前排行榜名次呈现
 
 - 修复“所有赛道”视图继续显示各队所属赛道名次，导致多个队伍同时出现第一名奖牌的问题。选择单一赛道时继续使用服务端该赛道权威名次；选择“所有赛道”时按当前获授权队伍的总分排序，并为当前组合视图生成连续的一、二、三名图标。
