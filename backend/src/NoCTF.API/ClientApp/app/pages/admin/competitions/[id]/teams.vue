@@ -4,8 +4,10 @@ import {
   adminAcceptTeamBanAppeal,
   adminApproveTeam,
   adminBanTeam,
+  adminCreateManualAdjustment,
   adminCorrectTeamBan,
   adminCompetitionTracksGet,
+  adminListCompetitionChallenges,
   adminListTeamBanAppeals,
   adminListTeams,
   adminRejectTeam,
@@ -16,6 +18,7 @@ import {
 import type {
   NoCtfapiEndpointsAdministrationTeamsAdminTeamBanCaseResponse,
   NoCtfapiEndpointsAuthenticationPublicUserProfileResponse,
+  NoCtfapiEndpointsChallengesChallengeResponse,
   NoCtfapiEndpointsCompetitionsTracksCompetitionTrackResponse,
   NoCtfapiEndpointsTeamsTeamResponse,
 } from '~/api'
@@ -38,6 +41,79 @@ const teamDetailLoading = ref(false)
 const teamDisplayNames = computed(() => buildTeamDisplayNames(teams.value))
 const displayTeamName = (team: NoCtfapiEndpointsTeamsTeamResponse) =>
   teamDisplayName(team, teamDisplayNames.value)
+
+// ---- Manual score adjustment ----
+const scoreAdjustmentTeam = ref<NoCtfapiEndpointsTeamsTeamResponse | null>(null)
+const scoreAdjustmentChallenges = ref<NoCtfapiEndpointsChallengesChallengeResponse[]>([])
+const scoreAdjustmentChallengeId = ref('')
+const scoreAdjustmentDelta = ref(0)
+const scoreAdjustmentLoading = ref(false)
+const scoreAdjustmentPending = ref(false)
+const scoreAdjustmentError = ref<string | null>(null)
+const scoreAdjustmentValid = computed(() =>
+  Boolean(scoreAdjustmentTeam.value?.id)
+  && Boolean(scoreAdjustmentChallengeId.value)
+  && Number.isInteger(scoreAdjustmentDelta.value)
+  && scoreAdjustmentDelta.value !== 0,
+)
+
+async function openScoreAdjustment(team: NoCtfapiEndpointsTeamsTeamResponse): Promise<void> {
+  if (!team.id || !canWrite.value) return
+  scoreAdjustmentTeam.value = team
+  scoreAdjustmentChallenges.value = []
+  scoreAdjustmentChallengeId.value = ''
+  scoreAdjustmentDelta.value = 0
+  scoreAdjustmentError.value = null
+  scoreAdjustmentLoading.value = true
+  try {
+    const { data, error: requestError } = await adminListCompetitionChallenges({
+      path: { competitionId },
+      query: { includeDeleted: false },
+    })
+    if (requestError) throw requestError
+    if (scoreAdjustmentTeam.value?.id !== team.id) return
+    scoreAdjustmentChallenges.value = (data?.items ?? [])
+      .filter(challenge => Boolean(challenge.id) && !challenge.deletedAt)
+      .sort((left, right) => (left.order ?? 0) - (right.order ?? 0))
+  }
+  catch (requestError) {
+    if (scoreAdjustmentTeam.value?.id === team.id)
+      scoreAdjustmentError.value = parseApiError(requestError, translate('加载题目列表失败')).message
+  }
+  finally {
+    if (scoreAdjustmentTeam.value?.id === team.id) scoreAdjustmentLoading.value = false
+  }
+}
+
+function closeScoreAdjustment(open: boolean): void {
+  if (!open && !scoreAdjustmentPending.value) scoreAdjustmentTeam.value = null
+}
+
+async function submitScoreAdjustment(): Promise<void> {
+  const teamId = scoreAdjustmentTeam.value?.id
+  if (!teamId || !scoreAdjustmentValid.value || scoreAdjustmentPending.value) return
+  scoreAdjustmentPending.value = true
+  scoreAdjustmentError.value = null
+  try {
+    const { error: requestError } = await adminCreateManualAdjustment({
+      path: { competitionId },
+      body: {
+        teamId,
+        competitionChallengeId: scoreAdjustmentChallengeId.value,
+        delta: scoreAdjustmentDelta.value,
+      },
+    })
+    if (requestError) throw requestError
+    toast.success(translate('得分修正已记录'))
+    scoreAdjustmentTeam.value = null
+  }
+  catch (requestError) {
+    scoreAdjustmentError.value = parseApiError(requestError, translate('记录得分修正失败')).message
+  }
+  finally {
+    scoreAdjustmentPending.value = false
+  }
+}
 
 async function openTeamDetail(team: NoCtfapiEndpointsTeamsTeamResponse): Promise<void> {
   selectedTeam.value = team
@@ -278,6 +354,9 @@ onMounted(() => {
                   <Button size="sm" :disabled="pendingId === t.id" @click="simpleAction(t, 'approve')">{{ $t('通过') }}</Button>
                   <Button variant="outline" size="sm" :disabled="pendingId === t.id" @click="simpleAction(t, 'reject')">{{ $t('拒绝') }}</Button>
                 </template>
+                <Button v-if="canWrite" variant="outline" size="sm" :disabled="pendingId === t.id" @click="openScoreAdjustment(t)">
+                  {{ $t('调整分数') }}
+                </Button>
                 <template v-if="canJudge && !t.isBanned">
                   <Button variant="outline" size="sm" :disabled="pendingId === t.id" @click="openBan(t, 'ban')">{{ $t('封禁') }}</Button>
                 </template>
@@ -333,6 +412,51 @@ onMounted(() => {
         </div>
       </SheetContent>
     </Sheet>
+
+    <Dialog :open="scoreAdjustmentTeam !== null" @update:open="closeScoreAdjustment">
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>{{ $t('得分修正') }}</DialogTitle>
+          <DialogDescription>
+            {{ $t('为队伍「{team}」记录题目得分修正。正数加分，负数扣分。', { team: scoreAdjustmentTeam ? displayTeamName(scoreAdjustmentTeam) : '-' }) }}
+          </DialogDescription>
+        </DialogHeader>
+        <FieldGroup>
+          <Alert v-if="scoreAdjustmentError" variant="destructive">
+            <AlertDescription>{{ scoreAdjustmentError }}</AlertDescription>
+          </Alert>
+          <Field>
+            <FieldLabel for="score-adjustment-challenge">{{ $t('题目') }}</FieldLabel>
+            <Skeleton v-if="scoreAdjustmentLoading" class="h-10 w-full" />
+            <Select v-else v-model="scoreAdjustmentChallengeId">
+              <SelectTrigger id="score-adjustment-challenge" class="w-full">
+                <SelectValue :placeholder="$t('选择题目')" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem v-for="challenge in scoreAdjustmentChallenges" :key="challenge.id" :value="challenge.id!">
+                  {{ challenge.title }} · {{ challenge.direction }}
+                </SelectItem>
+              </SelectContent>
+            </Select>
+            <FieldDescription v-if="!scoreAdjustmentLoading && scoreAdjustmentChallenges.length === 0">
+              {{ $t('当前竞赛没有可调整的题目') }}
+            </FieldDescription>
+          </Field>
+          <Field>
+            <FieldLabel for="score-adjustment-delta">{{ $t('修正分值') }}</FieldLabel>
+            <Input id="score-adjustment-delta" v-model.number="scoreAdjustmentDelta" type="number" step="1" />
+            <FieldDescription>{{ $t('请输入非零整数，例如 25 或 -10。') }}</FieldDescription>
+          </Field>
+        </FieldGroup>
+        <DialogFooter>
+          <Button variant="outline" :disabled="scoreAdjustmentPending" @click="scoreAdjustmentTeam = null">{{ $t('取消') }}</Button>
+          <Button :disabled="scoreAdjustmentLoading || scoreAdjustmentPending || !scoreAdjustmentValid" @click="submitScoreAdjustment">
+            <Spinner v-if="scoreAdjustmentPending" data-icon="inline-start" />
+            {{ $t('确认调整') }}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
 
     <Separator />
 
