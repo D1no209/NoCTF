@@ -75,8 +75,9 @@ export const medalRankClass: Record<number, string> = {
 
 /** 血榜名次 → Medal 图标着色;非前三名返回 undefined(调用方自行兜底)。 */
 export function medalBloodRankClass(bloodRank?: string | null): string | undefined {
-  const index = bloodRank
-    ? bloodRankOrder.indexOf(bloodRank as (typeof bloodRankOrder)[number])
+  const normalized = bloodRank?.replace(/Blood$/, '')
+  const index = normalized
+    ? bloodRankOrder.indexOf(normalized as (typeof bloodRankOrder)[number])
     : -1
   return index >= 0 ? medalRankClass[index + 1] : undefined
 }

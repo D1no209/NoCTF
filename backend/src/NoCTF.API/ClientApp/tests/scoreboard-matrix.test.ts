@@ -338,10 +338,13 @@ describe('normalized scoreboard matrix', () => {
     }, challengeId)).toBe(444)
     expect(scoreboardBloodAward({
       entries: [{ award: 'FirstBlood', awardPoints: 25 }],
-    })).toEqual({ label: '一血', points: 25 })
+    })).toEqual({ award: 'FirstBlood', label: '一血', points: 25 })
     expect(leaderboardPage).toContain('v-if="!isCtf"')
     expect(leaderboardPage).toContain('ctfScore(scoreboardSlot(team, column.index!))')
-    expect(leaderboardPage).toContain('scoreboardBloodAward(scoreboardSlot(team, column.index!))?.label')
+    expect(leaderboardPage).toContain('medalBloodRankClass(scoreboardBloodAward(scoreboardSlot(team, column.index!))?.award)')
+    expect(leaderboardPage).toContain('inline-flex items-center justify-center gap-2 whitespace-nowrap')
+    expect(leaderboardPage).toContain('font-mono text-lg font-bold tabular-nums')
+    expect(leaderboardPage).toContain('<span class="sr-only">{{ scoreboardBloodAward(scoreboardSlot(team, column.index!))?.label }}</span>')
     expect(leaderboardPage).not.toContain('<TableRow><template v-for="group in columnGroups"')
   })
 

@@ -10,7 +10,7 @@ import type {
   NoCtfapiEndpointsCompetitionsScoreboardSlotResponse,
   NoCtfapiEndpointsCompetitionsScoreboardTeamResponse,
 } from '~/api'
-import { medalRankClass } from '~/components/leaderboard/types'
+import { medalBloodRankClass, medalRankClass } from '~/components/leaderboard/types'
 import {
   scoreboardChallengeColumnGroups,
   scoreboardBloodAward,
@@ -401,11 +401,20 @@ function adjustmentKind(entry: NoCtfapiEndpointsCompetitionsScoreboardAdjustment
                     <TableCell v-for="column in group.columns" :key="column.index" class="border-l p-1 text-center">
                       <button v-if="column.index !== undefined && scoreboardSlot(team, column.index)" type="button" class="flex min-h-12 w-full items-center justify-center rounded-md px-1 py-1 transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" :aria-label="$t('查看 {team} 在 {challenge} {round} 的详情', { team: displayTeamName(team), challenge: group.challenge?.title ?? $t('未知题目'), round: roundLabel(column) })" @click="openDetail(team, column)">
                         <template v-if="isCtf">
-                          <span v-if="ctfScore(scoreboardSlot(team, column.index!)) !== null" class="flex flex-col items-center gap-0.5">
-                            <span class="font-mono font-semibold tabular-nums">{{ ctfScore(scoreboardSlot(team, column.index!)) }} pts</span>
-                            <span v-if="scoreboardBloodAward(scoreboardSlot(team, column.index!))" class="text-[0.6875rem] font-medium text-primary">
-                              {{ scoreboardBloodAward(scoreboardSlot(team, column.index!))?.label }}
-                              +{{ scoreboardBloodAward(scoreboardSlot(team, column.index!))?.points }} pts
+                          <span v-if="ctfScore(scoreboardSlot(team, column.index!)) !== null" class="inline-flex items-center justify-center gap-2 whitespace-nowrap">
+                            <span class="font-mono text-lg font-bold tabular-nums">{{ ctfScore(scoreboardSlot(team, column.index!)) }} pts</span>
+                            <span
+                              v-if="scoreboardBloodAward(scoreboardSlot(team, column.index!))"
+                              class="inline-flex items-center gap-1 text-primary"
+                              :title="`${scoreboardBloodAward(scoreboardSlot(team, column.index!))?.label} +${scoreboardBloodAward(scoreboardSlot(team, column.index!))?.points} pts`"
+                            >
+                              <Medal
+                                class="size-4 shrink-0"
+                                :class="medalBloodRankClass(scoreboardBloodAward(scoreboardSlot(team, column.index!))?.award)"
+                                aria-hidden="true"
+                              />
+                              <span class="sr-only">{{ scoreboardBloodAward(scoreboardSlot(team, column.index!))?.label }}</span>
+                              <span class="font-mono text-xs font-semibold tabular-nums">+{{ scoreboardBloodAward(scoreboardSlot(team, column.index!))?.points }} pts</span>
                             </span>
                           </span>
                           <span v-else class="font-mono text-sm text-muted-foreground/60">-</span>
