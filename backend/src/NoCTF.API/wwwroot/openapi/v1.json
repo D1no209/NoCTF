@@ -2507,6 +2507,51 @@
         }
       }
     },
+    "/api/v1/competitions/{competitionId}/leaderboard/trends": {
+      "get": {
+        "tags": [
+          "Competitions"
+        ],
+        "summary": "Get CTF team score trends from the authoritative scoreboard projection.",
+        "operationId": "GetLeaderboardTrendsEndpoint",
+        "parameters": [
+          {
+            "name": "competitionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsCompetitionsScoreboardTrendsResponse"
+                }
+              }
+            }
+          },
+          "202": {
+            "description": "Accepted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsCompetitionsLeaderboardProcessingProtocolResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found"
+          }
+        }
+      }
+    },
     "/api/v1/competitions/{competitionId}/leaderboard/teams/{teamId}/adjustments": {
       "get": {
         "tags": [
@@ -15286,6 +15331,73 @@
         ]
       },
       "NoCTFAPIEndpointsCompetitionsGetLeaderboardRequest": {
+        "type": "object",
+        "additionalProperties": false
+      },
+      "NoCTFAPIEndpointsCompetitionsScoreboardTrendsResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "competitionId": {
+            "type": "string",
+            "format": "guid"
+          },
+          "version": {
+            "type": "string"
+          },
+          "generatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "dataAsOf": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "teams": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NoCTFAPIEndpointsCompetitionsScoreboardTeamTrendResponse"
+            }
+          }
+        }
+      },
+      "NoCTFAPIEndpointsCompetitionsScoreboardTeamTrendResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "teamId": {
+            "type": "string",
+            "format": "guid"
+          },
+          "teamName": {
+            "type": "string"
+          },
+          "trackKey": {
+            "type": "string"
+          },
+          "points": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NoCTFAPIEndpointsCompetitionsScoreboardTrendPointResponse"
+            }
+          }
+        }
+      },
+      "NoCTFAPIEndpointsCompetitionsScoreboardTrendPointResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "score": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
+      "NoCTFAPIEndpointsCompetitionsGetLeaderboardTrendsRequest": {
         "type": "object",
         "additionalProperties": false
       },

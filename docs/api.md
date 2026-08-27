@@ -44,6 +44,7 @@ GET  /api/v1/competitions
 GET  /api/v1/competitions/{competitionId}
 GET  /api/v1/competitions/{competitionId}/poster
 GET  /api/v1/competitions/{competitionId}/leaderboard
+GET  /api/v1/competitions/{competitionId}/leaderboard/trends
 GET  /api/v1/competitions/{competitionId}/leaderboard/challenges
 GET  /api/v1/competitions/{competitionId}/leaderboard/schema
 GET  /api/v1/competitions/{competitionId}/leaderboard/teams/{teamId}/columns/{columnIndex}
@@ -78,6 +79,8 @@ Leaderboard GET 的 statusUrl 指回自身：无快照时原子置 Dirty 并返�
 以及队伍的非空 `slots[]`。每个 slot 明确区分 `Pending`/`Settled`，并提供 earned、deducted、net、
 breakdown 与压缩后的权威事实。完整 slot 历史通过带签名游标的 team/column 明细路由读取；
 超出主快照上限的全局调分历史通过 team/adjustments 签名游标路由读取。
+CTF 的 `leaderboard/trends` 返回与当前调用者、赛道权限和冻结截止时间一致的队伍累计分值序列；
+曲线由完整权威计分分配和已应用人工调分生成，最终点始终与同版本排行榜总分一致。其他模式不使用该接口。
 CTF 按题目列，AWD/AWDP 按题目×轮次列，KoH 按控制结算列；AWDP 当前未结算轮次只暴露操作
 状态，所有分数字段为 null，轮次结算后才进入累计分数。前端不得重算、预估或重新排序。
 AWDP 队伍行额外返回完整已结算历史的 `attackScore`、`defenseScore` 和按题目的

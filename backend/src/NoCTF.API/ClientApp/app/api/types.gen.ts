@@ -605,6 +605,30 @@ export type NoCtfapiEndpointsCompetitionsGetLeaderboardRequest = {
     [key: string]: never;
 };
 
+export type NoCtfapiEndpointsCompetitionsScoreboardTrendsResponse = {
+    competitionId?: string;
+    version?: string;
+    generatedAt?: string;
+    dataAsOf?: string;
+    teams?: Array<NoCtfapiEndpointsCompetitionsScoreboardTeamTrendResponse>;
+};
+
+export type NoCtfapiEndpointsCompetitionsScoreboardTeamTrendResponse = {
+    teamId?: string;
+    teamName?: string;
+    trackKey?: string;
+    points?: Array<NoCtfapiEndpointsCompetitionsScoreboardTrendPointResponse>;
+};
+
+export type NoCtfapiEndpointsCompetitionsScoreboardTrendPointResponse = {
+    at?: string;
+    score?: number;
+};
+
+export type NoCtfapiEndpointsCompetitionsGetLeaderboardTrendsRequest = {
+    [key: string]: never;
+};
+
 export type NoCtfapiEndpointsCompetitionsScoreboardAdjustmentDetailResponse = {
     competitionId?: string;
     teamId?: string;
@@ -3501,6 +3525,35 @@ export type GetLeaderboardEndpointResponses = {
 };
 
 export type GetLeaderboardEndpointResponse = GetLeaderboardEndpointResponses[keyof GetLeaderboardEndpointResponses];
+
+export type GetLeaderboardTrendsEndpointData = {
+    body?: never;
+    path: {
+        competitionId: string;
+    };
+    query?: never;
+    url: '/api/v1/competitions/{competitionId}/leaderboard/trends';
+};
+
+export type GetLeaderboardTrendsEndpointErrors = {
+    /**
+     * Not Found
+     */
+    404: unknown;
+};
+
+export type GetLeaderboardTrendsEndpointResponses = {
+    /**
+     * Success
+     */
+    200: NoCtfapiEndpointsCompetitionsScoreboardTrendsResponse;
+    /**
+     * Accepted
+     */
+    202: NoCtfapiEndpointsCompetitionsLeaderboardProcessingProtocolResponse;
+};
+
+export type GetLeaderboardTrendsEndpointResponse = GetLeaderboardTrendsEndpointResponses[keyof GetLeaderboardTrendsEndpointResponses];
 
 export type GetScoreboardAdjustmentDetailEndpointData = {
     body?: never;
