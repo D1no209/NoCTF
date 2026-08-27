@@ -20,13 +20,14 @@ enum
 {
     NOTE_COUNT = 4,
     NOTE_SIZE = 96,
+    FLAG_MAX_BYTES = 4096,
     REQUEST_SIZE = 256
 };
 
 typedef struct
 {
     char notes[NOTE_COUNT][NOTE_SIZE];
-    char secret[NOTE_SIZE];
+    char secret[FLAG_MAX_BYTES + 1];
 } Vault;
 
 static Vault vault;
@@ -47,7 +48,7 @@ static void initialize_vault(void)
     const char *flag = getenv("FLAG");
     if (flag == NULL || flag[0] == '\0')
         flag = "NOCTF_RUNTIME_FLAG_UNAVAILABLE";
-    snprintf(vault.secret, NOTE_SIZE, "%s", flag);
+    snprintf(vault.secret, sizeof(vault.secret), "%s", flag);
 }
 
 static void handle_request(char *request)

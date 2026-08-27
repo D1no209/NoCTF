@@ -31,6 +31,7 @@ NoCTF 接受可信的 tag 或 digest，不强制固定 digest。正式 Break 流
 | FlagSource | `PerTeam` |
 | Image | `REGISTRY/noctf-awdp-index-vault-target:test` |
 | FlagEnvironmentVariableName | `FLAG` |
+| Flag 容量 | 靶机和 EXP 完整支持 1～4096 UTF-8 字节 |
 | PortMappings | 容器 `31337`，主机 `0` |
 | InternalPorts | `[31337]` |
 | URL | `tcp://{HOST}:{PORT}`，`OwnerOnly` |
