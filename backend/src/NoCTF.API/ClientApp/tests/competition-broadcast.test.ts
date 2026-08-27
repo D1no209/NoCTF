@@ -2,7 +2,10 @@ import { describe, expect, test } from 'bun:test'
 import type { NoCtfapiEndpointsCompetitionsEventsCompetitionEventResponse } from '../app/api'
 import {
   competitionBroadcastKinds,
+  competitionBroadcastIdentity,
   deduplicateCompetitionBroadcasts,
+  isCompetitionBroadcastKind,
+  mergeCompetitionBroadcasts,
   competitionBroadcastTargetPath,
   competitionBroadcastText,
 } from '../app/utils/competition-broadcast'
@@ -36,6 +39,8 @@ describe('competition broadcast projection', () => {
       'AwdpFixAttempted',
       'AnnouncementPublished',
     ])
+    expect(isCompetitionBroadcastKind('FirstBloodAwarded')).toBe(true)
+    expect(isCompetitionBroadcastKind('QuestionOpened')).toBe(false)
   })
 
   test('renders the requested concise messages', () => {
@@ -84,6 +89,27 @@ describe('competition broadcast projection', () => {
     expect(deduplicateCompetitionBroadcasts(duplicated).map(item => item.id)).toEqual(['staff'])
   })
 
+  test('preserves existing row identity while prepending a realtime event', () => {
+    const existing = event('HintPublished', {
+      id: 'existing',
+      competitionChallengeId: 'challenge-1',
+      occurredAt: '2026-08-27T14:01:00Z',
+    })
+    const next = event('FirstBloodAwarded', {
+      id: 'next',
+      competitionChallengeId: 'challenge-1',
+      occurredAt: '2026-08-27T14:02:00Z',
+    })
+    const refreshedExisting = { ...existing, id: 'duplicate-copy' }
+
+    const merged = mergeCompetitionBroadcasts([existing], [next, refreshedExisting])
+
+    expect(merged.map(item => item.id)).toEqual(['next', 'existing'])
+    expect(merged[1]).toBe(existing)
+    expect(competitionBroadcastIdentity(refreshedExisting))
+      .toBe(competitionBroadcastIdentity(existing))
+  })
+
   test('mounts the compact panel beside challenges and removes the overlapping tab', async () => {
     const challengePage = await Bun.file(
       new URL('../app/pages/competitions/[id]/challenges/index.vue', import.meta.url),
@@ -111,8 +137,14 @@ describe('competition broadcast projection', () => {
     expect(shell).toContain('v-else-if="competition"')
     expect(shell).not.toContain("label: '公告/通知'")
     expect(panel).toContain('kinds: competitionBroadcastKinds')
-    expect(panel).toContain('competitionEventChanged: () => void refreshLatest()')
+    expect(panel).toContain('competitionEventChanged: notification => {')
+    expect(panel).toContain('if (!isCompetitionBroadcastKind(notification.kind)) return')
+    expect(panel).toContain('onReconnected: () => void refreshLatest()')
     expect(panel).toContain('const refreshLatest = createTrailingRefresh(load)')
+    expect(panel).toContain('mergeCompetitionBroadcasts(items.value, data.items ?? [])')
+    expect(panel).toContain('name="broadcast"')
+    expect(panel).toContain(':key="competitionBroadcastIdentity(event)"')
+    expect(panel).toContain('@media (prefers-reduced-motion: reduce)')
     expect(panel).toContain('const initialLoad = !initialized.value')
     expect(panel).toContain("now < startAt || status === 'Draft' || status === 'Visible' || status === 'Published'")
     expect(panel).toContain("status === 'Finished' && initialized.value && loadedStatus === status")

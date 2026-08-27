@@ -58,7 +58,7 @@ async function load(): Promise<void> {
     loading.value = false
     return
   }
-  items.value = deduplicateCompetitionBroadcasts(data.items ?? [])
+  items.value = mergeCompetitionBroadcasts(items.value, data.items ?? [])
   initialized.value = true
   loadedStatus = status
   loading.value = false
@@ -78,7 +78,11 @@ watch(
 let unwatch: (() => void) | undefined
 onMounted(() => {
   unwatch = watchCompetition(props.competitionId, {
-    competitionEventChanged: () => void refreshLatest(),
+    competitionEventChanged: notification => {
+      if (!isCompetitionBroadcastKind(notification.kind)) return
+      void refreshLatest()
+    },
+    onReconnected: () => void refreshLatest(),
   })
 })
 onUnmounted(() => unwatch?.())
@@ -109,8 +113,14 @@ onUnmounted(() => unwatch?.())
       <p class="text-sm text-muted-foreground">{{ $t('暂无赛事播报') }}</p>
       <p class="mt-1 text-xs text-muted-foreground/80">{{ $t('血榜、题目与纪律消息会在这里更新') }}</p>
     </div>
-    <ol v-else class="divide-y overflow-y-auto" :class="fill ? 'min-h-0 flex-1' : 'max-h-[32rem]'">
-      <li v-for="event in items" :key="event.id">
+    <TransitionGroup
+      v-else
+      tag="ol"
+      name="broadcast"
+      class="divide-y overflow-y-auto"
+      :class="fill ? 'min-h-0 flex-1' : 'max-h-[32rem]'"
+    >
+      <li v-for="event in items" :key="competitionBroadcastIdentity(event)">
         <NuxtLink
           v-if="competitionBroadcastTargetPath(event)"
           :to="competitionBroadcastTargetPath(event)!"
@@ -130,6 +140,32 @@ onUnmounted(() => unwatch?.())
           </time>
         </div>
       </li>
-    </ol>
+    </TransitionGroup>
   </aside>
 </template>
+
+<style scoped>
+.broadcast-enter-active {
+  transition:
+    opacity 220ms cubic-bezier(0.16, 1, 0.3, 1),
+    transform 220ms cubic-bezier(0.16, 1, 0.3, 1),
+    background-color 700ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.broadcast-enter-from {
+  opacity: 0;
+  transform: translateY(-0.4rem);
+  background-color: color-mix(in oklch, var(--primary) 10%, transparent);
+}
+
+.broadcast-move {
+  transition: transform 220ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .broadcast-enter-active,
+  .broadcast-move {
+    transition: none;
+  }
+}
+</style>
