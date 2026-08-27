@@ -1,10 +1,12 @@
 import { describe, expect, test } from 'bun:test'
 import type {
   NoCtfapiEndpointsAdministrationCompetitionsCompetitionTrackFailureCodeProtocol,
+  NoCtfapiEndpointsTeamsTeamMembershipFailureCodeProtocol,
   NoCtfapiEndpointsTeamsTeamRegistrationFailureCodeProtocol,
 } from '../app/api'
 import {
   competitionTrackErrorMessage,
+  teamMembershipErrorMessage,
   teamRegistrationErrorMessage,
 } from '../app/lib/competition-track'
 
@@ -40,6 +42,22 @@ describe('competition track error presentation', () => {
     'TrackInvitationInvalid',
   ] satisfies NoCtfapiEndpointsTeamsTeamRegistrationFailureCodeProtocol[]
 
+  const membershipCodes = [
+    'CompetitionNotFound',
+    'TeamNotFound',
+    'TeamForbidden',
+    'TeamBanned',
+    'MembershipLocked',
+    'UserAlreadyRegistered',
+    'TeamFull',
+    'MembershipConflict',
+    'CaptainCannotBeRemoved',
+    'MemberNotFound',
+    'MembershipNotFound',
+    'CaptainMustTransfer',
+    'CaptainOnly',
+  ] satisfies NoCtfapiEndpointsTeamsTeamMembershipFailureCodeProtocol[]
+
   test('maps every generated track failure code', () => {
     for (const code of trackCodes)
       expect(competitionTrackErrorMessage({ code }, 'fallback')).not.toBe('fallback')
@@ -48,6 +66,11 @@ describe('competition track error presentation', () => {
   test('maps every generated team-registration failure code', () => {
     for (const code of registrationCodes)
       expect(teamRegistrationErrorMessage({ code }, 'fallback')).not.toBe('fallback')
+  })
+
+  test('maps every generated team-membership failure code', () => {
+    for (const code of membershipCodes)
+      expect(teamMembershipErrorMessage({ code }, 'fallback')).not.toBe('fallback')
   })
 })
 
@@ -88,6 +111,12 @@ describe('competition track pages', () => {
     expect(overview).toContain('trackLoadError')
     expect(overview).toContain("translate('请选择参赛赛道。')")
     expect(overview).toContain('createValidationError')
+    expect(overview).toContain('teamMembershipErrorMessage')
+    expect(overview).toContain("invitationToken.length !== 32")
+    expect(overview).toContain('joinValidationError')
+    expect(overview).toContain('} finally {')
+    expect(overview).toContain('joinPending.value = false')
+    expect(overview).toContain('minlength="32" maxlength="32"')
     expect(overview).not.toContain(':disabled="createPending || !createName.trim() || !createTrackKey')
     expect(leaderboard).toContain("all.filter(team => team.trackKey === selectedTrackKey.value)")
     expect(leaderboard).toContain('availableTracks.length > 1')

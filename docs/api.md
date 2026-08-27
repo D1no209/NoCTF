@@ -70,6 +70,8 @@ POST /api/v1/competitions/{competitionId}/teams/{teamId}/registration/resubmit
 
 Team response 使用 CaptainId 与 MemberIds 数组，不返回成员顺序。
 Team Avatar 与 Competition Poster 都通过不可变 File 引用上传；上传/清除需要对应管理权限，读取路由不暴露通用 File 下载能力。
+邀请加入使用队伍当前的 32 位 InvitationToken；比赛运行中仅在 `AllowTeamRegistrationWhileRunning` 开启时允许加入。
+加入失败返回强类型 `TeamMembershipFailureCodeProtocol`，前端不得将阶段锁定、队伍已满或无效邀请码表现为无响应。
 
 Competition 列表只返回调用者可见状态：匿名可见 Visible/Published/Running/Paused/Finished，Draft 仅管理者。Team 私有字段（InvitationToken、Ban 原因）只按权限返回；公开 Team DTO 永不包含 InvitationToken。
 

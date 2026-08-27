@@ -24,7 +24,7 @@ import type {
   NoCtfapiEndpointsCompetitionsTracksCompetitionTrackResponse,
   NoCtfapiEndpointsTeamsTeamResponse,
 } from '~/api'
-import { teamRegistrationErrorMessage } from '~/lib/competition-track'
+import { teamMembershipErrorMessage, teamRegistrationErrorMessage } from '~/lib/competition-track'
 
 const route = useRoute()
 const competitionId = route.params.id as string
@@ -218,23 +218,44 @@ async function submitCreate() {
 const joinOpen = ref(false)
 const joinToken = ref('')
 const joinPending = ref(false)
+const joinValidationError = ref<string | null>(null)
+
+watch(joinToken, () => { joinValidationError.value = null })
+watch(joinOpen, (open) => { if (!open) joinValidationError.value = null })
 
 async function submitJoin() {
-  if (!joinToken.value.trim()) return
-  joinPending.value = true
-  const { error } = await joinTeamByInvitationEndpoint({
-    path: { competitionId },
-    body: { invitationToken: joinToken.value.trim() },
-  })
-  joinPending.value = false
-  if (error) {
-    toast.error(parseApiError(error, translate("加入队伍失败,请检查邀请码")).message)
+  if (joinPending.value) return
+  joinValidationError.value = null
+  const invitationToken = joinToken.value.trim()
+  if (invitationToken.length !== 32) {
+    joinValidationError.value = translate('邀请码必须为 32 位。')
     return
   }
-  toast.success(translate("已加入队伍"))
-  joinOpen.value = false
-  joinToken.value = ''
-  await loadMyTeam()
+  joinPending.value = true
+  try {
+    const { error } = await joinTeamByInvitationEndpoint({
+      path: { competitionId },
+      body: { invitationToken },
+    })
+    if (error) {
+      joinValidationError.value = teamMembershipErrorMessage(
+        error,
+        translate('加入队伍失败，请重试。'),
+      )
+      return
+    }
+    toast.success(translate('已加入队伍'))
+    joinOpen.value = false
+    joinToken.value = ''
+    await loadMyTeam()
+  } catch (error: unknown) {
+    joinValidationError.value = teamMembershipErrorMessage(
+      error,
+      translate('加入队伍失败，请重试。'),
+    )
+  } finally {
+    joinPending.value = false
+  }
 }
 
 const isCaptain = computed(
@@ -386,8 +407,9 @@ const isCaptain = computed(
                     <FieldGroup>
                       <Field>
                         <FieldLabel for="invitation-token">{{ $t('邀请码') }}</FieldLabel>
-                        <Input id="invitation-token" v-model="joinToken" required />
+                        <Input id="invitation-token" v-model="joinToken" required minlength="32" maxlength="32" autocomplete="off" />
                       </Field>
+                      <p v-if="joinValidationError" role="alert" class="text-sm text-destructive">{{ joinValidationError }}</p>
                       <Field>
                         <Button type="submit" class="w-full" :disabled="joinPending">
                           <Spinner v-if="joinPending" data-icon="inline-start" /> {{ $t('加入') }} </Button>
