@@ -17,6 +17,7 @@ const { competitionId, canWrite } = useCompetitionAdmin()
 const mode = ref<'Ctf' | 'Awd' | 'Awdp' | 'Koh'>('Ctf')
 const frozen = ref(false)
 type TrackForm = Omit<NoCtfapiEndpointsAdministrationCompetitionsUpdateCompetitionTrackRequest, 'invitationCode'> & {
+  clientId: string
   requiresInvitationCode: boolean
   invitationCodeConfigured: boolean
   invitationCode: string
@@ -37,6 +38,7 @@ async function load() {
   mode.value = data.mode ?? 'Ctf'
   frozen.value = data.isFrozen ?? false
   tracks.value = (data.items ?? []).map(item => ({
+    clientId: crypto.randomUUID(),
     key: item.key ?? '',
     name: item.name ?? '',
     isDefault: item.isDefault ?? false,
@@ -58,6 +60,7 @@ async function load() {
 function addTrack() {
   const ordinal = tracks.value.length + 1
   tracks.value.push({
+    clientId: crypto.randomUUID(),
     key: `track-${ordinal}`,
     name: translate('新赛道 {ordinal}', { ordinal }),
     isDefault: false,
@@ -213,7 +216,7 @@ onMounted(load)
           </TableRow>
         </TableHeader>
         <TableBody>
-          <TableRow v-for="(track, index) in tracks" :key="`${track.key}-${index}`">
+          <TableRow v-for="(track, index) in tracks" :key="track.clientId">
             <TableCell><Input v-model="track.key" :disabled="!canWrite || frozen" maxlength="64" class="font-mono" /></TableCell>
             <TableCell><Input v-model="track.name" :disabled="!canWrite || frozen" maxlength="80" /></TableCell>
             <TableCell><Checkbox :model-value="track.isDefault" :disabled="!canWrite || frozen" @update:model-value="value => value && setDefault(index)" /></TableCell>
