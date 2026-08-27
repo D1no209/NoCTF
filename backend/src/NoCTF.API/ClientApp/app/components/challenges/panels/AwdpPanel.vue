@@ -12,6 +12,8 @@ const props = defineProps<{
   challenge: NoCtfapiEndpointsChallengesChallengeResponse
 }>()
 
+const emit = defineEmits<{ submitted: [] }>()
+
 const state = ref<NoCtfapiEndpointsGameplayFactsAwdpParticipantStateResponse | null>(null)
 const loading = ref(true)
 const route = useRoute()
@@ -80,6 +82,11 @@ async function handleBreakEvaluation(result?: string | null): Promise<void> {
   if (result === 'Correct') await attackRuntimeCard.value?.refreshUntilStopped()
 }
 
+async function handleFixAccepted(): Promise<void> {
+  emit('submitted')
+  await refreshAndPoll()
+}
+
 let unwatch: (() => void) | undefined
 onMounted(() => {
   void refreshAndPoll()
@@ -128,6 +135,7 @@ onUnmounted(() => {
           :maximum-attempts="challenge.maximumFlagAttempts"
           :remaining-attempts="challenge.remainingFlagAttempts"
           @evaluated="handleBreakEvaluation"
+          @submitted="emit('submitted')"
         />
       </section>
 
@@ -169,7 +177,7 @@ onUnmounted(() => {
           :competition-challenge-id="challenge.id!"
           :defense="state?.defense"
           @changed="refreshAndPoll"
-          @accepted="refreshAndPoll"
+          @accepted="handleFixAccepted"
         />
       </section>
     </div>

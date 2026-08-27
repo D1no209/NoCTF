@@ -11,6 +11,8 @@ const props = defineProps<{
   challenge: NoCtfapiEndpointsChallengesChallengeResponse
 }>()
 
+const emit = defineEmits<{ submitted: [] }>()
+
 const targets = ref<NoCtfapiEndpointsRuntimeRuntimeTargetResponse[]>([])
 const targetsError = ref<string | null>(null)
 const targetsLoaded = ref(false)
@@ -80,6 +82,7 @@ onMounted(async () => {
       :title="$t('批量提交 Flag')"
       :maximum-attempts="challenge.maximumFlagAttempts"
       :remaining-attempts="challenge.remainingFlagAttempts"
+      @submitted="emit('submitted')"
     />
   </div>
 </template>

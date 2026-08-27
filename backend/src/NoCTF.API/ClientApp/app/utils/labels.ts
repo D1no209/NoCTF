@@ -249,8 +249,8 @@ const notificationTargetResolvers = {
   TeamRegistrationChanged: context => context.competitionId
     ? `/competitions/${context.competitionId}/my/team`
     : context.detailPath,
-  GameplayFactAdjudicated: context => context.competitionId && context.gameplayFactId
-    ? `/competitions/${context.competitionId}/my/submissions`
+  GameplayFactAdjudicated: context => context.competitionId && context.challengeId
+    ? `/competitions/${context.competitionId}/challenges?challenge=${context.challengeId}`
     : context.detailPath,
   RuntimeStateChanged: context => context.competitionId && context.challengeId
     ? `/competitions/${context.competitionId}/challenges?challenge=${context.challengeId}`
