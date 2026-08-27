@@ -1,6 +1,7 @@
 import type {
   NoCtfapiEndpointsCompetitionsScoreboardBreakdownKindProtocol,
   NoCtfapiEndpointsCompetitionsScoreboardBreakdownResponse,
+  NoCtfapiEndpointsCompetitionsScoreboardAwardProtocol,
   NoCtfapiEndpointsCompetitionsScoreboardChallengeCatalogItemResponse,
   NoCtfapiEndpointsCompetitionsScoreboardColumnResponse,
   NoCtfapiEndpointsCompetitionsScoreboardEntryKindProtocol,
@@ -252,7 +253,7 @@ export function scoreboardCurrentChallengeScore(
 
 export function scoreboardBloodAward(
   slot: NoCtfapiEndpointsCompetitionsScoreboardSlotResponse | null | undefined,
-): { label: string; points: number } | null {
+): { award: NoCtfapiEndpointsCompetitionsScoreboardAwardProtocol; label: string; points: number } | null {
   const entry = slot?.entries?.find(item => item.award)
   if (!entry?.award) return null
   const labels = {
@@ -260,7 +261,11 @@ export function scoreboardBloodAward(
     SecondBlood: '二血',
     ThirdBlood: '三血',
   } as const
-  return { label: translate(labels[entry.award]), points: entry.awardPoints ?? 0 }
+  return {
+    award: entry.award,
+    label: translate(labels[entry.award]),
+    points: entry.awardPoints ?? 0,
+  }
 }
 
 export function scoreboardTeamChallengeSignals(
