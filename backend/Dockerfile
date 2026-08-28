@@ -45,7 +45,9 @@ RUN dotnet publish src/NoCTF.Runner/NoCTF.Runner.csproj -c Release -o /app/runne
 RUN dotnet publish src/NoCTF.Host/NoCTF.Host.csproj -c Release -o /app/host /p:BuildSpaOnPublish=false
 
 FROM mcr.microsoft.com/dotnet/aspnet:10.0.10@sha256:f1126d438ccc359f51cc6d4701a8deae513856cf10f5fe645d29ea6403dcac6b AS runtime
-RUN apt-get update \
+RUN sed -i 's|http://archive.ubuntu.com/ubuntu|https://archive.ubuntu.com/ubuntu|g; s|http://security.ubuntu.com/ubuntu|https://security.ubuntu.com/ubuntu|g' \
+        /etc/apt/sources.list.d/ubuntu.sources \
+    && apt-get update \
     && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends libgssapi-krb5-2 \
     && rm -rf /var/lib/apt/lists/*
 

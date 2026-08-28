@@ -377,6 +377,8 @@ public sealed class DeploymentTopologyTests
             "FROM docker:28.5.1-cli@sha256:");
         await Assert.That(dockerfile).Contains("sha256sum -c -");
         await Assert.That(dockerfile).Contains("KOMPOSE_SHA256=");
+        await Assert.That(dockerfile).Contains("https://archive.ubuntu.com/ubuntu");
+        await Assert.That(dockerfile).Contains("https://security.ubuntu.com/ubuntu");
         await Assert.That(dockerfile).Contains("--retry-all-errors");
         await Assert.That(dockerfile).Contains("--speed-time 30");
         await Assert.That(dockerfile).Contains("COPY backend/docker-assets/");
