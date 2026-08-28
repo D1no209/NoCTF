@@ -33,6 +33,7 @@ public sealed class DeploymentTopologyTests
         await Assert.That(singleCompose).Contains("  noctf:");
         await Assert.That(singleCompose).Contains("target: host");
         await Assert.That(singleCompose).Contains("Hosting__Roles__0: Api");
+        await Assert.That(hostProgram).Contains("--migrate-only");
         await Assert.That(compose).Contains("GET /health/ready HTTP/1.1");
         await Assert.That(compose).Contains("[[ \"$$status\" == *\" 200 \"* ]]");
         await Assert.That(File.Exists(workerDeployment)).IsTrue();
@@ -317,7 +318,7 @@ public sealed class DeploymentTopologyTests
     }
 
     [Test]
-    public async Task Ci_publishes_tested_role_images_to_configured_registries()
+    public async Task Ci_publishes_one_tested_host_image_to_configured_registries()
     {
         var ci = (await ReadAsync(".github", "workflows", "ci.yml"))
             .ReplaceLineEndings("\n");
@@ -327,15 +328,13 @@ public sealed class DeploymentTopologyTests
         await Assert.That(ci).Contains(
             "    if: github.event_name == 'push' && github.ref == 'refs/heads/main'\n");
         await Assert.That(ci).Contains("      packages: write\n");
-        await Assert.That(ci).Contains("ghcr.io/$repository_owner/$repository_name-${{ matrix.image }}");
+        await Assert.That(ci).Contains("ghcr.io/$repository_owner/$repository_name");
         await Assert.That(ci).Contains("CUSTOM_REGISTRY: ${{ vars.CUSTOM_REGISTRY }}");
         await Assert.That(ci).Contains("if: env.CUSTOM_REGISTRY != ''");
+        await Assert.That(ci).Contains("target: host");
         await Assert.That(ci).Contains("push: true");
-
-        foreach (var role in new[] { "api", "worker", "runner", "host" })
-        {
-            await Assert.That(ci).Contains($"          - image: {role}\n            target: {role}\n");
-        }
+        await Assert.That(ci).DoesNotContain("matrix.image");
+        await Assert.That(ci).DoesNotContain("matrix.target");
 
         foreach (var webRole in new[] { "api", "host" })
         {

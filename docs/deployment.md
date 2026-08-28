@@ -24,16 +24,14 @@ Frontend/reverse proxy
 ## CI 容器镜像
 
 推送到 `main` 时，GitHub Actions 先运行唯一的 `test` Job。测试通过后，
-`publish-images` Job 使用仓库根目录作为构建上下文和 `backend/Dockerfile` 发布以下镜像：
+`publish-images` Job 使用仓库根目录作为构建上下文和 `backend/Dockerfile` 的 `host`
+target 发布一个镜像：`ghcr.io/<owner>/<repo>`。同一镜像通过 `Hosting__Roles__*`
+选择 Api、Worker、Runner 的任意非空组合；迁移任务也复用该镜像并以
+`--migrate-only` 启动。
 
-- `ghcr.io/<owner>/<repo>-api`
-- `ghcr.io/<owner>/<repo>-worker`
-- `ghcr.io/<owner>/<repo>-runner`
-- `ghcr.io/<owner>/<repo>-host`
-
-每个镜像同时发布 `latest`、程序集预发布版本（例如 `0.1.0-alpha.97`）和
-`sha-<完整提交哈希>` 标签。API 与 Host target 会先执行 Nuxt 静态生成，再把
-`.output/public` 放入发布目录的 `wwwroot`；Worker 与 Runner 镜像不携带无用的前端文件。
+镜像同时发布 `latest`、程序集预发布版本（例如 `0.1.0-alpha.97`）和
+`sha-<完整提交哈希>` 标签。Host target 会先执行 Nuxt 静态生成，再把
+`.output/public` 放入发布目录的 `wwwroot`。
 部署清单应固定版本或提交标签，不能以 `latest` 作为供应链身份。
 
 GHCR 使用工作流内置的 `GITHUB_TOKEN`。若仓库配置了以下 Actions Variables 与 Secrets，
@@ -46,8 +44,7 @@ GHCR 使用工作流内置的 `GITHUB_TOKEN`。若仓库配置了以下 Actions 
 | Secret | `CUSTOM_REGISTRY_USERNAME` | 自定义 Registry 用户名 |
 | Secret | `CUSTOM_REGISTRY_PASSWORD` | 自定义 Registry 密码或访问令牌 |
 
-自定义 Registry 镜像名为
-`<registry>/<namespace>/<repo>-{api,worker,runner,host}`，标签与 GHCR 完全一致。
+自定义 Registry 镜像名为 `<registry>/<namespace>/<repo>`，标签与 GHCR 完全一致。
 
 仓库中的第三方构建基础镜像、PostgreSQL、Redis、MinIO 与 MinIO Client 均同时固定可读版本标签和
 多架构 manifest digest；Kompose 固定版本下载后必须以官方发布的 SHA-256 校验通过才能执行。依赖更新

@@ -147,7 +147,7 @@ jobs:
           git diff --exit-code backend/artifacts/openapi/swagger.json backend/src/NoCTF.API/wwwroot/openapi/v1.json
 
   publish-images:
-    name: Publish ${{ matrix.image }} image
+    name: Publish application image
     needs: test
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
@@ -155,18 +155,6 @@ jobs:
     permissions:
       contents: read
       packages: write
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - image: api
-            target: api
-          - image: worker
-            target: worker
-          - image: runner
-            target: runner
-          - image: host
-            target: host
     env:
       CUSTOM_REGISTRY: ${{ vars.CUSTOM_REGISTRY }}
       CUSTOM_REGISTRY_NAMESPACE: ${{ vars.CUSTOM_REGISTRY_NAMESPACE }}
@@ -208,9 +196,9 @@ jobs:
           fi
           {
             echo 'names<<EOF'
-            echo "ghcr.io/$repository_owner/$repository_name-${{ matrix.image }}"
+            echo "ghcr.io/$repository_owner/$repository_name"
             if [[ -n "$CUSTOM_REGISTRY" ]]; then
-              echo "$CUSTOM_REGISTRY/$custom_namespace/$repository_name-${{ matrix.image }}"
+              echo "$CUSTOM_REGISTRY/$custom_namespace/$repository_name"
             fi
             echo 'EOF'
             echo "version=$version"
@@ -249,9 +237,9 @@ jobs:
         with:
           context: .
           file: backend/Dockerfile
-          target: ${{ matrix.target }}
+          target: host
           push: true
           tags: ${{ steps.metadata.outputs.tags }}
           labels: ${{ steps.metadata.outputs.labels }}
-          cache-from: type=gha,scope=noctf-${{ matrix.target }}
-          cache-to: type=gha,mode=max,scope=noctf-${{ matrix.target }}
+          cache-from: type=gha,scope=noctf-host
+          cache-to: type=gha,mode=max,scope=noctf-host

@@ -34,7 +34,7 @@ services:
     build:
       context: ..
       dockerfile: backend/Dockerfile
-      target: api
+      target: host
     command: ["--migrate-only"]
     restart: "no"
     environment:

@@ -35,7 +35,10 @@ if (Directory.Exists(apiConfigurationRoot))
         .AddEnvironmentVariables()
         .AddCommandLine(args);
 }
-var roles = HostRoles.FromConfiguration(builder.Configuration);
+var migrateOnly = args.Contains("--migrate-only", StringComparer.OrdinalIgnoreCase);
+var roles = migrateOnly
+    ? HostRoles.Only(HostRole.Api)
+    : HostRoles.FromConfiguration(builder.Configuration);
 var development = builder.Environment.IsDevelopment();
 builder.WebHost.ConfigureKestrel(options => options.Limits.MaxRequestBodySize = null);
 builder.Services.Configure<FormOptions>(options =>
@@ -93,6 +96,13 @@ builder.Services.AddNoCtfObservability(
     $"noctf-host-{string.Join('-', roles.Values).ToLowerInvariant()}");
 
 var app = builder.Build();
+if (migrateOnly)
+{
+    await app.Services.InitializeNoCtfAsync();
+    await app.StartAsync();
+    await app.StopAsync();
+    return;
+}
 app.UseNoCtfObservability();
 if (development && (roles.Has(HostRole.Api) || roles.Has(HostRole.Worker)))
     await app.Services.InitializeNoCtfAsync();
