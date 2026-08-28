@@ -36,7 +36,8 @@ public sealed class UploadPlatformLogoValidator : Validator<UploadPlatformLogoRe
 public sealed class UploadPlatformLogoEndpoint(
     ManagePlatformConfiguration configuration,
     LinkGenerator links,
-    FileUploadLimits uploadLimits)
+    FileUploadLimits uploadLimits,
+    TimeProvider timeProvider)
     : Endpoint<UploadPlatformLogoRequest,
         Results<Ok<PlatformConfigurationResponse>, ProblemHttpResult>>
 {
@@ -80,7 +81,7 @@ public sealed class UploadPlatformLogoEndpoint(
             request.File.ContentType,
             content.ToArray(),
             uploadLimits.MaximumLogoBytes,
-            DateTimeOffset.UtcNow,
+            timeProvider.GetUtcNow(),
             ct);
         return result.State switch
         {

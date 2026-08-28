@@ -28,7 +28,8 @@ internal static class CompetitionLeaderboardVisibilityMapper
 public sealed class GetCompetitionLeaderboardVisibilityEndpoint(
     GetCompetitionVisibility get,
     ICompetitionModerationAuthorizer authorizer,
-    IUserContext user)
+    IUserContext user,
+    TimeProvider timeProvider)
     : EndpointWithoutRequest<Results<
         Ok<CompetitionLeaderboardVisibilityResponse>,
         NotFound,
@@ -54,7 +55,7 @@ public sealed class GetCompetitionLeaderboardVisibilityEndpoint(
         var competitionId = Route<Guid>("competitionId");
         if (!await authorizer.CanObserveAsync(user.UserId, competitionId, ct))
             return TypedResults.Forbid();
-        var view = await get.ExecuteAsync(competitionId, DateTimeOffset.UtcNow, ct);
+        var view = await get.ExecuteAsync(competitionId, timeProvider.GetUtcNow(), ct);
         return view is null
             ? TypedResults.NotFound()
             : TypedResults.Ok(CompetitionLeaderboardVisibilityMapper.ToResponse(view));

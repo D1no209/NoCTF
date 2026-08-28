@@ -57,7 +57,8 @@ public sealed record PlatformUserDeletionConflictResponse(
 
 public sealed class DeletePlatformUserEndpoint(
     ManageUserAccounts accounts,
-    IUserContext actor)
+    IUserContext actor,
+    TimeProvider timeProvider)
     : Endpoint<DeletePlatformUserRequest,
         Results<
             Ok<PlatformUserDeletionResponse>,
@@ -95,7 +96,7 @@ public sealed class DeletePlatformUserEndpoint(
                 ? UserDeletionMode.HardDelete
                 : UserDeletionMode.Anonymize,
             request.Reason,
-            DateTimeOffset.UtcNow,
+            timeProvider.GetUtcNow(),
             ct);
         return result.State switch
         {

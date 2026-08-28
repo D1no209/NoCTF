@@ -41,7 +41,8 @@ public sealed class UpdateCompetitionValidator : Validator<UpdateCompetitionRequ
 public sealed class UpdateCompetitionEndpoint(
     UpdateCompetition update,
     ICompetitionModerationAuthorizer authorizer,
-    IUserContext user)
+    IUserContext user,
+    TimeProvider timeProvider)
     : Endpoint<UpdateCompetitionRequest,
         Results<Ok<CompetitionResponse>, NotFound, ForbidHttpResult, ProblemHttpResult>>
 {
@@ -77,7 +78,7 @@ public sealed class UpdateCompetitionEndpoint(
             request.MaxTeamMembers,
             request.MaxConcurrentRuntimeInstancesPerTeam!.Value,
             user.UserId,
-            DateTimeOffset.UtcNow,
+            timeProvider.GetUtcNow(),
             request.AllowTeamRegistrationWhileRunning,
             request.MaxActiveQuestionsPerTeam,
             request.MaxParticipantMessagesBeforeHandlerReply,
@@ -95,6 +96,8 @@ public sealed class UpdateCompetitionEndpoint(
                 detail: result.ErrorMessage);
         }
 
-        return TypedResults.Ok(CompetitionMapper.ToResponse(result.Value!));
+        return TypedResults.Ok(CompetitionMapper.ToResponse(
+            result.Value!,
+            timeProvider.GetUtcNow()));
     }
 }

@@ -29,8 +29,10 @@ public sealed class GameplayFactProcessor(
     BloodRankCriticalSection bloodRankCriticalSection,
     TeamChallengeCriticalSection teamChallengeCriticalSection,
     ICompetitionEventRecorder? eventRecorder = null,
-    ILogger<GameplayFactProcessor>? logger = null) : IGameplayFactProcessor
+    ILogger<GameplayFactProcessor>? logger = null,
+    TimeProvider? clock = null) : IGameplayFactProcessor
 {
+    private readonly TimeProvider timeProvider = clock ?? TimeProvider.System;
     private static readonly JsonSerializerOptions JsonOptions =
         new(JsonSerializerDefaults.Web);
 
@@ -103,7 +105,7 @@ public sealed class GameplayFactProcessor(
         if (submission is null)
             return null;
         submission.State = GameplayFactState.Processing;
-        submission.UpdatedAt = DateTimeOffset.UtcNow;
+        submission.UpdatedAt = timeProvider.GetUtcNow();
         await outbox.PublishAsync(new GameplayFactStateChanged(submission.Id, submission.State));
         await db.SaveChangesAsync(cancellationToken);
         await transaction.CommitAsync(cancellationToken);
@@ -148,7 +150,7 @@ public sealed class GameplayFactProcessor(
                 submission,
                 configuration.Competition.Status,
                 configuration.CompetitionChallenge,
-                DateTimeOffset.UtcNow,
+                timeProvider.GetUtcNow(),
                 cancellationToken);
             return new(special);
         }
@@ -346,7 +348,7 @@ public sealed class GameplayFactProcessor(
         using var processingLease = await AcquireProcessingScopeAsync(
             processingScope, cancellationToken);
 
-        var now = DateTimeOffset.UtcNow;
+        var now = timeProvider.GetUtcNow();
         if (submission.Kind is GameplayFactKind.HintUnlock or GameplayFactKind.ManualAdjustment)
         {
             await AcquireTeamScoringLockAsync(

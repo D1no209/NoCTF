@@ -1,7 +1,5 @@
 using System.Globalization;
 using System.Text.Json.Serialization;
-using System.Security.Cryptography;
-using System.Text;
 using FastEndpoints;
 using FluentValidation;
 using Microsoft.AspNetCore.Http;
@@ -14,6 +12,7 @@ using NoCTF.Application.Competitions.Visibility;
 using NoCTF.Application.Messaging;
 using NoCTF.Application.Scoring.Leaderboard;
 using NoCTF.Application.Teams.Moderation;
+using Riok.Mapperly.Abstractions;
 
 namespace NoCTF.API.Endpoints.Competitions;
 
@@ -155,7 +154,8 @@ public sealed record LeaderboardProcessingProtocolResponse(
     LeaderboardProjectionStateProtocol State,
     string StatusUrl);
 
-internal static class ScoreboardProtocolMapper
+[Mapper]
+internal static partial class ScoreboardProtocolMapper
 {
     public static ScoreboardSnapshotResponse ToResponse(ScoreboardSnapshot value) => new(
         value.CompetitionId,
@@ -242,166 +242,29 @@ internal static class ScoreboardProtocolMapper
         _ => throw new ArgumentOutOfRangeException(nameof(value), value, null)
     };
 
-    private static ScoreboardRankingStateProtocol ToProtocol(ScoreboardRankingState value) =>
-        Enum.Parse<ScoreboardRankingStateProtocol>(value.ToString());
-    private static ScoreboardScoreStateProtocol ToProtocol(ScoreboardScoreState value) =>
-        Enum.Parse<ScoreboardScoreStateProtocol>(value.ToString());
-    private static ScoreboardOperationStateProtocol ToProtocol(ScoreboardOperationState value) =>
-        Enum.Parse<ScoreboardOperationStateProtocol>(value.ToString());
-    private static ScoreboardBreakdownKindProtocol ToProtocol(ScoreboardBreakdownKind value) =>
-        Enum.Parse<ScoreboardBreakdownKindProtocol>(value.ToString());
-    private static ScoreboardEntryKindProtocol ToProtocol(ScoreboardEntryKind value) =>
-        Enum.Parse<ScoreboardEntryKindProtocol>(value.ToString());
-    private static ScoreboardEntryOutcomeProtocol ToProtocol(ScoreboardEntryOutcome value) =>
-        Enum.Parse<ScoreboardEntryOutcomeProtocol>(value.ToString());
-    private static ScoreboardAwardProtocol ToProtocol(ScoreboardAward value) =>
-        Enum.Parse<ScoreboardAwardProtocol>(value.ToString());
-    private static ScoreboardAdjustmentKindProtocol ToProtocol(ScoreboardAdjustmentKind value) =>
-        Enum.Parse<ScoreboardAdjustmentKindProtocol>(value.ToString());
-}
+    [MapEnum(EnumMappingStrategy.ByName)]
+    private static partial ScoreboardRankingStateProtocol ToProtocol(ScoreboardRankingState value);
 
-internal static class ScoreboardAudienceProjection
-{
-    public static ScoreboardProjection PreserveSnapshotScope(
-        ScoreboardProjection projection,
-        ScoreboardSnapshot source)
-    {
-        ScoreboardSnapshot Apply(ScoreboardSnapshot snapshot) => snapshot with
-        {
-            Visibility = source.Visibility,
-            DataScope = source.DataScope,
-            DataAsOf = source.DataAsOf
-        };
-        return projection with
-        {
-            Snapshot = Apply(projection.Snapshot),
-            ParticipantView = projection.ParticipantView is { } participant
-                ? participant with { Snapshot = Apply(participant.Snapshot) }
-                : null
-        };
-    }
+    [MapEnum(EnumMappingStrategy.ByName)]
+    public static partial ScoreboardScoreStateProtocol ToProtocol(ScoreboardScoreState value);
 
-    public static ScoreboardProjection Filter(ScoreboardProjection projection, bool canObserve)
-    {
-        if (canObserve)
-            return projection;
-        if (projection.ParticipantView is { } participantView)
-            return participantView.ToProjection();
+    [MapEnum(EnumMappingStrategy.ByName)]
+    private static partial ScoreboardOperationStateProtocol ToProtocol(ScoreboardOperationState value);
 
-        // Older frozen snapshots do not contain an authoritative participant projection.
-        // Fail closed instead of leaking totals or ranks derived from unpublished challenges.
-        var catalogRevision = StableRevision([]);
-        var schemaRevision = ScoreboardRevision.ForSchema(projection.Schema.Rounds, []);
-        return projection with
-        {
-            ChallengeCatalog = projection.ChallengeCatalog with
-            {
-                Revision = catalogRevision,
-                Challenges = []
-            },
-            Schema = projection.Schema with
-            {
-                Revision = schemaRevision,
-                ChallengeCatalogRevision = catalogRevision,
-                Columns = []
-            },
-            Snapshot = projection.Snapshot with
-            {
-                SchemaRevision = schemaRevision,
-                Actors = [],
-                Teams = []
-            },
-            DetailActors = [],
-            EntryAllocations = []
-        };
-    }
+    [MapEnum(EnumMappingStrategy.ByName)]
+    public static partial ScoreboardBreakdownKindProtocol ToProtocol(ScoreboardBreakdownKind value);
 
-    public static ScoreboardProjection FilterTracks(
-        ScoreboardProjection projection,
-        CompetitionTracksView tracks,
-        bool canViewInternalTracks)
-    {
-        if (canViewInternalTracks)
-            return projection;
-        var visibleKeys = tracks.Tracks
-            .Where(track => !track.IsInternal && track.VisibleOnLeaderboard)
-            .Select(track => track.Key)
-            .ToHashSet(StringComparer.OrdinalIgnoreCase);
-        // Keep one response internally consistent when an administrator changes
-        // a team's track after the projection (especially a frozen projection).
-        var viewerKeys = tracks.Tracks
-            .Where(track => track.IsViewerTrack && !track.IsInternal)
-            .Select(track => track.Key)
-            .ToHashSet(StringComparer.OrdinalIgnoreCase);
-        var teams = projection.Snapshot.Teams
-            .Where(team => visibleKeys.Contains(team.TrackKey)
-                || viewerKeys.Contains(team.TrackKey) && team.TeamId == tracks.ViewerTeamId)
-            .ToArray();
-        var visibleTeamIds = teams.Select(team => team.TeamId).ToHashSet();
-        Guid? VisibleTarget(Guid? teamId) => teamId is Guid value && visibleTeamIds.Contains(value)
-            ? value
-            : null;
-        var actorIndexes = teams
-            .SelectMany(team => team.GlobalAdjustments.Select(item => item.ActorIndex)
-                .Concat(team.Slots.SelectMany(slot => slot.Entries.Select(entry => entry.ActorIndex))))
-            .Where(index => index is not null)
-            .Select(index => index!.Value)
-            .ToHashSet();
-        var actorPairs = projection.Snapshot.Actors
-            .Where(actor => actorIndexes.Contains(actor.Index))
-            .OrderBy(actor => actor.Index)
-            .Select((actor, index) => new { OldIndex = actor.Index, Actor = actor with { Index = index } })
-            .ToArray();
-        var actorIndexMap = actorPairs.ToDictionary(pair => pair.OldIndex, pair => pair.Actor.Index);
-        int? MapActor(int? actorIndex) => actorIndex is int value
-            && actorIndexMap.TryGetValue(value, out var mapped)
-                ? mapped
-                : null;
-        return projection with
-        {
-            Snapshot = projection.Snapshot with
-            {
-                Actors = actorPairs.Select(pair => pair.Actor).ToArray(),
-                Teams = teams.Select(team => team with
-                {
-                    GlobalAdjustments = team.GlobalAdjustments
-                        .Select(item => item with { ActorIndex = MapActor(item.ActorIndex) })
-                        .ToArray(),
-                    Slots = team.Slots.Select(slot => slot with
-                    {
-                        Entries = slot.Entries.Select(entry => entry with
-                        {
-                            ActorIndex = MapActor(entry.ActorIndex),
-                            TargetTeamId = VisibleTarget(entry.TargetTeamId)
-                        }).ToArray()
-                    }).ToArray()
-                }).ToArray(),
-                Tracks = projection.Snapshot.Tracks
-                    .Where(track => visibleKeys.Contains(track.Key) || viewerKeys.Contains(track.Key))
-                    .Select(track => track with
-                    {
-                        IsViewerTrack = viewerKeys.Contains(track.Key)
-                    })
-                    .ToArray()
-            },
-            EntryAllocations = projection.EntryAllocations
-                .Where(allocation => visibleTeamIds.Contains(allocation.TeamId))
-                .Select(allocation => allocation with
-                {
-                    Entry = allocation.Entry with
-                    {
-                        TargetTeamId = VisibleTarget(allocation.Entry.TargetTeamId)
-                    }
-                })
-                .ToArray()
-        };
-    }
+    [MapEnum(EnumMappingStrategy.ByName)]
+    private static partial ScoreboardEntryKindProtocol ToProtocol(ScoreboardEntryKind value);
 
-    private static long StableRevision(IEnumerable<string> values)
-    {
-        var bytes = SHA256.HashData(Encoding.UTF8.GetBytes(string.Join('\n', values)));
-        return Math.Max(1, BitConverter.ToInt64(bytes, 0) & long.MaxValue);
-    }
+    [MapEnum(EnumMappingStrategy.ByName)]
+    private static partial ScoreboardEntryOutcomeProtocol ToProtocol(ScoreboardEntryOutcome value);
+
+    [MapEnum(EnumMappingStrategy.ByName)]
+    private static partial ScoreboardAwardProtocol ToProtocol(ScoreboardAward value);
+
+    [MapEnum(EnumMappingStrategy.ByName)]
+    private static partial ScoreboardAdjustmentKindProtocol ToProtocol(ScoreboardAdjustmentKind value);
 }
 
 public sealed class GetLeaderboardRequest
@@ -425,7 +288,8 @@ public sealed class GetLeaderboardEndpoint(
     ICompetitionVisibilityAccess access,
     GetCompetitionTracks getTracks,
     ICompetitionModerationAuthorizer authorizer,
-    IUserContext user)
+    IUserContext user,
+    TimeProvider timeProvider)
     : Endpoint<GetLeaderboardRequest, Results<Ok<ScoreboardSnapshotResponse>, Accepted<LeaderboardProcessingProtocolResponse>, NotFound, ProblemHttpResult>>
 {
     public override void Configure()
@@ -441,13 +305,13 @@ public sealed class GetLeaderboardEndpoint(
     {
         request.CompetitionId = Route<Guid>("competitionId");
         var visibility = await access.ResolveAsync(
-            user.UserId, request.CompetitionId, DateTimeOffset.UtcNow, cancellationToken);
+            user.UserId, request.CompetitionId, timeProvider.GetUtcNow(), cancellationToken);
         if (visibility is null)
             return TypedResults.NotFound();
         if (visibility.DataScope == LeaderboardDataScope.Hidden)
         {
             return TypedResults.Ok(ScoreboardProtocolMapper.ToResponse(new ScoreboardSnapshot(
-                request.CompetitionId, 0, 0, DateTimeOffset.UtcNow, null, [], [])
+                request.CompetitionId, 0, 0, timeProvider.GetUtcNow(), null, [], [])
             {
                 Visibility = visibility.Visibility,
                 DataScope = LeaderboardDataScope.Hidden
@@ -506,7 +370,7 @@ public sealed class GetLeaderboardEndpoint(
         if (visibility.DataScope == LeaderboardDataScope.Frozen)
         {
             await messages.ApplyCompetitionVisibilityAsync(
-                request.CompetitionId, DateTimeOffset.UtcNow, cancellationToken);
+                request.CompetitionId, timeProvider.GetUtcNow(), cancellationToken);
             return Processing(request.CompetitionId);
         }
         var status = await leaderboard.GetStatusAsync(request.CompetitionId, cancellationToken);

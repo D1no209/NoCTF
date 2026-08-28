@@ -1,6 +1,7 @@
 using System.Text;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Options;
 using NoCTF.Application.Authentication.EmailVerification;
 using NoCTF.Infrastructure.Authentication;
 using NoCTF.Infrastructure.Persistence;
@@ -41,7 +42,9 @@ public sealed class EmailVerificationConfigurationPersistenceTests
             await db.Database.EnsureCreatedAsync(cancellationToken);
             var store = new EmailVerificationConfigurationStore(
                 db,
-                new EmailVerificationSecretProtector(configuration));
+                new EmailVerificationSecretProtector(Options.Create(
+                    configuration.GetSection(EmailVerificationProtectionOptions.SectionName)
+                        .Get<EmailVerificationProtectionOptions>()!)));
             var initial = await store.GetAsync(cancellationToken);
             await Assert.That(initial.SmtpSecurityMode)
                 .IsEqualTo(SmtpSecurityMode.None);

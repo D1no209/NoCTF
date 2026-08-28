@@ -30,7 +30,8 @@ public sealed class GetScoreboardChallengeCatalogEndpoint(
     ILeaderboardCache leaderboard,
     ICompetitionVisibilityAccess access,
     ICompetitionModerationAuthorizer authorizer,
-    IUserContext user)
+    IUserContext user,
+    TimeProvider timeProvider)
     : Endpoint<GetScoreboardChallengeCatalogRequest, Results<Ok<ScoreboardChallengeCatalogResponse>, Accepted<LeaderboardProcessingProtocolResponse>, NotFound>>
 {
     public override void Configure()
@@ -46,7 +47,7 @@ public sealed class GetScoreboardChallengeCatalogEndpoint(
     {
         request.CompetitionId = Route<Guid>("competitionId");
         var visibility = await access.ResolveAsync(
-            user.UserId, request.CompetitionId, DateTimeOffset.UtcNow, cancellationToken);
+            user.UserId, request.CompetitionId, timeProvider.GetUtcNow(), cancellationToken);
         if (visibility is null)
             return TypedResults.NotFound();
         if (visibility.DataScope == LeaderboardDataScope.Hidden)

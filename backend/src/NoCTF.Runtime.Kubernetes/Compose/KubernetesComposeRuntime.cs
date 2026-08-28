@@ -15,8 +15,10 @@ namespace NoCTF.Runtime.Kubernetes.Compose;
 public sealed class KubernetesComposeRuntime(
     IKubernetes client,
     KubernetesRuntimeOptions options,
-    IKomposeConverter converter) : IComposeRuntime
+    IKomposeConverter converter,
+    TimeProvider? clock = null) : IComposeRuntime
 {
+    private readonly TimeProvider timeProvider = clock ?? TimeProvider.System;
     private const string ManagedLabel = "noctf.io/managed";
     private const string RuntimeIdLabel = "noctf.io/runtime-instance-id";
     private const string ExternalReasonExitCode = "ExitCode";
@@ -70,7 +72,7 @@ public sealed class KubernetesComposeRuntime(
             request.ProjectName,
             options.Namespace,
             options.PublicHost,
-            DateTimeOffset.UtcNow);
+            timeProvider.GetUtcNow());
     }
 
     public async Task DownAsync(

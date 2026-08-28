@@ -10,7 +10,8 @@ namespace NoCTF.API.Endpoints.Administration.Runtime;
 public sealed class StopSharedRuntimeEndpoint(
     ManageAdminRuntimes runtimes,
     ICompetitionModerationAuthorizer authorizer,
-    IUserContext user)
+    IUserContext user,
+    TimeProvider timeProvider)
     : EndpointWithoutRequest<
         Results<Accepted<RuntimeAcceptedResponse>, NotFound, ProblemHttpResult, ForbidHttpResult>>
 {
@@ -33,5 +34,5 @@ public sealed class StopSharedRuntimeEndpoint(
         AdminRuntimeMutation.ExecuteTeamAsync(
             runtimes, authorizer, user, RuntimeAction.Stop,
             Route<Guid>("competitionId"), Route<Guid>("competitionChallengeId"),
-            teamId: null, extension: null, ct);
+            teamId: null, extension: null, timeProvider, ct);
 }

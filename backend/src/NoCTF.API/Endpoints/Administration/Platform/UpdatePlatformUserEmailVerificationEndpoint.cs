@@ -23,7 +23,8 @@ public sealed record UpdatePlatformUserEmailVerificationConflictResponse(
 
 public sealed class UpdatePlatformUserEmailVerificationEndpoint(
     ManagePlatform platform,
-    IUserContext actor)
+    IUserContext actor,
+    TimeProvider timeProvider)
     : Endpoint<UpdatePlatformUserEmailVerificationRequest,
         Results<
             Ok<PlatformUserResponse>,
@@ -57,7 +58,7 @@ public sealed class UpdatePlatformUserEmailVerificationEndpoint(
             Route<Guid>("userId"),
             actor.UserId,
             request.EmailVerified,
-            DateTimeOffset.UtcNow,
+            timeProvider.GetUtcNow(),
             ct);
         return result.State switch
         {

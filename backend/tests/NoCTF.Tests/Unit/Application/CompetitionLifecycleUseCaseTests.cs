@@ -29,7 +29,7 @@ public class CompetitionLifecycleUseCaseTests
     {
         var competitionId = Guid.NewGuid();
         var store = new Store(CompetitionStatus.Paused);
-        var useCase = new TransitionCompetitionLifecycle(store);
+        var useCase = new TransitionCompetitionLifecycle(store, TimeProvider.System);
 
         var result = await useCase.ExecuteAsync(
             competitionId, CompetitionStatus.Running, Guid.NewGuid(), "resume");
@@ -46,7 +46,7 @@ public class CompetitionLifecycleUseCaseTests
     {
         var competitionId = Guid.NewGuid();
         var store = new Store(CompetitionStatus.Running);
-        var useCase = new TransitionCompetitionLifecycle(store);
+        var useCase = new TransitionCompetitionLifecycle(store, TimeProvider.System);
 
         var result = await useCase.ExecuteAsync(
             competitionId, CompetitionStatus.Finished, Guid.NewGuid(), "finish");

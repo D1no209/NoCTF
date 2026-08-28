@@ -11,7 +11,8 @@ namespace NoCTF.API.Endpoints.Administration.Runtime;
 public sealed class StartTeamRuntimeEndpoint(
     ManageAdminRuntimes runtimes,
     ICompetitionModerationAuthorizer authorizer,
-    IUserContext user)
+    IUserContext user,
+    TimeProvider timeProvider)
     : EndpointWithoutRequest<
         Results<Accepted<RuntimeAcceptedResponse>, NotFound, ProblemHttpResult, ForbidHttpResult>>
 {
@@ -34,7 +35,7 @@ public sealed class StartTeamRuntimeEndpoint(
         AdminRuntimeMutation.ExecuteTeamAsync(
             runtimes, authorizer, user, RuntimeAction.Start,
             Route<Guid>("competitionId"), Route<Guid>("competitionChallengeId"),
-            Route<Guid>("teamId"), null, ct);
+            Route<Guid>("teamId"), null, timeProvider, ct);
 }
 
 internal static class AdminRuntimeMutation
@@ -49,13 +50,14 @@ internal static class AdminRuntimeMutation
         Guid competitionChallengeId,
         Guid? teamId,
         TimeSpan? extension,
+        TimeProvider timeProvider,
         CancellationToken ct)
     {
         if (!await authorizer.CanModerateAsync(user.UserId, competitionId, ct))
             return TypedResults.Forbid();
         var result = await runtimes.MutateAsync(
             competitionId, competitionChallengeId, teamId, action, extension,
-            DateTimeOffset.UtcNow, ct);
+            timeProvider.GetUtcNow(), ct);
         if (result.Failure is RuntimeMutationFailure.NotFound or RuntimeMutationFailure.Unsupported)
             return TypedResults.NotFound();
         if (result.Runtime is null)

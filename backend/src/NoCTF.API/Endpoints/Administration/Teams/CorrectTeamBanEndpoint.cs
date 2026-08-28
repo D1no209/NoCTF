@@ -24,7 +24,8 @@ public sealed class CorrectTeamBanValidator : Validator<CorrectTeamBanRequest>
 public sealed class CorrectTeamBanEndpoint(
     CorrectTeamBan correct,
     ICompetitionModerationAuthorizer authorizer,
-    IUserContext user)
+    IUserContext user,
+    TimeProvider timeProvider)
     : Endpoint<CorrectTeamBanRequest,
         Results<NoContent, NotFound, ForbidHttpResult, ProblemHttpResult>>
 {
@@ -61,7 +62,7 @@ public sealed class CorrectTeamBanEndpoint(
             request.TeamId,
             user.UserId,
             request.Reason,
-            DateTimeOffset.UtcNow), cancellationToken);
+            timeProvider.GetUtcNow()), cancellationToken);
         return TeamBanAppealHttpResults.Map(result, "Team ban correction was rejected.");
     }
 }

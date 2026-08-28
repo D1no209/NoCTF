@@ -19,7 +19,10 @@ public enum RefreshAccessTokenFailureCode
     UserNotFound
 }
 
-public sealed class RefreshAccessToken(IUserAuthenticationStore store, IAccessTokenIssuer issuer)
+public sealed class RefreshAccessToken(
+    IUserAuthenticationStore store,
+    IAccessTokenIssuer issuer,
+    TimeProvider timeProvider)
 {
     public async Task<OperationResult<RefreshAccessTokenResult, RefreshAccessTokenFailureCode>> ExecuteAsync(
         string refreshToken,
@@ -41,7 +44,7 @@ public sealed class RefreshAccessToken(IUserAuthenticationStore store, IAccessTo
         if (user.TokenVersion != principal.TokenVersion)
             return OperationResult<RefreshAccessTokenResult, RefreshAccessTokenFailureCode>.Failure(
                 RefreshAccessTokenFailureCode.RefreshInvalid, "Refresh token is no longer valid.");
-        var access = issuer.Issue(user, DateTimeOffset.UtcNow);
+        var access = issuer.Issue(user, timeProvider.GetUtcNow());
         var replacement = issuer.IssueRefresh(user);
         return OperationResult<RefreshAccessTokenResult, RefreshAccessTokenFailureCode>.Success(
             new(

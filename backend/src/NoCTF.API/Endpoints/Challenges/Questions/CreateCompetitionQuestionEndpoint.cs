@@ -84,7 +84,8 @@ internal static class CompetitionQuestionFailureMapper
 
 public sealed class CreateCompetitionQuestionEndpoint(
     CreateCompetitionQuestion create,
-    IUserContext user)
+    IUserContext user,
+    TimeProvider timeProvider)
     : Endpoint<CreateCompetitionQuestionRequest, Results<
         CreatedAtRoute<CompetitionQuestionResponse>,
         Conflict<CompetitionQuestionFailureResponse>,
@@ -128,7 +129,7 @@ public sealed class CreateCompetitionQuestionEndpoint(
             user.UserId,
             request.Title,
             request.Body,
-            DateTimeOffset.UtcNow), ct);
+            timeProvider.GetUtcNow()), ct);
         return result.Failure switch
         {
             null => TypedResults.CreatedAtRoute(

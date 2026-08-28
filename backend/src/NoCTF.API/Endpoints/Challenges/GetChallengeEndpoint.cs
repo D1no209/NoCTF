@@ -95,7 +95,8 @@ public sealed class GetChallengeEndpoint(
     ICompetitionChallengeAudienceAccess audienceAccess,
     ICompetitionVisibilityAccess visibilityAccess,
     GetFlagAttemptBudget getAttemptBudget,
-    IUserContext user) : Endpoint<GetChallengeRequest, Results<Ok<ChallengeResponse>, NotFound>>
+    IUserContext user,
+    TimeProvider timeProvider) : Endpoint<GetChallengeRequest, Results<Ok<ChallengeResponse>, NotFound>>
 {
     public override void Configure()
     {
@@ -114,7 +115,7 @@ public sealed class GetChallengeEndpoint(
         var visibility = await visibilityAccess.ResolveAsync(
             user.UserId,
             competitionId,
-            DateTimeOffset.UtcNow,
+            timeProvider.GetUtcNow(),
             ct);
         if (visibility is null
             || !ParticipantChallengeVisibilityPolicy.CanView(

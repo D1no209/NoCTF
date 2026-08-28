@@ -34,9 +34,11 @@ public static class PlatformLoggingRegistration
 
 public sealed class RedisPlatformLoggerProvider(
     IConnectionMultiplexer redis,
-    PlatformLogWriterOptions options)
+    PlatformLogWriterOptions options,
+    TimeProvider? clock = null)
     : ILoggerProvider, ISupportExternalScope
 {
+    private readonly TimeProvider timeProvider = clock ?? TimeProvider.System;
     public const string StreamKeyPrefix = "platform-logs:v2:";
     public const string Channel = "platform-logs:v1:live";
     private static readonly System.Text.Json.JsonSerializerOptions JsonOptions =
@@ -44,7 +46,12 @@ public sealed class RedisPlatformLoggerProvider(
     private IExternalScopeProvider scopeProvider = new LoggerExternalScopeProvider();
 
     public ILogger CreateLogger(string categoryName) =>
-        new RedisPlatformLogger(categoryName, redis, options, () => scopeProvider);
+        new RedisPlatformLogger(
+            categoryName,
+            redis,
+            options,
+            timeProvider,
+            () => scopeProvider);
 
     public void SetScopeProvider(IExternalScopeProvider provider) =>
         scopeProvider = provider;
@@ -57,6 +64,7 @@ public sealed class RedisPlatformLoggerProvider(
         string category,
         IConnectionMultiplexer redis,
         PlatformLogWriterOptions options,
+        TimeProvider timeProvider,
         Func<IExternalScopeProvider> scopes) : ILogger
     {
         public IDisposable? BeginScope<TState>(TState state) where TState : notnull =>
@@ -86,7 +94,7 @@ public sealed class RedisPlatformLoggerProvider(
             scopes().ForEachScope(
                 static (scope, target) => AddProperties(scope, target),
                 properties);
-            var timestamp = DateTimeOffset.UtcNow;
+            var timestamp = timeProvider.GetUtcNow();
             var message = Limit(
                 PlatformLogRedactor.Redact(formatter(state, exception), properties),
                 16_384);
@@ -211,8 +219,10 @@ public sealed class RedisPlatformLoggerProvider(
 
 public sealed class RedisPlatformLogStore(
     IConnectionMultiplexer redis,
-    PlatformLogWriterOptions options) : IPlatformLogReader
+    PlatformLogWriterOptions options,
+    TimeProvider? clock = null) : IPlatformLogReader
 {
+    private readonly TimeProvider timeProvider = clock ?? TimeProvider.System;
     private const int ScanBatchSize = 500;
     private const int MaximumScannedEntries = 20_000;
     private const int MaximumExportScannedEntries = 700_000;
@@ -253,7 +263,7 @@ public sealed class RedisPlatformLogStore(
         try
         {
             var database = redis.GetDatabase();
-            var today = DateOnly.FromDateTime(DateTime.UtcNow);
+            var today = DateOnly.FromDateTime(timeProvider.GetUtcNow().UtcDateTime);
             var earliestRetained = today.AddDays(-(options.RetentionDays - 1));
             var fromPartition = query.From is null
                 ? earliestRetained

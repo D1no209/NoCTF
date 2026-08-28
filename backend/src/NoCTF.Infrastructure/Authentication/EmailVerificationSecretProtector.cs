@@ -1,6 +1,6 @@
 using System.Security.Cryptography;
 using System.Text;
-using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Options;
 
 namespace NoCTF.Infrastructure.Authentication;
 
@@ -12,9 +12,10 @@ public sealed class EmailVerificationSecretProtector
         Encoding.UTF8.GetBytes("NoCTF.EmailVerification.SmtpPassword.v1");
     private readonly string? configuredKey;
 
-    public EmailVerificationSecretProtector(IConfiguration configuration)
+    public EmailVerificationSecretProtector(
+        IOptions<EmailVerificationProtectionOptions> options)
     {
-        configuredKey = configuration["EmailVerification:EncryptionKey"];
+        configuredKey = options.Value.EncryptionKey;
     }
 
     private byte[] ReadKey()

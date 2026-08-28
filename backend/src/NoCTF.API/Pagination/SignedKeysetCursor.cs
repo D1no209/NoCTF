@@ -2,16 +2,22 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using Microsoft.AspNetCore.WebUtilities;
+using Microsoft.Extensions.Options;
 
 namespace NoCTF.API.Pagination;
 
 public sealed record KeysetPosition(DateTimeOffset CreatedAt, Guid Id);
 
-public sealed class SignedKeysetCursor(IConfiguration configuration)
+public sealed class PaginationOptions
+{
+    public string SigningKey { get; set; } = string.Empty;
+}
+
+public sealed class SignedKeysetCursor(IOptions<PaginationOptions> options)
 {
     private static readonly JsonSerializerOptions JsonOptions =
         new(JsonSerializerDefaults.Web);
-    private readonly byte[] key = ReadKey(configuration);
+    private readonly byte[] key = Encoding.UTF8.GetBytes(options.Value.SigningKey);
 
     public string Encode(string endpoint, string filter, KeysetPosition position)
     {
@@ -98,17 +104,6 @@ public sealed class SignedKeysetCursor(IConfiguration configuration)
         {
             return false;
         }
-    }
-
-    private static byte[] ReadKey(IConfiguration configuration)
-    {
-        var value = configuration["Pagination:SigningKey"]
-            ?? configuration["Authentication:SigningKey"];
-        if (string.IsNullOrWhiteSpace(value)
-            || Encoding.UTF8.GetByteCount(value) < 32)
-            throw new InvalidOperationException(
-                "Pagination:SigningKey must contain at least 32 UTF-8 bytes.");
-        return Encoding.UTF8.GetBytes(value);
     }
 
     private sealed record CursorPayload(

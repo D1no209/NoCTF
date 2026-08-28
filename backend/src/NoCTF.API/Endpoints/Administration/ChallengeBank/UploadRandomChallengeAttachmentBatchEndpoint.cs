@@ -47,7 +47,8 @@ public sealed record RandomAttachmentBatchFailureResponse(
 public sealed class UploadRandomChallengeAttachmentBatchEndpoint(
     ManageChallengeAttachments attachments,
     IUserContext user,
-    FileUploadLimits uploadLimits)
+    FileUploadLimits uploadLimits,
+    TimeProvider timeProvider)
     : Endpoint<UploadRandomChallengeAttachmentBatchRequest,
         Results<
             Created<ChallengeAttachmentListResponse>,
@@ -99,7 +100,7 @@ public sealed class UploadRandomChallengeAttachmentBatchEndpoint(
                     file.FileName,
                     file.ContentType,
                     streams[index])).ToArray(),
-                DateTimeOffset.UtcNow,
+                timeProvider.GetUtcNow(),
                 ct);
             if (result.FailureCode == ChallengeAttachmentFailureCode.ChallengeNotFound)
                 return TypedResults.NotFound();

@@ -1,5 +1,6 @@
 using System.Formats.Tar;
 using System.IO.Compression;
+using Microsoft.Extensions.Options;
 
 namespace NoCTF.Runner.Composition;
 
@@ -10,14 +11,13 @@ public sealed class FixArchivePreparer
     private readonly long maxSingleFileBytes;
     private readonly double maxCompressionRatio;
 
-    public FixArchivePreparer(IConfiguration configuration)
+    public FixArchivePreparer(IOptions<FixVerificationOptions> configuredOptions)
     {
-        maxExpandedBytes = configuration.GetValue("FixVerification:MaxExpandedBytes", 268_435_456L);
-        maxEntries = configuration.GetValue("FixVerification:MaxArchiveEntries", 2048);
-        maxSingleFileBytes = configuration.GetValue("FixVerification:MaxSingleFileBytes", 64L * 1024 * 1024);
-        maxCompressionRatio = configuration.GetValue("FixVerification:MaxCompressionRatio", 100d);
-        if (maxExpandedBytes <= 0 || maxEntries <= 0 || maxSingleFileBytes <= 0 || maxCompressionRatio <= 0)
-            throw new ArgumentOutOfRangeException(nameof(configuration), "Archive extraction limits must be positive.");
+        var options = configuredOptions.Value;
+        maxExpandedBytes = options.MaxExpandedBytes;
+        maxEntries = options.MaxArchiveEntries;
+        maxSingleFileBytes = options.MaxSingleFileBytes;
+        maxCompressionRatio = options.MaxCompressionRatio;
     }
 
     public async Task PrepareTarAsync(Stream source, string fileName, string patchEntrypoint,
@@ -126,4 +126,29 @@ public sealed class FixArchivePreparer
             throw new InvalidDataException("Fix archive path traversal is forbidden.");
         return path;
     }
+}
+
+public sealed class FixVerificationOptions
+{
+    public const string SectionName = "FixVerification";
+
+    public long MaxExpandedBytes { get; init; } = 268_435_456L;
+
+    public int MaxArchiveEntries { get; init; } = 2048;
+
+    public long MaxSingleFileBytes { get; init; } = 64L * 1024 * 1024;
+
+    public double MaxCompressionRatio { get; init; } = 100d;
+}
+
+public sealed class FixVerificationOptionsValidator : IValidateOptions<FixVerificationOptions>
+{
+    public ValidateOptionsResult Validate(string? name, FixVerificationOptions options) =>
+        options.MaxExpandedBytes > 0
+        && options.MaxArchiveEntries > 0
+        && options.MaxSingleFileBytes > 0
+        && options.MaxCompressionRatio > 0
+            ? ValidateOptionsResult.Success
+            : ValidateOptionsResult.Fail(
+                "FixVerification archive extraction limits must be positive.");
 }

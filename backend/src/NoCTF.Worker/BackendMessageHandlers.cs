@@ -34,11 +34,11 @@ using NoCTF.Domain.Gameplay;
 
 namespace NoCTF.Worker;
 
-public static class BackendMessageHandlers
+internal static class BackendMessageOperations
 {
     private static readonly TimeSpan RunnerDependencyRetryDelay = TimeSpan.FromSeconds(5);
 
-    public static async Task Handle(
+    public static async Task CleanupFileAsync(
         CleanupFile message,
         NoCtfDbContext db,
         IStore objects,
@@ -65,47 +65,7 @@ public static class BackendMessageHandlers
         await transaction.CommitAsync(cancellationToken);
     }
 
-    public static async Task Handle(
-        SendEmailVerification message,
-        IEmailVerificationDelivery delivery,
-        CancellationToken cancellationToken)
-    {
-        var state = await delivery.SendVerificationAsync(
-            message.UserId,
-            message.Token,
-            cancellationToken);
-        if (state == EmailVerificationDeliveryState.NotConfigured)
-        {
-            throw new InvalidOperationException(
-                "Email verification delivery was queued without a complete SMTP configuration.");
-        }
-    }
-
-    public static async Task Handle(
-        SendPasswordReset message,
-        IPasswordResetEmailDelivery delivery,
-        CancellationToken cancellationToken)
-    {
-        var state = await delivery.SendResetAsync(
-            message.UserId,
-            message.Token,
-            cancellationToken);
-        if (state == PasswordResetEmailDeliveryState.NotConfigured)
-        {
-            throw new InvalidOperationException(
-                "Password reset delivery was queued without a complete SMTP configuration.");
-        }
-    }
-
-    public static async Task Handle(
-        SendPasswordChangedNotification message,
-        IPasswordResetEmailDelivery delivery,
-        CancellationToken cancellationToken) =>
-        _ = await delivery.SendChangedNotificationAsync(
-            message.UserId,
-            cancellationToken);
-
-    public static async Task Handle(
+    public static async Task DispatchAwdCheckersAsync(
         DispatchAwdCheckers message,
         NoCtfDbContext db,
         AwdCheckerConfigurationCatalog configurations,
@@ -235,19 +195,19 @@ public static class BackendMessageHandlers
         return new Guid(hash[..16]);
     }
 
-    public static async Task Handle(
+    public static async Task AdvanceAwdRoundAsync(
         AdvanceAwdRound message,
         IAwdRoundCoordinator coordinator,
         CancellationToken cancellationToken) =>
         _ = await coordinator.AdvanceAsync(message, cancellationToken);
 
-    public static async Task Handle(
+    public static async Task GenerateAwdFlagsAsync(
         GenerateAwdFlags message,
         IAwdRoundCoordinator coordinator,
         CancellationToken cancellationToken) =>
         _ = await coordinator.GenerateFlagsAsync(message, cancellationToken);
 
-    public static async Task Handle(
+    public static async Task AwdFlagInjectionFailedAsync(
         AwdFlagInjectionFailed message,
         NoCtfDbContext db,
         CancellationToken cancellationToken)
@@ -290,7 +250,7 @@ public static class BackendMessageHandlers
         await db.SaveChangesAsync(cancellationToken);
     }
 
-    public static async Task Handle(
+    public static async Task AwdCheckerCallbackMissingAsync(
         AwdCheckerCallbackMissing message,
         IInternalResultStore results,
         NoCtfDbContext db,
@@ -343,7 +303,7 @@ public static class BackendMessageHandlers
         await db.SaveChangesAsync(cancellationToken);
     }
 
-    public static async Task Handle(
+    public static async Task AdvanceCompetitionLifecycleAsync(
         AdvanceCompetitionLifecycle message,
         CompetitionLifecycleAdvancer advancer,
         NoCtfDbContext db,
@@ -376,50 +336,17 @@ public static class BackendMessageHandlers
             : MessageExecutionOutcome.Idempotent;
     }
 
-    public static Task Handle(
-        EvaluateGameplayFact message,
-        IGameplayFactProcessor processor,
-        CancellationToken cancellationToken) =>
-        processor.ProcessAsync(message.GameplayFactId, cancellationToken);
-
-    public static async Task Handle(
-        GameplayFactStateChanged message,
-        NoCtfDbContext db,
-        NoCTF.Application.Notifications.IGameplayFactStateChangedNotification notifications,
-        CancellationToken cancellationToken)
-    {
-        var fact = await db.GameplayFacts.AsNoTracking()
-            .SingleOrDefaultAsync(candidate => candidate.Id == message.GameplayFactId, cancellationToken);
-        if (fact?.ActorUserId is not Guid userId || fact.State != message.State)
-            return;
-        var view = new NoCTF.Application.GameplayFacts.Status.GameplayFactStatusView(
-            fact.Id, fact.CompetitionId, fact.TeamId, fact.CompetitionChallengeId, fact.Kind,
-            fact.State,
-            NoCTF.Application.GameplayFacts.Status.GameplayFactResultDisclosure.PlayerResult(fact.Result, fact.FailureCode),
-            NoCTF.Application.GameplayFacts.Status.GameplayFactResultDisclosure.PlayerFailureCode(fact.FailureCode),
-            fact.OccurredAt, fact.UpdatedAt);
-        await notifications.PublishAsync(
-            new NoCTF.Application.Notifications.GameplayFactStateChangedNotification(userId, view),
-            cancellationToken);
-    }
-
-    public static Task Handle(
-        ProjectLeaderboard message,
-        ILeaderboardCache leaderboard,
-        CancellationToken cancellationToken) =>
-        leaderboard.RefreshAsync(message.CompetitionId, cancellationToken);
-
-    public static Task Handle(
+    public static Task ApplyCompetitionVisibilityAsync(
         ApplyCompetitionVisibility message,
         CancellationToken cancellationToken) => Task.CompletedTask;
 
-    public static Task Handle(
+    public static Task RecordAwdpFixResultAsync(
         AwdpFixResult message,
         IInternalResultStore results,
         CancellationToken cancellationToken) =>
         results.RecordAwdpAsync(message, cancellationToken);
 
-    public static async Task Handle(
+    public static async Task CompleteAwdpFixRecoveryAsync(
         CompleteAwdpFixRecovery message,
         NoCtfDbContext db,
         ITransactionalMessageOutbox outbox,
@@ -474,15 +401,16 @@ public static class BackendMessageHandlers
         await outbox.FlushOutgoingMessagesAsync();
     }
 
-    public static async Task Handle(
+    public static async Task ExpireAwdpFixVerificationAsync(
         ExpireAwdpFixVerification message,
         NoCtfDbContext db,
         ITransactionalMessageOutbox outbox,
+        TimeProvider timeProvider,
         CancellationToken cancellationToken,
         ICompetitionEventRecorder? events = null)
     {
         events ??= NullCompetitionEventRecorder.Instance;
-        if (DateTimeOffset.UtcNow < message.Deadline)
+        if (timeProvider.GetUtcNow() < message.Deadline)
         {
             await outbox.ScheduleAsync(message, message.Deadline);
             await outbox.FlushOutgoingMessagesAsync();
@@ -507,7 +435,7 @@ public static class BackendMessageHandlers
 
         submission.State = NoCTF.Domain.Gameplay.GameplayFactState.PlatformFailed;
         submission.FailureCode = NoCTF.Domain.Gameplay.GameplayFactFailureCode.CheckerPlatformError;
-        submission.UpdatedAt = DateTimeOffset.UtcNow;
+        submission.UpdatedAt = timeProvider.GetUtcNow();
         await outbox.PublishAsync(new GameplayFactStateChanged(submission.Id, submission.State));
         runtime.State = RuntimeState.Stopping;
         await events.RecordAsync(new(
@@ -540,13 +468,14 @@ public static class BackendMessageHandlers
         await outbox.FlushOutgoingMessagesAsync();
     }
 
-    public static async Task Handle(
+    public static async Task DispatchRuntimeAsync(
         DispatchRuntime message,
         NoCtfDbContext db,
         IChallengeRuntimeTemplateCatalog templates,
         IRuntimePlacementPolicy placementPolicy,
         IRunnerCapacityGate capacity,
         ITransactionalMessageOutbox outbox,
+        TimeProvider timeProvider,
         CancellationToken cancellationToken,
         ICompetitionEventRecorder? events = null)
     {
@@ -589,12 +518,13 @@ public static class BackendMessageHandlers
         {
             target.Instance.State = RuntimeState.Failed;
             target.Instance.FailureCode = RuntimeFailureCode.InvalidConfiguration;
-            await FailAwdpSubmissionAsync(target.Instance, db, outbox, cancellationToken);
+            await FailAwdpSubmissionAsync(
+                target.Instance, db, outbox, timeProvider, cancellationToken);
             await RecordRuntimeStateAsync(
                 events,
                 target.Instance,
                 CompetitionEventLevel.Error,
-                DateTimeOffset.UtcNow,
+                timeProvider.GetUtcNow(),
                 cancellationToken);
             await db.SaveChangesAsync(cancellationToken);
             await outbox.FlushOutgoingMessagesAsync();
@@ -633,7 +563,7 @@ public static class BackendMessageHandlers
                     events,
                     target.Instance,
                     CompetitionEventLevel.Error,
-                    DateTimeOffset.UtcNow,
+                    timeProvider.GetUtcNow(),
                     cancellationToken);
                 await db.SaveChangesAsync(cancellationToken);
                 await outbox.FlushOutgoingMessagesAsync();
@@ -646,7 +576,8 @@ public static class BackendMessageHandlers
         {
             target.Instance.State = RuntimeState.Failed;
             target.Instance.FailureCode = RuntimeFailureCode.InvalidConfiguration;
-            await FailAwdpSubmissionAsync(target.Instance, db, outbox, cancellationToken);
+            await FailAwdpSubmissionAsync(
+                target.Instance, db, outbox, timeProvider, cancellationToken);
             await db.SaveChangesAsync(cancellationToken);
             await outbox.FlushOutgoingMessagesAsync();
             return;
@@ -663,7 +594,7 @@ public static class BackendMessageHandlers
         if (capacityClaim.Availability != RunnerCapacityAvailability.Claimed
             || string.IsNullOrWhiteSpace(capacityClaim.RunnerId))
         {
-            var retryAt = DateTimeOffset.UtcNow.Add(RunnerDependencyRetryDelay);
+            var retryAt = timeProvider.GetUtcNow().Add(RunnerDependencyRetryDelay);
             await outbox.ScheduleAsync(message, retryAt);
             await outbox.FlushOutgoingMessagesAsync();
             return;
@@ -679,7 +610,7 @@ public static class BackendMessageHandlers
                     target.Instance.Id,
                     template,
                     target.Instance.RuntimeProvider,
-                    DateTimeOffset.UtcNow);
+                    timeProvider.GetUtcNow());
                 if (target.Instance.RuntimeProvider == RuntimeProvider.Docker)
                 {
                     definition = definition with
@@ -718,12 +649,13 @@ public static class BackendMessageHandlers
             }
             target.Instance.State = RuntimeState.Failed;
             target.Instance.FailureCode = RuntimeFailureCode.InvalidConfiguration;
-            await FailAwdpSubmissionAsync(target.Instance, db, outbox, cancellationToken);
+            await FailAwdpSubmissionAsync(
+                target.Instance, db, outbox, timeProvider, cancellationToken);
             await RecordRuntimeStateAsync(
                 events,
                 target.Instance,
                 CompetitionEventLevel.Error,
-                DateTimeOffset.UtcNow,
+                timeProvider.GetUtcNow(),
                 cancellationToken);
             await db.SaveChangesAsync(cancellationToken);
             await outbox.FlushOutgoingMessagesAsync();
@@ -742,6 +674,7 @@ public static class BackendMessageHandlers
         RuntimeInstance instance,
         NoCtfDbContext db,
         ITransactionalMessageOutbox outbox,
+        TimeProvider timeProvider,
         CancellationToken cancellationToken)
     {
         if (instance.Purpose != RuntimePurpose.AwdpTarget
@@ -755,7 +688,7 @@ public static class BackendMessageHandlers
             return;
         submission.State = NoCTF.Domain.Gameplay.GameplayFactState.PlatformFailed;
         submission.FailureCode = NoCTF.Domain.Gameplay.GameplayFactFailureCode.CheckerPlatformError;
-        submission.UpdatedAt = DateTimeOffset.UtcNow;
+        submission.UpdatedAt = timeProvider.GetUtcNow();
         await outbox.PublishAsync(new GameplayFactStateChanged(submission.Id, submission.State));
         await QueueNextGameplayFactAsync(submission, db, outbox, cancellationToken);
     }
@@ -781,10 +714,11 @@ public static class BackendMessageHandlers
             await outbox.PublishAsync(new EvaluateGameplayFact(id));
     }
 
-    public static async Task Handle(
+    public static async Task StopRuntimeAsync(
         StopRuntime message,
         NoCtfDbContext db,
         ITransactionalMessageOutbox outbox,
+        TimeProvider timeProvider,
         CancellationToken cancellationToken,
         ICompetitionEventRecorder? events = null)
     {
@@ -804,7 +738,7 @@ public static class BackendMessageHandlers
             }
 
             instance.State = RuntimeState.Stopped;
-            instance.StoppedAt = DateTimeOffset.UtcNow;
+            instance.StoppedAt = timeProvider.GetUtcNow();
             await RecordRuntimeStateAsync(
                 events,
                 instance,
@@ -823,10 +757,11 @@ public static class BackendMessageHandlers
         await outbox.FlushOutgoingMessagesAsync();
     }
 
-    public static async Task Handle(
+    public static async Task CleanupCompetitionRuntimesAsync(
         CleanupCompetitionRuntimes message,
         NoCtfDbContext db,
         ITransactionalMessageOutbox outbox,
+        TimeProvider timeProvider,
         CancellationToken cancellationToken,
         ICompetitionEventRecorder? events = null)
     {
@@ -838,7 +773,7 @@ public static class BackendMessageHandlers
                     || instance.State == RuntimeState.Running))
             .OrderBy(instance => instance.CreatedAt)
             .ToListAsync(cancellationToken);
-        var now = DateTimeOffset.UtcNow;
+        var now = timeProvider.GetUtcNow();
         foreach (var instance in runtimes)
         {
             if (instance.State == RuntimeState.Queued && string.IsNullOrWhiteSpace(instance.ProviderReceiptJson))
@@ -868,12 +803,13 @@ public static class BackendMessageHandlers
         await outbox.FlushOutgoingMessagesAsync();
     }
 
-    public static async Task Handle(
+    public static async Task ProvisionCompetitionRuntimesAsync(
         ProvisionCompetitionRuntimes message,
         IAwdRuntimeProvisioner awdRuntimes,
         IKohRuntimeProvisioner kohRuntimes,
         NoCtfDbContext db,
         ITransactionalMessageOutbox outbox,
+        TimeProvider timeProvider,
         CancellationToken cancellationToken)
     {
         var awdOutcome = await awdRuntimes.EnsureAsync(
@@ -881,7 +817,7 @@ public static class BackendMessageHandlers
             cancellationToken);
         if (awdOutcome == AwdRuntimeProvisioningOutcome.DeferredCleanup)
         {
-            var retryAt = DateTimeOffset.UtcNow.Add(RunnerDependencyRetryDelay);
+            var retryAt = timeProvider.GetUtcNow().Add(RunnerDependencyRetryDelay);
             await outbox.ScheduleAsync(message, retryAt);
             await outbox.FlushOutgoingMessagesAsync();
             return;
@@ -893,7 +829,7 @@ public static class BackendMessageHandlers
             cancellationToken);
         if (kohOutcome == KohRuntimeProvisioningOutcome.DeferredCleanup)
         {
-            var retryAt = DateTimeOffset.UtcNow.Add(RunnerDependencyRetryDelay);
+            var retryAt = timeProvider.GetUtcNow().Add(RunnerDependencyRetryDelay);
             await outbox.ScheduleAsync(message, retryAt);
             await outbox.FlushOutgoingMessagesAsync();
             return;
@@ -910,12 +846,13 @@ public static class BackendMessageHandlers
         await outbox.FlushOutgoingMessagesAsync();
     }
 
-    public static async Task Handle(
+    public static async Task ReconcileRunnerAssignmentsAsync(
         ReconcileRunnerAssignments message,
         NoCtfDbContext db,
         IRunnerCapacityGate capacity,
         IRuntimePlacementPolicy placementPolicy,
         ITransactionalMessageOutbox outbox,
+        TimeProvider timeProvider,
         CancellationToken cancellationToken)
     {
         _ = await ExecuteRunnerAssignmentReconciliationAsync(
@@ -924,6 +861,7 @@ public static class BackendMessageHandlers
             capacity,
             placementPolicy,
             outbox,
+            timeProvider,
             cancellationToken);
     }
 
@@ -933,6 +871,7 @@ public static class BackendMessageHandlers
         IRunnerCapacityGate capacity,
         IRuntimePlacementPolicy placementPolicy,
         ITransactionalMessageOutbox outbox,
+        TimeProvider timeProvider,
         CancellationToken cancellationToken)
     {
         var applied = false;
@@ -1027,7 +966,7 @@ public static class BackendMessageHandlers
             heartbeatStatuses.Add(heartbeat);
             if (heartbeat == RunnerHeartbeatStatus.Unavailable)
             {
-                var retryAt = DateTimeOffset.UtcNow.Add(RunnerDependencyRetryDelay);
+                var retryAt = timeProvider.GetUtcNow().Add(RunnerDependencyRetryDelay);
                 await outbox.ScheduleAsync(
                     message with { At = retryAt },
                     retryAt);
@@ -1063,7 +1002,7 @@ public static class BackendMessageHandlers
                     cancellationToken);
                 if (inventory.Availability == RunnerPoolInventoryAvailability.Unavailable)
                 {
-                    var retryAt = DateTimeOffset.UtcNow.Add(RunnerDependencyRetryDelay);
+                    var retryAt = timeProvider.GetUtcNow().Add(RunnerDependencyRetryDelay);
                     await outbox.ScheduleAsync(
                         message with { At = retryAt },
                         retryAt);
@@ -1080,7 +1019,7 @@ public static class BackendMessageHandlers
                         cancellationToken);
                     if (heartbeat == RunnerHeartbeatStatus.Unavailable)
                     {
-                        var retryAt = DateTimeOffset.UtcNow.Add(RunnerDependencyRetryDelay);
+                        var retryAt = timeProvider.GetUtcNow().Add(RunnerDependencyRetryDelay);
                         await outbox.ScheduleAsync(
                             message with { At = retryAt },
                             retryAt);
@@ -1129,23 +1068,25 @@ public static class BackendMessageHandlers
             : MessageExecutionOutcome.Idempotent;
     }
 
-    public static async Task Handle(
+    public static async Task DrainGameplayFactEvaluationAsync(
         DrainGameplayFactEvaluation message,
         NoCtfDbContext db,
         ITransactionalMessageOutbox outbox,
+        TimeProvider timeProvider,
         CancellationToken cancellationToken) =>
         await DrainGameplayFactsAsync(
             message.CompetitionId, message.CompetitionChallengeId, message.Cutoff,
-            rejudge: false, message.GameplayFactId, message, db, outbox, cancellationToken);
+            rejudge: false, message.GameplayFactId, message, db, outbox, timeProvider, cancellationToken);
 
-    public static async Task Handle(
+    public static async Task DrainGameplayFactRejudgeAsync(
         DrainGameplayFactRejudge message,
         NoCtfDbContext db,
         ITransactionalMessageOutbox outbox,
+        TimeProvider timeProvider,
         CancellationToken cancellationToken) =>
         await DrainGameplayFactsAsync(
             message.CompetitionId, message.CompetitionChallengeId, message.Cutoff,
-            rejudge: true, message.GameplayFactId, message, db, outbox, cancellationToken);
+            rejudge: true, message.GameplayFactId, message, db, outbox, timeProvider, cancellationToken);
 
     private static async Task DrainGameplayFactsAsync(
         Guid competitionId,
@@ -1156,6 +1097,7 @@ public static class BackendMessageHandlers
         object continuationMessage,
         NoCtfDbContext db,
         ITransactionalMessageOutbox outbox,
+        TimeProvider timeProvider,
         CancellationToken cancellationToken)
     {
         const int batchSize = 500;
@@ -1196,7 +1138,7 @@ public static class BackendMessageHandlers
         if (candidateIds.Length == 0)
             return;
 
-        var now = DateTimeOffset.UtcNow;
+        var now = timeProvider.GetUtcNow();
         await candidates.Where(submission => candidateIds.Contains(submission.Id))
             .ExecuteUpdateAsync(setters => setters
                 .SetProperty(

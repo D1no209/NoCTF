@@ -6,7 +6,9 @@ namespace NoCTF.API.Endpoints.Competitions;
 
 public sealed record CompetitionListResponse(IReadOnlyList<CompetitionResponse> Items);
 
-public sealed class ListCompetitionsEndpoint(ListCompetitions list)
+public sealed class ListCompetitionsEndpoint(
+    ListCompetitions list,
+    TimeProvider timeProvider)
     : EndpointWithoutRequest<Ok<CompetitionListResponse>>
 {
     public override void Configure() { Get("/competitions"); AllowAnonymous(); }
@@ -14,6 +16,8 @@ public sealed class ListCompetitionsEndpoint(ListCompetitions list)
     public override async Task<Ok<CompetitionListResponse>> ExecuteAsync(CancellationToken ct)
     {
         var items = await list.ExecuteAsync(false, ct);
-        return TypedResults.Ok(new CompetitionListResponse(items.Select(CompetitionMapper.ToResponse).ToList()));
+        var now = timeProvider.GetUtcNow();
+        return TypedResults.Ok(new CompetitionListResponse(
+            items.Select(item => CompetitionMapper.ToResponse(item, now)).ToList()));
     }
 }

@@ -4,18 +4,25 @@ using NoCTF.Domain.Gameplay;
 
 namespace NoCTF.GameModes.Leaderboard;
 
-public sealed class LeaderboardProjectionEngine(ILeaderboardProjectorCatalog projectors)
+public sealed class LeaderboardProjectionEngine(
+    ILeaderboardProjectorCatalog projectors,
+    TimeProvider? clock = null)
     : ILeaderboardProjectionEngine
 {
-    public ScoreboardProjection ProjectScoreboard(LeaderboardProjectionInput input)
+    private readonly TimeProvider timeProvider = clock ?? TimeProvider.System;
+
+    public LeaderboardProjectionOutputs ProjectOutputs(LeaderboardProjectionInput input)
     {
-        var legacy = Project(input);
-        return NormalizedScoreboardProjection.Project(input, legacy);
+        input = input with { ProjectedAt = input.ProjectedAt ?? timeProvider.GetUtcNow() };
+        var projection = projectors.Get(input.Mode).Project(input);
+        var legacy = ProjectLegacy(input, projection);
+        return new(legacy, NormalizedScoreboardProjection.Project(input, legacy));
     }
 
-    public LeaderboardProjectionResult Project(LeaderboardProjectionInput input)
+    private static LeaderboardProjectionResult ProjectLegacy(
+        LeaderboardProjectionInput input,
+        GameModeLeaderboardProjection projection)
     {
-        var projection = projectors.Get(input.Mode).Project(input);
         var entries = projection.Entries;
         var bloods = input.Mode == GameMode.Ctf
             ? BuildBloodRanks(BuildCtfSolveObservations(input))
@@ -60,7 +67,7 @@ public sealed class LeaderboardProjectionEngine(ILeaderboardProjectorCatalog pro
                 projection.CurrentBreakScores?.GetValueOrDefault(challenge.Id),
                 projection.CurrentFixScores?.GetValueOrDefault(challenge.Id)))
             .ToList();
-        return new(
+        return new LeaderboardProjectionResult(
             entriesWithCells,
             challenges,
             projection.CurrentRound,

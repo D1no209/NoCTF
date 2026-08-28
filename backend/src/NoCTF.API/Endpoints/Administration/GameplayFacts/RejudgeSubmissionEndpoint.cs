@@ -13,7 +13,8 @@ public sealed class RejudgeGameplayFactEndpoint(
     QueueGameplayFactWork queue,
     IAdminGameplayFactStatusReader submissions,
     ICompetitionModerationAuthorizer authorizer,
-    IUserContext user)
+    IUserContext user,
+    TimeProvider timeProvider)
     : EndpointWithoutRequest<
         Results<Accepted<RejudgeGameplayFactResponse>, NotFound, ForbidHttpResult>>
 {
@@ -39,7 +40,7 @@ public sealed class RejudgeGameplayFactEndpoint(
         var submission = await submissions.FindAsync(competitionId, gameplayFactId, ct);
         if (submission is null)
             return TypedResults.NotFound();
-        var cutoff = DateTimeOffset.UtcNow;
+        var cutoff = timeProvider.GetUtcNow();
         await queue.QueueAsync(
             competitionId,
             submission.CompetitionChallengeId,

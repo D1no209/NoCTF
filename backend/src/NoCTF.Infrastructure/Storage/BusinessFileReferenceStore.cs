@@ -9,8 +9,10 @@ namespace NoCTF.Infrastructure.Storage;
 public sealed class BusinessFileReferenceStore(
     NoCtfDbContext db,
     ITransactionalMessageOutbox outbox,
-    FileReferenceLock fileLock) : IBusinessFileReferenceStore
+    FileReferenceLock fileLock,
+    TimeProvider? clock = null) : IBusinessFileReferenceStore
 {
+    private readonly TimeProvider timeProvider = clock ?? TimeProvider.System;
     public async Task<BusinessFileReferenceResult> ReplaceTeamAvatarAsync(
         Guid actorUserId,
         bool isAdministrator,
@@ -134,7 +136,7 @@ public sealed class BusinessFileReferenceStore(
 
         var previousFileId = competition.PosterFileId;
         competition.PosterFileId = null;
-        competition.UpdatedAt = DateTimeOffset.UtcNow;
+        competition.UpdatedAt = timeProvider.GetUtcNow();
         await db.SaveChangesAsync(ct);
         if (previousFileId is { } previous)
             await outbox.PublishAsync(new CleanupFile(previous));

@@ -36,7 +36,7 @@ public sealed class RecordAwdpCheckResultValidator : Validator<RecordAwdpCheckRe
         RuleFor(request => request.Outcome).IsInEnum();
 }
 
-public sealed class RecordAwdpCheckResultEndpoint(RecordInternalResult record)
+public sealed class RecordAwdpCheckResultEndpoint(RecordInternalResult record, TimeProvider timeProvider)
     : Endpoint<RecordAwdpCheckResultRequest,
         Results<Ok<InternalResultResponse>, Accepted<InternalResultResponse>, NotFound, Conflict, UnauthorizedHttpResult>>
 {
@@ -65,13 +65,13 @@ public sealed class RecordAwdpCheckResultEndpoint(RecordInternalResult record)
                 $"gameplay-fact:{gameplayFactId:D}:runtime:{runtimeInstanceId:D}",
                 StringComparison.Ordinal) ||
             !long.TryParse(User.FindFirstValue("deadline"), out var deadline) ||
-            DateTimeOffset.UtcNow.ToUnixTimeSeconds() > deadline)
+            timeProvider.GetUtcNow().ToUnixTimeSeconds() > deadline)
             return TypedResults.Unauthorized();
         var disposition = await record.AwdpAsync(AwdpFixResult.Create(
             gameplayFactId,
             runtimeInstanceId,
             AwdpFixOutcomeMapper.ToDomain(request.Outcome),
-            DateTimeOffset.UtcNow), ct);
+            timeProvider.GetUtcNow()), ct);
         return disposition switch
         {
             InternalResultDisposition.Applied or InternalResultDisposition.Duplicate =>

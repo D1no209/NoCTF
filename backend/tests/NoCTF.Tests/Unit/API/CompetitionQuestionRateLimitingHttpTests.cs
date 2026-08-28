@@ -72,6 +72,7 @@ public sealed class CompetitionQuestionRateLimitingHttpTests
         builder.Services.AddNoCtfApi(
             builder.Configuration,
             includeInfrastructure: false);
+        builder.Services.AddSingleton(TimeProvider.System);
         builder.Services.AddFastEndpoints(options =>
         {
             options.DisableAutoDiscovery = true;
@@ -99,6 +100,8 @@ public sealed class CompetitionQuestionRateLimitingHttpTests
                 null,
                 CompetitionQuestionFailure.NotFound));
         builder.Services.AddSingleton(store);
+        builder.Services.AddSingleton<ICompetitionQuestionReader>(store);
+        builder.Services.AddSingleton<ICompetitionQuestionWriter>(store);
         builder.Services.AddScoped<CreateCompetitionQuestion>();
 
         var user = Substitute.For<IUserContext>();

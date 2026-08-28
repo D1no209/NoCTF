@@ -51,7 +51,7 @@ internal static partial class TeamMembershipMapper
         TeamMembershipFailure value);
 }
 
-public sealed class JoinTeamByInvitationEndpoint(JoinTeamByInvitation join, IUserContext user)
+public sealed class JoinTeamByInvitationEndpoint(JoinTeamByInvitation join, IUserContext user, TimeProvider timeProvider)
     : Endpoint<JoinTeamByInvitationRequest, Results<NoContent, Conflict<TeamMembershipFailureResponse>>>
 {
     public override void Configure() { Post("/competitions/{competitionId}/teams/join"); AuthSchemes("Bearer"); }
@@ -64,7 +64,7 @@ public sealed class JoinTeamByInvitationEndpoint(JoinTeamByInvitation join, IUse
             request.CompetitionId,
             request.InvitationToken,
             user.UserId,
-            DateTimeOffset.UtcNow,
+            timeProvider.GetUtcNow(),
             ct);
         return result.Succeeded
             ? TypedResults.NoContent()

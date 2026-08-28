@@ -26,7 +26,8 @@ public sealed class AssignTeamTrackValidator : Validator<AssignTeamTrackRequest>
 public sealed class AssignTeamTrackEndpoint(
     AssignTeamTrack assign,
     ICompetitionModerationAuthorizer authorizer,
-    IUserContext user)
+    IUserContext user,
+    TimeProvider timeProvider)
     : Endpoint<AssignTeamTrackRequest,
         Results<
             Ok<AssignTeamTrackResponse>,
@@ -63,7 +64,7 @@ public sealed class AssignTeamTrackEndpoint(
             teamId,
             request.TrackKey,
             user.UserId,
-            DateTimeOffset.UtcNow), cancellationToken);
+            timeProvider.GetUtcNow()), cancellationToken);
         if (result.FailureCode is CompetitionTrackFailureCode.CompetitionNotFound
             or CompetitionTrackFailureCode.TeamNotFound)
             return TypedResults.NotFound();

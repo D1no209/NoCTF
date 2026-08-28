@@ -79,13 +79,14 @@ public sealed class CtfPerTeamRuntimeFlagPersistenceTests
             await Assert.That(initialFlag.Flag).StartsWith("challenge{");
 
             var dispatch = outbox.Published.OfType<DispatchRuntime>().Single();
-            await BackendMessageHandlers.Handle(
+            await BackendMessageOperations.DispatchRuntimeAsync(
                 dispatch,
                 db,
                 templates,
                 new FixedRuntimePlacementPolicy(),
                 new FixedCapacityGate("runner-1"),
                 outbox,
+                TimeProvider.System,
                 cancellationToken);
             var claim = outbox.RunnerNodeMessages.OfType<ProvisionContainerRuntime>().Single();
             await Assert.That(claim.Definition.Environment["CHALLENGE_FLAG"])
@@ -303,13 +304,14 @@ public sealed class CtfPerTeamRuntimeFlagPersistenceTests
             await Assert.That(dispatches).Count().IsEqualTo(2);
             foreach (var dispatch in dispatches)
             {
-                await BackendMessageHandlers.Handle(
+                await BackendMessageOperations.DispatchRuntimeAsync(
                     dispatch,
                     db,
                     templates,
                     new FixedRuntimePlacementPolicy(),
                     capacity,
                     outbox,
+                    TimeProvider.System,
                     cancellationToken);
             }
 

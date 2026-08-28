@@ -13,6 +13,7 @@ using NoCTF.Domain.Runtime;
 using NoCTF.Runner.Composition;
 using NoCTF.GameModes.Awd.Configuration;
 using NoCTF.Infrastructure.Persistence;
+using NoCTF.Infrastructure.Authentication;
 using Wolverine.Attributes;
 
 namespace NoCTF.Runner.Messages;
@@ -57,7 +58,7 @@ public sealed class AwdCheckerWorkReader(
     AwdCheckerConfigurationCatalog configurations,
     IRunnerScoringTokenIssuer tokens,
     IRuntimeProviderCatalog providers,
-    IConfiguration configuration,
+    IOptions<RunnerScoringOptions> scoringOptions,
     TimeProvider timeProvider) : IAwdCheckerWorkReader
 {
     public async Task<AwdCheckerWork?> ReadAsync(
@@ -127,17 +128,8 @@ public sealed class AwdCheckerWorkReader(
             cancellationToken);
         if (targetHost is null)
             return null;
-        var callbackBase = configuration["RunnerScoring:CallbackBaseUrl"];
-        if (!Uri.TryCreate(callbackBase, UriKind.Absolute, out var baseUri)
-            || (!string.Equals(
-                    baseUri.Scheme,
-                    Uri.UriSchemeHttp,
-                    StringComparison.OrdinalIgnoreCase)
-                && !string.Equals(
-                    baseUri.Scheme,
-                    Uri.UriSchemeHttps,
-                    StringComparison.OrdinalIgnoreCase)))
-            throw new InvalidOperationException(
+        var baseUri = scoringOptions.Value.CallbackBaseUrl
+            ?? throw new InvalidOperationException(
                 "RunnerScoring:CallbackBaseUrl must be configured as an absolute HTTP(S) URI.");
         var callbackUrl = new Uri(baseUri, "/api/internal/v1/awd/check-results");
         var issuedAt = timeProvider.GetUtcNow();

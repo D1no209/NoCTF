@@ -39,7 +39,8 @@ public sealed record CompetitionForceDeleteConflictResponse(
 
 public sealed class ForceDeleteCompetitionEndpoint(
     ForceDeleteCompetition forceDelete,
-    IUserContext user)
+    IUserContext user,
+    TimeProvider timeProvider)
     : Endpoint<ForceDeleteCompetitionRequest,
         Results<NoContent, NotFound, Conflict<CompetitionForceDeleteConflictResponse>, ProblemHttpResult>>
 {
@@ -66,7 +67,7 @@ public sealed class ForceDeleteCompetitionEndpoint(
             user.UserId,
             request.ConfirmationTitle,
             request.Reason,
-            DateTimeOffset.UtcNow), user.IsAdministrator, ct);
+            timeProvider.GetUtcNow()), user.IsAdministrator, ct);
         return result.State switch
         {
             CompetitionForceDeleteState.Deleted => TypedResults.NoContent(),

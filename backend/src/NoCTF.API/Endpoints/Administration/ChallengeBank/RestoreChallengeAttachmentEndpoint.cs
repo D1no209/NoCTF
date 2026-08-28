@@ -7,7 +7,8 @@ namespace NoCTF.API.Endpoints.Administration.ChallengeBank;
 
 public sealed class RestoreChallengeAttachmentEndpoint(
     ManageChallengeAttachments attachments,
-    IUserContext user)
+    IUserContext user,
+    TimeProvider timeProvider)
     : EndpointWithoutRequest<Results<NoContent, NotFound>>
 {
     public override void Configure()
@@ -30,7 +31,7 @@ public sealed class RestoreChallengeAttachmentEndpoint(
             Route<Guid>("attachmentId"),
             user.UserId,
             user.IsAdministrator,
-            DateTimeOffset.UtcNow,
+            timeProvider.GetUtcNow(),
             ct);
         return result.Succeeded ? TypedResults.NoContent() : TypedResults.NotFound();
     }

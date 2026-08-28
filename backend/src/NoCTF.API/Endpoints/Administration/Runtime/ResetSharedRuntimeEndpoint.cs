@@ -10,7 +10,8 @@ namespace NoCTF.API.Endpoints.Administration.Runtime;
 public sealed class ResetSharedRuntimeEndpoint(
     ManageAdminRuntimes runtimes,
     ICompetitionModerationAuthorizer authorizer,
-    IUserContext user)
+    IUserContext user,
+    TimeProvider timeProvider)
     : EndpointWithoutRequest<
         Results<Accepted<RuntimeAcceptedResponse>, NotFound, ProblemHttpResult, ForbidHttpResult>>
 {
@@ -33,5 +34,5 @@ public sealed class ResetSharedRuntimeEndpoint(
         AdminRuntimeMutation.ExecuteTeamAsync(
             runtimes, authorizer, user, RuntimeAction.Reset,
             Route<Guid>("competitionId"), Route<Guid>("competitionChallengeId"),
-            teamId: null, extension: null, ct);
+            teamId: null, extension: null, timeProvider, ct);
 }

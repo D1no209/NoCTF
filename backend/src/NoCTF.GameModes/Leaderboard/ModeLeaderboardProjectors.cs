@@ -334,7 +334,8 @@ internal static class AwdLeaderboardProjection
             .OrderBy(fact => fact.OccurredAt)
             .ThenBy(fact => fact.GameplayFactId)
             .ToList();
-        var projectedAt = input.ProjectedAt ?? DateTimeOffset.UtcNow;
+        var projectedAt = input.ProjectedAt
+            ?? throw new InvalidOperationException("Leaderboard projection time is required.");
         foreach (var round in (input.AwdRounds ?? [])
                      .Where(round => teams.ContainsKey(round.TeamId)
                          && challenges.ContainsKey(round.CompetitionChallengeId)

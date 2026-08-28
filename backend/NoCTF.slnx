@@ -16,4 +16,7 @@
   <Folder Name="/tests/">
     <Project Path="tests/NoCTF.Tests/NoCTF.Tests.csproj" />
   </Folder>
+  <Folder Name="/benchmarks/">
+    <Project Path="benchmarks/NoCTF.Benchmarks/NoCTF.Benchmarks.csproj" />
+  </Folder>
 </Solution>

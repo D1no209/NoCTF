@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../src/NoCTF.Application/NoCTF.Application.csproj" />
+    <ProjectReference Include="../../src/NoCTF.Domain/NoCTF.Domain.csproj" />
+    <ProjectReference Include="../../src/NoCTF.GameModes/NoCTF.GameModes.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="BenchmarkDotNet" />
+  </ItemGroup>
+</Project>

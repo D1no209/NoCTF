@@ -11,9 +11,11 @@ namespace NoCTF.Infrastructure.Notifications;
 
 public sealed class CompetitionNotificationDelivery(
     NoCtfDbContext db,
-    ICompetitionEventRecorder? eventRecorder = null)
+    ICompetitionEventRecorder? eventRecorder = null,
+    TimeProvider? clock = null)
     : ICompetitionAnnouncementPublisher
 {
+    private readonly TimeProvider timeProvider = clock ?? TimeProvider.System;
     private static readonly JsonSerializerOptions JsonOptions =
         new(JsonSerializerDefaults.Web);
     private readonly ICompetitionEventRecorder events =
@@ -54,7 +56,7 @@ public sealed class CompetitionNotificationDelivery(
             ContentJson = contentJson,
             RelatedType = NoCTF.Domain.Shared.EntityReferenceKind.Competition,
             RelatedId = competitionId,
-            SentAt = DateTimeOffset.UtcNow
+            SentAt = timeProvider.GetUtcNow()
         });
         await db.SaveChangesAsync(ct);
     }
@@ -81,7 +83,7 @@ public sealed class CompetitionNotificationDelivery(
             return;
 
         _ = entityId;
-        var sentAt = DateTimeOffset.UtcNow;
+        var sentAt = timeProvider.GetUtcNow();
         var contentJson = EnsureObjectPayload(payload, sourceEventKey);
         var alreadyDelivered = await db.Notifications.AsNoTracking()
             .Where(item => item.TargetType == NotificationTargetType.User

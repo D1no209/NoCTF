@@ -55,6 +55,7 @@ public static class CompetitionNotificationMessageHandlers
         PublishHintNotification message,
         NoCtfDbContext db,
         CompetitionNotificationDelivery delivery,
+        TimeProvider timeProvider,
         CancellationToken ct,
         ICompetitionEventRecorder? eventRecorder = null)
     {
@@ -67,7 +68,7 @@ public static class CompetitionNotificationMessageHandlers
                 hint.Id == message.HintId
                 && hint.HiddenAt == null
                 && hint.PublishedAt == message.PublishedAt
-                && hint.PublishedAt <= DateTimeOffset.UtcNow);
+                && hint.PublishedAt <= timeProvider.GetUtcNow());
         if (!isCurrent)
             return;
 

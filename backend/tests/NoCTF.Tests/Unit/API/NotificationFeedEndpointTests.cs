@@ -77,12 +77,10 @@ public sealed class NotificationFeedEndpointTests
         var reader = new RecordingReader(new(now, Guid.Empty));
         await using var app = await CreateApplicationAsync(reader);
         using var client = app.GetTestClient();
-        var cursor = new SignedKeysetCursor(new ConfigurationBuilder()
-                .AddInMemoryCollection(new Dictionary<string, string?>
+        var cursor = new SignedKeysetCursor(Options.Create(new PaginationOptions
                 {
-                    ["Authentication:SigningKey"] = SigningKey
-                })
-                .Build())
+                    SigningKey = SigningKey
+                }))
             .Encode(
                 "notifications.feed",
                 Guid.CreateVersion7().ToString("N"),
@@ -105,6 +103,7 @@ public sealed class NotificationFeedEndpointTests
         builder.WebHost.UseTestServer();
         builder.Configuration["Authentication:SigningKey"] = SigningKey;
         builder.Services.AddProblemDetails();
+        builder.Services.AddSingleton(TimeProvider.System);
         builder.Services.AddFastEndpoints(options =>
         {
             options.DisableAutoDiscovery = true;

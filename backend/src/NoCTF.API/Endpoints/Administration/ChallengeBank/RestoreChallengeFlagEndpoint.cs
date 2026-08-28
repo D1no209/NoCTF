@@ -8,7 +8,8 @@ namespace NoCTF.API.Endpoints.Administration.ChallengeBank;
 
 public sealed class RestoreChallengeFlagEndpoint(
     ManageChallengeFlags flags,
-    IUserContext user)
+    IUserContext user,
+    TimeProvider timeProvider)
     : EndpointWithoutRequest<Results<NoContent, NotFound, Conflict<ChallengeFlagFailureResponse>>>
 {
     public override void Configure()
@@ -31,7 +32,7 @@ public sealed class RestoreChallengeFlagEndpoint(
             Route<Guid>("flagId"),
             user.UserId,
             user.IsAdministrator,
-            DateTimeOffset.UtcNow,
+            timeProvider.GetUtcNow(),
             ct);
         if (result.Succeeded)
             return TypedResults.NoContent();

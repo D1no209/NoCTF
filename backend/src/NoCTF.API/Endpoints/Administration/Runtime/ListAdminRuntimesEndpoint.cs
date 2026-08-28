@@ -66,7 +66,9 @@ public sealed record AdminRuntimeListResponse(
 
 internal static class AdminRuntimeMapping
 {
-    public static AdminRuntimeResponse ToResponse(RuntimeInstanceView view)
+    public static AdminRuntimeResponse ToResponse(
+        RuntimeInstanceView view,
+        DateTimeOffset now)
     {
         var availableAt = RuntimeForceTerminationPolicy.AvailableAt(view);
         return new(
@@ -81,7 +83,7 @@ internal static class AdminRuntimeMapping
             view.Urls, view.PublishedPorts ?? [], view.CreatedAt,
             view.RunningAt, view.ExpiresAt, view.StoppedAt,
             availableAt,
-            availableAt is { } value && value <= DateTimeOffset.UtcNow);
+            availableAt is { } value && value <= now);
     }
 }
 
@@ -89,7 +91,8 @@ public sealed class ListAdminRuntimesEndpoint(
     ManageAdminRuntimes runtimes,
     SignedKeysetCursor cursors,
     ICompetitionModerationAuthorizer authorizer,
-    IUserContext user)
+    IUserContext user,
+    TimeProvider timeProvider)
     : Endpoint<ListAdminRuntimesRequest,
         Results<Ok<AdminRuntimeListResponse>, ForbidHttpResult, ProblemHttpResult>>
 {
@@ -134,6 +137,8 @@ public sealed class ListAdminRuntimesEndpoint(
             ? cursors.Encode(CursorEndpoint, filterKey, new(items[^1].CreatedAt, items[^1].Id))
             : null;
         return TypedResults.Ok(new AdminRuntimeListResponse(
-            items.Select(AdminRuntimeMapping.ToResponse).ToArray(), next));
+            items.Select(item => AdminRuntimeMapping.ToResponse(
+                item,
+                timeProvider.GetUtcNow())).ToArray(), next));
     }
 }

@@ -33,6 +33,7 @@ builder.Services.AddNoCtfAuthentication(builder.Configuration);
 if (development)
 {
     builder.Services.AddNoCtfWorkerRole(
+        builder.Configuration,
         collectQueueMetrics: false,
         validateMessageTopology: false,
         enableClusterScheduling: false);

@@ -33,7 +33,7 @@ public sealed class CreatePlatformBotValidator : Validator<CreatePlatformBotRequ
     }
 }
 
-public sealed class CreatePlatformBotEndpoint(ManagePlatform platform)
+public sealed class CreatePlatformBotEndpoint(ManagePlatform platform, TimeProvider timeProvider)
     : Endpoint<CreatePlatformBotRequest,
         Results<Created<PlatformUserResponse>, ProblemHttpResult>>
 {
@@ -59,7 +59,7 @@ public sealed class CreatePlatformBotEndpoint(ManagePlatform platform)
         var result = await platform.CreateBotAsync(
             request.UserName,
             IdentityProtocolMapper.ToDomain(request.Role),
-            DateTimeOffset.UtcNow,
+            timeProvider.GetUtcNow(),
             ct);
         if (result.State == CreateBotState.UserNameConflict)
             return TypedResults.Problem(

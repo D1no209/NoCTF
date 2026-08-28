@@ -20,7 +20,8 @@ internal static class NormalizedScoreboardProjection
         LeaderboardProjectionInput input,
         LeaderboardProjectionResult legacy)
     {
-        var projectedAt = input.ProjectedAt ?? DateTimeOffset.UtcNow;
+        var projectedAt = input.ProjectedAt
+            ?? throw new InvalidOperationException("Leaderboard projection time is required.");
         var scoreboardInput = input.ScoreboardGameplayFacts is null
             ? input
             : input with { GameplayFacts = input.ScoreboardGameplayFacts };

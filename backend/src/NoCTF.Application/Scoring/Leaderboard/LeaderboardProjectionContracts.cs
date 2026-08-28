@@ -106,9 +106,11 @@ public sealed record LeaderboardProjectionResult(
     int? RoundDurationSeconds = null,
     int? CurrentRoundRemainingSeconds = null);
 
+public sealed record LeaderboardProjectionOutputs(
+    LeaderboardProjectionResult Legacy,
+    ScoreboardProjection Scoreboard);
+
 public interface ILeaderboardProjectionEngine
 {
-    LeaderboardProjectionResult Project(LeaderboardProjectionInput input);
-
-    ScoreboardProjection ProjectScoreboard(LeaderboardProjectionInput input);
+    LeaderboardProjectionOutputs ProjectOutputs(LeaderboardProjectionInput input);
 }

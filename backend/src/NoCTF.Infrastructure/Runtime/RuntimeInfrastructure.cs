@@ -9,6 +9,8 @@ using NoCTF.Infrastructure.Runtime.Instances;
 using NoCTF.Infrastructure.Runtime.Targets;
 using NoCTF.Infrastructure.Runtime.Placement;
 using StackExchange.Redis;
+using Microsoft.Extensions.Options;
+using NoCTF.Domain.Runtime;
 
 namespace NoCTF.Infrastructure.Runtime;
 
@@ -19,8 +21,36 @@ internal static class RuntimeInfrastructure
         IConfiguration configuration,
         bool development)
     {
+        services.AddOptions<RuntimePlacementOptions>()
+            .Configure(options =>
+            {
+                var providerText = configuration["Runtime:Provider"]
+                    ?? configuration["Runner:Provider"];
+                if (providerText is not null)
+                {
+                    options.Provider = Enum.TryParse<RuntimeProvider>(providerText, true, out var provider)
+                        ? provider
+                        : (RuntimeProvider)(-1);
+                }
+                options.RunnerPool = configuration["Runtime:RunnerPool"]
+                    ?? configuration["Runner:Pool"]
+                    ?? options.RunnerPool;
+            })
+            .Validate(options => options.Provider is RuntimeProvider.Docker
+                    or RuntimeProvider.Kubernetes,
+                "Runtime:Provider must be Docker or Kubernetes.")
+            .Validate(options => !string.IsNullOrWhiteSpace(options.RunnerPool)
+                    && options.RunnerPool.Length <= 256,
+                "Runtime:RunnerPool must contain 1..256 characters.")
+            .ValidateOnStart();
         if (development)
         {
+            services.AddOptions<DevelopmentRunnerCapacityOptions>()
+                .Bind(configuration.GetSection("Runner"))
+                .Validate(options => !string.IsNullOrWhiteSpace(options.Id)
+                        && !string.IsNullOrWhiteSpace(options.Pool),
+                    "Runner Id and Pool must be configured for development capacity.")
+                .ValidateOnStart();
             services.AddSingleton<IRunnerCapacityGate, DevelopmentRunnerCapacityGate>();
         }
         else

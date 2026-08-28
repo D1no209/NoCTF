@@ -7,7 +7,8 @@ namespace NoCTF.API.Endpoints.Administration.Competitions;
 
 public sealed class RestoreCompetitionEndpoint(
     RestoreCompetition restore,
-    IUserContext user)
+    IUserContext user,
+    TimeProvider timeProvider)
     : EndpointWithoutRequest<
         Results<
             NoContent,
@@ -37,7 +38,7 @@ public sealed class RestoreCompetitionEndpoint(
             Route<Guid>("competitionId"),
             user.UserId,
             user.IsAdministrator,
-            DateTimeOffset.UtcNow,
+            timeProvider.GetUtcNow(),
             ct);
         return result.State switch
         {

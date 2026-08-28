@@ -58,7 +58,7 @@ public sealed class RegisterValidator : Validator<RegisterRequest>
     }
 }
 
-public sealed class RegisterEndpoint(RegisterUser register)
+public sealed class RegisterEndpoint(RegisterUser register, TimeProvider timeProvider)
     : Endpoint<RegisterRequest, Results<Created<RegisterResponse>, Conflict<MvcProblemDetails>>>
 {
     public override void Configure()
@@ -78,7 +78,7 @@ public sealed class RegisterEndpoint(RegisterUser register)
         CancellationToken ct)
     {
         var result = await register.ExecuteAsync(
-            new(request.UserName, request.Email, request.Password, DateTimeOffset.UtcNow),
+            new(request.UserName, request.Email, request.Password, timeProvider.GetUtcNow()),
             ct);
         if (!result.Succeeded)
             return TypedResults.Conflict(new MvcProblemDetails

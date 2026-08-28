@@ -21,8 +21,11 @@ public sealed class DockerContainerLifecycle : IContainerLifecycle, IOneShotJobR
     private const string NetworkPurposePersistentRuntime = "persistent-runtime";
     private readonly DockerClient client;
     private readonly DockerRuntimeOptions options;
+    private readonly TimeProvider timeProvider;
 
-    public DockerContainerLifecycle(DockerRuntimeOptions options)
+    public DockerContainerLifecycle(
+        DockerRuntimeOptions options,
+        TimeProvider? clock = null)
     {
         if (options.RuntimeLogMaxSizeBytes <= 0
             || options.RuntimeLogMaxFiles <= 0
@@ -31,6 +34,7 @@ public sealed class DockerContainerLifecycle : IContainerLifecycle, IOneShotJobR
                 nameof(options),
                 "Docker runtime log and one-shot output limits must be positive.");
         this.options = options;
+        timeProvider = clock ?? TimeProvider.System;
         client = new DockerClientBuilder()
             .WithEndpoint(new Uri(options.Endpoint))
             .Build();
@@ -116,11 +120,11 @@ public sealed class DockerContainerLifecycle : IContainerLifecycle, IOneShotJobR
             var status = ToRuntimeStatus(created.State?.Status);
             if (status == RuntimeStatus.Starting)
             {
-                var deadline = DateTimeOffset.UtcNow.Add(
+                var deadline = timeProvider.GetUtcNow().Add(
                     request.OperationTimeout ?? TimeSpan.FromMinutes(2));
-                while (status == RuntimeStatus.Starting && DateTimeOffset.UtcNow < deadline)
+                while (status == RuntimeStatus.Starting && timeProvider.GetUtcNow() < deadline)
                 {
-                    await Task.Delay(TimeSpan.FromMilliseconds(250), cancellationToken);
+                    await Task.Delay(TimeSpan.FromMilliseconds(250), timeProvider, cancellationToken);
                     created = await client.Containers.InspectContainerAsync(
                         response.ID, cancellationToken);
                     status = ToRuntimeStatus(created.State?.Status);
@@ -207,10 +211,10 @@ public sealed class DockerContainerLifecycle : IContainerLifecycle, IOneShotJobR
         if (status == RuntimeStatus.Starting)
         {
             var timeout = request.OperationTimeout ?? TimeSpan.FromMinutes(2);
-            var deadline = DateTimeOffset.UtcNow.Add(timeout);
-            while (status == RuntimeStatus.Starting && DateTimeOffset.UtcNow < deadline)
+            var deadline = timeProvider.GetUtcNow().Add(timeout);
+            while (status == RuntimeStatus.Starting && timeProvider.GetUtcNow() < deadline)
             {
-                await Task.Delay(TimeSpan.FromMilliseconds(250), cancellationToken);
+                await Task.Delay(TimeSpan.FromMilliseconds(250), timeProvider, cancellationToken);
                 existing = await client.Containers.InspectContainerAsync(existing.ID, cancellationToken);
                 status = ToRuntimeStatus(existing.State?.Status);
             }
@@ -331,7 +335,7 @@ public sealed class DockerContainerLifecycle : IContainerLifecycle, IOneShotJobR
 
     public async Task<OneShotResult> RunAsync(ContainerRequest request, CancellationToken cancellationToken)
     {
-        var started = DateTimeOffset.UtcNow;
+        var started = timeProvider.GetUtcNow();
         var receipt = await CreateAsync(request, allowCompletedOneShot: true, cancellationToken);
         try
         {
@@ -343,7 +347,7 @@ public sealed class DockerContainerLifecycle : IContainerLifecycle, IOneShotJobR
             }, cancellationToken);
             var output = await ReadBoundedOutputAsync(logs, cancellationToken);
             return new(receipt.ResourceId, (int)wait.StatusCode, output.Stdout, output.Stderr,
-                started, DateTimeOffset.UtcNow);
+                started, timeProvider.GetUtcNow());
         }
         finally
         {
@@ -566,7 +570,7 @@ public sealed class DockerContainerLifecycle : IContainerLifecycle, IOneShotJobR
                 var state = await client.Exec.InspectContainerExecAsync(created.ID, timeoutSource.Token);
                 if (!state.Running)
                     return new(state.ExitCode is { } exitCode ? checked((int)exitCode) : -1, false);
-                await Task.Delay(100, timeoutSource.Token);
+                await Task.Delay(TimeSpan.FromMilliseconds(100), timeProvider, timeoutSource.Token);
             }
         }
         catch (OperationCanceledException) when (timeoutSource.IsCancellationRequested)

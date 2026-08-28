@@ -52,7 +52,7 @@ public sealed class RecordAwdCheckResultValidator : Validator<RecordAwdCheckResu
 
 public sealed record InternalResultResponse(InternalResultDispositionProtocol Disposition);
 
-public sealed class RecordAwdCheckResultEndpoint(RecordInternalResult record)
+public sealed class RecordAwdCheckResultEndpoint(RecordInternalResult record, TimeProvider timeProvider)
     : Endpoint<RecordAwdCheckResultRequest,
         Results<Ok<InternalResultResponse>, Accepted<InternalResultResponse>, NotFound, Conflict, UnauthorizedHttpResult>>
 {
@@ -81,13 +81,13 @@ public sealed class RecordAwdCheckResultEndpoint(RecordInternalResult record)
                 $"runtime:{runtimeId:D}",
                 StringComparison.Ordinal) ||
             !long.TryParse(User.FindFirstValue("deadline"), out var deadline) ||
-            DateTimeOffset.UtcNow > DateTimeOffset.FromUnixTimeSeconds(deadline).AddHours(24))
+            timeProvider.GetUtcNow() > DateTimeOffset.FromUnixTimeSeconds(deadline).AddHours(24))
             return TypedResults.Unauthorized();
         var disposition = await record.AwdAsync(AwdCheckResult.Create(
             runtimeId,
             gameplayFactId,
             InternalResultProtocolMapper.ToDomain(request.State),
-            DateTimeOffset.UtcNow), ct);
+            timeProvider.GetUtcNow()), ct);
         return disposition switch
         {
             InternalResultDisposition.Applied or InternalResultDisposition.Duplicate =>

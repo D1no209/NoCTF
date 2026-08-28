@@ -12,9 +12,11 @@ namespace NoCTF.Runtime.Kubernetes.Containers;
 /// <summary>Runs isolated challenge pods through the Kubernetes client seam.</summary>
 public sealed class KubernetesContainerLifecycle(
     IKubernetes client,
-    KubernetesRuntimeOptions options) : IContainerLifecycle, IOneShotJobRunner,
+    KubernetesRuntimeOptions options,
+    TimeProvider? clock = null) : IContainerLifecycle, IOneShotJobRunner,
     IAttachedOneShotJobRunner, IContainerSandboxLifecycle
 {
+    private readonly TimeProvider timeProvider = clock ?? TimeProvider.System;
     private const int ExecTimeoutExitCode = 124;
     private const string ResourceRoleLabel = "noctf.io/resource-role";
     private const string InternalServiceRole = "dns";
@@ -316,7 +318,7 @@ public sealed class KubernetesContainerLifecycle(
 
     public async Task<OneShotResult> RunAsync(ContainerRequest request, CancellationToken cancellationToken)
     {
-        var startedAt = DateTimeOffset.UtcNow;
+        var startedAt = timeProvider.GetUtcNow();
         var receipt = await CreateAsync(request, cancellationToken);
         try
         {
@@ -328,9 +330,9 @@ public sealed class KubernetesContainerLifecycle(
                 {
                     var terminated = pod.Status.ContainerStatuses?.SingleOrDefault()?.State?.Terminated;
                     return new(receipt.ResourceId, checked((int)(terminated?.ExitCode ?? -1)), string.Empty, string.Empty,
-                        startedAt, DateTimeOffset.UtcNow);
+                        startedAt, timeProvider.GetUtcNow());
                 }
-                await Task.Delay(250, cancellationToken);
+                await Task.Delay(TimeSpan.FromMilliseconds(250), timeProvider, cancellationToken);
             }
         }
         finally
@@ -1073,9 +1075,9 @@ public sealed class KubernetesContainerLifecycle(
             options.Namespace,
             body: CreatedDeleteOptions(metadata),
             cancellationToken: cancellationToken);
-        var deadline = DateTimeOffset.UtcNow.Add(
+        var deadline = timeProvider.GetUtcNow().Add(
             request.OperationTimeout ?? TimeSpan.FromMinutes(2));
-        while (DateTimeOffset.UtcNow < deadline)
+        while (timeProvider.GetUtcNow() < deadline)
         {
             try
             {
@@ -1089,7 +1091,7 @@ public sealed class KubernetesContainerLifecycle(
             {
                 return;
             }
-            await Task.Delay(TimeSpan.FromMilliseconds(250), cancellationToken);
+            await Task.Delay(TimeSpan.FromMilliseconds(250), timeProvider, cancellationToken);
         }
         throw new TimeoutException(
             $"Kubernetes Service '{publicName}' was not deleted before reconciliation.");
@@ -1433,8 +1435,8 @@ public sealed class KubernetesContainerLifecycle(
         bool waitForCallbackPolicy,
         CancellationToken cancellationToken)
     {
-        var deadline = DateTimeOffset.UtcNow.Add(timeout);
-        while (DateTimeOffset.UtcNow < deadline)
+        var deadline = timeProvider.GetUtcNow().Add(timeout);
+        while (timeProvider.GetUtcNow() < deadline)
         {
             var podExists = true;
             var serviceExists = true;
@@ -1496,7 +1498,7 @@ public sealed class KubernetesContainerLifecycle(
                 && !publicServiceExists
                 && !callbackPolicyExists)
                 return;
-            await Task.Delay(TimeSpan.FromMilliseconds(250), cancellationToken);
+            await Task.Delay(TimeSpan.FromMilliseconds(250), timeProvider, cancellationToken);
         }
         throw new TimeoutException("Kubernetes terminal resources were not deleted before recreation.");
     }
@@ -1516,7 +1518,7 @@ public sealed class KubernetesContainerLifecycle(
             if (pod.Status?.Phase == PodPhaseRunning) return;
             if (pod.Status?.Phase is PodPhaseFailed or PodPhaseSucceeded)
                 throw new InvalidOperationException("Kubernetes sandbox target stopped before it became ready.");
-            await Task.Delay(250, cancellationToken);
+            await Task.Delay(TimeSpan.FromMilliseconds(250), timeProvider, cancellationToken);
         }
     }
 

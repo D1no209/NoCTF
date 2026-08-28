@@ -3,13 +3,15 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.HttpResults;
 using NoCTF.API.Security;
 using NoCTF.Application.Authentication.Account;
+using Microsoft.Extensions.Options;
 
 namespace NoCTF.API.Endpoints.Authentication;
 
 public sealed class LogoutAllEndpoint(
     LogoutAll logoutAll,
     IUserContext user,
-    IConfiguration configuration)
+    IOptions<RefreshHttpOptions> options,
+    TimeProvider timeProvider)
     : EndpointWithoutRequest<Results<NoContent, NotFound>>
 {
     public override void Configure()
@@ -25,12 +27,12 @@ public sealed class LogoutAllEndpoint(
 
     public override async Task<Results<NoContent, NotFound>> ExecuteAsync(CancellationToken ct)
     {
-        var result = await logoutAll.ExecuteAsync(user.UserId, DateTimeOffset.UtcNow, ct);
+        var result = await logoutAll.ExecuteAsync(user.UserId, timeProvider.GetUtcNow(), ct);
         if (!result.Succeeded)
             return TypedResults.NotFound();
         HttpContext.Response.Cookies.Delete(
-            RefreshCookie.Name(configuration),
-            RefreshCookie.DeleteOptions(configuration));
+            RefreshCookie.Name(options.Value),
+            RefreshCookie.DeleteOptions(options.Value));
         return TypedResults.NoContent();
     }
 }

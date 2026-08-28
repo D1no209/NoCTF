@@ -2,7 +2,7 @@ namespace NoCTF.API.Endpoints.Authentication;
 
 public static class RefreshRequestGuard
 {
-    public static bool IsAllowed(HttpRequest request, IConfiguration configuration)
+    public static bool IsAllowed(HttpRequest request, RefreshHttpOptions options)
     {
         var suppliedOrigin = request.Headers.Origin.FirstOrDefault();
         if (string.IsNullOrWhiteSpace(suppliedOrigin))
@@ -13,14 +13,11 @@ public static class RefreshRequestGuard
         if (!Uri.TryCreate(suppliedOrigin, UriKind.Absolute, out var supplied)) return false;
 
         var apiOrigin = new Uri($"{request.Scheme}://{request.Host}");
-        var allowedOrigins = configuration
-            .GetSection("Authentication:RefreshAllowedOrigins")
-            .Get<string[]>()
-            ?.Select(NormalizeOrigin)
+        var allowedOrigins = options.RefreshAllowedOrigins
+            .Select(NormalizeOrigin)
             .Where(origin => origin is not null)
             .Cast<Uri>()
-            .Append(apiOrigin)
-            ?? [apiOrigin];
+            .Append(apiOrigin);
 
         return allowedOrigins.Any(origin => Uri.Compare(
             supplied,

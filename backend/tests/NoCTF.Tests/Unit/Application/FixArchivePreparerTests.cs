@@ -1,12 +1,35 @@
 using System.Formats.Tar;
 using System.IO.Compression;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Options;
 using NoCTF.Runner.Composition;
 
 namespace NoCTF.Tests.Unit.Application;
 
 public sealed class FixArchivePreparerTests
 {
+    [Test]
+    public async Task InvalidExtractionLimit_FailsDuringHostStartup()
+    {
+        var builder = Host.CreateApplicationBuilder();
+        builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>
+        {
+            [$"{FixVerificationOptions.SectionName}:MaxExpandedBytes"] = "0"
+        });
+        builder.Services.AddSingleton<IValidateOptions<FixVerificationOptions>,
+            FixVerificationOptionsValidator>();
+        builder.Services.AddOptions<FixVerificationOptions>()
+            .Bind(builder.Configuration.GetSection(FixVerificationOptions.SectionName))
+            .ValidateOnStart();
+        using var host = builder.Build();
+
+        var action = () => host.StartAsync(CancellationToken.None);
+
+        await Assert.That(action).Throws<OptionsValidationException>();
+    }
+
     [Test]
     public async Task PrepareTarAsync_SafeTarGzip_WritesUnderFixedContainerDirectory()
     {
@@ -15,7 +38,7 @@ public sealed class FixArchivePreparerTests
         {
             await using var archive = TarGzip(("fix.sh", "echo ok"), ("files/app.txt", "patched"));
             var output = Path.Combine(root, "payload.tar");
-            await new FixArchivePreparer(Configuration()).PrepareTarAsync(
+            await CreatePreparer().PrepareTarAsync(
                 archive, "fix.tar.gz", "fix.sh", Path.Combine(root, "work"), output, CancellationToken.None);
 
             await using var stream = File.OpenRead(output);
@@ -36,7 +59,7 @@ public sealed class FixArchivePreparerTests
         try
         {
             await using var archive = TarGzip(("../escape.sh", "bad"));
-            var action = async () => await new FixArchivePreparer(Configuration()).PrepareTarAsync(
+            var action = async () => await CreatePreparer().PrepareTarAsync(
                 archive, "fix.tar.gz", "fix.sh", Path.Combine(root, "work"), Path.Combine(root, "payload.tar"), CancellationToken.None);
 
             await Assert.That(action).Throws<InvalidDataException>();
@@ -54,7 +77,7 @@ public sealed class FixArchivePreparerTests
             await using var archive = TarGzipEntry(
                 new PaxTarEntry(TarEntryType.RegularFile, "/fix.sh"),
                 "echo bad");
-            var action = async () => await new FixArchivePreparer(Configuration()).PrepareTarAsync(
+            var action = async () => await CreatePreparer().PrepareTarAsync(
                 archive, "fix.tar.gz", "fix.sh", Path.Combine(root, "work"),
                 Path.Combine(root, "payload.tar"), CancellationToken.None);
 
@@ -75,7 +98,7 @@ public sealed class FixArchivePreparerTests
             await using var archive = TarGzipEntries(
                 (new PaxTarEntry(TarEntryType.RegularFile, "fix.sh"), "echo ok"),
                 (link, null));
-            var action = async () => await new FixArchivePreparer(Configuration()).PrepareTarAsync(
+            var action = async () => await CreatePreparer().PrepareTarAsync(
                 archive, "fix.tar.gz", "fix.sh", Path.Combine(root, "work"),
                 Path.Combine(root, "payload.tar"), CancellationToken.None);
 
@@ -91,7 +114,7 @@ public sealed class FixArchivePreparerTests
         try
         {
             await using var archive = TarWithoutGzip(("fix.sh", "echo ok"));
-            var action = async () => await new FixArchivePreparer(Configuration()).PrepareTarAsync(
+            var action = async () => await CreatePreparer().PrepareTarAsync(
                 archive, "fix.tar.gz", "fix.sh", Path.Combine(root, "work"),
                 Path.Combine(root, "payload.tar"), CancellationToken.None);
 
@@ -111,7 +134,7 @@ public sealed class FixArchivePreparerTests
             using (var writer = new StreamWriter(archive.CreateEntry("fix.sh").Open()))
                 writer.Write("echo ok");
             zip.Position = 0;
-            var action = async () => await new FixArchivePreparer(Configuration()).PrepareTarAsync(
+            var action = async () => await CreatePreparer().PrepareTarAsync(
                 zip, "fix.zip", "fix.sh", Path.Combine(root, "work"), Path.Combine(root, "payload.tar"), CancellationToken.None);
             await Assert.That(action).Throws<InvalidDataException>();
         }
@@ -125,7 +148,7 @@ public sealed class FixArchivePreparerTests
         try
         {
             await using var archive = TarGzip(("fix.sh", "one"), ("FIX.SH", "two"));
-            var action = async () => await new FixArchivePreparer(Configuration()).PrepareTarAsync(
+            var action = async () => await CreatePreparer().PrepareTarAsync(
                 archive, "fix.tar.gz", "fix.sh", Path.Combine(root, "work"), Path.Combine(root, "payload.tar"), CancellationToken.None);
             await Assert.That(action).Throws<InvalidDataException>();
         }
@@ -139,7 +162,7 @@ public sealed class FixArchivePreparerTests
         try
         {
             await using var archive = TarGzip();
-            var action = async () => await new FixArchivePreparer(Configuration()).PrepareTarAsync(
+            var action = async () => await CreatePreparer().PrepareTarAsync(
                 archive, "fix.tar.gz", "fix.sh", Path.Combine(root, "work"),
                 Path.Combine(root, "payload.tar"), CancellationToken.None);
 
@@ -155,7 +178,7 @@ public sealed class FixArchivePreparerTests
         try
         {
             await using var archive = TarGzip(("nested/fix.sh", "echo ok"));
-            var action = async () => await new FixArchivePreparer(Configuration()).PrepareTarAsync(
+            var action = async () => await CreatePreparer().PrepareTarAsync(
                 archive, "fix.tar.gz", "fix.sh", Path.Combine(root, "work"),
                 Path.Combine(root, "payload.tar"), CancellationToken.None);
 
@@ -209,8 +232,8 @@ public sealed class FixArchivePreparerTests
         return stream;
     }
 
-    private static IConfiguration Configuration() => new ConfigurationBuilder()
-        .AddInMemoryCollection(new Dictionary<string, string?>()).Build();
+    private static FixArchivePreparer CreatePreparer() =>
+        new(Options.Create(new FixVerificationOptions()));
 
     private static string NewRoot()
     {

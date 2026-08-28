@@ -12,6 +12,7 @@ using NoCTF.Domain.Runtime;
 using NoCTF.Domain.Gameplay;
 using NoCTF.GameModes.Awdp.Configuration;
 using NoCTF.Infrastructure.Persistence;
+using NoCTF.Infrastructure.Authentication;
 using NoCTF.Runner.Composition;
 using Wolverine.Attributes;
 
@@ -101,7 +102,7 @@ public static class AwdpPatchCommand
 public sealed class AwdpFixWorkReader(
     IServiceScopeFactory scopes,
     IRunnerScoringTokenIssuer tokens,
-    IConfiguration configuration,
+    IOptions<RunnerScoringOptions> scoringOptions,
     TimeProvider timeProvider) : IAwdpFixWorkReader
 {
     public async Task<AwdpFixWorkClaim> ClaimAsync(
@@ -222,17 +223,8 @@ public sealed class AwdpFixWorkReader(
             || receipt.InternalHost is not { Length: > 0 } targetHost)
             return new(AwdpFixExecutionFenceDisposition.Superseded);
 
-        var callbackBase = configuration["RunnerScoring:CallbackBaseUrl"];
-        if (!Uri.TryCreate(callbackBase, UriKind.Absolute, out var baseUri)
-            || (!string.Equals(
-                    baseUri.Scheme,
-                    Uri.UriSchemeHttp,
-                    StringComparison.OrdinalIgnoreCase)
-                && !string.Equals(
-                    baseUri.Scheme,
-                    Uri.UriSchemeHttps,
-                    StringComparison.OrdinalIgnoreCase)))
-            throw new InvalidOperationException(
+        var baseUri = scoringOptions.Value.CallbackBaseUrl
+            ?? throw new InvalidOperationException(
                 "RunnerScoring:CallbackBaseUrl must be configured as an absolute HTTP(S) URI.");
         var now = timeProvider.GetUtcNow();
         var remaining = message.Deadline - now;
@@ -353,6 +345,7 @@ public sealed class AwdpFixVerificationHandler(
     IRunnerCapacityGate capacity,
     ITransactionalMessageOutbox outbox,
     IOptions<RunnerOptions> runnerOptions,
+    TimeProvider timeProvider,
     ILogger<AwdpFixVerificationHandler> logger)
 {
     public async Task Handle(
@@ -452,7 +445,7 @@ public sealed class AwdpFixVerificationHandler(
             message.GameplayFactId,
             message.RuntimeInstanceId,
             result,
-            DateTimeOffset.UtcNow));
+            timeProvider.GetUtcNow()));
         await outbox.FlushOutgoingMessagesAsync();
     }
 
@@ -496,7 +489,7 @@ public sealed class AwdpFixVerificationHandler(
             recovery.GameplayFactId,
             recovery.RuntimeInstanceId,
             recovery.RunnerId,
-            DateTimeOffset.UtcNow));
+            timeProvider.GetUtcNow()));
         await outbox.FlushOutgoingMessagesAsync();
     }
 

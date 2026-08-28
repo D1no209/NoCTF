@@ -6,8 +6,11 @@ using NoCTF.Infrastructure.Administration;
 
 namespace NoCTF.Infrastructure.Competitions.Permissions;
 
-public sealed class CompetitionPermissionStore(NoCtfDbContext db) : ICompetitionPermissionStore
+public sealed class CompetitionPermissionStore(
+    NoCtfDbContext db,
+    TimeProvider? clock = null) : ICompetitionPermissionStore
 {
+    private readonly TimeProvider timeProvider = clock ?? TimeProvider.System;
     public async Task<CompetitionPermissionSnapshotResult> GetSnapshotAsync(
         Guid competitionId,
         Guid actorId,
@@ -171,7 +174,7 @@ public sealed class CompetitionPermissionStore(NoCtfDbContext db) : ICompetition
         competition.ManagerIds = command.ManagerIds.Distinct().Order().ToArray();
         competition.JudgeIds = command.JudgeIds.Distinct().Order().ToArray();
         competition.ObserverIds = command.ObserverIds.Distinct().Order().ToArray();
-        competition.UpdatedAt = DateTimeOffset.UtcNow;
+        competition.UpdatedAt = timeProvider.GetUtcNow();
         await db.SaveChangesAsync(ct);
         await transaction.CommitAsync(ct);
         return new(CompetitionPermissionUpdateState.Updated);

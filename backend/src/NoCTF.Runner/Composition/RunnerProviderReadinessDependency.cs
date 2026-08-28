@@ -6,7 +6,7 @@ namespace NoCTF.Runner.Composition;
 
 public sealed class RunnerProviderReadinessDependency(
     IOptions<RunnerOptions> options,
-    IServiceProvider services,
+    RuntimeProviderAvailabilityCatalog probes,
     RunnerProviderHealthState providerHealth) : IReadinessDependency
 {
     public string Name => "runtime-provider";
@@ -16,10 +16,22 @@ public sealed class RunnerProviderReadinessDependency(
     {
         var provider = options.Value.Provider
             ?? throw new InvalidOperationException("Runner provider is not configured.");
-        var probe = services.GetKeyedService<IRuntimeProviderAvailabilityProbe>(provider)
-            ?? throw new InvalidOperationException(
-                $"Runtime provider '{provider}' has no availability probe.");
+        var probe = probes.Get(provider);
         await probe.CheckAvailabilityAsync(cancellationToken);
         providerHealth.EnsureReady(provider);
     }
+}
+
+public sealed class RuntimeProviderAvailabilityCatalog(
+    IEnumerable<IRuntimeProviderAvailabilityProbe> probes)
+{
+    private readonly IReadOnlyDictionary<NoCTF.Domain.Runtime.RuntimeProvider,
+        IRuntimeProviderAvailabilityProbe> probesByProvider = probes.ToDictionary(probe => probe.Provider);
+
+    public IRuntimeProviderAvailabilityProbe Get(
+        NoCTF.Domain.Runtime.RuntimeProvider provider) =>
+        probesByProvider.TryGetValue(provider, out var probe)
+            ? probe
+            : throw new InvalidOperationException(
+                $"Runtime provider '{provider}' has no availability probe.");
 }

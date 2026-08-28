@@ -23,7 +23,8 @@ public sealed class TransferChallengeTemplateOwnerValidator
 
 public sealed class TransferChallengeTemplateOwnerEndpoint(
     TransferChallengeTemplateOwner transfer,
-    IUserContext user)
+    IUserContext user,
+    TimeProvider timeProvider)
     : Endpoint<TransferChallengeTemplateOwnerRequest,
         Results<
             Ok<ChallengeTemplateResponse>,
@@ -57,7 +58,7 @@ public sealed class TransferChallengeTemplateOwnerEndpoint(
             user.UserId,
             user.IsAdministrator,
             request.OwnerId,
-            DateTimeOffset.UtcNow,
+            timeProvider.GetUtcNow(),
             ct);
         return result.State switch
         {

@@ -40,7 +40,7 @@ public sealed class CreateCompetitionValidator : Validator<CreateCompetitionRequ
     }
 }
 
-public sealed class CreateCompetitionEndpoint(CreateCompetition create, IUserContext user)
+public sealed class CreateCompetitionEndpoint(CreateCompetition create, IUserContext user, TimeProvider timeProvider)
     : Endpoint<
         CreateCompetitionRequest,
         Results<
@@ -79,7 +79,7 @@ public sealed class CreateCompetitionEndpoint(CreateCompetition create, IUserCon
             request.MaxTeamMembers,
             request.MaxConcurrentRuntimeInstancesPerTeam!.Value,
             user.UserId,
-            DateTimeOffset.UtcNow,
+            timeProvider.GetUtcNow(),
             request.AllowTeamRegistrationWhileRunning,
             request.MaxActiveQuestionsPerTeam,
             request.MaxParticipantMessagesBeforeHandlerReply,
@@ -90,7 +90,7 @@ public sealed class CreateCompetitionEndpoint(CreateCompetition create, IUserCon
             CompetitionCreationState.Created =>
                 TypedResults.Created(
                     $"/api/v1/admin/competitions/{result.Competition!.Id}",
-                    CompetitionMapper.ToResponse(result.Competition)),
+                    CompetitionMapper.ToResponse(result.Competition, timeProvider.GetUtcNow())),
             CompetitionCreationState.InvalidRequest =>
                 TypedResults.Problem(
                     statusCode: StatusCodes.Status400BadRequest,

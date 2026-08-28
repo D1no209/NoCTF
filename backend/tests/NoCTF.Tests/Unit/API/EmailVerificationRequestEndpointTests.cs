@@ -72,6 +72,7 @@ public sealed class EmailVerificationRequestEndpointTests
                 limiter.QueueProcessingOrder = QueueProcessingOrder.OldestFirst;
             }));
         builder.Services.AddSingleton(store);
+        builder.Services.AddSingleton(TimeProvider.System);
         builder.Services.AddScoped<RequestEmailVerification>();
 
         var app = builder.Build();

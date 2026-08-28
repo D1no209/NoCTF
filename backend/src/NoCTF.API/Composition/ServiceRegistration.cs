@@ -5,6 +5,7 @@ using System.Threading.RateLimiting;
 using NoCTF.Application.Observability;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.AspNetCore.Routing;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using NoCTF.Application.Authentication.Login;
 using NoCTF.Application.Authentication.RefreshJwt;
 using NoCTF.Application.Authentication.Account;
@@ -22,6 +23,8 @@ using NoCTF.Application.Notifications;
 using NoCTF.Application.Messaging;
 using NoCTF.Application.Scoring.Leaderboard;
 using NoCTF.API.SignalR.Publishing;
+using NoCTF.API.Endpoints.Authentication;
+using NoCTF.API.Pagination;
 using NSwag;
 
 namespace NoCTF.API.Composition;
@@ -38,6 +41,22 @@ public static class ServiceRegistration
         bool development = false,
         IReadOnlyCollection<System.Reflection.Assembly>? endpointAssemblies = null)
     {
+        services.TryAddSingleton(TimeProvider.System);
+        services.AddOptions<RefreshHttpOptions>()
+            .Bind(configuration.GetSection("Authentication"))
+            .Validate(options => options.RefreshAllowedOrigins.All(origin =>
+                Uri.TryCreate(origin, UriKind.Absolute, out var uri)
+                && uri.Scheme is "http" or "https"),
+                "Authentication:RefreshAllowedOrigins must contain absolute HTTP(S) origins.")
+            .ValidateOnStart();
+        services.AddOptions<PaginationOptions>()
+            .Configure(options => options.SigningKey =
+                configuration["Pagination:SigningKey"]
+                ?? configuration["Authentication:SigningKey"]
+                ?? string.Empty)
+            .Validate(options => System.Text.Encoding.UTF8.GetByteCount(options.SigningKey) >= 32,
+                "Pagination:SigningKey must contain at least 32 UTF-8 bytes.")
+            .ValidateOnStart();
         var uploadLimits = new FileUploadLimits(
             configuration.GetValue(
                 "Uploads:MaximumAvatarBytes",
@@ -69,6 +88,8 @@ public static class ServiceRegistration
                 settings.SchemaSettings.ResolveExternalXmlDocumentation = false;
                 settings.DocumentProcessors.Add(
                     new AwdpFixResultOutcomeDocumentProcessor());
+                settings.DocumentProcessors.Add(
+                    new EndpointMetadataDocumentProcessor());
                 settings.AddAuth("Bearer", new OpenApiSecurityScheme
                 {
                     Type = OpenApiSecuritySchemeType.Http,

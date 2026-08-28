@@ -270,7 +270,8 @@ public sealed class FusionLeaderboardCache(
             selectedRoundWindowEnd,
             awdWindow.LatestRound,
             factRows.AwdAggregates);
-        var projection = projectionEngine.Project(projectionInput);
+        var outputs = projectionEngine.ProjectOutputs(projectionInput);
+        var projection = outputs.Legacy;
         var legacy = new LeaderboardResponse(competitionId, projectedAt, projection.Entries)
         {
             Challenges = projection.Challenges,
@@ -287,7 +288,7 @@ public sealed class FusionLeaderboardCache(
             RoundDurationSeconds = projection.RoundDurationSeconds,
             CurrentRoundRemainingSeconds = projection.CurrentRoundRemainingSeconds
         };
-        var scoreboard = projectionEngine.ProjectScoreboard(projectionInput);
+        var scoreboard = outputs.Scoreboard;
         ScoreboardProjection AddResponseMetadata(ScoreboardProjection value) => value with
         {
             Snapshot = value.Snapshot with
@@ -323,7 +324,7 @@ public sealed class FusionLeaderboardCache(
                 .ToArray()
         };
         var participantScoreboard = AddResponseMetadata(
-            projectionEngine.ProjectScoreboard(participantInput));
+            projectionEngine.ProjectOutputs(participantInput).Scoreboard);
         scoreboard = scoreboard with
         {
             ParticipantView = ScoreboardAudienceView.From(participantScoreboard)

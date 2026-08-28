@@ -6,6 +6,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using NoCTF.Application.Administration.PlatformLogs;
 using NoCTF.Application.Exports;
 using NoCTF.Domain.Challenges;
@@ -16,11 +17,37 @@ using NoCTF.Infrastructure.Persistence;
 
 namespace NoCTF.Infrastructure.Exports;
 
+public sealed class SynchronousArchiveOptions
+{
+    public const string SectionName = "SynchronousExports";
+
+    public string TemporaryDirectory { get; init; } =
+        Path.Combine(Path.GetTempPath(), "noctf-synchronous-exports");
+
+    public long MaxRecords { get; init; } = 250_000;
+
+    public long MaxCompressedBytes { get; init; } = 512L * 1024 * 1024;
+
+    public long MaxWorkingSetBytes { get; init; } = 8L * 1024 * 1024;
+
+    public int MaxDurationSeconds { get; init; } = 120;
+}
+
 internal static class SynchronousArchiveInfrastructure
 {
     internal static IServiceCollection AddNoCtfSynchronousArchives(
-        this IServiceCollection services)
+        this IServiceCollection services,
+        IConfiguration configuration)
     {
+        services.AddOptions<SynchronousArchiveOptions>()
+            .Bind(configuration.GetSection(SynchronousArchiveOptions.SectionName))
+            .Validate(options => !string.IsNullOrWhiteSpace(options.TemporaryDirectory)
+                    && options.MaxRecords > 0
+                    && options.MaxCompressedBytes > 0
+                    && options.MaxWorkingSetBytes > 0
+                    && options.MaxDurationSeconds > 0,
+                "SynchronousExports limits and temporary directory must be configured.")
+            .ValidateOnStart();
         services.AddScoped<ISynchronousArchiveGenerator, PostgresSynchronousArchiveGenerator>();
         services.AddScoped<ExportCompetitionArchive>();
         services.AddScoped<ExportPlatformAuditArchive>();
@@ -31,23 +58,18 @@ internal static class SynchronousArchiveInfrastructure
 public sealed class PostgresSynchronousArchiveGenerator(
     NoCtfDbContext db,
     IPlatformAuditLogStore platformAudits,
-    IConfiguration configuration,
+    IOptions<SynchronousArchiveOptions> configuredOptions,
     TimeProvider timeProvider,
     ILogger<PostgresSynchronousArchiveGenerator> log) : ISynchronousArchiveGenerator
 {
     private const string ZipContentType = "application/zip";
-    private const long DefaultMaximumRecords = 250_000;
-    private const long DefaultMaximumCompressedBytes = 512L * 1024 * 1024;
-    private const long DefaultMaximumWorkingSetBytes = 8L * 1024 * 1024;
-    private const int DefaultMaximumDurationSeconds = 120;
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web)
     {
         Converters = { new JsonStringEnumConverter() }
     };
 
-    private readonly ArchiveLimits limits = ArchiveLimits.From(configuration);
-    private readonly string temporaryDirectory = configuration["SynchronousExports:TemporaryDirectory"]
-        ?? Path.Combine(Path.GetTempPath(), "noctf-synchronous-exports");
+    private readonly ArchiveLimits limits = ArchiveLimits.From(configuredOptions.Value);
+    private readonly string temporaryDirectory = configuredOptions.Value.TemporaryDirectory;
 
     public async Task<SynchronousArchiveResult> GenerateCompetitionAsync(
         ExportCompetitionArchiveCommand command,
@@ -612,22 +634,11 @@ public sealed class PostgresSynchronousArchiveGenerator(
         long MaximumWorkingSetBytes,
         TimeSpan MaximumDuration)
     {
-        internal static ArchiveLimits From(IConfiguration configuration) => new(
-            Positive(
-                configuration.GetValue<long?>("SynchronousExports:MaxRecords"),
-                DefaultMaximumRecords),
-            Positive(
-                configuration.GetValue<long?>("SynchronousExports:MaxCompressedBytes"),
-                DefaultMaximumCompressedBytes),
-            Positive(
-                configuration.GetValue<long?>("SynchronousExports:MaxWorkingSetBytes"),
-                DefaultMaximumWorkingSetBytes),
-            TimeSpan.FromSeconds(Positive(
-                configuration.GetValue<int?>("SynchronousExports:MaxDurationSeconds"),
-                DefaultMaximumDurationSeconds)));
-
-        private static long Positive(long? value, long fallback) => value is > 0 ? value.Value : fallback;
-        private static int Positive(int? value, int fallback) => value is > 0 ? value.Value : fallback;
+        internal static ArchiveLimits From(SynchronousArchiveOptions options) => new(
+            options.MaxRecords,
+            options.MaxCompressedBytes,
+            options.MaxWorkingSetBytes,
+            TimeSpan.FromSeconds(options.MaxDurationSeconds));
     }
 
     private sealed class ArchiveBudget(ArchiveLimits limits)

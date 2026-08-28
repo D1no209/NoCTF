@@ -39,7 +39,23 @@ public static class ServiceRegistration
         IConfiguration configuration,
         bool development = false)
     {
-        ValidateRunnerScoringCallbackBaseUrl(configuration);
+        var callbackBaseUrl = configuration
+            .GetSection(RunnerScoringOptions.SectionName)
+            .Get<RunnerScoringOptions>()?
+            .CallbackBaseUrl;
+        if (callbackBaseUrl is null
+            || callbackBaseUrl.Scheme is not ("http" or "https"))
+        {
+            throw new InvalidOperationException(
+                "RunnerScoring:CallbackBaseUrl must be configured as an absolute HTTP(S) URI.");
+        }
+        services.AddOptions<RunnerScoringOptions>()
+            .Bind(configuration.GetSection(RunnerScoringOptions.SectionName))
+            .Validate(options => System.Text.Encoding.UTF8.GetByteCount(options.SigningKey) >= 32,
+                "RunnerScoring:SigningKey must contain at least 32 UTF-8 bytes.")
+            .Validate(options => options.CallbackBaseUrl is not null,
+                "RunnerScoring:CallbackBaseUrl must be configured as an absolute HTTP(S) URI.")
+            .ValidateOnStart();
         services.AddScoped<ICompetitionEventRecorder, CompetitionEventStore>();
         services.AddScoped<IAwdpFixExecutionFence, PostgresAwdpFixExecutionFence>();
         services.AddNoCtfLocalComputationCaching(configuration);
@@ -60,6 +76,11 @@ public static class ServiceRegistration
         services.AddSingleton<IValidateOptions<RunnerOptions>, RunnerOptionsValidator>();
         services.AddOptions<RunnerOptions>()
             .Bind(configuration.GetSection(RunnerOptions.SectionName))
+            .ValidateOnStart();
+        services.AddSingleton<IValidateOptions<FixVerificationOptions>,
+            FixVerificationOptionsValidator>();
+        services.AddOptions<FixVerificationOptions>()
+            .Bind(configuration.GetSection(FixVerificationOptions.SectionName))
             .ValidateOnStart();
         if (!development)
         {
@@ -85,120 +106,11 @@ public static class ServiceRegistration
             configuredProvider,
             nameof(NoCTF.Domain.Runtime.RuntimeProvider.Libvirt),
             StringComparison.OrdinalIgnoreCase);
-        var options = new DockerRuntimeOptions(
-            configuration["Runtime:Docker:Endpoint"] ?? "npipe://./pipe/docker_engine",
-            configuration["Runtime:Docker:Network"] ?? "noctf",
-            configuration["Runtime:Docker:PublicHost"] ?? "localhost",
-            configuration["Runtime:Docker:CallbackContainer"] ?? string.Empty,
-            configuration["Runtime:Docker:CallbackContainerLabelKey"] ?? "noctf.io/internal-role",
-            configuration["Runtime:Docker:CallbackContainerLabelValue"] ?? "scoring-callback-gateway",
-            configuration.GetValue<long?>("Runtime:Docker:RuntimeLogMaxSizeBytes")
-                ?? 10_485_760,
-            configuration.GetValue<int?>("Runtime:Docker:RuntimeLogMaxFiles") ?? 3,
-            configuration.GetValue<int?>("Runtime:Docker:OneShotOutputLimitBytesPerStream")
-                ?? 1_048_576);
-        if (options.RuntimeLogMaxSizeBytes <= 0
-            || options.RuntimeLogMaxFiles <= 0
-            || options.OneShotOutputLimitBytesPerStream <= 0)
-            throw new InvalidOperationException(
-                "Docker Runtime limits must be configured as positive integers.");
-        services.AddSingleton(options);
-        services.AddSingleton<DockerContainerLifecycle>();
-        services.AddSingleton<DockerComposeRuntime>();
-        services.AddSingleton<DockerRuntimeResourceReconciler>();
-        services.AddKeyedSingleton<IRuntimeProviderAvailabilityProbe>(
-            RuntimeProvider.Docker,
-            (provider, _) => provider.GetRequiredService<DockerRuntimeResourceReconciler>());
-        services.AddSingleton<IRuntimeManagedResourceReconciler>(provider =>
-            provider.GetRequiredService<DockerRuntimeResourceReconciler>());
-        services.AddSingleton(new KubernetesRuntimeOptions(
-            configuration["Runtime:Kubernetes:Namespace"] ?? "noctf",
-            configuration["Runtime:Kubernetes:PublicHost"] ?? "localhost",
-            configuration["Runtime:Kubernetes:ImagePullPolicy"] ?? "IfNotPresent",
-            configuration["Runtime:Kubernetes:CallbackPodLabelKey"] ?? "noctf.io/internal-role",
-            configuration["Runtime:Kubernetes:CallbackPodLabelValue"] ?? "awdp-callback",
-            isKubernetesPool
-                ? configuration.GetValue<long>("Runtime:Kubernetes:PodPidsLimit")
-                : 0,
-            isKubernetesPool
-                ? configuration["Runtime:Kubernetes:ClusterDomain"] ?? string.Empty
-                : string.Empty,
-            isKubernetesPool
-                ? KubernetesEgressPolicy.ValidateClusterDnsServiceAddress(
-                    configuration["Runtime:Kubernetes:ClusterDnsServiceAddress"]
-                        ?? string.Empty)
-                : string.Empty,
-            isKubernetesPool
-                && configuration.GetValue<bool>(
-                    "Runtime:Kubernetes:NetworkPolicyRequired"),
-            isKubernetesPool
-                ? KubernetesEgressPolicy.ValidateAndNormalizeProtectedCidrs(
-                    configuration.GetSection("Runtime:Kubernetes:ProtectedCidrs")
-                        .GetChildren()
-                        .Select(section => section.Value ?? string.Empty))
-                : null,
-            isKubernetesPool
-                ? configuration["Runtime:Kubernetes:CallbackNamespaceLabelKey"]
-                    ?? string.Empty
-                : "kubernetes.io/metadata.name",
-            isKubernetesPool
-                ? configuration["Runtime:Kubernetes:CallbackNamespaceLabelValue"]
-                    ?? string.Empty
-                : "noctf"));
-        if (isKubernetesPool
-            && (configuration.GetValue<long>("Runtime:Kubernetes:PodPidsLimit") <= 0
-                || string.IsNullOrWhiteSpace(configuration["Runtime:Kubernetes:ClusterDomain"])
-                || string.IsNullOrWhiteSpace(
-                    configuration["Runtime:Kubernetes:ClusterDnsServiceAddress"])
-                || !configuration.GetValue<bool>(
-                    "Runtime:Kubernetes:NetworkPolicyRequired")
-                || string.IsNullOrWhiteSpace(
-                    configuration["Runtime:Kubernetes:CallbackNamespaceLabelKey"])
-                || string.IsNullOrWhiteSpace(
-                    configuration["Runtime:Kubernetes:CallbackNamespaceLabelValue"])))
-            throw new InvalidOperationException(
-                "The active Kubernetes Runtime requires positive PIDs, cluster DNS, network policy, and callback namespace settings.");
-        services.AddSingleton<IKubernetes>(_ =>
-            new Kubernetes(KubernetesClientConfiguration.BuildDefaultConfig()));
-        if (isKubernetesPool)
-            services.AddHostedService<KubernetesRuntimePoolStartupCheck>();
-        services.AddSingleton<KubernetesContainerLifecycle>();
-        services.AddSingleton<IKomposeConverter>(new KomposeConverter());
-        services.AddSingleton<KubernetesComposeRuntime>();
-        services.AddSingleton<KubernetesRuntimeResourceReconciler>();
-        services.AddKeyedSingleton<IRuntimeProviderAvailabilityProbe>(
-            RuntimeProvider.Kubernetes,
-            (provider, _) => provider.GetRequiredService<KubernetesRuntimeResourceReconciler>());
-        services.AddSingleton<IRuntimeManagedResourceReconciler>(provider =>
-            provider.GetRequiredService<KubernetesRuntimeResourceReconciler>());
-        var hasLibvirtConfiguration =
-            !string.IsNullOrWhiteSpace(configuration["Runtime:Libvirt:PoolRoutedNetworkCidr"]);
-        if (isLibvirtPool || hasLibvirtConfiguration)
-        {
-            services.AddSingleton(new LibvirtRuntimeOptions(
-                configuration["Runtime:Libvirt:CacheDirectory"] ?? string.Empty,
-                configuration["Runtime:Libvirt:WorkDirectory"] ?? string.Empty,
-                configuration["Runtime:Libvirt:PoolRoutedNetworkCidr"] ?? string.Empty,
-                configuration["Runtime:Libvirt:NodeRoutedNetworkCidr"] ?? string.Empty,
-                configuration.GetValue<int>(
-                    "Runtime:Libvirt:RuntimeSubnetPrefixLength")));
-            services.AddSingleton<ILibvirtProcessAdapter, LibvirtProcessAdapter>();
-            services.AddHttpClient<OvaArtifactCache>(client =>
-                    client.Timeout = Timeout.InfiniteTimeSpan)
-                .AddResilienceHandler("ova-artifact", pipeline =>
-                    pipeline.AddRetry(CreateGetRetry(maxRetryAttempts: 2)));
-            services.AddSingleton<LibvirtRoutedNetworkManager>();
-            services.AddSingleton<LibvirtApplianceLifecycle>();
-            services.AddSingleton<IOvaRuntime>(provider =>
-                provider.GetRequiredService<LibvirtApplianceLifecycle>());
-            services.AddSingleton<LibvirtRuntimeResourceReconciler>();
-            services.AddKeyedSingleton<IRuntimeProviderAvailabilityProbe>(
-                RuntimeProvider.Libvirt,
-                (provider, _) => provider.GetRequiredService<LibvirtRuntimeResourceReconciler>());
-            services.AddSingleton<IRuntimeManagedResourceReconciler>(provider =>
-                provider.GetRequiredService<LibvirtRuntimeResourceReconciler>());
-        }
+        services.AddDockerRuntimeProvider(configuration);
+        services.AddKubernetesRuntimeProvider(configuration, isKubernetesPool);
+        services.AddLibvirtRuntimeProvider(configuration, isLibvirtPool);
         services.AddSingleton<RuntimeProviderCatalog>();
+        services.AddSingleton<RuntimeProviderAvailabilityCatalog>();
         services.AddSingleton<RunnerProviderHealthState>();
         services.AddSingleton<IReadinessDependency, RunnerProviderReadinessDependency>();
         services.AddSingleton<IOneShotRuntimeProviderCatalog>(provider =>
@@ -216,6 +128,13 @@ public static class ServiceRegistration
         services.AddSingleton<IAwdFlagInjectionExecutor, AwdFlagInjectionExecutor>();
         services.AddSingleton<IAwdFlagInjectionWorkReader, AwdFlagInjectionWorkReader>();
         services.AddSingleton<IAwdCheckerWorkReader, AwdCheckerWorkReader>();
+        services.AddSingleton<RuntimeProviderHandler>();
+        services.AddSingleton<ContainerRuntimeMessageHandler>();
+        services.AddSingleton<ComposeRuntimeMessageHandler>();
+        services.AddSingleton<OvaRuntimeMessageHandler>();
+        services.AddSingleton<RuntimeTerminationMessageHandler>();
+        services.AddScoped<RuntimeProvisionWriteBackMessageHandler>();
+        services.AddScoped<RuntimeStopWriteBackMessageHandler>();
         services.AddSingleton<IAwdCheckerExecutor, AwdCheckerExecutor>();
         services.AddSingleton<IAwdpFixWorkReader, AwdpFixWorkReader>();
         services.AddSingleton<IAwdpCheckerExecutor, AwdpCheckerExecutor>();
@@ -227,20 +146,7 @@ public static class ServiceRegistration
         return services;
     }
 
-    private static void ValidateRunnerScoringCallbackBaseUrl(IConfiguration configuration)
-    {
-        var value = configuration["RunnerScoring:CallbackBaseUrl"];
-        if (!Uri.TryCreate(value, UriKind.Absolute, out var uri)
-            || (!string.Equals(uri.Scheme, Uri.UriSchemeHttp, StringComparison.OrdinalIgnoreCase)
-                && !string.Equals(
-                    uri.Scheme,
-                    Uri.UriSchemeHttps,
-                    StringComparison.OrdinalIgnoreCase)))
-            throw new InvalidOperationException(
-                "RunnerScoring:CallbackBaseUrl must be configured as an absolute HTTP(S) URI.");
-    }
-
-    private static HttpRetryStrategyOptions CreateGetRetry(int maxRetryAttempts)
+    internal static HttpRetryStrategyOptions CreateGetRetry(int maxRetryAttempts)
     {
         var retry = new HttpRetryStrategyOptions
         {

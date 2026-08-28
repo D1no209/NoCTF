@@ -35,7 +35,8 @@ public sealed class UpdateChallengeTemplateValidator : Validator<UpdateChallenge
 
 public sealed class UpdateChallengeTemplateEndpoint(
     UpdateChallengeTemplate update,
-    IUserContext user)
+    IUserContext user,
+    TimeProvider timeProvider)
     : Endpoint<UpdateChallengeTemplateRequest,
         Results<
             Ok<ChallengeTemplateResponse>,
@@ -74,7 +75,7 @@ public sealed class UpdateChallengeTemplateEndpoint(
             request.Description,
             request.Direction,
             request.DefinitionJson,
-            DateTimeOffset.UtcNow), ct);
+            timeProvider.GetUtcNow()), ct);
         return ChallengeTemplateUpdateResponseMapper.ToResponse(result);
     }
 }

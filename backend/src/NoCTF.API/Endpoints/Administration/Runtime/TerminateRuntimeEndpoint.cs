@@ -11,7 +11,8 @@ namespace NoCTF.API.Endpoints.Administration.Runtime;
 public sealed class TerminateRuntimeEndpoint(
     ManageAdminRuntimes runtimes,
     ICompetitionModerationAuthorizer authorizer,
-    IUserContext user)
+    IUserContext user,
+    TimeProvider timeProvider)
     : EndpointWithoutRequest<
         Results<Accepted<RuntimeAcceptedResponse>, NotFound, ProblemHttpResult, ForbidHttpResult>>
 {
@@ -41,7 +42,7 @@ public sealed class TerminateRuntimeEndpoint(
             competitionId,
             Route<Guid>("runtimeInstanceId"),
             user.UserId,
-            DateTimeOffset.UtcNow,
+            timeProvider.GetUtcNow(),
             ct);
         if (result.Failure == RuntimeMutationFailure.NotFound)
             return TypedResults.NotFound();

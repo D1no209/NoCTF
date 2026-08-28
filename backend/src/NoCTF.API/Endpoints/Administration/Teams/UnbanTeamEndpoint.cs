@@ -15,7 +15,8 @@ public sealed class UnbanTeamRequest
 public sealed class UnbanTeamEndpoint(
     ModerateTeam moderate,
     ICompetitionModerationAuthorizer authorizer,
-    IUserContext userContext)
+    IUserContext userContext,
+    TimeProvider timeProvider)
     : Endpoint<UnbanTeamRequest, Results<NoContent, ForbidHttpResult, ProblemHttpResult>>
 {
     public override void Configure()
@@ -46,7 +47,7 @@ public sealed class UnbanTeamEndpoint(
             userContext.UserId,
             false,
             null,
-            DateTimeOffset.UtcNow), cancellationToken);
+            timeProvider.GetUtcNow()), cancellationToken);
         if (!result.Succeeded)
         {
             var statusCode = result.FailureCode == TeamModerationFailure.CompetitionFinished

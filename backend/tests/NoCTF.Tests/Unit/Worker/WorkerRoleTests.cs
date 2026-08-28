@@ -88,7 +88,8 @@ public sealed class WorkerRoleTests
             })
             .Build();
 
-        var queues = WorkerQueueMetricsCollector.ResolveMonitoredQueues(configuration);
+        var queues = WorkerQueueMetricsCollector.ResolveMonitoredQueues(
+            WorkerQueues.GetEnabled(configuration));
 
         await Assert.That(queues).IsEquivalentTo(new[]
         {

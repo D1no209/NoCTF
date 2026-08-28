@@ -7,7 +7,8 @@ namespace NoCTF.API.Endpoints.Runtime;
 
 public sealed class StopRuntimeEndpoint(
     MutatePlayerRuntime mutate,
-    IUserContext user)
+    IUserContext user,
+    TimeProvider timeProvider)
     : EndpointWithoutRequest<Results<Accepted<RuntimeAcceptedResponse>, NotFound, Conflict, ProblemHttpResult>>
 {
     public override void Configure()
@@ -24,5 +25,5 @@ public sealed class StopRuntimeEndpoint(
         CancellationToken ct) =>
         RuntimeMutationEndpoint.ExecuteAsync(
             mutate, user, Route<Guid>("competitionId"), Route<Guid>("competitionChallengeId"),
-            RuntimeAction.Stop, null, ct);
+            RuntimeAction.Stop, null, timeProvider, ct);
 }

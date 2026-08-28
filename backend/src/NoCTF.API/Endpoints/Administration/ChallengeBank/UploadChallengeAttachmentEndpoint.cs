@@ -28,7 +28,8 @@ public sealed class UploadChallengeAttachmentValidator : Validator<UploadChallen
 public sealed class UploadChallengeAttachmentEndpoint(
     ManageChallengeAttachments attachments,
     IUserContext user,
-    FileUploadLimits uploadLimits)
+    FileUploadLimits uploadLimits,
+    TimeProvider timeProvider)
     : Endpoint<UploadChallengeAttachmentRequest, Results<Created<ChallengeAttachmentResponse>, NotFound, ProblemHttpResult>>
 {
     public override void Configure()
@@ -71,7 +72,7 @@ public sealed class UploadChallengeAttachmentEndpoint(
             request.File.FileName,
             request.File.ContentType,
             content,
-            DateTimeOffset.UtcNow,
+            timeProvider.GetUtcNow(),
             ct);
         if (result.FailureCode == ChallengeAttachmentFailureCode.ChallengeNotFound)
             return TypedResults.NotFound();

@@ -23,7 +23,8 @@ public sealed class UpdateChallengeTemplatePermissionsValidator
 
 public sealed class UpdateChallengeTemplatePermissionsEndpoint(
     UpdateChallengeTemplatePermissions update,
-    IUserContext user)
+    IUserContext user,
+    TimeProvider timeProvider)
     : Endpoint<UpdateChallengeTemplatePermissionsRequest,
         Results<
             Ok<ChallengeTemplateResponse>,
@@ -57,7 +58,7 @@ public sealed class UpdateChallengeTemplatePermissionsEndpoint(
             user.UserId,
             user.IsAdministrator,
             request.ManagerIds,
-            DateTimeOffset.UtcNow,
+            timeProvider.GetUtcNow(),
             ct);
         return result.State switch
         {

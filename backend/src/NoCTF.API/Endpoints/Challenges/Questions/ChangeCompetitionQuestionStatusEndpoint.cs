@@ -22,7 +22,8 @@ public sealed class ChangeCompetitionQuestionStatusValidator
 
 public sealed class ChangeCompetitionQuestionStatusEndpoint(
     ChangeCompetitionQuestionStatus change,
-    IUserContext user)
+    IUserContext user,
+    TimeProvider timeProvider)
     : Endpoint<ChangeCompetitionQuestionStatusRequest, Results<
         Ok<CompetitionQuestionResponse>,
         Conflict<CompetitionQuestionFailureResponse>,
@@ -58,7 +59,7 @@ public sealed class ChangeCompetitionQuestionStatusEndpoint(
             Route<Guid>("threadRootId"),
             user.UserId,
             CompetitionQuestionResponseMapper.ToDomain(request.Status!.Value),
-            DateTimeOffset.UtcNow), ct);
+            timeProvider.GetUtcNow()), ct);
         return result.Failure switch
         {
             null => TypedResults.Ok(CompetitionQuestionResponseMapper.ToResponse(result.Question!)),

@@ -1,4 +1,3 @@
-using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using Microsoft.Extensions.Time.Testing;
@@ -18,17 +17,13 @@ public sealed class RunnerProviderReadinessDependencyTests
         docker.Provider.Returns(RuntimeProvider.Docker);
         var kubernetes = Substitute.For<IRuntimeProviderAvailabilityProbe>();
         kubernetes.Provider.Returns(RuntimeProvider.Kubernetes);
-        var services = new ServiceCollection();
-        services.AddKeyedSingleton(RuntimeProvider.Docker, docker);
-        services.AddKeyedSingleton(RuntimeProvider.Kubernetes, kubernetes);
-        await using var provider = services.BuildServiceProvider();
         var health = CreateHealth();
         var dependency = new RunnerProviderReadinessDependency(
             Options.Create(new RunnerOptions
             {
                 Provider = RuntimeProvider.Kubernetes
             }),
-            provider,
+            new RuntimeProviderAvailabilityCatalog([docker, kubernetes]),
             health);
 
         await dependency.CheckAsync(CancellationToken.None);
@@ -40,14 +35,13 @@ public sealed class RunnerProviderReadinessDependencyTests
     [Test]
     public async Task Missing_configured_provider_probe_fails_readiness()
     {
-        await using var provider = new ServiceCollection().BuildServiceProvider();
         var health = CreateHealth();
         var dependency = new RunnerProviderReadinessDependency(
             Options.Create(new RunnerOptions
             {
                 Provider = RuntimeProvider.Libvirt
             }),
-            provider,
+            new RuntimeProviderAvailabilityCatalog([]),
             health);
 
         var action = () => dependency.CheckAsync(CancellationToken.None);
@@ -60,9 +54,6 @@ public sealed class RunnerProviderReadinessDependencyTests
     {
         var docker = Substitute.For<IRuntimeProviderAvailabilityProbe>();
         docker.Provider.Returns(RuntimeProvider.Docker);
-        var services = new ServiceCollection();
-        services.AddKeyedSingleton(RuntimeProvider.Docker, docker);
-        await using var provider = services.BuildServiceProvider();
         var clock = new FakeTimeProvider(DateTimeOffset.Parse("2026-08-19T00:00:00Z"));
         var health = CreateHealth(clock, holdSeconds: 60);
         var dependency = new RunnerProviderReadinessDependency(
@@ -70,7 +61,7 @@ public sealed class RunnerProviderReadinessDependencyTests
             {
                 Provider = RuntimeProvider.Docker
             }),
-            provider,
+            new RuntimeProviderAvailabilityCatalog([docker]),
             health);
         var runtimeId = Guid.CreateVersion7();
 

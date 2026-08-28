@@ -25,7 +25,8 @@ public sealed class RequestEmailVerificationValidator
 }
 
 public sealed class RequestEmailVerificationEndpoint(
-    RequestEmailVerification requestEmailVerification)
+    RequestEmailVerification requestEmailVerification,
+    TimeProvider timeProvider)
     : Endpoint<RequestEmailVerificationRequest,
         Results<Accepted<RequestEmailVerificationAcceptedResponse>, ProblemHttpResult>>
 {
@@ -53,7 +54,7 @@ public sealed class RequestEmailVerificationEndpoint(
     {
         await requestEmailVerification.ExecuteAsync(
             request.Email,
-            DateTimeOffset.UtcNow,
+            timeProvider.GetUtcNow(),
             ct);
         return TypedResults.Accepted(
             uri: (string?)null,

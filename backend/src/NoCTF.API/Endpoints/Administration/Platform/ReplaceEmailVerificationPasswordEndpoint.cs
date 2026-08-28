@@ -21,7 +21,8 @@ public sealed class ReplaceEmailVerificationPasswordValidator
 }
 
 public sealed class ReplaceEmailVerificationPasswordEndpoint(
-    ManageEmailVerificationConfiguration configuration)
+    ManageEmailVerificationConfiguration configuration,
+    TimeProvider timeProvider)
     : Endpoint<ReplaceEmailVerificationPasswordRequest,
         Results<Ok<EmailVerificationConfigurationResponse>, ProblemHttpResult>>
 {
@@ -45,7 +46,7 @@ public sealed class ReplaceEmailVerificationPasswordEndpoint(
     {
         var result = await configuration.ReplacePasswordAsync(
             request.Password,
-            DateTimeOffset.UtcNow,
+            timeProvider.GetUtcNow(),
             ct);
         if (result.State == EmailVerificationConfigurationUpdateState.Invalid)
         {

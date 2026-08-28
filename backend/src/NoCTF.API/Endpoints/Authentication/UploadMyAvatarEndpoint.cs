@@ -39,7 +39,8 @@ public sealed class UploadMyAvatarEndpoint(
     ReplaceCurrentUserAvatar replace,
     IUserContext user,
     LinkGenerator links,
-    FileUploadLimits uploadLimits)
+    FileUploadLimits uploadLimits,
+    TimeProvider timeProvider)
     : Endpoint<UploadMyAvatarRequest,
         Results<Ok<CurrentUserResponse>, NotFound, BadRequest<AvatarUploadFailureResponse>, ProblemHttpResult>>
 {
@@ -73,7 +74,7 @@ public sealed class UploadMyAvatarEndpoint(
             request.File.ContentType,
             content.ToArray(),
             uploadLimits.MaximumAvatarBytes,
-            DateTimeOffset.UtcNow,
+            timeProvider.GetUtcNow(),
             ct);
         if (result.UserNotFound)
             return TypedResults.NotFound();

@@ -45,7 +45,8 @@ public sealed class GetScoreboardAdjustmentDetailEndpoint(
     GetCompetitionTracks getTracks,
     ICompetitionModerationAuthorizer authorizer,
     SignedKeysetCursor cursors,
-    IUserContext user)
+    IUserContext user,
+    TimeProvider timeProvider)
     : Endpoint<GetScoreboardAdjustmentDetailRequest,
         Results<Ok<ScoreboardAdjustmentDetailResponse>, Accepted<LeaderboardProcessingProtocolResponse>, NotFound, ProblemHttpResult>>
 {
@@ -65,7 +66,7 @@ public sealed class GetScoreboardAdjustmentDetailEndpoint(
         request.CompetitionId = Route<Guid>("competitionId");
         request.TeamId = Route<Guid>("teamId");
         var visibility = await access.ResolveAsync(
-            user.UserId, request.CompetitionId, DateTimeOffset.UtcNow, cancellationToken);
+            user.UserId, request.CompetitionId, timeProvider.GetUtcNow(), cancellationToken);
         if (visibility is null || visibility.DataScope == LeaderboardDataScope.Hidden)
             return TypedResults.NotFound();
 

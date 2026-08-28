@@ -32,7 +32,7 @@ public sealed record UpdatePlatformUserRoleConflictResponse(
     IReadOnlyList<Guid> CompetitionIds,
     IReadOnlyList<Guid> ChallengeIds);
 
-public sealed class UpdatePlatformUserRoleEndpoint(ManagePlatform platform)
+public sealed class UpdatePlatformUserRoleEndpoint(ManagePlatform platform, TimeProvider timeProvider)
     : Endpoint<UpdatePlatformUserRoleRequest,
         Results<
             Ok<PlatformUserResponse>,
@@ -67,7 +67,7 @@ public sealed class UpdatePlatformUserRoleEndpoint(ManagePlatform platform)
         var result = await platform.UpdateRoleAsync(
             userId,
             IdentityProtocolMapper.ToDomain(request.Role),
-            DateTimeOffset.UtcNow,
+            timeProvider.GetUtcNow(),
             ct);
         return result.State switch
         {

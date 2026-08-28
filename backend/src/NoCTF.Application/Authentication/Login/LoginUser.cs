@@ -20,7 +20,10 @@ public enum LoginFailureCode
     InvalidCredentials
 }
 
-public sealed class LoginUser(IUserAuthenticationStore store, IAccessTokenIssuer issuer)
+public sealed class LoginUser(
+    IUserAuthenticationStore store,
+    IAccessTokenIssuer issuer,
+    TimeProvider timeProvider)
 {
     public async Task<OperationResult<LoginResult, LoginFailureCode>> ExecuteAsync(
         LoginCommand command,
@@ -34,7 +37,7 @@ public sealed class LoginUser(IUserAuthenticationStore store, IAccessTokenIssuer
                 LoginFailureCode.InvalidCredentials,
                 "Invalid credentials.");
 
-        var token = issuer.Issue(user, DateTimeOffset.UtcNow);
+        var token = issuer.Issue(user, timeProvider.GetUtcNow());
         var refreshToken = issuer.IssueRefresh(user);
         return OperationResult<LoginResult, LoginFailureCode>.Success(new(
             user.Id,

@@ -25,48 +25,53 @@ public interface IRuntimeProviderCatalog : IContainerRuntimeProviderCatalog
     IOvaRuntime Appliance(RuntimeProvider provider);
 }
 
-public sealed class RuntimeProviderCatalog(IServiceProvider services)
+public sealed class RuntimeProviderCatalog(
+    DockerContainerLifecycle dockerContainers,
+    KubernetesContainerLifecycle kubernetesContainers,
+    DockerComposeRuntime dockerCompose,
+    KubernetesComposeRuntime kubernetesCompose,
+    IEnumerable<IOvaRuntime> appliances)
     : IOneShotRuntimeProviderCatalog, IRuntimeProviderCatalog
 {
     public IContainerLifecycle Containers(RuntimeProvider provider) => provider switch
     {
-        RuntimeProvider.Docker => services.GetRequiredService<DockerContainerLifecycle>(),
-        RuntimeProvider.Kubernetes => services.GetRequiredService<KubernetesContainerLifecycle>(),
+        RuntimeProvider.Docker => dockerContainers,
+        RuntimeProvider.Kubernetes => kubernetesContainers,
         _ => throw new UnsupportedRuntimeProviderException(provider)
     };
 
     public IComposeRuntime Compose(RuntimeProvider provider) => provider switch
     {
-        RuntimeProvider.Docker => services.GetRequiredService<DockerComposeRuntime>(),
-        RuntimeProvider.Kubernetes => services.GetRequiredService<KubernetesComposeRuntime>(),
+        RuntimeProvider.Docker => dockerCompose,
+        RuntimeProvider.Kubernetes => kubernetesCompose,
         _ => throw new UnsupportedRuntimeProviderException(provider)
     };
 
     public IOvaRuntime Appliance(RuntimeProvider provider) => provider switch
     {
-        RuntimeProvider.Libvirt => services.GetService<IOvaRuntime>()
+        RuntimeProvider.Libvirt => appliances.SingleOrDefault()
             ?? throw new UnsupportedRuntimeProviderException(provider),
         _ => throw new UnsupportedRuntimeProviderException(provider)
     };
 
     public IContainerSandboxLifecycle Sandbox(RuntimeProvider provider) => provider switch
     {
-        RuntimeProvider.Docker => services.GetRequiredService<DockerContainerLifecycle>(),
-        RuntimeProvider.Kubernetes => services.GetRequiredService<KubernetesContainerLifecycle>(),
+        RuntimeProvider.Docker => dockerContainers,
+        RuntimeProvider.Kubernetes => kubernetesContainers,
         _ => throw new UnsupportedRuntimeProviderException(provider)
     };
 
     public IOneShotJobRunner OneShot(RuntimeProvider provider) => provider switch
     {
-        RuntimeProvider.Docker => services.GetRequiredService<DockerContainerLifecycle>(),
-        RuntimeProvider.Kubernetes => services.GetRequiredService<KubernetesContainerLifecycle>(),
+        RuntimeProvider.Docker => dockerContainers,
+        RuntimeProvider.Kubernetes => kubernetesContainers,
         _ => throw new UnsupportedRuntimeProviderException(provider)
     };
 
     public IAttachedOneShotJobRunner Attached(RuntimeProvider provider) => provider switch
     {
-        RuntimeProvider.Docker => services.GetRequiredService<DockerContainerLifecycle>(),
-        RuntimeProvider.Kubernetes => services.GetRequiredService<KubernetesContainerLifecycle>(),
+        RuntimeProvider.Docker => dockerContainers,
+        RuntimeProvider.Kubernetes => kubernetesContainers,
         _ => throw new UnsupportedRuntimeProviderException(provider)
     };
 }

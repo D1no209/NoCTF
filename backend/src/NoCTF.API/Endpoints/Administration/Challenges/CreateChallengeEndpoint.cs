@@ -33,7 +33,8 @@ public sealed class CreateChallengeValidator : Validator<CreateChallengeRequest>
 public sealed class CreateChallengeEndpoint(
     CreateChallenge create,
     ICompetitionModerationAuthorizer authorizer,
-    IUserContext user)
+    IUserContext user,
+    TimeProvider timeProvider)
     : Endpoint<CreateChallengeRequest,
         Results<
             Created<ChallengeResponse>,
@@ -73,7 +74,7 @@ public sealed class CreateChallengeEndpoint(
             competitionId,
             request.ChallengeId,
             request.Order,
-            DateTimeOffset.UtcNow,
+            timeProvider.GetUtcNow(),
             request.CustomTitle), ct);
         if (result.Challenge is not null)
         {

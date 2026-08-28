@@ -58,7 +58,12 @@ internal static class ChallengeInfrastructure
         services.AddScoped<IChallengeConfigurationStore, ChallengeConfigurationStore>();
         services.AddScoped<GetChallengeConfiguration>();
         services.AddScoped<UpdateChallengeConfiguration>();
-        services.AddScoped<ICompetitionQuestionStore, CompetitionQuestionStore>();
+        services.AddScoped<CompetitionQuestionStore>();
+        services.AddScoped<CompetitionQuestionAccessResolver>();
+        services.AddScoped<ICompetitionQuestionStore>(provider =>
+            provider.GetRequiredService<CompetitionQuestionStore>());
+        services.AddScoped<ICompetitionQuestionReader, CompetitionQuestionQueryReader>();
+        services.AddScoped<ICompetitionQuestionWriter, CompetitionQuestionTransactionWriter>();
         services.AddScoped<CreateCompetitionQuestion>();
         services.AddScoped<ListCompetitionQuestions>();
         services.AddScoped<GetCompetitionQuestion>();

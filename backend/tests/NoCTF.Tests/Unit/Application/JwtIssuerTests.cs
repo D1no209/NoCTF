@@ -1,7 +1,8 @@
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
-using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Options;
+using Microsoft.Extensions.Time.Testing;
 using Microsoft.IdentityModel.Tokens;
 using NoCTF.Application.Authentication.Account;
 using NoCTF.Domain.Identity;
@@ -14,17 +15,17 @@ public class JwtIssuerTests
     [Test]
     public async Task Issue_ContainsValidatedIssuerAudienceAndSecurityClaims()
     {
-        var config = Configuration(new Dictionary<string, string?>
+        var options = Options.Create(new AuthenticationTokenOptions
         {
-            ["Authentication:SigningKey"] = "test-signing-key-with-at-least-32-bytes!",
-            ["Authentication:Issuer"] = "NoCTF.Test",
-            ["Authentication:Audience"] = "NoCTF.Api.Test",
-            ["Authentication:AccessTokenMinutes"] = "5"
+            SigningKey = "test-signing-key-with-at-least-32-bytes!",
+            Issuer = "NoCTF.Test",
+            Audience = "NoCTF.Api.Test",
+            AccessTokenMinutes = 5
         });
         var now = DateTimeOffset.UtcNow;
         var user = new AuthenticatedUser(
             Guid.NewGuid(), "alice", UserRole.Administrator, UserKind.Human, 7);
-        var issued = new JwtIssuer(config).Issue(user, now);
+        var issued = new JwtIssuer(options, TimeProvider.System).Issue(user, now);
         var token = new JwtSecurityTokenHandler().ReadJwtToken(issued.Token);
 
         await Assert.That(token.Issuer).IsEqualTo("NoCTF.Test");
@@ -39,9 +40,9 @@ public class JwtIssuerTests
     [Test]
     public async Task Issue_UsesRequestedBotLifetime()
     {
-        var config = Configuration(new Dictionary<string, string?>
+        var options = Options.Create(new AuthenticationTokenOptions
         {
-            ["Authentication:SigningKey"] = "test-signing-key-with-at-least-32-bytes!"
+            SigningKey = "test-signing-key-with-at-least-32-bytes!"
         });
         var now = DateTimeOffset.Parse("2026-07-30T10:00:00Z");
         var lifetime = TimeSpan.FromDays(365);
@@ -52,7 +53,7 @@ public class JwtIssuerTests
             UserKind.Bot,
             3);
 
-        var issued = new JwtIssuer(config).Issue(user, now, lifetime);
+        var issued = new JwtIssuer(options, TimeProvider.System).Issue(user, now, lifetime);
         var token = new JwtSecurityTokenHandler().ReadJwtToken(issued.Token);
 
         await Assert.That(issued.ExpiresAt).IsEqualTo(now.Add(lifetime));
@@ -65,27 +66,29 @@ public class JwtIssuerTests
     [Test]
     public async Task Issue_RejectsShortSigningKey()
     {
-        var config = Configuration(new Dictionary<string, string?>
+        var options = Options.Create(new AuthenticationTokenOptions
         {
-            ["Authentication:SigningKey"] = "too-short"
+            SigningKey = "too-short"
         });
 
-        await Assert.That(() => new JwtIssuer(config)).Throws<InvalidOperationException>();
+        await Assert.That(() => new JwtIssuer(options, TimeProvider.System))
+            .Throws<InvalidOperationException>();
     }
 
     [Test]
     public async Task IssueRefresh_UsesDistinctAudienceAndThirtyDayLifetime()
     {
-        var config = Configuration(new Dictionary<string, string?>
+        var options = Options.Create(new AuthenticationTokenOptions
         {
-            ["Authentication:SigningKey"] = "test-signing-key-with-at-least-32-bytes!",
-            ["Authentication:Issuer"] = "NoCTF.Test",
-            ["Authentication:Audience"] = "NoCTF.Api.Test",
-            ["Authentication:RefreshAudience"] = "NoCTF.Refresh.Test"
+            SigningKey = "test-signing-key-with-at-least-32-bytes!",
+            Issuer = "NoCTF.Test",
+            Audience = "NoCTF.Api.Test",
+            RefreshAudience = "NoCTF.Refresh.Test"
         });
         var user = new AuthenticatedUser(
             Guid.NewGuid(), "alice", UserRole.Administrator, UserKind.Human, 7);
-        var issuer = new JwtIssuer(config);
+        var now = DateTimeOffset.Parse("2026-08-28T00:00:00Z");
+        var issuer = new JwtIssuer(options, new FakeTimeProvider(now));
         var issued = issuer.IssueRefresh(user);
         var token = new JwtSecurityTokenHandler().ReadJwtToken(issued.Token);
 
@@ -93,18 +96,18 @@ public class JwtIssuerTests
         await Assert.That(token.Claims.Single(x => x.Type == "token_type").Value).IsEqualTo("refresh");
         await Assert.That(token.Claims.Single(x => x.Type == "token_version").Value).IsEqualTo("7");
         await Assert.That(token.Claims.Single(x => x.Type == JwtRegisteredClaimNames.Iat).Value).IsNotNull();
-        await Assert.That(issued.ExpiresAt - DateTimeOffset.UtcNow).IsGreaterThan(TimeSpan.FromDays(29));
+        await Assert.That(issued.ExpiresAt).IsEqualTo(now.AddDays(30));
         await Assert.That(issuer.ValidateRefresh(issued.Token)).IsEqualTo(new RefreshTokenPrincipal(user.Id, 7));
     }
 
     [Test]
     public async Task ValidateRefresh_RejectsAccessToken()
     {
-        var config = Configuration(new Dictionary<string, string?>
+        var options = Options.Create(new AuthenticationTokenOptions
         {
-            ["Authentication:SigningKey"] = "test-signing-key-with-at-least-32-bytes!"
+            SigningKey = "test-signing-key-with-at-least-32-bytes!"
         });
-        var issuer = new JwtIssuer(config);
+        var issuer = new JwtIssuer(options, TimeProvider.System);
         var access = issuer.Issue(
             new AuthenticatedUser(
                 Guid.NewGuid(),
@@ -116,7 +119,4 @@ public class JwtIssuerTests
 
         await Assert.That(issuer.ValidateRefresh(access.Token)).IsNull();
     }
-
-    private static IConfiguration Configuration(Dictionary<string, string?> values) =>
-        new ConfigurationBuilder().AddInMemoryCollection(values).Build();
 }

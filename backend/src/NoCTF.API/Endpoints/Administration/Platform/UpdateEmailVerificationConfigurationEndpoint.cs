@@ -81,7 +81,8 @@ public sealed class UpdateEmailVerificationConfigurationValidator
 }
 
 public sealed class UpdateEmailVerificationConfigurationEndpoint(
-    ManageEmailVerificationConfiguration configuration)
+    ManageEmailVerificationConfiguration configuration,
+    TimeProvider timeProvider)
     : Endpoint<UpdateEmailVerificationConfigurationRequest,
         Results<Ok<EmailVerificationConfigurationResponse>, ProblemHttpResult>>
 {
@@ -119,7 +120,7 @@ public sealed class UpdateEmailVerificationConfigurationEndpoint(
             request.SmtpFromAddress,
             request.SmtpFromName,
             request.SmtpTimeoutSeconds,
-            DateTimeOffset.UtcNow), ct);
+            timeProvider.GetUtcNow()), ct);
         if (result.State == EmailVerificationConfigurationUpdateState.Invalid)
         {
             return TypedResults.Problem(

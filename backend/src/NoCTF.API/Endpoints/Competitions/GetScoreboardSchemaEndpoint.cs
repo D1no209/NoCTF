@@ -8,11 +8,20 @@ using NoCTF.API.Serialization;
 using NoCTF.Application.Competitions.Visibility;
 using NoCTF.Application.Scoring.Leaderboard;
 using NoCTF.Application.Teams.Moderation;
+using NoCTF.Domain.Competitions;
+using Riok.Mapperly.Abstractions;
 
 namespace NoCTF.API.Endpoints.Competitions;
 
 [JsonConverter(typeof(StrictPascalCaseEnumConverter<ScoreboardRoundStateProtocol>))]
 public enum ScoreboardRoundStateProtocol { Pending, Running, Settling, Settled }
+
+[Mapper]
+internal static partial class ScoreboardSchemaProtocolMapper
+{
+    [MapEnum(EnumMappingStrategy.ByName)]
+    public static partial ScoreboardRoundStateProtocol ToProtocol(ScoreboardRoundState value);
+}
 
 public sealed record ScoreboardRoundResponse(
     Guid Id,
@@ -59,7 +68,8 @@ public sealed class GetScoreboardSchemaEndpoint(
     ILeaderboardSnapshotFactory snapshots,
     ICompetitionVisibilityAccess access,
     ICompetitionModerationAuthorizer authorizer,
-    IUserContext user)
+    IUserContext user,
+    TimeProvider timeProvider)
     : Endpoint<GetScoreboardSchemaRequest, Results<Ok<ScoreboardSchemaResponse>, Accepted<LeaderboardProcessingProtocolResponse>, NotFound>>
 {
     public override void Configure()
@@ -75,14 +85,14 @@ public sealed class GetScoreboardSchemaEndpoint(
     {
         request.CompetitionId = Route<Guid>("competitionId");
         var visibility = await access.ResolveAsync(
-            user.UserId, request.CompetitionId, DateTimeOffset.UtcNow, cancellationToken);
+            user.UserId, request.CompetitionId, timeProvider.GetUtcNow(), cancellationToken);
         if (visibility is null)
             return TypedResults.NotFound();
         if (visibility.DataScope == LeaderboardDataScope.Hidden)
         {
             return TypedResults.Ok(new ScoreboardSchemaResponse(
                 request.CompetitionId,
-                Enum.Parse<GameModeProtocol>(visibility.GameMode.ToString()),
+                CompetitionProtocolMapper.ToProtocol(visibility.GameMode),
                 "0",
                 "0",
                 [],
@@ -114,7 +124,7 @@ public sealed class GetScoreboardSchemaEndpoint(
         var schema = ScoreboardAudienceProjection.Filter(projection, canObserve).Schema;
         return TypedResults.Ok(new ScoreboardSchemaResponse(
             schema.CompetitionId,
-            Enum.Parse<GameModeProtocol>(schema.Mode.ToString()),
+            CompetitionProtocolMapper.ToProtocol(schema.Mode),
             schema.Revision.ToString(CultureInfo.InvariantCulture),
             schema.ChallengeCatalogRevision.ToString(CultureInfo.InvariantCulture),
             schema.Rounds.Select(round => new ScoreboardRoundResponse(
@@ -123,7 +133,7 @@ public sealed class GetScoreboardSchemaEndpoint(
                 round.StartAt,
                 round.EndAt,
                 round.SettledAt,
-                Enum.Parse<ScoreboardRoundStateProtocol>(round.State.ToString()))).ToArray(),
+                ScoreboardSchemaProtocolMapper.ToProtocol(round.State))).ToArray(),
             schema.Columns.Select(column => new ScoreboardColumnResponse(
                 column.Index, column.CompetitionChallengeId, column.RoundId)).ToArray())
         {

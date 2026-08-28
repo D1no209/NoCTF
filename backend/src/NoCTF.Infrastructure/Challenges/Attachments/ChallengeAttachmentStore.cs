@@ -14,8 +14,11 @@ namespace NoCTF.Infrastructure.Challenges.Attachments;
 
 public sealed class ChallengeAttachmentStore(
     NoCtfDbContext db,
-    FileReferenceLock fileLock) : IChallengeAttachmentStore
+    FileReferenceLock fileLock,
+    TimeProvider? clock = null) : IChallengeAttachmentStore
 {
+    private readonly TimeProvider timeProvider = clock ?? TimeProvider.System;
+
     public ChallengeAttachmentStore(NoCtfDbContext db)
         : this(db, new FileReferenceLock()) { }
 
@@ -375,7 +378,7 @@ public sealed class ChallengeAttachmentStore(
                     MatchKind = selected.MatchKind,
                     SpecificationKind = SpecificationKind.Attachment,
                     SpecificationId = selectedId,
-                    CreatedAt = DateTimeOffset.UtcNow
+                    CreatedAt = timeProvider.GetUtcNow()
                 };
             }
         }

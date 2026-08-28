@@ -206,7 +206,7 @@ public sealed class FileCleanupPersistenceTests
         CancellationToken cancellationToken)
     {
         await using var db = new NoCtfDbContext(options);
-        await BackendMessageHandlers.Handle(
+        await BackendMessageOperations.CleanupFileAsync(
             new CleanupFile(fileId),
             db,
             storage,
