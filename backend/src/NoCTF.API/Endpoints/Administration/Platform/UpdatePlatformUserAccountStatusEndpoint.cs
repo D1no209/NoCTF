@@ -41,7 +41,8 @@ public sealed record UpdatePlatformUserAccountStatusConflictResponse(
 
 public sealed class UpdatePlatformUserAccountStatusEndpoint(
     ManagePlatform platform,
-    IUserContext actor)
+    IUserContext actor,
+    TimeProvider timeProvider)
     : Endpoint<UpdatePlatformUserAccountStatusRequest,
         Results<
             Ok<PlatformUserResponse>,
@@ -74,7 +75,7 @@ public sealed class UpdatePlatformUserAccountStatusEndpoint(
             Route<Guid>("userId"),
             actor.UserId,
             ToDomain(request.AccountStatus!.Value),
-            DateTimeOffset.UtcNow,
+            timeProvider.GetUtcNow(),
             ct);
         return result.State switch
         {

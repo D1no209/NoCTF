@@ -7,7 +7,8 @@ namespace NoCTF.API.Endpoints.Administration.ChallengeBank;
 
 public sealed class DeleteChallengeAttachmentEndpoint(
     ManageChallengeAttachments attachments,
-    IUserContext user)
+    IUserContext user,
+    TimeProvider timeProvider)
     : EndpointWithoutRequest<Results<NoContent, NotFound>>
 {
     public override void Configure()
@@ -29,7 +30,7 @@ public sealed class DeleteChallengeAttachmentEndpoint(
             Route<Guid>("attachmentId"),
             user.UserId,
             user.IsAdministrator,
-            DateTimeOffset.UtcNow,
+            timeProvider.GetUtcNow(),
             ct);
         return result.Succeeded ? TypedResults.NoContent() : TypedResults.NotFound();
     }

@@ -58,7 +58,8 @@ public sealed class GetScoreboardSlotDetailEndpoint(
     GetCompetitionTracks getTracks,
     ICompetitionModerationAuthorizer authorizer,
     SignedKeysetCursor cursors,
-    IUserContext user)
+    IUserContext user,
+    TimeProvider timeProvider)
     : Endpoint<GetScoreboardSlotDetailRequest,
         Results<Ok<ScoreboardSlotDetailResponse>, Accepted<LeaderboardProcessingProtocolResponse>, NotFound, ProblemHttpResult>>
 {
@@ -79,7 +80,7 @@ public sealed class GetScoreboardSlotDetailEndpoint(
         request.TeamId = Route<Guid>("teamId");
         request.ColumnIndex = Route<int>("columnIndex");
         var visibility = await access.ResolveAsync(
-            user.UserId, request.CompetitionId, DateTimeOffset.UtcNow, cancellationToken);
+            user.UserId, request.CompetitionId, timeProvider.GetUtcNow(), cancellationToken);
         if (visibility is null || visibility.DataScope == LeaderboardDataScope.Hidden)
             return TypedResults.NotFound();
 
@@ -146,17 +147,6 @@ public sealed class GetScoreboardSlotDetailEndpoint(
                 title: "Invalid cursor.");
         }
 
-        var allocations = projection.EntryAllocations
-            .Where(allocation => allocation.TeamId == request.TeamId
-                && allocation.ColumnIndex == request.ColumnIndex)
-            .ToArray();
-        var synthetic = allocations
-            .Where(allocation => allocation.Source is null
-                && (position is null
-                    || allocation.Entry.OccurredAt < position.CreatedAt
-                    || allocation.Entry.OccurredAt == position.CreatedAt
-                    && allocation.Entry.Id.CompareTo(position.Id) < 0))
-            .ToArray();
         var round = column.RoundId is Guid roundId
             ? projection.Schema.Rounds.Single(item => item.Id == roundId)
             : null;
@@ -172,106 +162,41 @@ public sealed class GetScoreboardSlotDetailEndpoint(
             position?.CreatedAt,
             position?.Id,
             request.Limit + 1), cancellationToken);
-        var cachedActorsByIndex = projection.DetailActors.ToDictionary(actor => actor.Index);
-        var pageActors = facts
-            .Where(fact => fact.ActorUserId is not null)
-            .Select(fact => new
-            {
-                UserId = fact.ActorUserId!.Value,
-                DisplayName = string.IsNullOrWhiteSpace(fact.ActorDisplayName)
-                    ? "-"
-                    : fact.ActorDisplayName
-            })
-            .Concat(synthetic
-                .Where(allocation => allocation.Entry.ActorIndex is int index
-                    && cachedActorsByIndex.ContainsKey(index))
-                .Select(allocation =>
-                {
-                    var actor = cachedActorsByIndex[allocation.Entry.ActorIndex!.Value];
-                    return new { actor.UserId, actor.DisplayName };
-                }))
-            .GroupBy(actor => actor.UserId)
-            .OrderBy(group => group.Key)
-            .Select((group, index) => new ScoreboardActor(
-                index,
-                group.Key,
-                group.Select(actor => actor.DisplayName)
-                    .FirstOrDefault(name => !string.IsNullOrWhiteSpace(name)) ?? "-"))
+        var detailPage = ScoreboardSlotDetailProjection.Project(
+            projection,
+            request.TeamId,
+            request.ColumnIndex,
+            slot.ScoreState,
+            round?.SettledAt,
+            facts,
+            position?.CreatedAt,
+            position?.Id,
+            request.Limit);
+        var actors = detailPage.Actors
+            .Select(actor => new ScoreboardActorResponse(
+                actor.Index,
+                actor.UserId,
+                actor.DisplayName))
             .ToArray();
-        var actorIndexesByUserId = pageActors
-            .ToDictionary(actor => actor.UserId, actor => actor.Index);
-        var cachedActorUserIdsByIndex = projection.DetailActors
-            .ToDictionary(actor => actor.Index, actor => actor.UserId);
-        ScoreboardSlotEntry RemapSyntheticActor(ScoreboardSlotEntry entry) => entry with
-        {
-            ActorIndex = entry.ActorIndex is int actorIndex
-                && cachedActorUserIdsByIndex.TryGetValue(actorIndex, out var actorUserId)
-                && actorIndexesByUserId.TryGetValue(actorUserId, out var pageActorIndex)
-                    ? pageActorIndex
-                    : null
-        };
-        var visibleTeamIds = projection.Snapshot.Teams
-            .Select(item => item.TeamId)
-            .ToHashSet();
-        var entries = facts
-            .Select(fact => MapFact(
-                fact,
-                allocations,
-                projection.Schema.Mode,
-                slot.ScoreState,
-                round?.SettledAt,
-                actorIndexesByUserId,
-                visibleTeamIds))
-            .Concat(synthetic.Select(allocation => RemapSyntheticActor(allocation.Entry)))
-            .OrderByDescending(entry => entry.OccurredAt)
-            .ThenByDescending(entry => entry.Id)
-            .Take(request.Limit + 1)
-            .ToArray();
-        var page = entries.Take(request.Limit).ToArray();
-        var actorIndexes = page
-            .Where(entry => entry.ActorIndex is not null)
-            .Select(entry => entry.ActorIndex!.Value)
-            .ToHashSet();
-        var actorPairs = pageActors
-            .Where(actor => actorIndexes.Contains(actor.Index))
-            .OrderBy(actor => actor.Index)
-            .Select((actor, index) => new
-            {
-                OldIndex = actor.Index,
-                Actor = actor with { Index = index }
-            })
-            .ToArray();
-        var pageActorIndexMap = actorPairs.ToDictionary(pair => pair.OldIndex, pair => pair.Actor.Index);
-        page = page.Select(entry => entry with
-        {
-            ActorIndex = entry.ActorIndex is int actorIndex
-                && pageActorIndexMap.TryGetValue(actorIndex, out var mappedActorIndex)
-                    ? mappedActorIndex
-                    : null
-        }).ToArray();
-        var actors = actorPairs
-            .Select(pair => new ScoreboardActorResponse(
-                pair.Actor.Index,
-                pair.Actor.UserId,
-                pair.Actor.DisplayName))
-            .ToArray();
-        var mapped = page
+        var mapped = detailPage.Entries
             .Select(ScoreboardProtocolMapper.ToResponse)
             .ToArray();
-        var nextCursor = entries.Length > request.Limit
-            ? cursors.Encode(CursorEndpoint, scope, new(page[^1].OccurredAt, page[^1].Id))
+        var nextCursor = detailPage.HasMore
+            ? cursors.Encode(CursorEndpoint, scope, new(
+                detailPage.Entries[^1].OccurredAt,
+                detailPage.Entries[^1].Id))
             : null;
         return TypedResults.Ok(new ScoreboardSlotDetailResponse(
             request.CompetitionId,
             request.TeamId,
             request.ColumnIndex,
-            Enum.Parse<ScoreboardScoreStateProtocol>(slot.ScoreState.ToString()),
+            ScoreboardProtocolMapper.ToProtocol(slot.ScoreState),
             slot.EarnedPoints,
             slot.DeductedPoints,
             slot.NetPoints,
             slot.EntryCount,
             slot.Breakdowns.Select(item => new ScoreboardBreakdownResponse(
-                Enum.Parse<ScoreboardBreakdownKindProtocol>(item.Kind.ToString()),
+                ScoreboardProtocolMapper.ToProtocol(item.Kind),
                 item.SuccessfulCount,
                 item.AttemptCount,
                 item.EarnedPoints,
@@ -280,107 +205,6 @@ public sealed class GetScoreboardSlotDetailEndpoint(
             actors,
             mapped,
             nextCursor));
-    }
-
-    private static ScoreboardSlotEntry MapFact(
-        ScoreboardSlotDetailFact fact,
-        IReadOnlyList<ScoreboardEntryAllocation> allocations,
-        NoCTF.Domain.Competitions.GameMode mode,
-        ScoreboardScoreState scoreState,
-        DateTimeOffset? settledAt,
-        IReadOnlyDictionary<Guid, int> actorIndexes,
-        IReadOnlySet<Guid> visibleTeamIds)
-    {
-        var candidates = allocations
-            .Where(candidate => candidate.Source is { } source && Matches(source, fact, mode))
-            .ToArray();
-        var allocation = candidates.FirstOrDefault(candidate => candidate.Entry.Id == fact.Id)
-            ?? (candidates.Length == 1 || candidates.Select(OutputIdentity).Distinct().Count() == 1
-                ? candidates.FirstOrDefault()
-                : null);
-        var representative = allocation?.Entry.Id == fact.Id;
-        var pending = scoreState == ScoreboardScoreState.Pending;
-        var earned = pending
-            ? null
-            : allocation?.Source?.EarnedPointsPerOccurrence
-                ?? (representative ? allocation?.Entry.EarnedPoints : null);
-        var deducted = pending
-            ? null
-            : allocation?.Source?.DeductedPointsPerOccurrence
-                ?? (representative ? allocation?.Entry.DeductedPoints : null);
-        return new(
-            fact.Id,
-            allocation?.Entry.Kind ?? EntryKind(mode, fact.Kind),
-            EntryOutcome(fact),
-            fact.ActorUserId is Guid actorId && actorIndexes.TryGetValue(actorId, out var actorIndex)
-                ? actorIndex
-                : null,
-            allocation?.Source?.VictimTeamId is Guid targetTeamId
-                && visibleTeamIds.Contains(targetTeamId)
-                    ? targetTeamId
-                    : null,
-            fact.OccurredAt,
-            pending ? null : settledAt,
-            earned,
-            deducted,
-            pending || earned is null || deducted is null ? null : checked(earned.Value - deducted.Value),
-            representative ? allocation?.Entry.Award : null,
-            representative ? allocation?.Entry.AwardPoints ?? 0 : 0);
-    }
-
-    private static (ScoreboardEntryKind Kind, Guid? VictimTeamId, long? Earned, long? Deducted)
-        OutputIdentity(ScoreboardEntryAllocation allocation) => (
-            allocation.Entry.Kind,
-            allocation.Source!.VictimTeamId,
-            allocation.Source.EarnedPointsPerOccurrence,
-            allocation.Source.DeductedPointsPerOccurrence);
-
-    private static bool Matches(
-        ScoreboardEntrySource source,
-        ScoreboardSlotDetailFact fact,
-        NoCTF.Domain.Competitions.GameMode mode) =>
-        source.Kind == fact.Kind
-        && source.State == fact.State
-        && source.Result == fact.Result
-        && (!fact.ScoringIdentityKnown
-            || source.FailureCode == fact.FailureCode && source.VictimTeamId == fact.VictimTeamId)
-        && (mode is NoCTF.Domain.Competitions.GameMode.Awdp or NoCTF.Domain.Competitions.GameMode.Koh
-            || source.ReferenceKind == fact.ReferenceKind && source.ReferenceId == fact.ReferenceId);
-
-    private static ScoreboardEntryKind EntryKind(
-        NoCTF.Domain.Competitions.GameMode mode,
-        NoCTF.Domain.Gameplay.GameplayFactKind kind) => kind switch
-        {
-            NoCTF.Domain.Gameplay.GameplayFactKind.FlagAttempt when mode is NoCTF.Domain.Competitions.GameMode.Awd
-                => ScoreboardEntryKind.Attack,
-            NoCTF.Domain.Gameplay.GameplayFactKind.FlagAttempt => ScoreboardEntryKind.Solve,
-            NoCTF.Domain.Gameplay.GameplayFactKind.HintUnlock => ScoreboardEntryKind.Hint,
-            NoCTF.Domain.Gameplay.GameplayFactKind.BreakAttempt => ScoreboardEntryKind.Attack,
-            NoCTF.Domain.Gameplay.GameplayFactKind.FixAttempt => ScoreboardEntryKind.Defense,
-            NoCTF.Domain.Gameplay.GameplayFactKind.KohControlObservation => ScoreboardEntryKind.Control,
-            _ => throw new ArgumentOutOfRangeException(nameof(kind), kind, null)
-        };
-
-    private static ScoreboardEntryOutcome EntryOutcome(ScoreboardSlotDetailFact fact)
-    {
-        if (fact.State is NoCTF.Domain.Gameplay.GameplayFactState.Queued
-            or NoCTF.Domain.Gameplay.GameplayFactState.Processing || fact.Result is null)
-            return ScoreboardEntryOutcome.Pending;
-        return fact.Result switch
-        {
-            NoCTF.Domain.Gameplay.GameplayFactResult.Correct
-                or NoCTF.Domain.Gameplay.GameplayFactResult.Unlocked
-                or NoCTF.Domain.Gameplay.GameplayFactResult.Applied
-                or NoCTF.Domain.Gameplay.GameplayFactResult.ServiceUp
-                or NoCTF.Domain.Gameplay.GameplayFactResult.Controlled
-                => ScoreboardEntryOutcome.Succeeded,
-            NoCTF.Domain.Gameplay.GameplayFactResult.Wrong
-                or NoCTF.Domain.Gameplay.GameplayFactResult.AttemptsExhausted
-                or NoCTF.Domain.Gameplay.GameplayFactResult.ServiceDown
-                or NoCTF.Domain.Gameplay.GameplayFactResult.Uncontrolled
-                => ScoreboardEntryOutcome.Failed,
-            _ => ScoreboardEntryOutcome.Rejected
-        };
     }
 
     private Accepted<LeaderboardProcessingProtocolResponse> Processing(Guid competitionId)

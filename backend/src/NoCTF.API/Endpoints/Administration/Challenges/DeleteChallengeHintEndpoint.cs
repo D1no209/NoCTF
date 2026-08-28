@@ -9,7 +9,8 @@ namespace NoCTF.API.Endpoints.Administration.Challenges;
 public sealed class DeleteChallengeHintEndpoint(
     ManageChallengeHints hints,
     ICompetitionModerationAuthorizer authorizer,
-    IUserContext user)
+    IUserContext user,
+    TimeProvider timeProvider)
     : EndpointWithoutRequest<Results<NoContent, NotFound, ForbidHttpResult>>
 {
     public override void Configure()
@@ -34,7 +35,7 @@ public sealed class DeleteChallengeHintEndpoint(
             competitionId,
             Route<Guid>("competitionChallengeId"),
             Route<Guid>("hintId"),
-            DateTimeOffset.UtcNow,
+            timeProvider.GetUtcNow(),
             ct);
         return result.Succeeded ? TypedResults.NoContent() : TypedResults.NotFound();
     }

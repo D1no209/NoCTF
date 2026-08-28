@@ -110,6 +110,11 @@ public sealed class ChangePasswordEndpointTests
         builder.Services.AddSingleton<IUserAuthenticationStore>(new PasswordStore(state));
         builder.Services.AddScoped<ChangePassword>();
         builder.Services.AddSingleton<IUserContext>(new TestUserContext());
+        builder.Services.AddSingleton(TimeProvider.System);
+        builder.Services.AddSingleton(Options.Create(new RefreshHttpOptions
+        {
+            RefreshCookieSecure = refreshCookieSecure
+        }));
 
         var app = builder.Build();
         app.UseAuthentication();

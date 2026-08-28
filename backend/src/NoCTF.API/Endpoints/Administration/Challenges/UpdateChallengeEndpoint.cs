@@ -68,7 +68,8 @@ internal static class CompetitionChallengeConflictMapper
 public sealed class UpdateChallengeEndpoint(
     UpdateChallenge update,
     ICompetitionModerationAuthorizer authorizer,
-    IUserContext user)
+    IUserContext user,
+    TimeProvider timeProvider)
     : Endpoint<UpdateChallengeRequest,
         Results<
             Ok<ChallengeResponse>,
@@ -108,7 +109,7 @@ public sealed class UpdateChallengeEndpoint(
             Route<Guid>("competitionChallengeId"),
             request.Order!.Value,
             request.IsPublished!.Value,
-            DateTimeOffset.UtcNow,
+            timeProvider.GetUtcNow(),
             request.CustomTitle), ct);
         if (result.Challenge is not null)
             return TypedResults.Ok(ChallengeMapper.ToResponse(result.Challenge));

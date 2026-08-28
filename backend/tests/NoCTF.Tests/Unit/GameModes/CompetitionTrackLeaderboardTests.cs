@@ -7,6 +7,15 @@ namespace NoCTF.Tests.Unit.GameModes;
 
 public sealed class CompetitionTrackLeaderboardTests
 {
+    private static LeaderboardProjectionResult ProjectLegacy(
+        LeaderboardProjectionInput input) =>
+        new LeaderboardProjectionEngine(new LeaderboardProjectorCatalog())
+            .ProjectOutputs(input).Legacy;
+
+    private static LeaderboardProjectionResult ProjectLegacy(
+        LeaderboardProjectionEngine engine,
+        LeaderboardProjectionInput input) => engine.ProjectOutputs(input).Legacy;
+
     private static readonly DateTimeOffset Start =
         DateTimeOffset.Parse("2026-08-12T00:00:00Z");
 
@@ -33,7 +42,7 @@ public sealed class CompetitionTrackLeaderboardTests
             facts,
             [new(challengeId, "web", "track-test", false)]);
 
-        var result = new LeaderboardProjectionEngine(new LeaderboardProjectorCatalog()).Project(input);
+        var result = ProjectLegacy(input);
         var formalEntries = result.Entries.Where(entry => entry.TrackKey == "formal").ToArray();
         var studentEntry = result.Entries.Single(entry => entry.TeamId == student.Id);
 
@@ -79,7 +88,7 @@ public sealed class CompetitionTrackLeaderboardTests
             },
             _ => throw new ArgumentOutOfRangeException(nameof(mode))
         };
-        var result = new LeaderboardProjectionEngine(new LeaderboardProjectorCatalog()).Project(new(
+        var result = ProjectLegacy(new(
             Guid.NewGuid(),
             mode,
             [publicA, publicB, internalTeam],
@@ -106,7 +115,7 @@ public sealed class CompetitionTrackLeaderboardTests
                 Value: "500"),
             Solve(publicTeam.Id, challengeId, Start.AddSeconds(1))
         };
-        var result = new LeaderboardProjectionEngine(new LeaderboardProjectorCatalog()).Project(new(
+        var result = ProjectLegacy(new(
             Guid.NewGuid(),
             GameMode.Ctf,
             [publicTeam, internalTeam],
@@ -123,7 +132,7 @@ public sealed class CompetitionTrackLeaderboardTests
         var formal = Team("formal", "formal", earnsBlood: true, affectsDynamic: true);
         var calibration = Team("calibration", "calibration", earnsScore: false, earnsBlood: false,
             affectsDynamic: true, visible: false, competitive: false);
-        var result = new LeaderboardProjectionEngine(new LeaderboardProjectorCatalog()).Project(new(
+        var result = ProjectLegacy(new(
             Guid.NewGuid(),
             GameMode.Ctf,
             [formal, calibration],
@@ -152,7 +161,7 @@ public sealed class CompetitionTrackLeaderboardTests
             Solve(firstTeam.Id, challengeId, Start) with { GameplayFactId = earlierId },
             Solve(secondTeam.Id, challengeId, Start) with { GameplayFactId = laterId }
         };
-        var result = new LeaderboardProjectionEngine(new LeaderboardProjectorCatalog()).Project(new(
+        var result = ProjectLegacy(new(
             Guid.NewGuid(), GameMode.Ctf, [firstTeam, secondTeam], facts,
             [new(challengeId, "web", "track-test", false)]));
 
@@ -172,10 +181,10 @@ public sealed class CompetitionTrackLeaderboardTests
         var explicitDefault = Team("legacy", CompetitionTrackConfiguration.DefaultTrackKey,
             earnsBlood: true, affectsDynamic: true) with { Id = teamId };
         var engine = new LeaderboardProjectionEngine(new LeaderboardProjectorCatalog());
-        var legacyResult = engine.Project(new(
+        var legacyResult = ProjectLegacy(engine, new(
             Guid.NewGuid(), GameMode.Ctf, [legacy], [fact],
             [new(challengeId, "web", "track-test", false)]));
-        var explicitResult = engine.Project(new(
+        var explicitResult = ProjectLegacy(engine, new(
             Guid.NewGuid(), GameMode.Ctf, [explicitDefault], [fact],
             [new(challengeId, "web", "track-test", false)]));
 
@@ -199,7 +208,7 @@ public sealed class CompetitionTrackLeaderboardTests
                 GameplayFactKind.KohControlObservation, Start.AddSeconds(10), GameplayFactState.Completed,
                 GameplayFactResult.Controlled, null)
         };
-        var result = new LeaderboardProjectionEngine(new LeaderboardProjectorCatalog()).Project(new(
+        var result = ProjectLegacy(new(
             Guid.NewGuid(), GameMode.Koh, [publicTeam, internalTeam], observations,
             [new(challengeId, "pwn", "track-test", false)]));
 
@@ -233,7 +242,7 @@ public sealed class CompetitionTrackLeaderboardTests
                 GameplayFactResult.Controlled, null),
             _ => throw new ArgumentOutOfRangeException(nameof(mode))
         };
-        var result = new LeaderboardProjectionEngine(new LeaderboardProjectorCatalog()).Project(new(
+        var result = ProjectLegacy(new(
             Guid.NewGuid(), mode, [publicTeam, internalTeam], [fact],
             [new(challengeId, "pwn", "track-test", false)]));
 

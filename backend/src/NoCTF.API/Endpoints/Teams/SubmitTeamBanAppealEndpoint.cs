@@ -22,7 +22,8 @@ public sealed class SubmitTeamBanAppealValidator
 
 public sealed class SubmitTeamBanAppealEndpoint(
     SubmitTeamBanAppeal submit,
-    IUserContext user)
+    IUserContext user,
+    TimeProvider timeProvider)
     : Endpoint<SubmitTeamBanAppealRequest,
         Results<NoContent, NotFound, ForbidHttpResult, ProblemHttpResult>>
 {
@@ -50,7 +51,7 @@ public sealed class SubmitTeamBanAppealEndpoint(
             request.CompetitionId,
             user.UserId,
             request.Statement,
-            DateTimeOffset.UtcNow), cancellationToken);
+            timeProvider.GetUtcNow()), cancellationToken);
         if (result.Succeeded)
             return TypedResults.NoContent();
         if (result.Failure == TeamBanAppealFailure.CaptainRequired)

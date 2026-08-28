@@ -10,7 +10,8 @@ namespace NoCTF.API.Endpoints.Administration.Runtime;
 public sealed class ExtendTeamRuntimeEndpoint(
     ManageAdminRuntimes runtimes,
     ICompetitionModerationAuthorizer authorizer,
-    IUserContext user)
+    IUserContext user,
+    TimeProvider timeProvider)
     : Endpoint<ExtendRuntimeRequest,
         Results<Accepted<RuntimeAcceptedResponse>, NotFound, ProblemHttpResult, ForbidHttpResult>>
 {
@@ -34,5 +35,5 @@ public sealed class ExtendTeamRuntimeEndpoint(
         AdminRuntimeMutation.ExecuteTeamAsync(
             runtimes, authorizer, user, RuntimeAction.Extend,
             Route<Guid>("competitionId"), Route<Guid>("competitionChallengeId"),
-            Route<Guid>("teamId"), TimeSpan.FromSeconds(request.Seconds), ct);
+            Route<Guid>("teamId"), TimeSpan.FromSeconds(request.Seconds), timeProvider, ct);
 }

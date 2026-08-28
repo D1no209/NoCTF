@@ -38,7 +38,8 @@ public sealed class AdministratorBootstrapperTests
             var configuration = Configuration("Admin888");
             var bootstrapper = new AdministratorBootstrapper(
                 db,
-                configuration,
+                Options.Create(configuration.GetSection(
+                    SeedAdministratorOptions.SectionName).Get<SeedAdministratorOptions>()!),
                 hasher,
                 TimeProvider.System);
 
@@ -56,7 +57,8 @@ public sealed class AdministratorBootstrapperTests
             var changedConfiguration = Configuration("Change88");
             await new AdministratorBootstrapper(
                     db,
-                    changedConfiguration,
+                    Options.Create(changedConfiguration.GetSection(
+                        SeedAdministratorOptions.SectionName).Get<SeedAdministratorOptions>()!),
                     hasher,
                     TimeProvider.System)
                 .SeedAsync(cancellationToken);

@@ -26,7 +26,8 @@ public sealed class AddCompetitionQuestionMessageValidator
 
 public sealed class AddCompetitionQuestionMessageEndpoint(
     AddCompetitionQuestionMessage add,
-    IUserContext user)
+    IUserContext user,
+    TimeProvider timeProvider)
     : Endpoint<AddCompetitionQuestionMessageRequest, Results<
         Ok<CompetitionQuestionResponse>,
         Conflict<CompetitionQuestionFailureResponse>,
@@ -64,7 +65,7 @@ public sealed class AddCompetitionQuestionMessageEndpoint(
             Route<Guid>("threadRootId"),
             user.UserId,
             request.Body,
-            DateTimeOffset.UtcNow), ct);
+            timeProvider.GetUtcNow()), ct);
         return result.Failure switch
         {
             null => TypedResults.Ok(CompetitionQuestionResponseMapper.ToResponse(result.Question!)),

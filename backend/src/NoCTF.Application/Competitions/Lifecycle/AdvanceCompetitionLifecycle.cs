@@ -103,6 +103,7 @@ public sealed class AdvanceCompetitionLifecycleUseCase(
 
 public sealed class TransitionCompetitionLifecycle(
     ICompetitionLifecycleStore store,
+    TimeProvider timeProvider,
     ICompetitionLifecycleNotificationPublisher? notifications = null,
     CompetitionStartGate? startGate = null)
 {
@@ -154,7 +155,12 @@ public sealed class TransitionCompetitionLifecycle(
                 CompetitionTransitionFailureCode.LifecycleConflict,
                 "Competition status changed concurrently.");
         if (notifications is not null)
-            await notifications.PublishAsync(competitionId, current.Value, target, DateTimeOffset.UtcNow, cancellationToken);
+            await notifications.PublishAsync(
+                competitionId,
+                current.Value,
+                target,
+                timeProvider.GetUtcNow(),
+                cancellationToken);
         return OperationResult<CompetitionTransitionFailureCode>.Success();
     }
 }

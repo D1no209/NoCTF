@@ -100,6 +100,7 @@ public sealed class AwdCheckerCallbackHttpTests
         var builder = WebApplication.CreateBuilder();
         builder.WebHost.UseTestServer();
         builder.Services.AddProblemDetails();
+        builder.Services.AddSingleton(TimeProvider.System);
         builder.Services.AddFastEndpoints(options =>
         {
             options.DisableAutoDiscovery = true;

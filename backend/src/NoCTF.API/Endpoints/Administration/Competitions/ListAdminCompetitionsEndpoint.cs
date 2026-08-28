@@ -17,7 +17,8 @@ public sealed class ListAdminCompetitionsRequest
 public sealed class ListAdminCompetitionsEndpoint(
     ListAdminCompetitions list,
     ICompetitionModerationAuthorizer authorizer,
-    IUserContext user)
+    IUserContext user,
+    TimeProvider timeProvider)
     : Endpoint<ListAdminCompetitionsRequest, Ok<AdminCompetitionListResponse>>
 {
     public override void Configure()
@@ -50,7 +51,9 @@ public sealed class ListAdminCompetitionsEndpoint(
                 authorizer,
                 ct,
                 accessAlreadyEstablished: true);
-            responses.Add(CompetitionMapper.ToResponse(item) with
+            responses.Add(CompetitionMapper.ToResponse(
+                item,
+                timeProvider.GetUtcNow()) with
             {
                 AdministrationRole = role
             });

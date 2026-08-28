@@ -1,4 +1,4 @@
-using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Options;
 using NoCTF.Application.Runtime.Provisioning;
 using NoCTF.Domain.Runtime;
 
@@ -9,26 +9,10 @@ public sealed class ConfiguredRuntimePlacementPolicy : IRuntimePlacementPolicy
 {
     private readonly RuntimePlacement containerPlacement;
 
-    public ConfiguredRuntimePlacementPolicy(IConfiguration configuration)
+    public ConfiguredRuntimePlacementPolicy(IOptions<RuntimePlacementOptions> configuredOptions)
     {
-        var providerText = configuration["Runtime:Provider"]
-            ?? configuration["Runner:Provider"]
-            ?? nameof(RuntimeProvider.Docker);
-        if (!Enum.TryParse<RuntimeProvider>(providerText, true, out var provider)
-            || provider is not (RuntimeProvider.Docker or RuntimeProvider.Kubernetes))
-        {
-            throw new InvalidOperationException(
-                "Runtime:Provider must be Docker or Kubernetes.");
-        }
-
-        var runnerPool = configuration["Runtime:RunnerPool"]
-            ?? configuration["Runner:Pool"]
-            ?? "default";
-        if (string.IsNullOrWhiteSpace(runnerPool) || runnerPool.Length > 256)
-            throw new InvalidOperationException(
-                "Runtime:RunnerPool must contain 1..256 characters.");
-
-        containerPlacement = new(provider, runnerPool);
+        var options = configuredOptions.Value;
+        containerPlacement = new(options.Provider, options.RunnerPool);
     }
 
     public RuntimePlacement Resolve(RuntimeKind runtimeKind) => runtimeKind switch
@@ -38,4 +22,13 @@ public sealed class ConfiguredRuntimePlacementPolicy : IRuntimePlacementPolicy
             "The configured platform supports only Container and Compose runtimes."),
         _ => throw new ArgumentOutOfRangeException(nameof(runtimeKind), runtimeKind, null)
     };
+}
+
+public sealed class RuntimePlacementOptions
+{
+    public const string SectionName = "Runtime";
+
+    public RuntimeProvider Provider { get; set; } = RuntimeProvider.Docker;
+
+    public string RunnerPool { get; set; } = "default";
 }

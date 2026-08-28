@@ -944,6 +944,7 @@ public sealed class WolverineTransactionalOutboxTests
             builder.Services.AddSingleton<IAwdpCheckerExecutor, AwdpCheckerExecutor>();
             builder.Services.AddSingleton(new AwdpFixArchiveDownloader(
                 awdpFixExecution.HttpClientFactory));
+            builder.Services.AddOptions<FixVerificationOptions>();
             builder.Services.AddSingleton<FixArchivePreparer>();
             builder.Services.AddSingleton(Substitute.For<IRunnerCapacityGate>());
         }
@@ -1553,7 +1554,7 @@ public sealed class LifecycleMaintenanceProbeHandler
         ITransactionalMessageOutbox outbox,
         CancellationToken cancellationToken)
     {
-        var outcome = await BackendMessageHandlers.ExecuteCompetitionLifecycleAsync(
+        var outcome = await BackendMessageOperations.ExecuteCompetitionLifecycleAsync(
             message,
             advancer,
             db,

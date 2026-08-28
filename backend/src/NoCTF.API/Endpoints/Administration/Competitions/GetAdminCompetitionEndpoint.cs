@@ -10,7 +10,8 @@ namespace NoCTF.API.Endpoints.Administration.Competitions;
 public sealed class GetAdminCompetitionEndpoint(
     GetAdminCompetition get,
     ICompetitionModerationAuthorizer authorizer,
-    IUserContext user)
+    IUserContext user,
+    TimeProvider timeProvider)
     : EndpointWithoutRequest<Results<Ok<CompetitionResponse>, NotFound>>
 {
     public override void Configure()
@@ -42,7 +43,9 @@ public sealed class GetAdminCompetitionEndpoint(
             authorizer,
             ct,
             accessAlreadyEstablished: true);
-        return TypedResults.Ok(CompetitionMapper.ToResponse(view) with
+        return TypedResults.Ok(CompetitionMapper.ToResponse(
+            view,
+            timeProvider.GetUtcNow()) with
         {
             AdministrationRole = role
         });

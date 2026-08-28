@@ -8,7 +8,7 @@ using Wolverine;
 
 var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddNoCtfInfrastructure(builder.Configuration);
-builder.Services.AddNoCtfWorkerRole();
+builder.Services.AddNoCtfWorkerRole(builder.Configuration);
 builder.Services.AddNoCtfWorkerLogging(builder.Configuration);
 var roles = HostRoles.Only(HostRole.Worker);
 builder.UseWolverine(options =>

@@ -26,7 +26,8 @@ public sealed class BanTeamValidator : Validator<BanTeamRequest>
 public sealed class BanTeamEndpoint(
     ModerateTeam moderate,
     ICompetitionModerationAuthorizer authorizer,
-    IUserContext userContext)
+    IUserContext userContext,
+    TimeProvider timeProvider)
     : Endpoint<BanTeamRequest, Results<NoContent, ForbidHttpResult, ProblemHttpResult>>
 {
     public override void Configure()
@@ -57,7 +58,7 @@ public sealed class BanTeamEndpoint(
             userContext.UserId,
             true,
             request.Reason,
-            DateTimeOffset.UtcNow,
+            timeProvider.GetUtcNow(),
             request.AnnouncePublicly), cancellationToken);
         if (!result.Succeeded)
         {

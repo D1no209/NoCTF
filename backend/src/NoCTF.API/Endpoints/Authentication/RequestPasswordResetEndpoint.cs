@@ -23,7 +23,9 @@ public sealed class RequestPasswordResetValidator : Validator<RequestPasswordRes
             .MaximumLength(320);
 }
 
-public sealed class RequestPasswordResetEndpoint(RequestPasswordReset requestPasswordReset)
+public sealed class RequestPasswordResetEndpoint(
+    RequestPasswordReset requestPasswordReset,
+    TimeProvider timeProvider)
     : Endpoint<RequestPasswordResetRequest,
         Results<Accepted<RequestPasswordResetAcceptedResponse>, ProblemHttpResult>>
 {
@@ -49,7 +51,7 @@ public sealed class RequestPasswordResetEndpoint(RequestPasswordReset requestPas
         RequestPasswordResetRequest request,
         CancellationToken ct)
     {
-        await requestPasswordReset.ExecuteAsync(request.Email, DateTimeOffset.UtcNow, ct);
+        await requestPasswordReset.ExecuteAsync(request.Email, timeProvider.GetUtcNow(), ct);
         return TypedResults.Accepted(
             uri: (string?)null,
             value: new RequestPasswordResetAcceptedResponse(Accepted: true));

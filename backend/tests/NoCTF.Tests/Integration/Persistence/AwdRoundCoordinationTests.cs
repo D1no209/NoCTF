@@ -97,13 +97,13 @@ public sealed class AwdRoundCoordinationTests
 
             await using (var dispatchDb = new NoCtfDbContext(options))
             {
-                var first = await BackendMessageHandlers.ExecuteAwdCheckerDispatchAsync(
+                var first = await BackendMessageOperations.ExecuteAwdCheckerDispatchAsync(
                     new DispatchAwdCheckers(fixture.Now),
                     dispatchDb,
                     new AwdCheckerConfigurationCatalog(),
                     outbox,
                     cancellationToken);
-                var replay = await BackendMessageHandlers.ExecuteAwdCheckerDispatchAsync(
+                var replay = await BackendMessageOperations.ExecuteAwdCheckerDispatchAsync(
                     new DispatchAwdCheckers(fixture.Now),
                     dispatchDb,
                     new AwdCheckerConfigurationCatalog(),
@@ -146,7 +146,7 @@ public sealed class AwdRoundCoordinationTests
                 AwdConfiguration.Default.CheckerIntervalSeconds);
             await using (var dispatchDb = new NoCtfDbContext(options))
             {
-                var next = await BackendMessageHandlers.ExecuteAwdCheckerDispatchAsync(
+                var next = await BackendMessageOperations.ExecuteAwdCheckerDispatchAsync(
                     new DispatchAwdCheckers(nextCheckAt),
                     dispatchDb,
                     new AwdCheckerConfigurationCatalog(),

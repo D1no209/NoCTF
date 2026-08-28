@@ -1,7 +1,7 @@
 using System.Net.Mail;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Options;
 using NoCTF.Domain.Identity;
 using NoCTF.Infrastructure.Persistence;
 
@@ -9,19 +9,19 @@ namespace NoCTF.Infrastructure.Authentication;
 
 public sealed class AdministratorBootstrapper(
     NoCtfDbContext db,
-    IConfiguration configuration,
+    IOptions<SeedAdministratorOptions> configuredOptions,
     IPasswordHasher<User> passwordHasher,
     TimeProvider timeProvider)
 {
     public async Task SeedAsync(CancellationToken ct = default)
     {
-        var password = configuration["SeedAdmin:Password"];
+        var options = configuredOptions.Value;
+        var password = options.Password;
         if (string.IsNullOrWhiteSpace(password))
             return;
 
-        var userName = (configuration["SeedAdmin:UserName"] ?? "admin").Trim();
-        var email = EmailCanonicalizer.Canonicalize(
-            configuration["SeedAdmin:Email"] ?? "admin@noctf.local");
+        var userName = options.UserName.Trim();
+        var email = EmailCanonicalizer.Canonicalize(options.Email);
         Validate(userName, email, password);
 
         if (await db.Users.AsNoTracking().AnyAsync(

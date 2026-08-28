@@ -1,7 +1,7 @@
 using JasperFx;
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Options;
 using NoCTF.Application.Competitions.Events;
 using NoCTF.Application.Messaging;
 using NoCTF.Hosting;
@@ -13,7 +13,7 @@ namespace NoCTF.Worker;
 
 public sealed class WorkerMessageTopologyStartupValidator(
     IWolverineRuntime runtime,
-    IConfiguration configuration) : IHostedLifecycleService
+    IOptions<WorkerQueueOptions> queueOptions) : IHostedLifecycleService
 {
     public Task StartingAsync(CancellationToken cancellationToken) => Task.CompletedTask;
 
@@ -21,7 +21,7 @@ public sealed class WorkerMessageTopologyStartupValidator(
 
     public async Task StartedAsync(CancellationToken cancellationToken)
     {
-        var expectedQueues = ExpectedFanoutQueues(configuration);
+        var expectedQueues = ExpectedFanoutQueues(queueOptions.Value.Enabled);
         await runtime.AllRegisteredListenersAsync(cancellationToken);
         var routing = runtime.ExplainRoutingFor(typeof(CompetitionEventCommitted)).ToText();
 
@@ -147,9 +147,9 @@ public sealed class WorkerMessageTopologyStartupValidator(
 
     public Task StoppedAsync(CancellationToken cancellationToken) => Task.CompletedTask;
 
-    internal static IReadOnlyList<string> ExpectedFanoutQueues(IConfiguration configuration)
+    internal static IReadOnlyList<string> ExpectedFanoutQueues(
+        IReadOnlyCollection<WorkerQueue> enabled)
     {
-        var enabled = WorkerQueues.GetEnabled(configuration);
         var queues = new List<string>(2);
         if (enabled.Contains(WorkerQueue.Background))
             queues.Add(CompetitionEventFanoutQueueNames.Realtime);

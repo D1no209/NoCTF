@@ -99,7 +99,8 @@ internal static class ChallengeFlagFailureMapping
 
 public sealed class CreateChallengeFlagEndpoint(
     ManageChallengeFlags flags,
-    IUserContext user)
+    IUserContext user,
+    TimeProvider timeProvider)
     : Endpoint<SaveChallengeFlagRequest, Results<
         Created<ChallengeFlagResponse>,
         NotFound,
@@ -131,7 +132,7 @@ public sealed class CreateChallengeFlagEndpoint(
                 ChallengeFlagScope.Template(challengeId),
                 request.Id,
                 isCreate: true,
-                DateTimeOffset.UtcNow),
+                timeProvider.GetUtcNow()),
             user.UserId,
             user.IsAdministrator,
             ct);

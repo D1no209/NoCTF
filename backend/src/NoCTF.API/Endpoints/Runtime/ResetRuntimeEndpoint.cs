@@ -7,7 +7,8 @@ namespace NoCTF.API.Endpoints.Runtime;
 
 public sealed class ResetRuntimeEndpoint(
     MutatePlayerRuntime mutate,
-    IUserContext user)
+    IUserContext user,
+    TimeProvider timeProvider)
     : EndpointWithoutRequest<Results<Accepted<RuntimeAcceptedResponse>, NotFound, Conflict, ProblemHttpResult>>
 {
     public override void Configure()
@@ -24,5 +25,5 @@ public sealed class ResetRuntimeEndpoint(
         CancellationToken ct) =>
         RuntimeMutationEndpoint.ExecuteAsync(
             mutate, user, Route<Guid>("competitionId"), Route<Guid>("competitionChallengeId"),
-            RuntimeAction.Reset, null, ct);
+            RuntimeAction.Reset, null, timeProvider, ct);
 }

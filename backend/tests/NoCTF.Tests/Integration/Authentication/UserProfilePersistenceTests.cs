@@ -149,7 +149,8 @@ public sealed class UserProfilePersistenceTests
 
             var refresh = await new RefreshAccessToken(
                 users,
-                new StaleRefreshIssuer(new(userId, before.TokenVersion)))
+                new StaleRefreshIssuer(new(userId, before.TokenVersion)),
+                TimeProvider.System)
                 .ExecuteAsync("old-refresh", cancellationToken);
             await Assert.That(refresh.Succeeded).IsFalse();
             await Assert.That(refresh.FailureCode).IsEqualTo(RefreshAccessTokenFailureCode.RefreshInvalid);

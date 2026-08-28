@@ -4,7 +4,7 @@ using NoCTF.Application.Administration;
 
 namespace NoCTF.API.Endpoints.Administration.Platform;
 
-public sealed class InvalidatePlatformUserTokensEndpoint(ManagePlatform platform)
+public sealed class InvalidatePlatformUserTokensEndpoint(ManagePlatform platform, TimeProvider timeProvider)
     : EndpointWithoutRequest<Results<Ok<PlatformUserResponse>, NotFound>>
 {
     public override void Configure()
@@ -24,7 +24,7 @@ public sealed class InvalidatePlatformUserTokensEndpoint(ManagePlatform platform
         CancellationToken ct)
     {
         var user = await platform.InvalidateTokensAsync(
-            Route<Guid>("userId"), DateTimeOffset.UtcNow, ct);
+            Route<Guid>("userId"), timeProvider.GetUtcNow(), ct);
         return user is null
             ? TypedResults.NotFound()
             : TypedResults.Ok(PlatformUserMapping.ToResponse(user));

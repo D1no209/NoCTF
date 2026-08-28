@@ -28,7 +28,8 @@ public sealed class UpdatePlatformConfigurationValidator
 
 public sealed class UpdatePlatformConfigurationEndpoint(
     ManagePlatformConfiguration configuration,
-    LinkGenerator links)
+    LinkGenerator links,
+    TimeProvider timeProvider)
     : Endpoint<UpdatePlatformConfigurationRequest,
         Results<Ok<PlatformConfigurationResponse>, ProblemHttpResult>>
 {
@@ -53,7 +54,7 @@ public sealed class UpdatePlatformConfigurationEndpoint(
         var result = await configuration.UpdateAsync(
             request.Name,
             request.Description,
-            DateTimeOffset.UtcNow,
+            timeProvider.GetUtcNow(),
             ct);
         return result.State switch
         {

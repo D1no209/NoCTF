@@ -10,7 +10,8 @@ namespace NoCTF.API.Endpoints.Challenges;
 
 public sealed class UnlockChallengeHintEndpoint(
     UnlockChallengeHint unlock,
-    IUserContext user)
+    IUserContext user,
+    TimeProvider timeProvider)
     : EndpointWithoutRequest<
         Results<Accepted<AcceptedGameplayFactResponse>, NotFound, Conflict>>
 {
@@ -33,7 +34,7 @@ public sealed class UnlockChallengeHintEndpoint(
             Route<Guid>("competitionChallengeId"),
             Route<Guid>("hintId"),
             user.UserId,
-            DateTimeOffset.UtcNow,
+            timeProvider.GetUtcNow(),
             ct);
         if (result.FailureCode == ChallengeHintFailureCode.HintNotFound)
             return TypedResults.NotFound();

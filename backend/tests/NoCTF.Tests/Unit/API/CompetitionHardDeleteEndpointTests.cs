@@ -210,6 +210,7 @@ public sealed class CompetitionHardDeleteEndpointTests
         builder.WebHost.UseTestServer();
         builder.Configuration["Authentication:SigningKey"] = SigningKey;
         builder.Services.AddProblemDetails();
+        builder.Services.AddSingleton(TimeProvider.System);
         builder.Services.AddFastEndpoints(options =>
         {
             options.DisableAutoDiscovery = true;

@@ -580,6 +580,7 @@ public sealed class CompetitionNotificationDeliveryPersistenceTests
                 futureMessage,
                 db,
                 delivery,
+                TimeProvider.System,
                 ct);
 
             var challenge = await db.CompetitionChallenges
@@ -593,6 +594,7 @@ public sealed class CompetitionNotificationDeliveryPersistenceTests
                 futureMessage,
                 db,
                 delivery,
+                TimeProvider.System,
                 ct);
             await CompetitionNotificationMessageHandlers.Handle(
                 new PublishHintNotification(
@@ -604,6 +606,7 @@ public sealed class CompetitionNotificationDeliveryPersistenceTests
                     publishedAt),
                 db,
                 delivery,
+                TimeProvider.System,
                 ct);
             await Assert.That(await db.Notifications.CountAsync(ct)).IsEqualTo(0);
 
@@ -615,11 +618,13 @@ public sealed class CompetitionNotificationDeliveryPersistenceTests
                 currentMessage,
                 db,
                 delivery,
+                TimeProvider.System,
                 ct);
             await CompetitionNotificationMessageHandlers.Handle(
                 currentMessage,
                 db,
                 delivery,
+                TimeProvider.System,
                 ct);
 
             var notifications = await db.Notifications.AsNoTracking()

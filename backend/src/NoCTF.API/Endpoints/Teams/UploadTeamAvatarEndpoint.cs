@@ -33,7 +33,8 @@ public sealed record TeamAvatarResponse(Guid FileId, string ContentType);
 public sealed class UploadTeamAvatarEndpoint(
     ManageBusinessImages images,
     IUserContext user,
-    FileUploadLimits uploadLimits)
+    FileUploadLimits uploadLimits,
+    TimeProvider timeProvider)
     : Endpoint<UploadTeamAvatarRequest,
         Results<Ok<TeamAvatarResponse>, NotFound, ForbidHttpResult, ProblemHttpResult>>
 {
@@ -72,7 +73,7 @@ public sealed class UploadTeamAvatarEndpoint(
             request.File.FileName,
             request.File.ContentType,
             content,
-            DateTimeOffset.UtcNow,
+            timeProvider.GetUtcNow(),
             ct);
         return result.State switch
         {

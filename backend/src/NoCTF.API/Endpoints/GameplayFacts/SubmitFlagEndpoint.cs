@@ -247,7 +247,7 @@ public sealed record FlagGameplayFactAcceptedResponse(
     string? StatusUrl,
     IReadOnlyList<FlagGameplayFactItem>? Submissions);
 
-public sealed class SubmitFlagEndpoint(SubmitFlag submitFlag, IUserContext userContext)
+public sealed class SubmitFlagEndpoint(SubmitFlag submitFlag, IUserContext userContext, TimeProvider timeProvider)
     : Endpoint<SubmitFlagRequest,
         Results<Accepted<FlagGameplayFactAcceptedResponse>,
             Conflict<GameplayFactAdmissionFailureResponse>, ProblemHttpResult>>
@@ -282,7 +282,7 @@ public sealed class SubmitFlagEndpoint(SubmitFlag submitFlag, IUserContext userC
             request.CompetitionChallengeId,
             userContext.UserId,
             values,
-            DateTimeOffset.UtcNow,
+            timeProvider.GetUtcNow(),
             cancellationToken);
         if (!result.Succeeded)
         {

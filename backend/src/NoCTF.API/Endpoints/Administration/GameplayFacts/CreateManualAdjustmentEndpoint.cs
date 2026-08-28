@@ -28,7 +28,8 @@ public sealed class CreateManualAdjustmentValidator : Validator<CreateManualAdju
 public sealed class CreateManualAdjustmentEndpoint(
     CreateManualAdjustment create,
     ICompetitionModerationAuthorizer authorizer,
-    IUserContext user)
+    IUserContext user,
+    TimeProvider timeProvider)
     : Endpoint<CreateManualAdjustmentRequest,
         Results<Accepted<AcceptedGameplayFactResponse>, ForbidHttpResult, ProblemHttpResult>>
 {
@@ -57,7 +58,7 @@ public sealed class CreateManualAdjustmentEndpoint(
             request.CompetitionChallengeId,
             request.Delta,
             user.UserId,
-            DateTimeOffset.UtcNow), ct);
+            timeProvider.GetUtcNow()), ct);
         if (!result.Succeeded)
             return TypedResults.Problem(
                 statusCode: StatusCodes.Status404NotFound,

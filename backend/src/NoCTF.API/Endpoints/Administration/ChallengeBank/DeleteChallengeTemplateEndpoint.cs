@@ -8,7 +8,8 @@ namespace NoCTF.API.Endpoints.Administration.ChallengeBank;
 
 public sealed class DeleteChallengeTemplateEndpoint(
     DeleteChallengeTemplate delete,
-    IUserContext user)
+    IUserContext user,
+    TimeProvider timeProvider)
     : EndpointWithoutRequest<Results<NoContent, NotFound, ProblemHttpResult>>
 {
     public override void Configure()
@@ -30,7 +31,7 @@ public sealed class DeleteChallengeTemplateEndpoint(
             Route<Guid>("challengeId"),
             user.UserId,
             user.IsAdministrator,
-            DateTimeOffset.UtcNow,
+            timeProvider.GetUtcNow(),
             ct);
         if (result.Succeeded)
             return TypedResults.NoContent();

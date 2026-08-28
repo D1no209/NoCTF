@@ -15,8 +15,10 @@ public sealed class AuthenticationStore(
     NoCtfDbContext db,
     IPasswordHasher<User> passwordHasher,
     ITransactionalMessageOutbox? messageOutbox = null,
-    FileReferenceLock? fileReferenceLock = null) : IUserAuthenticationStore
+    FileReferenceLock? fileReferenceLock = null,
+    TimeProvider? clock = null) : IUserAuthenticationStore
 {
+    private readonly TimeProvider timeProvider = clock ?? TimeProvider.System;
     private readonly ITransactionalMessageOutbox outbox =
         messageOutbox ?? new OpenApiTransactionalMessageOutbox();
     private readonly FileReferenceLock fileLock = fileReferenceLock ?? new FileReferenceLock();
@@ -50,7 +52,7 @@ public sealed class AuthenticationStore(
         if (result == PasswordVerificationResult.SuccessRehashNeeded)
         {
             user.PasswordHash = passwordHasher.HashPassword(user, password);
-            user.UpdatedAt = DateTimeOffset.UtcNow;
+            user.UpdatedAt = timeProvider.GetUtcNow();
             await db.SaveChangesAsync(ct);
         }
         return result != PasswordVerificationResult.Failed;

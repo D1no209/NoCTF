@@ -1,18 +1,17 @@
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
-using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 using NoCTF.Application.Authentication;
 
 namespace NoCTF.Infrastructure.Authentication;
 
-public sealed class RunnerScoringTokenIssuer(IConfiguration configuration)
+public sealed class RunnerScoringTokenIssuer(IOptions<RunnerScoringOptions> configuredOptions)
     : IRunnerScoringTokenIssuer
 {
-    private readonly string issuer = configuration["RunnerScoring:Issuer"] ?? "NoCTF.Runner";
-    private readonly string audience = configuration["RunnerScoring:Audience"] ?? "NoCTF.ScoringInput";
-    private readonly byte[] key = ReadKey(configuration["RunnerScoring:SigningKey"]);
+    private readonly RunnerScoringOptions options = configuredOptions.Value;
+    private readonly byte[] key = ReadKey(configuredOptions.Value.SigningKey);
 
     public string Issue(string runnerId, DateTimeOffset now) =>
         Write(runnerId, now, now.AddMinutes(5), [new("permission", "runner:callback")]);
@@ -67,8 +66,8 @@ public sealed class RunnerScoringTokenIssuer(IConfiguration configuration)
             new SymmetricSecurityKey(key),
             SecurityAlgorithms.HmacSha256);
         var token = new JwtSecurityToken(
-            issuer,
-            audience,
+            options.Issuer,
+            options.Audience,
             allClaims,
             issuedAt.UtcDateTime,
             expiresAt.UtcDateTime,

@@ -10,7 +10,8 @@ public sealed record RuntimeTargetListResponse(IReadOnlyList<RuntimeTargetRespon
 
 public sealed class ListRuntimeTargetsEndpoint(
     ListRuntimeTargets list,
-    IUserContext user)
+    IUserContext user,
+    TimeProvider timeProvider)
     : EndpointWithoutRequest<Results<Ok<RuntimeTargetListResponse>, NotFound>>
 {
     public override void Configure()
@@ -31,7 +32,7 @@ public sealed class ListRuntimeTargetsEndpoint(
             Route<Guid>("competitionId"),
             Route<Guid>("competitionChallengeId"),
             user.UserId,
-            DateTimeOffset.UtcNow,
+            timeProvider.GetUtcNow(),
             ct);
         return items is null
             ? TypedResults.NotFound()

@@ -52,7 +52,8 @@ internal static partial class CompetitionVisibilityMutationMapper
 public sealed class UpdateCompetitionLeaderboardVisibilityEndpoint(
     UpdateCompetitionVisibility update,
     ICompetitionModerationAuthorizer authorizer,
-    IUserContext user)
+    IUserContext user,
+    TimeProvider timeProvider)
     : Endpoint<UpdateCompetitionLeaderboardVisibilityRequest, Results<
         Ok<CompetitionLeaderboardVisibilityResponse>,
         Conflict<CompetitionLeaderboardVisibilityFailureResponse>,
@@ -90,7 +91,7 @@ public sealed class UpdateCompetitionLeaderboardVisibilityEndpoint(
             request.HiddenStartAt,
             user.UserId,
             request.Reason,
-            DateTimeOffset.UtcNow), ct);
+            timeProvider.GetUtcNow()), ct);
         var current = result.Configuration is null
             ? null
             : CompetitionLeaderboardVisibilityMapper.ToResponse(result.Configuration);

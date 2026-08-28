@@ -15,7 +15,8 @@ public sealed class ListChallengesEndpoint(
     ListChallenges list,
     ICompetitionChallengeAudienceAccess audienceAccess,
     ICompetitionVisibilityAccess visibilityAccess,
-    IUserContext user) : Endpoint<ListChallengesRequest, Results<Ok<ChallengeListResponse>, NotFound>>
+    IUserContext user,
+    TimeProvider timeProvider) : Endpoint<ListChallengesRequest, Results<Ok<ChallengeListResponse>, NotFound>>
 {
     public override void Configure()
     {
@@ -34,7 +35,7 @@ public sealed class ListChallengesEndpoint(
         var visibility = await visibilityAccess.ResolveAsync(
             user.UserId,
             competitionId,
-            DateTimeOffset.UtcNow,
+            timeProvider.GetUtcNow(),
             ct);
         if (visibility is null
             || !ParticipantChallengeVisibilityPolicy.CanView(

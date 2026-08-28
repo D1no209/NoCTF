@@ -44,7 +44,8 @@ public sealed record PracticeFlagConflictResponse(
 
 public sealed class JudgePracticeFlagEndpoint(
     JudgePracticeFlag judge,
-    IUserContext user)
+    IUserContext user,
+    TimeProvider timeProvider)
     : Endpoint<JudgePracticeFlagRequest,
         Results<Ok<PracticeFlagJudgementResponse>, ForbidHttpResult,
             Conflict<PracticeFlagConflictResponse>, ProblemHttpResult>>
@@ -74,7 +75,7 @@ public sealed class JudgePracticeFlagEndpoint(
             Route<Guid>("competitionChallengeId"),
             user.UserId,
             request.Flag,
-            DateTimeOffset.UtcNow), ct);
+            timeProvider.GetUtcNow()), ct);
         if (result.Judgement is PracticeFlagJudgement judgement)
         {
             return TypedResults.Ok(new PracticeFlagJudgementResponse(

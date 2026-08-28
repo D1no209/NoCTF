@@ -53,9 +53,9 @@ public static class ServiceRegistration
         services.AddNoCtfChallenges();
         services.AddNoCtfStorage(configuration);
         services.AddNoCtfCompetitions(development);
-        services.AddNoCtfAuthentication();
+        services.AddNoCtfAuthentication(configuration);
         services.AddNoCtfAdministration(configuration, exporting, development);
-        services.AddNoCtfSynchronousArchives();
+        services.AddNoCtfSynchronousArchives(configuration);
         if (!exporting)
             services.AddHostedService<OperationalMetricsCollector>();
 

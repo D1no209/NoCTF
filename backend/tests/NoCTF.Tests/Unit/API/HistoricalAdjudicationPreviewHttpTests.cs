@@ -204,6 +204,7 @@ public sealed class HistoricalAdjudicationPreviewHttpTests
         var builder = WebApplication.CreateBuilder();
         builder.WebHost.UseTestServer();
         builder.Services.AddNoCtfApi(builder.Configuration, includeInfrastructure: false);
+        builder.Services.AddSingleton(TimeProvider.System);
         builder.Services.AddFastEndpoints(options =>
         {
             options.DisableAutoDiscovery = true;

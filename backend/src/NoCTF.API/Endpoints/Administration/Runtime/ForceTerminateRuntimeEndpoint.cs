@@ -23,7 +23,8 @@ public sealed class ForceTerminateRuntimeValidator : Validator<ForceTerminateRun
 
 public sealed class ForceTerminateRuntimeEndpoint(
     ManageAdminRuntimes runtimes,
-    IUserContext user)
+    IUserContext user,
+    TimeProvider timeProvider)
     : Endpoint<ForceTerminateRuntimeRequest,
         Results<Accepted<RuntimeAcceptedResponse>, NotFound, ProblemHttpResult>>
 {
@@ -54,7 +55,7 @@ public sealed class ForceTerminateRuntimeEndpoint(
             runtimeInstanceId,
             user.UserId,
             request.Reason,
-            DateTimeOffset.UtcNow,
+            timeProvider.GetUtcNow(),
             ct);
         if (result.Failure == RuntimeMutationFailure.NotFound)
             return TypedResults.NotFound();

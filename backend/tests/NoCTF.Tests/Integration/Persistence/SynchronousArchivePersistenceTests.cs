@@ -4,6 +4,7 @@ using System.Text;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Options;
 using Microsoft.Extensions.Time.Testing;
 using NoCTF.Application.Administration.PlatformLogs;
 using NoCTF.Application.Exports;
@@ -343,10 +344,13 @@ public sealed class SynchronousArchivePersistenceTests
         var configuration = new ConfigurationBuilder()
             .AddInMemoryCollection(values)
             .Build();
+        var archiveOptions = configuration
+            .GetSection(SynchronousArchiveOptions.SectionName)
+            .Get<SynchronousArchiveOptions>()!;
         return new(
             db,
             new PlatformAuditLogStore(db),
-            configuration,
+            Options.Create(archiveOptions),
             timeProvider,
             NullLogger<PostgresSynchronousArchiveGenerator>.Instance);
     }

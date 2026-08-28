@@ -31,7 +31,8 @@ public sealed record NotificationFeedResponse(
 public sealed class ReadNotificationFeedEndpoint(
     ReadNotificationFeed feed,
     SignedKeysetCursor cursors,
-    IUserContext user)
+    IUserContext user,
+    TimeProvider timeProvider)
     : Endpoint<ReadNotificationFeedRequest,
         Results<Ok<NotificationFeedResponse>, ProblemHttpResult>>
 {
@@ -75,7 +76,7 @@ public sealed class ReadNotificationFeedEndpoint(
         {
             var checkpoint = await feed.GetCheckpointAsync(
                 user.UserId,
-                DateTimeOffset.UtcNow,
+                timeProvider.GetUtcNow(),
                 ct);
             return TypedResults.Ok(new NotificationFeedResponse(
                 [],

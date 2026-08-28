@@ -16,7 +16,8 @@ public sealed class RestoreChallengeRequest
 public sealed class RestoreChallengeEndpoint(
     DeleteChallenge restore,
     ICompetitionModerationAuthorizer authorizer,
-    IUserContext user)
+    IUserContext user,
+    TimeProvider timeProvider)
     : Endpoint<RestoreChallengeRequest,
         Results<
             NoContent,
@@ -55,7 +56,7 @@ public sealed class RestoreChallengeEndpoint(
         var result = await restore.RestoreAsync(
             competitionId,
             request.CompetitionChallengeId,
-            DateTimeOffset.UtcNow,
+            timeProvider.GetUtcNow(),
             ct);
         return result switch
         {

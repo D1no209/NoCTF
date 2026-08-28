@@ -20,7 +20,8 @@ public sealed class ExtendRuntimeValidator : Validator<ExtendRuntimeRequest>
 
 public sealed class ExtendRuntimeEndpoint(
     MutatePlayerRuntime mutate,
-    IUserContext user)
+    IUserContext user,
+    TimeProvider timeProvider)
     : Endpoint<ExtendRuntimeRequest, Results<Accepted<RuntimeAcceptedResponse>, NotFound, Conflict, ProblemHttpResult>>
 {
     public override void Configure()
@@ -43,7 +44,7 @@ public sealed class ExtendRuntimeEndpoint(
             user.UserId,
             RuntimeAction.Extend,
             TimeSpan.FromSeconds(request.Seconds),
-            DateTimeOffset.UtcNow), ct);
+            timeProvider.GetUtcNow()), ct);
         if (result.FailureCode is RuntimeMutationFailureCode.RuntimeNotFound or RuntimeMutationFailureCode.RuntimeActionUnsupported)
             return TypedResults.NotFound();
         if (result.FailureCode is RuntimeMutationFailureCode.RuntimeStateConflict or RuntimeMutationFailureCode.RuntimeConflict)

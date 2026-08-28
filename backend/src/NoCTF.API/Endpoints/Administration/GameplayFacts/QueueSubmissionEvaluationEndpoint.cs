@@ -26,7 +26,8 @@ public sealed record QueueGameplayFactWorkResponse(
 public sealed class QueueGameplayFactEvaluationEndpoint(
     QueueGameplayFactWork queue,
     ICompetitionModerationAuthorizer authorizer,
-    IUserContext user)
+    IUserContext user,
+    TimeProvider timeProvider)
     : Endpoint<QueueGameplayFactWorkRequest,
         Results<Accepted<QueueGameplayFactWorkResponse>, ForbidHttpResult>>
 {
@@ -49,7 +50,7 @@ public sealed class QueueGameplayFactEvaluationEndpoint(
         var competitionId = Route<Guid>("competitionId");
         if (!await authorizer.CanJudgeAsync(user.UserId, competitionId, ct))
             return TypedResults.Forbid();
-        var cutoff = DateTimeOffset.UtcNow;
+        var cutoff = timeProvider.GetUtcNow();
         await queue.QueueAsync(
             competitionId, request.CompetitionChallengeId, cutoff, rejudge: false, null, ct);
         return TypedResults.Accepted(

@@ -20,12 +20,13 @@ public sealed class CompetitionRuntimeProvisioningHandlerTests
         await using var db = CreateUnusedDbContext();
         var before = DateTimeOffset.UtcNow;
 
-        await BackendMessageHandlers.Handle(
+        await BackendMessageOperations.ProvisionCompetitionRuntimesAsync(
             message,
             awd,
             koh,
             db,
             outbox,
+            TimeProvider.System,
             CancellationToken.None);
 
         var after = DateTimeOffset.UtcNow;
@@ -47,12 +48,13 @@ public sealed class CompetitionRuntimeProvisioningHandlerTests
         await using var db = CreateUnusedDbContext();
         var before = DateTimeOffset.UtcNow;
 
-        await BackendMessageHandlers.Handle(
+        await BackendMessageOperations.ProvisionCompetitionRuntimesAsync(
             message,
             awd,
             koh,
             db,
             outbox,
+            TimeProvider.System,
             CancellationToken.None);
 
         var after = DateTimeOffset.UtcNow;
@@ -73,12 +75,13 @@ public sealed class CompetitionRuntimeProvisioningHandlerTests
         var outbox = new RecordingOutbox();
         await using var db = CreateUnusedDbContext();
 
-        await BackendMessageHandlers.Handle(
+        await BackendMessageOperations.ProvisionCompetitionRuntimesAsync(
             new ProvisionCompetitionRuntimes(Guid.CreateVersion7()),
             awd,
             koh,
             db,
             outbox,
+            TimeProvider.System,
             CancellationToken.None);
 
         await Assert.That(outbox.Scheduled).IsEmpty();

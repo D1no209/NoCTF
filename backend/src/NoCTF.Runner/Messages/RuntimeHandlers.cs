@@ -20,10 +20,13 @@ public sealed class RuntimeProviderHandler(
     IOptions<RunnerOptions> runnerOptions,
     IRunnerCapacityGate capacity,
     IRuntimeNodeWorkReader workReader,
+    TimeProvider? configuredTimeProvider = null,
     IAwdpAttackProvisioningPlanReader? awdpAttackPlans = null,
     RunnerProviderHealthState? providerHealth = null)
 {
-    public async Task<object> Handle(
+    private readonly TimeProvider timeProvider = configuredTimeProvider ?? TimeProvider.System;
+
+    public async Task<object> ProvisionContainerAsync(
         ProvisionContainerRuntime message,
         CancellationToken cancellationToken)
     {
@@ -60,7 +63,7 @@ public sealed class RuntimeProviderHandler(
                 providers.Containers(definition.Provider),
                 providers.Sandbox(definition.Provider),
                 definition,
-                DateTimeOffset.UtcNow,
+                timeProvider.GetUtcNow(),
                 cancellationToken);
             providerHealth?.ReportSuccess(definition.Provider);
             ExpandedRuntimeUrls? expanded = null;
@@ -81,7 +84,7 @@ public sealed class RuntimeProviderHandler(
                     receipt.Provider,
                     JsonSerializer.Serialize(receipt),
                     expanded.Urls,
-                    definition.Ttl is { } ttl ? DateTimeOffset.UtcNow.Add(ttl) : null,
+                    definition.Ttl is { } ttl ? timeProvider.GetUtcNow().Add(ttl) : null,
                     definition.Provider == RuntimeProvider.Docker
                         ? receipt.PortMappings
                             .OrderBy(mapping => mapping.Key)
@@ -119,7 +122,7 @@ public sealed class RuntimeProviderHandler(
             cancellationToken);
     }
 
-    public async Task<object> Handle(
+    public async Task<object> StopContainerAsync(
         StopContainerRuntime message,
         CancellationToken cancellationToken)
     {
@@ -164,7 +167,7 @@ public sealed class RuntimeProviderHandler(
         }
     }
 
-    public async Task<object> Handle(
+    public async Task<object> ForceTerminateAsync(
         ForceTerminateRuntime message,
         CancellationToken cancellationToken)
     {
@@ -176,7 +179,7 @@ public sealed class RuntimeProviderHandler(
             {
                 return ForceTerminationFailed(
                     message,
-                    DateTimeOffset.UtcNow,
+                    timeProvider.GetUtcNow(),
                     RuntimeCleanupResult.CleanupFailed);
             }
 
@@ -204,7 +207,7 @@ public sealed class RuntimeProviderHandler(
                         message.RuntimeInstanceId);
                     return ForceTerminationFailed(
                         message,
-                        DateTimeOffset.UtcNow,
+                        timeProvider.GetUtcNow(),
                         RuntimeCleanupResult.ResourcesRemain);
                 }
             }
@@ -217,11 +220,11 @@ public sealed class RuntimeProviderHandler(
             {
                 return ForceTerminationFailed(
                     message,
-                    DateTimeOffset.UtcNow,
+                    timeProvider.GetUtcNow(),
                     RuntimeCleanupResult.CapacityOwnershipConflict);
             }
 
-            return ForceTerminationSucceeded(message, DateTimeOffset.UtcNow);
+            return ForceTerminationSucceeded(message, timeProvider.GetUtcNow());
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
@@ -235,12 +238,12 @@ public sealed class RuntimeProviderHandler(
                 message.RuntimeInstanceId);
             return ForceTerminationFailed(
                 message,
-                DateTimeOffset.UtcNow,
+                timeProvider.GetUtcNow(),
                 RuntimeCleanupResult.CleanupFailed);
         }
     }
 
-    public async Task<object> Handle(
+    public async Task<object> ProvisionComposeAsync(
         ProvisionComposeRuntime message,
         CancellationToken cancellationToken)
     {
@@ -300,7 +303,7 @@ public sealed class RuntimeProviderHandler(
                         JsonSerializer.Serialize(receipt),
                         expanded.Urls,
                         message.Definition.Ttl is { } ttl
-                            ? DateTimeOffset.UtcNow.Add(ttl)
+                            ? timeProvider.GetUtcNow().Add(ttl)
                             : null,
                         message.Definition.Provider == RuntimeProvider.Docker
                             ? ReadComposePublishedPorts(message.Definition, status)
@@ -330,7 +333,7 @@ public sealed class RuntimeProviderHandler(
             cancellationToken);
     }
 
-    public async Task<object> Handle(
+    public async Task<object> StopComposeAsync(
         StopComposeRuntime message,
         CancellationToken cancellationToken)
     {
@@ -375,7 +378,7 @@ public sealed class RuntimeProviderHandler(
         }
     }
 
-    public async Task<object> Handle(
+    public async Task<object> ProvisionOvaAsync(
         ProvisionOvaRuntime message,
         CancellationToken cancellationToken)
     {
@@ -426,7 +429,7 @@ public sealed class RuntimeProviderHandler(
                     JsonSerializer.Serialize(receipt),
                     expanded.Urls,
                     message.Definition.Ttl is { } ttl
-                        ? DateTimeOffset.UtcNow.Add(ttl)
+                        ? timeProvider.GetUtcNow().Add(ttl)
                         : null);
         }
         catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
@@ -460,7 +463,7 @@ public sealed class RuntimeProviderHandler(
             cancellationToken);
     }
 
-    public async Task<object> Handle(
+    public async Task<object> StopOvaAsync(
         StopOvaRuntime message,
         CancellationToken cancellationToken)
     {
@@ -663,16 +666,16 @@ public sealed class RuntimeProviderHandler(
     }
 }
 
-public static class RuntimeWriteBackHandler
+internal static class RuntimeWriteBackOperations
 {
-    public static async Task Handle(
+    public static async Task ProvisionedAsync(
         RuntimeProvisioned message,
         NoCtfDbContext db,
         ITransactionalMessageOutbox outbox,
-        CancellationToken cancellationToken,
-        ICompetitionEventRecorder? events = null)
+        ICompetitionEventRecorder events,
+        TimeProvider timeProvider,
+        CancellationToken cancellationToken)
     {
-        events ??= NullCompetitionEventRecorder.Instance;
         var instance = await db.RuntimeInstances
             .Include(candidate => candidate.PublishedPorts)
             .SingleOrDefaultAsync(
@@ -684,8 +687,8 @@ public static class RuntimeWriteBackHandler
         {
             instance.ProviderReceiptJson ??= message.ProviderReceiptJson;
             await ReplacePublishedPortsAsync(
-                instance, message, events, DateTimeOffset.UtcNow, cancellationToken);
-            await InvalidateAwdpAttackFlagAsync(db, instance, DateTimeOffset.UtcNow, cancellationToken);
+                instance, message, events, timeProvider.GetUtcNow(), cancellationToken);
+            await InvalidateAwdpAttackFlagAsync(db, instance, timeProvider.GetUtcNow(), cancellationToken);
             await PublishRuntimeStopAsync(outbox, instance, message.RunnerId);
             await db.SaveChangesAsync(cancellationToken);
             await outbox.FlushOutgoingMessagesAsync();
@@ -700,20 +703,20 @@ public static class RuntimeWriteBackHandler
             instance.ProviderReceiptJson = message.ProviderReceiptJson;
             instance.Urls = [];
             instance.State = RuntimeState.Stopping;
-            await InvalidateAwdpAttackFlagAsync(db, instance, DateTimeOffset.UtcNow, cancellationToken);
+            await InvalidateAwdpAttackFlagAsync(db, instance, timeProvider.GetUtcNow(), cancellationToken);
             await PublishRuntimeStopAsync(outbox, instance, message.RunnerId);
             await RecordRuntimeStateAsync(
                 events,
                 instance,
                 CompetitionEventLevel.Error,
-                DateTimeOffset.UtcNow,
+                timeProvider.GetUtcNow(),
                 cancellationToken);
             await db.SaveChangesAsync(cancellationToken);
             await outbox.FlushOutgoingMessagesAsync();
             return;
         }
 
-        var runningAt = DateTimeOffset.UtcNow;
+        var runningAt = timeProvider.GetUtcNow();
         instance.ProviderReceiptJson = message.ProviderReceiptJson;
         instance.Urls = normalizedUrls;
         instance.State = RuntimeState.Running;
@@ -723,7 +726,7 @@ public static class RuntimeWriteBackHandler
         await ActivateAwdpAttackFlagAsync(db, instance, runningAt, cancellationToken);
         await ReplacePublishedPortsAsync(
             instance, message, events, runningAt, cancellationToken);
-        var now = DateTimeOffset.UtcNow;
+        var now = timeProvider.GetUtcNow();
         var currentAwdFlag = instance.TeamId is null
             ? null
             : await db.ChallengeFlags.AsNoTracking()
@@ -753,13 +756,13 @@ public static class RuntimeWriteBackHandler
         await outbox.FlushOutgoingMessagesAsync();
     }
 
-    public static async Task Handle(
+    public static async Task ProvisionFailedAsync(
         RuntimeProvisionFailed message,
         NoCtfDbContext db,
-        CancellationToken cancellationToken,
-        ICompetitionEventRecorder? events = null)
+        ICompetitionEventRecorder events,
+        TimeProvider timeProvider,
+        CancellationToken cancellationToken)
     {
-        events ??= NullCompetitionEventRecorder.Instance;
         var instance = await db.RuntimeInstances.SingleOrDefaultAsync(
             candidate => candidate.Id == message.RuntimeInstanceId,
             cancellationToken);
@@ -776,17 +779,18 @@ public static class RuntimeWriteBackHandler
             db,
             events,
             null,
+            timeProvider,
             cancellationToken);
     }
 
-    public static async Task Handle(
+    public static async Task ProvisionTerminatedAsync(
         RuntimeProvisionTerminated message,
         NoCtfDbContext db,
         ITransactionalMessageOutbox outbox,
-        CancellationToken cancellationToken,
-        ICompetitionEventRecorder? events = null)
+        ICompetitionEventRecorder events,
+        TimeProvider timeProvider,
+        CancellationToken cancellationToken)
     {
-        events ??= NullCompetitionEventRecorder.Instance;
         var instance = await db.RuntimeInstances.SingleOrDefaultAsync(
             candidate => candidate.Id == message.RuntimeInstanceId,
             cancellationToken);
@@ -803,6 +807,7 @@ public static class RuntimeWriteBackHandler
                 db,
                 events,
                 outbox,
+                timeProvider,
                 cancellationToken);
             return;
         }
@@ -810,7 +815,7 @@ public static class RuntimeWriteBackHandler
             return;
 
         instance.State = RuntimeState.Stopped;
-        instance.StoppedAt = DateTimeOffset.UtcNow;
+        instance.StoppedAt = timeProvider.GetUtcNow();
         await InvalidateAwdpAttackFlagAsync(db, instance, instance.StoppedAt.Value, cancellationToken);
         await RecordRuntimeStateAsync(
             events,
@@ -828,11 +833,12 @@ public static class RuntimeWriteBackHandler
         NoCtfDbContext db,
         ICompetitionEventRecorder events,
         ITransactionalMessageOutbox? outbox,
+        TimeProvider timeProvider,
         CancellationToken cancellationToken)
     {
         instance.State = RuntimeState.Failed;
         instance.FailureCode = failureCode;
-        await InvalidateAwdpAttackFlagAsync(db, instance, DateTimeOffset.UtcNow, cancellationToken);
+        await InvalidateAwdpAttackFlagAsync(db, instance, timeProvider.GetUtcNow(), cancellationToken);
         if (instance.Purpose == RuntimePurpose.AwdpTarget
             && instance.GameplayFactId is Guid gameplayFactId)
         {
@@ -844,7 +850,7 @@ public static class RuntimeWriteBackHandler
             {
                 submission.State = NoCTF.Domain.Gameplay.GameplayFactState.PlatformFailed;
                 submission.FailureCode = NoCTF.Domain.Gameplay.GameplayFactFailureCode.CheckerPlatformError;
-                submission.UpdatedAt = DateTimeOffset.UtcNow;
+                submission.UpdatedAt = timeProvider.GetUtcNow();
                 if (outbox is not null)
                     await outbox.PublishAsync(new GameplayFactStateChanged(submission.Id, submission.State));
             }
@@ -853,21 +859,21 @@ public static class RuntimeWriteBackHandler
             events,
             instance,
             CompetitionEventLevel.Error,
-            DateTimeOffset.UtcNow,
+            timeProvider.GetUtcNow(),
             cancellationToken);
         await db.SaveChangesAsync(cancellationToken);
         if (outbox is not null)
             await outbox.FlushOutgoingMessagesAsync();
     }
 
-    public static async Task Handle(
+    public static async Task StoppedAsync(
         RuntimeStopped message,
         NoCtfDbContext db,
         ITransactionalMessageOutbox outbox,
-        CancellationToken cancellationToken,
-        ICompetitionEventRecorder? events = null)
+        ICompetitionEventRecorder events,
+        TimeProvider timeProvider,
+        CancellationToken cancellationToken)
     {
-        events ??= NullCompetitionEventRecorder.Instance;
         var instance = await db.RuntimeInstances.SingleOrDefaultAsync(
             candidate => candidate.Id == message.RuntimeInstanceId,
             cancellationToken);
@@ -877,7 +883,7 @@ public static class RuntimeWriteBackHandler
             return;
 
         instance.State = RuntimeState.Stopped;
-        instance.StoppedAt = DateTimeOffset.UtcNow;
+        instance.StoppedAt = timeProvider.GetUtcNow();
         await InvalidateAwdpAttackFlagAsync(db, instance, instance.StoppedAt.Value, cancellationToken);
         await RecordRuntimeStateAsync(
             events,
@@ -889,14 +895,14 @@ public static class RuntimeWriteBackHandler
         await outbox.FlushOutgoingMessagesAsync();
     }
 
-    public static async Task Handle(
+    public static async Task ForceTerminatedAsync(
         RuntimeForceTerminated message,
         NoCtfDbContext db,
         ITransactionalMessageOutbox outbox,
-        CancellationToken cancellationToken,
-        ICompetitionEventRecorder? events = null)
+        ICompetitionEventRecorder events,
+        TimeProvider timeProvider,
+        CancellationToken cancellationToken)
     {
-        events ??= NullCompetitionEventRecorder.Instance;
         var instance = await db.RuntimeInstances.SingleOrDefaultAsync(
             candidate => candidate.Id == message.RuntimeInstanceId,
             cancellationToken);
@@ -925,13 +931,12 @@ public static class RuntimeWriteBackHandler
         await outbox.FlushOutgoingMessagesAsync();
     }
 
-    public static async Task Handle(
+    public static async Task ForceTerminationFailedAsync(
         RuntimeForceTerminationFailed message,
         NoCtfDbContext db,
-        CancellationToken cancellationToken,
-        ICompetitionEventRecorder? events = null)
+        ICompetitionEventRecorder events,
+        CancellationToken cancellationToken)
     {
-        events ??= NullCompetitionEventRecorder.Instance;
         var instance = await db.RuntimeInstances.AsNoTracking()
             .SingleOrDefaultAsync(
                 candidate => candidate.Id == message.RuntimeInstanceId,
@@ -957,13 +962,13 @@ public static class RuntimeWriteBackHandler
         await db.SaveChangesAsync(cancellationToken);
     }
 
-    public static async Task Handle(
+    public static async Task StopFailedAsync(
         RuntimeStopFailed message,
         NoCtfDbContext db,
-        CancellationToken cancellationToken,
-        ICompetitionEventRecorder? events = null)
+        ICompetitionEventRecorder events,
+        TimeProvider timeProvider,
+        CancellationToken cancellationToken)
     {
-        events ??= NullCompetitionEventRecorder.Instance;
         var instance = await db.RuntimeInstances.SingleOrDefaultAsync(
             candidate => candidate.Id == message.RuntimeInstanceId,
             cancellationToken);
@@ -974,24 +979,24 @@ public static class RuntimeWriteBackHandler
 
         instance.State = RuntimeState.Failed;
         instance.FailureCode = message.FailureCode;
-        await InvalidateAwdpAttackFlagAsync(db, instance, DateTimeOffset.UtcNow, cancellationToken);
+        await InvalidateAwdpAttackFlagAsync(db, instance, timeProvider.GetUtcNow(), cancellationToken);
         await RecordRuntimeStateAsync(
             events,
             instance,
             CompetitionEventLevel.Error,
-            DateTimeOffset.UtcNow,
+            timeProvider.GetUtcNow(),
             cancellationToken);
         await db.SaveChangesAsync(cancellationToken);
     }
 
-    public static async Task Handle(
+    public static async Task ProvisionCanceledAsync(
         RuntimeProvisionCanceled message,
         NoCtfDbContext db,
         ITransactionalMessageOutbox outbox,
-        CancellationToken cancellationToken,
-        ICompetitionEventRecorder? events = null)
+        ICompetitionEventRecorder events,
+        TimeProvider timeProvider,
+        CancellationToken cancellationToken)
     {
-        events ??= NullCompetitionEventRecorder.Instance;
         var instance = await db.RuntimeInstances.SingleOrDefaultAsync(
             candidate => candidate.Id == message.RuntimeInstanceId,
             cancellationToken);
@@ -1002,7 +1007,7 @@ public static class RuntimeWriteBackHandler
             return;
 
         instance.State = RuntimeState.Stopped;
-        instance.StoppedAt = DateTimeOffset.UtcNow;
+        instance.StoppedAt = timeProvider.GetUtcNow();
         await InvalidateAwdpAttackFlagAsync(db, instance, instance.StoppedAt.Value, cancellationToken);
         await RecordRuntimeStateAsync(
             events,

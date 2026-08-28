@@ -7,7 +7,8 @@ namespace NoCTF.API.Endpoints.Administration.ChallengeBank;
 
 public sealed class RestoreChallengeTemplateEndpoint(
     RestoreChallengeTemplate restore,
-    IUserContext user)
+    IUserContext user,
+    TimeProvider timeProvider)
     : EndpointWithoutRequest<
         Results<
             NoContent,
@@ -37,7 +38,7 @@ public sealed class RestoreChallengeTemplateEndpoint(
             Route<Guid>("challengeId"),
             user.UserId,
             user.IsAdministrator,
-            DateTimeOffset.UtcNow,
+            timeProvider.GetUtcNow(),
             ct);
         return result.State switch
         {

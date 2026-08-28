@@ -61,6 +61,51 @@ public sealed partial class TargetArchitectureRulesTests
     }
 
     [Test]
+    public async Task Protocol_enums_do_not_round_trip_through_runtime_strings()
+    {
+        var apiRoot = Path.Combine(BackendRoot, "src", "NoCTF.API");
+        var violations = new List<string>();
+        foreach (var file in Directory.EnumerateFiles(apiRoot, "*.cs", SearchOption.AllDirectories)
+                     .Where(path => !path.Contains(
+                         $"{Path.DirectorySeparatorChar}obj{Path.DirectorySeparatorChar}",
+                         StringComparison.Ordinal)))
+        {
+            if (EnumStringRoundTripRegex().IsMatch(await File.ReadAllTextAsync(file)))
+                violations.Add(Path.GetRelativePath(BackendRoot, file));
+        }
+
+        await Assert.That(violations).IsEmpty();
+    }
+
+    [Test]
+    public async Task Business_code_uses_TimeProvider_instead_of_system_clock_reads()
+    {
+        var files = EnumerateProjectSourceFiles(
+                "NoCTF.Application",
+                "NoCTF.GameModes",
+                "NoCTF.Infrastructure",
+                "NoCTF.Runtime.Docker",
+                "NoCTF.Runtime.Kubernetes",
+                "NoCTF.Runner",
+                "NoCTF.Worker")
+            .Concat(Directory.EnumerateFiles(
+                Path.Combine(BackendRoot, "src", "NoCTF.API", "Endpoints"),
+                "*.cs",
+                SearchOption.AllDirectories))
+            .ToArray();
+        var violations = new List<string>();
+        foreach (var file in files)
+        {
+            var source = await File.ReadAllTextAsync(file);
+            if (source.Contains("DateTimeOffset.UtcNow", StringComparison.Ordinal)
+                || source.Contains("DateTime.UtcNow", StringComparison.Ordinal))
+                violations.Add(Path.GetRelativePath(BackendRoot, file));
+        }
+
+        await Assert.That(violations).IsEmpty();
+    }
+
+    [Test]
     public async Task Api_has_no_shared_models_files_or_provider_project_references()
     {
         var apiRoot = Path.Combine(BackendRoot, "src", "NoCTF.API");
@@ -212,6 +257,9 @@ public sealed partial class TargetArchitectureRulesTests
 
     [GeneratedRegex(@"\b(ServiceId|StageId|RuntimeOperationId|ChallengeInstanceId)\b")]
     private static partial Regex LegacyDimensionRegex();
+
+    [GeneratedRegex(@"Enum\.Parse<[^>]+>\([^\r\n;]*\.ToString\(\)\)")]
+    private static partial Regex EnumStringRoundTripRegex();
 
     [GeneratedRegex(@"\b(class|record|struct)\s+Ef[A-Z][A-Za-z0-9_]*\b")]
     private static partial Regex EfTypeNameRegex();

@@ -23,7 +23,7 @@ public sealed class IssuePlatformBotTokenValidator : Validator<IssuePlatformBotT
             ManagePlatform.MaximumBotTokenLifetimeSeconds);
 }
 
-public sealed class IssuePlatformBotTokenEndpoint(ManagePlatform platform)
+public sealed class IssuePlatformBotTokenEndpoint(ManagePlatform platform, TimeProvider timeProvider)
     : Endpoint<IssuePlatformBotTokenRequest,
         Results<Ok<IssuePlatformBotTokenResponse>, NotFound, ProblemHttpResult>>
 {
@@ -49,7 +49,7 @@ public sealed class IssuePlatformBotTokenEndpoint(ManagePlatform platform)
         var result = await platform.IssueBotTokenAsync(
             Route<Guid>("userId"),
             request.ExpiresInSeconds,
-            DateTimeOffset.UtcNow,
+            timeProvider.GetUtcNow(),
             ct);
         return result.Failure switch
         {

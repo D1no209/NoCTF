@@ -25,7 +25,8 @@ public sealed class UpdateCompetitionConfigurationValidator
 public sealed class UpdateCompetitionConfigurationEndpoint(
     UpdateCompetitionConfiguration update,
     ICompetitionModerationAuthorizer authorizer,
-    IUserContext user)
+    IUserContext user,
+    TimeProvider timeProvider)
     : Endpoint<UpdateCompetitionConfigurationRequest,
         Results<Ok<CompetitionConfigurationResponse>, NotFound, ForbidHttpResult, ProblemHttpResult>>
 {
@@ -54,7 +55,7 @@ public sealed class UpdateCompetitionConfigurationEndpoint(
         var result = await update.ExecuteAsync(
             competitionId,
             request.Json,
-            DateTimeOffset.UtcNow,
+            timeProvider.GetUtcNow(),
             ct);
         if (result.FailureCode == CompetitionConfigurationFailureCode.CompetitionNotFound)
             return TypedResults.NotFound();

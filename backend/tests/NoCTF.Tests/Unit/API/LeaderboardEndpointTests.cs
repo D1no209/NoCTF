@@ -8,8 +8,10 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 using NoCTF.API.Composition;
 using NoCTF.API.Endpoints.Competitions;
+using NoCTF.API.Pagination;
 using NoCTF.Application.Competitions.Visibility;
 using NoCTF.Application.Competitions.Tracks;
 using NoCTF.Application.Messaging;
@@ -1116,7 +1118,12 @@ public sealed class LeaderboardEndpointTests
         builder.Services.AddSingleton(detailReader ?? new StaticScoreboardDetailReader());
         builder.Services.AddSingleton<IScoreboardTrendFactReader>(new StaticScoreboardTrendFactReader());
         builder.Services.AddSingleton<BuildScoreboardTrends>();
-        builder.Services.AddSingleton<NoCTF.API.Pagination.SignedKeysetCursor>();
+        builder.Services.AddSingleton(TimeProvider.System);
+        builder.Services.AddSingleton(Options.Create(new PaginationOptions
+        {
+            SigningKey = "leaderboard-endpoint-tests-signing-key"
+        }));
+        builder.Services.AddSingleton<SignedKeysetCursor>();
 
         var app = builder.Build();
         app.UseNoCtfEndpoints();

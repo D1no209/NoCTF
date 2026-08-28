@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.HttpResults;
 using NoCTF.API.Security;
 using NoCTF.Application.Authentication.Account;
+using Microsoft.Extensions.Options;
 
 namespace NoCTF.API.Endpoints.Authentication;
 
@@ -36,7 +37,8 @@ public sealed record ChangePasswordFailureResponse(ChangePasswordFailureCode Cod
 public sealed class ChangePasswordEndpoint(
     ChangePassword change,
     IUserContext user,
-    IConfiguration configuration)
+    IOptions<RefreshHttpOptions> options,
+    TimeProvider timeProvider)
     : Endpoint<ChangePasswordRequest,
         Results<NoContent, Conflict<ChangePasswordFailureResponse>>>
 {
@@ -59,15 +61,15 @@ public sealed class ChangePasswordEndpoint(
             user.UserId,
             request.CurrentPassword,
             request.NewPassword,
-            DateTimeOffset.UtcNow,
+            timeProvider.GetUtcNow(),
             ct);
         if (result != ChangePasswordState.Changed)
             return TypedResults.Conflict(new ChangePasswordFailureResponse(
                 ChangePasswordFailureCode.CurrentPasswordInvalid));
 
         HttpContext.Response.Cookies.Delete(
-            RefreshCookie.Name(configuration),
-            RefreshCookie.DeleteOptions(configuration));
+            RefreshCookie.Name(options.Value),
+            RefreshCookie.DeleteOptions(options.Value));
         return TypedResults.NoContent();
     }
 }

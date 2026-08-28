@@ -12,8 +12,10 @@ namespace NoCTF.Runtime.Docker.Compose;
 public sealed class DockerComposeRuntime(
     DockerRuntimeOptions options,
     string dockerExecutable = "docker",
-    string? workDirectory = null) : IComposeRuntime
+    string? workDirectory = null,
+    TimeProvider? clock = null) : IComposeRuntime
 {
+    private readonly TimeProvider timeProvider = clock ?? TimeProvider.System;
     private const string RuntimeMetadataFileName = "noctf-runtime.json";
     private static readonly JsonSerializerOptions JsonOptions =
         new(JsonSerializerDefaults.Web);
@@ -74,7 +76,7 @@ public sealed class DockerComposeRuntime(
             request.ProjectName,
             directory,
             options.PublicHost,
-            DateTimeOffset.UtcNow);
+            timeProvider.GetUtcNow());
     }
 
     public async Task DownAsync(ComposeReceipt receipt, CancellationToken cancellationToken)

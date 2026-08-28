@@ -1,5 +1,6 @@
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 using NoCTF.Application.Administration.PlatformLogs;
 using NoCTF.Application.Authentication.EmailVerification;
 using NoCTF.Application.Messaging;
@@ -19,10 +20,32 @@ public static class WorkerRole
 {
     public static IServiceCollection AddNoCtfWorkerRole(
         this IServiceCollection services,
+        IConfiguration configuration,
         bool collectQueueMetrics = true,
         bool validateMessageTopology = true,
         bool enableClusterScheduling = true)
     {
+        services.AddOptions<WorkerQueueOptions>()
+            .Configure(options =>
+            {
+                var enabled = WorkerQueues.GetEnabled(configuration);
+                options.Enabled = enabled;
+                options.Concurrency = enabled.ToDictionary(
+                    queue => queue,
+                    queue => WorkerQueues.GetConcurrency(configuration, queue));
+            })
+            .Validate(options => options.Enabled.Count > 0,
+                "Worker:Queues must select at least one queue.")
+            .ValidateOnStart();
+        services.AddTransient<AccountNotificationMessageHandler>();
+        services.AddTransient<GameplayFactMessageHandler>();
+        services.AddTransient<LeaderboardMessageHandler>();
+        services.AddTransient<FileCleanupMessageHandler>();
+        services.AddTransient<AwdMessageHandler>();
+        services.AddTransient<CompetitionLifecycleMessageHandler>();
+        services.AddTransient<AwdpMessageHandler>();
+        services.AddTransient<RuntimeDispatchMessageHandler>();
+        services.AddTransient<GameplayFactDrainMessageHandler>();
         services.AddSingleton<LeaderboardProjectionMergeQueue>();
         if (enableClusterScheduling)
         {
@@ -52,7 +75,15 @@ public static class WorkerRole
         IConfiguration configuration,
         bool durable = true)
     {
-        options.Discovery.IncludeType(typeof(BackendMessageHandlers));
+        options.Discovery.IncludeType(typeof(FileCleanupMessageHandler));
+        options.Discovery.IncludeType(typeof(AwdMessageHandler));
+        options.Discovery.IncludeType(typeof(CompetitionLifecycleMessageHandler));
+        options.Discovery.IncludeType(typeof(AwdpMessageHandler));
+        options.Discovery.IncludeType(typeof(RuntimeDispatchMessageHandler));
+        options.Discovery.IncludeType(typeof(GameplayFactDrainMessageHandler));
+        options.Discovery.IncludeType(typeof(AccountNotificationMessageHandler));
+        options.Discovery.IncludeType(typeof(GameplayFactMessageHandler));
+        options.Discovery.IncludeType(typeof(LeaderboardMessageHandler));
         options.Discovery.IncludeType(typeof(CompetitionNotificationMessageHandlers));
         var enabledQueues = WorkerQueues.GetEnabled(configuration);
         if (enabledQueues.Contains(WorkerQueue.Background))

@@ -1,5 +1,4 @@
 using Microsoft.AspNetCore.Http;
-using Microsoft.Extensions.Configuration;
 using NoCTF.API.Endpoints.Authentication;
 
 namespace NoCTF.Tests.Unit.Api;
@@ -10,7 +9,7 @@ public sealed class RefreshRequestGuardTests
     public async Task IsAllowed_UsesConfiguredFrontendOrigin()
     {
         var request = Request("https://api.noctf.example", "https://app.noctf.example");
-        var configuration = Configuration(["https://app.noctf.example"]);
+        var configuration = Options(["https://app.noctf.example"]);
 
         await Assert.That(RefreshRequestGuard.IsAllowed(request, configuration)).IsTrue();
     }
@@ -19,7 +18,7 @@ public sealed class RefreshRequestGuardTests
     public async Task IsAllowed_RejectsAnOriginOutsideTheConfiguredDeploymentDomains()
     {
         var request = Request("https://api.noctf.example", "https://untrusted.example");
-        var configuration = Configuration(["https://app.noctf.example"]);
+        var configuration = Options(["https://app.noctf.example"]);
 
         await Assert.That(RefreshRequestGuard.IsAllowed(request, configuration)).IsFalse();
     }
@@ -29,7 +28,7 @@ public sealed class RefreshRequestGuardTests
     {
         var request = Request("https://api.noctf.example", "https://api.noctf.example");
 
-        await Assert.That(RefreshRequestGuard.IsAllowed(request, Configuration([]))).IsTrue();
+        await Assert.That(RefreshRequestGuard.IsAllowed(request, Options([]))).IsTrue();
     }
 
     [Test]
@@ -40,7 +39,7 @@ public sealed class RefreshRequestGuardTests
 
         await Assert.That(RefreshRequestGuard.IsAllowed(
             request,
-            Configuration(["https://app.noctf.example"]))).IsTrue();
+            Options(["https://app.noctf.example"]))).IsTrue();
     }
 
     private static HttpRequest Request(string apiOrigin, string? origin)
@@ -53,9 +52,8 @@ public sealed class RefreshRequestGuardTests
         return context.Request;
     }
 
-    private static IConfiguration Configuration(string[] allowedOrigins) =>
-        new ConfigurationBuilder()
-            .AddInMemoryCollection(allowedOrigins.Select((origin, index) =>
-                new KeyValuePair<string, string?>($"Authentication:RefreshAllowedOrigins:{index}", origin)))
-            .Build();
+    private static RefreshHttpOptions Options(string[] allowedOrigins) => new()
+    {
+        RefreshAllowedOrigins = allowedOrigins
+    };
 }

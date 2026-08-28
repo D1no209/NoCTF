@@ -21,13 +21,12 @@ public sealed class CompetitionQuestionStore(
     NoCtfDbContext db,
     ITransactionalMessageOutbox outbox,
     ICompetitionEventRecorder events,
-    ILogger<CompetitionQuestionStore> logger) : ICompetitionQuestionStore
+    ILogger<CompetitionQuestionStore> logger,
+    CompetitionQuestionAccessResolver? configuredAccessResolver = null)
+    : ICompetitionQuestionStore
 {
-    private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web)
-    {
-        Converters = { new JsonStringEnumConverter() }
-    };
-
+    private readonly CompetitionQuestionAccessResolver accessResolver =
+        configuredAccessResolver ?? new(db);
     public async Task<CompetitionQuestionMutationResult> CreateAsync(
         CreateCompetitionQuestionCommand command,
         CancellationToken ct)
@@ -150,7 +149,7 @@ public sealed class CompetitionQuestionStore(
             TargetType = NotificationTargetType.CompetitionCollaborators,
             TargetId = command.CompetitionId,
             Kind = NotificationKind.QuestionOpened,
-            ContentJson = JsonSerializer.Serialize(root, JsonOptions),
+            ContentJson = JsonSerializer.Serialize(root, CompetitionQuestionSerialization.Options),
             SentAt = command.Now,
             RelatedType = EntityReferenceKind.Competition,
             RelatedId = command.CompetitionId,
@@ -195,11 +194,11 @@ public sealed class CompetitionQuestionStore(
         CompetitionQuestionQuery query,
         CancellationToken ct)
     {
-        var actor = await ResolveActorContextAsync(query.CompetitionId, query.ActorUserId, ct);
+        var actor = await accessResolver.ResolveActorAsync(query.CompetitionId, query.ActorUserId, ct);
         if (actor is null)
             return new([], null);
         var limit = Math.Clamp(query.Limit, 1, CompetitionQuestionRules.MaximumListLimit);
-        var ownedChallengeIds = await ResolveOwnedCompetitionChallengeIdsAsync(
+        var ownedChallengeIds = await accessResolver.ResolveOwnedChallengeIdsAsync(
             query.CompetitionId,
             query.ActorUserId,
             actor,
@@ -210,7 +209,7 @@ public sealed class CompetitionQuestionStore(
             .Select(aggregate => new
             {
                 Question = aggregate,
-                Resolution = ResolveAccess(aggregate, actor, ownedChallengeIds)
+                Resolution = CompetitionQuestionAccessResolver.Resolve(aggregate, actor, ownedChallengeIds)
             })
             .Where(input => input.Resolution is not null)
             .Select(input => new QuestionViewInput(
@@ -234,10 +233,10 @@ public sealed class CompetitionQuestionStore(
         CancellationToken ct)
     {
         var aggregate = await LoadAggregateAsync(competitionId, questionId, ct);
-        var actor = await ResolveActorContextAsync(competitionId, actorUserId, ct);
+        var actor = await accessResolver.ResolveActorAsync(competitionId, actorUserId, ct);
         if (aggregate is null || actor is null)
             return null;
-        var access = await ResolveAccessAsync(aggregate, actorUserId, actor, ct);
+        var access = await accessResolver.ResolveAsync(aggregate, actorUserId, actor, ct);
         return access is null
             ? null
             : await BuildViewAsync(aggregate, access.Value.Access, true, ct);
@@ -252,7 +251,7 @@ public sealed class CompetitionQuestionStore(
             ct);
         await AcquireQuestionLockAsync(command.QuestionId, ct);
         var aggregate = await LoadAggregateAsync(command.CompetitionId, command.QuestionId, ct);
-        var actor = await ResolveActorContextAsync(command.CompetitionId, command.ActorUserId, ct);
+        var actor = await accessResolver.ResolveActorAsync(command.CompetitionId, command.ActorUserId, ct);
         if (aggregate is null)
             return Failure(
                 CompetitionQuestionFailure.NotFound,
@@ -262,7 +261,7 @@ public sealed class CompetitionQuestionStore(
                 command.ActorUserId);
         var access = actor is null
             ? null
-            : await ResolveAccessAsync(aggregate, command.ActorUserId, actor, ct);
+            : await accessResolver.ResolveAsync(aggregate, command.ActorUserId, actor, ct);
         if (access is null
             || access.Value.Access is not (CompetitionQuestionAccess.Asker
                 or CompetitionQuestionAccess.Handler))
@@ -300,7 +299,8 @@ public sealed class CompetitionQuestionStore(
                     command.ActorUserId,
                     actor.MaxActiveQuestionsPerTeam);
             }
-            var participantMessages = CountParticipantMessagesSinceHandlerReply(aggregate);
+            var participantMessages = CompetitionQuestionViewProjection
+                .CountParticipantMessagesSinceHandlerReply(aggregate);
             if (CompetitionQuestionRules.ValidateParticipantMessageLimit(
                     participantMessages,
                     actor!.MaxParticipantMessagesBeforeHandlerReply) is { } limitFailure)
@@ -324,7 +324,7 @@ public sealed class CompetitionQuestionStore(
             aggregate,
             command.ActorUserId,
             NotificationKind.Message,
-            JsonSerializer.Serialize(payload, JsonOptions),
+            JsonSerializer.Serialize(payload, CompetitionQuestionSerialization.Options),
             command.Now);
         db.Notifications.Add(node);
         await events.RecordAsync(new(
@@ -370,7 +370,7 @@ public sealed class CompetitionQuestionStore(
             ct);
         await AcquireQuestionLockAsync(command.QuestionId, ct);
         var aggregate = await LoadAggregateAsync(command.CompetitionId, command.QuestionId, ct);
-        var actor = await ResolveActorContextAsync(command.CompetitionId, command.ActorUserId, ct);
+        var actor = await accessResolver.ResolveActorAsync(command.CompetitionId, command.ActorUserId, ct);
         if (aggregate is null)
             return Failure(
                 CompetitionQuestionFailure.NotFound,
@@ -380,7 +380,7 @@ public sealed class CompetitionQuestionStore(
                 command.ActorUserId);
         var access = actor is null
             ? null
-            : await ResolveAccessAsync(aggregate, command.ActorUserId, actor, ct);
+            : await accessResolver.ResolveAsync(aggregate, command.ActorUserId, actor, ct);
         if (access is null
             || access.Value.Access is not (CompetitionQuestionAccess.Asker
                 or CompetitionQuestionAccess.Handler))
@@ -405,7 +405,7 @@ public sealed class CompetitionQuestionStore(
             aggregate,
             command.ActorUserId,
             NotificationKind.QuestionStatusChanged,
-            JsonSerializer.Serialize(payload, JsonOptions),
+            JsonSerializer.Serialize(payload, CompetitionQuestionSerialization.Options),
             command.Now);
         db.Notifications.Add(node);
         await events.RecordAsync(new(
@@ -593,7 +593,7 @@ public sealed class CompetitionQuestionStore(
             var aggregates = await LoadAggregatesAsync(candidates, ct);
             return aggregates
                 .Where(aggregate => MatchesQuery(aggregate, query)
-                    && ResolveAccess(aggregate, actor, ownedChallengeIds) is not null
+                    && CompetitionQuestionAccessResolver.Resolve(aggregate, actor, ownedChallengeIds) is not null
                     && IsBeforePosition(aggregate, query.Position))
                 .OrderByDescending(aggregate => aggregate.UpdatedAt)
                 .ThenByDescending(aggregate => aggregate.RootNotification.Id)
@@ -750,97 +750,6 @@ public sealed class CompetitionQuestionStore(
         return rootsWithActiveHeads.Length;
     }
 
-    private static int CountParticipantMessagesSinceHandlerReply(
-        QuestionAggregate aggregate)
-    {
-        var messages = aggregate.Nodes
-            .Where(node => node.Kind == NotificationKind.Message)
-            .Select(node => JsonSerializer.Deserialize<QuestionMessagePayload>(
-                node.ContentJson,
-                JsonOptions)!)
-            .ToArray();
-        var lastHandlerIndex = Array.FindLastIndex(
-            messages,
-            message => CompetitionQuestionRules.IsHandler(message.ActorRole));
-        var participantMessages = messages
-            .Skip(lastHandlerIndex + 1)
-            .Count(message => CompetitionQuestionRules.IsParticipant(message.ActorRole));
-        return lastHandlerIndex < 0 ? participantMessages + 1 : participantMessages;
-    }
-
-    private async Task<ActorContext?> ResolveActorContextAsync(
-        Guid competitionId,
-        Guid actorUserId,
-        CancellationToken ct)
-    {
-        var user = await db.Users.AsNoTracking()
-            .Where(candidate => candidate.Id == actorUserId
-                && candidate.Kind == UserKind.Human
-                && candidate.AccountStatus == UserAccountStatus.Active)
-            .Select(candidate => new { candidate.Role })
-            .SingleOrDefaultAsync(ct);
-        var competition = await db.Competitions.AsNoTracking()
-            .Where(candidate => candidate.Id == competitionId)
-            .Select(candidate => new
-            {
-                candidate.OwnerId,
-                candidate.ManagerIds,
-                candidate.JudgeIds,
-                candidate.ObserverIds,
-                candidate.MaxActiveQuestionsPerTeam,
-                candidate.MaxParticipantMessagesBeforeHandlerReply,
-                candidate.AllowChallengeOwnersToHandleQuestions
-            })
-            .SingleOrDefaultAsync(ct);
-        if (user is null || competition is null)
-            return null;
-        var teamId = await db.Teams.AsNoTracking()
-            .Where(team =>
-                team.CompetitionId == competitionId
-                && team.MemberIds.Contains(actorUserId)
-                && team.DeletedAt == null
-                && team.RegistrationStatus == TeamRegistrationStatus.Approved
-                && !team.IsBanned)
-            .Select(team => (Guid?)team.Id)
-            .SingleOrDefaultAsync(ct);
-        return new(
-            user.Role == UserRole.Administrator,
-            competition.OwnerId == actorUserId
-                || competition.ManagerIds.Contains(actorUserId),
-            competition.JudgeIds.Contains(actorUserId),
-            competition.ObserverIds.Contains(actorUserId),
-            teamId,
-            competition.MaxActiveQuestionsPerTeam,
-            competition.MaxParticipantMessagesBeforeHandlerReply,
-            competition.AllowChallengeOwnersToHandleQuestions);
-    }
-
-    private async Task<Guid[]> ResolveOwnedCompetitionChallengeIdsAsync(
-        Guid competitionId,
-        Guid actorUserId,
-        ActorContext actor,
-        CancellationToken ct)
-    {
-        if (!actor.AllowChallengeOwnersToHandleQuestions
-            || actor.IsPlatformAdministrator
-            || actor.IsCompetitionManager
-            || actor.IsJudge
-            || actor.IsObserver)
-            return [];
-        return await db.CompetitionChallenges.AsNoTracking()
-            .Where(binding => binding.CompetitionId == competitionId)
-            .Join(
-                db.Challenges.AsNoTracking(),
-                binding => binding.ChallengeId,
-                challenge => challenge.Id,
-                (binding, challenge) => new { binding.Id, challenge.OwnerId, challenge.ManagerIds })
-            .Where(item => item.OwnerId == actorUserId
-                || item.ManagerIds.Contains(actorUserId))
-            .OrderBy(item => item.Id)
-            .Select(item => item.Id)
-            .ToArrayAsync(ct);
-    }
-
     private static bool MatchesQuery(
         QuestionAggregate aggregate,
         CompetitionQuestionQuery query) =>
@@ -856,80 +765,6 @@ public sealed class CompetitionQuestionStore(
         || aggregate.UpdatedAt < position.UpdatedAt
         || aggregate.UpdatedAt == position.UpdatedAt
         && aggregate.RootNotification.Id.CompareTo(position.Id) < 0;
-
-    private static AccessResolution? ResolveAccess(
-        QuestionAggregate question,
-        ActorContext actor,
-        IReadOnlyCollection<Guid> ownedChallengeIds)
-    {
-        if (actor.IsPlatformAdministrator)
-            return new(
-                CompetitionQuestionAccess.Handler,
-                CompetitionQuestionParticipantRole.PlatformAdministrator);
-        if (actor.IsCompetitionManager)
-            return new(
-                CompetitionQuestionAccess.Handler,
-                CompetitionQuestionParticipantRole.CompetitionManager);
-        if (actor.IsJudge)
-            return new(
-                CompetitionQuestionAccess.Handler,
-                CompetitionQuestionParticipantRole.Judge);
-        if (actor.IsObserver)
-            return new(
-                CompetitionQuestionAccess.Observer,
-                CompetitionQuestionParticipantRole.Handler);
-        if (actor.TeamId == question.Root.TeamId)
-            return new(
-                CompetitionQuestionAccess.Asker,
-                CompetitionQuestionParticipantRole.Participant);
-        if (actor.AllowChallengeOwnersToHandleQuestions
-            && question.Root.CompetitionChallengeId is { } challengeId
-            && ownedChallengeIds.Contains(challengeId))
-            return new(
-                CompetitionQuestionAccess.Handler,
-                CompetitionQuestionParticipantRole.ChallengeOwner);
-        return null;
-    }
-
-    private async Task<AccessResolution?> ResolveAccessAsync(
-        QuestionAggregate question,
-        Guid actorUserId,
-        ActorContext actor,
-        CancellationToken ct)
-    {
-        if (actor.IsPlatformAdministrator)
-            return new(
-                CompetitionQuestionAccess.Handler,
-                CompetitionQuestionParticipantRole.PlatformAdministrator);
-        if (actor.IsCompetitionManager)
-            return new(
-                CompetitionQuestionAccess.Handler,
-                CompetitionQuestionParticipantRole.CompetitionManager);
-        if (actor.IsJudge)
-            return new(
-                CompetitionQuestionAccess.Handler,
-                CompetitionQuestionParticipantRole.Judge);
-        if (actor.IsObserver)
-            return new(
-                CompetitionQuestionAccess.Observer,
-                CompetitionQuestionParticipantRole.Handler);
-        if (actor.TeamId == question.Root.TeamId)
-            return new(
-                CompetitionQuestionAccess.Asker,
-                CompetitionQuestionParticipantRole.Participant);
-        if (actor.AllowChallengeOwnersToHandleQuestions
-            && question.Root.CompetitionChallengeId is { } challengeId
-            && await db.CompetitionChallenges.AsNoTracking().AnyAsync(binding =>
-                binding.Id == challengeId
-                && binding.CompetitionId == question.RootNotification.TargetId
-                && db.Challenges.Any(challenge => challenge.Id == binding.ChallengeId
-                    && (challenge.OwnerId == actorUserId
-                        || challenge.ManagerIds.Contains(actorUserId))), ct))
-            return new(
-                CompetitionQuestionAccess.Handler,
-                CompetitionQuestionParticipantRole.ChallengeOwner);
-        return null;
-    }
 
     private async Task<CompetitionQuestionView> BuildViewAsync(
         QuestionAggregate question,
@@ -987,7 +822,7 @@ public sealed class CompetitionQuestionStore(
                 competition => competition.Id,
                 competition => competition.MaxParticipantMessagesBeforeHandlerReply,
                 ct);
-        return questions.Select(input => BuildView(
+        return questions.Select(input => CompetitionQuestionViewProjection.Build(
             input.Question,
             input.Access,
             includeEntries,
@@ -997,94 +832,11 @@ public sealed class CompetitionQuestionStore(
             participantMessageLimits[input.Question.RootNotification.TargetId])).ToArray();
     }
 
-    private static CompetitionQuestionView BuildView(
-        QuestionAggregate question,
-        CompetitionQuestionAccess access,
-        bool includeEntries,
-        IReadOnlyDictionary<Guid, string> names,
-        IReadOnlyDictionary<Guid, string> teamNames,
-        IReadOnlyDictionary<Guid, string> challengeTitles,
-        int maximumParticipantMessages)
-    {
-        var askerId = question.RootNotification.SourceId!.Value;
-        var lastNode = question.Nodes.LastOrDefault();
-        var lastActorId = lastNode?.SourceId ?? askerId;
-        var lastActorRole = lastNode is null
-            ? CompetitionQuestionParticipantRole.Participant
-            : ReadActorRole(lastNode);
-        var remainingParticipantMessages = Math.Max(
-            0,
-            maximumParticipantMessages
-                - CountParticipantMessagesSinceHandlerReply(question));
-        var entries = includeEntries
-            ? question.Nodes.Select(node => MapEntry(node, names))
-                .Prepend(new CompetitionQuestionEntryView(
-                    question.RootNotification.Id,
-                    CompetitionQuestionEntryKind.Message,
-                    CompetitionQuestionParticipantRole.Participant,
-                    askerId,
-                    names.GetValueOrDefault(askerId, "已删除用户"),
-                    question.Root.Body,
-                    null,
-                    null,
-                    null,
-                    question.RootNotification.SentAt))
-                .ToArray()
-            : [];
-        return new(
-            question.RootNotification.Id,
-            question.RootNotification.TargetId,
-            question.Root.CompetitionChallengeId,
-            question.Root.TeamId,
-            askerId,
-            names.GetValueOrDefault(askerId, "已删除用户"),
-            teamNames.GetValueOrDefault(question.Root.TeamId),
-            question.Root.GameplayFactId,
-            question.Root.Subject,
-            question.Root.CompetitionChallengeId is { } challengeId
-                ? challengeTitles.GetValueOrDefault(challengeId)
-                : null,
-            question.Root.Title,
-            question.Root.Body,
-            question.Status,
-            access,
-            names.GetValueOrDefault(lastActorId, "已删除用户"),
-            lastActorRole,
-            remainingParticipantMessages,
-            maximumParticipantMessages,
-            question.RootNotification.SentAt,
-            question.Nodes.Count == 0 ? question.RootNotification.SentAt : question.Nodes[^1].SentAt,
-            entries);
-    }
-
-    private static CompetitionQuestionEntryView MapEntry(
-        Notification node,
-        IReadOnlyDictionary<Guid, string> names)
-    {
-        var actorId = node.SourceId ?? Guid.Empty;
-        if (node.Kind == NotificationKind.Message)
-        {
-            var payload = JsonSerializer.Deserialize<QuestionMessagePayload>(node.ContentJson, JsonOptions)!;
-            return new(node.Id, CompetitionQuestionEntryKind.Message, payload.ActorRole,
-                node.SourceId, names.GetValueOrDefault(actorId, "已删除用户"), payload.Body,
-                payload.From, payload.To, null, node.SentAt);
-        }
-        var status = JsonSerializer.Deserialize<QuestionStatusPayload>(node.ContentJson, JsonOptions)!;
-        return new(node.Id, CompetitionQuestionEntryKind.StatusTransition, status.ActorRole,
-            node.SourceId, names.GetValueOrDefault(actorId, "已删除用户"), null,
-            status.From, status.To, null, node.SentAt);
-    }
-
-    private static CompetitionQuestionParticipantRole ReadActorRole(Notification node) =>
-        node.Kind == NotificationKind.Message
-            ? JsonSerializer.Deserialize<QuestionMessagePayload>(node.ContentJson, JsonOptions)!.ActorRole
-            : JsonSerializer.Deserialize<QuestionStatusPayload>(node.ContentJson, JsonOptions)!.ActorRole;
-
     private static QuestionRootPayload? ParseRoot(string json)
     {
         try
         {
-            return JsonSerializer.Deserialize<QuestionRootPayload>(json, JsonOptions);
+            return JsonSerializer.Deserialize<QuestionRootPayload>(json, CompetitionQuestionSerialization.Options);
         }
         catch (JsonException)
         {
@@ -1118,7 +870,7 @@ public sealed class CompetitionQuestionStore(
             teamId,
             userId);
 
-    private sealed record ActorContext(
+    internal sealed record ActorContext(
         bool IsPlatformAdministrator,
         bool IsCompetitionManager,
         bool IsJudge,
@@ -1128,15 +880,15 @@ public sealed class CompetitionQuestionStore(
         int MaxParticipantMessagesBeforeHandlerReply,
         bool AllowChallengeOwnersToHandleQuestions);
 
-    private readonly record struct AccessResolution(
+    internal readonly record struct AccessResolution(
         CompetitionQuestionAccess Access,
         CompetitionQuestionParticipantRole ActorRole);
 
-    private readonly record struct QuestionViewInput(
+    internal readonly record struct QuestionViewInput(
         QuestionAggregate Question,
         CompetitionQuestionAccess Access);
 
-    private sealed record QuestionRootPayload(
+    internal sealed record QuestionRootPayload(
         int SchemaVersion,
         CompetitionQuestionSubject Subject,
         string Title,
@@ -1146,20 +898,20 @@ public sealed class CompetitionQuestionStore(
         Guid? GameplayFactId,
         CompetitionQuestionStatus Status);
 
-    private sealed record QuestionMessagePayload(
+    internal sealed record QuestionMessagePayload(
         int SchemaVersion,
         string Body,
         CompetitionQuestionStatus From,
         CompetitionQuestionStatus To,
         CompetitionQuestionParticipantRole ActorRole);
 
-    private sealed record QuestionStatusPayload(
+    internal sealed record QuestionStatusPayload(
         int SchemaVersion,
         CompetitionQuestionStatus From,
         CompetitionQuestionStatus To,
         CompetitionQuestionParticipantRole ActorRole);
 
-    private sealed record QuestionAggregate(
+    internal sealed record QuestionAggregate(
         Notification RootNotification,
         QuestionRootPayload Root,
         List<Notification> Nodes)
@@ -1179,10 +931,10 @@ public sealed class CompetitionQuestionStore(
                 return statusNode.Kind == NotificationKind.Message
                     ? JsonSerializer.Deserialize<QuestionMessagePayload>(
                         statusNode.ContentJson,
-                        JsonOptions)!.To
+                        CompetitionQuestionSerialization.Options)!.To
                     : JsonSerializer.Deserialize<QuestionStatusPayload>(
                         statusNode.ContentJson,
-                        JsonOptions)!.To;
+                        CompetitionQuestionSerialization.Options)!.To;
             }
         }
     }

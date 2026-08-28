@@ -16,7 +16,8 @@ public sealed class DeleteChallengeRequest
 public sealed class DeleteChallengeEndpoint(
     DeleteChallenge delete,
     ICompetitionModerationAuthorizer authorizer,
-    IUserContext user)
+    IUserContext user,
+    TimeProvider timeProvider)
     : Endpoint<DeleteChallengeRequest,
         Results<
             NoContent,
@@ -55,7 +56,7 @@ public sealed class DeleteChallengeEndpoint(
         var result = await delete.ExecuteAsync(
             competitionId,
             request.CompetitionChallengeId,
-            DateTimeOffset.UtcNow,
+            timeProvider.GetUtcNow(),
             ct);
         return result switch
         {

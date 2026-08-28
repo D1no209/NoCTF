@@ -3,6 +3,14 @@ using NoCTF.Application.Messaging;
 
 namespace NoCTF.Hosting;
 
+public sealed class WorkerQueueOptions
+{
+    public IReadOnlyList<WorkerQueue> Enabled { get; set; } = WorkerQueueNames.All;
+
+    public IReadOnlyDictionary<WorkerQueue, int> Concurrency { get; set; } =
+        new Dictionary<WorkerQueue, int>();
+}
+
 public static class WorkerQueues
 {
     public const string Control = WorkerQueueNames.Control;

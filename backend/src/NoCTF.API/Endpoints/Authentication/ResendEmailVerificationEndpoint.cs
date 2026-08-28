@@ -8,7 +8,8 @@ namespace NoCTF.API.Endpoints.Authentication;
 
 public sealed class ResendEmailVerificationEndpoint(
     ResendEmailVerification resend,
-    IUserContext user)
+    IUserContext user,
+    TimeProvider timeProvider)
     : EndpointWithoutRequest<Results<NoContent, ProblemHttpResult>>
 {
     public override void Configure()
@@ -25,7 +26,7 @@ public sealed class ResendEmailVerificationEndpoint(
     public override async Task<
         Results<NoContent, ProblemHttpResult>> ExecuteAsync(CancellationToken ct)
     {
-        var result = await resend.ExecuteAsync(user.UserId, DateTimeOffset.UtcNow, ct);
+        var result = await resend.ExecuteAsync(user.UserId, timeProvider.GetUtcNow(), ct);
         return result.Succeeded
             ? TypedResults.NoContent()
             : TypedResults.Problem(

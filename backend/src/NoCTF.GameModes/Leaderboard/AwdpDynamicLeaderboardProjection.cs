@@ -28,7 +28,8 @@ internal static class AwdpDynamicLeaderboardProjection
         var challenges = (input.Challenges ?? [])
             .Where(challenge => !challenge.IsDeleted)
             .ToDictionary(challenge => challenge.Id);
-        var projectedAt = input.ProjectedAt ?? DateTimeOffset.UtcNow;
+        var projectedAt = input.ProjectedAt
+            ?? throw new InvalidOperationException("Leaderboard projection time is required.");
         var elapsed = EffectiveElapsed(
             projectedAt,
             input.LifecycleAudits,

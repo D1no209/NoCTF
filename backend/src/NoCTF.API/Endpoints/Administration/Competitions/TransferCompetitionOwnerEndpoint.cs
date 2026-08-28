@@ -21,7 +21,8 @@ public sealed class TransferCompetitionOwnerValidator : Validator<TransferCompet
 
 public sealed class TransferCompetitionOwnerEndpoint(
     TransferCompetitionOwner transfer,
-    IUserContext user)
+    IUserContext user,
+    TimeProvider timeProvider)
     : Endpoint<
         TransferCompetitionOwnerRequest,
         Results<
@@ -56,12 +57,14 @@ public sealed class TransferCompetitionOwnerEndpoint(
             user.UserId,
             user.IsAdministrator,
             request.OwnerId,
-            DateTimeOffset.UtcNow,
+            timeProvider.GetUtcNow(),
             ct);
         return result.State switch
         {
             CompetitionOwnerTransferState.Transferred =>
-                TypedResults.Ok(CompetitionMapper.ToResponse(result.Competition!)),
+                TypedResults.Ok(CompetitionMapper.ToResponse(
+                    result.Competition!,
+                    timeProvider.GetUtcNow())),
             CompetitionOwnerTransferState.NotFound => TypedResults.NotFound(),
             CompetitionOwnerTransferState.UserNotFound =>
                 TypedResults.Conflict(

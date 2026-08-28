@@ -13,6 +13,10 @@ namespace NoCTF.Tests.Unit.GameModes;
 
 public sealed class NormalizedScoreboardProjectionTests
 {
+    private static ScoreboardProjection ProjectNormalized(
+        LeaderboardProjectionEngine engine,
+        LeaderboardProjectionInput input) => engine.ProjectOutputs(input).Scoreboard;
+
     private static readonly DateTimeOffset Start =
         DateTimeOffset.Parse("2026-08-19T00:00:00Z");
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
@@ -45,8 +49,8 @@ public sealed class NormalizedScoreboardProjectionTests
             ProjectedAt: Start.AddMinutes(1),
             CompetitionStatus: CompetitionStatus.Running);
 
-        var first = engine.ProjectScoreboard(input);
-        var replay = engine.ProjectScoreboard(input);
+        var first = ProjectNormalized(engine, input);
+        var replay = ProjectNormalized(engine, input);
 
         await Assert.That(first.ChallengeCatalog.Challenges.Select(item => item.Order))
             .IsEquivalentTo([1, 2]);
@@ -102,7 +106,7 @@ public sealed class NormalizedScoreboardProjectionTests
             ProjectedAt: Start.AddSeconds(130),
             CompetitionStatus: CompetitionStatus.Running);
 
-        var projection = engine.ProjectScoreboard(input);
+        var projection = ProjectNormalized(engine, input);
         var row = projection.Snapshot.Teams.Single();
         var rounds = projection.Schema.Rounds;
 
@@ -149,7 +153,7 @@ public sealed class NormalizedScoreboardProjectionTests
             FixedCurve(100),
             FixedCurve(40),
             RequireBreakBeforeFix: false), JsonOptions);
-        var projection = engine.ProjectScoreboard(new(
+        var projection = ProjectNormalized(engine, new(
             Guid.NewGuid(),
             GameMode.Awdp,
             [team],
@@ -182,7 +186,7 @@ public sealed class NormalizedScoreboardProjectionTests
             RequireBreakBeforeFix: false), JsonOptions);
         var pausedAt = Start.AddSeconds(90);
         var projectedAt = Start.AddSeconds(120);
-        var projection = engine.ProjectScoreboard(new(
+        var projection = ProjectNormalized(engine, new(
             competitionId,
             GameMode.Awdp,
             [Team(1, "Alpha")],
@@ -253,7 +257,7 @@ public sealed class NormalizedScoreboardProjectionTests
             Start, AwdRounds: rounds, ProjectedAt: Start.AddSeconds(61),
             CompetitionStatus: CompetitionStatus.Running);
 
-        var projection = engine.ProjectScoreboard(input);
+        var projection = ProjectNormalized(engine, input);
         var attackerRow = projection.Snapshot.Teams.Single(team => team.TeamId == attacker.Id);
         var slot = attackerRow.Slots.Single();
 
@@ -283,7 +287,7 @@ public sealed class NormalizedScoreboardProjectionTests
                 Start.AddSeconds((number - 1) * 60),
                 Start.AddSeconds(number * 60)))
             .ToArray();
-        var projection = engine.ProjectScoreboard(new(
+        var projection = ProjectNormalized(engine, new(
             Guid.NewGuid(),
             GameMode.Awd,
             [team],
@@ -326,7 +330,7 @@ public sealed class NormalizedScoreboardProjectionTests
             roundId,
             Start,
             Start.AddSeconds(60));
-        var before = engine.ProjectScoreboard(new(
+        var before = ProjectNormalized(engine, new(
             competitionId,
             GameMode.Awd,
             [team],
@@ -337,7 +341,7 @@ public sealed class NormalizedScoreboardProjectionTests
             AwdRounds: [round],
             ProjectedAt: Start.AddSeconds(59),
             CompetitionStatus: CompetitionStatus.Running));
-        var after = engine.ProjectScoreboard(new(
+        var after = ProjectNormalized(engine, new(
             competitionId,
             GameMode.Awd,
             [team],
@@ -355,7 +359,7 @@ public sealed class NormalizedScoreboardProjectionTests
         await Assert.That(after.Schema.Rounds.Single().State)
             .IsEqualTo(ScoreboardRoundState.Settled);
         await Assert.That(before.Schema.Revision).IsNotEqualTo(after.Schema.Revision);
-        await Assert.That(engine.ProjectScoreboard(new(
+        await Assert.That(ProjectNormalized(engine, new(
                 competitionId,
                 GameMode.Awd,
                 [team],
@@ -375,7 +379,7 @@ public sealed class NormalizedScoreboardProjectionTests
         var competitionId = Guid.NewGuid();
         var original = Challenge(1, "Web");
         var renamed = original with { Title = "Renamed", Direction = "Pwn" };
-        var before = engine.ProjectScoreboard(new(
+        var before = ProjectNormalized(engine, new(
             competitionId,
             GameMode.Ctf,
             [Team(1, "Alpha")],
@@ -383,7 +387,7 @@ public sealed class NormalizedScoreboardProjectionTests
             [original],
             ProjectedAt: Start,
             CompetitionStatus: CompetitionStatus.Running));
-        var after = engine.ProjectScoreboard(new(
+        var after = ProjectNormalized(engine, new(
             competitionId,
             GameMode.Ctf,
             [Team(1, "Alpha")],
@@ -404,7 +408,7 @@ public sealed class NormalizedScoreboardProjectionTests
         var challenge = Challenge(1, "Misc", "{\"schemaVersion\":1}");
         var team = Team(1, "King");
         var configuration = JsonSerializer.Serialize(new KohConfiguration(1, 5, 10), JsonOptions);
-        var projection = engine.ProjectScoreboard(new(
+        var projection = ProjectNormalized(engine, new(
             Guid.NewGuid(),
             GameMode.Koh,
             [team],
@@ -429,7 +433,7 @@ public sealed class NormalizedScoreboardProjectionTests
     {
         var teams = Enumerable.Range(1, 100).Select(index => Team(index, $"Team {index}")).ToArray();
         var challenges = Enumerable.Range(1, 20).Select(index => Challenge(index, "Misc")).ToArray();
-        var projection = engine.ProjectScoreboard(new(
+        var projection = ProjectNormalized(engine, new(
             Guid.NewGuid(),
             GameMode.Ctf,
             teams,
@@ -469,7 +473,7 @@ public sealed class NormalizedScoreboardProjectionTests
                 actorId: Guid.CreateVersion7(Start.AddSeconds(index)),
                 value: "1")))
             .ToArray();
-        var projection = engine.ProjectScoreboard(new(
+        var projection = ProjectNormalized(engine, new(
             Guid.NewGuid(),
             GameMode.Ctf,
             [team],
@@ -521,7 +525,7 @@ public sealed class NormalizedScoreboardProjectionTests
             LastOccurredAt = Start.AddSeconds(26)
         };
 
-        var projection = engine.ProjectScoreboard(new(
+        var projection = ProjectNormalized(engine, new(
             Guid.NewGuid(),
             GameMode.Ctf,
             [team],
@@ -555,7 +559,7 @@ public sealed class NormalizedScoreboardProjectionTests
             FixedCurve(100),
             FixedCurve(40),
             RequireBreakBeforeFix: false), JsonOptions);
-        var projection = engine.ProjectScoreboard(new(
+        var projection = ProjectNormalized(engine, new(
             Guid.NewGuid(),
             GameMode.Awdp,
             teams,
@@ -586,7 +590,7 @@ public sealed class NormalizedScoreboardProjectionTests
             FixedCurve(100),
             FixedCurve(40),
             RequireBreakBeforeFix: false), JsonOptions);
-        var projection = engine.ProjectScoreboard(new(
+        var projection = ProjectNormalized(engine, new(
             Guid.NewGuid(),
             GameMode.Awdp,
             [team],
@@ -632,7 +636,7 @@ public sealed class NormalizedScoreboardProjectionTests
             FixedCurve(100),
             FixedCurve(40),
             RequireBreakBeforeFix: false), JsonOptions);
-        var projection = engine.ProjectScoreboard(new(
+        var projection = ProjectNormalized(engine, new(
             Guid.NewGuid(),
             GameMode.Awdp,
             [team],
@@ -663,7 +667,7 @@ public sealed class NormalizedScoreboardProjectionTests
         var challenge = Challenge(1, "Web");
         var banned = Team(1, "Banned") with { IsBanned = true };
         var disqualified = Team(2, "Disqualified") with { AffectsCompetitiveResults = false };
-        var projection = engine.ProjectScoreboard(new(
+        var projection = ProjectNormalized(engine, new(
             Guid.NewGuid(), GameMode.Ctf, [banned, disqualified], [], [challenge],
             ProjectedAt: Start, CompetitionStatus: CompetitionStatus.Running));
 

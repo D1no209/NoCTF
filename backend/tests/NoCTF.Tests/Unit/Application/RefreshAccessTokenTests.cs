@@ -15,7 +15,7 @@ public sealed class RefreshAccessTokenTests
             userId, "alice", UserRole.User, UserKind.Human, 8));
         var issuer = new Issuer(new RefreshTokenPrincipal(userId, 7));
 
-        var result = await new RefreshAccessToken(store, issuer)
+        var result = await new RefreshAccessToken(store, issuer, TimeProvider.System)
             .ExecuteAsync("refresh-token");
 
         await Assert.That(result.Succeeded).IsFalse();
@@ -30,7 +30,7 @@ public sealed class RefreshAccessTokenTests
         var store = new Store(user);
         var issuer = new Issuer(new RefreshTokenPrincipal(user.Id, user.TokenVersion));
 
-        var result = await new RefreshAccessToken(store, issuer)
+        var result = await new RefreshAccessToken(store, issuer, TimeProvider.System)
             .ExecuteAsync("refresh-token");
 
         await Assert.That(result.Succeeded).IsTrue();
@@ -44,7 +44,7 @@ public sealed class RefreshAccessTokenTests
             Guid.NewGuid(), "gitops-bot", UserRole.Organizer, UserKind.Bot, 2);
         var issuer = new Issuer(new RefreshTokenPrincipal(user.Id, user.TokenVersion));
 
-        var result = await new RefreshAccessToken(new Store(user), issuer)
+        var result = await new RefreshAccessToken(new Store(user), issuer, TimeProvider.System)
             .ExecuteAsync("refresh-token");
 
         await Assert.That(result.Succeeded).IsFalse();

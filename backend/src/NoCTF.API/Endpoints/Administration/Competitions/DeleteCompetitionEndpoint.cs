@@ -7,7 +7,7 @@ using NoCTF.Application.Teams.Moderation;
 
 namespace NoCTF.API.Endpoints.Administration.Competitions;
 
-public sealed class DeleteCompetitionEndpoint(DeleteCompetition delete, ICompetitionModerationAuthorizer authorizer, IUserContext user)
+public sealed class DeleteCompetitionEndpoint(DeleteCompetition delete, ICompetitionModerationAuthorizer authorizer, IUserContext user, TimeProvider timeProvider)
     : EndpointWithoutRequest<Results<NoContent, NotFound, ForbidHttpResult, ProblemHttpResult>>
 {
     public override void Configure()
@@ -26,7 +26,7 @@ public sealed class DeleteCompetitionEndpoint(DeleteCompetition delete, ICompeti
     {
         var id = Route<Guid>("competitionId");
         if (!await authorizer.CanModerateAsync(user.UserId, id, ct)) return TypedResults.Forbid();
-        var result = await delete.ExecuteAsync(id, user.UserId, DateTimeOffset.UtcNow, ct);
+        var result = await delete.ExecuteAsync(id, user.UserId, timeProvider.GetUtcNow(), ct);
         if (result.FailureCode == CompetitionManagementFailureCode.CompetitionNotFound) return TypedResults.NotFound();
         if (!result.Succeeded) return TypedResults.Problem(statusCode: StatusCodes.Status409Conflict, title: "Competition was not deleted.", detail: result.ErrorMessage);
         return TypedResults.NoContent();

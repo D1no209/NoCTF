@@ -1,31 +1,30 @@
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
-using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 using NoCTF.Application.Authentication.Account;
 
 namespace NoCTF.Infrastructure.Authentication;
 
-public sealed class JwtIssuer(IConfiguration configuration) : IAccessTokenIssuer
+public sealed class JwtIssuer(
+    IOptions<AuthenticationTokenOptions> configuredOptions,
+    TimeProvider timeProvider) : IAccessTokenIssuer
 {
-    private readonly string issuer = configuration["Authentication:Issuer"] ?? "NoCTF";
-    private readonly string audience = configuration["Authentication:Audience"] ?? "NoCTF.Api";
-    private readonly string refreshAudience = configuration["Authentication:RefreshAudience"] ?? "NoCTF.Refresh";
-    private readonly byte[] key = ReadKey(configuration["Authentication:SigningKey"]);
-    private readonly TimeSpan lifetime = TimeSpan.FromMinutes(
-        configuration.GetValue("Authentication:AccessTokenMinutes", 15));
+    private readonly AuthenticationTokenOptions options = configuredOptions.Value;
+    private readonly byte[] key = ReadKey(configuredOptions.Value.SigningKey);
 
     public IssuedAccessToken Issue(
         AuthenticatedUser user,
         DateTimeOffset now,
         TimeSpan? requestedLifetime = null)
     {
-        var expires = now.Add(requestedLifetime ?? lifetime);
+        var expires = now.Add(requestedLifetime
+            ?? TimeSpan.FromMinutes(options.AccessTokenMinutes));
         var credentials = new SigningCredentials(new SymmetricSecurityKey(key), SecurityAlgorithms.HmacSha256);
         var token = new JwtSecurityToken(
-            issuer: issuer,
-            audience: audience,
+            issuer: options.Issuer,
+            audience: options.Audience,
             claims:
             [
                 new(JwtRegisteredClaimNames.Sub, user.Id.ToString()),
@@ -46,12 +45,12 @@ public sealed class JwtIssuer(IConfiguration configuration) : IAccessTokenIssuer
 
     public IssuedRefreshToken IssueRefresh(AuthenticatedUser user)
     {
-        var expires = DateTimeOffset.UtcNow.AddDays(30);
-        var now = DateTimeOffset.UtcNow;
+        var now = timeProvider.GetUtcNow();
+        var expires = now.AddDays(30);
         var credentials = new SigningCredentials(new SymmetricSecurityKey(key), SecurityAlgorithms.HmacSha256);
         var token = new JwtSecurityToken(
-            issuer: issuer,
-            audience: refreshAudience,
+            issuer: options.Issuer,
+            audience: options.RefreshAudience,
             claims:
             [
                 new(JwtRegisteredClaimNames.Sub, user.Id.ToString()),
@@ -76,9 +75,9 @@ public sealed class JwtIssuer(IConfiguration configuration) : IAccessTokenIssuer
                     ValidateIssuerSigningKey = true,
                     IssuerSigningKey = new SymmetricSecurityKey(key),
                     ValidateIssuer = true,
-                    ValidIssuer = issuer,
+                    ValidIssuer = options.Issuer,
                     ValidateAudience = true,
-                    ValidAudience = refreshAudience,
+                    ValidAudience = options.RefreshAudience,
                     ValidateLifetime = true,
                     RequireExpirationTime = true,
                     ClockSkew = TimeSpan.Zero

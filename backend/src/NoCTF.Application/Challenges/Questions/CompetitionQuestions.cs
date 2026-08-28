@@ -126,12 +126,8 @@ public sealed record CompetitionQuestionPage(
     IReadOnlyList<CompetitionQuestionView> Items,
     CompetitionQuestionPagePosition? NextPosition);
 
-public interface ICompetitionQuestionStore
+public interface ICompetitionQuestionReader
 {
-    Task<CompetitionQuestionMutationResult> CreateAsync(
-        CreateCompetitionQuestionCommand command,
-        CancellationToken cancellationToken);
-
     Task<CompetitionQuestionPage> ListAsync(
         CompetitionQuestionQuery query,
         CancellationToken cancellationToken);
@@ -141,6 +137,13 @@ public interface ICompetitionQuestionStore
         Guid questionId,
         Guid actorUserId,
         CancellationToken cancellationToken);
+}
+
+public interface ICompetitionQuestionWriter
+{
+    Task<CompetitionQuestionMutationResult> CreateAsync(
+        CreateCompetitionQuestionCommand command,
+        CancellationToken cancellationToken);
 
     Task<CompetitionQuestionMutationResult> AddMessageAsync(
         AddCompetitionQuestionMessageCommand command,
@@ -149,7 +152,11 @@ public interface ICompetitionQuestionStore
     Task<CompetitionQuestionMutationResult> ChangeStatusAsync(
         ChangeCompetitionQuestionStatusCommand command,
         CancellationToken cancellationToken);
+}
 
+public interface ICompetitionQuestionStore
+    : ICompetitionQuestionReader, ICompetitionQuestionWriter
+{
 }
 
 public static class CompetitionQuestionRules
@@ -285,7 +292,7 @@ public static class CompetitionQuestionRules
 }
 
 public sealed class CreateCompetitionQuestion(
-    ICompetitionQuestionStore store,
+    ICompetitionQuestionWriter store,
     ILogger<CreateCompetitionQuestion> logger)
 {
     public Task<CompetitionQuestionMutationResult> ExecuteAsync(
@@ -326,7 +333,7 @@ public sealed class CreateCompetitionQuestion(
             command.ActorUserId);
 }
 
-public sealed class ListCompetitionQuestions(ICompetitionQuestionStore store)
+public sealed class ListCompetitionQuestions(ICompetitionQuestionReader store)
 {
     public Task<CompetitionQuestionPage> ExecuteAsync(
         CompetitionQuestionQuery query,
@@ -337,7 +344,7 @@ public sealed class ListCompetitionQuestions(ICompetitionQuestionStore store)
         }, ct);
 }
 
-public sealed class GetCompetitionQuestion(ICompetitionQuestionStore store)
+public sealed class GetCompetitionQuestion(ICompetitionQuestionReader store)
 {
     public Task<CompetitionQuestionView?> ExecuteAsync(
         Guid competitionId,
@@ -348,7 +355,7 @@ public sealed class GetCompetitionQuestion(ICompetitionQuestionStore store)
 }
 
 public sealed class AddCompetitionQuestionMessage(
-    ICompetitionQuestionStore store,
+    ICompetitionQuestionWriter store,
     ILogger<AddCompetitionQuestionMessage> logger)
 {
     public Task<CompetitionQuestionMutationResult> ExecuteAsync(
@@ -376,7 +383,7 @@ public sealed class AddCompetitionQuestionMessage(
             command.ActorUserId);
 }
 
-public sealed class ChangeCompetitionQuestionStatus(ICompetitionQuestionStore store)
+public sealed class ChangeCompetitionQuestionStatus(ICompetitionQuestionWriter store)
 {
     public Task<CompetitionQuestionMutationResult> ExecuteAsync(
         ChangeCompetitionQuestionStatusCommand command,

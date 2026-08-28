@@ -9,7 +9,8 @@ namespace NoCTF.API.Endpoints.Administration.Runtime;
 public sealed class GetAdminRuntimeEndpoint(
     ManageAdminRuntimes runtimes,
     ICompetitionModerationAuthorizer authorizer,
-    IUserContext user)
+    IUserContext user,
+    TimeProvider timeProvider)
     : EndpointWithoutRequest<Results<Ok<AdminRuntimeResponse>, NotFound, ForbidHttpResult>>
 {
     public override void Configure()
@@ -34,6 +35,8 @@ public sealed class GetAdminRuntimeEndpoint(
             competitionId, Route<Guid>("runtimeInstanceId"), ct);
         return result is null
             ? TypedResults.NotFound()
-            : TypedResults.Ok(AdminRuntimeMapping.ToResponse(result));
+            : TypedResults.Ok(AdminRuntimeMapping.ToResponse(
+                result,
+                timeProvider.GetUtcNow()));
     }
 }

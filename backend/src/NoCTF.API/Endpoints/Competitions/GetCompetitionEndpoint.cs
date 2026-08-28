@@ -91,7 +91,9 @@ public sealed record CompetitionResponse(
 
 internal static class CompetitionMapper
 {
-    public static CompetitionResponse ToResponse(CompetitionView view) =>
+    public static CompetitionResponse ToResponse(
+        CompetitionView view,
+        DateTimeOffset now) =>
         new(
             view.Id,
             view.Title,
@@ -109,7 +111,7 @@ internal static class CompetitionMapper
                 CompetitionLeaderboardVisibilityPolicy.EffectiveAt(
                     view.FrozenStartAt,
                     view.HiddenStartAt,
-                    DateTimeOffset.UtcNow)),
+                    now)),
             view.DeletedAt,
             AdministrationRole: null,
             view.MaxActiveQuestionsPerTeam,
@@ -147,7 +149,8 @@ public sealed class GetCompetitionRequest { public Guid CompetitionId { get; set
 public sealed class GetCompetitionEndpoint(
     GetCompetition get,
     ICompetitionModerationAuthorizer authorizer,
-    IUserContext user)
+    IUserContext user,
+    TimeProvider timeProvider)
     : Endpoint<GetCompetitionRequest, Results<Ok<CompetitionResponse>, NotFound>>
 {
     public override void Configure() { Get("/competitions/{competitionId}"); AllowAnonymous(); }
@@ -159,6 +162,8 @@ public sealed class GetCompetitionEndpoint(
             return TypedResults.NotFound();
 
         var role = await CompetitionAdministrationRoleResolver.ResolveAsync(view, user, authorizer, ct);
-        return TypedResults.Ok(CompetitionMapper.ToResponse(view) with { AdministrationRole = role });
+        return TypedResults.Ok(CompetitionMapper.ToResponse(
+            view,
+            timeProvider.GetUtcNow()) with { AdministrationRole = role });
     }
 }

@@ -38,7 +38,8 @@ public sealed class CreateCompetitionAnnouncementValidator
 public sealed class CreateCompetitionAnnouncementEndpoint(
     PublishCompetitionAnnouncement publish,
     ICompetitionModerationAuthorizer authorizer,
-    IUserContext user)
+    IUserContext user,
+    TimeProvider timeProvider)
     : Endpoint<CreateCompetitionAnnouncementRequest,
         Results<Created<NotificationResponse>, NotFound, ForbidHttpResult>>
 {
@@ -69,7 +70,7 @@ public sealed class CreateCompetitionAnnouncementEndpoint(
             request.Audience == AnnouncementAudience.Participants
                 ? CompetitionAnnouncementAudience.Participants
                 : CompetitionAnnouncementAudience.Collaborators,
-            DateTimeOffset.UtcNow), ct);
+            timeProvider.GetUtcNow()), ct);
         if (item is null)
             return TypedResults.NotFound();
         var response = new NotificationResponse(

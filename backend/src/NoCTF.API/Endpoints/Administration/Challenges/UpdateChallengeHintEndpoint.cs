@@ -10,7 +10,8 @@ namespace NoCTF.API.Endpoints.Administration.Challenges;
 public sealed class UpdateChallengeHintEndpoint(
     ManageChallengeHints hints,
     ICompetitionModerationAuthorizer authorizer,
-    IUserContext user)
+    IUserContext user,
+    TimeProvider timeProvider)
     : Endpoint<SaveChallengeHintRequest,
         Results<Ok<ChallengeHintResponse>, NotFound, ForbidHttpResult, ProblemHttpResult>>
 {
@@ -41,7 +42,7 @@ public sealed class UpdateChallengeHintEndpoint(
             request.Content,
             request.Cost,
             request.PublishedAt,
-            DateTimeOffset.UtcNow), ct);
+            timeProvider.GetUtcNow()), ct);
         if (result.FailureCode == ChallengeHintFailureCode.HintNotFound)
             return TypedResults.NotFound();
         return result.Succeeded

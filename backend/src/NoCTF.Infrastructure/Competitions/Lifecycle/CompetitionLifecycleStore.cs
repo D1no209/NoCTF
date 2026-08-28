@@ -15,9 +15,11 @@ public sealed class CompetitionLifecycleStore(
     CompetitionStartGate startGate,
     ITransactionalMessageOutbox outbox,
     ICompetitionEventRecorder? eventRecorder = null,
-    NoCTF.Infrastructure.Competitions.Management.CompetitionReadModelCache? readModels = null)
+    NoCTF.Infrastructure.Competitions.Management.CompetitionReadModelCache? readModels = null,
+    TimeProvider? clock = null)
     : ICompetitionLifecycleStore
 {
+    private readonly TimeProvider timeProvider = clock ?? TimeProvider.System;
     private static readonly JsonSerializerOptions JsonOptions =
         new(JsonSerializerDefaults.Web);
 
@@ -56,7 +58,7 @@ public sealed class CompetitionLifecycleStore(
             if (competition is null)
                 return false;
             competition.Status = to;
-            competition.UpdatedAt = DateTimeOffset.UtcNow;
+            competition.UpdatedAt = timeProvider.GetUtcNow();
             await db.SaveChangesAsync(cancellationToken);
             if (readModels is not null)
                 await readModels.InvalidateAsync(competitionId, cancellationToken);
@@ -67,7 +69,7 @@ public sealed class CompetitionLifecycleStore(
             .ExecuteUpdateAsync(
                 setters => setters
                     .SetProperty(item => item.Status, to)
-                    .SetProperty(item => item.UpdatedAt, DateTimeOffset.UtcNow),
+                    .SetProperty(item => item.UpdatedAt, timeProvider.GetUtcNow()),
                 cancellationToken);
         if (changed == 1 && readModels is not null)
             await readModels.InvalidateAsync(competitionId, cancellationToken);
@@ -99,7 +101,7 @@ public sealed class CompetitionLifecycleStore(
             return false;
         var competition = await db.Competitions
             .SingleAsync(item => item.Id == competitionId, cancellationToken);
-        var now = DateTimeOffset.UtcNow;
+        var now = timeProvider.GetUtcNow();
         if (competition.Mode == GameMode.Awd)
         {
             if (from == CompetitionStatus.Paused && to == CompetitionStatus.Running)

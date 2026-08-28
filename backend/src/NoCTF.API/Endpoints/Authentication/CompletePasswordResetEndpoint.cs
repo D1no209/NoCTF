@@ -4,6 +4,7 @@ using FluentValidation;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.HttpResults;
 using NoCTF.Application.Authentication.PasswordReset;
+using Microsoft.Extensions.Options;
 
 namespace NoCTF.API.Endpoints.Authentication;
 
@@ -33,7 +34,8 @@ public sealed record CompletePasswordResetFailureResponse(
 
 public sealed class CompletePasswordResetEndpoint(
     CompletePasswordReset completePasswordReset,
-    IConfiguration configuration)
+    IOptions<RefreshHttpOptions> options,
+    TimeProvider timeProvider)
     : Endpoint<CompletePasswordResetRequest,
         Results<NoContent, BadRequest<CompletePasswordResetFailureResponse>>>
 {
@@ -58,7 +60,7 @@ public sealed class CompletePasswordResetEndpoint(
         var state = await completePasswordReset.ExecuteAsync(
             request.Token,
             request.NewPassword,
-            DateTimeOffset.UtcNow,
+            timeProvider.GetUtcNow(),
             ct);
         if (state != PasswordResetCompletionState.Reset)
         {
@@ -67,8 +69,8 @@ public sealed class CompletePasswordResetEndpoint(
         }
 
         HttpContext.Response.Cookies.Delete(
-            RefreshCookie.Name(configuration),
-            RefreshCookie.DeleteOptions(configuration));
+            RefreshCookie.Name(options.Value),
+            RefreshCookie.DeleteOptions(options.Value));
         return TypedResults.NoContent();
     }
 }

@@ -1,9 +1,9 @@
 using System.Data;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using NoCTF.Application.Messaging;
 using NoCTF.Application.Observability;
 using NoCTF.Hosting;
@@ -13,13 +13,14 @@ namespace NoCTF.Worker;
 
 public sealed class WorkerQueueMetricsCollector(
     IServiceScopeFactory scopeFactory,
-    IConfiguration configuration,
+    IOptions<WorkerQueueOptions> queueOptions,
     TimeProvider timeProvider,
     ILogger<WorkerQueueMetricsCollector> logger) : BackgroundService
 {
     private const string QueueSchema = "wolverine_queues";
     private static readonly TimeSpan CollectionInterval = TimeSpan.FromSeconds(5);
-    private readonly IReadOnlyList<string> monitoredQueues = ResolveMonitoredQueues(configuration);
+    private readonly IReadOnlyList<string> monitoredQueues =
+        ResolveMonitoredQueues(queueOptions.Value.Enabled);
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
@@ -74,9 +75,9 @@ public sealed class WorkerQueueMetricsCollector(
         }
     }
 
-    internal static IReadOnlyList<string> ResolveMonitoredQueues(IConfiguration configuration)
+    internal static IReadOnlyList<string> ResolveMonitoredQueues(
+        IReadOnlyCollection<WorkerQueue> enabled)
     {
-        var enabled = WorkerQueues.GetEnabled(configuration);
         var queues = enabled.Select(WorkerQueueNames.GetName).ToList();
         if (enabled.Contains(WorkerQueue.Background))
             queues.Add(CompetitionEventFanoutQueueNames.Realtime);

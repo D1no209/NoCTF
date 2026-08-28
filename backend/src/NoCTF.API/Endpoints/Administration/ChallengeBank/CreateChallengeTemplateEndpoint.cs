@@ -149,7 +149,8 @@ internal static partial class ChallengeTemplateMapper
 
 public sealed class CreateChallengeTemplateEndpoint(
     CreateChallengeTemplate create,
-    IUserContext user)
+    IUserContext user,
+    TimeProvider timeProvider)
     : Endpoint<
         CreateChallengeTemplateRequest,
         Results<
@@ -179,7 +180,7 @@ public sealed class CreateChallengeTemplateEndpoint(
         CancellationToken ct)
     {
         var result = await create.ExecuteAsync(
-            ChallengeTemplateMapper.ToCommand(request, user.UserId, DateTimeOffset.UtcNow),
+            ChallengeTemplateMapper.ToCommand(request, user.UserId, timeProvider.GetUtcNow()),
             ct);
         return result.State switch
         {

@@ -20,7 +20,8 @@ public sealed class VerifyEmailValidator : Validator<VerifyEmailRequest>
 
 public sealed class VerifyEmailEndpoint(
     VerifyEmail verify,
-    IEmailVerificationConfigurationStore configuration)
+    IEmailVerificationConfigurationStore configuration,
+    TimeProvider timeProvider)
     : Endpoint<VerifyEmailRequest, Results<NoContent, NotFound, ProblemHttpResult>>
 {
     public override void Configure()
@@ -41,7 +42,7 @@ public sealed class VerifyEmailEndpoint(
     {
         if (!(await configuration.GetAsync(ct)).Enabled)
             return TypedResults.NotFound();
-        var result = await verify.ExecuteAsync(request.Token, DateTimeOffset.UtcNow, ct);
+        var result = await verify.ExecuteAsync(request.Token, timeProvider.GetUtcNow(), ct);
         return result.Succeeded
             ? TypedResults.NoContent()
             : TypedResults.Problem(

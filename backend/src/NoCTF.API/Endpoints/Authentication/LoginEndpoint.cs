@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Http.HttpResults;
 using NoCTF.Application.Authentication.Login;
 using NoCTF.Domain.Identity;
 using Microsoft.AspNetCore.Http;
+using Microsoft.Extensions.Options;
 
 namespace NoCTF.API.Endpoints.Authentication;
 
@@ -30,7 +31,7 @@ public sealed class LoginValidator : Validator<LoginRequest>
     }
 }
 
-public sealed class LoginEndpoint(LoginUser login, IConfiguration configuration)
+public sealed class LoginEndpoint(LoginUser login, IOptions<RefreshHttpOptions> options)
     : Endpoint<LoginRequest, Results<Ok<LoginResponse>, UnauthorizedHttpResult>>
 {
     public override void Configure()
@@ -49,9 +50,9 @@ public sealed class LoginEndpoint(LoginUser login, IConfiguration configuration)
             return TypedResults.Unauthorized();
         }
         HttpContext.Response.Cookies.Append(
-            RefreshCookie.Name(configuration),
+            RefreshCookie.Name(options.Value),
             result.Value!.RefreshToken,
-            RefreshCookie.Options(configuration));
+            RefreshCookie.Options(options.Value));
         return TypedResults.Ok(new LoginResponse(
             result.Value!.UserId,
             result.Value.UserName,

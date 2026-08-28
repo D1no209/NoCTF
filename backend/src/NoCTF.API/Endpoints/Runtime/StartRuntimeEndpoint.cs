@@ -8,7 +8,8 @@ namespace NoCTF.API.Endpoints.Runtime;
 
 public sealed class StartRuntimeEndpoint(
     MutatePlayerRuntime mutate,
-    IUserContext user)
+    IUserContext user,
+    TimeProvider timeProvider)
     : EndpointWithoutRequest<Results<Accepted<RuntimeAcceptedResponse>, NotFound, Conflict, ProblemHttpResult>>
 {
     public override void Configure()
@@ -25,7 +26,7 @@ public sealed class StartRuntimeEndpoint(
         CancellationToken ct) =>
         RuntimeMutationEndpoint.ExecuteAsync(
             mutate, user, Route<Guid>("competitionId"), Route<Guid>("competitionChallengeId"),
-            RuntimeAction.Start, null, ct);
+            RuntimeAction.Start, null, timeProvider, ct);
 }
 
 internal static class RuntimeMutationEndpoint
@@ -37,6 +38,7 @@ internal static class RuntimeMutationEndpoint
         Guid competitionChallengeId,
         RuntimeAction action,
         TimeSpan? extension,
+        TimeProvider timeProvider,
         CancellationToken ct)
     {
         var result = await mutate.ExecuteAsync(new RuntimeMutationCommand(
@@ -45,7 +47,7 @@ internal static class RuntimeMutationEndpoint
             user.UserId,
             action,
             extension,
-            DateTimeOffset.UtcNow), ct);
+            timeProvider.GetUtcNow()), ct);
         if (result.FailureCode is RuntimeMutationFailureCode.RuntimeNotFound or RuntimeMutationFailureCode.RuntimeActionUnsupported)
             return TypedResults.NotFound();
         if (result.FailureCode is RuntimeMutationFailureCode.RuntimeStateConflict or RuntimeMutationFailureCode.RuntimeConflict)

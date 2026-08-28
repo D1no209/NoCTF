@@ -1,13 +1,21 @@
 using NoCTF.Application.Runtime.Capacity;
-using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Options;
 
 namespace NoCTF.Infrastructure.Runtime.Capacity;
 
-public sealed class DevelopmentRunnerCapacityGate(IConfiguration configuration)
+public sealed class DevelopmentRunnerCapacityOptions
+{
+    public string Id { get; init; } = "local-development";
+
+    public string Pool { get; init; } = "development";
+}
+
+public sealed class DevelopmentRunnerCapacityGate(
+    IOptions<DevelopmentRunnerCapacityOptions> options)
     : IRunnerCapacityGate
 {
-    private readonly string runnerId = configuration["Runner:Id"] ?? "local-development";
-    private readonly string runnerPool = configuration["Runner:Pool"] ?? "development";
+    private readonly string runnerId = options.Value.Id;
+    private readonly string runnerPool = options.Value.Pool;
     private readonly Dictionary<Guid, string> claims = [];
     private readonly Lock sync = new();
 

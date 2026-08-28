@@ -24,7 +24,8 @@ public sealed class UpdateMyProfileValidator : Validator<UpdateMyProfileRequest>
 public sealed class UpdateMyProfileEndpoint(
     UpdateCurrentUserProfile update,
     IUserContext user,
-    LinkGenerator links)
+    LinkGenerator links,
+    TimeProvider timeProvider)
     : Endpoint<UpdateMyProfileRequest, Results<Ok<CurrentUserResponse>, NotFound>>
 {
     public override void Configure()
@@ -42,7 +43,7 @@ public sealed class UpdateMyProfileEndpoint(
         var profile = await update.ExecuteAsync(
             user.UserId,
             request.Description,
-            DateTimeOffset.UtcNow,
+            timeProvider.GetUtcNow(),
             ct);
         return profile is null
             ? TypedResults.NotFound()

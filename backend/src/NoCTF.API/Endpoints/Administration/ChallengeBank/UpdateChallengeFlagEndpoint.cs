@@ -8,7 +8,8 @@ namespace NoCTF.API.Endpoints.Administration.ChallengeBank;
 
 public sealed class UpdateChallengeFlagEndpoint(
     ManageChallengeFlags flags,
-    IUserContext user)
+    IUserContext user,
+    TimeProvider timeProvider)
     : Endpoint<SaveChallengeFlagRequest, Results<
         Ok<ChallengeFlagResponse>,
         NotFound,
@@ -39,7 +40,7 @@ public sealed class UpdateChallengeFlagEndpoint(
                 ChallengeFlagScope.Template(Route<Guid>("challengeId")),
                 Route<Guid>("flagId"),
                 isCreate: false,
-                DateTimeOffset.UtcNow),
+                timeProvider.GetUtcNow()),
             user.UserId,
             user.IsAdministrator,
             ct);

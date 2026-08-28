@@ -38,7 +38,8 @@ public sealed class GetLeaderboardTrendsEndpoint(
     GetCompetitionTracks getTracks,
     ICompetitionModerationAuthorizer authorizer,
     BuildScoreboardTrends buildTrends,
-    IUserContext user)
+    IUserContext user,
+    TimeProvider timeProvider)
     : Endpoint<GetLeaderboardTrendsRequest,
         Results<Ok<ScoreboardTrendsResponse>, Accepted<LeaderboardProcessingProtocolResponse>, NotFound, ProblemHttpResult>>
 {
@@ -57,14 +58,14 @@ public sealed class GetLeaderboardTrendsEndpoint(
         var visibility = await access.ResolveAsync(
             user.UserId,
             request.CompetitionId,
-            DateTimeOffset.UtcNow,
+            timeProvider.GetUtcNow(),
             cancellationToken);
         if (visibility is null || visibility.GameMode != GameMode.Ctf)
             return TypedResults.NotFound();
 
         if (visibility.DataScope == LeaderboardDataScope.Hidden)
         {
-            var now = DateTimeOffset.UtcNow;
+            var now = timeProvider.GetUtcNow();
             return TypedResults.Ok(new ScoreboardTrendsResponse(
                 request.CompetitionId,
                 "0",
@@ -82,7 +83,7 @@ public sealed class GetLeaderboardTrendsEndpoint(
             {
                 await messages.ApplyCompetitionVisibilityAsync(
                     request.CompetitionId,
-                    DateTimeOffset.UtcNow,
+                    timeProvider.GetUtcNow(),
                     cancellationToken);
                 return Processing(request.CompetitionId);
             }

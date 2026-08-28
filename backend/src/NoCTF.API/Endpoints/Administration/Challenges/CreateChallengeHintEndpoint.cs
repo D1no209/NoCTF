@@ -31,7 +31,8 @@ public sealed class SaveChallengeHintValidator : Validator<SaveChallengeHintRequ
 public sealed class CreateChallengeHintEndpoint(
     ManageChallengeHints hints,
     ICompetitionModerationAuthorizer authorizer,
-    IUserContext user)
+    IUserContext user,
+    TimeProvider timeProvider)
     : Endpoint<SaveChallengeHintRequest,
         Results<Created<ChallengeHintResponse>, NotFound, ForbidHttpResult, ProblemHttpResult>>
 {
@@ -57,7 +58,7 @@ public sealed class CreateChallengeHintEndpoint(
         var challengeId = Route<Guid>("competitionChallengeId");
         var result = await hints.SaveAsync(new(
             competitionId, challengeId, request.Id, true, request.Content, request.Cost,
-            request.PublishedAt, DateTimeOffset.UtcNow), ct);
+            request.PublishedAt, timeProvider.GetUtcNow()), ct);
         if (result.FailureCode == ChallengeHintFailureCode.HintNotFound)
             return TypedResults.NotFound();
         if (!result.Succeeded)

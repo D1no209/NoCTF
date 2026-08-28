@@ -8,6 +8,7 @@ using NoCTF.API.Serialization;
 using NoCTF.Application.Competitions.Tracks;
 using NoCTF.Application.Teams.Moderation;
 using NoCTF.Domain.Competitions;
+using Riok.Mapperly.Abstractions;
 
 namespace NoCTF.API.Endpoints.Administration.Competitions;
 
@@ -55,20 +56,28 @@ public sealed class UpdateCompetitionTracksValidator : Validator<UpdateCompetiti
     }
 }
 
-internal static class CompetitionTrackFailureMapping
+[Mapper]
+internal static partial class CompetitionTrackFailureMapping
 {
     public static CompetitionTrackFailureResponse ToResponse(
         CompetitionTrackFailureCode code,
         string? detail) => new(
-        Enum.Parse<CompetitionTrackFailureCodeProtocol>(code.ToString()),
+        ToProtocol(code),
         detail ?? "The competition track operation failed.");
+
+    [MapEnum(EnumMappingStrategy.ByName)]
+    [MapperIgnoreTargetValue(CompetitionTrackFailureCodeProtocol.ConfigurationConflict)]
+    [MapperIgnoreTargetValue(CompetitionTrackFailureCodeProtocol.AssignmentConflict)]
+    private static partial CompetitionTrackFailureCodeProtocol ToProtocol(
+        CompetitionTrackFailureCode code);
 }
 
 public sealed class UpdateCompetitionTracksEndpoint(
     GetCompetitionTracks get,
     UpdateCompetitionTracks update,
     ICompetitionModerationAuthorizer authorizer,
-    IUserContext user)
+    IUserContext user,
+    TimeProvider timeProvider)
     : Endpoint<UpdateCompetitionTracksRequest,
         Results<
             Ok<CompetitionTrackListResponse>,
@@ -122,7 +131,7 @@ public sealed class UpdateCompetitionTracksEndpoint(
                 track.VisibleOnLeaderboard,
                 track.AffectsCompetitiveResults)).ToArray(),
             user.UserId,
-            DateTimeOffset.UtcNow,
+            timeProvider.GetUtcNow(),
             request.Tracks.Select(track => new CompetitionTrackInvitationCodeUpdate(
                 track.Key,
                 track.InvitationCode,

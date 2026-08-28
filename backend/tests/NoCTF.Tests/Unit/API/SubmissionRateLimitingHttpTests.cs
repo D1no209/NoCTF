@@ -71,6 +71,7 @@ public sealed class SubmissionRateLimitingHttpTests
         builder.Services.AddNoCtfApi(
             builder.Configuration,
             includeInfrastructure: false);
+        builder.Services.AddSingleton(TimeProvider.System);
         builder.Services.AddFastEndpoints(options =>
         {
             options.DisableAutoDiscovery = true;

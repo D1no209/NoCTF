@@ -1,4 +1,4 @@
-using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Options;
 using NoCTF.API.Pagination;
 
 namespace NoCTF.Tests.Unit.API;
@@ -11,12 +11,10 @@ public sealed class SignedPaginationCursorTests
     [Test]
     public async Task Opaque_positions_are_signed_and_filter_bound()
     {
-        var cursors = new SignedKeysetCursor(new ConfigurationBuilder()
-            .AddInMemoryCollection(new Dictionary<string, string?>
-            {
-                ["Authentication:SigningKey"] = SigningKey
-            })
-            .Build());
+        var cursors = new SignedKeysetCursor(Options.Create(new PaginationOptions
+        {
+            SigningKey = SigningKey
+        }));
         var encoded = cursors.EncodeOpaque(
             "admin.platform.logs.list",
             "warning|runner",

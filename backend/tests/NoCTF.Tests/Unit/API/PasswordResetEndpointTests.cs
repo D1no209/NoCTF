@@ -7,6 +7,7 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 using NoCTF.API.Composition;
 using NoCTF.API.Endpoints.Authentication;
 using NoCTF.Application.Authentication.PasswordReset;
@@ -127,6 +128,8 @@ public sealed class PasswordResetEndpointTests
         builder.Services.AddSingleton(store);
         builder.Services.AddScoped<RequestPasswordReset>();
         builder.Services.AddScoped<CompletePasswordReset>();
+        builder.Services.AddSingleton(TimeProvider.System);
+        builder.Services.AddSingleton(Options.Create(new RefreshHttpOptions()));
 
         var app = builder.Build();
         app.UseRateLimiter();

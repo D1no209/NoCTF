@@ -1,5 +1,5 @@
 using System.IdentityModel.Tokens.Jwt;
-using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Options;
 using NoCTF.Application.Authentication;
 using NoCTF.Infrastructure.Authentication;
 
@@ -10,15 +10,7 @@ public sealed class RunnerScoringTokenIssuerTests
     [Test]
     public async Task Awd_checker_token_binds_runtime_fact_and_callback_window()
     {
-        var configuration = new ConfigurationBuilder()
-            .AddInMemoryCollection(new Dictionary<string, string?>
-            {
-                ["RunnerScoring:SigningKey"] = "runner-scoring-test-key-with-at-least-32-bytes",
-                ["RunnerScoring:Issuer"] = "issuer",
-                ["RunnerScoring:Audience"] = "audience"
-            })
-            .Build();
-        var issuer = new RunnerScoringTokenIssuer(configuration);
+        var issuer = CreateIssuer();
         var runtimeId = Guid.Parse("11111111-1111-1111-1111-111111111111");
         var gameplayFactId = Guid.Parse("22222222-2222-2222-2222-222222222222");
         var issuedAt = DateTimeOffset.Parse("2026-07-24T00:00:00Z");
@@ -44,15 +36,7 @@ public sealed class RunnerScoringTokenIssuerTests
     [Test]
     public async Task Awdp_callback_token_binds_submission_and_target()
     {
-        var configuration = new ConfigurationBuilder()
-            .AddInMemoryCollection(new Dictionary<string, string?>
-            {
-                ["RunnerScoring:SigningKey"] = "runner-scoring-test-key-with-at-least-32-bytes",
-                ["RunnerScoring:Issuer"] = "issuer",
-                ["RunnerScoring:Audience"] = "audience"
-            })
-            .Build();
-        var issuer = new RunnerScoringTokenIssuer(configuration);
+        var issuer = CreateIssuer();
         var gameplayFactId = Guid.Parse("11111111-1111-1111-1111-111111111111");
         var runtimeId = Guid.Parse("22222222-2222-2222-2222-222222222222");
         var issuedAt = DateTimeOffset.Parse("2026-07-24T00:00:00Z");
@@ -74,15 +58,7 @@ public sealed class RunnerScoringTokenIssuerTests
     [Test]
     public async Task Awdp_archive_token_grants_read_only_access_to_one_gameplay_fact_upload()
     {
-        var configuration = new ConfigurationBuilder()
-            .AddInMemoryCollection(new Dictionary<string, string?>
-            {
-                ["RunnerScoring:SigningKey"] = "runner-scoring-test-key-with-at-least-32-bytes",
-                ["RunnerScoring:Issuer"] = "issuer",
-                ["RunnerScoring:Audience"] = "audience"
-            })
-            .Build();
-        var issuer = new RunnerScoringTokenIssuer(configuration);
+        var issuer = CreateIssuer();
         var uploadId = Guid.Parse("11111111-1111-1111-1111-111111111111");
         var gameplayFactId = Guid.Parse("22222222-2222-2222-2222-222222222222");
         var issuedAt = DateTimeOffset.Parse("2026-07-24T00:00:00Z");
@@ -102,4 +78,12 @@ public sealed class RunnerScoringTokenIssuerTests
             .IsEqualTo(gameplayFactId.ToString("D"));
         await Assert.That(token.ValidTo).IsEqualTo(issuedAt.AddMinutes(5).UtcDateTime);
     }
+
+    private static RunnerScoringTokenIssuer CreateIssuer() => new(Options.Create(
+        new RunnerScoringOptions
+        {
+            SigningKey = "runner-scoring-test-key-with-at-least-32-bytes",
+            Issuer = "issuer",
+            Audience = "audience"
+        }));
 }

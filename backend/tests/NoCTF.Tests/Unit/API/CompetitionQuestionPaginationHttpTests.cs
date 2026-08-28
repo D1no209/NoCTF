@@ -105,6 +105,7 @@ public sealed class CompetitionQuestionPaginationHttpTests
         builder.Services.AddNoCtfApi(
             builder.Configuration,
             includeInfrastructure: false);
+        builder.Services.AddSingleton(TimeProvider.System);
         builder.Services.AddFastEndpoints(options =>
         {
             options.DisableAutoDiscovery = true;
@@ -126,6 +127,8 @@ public sealed class CompetitionQuestionPaginationHttpTests
                 _ => { });
         builder.Services.AddAuthorization();
         builder.Services.AddSingleton(store);
+        builder.Services.AddSingleton<ICompetitionQuestionReader>(store);
+        builder.Services.AddSingleton<ICompetitionQuestionWriter>(store);
         builder.Services.AddScoped<ListCompetitionQuestions>();
         var emailVerification = Substitute.For<IEmailVerificationConfigurationStore>();
         emailVerification.GetAsync(Arg.Any<CancellationToken>()).Returns(new

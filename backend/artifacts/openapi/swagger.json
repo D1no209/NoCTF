@@ -11,6 +11,8 @@
         "tags": [
           "Health"
         ],
+        "summary": "Health Endpoint",
+        "description": "Executes GET /health.",
         "operationId": "HealthEndpoint",
         "responses": {
           "200": {
@@ -32,6 +34,7 @@
           "Competitions"
         ],
         "summary": "Clears a team's avatar and queues unreferenced File cleanup.",
+        "description": "Executes DELETE /api/v1/competitions/{competitionId}/teams/{teamId}/avatar.",
         "operationId": "TeamAvatar_Clear",
         "parameters": [
           {
@@ -76,6 +79,7 @@
           "Competitions"
         ],
         "summary": "Returns a team's current avatar.",
+        "description": "Executes GET /api/v1/competitions/{competitionId}/teams/{teamId}/avatar.",
         "operationId": "TeamAvatar_Get",
         "parameters": [
           {
@@ -106,6 +110,7 @@
           "Competitions"
         ],
         "summary": "Replaces a team's avatar with an immutable File reference.",
+        "description": "Executes POST /api/v1/competitions/{competitionId}/teams/{teamId}/avatar.",
         "operationId": "TeamAvatar_Replace",
         "parameters": [
           {
@@ -191,6 +196,8 @@
         "tags": [
           "Competitions"
         ],
+        "summary": "Create Team Endpoint",
+        "description": "Executes POST /api/v1/competitions/{competitionId}/teams.",
         "operationId": "CreateTeamEndpoint",
         "parameters": [
           {
@@ -257,6 +264,8 @@
         "tags": [
           "Competitions"
         ],
+        "summary": "List Competition Teams Endpoint",
+        "description": "Executes GET /api/v1/competitions/{competitionId}/teams.",
         "operationId": "ListCompetitionTeamsEndpoint",
         "parameters": [
           {
@@ -288,6 +297,8 @@
         "tags": [
           "Competitions"
         ],
+        "summary": "Delete Team Endpoint",
+        "description": "Executes DELETE /api/v1/competitions/{competitionId}/teams/{teamId}.",
         "operationId": "DeleteTeamEndpoint",
         "parameters": [
           {
@@ -331,6 +342,8 @@
         "tags": [
           "Competitions"
         ],
+        "summary": "Get Team Endpoint",
+        "description": "Executes GET /api/v1/competitions/{competitionId}/teams/{teamId}.",
         "operationId": "GetTeamEndpoint",
         "parameters": [
           {
@@ -372,6 +385,8 @@
         "tags": [
           "Competitions"
         ],
+        "summary": "Update Team Endpoint",
+        "description": "Executes PUT /api/v1/competitions/{competitionId}/teams/{teamId}.",
         "operationId": "UpdateTeamEndpoint",
         "parameters": [
           {
@@ -486,6 +501,8 @@
         "tags": [
           "Competitions"
         ],
+        "summary": "Get My Team Endpoint",
+        "description": "Executes GET /api/v1/competitions/{competitionId}/teams/me.",
         "operationId": "GetMyTeamEndpoint",
         "parameters": [
           {
@@ -531,6 +548,8 @@
         "tags": [
           "Competitions"
         ],
+        "summary": "Join Team By Invitation Endpoint",
+        "description": "Executes POST /api/v1/competitions/{competitionId}/teams/join.",
         "operationId": "JoinTeamByInvitationEndpoint",
         "parameters": [
           {
@@ -599,6 +618,8 @@
         "tags": [
           "Competitions"
         ],
+        "summary": "Leave Team Endpoint",
+        "description": "Executes DELETE /api/v1/competitions/{competitionId}/teams/me/membership.",
         "operationId": "LeaveTeamEndpoint",
         "parameters": [
           {
@@ -636,6 +657,8 @@
         "tags": [
           "Competitions"
         ],
+        "summary": "Remove Team Member Endpoint",
+        "description": "Executes DELETE /api/v1/competitions/{competitionId}/teams/{teamId}/members/{userId}.",
         "operationId": "RemoveTeamMemberEndpoint",
         "parameters": [
           {
@@ -690,6 +713,7 @@
           "Competitions"
         ],
         "summary": "Resubmits a rejected team registration.",
+        "description": "Executes POST /api/v1/competitions/{competitionId}/teams/{teamId}/registration/resubmit.",
         "operationId": "ResubmitTeamRegistrationEndpoint",
         "parameters": [
           {
@@ -738,6 +762,8 @@
         "tags": [
           "Competitions"
         ],
+        "summary": "Rotate Team Invitation Endpoint",
+        "description": "Executes POST /api/v1/competitions/{competitionId}/teams/{teamId}/invitation-token/rotate.",
         "operationId": "RotateTeamInvitationEndpoint",
         "parameters": [
           {
@@ -863,6 +889,8 @@
         "tags": [
           "Competitions"
         ],
+        "summary": "Transfer Team Captain Endpoint",
+        "description": "Executes POST /api/v1/competitions/{competitionId}/teams/{teamId}/captain/transfer.",
         "operationId": "TransferTeamCaptainEndpoint",
         "parameters": [
           {
@@ -922,6 +950,7 @@
           "Competitions"
         ],
         "summary": "Extends a running CTF runtime.",
+        "description": "Executes POST /api/v1/competitions/{competitionId}/challenges/{competitionChallengeId}/runtime/extend.",
         "operationId": "ExtendRuntimeEndpoint",
         "parameters": [
           {
@@ -1119,6 +1148,7 @@
           "Competitions"
         ],
         "summary": "Queues an atomic replacement runtime.",
+        "description": "Executes POST /api/v1/competitions/{competitionId}/challenges/{competitionChallengeId}/runtime/reset.",
         "operationId": "ResetRuntimeEndpoint",
         "parameters": [
           {
@@ -1185,6 +1215,7 @@
           "Competitions"
         ],
         "summary": "Queues a team runtime start.",
+        "description": "Executes POST /api/v1/competitions/{competitionId}/challenges/{competitionChallengeId}/runtime/start.",
         "operationId": "StartRuntimeEndpoint",
         "parameters": [
           {
@@ -1251,6 +1282,7 @@
           "Competitions"
         ],
         "summary": "Queues a team runtime stop.",
+        "description": "Executes POST /api/v1/competitions/{competitionId}/challenges/{competitionChallengeId}/runtime/stop.",
         "operationId": "StopRuntimeEndpoint",
         "parameters": [
           {
@@ -1817,6 +1849,8 @@
         "tags": [
           "Competitions"
         ],
+        "summary": "Get Gameplay Fact Status Endpoint",
+        "description": "Executes GET /api/v1/competitions/{competitionId}/gameplay-facts/{gameplayFactId}.",
         "operationId": "GetGameplayFactStatusEndpoint",
         "parameters": [
           {
@@ -2040,6 +2074,7 @@
           "Competitions"
         ],
         "summary": "Lists the current team's gameplay facts.",
+        "description": "Executes GET /api/v1/competitions/{competitionId}/gameplay-facts.",
         "operationId": "ListGameplayFactsEndpoint",
         "parameters": [
           {
@@ -2410,6 +2445,8 @@
         "tags": [
           "Competitions"
         ],
+        "summary": "Get Competition Endpoint",
+        "description": "Executes GET /api/v1/competitions/{competitionId}.",
         "operationId": "GetCompetitionEndpoint",
         "parameters": [
           {
@@ -2445,6 +2482,7 @@
           "Competitions"
         ],
         "summary": "Returns a competition's current poster.",
+        "description": "Executes GET /api/v1/competitions/{competitionId}/poster.",
         "operationId": "CompetitionPoster_Get",
         "parameters": [
           {
@@ -2469,6 +2507,7 @@
           "Competitions"
         ],
         "summary": "Get the sparse scoreboard snapshot or queue a refresh.",
+        "description": "Executes GET /api/v1/competitions/{competitionId}/leaderboard.",
         "operationId": "GetLeaderboardEndpoint",
         "parameters": [
           {
@@ -2533,6 +2572,7 @@
           "Competitions"
         ],
         "summary": "Get CTF team score trends from the authoritative scoreboard projection.",
+        "description": "Executes GET /api/v1/competitions/{competitionId}/leaderboard/trends.",
         "operationId": "GetLeaderboardTrendsEndpoint",
         "parameters": [
           {
@@ -2578,6 +2618,7 @@
           "Competitions"
         ],
         "summary": "Get global scoreboard adjustments with signed cursor pagination.",
+        "description": "Executes GET /api/v1/competitions/{competitionId}/leaderboard/teams/{teamId}/adjustments.",
         "operationId": "GetScoreboardAdjustmentDetailEndpoint",
         "parameters": [
           {
@@ -2659,6 +2700,7 @@
           "Competitions"
         ],
         "summary": "Get the low-frequency scoreboard challenge catalog.",
+        "description": "Executes GET /api/v1/competitions/{competitionId}/leaderboard/challenges.",
         "operationId": "GetScoreboardChallengeCatalogEndpoint",
         "parameters": [
           {
@@ -2704,6 +2746,7 @@
           "Competitions"
         ],
         "summary": "Get the low-frequency scoreboard matrix schema.",
+        "description": "Executes GET /api/v1/competitions/{competitionId}/leaderboard/schema.",
         "operationId": "GetScoreboardSchemaEndpoint",
         "parameters": [
           {
@@ -2768,6 +2811,7 @@
           "Competitions"
         ],
         "summary": "Get one sparse scoreboard slot with signed cursor pagination.",
+        "description": "Executes GET /api/v1/competitions/{competitionId}/leaderboard/teams/{teamId}/columns/{columnIndex}.",
         "operationId": "GetScoreboardSlotDetailEndpoint",
         "parameters": [
           {
@@ -2866,6 +2910,8 @@
         "tags": [
           "Competitions"
         ],
+        "summary": "List Competitions Endpoint",
+        "description": "Executes GET /api/v1/competitions.",
         "operationId": "ListCompetitionsEndpoint",
         "responses": {
           "200": {
@@ -3264,6 +3310,7 @@
           "Competitions"
         ],
         "summary": "Downloads one All-policy challenge attachment.",
+        "description": "Executes GET /api/v1/competitions/{competitionId}/challenges/{competitionChallengeId}/attachments/{attachmentId}.",
         "operationId": "DownloadChallengeAttachmentEndpoint",
         "parameters": [
           {
@@ -3359,6 +3406,7 @@
           "Competitions"
         ],
         "summary": "Gets a published challenge.",
+        "description": "Executes GET /api/v1/competitions/{competitionId}/challenges/{competitionChallengeId}.",
         "operationId": "GetChallengeEndpoint",
         "parameters": [
           {
@@ -3457,6 +3505,7 @@
           "Competitions"
         ],
         "summary": "Lists published challenges for a competition.",
+        "description": "Executes GET /api/v1/competitions/{competitionId}/challenges.",
         "operationId": "ListChallengesEndpoint",
         "parameters": [
           {
@@ -4108,6 +4157,7 @@
           "Users"
         ],
         "summary": "Returns a user's current public avatar.",
+        "description": "Executes GET /api/v1/users/{userId}/avatar.",
         "operationId": "UserAvatar_Get",
         "parameters": [
           {
@@ -4132,6 +4182,7 @@
           "Users"
         ],
         "summary": "Returns a user's public profile.",
+        "description": "Executes GET /api/v1/users/{userId}.",
         "operationId": "UserProfile_Get",
         "parameters": [
           {
@@ -4166,6 +4217,8 @@
         "tags": [
           "Auth"
         ],
+        "summary": "Login Endpoint",
+        "description": "Executes POST /api/v1/auth/login.",
         "operationId": "LoginEndpoint",
         "requestBody": {
           "x-name": "LoginRequest",
@@ -4238,6 +4291,8 @@
         "tags": [
           "Auth"
         ],
+        "summary": "Logout Endpoint",
+        "description": "Executes POST /api/v1/auth/logout.",
         "operationId": "LogoutEndpoint",
         "responses": {
           "204": {
@@ -4251,6 +4306,8 @@
         "tags": [
           "Auth"
         ],
+        "summary": "Refresh Token Endpoint",
+        "description": "Executes POST /api/v1/auth/refresh.",
         "operationId": "RefreshTokenEndpoint",
         "responses": {
           "200": {
@@ -4449,6 +4506,7 @@
           "Auth"
         ],
         "summary": "Updates the current user's profile.",
+        "description": "Executes PUT /api/v1/auth/me/profile.",
         "operationId": "Authentication_UpdateMyProfile",
         "requestBody": {
           "x-name": "UpdateMyProfileRequest",
@@ -4507,6 +4565,7 @@
           "Auth"
         ],
         "summary": "Replaces the current user's cropped avatar.",
+        "description": "Executes POST /api/v1/auth/me/avatar.",
         "operationId": "Authentication_UploadMyAvatar",
         "requestBody": {
           "x-name": "UploadMyAvatarRequest",

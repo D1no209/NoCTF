@@ -33,7 +33,8 @@ public sealed record CompetitionPosterResponse(Guid FileId, string ContentType);
 public sealed class UploadCompetitionPosterEndpoint(
     ManageBusinessImages images,
     IUserContext user,
-    FileUploadLimits uploadLimits)
+    FileUploadLimits uploadLimits,
+    TimeProvider timeProvider)
     : Endpoint<UploadCompetitionPosterRequest,
         Results<Ok<CompetitionPosterResponse>, NotFound, ForbidHttpResult, ProblemHttpResult>>
 {
@@ -76,7 +77,7 @@ public sealed class UploadCompetitionPosterEndpoint(
             request.File.FileName,
             request.File.ContentType,
             content,
-            DateTimeOffset.UtcNow,
+            timeProvider.GetUtcNow(),
             ct);
         return result.State switch
         {

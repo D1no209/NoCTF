@@ -25,7 +25,8 @@ public sealed class UpholdTeamBanAppealValidator
 public sealed class UpholdTeamBanAppealEndpoint(
     ResolveTeamBanAppeal resolve,
     ICompetitionModerationAuthorizer authorizer,
-    IUserContext user)
+    IUserContext user,
+    TimeProvider timeProvider)
     : Endpoint<UpholdTeamBanAppealRequest,
         Results<NoContent, NotFound, ForbidHttpResult, ProblemHttpResult>>
 {
@@ -63,7 +64,7 @@ public sealed class UpholdTeamBanAppealEndpoint(
             user.UserId,
             TeamBanAppealResolution.Uphold,
             request.Reason,
-            DateTimeOffset.UtcNow), cancellationToken);
+            timeProvider.GetUtcNow()), cancellationToken);
         return TeamBanAppealHttpResults.Map(result, "Team ban appeal rejection was rejected.");
     }
 }

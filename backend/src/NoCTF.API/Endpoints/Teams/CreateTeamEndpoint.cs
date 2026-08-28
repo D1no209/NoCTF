@@ -158,14 +158,14 @@ internal static partial class TeamMapper
         TeamRegistrationFailure value);
 }
 
-public sealed class CreateTeamEndpoint(CreateTeam create, IUserContext user, LinkGenerator links)
+public sealed class CreateTeamEndpoint(CreateTeam create, IUserContext user, LinkGenerator links, TimeProvider timeProvider)
     : Endpoint<CreateTeamRequest, Results<Created<TeamResponse>, NotFound, Conflict<TeamRegistrationFailureResponse>>>
 {
     public override void Configure() { Post("/competitions/{competitionId}/teams"); AuthSchemes("Bearer"); }
     public override async Task<Results<Created<TeamResponse>, NotFound, Conflict<TeamRegistrationFailureResponse>>> ExecuteAsync(CreateTeamRequest request, CancellationToken ct)
     {
         request.CompetitionId = Route<Guid>("competitionId");
-        var result = await create.ExecuteAsync(TeamMapper.ToCommand(request, user.UserId, DateTimeOffset.UtcNow), ct);
+        var result = await create.ExecuteAsync(TeamMapper.ToCommand(request, user.UserId, timeProvider.GetUtcNow()), ct);
         if (result.FailureCode == TeamRegistrationFailure.CompetitionNotFound) return TypedResults.NotFound();
         if (!result.Succeeded)
             return TypedResults.Conflict(new TeamRegistrationFailureResponse(

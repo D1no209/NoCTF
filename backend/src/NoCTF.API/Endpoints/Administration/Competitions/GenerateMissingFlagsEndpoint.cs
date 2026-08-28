@@ -37,7 +37,8 @@ internal static partial class GenerateMissingFlagsMapper
 public sealed class GenerateMissingFlagsEndpoint(
     GenerateMissingFlags generate,
     ICompetitionModerationAuthorizer authorizer,
-    IUserContext user)
+    IUserContext user,
+    TimeProvider timeProvider)
     : EndpointWithoutRequest<Results<Ok<GenerateMissingFlagsResponse>, ForbidHttpResult>>
 {
     public override void Configure()
@@ -59,7 +60,7 @@ public sealed class GenerateMissingFlagsEndpoint(
         if (!await authorizer.CanModerateAsync(user.UserId, competitionId, ct))
             return TypedResults.Forbid();
         var failures = await generate.ExecuteAsync(
-            competitionId, DateTimeOffset.UtcNow, ct);
+            competitionId, timeProvider.GetUtcNow(), ct);
         return TypedResults.Ok(new GenerateMissingFlagsResponse(
             failures.Select(GenerateMissingFlagsMapper.ToResponse).ToArray()));
     }
