@@ -5,7 +5,7 @@
 - .NET 10 / C# current；
 - FastEndpoints 8.2 StronglyTyped；
 - EF Core 10 + Npgsql/PostgreSQL；
-- Wolverine PostgreSQL persistence/transport；
+- Wolverine NATS JetStream transport；PostgreSQL 仅保存业务事实。
 - FluentStorage 8（Disk 与通用 S3 文件存储）；
 - Redis/SignalR backplane；
 - DynamicExpresso；

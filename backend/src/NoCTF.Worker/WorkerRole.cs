@@ -11,7 +11,7 @@ using NoCTF.Hosting.Health;
 using NoCTF.Hosting.Messaging;
 using Wolverine;
 using Wolverine.ErrorHandling;
-using Wolverine.Postgresql;
+using Wolverine.Nats;
 using Wolverine.Runtime.Agents;
 
 namespace NoCTF.Worker;
@@ -57,8 +57,8 @@ public static class WorkerRole
             services.AddSingleton<IReadinessDependency, ClusterSchedulingReadinessDependency>();
             services.AddSingularAgent<MaintenanceTickAgent>();
         }
-        if (collectQueueMetrics)
-            services.AddHostedService<WorkerQueueMetricsCollector>();
+        // Queue depth is now observed from JetStream consumer metrics. The old
+        // PostgreSQL table poller must not be registered in a NATS deployment.
         if (validateMessageTopology)
             services.AddHostedService<WorkerMessageTopologyStartupValidator>();
         return services;
@@ -121,7 +121,8 @@ public static class WorkerRole
         foreach (var queue in enabledQueues)
         {
             var queueName = WorkerQueues.GetName(queue);
-            options.ListenToPostgresqlQueue(queueName)
+            options.ListenToNatsSubject(NatsSubjects.Subject(queue))
+                .UseJetStream(NatsSubjects.Stream(queue), queueName)
                 .Named(queueName)
                 .MaximumParallelMessages(WorkerQueues.GetConcurrency(configuration, queue))
                 .UseDurableInbox();
@@ -129,7 +130,8 @@ public static class WorkerRole
 
         if (enabledQueues.Contains(WorkerQueue.Background))
         {
-            options.ListenToPostgresqlQueue(CompetitionEventFanoutQueueNames.Realtime)
+            options.ListenToNatsSubject(NatsSubjects.RealtimeEvents)
+                .UseJetStream(NatsSubjects.EventsStream, "noctf-realtime")
                 .Named(CompetitionEventFanoutQueueNames.Realtime)
                 .MaximumParallelMessages(WorkerQueues.GetConcurrency(
                     configuration,
@@ -138,7 +140,8 @@ public static class WorkerRole
         }
         if (enabledQueues.Contains(WorkerQueue.Projection))
         {
-            options.ListenToPostgresqlQueue(CompetitionEventFanoutQueueNames.Leaderboard)
+            options.ListenToNatsSubject(NatsSubjects.LeaderboardEvents)
+                .UseJetStream(NatsSubjects.EventsStream, "noctf-leaderboard")
                 .Named(CompetitionEventFanoutQueueNames.Leaderboard)
                 .ListenOnlyAtLeader()
                 .MaximumParallelMessages(WorkerQueues.GetConcurrency(

@@ -1,6 +1,7 @@
 using JasperFx;
 using JasperFx.CodeGeneration;
 using Npgsql;
+using NoCTF.Application.Competitions.Events;
 using NoCTF.Application.Messaging;
 using Wolverine;
 using Wolverine.Configuration;
@@ -112,8 +113,18 @@ public static class NoCtfMessagingRetryPolicies
                 string.Equals(endpoint.EndpointName, endpointName, StringComparison.Ordinal)
                 || string.Equals(
                     endpoint.Uri?.ToString().TrimEnd('/'),
-                    $"postgresql://{endpointName}",
+                    NatsEndpointAddress(endpointName),
                     StringComparison.OrdinalIgnoreCase));
         }
+
+        private static string NatsEndpointAddress(string endpointName) =>
+            endpointName switch
+            {
+                CompetitionEventFanoutQueueNames.Realtime =>
+                    "nats://noctf.events.realtime",
+                CompetitionEventFanoutQueueNames.Leaderboard =>
+                    "nats://noctf.events.leaderboard",
+                _ => $"nats://noctf.{endpointName.Replace("-", ".", StringComparison.Ordinal)}"
+            };
     }
 }

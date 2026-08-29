@@ -1,43 +1,36 @@
 using NoCTF.Application.Messaging;
 using NoCTF.Application.Runtime.Instances;
-using NoCTF.Infrastructure.Persistence;
-using Microsoft.EntityFrameworkCore;
 using Wolverine;
-using Wolverine.EntityFrameworkCore;
 
 namespace NoCTF.Infrastructure.Messaging;
 
 public sealed class WolverineTransactionalMessageOutbox(
-    IDbContextOutbox<NoCtfDbContext> outbox) : ITransactionalMessageOutbox
+    IMessageBus bus) : ITransactionalMessageOutbox
 {
-    public ValueTask PublishAsync<T>(T message) => outbox.PublishAsync(message);
+    public ValueTask PublishAsync<T>(T message) => bus.PublishAsync(message);
     public ValueTask ScheduleAsync<T>(T message, DateTimeOffset scheduledAt) =>
-        outbox.ScheduleAsync(message, scheduledAt);
+        bus.ScheduleAsync(message, scheduledAt);
 
     public ValueTask PublishToRunnerNodeAsync<T>(T message) where T : IRunnerNodeMessage
     {
         var queue = RunnerNodeQueueName.FromRunnerId(message.RunnerId);
-        return outbox.EndpointFor(ToPostgresqlQueueUri(queue.Value)).SendAsync(message);
+        return bus.EndpointFor(ToNatsSubjectUri(queue.Value)).SendAsync(message);
     }
 
     public ValueTask ScheduleToRunnerNodeAsync<T>(T message, DateTimeOffset scheduledAt)
         where T : IRunnerNodeMessage
     {
         var queue = RunnerNodeQueueName.FromRunnerId(message.RunnerId);
-        return outbox.EndpointFor(ToPostgresqlQueueUri(queue.Value)).SendAsync(
+        return bus.EndpointFor(ToNatsSubjectUri(queue.Value)).SendAsync(
             message,
             new DeliveryOptions { ScheduledTime = scheduledAt });
     }
 
-    public Task FlushOutgoingMessagesAsync() =>
-        outbox.DbContext.Database.CurrentTransaction is null
-            ? outbox.FlushOutgoingMessagesAsync()
-            : Task.CompletedTask;
+    public Task FlushOutgoingMessagesAsync() => Task.CompletedTask;
 
-    private static Uri ToPostgresqlQueueUri(string queueName)
+    private static Uri ToNatsSubjectUri(string queueName)
     {
-        var postgresQueueName = queueName.Replace('-', '_').ToLowerInvariant();
-        return new($"postgresql://{postgresQueueName}", UriKind.Absolute);
+        return new($"nats://noctf.runner.{queueName.Trim().ToLowerInvariant()}", UriKind.Absolute);
     }
 }
 

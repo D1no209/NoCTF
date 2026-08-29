@@ -6,29 +6,27 @@
 ## 角色与持久化
 
 `Api`、`Worker`、`Runner` 可以独立运行或由 `NoCTF.Host` 组合，但所有 durable 业务工作都经过
-同一 Wolverine PostgreSQL persistence/transport。Wolverine 保存 Durable Inbox/Outbox、命名
-PostgreSQL queues、节点/Agent 归属与 Dead Letter；业务任务不得走进程内 Channel、fire-and-forget
+同一 NATS JetStream。JetStream 保存持久 stream、durable consumer、ack/retry 和 DLQ；业务任务不得走进程内 Channel、fire-and-forget
 Task 或临时 local queue。
 
-业务写入与消息发送必须使用 Wolverine EF Core transactional outbox；事务回滚时消息不可见。
-所有消费 endpoint 使用 durable inbox；同一 MessageId 重投只产生一次业务效果。重试策略按 queue
+业务写入与 NATS 发布不提供跨系统原子事务；消费端使用状态、唯一键和业务幂等键收敛。
+所有消费 endpoint 使用 JetStream durable consumer；同一 MessageId 重投只产生一次业务效果。重试策略按 queue
 和强类型失败类别配置，确定性业务失败不得无限重试。
 
 ## 消费语义
 
 ### Competing consumers
 
-只需一个消费者执行的消息发布到一个命名 durable PostgreSQL endpoint。多个 Worker 监听同一 endpoint，
-由 PostgreSQL transport 竞争消费；扩容不得复制业务效果。
+只需一个消费者执行的消息发布到一个命名 JetStream work-queue stream。多个 Worker 监听同一 durable consumer，
+由 NATS 竞争消费；扩容不得复制业务效果。
 
 ### 显式 fan-out
 
-需要多个独立订阅者的消息显式发布到各自命名的 Sticky PostgreSQL endpoint。每个订阅者拥有独立
-Inbox、重试和 DLQ，消息身份使用 `IdAndDestination`，使同一 MessageId 在不同目的地各执行一次。
+需要多个独立订阅者的消息显式发布到各自命名的 JetStream consumer。每个订阅者拥有独立 ack、重试和 DLQ，消息身份使用 `IdAndDestination`，使同一 MessageId 在不同目的地各执行一次。
 禁止全局启用 `MultipleHandlerBehavior.Separated`。
 
-Wolverine 6.29.2 在 `[StickyHandler("name")]` 未配置同名 endpoint 时会静默生成 local queue；NoCTF
-必须在启动门禁中解析实际 routing，任何必需 Sticky destination 缺失、不是 PostgreSQL 或退化为
+Wolverine 在 `[StickyHandler("name")]` 未配置同名 endpoint 时会静默生成 local queue；NoCTF
+必须在启动门禁中解析实际 routing，任何必需 Sticky destination 缺失、不是 NATS JetStream 或退化为
 `local://` 都使对应角色启动失败。
 
 ## 队列
@@ -48,7 +46,7 @@ Runner 不监听 pool queue。队列名、目的地和消息类型必须由领�
 
 ## Singular Agent 调度
 
-所有 Worker 共享 Wolverine 选主。集群同一时刻只有一个活动调度 Agent，负责从 PostgreSQL 业务事实
+所有 Worker 共享 Wolverine/NATS 选主。集群同一时刻只有一个活动调度 Agent，负责从 PostgreSQL 业务事实
 重建内存优先队列并派发：
 
 - AWD Round；
@@ -67,7 +65,7 @@ leader、Agent 所属节点与最近接管时间，不暴露凭据或消息正�
 ## 事务、锁与幂等
 
 - PostgreSQL 主外键、业务唯一约束和 advisory lock 保护跨消息业务不变量；
-- Wolverine Inbox/Outbox 保护消息边界；
+- JetStream ack/retry/DLQ 保护消息边界；
 - MessageId/业务键识别同一 FactId 或同一 Runtime 动作；
 - 外部资源操作以 Runtime UUID、runner/provider 与 provider receipt 幂等；
 - 不使用 Revision、ProcessingVersion、generation 或 scheduled-message 序号作为通用并发栅栏；
