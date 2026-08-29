@@ -8,7 +8,8 @@ Browser/Client
      v
 NoCTF.API  ---- Redis (cache/rate limit/SignalR/heartbeat)
      |
-     +---- PostgreSQL (business + Wolverine inbox/outbox/queues)
+     +---- PostgreSQL (business facts)
+     +---- NATS JetStream (durable messages, consumers, retries, DLQ)
                          |
               +----------+----------+
               v                     v
@@ -39,7 +40,8 @@ Worker、Runner 与 API 均可多副本。每个进程中的每种角色至多�
 
 ## 数据依赖
 
-- PostgreSQL：唯一业务事实源；同时承载 Wolverine PostgreSQL persistence。
+- PostgreSQL：唯一业务事实源；不承载 Wolverine message transport。
+- NATS JetStream：跨角色 durable transport、consumer group、重投和 DLQ。
 - Redis：FusionCache 排行榜 L2、TokenVersion 缓存、分布式限流、SignalR backplane 和 Runner heartbeat/capacity。Redis 丢失不丢业务事实，也不决定排行榜是否刷新。
 - Object Storage：Challenge Attachment 与 AWDP Patch archive；支持 S3Compatible 和开发用 LocalFileSystem。
 - Runtime Provider：Docker、Kubernetes、Libvirt/QEMU/KVM。Provider 隐藏资源创建、查询、销毁与 receipt 细节。
@@ -59,9 +61,9 @@ Domain <- Application <- API / Worker / Runner / Host
 
 ## 一致性边界
 
-API 的业务写入与 Wolverine Outbox 在同一个 EF Core/PostgreSQL 事务中。消息可至少一次投递，因此 Handler 使用状态、唯一约束或自然幂等规则防重复；不得使用持久化 Revision、ProcessingVersion 或隐藏的版本栅栏替代业务幂等键。
+消息通过 NATS JetStream durable publish/consumer 传递；业务写入 PostgreSQL 后由状态、唯一约束和业务幂等键收敛。数据库事务与 NATS 发布之间不提供跨系统原子提交。
 
-分数投影不写回 GameplayFact。影响排行榜的业务提交通过 transactional outbox 发布失效消息；Worker 按比赛合并 500ms 内的失效并从 PostgreSQL 全量投影到命名 FusionCache。缓存丢失时由 PostgreSQL 重建，不扫描 Dirty 业务列。
+分数投影不写回 GameplayFact。影响排行榜的业务提交发布 NATS 失效消息；Worker 按比赛合并 500ms 内的失效并从 PostgreSQL 全量投影到命名 FusionCache。缓存丢失时由 PostgreSQL 重建，不扫描 Dirty 业务列。
 
 ## Runner Pool
 

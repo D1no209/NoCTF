@@ -24,10 +24,11 @@ The three production roles can run in one composable host or as independent proc
 ```mermaid
 flowchart LR
     Browser["Browser / API client"] --> API["Api role"]
-    API --> PostgreSQL[("PostgreSQL")]
+    API --> PostgreSQL[("PostgreSQL business DB")]
+    API --> NATS[("NATS JetStream")]
     API --> Redis[("Redis")]
-    PostgreSQL --> Worker["Worker role"]
-    PostgreSQL --> Runner["Runner role"]
+    NATS --> Worker["Worker role"]
+    NATS --> Runner["Runner role"]
     Worker --> Redis
     Runner --> Redis
     Runner --> Providers["Docker / Kubernetes / Libvirt"]
@@ -37,8 +38,8 @@ flowchart LR
 - `NoCTF.Worker` owns durable business processing and leaderboard projection.
 - `NoCTF.Runner` owns provider operations and checker/patch execution.
 - `NoCTF.Host` enables any non-empty combination of `Api`, `Worker`, and `Runner` and
-  defaults to all three. Combined roles still communicate through durable PostgreSQL queues.
-- PostgreSQL is the business source of truth and Wolverine persistence store.
+  defaults to all three. Combined roles still communicate through durable NATS JetStream queues.
+- PostgreSQL is the business source of truth; NATS JetStream is the Wolverine durable transport.
 - Redis holds replaceable caches, rate limits, the SignalR backplane, subscriptions, and Runner presence/capacity.
 
 Docker challenge services publish only their declared TCP ports and request host port

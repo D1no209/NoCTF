@@ -1,23 +1,17 @@
-using System.Data;
-using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using NoCTF.Application.Messaging;
 using NoCTF.Application.Observability;
 using NoCTF.Hosting;
-using NoCTF.Infrastructure.Persistence;
 
 namespace NoCTF.Worker;
 
 public sealed class WorkerQueueMetricsCollector(
-    IServiceScopeFactory scopeFactory,
     IOptions<WorkerQueueOptions> queueOptions,
     TimeProvider timeProvider,
     ILogger<WorkerQueueMetricsCollector> logger) : BackgroundService
 {
-    private const string QueueSchema = "wolverine_queues";
     private static readonly TimeSpan CollectionInterval = TimeSpan.FromSeconds(5);
     private readonly IReadOnlyList<string> monitoredQueues =
         ResolveMonitoredQueues(queueOptions.Value.Enabled);
@@ -31,48 +25,14 @@ public sealed class WorkerQueueMetricsCollector(
         } while (await timer.WaitForNextTickAsync(stoppingToken));
     }
 
-    private async Task CollectAsync(CancellationToken cancellationToken)
+    private Task CollectAsync(CancellationToken cancellationToken)
     {
-        try
-        {
-            await using var scope = scopeFactory.CreateAsyncScope();
-            var db = scope.ServiceProvider.GetRequiredService<NoCtfDbContext>();
-            var connection = db.Database.GetDbConnection();
-            var closeConnection = connection.State != ConnectionState.Open;
-            if (closeConnection)
-                await connection.OpenAsync(cancellationToken);
-
-            try
-            {
-                foreach (var queue in monitoredQueues)
-                {
-                    await using var command = connection.CreateCommand();
-                    command.CommandText = BuildSnapshotSql(queue);
-                    await using var reader = await command.ExecuteReaderAsync(cancellationToken);
-                    if (!await reader.ReadAsync(cancellationToken))
-                        continue;
-
-                    var depth = reader.GetInt64(0);
-                    var oldestAgeSeconds = reader.GetDouble(1);
-                    NoCtfTelemetry.UpdateWorkerQueueSnapshot(
-                        queue,
-                        depth,
-                        TimeSpan.FromSeconds(Math.Max(0, oldestAgeSeconds)));
-                }
-            }
-            finally
-            {
-                if (closeConnection)
-                    await connection.CloseAsync();
-            }
-        }
-        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
-        {
-        }
-        catch (Exception exception)
-        {
-            logger.LogWarning(exception, "Worker queue metric collection failed.");
-        }
+        cancellationToken.ThrowIfCancellationRequested();
+        // JetStream queue depth is exported by the NATS monitoring endpoint.
+        // Keeping this service as a compatibility shell avoids reintroducing a
+        // PostgreSQL queue poller into the worker process.
+        logger.LogDebug("NATS queue metrics are collected by the NATS monitoring endpoint for {Count} queues.", monitoredQueues.Count);
+        return Task.CompletedTask;
     }
 
     internal static IReadOnlyList<string> ResolveMonitoredQueues(
@@ -86,17 +46,4 @@ public sealed class WorkerQueueMetricsCollector(
         return queues;
     }
 
-    private static string BuildSnapshotSql(string queue)
-    {
-        if (!WorkerQueueMonitoringNames.IsKnown(queue))
-            throw new ArgumentOutOfRangeException(nameof(queue), queue, "Unknown worker queue.");
-        var tableName = queue.Replace('-', '_');
-        return $"""
-            SELECT COUNT(*)::bigint,
-                   COALESCE(
-                       EXTRACT(EPOCH FROM ((NOW() AT TIME ZONE 'utc') - MIN(timestamp))),
-                       0)::double precision
-            FROM {QueueSchema}.wolverine_queue_{tableName}
-            """;
-    }
 }

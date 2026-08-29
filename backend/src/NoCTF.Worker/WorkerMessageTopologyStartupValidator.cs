@@ -58,11 +58,11 @@ public sealed class WorkerMessageTopologyStartupValidator(
                     $"Required fan-out endpoint '{queueName}' is not registered.");
             }
             if (!endpoint.IsListener
-                || endpoint.Uri?.Scheme != "postgresql"
+                || endpoint.Uri?.Scheme != "nats"
                 || endpoint.Mode != EndpointMode.Durable)
             {
                 throw new InvalidOperationException(
-                    $"Fan-out endpoint '{queueName}' must be a durable PostgreSQL listener.");
+                    $"Fan-out endpoint '{queueName}' must be a durable NATS JetStream listener.");
             }
 
             if (string.Equals(
@@ -95,7 +95,7 @@ public sealed class WorkerMessageTopologyStartupValidator(
 
         foreach (var queueName in expectedQueues)
         {
-            var endpointAddress = PostgresqlQueueAddress(queueName);
+            var endpointAddress = NatsEndpointAddress(queueName);
             var matches = chains
                 .Where(chain => chain.Endpoints.Any(endpoint =>
                     string.Equals(endpoint.EndpointName, queueName, StringComparison.Ordinal)
@@ -125,7 +125,7 @@ public sealed class WorkerMessageTopologyStartupValidator(
     {
         foreach (var queueName in expectedQueues)
         {
-            var endpoint = PostgresqlQueueAddress(queueName);
+            var endpoint = NatsEndpointAddress(queueName);
             if (!routing.Contains(endpoint, StringComparison.OrdinalIgnoreCase)
                 || routing.Contains($"local://{queueName}", StringComparison.OrdinalIgnoreCase)
                 || routing.Contains(
@@ -133,13 +133,19 @@ public sealed class WorkerMessageTopologyStartupValidator(
                     StringComparison.OrdinalIgnoreCase))
             {
                 throw new InvalidOperationException(
-                    $"Competition event fan-out destination '{queueName}' is not routed to PostgreSQL.");
+                    $"Competition event fan-out destination '{queueName}' is not routed to NATS.");
             }
         }
     }
 
+    internal static string NatsEndpointAddress(string queueName) =>
+        $"nats://noctf.events.{(queueName.Contains("leaderboard", StringComparison.Ordinal)
+            ? "leaderboard"
+            : "realtime")}";
+
+    // Kept as a source-compatible test helper while the topology tests are migrated.
     internal static string PostgresqlQueueAddress(string queueName) =>
-        $"postgresql://{queueName.Replace('-', '_')}";
+        NatsEndpointAddress(queueName);
 
     public Task StoppingAsync(CancellationToken cancellationToken) => Task.CompletedTask;
 

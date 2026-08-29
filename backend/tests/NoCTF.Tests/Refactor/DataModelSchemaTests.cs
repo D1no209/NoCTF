@@ -130,7 +130,7 @@ public sealed class DataModelSchemaTests
 
     [Test]
     [Category("Integration")]
-    public async Task Initial_baseline_and_all_Wolverine_role_schemas_can_share_one_database(
+    public async Task Initial_baseline_does_not_create_Wolverine_PostgreSQL_role_schemas(
         CancellationToken ct)
     {
         await DockerIntegrationTest.RunAsync(async () =>
@@ -187,7 +187,7 @@ public sealed class DataModelSchemaTests
                     connection);
                 schemaCommand.Parameters.AddWithValue("schema", schema);
                 await Assert.That((int)(await schemaCommand.ExecuteScalarAsync(ct))!)
-                    .IsEqualTo(3);
+                    .IsEqualTo(0);
             }
         });
     }

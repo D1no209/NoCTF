@@ -8,11 +8,11 @@ using NoCTF.Infrastructure.Observability;
 using NoCTF.Infrastructure.Messaging;
 using NoCTF.Infrastructure.Persistence;
 using NoCTF.Hosting.Messaging;
+using NoCTF.Hosting;
 using NoCTF.Runner.Messages;
 using Wolverine;
-using Wolverine.EntityFrameworkCore;
 using Wolverine.ErrorHandling;
-using Wolverine.Postgresql;
+using Wolverine.Nats;
 
 namespace NoCTF.Runner;
 
@@ -24,7 +24,7 @@ public static class RunnerRole
     {
         var postgres = configuration.GetConnectionString("PostgreSql")
             ?? throw new InvalidOperationException("ConnectionStrings:PostgreSql is required.");
-        services.AddDbContextWithWolverineIntegration<NoCtfDbContext>(
+        services.AddDbContext<NoCtfDbContext>(
             options => options.UseNpgsql(postgres).UseSnakeCaseNamingConvention());
         services.AddScoped<ITransactionalMessageOutbox, WolverineTransactionalMessageOutbox>();
         return services;
@@ -49,7 +49,9 @@ public static class RunnerRole
         options.Durability.Mode = DurabilityMode.Balanced;
         options.ConfigureNoCtfRunnerInfrastructureRetries();
         if (durable)
-            options.ListenToPostgresqlQueue(nodeQueueName.Value).UseDurableInbox();
+            options.ListenToNatsSubject(NatsSubjects.Runner(nodeQueueName.Value))
+                .UseJetStream(NatsSubjects.RunnerStream, nodeQueueName.Value)
+                .UseDurableInbox();
     }
 
 }

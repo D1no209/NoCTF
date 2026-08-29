@@ -14,7 +14,6 @@
     <PackageReference Include="OpenTelemetry.Instrumentation.Http" />
     <PackageReference Include="OpenTelemetry.Instrumentation.Runtime" />
     <PackageReference Include="WolverineFx" />
-    <PackageReference Include="WolverineFx.EntityFrameworkCore" />
-    <PackageReference Include="WolverineFx.Postgresql" />
+    <PackageReference Include="WolverineFx.Nats" />
   </ItemGroup>
 </Project>

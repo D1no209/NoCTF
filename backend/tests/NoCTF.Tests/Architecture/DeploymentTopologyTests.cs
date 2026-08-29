@@ -45,9 +45,9 @@ public sealed class DeploymentTopologyTests
         await Assert.That(routing)
             .Contains("options.Durability.MessageIdentity = MessageIdentity.IdAndDestination");
         await Assert.That(routing)
-            .Contains("route.ToPostgresqlQueue(CompetitionEventFanoutQueueNames.Realtime)");
+            .Contains("route.ToNatsSubject(NatsSubjects.RealtimeEvents)");
         await Assert.That(routing)
-            .Contains("route.ToPostgresqlQueue(CompetitionEventFanoutQueueNames.Leaderboard)");
+            .Contains("route.ToNatsSubject(NatsSubjects.LeaderboardEvents)");
         await Assert.That(routing)
             .Contains("Route<CompleteAwdpFixRecovery>(options, WorkerQueue.Control)");
         foreach (var workerQueue in new[]

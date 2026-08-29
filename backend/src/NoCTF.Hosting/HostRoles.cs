@@ -30,11 +30,7 @@ public sealed class HostRoles
 
     public bool Has(HostRole role) => roles.Contains(role);
 
-    public string PersistenceSchema => Has(HostRole.Worker)
-        ? WolverinePersistenceSchemas.Worker
-        : Has(HostRole.Runner)
-            ? WolverinePersistenceSchemas.Runner
-            : WolverinePersistenceSchemas.Api;
+    public string PersistenceSchema => WolverinePersistenceSchemas.Api;
 
     public static HostRoles All() => new(AllRoles);
 

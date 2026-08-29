@@ -5,7 +5,7 @@ using NoCTF.Application.Runtime.Instances;
 using NoCTF.Application.GameplayFacts.Processing;
 using NoCTF.Hosting.Messaging;
 using Wolverine;
-using Wolverine.Postgresql;
+using Wolverine.Nats;
 
 namespace NoCTF.Hosting;
 
@@ -56,15 +56,15 @@ public static class MessageRouting
     private static void Route<TMessage>(WolverineOptions options, WorkerQueue queue)
     {
         var queueName = WorkerQueues.GetName(queue);
-        options.PublishMessage<TMessage>().ToPostgresqlQueue(queueName);
+        options.PublishMessage<TMessage>().ToNatsSubject(NatsSubjects.Subject(queue));
         options.ConfigureNoCtfInfrastructureRetriesFor<TMessage>(queue, queueName);
     }
 
     private static void FanOutCompetitionEvents(WolverineOptions options)
     {
         var route = options.PublishMessage<CompetitionEventCommitted>();
-        route.ToPostgresqlQueue(CompetitionEventFanoutQueueNames.Realtime);
-        route.ToPostgresqlQueue(CompetitionEventFanoutQueueNames.Leaderboard);
+        route.ToNatsSubject(NatsSubjects.RealtimeEvents);
+        route.ToNatsSubject(NatsSubjects.LeaderboardEvents);
         options.ConfigureNoCtfInfrastructureRetriesFor<CompetitionEventCommitted>(
             WorkerQueue.Background,
             CompetitionEventFanoutQueueNames.Realtime);

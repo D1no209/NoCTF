@@ -3,7 +3,6 @@ using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using AsyncKeyedLock;
-using Wolverine.EntityFrameworkCore;
 
 namespace NoCTF.Infrastructure.Persistence;
 
@@ -34,8 +33,10 @@ internal static class PersistenceInfrastructure
 
         var postgres = configuration.GetConnectionString("PostgreSql")
             ?? throw new InvalidOperationException("ConnectionStrings:PostgreSql is required.");
-        services.AddDbContextWithWolverineIntegration<NoCtfDbContext>(
-            options => options.UseNpgsql(postgres).UseSnakeCaseNamingConvention());
+        services.AddDbContext<NoCtfDbContext>(
+            options => options.UseNpgsql(postgres).UseSnakeCaseNamingConvention(),
+            contextLifetime: ServiceLifetime.Scoped,
+            optionsLifetime: ServiceLifetime.Singleton);
         return services;
     }
 }
