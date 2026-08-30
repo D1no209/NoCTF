@@ -8,7 +8,6 @@ describe('keyboard and icon accessibility', () => {
   test('opens clickable table rows with Enter or Space and exposes their purpose', async () => {
     const pages = await Promise.all([
       '../app/pages/admin/platform/users.vue',
-      '../app/pages/admin/platform/dead-letters.vue',
     ].map(source))
 
     for (const page of pages) {

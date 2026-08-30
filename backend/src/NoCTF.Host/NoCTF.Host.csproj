@@ -14,6 +14,7 @@
           AfterTargets="ComputeFilesToPublish"
           Condition="'$(BuildSpaOnPublish)' == 'true'">
     <Exec WorkingDirectory="$(SpaRoot)" Command="bun install --frozen-lockfile" />
+    <Exec WorkingDirectory="$(SpaRoot)" Command="bun run typecheck" />
     <Exec WorkingDirectory="$(SpaRoot)" Command="bun run generate" />
     <ItemGroup>
       <ClientAppFiles Include="$(SpaRoot).output/public/**" />

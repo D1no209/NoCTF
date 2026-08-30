@@ -1268,15 +1268,6 @@ export type NoCtfapiEndpointsAdministrationPlatformPlatformLogLevelProtocol = 'T
 
 export type NoCtfapiEndpointsAdministrationPlatformPlatformLogServiceProtocol = 'Api' | 'Worker' | 'Runner' | 'Host';
 
-export type NoCtfapiEndpointsAdministrationPlatformDeadLetterResponse = {
-    messageId?: string;
-    messageType?: string;
-    source?: string;
-    exceptionType?: string;
-    sentAt?: string;
-    replayable?: boolean;
-};
-
 export type NoCtfapiEndpointsAdministrationPlatformEmailVerificationConfigurationResponse = {
     enabled?: boolean;
     publicBaseUrl?: string;
@@ -1343,14 +1334,6 @@ export type NoCtfapiEndpointsAdministrationPlatformIssuePlatformBotTokenResponse
 
 export type NoCtfapiEndpointsAdministrationPlatformIssuePlatformBotTokenRequest = {
     expiresInSeconds?: number;
-};
-
-export type NoCtfapiEndpointsAdministrationPlatformDeadLetterListResponse = {
-    items?: Array<NoCtfapiEndpointsAdministrationPlatformDeadLetterResponse>;
-};
-
-export type NoCtfapiEndpointsAdministrationPlatformListDeadLettersRequest = {
-    [key: string]: never;
 };
 
 export type NoCtfapiEndpointsAdministrationPlatformPlatformAuditLogListResponse = {
@@ -5631,39 +5614,6 @@ export type AdminPlatformExportLogsErrors = {
 
 export type AdminPlatformExportLogsError = AdminPlatformExportLogsErrors[keyof AdminPlatformExportLogsErrors];
 
-export type AdminPlatformGetDeadLetterData = {
-    body?: never;
-    path: {
-        messageId: string;
-    };
-    query?: never;
-    url: '/api/v1/admin/platform/dead-letters/{messageId}';
-};
-
-export type AdminPlatformGetDeadLetterErrors = {
-    /**
-     * Unauthorized
-     */
-    401: unknown;
-    /**
-     * Forbidden
-     */
-    403: unknown;
-    /**
-     * Not Found
-     */
-    404: unknown;
-};
-
-export type AdminPlatformGetDeadLetterResponses = {
-    /**
-     * Success
-     */
-    200: NoCtfapiEndpointsAdministrationPlatformDeadLetterResponse;
-};
-
-export type AdminPlatformGetDeadLetterResponse = AdminPlatformGetDeadLetterResponses[keyof AdminPlatformGetDeadLetterResponses];
-
 export type AdminPlatformGetEmailVerificationConfigurationData = {
     body?: never;
     path?: never;
@@ -5910,41 +5860,6 @@ export type AdminPlatformIssueBotTokenResponses = {
 
 export type AdminPlatformIssueBotTokenResponse = AdminPlatformIssueBotTokenResponses[keyof AdminPlatformIssueBotTokenResponses];
 
-export type AdminPlatformListDeadLettersData = {
-    body?: never;
-    path?: never;
-    query: {
-        limit: number;
-    };
-    url: '/api/v1/admin/platform/dead-letters';
-};
-
-export type AdminPlatformListDeadLettersErrors = {
-    /**
-     * Bad Request
-     */
-    400: MicrosoftAspNetCoreMvcValidationProblemDetails;
-    /**
-     * Unauthorized
-     */
-    401: unknown;
-    /**
-     * Forbidden
-     */
-    403: unknown;
-};
-
-export type AdminPlatformListDeadLettersError = AdminPlatformListDeadLettersErrors[keyof AdminPlatformListDeadLettersErrors];
-
-export type AdminPlatformListDeadLettersResponses = {
-    /**
-     * Success
-     */
-    200: NoCtfapiEndpointsAdministrationPlatformDeadLetterListResponse;
-};
-
-export type AdminPlatformListDeadLettersResponse = AdminPlatformListDeadLettersResponses[keyof AdminPlatformListDeadLettersResponses];
-
 export type AdminPlatformListAuditLogsData = {
     body?: never;
     path?: never;
@@ -6127,37 +6042,6 @@ export type AdminPlatformReplaceEmailVerificationPasswordResponses = {
 };
 
 export type AdminPlatformReplaceEmailVerificationPasswordResponse = AdminPlatformReplaceEmailVerificationPasswordResponses[keyof AdminPlatformReplaceEmailVerificationPasswordResponses];
-
-export type AdminPlatformRequeueDeadLetterData = {
-    body?: never;
-    path: {
-        messageId: string;
-    };
-    query?: never;
-    url: '/api/v1/admin/platform/dead-letters/{messageId}/requeue';
-};
-
-export type AdminPlatformRequeueDeadLetterErrors = {
-    /**
-     * Unauthorized
-     */
-    401: unknown;
-    /**
-     * Forbidden
-     */
-    403: unknown;
-    /**
-     * Not Found
-     */
-    404: unknown;
-};
-
-export type AdminPlatformRequeueDeadLetterResponses = {
-    /**
-     * Accepted
-     */
-    202: unknown;
-};
 
 export type AdminPlatformSendEmailVerificationTestData = {
     body?: never;
