@@ -1,6 +1,5 @@
 using Microsoft.Extensions.Configuration;
 using NoCTF.Hosting;
-using NoCTF.Infrastructure.Administration;
 
 namespace NoCTF.Tests.Unit.Hosting;
 
@@ -13,8 +12,6 @@ public sealed class HostRolesTests
 
         await Assert.That(roles.Values)
             .IsEquivalentTo([HostRole.Api, HostRole.Worker, HostRole.Runner]);
-        await Assert.That(roles.PersistenceSchema)
-            .IsEqualTo(WolverinePersistenceSchemas.Worker);
     }
 
     [Test]
@@ -63,22 +60,6 @@ public sealed class HostRolesTests
             HostRoles.FromConfiguration(configuration));
 
         await Assert.That(exception.Message).Contains("Hosting:Roles");
-    }
-
-    [Test]
-    public async Task Persistence_schema_follows_worker_runner_api_precedence()
-    {
-        await Assert.That(HostRoles.Only(HostRole.Api).PersistenceSchema)
-            .IsEqualTo(WolverinePersistenceSchemas.Api);
-        await Assert.That(HostRoles.Only(HostRole.Runner).PersistenceSchema)
-            .IsEqualTo(WolverinePersistenceSchemas.Runner);
-        var workerAndRunner = HostRoles.FromConfiguration(BuildConfiguration(
-        [
-            new("Hosting:Roles:0", "Worker"),
-            new("Hosting:Roles:1", "Runner")
-        ]));
-        await Assert.That(workerAndRunner.PersistenceSchema)
-            .IsEqualTo(WolverinePersistenceSchemas.Worker);
     }
 
     private static IConfiguration BuildConfiguration(

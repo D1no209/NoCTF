@@ -54,12 +54,9 @@ public sealed class PlatformUserAccountStatusPersistenceTests
                 await seedDb.SaveChangesAsync(cancellationToken);
             }
 
-            await using var deadLetters = new WolverineProcessDeadLetters(
-                postgres.GetConnectionString());
             await using var operationDb = new NoCtfDbContext(options);
             var store = new PlatformAdministrationStore(
                 operationDb,
-                deadLetters,
                 new PasswordHasher<User>());
             var verified = await store.UpdateEmailVerificationAsync(
                 targetId,
@@ -220,11 +217,9 @@ public sealed class PlatformUserAccountStatusPersistenceTests
         DateTimeOffset now,
         CancellationToken ct)
     {
-        await using var deadLetters = new WolverineProcessDeadLetters(connectionString);
         await using var db = new NoCtfDbContext(options);
         return await new PlatformAdministrationStore(
                 db,
-                deadLetters,
                 new PasswordHasher<User>())
             .UpdateAccountStatusAsync(userId, actorUserId, accountStatus, now, ct);
     }

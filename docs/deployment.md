@@ -167,7 +167,7 @@ NoCTF 继续让 Kestrel 的全局 `MaxRequestBodySize=null`、multipart `Multipa
 
 JWT signing key 可供 Access/Refresh/Internal 使用，但 audience/Scheme 隔离。PostgreSQL、Redis、S3 credentials、SMTP、FlagDerivationSecret 不写日志。FlagDerivationSecret 是每 Competition 数据，不是部署 Secret。`EmailVerification:EncryptionKey` 必须是独立的 Base64 32-byte 部署 Secret，仅用于加密数据库中的 SMTP 密码；API 永不返回该密码。
 
-Runner Pool/Provider/resource max、Redis、Wolverine PostgreSQL transport、S3、CORS/Origin、Cookie Secure 是强类型 IOptions 并在进程启动时 ValidateOnStart。邮箱验证开关、密码找回有效期/冷却/账号限额、公开 URL 与 SMTP 投递参数由管理员页面写入数据库，API/Worker 动态读取；SMTP 密码只能整体替换，前端不回填也不持久化。密码找回不依赖注册邮箱验证开关，但没有完整 SMTP 投递配置时不会签发重置令牌。
+Runner Pool/Provider/resource max、Redis、NATS JetStream transport、S3、CORS/Origin、Cookie Secure 是强类型 IOptions 并在进程启动时 ValidateOnStart。邮箱验证开关、密码找回有效期/冷却/账号限额、公开 URL 与 SMTP 投递参数由管理员页面写入数据库，API/Worker 动态读取；SMTP 密码只能整体替换，前端不回填也不持久化。密码找回不依赖注册邮箱验证开关，但没有完整 SMTP 投递配置时不会签发重置令牌。
 
 Kubernetes 的平台 Namespace 缺省拒绝全部外联。Runner 通过 Cilium 的 `kube-apiserver` 实体仅访问
 真实 Kubernetes API，不得以 `0.0.0.0/0` 放行 443/6443。基础 DNS policy 只允许通过集群 DNS 查询
@@ -179,7 +179,7 @@ FQDN 与 TCP 端口的 Cilium policy，并以同一精确 FQDN 限制集群 DNS 
 
 ## 健康与关闭
 
-Liveness 只表示进程事件循环；Readiness 检查进程所需 PostgreSQL/Wolverine。API 将 Redis
+Liveness 只表示进程事件循环；Readiness 检查进程所需 PostgreSQL、NATS JetStream 与 Wolverine endpoints。API 将 Redis
 不可用报告为降级；Worker 和 Runner 将 Redis 视为必要依赖，因为排行榜投影、通知、平台日志及
 Runner 容量事实均依赖 Redis。Runtime 题目本身不使用平台 Health Probe。
 
@@ -188,6 +188,6 @@ Runner 容量事实均依赖 Redis。Runtime 题目本身不使用平台 Health 
 ## 运维边界
 
 平台进程和管理后台不实现数据库/对象备份或恢复 API；由外部运维负责。仓库提供强制停写、age
-加密、完整保留 Wolverine PostgreSQL schema、对象元数据和恢复后校验的外部工具及隔离演练，见
+加密、完整保留 JetStream 持久卷与 stream/consumer 配置、对象元数据和恢复后校验的外部工具及隔离演练，见
 [备份恢复](backup-recovery.md)。当前工具生成离散恢复点，不是 PITR。Redis 可丢失并重建。
 QQBot 不部署。

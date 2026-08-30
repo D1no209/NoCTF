@@ -36,15 +36,6 @@ public sealed class OpenApiPlatformAdministrationStore : IPlatformAdministration
     public Task<PlatformUserView?> InvalidateTokensAsync(
         Guid userId, DateTimeOffset now, CancellationToken cancellationToken) =>
         Task.FromResult<PlatformUserView?>(null);
-    public Task<IReadOnlyList<DeadLetterView>> ListDeadLettersAsync(
-        int limit, CancellationToken cancellationToken) =>
-        Task.FromResult<IReadOnlyList<DeadLetterView>>([]);
-    public Task<DeadLetterView?> FindDeadLetterAsync(
-        Guid messageId, CancellationToken cancellationToken) =>
-        Task.FromResult<DeadLetterView?>(null);
-    public Task<bool> RequeueDeadLetterAsync(
-        Guid messageId, CancellationToken cancellationToken) =>
-        Task.FromResult(false);
 }
 
 public sealed class OpenApiUserAccountAdministrationStore : IUserAccountAdministrationStore

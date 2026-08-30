@@ -7,14 +7,11 @@ using NoCTF.Application.Administration.UserAccounts;
 using NoCTF.Domain.Identity;
 using NoCTF.Domain.Notifications;
 using NoCTF.Domain.Shared;
-using NoCTF.Infrastructure.Administration;
-using Wolverine.Persistence.Durability;
 
 namespace NoCTF.Infrastructure.Administration;
 
 public sealed class PlatformAdministrationStore(
     NoCtfDbContext db,
-    IProcessDeadLetterStore deadLetters,
     IPasswordHasher<User> passwordHasher) : IPlatformAdministrationStore
 {
     private static readonly JsonSerializerOptions JsonOptions =
@@ -210,24 +207,6 @@ public sealed class PlatformAdministrationStore(
         return Map(user);
     }
 
-    public async Task<IReadOnlyList<DeadLetterView>> ListDeadLettersAsync(
-        int limit,
-        CancellationToken ct)
-    {
-        return (await deadLetters.ListAsync(limit, ct)).Select(Map).ToArray();
-    }
-
-    public async Task<DeadLetterView?> FindDeadLetterAsync(Guid messageId, CancellationToken ct)
-    {
-        var result = await deadLetters.FindAsync(messageId, ct);
-        return result is null ? null : Map(result);
-    }
-
-    public async Task<bool> RequeueDeadLetterAsync(Guid messageId, CancellationToken ct)
-    {
-        return await deadLetters.ReplayAsync(messageId, ct);
-    }
-
     private static PlatformUserView Map(User user) =>
         new(
             user.Id, user.UserName, user.Email, user.Kind, user.Role, user.AccountStatus,
@@ -305,12 +284,4 @@ public sealed class PlatformAdministrationStore(
         });
     }
 
-    private static DeadLetterView Map(DeadLetterEnvelope envelope) =>
-        new(
-            envelope.Id,
-            envelope.MessageType,
-            envelope.Source,
-            envelope.ExceptionType,
-            envelope.SentAt,
-            envelope.Replayable);
 }

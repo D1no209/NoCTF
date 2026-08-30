@@ -6,7 +6,6 @@
 
 1. [数据模型与 Wolverine 调度简化权威规范](data-model-wolverine-simplification.md)
    - [阶段 0 基线](data-model-wolverine-stage0-baseline.md)
-   - [Wolverine 6.29.2 Spike](wolverine-6.29.2-spike.md)
    - [生产切换与回滚 Runbook](data-model-wolverine-cutover.md)
    - [阶段 1：删除 Revision 协议闭环](data-model-wolverine-stage1-revision-removal.md)
    - [阶段 2：核心实体与隐私模型](data-model-wolverine-stage2-core-privacy.md)
@@ -48,7 +47,7 @@
 - `Api`、`Worker`、`Runner` 是三个可组合角色；既可使用三个兼容独立入口，也可通过
   `NoCTF.Host` 以任意非空组合运行，缺省为单进程全合一。
 - PostgreSQL 是业务事实源；Redis 是可丢失的缓存、限流、SignalR backplane 与 Runner 心跳存储。
-- Wolverine PostgreSQL persistence 承载 Inbox、Outbox 与 Dead Letter。周期调度由集群 Singular Agent 从事实重建，禁止用业务列或 Wolverine Scheduled Message 保存下一次周期执行时间；业务任务不得使用进程内 Channel。
+- NATS JetStream 承载 Wolverine durable 消息、ack、重投与 DLQ；PostgreSQL 只保存业务事实。周期调度由集群 Singular Agent 从事实重建，业务任务不得使用进程内 Channel。
 - GameplayFact 不保存分值、分差或累计分，只保存当前结果。排行榜由事件驱动立即失效、500ms 合并并用当前配置全量投影；不存在 Dirty 列或快照列。
 - 所有配置可在任何生命周期状态修改；保存后发布影响投影的比赛事件并失效排行榜缓存，但不会自动重判 GameplayFact。
 - Migration 与 Snapshot 只允许 `dotnet ef migrations ...` 生成，禁止手改。

@@ -14,8 +14,6 @@
     <PackageReference Include="TngTech.ArchUnitNET" />
     <PackageReference Include="TUnit" />
     <PackageReference Include="TUnit.Assertions" />
-    <PackageReference Include="WolverineFx.EntityFrameworkCore" />
-    <PackageReference Include="WolverineFx.Postgresql" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="../../src/NoCTF.API/NoCTF.API.csproj" />

@@ -77,8 +77,7 @@ leader、Agent 所属节点与最近接管时间，不暴露凭据或消息正�
 queue、message type、failure kind 和 trace id。CompetitionId、RuntimeId、FactId 可进入结构化日志/Trace，
 不得成为 Prometheus 高基数标签。管理员通过受权管理能力检查和重投 DLQ，比赛管理者不得直接操作队列。
 
-## 6.29.2 验证
+## NATS JetStream 验证
 
-固定依赖版本的编译与真实 PostgreSQL 行为记录见
-[Wolverine 6.29.2 Spike](wolverine-6.29.2-spike.md)。升级 Wolverine 前必须重新运行同一组测试，不得
-仅根据在线最新版文档假定 API 或语义不变。
+升级 Wolverine 或 NATS 前必须重新验证 durable consumer、竞争消费、ack 超时重投、最大投递、
+fan-out、Runner 定向 subject 与 scheduled delivery，不得仅根据在线最新版文档假定语义不变。
