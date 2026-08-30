@@ -1,15 +1,16 @@
-# PostgreSQL、对象存储与 Wolverine 备份恢复
+# PostgreSQL、NATS JetStream 与对象存储备份恢复
 
 ## 恢复边界
 
-NoCTF 的灾难恢复点由两部分组成：
+NoCTF 的灾难恢复点由三部分组成：
 
-- PostgreSQL 的 `public`、`wolverine_api`、`wolverine_worker`、`wolverine_runner` schema；
+- PostgreSQL 业务 schema；
+- NATS JetStream stream/consumer 配置与持久卷；
 - 当前 S3-compatible bucket 中的全部对象及其 `Content-Type`、`x-amz-meta-sha256` 元数据。
 
-Wolverine Inbox、Outbox、durable queue、scheduled message 和 dead letter 与业务事实位于同一个
-PostgreSQL 数据库，必须随数据库完整恢复。不得清空 Wolverine schema，也不得把队列当成 Redis
-缓存。Redis 不进入备份：恢复后由 PostgreSQL 事实、在线 Runner 和正常流量重建排行榜缓存、限流、
+Wolverine durable queue、scheduled message 和 dead letter 位于 JetStream，必须与 PostgreSQL 业务事实
+和对象存储一起纳入恢复流程。不得把 JetStream 队列当成 Redis 缓存。Redis 不进入备份：恢复后由
+PostgreSQL 事实、在线 Runner 和正常流量重建排行榜缓存、限流、
 SignalR backplane、心跳与容量。
 
 本仓库提供外部运维工具，不新增应用端点、后台页面或业务表。工具创建离散的、应用停写的一致性

@@ -1,5 +1,4 @@
 using Microsoft.Extensions.Configuration;
-using NoCTF.Infrastructure.Administration;
 
 namespace NoCTF.Hosting;
 
@@ -29,8 +28,6 @@ public sealed class HostRoles
         AllRoles.Where(roles.Contains).ToArray();
 
     public bool Has(HostRole role) => roles.Contains(role);
-
-    public string PersistenceSchema => WolverinePersistenceSchemas.Api;
 
     public static HostRoles All() => new(AllRoles);
 

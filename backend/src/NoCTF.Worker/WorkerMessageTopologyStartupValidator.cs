@@ -143,10 +143,6 @@ public sealed class WorkerMessageTopologyStartupValidator(
             ? "leaderboard"
             : "realtime")}";
 
-    // Kept as a source-compatible test helper while the topology tests are migrated.
-    internal static string PostgresqlQueueAddress(string queueName) =>
-        NatsEndpointAddress(queueName);
-
     public Task StoppingAsync(CancellationToken cancellationToken) => Task.CompletedTask;
 
     public Task StopAsync(CancellationToken cancellationToken) => Task.CompletedTask;

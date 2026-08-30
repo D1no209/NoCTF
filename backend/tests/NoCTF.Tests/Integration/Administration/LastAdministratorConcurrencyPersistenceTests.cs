@@ -369,11 +369,9 @@ public sealed class LastAdministratorConcurrencyPersistenceTests
         DateTimeOffset now,
         CancellationToken ct)
     {
-        await using var deadLetters = new WolverineProcessDeadLetters(connectionString);
         await using var db = new NoCtfDbContext(options);
         return await new PlatformAdministrationStore(
                 db,
-                deadLetters,
                 new PasswordHasher<User>())
             .UpdateRoleAsync(userId, UserRole.User, now, ct);
     }

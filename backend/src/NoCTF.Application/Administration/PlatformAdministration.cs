@@ -86,14 +86,6 @@ public static class BotIdentity
     public static string DummyEmail(Guid userId) => $"bot-{userId:N}@bot.invalid";
 }
 
-public sealed record DeadLetterView(
-    Guid MessageId,
-    string MessageType,
-    string Source,
-    string ExceptionType,
-    DateTimeOffset SentAt,
-    bool Replayable);
-
 public interface IPlatformAdministrationStore
 {
     Task<IReadOnlyList<PlatformUserView>> ListUsersAsync(CancellationToken cancellationToken);
@@ -123,15 +115,6 @@ public interface IPlatformAdministrationStore
     Task<PlatformUserView?> InvalidateTokensAsync(
         Guid userId,
         DateTimeOffset now,
-        CancellationToken cancellationToken);
-    Task<IReadOnlyList<DeadLetterView>> ListDeadLettersAsync(
-        int limit,
-        CancellationToken cancellationToken);
-    Task<DeadLetterView?> FindDeadLetterAsync(
-        Guid messageId,
-        CancellationToken cancellationToken);
-    Task<bool> RequeueDeadLetterAsync(
-        Guid messageId,
         CancellationToken cancellationToken);
 }
 
@@ -233,16 +216,4 @@ public sealed class ManagePlatform(
         DateTimeOffset now,
         CancellationToken ct = default) =>
         store.InvalidateTokensAsync(userId, now, ct);
-    public Task<IReadOnlyList<DeadLetterView>> ListDeadLettersAsync(
-        int limit,
-        CancellationToken ct = default) =>
-        store.ListDeadLettersAsync(limit, ct);
-    public Task<DeadLetterView?> GetDeadLetterAsync(
-        Guid messageId,
-        CancellationToken ct = default) =>
-        store.FindDeadLetterAsync(messageId, ct);
-    public Task<bool> RequeueDeadLetterAsync(
-        Guid messageId,
-        CancellationToken ct = default) =>
-        store.RequeueDeadLetterAsync(messageId, ct);
 }

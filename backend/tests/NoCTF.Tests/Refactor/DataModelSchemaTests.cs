@@ -1,14 +1,8 @@
-using JasperFx;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.Hosting;
 using Npgsql;
-using NoCTF.Hosting;
-using NoCTF.Infrastructure.Administration;
 using NoCTF.Infrastructure.Persistence;
 using NoCTF.Tests.Integration;
 using Testcontainers.PostgreSql;
-using Wolverine;
 
 namespace NoCTF.Tests.Refactor;
 
@@ -128,67 +122,4 @@ public sealed class DataModelSchemaTests
         });
     }
 
-    [Test]
-    [Category("Integration")]
-    public async Task Initial_baseline_does_not_create_Wolverine_PostgreSQL_role_schemas(
-        CancellationToken ct)
-    {
-        await DockerIntegrationTest.RunAsync(async () =>
-        {
-            await using var postgres = new PostgreSqlBuilder("postgres:17.10-alpine3.24@sha256:742f40ea20b9ff2ff31db5458d127452988a2164df9e17441e191f3b72252193")
-                .WithDatabase("noctf_model_wolverine")
-                .WithUsername("postgres")
-                .WithPassword("postgres")
-                .Build();
-            await postgres.StartAsync(ct);
-
-            var connectionString = postgres.GetConnectionString();
-            var options = new DbContextOptionsBuilder<NoCtfDbContext>()
-                .UseNpgsql(connectionString)
-                .UseSnakeCaseNamingConvention()
-                .Options;
-            await using (var db = new NoCtfDbContext(options))
-                await db.Database.MigrateAsync(ct);
-
-            foreach (var role in new[] { HostRole.Api, HostRole.Worker, HostRole.Runner })
-            {
-                var builder = Host.CreateApplicationBuilder();
-                builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>
-                {
-                    ["ConnectionStrings:PostgreSql"] = connectionString
-                });
-                builder.UseWolverine(wolverine =>
-                {
-                    wolverine.Discovery.DisableConventionalDiscovery();
-                    wolverine.AutoBuildMessageStorageOnStartup = AutoCreate.All;
-                    wolverine.ConfigureNoCtfPersistence(
-                        builder.Configuration,
-                        HostRoles.Only(role));
-                });
-                using var host = builder.Build();
-                await host.StartAsync(ct);
-                await host.StopAsync(ct);
-            }
-
-            await using var connection = new NpgsqlConnection(connectionString);
-            await connection.OpenAsync(ct);
-            foreach (var schema in WolverinePersistenceSchemas.All)
-            {
-                await using var schemaCommand = new NpgsqlCommand(
-                    """
-                    SELECT count(*)::int
-                    FROM pg_tables
-                    WHERE schemaname = @schema
-                      AND tablename IN (
-                        'wolverine_incoming_envelopes',
-                        'wolverine_outgoing_envelopes',
-                        'wolverine_nodes')
-                    """,
-                    connection);
-                schemaCommand.Parameters.AddWithValue("schema", schema);
-                await Assert.That((int)(await schemaCommand.ExecuteScalarAsync(ct))!)
-                    .IsEqualTo(0);
-            }
-        });
-    }
 }

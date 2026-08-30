@@ -43,15 +43,10 @@ public sealed class ResourceManagerRolePersistenceTests
                 await setup.SaveChangesAsync(cancellationToken);
             }
 
-            await using var firstDeadLetters =
-                new WolverineProcessDeadLetters(postgres.GetConnectionString());
-            await using var secondDeadLetters =
-                new WolverineProcessDeadLetters(postgres.GetConnectionString());
             await using var firstDb = new NoCtfDbContext(options);
             await using var secondDb = new NoCtfDbContext(options);
             var firstTask = new PlatformAdministrationStore(
                     firstDb,
-                    firstDeadLetters,
                     new PasswordHasher<User>())
                 .UpdateRoleAsync(
                     firstAdministratorId,
@@ -60,7 +55,6 @@ public sealed class ResourceManagerRolePersistenceTests
                     cancellationToken);
             var secondTask = new PlatformAdministrationStore(
                     secondDb,
-                    secondDeadLetters,
                     new PasswordHasher<User>())
                 .UpdateRoleAsync(
                     secondAdministratorId,
@@ -155,11 +149,8 @@ public sealed class ResourceManagerRolePersistenceTests
                     deletedAt: now));
             await db.SaveChangesAsync(cancellationToken);
 
-            await using var deadLetters =
-                new WolverineProcessDeadLetters(postgres.GetConnectionString());
             var platform = new PlatformAdministrationStore(
                 db,
-                deadLetters,
                 new PasswordHasher<User>());
             var blocked = await platform.UpdateRoleAsync(
                 targetId,
@@ -471,14 +462,11 @@ public sealed class ResourceManagerRolePersistenceTests
                 """,
                 cancellationToken);
 
-            await using var deadLetters =
-                new WolverineProcessDeadLetters(postgres.GetConnectionString());
             var passwordHasher = new PasswordHasher<User>();
             await using var downgradeDb = new NoCtfDbContext(options);
             await using var assignmentDb = new NoCtfDbContext(options);
             var downgradeTask = new PlatformAdministrationStore(
                     downgradeDb,
-                    deadLetters,
                     passwordHasher)
                 .UpdateRoleAsync(
                     targetId,
@@ -561,7 +549,6 @@ public sealed class ResourceManagerRolePersistenceTests
             await WaitForPostgresSleepAsync(db, cancellationToken);
             var downgradeSecondTask = new PlatformAdministrationStore(
                     downgradeSecondDb,
-                    deadLetters,
                     passwordHasher)
                 .UpdateRoleAsync(
                     targetId,

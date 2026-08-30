@@ -37,7 +37,6 @@ internal static class AdministrationInfrastructure
         }
         else if (development)
         {
-            services.AddSingleton<IProcessDeadLetterStore, DevelopmentProcessDeadLetterStore>();
             services.AddScoped<IPlatformAdministrationStore, PlatformAdministrationStore>();
             services.AddScoped<IUserAccountAdministrationStore, UserAccountAdministrationStore>();
             services.AddScoped<IPlatformConfigurationStore, PlatformConfigurationStore>();
@@ -48,10 +47,6 @@ internal static class AdministrationInfrastructure
         }
         else
         {
-            var postgres = configuration.GetConnectionString("PostgreSql")
-                ?? throw new InvalidOperationException("ConnectionStrings:PostgreSql is required.");
-            services.AddSingleton<IProcessDeadLetterStore>(_ =>
-                new WolverineProcessDeadLetters(postgres));
             services.AddScoped<IPlatformAdministrationStore, PlatformAdministrationStore>();
             services.AddScoped<IUserAccountAdministrationStore, UserAccountAdministrationStore>();
             services.AddScoped<IPlatformConfigurationStore, PlatformConfigurationStore>();
