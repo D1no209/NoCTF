@@ -21,7 +21,7 @@ public sealed class AdminCompetitionStore(
     private static readonly JsonSerializerOptions JsonOptions =
         new(JsonSerializerDefaults.Web);
     private readonly ITransactionalMessageOutbox outbox =
-        messageOutbox ?? new OpenApiTransactionalMessageOutbox();
+        messageOutbox ?? new NoOpTransactionalMessageOutbox();
     public async Task<IReadOnlyList<CompetitionView>> ListAsync(
         Guid actorId,
         bool isAdministrator,

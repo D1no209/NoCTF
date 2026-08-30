@@ -11,7 +11,7 @@ internal static class MessagingInfrastructure
         bool development)
     {
         if (exporting)
-            services.AddScoped<ITransactionalMessageOutbox, OpenApiTransactionalMessageOutbox>();
+            services.AddScoped<ITransactionalMessageOutbox, NoOpTransactionalMessageOutbox>();
         else if (development)
             services.AddScoped<ITransactionalMessageOutbox, DevelopmentTransactionalMessageOutbox>();
         else

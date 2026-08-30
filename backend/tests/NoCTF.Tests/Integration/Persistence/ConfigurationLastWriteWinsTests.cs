@@ -39,7 +39,7 @@ public sealed class ConfigurationLastWriteWinsTests
             {
                 var result = await new CompetitionConfigurationStore(
                     updateDb,
-                    new OpenApiTransactionalMessageOutbox()).TryUpdateAsync(
+                    new NoOpTransactionalMessageOutbox()).TryUpdateAsync(
                     ids.CompetitionId,
                     """{"schemaVersion":2,"defaultScoreCurve":{"initialPoints":600,"minimumPoints":100,"decayTeamCount":10,"decayMode":2},"bloodRewards":[]}""",
                     true,
@@ -53,7 +53,7 @@ public sealed class ConfigurationLastWriteWinsTests
             {
                 var result = await new ChallengeConfigurationStore(
                     updateDb,
-                    new OpenApiTransactionalMessageOutbox()).TryUpdateAsync(
+                    new NoOpTransactionalMessageOutbox()).TryUpdateAsync(
                     ids.CompetitionId,
                     ids.CompetitionChallengeId,
                     """{"schemaVersion":2,"scoreCurve":{"initialPoints":700,"minimumPoints":100,"decayTeamCount":10,"decayMode":2},"bloodRewards":[]}""",

@@ -150,6 +150,16 @@ public sealed class RawSqlPersistenceRulesTests
                 "FromSqlInterpolated",
                 "FOR UPDATE",
                 "SKIP LOCKED"
+            ],
+            ["backend/src/NoCTF.Worker/Storage/FileCleanupOperations.cs"] =
+            [
+                "ExecuteSqlInterpolated",
+                "FOR UPDATE"
+            ],
+            ["backend/src/NoCTF.Worker/GameplayFacts/AwdpRecoveryOperations.cs"] =
+            [
+                "FromSqlInterpolated",
+                "FOR UPDATE"
             ]
         };
 

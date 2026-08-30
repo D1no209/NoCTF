@@ -20,7 +20,7 @@ public sealed class CompetitionManagementStore(
     private readonly ICompetitionEventRecorder events =
         eventRecorder ?? NullCompetitionEventRecorder.Instance;
     private readonly ITransactionalMessageOutbox outbox =
-        messageOutbox ?? new OpenApiTransactionalMessageOutbox();
+        messageOutbox ?? new NoOpTransactionalMessageOutbox();
 
     public async Task<CompetitionCreationResult> CreateAsync(
         CreateCompetitionCommand command,

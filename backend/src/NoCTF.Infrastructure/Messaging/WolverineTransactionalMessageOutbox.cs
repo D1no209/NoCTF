@@ -34,7 +34,7 @@ public sealed class WolverineTransactionalMessageOutbox(
     }
 }
 
-public sealed class OpenApiTransactionalMessageOutbox : ITransactionalMessageOutbox
+public sealed class NoOpTransactionalMessageOutbox : ITransactionalMessageOutbox
 {
     public ValueTask PublishAsync<T>(T message) => ValueTask.CompletedTask;
     public ValueTask ScheduleAsync<T>(T message, DateTimeOffset scheduledAt) =>

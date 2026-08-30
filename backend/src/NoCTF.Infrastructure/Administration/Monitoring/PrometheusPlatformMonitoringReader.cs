@@ -7,7 +7,7 @@ namespace NoCTF.Infrastructure.Administration.Monitoring;
 
 internal sealed record PlatformMonitoringOptions(Uri? DashboardUri);
 
-internal sealed class OpenApiPlatformMonitoringReader(TimeProvider timeProvider)
+internal sealed class NoOpPlatformMonitoringReader(TimeProvider timeProvider)
     : IPlatformMonitoringReader
 {
     public Task<PlatformMonitoringMeasurements> ReadAsync(

@@ -27,20 +27,20 @@ internal static class AdministrationInfrastructure
 
         if (exporting)
         {
-            services.AddScoped<IPlatformAdministrationStore, OpenApiPlatformAdministrationStore>();
-            services.AddScoped<IUserAccountAdministrationStore, OpenApiUserAccountAdministrationStore>();
-            services.AddScoped<IPlatformConfigurationStore, OpenApiPlatformConfigurationStore>();
-            services.AddSingleton<IPlatformLogReader, OpenApiPlatformLogReader>();
-            services.AddScoped<IPlatformAuditLogStore, OpenApiPlatformAuditLogStore>();
+            services.AddScoped<IPlatformAdministrationStore, NoOpPlatformAdministrationStore>();
+            services.AddScoped<IUserAccountAdministrationStore, NoOpUserAccountAdministrationStore>();
+            services.AddScoped<IPlatformConfigurationStore, NoOpPlatformConfigurationStore>();
+            services.AddSingleton<IPlatformLogReader, NoOpPlatformLogReader>();
+            services.AddScoped<IPlatformAuditLogStore, NoOpPlatformAuditLogStore>();
             services.AddSingleton<IPlatformMonitoringReader,
-                OpenApiPlatformMonitoringReader>();
+                NoOpPlatformMonitoringReader>();
         }
         else if (development)
         {
             services.AddScoped<IPlatformAdministrationStore, PlatformAdministrationStore>();
             services.AddScoped<IUserAccountAdministrationStore, UserAccountAdministrationStore>();
             services.AddScoped<IPlatformConfigurationStore, PlatformConfigurationStore>();
-            services.AddSingleton<IPlatformLogReader, OpenApiPlatformLogReader>();
+            services.AddSingleton<IPlatformLogReader, NoOpPlatformLogReader>();
             services.AddScoped<IPlatformAuditLogStore, PlatformAuditLogStore>();
             services.AddSingleton<IPlatformMonitoringReader,
                 UnavailablePlatformMonitoringReader>();
