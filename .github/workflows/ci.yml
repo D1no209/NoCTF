@@ -56,6 +56,7 @@ jobs:
           bun install --frozen-lockfile
           bun test
           bun run typecheck
+          bun run generate
 
       - name: Restore backend
         run: dotnet restore backend/NoCTF.slnx --locked-mode
@@ -145,6 +146,17 @@ jobs:
         run: |
           dotnet run --project backend/src/NoCTF.API/NoCTF.API.csproj --configuration Release --no-build --no-launch-profile -- --export-openapi
           git diff --exit-code backend/artifacts/openapi/swagger.json backend/src/NoCTF.API/wwwroot/openapi/v1.json
+
+      - name: Verify generated frontend API client
+        working-directory: backend/src/NoCTF.API/ClientApp
+        run: |
+          bun install --frozen-lockfile
+          bun run api:gen
+
+      - name: Check generated frontend API client drift
+        shell: bash
+        run: git diff --exit-code backend/src/NoCTF.API/ClientApp/app/api
+          git diff --exit-code backend/src/NoCTF.API/ClientApp/app/api
 
   publish-images:
     name: Publish application image

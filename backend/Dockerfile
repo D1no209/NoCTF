@@ -1,11 +1,12 @@
-FROM docker.m.daocloud.io/oven/bun:1.3.14@sha256:e10577f0db68676a7024391c6e5cb4b879ebd17188ab750cf10024a6d700e5c4 AS frontend-build
+FROM oven/bun:1.3.14@sha256:e10577f0db68676a7024391c6e5cb4b879ebd17188ab750cf10024a6d700e5c4 AS frontend-build
 WORKDIR /src/ClientApp
 COPY backend/src/NoCTF.API/ClientApp/package.json backend/src/NoCTF.API/ClientApp/bun.lock ./
-RUN bun install --frozen-lockfile --ignore-scripts
+RUN bun install --frozen-lockfile
 COPY backend/src/NoCTF.API/ClientApp/ ./
+RUN bunx nuxt prepare
 RUN bun --bun run generate
 
-FROM docker.m.daocloud.io/docker:28.5.1-cli@sha256:9190b0613792e658a7783cf14b2d5ace5941bb68ede7276922ea36ee457d76ad AS docker-cli
+FROM docker:28.5.1-cli@sha256:9190b0613792e658a7783cf14b2d5ace5941bb68ede7276922ea36ee457d76ad AS docker-cli
 
 FROM mcr.microsoft.com/dotnet/sdk:10.0.302@sha256:72dd743782f2ae7e5476fd64f6a460045e3998dc862218b80e6944cba79a01b0 AS kompose-cli
 ARG KOMPOSE_VERSION=1.38.0

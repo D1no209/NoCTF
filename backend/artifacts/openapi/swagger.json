@@ -6570,54 +6570,6 @@
         ]
       }
     },
-    "/api/v1/admin/platform/dead-letters/{messageId}": {
-      "get": {
-        "tags": [
-          "Admin"
-        ],
-        "summary": "Gets redacted dead-letter metadata.",
-        "description": "Returns delivery metadata without message bodies, secrets, or exception text.",
-        "operationId": "AdminPlatformGetDeadLetter",
-        "parameters": [
-          {
-            "name": "messageId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Success",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationPlatformDeadLetterResponse"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Not Found"
-          },
-          "401": {
-            "description": "Unauthorized"
-          },
-          "403": {
-            "description": "Forbidden"
-          }
-        },
-        "security": [
-          {
-            "Bearer": [
-              "Administrator"
-            ]
-          }
-        ]
-      }
-    },
     "/api/v1/admin/platform/email-verification/configuration": {
       "get": {
         "tags": [
@@ -6962,62 +6914,6 @@
           },
           "404": {
             "description": "Not Found"
-          },
-          "401": {
-            "description": "Unauthorized"
-          },
-          "403": {
-            "description": "Forbidden"
-          },
-          "400": {
-            "description": "Bad Request",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcValidationProblemDetails"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "Bearer": [
-              "Administrator"
-            ]
-          }
-        ]
-      }
-    },
-    "/api/v1/admin/platform/dead-letters": {
-      "get": {
-        "tags": [
-          "Admin"
-        ],
-        "summary": "Lists redacted Wolverine dead letters.",
-        "description": "Message bodies and exception messages are deliberately omitted.",
-        "operationId": "AdminPlatformListDeadLetters",
-        "parameters": [
-          {
-            "name": "limit",
-            "in": "query",
-            "required": true,
-            "schema": {
-              "type": "integer",
-              "format": "int32"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Success",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationPlatformDeadLetterListResponse"
-                }
-              }
-            }
           },
           "401": {
             "description": "Unauthorized"
@@ -7473,47 +7369,6 @@
                 }
               }
             }
-          }
-        },
-        "security": [
-          {
-            "Bearer": [
-              "Administrator"
-            ]
-          }
-        ]
-      }
-    },
-    "/api/v1/admin/platform/dead-letters/{messageId}/requeue": {
-      "post": {
-        "tags": [
-          "Admin"
-        ],
-        "summary": "Queues a Wolverine dead letter for durable replay.",
-        "description": "Creates a new delivery attempt while preserving the original failed record.",
-        "operationId": "AdminPlatformRequeueDeadLetter",
-        "parameters": [
-          {
-            "name": "messageId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "202": {
-            "description": "Accepted"
-          },
-          "404": {
-            "description": "Not Found"
-          },
-          "401": {
-            "description": "Unauthorized"
-          },
-          "403": {
-            "description": "Forbidden"
           }
         },
         "security": [
@@ -17984,32 +17839,6 @@
           "Host"
         ]
       },
-      "NoCTFAPIEndpointsAdministrationPlatformDeadLetterResponse": {
-        "type": "object",
-        "additionalProperties": false,
-        "properties": {
-          "messageId": {
-            "type": "string",
-            "format": "guid"
-          },
-          "messageType": {
-            "type": "string"
-          },
-          "source": {
-            "type": "string"
-          },
-          "exceptionType": {
-            "type": "string"
-          },
-          "sentAt": {
-            "type": "string",
-            "format": "date-time"
-          },
-          "replayable": {
-            "type": "boolean"
-          }
-        }
-      },
       "NoCTFAPIEndpointsAdministrationPlatformEmailVerificationConfigurationResponse": {
         "type": "object",
         "additionalProperties": false,
@@ -18280,22 +18109,6 @@
             "minimum": 60.0
           }
         }
-      },
-      "NoCTFAPIEndpointsAdministrationPlatformDeadLetterListResponse": {
-        "type": "object",
-        "additionalProperties": false,
-        "properties": {
-          "items": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationPlatformDeadLetterResponse"
-            }
-          }
-        }
-      },
-      "NoCTFAPIEndpointsAdministrationPlatformListDeadLettersRequest": {
-        "type": "object",
-        "additionalProperties": false
       },
       "NoCTFAPIEndpointsAdministrationPlatformPlatformAuditLogListResponse": {
         "type": "object",

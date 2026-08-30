@@ -81,3 +81,35 @@ dotnet ef database update
 ## 文档同步
 
 修改领域契约必须同时更新 docs、OpenAPI 和测试。不得以代码现状为理由恢复已废弃的 Penetration 模式、RuntimeOperation、Artifact、TeamMember 或 Collaborator 表。
+
+## OpenAPI 与前端构建门禁
+
+OpenAPI 的源头是 API endpoint 元数据。导出命令会同时更新提交到仓库的
+`backend/artifacts/openapi/swagger.json` 和运行时提供的
+`backend/src/NoCTF.API/wwwroot/openapi/v1.json`：
+
+```powershell
+dotnet run --project backend/src/NoCTF.API/NoCTF.API.csproj -- --export-openapi
+```
+
+前端 SDK 由 `ClientApp/openapi-ts.config.ts` 从 `wwwroot/openapi/v1.json` 生成到
+`ClientApp/app/api`：
+
+```powershell
+Push-Location backend/src/NoCTF.API/ClientApp
+bun install --frozen-lockfile
+bun run api:gen
+Pop-Location
+```
+
+CI 和 `backend/scripts/Verify-Backend.ps1` 都会重新导出 OpenAPI、重新生成 SDK，
+并以 `git diff --exit-code` 拒绝未提交的漂移。因此 endpoint、OpenAPI 文档和前端
+调用代码必须在同一变更中更新。
+
+前端提交门禁依次执行 `bun test`、`bun run typecheck` 和 `bun run generate`；API/Host
+发布目标会执行同样的 typecheck/generate 钩子，Docker 构建则在专用阶段执行
+`nuxt prepare` 和 `bun run generate`，确保 Nuxt 生产静态包能够编译。
+
+Docker 使用多阶段构建：`frontend-build` 只是构建阶段，生成的 `.output/public`
+会复制到 API/Host 镜像的 `wwwroot`。生产 Compose 不启动任何 Node/Bun/Nuxt 容器；
+开发环境才由 ASP.NET Core SpaProxy 连接本机 Nuxt dev server。
