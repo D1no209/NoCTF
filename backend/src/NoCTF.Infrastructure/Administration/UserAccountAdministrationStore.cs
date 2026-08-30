@@ -21,7 +21,7 @@ public sealed class UserAccountAdministrationStore(
         new(JsonSerializerDefaults.Web);
 
     private readonly ITransactionalMessageOutbox outbox =
-        messageOutbox ?? new OpenApiTransactionalMessageOutbox();
+        messageOutbox ?? new NoOpTransactionalMessageOutbox();
     public async Task<UserDeletionPreview?> PreviewDeletionAsync(
         Guid userId,
         Guid actorUserId,

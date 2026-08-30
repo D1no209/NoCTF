@@ -24,7 +24,7 @@ public sealed class ChallengeBankStore(
     private static readonly IChallengeRuntimeTemplateCatalog RuntimeTemplates =
         new ChallengeRuntimeTemplateCatalog();
     private readonly ITransactionalMessageOutbox outbox =
-        messageOutbox ?? new OpenApiTransactionalMessageOutbox();
+        messageOutbox ?? new NoOpTransactionalMessageOutbox();
     private readonly ICompetitionEventRecorder events =
         eventRecorder ?? NullCompetitionEventRecorder.Instance;
 

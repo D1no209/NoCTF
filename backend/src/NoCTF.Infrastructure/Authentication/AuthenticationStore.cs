@@ -20,7 +20,7 @@ public sealed class AuthenticationStore(
 {
     private readonly TimeProvider timeProvider = clock ?? TimeProvider.System;
     private readonly ITransactionalMessageOutbox outbox =
-        messageOutbox ?? new OpenApiTransactionalMessageOutbox();
+        messageOutbox ?? new NoOpTransactionalMessageOutbox();
     private readonly FileReferenceLock fileLock = fileReferenceLock ?? new FileReferenceLock();
     public async Task<AuthenticatedUser?> FindByLoginAsync(
         string login,

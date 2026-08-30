@@ -23,7 +23,7 @@ public sealed class PlatformConfigurationStore(
     private const string CacheKey = "platform-configuration";
     private readonly IFusionCache? cache = cacheProvider?.GetCache(NoCtfCacheNames.ReadModels);
     private readonly ITransactionalMessageOutbox outbox =
-        messageOutbox ?? new OpenApiTransactionalMessageOutbox();
+        messageOutbox ?? new NoOpTransactionalMessageOutbox();
     private readonly FileReferenceLock fileLock = fileReferenceLock ?? new FileReferenceLock();
 
     public Task<PlatformConfigurationView> GetAsync(CancellationToken ct) =>
@@ -106,7 +106,7 @@ public sealed class PlatformConfigurationStore(
             settings.UpdatedAt);
 }
 
-public sealed class OpenApiPlatformConfigurationStore : IPlatformConfigurationStore
+public sealed class NoOpPlatformConfigurationStore : IPlatformConfigurationStore
 {
     private static readonly PlatformConfigurationView Default =
         new("NoCTF", null, null, DateTimeOffset.UnixEpoch);

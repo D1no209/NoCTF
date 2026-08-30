@@ -5,7 +5,7 @@ using NoCTF.Domain.Identity;
 
 namespace NoCTF.Infrastructure.Administration;
 
-public sealed class OpenApiPlatformAdministrationStore : IPlatformAdministrationStore
+public sealed class NoOpPlatformAdministrationStore : IPlatformAdministrationStore
 {
     public Task<IReadOnlyList<PlatformUserView>> ListUsersAsync(CancellationToken cancellationToken) =>
         Task.FromResult<IReadOnlyList<PlatformUserView>>([]);
@@ -38,7 +38,7 @@ public sealed class OpenApiPlatformAdministrationStore : IPlatformAdministration
         Task.FromResult<PlatformUserView?>(null);
 }
 
-public sealed class OpenApiUserAccountAdministrationStore : IUserAccountAdministrationStore
+public sealed class NoOpUserAccountAdministrationStore : IUserAccountAdministrationStore
 {
     public Task<UserDeletionPreview?> PreviewDeletionAsync(
         Guid userId,
@@ -56,7 +56,7 @@ public sealed class OpenApiUserAccountAdministrationStore : IUserAccountAdminist
         Task.FromResult(new UserDeletionStoreResult(UserDeletionState.UserNotFound));
 }
 
-public sealed class OpenApiPlatformLogReader : IPlatformLogReader
+public sealed class NoOpPlatformLogReader : IPlatformLogReader
 {
     public Task<PlatformLogQueryResult> QueryAsync(
         PlatformLogQuery query,
@@ -71,7 +71,7 @@ public sealed class OpenApiPlatformLogReader : IPlatformLogReader
             new PlatformLogExport(new MemoryStream(), "platform-logs.jsonl")));
 }
 
-public sealed class OpenApiPlatformAuditLogStore : IPlatformAuditLogStore
+public sealed class NoOpPlatformAuditLogStore : IPlatformAuditLogStore
 {
     public Task<IReadOnlyList<PlatformAuditView>> QueryAsync(
         PlatformAuditQuery query,

@@ -137,7 +137,7 @@ public sealed class CompetitionManagementPersistenceTests
                     CompetitionStatus.Draft));
             await db.SaveChangesAsync(cancellationToken);
 
-            var outbox = new OpenApiTransactionalMessageOutbox();
+            var outbox = new NoOpTransactionalMessageOutbox();
             var store = new CompetitionManagementStore(
                 db,
                 outbox,
@@ -188,7 +188,7 @@ public sealed class CompetitionManagementPersistenceTests
 
             var registrations = new TeamRegistrationStore(
                 db,
-                new OpenApiTransactionalMessageOutbox());
+                new NoOpTransactionalMessageOutbox());
             var allowed = await registrations.TryCreateAsync(
                 new(competitionId, ownerId, "Running team", now.AddMinutes(2), "default"),
                 TeamRegistrationStatus.Approved,
