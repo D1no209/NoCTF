@@ -139,7 +139,7 @@ public sealed class WorkerMessageTopologyStartupValidator(
     }
 
     internal static string NatsEndpointAddress(string queueName) =>
-        $"nats://noctf.events.{(queueName.Contains("leaderboard", StringComparison.Ordinal)
+        $"nats://subject/noctf.events.{(queueName.Contains("leaderboard", StringComparison.Ordinal)
             ? "leaderboard"
             : "realtime")}";
 
