@@ -100,6 +100,19 @@ public sealed class WorkerRoleTests
     }
 
     [Test]
+    [Arguments(CompetitionEventFanoutQueueNames.Realtime, "nats://subject/noctf.events.realtime")]
+    [Arguments(CompetitionEventFanoutQueueNames.Leaderboard, "nats://subject/noctf.events.leaderboard")]
+    public async Task Sticky_fanout_uses_the_canonical_NATS_subject_address(
+        string queueName,
+        string expected)
+    {
+        var endpoint = WorkerMessageTopologyStartupValidator.NatsEndpointAddress(queueName);
+
+        await Assert.That(endpoint).IsEqualTo(expected);
+        WorkerMessageTopologyStartupValidator.ValidateFanoutRouting([queueName], endpoint);
+    }
+
+    [Test]
     public async Task Leaderboard_fanout_rejects_listener_not_pinned_to_leader()
     {
         var action = () => WorkerMessageTopologyStartupValidator.ValidateLeaderboardListenerScope(

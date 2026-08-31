@@ -121,10 +121,10 @@ public static class NoCtfMessagingRetryPolicies
             endpointName switch
             {
                 CompetitionEventFanoutQueueNames.Realtime =>
-                    "nats://noctf.events.realtime",
+                    "nats://subject/noctf.events.realtime",
                 CompetitionEventFanoutQueueNames.Leaderboard =>
-                    "nats://noctf.events.leaderboard",
-                _ => $"nats://noctf.{endpointName.Replace("-", ".", StringComparison.Ordinal)}"
+                    "nats://subject/noctf.events.leaderboard",
+                _ => $"nats://subject/noctf.{endpointName.Replace("-", ".", StringComparison.Ordinal)}"
             };
     }
 }
