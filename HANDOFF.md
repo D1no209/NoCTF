@@ -3176,3 +3176,29 @@ dotnet run --project backend/src/NoCTF.API/NoCTF.API.csproj --no-build -- --expo
 
 - `.webbridge-tmp/`、`PLAN.md`、`backend/src/NoCTF.API/storage/` 是本地/用户内容，不应加入提交。
 - 不恢复旧 migration、旧表或兼容层；migration 与 snapshot 只能通过 EF CLI 修改。
+
+## 2026-09-01 Alpha.113 NATS 切换修正与生产部署
+
+- 本地 `main` 先快进同步协作者提交至 `d0029e5b`，随后以 `6b2d7cab`、`5f9e287b` 补齐 NATS
+  部署门禁、文档计数、非激活 Kubernetes provider 配置及国内可达构建镜像。首次生产构建暴露出
+  NATS 拓扑启动校验仍使用非规范 URI；`a8b012f7` 将其统一为 Wolverine 实际的
+  `nats://subject/...` 地址。
+- 第二次安全回滚后，通过 WolverineFx 6.30.3 包级反编译和隔离启动验证确认：JetStream listener
+  的通用 `EndpointMode` 默认是 `BufferedInMemory`，应以 `BrokerRole=stream` 判断；按 endpoint
+  name 查询还会命中 Sticky handler 的本地队列，必须按规范 NATS URI 查询。`5c223aa1` 修正这两点，
+  并恢复远程改动误删的 PostgreSQL Wolverine 节点协调和 EF transactional outbox；业务传输仍为
+  NATS JetStream，PostgreSQL 只持有 Wolverine 节点/agent 与事务 envelope 存储。
+- 最终本地验证：Release solution build 为 0 警告/0 错误；非 Integration 937/937；真实依赖
+  Integration 170/170，另 2 项仅因未配置外部 Kubernetes/Libvirt 环境按门禁跳过；EF model 无
+  migration 漂移。隔离的 PostgreSQL、Redis、NATS 生产模式 Worker 冒烟成功创建/复用全部 consumer、
+  取得 Singular Agent 领导权，并由 `/health/ready` 返回 200；临时容器和隔离 Redis 数据已清理。
+- 生产最终部署基线为 `5c223aa14c7c394a6b9250429b4c56491ced132c`，程序集版本
+  `0.1.0-alpha.113`。迁移容器明确报告数据库已是最新，没有业务 migration；切换前备份为
+  `/root/backups/noctf-ci-5c223aa1-20260831T171021Z.dump`，SHA-256
+  `08f8fb16b6dd77170051231f070290e397ce269d80fa334ec5ed774acf383779`。既有 PostgreSQL/Redis
+  容器未重建，均保持 7 天运行时长。
+- 部署后 API、Worker、Runner、NATS 均为 healthy 且 restart count 为 0；NATS 2.12.2 JetStream
+  有 6 个 stream、7 个 consumer。外网 `/`、`/health`、`/health/ready` 及服务器 IP HTTPS health
+  均为 200。Worker 仅在取得 leader 前出现两次预期的 readiness 503，随后成功启动
+  `noctf-maintenance-ticks` 和 leader-pinned leaderboard listener，无 Fatal、Unhandled 或持续错误。
+  清理未引用构建缓存后根分区可用空间由 7.8 GiB 回升至 12 GiB；运行镜像、回滚标签和数据卷均保留。
