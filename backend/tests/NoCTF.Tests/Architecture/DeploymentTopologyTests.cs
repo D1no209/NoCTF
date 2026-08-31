@@ -13,6 +13,14 @@ public sealed class DeploymentTopologyTests
         var hostProgram = await ReadAsync("backend", "src", "NoCTF.Host", "Program.cs");
         var roleModel = await ReadAsync("backend", "src", "NoCTF.Hosting", "HostRoles.cs");
         var routing = await ReadAsync("backend", "src", "NoCTF.Hosting", "MessageRouting.cs");
+        var persistence = await ReadAsync(
+            "backend", "src", "NoCTF.Hosting", "WolverineHosting.cs");
+        var outbox = await ReadAsync(
+            "backend", "src", "NoCTF.Infrastructure", "Messaging",
+            "WolverineTransactionalMessageOutbox.cs");
+        var workerTopology = await ReadAsync(
+            "backend", "src", "NoCTF.Worker",
+            "WorkerMessageTopologyStartupValidator.cs");
         var workerDeployment = Path.Combine(
             RepositoryRoot,
             "deploy",
@@ -48,6 +56,13 @@ public sealed class DeploymentTopologyTests
             .Contains("route.ToNatsSubject(NatsSubjects.RealtimeEvents)");
         await Assert.That(routing)
             .Contains("route.ToNatsSubject(NatsSubjects.LeaderboardEvents)");
+        await Assert.That(persistence).Contains("PersistMessagesWithPostgresql");
+        await Assert.That(persistence).Contains("UseEntityFrameworkCoreTransactions");
+        await Assert.That(persistence).Contains("options.UseNats(nats)");
+        await Assert.That(outbox).Contains("IDbContextOutbox<NoCtfDbContext>");
+        await Assert.That(outbox).Contains("nats://subject/noctf.runner.");
+        await Assert.That(workerTopology)
+            .Contains("endpoint.BrokerRole, \"stream\"");
         await Assert.That(routing)
             .Contains("Route<CompleteAwdpFixRecovery>(options, WorkerQueue.Control)");
         foreach (var workerQueue in new[]
