@@ -31,7 +31,7 @@ services:
       retries: 5
 
   nats:
-    image: nats:2.12.2-alpine
+    image: docker.m.daocloud.io/library/nats:2.12.2-alpine@sha256:2d5fce3229ae5741f4ef9225aff95dc4dc036455931eaf77a3eec33fddaa192d
     restart: unless-stopped
     command: ["-js", "-sd", "/data", "-m", "8222"]
     ports:

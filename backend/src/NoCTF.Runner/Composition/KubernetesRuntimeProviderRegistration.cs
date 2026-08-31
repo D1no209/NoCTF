@@ -49,8 +49,10 @@ internal static class KubernetesRuntimeProviderRegistration
         ValidateActiveProvider(configuration, isActiveProvider);
 
         services.AddSingleton(options);
-        services.AddSingleton<IKubernetes>(_ =>
-            new Kubernetes(KubernetesClientConfiguration.BuildDefaultConfig()));
+        services.AddSingleton<IKubernetes>(_ => new Kubernetes(
+            isActiveProvider
+                ? KubernetesClientConfiguration.BuildDefaultConfig()
+                : new KubernetesClientConfiguration { Host = "http://127.0.0.1" }));
         if (isActiveProvider)
             services.AddHostedService<KubernetesRuntimePoolStartupCheck>();
         services.AddSingleton<KubernetesContainerLifecycle>();
