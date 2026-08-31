@@ -123,15 +123,19 @@ describe('container security drafts', () => {
       capDrop: [],
       capAdd: [],
     })
+    expect(JSON.parse(serializeDefinition('Ctf', parsed)).runtime.definition.security).toBeUndefined()
   })
 
-  test('omits the trusted compatibility defaults', () => {
+  test('applies the safe capability baseline to new container drafts', () => {
     const model = emptyDefinition('Ctf')
     model.runtime = emptyRuntimeTemplate('Ctf')
 
     const json = JSON.parse(serializeDefinition('Ctf', model))
 
-    expect(json.runtime.definition.security).toBeUndefined()
+    expect(json.runtime.definition.security).toEqual({
+      noNewPrivileges: true,
+      capDrop: ['ALL'],
+    })
   })
 
   test('serializes and parses explicit hardening values', () => {

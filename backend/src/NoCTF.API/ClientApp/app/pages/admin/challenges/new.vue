@@ -5,7 +5,8 @@ import type {
   NoCtfapiEndpointsAdministrationChallengeBankChallengeVisibilityProtocol,
   NoCtfapiEndpointsCompetitionsGameModeProtocol,
 } from '~/api'
-import { challengeTemplateWriteErrorMessage } from '~/lib/challenge-template-error'
+import { challengeTemplateWriteErrorMessages } from '~/lib/challenge-template-error'
+import { validateChallengeTemplateDraft } from '~/lib/challenge-template-validation'
 import { defaultDefinitionJson, normalizeDefinitionJson } from '~/utils/game-config'
 
 definePageMeta({ middleware: 'auth' })
@@ -18,8 +19,14 @@ const visibility = ref<NoCtfapiEndpointsAdministrationChallengeBankChallengeVisi
 const direction = ref('')
 const description = ref('')
 const definitionJson = ref(defaultDefinitionJson(mode.value))
-const error = ref<string | null>(null)
+const saveErrors = ref<string[]>([])
+const saveAttempted = ref(false)
 const pending = ref(false)
+
+const titleInvalid = computed(() => saveAttempted.value
+  && (!title.value.trim() || title.value.trim().length > 160))
+const directionInvalid = computed(() => saveAttempted.value
+  && (!direction.value.trim() || direction.value.trim().length > 96))
 
 function changeMode(value: unknown): void {
   if (value !== 'Ctf' && value !== 'Awd' && value !== 'Awdp' && value !== 'Koh') return
@@ -28,14 +35,23 @@ function changeMode(value: unknown): void {
 }
 
 async function submit(): Promise<void> {
-  error.value = null
-  if (!title.value.trim() || !direction.value.trim()) {
-    error.value = translate('请填写标题和方向')
-    return
-  }
+  saveAttempted.value = true
+  saveErrors.value = []
   const normalizedDefinition = normalizeDefinitionJson(mode.value, definitionJson.value)
   if (!normalizedDefinition) {
-    error.value = translate('题目定义格式无效,请检查题目定义配置')
+    saveErrors.value = [translate('题目定义无法解析，请重置或修正后再保存')]
+    toast.error(saveErrors.value[0] ?? translate('无法保存题目模板'))
+    return
+  }
+  const validationErrors = validateChallengeTemplateDraft({
+    mode: mode.value,
+    title: title.value,
+    direction: direction.value,
+    definitionJson: normalizedDefinition,
+  })
+  if (validationErrors.length > 0) {
+    saveErrors.value = validationErrors
+    toast.error(validationErrors[0] ?? translate('无法保存题目模板'))
     return
   }
   pending.value = true
@@ -51,7 +67,8 @@ async function submit(): Promise<void> {
   })
   pending.value = false
   if (apiError || !data) {
-    error.value = challengeTemplateWriteErrorMessage(apiError)
+    saveErrors.value = challengeTemplateWriteErrorMessages(apiError)
+    toast.error(saveErrors.value[0] ?? translate('无法保存题目模板'))
     return
   }
   toast.success(translate("模板已创建"))
@@ -72,9 +89,15 @@ async function submit(): Promise<void> {
 
     <Card v-else>
       <CardContent class="pt-6">
-        <form @submit.prevent="submit">
-          <Alert v-if="error" variant="destructive" class="mb-6">
-            <AlertDescription>{{ error }}</AlertDescription>
+        <form novalidate @submit.prevent="submit">
+          <Alert v-if="saveErrors.length" variant="destructive" class="mb-6">
+            <AlertTitle>{{ $t('无法保存题目模板') }}</AlertTitle>
+            <AlertDescription class="flex flex-col gap-2">
+              <span>{{ $t('请修正以下问题后重试：') }}</span>
+              <ul class="list-disc pl-5">
+                <li v-for="message in saveErrors" :key="message">{{ message }}</li>
+              </ul>
+            </AlertDescription>
           </Alert>
           <Tabs default-value="basic">
             <TabsList>
@@ -83,9 +106,16 @@ async function submit(): Promise<void> {
             </TabsList>
             <TabsContent value="basic">
               <FieldGroup>
-                <Field>
+                <Field :data-invalid="titleInvalid || undefined">
                   <FieldLabel for="title">{{ $t('标题') }}</FieldLabel>
-                  <Input id="title" v-model="title" required maxlength="200" :placeholder="$t('例如:Web 入门 - SQL 注入')" />
+                  <Input
+                    id="title"
+                    v-model="title"
+                    required
+                    maxlength="160"
+                    :aria-invalid="titleInvalid || undefined"
+                    :placeholder="$t('例如:Web 入门 - SQL 注入')"
+                  />
                 </Field>
                 <div class="grid gap-4 sm:grid-cols-2">
                   <Field>
@@ -119,9 +149,16 @@ async function submit(): Promise<void> {
                     </Select>
                   </Field>
                 </div>
-                <Field>
+                <Field :data-invalid="directionInvalid || undefined">
                   <FieldLabel for="direction">{{ $t('方向') }}</FieldLabel>
-                  <Input id="direction" v-model="direction" required maxlength="100" :placeholder="$t('例如:Web / Pwn / Misc')" />
+                  <Input
+                    id="direction"
+                    v-model="direction"
+                    required
+                    maxlength="96"
+                    :aria-invalid="directionInvalid || undefined"
+                    :placeholder="$t('例如:Web / Pwn / Misc')"
+                  />
                 </Field>
                 <Field>
                   <FieldLabel for="description">{{ $t('题面') }}</FieldLabel>

@@ -3202,3 +3202,20 @@ dotnet run --project backend/src/NoCTF.API/NoCTF.API.csproj --no-build -- --expo
   均为 200。Worker 仅在取得 leader 前出现两次预期的 readiness 503，随后成功启动
   `noctf-maintenance-ticks` 和 leader-pinned leaderboard listener，无 Fatal、Unhandled 或持续错误。
   清理未引用构建缓存后根分区可用空间由 7.8 GiB 回升至 12 GiB；运行镜像、回滚标签和数据卷均保留。
+
+## 2026-09-01 Alpha.114 题目模板保存诊断与容器安全默认值
+
+- 题目模板新建页和编辑页不再依赖浏览器原生表单阻断；所有保存入口统一执行可见的草稿校验，并在
+  页面顶部 `Alert` 中逐条列出不能保存的原因，同时保留 toast 首要提示。标题/方向长度与后端约束
+  统一为 160/96；后端返回的 Definition、AWD/AWDP Runtime、Checker、Flag 注入和冲突原因会拆分并
+  本地化，不再一律折叠成“题目定义格式无效”。
+- 新增模式感知的模板校验：AWDP 会明确提示镜像、唯一内部端口、唯一对外端口、两端口一致、
+  OwnerOnly 访问入口及入口端口一致性；CTF、AWD、KoH 的分配、Flag、Checker、Compose、资源与
+  生命周期约束也在请求前检查。修复 AWD 默认定义错误启用空 Checker 导致新模板天然不可保存的问题。
+- 新建/新启用的单容器 Runtime 安全默认值为 `no-new-privileges=true`、`cap-drop=[ALL]`，不默认启用
+  只读根文件系统或非 root，以兼顾加固与题目镜像兼容性。读取安全配置缺失的存量模板仍使用旧兼容
+  语义并保持省略，不会因普通编辑被自动改写。
+- 平台版本递增为 `0.1.0-alpha.114`。没有 HTTP/OpenAPI、生成 SDK、数据模型或 migration 变化。
+  ClientApp 299/299 测试、typecheck 和 production generate 通过；Release solution build 为 0 警告/
+  0 错误，`git diff --check` 通过。Nuxt 仅保留既有大 chunk、插件耗时与第三方 Nitro 警告。
+- 本阶段按用户约束只创建本地提交，未 push、未部署；生产仍为 Alpha.113。
