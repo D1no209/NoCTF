@@ -123,7 +123,7 @@ const hasSecurity = computed(() => {
 
     <DefinitionSection
       :title="$t('安全选项')"
-      :hint="$t('容器加固与 Linux capabilities,通常保持默认')"
+      :hint="$t('默认禁止提权并移除全部 Linux capabilities')"
       :default-open="hasSecurity"
     >
       <div class="grid gap-3 sm:grid-cols-3">
@@ -150,7 +150,7 @@ const hasSecurity = computed(() => {
             :disabled="disabled"
             @update:model-value="definition.security.capDrop = $event"
           />
-          <FieldDescription>{{ $t('启用任意安全选项时,平台会自动加入 ALL 以满足容器能力基线。') }}</FieldDescription>
+          <FieldDescription>{{ $t('默认包含 ALL；仅在题目确有需要时通过 cap-add 恢复指定能力。') }}</FieldDescription>
         </Field>
         <Field>
           <FieldLabel>{{ $t('增加的能力(cap-add)') }}</FieldLabel>

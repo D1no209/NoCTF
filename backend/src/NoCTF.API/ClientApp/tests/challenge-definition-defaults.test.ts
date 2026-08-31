@@ -1,12 +1,19 @@
 import { describe, expect, test } from 'bun:test'
-import { challengeTemplateWriteErrorMessage } from '../app/lib/challenge-template-error'
+import {
+  challengeTemplateWriteErrorMessage,
+  challengeTemplateWriteErrorMessages,
+} from '../app/lib/challenge-template-error'
+import { validateChallengeTemplateDraft } from '../app/lib/challenge-template-validation'
 import { startGateErrorMessage } from '../app/lib/start-gate-error'
 import {
   competitionConfigFields,
   ctfPointsAtSolveCount,
   defaultDefinitionJson,
+  emptyDefinition,
+  emptyRuntimeTemplate,
   fieldDefaultValue,
   normalizeDefinitionJson,
+  serializeDefinition,
   serializeConfigValues,
 } from '../app/utils/game-config'
 
@@ -18,6 +25,12 @@ describe('challenge definition defaults', () => {
     ['Koh', 1],
   ] as const)('creates a complete %s default definition', (mode, schemaVersion) => {
     expect(JSON.parse(defaultDefinitionJson(mode)).schemaVersion).toBe(schemaVersion)
+    expect(validateChallengeTemplateDraft({
+      mode,
+      title: 'Example',
+      direction: 'Misc',
+      definitionJson: defaultDefinitionJson(mode),
+    })).toEqual([])
   })
 
   test('initializes creation and resets the definition before a mode switch', async () => {
@@ -32,6 +45,10 @@ describe('challenge definition defaults', () => {
     expect(editPage).toContain("form.mode = value.mode ?? 'Ctf'")
     expect(createPage).toContain('normalizeDefinitionJson(mode.value, definitionJson.value)')
     expect(editPage).toContain('normalizeDefinitionJson(form.mode, currentDefinition)')
+    expect(createPage).toContain('<form novalidate @submit.prevent="submit">')
+    expect(editPage).toContain('<form novalidate @submit.prevent="save">')
+    expect(createPage).toContain('v-if="saveErrors.length"')
+    expect(editPage).toContain('v-if="saveErrors.length"')
   })
 
   test('normalizes submission JSON with the active schema version', () => {
@@ -50,17 +67,30 @@ describe('challenge definition defaults', () => {
     expect(challengeTemplateWriteErrorMessage({
       status: 400,
       errors: { DefinitionJson: ['Definition schemaVersion is missing.'] },
-    })).toBe('题目定义格式无效,请检查题目定义配置')
+    })).toBe('题目定义版本或 JSON 格式无效')
     expect(challengeTemplateWriteErrorMessage({ status: 400, detail: 'Definition schemaVersion is missing.' }))
-      .toBe('题目定义格式无效,请检查题目定义配置')
+      .toBe('题目定义版本或 JSON 格式无效')
     expect(challengeTemplateWriteErrorMessage({
       status: 400,
       detail: 'CTF schemaVersion 1 has no registered upgrader.',
-    })).toBe('题目定义格式无效,请检查题目定义配置')
+    })).toBe('题目定义版本或 JSON 格式无效')
+
+    expect(challengeTemplateWriteErrorMessages({
+      status: 400,
+      detail: 'Runtime image is required. AWDP target Runtime must declare exactly one InternalPort. AWDP player Runtime must publish exactly one attack port.',
+    })).toEqual([
+      '容器镜像不能为空',
+      'AWDP 必须且只能填写 1 个内部端口',
+      'AWDP 必须且只能填写 1 个对外端口',
+    ])
+    expect(challengeTemplateWriteErrorMessages({
+      status: 409,
+      code: 'ActiveCompetitionModeConflict',
+    })).toEqual(['该模板正被进行中的比赛引用，不能修改游戏模式'])
 
     const createPage = await Bun.file(new URL('../app/pages/admin/challenges/new.vue', import.meta.url)).text()
     const submit = createPage.slice(createPage.indexOf('async function submit'), createPage.indexOf('</script>'))
-    expect(submit).toContain('challengeTemplateWriteErrorMessage(apiError)')
+    expect(submit).toContain('challengeTemplateWriteErrorMessages(apiError)')
     expect(submit).not.toContain("title.value = ''")
     expect(submit).not.toContain("definitionJson.value = ''")
   })
@@ -83,6 +113,23 @@ describe('challenge definition defaults', () => {
     expect(templatePage).toContain('data-testid="mode-definition-save"')
     expect(templatePage).toContain('serializeDefinition(form.mode, definitionModel.value)')
     expect(templatePage).not.toContain("$t('重置后请返回基本信息保存修改')")
+  })
+
+  test('lists every blocking AWDP runtime field before sending the save request', () => {
+    const model = emptyDefinition('Awdp')
+    model.runtime = emptyRuntimeTemplate('Awdp')
+
+    const issues = validateChallengeTemplateDraft({
+      mode: 'Awdp',
+      title: 'AWDP example',
+      direction: 'Pwn',
+      definitionJson: serializeDefinition('Awdp', model),
+    })
+
+    expect(issues).toContain('容器镜像不能为空')
+    expect(issues).toContain('AWDP 必须且只能填写 1 个内部端口')
+    expect(issues).toContain('AWDP 必须且只能填写 1 个对外端口')
+    expect(issues).toContain('AWDP 必须添加至少 1 个访问入口')
   })
 
   test('localizes legacy start-gate schema failures and retains challenge navigation', async () => {

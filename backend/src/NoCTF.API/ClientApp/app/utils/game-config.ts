@@ -174,6 +174,16 @@ export const DEFAULT_RUNTIME_OPERATION_TIMEOUT_SECONDS = 60
 
 export function defaultContainerSecurity(): SecurityModel {
   return {
+    noNewPrivileges: true,
+    readonlyRootfs: false,
+    runAsNonRoot: false,
+    capDrop: ['ALL'],
+    capAdd: [],
+  }
+}
+
+function compatibilityContainerSecurity(): SecurityModel {
+  return {
     noNewPrivileges: false,
     readonlyRootfs: false,
     runAsNonRoot: false,
@@ -240,7 +250,7 @@ export function emptyFlagTemplate(): FlagTemplateModel {
 export function emptyDefinition(mode: GameModeValue): DefinitionModel {
   return {
     runtime: null,
-    checker: mode === 'Awd' ? { job: emptyRunnerJob(), targetServiceName: '' } : null,
+    checker: null,
     checkerJob: null,
     flagInjection: null,
     flagTemplate: null,
@@ -304,7 +314,9 @@ export function parseJsonObject(json: string | null | undefined): JsonObject | n
 
 function parseSecurity(raw: unknown): SecurityModel {
   const obj = asObject(raw)
-  const defaults = defaultContainerSecurity()
+  // Omitted security on a legacy template remains omitted after a read/write
+  // cycle. Secure defaults are applied only when creating a new container draft.
+  const defaults = compatibilityContainerSecurity()
   return {
     noNewPrivileges: typeof obj?.noNewPrivileges === 'boolean' ? obj.noNewPrivileges : defaults.noNewPrivileges,
     readonlyRootfs: typeof obj?.readonlyRootfs === 'boolean' ? obj.readonlyRootfs : defaults.readonlyRootfs,

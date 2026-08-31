@@ -29,7 +29,8 @@ import type {
   NoCtfapiEndpointsAdministrationChallengeBankChallengeFlagFailureResponse,
   NoCtfapiEndpointsAdministrationChallengeBankRandomAttachmentBatchFailureResponse,
 } from '~/api'
-import { challengeTemplateWriteErrorMessage } from '~/lib/challenge-template-error'
+import { challengeTemplateWriteErrorMessages } from '~/lib/challenge-template-error'
+import { validateChallengeTemplateDraft } from '~/lib/challenge-template-validation'
 import { defaultDefinitionJson, FlagSource, normalizeDefinitionJson, serializeDefinition } from '~/utils/game-config'
 
 definePageMeta({ middleware: 'auth' })
@@ -58,10 +59,16 @@ const form = reactive({
   definitionJson: '{}',
 })
 const saving = ref(false)
+const saveErrors = ref<string[]>([])
+const saveAttempted = ref(false)
 const deleting = ref(false)
 const restoring = ref(false)
 
 const isDeleted = computed(() => !!template.value?.deletedAt)
+const titleInvalid = computed(() => saveAttempted.value
+  && (!form.title.trim() || form.title.trim().length > 160))
+const directionInvalid = computed(() => saveAttempted.value
+  && (!form.direction.trim() || form.direction.trim().length > 96))
 
 // 题目定义:definitionJson 字符串仍是单一事实源,切片组件直接修改共享 model。
 const { model: definitionModel, parseFailed: definitionParseFailed } = useDefinitionModel(
@@ -127,7 +134,13 @@ async function loadTemplate(): Promise<void> {
 }
 
 async function save(): Promise<void> {
-  if (!template.value) return
+  saveAttempted.value = true
+  saveErrors.value = []
+  if (!template.value) {
+    saveErrors.value = [translate('模板尚未加载完成，暂时无法保存')]
+    toast.error(saveErrors.value[0] ?? translate('无法保存题目模板'))
+    return
+  }
   // Read directly from the structured editor model. Its JSON bridge is watched,
   // so relying only on form.definitionJson can miss the latest edit when Save is
   // clicked in the same interaction cycle.
@@ -136,7 +149,19 @@ async function save(): Promise<void> {
     : form.definitionJson
   const normalizedDefinition = normalizeDefinitionJson(form.mode, currentDefinition)
   if (!normalizedDefinition) {
-    toast.error(translate('题目定义格式无效,请检查题目定义配置'))
+    saveErrors.value = [translate('题目定义无法解析，请重置或修正后再保存')]
+    toast.error(saveErrors.value[0] ?? translate('无法保存题目模板'))
+    return
+  }
+  const validationErrors = validateChallengeTemplateDraft({
+    mode: form.mode,
+    title: form.title,
+    direction: form.direction,
+    definitionJson: normalizedDefinition,
+  })
+  if (validationErrors.length > 0) {
+    saveErrors.value = validationErrors
+    toast.error(validationErrors[0] ?? translate('无法保存题目模板'))
     return
   }
   saving.value = true
@@ -153,13 +178,15 @@ async function save(): Promise<void> {
   })
   saving.value = false
   if (error) {
-    toast.error(challengeTemplateWriteErrorMessage(error))
+    saveErrors.value = challengeTemplateWriteErrorMessages(error)
+    toast.error(saveErrors.value[0] ?? translate('无法保存题目模板'))
     return
   }
   if (data) {
     template.value = data
     syncForm(data)
   }
+  saveErrors.value = []
   toast.success(translate("已保存"))
 }
 
@@ -589,6 +616,16 @@ onMounted(() => {
           </div>
         </div>
 
+        <Alert v-if="saveErrors.length" variant="destructive">
+          <AlertTitle>{{ $t('无法保存题目模板') }}</AlertTitle>
+          <AlertDescription class="flex flex-col gap-2">
+            <span>{{ $t('请修正以下问题后重试：') }}</span>
+            <ul class="list-disc pl-5">
+              <li v-for="message in saveErrors" :key="message">{{ message }}</li>
+            </ul>
+          </AlertDescription>
+        </Alert>
+
         <Tabs
           default-value="basic"
           orientation="vertical"
@@ -615,11 +652,18 @@ onMounted(() => {
           <TabsContent value="basic" class="mt-0">
             <Card>
               <CardContent class="pt-6">
-                <form @submit.prevent="save">
+                <form novalidate @submit.prevent="save">
                   <FieldGroup>
-                    <Field>
+                    <Field :data-invalid="titleInvalid || undefined">
                       <FieldLabel for="edit-title">{{ $t('标题') }}</FieldLabel>
-                      <Input id="edit-title" v-model="form.title" required maxlength="200" :disabled="isDeleted" />
+                      <Input
+                        id="edit-title"
+                        v-model="form.title"
+                        required
+                        maxlength="160"
+                        :aria-invalid="titleInvalid || undefined"
+                        :disabled="isDeleted"
+                      />
                     </Field>
                     <div class="grid gap-4 sm:grid-cols-2">
                       <Field>
@@ -654,9 +698,16 @@ onMounted(() => {
                         </Select>
                       </Field>
                     </div>
-                    <Field>
+                    <Field :data-invalid="directionInvalid || undefined">
                       <FieldLabel for="edit-direction">{{ $t('方向') }}</FieldLabel>
-                      <Input id="edit-direction" v-model="form.direction" required maxlength="100" :disabled="isDeleted" />
+                      <Input
+                        id="edit-direction"
+                        v-model="form.direction"
+                        required
+                        maxlength="96"
+                        :aria-invalid="directionInvalid || undefined"
+                        :disabled="isDeleted"
+                      />
                     </Field>
                     <Field>
                       <FieldLabel for="edit-description">{{ $t('题面') }}</FieldLabel>
