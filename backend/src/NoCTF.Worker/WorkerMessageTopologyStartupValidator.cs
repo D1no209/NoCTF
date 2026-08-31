@@ -43,7 +43,8 @@ public sealed class WorkerMessageTopologyStartupValidator(
             Endpoint? endpoint;
             try
             {
-                endpoint = runtime.Endpoints.EndpointByName(queueName);
+                endpoint = runtime.Endpoints.EndpointFor(
+                    new Uri(NatsEndpointAddress(queueName), UriKind.Absolute));
             }
             catch (Exception exception)
             {
@@ -59,10 +60,12 @@ public sealed class WorkerMessageTopologyStartupValidator(
             }
             if (!endpoint.IsListener
                 || endpoint.Uri?.Scheme != "nats"
-                || endpoint.Mode != EndpointMode.Durable)
+                || !string.Equals(endpoint.BrokerRole, "stream", StringComparison.Ordinal))
             {
                 throw new InvalidOperationException(
-                    $"Fan-out endpoint '{queueName}' must be a durable NATS JetStream listener.");
+                    $"Fan-out endpoint '{queueName}' must be a durable NATS JetStream listener "
+                    + $"(listener={endpoint.IsListener}, uri={endpoint.Uri}, "
+                    + $"brokerRole={endpoint.BrokerRole}, mode={endpoint.Mode}).");
             }
 
             if (string.Equals(

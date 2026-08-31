@@ -1,7 +1,9 @@
 using Microsoft.Extensions.Configuration;
 using NoCTF.Application.Messaging;
 using Wolverine;
+using Wolverine.EntityFrameworkCore;
 using Wolverine.Nats;
+using Wolverine.Postgresql;
 
 namespace NoCTF.Hosting;
 
@@ -12,10 +14,16 @@ public static class WolverineHosting
         IConfiguration configuration,
         HostRoles roles)
     {
+        var postgres = configuration.GetConnectionString("PostgreSql")
+            ?? throw new InvalidOperationException(
+                "ConnectionStrings:PostgreSql is required.");
         var nats = configuration.GetConnectionString("Nats")
             ?? configuration["Wolverine:Nats:ConnectionString"]
             ?? throw new InvalidOperationException(
                 "ConnectionStrings:Nats or Wolverine:Nats:ConnectionString is required.");
+
+        options.PersistMessagesWithPostgresql(postgres, roles.PersistenceSchema);
+        options.UseEntityFrameworkCoreTransactions();
 
         options.UseNats(nats)
             .AutoProvision()

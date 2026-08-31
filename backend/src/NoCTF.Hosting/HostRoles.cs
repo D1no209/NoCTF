@@ -29,6 +29,12 @@ public sealed class HostRoles
 
     public bool Has(HostRole role) => roles.Contains(role);
 
+    public string PersistenceSchema => Has(HostRole.Worker)
+        ? WolverinePersistenceSchemas.Worker
+        : Has(HostRole.Runner)
+            ? WolverinePersistenceSchemas.Runner
+            : WolverinePersistenceSchemas.Api;
+
     public static HostRoles All() => new(AllRoles);
 
     public static HostRoles Only(HostRole role) => new([role]);
@@ -61,4 +67,11 @@ public sealed class HostRoles
         }
         return new HostRoles(parsed);
     }
+}
+
+public static class WolverinePersistenceSchemas
+{
+    public const string Api = "wolverine_api";
+    public const string Worker = "wolverine_worker";
+    public const string Runner = "wolverine_runner";
 }
