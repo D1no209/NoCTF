@@ -1,5 +1,14 @@
 # NoCTF 数据模型重构交接
 
+## 2026-09-01 alpha.113 NATS 切换部署门禁修复
+
+- 本地 `main` 从 `82b0b879` 快进同步到协作者 `d0029e5b`，纳入 NATS JetStream durable transport、Runtime/Projection 架构拆分、Worker capability handler、单一 Host CI 镜像和强化后的 OpenAPI/前端构建门禁。
+- 部署前完整门禁发现并修复四项协作者遗留：官方 Bun/Docker 基础镜像断言仍要求旧代理；移除三条平台 Dead Letter HTTP 接口后管理员端点数、API 清单及总路由数未同步；未启用 Kubernetes 的 Docker Runner 仍会解析本机 kubeconfig 并在无配置主机启动失败。
+- 非活动 Kubernetes Provider 现在只构建不访问集群的本地占位客户端，活动 Kubernetes Pool 仍使用 `BuildDefaultConfig()` 和原有启动检查；Docker/Libvirt 选择语义未改变。Dead Letter 继续由 NATS JetStream 基础设施运维，不再通过平台 HTTP API暴露。
+- 新增 NATS `2.12.2-alpine` 的固定 manifest digest，并通过 `docker.m.daocloud.io/library/nats` 拉取，解决中国大陆测试服务器直连 Docker Hub 超时且原 Compose 使用可变标签的问题；分离进程与单 Host Compose 同步更新，新增 `nats_data` 持久卷保持不变。
+- 验证：Debug solution build 0 warning/0 error；非 Integration 935/935、真实 PostgreSQL/Redis/NATS/Docker Integration 170/170，Kubernetes 与 Libvirt 两项因未配置真实外部环境明确跳过；前端 298/298、typecheck、production generate、EF model drift、OpenAPI/SDK 幂等、三套 Compose config 与 `git diff --check` 全部通过。
+- 没有业务表、EF migration、OpenAPI 路由或产品语义变化；平台版本递增为 `0.1.0-alpha.113`。本节先提交部署门禁修复，部署结果将在切换完成后补记。
+
 ## 2026-08-27 alpha.112 推送与手动部署
 
 - 本地 `main` 的 alpha.108–alpha.112 五个提交已快进推送到远程 `main@413fb795`。GitHub Actions run `33081866848` 因托管 Runner/额度不可用在任何 step 启动前失败，没有产生 CI 镜像；本地与真实 PostgreSQL 门禁结果见各版本节。

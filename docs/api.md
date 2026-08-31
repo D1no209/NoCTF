@@ -413,9 +413,6 @@ PUT  /api/v1/admin/platform/users/{userId}/role
 PUT  /api/v1/admin/platform/users/{userId}/account-status
 PUT  /api/v1/admin/platform/users/{userId}/email-verification
 POST /api/v1/admin/platform/users/{userId}/tokens/invalidate
-GET  /api/v1/admin/platform/dead-letters
-GET  /api/v1/admin/platform/dead-letters/{messageId}
-POST /api/v1/admin/platform/dead-letters/{messageId}/requeue
 GET  /api/v1/admin/platform/email-verification/configuration
 PUT  /api/v1/admin/platform/email-verification/configuration
 PUT  /api/v1/admin/platform/email-verification/password
@@ -426,8 +423,8 @@ Bot 创建请求只包含 UserName 和固定的 `UserRole.Organizer`，不能创
 Bot，也不接受 Email 或 Password。服务端生成不可用的非空 dummy Email 和 PasswordHash。
 Token 签发请求包含正数 ExpiresInSeconds，只接受 Bot 身份，返回一次普通 AccessToken 与
 ExpiresAt，不签发 Refresh Token。Role 更新与 token invalidate 原子递增 User.TokenVersion。
-Dead Letter DTO 只返回投递元数据，省略消息 body、异常正文和 archive 内容；requeue 创建新的 durable
-delivery attempt 并保留 Wolverine 原失败记录，不直接调用 Handler。比赛管理者不能操作
+NATS JetStream 的 consumer、重投与 dead-letter 运维由受控基础设施工具负责，不通过平台 HTTP API
+暴露消息正文、异常详情或任意重投能力。比赛管理者不能操作
 DLQ，只能从 Competition/GameplayFact/Runtime 领域 API 重新触发。
 
 平台运行日志使用每日 Redis Stream 分片聚合 API、Worker、Runner、Host 的结构化诊断日志，并通过

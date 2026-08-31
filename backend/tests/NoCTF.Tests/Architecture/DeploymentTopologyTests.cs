@@ -370,10 +370,8 @@ public sealed class DeploymentTopologyTests
                 line,
                 "^FROM [^ ]+@sha256:[a-f0-9]{64} AS [^ ]+$"))).IsTrue();
         await Assert.That(dockerfile).Contains(
-            "FROM docker.m.daocloud.io/oven/bun:1.3.14@sha256:");
+            "FROM oven/bun:1.3.14@sha256:");
         await Assert.That(dockerfile).Contains(
-            "FROM docker.m.daocloud.io/docker:28.5.1-cli@sha256:");
-        await Assert.That(dockerfile).DoesNotContain(
             "FROM docker:28.5.1-cli@sha256:");
         await Assert.That(dockerfile).Contains("sha256sum -c -");
         await Assert.That(dockerfile).Contains("KOMPOSE_SHA256=");
@@ -392,9 +390,12 @@ public sealed class DeploymentTopologyTests
             .Select(line => line.Trim())
             .Where(line => line.StartsWith("image: postgres:", StringComparison.Ordinal)
                 || line.StartsWith("image: redis:", StringComparison.Ordinal)
+                || line.StartsWith(
+                    "image: docker.m.daocloud.io/library/nats:",
+                    StringComparison.Ordinal)
                 || line.StartsWith("image: minio/", StringComparison.Ordinal))
             .ToArray();
-        await Assert.That(externalRuntimeImages).Count().IsEqualTo(9);
+        await Assert.That(externalRuntimeImages).Count().IsEqualTo(11);
         await Assert.That(externalRuntimeImages.All(line =>
             System.Text.RegularExpressions.Regex.IsMatch(
                 line,
