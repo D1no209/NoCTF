@@ -46,11 +46,11 @@ public sealed class RuntimeStopWriteBackMessageHandler(
         RuntimeForceTerminationFailed message,
         CancellationToken cancellationToken) =>
         RuntimeWriteBackOperations.ForceTerminationFailedAsync(
-            message, db, events, cancellationToken);
+            message, db, outbox, events, cancellationToken);
 
     public Task Handle(RuntimeStopFailed message, CancellationToken cancellationToken) =>
         RuntimeWriteBackOperations.StopFailedAsync(
-            message, db, events, timeProvider, cancellationToken);
+            message, db, outbox, events, timeProvider, cancellationToken);
 }
 
 internal static class RuntimeWriteBackHandler
@@ -127,22 +127,26 @@ internal static class RuntimeWriteBackHandler
     public static Task Handle(
         RuntimeForceTerminationFailed message,
         NoCtfDbContext db,
+        ITransactionalMessageOutbox outbox,
         CancellationToken cancellationToken,
         ICompetitionEventRecorder? events = null) =>
         RuntimeWriteBackOperations.ForceTerminationFailedAsync(
             message,
             db,
+            outbox,
             events ?? NullCompetitionEventRecorder.Instance,
             cancellationToken);
 
     public static Task Handle(
         RuntimeStopFailed message,
         NoCtfDbContext db,
+        ITransactionalMessageOutbox outbox,
         CancellationToken cancellationToken,
         ICompetitionEventRecorder? events = null) =>
         RuntimeWriteBackOperations.StopFailedAsync(
             message,
             db,
+            outbox,
             events ?? NullCompetitionEventRecorder.Instance,
             TimeProvider.System,
             cancellationToken);

@@ -17,6 +17,7 @@ using NoCTF.Domain.Runtime;
 using NoCTF.Domain.Competitions;
 using NoCTF.Domain.Challenges;
 using NoCTF.Infrastructure.Persistence;
+using NoCTF.Infrastructure.GameplayFacts.Awdp;
 using NoCTF.Domain.Notifications;
 using System.Text.Json;
 using System.Buffers.Binary;
@@ -87,7 +88,7 @@ internal static partial class BackendMessageOperations
             target.Instance.State = RuntimeState.Failed;
             target.Instance.FailureCode = RuntimeFailureCode.InvalidConfiguration;
             await FailAwdpSubmissionAsync(
-                target.Instance, db, outbox, timeProvider, cancellationToken);
+                target.Instance, db, outbox, events, timeProvider, cancellationToken);
             await RecordRuntimeStateAsync(
                 events,
                 target.Instance,
@@ -145,7 +146,7 @@ internal static partial class BackendMessageOperations
             target.Instance.State = RuntimeState.Failed;
             target.Instance.FailureCode = RuntimeFailureCode.InvalidConfiguration;
             await FailAwdpSubmissionAsync(
-                target.Instance, db, outbox, timeProvider, cancellationToken);
+                target.Instance, db, outbox, events, timeProvider, cancellationToken);
             await db.SaveChangesAsync(cancellationToken);
             await outbox.FlushOutgoingMessagesAsync();
             return;
@@ -218,7 +219,7 @@ internal static partial class BackendMessageOperations
             target.Instance.State = RuntimeState.Failed;
             target.Instance.FailureCode = RuntimeFailureCode.InvalidConfiguration;
             await FailAwdpSubmissionAsync(
-                target.Instance, db, outbox, timeProvider, cancellationToken);
+                target.Instance, db, outbox, events, timeProvider, cancellationToken);
             await RecordRuntimeStateAsync(
                 events,
                 target.Instance,
@@ -242,45 +243,18 @@ internal static partial class BackendMessageOperations
         RuntimeInstance instance,
         NoCtfDbContext db,
         ITransactionalMessageOutbox outbox,
+        ICompetitionEventRecorder events,
         TimeProvider timeProvider,
         CancellationToken cancellationToken)
     {
-        if (instance.Purpose != RuntimePurpose.AwdpTarget
-            || instance.GameplayFactId is not Guid gameplayFactId)
-            return;
-        var submission = await db.GameplayFacts.SingleOrDefaultAsync(
-            item => item.Id == gameplayFactId,
+        await AwdpFixFailureConvergence.ConvergeAwdpFixFailureAsync(
+            instance,
+            db,
+            outbox,
+            events,
+            timeProvider.GetUtcNow(),
+            AwdpFixRuntimeCleanupMode.CallerManaged,
             cancellationToken);
-        if (submission is null
-            || submission.State is not (GameplayFactState.Pending
-                or GameplayFactState.Processing))
-            return;
-        submission.State = GameplayFactState.PlatformFailed;
-        submission.FailureCode = GameplayFactFailureCode.CheckerPlatformError;
-        submission.UpdatedAt = timeProvider.GetUtcNow();
-        await outbox.PublishAsync(new GameplayFactStateChanged(submission.Id, submission.State));
-        await QueueNextGameplayFactAsync(submission, db, outbox, cancellationToken);
-    }
-
-    private static async Task QueueNextGameplayFactAsync(
-        GameplayFact completed,
-        NoCtfDbContext db,
-        ITransactionalMessageOutbox outbox,
-        CancellationToken cancellationToken)
-    {
-        var nextGameplayFactId = await db.GameplayFacts.AsNoTracking()
-            .Where(candidate =>
-                candidate.CompetitionId == completed.CompetitionId
-                && candidate.CompetitionChallengeId == completed.CompetitionChallengeId
-                && candidate.TeamId == completed.TeamId
-                && candidate.Kind == completed.Kind
-                && candidate.State == GameplayFactState.Queued)
-            .OrderBy(candidate => candidate.OccurredAt)
-            .ThenBy(candidate => candidate.Id)
-            .Select(candidate => (Guid?)candidate.Id)
-            .FirstOrDefaultAsync(cancellationToken);
-        if (nextGameplayFactId is Guid id)
-            await outbox.PublishAsync(new EvaluateGameplayFact(id));
     }
 
 }

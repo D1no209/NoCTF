@@ -155,6 +155,38 @@ describe('challenge definition defaults', () => {
     expect(issues).toContain('AWDP 必须添加至少 1 个访问入口')
   })
 
+  test('reports every unsafe AWDP Fix execution setting before save', async () => {
+    const model = emptyDefinition('Awdp')
+    model.runtime = emptyRuntimeTemplate('Awdp')
+    model.patchCommand = ['/bin/sh', '{entrypoint']
+    model.patchTimeoutSeconds = 301
+    model.readyTimeoutSeconds = 121
+    model.checkerJob = {
+      image: 'checker:test',
+      command: [],
+      environment: {},
+      timeoutSeconds: 120,
+    }
+
+    const issues = validateChallengeTemplateDraft({
+      mode: 'Awdp',
+      title: 'Unsafe AWDP Fix',
+      direction: 'Pwn',
+      definitionJson: serializeDefinition('Awdp', model),
+    })
+
+    expect(issues).toContain('非空补丁应用命令必须恰好包含一个独立的 {entrypoint} 参数')
+    expect(issues).toContain('补丁超时必须在 1 到 300 秒之间')
+    expect(issues).toContain('就绪超时不能超过 Checker 超时')
+
+    const editor = await Bun.file(
+      new URL('../app/components/admin/DefinitionPatchSection.vue', import.meta.url),
+    ).text()
+    expect(editor).toContain(':max="300"')
+    expect(editor).toContain(':max="model.checkerJob?.timeoutSeconds ?? undefined"')
+    expect(editor).toContain('{entrypoint} 作为恰好一个独立参数')
+  })
+
   test.each([
     ['Ctf', 8080],
     ['Awd', 8081],

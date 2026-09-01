@@ -3364,3 +3364,33 @@ dotnet run --project backend/src/NoCTF.API/NoCTF.API.csproj --no-build -- --expo
   没有 HTTP/OpenAPI、业务数据模型或 migration 变化。非 Integration TUnit 936/936、ClientApp
   306/306、typecheck、production generate、Release solution build 与 EF pending-model 检查通过；新增
   PostgreSQL 回写回归已编译，本机 Docker 未运行，未将其误报为已执行。本阶段未 push、未部署。
+
+## 2026-09-01 Alpha.123 AWDP Fix 超时与终态收敛
+
+- 为 `RunAwdpFixVerification` 增加精确匹配消息类型的 Wolverine `IHandlerPolicy`，专用执行超时为
+  2400 秒；其他消息仍使用各自原有设置。最大合法下载/Patch/Checker/清理预算为 2220 秒，Handler
+  另留发布余量。Runner 处理每条消息时还按该消息 Deadline 创建独立取消边界。
+- 新增不持久化的 `AwdpFixExecutionBudget`：Deadline 改为
+  `min(Runtime.ExpiresAt, PatchUpload.UploadedAt + Download + Patch + Checker + Cleanup)`，不再把 Runtime
+  TTL 当作 Fix 恢复期限，也不再覆盖 Runtime 的原始 `ExpiresAt`。
+- Runner 注入 `IHostApplicationLifetime`：服务关闭取消继续抛出并交给 Wolverine 重投；其他取消以及
+  未预期 Docker/HTTP/IO 异常收敛为 `AwdpFixOutcome.PlatformFailed`，并使用独立 30 秒补偿窗口发布
+  `AwdpFixResult`，不复用已取消的 Handler Token。Patch 自身超时仍保持 `AwdpPatchTimeout`。
+- 抽出统一 `AwdpFixFailureConvergence`。Pending/Processing Fix 转为 `PlatformFailed`，失败码统一为
+  `AwdpPlatformFailed`，发送 `GameplayFactStateChanged`、公开终态事件并启动下一条排队 Fix；Running
+  Runtime 转 Stopping，Stopping 重派幂等清理，Stopped/Failed 只收敛 Fact。过期、Runner 取消结果、
+  Runtime 启动/Provider 失败、停止回写、管理员终止和比赛批量清理均复用该逻辑。
+- AWDP 模板保存校验新增：PatchTimeout 1–300 秒；ReadyTimeout 不得超过 Checker Timeout；非空
+  PatchCommand 必须恰好包含一个独立 `{entrypoint}` 参数，最多 64 个参数且单参数最多 4096 字符；
+  总执行预算必须小于专用 Handler 超时。前端保存前校验、数字输入上限、中文错误与英文资源同步。
+- WolverineFx.Nats 6.30.3 的版本匹配程序集证据确认 JetStream Listener 会通过 AckProgress 续租仍在
+  native-ack 执行通道中的消息。Runner 显式把最大 Ack 延长期设为 2700 秒，保持全局 AckWait 30 秒
+  不变；新增真实 NATS JetStream Testcontainers 回归，以 1 秒 AckWait 执行 4 秒 Handler 并断言仅
+  应用一次。
+- E2E 不再用 10 秒 PatchTimeout 回避 Wolverine 默认 60 秒：改为 75 秒，新增执行 65 秒后正常返回
+  PatchFailed 的用例，并以 90 秒脚本验证 PatchTimeout。平台版本递增为 `0.1.0-alpha.123`；没有
+  HTTP/OpenAPI、业务数据模型或 migration 变化。Release solution build 为 0 警告/0 错误，analyzer
+  verify、非 Integration TUnit 946/946、ClientApp 307/307、typecheck、production generate、E2E
+  project build、EF pending-model 与 `git diff --check` 通过。本机 Docker daemon 未运行；新增真实
+  PostgreSQL 收敛 4 项、JetStream Ack 续租 1 项及既有 DefenseTarget 3 项按门禁明确跳过，均已完成
+  Release 编译，未将其误报为执行通过。本阶段未 push、未部署。

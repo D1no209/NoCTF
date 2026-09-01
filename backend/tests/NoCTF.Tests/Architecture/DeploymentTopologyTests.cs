@@ -21,6 +21,8 @@ public sealed class DeploymentTopologyTests
         var workerTopology = await ReadAsync(
             "backend", "src", "NoCTF.Worker",
             "WorkerMessageTopologyStartupValidator.cs");
+        var runnerTopology = await ReadAsync(
+            "backend", "src", "NoCTF.Runner", "RunnerRole.cs");
         var workerDeployment = Path.Combine(
             RepositoryRoot,
             "deploy",
@@ -58,6 +60,9 @@ public sealed class DeploymentTopologyTests
             .Contains("route.ToNatsSubject(NatsSubjects.LeaderboardEvents)");
         await Assert.That(persistence).Contains("PersistMessagesWithPostgresql");
         await Assert.That(persistence).Contains("UseEntityFrameworkCoreTransactions");
+        await Assert.That(persistence)
+            .Contains("new AwdpFixVerificationExecutionTimeoutPolicy()")
+            .And.DoesNotContain("ExecutionTimeoutInSeconds = 60");
         await Assert.That(persistence).Contains("options.UseNats(nats)");
         await Assert.That(outbox).Contains("IDbContextOutbox<NoCtfDbContext>");
         await Assert.That(outbox).Contains("nats://subject/noctf.runner.");
@@ -67,6 +72,8 @@ public sealed class DeploymentTopologyTests
             .Contains("Route<CompleteAwdpFixRecovery>(options, WorkerQueue.Control)");
         await Assert.That(routing)
             .Contains("Route<StartAwdpFixVerification>(options, WorkerQueue.Gameplay)");
+        await Assert.That(runnerTopology).Contains(".MaximumAckExtension(");
+        await Assert.That(runnerTopology).DoesNotContain(".AckWait(");
         foreach (var workerQueue in new[]
                  {
                      "WorkerQueue.Control",

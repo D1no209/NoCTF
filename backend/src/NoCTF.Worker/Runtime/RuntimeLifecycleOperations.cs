@@ -50,6 +50,13 @@ internal static partial class BackendMessageOperations
             cancellationToken);
         if (instance is null || instance.State != RuntimeState.Stopping)
             return;
+        await FailAwdpSubmissionAsync(
+            instance,
+            db,
+            outbox,
+            events,
+            timeProvider,
+            cancellationToken);
         if (string.IsNullOrWhiteSpace(instance.ProviderReceiptJson))
         {
             if (instance.RunnerId is { } runnerId)
@@ -92,7 +99,9 @@ internal static partial class BackendMessageOperations
             .Where(instance => instance.CompetitionId == message.CompetitionId
                 && (instance.State == RuntimeState.Queued
                     || instance.State == RuntimeState.Provisioning
-                    || instance.State == RuntimeState.Running))
+                    || instance.State == RuntimeState.Running
+                    || (instance.Purpose == RuntimePurpose.AwdpTarget
+                        && instance.GameplayFactId != null)))
             .OrderBy(instance => instance.CreatedAt)
             .ToListAsync(cancellationToken);
         var now = timeProvider.GetUtcNow();
@@ -102,6 +111,7 @@ internal static partial class BackendMessageOperations
                 instance,
                 db,
                 outbox,
+                events,
                 timeProvider,
                 cancellationToken);
             if (instance.State == RuntimeState.Queued && string.IsNullOrWhiteSpace(instance.ProviderReceiptJson))
@@ -114,6 +124,15 @@ internal static partial class BackendMessageOperations
                     CompetitionEventLevel.Information,
                     now,
                     cancellationToken);
+                continue;
+            }
+
+            if (instance.State is RuntimeState.Stopped or RuntimeState.Failed)
+                continue;
+
+            if (instance.State == RuntimeState.Stopping)
+            {
+                await outbox.PublishAsync(new StopRuntime(instance.Id));
                 continue;
             }
 

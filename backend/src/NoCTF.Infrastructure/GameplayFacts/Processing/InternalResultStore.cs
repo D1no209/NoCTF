@@ -9,6 +9,7 @@ using NoCTF.Domain.Gameplay;
 using NoCTF.GameModes.Awdp.Scoring;
 using NoCTF.Application.Competitions.Events;
 using NoCTF.Domain.Competitions.Events;
+using NoCTF.Infrastructure.GameplayFacts.Awdp;
 
 namespace NoCTF.Infrastructure.GameplayFacts.Processing;
 
@@ -127,8 +128,26 @@ public sealed class InternalResultStore(
             || fact.ReferenceId is null
             || fact.TeamId is null)
             return InternalResultDisposition.NotFound;
-        var decision = AwdpFixOutcomeMapper.Map(result.Outcome);
         var resolvedAt = ToPostgresPrecision(result.OccurredAt);
+        if (result.Outcome == AwdpFixOutcome.PlatformFailed)
+        {
+            var convergence = await AwdpFixFailureConvergence
+                .ConvergeAwdpFixFailureAsync(
+                    runtime,
+                    db,
+                    outbox,
+                    events,
+                    resolvedAt,
+                    AwdpFixRuntimeCleanupMode.EnsureStop,
+                    ct);
+            await db.SaveChangesAsync(ct);
+            await transaction.CommitAsync(ct);
+            await outbox.FlushOutgoingMessagesAsync();
+            return convergence.FactConverged
+                ? InternalResultDisposition.Applied
+                : InternalResultDisposition.Duplicate;
+        }
+        var decision = AwdpFixOutcomeMapper.Map(result.Outcome);
         fact.Result = decision.Result;
         fact.State = GameplayFactState.Completed;
         fact.FailureCode = decision.FailureCode;

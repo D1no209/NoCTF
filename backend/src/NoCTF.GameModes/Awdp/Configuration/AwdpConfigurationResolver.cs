@@ -1,12 +1,11 @@
 using NoCTF.GameModes.Flags;
+using NoCTF.Application.GameplayFacts.Awdp;
 
 namespace NoCTF.GameModes.Awdp.Configuration;
 
 public static class AwdpConfigurationResolver
 {
     private const string DefaultPatchEntrypoint = "fix.sh";
-    private const int DefaultPatchTimeoutSeconds = 60;
-    private const int DefaultReadyTimeoutSeconds = 30;
 
     public static AwdpEffectiveConfiguration Resolve(
         string competitionJson,
@@ -40,9 +39,9 @@ public static class AwdpConfigurationResolver
             definition.Runtime,
             definition.PatchEntrypoint ?? DefaultPatchEntrypoint,
             definition.PatchCommand,
-            definition.PatchTimeoutSeconds ?? DefaultPatchTimeoutSeconds,
+            definition.PatchTimeoutSeconds ?? AwdpFixExecutionBudget.DefaultPatchTimeoutSeconds,
             definition.Checker,
-            definition.ReadyTimeoutSeconds ?? DefaultReadyTimeoutSeconds,
+            definition.ReadyTimeoutSeconds ?? AwdpFixExecutionBudget.DefaultReadyTimeoutSeconds,
             definition.MaximumPatchUploadBytes
                 ?? NoCTF.Application.GameplayFacts.PatchUploads.PatchUploadRules.DefaultMaximumArchiveBytes,
             rules.FlagTemplate ?? competition.FlagTemplate ?? PerTeamFlagTemplate.Default);

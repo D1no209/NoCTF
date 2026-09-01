@@ -43,8 +43,17 @@ const definitionDiagnostics: Record<string, string> = {
   'PatchEntrypoint is required.': '补丁入口不能为空',
   'PatchEntrypoint cannot exceed 256 characters.': '补丁入口最多 256 个字符',
   'PatchEntrypoint must be a safe relative path.': '补丁入口必须是安全的相对路径',
-  'PatchTimeoutSeconds must be positive when configured.': '补丁超时必须为正数',
+  'PatchTimeoutSeconds must be between 1 and 300 when configured.': '补丁超时必须在 1 到 300 秒之间',
+  'PatchTimeoutSeconds must be between 1 and 300.': '补丁超时必须在 1 到 300 秒之间',
   'ReadyTimeoutSeconds must be positive when configured.': '就绪超时必须为正数',
+  'ReadyTimeoutSeconds must be positive.': '就绪超时必须为正数',
+  'ReadyTimeoutSeconds cannot exceed Checker.TimeoutSeconds.': '就绪超时不能超过 Checker 超时',
+  'PatchCommand cannot contain more than 64 arguments.': '补丁应用命令最多包含 64 个参数',
+  'PatchCommand cannot contain blank arguments.': '补丁应用命令不能包含空参数',
+  'PatchCommand arguments cannot exceed 4096 characters.': '补丁应用命令的单个参数最多 4096 个字符',
+  'PatchCommand must contain exactly one standalone {entrypoint} argument.': '非空补丁应用命令必须恰好包含一个独立的 {entrypoint} 参数',
+  'AWDP Fix execution budget must remain below the dedicated handler timeout.': 'Fix 总执行预算必须小于专用处理器超时',
+  'Checker.TimeoutSeconds must be between 1 and 1800.': 'Checker 超时必须在 1 到 1800 秒之间',
 }
 
 function splitDiagnostics(message: string): string[] {

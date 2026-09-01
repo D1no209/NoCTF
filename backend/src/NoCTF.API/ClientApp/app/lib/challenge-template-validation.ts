@@ -10,6 +10,12 @@ import {
 import { translate } from '../utils/i18n'
 
 const environmentNamePattern = /^[A-Za-z_][A-Za-z0-9_]*$/
+const awdpPatchEntrypointPlaceholder = '{entrypoint}'
+const maximumAwdpPatchTimeoutSeconds = 300
+const maximumAwdpPatchCommandArguments = 64
+const maximumAwdpPatchCommandArgumentLength = 4096
+const awdpFixExecutionOverheadSeconds = 120
+const awdpFixHandlerTimeoutSeconds = 2400
 
 function addIssue(issues: string[], issue: string): void {
   if (!issues.includes(issue)) issues.push(issue)
@@ -201,10 +207,35 @@ export function validateChallengeTemplateDraft(draft: ChallengeTemplateDraft): s
           || segments.some(segment => segment === '.' || segment === '..'))
           addIssue(issues, translate('补丁入口必须是安全的相对路径'))
       }
-      if (model.patchTimeoutSeconds !== null && model.patchTimeoutSeconds <= 0)
-        addIssue(issues, translate('补丁超时必须为正数'))
+      if (model.patchCommand.length > 0) {
+        if (model.patchCommand.length > maximumAwdpPatchCommandArguments)
+          addIssue(issues, translate('补丁应用命令最多包含 64 个参数'))
+        if (model.patchCommand.some(argument => !argument.trim()))
+          addIssue(issues, translate('补丁应用命令不能包含空参数'))
+        if (model.patchCommand.some(argument => argument.length > maximumAwdpPatchCommandArgumentLength))
+          addIssue(issues, translate('补丁应用命令的单个参数最多 4096 个字符'))
+        if (model.patchCommand.filter(argument => argument === awdpPatchEntrypointPlaceholder).length !== 1)
+          addIssue(issues, translate('非空补丁应用命令必须恰好包含一个独立的 {entrypoint} 参数'))
+      }
+      if (model.patchTimeoutSeconds !== null
+        && (model.patchTimeoutSeconds < 1
+          || model.patchTimeoutSeconds > maximumAwdpPatchTimeoutSeconds)) {
+        addIssue(issues, translate('补丁超时必须在 1 到 300 秒之间'))
+      }
       if (model.readyTimeoutSeconds !== null && model.readyTimeoutSeconds <= 0)
         addIssue(issues, translate('就绪超时必须为正数'))
+      if (model.checkerJob) {
+        const checkerTimeout = model.checkerJob.timeoutSeconds ?? 60
+        const readyTimeout = model.readyTimeoutSeconds ?? 30
+        const patchTimeout = model.patchTimeoutSeconds ?? 60
+        if (readyTimeout > checkerTimeout)
+          addIssue(issues, translate('就绪超时不能超过 Checker 超时'))
+        if (patchTimeout > 0 && checkerTimeout > 0
+          && patchTimeout + checkerTimeout + awdpFixExecutionOverheadSeconds
+          >= awdpFixHandlerTimeoutSeconds) {
+          addIssue(issues, translate('Fix 总执行预算必须小于专用处理器超时'))
+        }
+      }
       if (model.maximumPatchUploadBytes !== null
         && (model.maximumPatchUploadBytes <= 0
           || model.maximumPatchUploadBytes > HARD_MAXIMUM_PATCH_UPLOAD_BYTES)) {
