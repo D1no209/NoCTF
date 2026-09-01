@@ -3228,4 +3228,14 @@ dotnet run --project backend/src/NoCTF.API/NoCTF.API.csproj --no-build -- --expo
   漂移门禁，验证成功后继续构建并发布 Host 镜像。
 - 同时修正生成前端 SDK 漂移步骤中重复且错误缩进的命令。部署架构测试同步断言 CI 不再包含任何
   `bun test` / `dotnet test` 命令或测试服务，并要求镜像发布依赖 `verify` Job。
-- 本阶段仅创建本地提交，未 push、未部署。
+- CI 调整提交 `972110a8` 已按后续明确指令推送，未部署。
+
+## 2026-09-01 CI 仅保留镜像发布
+
+- Windows `gh` 核验 Actions run `33474181991`：`Verify build` 的全部步骤成功，工作流真正失败在
+  `Log in to custom registry`，阿里云 ACR 返回 `unauthorized: authentication required`。当前
+  `CUSTOM_REGISTRY` 与命名空间已生效，用户随后已更新 `CUSTOM_REGISTRY_USERNAME` /
+  `CUSTOM_REGISTRY_PASSWORD`，下一次 push 将重新验证登录。
+- 按用户后续要求删除整个 `verify` Job；工作流只在 `main` push 时直接运行 `publish-images`，Docker
+  Host 镜像构建仍会完成后端 publish 与 Nuxt generate。架构门禁、部署/开发文档同步到这一策略。
+- 本阶段将按用户明确指令提交并推送，不部署。
