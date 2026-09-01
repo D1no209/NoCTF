@@ -29,7 +29,10 @@ public sealed record AwdpParticipantStateView(
     GameplayFactStatusView? LatestBreakAttempt,
     AwdpAchievementActivationView? BreakActivation,
     AwdpDefenseProgressView Defense,
-    AwdpAchievementActivationView? FixActivation);
+    AwdpAchievementActivationView? FixActivation,
+    int? MaximumFixAttempts,
+    int AcceptedFixAttempts,
+    int? RemainingFixAttempts);
 
 public interface IAwdpParticipantStateReader
 {

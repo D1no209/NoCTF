@@ -5,6 +5,9 @@ describe('AWDP participant panel', () => {
     const source = await Bun.file(
       new URL('../app/components/challenges/panels/AwdpPanel.vue', import.meta.url),
     ).text()
+    const types = await Bun.file(
+      new URL('../app/api/types.gen.ts', import.meta.url),
+    ).text()
 
     expect(source).toContain('攻击靶机 · Break 环境')
     expect(source).toContain('防御轨 · Fix')
@@ -12,6 +15,12 @@ describe('AWDP participant panel', () => {
     expect(source).toContain(":controls=\"state?.breakActivation ? 'readonly' : 'full'\"")
     expect(source).toContain('<FlagSubmit')
     expect(source).toContain('<FixSubmit')
+    expect(source).toContain('state?.maximumFixAttempts !== null')
+    expect(source).toContain('state.remainingFixAttempts ?? 0')
+    expect(source).toContain("$t('剩余 {count} 次提交'")
+    expect(types).toContain('maximumFixAttempts?: number | null')
+    expect(types).toContain('acceptedFixAttempts?: number')
+    expect(types).toContain('remainingFixAttempts?: number | null')
     expect(source).not.toContain('创建本队独立攻击实例')
     expect(source).not.toContain('只执行一次 Checker')
     expect(source).not.toContain('Fix 历史')

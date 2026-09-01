@@ -274,6 +274,9 @@ export type NoCtfapiEndpointsGameplayFactsAwdpParticipantStateResponse = {
     breakActivation?: NoCtfapiEndpointsGameplayFactsAwdpAchievementActivationResponse | null;
     defense?: NoCtfapiEndpointsGameplayFactsAwdpDefenseProgressResponse;
     fixActivation?: NoCtfapiEndpointsGameplayFactsAwdpAchievementActivationResponse | null;
+    maximumFixAttempts?: number | null;
+    acceptedFixAttempts?: number;
+    remainingFixAttempts?: number | null;
 };
 
 export type NoCtfapiEndpointsGameplayFactsGameplayFactStatusResponse = {

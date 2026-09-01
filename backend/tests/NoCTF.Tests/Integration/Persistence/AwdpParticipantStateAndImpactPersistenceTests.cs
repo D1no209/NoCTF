@@ -60,6 +60,9 @@ public sealed class AwdpParticipantStatePersistenceTests
             await Assert.That(state.Defense.RuntimeState).IsEqualTo(RuntimeState.Stopped);
             await Assert.That(state.Defense.Result).IsEqualTo(GameplayFactResult.Correct);
             await Assert.That(state.FixActivation?.EffectiveRound).IsEqualTo(2);
+            await Assert.That(state.MaximumFixAttempts).IsEqualTo(10);
+            await Assert.That(state.AcceptedFixAttempts).IsEqualTo(1);
+            await Assert.That(state.RemainingFixAttempts).IsEqualTo(9);
 
             var outsider = await new AwdpParticipantStateReader(db).FindAsync(
                 fixture.CompetitionId,
@@ -88,6 +91,7 @@ public sealed class AwdpParticipantStatePersistenceTests
         var latestBreakFactId = Guid.CreateVersion7(now.AddMilliseconds(7));
         var fixFactId = Guid.CreateVersion7(now.AddMilliseconds(8));
         var fixRuntimeId = Guid.CreateVersion7(now.AddMilliseconds(9));
+        var platformFailedFixFactId = Guid.CreateVersion7(now.AddMilliseconds(10));
         db.Users.Add(User(userId, "participant", now));
         db.Competitions.Add(new Competition
         {
@@ -144,7 +148,22 @@ public sealed class AwdpParticipantStatePersistenceTests
                 GameplayFactKind.BreakAttempt, GameplayFactResult.Wrong, now.AddSeconds(-10)),
             Fact(fixFactId, competitionId, competitionChallengeId, teamId, userId,
                 GameplayFactKind.FixAttempt, GameplayFactResult.Correct, now.AddSeconds(-70),
-                GameplayFactReferenceKind.PatchUpload, Guid.CreateVersion7(now.AddMilliseconds(10))));
+                GameplayFactReferenceKind.PatchUpload, Guid.CreateVersion7(now.AddMilliseconds(11))),
+            new GameplayFact
+            {
+                Id = platformFailedFixFactId,
+                CompetitionId = competitionId,
+                CompetitionChallengeId = competitionChallengeId,
+                TeamId = teamId,
+                ActorUserId = userId,
+                Kind = GameplayFactKind.FixAttempt,
+                ReferenceKind = GameplayFactReferenceKind.PatchUpload,
+                ReferenceId = Guid.CreateVersion7(now.AddMilliseconds(12)),
+                State = GameplayFactState.PlatformFailed,
+                FailureCode = GameplayFactFailureCode.CheckerPlatformError,
+                OccurredAt = now.AddSeconds(-20),
+                UpdatedAt = now.AddSeconds(-20)
+            });
         db.RuntimeInstances.AddRange(
             new RuntimeInstance
             {
