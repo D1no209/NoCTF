@@ -1113,8 +1113,8 @@ onMounted(() => {
         </AlertDialogHeader>
         <AlertDialogFooter>
           <AlertDialogCancel>{{ $t('取消') }}</AlertDialogCancel>
-          <AlertDialogAction variant="destructive" :disabled="attachmentActionPending" @click="confirmDeleteAttachment">
-            <Spinner v-if="attachmentActionPending" data-icon="inline-start" /> {{ $t('确认删除') }} </AlertDialogAction>
+          <Button variant="destructive" :disabled="attachmentActionPending" @click="confirmDeleteAttachment">
+            <Spinner v-if="attachmentActionPending" data-icon="inline-start" /> {{ $t('确认删除') }} </Button>
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>
@@ -1209,8 +1209,8 @@ onMounted(() => {
         </AlertDialogHeader>
         <AlertDialogFooter>
           <AlertDialogCancel>{{ $t('取消') }}</AlertDialogCancel>
-          <AlertDialogAction variant="destructive" :disabled="flagActionPending" @click="confirmDeleteFlag">
-            <Spinner v-if="flagActionPending" data-icon="inline-start" /> {{ $t('确认删除') }} </AlertDialogAction>
+          <Button variant="destructive" :disabled="flagActionPending" @click="confirmDeleteFlag">
+            <Spinner v-if="flagActionPending" data-icon="inline-start" /> {{ $t('确认删除') }} </Button>
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>
