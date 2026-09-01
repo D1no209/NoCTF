@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { History, ShieldCheck } from '@lucide/vue'
+import { ShieldCheck } from '@lucide/vue'
 import { getAwdpParticipantStateEndpoint } from '~/api'
 import type {
   NoCtfapiEndpointsChallengesChallengeResponse,
@@ -16,22 +16,7 @@ const emit = defineEmits<{ submitted: [] }>()
 
 const state = ref<NoCtfapiEndpointsGameplayFactsAwdpParticipantStateResponse | null>(null)
 const loading = ref(true)
-const route = useRoute()
-const router = useRouter()
-const fixHistoryOpen = ref(route.query.fixHistory === '1')
 const attackRuntimeCard = ref<{ refreshUntilStopped: () => Promise<void> } | null>(null)
-
-watch(() => route.query.fixHistory, value => {
-  fixHistoryOpen.value = value === '1'
-})
-
-async function setFixHistoryOpen(open: boolean): Promise<void> {
-  fixHistoryOpen.value = open
-  const query = { ...route.query }
-  if (open) query.fixHistory = '1'
-  else delete query.fixHistory
-  await router.replace({ query })
-}
 
 const defenseTransitionInProgress = computed(() => {
   const factState = state.value?.defense?.state
@@ -140,17 +125,13 @@ onUnmounted(() => {
       </section>
 
       <section class="flex min-w-0 flex-col gap-5 border-t pt-6 xl:border-l xl:border-t-0 xl:pl-6 xl:pt-0" aria-labelledby="awdp-defense-title">
-        <header class="flex flex-wrap items-center justify-between gap-3 border-b pb-4">
+        <header class="flex flex-wrap items-center gap-3 border-b pb-4">
           <div class="flex flex-wrap items-center gap-2">
             <h2 id="awdp-defense-title" class="text-lg font-semibold">{{ $t('防御轨 · Fix') }}</h2>
             <Badge v-if="state?.fixActivation" variant="default">
               {{ $t('已于第 {round} 轮生效', { round: state.fixActivation.effectiveRound ?? '-' }) }}
             </Badge>
           </div>
-          <Button variant="outline" size="sm" @click="setFixHistoryOpen(true)">
-            <History data-icon="inline-start" />
-            {{ $t('Fix 历史') }}
-          </Button>
         </header>
 
         <section v-if="state?.defense?.gameplayFactId" class="border-b pb-5" aria-labelledby="awdp-last-fix-title">
@@ -182,18 +163,5 @@ onUnmounted(() => {
       </section>
     </div>
 
-    <Dialog :open="fixHistoryOpen" @update:open="setFixHistoryOpen">
-      <DialogScrollContent class="max-h-[85vh] sm:max-w-4xl">
-        <DialogHeader>
-          <DialogTitle>{{ $t('Fix 历史') }}</DialogTitle>
-          <DialogDescription>{{ challenge.title }}</DialogDescription>
-        </DialogHeader>
-        <AwdpFixHistory
-          v-if="fixHistoryOpen"
-          :competition-id="competition.id!"
-          :competition-challenge-id="challenge.id!"
-        />
-      </DialogScrollContent>
-    </Dialog>
   </div>
 </template>

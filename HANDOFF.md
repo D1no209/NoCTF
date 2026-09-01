@@ -3314,3 +3314,13 @@ dotnet run --project backend/src/NoCTF.API/NoCTF.API.csproj --no-build -- --expo
   成功/失败”，并补齐英文资源和四种结果回归。
 - 平台版本递增为 `0.1.0-alpha.118`。没有 HTTP/OpenAPI、业务数据模型或 migration 变化。本阶段
   未 push、未部署。
+
+## 2026-09-01 Alpha.119 移除重复 Fix 历史入口
+
+- AWDP 防御轨页头删除“Fix 历史”按钮和 Dialog；下方通用“本题提交记录”继续按题目列出所有
+  Flag/Break/Fix，成为唯一记录入口。
+- 删除 `AwdpFixHistory.vue`、旧 `fix-history.vue` 重定向路由、`fixHistory` 查询参数同步、History
+  图标和仅供该重复界面使用的四条翻译。回归测试明确要求专用组件与路由不存在、统一记录不带
+  Fix kind 过滤。
+- 平台版本递增为 `0.1.0-alpha.119`。没有 HTTP/OpenAPI、业务数据模型或 migration 变化。本阶段
+  未 push、未部署。

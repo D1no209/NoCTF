@@ -14,7 +14,7 @@ describe('AWDP participant panel', () => {
     expect(source).toContain('<FixSubmit')
     expect(source).not.toContain('创建本队独立攻击实例')
     expect(source).not.toContain('只执行一次 Checker')
-    expect(source).toContain('Fix 历史')
+    expect(source).not.toContain('Fix 历史')
   })
 
   test('models defense as an explicit one-shot target with one upload', async () => {
@@ -92,28 +92,33 @@ describe('AWDP participant panel', () => {
     expect(fix).toContain('本题防御已成功，后续 Fix 不再受理。')
   })
 
-  test('keeps challenge details in the workspace and redirects legacy Fix history route into the dialog', async () => {
+  test('keeps challenge details in the workspace and removes the duplicate Fix history surface', async () => {
     const challengePage = Bun.file(
       new URL('../app/pages/competitions/[id]/challenges/[ccId]/index.vue', import.meta.url),
     )
     const historyPage = Bun.file(
       new URL('../app/pages/competitions/[id]/challenges/[ccId]/fix-history.vue', import.meta.url),
     )
+    const historyComponent = Bun.file(
+      new URL('../app/components/challenges/AwdpFixHistory.vue', import.meta.url),
+    )
     const panel = await Bun.file(
       new URL('../app/components/challenges/panels/AwdpPanel.vue', import.meta.url),
     ).text()
-    const historyRedirect = await historyPage.text()
+    const challengeDetail = await Bun.file(
+      new URL('../app/components/challenges/CompetitionChallengeDetail.vue', import.meta.url),
+    ).text()
     const obsoleteNestedParent = Bun.file(
       new URL('../app/pages/competitions/[id]/challenges/[ccId].vue', import.meta.url),
     )
 
     expect(await challengePage.exists()).toBe(true)
-    expect(await historyPage.exists()).toBe(true)
+    expect(await historyPage.exists()).toBe(false)
+    expect(await historyComponent.exists()).toBe(false)
     expect(await obsoleteNestedParent.exists()).toBe(false)
-    expect(panel).toContain('<AwdpFixHistory')
-    expect(panel).toContain("query.fixHistory = '1'")
-    expect(historyRedirect).toContain('navigateTo')
-    expect(historyRedirect).toContain("fixHistory: '1'")
+    expect(panel).not.toContain('<AwdpFixHistory')
+    expect(panel).not.toContain('fixHistory')
+    expect(challengeDetail).toContain('<ChallengeSubmissionHistory')
   })
 
   test('labels the AWDP checker as a one-shot Fix verifier', async () => {
@@ -128,12 +133,12 @@ describe('AWDP participant panel', () => {
     expect(awdpBranch).not.toContain('服务健康检查')
   })
 
-  test('shows safe defense outcomes and provides a generated-SDK Fix history', async () => {
+  test('shows safe defense outcomes in the unified challenge history', async () => {
     const panel = await Bun.file(
       new URL('../app/components/challenges/panels/AwdpPanel.vue', import.meta.url),
     ).text()
     const history = await Bun.file(
-      new URL('../app/components/challenges/AwdpFixHistory.vue', import.meta.url),
+      new URL('../app/components/challenges/ChallengeSubmissionHistory.vue', import.meta.url),
     ).text()
 
     expect(panel).toContain('防御异常：EXP 利用成功')
@@ -141,10 +146,8 @@ describe('AWDP participant panel', () => {
     expect(panel).not.toContain('防御未通过')
     expect(panel).not.toContain('失败原因')
     expect(history).toContain('listGameplayFactsEndpoint')
-    expect(history).toContain("kind: 'FixAttempt'")
     expect(history).toContain('competitionChallengeId')
-    expect(history).toContain('防御异常：服务异常')
-    expect(history).not.toContain('防御未通过')
+    expect(history).not.toContain('kind:')
     expect(history).not.toContain('/api/v1/')
   })
 })
