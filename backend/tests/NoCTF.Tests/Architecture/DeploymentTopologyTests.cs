@@ -427,6 +427,10 @@ public sealed class DeploymentTopologyTests
             "image: quay.io/oliver006/redis_exporter:v1.89.0");
         await Assert.That(observabilityCompose).Contains(
             "image: quay.io/prometheus/node-exporter:v1.12.1");
+        await Assert.That(observabilityCompose).Contains(
+            "image: docker.m.daocloud.io/natsio/prometheus-nats-exporter:0.20.1@sha256:4fbf6dacb84780a45a1c3af9b1080c69451a288d20902deae671b80717bb8f61");
+        await Assert.That(deployScript).Contains(
+            "postgres-exporter\n        redis-exporter\n        nats-exporter\n        node-exporter");
         await Assert.That(deployScript).Contains(
             "NOCTF_OBSERVABILITY_PULL_ATTEMPTS:-5");
         await Assert.That(deployScript).Contains("NOCTF_BUILD_ATTEMPTS:-3");
@@ -466,6 +470,61 @@ public sealed class DeploymentTopologyTests
             await Assert.That(serviceBlock).Contains(
                 "Observability__MetricsPort: 9464");
         }
+    }
+
+    [Test]
+    public async Task Observability_configuration_uses_real_JetStream_and_Wolverine_metrics()
+    {
+        var files = new[]
+        {
+            await ReadAsync("backend", "src", "NoCTF.Application", "Observability",
+                "NoCtfTelemetry.cs"),
+            await ReadAsync("backend", "src", "NoCTF.Infrastructure", "Administration",
+                "Monitoring", "PrometheusPlatformMonitoringReader.cs"),
+            await ReadAsync("deploy", "docker-compose.observability.yml"),
+            await ReadAsync("deploy", "observability", "prometheus", "prometheus.yml"),
+            await ReadAsync("deploy", "observability", "prometheus", "alerts.yml"),
+            await ReadAsync("deploy", "observability", "grafana", "dashboards",
+                "noctf-overview.json")
+        };
+        var configuration = string.Join('\n', files);
+
+        foreach (var obsoleteMetric in new[]
+                 {
+                     "noctf_worker_queue_depth",
+                     "noctf_worker_queue_oldest_age_seconds",
+                     "noctf.worker.queue.depth",
+                     "noctf.worker.queue.oldest_age",
+                     "noctf_leaderboard_dirty_competitions",
+                     "noctf_leaderboard_dirty_oldest_age_seconds",
+                     "wolverine_dead_letter_queue_total"
+                 })
+        {
+            await Assert.That(configuration).DoesNotContain(obsoleteMetric);
+        }
+
+        foreach (var requiredMetric in new[]
+                 {
+                     "jetstream_consumer_num_pending",
+                     "jetstream_consumer_num_ack_pending",
+                     "jetstream_consumer_num_redelivered",
+                     "jetstream_stream_total_messages",
+                     "jetstream_server_total_message_bytes",
+                     "jetstream_server_max_storage",
+                     "wolverine_outbox_count_Messages",
+                     "wolverine_inbox_count_Messages",
+                     "wolverine_messages_sent_Messages_total",
+                     "wolverine_messages_succeeded_Messages_total",
+                     "wolverine_execution_time_Milliseconds_bucket",
+                     "wolverine_effective_time_Milliseconds_bucket"
+                 })
+        {
+            await Assert.That(configuration).Contains(requiredMetric);
+        }
+
+        await Assert.That(configuration).Contains("job_name: nats");
+        await Assert.That(configuration).Contains("-jsz=all");
+        await Assert.That(configuration).Contains("http://nats:8222");
     }
 
     [Test]

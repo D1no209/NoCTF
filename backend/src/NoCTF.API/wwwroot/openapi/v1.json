@@ -17970,7 +17970,10 @@
           "status": {
             "$ref": "#/components/schemas/NoCTFApplicationAdministrationMonitoringPlatformMonitoringStatus"
           },
-          "sourceAvailable": {
+          "prometheusAvailable": {
+            "type": "boolean"
+          },
+          "natsAvailable": {
             "type": "boolean"
           },
           "capturedAt": {
@@ -17996,13 +17999,15 @@
           "Healthy",
           "Warning",
           "Critical",
-          "Unavailable"
+          "Unavailable",
+          "NoSamples"
         ],
         "enum": [
           0,
           1,
           2,
-          3
+          3,
+          4
         ]
       },
       "NoCTFAPIEndpointsAdministrationPlatformPlatformMonitoringMetricResponse": {
@@ -18033,14 +18038,20 @@
           "ApiP95Milliseconds",
           "ApiServerErrorPercent",
           "SignalRConnections",
-          "CriticalQueueDepth",
-          "CriticalQueueOldestSeconds",
+          "NatsAvailability",
+          "JetStreamStorageUsagePercent",
+          "CriticalQueuePendingCount",
+          "CriticalQueueAckPendingCount",
+          "CriticalQueueRedeliveredCount",
+          "WolverineOutboxCount",
+          "WolverineInboxCount",
           "RuntimeWaitingCount",
           "RuntimeOldestWaitingSeconds",
-          "LeaderboardInvalidationsPerSecond",
-          "LeaderboardMergeDispatchesPerSecond",
-          "LeaderboardCacheMissRebuildsPerSecond",
+          "LeaderboardMergeDispatchFailuresPerSecond",
+          "LeaderboardCacheMissRebuildFailuresPerSecond",
           "LeaderboardProjectionP95Milliseconds",
+          "LeaderboardPublishFailuresPerSecond",
+          "LeaderboardSignalRPublishFailuresPerSecond",
           "RunnerOnlineCount",
           "RunnerMinimumAvailablePercent",
           "PostgreSqlConnectionUsagePercent",
@@ -18064,7 +18075,13 @@
           13,
           14,
           15,
-          16
+          16,
+          17,
+          18,
+          19,
+          20,
+          21,
+          22
         ]
       },
       "NoCTFApplicationAdministrationMonitoringPlatformMonitoringUnit": {

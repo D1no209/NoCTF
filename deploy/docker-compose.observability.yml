@@ -5,6 +5,19 @@ services:
       Observability__MetricsPort: 9464
       Observability__PrometheusBaseUrl: http://prometheus:9090
       Observability__GrafanaPublicUrl: ${NOCTF_GRAFANA_PUBLIC_URL:-}
+      Observability__Monitoring__SustainedWindowMinutes: ${NOCTF_MONITORING_SUSTAINED_WINDOW_MINUTES:-3}
+      Observability__Monitoring__PendingWarning: ${NOCTF_MONITORING_PENDING_WARNING:-25}
+      Observability__Monitoring__PendingCritical: ${NOCTF_MONITORING_PENDING_CRITICAL:-100}
+      Observability__Monitoring__AckPendingWarning: ${NOCTF_MONITORING_ACK_PENDING_WARNING:-10}
+      Observability__Monitoring__AckPendingCritical: ${NOCTF_MONITORING_ACK_PENDING_CRITICAL:-50}
+      Observability__Monitoring__RedeliveryWarning: ${NOCTF_MONITORING_REDELIVERY_WARNING:-1}
+      Observability__Monitoring__RedeliveryCritical: ${NOCTF_MONITORING_REDELIVERY_CRITICAL:-10}
+      Observability__Monitoring__OutboxWarning: ${NOCTF_MONITORING_OUTBOX_WARNING:-25}
+      Observability__Monitoring__OutboxCritical: ${NOCTF_MONITORING_OUTBOX_CRITICAL:-100}
+      Observability__Monitoring__InboxWarning: ${NOCTF_MONITORING_INBOX_WARNING:-25}
+      Observability__Monitoring__InboxCritical: ${NOCTF_MONITORING_INBOX_CRITICAL:-100}
+      Observability__Monitoring__JetStreamStorageWarningPercent: ${NOCTF_MONITORING_JS_STORAGE_WARNING_PERCENT:-75}
+      Observability__Monitoring__JetStreamStorageCriticalPercent: ${NOCTF_MONITORING_JS_STORAGE_CRITICAL_PERCENT:-90}
 
   worker:
     environment:
@@ -38,6 +51,8 @@ services:
         condition: service_healthy
       runner:
         condition: service_healthy
+      nats-exporter:
+        condition: service_started
 
   grafana:
     image: docker.m.daocloud.io/grafana/grafana:13.2.0
@@ -78,6 +93,19 @@ services:
       - "9121"
     depends_on:
       redis:
+        condition: service_healthy
+
+  nats-exporter:
+    image: docker.m.daocloud.io/natsio/prometheus-nats-exporter:0.20.1@sha256:4fbf6dacb84780a45a1c3af9b1080c69451a288d20902deae671b80717bb8f61
+    restart: unless-stopped
+    command:
+      - -varz
+      - -jsz=all
+      - http://nats:8222
+    expose:
+      - "7777"
+    depends_on:
+      nats:
         condition: service_healthy
 
   node-exporter:

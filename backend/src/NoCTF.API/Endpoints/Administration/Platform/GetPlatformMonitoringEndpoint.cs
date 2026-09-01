@@ -12,7 +12,8 @@ public sealed record PlatformMonitoringMetricResponse(
 
 public sealed record PlatformMonitoringResponse(
     PlatformMonitoringStatus Status,
-    bool SourceAvailable,
+    bool PrometheusAvailable,
+    bool NatsAvailable,
     DateTimeOffset CapturedAt,
     string? DashboardUrl,
     IReadOnlyList<PlatformMonitoringMetricResponse> Metrics);
@@ -41,7 +42,8 @@ public sealed class GetPlatformMonitoringEndpoint(
         var view = await monitoring.ExecuteAsync(ct);
         return TypedResults.Ok(new PlatformMonitoringResponse(
             view.Status,
-            view.SourceAvailable,
+            view.PrometheusAvailable,
+            view.NatsAvailable,
             view.CapturedAt,
             view.DashboardUri?.AbsoluteUri,
             view.Metrics.Select(metric => new PlatformMonitoringMetricResponse(

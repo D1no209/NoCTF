@@ -3269,3 +3269,25 @@ dotnet run --project backend/src/NoCTF.API/NoCTF.API.csproj --no-build -- --expo
   Release solution build 为 0 警告/0 错误；非 Integration TUnit 941/941；其中四模式真实 HTTP PUT
   5/5；ClientApp 304/304、typecheck 与 production generate 通过，`git diff --check` 通过。Nuxt 仅
   保留既有大 chunk、插件耗时与第三方 Nitro 警告。本阶段仅创建本地提交，未 push、未部署。
+
+## 2026-09-01 Alpha.116 JetStream 运维监控迁移收尾
+
+- 运维监控不再查询或导出无人更新的 `noctf.worker.queue.*` / `noctf_worker_queue_*` 零值指标；
+  NATS 官方 Prometheus Exporter 0.20.1 以固定多架构镜像摘要接入 Compose，启用 `varz` 与完整
+  `jsz`，仅在内部暴露 7777。Prometheus 新增 `nats` Target，生产拉取及启动服务列表同步包含
+  `nats-exporter`，NATS 8222 仍仅绑定宿主机回环地址。
+- 平台摘要以 CONTROL/GAMEPLAY consumer leader 的 pending、ack pending、redelivered 为传输积压
+  事实源，并补充 JetStream 存储占用、Wolverine PostgreSQL Inbox/Outbox。页面显示当前值，状态使用
+  可配置持续窗口的最低值判断；默认阈值和窗口可通过 `NOCTF_MONITORING_*` 环境变量调整，非法阈值
+  在 API 启动时失败。
+- 监控协议新增 Prometheus/NATS 独立可用性以及 `NoSamples`。空闲请求、排行榜投影和 Redis 延迟显示
+  “暂无样本”；Runner 缺失按 0 且 Critical；Prometheus 不可达为 Unavailable，NATS Target 不可达为
+  Critical。OpenAPI、生成 SDK、管理页面和中英文资源已同步。
+- Grafana 使用生产实际导出的 Wolverine 大小写敏感指标名，移除不存在的 dead-letter 指标；排行榜
+  删除 dirty 语义，替换为 merge dispatch、cache-miss rebuild、projection P95、cache publish 和
+  SignalR publish 失败。告警同步覆盖 NATS、关键 consumer、重投递、Inbox/Outbox 与排行榜失败。
+- 平台版本递增为 `0.1.0-alpha.116`。本次没有业务数据模型变化、没有 EF Migration；EF 明确报告无
+  pending model changes。Release solution build 为 0 警告/0 错误；非 Integration TUnit 945/945；
+  ClientApp 305/305、typecheck 与 production generate 通过；Compose 合并配置和 Grafana JSON 有效；
+  Prometheus 3.14.0 `promtool` 校验 20 条告警和 6 条动态查询语法成功。生产 Worker 只读采样确认 Wolverine 6.30.3 实际
+  导出 `*_Messages` 与 `*_Milliseconds` 指标。本阶段未 push、未部署。

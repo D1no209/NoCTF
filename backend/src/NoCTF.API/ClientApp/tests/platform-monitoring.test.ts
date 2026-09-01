@@ -22,4 +22,22 @@ describe('platform monitoring', () => {
     expect(page).toContain('setInterval(refreshWhenVisible, 15_000)')
     expect(page).not.toMatch(/responseError[\s\S]{0,200}snapshot\.value\s*=\s*null/)
   })
+
+  test('separates Prometheus, JetStream, transaction messaging, and idle samples', async () => {
+    const page = await Bun.file('app/pages/admin/platform/monitoring.vue').text()
+    const types = await Bun.file('app/api/types.gen.ts').text()
+
+    expect(page).toContain("title: 'NATS JetStream'")
+    expect(page).toContain("title: '事务消息'")
+    expect(page).toContain('METRIC.criticalQueuePendingCount')
+    expect(page).toContain('METRIC.criticalQueueAckPendingCount')
+    expect(page).toContain('METRIC.criticalQueueRedeliveredCount')
+    expect(page).toContain('METRIC.wolverineOutboxCount')
+    expect(page).toContain('METRIC.wolverineInboxCount')
+    expect(page).toContain('snapshot.prometheusAvailable')
+    expect(page).toContain('snapshot.natsAvailable')
+    expect(page).toContain('STATUS.noSamples')
+    expect(types).toContain('prometheusAvailable?: boolean')
+    expect(types).toContain('natsAvailable?: boolean')
+  })
 })
