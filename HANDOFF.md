@@ -3406,3 +3406,18 @@ dotnet run --project backend/src/NoCTF.API/NoCTF.API.csproj --no-build -- --expo
 - 平台版本递增为 `0.1.0-alpha.124`。没有 HTTP/OpenAPI、业务数据模型或 migration 变化；定向
   Scoreboard/i18n 26/26、ClientApp 全量 308/308、typecheck、production generate 与 Release solution
   build 通过。本阶段未 push、未部署。
+
+## 2026-09-02 Alpha.125 恢复 CI 自动部署
+
+- 修复 `ded6ad5` 删除生产部署 Job 后 CI 只发布镜像、服务器长期停留 alpha.113 的问题。重新加入
+  `deploy-production`，严格依赖 `publish-images` 成功，仅在 `main` push 执行，并使用 production
+  environment 与 `noctf-production-deploy` 串行锁，部署进行中不会被后续提交取消。
+- 部署 Job 校验既有 `NOCTF_DEPLOY_*` secrets，固定 known_hosts 与专用 SSH key；使用 `git archive`
+  打包 `GITHUB_SHA` 精确提交，校验 Kompose SHA-256，上传到提交专属临时目录后调用现有
+  `deploy/ci/deploy.sh`。该脚本继续负责磁盘空间门禁、数据库备份、migration、受控构建、健康检查、
+  失败回滚、release 链接切换与旧资源清理。
+- GitHub production 环境及六个部署 secret 名称均已确认存在，环境没有 required reviewer 或等待计时，
+  因此镜像发布成功后会自动进入部署。保留此前要求：CI 不执行 test/verify Job。
+- 平台版本递增为 `0.1.0-alpha.125`。没有 HTTP/OpenAPI、业务数据模型或 migration 变化。Workflow
+  YAML 解析、`bash -n deploy/ci/deploy.sh`、三套 Compose config、DeploymentTopology 15/15、Release
+  solution build 与 `git diff --check` 通过。本阶段未 push、未部署。
