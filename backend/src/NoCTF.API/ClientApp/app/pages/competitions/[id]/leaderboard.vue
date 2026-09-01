@@ -512,24 +512,24 @@ function adjustmentKind(entry: NoCtfapiEndpointsCompetitionsScoreboardAdjustment
       <Card>
         <CardContent class="pt-6">
           <Empty v-if="!teams.length" class="border py-8"><EmptyHeader><EmptyTitle>{{ $t('还没有队伍得分') }}</EmptyTitle></EmptyHeader></Empty>
-          <div v-else class="overflow-x-auto">
-            <Table class="table-fixed">
+          <div v-else class="min-w-0">
+            <Table class="min-w-max table-auto">
               <TableHeader>
                 <TableRow>
-                  <TableHead :rowspan="isCtf ? 1 : 2" class="w-20 min-w-20 whitespace-nowrap">{{ $t('名次') }}</TableHead>
-                  <TableHead :rowspan="isCtf ? 1 : 2" class="sticky left-0 z-20 w-44 min-w-44 max-w-44 border-r bg-card">{{ $t('参赛队伍') }}</TableHead>
-                  <TableHead :rowspan="isCtf ? 1 : 2" class="w-24 text-right">{{ $t('总分') }}</TableHead>
-                  <TableHead v-for="group in columnGroups" :key="group.competitionChallengeId" :colspan="group.columns.length" class="border-l text-center">
-                    <span class="inline-flex items-center gap-1.5"><component :is="directionIcon(group.challenge?.direction)" class="size-4" :class="directionTextClass(group.challenge?.direction)" />{{ group.challenge?.title ?? $t('未知题目') }}</span>
+                  <TableHead :rowspan="isCtf ? 1 : 2" class="sticky left-0 z-30 w-20 min-w-20 max-w-20 bg-card text-center">{{ $t('名次') }}</TableHead>
+                  <TableHead :rowspan="isCtf ? 1 : 2" class="sticky left-20 z-30 w-56 min-w-56 max-w-56 bg-card">{{ $t('参赛队伍') }}</TableHead>
+                  <TableHead :rowspan="isCtf ? 1 : 2" class="sticky left-76 z-30 w-28 min-w-28 max-w-28 border-r bg-card text-right">{{ $t('总分') }}</TableHead>
+                  <TableHead v-for="group in columnGroups" :key="group.competitionChallengeId" :colspan="group.columns.length" class="border-l px-4 text-center">
+                    <span class="inline-flex items-center gap-1.5 whitespace-nowrap"><component :is="directionIcon(group.challenge?.direction)" class="size-4" :class="directionTextClass(group.challenge?.direction)" />{{ group.challenge?.title ?? $t('未知题目') }}</span>
                   </TableHead>
                 </TableRow>
-                <TableRow v-if="!isCtf"><template v-for="group in columnGroups" :key="`${group.competitionChallengeId}-rounds`"><TableHead v-for="column in group.columns" :key="column.index" class="min-w-20 border-l text-center">{{ roundLabel(column) }}</TableHead></template></TableRow>
+                <TableRow v-if="!isCtf"><template v-for="group in columnGroups" :key="`${group.competitionChallengeId}-rounds`"><TableHead v-for="column in group.columns" :key="column.index" class="min-w-28 border-l px-3 text-center">{{ roundLabel(column) }}</TableHead></template></TableRow>
               </TableHeader>
               <TableBody>
                 <TableRow v-for="team in visibleTeams" :key="team.teamId" :class="(displayRank(team) ?? 99) <= 3 ? 'bg-primary/5' : ''">
-                  <TableCell><Medal v-if="(displayRank(team) ?? 99) <= 3" class="size-5" :class="medalRankClass[displayRank(team) ?? 0]" /><span v-else class="font-mono tabular-nums">{{ displayRank(team) ?? '—' }}</span></TableCell>
-                  <TableCell class="sticky left-0 z-10 w-44 min-w-44 max-w-44 border-r bg-card"><div class="flex min-w-0 items-center gap-2"><button type="button" class="min-w-0 flex-1 truncate rounded-sm text-left font-medium underline-offset-4 hover:text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" :title="displayTeamName(team)" :aria-label="$t('查看队伍 {team} 详情', { team: displayTeamName(team) })" @click="openTeamDetail(team)">{{ displayTeamName(team) }}</button><Badge v-if="selectedAllTracks && availableTracks.length > 1" variant="outline" class="max-w-24 shrink-0 truncate" :title="trackName(team.trackKey)">{{ trackName(team.trackKey) }}</Badge><Badge v-if="team.rankingState !== 'Eligible'" variant="destructive" class="shrink-0">{{ scoreboardRankingStateLabel(team.rankingState) }}</Badge></div></TableCell>
-                  <TableCell class="text-right">
+                  <TableCell class="sticky left-0 z-20 w-20 min-w-20 max-w-20 bg-card text-center"><Medal v-if="(displayRank(team) ?? 99) <= 3" class="size-5" :class="medalRankClass[displayRank(team) ?? 0]" /><span v-else class="font-mono tabular-nums">{{ displayRank(team) ?? '—' }}</span></TableCell>
+                  <TableCell class="sticky left-20 z-20 w-56 min-w-56 max-w-56 bg-card"><div class="flex min-w-0 flex-col items-start gap-1"><button type="button" class="w-full whitespace-normal break-words rounded-sm text-left font-medium underline-offset-4 hover:text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" :title="displayTeamName(team)" :aria-label="$t('查看队伍 {team} 详情', { team: displayTeamName(team) })" @click="openTeamDetail(team)">{{ displayTeamName(team) }}</button><div v-if="(selectedAllTracks && availableTracks.length > 1) || team.rankingState !== 'Eligible'" class="flex flex-wrap items-center gap-1"><Badge v-if="selectedAllTracks && availableTracks.length > 1" variant="outline" class="whitespace-normal break-words text-left" :title="trackName(team.trackKey)">{{ trackName(team.trackKey) }}</Badge><Badge v-if="team.rankingState !== 'Eligible'" variant="destructive">{{ scoreboardRankingStateLabel(team.rankingState) }}</Badge></div></div></TableCell>
+                  <TableCell class="sticky left-76 z-20 w-28 min-w-28 max-w-28 border-r bg-card text-right">
                     <button v-if="(team.globalAdjustmentCount ?? 0) > 0" type="button" class="w-full rounded-md px-2 py-1 text-right transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" @click="openAdjustments(team)">
                       <span class="block font-mono font-semibold tabular-nums">{{ team.totalScore ?? 0 }} pts</span>
                       <span class="mt-1 block text-[0.7rem] text-muted-foreground">{{ $t('全局调分 {count} 条', { count: team.globalAdjustmentCount ?? 0 }) }}</span>
@@ -537,7 +537,7 @@ function adjustmentKind(entry: NoCtfapiEndpointsCompetitionsScoreboardAdjustment
                     <span v-else class="font-mono font-semibold tabular-nums">{{ team.totalScore ?? 0 }} pts</span>
                   </TableCell>
                   <template v-for="group in columnGroups" :key="`${team.teamId}-${group.competitionChallengeId}`">
-                    <TableCell v-for="column in group.columns" :key="column.index" class="border-l p-1 text-center">
+                    <TableCell v-for="column in group.columns" :key="column.index" class="border-l p-1 text-center" :class="isCtf ? 'min-w-56' : 'min-w-28'">
                       <button v-if="column.index !== undefined && scoreboardSlot(team, column.index)" type="button" class="flex min-h-12 w-full items-center justify-center rounded-md px-1 py-1 transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" :aria-label="$t('查看 {team} 在 {challenge} {round} 的详情', { team: displayTeamName(team), challenge: group.challenge?.title ?? $t('未知题目'), round: roundLabel(column) })" @click="openDetail(team, column)">
                         <template v-if="isCtf">
                           <span v-if="ctfScore(scoreboardSlot(team, column.index!)) !== null" class="inline-flex items-center justify-center gap-2 whitespace-nowrap">
