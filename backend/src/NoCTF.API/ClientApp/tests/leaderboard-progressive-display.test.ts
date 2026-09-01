@@ -26,12 +26,14 @@ describe('leaderboard progressive display', () => {
     expect(page).not.toContain('@click="page++"')
   })
 
-  test('keeps the participant team column compact while challenge columns use the remaining width', () => {
-    expect(page).toContain('<Table class="table-fixed">')
-    expect(page).toContain('w-20 min-w-20 whitespace-nowrap')
-    expect(page).toContain('w-44 min-w-44 max-w-44 border-r bg-card')
+  test('keeps identity columns frozen while every matrix column remains readable', () => {
+    expect(page).toContain('<Table class="min-w-max table-auto">')
+    expect(page).toContain('sticky left-0 z-30 w-20 min-w-20 max-w-20')
+    expect(page).toContain('sticky left-20 z-30 w-56 min-w-56 max-w-56')
+    expect(page).toContain('sticky left-76 z-30 w-28 min-w-28 max-w-28')
     expect(page).toContain(':title="displayTeamName(team)"')
-    expect(page).toContain('min-w-0 flex-1 truncate')
+    expect(page).toContain('w-full whitespace-normal break-words')
+    expect(page).not.toContain('min-w-0 flex-1 truncate')
   })
 
   test('keeps AWDP scores in authoritative detail while matrix cells show status icons', async () => {

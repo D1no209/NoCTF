@@ -102,6 +102,20 @@ describe('normalized scoreboard matrix', () => {
     expect(leaderboardPage).toContain("$t('返回最新轮次')")
   })
 
+  test('pins ranking, team and total score while preserving readable matrix widths', () => {
+    expect(leaderboardPage).toContain('class="min-w-max table-auto"')
+    expect(leaderboardPage).not.toContain('class="table-fixed"')
+    expect(leaderboardPage).toContain('sticky left-0 z-30 w-20 min-w-20 max-w-20')
+    expect(leaderboardPage).toContain('sticky left-20 z-30 w-56 min-w-56 max-w-56')
+    expect(leaderboardPage).toContain('sticky left-76 z-30 w-28 min-w-28 max-w-28')
+    expect(leaderboardPage).toContain('sticky left-0 z-20 w-20 min-w-20 max-w-20')
+    expect(leaderboardPage).toContain('sticky left-20 z-20 w-56 min-w-56 max-w-56')
+    expect(leaderboardPage).toContain('sticky left-76 z-20 w-28 min-w-28 max-w-28')
+    expect(leaderboardPage).toContain("isCtf ? 'min-w-56' : 'min-w-28'")
+    expect(leaderboardPage).toContain('w-full whitespace-normal break-words')
+    expect(leaderboardPage).toContain('whitespace-nowrap')
+  })
+
   test('keeps schema columns when challenge metadata is unpublished or temporarily missing', () => {
     const publishedChallengeId = crypto.randomUUID()
     const missingChallengeId = crypto.randomUUID()

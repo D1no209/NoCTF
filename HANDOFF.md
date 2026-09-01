@@ -3394,3 +3394,15 @@ dotnet run --project backend/src/NoCTF.API/NoCTF.API.csproj --no-build -- --expo
   project build、EF pending-model 与 `git diff --check` 通过。本机 Docker daemon 未运行；新增真实
   PostgreSQL 收敛 4 项、JetStream Ack 续租 1 项及既有 DefenseTarget 3 项按门禁明确跳过，均已完成
   Release 编译，未将其误报为执行通过。本阶段未 push、未部署。
+
+## 2026-09-01 Alpha.124 排行榜冻结列与可读列宽
+
+- 排行榜矩阵左侧“名次 / 参赛队伍 / 总分”改为连续三列横向 sticky：名次 `left-0`、队伍
+  `left-20`、总分 `left-76`，表头和数据行使用一致宽度与独立层级，横向浏览 AWD/AWDP 多轮矩阵时
+  三列始终可见。
+- 移除 `table-fixed`，改用 `table-auto + min-w-max`。AWD/AWDP 轮次列最小 7rem，CTF 题目分数列
+  最小 14rem；题目标题保持完整单行。队名、赛道和资格状态在 14rem 冻结列内允许换行，不再截断
+  隐藏内容。
+- 平台版本递增为 `0.1.0-alpha.124`。没有 HTTP/OpenAPI、业务数据模型或 migration 变化；定向
+  Scoreboard/i18n 26/26、ClientApp 全量 308/308、typecheck、production generate 与 Release solution
+  build 通过。本阶段未 push、未部署。
