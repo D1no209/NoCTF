@@ -10,6 +10,7 @@ using NoCTF.Infrastructure.Runtime.Instances;
 using NoCTF.Application.Competitions.Events;
 using NoCTF.Domain.Competitions.Events;
 using NoCTF.Domain.Shared;
+using NoCTF.Infrastructure.GameplayFacts.Awdp;
 
 namespace NoCTF.Infrastructure.Runtime.Administration;
 
@@ -195,6 +196,14 @@ public sealed class AdminRuntimeStore(
                 "Force termination requires an owning Runner assignment.");
         instance.State = RuntimeState.Stopping;
         instance.FailureCode = null;
+        await AwdpFixFailureConvergence.ConvergeAwdpFixFailureAsync(
+            instance,
+            db,
+            outbox,
+            events,
+            now,
+            AwdpFixRuntimeCleanupMode.CallerManaged,
+            ct);
         await outbox.PublishToRunnerNodeAsync(new ForceTerminateRuntime(
             instance.Id,
             instance.RuntimeProvider,
@@ -255,7 +264,20 @@ public sealed class AdminRuntimeStore(
         if (instance is null)
             return new(null, RuntimeMutationFailure.NotFound);
         if (instance.State == RuntimeState.Stopping)
+        {
+            await AwdpFixFailureConvergence.ConvergeAwdpFixFailureAsync(
+                instance,
+                db,
+                outbox,
+                events,
+                now,
+                AwdpFixRuntimeCleanupMode.EnsureStop,
+                ct);
+            await db.SaveChangesAsync(ct);
+            await transaction.CommitAsync(ct);
+            await outbox.FlushOutgoingMessagesAsync();
             return new(Map(instance));
+        }
         if (instance.State == RuntimeState.Stopped ||
             instance is { State: RuntimeState.Failed, ProviderReceiptJson: null })
         {
@@ -273,6 +295,15 @@ public sealed class AdminRuntimeStore(
             instance.FailureCode = null;
             await outbox.PublishAsync(new StopRuntime(instance.Id));
         }
+
+        await AwdpFixFailureConvergence.ConvergeAwdpFixFailureAsync(
+            instance,
+            db,
+            outbox,
+            events,
+            now,
+            AwdpFixRuntimeCleanupMode.CallerManaged,
+            ct);
 
         await events.RecordAsync(new(
                 instance.CompetitionId,

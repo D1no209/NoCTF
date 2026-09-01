@@ -37,7 +37,9 @@ withDefaults(defineProps<{
           :disabled="disabled"
           @update:model-value="model.patchCommand = $event"
         />
-        <FieldDescription>{{ $t('在重建的环境中应用补丁时执行的命令。') }}</FieldDescription>
+        <FieldDescription>
+          {{ $t('留空时执行入口文件；自定义命令必须将 {entrypoint} 作为恰好一个独立参数。') }}
+        </FieldDescription>
       </Field>
       <div class="grid gap-4 sm:grid-cols-2">
         <Field>
@@ -45,6 +47,7 @@ withDefaults(defineProps<{
           <NullableNumberInput
             :model-value="model.patchTimeoutSeconds"
             :min="1"
+            :max="300"
             :disabled="disabled"
             @update:model-value="model.patchTimeoutSeconds = $event"
           />
@@ -54,6 +57,7 @@ withDefaults(defineProps<{
           <NullableNumberInput
             :model-value="model.readyTimeoutSeconds"
             :min="1"
+            :max="model.checkerJob?.timeoutSeconds ?? undefined"
             :disabled="disabled"
             @update:model-value="model.readyTimeoutSeconds = $event"
           />

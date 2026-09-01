@@ -120,7 +120,10 @@ public sealed class AwdpDefenseTargetPersistenceTests
             await Assert.That(run[0].GameplayFactId).IsEqualTo(fact.Id);
             await Assert.That(run[0].PatchUploadId).IsEqualTo(patch.Id);
             await Assert.That(run[0].RuntimeInstanceId).IsEqualTo(runtimeId);
-            await Assert.That(run[0].Deadline).IsEqualTo(runtime.ExpiresAt);
+            await Assert.That(run[0].Deadline).IsEqualTo(
+                patch.UploadedAt.Add(AwdpFixExecutionBudget.Calculate(
+                    AwdpFixExecutionBudget.DefaultPatchTimeoutSeconds,
+                    60)));
             await Assert.That(outbox.Messages.OfType<ExpireAwdpFixVerification>())
                 .Count().IsEqualTo(1);
         });

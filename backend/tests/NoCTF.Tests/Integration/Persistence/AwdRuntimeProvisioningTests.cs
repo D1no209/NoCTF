@@ -245,6 +245,7 @@ public sealed class AwdRuntimeProvisioningTests
                     failedOld.RunnerId!,
                     RuntimeFailureCode.CleanupFailed),
                 db,
+                acknowledgementOutbox,
                 cancellationToken);
 
             await Assert.That(acknowledgementOutbox.Published.OfType<DispatchRuntime>()).IsEmpty();

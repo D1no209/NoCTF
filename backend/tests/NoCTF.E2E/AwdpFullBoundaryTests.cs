@@ -16,7 +16,7 @@ public sealed class AwdpFullBoundaryTests
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
 
     [Test]
-    [Timeout(420_000)]
+    [Timeout(600_000)]
     public async Task Awdp_v4_keeps_attack_runtime_fix_verification_and_round_scoring_independent(
         CancellationToken cancellationToken)
     {
@@ -433,12 +433,23 @@ public sealed class AwdpFullBoundaryTests
             greenClient,
             competitionId,
             competitionChallengeId,
-            CreatePatchArchive("#!/bin/sh\nsleep 30\n"),
+            CreatePatchArchive("#!/bin/sh\nsleep 65\nexit 9\n"),
+            "long-running-nonzero.tar.gz",
+            "FixAttempt",
+            "Rejected",
+            "AwdpPatchFailed",
+            TimeSpan.FromSeconds(120),
+            cancellationToken);
+        await SubmitFixAndAssertAsync(
+            greenClient,
+            competitionId,
+            competitionChallengeId,
+            CreatePatchArchive("#!/bin/sh\nsleep 90\n"),
             "timeout.tar.gz",
             "FixAttempt",
             "Rejected",
             "AwdpPatchTimeout",
-            TimeSpan.FromSeconds(90),
+            TimeSpan.FromSeconds(120),
             cancellationToken);
         await SubmitFixAndAssertAsync(
             greenClient,
@@ -727,7 +738,7 @@ public sealed class AwdpFullBoundaryTests
             },
             patchEntrypoint = "fix.sh",
             patchCommand = new[] { "/bin/sh", "{entrypoint}" },
-            patchTimeoutSeconds = 10,
+            patchTimeoutSeconds = 75,
             checker = new
             {
                 image = checkerImage,

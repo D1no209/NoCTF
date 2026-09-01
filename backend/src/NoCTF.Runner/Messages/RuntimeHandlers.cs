@@ -3,6 +3,8 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using NoCTF.Domain.Runtime;
 using NoCTF.Infrastructure.Persistence;
+using NoCTF.Infrastructure.GameplayFacts.Awdp;
+using NoCTF.Infrastructure.Messaging;
 using NoCTF.Runner.Composition;
 using NoCTF.Application.Runtime.Instances;
 using NoCTF.Application.Runtime.Provisioning;
@@ -691,6 +693,14 @@ internal static class RuntimeWriteBackOperations
                 instance, message, events, timeProvider.GetUtcNow(), cancellationToken);
             await InvalidateAwdpAttackFlagAsync(db, instance, timeProvider.GetUtcNow(), cancellationToken);
             await PublishRuntimeStopAsync(outbox, instance, message.RunnerId);
+            await AwdpFixFailureConvergence.ConvergeAwdpFixFailureAsync(
+                instance,
+                db,
+                outbox,
+                events,
+                timeProvider.GetUtcNow(),
+                AwdpFixRuntimeCleanupMode.CallerManaged,
+                cancellationToken);
             await db.SaveChangesAsync(cancellationToken);
             await outbox.FlushOutgoingMessagesAsync();
             return;
@@ -706,6 +716,14 @@ internal static class RuntimeWriteBackOperations
             instance.State = RuntimeState.Stopping;
             await InvalidateAwdpAttackFlagAsync(db, instance, timeProvider.GetUtcNow(), cancellationToken);
             await PublishRuntimeStopAsync(outbox, instance, message.RunnerId);
+            await AwdpFixFailureConvergence.ConvergeAwdpFixFailureAsync(
+                instance,
+                db,
+                outbox,
+                events,
+                timeProvider.GetUtcNow(),
+                AwdpFixRuntimeCleanupMode.CallerManaged,
+                cancellationToken);
             await RecordRuntimeStateAsync(
                 events,
                 instance,
@@ -819,6 +837,14 @@ internal static class RuntimeWriteBackOperations
         instance.State = RuntimeState.Stopped;
         instance.StoppedAt = timeProvider.GetUtcNow();
         await InvalidateAwdpAttackFlagAsync(db, instance, instance.StoppedAt.Value, cancellationToken);
+        await AwdpFixFailureConvergence.ConvergeAwdpFixFailureAsync(
+            instance,
+            db,
+            outbox,
+            events,
+            instance.StoppedAt.Value,
+            AwdpFixRuntimeCleanupMode.CallerManaged,
+            cancellationToken);
         await RecordRuntimeStateAsync(
             events,
             instance,
@@ -840,24 +866,17 @@ internal static class RuntimeWriteBackOperations
     {
         instance.State = RuntimeState.Failed;
         instance.FailureCode = failureCode;
-        await InvalidateAwdpAttackFlagAsync(db, instance, timeProvider.GetUtcNow(), cancellationToken);
-        if (instance.Purpose == RuntimePurpose.AwdpTarget
-            && instance.GameplayFactId is Guid gameplayFactId)
-        {
-            var submission = await db.GameplayFacts.SingleOrDefaultAsync(
-                item => item.Id == gameplayFactId,
-                cancellationToken);
-            if (submission is not null
-                && submission.State is (GameplayFactState.Pending
-                    or GameplayFactState.Processing))
-            {
-                submission.State = GameplayFactState.PlatformFailed;
-                submission.FailureCode = GameplayFactFailureCode.CheckerPlatformError;
-                submission.UpdatedAt = timeProvider.GetUtcNow();
-                if (outbox is not null)
-                    await outbox.PublishAsync(new GameplayFactStateChanged(submission.Id, submission.State));
-            }
-        }
+        var failedAt = timeProvider.GetUtcNow();
+        await InvalidateAwdpAttackFlagAsync(db, instance, failedAt, cancellationToken);
+        var effectiveOutbox = outbox ?? new NoOpTransactionalMessageOutbox();
+        await AwdpFixFailureConvergence.ConvergeAwdpFixFailureAsync(
+            instance,
+            db,
+            effectiveOutbox,
+            events,
+            failedAt,
+            AwdpFixRuntimeCleanupMode.CallerManaged,
+            cancellationToken);
         await RecordRuntimeStateAsync(
             events,
             instance,
@@ -888,6 +907,14 @@ internal static class RuntimeWriteBackOperations
         instance.State = RuntimeState.Stopped;
         instance.StoppedAt = timeProvider.GetUtcNow();
         await InvalidateAwdpAttackFlagAsync(db, instance, instance.StoppedAt.Value, cancellationToken);
+        await AwdpFixFailureConvergence.ConvergeAwdpFixFailureAsync(
+            instance,
+            db,
+            outbox,
+            events,
+            instance.StoppedAt.Value,
+            AwdpFixRuntimeCleanupMode.CallerManaged,
+            cancellationToken);
         await RecordRuntimeStateAsync(
             events,
             instance,
@@ -917,6 +944,14 @@ internal static class RuntimeWriteBackOperations
         instance.State = RuntimeState.Stopped;
         instance.StoppedAt = message.CompletedAt;
         await InvalidateAwdpAttackFlagAsync(db, instance, instance.StoppedAt.Value, cancellationToken);
+        await AwdpFixFailureConvergence.ConvergeAwdpFixFailureAsync(
+            instance,
+            db,
+            outbox,
+            events,
+            message.CompletedAt,
+            AwdpFixRuntimeCleanupMode.CallerManaged,
+            cancellationToken);
         await events.RecordAsync(new(
             instance.CompetitionId,
             CompetitionEventKind.RuntimeForceTerminationCompleted,
@@ -937,10 +972,11 @@ internal static class RuntimeWriteBackOperations
     public static async Task ForceTerminationFailedAsync(
         RuntimeForceTerminationFailed message,
         NoCtfDbContext db,
+        ITransactionalMessageOutbox outbox,
         ICompetitionEventRecorder events,
         CancellationToken cancellationToken)
     {
-        var instance = await db.RuntimeInstances.AsNoTracking()
+        var instance = await db.RuntimeInstances
             .SingleOrDefaultAsync(
                 candidate => candidate.Id == message.RuntimeInstanceId,
                 cancellationToken);
@@ -948,6 +984,15 @@ internal static class RuntimeWriteBackOperations
             || instance.State != RuntimeState.Stopping
             || !string.Equals(instance.RunnerId, message.RunnerId, StringComparison.Ordinal))
             return;
+
+        await AwdpFixFailureConvergence.ConvergeAwdpFixFailureAsync(
+            instance,
+            db,
+            outbox,
+            events,
+            message.CompletedAt,
+            AwdpFixRuntimeCleanupMode.EnsureStop,
+            cancellationToken);
 
         await events.RecordAsync(new(
             instance.CompetitionId,
@@ -963,11 +1008,13 @@ internal static class RuntimeWriteBackOperations
             RuntimeCleanupResult: message.CleanupResult,
             Reason: message.Reason), cancellationToken);
         await db.SaveChangesAsync(cancellationToken);
+        await outbox.FlushOutgoingMessagesAsync();
     }
 
     public static async Task StopFailedAsync(
         RuntimeStopFailed message,
         NoCtfDbContext db,
+        ITransactionalMessageOutbox outbox,
         ICompetitionEventRecorder events,
         TimeProvider timeProvider,
         CancellationToken cancellationToken)
@@ -982,7 +1029,16 @@ internal static class RuntimeWriteBackOperations
 
         instance.State = RuntimeState.Failed;
         instance.FailureCode = message.FailureCode;
-        await InvalidateAwdpAttackFlagAsync(db, instance, timeProvider.GetUtcNow(), cancellationToken);
+        var failedAt = timeProvider.GetUtcNow();
+        await InvalidateAwdpAttackFlagAsync(db, instance, failedAt, cancellationToken);
+        await AwdpFixFailureConvergence.ConvergeAwdpFixFailureAsync(
+            instance,
+            db,
+            outbox,
+            events,
+            failedAt,
+            AwdpFixRuntimeCleanupMode.CallerManaged,
+            cancellationToken);
         await RecordRuntimeStateAsync(
             events,
             instance,
@@ -990,6 +1046,7 @@ internal static class RuntimeWriteBackOperations
             timeProvider.GetUtcNow(),
             cancellationToken);
         await db.SaveChangesAsync(cancellationToken);
+        await outbox.FlushOutgoingMessagesAsync();
     }
 
     public static async Task ProvisionCanceledAsync(
@@ -1012,6 +1069,14 @@ internal static class RuntimeWriteBackOperations
         instance.State = RuntimeState.Stopped;
         instance.StoppedAt = timeProvider.GetUtcNow();
         await InvalidateAwdpAttackFlagAsync(db, instance, instance.StoppedAt.Value, cancellationToken);
+        await AwdpFixFailureConvergence.ConvergeAwdpFixFailureAsync(
+            instance,
+            db,
+            outbox,
+            events,
+            instance.StoppedAt.Value,
+            AwdpFixRuntimeCleanupMode.CallerManaged,
+            cancellationToken);
         await RecordRuntimeStateAsync(
             events,
             instance,

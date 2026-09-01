@@ -22,4 +22,14 @@ public sealed class AwdpPatchCommandTests
 
         await Assert.That(command).IsEquivalentTo(["/bin/sh", "/noctf/fix/fix.sh"]);
     }
+
+    [Test]
+    public async Task Custom_command_without_one_standalone_entrypoint_is_rejected()
+    {
+        Func<IReadOnlyList<string>> action = () => AwdpPatchCommand.Create(
+            ["/bin/sh", "{entrypoint"],
+            "fix.sh");
+
+        await Assert.That(action).Throws<InvalidOperationException>();
+    }
 }

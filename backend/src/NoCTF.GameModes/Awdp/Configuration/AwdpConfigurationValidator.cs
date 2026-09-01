@@ -1,6 +1,8 @@
 namespace NoCTF.GameModes.Awdp.Configuration;
 
 using NoCTF.Application.Scoring;
+using NoCTF.Application.GameplayFacts.Awdp;
+using NoCTF.Application.Runtime.Configuration;
 using NoCTF.GameModes.Flags;
 using NoCTF.GameModes.Scoring;
 
@@ -61,10 +63,13 @@ public static class AwdpConfigurationValidator
             errors.Add("FlagTemplate is invalid.");
         if (configuration.PatchEntrypoint is { } patchEntrypoint)
             ValidatePatchEntrypoint(patchEntrypoint, errors);
-        if (configuration.PatchTimeoutSeconds is <= 0)
-            errors.Add("PatchTimeoutSeconds must be positive when configured.");
-        if (configuration.ReadyTimeoutSeconds is <= 0)
-            errors.Add("ReadyTimeoutSeconds must be positive when configured.");
+        ValidateExecutionSettings(
+            configuration.PatchCommand,
+            configuration.PatchTimeoutSeconds,
+            configuration.Checker,
+            configuration.ReadyTimeoutSeconds,
+            configuredValuesAreOptional: true,
+            errors);
         if (configuration.MaximumPatchUploadBytes is <= 0
             or > NoCTF.Application.GameplayFacts.PatchUploads.PatchUploadRules.HardMaximumArchiveBytes)
         {
@@ -100,10 +105,13 @@ public static class AwdpConfigurationValidator
         if (!PerTeamFlagGenerator.IsValidTemplate(configuration.FlagTemplate))
             errors.Add("FlagTemplate is invalid.");
         ValidatePatchEntrypoint(configuration.PatchEntrypoint, errors);
-        if (configuration.PatchTimeoutSeconds <= 0)
-            errors.Add("PatchTimeoutSeconds must be positive.");
-        if (configuration.ReadyTimeoutSeconds <= 0)
-            errors.Add("ReadyTimeoutSeconds must be positive.");
+        ValidateExecutionSettings(
+            configuration.PatchCommand,
+            configuration.PatchTimeoutSeconds,
+            configuration.Checker,
+            configuration.ReadyTimeoutSeconds,
+            configuredValuesAreOptional: false,
+            errors);
         if (configuration.MaximumPatchUploadBytes is <= 0
             or > NoCTF.Application.GameplayFacts.PatchUploads.PatchUploadRules.HardMaximumArchiveBytes)
         {
@@ -120,6 +128,87 @@ public static class AwdpConfigurationValidator
         return errors;
     }
 
+    private static void ValidateExecutionSettings(
+        IReadOnlyList<string>? patchCommand,
+        int? patchTimeoutSeconds,
+        RunnerJobConfiguration? checker,
+        int? readyTimeoutSeconds,
+        bool configuredValuesAreOptional,
+        List<string> errors)
+    {
+        ValidatePatchCommand(patchCommand, errors);
+
+        var patchIsValid = patchTimeoutSeconds is null && configuredValuesAreOptional
+            || patchTimeoutSeconds is >= 1 and <= AwdpFixExecutionBudget.MaximumPatchTimeoutSeconds;
+        if (!patchIsValid)
+        {
+            errors.Add(configuredValuesAreOptional
+                ? $"PatchTimeoutSeconds must be between 1 and {AwdpFixExecutionBudget.MaximumPatchTimeoutSeconds} when configured."
+                : $"PatchTimeoutSeconds must be between 1 and {AwdpFixExecutionBudget.MaximumPatchTimeoutSeconds}.");
+        }
+
+        var readyIsValid = readyTimeoutSeconds is null && configuredValuesAreOptional
+            || readyTimeoutSeconds is > 0;
+        if (!readyIsValid)
+        {
+            errors.Add(configuredValuesAreOptional
+                ? "ReadyTimeoutSeconds must be positive when configured."
+                : "ReadyTimeoutSeconds must be positive.");
+        }
+
+        if (checker is null)
+            return;
+
+        var effectivePatchTimeout = patchTimeoutSeconds
+            ?? AwdpFixExecutionBudget.DefaultPatchTimeoutSeconds;
+        var effectiveReadyTimeout = readyTimeoutSeconds
+            ?? AwdpFixExecutionBudget.DefaultReadyTimeoutSeconds;
+        if (checker.TimeoutSeconds > 0
+            && effectiveReadyTimeout > checker.TimeoutSeconds)
+        {
+            errors.Add("ReadyTimeoutSeconds cannot exceed Checker.TimeoutSeconds.");
+        }
+
+        if (patchIsValid
+            && checker.TimeoutSeconds >= 1
+            && !AwdpFixExecutionBudget.FitsHandlerTimeout(
+                effectivePatchTimeout,
+                checker.TimeoutSeconds))
+        {
+            errors.Add(
+                "AWDP Fix execution budget must remain below the dedicated handler timeout.");
+        }
+    }
+
+    private static void ValidatePatchCommand(
+        IReadOnlyList<string>? patchCommand,
+        List<string> errors)
+    {
+        if (patchCommand is not { Count: > 0 })
+            return;
+        if (patchCommand.Count > AwdpPatchCommandRules.MaximumArguments)
+        {
+            errors.Add(
+                $"PatchCommand cannot contain more than {AwdpPatchCommandRules.MaximumArguments} arguments.");
+        }
+        if (patchCommand.Any(string.IsNullOrWhiteSpace))
+            errors.Add("PatchCommand cannot contain blank arguments.");
+        if (patchCommand.Any(argument =>
+                argument.Length > AwdpPatchCommandRules.MaximumArgumentLength))
+        {
+            errors.Add(
+                $"PatchCommand arguments cannot exceed {AwdpPatchCommandRules.MaximumArgumentLength} characters.");
+        }
+        if (patchCommand.Count(argument => string.Equals(
+                argument,
+                AwdpPatchCommandRules.EntrypointPlaceholder,
+                StringComparison.Ordinal)) != 1)
+        {
+            errors.Add(
+                "PatchCommand must contain exactly one standalone {entrypoint} argument.");
+        }
+    }
+
     public static IReadOnlyList<string> ValidateForStart(
         AwdpEffectiveConfiguration configuration)
     {
@@ -130,6 +219,13 @@ public static class AwdpConfigurationValidator
             errors.Add("Checker is required before an AWDP competition can start.");
         ValidateRuntime(configuration.Runtime, true, errors);
         ValidateChecker(configuration.Checker, errors);
+        ValidateExecutionSettings(
+            configuration.PatchCommand,
+            configuration.PatchTimeoutSeconds,
+            configuration.Checker,
+            configuration.ReadyTimeoutSeconds,
+            configuredValuesAreOptional: false,
+            errors);
         return errors;
     }
 

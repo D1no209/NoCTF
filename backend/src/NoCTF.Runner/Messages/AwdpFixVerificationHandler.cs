@@ -8,6 +8,7 @@ using NoCTF.Application.Messaging;
 using NoCTF.Application.Runtime.Provisioning;
 using NoCTF.Application.Runtime.Capacity;
 using NoCTF.Application.GameplayFacts.Processing;
+using NoCTF.Application.GameplayFacts.Awdp;
 using NoCTF.Domain.Runtime;
 using NoCTF.Domain.Gameplay;
 using NoCTF.GameModes.Awdp.Configuration;
@@ -90,10 +91,24 @@ public static class AwdpPatchCommand
         string patchEntrypoint)
     {
         var entrypoint = $"/noctf/fix/{patchEntrypoint}";
-        return command is not { Count: > 0 }
-            ? ["/bin/sh", entrypoint]
-            : [.. command.Select(argument =>
-                string.Equals(argument, "{entrypoint}", StringComparison.Ordinal)
+        if (command is not { Count: > 0 })
+            return ["/bin/sh", entrypoint];
+        if (command.Count > AwdpPatchCommandRules.MaximumArguments
+            || command.Any(string.IsNullOrWhiteSpace)
+            || command.Any(argument =>
+                argument.Length > AwdpPatchCommandRules.MaximumArgumentLength)
+            || command.Count(argument => string.Equals(
+                argument,
+                AwdpPatchCommandRules.EntrypointPlaceholder,
+                StringComparison.Ordinal)) != 1)
+        {
+            throw new InvalidOperationException("AWDP PatchCommand is invalid.");
+        }
+        return [.. command.Select(argument =>
+                string.Equals(
+                    argument,
+                    AwdpPatchCommandRules.EntrypointPlaceholder,
+                    StringComparison.Ordinal)
                     ? entrypoint
                     : argument)];
     }
@@ -345,6 +360,7 @@ public sealed class AwdpFixVerificationHandler(
     IRunnerCapacityGate capacity,
     ITransactionalMessageOutbox outbox,
     IOptions<RunnerOptions> runnerOptions,
+    IHostApplicationLifetime applicationLifetime,
     TimeProvider timeProvider,
     ILogger<AwdpFixVerificationHandler> logger)
 {
@@ -356,6 +372,64 @@ public sealed class AwdpFixVerificationHandler(
             message,
             runnerOptions.Value.Pool,
             runnerOptions.Value.Id);
+        AwdpFixOutcome? outcome;
+        try
+        {
+            var remaining = message.Deadline - timeProvider.GetUtcNow();
+            if (remaining <= TimeSpan.Zero)
+                outcome = AwdpFixOutcome.PlatformFailed;
+            else
+            {
+                using var deadline = CancellationTokenSource.CreateLinkedTokenSource(
+                    cancellationToken);
+                deadline.CancelAfter(remaining);
+                outcome = await ExecuteAsync(message, deadline.Token);
+            }
+        }
+        catch (OperationCanceledException) when (
+            applicationLifetime.ApplicationStopping.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (OperationCanceledException exception)
+        {
+            logger.LogError(
+                exception,
+                "AWDP Fix execution was canceled outside host shutdown. "
+                + "GameplayFactId={GameplayFactId} RuntimeInstanceId={RuntimeInstanceId}",
+                message.GameplayFactId,
+                message.RuntimeInstanceId);
+            outcome = AwdpFixOutcome.PlatformFailed;
+        }
+        catch (InvalidDataException exception)
+        {
+            logger.LogWarning(
+                exception,
+                "AWDP Fix archive or entrypoint is invalid. "
+                + "GameplayFactId={GameplayFactId} RuntimeInstanceId={RuntimeInstanceId}",
+                message.GameplayFactId,
+                message.RuntimeInstanceId);
+            outcome = AwdpFixOutcome.PatchFailed;
+        }
+        catch (Exception exception)
+        {
+            logger.LogError(
+                exception,
+                "AWDP Fix execution failed unexpectedly. "
+                + "GameplayFactId={GameplayFactId} RuntimeInstanceId={RuntimeInstanceId}",
+                message.GameplayFactId,
+                message.RuntimeInstanceId);
+            outcome = AwdpFixOutcome.PlatformFailed;
+        }
+
+        if (outcome is AwdpFixOutcome result)
+            await PublishResultWithCompensationAsync(message, result);
+    }
+
+    private async Task<AwdpFixOutcome?> ExecuteAsync(
+        RunAwdpFixVerification message,
+        CancellationToken cancellationToken)
+    {
         var claim = await reader.ClaimAsync(message, cancellationToken);
         if (claim.Disposition == AwdpFixExecutionFenceDisposition.Recover)
         {
@@ -363,12 +437,12 @@ public sealed class AwdpFixVerificationHandler(
                 claim.Recovery
                     ?? throw new InvalidOperationException("AWDP recovery work is unavailable."),
                 cancellationToken);
-            return;
+            return null;
         }
         var work = claim.Work;
         if (claim.Disposition != AwdpFixExecutionFenceDisposition.Execute
             || work is null)
-            return;
+            return null;
 
         AwdpFixOutcome? outcome = AwdpFixOutcome.PlatformFailed;
         var operationDirectory = Path.Combine(
@@ -426,27 +500,28 @@ public sealed class AwdpFixVerificationHandler(
                 }
             }
         }
-        catch (InvalidDataException)
-        {
-            outcome = AwdpFixOutcome.PatchFailed;
-        }
-        catch (FileNotFoundException)
-        {
-            outcome = AwdpFixOutcome.PlatformFailed;
-        }
         finally
         {
             TryDeleteDirectory(operationDirectory);
         }
 
-        if (outcome is not AwdpFixOutcome result)
-            return;
+        return outcome;
+    }
+
+    private async Task PublishResultWithCompensationAsync(
+        RunAwdpFixVerification message,
+        AwdpFixOutcome outcome)
+    {
+        using var compensation = CancellationTokenSource.CreateLinkedTokenSource(
+            applicationLifetime.ApplicationStopping);
+        compensation.CancelAfter(TimeSpan.FromSeconds(
+            AwdpFixExecutionBudget.ResultPublicationBudgetSeconds));
         await outbox.PublishAsync(AwdpFixResult.Create(
             message.GameplayFactId,
             message.RuntimeInstanceId,
-            result,
-            timeProvider.GetUtcNow()));
-        await outbox.FlushOutgoingMessagesAsync();
+            outcome,
+            timeProvider.GetUtcNow())).AsTask().WaitAsync(compensation.Token);
+        await outbox.FlushOutgoingMessagesAsync().WaitAsync(compensation.Token);
     }
 
     private async Task RecoverAsync(

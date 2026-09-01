@@ -3,6 +3,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using NoCTF.Application.Administration.PlatformLogs;
 using NoCTF.Application.Messaging;
+using NoCTF.Application.GameplayFacts.Awdp;
 using NoCTF.Application.Runtime.Instances;
 using NoCTF.Infrastructure.Observability;
 using NoCTF.Infrastructure.Messaging;
@@ -51,6 +52,8 @@ public static class RunnerRole
         if (durable)
             options.ListenToNatsSubject(NatsSubjects.Runner(nodeQueueName.Value))
                 .UseJetStream(NatsSubjects.RunnerStream, nodeQueueName.Value)
+                .MaximumAckExtension(TimeSpan.FromSeconds(
+                    AwdpFixExecutionBudget.JetStreamMaximumAckExtensionSeconds))
                 .UseDurableInbox();
     }
 

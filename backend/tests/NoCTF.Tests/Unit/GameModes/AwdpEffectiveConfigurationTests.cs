@@ -119,6 +119,54 @@ public sealed class AwdpEffectiveConfigurationTests
     }
 
     [Test]
+    public async Task Challenge_validation_rejects_unsafe_Patch_execution_settings()
+    {
+        var challenge = AwdpConfigurationParser.ParseChallenge(
+            new GameModeChallengeConfigurationCatalog().GetDefaultJson(
+                NoCTF.Domain.Competitions.GameMode.Awdp)) with
+        {
+            PatchCommand = ["/bin/sh", "{entrypoint"],
+            PatchTimeoutSeconds = 301,
+            Checker = new RunnerJobConfiguration(
+                "checker:test",
+                TimeoutSeconds: 120),
+            ReadyTimeoutSeconds = 121
+        };
+
+        var errors = AwdpConfigurationValidator.Validate(challenge);
+
+        await Assert.That(errors)
+            .Contains("PatchCommand must contain exactly one standalone {entrypoint} argument.");
+        await Assert.That(errors)
+            .Contains("PatchTimeoutSeconds must be between 1 and 300 when configured.");
+        await Assert.That(errors)
+            .Contains("ReadyTimeoutSeconds cannot exceed Checker.TimeoutSeconds.");
+    }
+
+    [Test]
+    public async Task Challenge_validation_rejects_a_total_budget_beyond_the_handler_timeout()
+    {
+        var challenge = AwdpConfigurationParser.ParseChallenge(
+            new GameModeChallengeConfigurationCatalog().GetDefaultJson(
+                NoCTF.Domain.Competitions.GameMode.Awdp)) with
+        {
+            PatchCommand = ["/bin/sh", "{entrypoint}"],
+            PatchTimeoutSeconds = 300,
+            Checker = new RunnerJobConfiguration(
+                "checker:test",
+                TimeoutSeconds: 2200),
+            ReadyTimeoutSeconds = 30
+        };
+
+        var errors = AwdpConfigurationValidator.Validate(challenge);
+
+        await Assert.That(errors)
+            .Contains("Checker.TimeoutSeconds must be between 1 and 1800.");
+        await Assert.That(errors)
+            .Contains("AWDP Fix execution budget must remain below the dedicated handler timeout.");
+    }
+
+    [Test]
     public async Task Start_gate_rejects_incomplete_published_awdp_challenge()
     {
         var competitionId = Guid.NewGuid();

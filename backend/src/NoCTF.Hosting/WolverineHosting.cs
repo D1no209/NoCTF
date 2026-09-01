@@ -1,5 +1,6 @@
 using Microsoft.Extensions.Configuration;
 using NoCTF.Application.Messaging;
+using NoCTF.Hosting.Messaging;
 using Wolverine;
 using Wolverine.EntityFrameworkCore;
 using Wolverine.Nats;
@@ -24,6 +25,7 @@ public static class WolverineHosting
 
         options.PersistMessagesWithPostgresql(postgres, roles.PersistenceSchema);
         options.UseEntityFrameworkCoreTransactions();
+        options.Policies.Add(new AwdpFixVerificationExecutionTimeoutPolicy());
 
         options.UseNats(nats)
             .AutoProvision()
