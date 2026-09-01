@@ -69,7 +69,7 @@ public sealed class UploadPatchEndpoint(
         {
             summary.Summary = "Upload the only Fix archive accepted by an AWDP defense target.";
             summary.Description =
-                "Atomically binds one archive and one Fix attempt to the clean disposable target, then starts one Checker verification.";
+                "Atomically binds one archive and one Fix attempt to the clean disposable target. Verification starts immediately when the target is running, or automatically after provisioning completes.";
         });
     }
 
@@ -153,7 +153,7 @@ public sealed class UploadPatchEndpoint(
             new UploadPatchResponse(
                 result.Value.PatchUploadId,
                 result.Value.GameplayFactId,
-                GameplayFactStateProtocol.Processing,
+                GameplayFactMapper.ToProtocol(result.Value.State),
                 statusUrl));
     }
 }

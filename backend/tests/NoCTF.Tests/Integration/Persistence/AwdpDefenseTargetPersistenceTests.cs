@@ -26,6 +26,7 @@ using NoCTF.Infrastructure.GameplayFacts.PatchUploads;
 using NoCTF.Infrastructure.Competitions.Events;
 using NoCTF.Infrastructure.Persistence;
 using NoCTF.Infrastructure.Storage;
+using NoCTF.Worker;
 using Testcontainers.PostgreSql;
 
 namespace NoCTF.Tests.Integration.Persistence;
@@ -36,6 +37,94 @@ public sealed class AwdpDefenseTargetPersistenceTests
 {
     private static readonly JsonSerializerOptions JsonOptions =
         new(JsonSerializerDefaults.Web);
+
+    [Test]
+    [Timeout(300_000)]
+    public async Task Patch_uploaded_while_target_is_queued_starts_once_after_provisioning(
+        CancellationToken cancellationToken)
+    {
+        await DockerIntegrationTest.RunAsync(async () =>
+        {
+            await using var postgres = await StartPostgresAsync(cancellationToken);
+            var options = Options(postgres);
+            var fixture = await SeedAsync(options, cancellationToken);
+            var requested = await RequestTargetAsync(options, fixture, cancellationToken);
+            var runtimeId = requested.RuntimeInstanceId!.Value;
+            var fileId = Guid.CreateVersion7();
+            await AddFilesAsync(options, fixture.Now, [fileId], cancellationToken);
+
+            var saved = await SavePatchAsync(
+                options,
+                fixture,
+                runtimeId,
+                fileId,
+                cancellationToken);
+
+            await Assert.That(saved.Result.State).IsEqualTo(PatchUploadSaveState.Accepted);
+            await Assert.That(saved.Result.GameplayFactState).IsEqualTo(GameplayFactState.Pending);
+            await Assert.That(saved.StartMessages).IsEqualTo(1);
+            await Assert.That(saved.RunMessages).IsEqualTo(0);
+
+            await using var db = new NoCtfDbContext(options);
+            var runtime = await db.RuntimeInstances.SingleAsync(
+                item => item.Id == runtimeId,
+                cancellationToken);
+            var factId = saved.Result.GameplayFactId!.Value;
+            var start = new StartAwdpFixVerification(factId, runtimeId);
+            var outbox = new RecordingOutbox();
+            var events = new CompetitionEventStore(db, outbox);
+            await BackendMessageOperations.StartAwdpFixVerificationAsync(
+                start,
+                db,
+                outbox,
+                TimeProvider.System,
+                cancellationToken,
+                events);
+            await Assert.That(outbox.Messages.OfType<StartAwdpFixVerification>())
+                .Count().IsEqualTo(1);
+
+            runtime = await db.RuntimeInstances.SingleAsync(
+                item => item.Id == runtimeId,
+                cancellationToken);
+            runtime.State = RuntimeState.Running;
+            runtime.RunnerId = "runner-1";
+            runtime.ProviderReceiptJson = "{}";
+            runtime.RunningAt = fixture.Now;
+            runtime.ExpiresAt = fixture.Now.AddMinutes(15);
+            await db.SaveChangesAsync(cancellationToken);
+            await BackendMessageOperations.StartAwdpFixVerificationAsync(
+                start,
+                db,
+                outbox,
+                TimeProvider.System,
+                cancellationToken,
+                events);
+            await BackendMessageOperations.StartAwdpFixVerificationAsync(
+                start,
+                db,
+                outbox,
+                TimeProvider.System,
+                cancellationToken,
+                events);
+
+            var fact = await db.GameplayFacts.SingleAsync(
+                item => item.Id == saved.Result.GameplayFactId,
+                cancellationToken);
+            var patch = await db.PatchUploads.SingleAsync(
+                item => item.RuntimeInstanceId == runtimeId,
+                cancellationToken);
+            await Assert.That(fact.State).IsEqualTo(GameplayFactState.Processing);
+            await Assert.That(fact.UpdatedAt).IsGreaterThan(fact.OccurredAt);
+            var run = outbox.Messages.OfType<RunAwdpFixVerification>().ToArray();
+            await Assert.That(run).Count().IsEqualTo(1);
+            await Assert.That(run[0].GameplayFactId).IsEqualTo(fact.Id);
+            await Assert.That(run[0].PatchUploadId).IsEqualTo(patch.Id);
+            await Assert.That(run[0].RuntimeInstanceId).IsEqualTo(runtimeId);
+            await Assert.That(run[0].Deadline).IsEqualTo(runtime.ExpiresAt);
+            await Assert.That(outbox.Messages.OfType<ExpireAwdpFixVerification>())
+                .Count().IsEqualTo(1);
+        });
+    }
 
     [Test]
     [Timeout(300_000)]
@@ -99,10 +188,15 @@ public sealed class AwdpDefenseTargetPersistenceTests
             await Assert.That(saves.Count(result =>
                     result.Result.State == PatchUploadSaveState.Accepted))
                 .IsEqualTo(1);
+            await Assert.That(saves.Single(result =>
+                    result.Result.State == PatchUploadSaveState.Accepted)
+                    .Result.GameplayFactState)
+                .IsEqualTo(GameplayFactState.Pending);
             await Assert.That(saves.Count(result =>
                     result.Result.State == PatchUploadSaveState.DefenseTargetConsumed))
                 .IsEqualTo(1);
-            await Assert.That(saves.Sum(result => result.RunMessages)).IsEqualTo(1);
+            await Assert.That(saves.Sum(result => result.StartMessages)).IsEqualTo(1);
+            await Assert.That(saves.Sum(result => result.RunMessages)).IsEqualTo(0);
 
             await using var verification = new NoCtfDbContext(options);
             await Assert.That(await verification.PatchUploads.CountAsync(
@@ -256,7 +350,10 @@ public sealed class AwdpDefenseTargetPersistenceTests
             cancellationToken);
     }
 
-    private static async Task<(PatchUploadSaveResult Result, int RunMessages)> SavePatchAsync(
+    private static async Task<(
+        PatchUploadSaveResult Result,
+        int StartMessages,
+        int RunMessages)> SavePatchAsync(
         DbContextOptions<NoCtfDbContext> options,
         Fixture fixture,
         Guid runtimeId,
@@ -286,7 +383,10 @@ public sealed class AwdpDefenseTargetPersistenceTests
             fileId,
             fixture.Now.AddSeconds(1),
             cancellationToken);
-        return (result, outbox.Messages.OfType<RunAwdpFixVerification>().Count());
+        return (
+            result,
+            outbox.Messages.OfType<StartAwdpFixVerification>().Count(),
+            outbox.Messages.OfType<RunAwdpFixVerification>().Count());
     }
 
     private static async Task AddFilesAsync(

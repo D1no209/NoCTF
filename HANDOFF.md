@@ -3324,3 +3324,19 @@ dotnet run --project backend/src/NoCTF.API/NoCTF.API.csproj --no-build -- --expo
   Fix kind 过滤。
 - 平台版本递增为 `0.1.0-alpha.119`。没有 HTTP/OpenAPI、业务数据模型或 migration 变化。本阶段
   未 push、未部署。
+
+## 2026-09-01 Alpha.120 AWDP 提前上传 Fix
+
+- AWDP 一次性防御目标处于 Queued、Provisioning 或 Running 时均可接收唯一 Patch。上传事务立即保存
+  File/PatchUpload 与 `FixAttempt(Pending)`，返回权威 Pending 状态，不再以 Runtime 必须已经 Running
+  作为受理前提。
+- 新增 durable `StartAwdpFixVerification` Gameplay 消息：对未就绪 Runtime 每秒重新检查；Running 后
+  在 Runtime 行锁内将同一事实切换为 Processing，再向绑定 Runner 投递一次验证和到期消息。事实状态
+  是幂等栅栏，重复启动消息不会重复执行 Checker；目标已失败/停止则将 Pending Fix 收敛为
+  PlatformFailed。Runtime 配置/Provision 失败与比赛清理也覆盖 Pending 状态。
+- 前端申请防御后在 Queued/Provisioning 阶段立即显示上传表单；上传后提示“环境就绪后自动验证”，
+  Running 后沿用正常验证状态。Endpoint OpenAPI 描述及生成 SDK 已同步，响应结构没有变化。
+- 平台版本递增为 `0.1.0-alpha.120`。没有业务数据模型或 migration 变化。非 Integration TUnit
+  946/946、ClientApp 305/305、typecheck、production generate 与 Release solution build 通过；EF 无
+  pending model changes。真实 PostgreSQL 新回归已编译，但本机 Docker 引擎未运行，因此 3 项
+  `AwdpDefenseTarget` Integration 按既有环境门禁跳过。本阶段未 push、未部署。

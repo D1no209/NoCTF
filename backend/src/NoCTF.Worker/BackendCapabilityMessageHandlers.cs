@@ -68,6 +68,17 @@ public sealed class AwdpMessageHandler(
     ICompetitionEventRecorder events,
     TimeProvider timeProvider)
 {
+    public Task Handle(
+        StartAwdpFixVerification message,
+        CancellationToken cancellationToken) =>
+        BackendMessageOperations.StartAwdpFixVerificationAsync(
+            message,
+            db,
+            outbox,
+            timeProvider,
+            cancellationToken,
+            events);
+
     public Task Handle(AwdpFixResult message, CancellationToken cancellationToken) =>
         BackendMessageOperations.RecordAwdpFixResultAsync(message, results, cancellationToken);
 

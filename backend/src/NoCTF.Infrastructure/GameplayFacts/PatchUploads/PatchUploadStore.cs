@@ -152,10 +152,17 @@ public sealed class PatchUploadStore(
         {
             return new(PatchUploadSaveState.DefenseTargetConsumed);
         }
-        if (target.State != RuntimeState.Running
-            || target.RunnerId is null
-            || target.ExpiresAt is not { } expiresAt
-            || expiresAt <= uploadedAt)
+        if (target.State is not (RuntimeState.Queued
+                or RuntimeState.Provisioning
+                or RuntimeState.Running))
+        {
+            return new(PatchUploadSaveState.DefenseTargetNotReady);
+        }
+        var targetIsRunning = target.State == RuntimeState.Running;
+        if (targetIsRunning
+            && (target.RunnerId is null
+                || target.ExpiresAt is not { } expiresAt
+                || expiresAt <= uploadedAt))
         {
             return new(PatchUploadSaveState.DefenseTargetNotReady);
         }
@@ -214,29 +221,13 @@ public sealed class PatchUploadStore(
             ReferenceKind = GameplayFactReferenceKind.PatchUpload,
             ReferenceId = patchUploadId,
             OccurredAt = uploadedAt,
-            State = GameplayFactState.Processing,
+            State = GameplayFactState.Pending,
             UpdatedAt = uploadedAt
         };
         db.GameplayFacts.Add(fact);
         target.GameplayFactId = fact.Id;
-        var ttlSeconds = configuration.Runtime.TtlSeconds is > 0
-            ? configuration.Runtime.TtlSeconds.Value
-            : 900;
-        var deadline = uploadedAt.AddSeconds(ttlSeconds);
-        target.ExpiresAt = deadline;
         await outbox.PublishAsync(new GameplayFactStateChanged(fact.Id, fact.State));
-        await outbox.PublishToRunnerNodeAsync(new RunAwdpFixVerification(
-            fact.Id,
-            fact.CompetitionChallengeId,
-            patchUploadId,
-            target.Id,
-            deadline,
-            target.RunnerId));
-        await outbox.ScheduleAsync(new ExpireAwdpFixVerification(
-            fact.Id,
-            target.Id,
-            deadline,
-            target.RunnerId), deadline);
+        await outbox.PublishAsync(new StartAwdpFixVerification(fact.Id, target.Id));
         await events.RecordAsync(new(
             fact.CompetitionId,
             CompetitionEventKind.GameplayFactReceived,
@@ -276,7 +267,7 @@ public sealed class PatchUploadStore(
                     "Patch upload {PatchUploadId} committed, but its durable cleanup message was not flushed immediately.",
                     patchUploadId);
             }
-            return new(PatchUploadSaveState.Accepted, fact.Id);
+            return new(PatchUploadSaveState.Accepted, fact.Id, fact.State);
         }
         catch (DbUpdateException)
         {

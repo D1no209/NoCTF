@@ -4,11 +4,41 @@ using System.Text;
 using FluentStorage.Storage;
 using NoCTF.Application.Storage;
 using NoCTF.Application.GameplayFacts.PatchUploads;
+using NoCTF.Domain.Gameplay;
 
 namespace NoCTF.Tests.Unit.Application;
 
 public sealed class CreatePatchUploadTests
 {
+    [Test]
+    public async Task Accepted_upload_preserves_the_authoritative_pending_state()
+    {
+        var store = new RejectingPatchUploadStore(
+            saveState: PatchUploadSaveState.Accepted,
+            acceptedState: GameplayFactState.Pending);
+        var objects = new RecordingStore();
+        var registry = new RecordingUploadRegistry();
+        var useCase = new CreatePatchUpload(
+            store,
+            new ManagedFileUploads(registry, objects));
+        await using var archive = new MemoryStream(CreatePatchArchive());
+
+        var result = await useCase.ExecuteAsync(
+            Guid.CreateVersion7(),
+            Guid.CreateVersion7(),
+            Guid.CreateVersion7(),
+            Guid.CreateVersion7(),
+            "fix.tar.gz",
+            "application/gzip",
+            archive,
+            DateTimeOffset.UtcNow);
+
+        await Assert.That(result.Succeeded).IsTrue();
+        await Assert.That(result.Value!.State).IsEqualTo(GameplayFactState.Pending);
+        await Assert.That(registry.RegisteredFileId).IsNotNull();
+        await Assert.That(registry.AbandonedFileId).IsNull();
+    }
+
     [Test]
     public async Task Oversized_archive_is_rejected_before_storage()
     {
@@ -167,7 +197,8 @@ public sealed class CreatePatchUploadTests
 
     private sealed class RejectingPatchUploadStore(
         long maximumArchiveBytes = PatchUploadRules.DefaultMaximumArchiveBytes,
-        PatchUploadSaveState saveState = PatchUploadSaveState.ConcurrencyConflict)
+        PatchUploadSaveState saveState = PatchUploadSaveState.ConcurrencyConflict,
+        GameplayFactState acceptedState = GameplayFactState.Processing)
         : IPatchUploadStore
     {
         public Task<PatchUploadScope?> ResolveScopeAsync(
@@ -190,9 +221,13 @@ public sealed class CreatePatchUploadTests
             PatchUploadScope scope,
             Guid fileId,
             DateTimeOffset uploadedAt,
-            CancellationToken cancellationToken) =>
-            Task.FromResult(new PatchUploadSaveResult(
-                saveState));
+            CancellationToken cancellationToken) => Task.FromResult(
+                saveState == PatchUploadSaveState.Accepted
+                    ? new PatchUploadSaveResult(
+                        saveState,
+                        gameplayFactId,
+                        acceptedState)
+                    : new PatchUploadSaveResult(saveState));
     }
 
     private sealed class RecordingStore : StoreBase

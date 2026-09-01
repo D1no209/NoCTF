@@ -65,6 +65,8 @@ public sealed class DeploymentTopologyTests
             .Contains("endpoint.BrokerRole, \"stream\"");
         await Assert.That(routing)
             .Contains("Route<CompleteAwdpFixRecovery>(options, WorkerQueue.Control)");
+        await Assert.That(routing)
+            .Contains("Route<StartAwdpFixVerification>(options, WorkerQueue.Gameplay)");
         foreach (var workerQueue in new[]
                  {
                      "WorkerQueue.Control",

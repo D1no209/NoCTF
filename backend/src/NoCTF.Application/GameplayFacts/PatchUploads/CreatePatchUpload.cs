@@ -19,7 +19,10 @@ public static class PatchUploadRules
     public const long HardMaximumArchiveBytes = 1024L * 1024 * 1024;
 }
 
-public sealed record AcceptedAwdpFix(Guid PatchUploadId, Guid GameplayFactId);
+public sealed record AcceptedAwdpFix(
+    Guid PatchUploadId,
+    Guid GameplayFactId,
+    NoCTF.Domain.Gameplay.GameplayFactState State);
 
 public enum PatchUploadFailureCode
 {
@@ -46,7 +49,8 @@ public enum PatchUploadSaveState
 
 public sealed record PatchUploadSaveResult(
     PatchUploadSaveState State,
-    Guid? GameplayFactId = null);
+    Guid? GameplayFactId = null,
+    NoCTF.Domain.Gameplay.GameplayFactState? GameplayFactState = null);
 
 public interface IPatchUploadStore
 {
@@ -89,7 +93,7 @@ public sealed class CreatePatchUpload(
         if (scope is null)
             return OperationResult<AcceptedAwdpFix, PatchUploadFailureCode>.Failure(
                 PatchUploadFailureCode.PatchUploadNotAvailable,
-                "No ready one-shot defense target is available for this team and challenge.");
+                "No active one-shot defense target is available for this team and challenge.");
         if (!content.CanSeek)
             return OperationResult<AcceptedAwdpFix, PatchUploadFailureCode>.Failure(
                 PatchUploadFailureCode.ArchiveStreamNotSeekable,
@@ -138,11 +142,14 @@ public sealed class CreatePatchUpload(
         {
             PatchUploadSaveState.Accepted =>
                 OperationResult<AcceptedAwdpFix, PatchUploadFailureCode>.Success(
-                    new(id, saved.GameplayFactId!.Value)),
+                    new(
+                        id,
+                        saved.GameplayFactId!.Value,
+                        saved.GameplayFactState!.Value)),
             PatchUploadSaveState.DefenseTargetNotReady =>
                 OperationResult<AcceptedAwdpFix, PatchUploadFailureCode>.Failure(
                     PatchUploadFailureCode.DefenseTargetNotReady,
-                    "The one-shot defense target is no longer ready for a patch."),
+                    "The one-shot defense target no longer accepts a patch."),
             PatchUploadSaveState.AchievementAlreadySucceeded =>
                 OperationResult<AcceptedAwdpFix, PatchUploadFailureCode>.Failure(
                     PatchUploadFailureCode.DefenseAlreadySucceeded,
