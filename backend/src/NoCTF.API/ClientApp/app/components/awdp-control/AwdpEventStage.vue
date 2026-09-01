@@ -1,9 +1,9 @@
 <script setup lang="ts">
 import { Activity, Crosshair, RadioTower, Shield } from '@lucide/vue'
-import type { AwdpControlEvent } from '~/utils/awdp-control-screen'
+import type { AwdpResolvedControlEvent } from '~/utils/awdp-control-screen'
 
 const props = defineProps<{
-  event: AwdpControlEvent | null
+  event: AwdpResolvedControlEvent | null
   queueLength: number
   progress: number
 }>()

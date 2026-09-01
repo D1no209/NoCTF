@@ -1,6 +1,7 @@
 using System.Collections.Concurrent;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Time.Testing;
+using NoCTF.Application.Competitions.Events;
 using NoCTF.Application.Messaging;
 using NoCTF.Application.GameplayFacts.Processing;
 using NoCTF.Application.Runtime.Instances;
@@ -28,6 +29,95 @@ namespace NoCTF.Tests.Integration.Persistence;
 [NotInParallel]
 public sealed class AwdpFixFailureConvergencePersistenceTests
 {
+    [Test]
+    [Timeout(300_000)]
+    public async Task Successful_Fix_events_expose_the_correct_result_for_new_and_legacy_payloads(
+        CancellationToken cancellationToken)
+    {
+        await DockerIntegrationTest.RunAsync(async () =>
+        {
+            await using var postgres = await StartPostgresAsync(cancellationToken);
+            var options = Options(postgres);
+            var fixture = await SeedBaseAsync(options, cancellationToken);
+            var operation = await AddFixAsync(
+                options,
+                fixture,
+                RuntimeState.Running,
+                cancellationToken);
+
+            await using var db = new NoCtfDbContext(options);
+            var outbox = new RecordingOutbox();
+            var eventStore = new CompetitionEventStore(db, outbox);
+            var resultStore = new InternalResultStore(db, outbox, eventStore);
+            var resolvedAt = fixture.Now.AddSeconds(1);
+            var disposition = await resultStore.RecordAwdpAsync(
+                AwdpFixResult.Create(
+                    operation.GameplayFactId,
+                    operation.RuntimeInstanceId,
+                    AwdpFixOutcome.DefenseSucceeded,
+                    resolvedAt),
+                cancellationToken);
+
+            await Assert.That(disposition).IsEqualTo(InternalResultDisposition.Applied);
+            db.ChangeTracker.Clear();
+            var current = await db.CompetitionEvents.AsNoTracking().SingleAsync(
+                item => item.Kind == CompetitionEventKind.AwdpFixResolved,
+                cancellationToken);
+            await Assert.That(current.GameplayFactState)
+                .IsEqualTo(GameplayFactState.Completed);
+            await Assert.That(current.GameplayFactResult)
+                .IsEqualTo(GameplayFactResult.Correct);
+
+            var legacyId = Guid.CreateVersion7(fixture.Now);
+            db.CompetitionEvents.Add(new CompetitionEvent
+            {
+                Id = legacyId,
+                CompetitionId = fixture.CompetitionId,
+                Kind = CompetitionEventKind.AwdpFixResolved,
+                Level = CompetitionEventLevel.Information,
+                Visibility = CompetitionEventVisibility.Public,
+                SubjectType = NoCTF.Domain.Shared.EntityReferenceKind.GameplayFact,
+                SubjectId = Guid.CreateVersion7(),
+                RelatedType = NoCTF.Domain.Shared.EntityReferenceKind.Team,
+                RelatedId = fixture.TeamId,
+                PayloadJson = AwdpFixResolvedEventPayload.Create(
+                    Guid.CreateVersion7(),
+                    Guid.CreateVersion7(),
+                    operation.RuntimeInstanceId,
+                    fixture.TeamId,
+                    fixture.CompetitionChallengeId,
+                    AwdpFixOutcome.DefenseSucceeded,
+                    null,
+                    fixture.Now).Serialize(),
+                OccurredAt = fixture.Now
+            });
+            await db.SaveChangesAsync(cancellationToken);
+            db.ChangeTracker.Clear();
+
+            var history = await eventStore.QueryAsync(new(
+                fixture.CompetitionId,
+                fixture.UserId,
+                Kind: CompetitionEventKind.AwdpFixResolved,
+                MinimumLevel: null,
+                TeamId: null,
+                ActorUserId: null,
+                CompetitionChallengeId: null,
+                RuntimeInstanceId: null,
+                From: null,
+                To: null,
+                BeforeOccurredAt: null,
+                BeforeId: null,
+                Limit: 10), cancellationToken);
+            var legacy = history.Items!.Single(item => item.Id == legacyId);
+            await Assert.That(legacy.GameplayFactKind)
+                .IsEqualTo(GameplayFactKind.FixAttempt);
+            await Assert.That(legacy.GameplayFactState)
+                .IsEqualTo(GameplayFactState.Completed);
+            await Assert.That(legacy.GameplayFactResult)
+                .IsEqualTo(GameplayFactResult.Correct);
+        });
+    }
+
     [Test]
     [Timeout(300_000)]
     public async Task Expiry_converges_every_runtime_terminal_shape_idempotently(

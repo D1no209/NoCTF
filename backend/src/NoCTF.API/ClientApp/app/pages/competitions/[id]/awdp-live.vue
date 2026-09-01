@@ -32,7 +32,7 @@ import {
   calculateAwdpCanvasScale,
   reconcileAwdpControlEvents,
 } from '~/utils/awdp-control-screen'
-import type { AwdpControlEvent, AwdpRankedEntry } from '~/utils/awdp-control-screen'
+import type { AwdpControlEvent, AwdpRankedEntry, AwdpResolvedControlEvent } from '~/utils/awdp-control-screen'
 import { directionIcon } from '~/utils/directions'
 import { scoreboardRankingStateLabel } from '~/utils/scoreboard'
 
@@ -50,8 +50,8 @@ const loading = ref(true)
 const refreshing = ref(false)
 const projectionPending = ref(false)
 const error = ref<string | null>(null)
-const activeEvent = ref<AwdpControlEvent | null>(null)
-const playbackQueue = ref<AwdpControlEvent[]>([])
+const activeEvent = ref<AwdpResolvedControlEvent | null>(null)
+const playbackQueue = ref<AwdpResolvedControlEvent[]>([])
 const playbackProgress = ref(0)
 const clock = ref(Date.now())
 const fullscreen = ref(false)
@@ -99,8 +99,9 @@ const selectedChallengeStates = computed(() => {
         - Number(left.competitionChallengeId === focusedChallengeId))
     : states
 })
-const recentFeed = computed(() => [...events.value].reverse().slice(0, 13))
-const tickerEvents = computed(() => [...events.value].reverse().slice(0, 18))
+const resolvedEvents = computed(() => awdpPlaybackEvents(events.value))
+const recentFeed = computed(() => [...resolvedEvents.value].reverse().slice(0, 13))
+const tickerEvents = computed(() => [...resolvedEvents.value].reverse().slice(0, 18))
 const canvasScale = computed(() => calculateAwdpCanvasScale(viewportWidth.value, viewportHeight.value))
 const canvasStyle = computed(() => ({
   transform: `translate(-50%, -50%) scale(${canvasScale.value})`,
@@ -147,11 +148,9 @@ function rankTone(rank: number | null | undefined): string {
   return 'normal'
 }
 
-function eventLabel(event: AwdpControlEvent): string {
+function eventLabel(event: AwdpResolvedControlEvent): string {
   const action = event.action === 'attack' ? t('攻击') : t('防御')
-  const outcome = event.outcome === 'pending'
-    ? t('操作已提交')
-    : event.outcome === 'success' ? t('成功') : t('失败')
+  const outcome = event.outcome === 'success' ? t('成功') : t('失败')
   return `${action}${outcome}`
 }
 

@@ -22,6 +22,10 @@ export interface AwdpControlEvent {
   gameplayFactId: string | null
 }
 
+export type AwdpResolvedControlEvent = Omit<AwdpControlEvent, 'outcome'> & {
+  outcome: Exclude<AwdpControlOutcome, 'pending'>
+}
+
 export interface AwdpControlEventReconciliation {
   seenIds: Set<string>
   newEvents: AwdpControlEvent[]
@@ -121,8 +125,8 @@ export function reconcileAwdpControlEvents(
   return { seenIds, newEvents }
 }
 
-export function awdpPlaybackEvents(events: readonly AwdpControlEvent[]): AwdpControlEvent[] {
-  return events.filter(event => event.outcome !== 'pending')
+export function awdpPlaybackEvents(events: readonly AwdpControlEvent[]): AwdpResolvedControlEvent[] {
+  return events.filter((event): event is AwdpResolvedControlEvent => event.outcome !== 'pending')
 }
 
 export function awdpOperationMetrics(events: readonly AwdpControlEvent[]): AwdpOperationMetrics {
