@@ -333,13 +333,16 @@ public sealed class DeploymentTopologyTests
     }
 
     [Test]
-    public async Task Ci_publishes_one_tested_host_image_to_configured_registries()
+    public async Task Ci_publishes_one_verified_host_image_to_configured_registries()
     {
         var ci = (await ReadAsync(".github", "workflows", "ci.yml"))
             .ReplaceLineEndings("\n");
 
         await Assert.That(ci).Contains("  publish-images:\n");
-        await Assert.That(ci).Contains("    needs: test\n");
+        await Assert.That(ci).Contains("    needs: verify\n");
+        await Assert.That(ci).DoesNotContain("bun test");
+        await Assert.That(ci).DoesNotContain("dotnet test");
+        await Assert.That(ci).DoesNotContain("bash deploy/recovery/rehearse.sh");
         await Assert.That(ci).Contains(
             "    if: github.event_name == 'push' && github.ref == 'refs/heads/main'\n");
         await Assert.That(ci).Contains("      packages: write\n");
@@ -511,7 +514,7 @@ public sealed class DeploymentTopologyTests
             .Where(line => line.StartsWith("image: postgres:", StringComparison.Ordinal)
                 || line.StartsWith("image: redis:", StringComparison.Ordinal))
             .ToArray();
-        await Assert.That(ciServiceImages).Count().IsEqualTo(2);
+        await Assert.That(ciServiceImages).Count().IsEqualTo(0);
         await Assert.That(ciServiceImages.All(line => IsImmutableTestImage(line["image: ".Length..])))
             .IsTrue();
 

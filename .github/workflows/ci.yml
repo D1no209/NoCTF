@@ -8,32 +8,9 @@ permissions:
   contents: read
 
 jobs:
-  test:
-    name: Test
+  verify:
+    name: Verify build
     runs-on: ubuntu-latest
-    services:
-      postgres:
-        image: postgres:16.14@sha256:95206741a5b214807675e14165369d05b93a9cf692223b616d07cca227e74b0b
-        env:
-          POSTGRES_DB: noctf
-          POSTGRES_USER: noctf
-          POSTGRES_PASSWORD: noctf_test_password
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd "pg_isready -U noctf -d noctf"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-      redis:
-        image: redis:7.4.10@sha256:e9b2e45ecd47fbb69b877cf8d045d5cccaaaed52524b6e098b4abe8212994f73
-        ports:
-          - 6379:6379
-        options: >-
-          --health-cmd "redis-cli ping"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
 
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
@@ -50,11 +27,10 @@ jobs:
         with:
           bun-version: '1.3.14'
 
-      - name: Test frontend
+      - name: Build frontend
         working-directory: backend/src/NoCTF.API/ClientApp
         run: |
           bun install --frozen-lockfile
-          bun test
           bun run typecheck
           bun run generate
 
@@ -96,13 +72,6 @@ jobs:
           dotnet publish backend/src/NoCTF.Runner/NoCTF.Runner.csproj --configuration Release --no-build --no-restore --output artifacts/runner
           test -f artifacts/runner/NoCTF.Runner.dll
 
-      - name: Test backend
-        env:
-          NOCTF_REDIS_INTEGRATION: 127.0.0.1:6379,abortConnect=false
-          NOCTF_POSTGRES_INTEGRATION: Host=localhost;Port=5432;Database=noctf;Username=noctf;Password=noctf_test_password
-          NOCTF_REQUIRE_DOCKER_INTEGRATION: 'true'
-        run: dotnet test backend/NoCTF.slnx --configuration Release --no-build
-
       - name: Verify analyzers and migration model
         shell: bash
         run: |
@@ -135,11 +104,9 @@ jobs:
           docker compose -f deploy/docker-compose.yml -f deploy/docker-compose.observability.yml config -q
           docker compose -f deploy/docker-compose.single.yml config -q
 
-      - name: Rehearse PostgreSQL, Wolverine, and object recovery
+      - name: Validate recovery scripts
         shell: bash
-        run: |
-          for script in deploy/recovery/*.sh; do bash -n "$script"; done
-          bash deploy/recovery/rehearse.sh
+        run: for script in deploy/recovery/*.sh; do bash -n "$script"; done
 
       - name: Verify OpenAPI artifact
         shell: bash
@@ -156,11 +123,10 @@ jobs:
       - name: Check generated frontend API client drift
         shell: bash
         run: git diff --exit-code backend/src/NoCTF.API/ClientApp/app/api
-          git diff --exit-code backend/src/NoCTF.API/ClientApp/app/api
 
   publish-images:
     name: Publish application image
-    needs: test
+    needs: verify
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     timeout-minutes: 45

@@ -3218,4 +3218,14 @@ dotnet run --project backend/src/NoCTF.API/NoCTF.API.csproj --no-build -- --expo
 - 平台版本递增为 `0.1.0-alpha.114`。没有 HTTP/OpenAPI、生成 SDK、数据模型或 migration 变化。
   ClientApp 299/299 测试、typecheck 和 production generate 通过；Release solution build 为 0 警告/
   0 错误，`git diff --check` 通过。Nuxt 仅保留既有大 chunk、插件耗时与第三方 Nitro 警告。
-- 本阶段按用户约束只创建本地提交，未 push、未部署；生产仍为 Alpha.113。
+- 功能提交 `de54ac51` 已按后续明确指令推送到远程 `main`，尚未部署；生产仍为 Alpha.113。
+
+## 2026-09-01 CI 取消重复测试
+
+- 按用户要求，GitHub Actions 的首个 Job 由 `test` 改为 `verify`，删除 PostgreSQL/Redis 测试服务、
+  `bun test` 与 `dotnet test`。本地开发仍按 `docs/development.md` 执行测试；远程 CI 保留依赖审计、
+  前后端编译、发布产物、analyzer、EF 模型漂移、Kubernetes/Compose 清单、恢复脚本语法以及 OpenAPI/SDK
+  漂移门禁，验证成功后继续构建并发布 Host 镜像。
+- 同时修正生成前端 SDK 漂移步骤中重复且错误缩进的命令。部署架构测试同步断言 CI 不再包含任何
+  `bun test` / `dotnet test` 命令或测试服务，并要求镜像发布依赖 `verify` Job。
+- 本阶段仅创建本地提交，未 push、未部署。
