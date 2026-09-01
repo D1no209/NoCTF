@@ -106,10 +106,9 @@ CI 和 `backend/scripts/Verify-Backend.ps1` 都会重新导出 OpenAPI、重新�
 并以 `git diff --exit-code` 拒绝未提交的漂移。因此 endpoint、OpenAPI 文档和前端
 调用代码必须在同一变更中更新。
 
-前端测试在本地开发与提交前执行；远程 CI 不重复运行测试，只执行
-`bun run typecheck` 和 `bun run generate`。API/Host 发布目标会执行同样的
-typecheck/generate 钩子，Docker 构建则在专用阶段执行 `nuxt prepare` 和
-`bun run generate`，确保 Nuxt 生产静态包能够编译。
+前端测试和 typecheck 在本地开发与提交前执行；远程 CI 不再设置独立验证 Job。
+镜像发布时，Docker 构建会在专用阶段执行 `nuxt prepare` 和 `bun run generate`，
+确保 Nuxt 生产静态包能够编译。
 
 Docker 使用多阶段构建：`frontend-build` 只是构建阶段，生成的 `.output/public`
 会复制到 API/Host 镜像的 `wwwroot`。生产 Compose 不启动任何 Node/Bun/Nuxt 容器；

@@ -23,9 +23,8 @@ Frontend/reverse proxy
 
 ## CI 容器镜像
 
-推送到 `main` 时，GitHub Actions 先运行 `verify` Job，执行恢复、依赖审计、编译、
-发布产物、analyzer、EF 模型漂移、部署清单、恢复脚本语法与 OpenAPI/SDK 漂移检查，
-不重复执行已在本地完成的测试。验证通过后，`publish-images` Job 使用仓库根目录作为构建上下文和 `backend/Dockerfile` 的 `host`
+推送到 `main` 时，GitHub Actions 直接运行 `publish-images` Job，不再设置独立的测试或 Verify Job。
+`publish-images` 使用仓库根目录作为构建上下文和 `backend/Dockerfile` 的 `host`
 target 发布一个镜像：`ghcr.io/<owner>/<repo>`。同一镜像通过 `Hosting__Roles__*`
 选择 Api、Worker、Runner 的任意非空组合；迁移任务也复用该镜像并以
 `--migrate-only` 启动。

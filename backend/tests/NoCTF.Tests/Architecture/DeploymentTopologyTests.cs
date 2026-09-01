@@ -289,14 +289,8 @@ public sealed class DeploymentTopologyTests
     }
 
     [Test]
-    public async Task Ci_validation_keeps_standard_schemas_strict_and_supplies_required_secrets()
+    public async Task Kubernetes_manifests_use_only_expected_api_groups()
     {
-        var ci = await ReadAsync(".github", "workflows", "ci.yml");
-
-        await Assert.That(ci).Contains(
-            "-strict -ignore-missing-schemas -summary /manifests");
-        await Assert.That(ci).DoesNotContain("-skip");
-
         var standardApiVersions = new HashSet<string>(StringComparer.Ordinal)
         {
             "v1",
@@ -323,13 +317,6 @@ public sealed class DeploymentTopologyTests
         await Assert.That(customResources).Count().IsEqualTo(3);
         await Assert.That(customResources.All(resource =>
             resource == "cilium.io/v2:CiliumNetworkPolicy")).IsTrue();
-
-        var encryptionKeyMatch = System.Text.RegularExpressions.Regex.Match(
-            ci,
-            "EMAIL_VERIFICATION_ENCRYPTION_KEY: (?<key>[A-Za-z0-9+/]+={0,2})");
-        await Assert.That(encryptionKeyMatch.Success).IsTrue();
-        await Assert.That(Convert.FromBase64String(
-            encryptionKeyMatch.Groups["key"].Value).Length).IsEqualTo(32);
     }
 
     [Test]
@@ -339,12 +326,12 @@ public sealed class DeploymentTopologyTests
             .ReplaceLineEndings("\n");
 
         await Assert.That(ci).Contains("  publish-images:\n");
-        await Assert.That(ci).Contains("    needs: verify\n");
+        await Assert.That(ci).DoesNotContain("  verify:\n");
+        await Assert.That(ci).DoesNotContain("    needs:");
         await Assert.That(ci).DoesNotContain("bun test");
         await Assert.That(ci).DoesNotContain("dotnet test");
         await Assert.That(ci).DoesNotContain("bash deploy/recovery/rehearse.sh");
-        await Assert.That(ci).Contains(
-            "    if: github.event_name == 'push' && github.ref == 'refs/heads/main'\n");
+        await Assert.That(ci).Contains("    branches:\n      - main\n");
         await Assert.That(ci).Contains("      packages: write\n");
         await Assert.That(ci).Contains("ghcr.io/$repository_owner/$repository_name");
         await Assert.That(ci).Contains("CUSTOM_REGISTRY: ${{ vars.CUSTOM_REGISTRY }}");
@@ -354,12 +341,6 @@ public sealed class DeploymentTopologyTests
         await Assert.That(ci).DoesNotContain("matrix.image");
         await Assert.That(ci).DoesNotContain("matrix.target");
 
-        foreach (var webRole in new[] { "api", "host" })
-        {
-            await Assert.That(ci).Contains($"test -f artifacts/{webRole}/wwwroot/index.html");
-            await Assert.That(ci).Contains($"test -f artifacts/{webRole}/wwwroot/200.html");
-            await Assert.That(ci).Contains($"test -f artifacts/{webRole}/wwwroot/404.html");
-        }
     }
 
     [Test]
@@ -491,23 +472,14 @@ public sealed class DeploymentTopologyTests
             .Select(line => line.Trim())
             .Where(line => line.StartsWith("- uses:", StringComparison.Ordinal))
             .ToArray();
-        await Assert.That(actionReferences).Count().IsEqualTo(5);
+        await Assert.That(actionReferences).Count().IsEqualTo(1);
         await Assert.That(actionReferences.All(line =>
             System.Text.RegularExpressions.Regex.IsMatch(
                 line,
                 "^- uses: [a-z0-9-]+/[a-z0-9-]+@[a-f0-9]{40} # v[0-9]+$"))).IsTrue();
 
-        foreach (var (action, count) in new[]
-                 {
-                     ("actions/checkout", 2),
-                     ("actions/setup-dotnet", 1),
-                     ("actions/setup-node", 1),
-                     ("oven-sh/setup-bun", 1)
-                 })
-        {
-            await Assert.That(actionReferences.Count(line =>
-                line.StartsWith($"- uses: {action}@", StringComparison.Ordinal))).IsEqualTo(count);
-        }
+        await Assert.That(actionReferences.Count(line =>
+            line.StartsWith("- uses: actions/checkout@", StringComparison.Ordinal))).IsEqualTo(1);
 
         var ciServiceImages = ci.Split('\n')
             .Select(line => line.Trim())
