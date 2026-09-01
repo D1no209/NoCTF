@@ -35,11 +35,15 @@ describe('competition broadcast projection', () => {
       'HintPublished',
       'ChallengeDescriptionUpdated',
       'ChallengePublished',
-      'AwdpBreakAttempted',
-      'AwdpFixAttempted',
+      'AwdpBreakResolved',
+      'AwdpFixResolved',
       'AnnouncementPublished',
     ])
     expect(isCompetitionBroadcastKind('FirstBloodAwarded')).toBe(true)
+    expect(isCompetitionBroadcastKind('AwdpBreakAttempted')).toBe(false)
+    expect(isCompetitionBroadcastKind('AwdpFixAttempted')).toBe(false)
+    expect(isCompetitionBroadcastKind('AwdpBreakResolved')).toBe(true)
+    expect(isCompetitionBroadcastKind('AwdpFixResolved')).toBe(true)
     expect(isCompetitionBroadcastKind('QuestionOpened')).toBe(false)
   })
 
@@ -60,10 +64,22 @@ describe('competition broadcast projection', () => {
       .toBe('题目「Web 100」已更新描述')
     expect(competitionBroadcastText(event('ChallengePublished')))
       .toBe('题目「Web 100」已开放')
-    expect(competitionBroadcastText(event('AwdpBreakAttempted')))
-      .toBe('队伍「Alpha」对题目「Web 100」进行了一次攻击操作')
-    expect(competitionBroadcastText(event('AwdpFixAttempted')))
-      .toBe('队伍「Alpha」对题目「Web 100」提交了一次防御操作')
+    expect(competitionBroadcastText(event('AwdpBreakResolved', {
+      gameplayFactState: 'Completed',
+      gameplayFactResult: 'Correct',
+    }))).toBe('队伍「Alpha」攻击题目「Web 100」成功')
+    expect(competitionBroadcastText(event('AwdpBreakResolved', {
+      gameplayFactState: 'Completed',
+      gameplayFactResult: 'Wrong',
+    }))).toBe('队伍「Alpha」攻击题目「Web 100」失败')
+    expect(competitionBroadcastText(event('AwdpFixResolved', {
+      gameplayFactState: 'Completed',
+      gameplayFactResult: 'Correct',
+    }))).toBe('队伍「Alpha」防御题目「Web 100」成功')
+    expect(competitionBroadcastText(event('AwdpFixResolved', {
+      gameplayFactState: 'PlatformFailed',
+      gameplayFactResult: null,
+    }))).toBe('队伍「Alpha」防御题目「Web 100」失败')
     expect(competitionBroadcastText(event('AnnouncementPublished')))
       .toBe('赛事发布了新通知')
   })

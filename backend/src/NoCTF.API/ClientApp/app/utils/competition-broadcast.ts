@@ -13,8 +13,8 @@ export const competitionBroadcastKinds = [
   'HintPublished',
   'ChallengeDescriptionUpdated',
   'ChallengePublished',
-  'AwdpBreakAttempted',
-  'AwdpFixAttempted',
+  'AwdpBreakResolved',
+  'AwdpFixResolved',
   'AnnouncementPublished',
 ] satisfies NoCtfapiEndpointsCompetitionsEventsCompetitionEventKindProtocol[]
 
@@ -68,6 +68,8 @@ export function competitionBroadcastText(
   const team = event.teamDisplayName ?? translate('某队伍')
   const challenge = event.challengeTitle ?? translate('某题目')
   if (!event.kind) return translate("赛事状态已更新")
+  const awdpSucceeded = event.gameplayFactState === 'Completed'
+    && event.gameplayFactResult === 'Correct'
   const messages: Partial<Record<NoCtfapiEndpointsCompetitionsEventsCompetitionEventKindProtocol, string>> = {
     FirstBloodAwarded: translate('队伍「{team}」获得题目「{challenge}」一血', { team, challenge }),
     SecondBloodAwarded: translate('队伍「{team}」获得题目「{challenge}」二血', { team, challenge }),
@@ -77,8 +79,12 @@ export function competitionBroadcastText(
     HintPublished: translate('题目「{challenge}」发布了新的提示', { challenge }),
     ChallengeDescriptionUpdated: translate('题目「{challenge}」已更新描述', { challenge }),
     ChallengePublished: translate('题目「{challenge}」已开放', { challenge }),
-    AwdpBreakAttempted: translate('队伍「{team}」对题目「{challenge}」进行了一次攻击操作', { team, challenge }),
-    AwdpFixAttempted: translate('队伍「{team}」对题目「{challenge}」提交了一次防御操作', { team, challenge }),
+    AwdpBreakResolved: awdpSucceeded
+      ? translate('队伍「{team}」攻击题目「{challenge}」成功', { team, challenge })
+      : translate('队伍「{team}」攻击题目「{challenge}」失败', { team, challenge }),
+    AwdpFixResolved: awdpSucceeded
+      ? translate('队伍「{team}」防御题目「{challenge}」成功', { team, challenge })
+      : translate('队伍「{team}」防御题目「{challenge}」失败', { team, challenge }),
     AnnouncementPublished: translate('赛事发布了新通知'),
   }
   return messages[event.kind] ?? translate('赛事状态已更新')

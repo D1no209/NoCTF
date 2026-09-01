@@ -3303,3 +3303,14 @@ dotnet run --project backend/src/NoCTF.API/NoCTF.API.csproj --no-build -- --expo
 - 平台版本递增为 `0.1.0-alpha.117`。没有 HTTP/OpenAPI、业务数据模型或 migration 变化。
   ClientApp 305/305、typecheck 与 production generate 通过；仅保留既有大 chunk、插件耗时与 Nitro
   第三方警告。本阶段未 push、未部署。
+
+## 2026-09-01 Alpha.118 AWDP 赛事播报结果语义
+
+- 赛事播报不再查询或展示 `AwdpBreakAttempted` / `AwdpFixAttempted`，因此不会再出现“进行了一次攻击
+  操作”或“提交了一次防御操作”的过程消息。初始 REST 查询和 SignalR 实时失效都只接受最终的
+  `AwdpBreakResolved` / `AwdpFixResolved`。
+- AWDP 最终事件按服务端 `gameplayFactState=Completed && gameplayFactResult=Correct` 判定成功，其余
+  Completed/Wrong 与 PlatformFailed 均显示失败；文案统一为“队伍「XXX」攻击/防御题目「XXX」
+  成功/失败”，并补齐英文资源和四种结果回归。
+- 平台版本递增为 `0.1.0-alpha.118`。没有 HTTP/OpenAPI、业务数据模型或 migration 变化。本阶段
+  未 push、未部署。
