@@ -20,7 +20,7 @@ export function useDefinitionModel(
     (json) => {
       // 自身序列化回灌跳过重解析。
       if (json === lastSerialized) return
-      const parsed = parseDefinition(json)
+      const parsed = parseDefinition(json, mode())
       if (parsed === null) {
         parseFailed.value = true
         model.value = null

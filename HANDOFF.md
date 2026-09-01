@@ -3249,3 +3249,23 @@ dotnet run --project backend/src/NoCTF.API/NoCTF.API.csproj --no-build -- --expo
   Registry 推送 attestation 清单；GHA cache exporter 增加 `ignore-error=true`，缓存服务异常不再阻断
   Registry 发布。架构门禁固定这三个兼容性选项。
 - 本阶段仅创建本地提交，未 push、未部署。
+
+## 2026-09-01 Alpha.115 跨模式题目模板保存审计
+
+- 生产 Nginx access log 确认题目 `01a05876-f956-724e-98b7-b98999e40630` 的多次 PUT 均到达 API 并
+  返回 400；生产仍为 `0.1.0-alpha.113`。只读数据库审计确认该模板为 AWDP、`schemaVersion=4`、
+  Runtime/Checker 均未启用、上传上限为 256 MiB，且模板与其竞赛引用范围内不存在任何活动/删除的
+  静态或正则 Flag。同一最小 Definition 通过当前权威 catalog，错误不在持久化数据本身。
+- 共用 `parseDefinition` 原先无论当前模式都以 CTF 模型初始化，加载/切换和立即保存时可能把错误模式的
+  Checker、Patch 或默认字段重新序列化进请求。现在解析必须携带当前模式，并按 CTF/AWD/AWDP/KoH
+  白名单读取模式字段；AWD checker wrapper 与 AWDP runner job 也按形状隔离。`normalizeDefinitionJson`、
+  `useDefinitionModel` 与保存前校验全部使用同一模式感知路径。
+- 扩大回归范围：四种模式的最小静态 Definition 均通过真实 FastEndpoints PUT 并返回 200；CTF、AWD、
+  AWDP、KoH 的完整单容器草稿均通过前端保存校验。AWDP 仍覆盖镜像、内外端口、入口与端口一致性的
+  缺项列表；新增跨模式 Checker/Patch 污染回归。
+- 创建/更新 Endpoint 在 `InvalidRequest` / `InvalidDefinition` 时新增结构化 Warning，记录模板 id、模式、
+  状态与不含 Flag/环境变量值的校验详情，后续生产日志可以直接定位 400 原因。
+- 平台版本递增为 `0.1.0-alpha.115`。没有 HTTP/OpenAPI、生成 SDK、数据模型或 migration 变化。
+  Release solution build 为 0 警告/0 错误；非 Integration TUnit 941/941；其中四模式真实 HTTP PUT
+  5/5；ClientApp 304/304、typecheck 与 production generate 通过，`git diff --check` 通过。Nuxt 仅
+  保留既有大 chunk、插件耗时与第三方 Nitro 警告。本阶段仅创建本地提交，未 push、未部署。

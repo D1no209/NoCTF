@@ -87,7 +87,7 @@ export function validateChallengeTemplateDraft(draft: ChallengeTemplateDraft): s
   if (!direction) addIssue(issues, translate('方向不能为空'))
   else if (direction.length > 96) addIssue(issues, translate('方向最多 96 个字符'))
 
-  const model = parseDefinition(draft.definitionJson)
+  const model = parseDefinition(draft.definitionJson, draft.mode)
   if (!model) {
     addIssue(issues, translate('题目定义无法解析，请重置或修正后再保存'))
     return issues

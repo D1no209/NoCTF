@@ -414,23 +414,29 @@ function parseRuntimeTemplate(raw: unknown): RuntimeTemplateModel {
   }
 }
 
-/** 解析模板 definitionJson 为编辑模型;JSON 非法时返回 null。 */
-export function parseDefinition(json: string | null | undefined): DefinitionModel | null {
+/** 解析模板 definitionJson 为当前模式的编辑模型;JSON 非法时返回 null。 */
+export function parseDefinition(
+  json: string | null | undefined,
+  mode: GameModeValue = 'Ctf',
+): DefinitionModel | null {
   const obj = parseJsonObject(json)
   if (!obj) return null
-  const model = emptyDefinition('Ctf')
+  const model = emptyDefinition(mode)
   model.runtime = obj.runtime ? parseRuntimeTemplate(obj.runtime) : null
-  if (obj.checker) {
+  if (mode === 'Awd' && obj.checker) {
     const checker = asObject(obj.checker) ?? {}
-    // AWD 的 checker 包装 job;AWDP 的 checker 直接是 RunnerJobConfiguration。
     if ('job' in checker) {
-      model.checker = { job: parseRunnerJob(checker.job), targetServiceName: asString(checker.targetServiceName) }
-    }
-    else {
-      model.checkerJob = parseRunnerJob(checker)
+      model.checker = {
+        job: parseRunnerJob(checker.job),
+        targetServiceName: asString(checker.targetServiceName),
+      }
     }
   }
-  if (obj.flagInjection) {
+  if (mode === 'Awdp' && obj.checker) {
+    const checker = asObject(obj.checker) ?? {}
+    if (!('job' in checker)) model.checkerJob = parseRunnerJob(checker)
+  }
+  if (mode === 'Awd' && obj.flagInjection) {
     const injection = asObject(obj.flagInjection) ?? {}
     if (!('kind' in injection)) {
       model.flagInjection = {
@@ -440,13 +446,16 @@ export function parseDefinition(json: string | null | undefined): DefinitionMode
       }
     }
   }
-  model.flagTemplate = obj.flagTemplate ? parseFlagTemplate(obj.flagTemplate) : null
-  model.patchEntrypoint = asString(obj.patchEntrypoint)
-  model.patchCommand = asStringArray(obj.patchCommand)
-  model.patchTimeoutSeconds = asNumber(obj.patchTimeoutSeconds)
-  model.readyTimeoutSeconds = asNumber(obj.readyTimeoutSeconds)
-  model.maximumPatchUploadBytes = asNumber(obj.maximumPatchUploadBytes)
-    ?? DEFAULT_MAXIMUM_PATCH_UPLOAD_BYTES
+  if (mode === 'Ctf' || mode === 'Awd')
+    model.flagTemplate = obj.flagTemplate ? parseFlagTemplate(obj.flagTemplate) : null
+  if (mode === 'Awdp') {
+    model.patchEntrypoint = asString(obj.patchEntrypoint)
+    model.patchCommand = asStringArray(obj.patchCommand)
+    model.patchTimeoutSeconds = asNumber(obj.patchTimeoutSeconds)
+    model.readyTimeoutSeconds = asNumber(obj.readyTimeoutSeconds)
+    model.maximumPatchUploadBytes = asNumber(obj.maximumPatchUploadBytes)
+      ?? DEFAULT_MAXIMUM_PATCH_UPLOAD_BYTES
+  }
   return model
 }
 
@@ -615,7 +624,7 @@ export function defaultDefinitionJson(mode: GameModeValue): string {
 }
 
 export function normalizeDefinitionJson(mode: GameModeValue, json: string): string | null {
-  const model = parseDefinition(json)
+  const model = parseDefinition(json, mode)
   return model ? serializeDefinition(mode, model) : null
 }
 

@@ -181,6 +181,22 @@ describe('container security drafts', () => {
 })
 
 describe('AWDP patch upload limits', () => {
+  test('keeps checker and patch fields isolated to their owning game mode', () => {
+    const awdChecker = JSON.stringify({
+      schemaVersion: 4,
+      checker: { job: { image: 'checker:latest' }, targetServiceName: 'service' },
+    })
+    const awdpChecker = JSON.stringify({
+      schemaVersion: 4,
+      checker: { image: 'checker:latest' },
+      patchEntrypoint: 'fix.sh',
+    })
+
+    expect(parseDefinition(awdChecker, 'Awdp')?.checkerJob).toBeNull()
+    expect(parseDefinition(awdpChecker, 'Awd')?.checker).toBeNull()
+    expect(parseDefinition(awdpChecker, 'Ctf')?.patchEntrypoint).toBe('')
+  })
+
   test('keeps the visible default and serializes challenge-managed bytes', () => {
     const model = emptyDefinition('Awdp')
     expect(model.maximumPatchUploadBytes).toBe(256 * 1024 * 1024)
@@ -193,7 +209,7 @@ describe('AWDP patch upload limits', () => {
 
     const json = serializeDefinition('Awdp', model)
     expect(JSON.parse(json).maximumPatchUploadBytes).toBe(512 * 1024 * 1024)
-    expect(parseDefinition(json)?.maximumPatchUploadBytes).toBe(512 * 1024 * 1024)
+    expect(parseDefinition(json, 'Awdp')?.maximumPatchUploadBytes).toBe(512 * 1024 * 1024)
     expect(JSON.parse(json)).toMatchObject({
       schemaVersion: 4,
     })
@@ -206,7 +222,7 @@ describe('AWDP patch upload limits', () => {
     const model = parseDefinition(JSON.stringify({
       schemaVersion: 4,
       flagInjection: { kind: 0, environmentVariableName: 'OLD_FLAG' },
-    }))
+    }), 'Awdp')
 
     expect(model?.flagInjection).toBeNull()
     expect(JSON.parse(serializeDefinition('Awdp', model!)).flagInjection).toBeUndefined()

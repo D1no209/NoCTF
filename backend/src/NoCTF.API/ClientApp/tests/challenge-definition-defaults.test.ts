@@ -15,6 +15,7 @@ import {
   normalizeDefinitionJson,
   serializeDefinition,
   serializeConfigValues,
+  UrlExposure,
 } from '../app/utils/game-config'
 
 describe('challenge definition defaults', () => {
@@ -130,6 +131,43 @@ describe('challenge definition defaults', () => {
     expect(issues).toContain('AWDP 必须且只能填写 1 个内部端口')
     expect(issues).toContain('AWDP 必须且只能填写 1 个对外端口')
     expect(issues).toContain('AWDP 必须添加至少 1 个访问入口')
+  })
+
+  test.each([
+    ['Ctf', 8080],
+    ['Awd', 8081],
+    ['Awdp', 9999],
+    ['Koh', 8082],
+  ] as const)('accepts a complete %s single-container save draft', (mode, port) => {
+    const model = emptyDefinition(mode)
+    const runtime = emptyRuntimeTemplate(mode)
+    model.runtime = runtime
+    if (runtime.definition.kind !== 'container') throw new Error('Expected container definition')
+    runtime.definition.image = 'registry.example.com/challenge:latest'
+    runtime.definition.containerPorts = [port]
+    runtime.urlBindings = [{
+      urlTemplate: 'http://{HOST}:{PORT}',
+      exposure: mode === 'Ctf' || mode === 'Awdp'
+        ? UrlExposure.OwnerOnly
+        : UrlExposure.Participants,
+      containerPort: port,
+      serviceName: '',
+    }]
+    if (mode === 'Awd') {
+      model.flagInjection = {
+        command: 'printf %s ${FLAG}',
+        timeoutSeconds: 30,
+        serviceName: '',
+      }
+    }
+    if (mode === 'Awdp') runtime.definition.internalPorts = [port]
+
+    expect(validateChallengeTemplateDraft({
+      mode,
+      title: `${mode} container`,
+      direction: 'Pwn',
+      definitionJson: serializeDefinition(mode, model),
+    })).toEqual([])
   })
 
   test('localizes legacy start-gate schema failures and retains challenge navigation', async () => {

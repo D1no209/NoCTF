@@ -36,7 +36,8 @@ public sealed class UpdateChallengeTemplateValidator : Validator<UpdateChallenge
 public sealed class UpdateChallengeTemplateEndpoint(
     UpdateChallengeTemplate update,
     IUserContext user,
-    TimeProvider timeProvider)
+    TimeProvider timeProvider,
+    ILogger<UpdateChallengeTemplateEndpoint> logger)
     : Endpoint<UpdateChallengeTemplateRequest,
         Results<
             Ok<ChallengeTemplateResponse>,
@@ -65,8 +66,9 @@ public sealed class UpdateChallengeTemplateEndpoint(
         UpdateChallengeTemplateRequest request,
         CancellationToken ct)
     {
+        var challengeId = Route<Guid>("challengeId");
         var result = await update.ExecuteAsync(new UpdateChallengeTemplateCommand(
-            Route<Guid>("challengeId"),
+            challengeId,
             user.UserId,
             user.IsAdministrator,
             CompetitionProtocolMapper.ToDomain(request.Mode!.Value),
@@ -76,6 +78,16 @@ public sealed class UpdateChallengeTemplateEndpoint(
             request.Direction,
             request.DefinitionJson,
             timeProvider.GetUtcNow()), ct);
+        if (result.State is ChallengeTemplateWriteState.InvalidRequest
+            or ChallengeTemplateWriteState.InvalidDefinition)
+        {
+            logger.LogWarning(
+                "Challenge template {ChallengeId} update rejected for mode {Mode}: {State}. {Detail}",
+                challengeId,
+                request.Mode,
+                result.State,
+                result.Detail);
+        }
         return ChallengeTemplateUpdateResponseMapper.ToResponse(result);
     }
 }
