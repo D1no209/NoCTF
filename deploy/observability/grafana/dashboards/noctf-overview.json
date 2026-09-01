@@ -31,39 +31,43 @@
       "targets": [{ "expr": "sum by (endpoint, outcome) (rate(noctf_runtime_operations_total{role=\"api\"}[5m]))", "legendFormat": "{{endpoint}} {{outcome}}" }]
     },
     {
-      "type": "timeseries", "title": "Wolverine 队列积压与最老等待", "id": 5,
+      "type": "timeseries", "title": "NATS JetStream 关键消费者", "id": 5,
       "gridPos": { "h": 8, "w": 8, "x": 8, "y": 8 },
       "targets": [
-        { "expr": "max by (queue) (noctf_worker_queue_depth{role=\"worker\"})", "legendFormat": "{{queue}} depth" },
-        { "expr": "max by (queue) (noctf_worker_queue_oldest_age_seconds{role=\"worker\"})", "legendFormat": "{{queue}} oldest(s)" }
+        { "expr": "sum(max by (stream_name, consumer_name) (jetstream_consumer_num_pending{is_consumer_leader=\"true\",stream_name=~\"NOCTF_CONTROL|NOCTF_GAMEPLAY\"})) or vector(0)", "legendFormat": "pending" },
+        { "expr": "sum(max by (stream_name, consumer_name) (jetstream_consumer_num_ack_pending{is_consumer_leader=\"true\",stream_name=~\"NOCTF_CONTROL|NOCTF_GAMEPLAY\"})) or vector(0)", "legendFormat": "ack pending" },
+        { "expr": "sum(max by (stream_name, consumer_name) (jetstream_consumer_num_redelivered{is_consumer_leader=\"true\",stream_name=~\"NOCTF_CONTROL|NOCTF_GAMEPLAY\"})) or vector(0)", "legendFormat": "redelivered" },
+        { "expr": "sum by (stream_name) (max by (stream_name, server_name) (jetstream_stream_total_messages{is_stream_leader=\"true\"}))", "legendFormat": "{{stream_name}} messages" },
+        { "expr": "sum(max by (server_name) (jetstream_server_total_message_bytes)) / clamp_min(sum(max by (server_name) (jetstream_server_max_storage)), 1)", "legendFormat": "storage ratio" }
       ]
     },
     {
-      "type": "timeseries", "title": "Wolverine 吞吐 / 失败 / 死信", "id": 6,
+      "type": "timeseries", "title": "Wolverine 事务消息与吞吐", "id": 6,
       "gridPos": { "h": 8, "w": 8, "x": 16, "y": 8 },
       "targets": [
-        { "expr": "sum(rate(wolverine_messages_sent_total{role=\"worker\"}[5m]))", "legendFormat": "sent/s" },
-        { "expr": "sum(rate(wolverine_messages_succeeded_total{role=\"worker\"}[5m]))", "legendFormat": "completed/s" },
-        { "expr": "sum(rate(wolverine_execution_failure_total{role=\"worker\"}[5m]))", "legendFormat": "retry failures/s" },
-        { "expr": "sum(rate(wolverine_dead_letter_queue_total{role=\"worker\"}[5m]))", "legendFormat": "dead letters/s" }
+        { "expr": "sum(wolverine_outbox_count_Messages)", "legendFormat": "outbox" },
+        { "expr": "sum(wolverine_inbox_count_Messages)", "legendFormat": "inbox" },
+        { "expr": "sum(rate(wolverine_messages_sent_Messages_total{role=\"worker\"}[5m]))", "legendFormat": "sent/s" },
+        { "expr": "sum(rate(wolverine_messages_succeeded_Messages_total{role=\"worker\"}[5m]))", "legendFormat": "completed/s" }
       ]
     },
     {
       "type": "timeseries", "title": "Wolverine Handler P95", "id": 7,
       "gridPos": { "h": 8, "w": 8, "x": 0, "y": 16 },
       "targets": [
-        { "expr": "histogram_quantile(0.95, sum by (le) (rate(wolverine_execution_time_milliseconds_bucket{role=\"worker\"}[5m])))", "legendFormat": "execution P95(ms)" },
-        { "expr": "histogram_quantile(0.95, sum by (le) (rate(wolverine_effective_time_milliseconds_bucket{role=\"worker\"}[5m])))", "legendFormat": "end-to-end P95(ms)" }
+        { "expr": "histogram_quantile(0.95, sum by (le) (rate(wolverine_execution_time_Milliseconds_bucket{role=\"worker\"}[5m])))", "legendFormat": "execution P95(ms)" },
+        { "expr": "histogram_quantile(0.95, sum by (le) (rate(wolverine_effective_time_Milliseconds_bucket{role=\"worker\"}[5m])))", "legendFormat": "end-to-end P95(ms)" }
       ]
     },
     {
       "type": "timeseries", "title": "排行榜投影", "id": 8,
       "gridPos": { "h": 8, "w": 8, "x": 8, "y": 16 },
       "targets": [
-        { "expr": "noctf_leaderboard_dirty_competitions{role=\"worker\"}", "legendFormat": "dirty" },
-        { "expr": "noctf_leaderboard_dirty_oldest_age_seconds{role=\"worker\"}", "legendFormat": "oldest(s)" },
+        { "expr": "sum(rate(noctf_leaderboard_merge_dispatches_total{role=\"worker\",outcome=\"failure\"}[5m])) or vector(0)", "legendFormat": "merge dispatch failures/s" },
+        { "expr": "sum(rate(noctf_leaderboard_cache_miss_rebuilds_total{role=\"api\",outcome=\"failure\"}[5m])) or vector(0)", "legendFormat": "cache rebuild failures/s" },
         { "expr": "histogram_quantile(0.95, sum by (le) (rate(noctf_leaderboard_projection_duration_seconds_bucket{role=\"worker\"}[5m])))", "legendFormat": "projection P95(s)" },
-        { "expr": "sum(rate(noctf_leaderboard_publish_failures_total{role=\"worker\"}[5m]))", "legendFormat": "publish failures/s" }
+        { "expr": "sum(rate(noctf_leaderboard_publish_failures_total{role=\"worker\"}[5m])) or vector(0)", "legendFormat": "publish failures/s" },
+        { "expr": "sum(rate(noctf_signalr_publishes_total{role=\"api\",endpoint=\"leaderboard\",outcome=\"failure\"}[5m])) or vector(0)", "legendFormat": "SignalR failures/s" }
       ]
     },
     {

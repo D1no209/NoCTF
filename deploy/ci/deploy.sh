@@ -265,6 +265,7 @@ pull_observability_images()
         grafana
         postgres-exporter
         redis-exporter
+        nats-exporter
         node-exporter
     )
 
@@ -327,7 +328,7 @@ if ! "${compose[@]}" up \
     --pull never \
     --wait \
     --wait-timeout 180 \
-    prometheus grafana postgres-exporter redis-exporter node-exporter; then
+    prometheus grafana postgres-exporter redis-exporter nats-exporter node-exporter; then
     rollback_services
     exit 1
 fi

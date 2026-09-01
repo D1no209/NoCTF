@@ -1,3 +1,4 @@
+using System.Globalization;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Http.Resilience;
@@ -24,6 +25,7 @@ internal static class AdministrationInfrastructure
             configuration["Observability:GrafanaPublicUrl"],
             "Observability:GrafanaPublicUrl");
         services.AddSingleton(new PlatformMonitoringOptions(dashboardUri));
+        services.AddSingleton(CreateMonitoringThresholds(configuration));
 
         if (exporting)
         {
@@ -115,4 +117,112 @@ internal static class AdministrationInfrastructure
 
     private static Uri NormalizeBaseUri(Uri uri) =>
         new(uri.AbsoluteUri.TrimEnd('/') + "/", UriKind.Absolute);
+
+    private static PlatformMonitoringThresholds CreateMonitoringThresholds(
+        IConfiguration configuration)
+    {
+        const string prefix = "Observability:Monitoring";
+        var defaults = PlatformMonitoringThresholds.Default;
+        var thresholds = new PlatformMonitoringThresholds(
+            PositiveInt(configuration, $"{prefix}:SustainedWindowMinutes",
+                defaults.SustainedWindowMinutes),
+            NonNegativeInt(configuration, $"{prefix}:PendingWarning",
+                defaults.PendingWarning),
+            PositiveInt(configuration, $"{prefix}:PendingCritical",
+                defaults.PendingCritical),
+            NonNegativeInt(configuration, $"{prefix}:AckPendingWarning",
+                defaults.AckPendingWarning),
+            PositiveInt(configuration, $"{prefix}:AckPendingCritical",
+                defaults.AckPendingCritical),
+            NonNegativeInt(configuration, $"{prefix}:RedeliveryWarning",
+                defaults.RedeliveryWarning),
+            PositiveInt(configuration, $"{prefix}:RedeliveryCritical",
+                defaults.RedeliveryCritical),
+            NonNegativeInt(configuration, $"{prefix}:OutboxWarning",
+                defaults.OutboxWarning),
+            PositiveInt(configuration, $"{prefix}:OutboxCritical",
+                defaults.OutboxCritical),
+            NonNegativeInt(configuration, $"{prefix}:InboxWarning",
+                defaults.InboxWarning),
+            PositiveInt(configuration, $"{prefix}:InboxCritical",
+                defaults.InboxCritical),
+            Percentage(configuration, $"{prefix}:JetStreamStorageWarningPercent",
+                defaults.JetStreamStorageWarningPercent),
+            Percentage(configuration, $"{prefix}:JetStreamStorageCriticalPercent",
+                defaults.JetStreamStorageCriticalPercent));
+
+        ValidatePair(thresholds.PendingWarning, thresholds.PendingCritical,
+            "pending");
+        ValidatePair(thresholds.AckPendingWarning, thresholds.AckPendingCritical,
+            "ack pending");
+        ValidatePair(thresholds.RedeliveryWarning, thresholds.RedeliveryCritical,
+            "redelivery");
+        ValidatePair(thresholds.OutboxWarning, thresholds.OutboxCritical,
+            "outbox");
+        ValidatePair(thresholds.InboxWarning, thresholds.InboxCritical,
+            "inbox");
+        if (thresholds.JetStreamStorageWarningPercent
+            >= thresholds.JetStreamStorageCriticalPercent)
+        {
+            throw new InvalidOperationException(
+                "JetStream storage warning threshold must be below its critical threshold.");
+        }
+        return thresholds;
+    }
+
+    private static int PositiveInt(
+        IConfiguration configuration,
+        string key,
+        int fallback) => ParseInt(configuration, key, fallback, minimum: 1);
+
+    private static int NonNegativeInt(
+        IConfiguration configuration,
+        string key,
+        int fallback) => ParseInt(configuration, key, fallback, minimum: 0);
+
+    private static int ParseInt(
+        IConfiguration configuration,
+        string key,
+        int fallback,
+        int minimum)
+    {
+        var raw = configuration[key];
+        if (string.IsNullOrWhiteSpace(raw))
+            return fallback;
+        if (!int.TryParse(raw, NumberStyles.Integer, CultureInfo.InvariantCulture,
+                out var value)
+            || value < minimum)
+        {
+            throw new InvalidOperationException(
+                $"{key} must be an integer greater than or equal to {minimum}.");
+        }
+        return value;
+    }
+
+    private static double Percentage(
+        IConfiguration configuration,
+        string key,
+        double fallback)
+    {
+        var raw = configuration[key];
+        if (string.IsNullOrWhiteSpace(raw))
+            return fallback;
+        if (!double.TryParse(raw, NumberStyles.Float, CultureInfo.InvariantCulture,
+                out var value)
+            || value is < 0 or > 100)
+        {
+            throw new InvalidOperationException(
+                $"{key} must be a percentage between 0 and 100.");
+        }
+        return value;
+    }
+
+    private static void ValidatePair(int warning, int critical, string name)
+    {
+        if (warning >= critical)
+        {
+            throw new InvalidOperationException(
+                $"The {name} warning threshold must be below its critical threshold.");
+        }
+    }
 }

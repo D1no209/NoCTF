@@ -5,7 +5,8 @@ public enum PlatformMonitoringStatus : short
     Healthy,
     Warning,
     Critical,
-    Unavailable
+    Unavailable,
+    NoSamples
 }
 
 public enum PlatformMonitoringMetricKind : short
@@ -14,14 +15,20 @@ public enum PlatformMonitoringMetricKind : short
     ApiP95Milliseconds,
     ApiServerErrorPercent,
     SignalRConnections,
-    CriticalQueueDepth,
-    CriticalQueueOldestSeconds,
+    NatsAvailability,
+    JetStreamStorageUsagePercent,
+    CriticalQueuePendingCount,
+    CriticalQueueAckPendingCount,
+    CriticalQueueRedeliveredCount,
+    WolverineOutboxCount,
+    WolverineInboxCount,
     RuntimeWaitingCount,
     RuntimeOldestWaitingSeconds,
-    LeaderboardInvalidationsPerSecond,
-    LeaderboardMergeDispatchesPerSecond,
-    LeaderboardCacheMissRebuildsPerSecond,
+    LeaderboardMergeDispatchFailuresPerSecond,
+    LeaderboardCacheMissRebuildFailuresPerSecond,
     LeaderboardProjectionP95Milliseconds,
+    LeaderboardPublishFailuresPerSecond,
+    LeaderboardSignalRPublishFailuresPerSecond,
     RunnerOnlineCount,
     RunnerMinimumAvailablePercent,
     PostgreSqlConnectionUsagePercent,
@@ -38,27 +45,88 @@ public enum PlatformMonitoringUnit : short
     Percent
 }
 
+public enum PlatformMonitoringSampleState : short
+{
+    Available,
+    NoSamples,
+    Unavailable
+}
+
+public readonly record struct PlatformMonitoringSample(
+    double? Value,
+    PlatformMonitoringSampleState State,
+    double? ThresholdValue = null)
+{
+    public static PlatformMonitoringSample From(
+        double value,
+        double? thresholdValue = null) =>
+        new(value, PlatformMonitoringSampleState.Available, thresholdValue);
+
+    public static PlatformMonitoringSample NoSamples() =>
+        new(null, PlatformMonitoringSampleState.NoSamples);
+
+    public static PlatformMonitoringSample Unavailable() =>
+        new(null, PlatformMonitoringSampleState.Unavailable);
+}
+
+public sealed record PlatformMonitoringThresholds(
+    int SustainedWindowMinutes,
+    int PendingWarning,
+    int PendingCritical,
+    int AckPendingWarning,
+    int AckPendingCritical,
+    int RedeliveryWarning,
+    int RedeliveryCritical,
+    int OutboxWarning,
+    int OutboxCritical,
+    int InboxWarning,
+    int InboxCritical,
+    double JetStreamStorageWarningPercent,
+    double JetStreamStorageCriticalPercent)
+{
+    public static PlatformMonitoringThresholds Default { get; } = new(
+        SustainedWindowMinutes: 3,
+        PendingWarning: 25,
+        PendingCritical: 100,
+        AckPendingWarning: 10,
+        AckPendingCritical: 50,
+        RedeliveryWarning: 1,
+        RedeliveryCritical: 10,
+        OutboxWarning: 25,
+        OutboxCritical: 100,
+        InboxWarning: 25,
+        InboxCritical: 100,
+        JetStreamStorageWarningPercent: 75,
+        JetStreamStorageCriticalPercent: 90);
+}
+
 public sealed record PlatformMonitoringMeasurements(
-    bool SourceAvailable,
+    bool PrometheusAvailable,
     DateTimeOffset CapturedAt,
     Uri? DashboardUri,
-    double? ApiRequestsPerSecond,
-    double? ApiP95Seconds,
-    double? ApiServerErrorRatio,
-    double? SignalRConnections,
-    double? CriticalQueueDepth,
-    double? CriticalQueueOldestSeconds,
-    double? RuntimeWaitingCount,
-    double? RuntimeOldestWaitingSeconds,
-    double? LeaderboardInvalidationsPerSecond,
-    double? LeaderboardMergeDispatchesPerSecond,
-    double? LeaderboardCacheMissRebuildsPerSecond,
-    double? LeaderboardProjectionP95Seconds,
-    double? RunnerOnlineCount,
-    double? RunnerMinimumAvailableRatio,
-    double? PostgreSqlConnectionUsageRatio,
-    double? RedisP99Seconds,
-    double? DiskAvailableRatio);
+    PlatformMonitoringSample ApiRequestsPerSecond,
+    PlatformMonitoringSample ApiP95Seconds,
+    PlatformMonitoringSample ApiServerErrorRatio,
+    PlatformMonitoringSample SignalRConnections,
+    PlatformMonitoringSample NatsAvailability,
+    PlatformMonitoringSample JetStreamStorageUsageRatio,
+    PlatformMonitoringSample CriticalQueuePendingCount,
+    PlatformMonitoringSample CriticalQueueAckPendingCount,
+    PlatformMonitoringSample CriticalQueueRedeliveredCount,
+    PlatformMonitoringSample WolverineOutboxCount,
+    PlatformMonitoringSample WolverineInboxCount,
+    PlatformMonitoringSample RuntimeWaitingCount,
+    PlatformMonitoringSample RuntimeOldestWaitingSeconds,
+    PlatformMonitoringSample LeaderboardMergeDispatchFailuresPerSecond,
+    PlatformMonitoringSample LeaderboardCacheMissRebuildFailuresPerSecond,
+    PlatformMonitoringSample LeaderboardProjectionP95Seconds,
+    PlatformMonitoringSample LeaderboardPublishFailuresPerSecond,
+    PlatformMonitoringSample LeaderboardSignalRPublishFailuresPerSecond,
+    PlatformMonitoringSample RunnerOnlineCount,
+    PlatformMonitoringSample RunnerMinimumAvailableRatio,
+    PlatformMonitoringSample PostgreSqlConnectionUsageRatio,
+    PlatformMonitoringSample RedisP99Seconds,
+    PlatformMonitoringSample DiskAvailableRatio);
 
 public sealed record PlatformMonitoringMetricView(
     PlatformMonitoringMetricKind Kind,
@@ -68,7 +136,8 @@ public sealed record PlatformMonitoringMetricView(
 
 public sealed record PlatformMonitoringView(
     PlatformMonitoringStatus Status,
-    bool SourceAvailable,
+    bool PrometheusAvailable,
+    bool NatsAvailable,
     DateTimeOffset CapturedAt,
     Uri? DashboardUri,
     IReadOnlyList<PlatformMonitoringMetricView> Metrics);
@@ -79,7 +148,9 @@ public interface IPlatformMonitoringReader
         CancellationToken cancellationToken);
 }
 
-public sealed class ObservePlatformMonitoring(IPlatformMonitoringReader reader)
+public sealed class ObservePlatformMonitoring(
+    IPlatformMonitoringReader reader,
+    PlatformMonitoringThresholds thresholds)
 {
     public async Task<PlatformMonitoringView> ExecuteAsync(
         CancellationToken cancellationToken = default)
@@ -91,34 +162,67 @@ public sealed class ObservePlatformMonitoring(IPlatformMonitoringReader reader)
                 PlatformMonitoringUnit.PerSecond, measurements.ApiRequestsPerSecond),
             Metric(PlatformMonitoringMetricKind.ApiP95Milliseconds,
                 PlatformMonitoringUnit.Milliseconds, Milliseconds(measurements.ApiP95Seconds),
-                warningAbove: 800),
+                warningAbove: 800, noSamplesStatus: PlatformMonitoringStatus.NoSamples),
             Metric(PlatformMonitoringMetricKind.ApiServerErrorPercent,
                 PlatformMonitoringUnit.Percent, Percent(measurements.ApiServerErrorRatio),
                 criticalAbove: 2),
             Metric(PlatformMonitoringMetricKind.SignalRConnections,
                 PlatformMonitoringUnit.Count, measurements.SignalRConnections),
-            Metric(PlatformMonitoringMetricKind.CriticalQueueDepth,
-                PlatformMonitoringUnit.Count, measurements.CriticalQueueDepth),
-            Metric(PlatformMonitoringMetricKind.CriticalQueueOldestSeconds,
-                PlatformMonitoringUnit.Seconds, measurements.CriticalQueueOldestSeconds,
-                criticalAbove: 15),
+            Metric(PlatformMonitoringMetricKind.NatsAvailability,
+                PlatformMonitoringUnit.Count, measurements.NatsAvailability,
+                criticalBelow: 1,
+                noSamplesStatus: PlatformMonitoringStatus.Critical,
+                unavailableStatus: PlatformMonitoringStatus.Critical),
+            Metric(PlatformMonitoringMetricKind.JetStreamStorageUsagePercent,
+                PlatformMonitoringUnit.Percent,
+                Percent(measurements.JetStreamStorageUsageRatio),
+                warningAbove: thresholds.JetStreamStorageWarningPercent,
+                criticalAbove: thresholds.JetStreamStorageCriticalPercent),
+            Metric(PlatformMonitoringMetricKind.CriticalQueuePendingCount,
+                PlatformMonitoringUnit.Count, measurements.CriticalQueuePendingCount,
+                warningAbove: thresholds.PendingWarning,
+                criticalAbove: thresholds.PendingCritical),
+            Metric(PlatformMonitoringMetricKind.CriticalQueueAckPendingCount,
+                PlatformMonitoringUnit.Count, measurements.CriticalQueueAckPendingCount,
+                warningAbove: thresholds.AckPendingWarning,
+                criticalAbove: thresholds.AckPendingCritical),
+            Metric(PlatformMonitoringMetricKind.CriticalQueueRedeliveredCount,
+                PlatformMonitoringUnit.Count, measurements.CriticalQueueRedeliveredCount,
+                warningAbove: thresholds.RedeliveryWarning,
+                criticalAbove: thresholds.RedeliveryCritical),
+            Metric(PlatformMonitoringMetricKind.WolverineOutboxCount,
+                PlatformMonitoringUnit.Count, measurements.WolverineOutboxCount,
+                warningAbove: thresholds.OutboxWarning,
+                criticalAbove: thresholds.OutboxCritical),
+            Metric(PlatformMonitoringMetricKind.WolverineInboxCount,
+                PlatformMonitoringUnit.Count, measurements.WolverineInboxCount,
+                warningAbove: thresholds.InboxWarning,
+                criticalAbove: thresholds.InboxCritical),
             Metric(PlatformMonitoringMetricKind.RuntimeWaitingCount,
                 PlatformMonitoringUnit.Count, measurements.RuntimeWaitingCount),
             Metric(PlatformMonitoringMetricKind.RuntimeOldestWaitingSeconds,
                 PlatformMonitoringUnit.Seconds, measurements.RuntimeOldestWaitingSeconds,
                 criticalAbove: 30),
-            Metric(PlatformMonitoringMetricKind.LeaderboardInvalidationsPerSecond,
+            Metric(PlatformMonitoringMetricKind.LeaderboardMergeDispatchFailuresPerSecond,
                 PlatformMonitoringUnit.PerSecond,
-                measurements.LeaderboardInvalidationsPerSecond),
-            Metric(PlatformMonitoringMetricKind.LeaderboardMergeDispatchesPerSecond,
+                measurements.LeaderboardMergeDispatchFailuresPerSecond,
+                warningAbove: 0),
+            Metric(PlatformMonitoringMetricKind.LeaderboardCacheMissRebuildFailuresPerSecond,
                 PlatformMonitoringUnit.PerSecond,
-                measurements.LeaderboardMergeDispatchesPerSecond),
-            Metric(PlatformMonitoringMetricKind.LeaderboardCacheMissRebuildsPerSecond,
-                PlatformMonitoringUnit.PerSecond,
-                measurements.LeaderboardCacheMissRebuildsPerSecond),
+                measurements.LeaderboardCacheMissRebuildFailuresPerSecond,
+                warningAbove: 0),
             Metric(PlatformMonitoringMetricKind.LeaderboardProjectionP95Milliseconds,
                 PlatformMonitoringUnit.Milliseconds,
-                Milliseconds(measurements.LeaderboardProjectionP95Seconds)),
+                Milliseconds(measurements.LeaderboardProjectionP95Seconds),
+                noSamplesStatus: PlatformMonitoringStatus.NoSamples),
+            Metric(PlatformMonitoringMetricKind.LeaderboardPublishFailuresPerSecond,
+                PlatformMonitoringUnit.PerSecond,
+                measurements.LeaderboardPublishFailuresPerSecond,
+                warningAbove: 0),
+            Metric(PlatformMonitoringMetricKind.LeaderboardSignalRPublishFailuresPerSecond,
+                PlatformMonitoringUnit.PerSecond,
+                measurements.LeaderboardSignalRPublishFailuresPerSecond,
+                warningAbove: 0),
             Metric(PlatformMonitoringMetricKind.RunnerOnlineCount,
                 PlatformMonitoringUnit.Count, measurements.RunnerOnlineCount,
                 criticalBelow: 1),
@@ -130,16 +234,20 @@ public sealed class ObservePlatformMonitoring(IPlatformMonitoringReader reader)
                 Percent(measurements.PostgreSqlConnectionUsageRatio), warningAbove: 80),
             Metric(PlatformMonitoringMetricKind.RedisP99Milliseconds,
                 PlatformMonitoringUnit.Milliseconds,
-                Milliseconds(measurements.RedisP99Seconds), warningAbove: 50),
+                Milliseconds(measurements.RedisP99Seconds), warningAbove: 50,
+                noSamplesStatus: PlatformMonitoringStatus.NoSamples),
             Metric(PlatformMonitoringMetricKind.DiskAvailablePercent,
                 PlatformMonitoringUnit.Percent,
                 Percent(measurements.DiskAvailableRatio), criticalBelow: 15)
         };
 
-        var status = ResolveOverallStatus(measurements.SourceAvailable, metrics);
+        var status = ResolveOverallStatus(measurements.PrometheusAvailable, metrics);
+        var natsAvailable = Metric(metrics, PlatformMonitoringMetricKind.NatsAvailability)
+            .Status == PlatformMonitoringStatus.Healthy;
         return new(
             status,
-            measurements.SourceAvailable,
+            measurements.PrometheusAvailable,
+            natsAvailable,
             measurements.CapturedAt,
             measurements.DashboardUri,
             metrics);
@@ -148,43 +256,65 @@ public sealed class ObservePlatformMonitoring(IPlatformMonitoringReader reader)
     private static PlatformMonitoringMetricView Metric(
         PlatformMonitoringMetricKind kind,
         PlatformMonitoringUnit unit,
-        double? value,
+        PlatformMonitoringSample sample,
         double? warningAbove = null,
         double? criticalAbove = null,
-        double? criticalBelow = null)
+        double? criticalBelow = null,
+        PlatformMonitoringStatus noSamplesStatus = PlatformMonitoringStatus.Unavailable,
+        PlatformMonitoringStatus unavailableStatus = PlatformMonitoringStatus.Unavailable)
     {
-        value = Finite(value);
-        var status = value switch
+        var value = Finite(sample.Value);
+        var thresholdValue = Finite(sample.ThresholdValue) ?? value;
+        var status = sample.State switch
         {
-            null => PlatformMonitoringStatus.Unavailable,
-            _ when criticalAbove is not null && value > criticalAbove =>
+            PlatformMonitoringSampleState.Unavailable => unavailableStatus,
+            PlatformMonitoringSampleState.NoSamples => noSamplesStatus,
+            _ when value is null => unavailableStatus,
+            _ when criticalAbove is not null && thresholdValue > criticalAbove =>
                 PlatformMonitoringStatus.Critical,
-            _ when criticalBelow is not null && value < criticalBelow =>
+            _ when criticalBelow is not null && thresholdValue < criticalBelow =>
                 PlatformMonitoringStatus.Critical,
-            _ when warningAbove is not null && value > warningAbove =>
+            _ when warningAbove is not null && thresholdValue > warningAbove =>
                 PlatformMonitoringStatus.Warning,
             _ => PlatformMonitoringStatus.Healthy
         };
         return new(kind, unit, value, status);
     }
 
+    private static PlatformMonitoringMetricView Metric(
+        IReadOnlyList<PlatformMonitoringMetricView> metrics,
+        PlatformMonitoringMetricKind kind) =>
+        metrics.Single(metric => metric.Kind == kind);
+
     private static PlatformMonitoringStatus ResolveOverallStatus(
-        bool sourceAvailable,
+        bool prometheusAvailable,
         IReadOnlyList<PlatformMonitoringMetricView> metrics)
     {
-        if (!sourceAvailable)
+        if (!prometheusAvailable)
             return PlatformMonitoringStatus.Unavailable;
         if (metrics.Any(metric => metric.Status == PlatformMonitoringStatus.Critical))
             return PlatformMonitoringStatus.Critical;
         if (metrics.Any(metric => metric.Status is PlatformMonitoringStatus.Warning
                 or PlatformMonitoringStatus.Unavailable))
+        {
             return PlatformMonitoringStatus.Warning;
+        }
         return PlatformMonitoringStatus.Healthy;
     }
 
-    private static double? Milliseconds(double? seconds) => seconds * 1000;
+    private static PlatformMonitoringSample Milliseconds(PlatformMonitoringSample sample) =>
+        sample with
+        {
+            Value = sample.Value * 1000,
+            ThresholdValue = sample.ThresholdValue * 1000
+        };
 
-    private static double? Percent(double? ratio) => ratio * 100;
+    private static PlatformMonitoringSample Percent(PlatformMonitoringSample sample) =>
+        sample with
+        {
+            Value = sample.Value * 100,
+            ThresholdValue = sample.ThresholdValue * 100
+        };
 
     private static double? Finite(double? value) =>
         value is { } number && double.IsFinite(number) ? number : null;

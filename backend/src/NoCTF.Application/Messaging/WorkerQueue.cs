@@ -40,19 +40,3 @@ public static class CompetitionEventFanoutQueueNames
 
     public static readonly IReadOnlyList<string> All = [Realtime, Leaderboard];
 }
-
-public static class WorkerQueueMonitoringNames
-{
-    public static readonly IReadOnlyList<string> All =
-    [
-        WorkerQueueNames.Control,
-        WorkerQueueNames.Gameplay,
-        WorkerQueueNames.Projection,
-        WorkerQueueNames.Background,
-        CompetitionEventFanoutQueueNames.Realtime,
-        CompetitionEventFanoutQueueNames.Leaderboard
-    ];
-
-    public static bool IsKnown(string queueName) =>
-        All.Contains(queueName, StringComparer.Ordinal);
-}

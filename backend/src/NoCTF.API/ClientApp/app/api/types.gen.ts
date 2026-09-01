@@ -1308,13 +1308,14 @@ export type NoCtfapiEndpointsAdministrationPlatformPlatformContributorResponse =
 
 export type NoCtfapiEndpointsAdministrationPlatformPlatformMonitoringResponse = {
     status?: NoCtfApplicationAdministrationMonitoringPlatformMonitoringStatus;
-    sourceAvailable?: boolean;
+    prometheusAvailable?: boolean;
+    natsAvailable?: boolean;
     capturedAt?: string;
     dashboardUrl?: string | null;
     metrics?: Array<NoCtfapiEndpointsAdministrationPlatformPlatformMonitoringMetricResponse>;
 };
 
-export type NoCtfApplicationAdministrationMonitoringPlatformMonitoringStatus = 0 | 1 | 2 | 3;
+export type NoCtfApplicationAdministrationMonitoringPlatformMonitoringStatus = 0 | 1 | 2 | 3 | 4;
 
 export type NoCtfapiEndpointsAdministrationPlatformPlatformMonitoringMetricResponse = {
     kind?: NoCtfApplicationAdministrationMonitoringPlatformMonitoringMetricKind;
@@ -1323,7 +1324,7 @@ export type NoCtfapiEndpointsAdministrationPlatformPlatformMonitoringMetricRespo
     status?: NoCtfApplicationAdministrationMonitoringPlatformMonitoringStatus;
 };
 
-export type NoCtfApplicationAdministrationMonitoringPlatformMonitoringMetricKind = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12 | 13 | 14 | 15 | 16;
+export type NoCtfApplicationAdministrationMonitoringPlatformMonitoringMetricKind = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12 | 13 | 14 | 15 | 16 | 17 | 18 | 19 | 20 | 21 | 22;
 
 export type NoCtfApplicationAdministrationMonitoringPlatformMonitoringUnit = 0 | 1 | 2 | 3 | 4;
 

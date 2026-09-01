@@ -1,7 +1,6 @@
 using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Diagnostics.Metrics;
-using NoCTF.Application.Messaging;
 
 namespace NoCTF.Application.Observability;
 
@@ -65,8 +64,6 @@ public static class NoCtfTelemetry
         "noctf.scheduler.skipped_ticks", unit: "{tick}");
     private static long _waitingRuntimeCount;
     private static long _oldestWaitingRuntimeAgeSeconds;
-    private static readonly ConcurrentDictionary<string, WorkerQueueSnapshot> WorkerQueueSnapshots =
-        new(StringComparer.Ordinal);
     private static readonly ConcurrentDictionary<string, RunnerCapacitySnapshot> RunnerCapacitySnapshots =
         new(StringComparer.Ordinal);
 
@@ -79,14 +76,6 @@ public static class NoCtfTelemetry
         Meter.CreateObservableGauge(
             "noctf.runtime.waiting.oldest_age",
             () => Interlocked.Read(ref _oldestWaitingRuntimeAgeSeconds),
-            unit: "s");
-        Meter.CreateObservableGauge(
-            "noctf.worker.queue.depth",
-            ObserveWorkerQueueDepth,
-            unit: "{message}");
-        Meter.CreateObservableGauge(
-            "noctf.worker.queue.oldest_age",
-            ObserveWorkerQueueOldestAge,
             unit: "s");
         Meter.CreateObservableGauge(
             "noctf.runner.online",
@@ -211,19 +200,6 @@ public static class NoCtfTelemetry
             Math.Max(0, (long)oldestWaitingRuntimeAge.TotalSeconds));
     }
 
-    public static void UpdateWorkerQueueSnapshot(
-        string queue,
-        long depth,
-        TimeSpan oldestAge)
-    {
-        ArgumentException.ThrowIfNullOrWhiteSpace(queue);
-        if (!WorkerQueueMonitoringNames.IsKnown(queue))
-            throw new ArgumentOutOfRangeException(nameof(queue), queue, "Unknown worker queue.");
-        WorkerQueueSnapshots[queue] = new(
-            Math.Max(0, depth),
-            Math.Max(0, (long)oldestAge.TotalSeconds));
-    }
-
     public static void UpdateRunnerCapacitySnapshot(
         string pool,
         string runnerId,
@@ -247,18 +223,6 @@ public static class NoCtfTelemetry
             ClampAvailable(online, availablePids, totalPids),
             Math.Max(0, totalPids));
     }
-
-    private static IEnumerable<Measurement<long>> ObserveWorkerQueueDepth() =>
-        WorkerQueueMonitoringNames.All.Select(queue => new Measurement<long>(
-            WorkerQueueSnapshots.TryGetValue(queue, out var snapshot) ? snapshot.Depth : 0,
-            new KeyValuePair<string, object?>("queue", queue)));
-
-    private static IEnumerable<Measurement<long>> ObserveWorkerQueueOldestAge() =>
-        WorkerQueueMonitoringNames.All.Select(queue => new Measurement<long>(
-            WorkerQueueSnapshots.TryGetValue(queue, out var snapshot)
-                ? snapshot.OldestAgeSeconds
-                : 0,
-            new KeyValuePair<string, object?>("queue", queue)));
 
     private static IEnumerable<Measurement<long>> ObserveRunnerOnline() =>
         RunnerCapacitySnapshots.Values
@@ -315,6 +279,4 @@ public static class NoCtfTelemetry
         long TotalNanoCpus,
         long AvailablePids,
         long TotalPids);
-
-    private sealed record WorkerQueueSnapshot(long Depth, long OldestAgeSeconds);
 }

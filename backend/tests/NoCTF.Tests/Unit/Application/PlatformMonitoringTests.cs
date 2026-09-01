@@ -8,11 +8,13 @@ public sealed class PlatformMonitoringTests
     [Test]
     public async Task HealthyMeasurements_AreConvertedForTheProtocolView()
     {
-        var useCase = new ObservePlatformMonitoring(new StubReader(Measurements()));
+        var useCase = UseCase(Measurements());
 
         var result = await useCase.ExecuteAsync();
 
         await Assert.That(result.Status).IsEqualTo(PlatformMonitoringStatus.Healthy);
+        await Assert.That(result.PrometheusAvailable).IsTrue();
+        await Assert.That(result.NatsAvailable).IsTrue();
         await Assert.That(Metric(result, PlatformMonitoringMetricKind.ApiP95Milliseconds).Value)
             .IsEqualTo(250);
         await Assert.That(Metric(result, PlatformMonitoringMetricKind.ApiServerErrorPercent).Value)
@@ -24,9 +26,9 @@ public sealed class PlatformMonitoringTests
     [Test]
     public async Task CriticalThreshold_TakesPrecedenceOverWarnings()
     {
-        var useCase = new ObservePlatformMonitoring(new StubReader(Measurements(
+        var useCase = UseCase(Measurements(
             apiP95Seconds: 1.2,
-            runtimeOldestWaitingSeconds: 31)));
+            runtimeOldestWaitingSeconds: 31));
 
         var result = await useCase.ExecuteAsync();
 
@@ -40,15 +42,71 @@ public sealed class PlatformMonitoringTests
     }
 
     [Test]
-    public async Task UnavailableSource_DoesNotPretendThePlatformIsHealthy()
+    public async Task TransientQueueMessage_DoesNotTriggerSustainedThreshold()
     {
-        var measurements = Measurements() with { SourceAvailable = false };
-        var useCase = new ObservePlatformMonitoring(new StubReader(measurements));
+        var measurements = Measurements() with
+        {
+            CriticalQueuePendingCount = PlatformMonitoringSample.From(
+                value: 80,
+                thresholdValue: 0)
+        };
 
-        var result = await useCase.ExecuteAsync();
+        var result = await UseCase(measurements).ExecuteAsync();
+
+        await Assert.That(Metric(result,
+                PlatformMonitoringMetricKind.CriticalQueuePendingCount).Value)
+            .IsEqualTo(80);
+        await Assert.That(Metric(result,
+                PlatformMonitoringMetricKind.CriticalQueuePendingCount).Status)
+            .IsEqualTo(PlatformMonitoringStatus.Healthy);
+    }
+
+    [Test]
+    public async Task NatsUnavailable_IsCriticalWhilePrometheusIsAvailable()
+    {
+        var measurements = Measurements() with
+        {
+            NatsAvailability = PlatformMonitoringSample.From(0)
+        };
+
+        var result = await UseCase(measurements).ExecuteAsync();
+
+        await Assert.That(result.Status).IsEqualTo(PlatformMonitoringStatus.Critical);
+        await Assert.That(result.NatsAvailable).IsFalse();
+        await Assert.That(Metric(result, PlatformMonitoringMetricKind.NatsAvailability).Status)
+            .IsEqualTo(PlatformMonitoringStatus.Critical);
+    }
+
+    [Test]
+    public async Task UnavailablePrometheus_DoesNotPretendThePlatformIsHealthy()
+    {
+        var measurements = Measurements() with { PrometheusAvailable = false };
+
+        var result = await UseCase(measurements).ExecuteAsync();
 
         await Assert.That(result.Status).IsEqualTo(PlatformMonitoringStatus.Unavailable);
-        await Assert.That(result.SourceAvailable).IsFalse();
+        await Assert.That(result.PrometheusAvailable).IsFalse();
+    }
+
+    [Test]
+    public async Task IdleLatency_IsNoSamplesWithoutDegradingOverallStatus()
+    {
+        var measurements = Measurements() with
+        {
+            ApiP95Seconds = PlatformMonitoringSample.NoSamples(),
+            LeaderboardProjectionP95Seconds = PlatformMonitoringSample.NoSamples(),
+            RedisP99Seconds = PlatformMonitoringSample.NoSamples()
+        };
+
+        var result = await UseCase(measurements).ExecuteAsync();
+
+        await Assert.That(result.Status).IsEqualTo(PlatformMonitoringStatus.Healthy);
+        await Assert.That(Metric(result,
+                PlatformMonitoringMetricKind.ApiP95Milliseconds).Status)
+            .IsEqualTo(PlatformMonitoringStatus.NoSamples);
+        await Assert.That(Metric(result,
+                PlatformMonitoringMetricKind.LeaderboardProjectionP95Milliseconds).Status)
+            .IsEqualTo(PlatformMonitoringStatus.NoSamples);
     }
 
     [Test]
@@ -56,13 +114,12 @@ public sealed class PlatformMonitoringTests
     {
         var measurements = Measurements() with
         {
-            ApiRequestsPerSecond = double.PositiveInfinity,
-            ApiP95Seconds = double.NaN,
-            DiskAvailableRatio = double.NegativeInfinity
+            ApiRequestsPerSecond = PlatformMonitoringSample.From(double.PositiveInfinity),
+            ApiP95Seconds = PlatformMonitoringSample.From(double.NaN),
+            DiskAvailableRatio = PlatformMonitoringSample.From(double.NegativeInfinity)
         };
-        var useCase = new ObservePlatformMonitoring(new StubReader(measurements));
 
-        var result = await useCase.ExecuteAsync();
+        var result = await UseCase(measurements).ExecuteAsync();
 
         await Assert.That(result.Status).IsEqualTo(PlatformMonitoringStatus.Warning);
         await Assert.That(Metric(result,
@@ -81,6 +138,10 @@ public sealed class PlatformMonitoringTests
         await Assert.That(() => JsonSerializer.Serialize(result)).ThrowsNothing();
     }
 
+    private static ObservePlatformMonitoring UseCase(
+        PlatformMonitoringMeasurements measurements) =>
+        new(new StubReader(measurements), PlatformMonitoringThresholds.Default);
+
     private static PlatformMonitoringMetricView Metric(
         PlatformMonitoringView view,
         PlatformMonitoringMetricKind kind) =>
@@ -88,28 +149,39 @@ public sealed class PlatformMonitoringTests
 
     private static PlatformMonitoringMeasurements Measurements(
         double apiP95Seconds = 0.25,
-        double runtimeOldestWaitingSeconds = 1) =>
-        new(
+        double runtimeOldestWaitingSeconds = 1)
+    {
+        static PlatformMonitoringSample Value(double value) =>
+            PlatformMonitoringSample.From(value);
+
+        return new(
             true,
             new DateTimeOffset(2026, 8, 23, 12, 0, 0, TimeSpan.Zero),
             new Uri("https://monitoring.example.test/"),
-            12,
-            apiP95Seconds,
-            0.005,
-            8,
-            0,
-            0,
-            0,
-            runtimeOldestWaitingSeconds,
-            0,
-            0,
-            0,
-            0,
-            2,
-            0.75,
-            0.45,
-            0.01,
-            0.60);
+            Value(12),
+            Value(apiP95Seconds),
+            Value(0.005),
+            Value(8),
+            Value(1),
+            Value(0.10),
+            Value(0),
+            Value(0),
+            Value(0),
+            Value(0),
+            Value(0),
+            Value(0),
+            Value(runtimeOldestWaitingSeconds),
+            Value(0),
+            Value(0),
+            Value(0.1),
+            Value(0),
+            Value(0),
+            Value(2),
+            Value(0.75),
+            Value(0.45),
+            Value(0.01),
+            Value(0.60));
+    }
 
     private sealed class StubReader(PlatformMonitoringMeasurements measurements)
         : IPlatformMonitoringReader

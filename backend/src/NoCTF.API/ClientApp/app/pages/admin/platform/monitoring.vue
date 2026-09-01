@@ -22,6 +22,7 @@ const STATUS = {
   warning: 1,
   critical: 2,
   unavailable: 3,
+  noSamples: 4,
 } as const satisfies Record<string, MonitoringStatus>
 
 const METRIC = {
@@ -29,19 +30,25 @@ const METRIC = {
   apiP95Milliseconds: 1,
   apiServerErrorPercent: 2,
   signalRConnections: 3,
-  criticalQueueDepth: 4,
-  criticalQueueOldestSeconds: 5,
-  runtimeWaitingCount: 6,
-  runtimeOldestWaitingSeconds: 7,
-  leaderboardInvalidationsPerSecond: 8,
-  leaderboardMergeDispatchesPerSecond: 9,
-  leaderboardCacheMissRebuildsPerSecond: 10,
-  leaderboardProjectionP95Milliseconds: 11,
-  runnerOnlineCount: 12,
-  runnerMinimumAvailablePercent: 13,
-  postgreSqlConnectionUsagePercent: 14,
-  redisP99Milliseconds: 15,
-  diskAvailablePercent: 16,
+  natsAvailability: 4,
+  jetStreamStorageUsagePercent: 5,
+  criticalQueuePendingCount: 6,
+  criticalQueueAckPendingCount: 7,
+  criticalQueueRedeliveredCount: 8,
+  wolverineOutboxCount: 9,
+  wolverineInboxCount: 10,
+  runtimeWaitingCount: 11,
+  runtimeOldestWaitingSeconds: 12,
+  leaderboardMergeDispatchFailuresPerSecond: 13,
+  leaderboardCacheMissRebuildFailuresPerSecond: 14,
+  leaderboardProjectionP95Milliseconds: 15,
+  leaderboardPublishFailuresPerSecond: 16,
+  leaderboardSignalRPublishFailuresPerSecond: 17,
+  runnerOnlineCount: 18,
+  runnerMinimumAvailablePercent: 19,
+  postgreSqlConnectionUsagePercent: 20,
+  redisP99Milliseconds: 21,
+  diskAvailablePercent: 22,
 } as const
 
 const UNIT = {
@@ -58,14 +65,27 @@ const GROUPS: Array<{ title: string; kinds: number[] }> = [
     kinds: [METRIC.apiRequestsPerSecond, METRIC.apiP95Milliseconds, METRIC.apiServerErrorPercent, METRIC.signalRConnections],
   },
   {
-    title: '队列与投影',
+    title: 'NATS JetStream',
     kinds: [
-      METRIC.criticalQueueDepth,
-      METRIC.criticalQueueOldestSeconds,
-      METRIC.leaderboardInvalidationsPerSecond,
-      METRIC.leaderboardMergeDispatchesPerSecond,
-      METRIC.leaderboardCacheMissRebuildsPerSecond,
+      METRIC.natsAvailability,
+      METRIC.jetStreamStorageUsagePercent,
+      METRIC.criticalQueuePendingCount,
+      METRIC.criticalQueueAckPendingCount,
+      METRIC.criticalQueueRedeliveredCount,
+    ],
+  },
+  {
+    title: '事务消息',
+    kinds: [METRIC.wolverineOutboxCount, METRIC.wolverineInboxCount],
+  },
+  {
+    title: '排行榜链路',
+    kinds: [
+      METRIC.leaderboardMergeDispatchFailuresPerSecond,
+      METRIC.leaderboardCacheMissRebuildFailuresPerSecond,
       METRIC.leaderboardProjectionP95Milliseconds,
+      METRIC.leaderboardPublishFailuresPerSecond,
+      METRIC.leaderboardSignalRPublishFailuresPerSecond,
     ],
   },
   {
@@ -83,14 +103,20 @@ const METRIC_LABELS: Record<number, string> = {
   [METRIC.apiP95Milliseconds]: 'API P95 延迟',
   [METRIC.apiServerErrorPercent]: 'API 5xx 比例',
   [METRIC.signalRConnections]: 'SignalR 当前连接',
-  [METRIC.criticalQueueDepth]: '关键队列积压',
-  [METRIC.criticalQueueOldestSeconds]: '最旧关键消息等待',
+  [METRIC.natsAvailability]: 'NATS 可用性',
+  [METRIC.jetStreamStorageUsagePercent]: 'JetStream 存储使用率',
+  [METRIC.criticalQueuePendingCount]: '关键消息待投递',
+  [METRIC.criticalQueueAckPendingCount]: '关键消息处理中未确认',
+  [METRIC.criticalQueueRedeliveredCount]: '关键消息重投递',
+  [METRIC.wolverineOutboxCount]: 'Wolverine Outbox 积压',
+  [METRIC.wolverineInboxCount]: 'Wolverine Inbox 积压',
   [METRIC.runtimeWaitingCount]: '等待中的 Runtime',
   [METRIC.runtimeOldestWaitingSeconds]: '最长 Runtime 等待',
-  [METRIC.leaderboardInvalidationsPerSecond]: '排行榜缓存失效速率',
-  [METRIC.leaderboardMergeDispatchesPerSecond]: '排行榜合并投影速率',
-  [METRIC.leaderboardCacheMissRebuildsPerSecond]: '排行榜缓存缺失重建速率',
+  [METRIC.leaderboardMergeDispatchFailuresPerSecond]: '排行榜合并分发失败率',
+  [METRIC.leaderboardCacheMissRebuildFailuresPerSecond]: '排行榜缓存重建失败率',
   [METRIC.leaderboardProjectionP95Milliseconds]: '排行榜投影 P95 延迟',
+  [METRIC.leaderboardPublishFailuresPerSecond]: '排行榜缓存发布失败率',
+  [METRIC.leaderboardSignalRPublishFailuresPerSecond]: '排行榜 SignalR 发布失败率',
   [METRIC.runnerOnlineCount]: '在线 Runner',
   [METRIC.runnerMinimumAvailablePercent]: 'Runner 最低可用容量',
   [METRIC.postgreSqlConnectionUsagePercent]: 'PostgreSQL 连接使用率',
@@ -107,6 +133,7 @@ function statusLabel(status: MonitoringStatus | undefined): string {
   if (status === STATUS.healthy) return translate("运行正常")
   if (status === STATUS.warning) return translate("需要关注")
   if (status === STATUS.critical) return translate("严重异常")
+  if (status === STATUS.noSamples) return translate("暂无样本")
   return translate("数据不可用")
 }
 
@@ -126,8 +153,10 @@ function metricLabel(kind: number): string {
 }
 
 function formatMetric(metric: MonitoringMetric | undefined): string {
+  if (metric?.status === STATUS.noSamples) return translate('暂无样本')
   if (metric?.value === null || metric?.value === undefined) return '—'
   const value = metric.value
+  if (metric.kind === METRIC.natsAvailability) return translate(value >= 1 ? '可用' : '不可用')
   if (metric.unit === UNIT.perSecond) return `${value.toFixed(value < 10 ? 2 : 1)} /s`
   if (metric.unit === UNIT.milliseconds) return `${Math.round(value)} ms`
   if (metric.unit === UNIT.seconds) return `${Math.round(value)} s`
@@ -186,6 +215,14 @@ onUnmounted(() => {
           <p class="mt-1 text-sm text-muted-foreground">
             {{ $t('平台关键链路与容量摘要') }}
           </p>
+          <div v-if="snapshot" class="mt-2 flex flex-wrap gap-2">
+            <Badge :variant="snapshot.prometheusAvailable ? 'default' : 'destructive'">
+              Prometheus · {{ $t(snapshot.prometheusAvailable ? '可用' : '不可用') }}
+            </Badge>
+            <Badge :variant="snapshot.natsAvailable ? 'default' : 'destructive'">
+              NATS · {{ $t(snapshot.natsAvailable ? '可用' : '不可用') }}
+            </Badge>
+          </div>
         </div>
       </div>
       <div class="flex flex-wrap gap-2">
@@ -207,9 +244,15 @@ onUnmounted(() => {
       <AlertDescription>{{ error }}</AlertDescription>
     </Alert>
 
-    <Alert v-if="snapshot && !snapshot.sourceAvailable">
+    <Alert v-if="snapshot && !snapshot.prometheusAvailable" variant="destructive">
       <AlertDescription>
-        {{ $t('监控数据源暂不可用,请检查 Prometheus 与采集目标') }}
+        {{ $t('Prometheus 暂不可用,当前监控摘要不是实时状态') }}
+      </AlertDescription>
+    </Alert>
+
+    <Alert v-else-if="snapshot && !snapshot.natsAvailable" variant="destructive">
+      <AlertDescription>
+        {{ $t('NATS Exporter 或 NATS 监控接口不可用,消息链路状态为严重异常') }}
       </AlertDescription>
     </Alert>
 
