@@ -3239,3 +3239,13 @@ dotnet run --project backend/src/NoCTF.API/NoCTF.API.csproj --no-build -- --expo
 - 按用户后续要求删除整个 `verify` Job；工作流只在 `main` push 时直接运行 `publish-images`，Docker
   Host 镜像构建仍会完成后端 publish 与 Nuxt generate。架构门禁、部署/开发文档同步到这一策略。
 - 本阶段将按用户明确指令提交并推送，不部署。
+
+## 2026-09-01 阿里云 ACR OCI attestation 兼容
+
+- Actions run `33475559128` 中 GHCR 的三个标签均已成功推送；阿里云 ACR 在接收 Buildx 自动生成的
+  provenance attestation manifest 时拒绝 `application/vnd.oci.empty.v1+json`，因此失败不是登录、
+  镜像层或 Dockerfile 问题。`#42` GHA cache 错误是并行 exporter 传播同一 push 失败。
+- `docker/build-push-action` 现显式设置 `provenance: false`、`sbom: false`，避免向兼容性有限的自定义
+  Registry 推送 attestation 清单；GHA cache exporter 增加 `ignore-error=true`，缓存服务异常不再阻断
+  Registry 发布。架构门禁固定这三个兼容性选项。
+- 本阶段仅创建本地提交，未 push、未部署。
