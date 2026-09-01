@@ -1,0 +1,22 @@
+services:
+  migration:
+    image: ${NOCTF_MIGRATION_IMAGE:?set NOCTF_MIGRATION_IMAGE}
+    pull_policy: never
+
+  backend:
+    image: ${NOCTF_BACKEND_IMAGE:?set NOCTF_BACKEND_IMAGE}
+    pull_policy: never
+    environment:
+      Hosting__Roles__0: Api
+
+  worker:
+    image: ${NOCTF_WORKER_IMAGE:?set NOCTF_WORKER_IMAGE}
+    pull_policy: never
+    environment:
+      Hosting__Roles__0: Worker
+
+  runner:
+    image: ${NOCTF_RUNNER_IMAGE:?set NOCTF_RUNNER_IMAGE}
+    pull_policy: never
+    environment:
+      Hosting__Roles__0: Runner

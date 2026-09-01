@@ -10,6 +10,7 @@ public sealed class DeploymentTopologyTests
         var dockerfile = await ReadAsync("backend", "Dockerfile");
         var compose = await ReadAsync("deploy", "docker-compose.yml");
         var singleCompose = await ReadAsync("deploy", "docker-compose.single.yml");
+        var ciCompose = await ReadAsync("deploy", "docker-compose.ci.yml");
         var hostProgram = await ReadAsync("backend", "src", "NoCTF.Host", "Program.cs");
         var roleModel = await ReadAsync("backend", "src", "NoCTF.Hosting", "HostRoles.cs");
         var routing = await ReadAsync("backend", "src", "NoCTF.Hosting", "MessageRouting.cs");
@@ -43,6 +44,10 @@ public sealed class DeploymentTopologyTests
         await Assert.That(singleCompose).Contains("  noctf:");
         await Assert.That(singleCompose).Contains("target: host");
         await Assert.That(singleCompose).Contains("Hosting__Roles__0: Api");
+        await Assert.That(ciCompose).Contains("NOCTF_BACKEND_IMAGE");
+        await Assert.That(ciCompose).Contains("Hosting__Roles__0: Api");
+        await Assert.That(ciCompose).Contains("Hosting__Roles__0: Worker");
+        await Assert.That(ciCompose).Contains("Hosting__Roles__0: Runner");
         await Assert.That(hostProgram).Contains("--migrate-only");
         await Assert.That(compose).Contains("GET /health/ready HTTP/1.1");
         await Assert.That(compose).Contains("[[ \"$$status\" == *\" 200 \"* ]]");
@@ -352,6 +357,8 @@ public sealed class DeploymentTopologyTests
         await Assert.That(ci).Contains("CUSTOM_REGISTRY: ${{ vars.CUSTOM_REGISTRY }}");
         await Assert.That(ci).Contains("if: env.CUSTOM_REGISTRY != ''");
         await Assert.That(ci).Contains("target: host");
+        await Assert.That(ci).Contains("steps.build.outputs.digest");
+        await Assert.That(ci).Contains("deployment_repository");
         await Assert.That(ci).Contains("push: true");
         await Assert.That(ci).Contains("provenance: false");
         await Assert.That(ci).Contains("sbom: false");
@@ -378,11 +385,19 @@ public sealed class DeploymentTopologyTests
         await Assert.That(ci).Contains("NOCTF_DEPLOY_HOST");
         await Assert.That(ci).Contains("NOCTF_DEPLOY_SSH_KEY");
         await Assert.That(ci).Contains("NOCTF_DEPLOY_KNOWN_HOSTS");
+        await Assert.That(ci).Contains("DEPLOY_IMAGE: ${{ needs.publish-images.outputs.deployment-image }}");
+        await Assert.That(ci).Contains("Authenticate deployment registry");
+        await Assert.That(ci).Contains("Deploy exact image");
         await Assert.That(ci).Contains("git archive \\\n");
         await Assert.That(ci).Contains("$GITHUB_SHA");
+        await Assert.That(ci).Contains("backend/Directory.Build.props");
+        await Assert.That(ci).Contains("deploy/docker-compose.ci.yml");
+        await Assert.That(ci).DoesNotContain("            \"$GITHUB_SHA\"\n          tar -tzf");
         await Assert.That(ci).Contains("deploy/ci/deploy.sh");
         await Assert.That(ci).Contains("noctf-ci-upload-$GITHUB_SHA");
         await Assert.That(ci).Contains("if: always()\n");
+        await Assert.That(ci).DoesNotContain("kompose_version=1.38.0");
+        await Assert.That(ci).DoesNotContain("Reused the verified Kompose asset");
     }
 
     [Test]
@@ -424,9 +439,13 @@ public sealed class DeploymentTopologyTests
         await Assert.That(dockerfile).Contains("--speed-time 30");
         await Assert.That(dockerfile).Contains("COPY backend/docker-assets/");
         await Assert.That(deployScript).Contains(
-            "kompose_asset_path=${5:?verified Kompose asset path is required}");
-        await Assert.That(deployScript).Contains(
-            "backend/docker-assets/kompose-linux-amd64");
+            "platform_image=${5:?published platform image is required}");
+        await Assert.That(deployScript).Contains("docker-compose.ci.yml");
+        await Assert.That(deployScript).Contains("docker pull \"$platform_image\"");
+        await Assert.That(deployScript).Contains("--no-build");
+        await Assert.That(deployScript).DoesNotContain("kompose_asset_path");
+        await Assert.That(deployScript).DoesNotContain(
+            "\"${compose[@]}\" build migration backend worker runner");
 
         var externalRuntimeImages = deploymentFiles
             .SelectMany(content => content.Split('\n'))
@@ -453,7 +472,7 @@ public sealed class DeploymentTopologyTests
         var deployScript = await ReadAsync("deploy", "ci", "deploy.sh");
         var observabilityCompose = await ReadAsync("deploy", "docker-compose.observability.yml");
 
-        await Assert.That(deployScript).Contains("pull_observability_images()");
+        await Assert.That(deployScript).Contains("ensure_observability_images()");
         await Assert.That(deployScript).DoesNotContain("load_grafana_image");
         await Assert.That(observabilityCompose).Contains(
             "image: quay.io/prometheus/prometheus:v3.14.0");
@@ -471,10 +490,11 @@ public sealed class DeploymentTopologyTests
             "postgres-exporter\n        redis-exporter\n        nats-exporter\n        node-exporter");
         await Assert.That(deployScript).Contains(
             "NOCTF_OBSERVABILITY_PULL_ATTEMPTS:-5");
-        await Assert.That(deployScript).Contains("NOCTF_BUILD_ATTEMPTS:-3");
-        await Assert.That(deployScript).Contains("Docker registry request failed transiently.");
+        await Assert.That(deployScript).Contains("pull --policy missing");
+        await Assert.That(deployScript).Contains("NOCTF_PLATFORM_PULL_ATTEMPTS:-5");
+        await Assert.That(deployScript).DoesNotContain("NOCTF_BUILD_ATTEMPTS");
         await Assert.That(deployScript).Contains(
-            "ensure_build_space\nif ! pull_observability_images; then\n    exit 1\nfi\nbackup_database");
+            "ensure_deploy_space\nif ! ensure_observability_images; then\n    exit 1\nfi\nif ! pull_platform_image; then\n    exit 1\nfi\nbackup_database");
         await Assert.That(deployScript).Contains("--pull never");
     }
 
@@ -489,11 +509,18 @@ public sealed class DeploymentTopologyTests
             "--file \"$config_root/deploy/docker-compose.prod.yml\"";
         var observabilityOverride =
             "--file \"$release_dir/deploy/docker-compose.observability.yml\"";
+        var ciOverride =
+            "--file \"$release_dir/deploy/docker-compose.ci.yml\"";
 
         await Assert.That(deployScript.IndexOf(
             productionOverride,
             StringComparison.Ordinal)).IsLessThan(deployScript.IndexOf(
                 observabilityOverride,
+                StringComparison.Ordinal));
+        await Assert.That(deployScript.IndexOf(
+            observabilityOverride,
+            StringComparison.Ordinal)).IsLessThan(deployScript.IndexOf(
+                ciOverride,
                 StringComparison.Ordinal));
 
         foreach (var service in new[] { "backend", "worker", "runner" })

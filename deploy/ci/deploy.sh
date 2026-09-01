@@ -5,12 +5,15 @@ archive_path=${1:?release archive path is required}
 commit_sha=${2:?commit SHA is required}
 config_root=${3:-/root/NoCTF}
 release_root=${4:-/root/noctf-releases}
-kompose_asset_path=${5:?verified Kompose asset path is required}
+platform_image=${5:?published platform image is required}
 minimum_free_kb=${NOCTF_DEPLOY_MIN_FREE_KB:-6291456}
-kompose_sha256=65a6a720605bead3964e8b22d423a0763de451a236fe03de902e366cf3d9c147
 
 [[ "$commit_sha" =~ ^[0-9a-f]{40}$ ]] || {
     echo "Invalid deployment commit SHA." >&2
+    exit 2
+}
+[[ "$platform_image" =~ ^[A-Za-z0-9.-]+(:[0-9]+)?/[A-Za-z0-9._/-]+@sha256:[a-f0-9]{64}$ ]] || {
+    echo "Invalid deployment image reference." >&2
     exit 2
 }
 
@@ -18,11 +21,6 @@ archive_path=$(realpath "$archive_path")
 upload_dir=$(dirname "$archive_path")
 [[ $(basename "$archive_path") == "noctf-release.tar.gz" ]]
 [[ $(basename "$upload_dir") == "noctf-ci-upload-$commit_sha" ]]
-kompose_asset_path=$(realpath "$kompose_asset_path")
-[[ $(dirname "$kompose_asset_path") == "$upload_dir" ]]
-[[ $(basename "$kompose_asset_path") == "kompose-linux-amd64" ]]
-echo "$kompose_sha256  $kompose_asset_path" | sha256sum -c -
-
 config_root=$(realpath "$config_root")
 mkdir -p "$release_root"
 release_root=$(realpath "$release_root")
@@ -66,22 +64,17 @@ if [[ ! -d "$release_dir" ]]; then
     mkdir -p "$release_tmp"
     tar -xzf "$archive_path" -C "$release_tmp"
     [[ -f "$release_tmp/deploy/docker-compose.yml" ]]
+    [[ -f "$release_tmp/deploy/docker-compose.ci.yml" ]]
     [[ -f "$release_tmp/deploy/docker-compose.observability.yml" ]]
     [[ -f "$release_tmp/deploy/observability/prometheus/prometheus.yml" ]]
     [[ -f "$release_tmp/deploy/observability/grafana/provisioning/dashboards/dashboards.yml" ]]
-    [[ -f "$release_tmp/backend/Dockerfile" ]]
-    install -d -m 0755 "$release_tmp/backend/docker-assets"
-    install -m 0644 \
-        "$kompose_asset_path" \
-        "$release_tmp/backend/docker-assets/kompose-linux-amd64"
-    echo "$kompose_sha256  $release_tmp/backend/docker-assets/kompose-linux-amd64" \
-        | sha256sum -c -
     mv "$release_tmp" "$release_dir"
 fi
 
-[[ -f "$release_dir/backend/docker-assets/kompose-linux-amd64" ]]
-echo "$kompose_sha256  $release_dir/backend/docker-assets/kompose-linux-amd64" \
-    | sha256sum -c -
+export NOCTF_MIGRATION_IMAGE="$platform_image"
+export NOCTF_BACKEND_IMAGE="$platform_image"
+export NOCTF_WORKER_IMAGE="$platform_image"
+export NOCTF_RUNNER_IMAGE="$platform_image"
 
 compose=(
     docker compose
@@ -91,6 +84,7 @@ compose=(
     --file "$release_dir/deploy/docker-compose.yml"
     --file "$config_root/deploy/docker-compose.prod.yml"
     --file "$release_dir/deploy/docker-compose.observability.yml"
+    --file "$release_dir/deploy/docker-compose.ci.yml"
 )
 "${compose[@]}" config --quiet
 
@@ -138,18 +132,22 @@ cleanup_stale_resources()
         --filter 'until=24h' >/dev/null
     "${compose[@]}" rm --force --stop migration >/dev/null 2>&1 || true
     docker image prune --force >/dev/null
-    docker builder prune --all --force --filter 'until=24h' >/dev/null
     cleanup_platform_images
 }
 
-ensure_build_space()
+ensure_deploy_space()
 {
+    if (( $(available_kb) >= minimum_free_kb )); then
+        return
+    fi
+
+    echo "Free space is below the deployment threshold; clearing stale deployment resources."
     cleanup_stale_resources
     if (( $(available_kb) >= minimum_free_kb )); then
         return
     fi
 
-    echo "Free space is below the deployment threshold; clearing unused build cache."
+    echo "Free space remains below the deployment threshold; clearing unused build cache."
     docker builder prune --all --force >/dev/null
     cleanup_platform_images
 
@@ -204,58 +202,54 @@ done
 
 rollback_services()
 {
-    local service image_id
+    local service image_id rollback_tag
+    local backend_image="$platform_image"
+    local worker_image="$platform_image"
+    local runner_image="$platform_image"
     echo "Deployment failed; restoring the previous platform images." >&2
     for service in backend worker runner; do
         image_id=${previous_images[$service]:-}
         if [[ -n "$image_id" ]]; then
-            docker image tag "$image_id" "deploy-$service:latest"
+            rollback_tag="deploy-$service:rollback-${commit_sha:0:8}"
+            docker image tag "$image_id" "$rollback_tag"
+            case "$service" in
+                backend) backend_image=$rollback_tag ;;
+                worker) worker_image=$rollback_tag ;;
+                runner) runner_image=$rollback_tag ;;
+            esac
         fi
     done
-    "${compose[@]}" up --detach --no-deps --force-recreate backend worker runner || true
+    NOCTF_BACKEND_IMAGE="$backend_image" \
+    NOCTF_WORKER_IMAGE="$worker_image" \
+    NOCTF_RUNNER_IMAGE="$runner_image" \
+        "${compose[@]}" up \
+            --detach --no-deps --force-recreate --no-build --pull never \
+            backend worker runner || true
 }
 
-build_images()
+pull_platform_image()
 {
-    local attempt build_log
-    local max_attempts=${NOCTF_BUILD_ATTEMPTS:-3}
-    local retry_delay_seconds=${NOCTF_BUILD_RETRY_DELAY_SECONDS:-10}
+    local attempt
+    local max_attempts=${NOCTF_PLATFORM_PULL_ATTEMPTS:-5}
+    local retry_delay_seconds=${NOCTF_PLATFORM_PULL_RETRY_DELAY_SECONDS:-10}
 
     [[ "$max_attempts" =~ ^[1-9][0-9]*$ ]]
     [[ "$retry_delay_seconds" =~ ^[1-9][0-9]*$ ]]
 
     for (( attempt = 1; attempt <= max_attempts; attempt++ )); do
-        build_log=$(mktemp)
-        if "${compose[@]}" build migration backend worker runner 2>&1 | tee "$build_log"; then
-            rm -f -- "$build_log"
+        if docker pull "$platform_image"; then
             return
         fi
-
-        if grep -Eiq 'no space left on device|disk quota exceeded' "$build_log"; then
-            echo "Docker build exhausted disk space; cleaning build cache before retrying." >&2
-            docker builder prune --all --force >/dev/null
-            cleanup_platform_images
-        elif grep -Eiq \
-            'i/o timeout|TLS handshake timeout|connection reset by peer|temporary failure in name resolution|failed to do request|unexpected EOF' \
-            "$build_log"; then
-            echo "Docker registry request failed transiently." >&2
-        else
-            rm -f -- "$build_log"
-            return 1
-        fi
-
-        rm -f -- "$build_log"
         if (( attempt == max_attempts )); then
-            echo "Unable to build platform images after $max_attempts attempts." >&2
+            echo "Unable to pull the published platform image after $max_attempts attempts." >&2
             return 1
         fi
-
-        echo "Docker build attempt $attempt/$max_attempts failed; retrying in $retry_delay_seconds seconds." >&2
+        echo "Platform image pull attempt $attempt/$max_attempts failed; retrying in $retry_delay_seconds seconds." >&2
         sleep "$retry_delay_seconds"
     done
 }
 
-pull_observability_images()
+ensure_observability_images()
 {
     local attempt
     local max_attempts=${NOCTF_OBSERVABILITY_PULL_ATTEMPTS:-5}
@@ -273,32 +267,30 @@ pull_observability_images()
     [[ "$retry_delay_seconds" =~ ^[1-9][0-9]*$ ]]
 
     for (( attempt = 1; attempt <= max_attempts; attempt++ )); do
-        if "${compose[@]}" pull "${services[@]}"; then
+        if "${compose[@]}" pull --policy missing "${services[@]}"; then
             return
         fi
 
         if (( attempt == max_attempts )); then
-            echo "Unable to pull observability images after $max_attempts attempts." >&2
+            echo "Unable to ensure observability images after $max_attempts attempts." >&2
             return 1
         fi
 
-        echo "Observability image pull attempt $attempt/$max_attempts failed; retrying in $retry_delay_seconds seconds." >&2
+        echo "Observability image check attempt $attempt/$max_attempts failed; retrying in $retry_delay_seconds seconds." >&2
         sleep "$retry_delay_seconds"
     done
 }
 
-ensure_build_space
-if ! pull_observability_images; then
+ensure_deploy_space
+if ! ensure_observability_images; then
+    exit 1
+fi
+if ! pull_platform_image; then
     exit 1
 fi
 backup_database
 
-if ! build_images; then
-    rollback_services
-    exit 1
-fi
-
-if ! "${compose[@]}" run --rm migration; then
+if ! "${compose[@]}" run --rm --pull never migration; then
     rollback_services
     exit 1
 fi
@@ -307,6 +299,7 @@ if ! "${compose[@]}" up \
     --detach \
     --no-deps \
     --force-recreate \
+    --no-build \
     --pull never \
     --wait \
     --wait-timeout 180 \
@@ -325,6 +318,7 @@ if ! "${compose[@]}" up \
     --detach \
     --no-deps \
     --force-recreate \
+    --no-build \
     --pull never \
     --wait \
     --wait-timeout 180 \
@@ -339,11 +333,16 @@ version_suffix=$(sed -n \
 version_tag=${version_suffix//./}
 version_tag=${version_tag:-ci}
 for service in backend worker runner migration; do
-    image_id=$(docker image inspect "deploy-$service:latest" --format '{{.Id}}' 2>/dev/null || true)
+    container_id=$("${compose[@]}" ps --quiet "$service" 2>/dev/null || true)
+    image_id=""
+    if [[ -n "$container_id" ]]; then
+        image_id=$(docker inspect --format '{{.Image}}' "$container_id")
+    fi
     if [[ -n "$image_id" ]]; then
         docker image tag "$image_id" "deploy-$service:$version_tag-${commit_sha:0:8}"
     fi
 done
+docker image rm "$platform_image" >/dev/null 2>&1 || true
 
 current_link="$release_root/current"
 previous_link="$release_root/previous"
