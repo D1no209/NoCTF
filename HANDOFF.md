@@ -3421,3 +3421,24 @@ dotnet run --project backend/src/NoCTF.API/NoCTF.API.csproj --no-build -- --expo
 - 平台版本递增为 `0.1.0-alpha.125`。没有 HTTP/OpenAPI、业务数据模型或 migration 变化。Workflow
   YAML 解析、`bash -n deploy/ci/deploy.sh`、三套 Compose config、DeploymentTopology 15/15、Release
   solution build 与 `git diff --check` 通过。本阶段未 push、未部署。
+
+## 2026-09-02 Alpha.126 去除 CI 部署重复构建
+
+- 删除“CI 已构建并推送 host 镜像，生产服务器又从同一源码构建 migration/backend/worker/runner”
+  的重复链路。`publish-images` 现在输出首选仓库与 Buildx 生成的不可变 manifest digest；生产服务器只
+  登录镜像仓库并 `docker pull repository@sha256:...` 一次。
+- 新增 `deploy/docker-compose.ci.yml`：migration/backend/worker/runner 共用同一个 Host 镜像，分别以
+  `--migrate-only`、Api、Worker、Runner 角色运行。部署命令显式使用 `--no-build --pull never`，
+  `deploy.sh` 不再下载 Kompose、不再执行四服务 Compose build，也不再在每次部署清理 BuildKit 缓存。
+- Workflow 将原来的单个“Upload and deploy”拆成“Upload exact release / Authenticate deployment
+  registry / Deploy exact image”，上传与远端执行耗时可以独立观察；SSH 配置集中到 Host alias，删除
+  重复的 ssh/scp 参数数组。上传包只保留 Compose/监控配置和版本信息，不再传输无需在服务器构建的
+  后端、前端与测试源码。监控镜像使用 `pull --policy missing`，本地已有固定镜像时不再重复拉取。
+- 完整资源清理不再于部署前后重复执行：正常路径仅在成功后清理一次；部署前仅检查磁盘空间，低于
+  阈值时才清理陈旧资源和 BuildKit 缓存。
+- 保留数据库备份、migration、服务和监控健康检查、串行部署锁、精确提交 release、旧 release 清理及
+  失败回滚。回滚现在为三个角色分别引用原容器 image id，即使上一版本仍是旧的分离镜像也可恢复。
+- 旧 alpha.125 自动部署已成功，但总耗时 19 分 09 秒，其中远端重复构建步骤占 18 分 58 秒；本次优化
+  针对该实测瓶颈。平台版本递增为 `0.1.0-alpha.126`。没有 HTTP/OpenAPI、业务数据模型或 migration
+  变化。Workflow YAML、Shell、角色化 Compose config、DeploymentTopology 15/15、Release solution
+  build 与 `git diff --check` 通过。本阶段未 push、未部署。
