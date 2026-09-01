@@ -161,6 +161,20 @@ describe('AWDP control screen data adapter', () => {
     expect(reconcileAwdpControlEvents(reconciliation.seenIds, burst).newEvents).toEqual([])
   })
 
+  test('keeps submitted operations out of the verified feed and animation queue', () => {
+    const verified = awdpPlaybackEvents(awdpControlEvents([
+      event('AwdpFixAttempted'),
+      event('AwdpFixResolved', {
+        occurredAt: '2026-08-19T12:00:01Z',
+        gameplayFactState: 'Completed',
+        gameplayFactResult: 'Correct',
+      }),
+    ]))
+
+    expect(verified).toHaveLength(1)
+    expect(verified[0]).toMatchObject({ action: 'defense', outcome: 'success' })
+  })
+
   test('uses settled public scores and excludes internal tracks', () => {
     expect(awdpPublicEntries(snapshot).map(entry => entry.teamName)).toEqual(['BlueWhale'])
     expect(awdpRankedEntries(snapshot, new Map([[teamId, 3]]))[0])
@@ -380,6 +394,8 @@ describe('AWDP control screen implementation contract', () => {
     expect(page).toContain('listCompetitionEvents({')
     expect(page).toContain('competitionEventChanged: () => void refreshLatest()')
     expect(page).toContain('playbackQueue')
+    expect(page).toContain('const resolvedEvents = computed(() => awdpPlaybackEvents(events.value))')
+    expect(page).not.toContain("t('操作已提交')")
     expect(page).toContain('PLAYBACK_DURATION_MS = 5_400')
     expect(page).toContain('carouselTimer = setInterval(selectNextTeam, 8_000)')
     expect(page).toContain("directionIcon(challenge.direction)")
@@ -405,6 +421,7 @@ describe('AWDP control screen implementation contract', () => {
     expect(stage).toContain('AwdpDefenseSuccessAnimation')
     expect(stage).toContain('AwdpDefenseFailureAnimation')
     expect(ticker).toContain('requestAnimationFrame(tick)')
+    expect(ticker).not.toContain("t('操作已提交')")
     expect(ticker).not.toContain('<marquee')
     expect(ticker).not.toContain('@keyframes marquee')
   })

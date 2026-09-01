@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { Activity } from '@lucide/vue'
-import type { AwdpControlEvent } from '~/utils/awdp-control-screen'
+import type { AwdpResolvedControlEvent } from '~/utils/awdp-control-screen'
 
-const props = defineProps<{ events: readonly AwdpControlEvent[] }>()
+const props = defineProps<{ events: readonly AwdpResolvedControlEvent[] }>()
 const { t } = useLocale()
 const viewport = ref<HTMLElement | null>(null)
 const group = ref<HTMLElement | null>(null)
@@ -22,9 +22,9 @@ function tick(timestamp: number): void {
 onMounted(() => { animationFrame = requestAnimationFrame(tick) })
 onUnmounted(() => cancelAnimationFrame(animationFrame))
 
-function eventText(event: AwdpControlEvent): string {
+function eventText(event: AwdpResolvedControlEvent): string {
   const action = event.action === 'attack' ? t('攻击') : t('防御')
-  const outcome = event.outcome === 'pending' ? t('操作已提交') : event.outcome === 'success' ? t('成功') : t('失败')
+  const outcome = event.outcome === 'success' ? t('成功') : t('失败')
   return `${event.teamName} · ${event.challengeTitle} · ${action}${outcome}`
 }
 

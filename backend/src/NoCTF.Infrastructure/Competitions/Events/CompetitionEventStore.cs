@@ -1,15 +1,18 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using System.Text.Json.Nodes;
 using Microsoft.EntityFrameworkCore;
 using NoCTF.Application.Competitions.Events;
 using NoCTF.Application.Messaging;
 using NoCTF.Domain.Competitions;
 using NoCTF.Domain.Competitions.Events;
+using NoCTF.Domain.Gameplay;
 using NoCTF.Domain.Identity;
 using NoCTF.Domain.Teams;
 using NoCTF.Domain.Shared;
 using NoCTF.Infrastructure.Observability;
 using NoCTF.Infrastructure.Persistence;
+using NoCTF.GameModes.Awdp.Scoring;
 
 namespace NoCTF.Infrastructure.Competitions.Events;
 
@@ -44,30 +47,7 @@ public sealed class CompetitionEventStore(
             RelatedType = related?.Type,
             RelatedId = related?.Id,
             ParentEventId = draft.ParentEventId,
-            PayloadJson = draft.PayloadJson ?? JsonSerializer.Serialize(new
-            {
-                schemaVersion = 1,
-                competitionStatus = draft.CompetitionStatus,
-                leaderboardVisibility = draft.LeaderboardVisibility,
-                teamRegistrationStatus = draft.TeamRegistrationStatus,
-                gameplayFactKind = draft.GameplayFactKind,
-                gameplayFactState = draft.GameplayFactState,
-                gameplayFactResult = draft.GameplayFactResult,
-                runtimeState = draft.RuntimeState,
-                runtimeCleanupResult = draft.RuntimeCleanupResult,
-                questionStatus = draft.QuestionStatus,
-                hostPort = draft.HostPort,
-                relatedUserId = draft.RelatedUserId,
-                teamId = draft.TeamId,
-                competitionChallengeId = draft.CompetitionChallengeId,
-                hintId = draft.HintId,
-                runtimeInstanceId = draft.RuntimeInstanceId,
-                gameplayFactId = draft.GameplayFactId,
-                questionId = draft.QuestionId,
-                reason = SanitizeReason(draft.Reason),
-                trackKey = draft.TrackKey,
-                previousTrackKey = draft.PreviousTrackKey
-            }, ExportJsonOptions),
+            PayloadJson = SerializePayload(draft),
             OccurredAt = draft.OccurredAt
         });
         await outbox.PublishAsync(new CompetitionEventCommitted(
@@ -404,7 +384,7 @@ public sealed class CompetitionEventStore(
 
         return events.Select(item =>
         {
-            var payload = ParseLegacyPayload(item.PayloadJson);
+            var payload = ParsePayload(item);
             var relatedUserId = item.RelatedUserId;
             var teamId = item.TeamId;
             var challengeId = item.CompetitionChallengeId;
@@ -459,6 +439,57 @@ public sealed class CompetitionEventStore(
         return sanitized.Length <= 512 ? sanitized : sanitized[..512];
     }
 
+    internal static string SerializePayload(CompetitionEventDraft draft)
+    {
+        var standard = JsonSerializer.SerializeToNode(new
+        {
+            schemaVersion = 1,
+            competitionStatus = draft.CompetitionStatus,
+            leaderboardVisibility = draft.LeaderboardVisibility,
+            teamRegistrationStatus = draft.TeamRegistrationStatus,
+            gameplayFactKind = draft.GameplayFactKind,
+            gameplayFactState = draft.GameplayFactState,
+            gameplayFactResult = draft.GameplayFactResult,
+            runtimeState = draft.RuntimeState,
+            runtimeCleanupResult = draft.RuntimeCleanupResult,
+            questionStatus = draft.QuestionStatus,
+            hostPort = draft.HostPort,
+            relatedUserId = draft.RelatedUserId,
+            teamId = draft.TeamId,
+            competitionChallengeId = draft.CompetitionChallengeId,
+            hintId = draft.HintId,
+            runtimeInstanceId = draft.RuntimeInstanceId,
+            gameplayFactId = draft.GameplayFactId,
+            questionId = draft.QuestionId,
+            reason = SanitizeReason(draft.Reason),
+            trackKey = draft.TrackKey,
+            previousTrackKey = draft.PreviousTrackKey
+        }, ExportJsonOptions)!.AsObject();
+        if (draft.PayloadJson is null)
+            return standard.ToJsonString(ExportJsonOptions);
+
+        JsonObject custom;
+        try
+        {
+            custom = JsonNode.Parse(draft.PayloadJson)?.AsObject()
+                ?? throw new InvalidOperationException(
+                    "Competition event payload must be a JSON object.");
+        }
+        catch (JsonException exception)
+        {
+            throw new InvalidOperationException(
+                "Competition event payload must be valid JSON.",
+                exception);
+        }
+
+        foreach (var (name, value) in standard)
+        {
+            if (value is not null && !custom.ContainsKey(name))
+                custom[name] = value.DeepClone();
+        }
+        return custom.ToJsonString(ExportJsonOptions);
+    }
+
     private static (EntityReferenceKind Type, Guid Id) ResolveSubject(
         CompetitionEventDraft draft,
         Guid eventId)
@@ -510,11 +541,46 @@ public sealed class CompetitionEventStore(
             ? (type, value)
             : null;
 
-    private static LegacyEventPayload ParseLegacyPayload(string json)
+    internal static CompetitionEventPayload ParsePayload(CompetitionEvent item)
+    {
+        var payload = ParseLegacyPayload(item.PayloadJson);
+        if (item.Kind != CompetitionEventKind.AwdpFixResolved
+            || payload.GameplayFactState is not null)
+            return payload;
+
+        try
+        {
+            var resolved = AwdpFixResolvedEventPayload.Deserialize(item.PayloadJson);
+            if (resolved is null || !Enum.IsDefined(resolved.Outcome))
+                return payload;
+            if (resolved.Outcome == AwdpFixOutcome.PlatformFailed)
+            {
+                return payload with
+                {
+                    GameplayFactKind = GameplayFactKind.FixAttempt,
+                    GameplayFactState = GameplayFactState.PlatformFailed,
+                    GameplayFactResult = null
+                };
+            }
+
+            return payload with
+            {
+                GameplayFactKind = GameplayFactKind.FixAttempt,
+                GameplayFactState = GameplayFactState.Completed,
+                GameplayFactResult = AwdpFixOutcomeMapper.Map(resolved.Outcome).Result
+            };
+        }
+        catch (JsonException)
+        {
+            return payload;
+        }
+    }
+
+    private static CompetitionEventPayload ParseLegacyPayload(string json)
     {
         try
         {
-            return JsonSerializer.Deserialize<LegacyEventPayload>(json, ExportJsonOptions) ?? new();
+            return JsonSerializer.Deserialize<CompetitionEventPayload>(json, ExportJsonOptions) ?? new();
         }
         catch (JsonException)
         {
@@ -522,7 +588,7 @@ public sealed class CompetitionEventStore(
         }
     }
 
-    private sealed record LegacyEventPayload(
+    internal sealed record CompetitionEventPayload(
         CompetitionStatus? CompetitionStatus = null,
         CompetitionLeaderboardVisibility? LeaderboardVisibility = null,
         TeamRegistrationStatus? TeamRegistrationStatus = null,

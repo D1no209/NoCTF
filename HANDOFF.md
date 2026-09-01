@@ -3442,3 +3442,16 @@ dotnet run --project backend/src/NoCTF.API/NoCTF.API.csproj --no-build -- --expo
   针对该实测瓶颈。平台版本递增为 `0.1.0-alpha.126`。没有 HTTP/OpenAPI、业务数据模型或 migration
   变化。Workflow YAML、Shell、角色化 Compose config、DeploymentTopology 15/15、Release solution
   build 与 `git diff --check` 通过。本阶段未 push、未部署。
+
+## 2026-09-02 Alpha.127 修正 AWDP 中控防御结果语义
+
+- 修正 `AwdpFixResolved` 自定义 payload 覆盖通用事实字段的问题。事件存储现在将自定义字段与标准
+  `gameplayFactKind/state/result` 元数据合并，新产生的防御成功事件会稳定返回
+  `FixAttempt + Completed + Correct`，不再被前端误判为失败。
+- 查询历史事件时兼容已经持久化的旧 AWDP Fix payload：依据受限 `AwdpFixOutcome` 恢复状态与结果，
+  因此部署前已经产生的 `DefenseSucceeded` 记录也会显示为防御成功，无需修改数据库或执行 migration。
+- 中控大屏将待评测事件与已验证事件改为强类型分离。左侧动态、底部滚动与中央动画只接收成功或失败
+  的最终结果，“提交了一次防御操作”不再进入播报，pending 也不可能落入防御失败动画的默认分支。
+- 平台版本递增为 `0.1.0-alpha.127`。新增事件 payload 单元测试 3/3、前端 AWDP/赛事播报测试
+  19/19；ClientApp typecheck 与 Release solution build 通过。真实 PostgreSQL 回归测试已补充，当前机器
+  因 Docker 不可用而跳过。本阶段未 push、未部署。
