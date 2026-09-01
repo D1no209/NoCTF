@@ -3455,3 +3455,13 @@ dotnet run --project backend/src/NoCTF.API/NoCTF.API.csproj --no-build -- --expo
 - 平台版本递增为 `0.1.0-alpha.127`。新增事件 payload 单元测试 3/3、前端 AWDP/赛事播报测试
   19/19；ClientApp typecheck 与 Release solution build 通过。真实 PostgreSQL 回归测试已补充，当前机器
   因 Docker 不可用而跳过。本阶段未 push、未部署。
+
+## 2026-09-02 Alpha.128 修正确认后无法删除附件
+
+- 修正题库模板附件删除确认按钮使用 `AlertDialogAction` 自动关闭的问题。自动关闭会先触发
+  `update:open` 清空 `deletingAttachment`，删除处理器因此在调用生成 SDK 前直接返回。确认按钮现改为
+  普通 destructive `Button`，请求成功后才由处理器关闭弹窗；失败时保留目标并显示 API 错误。
+- 审查同页确认流程后同步修正 Flag 删除的相同目标丢失问题。模板删除和负责人转让不依赖临时目标，
+  未扩大改动。后端附件软删除、关联随机 Flag 软删除与恢复逻辑已有持久化覆盖，无 HTTP/API 变更。
+- 平台版本递增为 `0.1.0-alpha.128`。附件/Flag 编辑器回归测试 5/5 与 ClientApp typecheck
+  通过。本阶段未 push、未部署。

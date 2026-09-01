@@ -43,10 +43,36 @@ describe('challenge flag match kind editor', () => {
       templatePage.indexOf('async function confirmDeleteFlag'),
     )
     expect(create.indexOf('flagCreateOpen.value = false')).toBeGreaterThan(create.indexOf('if (error)'))
+    const confirmation = templatePage.slice(
+      templatePage.indexOf('<AlertDialog :open="!!deletingFlag"'),
+      templatePage.indexOf('<AlertDialog v-model:open="transferOpen">'),
+    )
+    expect(confirmation).toContain('<Button variant="destructive"')
+    expect(confirmation).not.toContain('<AlertDialogAction')
   })
 })
 
 describe('attachment delivery editor', () => {
+  test('keeps the delete target alive until the asynchronous request succeeds', async () => {
+    const page = await Bun.file(
+      new URL('../app/pages/admin/challenges/[id].vue', import.meta.url),
+    ).text()
+    const confirmation = page.slice(
+      page.indexOf('<AlertDialog :open="!!deletingAttachment"'),
+      page.indexOf('<Dialog v-model:open="randomBatchOpen">'),
+    )
+    const deletion = page.slice(
+      page.indexOf('async function confirmDeleteAttachment'),
+      page.indexOf('async function restoreAttachment'),
+    )
+
+    expect(confirmation).toContain('<Button variant="destructive"')
+    expect(confirmation).not.toContain('<AlertDialogAction')
+    expect(deletion).toContain('adminChallengeBankDeleteAttachment({')
+    expect(deletion.indexOf('deletingAttachment.value = null'))
+      .toBeGreaterThan(deletion.indexOf('if (error)'))
+  })
+
   test('uses the generated random-batch SDK and keeps selected input after failure', async () => {
     const page = await Bun.file(
       new URL('../app/pages/admin/challenges/[id].vue', import.meta.url),
