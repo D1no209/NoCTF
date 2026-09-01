@@ -10,6 +10,8 @@ const props = withDefaults(defineProps<{
   /** Compose 运行时需要选择服务名。 */
   showServiceName?: boolean
   addLabel?: string
+  /** 访问入口允许输出命令等自定义显示文本；控制检查入口仍要求 URL。 */
+  allowCustomDisplay?: boolean
   disabled?: boolean
 }>(), {
   exposureOptions: () => [
@@ -18,6 +20,7 @@ const props = withDefaults(defineProps<{
   ],
   showServiceName: false,
   addLabel: '添加访问入口',
+  allowCustomDisplay: true,
   disabled: false,
 })
 
@@ -55,10 +58,10 @@ function add(): void {
       <div class="flex items-start gap-2">
         <div class="grid flex-1 gap-2 sm:grid-cols-2">
           <Field>
-            <FieldLabel>{{ $t('URL 模板') }}</FieldLabel>
+            <FieldLabel>{{ allowCustomDisplay ? $t('显示模板') : $t('URL 模板') }}</FieldLabel>
             <Input
               :model-value="binding.urlTemplate"
-              placeholder="http://{HOST}:{PORT}/"
+              :placeholder="allowCustomDisplay ? $t('例如：nc {HOST} {PORT}') : 'http://{HOST}:{PORT}/'"
               class="font-mono text-sm"
               :disabled="disabled"
               @update:model-value="update(index, { urlTemplate: String($event ?? '') })"
@@ -129,6 +132,11 @@ function add(): void {
       <Plus data-icon="inline-start" />
       {{ $t(addLabel) }}
     </Button>
-    <p class="text-xs text-muted-foreground"> {{ $t('URL 模板只允许 {HOST} 与 {PORT} 占位符;{PORT} 为平台分配的随机主机端口。') }} </p>
+    <p v-if="allowCustomDisplay" class="text-xs text-muted-foreground">
+      {{ $t('可自定义选手看到的内容，只替换 {HOST} 与 {PORT} 占位符；无需填写合法 URL。') }}
+    </p>
+    <p v-else class="text-xs text-muted-foreground">
+      {{ $t('URL 模板只允许 {HOST} 与 {PORT} 占位符;{PORT} 为平台分配的随机主机端口。') }}
+    </p>
   </div>
 </template>

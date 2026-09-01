@@ -699,7 +699,7 @@ internal static class RuntimeWriteBackOperations
             || instance.RuntimeProvider != message.Provider)
             return;
 
-        if (!TryNormalizeAccessUrls(message.Urls, out var normalizedUrls))
+        if (!TryReadAccessDisplays(message.Urls, out var accessDisplays))
         {
             instance.ProviderReceiptJson = message.ProviderReceiptJson;
             instance.Urls = [];
@@ -719,7 +719,7 @@ internal static class RuntimeWriteBackOperations
 
         var runningAt = timeProvider.GetUtcNow();
         instance.ProviderReceiptJson = message.ProviderReceiptJson;
-        instance.Urls = normalizedUrls;
+        instance.Urls = accessDisplays;
         instance.State = RuntimeState.Running;
         instance.FailureCode = null;
         instance.RunningAt = runningAt;
@@ -1173,16 +1173,16 @@ internal static class RuntimeWriteBackOperations
                 $"Unsupported runtime kind '{instance.RuntimeKind}'.")
         };
 
-    private static bool TryNormalizeAccessUrls(
-        IReadOnlyList<string> urls,
-        out string[] normalizedUrls)
+    private static bool TryReadAccessDisplays(
+        IReadOnlyList<string> values,
+        out string[] accessDisplays)
     {
-        normalizedUrls = new string[urls.Count];
-        for (var index = 0; index < urls.Count; index++)
+        accessDisplays = new string[values.Count];
+        for (var index = 0; index < values.Count; index++)
         {
-            if (!RuntimeAccessUrl.TryCreate(urls[index], out var accessUrl))
+            if (string.IsNullOrWhiteSpace(values[index]))
                 return false;
-            normalizedUrls[index] = accessUrl.Value;
+            accessDisplays[index] = values[index].Trim();
         }
 
         return true;

@@ -10,6 +10,7 @@ describe('runtime access URL presentation', () => {
     expect(isRuntimeUrlClickable('ssh://user@runtime.example:31004')).toBeFalse()
     expect(isRuntimeUrlClickable('javascript:alert(1)')).toBeFalse()
     expect(isRuntimeUrlClickable('not a URL')).toBeFalse()
+    expect(isRuntimeUrlClickable('nc runtime.example 31005')).toBeFalse()
   })
 
   test('all runtime URL surfaces use the safe shared renderer', async () => {

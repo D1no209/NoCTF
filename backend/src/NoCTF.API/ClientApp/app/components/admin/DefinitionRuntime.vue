@@ -244,6 +244,7 @@ watch(
           :exposure-options="[{ value: UrlExposure.Participants, label: $t('平台检查使用') }]"
           :show-service-name="isCompose"
           :add-label="$t('设置控制检查入口')"
+          :allow-custom-display="false"
           :disabled="disabled"
         />
         <FieldDescription>{{ $t('平台周期性检查控制权的地址;KoH 开赛必填。') }}</FieldDescription>

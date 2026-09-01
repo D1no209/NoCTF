@@ -962,7 +962,7 @@ public class ChallengeConfigurationCatalogTests
     }
 
     [Test]
-    public async Task Runtime_url_binding_must_expand_to_absolute_uri()
+    public async Task Runtime_access_binding_accepts_custom_display_template()
     {
         var runtime = new ChallengeRuntimeTemplate(
                         RuntimeAllocation.PerTeam,
@@ -972,7 +972,7 @@ public class ChallengeConfigurationCatalogTests
             UrlBindings:
             [
                 new(
-                    "relative/{HOST}/{PORT}",
+                    "nc {HOST} {PORT}",
                     RuntimeExposure.OwnerOnly,
                     ContainerPort: 8080)
             ]);
@@ -983,11 +983,14 @@ public class ChallengeConfigurationCatalogTests
             WithRuntime(catalog.GetDefaultJson(GameMode.Ctf), runtime));
 
         await Assert.That(errors)
-            .Contains("Runtime URL bindings must expand to an absolute URI.");
+            .DoesNotContain("Runtime URL bindings must expand to an absolute URI.");
+        await Assert.That(errors)
+            .DoesNotContain(
+                "Runtime access URL bindings only allow http, https, tcp, udp, and ssh schemes.");
     }
 
     [Test]
-    public async Task Runtime_access_url_binding_rejects_unsupported_scheme()
+    public async Task Runtime_access_binding_does_not_filter_custom_display_scheme()
     {
         var runtime = new ChallengeRuntimeTemplate(
             RuntimeAllocation.PerTeam,
@@ -1008,8 +1011,30 @@ public class ChallengeConfigurationCatalogTests
             WithRuntime(catalog.GetDefaultJson(GameMode.Ctf), runtime));
 
         await Assert.That(errors)
-            .Contains(
+            .DoesNotContain(
                 "Runtime access URL bindings only allow http, https, tcp, udp, and ssh schemes.");
+    }
+
+    [Test]
+    public async Task Runtime_control_check_binding_still_requires_an_absolute_uri()
+    {
+        var runtime = new ChallengeRuntimeTemplate(
+            RuntimeAllocation.Shared,
+            new ContainerRuntimeDefinition(
+                "registry.example/challenge:v1",
+                PortMappings: new Dictionary<int, int> { [8080] = 0 }),
+            ControlCheckUrlBinding: new(
+                "check {HOST} {PORT}",
+                RuntimeExposure.Participants,
+                ContainerPort: 8080));
+        var catalog = new GameModeChallengeConfigurationCatalog();
+
+        var errors = catalog.Validate(
+            GameMode.Koh,
+            WithRuntime(catalog.GetDefaultJson(GameMode.Koh), runtime));
+
+        await Assert.That(errors)
+            .Contains("Runtime URL bindings must expand to an absolute URI.");
     }
 
     [Test]

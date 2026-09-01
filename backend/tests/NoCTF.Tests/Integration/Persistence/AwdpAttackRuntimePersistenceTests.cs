@@ -387,13 +387,17 @@ public sealed class AwdpAttackRuntimePersistenceTests
                     "runner-1",
                     RuntimeProvider.Docker,
                     "{}",
-                    ["tcp://127.0.0.1:30000"],
+                    ["nc 127.0.0.1 30000"],
                     fixture.Now.AddMinutes(30),
                     [new RuntimePublishedPortMapping(null, 31337, 30000)]),
                 db,
                 new NoopOutbox(),
                 cancellationToken);
             await AssertRuntimeStateAsync(db, runtime.Id, RuntimeState.Running, cancellationToken);
+            var provisioned = await db.RuntimeInstances.AsNoTracking().SingleAsync(
+                item => item.Id == runtime.Id,
+                cancellationToken);
+            await Assert.That(provisioned.Urls).IsEquivalentTo(["nc 127.0.0.1 30000"]);
             var reactivated = await db.ChallengeFlags.AsNoTracking().SingleAsync(
                 item => item.Id == flag.Id,
                 cancellationToken);

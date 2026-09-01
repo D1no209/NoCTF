@@ -1,6 +1,5 @@
 using System.Globalization;
 using NoCTF.Application.Runtime.Provisioning;
-using NoCTF.Domain.Runtime;
 
 namespace NoCTF.Runner.Messages;
 
@@ -51,7 +50,7 @@ public static class RuntimeUrlExpander
         foreach (var binding in bindings ?? [])
         {
             var machine = FindOvaVirtualMachine(receipt, binding);
-            var url = ExpandOvaBinding(machine, binding, requireAccessScheme: true);
+            var url = ExpandOvaBinding(machine, binding);
             urls.Add(url);
         }
         return new(urls);
@@ -87,8 +86,7 @@ public static class RuntimeUrlExpander
 
     private static string ExpandOvaBinding(
         OvaVirtualMachineReceipt machine,
-        RuntimeUrlBinding binding,
-        bool requireAccessScheme)
+        RuntimeUrlBinding binding)
     {
         if (string.IsNullOrWhiteSpace(machine.Address))
             throw new InvalidOperationException(
@@ -108,12 +106,7 @@ public static class RuntimeUrlExpander
                 guestPort.ToString(CultureInfo.InvariantCulture),
                 StringComparison.Ordinal);
         }
-        if (!Uri.TryCreate(expanded, UriKind.Absolute, out _))
-            throw new InvalidOperationException(
-                "OVA URL binding did not expand to an absolute URI.");
-        return requireAccessScheme
-            ? NormalizeAccessUrl(expanded)
-            : expanded;
+        return expanded;
     }
 
     private static string ExpandPublicContainerBinding(
@@ -141,18 +134,10 @@ public static class RuntimeUrlExpander
                 "{PORT}",
                 port.ToString(CultureInfo.InvariantCulture),
                 StringComparison.Ordinal);
-        if (!Uri.TryCreate(expanded, UriKind.Absolute, out _))
-            throw new InvalidOperationException("Runtime URL binding did not expand to an absolute URI.");
         return expanded;
     }
 
     private static string ExpandAccessUrl(string template, string? host, int port) =>
-        NormalizeAccessUrl(Expand(template, host, port));
-
-    private static string NormalizeAccessUrl(string value) =>
-        RuntimeAccessUrl.TryCreate(value, out var accessUrl)
-            ? accessUrl.Value
-            : throw new InvalidOperationException(
-                "Runtime URL binding uses an unsupported access URL scheme.");
+        Expand(template, host, port);
 
 }
