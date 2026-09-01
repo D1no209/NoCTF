@@ -252,10 +252,11 @@ internal static partial class BackendMessageOperations
             item => item.Id == gameplayFactId,
             cancellationToken);
         if (submission is null
-            || submission.State != NoCTF.Domain.Gameplay.GameplayFactState.Processing)
+            || submission.State is not (GameplayFactState.Pending
+                or GameplayFactState.Processing))
             return;
-        submission.State = NoCTF.Domain.Gameplay.GameplayFactState.PlatformFailed;
-        submission.FailureCode = NoCTF.Domain.Gameplay.GameplayFactFailureCode.CheckerPlatformError;
+        submission.State = GameplayFactState.PlatformFailed;
+        submission.FailureCode = GameplayFactFailureCode.CheckerPlatformError;
         submission.UpdatedAt = timeProvider.GetUtcNow();
         await outbox.PublishAsync(new GameplayFactStateChanged(submission.Id, submission.State));
         await QueueNextGameplayFactAsync(submission, db, outbox, cancellationToken);

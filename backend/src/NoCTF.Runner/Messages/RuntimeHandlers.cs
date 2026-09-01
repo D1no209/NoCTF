@@ -11,6 +11,7 @@ using NoCTF.Application.Messaging;
 using NoCTF.Application.Competitions.Events;
 using NoCTF.Domain.Competitions;
 using NoCTF.Domain.Competitions.Events;
+using NoCTF.Domain.Gameplay;
 
 namespace NoCTF.Runner.Messages;
 
@@ -759,6 +760,7 @@ internal static class RuntimeWriteBackOperations
     public static async Task ProvisionFailedAsync(
         RuntimeProvisionFailed message,
         NoCtfDbContext db,
+        ITransactionalMessageOutbox? outbox,
         ICompetitionEventRecorder events,
         TimeProvider timeProvider,
         CancellationToken cancellationToken)
@@ -778,7 +780,7 @@ internal static class RuntimeWriteBackOperations
             message.FailureCode,
             db,
             events,
-            null,
+            outbox,
             timeProvider,
             cancellationToken);
     }
@@ -846,10 +848,11 @@ internal static class RuntimeWriteBackOperations
                 item => item.Id == gameplayFactId,
                 cancellationToken);
             if (submission is not null
-                && submission.State == NoCTF.Domain.Gameplay.GameplayFactState.Processing)
+                && submission.State is (GameplayFactState.Pending
+                    or GameplayFactState.Processing))
             {
-                submission.State = NoCTF.Domain.Gameplay.GameplayFactState.PlatformFailed;
-                submission.FailureCode = NoCTF.Domain.Gameplay.GameplayFactFailureCode.CheckerPlatformError;
+                submission.State = GameplayFactState.PlatformFailed;
+                submission.FailureCode = GameplayFactFailureCode.CheckerPlatformError;
                 submission.UpdatedAt = timeProvider.GetUtcNow();
                 if (outbox is not null)
                     await outbox.PublishAsync(new GameplayFactStateChanged(submission.Id, submission.State));

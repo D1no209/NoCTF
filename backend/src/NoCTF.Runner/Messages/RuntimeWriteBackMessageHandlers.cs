@@ -17,7 +17,7 @@ public sealed class RuntimeProvisionWriteBackMessageHandler(
 
     public Task Handle(RuntimeProvisionFailed message, CancellationToken cancellationToken) =>
         RuntimeWriteBackOperations.ProvisionFailedAsync(
-            message, db, events, timeProvider, cancellationToken);
+            message, db, outbox, events, timeProvider, cancellationToken);
 
     public Task Handle(RuntimeProvisionTerminated message, CancellationToken cancellationToken) =>
         RuntimeWriteBackOperations.ProvisionTerminatedAsync(
@@ -77,6 +77,7 @@ internal static class RuntimeWriteBackHandler
         RuntimeWriteBackOperations.ProvisionFailedAsync(
             message,
             db,
+            null,
             events ?? NullCompetitionEventRecorder.Instance,
             TimeProvider.System,
             cancellationToken);

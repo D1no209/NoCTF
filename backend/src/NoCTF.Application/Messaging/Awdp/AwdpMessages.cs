@@ -2,6 +2,10 @@ using NoCTF.Application.Runtime.Instances;
 
 namespace NoCTF.Application.Messaging;
 
+public sealed record StartAwdpFixVerification(
+    Guid GameplayFactId,
+    Guid RuntimeInstanceId);
+
 public sealed record RunAwdpFixVerification(
     Guid GameplayFactId,
     Guid CompetitionChallengeId,

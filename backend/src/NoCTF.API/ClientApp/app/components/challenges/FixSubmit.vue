@@ -31,7 +31,7 @@ const requestFailureLabels: Record<NoCtfapiEndpointsGameplayFactsAwdpDefenseTarg
 const uploadFailureLabels: Record<NoCtfapiEndpointsGameplayFactsUploadPatchFailureCodeProtocol, string> = {
   ArchiveStreamNotSeekable: '无法验证该 Fix 归档，请重新选择文件。',
   ArchiveInvalid: 'Fix 归档格式无效，请上传有效的 tar.gz 文件。',
-  DefenseTargetNotReady: '该一次性防御验证环境尚未就绪或已被回收。',
+  DefenseTargetNotReady: '该一次性防御验证环境已失效或不再接受 Fix。',
   DefenseAlreadySucceeded: '本题防御已成功，后续 Fix 不再受理。',
   FixAttemptsExhausted: '本题的 Fix 尝试次数已用尽。',
   DefenseTargetConsumed: '该一次性防御验证环境已绑定过 Fix，不能再次上传。',
@@ -46,7 +46,9 @@ const targetCreating = computed(() => {
   return state === 'Queued' || state === 'Provisioning'
 })
 const canUpload = computed(() =>
-  props.defense?.runtimeState === 'Running'
+  (props.defense?.runtimeState === 'Queued'
+    || props.defense?.runtimeState === 'Provisioning'
+    || props.defense?.runtimeState === 'Running')
   && !props.defense.gameplayFactId,
 )
 const validating = computed(() =>
@@ -55,6 +57,9 @@ const validating = computed(() =>
   || props.defense?.state === 'Processing'
 )
 const recycling = computed(() => props.defense?.runtimeState === 'Stopping')
+const patchWaitingForTarget = computed(() =>
+  !!props.defense?.gameplayFactId && targetCreating.value,
+)
 const targetFailed = computed(() => props.defense?.runtimeState === 'Failed')
 const completedAndRecycled = computed(() =>
   props.defense?.runtimeState === 'Stopped' && !!props.defense.gameplayFactId,
@@ -117,7 +122,7 @@ async function uploadFix(): Promise<void> {
       return
     }
     file.value = null
-    toast.success(translate('Fix 已锁定到本次验证环境，正在执行一次性 Checker。'))
+    toast.success(translate('Fix 已锁定，环境就绪后会自动开始一次性验证。'))
     emit('accepted')
     emit('changed')
   }
@@ -131,15 +136,13 @@ async function uploadFix(): Promise<void> {
   <section class="flex flex-col gap-4" aria-labelledby="fix-submit-title">
     <h3 id="fix-submit-title" class="text-sm font-semibold">{{ $t('防御验证') }}</h3>
     <div class="flex flex-col gap-4">
-      <Alert v-if="targetCreating">
-        <Spinner class="mr-2 inline size-3" />
-        <AlertDescription class="inline">{{ $t('正在准备防御验证…') }}</AlertDescription>
-      </Alert>
-
-      <form v-else-if="canUpload" class="flex flex-col gap-4" @submit.prevent="uploadFix">
+      <form v-if="canUpload" class="flex flex-col gap-4" @submit.prevent="uploadFix">
         <Alert>
+          <Spinner v-if="targetCreating" class="mr-2 inline size-3" />
           <AlertDescription>
-            {{ $t('验证环境已就绪，请上传本次 Fix 包。') }}
+            {{ targetCreating
+              ? $t('防御环境正在启动，可立即上传 Fix；环境就绪后将自动开始验证。')
+              : $t('验证环境已就绪，请上传本次 Fix 包。') }}
           </AlertDescription>
         </Alert>
         <FieldGroup>
@@ -168,7 +171,9 @@ async function uploadFix(): Promise<void> {
       <Alert v-else-if="validating">
         <Spinner class="mr-2 inline size-3" />
         <AlertDescription class="inline">
-          {{ $t('正在验证本次 Fix…') }}
+          {{ patchWaitingForTarget
+            ? $t('Fix 已上传，防御环境就绪后将自动开始验证…')
+            : $t('正在验证本次 Fix…') }}
         </AlertDescription>
       </Alert>
 

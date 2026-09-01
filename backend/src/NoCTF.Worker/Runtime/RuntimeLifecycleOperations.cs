@@ -98,6 +98,12 @@ internal static partial class BackendMessageOperations
         var now = timeProvider.GetUtcNow();
         foreach (var instance in runtimes)
         {
+            await FailAwdpSubmissionAsync(
+                instance,
+                db,
+                outbox,
+                timeProvider,
+                cancellationToken);
             if (instance.State == RuntimeState.Queued && string.IsNullOrWhiteSpace(instance.ProviderReceiptJson))
             {
                 instance.State = RuntimeState.Stopped;

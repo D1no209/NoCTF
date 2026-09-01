@@ -2328,7 +2328,7 @@
           "Competitions"
         ],
         "summary": "Upload the only Fix archive accepted by an AWDP defense target.",
-        "description": "Atomically binds one archive and one Fix attempt to the clean disposable target, then starts one Checker verification.",
+        "description": "Atomically binds one archive and one Fix attempt to the clean disposable target. Verification starts immediately when the target is running, or automatically after provisioning completes.",
         "operationId": "UploadPatchEndpoint",
         "parameters": [
           {

@@ -706,7 +706,7 @@ export const submitFlagEndpoint = <ThrowOnError extends boolean = false>(options
 /**
  * Upload the only Fix archive accepted by an AWDP defense target.
  *
- * Atomically binds one archive and one Fix attempt to the clean disposable target, then starts one Checker verification.
+ * Atomically binds one archive and one Fix attempt to the clean disposable target. Verification starts immediately when the target is running, or automatically after provisioning completes.
  */
 export const uploadPatchEndpoint = <ThrowOnError extends boolean = false>(options: Options<UploadPatchEndpointData, ThrowOnError>): RequestResult<UploadPatchEndpointResponses, UploadPatchEndpointErrors, ThrowOnError> => (options.client ?? client).post<UploadPatchEndpointResponses, UploadPatchEndpointErrors, ThrowOnError>({
     ...formDataBodySerializer,
