@@ -32,7 +32,10 @@ public sealed record AwdpParticipantStateResponse(
     GameplayFactStatusResponse? LatestBreakAttempt,
     AwdpAchievementActivationResponse? BreakActivation,
     AwdpDefenseProgressResponse Defense,
-    AwdpAchievementActivationResponse? FixActivation);
+    AwdpAchievementActivationResponse? FixActivation,
+    int? MaximumFixAttempts,
+    int AcceptedFixAttempts,
+    int? RemainingFixAttempts);
 
 internal static class AwdpParticipantStateMapping
 {
@@ -67,7 +70,10 @@ internal static class AwdpParticipantStateMapping
                 view.Defense.TargetExpiresAt,
                 view.Defense.TargetStoppedAt,
                 view.Defense.UpdatedAt),
-            Activation(view.FixActivation));
+            Activation(view.FixActivation),
+            view.MaximumFixAttempts,
+            view.AcceptedFixAttempts,
+            view.RemainingFixAttempts);
 
     private static AwdpAchievementActivationResponse? Activation(
         AwdpAchievementActivationView? view) =>
@@ -88,7 +94,7 @@ public sealed class GetAwdpParticipantStateEndpoint(
         {
             summary.Summary = "Gets the current team's AWDP attack and defense state.";
             summary.Description =
-                "Returns the current attack Runtime, Break activation, one-shot Fix progress and defense activation.";
+                "Returns the current attack Runtime, Break activation, one-shot Fix progress, authoritative Fix attempt limits and defense activation.";
         });
     }
 

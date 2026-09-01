@@ -52,13 +52,30 @@ public sealed class AwdpParticipantStateReader(NoCtfDbContext db) : IAwdpPartici
                     TeamId = item.Team.Id,
                     item.Competition.ConfigurationJson,
                     item.Competition.Status,
-                    ChallengeId = challenge.Id
+                    challenge.RulesJson,
+                    TemplateId = challenge.ChallengeId
+                })
+            .Join(
+                db.Challenges.AsNoTracking()
+                    .Where(template => template.DeletedAt == null),
+                item => item.TemplateId,
+                template => template.Id,
+                (item, template) => new
+                {
+                    item.TeamId,
+                    item.ConfigurationJson,
+                    item.Status,
+                    item.RulesJson,
+                    template.DefinitionJson
                 })
             .SingleOrDefaultAsync(cancellationToken);
         if (scope is null)
             return null;
 
-        var configuration = AwdpConfigurationParser.ParseCompetition(scope.ConfigurationJson);
+        var configuration = AwdpConfigurationResolver.Resolve(
+            scope.ConfigurationJson,
+            scope.RulesJson,
+            scope.DefinitionJson);
 
         var facts = await db.GameplayFacts.AsNoTracking()
             .Where(fact => fact.CompetitionId == competitionId
@@ -155,6 +172,15 @@ public sealed class AwdpParticipantStateReader(NoCtfDbContext db) : IAwdpPartici
             .OrderByDescending(fact => fact.OccurredAt)
             .ThenByDescending(fact => fact.Id)
             .FirstOrDefault();
+        var acceptedFixAttempts = facts.Count(fact =>
+            fact.Kind == GameplayFactKind.FixAttempt
+            && fact.State != GameplayFactState.PlatformFailed);
+        var maximumFixAttempts = configuration.MaxFixSubmissions > 0
+            ? configuration.MaxFixSubmissions
+            : (int?)null;
+        var remainingFixAttempts = maximumFixAttempts is { } maximum
+            ? Math.Max(0, maximum - acceptedFixAttempts)
+            : (int?)null;
 
         return new(
             currentRound,
@@ -174,7 +200,10 @@ public sealed class AwdpParticipantStateReader(NoCtfDbContext db) : IAwdpPartici
                 fixRuntime?.ExpiresAt,
                 fixRuntime?.StoppedAt,
                 latestFix?.UpdatedAt),
-            Activation(firstFix, lifecycle, configuration.RoundDurationSeconds));
+            Activation(firstFix, lifecycle, configuration.RoundDurationSeconds),
+            maximumFixAttempts,
+            acceptedFixAttempts,
+            remainingFixAttempts);
     }
 
     private static GameplayFactStatusView ToStatus(GameplayFact fact) =>

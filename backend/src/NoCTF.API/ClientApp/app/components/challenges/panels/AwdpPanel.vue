@@ -131,6 +131,13 @@ onUnmounted(() => {
             <Badge v-if="state?.fixActivation" variant="default">
               {{ $t('已于第 {round} 轮生效', { round: state.fixActivation.effectiveRound ?? '-' }) }}
             </Badge>
+            <Badge
+              v-if="state?.maximumFixAttempts !== null && state?.maximumFixAttempts !== undefined"
+              variant="secondary"
+              class="font-mono tabular-nums"
+            >
+              {{ $t('剩余 {count} 次提交', { count: state.remainingFixAttempts ?? 0 }) }}
+            </Badge>
           </div>
         </header>
 

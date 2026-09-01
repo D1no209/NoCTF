@@ -3340,3 +3340,15 @@ dotnet run --project backend/src/NoCTF.API/NoCTF.API.csproj --no-build -- --expo
   946/946、ClientApp 305/305、typecheck、production generate 与 Release solution build 通过；EF 无
   pending model changes。真实 PostgreSQL 新回归已编译，但本机 Docker 引擎未运行，因此 3 项
   `AwdpDefenseTarget` Integration 按既有环境门禁跳过。本阶段未 push、未部署。
+
+## 2026-09-01 Alpha.121 Fix 剩余次数
+
+- AWDP participant state 新增 `maximumFixAttempts`、`acceptedFixAttempts`、`remainingFixAttempts`。
+  Reader 使用与实际受理相同的 `AwdpConfigurationResolver` 合并比赛默认、题目规则覆盖与模板定义，
+  不再只看比赛级配置。
+- 已接受次数与后端 admission 口径一致：统计该队本题所有非 PlatformFailed 的 FixAttempt；剩余次数
+  下限为 0。有效上限大于 0 时，防御轨标题旁以 Badge 显示“剩余 X 次提交”；0/未限制时不显示。
+  每次申请、上传和状态变化后的 participant state 刷新会同步更新数值。
+- 平台版本递增为 `0.1.0-alpha.121`。OpenAPI 与生成 SDK 已同步；没有业务数据模型或 migration
+  变化。非 Integration TUnit 946/946、ClientApp 305/305、typecheck、production generate、Release
+  solution build 与 EF pending-model 检查通过。本阶段未 push、未部署。

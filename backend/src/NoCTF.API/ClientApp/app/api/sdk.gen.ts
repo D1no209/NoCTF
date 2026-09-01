@@ -574,7 +574,7 @@ export const recordAwdpCheckResultEndpoint = <ThrowOnError extends boolean = fal
 /**
  * Gets the current team's AWDP attack and defense state.
  *
- * Returns the current attack Runtime, Break activation, one-shot Fix progress and defense activation.
+ * Returns the current attack Runtime, Break activation, one-shot Fix progress, authoritative Fix attempt limits and defense activation.
  */
 export const getAwdpParticipantStateEndpoint = <ThrowOnError extends boolean = false>(options: Options<GetAwdpParticipantStateEndpointData, ThrowOnError>): RequestResult<GetAwdpParticipantStateEndpointResponses, GetAwdpParticipantStateEndpointErrors, ThrowOnError> => (options.client ?? client).get<GetAwdpParticipantStateEndpointResponses, GetAwdpParticipantStateEndpointErrors, ThrowOnError>({
     security: [{

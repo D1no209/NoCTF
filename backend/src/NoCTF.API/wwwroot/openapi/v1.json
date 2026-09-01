@@ -1742,7 +1742,7 @@
           "Competitions"
         ],
         "summary": "Gets the current team's AWDP attack and defense state.",
-        "description": "Returns the current attack Runtime, Break activation, one-shot Fix progress and defense activation.",
+        "description": "Returns the current attack Runtime, Break activation, one-shot Fix progress, authoritative Fix attempt limits and defense activation.",
         "operationId": "GetAwdpParticipantStateEndpoint",
         "parameters": [
           {
@@ -13824,6 +13824,20 @@
                 "$ref": "#/components/schemas/NoCTFAPIEndpointsGameplayFactsAwdpAchievementActivationResponse"
               }
             ]
+          },
+          "maximumFixAttempts": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "acceptedFixAttempts": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "remainingFixAttempts": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
           }
         }
       },
