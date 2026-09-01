@@ -150,7 +150,8 @@ internal static partial class ChallengeTemplateMapper
 public sealed class CreateChallengeTemplateEndpoint(
     CreateChallengeTemplate create,
     IUserContext user,
-    TimeProvider timeProvider)
+    TimeProvider timeProvider,
+    ILogger<CreateChallengeTemplateEndpoint> logger)
     : Endpoint<
         CreateChallengeTemplateRequest,
         Results<
@@ -182,6 +183,15 @@ public sealed class CreateChallengeTemplateEndpoint(
         var result = await create.ExecuteAsync(
             ChallengeTemplateMapper.ToCommand(request, user.UserId, timeProvider.GetUtcNow()),
             ct);
+        if (result.State is ChallengeTemplateWriteState.InvalidRequest
+            or ChallengeTemplateWriteState.InvalidDefinition)
+        {
+            logger.LogWarning(
+                "Challenge template creation rejected for mode {Mode}: {State}. {Detail}",
+                request.Mode,
+                result.State,
+                result.Detail);
+        }
         return result.State switch
         {
             ChallengeTemplateWriteState.Succeeded =>

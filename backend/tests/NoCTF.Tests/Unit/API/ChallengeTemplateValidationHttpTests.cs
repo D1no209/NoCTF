@@ -16,6 +16,7 @@ using Microsoft.Extensions.Options;
 using NSubstitute;
 using NoCTF.API.Composition;
 using NoCTF.API.Endpoints.Administration.ChallengeBank;
+using NoCTF.API.Endpoints.Competitions;
 using NoCTF.API.Security;
 using NoCTF.Application.Challenges.Bank;
 using NoCTF.Application.Challenges.Configuration;
@@ -59,6 +60,34 @@ public sealed class ChallengeTemplateValidationHttpTests
             nameof(UpdateChallengeTemplateRequest.DefinitionJson));
     }
 
+    [Test]
+    [Arguments(GameModeProtocol.Ctf, "{\"schemaVersion\":2}")]
+    [Arguments(GameModeProtocol.Awd, "{\"schemaVersion\":4}")]
+    [Arguments(GameModeProtocol.Awdp, "{\"schemaVersion\":4,\"maximumPatchUploadBytes\":268435456}")]
+    [Arguments(GameModeProtocol.Koh, "{\"schemaVersion\":1}")]
+    public async Task Minimal_definition_updates_succeed_for_every_game_mode(
+        GameModeProtocol mode,
+        string definitionJson)
+    {
+        await using var app = await CreateApplicationAsync();
+        using var client = app.GetTestClient();
+        client.DefaultRequestHeaders.Authorization =
+            new AuthenticationHeaderValue(BearerScheme, "test-token");
+
+        using var response = await client.PutAsJsonAsync(
+            $"/api/v1/admin/challenges/{Guid.NewGuid()}",
+            new
+            {
+                mode = mode.ToString(),
+                visibility = "Private",
+                title = $"{mode} template",
+                direction = "Pwn",
+                definitionJson
+            });
+
+        await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.OK);
+    }
+
     private static async Task<WebApplication> CreateApplicationAsync()
     {
         var builder = WebApplication.CreateBuilder();
@@ -89,8 +118,31 @@ public sealed class ChallengeTemplateValidationHttpTests
         user.UserId.Returns(ActorId);
         user.IsAdministrator.Returns(true);
         builder.Services.AddSingleton<IUserContext>(user);
-        builder.Services.AddSingleton<IChallengeBankStore>(
-            Substitute.For<IChallengeBankStore>());
+        var store = Substitute.For<IChallengeBankStore>();
+        store.UpdateAsync(
+                Arg.Any<UpdateChallengeTemplateCommand>(),
+                Arg.Any<CancellationToken>())
+            .Returns(call =>
+            {
+                var command = call.Arg<UpdateChallengeTemplateCommand>()!;
+                return Task.FromResult(new ChallengeTemplateWriteResult(
+                    ChallengeTemplateWriteState.Succeeded,
+                    new ChallengeTemplateView(
+                        command.ChallengeId,
+                        command.ActorId,
+                        [],
+                        command.Mode,
+                        command.Visibility,
+                        command.Title,
+                        command.Description,
+                        command.Direction,
+                        command.DefinitionJson,
+                        null,
+                        0,
+                        command.UpdatedAt,
+                        command.UpdatedAt)));
+            });
+        builder.Services.AddSingleton<IChallengeBankStore>(store);
         builder.Services.AddSingleton<IChallengeConfigurationCatalog>(
             new GameModeChallengeConfigurationCatalog());
         builder.Services.AddScoped<UpdateChallengeTemplate>();
