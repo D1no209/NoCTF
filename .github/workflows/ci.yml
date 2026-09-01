@@ -106,3 +106,152 @@ jobs:
           labels: ${{ steps.metadata.outputs.labels }}
           cache-from: type=gha,scope=noctf-host
           cache-to: type=gha,mode=max,scope=noctf-host,ignore-error=true
+
+  deploy-production:
+    name: Deploy production
+    needs: publish-images
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    environment: production
+    concurrency:
+      group: noctf-production-deploy
+      cancel-in-progress: false
+    env:
+      DEPLOY_HOST: ${{ secrets.NOCTF_DEPLOY_HOST }}
+      DEPLOY_USER: ${{ secrets.NOCTF_DEPLOY_USER }}
+      DEPLOY_PORT: ${{ secrets.NOCTF_DEPLOY_PORT }}
+      DEPLOY_PATH: ${{ secrets.NOCTF_DEPLOY_PATH }}
+      DEPLOY_SSH_KEY: ${{ secrets.NOCTF_DEPLOY_SSH_KEY }}
+      DEPLOY_KNOWN_HOSTS: ${{ secrets.NOCTF_DEPLOY_KNOWN_HOSTS }}
+
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - name: Validate deployment configuration
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          : "${DEPLOY_HOST:?NOCTF_DEPLOY_HOST is required}"
+          : "${DEPLOY_USER:?NOCTF_DEPLOY_USER is required}"
+          : "${DEPLOY_SSH_KEY:?NOCTF_DEPLOY_SSH_KEY is required}"
+          : "${DEPLOY_KNOWN_HOSTS:?NOCTF_DEPLOY_KNOWN_HOSTS is required}"
+          DEPLOY_PORT=${DEPLOY_PORT:-22}
+          DEPLOY_PATH=${DEPLOY_PATH:-/root/NoCTF}
+          [[ "$DEPLOY_HOST" =~ ^[A-Za-z0-9.:-]+$ ]]
+          [[ "$DEPLOY_USER" =~ ^[a-z_][a-z0-9_-]*$ ]]
+          [[ "$DEPLOY_PORT" =~ ^[0-9]+$ ]]
+          [[ "$DEPLOY_PATH" =~ ^/[A-Za-z0-9._/-]+$ ]]
+
+      - name: Configure SSH
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          install -d -m 700 "$HOME/.ssh"
+          printf '%s\n' "$DEPLOY_SSH_KEY" > "$HOME/.ssh/noctf_deploy"
+          chmod 600 "$HOME/.ssh/noctf_deploy"
+          printf '%s\n' "$DEPLOY_KNOWN_HOSTS" > "$HOME/.ssh/known_hosts"
+          chmod 600 "$HOME/.ssh/known_hosts"
+
+      - name: Package exact commit
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          kompose_version=1.38.0
+          kompose_sha256=65a6a720605bead3964e8b22d423a0763de451a236fe03de902e366cf3d9c147
+          kompose_asset="$RUNNER_TEMP/kompose-linux-amd64"
+          curl --fail --location --show-error \
+            --connect-timeout 15 --max-time 600 \
+            --retry 5 --retry-delay 2 --retry-all-errors \
+            --output "$kompose_asset" \
+            "https://github.com/kubernetes/kompose/releases/download/v${kompose_version}/kompose-linux-amd64"
+          echo "$kompose_sha256  $kompose_asset" | sha256sum -c -
+          git archive \
+            --format=tar.gz \
+            --output="$RUNNER_TEMP/noctf-release.tar.gz" \
+            "$GITHUB_SHA"
+          tar -tzf "$RUNNER_TEMP/noctf-release.tar.gz" >/dev/null
+
+      - name: Upload and deploy
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          DEPLOY_PORT=${DEPLOY_PORT:-22}
+          DEPLOY_PATH=${DEPLOY_PATH:-/root/NoCTF}
+          remote_parent=$(dirname "$DEPLOY_PATH")
+          remote_upload="$remote_parent/noctf-ci-upload-$GITHUB_SHA"
+          release_root="$remote_parent/noctf-releases"
+          kompose_sha256=65a6a720605bead3964e8b22d423a0763de451a236fe03de902e366cf3d9c147
+          ssh_options=(
+            -i "$HOME/.ssh/noctf_deploy"
+            -o BatchMode=yes
+            -o IdentitiesOnly=yes
+            -o StrictHostKeyChecking=yes
+            -o ConnectTimeout=15
+            -o ServerAliveInterval=30
+            -o ServerAliveCountMax=20
+            -o TCPKeepAlive=yes
+            -p "$DEPLOY_PORT"
+          )
+          scp_options=(
+            -i "$HOME/.ssh/noctf_deploy"
+            -o BatchMode=yes
+            -o IdentitiesOnly=yes
+            -o StrictHostKeyChecking=yes
+            -o ConnectTimeout=15
+            -o ServerAliveInterval=30
+            -o ServerAliveCountMax=20
+            -o TCPKeepAlive=yes
+            -P "$DEPLOY_PORT"
+          )
+          ssh "${ssh_options[@]}" "$DEPLOY_USER@$DEPLOY_HOST" \
+            "mkdir -p -- '$remote_upload'"
+
+          if ssh "${ssh_options[@]}" "$DEPLOY_USER@$DEPLOY_HOST" \
+            "bash -s -- '$release_root' '$remote_upload' '$kompose_sha256'" <<'CACHE_KOMPOSE'
+          set -Eeuo pipefail
+          release_root=$1
+          remote_upload=$2
+          kompose_sha256=$3
+          cached_kompose="$release_root/current/backend/docker-assets/kompose-linux-amd64"
+          [[ -f "$cached_kompose" ]]
+          echo "$kompose_sha256  $cached_kompose" | sha256sum -c -
+          install -m 0644 "$cached_kompose" "$remote_upload/kompose-linux-amd64"
+          CACHE_KOMPOSE
+          then
+            echo "Reused the verified Kompose asset from the current server release."
+          else
+            scp "${scp_options[@]}" \
+              "$RUNNER_TEMP/kompose-linux-amd64" \
+              "$DEPLOY_USER@$DEPLOY_HOST:$remote_upload/kompose-linux-amd64"
+          fi
+
+          scp "${scp_options[@]}" \
+            "$RUNNER_TEMP/noctf-release.tar.gz" \
+            deploy/ci/deploy.sh \
+            "$DEPLOY_USER@$DEPLOY_HOST:$remote_upload/"
+          ssh "${ssh_options[@]}" "$DEPLOY_USER@$DEPLOY_HOST" \
+            "bash '$remote_upload/deploy.sh' '$remote_upload/noctf-release.tar.gz' '$GITHUB_SHA' '$DEPLOY_PATH' '$release_root' '$remote_upload/kompose-linux-amd64'"
+
+      - name: Remove interrupted upload
+        if: always()
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          DEPLOY_PORT=${DEPLOY_PORT:-22}
+          DEPLOY_PATH=${DEPLOY_PATH:-/root/NoCTF}
+          [[ "$DEPLOY_PATH" =~ ^/[A-Za-z0-9._/-]+$ ]] || exit 0
+          remote_upload="$(dirname "$DEPLOY_PATH")/noctf-ci-upload-$GITHUB_SHA"
+          ssh \
+            -i "$HOME/.ssh/noctf_deploy" \
+            -o BatchMode=yes \
+            -o IdentitiesOnly=yes \
+            -o StrictHostKeyChecking=yes \
+            -o ConnectTimeout=15 \
+            -o ServerAliveInterval=30 \
+            -o ServerAliveCountMax=20 \
+            -o TCPKeepAlive=yes \
+            -p "$DEPLOY_PORT" \
+            "$DEPLOY_USER@$DEPLOY_HOST" \
+            "test \"$(basename "$remote_upload")\" = 'noctf-ci-upload-$GITHUB_SHA' && rm -rf -- '$remote_upload'" \
+            || true

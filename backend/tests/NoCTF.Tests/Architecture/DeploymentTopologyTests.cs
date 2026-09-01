@@ -333,10 +333,16 @@ public sealed class DeploymentTopologyTests
     {
         var ci = (await ReadAsync(".github", "workflows", "ci.yml"))
             .ReplaceLineEndings("\n");
+        var publishJob = System.Text.RegularExpressions.Regex.Match(
+            ci,
+            "(?ms)^  publish-images:\n(?<body>.*?)(?=^  deploy-production:)")
+            .Groups["body"]
+            .Value;
 
         await Assert.That(ci).Contains("  publish-images:\n");
+        await Assert.That(publishJob).IsNotEmpty();
         await Assert.That(ci).DoesNotContain("  verify:\n");
-        await Assert.That(ci).DoesNotContain("    needs:");
+        await Assert.That(publishJob).DoesNotContain("    needs:");
         await Assert.That(ci).DoesNotContain("bun test");
         await Assert.That(ci).DoesNotContain("dotnet test");
         await Assert.That(ci).DoesNotContain("bash deploy/recovery/rehearse.sh");
@@ -354,6 +360,29 @@ public sealed class DeploymentTopologyTests
         await Assert.That(ci).DoesNotContain("matrix.image");
         await Assert.That(ci).DoesNotContain("matrix.target");
 
+    }
+
+    [Test]
+    public async Task Ci_deploys_the_exact_main_commit_after_image_publication()
+    {
+        var ci = (await ReadAsync(".github", "workflows", "ci.yml"))
+            .ReplaceLineEndings("\n");
+
+        await Assert.That(ci).Contains("  deploy-production:\n");
+        await Assert.That(ci).Contains("    needs: publish-images\n");
+        await Assert.That(ci).Contains(
+            "    if: github.event_name == 'push' && github.ref == 'refs/heads/main'\n");
+        await Assert.That(ci).Contains("    environment: production\n");
+        await Assert.That(ci).Contains("      group: noctf-production-deploy\n");
+        await Assert.That(ci).Contains("      cancel-in-progress: false\n");
+        await Assert.That(ci).Contains("NOCTF_DEPLOY_HOST");
+        await Assert.That(ci).Contains("NOCTF_DEPLOY_SSH_KEY");
+        await Assert.That(ci).Contains("NOCTF_DEPLOY_KNOWN_HOSTS");
+        await Assert.That(ci).Contains("git archive \\\n");
+        await Assert.That(ci).Contains("$GITHUB_SHA");
+        await Assert.That(ci).Contains("deploy/ci/deploy.sh");
+        await Assert.That(ci).Contains("noctf-ci-upload-$GITHUB_SHA");
+        await Assert.That(ci).Contains("if: always()\n");
     }
 
     [Test]
@@ -544,14 +573,14 @@ public sealed class DeploymentTopologyTests
             .Select(line => line.Trim())
             .Where(line => line.StartsWith("- uses:", StringComparison.Ordinal))
             .ToArray();
-        await Assert.That(actionReferences).Count().IsEqualTo(1);
+        await Assert.That(actionReferences).Count().IsEqualTo(2);
         await Assert.That(actionReferences.All(line =>
             System.Text.RegularExpressions.Regex.IsMatch(
                 line,
                 "^- uses: [a-z0-9-]+/[a-z0-9-]+@[a-f0-9]{40} # v[0-9]+$"))).IsTrue();
 
         await Assert.That(actionReferences.Count(line =>
-            line.StartsWith("- uses: actions/checkout@", StringComparison.Ordinal))).IsEqualTo(1);
+            line.StartsWith("- uses: actions/checkout@", StringComparison.Ordinal))).IsEqualTo(2);
 
         var ciServiceImages = ci.Split('\n')
             .Select(line => line.Trim())
