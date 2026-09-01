@@ -1,6 +1,13 @@
 <script setup lang="ts">
-import { getGameplayFactValueEndpoint, listGameplayFactsEndpoint } from '~/api'
-import type { NoCtfapiEndpointsGameplayFactsGameplayFactListItemResponse } from '~/api'
+import {
+  getGameplayFactStatusEndpoint,
+  getGameplayFactValueEndpoint,
+  listGameplayFactsEndpoint,
+} from '~/api'
+import type {
+  NoCtfapiEndpointsGameplayFactsGameplayFactListItemResponse,
+  NoCtfapiEndpointsGameplayFactsGameplayFactStatusResponse,
+} from '~/api'
 import { createLatestPageRefresh } from '~/lib/latest-page-refresh'
 
 type Submission = NoCtfapiEndpointsGameplayFactsGameplayFactListItemResponse
@@ -35,20 +42,60 @@ const { items, loading, error, hasMore, initialized, loadMore, reset } =
     return { items: data.items, nextCursor: data.nextCursor }
   })
 
-const { refreshLatest } = createLatestPageRefresh({
+const { loadNextPage, refreshLatest } = createLatestPageRefresh({
   loadMore,
   reset: () => reset({ preserveItems: true }),
 })
 
-function sameId(left: string | null | undefined, right: string): boolean {
-  return left?.replaceAll('-', '').toLowerCase() === right.replaceAll('-', '').toLowerCase()
+function sameId(
+  left: string | null | undefined,
+  right: string | null | undefined,
+): boolean {
+  if (!left || !right) return false
+  return left.replaceAll('-', '').toLowerCase() === right.replaceAll('-', '').toLowerCase()
 }
+
+function applyStatus(status: NoCtfapiEndpointsGameplayFactsGameplayFactStatusResponse): boolean {
+  const submission = items.value.find(item => sameId(item.id, status.gameplayFactId))
+  if (!submission) return false
+  submission.state = status.state
+  submission.result = status.result
+  submission.failureCode = status.failureCode
+  submission.updatedAt = status.updatedAt
+  return true
+}
+
+async function refreshPending(): Promise<void> {
+  const pending = items.value.filter(item => item.id && isGameplayFactPending(item.state))
+  await Promise.all(pending.map(async (submission) => {
+    const { data } = await getGameplayFactStatusEndpoint({
+      path: {
+        competitionId: props.competitionId,
+        gameplayFactId: submission.id!,
+      },
+    })
+    if (data) applyStatus(data)
+  }))
+}
+
+const { start: startPendingPolling, stop: stopPendingPolling } = usePolling(
+  async () => {
+    await refreshPending()
+    return !items.value.some(item => isGameplayFactPending(item.state))
+  },
+  { interval: 1500, timeout: 300_000 },
+)
+
+watch(
+  () => items.value.some(item => isGameplayFactPending(item.state)),
+  pending => pending ? startPendingPolling() : stopPendingPolling(),
+)
 
 watch(
   () => [props.competitionId, props.competitionChallengeId] as const,
   () => {
     reset()
-    void loadMore()
+    void loadNextPage()
   },
   { immediate: true },
 )
@@ -64,13 +111,16 @@ let unwatch: (() => void) | undefined
 onMounted(() => {
   unwatch = watchCompetition(props.competitionId, {
     gameplayFactStateChanged: payload => {
-      if (sameId(payload.competitionChallengeId, props.competitionChallengeId))
-        void refreshLatest()
+      if (!sameId(payload.competitionChallengeId, props.competitionChallengeId)) return
+      if (!applyStatus(payload)) void refreshLatest()
     },
     onReconnected: () => void refreshLatest(),
   })
 })
-onUnmounted(() => unwatch?.())
+onUnmounted(() => {
+  unwatch?.()
+  stopPendingPolling()
+})
 
 function resultVariant(submission: Submission) {
   if (isGameplayFactPending(submission.state)) return 'secondary' as const
@@ -182,7 +232,7 @@ function setValueDialogOpen(open: boolean): void {
       </TableBody>
     </Table>
 
-    <Button v-if="hasMore" variant="outline" size="sm" class="mt-3" :disabled="loading" @click="loadMore">
+    <Button v-if="hasMore" variant="outline" size="sm" class="mt-3" :disabled="loading" @click="loadNextPage">
       <Spinner v-if="loading" data-icon="inline-start" />{{ $t('加载更多') }}
     </Button>
 

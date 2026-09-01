@@ -3291,3 +3291,15 @@ dotnet run --project backend/src/NoCTF.API/NoCTF.API.csproj --no-build -- --expo
   ClientApp 305/305、typecheck 与 production generate 通过；Compose 合并配置和 Grafana JSON 有效；
   Prometheus 3.14.0 `promtool` 校验 20 条告警和 6 条动态查询语法成功。生产 Worker 只读采样确认 Wolverine 6.30.3 实际
   导出 `*_Messages` 与 `*_Milliseconds` 指标。本阶段未 push、未部署。
+
+## 2026-09-01 Alpha.117 题目提交记录实时收敛
+
+- 修复题目详情页的“本题提交记录”只在接受提交时重载列表、之后完全依赖 SignalR 的问题。现在
+  `gameplayFactStateChanged` 会按 fact id 直接更新现有行的 state/result/failureCode/updatedAt，避免
+  AWDP 顶部防御结果已终结而表格仍停留在“评测中”。未在当前页找到对应行时才重载最新首屏。
+- 对 Pending/Queued/Processing 行增加 1.5 秒 REST 状态轮询兜底，直到终态或 5 分钟上限；断线重连
+  仍重载最新首屏，卸载组件时停止轮询。首屏、加载更多和实时失效统一经 `createLatestPageRefresh`
+  串行，避免初次加载与新提交重载互相覆盖。
+- 平台版本递增为 `0.1.0-alpha.117`。没有 HTTP/OpenAPI、业务数据模型或 migration 变化。
+  ClientApp 305/305、typecheck 与 production generate 通过；仅保留既有大 chunk、插件耗时与 Nitro
+  第三方警告。本阶段未 push、未部署。
