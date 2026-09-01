@@ -45,6 +45,9 @@ GHCR 使用工作流内置的 `GITHUB_TOKEN`。若仓库配置了以下 Actions 
 | Secret | `CUSTOM_REGISTRY_PASSWORD` | 自定义 Registry 密码或访问令牌 |
 
 自定义 Registry 镜像名为 `<registry>/<namespace>/<repo>`，标签与 GHCR 完全一致。
+为兼容不接受 OCI attestation manifest 的 Registry，发布镜像显式关闭 Buildx provenance 与 SBOM
+附加清单；镜像标签与 OCI image metadata 保持不变。GitHub Actions Cache 仅用于加速，缓存导出失败
+不会阻断已经完成的 Registry 发布。
 
 仓库中的第三方构建基础镜像、PostgreSQL、Redis、MinIO 与 MinIO Client 均同时固定可读版本标签和
 多架构 manifest digest；Kompose 固定版本下载后必须以官方发布的 SHA-256 校验通过才能执行。依赖更新

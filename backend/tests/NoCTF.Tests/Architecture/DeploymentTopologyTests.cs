@@ -338,6 +338,10 @@ public sealed class DeploymentTopologyTests
         await Assert.That(ci).Contains("if: env.CUSTOM_REGISTRY != ''");
         await Assert.That(ci).Contains("target: host");
         await Assert.That(ci).Contains("push: true");
+        await Assert.That(ci).Contains("provenance: false");
+        await Assert.That(ci).Contains("sbom: false");
+        await Assert.That(ci).Contains(
+            "cache-to: type=gha,mode=max,scope=noctf-host,ignore-error=true");
         await Assert.That(ci).DoesNotContain("matrix.image");
         await Assert.That(ci).DoesNotContain("matrix.target");
 
