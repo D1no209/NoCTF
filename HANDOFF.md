@@ -3352,3 +3352,15 @@ dotnet run --project backend/src/NoCTF.API/NoCTF.API.csproj --no-build -- --expo
 - 平台版本递增为 `0.1.0-alpha.121`。OpenAPI 与生成 SDK 已同步；没有业务数据模型或 migration
   变化。非 Integration TUnit 946/946、ClientApp 305/305、typecheck、production generate、Release
   solution build 与 EF pending-model 检查通过。本阶段未 push、未部署。
+
+## 2026-09-01 Alpha.122 自定义访问入口显示模板
+
+- 题目运行环境的访问入口从“必须展开为受支持协议的绝对 URL”改为开放显示模板；出题人可以填写
+  `nc {HOST} {PORT}`、说明文本或自定义协议，Runner 只替换 `{HOST}` / `{PORT}` 并将结果原样回写。
+- 前端字段改称“显示模板”，明确结果无需是合法 URL。所有选手端与管理端展示继续通过统一安全组件：只有
+  HTTP/HTTPS 会生成可点击链接，其他自定义内容以可选择、可复制的纯文本显示。
+- 服务端仍要求模板非空且不包含未知占位符；KoH 控制检查入口是真实探测地址，继续要求展开为绝对 URI。
+  删除不再适用的 `RuntimeAccessUrl` 协议白名单值对象及测试。平台版本递增为 `0.1.0-alpha.122`；
+  没有 HTTP/OpenAPI、业务数据模型或 migration 变化。非 Integration TUnit 936/936、ClientApp
+  306/306、typecheck、production generate、Release solution build 与 EF pending-model 检查通过；新增
+  PostgreSQL 回写回归已编译，本机 Docker 未运行，未将其误报为已执行。本阶段未 push、未部署。

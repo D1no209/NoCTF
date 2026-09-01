@@ -34,6 +34,28 @@ describe('challenge definition defaults', () => {
     })).toEqual([])
   })
 
+  test('accepts a custom runtime access display template', () => {
+    const model = emptyDefinition('Ctf')
+    const runtime = emptyRuntimeTemplate('Ctf')
+    model.runtime = runtime
+    if (runtime.definition.kind !== 'container') throw new Error('Expected container definition')
+    runtime.definition.image = 'registry.example.com/challenge:latest'
+    runtime.definition.containerPorts = [31337]
+    runtime.urlBindings = [{
+      urlTemplate: 'nc {HOST} {PORT}',
+      exposure: UrlExposure.OwnerOnly,
+      containerPort: 31337,
+      serviceName: '',
+    }]
+
+    expect(validateChallengeTemplateDraft({
+      mode: 'Ctf',
+      title: 'Custom connection command',
+      direction: 'Pwn',
+      definitionJson: serializeDefinition('Ctf', model),
+    })).toEqual([])
+  })
+
   test('initializes creation and resets the definition before a mode switch', async () => {
     const createPage = (await Bun.file(new URL('../app/pages/admin/challenges/new.vue', import.meta.url)).text())
       .replaceAll('\r\n', '\n')

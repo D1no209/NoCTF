@@ -49,7 +49,7 @@ public sealed class RuntimeUrlExpanderTests
     }
 
     [Test]
-    public async Task Public_bindings_reject_unsupported_access_schemes()
+    public async Task Public_bindings_render_custom_display_text()
     {
         var receipt = new ContainerReceipt(
             Guid.CreateVersion7(),
@@ -60,10 +60,12 @@ public sealed class RuntimeUrlExpanderTests
             "runner.example",
             "container-1");
 
-        await Assert.That(() => RuntimeUrlExpander.ExpandContainer(
-                receipt,
-                [new("javascript://{HOST}:{PORT}/unsafe", RuntimeExposure.OwnerOnly, ContainerPort: 8080)]))
-            .Throws<InvalidOperationException>();
+        var expanded = RuntimeUrlExpander.ExpandContainer(
+            receipt,
+            [new("nc {HOST} {PORT}", RuntimeExposure.OwnerOnly, ContainerPort: 8080)]);
+
+        await Assert.That(expanded.Urls)
+            .IsEquivalentTo(["nc runner.example 32000"]);
     }
 
     [Test]

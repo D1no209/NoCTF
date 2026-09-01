@@ -45,28 +45,16 @@ function validateRunnerJob(issues: string[], job: RunnerJobModel | null, label: 
   validateEnvironment(issues, job.environment, label)
 }
 
-function validateUrlTemplate(issues: string[], template: string): void {
+function validateAccessDisplayTemplate(issues: string[], template: string): void {
   if (!template.trim()) {
-    addIssue(issues, translate('访问入口的 URL 模板不能为空'))
+    addIssue(issues, translate('访问入口的显示模板不能为空'))
     return
   }
   const remaining = template
     .replaceAll('{HOST}', '')
     .replaceAll('{PORT}', '')
   if (remaining.includes('{') || remaining.includes('}')) {
-    addIssue(issues, translate('访问入口的 URL 模板只能使用 {HOST} 和 {PORT} 占位符'))
-    return
-  }
-  try {
-    const expanded = template
-      .replaceAll('{HOST}', 'runtime.invalid')
-      .replaceAll('{PORT}', '1')
-    const url = new URL(expanded)
-    if (!['http:', 'https:', 'tcp:', 'udp:', 'ssh:'].includes(url.protocol))
-      addIssue(issues, translate('访问入口仅支持 http、https、tcp、udp 或 ssh 协议'))
-  }
-  catch {
-    addIssue(issues, translate('访问入口的 URL 模板必须能展开为完整 URL'))
+    addIssue(issues, translate('访问入口的显示模板只能使用 {HOST} 和 {PORT} 占位符'))
   }
 }
 
@@ -146,7 +134,7 @@ export function validateChallengeTemplateDraft(draft: ChallengeTemplateDraft): s
   }
 
   for (const binding of runtime.urlBindings) {
-    validateUrlTemplate(issues, binding.urlTemplate)
+    validateAccessDisplayTemplate(issues, binding.urlTemplate)
     if (!validPort(binding.containerPort))
       addIssue(issues, translate('每个访问入口都必须填写有效的容器端口'))
     if (definition.kind === 'container' && validPort(binding.containerPort)
