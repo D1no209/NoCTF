@@ -443,6 +443,8 @@ public sealed class DeploymentTopologyTests
         await Assert.That(deployScript).Contains("docker-compose.ci.yml");
         await Assert.That(deployScript).Contains("docker pull \"$platform_image\"");
         await Assert.That(deployScript).Contains("--no-build");
+        await Assert.That(deployScript).Contains("run --rm migration");
+        await Assert.That(deployScript).DoesNotContain("run --rm --pull");
         await Assert.That(deployScript).DoesNotContain("kompose_asset_path");
         await Assert.That(deployScript).DoesNotContain(
             "\"${compose[@]}\" build migration backend worker runner");

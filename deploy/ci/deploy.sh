@@ -290,7 +290,7 @@ if ! pull_platform_image; then
 fi
 backup_database
 
-if ! "${compose[@]}" run --rm --pull never migration; then
+if ! "${compose[@]}" run --rm migration; then
     rollback_services
     exit 1
 fi

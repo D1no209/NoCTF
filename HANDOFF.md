@@ -3465,3 +3465,14 @@ dotnet run --project backend/src/NoCTF.API/NoCTF.API.csproj --no-build -- --expo
   未扩大改动。后端附件软删除、关联随机 Flag 软删除与恢复逻辑已有持久化覆盖，无 HTTP/API 变更。
 - 平台版本递增为 `0.1.0-alpha.128`。附件/Flag 编辑器回归测试 5/5 与 ClientApp typecheck
   通过。本阶段未 push、未部署。
+
+## 2026-09-02 Alpha.129 兼容生产服务器 Compose migration run
+
+- 首次复用 CI 镜像的生产部署已确认服务器直接拉取 manifest digest，未执行 Docker build；失败发生在
+  migration 启动参数：生产服务器当前 Docker Compose 不支持 `docker compose run --pull`，返回
+  `unknown flag: --pull` 后回滚到旧容器。
+- 移除 migration `run` 的不兼容 `--pull never`。`deploy/docker-compose.ci.yml` 已为 migration 设置
+  `pull_policy: never`，且脚本在备份和 migration 前显式 `docker pull repository@sha256:...`，因此仍只
+  使用 CI 已发布的精确镜像，不触发服务端 build 或额外拉取。
+- 平台版本递增为 `0.1.0-alpha.129`。部署拓扑测试新增 migration 参数兼容断言。本阶段待 push 后由
+  CI 重新部署。
