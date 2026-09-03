@@ -23,6 +23,10 @@ const props = defineProps<{
 
 const open = defineModel<boolean>('open', { default: false })
 const isAwdp = computed(() => props.mode === 'Awdp')
+const usesCurrentScore = computed(() => props.mode === 'Ctf' || props.mode === 'Koh')
+const scoreLabel = computed(() => translate(
+  usesCurrentScore.value ? '当前得分' : '已结算得分',
+))
 
 function challengeSplitScore(
   team: NoCtfapiEndpointsCompetitionsScoreboardTeamResponse,
@@ -88,7 +92,7 @@ const radarOption = computed<echarts.EChartsCoreOption>(() => {
         },
       ]
     : [{
-        name: translate('已结算得分'),
+        name: scoreLabel.value,
         value: selectedScores.map(score => score.total),
         lineStyle: { width: 3 },
         areaStyle: { opacity: 0.35 },
@@ -127,7 +131,7 @@ function flagLabel(succeeded: boolean): string {
     <DialogScrollContent class="max-h-[90vh] sm:max-w-4xl">
       <DialogHeader>
         <DialogTitle>{{ team?.teamName ?? $t('队伍详情') }}</DialogTitle>
-        <DialogDescription>{{ $t('各轴按题目方向汇总已结算分值，点击矩阵状态图标可查看逐轮明细。') }}</DialogDescription>
+        <DialogDescription>{{ $t('各轴按题目方向汇总计入总分的有效分值，点击矩阵状态图标可查看逐轮明细。') }}</DialogDescription>
       </DialogHeader>
 
       <template v-if="team">
@@ -148,7 +152,7 @@ function flagLabel(succeeded: boolean): string {
 
         <div class="overflow-x-auto rounded-lg border">
           <Table>
-            <TableHeader><TableRow><TableHead>{{ $t('题目') }}</TableHead><TableHead>{{ $t('状态') }}</TableHead><TableHead v-if="isAwdp" class="text-right">{{ $t('攻击分') }}</TableHead><TableHead v-if="isAwdp" class="text-right">{{ $t('防御分') }}</TableHead><TableHead class="text-right">{{ $t('已结算得分') }}</TableHead></TableRow></TableHeader>
+            <TableHeader><TableRow><TableHead>{{ $t('题目') }}</TableHead><TableHead>{{ $t('状态') }}</TableHead><TableHead v-if="isAwdp" class="text-right">{{ $t('攻击分') }}</TableHead><TableHead v-if="isAwdp" class="text-right">{{ $t('防御分') }}</TableHead><TableHead class="text-right">{{ scoreLabel }}</TableHead></TableRow></TableHeader>
             <TableBody>
               <TableRow v-for="row in rows" :key="row.group.competitionChallengeId">
                 <TableCell class="font-medium">{{ row.title }}</TableCell>
