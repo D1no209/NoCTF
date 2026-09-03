@@ -1413,6 +1413,21 @@ export type NoCtfapiEndpointsAdministrationPlatformListPlatformLogsRequest = {
     [key: string]: never;
 };
 
+export type NoCtfapiEndpointsAdministrationPlatformPlatformRuntimeListResponse = {
+    items?: Array<NoCtfapiEndpointsAdministrationPlatformPlatformRuntimeResponse>;
+    nextCursor?: string | null;
+};
+
+export type NoCtfapiEndpointsAdministrationPlatformPlatformRuntimeResponse = {
+    runtime?: NoCtfapiEndpointsAdministrationRuntimeAdminRuntimeResponse;
+    competitionTitle?: string;
+    challengeTitle?: string;
+};
+
+export type NoCtfapiEndpointsAdministrationPlatformListPlatformRuntimesRequest = {
+    [key: string]: never;
+};
+
 export type NoCtfapiEndpointsAdministrationPlatformPlatformUserListResponse = {
     items?: Array<NoCtfapiEndpointsAdministrationPlatformPlatformUserResponse>;
 };
@@ -5953,6 +5968,42 @@ export type AdminPlatformListLogsResponses = {
 };
 
 export type AdminPlatformListLogsResponse = AdminPlatformListLogsResponses[keyof AdminPlatformListLogsResponses];
+
+export type AdminPlatformListActiveRuntimesData = {
+    body?: never;
+    path?: never;
+    query: {
+        cursor?: string | null;
+        limit: number;
+    };
+    url: '/api/v1/admin/platform/runtimes';
+};
+
+export type AdminPlatformListActiveRuntimesErrors = {
+    /**
+     * Bad Request
+     */
+    400: MicrosoftAspNetCoreMvcValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+};
+
+export type AdminPlatformListActiveRuntimesError = AdminPlatformListActiveRuntimesErrors[keyof AdminPlatformListActiveRuntimesErrors];
+
+export type AdminPlatformListActiveRuntimesResponses = {
+    /**
+     * Success
+     */
+    200: NoCtfapiEndpointsAdministrationPlatformPlatformRuntimeListResponse;
+};
+
+export type AdminPlatformListActiveRuntimesResponse = AdminPlatformListActiveRuntimesResponses[keyof AdminPlatformListActiveRuntimesResponses];
 
 export type AdminPlatformListUsersData = {
     body?: never;

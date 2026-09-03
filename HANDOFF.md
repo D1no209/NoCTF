@@ -3476,3 +3476,19 @@ dotnet run --project backend/src/NoCTF.API/NoCTF.API.csproj --no-build -- --expo
   使用 CI 已发布的精确镜像，不触发服务端 build 或额外拉取。
 - 平台版本递增为 `0.1.0-alpha.129`。部署拓扑测试新增 migration 参数兼容断言。本阶段待 push 后由
   CI 重新部署。
+
+## 2026-09-03 Alpha.130 平台级活动容器管理
+
+- `/admin/platform` 新增“运行容器”管理入口，管理员可统一查看所有赛事中处于 Queued、Provisioning、
+  Running 或 Stopping 状态的 Container/Compose 实例。列表展示赛事、题目、归属队伍、Runtime 类型、
+  Provider、Runner、状态以及创建/到期时间，每 10 秒自动刷新并支持签名 keyset 加载更多。
+- 新增强类型管理员端点 `GET /api/v1/admin/platform/runtimes`。Application/Infrastructure 从全平台
+  Runtime 当前状态投影活动容器，并补齐赛事、题目和 AWDP 来源队伍归属；已停止、失败与 OVA 虚拟机
+  不进入该运维视图。端点仅允许 Administrator，OpenAPI 与前端 SDK 均由工具重新生成。
+- 平台页面的普通终止与卡死实例强制终结复用既有精确 Runtime 操作、Runner durable cleanup 和不可变
+  赛事审计，不增加第二套资源清理路径。确认弹窗会在请求完成前保留目标，失败时保留上下文并显示 API
+  错误。没有业务表、EF migration 或 snapshot 变化。
+- 平台版本递增为 `0.1.0-alpha.130`。Release solution build 0 warning/0 error，非 Integration TUnit
+  950/950、前端 312/312、ClientApp typecheck 与 Nuxt generate 通过；EF model 无 migration 漂移，
+  OpenAPI 与生成 SDK 连续两轮生成保持幂等。真实 PostgreSQL 跨赛事投影测试已补充，当前机器 Docker
+  daemon 不可用而跳过。本阶段未 push、未部署。
