@@ -106,6 +106,100 @@ public sealed class AdminRuntimeStore(
         return await AddTeamAttributionAsync(items, ct);
     }
 
+    public async Task<IReadOnlyList<PlatformRuntimeInstanceView>> ListActiveContainersAsync(
+        DateTimeOffset? beforeCreatedAt,
+        Guid? beforeId,
+        int limit,
+        CancellationToken ct)
+    {
+        var query = db.RuntimeInstances.AsNoTracking()
+            .Where(item =>
+                (item.RuntimeKind == RuntimeKind.Container
+                    || item.RuntimeKind == RuntimeKind.Compose)
+                && (item.State == RuntimeState.Queued
+                    || item.State == RuntimeState.Provisioning
+                    || item.State == RuntimeState.Running
+                    || item.State == RuntimeState.Stopping));
+        if (beforeCreatedAt is DateTimeOffset createdAt && beforeId is Guid id)
+        {
+            query = query.Where(item =>
+                item.CreatedAt < createdAt
+                || item.CreatedAt == createdAt && item.Id.CompareTo(id) < 0);
+        }
+
+        var runtimes = await query
+            .OrderByDescending(item => item.CreatedAt)
+            .ThenByDescending(item => item.Id)
+            .Take(limit)
+            .Select(item => new RuntimeInstanceView(
+                item.Id, item.CompetitionId, item.CompetitionChallengeId, item.TeamId,
+                item.Purpose, item.RuntimeKind, item.RuntimeProvider,
+                item.State, item.FailureCode, item.Urls,
+                item.CreatedAt, item.RunningAt, item.ExpiresAt, item.StoppedAt,
+                item.RunnerId,
+                item.PublishedPorts
+                    .OrderBy(port => port.ServiceName)
+                    .ThenBy(port => port.ContainerPort)
+                    .Select(port => new RuntimePublishedPortView(
+                        port.ServiceName,
+                        port.ContainerPort,
+                        port.HostPort))
+                    .ToArray(),
+                db.CompetitionEvents
+                    .Where(eventItem =>
+                        eventItem.CompetitionId == item.CompetitionId
+                        && eventItem.Kind == CompetitionEventKind.RuntimeStateChanged
+                        && eventItem.SubjectType == EntityReferenceKind.RuntimeInstance
+                        && eventItem.SubjectId == item.Id)
+                    .OrderByDescending(eventItem => eventItem.OccurredAt)
+                    .ThenByDescending(eventItem => eventItem.Id)
+                    .Select(eventItem => (DateTimeOffset?)eventItem.OccurredAt)
+                    .FirstOrDefault()))
+            .ToListAsync(ct);
+        if (runtimes.Count == 0)
+            return [];
+
+        var attributed = await AddTeamAttributionAsync(runtimes, ct);
+        var competitionIds = attributed
+            .Select(runtime => runtime.CompetitionId)
+            .Distinct()
+            .ToArray();
+        var competitionTitles = await db.Competitions
+            .IgnoreQueryFilters()
+            .AsNoTracking()
+            .Where(competition => competitionIds.Contains(competition.Id))
+            .ToDictionaryAsync(
+                competition => competition.Id,
+                competition => competition.Title,
+                ct);
+        var competitionChallengeIds = attributed
+            .Select(runtime => runtime.CompetitionChallengeId)
+            .Distinct()
+            .ToArray();
+        var challengeTitles = await db.CompetitionChallenges
+            .IgnoreQueryFilters()
+            .AsNoTracking()
+            .Where(challenge => competitionChallengeIds.Contains(challenge.Id))
+            .Join(
+                db.Challenges.IgnoreQueryFilters().AsNoTracking(),
+                challenge => challenge.ChallengeId,
+                template => template.Id,
+                (challenge, template) => new
+                {
+                    challenge.Id,
+                    Title = challenge.CustomTitle ?? template.Title
+                })
+            .ToDictionaryAsync(item => item.Id, item => item.Title, ct);
+
+        return attributed.Select(runtime => new PlatformRuntimeInstanceView(
+            runtime,
+            competitionTitles.GetValueOrDefault(runtime.CompetitionId)
+                ?? runtime.CompetitionId.ToString("D"),
+            challengeTitles.GetValueOrDefault(runtime.CompetitionChallengeId)
+                ?? runtime.CompetitionChallengeId.ToString("D")))
+            .ToArray();
+    }
+
     public async Task<RuntimeInstanceView?> FindAsync(
         Guid competitionId,
         Guid runtimeInstanceId,

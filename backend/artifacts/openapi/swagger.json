@@ -7239,6 +7239,70 @@
         ]
       }
     },
+    "/api/v1/admin/platform/runtimes": {
+      "get": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "Lists active runtime containers across the platform.",
+        "description": "Returns keyset-paged Container and Compose runtimes in active lifecycle states to platform administrators.",
+        "operationId": "AdminPlatformListActiveRuntimes",
+        "parameters": [
+          {
+            "name": "cursor",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "nullable": true
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationPlatformPlatformRuntimeListResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcValidationProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "Bearer": [
+              "Administrator"
+            ]
+          }
+        ]
+      }
+    },
     "/api/v1/admin/platform/users": {
       "get": {
         "tags": [
@@ -18469,6 +18533,41 @@
         }
       },
       "NoCTFAPIEndpointsAdministrationPlatformListPlatformLogsRequest": {
+        "type": "object",
+        "additionalProperties": false
+      },
+      "NoCTFAPIEndpointsAdministrationPlatformPlatformRuntimeListResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationPlatformPlatformRuntimeResponse"
+            }
+          },
+          "nextCursor": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
+      "NoCTFAPIEndpointsAdministrationPlatformPlatformRuntimeResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "runtime": {
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationRuntimeAdminRuntimeResponse"
+          },
+          "competitionTitle": {
+            "type": "string"
+          },
+          "challengeTitle": {
+            "type": "string"
+          }
+        }
+      },
+      "NoCTFAPIEndpointsAdministrationPlatformListPlatformRuntimesRequest": {
         "type": "object",
         "additionalProperties": false
       },

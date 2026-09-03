@@ -403,6 +403,7 @@ PUT  /api/v1/admin/platform/configuration
 POST /api/v1/admin/platform/configuration/logo
 GET  /api/v1/admin/platform/information
 GET  /api/v1/admin/platform/monitoring
+GET  /api/v1/admin/platform/runtimes
 GET  /api/v1/admin/platform/logs
 GET  /api/v1/admin/platform/logs/export
 GET  /api/v1/admin/platform/audit-logs
@@ -418,6 +419,11 @@ PUT  /api/v1/admin/platform/email-verification/configuration
 PUT  /api/v1/admin/platform/email-verification/password
 POST /api/v1/admin/platform/email-verification/test
 ```
+
+平台 Runtime 清单只投影当前处于 Queued、Provisioning、Running 或 Stopping 状态的 Container 与
+Compose 实例，按 CreatedAt/Id 使用签名 keyset cursor 分页。响应带赛事、题目、来源队伍、Provider、
+Runner、端口及生命周期时间；停止与强制终结继续调用 Competition Runtime 的精确实例写端点，复用
+同一 durable cleanup 与审计链路。
 
 Bot 创建请求只包含 UserName 和固定的 `UserRole.Organizer`，不能创建 User 或 Administrator
 Bot，也不接受 Email 或 Password。服务端生成不可用的非空 dummy Email 和 PasswordHash。

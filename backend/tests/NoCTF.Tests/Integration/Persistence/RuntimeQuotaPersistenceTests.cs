@@ -29,6 +29,94 @@ public sealed class RuntimeQuotaPersistenceTests
 {
     [Test]
     [Timeout(300_000)]
+    public async Task Platform_runtime_inventory_lists_active_containers_across_competitions(
+        CancellationToken cancellationToken)
+    {
+        await DockerIntegrationTest.RunAsync(async () =>
+        {
+            await using var postgres = new PostgreSqlBuilder("postgres:17.10-alpine3.24@sha256:742f40ea20b9ff2ff31db5458d127452988a2164df9e17441e191f3b72252193")
+                .WithDatabase("noctf_platform_runtime_inventory")
+                .WithUsername("postgres")
+                .WithPassword("postgres")
+                .Build();
+            await postgres.StartAsync(cancellationToken);
+            var options = Options(postgres.GetConnectionString());
+            var fixture = await SeedAsync(
+                options,
+                [RuntimeState.Running, RuntimeState.Stopped, RuntimeState.Failed],
+                cancellationToken);
+            var secondCompetitionId = Guid.CreateVersion7(fixture.Now.AddMinutes(1));
+            var secondChallengeId = Guid.CreateVersion7(fixture.Now.AddMinutes(1).AddTicks(1));
+            await using (var seed = new NoCtfDbContext(options))
+            {
+                seed.Competitions.Add(new Competition
+                {
+                    Id = secondCompetitionId,
+                    OwnerId = fixture.Teams[0].UserId,
+                    Title = "Second runtime competition",
+                    Mode = GameMode.Ctf,
+                    Status = CompetitionStatus.Running,
+                    ConfigurationJson = GameModeDefaultConfiguration.GetCompetitionJson(GameMode.Ctf),
+                    StartAt = fixture.Now.AddMinutes(-1),
+                    EndAt = fixture.Now.AddHours(1),
+                    FlagDerivationSecret = Enumerable.Range(1, 32).Select(value => (byte)value).ToArray(),
+                    CreatedAt = fixture.Now,
+                    UpdatedAt = fixture.Now
+                });
+                AddChallenge(
+                    seed,
+                    fixture.Teams[0].UserId,
+                    secondCompetitionId,
+                    secondChallengeId,
+                    "Second challenge",
+                    1,
+                    fixture.Now);
+                seed.RuntimeInstances.AddRange(
+                    Runtime(RuntimeKind.Compose, RuntimeState.Running, 2),
+                    Runtime(RuntimeKind.Container, RuntimeState.Provisioning, 3),
+                    Runtime(RuntimeKind.OvaVm, RuntimeState.Running, 4));
+                await seed.SaveChangesAsync(cancellationToken);
+
+                RuntimeInstance Runtime(RuntimeKind kind, RuntimeState state, int tick) => new()
+                {
+                    Id = Guid.CreateVersion7(fixture.Now.AddMinutes(1).AddTicks(tick)),
+                    CompetitionId = secondCompetitionId,
+                    CompetitionChallengeId = secondChallengeId,
+                    Purpose = RuntimePurpose.Player,
+                    RuntimeKind = kind,
+                    RuntimeProvider = RuntimeProvider.Docker,
+                    State = state,
+                    RunnerId = "runner-platform",
+                    CreatedAt = fixture.Now.AddMinutes(1).AddTicks(tick),
+                    RunningAt = state == RuntimeState.Running ? fixture.Now.AddMinutes(1) : null
+                };
+            }
+
+            await using var db = new NoCtfDbContext(options);
+            var items = await CreateAdminStore(db, new RecordingOutbox())
+                .ListActiveContainersAsync(null, null, 50, cancellationToken);
+
+            await Assert.That(items).Count().IsEqualTo(3);
+            await Assert.That(items.Select(item => item.CompetitionTitle))
+                .Contains("Runtime quota");
+            await Assert.That(items.Select(item => item.CompetitionTitle))
+                .Contains("Second runtime competition");
+            await Assert.That(items.Select(item => item.ChallengeTitle))
+                .Contains("Second challenge");
+            await Assert.That(items.All(item =>
+                    item.Runtime.RuntimeKind is RuntimeKind.Container or RuntimeKind.Compose))
+                .IsTrue();
+            await Assert.That(items.All(item =>
+                    item.Runtime.State is RuntimeState.Queued
+                        or RuntimeState.Provisioning
+                        or RuntimeState.Running
+                        or RuntimeState.Stopping))
+                .IsTrue();
+        });
+    }
+
+    [Test]
+    [Timeout(300_000)]
     public async Task Admin_termination_targets_the_exact_instance_and_is_idempotent(
         CancellationToken cancellationToken)
     {
