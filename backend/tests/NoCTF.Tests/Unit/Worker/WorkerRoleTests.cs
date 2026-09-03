@@ -120,4 +120,38 @@ public sealed class WorkerRoleTests
 
         await Assert.That(action).Throws<InvalidOperationException>();
     }
+
+    [Test]
+    public async Task Account_notifications_use_the_canonical_background_NATS_route()
+    {
+        var endpoint = WorkerMessageTopologyStartupValidator.BackgroundEndpointAddress();
+
+        await Assert.That(endpoint).IsEqualTo("nats://subject/noctf.background");
+        WorkerMessageTopologyStartupValidator.ValidateBackgroundRouting(endpoint);
+    }
+
+    [Test]
+    public async Task Account_notifications_reject_a_local_queue_fallback()
+    {
+        var endpoint = WorkerMessageTopologyStartupValidator.BackgroundEndpointAddress();
+        var action = () => WorkerMessageTopologyStartupValidator.ValidateBackgroundRouting(
+            $"{endpoint}{Environment.NewLine}local://{WorkerQueueNames.Background}");
+
+        await Assert.That(action).Throws<InvalidOperationException>();
+    }
+
+    [Test]
+    public async Task Account_notification_messages_require_exactly_one_handler()
+    {
+        WorkerMessageTopologyStartupValidator.ValidateAccountNotificationHandlerTypes(
+            [typeof(AccountNotificationMessageHandler)]);
+
+        await Assert.That(() =>
+                WorkerMessageTopologyStartupValidator.ValidateAccountNotificationHandlerTypes([]))
+            .Throws<InvalidOperationException>();
+        await Assert.That(() =>
+                WorkerMessageTopologyStartupValidator.ValidateAccountNotificationHandlerTypes(
+                    [typeof(AccountNotificationMessageHandler), typeof(AccountNotificationMessageHandler)]))
+            .Throws<InvalidOperationException>();
+    }
 }

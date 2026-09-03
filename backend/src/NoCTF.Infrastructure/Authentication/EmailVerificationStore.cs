@@ -2,9 +2,11 @@ using System.Data;
 using System.Security.Cryptography;
 using System.Text;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 using NoCTF.Application.Authentication.Account;
 using NoCTF.Application.Authentication.EmailVerification;
 using NoCTF.Application.Messaging;
+using NoCTF.Application.Observability;
 using NoCTF.Domain.Identity;
 using NoCTF.Infrastructure.Persistence;
 
@@ -13,7 +15,8 @@ namespace NoCTF.Infrastructure.Authentication;
 public sealed class EmailVerificationStore(
     NoCtfDbContext db,
     IEmailVerificationConfigurationStore configuration,
-    ITransactionalMessageOutbox outbox) : IEmailVerificationStore
+    ITransactionalMessageOutbox outbox,
+    ILogger<EmailVerificationStore>? logger = null) : IEmailVerificationStore
 {
     public async Task<bool> IsRequiredAsync(CancellationToken ct) =>
         (await configuration.GetAsync(ct)).Enabled;
@@ -32,7 +35,7 @@ public sealed class EmailVerificationStore(
             .Select(user => (Guid?)user.Id)
             .SingleOrDefaultAsync(ct);
         return userId is null
-            ? EmailVerificationState.UserNotFound
+            ? Observe(EmailVerificationState.UserNotFound, null)
             : await IssueAsync(userId.Value, now, ct);
     }
 
@@ -48,9 +51,9 @@ public sealed class EmailVerificationStore(
 
         var user = await db.Users.SingleOrDefaultAsync(item => item.Id == userId, ct);
         if (user is null)
-            return EmailVerificationState.UserNotFound;
+            return Observe(EmailVerificationState.UserNotFound, userId);
         if (user.EmailVerifiedAt is not null)
-            return EmailVerificationState.AlreadyVerified;
+            return Observe(EmailVerificationState.AlreadyVerified, userId);
 
         var settings = await configuration.GetAsync(ct);
         if (!settings.Enabled)
@@ -59,14 +62,14 @@ public sealed class EmailVerificationStore(
             user.UpdatedAt = now;
             await db.SaveChangesAsync(ct);
             await transaction.CommitAsync(ct);
-            return EmailVerificationState.Disabled;
+            return Observe(EmailVerificationState.Disabled, userId);
         }
         if (!settings.SmtpPasswordConfigured
             || string.IsNullOrWhiteSpace(settings.SmtpHost)
             || string.IsNullOrWhiteSpace(settings.SmtpUserName)
             || string.IsNullOrWhiteSpace(settings.SmtpFromAddress))
         {
-            return EmailVerificationState.DeliveryNotConfigured;
+            return Observe(EmailVerificationState.DeliveryNotConfigured, userId);
         }
 
         var resendBoundary = now.AddSeconds(-settings.ResendCooldownSeconds);
@@ -77,7 +80,7 @@ public sealed class EmailVerificationStore(
                 && item.CreatedAt > resendBoundary,
             ct);
         if (sentRecently)
-            return EmailVerificationState.RateLimited;
+            return Observe(EmailVerificationState.RateLimited, userId);
 
         await db.AccountTokens
             .Where(item => item.UserId == userId
@@ -99,12 +102,11 @@ public sealed class EmailVerificationStore(
             CreatedAt = now,
             ExpiresAt = now.AddMinutes(settings.TokenLifetimeMinutes)
         });
-        await db.SaveChangesAsync(ct);
         await outbox.PublishAsync(new SendEmailVerification(userId, token));
         await db.SaveChangesAsync(ct);
         await transaction.CommitAsync(ct);
         await outbox.FlushOutgoingMessagesAsync();
-        return EmailVerificationState.Issued;
+        return Observe(EmailVerificationState.Issued, userId);
     }
 
     public async Task<EmailVerificationState> VerifyAsync(
@@ -145,5 +147,19 @@ public sealed class EmailVerificationStore(
         _ = await db.Users
             .FromSqlInterpolated($"SELECT * FROM users WHERE id = {userId} FOR UPDATE")
             .SingleOrDefaultAsync(ct);
+    }
+
+    private EmailVerificationState Observe(
+        EmailVerificationState state,
+        Guid? userId)
+    {
+        NoCtfTelemetry.RecordAccountNotificationIssuance(
+            "email_verification",
+            state.ToString());
+        logger?.LogInformation(
+            "Email verification token issuance completed with {Outcome} for user {UserId}.",
+            state,
+            userId);
+        return state;
     }
 }

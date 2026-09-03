@@ -62,6 +62,10 @@ public static class NoCtfTelemetry
         "noctf.scheduler.dispatches", unit: "{message}");
     private static readonly Counter<long> SchedulerSkippedTicks = Meter.CreateCounter<long>(
         "noctf.scheduler.skipped_ticks", unit: "{tick}");
+    private static readonly Counter<long> AccountNotificationIssuances = Meter.CreateCounter<long>(
+        "noctf.account_notification.issuances", unit: "{issuance}");
+    private static readonly Counter<long> AccountNotificationDeliveries = Meter.CreateCounter<long>(
+        "noctf.account_notification.deliveries", unit: "{delivery}");
     private static long _waitingRuntimeCount;
     private static long _oldestWaitingRuntimeAgeSeconds;
     private static readonly ConcurrentDictionary<string, RunnerCapacitySnapshot> RunnerCapacitySnapshots =
@@ -189,6 +193,20 @@ public static class NoCtfTelemetry
             return;
         SchedulerSkippedTicks.Add(count, new TagList { { "kind", kind } });
     }
+
+    public static void RecordAccountNotificationIssuance(string kind, string outcome) =>
+        AccountNotificationIssuances.Add(1, new TagList
+        {
+            { "kind", kind },
+            { "outcome", outcome }
+        });
+
+    public static void RecordAccountNotificationDelivery(string kind, string outcome) =>
+        AccountNotificationDeliveries.Add(1, new TagList
+        {
+            { "kind", kind },
+            { "outcome", outcome }
+        });
 
     public static void UpdateOperationalSnapshot(
         long waitingRuntimeCount,

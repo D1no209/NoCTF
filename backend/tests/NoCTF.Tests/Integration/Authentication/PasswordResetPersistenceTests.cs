@@ -45,10 +45,10 @@ public sealed class PasswordResetPersistenceTests
                     cancellationToken);
             }
 
-            var firstOutbox = new RecordingOutbox();
-            var secondOutbox = new RecordingOutbox();
             await using var firstIssueDb = new NoCtfDbContext(options);
             await using var secondIssueDb = new NoCtfDbContext(options);
+            var firstOutbox = new RecordingOutbox(firstIssueDb);
+            var secondOutbox = new RecordingOutbox(secondIssueDb);
             var issueResults = await Task.WhenAll(
                 CreateStore(firstIssueDb, hasher, firstOutbox).IssueAsync(
                     "  RESET-OWNER@example.test ", now.AddMinutes(1), cancellationToken),
@@ -62,6 +62,10 @@ public sealed class PasswordResetPersistenceTests
             var resetMessage = firstOutbox.Messages.Concat(secondOutbox.Messages)
                 .OfType<SendPasswordReset>()
                 .Single();
+            await Assert.That(new[] { firstOutbox, secondOutbox }
+                    .Single(outbox => outbox.Messages.OfType<SendPasswordReset>().Any())
+                    .TokenWasPendingWhenPublished)
+                .IsTrue();
 
             await using (var inspectionDb = new NoCtfDbContext(options))
             {
@@ -76,10 +80,10 @@ public sealed class PasswordResetPersistenceTests
                     .IsEqualTo(now.AddMinutes(31).ToUnixTimeMilliseconds());
             }
 
-            var firstCompletionOutbox = new RecordingOutbox();
-            var secondCompletionOutbox = new RecordingOutbox();
             await using var firstCompletionDb = new NoCtfDbContext(options);
             await using var secondCompletionDb = new NoCtfDbContext(options);
+            var firstCompletionOutbox = new RecordingOutbox(firstCompletionDb);
+            var secondCompletionOutbox = new RecordingOutbox(secondCompletionDb);
             var completionResults = await Task.WhenAll(
                 CreateStore(firstCompletionDb, hasher, firstCompletionOutbox).CompleteAsync(
                     resetMessage.Token, "new-pass", now.AddMinutes(2), cancellationToken),
@@ -94,6 +98,10 @@ public sealed class PasswordResetPersistenceTests
                 .Concat(secondCompletionOutbox.Messages)
                 .OfType<SendPasswordChangedNotification>()
                 .Count()).IsEqualTo(1);
+            await Assert.That(new[] { firstCompletionOutbox, secondCompletionOutbox }
+                    .Single(outbox => outbox.Messages.OfType<SendPasswordChangedNotification>().Any())
+                    .TokenWasPendingWhenPasswordChangedWasPublished)
+                .IsTrue();
 
             await using var verificationDb = new NoCtfDbContext(options);
             var users = new AuthenticationStore(verificationDb, hasher);
@@ -287,14 +295,28 @@ public sealed class PasswordResetPersistenceTests
                 SmtpTimeoutSeconds: 10));
     }
 
-    private sealed class RecordingOutbox : ITransactionalMessageOutbox
+    private sealed class RecordingOutbox(NoCtfDbContext? db = null) : ITransactionalMessageOutbox
     {
         private readonly ConcurrentQueue<object> messages = new();
 
         public IReadOnlyCollection<object> Messages => messages.ToArray();
+        public bool TokenWasPendingWhenPublished { get; private set; }
+        public bool TokenWasPendingWhenPasswordChangedWasPublished { get; private set; }
 
         public ValueTask PublishAsync<T>(T message)
         {
+            if (db is not null && message is SendPasswordReset)
+            {
+                TokenWasPendingWhenPublished = db.ChangeTracker
+                    .Entries<AccountToken>()
+                    .Any(entry => entry.State == EntityState.Added);
+            }
+            if (db is not null && message is SendPasswordChangedNotification)
+            {
+                TokenWasPendingWhenPasswordChangedWasPublished = db.ChangeTracker
+                    .Entries<AccountToken>()
+                    .Any(entry => entry.State == EntityState.Modified);
+            }
             messages.Enqueue(message!);
             return ValueTask.CompletedTask;
         }

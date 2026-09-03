@@ -265,57 +265,67 @@ public sealed class SmtpEmailVerificationDelivery(
         {
             await operation(operationToken);
         }
-        catch (OperationCanceledException) when (!callerToken.IsCancellationRequested)
+        catch (OperationCanceledException exception) when (!callerToken.IsCancellationRequested)
         {
-            throw new EmailVerificationDeliveryException(
-                EmailVerificationDeliveryFailure.TimedOut);
+            throw DeliveryException(
+                EmailVerificationDeliveryFailure.TimedOut,
+                exception);
         }
         catch (OperationCanceledException)
         {
             throw;
         }
-        catch (TimeoutException)
+        catch (TimeoutException exception)
         {
-            throw new EmailVerificationDeliveryException(
-                EmailVerificationDeliveryFailure.TimedOut);
+            throw DeliveryException(
+                EmailVerificationDeliveryFailure.TimedOut,
+                exception);
         }
-        catch (AuthenticationException)
+        catch (AuthenticationException exception)
         {
-            throw new EmailVerificationDeliveryException(failure);
+            throw DeliveryException(failure, exception);
         }
-        catch (SslHandshakeException)
+        catch (SslHandshakeException exception)
         {
-            throw new EmailVerificationDeliveryException(failure);
+            throw DeliveryException(failure, exception);
         }
-        catch (SmtpCommandException)
+        catch (SmtpCommandException exception)
         {
-            throw new EmailVerificationDeliveryException(failure);
+            throw DeliveryException(failure, exception, exception.StatusCode.ToString());
         }
-        catch (SmtpProtocolException)
+        catch (SmtpProtocolException exception)
         {
-            throw new EmailVerificationDeliveryException(failure);
+            throw DeliveryException(failure, exception);
         }
-        catch (ServiceNotAuthenticatedException)
+        catch (ServiceNotAuthenticatedException exception)
         {
-            throw new EmailVerificationDeliveryException(failure);
+            throw DeliveryException(failure, exception);
         }
-        catch (ServiceNotConnectedException)
+        catch (ServiceNotConnectedException exception)
         {
-            throw new EmailVerificationDeliveryException(failure);
+            throw DeliveryException(failure, exception);
         }
-        catch (IOException)
+        catch (IOException exception)
         {
-            throw new EmailVerificationDeliveryException(failure);
+            throw DeliveryException(failure, exception);
         }
-        catch (SocketException)
+        catch (SocketException exception)
         {
-            throw new EmailVerificationDeliveryException(failure);
+            throw DeliveryException(failure, exception);
         }
-        catch (NotSupportedException)
+        catch (NotSupportedException exception)
         {
-            throw new EmailVerificationDeliveryException(failure);
+            throw DeliveryException(failure, exception);
         }
     }
+
+    private static EmailVerificationDeliveryException DeliveryException(
+        EmailVerificationDeliveryFailure failure,
+        Exception exception,
+        string? smtpStatusCode = null) =>
+        new(
+            failure,
+            new SanitizedSmtpException(exception.GetType().Name, smtpStatusCode));
 
     private static async Task TryDisconnectAsync(SmtpClient client, TimeSpan timeout)
     {
@@ -348,4 +358,11 @@ public sealed class SmtpEmailVerificationDelivery(
             SmtpSecurityMode.StartTls => SecureSocketOptions.StartTls,
             _ => throw new ArgumentOutOfRangeException(nameof(mode), mode, null)
         };
+
+    private sealed class SanitizedSmtpException(
+        string exceptionType,
+        string? smtpStatusCode)
+        : Exception(smtpStatusCode is null
+            ? $"SMTP phase failed with {exceptionType}."
+            : $"SMTP phase failed with {exceptionType}; status={smtpStatusCode}.");
 }

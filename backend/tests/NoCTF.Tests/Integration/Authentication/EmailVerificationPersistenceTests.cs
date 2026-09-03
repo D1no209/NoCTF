@@ -47,10 +47,10 @@ public sealed class EmailVerificationPersistenceTests
                 await setupDb.SaveChangesAsync(cancellationToken);
             }
 
-            var firstOutbox = new RecordingOutbox();
-            var secondOutbox = new RecordingOutbox();
             await using var firstDb = new NoCtfDbContext(options);
             await using var secondDb = new NoCtfDbContext(options);
+            var firstOutbox = new RecordingOutbox(firstDb);
+            var secondOutbox = new RecordingOutbox(secondDb);
             var results = await Task.WhenAll(
                 CreateStore(firstDb, firstOutbox).IssueByEmailAsync(
                     " VERIFICATION-OWNER@example.test ",
@@ -68,6 +68,10 @@ public sealed class EmailVerificationPersistenceTests
             await Assert.That(firstOutbox.Messages.Concat(secondOutbox.Messages)
                 .OfType<SendEmailVerification>()
                 .Count()).IsEqualTo(1);
+            await Assert.That(new[] { firstOutbox, secondOutbox }
+                    .Single(outbox => outbox.Messages.OfType<SendEmailVerification>().Any())
+                    .TokenWasPendingWhenPublished)
+                .IsTrue();
 
             await using var inspectionDb = new NoCtfDbContext(options);
             var tokens = await inspectionDb.AccountTokens.AsNoTracking()
@@ -137,14 +141,21 @@ public sealed class EmailVerificationPersistenceTests
             CancellationToken cancellationToken) => throw new NotSupportedException();
     }
 
-    private sealed class RecordingOutbox : ITransactionalMessageOutbox
+    private sealed class RecordingOutbox(NoCtfDbContext db) : ITransactionalMessageOutbox
     {
         private readonly ConcurrentQueue<object> messages = new();
 
         public IReadOnlyCollection<object> Messages => messages.ToArray();
+        public bool TokenWasPendingWhenPublished { get; private set; }
 
         public ValueTask PublishAsync<T>(T message)
         {
+            if (message is SendEmailVerification)
+            {
+                TokenWasPendingWhenPublished = db.ChangeTracker
+                    .Entries<AccountToken>()
+                    .Any(entry => entry.State == EntityState.Added);
+            }
             messages.Enqueue(message!);
             return ValueTask.CompletedTask;
         }

@@ -28,6 +28,60 @@ public sealed class WorkerMessageTopologyStartupValidator(
         ValidateFanoutRouting(expectedQueues, routing);
         ValidateFanoutEndpoints(expectedQueues);
         ValidateFanoutHandlers(expectedQueues);
+        if (queueOptions.Value.Enabled.Contains(WorkerQueue.Background))
+            ValidateAccountNotificationTopology();
+    }
+
+    private void ValidateAccountNotificationTopology()
+    {
+        var endpointAddress = BackgroundEndpointAddress();
+        foreach (var messageType in AccountNotificationMessageTypes)
+        {
+            ValidateBackgroundRouting(runtime.ExplainRoutingFor(messageType).ToText());
+        }
+
+        Endpoint? endpoint;
+        try
+        {
+            endpoint = runtime.Endpoints.EndpointFor(new Uri(endpointAddress, UriKind.Absolute));
+        }
+        catch (Exception exception)
+        {
+            throw new InvalidOperationException(
+                $"Required account notification endpoint '{endpointAddress}' is not registered.",
+                exception);
+        }
+
+        if (endpoint is null
+            || !endpoint.IsListener
+            || endpoint.Uri?.Scheme != "nats"
+            || !string.Equals(endpoint.BrokerRole, "stream", StringComparison.Ordinal))
+        {
+            throw new InvalidOperationException(
+                "Account notifications must use the durable NATS background listener.");
+        }
+
+        var graph = runtime.Services.GetRequiredService<HandlerGraph>();
+        foreach (var messageType in AccountNotificationMessageTypes)
+        {
+            var root = graph.ChainFor(messageType)
+                ?? throw new InvalidOperationException(
+                    $"Account notification handler graph for '{messageType.Name}' is not registered.");
+            var handlerTypes = root.ByEndpoint
+                .Where(chain => chain.Endpoints.Any(candidate =>
+                    string.Equals(
+                        candidate.EndpointName,
+                        WorkerQueueNames.Background,
+                        StringComparison.Ordinal)
+                    || string.Equals(
+                        candidate.Uri?.ToString().TrimEnd('/'),
+                        endpointAddress,
+                        StringComparison.OrdinalIgnoreCase)))
+                .SelectMany(chain => chain.HandlerCalls())
+                .Select(call => call.HandlerType)
+                .ToArray();
+            ValidateAccountNotificationHandlerTypes(handlerTypes);
+        }
     }
 
     private void ValidateFanoutEndpoints(IReadOnlyList<string> expectedQueues)
@@ -141,6 +195,36 @@ public sealed class WorkerMessageTopologyStartupValidator(
         }
     }
 
+    internal static void ValidateBackgroundRouting(string routing)
+    {
+        var endpoint = BackgroundEndpointAddress();
+        if (!routing.Contains(endpoint, StringComparison.OrdinalIgnoreCase)
+            || routing.Contains(
+                $"local://{WorkerQueueNames.Background}",
+                StringComparison.OrdinalIgnoreCase)
+            || routing.Contains(
+                $"local://{WorkerQueueNames.Background.Replace('-', '_')}",
+                StringComparison.OrdinalIgnoreCase))
+        {
+            throw new InvalidOperationException(
+                "Account notification messages must be routed to the NATS background queue.");
+        }
+    }
+
+    internal static void ValidateAccountNotificationHandlerTypes(
+        IReadOnlyCollection<Type> handlerTypes)
+    {
+        if (handlerTypes.Count != 1
+            || handlerTypes.Single() != typeof(AccountNotificationMessageHandler))
+        {
+            throw new InvalidOperationException(
+                "Each account notification message must have exactly one AccountNotificationMessageHandler.");
+        }
+    }
+
+    internal static string BackgroundEndpointAddress() =>
+        $"nats://subject/{NatsSubjects.Subject(WorkerQueue.Background)}";
+
     internal static string NatsEndpointAddress(string queueName) =>
         $"nats://subject/noctf.events.{(queueName.Contains("leaderboard", StringComparison.Ordinal)
             ? "leaderboard"
@@ -162,4 +246,11 @@ public sealed class WorkerMessageTopologyStartupValidator(
             queues.Add(CompetitionEventFanoutQueueNames.Leaderboard);
         return queues;
     }
+
+    private static readonly IReadOnlyList<Type> AccountNotificationMessageTypes =
+    [
+        typeof(SendEmailVerification),
+        typeof(SendPasswordReset),
+        typeof(SendPasswordChangedNotification)
+    ];
 }
