@@ -1,11 +1,17 @@
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
+using System.Data;
+using System.Security.Cryptography;
+using System.Text;
 using NoCTF.Application.Authentication.Account;
+using NoCTF.Application.Authentication.EmailVerification;
 using NoCTF.Domain.Identity;
 using NoCTF.Infrastructure.Persistence;
 using NoCTF.Application.Storage;
 using NoCTF.Domain.Storage;
 using NoCTF.Application.Messaging;
+using NoCTF.Application.Observability;
 using NoCTF.Infrastructure.Messaging;
 using NoCTF.Infrastructure.Storage;
 
@@ -16,7 +22,11 @@ public sealed class AuthenticationStore(
     IPasswordHasher<User> passwordHasher,
     ITransactionalMessageOutbox? messageOutbox = null,
     FileReferenceLock? fileReferenceLock = null,
-    TimeProvider? clock = null) : IUserAuthenticationStore
+    TimeProvider? clock = null,
+    IEmailVerificationConfigurationStore? emailVerificationConfiguration = null,
+    ILogger<AuthenticationStore>? logger = null)
+    : IUserAuthenticationStore,
+        IUserRegistrationStore
 {
     private readonly TimeProvider timeProvider = clock ?? TimeProvider.System;
     private readonly ITransactionalMessageOutbox outbox =
@@ -149,20 +159,14 @@ public sealed class AuthenticationStore(
         if (await db.Users.AnyAsync(user => user.Email == canonicalEmail, ct))
             return CreateUserState.EmailConflict;
 
-        var user = new User
-        {
-            Id = userId,
-            UserName = trimmedUserName,
-            NormalizedUserName = normalizedUserName,
-            Email = canonicalEmail,
-            Kind = UserKind.Human,
-            Role = UserRole.User,
-            AccountStatus = UserAccountStatus.Active,
-            EmailVerifiedAt = emailVerified ? now : null,
-            CreatedAt = now,
-            UpdatedAt = now
-        };
-        user.PasswordHash = passwordHasher.HashPassword(user, password);
+        var user = CreateUser(
+            userId,
+            trimmedUserName,
+            normalizedUserName,
+            canonicalEmail,
+            password,
+            emailVerified,
+            now);
         db.Users.Add(user);
         try
         {
@@ -177,6 +181,92 @@ public sealed class AuthenticationStore(
                 ? CreateUserState.EmailConflict
                 : CreateUserState.UserNameConflict;
         }
+    }
+
+    public async Task<CreateRegisteredUserResult> RegisterAsync(
+        Guid userId,
+        string userName,
+        string email,
+        string password,
+        DateTimeOffset now,
+        CancellationToken ct)
+    {
+        var trimmedUserName = userName.Trim();
+        var canonicalEmail = EmailCanonicalizer.Canonicalize(email);
+        var normalizedUserName = trimmedUserName.ToUpperInvariant();
+        var settings = emailVerificationConfiguration is null
+            ? null
+            : await emailVerificationConfiguration.GetAsync(ct);
+        var verificationState = settings?.Enabled == true
+            ? DeliveryConfigured(settings)
+                ? EmailVerificationState.Issued
+                : EmailVerificationState.DeliveryNotConfigured
+            : EmailVerificationState.Disabled;
+
+        await using var transaction = await db.Database.BeginTransactionAsync(
+            IsolationLevel.ReadCommitted,
+            ct);
+        if (await db.Users.AnyAsync(user => user.NormalizedUserName == normalizedUserName, ct))
+            return new(CreateUserState.UserNameConflict, verificationState);
+        if (await db.Users.AnyAsync(user => user.Email == canonicalEmail, ct))
+            return new(CreateUserState.EmailConflict, verificationState);
+
+        var user = CreateUser(
+            userId,
+            trimmedUserName,
+            normalizedUserName,
+            canonicalEmail,
+            password,
+            emailVerified: verificationState == EmailVerificationState.Disabled,
+            now);
+        db.Users.Add(user);
+
+        string? verificationToken = null;
+        if (verificationState == EmailVerificationState.Issued)
+        {
+            verificationToken = Microsoft.AspNetCore.WebUtilities.WebEncoders.Base64UrlEncode(
+                RandomNumberGenerator.GetBytes(32));
+            db.AccountTokens.Add(new AccountToken
+            {
+                Id = Guid.CreateVersion7(now),
+                UserId = userId,
+                Kind = AccountTokenKind.EmailVerification,
+                TokenSha256 = SHA256.HashData(Encoding.UTF8.GetBytes(verificationToken)),
+                CreatedAt = now,
+                ExpiresAt = now.AddMinutes(settings!.TokenLifetimeMinutes)
+            });
+        }
+
+        try
+        {
+            // Persist the user and token before publishing so a uniqueness failure cannot
+            // leave an in-memory envelope for an account that was never created. The
+            // transaction remains open and the scoped Wolverine outbox permits the second
+            // flush that atomically stores the envelope below.
+            await db.SaveChangesAsync(ct);
+        }
+        catch (DbUpdateException)
+        {
+            await transaction.RollbackAsync(ct);
+            db.ChangeTracker.Clear();
+            return new(
+                await db.Users.AnyAsync(existing => existing.Email == canonicalEmail, ct)
+                    ? CreateUserState.EmailConflict
+                    : CreateUserState.UserNameConflict,
+                verificationState);
+        }
+
+        if (verificationToken is not null)
+        {
+            await outbox.PublishAsync(new SendEmailVerification(userId, verificationToken));
+            await db.SaveChangesAsync(ct);
+        }
+
+        await transaction.CommitAsync(ct);
+        if (verificationToken is not null)
+            await outbox.FlushOutgoingMessagesAsync();
+        ObserveRegistrationVerification(verificationState, userId);
+        return new(CreateUserState.Created, verificationState);
     }
 
     public async Task<ChangePasswordState> ChangePasswordAsync(
@@ -237,4 +327,49 @@ public sealed class AuthenticationStore(
             user.EmailVerifiedAt is not null,
             user.Description,
             user.AvatarFileId);
+
+    private User CreateUser(
+        Guid userId,
+        string userName,
+        string normalizedUserName,
+        string email,
+        string password,
+        bool emailVerified,
+        DateTimeOffset now)
+    {
+        var user = new User
+        {
+            Id = userId,
+            UserName = userName,
+            NormalizedUserName = normalizedUserName,
+            Email = email,
+            Kind = UserKind.Human,
+            Role = UserRole.User,
+            AccountStatus = UserAccountStatus.Active,
+            EmailVerifiedAt = emailVerified ? now : null,
+            CreatedAt = now,
+            UpdatedAt = now
+        };
+        user.PasswordHash = passwordHasher.HashPassword(user, password);
+        return user;
+    }
+
+    private static bool DeliveryConfigured(EmailVerificationConfigurationView settings) =>
+        !string.IsNullOrWhiteSpace(settings.SmtpHost)
+        && !string.IsNullOrWhiteSpace(settings.SmtpFromAddress)
+        && (string.IsNullOrWhiteSpace(settings.SmtpUserName)
+            || settings.SmtpPasswordConfigured);
+
+    private void ObserveRegistrationVerification(
+        EmailVerificationState state,
+        Guid userId)
+    {
+        NoCtfTelemetry.RecordAccountNotificationIssuance(
+            "email_verification",
+            state.ToString());
+        logger?.LogInformation(
+            "Registration email verification issuance completed with {Outcome} for user {UserId}.",
+            state,
+            userId);
+    }
 }

@@ -15,26 +15,19 @@ public sealed class RegisterUserEmailVerificationTests
         bool requiresVerification,
         bool emailQueued)
     {
-        var users = Substitute.For<IUserAuthenticationStore>();
-        users.CreateAsync(
+        var users = Substitute.For<IUserRegistrationStore>();
+        users.RegisterAsync(
                 Arg.Any<Guid>(),
                 Arg.Any<string>(),
                 Arg.Any<string>(),
                 Arg.Any<string>(),
-                Arg.Any<bool>(),
                 Arg.Any<DateTimeOffset>(),
                 Arg.Any<CancellationToken>())
-            .Returns(CreateUserState.Created);
-        var emailVerification = Substitute.For<IEmailVerificationStore>();
-        emailVerification.IsRequiredAsync(Arg.Any<CancellationToken>())
-            .Returns(verificationState != EmailVerificationState.Disabled);
-        emailVerification.IssueAsync(
-                Arg.Any<Guid>(),
-                Arg.Any<DateTimeOffset>(),
-                Arg.Any<CancellationToken>())
-            .Returns(verificationState);
+            .Returns(new CreateRegisteredUserResult(
+                CreateUserState.Created,
+                verificationState));
 
-        var result = await new RegisterUser(users, emailVerification).ExecuteAsync(new(
+        var result = await new RegisterUser(users).ExecuteAsync(new(
             "  Player_One  ",
             " player@example.test ",
             "password",
