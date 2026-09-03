@@ -227,6 +227,17 @@ rollback_services()
             backend worker runner || true
 }
 
+dump_platform_diagnostics()
+{
+    local service
+    echo "Platform service diagnostics before rollback:" >&2
+    "${compose[@]}" ps >&2 || true
+    for service in backend worker runner; do
+        echo "--- $service (last 200 lines) ---" >&2
+        "${compose[@]}" logs --no-color --timestamps --tail 200 "$service" >&2 || true
+    done
+}
+
 pull_platform_image()
 {
     local attempt
@@ -304,12 +315,14 @@ if ! "${compose[@]}" up \
     --wait \
     --wait-timeout 180 \
     backend worker runner; then
+    dump_platform_diagnostics
     rollback_services
     exit 1
 fi
 
 if ! curl --fail --silent --show-error \
     http://127.0.0.1:8080/health/ready >/dev/null; then
+    dump_platform_diagnostics
     rollback_services
     exit 1
 fi

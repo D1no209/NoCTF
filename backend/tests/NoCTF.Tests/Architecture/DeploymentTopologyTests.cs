@@ -448,6 +448,9 @@ public sealed class DeploymentTopologyTests
         await Assert.That(deployScript).Contains("docker pull \"$platform_image\"");
         await Assert.That(deployScript).Contains("--no-build");
         await Assert.That(deployScript).Contains("run --rm migration");
+        await Assert.That(deployScript).Contains("dump_platform_diagnostics()");
+        await Assert.That(deployScript).Contains(
+            "logs --no-color --timestamps --tail 200 \"$service\"");
         await Assert.That(deployScript).DoesNotContain("run --rm --pull");
         await Assert.That(deployScript).DoesNotContain("kompose_asset_path");
         await Assert.That(deployScript).DoesNotContain(
