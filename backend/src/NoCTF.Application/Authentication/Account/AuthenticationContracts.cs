@@ -32,6 +32,21 @@ public sealed record UserAvatarReplacement(UserProfile Profile, Guid? PreviousFi
 public enum CreateUserState { Created, UserNameConflict, EmailConflict }
 public enum ChangePasswordState { Changed, CurrentPasswordInvalid }
 
+public sealed record CreateRegisteredUserResult(
+    CreateUserState UserState,
+    EmailVerificationState VerificationState);
+
+public interface IUserRegistrationStore
+{
+    Task<CreateRegisteredUserResult> RegisterAsync(
+        Guid userId,
+        string userName,
+        string email,
+        string password,
+        DateTimeOffset now,
+        CancellationToken cancellationToken);
+}
+
 public interface IUserAuthenticationStore
 {
     Task<AuthenticatedUser?> FindByLoginAsync(string login, CancellationToken cancellationToken);

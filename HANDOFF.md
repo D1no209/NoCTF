@@ -3567,4 +3567,19 @@ dotnet run --project backend/src/NoCTF.API/NoCTF.API.csproj --no-build -- --expo
 - 所有题目方向仍是开放文本，未知方向继续明确回退到旗帜；题目导航、题目详情、排行榜、AWDP 大屏和
   管理端徽章统一复用该映射，不新增页面级硬编码。新增方向图标回归测试 2/2，ClientApp typecheck
  通过；完整前端测试 314/314、Nuxt generate、Release solution build（0 warning/0 error）均通过。
- 平台版本递增为 `0.1.0-alpha.135`，无 HTTP、数据库或 migration 变化。本阶段未 push、未部署。
+  平台版本递增为 `0.1.0-alpha.135`，无 HTTP、数据库或 migration 变化。本阶段未 push、未部署。
+
+## 2026-09-04 Alpha.136 注册邮箱验证事务收敛
+
+- 生产只读核查确认线上已运行 `0.1.0-alpha.133`，邮箱验证开关启用，公开地址与 SMTP 基础配置存在；
+  历史日志记录过 alpha.132 Worker 邮件 Handler 拓扑校验失败，alpha.133 部署后服务恢复健康。
+- 注册流程不再先提交用户后调用独立验证存储。新增 `IUserRegistrationStore`，由同一个
+  `AuthenticationStore` 在单一 PostgreSQL 事务内创建用户、验证令牌并持久化 Wolverine Outbox
+  envelope，事务提交后才 flush；用户名/邮箱唯一性失败发生在入队前，避免产生无对应账户的邮件。
+- 注册邮件签发继续记录脱敏的 outcome/UserId 指标与日志。SMTP 配置判断与实际发送器统一：仅配置了
+  SMTP 用户名时才要求密码，允许合法的无认证 SMTP relay，不再被误判为未配置。
+- 原有 PostgreSQL + NATS + Worker + Mailpit 端到端测试改走新的原子注册入口；新增注册事务一致性及
+  无认证 SMTP relay 回归；SMTP 超时脱敏原因统一为稳定的 `Timeout`，消除底层抛出
+  TimeoutException/TaskCanceledException 时的结果漂移。Release solution build 0 warning/0 error，TUnit
+  1140 total：964 passed、0 failed、176 项真实依赖用例因本机 Docker 不可用明确跳过。平台版本递增为
+  `0.1.0-alpha.136`，无 HTTP/OpenAPI、业务表、EF migration 或 snapshot 变化。本阶段未 push、未部署。

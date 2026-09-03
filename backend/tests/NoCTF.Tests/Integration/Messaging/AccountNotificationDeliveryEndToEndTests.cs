@@ -98,7 +98,11 @@ public sealed class AccountNotificationDeliveryEndToEndTests
                         options.UseNpgsql(connectionString).UseSnakeCaseNamingConvention());
                     services.AddScoped<ITransactionalMessageOutbox,
                         WolverineTransactionalMessageOutbox>();
-                    services.AddScoped<IUserAuthenticationStore, AuthenticationStore>();
+                    services.AddScoped<AuthenticationStore>();
+                    services.AddScoped<IUserAuthenticationStore>(provider =>
+                        provider.GetRequiredService<AuthenticationStore>());
+                    services.AddScoped<IUserRegistrationStore>(provider =>
+                        provider.GetRequiredService<AuthenticationStore>());
                     services.AddScoped<IEmailVerificationStore, EmailVerificationStore>();
                     services.AddScoped<IPasswordResetStore, PasswordResetStore>();
                     services.AddScoped<SmtpEmailVerificationDelivery>();
@@ -139,11 +143,13 @@ public sealed class AccountNotificationDeliveryEndToEndTests
             {
                 using var scope = host.Services.CreateScope();
                 var users = scope.ServiceProvider.GetRequiredService<IUserAuthenticationStore>();
+                var registrations = scope.ServiceProvider
+                    .GetRequiredService<IUserRegistrationStore>();
                 var verification = scope.ServiceProvider
                     .GetRequiredService<IEmailVerificationStore>();
                 var passwordReset = scope.ServiceProvider.GetRequiredService<IPasswordResetStore>();
                 var now = DateTimeOffset.UtcNow;
-                var registration = await new RegisterUser(users, verification).ExecuteAsync(
+                var registration = await new RegisterUser(registrations).ExecuteAsync(
                     new("DeliveryOwner", "delivery-owner@example.test", "old-pass", now),
                     cancellationToken);
                 await Assert.That(registration.Succeeded).IsTrue();

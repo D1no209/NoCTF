@@ -265,21 +265,17 @@ public sealed class SmtpEmailVerificationDelivery(
         {
             await operation(operationToken);
         }
-        catch (OperationCanceledException exception) when (!callerToken.IsCancellationRequested)
+        catch (OperationCanceledException) when (!callerToken.IsCancellationRequested)
         {
-            throw DeliveryException(
-                EmailVerificationDeliveryFailure.TimedOut,
-                exception);
+            throw TimeoutDeliveryException();
         }
         catch (OperationCanceledException)
         {
             throw;
         }
-        catch (TimeoutException exception)
+        catch (TimeoutException)
         {
-            throw DeliveryException(
-                EmailVerificationDeliveryFailure.TimedOut,
-                exception);
+            throw TimeoutDeliveryException();
         }
         catch (AuthenticationException exception)
         {
@@ -326,6 +322,11 @@ public sealed class SmtpEmailVerificationDelivery(
         new(
             failure,
             new SanitizedSmtpException(exception.GetType().Name, smtpStatusCode));
+
+    private static EmailVerificationDeliveryException TimeoutDeliveryException() =>
+        new(
+            EmailVerificationDeliveryFailure.TimedOut,
+            new SanitizedSmtpException("Timeout", null));
 
     private static async Task TryDisconnectAsync(SmtpClient client, TimeSpan timeout)
     {

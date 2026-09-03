@@ -64,10 +64,10 @@ public sealed class EmailVerificationStore(
             await transaction.CommitAsync(ct);
             return Observe(EmailVerificationState.Disabled, userId);
         }
-        if (!settings.SmtpPasswordConfigured
-            || string.IsNullOrWhiteSpace(settings.SmtpHost)
-            || string.IsNullOrWhiteSpace(settings.SmtpUserName)
-            || string.IsNullOrWhiteSpace(settings.SmtpFromAddress))
+        if (string.IsNullOrWhiteSpace(settings.SmtpHost)
+            || string.IsNullOrWhiteSpace(settings.SmtpFromAddress)
+            || (!string.IsNullOrWhiteSpace(settings.SmtpUserName)
+                && !settings.SmtpPasswordConfigured))
         {
             return Observe(EmailVerificationState.DeliveryNotConfigured, userId);
         }

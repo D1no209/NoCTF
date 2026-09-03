@@ -179,7 +179,7 @@ public sealed class SmtpEmailVerificationDeliveryTests
                 .IsEqualTo(EmailVerificationDeliveryFailure.TimedOut);
             await Assert.That(timedOut.InnerException).IsNotNull();
             await Assert.That(timedOut.InnerException!.Message)
-                .Contains(nameof(OperationCanceledException));
+                .Contains("Timeout");
         }
 
         await using (var stalled = new StalledSmtpServer())

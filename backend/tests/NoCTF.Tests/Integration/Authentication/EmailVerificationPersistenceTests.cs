@@ -1,5 +1,7 @@
 using System.Collections.Concurrent;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 using NoCTF.Application.Authentication.Account;
 using NoCTF.Application.Authentication.EmailVerification;
 using NoCTF.Application.Messaging;
@@ -15,6 +17,60 @@ namespace NoCTF.Tests.Integration.Authentication;
 [NotInParallel]
 public sealed class EmailVerificationPersistenceTests
 {
+    [Test]
+    [Timeout(300_000)]
+    public async Task Registration_commits_user_token_and_email_envelope_in_one_transaction(
+        CancellationToken cancellationToken)
+    {
+        await DockerIntegrationTest.RunAsync(async () =>
+        {
+            await using var postgres = await StartPostgresAsync(cancellationToken);
+            var options = OptionsFor(postgres);
+            var now = DateTimeOffset.UtcNow;
+            var userId = Guid.CreateVersion7(now);
+
+            await using var db = new NoCtfDbContext(options);
+            await db.Database.EnsureCreatedAsync(cancellationToken);
+            var outbox = new RecordingOutbox(db);
+            var registrations = new AuthenticationStore(
+                db,
+                new PasswordHasher<User>(Options.Create(new PasswordHasherOptions
+                {
+                    IterationCount = 10_000
+                })),
+                outbox,
+                emailVerificationConfiguration: new FixedConfigurationStore());
+
+            var result = await registrations.RegisterAsync(
+                userId,
+                "RegistrationOwner",
+                "registration-owner@example.test",
+                "eight888",
+                now,
+                cancellationToken);
+
+            await Assert.That(result.UserState).IsEqualTo(CreateUserState.Created);
+            await Assert.That(result.VerificationState)
+                .IsEqualTo(EmailVerificationState.Issued);
+            await Assert.That(outbox.Messages.OfType<SendEmailVerification>())
+                .HasSingleItem();
+            await Assert.That(outbox.TransactionWasActiveWhenPublished).IsTrue();
+            await Assert.That(outbox.FlushCount).IsEqualTo(1);
+
+            db.ChangeTracker.Clear();
+            var user = await db.Users.SingleAsync(
+                candidate => candidate.Id == userId,
+                cancellationToken);
+            var token = await db.AccountTokens.SingleAsync(
+                candidate => candidate.UserId == userId
+                    && candidate.Kind == AccountTokenKind.EmailVerification,
+                cancellationToken);
+            await Assert.That(user.EmailVerifiedAt).IsNull();
+            await Assert.That(token.ConsumedAt).IsNull();
+            await Assert.That(token.InvalidatedAt).IsNull();
+        });
+    }
+
     [Test]
     [Timeout(300_000)]
     public async Task Concurrent_anonymous_requests_issue_only_one_active_token(
@@ -84,6 +140,49 @@ public sealed class EmailVerificationPersistenceTests
         });
     }
 
+    [Test]
+    [Timeout(300_000)]
+    public async Task Unauthenticated_smtp_can_issue_a_verification_message(
+        CancellationToken cancellationToken)
+    {
+        await DockerIntegrationTest.RunAsync(async () =>
+        {
+            await using var postgres = await StartPostgresAsync(cancellationToken);
+            var options = OptionsFor(postgres);
+            var now = DateTimeOffset.UtcNow;
+            var userId = Guid.CreateVersion7(now);
+
+            await using var db = new NoCtfDbContext(options);
+            await db.Database.EnsureCreatedAsync(cancellationToken);
+            db.Users.Add(new User
+            {
+                Id = userId,
+                UserName = "RelayOwner",
+                NormalizedUserName = "RELAYOWNER",
+                Email = "relay-owner@example.test",
+                PasswordHash = "unused",
+                Kind = UserKind.Human,
+                Role = UserRole.User,
+                AccountStatus = UserAccountStatus.Active,
+                EmailVerifiedAt = null,
+                CreatedAt = now,
+                UpdatedAt = now
+            });
+            await db.SaveChangesAsync(cancellationToken);
+            var outbox = new RecordingOutbox(db);
+
+            var state = await new EmailVerificationStore(
+                    db,
+                    new FixedConfigurationStore(usesAuthentication: false),
+                    outbox)
+                .IssueAsync(userId, now.AddMinutes(1), cancellationToken);
+
+            await Assert.That(state).IsEqualTo(EmailVerificationState.Issued);
+            await Assert.That(outbox.Messages.OfType<SendEmailVerification>())
+                .HasSingleItem();
+        });
+    }
+
     private static EmailVerificationStore CreateStore(
         NoCtfDbContext db,
         ITransactionalMessageOutbox outbox) =>
@@ -109,7 +208,8 @@ public sealed class EmailVerificationPersistenceTests
             .UseSnakeCaseNamingConvention()
             .Options;
 
-    private sealed class FixedConfigurationStore : IEmailVerificationConfigurationStore
+    private sealed class FixedConfigurationStore(bool usesAuthentication = true)
+        : IEmailVerificationConfigurationStore
     {
         public Task<EmailVerificationConfigurationView> GetAsync(
             CancellationToken cancellationToken) =>
@@ -124,8 +224,8 @@ public sealed class EmailVerificationPersistenceTests
                 SmtpHost: "smtp.noctf.test",
                 SmtpPort: 465,
                 SmtpSecurityMode: SmtpSecurityMode.SslOnConnect,
-                SmtpUserName: "mailer",
-                SmtpPasswordConfigured: true,
+                SmtpUserName: usesAuthentication ? "mailer" : string.Empty,
+                SmtpPasswordConfigured: usesAuthentication,
                 SmtpFromAddress: "no-reply@noctf.test",
                 SmtpFromName: "NoCTF",
                 SmtpTimeoutSeconds: 10,
@@ -147,11 +247,15 @@ public sealed class EmailVerificationPersistenceTests
 
         public IReadOnlyCollection<object> Messages => messages.ToArray();
         public bool TokenWasPendingWhenPublished { get; private set; }
+        public bool TransactionWasActiveWhenPublished { get; private set; }
+        public int FlushCount { get; private set; }
 
         public ValueTask PublishAsync<T>(T message)
         {
             if (message is SendEmailVerification)
             {
+                TransactionWasActiveWhenPublished =
+                    db.Database.CurrentTransaction is not null;
                 TokenWasPendingWhenPublished = db.ChangeTracker
                     .Entries<AccountToken>()
                     .Any(entry => entry.State == EntityState.Added);
@@ -171,6 +275,10 @@ public sealed class EmailVerificationPersistenceTests
             DateTimeOffset scheduledAt)
             where T : IRunnerNodeMessage => ValueTask.CompletedTask;
 
-        public Task FlushOutgoingMessagesAsync() => Task.CompletedTask;
+        public Task FlushOutgoingMessagesAsync()
+        {
+            FlushCount++;
+            return Task.CompletedTask;
+        }
     }
 }

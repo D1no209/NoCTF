@@ -44,7 +44,11 @@ internal static class AuthenticationInfrastructure
                 "EmailVerification:EncryptionKey must be a Base64-encoded 32-byte key.")
             .ValidateOnStart();
         services.AddSingleton<IRunnerScoringTokenIssuer, RunnerScoringTokenIssuer>();
-        services.AddScoped<IUserAuthenticationStore, AuthenticationStore>();
+        services.AddScoped<AuthenticationStore>();
+        services.AddScoped<IUserAuthenticationStore>(provider =>
+            provider.GetRequiredService<AuthenticationStore>());
+        services.AddScoped<IUserRegistrationStore>(provider =>
+            provider.GetRequiredService<AuthenticationStore>());
         services.Configure<PasswordHasherOptions>(options =>
             options.IterationCount = 210_000);
         services.AddScoped<IPasswordHasher<User>, PasswordHasher<User>>();
