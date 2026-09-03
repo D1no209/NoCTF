@@ -73,7 +73,50 @@ public sealed class NormalizedScoreboardProjectionTests
             .IsEqualTo(ScoreboardAward.FirstBlood);
         await Assert.That(alphaSlot.Breakdowns.Any(item => item.Kind == ScoreboardBreakdownKind.Hint))
             .IsTrue();
+        await Assert.That(alpha.MemberContributions).HasSingleItem();
+        await Assert.That(alpha.MemberContributions[0].UserId).IsEqualTo(actorId);
+        await Assert.That(alpha.MemberContributions[0].DisplayName).IsEqualTo("Player");
+        await Assert.That(alpha.MemberContributions[0].EarnedPoints)
+            .IsEqualTo(alphaSlot.EarnedPoints!.Value);
         await AssertArithmetic(alpha);
+    }
+
+    [Test]
+    public async Task Ctf_member_contributions_group_all_positive_points_by_submitter()
+    {
+        var team = Team(1, "Contributors");
+        var web = Challenge(1, "Web");
+        var pwn = Challenge(2, "Pwn");
+        var misc = Challenge(3, "Misc");
+        var alice = Guid.Parse("00000000-0000-0000-0003-000000000001");
+        var bob = Guid.Parse("00000000-0000-0000-0003-000000000002");
+        var projection = ProjectNormalized(engine, new(
+            Guid.NewGuid(),
+            GameMode.Ctf,
+            [team],
+            [
+                Fact(team.Id, web.Id, GameplayFactKind.FlagAttempt, 1,
+                    GameplayFactResult.Correct, actorId: alice, submitter: "Alice"),
+                Fact(team.Id, pwn.Id, GameplayFactKind.FlagAttempt, 2,
+                    GameplayFactResult.Correct, actorId: bob, submitter: "Bob"),
+                Fact(team.Id, misc.Id, GameplayFactKind.FlagAttempt, 3,
+                    GameplayFactResult.Correct, actorId: alice, submitter: "Alice"),
+                Fact(team.Id, pwn.Id, GameplayFactKind.FlagAttempt, 4,
+                    GameplayFactResult.Wrong, actorId: alice, submitter: "Alice")
+            ],
+            [web, pwn, misc],
+            ProjectedAt: Start.AddMinutes(1),
+            CompetitionStatus: CompetitionStatus.Running));
+
+        var row = projection.Snapshot.Teams.Single();
+        var contributions = row.MemberContributions.ToDictionary(item => item.UserId);
+        await Assert.That(contributions).Count().IsEqualTo(2);
+        await Assert.That(contributions[alice].DisplayName).IsEqualTo("Alice");
+        await Assert.That(contributions[bob].DisplayName).IsEqualTo("Bob");
+        await Assert.That(contributions[alice].EarnedPoints)
+            .IsGreaterThan(contributions[bob].EarnedPoints);
+        await Assert.That(contributions.Values.Sum(item => item.EarnedPoints))
+            .IsEqualTo(row.Slots.Sum(slot => slot.EarnedPoints.GetValueOrDefault()));
     }
 
     [Test]

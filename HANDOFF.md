@@ -3542,3 +3542,19 @@ dotnet run --project backend/src/NoCTF.API/NoCTF.API.csproj --no-build -- --expo
 - 平台版本递增为 `0.1.0-alpha.133`。Release solution build 0 warning/0 error、非 Integration TUnit
   955/955、`bash -n deploy/ci/deploy.sh` 与 `git diff --check` 通过。没有 HTTP/OpenAPI、业务表、EF
   migration 或 snapshot 变化。本阶段待 push 后由 CI 重新部署。
+
+## 2026-09-04 Alpha.134 队员得分贡献饼图
+
+- 队伍得分详情新增 ECharts 环形饼图，与题目方向雷达在桌面端并排、窄屏纵向排列。每个扇区显示队员
+  名称、正向得分和占比，支持 tooltip、滚动图例及屏幕阅读器等价列表；无可归属分值时显示明确空态。
+- 主排行榜快照新增有界 `memberContributions`：服务端在压缩 Slot 明细前按 ActorUserId 聚合完整当前
+  投影中的正向 EarnedPoints，并直接携带显示名，避免前端从最多 5 条压缩事件反推而遗漏历史贡献。
+  CTF/KoH 当前有效分、AWD 已结算窗口和 AWDP 权威结算沿用各自原有计分边界。
+- 自动可用性结算、窗口外历史、全局调分及其他无法归属个人的正向分值不会伪装成某位队员贡献；前端
+  将总分与个人正向贡献之间的正差单列为“团队/系统”。扣分不参与正向贡献饼图，避免负数扇区产生
+  错误比例。
+- OpenAPI 与 TypeScript SDK 已由工具重新生成，新增后端回归覆盖同一队员跨题聚合、不同队员拆分、
+  扣分排除和贡献总和；前端回归覆盖个人占比及团队/系统余量。平台版本递增为
+  `0.1.0-alpha.134`。Release solution build 0 warning/0 error、非 Integration TUnit 956/956、前端
+  312/312、ClientApp typecheck 与 Nuxt generate 通过；OpenAPI/SDK 连续生成幂等，EF model 无漂移。
+  无数据库 migration。本阶段未 push、未部署。

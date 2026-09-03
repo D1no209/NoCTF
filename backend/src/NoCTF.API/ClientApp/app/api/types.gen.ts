@@ -512,6 +512,7 @@ export type NoCtfapiEndpointsCompetitionsScoreboardTeamResponse = {
     attackScore?: number | null;
     defenseScore?: number | null;
     challengeScores?: Array<NoCtfapiEndpointsCompetitionsScoreboardChallengeScoreResponse>;
+    memberContributions?: Array<NoCtfapiEndpointsCompetitionsScoreboardMemberContributionResponse>;
     globalAdjustmentCount?: number;
     globalAdjustments?: Array<NoCtfapiEndpointsCompetitionsScoreboardAdjustmentResponse>;
     slots?: Array<NoCtfapiEndpointsCompetitionsScoreboardSlotResponse>;
@@ -523,6 +524,12 @@ export type NoCtfapiEndpointsCompetitionsScoreboardChallengeScoreResponse = {
     competitionChallengeId?: string;
     attackScore?: number;
     defenseScore?: number;
+};
+
+export type NoCtfapiEndpointsCompetitionsScoreboardMemberContributionResponse = {
+    userId?: string;
+    displayName?: string;
+    earnedPoints?: number;
 };
 
 export type NoCtfapiEndpointsCompetitionsScoreboardAdjustmentResponse = {

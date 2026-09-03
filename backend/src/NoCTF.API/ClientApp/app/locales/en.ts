@@ -2345,4 +2345,9 @@ export const englishMessages: Record<string, string> = {
   "创建 / 到期": "Created / expires",
   "尚未分配 Runner": "Runner not assigned",
   "赛事运行时": "Competition runtimes",
+  "队员得分占比": "Member score contribution",
+  "按可归属到队员的正向得分统计": "Based on positive points attributable to individual members",
+  "团队/系统": "Team / system",
+  "暂无可归属的队员得分": "No member-attributed score yet",
+  "自动结算、历史窗口及其他无法归属个人的分值归入“团队/系统”。": "Automated settlement, historical windows, and other points without an individual owner are grouped under “Team / system”.",
 }

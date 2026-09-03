@@ -45,6 +45,12 @@ export interface ScoreboardSlotSignals {
   shieldSucceeded: boolean
 }
 
+export interface ScoreboardMemberContributionSlice {
+  name: string
+  value: number
+  userId: string
+}
+
 const rankingStateLabels = {
   Eligible: '符合排名资格',
   Banned: '已封禁',
@@ -75,6 +81,23 @@ export function scoreboardRankingStateLabel(
 ): string {
   if (!state) return '—'
   return translate(rankingStateLabels[state])
+}
+
+export function scoreboardMemberContributionSlices(
+  team: NoCtfapiEndpointsCompetitionsScoreboardTeamResponse | null | undefined,
+): ScoreboardMemberContributionSlice[] {
+  const members = (team?.memberContributions ?? [])
+    .filter(contribution => (contribution.earnedPoints ?? 0) > 0)
+    .map(contribution => ({
+      name: contribution.displayName ?? translate('未知用户'),
+      value: contribution.earnedPoints ?? 0,
+      userId: contribution.userId ?? '',
+    }))
+  const attributed = members.reduce((total, contribution) => total + contribution.value, 0)
+  const unattributed = Math.max(0, (team?.totalScore ?? 0) - attributed)
+  return unattributed > 0
+    ? [...members, { name: translate('团队/系统'), value: unattributed, userId: '' }]
+    : members
 }
 
 export function scoreboardEntryKindLabel(

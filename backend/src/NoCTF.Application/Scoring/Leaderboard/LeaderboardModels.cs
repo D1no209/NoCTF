@@ -263,6 +263,11 @@ public sealed record ScoreboardChallengeScore(
     long AttackScore,
     long DefenseScore);
 
+public sealed record ScoreboardMemberContribution(
+    Guid UserId,
+    string DisplayName,
+    long EarnedPoints);
+
 public sealed record ScoreboardTeam(
     Guid TeamId,
     string TeamName,
@@ -278,6 +283,7 @@ public sealed record ScoreboardTeam(
     public long? AttackScore { get; init; }
     public long? DefenseScore { get; init; }
     public IReadOnlyList<ScoreboardChallengeScore> ChallengeScores { get; init; } = [];
+    public IReadOnlyList<ScoreboardMemberContribution> MemberContributions { get; init; } = [];
 }
 
 public sealed record ScoreboardTrack(
