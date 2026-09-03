@@ -66,6 +66,7 @@ public sealed class LeaderboardOpenApiTests
             "attackScore",
             "defenseScore",
             "challengeScores",
+            "memberContributions",
             "globalAdjustments",
             "globalAdjustmentCount",
             "slots"
@@ -77,6 +78,14 @@ public sealed class LeaderboardOpenApiTests
             "competitionChallengeId",
             "attackScore",
             "defenseScore"
+        ]);
+        var memberContribution = ResolveSchema(
+            root,
+            team.GetProperty("properties").GetProperty("memberContributions").GetProperty("items"));
+        await Assert.That(PropertyNames(memberContribution)).IsEquivalentTo([
+            "userId",
+            "displayName",
+            "earnedPoints"
         ]);
         var slot = ResolveSchema(
             root,

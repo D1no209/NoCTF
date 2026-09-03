@@ -11,6 +11,7 @@ import {
   scoreboardColumnsForChallenge,
   scoreboardCurrentChallengeScore,
   scoreboardDirectionGroups,
+  scoreboardMemberContributionSlices,
   scoreboardEntryKindLabel,
   scoreboardEntryOutcomeLabel,
   scoreboardRankingStateLabel,
@@ -310,6 +311,10 @@ describe('normalized scoreboard matrix', () => {
       teamId: crypto.randomUUID(),
       teamName: 'Radar team',
       challengeScores: [{ competitionChallengeId: challengeA, attackScore: 240, defenseScore: 160 }],
+      memberContributions: [
+        { userId: crypto.randomUUID(), displayName: 'Alice', earnedPoints: 500 },
+        { userId: crypto.randomUUID(), displayName: 'Bob', earnedPoints: 300 },
+      ],
       slots: [
         { columnIndex: 0, scoreState: 'Settled', netPoints: 300, breakdown: [{ kind: 'Solve', successfulCount: 1, attemptCount: 1 }] },
         { columnIndex: 1, scoreState: 'Provisional', netPoints: 525, breakdown: [{ kind: 'Solve', successfulCount: 1, attemptCount: 1 }] },
@@ -337,9 +342,21 @@ describe('normalized scoreboard matrix', () => {
       defense: 160,
       total: 400,
     })
+    expect(scoreboardMemberContributionSlices({
+      ...team,
+      totalScore: 1_000,
+    })).toEqual([
+      expect.objectContaining({ name: 'Alice', value: 500 }),
+      expect.objectContaining({ name: 'Bob', value: 300 }),
+      { name: '团队/系统', value: 200, userId: '' },
+    ])
     expect(leaderboardPage).toContain('@click="openTeamDetail(team)"')
     expect(leaderboardPage).toContain('<ScoreboardTeamDetailDialog')
     expect(scoreboardTeamDetailDialog).toContain("type: 'radar'")
+    expect(scoreboardTeamDetailDialog).toContain("type: 'pie'")
+    expect(scoreboardTeamDetailDialog).toContain('scoreboardMemberContributionSlices')
+    expect(scoreboardTeamDetailDialog).toContain("radius: ['38%', '68%']")
+    expect(scoreboardTeamDetailDialog).toContain('lg:grid-cols-2')
     expect(scoreboardTeamDetailDialog).toContain('scoreboardDirectionGroups')
     expect(scoreboardTeamDetailDialog).toContain('scoreboardTeamDirectionScore')
     expect(scoreboardTeamDetailDialog).toContain("radius: '62%'")

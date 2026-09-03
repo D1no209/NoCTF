@@ -78,6 +78,7 @@ internal static class NormalizedScoreboardProjection
                     .FirstOrDefault(value => !string.IsNullOrWhiteSpace(value)) ?? "-"))
             .ToArray();
         var actorIndexes = actors.ToDictionary(actor => actor.UserId, actor => actor.Index);
+        var actorsByIndex = actors.ToDictionary(actor => actor.Index);
         var columnsByKey = columns.ToDictionary(
             column => (column.CompetitionChallengeId, column.RoundId),
             column => column);
@@ -163,6 +164,24 @@ internal static class NormalizedScoreboardProjection
                         cell.DefenseScore ?? 0))
                     .ToArray()
                 : [];
+            var memberContributions = builtSlots
+                .SelectMany(item => item.Slot.Entries)
+                .Where(entry => entry.ActorIndex is not null
+                    && entry.EarnedPoints.GetValueOrDefault() > 0)
+                .GroupBy(entry => entry.ActorIndex!.Value)
+                .Select(group =>
+                {
+                    var actor = actorsByIndex[group.Key];
+                    return new ScoreboardMemberContribution(
+                        actor.UserId,
+                        actor.DisplayName,
+                        group.Aggregate(0L, (total, entry) =>
+                            checked(total + entry.EarnedPoints.GetValueOrDefault())));
+                })
+                .OrderByDescending(contribution => contribution.EarnedPoints)
+                .ThenBy(contribution => contribution.DisplayName, StringComparer.Ordinal)
+                .ThenBy(contribution => contribution.UserId)
+                .ToArray();
             var globalAdjustmentCount = scoreboardInput.GameplayFacts
                 .Where(fact => fact.TeamId == team.Id
                     && fact.Kind == GameplayFactKind.ManualAdjustment
@@ -186,7 +205,8 @@ internal static class NormalizedScoreboardProjection
                 ScoreOutsideWindow = scoreOutsideWindow,
                 AttackScore = attackScore,
                 DefenseScore = defenseScore,
-                ChallengeScores = challengeScores
+                ChallengeScores = challengeScores,
+                MemberContributions = memberContributions
             });
         }
 

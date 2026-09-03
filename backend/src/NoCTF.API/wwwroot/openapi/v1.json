@@ -14959,6 +14959,12 @@
               "$ref": "#/components/schemas/NoCTFAPIEndpointsCompetitionsScoreboardChallengeScoreResponse"
             }
           },
+          "memberContributions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NoCTFAPIEndpointsCompetitionsScoreboardMemberContributionResponse"
+            }
+          },
           "globalAdjustmentCount": {
             "type": "integer",
             "format": "int32"
@@ -15004,6 +15010,23 @@
             "format": "int64"
           },
           "defenseScore": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
+      "NoCTFAPIEndpointsCompetitionsScoreboardMemberContributionResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "userId": {
+            "type": "string",
+            "format": "guid"
+          },
+          "displayName": {
+            "type": "string"
+          },
+          "earnedPoints": {
             "type": "integer",
             "format": "int64"
           }

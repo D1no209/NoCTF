@@ -7,6 +7,7 @@ import type {
 import type { echarts } from '~/utils/echarts'
 import {
   scoreboardDirectionGroups,
+  scoreboardMemberContributionSlices,
   scoreboardRankingStateLabel,
   scoreboardTeamChallengeScore,
   scoreboardTeamChallengeSignals,
@@ -27,6 +28,43 @@ const usesCurrentScore = computed(() => props.mode === 'Ctf' || props.mode === '
 const scoreLabel = computed(() => translate(
   usesCurrentScore.value ? '当前得分' : '已结算得分',
 ))
+
+const memberContributionSlices = computed(() => scoreboardMemberContributionSlices(props.team))
+
+const memberContributionTotal = computed(() => memberContributionSlices.value
+  .reduce((total, contribution) => total + contribution.value, 0))
+
+function memberContributionPercent(value: number): number {
+  return memberContributionTotal.value > 0
+    ? Math.round(value / memberContributionTotal.value * 1000) / 10
+    : 0
+}
+
+const memberContributionPieOption = computed<echarts.EChartsCoreOption>(() => ({
+  tooltip: {
+    trigger: 'item',
+    formatter: '{b}<br/>{c} pts · {d}%',
+  },
+  legend: {
+    type: 'scroll',
+    bottom: 0,
+    left: 'center',
+  },
+  series: [{
+    type: 'pie',
+    radius: ['38%', '68%'],
+    center: ['50%', '43%'],
+    avoidLabelOverlap: true,
+    minAngle: 4,
+    label: {
+      formatter: '{b}\n{c} pts · {d}%',
+      fontSize: 11,
+      lineHeight: 16,
+    },
+    labelLine: { length: 12, length2: 8 },
+    data: memberContributionSlices.value,
+  }],
+}))
 
 function challengeSplitScore(
   team: NoCtfapiEndpointsCompetitionsScoreboardTeamResponse,
@@ -141,14 +179,36 @@ function flagLabel(succeeded: boolean): string {
           <div class="bg-background p-4"><p class="text-xs text-muted-foreground">{{ $t('排名状态') }}</p><p class="mt-1 flex items-center gap-2 font-medium"><Trophy class="size-4 text-primary" aria-hidden="true" />{{ scoreboardRankingStateLabel(team.rankingState) }}</p></div>
         </div>
 
-        <section class="rounded-xl border bg-muted/20 p-4" aria-labelledby="scoreboard-team-radar-title">
-          <div class="mb-2 flex items-center gap-2">
-            <Target class="size-4 text-primary" aria-hidden="true" />
-            <h3 id="scoreboard-team-radar-title" class="text-sm font-semibold">{{ $t('题目方向得分雷达') }}</h3>
-          </div>
-          <MiniChart v-if="directionGroups.length" :option="radarOption" height="360px" />
-          <p v-else class="py-10 text-center text-sm text-muted-foreground">{{ $t('暂无数据') }}</p>
-        </section>
+        <div class="grid gap-4 lg:grid-cols-2">
+          <section class="rounded-xl border bg-muted/20 p-4" aria-labelledby="scoreboard-team-radar-title">
+            <div class="mb-2 flex items-center gap-2">
+              <Target class="size-4 text-primary" aria-hidden="true" />
+              <h3 id="scoreboard-team-radar-title" class="text-sm font-semibold">{{ $t('题目方向得分雷达') }}</h3>
+            </div>
+            <MiniChart v-if="directionGroups.length" :option="radarOption" height="360px" />
+            <p v-else class="py-10 text-center text-sm text-muted-foreground">{{ $t('暂无数据') }}</p>
+          </section>
+
+          <section class="rounded-xl border bg-muted/20 p-4" aria-labelledby="scoreboard-member-contribution-title">
+            <div class="mb-2 flex items-center gap-2">
+              <Trophy class="size-4 text-primary" aria-hidden="true" />
+              <div>
+                <h3 id="scoreboard-member-contribution-title" class="text-sm font-semibold">{{ $t('队员得分占比') }}</h3>
+                <p class="text-xs text-muted-foreground">{{ $t('按可归属到队员的正向得分统计') }}</p>
+              </div>
+            </div>
+            <MiniChart v-if="memberContributionSlices.length" :option="memberContributionPieOption" height="360px" />
+            <p v-else class="py-10 text-center text-sm text-muted-foreground">{{ $t('暂无可归属的队员得分') }}</p>
+            <p class="text-xs leading-5 text-muted-foreground">
+              {{ $t('自动结算、历史窗口及其他无法归属个人的分值归入“团队/系统”。') }}
+            </p>
+            <ul class="sr-only">
+              <li v-for="slice in memberContributionSlices" :key="`${slice.userId}:${slice.name}`">
+                {{ slice.name }}：{{ slice.value }} pts，{{ memberContributionPercent(slice.value) }}%
+              </li>
+            </ul>
+          </section>
+        </div>
 
         <div class="overflow-x-auto rounded-lg border">
           <Table>
