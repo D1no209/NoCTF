@@ -198,7 +198,9 @@ public sealed class AuthenticationStore(
         user.PasswordHash = passwordHasher.HashPassword(user, newPassword);
         user.TokenVersion = checked(user.TokenVersion + 1);
         user.UpdatedAt = now;
+        await outbox.PublishAsync(new SendPasswordChangedNotification(user.Id));
         await db.SaveChangesAsync(ct);
+        await outbox.FlushOutgoingMessagesAsync();
         return ChangePasswordState.Changed;
     }
 

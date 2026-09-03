@@ -3,9 +3,11 @@ using System.Security.Cryptography;
 using System.Text;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 using NoCTF.Application.Authentication.EmailVerification;
 using NoCTF.Application.Authentication.PasswordReset;
 using NoCTF.Application.Messaging;
+using NoCTF.Application.Observability;
 using NoCTF.Domain.Identity;
 using NoCTF.Infrastructure.Persistence;
 
@@ -16,7 +18,8 @@ public sealed class PasswordResetStore(
     IPasswordHasher<User> passwordHasher,
     IEmailVerificationConfigurationStore configuration,
     IEmailVerificationDeliveryConfigurationReader deliveryConfiguration,
-    ITransactionalMessageOutbox outbox) : IPasswordResetStore
+    ITransactionalMessageOutbox outbox,
+    ILogger<PasswordResetStore>? logger = null) : IPasswordResetStore
 {
     public async Task<PasswordResetRequestState> IssueAsync(
         string email,
@@ -28,7 +31,7 @@ public sealed class PasswordResetStore(
                 requireEnabled: false,
                 ct) is null)
         {
-            return PasswordResetRequestState.DeliveryNotConfigured;
+            return Observe(PasswordResetRequestState.DeliveryNotConfigured, null);
         }
 
         var canonicalEmail = EmailCanonicalizer.Canonicalize(email);
@@ -40,7 +43,7 @@ public sealed class PasswordResetStore(
             .Select(user => (Guid?)user.Id)
             .SingleOrDefaultAsync(ct);
         if (userId is null)
-            return PasswordResetRequestState.Ignored;
+            return Observe(PasswordResetRequestState.Ignored, null);
 
         await using var transaction = await db.Database.BeginTransactionAsync(
             IsolationLevel.ReadCommitted,
@@ -55,7 +58,7 @@ public sealed class PasswordResetStore(
             && user.Email == canonicalEmail,
             ct);
         if (!userExists)
-            return PasswordResetRequestState.Ignored;
+            return Observe(PasswordResetRequestState.Ignored, userId);
 
         var hourlyBoundary = now.AddHours(-1);
         var recentRequests = await db.AccountTokens.CountAsync(token =>
@@ -64,7 +67,7 @@ public sealed class PasswordResetStore(
             && token.CreatedAt > hourlyBoundary,
             ct);
         if (recentRequests >= settings.PasswordResetMaxRequestsPerHour)
-            return PasswordResetRequestState.RateLimited;
+            return Observe(PasswordResetRequestState.RateLimited, userId);
 
         var cooldownBoundary = now.AddSeconds(-settings.PasswordResetCooldownSeconds);
         if (await db.AccountTokens.AsNoTracking().AnyAsync(token =>
@@ -73,7 +76,7 @@ public sealed class PasswordResetStore(
                 && token.CreatedAt > cooldownBoundary,
                 ct))
         {
-            return PasswordResetRequestState.RateLimited;
+            return Observe(PasswordResetRequestState.RateLimited, userId);
         }
 
         await db.AccountTokens
@@ -95,6 +98,7 @@ public sealed class PasswordResetStore(
             ExpiresAt = now.AddMinutes(settings.PasswordResetTokenLifetimeMinutes),
             CreatedAt = now
         });
+        await outbox.PublishAsync(new SendPasswordReset(userId.Value, rawToken));
         try
         {
             await db.SaveChangesAsync(ct);
@@ -103,13 +107,11 @@ public sealed class PasswordResetStore(
         {
             await transaction.RollbackAsync(ct);
             db.ChangeTracker.Clear();
-            return PasswordResetRequestState.RateLimited;
+            return Observe(PasswordResetRequestState.RateLimited, userId);
         }
-        await outbox.PublishAsync(new SendPasswordReset(userId.Value, rawToken));
-        await db.SaveChangesAsync(ct);
         await transaction.CommitAsync(ct);
         await outbox.FlushOutgoingMessagesAsync();
-        return PasswordResetRequestState.Queued;
+        return Observe(PasswordResetRequestState.Queued, userId);
     }
 
     public async Task<PasswordResetCompletionState> CompleteAsync(
@@ -175,6 +177,7 @@ public sealed class PasswordResetStore(
                 && candidate.InvalidatedAt == null)
             .ExecuteUpdateAsync(setters => setters
                 .SetProperty(candidate => candidate.InvalidatedAt, now), ct);
+        await outbox.PublishAsync(new SendPasswordChangedNotification(user.Id));
         try
         {
             await db.SaveChangesAsync(ct);
@@ -185,8 +188,6 @@ public sealed class PasswordResetStore(
             db.ChangeTracker.Clear();
             return PasswordResetCompletionState.InvalidOrExpired;
         }
-        await outbox.PublishAsync(new SendPasswordChangedNotification(user.Id));
-        await db.SaveChangesAsync(ct);
         await transaction.CommitAsync(ct);
         await outbox.FlushOutgoingMessagesAsync();
         return PasswordResetCompletionState.Reset;
@@ -207,4 +208,18 @@ public sealed class PasswordResetStore(
 
     private static byte[] HashToken(string token) =>
         SHA256.HashData(Encoding.UTF8.GetBytes(token));
+
+    private PasswordResetRequestState Observe(
+        PasswordResetRequestState state,
+        Guid? userId)
+    {
+        NoCtfTelemetry.RecordAccountNotificationIssuance(
+            "password_reset",
+            state.ToString());
+        logger?.LogInformation(
+            "Password reset token issuance completed with {Outcome} for user {UserId}.",
+            state,
+            userId);
+        return state;
+    }
 }

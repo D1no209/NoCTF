@@ -4,12 +4,26 @@ using NoCTF.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Wolverine;
 using Wolverine.EntityFrameworkCore;
+using Wolverine.Runtime;
 
 namespace NoCTF.Infrastructure.Messaging;
 
-public sealed class WolverineTransactionalMessageOutbox(
-    IDbContextOutbox<NoCtfDbContext> outbox) : ITransactionalMessageOutbox
+public sealed class WolverineTransactionalMessageOutbox : ITransactionalMessageOutbox
 {
+    private readonly IDbContextOutbox<NoCtfDbContext> outbox;
+
+    public WolverineTransactionalMessageOutbox(IDbContextOutbox<NoCtfDbContext> outbox)
+    {
+        this.outbox = outbox;
+        if (outbox is not MessageContext context)
+        {
+            throw new InvalidOperationException(
+                "The Wolverine EF Core outbox must expose its scoped message context.");
+        }
+
+        context.MultiFlushMode = MultiFlushMode.AllowMultiples;
+    }
+
     public ValueTask PublishAsync<T>(T message) => outbox.PublishAsync(message);
     public ValueTask ScheduleAsync<T>(T message, DateTimeOffset scheduledAt) =>
         outbox.ScheduleAsync(message, scheduledAt);

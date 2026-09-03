@@ -70,9 +70,13 @@ public sealed class DeploymentTopologyTests
             .And.DoesNotContain("ExecutionTimeoutInSeconds = 60");
         await Assert.That(persistence).Contains("options.UseNats(nats)");
         await Assert.That(outbox).Contains("IDbContextOutbox<NoCtfDbContext>");
+        await Assert.That(outbox).Contains("MultiFlushMode.AllowMultiples");
         await Assert.That(outbox).Contains("nats://subject/noctf.runner.");
         await Assert.That(workerTopology)
             .Contains("endpoint.BrokerRole, \"stream\"");
+        await Assert.That(workerTopology)
+            .Contains("typeof(SendEmailVerification)")
+            .And.Contains("BackgroundEndpointAddress()");
         await Assert.That(routing)
             .Contains("Route<CompleteAwdpFixRecovery>(options, WorkerQueue.Control)");
         await Assert.That(routing)

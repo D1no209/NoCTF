@@ -177,6 +177,9 @@ public sealed class SmtpEmailVerificationDeliveryTests
                     .SendTestAsync(UserId, cancellationToken));
             await Assert.That(timedOut.Failure)
                 .IsEqualTo(EmailVerificationDeliveryFailure.TimedOut);
+            await Assert.That(timedOut.InnerException).IsNotNull();
+            await Assert.That(timedOut.InnerException!.Message)
+                .Contains(nameof(OperationCanceledException));
         }
 
         await using (var stalled = new StalledSmtpServer())
@@ -211,6 +214,9 @@ public sealed class SmtpEmailVerificationDeliveryTests
                 null)).SendTestAsync(UserId, cancellationToken));
         await Assert.That(connectionFailure.Failure)
             .IsEqualTo(EmailVerificationDeliveryFailure.ConnectionFailed);
+        await Assert.That(connectionFailure.InnerException).IsNotNull();
+        await Assert.That(connectionFailure.InnerException!.Message)
+            .StartsWith("SMTP phase failed with ");
 
         await using var rejecting = new RejectingSmtpServer();
         var rejection = await CaptureDeliveryFailureAsync(() =>
@@ -221,6 +227,11 @@ public sealed class SmtpEmailVerificationDeliveryTests
                 null)).SendTestAsync(UserId, cancellationToken));
         await Assert.That(rejection.Failure)
             .IsEqualTo(EmailVerificationDeliveryFailure.MessageRejected);
+        await Assert.That(rejection.InnerException).IsNotNull();
+        await Assert.That(rejection.InnerException!.Message)
+            .Contains(nameof(SmtpCommandException));
+        await Assert.That(rejection.InnerException.Message).Contains("status=");
+        await Assert.That(rejection.ToString()).DoesNotContain("mailbox unavailable");
     }
 
     private static IContainer BuildGreenMail(bool authenticationDisabled)
@@ -244,7 +255,7 @@ public sealed class SmtpEmailVerificationDeliveryTests
     }
 
     private static IContainer BuildMailpit(string tlsDirectory) =>
-        new ContainerBuilder("axllent/mailpit:v1.30.0")
+        new ContainerBuilder("axllent/mailpit:v1.30.4")
             .WithEnvironment("MP_DISABLE_VERSION_CHECK", "true")
             .WithEnvironment("MP_SMTP_TLS_CERT", "/certs/cert.pem")
             .WithEnvironment("MP_SMTP_TLS_KEY", "/certs/key.pem")

@@ -3,6 +3,8 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using NoCTF.Application.Authentication.Account;
 using NoCTF.Application.Authentication.RefreshJwt;
+using NoCTF.Application.Messaging;
+using NoCTF.Application.Runtime.Instances;
 using NoCTF.Domain.Identity;
 using NoCTF.Domain.Storage;
 using NoCTF.Infrastructure.Authentication;
@@ -119,7 +121,8 @@ public sealed class UserProfilePersistenceTests
 
             await using var db = new NoCtfDbContext(options);
             await db.Database.EnsureCreatedAsync(cancellationToken);
-            var users = new AuthenticationStore(db, hasher);
+            var outbox = new RecordingOutbox();
+            var users = new AuthenticationStore(db, hasher, outbox);
             await users.CreateAsync(
                 userId,
                 "PasswordOwner",
@@ -139,6 +142,8 @@ public sealed class UserProfilePersistenceTests
             var after = await users.FindByIdAsync(userId, cancellationToken);
 
             await Assert.That(state).IsEqualTo(ChangePasswordState.Changed);
+            await Assert.That(outbox.Messages.OfType<SendPasswordChangedNotification>())
+                .HasSingleItem();
             await Assert.That(after!.TokenVersion).IsEqualTo(before!.TokenVersion + 1);
             await Assert.That(await users.VerifyPasswordAsync(
                 userId, "old-pass", cancellationToken)).IsFalse();
@@ -169,5 +174,29 @@ public sealed class UserProfilePersistenceTests
             new("unused-refresh", DateTimeOffset.UtcNow.AddDays(30));
 
         public RefreshTokenPrincipal? ValidateRefresh(string token) => principal;
+    }
+
+    private sealed class RecordingOutbox : ITransactionalMessageOutbox
+    {
+        public List<object> Messages { get; } = [];
+
+        public ValueTask PublishAsync<T>(T message)
+        {
+            Messages.Add(message!);
+            return ValueTask.CompletedTask;
+        }
+
+        public ValueTask ScheduleAsync<T>(T message, DateTimeOffset scheduledAt) =>
+            ValueTask.CompletedTask;
+
+        public ValueTask PublishToRunnerNodeAsync<T>(T message)
+            where T : IRunnerNodeMessage => ValueTask.CompletedTask;
+
+        public ValueTask ScheduleToRunnerNodeAsync<T>(
+            T message,
+            DateTimeOffset scheduledAt)
+            where T : IRunnerNodeMessage => ValueTask.CompletedTask;
+
+        public Task FlushOutgoingMessagesAsync() => Task.CompletedTask;
     }
 }

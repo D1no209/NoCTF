@@ -3504,3 +3504,26 @@ dotnet run --project backend/src/NoCTF.API/NoCTF.API.csproj --no-build -- --expo
 - 平台版本递增为 `0.1.0-alpha.131`。前端全量测试 312/312、ClientApp typecheck、Nuxt generate 与
   Release solution build（0 warning/0 error）通过。没有 HTTP/OpenAPI、数据库模型或 migration
   变化。本阶段未 push、未部署。
+
+## 2026-09-03 Alpha.132 修复账户邮件 Outbox 丢失
+
+- 生产根因确认与审计一致：Wolverine 6.30.3 的作用域 `MessageContext` 默认 `OnlyOnce`，注册流程第一次
+  保存用户后已完成空 flush，随后加入的邮箱验证 envelope 不再持久化。生产
+  `WolverineTransactionalMessageOutbox` 现在在作用域首次保存前强制设置
+  `MultiFlushMode.AllowMultiples`，并在底层实现不暴露 `MessageContext` 时启动即失败，禁止静默退化。
+- 邮箱验证和密码重置签发均调整为先加入 AccountToken 与消息、再执行一次 `SaveChangesAsync`，令 Token
+  与 Outbox envelope 在同一事务中持久化；密码重置完成的密码变更通知同样在保存前入队。普通登录态
+  修改密码现在也发送 `SendPasswordChangedNotification`，且与密码哈希、TokenVersion 在同一次保存中提交。
+- `SendEmailVerification.ToString()` 与密码重置消息一致，将 Token 固定输出为 `[REDACTED]`。SMTP 失败
+  继续使用稳定枚举驱动 Wolverine 重试，同时保留只含异常类型和 SMTP 状态码的脱敏 inner exception，
+  不记录收件地址、认证信息或 Token。
+- Worker 启动检查在启用 background 队列时验证三种账户邮件消息均路由至
+  `nats://subject/noctf.background`、对应 JetStream listener 存在且每种消息恰好注册一个
+  `AccountNotificationMessageHandler`，发现 local fallback、缺失或重复 Handler 时 readiness 启动失败。
+  签发与消费新增有界 outcome 日志及 `noctf.account_notification.*` 指标。
+- 回归覆盖 `AllowMultiples` 设置、令牌脱敏、邮件签发事务顺序、冷却期不重复签发、普通密码变更通知和
+  background 拓扑。另新增真实 PostgreSQL + Wolverine EF Outbox 的多次 flush 测试，以及 PostgreSQL +
+  NATS JetStream + Worker + Mailpit 的注册、匿名/登录态重发、密码重置与密码变更完整链路测试；当前机器
+  Docker daemon 不可用，两项真实依赖测试已明确跳过，未误报为通过。
+- 平台版本递增为 `0.1.0-alpha.132`。Release solution build 0 warning/0 error，非 Integration TUnit
+  955/955 通过。没有 HTTP/OpenAPI、业务表、EF migration 或 snapshot 变化。本阶段未 push、未部署。

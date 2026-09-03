@@ -225,8 +225,9 @@ public enum EmailVerificationDeliveryFailure
 }
 
 public sealed class EmailVerificationDeliveryException(
-    EmailVerificationDeliveryFailure failure)
-    : Exception("Email verification delivery failed.")
+    EmailVerificationDeliveryFailure failure,
+    Exception? innerException = null)
+    : Exception("Email verification delivery failed.", innerException)
 {
     public EmailVerificationDeliveryFailure Failure { get; } = failure;
 }
