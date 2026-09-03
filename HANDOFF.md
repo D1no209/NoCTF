@@ -3492,3 +3492,15 @@ dotnet run --project backend/src/NoCTF.API/NoCTF.API.csproj --no-build -- --expo
   950/950、前端 312/312、ClientApp typecheck 与 Nuxt generate 通过；EF model 无 migration 漂移，
   OpenAPI 与生成 SDK 连续两轮生成保持幂等。真实 PostgreSQL 跨赛事投影测试已补充，当前机器 Docker
   daemon 不可用而跳过。本阶段未 push、未部署。
+
+## 2026-09-03 Alpha.131 修正队伍得分详情统计
+
+- 修正 CTF/KoH 进行中队伍详情把 `Provisional` 题目槽位错误按 0 分统计的问题。非轮次模式的当前有效
+  分本来已经计入排行榜总分，详情弹窗现在同样计入；AWD 仍只统计 Settled 轮次，AWDP 仍使用服务端
+  权威的题目攻防聚合，不会把当前未结算轮次提前计分。
+- CTF/KoH 的雷达图与题目表列名改为“当前得分”，AWD/AWDP 保持“已结算得分”；说明文字统一为
+  “计入总分的有效分值”，避免把实时动态计分误称为最终结算。新增回归覆盖 CTF/KoH Provisional、
+  AWD Provisional 排除与 Pending 排除。
+- 平台版本递增为 `0.1.0-alpha.131`。前端全量测试 312/312、ClientApp typecheck、Nuxt generate 与
+  Release solution build（0 warning/0 error）通过。没有 HTTP/OpenAPI、数据库模型或 migration
+  变化。本阶段未 push、未部署。

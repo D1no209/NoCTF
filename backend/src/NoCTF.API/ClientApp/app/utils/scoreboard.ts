@@ -199,7 +199,10 @@ export function scoreboardTeamChallengeScore(
   return group.columns.reduce((total, column) => {
     if (column.index === undefined) return total
     const slot = scoreboardSlot(team, column.index)
-    return slot?.scoreState === 'Settled' ? total + (slot.netPoints ?? 0) : total
+    const countsTowardChallengeScore = mode === 'Ctf' || mode === 'Koh'
+      ? slot?.scoreState === 'Provisional' || slot?.scoreState === 'Settled'
+      : slot?.scoreState === 'Settled'
+    return countsTowardChallengeScore ? total + (slot?.netPoints ?? 0) : total
   }, 0)
 }
 

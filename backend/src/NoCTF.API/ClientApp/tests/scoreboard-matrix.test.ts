@@ -303,7 +303,7 @@ describe('normalized scoreboard matrix', () => {
     expect(leaderboardPage).not.toContain('breakdownText(scoreboardSlot(team, column.index!)!)')
   })
 
-  test('builds each team radar from authoritative settled challenge scores', () => {
+  test('builds each team radar from authoritative effective challenge scores', () => {
     const challengeA = crypto.randomUUID()
     const challengeB = crypto.randomUUID()
     const team: NoCtfapiEndpointsCompetitionsScoreboardTeamResponse = {
@@ -312,14 +312,19 @@ describe('normalized scoreboard matrix', () => {
       challengeScores: [{ competitionChallengeId: challengeA, attackScore: 240, defenseScore: 160 }],
       slots: [
         { columnIndex: 0, scoreState: 'Settled', netPoints: 300, breakdown: [{ kind: 'Solve', successfulCount: 1, attemptCount: 1 }] },
-        { columnIndex: 1, scoreState: 'Pending', netPoints: 999, breakdown: [{ kind: 'Solve', successfulCount: 1, attemptCount: 1 }] },
+        { columnIndex: 1, scoreState: 'Provisional', netPoints: 525, breakdown: [{ kind: 'Solve', successfulCount: 1, attemptCount: 1 }] },
+        { columnIndex: 2, scoreState: 'Pending', netPoints: 999, breakdown: [{ kind: 'Solve', successfulCount: 1, attemptCount: 1 }] },
       ],
     }
     const aggregateGroup = { competitionChallengeId: challengeA, challenge: null, columns: [] }
-    const settledGroup = { competitionChallengeId: challengeB, challenge: null, columns: [{ index: 0 }, { index: 1 }] }
+    const settledGroup = { competitionChallengeId: challengeB, challenge: null, columns: [{ index: 0 }, { index: 2 }] }
+    const provisionalGroup = { competitionChallengeId: challengeB, challenge: null, columns: [{ index: 1 }] }
 
     expect(scoreboardTeamChallengeScore(team, aggregateGroup, 'Awdp')).toBe(400)
     expect(scoreboardTeamChallengeScore(team, settledGroup, 'Ctf')).toBe(300)
+    expect(scoreboardTeamChallengeScore(team, provisionalGroup, 'Ctf')).toBe(525)
+    expect(scoreboardTeamChallengeScore(team, provisionalGroup, 'Koh')).toBe(525)
+    expect(scoreboardTeamChallengeScore(team, provisionalGroup, 'Awd')).toBe(0)
     expect(scoreboardTeamChallengeSignals(team, settledGroup, 'Ctf').flagSucceeded).toBeTrue()
     const directions = scoreboardDirectionGroups([
       { ...aggregateGroup, challenge: { direction: 'PWN' } },
@@ -341,6 +346,7 @@ describe('normalized scoreboard matrix', () => {
     expect(scoreboardTeamDetailDialog).toContain('splitNumber: 3')
     expect(scoreboardTeamDetailDialog).toContain("name: translate('攻击分')")
     expect(scoreboardTeamDetailDialog).toContain("name: translate('防御分')")
+    expect(scoreboardTeamDetailDialog).toContain("usesCurrentScore.value ? '当前得分' : '已结算得分'")
     expect(scoreboardTeamDetailDialog).toContain("areaStyle: { color: '#ef4444', opacity: 0.2 }")
     expect(scoreboardTeamDetailDialog).toContain("areaStyle: { color: '#0ea5e9', opacity: 0.2 }")
   })
