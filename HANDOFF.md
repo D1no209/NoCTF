@@ -3558,3 +3558,13 @@ dotnet run --project backend/src/NoCTF.API/NoCTF.API.csproj --no-build -- --expo
   `0.1.0-alpha.134`。Release solution build 0 warning/0 error、非 Integration TUnit 956/956、前端
   312/312、ClientApp typecheck 与 Nuxt generate 通过；OpenAPI/SDK 连续生成幂等，EF model 无漂移。
   无数据库 migration。本阶段未 push、未部署。
+
+## 2026-09-04 Alpha.135 方向语义图标
+
+- 共享方向映射补齐语义图标：OSINT/Open Source Intelligence/Recon 使用放大镜，AI/ML/Machine
+  Learning/LLM 使用机器人，Blockchain/Web3/ETH 使用链条；Forensics/DFIR 使用扫描检索，Hardware/
+  Embedded 使用电路板，Cloud 使用云。Mobile、IoT、Web、Pwn、Reverse、Crypto、Misc 保持已有语义。
+- 所有题目方向仍是开放文本，未知方向继续明确回退到旗帜；题目导航、题目详情、排行榜、AWDP 大屏和
+  管理端徽章统一复用该映射，不新增页面级硬编码。新增方向图标回归测试 2/2，ClientApp typecheck
+ 通过；完整前端测试 314/314、Nuxt generate、Release solution build（0 warning/0 error）均通过。
+ 平台版本递增为 `0.1.0-alpha.135`，无 HTTP、数据库或 migration 变化。本阶段未 push、未部署。
