@@ -67,17 +67,7 @@ public sealed class WorkerMessageTopologyStartupValidator(
             var root = graph.ChainFor(messageType)
                 ?? throw new InvalidOperationException(
                     $"Account notification handler graph for '{messageType.Name}' is not registered.");
-            var handlerTypes = root.ByEndpoint
-                .Where(chain => chain.Endpoints.Any(candidate =>
-                    string.Equals(
-                        candidate.EndpointName,
-                        WorkerQueueNames.Background,
-                        StringComparison.Ordinal)
-                    || string.Equals(
-                        candidate.Uri?.ToString().TrimEnd('/'),
-                        endpointAddress,
-                        StringComparison.OrdinalIgnoreCase)))
-                .SelectMany(chain => chain.HandlerCalls())
+            var handlerTypes = root.HandlerCalls()
                 .Select(call => call.HandlerType)
                 .ToArray();
             ValidateAccountNotificationHandlerTypes(handlerTypes);

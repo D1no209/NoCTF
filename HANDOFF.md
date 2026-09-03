@@ -3527,3 +3527,18 @@ dotnet run --project backend/src/NoCTF.API/NoCTF.API.csproj --no-build -- --expo
   Docker daemon 不可用，两项真实依赖测试已明确跳过，未误报为通过。
 - 平台版本递增为 `0.1.0-alpha.132`。Release solution build 0 warning/0 error，非 Integration TUnit
   955/955 通过。没有 HTTP/OpenAPI、业务表、EF migration 或 snapshot 变化。本阶段未 push、未部署。
+
+## 2026-09-03 Alpha.133 修复 Worker 拓扑校验误报与部署诊断
+
+- `caf1dfda` 对应 CI run `33767995671` 已确认：应用镜像构建/推送、远端拉取、数据库备份、Migration、
+  API 与 Runner 健康检查均成功，只有 Worker unhealthy，部署脚本随后正确回滚到旧镜像。
+- 根因是 alpha.132 新增的账户邮件启动校验沿用了 CompetitionEvent Sticky fan-out 的
+  `HandlerChain.ByEndpoint` 检查方式。账户邮件属于普通 background competing-consumer，Handler 位于
+  主 Chain；现改为 `root.HandlerCalls()` 验证恰好一个 `AccountNotificationMessageHandler`，NATS 路由和
+  durable JetStream listener 仍独立严格校验，不降低 readiness 要求。
+- 部署脚本在平台服务等待失败或 API readiness 失败时，先输出 backend/worker/runner 状态及各自最后
+  200 行带时间戳日志，再执行镜像回滚。后续健康检查失败可直接从 CI 看到真实进程错误，不再只留下
+  `container ... is unhealthy`。
+- 平台版本递增为 `0.1.0-alpha.133`。Release solution build 0 warning/0 error、非 Integration TUnit
+  955/955、`bash -n deploy/ci/deploy.sh` 与 `git diff --check` 通过。没有 HTTP/OpenAPI、业务表、EF
+  migration 或 snapshot 变化。本阶段待 push 后由 CI 重新部署。
