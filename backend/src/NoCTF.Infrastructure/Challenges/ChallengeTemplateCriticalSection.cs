@@ -4,7 +4,7 @@ using NoCTF.Infrastructure.Persistence;
 
 namespace NoCTF.Infrastructure.Challenges;
 
-internal static class ChallengeTemplateCriticalSection
+public static class ChallengeTemplateCriticalSection
 {
     public static Task<Challenge?> AcquireAsync(
         NoCtfDbContext db,

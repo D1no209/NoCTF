@@ -195,7 +195,9 @@ public sealed class ChallengeFlagManagementStore(
             : db.ChallengeFlags;
         return source.Where(flag =>
             flag.ChallengeId == scope.ChallengeId &&
-            flag.CompetitionChallengeId == scope.CompetitionChallengeId);
+            flag.CompetitionChallengeId == scope.CompetitionChallengeId
+            && (scope.ChallengeId == null
+                || flag.SpecificationKind != SpecificationKind.RuntimeInstance));
     }
 
     private Task<bool> ScopeExistsAsync(

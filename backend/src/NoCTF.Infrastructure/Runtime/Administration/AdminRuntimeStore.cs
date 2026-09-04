@@ -11,6 +11,8 @@ using NoCTF.Application.Competitions.Events;
 using NoCTF.Domain.Competitions.Events;
 using NoCTF.Domain.Shared;
 using NoCTF.Infrastructure.GameplayFacts.Awdp;
+using NoCTF.Infrastructure.Challenges;
+using NoCTF.Domain.Challenges;
 
 namespace NoCTF.Infrastructure.Runtime.Administration;
 
@@ -79,7 +81,7 @@ public sealed class AdminRuntimeStore(
             .ThenByDescending(item => item.Id)
             .Take(limit)
             .Select(item => new RuntimeInstanceView(
-                item.Id, item.CompetitionId, item.CompetitionChallengeId, item.TeamId,
+                item.Id, item.CompetitionId, item.CompetitionChallengeId, item.ChallengeId, item.TeamId,
                 item.Purpose, item.RuntimeKind, item.RuntimeProvider,
                 item.State, item.FailureCode, item.Urls,
                 item.CreatedAt, item.RunningAt, item.ExpiresAt, item.StoppedAt,
@@ -132,7 +134,7 @@ public sealed class AdminRuntimeStore(
             .ThenByDescending(item => item.Id)
             .Take(limit)
             .Select(item => new RuntimeInstanceView(
-                item.Id, item.CompetitionId, item.CompetitionChallengeId, item.TeamId,
+                item.Id, item.CompetitionId, item.CompetitionChallengeId, item.ChallengeId, item.TeamId,
                 item.Purpose, item.RuntimeKind, item.RuntimeProvider,
                 item.State, item.FailureCode, item.Urls,
                 item.CreatedAt, item.RunningAt, item.ExpiresAt, item.StoppedAt,
@@ -162,6 +164,7 @@ public sealed class AdminRuntimeStore(
         var attributed = await AddTeamAttributionAsync(runtimes, ct);
         var competitionIds = attributed
             .Select(runtime => runtime.CompetitionId)
+            .OfType<Guid>()
             .Distinct()
             .ToArray();
         var competitionTitles = await db.Competitions
@@ -174,9 +177,10 @@ public sealed class AdminRuntimeStore(
                 ct);
         var competitionChallengeIds = attributed
             .Select(runtime => runtime.CompetitionChallengeId)
+            .OfType<Guid>()
             .Distinct()
             .ToArray();
-        var challengeTitles = await db.CompetitionChallenges
+        var competitionChallengeTitles = await db.CompetitionChallenges
             .IgnoreQueryFilters()
             .AsNoTracking()
             .Where(challenge => competitionChallengeIds.Contains(challenge.Id))
@@ -190,13 +194,35 @@ public sealed class AdminRuntimeStore(
                     Title = challenge.CustomTitle ?? template.Title
                 })
             .ToDictionaryAsync(item => item.Id, item => item.Title, ct);
+        var templateChallengeIds = attributed
+            .Select(runtime => runtime.ChallengeId)
+            .OfType<Guid>()
+            .Distinct()
+            .ToArray();
+        var templateChallengeTitles = await db.Challenges
+            .IgnoreQueryFilters()
+            .AsNoTracking()
+            .Where(challenge => templateChallengeIds.Contains(challenge.Id))
+            .ToDictionaryAsync(challenge => challenge.Id, challenge => challenge.Title, ct);
 
-        return attributed.Select(runtime => new PlatformRuntimeInstanceView(
-            runtime,
-            competitionTitles.GetValueOrDefault(runtime.CompetitionId)
-                ?? runtime.CompetitionId.ToString("D"),
-            challengeTitles.GetValueOrDefault(runtime.CompetitionChallengeId)
-                ?? runtime.CompetitionChallengeId.ToString("D")))
+        return attributed.Select(runtime => runtime.ChallengeId is Guid templateChallengeId
+            ? new PlatformRuntimeInstanceView(
+                runtime,
+                PlatformRuntimeScope.ChallengeTest,
+                null,
+                templateChallengeTitles.GetValueOrDefault(templateChallengeId)
+                    ?? templateChallengeId.ToString("D"))
+            : new PlatformRuntimeInstanceView(
+                runtime,
+                PlatformRuntimeScope.Competition,
+                runtime.CompetitionId is Guid competitionId
+                    ? competitionTitles.GetValueOrDefault(competitionId)
+                        ?? competitionId.ToString("D")
+                    : null,
+                runtime.CompetitionChallengeId is Guid competitionChallengeId
+                    ? competitionChallengeTitles.GetValueOrDefault(competitionChallengeId)
+                        ?? competitionChallengeId.ToString("D")
+                    : runtime.Id.ToString("D")))
             .ToArray();
     }
 
@@ -208,7 +234,7 @@ public sealed class AdminRuntimeStore(
         var item = await db.RuntimeInstances.AsNoTracking()
             .Where(item => item.Id == runtimeInstanceId && item.CompetitionId == competitionId)
             .Select(item => new RuntimeInstanceView(
-                item.Id, item.CompetitionId, item.CompetitionChallengeId, item.TeamId,
+                item.Id, item.CompetitionId, item.CompetitionChallengeId, item.ChallengeId, item.TeamId,
                 item.Purpose, item.RuntimeKind, item.RuntimeProvider,
                 item.State, item.FailureCode, item.Urls,
                 item.CreatedAt, item.RunningAt, item.ExpiresAt, item.StoppedAt,
@@ -273,7 +299,7 @@ public sealed class AdminRuntimeStore(
             ? await runtimeQuota.AcquireLockAsync(db, competitionId, teamId, ct)
             : await sharedRuntimeCriticalSection.AcquireAsync(
                 db,
-                scope.CompetitionChallengeId,
+                scope.CompetitionChallengeId!.Value,
                 ct);
         var instance = await db.RuntimeInstances.SingleOrDefaultAsync(candidate =>
             candidate.Id == runtimeInstanceId
@@ -306,7 +332,7 @@ public sealed class AdminRuntimeStore(
             reason,
             now));
         await events.RecordAsync(new(
-            instance.CompetitionId,
+            instance.CompetitionId!.Value,
             CompetitionEventKind.RuntimeForceTerminationRequested,
             CompetitionEventLevel.Warning,
             CompetitionEventVisibility.Staff,
@@ -349,7 +375,7 @@ public sealed class AdminRuntimeStore(
             ? await runtimeQuota.AcquireLockAsync(db, competitionId, teamId, ct)
             : await sharedRuntimeCriticalSection.AcquireAsync(
                 db,
-                scope.CompetitionChallengeId,
+                scope.CompetitionChallengeId!.Value,
                 ct);
         var instance = await db.RuntimeInstances.SingleOrDefaultAsync(candidate =>
             candidate.Id == runtimeInstanceId &&
@@ -400,7 +426,7 @@ public sealed class AdminRuntimeStore(
             ct);
 
         await events.RecordAsync(new(
-                instance.CompetitionId,
+                instance.CompetitionId!.Value,
                 CompetitionEventKind.RuntimeStateChanged,
                 CompetitionEventLevel.Warning,
                 instance.TeamId is null
@@ -416,6 +442,169 @@ public sealed class AdminRuntimeStore(
         await transaction.CommitAsync(ct);
         await outbox.FlushOutgoingMessagesAsync();
         return new(Map(instance));
+    }
+
+    public async Task<RuntimeMutationResult> TerminatePlatformAsync(
+        Guid runtimeInstanceId,
+        Guid actorUserId,
+        DateTimeOffset now,
+        CancellationToken ct)
+    {
+        var scope = await db.RuntimeInstances.AsNoTracking()
+            .Where(instance => instance.Id == runtimeInstanceId)
+            .Select(instance => new { instance.CompetitionId, instance.ChallengeId })
+            .SingleOrDefaultAsync(ct);
+        if (scope?.CompetitionId is Guid competitionId)
+            return await TerminateAsync(competitionId, runtimeInstanceId, actorUserId, now, ct);
+        return scope?.ChallengeId is Guid challengeId
+            ? await TerminateTemplateTestAsync(runtimeInstanceId, challengeId, now, ct)
+            : new(null, RuntimeMutationFailure.NotFound);
+    }
+
+    public async Task<RuntimeMutationResult> ForceTerminatePlatformAsync(
+        Guid runtimeInstanceId,
+        Guid actorUserId,
+        string reason,
+        DateTimeOffset now,
+        CancellationToken ct)
+    {
+        var scope = await db.RuntimeInstances.AsNoTracking()
+            .Where(instance => instance.Id == runtimeInstanceId)
+            .Select(instance => new { instance.CompetitionId, instance.ChallengeId })
+            .SingleOrDefaultAsync(ct);
+        if (scope?.CompetitionId is Guid competitionId)
+        {
+            return await ForceTerminateAsync(
+                competitionId,
+                runtimeInstanceId,
+                actorUserId,
+                reason,
+                now,
+                ct);
+        }
+        return scope?.ChallengeId is Guid challengeId
+            ? await ForceTerminateTemplateTestAsync(
+                runtimeInstanceId,
+                challengeId,
+                actorUserId,
+                reason,
+                now,
+                ct)
+            : new(null, RuntimeMutationFailure.NotFound);
+    }
+
+    private async Task<RuntimeMutationResult> TerminateTemplateTestAsync(
+        Guid runtimeInstanceId,
+        Guid challengeId,
+        DateTimeOffset now,
+        CancellationToken ct)
+    {
+        await using var transaction = await db.Database.BeginTransactionAsync(ct);
+        if (await ChallengeTemplateCriticalSection.AcquireAsync(db, challengeId, ct) is null)
+            return new(null, RuntimeMutationFailure.NotFound);
+        var instance = await db.RuntimeInstances.SingleOrDefaultAsync(candidate =>
+            candidate.Id == runtimeInstanceId
+            && candidate.ChallengeId == challengeId
+            && candidate.Purpose == RuntimePurpose.TemplateTest,
+            ct);
+        if (instance is null)
+            return new(null, RuntimeMutationFailure.NotFound);
+        if (instance.State == RuntimeState.Stopping)
+        {
+            await outbox.PublishAsync(new StopRuntime(instance.Id));
+        }
+        else if (instance.State == RuntimeState.Queued
+            && instance.RunnerId is null
+            && string.IsNullOrWhiteSpace(instance.ProviderReceiptJson))
+        {
+            instance.State = RuntimeState.Stopped;
+            instance.StoppedAt = now;
+        }
+        else if (instance.State is RuntimeState.Provisioning or RuntimeState.Running
+            || instance is { State: RuntimeState.Failed, ProviderReceiptJson: not null })
+        {
+            instance.State = RuntimeState.Stopping;
+            instance.FailureCode = null;
+            await outbox.PublishAsync(new StopRuntime(instance.Id));
+        }
+        else
+        {
+            return new(null, RuntimeMutationFailure.InvalidState);
+        }
+
+        await EndPendingTemplateTestFlagAsync(
+            instance,
+            RuntimeTestFlagState.Canceled,
+            now,
+            ct);
+        await db.SaveChangesAsync(ct);
+        await transaction.CommitAsync(ct);
+        await outbox.FlushOutgoingMessagesAsync();
+        return new(Map(instance));
+    }
+
+    private async Task<RuntimeMutationResult> ForceTerminateTemplateTestAsync(
+        Guid runtimeInstanceId,
+        Guid challengeId,
+        Guid actorUserId,
+        string reason,
+        DateTimeOffset now,
+        CancellationToken ct)
+    {
+        await using var transaction = await db.Database.BeginTransactionAsync(ct);
+        if (await ChallengeTemplateCriticalSection.AcquireAsync(db, challengeId, ct) is null)
+            return new(null, RuntimeMutationFailure.NotFound);
+        var instance = await db.RuntimeInstances.SingleOrDefaultAsync(candidate =>
+            candidate.Id == runtimeInstanceId
+            && candidate.ChallengeId == challengeId
+            && candidate.Purpose == RuntimePurpose.TemplateTest,
+            ct);
+        if (instance is null)
+            return new(null, RuntimeMutationFailure.NotFound);
+        var current = Map(instance);
+        if (!RuntimeForceTerminationPolicy.CanForceTerminate(current, now))
+            return new(null, RuntimeMutationFailure.NotStuck);
+        var runnerId = instance.RunnerId
+            ?? throw new InvalidOperationException(
+                "Force termination requires an owning Runner assignment.");
+
+        instance.State = RuntimeState.Stopping;
+        instance.FailureCode = null;
+        await EndPendingTemplateTestFlagAsync(
+            instance,
+            RuntimeTestFlagState.Failed,
+            now,
+            ct);
+        await outbox.PublishToRunnerNodeAsync(new ForceTerminateRuntime(
+            instance.Id,
+            instance.RuntimeProvider,
+            runnerId,
+            actorUserId,
+            reason,
+            now));
+        await db.SaveChangesAsync(ct);
+        await transaction.CommitAsync(ct);
+        await outbox.FlushOutgoingMessagesAsync();
+        return new(Map(instance, now));
+    }
+
+    private async Task EndPendingTemplateTestFlagAsync(
+        RuntimeInstance instance,
+        RuntimeTestFlagState state,
+        DateTimeOffset at,
+        CancellationToken ct)
+    {
+        if (instance.TestFlagDelivery == RuntimeTestFlagDelivery.NotRequired)
+            return;
+        if (instance.TestFlagState == RuntimeTestFlagState.Pending)
+            instance.TestFlagState = state;
+        var flag = await db.ChallengeFlags.SingleOrDefaultAsync(candidate =>
+            candidate.ChallengeId == instance.ChallengeId
+            && candidate.SpecificationKind == SpecificationKind.RuntimeInstance
+            && candidate.SpecificationId == instance.Id,
+            ct);
+        if (flag is not null)
+            flag.ValidUntil ??= at;
     }
 
     public async Task<RuntimeMutationResult> MutateAsync(
@@ -539,7 +728,7 @@ public sealed class AdminRuntimeStore(
                 cleanupTarget.FailureCode = null;
                 await outbox.PublishAsync(new StopRuntime(cleanupTarget.Id));
                 await events.RecordAsync(new(
-                    cleanupTarget.CompetitionId,
+                    cleanupTarget.CompetitionId!.Value,
                     CompetitionEventKind.RuntimeStateChanged,
                     CompetitionEventLevel.Warning,
                     cleanupTarget.TeamId is null
@@ -654,7 +843,7 @@ public sealed class AdminRuntimeStore(
                 _ => throw new InvalidOperationException("Unsupported runtime event action.")
             };
             await events.RecordAsync(new(
-                entity.CompetitionId,
+                entity.CompetitionId!.Value,
                 eventKind,
                 entity.State == RuntimeState.Failed
                     ? CompetitionEventLevel.Error
@@ -688,7 +877,7 @@ public sealed class AdminRuntimeStore(
         RuntimeInstance item,
         DateTimeOffset? stateChangedAt = null) =>
         new(
-            item.Id, item.CompetitionId, item.CompetitionChallengeId, item.TeamId,
+            item.Id, item.CompetitionId, item.CompetitionChallengeId, item.ChallengeId, item.TeamId,
             item.Purpose, item.RuntimeKind, item.RuntimeProvider,
             item.State, item.FailureCode, item.Urls,
             item.CreatedAt, item.RunningAt, item.ExpiresAt, item.StoppedAt,

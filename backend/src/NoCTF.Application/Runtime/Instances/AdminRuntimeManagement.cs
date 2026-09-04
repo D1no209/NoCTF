@@ -13,9 +13,16 @@ public sealed record AdminRuntimeFilter(
     DateTimeOffset? ExpiresBefore,
     int? HostPort);
 
+public enum PlatformRuntimeScope
+{
+    Competition,
+    ChallengeTest
+}
+
 public sealed record PlatformRuntimeInstanceView(
     RuntimeInstanceView Runtime,
-    string CompetitionTitle,
+    PlatformRuntimeScope Scope,
+    string? CompetitionTitle,
     string ChallengeTitle);
 
 public interface IAdminRuntimeStore
@@ -51,6 +58,17 @@ public interface IAdminRuntimeStore
         CancellationToken cancellationToken);
     Task<RuntimeMutationResult> ForceTerminateAsync(
         Guid competitionId,
+        Guid runtimeInstanceId,
+        Guid actorUserId,
+        string reason,
+        DateTimeOffset now,
+        CancellationToken cancellationToken);
+    Task<RuntimeMutationResult> TerminatePlatformAsync(
+        Guid runtimeInstanceId,
+        Guid actorUserId,
+        DateTimeOffset now,
+        CancellationToken cancellationToken);
+    Task<RuntimeMutationResult> ForceTerminatePlatformAsync(
         Guid runtimeInstanceId,
         Guid actorUserId,
         string reason,
@@ -117,6 +135,33 @@ public sealed class ManageAdminRuntimes(IAdminRuntimeStore store)
         return normalizedReason.Length is >= 8 and <= 512
             ? store.ForceTerminateAsync(
                 competitionId,
+                runtimeInstanceId,
+                actorUserId,
+                normalizedReason,
+                now,
+                ct)
+            : Task.FromResult(new RuntimeMutationResult(
+                null,
+                RuntimeMutationFailure.InvalidReason));
+    }
+
+    public Task<RuntimeMutationResult> TerminatePlatformAsync(
+        Guid runtimeInstanceId,
+        Guid actorUserId,
+        DateTimeOffset now,
+        CancellationToken ct = default) =>
+        store.TerminatePlatformAsync(runtimeInstanceId, actorUserId, now, ct);
+
+    public Task<RuntimeMutationResult> ForceTerminatePlatformAsync(
+        Guid runtimeInstanceId,
+        Guid actorUserId,
+        string reason,
+        DateTimeOffset now,
+        CancellationToken ct = default)
+    {
+        var normalizedReason = reason.Trim();
+        return normalizedReason.Length is >= 8 and <= 512
+            ? store.ForceTerminatePlatformAsync(
                 runtimeInstanceId,
                 actorUserId,
                 normalizedReason,

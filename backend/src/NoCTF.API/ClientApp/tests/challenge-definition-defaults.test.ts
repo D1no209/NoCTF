@@ -187,6 +187,29 @@ describe('challenge definition defaults', () => {
     expect(editor).toContain('{entrypoint} 作为恰好一个独立参数')
   })
 
+  test('rejects AWD Flag injection timeouts beyond the dedicated handler budget', async () => {
+    const model = emptyDefinition('Awd')
+    model.runtime = emptyRuntimeTemplate('Awd')
+    model.flagInjection = {
+      command: 'printf %s ${FLAG}',
+      timeoutSeconds: 301,
+      serviceName: '',
+    }
+
+    const issues = validateChallengeTemplateDraft({
+      mode: 'Awd',
+      title: 'AWD timeout',
+      direction: 'Pwn',
+      definitionJson: serializeDefinition('Awd', model),
+    })
+
+    expect(issues).toContain('AWD Flag 注入超时必须在 1 到 300 秒之间')
+    const editor = await Bun.file(
+      new URL('../app/components/admin/DefinitionFlagInjectionSection.vue', import.meta.url),
+    ).text()
+    expect(editor).toContain(':max="300"')
+  })
+
   test.each([
     ['Ctf', 8080],
     ['Awd', 8081],

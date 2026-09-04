@@ -127,6 +127,7 @@ public static class ServiceRegistration
         services.AddSingleton<IRunnerScoringTokenIssuer, RunnerScoringTokenIssuer>();
         services.AddSingleton<IAwdFlagInjectionExecutor, AwdFlagInjectionExecutor>();
         services.AddSingleton<IAwdFlagInjectionWorkReader, AwdFlagInjectionWorkReader>();
+        services.AddSingleton<IChallengeTestFlagInjectionStore, ChallengeTestFlagInjectionStore>();
         services.AddSingleton<IAwdCheckerWorkReader, AwdCheckerWorkReader>();
         services.AddSingleton<RuntimeProviderHandler>();
         services.AddSingleton<ContainerRuntimeMessageHandler>();

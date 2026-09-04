@@ -1092,11 +1092,15 @@ namespace NoCTF.Infrastructure.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("id");
 
-                    b.Property<Guid>("CompetitionChallengeId")
+                    b.Property<Guid?>("ChallengeId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("challenge_id");
+
+                    b.Property<Guid?>("CompetitionChallengeId")
                         .HasColumnType("uuid")
                         .HasColumnName("competition_challenge_id");
 
-                    b.Property<Guid>("CompetitionId")
+                    b.Property<Guid?>("CompetitionId")
                         .HasColumnType("uuid")
                         .HasColumnName("competition_id");
 
@@ -1153,6 +1157,14 @@ namespace NoCTF.Infrastructure.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("team_id");
 
+                    b.Property<short?>("TestFlagDelivery")
+                        .HasColumnType("smallint")
+                        .HasColumnName("test_flag_delivery");
+
+                    b.Property<short?>("TestFlagState")
+                        .HasColumnType("smallint")
+                        .HasColumnName("test_flag_state");
+
                     b.PrimitiveCollection<string[]>("Urls")
                         .IsRequired()
                         .HasColumnType("text[]")
@@ -1161,8 +1173,10 @@ namespace NoCTF.Infrastructure.Migrations
                     b.HasKey("Id")
                         .HasName("pk_runtime_instances");
 
-                    b.HasAlternateKey("Id", "CompetitionId")
-                        .HasName("ak_runtime_instances_id_competition_id");
+                    b.HasIndex("ChallengeId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_runtime_instances_challenge_id")
+                        .HasFilter("purpose = 4 AND state IN (0, 1, 2)");
 
                     b.HasIndex("CompetitionId")
                         .HasDatabaseName("ix_runtime_instances_competition_id");
@@ -1191,6 +1205,10 @@ namespace NoCTF.Infrastructure.Migrations
                             t.HasCheckConstraint("ck_runtime_instances_awdp_gameplay_fact", "gameplay_fact_id IS NULL OR purpose = 1");
 
                             t.HasCheckConstraint("ck_runtime_instances_failure", "(state = 5) = (failure_code IS NOT NULL)");
+
+                            t.HasCheckConstraint("ck_runtime_instances_scope", "(purpose = 4 AND challenge_id IS NOT NULL AND competition_id IS NULL AND competition_challenge_id IS NULL AND team_id IS NULL AND gameplay_fact_id IS NULL) OR (purpose <> 4 AND challenge_id IS NULL AND competition_id IS NOT NULL AND competition_challenge_id IS NOT NULL)");
+
+                            t.HasCheckConstraint("ck_runtime_instances_test_flag", "(purpose = 4) = (test_flag_delivery IS NOT NULL AND test_flag_state IS NOT NULL)");
                         });
                 });
 
@@ -1628,18 +1646,22 @@ namespace NoCTF.Infrastructure.Migrations
 
             modelBuilder.Entity("NoCTF.Domain.Runtime.RuntimeInstance", b =>
                 {
+                    b.HasOne("NoCTF.Domain.Challenges.Challenge", null)
+                        .WithMany()
+                        .HasForeignKey("ChallengeId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_runtime_instances_challenges_challenge_id");
+
                     b.HasOne("NoCTF.Domain.Challenges.CompetitionChallenge", null)
                         .WithMany()
                         .HasForeignKey("CompetitionChallengeId")
                         .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired()
                         .HasConstraintName("fk_runtime_instances_competition_challenges_competition_challe");
 
                     b.HasOne("NoCTF.Domain.Competitions.Competition", null)
                         .WithMany()
                         .HasForeignKey("CompetitionId")
                         .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired()
                         .HasConstraintName("fk_runtime_instances_competitions_competition_id");
 
                     b.HasOne("NoCTF.Domain.Gameplay.GameplayFact", null)

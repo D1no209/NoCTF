@@ -3626,3 +3626,26 @@ dotnet run --project backend/src/NoCTF.API/NoCTF.API.csproj --no-build -- --expo
 - 回归测试覆盖趋势层级、详情数据绑定、颜色来源和 hover 不隐藏契约。前端 319/319、ClientApp
   typecheck 与 Nuxt generate 通过。平台版本递增为 `0.1.0-alpha.139`，无 HTTP/OpenAPI、业务表、
   EF migration 或 snapshot 变化。
+
+## 2026-09-04 Alpha.140 题库模板测试容器与镜像预热
+
+- 题库模板“运行环境”页新增真实测试容器工作区。模板负责人、协作者和平台管理员可读取、启动、停止、
+  重置、临近到期续期并查看访问地址；未保存的题目定义会阻止启动/重置，所有异步状态、失败码和轮询
+  超时均有明确反馈。测试实例停止时只清理容器与隔离网络，不主动删除 Runner 节点镜像缓存。
+- `RuntimePurpose.TemplateTest` 使用 `ChallengeId` 作为题库模板作用域，与正式比赛 Runtime 的
+  `CompetitionId + CompetitionChallengeId` 严格互斥。CTF/AWDP 测试 Flag 通过正式容器环境变量注入；
+  AWD 在 Runtime Running 后执行题目定义的 Flag 注入命令，失败按同一 Runner 节点最多重试三次并持久化
+  Succeeded/Failed/Canceled 状态。测试 Flag 仅从授权测试 Runtime 接口返回并设置 no-store，不混入普通
+  模板 Flag 列表。
+- 平台运行容器清单新增 Competition/ChallengeTest 作用域，测试实例可跳回题目模板；平台管理员使用新的
+  通用精确停止/强制终结接口管理两种作用域。比赛 Runtime 继续写 CompetitionEvent，模板测试实例不伪造
+  比赛审计。运行操作指标新增 runtime_test_start/stop/reset/extend 分类。
+- 上线前审计补齐两个边界：测试 Runtime 的调度与题目模板启动/停止/重置共用 PostgreSQL 行锁，避免排队
+  停止与 Worker 调度竞争后重新启动；AWD 正式及测试 Flag 注入限制为 1–300 秒，并使用仅作用于两类注入
+  消息的 330 秒 Wolverine 执行预算，避免外层超时使测试 Flag 永久停留 Pending。前后端校验与错误文案一致。
+- EF 工具生成 `20260904120421_ChallengeTemplateTestRuntimes`，只扩展现有 `runtime_instances` 的可空作用域、
+  测试 Flag 状态与活动实例唯一约束，不新增业务表；现有比赛 Runtime 数据满足新约束。OpenAPI 路由增至
+  210 个，其中管理端 132 个，TypeScript SDK 与 API 文档同步。
+- Release solution build 0 warning/0 error；TUnit 1165 total：988 passed、0 failed、177 项真实依赖测试因
+  本机 Docker 不可用明确跳过；前端 324/324、ClientApp typecheck 与 Nuxt generate 通过；EF model 无
+  pending changes。平台版本递增为 `0.1.0-alpha.140`。本阶段未 push、未部署。

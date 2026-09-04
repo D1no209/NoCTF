@@ -427,14 +427,17 @@ internal static partial class BackendMessageOperations
                 $"Unsupported runtime provision type '{provision.GetType().Name}'.")
         };
 
-    private static ValueTask<Guid> RecordRuntimeStateAsync(
+    private static async ValueTask<Guid?> RecordRuntimeStateAsync(
         ICompetitionEventRecorder events,
         RuntimeInstance instance,
         CompetitionEventLevel level,
         DateTimeOffset occurredAt,
-        CancellationToken cancellationToken) =>
-        events.RecordAsync(new(
-            instance.CompetitionId,
+        CancellationToken cancellationToken)
+    {
+        if (instance.CompetitionId is not Guid competitionId)
+            return null;
+        return await events.RecordAsync(new(
+            competitionId,
             CompetitionEventKind.RuntimeStateChanged,
             level,
             instance.TeamId is null
@@ -447,6 +450,7 @@ internal static partial class BackendMessageOperations
             GameplayFactId: instance.GameplayFactId,
             RuntimeState: instance.State),
             cancellationToken);
+    }
 
     private static ValueTask PublishRuntimeStopAsync(
         ITransactionalMessageOutbox outbox,

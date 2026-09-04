@@ -6626,6 +6626,87 @@
         ]
       }
     },
+    "/api/v1/admin/platform/runtimes/{runtimeInstanceId}/force-terminate": {
+      "post": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "Force-terminates any stuck platform Runtime.",
+        "description": "Cleans a competition or challenge-template test Runtime by its Runner-owned resource identity.",
+        "operationId": "AdminPlatformForceTerminateRuntime",
+        "parameters": [
+          {
+            "name": "runtimeInstanceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "x-name": "ForceTerminatePlatformRuntimeRequest",
+          "description": "",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationPlatformForceTerminatePlatformRuntimeRequest"
+              }
+            }
+          },
+          "required": true,
+          "x-position": 1
+        },
+        "responses": {
+          "202": {
+            "description": "Accepted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsRuntimeRuntimeAcceptedResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "409": {
+            "description": "",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FastEndpointsErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "Bearer": [
+              "Administrator"
+            ]
+          }
+        ]
+      }
+    },
     "/api/v1/admin/platform/email-verification/configuration": {
       "get": {
         "tags": [
@@ -7517,6 +7598,64 @@
           },
           "403": {
             "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "Bearer": [
+              "Administrator"
+            ]
+          }
+        ]
+      }
+    },
+    "/api/v1/admin/platform/runtimes/{runtimeInstanceId}/terminate": {
+      "post": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "Terminates any active platform Runtime.",
+        "description": "Supports competition runtimes and challenge-template test runtimes through one platform operation.",
+        "operationId": "AdminPlatformTerminateRuntime",
+        "parameters": [
+          {
+            "name": "runtimeInstanceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Accepted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsRuntimeRuntimeAcceptedResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "409": {
+            "description": "",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FastEndpointsErrorResponse"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -12237,6 +12376,147 @@
         ]
       }
     },
+    "/api/v1/admin/challenges/{challengeId}/test-runtime/extend": {
+      "post": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "Extends a nearly expired challenge-template test Runtime.",
+        "description": "Executes POST /api/v1/admin/challenges/{challengeId}/test-runtime/extend.",
+        "operationId": "AdminChallengeBankExtendTestRuntime",
+        "parameters": [
+          {
+            "name": "challengeId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "x-name": "ExtendChallengeTestRuntimeRequest",
+          "description": "",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationChallengeBankExtendChallengeTestRuntimeRequest"
+              }
+            }
+          },
+          "required": true,
+          "x-position": 1
+        },
+        "responses": {
+          "202": {
+            "description": "Accepted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationChallengeBankChallengeTestRuntimeAcceptedResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "409": {
+            "description": "",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FastEndpointsErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FastEndpointsErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "Bearer": [
+              "Organizer",
+              "Administrator"
+            ]
+          }
+        ]
+      }
+    },
+    "/api/v1/admin/challenges/{challengeId}/test-runtime": {
+      "get": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "Gets the latest challenge-template test Runtime.",
+        "description": "Returns protected test Flag and access displays only to template managers and platform administrators.",
+        "operationId": "AdminChallengeBankGetTestRuntime",
+        "parameters": [
+          {
+            "name": "challengeId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationChallengeBankChallengeTestRuntimeResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "Bearer": [
+              "Organizer",
+              "Administrator"
+            ]
+          }
+        ]
+      }
+    },
     "/api/v1/admin/challenges/{challengeId}/attachments": {
       "get": {
         "tags": [
@@ -12365,6 +12645,75 @@
         "security": [
           {
             "Bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/admin/challenges/{challengeId}/test-runtime/reset": {
+      "post": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "Replaces the current challenge-template test Runtime.",
+        "description": "Executes POST /api/v1/admin/challenges/{challengeId}/test-runtime/reset.",
+        "operationId": "AdminChallengeBankResetTestRuntime",
+        "parameters": [
+          {
+            "name": "challengeId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Accepted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationChallengeBankChallengeTestRuntimeAcceptedResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "409": {
+            "description": "",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FastEndpointsErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FastEndpointsErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "Bearer": [
+              "Organizer",
+              "Administrator"
+            ]
           }
         ]
       }
@@ -12518,6 +12867,144 @@
         "security": [
           {
             "Bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/admin/challenges/{challengeId}/test-runtime/start": {
+      "post": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "Queues a challenge-template test Runtime.",
+        "description": "Uses the saved runtime definition and normal Runner provisioning path, including dynamic Flag delivery.",
+        "operationId": "AdminChallengeBankStartTestRuntime",
+        "parameters": [
+          {
+            "name": "challengeId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Accepted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationChallengeBankChallengeTestRuntimeAcceptedResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "409": {
+            "description": "",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FastEndpointsErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FastEndpointsErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "Bearer": [
+              "Organizer",
+              "Administrator"
+            ]
+          }
+        ]
+      }
+    },
+    "/api/v1/admin/challenges/{challengeId}/test-runtime/stop": {
+      "post": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "Stops the current challenge-template test Runtime.",
+        "description": "Executes POST /api/v1/admin/challenges/{challengeId}/test-runtime/stop.",
+        "operationId": "AdminChallengeBankStopTestRuntime",
+        "parameters": [
+          {
+            "name": "challengeId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Accepted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationChallengeBankChallengeTestRuntimeAcceptedResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "409": {
+            "description": "",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FastEndpointsErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FastEndpointsErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "Bearer": [
+              "Organizer",
+              "Administrator"
+            ]
           }
         ]
       }
@@ -17607,11 +18094,18 @@
           },
           "competitionId": {
             "type": "string",
-            "format": "guid"
+            "format": "guid",
+            "nullable": true
           },
           "competitionChallengeId": {
             "type": "string",
-            "format": "guid"
+            "format": "guid",
+            "nullable": true
+          },
+          "challengeId": {
+            "type": "string",
+            "format": "guid",
+            "nullable": true
           },
           "teamId": {
             "type": "string",
@@ -17699,13 +18193,15 @@
           "Player",
           "AwdpTarget",
           "Practice",
-          "AwdpAttack"
+          "AwdpAttack",
+          "TemplateTest"
         ],
         "enum": [
           "Player",
           "AwdpTarget",
           "Practice",
-          "AwdpAttack"
+          "AwdpAttack",
+          "TemplateTest"
         ]
       },
       "NoCTFApplicationRuntimeInstancesRuntimePublishedPortView": {
@@ -18044,6 +18540,21 @@
           "Runner",
           "Host"
         ]
+      },
+      "NoCTFAPIEndpointsAdministrationPlatformForceTerminatePlatformRuntimeRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "reason"
+        ],
+        "properties": {
+          "reason": {
+            "type": "string",
+            "maxLength": 512,
+            "minLength": 8,
+            "nullable": false
+          }
+        }
       },
       "NoCTFAPIEndpointsAdministrationPlatformEmailVerificationConfigurationResponse": {
         "type": "object",
@@ -18687,13 +19198,29 @@
           "runtime": {
             "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationRuntimeAdminRuntimeResponse"
           },
+          "scope": {
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationPlatformPlatformRuntimeScopeProtocol"
+          },
           "competitionTitle": {
-            "type": "string"
+            "type": "string",
+            "nullable": true
           },
           "challengeTitle": {
             "type": "string"
           }
         }
+      },
+      "NoCTFAPIEndpointsAdministrationPlatformPlatformRuntimeScopeProtocol": {
+        "type": "string",
+        "description": "",
+        "x-enumNames": [
+          "Competition",
+          "ChallengeTest"
+        ],
+        "enum": [
+          "Competition",
+          "ChallengeTest"
+        ]
       },
       "NoCTFAPIEndpointsAdministrationPlatformListPlatformRuntimesRequest": {
         "type": "object",
@@ -20916,6 +21443,31 @@
           }
         }
       },
+      "NoCTFAPIEndpointsAdministrationChallengeBankChallengeTestRuntimeAcceptedResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "runtimeInstanceId": {
+            "type": "string",
+            "format": "guid"
+          },
+          "statusUrl": {
+            "type": "string"
+          }
+        }
+      },
+      "NoCTFAPIEndpointsAdministrationChallengeBankExtendChallengeTestRuntimeRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "seconds": {
+            "type": "integer",
+            "format": "int32",
+            "maximum": 86400.0,
+            "minimum": 60.0
+          }
+        }
+      },
       "NoCTFAPIEndpointsAdministrationChallengeBankGetChallengeFlagRequest": {
         "type": "object",
         "additionalProperties": false
@@ -20923,6 +21475,87 @@
       "NoCTFAPIEndpointsAdministrationChallengeBankGetChallengeTemplateRequest": {
         "type": "object",
         "additionalProperties": false
+      },
+      "NoCTFAPIEndpointsAdministrationChallengeBankChallengeTestRuntimeResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "guid"
+          },
+          "challengeId": {
+            "type": "string",
+            "format": "guid"
+          },
+          "runtimeKind": {
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsRuntimeRuntimeKindProtocol"
+          },
+          "provider": {
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsRuntimeRuntimeProviderProtocol"
+          },
+          "state": {
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsRuntimeRuntimeStateProtocol"
+          },
+          "failureCode": {
+            "nullable": true,
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsRuntimeRuntimeFailureCodeProtocol"
+              }
+            ]
+          },
+          "flagState": {
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationChallengeBankRuntimeTestFlagStateProtocol"
+          },
+          "testFlag": {
+            "type": "string",
+            "nullable": true
+          },
+          "urls": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "runningAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "stoppedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          }
+        }
+      },
+      "NoCTFAPIEndpointsAdministrationChallengeBankRuntimeTestFlagStateProtocol": {
+        "type": "string",
+        "description": "",
+        "x-enumNames": [
+          "NotRequired",
+          "Pending",
+          "Succeeded",
+          "Failed",
+          "Canceled"
+        ],
+        "enum": [
+          "NotRequired",
+          "Pending",
+          "Succeeded",
+          "Failed",
+          "Canceled"
+        ]
       },
       "NoCTFAPIEndpointsAdministrationChallengeBankListChallengeAttachmentsRequest": {
         "type": "object",

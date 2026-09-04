@@ -277,7 +277,7 @@ public sealed class DeleteChallengeTemplate(IChallengeBankStore store)
             null => OperationResult<ChallengeTemplateDeleteFailureCode>.Success(),
             ChallengeTemplateDeleteFailure.InUse => OperationResult<ChallengeTemplateDeleteFailureCode>.Failure(
                 ChallengeTemplateDeleteFailureCode.ChallengeInUse,
-                "Challenge is still referenced by an active competition challenge."),
+                "Challenge is still referenced by an active competition challenge or test Runtime."),
             _ => OperationResult<ChallengeTemplateDeleteFailureCode>.Failure(
                 ChallengeTemplateDeleteFailureCode.ChallengeNotFound,
                 "Challenge was not found or access was denied.")

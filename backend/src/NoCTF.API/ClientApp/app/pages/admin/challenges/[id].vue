@@ -91,6 +91,14 @@ const usesRuntimeFlagInjection = computed(() =>
 
 // 依赖运行环境的模式定义块在未启用运行环境时不生效。
 const runtimeDisabled = computed(() => definitionModel.value !== null && definitionModel.value.runtime === null)
+const runtimeDefinitionDirty = computed(() => {
+  if (!template.value) return true
+  const current = definitionModel.value
+    ? normalizeDefinitionJson(form.mode, serializeDefinition(form.mode, definitionModel.value))
+    : null
+  const persisted = normalizeDefinitionJson(template.value.mode ?? form.mode, template.value.definitionJson ?? '{}')
+  return current === null || persisted === null || current !== persisted
+})
 
 function changeMode(value: unknown): void {
   if (value !== 'Ctf' && value !== 'Awd' && value !== 'Awdp' && value !== 'Koh') return
@@ -750,6 +758,11 @@ onMounted(() => {
                   </div>
                   <DefinitionRuntimeSection :model="definitionModel" :mode="form.mode" :disabled="isDeleted" />
                   <FieldDescription>{{ $t('Runtime 定义修改对未来启动的实例生效。') }}</FieldDescription>
+                  <ChallengeTestRuntimePanel
+                    v-if="definitionModel.runtime && !isDeleted"
+                    :challenge-id="challengeId"
+                    :definition-dirty="runtimeDefinitionDirty"
+                  />
                 </FieldGroup>
               </CardContent>
             </Card>

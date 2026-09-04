@@ -307,7 +307,18 @@ GET  /api/v1/admin/challenges/{challengeId}/flags/{flagId}
 PUT  /api/v1/admin/challenges/{challengeId}/flags/{flagId}
 DELETE /api/v1/admin/challenges/{challengeId}/flags/{flagId}
 POST /api/v1/admin/challenges/{challengeId}/flags/{flagId}/restore
+GET  /api/v1/admin/challenges/{challengeId}/test-runtime
+POST /api/v1/admin/challenges/{challengeId}/test-runtime/start
+POST /api/v1/admin/challenges/{challengeId}/test-runtime/stop
+POST /api/v1/admin/challenges/{challengeId}/test-runtime/reset
+POST /api/v1/admin/challenges/{challengeId}/test-runtime/extend
 ```
+
+题库模板负责人、协作者和平台管理员可为包含 Container/Compose 定义的模板创建一个活动测试
+Runtime。测试实例沿用正式 Runner 的镜像拉取、资源限制、安全策略、隔离网络、动态端口和访问地址
+展开；CTF/AWDP 使用环境变量注入本次测试 Flag，AWD 在实例启动后执行题目定义中的 Flag 注入命令。
+测试 Flag 只由该资源的测试 Runtime 接口返回，不进入普通模板 Flag 列表。停止实例会清理容器与网络，
+不会主动删除 Runner 节点的镜像缓存。
 
 ## Admin Runtime
 
@@ -404,6 +415,8 @@ POST /api/v1/admin/platform/configuration/logo
 GET  /api/v1/admin/platform/information
 GET  /api/v1/admin/platform/monitoring
 GET  /api/v1/admin/platform/runtimes
+POST /api/v1/admin/platform/runtimes/{runtimeInstanceId}/terminate
+POST /api/v1/admin/platform/runtimes/{runtimeInstanceId}/force-terminate
 GET  /api/v1/admin/platform/logs
 GET  /api/v1/admin/platform/logs/export
 GET  /api/v1/admin/platform/audit-logs
@@ -421,9 +434,10 @@ POST /api/v1/admin/platform/email-verification/test
 ```
 
 平台 Runtime 清单只投影当前处于 Queued、Provisioning、Running 或 Stopping 状态的 Container 与
-Compose 实例，按 CreatedAt/Id 使用签名 keyset cursor 分页。响应带赛事、题目、来源队伍、Provider、
-Runner、端口及生命周期时间；停止与强制终结继续调用 Competition Runtime 的精确实例写端点，复用
-同一 durable cleanup 与审计链路。
+Compose 实例，包含比赛 Runtime 与题库模板测试 Runtime，并按 CreatedAt/Id 使用签名 keyset cursor
+分页。响应带作用域、赛事或模板题目、来源队伍、Provider、Runner、端口及生命周期时间；平台级停止
+与强制终结按 RuntimeInstanceId 操作两种作用域，复用同一 durable cleanup 链路。比赛 Runtime 继续写入
+比赛审计事件，题库测试 Runtime 不伪造 CompetitionEvent。
 
 Bot 创建请求只包含 UserName 和固定的 `UserRole.Organizer`，不能创建 User 或 Administrator
 Bot，也不接受 Email 或 Password。服务端生成不可用的非空 dummy Email 和 PasswordHash。

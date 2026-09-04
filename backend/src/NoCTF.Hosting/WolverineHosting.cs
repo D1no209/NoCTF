@@ -26,6 +26,7 @@ public static class WolverineHosting
         options.PersistMessagesWithPostgresql(postgres, roles.PersistenceSchema);
         options.UseEntityFrameworkCoreTransactions();
         options.Policies.Add(new AwdpFixVerificationExecutionTimeoutPolicy());
+        options.Policies.Add(new AwdFlagInjectionExecutionTimeoutPolicy());
 
         options.UseNats(nats)
             .AutoProvision()

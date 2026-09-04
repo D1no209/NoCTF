@@ -625,7 +625,7 @@ public sealed class GameplayFactProcessor(
             }
 
             await events.RecordAsync(new(
-                runtime.CompetitionId,
+                runtime.CompetitionId!.Value,
                 CompetitionEventKind.RuntimeStateChanged,
                 CompetitionEventLevel.Information,
                 CompetitionEventVisibility.Team,

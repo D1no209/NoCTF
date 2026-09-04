@@ -169,8 +169,10 @@ export function validateChallengeTemplateDraft(draft: ChallengeTemplateDraft): s
       else {
         if (!model.flagInjection.command.trim() || !model.flagInjection.command.includes('${FLAG}'))
           addIssue(issues, translate('AWD Flag 注入命令必须包含 ${FLAG}'))
-        if (model.flagInjection.timeoutSeconds === null || model.flagInjection.timeoutSeconds <= 0)
-          addIssue(issues, translate('AWD Flag 注入超时必须为正数'))
+        if (model.flagInjection.timeoutSeconds === null
+          || model.flagInjection.timeoutSeconds < 1
+          || model.flagInjection.timeoutSeconds > 300)
+          addIssue(issues, translate('AWD Flag 注入超时必须在 1 到 300 秒之间'))
         if (definition.kind === 'compose' && !model.flagInjection.serviceName.trim())
           addIssue(issues, translate('Compose 运行环境必须填写 Flag 注入目标服务名'))
       }

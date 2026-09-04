@@ -9,6 +9,7 @@ import type {
   NoCtfapiEndpointsGameplayFactsGameplayFactResultProtocol,
   NoCtfapiEndpointsGameplayFactsGameplayFactStateProtocol,
   NoCtfapiEndpointsRuntimeRuntimeKindProtocol,
+  NoCtfapiEndpointsRuntimeRuntimeFailureCodeProtocol,
   NoCtfapiEndpointsRuntimeRuntimeProviderProtocol,
   NoCtfapiEndpointsRuntimeRuntimeStateProtocol,
   NoCtfapiEndpointsTeamsTeamBanAppealStatusProtocol,
@@ -65,6 +66,16 @@ export const RuntimeProviderLabel = {
 export const RuntimeStateLabel = {
   Queued: '排队中', Provisioning: '准备中', Running: '运行中', Stopping: '停止中', Stopped: '已停止', Failed: '失败',
 } satisfies Record<NoCtfapiEndpointsRuntimeRuntimeStateProtocol, string>
+
+export const RuntimeFailureCodeLabel = {
+  InvalidConfiguration: '运行配置无效',
+  RunnerUnavailable: 'Runner 不可用',
+  ProviderUnavailable: '运行提供方不可用',
+  ProvisionTimeout: '创建环境超时',
+  ProviderRejected: '运行提供方拒绝请求',
+  CleanupFailed: '资源清理失败',
+  UrlExpansionFailed: '访问地址生成失败',
+} satisfies Record<NoCtfapiEndpointsRuntimeRuntimeFailureCodeProtocol, string>
 
 export const CheatIncidentStatusLabel = {
   Pending: '待处理', Confirmed: '已确认', Dismissed: '已驳回', Superseded: '已取代', Corrected: '已纠正',

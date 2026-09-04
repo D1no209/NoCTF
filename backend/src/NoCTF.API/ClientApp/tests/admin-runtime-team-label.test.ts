@@ -44,6 +44,14 @@ describe('admin runtime team presentation', () => {
     }), t)).toBe('共享')
   })
 
+  test('labels challenge-template test runtimes without inventing a team', () => {
+    expect(adminRuntimeTeamLabel(runtime('TemplateTest', {
+      teamId: null,
+      sourceTeamId: null,
+      sourceTeamName: null,
+    }), t)).toBe('题目测试')
+  })
+
   test('never mislabels an unbound AWDP attack runtime as shared', () => {
     expect(adminRuntimeTeamLabel(runtime('AwdpAttack', {
       teamId: null,

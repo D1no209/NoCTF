@@ -31,6 +31,11 @@ public sealed class ObservabilityExtensionsTests
     [Arguments("POST", "/competitions/{competitionId}/challenges/{competitionChallengeId}/awdp-defense-targets", "fix_request")]
     [Arguments("POST", "/competitions/{competitionId}/challenges/{competitionChallengeId}/awdp-defense-targets/{runtimeInstanceId}/fix", "fix_upload")]
     [Arguments("POST", "/competitions/{competitionId}/challenges/{competitionChallengeId}/runtime/start", "runtime_start")]
+    [Arguments("POST", "/admin/challenges/{challengeId}/test-runtime/start", "runtime_test_start")]
+    [Arguments("POST", "/admin/challenges/{challengeId}/test-runtime/stop", "runtime_test_stop")]
+    [Arguments("POST", "/admin/challenges/{challengeId}/test-runtime/reset", "runtime_test_reset")]
+    [Arguments("POST", "/admin/challenges/{challengeId}/test-runtime/extend", "runtime_test_extend")]
+    [Arguments("POST", "/admin/platform/runtimes/{runtimeInstanceId}/terminate", "runtime_terminate")]
     [Arguments("POST", "/admin/competitions/{competitionId}/runtimes/{runtimeInstanceId}/force-terminate", "runtime_force_terminate")]
     public async Task Mutating_gameplay_routes_are_classified(
         string method,

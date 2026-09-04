@@ -230,6 +230,17 @@ public sealed class ChallengeBankStore(
                 item => item.ChallengeId == challengeId && item.DeletedAt == null,
                 ct))
             return ChallengeTemplateDeleteFailure.InUse;
+        if (await db.RuntimeInstances.AsNoTracking().AnyAsync(
+                runtime => runtime.ChallengeId == challengeId
+                    && runtime.Purpose == NoCTF.Domain.Runtime.RuntimePurpose.TemplateTest
+                    && (runtime.State == NoCTF.Domain.Runtime.RuntimeState.Queued
+                        || runtime.State == NoCTF.Domain.Runtime.RuntimeState.Provisioning
+                        || runtime.State == NoCTF.Domain.Runtime.RuntimeState.Running
+                        || runtime.State == NoCTF.Domain.Runtime.RuntimeState.Stopping),
+                ct))
+        {
+            return ChallengeTemplateDeleteFailure.InUse;
+        }
         entity.DeletedAt = now;
         entity.UpdatedAt = now;
         await db.SaveChangesAsync(ct);

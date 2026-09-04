@@ -2,9 +2,9 @@
 import { ExternalLink, RefreshCw } from '@lucide/vue'
 import { toast } from 'vue-sonner'
 import {
-  adminForceTerminateRuntime,
+  adminPlatformForceTerminateRuntime,
   adminPlatformListActiveRuntimes,
-  adminTerminateRuntime,
+  adminPlatformTerminateRuntime,
 } from '~/api'
 import type {
   NoCtfapiEndpointsAdministrationPlatformPlatformRuntimeResponse,
@@ -79,14 +79,11 @@ function openForceTermination(item: PlatformRuntime): void {
 
 async function submitTermination(): Promise<void> {
   const runtime = runtimeOf(terminateTarget.value)
-  if (!runtime?.id || !runtime.competitionId || terminatePending.value) return
+  if (!runtime?.id || terminatePending.value) return
   terminatePending.value = true
   try {
-    const { error: requestError } = await adminTerminateRuntime({
-      path: {
-        competitionId: runtime.competitionId,
-        runtimeInstanceId: runtime.id,
-      },
+    const { error: requestError } = await adminPlatformTerminateRuntime({
+      path: { runtimeInstanceId: runtime.id },
     })
     if (requestError) throw requestError
     toast.success(translate('实例终止操作已受理'))
@@ -105,7 +102,6 @@ async function submitForceTermination(): Promise<void> {
   const runtime = runtimeOf(forceTerminateTarget.value)
   const reason = forceTerminateReason.value.trim()
   if (!runtime?.id
-    || !runtime.competitionId
     || reason.length < 8
     || !forceTerminateConfirmed.value
     || forceTerminatePending.value)
@@ -113,11 +109,8 @@ async function submitForceTermination(): Promise<void> {
 
   forceTerminatePending.value = true
   try {
-    const { error: requestError } = await adminForceTerminateRuntime({
-      path: {
-        competitionId: runtime.competitionId,
-        runtimeInstanceId: runtime.id,
-      },
+    const { error: requestError } = await adminPlatformForceTerminateRuntime({
+      path: { runtimeInstanceId: runtime.id },
       body: { reason },
     })
     if (requestError) throw requestError
@@ -191,7 +184,7 @@ onBeforeUnmount(() => {
           <TableRow v-for="item in items" :key="item.runtime?.id">
             <TableCell class="min-w-64">
               <div class="grid gap-1">
-                <span class="font-semibold">{{ item.competitionTitle ?? '-' }}</span>
+                <span class="font-semibold">{{ item.scope === 'ChallengeTest' ? $t('题目测试') : item.competitionTitle ?? '-' }}</span>
                 <span class="text-xs text-muted-foreground">{{ item.challengeTitle ?? '-' }}</span>
               </div>
             </TableCell>
@@ -216,6 +209,11 @@ onBeforeUnmount(() => {
                 <Button v-if="item.runtime?.competitionId" variant="ghost" size="sm" as-child>
                   <NuxtLink :to="`/admin/competitions/${item.runtime.competitionId}/runtimes`">
                     <ExternalLink data-icon="inline-start" /> {{ $t('赛事运行时') }}
+                  </NuxtLink>
+                </Button>
+                <Button v-else-if="item.runtime?.challengeId" variant="ghost" size="sm" as-child>
+                  <NuxtLink :to="`/admin/challenges/${item.runtime.challengeId}`">
+                    <ExternalLink data-icon="inline-start" /> {{ $t('题目模板') }}
                   </NuxtLink>
                 </Button>
                 <Button
@@ -287,7 +285,7 @@ onBeforeUnmount(() => {
               id="platform-force-termination-reason"
               v-model="forceTerminateReason"
               maxlength="512"
-              :placeholder="$t('至少 8 个字符；将写入不可变比赛审计')"
+              :placeholder="$t('至少 8 个字符，用于定位本次资源清理操作')"
             />
             <FieldDescription>{{ forceTerminateReason.trim().length }}/512</FieldDescription>
           </Field>
