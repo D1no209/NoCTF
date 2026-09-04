@@ -488,7 +488,7 @@ function adjustmentKind(entry: NoCtfapiEndpointsCompetitionsScoreboardAdjustment
             <CardContent class="pt-2">
               <Skeleton v-if="trendsLoading && !trends" class="h-[320px] w-full" />
               <Empty v-else-if="!visibleTrendSeries.length" class="h-[320px]"><EmptyHeader><EmptyTitle>{{ $t('暂无得分趋势') }}</EmptyTitle></EmptyHeader></Empty>
-              <ScoreTrendChart v-else :series="visibleTrendSeries" :range-start="trendRangeStart" :range-end="trendRangeEnd" height="320px" />
+              <LazyScoreTrendChart v-else :series="visibleTrendSeries" :range-start="trendRangeStart" :range-end="trendRangeEnd" height="320px" />
             </CardContent>
           </Card>
           <Card>
@@ -505,7 +505,7 @@ function adjustmentKind(entry: NoCtfapiEndpointsCompetitionsScoreboardAdjustment
             <CardContent class="pt-2">
               <Skeleton v-if="trendsLoading && !trends" class="h-[320px] w-full" />
               <Empty v-else-if="!selectedTrendSeries.length" class="h-[320px]"><EmptyHeader><EmptyTitle>{{ $t('暂无得分趋势') }}</EmptyTitle></EmptyHeader></Empty>
-              <ScoreTrendChart v-else :series="selectedTrendSeries" :range-start="trendRangeStart" :range-end="trendRangeEnd" height="320px" />
+              <LazyScoreTrendChart v-else :series="selectedTrendSeries" :range-start="trendRangeStart" :range-end="trendRangeEnd" height="320px" />
             </CardContent>
           </Card>
         </div>
@@ -573,7 +573,7 @@ function adjustmentKind(entry: NoCtfapiEndpointsCompetitionsScoreboardAdjustment
       </template>
     </template>
 
-    <ScoreboardTeamDetailDialog v-model:open="teamDetailOpen" :mode="board.schema.value?.mode" :team="teamDetailTeam" :teams="teams" :column-groups="columnGroups" />
+    <LazyScoreboardTeamDetailDialog v-model:open="teamDetailOpen" :mode="board.schema.value?.mode" :team="teamDetailTeam" :teams="teams" :column-groups="columnGroups" />
 
     <Dialog v-model:open="detailOpen">
       <DialogScrollContent class="max-h-[85vh] sm:max-w-2xl">

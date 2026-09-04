@@ -8,11 +8,22 @@ const { configuration } = usePlatform()
 const { isLoggedIn } = useAuth()
 
 const items = ref<NoCtfapiEndpointsCompetitionsCompetitionResponse[]>([])
+const competitionsLoading = ref(true)
+const competitionsError = ref<string | null>(null)
 
-onMounted(async () => {
-  const { data } = await listCompetitionsEndpoint()
+async function loadCompetitions(): Promise<void> {
+  competitionsLoading.value = true
+  competitionsError.value = null
+  const { data, error } = await listCompetitionsEndpoint()
+  competitionsLoading.value = false
+  if (error || !data) {
+    competitionsError.value = parseApiError(error, translate('加载近期竞赛失败')).message
+    return
+  }
   items.value = data?.items ?? []
-})
+}
+
+onMounted(() => void loadCompetitions())
 
 const activeStatuses: string[] = [
   'Running',
@@ -112,7 +123,16 @@ const modes = [
           </NuxtLink>
         </Button>
       </div>
-      <div v-if="recent.length" class="grid gap-5 md:grid-cols-2 lg:grid-cols-3">
+      <div v-if="competitionsLoading" class="grid gap-5 md:grid-cols-2 lg:grid-cols-3" :aria-label="$t('正在加载近期竞赛')">
+        <Skeleton v-for="index in 3" :key="index" class="h-44 w-full" />
+      </div>
+      <Alert v-else-if="competitionsError" variant="destructive">
+        <AlertDescription class="flex flex-wrap items-center justify-between gap-3">
+          <span>{{ competitionsError }}</span>
+          <Button type="button" size="sm" variant="outline" @click="loadCompetitions">{{ $t('重新加载') }}</Button>
+        </AlertDescription>
+      </Alert>
+      <div v-else-if="recent.length" class="grid gap-5 md:grid-cols-2 lg:grid-cols-3">
         <CompetitionCard v-for="c in recent" :key="c.id" :competition="c" />
       </div>
       <Empty v-else class="border border-dashed py-12">

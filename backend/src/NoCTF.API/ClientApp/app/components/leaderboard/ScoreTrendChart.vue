@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { echarts, CHART_PALETTE } from '~/utils/echarts'
+import { chartPalette, echarts } from '~/utils/echarts'
 import type { TrendSeries } from './types'
 
 const props = withDefaults(
@@ -16,6 +16,7 @@ const props = withDefaults(
 
 const el = ref<HTMLElement | null>(null)
 const { locale } = useLocale()
+const { isDark } = useTheme()
 let chart: echarts.ECharts | null = null
 
 function buildOption(): echarts.EChartsCoreOption {
@@ -24,7 +25,7 @@ function buildOption(): echarts.EChartsCoreOption {
   const foreground = el.value ? getComputedStyle(el.value).color : undefined
   return {
     backgroundColor: 'transparent',
-    color: CHART_PALETTE,
+    color: chartPalette(el.value),
     title: props.title
       ? {
           text: props.title,
@@ -92,6 +93,7 @@ onMounted(() => {
 })
 
 watch(() => [props.series, props.rangeStart, props.rangeEnd, props.title, locale.value], render, { deep: true })
+watch(isDark, () => void nextTick(render))
 
 const onResize = () => chart?.resize()
 let observer: ResizeObserver | null = null

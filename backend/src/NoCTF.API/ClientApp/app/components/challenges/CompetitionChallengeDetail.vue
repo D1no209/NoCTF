@@ -26,6 +26,8 @@ const loading = ref(true)
 const error = ref<string | null>(null)
 const attachments = ref<NoCtfapiEndpointsAdministrationChallengeBankChallengeAttachmentResponse[]>([])
 const attachmentDeliveryPolicy = ref<NoCtfapiEndpointsAdministrationChallengeBankAttachmentDeliveryPolicyProtocol>('All')
+const attachmentsLoading = ref(false)
+const attachmentError = ref<string | null>(null)
 const downloading = ref(false)
 const historyRefreshKey = ref(0)
 let loadSequence = 0
@@ -61,9 +63,13 @@ async function loadAttachments(): Promise<void> {
   if (!isLoggedIn.value) {
     attachments.value = []
     attachmentDeliveryPolicy.value = 'All'
+    attachmentsLoading.value = false
+    attachmentError.value = null
     return
   }
   const challengeId = props.competitionChallengeId
+  attachmentsLoading.value = true
+  attachmentError.value = null
   const { data, error: requestError } = await listChallengeAttachmentsEndpoint({
     path: {
       competitionId: props.competitionId,
@@ -71,7 +77,11 @@ async function loadAttachments(): Promise<void> {
     },
   })
   if (challengeId !== props.competitionChallengeId) return
-  if (requestError || !data) return
+  attachmentsLoading.value = false
+  if (requestError || !data) {
+    attachmentError.value = parseApiError(requestError, translate('加载题目附件失败')).message
+    return
+  }
   attachmentDeliveryPolicy.value = data.deliveryPolicy ?? 'All'
   attachments.value = (data.items ?? []).filter(attachment => !attachment.deletedAt)
 }
@@ -160,14 +170,14 @@ const mode = computed(() => ctx.competition.value?.mode)
       </section>
 
       <section
-        v-if="attachments.length || attachmentDeliveryPolicy === 'RandomOnePerTeam'"
+        v-if="isLoggedIn && (attachmentsLoading || attachmentError || attachments.length || attachmentDeliveryPolicy === 'RandomOnePerTeam')"
         class="border-b py-5"
         aria-labelledby="challenge-attachments-title"
       >
         <div class="flex items-center justify-between gap-3">
             <h3 id="challenge-attachments-title" class="text-sm font-semibold">{{ $t('附件') }}</h3>
             <Button
-              v-if="attachmentDeliveryPolicy === 'RandomOnePerTeam'"
+              v-if="!attachmentsLoading && !attachmentError && attachmentDeliveryPolicy === 'RandomOnePerTeam'"
               variant="outline"
               size="sm"
               :disabled="downloading"
@@ -176,7 +186,14 @@ const mode = computed(() => ctx.competition.value?.mode)
               <Dice5 data-icon="inline-start" /> {{ $t('下载附件') }}
             </Button>
         </div>
-          <ul v-if="attachmentDeliveryPolicy !== 'RandomOnePerTeam'" class="mt-3 divide-y border-y">
+          <Skeleton v-if="attachmentsLoading" class="mt-3 h-12 w-full" />
+          <Alert v-else-if="attachmentError" variant="destructive" class="mt-3">
+            <AlertDescription class="flex flex-wrap items-center justify-between gap-3">
+              <span>{{ attachmentError }}</span>
+              <Button type="button" size="sm" variant="outline" @click="loadAttachments">{{ $t('重新加载') }}</Button>
+            </AlertDescription>
+          </Alert>
+          <ul v-else-if="attachmentDeliveryPolicy !== 'RandomOnePerTeam'" class="mt-3 divide-y border-y">
             <li
               v-for="attachment in attachments"
               :key="attachment.id"

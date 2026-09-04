@@ -16,6 +16,7 @@ const emit = defineEmits<{ submitted: [] }>()
 
 const state = ref<NoCtfapiEndpointsGameplayFactsAwdpParticipantStateResponse | null>(null)
 const loading = ref(true)
+const stateError = ref<string | null>(null)
 const attackRuntimeCard = ref<{ refreshUntilStopped: () => Promise<void> } | null>(null)
 
 const defenseTransitionInProgress = computed(() => {
@@ -47,19 +48,23 @@ async function refreshState(): Promise<boolean> {
     },
   })
   loading.value = false
-  if (error || !data) return true
+  if (error || !data) {
+    stateError.value = parseApiError(error, translate('加载 AWDP 题目状态失败')).message
+    return false
+  }
+  stateError.value = null
   state.value = data
   return !defenseTransitionInProgress.value
 }
 
-const { start: startStatePolling, stop: stopStatePolling } = usePolling(
+const { timedOut: statePollingTimedOut, start: startStatePolling, stop: stopStatePolling } = usePolling(
   refreshState,
   { interval: 1500, timeout: 300_000 },
 )
 
 async function refreshAndPoll(): Promise<void> {
-  await refreshState()
-  if (defenseTransitionInProgress.value) startStatePolling()
+  const complete = await refreshState()
+  if (!complete) startStatePolling()
 }
 
 async function handleBreakEvaluation(result?: string | null): Promise<void> {
@@ -87,6 +92,18 @@ onUnmounted(() => {
 
 <template>
   <div class="flex flex-col gap-6">
+    <Alert v-if="statePollingTimedOut" variant="destructive">
+      <AlertDescription class="flex flex-wrap items-center justify-between gap-3">
+        <span>{{ $t('AWDP 状态自动刷新已停止，请手动重试。') }}</span>
+        <Button type="button" size="sm" variant="outline" @click="refreshAndPoll">{{ $t('重新加载') }}</Button>
+      </AlertDescription>
+    </Alert>
+    <Alert v-else-if="stateError" variant="destructive">
+      <AlertDescription class="flex flex-wrap items-center justify-between gap-3">
+        <span>{{ stateError }}</span>
+        <Button type="button" size="sm" variant="outline" @click="refreshAndPoll">{{ $t('重新加载') }}</Button>
+      </AlertDescription>
+    </Alert>
     <div v-if="loading" class="grid gap-6 lg:grid-cols-2">
       <Skeleton class="h-80 w-full" />
       <Skeleton class="h-80 w-full" />

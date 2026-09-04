@@ -182,10 +182,15 @@ const appealOpen = ref(false)
 const appealStatement = ref('')
 const appealPending = ref(false)
 const appealError = ref<string | null>(null)
+const banCaseError = ref<string | null>(null)
 
 async function loadBanCase() {
+  banCaseError.value = null
   const { data, error } = await getMyTeamBanCase({ path: { competitionId } })
-  if (error || !data) return
+  if (error || !data) {
+    banCaseError.value = parseApiError(error, translate('加载封禁与申诉状态失败')).message
+    return
+  }
   banCase.value = data
 }
 
@@ -295,6 +300,12 @@ function setAppealOpen(open: boolean) {
           <CardDescription>{{ $t('你的队伍当前处于封禁状态,可提交申诉说明情况') }}</CardDescription>
         </CardHeader>
         <CardContent class="flex flex-col gap-3">
+          <Alert v-if="banCaseError" variant="destructive">
+            <AlertDescription class="flex flex-wrap items-center justify-between gap-3">
+              <span>{{ banCaseError }}</span>
+              <Button type="button" size="sm" variant="outline" @click="loadBanCase">{{ $t('重新加载') }}</Button>
+            </AlertDescription>
+          </Alert>
           <template v-if="banCase">
             <p class="text-sm">
               封禁时间:{{ formatDateTime(banCase.bannedAt) }} · 来源:{{ banCase.source === 'CheatIncident' ? $t('作弊检测') : $t('人工处理') }}
@@ -308,7 +319,7 @@ function setAppealOpen(open: boolean) {
               </AlertDescription>
             </Alert>
           </template>
-          <div v-if="banCase?.canAppeal !== false">
+          <div v-if="!banCaseError && banCase?.canAppeal !== false">
             <Dialog :open="appealOpen" @update:open="setAppealOpen">
               <DialogTrigger as-child>
                 <Button variant="outline">{{ $t('提交封禁申诉') }}</Button>
@@ -449,6 +460,9 @@ function setAppealOpen(open: boolean) {
                 </form>
               </DialogContent>
             </Dialog>
+            <p v-if="!transferableMembers.length" class="text-xs text-muted-foreground">
+              {{ $t('队伍中没有其他成员，暂时无法转让队长。') }}
+            </p>
 
             <AlertDialog>
               <AlertDialogTrigger as-child>

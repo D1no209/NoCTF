@@ -46,8 +46,11 @@ describe('participant action page wiring', () => {
 
     expect(page).toContain('sm:max-w-2xl')
     expect(page).toContain('class="min-h-44"')
-    expect(page).toContain('type="button" class="w-full" :disabled="createPending" @click="submitCreate"')
+    expect(page).toContain(':disabled="createPending || createSubject === \'Challenge\' && (challengesLoading || Boolean(challengeLoadError))"')
+    expect(page).toContain('@click="submitCreate"')
     expect(page).toContain('关联题目(必选)')
+    expect(page).toContain('<Alert v-else-if="challengeLoadError" variant="destructive">')
+    expect(page).toContain('@click="loadChallengeOptions"')
   })
 
   test('accepts the password reset route emitted by email delivery', async () => {

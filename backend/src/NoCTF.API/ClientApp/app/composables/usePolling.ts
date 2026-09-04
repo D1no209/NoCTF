@@ -16,6 +16,7 @@ export function usePolling(probe: () => Promise<boolean>, options: PollingOption
 
   const polling = ref(false)
   const timedOut = ref(false)
+  const error = ref<unknown | null>(null)
 
   let stopped = false
   let timer: ReturnType<typeof setTimeout> | undefined
@@ -32,8 +33,10 @@ export function usePolling(probe: () => Promise<boolean>, options: PollingOption
       let done = false
       try {
         done = await probe()
+        error.value = null
       }
-      catch {
+      catch (probeError) {
+        error.value = probeError
         // Keep polling through transient failures until the timeout.
       }
       if (done || stopped) {
@@ -48,6 +51,7 @@ export function usePolling(probe: () => Promise<boolean>, options: PollingOption
     stop()
     stopped = false
     timedOut.value = false
+    error.value = null
     polling.value = true
     void tick(interval, 0)
   }
@@ -55,10 +59,12 @@ export function usePolling(probe: () => Promise<boolean>, options: PollingOption
   function stop(): void {
     stopped = true
     polling.value = false
+    timedOut.value = false
+    error.value = null
     if (timer) clearTimeout(timer)
   }
 
   onScopeDispose(stop)
 
-  return { polling, timedOut, start, stop }
+  return { polling, timedOut, error, start, stop }
 }

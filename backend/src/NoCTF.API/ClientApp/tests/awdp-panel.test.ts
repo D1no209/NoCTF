@@ -63,13 +63,15 @@ describe('AWDP participant panel', () => {
     expect(source).not.toContain('AwdRotation')
   })
 
-  test('does not render a page-wide participant-state error banner', async () => {
+  test('keeps participant-state failures visible and retryable', async () => {
     const source = await Bun.file(
       new URL('../app/components/challenges/panels/AwdpPanel.vue', import.meta.url),
     ).text()
 
-    expect(source).not.toContain('loadError')
-    expect(source).not.toContain('加载 AWDP 状态失败')
+    expect(source).toContain('stateError.value = parseApiError(error')
+    expect(source).toContain('加载 AWDP 题目状态失败')
+    expect(source).toContain('statePollingTimedOut')
+    expect(source).toContain('@click="refreshAndPoll"')
   })
 
   test('locks scoring changes but keeps read-only Break validation after first success', async () => {

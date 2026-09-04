@@ -89,19 +89,23 @@ function celebrateCorrectFlag(): void {
   })
 }
 
-const { polling, timedOut, start: startPolling, stop: stopPolling } = usePolling(
+const { polling, timedOut, error: pollingError, start: startPolling, stop: stopPolling } = usePolling(
   async () => {
     await refreshPending()
     return !tracked.value.some((t) => isGameplayFactPending(t.state))
   },
   { interval: 1500, timeout: 120_000 },
 )
+const pollingErrorMessage = computed(() => pollingError.value
+  ? parseApiError(pollingError.value, translate('刷新提交状态失败')).message
+  : null)
 
 async function refreshOne(id: string): Promise<void> {
   const { data, error } = await getGameplayFactStatusEndpoint({
     path: { competitionId: props.competitionId, gameplayFactId: id },
   })
-  if (error || !data) return
+  if (error || !data)
+    throw parseApiError(error, translate('刷新提交状态失败'))
   const item = tracked.value.find((t) => t.id === id)
   const wasPending = item ? isGameplayFactPending(item.state) : true
   if (item) {
@@ -249,7 +253,10 @@ onMounted(() => {
     gameplayFactStateChanged: (payload) => {
       const id = competitionHubString(payload, 'gameplayFactId')
       if (id && tracked.value.some((t) => t.id === id)) {
-        void refreshOne(id)
+        void refreshOne(id).catch((error) => {
+          toast.error(parseApiError(error, translate('刷新提交状态失败')).message)
+          startPolling()
+        })
       }
     },
   })
@@ -333,6 +340,9 @@ onUnmounted(() => {
 
       <Alert v-if="timedOut" class="mt-4">
         <AlertDescription>{{ $t('评测结果等待超时，可在本题提交记录中继续查看。') }}</AlertDescription>
+      </Alert>
+      <Alert v-else-if="pollingErrorMessage" variant="destructive" class="mt-4">
+        <AlertDescription>{{ $t('提交状态刷新失败，正在自动重试：{reason}', { reason: pollingErrorMessage }) }}</AlertDescription>
       </Alert>
     </div>
   </section>

@@ -14,6 +14,7 @@ import {
   Users,
   X,
 } from '@lucide/vue'
+import { toast } from 'vue-sonner'
 import { getCompetitionEndpoint, listCompetitionEvents } from '~/api'
 import type {
   NoCtfapiEndpointsCompetitionsCompetitionResponse,
@@ -297,7 +298,7 @@ async function toggleFullscreen(): Promise<void> {
     else await document.exitFullscreen()
   }
   catch {
-    // Fullscreen is optional; embedded browsers may reject the request.
+    toast.error(translate('浏览器拒绝进入全屏，请检查站点权限或使用浏览器全屏快捷键。'))
   }
 }
 
