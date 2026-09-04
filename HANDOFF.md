@@ -3649,3 +3649,13 @@ dotnet run --project backend/src/NoCTF.API/NoCTF.API.csproj --no-build -- --expo
 - Release solution build 0 warning/0 error；TUnit 1165 total：988 passed、0 failed、177 项真实依赖测试因
   本机 Docker 不可用明确跳过；前端 324/324、ClientApp typecheck 与 Nuxt generate 通过；EF model 无
   pending changes。平台版本递增为 `0.1.0-alpha.140`。本阶段未 push、未部署。
+
+## 2026-09-04 Alpha.141 题目测试容器状态自动刷新
+
+- 修复启动测试容器后必须手动刷新才能显示的问题。前端现在跟踪 202 响应返回的目标 Runtime ID，启动或
+  重置后的短暂 404、旧实例快照及瞬时查询失败均不会提前结束轮询；操作受理后立即查询一次，并持续更新
+  Queued、Provisioning、Running、Stopping 及动态 Flag 注入状态。
+- 等待新实例出现期间保持启动/重置按钮忙碌，避免重复操作；停止和续期分别等待目标状态或到期时间确实
+  发生变化。新增纯状态机回归测试覆盖短暂缺失、旧实例、网络失败、停止与续期收敛。
+- 前端 328/328、ClientApp typecheck 与 Nuxt generate 通过；Release solution build 0 warning/0 error。
+  无 HTTP/OpenAPI、数据库或 EF migration 变化。平台版本递增为 `0.1.0-alpha.141`。本阶段未 push、未部署。
