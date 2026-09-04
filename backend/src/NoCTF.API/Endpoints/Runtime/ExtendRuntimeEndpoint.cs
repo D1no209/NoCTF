@@ -22,7 +22,7 @@ public sealed class ExtendRuntimeEndpoint(
     MutatePlayerRuntime mutate,
     IUserContext user,
     TimeProvider timeProvider)
-    : Endpoint<ExtendRuntimeRequest, Results<Accepted<RuntimeAcceptedResponse>, NotFound, Conflict, ProblemHttpResult>>
+    : Endpoint<ExtendRuntimeRequest, Results<Accepted<RuntimeAcceptedResponse>, NotFound, ProblemHttpResult>>
 {
     public override void Configure()
     {
@@ -30,11 +30,13 @@ public sealed class ExtendRuntimeEndpoint(
         AuthSchemes("Bearer");
         Options(options => options
             .ProducesProblemFE<Microsoft.AspNetCore.Mvc.ProblemDetails>(
+                StatusCodes.Status409Conflict)
+            .ProducesProblemFE<Microsoft.AspNetCore.Mvc.ProblemDetails>(
                 StatusCodes.Status503ServiceUnavailable));
         Summary(summary => summary.Summary = "Extends a running CTF runtime.");
     }
 
-    public override async Task<Results<Accepted<RuntimeAcceptedResponse>, NotFound, Conflict, ProblemHttpResult>> ExecuteAsync(
+    public override async Task<Results<Accepted<RuntimeAcceptedResponse>, NotFound, ProblemHttpResult>> ExecuteAsync(
         ExtendRuntimeRequest request,
         CancellationToken ct)
     {
@@ -48,7 +50,14 @@ public sealed class ExtendRuntimeEndpoint(
         if (result.FailureCode is RuntimeMutationFailureCode.RuntimeNotFound or RuntimeMutationFailureCode.RuntimeActionUnsupported)
             return TypedResults.NotFound();
         if (result.FailureCode is RuntimeMutationFailureCode.RuntimeStateConflict or RuntimeMutationFailureCode.RuntimeConflict)
-            return TypedResults.Conflict();
+            return TypedResults.Problem(
+                statusCode: StatusCodes.Status409Conflict,
+                title: "Runtime extension conflicts with its current state.",
+                detail: result.ErrorMessage,
+                extensions: new Dictionary<string, object?>
+                {
+                    ["code"] = result.FailureCode.Value.ToString()
+                });
         if (!result.Succeeded)
             return TypedResults.Problem(
                 statusCode: StatusCodes.Status503ServiceUnavailable,

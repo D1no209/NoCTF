@@ -38,7 +38,8 @@ public sealed class RecordAwdpCheckResultValidator : Validator<RecordAwdpCheckRe
 
 public sealed class RecordAwdpCheckResultEndpoint(RecordInternalResult record, TimeProvider timeProvider)
     : Endpoint<RecordAwdpCheckResultRequest,
-        Results<Ok<InternalResultResponse>, Accepted<InternalResultResponse>, NotFound, Conflict, UnauthorizedHttpResult>>
+        Results<Ok<InternalResultResponse>, Accepted<InternalResultResponse>, NotFound,
+            Conflict<InternalResultResponse>, UnauthorizedHttpResult>>
 {
     public override void Configure()
     {
@@ -54,7 +55,8 @@ public sealed class RecordAwdpCheckResultEndpoint(RecordInternalResult record, T
     }
 
     public override async Task<
-        Results<Ok<InternalResultResponse>, Accepted<InternalResultResponse>, NotFound, Conflict, UnauthorizedHttpResult>> ExecuteAsync(
+        Results<Ok<InternalResultResponse>, Accepted<InternalResultResponse>, NotFound,
+            Conflict<InternalResultResponse>, UnauthorizedHttpResult>> ExecuteAsync(
         RecordAwdpCheckResultRequest request,
         CancellationToken ct)
     {
@@ -83,7 +85,12 @@ public sealed class RecordAwdpCheckResultEndpoint(RecordInternalResult record, T
                     value: new InternalResultResponse(
                         InternalResultDispositionProtocol.Superseded)),
             InternalResultDisposition.NotFound => TypedResults.NotFound(),
-            _ => TypedResults.Conflict()
+            InternalResultDisposition.Conflict => TypedResults.Conflict(
+                new InternalResultResponse(
+                    InternalResultDispositionProtocol.Conflict,
+                    "The result conflicts with the gameplay fact or runtime currently bound to this Fix verification.")),
+            _ => throw new InvalidOperationException(
+                $"Unsupported AWDP result disposition: {disposition}.")
         };
     }
 }

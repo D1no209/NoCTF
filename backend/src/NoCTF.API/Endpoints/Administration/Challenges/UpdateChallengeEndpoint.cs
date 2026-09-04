@@ -40,29 +40,48 @@ public enum CompetitionChallengeConflictCode
 }
 
 public sealed record CompetitionChallengeConflictResponse(
-    [property: Required, JsonRequired] CompetitionChallengeConflictCode Code);
+    [property: Required, JsonRequired] CompetitionChallengeConflictCode Code,
+    [property: Required, JsonRequired] string Detail);
 
 internal static class CompetitionChallengeConflictMapper
 {
     public static CompetitionChallengeConflictResponse ToResponse(
         ChallengeMutationFailure failure) =>
-        new(failure switch
-        {
-            ChallengeMutationFailure.ResourceIdConflict =>
-                CompetitionChallengeConflictCode.ResourceIdConflict,
-            ChallengeMutationFailure.ChallengeOrderConflict =>
-                CompetitionChallengeConflictCode.ChallengeOrderConflict,
-            ChallengeMutationFailure.ChallengeTemplateConflict =>
-                CompetitionChallengeConflictCode.ChallengeTemplateConflict,
-            ChallengeMutationFailure.LifecycleStateConflict =>
-                CompetitionChallengeConflictCode.LifecycleStateConflict,
-            ChallengeMutationFailure.TemplateNotFound =>
-                CompetitionChallengeConflictCode.ChallengeTemplateNotFound,
-            ChallengeMutationFailure.TemplateModeMismatch =>
-                CompetitionChallengeConflictCode.ChallengeTemplateModeMismatch,
-            _ => throw new InvalidOperationException(
-                $"Unsupported competition challenge conflict: {failure}.")
-        });
+        new(
+            failure switch
+            {
+                ChallengeMutationFailure.ResourceIdConflict =>
+                    CompetitionChallengeConflictCode.ResourceIdConflict,
+                ChallengeMutationFailure.ChallengeOrderConflict =>
+                    CompetitionChallengeConflictCode.ChallengeOrderConflict,
+                ChallengeMutationFailure.ChallengeTemplateConflict =>
+                    CompetitionChallengeConflictCode.ChallengeTemplateConflict,
+                ChallengeMutationFailure.LifecycleStateConflict =>
+                    CompetitionChallengeConflictCode.LifecycleStateConflict,
+                ChallengeMutationFailure.TemplateNotFound =>
+                    CompetitionChallengeConflictCode.ChallengeTemplateNotFound,
+                ChallengeMutationFailure.TemplateModeMismatch =>
+                    CompetitionChallengeConflictCode.ChallengeTemplateModeMismatch,
+                _ => throw new InvalidOperationException(
+                    $"Unsupported competition challenge conflict: {failure}.")
+            },
+            failure switch
+            {
+                ChallengeMutationFailure.ResourceIdConflict =>
+                    "The requested competition challenge identifier is already in use.",
+                ChallengeMutationFailure.ChallengeOrderConflict =>
+                    "Another challenge already uses this display order. Choose a different order and try again.",
+                ChallengeMutationFailure.ChallengeTemplateConflict =>
+                    "This challenge template is already attached to the competition.",
+                ChallengeMutationFailure.LifecycleStateConflict =>
+                    "The competition has already started, so its challenge set is frozen.",
+                ChallengeMutationFailure.TemplateNotFound =>
+                    "The selected challenge template no longer exists.",
+                ChallengeMutationFailure.TemplateModeMismatch =>
+                    "The selected challenge template uses a different game mode than this competition.",
+                _ => throw new InvalidOperationException(
+                    $"Unsupported competition challenge conflict: {failure}.")
+            });
 }
 
 public sealed class UpdateChallengeEndpoint(

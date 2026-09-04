@@ -32,7 +32,9 @@ public enum ChangePasswordFailureCode
     CurrentPasswordInvalid
 }
 
-public sealed record ChangePasswordFailureResponse(ChangePasswordFailureCode Code);
+public sealed record ChangePasswordFailureResponse(
+    ChangePasswordFailureCode Code,
+    string Detail);
 
 public sealed class ChangePasswordEndpoint(
     ChangePassword change,
@@ -65,7 +67,8 @@ public sealed class ChangePasswordEndpoint(
             ct);
         if (result != ChangePasswordState.Changed)
             return TypedResults.Conflict(new ChangePasswordFailureResponse(
-                ChangePasswordFailureCode.CurrentPasswordInvalid));
+                ChangePasswordFailureCode.CurrentPasswordInvalid,
+                "The current password is incorrect."));
 
         HttpContext.Response.Cookies.Delete(
             RefreshCookie.Name(options.Value),

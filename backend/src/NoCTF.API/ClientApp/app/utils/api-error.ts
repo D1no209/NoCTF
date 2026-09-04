@@ -21,10 +21,12 @@ export class ApiError extends Error {
 
 interface ProblemDetailsLike {
   status?: number
+  statusCode?: number
   title?: string
   detail?: string
+  message?: string
   code?: string
-  errors?: Record<string, string[]>
+  errors?: Record<string, string[] | string>
 }
 
 function isUntranslatedEnglish(message: string): boolean {
@@ -41,12 +43,23 @@ function isUntranslatedEnglish(message: string): boolean {
 export function userFacingErrorMessage(
   message: string | null | undefined,
   fallback = translate("请求失败,请稍后重试"),
+  allowUntranslated = false,
 ): string {
   const source = message?.trim()
   if (!source) return fallback
 
   const localized = localizeMessage(source)
-  return isUntranslatedEnglish(localized) ? fallback : localized
+  return !allowUntranslated && isUntranslatedEnglish(localized) ? fallback : localized
+}
+
+function normalizeFieldErrors(
+  errors: ProblemDetailsLike['errors'],
+): Record<string, string[]> | undefined {
+  if (!errors) return undefined
+  return Object.fromEntries(Object.entries(errors).map(([field, messages]) => [
+    field,
+    Array.isArray(messages) ? messages : [messages],
+  ]))
 }
 
 /** Convert an SDK error payload into a user-facing ApiError. */
@@ -54,19 +67,22 @@ export function parseApiError(error: unknown, fallback = translate("请求失败
   if (error instanceof ApiError) return error
   if (error && typeof error === 'object') {
     const problem = error as ProblemDetailsLike
-    const firstFieldError = problem.errors ? Object.values(problem.errors).flat()[0] : undefined
+    const status = problem.status ?? problem.statusCode
+    const fieldErrors = normalizeFieldErrors(problem.errors)
+    const firstFieldError = fieldErrors ? Object.values(fieldErrors).flat()[0] : undefined
     // 字段级校验错误(FluentValidation)优先于泛泛的 title("One or more validation errors occurred")。
-    const statusFallback = problem.status === undefined
+    const statusFallback = status === undefined
       ? fallback
-      : statusErrorMessage(problem.status)
+      : statusErrorMessage(status)
     const message = userFacingErrorMessage(
-      problem.detail ?? firstFieldError ?? problem.title,
+      problem.detail ?? firstFieldError ?? problem.message ?? problem.title,
       statusFallback,
+      status === 409 || status === 422,
     )
     return new ApiError(message, {
-      status: problem.status,
+      status,
       code: problem.code,
-      fieldErrors: problem.errors,
+      fieldErrors,
     })
   }
   return new ApiError(fallback)
@@ -80,7 +96,7 @@ export function statusErrorMessage(status: number | undefined, authenticatedRequ
       return authenticatedRequest ? translate("登录状态已失效,请重新登录") : translate("用户名或密码错误")
     case 403: return translate("没有权限执行此操作")
     case 404: return translate("请求的资源不存在")
-    case 409: return translate("请求与当前状态冲突,请检查后重试")
+    case 409: return translate("资源状态已发生变化,请刷新页面获取最新状态后重试")
     case 413: return translate("上传的文件过大")
     case 429: return translate("请求过于频繁,请稍后重试")
     default:

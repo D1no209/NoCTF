@@ -36,7 +36,7 @@ describe('competition challenge custom title', () => {
   })
 
   test('keeps generic HTTP conflicts separate from typed add conflicts', () => {
-    expect(statusErrorMessage(409)).toBe('请求与当前状态冲突,请检查后重试')
+    expect(statusErrorMessage(409)).toBe('资源状态已发生变化,请刷新页面获取最新状态后重试')
   })
 
   test('keeps the add dialog and its inputs after an SDK error', async () => {

@@ -35,7 +35,9 @@ public enum UploadPatchFailureCodeProtocol
     DefenseTargetConsumed
 }
 
-public sealed record UploadPatchFailureResponse(UploadPatchFailureCodeProtocol Code);
+public sealed record UploadPatchFailureResponse(
+    UploadPatchFailureCodeProtocol Code,
+    string Detail);
 
 public sealed class UploadPatchValidator : Validator<UploadPatchRequest>
 {
@@ -101,37 +103,44 @@ public sealed class UploadPatchEndpoint(
             if (result.FailureCode is PatchUploadFailureCode.DefenseTargetNotReady)
             {
                 return TypedResults.Conflict(new UploadPatchFailureResponse(
-                    UploadPatchFailureCodeProtocol.DefenseTargetNotReady));
+                    UploadPatchFailureCodeProtocol.DefenseTargetNotReady,
+                    result.ErrorMessage!));
             }
             if (result.FailureCode is PatchUploadFailureCode.DefenseAlreadySucceeded)
             {
                 return TypedResults.Conflict(new UploadPatchFailureResponse(
-                    UploadPatchFailureCodeProtocol.DefenseAlreadySucceeded));
+                    UploadPatchFailureCodeProtocol.DefenseAlreadySucceeded,
+                    result.ErrorMessage!));
             }
             if (result.FailureCode is PatchUploadFailureCode.AttemptsExhausted)
             {
                 return TypedResults.Conflict(new UploadPatchFailureResponse(
-                    UploadPatchFailureCodeProtocol.FixAttemptsExhausted));
+                    UploadPatchFailureCodeProtocol.FixAttemptsExhausted,
+                    result.ErrorMessage!));
             }
             if (result.FailureCode is PatchUploadFailureCode.PatchUploadConflict)
             {
                 return TypedResults.Conflict(new UploadPatchFailureResponse(
-                    UploadPatchFailureCodeProtocol.DefenseTargetConsumed));
+                    UploadPatchFailureCodeProtocol.DefenseTargetConsumed,
+                    result.ErrorMessage!));
             }
             if (result.FailureCode is PatchUploadFailureCode.DefenseTargetConsumed)
             {
                 return TypedResults.Conflict(new UploadPatchFailureResponse(
-                    UploadPatchFailureCodeProtocol.DefenseTargetConsumed));
+                    UploadPatchFailureCodeProtocol.DefenseTargetConsumed,
+                    result.ErrorMessage!));
             }
             if (result.FailureCode is PatchUploadFailureCode.ArchiveStreamNotSeekable)
             {
                 return TypedResults.UnprocessableEntity(new UploadPatchFailureResponse(
-                    UploadPatchFailureCodeProtocol.ArchiveStreamNotSeekable));
+                    UploadPatchFailureCodeProtocol.ArchiveStreamNotSeekable,
+                    result.ErrorMessage!));
             }
             if (result.FailureCode is PatchUploadFailureCode.ArchiveInvalid)
             {
                 return TypedResults.UnprocessableEntity(new UploadPatchFailureResponse(
-                    UploadPatchFailureCodeProtocol.ArchiveInvalid));
+                    UploadPatchFailureCodeProtocol.ArchiveInvalid,
+                    result.ErrorMessage!));
             }
             return TypedResults.Problem(
                 statusCode: result.FailureCode == PatchUploadFailureCode.ArchiveTooLarge

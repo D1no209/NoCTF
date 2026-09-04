@@ -28,7 +28,7 @@ public sealed class UpdateCompetitionLeaderboardVisibilityValidator
     }
 }
 
- [JsonConverter(typeof(NoCTF.API.Serialization.StrictPascalCaseEnumConverter<CompetitionVisibilityMutationCodeProtocol>))]
+[JsonConverter(typeof(NoCTF.API.Serialization.StrictPascalCaseEnumConverter<CompetitionVisibilityMutationCodeProtocol>))]
 public enum CompetitionVisibilityMutationCodeProtocol
 {
     Updated,
@@ -39,6 +39,7 @@ public enum CompetitionVisibilityMutationCodeProtocol
 
 public sealed record CompetitionLeaderboardVisibilityFailureResponse(
     CompetitionVisibilityMutationCodeProtocol Code,
+    string Detail,
     CompetitionLeaderboardVisibilityResponse? Current);
 
 [Mapper(RequiredMappingStrategy = RequiredMappingStrategy.Source)]
@@ -109,6 +110,7 @@ public sealed class UpdateCompetitionLeaderboardVisibilityEndpoint(
             CompetitionVisibilityMutationState.CompetitionFinished => TypedResults.Conflict(
                     new CompetitionLeaderboardVisibilityFailureResponse(
                         CompetitionVisibilityMutationMapper.ToProtocol(result.State),
+                        "A finished competition cannot start a new leaderboard freeze or hidden interval.",
                         current)),
             _ => throw new ArgumentOutOfRangeException(nameof(result.State), result.State, null)
         };

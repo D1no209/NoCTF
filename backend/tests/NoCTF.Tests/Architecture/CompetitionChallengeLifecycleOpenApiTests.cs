@@ -49,7 +49,7 @@ public sealed class CompetitionChallengeLifecycleOpenApiTests
             .Value;
 
         await Assert.That(RequiredPropertyNames(responseSchema))
-            .IsEquivalentTo(["code"]);
+            .IsEquivalentTo(["code", "detail"]);
         await Assert.That(codeSchema.GetProperty("type").GetString()).IsEqualTo("string");
         await Assert.That(codeSchema.GetProperty("enum")
                 .EnumerateArray()

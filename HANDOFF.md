@@ -3583,3 +3583,21 @@ dotnet run --project backend/src/NoCTF.API/NoCTF.API.csproj --no-build -- --expo
   TimeoutException/TaskCanceledException 时的结果漂移。Release solution build 0 warning/0 error，TUnit
   1140 total：964 passed、0 failed、176 项真实依赖用例因本机 Docker 不可用明确跳过。平台版本递增为
   `0.1.0-alpha.136`，无 HTTP/OpenAPI、业务表、EF migration 或 snapshot 变化。本阶段未 push、未部署。
+
+## 2026-09-04 Alpha.137 冲突错误信息全链路审计
+
+- 审计 OpenAPI 中全部 74 个 HTTP 409 操作。修复 8 个无响应体冲突：选手 Runtime 启动/停止/重置/
+  延时、队伍报名重提、提示解锁以及 AWD/AWDP 内部结果回调现在均返回带具体原因的强类型响应或
+  RFC Problem Details，不再只返回空 409。
+- 所有原本只有 `code` 的冲突协议补充 `detail`，覆盖 AWDP/练习 Flag、一次性防御环境、Fix 上传、
+  咨询、修改密码、平台用户生命周期、赛事协作者、题目/题库冲突、排行榜可见性与永久删除预检。
+  Runtime 应用层按 NotFound/Unsupported/InvalidState/Capacity/Configuration/Concurrency 给出不同原因
+  及下一步操作。
+- 前端 API 拦截器不再丢弃 `code`/`message` 响应，统一解析器支持 Problem Details 的 `status/detail`、
+  FastEndpoints 的 `statusCode/message/errors` 和强类型业务失败；4xx 的服务端明细不再被笼统状态文案
+  覆盖，5xx 未知诊断仍保持隐藏。原“请求与当前状态冲突”兜底改为明确提示刷新最新资源状态。
+- 新增 OpenAPI 架构守卫：每个 409 必须有响应体且 schema 必须包含 `detail`、`message` 或 `errors`；
+  同时禁止新增参数为空的 `TypedResults.Conflict()`。OpenAPI 与 TypeScript SDK 已重新生成且二次生成
+  幂等。Release solution build 0 warning/0 error；TUnit 1147 total：971 passed、0 failed、176 项真实依赖
+  用例因本机 Docker 不可用明确跳过；前端 314/314、typecheck 与 Nuxt generate 通过。平台版本递增为
+  `0.1.0-alpha.137`，无业务表、EF migration 或 snapshot 变化。本阶段未 push、未部署。

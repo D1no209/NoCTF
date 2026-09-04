@@ -37,7 +37,8 @@ public enum UpdatePlatformUserAccountStatusConflictCode
 }
 
 public sealed record UpdatePlatformUserAccountStatusConflictResponse(
-    UpdatePlatformUserAccountStatusConflictCode Code);
+    UpdatePlatformUserAccountStatusConflictCode Code,
+    string Detail);
 
 public sealed class UpdatePlatformUserAccountStatusEndpoint(
     ManagePlatform platform,
@@ -84,10 +85,12 @@ public sealed class UpdatePlatformUserAccountStatusEndpoint(
             UpdatePlatformUserStatusState.UserNotFound => TypedResults.NotFound(),
             UpdatePlatformUserStatusState.AnonymizedAccountImmutable =>
                 TypedResults.Conflict(new UpdatePlatformUserAccountStatusConflictResponse(
-                    UpdatePlatformUserAccountStatusConflictCode.AnonymizedAccountImmutable)),
+                    UpdatePlatformUserAccountStatusConflictCode.AnonymizedAccountImmutable,
+                    "An anonymized account is immutable and its status cannot be changed.")),
             UpdatePlatformUserStatusState.LastAdministratorProtected =>
                 TypedResults.Conflict(new UpdatePlatformUserAccountStatusConflictResponse(
-                    UpdatePlatformUserAccountStatusConflictCode.LastAdministratorProtected)),
+                    UpdatePlatformUserAccountStatusConflictCode.LastAdministratorProtected,
+                    "This account is the last active human administrator and cannot be disabled or banned.")),
             _ => throw new InvalidOperationException(
                 $"Unsupported platform account status update state: {result.State}.")
         };

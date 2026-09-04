@@ -136,7 +136,7 @@ public sealed class MutatePlayerRuntime(IRuntimeInstanceStore store)
         if (result.Runtime is not null)
             return OperationResult<RuntimeInstanceView, RuntimeMutationFailureCode>.Success(result.Runtime);
         var failure = result.Failure ?? RuntimeMutationFailure.Conflict;
-        return OperationResult<RuntimeInstanceView, RuntimeMutationFailureCode>.Failure(failure switch
+        var failureCode = failure switch
         {
             RuntimeMutationFailure.NotFound => RuntimeMutationFailureCode.RuntimeNotFound,
             RuntimeMutationFailure.Unsupported => RuntimeMutationFailureCode.RuntimeActionUnsupported,
@@ -144,6 +144,24 @@ public sealed class MutatePlayerRuntime(IRuntimeInstanceStore store)
             RuntimeMutationFailure.CapacityExceeded => RuntimeMutationFailureCode.RuntimeCapacityExceeded,
             RuntimeMutationFailure.ConfigurationInvalid => RuntimeMutationFailureCode.RuntimeConfigurationInvalid,
             _ => RuntimeMutationFailureCode.RuntimeConflict
-        }, "Runtime action was rejected.");
+        };
+        var detail = failure switch
+        {
+            RuntimeMutationFailure.NotFound =>
+                "No runtime exists for this team and challenge.",
+            RuntimeMutationFailure.Unsupported =>
+                "This challenge does not support the requested runtime operation.",
+            RuntimeMutationFailure.InvalidState =>
+                $"The runtime is not in a state that permits the requested {command.Action.ToString().ToLowerInvariant()} operation. Refresh the runtime status before retrying.",
+            RuntimeMutationFailure.CapacityExceeded =>
+                "No runner currently has enough capacity to start this runtime. Stop an unused runtime or try again later.",
+            RuntimeMutationFailure.ConfigurationInvalid =>
+                "The challenge runtime configuration is invalid. Ask a competition administrator to review it.",
+            _ =>
+                "The runtime state changed while this request was being processed. Refresh the runtime status before retrying."
+        };
+        return OperationResult<RuntimeInstanceView, RuntimeMutationFailureCode>.Failure(
+            failureCode,
+            detail);
     }
 }
