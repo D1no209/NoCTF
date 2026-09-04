@@ -25,8 +25,16 @@ echarts.use([
 
 export { echarts }
 
-/** 队伍配色盘(截图风格的高饱和区分色)。 */
-export const CHART_PALETTE = [
-  '#f87171', '#34d399', '#fbbf24', '#a78bfa', '#22d3ee',
-  '#fb923c', '#a3e635', '#f472b6', '#818cf8', '#38bdf8',
+const chartColorProperties = [
+  '--chart-1', '--chart-2', '--chart-3', '--chart-4', '--chart-5',
+  '--chart-6', '--chart-7', '--chart-8', '--chart-9', '--chart-10',
 ]
+
+/** 从当前主题读取队伍配色，确保 Canvas 图表随明暗模式同步。 */
+export function chartPalette(element?: Element | null): string[] {
+  if (typeof getComputedStyle === 'undefined') return []
+  const styles = getComputedStyle(element ?? document.documentElement)
+  return chartColorProperties
+    .map(property => styles.getPropertyValue(property).trim())
+    .filter(Boolean)
+}

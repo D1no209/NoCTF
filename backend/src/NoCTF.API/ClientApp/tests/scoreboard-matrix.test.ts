@@ -351,7 +351,7 @@ describe('normalized scoreboard matrix', () => {
       { name: '团队/系统', value: 200, userId: '' },
     ])
     expect(leaderboardPage).toContain('@click="openTeamDetail(team)"')
-    expect(leaderboardPage).toContain('<ScoreboardTeamDetailDialog')
+    expect(leaderboardPage).toContain('<LazyScoreboardTeamDetailDialog')
     expect(scoreboardTeamDetailDialog).toContain("type: 'radar'")
     expect(scoreboardTeamDetailDialog).toContain("type: 'pie'")
     expect(scoreboardTeamDetailDialog).toContain('scoreboardMemberContributionSlices')
@@ -364,8 +364,9 @@ describe('normalized scoreboard matrix', () => {
     expect(scoreboardTeamDetailDialog).toContain("name: translate('攻击分')")
     expect(scoreboardTeamDetailDialog).toContain("name: translate('防御分')")
     expect(scoreboardTeamDetailDialog).toContain("usesCurrentScore.value ? '当前得分' : '已结算得分'")
-    expect(scoreboardTeamDetailDialog).toContain("areaStyle: { color: '#ef4444', opacity: 0.2 }")
-    expect(scoreboardTeamDetailDialog).toContain("areaStyle: { color: '#0ea5e9', opacity: 0.2 }")
+    expect(scoreboardTeamDetailDialog.match(/areaStyle: \{ opacity: 0\.2 \}/g)).toHaveLength(2)
+    expect(scoreboardTeamDetailDialog).not.toContain("color: '#ef4444'")
+    expect(scoreboardTeamDetailDialog).not.toContain("color: '#0ea5e9'")
   })
 
   test('uses authoritative current challenge scores and renders CTF score cells with blood bonuses', () => {

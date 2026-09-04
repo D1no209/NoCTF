@@ -2,7 +2,7 @@
 import { Bell, CalendarCog, Database, Flag, LogOut, ShieldCheck, User } from '@lucide/vue'
 
 const { user, isLoggedIn, isAdministrator, canOrganize, logout } = useAuth()
-const { configuration } = usePlatform()
+const { configuration, error: platformError, loading: platformLoading, ensureLoaded } = usePlatform()
 const route = useRoute()
 const { hasUnread, refreshUnread } = useNotificationUnread()
 const { t } = useLocale()
@@ -122,6 +122,14 @@ onBeforeUnmount(() => {
         </div>
       </div>
     </header>
+    <Alert v-if="platformError" variant="destructive" class="m-3">
+      <AlertDescription class="flex flex-wrap items-center justify-between gap-3">
+        <span>{{ platformError }}</span>
+        <Button type="button" size="sm" variant="outline" :disabled="platformLoading" @click="ensureLoaded">
+          <Spinner v-if="platformLoading" data-icon="inline-start" />{{ t('重新加载') }}
+        </Button>
+      </AlertDescription>
+    </Alert>
     <main class="flex-1">
       <slot />
     </main>

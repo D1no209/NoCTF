@@ -20,6 +20,8 @@ const competition = ref<NoCtfapiEndpointsCompetitionsCompetitionResponse | null>
 const myTeam = ref<NoCtfapiEndpointsTeamsTeamResponse | null>(null)
 const myStanding = ref<NoCtfapiEndpointsCompetitionsScoreboardTeamResponse | null>(null)
 const standingLoading = ref(false)
+const teamLoadError = ref<string | null>(null)
+const standingError = ref<string | null>(null)
 const loading = ref(true)
 const error = ref<string | null>(null)
 const { user } = useAuth()
@@ -32,12 +34,25 @@ async function refreshMyTeam() {
   if (!user.value) {
     myTeam.value = null
     myStanding.value = null
+    teamLoadError.value = null
+    standingError.value = null
     return
   }
-  const { data, error: teamError } = await getMyTeamEndpoint({
+  const { data, error: teamError, response } = await getMyTeamEndpoint({
     path: { competitionId: competitionId.value },
   })
-  myTeam.value = teamError || !data ? null : data
+  if (response?.status === 404) {
+    myTeam.value = null
+    teamLoadError.value = null
+    standingError.value = null
+    return
+  }
+  if (teamError || !data) {
+    teamLoadError.value = parseApiError(teamError, translate('加载我的队伍失败')).message
+    return
+  }
+  teamLoadError.value = null
+  myTeam.value = data
   await refreshMyStanding()
 }
 
@@ -45,6 +60,7 @@ async function refreshMyStanding(): Promise<void> {
   if (myTeam.value?.registrationStatus !== 'Approved' || myTeam.value.isBanned || !myTeam.value.id) {
     myStanding.value = null
     standingLoading.value = false
+    standingError.value = null
     return
   }
   standingLoading.value = myStanding.value === null
@@ -55,9 +71,14 @@ async function refreshMyStanding(): Promise<void> {
   standingLoading.value = false
   if (response?.status === 404) {
     myStanding.value = null
+    standingError.value = null
     return
   }
-  if (requestError || !data || !('teams' in data)) return
+  if (requestError || !data || !('teams' in data)) {
+    standingError.value = parseApiError(requestError, translate('加载本队排名失败')).message
+    return
+  }
+  standingError.value = null
   myStanding.value = data.teams?.find(team => team.teamId === myTeam.value?.id) ?? null
 }
 
@@ -175,6 +196,18 @@ provide(competitionWorkspaceNavigationKey, navGroups)
         </div>
       </dl>
     </div>
+    <Alert v-if="teamLoadError" variant="destructive">
+      <AlertDescription class="flex flex-wrap items-center justify-between gap-3">
+        <span>{{ teamLoadError }}</span>
+        <Button type="button" size="sm" variant="outline" @click="refreshMyTeam">{{ $t('重新加载') }}</Button>
+      </AlertDescription>
+    </Alert>
+    <Alert v-else-if="standingError" variant="destructive">
+      <AlertDescription class="flex flex-wrap items-center justify-between gap-3">
+        <span>{{ standingError }}</span>
+        <Button type="button" size="sm" variant="outline" @click="refreshMyStanding">{{ $t('重新加载') }}</Button>
+      </AlertDescription>
+    </Alert>
     <NuxtPage />
   </div>
 

@@ -68,23 +68,34 @@ function applyStatus(status: NoCtfapiEndpointsGameplayFactsGameplayFactStatusRes
 async function refreshPending(): Promise<void> {
   const pending = items.value.filter(item => item.id && isGameplayFactPending(item.state))
   await Promise.all(pending.map(async (submission) => {
-    const { data } = await getGameplayFactStatusEndpoint({
+    const { data, error: requestError } = await getGameplayFactStatusEndpoint({
       path: {
         competitionId: props.competitionId,
         gameplayFactId: submission.id!,
       },
     })
+    if (requestError || !data)
+      throw parseApiError(requestError, translate('刷新提交状态失败'))
     if (data) applyStatus(data)
   }))
 }
 
-const { start: startPendingPolling, stop: stopPendingPolling } = usePolling(
+const {
+  timedOut: pendingPollingTimedOut,
+  error: pendingPollingError,
+  start: startPendingPolling,
+  stop: stopPendingPolling,
+} = usePolling(
   async () => {
     await refreshPending()
     return !items.value.some(item => isGameplayFactPending(item.state))
   },
   { interval: 1500, timeout: 300_000 },
 )
+
+const pendingPollingErrorMessage = computed(() => pendingPollingError.value
+  ? parseApiError(pendingPollingError.value, translate('刷新提交状态失败')).message
+  : null)
 
 watch(
   () => items.value.some(item => isGameplayFactPending(item.state)),
@@ -184,6 +195,15 @@ function setValueDialogOpen(open: boolean): void {
 
     <Alert v-if="error" variant="destructive" class="mt-3">
       <AlertDescription>{{ error.message }}</AlertDescription>
+    </Alert>
+    <Alert v-else-if="pendingPollingTimedOut" variant="destructive" class="mt-3">
+      <AlertDescription class="flex flex-wrap items-center justify-between gap-3">
+        <span>{{ $t('提交状态自动刷新已停止，请手动重试。') }}</span>
+        <Button type="button" size="sm" variant="outline" @click="startPendingPolling">{{ $t('重新加载') }}</Button>
+      </AlertDescription>
+    </Alert>
+    <Alert v-else-if="pendingPollingErrorMessage" variant="destructive" class="mt-3">
+      <AlertDescription>{{ $t('提交状态刷新失败，正在自动重试：{reason}', { reason: pendingPollingErrorMessage }) }}</AlertDescription>
     </Alert>
 
     <div v-if="loading && !initialized" class="mt-3 flex flex-col gap-2">

@@ -99,11 +99,25 @@ const createBody = ref('')
 const createPending = ref(false)
 const createError = ref<string | null>(null)
 const challenges = ref<NoCtfapiEndpointsChallengesChallengeResponse[]>([])
+const challengesLoading = ref(false)
+const challengeLoadError = ref<string | null>(null)
 
-watch(createOpen, async (open) => {
-  if (!open || challenges.value.length) return
-  const { data } = await listChallengesEndpoint({ path: { competitionId } })
+async function loadChallengeOptions(): Promise<void> {
+  if (challengesLoading.value) return
+  challengesLoading.value = true
+  challengeLoadError.value = null
+  const { data, error } = await listChallengesEndpoint({ path: { competitionId } })
+  challengesLoading.value = false
+  if (error || !data) {
+    challengeLoadError.value = parseApiError(error, translate('加载可咨询题目失败')).message
+    return
+  }
   challenges.value = (data?.items ?? []).filter((c) => c.isPublished)
+}
+
+watch(createOpen, (open) => {
+  if (open && !challenges.value.length && !challengeLoadError.value)
+    void loadChallengeOptions()
 })
 
 async function submitCreate() {
@@ -354,7 +368,14 @@ const participantLimitReached = computed(() =>
                 </Field>
                 <Field v-if="createSubject === 'Challenge'">
                   <FieldLabel>{{ $t('关联题目(必选)') }}</FieldLabel>
-                  <Select v-model="createChallengeId">
+                  <Skeleton v-if="challengesLoading" class="h-10 w-full" />
+                  <Alert v-else-if="challengeLoadError" variant="destructive">
+                    <AlertDescription class="flex flex-wrap items-center justify-between gap-3">
+                      <span>{{ challengeLoadError }}</span>
+                      <Button type="button" size="sm" variant="outline" @click="loadChallengeOptions">{{ $t('重新加载') }}</Button>
+                    </AlertDescription>
+                  </Alert>
+                  <Select v-else v-model="createChallengeId">
                     <SelectTrigger><SelectValue :placeholder="$t('不关联题目')" /></SelectTrigger>
                     <SelectContent>
                       <SelectGroup>
@@ -394,7 +415,12 @@ const participantLimitReached = computed(() =>
                   {{ createError }}
                 </p>
                 <Field>
-                  <Button type="button" class="w-full" :disabled="createPending" @click="submitCreate">
+                  <Button
+                    type="button"
+                    class="w-full"
+                    :disabled="createPending || createSubject === 'Challenge' && (challengesLoading || Boolean(challengeLoadError))"
+                    @click="submitCreate"
+                  >
                     <Spinner v-if="createPending" data-icon="inline-start" /> {{ $t('提交') }} </Button>
                 </Field>
               </FieldGroup>

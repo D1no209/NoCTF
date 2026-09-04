@@ -18,19 +18,30 @@ const emit = defineEmits<{ changed: [] }>()
 
 const profiles = ref<Record<string, NoCtfapiEndpointsAuthenticationPublicUserProfileResponse>>({})
 const loaded = ref(false)
+const loadError = ref<string | null>(null)
 const removing = ref<string | null>(null)
 
 async function loadProfiles() {
   const ids = props.team.memberIds ?? []
+  loaded.value = false
+  loadError.value = null
   const entries = await Promise.all(
     ids.map(async (id) => {
-      const { data } = await userProfileGet({ path: { userId: id } })
-      return [id, data] as const
+      const { data, error } = await userProfileGet({ path: { userId: id } })
+      return { id, data, error }
     }),
   )
   profiles.value = Object.fromEntries(
-    entries.filter((entry): entry is readonly [string, NoCtfapiEndpointsAuthenticationPublicUserProfileResponse] => !!entry[1]),
+    entries
+      .filter(entry => !!entry.data)
+      .map(entry => [entry.id, entry.data!] as const),
   )
+  const failures = entries.filter(entry => entry.error || !entry.data).length
+  if (failures > 0) {
+    loadError.value = translate('有 {count} 名队员资料加载失败，当前暂时显示用户标识。', {
+      count: failures,
+    })
+  }
   loaded.value = true
 }
 
@@ -52,7 +63,14 @@ async function remove(userId: string) {
 </script>
 
 <template>
-  <ul class="flex flex-col gap-2">
+  <div class="flex flex-col gap-2">
+    <Alert v-if="loadError" variant="destructive">
+      <AlertDescription class="flex flex-wrap items-center justify-between gap-3">
+        <span>{{ loadError }}</span>
+        <Button type="button" size="sm" variant="outline" @click="loadProfiles">{{ $t('重新加载') }}</Button>
+      </AlertDescription>
+    </Alert>
+    <ul class="flex flex-col gap-2">
     <Skeleton v-if="!loaded" class="h-12 w-full" />
     <li
       v-for="memberId in team.memberIds ?? []"
@@ -83,5 +101,6 @@ async function remove(userId: string) {
         <Spinner v-if="removing === memberId" data-icon="inline-start" />
         <UserMinus v-else data-icon="inline-start" /> {{ $t('移除') }} </Button>
     </li>
-  </ul>
+    </ul>
+  </div>
 </template>

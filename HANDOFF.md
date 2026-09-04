@@ -3601,3 +3601,18 @@ dotnet run --project backend/src/NoCTF.API/NoCTF.API.csproj --no-build -- --expo
   幂等。Release solution build 0 warning/0 error；TUnit 1147 total：971 passed、0 failed、176 项真实依赖
   用例因本机 Docker 不可用明确跳过；前端 314/314、typecheck 与 Nuxt generate 通过。平台版本递增为
   `0.1.0-alpha.137`，无业务表、EF migration 或 snapshot 变化。本阶段未 push、未部署。
+
+## 2026-09-04 Alpha.138 前端无响应路径收敛
+
+- 全量审计参赛端按钮、请求和轮询路径。首页竞赛、咨询题目选项、题目附件、我的队伍与排名、队员资料、
+  封禁申诉状态、提交题目名称和平台配置加载失败时均展示明确原因与重试入口，不再伪装为空数据或静默
+  降级；无法转让队长时直接说明缺少其他成员。
+- 题目提交历史、个人提交页、Flag 弹窗和 AWDP 参赛状态轮询现在保留最近数据、显示瞬时失败、持续自动
+  重试，并在达到超时上限后提供手动恢复。SignalR 触发的刷新失败也会反馈，不再产生未处理的异步拒绝。
+  两个中控大屏被浏览器拒绝全屏时会显示可执行的权限提示。
+- Three.js 城市场景、排行榜趋势图和队伍详情改为路由/交互时按需加载；ECharts 配色改读明暗主题语义变量，
+  队伍详情不再硬编码 Canvas 色值，切换主题会立即重绘。专用深色中控大屏继续保留固定态势配色。
+- 新增参赛端错误反馈回归测试并更新既有 AWDP、咨询和排行榜契约。前端 318/318、typecheck、Nuxt
+  generate 通过；Release solution build 0 warning/0 error；TUnit 1147 total：971 passed、0 failed、176 项
+  真实依赖用例因本机 Docker 不可用明确跳过。平台版本递增为 `0.1.0-alpha.138`，无 HTTP/OpenAPI、
+  业务表、EF migration 或 snapshot 变化。

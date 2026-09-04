@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { echarts, CHART_PALETTE } from '~/utils/echarts'
+import { chartPalette, echarts } from '~/utils/echarts'
 
 const props = withDefaults(
   defineProps<{
@@ -10,6 +10,7 @@ const props = withDefaults(
 )
 
 const el = ref<HTMLElement | null>(null)
+const { isDark } = useTheme()
 let chart: echarts.ECharts | null = null
 
 function render() {
@@ -18,7 +19,7 @@ function render() {
   chart.setOption(
     {
       backgroundColor: 'transparent',
-      color: CHART_PALETTE,
+      color: chartPalette(el.value),
       textStyle: { color: foreground },
       ...props.option,
     },
@@ -32,6 +33,7 @@ onMounted(() => {
 })
 
 watch(() => props.option, render, { deep: true })
+watch(isDark, () => void nextTick(render))
 
 let observer: ResizeObserver | null = null
 onMounted(() => {

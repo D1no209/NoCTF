@@ -10,6 +10,7 @@ import {
   Users,
   X,
 } from '@lucide/vue'
+import { toast } from 'vue-sonner'
 import { getCompetitionEndpoint } from '~/api'
 import type {
   NoCtfapiEndpointsCompetitionsCompetitionResponse,
@@ -22,8 +23,7 @@ import {
 } from '~/utils/control-screen'
 import type { ControlScreenBloodRank, ControlScreenSolve } from '~/utils/control-screen'
 import { createTrailingRefresh } from '~/lib/latest-page-refresh'
-import { LiveCityScene } from '~/lib/live-city-3d'
-import type { LiveCityBlood, LiveCityChallengeState } from '~/lib/live-city-3d'
+import type { LiveCityBlood, LiveCityChallengeState, LiveCityScene } from '~/lib/live-city-3d'
 import { scoreboardRankingStateLabel, scoreboardTeamSolveCount } from '~/utils/scoreboard'
 
 definePageMeta({ layout: false })
@@ -45,6 +45,7 @@ const fullscreen = ref(false)
 const clock = ref(Date.now())
 const arenaRef = ref<HTMLElement | null>(null)
 let scene: LiveCityScene | null = null
+let disposed = false
 let clockTimer: ReturnType<typeof setInterval> | undefined
 let refreshTimer: ReturnType<typeof setInterval> | undefined
 let projectionTimer: ReturnType<typeof setTimeout> | undefined
@@ -245,7 +246,7 @@ async function toggleFullscreen(): Promise<void> {
     else await document.exitFullscreen()
   }
   catch {
-    // Some embedded browsers deny fullscreen; the screen remains fully usable.
+    toast.error(translate('浏览器拒绝进入全屏，请检查站点权限或使用浏览器全屏快捷键。'))
   }
 }
 
@@ -254,10 +255,15 @@ function syncFullscreen(): void {
 }
 
 onMounted(async () => {
-  if (arenaRef.value) scene = new LiveCityScene(arenaRef.value)
-  scene?.setChallenges(cityStates.value)
+  const sceneModule = arenaRef.value ? import('~/lib/live-city-3d') : null
   await ensureLoaded()
   await refreshLatest()
+  if (sceneModule) {
+    const { LiveCityScene } = await sceneModule
+    if (disposed || !arenaRef.value) return
+    scene = new LiveCityScene(arenaRef.value)
+    scene.setChallenges(cityStates.value)
+  }
   clockTimer = setInterval(() => { clock.value = Date.now() }, 1000)
   refreshTimer = setInterval(() => void refreshLatest(), 15_000)
   document.addEventListener('fullscreenchange', syncFullscreen)
@@ -269,6 +275,7 @@ onMounted(async () => {
 })
 
 onUnmounted(() => {
+  disposed = true
   if (clockTimer) clearInterval(clockTimer)
   if (refreshTimer) clearInterval(refreshTimer)
   if (projectionTimer) clearTimeout(projectionTimer)

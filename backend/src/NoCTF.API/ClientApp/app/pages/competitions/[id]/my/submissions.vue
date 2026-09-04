@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { toast } from 'vue-sonner'
 import {
   getGameplayFactStatusEndpoint,
   listChallengesEndpoint,
@@ -14,6 +15,7 @@ const route = useRoute()
 const competitionId = route.params.id as string
 
 const challengeTitles = ref<Record<string, string>>({})
+const challengeTitlesError = ref<string | null>(null)
 
 const { items, loading, error, hasMore, initialized, loadMore } =
   useCursorPagination<Submission>(async (cursor) => {
@@ -29,23 +31,30 @@ const { items, loading, error, hasMore, initialized, loadMore } =
     return { items: data.items, nextCursor: data.nextCursor }
   })
 
-onMounted(async () => {
-  const { data } = await listChallengesEndpoint({ path: { competitionId } })
+async function loadChallengeTitles(): Promise<void> {
+  challengeTitlesError.value = null
+  const { data, error } = await listChallengesEndpoint({ path: { competitionId } })
+  if (error || !data) {
+    challengeTitlesError.value = parseApiError(error, translate('加载题目名称失败')).message
+    return
+  }
   challengeTitles.value = Object.fromEntries(
     (data?.items ?? []).map((c) => [c.id!, c.title ?? '']),
   )
-  await loadMore()
-})
+}
+
+onMounted(() => void Promise.all([loadChallengeTitles(), loadMore()]))
 
 // 待评测提交轮询刷新
 async function refreshPending() {
   const pending = items.value.filter((s) => isGameplayFactPending(s.state))
   await Promise.all(
     pending.map(async (submission) => {
-      const { data } = await getGameplayFactStatusEndpoint({
+      const { data, error: requestError } = await getGameplayFactStatusEndpoint({
         path: { competitionId, gameplayFactId: submission.id! },
       })
-      if (!data) return
+      if (requestError || !data)
+        throw parseApiError(requestError, translate('刷新提交状态失败'))
       submission.state = data.state
       submission.result = data.result
       submission.failureCode = data.failureCode
@@ -53,13 +62,17 @@ async function refreshPending() {
   )
 }
 
-const { start: startPolling } = usePolling(
+const { timedOut, error: pollingError, start: startPolling } = usePolling(
   async () => {
     await refreshPending()
     return !items.value.some((s) => isGameplayFactPending(s.state))
   },
   { interval: 3000, timeout: 300_000 },
 )
+
+const pollingErrorMessage = computed(() => pollingError.value
+  ? parseApiError(pollingError.value, translate('刷新提交状态失败')).message
+  : null)
 
 watch(
   () => items.value.some((s) => isGameplayFactPending(s.state)),
@@ -72,7 +85,10 @@ watch(
 let unwatch: (() => void) | undefined
 onMounted(() => {
   unwatch = watchCompetition(competitionId, {
-    gameplayFactStateChanged: () => void refreshPending(),
+    gameplayFactStateChanged: () => void refreshPending().catch((requestError) => {
+      toast.error(parseApiError(requestError, translate('刷新提交状态失败')).message)
+      startPolling()
+    }),
   })
 })
 onUnmounted(() => unwatch?.())
@@ -100,6 +116,21 @@ function resultText(submission: Submission) {
 
     <Alert v-if="error" variant="destructive">
       <AlertDescription>{{ error.message }}</AlertDescription>
+    </Alert>
+    <Alert v-if="challengeTitlesError" variant="destructive">
+      <AlertDescription class="flex flex-wrap items-center justify-between gap-3">
+        <span>{{ challengeTitlesError }}</span>
+        <Button type="button" size="sm" variant="outline" @click="loadChallengeTitles">{{ $t('重新加载') }}</Button>
+      </AlertDescription>
+    </Alert>
+    <Alert v-if="timedOut" variant="destructive">
+      <AlertDescription class="flex flex-wrap items-center justify-between gap-3">
+        <span>{{ $t('提交状态自动刷新已停止，请手动重试。') }}</span>
+        <Button type="button" size="sm" variant="outline" @click="startPolling">{{ $t('重新加载') }}</Button>
+      </AlertDescription>
+    </Alert>
+    <Alert v-else-if="pollingErrorMessage" variant="destructive">
+      <AlertDescription>{{ $t('提交状态刷新失败，正在自动重试：{reason}', { reason: pollingErrorMessage }) }}</AlertDescription>
     </Alert>
 
     <div v-if="loading && !initialized" class="flex flex-col gap-2">
