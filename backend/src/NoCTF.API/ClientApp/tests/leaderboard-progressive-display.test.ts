@@ -9,6 +9,15 @@ const scoreboard = await Bun.file(
 const slotStatus = await Bun.file(
   new URL('../app/components/leaderboard/ScoreboardSlotStatus.vue', import.meta.url),
 ).text()
+const teamDetail = await Bun.file(
+  new URL('../app/components/leaderboard/ScoreboardTeamDetailDialog.vue', import.meta.url),
+).text()
+const trendChart = await Bun.file(
+  new URL('../app/components/leaderboard/ScoreTrendChart.vue', import.meta.url),
+).text()
+const theme = await Bun.file(
+  new URL('../app/assets/css/main.css', import.meta.url),
+).text()
 
 describe('leaderboard progressive display', () => {
   test('keeps the full snapshot and progressively reveals stable entries', () => {
@@ -56,15 +65,29 @@ describe('leaderboard progressive display', () => {
     expect(page).not.toContain('entry.defenseScore')
   })
 
-  test('renders server-authoritative CTF score trends above the matrix', () => {
+  test('keeps the overall CTF trend above the matrix and moves the team trend into team detail', () => {
     expect(page).toContain('getLeaderboardTrendsEndpoint')
     expect(page).toContain("const visibleTrendSeries = computed<TrendSeries[]>")
     expect(page).toContain("teams.value")
     expect(page).toContain("$t('总分趋势')")
-    expect(page).toContain("$t('队伍得分趋势')")
     expect(page).toContain('<LazyScoreTrendChart v-else :series="visibleTrendSeries"')
-    expect(page).toContain('<LazyScoreTrendChart v-else :series="selectedTrendSeries"')
     expect(page).toContain('<LazyScoreboardTeamDetailDialog')
-    expect(page).toContain('v-if="isCtf" class="grid gap-4 xl:grid-cols-2"')
+    expect(page).toContain(':trend-series="teamDetailTrendSeries"')
+    expect(page).not.toContain('selectedTrendTeamId')
+    expect(page).not.toContain('selectedTrendSeries')
+    expect(teamDetail).toContain("$t('队伍得分趋势')")
+    expect(teamDetail).toContain('<LazyScoreTrendChart')
+    expect(teamDetail.indexOf('scoreboard-team-trend-title'))
+      .toBeLessThan(teamDetail.indexOf('scoreboard-team-radar-title'))
+  })
+
+  test('keeps every team visible on hover and assigns series colors from a diverse theme palette', () => {
+    expect(trendChart).toContain("colorBy: 'series' as const")
+    expect(trendChart).toContain('hoverLink: false')
+    expect(trendChart).toContain('selectedMode: false')
+    expect(trendChart).toContain('emphasis: { disabled: true }')
+    expect(trendChart).toContain('blur: { lineStyle: { opacity: 1 }, itemStyle: { opacity: 1 } }')
+    expect(trendChart).not.toContain("focus: 'series'")
+    expect(theme.match(/--chart-(?:[1-9]|10): oklch\([^)]+\);/g)).toHaveLength(20)
   })
 })

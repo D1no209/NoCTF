@@ -38,7 +38,14 @@ function buildOption(): echarts.EChartsCoreOption {
       trigger: 'axis',
       valueFormatter: (value: number | string) => `${value} pts`,
     },
-    legend: { bottom: 36, type: 'scroll', itemGap: 16, textStyle: { color: foreground } },
+    legend: {
+      bottom: 36,
+      type: 'scroll',
+      itemGap: 16,
+      hoverLink: false,
+      selectedMode: false,
+      textStyle: { color: foreground },
+    },
     toolbox: {
       right: 16,
       feature: {
@@ -71,10 +78,12 @@ function buildOption(): echarts.EChartsCoreOption {
         : [[new Date(start).getTime(), 0], [new Date(end).getTime(), 0]]
       return {
         type: 'line' as const,
+        colorBy: 'series' as const,
         name: team.teamName ?? translate('队伍'),
         step: 'end' as const,
         showSymbol: false,
-        emphasis: { focus: 'series' as const },
+        emphasis: { disabled: true },
+        blur: { lineStyle: { opacity: 1 }, itemStyle: { opacity: 1 } },
         lineStyle: { width: 2 },
         data,
       }
