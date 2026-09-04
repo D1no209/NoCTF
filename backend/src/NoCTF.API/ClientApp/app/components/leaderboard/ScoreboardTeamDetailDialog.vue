@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Flag, ShieldCheck, Target, Trophy } from '@lucide/vue'
+import { ChartSpline, Flag, ShieldCheck, Target, Trophy } from '@lucide/vue'
 import type {
   NoCtfapiEndpointsCompetitionsGameModeProtocol,
   NoCtfapiEndpointsCompetitionsScoreboardTeamResponse,
@@ -14,13 +14,21 @@ import {
   scoreboardTeamDirectionScore,
 } from '~/utils/scoreboard'
 import type { ScoreboardChallengeColumnGroup } from '~/utils/scoreboard'
+import type { TrendSeries } from './types'
 
 const props = defineProps<{
   mode?: NoCtfapiEndpointsCompetitionsGameModeProtocol | null
   team: NoCtfapiEndpointsCompetitionsScoreboardTeamResponse | null
   teams: NoCtfapiEndpointsCompetitionsScoreboardTeamResponse[]
   columnGroups: ScoreboardChallengeColumnGroup[]
+  trendSeries?: TrendSeries[]
+  trendLoading?: boolean
+  trendError?: string | null
+  trendRangeStart?: string | null
+  trendRangeEnd?: string | null
 }>()
+
+const emit = defineEmits<{ retryTrends: [] }>()
 
 const open = defineModel<boolean>('open', { default: false })
 const isAwdp = computed(() => props.mode === 'Awdp')
@@ -176,6 +184,31 @@ function flagLabel(succeeded: boolean): string {
           <div class="bg-background p-4"><p class="text-xs text-muted-foreground">{{ $t('总分') }}</p><p class="mt-1 font-mono text-lg font-semibold tabular-nums">{{ team.totalScore ?? 0 }} pts</p></div>
           <div class="bg-background p-4"><p class="text-xs text-muted-foreground">{{ $t('排名状态') }}</p><p class="mt-1 flex items-center gap-2 font-medium"><Trophy class="size-4 text-primary" aria-hidden="true" />{{ scoreboardRankingStateLabel(team.rankingState) }}</p></div>
         </div>
+
+        <section v-if="mode === 'Ctf'" class="rounded-xl border bg-muted/20 p-4" aria-labelledby="scoreboard-team-trend-title">
+          <div class="mb-2 flex items-start gap-2">
+            <ChartSpline class="mt-0.5 size-4 shrink-0 text-primary" aria-hidden="true" />
+            <div>
+              <h3 id="scoreboard-team-trend-title" class="text-sm font-semibold">{{ $t('队伍得分趋势') }}</h3>
+              <p class="text-xs text-muted-foreground">{{ $t('查看单支队伍的累计分值变化') }}</p>
+            </div>
+          </div>
+          <Skeleton v-if="trendLoading && !trendSeries?.length" class="h-[280px] w-full" />
+          <Alert v-else-if="trendError" variant="destructive">
+            <AlertDescription class="flex flex-wrap items-center justify-between gap-3">
+              <span>{{ trendError }}</span>
+              <Button type="button" size="sm" variant="outline" @click="emit('retryTrends')">{{ $t('重新加载') }}</Button>
+            </AlertDescription>
+          </Alert>
+          <LazyScoreTrendChart
+            v-else-if="trendSeries?.length"
+            :series="trendSeries"
+            :range-start="trendRangeStart"
+            :range-end="trendRangeEnd"
+            height="280px"
+          />
+          <p v-else class="py-10 text-center text-sm text-muted-foreground">{{ $t('暂无得分趋势') }}</p>
+        </section>
 
         <div class="grid gap-4 lg:grid-cols-2">
           <section class="rounded-xl border bg-muted/20 p-4" aria-labelledby="scoreboard-team-radar-title">

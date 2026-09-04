@@ -92,7 +92,6 @@ const isCtf = computed(() => board.schema.value?.mode === 'Ctf')
 const trends = ref<NoCtfapiEndpointsCompetitionsScoreboardTrendsResponse | null>(null)
 const trendsLoading = ref(false)
 const trendsError = ref<string | null>(null)
-const selectedTrendTeamId = ref<string | null>(null)
 let trendsGeneration = 0
 let trendsRetryTimer: ReturnType<typeof setTimeout> | null = null
 
@@ -111,17 +110,8 @@ const visibleTrendSeries = computed<TrendSeries[]>(() => {
       }
     })
 })
-const selectedTrendSeries = computed(() => {
-  const selected = visibleTrendSeries.value.find(team => team.teamId === selectedTrendTeamId.value)
-  return selected ? [selected] : []
-})
 const trendRangeStart = computed(() => ctx.competition.value?.startTime ?? null)
 const trendRangeEnd = computed(() => trends.value?.dataAsOf ?? trends.value?.generatedAt ?? null)
-
-watch(visibleTrendSeries, (series) => {
-  if (!series.some(team => team.teamId === selectedTrendTeamId.value))
-    selectedTrendTeamId.value = series[0]?.teamId ?? null
-}, { immediate: true })
 
 async function loadTrends(): Promise<void> {
   if (trendsRetryTimer) clearTimeout(trendsRetryTimer)
@@ -250,6 +240,11 @@ function exportCsv(): void {
 const detailOpen = ref(false)
 const teamDetailOpen = ref(false)
 const teamDetailTeam = ref<NoCtfapiEndpointsCompetitionsScoreboardTeamResponse | null>(null)
+const teamDetailTrendSeries = computed(() => {
+  const teamId = teamDetailTeam.value?.teamId
+  if (!teamId) return []
+  return visibleTrendSeries.value.filter(series => series.teamId === teamId)
+})
 const detailLoading = ref(false)
 const detailLoadingMore = ref(false)
 const detailError = ref<string | null>(null)
@@ -479,7 +474,7 @@ function adjustmentKind(entry: NoCtfapiEndpointsCompetitionsScoreboardAdjustment
       <Empty v-if="board.snapshot.value.dataScope === 'Hidden'" class="border py-12"><EmptyHeader><EmptyTitle>{{ $t('排行榜暂不公开') }}</EmptyTitle><EmptyDescription>{{ $t('主办方当前隐藏了排行榜数据') }}</EmptyDescription></EmptyHeader></Empty>
       <template v-else>
         <Alert v-if="isCtf && trendsError" variant="destructive"><AlertDescription class="flex items-center justify-between gap-3"><span>{{ trendsError }}</span><Button variant="outline" size="sm" @click="loadTrends">{{ $t('重试') }}</Button></AlertDescription></Alert>
-        <div v-if="isCtf" class="grid gap-4 xl:grid-cols-2">
+        <div v-if="isCtf">
           <Card>
             <CardHeader class="pb-0">
               <CardTitle class="text-base">{{ $t('总分趋势') }}</CardTitle>
@@ -489,23 +484,6 @@ function adjustmentKind(entry: NoCtfapiEndpointsCompetitionsScoreboardAdjustment
               <Skeleton v-if="trendsLoading && !trends" class="h-[320px] w-full" />
               <Empty v-else-if="!visibleTrendSeries.length" class="h-[320px]"><EmptyHeader><EmptyTitle>{{ $t('暂无得分趋势') }}</EmptyTitle></EmptyHeader></Empty>
               <LazyScoreTrendChart v-else :series="visibleTrendSeries" :range-start="trendRangeStart" :range-end="trendRangeEnd" height="320px" />
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader class="gap-3 pb-0 sm:flex-row sm:items-center sm:justify-between">
-              <div>
-                <CardTitle class="text-base">{{ $t('队伍得分趋势') }}</CardTitle>
-                <CardDescription>{{ $t('查看单支队伍的累计分值变化') }}</CardDescription>
-              </div>
-              <Select v-if="visibleTrendSeries.length" v-model="selectedTrendTeamId">
-                <SelectTrigger class="w-full sm:w-52" :aria-label="$t('选择队伍')"><SelectValue :placeholder="$t('选择队伍')" /></SelectTrigger>
-                <SelectContent><SelectItem v-for="team in visibleTrendSeries" :key="team.teamId" :value="team.teamId!">{{ team.teamName }}</SelectItem></SelectContent>
-              </Select>
-            </CardHeader>
-            <CardContent class="pt-2">
-              <Skeleton v-if="trendsLoading && !trends" class="h-[320px] w-full" />
-              <Empty v-else-if="!selectedTrendSeries.length" class="h-[320px]"><EmptyHeader><EmptyTitle>{{ $t('暂无得分趋势') }}</EmptyTitle></EmptyHeader></Empty>
-              <LazyScoreTrendChart v-else :series="selectedTrendSeries" :range-start="trendRangeStart" :range-end="trendRangeEnd" height="320px" />
             </CardContent>
           </Card>
         </div>
@@ -573,7 +551,19 @@ function adjustmentKind(entry: NoCtfapiEndpointsCompetitionsScoreboardAdjustment
       </template>
     </template>
 
-    <LazyScoreboardTeamDetailDialog v-model:open="teamDetailOpen" :mode="board.schema.value?.mode" :team="teamDetailTeam" :teams="teams" :column-groups="columnGroups" />
+    <LazyScoreboardTeamDetailDialog
+      v-model:open="teamDetailOpen"
+      :mode="board.schema.value?.mode"
+      :team="teamDetailTeam"
+      :teams="teams"
+      :column-groups="columnGroups"
+      :trend-series="teamDetailTrendSeries"
+      :trend-loading="trendsLoading"
+      :trend-error="trendsError"
+      :trend-range-start="trendRangeStart"
+      :trend-range-end="trendRangeEnd"
+      @retry-trends="loadTrends"
+    />
 
     <Dialog v-model:open="detailOpen">
       <DialogScrollContent class="max-h-[85vh] sm:max-w-2xl">

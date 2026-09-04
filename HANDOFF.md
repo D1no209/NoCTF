@@ -3616,3 +3616,13 @@ dotnet run --project backend/src/NoCTF.API/NoCTF.API.csproj --no-build -- --expo
   generate 通过；Release solution build 0 warning/0 error；TUnit 1147 total：971 passed、0 failed、176 项
   真实依赖用例因本机 Docker 不可用明确跳过。平台版本递增为 `0.1.0-alpha.138`，无 HTTP/OpenAPI、
   业务表、EF migration 或 snapshot 变化。
+
+## 2026-09-04 Alpha.139 排行榜趋势层级与交互修复
+
+- 排行榜上半部分只保留跨队伍总分趋势；单支队伍得分趋势移动到队伍详情，并置于题目方向雷达图上方，
+  与当前点击的队伍绑定，不再通过排行榜上的额外选择器重复占用空间。
+- 总分趋势改用十种不同色相的明暗主题语义色，并显式按系列着色。关闭 ECharts 的系列聚焦淡化、图例
+  hover 联动和图例点击隐藏，指针停留时所有队伍曲线持续可见。
+- 回归测试覆盖趋势层级、详情数据绑定、颜色来源和 hover 不隐藏契约。前端 319/319、ClientApp
+  typecheck 与 Nuxt generate 通过。平台版本递增为 `0.1.0-alpha.139`，无 HTTP/OpenAPI、业务表、
+  EF migration 或 snapshot 变化。
