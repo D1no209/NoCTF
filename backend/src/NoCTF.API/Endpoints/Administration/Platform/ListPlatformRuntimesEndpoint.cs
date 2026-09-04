@@ -4,7 +4,9 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.HttpResults;
 using NoCTF.API.Endpoints.Administration.Runtime;
 using NoCTF.API.Pagination;
+using NoCTF.API.Serialization;
 using NoCTF.Application.Runtime.Instances;
+using System.Text.Json.Serialization;
 
 namespace NoCTF.API.Endpoints.Administration.Platform;
 
@@ -22,9 +24,17 @@ public sealed class ListPlatformRuntimesValidator : Validator<ListPlatformRuntim
     }
 }
 
+[JsonConverter(typeof(StrictPascalCaseEnumConverter<PlatformRuntimeScopeProtocol>))]
+public enum PlatformRuntimeScopeProtocol
+{
+    Competition,
+    ChallengeTest
+}
+
 public sealed record PlatformRuntimeResponse(
     AdminRuntimeResponse Runtime,
-    string CompetitionTitle,
+    PlatformRuntimeScopeProtocol Scope,
+    string? CompetitionTitle,
     string ChallengeTitle);
 
 public sealed record PlatformRuntimeListResponse(
@@ -81,6 +91,9 @@ public sealed class ListPlatformRuntimesEndpoint(
         return TypedResults.Ok(new PlatformRuntimeListResponse(
             items.Select(item => new PlatformRuntimeResponse(
                     AdminRuntimeMapping.ToResponse(item.Runtime, now),
+                    item.Scope == PlatformRuntimeScope.ChallengeTest
+                        ? PlatformRuntimeScopeProtocol.ChallengeTest
+                        : PlatformRuntimeScopeProtocol.Competition,
                     item.CompetitionTitle,
                     item.ChallengeTitle))
                 .ToArray(),

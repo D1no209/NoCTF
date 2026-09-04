@@ -14,7 +14,9 @@ using NoCTF.Infrastructure.Challenges.Flags;
 using NoCTF.Infrastructure.Challenges.Hints;
 using NoCTF.Infrastructure.Challenges.Management;
 using NoCTF.Application.Challenges.Questions;
+using NoCTF.Application.Challenges.Testing;
 using NoCTF.Infrastructure.Challenges.Questions;
+using NoCTF.Infrastructure.Challenges.Testing;
 using NoCTF.Infrastructure.Caching;
 
 namespace NoCTF.Infrastructure.Challenges;
@@ -40,6 +42,9 @@ internal static class ChallengeInfrastructure
         services.AddScoped<RestoreChallengeTemplate>();
         services.AddScoped<UpdateChallengeTemplatePermissions>();
         services.AddScoped<TransferChallengeTemplateOwner>();
+        services.AddScoped<IChallengeTestRuntimeStore, ChallengeTestRuntimeStore>();
+        services.AddScoped<GetChallengeTestRuntime>();
+        services.AddScoped<MutateChallengeTestRuntime>();
         services.AddScoped<IChallengeAttachmentStore, ChallengeAttachmentStore>();
         services.AddScoped<ManageChallengeAttachments>();
         services.AddScoped<GetChallengeAttachments>();

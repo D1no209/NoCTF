@@ -24,7 +24,24 @@ public enum RuntimePurpose : short
     Player,
     AwdpTarget,
     Practice,
-    AwdpAttack
+    AwdpAttack,
+    TemplateTest
+}
+
+public enum RuntimeTestFlagDelivery : short
+{
+    NotRequired,
+    Environment,
+    Command
+}
+
+public enum RuntimeTestFlagState : short
+{
+    NotRequired,
+    Pending,
+    Succeeded,
+    Failed,
+    Canceled
 }
 
 public enum RuntimeFailureCode : short
@@ -58,10 +75,13 @@ public sealed class RuntimePublishedPort
 public sealed class RuntimeInstance
 {
     public Guid Id { get; set; }
-    public Guid CompetitionId { get; set; }
-    public Guid CompetitionChallengeId { get; set; }
+    public Guid? CompetitionId { get; set; }
+    public Guid? CompetitionChallengeId { get; set; }
+    public Guid? ChallengeId { get; set; }
     public Guid? TeamId { get; set; }
     public RuntimePurpose Purpose { get; set; }
+    public RuntimeTestFlagDelivery? TestFlagDelivery { get; set; }
+    public RuntimeTestFlagState? TestFlagState { get; set; }
     public Guid? GameplayFactId { get; set; }
     public RuntimeKind RuntimeKind { get; set; }
     public RuntimeProvider RuntimeProvider { get; set; }

@@ -3,6 +3,14 @@ using NoCTF.Domain.Challenges;
 
 namespace NoCTF.Application.Messaging;
 
+public static class AwdFlagInjectionExecutionBudget
+{
+    public const int MaximumCommandTimeoutSeconds = 300;
+    public const int HandlerCleanupAllowanceSeconds = 30;
+    public const int HandlerExecutionTimeoutSeconds =
+        MaximumCommandTimeoutSeconds + HandlerCleanupAllowanceSeconds;
+}
+
 public sealed record AdvanceAwdRound(
     Guid CompetitionId,
     Guid CompetitionChallengeId,

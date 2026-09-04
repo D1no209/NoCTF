@@ -19,6 +19,8 @@ export function adminRuntimeTeamLabel(
       ? t('一次性 Fix 验证 Target · {team}', { team: sourceTeamName })
       : t('一次性 Fix 验证 Target')
   }
+  if (runtime.purpose === 'TemplateTest')
+    return t('题目测试')
 
   if (sourceTeamName)
     return sourceTeamName

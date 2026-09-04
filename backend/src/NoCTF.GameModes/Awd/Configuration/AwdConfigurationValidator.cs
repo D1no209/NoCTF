@@ -1,5 +1,6 @@
 namespace NoCTF.GameModes.Awd.Configuration;
 
+using NoCTF.Application.Messaging;
 using NoCTF.Application.Runtime.Provisioning;
 using NoCTF.Application.Runtime.Configuration;
 using NoCTF.Application.Scoring;
@@ -63,8 +64,12 @@ public static class AwdConfigurationValidator
             if (string.IsNullOrWhiteSpace(injection.Command)
                 || !injection.Command.Contains("${FLAG}", StringComparison.Ordinal))
                 errors.Add("FlagInjection.Command must be a non-empty raw template containing ${FLAG}.");
-            if (injection.TimeoutSeconds <= 0)
-                errors.Add("FlagInjection.TimeoutSeconds must be positive.");
+            if (injection.TimeoutSeconds is <= 0
+                or > AwdFlagInjectionExecutionBudget.MaximumCommandTimeoutSeconds)
+            {
+                errors.Add(
+                    $"FlagInjection.TimeoutSeconds must be between 1 and {AwdFlagInjectionExecutionBudget.MaximumCommandTimeoutSeconds}.");
+            }
             if (configuration.Runtime?.Definition is ComposeRuntimeDefinition
                 && string.IsNullOrWhiteSpace(injection.ServiceName))
                 errors.Add("FlagInjection.ServiceName is required for Compose runtimes.");

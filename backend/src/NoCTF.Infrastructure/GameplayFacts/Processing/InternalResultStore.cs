@@ -68,7 +68,7 @@ public sealed class InternalResultStore(
                 : null;
         fact.UpdatedAt = appliedAt;
         await events.RecordAsync(new(
-            runtime.CompetitionId,
+            runtime.CompetitionId!.Value,
             CompetitionEventKind.ScoringRecorded,
             scoringResult == GameplayFactResult.ServiceDown
                 ? CompetitionEventLevel.Warning
@@ -211,7 +211,7 @@ public sealed class InternalResultStore(
             GameplayFactResult: fact.Result,
             PayloadJson: payload.Serialize()), ct);
         await events.RecordAsync(new(
-            runtime.CompetitionId,
+            runtime.CompetitionId!.Value,
             CompetitionEventKind.RuntimeStateChanged,
             CompetitionEventLevel.Information,
             CompetitionEventVisibility.Team,

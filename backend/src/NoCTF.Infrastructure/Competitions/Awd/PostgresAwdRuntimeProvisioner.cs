@@ -122,7 +122,8 @@ public sealed class PostgresAwdRuntimeProvisioner(
                     && runtime.Purpose == RuntimePurpose.Player
                     && runtime.TeamId == teamId)
                 .ToListAsync(cancellationToken);
-            if (existing.Any(runtime => desiredChallengeIds.Contains(runtime.CompetitionChallengeId)
+            if (existing.Any(runtime => runtime.CompetitionChallengeId is Guid runtimeChallengeId
+                    && desiredChallengeIds.Contains(runtimeChallengeId)
                     && runtime.State == RuntimeState.Stopping))
             {
                 deferredCleanup = true;
@@ -134,7 +135,7 @@ public sealed class PostgresAwdRuntimeProvisioner(
                     or RuntimeState.Provisioning
                     or RuntimeState.Running
                     or RuntimeState.Stopping)
-                .Select(runtime => runtime.CompetitionChallengeId)
+                .Select(runtime => runtime.CompetitionChallengeId!.Value)
                 .ToHashSet();
             if (competition.MaxConcurrentRuntimeInstancesPerTeam > 0
                 && active.Concat(desiredChallengeIds).Distinct().Count()
@@ -148,8 +149,9 @@ public sealed class PostgresAwdRuntimeProvisioner(
             var cleanupTargets = existing
                 .Where(runtime => runtime.State == RuntimeState.Failed
                     && runtime.ProviderReceiptJson != null
-                    && desiredChallengeIds.Contains(runtime.CompetitionChallengeId))
-                .GroupBy(runtime => runtime.CompetitionChallengeId)
+                    && runtime.CompetitionChallengeId is Guid runtimeChallengeId
+                    && desiredChallengeIds.Contains(runtimeChallengeId))
+                .GroupBy(runtime => runtime.CompetitionChallengeId!.Value)
                 .Where(group => !active.Contains(group.Key))
                 .Select(group => group
                     .OrderByDescending(runtime => runtime.CreatedAt)
@@ -161,7 +163,7 @@ public sealed class PostgresAwdRuntimeProvisioner(
                 var challengesById = challenges.ToDictionary(challenge => challenge.Id);
                 foreach (var cleanupTarget in cleanupTargets)
                 {
-                    var challenge = challengesById[cleanupTarget.CompetitionChallengeId];
+                    var challenge = challengesById[cleanupTarget.CompetitionChallengeId!.Value];
                     cleanupTarget.State = RuntimeState.Stopping;
                     cleanupTarget.FailureCode = null;
                     var replacement = new RuntimeInstance
@@ -238,7 +240,7 @@ public sealed class PostgresAwdRuntimeProvisioner(
         DateTimeOffset occurredAt,
         CancellationToken cancellationToken) =>
         events.RecordAsync(new(
-            runtime.CompetitionId,
+            runtime.CompetitionId!.Value,
             CompetitionEventKind.RuntimeCreated,
             CompetitionEventLevel.Information,
             CompetitionEventVisibility.Team,
@@ -255,7 +257,7 @@ public sealed class PostgresAwdRuntimeProvisioner(
         DateTimeOffset occurredAt,
         CancellationToken cancellationToken) =>
         events.RecordAsync(new(
-            runtime.CompetitionId,
+            runtime.CompetitionId!.Value,
             CompetitionEventKind.RuntimeStateChanged,
             level,
             CompetitionEventVisibility.Team,

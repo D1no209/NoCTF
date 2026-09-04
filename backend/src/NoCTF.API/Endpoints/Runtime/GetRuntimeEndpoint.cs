@@ -42,7 +42,8 @@ public enum RuntimePurposeProtocol
     Player,
     AwdpTarget,
     Practice,
-    AwdpAttack
+    AwdpAttack,
+    TemplateTest
 }
 
 [JsonConverter(typeof(StrictPascalCaseEnumConverter<RuntimeFailureCodeProtocol>))]
@@ -109,8 +110,10 @@ internal static class RuntimeEndpointMapping
     public static RuntimeResponse ToResponse(RuntimeInstanceView view) =>
         new(
             view.Id,
-            view.CompetitionId,
-            view.CompetitionChallengeId,
+            view.CompetitionId
+                ?? throw new InvalidOperationException("Player Runtime has no CompetitionId."),
+            view.CompetitionChallengeId
+                ?? throw new InvalidOperationException("Player Runtime has no CompetitionChallengeId."),
             view.TeamId,
             RuntimeProtocolMapper.ToProtocol(view.RuntimeKind),
             RuntimeProtocolMapper.ToProtocol(view.Provider),
@@ -127,7 +130,7 @@ internal static class RuntimeEndpointMapping
     public static RuntimeAcceptedResponse ToAccepted(RuntimeInstanceView view) =>
         new(
             view.Id,
-            $"/api/v1/competitions/{view.CompetitionId}/challenges/{view.CompetitionChallengeId}/runtime");
+            $"/api/v1/competitions/{view.CompetitionId!.Value}/challenges/{view.CompetitionChallengeId!.Value}/runtime");
 }
 
 public sealed class GetRuntimeEndpoint(

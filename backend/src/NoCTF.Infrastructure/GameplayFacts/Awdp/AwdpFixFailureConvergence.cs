@@ -73,7 +73,7 @@ public static class AwdpFixFailureConvergence
                 runtime.State = RuntimeState.Stopping;
                 runtimeStateChanged = true;
                 await events.RecordAsync(new(
-                    runtime.CompetitionId,
+                    runtime.CompetitionId!.Value,
                     CompetitionEventKind.RuntimeStateChanged,
                     CompetitionEventLevel.Warning,
                     CompetitionEventVisibility.Team,

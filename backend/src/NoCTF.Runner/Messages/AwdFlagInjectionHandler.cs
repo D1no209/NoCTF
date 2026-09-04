@@ -85,7 +85,7 @@ public sealed class AwdFlagInjectionWorkReader(
         if (injection is null)
             return null;
         return new(
-            target.CompetitionId,
+            target.CompetitionId!.Value,
             target.RuntimeKind,
             target.RuntimeProvider,
             target.ProviderReceiptJson,

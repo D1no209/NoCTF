@@ -177,7 +177,7 @@ public sealed class PostgresKohRuntimeProvisioner(
         DateTimeOffset occurredAt,
         CancellationToken cancellationToken) =>
         events.RecordAsync(new(
-            runtime.CompetitionId,
+            runtime.CompetitionId!.Value,
             CompetitionEventKind.RuntimeCreated,
             CompetitionEventLevel.Information,
             CompetitionEventVisibility.Public,
@@ -193,7 +193,7 @@ public sealed class PostgresKohRuntimeProvisioner(
         DateTimeOffset occurredAt,
         CancellationToken cancellationToken) =>
         events.RecordAsync(new(
-            runtime.CompetitionId,
+            runtime.CompetitionId!.Value,
             CompetitionEventKind.RuntimeStateChanged,
             level,
             CompetitionEventVisibility.Public,

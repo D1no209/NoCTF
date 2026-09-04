@@ -165,6 +165,10 @@ public static class ObservabilityExtensions
 
     private static readonly RuntimeAction[] RuntimeActions =
     [
+        new("/test-runtime/start", "runtime_test_start"),
+        new("/test-runtime/stop", "runtime_test_stop"),
+        new("/test-runtime/reset", "runtime_test_reset"),
+        new("/test-runtime/extend", "runtime_test_extend"),
         new("/runtime/start", "runtime_start"),
         new("/runtime/stop", "runtime_stop"),
         new("/runtime/reset", "runtime_reset"),

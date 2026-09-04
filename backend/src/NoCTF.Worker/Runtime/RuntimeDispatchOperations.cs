@@ -18,6 +18,7 @@ using NoCTF.Domain.Competitions;
 using NoCTF.Domain.Challenges;
 using NoCTF.Infrastructure.Persistence;
 using NoCTF.Infrastructure.GameplayFacts.Awdp;
+using NoCTF.Infrastructure.Challenges;
 using NoCTF.Domain.Notifications;
 using System.Text.Json;
 using System.Buffers.Binary;
@@ -49,73 +50,93 @@ internal static partial class BackendMessageOperations
         ICompetitionEventRecorder? events = null)
     {
         events ??= NullCompetitionEventRecorder.Instance;
-        var target = await db.RuntimeInstances
-            .Join(
-                db.CompetitionChallenges,
-                instance => instance.CompetitionChallengeId,
-                challenge => challenge.Id,
-                (instance, challenge) => new { Instance = instance, Challenge = challenge })
-            .Join(
-                db.Competitions,
-                pair => pair.Instance.CompetitionId,
-                competition => competition.Id,
-                (pair, competition) => new { pair.Instance, pair.Challenge, Competition = competition })
-            .Join(
-                db.Challenges,
-                item => item.Challenge.ChallengeId,
-                challenge => challenge.Id,
-                (item, challenge) => new
-                {
-                    item.Instance,
-                    item.Challenge,
-                    item.Competition,
-                    Template = challenge
-                })
-            .SingleOrDefaultAsync(item => item.Instance.Id == message.RuntimeInstanceId, cancellationToken);
-        if (target is null || target.Instance.State != RuntimeState.Queued)
+        var runtimeScope = await db.RuntimeInstances.AsNoTracking()
+            .Where(candidate => candidate.Id == message.RuntimeInstanceId)
+            .Select(candidate => new { candidate.Purpose, candidate.ChallengeId })
+            .SingleOrDefaultAsync(cancellationToken);
+        if (runtimeScope is null)
+            return;
+        if (runtimeScope.Purpose == RuntimePurpose.TemplateTest)
+        {
+            if (runtimeScope.ChallengeId is not Guid challengeId
+                || await ChallengeTemplateCriticalSection.AcquireAsync(
+                    db,
+                    challengeId,
+                    cancellationToken) is null)
+            {
+                return;
+            }
+        }
+
+        var instance = await db.RuntimeInstances.SingleOrDefaultAsync(
+            candidate => candidate.Id == message.RuntimeInstanceId,
+            cancellationToken);
+        if (instance is null || instance.State != RuntimeState.Queued)
             return;
 
-        var awdpConfiguration = target.Instance.Purpose == RuntimePurpose.AwdpTarget
-            ? AwdpConfigurationResolver.Resolve(
-                target.Competition.ConfigurationJson,
-                target.Challenge.RulesJson,
-                target.Template.DefinitionJson)
-            : null;
-        var template = awdpConfiguration?.Runtime
-            ?? templates.Get(target.Competition.Mode, target.Template.DefinitionJson);
+        var target = await ResolveRuntimeDispatchTargetAsync(instance, db, cancellationToken);
+        if (target is null)
+        {
+            await RejectInvalidConfigurationAsync(
+                instance, db, outbox, events, timeProvider, cancellationToken);
+            return;
+        }
+
+        ChallengeRuntimeTemplate? template;
+        try
+        {
+            var awdpConfiguration = instance.Purpose == RuntimePurpose.AwdpTarget
+                ? AwdpConfigurationResolver.Resolve(
+                    target.CompetitionConfigurationJson!,
+                    target.RulesJson!,
+                    target.DefinitionJson)
+                : null;
+            template = awdpConfiguration?.Runtime
+                ?? templates.Get(target.Mode, target.DefinitionJson);
+        }
+        catch (Exception exception) when (exception is InvalidOperationException
+            or GameModeConfigurationException
+            or JsonException)
+        {
+            template = null;
+        }
         if (template is null)
         {
-            target.Instance.State = RuntimeState.Failed;
-            target.Instance.FailureCode = RuntimeFailureCode.InvalidConfiguration;
-            await FailAwdpSubmissionAsync(
-                target.Instance, db, outbox, events, timeProvider, cancellationToken);
-            await RecordRuntimeStateAsync(
-                events,
-                target.Instance,
-                CompetitionEventLevel.Error,
-                timeProvider.GetUtcNow(),
-                cancellationToken);
-            await db.SaveChangesAsync(cancellationToken);
-            await outbox.FlushOutgoingMessagesAsync();
+            await RejectInvalidConfigurationAsync(
+                instance, db, outbox, events, timeProvider, cancellationToken);
             return;
         }
 
         string? perTeamFlag = null;
-        if (target.Competition.Mode is GameMode.Ctf or GameMode.Awdp
-            && target.Instance.Purpose != RuntimePurpose.AwdpTarget
+        if (instance.Purpose == RuntimePurpose.TemplateTest
+            && instance.TestFlagDelivery == RuntimeTestFlagDelivery.Environment)
+        {
+            perTeamFlag = await db.ChallengeFlags.AsNoTracking()
+                .Where(flag =>
+                    flag.ChallengeId == target.ChallengeId
+                    && flag.SpecificationKind == SpecificationKind.RuntimeInstance
+                    && flag.SpecificationId == instance.Id
+                    && flag.DeletedAt == null
+                    && flag.ValidUntil == null)
+                .Select(flag => flag.Flag)
+                .SingleOrDefaultAsync(cancellationToken);
+        }
+        else if (target.Mode is GameMode.Ctf or GameMode.Awdp
+            && instance.Purpose != RuntimePurpose.AwdpTarget
             && template.FlagSource == RuntimeFlagSource.PerTeam)
         {
-            if (target.Instance.TeamId is Guid teamId)
+            if (instance.TeamId is Guid teamId
+                && instance.CompetitionChallengeId is Guid competitionChallengeId)
             {
-                var specificationKind = target.Competition.Mode == GameMode.Awdp
+                var specificationKind = target.Mode == GameMode.Awdp
                     ? SpecificationKind.RuntimeInstance
                     : SpecificationKind.RuntimeDefinition;
-                var specificationId = target.Competition.Mode == GameMode.Awdp
-                    ? target.Instance.Id
-                    : target.Challenge.Id;
+                var specificationId = target.Mode == GameMode.Awdp
+                    ? instance.Id
+                    : competitionChallengeId;
                 perTeamFlag = await db.ChallengeFlags.AsNoTracking()
                     .Where(flag =>
-                        flag.CompetitionChallengeId == target.Challenge.Id
+                        flag.CompetitionChallengeId == competitionChallengeId
                         && flag.TeamId == teamId
                         && flag.SpecificationKind == specificationKind
                         && flag.SpecificationId == specificationId
@@ -124,38 +145,30 @@ internal static partial class BackendMessageOperations
                     .Select(flag => flag.Flag)
                     .SingleOrDefaultAsync(cancellationToken);
             }
-            if (perTeamFlag is null)
-            {
-                target.Instance.State = RuntimeState.Failed;
-                target.Instance.FailureCode = RuntimeFailureCode.InvalidConfiguration;
-                await RecordRuntimeStateAsync(
-                    events,
-                    target.Instance,
-                    CompetitionEventLevel.Error,
-                    timeProvider.GetUtcNow(),
-                    cancellationToken);
-                await db.SaveChangesAsync(cancellationToken);
-                await outbox.FlushOutgoingMessagesAsync();
-                return;
-            }
+        }
+        if ((instance.TestFlagDelivery == RuntimeTestFlagDelivery.Environment
+                || target.Mode is GameMode.Ctf or GameMode.Awdp
+                    && instance.Purpose != RuntimePurpose.AwdpTarget
+                    && template.FlagSource == RuntimeFlagSource.PerTeam)
+            && perTeamFlag is null)
+        {
+            await RejectInvalidConfigurationAsync(
+                instance, db, outbox, events, timeProvider, cancellationToken);
+            return;
         }
 
-        var placement = placementPolicy.Resolve(target.Instance.RuntimeKind);
-        if (placement.Provider != target.Instance.RuntimeProvider)
+        var placement = placementPolicy.Resolve(instance.RuntimeKind);
+        if (placement.Provider != instance.RuntimeProvider)
         {
-            target.Instance.State = RuntimeState.Failed;
-            target.Instance.FailureCode = RuntimeFailureCode.InvalidConfiguration;
-            await FailAwdpSubmissionAsync(
-                target.Instance, db, outbox, events, timeProvider, cancellationToken);
-            await db.SaveChangesAsync(cancellationToken);
-            await outbox.FlushOutgoingMessagesAsync();
+            await RejectInvalidConfigurationAsync(
+                instance, db, outbox, events, timeProvider, cancellationToken);
             return;
         }
 
         var limits = template.Limits
             ?? new RuntimeResourceLimits(512 * 1024 * 1024, 500_000_000, 256);
         var capacityClaim = await capacity.TryClaimAsync(new RunnerCapacityRequest(
-            target.Instance.Id,
+            instance.Id,
             placement.RunnerPool,
             limits.MemoryBytes,
             limits.NanoCpus,
@@ -173,14 +186,14 @@ internal static partial class BackendMessageOperations
         IRuntimeProvisionMessage provision;
         try
         {
-            if (target.Instance.Purpose == RuntimePurpose.AwdpTarget)
+            if (instance.Purpose == RuntimePurpose.AwdpTarget)
             {
                 var definition = AwdpTargetDefinitionFactory.Create(
-                    target.Instance.Id,
+                    instance.Id,
                     template,
-                    target.Instance.RuntimeProvider,
+                    instance.RuntimeProvider,
                     timeProvider.GetUtcNow());
-                if (target.Instance.RuntimeProvider == RuntimeProvider.Docker)
+                if (instance.RuntimeProvider == RuntimeProvider.Docker)
                 {
                     definition = definition with
                     {
@@ -190,25 +203,25 @@ internal static partial class BackendMessageOperations
                     };
                 }
                 provision = new ProvisionContainerRuntime(
-                    target.Instance.Id,
+                    instance.Id,
                     runnerId,
                     definition);
             }
             else
             {
                 provision = RuntimeClaimFactory.Create(
-                    target.Instance,
+                    instance,
                     runnerId,
-                    target.Competition.Mode,
+                    target.Mode,
                     template,
-                    target.Template.DefinitionJson,
+                    target.DefinitionJson,
                     perTeamFlag);
             }
         }
         catch (InvalidOperationException)
         {
             var release = await capacity.ReleaseAsync(
-                target.Instance.Id,
+                instance.Id,
                 runnerId,
                 cancellationToken);
             if (release == RunnerCapacityReleaseOutcome.OwnerMismatch)
@@ -216,24 +229,14 @@ internal static partial class BackendMessageOperations
                 throw new InvalidOperationException(
                     "The selected Runner no longer owns the Runtime capacity claim.");
             }
-            target.Instance.State = RuntimeState.Failed;
-            target.Instance.FailureCode = RuntimeFailureCode.InvalidConfiguration;
-            await FailAwdpSubmissionAsync(
-                target.Instance, db, outbox, events, timeProvider, cancellationToken);
-            await RecordRuntimeStateAsync(
-                events,
-                target.Instance,
-                CompetitionEventLevel.Error,
-                timeProvider.GetUtcNow(),
-                cancellationToken);
-            await db.SaveChangesAsync(cancellationToken);
-            await outbox.FlushOutgoingMessagesAsync();
+            await RejectInvalidConfigurationAsync(
+                instance, db, outbox, events, timeProvider, cancellationToken);
             return;
         }
 
-        target.Instance.RunnerId = runnerId;
-        target.Instance.State = RuntimeState.Provisioning;
-        target.Instance.FailureCode = null;
+        instance.RunnerId = runnerId;
+        instance.State = RuntimeState.Provisioning;
+        instance.FailureCode = null;
         await PublishRuntimeProvisionAsync(outbox, provision);
         await db.SaveChangesAsync(cancellationToken);
         await outbox.FlushOutgoingMessagesAsync();
@@ -256,5 +259,105 @@ internal static partial class BackendMessageOperations
             AwdpFixRuntimeCleanupMode.CallerManaged,
             cancellationToken);
     }
+
+    private static async Task<RuntimeDispatchTarget?> ResolveRuntimeDispatchTargetAsync(
+        RuntimeInstance instance,
+        NoCtfDbContext db,
+        CancellationToken cancellationToken)
+    {
+        if (instance.Purpose == RuntimePurpose.TemplateTest)
+        {
+            if (instance.ChallengeId is not Guid challengeId)
+                return null;
+            var challenge = await db.Challenges.AsNoTracking()
+                .SingleOrDefaultAsync(candidate => candidate.Id == challengeId, cancellationToken);
+            return challenge is null
+                ? null
+                : new(
+                    instance,
+                    challenge.Id,
+                    challenge.Mode,
+                    challenge.DefinitionJson,
+                    null,
+                    null);
+        }
+
+        if (instance.CompetitionId is not Guid competitionId
+            || instance.CompetitionChallengeId is not Guid competitionChallengeId)
+            return null;
+        var scope = await db.CompetitionChallenges.AsNoTracking()
+            .Where(challenge => challenge.Id == competitionChallengeId
+                && challenge.CompetitionId == competitionId)
+            .Join(
+                db.Competitions.AsNoTracking(),
+                challenge => challenge.CompetitionId,
+                competition => competition.Id,
+                (challenge, competition) => new { Challenge = challenge, Competition = competition })
+            .Join(
+                db.Challenges.AsNoTracking(),
+                item => item.Challenge.ChallengeId,
+                challenge => challenge.Id,
+                (item, challenge) => new
+                {
+                    ChallengeId = challenge.Id,
+                    item.Competition.Mode,
+                    challenge.DefinitionJson,
+                    CompetitionConfigurationJson = item.Competition.ConfigurationJson,
+                    RulesJson = item.Challenge.RulesJson
+                })
+            .SingleOrDefaultAsync(cancellationToken);
+        return scope is null
+            ? null
+            : new(
+                instance,
+                scope.ChallengeId,
+                scope.Mode,
+                scope.DefinitionJson,
+                scope.CompetitionConfigurationJson,
+                scope.RulesJson);
+    }
+
+    private static async Task RejectInvalidConfigurationAsync(
+        RuntimeInstance instance,
+        NoCtfDbContext db,
+        ITransactionalMessageOutbox outbox,
+        ICompetitionEventRecorder events,
+        TimeProvider timeProvider,
+        CancellationToken cancellationToken)
+    {
+        var failedAt = timeProvider.GetUtcNow();
+        instance.State = RuntimeState.Failed;
+        instance.FailureCode = RuntimeFailureCode.InvalidConfiguration;
+        if (instance.Purpose == RuntimePurpose.TemplateTest
+            && instance.TestFlagState == RuntimeTestFlagState.Pending)
+        {
+            instance.TestFlagState = RuntimeTestFlagState.Failed;
+            var flag = await db.ChallengeFlags.SingleOrDefaultAsync(
+                candidate => candidate.ChallengeId == instance.ChallengeId
+                    && candidate.SpecificationKind == SpecificationKind.RuntimeInstance
+                    && candidate.SpecificationId == instance.Id,
+                cancellationToken);
+            if (flag is not null)
+                flag.ValidUntil ??= failedAt;
+        }
+        await FailAwdpSubmissionAsync(
+            instance, db, outbox, events, timeProvider, cancellationToken);
+        await RecordRuntimeStateAsync(
+            events,
+            instance,
+            CompetitionEventLevel.Error,
+            failedAt,
+            cancellationToken);
+        await db.SaveChangesAsync(cancellationToken);
+        await outbox.FlushOutgoingMessagesAsync();
+    }
+
+    private sealed record RuntimeDispatchTarget(
+        RuntimeInstance Instance,
+        Guid ChallengeId,
+        GameMode Mode,
+        string DefinitionJson,
+        string? CompetitionConfigurationJson,
+        string? RulesJson);
 
 }

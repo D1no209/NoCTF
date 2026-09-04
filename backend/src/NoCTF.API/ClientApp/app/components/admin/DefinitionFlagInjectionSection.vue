@@ -44,6 +44,7 @@ function toggleFlagInjection(enabled: boolean): void {
           <NullableNumberInput
             :model-value="model.flagInjection.timeoutSeconds"
             :min="1"
+            :max="300"
             :placeholder="$t('默认 30')"
             :disabled="disabled"
             @update:model-value="model.flagInjection!.timeoutSeconds = $event"

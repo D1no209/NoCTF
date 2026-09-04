@@ -125,8 +125,8 @@ internal static partial class BackendMessageOperations
             db.GameplayFacts.Add(new GameplayFact
             {
                 Id = factId,
-                CompetitionId = target.Runtime.CompetitionId,
-                CompetitionChallengeId = target.Runtime.CompetitionChallengeId,
+                CompetitionId = target.Runtime.CompetitionId!.Value,
+                CompetitionChallengeId = target.Runtime.CompetitionChallengeId!.Value,
                 TeamId = target.Runtime.TeamId,
                 Kind = GameplayFactKind.AwdServiceTransition,
                 OccurredAt = message.At,
@@ -135,13 +135,13 @@ internal static partial class BackendMessageOperations
             });
             await outbox.PublishToRunnerNodeAsync(new RunAwdChecker(
                 target.Runtime.Id,
-                target.Runtime.CompetitionChallengeId,
+                target.Runtime.CompetitionChallengeId!.Value,
                 factId,
                 target.Runtime.RunnerId!,
                 deadline));
             await outbox.ScheduleAsync(new AwdCheckerCallbackMissing(
-                target.Runtime.CompetitionId,
-                target.Runtime.CompetitionChallengeId,
+                target.Runtime.CompetitionId!.Value,
+                target.Runtime.CompetitionChallengeId!.Value,
                 target.Runtime.Id,
                 factId,
                 deadline), deadline);

@@ -40,8 +40,9 @@ public sealed class ListAdminRuntimesValidator : Validator<ListAdminRuntimesRequ
 
 public sealed record AdminRuntimeResponse(
     Guid Id,
-    Guid CompetitionId,
-    Guid CompetitionChallengeId,
+    Guid? CompetitionId,
+    Guid? CompetitionChallengeId,
+    Guid? ChallengeId,
     Guid? TeamId,
     Guid? SourceTeamId,
     string? SourceTeamName,
@@ -72,7 +73,7 @@ internal static class AdminRuntimeMapping
     {
         var availableAt = RuntimeForceTerminationPolicy.AvailableAt(view);
         return new(
-            view.Id, view.CompetitionId, view.CompetitionChallengeId, view.TeamId,
+            view.Id, view.CompetitionId, view.CompetitionChallengeId, view.ChallengeId, view.TeamId,
             view.SourceTeamId, view.SourceTeamName,
             RuntimeProtocolMapper.ToProtocol(view.Purpose),
             RuntimeProtocolMapper.ToProtocol(view.RuntimeKind),

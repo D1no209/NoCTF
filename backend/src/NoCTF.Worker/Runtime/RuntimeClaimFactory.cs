@@ -221,11 +221,16 @@ public static class RuntimeClaimFactory
             ? new Dictionary<string, string>(StringComparer.Ordinal)
             : new Dictionary<string, string>(configured, StringComparer.Ordinal);
         labels["noctf.io/managed"] = "true";
-        labels["noctf.io/job-kind"] = "persistent-runtime";
+        labels["noctf.io/job-kind"] = instance.Purpose == RuntimePurpose.TemplateTest
+            ? "challenge-test-runtime"
+            : "persistent-runtime";
         labels["noctf.io/runtime-instance-id"] = instance.Id.ToString("D");
-        labels["noctf.io/competition-id"] = instance.CompetitionId.ToString("D");
-        labels["noctf.io/competition-challenge-id"] =
-            instance.CompetitionChallengeId.ToString("D");
+        if (instance.CompetitionId is Guid competitionId)
+            labels["noctf.io/competition-id"] = competitionId.ToString("D");
+        if (instance.CompetitionChallengeId is Guid competitionChallengeId)
+            labels["noctf.io/competition-challenge-id"] = competitionChallengeId.ToString("D");
+        if (instance.ChallengeId is Guid challengeId)
+            labels["noctf.io/challenge-id"] = challengeId.ToString("D");
         if (instance.TeamId is Guid teamId)
             labels["noctf.io/team-id"] = teamId.ToString("D");
         return labels;

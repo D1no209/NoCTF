@@ -1186,8 +1186,9 @@ export type NoCtfapiEndpointsAdministrationRuntimeForceTerminateRuntimeRequest =
 
 export type NoCtfapiEndpointsAdministrationRuntimeAdminRuntimeResponse = {
     id?: string;
-    competitionId?: string;
-    competitionChallengeId?: string;
+    competitionId?: string | null;
+    competitionChallengeId?: string | null;
+    challengeId?: string | null;
     teamId?: string | null;
     sourceTeamId?: string | null;
     sourceTeamName?: string | null;
@@ -1207,7 +1208,7 @@ export type NoCtfapiEndpointsAdministrationRuntimeAdminRuntimeResponse = {
     canForceTerminate?: boolean;
 };
 
-export type NoCtfapiEndpointsRuntimeRuntimePurposeProtocol = 'Player' | 'AwdpTarget' | 'Practice' | 'AwdpAttack';
+export type NoCtfapiEndpointsRuntimeRuntimePurposeProtocol = 'Player' | 'AwdpTarget' | 'Practice' | 'AwdpAttack' | 'TemplateTest';
 
 export type NoCtfApplicationRuntimeInstancesRuntimePublishedPortView = {
     serviceName?: string | null;
@@ -1292,6 +1293,10 @@ export type NoCtfapiEndpointsAdministrationPlatformExportPlatformLogsRequest = {
 export type NoCtfapiEndpointsAdministrationPlatformPlatformLogLevelProtocol = 'Trace' | 'Debug' | 'Information' | 'Warning' | 'Error' | 'Critical';
 
 export type NoCtfapiEndpointsAdministrationPlatformPlatformLogServiceProtocol = 'Api' | 'Worker' | 'Runner' | 'Host';
+
+export type NoCtfapiEndpointsAdministrationPlatformForceTerminatePlatformRuntimeRequest = {
+    reason: string;
+};
 
 export type NoCtfapiEndpointsAdministrationPlatformEmailVerificationConfigurationResponse = {
     enabled?: boolean;
@@ -1442,9 +1447,12 @@ export type NoCtfapiEndpointsAdministrationPlatformPlatformRuntimeListResponse =
 
 export type NoCtfapiEndpointsAdministrationPlatformPlatformRuntimeResponse = {
     runtime?: NoCtfapiEndpointsAdministrationRuntimeAdminRuntimeResponse;
-    competitionTitle?: string;
+    scope?: NoCtfapiEndpointsAdministrationPlatformPlatformRuntimeScopeProtocol;
+    competitionTitle?: string | null;
     challengeTitle?: string;
 };
+
+export type NoCtfapiEndpointsAdministrationPlatformPlatformRuntimeScopeProtocol = 'Competition' | 'ChallengeTest';
 
 export type NoCtfapiEndpointsAdministrationPlatformListPlatformRuntimesRequest = {
     [key: string]: never;
@@ -2044,6 +2052,15 @@ export type NoCtfapiEndpointsAdministrationChallengeBankCreateChallengeTemplateR
     definitionJson?: string;
 };
 
+export type NoCtfapiEndpointsAdministrationChallengeBankChallengeTestRuntimeAcceptedResponse = {
+    runtimeInstanceId?: string;
+    statusUrl?: string;
+};
+
+export type NoCtfapiEndpointsAdministrationChallengeBankExtendChallengeTestRuntimeRequest = {
+    seconds?: number;
+};
+
 export type NoCtfapiEndpointsAdministrationChallengeBankGetChallengeFlagRequest = {
     [key: string]: never;
 };
@@ -2051,6 +2068,24 @@ export type NoCtfapiEndpointsAdministrationChallengeBankGetChallengeFlagRequest 
 export type NoCtfapiEndpointsAdministrationChallengeBankGetChallengeTemplateRequest = {
     [key: string]: never;
 };
+
+export type NoCtfapiEndpointsAdministrationChallengeBankChallengeTestRuntimeResponse = {
+    id?: string;
+    challengeId?: string;
+    runtimeKind?: NoCtfapiEndpointsRuntimeRuntimeKindProtocol;
+    provider?: NoCtfapiEndpointsRuntimeRuntimeProviderProtocol;
+    state?: NoCtfapiEndpointsRuntimeRuntimeStateProtocol;
+    failureCode?: NoCtfapiEndpointsRuntimeRuntimeFailureCodeProtocol | null;
+    flagState?: NoCtfapiEndpointsAdministrationChallengeBankRuntimeTestFlagStateProtocol;
+    testFlag?: string | null;
+    urls?: Array<string>;
+    createdAt?: string;
+    runningAt?: string | null;
+    expiresAt?: string | null;
+    stoppedAt?: string | null;
+};
+
+export type NoCtfapiEndpointsAdministrationChallengeBankRuntimeTestFlagStateProtocol = 'NotRequired' | 'Pending' | 'Succeeded' | 'Failed' | 'Canceled';
 
 export type NoCtfapiEndpointsAdministrationChallengeBankListChallengeAttachmentsRequest = {
     [key: string]: never;
@@ -5668,6 +5703,46 @@ export type AdminPlatformExportLogsErrors = {
 
 export type AdminPlatformExportLogsError = AdminPlatformExportLogsErrors[keyof AdminPlatformExportLogsErrors];
 
+export type AdminPlatformForceTerminateRuntimeData = {
+    body: NoCtfapiEndpointsAdministrationPlatformForceTerminatePlatformRuntimeRequest;
+    path: {
+        runtimeInstanceId: string;
+    };
+    query?: never;
+    url: '/api/v1/admin/platform/runtimes/{runtimeInstanceId}/force-terminate';
+};
+
+export type AdminPlatformForceTerminateRuntimeErrors = {
+    /**
+     * Bad Request
+     */
+    400: MicrosoftAspNetCoreMvcValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+    /**
+     * Not Found
+     */
+    404: unknown;
+    409: FastEndpointsErrorResponse;
+};
+
+export type AdminPlatformForceTerminateRuntimeError = AdminPlatformForceTerminateRuntimeErrors[keyof AdminPlatformForceTerminateRuntimeErrors];
+
+export type AdminPlatformForceTerminateRuntimeResponses = {
+    /**
+     * Accepted
+     */
+    202: NoCtfapiEndpointsRuntimeRuntimeAcceptedResponse;
+};
+
+export type AdminPlatformForceTerminateRuntimeResponse = AdminPlatformForceTerminateRuntimeResponses[keyof AdminPlatformForceTerminateRuntimeResponses];
+
 export type AdminPlatformGetEmailVerificationConfigurationData = {
     body?: never;
     path?: never;
@@ -6159,6 +6234,42 @@ export type AdminPlatformSendEmailVerificationTestResponses = {
 };
 
 export type AdminPlatformSendEmailVerificationTestResponse = AdminPlatformSendEmailVerificationTestResponses[keyof AdminPlatformSendEmailVerificationTestResponses];
+
+export type AdminPlatformTerminateRuntimeData = {
+    body?: never;
+    path: {
+        runtimeInstanceId: string;
+    };
+    query?: never;
+    url: '/api/v1/admin/platform/runtimes/{runtimeInstanceId}/terminate';
+};
+
+export type AdminPlatformTerminateRuntimeErrors = {
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+    /**
+     * Not Found
+     */
+    404: unknown;
+    409: FastEndpointsErrorResponse;
+};
+
+export type AdminPlatformTerminateRuntimeError = AdminPlatformTerminateRuntimeErrors[keyof AdminPlatformTerminateRuntimeErrors];
+
+export type AdminPlatformTerminateRuntimeResponses = {
+    /**
+     * Accepted
+     */
+    202: NoCtfapiEndpointsRuntimeRuntimeAcceptedResponse;
+};
+
+export type AdminPlatformTerminateRuntimeResponse = AdminPlatformTerminateRuntimeResponses[keyof AdminPlatformTerminateRuntimeResponses];
 
 export type AdminPlatformUpdateUserAccountStatusData = {
     body: NoCtfapiEndpointsAdministrationPlatformUpdatePlatformUserAccountStatusRequest;
@@ -8840,6 +8951,80 @@ export type AdminChallengeBankUpdateTemplateResponses = {
 
 export type AdminChallengeBankUpdateTemplateResponse = AdminChallengeBankUpdateTemplateResponses[keyof AdminChallengeBankUpdateTemplateResponses];
 
+export type AdminChallengeBankExtendTestRuntimeData = {
+    body: NoCtfapiEndpointsAdministrationChallengeBankExtendChallengeTestRuntimeRequest;
+    path: {
+        challengeId: string;
+    };
+    query?: never;
+    url: '/api/v1/admin/challenges/{challengeId}/test-runtime/extend';
+};
+
+export type AdminChallengeBankExtendTestRuntimeErrors = {
+    /**
+     * Bad Request
+     */
+    400: MicrosoftAspNetCoreMvcValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+    /**
+     * Not Found
+     */
+    404: unknown;
+    409: FastEndpointsErrorResponse;
+    503: FastEndpointsErrorResponse;
+};
+
+export type AdminChallengeBankExtendTestRuntimeError = AdminChallengeBankExtendTestRuntimeErrors[keyof AdminChallengeBankExtendTestRuntimeErrors];
+
+export type AdminChallengeBankExtendTestRuntimeResponses = {
+    /**
+     * Accepted
+     */
+    202: NoCtfapiEndpointsAdministrationChallengeBankChallengeTestRuntimeAcceptedResponse;
+};
+
+export type AdminChallengeBankExtendTestRuntimeResponse = AdminChallengeBankExtendTestRuntimeResponses[keyof AdminChallengeBankExtendTestRuntimeResponses];
+
+export type AdminChallengeBankGetTestRuntimeData = {
+    body?: never;
+    path: {
+        challengeId: string;
+    };
+    query?: never;
+    url: '/api/v1/admin/challenges/{challengeId}/test-runtime';
+};
+
+export type AdminChallengeBankGetTestRuntimeErrors = {
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+    /**
+     * Not Found
+     */
+    404: unknown;
+};
+
+export type AdminChallengeBankGetTestRuntimeResponses = {
+    /**
+     * Success
+     */
+    200: NoCtfapiEndpointsAdministrationChallengeBankChallengeTestRuntimeResponse;
+};
+
+export type AdminChallengeBankGetTestRuntimeResponse = AdminChallengeBankGetTestRuntimeResponses[keyof AdminChallengeBankGetTestRuntimeResponses];
+
 export type AdminChallengeBankListAttachmentsData = {
     body?: never;
     path: {
@@ -8914,6 +9099,43 @@ export type AdminChallengeBankUploadAttachmentResponses = {
 };
 
 export type AdminChallengeBankUploadAttachmentResponse = AdminChallengeBankUploadAttachmentResponses[keyof AdminChallengeBankUploadAttachmentResponses];
+
+export type AdminChallengeBankResetTestRuntimeData = {
+    body?: never;
+    path: {
+        challengeId: string;
+    };
+    query?: never;
+    url: '/api/v1/admin/challenges/{challengeId}/test-runtime/reset';
+};
+
+export type AdminChallengeBankResetTestRuntimeErrors = {
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+    /**
+     * Not Found
+     */
+    404: unknown;
+    409: FastEndpointsErrorResponse;
+    503: FastEndpointsErrorResponse;
+};
+
+export type AdminChallengeBankResetTestRuntimeError = AdminChallengeBankResetTestRuntimeErrors[keyof AdminChallengeBankResetTestRuntimeErrors];
+
+export type AdminChallengeBankResetTestRuntimeResponses = {
+    /**
+     * Accepted
+     */
+    202: NoCtfapiEndpointsAdministrationChallengeBankChallengeTestRuntimeAcceptedResponse;
+};
+
+export type AdminChallengeBankResetTestRuntimeResponse = AdminChallengeBankResetTestRuntimeResponses[keyof AdminChallengeBankResetTestRuntimeResponses];
 
 export type AdminChallengeBankRestoreAttachmentData = {
     body?: never;
@@ -9021,6 +9243,80 @@ export type AdminChallengeBankRestoreTemplateResponses = {
 };
 
 export type AdminChallengeBankRestoreTemplateResponse = AdminChallengeBankRestoreTemplateResponses[keyof AdminChallengeBankRestoreTemplateResponses];
+
+export type AdminChallengeBankStartTestRuntimeData = {
+    body?: never;
+    path: {
+        challengeId: string;
+    };
+    query?: never;
+    url: '/api/v1/admin/challenges/{challengeId}/test-runtime/start';
+};
+
+export type AdminChallengeBankStartTestRuntimeErrors = {
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+    /**
+     * Not Found
+     */
+    404: unknown;
+    409: FastEndpointsErrorResponse;
+    503: FastEndpointsErrorResponse;
+};
+
+export type AdminChallengeBankStartTestRuntimeError = AdminChallengeBankStartTestRuntimeErrors[keyof AdminChallengeBankStartTestRuntimeErrors];
+
+export type AdminChallengeBankStartTestRuntimeResponses = {
+    /**
+     * Accepted
+     */
+    202: NoCtfapiEndpointsAdministrationChallengeBankChallengeTestRuntimeAcceptedResponse;
+};
+
+export type AdminChallengeBankStartTestRuntimeResponse = AdminChallengeBankStartTestRuntimeResponses[keyof AdminChallengeBankStartTestRuntimeResponses];
+
+export type AdminChallengeBankStopTestRuntimeData = {
+    body?: never;
+    path: {
+        challengeId: string;
+    };
+    query?: never;
+    url: '/api/v1/admin/challenges/{challengeId}/test-runtime/stop';
+};
+
+export type AdminChallengeBankStopTestRuntimeErrors = {
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+    /**
+     * Not Found
+     */
+    404: unknown;
+    409: FastEndpointsErrorResponse;
+    503: FastEndpointsErrorResponse;
+};
+
+export type AdminChallengeBankStopTestRuntimeError = AdminChallengeBankStopTestRuntimeErrors[keyof AdminChallengeBankStopTestRuntimeErrors];
+
+export type AdminChallengeBankStopTestRuntimeResponses = {
+    /**
+     * Accepted
+     */
+    202: NoCtfapiEndpointsAdministrationChallengeBankChallengeTestRuntimeAcceptedResponse;
+};
+
+export type AdminChallengeBankStopTestRuntimeResponse = AdminChallengeBankStopTestRuntimeResponses[keyof AdminChallengeBankStopTestRuntimeResponses];
 
 export type AdminChallengeBankTransferOwnerData = {
     body: NoCtfapiEndpointsAdministrationChallengeBankTransferChallengeTemplateOwnerRequest;

@@ -11,6 +11,7 @@ using NoCTF.Application.Runtime.Provisioning;
 using NoCTF.Application.Runtime.Capacity;
 using NoCTF.Application.Messaging;
 using NoCTF.Application.Competitions.Events;
+using NoCTF.Application.Challenges.Testing;
 using NoCTF.Domain.Competitions;
 using NoCTF.Domain.Competitions.Events;
 using NoCTF.Domain.Gameplay;
@@ -692,6 +693,8 @@ internal static class RuntimeWriteBackOperations
             await ReplacePublishedPortsAsync(
                 instance, message, events, timeProvider.GetUtcNow(), cancellationToken);
             await InvalidateAwdpAttackFlagAsync(db, instance, timeProvider.GetUtcNow(), cancellationToken);
+            await EndChallengeTestFlagAsync(
+                db, instance, RuntimeTestFlagState.Canceled, timeProvider.GetUtcNow(), cancellationToken);
             await PublishRuntimeStopAsync(outbox, instance, message.RunnerId);
             await AwdpFixFailureConvergence.ConvergeAwdpFixFailureAsync(
                 instance,
@@ -715,6 +718,8 @@ internal static class RuntimeWriteBackOperations
             instance.Urls = [];
             instance.State = RuntimeState.Stopping;
             await InvalidateAwdpAttackFlagAsync(db, instance, timeProvider.GetUtcNow(), cancellationToken);
+            await EndChallengeTestFlagAsync(
+                db, instance, RuntimeTestFlagState.Failed, timeProvider.GetUtcNow(), cancellationToken);
             await PublishRuntimeStopAsync(outbox, instance, message.RunnerId);
             await AwdpFixFailureConvergence.ConvergeAwdpFixFailureAsync(
                 instance,
@@ -743,6 +748,8 @@ internal static class RuntimeWriteBackOperations
         instance.RunningAt = runningAt;
         instance.ExpiresAt = message.ExpiresAt;
         await ActivateAwdpAttackFlagAsync(db, instance, runningAt, cancellationToken);
+        await StartChallengeTestFlagDeliveryAsync(
+            db, outbox, instance, message.RunnerId, runningAt, cancellationToken);
         await ReplacePublishedPortsAsync(
             instance, message, events, runningAt, cancellationToken);
         var now = timeProvider.GetUtcNow();
@@ -760,7 +767,7 @@ internal static class RuntimeWriteBackOperations
         {
             await outbox.PublishToRunnerNodeAsync(new InjectAwdFlag(
                 instance.Id,
-                instance.CompetitionChallengeId,
+                instance.CompetitionChallengeId!.Value,
                 currentAwdFlag.Id,
                 currentAwdFlag.ValidUntil!.Value,
                 message.RunnerId));
@@ -837,6 +844,8 @@ internal static class RuntimeWriteBackOperations
         instance.State = RuntimeState.Stopped;
         instance.StoppedAt = timeProvider.GetUtcNow();
         await InvalidateAwdpAttackFlagAsync(db, instance, instance.StoppedAt.Value, cancellationToken);
+        await EndChallengeTestFlagAsync(
+            db, instance, RuntimeTestFlagState.Canceled, instance.StoppedAt.Value, cancellationToken);
         await AwdpFixFailureConvergence.ConvergeAwdpFixFailureAsync(
             instance,
             db,
@@ -868,6 +877,8 @@ internal static class RuntimeWriteBackOperations
         instance.FailureCode = failureCode;
         var failedAt = timeProvider.GetUtcNow();
         await InvalidateAwdpAttackFlagAsync(db, instance, failedAt, cancellationToken);
+        await EndChallengeTestFlagAsync(
+            db, instance, RuntimeTestFlagState.Failed, failedAt, cancellationToken);
         var effectiveOutbox = outbox ?? new NoOpTransactionalMessageOutbox();
         await AwdpFixFailureConvergence.ConvergeAwdpFixFailureAsync(
             instance,
@@ -907,6 +918,8 @@ internal static class RuntimeWriteBackOperations
         instance.State = RuntimeState.Stopped;
         instance.StoppedAt = timeProvider.GetUtcNow();
         await InvalidateAwdpAttackFlagAsync(db, instance, instance.StoppedAt.Value, cancellationToken);
+        await EndChallengeTestFlagAsync(
+            db, instance, RuntimeTestFlagState.Canceled, instance.StoppedAt.Value, cancellationToken);
         await AwdpFixFailureConvergence.ConvergeAwdpFixFailureAsync(
             instance,
             db,
@@ -944,6 +957,8 @@ internal static class RuntimeWriteBackOperations
         instance.State = RuntimeState.Stopped;
         instance.StoppedAt = message.CompletedAt;
         await InvalidateAwdpAttackFlagAsync(db, instance, instance.StoppedAt.Value, cancellationToken);
+        await EndChallengeTestFlagAsync(
+            db, instance, RuntimeTestFlagState.Canceled, instance.StoppedAt.Value, cancellationToken);
         await AwdpFixFailureConvergence.ConvergeAwdpFixFailureAsync(
             instance,
             db,
@@ -952,19 +967,22 @@ internal static class RuntimeWriteBackOperations
             message.CompletedAt,
             AwdpFixRuntimeCleanupMode.CallerManaged,
             cancellationToken);
-        await events.RecordAsync(new(
-            instance.CompetitionId,
-            CompetitionEventKind.RuntimeForceTerminationCompleted,
-            CompetitionEventLevel.Warning,
-            CompetitionEventVisibility.Staff,
-            message.CompletedAt,
-            ActorUserId: message.ActorUserId,
-            TeamId: instance.TeamId,
-            CompetitionChallengeId: instance.CompetitionChallengeId,
-            RuntimeInstanceId: instance.Id,
-            RuntimeState: instance.State,
-            RuntimeCleanupResult: message.CleanupResult,
-            Reason: message.Reason), cancellationToken);
+        if (instance.CompetitionId is Guid competitionId)
+        {
+            await events.RecordAsync(new(
+                competitionId,
+                CompetitionEventKind.RuntimeForceTerminationCompleted,
+                CompetitionEventLevel.Warning,
+                CompetitionEventVisibility.Staff,
+                message.CompletedAt,
+                ActorUserId: message.ActorUserId,
+                TeamId: instance.TeamId,
+                CompetitionChallengeId: instance.CompetitionChallengeId,
+                RuntimeInstanceId: instance.Id,
+                RuntimeState: instance.State,
+                RuntimeCleanupResult: message.CleanupResult,
+                Reason: message.Reason), cancellationToken);
+        }
         await db.SaveChangesAsync(cancellationToken);
         await outbox.FlushOutgoingMessagesAsync();
     }
@@ -993,20 +1011,24 @@ internal static class RuntimeWriteBackOperations
             message.CompletedAt,
             AwdpFixRuntimeCleanupMode.EnsureStop,
             cancellationToken);
-
-        await events.RecordAsync(new(
-            instance.CompetitionId,
-            CompetitionEventKind.RuntimeForceTerminationFailed,
-            CompetitionEventLevel.Error,
-            CompetitionEventVisibility.Staff,
-            message.CompletedAt,
-            ActorUserId: message.ActorUserId,
-            TeamId: instance.TeamId,
-            CompetitionChallengeId: instance.CompetitionChallengeId,
-            RuntimeInstanceId: instance.Id,
-            RuntimeState: instance.State,
-            RuntimeCleanupResult: message.CleanupResult,
-            Reason: message.Reason), cancellationToken);
+        await EndChallengeTestFlagAsync(
+            db, instance, RuntimeTestFlagState.Failed, message.CompletedAt, cancellationToken);
+        if (instance.CompetitionId is Guid competitionId)
+        {
+            await events.RecordAsync(new(
+                competitionId,
+                CompetitionEventKind.RuntimeForceTerminationFailed,
+                CompetitionEventLevel.Error,
+                CompetitionEventVisibility.Staff,
+                message.CompletedAt,
+                ActorUserId: message.ActorUserId,
+                TeamId: instance.TeamId,
+                CompetitionChallengeId: instance.CompetitionChallengeId,
+                RuntimeInstanceId: instance.Id,
+                RuntimeState: instance.State,
+                RuntimeCleanupResult: message.CleanupResult,
+                Reason: message.Reason), cancellationToken);
+        }
         await db.SaveChangesAsync(cancellationToken);
         await outbox.FlushOutgoingMessagesAsync();
     }
@@ -1031,6 +1053,8 @@ internal static class RuntimeWriteBackOperations
         instance.FailureCode = message.FailureCode;
         var failedAt = timeProvider.GetUtcNow();
         await InvalidateAwdpAttackFlagAsync(db, instance, failedAt, cancellationToken);
+        await EndChallengeTestFlagAsync(
+            db, instance, RuntimeTestFlagState.Failed, failedAt, cancellationToken);
         await AwdpFixFailureConvergence.ConvergeAwdpFixFailureAsync(
             instance,
             db,
@@ -1069,6 +1093,8 @@ internal static class RuntimeWriteBackOperations
         instance.State = RuntimeState.Stopped;
         instance.StoppedAt = timeProvider.GetUtcNow();
         await InvalidateAwdpAttackFlagAsync(db, instance, instance.StoppedAt.Value, cancellationToken);
+        await EndChallengeTestFlagAsync(
+            db, instance, RuntimeTestFlagState.Canceled, instance.StoppedAt.Value, cancellationToken);
         await AwdpFixFailureConvergence.ConvergeAwdpFixFailureAsync(
             instance,
             db,
@@ -1087,14 +1113,17 @@ internal static class RuntimeWriteBackOperations
         await outbox.FlushOutgoingMessagesAsync();
     }
 
-    private static ValueTask<Guid> RecordRuntimeStateAsync(
+    private static async ValueTask<Guid?> RecordRuntimeStateAsync(
         ICompetitionEventRecorder events,
         RuntimeInstance instance,
         CompetitionEventLevel level,
         DateTimeOffset occurredAt,
-        CancellationToken cancellationToken) =>
-        events.RecordAsync(new(
-            instance.CompetitionId,
+        CancellationToken cancellationToken)
+    {
+        if (instance.CompetitionId is not Guid competitionId)
+            return null;
+        return await events.RecordAsync(new(
+            competitionId,
             CompetitionEventKind.RuntimeStateChanged,
             level,
             instance.TeamId is null
@@ -1107,6 +1136,71 @@ internal static class RuntimeWriteBackOperations
             GameplayFactId: instance.GameplayFactId,
             RuntimeState: instance.State),
             cancellationToken);
+    }
+
+    private static async Task StartChallengeTestFlagDeliveryAsync(
+        NoCtfDbContext db,
+        ITransactionalMessageOutbox outbox,
+        RuntimeInstance instance,
+        string runnerId,
+        DateTimeOffset runningAt,
+        CancellationToken cancellationToken)
+    {
+        if (instance.Purpose != RuntimePurpose.TemplateTest
+            || instance.TestFlagState != RuntimeTestFlagState.Pending)
+            return;
+        var flag = await db.ChallengeFlags.SingleOrDefaultAsync(
+            candidate => candidate.ChallengeId == instance.ChallengeId
+                && candidate.SpecificationKind
+                    == NoCTF.Domain.Challenges.SpecificationKind.RuntimeInstance
+                && candidate.SpecificationId == instance.Id
+                && candidate.DeletedAt == null,
+            cancellationToken);
+        if (flag is null)
+        {
+            instance.TestFlagState = RuntimeTestFlagState.Failed;
+            return;
+        }
+
+        if (instance.TestFlagDelivery == RuntimeTestFlagDelivery.Environment)
+        {
+            flag.ValidStart ??= runningAt;
+            instance.TestFlagState = RuntimeTestFlagState.Succeeded;
+            return;
+        }
+        if (instance.TestFlagDelivery == RuntimeTestFlagDelivery.Command
+            && instance.ChallengeId is Guid challengeId)
+        {
+            await outbox.PublishToRunnerNodeAsync(new InjectChallengeTestFlag(
+                instance.Id,
+                challengeId,
+                flag.Id,
+                runnerId));
+        }
+    }
+
+    private static async Task EndChallengeTestFlagAsync(
+        NoCtfDbContext db,
+        RuntimeInstance instance,
+        RuntimeTestFlagState state,
+        DateTimeOffset at,
+        CancellationToken cancellationToken)
+    {
+        if (instance.Purpose != RuntimePurpose.TemplateTest
+            || instance.TestFlagDelivery == RuntimeTestFlagDelivery.NotRequired)
+            return;
+        if (instance.TestFlagState == RuntimeTestFlagState.Pending)
+            instance.TestFlagState = state;
+        var flag = await db.ChallengeFlags.SingleOrDefaultAsync(
+            candidate => candidate.ChallengeId == instance.ChallengeId
+                && candidate.SpecificationKind
+                    == NoCTF.Domain.Challenges.SpecificationKind.RuntimeInstance
+                && candidate.SpecificationId == instance.Id
+                && candidate.DeletedAt == null,
+            cancellationToken);
+        if (flag is not null)
+            flag.ValidUntil ??= at;
+    }
 
     private static async Task ActivateAwdpAttackFlagAsync(
         NoCtfDbContext db,
@@ -1199,20 +1293,23 @@ internal static class RuntimeWriteBackOperations
                 ContainerPort = mapping.ContainerPort,
                 HostPort = mapping.HostPort
             });
-            await events.RecordAsync(new(
-                instance.CompetitionId,
-                CompetitionEventKind.RuntimePortAllocated,
-                CompetitionEventLevel.Information,
-                instance.TeamId is null
-                    ? CompetitionEventVisibility.Public
-                    : CompetitionEventVisibility.Team,
-                allocatedAt,
-                TeamId: instance.TeamId,
-                CompetitionChallengeId: instance.CompetitionChallengeId,
-                RuntimeInstanceId: instance.Id,
-                GameplayFactId: instance.GameplayFactId,
-                RuntimeState: instance.State,
-                HostPort: mapping.HostPort), cancellationToken);
+            if (instance.CompetitionId is Guid competitionId)
+            {
+                await events.RecordAsync(new(
+                    competitionId,
+                    CompetitionEventKind.RuntimePortAllocated,
+                    CompetitionEventLevel.Information,
+                    instance.TeamId is null
+                        ? CompetitionEventVisibility.Public
+                        : CompetitionEventVisibility.Team,
+                    allocatedAt,
+                    TeamId: instance.TeamId,
+                    CompetitionChallengeId: instance.CompetitionChallengeId,
+                    RuntimeInstanceId: instance.Id,
+                    GameplayFactId: instance.GameplayFactId,
+                    RuntimeState: instance.State,
+                    HostPort: mapping.HostPort), cancellationToken);
+            }
         }
     }
 

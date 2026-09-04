@@ -26,7 +26,7 @@ const definitionDiagnostics: Record<string, string> = {
   'AWD runtimes only support Container or Compose.': 'AWD 只支持单容器或 Docker Compose 运行环境',
   'FlagInjection is required when Runtime is configured.': '启用 AWD 运行环境后必须配置 Flag 注入命令',
   'FlagInjection.Command must be a non-empty raw template containing ${FLAG}.': 'AWD Flag 注入命令必须包含 ${FLAG}',
-  'FlagInjection.TimeoutSeconds must be positive.': 'AWD Flag 注入超时必须为正数',
+  'FlagInjection.TimeoutSeconds must be between 1 and 300.': 'AWD Flag 注入超时必须在 1 到 300 秒之间',
   'FlagInjection.ServiceName is required for Compose runtimes.': 'Compose 运行环境必须填写 Flag 注入目标服务名',
   'Runtime is required when Checker is configured.': '启用 Checker 前必须先启用运行环境',
   'Checker.Image is required.': 'Checker 镜像不能为空',

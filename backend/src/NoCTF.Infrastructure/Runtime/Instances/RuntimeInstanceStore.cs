@@ -64,7 +64,7 @@ public sealed class RuntimeInstanceStore(
             .OrderByDescending(instance => instance.CreatedAt)
             .ThenByDescending(instance => instance.Id)
             .Select(instance => new RuntimeInstanceView(
-                instance.Id, instance.CompetitionId, instance.CompetitionChallengeId, instance.TeamId,
+                instance.Id, instance.CompetitionId, instance.CompetitionChallengeId, instance.ChallengeId, instance.TeamId,
                 instance.Purpose, instance.RuntimeKind, instance.RuntimeProvider,
                 instance.State, instance.FailureCode, instance.Urls,
                 instance.CreatedAt, instance.RunningAt, instance.ExpiresAt, instance.StoppedAt))
@@ -148,7 +148,7 @@ public sealed class RuntimeInstanceStore(
                     cleanupTarget.FailureCode = null;
                     await outbox.PublishAsync(new StopRuntime(cleanupTarget.Id));
                     await events.RecordAsync(new(
-                        cleanupTarget.CompetitionId,
+                        cleanupTarget.CompetitionId!.Value,
                         CompetitionEventKind.RuntimeStateChanged,
                         CompetitionEventLevel.Warning,
                         CompetitionEventVisibility.Team,
@@ -234,7 +234,7 @@ public sealed class RuntimeInstanceStore(
                 _ => throw new InvalidOperationException("Unsupported runtime event action.")
             };
             await events.RecordAsync(new(
-                entity.CompetitionId,
+                entity.CompetitionId!.Value,
                 eventKind,
                 entity.State == RuntimeState.Failed
                     ? CompetitionEventLevel.Error
@@ -401,7 +401,7 @@ public sealed class RuntimeInstanceStore(
 
     private static RuntimeInstanceView Map(RuntimeInstance instance) =>
         new(
-            instance.Id, instance.CompetitionId, instance.CompetitionChallengeId, instance.TeamId,
+            instance.Id, instance.CompetitionId, instance.CompetitionChallengeId, instance.ChallengeId, instance.TeamId,
             instance.Purpose, instance.RuntimeKind, instance.RuntimeProvider,
             instance.State, instance.FailureCode, instance.Urls,
             instance.CreatedAt, instance.RunningAt, instance.ExpiresAt, instance.StoppedAt);

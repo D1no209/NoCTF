@@ -14,8 +14,9 @@ public enum RuntimeAction
 
 public sealed record RuntimeInstanceView(
     Guid Id,
-    Guid CompetitionId,
-    Guid CompetitionChallengeId,
+    Guid? CompetitionId,
+    Guid? CompetitionChallengeId,
+    Guid? ChallengeId,
     Guid? TeamId,
     RuntimePurpose Purpose,
     RuntimeKind RuntimeKind,
