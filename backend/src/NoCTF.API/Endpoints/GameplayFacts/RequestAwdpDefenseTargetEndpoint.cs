@@ -28,7 +28,8 @@ public sealed record RequestAwdpDefenseTargetResponse(
     string StatusUrl);
 
 public sealed record AwdpDefenseTargetConflictResponse(
-    AwdpDefenseTargetRequestFailureCodeProtocol Code);
+    AwdpDefenseTargetRequestFailureCodeProtocol Code,
+    string Detail);
 
 [Mapper]
 internal static partial class AwdpDefenseTargetRequestMapping
@@ -76,7 +77,8 @@ public sealed class RequestAwdpDefenseTargetEndpoint(
         if (!result.Succeeded)
         {
             return TypedResults.Conflict(new AwdpDefenseTargetConflictResponse(
-                AwdpDefenseTargetRequestMapping.ToProtocol(result.FailureCode!.Value)));
+                AwdpDefenseTargetRequestMapping.ToProtocol(result.FailureCode!.Value),
+                result.ErrorMessage ?? "The one-shot defense target could not be requested."));
         }
 
         var statusUrl =

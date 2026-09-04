@@ -19,7 +19,8 @@ public enum UpdatePlatformUserEmailVerificationConflictCode
 }
 
 public sealed record UpdatePlatformUserEmailVerificationConflictResponse(
-    UpdatePlatformUserEmailVerificationConflictCode Code);
+    UpdatePlatformUserEmailVerificationConflictCode Code,
+    string Detail);
 
 public sealed class UpdatePlatformUserEmailVerificationEndpoint(
     ManagePlatform platform,
@@ -70,7 +71,8 @@ public sealed class UpdatePlatformUserEmailVerificationEndpoint(
                 TypedResults.Conflict(
                     new UpdatePlatformUserEmailVerificationConflictResponse(
                         UpdatePlatformUserEmailVerificationConflictCode
-                            .AnonymizedAccountImmutable)),
+                            .AnonymizedAccountImmutable,
+                        "An anonymized account is immutable and its email verification state cannot be changed.")),
             _ => throw new InvalidOperationException(
                 $"Unsupported platform email verification update state: {result.State}.")
         };

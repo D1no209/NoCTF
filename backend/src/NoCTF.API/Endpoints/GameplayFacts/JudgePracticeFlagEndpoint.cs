@@ -40,7 +40,8 @@ public sealed record PracticeFlagJudgementResponse(
     PracticeFlagJudgementProtocol Result);
 
 public sealed record PracticeFlagConflictResponse(
-    PracticeFlagFailureCodeProtocol Code);
+    PracticeFlagFailureCodeProtocol Code,
+    string Detail);
 
 public sealed class JudgePracticeFlagEndpoint(
     JudgePracticeFlag judge,
@@ -89,10 +90,12 @@ public sealed class JudgePracticeFlagEndpoint(
             PracticeFlagFailureCode.TeamNotEligible => TypedResults.Forbid(),
             PracticeFlagFailureCode.PracticeUnavailable =>
                 TypedResults.Conflict(new PracticeFlagConflictResponse(
-                    PracticeFlagFailureCodeProtocol.PracticeUnavailable)),
+                    PracticeFlagFailureCodeProtocol.PracticeUnavailable,
+                    "Practice Flag checking is available only for a published CTF challenge after the competition has finished with practice mode enabled.")),
             PracticeFlagFailureCode.RuntimeNotRunning =>
                 TypedResults.Conflict(new PracticeFlagConflictResponse(
-                    PracticeFlagFailureCodeProtocol.RuntimeNotRunning)),
+                    PracticeFlagFailureCodeProtocol.RuntimeNotRunning,
+                    "Start a live practice runtime for this challenge before checking its Flag.")),
             PracticeFlagFailureCode.FlagInvalid => TypedResults.Problem(
                 statusCode: StatusCodes.Status400BadRequest,
                 title: "Practice Flag was not accepted.",

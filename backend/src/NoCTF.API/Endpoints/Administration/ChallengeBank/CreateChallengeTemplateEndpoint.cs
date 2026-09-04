@@ -69,6 +69,7 @@ public enum ChallengeTemplateConflictCode
 
 public sealed record ChallengeTemplateConflictResponse(
     [property: Required, JsonRequired] ChallengeTemplateConflictCode Code,
+    [property: Required, JsonRequired] string Detail,
     [property: Required, JsonRequired] IReadOnlyList<Guid> UserIds);
 
 internal static class ChallengeTemplateWriteResponseMapper
@@ -91,6 +92,20 @@ internal static class ChallengeTemplateWriteResponseMapper
                 _ => throw new InvalidOperationException(
                     $"Unsupported challenge template conflict state: {result.State}.")
             },
+            result.Detail ?? (result.State switch
+            {
+                ChallengeTemplateWriteState.ResourceIdConflict =>
+                    "The requested challenge template identifier is already in use.",
+                ChallengeTemplateWriteState.ActiveCompetitionModeConflict =>
+                    "The template mode cannot change while active competitions reference it.",
+                ChallengeTemplateWriteState.OwnerIncludedInManagerSet =>
+                    "The template owner cannot also be listed as a manager.",
+                ChallengeTemplateWriteState.UserNotFound =>
+                    "One or more selected template managers no longer exist.",
+                ChallengeTemplateWriteState.RoleNotEligible =>
+                    "One or more selected accounts do not have a platform role eligible to manage challenge templates.",
+                _ => "The challenge template conflicts with its current state."
+            }),
             result.UserIds ?? []);
 }
 

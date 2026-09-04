@@ -9,7 +9,7 @@ public sealed class ResetRuntimeEndpoint(
     MutatePlayerRuntime mutate,
     IUserContext user,
     TimeProvider timeProvider)
-    : EndpointWithoutRequest<Results<Accepted<RuntimeAcceptedResponse>, NotFound, Conflict, ProblemHttpResult>>
+    : EndpointWithoutRequest<Results<Accepted<RuntimeAcceptedResponse>, NotFound, ProblemHttpResult>>
 {
     public override void Configure()
     {
@@ -17,11 +17,13 @@ public sealed class ResetRuntimeEndpoint(
         AuthSchemes("Bearer");
         Options(options => options
             .ProducesProblemFE<Microsoft.AspNetCore.Mvc.ProblemDetails>(
+                StatusCodes.Status409Conflict)
+            .ProducesProblemFE<Microsoft.AspNetCore.Mvc.ProblemDetails>(
                 StatusCodes.Status503ServiceUnavailable));
         Summary(summary => summary.Summary = "Queues an atomic replacement runtime.");
     }
 
-    public override Task<Results<Accepted<RuntimeAcceptedResponse>, NotFound, Conflict, ProblemHttpResult>> ExecuteAsync(
+    public override Task<Results<Accepted<RuntimeAcceptedResponse>, NotFound, ProblemHttpResult>> ExecuteAsync(
         CancellationToken ct) =>
         RuntimeMutationEndpoint.ExecuteAsync(
             mutate, user, Route<Guid>("competitionId"), Route<Guid>("competitionChallengeId"),

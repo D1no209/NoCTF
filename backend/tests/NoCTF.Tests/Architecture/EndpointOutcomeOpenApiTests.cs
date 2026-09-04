@@ -82,7 +82,7 @@ public sealed class EndpointOutcomeOpenApiTests
             ["401"] = ResponseBodyKind.Empty,
             ["403"] = ResponseBodyKind.Empty,
             ["404"] = ResponseBodyKind.Empty,
-            ["409"] = ResponseBodyKind.Empty,
+            ["409"] = ResponseBodyKind.Problem,
             ["503"] = ResponseBodyKind.Problem
         };
         if (includesValidationProblem)

@@ -35,6 +35,7 @@ public enum CompetitionForceDeleteConflictCode
 
 public sealed record CompetitionForceDeleteConflictResponse(
     CompetitionForceDeleteConflictCode Code,
+    string Detail,
     CompetitionHardDeletePreviewResponse? Preview = null);
 
 public sealed class ForceDeleteCompetitionEndpoint(
@@ -74,12 +75,15 @@ public sealed class ForceDeleteCompetitionEndpoint(
             CompetitionForceDeleteState.NotFound => TypedResults.NotFound(),
             CompetitionForceDeleteState.ActiveCompetition => TypedResults.Conflict<CompetitionForceDeleteConflictResponse>(new(
                 CompetitionForceDeleteConflictCode.ActiveCompetition,
+                "Pause or finish the competition before permanently deleting it.",
                 result.Preview is null ? null : CompetitionHardDeleteMapping.ToResponse(result.Preview))),
             CompetitionForceDeleteState.ActiveRuntimeResource => TypedResults.Conflict<CompetitionForceDeleteConflictResponse>(new(
                 CompetitionForceDeleteConflictCode.ActiveRuntimeResource,
+                "One or more runtime resources are still active. Terminate them and wait for cleanup before retrying.",
                 result.Preview is null ? null : CompetitionHardDeleteMapping.ToResponse(result.Preview))),
             CompetitionForceDeleteState.ConfirmationMismatch => TypedResults.Conflict<CompetitionForceDeleteConflictResponse>(new(
-                CompetitionForceDeleteConflictCode.ConfirmationMismatch)),
+                CompetitionForceDeleteConflictCode.ConfirmationMismatch,
+                "The confirmation title does not exactly match the current competition title.")),
             CompetitionForceDeleteState.InvalidReason => TypedResults.Problem(
                 statusCode: StatusCodes.Status400BadRequest,
                 title: "Competition was not force-deleted.",

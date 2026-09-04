@@ -40,7 +40,8 @@ public sealed record AwdpBreakFlagJudgementResponse(
     AwdpBreakFlagJudgementProtocol Result);
 
 public sealed record AwdpBreakFlagJudgementConflictResponse(
-    AwdpBreakFlagJudgementFailureCodeProtocol Code);
+    AwdpBreakFlagJudgementFailureCodeProtocol Code,
+    string Detail);
 
 public sealed class JudgeAwdpBreakFlagEndpoint(
     JudgeAwdpBreakFlag judge,
@@ -87,10 +88,12 @@ public sealed class JudgeAwdpBreakFlagEndpoint(
             AwdpBreakFlagJudgementFailureCode.TeamNotEligible => TypedResults.Forbid(),
             AwdpBreakFlagJudgementFailureCode.JudgementUnavailable =>
                 TypedResults.Conflict(new AwdpBreakFlagJudgementConflictResponse(
-                    AwdpBreakFlagJudgementFailureCodeProtocol.JudgementUnavailable)),
+                    AwdpBreakFlagJudgementFailureCodeProtocol.JudgementUnavailable,
+                    "This published AWDP challenge is not available for Break Flag judgement.")),
             AwdpBreakFlagJudgementFailureCode.AchievementNotSucceeded =>
                 TypedResults.Conflict(new AwdpBreakFlagJudgementConflictResponse(
-                    AwdpBreakFlagJudgementFailureCodeProtocol.AchievementNotSucceeded)),
+                    AwdpBreakFlagJudgementFailureCodeProtocol.AchievementNotSucceeded,
+                    "The team must complete a successful Break on this challenge before its Flag can be checked.")),
             AwdpBreakFlagJudgementFailureCode.FlagInvalid => TypedResults.Problem(
                 statusCode: StatusCodes.Status400BadRequest,
                 title: "AWDP Break Flag was not accepted.",

@@ -50,6 +50,7 @@ public enum CompetitionQuestionFailureCode
 
 public sealed record CompetitionQuestionFailureResponse(
     CompetitionQuestionFailureCode Code,
+    string Detail,
     CompetitionQuestionResponse? Current,
     int? Limit);
 
@@ -57,10 +58,37 @@ internal static class CompetitionQuestionFailureMapper
 {
     public static CompetitionQuestionFailureResponse ToResponse(
         CompetitionQuestionMutationResult result) =>
-        new(ToCode(result.Failure!.Value), result.Question is null
-            ? null
-            : CompetitionQuestionResponseMapper.ToResponse(result.Question),
+        new(
+            ToCode(result.Failure!.Value),
+            Detail(result.Failure.Value, result.Limit),
+            result.Question is null
+                ? null
+                : CompetitionQuestionResponseMapper.ToResponse(result.Question),
             result.Limit);
+
+    private static string Detail(CompetitionQuestionFailure failure, int? limit) =>
+        failure switch
+        {
+            CompetitionQuestionFailure.InvalidRequest =>
+                "The question request is invalid.",
+            CompetitionQuestionFailure.SpamRejected =>
+                "The question was rejected by the spam policy.",
+            CompetitionQuestionFailure.CompetitionNotAcceptingQuestions =>
+                "This competition is not currently accepting participant questions.",
+            CompetitionQuestionFailure.TeamNotEligible =>
+                "The current account does not belong to an eligible team in this competition.",
+            CompetitionQuestionFailure.InvalidChallengeReference =>
+                "The selected challenge is unavailable or does not belong to this competition.",
+            CompetitionQuestionFailure.TeamActiveQuestionLimitReached =>
+                $"The team already has the maximum of {limit ?? 0} active questions.",
+            CompetitionQuestionFailure.ParticipantMessageLimitReached =>
+                $"Participants have reached the {limit ?? 0}-message limit until a staff member replies.",
+            CompetitionQuestionFailure.InvalidTransition =>
+                "The requested question status cannot follow its current status.",
+            CompetitionQuestionFailure.QuestionClosed =>
+                "This question is closed and no longer accepts participant messages.",
+            _ => throw new ArgumentOutOfRangeException(nameof(failure), failure, null)
+        };
 
     public static CompetitionQuestionFailureCode ToCode(CompetitionQuestionFailure failure) =>
         failure switch

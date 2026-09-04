@@ -31,13 +31,24 @@ public sealed record CompetitionHardDeletePreviewResponse(
     bool IsSoftDeleted,
     bool CanHardDelete,
     bool CanForceDelete,
+    string Detail,
     IReadOnlyList<CompetitionHardDeleteReferenceResponse> References);
 
 [Mapper(RequiredMappingStrategy = RequiredMappingStrategy.Source)]
 internal static partial class CompetitionHardDeleteMapping
 {
-    public static partial CompetitionHardDeletePreviewResponse ToResponse(
-        CompetitionHardDeletePreview preview);
+    public static CompetitionHardDeletePreviewResponse ToResponse(
+        CompetitionHardDeletePreview preview) =>
+        new(
+            preview.CompetitionId,
+            preview.Title,
+            preview.IsSoftDeleted,
+            preview.CanHardDelete,
+            preview.CanForceDelete,
+            preview.CanHardDelete
+                ? "The competition has no blocking references and can be permanently deleted."
+                : "The competition still has the listed business or historical references. Remove active resources, or use audited force deletion when permitted.",
+            preview.References.Select(ToResponse).ToArray());
 
     [MapProperty(
         nameof(CompetitionHardDeleteReference.Kind),

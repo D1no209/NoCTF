@@ -10,7 +10,7 @@ public sealed class StartRuntimeEndpoint(
     MutatePlayerRuntime mutate,
     IUserContext user,
     TimeProvider timeProvider)
-    : EndpointWithoutRequest<Results<Accepted<RuntimeAcceptedResponse>, NotFound, Conflict, ProblemHttpResult>>
+    : EndpointWithoutRequest<Results<Accepted<RuntimeAcceptedResponse>, NotFound, ProblemHttpResult>>
 {
     public override void Configure()
     {
@@ -18,11 +18,13 @@ public sealed class StartRuntimeEndpoint(
         AuthSchemes("Bearer");
         Options(options => options
             .ProducesProblemFE<Microsoft.AspNetCore.Mvc.ProblemDetails>(
+                StatusCodes.Status409Conflict)
+            .ProducesProblemFE<Microsoft.AspNetCore.Mvc.ProblemDetails>(
                 StatusCodes.Status503ServiceUnavailable));
         Summary(summary => summary.Summary = "Queues a team runtime start.");
     }
 
-    public override Task<Results<Accepted<RuntimeAcceptedResponse>, NotFound, Conflict, ProblemHttpResult>> ExecuteAsync(
+    public override Task<Results<Accepted<RuntimeAcceptedResponse>, NotFound, ProblemHttpResult>> ExecuteAsync(
         CancellationToken ct) =>
         RuntimeMutationEndpoint.ExecuteAsync(
             mutate, user, Route<Guid>("competitionId"), Route<Guid>("competitionChallengeId"),
@@ -31,7 +33,7 @@ public sealed class StartRuntimeEndpoint(
 
 internal static class RuntimeMutationEndpoint
 {
-    public static async Task<Results<Accepted<RuntimeAcceptedResponse>, NotFound, Conflict, ProblemHttpResult>> ExecuteAsync(
+    public static async Task<Results<Accepted<RuntimeAcceptedResponse>, NotFound, ProblemHttpResult>> ExecuteAsync(
         MutatePlayerRuntime mutate,
         IUserContext user,
         Guid competitionId,
@@ -51,7 +53,14 @@ internal static class RuntimeMutationEndpoint
         if (result.FailureCode is RuntimeMutationFailureCode.RuntimeNotFound or RuntimeMutationFailureCode.RuntimeActionUnsupported)
             return TypedResults.NotFound();
         if (result.FailureCode is RuntimeMutationFailureCode.RuntimeStateConflict or RuntimeMutationFailureCode.RuntimeConflict)
-            return TypedResults.Conflict();
+            return TypedResults.Problem(
+                statusCode: StatusCodes.Status409Conflict,
+                title: "Runtime operation conflicts with its current state.",
+                detail: result.ErrorMessage,
+                extensions: new Dictionary<string, object?>
+                {
+                    ["code"] = result.FailureCode.Value.ToString()
+                });
         if (!result.Succeeded)
             return TypedResults.Problem(
                 statusCode: StatusCodes.Status503ServiceUnavailable,

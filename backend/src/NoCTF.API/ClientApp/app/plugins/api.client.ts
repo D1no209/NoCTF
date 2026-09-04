@@ -41,16 +41,23 @@ export default defineNuxtPlugin(() => {
   })
 
   client.interceptors.error.use((error, response, request) => {
-    // 保留真实的 problem+json 响应体(detail/title/errors)。
+    const status = response?.ok === false ? response.status : undefined
+    // 保留真实的 problem+json 及强类型失败响应体。很多业务冲突只携带
+    // code/message；丢弃它们会把明确原因退化成笼统的 HTTP 状态提示。
     if (error && typeof error === 'object' && !(error instanceof Error)) {
       const problem = error as Record<string, unknown>
-      if (typeof problem.detail === 'string' || typeof problem.title === 'string' || problem.errors) {
-        return error
+      if (typeof problem.detail === 'string'
+        || typeof problem.title === 'string'
+        || typeof problem.message === 'string'
+        || typeof problem.code === 'string'
+        || problem.errors) {
+        return status === undefined || typeof problem.status === 'number'
+          ? error
+          : { ...problem, status }
       }
     }
     // 空响应体(如登录 401)或网络错误:合成带状态码的 problem 形状,
     // parseApiError 会读出其中的 detail 与 status。
-    const status = response?.ok === false ? response.status : undefined
     const authenticatedRequest = request?.headers.has('Authorization') ?? false
     return { status, detail: statusErrorMessage(status, authenticatedRequest) }
   })

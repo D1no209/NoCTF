@@ -53,6 +53,7 @@ public enum PlatformUserDeletionConflictCode
 
 public sealed record PlatformUserDeletionConflictResponse(
     PlatformUserDeletionConflictCode Code,
+    string Detail,
     PlatformUserDeletionPreviewResponse? Preview);
 
 public sealed class DeletePlatformUserEndpoint(
@@ -133,5 +134,17 @@ public sealed class DeletePlatformUserEndpoint(
         UserDeletionPreview? preview) =>
         TypedResults.Conflict(new PlatformUserDeletionConflictResponse(
             code,
+            code switch
+            {
+                PlatformUserDeletionConflictCode.HardDeleteBlocked =>
+                    "This user still owns or is referenced by business records. Review the preview and anonymize the account instead.",
+                PlatformUserDeletionConflictCode.SelfDeletionForbidden =>
+                    "Administrators cannot delete or anonymize their own account.",
+                PlatformUserDeletionConflictCode.LastAdministratorProtected =>
+                    "This account is the last active human administrator and cannot be removed.",
+                PlatformUserDeletionConflictCode.AlreadyAnonymized =>
+                    "This account has already been anonymized and cannot be changed again.",
+                _ => throw new ArgumentOutOfRangeException(nameof(code), code, null)
+            },
             preview is null ? null : PlatformUserDeletionMapping.ToResponse(preview)));
 }

@@ -29,6 +29,7 @@ public enum UpdatePlatformUserRoleConflictCode
 
 public sealed record UpdatePlatformUserRoleConflictResponse(
     UpdatePlatformUserRoleConflictCode Code,
+    string Detail,
     IReadOnlyList<Guid> CompetitionIds,
     IReadOnlyList<Guid> ChallengeIds);
 
@@ -77,11 +78,13 @@ public sealed class UpdatePlatformUserRoleEndpoint(ManagePlatform platform, Time
             UpdatePlatformRoleState.ActiveOwnerOrManagerAssignments =>
                 TypedResults.Conflict(new UpdatePlatformUserRoleConflictResponse(
                     UpdatePlatformUserRoleConflictCode.ActiveOwnerOrManagerAssignments,
+                    "The user still owns or manages active competitions or challenge templates. Transfer or remove those assignments before lowering the role.",
                     result.Blockers!.CompetitionIds,
                     result.Blockers.ChallengeIds)),
             UpdatePlatformRoleState.LastAdministratorProtected =>
                 TypedResults.Conflict(new UpdatePlatformUserRoleConflictResponse(
                     UpdatePlatformUserRoleConflictCode.LastAdministratorProtected,
+                    "This account is the last active human administrator and cannot be downgraded.",
                     [],
                     [])),
             UpdatePlatformRoleState.InvalidBotRole => TypedResults.Problem(

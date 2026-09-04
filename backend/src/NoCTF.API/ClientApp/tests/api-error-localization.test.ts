@@ -33,7 +33,7 @@ describe('api error localization', () => {
     }).message).toBe('The platform log query range must be between zero and 14 days.')
   })
 
-  test('does not expose unknown English diagnostics in the Chinese locale', () => {
+  test('shows explicit conflict details but hides unknown diagnostics for other statuses', () => {
     setLocale('zh-CN')
 
     expect(parseApiError({
@@ -45,6 +45,28 @@ describe('api error localization', () => {
       status: 400,
       detail: 'Unexpected legacy payload value.',
     }).message).toBe('请求参数有误,请检查输入')
+
+    expect(parseApiError({
+      statusCode: 409,
+      code: 'RuntimeStateConflict',
+      message: 'The runtime is stopping and cannot be extended.',
+    })).toMatchObject({
+      status: 409,
+      code: 'RuntimeStateConflict',
+      message: 'The runtime is stopping and cannot be extended.',
+    })
+
+    expect(parseApiError({
+      statusCode: 409,
+      message: 'One or more errors occurred.',
+      errors: { General: 'The competition has already finished.' },
+    }).message).toBe('The competition has already finished.')
+
+    expect(parseApiError({
+      status: 409,
+      code: 'RuntimeStateConflict',
+      detail: 'The runtime state changed while this request was being processed. Refresh the runtime status before retrying.',
+    }).message).toBe('处理请求期间运行环境状态已变化，请刷新运行状态后重试。')
   })
 
   test('keeps unknown English diagnostics in the English locale', () => {

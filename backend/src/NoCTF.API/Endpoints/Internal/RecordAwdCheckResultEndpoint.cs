@@ -30,7 +30,8 @@ public enum InternalResultDispositionProtocol
 {
     Applied,
     Duplicate,
-    Superseded
+    Superseded,
+    Conflict
 }
 
 [Mapper(RequiredMappingStrategy = RequiredMappingStrategy.Target)]
@@ -50,11 +51,14 @@ public sealed class RecordAwdCheckResultValidator : Validator<RecordAwdCheckResu
         RuleFor(request => request.State).IsInEnum();
 }
 
-public sealed record InternalResultResponse(InternalResultDispositionProtocol Disposition);
+public sealed record InternalResultResponse(
+    InternalResultDispositionProtocol Disposition,
+    string? Detail = null);
 
 public sealed class RecordAwdCheckResultEndpoint(RecordInternalResult record, TimeProvider timeProvider)
     : Endpoint<RecordAwdCheckResultRequest,
-        Results<Ok<InternalResultResponse>, Accepted<InternalResultResponse>, NotFound, Conflict, UnauthorizedHttpResult>>
+        Results<Ok<InternalResultResponse>, Accepted<InternalResultResponse>, NotFound,
+            Conflict<InternalResultResponse>, UnauthorizedHttpResult>>
 {
     public override void Configure()
     {
@@ -70,7 +74,8 @@ public sealed class RecordAwdCheckResultEndpoint(RecordInternalResult record, Ti
     }
 
     public override async Task<
-        Results<Ok<InternalResultResponse>, Accepted<InternalResultResponse>, NotFound, Conflict, UnauthorizedHttpResult>> ExecuteAsync(
+        Results<Ok<InternalResultResponse>, Accepted<InternalResultResponse>, NotFound,
+            Conflict<InternalResultResponse>, UnauthorizedHttpResult>> ExecuteAsync(
         RecordAwdCheckResultRequest request,
         CancellationToken ct)
     {
@@ -99,7 +104,12 @@ public sealed class RecordAwdCheckResultEndpoint(RecordInternalResult record, Ti
                     value: new InternalResultResponse(
                         InternalResultDispositionProtocol.Superseded)),
             InternalResultDisposition.NotFound => TypedResults.NotFound(),
-            _ => TypedResults.Conflict()
+            InternalResultDisposition.Conflict => TypedResults.Conflict(
+                new InternalResultResponse(
+                    InternalResultDispositionProtocol.Conflict,
+                    "The result conflicts with the runtime or gameplay fact currently bound to this checker.")),
+            _ => throw new InvalidOperationException(
+                $"Unsupported AWD result disposition: {disposition}.")
         };
     }
 }

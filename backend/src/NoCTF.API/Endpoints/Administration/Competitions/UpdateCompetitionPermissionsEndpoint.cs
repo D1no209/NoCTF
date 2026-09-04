@@ -41,6 +41,7 @@ public enum CompetitionResourceManagerConflictCode
 
 public sealed record CompetitionResourceManagerConflictResponse(
     CompetitionResourceManagerConflictCode Code,
+    string Detail,
     IReadOnlyList<Guid> UserIds);
 
 internal static class CompetitionResourceManagerConflictMapper
@@ -48,7 +49,23 @@ internal static class CompetitionResourceManagerConflictMapper
     public static CompetitionResourceManagerConflictResponse ToResponse(
         CompetitionResourceManagerConflictCode code,
         IReadOnlyList<Guid>? userIds) =>
-        new(code, userIds ?? []);
+        new(
+            code,
+            code switch
+            {
+                CompetitionResourceManagerConflictCode.RolesOverlap =>
+                    "A collaborator cannot hold more than one competition role. Remove duplicate assignments and try again.",
+                CompetitionResourceManagerConflictCode.OwnerIncluded =>
+                    "The competition owner cannot also be listed as a manager, judge, or observer.",
+                CompetitionResourceManagerConflictCode.UserNotFound =>
+                    "One or more selected collaborator accounts no longer exist.",
+                CompetitionResourceManagerConflictCode.RoleNotEligible =>
+                    "One or more selected accounts do not have a platform role eligible for this competition role.",
+                CompetitionResourceManagerConflictCode.EmailNotVerified =>
+                    "One or more selected human accounts must verify their email before receiving this competition role.",
+                _ => throw new ArgumentOutOfRangeException(nameof(code), code, null)
+            },
+            userIds ?? []);
 }
 
 internal static class UpdateCompetitionPermissionsMapper

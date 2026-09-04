@@ -741,7 +741,14 @@
             "description": "Not Found"
           },
           "409": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsTeamsTeamRegistrationFailureResponse"
+                }
+              }
+            }
           },
           "401": {
             "description": "Unauthorized"
@@ -998,7 +1005,14 @@
             "description": "Not Found"
           },
           "409": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcProblemDetails"
+                }
+              }
+            }
           },
           "503": {
             "description": "",
@@ -1183,7 +1197,14 @@
             "description": "Not Found"
           },
           "409": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcProblemDetails"
+                }
+              }
+            }
           },
           "503": {
             "description": "",
@@ -1250,7 +1271,14 @@
             "description": "Not Found"
           },
           "409": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcProblemDetails"
+                }
+              }
+            }
           },
           "503": {
             "description": "",
@@ -1317,7 +1345,14 @@
             "description": "Not Found"
           },
           "409": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcProblemDetails"
+                }
+              }
+            }
           },
           "503": {
             "description": "",
@@ -1648,7 +1683,14 @@
             "description": "Not Found"
           },
           "409": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsInternalInternalResultResponse"
+                }
+              }
+            }
           },
           "401": {
             "description": "Unauthorized"
@@ -1715,7 +1757,14 @@
             "description": "Not Found"
           },
           "409": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsInternalInternalResultResponse"
+                }
+              }
+            }
           },
           "401": {
             "description": "Unauthorized"
@@ -3584,7 +3633,14 @@
             "description": "Not Found"
           },
           "409": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsChallengesChallengeHintUnlockConflictResponse"
+                }
+              }
+            }
           },
           "401": {
             "description": "Unauthorized"
@@ -13778,6 +13834,10 @@
         "properties": {
           "disposition": {
             "$ref": "#/components/schemas/NoCTFAPIEndpointsInternalInternalResultDispositionProtocol"
+          },
+          "detail": {
+            "type": "string",
+            "nullable": true
           }
         }
       },
@@ -13787,12 +13847,14 @@
         "x-enumNames": [
           "Applied",
           "Duplicate",
-          "Superseded"
+          "Superseded",
+          "Conflict"
         ],
         "enum": [
           "Applied",
           "Duplicate",
-          "Superseded"
+          "Superseded",
+          "Conflict"
         ]
       },
       "NoCTFAPIEndpointsInternalRecordAwdCheckResultRequest": {
@@ -14248,6 +14310,9 @@
         "properties": {
           "code": {
             "$ref": "#/components/schemas/NoCTFAPIEndpointsGameplayFactsAwdpBreakFlagJudgementFailureCodeProtocol"
+          },
+          "detail": {
+            "type": "string"
           }
         }
       },
@@ -14309,6 +14374,9 @@
         "properties": {
           "code": {
             "$ref": "#/components/schemas/NoCTFAPIEndpointsGameplayFactsPracticeFlagFailureCodeProtocol"
+          },
+          "detail": {
+            "type": "string"
           }
         }
       },
@@ -14479,6 +14547,9 @@
         "properties": {
           "code": {
             "$ref": "#/components/schemas/NoCTFAPIEndpointsGameplayFactsAwdpDefenseTargetRequestFailureCodeProtocol"
+          },
+          "detail": {
+            "type": "string"
           }
         }
       },
@@ -14650,6 +14721,9 @@
         "properties": {
           "code": {
             "$ref": "#/components/schemas/NoCTFAPIEndpointsGameplayFactsUploadPatchFailureCodeProtocol"
+          },
+          "detail": {
+            "type": "string"
           }
         }
       },
@@ -16468,6 +16542,28 @@
           }
         }
       },
+      "NoCTFAPIEndpointsChallengesChallengeHintUnlockConflictResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "code": {
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsChallengesChallengeHintUnlockFailureCodeProtocol"
+          },
+          "detail": {
+            "type": "string"
+          }
+        }
+      },
+      "NoCTFAPIEndpointsChallengesChallengeHintUnlockFailureCodeProtocol": {
+        "type": "string",
+        "description": "",
+        "x-enumNames": [
+          "InsufficientScore"
+        ],
+        "enum": [
+          "InsufficientScore"
+        ]
+      },
       "NoCTFAPIEndpointsChallengesQuestionsCompetitionQuestionResponse": {
         "type": "object",
         "additionalProperties": false,
@@ -16701,6 +16797,9 @@
           "code": {
             "$ref": "#/components/schemas/NoCTFAPIEndpointsChallengesQuestionsCompetitionQuestionFailureCode"
           },
+          "detail": {
+            "type": "string"
+          },
           "current": {
             "nullable": true,
             "oneOf": [
@@ -16841,6 +16940,9 @@
         "properties": {
           "code": {
             "$ref": "#/components/schemas/NoCTFAPIEndpointsAuthenticationChangePasswordFailureCode"
+          },
+          "detail": {
+            "type": "string"
           }
         }
       },
@@ -17746,6 +17848,9 @@
         "properties": {
           "code": {
             "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationPlatformPlatformUserDeletionConflictCode"
+          },
+          "detail": {
+            "type": "string"
           },
           "preview": {
             "nullable": true,
@@ -18744,6 +18849,9 @@
         "properties": {
           "code": {
             "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationPlatformUpdatePlatformUserAccountStatusConflictCode"
+          },
+          "detail": {
+            "type": "string"
           }
         }
       },
@@ -18796,6 +18904,9 @@
         "properties": {
           "code": {
             "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationPlatformUpdatePlatformUserEmailVerificationConflictCode"
+          },
+          "detail": {
+            "type": "string"
           }
         }
       },
@@ -18824,6 +18935,9 @@
         "properties": {
           "code": {
             "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationPlatformUpdatePlatformUserRoleConflictCode"
+          },
+          "detail": {
+            "type": "string"
           },
           "competitionIds": {
             "type": "array",
@@ -19213,6 +19327,9 @@
           "code": {
             "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationCompetitionsCompetitionResourceManagerConflictCode"
           },
+          "detail": {
+            "type": "string"
+          },
           "userIds": {
             "type": "array",
             "items": {
@@ -19313,6 +19430,9 @@
           "code": {
             "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationCompetitionsCompetitionForceDeleteConflictCode"
           },
+          "detail": {
+            "type": "string"
+          },
           "preview": {
             "nullable": true,
             "oneOf": [
@@ -19356,6 +19476,9 @@
           },
           "canForceDelete": {
             "type": "boolean"
+          },
+          "detail": {
+            "type": "string"
           },
           "references": {
             "type": "array",
@@ -19701,6 +19824,9 @@
         "properties": {
           "code": {
             "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationCompetitionsCompetitionVisibilityMutationCodeProtocol"
+          },
+          "detail": {
+            "type": "string"
           },
           "current": {
             "nullable": true,
@@ -20220,11 +20346,16 @@
         "type": "object",
         "additionalProperties": false,
         "required": [
-          "code"
+          "code",
+          "detail"
         ],
         "properties": {
           "code": {
             "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationChallengesCompetitionChallengeConflictCode"
+          },
+          "detail": {
+            "type": "string",
+            "minLength": 1
           }
         }
       },
@@ -20707,11 +20838,16 @@
         "additionalProperties": false,
         "required": [
           "code",
+          "detail",
           "userIds"
         ],
         "properties": {
           "code": {
             "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationChallengeBankChallengeTemplateConflictCode"
+          },
+          "detail": {
+            "type": "string",
+            "minLength": 1
           },
           "userIds": {
             "type": "array",

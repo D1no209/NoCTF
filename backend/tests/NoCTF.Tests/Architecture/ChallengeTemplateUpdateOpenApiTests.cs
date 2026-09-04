@@ -28,7 +28,7 @@ public sealed class ChallengeTemplateUpdateOpenApiTests
             "ChallengeTemplateConflictResponse",
             StringComparison.Ordinal)).IsTrue();
         await Assert.That(RequiredPropertyNames(response))
-            .IsEquivalentTo(["code", "userIds"]);
+            .IsEquivalentTo(["code", "detail", "userIds"]);
         await Assert.That(code.GetProperty("type").GetString()).IsEqualTo("string");
         await Assert.That(code.GetProperty("enum")
                 .EnumerateArray()
