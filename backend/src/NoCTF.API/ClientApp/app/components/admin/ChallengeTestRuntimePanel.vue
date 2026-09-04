@@ -9,9 +9,15 @@ import {
   adminChallengeBankStopTestRuntime,
 } from '~/api'
 import type {
+  NoCtfapiEndpointsAdministrationChallengeBankChallengeTestRuntimeAcceptedResponse,
   NoCtfapiEndpointsAdministrationChallengeBankChallengeTestRuntimeResponse,
   NoCtfapiEndpointsAdministrationChallengeBankRuntimeTestFlagStateProtocol,
 } from '~/api'
+import type {
+  ChallengeTestRuntimeLoadOutcome,
+  ChallengeTestRuntimeMutationKind,
+  PendingChallengeTestRuntimeMutation,
+} from '~/utils/challenge-test-runtime-polling'
 
 type TestRuntime = NoCtfapiEndpointsAdministrationChallengeBankChallengeTestRuntimeResponse
 
@@ -24,41 +30,52 @@ const runtime = ref<TestRuntime | null>(null)
 const loading = ref(true)
 const loadError = ref<string | null>(null)
 const acting = ref(false)
+const pendingMutation = ref<PendingChallengeTestRuntimeMutation | null>(null)
 const copied = ref(false)
 const now = ref(Date.now())
 const extendMinutes = ref(30)
 let copiedTimer: ReturnType<typeof setTimeout> | undefined
 let clockTimer: ReturnType<typeof setInterval> | undefined
 
-function needsPolling(value: TestRuntime | null): boolean {
-  return value?.state === 'Queued'
-    || value?.state === 'Provisioning'
-    || value?.state === 'Stopping'
-    || value?.state === 'Running' && value.flagState === 'Pending'
-}
-
-async function load(): Promise<'available' | 'missing' | 'failed'> {
-  const { data, error, response } = await adminChallengeBankGetTestRuntime({
-    path: { challengeId: props.challengeId },
-  })
-  if (response?.status === 404) {
-    runtime.value = null
+async function load(): Promise<ChallengeTestRuntimeLoadOutcome> {
+  try {
+    const { data, error, response } = await adminChallengeBankGetTestRuntime({
+      path: { challengeId: props.challengeId },
+    })
+    if (response?.status === 404) {
+      runtime.value = null
+      loadError.value = null
+      return 'missing'
+    }
+    if (error || !data) {
+      loadError.value = parseApiError(error, translate('加载题目测试容器失败')).message
+      return 'failed'
+    }
+    runtime.value = data
     loadError.value = null
-    return 'missing'
+    return 'available'
   }
-  if (error || !data) {
+  catch (error) {
     loadError.value = parseApiError(error, translate('加载题目测试容器失败')).message
     return 'failed'
   }
-  runtime.value = data
-  loadError.value = null
-  return 'available'
+}
+
+function shouldContinuePolling(outcome: ChallengeTestRuntimeLoadOutcome): boolean {
+  const decision = evaluateChallengeTestRuntimePolling(
+    outcome,
+    runtime.value,
+    pendingMutation.value,
+  )
+  if (decision.mutationObserved)
+    pendingMutation.value = null
+  return decision.continuePolling
 }
 
 const { timedOut, start: startPolling } = usePolling(
   async () => {
     const outcome = await load()
-    return outcome === 'failed' || !needsPolling(runtime.value)
+    return !shouldContinuePolling(outcome)
   },
   { interval: 1500, timeout: 180_000 },
 )
@@ -66,7 +83,7 @@ const { timedOut, start: startPolling } = usePolling(
 onMounted(async () => {
   const outcome = await load()
   loading.value = false
-  if (outcome === 'available' && needsPolling(runtime.value))
+  if (shouldContinuePolling(outcome))
     startPolling()
   clockTimer = setInterval(() => { now.value = Date.now() }, 1000)
 })
@@ -80,21 +97,35 @@ async function retryLoad(): Promise<void> {
   loading.value = true
   const outcome = await load()
   loading.value = false
-  if (outcome === 'available' && needsPolling(runtime.value))
+  if (shouldContinuePolling(outcome))
     startPolling()
 }
 
 async function act(
-  action: () => Promise<{ error?: unknown }>,
+  kind: ChallengeTestRuntimeMutationKind,
+  action: () => Promise<{
+    data?: NoCtfapiEndpointsAdministrationChallengeBankChallengeTestRuntimeAcceptedResponse
+    error?: unknown
+  }>,
   failureMessage: string,
 ): Promise<void> {
   if (acting.value) return
   acting.value = true
   try {
-    const { error } = await action()
+    const previousRuntimeInstanceId = runtime.value?.id
+    const previousExpiresAt = runtime.value?.expiresAt
+    const { data, error } = await action()
     if (error) throw error
+    pendingMutation.value = {
+      kind,
+      runtimeInstanceId: data?.runtimeInstanceId,
+      previousRuntimeInstanceId,
+      previousExpiresAt,
+    }
     toast.success(translate('操作已受理,测试容器状态更新中'))
-    startPolling()
+    const outcome = await load()
+    if (shouldContinuePolling(outcome))
+      startPolling()
   }
   catch (error) {
     toast.error(parseApiError(error, failureMessage).message)
@@ -106,18 +137,22 @@ async function act(
 
 const path = computed(() => ({ challengeId: props.challengeId }))
 const start = () => act(
+  'start',
   () => adminChallengeBankStartTestRuntime({ path: path.value }),
   translate('启动题目测试容器失败'),
 )
 const stop = () => act(
+  'stop',
   () => adminChallengeBankStopTestRuntime({ path: path.value }),
   translate('停止题目测试容器失败'),
 )
 const reset = () => act(
+  'reset',
   () => adminChallengeBankResetTestRuntime({ path: path.value }),
   translate('重置题目测试容器失败'),
 )
 const extend = () => act(
+  'extend',
   () => adminChallengeBankExtendTestRuntime({
     path: path.value,
     body: { seconds: Math.max(60, Math.round(extendMinutes.value * 60)) },
@@ -144,7 +179,16 @@ const active = computed(() => runtime.value?.state === 'Queued'
 const canStart = computed(() => !runtime.value
   || runtime.value.state === 'Stopped'
   || runtime.value.state === 'Failed')
-const busy = computed(() => acting.value)
+const waitingForAcceptedRuntime = computed(() => {
+  const pending = pendingMutation.value
+  if (!pending || pending.kind !== 'start' && pending.kind !== 'reset') return false
+  if (!runtime.value) return true
+  if (pending.runtimeInstanceId)
+    return runtime.value.id !== pending.runtimeInstanceId
+  return pending.kind === 'reset'
+    && runtime.value.id === pending.previousRuntimeInstanceId
+})
+const busy = computed(() => acting.value || waitingForAcceptedRuntime.value)
 const ttl = computed(() => {
   if (!runtime.value?.expiresAt) return null
   const remaining = new Date(runtime.value.expiresAt).getTime() - now.value
