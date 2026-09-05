@@ -72,7 +72,11 @@ public sealed class DataModelSchemaTests
                     migrations.Add(reader.GetString(0));
             }
 
-            await Assert.That(migrations).Count().IsEqualTo(1);
+            await Assert.That(migrations).IsEquivalentTo(
+            [
+                "20260826172216_InitialBaseline",
+                "20260904120421_ChallengeTemplateTestRuntimes"
+            ]);
             await Assert.That(migrations[0]).EndsWith("_InitialBaseline");
 
             await using var primaryKeyCommand = new NpgsqlCommand(

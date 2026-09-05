@@ -80,6 +80,8 @@ public static class AwdpConfigurationValidator
         errors.AddRange(Registration.RunnerJobConfigurationValidator.Validate(configuration.Checker, "Checker"));
         ValidateRuntime(configuration.Runtime, true, errors);
         ValidateChecker(configuration.Checker, errors);
+        if (configuration.CheckerFixInput && configuration.Checker is null)
+            errors.Add("CheckerFixInput requires Checker.");
         return errors;
     }
 
@@ -125,6 +127,8 @@ public static class AwdpConfigurationValidator
             "Checker"));
         ValidateRuntime(configuration.Runtime, true, errors);
         ValidateChecker(configuration.Checker, errors);
+        if (configuration.CheckerFixInput && configuration.Checker is null)
+            errors.Add("CheckerFixInput requires Checker.");
         return errors;
     }
 

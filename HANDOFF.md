@@ -3659,3 +3659,30 @@ dotnet run --project backend/src/NoCTF.API/NoCTF.API.csproj --no-build -- --expo
   发生变化。新增纯状态机回归测试覆盖短暂缺失、旧实例、网络失败、停止与续期收敛。
 - 前端 328/328、ClientApp typecheck 与 Nuxt generate 通过；Release solution build 0 warning/0 error。
   无 HTTP/OpenAPI、数据库或 EF migration 变化。平台版本递增为 `0.1.0-alpha.141`。本阶段未 push、未部署。
+
+## 2026-09-05 Alpha.142 AWDP Checker 可选 Fix 输入
+
+- `AwdpChallengeConfiguration` 与有效配置新增默认关闭的 `CheckerFixInput`，保持 schemaVersion 4；旧 JSON
+  缺少字段时解析为 false。题库 AWDP Checker 区新增“向 Checker 提供 Fix 包”开关和固定
+  `/noctf/fix` 说明，关闭 Checker 会同步关闭该能力，非 AWDP 模式不序列化字段。
+- Runner 继续只下载并安全规范化 Fix 一次。Target 和 Checker 分别打开同一 `tarPath` 的独立读取流；
+  关闭开关时仍调用旧 OneShot 重载。进程内 `OneShotInputArchive` 固定 DestinationPath `/`，不会进入
+  Wolverine 消息，并保护调用方 Stream 生命周期。
+- Docker 在 Checker 容器 created、未启动时注入 canonical tar，再启动并等待；复制、启动、取消和超时
+  均走独立补偿清理。Kubernetes 使用 Pod-owned `emptyDir` 与阻塞 initContainer 流式准备输入，不使用
+  ConfigMap/Secret/PVC，主 Checker 在准备完成前不会启动，Pod 删除即清理输入。
+- 输入准备、Target Patch、Checker 启动和资源清理使用有界阶段/失败码；输入准备失败收敛为
+  PlatformFailed，服务关闭取消仍交由 Wolverine 重投。敏感工作对象 ToString 和结构化日志不包含 Token、
+  Flag、归档内容或完整临时路径；OpenTelemetry 新增 `awdp.checker.input.prepare` 阶段。
+- 新增独立 `docs/challenge-authoring-templates-v2/`，包含可运行 Target/Checker、静态检查、独立基线重放、
+  Before/After Diff、真实 Target 功能/漏洞探测、三类 Fix 与 Callback smoke；旧模板目录保持本任务开始时
+  的内容不变。
+- 完整审计同时修复真实依赖测试暴露的既有问题：Wolverine 邮件 Handler 的认证存储改为直接 DI 类型
+  注册；重发验证邮件以到期旧 Token 收敛，符合现有数据库约束且不新增 migration；三项过期/不确定
+  Integration 断言同步修正。
+- Release build 0 warning/0 error；非 Integration TUnit 1000/1000；Integration 190 total：187 passed、
+  0 failed、2 个 Kubernetes 与 1 个 Libvirt 用例因环境未配置跳过；Docker OneShot 输入 4/4 和 V2
+  Starter Kit 三结果 smoke 均真实通过；旧 AWDP Starter Kit 在隔离临时副本中保持 smoke 通过；前端
+  333/333、typecheck、Nuxt generate 通过。OpenAPI、静态规范与生成 SDK 重生成均无漂移，EF model 无
+  pending migration，`git diff --check` 通过。生产 `172.26.106.246` 只读盘点为 0 个题目模板，因此没有
+  schemaVersion 1–3 AWDP 定义需要迁移。本阶段未 push、未部署。

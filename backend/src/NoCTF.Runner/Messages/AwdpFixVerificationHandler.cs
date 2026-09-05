@@ -30,7 +30,16 @@ public sealed record AwdpCheckerWork(
     int TargetReadyTimeoutSeconds,
     Uri CallbackUrl,
     string CallbackToken,
-    TimeSpan Timeout);
+    TimeSpan Timeout,
+    bool FixInputEnabled = false)
+{
+    public override string ToString() =>
+        $"AwdpCheckerWork {{ RuntimeInstanceId = {RuntimeInstanceId}, Provider = {Provider}, "
+        + $"Image = {Image}, CommandCount = {Command.Count}, EnvironmentCount = {Environment.Count}, "
+        + $"NetworkId = [REDACTED], TargetHost = [REDACTED], "
+        + $"TargetReadyTimeoutSeconds = {TargetReadyTimeoutSeconds}, CallbackUrl = [REDACTED], "
+        + $"CallbackToken = [REDACTED], Timeout = {Timeout}, FixInputEnabled = {FixInputEnabled} }}";
+}
 
 public sealed record AwdpFixWork(
     AwdpFixArchive Archive,
@@ -64,6 +73,51 @@ public interface IAwdpCheckerExecutor
     Task<AwdpCheckerExecutionOutcome> ExecuteAsync(
         AwdpCheckerWork work,
         CancellationToken cancellationToken);
+
+    Task<AwdpCheckerExecutionOutcome> ExecuteAsync(
+        AwdpCheckerWork work,
+        OneShotInputArchive input,
+        CancellationToken cancellationToken);
+}
+
+public enum AwdpFixExecutionStage
+{
+    ArchiveDownload,
+    ArchivePreparation,
+    TargetInputPreparation,
+    TargetPatchExecution,
+    CheckerInputPreparation,
+    CheckerExecution,
+    ResourceCleanup
+}
+
+public enum AwdpFixPlatformFailureCode
+{
+    ExecutionCanceled,
+    ArchiveRejected,
+    ArchivePreparationFailed,
+    TargetInputInjectionFailed,
+    TargetPatchExecutionFailed,
+    CheckerInputInjectionFailed,
+    CheckerStartFailed,
+    ResourceCleanupFailed,
+    UnexpectedPlatformFailure
+}
+
+public sealed class AwdpFixPlatformException(
+    AwdpFixExecutionStage stage,
+    AwdpFixPlatformFailureCode failureCode,
+    RuntimeProvider provider,
+    Exception innerException)
+    : Exception("AWDP Fix platform execution failed.", innerException)
+{
+    public AwdpFixExecutionStage Stage { get; } = stage;
+    public AwdpFixPlatformFailureCode FailureCode { get; } = failureCode;
+    public RuntimeProvider Provider { get; } = provider;
+
+    public override string ToString() =>
+        $"AwdpFixPlatformException {{ Stage = {Stage}, FailureCode = {FailureCode}, "
+        + $"Provider = {Provider}, Details = [REDACTED] }}";
 }
 
 public enum AwdpCheckerExecutionOutcome
@@ -287,15 +341,28 @@ public sealed class AwdpFixWorkReader(
                     settings.ReadyTimeoutSeconds,
                     new Uri(baseUri, "/api/internal/v1/awdp/fix-results"),
                     callbackToken,
-                    timeout)));
+                    timeout,
+                    settings.CheckerFixInput)));
     }
 }
 
 public sealed class AwdpCheckerExecutor(IOneShotRuntimeProviderCatalog providers)
     : IAwdpCheckerExecutor
 {
-    public async Task<AwdpCheckerExecutionOutcome> ExecuteAsync(
+    public Task<AwdpCheckerExecutionOutcome> ExecuteAsync(
         AwdpCheckerWork work,
+        CancellationToken cancellationToken) =>
+        ExecuteCoreAsync(work, input: null, cancellationToken);
+
+    public Task<AwdpCheckerExecutionOutcome> ExecuteAsync(
+        AwdpCheckerWork work,
+        OneShotInputArchive input,
+        CancellationToken cancellationToken) =>
+        ExecuteCoreAsync(work, input, cancellationToken);
+
+    private async Task<AwdpCheckerExecutionOutcome> ExecuteCoreAsync(
+        AwdpCheckerWork work,
+        OneShotInputArchive? input,
         CancellationToken cancellationToken)
     {
         var environment = new Dictionary<string, string>(work.Environment, StringComparer.Ordinal)
@@ -315,7 +382,7 @@ public sealed class AwdpCheckerExecutor(IOneShotRuntimeProviderCatalog providers
             new Dictionary<string, string>(),
             new Dictionary<int, int>(),
             new RuntimeResourceLimits(256 * 1024 * 1024, 250_000_000, 128),
-            new ContainerSecurityPolicy(true, true, true, ["ALL"], []),
+            new ContainerSecurityPolicy(true, input is null, true, ["ALL"], []),
             work.Timeout,
             NetworkName: work.NetworkId,
             OperationTimeout: work.Timeout,
@@ -326,7 +393,10 @@ public sealed class AwdpCheckerExecutor(IOneShotRuntimeProviderCatalog providers
         timeout.CancelAfter(work.Timeout);
         try
         {
-            var result = await providers.OneShot(work.Provider).RunAsync(request, timeout.Token);
+            var runner = providers.OneShot(work.Provider);
+            var result = input is null
+                ? await runner.RunAsync(request, timeout.Token)
+                : await runner.RunAsync(request, input, timeout.Token);
             return result.ExitCode == 0
                 ? AwdpCheckerExecutionOutcome.Completed
                 : AwdpCheckerExecutionOutcome.AbnormalExit;
@@ -334,7 +404,43 @@ public sealed class AwdpCheckerExecutor(IOneShotRuntimeProviderCatalog providers
         catch (OperationCanceledException) when (
             !cancellationToken.IsCancellationRequested && timeout.IsCancellationRequested)
         {
+            if (input is not null && !input.PreparationCompleted)
+            {
+                throw new AwdpFixPlatformException(
+                    AwdpFixExecutionStage.CheckerInputPreparation,
+                    AwdpFixPlatformFailureCode.CheckerInputInjectionFailed,
+                    work.Provider,
+                    new TimeoutException("Checker input preparation exceeded its execution budget."));
+            }
             return AwdpCheckerExecutionOutcome.TimedOut;
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (OneShotInputPreparationException exception)
+        {
+            throw new AwdpFixPlatformException(
+                AwdpFixExecutionStage.CheckerInputPreparation,
+                AwdpFixPlatformFailureCode.CheckerInputInjectionFailed,
+                work.Provider,
+                exception);
+        }
+        catch (OneShotCleanupException exception)
+        {
+            throw new AwdpFixPlatformException(
+                AwdpFixExecutionStage.ResourceCleanup,
+                AwdpFixPlatformFailureCode.ResourceCleanupFailed,
+                work.Provider,
+                exception);
+        }
+        catch (Exception exception)
+        {
+            throw new AwdpFixPlatformException(
+                AwdpFixExecutionStage.CheckerExecution,
+                AwdpFixPlatformFailureCode.CheckerStartFailed,
+                work.Provider,
+                exception);
         }
     }
 
@@ -391,34 +497,54 @@ public sealed class AwdpFixVerificationHandler(
         {
             throw;
         }
-        catch (OperationCanceledException exception)
+        catch (OperationCanceledException)
         {
             logger.LogError(
-                exception,
                 "AWDP Fix execution was canceled outside host shutdown. "
-                + "GameplayFactId={GameplayFactId} RuntimeInstanceId={RuntimeInstanceId}",
+                + "FailureCode={FailureCode} GameplayFactId={GameplayFactId} "
+                + "RuntimeInstanceId={RuntimeInstanceId} PatchUploadId={PatchUploadId}",
+                AwdpFixPlatformFailureCode.ExecutionCanceled,
                 message.GameplayFactId,
-                message.RuntimeInstanceId);
+                message.RuntimeInstanceId,
+                message.PatchUploadId);
             outcome = AwdpFixOutcome.PlatformFailed;
         }
-        catch (InvalidDataException exception)
+        catch (InvalidDataException)
         {
             logger.LogWarning(
-                exception,
                 "AWDP Fix archive or entrypoint is invalid. "
-                + "GameplayFactId={GameplayFactId} RuntimeInstanceId={RuntimeInstanceId}",
+                + "FailureCode={FailureCode} GameplayFactId={GameplayFactId} "
+                + "RuntimeInstanceId={RuntimeInstanceId} PatchUploadId={PatchUploadId}",
+                AwdpFixPlatformFailureCode.ArchiveRejected,
                 message.GameplayFactId,
-                message.RuntimeInstanceId);
+                message.RuntimeInstanceId,
+                message.PatchUploadId);
             outcome = AwdpFixOutcome.PatchFailed;
         }
-        catch (Exception exception)
+        catch (AwdpFixPlatformException exception)
         {
             logger.LogError(
-                exception,
-                "AWDP Fix execution failed unexpectedly. "
-                + "GameplayFactId={GameplayFactId} RuntimeInstanceId={RuntimeInstanceId}",
+                "AWDP Fix platform stage failed. Stage={Stage} FailureCode={FailureCode} "
+                + "Provider={Provider} GameplayFactId={GameplayFactId} "
+                + "RuntimeInstanceId={RuntimeInstanceId} PatchUploadId={PatchUploadId}",
+                exception.Stage,
+                exception.FailureCode,
+                exception.Provider,
                 message.GameplayFactId,
-                message.RuntimeInstanceId);
+                message.RuntimeInstanceId,
+                message.PatchUploadId);
+            outcome = AwdpFixOutcome.PlatformFailed;
+        }
+        catch (Exception)
+        {
+            logger.LogError(
+                "AWDP Fix execution failed unexpectedly. "
+                + "FailureCode={FailureCode} GameplayFactId={GameplayFactId} "
+                + "RuntimeInstanceId={RuntimeInstanceId} PatchUploadId={PatchUploadId}",
+                AwdpFixPlatformFailureCode.UnexpectedPlatformFailure,
+                message.GameplayFactId,
+                message.RuntimeInstanceId,
+                message.PatchUploadId);
             outcome = AwdpFixOutcome.PlatformFailed;
         }
 
@@ -462,40 +588,150 @@ public sealed class AwdpFixVerificationHandler(
             {
                 logger.LogWarning(
                     "AWDP Fix archive failed before patch execution. "
-                    + "FailureCode={FailureCode} GameplayFactId={GameplayFactId} "
-                    + "RuntimeInstanceId={RuntimeInstanceId}",
+                    + "Stage={Stage} FailureCode={FailureCode} Provider={Provider} "
+                    + "GameplayFactId={GameplayFactId} RuntimeInstanceId={RuntimeInstanceId} "
+                    + "PatchUploadId={PatchUploadId}",
+                    AwdpFixExecutionStage.ArchiveDownload,
                     download,
+                    work.TargetReceipt.Provider,
                     message.GameplayFactId,
-                    message.RuntimeInstanceId);
+                    message.RuntimeInstanceId,
+                    message.PatchUploadId);
                 outcome = AwdpFixOutcome.PlatformFailed;
             }
             else
             {
-                await using var source = File.OpenRead(archivePath);
-                await preparer.PrepareTarAsync(
-                    source,
-                    work.Archive.OriginalFileName,
-                    work.PatchEntrypoint,
-                    workDirectory,
-                    tarPath,
-                    cancellationToken);
+                try
+                {
+                    await using var source = File.OpenRead(archivePath);
+                    await preparer.PrepareTarAsync(
+                        source,
+                        work.Archive.OriginalFileName,
+                        work.PatchEntrypoint,
+                        workDirectory,
+                        tarPath,
+                        cancellationToken);
+                }
+                catch (InvalidDataException)
+                {
+                    throw;
+                }
+                catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+                {
+                    throw;
+                }
+                catch (Exception exception)
+                {
+                    throw new AwdpFixPlatformException(
+                        AwdpFixExecutionStage.ArchivePreparation,
+                        AwdpFixPlatformFailureCode.ArchivePreparationFailed,
+                        work.TargetReceipt.Provider,
+                        exception);
+                }
                 var sandbox = providers.Sandbox(work.TargetReceipt.Provider);
-                await using (var tar = File.OpenRead(tarPath))
+                try
+                {
+                    await using var targetTar = File.OpenRead(tarPath);
                     await sandbox.CopyArchiveAsync(
-                        work.TargetReceipt, tar, cancellationToken);
-                var patch = await sandbox.ExecAsync(
-                    work.TargetReceipt,
-                    work.PatchCommand,
-                    work.PatchTimeout,
-                    cancellationToken);
+                        work.TargetReceipt,
+                        targetTar,
+                        cancellationToken);
+                }
+                catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+                {
+                    throw;
+                }
+                catch (Exception exception)
+                {
+                    throw new AwdpFixPlatformException(
+                        AwdpFixExecutionStage.TargetInputPreparation,
+                        AwdpFixPlatformFailureCode.TargetInputInjectionFailed,
+                        work.TargetReceipt.Provider,
+                        exception);
+                }
+
+                ContainerExecResult patch;
+                try
+                {
+                    patch = await sandbox.ExecAsync(
+                        work.TargetReceipt,
+                        work.PatchCommand,
+                        work.PatchTimeout,
+                        cancellationToken);
+                }
+                catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+                {
+                    throw;
+                }
+                catch (Exception exception)
+                {
+                    throw new AwdpFixPlatformException(
+                        AwdpFixExecutionStage.TargetPatchExecution,
+                        AwdpFixPlatformFailureCode.TargetPatchExecutionFailed,
+                        work.TargetReceipt.Provider,
+                        exception);
+                }
                 if (patch.TimedOut)
+                {
+                    logger.LogWarning(
+                        "AWDP Target Patch did not complete. Stage={Stage} FailureCode={FailureCode} "
+                        + "Provider={Provider} GameplayFactId={GameplayFactId} "
+                        + "RuntimeInstanceId={RuntimeInstanceId} PatchUploadId={PatchUploadId}",
+                        AwdpFixExecutionStage.TargetPatchExecution,
+                        AwdpFixOutcome.PatchTimeout,
+                        work.TargetReceipt.Provider,
+                        message.GameplayFactId,
+                        message.RuntimeInstanceId,
+                        message.PatchUploadId);
                     outcome = AwdpFixOutcome.PatchTimeout;
+                }
                 else if (patch.ExitCode != 0)
+                {
+                    logger.LogWarning(
+                        "AWDP Target Patch did not complete. Stage={Stage} FailureCode={FailureCode} "
+                        + "Provider={Provider} GameplayFactId={GameplayFactId} "
+                        + "RuntimeInstanceId={RuntimeInstanceId} PatchUploadId={PatchUploadId}",
+                        AwdpFixExecutionStage.TargetPatchExecution,
+                        AwdpFixOutcome.PatchFailed,
+                        work.TargetReceipt.Provider,
+                        message.GameplayFactId,
+                        message.RuntimeInstanceId,
+                        message.PatchUploadId);
                     outcome = AwdpFixOutcome.PatchFailed;
+                }
                 else
                 {
-                    var execution = await checker.ExecuteAsync(
-                        work.Checker, cancellationToken);
+                    AwdpCheckerExecutionOutcome execution;
+                    if (work.Checker.FixInputEnabled)
+                    {
+                        await using var checkerTar = File.OpenRead(tarPath);
+                        execution = await checker.ExecuteAsync(
+                            work.Checker,
+                            new(
+                                checkerTar,
+                                OneShotInputArchive.RootDestinationPath),
+                            cancellationToken);
+                    }
+                    else
+                    {
+                        execution = await checker.ExecuteAsync(
+                            work.Checker,
+                            cancellationToken);
+                    }
+                    if (execution != AwdpCheckerExecutionOutcome.Completed)
+                    {
+                        logger.LogWarning(
+                            "AWDP Checker did not complete normally. Stage={Stage} "
+                            + "FailureCode={FailureCode} Provider={Provider} "
+                            + "GameplayFactId={GameplayFactId} RuntimeInstanceId={RuntimeInstanceId} "
+                            + "PatchUploadId={PatchUploadId}",
+                            AwdpFixExecutionStage.CheckerExecution,
+                            execution,
+                            work.Checker.Provider,
+                            message.GameplayFactId,
+                            message.RuntimeInstanceId,
+                            message.PatchUploadId);
+                    }
                     outcome = AwdpCheckerCompletionPolicy.ResultFor(execution);
                 }
             }

@@ -18,6 +18,7 @@ function toggleChecker(enabled: boolean): void {
 
 function toggleCheckerJob(enabled: boolean): void {
   props.model.checkerJob = enabled ? emptyRunnerJob() : null
+  if (!enabled) props.model.checkerFixInput = false
 }
 </script>
 
@@ -59,6 +60,24 @@ function toggleCheckerJob(enabled: boolean): void {
       />
       <FieldLabel for="def-has-checker-job" class="font-normal">{{ $t('启用 Fix 一次性验证 Checker') }}</FieldLabel>
     </Field>
-    <RunnerJobEditor v-if="model.checkerJob" :job="model.checkerJob" :disabled="disabled" />
+    <template v-if="model.checkerJob">
+      <RunnerJobEditor :job="model.checkerJob" :disabled="disabled" />
+      <Field orientation="horizontal">
+        <Switch
+          id="def-checker-fix-input"
+          v-model="model.checkerFixInput"
+          :disabled="disabled"
+        />
+        <div class="grid gap-1">
+          <FieldLabel for="def-checker-fix-input" class="font-normal">{{ $t('向 Checker 提供 Fix 包') }}</FieldLabel>
+          <FieldDescription>
+            {{ $t('Checker 启动前将在固定目录 /noctf/fix 获得经过平台验证的 Fix 内容。') }}
+          </FieldDescription>
+        </div>
+      </Field>
+    </template>
+    <FieldDescription v-else>
+      {{ $t('启用 Fix 一次性验证 Checker 后，才可向 Checker 提供 Fix 包。') }}
+    </FieldDescription>
   </FieldSet>
 </template>

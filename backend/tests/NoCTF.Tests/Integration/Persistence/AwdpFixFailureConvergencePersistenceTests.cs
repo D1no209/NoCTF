@@ -182,10 +182,12 @@ public sealed class AwdpFixFailureConvergencePersistenceTests
                     state == RuntimeState.Running ? RuntimeState.Stopping : state);
                 await Assert.That(outbox.Messages.OfType<GameplayFactStateChanged>().Count())
                     .IsEqualTo(1);
-                await Assert.That(await db.CompetitionEvents.AsNoTracking().CountAsync(
-                    item => item.GameplayFactId == operation.GameplayFactId
-                        && item.Kind == CompetitionEventKind.AwdpFixResolved,
-                    cancellationToken)).IsEqualTo(1);
+                var resolvedEvents = await db.CompetitionEvents.AsNoTracking()
+                    .Where(item => item.Kind == CompetitionEventKind.AwdpFixResolved)
+                    .ToListAsync(cancellationToken);
+                await Assert.That(resolvedEvents.Count(item =>
+                        item.GameplayFactId == operation.GameplayFactId))
+                    .IsEqualTo(1);
             }
         });
     }

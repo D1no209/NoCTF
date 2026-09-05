@@ -86,6 +86,8 @@ export function validateChallengeTemplateDraft(draft: ChallengeTemplateDraft): s
     addIssue(issues, translate('题目定义无法解析，请重置或修正后再保存'))
     return issues
   }
+  if (draft.mode === 'Awdp' && model.checkerFixInput && !model.checkerJob)
+    addIssue(issues, translate('向 Checker 提供 Fix 包前必须启用 Checker'))
   const runtime = model.runtime
   if (!runtime) {
     validateRunnerJob(

@@ -1,0 +1,56 @@
+# NoCTF AWDP V2 configuration
+
+Replace only the local training image names. Keep the input directory fixed and do not add an archive
+URL, download token, Checker listener, or Target inspection port.
+
+```json
+{
+  "schemaVersion": 4,
+  "runtime": {
+    "allocation": 1,
+    "definition": {
+      "kind": "container",
+      "image": "noctf-awdp-v2-target:local",
+      "portMappings": { "8080": 0 },
+      "internalPorts": [8080],
+      "flagEnvironmentVariableName": "FLAG",
+      "security": {
+        "noNewPrivileges": true,
+        "readonlyRootfs": false,
+        "runAsNonRoot": true,
+        "capDrop": ["ALL"],
+        "capAdd": []
+      }
+    },
+    "limits": {
+      "memoryBytes": 268435456,
+      "nanoCpus": 500000000,
+      "pidsLimit": 128
+    },
+    "ttlSeconds": 3600,
+    "operationTimeoutSeconds": 60,
+    "urlBindings": [
+      {
+        "urlTemplate": "http://{HOST}:{PORT}",
+        "exposure": 0,
+        "containerPort": 8080
+      }
+    ],
+    "flagSource": 1
+  },
+  "patchEntrypoint": "fix.sh",
+  "patchCommand": ["/bin/sh", "{entrypoint}"],
+  "patchTimeoutSeconds": 60,
+  "checker": {
+    "image": "noctf-awdp-v2-checker:local",
+    "command": [],
+    "environment": {},
+    "timeoutSeconds": 120
+  },
+  "readyTimeoutSeconds": 30,
+  "maximumPatchUploadBytes": 268435456,
+  "checkerFixInput": true
+}
+```
+
+With `checkerFixInput: false` or an omitted field, NoCTF uses the legacy Checker path unchanged.

@@ -88,7 +88,7 @@ public sealed class EmailVerificationStore(
                 && item.ConsumedAt == null
                 && item.InvalidatedAt == null)
             .ExecuteUpdateAsync(
-                setters => setters.SetProperty(item => item.InvalidatedAt, now),
+                setters => setters.SetProperty(item => item.ExpiresAt, now),
                 ct);
 
         var bytes = RandomNumberGenerator.GetBytes(32);

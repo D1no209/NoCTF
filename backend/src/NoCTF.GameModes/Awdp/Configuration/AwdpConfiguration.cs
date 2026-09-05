@@ -41,7 +41,8 @@ public sealed record AwdpChallengeConfiguration(
     long? ServiceAbnormalPenalty = null,
     EvaluationDispatchMode? EvaluationDispatchMode = null,
     long? MaximumPatchUploadBytes = null,
-    PerTeamFlagTemplate? FlagTemplate = null)
+    PerTeamFlagTemplate? FlagTemplate = null,
+    bool CheckerFixInput = false)
 {
     public const int CurrentSchemaVersion = 4;
 }
@@ -64,4 +65,5 @@ public sealed record AwdpEffectiveConfiguration(
     RunnerJobConfiguration? Checker,
     int ReadyTimeoutSeconds,
     long MaximumPatchUploadBytes,
-    PerTeamFlagTemplate FlagTemplate);
+    PerTeamFlagTemplate FlagTemplate,
+    bool CheckerFixInput);

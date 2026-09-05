@@ -44,7 +44,8 @@ public static class AwdpConfigurationResolver
             definition.ReadyTimeoutSeconds ?? AwdpFixExecutionBudget.DefaultReadyTimeoutSeconds,
             definition.MaximumPatchUploadBytes
                 ?? NoCTF.Application.GameplayFacts.PatchUploads.PatchUploadRules.DefaultMaximumArchiveBytes,
-            rules.FlagTemplate ?? competition.FlagTemplate ?? PerTeamFlagTemplate.Default);
+            rules.FlagTemplate ?? competition.FlagTemplate ?? PerTeamFlagTemplate.Default,
+            definition.CheckerFixInput);
 
     public static AwdpEffectiveConfiguration Resolve(
         AwdpConfiguration competition,
