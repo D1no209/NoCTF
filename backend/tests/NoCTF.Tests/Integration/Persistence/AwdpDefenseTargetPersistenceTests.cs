@@ -4,6 +4,7 @@ using System.Text;
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Time.Testing;
 using NoCTF.Application.GameplayFacts.Awdp;
 using NoCTF.Application.GameplayFacts.Intake;
 using NoCTF.Application.GameplayFacts.PatchUploads;
@@ -71,13 +72,14 @@ public sealed class AwdpDefenseTargetPersistenceTests
                 cancellationToken);
             var factId = saved.Result.GameplayFactId!.Value;
             var start = new StartAwdpFixVerification(factId, runtimeId);
+            var clock = new FakeTimeProvider(fixture.Now.AddSeconds(2));
             var outbox = new RecordingOutbox();
             var events = new CompetitionEventStore(db, outbox);
             await BackendMessageOperations.StartAwdpFixVerificationAsync(
                 start,
                 db,
                 outbox,
-                TimeProvider.System,
+                clock,
                 cancellationToken,
                 events);
             await Assert.That(outbox.Messages.OfType<StartAwdpFixVerification>())
@@ -96,14 +98,14 @@ public sealed class AwdpDefenseTargetPersistenceTests
                 start,
                 db,
                 outbox,
-                TimeProvider.System,
+                clock,
                 cancellationToken,
                 events);
             await BackendMessageOperations.StartAwdpFixVerificationAsync(
                 start,
                 db,
                 outbox,
-                TimeProvider.System,
+                clock,
                 cancellationToken,
                 events);
 
@@ -114,7 +116,7 @@ public sealed class AwdpDefenseTargetPersistenceTests
                 item => item.RuntimeInstanceId == runtimeId,
                 cancellationToken);
             await Assert.That(fact.State).IsEqualTo(GameplayFactState.Processing);
-            await Assert.That(fact.UpdatedAt).IsGreaterThan(fact.OccurredAt);
+            await Assert.That(fact.UpdatedAt).IsEqualTo(clock.GetUtcNow());
             var run = outbox.Messages.OfType<RunAwdpFixVerification>().ToArray();
             await Assert.That(run).Count().IsEqualTo(1);
             await Assert.That(run[0].GameplayFactId).IsEqualTo(fact.Id);

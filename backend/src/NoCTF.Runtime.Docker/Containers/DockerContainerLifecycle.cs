@@ -6,6 +6,7 @@ using Docker.DotNet;
 using Docker.DotNet.Models;
 using NoCTF.Application.Runtime.Provisioning;
 using NoCTF.Application.Runtime.Callbacks;
+using NoCTF.Application.Observability;
 using NoCTF.Domain.Runtime;
 
 namespace NoCTF.Runtime.Docker.Containers;
@@ -43,11 +44,16 @@ public sealed class DockerContainerLifecycle : IContainerLifecycle, IOneShotJobR
     public Task<ContainerReceipt> CreateAsync(
         ContainerRequest request,
         CancellationToken cancellationToken) =>
-        CreateAsync(request, allowCompletedOneShot: false, cancellationToken);
+        CreateAsync(
+            request,
+            allowCompletedOneShot: false,
+            startContainer: true,
+            cancellationToken);
 
     private async Task<ContainerReceipt> CreateAsync(
         ContainerRequest request,
         bool allowCompletedOneShot,
+        bool startContainer,
         CancellationToken cancellationToken)
     {
         if (request.Provider != RuntimeProvider.Docker)
@@ -113,12 +119,15 @@ public sealed class DockerContainerLifecycle : IContainerLifecycle, IOneShotJobR
             }, cancellationToken);
             if (request.AllowInternalCallback)
                 await ConnectInternalCallbackAsync(request, response.ID, cancellationToken);
-            await client.Containers.StartContainerAsync(
-                response.ID, new ContainerStartParameters(), cancellationToken);
+            if (startContainer)
+            {
+                await client.Containers.StartContainerAsync(
+                    response.ID, new ContainerStartParameters(), cancellationToken);
+            }
             var created = await client.Containers.InspectContainerAsync(
                 response.ID, cancellationToken);
             var status = ToRuntimeStatus(created.State?.Status);
-            if (status == RuntimeStatus.Starting)
+            if (startContainer && status == RuntimeStatus.Starting)
             {
                 var deadline = timeProvider.GetUtcNow().Add(
                     request.OperationTimeout ?? TimeSpan.FromMinutes(2));
@@ -130,8 +139,11 @@ public sealed class DockerContainerLifecycle : IContainerLifecycle, IOneShotJobR
                     status = ToRuntimeStatus(created.State?.Status);
                 }
             }
-            if (status != RuntimeStatus.Running
-                && !(allowCompletedOneShot && status == RuntimeStatus.Stopped))
+            var accepted = startContainer
+                ? status == RuntimeStatus.Running
+                    || allowCompletedOneShot && status == RuntimeStatus.Stopped
+                : status == RuntimeStatus.Pending;
+            if (!accepted)
             {
                 throw new InvalidOperationException(
                     $"Docker container {response.ID} did not reach the running state; current state is {status}.");
@@ -333,12 +345,67 @@ public sealed class DockerContainerLifecycle : IContainerLifecycle, IOneShotJobR
         }
     }
 
-    public async Task<OneShotResult> RunAsync(ContainerRequest request, CancellationToken cancellationToken)
+    public Task<OneShotResult> RunAsync(
+        ContainerRequest request,
+        CancellationToken cancellationToken) =>
+        RunAsync(request, input: null, cancellationToken);
+
+    public async Task<OneShotResult> RunAsync(
+        ContainerRequest request,
+        OneShotInputArchive? input,
+        CancellationToken cancellationToken)
     {
+        input?.Validate();
         var started = timeProvider.GetUtcNow();
-        var receipt = await CreateAsync(request, allowCompletedOneShot: true, cancellationToken);
+        var receipt = await CreateAsync(
+            request,
+            allowCompletedOneShot: true,
+            startContainer: input is null,
+            cancellationToken);
         try
         {
+            if (input is not null)
+            {
+                using var inputActivity = NoCtfTelemetry.ActivitySource.StartActivity(
+                    "awdp.checker.input.prepare");
+                inputActivity?.SetTag("runtime.provider", RuntimeProvider.Docker.ToString());
+                inputActivity?.SetTag("awdp.checker.fix_input", true);
+                try
+                {
+                    await client.Containers.ExtractArchiveToContainerAsync(
+                        receipt.ResourceId,
+                        new CopyToContainerParameters { Path = input.DestinationPath },
+                        new CallerOwnedReadStream(input.Archive),
+                        cancellationToken);
+                    input.MarkPreparationCompleted();
+                    inputActivity?.SetStatus(System.Diagnostics.ActivityStatusCode.Ok);
+                }
+                catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+                {
+                    throw;
+                }
+                catch (Exception exception)
+                {
+                    inputActivity?.SetTag(
+                        "error.type",
+                        "CheckerInputInjectionFailed");
+                    inputActivity?.SetStatus(System.Diagnostics.ActivityStatusCode.Error);
+                    throw new OneShotInputPreparationException(
+                        "Docker could not prepare the one-shot input archive.",
+                        exception);
+                }
+
+                var containerStarted = await client.Containers.StartContainerAsync(
+                    receipt.ResourceId,
+                    new ContainerStartParameters(),
+                    cancellationToken);
+                if (!containerStarted)
+                {
+                    throw new InvalidOperationException(
+                        "Docker did not start the prepared one-shot container.");
+                }
+            }
+
             var wait = await client.Containers.WaitContainerAsync(receipt.ResourceId, cancellationToken);
             using var logs = await client.Containers.GetContainerLogsAsync(receipt.ResourceId, new ContainerLogsParameters
             {
@@ -353,7 +420,16 @@ public sealed class DockerContainerLifecycle : IContainerLifecycle, IOneShotJobR
         {
             using var cleanupSource = new CancellationTokenSource(
                 RunnerScoringCallbackDeliveryPolicy.OneShotCleanupBudget);
-            await DestroyAsync(receipt, cleanupSource.Token);
+            try
+            {
+                await DestroyAsync(receipt, cleanupSource.Token);
+            }
+            catch (Exception exception)
+            {
+                throw new OneShotCleanupException(
+                    "Docker could not clean up the one-shot container.",
+                    exception);
+            }
         }
     }
 
@@ -1092,6 +1168,48 @@ public sealed class DockerContainerLifecycle : IContainerLifecycle, IOneShotJobR
                 request.Identity.RuntimeInstanceId.ToString("D")
         };
         return labels;
+    }
+
+    private sealed class CallerOwnedReadStream(Stream inner) : Stream
+    {
+        public override bool CanRead => inner.CanRead;
+        public override bool CanSeek => inner.CanSeek;
+        public override bool CanWrite => false;
+        public override long Length => inner.Length;
+        public override long Position
+        {
+            get => inner.Position;
+            set => inner.Position = value;
+        }
+
+        public override int Read(byte[] buffer, int offset, int count) =>
+            inner.Read(buffer, offset, count);
+        public override int Read(Span<byte> buffer) => inner.Read(buffer);
+        public override Task<int> ReadAsync(
+            byte[] buffer,
+            int offset,
+            int count,
+            CancellationToken cancellationToken) =>
+            inner.ReadAsync(buffer, offset, count, cancellationToken);
+        public override ValueTask<int> ReadAsync(
+            Memory<byte> buffer,
+            CancellationToken cancellationToken = default) =>
+            inner.ReadAsync(buffer, cancellationToken);
+        public override long Seek(long offset, SeekOrigin origin) =>
+            inner.Seek(offset, origin);
+        public override void Flush()
+        {
+        }
+        public override Task FlushAsync(CancellationToken cancellationToken) =>
+            Task.CompletedTask;
+        public override void SetLength(long value) => throw new NotSupportedException();
+        public override void Write(byte[] buffer, int offset, int count) =>
+            throw new NotSupportedException();
+        protected override void Dispose(bool disposing)
+        {
+            // Docker.DotNet disposes the stream it is given. The archive remains caller-owned.
+        }
+        public override ValueTask DisposeAsync() => ValueTask.CompletedTask;
     }
 
     private sealed class ImagePullProgress : IProgress<JSONMessage>

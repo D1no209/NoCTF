@@ -3,6 +3,7 @@ using k8s.Models;
 using System.Text.Json;
 using NoCTF.Application.Runtime.Provisioning;
 using NoCTF.Application.Runtime.Callbacks;
+using NoCTF.Application.Observability;
 using NoCTF.Domain.Runtime;
 using NoCTF.Runtime.Kubernetes.Configuration;
 using NoCTF.Runtime.Kubernetes.Networking;
@@ -35,6 +36,9 @@ public sealed class KubernetesContainerLifecycle(
     private const string NetworkPurposeAwdpVerification = "awdp-verification";
     private const string NetworkPurposePersistentRuntime = "persistent-runtime";
     private const string ExternalReasonExitCode = "ExitCode";
+    private const string OneShotInputVolumeName = "noctf-fix-input";
+    private const string OneShotInputInitializerName = "noctf-fix-input-preparer";
+    private const string OneShotInputReadyFile = "/input/noctf/.input-complete";
     private const string ExecTimeoutScript = """
         duration=$1
         shift
@@ -59,7 +63,15 @@ public sealed class KubernetesContainerLifecycle(
         exit "$status"
         """;
 
-    public async Task<ContainerReceipt> CreateAsync(ContainerRequest request, CancellationToken cancellationToken)
+    public Task<ContainerReceipt> CreateAsync(
+        ContainerRequest request,
+        CancellationToken cancellationToken) =>
+        CreateAsync(request, prepareOneShotInput: false, cancellationToken);
+
+    private async Task<ContainerReceipt> CreateAsync(
+        ContainerRequest request,
+        bool prepareOneShotInput,
+        CancellationToken cancellationToken)
     {
         if (request.Provider != RuntimeProvider.Kubernetes)
             throw new ArgumentOutOfRangeException(nameof(request), request.Provider, "Kubernetes runtime cannot create another provider.");
@@ -131,6 +143,8 @@ public sealed class KubernetesContainerLifecycle(
                 RestartPolicy = "Never"
             }
         };
+        if (prepareOneShotInput)
+            ConfigureOneShotInput(pod.Spec, request);
         V1Pod? createdPod = null;
         var createdCallbackPolicies = new List<V1NetworkPolicy>();
         var createdServices = new List<V1Service>();
@@ -316,12 +330,26 @@ public sealed class KubernetesContainerLifecycle(
         }
     }
 
-    public async Task<OneShotResult> RunAsync(ContainerRequest request, CancellationToken cancellationToken)
+    public Task<OneShotResult> RunAsync(
+        ContainerRequest request,
+        CancellationToken cancellationToken) =>
+        RunAsync(request, input: null, cancellationToken);
+
+    public async Task<OneShotResult> RunAsync(
+        ContainerRequest request,
+        OneShotInputArchive? input,
+        CancellationToken cancellationToken)
     {
+        input?.Validate();
         var startedAt = timeProvider.GetUtcNow();
-        var receipt = await CreateAsync(request, cancellationToken);
+        var receipt = await CreateAsync(
+            request,
+            prepareOneShotInput: input is not null,
+            cancellationToken);
         try
         {
+            if (input is not null)
+                await PrepareOneShotInputAsync(receipt.ResourceId, input, cancellationToken);
             while (true)
             {
                 var pod = await client.CoreV1.ReadNamespacedPodAsync(
@@ -339,7 +367,169 @@ public sealed class KubernetesContainerLifecycle(
         {
             using var cleanupSource = new CancellationTokenSource(
                 RunnerScoringCallbackDeliveryPolicy.OneShotCleanupBudget);
-            await DestroyAsync(receipt, cleanupSource.Token);
+            try
+            {
+                await DestroyAsync(receipt, cleanupSource.Token);
+            }
+            catch (Exception exception)
+            {
+                throw new OneShotCleanupException(
+                    "Kubernetes could not clean up the one-shot Pod.",
+                    exception);
+            }
+        }
+    }
+
+    private void ConfigureOneShotInput(
+        V1PodSpec specification,
+        ContainerRequest request)
+    {
+        var checker = specification.Containers.Single();
+        specification.Volumes =
+        [
+            .. (specification.Volumes ?? []),
+            new V1Volume
+            {
+                Name = OneShotInputVolumeName,
+                EmptyDir = new V1EmptyDirVolumeSource()
+            }
+        ];
+        checker.VolumeMounts =
+        [
+            .. (checker.VolumeMounts ?? []),
+            new V1VolumeMount
+            {
+                Name = OneShotInputVolumeName,
+                MountPath = "/noctf"
+            }
+        ];
+        specification.SecurityContext = new V1PodSecurityContext
+        {
+            FsGroup = 65_532,
+            FsGroupChangePolicy = "OnRootMismatch"
+        };
+        specification.InitContainers =
+        [
+            new V1Container
+            {
+                Name = OneShotInputInitializerName,
+                Image = request.Image,
+                ImagePullPolicy = options.ImagePullPolicy,
+                Command =
+                [
+                    "/bin/sh",
+                    "-c",
+                    $"trap 'exit 143' TERM INT; while [ ! -f {OneShotInputReadyFile} ]; do sleep 1; done"
+                ],
+                SecurityContext = new V1SecurityContext
+                {
+                    AllowPrivilegeEscalation = false,
+                    ReadOnlyRootFilesystem = true,
+                    RunAsNonRoot = request.Security.RunAsNonRoot,
+                    Capabilities = new V1Capabilities { Drop = ["ALL"], Add = [] }
+                },
+                Resources = checker.Resources,
+                VolumeMounts =
+                [
+                    new V1VolumeMount
+                    {
+                        Name = OneShotInputVolumeName,
+                        MountPath = "/input/noctf"
+                    }
+                ]
+            }
+        ];
+    }
+
+    private async Task PrepareOneShotInputAsync(
+        string podName,
+        OneShotInputArchive input,
+        CancellationToken cancellationToken)
+    {
+        using var inputActivity = NoCtfTelemetry.ActivitySource.StartActivity(
+            "awdp.checker.input.prepare");
+        inputActivity?.SetTag("runtime.provider", RuntimeProvider.Kubernetes.ToString());
+        inputActivity?.SetTag("awdp.checker.fix_input", true);
+        try
+        {
+            await WaitUntilInputInitializerRunningAsync(podName, cancellationToken);
+            using var demuxer = await client.MuxedStreamNamespacedPodExecAsync(
+                podName,
+                options.Namespace,
+                [
+                    "/bin/sh",
+                    "-c",
+                    $"tar -xf - -C /input && touch {OneShotInputReadyFile}"
+                ],
+                OneShotInputInitializerName,
+                true,
+                false,
+                false,
+                false,
+                cancellationToken: cancellationToken);
+            demuxer.Start();
+            using var standardInput = demuxer.GetStream(null, ChannelIndex.StdIn);
+            using var error = demuxer.GetStream(ChannelIndex.Error, null);
+            var statusTask = ReadExecStatusAsync(error, cancellationToken);
+            await input.Archive.CopyToAsync(standardInput, cancellationToken);
+            await standardInput.FlushAsync(cancellationToken);
+            standardInput.Dispose();
+            if (await statusTask != 0)
+            {
+                throw new OneShotInputPreparationException(
+                    "Kubernetes could not extract the one-shot input archive.");
+            }
+            input.MarkPreparationCompleted();
+            inputActivity?.SetStatus(System.Diagnostics.ActivityStatusCode.Ok);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (OneShotInputPreparationException)
+        {
+            inputActivity?.SetTag(
+                "error.type",
+                "CheckerInputInjectionFailed");
+            inputActivity?.SetStatus(System.Diagnostics.ActivityStatusCode.Error);
+            throw;
+        }
+        catch (Exception exception)
+        {
+            inputActivity?.SetTag(
+                "error.type",
+                "CheckerInputInjectionFailed");
+            inputActivity?.SetStatus(System.Diagnostics.ActivityStatusCode.Error);
+            throw new OneShotInputPreparationException(
+                "Kubernetes could not prepare the one-shot input archive.",
+                exception);
+        }
+    }
+
+    private async Task WaitUntilInputInitializerRunningAsync(
+        string podName,
+        CancellationToken cancellationToken)
+    {
+        while (true)
+        {
+            var pod = await client.CoreV1.ReadNamespacedPodAsync(
+                podName,
+                options.Namespace,
+                cancellationToken: cancellationToken);
+            var initializer = pod.Status?.InitContainerStatuses?
+                .SingleOrDefault(status => string.Equals(
+                    status.Name,
+                    OneShotInputInitializerName,
+                    StringComparison.Ordinal));
+            if (initializer?.State?.Running is not null)
+                return;
+            if (initializer?.State?.Terminated is not null
+                || string.Equals(pod.Status?.Phase, PodPhaseFailed, StringComparison.Ordinal))
+            {
+                throw new OneShotInputPreparationException(
+                    "Kubernetes input initializer terminated before the archive was prepared.");
+            }
+            await Task.Delay(TimeSpan.FromMilliseconds(250), timeProvider, cancellationToken);
         }
     }
 
@@ -731,7 +921,15 @@ public sealed class KubernetesContainerLifecycle(
                     .Throw();
                 throw;
             }
-            ValidatePod(existing, desired.Metadata.Name, request);
+            ValidatePod(
+                existing,
+                desired.Metadata.Name,
+                request,
+                requireOneShotInput: desired.Spec.InitContainers?.Any(container =>
+                    string.Equals(
+                        container.Name,
+                        OneShotInputInitializerName,
+                        StringComparison.Ordinal)) == true);
             return new(existing, false);
         }
     }
@@ -1097,7 +1295,11 @@ public sealed class KubernetesContainerLifecycle(
             $"Kubernetes Service '{publicName}' was not deleted before reconciliation.");
     }
 
-    private static void ValidatePod(V1Pod pod, string name, ContainerRequest request)
+    private static void ValidatePod(
+        V1Pod pod,
+        string name,
+        ContainerRequest request,
+        bool requireOneShotInput = false)
     {
         var identity = new RuntimeResourceIdentity(
             request.RuntimeInstanceId ?? request.OperationId);
@@ -1117,9 +1319,29 @@ public sealed class KubernetesContainerLifecycle(
                 && !HasLabel(
                     pod.Metadata?.Labels,
                     "noctf.io/purpose",
-                    CallbackPurpose(request.NetworkPurpose)))
+                    CallbackPurpose(request.NetworkPurpose))
+            || requireOneShotInput && !HasOneShotInputContract(pod.Spec))
             throw new InvalidOperationException(
                 $"Kubernetes Pod '{name}' has a different ownership identity or network.");
+    }
+
+    private static bool HasOneShotInputContract(V1PodSpec? specification)
+    {
+        var checker = specification?.Containers?.SingleOrDefault();
+        var initializer = specification?.InitContainers?.SingleOrDefault(container =>
+            string.Equals(
+                container.Name,
+                OneShotInputInitializerName,
+                StringComparison.Ordinal));
+        return specification?.Volumes?.Any(volume =>
+                string.Equals(volume.Name, OneShotInputVolumeName, StringComparison.Ordinal)
+                && volume.EmptyDir is not null) == true
+            && checker?.VolumeMounts?.Any(mount =>
+                string.Equals(mount.Name, OneShotInputVolumeName, StringComparison.Ordinal)
+                && string.Equals(mount.MountPath, "/noctf", StringComparison.Ordinal)) == true
+            && initializer?.VolumeMounts?.Any(mount =>
+                string.Equals(mount.Name, OneShotInputVolumeName, StringComparison.Ordinal)
+                && string.Equals(mount.MountPath, "/input/noctf", StringComparison.Ordinal)) == true;
     }
 
     private static Dictionary<string, string> ServiceSelector(

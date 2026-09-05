@@ -1,5 +1,9 @@
 /** English UI resources keyed by the canonical Simplified Chinese source text. */
 export const englishMessages: Record<string, string> = {
+  "向 Checker 提供 Fix 包": "Provide the Fix package to the Checker",
+  "Checker 启动前将在固定目录 /noctf/fix 获得经过平台验证的 Fix 内容。": "Before it starts, the Checker receives the platform-validated Fix contents at the fixed /noctf/fix directory.",
+  "启用 Fix 一次性验证 Checker 后，才可向 Checker 提供 Fix 包。": "Enable the one-shot Fix Checker before providing it with the Fix package.",
+  "向 Checker 提供 Fix 包前必须启用 Checker": "Enable the Checker before providing it with the Fix package",
   "题目定义版本或 JSON 格式无效": "The challenge definition version or JSON format is invalid",
   "后端返回了未识别的校验原因：{reason}": "The server returned an unrecognized validation reason: {reason}",
   "{label}中的环境变量名“{name}”无效": "Environment variable name “{name}” in {label} is invalid",

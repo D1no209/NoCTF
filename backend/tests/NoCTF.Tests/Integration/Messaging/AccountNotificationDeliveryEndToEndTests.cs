@@ -98,18 +98,14 @@ public sealed class AccountNotificationDeliveryEndToEndTests
                         options.UseNpgsql(connectionString).UseSnakeCaseNamingConvention());
                     services.AddScoped<ITransactionalMessageOutbox,
                         WolverineTransactionalMessageOutbox>();
-                    services.AddScoped<AuthenticationStore>();
-                    services.AddScoped<IUserAuthenticationStore>(provider =>
-                        provider.GetRequiredService<AuthenticationStore>());
-                    services.AddScoped<IUserRegistrationStore>(provider =>
-                        provider.GetRequiredService<AuthenticationStore>());
+                    services.AddScoped<IUserAuthenticationStore, AuthenticationStore>();
+                    services.AddScoped<IUserRegistrationStore, AuthenticationStore>();
                     services.AddScoped<IEmailVerificationStore, EmailVerificationStore>();
                     services.AddScoped<IPasswordResetStore, PasswordResetStore>();
-                    services.AddScoped<SmtpEmailVerificationDelivery>();
-                    services.AddScoped<IEmailVerificationDelivery>(provider =>
-                        provider.GetRequiredService<SmtpEmailVerificationDelivery>());
-                    services.AddScoped<IPasswordResetEmailDelivery>(provider =>
-                        provider.GetRequiredService<SmtpEmailVerificationDelivery>());
+                    services.AddScoped<IEmailVerificationDelivery,
+                        SmtpEmailVerificationDelivery>();
+                    services.AddScoped<IPasswordResetEmailDelivery,
+                        SmtpEmailVerificationDelivery>();
                     services.AddTransient<AccountNotificationMessageHandler>();
                 })
                 .UseWolverine(options =>
@@ -208,7 +204,8 @@ public sealed class AccountNotificationDeliveryEndToEndTests
                 await Assert.That(await db.AccountTokens.CountAsync(
                         token => token.UserId == userId
                             && token.Kind == AccountTokenKind.EmailVerification
-                            && token.InvalidatedAt == null,
+                            && token.ConsumedAt == null
+                            && token.ExpiresAt > now.AddMinutes(4),
                         cancellationToken))
                     .IsEqualTo(1);
             }

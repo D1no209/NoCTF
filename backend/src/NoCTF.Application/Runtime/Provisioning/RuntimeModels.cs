@@ -190,6 +190,40 @@ public sealed record OneShotResult(
     DateTimeOffset StartedAt,
     DateTimeOffset FinishedAt);
 
+public sealed record OneShotInputArchive(Stream Archive, string DestinationPath)
+{
+    public const string RootDestinationPath = "/";
+    private int preparationCompleted;
+
+    public bool PreparationCompleted => Volatile.Read(ref preparationCompleted) != 0;
+
+    public void Validate()
+    {
+        ArgumentNullException.ThrowIfNull(Archive);
+        if (!Archive.CanRead)
+            throw new ArgumentException("The one-shot input archive must be readable.", nameof(Archive));
+        if (!string.Equals(DestinationPath, RootDestinationPath, StringComparison.Ordinal))
+        {
+            throw new ArgumentException(
+                $"The one-shot input destination must be '{RootDestinationPath}'.",
+                nameof(DestinationPath));
+        }
+    }
+
+    public void MarkPreparationCompleted() =>
+        Interlocked.Exchange(ref preparationCompleted, 1);
+
+    public override string ToString() =>
+        $"OneShotInputArchive {{ Archive = [REDACTED], DestinationPath = /, "
+        + $"PreparationCompleted = {PreparationCompleted} }}";
+}
+
+public sealed class OneShotInputPreparationException(string message, Exception? innerException = null)
+    : Exception(message, innerException);
+
+public sealed class OneShotCleanupException(string message, Exception? innerException = null)
+    : Exception(message, innerException);
+
 public interface IContainerLifecycle
 {
     Task<ContainerReceipt> CreateAsync(ContainerRequest request, CancellationToken cancellationToken);
@@ -203,6 +237,14 @@ public interface IContainerLifecycle
 public interface IOneShotJobRunner
 {
     Task<OneShotResult> RunAsync(ContainerRequest request, CancellationToken cancellationToken);
+
+    Task<OneShotResult> RunAsync(
+        ContainerRequest request,
+        OneShotInputArchive? input,
+        CancellationToken cancellationToken) => input is null
+        ? RunAsync(request, cancellationToken)
+        : Task.FromException<OneShotResult>(new NotSupportedException(
+            "The selected one-shot Runtime provider does not support input archives."));
 }
 
 public sealed record ContainerExecResult(int ExitCode, bool TimedOut);

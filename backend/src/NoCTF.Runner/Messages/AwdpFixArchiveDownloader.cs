@@ -10,7 +10,12 @@ public sealed record AwdpFixArchive(
     string DownloadToken,
     string OriginalFileName,
     long ByteLength,
-    byte[] Sha256);
+    byte[] Sha256)
+{
+    public override string ToString() =>
+        $"AwdpFixArchive {{ DownloadUrl = [REDACTED], DownloadToken = [REDACTED], "
+        + $"OriginalFileName = [REDACTED], ByteLength = {ByteLength}, Sha256 = [REDACTED] }}";
+}
 
 public enum AwdpFixArchiveDownloadOutcome
 {
