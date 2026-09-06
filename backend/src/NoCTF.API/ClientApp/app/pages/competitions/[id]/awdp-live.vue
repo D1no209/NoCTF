@@ -59,6 +59,9 @@ const fullscreen = ref(false)
 const viewportWidth = ref(1920)
 const viewportHeight = ref(1080)
 const selectedTeamIndex = ref(0)
+const teamPanelHovered = ref(false)
+const teamPanelFocused = ref(false)
+const teamCarouselPaused = computed(() => teamPanelHovered.value || teamPanelFocused.value)
 const previousRanks = new Map<string, number>()
 let seenEventIds: Set<string> | null = null
 let clockTimer: ReturnType<typeof setInterval> | undefined
@@ -302,6 +305,10 @@ async function toggleFullscreen(): Promise<void> {
   }
 }
 
+function advanceTeamCarousel(): void {
+  if (!teamCarouselPaused.value) selectNextTeam()
+}
+
 function syncFullscreen(): void { fullscreen.value = Boolean(document.fullscreenElement) }
 
 onMounted(async () => {
@@ -312,7 +319,7 @@ onMounted(async () => {
   await refreshLatest()
   clockTimer = setInterval(() => { clock.value = Date.now() }, 1_000)
   refreshTimer = setInterval(() => void refreshLatest(), 10_000)
-  carouselTimer = setInterval(selectNextTeam, 8_000)
+  carouselTimer = setInterval(advanceTeamCarousel, 8_000)
   unwatch = watchCompetition(competitionId, {
     scoreboardUpdated: () => void refreshLatest(),
     competitionEventChanged: () => void refreshLatest(),
@@ -409,10 +416,16 @@ onUnmounted(() => {
             <footer>{{ $t('仅显示已完成轮次的结算分数') }} · {{ eventTime(board.snapshot.value?.generatedAt) }}</footer>
           </section>
 
-          <section class="team-panel hud-panel">
+          <section
+            class="team-panel hud-panel"
+            @mouseenter="teamPanelHovered = true"
+            @mouseleave="teamPanelHovered = false"
+            @focusin="teamPanelFocused = true"
+            @focusout="teamPanelFocused = false"
+          >
             <header class="hud-heading">
               <div class="hud-title"><Activity class="hud-title-icon" /><span>{{ $t('队伍题目动态') }}</span></div>
-              <span>{{ $t('每 8 秒轮播') }}</span>
+              <span>{{ teamCarouselPaused ? $t('轮播已暂停') : $t('每 8 秒轮播') }}</span>
             </header>
             <div v-if="selectedTeam" class="team-carousel">
               <nav class="team-tabs" :aria-label="$t('选择队伍')">
@@ -441,15 +454,21 @@ onUnmounted(() => {
                 <strong>{{ selectedTeam.teamName }}</strong>
                 <span>{{ $t('攻击') }} {{ selectedTeamMetrics.attack.success }}/{{ selectedTeamMetrics.attack.total }} · {{ $t('防御') }} {{ selectedTeamMetrics.defense.success }}/{{ selectedTeamMetrics.defense.total }}</span>
               </div>
-              <div class="challenge-strip">
+              <div
+                :key="selectedTeam.teamId"
+                class="challenge-strip"
+                role="region"
+                :aria-label="$t('队伍题目动态')"
+                tabindex="0"
+              >
                 <article
-                  v-for="challenge in selectedChallengeStates.slice(0, 4)"
+                  v-for="challenge in selectedChallengeStates"
                   :key="challenge.competitionChallengeId"
                   :class="isChallengeFocused(challenge.competitionChallengeId) && 'event-focus'"
                 >
                   <div class="challenge-identity">
                     <span class="challenge-icon"><component :is="directionIcon(challenge.direction)" /></span>
-                    <div><span>{{ challenge.direction }}</span><strong>{{ challenge.title }}</strong></div>
+                    <div><span>{{ challenge.direction }}</span><strong :title="challenge.title">{{ challenge.title }}</strong></div>
                   </div>
                   <dl>
                     <div><dt>{{ $t('攻击') }}</dt><dd :class="challenge.attackOutcome">{{ challenge.attackOutcome === 'idle' ? '—' : challenge.attackOutcome === 'pending' ? $t('进行中') : challenge.attackOutcome === 'success' ? $t('成功') : $t('失败') }}</dd></div>
@@ -487,13 +506,29 @@ onUnmounted(() => {
 </style>
 
 <style>
-.team-carousel{grid-template-rows:36px 45px 150px;align-content:start}
+.team-carousel{grid-template-rows:36px 45px minmax(0,1fr)}
 .team-tabs{grid-template-columns:30px minmax(0,1fr) 30px;grid-auto-flow:row;grid-auto-columns:auto}
 .team-tab-list{display:flex;min-width:0;gap:4px;overflow:hidden}
 .team-tab-list button{flex:1 1 0;width:auto!important}
 .team-tab-control{width:30px;display:grid;place-items:center}
 .team-tab-control:disabled{cursor:default;opacity:.35}
-.challenge-strip{height:150px}
+.challenge-strip {
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 160px), 1fr));
+  grid-auto-rows: minmax(150px, max-content);
+  align-content: start;
+  overflow-y: auto;
+  overflow-x: hidden;
+  scrollbar-gutter: stable;
+  color-scheme: dark;
+}
+.challenge-strip:focus-visible { outline: 1px solid currentColor; outline-offset: -1px; }
+.challenge-strip .challenge-identity strong {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
 .challenge-strip article{padding-top:8px}
 .challenge-strip dl{margin-top:7px;gap:3px}
 .challenge-identity{grid-template-columns:34px minmax(0,1fr);gap:7px}

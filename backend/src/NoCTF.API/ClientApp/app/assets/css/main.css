@@ -54,6 +54,7 @@
 }
 
 :root {
+    color-scheme: light;
     --background: oklch(0.972 0.007 256);
     --foreground: oklch(0.215 0.02 262);
     --card: oklch(0.995 0.002 256);
@@ -94,6 +95,7 @@
 }
 
 .dark {
+    color-scheme: dark;
     --background: oklch(0.145 0.014 264);
     --foreground: oklch(0.94 0.008 255);
     --card: oklch(0.19 0.017 264);
@@ -155,4 +157,11 @@
     font-family: var(--font-heading);
     font-weight: 600;
     letter-spacing: -0.03em;
+}
+
+@utility scrollbar-none {
+    scrollbar-width: none;
+    &::-webkit-scrollbar {
+        display: none;
+    }
 }

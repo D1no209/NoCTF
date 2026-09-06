@@ -109,6 +109,9 @@ public static class ChallengeTemplateUpdateResponseMapper
             ChallengeTemplateWriteState.ActiveCompetitionModeConflict =>
                 TypedResults.Conflict(
                     ChallengeTemplateWriteResponseMapper.ToConflict(result)),
+            ChallengeTemplateWriteState.ActiveRuntimeDefinitionConflict =>
+                TypedResults.Conflict(
+                    ChallengeTemplateWriteResponseMapper.ToConflict(result)),
             ChallengeTemplateWriteState.InvalidRequest
                 or ChallengeTemplateWriteState.InvalidDefinition =>
                 TypedResults.Problem(ApiValidationProblemFactory.Create(

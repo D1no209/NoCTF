@@ -63,7 +63,7 @@ ENTRYPOINT ["python", "-B", "/app/server.py"]
 ### 2.3 网络、端口和地址
 
 - Container 的对外端口在“对外端口”中声明；内部仅供 Checker 访问的端口放在“内部端口”。
-- URL 模板只允许 `http`、`https`、`tcp`、`udp`、`ssh`。常用 HTTP 模板为 `http://{HOST}:{PORT}/`。
+- 选手看到的访问入口是显示模板，只能使用 `{HOST}`、`{PORT}` 占位符，但不限制协议形式；例如可以填写 `http://{HOST}:{PORT}/` 或 `nc {HOST} {PORT}`。只有平台内部 Control Check 才必须展开为绝对 URL。
 - `OwnerOnly` 地址只返回给本队；AWD 攻防入口需要 `Participants`，硬化期结束后平台才会向参赛队伍提供对手入口。
 - `Isolated` 表示题目网络与其他 Runtime/平台网络隔离，不应把它理解为绝对的无公网保证；题目本身仍不得依赖外网。
 - Checker 与目标在隔离网络内通信，不通过选手看到的公网随机端口。
@@ -89,10 +89,11 @@ AWD 只允许：
 2. 配置 Container 或 Compose Runtime，设定资源、内部/公网端口、URL 和安全选项。
 3. 配置 Flag 注入命令。
 4. 配置 Checker 镜像、超时和目标服务。
-5. 在比赛中添加该模板。
-6. 在比赛配置中设置硬化期、轮次、攻击收益、服务分和 Checker 默认周期。
-7. 在比赛题目规则中按需覆盖单题计分、Checker 周期和比赛专属 Flag 模板。
-8. 使用至少两支测试队伍完成轮换、攻击、宕机恢复、暂停恢复和比赛结束验收。
+5. 在题库“运行环境”页启动题目测试容器，验证镜像拉取、入口展开和测试 Flag 注入；停止后 Runner 保留镜像缓存，可用于赛前预热。
+6. 在比赛中添加该模板。
+7. 在比赛配置中设置硬化期、轮次、攻击收益、服务分和 Checker 默认周期。
+8. 在比赛题目规则中按需覆盖单题计分、Checker 周期和比赛专属 Flag 模板。
+9. 使用至少两支测试队伍完成轮换、攻击、宕机恢复、暂停恢复和比赛结束验收。
 
 ### 3.3 比赛配置
 
@@ -248,8 +249,9 @@ Fix 不是 Flag，不能把修复包、修复状态或补丁 ID 塞进 Flag 接�
 
 - Player Runtime：`Purpose=Player`、有 TeamId，使用 `PerTeam` 动态精确 Flag、host port `0`
   和 OwnerOnly URL；选手 Start/Stop/Reset/Extend 并从自己的实例取得 Break Flag。
-- Fix Target：`Purpose=AwdpTarget`、绑定申请它的 Team；申请时没有 Fix GameplayFact，Running 后
-  只接受一次 PatchUpload，并在同一事务绑定唯一 Fix GameplayFact；复用干净镜像与唯一内部端口，
+- Fix Target：`Purpose=AwdpTarget`、绑定申请它的 Team；申请时没有 Fix GameplayFact，Queued、
+  Provisioning 或 Running 时即可接受唯一一次 PatchUpload，并在同一事务绑定唯一 Fix GameplayFact；
+  若 Target 尚未 Running，验证会等待启动完成；复用干净镜像与唯一内部端口，
   但忽略公开 PortMappings/URL，不向选手提供入口，验证结束后销毁。
 
 共同约束：
@@ -273,7 +275,8 @@ Fix 不是 Flag，不能把修复包、修复状态或补丁 ID 塞进 Flag 接�
 
 ### 4.5 Fix 归档规范
 
-只接受 gzip 压缩的 POSIX ustar/pax tar 归档。平台根据内容校验，不依赖上传文件名或 MIME 类型。
+Fix 包仍以 `.tar.gz` 提交，内容必须为 gzip 压缩的 tar 归档。支持 GNU Tar、USTAR、PAX 和 V7，
+不再要求指定 `--format=ustar`；格式兼容不代表放开链接、特殊文件或不安全路径。
 
 默认值：
 
@@ -296,12 +299,13 @@ touch /dev/shm/fixed
 制作归档：
 
 ```sh
-tar --format=ustar -czf fix.tar.gz fix.sh
+tar -czf fix.tar.gz -- fix.sh
 ```
 
 归档约束：
 
 - 不会自动剥离顶层目录；若入口是 `fix.sh`，文件必须位于归档根。
+- 接受 GNU tar 常见的 `./` 根目录条目及 `./fix.sh` 路径；路径规范化后重复的文件仍会拒绝。
 - 禁止绝对路径、`..` 路径穿越、符号链接、硬链接、设备文件、重复路径和大小写冲突路径。
 - `{entrypoint}` 会作为一个独立 argv 参数替换为容器内路径，不进行 shell 字符串拼接。
 - Fix 脚本应幂等；Worker/Wolverine 重投存在不确定执行窗口时，平台会清理旧的一次性目标并从不可变归档重新创建环境。
@@ -384,7 +388,7 @@ Checker 成功回调后以 0 退出。Runner 级验证超时会判为 `ServiceAb
 - 目标服务、漏洞读取路径和作者 EXP 必须完整承载 1～4096 UTF-8 字节动态 Flag；不得因固定缓冲区、固定读取长度或截断导致已注入 Flag 无法被提交。
 - 本队当前活动 Runtime UUID 的 Flag 才能产生 Break；错误、外队、已停止或旧 Runtime UUID Flag 按模式规则拒绝。
 - Reset 为新 Runtime UUID 生成新 Flag，并立刻使旧 Runtime UUID 的 Flag 失效；Flag 不通过 URL、事件或普通日志返回。
-- 开启“先 Break 后 Fix”后，未满足当前规则时上传可以保留，但触发 Fix 会稳定拒绝，不创建 Fix GameplayFact，也不会错误消耗补丁。
+- 开启“先 Break 后 Fix”后，未满足当前规则时“申请防御”会被明确拒绝，因此不会创建 Target、PatchUpload 或 Fix GameplayFact，也不会消耗尝试次数。
 
 ### 4.8 AWDP 验收清单
 

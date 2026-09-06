@@ -8,6 +8,7 @@ using NoCTF.Hosting;
 using NoCTF.Hosting.Health;
 using NoCTF.Hosting.Observability;
 using NoCTF.Infrastructure;
+using NoCTF.Infrastructure.Persistence;
 using NoCTF.Infrastructure.Observability;
 using NoCTF.Runner;
 using NoCTF.Runner.Composition;
@@ -67,7 +68,7 @@ else
 if (roles.Has(HostRole.Worker))
     builder.Services.AddNoCtfWorkerRole(
         builder.Configuration,
-        collectQueueMetrics: !development,
+        collectQueueMetrics: !development && builder.Configuration.GetValue("Observability:Enabled", true),
         validateMessageTopology: !development);
 if (roles.Has(HostRole.Runner))
     builder.Services.AddNoCtfRunner(builder.Configuration, development);
@@ -105,8 +106,9 @@ if (migrateOnly)
     return;
 }
 app.UseNoCtfObservability();
-if (development && (roles.Has(HostRole.Api) || roles.Has(HostRole.Worker)))
-    await app.Services.InitializeNoCtfAsync();
+if ((development || app.Configuration.GetValue("Database:AutoMigrate", false))
+    && (roles.Has(HostRole.Api) || roles.Has(HostRole.Worker)))
+    await DatabaseStartup.InitializeAsync(app.Services, app.Configuration, app.Lifetime.ApplicationStopping);
 if (roles.Has(HostRole.Api))
 {
     app.UseNoCtfPipeline();

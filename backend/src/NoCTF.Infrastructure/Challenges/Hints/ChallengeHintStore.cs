@@ -223,10 +223,14 @@ public sealed class ChallengeHintStore(
             return HintUnlockAttempt.Failed(HintUnlockFailure.NotFound);
         var existing = await db.GameplayFacts.AsNoTracking().Where(item =>
             item.CompetitionId == competitionId &&
+            item.CompetitionChallengeId == competitionChallengeId &&
             item.TeamId == teamId &&
             item.Kind == GameplayFactKind.HintUnlock &&
             item.ReferenceKind == GameplayFactReferenceKind.Hint &&
-            item.ReferenceId == hintId)
+            item.ReferenceId == hintId &&
+            (item.State == GameplayFactState.Pending || item.State == GameplayFactState.Queued
+                || item.State == GameplayFactState.Processing
+                || (item.State == GameplayFactState.Completed && item.Result == GameplayFactResult.Unlocked)))
             .OrderByDescending(item => item.OccurredAt)
             .Select(item => (Guid?)item.Id)
             .FirstOrDefaultAsync(ct);

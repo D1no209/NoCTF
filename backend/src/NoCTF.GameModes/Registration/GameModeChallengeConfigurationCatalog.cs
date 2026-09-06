@@ -149,6 +149,7 @@ public sealed class GameModeChallengeConfigurationCatalog : IChallengeConfigurat
                     "patchCommand",
                     "patchTimeoutSeconds",
                     "checker",
+                    "checkerFixInput",
                     "readyTimeoutSeconds",
                     "flagInjection"
                 ],

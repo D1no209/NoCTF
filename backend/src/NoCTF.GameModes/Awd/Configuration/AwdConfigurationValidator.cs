@@ -49,9 +49,18 @@ public static class AwdConfigurationValidator
             configuration.Runtime));
         if (configuration.Runtime is { Allocation: not RuntimeAllocation.PerTeam })
             errors.Add("AWD runtimes must use PerTeam allocation.");
+        if (configuration.Runtime is { FlagSource: not RuntimeFlagSource.AwdRotation })
+            errors.Add("AWD runtimes must use AwdRotation flags.");
         if (configuration.Runtime?.Definition is not null
             and not (ContainerRuntimeDefinition or ComposeRuntimeDefinition))
             errors.Add("AWD runtimes only support Container or Compose.");
+        if (configuration.Runtime is not null
+            && !(configuration.Runtime.UrlBindings ?? []).Any(binding =>
+                binding is not null
+                && binding.Exposure == RuntimeExposure.Participants))
+        {
+            errors.Add("AWD runtimes require at least one Participants access URL.");
+        }
         errors.AddRange(Registration.RunnerJobConfigurationValidator.Validate(
             configuration.Checker?.Job,
             "Checker"));

@@ -18,6 +18,8 @@ public static class ObservabilityExtensions
         IConfiguration configuration,
         string serviceName)
     {
+        if (!configuration.GetValue("Observability:Enabled", true))
+            return services;
         var openTelemetry = services.AddOpenTelemetry()
             .ConfigureResource(resource => resource
                 .AddService(serviceName, serviceVersion: ThisAssemblyVersion.Value)
@@ -54,6 +56,17 @@ public static class ObservabilityExtensions
 
     public static WebApplication UseNoCtfObservability(this WebApplication app)
     {
+        if (!app.Configuration.GetValue("Observability:Enabled", true))
+        {
+            app.Use(async (context, next) =>
+            {
+                if (context.Request.Path == "/metrics")
+                    context.Response.StatusCode = StatusCodes.Status404NotFound;
+                else
+                    await next();
+            });
+            return app;
+        }
         var metricsPort = app.Configuration.GetValue("Observability:MetricsPort", 9464);
         if (metricsPort is < 1 or > 65_535)
             throw new InvalidOperationException(

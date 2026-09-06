@@ -10,7 +10,7 @@
 | 题目方向 | Pwn / Web / Misc / Crypto / Reverse / 其他：待填写 |
 | 题目 Owner | 待填写 |
 | 题目 Manager | 待填写 |
-| 模板可见性 | Private / Public |
+| 模板可见性 | Private / Shared |
 | Runtime 形式 | Container / Compose |
 | 目标服务端口 | 待填写 |
 | 预计单实例内存 | 待填写 MiB |
@@ -41,6 +41,7 @@
 ### 3.1 Runtime
 
 - [ ] 分配方式为 `PerTeam`。
+- [ ] Flag 来源为 `AwdRotation`。
 - [ ] Runtime 为 Container 或 Compose，没有 OVA。
 - [ ] 服务监听 `0.0.0.0` 上的固定容器端口。
 - [ ] 对外端口的宿主端口保持 `0`，不写死宿主端口。
@@ -63,6 +64,9 @@ Runtime 配置摘要：
 | 只读根文件系统 | 开启 / 关闭，原因：待填写 |
 | 非 root | 开启 / 关闭，镜像 USER：待填写 |
 | CapDrop / CapAdd | 待填写 |
+
+保存 Runtime 定义后，应在题库“运行环境”页启动测试容器，确认镜像、动态端口、入口显示和测试 Flag
+注入均正常；停止测试容器只回收实例资源，不主动删除 Runner 镜像缓存。
 
 ### 3.2 动态 Flag 注入
 

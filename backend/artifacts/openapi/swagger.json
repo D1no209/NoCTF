@@ -16917,6 +16917,41 @@
           },
           "usesDynamicFlag": {
             "type": "boolean"
+          },
+          "hints": {
+            "type": "array",
+            "nullable": true,
+            "items": {
+              "$ref": "#/components/schemas/NoCTFAPIEndpointsChallengesParticipantChallengeHintResponse"
+            }
+          }
+        }
+      },
+      "NoCTFAPIEndpointsChallengesParticipantChallengeHintResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "guid"
+          },
+          "cost": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "publishedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "content": {
+            "type": "string",
+            "nullable": true
+          },
+          "isUnlocked": {
+            "type": "boolean"
+          },
+          "canUnlock": {
+            "type": "boolean"
           }
         }
       },
@@ -21391,6 +21426,7 @@
         "x-enumNames": [
           "ResourceIdConflict",
           "ActiveCompetitionModeConflict",
+          "ActiveRuntimeDefinitionConflict",
           "OwnerIncludedInManagerSet",
           "UserNotFound",
           "RoleNotEligible"
@@ -21398,6 +21434,7 @@
         "enum": [
           "ResourceIdConflict",
           "ActiveCompetitionModeConflict",
+          "ActiveRuntimeDefinitionConflict",
           "OwnerIncludedInManagerSet",
           "UserNotFound",
           "RoleNotEligible"

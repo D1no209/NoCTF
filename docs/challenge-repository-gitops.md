@@ -36,7 +36,7 @@ NoCTF 不解析 Git 仓库、不执行 Docker build，也不承担仓库级差�
 - 静态题和静态附件中的 Flag 可以明文提交；
 - CTF 动态容器 Flag、AWD 轮换 Flag 和 KoH Control Flag 由 NoCTF 生成，不进入 Git；
 - Git 是配置期望状态，PostgreSQL 是运行时事实来源；
-- 当前 Runtime 不因 Challenge Definition 修改而热更新，Reset 创建的新 Runtime UUID 才使用新 Definition；
+- 当前 Runtime 不因 Challenge Definition 修改而热更新；存在 Queued/Provisioning/Running/Stopping Runtime 时平台以 `ActiveRuntimeDefinitionConflict` 拒绝技术定义更新，停止相关实例后，新 UUID 的 Start/Reset 才使用新 Definition；
 - 不记录题目发布版本，不进行自动版本升级，也不自动修改 Manifest 中的镜像 digest。
 
 ## 领域模型映射
@@ -1285,6 +1285,9 @@ Challenge template 的 Mode 只有在不存在未软删除的 CompetitionChallen
 即使父 Competition 已软删除，仍活动的引用也会返回 typed
 `ActiveCompetitionModeConflict`。仓库必须先显式收敛这些引用的生命周期，不能解析错误文本、
 强制覆盖或把业务冲突当作普通网络重试。
+Challenge technical Definition 在存在活动 Runtime 时会返回 typed
+`ActiveRuntimeDefinitionConflict`。GitOps 应保留仓库期望状态、停止或等待相关 Runtime 收敛后重试，
+不能让当前 Runtime 热读取新 Checker 或 Flag 注入配置。
 Attachment、Flag 和 Hint 按稳定 UUID、删除状态和内容收敛。写入失败时重新读取资源并重新计算差异；若已达到目标状态则成功，否则只对可重试传输失败重试，业务唯一冲突必须停止并报告。
 
 稳定 UUID 使 create 可重复：

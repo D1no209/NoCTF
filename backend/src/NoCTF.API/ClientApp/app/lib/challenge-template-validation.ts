@@ -165,6 +165,10 @@ export function validateChallengeTemplateDraft(draft: ChallengeTemplateDraft): s
     case 'Awd':
       if (runtime.allocation !== RuntimeAllocation.PerTeam)
         addIssue(issues, translate('AWD 运行环境必须采用每队独立分配'))
+      if (runtime.flagSource !== FlagSource.AwdRotation)
+        addIssue(issues, translate('AWD 运行环境必须使用轮换 Flag'))
+      if (!runtime.urlBindings.some(binding => binding.exposure === UrlExposure.Participants))
+        addIssue(issues, translate('AWD 运行环境必须至少提供一个参赛队伍可见入口'))
       if (!model.flagInjection) {
         addIssue(issues, translate('启用 AWD 运行环境后必须配置 Flag 注入命令'))
       }

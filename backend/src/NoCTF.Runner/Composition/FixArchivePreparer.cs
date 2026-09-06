@@ -62,14 +62,13 @@ public sealed class FixArchivePreparer
         while (await reader.GetNextEntryAsync(copyData: false, cancellationToken) is { } entry)
         {
             if (++count > maxEntries) throw new InvalidDataException("Fix archive contains too many entries.");
-            if (entry.Format is not (TarEntryFormat.Ustar or TarEntryFormat.Pax))
-                throw new InvalidDataException("Fix archive must use a POSIX tar format.");
-            var normalizedName = entry.Name.Replace('\\', '/').TrimEnd('/');
-            if (!names.Add(normalizedName))
+            // TarReader resolves GNU/PAX metadata. Validate the resulting paths and
+            // entry types instead of rejecting an otherwise safe archive dialect.
+            var path = SafePath(root, entry.Name, allowRoot: entry.EntryType == TarEntryType.Directory);
+            if (!names.Add(path.TrimEnd(Path.DirectorySeparatorChar)))
                 throw new InvalidDataException("Fix archive contains duplicate paths.");
-            var path = SafePath(root, entry.Name);
             if (entry.EntryType == TarEntryType.Directory) { Directory.CreateDirectory(path); continue; }
-            if (entry.EntryType is not TarEntryType.RegularFile)
+            if (entry.EntryType is not (TarEntryType.RegularFile or TarEntryType.V7RegularFile))
                 throw new InvalidDataException("Fix archive contains a forbidden entry type.");
             if (entry.Length < 0 || entry.Length > maxSingleFileBytes)
                 throw new InvalidDataException("Fix archive contains a file beyond the configured per-file limit.");
@@ -116,13 +115,18 @@ public sealed class FixArchivePreparer
         public override void Write(byte[] buffer, int offset, int count) => throw new NotSupportedException();
     }
 
-    private static string SafePath(string root, string name)
+    private static string SafePath(string root, string name, bool allowRoot = false)
     {
-        if (string.IsNullOrWhiteSpace(name) || Path.IsPathRooted(name) || name.Contains('\\'))
+        if (string.IsNullOrWhiteSpace(name) || Path.IsPathRooted(name) || name.Contains('\\')
+            || name.Split('/').Contains("..", StringComparer.Ordinal))
             throw new InvalidDataException("Fix archive path is invalid.");
-        var fullRoot = Path.GetFullPath(root) + Path.DirectorySeparatorChar;
+        var fullRoot = Path.GetFullPath(root).TrimEnd(Path.DirectorySeparatorChar);
         var path = Path.GetFullPath(Path.Combine(root, name));
-        if (!path.StartsWith(fullRoot, StringComparison.OrdinalIgnoreCase))
+        // GNU tar -C dir . includes a harmless './' directory entry; files may
+        // never resolve to the extraction root itself.
+        if (allowRoot && string.Equals(path.TrimEnd(Path.DirectorySeparatorChar), fullRoot, StringComparison.OrdinalIgnoreCase))
+            return fullRoot;
+        if (!path.StartsWith(fullRoot + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase))
             throw new InvalidDataException("Fix archive path traversal is forbidden.");
         return path;
     }

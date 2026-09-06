@@ -2,7 +2,7 @@
 
 ## 存储与比较
 
-所有正确答案只存 `challenge_flags`，选手提交原文只存 `gameplay_facts.value`。Flag 明文保存，不加密、不 HMAC 替代、不做不可逆隐藏。日志允许记录 Flag；玩家 API 不得泄露其他队/正确答案。
+所有正确答案只存 `challenge_flags`，选手提交原文只存 `gameplay_facts.value`。Flag 明文保存，不加密、不 HMAC 替代、不做不可逆隐藏。Flag 原文不得进入普通日志、指标、事件或非授权 API；只有受权限和审计保护的原文读取接口可以返回。
 
 精确匹配固定为：UTF-8、ordinal、区分大小写、固定时间比较；不 Trim、不 Unicode 归一化。合法 Flag 或匹配表达式为 1..4096 UTF-8 bytes且不含 NUL。
 
@@ -29,7 +29,7 @@ GameplayFact、CompetitionEvent、Notification，不触发血榜、分数或排�
 
 ChallengeFlag 必须二选一：
 
-- `ChallengeId`：模板级静态答案；所有引用模板的 CompetitionChallenge 实时使用。
+- `ChallengeId`：模板级静态答案，以及 `SpecificationKind=RuntimeInstance` 的受保护 TemplateTest Flag；普通题库 Flag 列表必须过滤后者。
 - `CompetitionChallengeId`：比赛实例、Team、Runtime、RandomOne、AWD Round、KoH Control Flag。
 
 模板 Flag 不允许 TeamId。判题同时加载实例 Flag与关联模板 Flag，再按模式/选择策略筛选。
@@ -40,8 +40,8 @@ ChallengeFlag 必须二选一：
 
 - `Attachment`：SpecificationId=ChallengeAttachment.Id；
 - `AwdRound`：SpecificationId=Round Number 编码 Guid；
-- `RuntimeDefinition`：绑定 versioned Competition/Challenge configuration JSON 中某个稳定 `definitionId`；definitionId 一经被 Flag 引用不得复用或原位改变语义；
-- `RuntimeDefinition` 之外的动态 Runtime Flag 使用 `SpecificationId=RuntimeInstance.Id` 绑定一次具体 Runtime UUID；AWDP 每个 Team/CompetitionChallenge/Runtime 一条；
+- `RuntimeDefinition`：CTF PerTeam 与 KoH Control Flag 使用 `SpecificationId=CompetitionChallengeId`，不引入 definitionId、配置版本或题目定义快照；
+- `RuntimeDefinition` 之外的动态 Runtime Flag 使用 `SpecificationId=RuntimeInstance.Id` 绑定一次具体 Runtime UUID；AWDP 使用 CompetitionChallengeId + TeamId 作用域，TemplateTest 使用 ChallengeId 且不绑定 Team；
 - `Hint`：仅 GameplayFact HintUnlock 的多态 Reference 使用，不用于 ChallengeFlag。
 
 Kind/Id 同时为空或同时非空。
@@ -135,7 +135,7 @@ m -> M,n,N        z -> Z,2
 
 ## CTF 策略
 
-`FlagSelectionPolicy.All` 默认：全部附件可见，所有符合当前 scope/window 的 Flag 可正确。
+`AttachmentDeliveryPolicy.All` 默认：全部附件可见，所有符合当前 scope/window 的 Flag 可正确。该策略属于附件交付，不是 CTF `RulesJson` 字段。
 
 `RandomOnePerTeam` 只用于多附件题：
 
@@ -164,6 +164,8 @@ All 判定使用模板中未绑定 Attachment 的 Flag和全部 Attachment-bound
   Competition/CompetitionChallenge 配置 Flag 模板。Provider Running 且注入成功后才设置 ValidStart；
   Stop、Reset、过期或失败设置 ValidUntil。AWDP 不使用 AwdRound，不允许出题人手工建立正常攻击路径的
   静态 Break Flag，也不把动态 Flag 返回给玩家 API。
+- TemplateTest：题目测试 Runtime UUID 可生成独立测试 Flag，使用 ChallengeId + RuntimeInstance Specification；
+  仅题目 Owner/Manager 或平台管理员可通过 no-store 测试 Runtime 响应查看，且不得参与比赛判题。
 
 ## 手动预生成
 

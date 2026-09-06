@@ -17,17 +17,17 @@ Frontend/reverse proxy
 `Hosting__Roles__1=Worker`、`Hosting__Roles__2=Runner` 明确配置。角色集合在进程启动后
 不可热切换。
 
-仓库提供同等受支持的本地样例：`deploy/docker-compose.yml` 为独立进程，
-`deploy/docker-compose.single.yml` 为全合一。生产环境可按负载运行单 API、N Worker、N Runner，
-或组合 API+Worker/Worker+Runner 等；N 表示多个进程或容器，不是在一个进程中重复注册角色。
+单机部署只提供 `deploy/docker-compose.yml`：五个服务为统一 Host、PostgreSQL、Redis、NATS、Registry。
+使用 CI 预构建镜像、目录 bind mount、分服务 `.env`；无宿主端口发布、Compose expose、迁移容器或
+exporter。HTTP 服务加入既有 `1panel-network`，代理由运维配置。完整目录与升级流程见
+[单机生产部署](../deploy/README.md)。代码与 Kubernetes 仍支持角色拆分；此处不再提供重复 Compose 拓扑。
 
 ## CI 容器镜像
 
 推送到 `main` 时，GitHub Actions 直接运行 `publish-images` Job，不再设置独立的测试或 Verify Job。
 `publish-images` 使用仓库根目录作为构建上下文和 `backend/Dockerfile` 的 `host`
 target 发布一个镜像：`ghcr.io/<owner>/<repo>`。同一镜像通过 `Hosting__Roles__*`
-选择 Api、Worker、Runner 的任意非空组合；迁移任务也复用该镜像并以
-`--migrate-only` 启动。
+选择 Api、Worker、Runner 的任意非空组合。单机 Host 在启动时自动执行 migration，不创建独立迁移容器。
 
 镜像同时发布 `latest`、程序集预发布版本（例如 `0.1.0-alpha.97`）和
 `sha-<完整提交哈希>` 标签。Host target 会先执行 Nuxt 静态生成，再把
@@ -77,9 +77,9 @@ Kubernetes Namespace、Service、cluster domain 或 callback 标签时，必须�
 
 - Docker Pool：Docker daemon，禁止把 socket 暴露给题目 Container。平台网络统一命名为
   `noctf-network`；Runner 必须配置 `Runtime__Docker__Network=noctf-network`。
-  Compose 部署保持 Runner 为非 root，并将 `DOCKER_SOCKET_GID` 设置为宿主
-  `/var/run/docker.sock` 的数字组 ID（Linux 可用
-  `stat -c '%g' /var/run/docker.sock` 查询；Docker Desktop 默认通常为 `0`）。
+  标准 Compose 的 Host 镜像包含 Runner，以 root 访问挂载的 socket；不设置 group_add，不修改宿主机
+  socket 权限。Docker socket 本身等同宿主机级权限，必须只运行可信镜像。私有 Registry 拉取读取挂载的
+  标准 Docker config，Container/Checker 与 Compose CLI 共用登录配置。
 - Kubernetes Pool：统一 Runtime Namespace、支持 NetworkPolicy 的 CNI、固定 Kompose
   `v1.38.0` 与最小 Kubernetes API 权限。Pool 必须显式声明
   `Runtime__Kubernetes__Namespace`、`ClusterDomain`、`PodPidsLimit` 和
@@ -132,12 +132,10 @@ Runtime Namespace 只放置 `rt-*` Runtime 资源；如确需平台资源，名�
 
 ## 网络
 
-ASP.NET Core 只监听 `http://+:8080`，不执行 HTTPS 重定向，也不加载公网证书。Docker
-Compose 将该端口仅发布到宿主回环地址 `127.0.0.1:${NOCTF_BACKEND_PORT:-8080}`；公网
-HTTP→HTTPS、TLS 终止、HSTS 和 WebSocket upgrade 由宿主 Nginx 完成。仓库样例
-`deploy/nginx/noctf.conf` 中的域名和证书路径必须替换后再启用，Nginx 上游保持
-`http://127.0.0.1:8080`。不得把 API 8080 改回 `0.0.0.0` 公网发布，也不得让内部
-Runner/Checker 绕行公网入口。
+ASP.NET Core 只监听容器内部 `http://+:8080`，不加载公网证书。Compose 没有 ports/expose。
+运维通过 `1panel-network` 的 `noctf-web:8080` 和 `noctf-registry:5000` 配置 TLS 与转发；
+CI 不修改或加载仓库里的 Nginx 样例。内部 Runner/Checker 继续使用默认网络中的 callback 身份，
+不绕行公网入口。
 
 Nginx 必须传递 `Host`、`X-Forwarded-Host`、`X-Forwarded-For` 和
 `X-Forwarded-Proto`。API 只接受 `ForwardedHeaders:KnownNetworks`/`KnownProxies` 中明确

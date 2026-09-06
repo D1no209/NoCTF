@@ -15,6 +15,7 @@ import {
   normalizeDefinitionJson,
   serializeDefinition,
   serializeConfigValues,
+  FlagSource,
   UrlExposure,
 } from '../app/utils/game-config'
 
@@ -110,6 +111,10 @@ describe('challenge definition defaults', () => {
       status: 409,
       code: 'ActiveCompetitionModeConflict',
     })).toEqual(['该模板正被进行中的比赛引用，不能修改游戏模式'])
+    expect(challengeTemplateWriteErrorMessages({
+      status: 409,
+      code: 'ActiveRuntimeDefinitionConflict',
+    })).toEqual(['该模板仍有活动运行环境，请停止相关实例后再修改技术定义'])
 
     const createPage = await Bun.file(new URL('../app/pages/admin/challenges/new.vue', import.meta.url)).text()
     const submit = createPage.slice(createPage.indexOf('async function submit'), createPage.indexOf('</script>'))
@@ -208,6 +213,34 @@ describe('challenge definition defaults', () => {
       new URL('../app/components/admin/DefinitionFlagInjectionSection.vue', import.meta.url),
     ).text()
     expect(editor).toContain(':max="300"')
+  })
+
+  test('rejects AWD definitions without rotation flags or participant access', () => {
+    const model = emptyDefinition('Awd')
+    const runtime = emptyRuntimeTemplate('Awd')
+    runtime.flagSource = FlagSource.Static
+    runtime.urlBindings = [{
+      urlTemplate: 'nc {HOST} {PORT}',
+      exposure: UrlExposure.OwnerOnly,
+      containerPort: 8080,
+      serviceName: '',
+    }]
+    model.runtime = runtime
+    model.flagInjection = {
+      command: "printf '%s' '${FLAG}' > /dev/shm/flag",
+      timeoutSeconds: 30,
+      serviceName: '',
+    }
+
+    const issues = validateChallengeTemplateDraft({
+      mode: 'Awd',
+      title: 'Invalid AWD runtime',
+      direction: 'Pwn',
+      definitionJson: serializeDefinition('Awd', model),
+    })
+
+    expect(issues).toContain('AWD 运行环境必须使用轮换 Flag')
+    expect(issues).toContain('AWD 运行环境必须至少提供一个参赛队伍可见入口')
   })
 
   test.each([

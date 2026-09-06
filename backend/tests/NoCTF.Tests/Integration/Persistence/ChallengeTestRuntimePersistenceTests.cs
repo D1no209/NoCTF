@@ -76,6 +76,24 @@ public sealed class ChallengeTestRuntimePersistenceTests
             await Assert.That(entity.TestFlagDelivery).IsEqualTo(RuntimeTestFlagDelivery.Environment);
             await Assert.That(entity.TestFlagState).IsEqualTo(RuntimeTestFlagState.Pending);
 
+            var definitionBlocked = await new ChallengeBankStore(db).UpdateAsync(new(
+                fixture.ChallengeId,
+                fixture.OwnerId,
+                false,
+                GameMode.Ctf,
+                ChallengeVisibility.Private,
+                "Template test runtime",
+                null,
+                "PWN",
+                (await db.Challenges.AsNoTracking()
+                    .Where(challenge => challenge.Id == fixture.ChallengeId)
+                    .Select(challenge => challenge.DefinitionJson)
+                    .SingleAsync(cancellationToken))
+                    .Replace("challenge:test", "challenge:test-v2", StringComparison.Ordinal),
+                fixture.Now.AddMilliseconds(1)), cancellationToken);
+            await Assert.That(definitionBlocked.State)
+                .IsEqualTo(ChallengeTemplateWriteState.ActiveRuntimeDefinitionConflict);
+
             var flag = await db.ChallengeFlags.SingleAsync(candidate =>
                 candidate.ChallengeId == fixture.ChallengeId
                 && candidate.SpecificationKind == SpecificationKind.RuntimeInstance

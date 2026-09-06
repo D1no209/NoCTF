@@ -3,7 +3,7 @@ from pathlib import Path
 
 
 FLAG_PATH = Path("/dev/shm/flag")
-FLAG_PATH.write_text("awaiting-first-round", encoding="ascii")
+FLAG_PATH.write_text("awaiting-first-round", encoding="utf-8")
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -12,14 +12,14 @@ class Handler(BaseHTTPRequestHandler):
             self.respond(200, "ok")
             return
         if self.path == "/flag":
-            self.respond(200, FLAG_PATH.read_text(encoding="ascii"))
+            self.respond(200, FLAG_PATH.read_text(encoding="utf-8"))
             return
         self.respond(404, "not found")
 
     def respond(self, status: int, body: str) -> None:
-        encoded = body.encode("ascii")
+        encoded = body.encode("utf-8")
         self.send_response(status)
-        self.send_header("Content-Type", "text/plain")
+        self.send_header("Content-Type", "text/plain; charset=utf-8")
         self.send_header("Content-Length", str(len(encoded)))
         self.end_headers()
         self.wfile.write(encoded)

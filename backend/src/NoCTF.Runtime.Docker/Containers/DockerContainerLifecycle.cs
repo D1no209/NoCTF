@@ -272,7 +272,7 @@ public sealed class DockerContainerLifecycle : IContainerLifecycle, IOneShotJobR
         var progress = new ImagePullProgress();
         await client.Images.CreateImageAsync(
             new ImagesCreateParameters { FromImage = image },
-            new AuthConfig(),
+            DockerRegistryAuthentication.Read(image),
             progress,
             cancellationToken);
         if (progress.Error is not null)

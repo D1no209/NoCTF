@@ -6,6 +6,7 @@
 
 - 游戏模式：`AWD`
 - 分配方式：`PerTeam`
+- Flag 来源：`AwdRotation`
 - Runtime：Container 或 Compose
 - Runtime 镜像：`待填写`
 - 对外端口：容器 `8080` / host `0` / Exposure `Participants`
@@ -16,6 +17,9 @@
 - Checker 目标：Container 使用 `target`；Compose 使用目标 service
 - Checker 目标端口：`8080`
 - Checker 超时：`待填写`
+
+至少一个攻防入口必须使用 `Participants`。Flag 注入超时范围为 1～300 秒。保存后先使用题库测试容器
+验证并预热镜像，再加入比赛。
 
 ## 比赛题目规则
 

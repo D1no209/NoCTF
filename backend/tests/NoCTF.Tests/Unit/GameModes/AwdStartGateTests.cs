@@ -49,8 +49,17 @@ public sealed class AwdStartGateTests
                 AwdChallengeConfiguration.CurrentSchemaVersion,
                 Runtime: new ChallengeRuntimeTemplate(
                     RuntimeAllocation.PerTeam,
-                    new ContainerRuntimeDefinition("registry.example/awd:v1"),
+                    new ContainerRuntimeDefinition(
+                        "registry.example/awd:v1",
+                        PortMappings: new Dictionary<int, int> { [8080] = 0 }),
                     new RuntimeResourceLimits(67_108_864, 100_000_000, 64),
+                    UrlBindings:
+                    [
+                        new(
+                            "nc {HOST} {PORT}",
+                            RuntimeExposure.Participants,
+                            ContainerPort: 8080)
+                    ],
                     FlagSource: RuntimeFlagSource.AwdRotation),
                 FlagInjection: new AwdFlagInjectionConfiguration(
                     "printf '%s' '${FLAG}' > /dev/shm/flag")),

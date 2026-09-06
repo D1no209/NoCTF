@@ -44,13 +44,13 @@ onBeforeUnmount(() => {
           <span>{{ configuration?.name ?? 'NoCTF' }}</span>
           <span class="animate-blink text-primary">_</span>
         </NuxtLink>
-        <nav class="flex min-w-0 items-center gap-1 overflow-x-auto">
+        <nav class="scrollbar-none flex min-w-0 items-center gap-1 overflow-x-auto overflow-y-hidden py-1" :aria-label="t('主导航')">
           <Button
             v-for="item in navItems.filter((i) => i.show)"
             :key="item.to"
             variant="ghost"
             as-child
-            class="relative"
+            class="relative shrink-0"
             :class="isActive(item.to) ? 'text-foreground font-medium after:absolute after:inset-x-2.5 after:bottom-1 after:h-0.5 after:rounded-full after:bg-primary' : 'text-muted-foreground'"
           >
             <NuxtLink :to="item.to">
@@ -59,7 +59,7 @@ onBeforeUnmount(() => {
             </NuxtLink>
           </Button>
         </nav>
-        <div class="ml-auto flex items-center gap-2">
+        <div class="ml-auto flex shrink-0 items-center gap-2">
           <ThemeToggle />
           <LanguageToggle />
           <template v-if="isLoggedIn">

@@ -21,7 +21,7 @@ HAProxy 或入口代理。
 
 `runtime_instances` 只保存恢复和清理外部资源所需事实：
 
-- Competition、CompetitionChallenge、Team 和可选 GameplayFact 关系；
+- 比赛/练习实例保存 Competition、CompetitionChallenge、Team 和可选 GameplayFact 关系；题目测试实例改用互斥的 Challenge 关系；
 - Runtime kind、purpose、provider、`RunnerId`；
 - 状态、稳定失败码、provider receipt；
 - 完整访问 URL 与已发布端口；
@@ -43,6 +43,11 @@ HAProxy 或入口代理。
 每次 Start 或 Reset 都创建全新的 Runtime UUID。Reset 的事务边界是：请求旧 Runtime 停止，
 并创建新的 `Queued` Runtime；新旧实例没有持久化 replacement/generation 关系。旧 UUID 的
 迟到消息只能作用于旧实例，不能覆盖新实例。
+
+题目技术定义没有 Runtime 快照。为保证运行中实例不会读到半途修改的 Runtime、Checker 或 Flag
+注入定义，只要该模板仍有 Queued、Provisioning、Running 或 Stopping Runtime，技术定义更新就返回
+`ActiveRuntimeDefinitionConflict`；标题、题面、方向和可见性等元数据仍可独立更新。停止全部相关实例后，
+新定义对之后的 Start/Reset 生效。
 
 ```text
 Queued -> Provisioning -> Running -> Stopping -> Stopped
@@ -86,11 +91,14 @@ Provider。它不保存业务 next-run，也不使用 Wolverine Scheduled Messag
 | CTF | Player | Team | 选手按需 Start/Stop/Reset/Extend |
 | AWD | Player | Team | 比赛生命周期自动创建；选手按规则 Reset |
 | AWDP | Player/AwdpAttack | Team | 长期攻击实例，可 Start/Stop/Reset/Extend |
-| AWDP | AwdpTarget | Team + GameplayFact | 一次性 Fix 验证，完成/失败/超时即清理 |
+| AWDP | AwdpTarget | Team；上传后 + GameplayFact | 一次性 Fix 验证，完成/失败/超时即清理 |
 | KoH | Shared | CompetitionChallenge | 工作人员控制，参赛者共享 |
+| 题库测试 | TemplateTest | Challenge | Owner/Manager/Admin 验证真实 Runtime、动态 Flag 与访问入口；停止后保留节点镜像缓存 |
 
 只有真正的 Shared allocation 才显示“共享”。AWDP Player 必须绑定真实 Team；AwdpTarget 在
-管理端显示“一次性 Fix 验证 Target”，并通过 GameplayFact/PatchUpload 关联展示来源队伍。
+管理端显示“一次性 Fix 验证 Target”。申请后先通过 Team 展示归属，Patch 成功绑定后再通过
+GameplayFact/PatchUpload 展示评测来源。TemplateTest 不绑定 Competition、CompetitionChallenge、
+Team 或 GameplayFact。
 
 ## CTF 与 TTL
 
@@ -111,10 +119,14 @@ Running 后 Flag 才有效；Stop、Reset、失败或到期使旧 Runtime UUID �
 Runtime Reset 生成新 UUID 和新动态 Flag。明文 Flag 不得进入 URL、普通响应、事件、通知、
 Prometheus 标签或结构化日志。
 
+TemplateTest 使用独立测试 Flag，不是比赛 Flag。它只可由题目 Owner/Manager 或平台管理员通过
+`/admin/challenges/{challengeId}/test-runtime` 的 `no-store` 响应查看，不得进入普通题目、比赛或参赛者响应。
+
 ## AWDP 一次性 Target
 
-申请防御会创建一个全新的 `AwdpTarget` Runtime，并通过 `GameplayFactId` 绑定一次 Fix 尝试。
-同一 Target 最多绑定一个 PatchUpload。应用 Patch 后只运行一次 Checker；成功、业务失败、
+申请防御会创建一个只绑定 Team、尚未绑定 GameplayFact 的全新 `AwdpTarget` Runtime。Target 在
+Queued、Provisioning 或 Running 时即可接收唯一 PatchUpload；成功上传会在同一事务创建 Fix GameplayFact，
+并设置 Runtime 的 `GameplayFactId`。应用 Patch 后只运行一次 Checker；成功、业务失败、
 平台失败和超时均派发幂等清理，回收 Checker、Target、网络、端口和容量。再次尝试必须创建
 新的 Runtime UUID。
 

@@ -3686,3 +3686,242 @@ dotnet run --project backend/src/NoCTF.API/NoCTF.API.csproj --no-build -- --expo
   333/333、typecheck、Nuxt generate 通过。OpenAPI、静态规范与生成 SDK 重生成均无漂移，EF model 无
   pending migration，`git diff --check` 通过。生产 `172.26.106.246` 只读盘点为 0 个题目模板，因此没有
   schemaVersion 1–3 AWDP 定义需要迁移。本阶段未 push、未部署。
+
+## 2026-09-05 Alpha.143 GitOps 当前契约联调
+
+- 参考 `D1no209/NoCTF-Challenge-Template` 的 `25718936`。按用户明确要求，GitOps 只使用既有
+  读取及 CRUD 接口；此前试加的配置校验 Endpoint、UseCase、专用测试、API 目录及生成 SDK
+  已撤回，实际 OpenAPI 路径集合与 HEAD 相同。dry-run 对 NoCTF 仅发送 GET，不试写/回滚，
+  不宣称完成服务端全量模式校验；真正写入仍由普通 API 校验。
+- 修复 AWDP `checkerFixInput` 的配置归属边界：它属于 Definition，Rules 不得包含该字段。
+  无新 API、业务字段或 EF migration；原有其他任务的 API 失败码变更保持不动。
+- 模板仓库本地副本位于 `E:/SourceCode/NoCTF-Challenge-Template-reference`，分支
+  `codex/gitops-contract-alignment`。移除旧 revision/baseScore 依赖，适配 CTF/AWDP schema 与
+  customTitle，增加本地/只读检查与 dry-run、独立权限检查、稳定 ID 失败重读、完整分页、恢复空 JSON、
+  附件不可变身份校验、顺序交换、错误脱敏和精确镜像构建选择。修复初始化空集合追加、初始化后
+  self-test 依赖已删除示例，以及手动 workflow 缺少 base SHA；拒绝越界/符号链接、危险路径及
+  未识别的计分规则字段。未向该仓库推送。
+- 新增八组由模板脚本实际生成的四模式配置 Fixture，以及可选跨仓库真实 HTTP/JWT/PostgreSQL
+  测试。设 `NOCTF_GITOPS_TEMPLATE_ROOT` 指向上述 checkout 即可运行；消息 Outbox 在此 HTTP
+  测试中为隔离替身，不将结果当作 Wolverine/NATS 持久投递证明。
+- 审计后修复五项负例：更新失败不再把已发布题目/Shared 模板降级；恢复前避让旧序号，所有墓碑
+  逐一恢复并腾空旧槽位后才最终排序，支持多个墓碑共槽及中断重跑；Container/Checker/Compose
+  镜像引用统一要求唯一 build/external 且外部使用 digest；source-v2 对输入分段并加入文件摘要、
+  Git 模式，修复路径与内容拼接碰撞；附件冲突重读同时比对 hash、文件名、ContentType、ByteLength。
+- 最新验证：Release build 0 warning/0 error；非 Integration 1008/1008；前端 333/333、typecheck；
+  模板 self-test（含五项审计负例）、精确镜像选择及 `git diff --check` 通过。首次应用新版 hash 应
+  全量重建仓库镜像，不删除旧 tag/digest。
+- 首轮真实联调已覆盖 Manager Bot、首次导入、原样重跑、顺序交换、子资源恢复及权限拒绝；
+  本轮已扩展为 dry-run 零写请求、已发布题目遇到无效 Hint/HTTP 500 保持发布、旧序号占用恢复及
+  恢复后中断重跑。当前本机 Docker endpoint 不可用，这些新增真实 PostgreSQL 负例尚未复验，
+  不能引用首轮通过结果当作本轮新代码的集成通过证明。
+  接入与升级说明见 `docs/gitops-integration.md` 和模板仓库 `docs/contract-upgrade.md`。
+- 本轮两个仓库均未提交/推送/部署；保留 NoCTF 工作区开始时已有的题目技术定义冻结、AWD 校验等
+  未提交改动。后续提交应区分这些原有变更与本轮 GitOps 变更，不能直接 `git add --all`。
+
+## 2026-09-05 单机生产 Compose 精简与题目 Registry
+
+- 用户明确要求平台部署不使用 ports/expose、Compose environment/healthcheck/build、命名卷、
+  tmpfs/cap/group_add/security_opt/read_only、exporter 或单独 migration 服务。已收敛为唯一
+  `deploy/docker-compose.yml`：NoCTF unified Host、PostgreSQL、Redis、NATS、Registry 五服务。
+- HTTP 服务仅接入既有外部 `1panel-network`，别名为 `noctf-web:8080` 与 `noctf-registry:5000`；
+  Registry 在默认网络另有 `registry` 与 `noctf-registry` 别名。未修改任何反代文件或生产服务器。
+- 业务数据使用 `data/{postgres,redis,nats,registry,uploads}` 目录 bind，备份在 data/backups；
+  Docker 登录配置和 Registry bcrypt 文件分别位于 config/docker 与 config/registry/auth。
+  缺少 bind 目录不会隐式创建。根 `.env` 提供共享参数，env/<service>/.env 仅向对应服务传值；
+  已有被忽略的 deploy/.env 未修改。init-layout.sh 只准备目录并复制不存在的模板，不启动服务。
+- NoCTF 健康检查移入 Dockerfile；Host/Runner 镜像以 root 访问 Docker socket，不动态 chmod
+  宿主 socket 或修改宿主用户/组。模板中 Database__AutoMigrate=true，Host 在启动监听器/消费者
+  前执行 EF migration 与管理员初始化；短暂 PostgreSQL 不可用有界重试，非瞬时错误失败退出。
+- 标准部署关闭 OpenTelemetry 注册/采集与 Prometheus endpoint，也不运行队列指标采样器。
+  移除旧的 single/ci/observability Compose 及 Prometheus/Grafana 配置资产；可由 Git 恢复，
+  不代表已删除线上监控服务或其数据。Registry 同样关闭 OTEL，并启用 htpasswd 与 relative URLs。
+- 私有镜像拉取修复：Docker SDK 读取 DOCKER_CONFIG 中的标准 auths，按精确 registry authority
+  匹配，Compose CLI 共用同一目录。不会记录配置内容/密码；不支持桌面 credential helper，
+  运维应使用独立配置目录 docker login。Docker 宿主机应使用 Registry 的运维 HTTPS 域名，
+  不能将容器 DNS 别名作为宿主机镜像地址。
+- CI 仍只发布一个 Host 镜像，上传仅包含 Compose 与版本元数据；部署只更新 NoCTF，使用镜像内
+  健康检查等待，无服务端 build、migration 容器、全局 prune 或反代操作。旧服务/命名卷/不同目录
+  会阻止切换，要求运维先完成一次性数据迁移。保留一次数据库备份，仅数据库结构未变时尝试旧镜像
+  回退，不自动用备份覆盖数据库。
+- 验证：Release build 0 warning/0 error；非 Integration TUnit 1018/1018；真实 Compose CLI
+  配置展开测试通过（无需 Docker daemon），确认五服务、网络别名、禁止字段与环境隔离；Bash 与
+  内嵌 Python 语法检查、git diff --check 通过。新增启动迁移/保留管理员的真实 PostgreSQL 用例
+  已编译，但本机 Docker daemon 不可用，尚未运行；完整容器启动和私有 Registry 拉取待复验。
+- 两个仓库均未提交/推送/部署。新安装和旧数据迁移指引在 deploy/README.md；不要将旧命名卷直接
+  换成空目录启动，保留原密码、签名密钥与邮箱加密密钥。
+
+## 2026-09-05 生产 HTTPS 登录续期配置修复
+
+- 仅生产 `172.26.106.246`，仍使用 `f9117004570e8e28fa253b12b2da85b2c4c7a577` 的
+  `0.1.0-alpha.142` CI 镜像；此前本地 Compose/Registry/GitOps 改动未因此部署。
+- 已复现有效 Cookie 在 `Origin: https://noctf.d1no.cn` 下 refresh 401，而 HTTP Origin 为 200。
+  反代未发送 X-Forwarded-Host，应用开启 RequireHeaderSymmetry，HTTPS scheme 未正确恢复；
+  同时应用沿用旧 IP AllowedHosts 和 RefreshCookieSecure=false。
+- 用户授权仅修改 NoCTF 认证配置、不动运维反代：生产 `/root/NoCTF/.env` 的
+  NOCTF_PUBLIC_HOST 改为 noctf.d1no.cn，AUTHENTICATION_REFRESH_COOKIE_SECURE 改为 true，
+  新增 AUTHENTICATION_REFRESH_ALLOWED_ORIGIN=https://noctf.d1no.cn；现有生产 Compose overlay
+  仅增加到 Authentication__RefreshAllowedOrigins__0 的变量映射。未来切换新版 env_file 部署时，
+  也必须保留该精确 HTTPS 来源；完整转发头适配仍需由运维另行处理，不应关闭来源校验。
+- 配置备份在 `/root/noctf-auth-config-backup.f9yq8yli`（600 权限），未备份/迁移/恢复数据库。
+  仅以 --no-deps --no-build --pull never 重建 noctf，容器变为 9fc62f77bdea；其余 53 个容器
+  的 ID/启动时间及两个 NoCTF 反代文件摘要均不变。
+- HTTPS 链路验证：登录 200；__Secure-noctf_refresh 带 Secure、HttpOnly、SameSite=Strict，
+  Path=/api/v1/auth，Max-Age=2592000。连续三次无内存 Access Token 的页面加载/续期/auth-me
+  HTTP 调用均 200；非法来源、缺来源和缺 Cookie 均 401。此为接口回归，不冒充真实浏览器刷新测试。
+- 平台 Healthy，Runner 心跳/Docker 访问正常，保持已生效的 32 GiB / 16 核 / 8192 PIDs。
+  Cookie 名称变更后用户需重新登录一次。未推送代码，未修改签名密钥、账号或题目容器。
+
+## 2026-09-05 V2 出题文档中文化与私有／附件目录
+
+- 仅调整 `docs/challenge-authoring-templates-v2/` 及对应 AwdpV2TemplateTests；V2 当前只有 AWDP
+  参考模板。原有五份 Markdown 全部改为中文，并新增私有资料、公开附件、Patch 模板三份中文说明。
+- 将 Target 源码／Dockerfile、Checker／PoC 和三组内部修补样例迁移到 `private/`；新增
+  `attachment/` 公开数据与 `patch-template/`。空白修补入口明确报错并退出 1，不泄漏内部正确修补。
+- 更新镜像构建与 smoke 路径，示例镜像声明非零数字 UID/GID 10001:10001；验收资源使用每次运行
+  独立名称，避免删除其他测试实例。为 Shell/Python/Dockerfile 固定 LF 换行。
+- 新增公开附件白名单构建脚本，产物仅为 README.md、public.txt、patch-template.tar.gz；内部
+  样例包只生成到 private/artifacts/fixes。拒绝符号链接与未知输出，统一时间／权限使归档可重复构建。
+- 验证：AwdpV2TemplateTests 6/6 通过（含平台真实归档规范化器）；WSL 附件边界、三组内部样例、
+  符号链接拒绝、未知输出拒绝、重复构建哈希检查通过；全部 Shell/Python 语法、8 份文档链接及
+  git diff --check 通过。本机 Docker Desktop endpoint 不可用，完整容器 smoke 尚未执行。
+- 未提交／推送／部署，未触碰生产环境。`private/` 只是内容分类，不自动产生访问权限；真实题目
+  必须保存在受控仓库，发布仅选取审核后的附件。保留其他任务已有的全部工作区改动。
+
+## 2026-09-06 V2 前端照填说明与出题交接补齐
+
+- 用户澄清文档必须按前端输入框逐项说明，不要求出题人或运维理解 JSON/YAML。本轮一度新增的
+  GitOps YAML 清单已撤回，未修改外部模板仓库或新增平台接口。
+- `platform/CONFIGURATION.md` 改为按“基本信息 → 运行环境 → 模式定义 → 附件 → 测试 → 比赛题目”
+  排列的照填表，列出界面原名、本题具体值、开／关／留空和分行参数；内存直接填 256、CPU 填 0.5。
+  `platform/FIELDS.md` 按同名输入框解释含义、单位、范围及填错后果，不再提供配置代码块。
+- 新增 `statement.md`、`private/DEPLOYMENT.md`、`private/HINTS.md`，分别作为公开题面、部署交接单
+  与前端 Hint 填写单。明确发布时间留空为未发布，Hint 在比赛题目页面添加，不用手工生成 UUID。
+- 新增 `private/CHECKER-FIX.md`、只读 `inspect-file.py` 与 5 项 Python 测试，区别上传包输入、
+  Checker 自身基线重放产物和真实靶机磁盘。没有编造挂载／导出接口，明确直接重放教学脚本不是安全沙箱。
+- 保留用户放入题目目录的 awdp-challenge-template.md 入口，将其指向统一正文，避免旧副本链接失效。
+  原文档中的机器 Definition 移到后端测试 Fixture，不要求普通作者阅读；Checker 镜像加入文件检查工具。
+- 验证：AwdpV2TemplateTests 8/8，Python 文件契约 5/5，WSL 附件安全边界／幂等打包检查通过，
+  14 份中文文档相对链接正常。包含前端真实标签和单位核对，以及禁止作者文档配置代码块的回归。
+  Docker Desktop endpoint 仍不可用，未在生产代跑容器 smoke；未提交、推送或部署。
+
+## 2026-09-06 选手题目 Hint 与导航滚动条修复
+
+- 用户确认“提示”指比赛题目 Hint。复用题目详情和既有解锁接口，不新增 HTTP 路由；详情返回已发布
+  Hint 元数据，免费正文直接可读，付费正文仅对有 Completed/Unlocked 记录的本队返回。匿名、其他队伍、
+  被禁赛队伍及未发布提示均有隔离测试；个性化详情响应使用 private, no-store。
+- 题目详情新增提示区，支持扣分确认、解锁状态轮询、失败重试、SignalR 更新和身份切换清理。
+  修复既有 Hint 解锁失败后一直复用失败事实的问题；待处理及成功请求仍幂等，避免重复扣分。
+- 顶部导航仅允许横向滚动并隐藏该导航滚动条，保留窄屏键盘访问；主题声明原生 color-scheme，
+  使页面滚动条和原生控件随深浅主题变化。沿用现有组件和视觉风格，没有重新设计页面。
+- 重新导出 OpenAPI 并生成前端 SDK；未修改数据库结构。真实 PostgreSQL Hint 聚焦测试 10/10、
+  后端非 Integration 全量 1025/1025、前端 339/339、typecheck、静态构建与 git diff --check 均通过。
+  本机 Docker Desktop 已恢复可用；集成测试使用本机 Testcontainers，没有在生产环境执行测试。
+- 本地真实 Vue 页面配合模拟接口验证免费提示、付费确认/解锁/刷新保留，以及窄屏导航键盘访问和
+  深浅主题滚动条；此浏览器回归不是生产端到端验收。临时服务与浏览器测试页已关闭。
+- 未提交、推送或部署，保留工作区其他任务改动。
+
+## 2026-09-06 CTF 3D 大屏分辨率与建筑比例
+
+- 仅调整 CTF live.vue、live-city-3d.ts，新增无 DOM 的 live-city-layout.ts 及回归测试；未改 AWDP、
+  接口或数据库。按显示区域宽高、城市边界及 CSS 浮标实际尺寸计算全周巡航取景，楼顶/基座保留边距。
+- 俯视角改为 32 度；最高建筑从少量题目的 28 随数量增长到最多 64，保留分数高低差异及原有楼宽。
+  9/16/36 题在同一画布下的建筑投影高度比旧算法至少增加 30%；出场延迟最多 1.2 秒，避免多题久等。
+- ResizeObserver 和窗口 resize 同步调整画布、相机及高 DPI 像素预算；浮标尺寸变化平滑续接聚焦/
+  返回动画。聚焦距离不再错误叠加建筑距城市中心的距离，远裁剪与雾距离随取景调整。
+- 桌面固定占满动态视口，窄屏改为场景/信息栏纵向排列，移除原固定 75rem 高度；高分辨率提高
+  标签和数据字号。密集场景浮标保留题名/分数，聚焦时显示完整解题数量和血榜。
+- 验证：前端 352/352、typecheck、generate、差异空白检查通过；投影测试覆盖 1/2/8/16/36/64 题、
+  六类画布尺寸、全周旋转、聚焦及像素预算。浏览器配合本地模拟赛事数据检查 375×812、1366×768、
+  1920×1080、3840×2160 布局；36 题 4K 总览无边缘浮标裁切。聚焦缩放的浏览器交互因测试页签
+  被关闭未完成，此路径以投影回归覆盖，不作为完整浏览器 E2E。已恢复视口、停止本轮临时服务。
+- 保留现有视觉风格，无新增依赖，未提交、推送或部署。
+
+## 2026-09-06 生产 AWDP PatchFailed 只读审计
+
+- 生产隔离解除后 WSL SSH 恢复，主机 dino209，NoCTF 仍为 alpha142/f9117004，容器
+  9fc62f77bdea；没有重启、部署、修改配置/数据库或重跑生产 Patch。SQL 使用只读事务默认值及
+  5 秒 statement_timeout。主机内存可用约 210 GiB、磁盘剩余约 1.4 TiB，没有 Fix Pending/Processing。
+- 截至 2026-09-06 13:27 +08:00，前 48 小时 41 个 Fix：22 PatchFailed、7 ExploitSucceeded、
+  5 Correct、4 ServiceAbnormal、3 PlatformFailed。后续仍有实时提交，统计必须保留截止时间。
+- 对 22 个 PatchFailed 原始包逐个只读检查：12 为 GNU Tar（平台只允许 Ustar/Pax），1 为 USTAR
+  但多套 fix-template/ 导致根入口缺失，3 为未填写模板且显式 exit 1，1 为测试脚本 exit 17，
+  其余 5 为较早的真实脚本非零退出（just_wait 四次、站点模板管理系统一次）。另一个 GNU 包
+  safejinja 同时存在 ./patch/fix.sh 与所配 fix.sh 不符的问题，统计按首个拒绝原因归入 GNU。
+- 强证据：残存的坐标 13:21:27 失败事实 01a0752a-154e-770a-ba03-6fd475a10016，与 13:21:47
+  成功事实 01a0752a-6341-7ef4-92c3-806bc4fca7ac 的 fix.sh 和 pwn 内容哈希分别完全一致。
+  将两个原始包取回本地 .codex/tmp/patch-format-audit-20260906，直接链接未改动的生产同版
+  FixArchivePreparer.cs 验证：Gnu 抛出 Fix archive must use a POSIX tar format，Ustar 通过。
+  仅本地解析/规范化归档，没有执行包内程序；差异不是 chmod 777 或修补逻辑。
+- 报错设计问题：FixArchivePreparer 的 InvalidDataException 被统一映射为 PatchFailed，具体
+  校验原因未传递；Docker RunExecAsync 的 AttachStdout/AttachStderr 均 false，Handler 不记录
+  非零 ExitCode。后 5 次历史容器已清理，无法从现存记录精确恢复 stderr/退出码，不应猜作权限问题。
+  just_wait 当前镜像创建时间晚于对应失败记录，也不能拿现镜像假冒原始环境复现结论。
+- 文档不一致：V2 attachment/patch-template/README.md 的 tar -czf 缺少 --format=ustar；
+  本机 GNU tar --show-defaults 明确为 --format=gnu。普通打包命令会被当前平台拒绝。
+  临时正确打包应明确 --format=ustar 并逐个列出根目录 fix.sh 与替换文件。
+- 本轮仅诊断，未修改校验规则/业务代码或推送。后续修复应区分归档失败与脚本失败，保留安全边界
+  下兼容 GNU 普通归档，补齐有界脱敏执行诊断，并统一出题文档/客户端错误提示。
+
+## 2026-09-06 偏航的归途 admin ServiceAbnormal 深入诊断
+
+- 生产题目实例 01a074d5-d889-7bff-86a3-f7c7176ecb5b，admin 的 14:04:55 与 14:06:07 Fix
+  均已通过 Target Patch 执行，结果为 Completed/Rejected/AwdpServiceAbnormal；最近事实
+  01a07552-f9c4-7af9-bef7-b81b335c6e25，上传包 fix-uploads/01a07552f9c4751181e78188ceeb26b6。
+- 原因不是可据此确认的 Target 服务宕机：本题 journey_checker 的 /checker/check.py 在网络探测前，
+  会复制 /opt/noctf-baseline 到 /tmp/noctf-fix-work，再次执行输入包 fix.sh，设置
+  NOCTF_TARGET_ROOT 指向该工作目录；重放失败直接返回 ServiceAbnormal。此为题目自定义逻辑，
+  不是平台要求 Patch 必须运行两次。checkerFixInput 已开启，仅表示提供输入副本。
+- admin 使用的示例为 chmod 755 /noctf/fix/attachment 后 mv 到硬编码 /home/ctf/attachment。
+  平台进程 UID 1654，规范化输入归属 1654/0644；Checker UID 10001 无法 chmod 输入文件。
+  即便跳过 chmod，硬编码目标仍不遵守本题 Checker 的 NOCTF_TARGET_ROOT 契约。
+  助手前次示例仅针对 Target 替换，遗漏该重放要求，已向用户说明示例不完整。
+- 仅只读读取生产镜像层中的 checker/check.py、入口及基线元数据；未执行生产 Patch。将 Checker
+  镜像按 ID 导出并载入本机 docker-desktop（未覆盖本地标签），使用 network=none、无宿主挂载、
+  非 root、受限 CPU/内存/PIDs 的临时容器，模拟同样的 UID/文件权限：原脚本得到
+  fix.sh 退出码 1：chmod: /noctf/fix/attachment: Operation not permitted。
+- 本地对照脚本使用 target_root="${NOCTF_TARGET_ROOT:-/home/ctf}"，cp 输入到目标目录临时文件，
+  chmod 755 目标临时文件，再 mv 替换目标；Checker 重放返回 (True, 'size-ok')。没有运行其网络
+  漏洞探测/真实 Target，不宣称 DefenseSucceeded。诊断文件在 .codex/tmp/checker-replay-audit-20260906，
+  原/对照临时容器已删除。未修改生产、题目配置、提交结果或业务代码。
+
+## 2026-09-06 alpha.143 AWDP Tar 格式兼容
+
+- 用户明确要求在新版移除 AWDP 的 USTAR 格式限制。远程 main 已只读核实仍为 f9117004/alpha.142，
+  本地 VersionSuffix 已是 alpha.143；不热改当前生产比赛，未推送或部署。
+- FixArchivePreparer 不再按 TarEntryFormat 拒绝 GNU/V7；保留 gzip .tar.gz 输入要求，只允许目录和
+ 普通文件（包括 V7RegularFile）。GNU 长路径由 TarReader 解析后仍走相同路径/类型/限额校验。
+- 接受 tar -C dir . 常见的 ./ 根目录标记；目录之外的条目不能落到解压根。按解析后的完整路径
+  检查重复，阻止 fix.sh 与 ./fix.sh/.//fix.sh 大小写别名覆盖，并拒绝所有 .. 路径片段。
+- 链接、FIFO/特殊条目、越界路径、空归档、入口目录不符、未压缩 Tar/ZIP、条目数/单文件/展开大小/
+  压缩比限制继续生效。没有增加数据库字段、Migration、API 或改变解压后的 Target/Checker 路径。
+- 回归：Fix 相关测试 90/90（包含本机真实 PostgreSQL 恢复/执行栅栏用例）、后端非 Integration
+  全量 1048/1048。新参数化用例覆盖四种格式的上传与归档准备，以及 GNU 输入被规范化一次后向
+  Target/Checker 分别传递相同 Tar 字节；安全与限额负例通过。
+- 使用此前留存的生产 failed-gnu.tar.gz 与 succeeded-ustar.tar.gz 在本地只做解析/规范化复验，
+  两者均 Validation: accepted；没有重跑生产 Patch。同步四份平台出题/存储文档，不要求再加
+  --format=ustar。保留其他尚未提交的工作区修改；差异空白检查通过。
+
+## 2026-09-06 AWDP 大屏队伍题目列表多行展示
+
+- 修复 awdp-live.vue 的 selectedChallengeStates.slice(0, 4) 截断及固定 150px 高度；所有已发布
+  题目均渲染，按面板宽度排列为多行网格。保留单卡最小高度，超出面板时纵向滚动，题名可展示两行。
+- 鼠标悬停/键盘聚焦队伍面板时暂停 8 秒自动换队，显示本地化暂停状态；滚动区域可键盘操作。
+  切换队伍时重置该列表滚动位置。没有改变计分、事件数据或中央动画播放逻辑。
+- 验证：前端 353/353、typecheck、generate、差异检查通过。本地模拟 API 配合真实 Vue 页面确认
+  6 题完整显示为 3 列 2 行，20 题可滚至末项；聚焦超过轮播周期队伍不变，手动换队 scrollTop 为 0。
+  临时本地服务已停止；没有访问或修改生产环境。改动仍归入本地 alpha.143，未提交/推送/部署。
+
+## 2026-09-06 alpha.143 发布交接
+
+- 用户要求推送当前平台代码，生产服务器代码不动；随后明确要求推送后暂停 CI 检查，转为只读审计
+  po4nt 的 Patch 平台错误。本次不跟踪新 CI 完成，也不执行测试环境目录迁移。
+- 已核对 GitHub 私有仓库 main 仍为 f9117004，NOCTF_DEPLOY_* 凭据最后更新时间为 2026-08-22，
+  最近成功流水线部署的是测试环境的 deploy-backend/worker/runner。GitHub environment 的 production
+  是历史名称，不是当前 172.26.106.246 生产主机。
+- CI 显示名改为 Deploy test server；部署前拒绝生产 IP/域名及远程 hostname dino209，未通过身份
+  检查时连清理上传目录也不执行。保留历史 environment 和串行锁，避免凭据迁移和并发部署风险。
+- 新目录式 Compose 的一次性迁移门禁保持生效；旧命名卷/分离角色布局不满足时 CI 会停止，不自动
+  迁移数据或清除旧服务。部署架构回归 15/15 通过，原 1048 后端和 353 前端测试及构建结果仍有效。
+- 发布范围为当前已完成的平台功能、部署定义和出题文档；未纳入临时审计文件、真实 .env、外部题目
+  Checker 源码或未跟踪的 challenge-authoring-templates.zip 打包产物。

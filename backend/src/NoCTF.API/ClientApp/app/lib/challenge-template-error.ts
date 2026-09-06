@@ -23,7 +23,9 @@ const definitionDiagnostics: Record<string, string> = {
   'CTF runtimes must use PerTeam flags injected into the runtime environment.': 'CTF 容器题必须使用每队独立 Flag',
   'CTF runtime URL bindings must use OwnerOnly exposure.': 'CTF 访问入口必须设为仅队伍自己可见',
   'AWD runtimes must use PerTeam allocation.': 'AWD 运行环境必须采用每队独立分配',
+  'AWD runtimes must use AwdRotation flags.': 'AWD 运行环境必须使用轮换 Flag',
   'AWD runtimes only support Container or Compose.': 'AWD 只支持单容器或 Docker Compose 运行环境',
+  'AWD runtimes require at least one Participants access URL.': 'AWD 运行环境必须至少提供一个参赛队伍可见入口',
   'FlagInjection is required when Runtime is configured.': '启用 AWD 运行环境后必须配置 Flag 注入命令',
   'FlagInjection.Command must be a non-empty raw template containing ${FLAG}.': 'AWD Flag 注入命令必须包含 ${FLAG}',
   'FlagInjection.TimeoutSeconds must be between 1 and 300.': 'AWD Flag 注入超时必须在 1 到 300 秒之间',
@@ -81,6 +83,8 @@ export function challengeTemplateWriteErrorMessages(error: unknown): string[] {
       return [translate('题目模板资源标识冲突，请重新创建')]
     case 'ActiveCompetitionModeConflict':
       return [translate('该模板正被进行中的比赛引用，不能修改游戏模式')]
+    case 'ActiveRuntimeDefinitionConflict':
+      return [translate('该模板仍有活动运行环境，请停止相关实例后再修改技术定义')]
     case 'OwnerIncludedInManagerSet':
       return [translate('模板负责人不能同时出现在协作者列表中')]
     case 'UserNotFound':

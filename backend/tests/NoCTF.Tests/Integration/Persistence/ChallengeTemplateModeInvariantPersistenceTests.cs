@@ -7,6 +7,7 @@ using NoCTF.Domain.Competitions.Events;
 using NoCTF.Domain.Challenges;
 using NoCTF.Domain.Competitions;
 using NoCTF.Domain.Identity;
+using NoCTF.Domain.Runtime;
 using NoCTF.Infrastructure.Challenges.Bank;
 using NoCTF.Infrastructure.Challenges.Management;
 using NoCTF.Infrastructure.Competitions.Events;
@@ -126,6 +127,61 @@ public sealed class ChallengeTemplateModeInvariantPersistenceTests
                         && item.SubjectId == fixture.CompetitionChallengeId)
                     .ToArrayAsync(cancellationToken);
                 await Assert.That(descriptionEvents).Count().IsEqualTo(1);
+            }
+
+            var activeRuntimeId = Guid.CreateVersion7(changedAt.AddMilliseconds(1));
+            await using (var runtimeDb = new NoCtfDbContext(options))
+            {
+                runtimeDb.RuntimeInstances.Add(new RuntimeInstance
+                {
+                    Id = activeRuntimeId,
+                    CompetitionId = fixture.CompetitionId,
+                    CompetitionChallengeId = fixture.CompetitionChallengeId,
+                    Purpose = RuntimePurpose.Player,
+                    RuntimeKind = RuntimeKind.Container,
+                    RuntimeProvider = RuntimeProvider.Docker,
+                    State = RuntimeState.Running,
+                    CreatedAt = changedAt.AddMilliseconds(1),
+                    RunningAt = changedAt.AddMilliseconds(1)
+                });
+                await runtimeDb.SaveChangesAsync(cancellationToken);
+            }
+
+            var activeRuntimeBlocked = await UpdateAsync(
+                options,
+                Command(
+                    fixture.ChallengeId,
+                    fixture.OwnerId,
+                    GameMode.Ctf,
+                    "Blocked by active Runtime",
+                    changedAt.AddMilliseconds(2)) with
+                {
+                    DefinitionJson = """{"schemaVersion":1,"updated":"again"}"""
+                },
+                cancellationToken);
+            await Assert.That(activeRuntimeBlocked.State)
+                .IsEqualTo(ChallengeTemplateWriteState.ActiveRuntimeDefinitionConflict);
+
+            var metadataWhileActive = await UpdateAsync(
+                options,
+                Command(
+                    fixture.ChallengeId,
+                    fixture.OwnerId,
+                    GameMode.Ctf,
+                    "Metadata while active",
+                    changedAt.AddMilliseconds(3)),
+                cancellationToken);
+            await Assert.That(metadataWhileActive.State)
+                .IsEqualTo(ChallengeTemplateWriteState.Succeeded);
+
+            await using (var runtimeDb = new NoCtfDbContext(options))
+            {
+                var runtime = await runtimeDb.RuntimeInstances.SingleAsync(
+                    item => item.Id == activeRuntimeId,
+                    cancellationToken);
+                runtime.State = RuntimeState.Stopped;
+                runtime.StoppedAt = changedAt.AddMilliseconds(4);
+                await runtimeDb.SaveChangesAsync(cancellationToken);
             }
 
             await using (var deleteDb = new NoCtfDbContext(options))

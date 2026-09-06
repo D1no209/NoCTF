@@ -120,11 +120,12 @@ jobs:
           cache-to: type=gha,mode=max,scope=noctf-host,ignore-error=true
 
   deploy-production:
-    name: Deploy production
+    name: Deploy test server
     needs: publish-images
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     timeout-minutes: 60
+    # Legacy environment name: these credentials belong to the test server.
     environment: production
     permissions:
       contents: read
@@ -162,6 +163,12 @@ jobs:
           DEPLOY_PORT=${DEPLOY_PORT:-22}
           DEPLOY_PATH=${DEPLOY_PATH:-/root/NoCTF}
           [[ "$DEPLOY_HOST" =~ ^[A-Za-z0-9.:-]+$ ]]
+          case "${DEPLOY_HOST,,}" in
+            172.26.106.246|noctf.d1no.cn)
+              echo 'Production is not an allowed CI deployment target.' >&2
+              exit 1
+              ;;
+          esac
           [[ "$DEPLOY_USER" =~ ^[a-z_][a-z0-9_-]*$ ]]
           [[ "$DEPLOY_PORT" =~ ^[0-9]+$ ]]
           [[ "$DEPLOY_PATH" =~ ^/[A-Za-z0-9._/-]+$ ]]
@@ -194,6 +201,17 @@ jobs:
           EOF
           chmod 600 "$HOME/.ssh/config"
 
+      - name: Verify test server identity
+        id: verify_test_target
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          remote_hostname=$(ssh noctf-deploy hostname)
+          if [[ "${remote_hostname,,}" == dino209 ]]; then
+            echo 'Refusing to write to the production server.' >&2
+            exit 1
+          fi
+
       - name: Package exact commit
         shell: bash
         run: |
@@ -203,10 +221,7 @@ jobs:
             --output="$RUNNER_TEMP/noctf-release.tar.gz" \
             "$GITHUB_SHA" \
             backend/Directory.Build.props \
-            deploy/docker-compose.yml \
-            deploy/docker-compose.ci.yml \
-            deploy/docker-compose.observability.yml \
-            deploy/observability
+            deploy/docker-compose.yml
           tar -tzf "$RUNNER_TEMP/noctf-release.tar.gz" >/dev/null
 
       - name: Upload exact release
@@ -242,7 +257,7 @@ jobs:
             "bash '$remote_upload/deploy.sh' '$remote_upload/noctf-release.tar.gz' '$GITHUB_SHA' '$DEPLOY_PATH' '$release_root' '$DEPLOY_IMAGE'"
 
       - name: Remove interrupted upload
-        if: always()
+        if: always() && steps.verify_test_target.outcome == 'success'
         shell: bash
         run: |
           set -Eeuo pipefail

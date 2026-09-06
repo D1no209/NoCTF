@@ -62,7 +62,7 @@ Runtime UUID 生成精确 Flag，并在 Provider 创建前覆盖注入 `FLAG`。
 4. 确认 Worker/Runner 可以拉取两个镜像，再发布并开始比赛。
 
 公开端口和 URL 只用于 Player attack Runtime。Runner 为 Fix 自动建立
-`Purpose=AwdpTarget` 的一次性实例，绑定申请队伍和 Fix GameplayFact，忽略公开端口和 URL，Checker 只访问内部
+`Purpose=AwdpTarget` 的一次性实例。申请时只绑定队伍；首次成功上传 Patch 时才原子创建并绑定 Fix GameplayFact。Target 忽略公开端口和 URL，Checker 只访问内部
 `31337`，验证结束后清理全部资源。
 
 ## 4. 双队闭环
