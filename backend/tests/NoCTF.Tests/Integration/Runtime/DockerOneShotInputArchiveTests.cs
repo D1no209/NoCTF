@@ -16,6 +16,28 @@ public sealed class DockerOneShotInputArchiveTests
 {
     [Test]
     [Timeout(300_000)]
+    public async Task Root_image_is_refused_by_default_and_allowed_only_without_non_root_requirement(
+        CancellationToken cancellationToken)
+    {
+        await DockerIntegrationTest.RunAsync(async () =>
+        {
+            await EnsureBusyBoxAsync(cancellationToken);
+            using var lifecycle = CreateLifecycle();
+            var request = Request(Guid.NewGuid(), "id -u; grep -E '^(CapEff|NoNewPrivs):' /proc/self/status");
+            var secure = request with { Security = request.Security with { RunAsNonRoot = true } };
+            Func<Task> runDenied = async () => _ = await lifecycle.RunAsync(secure, cancellationToken);
+            await Assert.That(runDenied).Throws<RuntimeConfigurationException>();
+
+            var allowed = await lifecycle.RunAsync(request, cancellationToken);
+            await Assert.That(allowed.ExitCode).IsEqualTo(0);
+            await Assert.That(allowed.StandardOutput).StartsWith("0\n");
+            await Assert.That(allowed.StandardOutput).Contains("CapEff:\t0000000000000000");
+            await Assert.That(allowed.StandardOutput).Contains("NoNewPrivs:\t1");
+        });
+    }
+
+    [Test]
+    [Timeout(300_000)]
     public async Task InputArchive_IsExtractedBeforeEntrypoint_AndContainerIsRemoved(
         CancellationToken cancellationToken)
     {

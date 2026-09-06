@@ -52,7 +52,8 @@ public sealed record AwdChallengeConfiguration(
     ChallengeRuntimeTemplate? Runtime = null,
     AwdCheckerConfiguration? Checker = null,
     AwdFlagInjectionConfiguration? FlagInjection = null,
-    PerTeamFlagTemplate? FlagTemplate = null)
+    PerTeamFlagTemplate? FlagTemplate = null,
+    bool CheckerAllowRoot = false)
 {
     public const int CurrentSchemaVersion = 4;
 }

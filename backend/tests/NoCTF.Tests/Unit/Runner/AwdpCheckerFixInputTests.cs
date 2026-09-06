@@ -24,7 +24,9 @@ public sealed class AwdpCheckerFixInputTests
     }
 
     [Test]
-    public async Task ExecuteAsync_WithInput_PassesSameReadableStreamAndWritableCheckerRoot()
+    [Arguments(false)]
+    [Arguments(true)]
+    public async Task ExecuteAsync_WithInput_PassesSameReadableStreamAndWritableCheckerRoot(bool allowRoot)
     {
         var runner = new RecordingOneShotRunner();
         var executor = new AwdpCheckerExecutor(new RecordingCatalog(runner));
@@ -32,7 +34,7 @@ public sealed class AwdpCheckerFixInputTests
         stream.Position = "prefix-".Length;
         var input = new OneShotInputArchive(stream, OneShotInputArchive.RootDestinationPath);
 
-        var outcome = await executor.ExecuteAsync(Work(), input, CancellationToken.None);
+        var outcome = await executor.ExecuteAsync(Work() with { AllowRoot = allowRoot }, input, CancellationToken.None);
 
         await Assert.That(outcome).IsEqualTo(AwdpCheckerExecutionOutcome.Completed);
         await Assert.That(runner.LegacyCalls).IsEqualTo(0);
@@ -41,6 +43,10 @@ public sealed class AwdpCheckerFixInputTests
         await Assert.That(runner.Input!.Archive).IsSameReferenceAs(stream);
         await Assert.That(runner.Input.Archive.Position).IsEqualTo("prefix-".Length);
         await Assert.That(runner.Request!.Security.ReadonlyRootfs).IsFalse();
+        await Assert.That(runner.Request.Security.RunAsNonRoot).IsEqualTo(!allowRoot);
+        await Assert.That(runner.Request.Security.NoNewPrivileges).IsTrue();
+        await Assert.That(runner.Request.Security.CapDrop).IsEquivalentTo(["ALL"]);
+        await Assert.That(runner.Request.Security.CapAdd).IsEmpty();
     }
 
     [Test]

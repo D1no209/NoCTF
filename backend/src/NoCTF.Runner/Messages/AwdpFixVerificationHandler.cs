@@ -31,7 +31,8 @@ public sealed record AwdpCheckerWork(
     Uri CallbackUrl,
     string CallbackToken,
     TimeSpan Timeout,
-    bool FixInputEnabled = false)
+    bool FixInputEnabled = false,
+    bool AllowRoot = false)
 {
     public override string ToString() =>
         $"AwdpCheckerWork {{ RuntimeInstanceId = {RuntimeInstanceId}, Provider = {Provider}, "
@@ -342,7 +343,8 @@ public sealed class AwdpFixWorkReader(
                     new Uri(baseUri, "/api/internal/v1/awdp/fix-results"),
                     callbackToken,
                     timeout,
-                    settings.CheckerFixInput)));
+                    settings.CheckerFixInput,
+                    settings.CheckerAllowRoot)));
     }
 }
 
@@ -382,7 +384,7 @@ public sealed class AwdpCheckerExecutor(IOneShotRuntimeProviderCatalog providers
             new Dictionary<string, string>(),
             new Dictionary<int, int>(),
             new RuntimeResourceLimits(256 * 1024 * 1024, 250_000_000, 128),
-            new ContainerSecurityPolicy(true, input is null, true, ["ALL"], []),
+            new ContainerSecurityPolicy(true, input is null, !work.AllowRoot, ["ALL"], []),
             work.Timeout,
             NetworkName: work.NetworkId,
             OperationTimeout: work.Timeout,

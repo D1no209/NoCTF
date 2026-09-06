@@ -3,6 +3,7 @@ using FluentValidation;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.HttpResults;
 using NoCTF.API.Endpoints.Administration.Runtime;
+using NoCTF.API.Endpoints.Runtime;
 using NoCTF.API.Pagination;
 using NoCTF.API.Serialization;
 using NoCTF.Application.Runtime.Instances;
@@ -12,6 +13,10 @@ namespace NoCTF.API.Endpoints.Administration.Platform;
 
 public sealed class ListPlatformRuntimesRequest
 {
+    [QueryParam] public string? Search { get; set; }
+    [QueryParam] public PlatformRuntimeScopeProtocol? Scope { get; set; }
+    [QueryParam] public RuntimeStateProtocol? State { get; set; }
+    [QueryParam] public RuntimeKindProtocol? RuntimeKind { get; set; }
     [QueryParam] public string? Cursor { get; set; }
     [QueryParam] public int Limit { get; set; } = 50;
 }
@@ -21,6 +26,15 @@ public sealed class ListPlatformRuntimesValidator : Validator<ListPlatformRuntim
     public ListPlatformRuntimesValidator()
     {
         RuleFor(request => request.Limit).InclusiveBetween(1, 200);
+        RuleFor(request => request.Search).MaximumLength(200);
+        RuleFor(request => request.Scope).IsInEnum();
+        RuleFor(request => request.State).Must(value => value is null
+            or RuntimeStateProtocol.Queued or RuntimeStateProtocol.Provisioning
+            or RuntimeStateProtocol.Running or RuntimeStateProtocol.Stopping)
+            .WithMessage("State must be Queued, Provisioning, Running or Stopping.");
+        RuleFor(request => request.RuntimeKind).Must(value => value is null
+            or RuntimeKindProtocol.Container or RuntimeKindProtocol.Compose)
+            .WithMessage("RuntimeKind must be Container or Compose.");
     }
 }
 
@@ -49,7 +63,6 @@ public sealed class ListPlatformRuntimesEndpoint(
         Results<Ok<PlatformRuntimeListResponse>, ProblemHttpResult>>
 {
     private const string CursorEndpoint = "runtimes.platform.active.list";
-    private const string FilterKey = "active-containers";
 
     public override void Configure()
     {
@@ -61,7 +74,8 @@ public sealed class ListPlatformRuntimesEndpoint(
         {
             summary.Summary = "Lists active runtime containers across the platform.";
             summary.Description =
-                "Returns keyset-paged Container and Compose runtimes in active lifecycle states to platform administrators.";
+                "Returns keyset-paged Container and Compose runtimes in active lifecycle states to platform administrators. "
+                + "Supports scope, state, kind and case-insensitive title/team search, including Fix target team attribution.";
         });
     }
 
@@ -69,7 +83,15 @@ public sealed class ListPlatformRuntimesEndpoint(
         ListPlatformRuntimesRequest request,
         CancellationToken ct)
     {
-        if (!cursors.TryDecode(request.Cursor, CursorEndpoint, FilterKey, out var position))
+        var search = request.Search?.Trim();
+        var filterKey = System.Text.Json.JsonSerializer.Serialize(new
+        {
+            Search = string.IsNullOrEmpty(search) ? null : search.ToLowerInvariant(),
+            request.Scope,
+            request.State,
+            request.RuntimeKind
+        });
+        if (!cursors.TryDecode(request.Cursor, CursorEndpoint, filterKey, out var position))
         {
             return TypedResults.Problem(
                 statusCode: StatusCodes.Status400BadRequest,
@@ -77,6 +99,12 @@ public sealed class ListPlatformRuntimesEndpoint(
         }
 
         var items = await runtimes.ListActiveContainersAsync(
+            new PlatformRuntimeFilter(
+                search,
+                request.Scope is null ? null : request.Scope == PlatformRuntimeScopeProtocol.ChallengeTest
+                    ? PlatformRuntimeScope.ChallengeTest : PlatformRuntimeScope.Competition,
+                request.State is null ? null : RuntimeProtocolMapper.ToDomain(request.State.Value),
+                request.RuntimeKind is null ? null : RuntimeProtocolMapper.ToDomain(request.RuntimeKind.Value)),
             position?.CreatedAt,
             position?.Id,
             request.Limit,
@@ -84,7 +112,7 @@ public sealed class ListPlatformRuntimesEndpoint(
         var next = items.Count == request.Limit
             ? cursors.Encode(
                 CursorEndpoint,
-                FilterKey,
+                filterKey,
                 new(items[^1].Runtime.CreatedAt, items[^1].Runtime.Id))
             : null;
         var now = timeProvider.GetUtcNow();

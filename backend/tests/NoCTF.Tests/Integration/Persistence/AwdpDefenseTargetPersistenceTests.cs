@@ -26,6 +26,8 @@ using NoCTF.Infrastructure.GameplayFacts.Intake;
 using NoCTF.Infrastructure.GameplayFacts.PatchUploads;
 using NoCTF.Infrastructure.Competitions.Events;
 using NoCTF.Infrastructure.Persistence;
+using NoCTF.Infrastructure.Runtime.Administration;
+using NoCTF.Infrastructure.Challenges.Flags;
 using NoCTF.Infrastructure.Storage;
 using NoCTF.Worker;
 using Testcontainers.PostgreSql;
@@ -116,6 +118,19 @@ public sealed class AwdpDefenseTargetPersistenceTests
                 item => item.RuntimeInstanceId == runtimeId,
                 cancellationToken);
             await Assert.That(fact.State).IsEqualTo(GameplayFactState.Processing);
+            // Historical Fix targets can lack TeamId; the fact remains their attribution source.
+            runtime.TeamId = null;
+            await db.SaveChangesAsync(cancellationToken);
+            var inventory = new AdminRuntimeStore(db, new ChallengeRuntimeTemplateCatalog(),
+                new FixedRuntimePlacementPolicy(), new PostgresPerTeamRuntimeFlagStore(db), outbox);
+            var targets = await inventory.ListActiveContainersAsync(
+                new(Search: "  TEAM  ", Scope: PlatformRuntimeScope.Competition),
+                null, null, 50, cancellationToken);
+            await Assert.That(targets).Count().IsEqualTo(2); // Attack runtime and its independent Fix target.
+            var fixTarget = targets.Single(item => item.Runtime.Id == runtimeId).Runtime;
+            await Assert.That(fixTarget.TeamId).IsNull();
+            await Assert.That(fixTarget.SourceTeamId).IsEqualTo(fixture.TeamId);
+            await Assert.That(targets.All(item => item.Runtime.SourceTeamId == fixture.TeamId)).IsTrue();
             await Assert.That(fact.UpdatedAt).IsEqualTo(clock.GetUtcNow());
             var run = outbox.Messages.OfType<RunAwdpFixVerification>().ToArray();
             await Assert.That(run).Count().IsEqualTo(1);

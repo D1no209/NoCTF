@@ -82,6 +82,7 @@
 | 环境变量（Checker 区域） | Checker 的额外设置，不继承靶机环境变量 | 留空；平台自动注入靶机地址和回调凭证 |
 | 超时(秒)（Checker 区域） | Checker 总执行预算，1–1800 秒 | 120 |
 | 向 Checker 提供 Fix 包 | 启动前把选手包副本放入 Checker 的 /noctf/fix | 本题开；不等于复制修补后的靶机磁盘 |
+| 允许 Checker 以 root 运行 | 默认关闭，要求 Checker 镜像声明非零数字 USER；开后允许镜像使用 root，不强制切换用户 | 本教学模板关；只对确实需要 root 的可信 Checker 开启，不改变 Target 或 Patch 用户，不解除能力限制、禁止提权或网络隔离 |
 
 不要把 `{entrypoint}` 误写成 `entrypoint`，也不要把它与 `/bin/sh` 放在同一行。
 Fix 失败、服务异常、Checker 平台故障是不同结果，基础设施异常不能当成“防御成功”。

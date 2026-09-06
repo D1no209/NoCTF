@@ -19,6 +19,7 @@ using NoCTF.Infrastructure.Challenges.Bank;
 using NoCTF.Infrastructure.Challenges.Flags;
 using NoCTF.Infrastructure.Challenges;
 using NoCTF.Infrastructure.Persistence;
+using NoCTF.Infrastructure.Runtime.Administration;
 using NoCTF.Runner.Messages;
 using NoCTF.Worker;
 using Testcontainers.PostgreSql;
@@ -73,6 +74,15 @@ public sealed class ChallengeTestRuntimePersistenceTests
             await Assert.That(entity.CompetitionChallengeId).IsNull();
             await Assert.That(entity.ChallengeId).IsEqualTo(fixture.ChallengeId);
             await Assert.That(entity.Purpose).IsEqualTo(RuntimePurpose.TemplateTest);
+            var inventory = new AdminRuntimeStore(db, templates, new FixedRuntimePlacementPolicy(),
+                new PostgresPerTeamRuntimeFlagStore(db), outbox);
+            var globalTests = await inventory.ListActiveContainersAsync(
+                new(Scope: PlatformRuntimeScope.ChallengeTest), null, null, 50, cancellationToken);
+            await Assert.That(globalTests).HasSingleItem();
+            await Assert.That(globalTests[0].Runtime.Id).IsEqualTo(runtimeId);
+            var competitionOnly = await inventory.ListActiveContainersAsync(
+                new(Scope: PlatformRuntimeScope.Competition), null, null, 50, cancellationToken);
+            await Assert.That(competitionOnly).IsEmpty();
             await Assert.That(entity.TestFlagDelivery).IsEqualTo(RuntimeTestFlagDelivery.Environment);
             await Assert.That(entity.TestFlagState).IsEqualTo(RuntimeTestFlagState.Pending);
 

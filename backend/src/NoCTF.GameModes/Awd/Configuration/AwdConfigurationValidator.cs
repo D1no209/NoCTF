@@ -66,6 +66,8 @@ public static class AwdConfigurationValidator
             "Checker"));
         if (configuration.Checker is { } checker)
             ValidateChecker(configuration.Runtime, checker, errors);
+        if (configuration.CheckerAllowRoot && configuration.Checker is null)
+            errors.Add("CheckerAllowRoot requires Checker.");
         if (configuration.Runtime is not null && configuration.FlagInjection is null)
             errors.Add("FlagInjection is required when Runtime is configured.");
         if (configuration.FlagInjection is { } injection)

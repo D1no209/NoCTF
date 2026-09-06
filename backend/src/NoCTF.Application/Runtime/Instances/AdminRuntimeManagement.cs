@@ -25,6 +25,12 @@ public sealed record PlatformRuntimeInstanceView(
     string? CompetitionTitle,
     string ChallengeTitle);
 
+public sealed record PlatformRuntimeFilter(
+    string? Search = null,
+    PlatformRuntimeScope? Scope = null,
+    RuntimeState? State = null,
+    RuntimeKind? RuntimeKind = null);
+
 public interface IAdminRuntimeStore
 {
     Task<IReadOnlyList<RuntimeInstanceView>> ListAsync(
@@ -34,6 +40,7 @@ public interface IAdminRuntimeStore
         int limit,
         CancellationToken cancellationToken);
     Task<IReadOnlyList<PlatformRuntimeInstanceView>> ListActiveContainersAsync(
+        PlatformRuntimeFilter filter,
         DateTimeOffset? beforeCreatedAt,
         Guid? beforeId,
         int limit,
@@ -87,11 +94,12 @@ public sealed class ManageAdminRuntimes(IAdminRuntimeStore store)
         store.ListAsync(filter, beforeCreatedAt, beforeId, limit, ct);
 
     public Task<IReadOnlyList<PlatformRuntimeInstanceView>> ListActiveContainersAsync(
+        PlatformRuntimeFilter filter,
         DateTimeOffset? beforeCreatedAt,
         Guid? beforeId,
         int limit,
         CancellationToken ct = default) =>
-        store.ListActiveContainersAsync(beforeCreatedAt, beforeId, limit, ct);
+        store.ListActiveContainersAsync(filter, beforeCreatedAt, beforeId, limit, ct);
 
     public Task<RuntimeInstanceView?> GetAsync(
         Guid competitionId,

@@ -82,6 +82,8 @@ public static class AwdpConfigurationValidator
         ValidateChecker(configuration.Checker, errors);
         if (configuration.CheckerFixInput && configuration.Checker is null)
             errors.Add("CheckerFixInput requires Checker.");
+        if (configuration.CheckerAllowRoot && configuration.Checker is null)
+            errors.Add("CheckerAllowRoot requires Checker.");
         return errors;
     }
 
@@ -129,6 +131,8 @@ public static class AwdpConfigurationValidator
         ValidateChecker(configuration.Checker, errors);
         if (configuration.CheckerFixInput && configuration.Checker is null)
             errors.Add("CheckerFixInput requires Checker.");
+        if (configuration.CheckerAllowRoot && configuration.Checker is null)
+            errors.Add("CheckerAllowRoot requires Checker.");
         return errors;
     }
 
