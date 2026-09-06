@@ -119,7 +119,7 @@ jobs:
           cache-from: type=gha,scope=noctf-host
           cache-to: type=gha,mode=max,scope=noctf-host,ignore-error=true
 
-  deploy-production:
+  deploy-test:
     name: Deploy test server
     needs: publish-images
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
@@ -131,7 +131,7 @@ jobs:
       contents: read
       packages: read
     concurrency:
-      group: noctf-production-deploy
+      group: noctf-test-deploy
       cancel-in-progress: false
     env:
       DEPLOY_HOST: ${{ secrets.NOCTF_DEPLOY_HOST }}
@@ -221,7 +221,7 @@ jobs:
             --output="$RUNNER_TEMP/noctf-release.tar.gz" \
             "$GITHUB_SHA" \
             backend/Directory.Build.props \
-            deploy/docker-compose.yml
+            deploy/ci/update_image.py
           tar -tzf "$RUNNER_TEMP/noctf-release.tar.gz" >/dev/null
 
       - name: Upload exact release

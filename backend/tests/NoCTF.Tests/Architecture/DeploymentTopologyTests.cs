@@ -326,7 +326,7 @@ public sealed class DeploymentTopologyTests
             .ReplaceLineEndings("\n");
         var publishJob = System.Text.RegularExpressions.Regex.Match(
             ci,
-            "(?ms)^  publish-images:\n(?<body>.*?)(?=^  deploy-production:)")
+            "(?ms)^  publish-images:\n(?<body>.*?)(?=^  deploy-test:)")
             .Groups["body"]
             .Value;
 
@@ -361,13 +361,13 @@ public sealed class DeploymentTopologyTests
         var ci = (await ReadAsync(".github", "workflows", "ci.yml"))
             .ReplaceLineEndings("\n");
 
-        await Assert.That(ci).Contains("  deploy-production:\n");
+        await Assert.That(ci).Contains("  deploy-test:\n");
         await Assert.That(ci).Contains("    name: Deploy test server\n");
         await Assert.That(ci).Contains("    needs: publish-images\n");
         await Assert.That(ci).Contains(
             "    if: github.event_name == 'push' && github.ref == 'refs/heads/main'\n");
         await Assert.That(ci).Contains("    environment: production\n");
-        await Assert.That(ci).Contains("      group: noctf-production-deploy\n");
+        await Assert.That(ci).Contains("      group: noctf-test-deploy\n");
         await Assert.That(ci).Contains("      cancel-in-progress: false\n");
         await Assert.That(ci).Contains("NOCTF_DEPLOY_HOST");
         await Assert.That(ci).Contains("NOCTF_DEPLOY_SSH_KEY");
@@ -378,7 +378,7 @@ public sealed class DeploymentTopologyTests
         await Assert.That(ci).Contains("git archive \\\n");
         await Assert.That(ci).Contains("$GITHUB_SHA");
         await Assert.That(ci).Contains("backend/Directory.Build.props");
-        await Assert.That(ci).Contains("deploy/docker-compose.yml");
+        await Assert.That(ci).Contains("deploy/ci/update_image.py");
         await Assert.That(ci).DoesNotContain("            \"$GITHUB_SHA\"\n          tar -tzf");
         await Assert.That(ci).Contains("deploy/ci/deploy.sh");
         await Assert.That(ci).Contains("noctf-ci-upload-$GITHUB_SHA");
@@ -394,7 +394,8 @@ public sealed class DeploymentTopologyTests
     public async Task External_deployment_artifacts_are_immutable_and_verified()
     {
         var dockerfile = await ReadAsync("backend", "Dockerfile");
-        var deployScript = await ReadAsync("deploy", "ci", "deploy.sh");
+        var deployScript = await ReadAsync("deploy", "ci", "deploy.sh")
+            + await ReadAsync("deploy", "ci", "update_image.py");
         var deploymentFiles = new[]
         {
             await ReadAsync("deploy", "docker-compose.yml"),
@@ -434,9 +435,8 @@ public sealed class DeploymentTopologyTests
         await Assert.That(deployScript).Contains("docker pull \"$platform_image\"");
         await Assert.That(deployScript).Contains("--no-build");
         await Assert.That(deployScript).DoesNotContain("run --rm migration");
-        await Assert.That(deployScript).Contains("schema_fingerprint()");
-        await Assert.That(deployScript).Contains(
-            "logs --no-color --tail 100 noctf");
+        await Assert.That(deployScript).Contains("def schema_fingerprint(postgres)");
+        await Assert.That(deployScript).Contains("validate_existing_config(config, apps)");
         await Assert.That(deployScript).DoesNotContain("run --rm --pull");
         await Assert.That(deployScript).DoesNotContain("kompose_asset_path");
         await Assert.That(deployScript).DoesNotContain(
@@ -466,15 +466,20 @@ public sealed class DeploymentTopologyTests
     [Test]
     public async Task Production_deployment_never_starts_exporters_or_changes_other_services()
     {
-        var script = await ReadAsync("deploy", "ci", "deploy.sh");
+        var script = await ReadAsync("deploy", "ci", "deploy.sh")
+            + await ReadAsync("deploy", "ci", "update_image.py");
         await Assert.That(script).Contains("docker pull \"$platform_image\"");
-        await Assert.That(script).Contains("--no-deps --no-build --pull never");
+        await Assert.That(script).Contains("\"--no-deps\", \"--no-build\", \"--pull\", \"never\"");
         await Assert.That(script).DoesNotContain("prune --");
         await Assert.That(script).DoesNotContain("ensure_observability_images");
         await Assert.That(script).DoesNotContain("nginx -s");
         await Assert.That(script).DoesNotContain("--remove-orphans");
-        await Assert.That(script).Contains("CI refuses to start an empty replacement");
+        await Assert.That(script).Contains("refusing a new empty deployment");
         await Assert.That(script).Contains("No automatic database rollback");
+        await Assert.That(script).Contains("CI must never deploy to production");
+        await Assert.That(script).Contains("Network identity changed:");
+        await Assert.That(script).DoesNotContain("\"network\", \"create\"");
+        await Assert.That(script).DoesNotContain("\"network\", \"rm\"");
     }
 
     [Test]
