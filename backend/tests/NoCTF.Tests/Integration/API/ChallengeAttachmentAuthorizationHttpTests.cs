@@ -36,8 +36,11 @@ public sealed class ChallengeAttachmentAuthorizationHttpTests
     private const string BearerScheme = "Bearer";
 
     [Test]
+    [Arguments(false)]
+    [Arguments(true)]
     [Timeout(300_000)]
     public async Task Player_downloads_are_bound_to_the_authorized_challenge_scope(
+        bool practice,
         CancellationToken cancellationToken)
     {
         await DockerIntegrationTest.RunAsync(async () =>
@@ -49,6 +52,14 @@ public sealed class ChallengeAttachmentAuthorizationHttpTests
                 .Build();
             await postgres.StartAsync(cancellationToken);
             var fixture = await SeedAsync(postgres.GetConnectionString(), cancellationToken);
+            if (practice)
+            {
+                await using var setup = CreateDbContext(postgres.GetConnectionString());
+                var competition = await setup.Competitions.SingleAsync(item => item.Id == fixture.CompetitionId, cancellationToken);
+                competition.Status = CompetitionStatus.Finished;
+                competition.PracticeModeEnabled = true;
+                await setup.SaveChangesAsync(cancellationToken);
+            }
             await using var app = await CreateApplicationAsync(
                 postgres.GetConnectionString(),
                 fixture,
@@ -154,6 +165,21 @@ public sealed class ChallengeAttachmentAuthorizationHttpTests
                     flag.TeamId == fixture.TeamId &&
                     flag.SpecificationKind == SpecificationKind.Attachment,
                 cancellationToken)).IsFalse();
+
+            if (practice)
+            {
+                var competition = await verification.Competitions.SingleAsync(item => item.Id == fixture.CompetitionId, cancellationToken);
+                competition.PracticeModeEnabled = false;
+                await verification.SaveChangesAsync(cancellationToken);
+                using var disabled = await client.GetAsync(AttachmentListUri(fixture.CompetitionId, fixture.AllCompetitionChallengeId), cancellationToken);
+                await Assert.That(disabled.StatusCode).IsEqualTo(HttpStatusCode.NotFound);
+                competition.PracticeModeEnabled = true;
+            }
+            var team = await verification.Teams.SingleAsync(item => item.Id == fixture.TeamId, cancellationToken);
+            team.IsBanned = true;
+            await verification.SaveChangesAsync(cancellationToken);
+            using var banned = await client.GetAsync(AttachmentListUri(fixture.CompetitionId, fixture.AllCompetitionChallengeId), cancellationToken);
+            await Assert.That(banned.StatusCode).IsEqualTo(HttpStatusCode.NotFound);
         });
     }
 

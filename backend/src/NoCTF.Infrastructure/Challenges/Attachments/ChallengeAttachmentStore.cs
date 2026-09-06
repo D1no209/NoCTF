@@ -439,7 +439,10 @@ public sealed class ChallengeAttachmentStore(
             .Where(item =>
                 item.Challenge.Id == competitionChallengeId &&
                 item.Challenge.IsPublished &&
-                item.Competition.Status == CompetitionStatus.Running)
+                (item.Competition.Status == CompetitionStatus.Running
+                    || item.Competition.Status == CompetitionStatus.Finished
+                        && item.Competition.Mode == GameMode.Ctf
+                        && item.Competition.PracticeModeEnabled))
             .Select(item => new PlayerScope(
                 item.Team.Id,
                 item.Challenge.ChallengeId))
