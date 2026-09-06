@@ -29,6 +29,62 @@ public sealed class CompetitionPracticeModePersistenceTests
 {
     [Test]
     [Timeout(300_000)]
+    public async Task Static_practice_flags_do_not_require_a_runtime_or_accept_unassigned_attachment_flags(CancellationToken ct)
+    {
+        await DockerIntegrationTest.RunAsync(async () =>
+        {
+            await using var postgres = new PostgreSqlBuilder("postgres:17.10-alpine3.24@sha256:742f40ea20b9ff2ff31db5458d127452988a2164df9e17441e191f3b72252193")
+                .WithDatabase("noctf_static_practice").WithUsername("postgres").WithPassword("postgres").Build();
+            await postgres.StartAsync(ct);
+            var options = new DbContextOptionsBuilder<NoCtfDbContext>()
+                .UseNpgsql(postgres.GetConnectionString()).UseSnakeCaseNamingConvention().Options;
+            var fixture = await SeedAsync(options, ct);
+            await using var db = new NoCtfDbContext(options);
+            var template = await db.Challenges.SingleAsync(ct);
+            template.DefinitionJson = new GameModeChallengeConfigurationCatalog().GetDefaultDefinitionJson(GameMode.Ctf);
+            var candidate = new ChallengeFlag
+            {
+                Id = Guid.CreateVersion7(), ChallengeId = fixture.ChallengeId,
+                Flag = "flag{unassigned-attachment}",
+                FlagSha256 = SHA256.HashData(Encoding.UTF8.GetBytes("flag{unassigned-attachment}")),
+                SpecificationKind = SpecificationKind.Attachment, SpecificationId = Guid.CreateVersion7(), CreatedAt = fixture.Now
+            };
+            db.ChallengeFlags.Add(candidate);
+            await db.SaveChangesAsync(ct);
+            var judge = new JudgePracticeFlag(new PracticeFlagJudge(db));
+            var command = new JudgePracticeFlagCommand(fixture.CompetitionId, fixture.CompetitionChallengeId,
+                fixture.UserId, fixture.Flag, fixture.Now);
+            await Assert.That((await judge.ExecuteAsync(command, ct)).Judgement).IsEqualTo(PracticeFlagJudgement.Correct);
+            await Assert.That((await judge.ExecuteAsync(command with { Flag = "wrong" }, ct)).Judgement).IsEqualTo(PracticeFlagJudgement.Wrong);
+            await Assert.That((await judge.ExecuteAsync(command with { Flag = candidate.Flag }, ct)).Judgement).IsEqualTo(PracticeFlagJudgement.Wrong);
+
+            db.ChallengeFlags.Add(new ChallengeFlag
+            {
+                Id = Guid.CreateVersion7(), CompetitionChallengeId = fixture.CompetitionChallengeId, TeamId = fixture.TeamId,
+                Flag = candidate.Flag, FlagSha256 = candidate.FlagSha256, SpecificationKind = SpecificationKind.Attachment,
+                SpecificationId = candidate.SpecificationId, CreatedAt = fixture.Now
+            });
+            await db.SaveChangesAsync(ct);
+            await Assert.That((await judge.ExecuteAsync(command with { Flag = candidate.Flag }, ct)).Judgement).IsEqualTo(PracticeFlagJudgement.Correct);
+            await Assert.That(await db.RuntimeInstances.CountAsync(ct)).IsEqualTo(0);
+            await Assert.That(await db.GameplayFacts.CountAsync(ct)).IsEqualTo(0);
+            await Assert.That(await db.CompetitionEvents.CountAsync(ct)).IsEqualTo(0);
+            await Assert.That(await db.Notifications.CountAsync(ct)).IsEqualTo(0);
+
+            var competition = await db.Competitions.SingleAsync(ct);
+            competition.PracticeModeEnabled = false;
+            await db.SaveChangesAsync(ct);
+            await Assert.That((await judge.ExecuteAsync(command, ct)).FailureCode).IsEqualTo(PracticeFlagFailureCode.PracticeUnavailable);
+            competition.PracticeModeEnabled = true;
+            var team = await db.Teams.SingleAsync(ct);
+            team.RegistrationStatus = TeamRegistrationStatus.Pending;
+            await db.SaveChangesAsync(ct);
+            await Assert.That((await judge.ExecuteAsync(command, ct)).FailureCode).IsEqualTo(PracticeFlagFailureCode.TeamNotEligible);
+        });
+    }
+
+    [Test]
+    [Timeout(300_000)]
     public async Task Finished_ctf_practice_runtime_can_judge_flags_without_scoring(
         CancellationToken ct)
     {

@@ -58,18 +58,23 @@ public sealed class PracticeFlagJudge(
         if (team is null)
             return new(FailureCode: PracticeFlagFailureCode.TeamNotEligible);
 
-        var running = await db.RuntimeInstances.AsNoTracking().AnyAsync(item =>
-            item.CompetitionId == command.CompetitionId
-            && item.CompetitionChallengeId == command.CompetitionChallengeId
-            && item.TeamId == team.Id
-            && item.Purpose == RuntimePurpose.Practice
-            && item.State == RuntimeState.Running
-            && item.ExpiresAt > command.SubmittedAt, ct);
-        if (!running)
-            return new(FailureCode: PracticeFlagFailureCode.RuntimeNotRunning);
+        var runtimeTemplate = runtimeTemplates.Get(GameMode.Ctf, scope.DefinitionJson);
+        if (runtimeTemplate is not null)
+        {
+            if (runtimeTemplate.RuntimeKind is not (RuntimeKind.Container or RuntimeKind.Compose))
+                return new(FailureCode: PracticeFlagFailureCode.PracticeUnavailable);
+            var running = await db.RuntimeInstances.AsNoTracking().AnyAsync(item =>
+                item.CompetitionId == command.CompetitionId
+                && item.CompetitionChallengeId == command.CompetitionChallengeId
+                && item.TeamId == team.Id
+                && item.Purpose == RuntimePurpose.Practice
+                && item.State == RuntimeState.Running
+                && item.ExpiresAt > command.SubmittedAt, ct);
+            if (!running)
+                return new(FailureCode: PracticeFlagFailureCode.RuntimeNotRunning);
+        }
 
         var hash = SHA256.HashData(Encoding.UTF8.GetBytes(command.Flag));
-        var runtimeTemplate = runtimeTemplates.Get(GameMode.Ctf, scope.DefinitionJson);
         var usesRuntimeInjection = runtimeTemplate?.FlagSource == RuntimeFlagSource.PerTeam;
         var supportsRegularExpression = runtimeTemplate?.FlagSource
             is null or RuntimeFlagSource.Static;
@@ -79,6 +84,8 @@ public sealed class PracticeFlagJudge(
                 && (flag.ChallengeId == scope.ChallengeId
                     || flag.CompetitionChallengeId == command.CompetitionChallengeId)
                 && (flag.TeamId == null || flag.TeamId == team.Id)
+                && (flag.SpecificationKind != SpecificationKind.Attachment
+                    || flag.CompetitionChallengeId == command.CompetitionChallengeId && flag.TeamId == team.Id)
                 && (!usesRuntimeInjection
                     || flag.TeamId == team.Id
                     && flag.SpecificationKind == SpecificationKind.RuntimeDefinition
