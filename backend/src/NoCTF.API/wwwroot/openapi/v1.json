@@ -7382,9 +7382,53 @@
           "Admin"
         ],
         "summary": "Lists active runtime containers across the platform.",
-        "description": "Returns keyset-paged Container and Compose runtimes in active lifecycle states to platform administrators.",
+        "description": "Returns keyset-paged Container and Compose runtimes in active lifecycle states to platform administrators. Supports scope, state, kind and case-insensitive title/team search, including Fix target team attribution.",
         "operationId": "AdminPlatformListActiveRuntimes",
         "parameters": [
+          {
+            "name": "search",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "nullable": true
+            }
+          },
+          {
+            "name": "scope",
+            "in": "query",
+            "schema": {
+              "nullable": true,
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationPlatformPlatformRuntimeScopeProtocol"
+                }
+              ]
+            }
+          },
+          {
+            "name": "state",
+            "in": "query",
+            "schema": {
+              "nullable": true,
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsRuntimeRuntimeStateProtocol"
+                }
+              ]
+            }
+          },
+          {
+            "name": "runtimeKind",
+            "in": "query",
+            "schema": {
+              "nullable": true,
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsRuntimeRuntimeKindProtocol"
+                }
+              ]
+            }
+          },
           {
             "name": "cursor",
             "in": "query",

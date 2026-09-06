@@ -31,7 +31,8 @@ public sealed record AwdCheckerWork(
     Uri CallbackUrl,
     string CallbackToken,
     DateTimeOffset Deadline,
-    TimeSpan Timeout);
+    TimeSpan Timeout,
+    bool AllowRoot = false);
 
 public interface IAwdCheckerWorkReader
 {
@@ -157,7 +158,8 @@ public sealed class AwdCheckerWorkReader(
             message.Deadline,
             TimeSpan.FromSeconds(checker.TimeoutSeconds) < remaining
                 ? TimeSpan.FromSeconds(checker.TimeoutSeconds)
-                : remaining);
+                : remaining,
+            settings.CheckerAllowRoot);
     }
 
     private static async Task<string?> ResolveTargetHostAsync(
@@ -228,7 +230,7 @@ public sealed class AwdCheckerExecutor(
             new Dictionary<string, string>(),
             new Dictionary<int, int>(),
             new RuntimeResourceLimits(256 * 1024 * 1024, 250_000_000, 128),
-            new ContainerSecurityPolicy(true, true, true, ["ALL"], []),
+            new ContainerSecurityPolicy(true, true, !work.AllowRoot, ["ALL"], []),
             work.Timeout,
             OperationTimeout: work.Timeout,
             AllowInternalCallback: true,

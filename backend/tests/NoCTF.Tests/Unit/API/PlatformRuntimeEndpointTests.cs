@@ -1,0 +1,140 @@
+using System.Net;
+using System.Net.Http.Json;
+using System.Security.Claims;
+using System.Text.Encodings.Web;
+using FastEndpoints;
+using FastEndpoints.Swagger;
+using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.TestHost;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
+using NSubstitute;
+using NoCTF.API.Composition;
+using NoCTF.API.Endpoints.Administration.Platform;
+using NoCTF.API.Pagination;
+using NoCTF.Application.Runtime.Instances;
+using NoCTF.Domain.Runtime;
+
+namespace NoCTF.Tests.Unit.API;
+
+public sealed class PlatformRuntimeEndpointTests
+{
+    private const string Route = "/api/v1/admin/platform/runtimes";
+
+    [Test]
+    [Arguments("Administrator", HttpStatusCode.OK)]
+    [Arguments("User", HttpStatusCode.Forbidden)]
+    [Arguments("", HttpStatusCode.Unauthorized)]
+    public async Task Inventory_requires_platform_administrator(string role, HttpStatusCode expected)
+    {
+        var store = CreateStore();
+        await using var app = await CreateApp(store);
+        using var client = app.GetTestClient();
+        if (role.Length > 0) client.DefaultRequestHeaders.Add("X-Test-Role", role);
+        using var response = await client.GetAsync(Route);
+        await Assert.That(response.StatusCode).IsEqualTo(expected);
+        await Assert.That(store.ReceivedCalls().Count()).IsEqualTo(expected == HttpStatusCode.OK ? 1 : 0);
+    }
+
+    [Test]
+    public async Task Filters_reach_store_and_cursor_is_bound_to_every_filter()
+    {
+        var store = CreateStore();
+        await using var app = await CreateApp(store);
+        using var client = app.GetTestClient();
+        client.DefaultRequestHeaders.Add("X-Test-Role", "Administrator");
+        const string filters = "search=soul&scope=Competition&state=Running&runtimeKind=Container&limit=1";
+        var first = await client.GetFromJsonAsync<PlatformRuntimeListResponse>($"{Route}?{filters}");
+        await Assert.That(first!.NextCursor).IsNotNull();
+        await store.Received(1).ListActiveContainersAsync(
+            new("soul", PlatformRuntimeScope.Competition, RuntimeState.Running, RuntimeKind.Container),
+            null, null, 1, Arg.Any<CancellationToken>());
+        var cursor = Uri.EscapeDataString(first.NextCursor!);
+        using var next = await client.GetAsync($"{Route}?{filters}&cursor={cursor}");
+        await Assert.That(next.StatusCode).IsEqualTo(HttpStatusCode.OK);
+        foreach (var changed in new[]
+        {
+            filters.Replace("soul", "different"), filters.Replace("Competition", "ChallengeTest"),
+            filters.Replace("Running", "Stopping"), filters.Replace("Container", "Compose")
+        })
+        {
+            using var response = await client.GetAsync($"{Route}?{changed}&cursor={cursor}");
+            await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.BadRequest);
+        }
+        await Assert.That(store.ReceivedCalls().Count()).IsEqualTo(2);
+    }
+
+    [Test]
+    [Arguments("state=Stopped")]
+    [Arguments("runtimeKind=OvaVm")]
+    [Arguments("scope=999")]
+    [Arguments("limit=201")]
+    public async Task Invalid_inventory_filters_return_validation_errors(string query)
+    {
+        var store = CreateStore();
+        await using var app = await CreateApp(store);
+        using var client = app.GetTestClient();
+        client.DefaultRequestHeaders.Add("X-Test-Role", "Administrator");
+        using var response = await client.GetAsync($"{Route}?{query}");
+        await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.BadRequest);
+        await Assert.That(store.ReceivedCalls()).IsEmpty();
+    }
+
+    private static IAdminRuntimeStore CreateStore()
+    {
+        var store = Substitute.For<IAdminRuntimeStore>();
+        store.ListActiveContainersAsync(Arg.Any<PlatformRuntimeFilter>(), Arg.Any<DateTimeOffset?>(),
+            Arg.Any<Guid?>(), Arg.Any<int>(), Arg.Any<CancellationToken>()).Returns(
+            Task.FromResult<IReadOnlyList<PlatformRuntimeInstanceView>>([
+                new(new(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), null, null, RuntimePurpose.Player,
+                    RuntimeKind.Container, RuntimeProvider.Docker, RuntimeState.Running, null, [],
+                    DateTimeOffset.UtcNow, null, null, null), PlatformRuntimeScope.Competition, "Contest", "soul")
+            ]));
+        return store;
+    }
+
+    private static async Task<WebApplication> CreateApp(IAdminRuntimeStore store)
+    {
+        var builder = WebApplication.CreateBuilder();
+        builder.WebHost.UseTestServer();
+        builder.Services.AddProblemDetails();
+        builder.Services.AddFastEndpoints(options =>
+        {
+            options.DisableAutoDiscovery = true;
+            options.Assemblies = [typeof(ListPlatformRuntimesEndpoint).Assembly];
+            options.Filter = type => type == typeof(ListPlatformRuntimesEndpoint)
+                || type == typeof(ListPlatformRuntimesValidator);
+        });
+        builder.Services.SwaggerDocument();
+        builder.Services.AddAuthentication("Bearer")
+            .AddScheme<AuthenticationSchemeOptions, TestBearer>("Bearer", _ => { });
+        builder.Services.AddAuthorization();
+        builder.Services.AddSingleton(store);
+        builder.Services.AddScoped<ManageAdminRuntimes>();
+        builder.Services.AddSingleton(TimeProvider.System);
+        builder.Services.Configure<PaginationOptions>(options => options.SigningKey = "test-only-cursor-signing-key");
+        builder.Services.AddSingleton<SignedKeysetCursor>();
+        var app = builder.Build();
+        app.UseAuthentication();
+        app.UseAuthorization();
+        app.UseNoCtfEndpoints();
+        await app.StartAsync();
+        return app;
+    }
+
+    private sealed class TestBearer(IOptionsMonitor<AuthenticationSchemeOptions> options,
+        ILoggerFactory logger, UrlEncoder encoder) : AuthenticationHandler<AuthenticationSchemeOptions>(options, logger, encoder)
+    {
+        protected override Task<AuthenticateResult> HandleAuthenticateAsync()
+        {
+            var role = Request.Headers["X-Test-Role"].ToString();
+            return Task.FromResult(role.Length == 0 ? AuthenticateResult.NoResult()
+                : AuthenticateResult.Success(new AuthenticationTicket(new ClaimsPrincipal(new ClaimsIdentity(
+                    [new Claim(ClaimTypes.NameIdentifier, Guid.NewGuid().ToString()), new Claim(ClaimTypes.Role, role)],
+                    Scheme.Name)), Scheme.Name)));
+        }
+    }
+}

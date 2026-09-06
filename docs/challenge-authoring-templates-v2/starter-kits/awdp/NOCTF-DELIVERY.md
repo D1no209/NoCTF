@@ -23,7 +23,7 @@
 - [ ] “补丁入口”填 fix.sh；“补丁应用命令”按参数分行，并且恰好一行是 {entrypoint}。
 - [ ] Patch 模板直接打包入口文件，不包含额外顶层目录。
 - [ ] 先构建 Target，再构建 Checker，确保其中保存的是同版本的独立靶机基线。
-- [ ] 镜像声明非零数字 UID/GID，实际监听端口、平台端口映射和 Checker 访问端口一致。
+- [ ] Checker 镜像默认声明非零数字 UID/GID；确需 root 时经审核在模式定义中打开“允许 Checker 以 root 运行”。实际监听端口、平台端口映射和 Checker 访问端口一致。
 - [ ] Checker 所需的 Python、wget 等程序实际存在，工作目录权限与只读限制经过验证。
 - [ ] Checker 启动时 `/noctf/fix/fix.sh` 已存在，归档由 Runner 下载并规范化一次后分别注入。
 - [ ] 没有假定 Checker 自动继承靶机的动态 Flag 环境变量。
@@ -34,6 +34,6 @@
 - [ ] 日志不包含 Fix 下载凭证、真实 Flag 或回调令牌。
 - [ ] 没有 Docker socket、宿主机挂载、公开 Checker 端口或靶机检查端口。
 - [ ] 不可信 Fix 的重放具有独立隔离边界，不能读取 Checker 凭证；关键词扫描不作为沙箱替代品。
-- [ ] 保留资源限额、`no-new-privileges`、非 root、能力限制、隔离网络和有界超时。
+- [ ] 保留资源限额、`no-new-privileges`、能力限制、隔离网络和有界超时。默认非 root；允许 root 不代表特权容器或宿主机权限。
 - [ ] 已在可丢弃环境用内部样例验证 `DefenseSucceeded`、`ExploitSucceeded`、`ServiceAbnormal`。
 - [ ] 正式出题前替换所有教学镜像名、教学数据与判定规则，不在生产运行模板验收脚本。

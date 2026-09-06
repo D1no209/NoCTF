@@ -8,7 +8,9 @@ namespace NoCTF.Tests.Unit.Runner;
 public sealed class AwdpCheckerExecutorTests
 {
     [Test]
-    public async Task Checker_runs_as_an_isolated_one_shot_on_the_target_network()
+    [Arguments(false)]
+    [Arguments(true)]
+    public async Task Checker_runs_as_an_isolated_one_shot_on_the_target_network(bool allowRoot)
     {
         var runner = new RecordingOneShotRunner();
         var executor = new AwdpCheckerExecutor(new RecordingCatalog(runner));
@@ -27,7 +29,8 @@ public sealed class AwdpCheckerExecutorTests
             30,
             new Uri("https://api.example/api/internal/v1/awdp/fix-results"),
             "callback-token",
-            TimeSpan.FromSeconds(20));
+            TimeSpan.FromSeconds(20),
+            AllowRoot: allowRoot);
 
         var outcome = await executor.ExecuteAsync(work, CancellationToken.None);
 
@@ -39,6 +42,11 @@ public sealed class AwdpCheckerExecutorTests
         await Assert.That(request.Environment["NOCTF_CALLBACK_TOKEN"]).IsEqualTo("callback-token");
         await Assert.That(request.Environment).DoesNotContainKey("OBJECT_KEY");
         await Assert.That(request.Labels).IsEmpty();
+        await Assert.That(request.Security.RunAsNonRoot).IsEqualTo(!allowRoot);
+        await Assert.That(request.Security.NoNewPrivileges).IsTrue();
+        await Assert.That(request.Security.ReadonlyRootfs).IsTrue();
+        await Assert.That(request.Security.CapDrop).IsEquivalentTo(["ALL"]);
+        await Assert.That(request.Security.CapAdd).IsEmpty();
         await Assert.That(request.NetworkPurpose)
             .IsEqualTo(ContainerNetworkPurpose.AwdpVerification);
         await Assert.That(request.PortMappings).IsEmpty();

@@ -109,6 +109,7 @@ public sealed class AdminRuntimeStore(
     }
 
     public async Task<IReadOnlyList<PlatformRuntimeInstanceView>> ListActiveContainersAsync(
+        PlatformRuntimeFilter filter,
         DateTimeOffset? beforeCreatedAt,
         Guid? beforeId,
         int limit,
@@ -122,6 +123,39 @@ public sealed class AdminRuntimeStore(
                     || item.State == RuntimeState.Provisioning
                     || item.State == RuntimeState.Running
                     || item.State == RuntimeState.Stopping));
+        if (filter.Scope is PlatformRuntimeScope scope)
+            query = query.Where(item => scope == PlatformRuntimeScope.ChallengeTest
+                ? item.Purpose == RuntimePurpose.TemplateTest
+                : item.Purpose != RuntimePurpose.TemplateTest);
+        if (filter.State is RuntimeState state)
+            query = query.Where(item => item.State == state);
+        if (filter.RuntimeKind is RuntimeKind kind)
+            query = query.Where(item => item.RuntimeKind == kind);
+        if (!string.IsNullOrWhiteSpace(filter.Search))
+        {
+            var search = filter.Search.Trim().ToLowerInvariant();
+            var competitions = db.Competitions.IgnoreQueryFilters()
+                .Where(item => item.Title.ToLower().Contains(search)).Select(item => item.Id);
+            var templates = db.Challenges.IgnoreQueryFilters()
+                .Where(item => item.Title.ToLower().Contains(search)).Select(item => item.Id);
+            var challenges = db.CompetitionChallenges.IgnoreQueryFilters()
+                .Join(db.Challenges.IgnoreQueryFilters(), item => item.ChallengeId, item => item.Id,
+                    (item, template) => new { item.Id, Title = item.CustomTitle ?? template.Title })
+                .Where(item => item.Title.ToLower().Contains(search)).Select(item => item.Id);
+            var teams = db.Teams.IgnoreQueryFilters()
+                .Where(item => item.Name.ToLower().Contains(search)).Select(item => (Guid?)item.Id);
+            // Historical Fix targets may lack TeamId. Match the same attribution used by the list.
+            query = query.Where(item =>
+                item.CompetitionId.HasValue && competitions.Contains(item.CompetitionId.Value)
+                || item.ChallengeId.HasValue && templates.Contains(item.ChallengeId.Value)
+                || item.CompetitionChallengeId.HasValue && challenges.Contains(item.CompetitionChallengeId.Value)
+                || teams.Contains(item.TeamId
+                    ?? db.GameplayFacts.Where(fact => fact.Id == item.GameplayFactId)
+                        .Select(fact => fact.TeamId).FirstOrDefault()
+                    ?? db.PatchUploads.Where(upload => upload.RuntimeInstanceId == item.Id)
+                        .OrderBy(upload => upload.UploadedAt).ThenBy(upload => upload.Id)
+                        .Select(upload => (Guid?)upload.TeamId).FirstOrDefault()));
+        }
         if (beforeCreatedAt is DateTimeOffset createdAt && beforeId is Guid id)
         {
             query = query.Where(item =>

@@ -23,7 +23,9 @@ public sealed class AwdCheckerHandlerTests
     }
 
     [Test]
-    public async Task Checker_job_receives_target_and_claim_bound_callback_only_at_execution_time()
+    [Arguments(false)]
+    [Arguments(true)]
+    public async Task Checker_job_receives_target_and_claim_bound_callback_only_at_execution_time(bool allowRoot)
     {
         var runner = new RecordingOneShotRunner();
         var executor = new AwdCheckerExecutor(
@@ -44,7 +46,8 @@ public sealed class AwdCheckerHandlerTests
             new Uri("https://api.example/api/internal/v1/awd/check-results"),
             "claim-bound-token",
             deadline,
-            TimeSpan.FromMinutes(1));
+            TimeSpan.FromMinutes(1),
+            AllowRoot: allowRoot);
 
         await executor.ExecuteAsync(work, CancellationToken.None);
 
@@ -57,6 +60,11 @@ public sealed class AwdCheckerHandlerTests
         await Assert.That(request.Environment["NOCTF_CALLBACK_TOKEN"])
             .IsEqualTo("claim-bound-token");
         await Assert.That(request.Labels).IsEmpty();
+        await Assert.That(request.Security.RunAsNonRoot).IsEqualTo(!allowRoot);
+        await Assert.That(request.Security.NoNewPrivileges).IsTrue();
+        await Assert.That(request.Security.ReadonlyRootfs).IsTrue();
+        await Assert.That(request.Security.CapDrop).IsEquivalentTo(["ALL"]);
+        await Assert.That(request.Security.CapAdd).IsEmpty();
         await Assert.That(request.NetworkPurpose)
             .IsEqualTo(ContainerNetworkPurpose.AwdChecker);
         await Assert.That(request.OperationTimeout).IsEqualTo(TimeSpan.FromMinutes(1));

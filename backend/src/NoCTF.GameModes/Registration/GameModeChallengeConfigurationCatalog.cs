@@ -141,7 +141,7 @@ public sealed class GameModeChallengeConfigurationCatalog : IChallengeConfigurat
             mode switch
             {
                 GameMode.Ctf => ["runtime"],
-                GameMode.Awd => ["runtime", "checker", "flagInjection"],
+                GameMode.Awd => ["runtime", "checker", "checkerAllowRoot", "flagInjection"],
                 GameMode.Awdp =>
                 [
                     "runtime",
@@ -150,6 +150,7 @@ public sealed class GameModeChallengeConfigurationCatalog : IChallengeConfigurat
                     "patchTimeoutSeconds",
                     "checker",
                     "checkerFixInput",
+                    "checkerAllowRoot",
                     "readyTimeoutSeconds",
                     "flagInjection"
                 ],

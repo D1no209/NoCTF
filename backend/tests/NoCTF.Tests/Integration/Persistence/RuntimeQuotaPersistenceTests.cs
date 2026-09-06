@@ -94,7 +94,7 @@ public sealed class RuntimeQuotaPersistenceTests
 
             await using var db = new NoCtfDbContext(options);
             var items = await CreateAdminStore(db, new RecordingOutbox())
-                .ListActiveContainersAsync(null, null, 50, cancellationToken);
+                .ListActiveContainersAsync(new(), null, null, 50, cancellationToken);
 
             await Assert.That(items).Count().IsEqualTo(3);
             await Assert.That(items.Select(item => item.CompetitionTitle))
@@ -106,6 +106,23 @@ public sealed class RuntimeQuotaPersistenceTests
             await Assert.That(items.All(item =>
                     item.Runtime.RuntimeKind is RuntimeKind.Container or RuntimeKind.Compose))
                 .IsTrue();
+            var store = CreateAdminStore(db, new RecordingOutbox());
+            var filtered = await store.ListActiveContainersAsync(
+                new(Search: "  SECOND  ", State: RuntimeState.Running, RuntimeKind: RuntimeKind.Compose),
+                null, null, 50, cancellationToken);
+            await Assert.That(filtered).HasSingleItem();
+            await Assert.That(filtered[0].Runtime.RuntimeKind).IsEqualTo(RuntimeKind.Compose);
+            var byTeam = await store.ListActiveContainersAsync(
+                new(Search: "Quota Team 0"), null, null, 50, cancellationToken);
+            await Assert.That(byTeam).HasSingleItem();
+            var tests = await store.ListActiveContainersAsync(
+                new(Scope: PlatformRuntimeScope.ChallengeTest), null, null, 50, cancellationToken);
+            await Assert.That(tests).IsEmpty();
+            var firstPage = await store.ListActiveContainersAsync(new(), null, null, 1, cancellationToken);
+            var secondPage = await store.ListActiveContainersAsync(new(),
+                firstPage[0].Runtime.CreatedAt, firstPage[0].Runtime.Id, 50, cancellationToken);
+            await Assert.That(secondPage).Count().IsEqualTo(2);
+            await Assert.That(secondPage.Select(item => item.Runtime.Id)).DoesNotContain(firstPage[0].Runtime.Id);
             await Assert.That(items.All(item =>
                     item.Runtime.State is RuntimeState.Queued
                         or RuntimeState.Provisioning

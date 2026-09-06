@@ -45,7 +45,8 @@ public static class AwdpConfigurationResolver
             definition.MaximumPatchUploadBytes
                 ?? NoCTF.Application.GameplayFacts.PatchUploads.PatchUploadRules.DefaultMaximumArchiveBytes,
             rules.FlagTemplate ?? competition.FlagTemplate ?? PerTeamFlagTemplate.Default,
-            definition.CheckerFixInput);
+            definition.CheckerFixInput,
+            definition.CheckerAllowRoot);
 
     public static AwdpEffectiveConfiguration Resolve(
         AwdpConfiguration competition,
