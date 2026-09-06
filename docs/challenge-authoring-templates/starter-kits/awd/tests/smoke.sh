@@ -25,7 +25,8 @@ docker run -d --name "${runtime}" --network "${network}" --network-alias target 
 docker run -d --name "${callback}" --network "${network}" --network-alias callback \
     -e EXPECTED_TOKEN=starter-kit-token "${callback_image}" >/dev/null
 
-docker exec "${runtime}" sh -c "printf '%s' 'flag{starter-kit}' > /dev/shm/flag"
+test_flag='flag{starter-kit-测试}'
+printf '%s' "${test_flag}" | docker exec -i "${runtime}" sh -c 'cat > /dev/shm/flag'
 
 attempt=0
 until docker exec "${callback}" python -c \
@@ -38,7 +39,7 @@ done
 
 actual_flag="$(docker exec "${runtime}" python -c \
     "from urllib.request import urlopen; print(urlopen('http://127.0.0.1:8080/flag').read().decode())")"
-[ "${actual_flag}" = 'flag{starter-kit}' ]
+[ "${actual_flag}" = "${test_flag}" ]
 
 docker run --rm --network "${network}" \
     -e NOCTF_TARGET_HOST=target \

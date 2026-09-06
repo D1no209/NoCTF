@@ -1,5 +1,7 @@
-artifacts/
+private/artifacts/
+attachment/dist/
 .smoke/
+.smoke.*/
 *.tar.gz
 __pycache__/
 *.pyc

@@ -66,10 +66,10 @@ AWDP 接受单个 `BreakAttempt`：
 ## 一次性 Fix 流程
 
 1. 队伍点击“申请防御”；
-2. API 在 PostgreSQL 临界区校验资格、次数和 Break 前置条件，创建 Fix GameplayFact；
-3. 创建绑定 Team 与 GameplayFact 的全新 `AwdpTarget` Runtime；
-4. Target Running 后允许唯一上传一次不可变 `tar.gz` Patch；
-5. 事务内把 PatchUpload、GameplayFact 和 Target 原子绑定；
+2. API 在 PostgreSQL 临界区校验资格、次数和 Break 前置条件，创建只绑定 Team 的全新 `AwdpTarget` Runtime；此时不创建 GameplayFact；
+3. Target 进入 Queued、Provisioning 或 Running 后即可选择并上传唯一一次不可变 `tar.gz` Patch；
+4. 事务内创建 PatchUpload 与 Fix GameplayFact，并把 Target 原子绑定到该 GameplayFact；
+5. 若上传发生在 Target 启动前，验证消息等待同一 Target Running 后自动继续；
 6. Runner 安全解包并以 argv 形式执行 Patch；
 7. 只启动一次 Checker；
 8. Checker 返回强类型业务 outcome；

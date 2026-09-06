@@ -9,6 +9,7 @@ using NoCTF.API.Composition;
 using NoCTF.API.Endpoints.Challenges;
 using NoCTF.API.Security;
 using NoCTF.Application.Challenges.Management;
+using NoCTF.Application.Challenges.Hints;
 using NoCTF.Application.Competitions.Koh;
 using NoCTF.Application.Competitions.Visibility;
 using NoCTF.Application.Scoring.Leaderboard;
@@ -54,6 +55,11 @@ public sealed class ChallengeAudienceEndpointTests
         await Assert.That(detail.StatusCode).IsEqualTo(HttpStatusCode.OK);
         var response = await detail.Content.ReadFromJsonAsync<ChallengeResponse>();
         await Assert.That(response?.UsesDynamicFlag).IsTrue();
+        await Assert.That(response?.Hints?.Count).IsEqualTo(2);
+        await Assert.That(response!.Hints!.Single(hint => hint.Cost == 0).Content).IsEqualTo("Public hint");
+        await Assert.That(response.Hints!.Single(hint => hint.Cost == 20).Content).IsNull();
+        await Assert.That(detail.Headers.CacheControl?.NoStore).IsTrue();
+        await Assert.That(detail.Headers.CacheControl?.Private).IsTrue();
         await Assert.That(store.ListCalls).IsEqualTo(1);
         await Assert.That(store.FindCalls).IsEqualTo(1);
     }
@@ -84,6 +90,19 @@ public sealed class ChallengeAudienceEndpointTests
         builder.Services.AddScoped<ListChallenges>();
         builder.Services.AddScoped<GetChallenge>();
         builder.Services.AddScoped<GetFlagAttemptBudget>();
+        var hintStore = Substitute.For<IParticipantChallengeHintStore>();
+        var now = DateTimeOffset.UtcNow.AddMinutes(-1);
+        hintStore.ReadAsync(Arg.Any<Guid>(), Arg.Any<Guid>(), Arg.Any<Guid>(), Arg.Any<CancellationToken>())
+            .Returns(_ => canRead
+                ? new ParticipantChallengeHintAccess(
+                    [
+                        new(Guid.NewGuid(), ChallengeId, "Public hint", 0, now, null, now, now),
+                        new(Guid.NewGuid(), ChallengeId, "Locked hint", 20, now, null, now, now),
+                        new(Guid.NewGuid(), ChallengeId, "Unpublished hint", 0, null, null, now, now)
+                    ], new HashSet<Guid>(), true)
+                : throw new InvalidOperationException("Hint data must not be read before audience authorization."));
+        builder.Services.AddSingleton(hintStore);
+        builder.Services.AddScoped<ReadParticipantChallengeHints>();
 
         var app = builder.Build();
         app.UseNoCtfEndpoints();

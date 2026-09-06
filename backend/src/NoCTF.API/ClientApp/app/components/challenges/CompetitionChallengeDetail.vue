@@ -20,7 +20,7 @@ const props = defineProps<{
 }>()
 
 const ctx = inject(competitionContextKey)!
-const { isLoggedIn } = useAuth()
+const { isLoggedIn, user } = useAuth()
 const challenge = ref<NoCtfapiEndpointsChallengesChallengeResponse | null>(null)
 const loading = ref(true)
 const error = ref<string | null>(null)
@@ -95,6 +95,7 @@ watch(
   { immediate: true },
 )
 watch(isLoggedIn, () => void loadAttachments())
+watch(() => user.value?.userId, () => void loadChallenge())
 
 async function downloadAttachment(attachmentId: string, fileName: string): Promise<void> {
   downloading.value = true
@@ -215,6 +216,14 @@ const mode = computed(() => ctx.competition.value?.mode)
             </li>
           </ul>
       </section>
+
+      <ChallengeHints
+        :key="`${competitionId}:${challenge.id}:${user?.userId ?? 'anonymous'}`"
+        :competition-id="competitionId"
+        :competition-challenge-id="competitionChallengeId"
+        :hints="challenge.hints"
+        @unlocked="refreshSubmissionHistory"
+      />
 
       <div v-if="ctx.competition.value" class="pt-5">
         <CtfPanel

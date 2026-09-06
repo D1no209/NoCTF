@@ -51,6 +51,8 @@ RUN sed -i 's|http://archive.ubuntu.com/ubuntu|https://archive.ubuntu.com/ubuntu
     && apt-get update \
     && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends libgssapi-krb5-2 \
     && rm -rf /var/lib/apt/lists/*
+COPY --chmod=0755 backend/docker/healthcheck.sh /usr/local/bin/noctf-healthcheck
+HEALTHCHECK --interval=10s --timeout=3s --start-period=120s --retries=12 CMD ["/usr/local/bin/noctf-healthcheck"]
 
 FROM runtime AS api
 WORKDIR /app
@@ -58,7 +60,6 @@ COPY --from=build /app/api .
 COPY --from=frontend-build /src/ClientApp/.output/public ./wwwroot
 RUN mkdir -p /app/uploads && chown -R 1654:1654 /app/uploads
 USER 1654
-EXPOSE 8080
 ENTRYPOINT ["dotnet", "NoCTF.API.dll"]
 
 FROM runtime AS worker
@@ -66,7 +67,6 @@ WORKDIR /app
 COPY --from=build /app/worker .
 RUN mkdir -p /app/uploads && chown -R 1654:1654 /app/uploads
 USER 1654
-EXPOSE 8080
 ENTRYPOINT ["dotnet", "NoCTF.Worker.dll"]
 
 FROM runtime AS runner
@@ -75,8 +75,8 @@ COPY --from=build /app/runner .
 COPY --from=docker-cli /usr/local/bin/docker /usr/local/bin/docker
 COPY --from=docker-cli /usr/local/libexec/docker/cli-plugins/docker-compose /usr/local/libexec/docker/cli-plugins/docker-compose
 COPY --from=kompose-cli /usr/local/bin/kompose /usr/local/bin/kompose
-USER 1654
-EXPOSE 8080
+# Docker socket access already grants host-level authority; no host socket chmod/group patching.
+USER 0
 ENTRYPOINT ["dotnet", "NoCTF.Runner.dll"]
 
 FROM runtime AS host
@@ -87,6 +87,6 @@ COPY --from=docker-cli /usr/local/bin/docker /usr/local/bin/docker
 COPY --from=docker-cli /usr/local/libexec/docker/cli-plugins/docker-compose /usr/local/libexec/docker/cli-plugins/docker-compose
 COPY --from=kompose-cli /usr/local/bin/kompose /usr/local/bin/kompose
 RUN mkdir -p /app/uploads && chown -R 1654:1654 /app/uploads
-USER 1654
-EXPOSE 8080
+# The combined Host includes Runner and accesses the mounted Docker socket.
+USER 0
 ENTRYPOINT ["dotnet", "NoCTF.Host.dll"]

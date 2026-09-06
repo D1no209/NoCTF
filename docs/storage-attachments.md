@@ -33,12 +33,12 @@ Attachment 属于 Challenge 模板。文件内容、显示名称和 MIME 都不�
 
 申请与上传分离：
 
-1. 申请防御 API 先创建一个干净、无公开入口的 `AwdpTarget`；Running 后进入 `AwaitingPatch`。
-2. multipart 上传 API 在一个 PostgreSQL 临界区内把单文件、PatchUpload、FixAttempt 与该 Target 原子绑定，并发布唯一一次 `RunAwdpFixVerification`。
+1. 申请防御 API 先创建一个干净、无公开入口的 `AwdpTarget`；Queued、Provisioning 或 Running 时均可选择 Patch。
+2. multipart 上传 API 在一个 PostgreSQL 临界区内把单文件、PatchUpload、Pending FixAttempt 与该 Target 原子绑定；Target Running 后再发布唯一一次 `RunAwdpFixVerification`。
 
 一个 AwdpTarget 最多绑定一个 PatchUpload/FixAttempt。并发上传只有一个能消费 Target；消费后不可替换、删除或再次验证，随 Competition 最终硬删除。队伍再次尝试必须申请新的干净 Target。
 
-仅接受内容为 gzip 压缩 POSIX ustar/pax tar 的 tar.gz；不以 FileName/MIME 判定。压缩包上传上限来自 Challenge.DefinitionJson 的 `MaximumPatchUploadBytes`，默认 256 MiB、最大 1 GiB；超过上限在解压校验与对象存储之前返回 413/`ArchiveTooLarge`。通过大小门禁后再验证 gzip header/trailer 与 tar block 结构并写新的 ObjectKey、计算 SHA-256；不是 tar.gz 则删除新对象、返回 422、且不创建 PatchUpload/FixAttempt，也不消费仍在 AwaitingPatch 的 Target。数据库 commit 失败也 best-effort 删除新对象，ObjectStorage bucket lifecycle 兜底清理由随机 Id 但无对应数据库行的临时对象。
+Fix 文件继续以 `.tar.gz` 提交，内容须为 gzip 压缩的 tar；支持 GNU Tar、USTAR、PAX、V7，不再限制为 POSIX ustar/pax。压缩包上传上限来自 Challenge.DefinitionJson 的 `MaximumPatchUploadBytes`，默认 256 MiB、最大 1 GiB；超过上限在解压校验与对象存储之前返回 413/`ArchiveTooLarge`。通过大小门禁后再验证 gzip header/trailer 与 tar block 结构并写新的 ObjectKey、计算 SHA-256；不是 tar.gz 则删除新对象、返回 422、且不创建 PatchUpload/FixAttempt，也不消费尚未绑定 Patch 的 Target。数据库 commit 失败也 best-effort 删除新对象，ObjectStorage bucket lifecycle 兜底清理由随机 Id 但无对应数据库行的临时对象。
 
 Runner 在消费后再次验证 Hash/长度/格式并安全解包，拒绝绝对路径、`..`、符号/硬链接、设备文件、重复/大小写冲突路径、超过部署安全限额的条目/展开字节/单文件/压缩比。安全限额来自启动时验证的 `ArchiveExtractionOptions`（MaxEntries、MaxExpandedBytes、MaxSingleFileBytes、MaxCompressionRatio 均为正数），与 HTTP 压缩包上传上限相互独立。解包超限是 Rejected/FixArchiveLimitExceeded；Hash/长度/格式与已上传元数据不一致是 PlatformFailed/StorageUnavailable，不消耗尝试。
 

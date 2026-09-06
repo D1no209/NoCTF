@@ -1,385 +1,145 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
+umask 077
 
 archive_path=${1:?release archive path is required}
 commit_sha=${2:?commit SHA is required}
 config_root=${3:-/root/NoCTF}
 release_root=${4:-/root/noctf-releases}
 platform_image=${5:?published platform image is required}
-minimum_free_kb=${NOCTF_DEPLOY_MIN_FREE_KB:-6291456}
-
-[[ "$commit_sha" =~ ^[0-9a-f]{40}$ ]] || {
-    echo "Invalid deployment commit SHA." >&2
-    exit 2
-}
-[[ "$platform_image" =~ ^[A-Za-z0-9.-]+(:[0-9]+)?/[A-Za-z0-9._/-]+@sha256:[a-f0-9]{64}$ ]] || {
-    echo "Invalid deployment image reference." >&2
-    exit 2
-}
-
+[[ "$commit_sha" =~ ^[0-9a-f]{40}$ ]]
+[[ "$platform_image" =~ ^[A-Za-z0-9.-]+(:[0-9]+)?/[A-Za-z0-9._/-]+@sha256:[a-f0-9]{64}$ ]]
 archive_path=$(realpath "$archive_path")
-upload_dir=$(dirname "$archive_path")
-[[ $(basename "$archive_path") == "noctf-release.tar.gz" ]]
-[[ $(basename "$upload_dir") == "noctf-ci-upload-$commit_sha" ]]
 config_root=$(realpath "$config_root")
+[[ "$config_root" != / && -f "$config_root/.env" && ! -L "$config_root/.env" ]]
 mkdir -p "$release_root"
 release_root=$(realpath "$release_root")
+[[ "$release_root" != / ]]
+exec 9>"$config_root/.deploy.lock"
+flock -n 9 || { echo 'Another deployment is active.' >&2; exit 1; }
+
+# Release bundles contain deployment metadata only, never application source/build inputs.
+while IFS= read -r member; do
+    case "$member" in
+        backend/|deploy/|backend/Directory.Build.props|deploy/docker-compose.yml) ;;
+        *) echo 'Unexpected release archive entry.' >&2; exit 2 ;;
+    esac
+done < <(tar -tzf "$archive_path")
 release_dir="$release_root/$commit_sha"
-release_tmp="$release_dir.tmp"
+mkdir -p "$release_dir"
+tar -xzf "$archive_path" -C "$release_dir" backend/Directory.Build.props deploy/docker-compose.yml
+export NOCTF_PLATFORM_IMAGE="$platform_image"
+compose=(docker compose --project-directory "$config_root" --env-file "$config_root/.env"
+    --file "$release_dir/deploy/docker-compose.yml")
+rendered=$(mktemp "$config_root/.compose-config.XXXXXX")
+trap 'rm -f -- "$rendered"' EXIT
+"${compose[@]}" config --format json > "$rendered"
+docker network inspect 1panel-network >/dev/null
 
-cleanup_upload()
-{
-    if [[ -d "$upload_dir" && $(basename "$upload_dir") == "noctf-ci-upload-$commit_sha" ]]; then
-        rm -rf -- "$upload_dir"
-    fi
-}
-trap cleanup_upload EXIT
-
-[[ -f "$config_root/.env" ]] || {
-    echo "Deployment environment file is missing: $config_root/.env" >&2
-    exit 2
-}
-[[ -f "$config_root/deploy/docker-compose.prod.yml" ]] || {
-    echo "Production Compose override is missing." >&2
-    exit 2
-}
-
-observability_env="$config_root/deploy/observability.env"
-if [[ ! -f "$observability_env" ]]; then
-    install -d -m 0755 "$(dirname "$observability_env")"
-    umask 077
-    grafana_password=$(od -An -N32 -tx1 /dev/urandom | tr -d ' \n')
-    [[ ${#grafana_password} -eq 64 ]]
-    printf 'GRAFANA_ADMIN_PASSWORD=%s\n' "$grafana_password" > "$observability_env"
-fi
-chmod 0600 "$observability_env"
-grep -Eq '^GRAFANA_ADMIN_PASSWORD=.{16,}$' "$observability_env" || {
-    echo "Grafana deployment credential is missing or too short." >&2
-    exit 2
-}
-
-if [[ ! -d "$release_dir" ]]; then
-    [[ "$release_tmp" == "$release_root/$commit_sha.tmp" ]]
-    rm -rf -- "$release_tmp"
-    mkdir -p "$release_tmp"
-    tar -xzf "$archive_path" -C "$release_tmp"
-    [[ -f "$release_tmp/deploy/docker-compose.yml" ]]
-    [[ -f "$release_tmp/deploy/docker-compose.ci.yml" ]]
-    [[ -f "$release_tmp/deploy/docker-compose.observability.yml" ]]
-    [[ -f "$release_tmp/deploy/observability/prometheus/prometheus.yml" ]]
-    [[ -f "$release_tmp/deploy/observability/grafana/provisioning/dashboards/dashboards.yml" ]]
-    mv "$release_tmp" "$release_dir"
-fi
-
-export NOCTF_MIGRATION_IMAGE="$platform_image"
-export NOCTF_BACKEND_IMAGE="$platform_image"
-export NOCTF_WORKER_IMAGE="$platform_image"
-export NOCTF_RUNNER_IMAGE="$platform_image"
-
-compose=(
-    docker compose
-    --project-name deploy
-    --env-file "$config_root/.env"
-    --env-file "$observability_env"
-    --file "$release_dir/deploy/docker-compose.yml"
-    --file "$config_root/deploy/docker-compose.prod.yml"
-    --file "$release_dir/deploy/docker-compose.observability.yml"
-    --file "$release_dir/deploy/docker-compose.ci.yml"
+# Do not silently replace named volumes with empty directories or run beside the old split Host.
+python3 - "$rendered" "$config_root" <<'PY'
+import json, os, pathlib, subprocess, sys
+config = json.load(open(sys.argv[1]))
+root = pathlib.Path(sys.argv[2])
+expected = {'noctf', 'postgres', 'redis', 'nats', 'registry'}
+if set(config['services']) != expected:
+    raise SystemExit('Expected the five-service directory-based deployment layout.')
+env = config['services']['noctf']['environment']
+if str(env.get('Database__AutoMigrate', '')).lower() != 'true':
+    raise SystemExit('Enable Database__AutoMigrate in the NoCTF .env before deployment.')
+if str(env.get('Observability__Enabled', '')).lower() != 'false' or env.get('ASPNETCORE_URLS') != 'http://+:8080':
+    raise SystemExit('The stock deployment requires telemetry disabled and the single internal HTTP listener on 8080.')
+for service in config['services'].values():
+    for volume in service.get('volumes', []):
+        if volume['type'] != 'bind' or not os.path.exists(volume['source']):
+            raise SystemExit('A required bind source is missing; prepare/migrate the data directories first.')
+if not (root / 'config/registry/auth/htpasswd').is_file() or not (root / 'config/registry/auth/htpasswd').stat().st_size:
+    raise SystemExit('Create Registry bcrypt credentials in config/registry/auth/htpasswd first.')
+ids = subprocess.check_output(['docker', 'ps', '-aq', '--filter', 'label=com.docker.compose.project='+config['name']], text=True).split()
+containers = json.loads(subprocess.check_output(['docker', 'inspect', *ids])) if ids else []
+running = set()
+for container in containers:
+    service = container['Config']['Labels'].get('com.docker.compose.service')
+    if service not in expected:
+        raise SystemExit('Legacy service '+str(service)+' still exists in this project. Operations must complete the one-time topology transition; CI will not stop or delete it.')
+    mounts = {mount['Destination']: mount for mount in container['Mounts']}
+    for desired in config['services'][service].get('volumes', []):
+        current = mounts.get(desired['target'])
+        if not current or current['Type'] != 'bind' or os.path.realpath(current['Source']) != os.path.realpath(desired['source']):
+            raise SystemExit('Existing '+service+' data mounts do not match the new layout. Stop and migrate the exact NoCTF data explicitly; CI refuses to start an empty replacement.')
+    if container['State']['Running']:
+        running.add(service)
+if not expected.difference({'noctf'}).issubset(running):
+    raise SystemExit('Start the configured postgres, redis, nats and registry dependencies first. CI upgrades only the NoCTF application.')
+print('Existing data layout and dependency containers verified.')
+PY
+readiness_timeout=$(python3 - "$rendered" <<'PY'
+import json, sys
+env = json.load(open(sys.argv[1]))['services']['noctf']['environment']
+seconds = int(env.get('Database__StartupTimeoutSeconds', '180'))
+if not 1 <= seconds <= 1800:
+    raise SystemExit('Database startup timeout is outside the supported range.')
+print(seconds + 180)
+PY
 )
-"${compose[@]}" config --quiet
 
-available_kb()
+available_kb=$(df -Pk "$config_root" | awk 'NR == 2 {print $4}')
+(( available_kb >= ${NOCTF_DEPLOY_MIN_FREE_KB:-6291456} )) || {
+    echo 'Insufficient free space. CI will not prune shared host images, containers or caches.' >&2; exit 1;
+}
+docker pull "$platform_image" </dev/null
+[[ $(docker image inspect "$platform_image" --format '{{index .Config.Labels "org.opencontainers.image.revision"}}') == "$commit_sha" ]]
+[[ $(docker image inspect "$platform_image" --format '{{json .Config.Healthcheck}}') != null ]]
+postgres_id=$("${compose[@]}" ps -q postgres)
+previous_id=$("${compose[@]}" ps -q noctf)
+previous_image=""
+if [[ -n "$previous_id" ]]; then previous_image=$(docker inspect "$previous_id" --format '{{.Config.Image}}'); fi
+backup_dir="$config_root/data/backups/$commit_sha-$(date -u +%Y%m%dT%H%M%SZ)"
+mkdir -p "$backup_dir"
+cp -p "$config_root/.env" "$backup_dir/environment"
+docker exec "$postgres_id" sh -ec 'exec pg_dump -U "$POSTGRES_USER" -d "$POSTGRES_DB" -Fc' </dev/null > "$backup_dir/database.dump"
+[[ -s "$backup_dir/database.dump" ]]
+docker exec -i "$postgres_id" pg_restore --list < "$backup_dir/database.dump" >/dev/null
+sha256sum "$backup_dir/database.dump"
+
+schema_fingerprint()
 {
-    df -Pk "$release_root" | awk 'NR == 2 { print $4 }'
+    docker exec "$postgres_id" sh -ec 'exec pg_dump -U "$POSTGRES_USER" -d "$POSTGRES_DB" --schema-only --no-owner --no-privileges' </dev/null \
+        | sed -E '/^--/d; /^\\(un)?restrict /d; /^[[:space:]]*$/d' | sha256sum | cut -d' ' -f1
+}
+previous_schema=$(schema_fingerprint)
+set_image()
+{
+    python3 - "$config_root/.env" "$1" <<'PY'
+import os, pathlib, stat, sys
+path = pathlib.Path(sys.argv[1])
+lines = path.read_text().splitlines()
+key = 'NOCTF_PLATFORM_IMAGE='
+if sum(line.startswith(key) for line in lines) != 1:
+    raise SystemExit('The root .env must have exactly one NOCTF_PLATFORM_IMAGE entry.')
+temp = path.with_name('.env.deploy.tmp')
+with temp.open('x') as out:
+    out.write('\n'.join(key+sys.argv[2] if line.startswith(key) else line for line in lines)+'\n')
+os.chmod(temp, stat.S_IMODE(path.stat().st_mode))
+os.replace(temp, path)
+PY
 }
 
-image_is_referenced()
-{
-    [[ -n $(docker ps --all --quiet --filter "ancestor=$1") ]]
-}
-
-cleanup_platform_images()
-{
-    local repository image_id
-    local -a image_ids
-
-    for repository in deploy-backend deploy-worker deploy-runner deploy-migration; do
-        mapfile -t image_ids < <(
-            docker image ls \
-                --filter "reference=$repository:*" \
-                --format '{{.ID}}' \
-                | awk '!seen[$0]++'
-        )
-
-        local kept_unused=0
-        for image_id in "${image_ids[@]}"; do
-            if image_is_referenced "$image_id"; then
-                continue
-            fi
-            if (( kept_unused == 0 )); then
-                kept_unused=1
-                continue
-            fi
-            docker image rm --force "$image_id" >/dev/null 2>&1 || true
-        done
-    done
-}
-
-cleanup_stale_resources()
-{
-    docker container prune --force \
-        --filter 'label=noctf.io/managed=true' \
-        --filter 'until=24h' >/dev/null
-    "${compose[@]}" rm --force --stop migration >/dev/null 2>&1 || true
-    docker image prune --force >/dev/null
-    cleanup_platform_images
-}
-
-ensure_deploy_space()
-{
-    if (( $(available_kb) >= minimum_free_kb )); then
-        return
+set_image "$platform_image"
+# The image performs migration before its listeners/consumers start. No migration container is used.
+if ! "${compose[@]}" up -d --no-deps --no-build --pull never --wait --wait-timeout "$readiness_timeout" noctf </dev/null; then
+    "${compose[@]}" logs --no-color --tail 100 noctf >&2 || true
+    if [[ -n "$previous_image" && $(schema_fingerprint) == "$previous_schema" ]]; then
+        echo 'Database schema is unchanged; restoring the previous application image.' >&2
+        cp -p "$backup_dir/environment" "$config_root/.env"
+        NOCTF_PLATFORM_IMAGE="$previous_image" "${compose[@]}" up -d --no-deps --no-build --pull never noctf </dev/null || true
+    else
+        echo "Schema changed or no previous image exists. No automatic database rollback. Backup: $backup_dir" >&2
     fi
-
-    echo "Free space is below the deployment threshold; clearing stale deployment resources."
-    cleanup_stale_resources
-    if (( $(available_kb) >= minimum_free_kb )); then
-        return
-    fi
-
-    echo "Free space remains below the deployment threshold; clearing unused build cache."
-    docker builder prune --all --force >/dev/null
-    cleanup_platform_images
-
-    if (( $(available_kb) < minimum_free_kb )); then
-        echo "Insufficient disk space after scoped cleanup." >&2
-        df -h "$release_root" >&2
-        return 1
-    fi
-}
-
-backup_database()
-{
-    local postgres_id backup_dir backup_file timestamp
-    postgres_id=$("${compose[@]}" ps --quiet postgres 2>/dev/null || true)
-    [[ -n "$postgres_id" ]] || return 0
-
-    backup_dir="$(dirname "$config_root")/backups"
-    mkdir -p "$backup_dir"
-    backup_dir=$(realpath "$backup_dir")
-    timestamp=$(date -u +%Y%m%dT%H%M%SZ)
-    backup_file="$backup_dir/noctf-ci-${commit_sha:0:8}-$timestamp.dump"
-
-    docker exec "$postgres_id" sh -ec \
-        'exec pg_dump -U "$POSTGRES_USER" -d "$POSTGRES_DB" -Fc' \
-        > "$backup_file"
-    [[ -s "$backup_file" ]]
-    docker exec --interactive "$postgres_id" pg_restore --list \
-        < "$backup_file" >/dev/null
-    sha256sum "$backup_file"
-
-    local -a backups
-    mapfile -t backups < <(
-        find "$backup_dir" -maxdepth 1 -type f -name 'noctf-ci-*.dump' \
-            -printf '%T@ %p\n' | sort -rn | cut -d' ' -f2-
-    )
-    local index candidate
-    for (( index = 10; index < ${#backups[@]}; index++ )); do
-        candidate=$(realpath "${backups[$index]}")
-        [[ $(dirname "$candidate") == "$backup_dir" ]]
-        [[ $(basename "$candidate") == noctf-ci-*.dump ]]
-        rm -f -- "$candidate"
-    done
-}
-
-declare -A previous_images=()
-for service in backend worker runner; do
-    container_id=$("${compose[@]}" ps --quiet "$service" 2>/dev/null || true)
-    if [[ -n "$container_id" ]]; then
-        previous_images[$service]=$(docker inspect --format '{{.Image}}' "$container_id")
-    fi
-done
-
-rollback_services()
-{
-    local service image_id rollback_tag
-    local backend_image="$platform_image"
-    local worker_image="$platform_image"
-    local runner_image="$platform_image"
-    echo "Deployment failed; restoring the previous platform images." >&2
-    for service in backend worker runner; do
-        image_id=${previous_images[$service]:-}
-        if [[ -n "$image_id" ]]; then
-            rollback_tag="deploy-$service:rollback-${commit_sha:0:8}"
-            docker image tag "$image_id" "$rollback_tag"
-            case "$service" in
-                backend) backend_image=$rollback_tag ;;
-                worker) worker_image=$rollback_tag ;;
-                runner) runner_image=$rollback_tag ;;
-            esac
-        fi
-    done
-    NOCTF_BACKEND_IMAGE="$backend_image" \
-    NOCTF_WORKER_IMAGE="$worker_image" \
-    NOCTF_RUNNER_IMAGE="$runner_image" \
-        "${compose[@]}" up \
-            --detach --no-deps --force-recreate --no-build --pull never \
-            backend worker runner || true
-}
-
-dump_platform_diagnostics()
-{
-    local service
-    echo "Platform service diagnostics before rollback:" >&2
-    "${compose[@]}" ps >&2 || true
-    for service in backend worker runner; do
-        echo "--- $service (last 200 lines) ---" >&2
-        "${compose[@]}" logs --no-color --timestamps --tail 200 "$service" >&2 || true
-    done
-}
-
-pull_platform_image()
-{
-    local attempt
-    local max_attempts=${NOCTF_PLATFORM_PULL_ATTEMPTS:-5}
-    local retry_delay_seconds=${NOCTF_PLATFORM_PULL_RETRY_DELAY_SECONDS:-10}
-
-    [[ "$max_attempts" =~ ^[1-9][0-9]*$ ]]
-    [[ "$retry_delay_seconds" =~ ^[1-9][0-9]*$ ]]
-
-    for (( attempt = 1; attempt <= max_attempts; attempt++ )); do
-        if docker pull "$platform_image"; then
-            return
-        fi
-        if (( attempt == max_attempts )); then
-            echo "Unable to pull the published platform image after $max_attempts attempts." >&2
-            return 1
-        fi
-        echo "Platform image pull attempt $attempt/$max_attempts failed; retrying in $retry_delay_seconds seconds." >&2
-        sleep "$retry_delay_seconds"
-    done
-}
-
-ensure_observability_images()
-{
-    local attempt
-    local max_attempts=${NOCTF_OBSERVABILITY_PULL_ATTEMPTS:-5}
-    local retry_delay_seconds=${NOCTF_OBSERVABILITY_PULL_RETRY_DELAY_SECONDS:-10}
-    local -a services=(
-        prometheus
-        grafana
-        postgres-exporter
-        redis-exporter
-        nats-exporter
-        node-exporter
-    )
-
-    [[ "$max_attempts" =~ ^[1-9][0-9]*$ ]]
-    [[ "$retry_delay_seconds" =~ ^[1-9][0-9]*$ ]]
-
-    for (( attempt = 1; attempt <= max_attempts; attempt++ )); do
-        if "${compose[@]}" pull --policy missing "${services[@]}"; then
-            return
-        fi
-
-        if (( attempt == max_attempts )); then
-            echo "Unable to ensure observability images after $max_attempts attempts." >&2
-            return 1
-        fi
-
-        echo "Observability image check attempt $attempt/$max_attempts failed; retrying in $retry_delay_seconds seconds." >&2
-        sleep "$retry_delay_seconds"
-    done
-}
-
-ensure_deploy_space
-if ! ensure_observability_images; then
     exit 1
 fi
-if ! pull_platform_image; then
-    exit 1
-fi
-backup_database
-
-if ! "${compose[@]}" run --rm migration; then
-    rollback_services
-    exit 1
-fi
-
-if ! "${compose[@]}" up \
-    --detach \
-    --no-deps \
-    --force-recreate \
-    --no-build \
-    --pull never \
-    --wait \
-    --wait-timeout 180 \
-    backend worker runner; then
-    dump_platform_diagnostics
-    rollback_services
-    exit 1
-fi
-
-if ! curl --fail --silent --show-error \
-    http://127.0.0.1:8080/health/ready >/dev/null; then
-    dump_platform_diagnostics
-    rollback_services
-    exit 1
-fi
-
-if ! "${compose[@]}" up \
-    --detach \
-    --no-deps \
-    --force-recreate \
-    --no-build \
-    --pull never \
-    --wait \
-    --wait-timeout 180 \
-    prometheus grafana postgres-exporter redis-exporter nats-exporter node-exporter; then
-    rollback_services
-    exit 1
-fi
-
-version_suffix=$(sed -n \
-    's:.*<VersionSuffix>\([^<]*\)</VersionSuffix>.*:\1:p' \
-    "$release_dir/backend/Directory.Build.props" | head -n 1)
-version_tag=${version_suffix//./}
-version_tag=${version_tag:-ci}
-for service in backend worker runner migration; do
-    container_id=$("${compose[@]}" ps --quiet "$service" 2>/dev/null || true)
-    image_id=""
-    if [[ -n "$container_id" ]]; then
-        image_id=$(docker inspect --format '{{.Image}}' "$container_id")
-    fi
-    if [[ -n "$image_id" ]]; then
-        docker image tag "$image_id" "deploy-$service:$version_tag-${commit_sha:0:8}"
-    fi
-done
-docker image rm "$platform_image" >/dev/null 2>&1 || true
-
-current_link="$release_root/current"
-previous_link="$release_root/previous"
-if [[ -L "$current_link" ]]; then
-    current_target=$(realpath "$current_link")
-    [[ $(dirname "$current_target") == "$release_root" ]]
-    ln -sfn "$current_target" "$previous_link"
-fi
-ln -sfn "$release_dir" "$current_link"
-
-current_target=$(realpath "$current_link")
-previous_target=$(realpath "$previous_link" 2>/dev/null || true)
-while IFS= read -r candidate; do
-    candidate=$(realpath "$candidate")
-    [[ $(dirname "$candidate") == "$release_root" ]]
-    if [[ ! $(basename "$candidate") =~ ^[0-9a-f]{40}$ ]]; then
-        continue
-    fi
-    if [[ "$candidate" != "$current_target" && "$candidate" != "$previous_target" ]]; then
-        rm -rf -- "$candidate"
-    fi
-done < <(find "$release_root" -mindepth 1 -maxdepth 1 -type d -name '[0-9a-f]*' -print)
-
-cleanup_stale_resources
-"${compose[@]}" ps
-df -h "$release_root"
-echo "Deployed commit $commit_sha successfully."
+container_id=$("${compose[@]}" ps -q noctf)
+[[ $(docker inspect "$container_id" --format '{{.State.Health.Status}}') == healthy ]]
+ln -sfn "$release_dir" "$release_root/current"
+echo "Deployed $commit_sha. Application healthy; proxy and dependency services were not modified."
+echo "Backup: $backup_dir"

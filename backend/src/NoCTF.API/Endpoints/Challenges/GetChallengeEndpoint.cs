@@ -8,6 +8,7 @@ using NoCTF.Application.Scoring.Leaderboard;
 using NoCTF.Domain.Competitions;
 using NoCTF.API.Endpoints.Competitions;
 using NoCTF.Application.GameplayFacts.Intake;
+using NoCTF.Application.Challenges.Hints;
 
 namespace NoCTF.API.Endpoints.Challenges;
 
@@ -32,7 +33,16 @@ public sealed record ChallengeResponse(
     int? MaximumFlagAttempts = null,
     int? AcceptedFlagAttempts = null,
     int? RemainingFlagAttempts = null,
-    bool UsesDynamicFlag = false);
+    bool UsesDynamicFlag = false,
+    IReadOnlyList<ParticipantChallengeHintResponse>? Hints = null);
+
+public sealed record ParticipantChallengeHintResponse(
+    Guid Id,
+    long Cost,
+    DateTimeOffset PublishedAt,
+    string? Content,
+    bool IsUnlocked,
+    bool CanUnlock);
 
 public sealed record ChallengeListResponse(
     IReadOnlyList<ChallengeResponse> Items,
@@ -46,7 +56,8 @@ internal static class ChallengeMapper
         KohChallengeAccessView? koh = null,
         CompetitionLeaderboardVisibility visibility = CompetitionLeaderboardVisibility.Normal,
         LeaderboardDataScope dataScope = LeaderboardDataScope.Live,
-        FlagAttemptBudget? attemptBudget = null) =>
+        FlagAttemptBudget? attemptBudget = null,
+        IReadOnlyList<ParticipantChallengeHintView>? hints = null) =>
         new(
             view.Id,
             view.CompetitionId,
@@ -68,7 +79,9 @@ internal static class ChallengeMapper
             attemptBudget?.Maximum,
             attemptBudget?.Accepted,
             attemptBudget?.Remaining,
-            view.UsesDynamicFlag);
+            view.UsesDynamicFlag,
+            hints?.Select(hint => new ParticipantChallengeHintResponse(
+                hint.Id, hint.Cost, hint.PublishedAt, hint.Content, hint.IsUnlocked, hint.CanUnlock)).ToArray());
 
     public static ChallengeListResponse ToListResponse(
         IReadOnlyList<ChallengeView> views,
@@ -95,6 +108,7 @@ public sealed class GetChallengeEndpoint(
     ICompetitionChallengeAudienceAccess audienceAccess,
     ICompetitionVisibilityAccess visibilityAccess,
     GetFlagAttemptBudget getAttemptBudget,
+    ReadParticipantChallengeHints getHints,
     IUserContext user,
     TimeProvider timeProvider) : Endpoint<GetChallengeRequest, Results<Ok<ChallengeResponse>, NotFound>>
 {
@@ -109,6 +123,8 @@ public sealed class GetChallengeEndpoint(
         GetChallengeRequest request,
         CancellationToken ct)
     {
+        // The hint bodies are personalized by the viewer's team and must not enter shared caches.
+        HttpContext.Response.Headers.CacheControl = "private, no-store";
         var competitionId = Route<Guid>("competitionId");
         if (!await audienceAccess.CanReadAsync(user.UserId, competitionId, ct))
             return TypedResults.NotFound();
@@ -147,6 +163,7 @@ public sealed class GetChallengeEndpoint(
             access,
             visibility.Visibility,
             visibility.DataScope,
-            attemptBudget));
+            attemptBudget,
+            await getHints.ExecuteAsync(item.CompetitionId, item.Id, user.UserId, timeProvider.GetUtcNow(), ct)));
     }
 }

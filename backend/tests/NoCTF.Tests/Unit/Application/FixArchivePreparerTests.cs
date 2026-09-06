@@ -31,6 +31,152 @@ public sealed class FixArchivePreparerTests
     }
 
     [Test]
+    [Arguments(TarEntryFormat.Ustar)]
+    [Arguments(TarEntryFormat.Pax)]
+    [Arguments(TarEntryFormat.Gnu)]
+    [Arguments(TarEntryFormat.V7)]
+    public async Task PrepareTarAsync_SupportedTarFormats_PreserveRegularFiles(TarEntryFormat format)
+    {
+        var root = NewRoot();
+        try
+        {
+            await using var archive = TarGzipEntries(
+                (CreateEntry(format, TarEntryType.RegularFile, "fix.sh"), "echo ok"),
+                (CreateEntry(format, TarEntryType.RegularFile, "attachment"), "replacement"));
+            var output = Path.Combine(root, "payload.tar");
+            await CreatePreparer().PrepareTarAsync(
+                archive, "fix.tar.gz", "fix.sh", Path.Combine(root, "work"), output, CancellationToken.None);
+
+            await Assert.That(await File.ReadAllTextAsync(Path.Combine(root, "work/noctf/fix/attachment")))
+                .IsEqualTo("replacement");
+            await using var stream = File.OpenRead(output);
+            using var reader = new TarReader(stream);
+            var names = new List<string>();
+            while (await reader.GetNextEntryAsync() is { } entry)
+            {
+                names.Add(entry.Name.Replace('\\', '/'));
+                await Assert.That(entry.EntryType is TarEntryType.RegularFile or TarEntryType.Directory).IsTrue();
+            }
+            await Assert.That(names).Contains("noctf/fix/fix.sh");
+            await Assert.That(names).Contains("noctf/fix/attachment");
+        }
+        finally { Directory.Delete(root, recursive: true); }
+    }
+
+    [Test]
+    public async Task PrepareTarAsync_GnuDotDirectoryAndLongPath_AreNormalized()
+    {
+        var root = NewRoot();
+        try
+        {
+            var nested = $"{new string('a', 60)}/{new string('b', 60)}.txt";
+            await using var archive = TarGzipEntries(
+                (new GnuTarEntry(TarEntryType.Directory, "./"), null),
+                (new GnuTarEntry(TarEntryType.RegularFile, "./fix.sh"), "echo ok"),
+                (new GnuTarEntry(TarEntryType.RegularFile, $"./{nested}"), "long-path-data"));
+            await CreatePreparer().PrepareTarAsync(
+                archive, "fix.tar.gz", "fix.sh", Path.Combine(root, "work"),
+                Path.Combine(root, "payload.tar"), CancellationToken.None);
+
+            await Assert.That(await File.ReadAllTextAsync(Path.Combine(root, "work/noctf/fix", nested)))
+                .IsEqualTo("long-path-data");
+        }
+        finally { Directory.Delete(root, recursive: true); }
+    }
+
+    [Test]
+    [Arguments("../escape.sh")]
+    [Arguments("/fix.sh")]
+    [Arguments("directory/../fix.sh")]
+    [Arguments(".\\fix.sh")]
+    public async Task PrepareTarAsync_GnuUnsafePath_RemainsRejected(string path)
+    {
+        var root = NewRoot();
+        try
+        {
+            await using var archive = TarGzipEntries((new GnuTarEntry(TarEntryType.RegularFile, path), "bad"));
+            var action = async () => await CreatePreparer().PrepareTarAsync(
+                archive, "fix.tar.gz", "fix.sh", Path.Combine(root, "work"),
+                Path.Combine(root, "payload.tar"), CancellationToken.None);
+            await Assert.That(action).Throws<InvalidDataException>();
+            await Assert.That(File.Exists(Path.Combine(root, "escape.sh"))).IsFalse();
+        }
+        finally { Directory.Delete(root, recursive: true); }
+    }
+
+    [Test]
+    [Arguments("./fix.sh")]
+    [Arguments("./FIX.SH")]
+    [Arguments(".//fix.sh")]
+    public async Task PrepareTarAsync_GnuAliasedDuplicatePath_IsRejected(string duplicate)
+    {
+        var root = NewRoot();
+        try
+        {
+            await using var archive = TarGzipEntries(
+                (new GnuTarEntry(TarEntryType.RegularFile, "fix.sh"), "first"),
+                (new GnuTarEntry(TarEntryType.RegularFile, duplicate), "second"));
+            var action = async () => await CreatePreparer().PrepareTarAsync(
+                archive, "fix.tar.gz", "fix.sh", Path.Combine(root, "work"),
+                Path.Combine(root, "payload.tar"), CancellationToken.None);
+            await Assert.That(action).Throws<InvalidDataException>();
+            await Assert.That(await File.ReadAllTextAsync(Path.Combine(root, "work/noctf/fix/fix.sh")))
+                .IsEqualTo("first");
+        }
+        finally { Directory.Delete(root, recursive: true); }
+    }
+
+    [Test]
+    [Arguments(TarEntryType.SymbolicLink)]
+    [Arguments(TarEntryType.HardLink)]
+    [Arguments(TarEntryType.Fifo)]
+    public async Task PrepareTarAsync_GnuNonRegularEntry_RemainsRejected(TarEntryType type)
+    {
+        var root = NewRoot();
+        try
+        {
+            var entry = new GnuTarEntry(type, "unsafe");
+            if (type is TarEntryType.SymbolicLink or TarEntryType.HardLink) entry.LinkName = "fix.sh";
+            await using var archive = TarGzipEntries(
+                (new GnuTarEntry(TarEntryType.RegularFile, "fix.sh"), "echo ok"), (entry, null));
+            var action = async () => await CreatePreparer().PrepareTarAsync(
+                archive, "fix.tar.gz", "fix.sh", Path.Combine(root, "work"),
+                Path.Combine(root, "payload.tar"), CancellationToken.None);
+            await Assert.That(action).Throws<InvalidDataException>();
+        }
+        finally { Directory.Delete(root, recursive: true); }
+    }
+
+    [Test]
+    [Arguments(1, 10000L, 10000L, 100d)]
+    [Arguments(10, 5L, 10000L, 100d)]
+    [Arguments(10, 10000L, 2L, 100d)]
+    [Arguments(10, 10000L, 10000L, 1d)]
+    public async Task PrepareTarAsync_GnuExtractionLimits_RemainEnforced(
+        int maxEntries, long maxExpanded, long maxSingleFile, double maxRatio)
+    {
+        var root = NewRoot();
+        try
+        {
+            await using var archive = TarGzipEntries(
+                (new GnuTarEntry(TarEntryType.RegularFile, "fix.sh"), "echo ok"),
+                (new GnuTarEntry(TarEntryType.RegularFile, "attachment"), new string('a', 1000)));
+            var preparer = new FixArchivePreparer(Options.Create(new FixVerificationOptions
+            {
+                MaxArchiveEntries = maxEntries,
+                MaxExpandedBytes = maxExpanded,
+                MaxSingleFileBytes = maxSingleFile,
+                MaxCompressionRatio = maxRatio
+            }));
+            var action = async () => await preparer.PrepareTarAsync(
+                archive, "fix.tar.gz", "fix.sh", Path.Combine(root, "work"),
+                Path.Combine(root, "payload.tar"), CancellationToken.None);
+            await Assert.That(action).Throws<InvalidDataException>();
+        }
+        finally { Directory.Delete(root, recursive: true); }
+    }
+
+    [Test]
     public async Task PrepareTarAsync_SafeTarGzip_WritesUnderFixedContainerDirectory()
     {
         var root = NewRoot();
@@ -204,7 +350,7 @@ public sealed class FixArchivePreparerTests
     private static MemoryStream TarGzipEntry(PaxTarEntry entry, string? content) =>
         TarGzipEntries((entry, content));
 
-    private static MemoryStream TarGzipEntries(params (PaxTarEntry Entry, string? Content)[] entries)
+    private static MemoryStream TarGzipEntries(params (TarEntry Entry, string? Content)[] entries)
     {
         var stream = new MemoryStream();
         using (var gzip = new GZipStream(stream, CompressionMode.Compress, leaveOpen: true))
@@ -218,6 +364,15 @@ public sealed class FixArchivePreparerTests
         stream.Position = 0;
         return stream;
     }
+
+    private static TarEntry CreateEntry(TarEntryFormat format, TarEntryType type, string name) => format switch
+    {
+        TarEntryFormat.Ustar => new UstarTarEntry(type, name),
+        TarEntryFormat.Pax => new PaxTarEntry(type, name),
+        TarEntryFormat.Gnu => new GnuTarEntry(type, name),
+        TarEntryFormat.V7 => new V7TarEntry(type == TarEntryType.RegularFile ? TarEntryType.V7RegularFile : type, name),
+        _ => throw new ArgumentOutOfRangeException(nameof(format))
+    };
 
     private static MemoryStream TarWithoutGzip(params (string Name, string Content)[] files)
     {

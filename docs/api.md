@@ -163,7 +163,7 @@ AWD 可二选一使用 flag 或 flags；CTF/AWDP Break 必须只用 flag。AWD f
 `FlagInvalid`/400 且零写入。每项创建独立 GameplayFact；数据库不保存 batch。单 flag 的 202 body 返回
 GameplayFactId/state/statusUrl；flags 保持输入顺序，不返回 BatchId。
 
-AWDP Break 首次正确后，普通 Flag 提交不再创建新 GameplayFact、计分、播报或改变 Runtime；只读 judgement 路由仅验证当前 Flag 正误，供赛后复现和 WP 使用。第一条 AWDP 防御路由申请一次性干净 Target，返回 RuntimeInstanceId 和状态地址。Target 进入 AwaitingPatch 后，第二条 multipart 单文件路由在事务中唯一绑定 PatchUpload/FixAttempt，并直接返回 PatchUploadId、GameplayFactId 与事实状态；没有独立的 Fix trigger。归档校验失败不消费 Target，成功绑定后同一 Target 不再接受第二次上传。
+AWDP Break 首次正确后，普通 Flag 提交不再创建新 GameplayFact、计分、播报或改变 Runtime；只读 judgement 路由仅验证当前 Flag 正误，供赛后复现和 WP 使用。第一条 AWDP 防御路由申请一次性干净 Target，返回 RuntimeInstanceId 和状态地址。Target 为 Queued、Provisioning 或 Running 时，第二条 multipart 单文件路由即可在事务中唯一绑定 PatchUpload/Pending FixAttempt，并直接返回 PatchUploadId、GameplayFactId 与事实状态；没有独立的 Fix trigger。Target Running 后验证自动继续。归档校验失败不消费 Target，成功绑定后同一 Target 不再接受第二次上传。
 
 ## Runtime
 
@@ -320,6 +320,9 @@ Runtime。测试实例沿用正式 Runner 的镜像拉取、资源限制、安�
 测试 Flag 只由该资源的测试 Runtime 接口返回，不进入普通模板 Flag 列表。停止实例会清理容器与网络，
 不会主动删除 Runner 节点的镜像缓存。
 
+更新题目模板技术定义时，如果该模板仍有 Queued、Provisioning、Running 或 Stopping Runtime，接口返回
+`409 ActiveRuntimeDefinitionConflict`。标题、题面、方向和可见性等元数据不受此限制。
+
 ## Admin Runtime
 
 ```text
@@ -456,8 +459,8 @@ RuntimeInstance、Team、User、CompetitionChallenge、GameplayFact 以及有界
 范围最多 14 天且最多 50,000 条。
 
 日志入口与读取投影都会保留结构化作用域；密码、Token、Authorization/Cookie、SMTP 凭据和
-通用 Secret 必须在写入 Redis 前脱敏。平台管理员属于可信角色，Flag 不在日志层强制脱敏，
-但业务代码仍不得为调试目的主动打印 Flag。管理审计使用签名 keyset 分页，从用户账号生命周期
+通用 Secret 必须在写入 Redis 前脱敏。无论调用者角色，Flag 原文都不得进入普通日志层，
+业务代码也不得为调试目的主动打印 Flag。管理审计使用签名 keyset 分页，从用户账号生命周期
 审计和工作人员可见的 PostgreSQL `competition_events` 投影，不复制事实、不设置 TTL 或新增
 审计业务表。`competition_events` 默认永久、append-only，普通物理删除在存在历史事件时必须拒绝；
 比赛结束、队伍解散和用户匿名化注销不会清理事件关系。唯一显式例外是平台 Administrator 的强制

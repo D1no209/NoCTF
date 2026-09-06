@@ -1,5 +1,14 @@
 import * as THREE from 'three'
 import { CSS2DObject, CSS2DRenderer } from 'three/addons/renderers/CSS2DRenderer.js'
+import {
+  fitLiveCityFrame,
+  LIVE_CITY_CELL_SIZE,
+  LIVE_CITY_FOV,
+  LIVE_CITY_LABEL_OFFSET,
+  liveCityBuildingHeight,
+  liveCityPixelRatio,
+  liveCitySlots,
+} from './live-city-layout'
 
 /**
  * 3D 实时大屏城市场景:每道赛题是一栋带程序化生成立面纹理的建筑,
@@ -90,7 +99,6 @@ const COLOR_PURPLE = new THREE.Color('#a06bff')
 const COLOR_GOLD = new THREE.Color('#ffd166')
 const BG_COLOR = new THREE.Color('#070312')
 
-const CELL_SIZE = 22
 const TWO_PI = Math.PI * 2
 
 function hashId(id: string): number {
@@ -209,6 +217,7 @@ export class LiveCityScene {
   private readonly camera: THREE.PerspectiveCamera
   private readonly clock = new THREE.Clock()
   private readonly resizeObserver: ResizeObserver
+  private readonly labelResizeObserver: ResizeObserver
   private readonly buildings = new Map<string, BuildingRecord>()
   private readonly effects: TimedEffect[] = []
   private readonly facadeCache = new Map<string, { map: THREE.CanvasTexture; emissive: THREE.CanvasTexture }>()
@@ -242,6 +251,9 @@ export class LiveCityScene {
   private cruise: CameraRig = { ...this.rig }
   private tween: { from: CameraRig; to: CameraRig; elapsed: number; duration: number } | null = null
   private focusing = false
+  private focusedId: string | null = null
+  private worldRadius = 16
+  private worldHeight = 34
   private frameId = 0
   private disposed = false
   private citySpan = 48
@@ -249,7 +261,6 @@ export class LiveCityScene {
   constructor(container: HTMLElement) {
     this.container = container
     this.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false })
-    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.75))
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping
     this.renderer.toneMappingExposure = 1.05
     this.renderer.domElement.classList.add('live-city-canvas')
@@ -259,7 +270,7 @@ export class LiveCityScene {
     this.labelRenderer.domElement.classList.add('live-city-labels')
     container.appendChild(this.labelRenderer.domElement)
 
-    this.camera = new THREE.PerspectiveCamera(52, 1, 0.1, 600)
+    this.camera = new THREE.PerspectiveCamera(LIVE_CITY_FOV, 1, 0.1, 600)
     this.scene.background = BG_COLOR
     this.scene.fog = new THREE.FogExp2(BG_COLOR, 0.0032)
 
@@ -315,7 +326,9 @@ export class LiveCityScene {
     this.scene.add(this.radar)
 
     this.resizeObserver = new ResizeObserver(() => this.resize())
+    this.labelResizeObserver = new ResizeObserver(() => this.refitCamera(false))
     this.resizeObserver.observe(container)
+    window.addEventListener('resize', this.resize)
     this.resize()
     this.tick()
   }
@@ -335,17 +348,8 @@ export class LiveCityScene {
     const building = this.buildings.get(id)
     if (!building || this.disposed) return
     this.focusing = true
-    const position = building.group.position
-    const azimuth = Math.atan2(position.x, position.z)
-    const distance = Math.hypot(position.x, position.z)
-    this.startTween({
-      azimuth,
-      radius: distance + 26 + building.height * 0.3,
-      height: building.height * 0.8 + 9,
-      lookX: position.x,
-      lookY: building.height * 0.58,
-      lookZ: position.z,
-    }, 1.15)
+    this.focusedId = id
+    this.startTween(this.frameBuilding(building), 1.15)
     const color = building.solved ? COLOR_SOLVED : COLOR_GREEN
     this.spawnBeam(building, color)
     this.spawnShockRings(building, color)
@@ -406,6 +410,8 @@ export class LiveCityScene {
   endFocus(): void {
     if (this.disposed) return
     this.focusing = false
+    this.focusedId = null
+    this.cruise.azimuth = this.rig.azimuth
     this.startTween({ ...this.cruise }, 1.4)
   }
 
@@ -413,6 +419,8 @@ export class LiveCityScene {
     this.disposed = true
     cancelAnimationFrame(this.frameId)
     this.resizeObserver.disconnect()
+    this.labelResizeObserver.disconnect()
+    window.removeEventListener('resize', this.resize)
     for (const effect of this.effects) effect.dispose()
     this.effects.length = 0
     this.clearCity()
@@ -480,43 +488,17 @@ export class LiveCityScene {
 
     const sorted = [...states].sort((a, b) => b.score - a.score)
     const maxScore = Math.max(1, ...sorted.map(state => state.score))
-    const cols = Math.max(1, Math.ceil(Math.sqrt(sorted.length)))
-    const rows = Math.max(1, Math.ceil(sorted.length / cols))
-    this.citySpan = Math.max(cols, rows) * CELL_SIZE
-    this.cruise = {
-      azimuth: this.rig.azimuth,
-      radius: this.citySpan * 1.1 + 36,
-      height: this.citySpan * 1.1 + 42,
-      lookX: 0,
-      lookY: Math.min(7, this.citySpan * 0.06 + 2.5),
-      lookZ: 0,
-    }
-    if (!this.focusing && !this.tween) {
-      this.rig.radius = this.cruise.radius
-      this.rig.height = this.cruise.height
-      this.rig.lookX = 0
-      this.rig.lookY = this.cruise.lookY
-      this.rig.lookZ = 0
-    }
-
     // 分数最高的建筑放在靠近中心的位置。
-    const positions: { x: number; z: number }[] = []
-    for (let row = 0; row < rows; row++) {
-      for (let col = 0; col < cols; col++) {
-        positions.push({
-          x: (col - (cols - 1) / 2) * CELL_SIZE,
-          z: (row - (rows - 1) / 2) * CELL_SIZE,
-        })
-      }
-    }
-    positions.sort((a, b) => (a.x * a.x + a.z * a.z) - (b.x * b.x + b.z * b.z))
-
+    const positions = liveCitySlots(sorted.length)
+    this.citySpan = Math.max(1, Math.ceil(Math.sqrt(sorted.length))) * LIVE_CITY_CELL_SIZE
     this.buildBackdrop(this.citySpan)
+    this.worldRadius = 16
+    this.worldHeight = 34
 
     sorted.forEach((state, index) => {
       const slot = positions[index]!
       const rand = mulberry32(hashId(state.id))
-      const record = this.createBuilding(state, rand, maxScore, this.clock.elapsedTime + index * 0.06)
+      const record = this.createBuilding(state, rand, maxScore, sorted.length, this.clock.elapsedTime + Math.min(index * 0.06, 1.2))
       record.group.position.set(
         slot.x + (rand() - 0.5) * 2.4,
         0,
@@ -526,18 +508,29 @@ export class LiveCityScene {
       record.group.scale.y = 0.001
       this.cityGroup.add(record.group)
       this.buildings.set(state.id, record)
+      this.labelResizeObserver.observe(record.label.element)
+      // Half-diagonal of the largest podium, independent of its random rotation.
+      this.worldRadius = Math.max(this.worldRadius, Math.hypot(record.group.position.x, record.group.position.z) + 9.2)
+      this.worldHeight = Math.max(this.worldHeight, record.height + LIVE_CITY_LABEL_OFFSET)
     })
+    if (this.focusedId && !this.buildings.has(this.focusedId)) {
+      this.focusedId = null
+      this.focusing = false
+    }
+    this.setLabelFocus(this.focusedId)
+    this.refitCamera()
   }
 
   private createBuilding(
     state: LiveCityChallengeState,
     rand: () => number,
     maxScore: number,
+    count: number,
     birthAt: number,
   ): BuildingRecord {
     const group = new THREE.Group()
     const variant = Math.floor(rand() * 3)
-    const height = 8 + (state.score / maxScore) * 20
+    const height = liveCityBuildingHeight(state.score, maxScore, count)
     const baseWidth = 6.8 + rand() * 3.2
     const baseDepth = 6.8 + rand() * 3.2
 
@@ -614,7 +607,7 @@ export class LiveCityScene {
     labelEls.root.style.opacity = '0'
     labelEls.root.style.transition = 'opacity .45s ease'
     const label = new CSS2DObject(labelEls.root)
-    label.position.set(0, topY + 4.6, 0)
+    label.position.set(0, topY + LIVE_CITY_LABEL_OFFSET, 0)
     group.add(label)
 
     return {
@@ -696,6 +689,7 @@ export class LiveCityScene {
 
   private clearCity(): void {
     for (const building of this.buildings.values()) {
+      this.labelResizeObserver.unobserve(building.label.element)
       building.label.removeFromParent()
       building.beaconMaterial.dispose()
       building.glowMaterial.dispose()
@@ -1014,13 +1008,75 @@ export class LiveCityScene {
     })
   }
 
-  private resize(): void {
-    const width = this.container.clientWidth || 1
-    const height = this.container.clientHeight || 1
-    this.renderer.setSize(width, height)
+  private resize = (): void => {
+    if (this.disposed) return
+    const width = this.container.clientWidth
+    const height = this.container.clientHeight
+    if (width <= 0 || height <= 0) return
+    this.renderer.setPixelRatio(liveCityPixelRatio(width, height, window.devicePixelRatio))
+    this.renderer.setSize(width, height, false)
     this.labelRenderer.setSize(width, height)
     this.camera.aspect = width / height
+    this.refitCamera()
+  }
+
+  private labelSize(): { width: number; height: number } {
+    let width = 0
+    let height = 0
+    for (const building of this.buildings.values()) {
+      width = Math.max(width, building.label.element.offsetWidth)
+      height = Math.max(height, building.label.element.offsetHeight)
+    }
+    return { width: width || 136, height: height || 60 }
+  }
+
+  private frameBuilding(building: BuildingRecord): CameraRig {
+    const label = this.labelSize()
+    const frame = fitLiveCityFrame(9.2, building.height + LIVE_CITY_LABEL_OFFSET,
+      this.container.clientWidth, this.container.clientHeight, label.width, label.height)
+    return {
+      azimuth: Math.atan2(building.group.position.x, building.group.position.z),
+      radius: frame.radius,
+      height: frame.height,
+      lookX: building.group.position.x,
+      lookY: frame.lookY,
+      lookZ: building.group.position.z,
+    }
+  }
+
+  private refitCamera(immediate = true): void {
+    if (this.disposed || this.container.clientWidth <= 0 || this.container.clientHeight <= 0) return
+    const labelSpace = this.container.clientWidth / Math.max(1, Math.sqrt(this.buildings.size))
+    this.container.dataset.compactLabels = String(labelSpace < 180)
+    this.container.style.setProperty('--live-label-width', `${Math.max(80, Math.min(144, labelSpace))}px`)
+    const label = this.labelSize()
+    const frame = fitLiveCityFrame(this.worldRadius, this.worldHeight,
+      this.container.clientWidth, this.container.clientHeight, label.width, label.height)
+    this.cruise = {
+      radius: frame.radius,
+      height: frame.height,
+      lookY: frame.lookY,
+      azimuth: this.rig.azimuth,
+      lookX: 0,
+      lookZ: 0,
+    }
+    const focused = this.focusedId ? this.buildings.get(this.focusedId) : undefined
+    const target = focused ? this.frameBuilding(focused) : { ...this.cruise }
+    if (immediate) {
+      // Viewport resize must not retain an old, clipped framing.
+      this.tween = null
+      this.rig = target
+    }
+    else {
+      // Expanded labels must not cut short the focus/return flight with a camera jump.
+      const remaining = this.tween ? this.tween.duration - this.tween.elapsed : 0.3
+      this.startTween(target, Math.max(0.3, remaining))
+    }
+    this.camera.far = frame.far
     this.camera.updateProjectionMatrix()
+    const distance = Math.hypot(frame.radius, frame.height - frame.lookY)
+    const fog = this.scene.fog as THREE.FogExp2
+    fog.density = Math.min(0.0032, 0.5 / distance)
   }
 
   private tick = (): void => {
@@ -1043,8 +1099,8 @@ export class LiveCityScene {
     }
     else if (!this.focusing) {
       this.rig.azimuth += dt * 0.055
-      this.rig.radius = this.cruise.radius + Math.sin(time * 0.11) * 4
-      this.rig.height = this.cruise.height + Math.sin(time * 0.07) * 1.5
+      this.rig.radius = this.cruise.radius
+      this.rig.height = this.cruise.height
     }
 
     this.camera.position.set(

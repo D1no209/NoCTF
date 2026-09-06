@@ -855,6 +855,16 @@ export type NoCtfapiEndpointsChallengesChallengeResponse = {
     acceptedFlagAttempts?: number | null;
     remainingFlagAttempts?: number | null;
     usesDynamicFlag?: boolean;
+    hints?: Array<NoCtfapiEndpointsChallengesParticipantChallengeHintResponse> | null;
+};
+
+export type NoCtfapiEndpointsChallengesParticipantChallengeHintResponse = {
+    id?: string;
+    cost?: number;
+    publishedAt?: string;
+    content?: string | null;
+    isUnlocked?: boolean;
+    canUnlock?: boolean;
 };
 
 export type NoCtfapiEndpointsChallengesGetChallengeRequest = {
@@ -2040,7 +2050,7 @@ export type NoCtfapiEndpointsAdministrationChallengeBankChallengeTemplateConflic
     userIds: Array<string>;
 };
 
-export type NoCtfapiEndpointsAdministrationChallengeBankChallengeTemplateConflictCode = 'ResourceIdConflict' | 'ActiveCompetitionModeConflict' | 'OwnerIncludedInManagerSet' | 'UserNotFound' | 'RoleNotEligible';
+export type NoCtfapiEndpointsAdministrationChallengeBankChallengeTemplateConflictCode = 'ResourceIdConflict' | 'ActiveCompetitionModeConflict' | 'ActiveRuntimeDefinitionConflict' | 'OwnerIncludedInManagerSet' | 'UserNotFound' | 'RoleNotEligible';
 
 export type NoCtfapiEndpointsAdministrationChallengeBankCreateChallengeTemplateRequest = {
     id?: string | null;

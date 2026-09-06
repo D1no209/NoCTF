@@ -374,6 +374,28 @@ describe('AWDP control screen data adapter', () => {
 })
 
 describe('AWDP control screen implementation contract', () => {
+  test('renders every published challenge in a multi-row scrollable team panel', async () => {
+    for (const count of [1, 6, 20]) {
+      const items = Array.from({ length: count }, (_, index) => ({
+        id: crypto.randomUUID(), title: `Challenge ${index + 1}`, direction: 'PWN', published: true,
+      }))
+      const states = awdpTeamChallengeStates({ ...catalog, items }, schema, snapshot.teams![0]!, [])
+      expect(states.map(state => state.competitionChallengeId)).toEqual(items.map(item => item.id))
+    }
+    const page = await Bun.file(new URL('../app/pages/competitions/[id]/awdp-live.vue', import.meta.url)).text()
+    expect(page).toContain('v-for="challenge in selectedChallengeStates"')
+    expect(page).not.toContain('selectedChallengeStates.slice(')
+    expect(page).toContain('grid-auto-rows: minmax(150px, max-content)')
+    expect(page).toContain('repeat(auto-fit, minmax(min(100%, 160px), 1fr))')
+    expect(page).toContain('overflow-y: auto')
+    expect(page).toContain(':key="selectedTeam.teamId"')
+    expect(page).toContain('tabindex="0"')
+    expect(page).toContain('@mouseenter="teamPanelHovered = true"')
+    expect(page).toContain('@focusin="teamPanelFocused = true"')
+    expect(page).toContain('if (!teamCarouselPaused.value) selectNextTeam()')
+    expect(page).toContain(':title="challenge.title"')
+  })
+
   test('uses generated SDK data, FIFO playback, SignalR invalidation, and four code-native animations', async () => {
     const page = await Bun.file(
       new URL('../app/pages/competitions/[id]/awdp-live.vue', import.meta.url),
@@ -397,7 +419,7 @@ describe('AWDP control screen implementation contract', () => {
     expect(page).toContain('const resolvedEvents = computed(() => awdpPlaybackEvents(events.value))')
     expect(page).not.toContain("t('操作已提交')")
     expect(page).toContain('PLAYBACK_DURATION_MS = 5_400')
-    expect(page).toContain('carouselTimer = setInterval(selectNextTeam, 8_000)')
+    expect(page).toContain('carouselTimer = setInterval(advanceTeamCarousel, 8_000)')
     expect(page).toContain("directionIcon(challenge.direction)")
     expect(page).toContain('operationMetrics.attack.success')
     expect(page).toContain('operationMetrics.defense.success')
@@ -405,8 +427,8 @@ describe('AWDP control screen implementation contract', () => {
     expect(page).toContain('class="team-tab-list"')
     expect(page).toContain('grid-template-columns:30px minmax(0,1fr) 30px')
     expect(page).toContain(':disabled="rankedEntries.length <= 1"')
-    expect(page).toContain('grid-template-rows:36px 45px 150px')
-    expect(page).toContain('.challenge-strip{height:150px}')
+    expect(page).toContain('grid-template-rows:36px 45px minmax(0,1fr)')
+    expect(page).not.toContain('.challenge-strip{height:150px}')
     expect(page).not.toContain('totalAttackScore')
     expect(page).not.toContain('totalDefenseScore')
     expect(page).toContain('width:1920px')

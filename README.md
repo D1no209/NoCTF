@@ -54,38 +54,26 @@ not add an HAProxy or ingress-proxy layer for Docker runtimes.
 - Runtime providers: Docker Container/Compose, Kubernetes Container/Compose, Libvirt/OVA.
 - Tests: TUnit, NSubstitute, and Testcontainers against real dependencies.
 
-## Local Docker Compose
+## Production Docker Compose
 
-The checked-in Compose stacks are for local development and validation, not production
-deployment templates. Choose either the distributed topology:
-
-```bash
-cp .env.example .env
-# Set POSTGRES_PASSWORD, JWT_SECRET, SEED_ADMIN_PASSWORD,
-# EMAIL_VERIFICATION_ENCRYPTION_KEY, and other local values.
-docker compose --env-file .env -f deploy/docker-compose.yml up --build --wait
-```
-
-or the single-process topology:
+The single Compose definition contains the combined NoCTF Host, PostgreSQL, Redis, NATS,
+and an authenticated Registry. It uses prebuilt images and directory bind mounts only.
+No ports are published/exposed; operations connects its reverse proxy through the existing
+`1panel-network` aliases `noctf-web:8080` and `noctf-registry:5000`.
 
 ```bash
-docker compose --env-file .env -f deploy/docker-compose.single.yml up --build --wait
+bash deploy/init-layout.sh /opt/noctf
+# Fill /opt/noctf/.env with the CI image digest, existing/new secrets and real host names.
+# Prepare Registry bcrypt credentials and Docker login as described in deploy/README.md.
+cd /opt/noctf
+docker compose config --quiet
+docker compose up -d
 ```
 
-Verify the API and open the bundled frontend:
-
-```bash
-curl http://localhost/health
-```
-
-Open `http://localhost/` in a browser. Stop the stack without deleting its data volumes:
-
-```bash
-docker compose --env-file .env -f deploy/docker-compose.yml down
-```
-
-For Docker Runner deployments, set `DOCKER_SOCKET_GID` to the numeric group ID of the
-host Docker socket when it is not `0`.
+Migration runs inside NoCTF at startup; image health checks are in the Dockerfile.
+Telemetry/exporters and proxy configuration are not deployed. Read
+[deployment instructions](deploy/README.md) before migrating an existing installation:
+never replace an existing named volume with an empty directory.
 
 ## Repository layout
 

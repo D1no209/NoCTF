@@ -17,11 +17,15 @@ ServiceUnhealthyPenalty: bigint >= 0
 
 ```text
 Runtime: Container | Compose
+  Allocation: PerTeam
+  FlagSource: AwdRotation
+  UrlBindings: 至少一个 Participants 入口
 Checker:
   Job: RunnerJobConfiguration
   TargetServiceName: 仅 Compose 必填
 FlagInjection:
   Command: 包含 ${FLAG} 的非空模板
+  TimeoutSeconds: 1..300
   ServiceName: 仅 Compose 必填
 ```
 

@@ -10,7 +10,7 @@
 | 题目方向 | Pwn / Web / Misc / 其他：待填写 |
 | 题目 Owner | 待填写 |
 | 题目 Manager | 待填写 |
-| 模板可见性 | Private / Public |
+| 模板可见性 | Private / Shared |
 | 目标内部端口 | 待填写，只能有一个 |
 | 预计目标内存 | 待填写 MiB |
 | 预计目标 CPU | 待填写 |
@@ -52,7 +52,7 @@
 - [ ] 分配语义为 `PerTeam`，Flag 来源为 `PerTeam`。
 - [ ] Player 使用 host port `0` 和 OwnerOnly URL。
 - [ ] Player 有 TeamId，Purpose 为 `Player`。
-- [ ] Fix Target 绑定申请队伍、Purpose 为 `AwdpTarget`，并绑定 Fix GameplayFact。
+- [ ] Fix Target 绑定申请队伍、Purpose 为 `AwdpTarget`；申请时没有 GameplayFact，首次成功上传 Patch 时才原子绑定唯一 Fix GameplayFact。
 - [ ] Fix Target 忽略 Player 的公网端口和 URL。
 - [ ] `InternalPorts` 恰好包含一个真实监听端口。
 - [ ] 服务监听 `0.0.0.0`，Checker 可以从隔离网络访问。
@@ -91,7 +91,7 @@
 
 Fix 包要求：
 
-- [ ] gzip 压缩的 POSIX ustar/pax tar。
+- [ ] gzip 压缩的 tar（GNU Tar、USTAR、PAX、V7 均可），无需指定 `--format=ustar`。
 - [ ] 入口文件位于归档中精确配置的位置。
 - [ ] 没有绝对路径、`..`、符号链接、硬链接、设备文件或重复路径。
 - [ ] 没有依赖平台地址、Token、真实 Flag 或外网下载。

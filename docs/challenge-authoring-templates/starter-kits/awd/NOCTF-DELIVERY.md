@@ -25,7 +25,7 @@
 
 ## 3. 题库 Runtime
 
-- [ ] `PerTeam`，Container 或 Compose，不使用 OVA。
+- [ ] `PerTeam`、`AwdRotation`，Container 或 Compose，不使用 OVA。
 - [ ] 服务监听 `0.0.0.0` 的固定容器端口。
 - [ ] 对外端口使用 Docker host port `0`，入口 Exposure 为 `Participants`。
 - [ ] 不依赖宿主路径、Docker Socket、特权模式、平台网络或外网。

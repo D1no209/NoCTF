@@ -9,8 +9,8 @@ public sealed class DeploymentTopologyTests
     {
         var dockerfile = await ReadAsync("backend", "Dockerfile");
         var compose = await ReadAsync("deploy", "docker-compose.yml");
-        var singleCompose = await ReadAsync("deploy", "docker-compose.single.yml");
-        var ciCompose = await ReadAsync("deploy", "docker-compose.ci.yml");
+        var runtimeEnv = await ReadAsync("deploy", "env", "noctf", ".env.example");
+        var healthcheck = await ReadAsync("backend", "docker", "healthcheck.sh");
         var hostProgram = await ReadAsync("backend", "src", "NoCTF.Host", "Program.cs");
         var roleModel = await ReadAsync("backend", "src", "NoCTF.Hosting", "HostRoles.cs");
         var routing = await ReadAsync("backend", "src", "NoCTF.Hosting", "MessageRouting.cs");
@@ -40,17 +40,15 @@ public sealed class DeploymentTopologyTests
         await Assert.That(dockerfile).Contains("FROM runtime AS runner");
         await Assert.That(dockerfile).Contains("FROM runtime AS host");
         await Assert.That(dockerfile).Contains("NoCTF.Host.dll");
-        await Assert.That(compose).Contains("  worker:");
-        await Assert.That(singleCompose).Contains("  noctf:");
-        await Assert.That(singleCompose).Contains("target: host");
-        await Assert.That(singleCompose).Contains("Hosting__Roles__0: Api");
-        await Assert.That(ciCompose).Contains("NOCTF_BACKEND_IMAGE");
-        await Assert.That(ciCompose).Contains("Hosting__Roles__0: Api");
-        await Assert.That(ciCompose).Contains("Hosting__Roles__0: Worker");
-        await Assert.That(ciCompose).Contains("Hosting__Roles__0: Runner");
-        await Assert.That(hostProgram).Contains("--migrate-only");
-        await Assert.That(compose).Contains("GET /health/ready HTTP/1.1");
-        await Assert.That(compose).Contains("[[ \"$$status\" == *\" 200 \"* ]]");
+        await Assert.That(compose).Contains("  noctf:");
+        await Assert.That(compose).DoesNotContain("build:");
+        await Assert.That(compose).DoesNotContain("  migration:");
+        await Assert.That(runtimeEnv).Contains("Hosting__Roles__0=Api");
+        await Assert.That(runtimeEnv).Contains("Hosting__Roles__1=Worker");
+        await Assert.That(runtimeEnv).Contains("Hosting__Roles__2=Runner");
+        await Assert.That(hostProgram).Contains("DatabaseStartup.InitializeAsync");
+        await Assert.That(healthcheck).Contains("GET /health/ready HTTP/1.1");
+        await Assert.That(dockerfile).Contains("HEALTHCHECK");
         await Assert.That(File.Exists(workerDeployment)).IsTrue();
         await Assert.That(roleModel).Contains("public enum HostRole");
         await Assert.That(roleModel).Contains("HostRole.Api, HostRole.Worker, HostRole.Runner");
@@ -102,7 +100,7 @@ public sealed class DeploymentTopologyTests
                      "Runner__Heartbeat__TtlSeconds"
                  })
         {
-            await Assert.That(compose).Contains(runnerAvailabilitySetting);
+            await Assert.That(runtimeEnv).Contains(runnerAvailabilitySetting);
             await Assert.That(kubernetesConfig).Contains(runnerAvailabilitySetting);
         }
 
@@ -127,16 +125,10 @@ public sealed class DeploymentTopologyTests
         var backend = await ReadAsync("deploy", "k8s", "backend-deployment.yaml");
         var worker = await ReadAsync("deploy", "k8s", "worker-deployment.yaml");
         var runner = await ReadAsync("deploy", "k8s", "runner-deployment.yaml");
-        var workerImageStage = dockerfile
-            .Split("FROM runtime AS worker", 2, StringSplitOptions.None)[1]
-            .Split("FROM runtime AS runner", 2, StringSplitOptions.None)[0];
-        var workerComposeService = compose
-            .Split("\n  worker:", 2, StringSplitOptions.None)[1]
-            .Split("\n  runner:", 2, StringSplitOptions.None)[0];
-
-        await Assert.That(workerImageStage).Contains("EXPOSE 8080");
-        await Assert.That(workerComposeService).Contains("ASPNETCORE_URLS: http://+:8080");
-        await Assert.That(workerComposeService).Contains("GET /health/ready HTTP/1.1");
+        await Assert.That(dockerfile).Contains("HEALTHCHECK");
+        await Assert.That(dockerfile).Contains("noctf-healthcheck");
+        await Assert.That(dockerfile).DoesNotContain("EXPOSE ");
+        await Assert.That(compose).DoesNotContain("healthcheck:");
         foreach (var manifest in new[] { backend, worker, runner })
         {
             await Assert.That(manifest).Contains("path: /health/live");
@@ -148,7 +140,7 @@ public sealed class DeploymentTopologyTests
     public async Task Stock_manifests_give_scoring_checkers_a_reachable_callback_identity()
     {
         var compose = await ReadAsync("deploy", "docker-compose.yml");
-        var singleCompose = await ReadAsync("deploy", "docker-compose.single.yml");
+        var runtimeEnv = await ReadAsync("deploy", "env", "noctf", ".env.example");
         var kubernetesConfig = await ReadAsync("deploy", "k8s", "configmap.yaml");
         var backendDeployment = await ReadAsync(
             "deploy",
@@ -164,17 +156,10 @@ public sealed class DeploymentTopologyTests
 
         await Assert.That(compose)
             .Contains("noctf.io/internal-role: scoring-callback-gateway");
-        await Assert.That(compose)
-            .Contains("Runtime__Docker__CallbackContainerLabelValue: scoring-callback-gateway");
-        await Assert.That(compose)
-            .Contains("RunnerScoring__CallbackBaseUrl: http://backend:8080");
-        await Assert.That(singleCompose)
-            .Contains("noctf.io/internal-role: scoring-callback-gateway");
-        await Assert.That(singleCompose)
-            .Contains("Runtime__Docker__CallbackContainerLabelValue: scoring-callback-gateway");
-        await Assert.That(singleCompose)
-            .Contains("RunnerScoring__CallbackBaseUrl: http://noctf:8080");
-
+        await Assert.That(runtimeEnv)
+            .Contains("Runtime__Docker__CallbackContainerLabelValue=scoring-callback-gateway");
+        await Assert.That(runtimeEnv)
+            .Contains("RunnerScoring__CallbackBaseUrl=http://noctf:8080");
         await Assert.That(kubernetesConfig).Contains(
             "RunnerScoring__CallbackBaseUrl: \"http://backend-service.noctf.svc.cluster.local:8080\"");
         await Assert.That(kubernetesConfig).Contains(
@@ -196,7 +181,7 @@ public sealed class DeploymentTopologyTests
     public async Task Public_tls_terminates_at_nginx_while_internal_api_remains_http_only()
     {
         var compose = await ReadAsync("deploy", "docker-compose.yml");
-        var singleCompose = await ReadAsync("deploy", "docker-compose.single.yml");
+        var runtimeEnv = await ReadAsync("deploy", "env", "noctf", ".env.example");
         var nginx = await ReadAsync("deploy", "nginx", "noctf.conf");
         var kubernetesConfig = await ReadAsync("deploy", "k8s", "configmap.yaml");
         var kubernetesIngress = await ReadAsync("deploy", "k8s", "ingress.yaml");
@@ -205,16 +190,13 @@ public sealed class DeploymentTopologyTests
         var pipeline = await ReadAsync(
             "backend", "src", "NoCTF.API", "Composition", "PipelineConfiguration.cs");
 
-        foreach (var manifest in new[] { compose, singleCompose })
-        {
-            await Assert.That(manifest).Contains("ASPNETCORE_URLS: http://+:8080");
-            await Assert.That(manifest).Contains(
-                "127.0.0.1:${NOCTF_BACKEND_PORT:-8080}:8080");
-            await Assert.That(manifest).DoesNotContain("\"80:8080\"");
-            await Assert.That(manifest).Contains("ForwardedHeaders__KnownNetworks__0:");
-            await Assert.That(manifest).Contains("ForwardedHeaders__AllowedHosts__0:");
-        }
-
+        await Assert.That(compose).Contains("name: 1panel-network");
+        await Assert.That(compose).Contains("aliases: [noctf-web]");
+        await Assert.That(compose).DoesNotContain("ports:");
+        await Assert.That(compose).DoesNotContain("expose:");
+        await Assert.That(runtimeEnv).Contains("ASPNETCORE_URLS=http://+:8080");
+        await Assert.That(runtimeEnv).Contains("ForwardedHeaders__KnownNetworks__0=");
+        await Assert.That(runtimeEnv).Contains("ForwardedHeaders__AllowedHosts__0=");
         await Assert.That(nginx).Contains("return 308 https://$host$request_uri;");
         await Assert.That(nginx).Contains("proxy_pass http://127.0.0.1:8080;");
         await Assert.That(nginx).Contains("Strict-Transport-Security");
@@ -380,6 +362,7 @@ public sealed class DeploymentTopologyTests
             .ReplaceLineEndings("\n");
 
         await Assert.That(ci).Contains("  deploy-production:\n");
+        await Assert.That(ci).Contains("    name: Deploy test server\n");
         await Assert.That(ci).Contains("    needs: publish-images\n");
         await Assert.That(ci).Contains(
             "    if: github.event_name == 'push' && github.ref == 'refs/heads/main'\n");
@@ -395,11 +378,14 @@ public sealed class DeploymentTopologyTests
         await Assert.That(ci).Contains("git archive \\\n");
         await Assert.That(ci).Contains("$GITHUB_SHA");
         await Assert.That(ci).Contains("backend/Directory.Build.props");
-        await Assert.That(ci).Contains("deploy/docker-compose.ci.yml");
+        await Assert.That(ci).Contains("deploy/docker-compose.yml");
         await Assert.That(ci).DoesNotContain("            \"$GITHUB_SHA\"\n          tar -tzf");
         await Assert.That(ci).Contains("deploy/ci/deploy.sh");
         await Assert.That(ci).Contains("noctf-ci-upload-$GITHUB_SHA");
-        await Assert.That(ci).Contains("if: always()\n");
+        await Assert.That(ci).Contains("192.0.2.30|noctf.example.com)");
+        await Assert.That(ci).Contains("remote_hostname=$(ssh noctf-deploy hostname)");
+        await Assert.That(ci).Contains("\"${remote_hostname,,}\" == dino209");
+        await Assert.That(ci).Contains("if: always() && steps.verify_test_target.outcome == 'success'");
         await Assert.That(ci).DoesNotContain("kompose_version=1.38.0");
         await Assert.That(ci).DoesNotContain("Reused the verified Kompose asset");
     }
@@ -412,7 +398,7 @@ public sealed class DeploymentTopologyTests
         var deploymentFiles = new[]
         {
             await ReadAsync("deploy", "docker-compose.yml"),
-            await ReadAsync("deploy", "docker-compose.single.yml"),
+            await ReadAsync("deploy", ".env.example"),
             await ReadAsync("deploy", "k8s", "postgres-deployment.yaml"),
             await ReadAsync("deploy", "k8s", "redis-deployment.yaml"),
             await ReadAsync("deploy", "k8s", "minio-deployment.yaml"),
@@ -444,13 +430,13 @@ public sealed class DeploymentTopologyTests
         await Assert.That(dockerfile).Contains("COPY backend/docker-assets/");
         await Assert.That(deployScript).Contains(
             "platform_image=${5:?published platform image is required}");
-        await Assert.That(deployScript).Contains("docker-compose.ci.yml");
+        await Assert.That(deployScript).Contains("docker-compose.yml");
         await Assert.That(deployScript).Contains("docker pull \"$platform_image\"");
         await Assert.That(deployScript).Contains("--no-build");
-        await Assert.That(deployScript).Contains("run --rm migration");
-        await Assert.That(deployScript).Contains("dump_platform_diagnostics()");
+        await Assert.That(deployScript).DoesNotContain("run --rm migration");
+        await Assert.That(deployScript).Contains("schema_fingerprint()");
         await Assert.That(deployScript).Contains(
-            "logs --no-color --timestamps --tail 200 \"$service\"");
+            "logs --no-color --tail 100 noctf");
         await Assert.That(deployScript).DoesNotContain("run --rm --pull");
         await Assert.That(deployScript).DoesNotContain("kompose_asset_path");
         await Assert.That(deployScript).DoesNotContain(
@@ -459,14 +445,16 @@ public sealed class DeploymentTopologyTests
         var externalRuntimeImages = deploymentFiles
             .SelectMany(content => content.Split('\n'))
             .Select(line => line.Trim())
+            .Select(line => line.Contains("_IMAGE=", StringComparison.Ordinal) ? "image: " + line[(line.IndexOf('=') + 1)..] : line)
             .Where(line => line.StartsWith("image: postgres:", StringComparison.Ordinal)
                 || line.StartsWith("image: redis:", StringComparison.Ordinal)
                 || line.StartsWith(
                     "image: docker.m.daocloud.io/library/nats:",
                     StringComparison.Ordinal)
-                || line.StartsWith("image: minio/", StringComparison.Ordinal))
+                || line.StartsWith("image: minio/", StringComparison.Ordinal)
+                || line.StartsWith("image: registry:", StringComparison.Ordinal))
             .ToArray();
-        await Assert.That(externalRuntimeImages).Count().IsEqualTo(11);
+        await Assert.That(externalRuntimeImages).Count().IsEqualTo(8);
         await Assert.That(externalRuntimeImages.All(line =>
             System.Text.RegularExpressions.Regex.IsMatch(
                 line,
@@ -476,129 +464,41 @@ public sealed class DeploymentTopologyTests
     }
 
     [Test]
-    public async Task Production_deployment_pulls_observability_images_without_direct_docker_hub_access()
+    public async Task Production_deployment_never_starts_exporters_or_changes_other_services()
     {
-        var deployScript = await ReadAsync("deploy", "ci", "deploy.sh");
-        var observabilityCompose = await ReadAsync("deploy", "docker-compose.observability.yml");
-
-        await Assert.That(deployScript).Contains("ensure_observability_images()");
-        await Assert.That(deployScript).DoesNotContain("load_grafana_image");
-        await Assert.That(observabilityCompose).Contains(
-            "image: quay.io/prometheus/prometheus:v3.14.0");
-        await Assert.That(observabilityCompose).Contains(
-            "image: docker.m.daocloud.io/grafana/grafana:13.2.0");
-        await Assert.That(observabilityCompose).Contains(
-            "image: quay.io/prometheuscommunity/postgres-exporter:v0.20.1");
-        await Assert.That(observabilityCompose).Contains(
-            "image: quay.io/oliver006/redis_exporter:v1.89.0");
-        await Assert.That(observabilityCompose).Contains(
-            "image: quay.io/prometheus/node-exporter:v1.12.1");
-        await Assert.That(observabilityCompose).Contains(
-            "image: docker.m.daocloud.io/natsio/prometheus-nats-exporter:0.20.1@sha256:4fbf6dacb84780a45a1c3af9b1080c69451a288d20902deae671b80717bb8f61");
-        await Assert.That(deployScript).Contains(
-            "postgres-exporter\n        redis-exporter\n        nats-exporter\n        node-exporter");
-        await Assert.That(deployScript).Contains(
-            "NOCTF_OBSERVABILITY_PULL_ATTEMPTS:-5");
-        await Assert.That(deployScript).Contains("pull --policy missing");
-        await Assert.That(deployScript).Contains("NOCTF_PLATFORM_PULL_ATTEMPTS:-5");
-        await Assert.That(deployScript).DoesNotContain("NOCTF_BUILD_ATTEMPTS");
-        await Assert.That(deployScript).Contains(
-            "ensure_deploy_space\nif ! ensure_observability_images; then\n    exit 1\nfi\nif ! pull_platform_image; then\n    exit 1\nfi\nbackup_database");
-        await Assert.That(deployScript).Contains("--pull never");
+        var script = await ReadAsync("deploy", "ci", "deploy.sh");
+        await Assert.That(script).Contains("docker pull \"$platform_image\"");
+        await Assert.That(script).Contains("--no-deps --no-build --pull never");
+        await Assert.That(script).DoesNotContain("prune --");
+        await Assert.That(script).DoesNotContain("ensure_observability_images");
+        await Assert.That(script).DoesNotContain("nginx -s");
+        await Assert.That(script).DoesNotContain("--remove-orphans");
+        await Assert.That(script).Contains("CI refuses to start an empty replacement");
+        await Assert.That(script).Contains("No automatic database rollback");
     }
 
     [Test]
-    public async Task Production_observability_overlay_keeps_the_private_metrics_listener_enabled()
+    public async Task Production_defaults_disable_telemetry_and_remove_old_overlays()
     {
-        var deployScript = await ReadAsync("deploy", "ci", "deploy.sh");
-        var observabilityCompose = (await ReadAsync(
-            "deploy",
-            "docker-compose.observability.yml")).ReplaceLineEndings("\n");
-        var productionOverride =
-            "--file \"$config_root/deploy/docker-compose.prod.yml\"";
-        var observabilityOverride =
-            "--file \"$release_dir/deploy/docker-compose.observability.yml\"";
-        var ciOverride =
-            "--file \"$release_dir/deploy/docker-compose.ci.yml\"";
-
-        await Assert.That(deployScript.IndexOf(
-            productionOverride,
-            StringComparison.Ordinal)).IsLessThan(deployScript.IndexOf(
-                observabilityOverride,
-                StringComparison.Ordinal));
-        await Assert.That(deployScript.IndexOf(
-            observabilityOverride,
-            StringComparison.Ordinal)).IsLessThan(deployScript.IndexOf(
-                ciOverride,
-                StringComparison.Ordinal));
-
-        foreach (var service in new[] { "backend", "worker", "runner" })
-        {
-            var serviceBlock = System.Text.RegularExpressions.Regex.Match(
-                observabilityCompose,
-                $"(?ms)^  {service}:\\n(?<body>.*?)(?=^  \\S|\\z)")
-                .Groups["body"]
-                .Value;
-            await Assert.That(serviceBlock).Contains(
-                "ASPNETCORE_URLS: http://+:8080;http://+:9464");
-            await Assert.That(serviceBlock).Contains(
-                "Observability__MetricsPort: 9464");
-        }
+        var environment = await ReadAsync("deploy", "env", "noctf", ".env.example");
+        var registryEnvironment = await ReadAsync("deploy", "env", "registry", ".env.example");
+        await Assert.That(environment).Contains("Observability__Enabled=false");
+        await Assert.That(environment).Contains("OTEL_SDK_DISABLED=true");
+        await Assert.That(registryEnvironment).Contains("OTEL_TRACES_EXPORTER=none");
+        foreach (var obsolete in new[] { "docker-compose.single.yml", "docker-compose.ci.yml", "docker-compose.observability.yml" })
+            await Assert.That(File.Exists(Path.Combine(RepositoryRoot, "deploy", obsolete))).IsFalse();
     }
 
     [Test]
-    public async Task Observability_configuration_uses_real_JetStream_and_Wolverine_metrics()
+    public async Task Optional_monitoring_code_does_not_enable_exporters_when_disabled()
     {
-        var files = new[]
-        {
-            await ReadAsync("backend", "src", "NoCTF.Application", "Observability",
-                "NoCtfTelemetry.cs"),
-            await ReadAsync("backend", "src", "NoCTF.Infrastructure", "Administration",
-                "Monitoring", "PrometheusPlatformMonitoringReader.cs"),
-            await ReadAsync("deploy", "docker-compose.observability.yml"),
-            await ReadAsync("deploy", "observability", "prometheus", "prometheus.yml"),
-            await ReadAsync("deploy", "observability", "prometheus", "alerts.yml"),
-            await ReadAsync("deploy", "observability", "grafana", "dashboards",
-                "noctf-overview.json")
-        };
-        var configuration = string.Join('\n', files);
-
-        foreach (var obsoleteMetric in new[]
-                 {
-                     "noctf_worker_queue_depth",
-                     "noctf_worker_queue_oldest_age_seconds",
-                     "noctf.worker.queue.depth",
-                     "noctf.worker.queue.oldest_age",
-                     "noctf_leaderboard_dirty_competitions",
-                     "noctf_leaderboard_dirty_oldest_age_seconds",
-                     "wolverine_dead_letter_queue_total"
-                 })
-        {
-            await Assert.That(configuration).DoesNotContain(obsoleteMetric);
-        }
-
-        foreach (var requiredMetric in new[]
-                 {
-                     "jetstream_consumer_num_pending",
-                     "jetstream_consumer_num_ack_pending",
-                     "jetstream_consumer_num_redelivered",
-                     "jetstream_stream_total_messages",
-                     "jetstream_server_total_message_bytes",
-                     "jetstream_server_max_storage",
-                     "wolverine_outbox_count_Messages",
-                     "wolverine_inbox_count_Messages",
-                     "wolverine_messages_sent_Messages_total",
-                     "wolverine_messages_succeeded_Messages_total",
-                     "wolverine_execution_time_Milliseconds_bucket",
-                     "wolverine_effective_time_Milliseconds_bucket"
-                 })
-        {
-            await Assert.That(configuration).Contains(requiredMetric);
-        }
-
-        await Assert.That(configuration).Contains("job_name: nats");
-        await Assert.That(configuration).Contains("-jsz=all");
-        await Assert.That(configuration).Contains("http://nats:8222");
+        var extension = await ReadAsync("backend", "src", "NoCTF.Hosting", "Observability", "ObservabilityExtensions.cs");
+        var infrastructure = await ReadAsync("backend", "src", "NoCTF.Infrastructure", "ServiceRegistration.cs");
+        var environment = await ReadAsync("deploy", "env", "noctf", ".env.example");
+        await Assert.That(extension).Contains("Observability:Enabled");
+        await Assert.That(infrastructure).Contains("Observability:Enabled");
+        await Assert.That(environment).Contains("Observability__PrometheusBaseUrl=");
+        await Assert.That(environment).DoesNotContain("http://prometheus");
     }
 
     [Test]

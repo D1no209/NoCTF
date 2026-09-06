@@ -11,7 +11,11 @@ namespace NoCTF.Tests.Unit.Application;
 public sealed class CreatePatchUploadTests
 {
     [Test]
-    public async Task Accepted_upload_preserves_the_authoritative_pending_state()
+    [Arguments(TarEntryFormat.Ustar)]
+    [Arguments(TarEntryFormat.Pax)]
+    [Arguments(TarEntryFormat.Gnu)]
+    [Arguments(TarEntryFormat.V7)]
+    public async Task Accepted_upload_preserves_the_authoritative_pending_state(TarEntryFormat format)
     {
         var store = new RejectingPatchUploadStore(
             saveState: PatchUploadSaveState.Accepted,
@@ -21,7 +25,7 @@ public sealed class CreatePatchUploadTests
         var useCase = new CreatePatchUpload(
             store,
             new ManagedFileUploads(registry, objects));
-        await using var archive = new MemoryStream(CreatePatchArchive());
+        await using var archive = new MemoryStream(CreatePatchArchive(format));
 
         var result = await useCase.ExecuteAsync(
             Guid.CreateVersion7(),
@@ -174,7 +178,7 @@ public sealed class CreatePatchUploadTests
             .IsEqualTo(registry.RegisteredFileId);
     }
 
-    private static byte[] CreatePatchArchive()
+    private static byte[] CreatePatchArchive(TarEntryFormat format = TarEntryFormat.Pax)
     {
         using var output = new MemoryStream();
         using (var gzip = new GZipStream(
@@ -183,14 +187,20 @@ public sealed class CreatePatchUploadTests
                    leaveOpen: true))
         using (var writer = new TarWriter(
                    gzip,
-                   TarEntryFormat.Pax,
+                   format,
                    leaveOpen: true))
         using (var data = new MemoryStream(Encoding.UTF8.GetBytes("echo fix")))
         {
-            writer.WriteEntry(new PaxTarEntry(TarEntryType.RegularFile, "fix.sh")
+            TarEntry entry = format switch
             {
-                DataStream = data
-            });
+                TarEntryFormat.Ustar => new UstarTarEntry(TarEntryType.RegularFile, "fix.sh"),
+                TarEntryFormat.Pax => new PaxTarEntry(TarEntryType.RegularFile, "fix.sh"),
+                TarEntryFormat.Gnu => new GnuTarEntry(TarEntryType.RegularFile, "fix.sh"),
+                TarEntryFormat.V7 => new V7TarEntry(TarEntryType.V7RegularFile, "fix.sh"),
+                _ => throw new ArgumentOutOfRangeException(nameof(format))
+            };
+            entry.DataStream = data;
+            writer.WriteEntry(entry);
         }
         return output.ToArray();
     }

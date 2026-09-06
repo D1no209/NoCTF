@@ -28,6 +28,7 @@ public enum ChallengeTemplateWriteState
     ResourceIdConflict,
     NotFoundOrForbidden,
     ActiveCompetitionModeConflict,
+    ActiveRuntimeDefinitionConflict,
     OwnerIncludedInManagerSet,
     UserNotFound,
     RoleNotEligible

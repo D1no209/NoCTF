@@ -73,6 +73,7 @@ public sealed class ChallengeTemplateProtocolTests
     [Test]
     [Arguments(ChallengeTemplateConflictCode.RoleNotEligible)]
     [Arguments(ChallengeTemplateConflictCode.ActiveCompetitionModeConflict)]
+    [Arguments(ChallengeTemplateConflictCode.ActiveRuntimeDefinitionConflict)]
     public async Task Conflict_code_serializes_as_a_named_enum(
         ChallengeTemplateConflictCode code)
     {
@@ -88,6 +89,8 @@ public sealed class ChallengeTemplateProtocolTests
             new(ChallengeTemplateWriteState.NotFoundOrForbidden));
         var activeMode = ChallengeTemplateUpdateResponseMapper.ToResponse(
             new(ChallengeTemplateWriteState.ActiveCompetitionModeConflict));
+        var activeRuntime = ChallengeTemplateUpdateResponseMapper.ToResponse(
+            new(ChallengeTemplateWriteState.ActiveRuntimeDefinitionConflict));
         var invalidDefinition = ChallengeTemplateUpdateResponseMapper.ToResponse(
             new(
                 ChallengeTemplateWriteState.InvalidDefinition,
@@ -100,6 +103,12 @@ public sealed class ChallengeTemplateProtocolTests
             (Conflict<ChallengeTemplateConflictResponse>)activeMode.Result;
         await Assert.That(activeModeConflict.Value!.Code)
             .IsEqualTo(ChallengeTemplateConflictCode.ActiveCompetitionModeConflict);
+        await Assert.That(activeRuntime.Result)
+            .IsTypeOf<Conflict<ChallengeTemplateConflictResponse>>();
+        var activeRuntimeConflict =
+            (Conflict<ChallengeTemplateConflictResponse>)activeRuntime.Result;
+        await Assert.That(activeRuntimeConflict.Value!.Code)
+            .IsEqualTo(ChallengeTemplateConflictCode.ActiveRuntimeDefinitionConflict);
         await Assert.That(invalidDefinition.Result)
             .IsTypeOf<ProblemHttpResult>();
         var response = (ProblemHttpResult)invalidDefinition.Result;

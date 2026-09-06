@@ -143,7 +143,7 @@ describe('CTF control screen projection', () => {
     expect(reconcileControlScreenSolves(reconciled.seenKeys, next).newSolves).toEqual([])
   })
 
-  test('keeps challenge telemetry readable from a 45-degree overview camera', async () => {
+  test('keeps challenge telemetry wired to the responsive city camera', async () => {
     const page = await Bun.file(
       new URL('../app/pages/competitions/[id]/live.vue', import.meta.url),
     ).text()
@@ -178,8 +178,12 @@ describe('CTF control screen projection', () => {
     expect(shell).toContain("competition.value?.mode === 'Awdp'")
     expect(shell).toContain('label: translate("中控大屏")')
     expect(shell).toContain('label: translate("3D 大屏")')
-    expect(scene).toContain('radius: this.citySpan * 1.1 + 36')
-    expect(scene).toContain('height: this.citySpan * 1.1 + 42')
+    expect(scene).toContain('fitLiveCityFrame(this.worldRadius, this.worldHeight,')
+    expect(scene).toContain("window.addEventListener('resize', this.resize)")
+    expect(scene).toContain("window.removeEventListener('resize', this.resize)")
+    expect(scene).toContain('this.labelResizeObserver.disconnect()')
+    expect(page).toContain('height: 100dvh')
+    expect(page).not.toContain('min-height: 75rem')
     expect(scene).toContain("els.labelPts.textContent = `${state.score} pts`")
     expect(scene).toContain('els.labelSolves.textContent = state.solvesText')
     expect(page).toContain('bloodToneOrder[left.tone] - bloodToneOrder[right.tone]')
@@ -189,7 +193,7 @@ describe('CTF control screen projection', () => {
     expect(page).toContain('if (sameChallengeUpdates.length) focusSolve(sameChallengeUpdates.at(-1)!)')
     expect(scene).toContain('minHeight: 6, maxHeight: 24')
     expect(scene).toContain('minHeight: 4, maxHeight: 18')
-    expect(scene).toContain('const height = 8 + (state.score / maxScore) * 20')
+    expect(scene).toContain('liveCityBuildingHeight(state.score, maxScore, count)')
     expect(scene).toContain('const baseWidth = 6.8 + rand() * 3.2')
     expect(scene).toContain('const baseDepth = 6.8 + rand() * 3.2')
     expect(scene).toContain('const backdropOpacity = this.focusing ? 0.08 : 0.96')

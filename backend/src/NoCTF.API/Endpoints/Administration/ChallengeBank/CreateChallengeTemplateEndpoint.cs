@@ -62,6 +62,7 @@ public enum ChallengeTemplateConflictCode
 {
     ResourceIdConflict,
     ActiveCompetitionModeConflict,
+    ActiveRuntimeDefinitionConflict,
     OwnerIncludedInManagerSet,
     UserNotFound,
     RoleNotEligible
@@ -83,6 +84,8 @@ internal static class ChallengeTemplateWriteResponseMapper
                     ChallengeTemplateConflictCode.ResourceIdConflict,
                 ChallengeTemplateWriteState.ActiveCompetitionModeConflict =>
                     ChallengeTemplateConflictCode.ActiveCompetitionModeConflict,
+                ChallengeTemplateWriteState.ActiveRuntimeDefinitionConflict =>
+                    ChallengeTemplateConflictCode.ActiveRuntimeDefinitionConflict,
                 ChallengeTemplateWriteState.OwnerIncludedInManagerSet =>
                     ChallengeTemplateConflictCode.OwnerIncludedInManagerSet,
                 ChallengeTemplateWriteState.UserNotFound =>
@@ -98,6 +101,8 @@ internal static class ChallengeTemplateWriteResponseMapper
                     "The requested challenge template identifier is already in use.",
                 ChallengeTemplateWriteState.ActiveCompetitionModeConflict =>
                     "The template mode cannot change while active competitions reference it.",
+                ChallengeTemplateWriteState.ActiveRuntimeDefinitionConflict =>
+                    "The template definition cannot change while active Runtimes use it.",
                 ChallengeTemplateWriteState.OwnerIncludedInManagerSet =>
                     "The template owner cannot also be listed as a manager.",
                 ChallengeTemplateWriteState.UserNotFound =>

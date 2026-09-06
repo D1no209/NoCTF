@@ -37,6 +37,7 @@ public sealed class ChallengeTemplateUpdateOpenApiTests
             .IsEquivalentTo([
                 "ResourceIdConflict",
                 "ActiveCompetitionModeConflict",
+                "ActiveRuntimeDefinitionConflict",
                 "OwnerIncludedInManagerSet",
                 "UserNotFound",
                 "RoleNotEligible"

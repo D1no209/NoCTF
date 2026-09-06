@@ -1,0 +1,6 @@
+/.smoke/
+/.smoke.*/
+/private/artifacts/
+/attachment/dist/
+__pycache__/
+*.pyc

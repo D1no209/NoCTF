@@ -214,18 +214,30 @@ public class ChallengeConfigurationCatalogTests
             var modeTemplate = template with
             {
                 Allocation = expectedAllocation,
-                FlagSource = mode is GameMode.Ctf or GameMode.Awdp
-                    ? RuntimeFlagSource.PerTeam
-                    : template.FlagSource,
-                UrlBindings = mode == GameMode.Awdp
-                    ?
+                FlagSource = mode switch
+                {
+                    GameMode.Ctf or GameMode.Awdp => RuntimeFlagSource.PerTeam,
+                    GameMode.Awd => RuntimeFlagSource.AwdRotation,
+                    _ => RuntimeFlagSource.Static
+                },
+                UrlBindings = mode switch
+                {
+                    GameMode.Awdp =>
                     [
                         new RuntimeUrlBinding(
                             "http://{HOST}:{PORT}",
                             RuntimeExposure.OwnerOnly,
                             ContainerPort: 8080)
-                    ]
-                    : template.UrlBindings,
+                    ],
+                    GameMode.Awd =>
+                    [
+                        new RuntimeUrlBinding(
+                            "nc {HOST} {PORT}",
+                            RuntimeExposure.Participants,
+                            ContainerPort: 8080)
+                    ],
+                    _ => template.UrlBindings
+                },
                 Definition = ((ContainerRuntimeDefinition)template.Definition) with
                 {
                     FlagEnvironmentVariableName = mode is GameMode.Ctf or GameMode.Awdp

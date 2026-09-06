@@ -21,9 +21,11 @@ namespace NoCTF.Tests.Unit.Runner;
 public sealed class AwdpCanonicalFixInputFlowTests
 {
     [Test]
-    public async Task EnabledInput_ReusesCanonicalTarWithIndependentStreamsAndOneDownload()
+    [Arguments(TarEntryFormat.Pax)]
+    [Arguments(TarEntryFormat.Gnu)]
+    public async Task EnabledInput_ReusesCanonicalTarWithIndependentStreamsAndOneDownload(TarEntryFormat format)
     {
-        var sourceArchive = CreateFixTarGzip();
+        var sourceArchive = CreateFixTarGzip(format);
         var http = new ArchiveHttpClientFactory(sourceArchive);
         var sandbox = new RecordingSandbox();
         var checker = new RecordingChecker();
@@ -181,20 +183,20 @@ public sealed class AwdpCanonicalFixInputFlowTests
         DateTimeOffset.UtcNow.AddMinutes(5),
         "runner-a");
 
-    private static byte[] CreateFixTarGzip()
+    private static byte[] CreateFixTarGzip(TarEntryFormat format = TarEntryFormat.Pax)
     {
         using var output = new MemoryStream();
         using (var gzip = new GZipStream(output, CompressionLevel.NoCompression, leaveOpen: true))
-        using (var writer = new TarWriter(gzip, TarEntryFormat.Pax, leaveOpen: false))
+        using (var writer = new TarWriter(gzip, format, leaveOpen: false))
         {
-            writer.WriteEntry(new PaxTarEntry(TarEntryType.RegularFile, "fix.sh")
+            foreach (var (name, content) in new[] { ("fix.sh", "#!/bin/sh\nexit 0\n"), ("payload.txt", "same-canonical-input") })
             {
-                DataStream = new MemoryStream("#!/bin/sh\nexit 0\n"u8.ToArray())
-            });
-            writer.WriteEntry(new PaxTarEntry(TarEntryType.RegularFile, "payload.txt")
-            {
-                DataStream = new MemoryStream("same-canonical-input"u8.ToArray())
-            });
+                TarEntry entry = format == TarEntryFormat.Gnu
+                    ? new GnuTarEntry(TarEntryType.RegularFile, name)
+                    : new PaxTarEntry(TarEntryType.RegularFile, name);
+                entry.DataStream = new MemoryStream(System.Text.Encoding.UTF8.GetBytes(content));
+                writer.WriteEntry(entry);
+            }
         }
         return output.ToArray();
     }

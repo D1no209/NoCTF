@@ -55,6 +55,8 @@ internal static class ChallengeInfrastructure
         services.AddScoped<IChallengeHintStore, ChallengeHintStore>();
         services.AddScoped<ManageChallengeHints>();
         services.AddScoped<UnlockChallengeHint>();
+        services.AddScoped<IParticipantChallengeHintStore, ParticipantChallengeHintStore>();
+        services.AddScoped<ReadParticipantChallengeHints>();
         services.AddScoped<CreateChallenge>();
         services.AddScoped<GetChallenge>();
         services.AddScoped<ListChallenges>();

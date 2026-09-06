@@ -147,6 +147,27 @@ public sealed class ChallengeBankStore(
         {
             return new(ChallengeTemplateWriteState.ActiveCompetitionModeConflict);
         }
+        var definitionChanged = !JsonEquals(
+            entity.DefinitionJson,
+            command.DefinitionJson);
+        if (definitionChanged
+            && await db.RuntimeInstances.AsNoTracking().AnyAsync(runtime =>
+                (runtime.State == NoCTF.Domain.Runtime.RuntimeState.Queued
+                    || runtime.State == NoCTF.Domain.Runtime.RuntimeState.Provisioning
+                    || runtime.State == NoCTF.Domain.Runtime.RuntimeState.Running
+                    || runtime.State == NoCTF.Domain.Runtime.RuntimeState.Stopping)
+                && (runtime.ChallengeId == command.ChallengeId
+                    || runtime.CompetitionChallengeId != null
+                    && db.CompetitionChallenges.IgnoreQueryFilters().Any(reference =>
+                        reference.Id == runtime.CompetitionChallengeId
+                        && reference.ChallengeId == command.ChallengeId)),
+                ct))
+        {
+            return new(
+                ChallengeTemplateWriteState.ActiveRuntimeDefinitionConflict,
+                Detail:
+                    "Stop every active Runtime created from this template before changing its technical definition.");
+        }
         var supportsRegularExpression = command.Mode == GameMode.Ctf
             && RuntimeTemplates.Get(command.Mode, command.DefinitionJson)?.FlagSource
                 is null or RuntimeFlagSource.Static;

@@ -293,7 +293,7 @@ onUnmounted(() => {
     <div class="live-screen-aurora" aria-hidden="true" />
 
     <header class="live-screen-header">
-      <div class="min-w-0">
+      <div class="live-screen-title min-w-0">
         <div class="flex items-center gap-3">
           <span class="live-screen-wordmark">{{ configuration?.name ?? 'NoCTF' }}</span>
           <span class="live-screen-divider" aria-hidden="true" />
@@ -319,7 +319,7 @@ onUnmounted(() => {
         </div>
       </dl>
 
-      <div class="flex items-center gap-3">
+      <div class="live-screen-controls flex items-center gap-3">
         <div class="hidden text-right sm:block">
           <p class="text-[0.625rem] uppercase tracking-[0.2em] text-slate-500">{{ t('大屏距结束') }}</p>
           <p class="live-screen-countdown font-mono text-lg font-semibold tabular-nums lg:text-2xl">{{ remainingText }}</p>
@@ -495,7 +495,8 @@ onUnmounted(() => {
   display: grid;
   grid-template-rows: auto minmax(0, 1fr) auto;
   width: 100%;
-  min-height: 100svh;
+  height: 100dvh;
+  min-height: 0;
   overflow: hidden;
   color: oklch(0.94 0.015 292);
   background: oklch(0.105 0.025 292);
@@ -530,6 +531,8 @@ onUnmounted(() => {
   background: rgba(7, 5, 16, .95);
 }
 .live-screen-header { min-height: 5.5rem; border-bottom-width: 1px; padding: 1rem 1.5rem; }
+.live-screen-title { flex: 1; }
+.live-screen-controls { flex-shrink: 0; }
 .live-screen-footer { min-height: 2rem; border-top-width: 1px; padding: .4rem 1.5rem; font-size: .625rem; text-transform: uppercase; letter-spacing: .14em; color: #64748b; }
 .live-screen-wordmark { font-family: var(--font-mono); font-weight: 700; letter-spacing: .18em; color: var(--live-purple); text-transform: uppercase; }
 .live-screen-divider { width: 1px; height: 1.75rem; background: rgba(148, 163, 184, .18); }
@@ -540,10 +543,11 @@ onUnmounted(() => {
 .live-screen-metrics dd span { margin-left: .15rem; font-size: .7rem; color: #64748b; }
 .live-screen-countdown { color: var(--live-green); text-shadow: 0 0 18px rgba(45, 255, 143, .45); }
 
-.live-screen-layout { position: relative; z-index: 1; display: grid; grid-template-columns: minmax(0, 1fr) clamp(18rem, 24vw, 27rem); min-height: 0; gap: .75rem; padding: .75rem; }
+.live-screen-layout { position: relative; z-index: 1; display: grid; grid-template-columns: minmax(0, 1fr) clamp(16rem, 23vw, 32rem); min-height: 0; min-width: 0; gap: .75rem; padding: .75rem; }
 .live-arena {
   position: relative;
   min-height: 0;
+  min-width: 0;
   overflow: hidden;
   border: 1px solid var(--live-line);
   background: #070312;
@@ -653,6 +657,18 @@ onUnmounted(() => {
 .live-arena :deep(.live-label-blood-second) { color: #cbd5e1; }
 .live-arena :deep(.live-label-blood-third) { color: #fb923c; }
 
+/* Dense/narrow overviews keep names and points; a focused challenge retains its full label. */
+.live-arena[data-compact-labels="true"] :deep(.live-label:not([data-focus="true"])) {
+  min-width: 0;
+  width: var(--live-label-width);
+  max-width: var(--live-label-width);
+  padding: .25rem .35rem;
+}
+.live-arena[data-compact-labels="true"] :deep(.live-label:not([data-focus="true"]) .live-label-name) { font-size: .7rem; }
+.live-arena[data-compact-labels="true"] :deep(.live-label:not([data-focus="true"]) .live-label-pts) { font-size: .65rem; }
+.live-arena[data-compact-labels="true"] :deep(.live-label:not([data-focus="true"]) .live-label-solves),
+.live-arena[data-compact-labels="true"] :deep(.live-label:not([data-focus="true"]) .live-label-bloods) { display: none; }
+
 /* 解题聚焦横幅。 */
 .live-celebration { position: absolute; z-index: 9; inset: 0; display: grid; place-items: center; pointer-events: none; }
 .live-celebration-flash { position: absolute; inset: 0; background: radial-gradient(circle at center, rgba(111, 255, 169, .3), transparent 48%); animation: live-flash 1.15s ease-out both; }
@@ -682,7 +698,7 @@ onUnmounted(() => {
 .live-blood-third { color: #fb923c; }
 
 /* 右侧面板。 */
-.live-rail { display: flex; min-height: 0; flex-direction: column; gap: .75rem; }
+.live-rail { display: flex; min-height: 0; min-width: 0; flex-direction: column; gap: .75rem; }
 .live-panel { display: flex; flex-direction: column; overflow: hidden; border: 1px solid var(--live-line); background: var(--live-panel); }
 .live-panel-heading { display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid rgba(148, 163, 184, .12); padding: .75rem 1rem; font-size: .7rem; font-weight: 700; letter-spacing: .16em; text-transform: uppercase; }
 .live-panel-heading span { font-family: var(--font-mono); font-size: .55rem; color: #64748b; }
@@ -697,7 +713,7 @@ onUnmounted(() => {
 .live-rank-first .live-rank { color: #fbbf24; }
 .live-rank-second .live-rank { color: #cbd5e1; }
 .live-rank-third .live-rank { color: #fb923c; }
-.live-feed { min-height: 0; overflow: hidden; padding: .4rem; }
+.live-feed { min-height: 0; overflow: auto; padding: .4rem; }
 .live-feed li { display: grid; grid-template-columns: 3.7rem auto minmax(0, 1fr); align-items: start; gap: .5rem; border-bottom: 1px solid rgba(148, 163, 184, .08); padding: .55rem .35rem; }
 .live-feed time { padding-top: .12rem; font-family: var(--font-mono); font-size: .55rem; color: #475569; }
 .live-feed > li > span { border: 1px solid currentColor; border-radius: 999px; padding: .06rem .32rem; font-size: .52rem; font-weight: 700; white-space: nowrap; }
@@ -717,13 +733,39 @@ onUnmounted(() => {
 @keyframes live-card-arrive { 0% { opacity: 0; transform: translateY(-1rem) scale(.84); clip-path: inset(0 50%); } 12% { opacity: 1; transform: translateY(0) scale(1.025); clip-path: inset(0); } 18%, 100% { opacity: 1; transform: scale(1); clip-path: inset(0); } }
 @keyframes live-celebration-progress { from { transform: scaleX(1); } to { transform: scaleX(0); } }
 
-@media (max-width: 900px) {
-  .live-screen { min-height: 100svh; overflow: auto; }
-  .live-screen-header { flex-wrap: wrap; }
+@media (max-width: 1280px) {
+  .live-screen-header { flex-wrap: wrap; gap: .75rem; padding: .75rem 1rem; }
   .live-screen-metrics { order: 3; width: 100%; justify-content: space-around; border-top: 1px solid rgba(148, 163, 184, .1); padding-top: .7rem; }
-  .live-screen-layout { grid-template-columns: 1fr; min-height: 75rem; }
-  .live-arena { min-height: 42rem; }
-  .live-rail { min-height: 35rem; }
+}
+@media (max-width: 900px) {
+  .live-screen { height: auto; min-height: 100dvh; overflow: clip; }
+  .live-screen-layout { grid-template-columns: minmax(0, 1fr); grid-template-rows: clamp(22rem, 62dvh, 44rem) auto; }
+  .live-rail { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .live-panel { height: clamp(16rem, 35dvh, 24rem); }
+}
+@media (max-width: 600px) {
+  .live-screen-title { flex-basis: 100%; }
+  .live-screen-controls { margin-left: auto; }
+  .live-rail { grid-template-columns: minmax(0, 1fr); }
+  .live-arena-heading { inset: .75rem; flex-wrap: wrap; gap: .3rem; }
+  .live-celebration-card { min-width: 0; max-width: 90%; padding: 1rem; }
+}
+@media (min-width: 2560px) and (min-height: 1200px) {
+  .live-screen-header { min-height: 7rem; }
+  .live-screen-title h1 { font-size: 2rem; }
+  .live-screen-metrics { gap: 2.5rem; }
+  .live-screen-metrics dt, .live-screen-footer { font-size: .875rem; }
+  .live-screen-metrics dd { font-size: 2rem; }
+  .live-arena-heading, .live-panel-heading, .live-ranking li { font-size: 1rem; }
+  .live-ranking li { min-height: 3.25rem; }
+  .live-feed p { font-size: .9rem; }
+  .live-feed time, .live-feed > li > span { font-size: .75rem; }
+  .live-feed li { grid-template-columns: 5rem auto minmax(0, 1fr); }
+  .live-arena :deep(.live-label) { min-width: 11rem; max-width: 18rem; padding: .6rem .9rem; }
+  .live-arena :deep(.live-label-name) { font-size: 1rem; }
+  .live-arena :deep(.live-label-pts) { font-size: 1.1rem; }
+  .live-arena :deep(.live-label-solves) { font-size: .875rem; }
+  .live-arena :deep(.live-label-blood) { max-width: 16rem; font-size: .75rem; }
 }
 @media (prefers-reduced-motion: reduce) {
   .live-arena-pulse, .live-rank-track-scroll, .live-celebration-flash, .live-impact-ring, .live-celebration-particle, .live-celebration-card, .live-celebration-progress i { animation: none; }
