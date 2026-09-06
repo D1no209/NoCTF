@@ -76,7 +76,8 @@ describe('participant challenge progress', () => {
       new URL('../app/pages/admin/competitions/new.vue', import.meta.url),
     ).text()
 
-    expect(panel).toContain("competition.status === 'Finished' && competition.practiceModeEnabled === true")
+    expect(panel).toContain('isCtfPracticeOpen(props.competition)')
+    expect(panel).toContain(':practice="practiceOpen"')
     expect(submit).toContain('judgePracticeFlag({')
     expect(submit).toContain('Flag 正确；本次练习不计分')
     expect(submit).not.toContain('judgePracticeFlagEndpoint')
