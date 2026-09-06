@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { canEnterCompetition, isCtfPracticeOpen } from '~/lib/competition-participation'
 import { toast } from 'vue-sonner'
 import {
   ArrowRight,
@@ -129,12 +130,8 @@ const countdown = computed(() => {
   return { label: translate("已结束"), ms: 0 }
 })
 
-const canParticipate = computed(
-  () =>
-    myTeam.value?.registrationStatus === 'Approved'
-    && !myTeam.value?.isBanned
-    && competition.value?.status === 'Running',
-)
+const practiceOpen = computed(() => isCtfPracticeOpen(competition.value))
+const canParticipate = computed(() => canEnterCompetition(competition.value, myTeam.value))
 
 const teamRegistrationOpen = computed(() => {
   const status = competition.value?.status
@@ -291,6 +288,10 @@ const isCaptain = computed(
             </span>
           </div>
 
+          <p v-if="practiceOpen" class="text-sm text-muted-foreground">
+            {{ $t('赛后练习已开放，原已审核通过且未封禁的队伍可进入；练习不影响正式成绩。') }}
+          </p>
+
           <div class="flex flex-wrap items-center gap-3 pt-1">
             <template v-if="!teamLoaded">
               <Skeleton class="h-10 w-32" />
@@ -299,7 +300,7 @@ const isCaptain = computed(
             <template v-else-if="!isLoggedIn">
               <Button as-child size="lg">
                 <NuxtLink :to="`/auth/login?redirect=/competitions/${competitionId}`">
-                  <LogIn data-icon="inline-start" /> {{ $t('登录 / 注册后报名') }} </NuxtLink>
+                  <LogIn data-icon="inline-start" /> {{ practiceOpen ? $t('登录后进入练习') : $t('登录 / 注册后报名') }} </NuxtLink>
               </Button>
             </template>
 
@@ -422,7 +423,7 @@ const isCaptain = computed(
 
             <template v-else>
               <Button v-if="canParticipate" as-child size="lg">
-                <NuxtLink :to="`/competitions/${competitionId}/challenges`"> {{ $t('进入比赛') }} <ArrowRight data-icon="inline-end" />
+                <NuxtLink :to="`/competitions/${competitionId}/challenges`"> {{ practiceOpen ? $t('进入练习') : $t('进入比赛') }} <ArrowRight data-icon="inline-end" />
                 </NuxtLink>
               </Button>
               <Button as-child size="lg" variant="outline">

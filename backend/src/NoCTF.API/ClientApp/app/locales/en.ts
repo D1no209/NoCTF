@@ -1,5 +1,8 @@
 /** English UI resources keyed by the canonical Simplified Chinese source text. */
 export const englishMessages: Record<string, string> = {
+  "进入练习": "Enter practice",
+  "登录后进入练习": "Sign in to practice",
+  "赛后练习已开放，原已审核通过且未封禁的队伍可进入；练习不影响正式成绩。": "Post-competition practice is open to approved, non-banned participating teams. Practice does not affect official results.",
   "允许 Checker 以 root 运行": "Allow the Checker to run as root",
   "允许 Checker 以 root 运行前必须启用 Checker": "Enable the Checker before allowing it to run as root",
   "默认关闭，镜像须声明非零数字 USER。开启后允许镜像使用 root，但不会强制切换用户，也不会授予特权模式或宿主机权限。": "Off by default; the image must declare a nonzero numeric USER. Enabling this permits root without overriding the image user or granting privileged mode or host access.",

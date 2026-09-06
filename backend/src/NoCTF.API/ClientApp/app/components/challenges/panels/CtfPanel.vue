@@ -1,13 +1,17 @@
 <script setup lang="ts">
+import { isCtfPracticeOpen } from '~/lib/competition-participation'
 import type {
   NoCtfapiEndpointsChallengesChallengeResponse,
   NoCtfapiEndpointsCompetitionsCompetitionResponse,
 } from '~/api'
 
-defineProps<{
+const props = defineProps<{
   competition: NoCtfapiEndpointsCompetitionsCompetitionResponse
   challenge: NoCtfapiEndpointsChallengesChallengeResponse
 }>()
+
+const practiceOpen = computed(() => isCtfPracticeOpen(props.competition))
+const actionsAvailable = computed(() => props.competition.status === 'Running' || practiceOpen.value)
 
 const emit = defineEmits<{ submitted: [] }>()
 
@@ -21,7 +25,7 @@ function handleEvaluation(result?: string | null): void {
 <template>
   <div class="flex flex-col divide-y">
     <RuntimeCard
-      v-if="challenge.hasRuntime === true && (competition.status === 'Running' || competition.status === 'Finished' && competition.practiceModeEnabled === true)"
+      v-if="challenge.hasRuntime === true && actionsAvailable"
       ref="runtimeCard"
       class="pb-5"
       :competition-id="competition.id!"
@@ -29,11 +33,11 @@ function handleEvaluation(result?: string | null): void {
       controls="full"
     />
     <FlagSubmit
-      v-if="competition.status === 'Running' || competition.status === 'Finished' && competition.practiceModeEnabled === true"
+      v-if="actionsAvailable"
       class="pt-5"
       :competition-id="competition.id!"
       :competition-challenge-id="challenge.id!"
-      :practice="competition.status === 'Finished' && competition.practiceModeEnabled === true"
+      :practice="practiceOpen"
       :maximum-attempts="challenge.maximumFlagAttempts"
       :remaining-attempts="challenge.remainingFlagAttempts"
       @evaluated="handleEvaluation"
