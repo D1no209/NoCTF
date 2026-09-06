@@ -1,4 +1,5 @@
 import { describe, expect, test } from 'bun:test'
+import { emptyPlatformRuntimeFilters, platformRuntimeQuery } from '../app/utils/platform-runtime-filters'
 
 describe('platform runtime administration', () => {
   test('adds an administrator-only global container inventory to the platform workspace', async () => {
@@ -15,11 +16,35 @@ describe('platform runtime administration', () => {
     expect(page).toContain('adminPlatformTerminateRuntime')
     expect(page).toContain('adminPlatformForceTerminateRuntime')
     expect(page).toContain("item.scope === 'ChallengeTest'")
-    expect(page).toContain('v-else-if="item.runtime?.challengeId"')
-    expect(page).toContain('`/admin/challenges/${item.runtime.challengeId}`')
+    expect(page).toContain('v-else-if="detail.runtime?.challengeId"')
+    expect(page).toContain('`/admin/challenges/${detail.runtime.challengeId}`')
     expect(page).toContain('useCursorPagination<PlatformRuntime>')
     expect(page).toContain('setInterval(() => void refresh(), 10_000)')
     expect(page).not.toContain("fetch('/api")
+  })
+
+  test('snapshots applied server filters independently from form edits', () => {
+    const filters = emptyPlatformRuntimeFilters()
+    expect(platformRuntimeQuery(filters)).toEqual({ search: undefined, scope: undefined, state: undefined, runtimeKind: undefined })
+    Object.assign(filters, { search: '  soul  ', scope: 'Competition', state: 'Running', kind: 'Container' })
+    const applied = platformRuntimeQuery(filters)
+    filters.search = 'another team'
+    filters.state = 'Stopping'
+    expect(applied).toEqual({ search: 'soul', scope: 'Competition', state: 'Running', runtimeKind: 'Container' })
+    expect(platformRuntimeQuery(filters).state).toBe('Stopping')
+  })
+
+  test('uses a compact filter form, wrapping cells and a detail sheet instead of an oversized card table', async () => {
+    const page = await Bun.file(new URL('../app/pages/admin/platform/runtimes.vue', import.meta.url)).text()
+    const workspace = await Bun.file(new URL('../app/components/app/AppWorkspaceNav.vue', import.meta.url)).text()
+    expect(workspace).toContain('<SidebarInset class="min-w-0">')
+    expect(page).toContain('<form @submit.prevent="applyFilters">')
+    expect(page).toContain('query: { ...appliedQuery.value, cursor, limit: 50 }')
+    expect(page).toContain('appliedQuery.value = platformRuntimeQuery(filters)\n  reset()')
+    expect(page).toContain('whitespace-normal break-words')
+    expect(page).toContain('<SheetTitle>')
+    expect(page).not.toContain('min-w-64')
+    expect(page).not.toContain('<Card v-else-if="items.length > 0"')
   })
 
   test('keeps destructive runtime targets until the generated SDK request completes', async () => {
@@ -33,5 +58,9 @@ describe('platform runtime administration', () => {
     expect(page).toContain('if (!open && !forceTerminatePending) forceTerminateTarget = null')
     expect(page).toContain('terminateTarget.value = null')
     expect(page).toContain('forceTerminateTarget.value = null')
+    expect(page).toContain('terminationError.value = parseApiError(requestError).message')
+    expect(page).toContain('forceTerminationError.value = parseApiError(requestError).message')
+    expect(page).toContain('<Alert v-if="terminationError" variant="destructive">')
+    expect(page).toContain('<Alert v-if="forceTerminationError" variant="destructive">')
   })
 })

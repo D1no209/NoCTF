@@ -14,11 +14,13 @@ const isCompose = computed(() => props.model.runtime?.definition.kind === 'compo
 
 function toggleChecker(enabled: boolean): void {
   props.model.checker = enabled ? { job: emptyRunnerJob(), targetServiceName: '' } : null
+  if (!enabled) props.model.checkerAllowRoot = false
 }
 
 function toggleCheckerJob(enabled: boolean): void {
   props.model.checkerJob = enabled ? emptyRunnerJob() : null
   if (!enabled) props.model.checkerFixInput = false
+  if (!enabled) props.model.checkerAllowRoot = false
 }
 </script>
 
@@ -80,4 +82,17 @@ function toggleCheckerJob(enabled: boolean): void {
       {{ $t('启用 Fix 一次性验证 Checker 后，才可向 Checker 提供 Fix 包。') }}
     </FieldDescription>
   </FieldSet>
+
+  <FieldGroup v-if="(mode === 'Awd' && model.checker) || (mode === 'Awdp' && model.checkerJob)">
+    <Field orientation="horizontal" :data-disabled="disabled">
+      <Switch id="def-checker-allow-root" v-model="model.checkerAllowRoot" :disabled="disabled" />
+      <FieldContent>
+        <FieldLabel for="def-checker-allow-root">{{ $t('允许 Checker 以 root 运行') }}</FieldLabel>
+        <FieldDescription>
+          {{ $t('默认关闭，镜像须声明非零数字 USER。开启后允许镜像使用 root，但不会强制切换用户，也不会授予特权模式或宿主机权限。') }}
+          {{ $t('仅对可信 Checker 开启；网络隔离、能力限制和禁止提权仍然生效，不影响 Target 或 Patch 的运行用户。') }}
+        </FieldDescription>
+      </FieldContent>
+    </Field>
+  </FieldGroup>
 </template>

@@ -1,5 +1,13 @@
 /** English UI resources keyed by the canonical Simplified Chinese source text. */
 export const englishMessages: Record<string, string> = {
+  "允许 Checker 以 root 运行": "Allow the Checker to run as root",
+  "允许 Checker 以 root 运行前必须启用 Checker": "Enable the Checker before allowing it to run as root",
+  "默认关闭，镜像须声明非零数字 USER。开启后允许镜像使用 root，但不会强制切换用户，也不会授予特权模式或宿主机权限。": "Off by default; the image must declare a nonzero numeric USER. Enabling this permits root without overriding the image user or granting privileged mode or host access.",
+  "仅对可信 Checker 开启；网络隔离、能力限制和禁止提权仍然生效，不影响 Target 或 Patch 的运行用户。": "Enable only for trusted Checkers. Network isolation, capability limits and no-new-privileges remain enforced; the Target and Patch users are unchanged.",
+  "搜索赛事、题目或队伍": "Search competition, challenge or team",
+  "来源(全部)": "All sources",
+  "赛事容器": "Competition containers",
+  "仅显示活动容器，可按赛事、题目或来源队伍搜索。": "Active containers only. Search by competition, challenge or attributed team.",
   "向 Checker 提供 Fix 包": "Provide the Fix package to the Checker",
   "Checker 启动前将在固定目录 /noctf/fix 获得经过平台验证的 Fix 内容。": "Before it starts, the Checker receives the platform-validated Fix contents at the fixed /noctf/fix directory.",
   "启用 Fix 一次性验证 Checker 后，才可向 Checker 提供 Fix 包。": "Enable the one-shot Fix Checker before providing it with the Fix package.",

@@ -88,6 +88,9 @@ export function validateChallengeTemplateDraft(draft: ChallengeTemplateDraft): s
   }
   if (draft.mode === 'Awdp' && model.checkerFixInput && !model.checkerJob)
     addIssue(issues, translate('向 Checker 提供 Fix 包前必须启用 Checker'))
+  if (model.checkerAllowRoot
+    && ((draft.mode === 'Awd' && !model.checker) || (draft.mode === 'Awdp' && !model.checkerJob)))
+    addIssue(issues, translate('允许 Checker 以 root 运行前必须启用 Checker'))
   const runtime = model.runtime
   if (!runtime) {
     validateRunnerJob(

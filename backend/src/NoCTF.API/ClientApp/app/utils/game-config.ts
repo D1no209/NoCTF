@@ -163,6 +163,7 @@ export interface DefinitionModel {
   readyTimeoutSeconds: number | null
   maximumPatchUploadBytes: number | null
   checkerFixInput: boolean
+  checkerAllowRoot: boolean
 }
 
 export const DEFAULT_MAXIMUM_PATCH_UPLOAD_BYTES = 256 * 1024 * 1024
@@ -261,6 +262,7 @@ export function emptyDefinition(mode: GameModeValue): DefinitionModel {
     readyTimeoutSeconds: null,
     maximumPatchUploadBytes: mode === 'Awdp' ? DEFAULT_MAXIMUM_PATCH_UPLOAD_BYTES : null,
     checkerFixInput: false,
+    checkerAllowRoot: false,
   }
 }
 
@@ -424,6 +426,8 @@ export function parseDefinition(
   const obj = parseJsonObject(json)
   if (!obj) return null
   const model = emptyDefinition(mode)
+  if (mode === 'Awd' || mode === 'Awdp')
+    model.checkerAllowRoot = obj.checkerAllowRoot === true
   model.runtime = obj.runtime ? parseRuntimeTemplate(obj.runtime) : null
   if (mode === 'Awd' && obj.checker) {
     const checker = asObject(obj.checker) ?? {}
@@ -596,6 +600,8 @@ function serializeRunnerJob(job: RunnerJobModel): JsonObject {
 /** 按模式白名单序列化编辑模型为 definitionJson。 */
 export function serializeDefinition(mode: GameModeValue, model: DefinitionModel): string {
   const obj: JsonObject = { schemaVersion: DEFINITION_SCHEMA_VERSION[mode] }
+  if (mode === 'Awd' || mode === 'Awdp')
+    obj.checkerAllowRoot = model.checkerAllowRoot
   if (model.runtime) obj.runtime = serializeRuntimeTemplate(model.runtime)
   if (mode === 'Awd') {
     if (model.checker) {
