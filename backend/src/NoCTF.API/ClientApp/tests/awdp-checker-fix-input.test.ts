@@ -15,6 +15,7 @@ describe('AWDP Checker Fix input', () => {
     expect(model?.checkerFixInput).toBeFalse()
     expect(serializeDefinition('Awdp', model!)).toBe(JSON.stringify({
       schemaVersion: 4,
+      checkerAllowRoot: false,
       maximumPatchUploadBytes: 256 * 1024 * 1024,
       checkerFixInput: false,
     }, null, 2))

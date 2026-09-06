@@ -6093,6 +6093,10 @@ export type AdminPlatformListActiveRuntimesData = {
     body?: never;
     path?: never;
     query: {
+        search?: string | null;
+        scope?: NoCtfapiEndpointsAdministrationPlatformPlatformRuntimeScopeProtocol | null;
+        state?: NoCtfapiEndpointsRuntimeRuntimeStateProtocol | null;
+        runtimeKind?: NoCtfapiEndpointsRuntimeRuntimeKindProtocol | null;
         cursor?: string | null;
         limit: number;
     };

@@ -12,10 +12,15 @@ import type {
 } from '~/api'
 import { createLatestPageRefresh } from '~/lib/latest-page-refresh'
 import { adminRuntimeTeamLabel } from '~/utils/admin-runtime'
+import { emptyPlatformRuntimeFilters, platformRuntimeQuery } from '~/utils/platform-runtime-filters'
 
 definePageMeta({ middleware: 'platform-admin' })
 
 type PlatformRuntime = NoCtfapiEndpointsAdministrationPlatformPlatformRuntimeResponse
+
+const filters = reactive(emptyPlatformRuntimeFilters())
+const appliedQuery = ref(platformRuntimeQuery(filters))
+const detailTarget = ref<PlatformRuntime | null>(null)
 
 const {
   items,
@@ -27,7 +32,7 @@ const {
   reset,
 } = useCursorPagination<PlatformRuntime>(async (cursor) => {
   const { data, error: requestError } = await adminPlatformListActiveRuntimes({
-    query: { cursor, limit: 100 },
+    query: { ...appliedQuery.value, cursor, limit: 50 },
   })
   if (requestError || !data) throw parseApiError(requestError)
   return data
@@ -41,12 +46,27 @@ const {
   reset: () => reset({ preserveItems: true }),
 })
 
+const detail = computed(() => items.value.find(item => item.runtime?.id === detailTarget.value?.runtime?.id) ?? detailTarget.value)
+
+async function applyFilters(): Promise<void> {
+  appliedQuery.value = platformRuntimeQuery(filters)
+  reset()
+  await refresh()
+}
+
+function clearFilters(): void {
+  Object.assign(filters, emptyPlatformRuntimeFilters())
+  void applyFilters()
+}
+
 const terminateTarget = ref<PlatformRuntime | null>(null)
 const terminatePending = ref(false)
+const terminationError = ref<string | null>(null)
 const forceTerminateTarget = ref<PlatformRuntime | null>(null)
 const forceTerminateReason = ref('')
 const forceTerminateConfirmed = ref(false)
 const forceTerminatePending = ref(false)
+const forceTerminationError = ref<string | null>(null)
 
 let refreshTimer: ReturnType<typeof setInterval> | undefined
 
@@ -71,7 +91,13 @@ function canTerminate(item: PlatformRuntime): boolean {
   return state === 'Queued' || state === 'Provisioning' || state === 'Running'
 }
 
+function openTermination(item: PlatformRuntime): void {
+  terminationError.value = null
+  terminateTarget.value = item
+}
+
 function openForceTermination(item: PlatformRuntime): void {
+  forceTerminationError.value = null
   forceTerminateTarget.value = item
   forceTerminateReason.value = ''
   forceTerminateConfirmed.value = false
@@ -81,6 +107,7 @@ async function submitTermination(): Promise<void> {
   const runtime = runtimeOf(terminateTarget.value)
   if (!runtime?.id || terminatePending.value) return
   terminatePending.value = true
+  terminationError.value = null
   try {
     const { error: requestError } = await adminPlatformTerminateRuntime({
       path: { runtimeInstanceId: runtime.id },
@@ -91,7 +118,8 @@ async function submitTermination(): Promise<void> {
     await refresh()
   }
   catch (requestError) {
-    toast.error(parseApiError(requestError).message)
+    terminationError.value = parseApiError(requestError).message
+    toast.error(terminationError.value)
   }
   finally {
     terminatePending.value = false
@@ -108,6 +136,7 @@ async function submitForceTermination(): Promise<void> {
     return
 
   forceTerminatePending.value = true
+  forceTerminationError.value = null
   try {
     const { error: requestError } = await adminPlatformForceTerminateRuntime({
       path: { runtimeInstanceId: runtime.id },
@@ -119,7 +148,8 @@ async function submitForceTermination(): Promise<void> {
     await refresh()
   }
   catch (requestError) {
-    toast.error(parseApiError(requestError).message)
+    forceTerminationError.value = parseApiError(requestError).message
+    toast.error(forceTerminationError.value)
   }
   finally {
     forceTerminatePending.value = false
@@ -137,24 +167,76 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div class="flex flex-col gap-4">
+  <div class="flex min-w-0 flex-col gap-4">
+    <div class="flex flex-wrap items-center justify-between gap-3">
+      <h2 class="text-lg font-semibold">{{ $t('运行容器') }}</h2>
+      <Button variant="outline" size="sm" :disabled="loading" @click="refresh">
+        <Spinner v-if="loading" data-icon="inline-start" />
+        <RefreshCw v-else data-icon="inline-start" />
+        {{ $t('刷新') }}
+      </Button>
+    </div>
     <Card>
-      <CardHeader class="flex-row items-start justify-between gap-4">
-        <div>
-          <CardTitle>{{ $t('运行容器') }}</CardTitle>
-          <CardDescription>{{ $t('集中查看并终止全平台当前活动的 Container 与 Compose 运行环境') }}</CardDescription>
-        </div>
-        <Button variant="outline" size="sm" :disabled="loading" @click="refresh">
-          <Spinner v-if="loading" data-icon="inline-start" />
-          <RefreshCw v-else data-icon="inline-start" />
-          {{ $t('刷新') }}
-        </Button>
+      <CardHeader class="sr-only">
+        <CardTitle>{{ $t('应用筛选') }}</CardTitle>
+        <CardDescription>{{ $t('仅显示活动容器，可按赛事、题目或来源队伍搜索。') }}</CardDescription>
       </CardHeader>
-      <CardContent class="flex flex-wrap gap-x-6 gap-y-2 text-sm text-muted-foreground">
-        <span>{{ $t('当前已载入 {count} 个活动容器', { count: items.length }) }}</span>
-        <span>{{ $t('页面每 10 秒自动刷新') }}</span>
+      <CardContent>
+        <form @submit.prevent="applyFilters">
+          <FieldGroup class="grid gap-3 sm:grid-cols-2 xl:grid-cols-[minmax(12rem,1fr)_repeat(3,minmax(7rem,9rem))_auto] xl:items-end">
+            <Field>
+              <FieldLabel for="platform-runtime-search" class="sr-only">{{ $t('搜索赛事、题目或队伍') }}</FieldLabel>
+              <Input id="platform-runtime-search" v-model="filters.search" maxlength="200" :placeholder="$t('搜索赛事、题目或队伍')" />
+            </Field>
+            <Field>
+              <FieldLabel for="platform-runtime-scope" class="sr-only">{{ $t('来源(全部)') }}</FieldLabel>
+              <Select v-model="filters.scope">
+                <SelectTrigger id="platform-runtime-scope" class="w-full"><SelectValue /></SelectTrigger>
+                <SelectContent><SelectGroup>
+                  <SelectItem value="all">{{ $t('来源(全部)') }}</SelectItem>
+                  <SelectItem value="Competition">{{ $t('赛事容器') }}</SelectItem>
+                  <SelectItem value="ChallengeTest">{{ $t('题目测试') }}</SelectItem>
+                </SelectGroup></SelectContent>
+              </Select>
+            </Field>
+            <Field>
+              <FieldLabel for="platform-runtime-state" class="sr-only">{{ $t('状态(全部)') }}</FieldLabel>
+              <Select v-model="filters.state">
+                <SelectTrigger id="platform-runtime-state" class="w-full"><SelectValue /></SelectTrigger>
+                <SelectContent><SelectGroup>
+                  <SelectItem value="all">{{ $t('状态(全部)') }}</SelectItem>
+                  <SelectItem value="Queued">{{ $t('排队中') }}</SelectItem>
+                  <SelectItem value="Provisioning">{{ $t('准备中') }}</SelectItem>
+                  <SelectItem value="Running">{{ $t('运行中') }}</SelectItem>
+                  <SelectItem value="Stopping">{{ $t('停止中') }}</SelectItem>
+                </SelectGroup></SelectContent>
+              </Select>
+            </Field>
+            <Field>
+              <FieldLabel for="platform-runtime-kind" class="sr-only">{{ $t('类型(全部)') }}</FieldLabel>
+              <Select v-model="filters.kind">
+                <SelectTrigger id="platform-runtime-kind" class="w-full"><SelectValue /></SelectTrigger>
+                <SelectContent><SelectGroup>
+                  <SelectItem value="all">{{ $t('类型(全部)') }}</SelectItem>
+                  <SelectItem value="Container">{{ $t('容器') }}</SelectItem>
+                  <SelectItem value="Compose">Compose</SelectItem>
+                </SelectGroup></SelectContent>
+              </Select>
+            </Field>
+            <Field orientation="horizontal">
+              <Button type="submit" size="sm" :disabled="loading">
+                <Spinner v-if="loading" data-icon="inline-start" />{{ $t('应用筛选') }}
+              </Button>
+              <Button type="button" variant="ghost" size="sm" :disabled="loading" @click="clearFilters">{{ $t('清空') }}</Button>
+            </Field>
+          </FieldGroup>
+        </form>
       </CardContent>
     </Card>
+    <div class="flex flex-wrap justify-between gap-2 text-xs text-muted-foreground" role="status">
+      <span>{{ $t('当前已载入 {count} 个活动容器', { count: items.length }) }}</span>
+      <span>{{ $t('页面每 10 秒自动刷新') }}</span>
+    </div>
 
     <Alert v-if="error" variant="destructive">
       <AlertDescription>{{ error.message }}</AlertDescription>
@@ -163,64 +245,52 @@ onBeforeUnmount(() => {
     <Skeleton v-if="loading && !initialized" class="h-64 w-full" />
     <Empty v-else-if="initialized && items.length === 0 && !error" class="border border-dashed py-14">
       <EmptyHeader>
-        <EmptyTitle>{{ $t('没有正在运行的容器') }}</EmptyTitle>
+        <EmptyTitle>{{ $t('没有符合条件的运行时实例') }}</EmptyTitle>
         <EmptyDescription>{{ $t('排队、创建中、运行中和停止中的 Container/Compose 实例会显示在这里。') }}</EmptyDescription>
       </EmptyHeader>
     </Empty>
 
-    <Card v-else-if="items.length > 0" class="overflow-hidden py-0">
-      <Table>
+    <template v-else-if="items.length > 0">
+      <Table class="min-w-[48rem] table-fixed">
         <TableHeader>
           <TableRow>
-            <TableHead>{{ $t('赛事 / 题目') }}</TableHead>
-            <TableHead>{{ $t('归属队伍') }}</TableHead>
-            <TableHead>{{ $t('运行位置') }}</TableHead>
-            <TableHead>{{ $t('状态') }}</TableHead>
-            <TableHead>{{ $t('创建 / 到期') }}</TableHead>
-            <TableHead class="text-right">{{ $t('操作') }}</TableHead>
+            <TableHead class="w-[20%]">{{ $t('队伍') }}</TableHead>
+            <TableHead class="w-[29%]">{{ $t('赛事 / 题目') }}</TableHead>
+            <TableHead class="w-[9%]">{{ $t('类型') }}</TableHead>
+            <TableHead class="w-[10%]">{{ $t('状态') }}</TableHead>
+            <TableHead class="w-[17%]">{{ $t('到期时间') }}</TableHead>
+            <TableHead class="w-[15%] text-right">{{ $t('操作') }}</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
           <TableRow v-for="item in items" :key="item.runtime?.id">
-            <TableCell class="min-w-64">
+            <TableCell class="whitespace-normal break-words font-medium">{{ teamLabel(item) }}</TableCell>
+            <TableCell class="whitespace-normal break-words">
               <div class="grid gap-1">
-                <span class="font-semibold">{{ item.scope === 'ChallengeTest' ? $t('题目测试') : item.competitionTitle ?? '-' }}</span>
-                <span class="text-xs text-muted-foreground">{{ item.challengeTitle ?? '-' }}</span>
+                <span>{{ item.challengeTitle ?? '-' }}</span>
+                <span class="text-xs text-muted-foreground">{{ item.scope === 'ChallengeTest' ? $t('题目测试') : item.competitionTitle ?? '-' }}</span>
               </div>
             </TableCell>
-            <TableCell class="min-w-40 font-medium">{{ teamLabel(item) }}</TableCell>
-            <TableCell class="min-w-44">
-              <div class="grid gap-1 text-xs">
-                <span>{{ enumLabel(RuntimeKindLabel, item.runtime?.runtimeKind) }} · {{ enumLabel(RuntimeProviderLabel, item.runtime?.provider) }}</span>
-                <span class="font-mono text-muted-foreground">{{ item.runtime?.runnerId ?? $t('尚未分配 Runner') }}</span>
-              </div>
+            <TableCell class="whitespace-normal break-words">
+              {{ enumLabel(RuntimeKindLabel, item.runtime?.runtimeKind) }}
             </TableCell>
             <TableCell>
               <Badge :variant="stateBadgeVariant(item.runtime?.state)">
                 {{ enumLabel(RuntimeStateLabel, item.runtime?.state) }}
               </Badge>
             </TableCell>
-            <TableCell class="min-w-52 font-mono text-xs tabular-nums">
-              <div>{{ adminFormatDateTime(item.runtime?.createdAt) }}</div>
-              <div class="text-muted-foreground">{{ adminFormatDateTime(item.runtime?.expiresAt) }}</div>
+            <TableCell class="whitespace-normal font-mono text-xs tabular-nums">
+              {{ adminFormatDateTime(item.runtime?.expiresAt) }}
             </TableCell>
-            <TableCell class="min-w-64 text-right">
+            <TableCell class="text-right">
               <div class="flex flex-wrap justify-end gap-1">
-                <Button v-if="item.runtime?.competitionId" variant="ghost" size="sm" as-child>
-                  <NuxtLink :to="`/admin/competitions/${item.runtime.competitionId}/runtimes`">
-                    <ExternalLink data-icon="inline-start" /> {{ $t('赛事运行时') }}
-                  </NuxtLink>
-                </Button>
-                <Button v-else-if="item.runtime?.challengeId" variant="ghost" size="sm" as-child>
-                  <NuxtLink :to="`/admin/challenges/${item.runtime.challengeId}`">
-                    <ExternalLink data-icon="inline-start" /> {{ $t('题目模板') }}
-                  </NuxtLink>
-                </Button>
+                <Button variant="ghost" size="sm" @click="detailTarget = item">{{ $t('详情') }}</Button>
                 <Button
                   v-if="canTerminate(item)"
                   variant="destructive"
                   size="sm"
-                  @click="terminateTarget = item"
+                  :disabled="terminatePending || forceTerminatePending"
+                  @click="openTermination(item)"
                 >
                   {{ $t('终止') }}
                 </Button>
@@ -228,6 +298,7 @@ onBeforeUnmount(() => {
                   v-if="item.runtime?.canForceTerminate"
                   variant="destructive"
                   size="sm"
+                  :disabled="terminatePending || forceTerminatePending"
                   @click="openForceTermination(item)"
                 >
                   {{ $t('强制终结') }}
@@ -242,7 +313,40 @@ onBeforeUnmount(() => {
           <Spinner v-if="loading" data-icon="inline-start" /> {{ $t('加载更多') }}
         </Button>
       </div>
-    </Card>
+    </template>
+
+    <Sheet :open="detailTarget !== null" @update:open="(open) => { if (!open) detailTarget = null }">
+      <SheetContent class="overflow-y-auto">
+        <SheetHeader>
+          <SheetTitle>{{ $t('运行时详情') }}</SheetTitle>
+          <SheetDescription class="break-all font-mono text-xs">{{ detail?.runtime?.id }}</SheetDescription>
+        </SheetHeader>
+        <div v-if="detail" class="flex flex-col gap-4 px-4 pb-4 text-sm">
+          <dl class="grid grid-cols-[auto_minmax(0,1fr)] gap-x-4 gap-y-3">
+            <dt class="text-muted-foreground">{{ $t('队伍') }}</dt><dd class="break-words">{{ teamLabel(detail) }}</dd>
+            <dt class="text-muted-foreground">{{ $t('赛事 / 题目') }}</dt>
+            <dd class="break-words">{{ detail.challengeTitle }}<p class="mt-1 text-xs text-muted-foreground">{{ detail.competitionTitle ?? $t('题目测试') }}</p></dd>
+            <dt class="text-muted-foreground">{{ $t('类型') }}</dt><dd>{{ enumLabel(RuntimeKindLabel, detail.runtime?.runtimeKind) }}</dd>
+            <dt class="text-muted-foreground">{{ $t('状态') }}</dt><dd><Badge :variant="stateBadgeVariant(detail.runtime?.state)">{{ enumLabel(RuntimeStateLabel, detail.runtime?.state) }}</Badge></dd>
+            <dt class="text-muted-foreground">{{ $t('运行位置') }}</dt><dd class="break-all">{{ enumLabel(RuntimeProviderLabel, detail.runtime?.provider) }}<p class="mt-1 font-mono text-xs">{{ detail.runtime?.runnerId ?? $t('尚未分配 Runner') }}</p></dd>
+            <dt class="text-muted-foreground">{{ $t('创建时间') }}</dt><dd class="font-mono text-xs tabular-nums">{{ adminFormatDateTime(detail.runtime?.createdAt) }}</dd>
+            <dt class="text-muted-foreground">{{ $t('到期时间') }}</dt><dd class="font-mono text-xs tabular-nums">{{ adminFormatDateTime(detail.runtime?.expiresAt) }}</dd>
+          </dl>
+          <template v-if="detail.runtime?.urls?.length">
+            <Separator />
+            <p class="font-medium">{{ $t('访问入口') }}</p>
+            <code v-for="url in detail.runtime.urls" :key="url" class="whitespace-pre-wrap break-all text-xs">{{ url }}</code>
+          </template>
+          <Separator />
+          <Button v-if="detail.runtime?.competitionId" variant="outline" as-child>
+            <NuxtLink :to="`/admin/competitions/${detail.runtime.competitionId}/runtimes`"><ExternalLink data-icon="inline-start" />{{ $t('赛事运行时') }}</NuxtLink>
+          </Button>
+          <Button v-else-if="detail.runtime?.challengeId" variant="outline" as-child>
+            <NuxtLink :to="`/admin/challenges/${detail.runtime.challengeId}`"><ExternalLink data-icon="inline-start" />{{ $t('题目模板') }}</NuxtLink>
+          </Button>
+        </div>
+      </SheetContent>
+    </Sheet>
 
     <AlertDialog
       :open="terminateTarget !== null"
@@ -258,6 +362,9 @@ onBeforeUnmount(() => {
             }) }}
           </AlertDialogDescription>
         </AlertDialogHeader>
+        <Alert v-if="terminationError" variant="destructive">
+          <AlertDescription>{{ terminationError }}</AlertDescription>
+        </Alert>
         <AlertDialogFooter>
           <AlertDialogCancel :disabled="terminatePending">{{ $t('取消') }}</AlertDialogCancel>
           <Button type="button" variant="destructive" :disabled="terminatePending" @click="submitTermination">
@@ -279,18 +386,22 @@ onBeforeUnmount(() => {
           </AlertDialogDescription>
         </AlertDialogHeader>
         <FieldGroup>
+          <Alert v-if="forceTerminationError" variant="destructive">
+            <AlertDescription>{{ forceTerminationError }}</AlertDescription>
+          </Alert>
           <Field>
             <FieldLabel for="platform-force-termination-reason">{{ $t('操作原因') }}</FieldLabel>
             <Textarea
               id="platform-force-termination-reason"
               v-model="forceTerminateReason"
+              :disabled="forceTerminatePending"
               maxlength="512"
               :placeholder="$t('至少 8 个字符，用于定位本次资源清理操作')"
             />
             <FieldDescription>{{ forceTerminateReason.trim().length }}/512</FieldDescription>
           </Field>
           <Field orientation="horizontal">
-            <Checkbox id="platform-force-termination-confirm" v-model="forceTerminateConfirmed" />
+            <Checkbox id="platform-force-termination-confirm" v-model="forceTerminateConfirmed" :disabled="forceTerminatePending" />
             <FieldLabel for="platform-force-termination-confirm" class="font-normal">
               {{ $t('我确认这是卡住的实例，并理解清理失败时实例不会被强改为 Stopped。') }}
             </FieldLabel>

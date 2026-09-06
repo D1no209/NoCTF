@@ -22,7 +22,7 @@ defineProps<{
         <WorkspaceNavMenu :groups="groups" />
       </SidebarContent>
     </Sidebar>
-    <SidebarInset>
+    <SidebarInset class="min-w-0">
       <div class="flex items-center gap-2 border-b px-3 py-2 md:hidden">
         <SidebarTrigger />
         <span v-if="title" class="truncate text-sm font-semibold">{{ title }}</span>
