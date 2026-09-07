@@ -11,6 +11,7 @@ import {
   scoreboardRankingStateLabel,
   scoreboardTeamChallengeScore,
   scoreboardTeamChallengeSignals,
+  scoreboardTeamAchievements,
   scoreboardTeamDirectionScore,
 } from '~/utils/scoreboard'
 import type { ScoreboardChallengeColumnGroup } from '~/utils/scoreboard'
@@ -97,8 +98,9 @@ const rows = computed(() => props.columnGroups.map((group) => {
     signals: props.team
       ? scoreboardTeamChallengeSignals(props.team, group, props.mode)
       : null,
+    achievements: scoreboardTeamAchievements(props.team, group.competitionChallengeId, props.mode),
   }
-}))
+}).filter(row => props.mode !== 'Ctf' && props.mode !== 'Awdp' || row.achievements.length > 0))
 
 const directionGroups = computed(() => scoreboardDirectionGroups(props.columnGroups))
 
@@ -172,13 +174,13 @@ function flagLabel(succeeded: boolean): string {
 
 <template>
   <Dialog v-model:open="open">
-    <DialogScrollContent class="max-h-[90vh] sm:max-w-4xl">
-      <DialogHeader>
+    <DialogContent class="flex max-h-[calc(100dvh-2rem)] flex-col overflow-clip p-0 sm:max-w-5xl">
+      <DialogHeader class="shrink-0 border-b px-5 py-4 pr-12">
         <DialogTitle>{{ team?.teamName ?? $t('队伍详情') }}</DialogTitle>
         <DialogDescription>{{ $t('各轴按题目方向汇总计入总分的有效分值，点击矩阵状态图标可查看逐轮明细。') }}</DialogDescription>
       </DialogHeader>
 
-      <template v-if="team">
+      <div v-if="team" class="flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto overscroll-contain p-4 *:shrink-0 sm:p-5" data-testid="team-detail-scroll">
         <div class="grid gap-px overflow-hidden rounded-lg border bg-border sm:grid-cols-3">
           <div class="bg-background p-4"><p class="text-xs text-muted-foreground">{{ $t('排名') }}</p><p class="mt-1 font-mono text-lg font-semibold tabular-nums">#{{ team.rank ?? '—' }}</p></div>
           <div class="bg-background p-4"><p class="text-xs text-muted-foreground">{{ $t('总分') }}</p><p class="mt-1 font-mono text-lg font-semibold tabular-nums">{{ team.totalScore ?? 0 }} pts</p></div>
@@ -241,26 +243,50 @@ function flagLabel(succeeded: boolean): string {
           </section>
         </div>
 
-        <div class="overflow-x-auto rounded-lg border">
-          <Table>
-            <TableHeader><TableRow><TableHead>{{ $t('题目') }}</TableHead><TableHead>{{ $t('状态') }}</TableHead><TableHead v-if="isAwdp" class="text-right">{{ $t('攻击分') }}</TableHead><TableHead v-if="isAwdp" class="text-right">{{ $t('防御分') }}</TableHead><TableHead class="text-right">{{ scoreLabel }}</TableHead></TableRow></TableHeader>
-            <TableBody>
-              <TableRow v-for="row in rows" :key="row.group.competitionChallengeId">
-                <TableCell class="font-medium">{{ row.title }}</TableCell>
-                <TableCell>
-                  <div v-if="row.signals" class="flex flex-wrap items-center gap-3 text-xs">
-                    <span v-if="row.signals.showFlag" class="inline-flex items-center gap-1.5"><Flag class="size-4" :class="row.signals.flagSucceeded ? 'text-emerald-600' : 'text-muted-foreground/50'" aria-hidden="true" />{{ flagLabel(row.signals.flagSucceeded) }}</span>
-                    <span v-if="row.signals.showShield" class="inline-flex items-center gap-1.5"><ShieldCheck class="size-4" :class="row.signals.shieldSucceeded ? 'text-emerald-600' : 'text-muted-foreground/50'" aria-hidden="true" />{{ row.signals.shieldSucceeded ? $t('防御成功') : $t('防御未成功') }}</span>
-                  </div>
-                </TableCell>
-                <TableCell v-if="isAwdp" class="text-right font-mono tabular-nums">{{ row.attackScore }} pts</TableCell>
-                <TableCell v-if="isAwdp" class="text-right font-mono tabular-nums">{{ row.defenseScore }} pts</TableCell>
-                <TableCell class="text-right font-mono font-semibold tabular-nums">{{ row.score }} pts</TableCell>
-              </TableRow>
-            </TableBody>
-          </Table>
-        </div>
-      </template>
-    </DialogScrollContent>
+
+        <section class="flex min-w-0 flex-col gap-3">
+          <h3 class="font-semibold">{{ mode === 'Ctf' || isAwdp ? $t('已解出题目') : $t('题目详情') }}</h3>
+          <p v-if="mode === 'Ctf' || isAwdp" class="text-xs text-muted-foreground">{{ $t('仅显示成功解出的题目，记录首次成功的操作者与提交时间。') }}</p>
+          <Empty v-if="!rows.length" class="border">
+            <EmptyDescription>{{ team.achievements == null && (mode === 'Ctf' || isAwdp) ? $t('此快照尚无解题者记录，请等待排行榜刷新。') : $t('该队伍暂无已解出的题目') }}</EmptyDescription>
+          </Empty>
+          <div v-else class="min-w-0 rounded-lg border bg-background">
+            <Table>
+              <TableHeader><TableRow>
+                <TableHead class="min-w-44">{{ $t('题目') }}</TableHead>
+                <TableHead class="whitespace-nowrap">{{ $t('状态') }}</TableHead>
+                <TableHead v-if="mode === 'Ctf' || isAwdp" class="min-w-28">{{ $t('解出人') }}</TableHead>
+                <TableHead v-if="mode === 'Ctf' || isAwdp" class="whitespace-nowrap">{{ $t('解题时间') }}</TableHead>
+                <TableHead v-if="isAwdp" class="whitespace-nowrap text-right">{{ $t('攻击分') }}</TableHead>
+                <TableHead v-if="isAwdp" class="whitespace-nowrap text-right">{{ $t('防御分') }}</TableHead>
+                <TableHead class="whitespace-nowrap text-right">{{ scoreLabel }}</TableHead>
+              </TableRow></TableHeader>
+              <TableBody>
+                <template v-for="row in rows" :key="row.group.competitionChallengeId">
+                  <TableRow v-for="(achievement, index) in row.achievements.length ? row.achievements : [null]" :key="achievement?.kind ?? 'status'">
+                    <TableCell v-if="index === 0" :rowspan="Math.max(1, row.achievements.length)" class="max-w-64 whitespace-normal break-words font-medium">{{ row.title }}</TableCell>
+                    <TableCell class="whitespace-nowrap">
+                      <span v-if="achievement" class="inline-flex items-center gap-1.5 text-xs">
+                        <ShieldCheck v-if="achievement.kind === 'Defense'" class="size-4 text-primary" aria-hidden="true" /><Flag v-else class="size-4 text-primary" aria-hidden="true" />
+                        {{ achievement.kind === 'Defense' ? $t('防御成功') : flagLabel(true) }}
+                      </span>
+                      <div v-else-if="row.signals" class="flex flex-wrap items-center gap-3 text-xs">
+                        <span v-if="row.signals.showFlag">{{ flagLabel(row.signals.flagSucceeded) }}</span>
+                        <span v-if="row.signals.showShield">{{ row.signals.shieldSucceeded ? $t('防御成功') : $t('防御未成功') }}</span>
+                      </div>
+                    </TableCell>
+                    <TableCell v-if="mode === 'Ctf' || isAwdp" class="max-w-48 whitespace-normal break-words">{{ achievement?.displayName || $t('未记录解题者') }}</TableCell>
+                    <TableCell v-if="mode === 'Ctf' || isAwdp" class="whitespace-nowrap font-mono text-xs tabular-nums">{{ achievement?.occurredAt ? formatDateTime(achievement.occurredAt) : '—' }}</TableCell>
+                    <TableCell v-if="isAwdp && index === 0" :rowspan="Math.max(1, row.achievements.length)" class="whitespace-nowrap text-right font-mono tabular-nums">{{ row.attackScore }} pts</TableCell>
+                    <TableCell v-if="isAwdp && index === 0" :rowspan="Math.max(1, row.achievements.length)" class="whitespace-nowrap text-right font-mono tabular-nums">{{ row.defenseScore }} pts</TableCell>
+                    <TableCell v-if="index === 0" :rowspan="Math.max(1, row.achievements.length)" class="whitespace-nowrap text-right font-mono font-semibold tabular-nums">{{ row.score }} pts</TableCell>
+                  </TableRow>
+                </template>
+              </TableBody>
+            </Table>
+          </div>
+        </section>
+      </div>
+    </DialogContent>
   </Dialog>
 </template>

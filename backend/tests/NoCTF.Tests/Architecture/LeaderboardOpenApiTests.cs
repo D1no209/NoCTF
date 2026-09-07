@@ -67,6 +67,7 @@ public sealed class LeaderboardOpenApiTests
             "defenseScore",
             "challengeScores",
             "memberContributions",
+            "achievements",
             "globalAdjustments",
             "globalAdjustmentCount",
             "slots"

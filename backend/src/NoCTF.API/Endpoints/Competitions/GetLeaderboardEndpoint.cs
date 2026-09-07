@@ -110,6 +110,9 @@ public sealed record ScoreboardMemberContributionResponse(
     string DisplayName,
     long EarnedPoints);
 
+public sealed record ScoreboardChallengeAchievementResponse(Guid CompetitionChallengeId,
+    ScoreboardEntryKindProtocol Kind, Guid? UserId, string? DisplayName, DateTimeOffset OccurredAt);
+
 public sealed record ScoreboardTeamResponse(
     Guid TeamId,
     string TeamName,
@@ -124,7 +127,10 @@ public sealed record ScoreboardTeamResponse(
     IReadOnlyList<ScoreboardMemberContributionResponse> MemberContributions,
     int GlobalAdjustmentCount,
     IReadOnlyList<ScoreboardAdjustmentResponse> GlobalAdjustments,
-    IReadOnlyList<ScoreboardSlotResponse> Slots);
+    IReadOnlyList<ScoreboardSlotResponse> Slots)
+{
+    public IReadOnlyList<ScoreboardChallengeAchievementResponse>? Achievements { get; init; }
+}
 
 public sealed record ScoreboardTrackResponse(
     string Key,
@@ -242,7 +248,11 @@ internal static partial class ScoreboardProtocolMapper
                 item.EarnedPoints, item.DeductedPoints, item.NetPoints)).ToArray(),
             slot.Entries.Select(ToResponse).ToArray(),
             ToProtocol(slot.OffenseState),
-            ToProtocol(slot.DefenseState))).ToArray());
+            ToProtocol(slot.DefenseState))).ToArray())
+    {
+        Achievements = value.Achievements?.Select(item => new ScoreboardChallengeAchievementResponse(
+            item.CompetitionChallengeId, ToProtocol(item.Kind), item.UserId, item.DisplayName, item.OccurredAt)).ToArray()
+    };
 
     public static LeaderboardDataScopeProtocol ToProtocol(LeaderboardDataScope value) => value switch
     {

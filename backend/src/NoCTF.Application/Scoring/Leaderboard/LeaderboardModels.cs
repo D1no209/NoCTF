@@ -268,6 +268,9 @@ public sealed record ScoreboardMemberContribution(
     string DisplayName,
     long EarnedPoints);
 
+public sealed record ScoreboardChallengeAchievement(Guid CompetitionChallengeId,
+    ScoreboardEntryKind Kind, Guid? UserId, string? DisplayName, DateTimeOffset OccurredAt);
+
 public sealed record ScoreboardTeam(
     Guid TeamId,
     string TeamName,
@@ -284,6 +287,8 @@ public sealed record ScoreboardTeam(
     public long? DefenseScore { get; init; }
     public IReadOnlyList<ScoreboardChallengeScore> ChallengeScores { get; init; } = [];
     public IReadOnlyList<ScoreboardMemberContribution> MemberContributions { get; init; } = [];
+    // Null identifies snapshots written before achievement attribution was available.
+    public IReadOnlyList<ScoreboardChallengeAchievement>? Achievements { get; init; }
 }
 
 public sealed record ScoreboardTrack(

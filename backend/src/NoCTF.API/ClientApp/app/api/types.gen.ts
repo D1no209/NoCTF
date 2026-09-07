@@ -521,6 +521,7 @@ export type NoCtfapiEndpointsCompetitionsScoreboardTeamResponse = {
     globalAdjustmentCount?: number;
     globalAdjustments?: Array<NoCtfapiEndpointsCompetitionsScoreboardAdjustmentResponse>;
     slots?: Array<NoCtfapiEndpointsCompetitionsScoreboardSlotResponse>;
+    achievements?: Array<NoCtfapiEndpointsCompetitionsScoreboardChallengeAchievementResponse> | null;
 };
 
 export type NoCtfapiEndpointsCompetitionsScoreboardRankingStateProtocol = 'Eligible' | 'Banned' | 'Disqualified';
@@ -597,6 +598,14 @@ export type NoCtfapiEndpointsCompetitionsScoreboardEntryOutcomeProtocol = 'Pendi
 export type NoCtfapiEndpointsCompetitionsScoreboardAwardProtocol = 'FirstBlood' | 'SecondBlood' | 'ThirdBlood';
 
 export type NoCtfapiEndpointsCompetitionsScoreboardOperationStateProtocol = 'None' | 'Failed' | 'Succeeded';
+
+export type NoCtfapiEndpointsCompetitionsScoreboardChallengeAchievementResponse = {
+    competitionChallengeId?: string;
+    kind?: NoCtfapiEndpointsCompetitionsScoreboardEntryKindProtocol;
+    userId?: string | null;
+    displayName?: string | null;
+    occurredAt?: string;
+};
 
 export type NoCtfapiEndpointsCompetitionsScoreboardTrackResponse = {
     key?: string;

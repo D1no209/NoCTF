@@ -1,5 +1,12 @@
 /** English UI resources keyed by the canonical Simplified Chinese source text. */
 export const englishMessages: Record<string, string> = {
+  "已解出题目": "Solved challenges",
+  "解出人": "Solved by",
+  "解题时间": "Solved at",
+  "未记录解题者": "Solver not recorded",
+  "仅显示成功解出的题目，记录首次成功的操作者与提交时间。": "Only successful challenges are shown, with the first successful actor and submission time.",
+  "此快照尚无解题者记录，请等待排行榜刷新。": "This snapshot has no solver attribution yet. Please wait for the leaderboard to refresh.",
+  "该队伍暂无已解出的题目": "This team has not solved any challenges yet",
   "姓名最多 100 个字符。": "Full name must be at most 100 characters.",
   "学号最多 64 个字符。": "Student number must be at most 64 characters.",
   "姓名不能包含控制字符。": "Full name must not contain control characters.",
