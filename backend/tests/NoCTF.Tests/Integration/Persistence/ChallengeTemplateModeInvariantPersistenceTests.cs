@@ -51,7 +51,7 @@ public sealed class ChallengeTemplateModeInvariantPersistenceTests
                     ChallengeVisibility.Private,
                     "Original title",
                     "Original description",
-                    "Web",
+                    "wEb",
                     """{ "schemaVersion": 1 }""",
                     changedAt),
                 cancellationToken);
