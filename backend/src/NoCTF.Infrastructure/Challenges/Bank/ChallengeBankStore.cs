@@ -197,7 +197,7 @@ public sealed class ChallengeBankStore(
             command.Description,
             StringComparison.Ordinal);
         var catalogChanged = !string.Equals(entity.Title, command.Title, StringComparison.Ordinal)
-            || !string.Equals(entity.Direction, command.Direction, StringComparison.Ordinal);
+            || !string.Equals(entity.Direction, command.Direction, StringComparison.OrdinalIgnoreCase);
         var publishedReferences = descriptionChanged
             ? await db.CompetitionChallenges.AsNoTracking()
                 .Where(item =>
@@ -410,7 +410,7 @@ public sealed class ChallengeBankStore(
         && entity.Visibility == command.Visibility
         && string.Equals(entity.Title, command.Title, StringComparison.Ordinal)
         && string.Equals(entity.Description, command.Description, StringComparison.Ordinal)
-        && string.Equals(entity.Direction, command.Direction, StringComparison.Ordinal)
+        && string.Equals(entity.Direction, command.Direction, StringComparison.OrdinalIgnoreCase)
         && JsonEquals(entity.DefinitionJson, command.DefinitionJson);
 
     private static bool JsonEquals(string current, string updated)
