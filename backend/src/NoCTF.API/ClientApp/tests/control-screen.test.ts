@@ -106,6 +106,9 @@ const snapshot: NoCtfapiEndpointsCompetitionsScoreboardSnapshotResponse = {
 }
 
 describe('CTF control screen projection', () => {
+  test('normalizes direction labels in the control screen model', () => {
+    expect(controlScreenChallenges(catalog, schema, controlScreenPublicEntries(snapshot)).map(challenge => challenge.direction)).toEqual(['Web', 'Pwn'])
+  })
   test('aggregates every non-internal track and excludes internal data', () => {
     const entries = controlScreenPublicEntries(snapshot)
     expect(entries.map(entry => entry.teamName)).toEqual(['Alpha', 'Beta'])

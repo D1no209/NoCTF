@@ -62,12 +62,28 @@ const directionStyles: Record<string, DirectionStyle> = {
 }
 
 export function directionStyle(direction?: string | null): DirectionStyle {
-  const key = (direction ?? '').trim().toLowerCase()
+  const key = directionKey(direction)
   if (!key) return fallback
-  const direct = directionStyles[key]
+  const direct = Object.hasOwn(directionStyles, key) ? directionStyles[key] : undefined
   if (direct) return direct
   const partial = Object.entries(directionStyles).find(([name]) => key.startsWith(name))
   return partial?.[1] ?? fallback
+}
+
+/** Stable comparison key for open-text directions, independent of browser locale. */
+export function directionKey(direction?: string | null): string {
+  return (direction ?? '').trim().toLowerCase()
+}
+
+const directionAbbreviations: Record<string, string> = {
+  ai: 'AI', osint: 'OSINT', iot: 'IoT', ml: 'ML', llm: 'LLM', dfir: 'DFIR',
+}
+
+/** Display convention: initial capital, with explicit standard abbreviation spellings. */
+export function directionLabel(direction?: string | null): string {
+  const key = directionKey(direction)
+  return (Object.hasOwn(directionAbbreviations, key) ? directionAbbreviations[key] : undefined)
+    ?? key.charAt(0).toUpperCase() + key.slice(1)
 }
 
 export function directionIcon(direction?: string | null): FunctionalComponent {

@@ -103,7 +103,7 @@ function visibilityLabel(visibility?: string): string {
               <TableCell>
                 <AdminGameModeBadge :mode="template.mode" />
               </TableCell>
-              <TableCell>{{ template.direction }}</TableCell>
+              <TableCell>{{ directionLabel(template.direction) }}</TableCell>
               <TableCell>
                 <Badge variant="outline">{{ visibilityLabel(template.visibility) }}</Badge>
               </TableCell>

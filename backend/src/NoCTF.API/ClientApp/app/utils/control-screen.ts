@@ -6,6 +6,7 @@ import type {
   NoCtfapiEndpointsCompetitionsScoreboardTeamResponse,
 } from '~/api'
 import { scoreboardBreakdown, scoreboardColumnsForChallenge, scoreboardSlot } from './scoreboard'
+import { directionLabel } from './directions'
 
 export type ControlScreenBloodRank = 'First' | 'Second' | 'Third'
 
@@ -73,7 +74,7 @@ export function controlScreenChallenges(
     return {
       competitionChallengeId: challenge.id!,
       title: challenge.title ?? '',
-      direction: challenge.direction ?? '',
+      direction: directionLabel(challenge.direction),
       currentScore: currentScoreByChallenge.get(challenge.id!) ?? fallbackScore,
       solveCount,
       completionPercent: entries.length ? Math.round(solveCount / entries.length * 100) : 0,
@@ -110,7 +111,7 @@ export function controlScreenSolveFeed(
           teamName: team.teamName,
           competitionChallengeId: column.competitionChallengeId,
           challengeTitle: challenge?.title ?? '',
-          direction: challenge?.direction ?? '',
+          direction: directionLabel(challenge?.direction),
           score: entry.netPoints ?? 0,
           bloodRank,
           awardPoints: entry.awardPoints ?? 0,

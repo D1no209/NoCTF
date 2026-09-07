@@ -60,7 +60,7 @@ async function submit(): Promise<void> {
       title: title.value.trim(),
       mode: mode.value,
       visibility: visibility.value,
-      direction: direction.value.trim(),
+      direction: directionLabel(direction.value),
       description: description.value.trim() || null,
       definitionJson: normalizedDefinition,
     },
@@ -154,6 +154,7 @@ async function submit(): Promise<void> {
                   <Input
                     id="direction"
                     v-model="direction"
+                    @blur="direction = directionLabel(direction)"
                     required
                     maxlength="96"
                     :aria-invalid="directionInvalid || undefined"

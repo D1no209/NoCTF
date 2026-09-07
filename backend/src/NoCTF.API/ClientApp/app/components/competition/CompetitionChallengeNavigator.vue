@@ -157,7 +157,7 @@ function currentScore(challengeId?: string): number | null {
 const groups = computed(() => {
   const grouped = new Map<string, Challenge[]>()
   for (const item of items.value) {
-    const direction = item.direction || translate('未分类')
+    const direction = directionLabel(item.direction) || translate('未分类')
     const challenges = grouped.get(direction) ?? []
     challenges.push(item)
     grouped.set(direction, challenges)

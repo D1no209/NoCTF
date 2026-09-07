@@ -109,6 +109,11 @@ const snapshot: NoCtfapiEndpointsCompetitionsScoreboardSnapshotResponse = {
 }
 
 describe('AWDP control screen data adapter', () => {
+  test('uses the shared direction display convention for challenge cards', () => {
+    const challenges = awdpTeamChallengeStates(catalog, schema, snapshot.teams?.[0] ?? null, [])
+    expect(challenges.map(challenge => challenge.direction)).toEqual(['Pwn'])
+  })
+
   test('normalizes the four public operation outcomes without inventing victim teams', () => {
     const pendingAttack = normalizeAwdpControlEvent(event('AwdpBreakAttempted'))
     const attackSuccess = normalizeAwdpControlEvent(event('AwdpBreakResolved', {

@@ -114,7 +114,7 @@ function resetDefinitionToCurrentMode(): void {
 function syncForm(value: Template): void {
   form.title = value.title ?? ''
   form.visibility = value.visibility ?? 'Private'
-  form.direction = value.direction ?? ''
+  form.direction = directionLabel(value.direction)
   form.description = value.description ?? ''
   // Keep definitionJson ahead of mode while loading existing templates.
   // useDefinitionModel watches mode and serializes the current parsed model;
@@ -179,7 +179,7 @@ async function save(): Promise<void> {
       title: form.title.trim(),
       mode: form.mode,
       visibility: form.visibility,
-      direction: form.direction.trim(),
+      direction: directionLabel(form.direction),
       description: form.description.trim() || null,
       definitionJson: normalizedDefinition,
     },
@@ -711,6 +711,7 @@ onMounted(() => {
                       <Input
                         id="edit-direction"
                         v-model="form.direction"
+                        @blur="form.direction = directionLabel(form.direction)"
                         required
                         maxlength="96"
                         :aria-invalid="directionInvalid || undefined"

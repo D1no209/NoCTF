@@ -150,12 +150,12 @@ onUnmounted(() => {
       <li v-for="(hint, index) in hints" :key="hint.id ?? index" class="py-3">
         <div class="flex flex-wrap items-center justify-between gap-2">
           <span class="text-sm font-medium">{{ $t('提示 {index}', { index: index + 1 }) }}</span>
-          <Badge v-if="hint.isUnlocked" variant="secondary">{{ (hint.cost ?? 0) === 0 ? $t('免费') : $t('已解锁') }}</Badge>
-          <Button v-else type="button" variant="outline" size="sm" :disabled="!hint.canUnlock || busy" @click="confirmingId = hint.id ?? null">
+          <Badge v-if="hint.isUnlocked && (hint.cost ?? 0) > 0" variant="secondary">{{ $t('已解锁') }}</Badge>
+          <Button v-else-if="!hint.isUnlocked" type="button" variant="outline" size="sm" :disabled="!hint.canUnlock || busy" @click="confirmingId = hint.id ?? null">
             <LockKeyhole data-icon="inline-start" />{{ $t('解锁提示（{cost} 分）', { cost: hint.cost ?? 0 }) }}
           </Button>
         </div>
-        <p v-if="readableHintContent(hint) !== null" class="mt-2 whitespace-pre-wrap break-words text-sm leading-6">{{ readableHintContent(hint) }}</p>
+        <MarkdownContent v-if="readableHintContent(hint) !== null" :source="readableHintContent(hint) ?? ''" class="mt-2" />
         <p v-else-if="!hint.canUnlock" class="mt-2 text-sm text-muted-foreground">
           {{ isLoggedIn ? $t('当前状态无法解锁提示') : $t('登录后可解锁提示') }}
         </p>
