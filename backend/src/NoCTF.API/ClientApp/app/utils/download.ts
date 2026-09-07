@@ -15,7 +15,9 @@ export interface ProtectedDownload {
 }
 
 function contentDispositionFileName(disposition: string, fallbackName: string): string {
-  const match = /filename\*?=(?:UTF-8''|")?([^";]+)/i.exec(disposition)
+  // Prefer the UTF-8 name over the server's ASCII fallback (important for Chinese Patch names).
+  const match = /filename\*=(?:UTF-8''|")?([^";]+)/i.exec(disposition)
+    ?? /filename=(?:")?([^";]+)/i.exec(disposition)
   if (!match?.[1]) return fallbackName
   const encoded = match[1].replace(/"$/, '')
   try {

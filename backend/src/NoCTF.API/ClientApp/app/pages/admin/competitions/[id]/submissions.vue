@@ -1,8 +1,11 @@
 <script setup lang="ts">
 import { toast } from 'vue-sonner'
+import { Download } from '@lucide/vue'
+import { downloadSdkFile } from '~/utils/download'
 import {
   adminAccessCompetitionGameplayFactValue,
   adminGetGameplayFact,
+  adminDownloadGameplayFactPatch,
   adminListCompetitionChallenges,
   adminListGameplayFacts,
   adminPreviewHistoricalAdjudicationDifferences,
@@ -24,8 +27,30 @@ import { useCompetitionAdmin } from '~/lib/admin-competition'
 
 definePageMeta({ middleware: 'auth' })
 
-const { competitionId, canWrite, canJudge } = useCompetitionAdmin()
+const { competitionId, role, canWrite, canJudge } = useCompetitionAdmin()
 const { isAdministrator } = useAuth()
+const canDownloadPatch = computed(() => isAdministrator.value
+  || role.value === 'Owner' || role.value === 'Manager' || role.value === 'Judge')
+const patchDownloading = ref(new Set<string>())
+const patchErrors = ref<Record<string, string>>({})
+
+async function downloadPatch(id?: string) {
+  if (!id || !canDownloadPatch.value || patchDownloading.value.has(id)) return
+  patchDownloading.value.add(id)
+  delete patchErrors.value[id]
+  try {
+    await downloadSdkFile(adminDownloadGameplayFactPatch({
+      path: { competitionId, gameplayFactId: id }, parseAs: 'blob',
+    }), `patch-${id}.tar.gz`)
+  }
+  catch (error) {
+    patchErrors.value[id] = parseApiError(error).message
+    toast.error(patchErrors.value[id])
+  }
+  finally {
+    patchDownloading.value.delete(id)
+  }
+}
 
 interface FilterOption<T extends string> {
   value: T
@@ -174,17 +199,30 @@ function applyFilters() {
 const detail = ref<NoCtfapiEndpointsGameplayFactsAdminGameplayFactStatusResponse | null>(null)
 const detailOpen = ref(false)
 const detailLoading = ref(false)
+const detailError = ref<string | null>(null)
+let detailRequest = 0
 
 async function openDetail(id?: string) {
   if (!id) return
+  const request = ++detailRequest
   detailOpen.value = true
   detailLoading.value = true
+  detailError.value = null
   detail.value = null
-  const { data, error } = await adminGetGameplayFact({ path: { competitionId, gameplayFactId: id } })
-  if (error) toast.error(parseApiError(error).message)
-  else detail.value = data ?? null
-  detailLoading.value = false
+  try {
+    const { data, error } = await adminGetGameplayFact({ path: { competitionId, gameplayFactId: id } })
+    if (error || !data) throw error
+    if (request === detailRequest) detail.value = data
+  }
+  catch (error) {
+    if (request === detailRequest) detailError.value = parseApiError(error).message
+  }
+  finally {
+    if (request === detailRequest) detailLoading.value = false
+  }
 }
+
+watch(detailOpen, open => { if (!open) { detailRequest++; detailLoading.value = false } })
 
 // ---- Rejudge / queue evaluation ----
 const actionPending = ref<string | null>(null)
@@ -486,10 +524,17 @@ onMounted(() => {
             <TableCell class="text-right">
               <div class="flex flex-wrap justify-end gap-1">
                 <Button variant="ghost" size="sm" @click="openDetail(s.id)">{{ $t('详情') }}</Button>
-                <Button v-if="canJudge" variant="ghost" size="sm" @click="openFlagAccess(s.id)">{{ $t('读取 Flag') }}</Button>
+                <Button v-if="canJudge && (s.kind === 'FlagAttempt' || s.kind === 'BreakAttempt')" variant="ghost" size="sm" @click="openFlagAccess(s.id)">{{ $t('读取 Flag') }}</Button>
+                <Button v-if="canDownloadPatch && s.kind === 'FixAttempt'" variant="ghost" size="sm" :disabled="patchDownloading.has(s.id ?? '')" @click="downloadPatch(s.id)">
+                  <Spinner v-if="patchDownloading.has(s.id ?? '')" data-icon="inline-start" />
+                  <Download v-else data-icon="inline-start" />{{ $t('下载 Patch') }}
+                </Button>
                 <Button v-if="canWrite" variant="ghost" size="sm" :disabled="actionPending === s.id" @click="rejudgeOne(s.id)">
                   <Spinner v-if="actionPending === s.id" data-icon="inline-start" /> {{ $t('重判') }} </Button>
               </div>
+              <Alert v-if="patchErrors[s.id ?? '']" variant="destructive" class="mt-2 text-left">
+                <AlertDescription>{{ patchErrors[s.id ?? ''] }}</AlertDescription>
+              </Alert>
             </TableCell>
           </TableRow>
         </TableBody>
@@ -507,6 +552,7 @@ onMounted(() => {
           <SheetDescription>{{ $t('提交 ID：{id}', { id: detail?.gameplayFactId ?? '-' }) }}</SheetDescription>
         </SheetHeader>
         <Skeleton v-if="detailLoading" class="mx-4 h-48" />
+        <Alert v-else-if="detailError" variant="destructive" class="mx-4"><AlertDescription>{{ detailError }}</AlertDescription></Alert>
         <div v-else-if="detail" class="flex flex-col gap-3 px-4 pb-4 text-sm">
           <div class="flex justify-between"><span class="text-muted-foreground">{{ $t('队伍') }}</span><span>{{ teamName(detail.teamId) }}</span></div>
           <div class="flex justify-between"><span class="text-muted-foreground">{{ $t('题目') }}</span><span>{{ challengeTitle(detail.competitionChallengeId) }}</span></div>
@@ -517,6 +563,23 @@ onMounted(() => {
           <div class="flex justify-between"><span class="text-muted-foreground">{{ $t('失败原因') }}</span><span>{{ gameplayFactFailureCodeLabel(detail.failureCode) }}</span></div>
           <div class="flex justify-between"><span class="text-muted-foreground">{{ $t('提交时间') }}</span><span class="font-mono tabular-nums">{{ adminFormatDateTime(detail.occurredAt) }}</span></div>
           <div class="flex justify-between"><span class="text-muted-foreground">{{ $t('更新时间') }}</span><span class="font-mono tabular-nums">{{ adminFormatDateTime(detail.updatedAt) }}</span></div>
+          <section v-if="detail.kind === 'FixAttempt' && canDownloadPatch && detail.canDownloadPatch" class="flex flex-col gap-3">
+            <Separator />
+            <h3 class="font-semibold">{{ $t('Patch 包') }}</h3>
+            <p class="text-muted-foreground">{{ $t('下载原始上传包，不会在平台在线预览、解压或执行。所有工作人员下载均记录审计，包括平台管理员。') }}</p>
+            <Alert v-if="detail.patchFailure" variant="destructive"><AlertDescription>{{ adminPatchFailureMessage(detail.patchFailure) }}</AlertDescription></Alert>
+            <dl v-if="detail.patch" class="flex flex-col gap-2">
+              <dt class="text-muted-foreground">{{ $t('原始文件名') }}</dt><dd class="break-all font-mono">{{ detail.patch.fileName }}</dd>
+              <dt class="text-muted-foreground">{{ $t('文件大小') }}</dt><dd>{{ formatBytes(detail.patch.byteLength) }}</dd>
+              <dt class="text-muted-foreground">{{ $t('上传时间') }}</dt><dd class="font-mono">{{ adminFormatDateTime(detail.patch.uploadedAt) }}</dd>
+              <dt class="text-muted-foreground">SHA-256</dt><dd class="break-all font-mono text-xs">{{ detail.patch.sha256 }}</dd>
+            </dl>
+            <Button variant="outline" :disabled="patchDownloading.has(detail.gameplayFactId ?? '')" @click="downloadPatch(detail.gameplayFactId)">
+              <Spinner v-if="patchDownloading.has(detail.gameplayFactId ?? '')" data-icon="inline-start" />
+              <Download v-else data-icon="inline-start" />{{ $t('下载 Patch') }}
+            </Button>
+            <Alert v-if="patchErrors[detail.gameplayFactId ?? '']" variant="destructive"><AlertDescription>{{ patchErrors[detail.gameplayFactId ?? ''] }}</AlertDescription></Alert>
+          </section>
         </div>
       </SheetContent>
     </Sheet>

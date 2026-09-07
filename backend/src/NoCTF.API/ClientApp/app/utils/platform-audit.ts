@@ -55,6 +55,7 @@ const EVENT_ACTION_LABELS: Partial<Record<NoCtfapiEndpointsCompetitionsEventsCom
   TeamBanned: '封禁参赛队伍',
   TeamUnbanned: '解除队伍封禁',
   ProtectedGameplayFactValueAccessed: '查看受保护 Flag',
+  GameplayFactPatchDownloaded: '下载提交 Patch',
   CheatIncidentConfirmed: '确认作弊并封禁队伍',
   CheatIncidentDismissed: '驳回作弊事件',
   CheatIncidentSuperseded: '取代作弊事件处置',

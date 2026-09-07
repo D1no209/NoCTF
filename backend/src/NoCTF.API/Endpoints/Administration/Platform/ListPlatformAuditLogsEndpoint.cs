@@ -116,7 +116,8 @@ public sealed record PlatformAuditLogResponse(
     string? SubjectDisplayName,
     string? Reason,
     bool Automatic,
-    DateTimeOffset OccurredAt);
+    DateTimeOffset OccurredAt,
+    Guid? FileId = null);
 
 public sealed record PlatformAuditLogListResponse(
     IReadOnlyList<PlatformAuditLogResponse> Items,
@@ -195,7 +196,7 @@ public sealed class ListPlatformAuditLogsEndpoint(
                 view.SubjectDisplayName,
                 view.Reason,
                 view.Automatic,
-                view.OccurredAt))
+                view.OccurredAt, view.FileId))
             .ToArray();
         return TypedResults.Ok(new PlatformAuditLogListResponse(
             responses,

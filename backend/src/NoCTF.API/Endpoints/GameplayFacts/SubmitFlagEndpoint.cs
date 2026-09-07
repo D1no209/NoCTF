@@ -118,7 +118,10 @@ public sealed record AdminGameplayFactStatusResponse(
     GameplayFactResultProtocol? Result,
     GameplayFactFailureCodeProtocol? FailureCode,
     DateTimeOffset OccurredAt,
-    DateTimeOffset UpdatedAt);
+    DateTimeOffset UpdatedAt,
+    NoCTF.API.Endpoints.Administration.GameplayFacts.AdminPatchMetadataResponse? Patch = null,
+    NoCTF.API.Endpoints.Administration.GameplayFacts.AdminPatchFailureCode? PatchFailure = null,
+    bool CanDownloadPatch = false);
 
 [JsonConverter(typeof(StrictPascalCaseEnumConverter<GameplayFactAdmissionFailureCodeProtocol>))]
 public enum GameplayFactAdmissionFailureCodeProtocol
@@ -151,6 +154,9 @@ public sealed record GameplayFactAdmissionFailureResponse(
 public static partial class GameplayFactMapper
 {
     public static partial GameplayFactStatusResponse ToStatusResponse(GameplayFactStatusView view);
+    [MapperIgnoreTarget(nameof(AdminGameplayFactStatusResponse.Patch))]
+    [MapperIgnoreTarget(nameof(AdminGameplayFactStatusResponse.PatchFailure))]
+    [MapperIgnoreTarget(nameof(AdminGameplayFactStatusResponse.CanDownloadPatch))]
     public static partial AdminGameplayFactStatusResponse ToAdminStatusResponse(
         AdminGameplayFactStatusView view);
 

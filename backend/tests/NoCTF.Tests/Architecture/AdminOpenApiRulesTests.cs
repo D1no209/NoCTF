@@ -5,6 +5,22 @@ namespace NoCTF.Tests.Architecture;
 public class AdminOpenApiRulesTests
 {
     [Test]
+    public async Task Patch_download_contract_declares_binary_bytes_and_authenticated_error_responses()
+    {
+        using var swagger = JsonDocument.Parse(await File.ReadAllTextAsync(
+            Path.Combine(FindBackendRoot(), "artifacts", "openapi", "swagger.json")));
+        var operation = swagger.RootElement.GetProperty("paths")
+            .GetProperty("/api/v1/admin/competitions/{competitionId}/gameplay-facts/{gameplayFactId}/patch").GetProperty("get");
+        var responses = operation.GetProperty("responses");
+        var body = responses.GetProperty("200").GetProperty("content").GetProperty("application/octet-stream").GetProperty("schema");
+        await Assert.That(body.GetProperty("type").GetString()).IsEqualTo("string");
+        await Assert.That(body.GetProperty("format").GetString()).IsEqualTo("binary");
+        foreach (var status in new[] { "403", "404", "409", "503" })
+            await Assert.That(responses.GetProperty(status).GetProperty("content").TryGetProperty("application/problem+json", out _)).IsTrue();
+        await Assert.That(operation.GetProperty("security").EnumerateArray().Any(x => x.TryGetProperty("Bearer", out _))).IsTrue();
+    }
+
+    [Test]
     public async Task Admin_endpoints_publish_complete_stable_metadata()
     {
         var backend = FindBackendRoot();
@@ -21,7 +37,7 @@ public class AdminOpenApiRulesTests
                     operation.Value)))
             .ToArray();
 
-        await Assert.That(operations).Count().IsEqualTo(132);
+        await Assert.That(operations).Count().IsEqualTo(133);
         await Assert.That(operations
             .Where(operation => !operation.Value.TryGetProperty("operationId", out var id)
                 || id.GetString() is not { } value

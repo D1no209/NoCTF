@@ -175,6 +175,11 @@ onMounted(() => {
               </TableCell>
               <TableCell class="max-w-md">
                 <div class="font-medium" :title="platformAuditActionText(log)">{{ platformAuditActionText(log) }}</div>
+                <div v-if="log.fileId" class="mt-1 flex flex-col gap-1 break-all font-mono text-xs text-muted-foreground">
+                  <span>{{ $t('文件 ID') }}: {{ log.fileId }}</span>
+                  <span>{{ $t('提交 ID') }}: {{ log.gameplayFactId }}</span>
+                  <span>{{ $t('队伍 ID') }}: {{ log.teamId }}</span>
+                </div>
               </TableCell>
               <TableCell class="max-w-32 truncate font-mono text-xs text-muted-foreground" :title="log.actorId ?? ''">
                 {{ log.actorId ?? $t('系统') }}

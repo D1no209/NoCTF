@@ -8078,6 +8078,107 @@
         ]
       }
     },
+    "/api/v1/admin/competitions/{competitionId}/gameplay-facts/{gameplayFactId}/patch": {
+      "get": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "Downloads the original Patch archive with a mandatory access audit.",
+        "description": "Only platform administrators and this competition's owner, managers and judges may download. Observers and participants are forbidden. Evaluation results do not restrict access.",
+        "operationId": "AdminDownloadGameplayFactPatch",
+        "parameters": [
+          {
+            "name": "competitionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          },
+          {
+            "name": "gameplayFactId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/octet-stream": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcProblemDetails"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcValidationProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ]
+      }
+    },
     "/api/v1/admin/competitions/{competitionId}/gameplay-facts/{gameplayFactId}": {
       "get": {
         "tags": [
@@ -16525,7 +16626,8 @@
           "AwdpBreakAttempted",
           "AwdpFixAttempted",
           "AwdpBreakResolved",
-          "AwdpFixResolved"
+          "AwdpFixResolved",
+          "GameplayFactPatchDownloaded"
         ],
         "enum": [
           "CompetitionCreated",
@@ -16584,7 +16686,8 @@
           "AwdpBreakAttempted",
           "AwdpFixAttempted",
           "AwdpBreakResolved",
-          "AwdpFixResolved"
+          "AwdpFixResolved",
+          "GameplayFactPatchDownloaded"
         ]
       },
       "NoCTFAPIEndpointsCompetitionsEventsCompetitionEventLevelProtocol": {
@@ -19251,6 +19354,11 @@
           "occurredAt": {
             "type": "string",
             "format": "date-time"
+          },
+          "fileId": {
+            "type": "string",
+            "format": "guid",
+            "nullable": true
           }
         }
       },
@@ -19769,6 +19877,10 @@
           }
         }
       },
+      "NoCTFAPIEndpointsAdministrationGameplayFactsDownloadAdminGameplayFactPatchRequest": {
+        "type": "object",
+        "additionalProperties": false
+      },
       "NoCTFAPIEndpointsGameplayFactsAdminGameplayFactStatusResponse": {
         "type": "object",
         "additionalProperties": false,
@@ -19824,8 +19936,75 @@
           "updatedAt": {
             "type": "string",
             "format": "date-time"
+          },
+          "patch": {
+            "nullable": true,
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationGameplayFactsAdminPatchMetadataResponse"
+              }
+            ]
+          },
+          "patchFailure": {
+            "nullable": true,
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationGameplayFactsAdminPatchFailureCode"
+              }
+            ]
+          },
+          "canDownloadPatch": {
+            "type": "boolean"
           }
         }
+      },
+      "NoCTFAPIEndpointsAdministrationGameplayFactsAdminPatchMetadataResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "fileId": {
+            "type": "string",
+            "format": "guid"
+          },
+          "fileName": {
+            "type": "string"
+          },
+          "byteLength": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "uploadedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "sha256": {
+            "type": "string"
+          }
+        }
+      },
+      "NoCTFAPIEndpointsAdministrationGameplayFactsAdminPatchFailureCode": {
+        "type": "string",
+        "description": "",
+        "x-enumNames": [
+          "Forbidden",
+          "SubmissionNotFound",
+          "NotFixSubmission",
+          "PatchNotFound",
+          "InvalidAssociation",
+          "FileNotFound",
+          "StorageUnavailable",
+          "AuditUnavailable"
+        ],
+        "enum": [
+          "Forbidden",
+          "SubmissionNotFound",
+          "NotFixSubmission",
+          "PatchNotFound",
+          "InvalidAssociation",
+          "FileNotFound",
+          "StorageUnavailable",
+          "AuditUnavailable"
+        ]
       },
       "NoCTFAPIEndpointsAdministrationGameplayFactsGetAdminGameplayFactStatusRequest": {
         "type": "object",

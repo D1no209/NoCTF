@@ -4,6 +4,8 @@ using NoCTF.API.Security;
 using NoCTF.Application.GameplayFacts.Status;
 using NoCTF.Application.Teams.Moderation;
 using NoCTF.API.Endpoints.GameplayFacts;
+using NoCTF.Application.GameplayFacts.PatchUploads;
+using NoCTF.Domain.Gameplay;
 
 namespace NoCTF.API.Endpoints.Administration.GameplayFacts;
 
@@ -16,7 +18,8 @@ public sealed class GetAdminGameplayFactStatusRequest
 public sealed class GetAdminGameplayFactStatusEndpoint(
     IAdminGameplayFactStatusReader reader,
     ICompetitionModerationAuthorizer authorizer,
-    IUserContext user)
+    IUserContext user,
+    AccessAdminPatch patches)
     : Endpoint<GetAdminGameplayFactStatusRequest, Results<Ok<AdminGameplayFactStatusResponse>, NotFound, ForbidHttpResult>>
 {
     public override void Configure()
@@ -36,10 +39,23 @@ public sealed class GetAdminGameplayFactStatusEndpoint(
         CancellationToken cancellationToken)
     {
         request.CompetitionId = Route<Guid>("competitionId");
+        HttpContext.Response.Headers.CacheControl = "private, no-store";
         request.GameplayFactId = Route<Guid>("gameplayFactId");
         if (!await authorizer.CanObserveAsync(user.UserId, request.CompetitionId, cancellationToken))
             return TypedResults.Forbid();
         var view = await reader.FindAsync(request.CompetitionId, request.GameplayFactId, cancellationToken);
-        return view is null ? TypedResults.NotFound() : TypedResults.Ok(GameplayFactMapper.ToAdminStatusResponse(view));
+        if (view is null) return TypedResults.NotFound();
+        var response = GameplayFactMapper.ToAdminStatusResponse(view);
+        if (view.Kind == GameplayFactKind.FixAttempt)
+        {
+            var patch = await patches.DescribeAsync(request.CompetitionId, request.GameplayFactId, user.UserId, cancellationToken);
+            response = response with
+            {
+                Patch = patch.Metadata is null ? null : AdminPatchMapping.ToResponse(patch.Metadata),
+                PatchFailure = patch.Failure is null or AdminPatchFailure.Forbidden ? null : AdminPatchMapping.ToProtocol(patch.Failure.Value),
+                CanDownloadPatch = patch.Failure != AdminPatchFailure.Forbidden
+            };
+        }
+        return TypedResults.Ok(response);
     }
 }
