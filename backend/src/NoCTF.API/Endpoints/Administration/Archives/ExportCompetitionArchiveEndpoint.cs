@@ -30,6 +30,8 @@ public sealed class ExportCompetitionArchiveEndpoint(
 {
     public override void Configure()
     {
+        Options(builder => builder.WithMetadata(new NoCTF.Hosting.Observability.ApiRequestMetricsMetadata(
+            NoCTF.Application.Observability.ApiRequestKind.Download)));
         Post("/admin/competitions/{competitionId}/data-export");
         AuthSchemes("Bearer");
         Description(builder => builder.WithName("AdminExportCompetitionArchive"));

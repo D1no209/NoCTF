@@ -8,7 +8,8 @@ public sealed record PlatformMonitoringMetricResponse(
     PlatformMonitoringMetricKind Kind,
     PlatformMonitoringUnit Unit,
     double? Value,
-    PlatformMonitoringStatus Status);
+    PlatformMonitoringStatus Status,
+    double? SampleCount, int? MinimumSamples, int? WindowSeconds);
 
 public sealed record PlatformMonitoringResponse(
     PlatformMonitoringStatus Status,
@@ -16,7 +17,10 @@ public sealed record PlatformMonitoringResponse(
     bool NatsAvailable,
     DateTimeOffset CapturedAt,
     string? DashboardUrl,
-    IReadOnlyList<PlatformMonitoringMetricResponse> Metrics);
+    IReadOnlyList<PlatformMonitoringMetricResponse> Metrics,
+    IReadOnlyList<PlatformMonitoringLatencyView> LatencyDetails,
+    IReadOnlyList<PlatformMonitoringPoolResource> PoolResources,
+    int LatencySustainedWindowMinutes);
 
 public sealed class GetPlatformMonitoringEndpoint(
     ObservePlatformMonitoring monitoring)
@@ -50,6 +54,7 @@ public sealed class GetPlatformMonitoringEndpoint(
                 metric.Kind,
                 metric.Unit,
                 metric.Value,
-                metric.Status)).ToArray()));
+                metric.Status, metric.SampleCount, metric.MinimumSamples, metric.WindowSeconds)).ToArray(),
+            view.LatencyDetails ?? [], view.PoolResources ?? [], view.LatencySustainedWindowMinutes));
     }
 }

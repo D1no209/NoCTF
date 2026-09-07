@@ -43,6 +43,8 @@ public sealed class UploadPlatformLogoEndpoint(
 {
     public override void Configure()
     {
+        Options(builder => builder.WithMetadata(new NoCTF.Hosting.Observability.ApiRequestMetricsMetadata(
+            NoCTF.Application.Observability.ApiRequestKind.Upload)));
         Post("/admin/platform/configuration/logo");
         AuthSchemes("Bearer");
         Roles("Administrator");

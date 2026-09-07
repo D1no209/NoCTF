@@ -6,6 +6,25 @@ namespace NoCTF.Tests.Unit.Application;
 public sealed class PlatformMonitoringTests
 {
     [Test]
+    [Arguments(0, 1.2, 1.2, PlatformMonitoringStatus.NoSamples)]
+    [Arguments(2, 1.2, 1.2, PlatformMonitoringStatus.InsufficientSamples)]
+    [Arguments(100, 0.012, 0.012, PlatformMonitoringStatus.Healthy)]
+    [Arguments(100, 1.2, 0.2, PlatformMonitoringStatus.Observing)]
+    [Arguments(100, 1.2, 1.2, PlatformMonitoringStatus.Warning)]
+    public async Task Latency_requires_samples_and_sustained_evidence_and_converts_seconds_once(
+        int samples, double current, double sustained, PlatformMonitoringStatus expected)
+    {
+        var sample = samples == 0 ? PlatformMonitoringSample.NoSamples() : PlatformMonitoringSample.From(current, sustained);
+        sample = sample with { SampleCount = samples, MinimumSamples = 100, WindowSeconds = 300 };
+        var result = await UseCase(Measurements() with { ApiP95Seconds = sample, RedisP99Seconds = sample }).ExecuteAsync();
+        var api = Metric(result, PlatformMonitoringMetricKind.ApiP95Milliseconds);
+        await Assert.That(api.Status).IsEqualTo(expected);
+        await Assert.That(api.Value).IsEqualTo(samples == 0 ? null : current * 1000);
+        await Assert.That(api.SampleCount).IsEqualTo(samples);
+        await Assert.That(api.WindowSeconds).IsEqualTo(300);
+    }
+
+    [Test]
     public async Task HealthyMeasurements_AreConvertedForTheProtocolView()
     {
         var useCase = UseCase(Measurements());

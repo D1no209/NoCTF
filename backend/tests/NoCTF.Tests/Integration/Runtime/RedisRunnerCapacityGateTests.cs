@@ -4,12 +4,67 @@ using NoCTF.Domain.Runtime;
 using NoCTF.Infrastructure.Runtime.Capacity;
 using StackExchange.Redis;
 using Testcontainers.Redis;
+using System.Collections.Concurrent;
+using System.Diagnostics.Metrics;
+using NoCTF.Application.Observability;
 
 namespace NoCTF.Tests.Integration.Runtime;
 
 [Category("Integration")]
 public sealed class RedisRunnerCapacityGateTests
 {
+    [Test, Timeout(300_000)]
+    public async Task Exported_pool_quota_follows_real_claim_release_and_offline_heartbeats(CancellationToken ct)
+    {
+        await DockerIntegrationTest.RunAsync(async () =>
+        {
+            await using var container = new RedisBuilder("redis:7.4.10-alpine3.21@sha256:e7723ff73d963f5cc6d9c4643ea3d989527a402a319239054e9472a7fb9219a2").Build();
+            await container.StartAsync(ct);
+            await using var redis = await ConnectionMultiplexer.ConnectAsync(container.GetConnectionString());
+            var pool = $"quota-{Guid.NewGuid():N}";
+            var runner = $"runner-{Guid.NewGuid():N}";
+            var readings = new ConcurrentDictionary<string, long>();
+            using var listener = new MeterListener();
+            listener.InstrumentPublished = (instrument, owner) =>
+            {
+                if (instrument.Meter.Name == NoCtfTelemetry.MeterName) owner.EnableMeasurementEvents(instrument);
+            };
+            listener.SetMeasurementEventCallback<long>((instrument, value, tags, _) =>
+            {
+                string group = "", resource = "";
+                foreach (var tag in tags)
+                {
+                    if (tag.Key == "pool") group = tag.Value?.ToString() ?? "";
+                    if (tag.Key == "resource") resource = tag.Value?.ToString() ?? "";
+                }
+                if (group == pool) readings[instrument.Name + ":" + resource] = value;
+            });
+            listener.Start();
+            var registry = new RedisRunnerAvailabilityRegistry(redis);
+            var registration = new RunnerAvailabilityRegistration(pool, runner, RuntimeProvider.Docker, "test-version",
+                new RuntimeResourceLimits(1024, 100, 10), TimeSpan.FromMinutes(1), HasActiveAssignments: false);
+            await registry.RegisterAsync(registration, ct);
+            listener.RecordObservableInstruments();
+            await Assert.That(readings["noctf.runner.capacity.available:memory"]).IsEqualTo(1024);
+            var gate = new RedisRunnerCapacityGate(redis);
+            var runtime = Guid.NewGuid();
+            await Assert.That((await gate.TryClaimAsync(new(runtime, pool, 512, 40, 2), ct)).Availability).IsEqualTo(RunnerCapacityAvailability.Claimed);
+            await registry.RegisterAsync(registration with { HasActiveAssignments = true }, ct);
+            listener.RecordObservableInstruments();
+            await Assert.That(readings["noctf.runner.capacity.available:memory"]).IsEqualTo(512);
+            await Assert.That(readings["noctf.runner.capacity.available:cpu"]).IsEqualTo(60);
+            await Assert.That(readings["noctf.runner.capacity.available:pids"]).IsEqualTo(8);
+            await gate.ReleaseAsync(runtime, runner, ct);
+            await registry.RegisterAsync(registration, ct);
+            listener.RecordObservableInstruments();
+            await Assert.That(readings["noctf.runner.capacity.available:memory"]).IsEqualTo(1024);
+            await registry.RegisterAsync(registration with { ProviderAvailable = false }, ct);
+            listener.RecordObservableInstruments();
+            await Assert.That(readings["noctf.runner.online:"]).IsEqualTo(0);
+            await Assert.That(readings["noctf.runner.capacity.total:memory"]).IsEqualTo(0);
+        });
+    }
+
     [Test]
     [Timeout(300_000)]
     public async Task Runner_registration_initializes_and_renews_capacity_without_overwriting_claims(

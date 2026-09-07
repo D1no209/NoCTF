@@ -58,6 +58,8 @@ public sealed class UploadRandomChallengeAttachmentBatchEndpoint(
 {
     public override void Configure()
     {
+        Options(builder => builder.WithMetadata(new NoCTF.Hosting.Observability.ApiRequestMetricsMetadata(
+            NoCTF.Application.Observability.ApiRequestKind.Upload)));
         Post("/admin/challenges/{challengeId}/attachments/random-batch");
         AuthSchemes("Bearer");
         AllowFileUploads();

@@ -46,6 +46,8 @@ public sealed class UploadMyAvatarEndpoint(
 {
     public override void Configure()
     {
+        Options(builder => builder.WithMetadata(new NoCTF.Hosting.Observability.ApiRequestMetricsMetadata(
+            NoCTF.Application.Observability.ApiRequestKind.Upload)));
         Post("/auth/me/avatar");
         AuthSchemes("Bearer");
         AllowFileUploads();

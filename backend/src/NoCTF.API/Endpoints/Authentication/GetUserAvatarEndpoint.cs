@@ -9,6 +9,8 @@ public sealed class GetUserAvatarEndpoint(GetUserAvatar getAvatar)
 {
     public override void Configure()
     {
+        Options(builder => builder.WithMetadata(new NoCTF.Hosting.Observability.ApiRequestMetricsMetadata(
+            NoCTF.Application.Observability.ApiRequestKind.Download)));
         Get("/users/{userId}/avatar");
         AllowAnonymous();
         Description(builder => builder.WithName("UserAvatar_Get"));

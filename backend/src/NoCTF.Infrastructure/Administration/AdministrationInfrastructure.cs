@@ -149,10 +149,14 @@ internal static class AdministrationInfrastructure
             Percentage(configuration, $"{prefix}:JetStreamStorageWarningPercent",
                 defaults.JetStreamStorageWarningPercent),
             Percentage(configuration, $"{prefix}:JetStreamStorageCriticalPercent",
-                defaults.JetStreamStorageCriticalPercent));
+                defaults.JetStreamStorageCriticalPercent),
+            PositiveInt(configuration, $"{prefix}:LatencyMinimumSamples", defaults.LatencyMinimumSamples),
+            PositiveInt(configuration, $"{prefix}:LatencySustainedWindowMinutes", defaults.LatencySustainedWindowMinutes));
 
         ValidatePair(thresholds.PendingWarning, thresholds.PendingCritical,
             "pending");
+        if (thresholds.LatencySustainedWindowMinutes > 60)
+            throw new InvalidOperationException("LatencySustainedWindowMinutes must be between 1 and 60.");
         ValidatePair(thresholds.AckPendingWarning, thresholds.AckPendingCritical,
             "ack pending");
         ValidatePair(thresholds.RedeliveryWarning, thresholds.RedeliveryCritical,

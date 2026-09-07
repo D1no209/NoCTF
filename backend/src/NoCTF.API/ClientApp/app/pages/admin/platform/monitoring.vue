@@ -23,6 +23,8 @@ const STATUS = {
   critical: 2,
   unavailable: 3,
   noSamples: 4,
+  insufficientSamples: 5,
+  observing: 6,
 } as const satisfies Record<string, MonitoringStatus>
 
 const METRIC = {
@@ -99,9 +101,9 @@ const GROUPS: Array<{ title: string; kinds: number[] }> = [
 ]
 
 const METRIC_LABELS: Record<number, string> = {
-  [METRIC.apiRequestsPerSecond]: 'API 请求速率',
-  [METRIC.apiP95Milliseconds]: 'API P95 延迟',
-  [METRIC.apiServerErrorPercent]: 'API 5xx 比例',
+  [METRIC.apiRequestsPerSecond]: '普通 API 请求速率',
+  [METRIC.apiP95Milliseconds]: '普通 API P95 耗时',
+  [METRIC.apiServerErrorPercent]: '普通 API 5xx 比例',
   [METRIC.signalRConnections]: 'SignalR 当前连接',
   [METRIC.natsAvailability]: 'NATS 可用性',
   [METRIC.jetStreamStorageUsagePercent]: 'JetStream 存储使用率',
@@ -118,9 +120,9 @@ const METRIC_LABELS: Record<number, string> = {
   [METRIC.leaderboardPublishFailuresPerSecond]: '排行榜缓存发布失败率',
   [METRIC.leaderboardSignalRPublishFailuresPerSecond]: '排行榜 SignalR 发布失败率',
   [METRIC.runnerOnlineCount]: '在线 Runner',
-  [METRIC.runnerMinimumAvailablePercent]: 'Runner 最低可用容量',
+  [METRIC.runnerMinimumAvailablePercent]: '资源池最低剩余配额',
   [METRIC.postgreSqlConnectionUsagePercent]: 'PostgreSQL 连接使用率',
-  [METRIC.redisP99Milliseconds]: 'Redis P99 延迟',
+  [METRIC.redisP99Milliseconds]: '平台 Redis 操作 P99 耗时',
   [METRIC.diskAvailablePercent]: '磁盘最低可用空间',
 }
 
@@ -134,12 +136,14 @@ function statusLabel(status: MonitoringStatus | undefined): string {
   if (status === STATUS.warning) return translate("需要关注")
   if (status === STATUS.critical) return translate("严重异常")
   if (status === STATUS.noSamples) return translate("暂无样本")
+  if (status === STATUS.insufficientSamples) return translate('样本不足／低置信度')
+  if (status === STATUS.observing) return translate('超阈值，持续观察')
   return translate("数据不可用")
 }
 
 function statusVariant(status: MonitoringStatus | undefined): 'default' | 'secondary' | 'destructive' | 'outline' {
   if (status === STATUS.healthy) return 'default'
-  if (status === STATUS.warning) return 'secondary'
+  if (status === STATUS.warning || status === STATUS.observing) return 'secondary'
   if (status === STATUS.critical) return 'destructive'
   return 'outline'
 }
@@ -158,7 +162,7 @@ function formatMetric(metric: MonitoringMetric | undefined): string {
   const value = metric.value
   if (metric.kind === METRIC.natsAvailability) return translate(value >= 1 ? '可用' : '不可用')
   if (metric.unit === UNIT.perSecond) return `${value.toFixed(value < 10 ? 2 : 1)} /s`
-  if (metric.unit === UNIT.milliseconds) return `${Math.round(value)} ms`
+  if (metric.unit === UNIT.milliseconds) return monitoringMilliseconds(value)
   if (metric.unit === UNIT.seconds) return `${Math.round(value)} s`
   if (metric.unit === UNIT.percent) return `${value.toFixed(1)}%`
   return Math.round(value).toLocaleString()
@@ -172,15 +176,22 @@ function formatCapturedAt(value: string | undefined): string {
 async function refreshMonitoring(): Promise<void> {
   if (loading.value) return
   loading.value = true
-  const { data, error: responseError } = await adminPlatformGetMonitoring()
-  loading.value = false
-  if (responseError || !data) {
-    error.value = parseApiError(responseError).message
-    return
+  try {
+    const { data, error: responseError } = await adminPlatformGetMonitoring()
+    if (responseError || !data) throw responseError
+    error.value = null
+    snapshot.value = data
   }
-  error.value = null
-  snapshot.value = data
+  catch (responseError) {
+    error.value = parseApiError(responseError).message
+  }
+  finally {
+    loading.value = false
+  }
 }
+
+const LATENCY_LABELS = ['普通 REST API', 'SignalR HTTP 连接', '上传请求', '下载请求', '平台 Redis 操作']
+const RESOURCE_LABELS = ['内存配额', 'CPU 配额', 'PID 配额']
 
 function refreshWhenVisible(): void {
   if (document.visibilityState === 'visible') void refreshMonitoring()
@@ -279,6 +290,10 @@ onUnmounted(() => {
               <p class="mt-1 font-mono text-xl font-semibold tabular-nums">
                 {{ formatMetric(metricByKind(kind)) }}
               </p>
+              <p v-if="metricByKind(kind)?.windowSeconds" class="mt-1 text-xs text-muted-foreground">
+                {{ $t('近五分钟样本') }}：{{ monitoringNumber(metricByKind(kind)?.sampleCount, 0) }}
+                · {{ $t('最低样本数') }} {{ metricByKind(kind)?.minimumSamples }}
+              </p>
             </div>
             <Badge :variant="statusVariant(metricByKind(kind)?.status)">
               {{ statusLabel(metricByKind(kind)?.status) }}
@@ -287,6 +302,72 @@ onUnmounted(() => {
         </div>
       </section>
     </div>
+
+    <section v-if="snapshot" class="flex flex-col gap-3">
+      <h3 class="text-sm font-semibold">{{ $t('请求与操作耗时明细') }}</h3>
+      <p class="max-w-prose text-sm text-muted-foreground">
+        {{ $t('同一五分钟窗口内的分位数、均值、样本量、速率及错误率。分位数是桶内估算值；失败请求也计入耗时。') }}
+        {{ $t('延迟告警需满足最低样本数，并持续超阈值。持续时间（分钟）') }}：{{ snapshot.latencySustainedWindowMinutes }}。
+      </p>
+      <p class="max-w-prose text-sm text-muted-foreground">
+        {{ $t('普通 API 不含静态资源、健康检查、SignalR 和文件传输。SignalR 耗时是已完成 HTTP 连接的存续时间，不等于消息发布延迟。') }}
+      </p>
+      <p class="max-w-prose text-sm text-muted-foreground">
+        {{ $t('平台 Redis 操作可能包含多次 Redis 调用，不代表单条命令或 Redis 服务端所有命令的延迟。endpoint 标识心跳、容量领取、排行榜发布等封装操作。') }}
+      </p>
+      <Table>
+        <TableCaption>{{ $t('错误率口径：HTTP 为 5xx；Redis 为平台操作失败。') }}</TableCaption>
+        <TableHeader><TableRow>
+          <TableHead>{{ $t('分类／endpoint') }}</TableHead><TableHead>P95</TableHead><TableHead>P99</TableHead>
+          <TableHead>{{ $t('均值') }}</TableHead><TableHead>{{ $t('近五分钟样本') }}</TableHead>
+          <TableHead>{{ $t('速率') }}</TableHead><TableHead>{{ $t('错误率') }}</TableHead><TableHead>{{ $t('状态') }}</TableHead>
+        </TableRow></TableHeader>
+        <TableBody>
+          <TableRow v-for="row in snapshot.latencyDetails" :key="`${row.kind}:${row.endpoint}`">
+            <TableCell>
+              {{ $t(LATENCY_LABELS[row.kind ?? 0] ?? '未知指标') }}
+              <span v-if="row.endpoint" class="block font-mono text-xs text-muted-foreground">{{ row.endpoint }}</span>
+            </TableCell>
+            <TableCell class="font-mono">{{ monitoringMilliseconds(row.p95Milliseconds) }}</TableCell>
+            <TableCell class="font-mono">{{ monitoringMilliseconds(row.p99Milliseconds) }}</TableCell>
+            <TableCell class="font-mono">{{ monitoringMilliseconds(row.meanMilliseconds) }}</TableCell>
+            <TableCell class="font-mono">
+              {{ monitoringNumber(row.sampleCount, 0) }}
+              <span class="block text-xs text-muted-foreground">{{ $t('最低样本数') }} {{ row.minimumSamples }}</span>
+            </TableCell>
+            <TableCell class="font-mono">{{ monitoringNumber(row.requestsPerSecond, 2, ' /s') }}</TableCell>
+            <TableCell class="font-mono">{{ monitoringNumber(row.errorPercent, 2, '%') }}</TableCell>
+            <TableCell><Badge :variant="statusVariant(row.status)">{{ statusLabel(row.status) }}</Badge></TableCell>
+          </TableRow>
+        </TableBody>
+      </Table>
+      <p v-if="!snapshot.latencyDetails?.some(row => row.kind === 4)" class="text-sm text-muted-foreground">
+        {{ $t('Redis 操作明细暂无样本或暂不可用，请结合上方采集状态判断。') }}
+      </p>
+    </section>
+
+    <section v-if="snapshot" class="flex flex-col gap-3">
+      <h3 class="text-sm font-semibold">{{ $t('资源池剩余配额明细') }}</h3>
+      <p class="max-w-prose text-sm text-muted-foreground">
+        {{ $t('最低比例取各资源池内存、CPU、PID 的汇总可用量／总配额中的最小值，不是单个 Runner 的最低比例，也不是主机真实利用率。') }}
+        {{ $t('仅汇总在线 Runner。节点离线可能使比例上升，请同时查看在线数量；零配额不计算比例。') }}
+      </p>
+      <Table>
+        <TableHeader><TableRow>
+          <TableHead>{{ $t('资源池') }}</TableHead><TableHead>{{ $t('资源') }}</TableHead>
+          <TableHead>{{ $t('可用量／总配额') }}</TableHead><TableHead>{{ $t('剩余比例') }}</TableHead><TableHead>{{ $t('在线 Runner') }}</TableHead>
+        </TableRow></TableHeader>
+        <TableBody><TableRow v-for="row in snapshot.poolResources" :key="`${row.pool}:${row.resource}`">
+          <TableCell class="font-mono">{{ row.pool }}</TableCell>
+          <TableCell>{{ $t(RESOURCE_LABELS[row.resource ?? 0] ?? '未知指标') }}</TableCell>
+          <TableCell class="font-mono">{{ monitoringQuota(row.available, row.resource) }} / {{ monitoringQuota(row.total, row.resource) }}</TableCell>
+          <TableCell class="font-mono">{{ monitoringQuotaPercent(row.available, row.total) === null ? $t('暂无样本') : `${monitoringNumber(monitoringQuotaPercent(row.available, row.total))}%` }}</TableCell>
+          <TableCell class="font-mono">{{ monitoringNumber(row.onlineRunners, 0) }}</TableCell>
+        </TableRow></TableBody>
+      </Table>
+      <p v-if="!snapshot.poolResources?.length" class="text-sm text-muted-foreground">{{ $t('资源池配额暂无样本或暂不可用，请结合上方采集状态判断。') }}</p>
+      <p class="text-sm text-muted-foreground">{{ $t('主机真实利用率请查看现有 Grafana 主机监控，与此处调度配额分开判断。') }}</p>
+    </section>
 
     <div v-if="snapshot" class="flex flex-wrap items-center justify-between gap-2 border-t pt-4 text-xs text-muted-foreground">
       <span>{{ $t('数据每 15 秒自动刷新') }}</span>

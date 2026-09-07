@@ -9,6 +9,8 @@ public sealed class GetPlatformLogoEndpoint(ManagePlatformConfiguration configur
 {
     public override void Configure()
     {
+        Options(builder => builder.WithMetadata(new NoCTF.Hosting.Observability.ApiRequestMetricsMetadata(
+            NoCTF.Application.Observability.ApiRequestKind.Download)));
         Get("/platform/logo");
         AllowAnonymous();
         Description(builder => builder.WithName("PlatformLogo_Get"));

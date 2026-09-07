@@ -14,6 +14,8 @@ public sealed class DownloadFixArchiveEndpoint(
 {
     public override void Configure()
     {
+        Options(builder => builder.WithMetadata(new NoCTF.Hosting.Observability.ApiRequestMetricsMetadata(
+            NoCTF.Application.Observability.ApiRequestKind.Download)));
         Get("/api/internal/v1/awdp/fix-archives/{gameplayFactId}");
         AuthSchemes("Internal");
         Policies("FixArchiveRead");

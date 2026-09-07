@@ -18785,6 +18785,22 @@
             "items": {
               "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationPlatformPlatformMonitoringMetricResponse"
             }
+          },
+          "latencyDetails": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NoCTFApplicationAdministrationMonitoringPlatformMonitoringLatencyView"
+            }
+          },
+          "poolResources": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NoCTFApplicationAdministrationMonitoringPlatformMonitoringPoolResource"
+            }
+          },
+          "latencySustainedWindowMinutes": {
+            "type": "integer",
+            "format": "int32"
           }
         }
       },
@@ -18796,14 +18812,18 @@
           "Warning",
           "Critical",
           "Unavailable",
-          "NoSamples"
+          "NoSamples",
+          "InsufficientSamples",
+          "Observing"
         ],
         "enum": [
           0,
           1,
           2,
           3,
-          4
+          4,
+          5,
+          6
         ]
       },
       "NoCTFAPIEndpointsAdministrationPlatformPlatformMonitoringMetricResponse": {
@@ -18823,6 +18843,21 @@
           },
           "status": {
             "$ref": "#/components/schemas/NoCTFApplicationAdministrationMonitoringPlatformMonitoringStatus"
+          },
+          "sampleCount": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "minimumSamples": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "windowSeconds": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
           }
         }
       },
@@ -18896,6 +18931,118 @@
           2,
           3,
           4
+        ]
+      },
+      "NoCTFApplicationAdministrationMonitoringPlatformMonitoringLatencyView": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "kind": {
+            "$ref": "#/components/schemas/NoCTFApplicationAdministrationMonitoringPlatformMonitoringLatencyKind"
+          },
+          "endpoint": {
+            "type": "string"
+          },
+          "p95Milliseconds": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "p99Milliseconds": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "meanMilliseconds": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "requestsPerSecond": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "errorPercent": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "sampleCount": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "minimumSamples": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "windowSeconds": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "status": {
+            "$ref": "#/components/schemas/NoCTFApplicationAdministrationMonitoringPlatformMonitoringStatus"
+          }
+        }
+      },
+      "NoCTFApplicationAdministrationMonitoringPlatformMonitoringLatencyKind": {
+        "type": "integer",
+        "description": "",
+        "x-enumNames": [
+          "Rest",
+          "SignalR",
+          "Upload",
+          "Download",
+          "RedisOperation"
+        ],
+        "enum": [
+          0,
+          1,
+          2,
+          3,
+          4
+        ]
+      },
+      "NoCTFApplicationAdministrationMonitoringPlatformMonitoringPoolResource": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "pool": {
+            "type": "string"
+          },
+          "resource": {
+            "$ref": "#/components/schemas/NoCTFApplicationAdministrationMonitoringPlatformMonitoringResource"
+          },
+          "available": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "total": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "onlineRunners": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          }
+        }
+      },
+      "NoCTFApplicationAdministrationMonitoringPlatformMonitoringResource": {
+        "type": "integer",
+        "description": "",
+        "x-enumNames": [
+          "Memory",
+          "Cpu",
+          "Pids"
+        ],
+        "enum": [
+          0,
+          1,
+          2
         ]
       },
       "NoCTFAPIEndpointsAdministrationPlatformIssuePlatformBotTokenResponse": {

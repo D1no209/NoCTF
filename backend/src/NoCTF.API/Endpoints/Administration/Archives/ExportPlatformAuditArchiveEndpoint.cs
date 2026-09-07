@@ -38,6 +38,8 @@ public sealed class ExportPlatformAuditArchiveEndpoint(
 {
     public override void Configure()
     {
+        Options(builder => builder.WithMetadata(new NoCTF.Hosting.Observability.ApiRequestMetricsMetadata(
+            NoCTF.Application.Observability.ApiRequestKind.Download)));
         Post("/admin/platform/audit-logs/data-export");
         AuthSchemes("Bearer");
         Roles("Administrator");
