@@ -7,6 +7,47 @@ namespace NoCTF.Tests.Unit.Application.Observability;
 public sealed class NoCtfTelemetryTests
 {
     [Test]
+    public async Task Pools_remain_separate_and_offline_nodes_change_quota_and_online_count_independently()
+    {
+        var pool = $"pool-{Guid.NewGuid():N}";
+        var other = pool + "-other";
+        var zero = pool + "-zero";
+        var values = new ConcurrentDictionary<string, long>();
+        using var listener = new MeterListener();
+        listener.InstrumentPublished = (instrument, meter) =>
+        {
+            if (instrument.Meter.Name == NoCtfTelemetry.MeterName) meter.EnableMeasurementEvents(instrument);
+        };
+        listener.SetMeasurementEventCallback<long>((instrument, value, tags, _) =>
+        {
+            string group = "", resource = "";
+            foreach (var tag in tags)
+            {
+                if (tag.Key == "pool") group = tag.Value?.ToString() ?? "";
+                if (tag.Key == "resource") resource = tag.Value?.ToString() ?? "";
+            }
+            if (group.StartsWith(pool, StringComparison.Ordinal)) values[$"{group}:{instrument.Name}:{resource}"] = value;
+        });
+        listener.Start();
+        NoCtfTelemetry.UpdateRunnerCapacitySnapshot(pool, "full", true, 0, 100, 10, 10, 10, 10);
+        NoCtfTelemetry.UpdateRunnerCapacitySnapshot(pool, "free", true, 300, 300, 30, 30, 30, 30);
+        NoCtfTelemetry.UpdateRunnerCapacitySnapshot(other, "single", true, 20, 100, 10, 10, 10, 10);
+        NoCtfTelemetry.UpdateRunnerCapacitySnapshot(zero, "empty-quota", true, 0, 0, 0, 0, 0, 0);
+        listener.RecordObservableInstruments();
+        double Ratio(string group) => values[$"{group}:noctf.runner.capacity.available:memory"]
+            / (double)values[$"{group}:noctf.runner.capacity.total:memory"];
+        await Assert.That(Ratio(pool)).IsEqualTo(0.75); // Node-level minimum would incorrectly be zero.
+        await Assert.That(Ratio(other)).IsEqualTo(0.2);
+        await Assert.That(values[$"{zero}:noctf.runner.capacity.total:memory"]).IsEqualTo(0);
+        await Assert.That(values[$"{pool}:noctf.runner.online:"]).IsEqualTo(2);
+        NoCtfTelemetry.UpdateRunnerCapacitySnapshot(pool, "full", false, 0, 100, 10, 10, 10, 10);
+        listener.RecordObservableInstruments();
+        await Assert.That(Ratio(pool)).IsEqualTo(1);
+        await Assert.That(values[$"{pool}:noctf.runner.online:"]).IsEqualTo(1);
+        await Assert.That(Ratio(other)).IsEqualTo(0.2);
+    }
+
+    [Test]
     public async Task Runner_capacity_is_aggregated_across_online_runners_in_the_same_pool()
     {
         var pool = $"test-{Guid.NewGuid():N}";

@@ -39,8 +39,9 @@ internal sealed class PrometheusPlatformMonitoringReader(
         CancellationToken cancellationToken)
     {
         var client = clients.CreateClient(ClientName);
+        var capturedAt = timeProvider.GetUtcNow();
         var results = await Task.WhenAll(QueryDefinitions.Create(thresholds).Select(definition =>
-            QueryAsync(client, definition, cancellationToken)));
+            QueryAsync(client, definition, capturedAt, cancellationToken)));
         var values = results.ToDictionary(result => result.Kind);
         var prometheus = Result(values, PrometheusMeasurementKind.PrometheusAvailability);
         var prometheusAvailable = prometheus.Succeeded && prometheus.Value >= 1;
@@ -49,10 +50,10 @@ internal sealed class PrometheusPlatformMonitoringReader(
 
         return new(
             prometheusAvailable,
-            timeProvider.GetUtcNow(),
+            capturedAt,
             options.DashboardUri,
             Sample(values, PrometheusMeasurementKind.ApiRequestsPerSecond),
-            Sample(values, PrometheusMeasurementKind.ApiP95Seconds),
+            LatencySample(values, PrometheusMeasurementKind.ApiP95Seconds, PrometheusMeasurementKind.ApiSamples, PrometheusMeasurementKind.ApiSustainedSeconds),
             Sample(values, PrometheusMeasurementKind.ApiServerErrorRatio),
             Sample(values, PrometheusMeasurementKind.SignalRConnections),
             Sample(values, PrometheusMeasurementKind.NatsAvailability),
@@ -76,24 +77,26 @@ internal sealed class PrometheusPlatformMonitoringReader(
             Sample(values, PrometheusMeasurementKind.RuntimeOldestWaitingSeconds),
             Sample(values, PrometheusMeasurementKind.LeaderboardMergeDispatchFailuresPerSecond),
             Sample(values, PrometheusMeasurementKind.LeaderboardCacheMissRebuildFailuresPerSecond),
-            Sample(values, PrometheusMeasurementKind.LeaderboardProjectionP95Seconds),
+            LatencySample(values, PrometheusMeasurementKind.LeaderboardProjectionP95Seconds, PrometheusMeasurementKind.ProjectionSamples),
             Sample(values, PrometheusMeasurementKind.LeaderboardPublishFailuresPerSecond),
             Sample(values, PrometheusMeasurementKind.LeaderboardSignalRPublishFailuresPerSecond),
             Sample(values, PrometheusMeasurementKind.RunnerOnlineCount),
             Sample(values, PrometheusMeasurementKind.RunnerMinimumAvailableRatio),
             Sample(values, PrometheusMeasurementKind.PostgreSqlConnectionUsageRatio),
-            Sample(values, PrometheusMeasurementKind.RedisP99Seconds),
-            Sample(values, PrometheusMeasurementKind.DiskAvailableRatio));
+            LatencySample(values, PrometheusMeasurementKind.RedisP99Seconds, PrometheusMeasurementKind.RedisSamples, PrometheusMeasurementKind.RedisSustainedSeconds),
+            Sample(values, PrometheusMeasurementKind.DiskAvailableRatio),
+            BuildLatencyDetails(values), BuildPoolResources(values));
     }
 
     private async Task<PrometheusQueryResult> QueryAsync(
         HttpClient client,
         PrometheusQueryDefinition definition,
+        DateTimeOffset capturedAt,
         CancellationToken cancellationToken)
     {
         try
         {
-            var path = $"api/v1/query?query={Uri.EscapeDataString(definition.Expression)}";
+            var path = $"api/v1/query?query={Uri.EscapeDataString(definition.Expression)}&time={capturedAt.ToUnixTimeSeconds()}";
             using var response = await client.GetAsync(
                 path,
                 HttpCompletionOption.ResponseHeadersRead,
@@ -116,7 +119,9 @@ internal sealed class PrometheusPlatformMonitoringReader(
 
             if (result.GetArrayLength() == 0)
                 return new(definition.Kind, true, null);
-            var first = result[0];
+            var rows = new List<PrometheusRow>();
+            foreach (var first in result.EnumerateArray())
+            {
             if (!first.TryGetProperty("value", out var value)
                 || value.ValueKind != JsonValueKind.Array
                 || value.GetArrayLength() < 2)
@@ -126,7 +131,10 @@ internal sealed class PrometheusPlatformMonitoringReader(
 
             var raw = value[1].GetString();
             if (string.Equals(raw, "NaN", StringComparison.Ordinal))
-                return new(definition.Kind, true, null);
+            {
+                rows.Add(new(Labels(first), null));
+                continue;
+            }
             if (!double.TryParse(raw, NumberStyles.Float,
                     CultureInfo.InvariantCulture, out var parsed)
                 || !double.IsFinite(parsed))
@@ -134,7 +142,9 @@ internal sealed class PrometheusPlatformMonitoringReader(
                 return new(definition.Kind, false, null);
             }
 
-            return new(definition.Kind, true, parsed);
+                rows.Add(new(Labels(first), parsed));
+            }
+            return new(definition.Kind, true, rows.FirstOrDefault()?.Value, rows);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
@@ -150,6 +160,85 @@ internal sealed class PrometheusPlatformMonitoringReader(
             return new(definition.Kind, false, null);
         }
     }
+
+    private static IReadOnlyDictionary<string, string> Labels(JsonElement row) =>
+        row.TryGetProperty("metric", out var labels) && labels.ValueKind == JsonValueKind.Object
+            ? labels.EnumerateObject().ToDictionary(p => p.Name, p => p.Value.GetString() ?? "")
+            : new Dictionary<string, string>();
+
+    private PlatformMonitoringSample LatencySample(
+        IReadOnlyDictionary<PrometheusMeasurementKind, PrometheusQueryResult> values,
+        PrometheusMeasurementKind kind, PrometheusMeasurementKind countKind,
+        PrometheusMeasurementKind? sustainedKind = null, string? label = null, string? key = null)
+    {
+        var count = Read(values, countKind, label, key);
+        var sample = Read(values, kind, label, key);
+        var sustained = sustainedKind.HasValue ? Read(values, sustainedKind.Value, label, key) : sample;
+        if (count.State == PlatformMonitoringSampleState.Unavailable || sustained.State == PlatformMonitoringSampleState.Unavailable)
+            sample = sample with { State = PlatformMonitoringSampleState.Unavailable };
+        else if ((count.Value ?? 0) <= 0)
+            sample = PlatformMonitoringSample.NoSamples();
+        return sample with
+        {
+            SampleCount = count.State == PlatformMonitoringSampleState.Unavailable ? null : count.Value ?? 0,
+            MinimumSamples = thresholds.LatencyMinimumSamples, WindowSeconds = 300,
+            // Missing sustained evidence means not yet eligible, never fall back to the current spike.
+            ThresholdValue = sustainedKind.HasValue ? sustained.Value ?? 0 : null
+        };
+    }
+
+    private static PlatformMonitoringSample Read(IReadOnlyDictionary<PrometheusMeasurementKind, PrometheusQueryResult> values,
+        PrometheusMeasurementKind kind, string? label, string? key)
+    {
+        if (label is null) return Sample(values, kind);
+        var result = Result(values, kind);
+        if (!result.Succeeded) return PlatformMonitoringSample.Unavailable();
+        var value = result.Rows?.FirstOrDefault(row => row.Labels.GetValueOrDefault(label) == key)?.Value;
+        return value.HasValue ? PlatformMonitoringSample.From(value.Value) : PlatformMonitoringSample.NoSamples();
+    }
+
+    private IReadOnlyList<PlatformMonitoringLatencyMeasurement> BuildLatencyDetails(
+        IReadOnlyDictionary<PrometheusMeasurementKind, PrometheusQueryResult> values)
+    {
+        var rows = new List<PlatformMonitoringLatencyMeasurement>();
+        foreach (var (key, kind) in new[] { ("rest", PlatformMonitoringLatencyKind.Rest), ("signalr", PlatformMonitoringLatencyKind.SignalR),
+            ("upload", PlatformMonitoringLatencyKind.Upload), ("download", PlatformMonitoringLatencyKind.Download) })
+            rows.Add(Row(kind, key, "request_kind", false));
+        foreach (var key in (Result(values, PrometheusMeasurementKind.RedisDetailSamples).Rows ?? [])
+            .Select(row => row.Labels.GetValueOrDefault("endpoint")).Where(key => !string.IsNullOrWhiteSpace(key)).Distinct().Order())
+            rows.Add(Row(PlatformMonitoringLatencyKind.RedisOperation, key!, "endpoint", true));
+        return rows;
+
+        PlatformMonitoringLatencyMeasurement Row(PlatformMonitoringLatencyKind kind, string key, string label, bool redis) => new(
+            kind, redis ? key : "",
+            LatencySample(values, redis ? PrometheusMeasurementKind.RedisDetailP95 : PrometheusMeasurementKind.HttpP95,
+                redis ? PrometheusMeasurementKind.RedisDetailSamples : PrometheusMeasurementKind.HttpSamples,
+                redis ? null : PrometheusMeasurementKind.HttpSustained, label, key),
+            LatencySample(values, redis ? PrometheusMeasurementKind.RedisDetailP99 : PrometheusMeasurementKind.HttpP99,
+                redis ? PrometheusMeasurementKind.RedisDetailSamples : PrometheusMeasurementKind.HttpSamples,
+                redis ? PrometheusMeasurementKind.RedisDetailSustained : null, label, key),
+            Read(values, redis ? PrometheusMeasurementKind.RedisDetailMean : PrometheusMeasurementKind.HttpMean, label, key),
+            Read(values, redis ? PrometheusMeasurementKind.RedisDetailRate : PrometheusMeasurementKind.HttpRate, label, key),
+            Read(values, redis ? PrometheusMeasurementKind.RedisDetailErrors : PrometheusMeasurementKind.HttpErrors, label, key));
+    }
+
+    private static IReadOnlyList<PlatformMonitoringPoolResource> BuildPoolResources(
+        IReadOnlyDictionary<PrometheusMeasurementKind, PrometheusQueryResult> values) =>
+        (Result(values, PrometheusMeasurementKind.PoolTotal).Rows ?? []).Select(row =>
+        {
+            var pool = row.Labels.GetValueOrDefault("pool") ?? "";
+            var resource = row.Labels.GetValueOrDefault("resource");
+            PlatformMonitoringResource? kind = resource switch
+            {
+                "memory" => PlatformMonitoringResource.Memory, "cpu" => PlatformMonitoringResource.Cpu,
+                "pids" => PlatformMonitoringResource.Pids, _ => null
+            };
+            if (kind is null) return null;
+            var available = Result(values, PrometheusMeasurementKind.PoolAvailable).Rows?.FirstOrDefault(candidate =>
+                candidate.Labels.GetValueOrDefault("pool") == pool && candidate.Labels.GetValueOrDefault("resource") == resource)?.Value;
+            return new PlatformMonitoringPoolResource(pool, kind.Value, available, row.Value,
+                Read(values, PrometheusMeasurementKind.PoolOnline, "pool", pool).Value);
+        }).OfType<PlatformMonitoringPoolResource>().OrderBy(row => row.Pool).ThenBy(row => row.Resource).ToArray();
 
     private static PlatformMonitoringSample Sample(
         IReadOnlyDictionary<PrometheusMeasurementKind, PrometheusQueryResult> values,
@@ -212,7 +301,11 @@ internal sealed class PrometheusPlatformMonitoringReader(
         RunnerMinimumAvailableRatio,
         PostgreSqlConnectionUsageRatio,
         RedisP99Seconds,
-        DiskAvailableRatio
+        DiskAvailableRatio,
+        ApiSamples, ApiSustainedSeconds, RedisSamples, RedisSustainedSeconds, ProjectionSamples,
+        HttpSamples, HttpP95, HttpP99, HttpMean, HttpRate, HttpErrors, HttpSustained,
+        RedisDetailSamples, RedisDetailP95, RedisDetailP99, RedisDetailMean, RedisDetailRate, RedisDetailErrors, RedisDetailSustained,
+        PoolAvailable, PoolTotal, PoolOnline
     }
 
     private sealed record PrometheusQueryDefinition(
@@ -222,11 +315,16 @@ internal sealed class PrometheusPlatformMonitoringReader(
     private sealed record PrometheusQueryResult(
         PrometheusMeasurementKind Kind,
         bool Succeeded,
-        double? Value);
+        double? Value, IReadOnlyList<PrometheusRow>? Rows = null);
+
+    private sealed record PrometheusRow(IReadOnlyDictionary<string, string> Labels, double? Value);
 
     private static class QueryDefinitions
     {
         private const string CriticalStreams = "NOCTF_CONTROL|NOCTF_GAMEPLAY";
+        private const string Rest = "{role=\"api\",request_kind=\"rest\"}";
+        private const string ApiHistogram = "noctf_api_request_duration_seconds";
+        private const string RedisHistogram = "noctf_redis_operation_duration_seconds";
 
         public static IReadOnlyList<PrometheusQueryDefinition> Create(
             PlatformMonitoringThresholds thresholds)
@@ -242,11 +340,11 @@ internal sealed class PrometheusPlatformMonitoringReader(
             [
                 new(PrometheusMeasurementKind.PrometheusAvailability, "vector(1)"),
                 new(PrometheusMeasurementKind.ApiRequestsPerSecond,
-                    "sum(rate(noctf_api_requests_total{role=\"api\"}[5m])) or vector(0)"),
+                    $"sum(rate(noctf_api_requests_total{Rest}[5m])) or vector(0)"),
                 new(PrometheusMeasurementKind.ApiP95Seconds,
-                    "histogram_quantile(0.95, sum by (le) (rate(noctf_api_request_duration_seconds_bucket{role=\"api\"}[5m])))"),
+                    Quantile(ApiHistogram, Rest, "", "0.95")),
                 new(PrometheusMeasurementKind.ApiServerErrorRatio,
-                    "(sum(rate(noctf_api_requests_total{role=\"api\",outcome=\"server_error\"}[5m])) or vector(0)) / clamp_min(sum(rate(noctf_api_requests_total{role=\"api\"}[5m])) or vector(0), 1)"),
+                    "((sum(rate(noctf_api_requests_total{role=\"api\",request_kind=\"rest\",outcome=\"server_error\"}[5m])) or vector(0)) / (sum(rate(noctf_api_requests_total{role=\"api\",request_kind=\"rest\"}[5m])) > 0)) or vector(0)"),
                 new(PrometheusMeasurementKind.SignalRConnections,
                     "sum(noctf_signalr_connections{role=\"api\"}) or vector(0)"),
                 new(PrometheusMeasurementKind.NatsAvailability,
@@ -285,14 +383,59 @@ internal sealed class PrometheusPlatformMonitoringReader(
                 new(PrometheusMeasurementKind.RunnerOnlineCount,
                     "sum(noctf_runner_online{role=\"runner\"}) or vector(0)"),
                 new(PrometheusMeasurementKind.RunnerMinimumAvailableRatio,
-                    "min(sum by (pool, resource) (noctf_runner_capacity_available{role=\"runner\"}) / clamp_min(sum by (pool, resource) (noctf_runner_capacity_total{role=\"runner\"}), 1)) or vector(0)"),
+                    "min(sum by (pool, resource) (noctf_runner_capacity_available{role=\"runner\"}) / (sum by (pool, resource) (noctf_runner_capacity_total{role=\"runner\"}) > 0))"),
                 new(PrometheusMeasurementKind.PostgreSqlConnectionUsageRatio,
                     "sum(pg_stat_activity_count) / clamp_min(max(pg_settings_max_connections), 1)"),
                 new(PrometheusMeasurementKind.RedisP99Seconds,
-                    "histogram_quantile(0.99, sum by (le) (rate(noctf_redis_operation_duration_seconds_bucket[5m])))"),
+                    Quantile(RedisHistogram, "", "", "0.99")),
                 new(PrometheusMeasurementKind.DiskAvailableRatio,
-                    "min(node_filesystem_avail_bytes{fstype!~\"tmpfs|overlay\"} / node_filesystem_size_bytes{fstype!~\"tmpfs|overlay\"})")
+                    "min(node_filesystem_avail_bytes{fstype!~\"tmpfs|overlay\"} / node_filesystem_size_bytes{fstype!~\"tmpfs|overlay\"})"),
+                new(PrometheusMeasurementKind.ApiSamples, Count(ApiHistogram, Rest, "")),
+                new(PrometheusMeasurementKind.ApiSustainedSeconds,
+                    SustainedLatency(Quantile(ApiHistogram, Rest, "", "0.95"), Count(ApiHistogram, Rest, ""), thresholds)),
+                new(PrometheusMeasurementKind.RedisSamples, Count(RedisHistogram, "", "")),
+                new(PrometheusMeasurementKind.RedisSustainedSeconds,
+                    SustainedLatency(Quantile(RedisHistogram, "", "", "0.99"), Count(RedisHistogram, "", ""), thresholds)),
+                new(PrometheusMeasurementKind.ProjectionSamples, Count("noctf_leaderboard_projection_duration_seconds", "{role=\"worker\"}", "")),
+                .. DetailQueries(false, thresholds), .. DetailQueries(true, thresholds),
+                new(PrometheusMeasurementKind.PoolAvailable, "sum by (pool,resource) (noctf_runner_capacity_available{role=\"runner\"})"),
+                new(PrometheusMeasurementKind.PoolTotal, "sum by (pool,resource) (noctf_runner_capacity_total{role=\"runner\"})"),
+                new(PrometheusMeasurementKind.PoolOnline, "sum by (pool) (noctf_runner_online{role=\"runner\"})")
             ];
+        }
+
+        private static IEnumerable<PrometheusQueryDefinition> DetailQueries(bool redis, PlatformMonitoringThresholds thresholds)
+        {
+            var histogram = redis ? RedisHistogram : ApiHistogram;
+            var selector = redis ? "" : "{role=\"api\",request_kind=~\"rest|signalr|upload|download\"}";
+            var group = redis ? "endpoint" : "request_kind";
+            var count = Count(histogram, selector, group);
+            var rate = Sum(group, $"rate({histogram}_count{selector}[5m])");
+            var errors = redis ? "{outcome!=\"success\"}" : "{role=\"api\",request_kind=~\"rest|signalr|upload|download\",outcome=\"server_error\"}";
+            yield return new(redis ? PrometheusMeasurementKind.RedisDetailSamples : PrometheusMeasurementKind.HttpSamples, count);
+            yield return new(redis ? PrometheusMeasurementKind.RedisDetailP95 : PrometheusMeasurementKind.HttpP95, Quantile(histogram, selector, group, "0.95"));
+            yield return new(redis ? PrometheusMeasurementKind.RedisDetailP99 : PrometheusMeasurementKind.HttpP99, Quantile(histogram, selector, group, "0.99"));
+            yield return new(redis ? PrometheusMeasurementKind.RedisDetailMean : PrometheusMeasurementKind.HttpMean,
+                $"{Sum(group, $"rate({histogram}_sum{selector}[5m])")} / ({rate} > 0)");
+            yield return new(redis ? PrometheusMeasurementKind.RedisDetailRate : PrometheusMeasurementKind.HttpRate, rate);
+            yield return new(redis ? PrometheusMeasurementKind.RedisDetailErrors : PrometheusMeasurementKind.HttpErrors,
+                $"({Sum(group, $"rate({histogram}_count{errors}[5m])")} or ({rate}) * 0) / ({rate} > 0)");
+            yield return new(redis ? PrometheusMeasurementKind.RedisDetailSustained : PrometheusMeasurementKind.HttpSustained,
+                SustainedLatency(Quantile(histogram, selector, group, redis ? "0.99" : "0.95"), count, thresholds));
+        }
+
+        private static string Sum(string group, string expression) =>
+            group.Length == 0 ? $"sum({expression})" : $"sum by ({group}) ({expression})";
+        private static string Count(string histogram, string selector, string group) => Sum(group, $"increase({histogram}_count{selector}[5m])");
+        private static string Quantile(string histogram, string selector, string group, string quantile) =>
+            $"histogram_quantile({quantile}, sum by (le{(group.Length == 0 ? "" : "," + group)}) (rate({histogram}_bucket{selector}[5m])))";
+        private static string SustainedLatency(string quantile, string samples, PlatformMonitoringThresholds thresholds)
+        {
+            var window = $"{thresholds.LatencySustainedWindowMinutes}m";
+            // A sparse/missing point is not proof of a sustained breach. Keep the same five-minute
+            // distribution at each evaluation; the subquery is an alert hold, not a wider sample window.
+            var eligible = $"((({quantile}) >= 0) * (({samples}) >= bool {thresholds.LatencyMinimumSamples})) or (({samples}) * 0)";
+            return $"min_over_time(({eligible})[{window}:15s]) and (count_over_time(({samples})[{window}:15s]) >= {thresholds.LatencySustainedWindowMinutes * 4})";
         }
 
         private static string CriticalConsumerSum(string metric) =>

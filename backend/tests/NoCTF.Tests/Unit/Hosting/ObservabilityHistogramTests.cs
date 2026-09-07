@@ -57,6 +57,8 @@ public sealed class ObservabilityHistogramTests
         // Count histograms must not inherit the second-based view.
         await Assert.That(exported.Split('\n').Any(line => line.StartsWith("noctf_leaderboard_projection_teams", StringComparison.Ordinal)
             && line.Contains("le=\"0.05\"", StringComparison.Ordinal))).IsFalse();
+        await Assert.That(exported.Split('\n').Any(line => line.StartsWith("noctf_leaderboard_projection_teams", StringComparison.Ordinal)
+            && line.Contains("le=\"50\"", StringComparison.Ordinal))).IsTrue();
     }
 
     private static SortedDictionary<double, double> Buckets(string text, string metric)

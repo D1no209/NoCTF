@@ -66,11 +66,16 @@ public static class ObservabilityExtensions
             "noctf.scheduler.dispatch.lateness"
         })
         {
-            metrics.AddView(name, new ExplicitBucketHistogramConfiguration
+            var view = new ExplicitBucketHistogramConfiguration
             {
                 Boundaries = [0.0001, 0.00025, 0.0005, 0.001, 0.0025, 0.005, 0.01, 0.025,
                     0.05, 0.1, 0.25, 0.5, 0.8, 1, 2.5, 5, 10, 30, 60, 120, 300]
-            });
+            };
+            // Completed SignalR connections and file transfers share this instrument but have
+            // separate request_kind labels. Keep a long tail without sacrificing REST precision.
+            if (name == "noctf.api.request.duration")
+                view.Boundaries = [.. view.Boundaries, 600, 1800, 3600, 21600, 86400];
+            metrics.AddView(name, view);
         }
         return metrics;
     }
@@ -130,10 +135,8 @@ public static class ObservabilityExtensions
             {
                 var route = (context.GetEndpoint() as RouteEndpoint)?.RoutePattern.RawText
                     ?? "unmatched";
-                NoCtfTelemetry.RecordApiRequest(
-                    route,
-                    outcome,
-                    Stopwatch.GetElapsedTime(started).TotalSeconds);
+                if (ClassifyRequest(context) is { } kind)
+                    NoCtfTelemetry.RecordApiRequest(route, outcome, Stopwatch.GetElapsedTime(started).TotalSeconds, kind);
                 if (TryClassifyRuntimeOperation(
                         context.Request.Method,
                         route,
@@ -154,6 +157,14 @@ public static class ObservabilityExtensions
         int localPort,
         int metricsPort) =>
         path == "/metrics" && localPort == metricsPort;
+
+    internal static ApiRequestKind? ClassifyRequest(HttpContext context)
+    {
+        if (context.Request.Path.StartsWithSegments("/hubs")) return ApiRequestKind.SignalR;
+        if (!context.Request.Path.StartsWithSegments("/api")) return null;
+        // Endpoint metadata applies even to rejected uploads/downloads; response headers do not.
+        return context.GetEndpoint()?.Metadata.GetMetadata<ApiRequestMetricsMetadata>()?.Kind ?? ApiRequestKind.Rest;
+    }
 
     internal static bool TryClassifyRuntimeOperation(
         string method,
@@ -213,6 +224,8 @@ public static class ObservabilityExtensions
 
     private sealed record RuntimeAction(string Suffix, string Operation);
 }
+
+public sealed record ApiRequestMetricsMetadata(ApiRequestKind Kind);
 
 file static class ThisAssemblyVersion
 {

@@ -42,6 +42,8 @@ public sealed class ExportCompetitionEventsEndpoint(
 {
     public override void Configure()
     {
+        Options(builder => builder.WithMetadata(new NoCTF.Hosting.Observability.ApiRequestMetricsMetadata(
+            NoCTF.Application.Observability.ApiRequestKind.Download)));
         Get("/admin/competitions/{competitionId}/events/export");
         AuthSchemes("Bearer");
         Description(builder => builder.WithName("AdminExportCompetitionEvents"));

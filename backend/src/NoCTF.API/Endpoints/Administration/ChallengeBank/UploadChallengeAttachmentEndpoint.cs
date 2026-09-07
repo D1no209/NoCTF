@@ -34,6 +34,8 @@ public sealed class UploadChallengeAttachmentEndpoint(
 {
     public override void Configure()
     {
+        Options(builder => builder.WithMetadata(new NoCTF.Hosting.Observability.ApiRequestMetricsMetadata(
+            NoCTF.Application.Observability.ApiRequestKind.Upload)));
         Post("/admin/challenges/{challengeId}/attachments");
         AuthSchemes("Bearer");
         AllowFileUploads();

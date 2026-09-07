@@ -93,9 +93,9 @@ public static class NoCtfTelemetry
             ObserveRunnerCapacityTotal);
     }
 
-    public static void RecordApiRequest(string endpoint, string outcome, double elapsedSeconds)
+    public static void RecordApiRequest(string endpoint, string outcome, double elapsedSeconds, ApiRequestKind kind = ApiRequestKind.Rest)
     {
-        var tags = new TagList { { "endpoint", endpoint }, { "outcome", outcome } };
+        var tags = new TagList { { "endpoint", endpoint }, { "outcome", outcome }, { "request_kind", kind.ToString().ToLowerInvariant() } };
         ApiRequests.Add(1, tags);
         ApiDuration.Record(elapsedSeconds, tags);
     }
@@ -298,3 +298,5 @@ public static class NoCtfTelemetry
         long AvailablePids,
         long TotalPids);
 }
+
+public enum ApiRequestKind { Rest, SignalR, Upload, Download }

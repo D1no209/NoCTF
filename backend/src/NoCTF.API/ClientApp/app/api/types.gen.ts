@@ -1353,20 +1353,52 @@ export type NoCtfapiEndpointsAdministrationPlatformPlatformMonitoringResponse = 
     capturedAt?: string;
     dashboardUrl?: string | null;
     metrics?: Array<NoCtfapiEndpointsAdministrationPlatformPlatformMonitoringMetricResponse>;
+    latencyDetails?: Array<NoCtfApplicationAdministrationMonitoringPlatformMonitoringLatencyView>;
+    poolResources?: Array<NoCtfApplicationAdministrationMonitoringPlatformMonitoringPoolResource>;
+    latencySustainedWindowMinutes?: number;
 };
 
-export type NoCtfApplicationAdministrationMonitoringPlatformMonitoringStatus = 0 | 1 | 2 | 3 | 4;
+export type NoCtfApplicationAdministrationMonitoringPlatformMonitoringStatus = 0 | 1 | 2 | 3 | 4 | 5 | 6;
 
 export type NoCtfapiEndpointsAdministrationPlatformPlatformMonitoringMetricResponse = {
     kind?: NoCtfApplicationAdministrationMonitoringPlatformMonitoringMetricKind;
     unit?: NoCtfApplicationAdministrationMonitoringPlatformMonitoringUnit;
     value?: number | null;
     status?: NoCtfApplicationAdministrationMonitoringPlatformMonitoringStatus;
+    sampleCount?: number | null;
+    minimumSamples?: number | null;
+    windowSeconds?: number | null;
 };
 
 export type NoCtfApplicationAdministrationMonitoringPlatformMonitoringMetricKind = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12 | 13 | 14 | 15 | 16 | 17 | 18 | 19 | 20 | 21 | 22;
 
 export type NoCtfApplicationAdministrationMonitoringPlatformMonitoringUnit = 0 | 1 | 2 | 3 | 4;
+
+export type NoCtfApplicationAdministrationMonitoringPlatformMonitoringLatencyView = {
+    kind?: NoCtfApplicationAdministrationMonitoringPlatformMonitoringLatencyKind;
+    endpoint?: string;
+    p95Milliseconds?: number | null;
+    p99Milliseconds?: number | null;
+    meanMilliseconds?: number | null;
+    requestsPerSecond?: number | null;
+    errorPercent?: number | null;
+    sampleCount?: number | null;
+    minimumSamples?: number;
+    windowSeconds?: number;
+    status?: NoCtfApplicationAdministrationMonitoringPlatformMonitoringStatus;
+};
+
+export type NoCtfApplicationAdministrationMonitoringPlatformMonitoringLatencyKind = 0 | 1 | 2 | 3 | 4;
+
+export type NoCtfApplicationAdministrationMonitoringPlatformMonitoringPoolResource = {
+    pool?: string;
+    resource?: NoCtfApplicationAdministrationMonitoringPlatformMonitoringResource;
+    available?: number | null;
+    total?: number | null;
+    onlineRunners?: number | null;
+};
+
+export type NoCtfApplicationAdministrationMonitoringPlatformMonitoringResource = 0 | 1 | 2;
 
 export type NoCtfapiEndpointsAdministrationPlatformIssuePlatformBotTokenResponse = {
     accessToken?: string;

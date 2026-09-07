@@ -6,7 +6,9 @@ public enum PlatformMonitoringStatus : short
     Warning,
     Critical,
     Unavailable,
-    NoSamples
+    NoSamples,
+    InsufficientSamples,
+    Observing
 }
 
 public enum PlatformMonitoringMetricKind : short
@@ -55,7 +57,10 @@ public enum PlatformMonitoringSampleState : short
 public readonly record struct PlatformMonitoringSample(
     double? Value,
     PlatformMonitoringSampleState State,
-    double? ThresholdValue = null)
+    double? ThresholdValue = null,
+    double? SampleCount = null,
+    int? MinimumSamples = null,
+    int? WindowSeconds = null)
 {
     public static PlatformMonitoringSample From(
         double value,
@@ -82,7 +87,9 @@ public sealed record PlatformMonitoringThresholds(
     int InboxWarning,
     int InboxCritical,
     double JetStreamStorageWarningPercent,
-    double JetStreamStorageCriticalPercent)
+    double JetStreamStorageCriticalPercent,
+    int LatencyMinimumSamples = 100,
+    int LatencySustainedWindowMinutes = 3)
 {
     public static PlatformMonitoringThresholds Default { get; } = new(
         SustainedWindowMinutes: 3,
@@ -126,13 +133,34 @@ public sealed record PlatformMonitoringMeasurements(
     PlatformMonitoringSample RunnerMinimumAvailableRatio,
     PlatformMonitoringSample PostgreSqlConnectionUsageRatio,
     PlatformMonitoringSample RedisP99Seconds,
-    PlatformMonitoringSample DiskAvailableRatio);
+    PlatformMonitoringSample DiskAvailableRatio,
+    IReadOnlyList<PlatformMonitoringLatencyMeasurement>? LatencyDetails = null,
+    IReadOnlyList<PlatformMonitoringPoolResource>? PoolResources = null);
+
+public enum PlatformMonitoringLatencyKind { Rest, SignalR, Upload, Download, RedisOperation }
+public enum PlatformMonitoringResource { Memory, Cpu, Pids }
+
+public sealed record PlatformMonitoringLatencyMeasurement(
+    PlatformMonitoringLatencyKind Kind, string Endpoint,
+    PlatformMonitoringSample P95Seconds, PlatformMonitoringSample P99Seconds,
+    PlatformMonitoringSample MeanSeconds, PlatformMonitoringSample Rate, PlatformMonitoringSample ErrorRatio);
+
+public sealed record PlatformMonitoringLatencyView(
+    PlatformMonitoringLatencyKind Kind, string Endpoint, double? P95Milliseconds, double? P99Milliseconds,
+    double? MeanMilliseconds, double? RequestsPerSecond, double? ErrorPercent,
+    double? SampleCount, int MinimumSamples, int WindowSeconds, PlatformMonitoringStatus Status);
+
+public sealed record PlatformMonitoringPoolResource(
+    string Pool, PlatformMonitoringResource Resource, double? Available, double? Total, double? OnlineRunners);
 
 public sealed record PlatformMonitoringMetricView(
     PlatformMonitoringMetricKind Kind,
     PlatformMonitoringUnit Unit,
     double? Value,
-    PlatformMonitoringStatus Status);
+    PlatformMonitoringStatus Status,
+    double? SampleCount = null,
+    int? MinimumSamples = null,
+    int? WindowSeconds = null);
 
 public sealed record PlatformMonitoringView(
     PlatformMonitoringStatus Status,
@@ -140,7 +168,10 @@ public sealed record PlatformMonitoringView(
     bool NatsAvailable,
     DateTimeOffset CapturedAt,
     Uri? DashboardUri,
-    IReadOnlyList<PlatformMonitoringMetricView> Metrics);
+    IReadOnlyList<PlatformMonitoringMetricView> Metrics,
+    IReadOnlyList<PlatformMonitoringLatencyView>? LatencyDetails = null,
+    IReadOnlyList<PlatformMonitoringPoolResource>? PoolResources = null,
+    int LatencySustainedWindowMinutes = 3);
 
 public interface IPlatformMonitoringReader
 {
@@ -228,7 +259,8 @@ public sealed class ObservePlatformMonitoring(
                 criticalBelow: 1),
             Metric(PlatformMonitoringMetricKind.RunnerMinimumAvailablePercent,
                 PlatformMonitoringUnit.Percent,
-                Percent(measurements.RunnerMinimumAvailableRatio), criticalBelow: 15),
+                Percent(measurements.RunnerMinimumAvailableRatio), criticalBelow: 15,
+                noSamplesStatus: PlatformMonitoringStatus.NoSamples),
             Metric(PlatformMonitoringMetricKind.PostgreSqlConnectionUsagePercent,
                 PlatformMonitoringUnit.Percent,
                 Percent(measurements.PostgreSqlConnectionUsageRatio), warningAbove: 80),
@@ -250,7 +282,25 @@ public sealed class ObservePlatformMonitoring(
             natsAvailable,
             measurements.CapturedAt,
             measurements.DashboardUri,
-            metrics);
+            metrics,
+            (measurements.LatencyDetails ?? []).Select(LatencyView).ToArray(),
+            measurements.PoolResources ?? [],
+            thresholds.LatencySustainedWindowMinutes);
+    }
+
+    private PlatformMonitoringLatencyView LatencyView(PlatformMonitoringLatencyMeasurement row)
+    {
+        var sample = row.Kind == PlatformMonitoringLatencyKind.RedisOperation ? row.P99Seconds : row.P95Seconds;
+        var metric = Metric(PlatformMonitoringMetricKind.ApiP95Milliseconds, PlatformMonitoringUnit.Milliseconds,
+            Milliseconds(sample), warningAbove: row.Kind switch
+            {
+                PlatformMonitoringLatencyKind.Rest => 800,
+                PlatformMonitoringLatencyKind.RedisOperation => 50,
+                _ => null
+            }, noSamplesStatus: PlatformMonitoringStatus.NoSamples);
+        return new(row.Kind, row.Endpoint, Finite(row.P95Seconds.Value * 1000), Finite(row.P99Seconds.Value * 1000),
+            sample.SampleCount > 0 ? Finite(row.MeanSeconds.Value * 1000) : null, Finite(row.Rate.Value), Finite(row.ErrorRatio.Value * 100),
+            sample.SampleCount, thresholds.LatencyMinimumSamples, 300, metric.Status);
     }
 
     private static PlatformMonitoringMetricView Metric(
@@ -270,15 +320,19 @@ public sealed class ObservePlatformMonitoring(
             PlatformMonitoringSampleState.Unavailable => unavailableStatus,
             PlatformMonitoringSampleState.NoSamples => noSamplesStatus,
             _ when value is null => unavailableStatus,
+            _ when sample.MinimumSamples.HasValue && sample.SampleCount < sample.MinimumSamples =>
+                PlatformMonitoringStatus.InsufficientSamples,
             _ when criticalAbove is not null && thresholdValue > criticalAbove =>
                 PlatformMonitoringStatus.Critical,
             _ when criticalBelow is not null && thresholdValue < criticalBelow =>
                 PlatformMonitoringStatus.Critical,
             _ when warningAbove is not null && thresholdValue > warningAbove =>
                 PlatformMonitoringStatus.Warning,
+            _ when sample.MinimumSamples.HasValue && warningAbove is not null && value > warningAbove =>
+                PlatformMonitoringStatus.Observing,
             _ => PlatformMonitoringStatus.Healthy
         };
-        return new(kind, unit, value, status);
+        return new(kind, unit, value, status, Finite(sample.SampleCount), sample.MinimumSamples, sample.WindowSeconds);
     }
 
     private static PlatformMonitoringMetricView Metric(
