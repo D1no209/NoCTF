@@ -24,6 +24,17 @@ const competitionId = '00000000-0000-0000-0000-000000000001'
 const challengeId = '00000000-0000-0000-0000-000000000002'
 const teamId = '00000000-0000-0000-0000-000000000003'
 
+test('settled final round never shows a running countdown even with an older snapshot', () => {
+  const snapshot: NoCtfapiEndpointsCompetitionsScoreboardSnapshotResponse = {
+    currentRoundId: 'final', generatedAt: '2026-09-08T00:00:00Z',
+  }
+  const schema: NoCtfapiEndpointsCompetitionsScoreboardSchemaResponse = {
+    rounds: [{ id: 'final', number: 2, state: 'Settled', endAt: '2026-09-08T00:01:00Z' }],
+  }
+  expect(awdpRoundClock(snapshot, schema, Date.parse('2026-09-08T00:00:10Z'), false))
+    .toEqual({ currentRound: 2, remainingSeconds: 0 })
+})
+
 function event(
   kind: NoCtfapiEndpointsCompetitionsEventsCompetitionEventResponse['kind'],
   values: Partial<NoCtfapiEndpointsCompetitionsEventsCompetitionEventResponse> = {},
@@ -416,7 +427,7 @@ describe('AWDP control screen implementation contract', () => {
     ).text()
 
     expect(page).toContain('definePageMeta({ layout: false })')
-    expect(page).toContain('useScoreboardMatrix(competitionId)')
+    expect(page).toContain('useScoreboardMatrix(competitionId, { pollRounds: false })')
     expect(page).toContain('board.refresh({ catalog: true, schema: true, snapshot: true })')
     expect(page).toContain('listCompetitionEvents({')
     expect(page).toContain('competitionEventChanged: () => void refreshLatest()')

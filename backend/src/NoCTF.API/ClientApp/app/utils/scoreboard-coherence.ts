@@ -6,6 +6,15 @@ import type {
 
 export type ScoreboardRefreshOutcome = 'accepted' | 'retrying' | 'failed' | 'superseded'
 
+/** Anonymous viewers have no Hub; clock-driven settlement must still reach them. */
+export function needsAwdpRoundRefresh(
+  schema: NoCtfapiEndpointsCompetitionsScoreboardSchemaResponse | null,
+  snapshot: NoCtfapiEndpointsCompetitionsScoreboardSnapshotResponse | null,
+): boolean {
+  return schema?.mode === 'Awdp' && snapshot?.dataScope === 'Live'
+    && (schema.rounds ?? []).some(round => round.state === 'Running')
+}
+
 function normalizeScoreboardVersion(value: string | null | undefined): string | null {
   if (!value || !/^\d+$/.test(value)) return null
   return value.replace(/^0+(?=\d)/, '')

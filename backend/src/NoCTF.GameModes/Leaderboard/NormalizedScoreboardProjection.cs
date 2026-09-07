@@ -954,35 +954,8 @@ internal static class NormalizedScoreboardProjection
 
     private static DateTimeOffset EffectiveClockToWallTime(
         LeaderboardProjectionInput input,
-        TimeSpan target)
-    {
-        var transitions = (input.LifecycleAudits ?? [])
-            .OrderBy(item => item.OccurredAt)
-            .ThenBy(item => item.Id)
-            .ToArray();
-        if (transitions.Length == 0)
-            return input.CompetitionStartTime.GetValueOrDefault() + target;
-        var accumulated = TimeSpan.Zero;
-        DateTimeOffset? runningSince = null;
-        foreach (var transition in transitions)
-        {
-            if (transition.To == CompetitionStatus.Running && runningSince is null)
-            {
-                runningSince = transition.OccurredAt;
-                continue;
-            }
-            if (transition.From != CompetitionStatus.Running
-                || transition.To == CompetitionStatus.Running
-                || runningSince is not DateTimeOffset segmentStart)
-                continue;
-            var segment = transition.OccurredAt - segmentStart;
-            if (accumulated + segment >= target)
-                return segmentStart + (target - accumulated);
-            accumulated += segment;
-            runningSince = null;
-        }
-        return (runningSince ?? input.CompetitionStartTime.GetValueOrDefault()) + (target - accumulated);
-    }
+        TimeSpan target) => AwdEffectiveRunningClock.ToWallTime(
+            input.LifecycleAudits ?? [], input.CompetitionStartTime.GetValueOrDefault(), target);
 
     private static int FactRound(
         LeaderboardProjectionInput input,

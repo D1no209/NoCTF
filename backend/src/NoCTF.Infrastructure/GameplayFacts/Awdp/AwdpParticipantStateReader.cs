@@ -155,7 +155,7 @@ public sealed class AwdpParticipantStateReader(NoCtfDbContext db) : IAwdpPartici
             .ToArray();
         var hasStarted = lifecycle.Any(transition => transition.To == CompetitionStatus.Running);
         var currentRound = hasStarted
-            ? Round(lifecycle, now, configuration.RoundDurationSeconds)
+            ? Round(lifecycle, now, configuration.RoundDurationSeconds, scope.Status == CompetitionStatus.Finished)
             : (int?)null;
 
         var firstBreak = facts.FirstOrDefault(fact => fact is
@@ -231,10 +231,13 @@ public sealed class AwdpParticipantStateReader(NoCtfDbContext db) : IAwdpPartici
     private static int Round(
         IReadOnlyList<CompetitionLifecycleTransition> lifecycle,
         DateTimeOffset at,
-        int durationSeconds)
+        int durationSeconds,
+        bool finished = false)
     {
         var seconds = Math.Max(0, AwdEffectiveRunningClock.Calculate(lifecycle, at).TotalSeconds);
-        return checked((int)(seconds / durationSeconds) + 1);
+        return finished
+            ? Math.Max(1, checked((int)Math.Ceiling(seconds / durationSeconds)))
+            : checked((int)(seconds / durationSeconds) + 1);
     }
 
     private static CompetitionLifecycleTransition? ParseLifecycle(

@@ -71,6 +71,13 @@ public sealed class AwdpParticipantStatePersistenceTests
                 now,
                 cancellationToken);
             await Assert.That(outsider).IsNull();
+            var competition = await db.Competitions.SingleAsync(x => x.Id == fixture.CompetitionId, cancellationToken);
+            competition.Status = CompetitionStatus.Finished;
+            AddLifecycle(db, fixture.CompetitionId, CompetitionStatus.Running, CompetitionStatus.Finished, now.AddSeconds(20));
+            await db.SaveChangesAsync(cancellationToken);
+            var finished = await new AwdpParticipantStateReader(db).FindAsync(fixture.CompetitionId,
+                fixture.CompetitionChallengeId, fixture.UserId, now.AddDays(1), cancellationToken);
+            await Assert.That(finished!.CurrentRound).IsEqualTo(3);
         });
     }
 

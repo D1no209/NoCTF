@@ -762,6 +762,80 @@ public sealed class NormalizedScoreboardProjectionTests
         await Assert.That(projection.Snapshot.Teams.All(team => team.Slots.Count == 0)).IsTrue();
     }
 
+    [Test]
+    [Arguments(120, false)]
+    [Arguments(130, false)]
+    [Arguments(3000, false)]
+    [Arguments(3001, false)]
+    [Arguments(130, true)]
+    public async Task Finished_awdp_retains_rounds_and_clamps_final_boundary(int seconds, bool paused)
+    {
+        var id = Guid.NewGuid();
+        var team = Team(1, "Alpha");
+        var challenge = Challenge(1, "Pwn");
+        var stop = Start.AddSeconds(seconds);
+        var finish = paused ? stop.AddMinutes(10) : stop;
+        var transitions = new List<CompetitionLifecycleTransition>
+        {
+            new() { Id = Guid.NewGuid(), CompetitionId = id, From = CompetitionStatus.Published,
+                To = CompetitionStatus.Running, OccurredAt = Start },
+            new() { Id = Guid.NewGuid(), CompetitionId = id, From = CompetitionStatus.Running,
+                To = paused ? CompetitionStatus.Paused : CompetitionStatus.Finished, OccurredAt = stop }
+        };
+        if (paused)
+            transitions.Add(new() { Id = Guid.NewGuid(), CompetitionId = id, From = CompetitionStatus.Paused,
+                To = CompetitionStatus.Finished, OccurredAt = finish });
+        var input = new LeaderboardProjectionInput(id, GameMode.Awdp, [team],
+            [Fact(team.Id, challenge.Id, GameplayFactKind.BreakAttempt, 10, GameplayFactResult.Correct)],
+            [challenge], JsonSerializer.Serialize(new AwdpConfiguration(AwdpConfiguration.CurrentSchemaVersion,
+                60, FixedCurve(100), FixedCurve(40), RequireBreakBeforeFix: false), JsonOptions),
+            Start, transitions, ProjectedAt: finish.AddDays(1), CompetitionStatus: CompetitionStatus.Finished);
+        var projection = ProjectNormalized(engine, input);
+        var last = (int)Math.Ceiling(seconds / 60d);
+        await Assert.That(projection.Schema.LatestRound).IsEqualTo(last);
+        await Assert.That(projection.Schema.Rounds.Count).IsEqualTo(Math.Min(50, last));
+        await Assert.That(projection.Schema.Columns.Count).IsEqualTo(Math.Min(50, last));
+        await Assert.That(projection.Schema.Rounds.All(round => round.State == ScoreboardRoundState.Settled
+            && round.EndAt >= round.StartAt)).IsTrue();
+        await Assert.That(projection.Schema.Rounds[^1].EndAt).IsEqualTo(seconds % 60 == 0 ? stop : finish);
+        await Assert.That(projection.Snapshot.Teams.Single().TotalScore).IsEqualTo(100L * last);
+        await AssertArithmetic(projection.Snapshot.Teams.Single());
+        var older = ProjectNormalized(engine, input with { ScoreboardRoundWindowEnd = 1 });
+        await Assert.That(older.Schema.Rounds.Single().Number).IsEqualTo(1);
+        await Assert.That(older.Snapshot.Teams.Single().TotalScore).IsEqualTo(100L * last);
+        await AssertArithmetic(older.Snapshot.Teams.Single());
+    }
+
+    [Test]
+    public async Task Awdp_duration_edit_changes_schema_clock_and_reprojects_current_rules()
+    {
+        var team = Team(1, "Alpha");
+        var challenge = Challenge(1, "Pwn");
+        string Configuration(int duration) => JsonSerializer.Serialize(new AwdpConfiguration(
+            AwdpConfiguration.CurrentSchemaVersion, duration, FixedCurve(100), FixedCurve(40),
+            RequireBreakBeforeFix: false), JsonOptions);
+        var input = new LeaderboardProjectionInput(Guid.NewGuid(), GameMode.Awdp, [team],
+            [Fact(team.Id, challenge.Id, GameplayFactKind.BreakAttempt, 10, GameplayFactResult.Correct)],
+            [challenge], Configuration(60), Start, ProjectedAt: Start.AddSeconds(130),
+            CompetitionStatus: CompetitionStatus.Running);
+        var before = ProjectNormalized(engine, input);
+        var after = ProjectNormalized(engine, input with { CompetitionConfigurationJson = Configuration(120) });
+        await Assert.That(before.Schema.LatestRound).IsEqualTo(3);
+        await Assert.That(after.Schema.LatestRound).IsEqualTo(2);
+        await Assert.That(after.Schema.Rounds[^1].EndAt).IsEqualTo(Start.AddSeconds(240));
+        await Assert.That(after.Schema.Revision).IsNotEqualTo(before.Schema.Revision);
+        await Assert.That(after.Snapshot.SchemaRevision).IsEqualTo(after.Schema.Revision);
+        await Assert.That(before.Snapshot.Teams.Single().TotalScore).IsEqualTo(200);
+        await Assert.That(after.Snapshot.Teams.Single().TotalScore).IsEqualTo(100);
+        var historical = ProjectNormalized(engine, input with { ScoreboardRoundWindowEnd = 1 });
+        historical = historical with { ParticipantView = ScoreboardAudienceView.From(historical) };
+        var publishedSnapshot = before.Snapshot with { Version = before.Snapshot.Version + 10 };
+        var scoped = ScoreboardAudienceProjection.PreserveSnapshotScope(historical, publishedSnapshot);
+        await Assert.That(scoped.Snapshot.Version).IsEqualTo(publishedSnapshot.Version);
+        await Assert.That(scoped.ParticipantView!.Snapshot.Version).IsEqualTo(publishedSnapshot.Version);
+        await Assert.That(scoped.Snapshot.SchemaRevision).IsEqualTo(historical.Schema.Revision);
+    }
+
     private static async Task AssertArithmetic(ScoreboardTeam team)
     {
         var slotNet = team.Slots.Aggregate(0L, (total, slot) =>

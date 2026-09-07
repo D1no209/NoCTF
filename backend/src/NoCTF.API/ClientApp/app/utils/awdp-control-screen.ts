@@ -201,7 +201,8 @@ export function awdpRoundClock(
   const currentRound = Math.max(0, round?.number ?? 0)
   const endAt = round?.endAt ? new Date(round.endAt).getTime() : Number.NaN
   const startAt = round?.startAt ? new Date(round.startAt).getTime() : now
-  if (!currentRound || !Number.isFinite(endAt)) return { currentRound, remainingSeconds: 0 }
+  if (!currentRound || !Number.isFinite(endAt) || round?.state === 'Settled')
+    return { currentRound, remainingSeconds: 0 }
   const generatedAt = snapshot?.generatedAt ? new Date(snapshot.generatedAt).getTime() : Number.NaN
   const reference = advances
     ? now

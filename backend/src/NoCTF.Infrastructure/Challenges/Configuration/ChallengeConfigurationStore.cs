@@ -4,12 +4,15 @@ using NoCTF.Application.Challenges.Configuration;
 using NoCTF.Domain.Competitions;
 using NoCTF.Domain.Teams;
 using NoCTF.Application.Messaging;
+using NoCTF.Application.Competitions.Events;
+using NoCTF.Domain.Competitions.Events;
 
 namespace NoCTF.Infrastructure.Challenges.Configuration;
 
 public sealed class ChallengeConfigurationStore(
     NoCtfDbContext db,
-    ITransactionalMessageOutbox outbox) : IChallengeConfigurationStore
+    ITransactionalMessageOutbox outbox,
+    ICompetitionEventRecorder events) : IChallengeConfigurationStore
 {
     public Task<ChallengeConfigurationView?> FindAsync(
         Guid competitionId,
@@ -99,10 +102,18 @@ public sealed class ChallengeConfigurationStore(
                 challengeId,
                 updatedAt));
         }
-        if (!db.Database.IsRelational())
-            await db.SaveChangesAsync(ct);
+        await events.RecordAsync(new(
+            competitionId,
+            CompetitionEventKind.ChallengeUpdated,
+            CompetitionEventLevel.Information,
+            CompetitionEventVisibility.Staff,
+            updatedAt,
+            CompetitionChallengeId: challengeId,
+            CompetitionStatus: status), ct);
+        await db.SaveChangesAsync(ct);
+        var result = await FindAsync(competitionId, challengeId, ct);
         await transaction.CommitAsync(ct);
-        await outbox.FlushOutgoingMessagesAsync();
-        return new(await FindAsync(competitionId, challengeId, ct));
+        await outbox.FlushCommittedMessagesAsync();
+        return new(result);
     }
 }

@@ -37,6 +37,63 @@ namespace NoCTF.Tests.Integration.Messaging;
 public sealed class CommandReceiptOutboxTests
 {
     [Test, Timeout(300_000)]
+    public async Task Configuration_changes_persist_events_and_fanout_before_request_dispatch(CancellationToken ct)
+    {
+        await DockerIntegrationTest.RunAsync(async () =>
+        {
+            await using var postgres = new PostgreSqlBuilder("postgres:17.10-alpine3.24@sha256:742f40ea20b9ff2ff31db5458d127452988a2164df9e17441e191f3b72252193").Build();
+            await using var nats = new ContainerBuilder("docker.m.daocloud.io/library/nats:2.12.2-alpine@sha256:2d5fce3229ae5741f4ef9225aff95dc4dc036455931eaf77a3eec33fddaa192d")
+                .WithPortBinding(4222, true).WithCommand("-js")
+                .WithWaitStrategy(Wait.ForUnixContainer().UntilInternalTcpPortIsAvailable(4222)).Build();
+            await Task.WhenAll(postgres.StartAsync(ct), nats.StartAsync(ct));
+            var connection = postgres.GetConnectionString();
+            var options = new DbContextOptionsBuilder<NoCtfDbContext>()
+                .UseNpgsql(connection).UseSnakeCaseNamingConvention().Options;
+            var fixture = new CompetitionForceDeleteFixture();
+            await using (var setup = new NoCtfDbContext(options))
+            {
+                await setup.Database.EnsureCreatedAsync(ct);
+                await fixture.SeedAsync(setup, ct);
+            }
+            var commits = new ConfigurationCommitProbe();
+            using var host = BuildHost(connection, $"nats://{nats.Hostname}:{nats.GetMappedPublicPort(4222)}", new DeliveryProbe(), false, commits);
+            await host.Services.GetRequiredService<IMessageStore>().Admin.MigrateAsync();
+            await host.StartAsync(ct);
+            try
+            {
+                using var scope = host.Services.CreateScope();
+                var db = scope.ServiceProvider.GetRequiredService<NoCtfDbContext>();
+                var outbox = scope.ServiceProvider.GetRequiredService<ITransactionalMessageOutbox>();
+                var events = new CompetitionEventStore(db, outbox);
+                var store = new NoCTF.Infrastructure.Competitions.Configuration.CompetitionConfigurationStore(db, outbox, events);
+                var configuration = await store.FindAsync(fixture.Id, ct);
+                var changed = await store.TryUpdateAsync(fixture.Id, configuration!.Json, true, fixture.Now, ct);
+                await Assert.That(changed.Failure).IsNull();
+                var challengeId = await db.CompetitionChallenges.Where(x => x.CompetitionId == fixture.Id)
+                    .Select(x => x.Id).SingleAsync(ct);
+                var challenges = new NoCTF.Infrastructure.Challenges.Configuration.ChallengeConfigurationStore(db, outbox, events);
+                var rules = await challenges.FindAsync(fixture.Id, challengeId, ct);
+                await Assert.That((await challenges.TryUpdateAsync(fixture.Id, challengeId, rules!.Json, fixture.Now, ct)).Failure).IsNull();
+                await using var observer = new NoCtfDbContext(options);
+                await Assert.That(await observer.CompetitionEvents.CountAsync(x => x.CompetitionId == fixture.Id
+                    && (x.Kind == NoCTF.Domain.Competitions.Events.CompetitionEventKind.CompetitionUpdated
+                        || x.Kind == NoCTF.Domain.Competitions.Events.CompetitionEventKind.ChallengeUpdated), ct)).IsEqualTo(2);
+                // Observe real database rows inside each transaction, before dispatch can remove them.
+                await Assert.That(commits.EnvelopeCounts).IsEquivalentTo([2, 2]);
+                commits.FailCommit = true;
+                await Assert.That(async () => await store.TryUpdateAsync(fixture.Id,
+                    """{"schemaVersion":4,"roundDurationSeconds":99}""", true, fixture.Now.AddSeconds(1), ct))
+                    .Throws<InvalidOperationException>();
+                await Assert.That(await observer.Competitions.Where(x => x.Id == fixture.Id)
+                    .Select(x => x.ConfigurationJson).SingleAsync(ct)).IsEqualTo(configuration.Json);
+                await Assert.That(await observer.CompetitionEvents.CountAsync(x => x.CompetitionId == fixture.Id
+                    && x.Kind == NoCTF.Domain.Competitions.Events.CompetitionEventKind.CompetitionUpdated, ct)).IsEqualTo(1);
+            }
+            finally { await host.StopAsync(ct); }
+        });
+    }
+
+    [Test, Timeout(300_000)]
     public async Task Actual_flag_and_adjustment_stores_commit_one_fact_per_request_key(CancellationToken ct)
     {
         await DockerIntegrationTest.RunAsync(async () => {
@@ -172,10 +229,12 @@ public sealed class CommandReceiptOutboxTests
             finally { await recovery.StopAsync(ct); }
         });
     }
-    private static IHost BuildHost(string connection, string nats, DeliveryProbe probe, bool recover) => Host.CreateDefaultBuilder()
+    private static IHost BuildHost(string connection, string nats, DeliveryProbe probe, bool recover,
+        Microsoft.EntityFrameworkCore.Diagnostics.IInterceptor? interceptor = null) => Host.CreateDefaultBuilder()
         .ConfigureServices(services => {
             services.AddSingleton(probe);
-            services.AddDbContextWithWolverineIntegration<NoCtfDbContext>(options => options.UseNpgsql(connection).UseSnakeCaseNamingConvention());
+            services.AddDbContextWithWolverineIntegration<NoCtfDbContext>(options => options.UseNpgsql(connection)
+                .UseSnakeCaseNamingConvention().AddInterceptors(interceptor is null ? [] : [interceptor]));
             services.AddScoped<ITransactionalMessageOutbox, WolverineTransactionalMessageOutbox>();
         }).UseWolverine(options => {
             options.Discovery.DisableConventionalDiscovery(); options.Discovery.IncludeType(typeof(DeliveryHandler));
@@ -195,6 +254,24 @@ public sealed class CommandReceiptOutboxTests
             options.ConfigureNoCtfMessageRouting(new ConfigurationBuilder().Build(), HostRoles.Only(HostRole.Worker));
         }).Build();
     private sealed class RequestKey(Guid? key = null) : IRequestCommandKey { public Guid? Key { get; } = key ?? Guid.NewGuid(); }
+    private sealed class ConfigurationCommitProbe : Microsoft.EntityFrameworkCore.Diagnostics.DbTransactionInterceptor
+    {
+        public List<int> EnvelopeCounts { get; } = [];
+        public bool FailCommit { get; set; }
+        public override async ValueTask<Microsoft.EntityFrameworkCore.Diagnostics.InterceptionResult> TransactionCommittingAsync(
+            System.Data.Common.DbTransaction transaction,
+            Microsoft.EntityFrameworkCore.Diagnostics.TransactionEventData eventData,
+            Microsoft.EntityFrameworkCore.Diagnostics.InterceptionResult result,
+            CancellationToken cancellationToken = default)
+        {
+            await using var command = transaction.Connection!.CreateCommand();
+            command.Transaction = transaction;
+            command.CommandText = "SELECT count(*)::integer FROM wolverine_command_receipts.wolverine_outgoing_envelopes";
+            EnvelopeCounts.Add((int)(await command.ExecuteScalarAsync(cancellationToken))!);
+            if (FailCommit) throw new InvalidOperationException("Injected configuration commit failure.");
+            return result;
+        }
+    }
     public sealed class DeliveryProbe
     {
         public int Count;

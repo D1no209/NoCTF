@@ -14,6 +14,7 @@ import {
   isScoreboardVersionAtLeast,
   isCoherentScoreboardBundle,
   newestScoreboardVersion,
+  needsAwdpRoundRefresh,
   shouldRestoreRequestedRoundWindow,
 } from '~/utils/scoreboard-coherence'
 import type { ScoreboardRefreshOutcome } from '~/utils/scoreboard-coherence'
@@ -50,7 +51,7 @@ function scoreboardUpdatedPayload(payload: ScoreboardUpdatedNotification): Score
  * Owns the three normalized scoreboard resources. Every accepted refresh is
  * generation- and version-fenced, so an older response cannot replace newer page state.
  */
-export function useScoreboardMatrix(competitionId: string) {
+export function useScoreboardMatrix(competitionId: string, options: { pollRounds?: boolean } = {}) {
   const catalog = ref<NoCtfapiEndpointsCompetitionsScoreboardChallengeCatalogResponse | null>(null)
   const schema = ref<NoCtfapiEndpointsCompetitionsScoreboardSchemaResponse | null>(null)
   const snapshot = ref<NoCtfapiEndpointsCompetitionsScoreboardSnapshotResponse | null>(null)
@@ -63,6 +64,7 @@ export function useScoreboardMatrix(competitionId: string) {
   let stopped = false
   let retryTimer: ReturnType<typeof setTimeout> | null = null
   let coherenceRetryTimer: ReturnType<typeof setTimeout> | null = null
+  let roundRefreshTimer: ReturnType<typeof setInterval> | null = null
   let coherenceRetryCount = 0
   let minimumSnapshotVersion: string | null = null
 
@@ -196,7 +198,14 @@ export function useScoreboardMatrix(competitionId: string) {
 
   onMounted(() => {
     void refresh({ catalog: true, schema: true, snapshot: true })
+    if (options.pollRounds !== false) {
+      roundRefreshTimer = setInterval(() => {
+        if (!refreshing.value && needsAwdpRoundRefresh(schema.value, snapshot.value))
+          void queueRefresh({ catalog: true, schema: true, snapshot: true })
+      }, 10_000)
+    }
     unwatch = watchCompetition(competitionId, {
+      competitionLifecycleChanged: () => void queueRefresh({ catalog: true, schema: true, snapshot: true }),
       scoreboardUpdated: (raw) => {
         const notice = scoreboardUpdatedPayload(raw)
         if (snapshot.value === null || snapshot.value.dataScope === 'Live')
@@ -225,6 +234,8 @@ export function useScoreboardMatrix(competitionId: string) {
     retryTimer = null
     if (coherenceRetryTimer) clearTimeout(coherenceRetryTimer)
     coherenceRetryTimer = null
+    if (roundRefreshTimer) clearInterval(roundRefreshTimer)
+    roundRefreshTimer = null
     unwatch?.()
     unwatch = null
   })

@@ -36,6 +36,7 @@ public sealed class FusionLeaderboardCache(
     private readonly IFusionCache cache = caches.GetCache(NoCtfCacheNames.Leaderboards);
     private readonly LeaderboardProjectionKeyedLock keyedLock = projectionKeyedLock ?? new();
     private readonly TimeProvider timeProvider = clock ?? TimeProvider.System;
+    private const int CurrentAwdpRoundProjectionFormat = 1;
 
     public async Task<LeaderboardResponse?> GetAsync(Guid competitionId, CancellationToken ct) =>
         (await GetOrRebuildPublishedBundleAsync(competitionId, ct))?.Legacy;
@@ -331,6 +332,7 @@ public sealed class FusionLeaderboardCache(
         };
         return new(legacy, scoreboard)
         {
+            AwdpRoundProjectionFormat = competition.Mode == GameMode.Awdp ? CurrentAwdpRoundProjectionFormat : 0,
             ValidUntil = competition.Mode == GameMode.Awdp
                 && competitionStatusAtProjection == CompetitionStatus.Running
                 && projection.CurrentRoundRemainingSeconds is > 0
@@ -625,6 +627,8 @@ public sealed class FusionLeaderboardCache(
 
     private bool IsExpired(LeaderboardProjectionBundle? bundle) =>
         bundle?.ValidUntil is { } validUntil && timeProvider.GetUtcNow() >= validUntil
+        || bundle is not null && bundle.Scoreboard.Schema.Mode == GameMode.Awdp
+            && bundle.AwdpRoundProjectionFormat != CurrentAwdpRoundProjectionFormat
         || bundle is not null && bundle.Scoreboard.Snapshot.DataScope == LeaderboardDataScope.Live
             && bundle.Scoreboard.Schema.Mode is GameMode.Ctf or GameMode.Awdp
             && bundle.Scoreboard.Snapshot.Teams.Any(team => team.Achievements is null);
