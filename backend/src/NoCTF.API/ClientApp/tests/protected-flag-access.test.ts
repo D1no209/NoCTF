@@ -10,7 +10,8 @@ describe('protected Flag access', () => {
   test('loads the Flag immediately without collecting a reason', () => {
     expect(source).toContain('void accessFlag(requestSequence)')
     expect(source).toContain('adminAccessCompetitionGameplayFactValue({')
-    expect(source).toContain('v-if="canJudge" variant="ghost" size="sm" @click="openFlagAccess(s.id)"')
+    expect(source).toContain('v-if="canJudge && (s.kind === \'FlagAttempt\' || s.kind === \'BreakAttempt\')"')
+    expect(source).toContain('@click="openFlagAccess(s.id)"')
     expect(source).not.toContain('flagReason')
     expect(source).not.toContain('flag-reason')
   })

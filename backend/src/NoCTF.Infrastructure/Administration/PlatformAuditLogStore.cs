@@ -32,6 +32,7 @@ public sealed class PlatformAuditLogStore(NoCtfDbContext db) : IPlatformAuditLog
         CompetitionEventKind.TeamBanned,
         CompetitionEventKind.TeamUnbanned,
         CompetitionEventKind.ProtectedGameplayFactValueAccessed,
+        CompetitionEventKind.GameplayFactPatchDownloaded,
         CompetitionEventKind.CheatIncidentConfirmed,
         CompetitionEventKind.CheatIncidentDismissed,
         CompetitionEventKind.CheatIncidentSuperseded,
@@ -125,8 +126,8 @@ public sealed class PlatformAuditLogStore(NoCtfDbContext db) : IPlatformAuditLog
                 item.Level,
                 item.Visibility,
                 Reference(item, EntityReferenceKind.User),
-                Reference(item, EntityReferenceKind.Team),
-                Reference(item, EntityReferenceKind.CompetitionChallenge),
+                Reference(item, EntityReferenceKind.Team) ?? (item.Kind == CompetitionEventKind.GameplayFactPatchDownloaded ? item.TeamId : null),
+                Reference(item, EntityReferenceKind.CompetitionChallenge) ?? (item.Kind == CompetitionEventKind.GameplayFactPatchDownloaded ? item.CompetitionChallengeId : null),
                 Reference(item, EntityReferenceKind.RuntimeInstance),
                 Reference(item, EntityReferenceKind.GameplayFact),
                 Reference(item, EntityReferenceKind.Notification),
@@ -136,7 +137,8 @@ public sealed class PlatformAuditLogStore(NoCtfDbContext db) : IPlatformAuditLog
                 competitionTitles.GetValueOrDefault(item.CompetitionId),
                 item.Reason,
                 item.Automatic,
-                item.OccurredAt)));
+                item.OccurredAt,
+                Reference(item, EntityReferenceKind.File))));
         }
 
         if (query.Kind is null

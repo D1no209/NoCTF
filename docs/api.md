@@ -378,6 +378,7 @@ CompetitionChallenge 管理写共享 Competition transaction lock，并通过 Ou
 GET  /api/v1/admin/competitions/{competitionId}/gameplay-facts
 GET  /api/v1/admin/competitions/{competitionId}/gameplay-facts/adjudication-differences
 GET  /api/v1/admin/competitions/{competitionId}/gameplay-facts/{gameplayFactId}
+GET  /api/v1/admin/competitions/{competitionId}/gameplay-facts/{gameplayFactId}/patch
 POST /api/v1/admin/competitions/{competitionId}/gameplay-facts/{gameplayFactId}/flag-access
 POST /api/v1/admin/competitions/{competitionId}/gameplay-facts/queue-evaluation
 POST /api/v1/admin/competitions/{competitionId}/gameplay-facts/rejudge
@@ -386,6 +387,14 @@ POST /api/v1/admin/competitions/{competitionId}/gameplay-facts/manual-adjustment
 ```
 
 管理 GameplayFact 列表筛选 competitionChallengeId、teamId、victimTeamId、actorUserId、kind、state、result、failureCode、occurredFrom/To、value 精确匹配、referenceKind/referenceId。顺序 OccurredAt desc/Id desc，limit 1..200，不算 total。
+
+Patch 下载仅允许平台管理员、本场 Owner/Manager/Judge，不允许 Observer 或普通选手使用该管理接口。
+校验 FixAttempt 与 PatchUpload、File 的关联，比赛、题目、队伍、提交人必须一致；不按评测状态或结果限制下载。
+现有提交详情为有权限的工作人员返回 `patch`（文件名、大小、上传时间、SHA-256、文件 ID）、`patchFailure` 和 `canDownloadPatch`。
+下载返回 `application/octet-stream` 附件流，禁止共享缓存，不提供内部令牌、对象路径、永久链接或在线预览。
+所有成功授权并打开文件的下载，在下发字节前写入 `GameplayFactPatchDownloaded` 审计，包含管理员；审计保存失败则拒绝下发。
+失败使用 ProblemDetails 与稳定 `code`：`Forbidden`、`SubmissionNotFound`、`NotFixSubmission`、`PatchNotFound`、
+`InvalidAssociation`、`FileNotFound`、`StorageUnavailable`、`AuditUnavailable`。
 
 queue-evaluation 用于 Pending/首次 PlatformFailed 集合；rejudge 选择已有 Result 的 Flag/Break 或精确 GameplayFact。两者必须指定 CompetitionChallengeId，事务写入对应 durable drain message，Worker 以 500 条 SKIP LOCKED 短事务置 Queued 并写逐项 EvaluateGameplayFact Outbox。不使用 ProcessingVersion，也不建 Batch/Rejudge 实体。
 

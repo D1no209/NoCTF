@@ -163,6 +163,7 @@ export function competitionEventText(
       : translate('队伍「{team}」对题目「{challenge}」的防御验证失败', { team, challenge })
   }
   const templates: Partial<Record<NoCtfapiEndpointsCompetitionsEventsCompetitionEventKindProtocol, string>> = {
+    GameplayFactPatchDownloaded: translate('{actor}下载了队伍「{team}」的 Patch 包', { actor, team }),
     CompetitionCreated: translate('竞赛已创建'), CompetitionUpdated: translate('竞赛信息已更新'), CompetitionLifecycleChanged: translate('竞赛生命周期变更'),
     LeaderboardVisibilityChanged: translate('排行榜可见性已变更'), ChallengeCreated: translate('题目「{challenge}」已加入竞赛', { challenge }), ChallengeUpdated: translate('题目「{challenge}」已更新', { challenge }),
     ChallengePublished: translate('题目「{challenge}」已发布', { challenge }), ChallengeDescriptionUpdated: translate('题目「{challenge}」已更新描述', { challenge }), ChallengeUnpublished: translate('题目「{challenge}」已下线', { challenge }), HintPublished: translate('题目「{challenge}」发布了新提示', { challenge }),

@@ -42,6 +42,8 @@ internal static class GameplayFactInfrastructure
         services.AddScoped<IPatchUploadStore, PatchUploadStore>();
         services.AddScoped<CreatePatchUpload>();
         services.AddScoped<IFixArchiveReader, FixArchiveReader>();
+        services.AddScoped<IAdminPatchDownloadStore, AdminPatchDownloadStore>();
+        services.AddScoped<AccessAdminPatch>();
         services.AddScoped<IGameplayFactStatusReader, GameplayFactStatusReader>();
         services.AddScoped<IAdminGameplayFactStatusReader, AdminGameplayFactStatusReader>();
         services.AddScoped<IGameplayFactManagementStore, GameplayFactManagementStore>();

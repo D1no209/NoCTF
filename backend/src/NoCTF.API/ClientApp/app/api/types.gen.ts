@@ -773,7 +773,7 @@ export type NoCtfapiEndpointsCompetitionsEventsExportCompetitionEventsRequest = 
     [key: string]: never;
 };
 
-export type NoCtfapiEndpointsCompetitionsEventsCompetitionEventKindProtocol = 'CompetitionCreated' | 'CompetitionUpdated' | 'CompetitionDeleted' | 'CompetitionLifecycleChanged' | 'LeaderboardVisibilityChanged' | 'ChallengeCreated' | 'ChallengeUpdated' | 'ChallengePublished' | 'ChallengeUnpublished' | 'ChallengeDeleted' | 'HintPublished' | 'HintUnlocked' | 'TeamRegistered' | 'TeamRegistrationChanged' | 'TeamUpdated' | 'TeamDeleted' | 'TeamMemberJoined' | 'TeamMemberRemoved' | 'TeamCaptainTransferred' | 'TeamBanned' | 'TeamUnbanned' | 'GameplayFactReceived' | 'GameplayFactAdjudicated' | 'ScoringRecorded' | 'FirstBloodAwarded' | 'SecondBloodAwarded' | 'ThirdBloodAwarded' | 'RuntimeCreated' | 'RuntimeStateChanged' | 'RuntimeExtended' | 'RuntimeReset' | 'RuntimePortAllocated' | 'ProtectedGameplayFactValueAccessed' | 'CheatIncidentDetected' | 'CheatIncidentConfirmed' | 'CheatIncidentDismissed' | 'CheatIncidentSuperseded' | 'CheatIncidentCorrected' | 'CompetitionArchiveExported' | 'TeamBanAppealSubmitted' | 'TeamBanAppealUpheld' | 'TeamBanAppealAccepted' | 'TeamBanCorrectionPublished' | 'RuntimeForceTerminationRequested' | 'RuntimeForceTerminationCompleted' | 'RuntimeForceTerminationFailed' | 'AnnouncementPublished' | 'QuestionOpened' | 'QuestionReplied' | 'QuestionStatusChanged' | 'ChallengeDescriptionUpdated' | 'TrackConfigurationUpdated' | 'TeamTrackChanged' | 'AwdpBreakAttempted' | 'AwdpFixAttempted' | 'AwdpBreakResolved' | 'AwdpFixResolved';
+export type NoCtfapiEndpointsCompetitionsEventsCompetitionEventKindProtocol = 'CompetitionCreated' | 'CompetitionUpdated' | 'CompetitionDeleted' | 'CompetitionLifecycleChanged' | 'LeaderboardVisibilityChanged' | 'ChallengeCreated' | 'ChallengeUpdated' | 'ChallengePublished' | 'ChallengeUnpublished' | 'ChallengeDeleted' | 'HintPublished' | 'HintUnlocked' | 'TeamRegistered' | 'TeamRegistrationChanged' | 'TeamUpdated' | 'TeamDeleted' | 'TeamMemberJoined' | 'TeamMemberRemoved' | 'TeamCaptainTransferred' | 'TeamBanned' | 'TeamUnbanned' | 'GameplayFactReceived' | 'GameplayFactAdjudicated' | 'ScoringRecorded' | 'FirstBloodAwarded' | 'SecondBloodAwarded' | 'ThirdBloodAwarded' | 'RuntimeCreated' | 'RuntimeStateChanged' | 'RuntimeExtended' | 'RuntimeReset' | 'RuntimePortAllocated' | 'ProtectedGameplayFactValueAccessed' | 'CheatIncidentDetected' | 'CheatIncidentConfirmed' | 'CheatIncidentDismissed' | 'CheatIncidentSuperseded' | 'CheatIncidentCorrected' | 'CompetitionArchiveExported' | 'TeamBanAppealSubmitted' | 'TeamBanAppealUpheld' | 'TeamBanAppealAccepted' | 'TeamBanCorrectionPublished' | 'RuntimeForceTerminationRequested' | 'RuntimeForceTerminationCompleted' | 'RuntimeForceTerminationFailed' | 'AnnouncementPublished' | 'QuestionOpened' | 'QuestionReplied' | 'QuestionStatusChanged' | 'ChallengeDescriptionUpdated' | 'TrackConfigurationUpdated' | 'TeamTrackChanged' | 'AwdpBreakAttempted' | 'AwdpFixAttempted' | 'AwdpBreakResolved' | 'AwdpFixResolved' | 'GameplayFactPatchDownloaded';
 
 export type NoCtfapiEndpointsCompetitionsEventsCompetitionEventLevelProtocol = 'Information' | 'Warning' | 'Error';
 
@@ -1442,6 +1442,7 @@ export type NoCtfapiEndpointsAdministrationPlatformPlatformAuditLogResponse = {
     reason?: string | null;
     automatic?: boolean;
     occurredAt?: string;
+    fileId?: string | null;
 };
 
 export type NoCtfapiEndpointsAdministrationPlatformPlatformAuditKindProtocol = 'CompetitionLifecycle' | 'UserAccountLifecycle' | 'PlatformAdministration' | 'CompetitionAdministration' | 'CompetitionLeaderboardVisibility' | 'CompetitionEvent';
@@ -1577,6 +1578,10 @@ export type NoCtfapiEndpointsAdministrationGameplayFactsCreateManualAdjustmentRe
     delta?: number;
 };
 
+export type NoCtfapiEndpointsAdministrationGameplayFactsDownloadAdminGameplayFactPatchRequest = {
+    [key: string]: never;
+};
+
 export type NoCtfapiEndpointsGameplayFactsAdminGameplayFactStatusResponse = {
     gameplayFactId?: string;
     competitionId?: string;
@@ -1589,7 +1594,20 @@ export type NoCtfapiEndpointsGameplayFactsAdminGameplayFactStatusResponse = {
     failureCode?: NoCtfapiEndpointsGameplayFactsGameplayFactFailureCodeProtocol | null;
     occurredAt?: string;
     updatedAt?: string;
+    patch?: NoCtfapiEndpointsAdministrationGameplayFactsAdminPatchMetadataResponse | null;
+    patchFailure?: NoCtfapiEndpointsAdministrationGameplayFactsAdminPatchFailureCode | null;
+    canDownloadPatch?: boolean;
 };
+
+export type NoCtfapiEndpointsAdministrationGameplayFactsAdminPatchMetadataResponse = {
+    fileId?: string;
+    fileName?: string;
+    byteLength?: number;
+    uploadedAt?: string;
+    sha256?: string;
+};
+
+export type NoCtfapiEndpointsAdministrationGameplayFactsAdminPatchFailureCode = 'Forbidden' | 'SubmissionNotFound' | 'NotFixSubmission' | 'PatchNotFound' | 'InvalidAssociation' | 'FileNotFound' | 'StorageUnavailable' | 'AuditUnavailable';
 
 export type NoCtfapiEndpointsAdministrationGameplayFactsGetAdminGameplayFactStatusRequest = {
     [key: string]: never;
@@ -6502,6 +6520,48 @@ export type AdminCreateManualAdjustmentResponses = {
 };
 
 export type AdminCreateManualAdjustmentResponse = AdminCreateManualAdjustmentResponses[keyof AdminCreateManualAdjustmentResponses];
+
+export type AdminDownloadGameplayFactPatchData = {
+    body?: never;
+    path: {
+        competitionId: string;
+        gameplayFactId: string;
+    };
+    query?: never;
+    url: '/api/v1/admin/competitions/{competitionId}/gameplay-facts/{gameplayFactId}/patch';
+};
+
+export type AdminDownloadGameplayFactPatchErrors = {
+    /**
+     * Bad Request
+     */
+    400: MicrosoftAspNetCoreMvcValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: MicrosoftAspNetCoreMvcProblemDetails;
+    /**
+     * Not Found
+     */
+    404: MicrosoftAspNetCoreMvcProblemDetails;
+    409: MicrosoftAspNetCoreMvcProblemDetails;
+    503: MicrosoftAspNetCoreMvcProblemDetails;
+};
+
+export type AdminDownloadGameplayFactPatchError = AdminDownloadGameplayFactPatchErrors[keyof AdminDownloadGameplayFactPatchErrors];
+
+export type AdminDownloadGameplayFactPatchResponses = {
+    /**
+     * Success
+     */
+    200: Blob | File;
+};
+
+export type AdminDownloadGameplayFactPatchResponse = AdminDownloadGameplayFactPatchResponses[keyof AdminDownloadGameplayFactPatchResponses];
 
 export type AdminGetGameplayFactData = {
     body?: never;

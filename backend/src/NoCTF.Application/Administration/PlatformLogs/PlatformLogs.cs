@@ -127,7 +127,8 @@ public sealed record PlatformAuditView(
     string? SubjectDisplayName,
     string? Reason,
     bool Automatic,
-    DateTimeOffset OccurredAt);
+    DateTimeOffset OccurredAt,
+    Guid? FileId = null);
 
 public sealed record PlatformAuditQuery(
     PlatformAuditKind? Kind,
