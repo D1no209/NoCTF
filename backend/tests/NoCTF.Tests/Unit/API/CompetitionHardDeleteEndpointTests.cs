@@ -193,6 +193,50 @@ public sealed class CompetitionHardDeleteEndpointTests
             .IsEqualTo(CompetitionHardDeleteReferenceCode.ActiveRuntimeResource);
     }
 
+    [Test]
+    [Arguments(CompetitionForceDeleteState.ActiveCompetition)]
+    [Arguments(CompetitionForceDeleteState.NotificationScopeConflict)]
+    public async Task Force_delete_conflicts_explain_the_required_action(CompetitionForceDeleteState state)
+    {
+        var store = Substitute.For<IAdminCompetitionStore>();
+        var notificationId = Guid.NewGuid();
+        store.ForceDeleteAsync(Arg.Any<ForceDeleteCompetitionCommand>(), true, Arg.Any<CancellationToken>())
+            .Returns(new CompetitionForceDeleteResult(state, ConflictingNotificationIds: [notificationId]));
+        await using var app = await CreateApplicationAsync(store, administrator: true);
+        using var client = app.GetTestClient();
+        using var response = await client.PostAsJsonAsync(ForceDeleteUri(), new ForceDeleteCompetitionRequest
+        {
+            ConfirmationTitle = "Protected competition", Reason = "Detailed deletion test reason."
+        });
+        var body = await response.Content.ReadFromJsonAsync<CompetitionForceDeleteConflictResponse>();
+        await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.Conflict);
+        if (state == CompetitionForceDeleteState.ActiveCompetition)
+            await Assert.That(body!.Detail).IsEqualTo("Finish the competition before permanently deleting it. Paused competitions cannot be deleted.");
+        else
+        {
+            await Assert.That(body!.Code).IsEqualTo(CompetitionForceDeleteConflictCode.NotificationScopeConflict);
+            await Assert.That(body.ConflictingNotificationIds).IsEquivalentTo([notificationId]);
+            await Assert.That(body.Detail).Contains("No data was deleted");
+        }
+    }
+
+    [Test]
+    [Arguments(false, "Detailed deletion test reason.", HttpStatusCode.Forbidden)]
+    [Arguments(true, "short", HttpStatusCode.BadRequest)]
+    public async Task Force_delete_rejects_unauthorized_and_invalid_requests_before_store(
+        bool administrator, string reason, HttpStatusCode expected)
+    {
+        var store = Substitute.For<IAdminCompetitionStore>();
+        await using var app = await CreateApplicationAsync(store, administrator);
+        using var client = app.GetTestClient();
+        using var response = await client.PostAsJsonAsync(ForceDeleteUri(), new ForceDeleteCompetitionRequest
+        {
+            ConfirmationTitle = "Protected competition", Reason = reason
+        });
+        await Assert.That(response.StatusCode).IsEqualTo(expected);
+        await store.DidNotReceive().ForceDeleteAsync(Arg.Any<ForceDeleteCompetitionCommand>(), Arg.Any<bool>(), Arg.Any<CancellationToken>());
+    }
+
     private static string PreviewUri() =>
         $"/api/v1/admin/competitions/{CompetitionId}/hard-delete-preview";
 

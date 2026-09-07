@@ -41,6 +41,7 @@ public static class WorkerRole
         services.AddTransient<GameplayFactMessageHandler>();
         services.AddTransient<LeaderboardMessageHandler>();
         services.AddTransient<FileCleanupMessageHandler>();
+        services.AddTransient<Competitions.CompetitionDeletionMessageHandler>();
         services.AddTransient<AwdMessageHandler>();
         services.AddTransient<CompetitionLifecycleMessageHandler>();
         services.AddTransient<AwdpMessageHandler>();
@@ -76,6 +77,7 @@ public static class WorkerRole
         bool durable = true)
     {
         options.Discovery.IncludeType(typeof(FileCleanupMessageHandler));
+        options.Discovery.IncludeType(typeof(Competitions.CompetitionDeletionMessageHandler));
         options.Discovery.IncludeType(typeof(AwdMessageHandler));
         options.Discovery.IncludeType(typeof(CompetitionLifecycleMessageHandler));
         options.Discovery.IncludeType(typeof(AwdpMessageHandler));

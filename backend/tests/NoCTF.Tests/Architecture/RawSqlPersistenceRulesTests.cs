@@ -74,6 +74,12 @@ public sealed class RawSqlPersistenceRulesTests
                 "FOR UPDATE",
                 "WITH RECURSIVE"
             ],
+            // Lock the proven notification roots/members to serialize new FK references with deletion.
+            ["backend/src/NoCTF.Infrastructure/Competitions/Administration/CompetitionNotificationDeletionScope.cs"] =
+            [
+                "ExecuteSqlInterpolated",
+                "FOR UPDATE"
+            ],
             ["backend/src/NoCTF.Infrastructure/Competitions/Management/CompetitionManagementStore.cs"] =
             [
                 "ExecuteSqlInterpolated",

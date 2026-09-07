@@ -38,7 +38,8 @@ public static class MessageRouting
         Route<SendEmailVerification>(options, WorkerQueue.Background);
         Route<SendPasswordReset>(options, WorkerQueue.Background);
         Route<SendPasswordChangedNotification>(options, WorkerQueue.Background);
-        Route<CleanupFile>(options, WorkerQueue.Background);
+        Route<CleanupFile>(options, WorkerQueue.Background, durableOutbox: true);
+        Route<InvalidateDeletedCompetitionReadModels>(options, WorkerQueue.Background, durableOutbox: true);
         Route<ChallengePublished>(options, WorkerQueue.Background);
         Route<PublishHintNotification>(options, WorkerQueue.Background);
         Route<TeamBanned>(options, WorkerQueue.Background);
@@ -54,10 +55,14 @@ public static class MessageRouting
         Route<ExpireAwdpFixVerification>(options, WorkerQueue.Control);
     }
 
-    private static void Route<TMessage>(WolverineOptions options, WorkerQueue queue)
+    private static void Route<TMessage>(WolverineOptions options, WorkerQueue queue, bool durableOutbox = false)
     {
         var queueName = WorkerQueues.GetName(queue);
-        options.PublishMessage<TMessage>().ToNatsSubject(NatsSubjects.Subject(queue));
+        var route = options.PublishMessage<TMessage>().ToNatsSubject(NatsSubjects.Subject(queue));
+        // Buffered senders are not persisted by the EF transactional outbox. Configure only
+        // the background endpoint used by post-deletion work; do not change every queue.
+        if (durableOutbox)
+            route.UseJetStream(NatsSubjects.Stream(queue)).UseDurableOutbox();
         options.ConfigureNoCtfInfrastructureRetriesFor<TMessage>(queue, queueName);
     }
 

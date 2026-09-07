@@ -1,0 +1,124 @@
+using Microsoft.EntityFrameworkCore;
+using NoCTF.Application.Competitions.Management;
+using NoCTF.Domain.Challenges;
+using NoCTF.Domain.Competitions;
+using NoCTF.Domain.Gameplay;
+using NoCTF.Domain.Identity;
+using NoCTF.Domain.Notifications;
+using NoCTF.Domain.Runtime;
+using NoCTF.Domain.Shared;
+using NoCTF.Domain.Storage;
+using NoCTF.Domain.Teams;
+using NoCTF.Infrastructure.Persistence;
+
+namespace NoCTF.Tests.Integration.Persistence;
+
+internal sealed class CompetitionForceDeleteFixture
+{
+    public Guid Id { get; } = Guid.NewGuid();
+    public Guid OtherId { get; } = Guid.NewGuid();
+    public Guid OwnerId { get; } = Guid.NewGuid();
+    public Guid TemplateId { get; } = Guid.NewGuid();
+    public Guid FileId { get; } = Guid.NewGuid();
+    public Guid SharedFileId { get; } = Guid.NewGuid();
+    public Guid[] AdditionalPatchFileIds { get; } = [Guid.NewGuid(), Guid.NewGuid()];
+    public Guid[] CleanupFileIds => [FileId, SharedFileId, .. AdditionalPatchFileIds];
+    public Guid RootId { get; } = Guid.NewGuid();
+    public Guid MemberId { get; } = Guid.NewGuid();
+    public Guid[] RuntimeIds { get; } = [Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid()];
+    public DateTimeOffset Now { get; } = DateTimeOffset.UtcNow;
+    public ForceDeleteCompetitionCommand Command => new(Id, OwnerId, "Delete fixture", "Delete this disposable test competition.", Now);
+
+    public async Task SeedAsync(NoCtfDbContext db, CancellationToken ct)
+    {
+        db.Users.Add(new User
+        {
+            Id = OwnerId, UserName = $"owner-{OwnerId:N}", NormalizedUserName = $"OWNER-{OwnerId:N}",
+            Email = $"{OwnerId:N}@example.test", PasswordHash = "unused", Kind = UserKind.Human,
+            Role = UserRole.Administrator, AccountStatus = UserAccountStatus.Active, CreatedAt = Now, UpdatedAt = Now
+        });
+        db.Files.AddRange(File(FileId), File(SharedFileId));
+        db.Files.AddRange(AdditionalPatchFileIds.Select(File));
+        db.Competitions.AddRange(Competition(Id, "Delete fixture", FileId), Competition(OtherId, "Keep fixture", SharedFileId));
+        db.Challenges.Add(new Challenge
+        {
+            Id = TemplateId, OwnerId = OwnerId, Mode = GameMode.Awdp, Visibility = ChallengeVisibility.Private,
+            Title = "Global template", Direction = "Pwn", DefinitionJson = "{}", CreatedAt = Now, UpdatedAt = Now
+        });
+        db.Set<ChallengeAttachment>().Add(new ChallengeAttachment
+        {
+            Id = Guid.NewGuid(), ChallengeId = TemplateId, FileId = SharedFileId, CreatedAt = Now
+        });
+        db.ChallengeFlags.Add(new ChallengeFlag
+        {
+            Id = Guid.NewGuid(), ChallengeId = TemplateId, Flag = "flag{keep}", FlagSha256 = new byte[32], CreatedAt = Now
+        });
+        var challenge = Guid.NewGuid();
+        var team = Guid.NewGuid();
+        db.CompetitionChallenges.Add(new CompetitionChallenge
+        {
+            Id = challenge, CompetitionId = Id, ChallengeId = TemplateId, RulesJson = "{}", UpdatedAt = Now
+        });
+        db.CompetitionChallenges.Add(new CompetitionChallenge
+        {
+            Id = Guid.NewGuid(), CompetitionId = OtherId, ChallengeId = TemplateId, RulesJson = "{}", UpdatedAt = Now
+        });
+        db.Teams.Add(new Team
+        {
+            Id = team, CompetitionId = Id, Name = "Team", CaptainId = OwnerId, MemberIds = [OwnerId],
+            InvitationToken = Guid.NewGuid().ToString("N"), RegistrationStatus = TeamRegistrationStatus.Approved, RegisteredAt = Now
+        });
+        foreach (var (runtimeId, index) in RuntimeIds.Select((id, index) => (id, index)))
+        {
+            var factId = Guid.NewGuid();
+            var patchId = Guid.NewGuid();
+            db.GameplayFacts.Add(new GameplayFact
+            {
+                Id = factId, CompetitionId = Id, CompetitionChallengeId = challenge, TeamId = team,
+                ActorUserId = OwnerId, Kind = GameplayFactKind.FixAttempt, State = GameplayFactState.Completed,
+                Result = GameplayFactResult.Wrong, ReferenceKind = GameplayFactReferenceKind.PatchUpload,
+                ReferenceId = patchId, OccurredAt = Now, UpdatedAt = Now
+            });
+            db.RuntimeInstances.Add(new RuntimeInstance
+            {
+                Id = runtimeId, CompetitionId = Id, CompetitionChallengeId = challenge, TeamId = team,
+                GameplayFactId = factId, Purpose = RuntimePurpose.AwdpTarget, RuntimeKind = RuntimeKind.Container,
+                RuntimeProvider = RuntimeProvider.Docker, State = RuntimeState.Stopped, CreatedAt = Now, StoppedAt = Now
+            });
+            db.PatchUploads.Add(new PatchUpload
+            {
+                Id = patchId, CompetitionId = Id, CompetitionChallengeId = challenge, TeamId = team,
+                RuntimeInstanceId = runtimeId, UploadedByUserId = OwnerId,
+                FileId = index == 0 ? SharedFileId : AdditionalPatchFileIds[index - 1], UploadedAt = Now
+            });
+        }
+        db.Notifications.Add(Notification(RootId, Id));
+        var member = Notification(MemberId, null);
+        member.ThreadRootId = RootId; // No ReplyToId or direct competition reference.
+        db.Notifications.Add(member);
+        await db.SaveChangesAsync(ct);
+        db.ChangeTracker.Clear();
+    }
+
+    public Notification Notification(Guid id, Guid? competitionId) => new()
+    {
+        Id = id, SourceType = NotificationSourceType.User, SourceId = OwnerId,
+        TargetType = NotificationTargetType.User, TargetId = OwnerId, Kind = NotificationKind.Message,
+        RelatedType = competitionId.HasValue ? EntityReferenceKind.Competition : null,
+        RelatedId = competitionId, SentAt = Now
+    };
+
+    private Competition Competition(Guid id, string title, Guid poster) => new()
+    {
+        Id = id, OwnerId = OwnerId, Title = title, Mode = GameMode.Awdp, PosterFileId = poster,
+        ConfigurationJson = "{\"schemaVersion\":1}", FlagDerivationSecret = new byte[32],
+        StartAt = Now.AddHours(-2), EndAt = Now.AddHours(-1), Status = CompetitionStatus.Finished,
+        CreatedAt = Now, UpdatedAt = Now
+    };
+
+    private StoredFile File(Guid id) => new()
+    {
+        Id = id, ObjectKey = $"deletion-tests/{id:N}", FileName = "fixture.tar.gz",
+        ContentType = "application/gzip", ByteLength = 1, Sha256 = new byte[32], CreatedAt = Now
+    };
+}

@@ -20046,6 +20046,14 @@
                 "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationCompetitionsCompetitionHardDeletePreviewResponse"
               }
             ]
+          },
+          "conflictingNotificationIds": {
+            "type": "array",
+            "nullable": true,
+            "items": {
+              "type": "string",
+              "format": "guid"
+            }
           }
         }
       },
@@ -20055,12 +20063,14 @@
         "x-enumNames": [
           "ActiveCompetition",
           "ActiveRuntimeResource",
-          "ConfirmationMismatch"
+          "ConfirmationMismatch",
+          "NotificationScopeConflict"
         ],
         "enum": [
           "ActiveCompetition",
           "ActiveRuntimeResource",
-          "ConfirmationMismatch"
+          "ConfirmationMismatch",
+          "NotificationScopeConflict"
         ]
       },
       "NoCTFAPIEndpointsAdministrationCompetitionsCompetitionHardDeletePreviewResponse": {
@@ -20119,7 +20129,8 @@
           "PatchUpload",
           "Notification",
           "PosterFile",
-          "ActiveRuntimeResource"
+          "ActiveRuntimeResource",
+          "NotificationScopeConflict"
         ],
         "enum": [
           "HistoricalEvent",
@@ -20130,7 +20141,8 @@
           "PatchUpload",
           "Notification",
           "PosterFile",
-          "ActiveRuntimeResource"
+          "ActiveRuntimeResource",
+          "NotificationScopeConflict"
         ]
       },
       "NoCTFAPIEndpointsAdministrationCompetitionsForceDeleteCompetitionRequest": {

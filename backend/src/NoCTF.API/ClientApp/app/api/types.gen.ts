@@ -1653,9 +1653,10 @@ export type NoCtfapiEndpointsAdministrationCompetitionsCompetitionForceDeleteCon
     code?: NoCtfapiEndpointsAdministrationCompetitionsCompetitionForceDeleteConflictCode;
     detail?: string;
     preview?: NoCtfapiEndpointsAdministrationCompetitionsCompetitionHardDeletePreviewResponse | null;
+    conflictingNotificationIds?: Array<string> | null;
 };
 
-export type NoCtfapiEndpointsAdministrationCompetitionsCompetitionForceDeleteConflictCode = 'ActiveCompetition' | 'ActiveRuntimeResource' | 'ConfirmationMismatch';
+export type NoCtfapiEndpointsAdministrationCompetitionsCompetitionForceDeleteConflictCode = 'ActiveCompetition' | 'ActiveRuntimeResource' | 'ConfirmationMismatch' | 'NotificationScopeConflict';
 
 export type NoCtfapiEndpointsAdministrationCompetitionsCompetitionHardDeletePreviewResponse = {
     competitionId?: string;
@@ -1672,7 +1673,7 @@ export type NoCtfapiEndpointsAdministrationCompetitionsCompetitionHardDeleteRefe
     count?: number;
 };
 
-export type NoCtfapiEndpointsAdministrationCompetitionsCompetitionHardDeleteReferenceCode = 'HistoricalEvent' | 'Team' | 'CompetitionChallenge' | 'GameplayFact' | 'RuntimeInstance' | 'PatchUpload' | 'Notification' | 'PosterFile' | 'ActiveRuntimeResource';
+export type NoCtfapiEndpointsAdministrationCompetitionsCompetitionHardDeleteReferenceCode = 'HistoricalEvent' | 'Team' | 'CompetitionChallenge' | 'GameplayFact' | 'RuntimeInstance' | 'PatchUpload' | 'Notification' | 'PosterFile' | 'ActiveRuntimeResource' | 'NotificationScopeConflict';
 
 export type NoCtfapiEndpointsAdministrationCompetitionsForceDeleteCompetitionRequest = {
     confirmationTitle: string;

@@ -5,6 +5,14 @@ import { setLocale } from '../app/utils/i18n'
 describe('api error localization', () => {
   afterEach(() => setLocale('zh-CN'))
 
+  test('explains competition deletion guards without suggesting that pausing is enough', () => {
+    setLocale('zh-CN')
+    expect(parseApiError({ status: 409, detail: 'Finish the competition before permanently deleting it. Paused competitions cannot be deleted.' }).message)
+      .toBe('请先结束比赛再永久删除，暂停中的比赛不能删除。')
+    expect(parseApiError({ status: 409, detail: 'Notification threads contain cross-scope or unproven references. No data was deleted. Review the conflicting notification IDs before retrying.' }).message)
+      .toBe('通知线程存在跨作用域或归属不明的引用，未删除任何数据。请检查返回的冲突通知 ID 后重试。')
+  })
+
   test('localizes known backend problem details in the Chinese locale', () => {
     setLocale('zh-CN')
 

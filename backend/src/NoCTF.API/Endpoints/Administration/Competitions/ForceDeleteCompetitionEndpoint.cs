@@ -30,13 +30,15 @@ public enum CompetitionForceDeleteConflictCode
 {
     ActiveCompetition,
     ActiveRuntimeResource,
-    ConfirmationMismatch
+    ConfirmationMismatch,
+    NotificationScopeConflict
 }
 
 public sealed record CompetitionForceDeleteConflictResponse(
     CompetitionForceDeleteConflictCode Code,
     string Detail,
-    CompetitionHardDeletePreviewResponse? Preview = null);
+    CompetitionHardDeletePreviewResponse? Preview = null,
+    IReadOnlyList<Guid>? ConflictingNotificationIds = null);
 
 public sealed class ForceDeleteCompetitionEndpoint(
     ForceDeleteCompetition forceDelete,
@@ -75,7 +77,7 @@ public sealed class ForceDeleteCompetitionEndpoint(
             CompetitionForceDeleteState.NotFound => TypedResults.NotFound(),
             CompetitionForceDeleteState.ActiveCompetition => TypedResults.Conflict<CompetitionForceDeleteConflictResponse>(new(
                 CompetitionForceDeleteConflictCode.ActiveCompetition,
-                "Pause or finish the competition before permanently deleting it.",
+                "Finish the competition before permanently deleting it. Paused competitions cannot be deleted.",
                 result.Preview is null ? null : CompetitionHardDeleteMapping.ToResponse(result.Preview))),
             CompetitionForceDeleteState.ActiveRuntimeResource => TypedResults.Conflict<CompetitionForceDeleteConflictResponse>(new(
                 CompetitionForceDeleteConflictCode.ActiveRuntimeResource,
@@ -84,6 +86,11 @@ public sealed class ForceDeleteCompetitionEndpoint(
             CompetitionForceDeleteState.ConfirmationMismatch => TypedResults.Conflict<CompetitionForceDeleteConflictResponse>(new(
                 CompetitionForceDeleteConflictCode.ConfirmationMismatch,
                 "The confirmation title does not exactly match the current competition title.")),
+            CompetitionForceDeleteState.NotificationScopeConflict => TypedResults.Conflict<CompetitionForceDeleteConflictResponse>(new(
+                CompetitionForceDeleteConflictCode.NotificationScopeConflict,
+                "Notification threads contain cross-scope or unproven references. No data was deleted. Review the conflicting notification IDs before retrying.",
+                result.Preview is null ? null : CompetitionHardDeleteMapping.ToResponse(result.Preview),
+                result.ConflictingNotificationIds)),
             CompetitionForceDeleteState.InvalidReason => TypedResults.Problem(
                 statusCode: StatusCodes.Status400BadRequest,
                 title: "Competition was not force-deleted.",
