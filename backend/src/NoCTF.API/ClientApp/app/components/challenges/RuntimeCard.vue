@@ -31,6 +31,7 @@ const runtime = ref<Runtime | null>(null)
 const loading = ref(true)
 const loadError = ref<string | null>(null)
 const acting = ref(false)
+const commandAttempt = createCommandAttempt()
 const extendMinutes = ref(30)
 const now = ref(Date.now())
 const forceUntilStopped = ref(false)
@@ -105,15 +106,19 @@ async function retryLoad(): Promise<void> {
 }
 
 async function act(action: () => Promise<{ error?: unknown }>, failMessage: string) {
+  if (acting.value) return
   acting.value = true
+  try {
   const { error } = await action()
-  acting.value = false
   if (error) {
     toast.error(parseApiError(error, failMessage).message)
     return
   }
+  commandAttempt.completed()
   toast.success(translate("操作已受理,环境状态更新中"))
   startPolling()
+  } catch (e) { toast.error(parseApiError(e, failMessage).message) }
+  finally { acting.value = false }
 }
 
 const path = computed(() => ({
@@ -121,13 +126,14 @@ const path = computed(() => ({
   competitionChallengeId: props.competitionChallengeId,
 }))
 
-const start = () => act(() => startRuntimeEndpoint({ path: path.value }), translate("启动环境失败"))
-const stop = () => act(() => stopRuntimeEndpoint({ path: path.value }), translate("停止环境失败"))
-const reset = () => act(() => resetRuntimeEndpoint({ path: path.value }), translate("重置环境失败"))
+const start = () => act(() => startRuntimeEndpoint({ path: path.value, headers: commandAttempt.headers({ ...path.value, action: 'start' }) }), translate("启动环境失败"))
+const stop = () => act(() => stopRuntimeEndpoint({ path: path.value, headers: commandAttempt.headers({ ...path.value, action: 'stop' }) }), translate("停止环境失败"))
+const reset = () => act(() => resetRuntimeEndpoint({ path: path.value, headers: commandAttempt.headers({ ...path.value, action: 'reset' }) }), translate("重置环境失败"))
 const extend = () =>
   act(
     () =>
       extendRuntimeEndpoint({
+        headers: commandAttempt.headers({ ...path.value, action: 'extend', minutes: extendMinutes.value }),
         path: path.value,
         body: { seconds: Math.max(60, Math.round(extendMinutes.value * 60)) },
       }),

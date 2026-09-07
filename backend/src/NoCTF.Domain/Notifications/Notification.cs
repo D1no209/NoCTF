@@ -62,5 +62,6 @@ public enum NotificationKind : short
     PlatformAuditExported,
     UserAccountLifecycleChanged,
     CompetitionForceDeleted,
-    AuthenticationSecurityActivity
+    AuthenticationSecurityActivity,
+    HttpCommandReceipt
 }

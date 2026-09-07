@@ -17,6 +17,7 @@ public static class MessageRouting
         HostRoles roles)
     {
         options.Durability.MessageIdentity = MessageIdentity.IdAndDestination;
+        options.Policies.Add(new DurableRunnerCommandPolicy());
         Route<EvaluateGameplayFact>(options, WorkerQueue.Gameplay);
         Route<GameplayFactStateChanged>(options, WorkerQueue.Gameplay);
         Route<ProjectLeaderboard>(options, WorkerQueue.Projection);
@@ -56,12 +57,11 @@ public static class MessageRouting
         Route<ExpireAwdpFixVerification>(options, WorkerQueue.Control);
     }
 
-    private static void Route<TMessage>(WolverineOptions options, WorkerQueue queue, bool durableOutbox = false)
+    private static void Route<TMessage>(WolverineOptions options, WorkerQueue queue, bool durableOutbox = true)
     {
         var queueName = WorkerQueues.GetName(queue);
         var route = options.PublishMessage<TMessage>().ToNatsSubject(NatsSubjects.Subject(queue));
-        // Buffered senders are not persisted by the EF transactional outbox. Configure only
-        // the background endpoint used by post-deletion work; do not change every queue.
+        // Business queues must be durable senders or EF SaveChanges cannot persist their envelopes.
         if (durableOutbox)
             route.UseJetStream(NatsSubjects.Stream(queue)).UseDurableOutbox();
         options.ConfigureNoCtfInfrastructureRetriesFor<TMessage>(queue, queueName);
@@ -70,8 +70,8 @@ public static class MessageRouting
     private static void FanOutCompetitionEvents(WolverineOptions options)
     {
         var route = options.PublishMessage<CompetitionEventCommitted>();
-        route.ToNatsSubject(NatsSubjects.RealtimeEvents);
-        route.ToNatsSubject(NatsSubjects.LeaderboardEvents);
+        route.ToNatsSubject(NatsSubjects.RealtimeEvents).UseJetStream(NatsSubjects.EventsStream).UseDurableOutbox();
+        route.ToNatsSubject(NatsSubjects.LeaderboardEvents).UseJetStream(NatsSubjects.EventsStream).UseDurableOutbox();
         options.ConfigureNoCtfInfrastructureRetriesFor<CompetitionEventCommitted>(
             WorkerQueue.Background,
             CompetitionEventFanoutQueueNames.Realtime);

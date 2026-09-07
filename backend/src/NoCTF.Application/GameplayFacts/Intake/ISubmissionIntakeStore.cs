@@ -4,6 +4,8 @@ namespace NoCTF.Application.GameplayFacts.Intake;
 
 public interface IGameplayFactIntakeStore
 {
+    Task<GameplayFactAcceptanceResult[]?> FindFlagReplayAsync(Guid competitionId, Guid challengeId, Guid userId,
+        IReadOnlyList<string> flags, CancellationToken ct) => Task.FromResult<GameplayFactAcceptanceResult[]?>(null);
     Task<GameplayFactAdmissionSnapshot?> LoadAdmissionAsync(
         Guid competitionId,
         Guid competitionChallengeId,

@@ -19,6 +19,7 @@ public sealed class ExtendTeamRuntimeEndpoint(
     {
         Post("/admin/competitions/{competitionId}/teams/{teamId}/challenges/{competitionChallengeId}/runtime/extend");
         AuthSchemes("Bearer");
+        Options(builder => builder.WithMetadata(new NoCTF.API.Security.ProtectedEntryMetadata(NoCTF.API.Security.ProtectedEntry.RuntimeCommand)));
         Description(builder => builder.WithName("AdminExtendTeamRuntime")
             .ProducesProblemFE(StatusCodes.Status409Conflict));
         Summary(summary =>

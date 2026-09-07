@@ -239,6 +239,8 @@ public sealed class SubmitFlagRequestValidator : Validator<SubmitFlagRequest>
         RuleForEach(request => request.Flags)
             .NotNull()
             .SwaggerIgnore();
+        RuleFor(request => request.Flags).Must(flags => flags is null || flags.Count <= 128)
+            .WithMessage("每次最多提交 128 个 Flag。");
     }
 }
 
@@ -262,6 +264,8 @@ public sealed class SubmitFlagEndpoint(SubmitFlag submitFlag, IUserContext userC
     {
         Post("/competitions/{competitionId}/challenges/{competitionChallengeId}/flag-submissions");
         AuthSchemes("Bearer");
+        MaxRequestBodySize(4 * 1024 * 1024);
+        Options(builder => builder.WithMetadata(new NoCTF.API.Security.ProtectedEntryMetadata(NoCTF.API.Security.ProtectedEntry.FlagSubmission)));
         Options(options => options
             .WithMetadata(new EnableRateLimitingAttribute("submission"))
             .ProducesProblemFE<Microsoft.AspNetCore.Mvc.ProblemDetails>(

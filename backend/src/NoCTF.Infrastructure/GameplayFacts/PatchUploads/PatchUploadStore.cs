@@ -13,6 +13,7 @@ using NoCTF.Infrastructure.Persistence;
 using NoCTF.Infrastructure.Storage;
 using NoCTF.Infrastructure.GameplayFacts.Intake;
 using NoCTF.GameModes.Awdp.Configuration;
+using NoCTF.Application.Commands.Idempotency;
 
 namespace NoCTF.Infrastructure.GameplayFacts.PatchUploads;
 
@@ -23,10 +24,24 @@ public sealed class PatchUploadStore(
     FileReferenceLock fileLock,
     ILogger<PatchUploadStore> logger,
     ICompetitionEventRecorder? eventRecorder = null,
-    NoCTF.Application.Authentication.Privacy.IRequestSourceAddress? source = null) : IPatchUploadStore
+    NoCTF.Application.Authentication.Privacy.IRequestSourceAddress? source = null,
+    IRequestReplay? replay = null) : IPatchUploadStore
 {
     private readonly ICompetitionEventRecorder events =
         eventRecorder ?? NullCompetitionEventRecorder.Instance;
+
+    public Task<bool> CanAccessTargetAsync(Guid competitionId, Guid challengeId, Guid targetId, Guid userId, CancellationToken ct) =>
+        db.RuntimeInstances.AsNoTracking().Where(target => target.Id == targetId && target.CompetitionId == competitionId
+                && target.CompetitionChallengeId == challengeId && target.Purpose == RuntimePurpose.AwdpTarget)
+            .Join(db.Teams.Where(team => team.DeletedAt == null && !team.IsBanned && team.RegistrationStatus == TeamRegistrationStatus.Approved
+                    && team.CompetitionId == competitionId && team.MemberIds.Contains(userId)), target => target.TeamId, team => (Guid?)team.Id,
+                (target, team) => target.Id).AnyAsync(ct);
+
+    public Task<bool> IsTargetUnconsumedAsync(PatchUploadScope scope, CancellationToken ct) =>
+        db.RuntimeInstances.AsNoTracking().AnyAsync(target => target.Id == scope.RuntimeInstanceId
+            && target.CompetitionId == scope.CompetitionId && target.CompetitionChallengeId == scope.CompetitionChallengeId
+            && target.TeamId == scope.TeamId && target.Purpose == RuntimePurpose.AwdpTarget && target.GameplayFactId == null
+            && (target.State == RuntimeState.Queued || target.State == RuntimeState.Provisioning || target.State == RuntimeState.Running), ct);
 
     public PatchUploadStore(
         NoCtfDbContext db,
@@ -256,11 +271,12 @@ public sealed class PatchUploadStore(
             GameplayFactKind: fact.Kind), ct);
         try
         {
+            replay?.Store(new AcceptedAwdpFix(patchUploadId, fact.Id, fact.State));
             await db.SaveChangesAsync(ct);
             await transaction.CommitAsync(ct);
             try
             {
-                await outbox.FlushOutgoingMessagesAsync();
+                await outbox.FlushCommittedMessagesAsync();
             }
             catch (Exception exception)
             {
@@ -271,7 +287,7 @@ public sealed class PatchUploadStore(
             }
             return new(PatchUploadSaveState.Accepted, fact.Id, fact.State);
         }
-        catch (DbUpdateException)
+        catch (DbUpdateException exception) when (!TransactionFailureClassifier.IsRetryable(exception))
         {
             return new(PatchUploadSaveState.ConcurrencyConflict);
         }

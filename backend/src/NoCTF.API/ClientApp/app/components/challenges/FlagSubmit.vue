@@ -36,10 +36,13 @@ const emit = defineEmits<{
 }>()
 
 const input = ref('')
+const commandAttempt = createCommandAttempt()
 const submitting = ref(false)
 const tracked = ref<TrackedSubmission[]>([])
 const toasted = new Set<string>()
 const celebrating = ref(false)
+const persistentResult = ref<{ correct: boolean | null; message: string } | null>(null)
+let requestGeneration = 0
 const resultDialog = ref<{ correct: boolean; title: string; message: string } | null>(null)
 const remainingAttempts = ref<number | null>(props.remainingAttempts ?? null)
 let celebrationTimer: ReturnType<typeof setTimeout> | undefined
@@ -63,6 +66,7 @@ const attemptsExhausted = computed(() =>
   !props.practice && !props.readOnlyJudgement && remainingAttempts.value === 0)
 
 function showResult(correct: boolean, message: string): void {
+  persistentResult.value = { correct, message }
   if (resultTimer) clearTimeout(resultTimer)
   resultDialog.value = {
     correct,
@@ -145,6 +149,10 @@ async function refreshPending(): Promise<void> {
 }
 
 async function submit() {
+  if (submitting.value || attemptsExhausted.value) return
+  const generation = requestGeneration
+  persistentResult.value = null
+  try {
   const lines = props.multiple
     ? input.value.split('\n').map((line) => line.trim()).filter(Boolean)
     : [input.value.trim()].filter(Boolean)
@@ -157,8 +165,9 @@ async function submit() {
         competitionChallengeId: props.competitionChallengeId,
       },
       body: { flag: lines[0]! },
+      signal: AbortSignal.timeout(30_000),
     })
-    submitting.value = false
+    if (generation !== requestGeneration) return
     if (error || !data) {
       const parsed = parseApiError(error, translate('Flag 验证失败'))
       const message = parsed.code === 'AchievementNotSucceeded'
@@ -170,7 +179,7 @@ async function submit() {
             : parsed.status === 403
               ? translate('当前账号没有可参与本题的已审核队伍')
               : parsed.message
-      showResult(false, message)
+      persistentResult.value = { correct: null, message }
       return
     }
     if (data.result === 'Correct') {
@@ -189,8 +198,9 @@ async function submit() {
         competitionChallengeId: props.competitionChallengeId,
       },
       body: { flag: lines[0]! },
+      signal: AbortSignal.timeout(30_000),
     })
-    submitting.value = false
+    if (generation !== requestGeneration) return
     if (error || !data) {
       const parsed = parseApiError(error, translate('练习 Flag 验证失败'))
       const message = parsed.code === 'PracticeUnavailable'
@@ -202,7 +212,11 @@ async function submit() {
             : parsed.status === 403
               ? translate('当前账号没有可参与练习的已审核队伍')
               : parsed.message
-      showResult(false, message)
+      persistentResult.value = { correct: null, message }
+      return
+    }
+    if (data.result !== 'Correct' && data.result !== 'Wrong') {
+      persistentResult.value = { correct: null, message: translate('判题接口未返回有效结果，请重试。') }
       return
     }
     if (data.result === 'Correct') {
@@ -216,10 +230,12 @@ async function submit() {
     return
   }
   const { data, error } = await submitFlagEndpoint({
+    signal: AbortSignal.timeout(30_000),
+    headers: commandAttempt.headers({ competitionId: props.competitionId, challengeId: props.competitionChallengeId, lines }),
     path: { competitionId: props.competitionId, competitionChallengeId: props.competitionChallengeId },
     body: props.multiple ? { flags: lines } : { flag: lines[0] },
   })
-  submitting.value = false
+  if (generation !== requestGeneration) return
   if (error || !data) {
     const parsed = parseApiError(error, translate("提交失败"))
     const code = parsed.code as NoCtfapiEndpointsGameplayFactsGameplayFactAdmissionFailureCodeProtocol | undefined
@@ -238,14 +254,32 @@ async function submit() {
       tracked.value.unshift({ id, state: 'Pending', result: null })
     }
   }
+  if (!ids.length) throw new Error(translate('判题接口未返回有效结果，请重试。'))
+  commandAttempt.completed()
   input.value = ''
   if (remainingAttempts.value !== null)
     remainingAttempts.value = Math.max(0, remainingAttempts.value - ids.length)
   toast.success(translate('已受理 {count} 条提交，评测中', { count: ids.length }))
   emit('submitted', ids)
   startPolling()
+  } catch (error) {
+    if (generation === requestGeneration) {
+      persistentResult.value = { correct: null, message: parseApiError(error, translate('Flag 验证失败')).message }
+    }
+  } finally {
+    if (generation === requestGeneration) submitting.value = false
+  }
 }
 
+watch(() => [props.competitionId, props.competitionChallengeId, props.practice], () => {
+  requestGeneration++
+  submitting.value = false
+  persistentResult.value = null
+  input.value = ''
+  tracked.value = []
+  closeResultDialog()
+  stopPolling()
+})
 // 实时:服务端推送提交结果 → 立即刷新该提交
 let unwatch: (() => void) | undefined
 onMounted(() => {
@@ -338,6 +372,7 @@ onUnmounted(() => {
         </FieldGroup>
       </form>
 
+      <Alert v-if="persistentResult" class="mt-4" :variant="persistentResult.correct === true ? 'default' : 'destructive'" role="status"><AlertTitle>{{ persistentResult.correct === null ? $t('请求未得到判定') : $t('最近一次判定') }}</AlertTitle><AlertDescription>{{ persistentResult.message }}</AlertDescription></Alert>
       <Alert v-if="timedOut" class="mt-4">
         <AlertDescription>{{ $t('评测结果等待超时，可在本题提交记录中继续查看。') }}</AlertDescription>
       </Alert>

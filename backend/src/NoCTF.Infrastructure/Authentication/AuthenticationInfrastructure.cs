@@ -14,7 +14,8 @@ internal static class AuthenticationInfrastructure
 {
     internal static IServiceCollection AddNoCtfAuthentication(
         this IServiceCollection services,
-        IConfiguration configuration)
+        IConfiguration configuration,
+        bool development = false)
     {
         services.AddOptions<AuthenticationTokenOptions>()
             .Bind(configuration.GetSection(AuthenticationTokenOptions.SectionName))
@@ -46,6 +47,19 @@ internal static class AuthenticationInfrastructure
         services.AddSingleton<IRunnerScoringTokenIssuer, RunnerScoringTokenIssuer>();
         services.AddScoped<IUserAuthenticationStore, AuthenticationStore>();
         services.AddScoped<IUserRegistrationStore, AuthenticationStore>();
+        services.AddScoped<NoCTF.Application.Commands.Idempotency.IRequestReplay, NoCTF.Infrastructure.Commands.Idempotency.TransactionalRequestReplay>();
+        services.AddSingleton<NoCTF.Application.Admission.IRequestAdmission, NoCTF.Infrastructure.Admission.RedisRequestAdmission>();
+        if (development)
+            services.AddSingleton<NoCTF.Application.Admission.IRequestAdmission, NoCTF.Infrastructure.Admission.DevelopmentRequestAdmission>();
+        services.AddSingleton<NoCTF.Application.Admission.ICredentialWorkAdmission, NoCTF.Infrastructure.Admission.CredentialWorkAdmission>();
+        services.AddOptions<NoCTF.Application.Admission.RequestAdmissionOptions>()
+            .Bind(configuration.GetSection("RequestAdmission"))
+            .Validate(value => value.AuthenticationIpPerMinute > 0 && value.AuthenticationAccountPerMinute > 0
+                && value.PasswordConcurrency is >= 1 and <= 128 && value.PatchConcurrency is >= 1 and <= 32
+                && value.PatchPerUserConcurrency > 0 && value.SubmissionPerUserPerMinute > 0
+                && value.SubmissionConcurrency is >= 1 and <= 128 && value.SubmissionPerUserConcurrency > 0,
+                "RequestAdmission limits must be positive and concurrency budgets must be within platform bounds.")
+            .ValidateOnStart();
         services.AddOptions<NoCTF.Application.Authentication.Privacy.AccountPrivacyOptions>()
             .Bind(configuration.GetSection("AccountPrivacy"))
             .Validate(value => value.IpRetentionDays is >= 1 and <= 365, "AccountPrivacy:IpRetentionDays must be between 1 and 365.")

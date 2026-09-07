@@ -11,6 +11,7 @@ using NoCTF.Application.Competitions.Events;
 using NoCTF.Domain.Competitions.Events;
 using NoCTF.GameModes.Awdp.Configuration;
 using NoCTF.GameModes.Registration;
+using NoCTF.Application.Commands.Idempotency;
 
 namespace NoCTF.Infrastructure.Runtime.Instances;
 
@@ -21,7 +22,8 @@ public sealed class RuntimeInstanceStore(
     IPerTeamRuntimeFlagStore runtimeFlags,
     ITransactionalMessageOutbox outbox,
     TeamRuntimeQuota runtimeQuota,
-    ICompetitionEventRecorder? eventRecorder = null) : IRuntimeInstanceStore
+    ICompetitionEventRecorder? eventRecorder = null,
+    IRequestReplay? replay = null) : IRuntimeInstanceStore
 {
     public RuntimeInstanceStore(
         NoCtfDbContext db,
@@ -98,6 +100,14 @@ public sealed class RuntimeInstanceStore(
             command.CompetitionId,
             scope.TeamId,
             ct);
+        var prior = replay is null ? null : await replay.FindAsync<RuntimeCommandReceipt>(
+            new(command.UserId, ReplayOperation.RuntimeMutation, command.CompetitionId, command.CompetitionChallengeId),
+            new { command.Action, command.Extension }, ct);
+        if (prior is not null)
+        {
+            var original = await db.RuntimeInstances.AsNoTracking().SingleOrDefaultAsync(item => item.Id == prior.RuntimeInstanceId, ct);
+            return original is null ? new(null, RuntimeMutationFailure.NotFound) : new(Map(original));
+        }
         var current = await db.RuntimeInstances
             .Where(instance =>
                 instance.CompetitionChallengeId == command.CompetitionChallengeId &&
@@ -246,12 +256,13 @@ public sealed class RuntimeInstanceStore(
                 CompetitionChallengeId: entity.CompetitionChallengeId,
                 RuntimeInstanceId: entity.Id,
                 RuntimeState: entity.State), ct);
+            replay?.Store(new RuntimeCommandReceipt(entity.Id));
             await db.SaveChangesAsync(ct);
             await transaction.CommitAsync(ct);
-            await outbox.FlushOutgoingMessagesAsync();
+            await outbox.FlushCommittedMessagesAsync();
             return new(Map(entity));
         }
-        catch (DbUpdateException)
+        catch (DbUpdateException exception) when (!TransactionFailureClassifier.IsRetryable(exception))
         {
             return new(null, RuntimeMutationFailure.Conflict);
         }
@@ -359,9 +370,7 @@ public sealed class RuntimeInstanceStore(
             .SingleOrDefaultAsync(ct);
 
     private Task LockCompetitionAsync(Guid competitionId, CancellationToken ct) =>
-        db.Database.ExecuteSqlInterpolatedAsync(
-            $"SELECT 1 FROM competitions WHERE id = {competitionId} FOR UPDATE",
-            ct);
+        NoCTF.Infrastructure.Competitions.Participation.CompetitionParticipationLock.AcquireAsync(db, competitionId, ct);
 
     private static bool IsActive(RuntimeState state) =>
         state is RuntimeState.Queued or RuntimeState.Provisioning or RuntimeState.Running or RuntimeState.Stopping;

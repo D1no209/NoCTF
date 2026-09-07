@@ -7,6 +7,7 @@ using NoCTF.Domain.Competitions;
 using NoCTF.Domain.Gameplay;
 using NoCTF.Application.Competitions.Events;
 using NoCTF.Domain.Competitions.Events;
+using NoCTF.Application.Commands.Idempotency;
 
 namespace NoCTF.Infrastructure.GameplayFacts.Intake;
 
@@ -15,7 +16,8 @@ public sealed class GameplayFactIntakeStore(
     ITransactionalMessageOutbox outbox,
     GameplayFactAttemptCriticalSection attemptCriticalSection,
     ICompetitionEventRecorder? eventRecorder = null,
-    NoCTF.Application.Authentication.Privacy.IRequestSourceAddress? source = null) : IGameplayFactIntakeStore
+    NoCTF.Application.Authentication.Privacy.IRequestSourceAddress? source = null,
+    IRequestReplay? replay = null) : IGameplayFactIntakeStore
 {
     public GameplayFactIntakeStore(
         NoCtfDbContext db,
@@ -31,6 +33,12 @@ public sealed class GameplayFactIntakeStore(
 
     private readonly ICompetitionEventRecorder events =
         eventRecorder ?? NullCompetitionEventRecorder.Instance;
+
+    public Task<GameplayFactAcceptanceResult[]?> FindFlagReplayAsync(Guid competitionId, Guid challengeId, Guid userId,
+        IReadOnlyList<string> flags, CancellationToken ct) => replay is null
+            ? Task.FromResult<GameplayFactAcceptanceResult[]?>(null)
+            : replay.FindAsync<GameplayFactAcceptanceResult[]>(new(userId, ReplayOperation.FlagSubmission, competitionId, challengeId),
+                new { Flags = flags }, ct);
 
     public Task<GameplayFactAdmissionSnapshot?> LoadAdmissionAsync(
         Guid competitionId,
@@ -67,6 +75,9 @@ public sealed class GameplayFactIntakeStore(
             received[0].CompetitionChallengeId,
             received[0].Kind,
             cancellationToken);
+        var previous = await FindFlagReplayAsync(received[0].CompetitionId, received[0].CompetitionChallengeId,
+            received[0].UserId, received.Select(item => item.Value).ToArray(), cancellationToken);
+        if (previous is not null) return previous;
         var current = await LoadAdmissionAsync(
             received[0].CompetitionId,
             received[0].CompetitionChallengeId,
@@ -136,9 +147,12 @@ public sealed class GameplayFactIntakeStore(
                     GameplayFactKind: entity.Kind), cancellationToken);
             }
         }
+        var response = entities.Select(entity => new GameplayFactAcceptanceResult(
+            GameplayFactAcceptanceState.Created, entity.Id, entity.OccurredAt)).ToArray();
+        replay?.Store(response);
         await db.SaveChangesAsync(cancellationToken);
         await transaction.CommitAsync(cancellationToken);
-        await outbox.FlushOutgoingMessagesAsync();
+        await outbox.FlushCommittedMessagesAsync();
         return entities.Select(entity => new GameplayFactAcceptanceResult(
             GameplayFactAcceptanceState.Created,
             entity.Id,
@@ -181,7 +195,7 @@ public sealed class GameplayFactIntakeStore(
         await outbox.PublishAsync(new GameplayFactStateChanged(entity.Id, entity.State));
         await db.SaveChangesAsync(cancellationToken);
         await transaction.CommitAsync(cancellationToken);
-        await outbox.FlushOutgoingMessagesAsync();
+        await outbox.FlushCommittedMessagesAsync();
         return new(GameplayFactAcceptanceState.Created, entity.Id, entity.OccurredAt);
     }
 
@@ -190,6 +204,12 @@ public sealed class GameplayFactIntakeStore(
         CancellationToken cancellationToken)
     {
         await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
+        using var attemptLease = await attemptCriticalSection.AcquireAsync(db, received.TeamId,
+            received.CompetitionChallengeId, GameplayFactKind.ManualAdjustment, cancellationToken);
+        var previous = replay is null ? null : await replay.FindAsync<GameplayFactAcceptanceResult>(
+            new(received.UserId, ReplayOperation.ManualAdjustment, received.CompetitionId, received.CompetitionChallengeId),
+            new { received.TeamId, received.Delta }, cancellationToken);
+        if (previous is not null) return previous;
         var valid = await db.CompetitionChallenges.AnyAsync(item =>
             item.Id == received.CompetitionChallengeId
             && item.CompetitionId == received.CompetitionId, cancellationToken)
@@ -227,9 +247,10 @@ public sealed class GameplayFactIntakeStore(
             GameplayFactKind: entity.Kind,
             GameplayFactState: entity.State,
             GameplayFactResult: entity.Result), cancellationToken);
+        replay?.Store(new GameplayFactAcceptanceResult(GameplayFactAcceptanceState.Created, entity.Id, entity.OccurredAt));
         await db.SaveChangesAsync(cancellationToken);
         await transaction.CommitAsync(cancellationToken);
-        await outbox.FlushOutgoingMessagesAsync();
+        await outbox.FlushCommittedMessagesAsync();
         return new(GameplayFactAcceptanceState.Created, entity.Id, entity.OccurredAt);
     }
 }

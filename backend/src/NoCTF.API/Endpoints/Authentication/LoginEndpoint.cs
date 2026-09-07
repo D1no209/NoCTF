@@ -38,6 +38,8 @@ public sealed class LoginEndpoint(LoginUser login, IOptions<RefreshHttpOptions> 
     {
         Post("/auth/login");
         AllowAnonymous();
+        Options(builder => builder.WithMetadata(new NoCTF.API.Security.ProtectedEntryMetadata(NoCTF.API.Security.ProtectedEntry.Authentication)));
+        MaxRequestBodySize(16 * 1024);
     }
 
     public override async Task<Results<Ok<LoginResponse>, UnauthorizedHttpResult>> ExecuteAsync(

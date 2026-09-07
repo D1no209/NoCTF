@@ -1,5 +1,10 @@
 /** English UI resources keyed by the canonical Simplified Chinese source text. */
 export const englishMessages: Record<string, string> = {
+  "每次最多提交 128 个 Flag。": "Submit at most 128 Flags per request.",
+  "请求超时，结果暂未确认，请重试。": "The request timed out and its outcome is not yet confirmed. Please retry.",
+  "判题接口未返回有效结果，请重试。": "The judging endpoint returned no valid result. Please retry.",
+  "最近一次判定": "Latest judgement",
+  "请求未得到判定": "No judgement received",
   "已解出题目": "Solved challenges",
   "解出人": "Solved by",
   "解题时间": "Solved at",

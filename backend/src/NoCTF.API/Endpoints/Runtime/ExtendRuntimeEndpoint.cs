@@ -28,6 +28,7 @@ public sealed class ExtendRuntimeEndpoint(
     {
         Post("/competitions/{competitionId}/challenges/{competitionChallengeId}/runtime/extend");
         AuthSchemes("Bearer");
+        Options(builder => builder.WithMetadata(new NoCTF.API.Security.ProtectedEntryMetadata(NoCTF.API.Security.ProtectedEntry.RuntimeCommand)));
         Options(options => options
             .ProducesProblemFE<Microsoft.AspNetCore.Mvc.ProblemDetails>(
                 StatusCodes.Status409Conflict)

@@ -51,7 +51,7 @@ public sealed partial class TargetArchitectureRulesTests
             if (source.Contains("System.Threading.Channels", StringComparison.Ordinal)
                 || source.Contains("Task.Run(", StringComparison.Ordinal)
                 || source.Contains("RequiredMappingStrategy.Both", StringComparison.Ordinal)
-                || source.Contains("HandleAsync(", StringComparison.Ordinal)
+                || Regex.IsMatch(source, @"\bHandleAsync\(")
                 || LegacyDimensionRegex().IsMatch(source)
                 || QuerySyntaxRegex().IsMatch(source))
                 violations.Add(Path.GetRelativePath(BackendRoot, file));

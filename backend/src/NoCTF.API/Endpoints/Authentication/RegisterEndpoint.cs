@@ -65,6 +65,8 @@ public sealed class RegisterEndpoint(RegisterUser register, TimeProvider timePro
     {
         Post("/auth/register");
         AllowAnonymous();
+        Options(builder => builder.WithMetadata(new NoCTF.API.Security.ProtectedEntryMetadata(NoCTF.API.Security.ProtectedEntry.Registration)));
+        MaxRequestBodySize(16 * 1024);
         Summary(summary =>
         {
             summary.Summary = "Register a user account";

@@ -141,7 +141,9 @@ public sealed class NotificationReader(NoCtfDbContext db) : INotificationReader
     }
 
     private IQueryable<NotificationView> Project(IQueryable<Notification> query) =>
-        query.Select(notification => new NotificationView(
+        query.Where(notification => notification.Kind != NotificationKind.AuthenticationSecurityActivity
+                && notification.Kind != NotificationKind.HttpCommandReceipt)
+            .Select(notification => new NotificationView(
                 notification.Id,
                 notification.SourceType,
                 notification.SourceId,
@@ -209,7 +211,7 @@ public sealed class NotificationReader(NoCtfDbContext db) : INotificationReader
             FROM notifications AS n
             JOIN visible_roots AS visible
               ON n.id = visible.root_id OR n.thread_root_id = visible.root_id
-            """).AsNoTracking().Where(item => item.Kind != NotificationKind.AuthenticationSecurityActivity);
+            """).AsNoTracking().Where(item => item.Kind != NotificationKind.AuthenticationSecurityActivity && item.Kind != NotificationKind.HttpCommandReceipt);
     }
 
     private async Task<IQueryable<Notification>> VisibleToInMemoryAsync(
@@ -262,7 +264,7 @@ public sealed class NotificationReader(NoCtfDbContext db) : INotificationReader
             .Select(notification => notification.ThreadRootId ?? notification.Id));
 
         return db.Notifications.AsNoTracking()
-            .Where(notification => notification.Kind != NotificationKind.AuthenticationSecurityActivity)
+            .Where(notification => notification.Kind != NotificationKind.AuthenticationSecurityActivity && notification.Kind != NotificationKind.HttpCommandReceipt)
             .Where(notification => visibleRootIds.Contains(
                 notification.ThreadRootId ?? notification.Id));
     }

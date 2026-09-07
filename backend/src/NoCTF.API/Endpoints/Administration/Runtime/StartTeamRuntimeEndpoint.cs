@@ -20,6 +20,7 @@ public sealed class StartTeamRuntimeEndpoint(
     {
         Post("/admin/competitions/{competitionId}/teams/{teamId}/challenges/{competitionChallengeId}/runtime/start");
         AuthSchemes("Bearer");
+        Options(builder => builder.WithMetadata(new NoCTF.API.Security.ProtectedEntryMetadata(NoCTF.API.Security.ProtectedEntry.RuntimeCommand)));
         Description(builder => builder.WithName("AdminStartTeamRuntime")
             .ProducesProblemFE(StatusCodes.Status409Conflict));
         Summary(summary =>

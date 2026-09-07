@@ -77,11 +77,14 @@ function onFileChange(event: Event): void {
   file.value = target.files?.[0] ?? null
 }
 
+const targetCommandAttempt = createCommandAttempt()
 async function requestTarget(): Promise<void> {
   if (!canRequest.value || pendingAction.value) return
   pendingAction.value = 'request'
   try {
     const { data, error } = await requestAwdpDefenseTargetEndpoint({
+      headers: targetCommandAttempt.headers({ competitionId: props.competitionId, challengeId: props.competitionChallengeId }),
+      signal: AbortSignal.timeout(30_000),
       path: {
         competitionId: props.competitionId,
         competitionChallengeId: props.competitionChallengeId,
@@ -92,6 +95,7 @@ async function requestTarget(): Promise<void> {
       toast.error(code ? translate(requestFailureLabels[code]) : parseApiError(error, translate('申请防御验证环境失败')).message)
       return
     }
+    targetCommandAttempt.completed()
     toast.success(translate('已申请一次性防御验证环境，正在创建干净 target。'))
     emit('changed')
   }
@@ -100,12 +104,15 @@ async function requestTarget(): Promise<void> {
   }
 }
 
+const patchCommandAttempt = createCommandAttempt()
 async function uploadFix(): Promise<void> {
   const runtimeInstanceId = props.defense?.runtimeInstanceId
   if (!file.value || !canUpload.value || !runtimeInstanceId || pendingAction.value) return
   pendingAction.value = 'upload'
   try {
     const { data, error } = await uploadPatchEndpoint({
+      signal: AbortSignal.timeout(360_000),
+      headers: patchCommandAttempt.headers({ runtimeInstanceId, name: file.value.name, size: file.value.size, modified: file.value.lastModified }),
       path: {
         competitionId: props.competitionId,
         competitionChallengeId: props.competitionChallengeId,
@@ -121,6 +128,7 @@ async function uploadFix(): Promise<void> {
       toast.error(translate(message))
       return
     }
+    patchCommandAttempt.completed()
     file.value = null
     toast.success(translate('Fix 已锁定，环境就绪后会自动开始一次性验证。'))
     emit('accepted')

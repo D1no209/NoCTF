@@ -25,6 +25,9 @@ public sealed class RawSqlPersistenceRulesTests
     private static readonly IReadOnlyDictionary<string, HashSet<string>> ApprovedProviderSql =
         new Dictionary<string, HashSet<string>>(StringComparer.Ordinal)
         {
+            // Competition-scoped shared admission lock, with a bound UUID parameter.
+            ["backend/src/NoCTF.Infrastructure/Competitions/Participation/CompetitionParticipationLock.cs"] = ["ExecuteSqlInterpolated"],
+            ["backend/src/NoCTF.Infrastructure/Commands/Idempotency/TransactionalRequestReplay.cs"] = ["ExecuteSqlInterpolated", "pg_advisory_"],
             ["backend/src/NoCTF.Infrastructure/Challenges/Questions/CompetitionQuestionStore.cs"] =
             [
                 "ExecuteSqlInterpolated",

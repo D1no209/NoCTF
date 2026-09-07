@@ -10,4 +10,12 @@ public interface ITransactionalMessageOutbox
     ValueTask ScheduleToRunnerNodeAsync<T>(T message, DateTimeOffset scheduledAt)
         where T : IRunnerNodeMessage;
     Task FlushOutgoingMessagesAsync();
+    /// <summary>Call only after saving messages with business data and confirming the transaction commit.</summary>
+    Task FlushCommittedMessagesAsync() => FlushOutgoingMessagesAsync();
+}
+
+public sealed class PostCommitDispatchStatus
+{
+    public bool Pending { get; private set; }
+    public void MarkPending() => Pending = true;
 }

@@ -24,13 +24,17 @@ public sealed class LoginUser(
     IUserAuthenticationStore store,
     IAccessTokenIssuer issuer,
     TimeProvider timeProvider,
-    NoCTF.Application.Authentication.Privacy.IAccountActivityRecorder? activities = null)
+    NoCTF.Application.Authentication.Privacy.IAccountActivityRecorder? activities = null,
+    NoCTF.Application.Admission.ICredentialWorkAdmission? admission = null)
 {
     public async Task<OperationResult<LoginResult, LoginFailureCode>> ExecuteAsync(
         LoginCommand command,
         CancellationToken cancellationToken = default)
     {
         var user = await store.FindByLoginAsync(command.Login.Trim(), cancellationToken);
+        await using var lease = admission is null ? null : await admission.AcquireAsync(
+            user?.Id.ToString("N") ?? command.Login.Trim().ToUpperInvariant(), cancellationToken);
+        cancellationToken = lease?.Token ?? cancellationToken;
         if (user is null
             || user.Kind != UserKind.Human
             || !await store.VerifyPasswordAsync(user.Id, command.Password, cancellationToken))

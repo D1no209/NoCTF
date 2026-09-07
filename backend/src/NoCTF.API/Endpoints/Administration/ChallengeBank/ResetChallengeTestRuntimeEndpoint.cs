@@ -18,6 +18,7 @@ public sealed class ResetChallengeTestRuntimeEndpoint(
     {
         Post("/admin/challenges/{challengeId}/test-runtime/reset");
         AuthSchemes("Bearer");
+        Options(builder => builder.WithMetadata(new NoCTF.API.Security.ProtectedEntryMetadata(NoCTF.API.Security.ProtectedEntry.RuntimeCommand)));
         Roles("Organizer", "Administrator");
         Description(builder => builder.WithName("AdminChallengeBankResetTestRuntime")
             .ProducesProblemFE(StatusCodes.Status409Conflict)

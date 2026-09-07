@@ -2,6 +2,7 @@ using System.Formats.Tar;
 using System.IO.Compression;
 using NoCTF.Application.Common;
 using NoCTF.Application.Storage;
+using NoCTF.Application.Commands.Idempotency;
 
 namespace NoCTF.Application.GameplayFacts.PatchUploads;
 
@@ -54,6 +55,8 @@ public sealed record PatchUploadSaveResult(
 
 public interface IPatchUploadStore
 {
+    Task<bool> CanAccessTargetAsync(Guid competitionId, Guid challengeId, Guid targetId, Guid userId, CancellationToken ct) => Task.FromResult(false);
+    Task<bool> IsTargetUnconsumedAsync(PatchUploadScope scope, CancellationToken ct) => Task.FromResult(true);
     Task<PatchUploadScope?> ResolveScopeAsync(
         Guid competitionId,
         Guid competitionChallengeId,
@@ -71,7 +74,8 @@ public interface IPatchUploadStore
 
 public sealed class CreatePatchUpload(
     IPatchUploadStore store,
-    ManagedFileUploads uploads)
+    ManagedFileUploads uploads,
+    IRequestReplay? replay = null)
 {
     private const int MaxEntries = 10_000;
     private const long MaxExpandedBytes = 1L << 30;
@@ -88,6 +92,15 @@ public sealed class CreatePatchUpload(
         DateTimeOffset now,
         CancellationToken ct = default)
     {
+        if (content.CanSeek && content.Length <= PatchUploadRules.HardMaximumArchiveBytes && replay is not null)
+        {
+            var hash = await System.Security.Cryptography.SHA256.HashDataAsync(content, ct);
+            content.Position = 0;
+            var previous = await replay.FindAsync<AcceptedAwdpFix>(
+                new(userId, ReplayOperation.PatchUpload, competitionId, runtimeInstanceId),
+                new { competitionChallengeId, fileName, contentType, content.Length, Sha256 = Convert.ToHexString(hash) }, ct);
+            if (previous is not null) return OperationResult<AcceptedAwdpFix, PatchUploadFailureCode>.Success(previous);
+        }
         var scope = await store.ResolveScopeAsync(
             competitionId, competitionChallengeId, runtimeInstanceId, userId, ct);
         if (scope is null)
@@ -103,7 +116,12 @@ public sealed class CreatePatchUpload(
                 PatchUploadFailureCode.ArchiveTooLarge,
                 $"The archive exceeds the configured {scope.MaximumArchiveBytes}-byte upload limit.");
 
+        if (!await store.IsTargetUnconsumedAsync(scope, ct))
+            return OperationResult<AcceptedAwdpFix, PatchUploadFailureCode>.Failure(
+                PatchUploadFailureCode.DefenseTargetConsumed, "This defense target already accepted a Patch or is no longer active.");
+
         var validation = ValidateArchive(content);
+        ct.ThrowIfCancellationRequested();
         content.Position = 0;
         if (validation is not null)
             return OperationResult<AcceptedAwdpFix, PatchUploadFailureCode>.Failure(

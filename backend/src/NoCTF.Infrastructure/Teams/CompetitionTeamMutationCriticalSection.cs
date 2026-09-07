@@ -24,7 +24,7 @@ internal static class CompetitionTeamMutationCriticalSection
                 FROM competitions
                 WHERE id = {competitionId}
                     AND deleted_at IS NULL
-                FOR UPDATE
+                FOR NO KEY UPDATE
                 """)
             .SingleOrDefaultAsync(cancellationToken);
     }

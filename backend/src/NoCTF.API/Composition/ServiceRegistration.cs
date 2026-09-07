@@ -75,7 +75,9 @@ public static class ServiceRegistration
             throw new InvalidOperationException(string.Join(" ", uploadLimitErrors));
         services.AddSingleton(uploadLimits);
         services.AddProblemDetails();
+        services.AddExceptionHandler<NoCTF.API.Security.RequestSafetyExceptionHandler>();
         services.AddHttpContextAccessor();
+        services.AddScoped<NoCTF.Application.Commands.Idempotency.IRequestCommandKey, NoCTF.API.Security.RequestCommandKey>();
         services.AddScoped<NoCTF.Application.Authentication.Privacy.IRequestSourceAddress, NoCTF.API.Security.RequestSourceAddress>();
         services.AddNoCtfForwardedHeaders(configuration);
         if (endpointAssemblies is null)
@@ -193,12 +195,15 @@ public static class ServiceRegistration
         services.AddRateLimiter(options =>
         {
             options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
-            options.OnRejected = (context, _) =>
+            options.OnRejected = async (context, _) =>
             {
                 var route = (context.HttpContext.GetEndpoint() as RouteEndpoint)?
                     .RoutePattern.RawText ?? "unmatched";
                 NoCtfTelemetry.RecordRateLimitRejection(route);
-                return ValueTask.CompletedTask;
+                context.HttpContext.Response.Headers.RetryAfter = context.Lease.TryGetMetadata(System.Threading.RateLimiting.MetadataName.RetryAfter, out var retry)
+                    ? Math.Max(1, (int)Math.Ceiling(retry.TotalSeconds)).ToString(System.Globalization.CultureInfo.InvariantCulture) : "60";
+                await TypedResults.Problem(statusCode: 429, title: "请求过于频繁", detail: "请求频率超限，请按 Retry-After 提示重试。",
+                    extensions: new Dictionary<string, object?> { ["code"] = "RateLimited" }).ExecuteAsync(context.HttpContext);
             };
             options.AddPolicy("submission", context =>
                 RateLimitPartition.GetFixedWindowLimiter(
