@@ -8,6 +8,8 @@ using NoCTF.Application.Messaging;
 using NoCTF.Application.Storage;
 using NoCTF.Domain.Identity;
 using NoCTF.Domain.Storage;
+using NoCTF.Domain.Competitions;
+using NoCTF.Domain.Teams;
 using NoCTF.Infrastructure.Persistence;
 using NoCTF.Infrastructure.Storage;
 using NoCTF.Worker;
@@ -170,6 +172,36 @@ public sealed class FileCleanupPersistenceTests
                 }
 
                 var failOnce = new FailOnceDeleteStore(storage);
+                var competitionId = Guid.NewGuid();
+                var teamId = Guid.NewGuid();
+                await using (var db = new NoCtfDbContext(options))
+                {
+                    db.Competitions.Add(new Competition
+                    {
+                        Id = competitionId, OwnerId = userId, Title = "Soft-deleted file owner",
+                        Mode = GameMode.Ctf, ConfigurationJson = "{\"schemaVersion\":1}", FlagDerivationSecret = new byte[32],
+                        StartAt = now, EndAt = now.AddHours(1), Status = CompetitionStatus.Finished,
+                        CreatedAt = now, UpdatedAt = now, DeletedAt = now, PosterFileId = fileId
+                    });
+                    db.Teams.Add(new Team
+                    {
+                        Id = teamId, CompetitionId = competitionId, Name = "Soft-deleted team", CaptainId = userId,
+                        MemberIds = [userId], InvitationToken = Guid.NewGuid().ToString("N"),
+                        RegisteredAt = now, RegistrationStatus = TeamRegistrationStatus.Approved,
+                        DeletedAt = now, AvatarFileId = fileId
+                    });
+                    await db.SaveChangesAsync(cancellationToken);
+                }
+                await HandleCleanupAsync(options, storage, fileId, cancellationToken);
+                await AssertFileExistsAsync(options, storage, fileId, objectKey, cancellationToken);
+                await using (var db = new NoCtfDbContext(options))
+                    await db.Competitions.IgnoreQueryFilters().Where(x => x.Id == competitionId)
+                        .ExecuteUpdateAsync(s => s.SetProperty(x => x.PosterFileId, (Guid?)null), cancellationToken);
+                await HandleCleanupAsync(options, storage, fileId, cancellationToken);
+                await AssertFileExistsAsync(options, storage, fileId, objectKey, cancellationToken);
+                await using (var db = new NoCtfDbContext(options))
+                    await db.Teams.IgnoreQueryFilters().Where(x => x.Id == teamId)
+                        .ExecuteUpdateAsync(s => s.SetProperty(x => x.AvatarFileId, (Guid?)null), cancellationToken);
                 Func<Task> failedCleanup = () =>
                     HandleCleanupAsync(options, failOnce, fileId, cancellationToken);
                 await Assert.That(failedCleanup).Throws<IOException>();

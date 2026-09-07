@@ -93,6 +93,17 @@ public static class NoCtfMessagingRetryPolicies
         {
             foreach (var chain in chains.Where(Matches))
             {
+                if (messageType == typeof(CleanupFile)
+                    || messageType == typeof(InvalidateDeletedCompetitionReadModels))
+                {
+                    // Deletion has already committed. Storage/Redis/IO failures must retry
+                    // independently and eventually remain visible in the durable error queue.
+                    chain.OnException<Exception>()
+                        .RetryWithCooldown(TimeSpan.FromMilliseconds(250))
+                        .Then.ScheduleRetry(delays)
+                        .WithFullJitter();
+                    continue;
+                }
                 chain.OnException<TimeoutException>()
                     .RetryWithCooldown(TimeSpan.FromMilliseconds(250))
                     .Then.ScheduleRetry(delays)
@@ -108,6 +119,12 @@ public static class NoCtfMessagingRetryPolicies
         {
             if (chain.MessageType != messageType)
                 return false;
+
+            // These single-consumer messages have one handler and one background destination.
+            // Handler policies may run before endpoint associations are populated.
+            if (messageType == typeof(CleanupFile)
+                || messageType == typeof(InvalidateDeletedCompetitionReadModels))
+                return true;
 
             return chain.Endpoints.Any(endpoint =>
                 string.Equals(endpoint.EndpointName, endpointName, StringComparison.Ordinal)

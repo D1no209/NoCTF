@@ -174,6 +174,7 @@ const forceDeleteOpen = ref(false)
 const forceDeleteTitle = ref('')
 const forceDeleteReason = ref('')
 const forceDeleteError = ref<string | null>(null)
+const forceDeleteConflictingIds = ref<string[]>([])
 const hardDeletePreview = ref<NoCtfapiEndpointsAdministrationCompetitionsCompetitionHardDeletePreviewResponse | null>(null)
 const hardDeletePreviewLoading = ref(false)
 const hardDeletePreviewError = ref<string | null>(null)
@@ -189,6 +190,7 @@ const hardDeleteReferenceLabels: Record<NoCtfapiEndpointsAdministrationCompetiti
   Notification: '通知与咨询',
   PosterFile: '比赛海报',
   ActiveRuntimeResource: '活动运行环境资源',
+  NotificationScopeConflict: '跨作用域或归属不明的通知引用',
 }
 
 function hardDeleteReferenceLabel(code?: NoCtfapiEndpointsAdministrationCompetitionsCompetitionHardDeleteReferenceCode) {
@@ -305,6 +307,7 @@ async function forceDelete(): Promise<void> {
   if (!forceDeleteValid.value) return
   forceDeleting.value = true
   forceDeleteError.value = null
+  forceDeleteConflictingIds.value = []
   try {
     const { error } = await adminForceDeleteCompetition({
       path: { competitionId },
@@ -313,7 +316,13 @@ async function forceDelete(): Promise<void> {
         reason: forceDeleteReason.value.trim(),
       },
     })
-    if (error) throw error
+    if (error) {
+      if (typeof error === 'object' && 'conflictingNotificationIds' in error
+        && Array.isArray(error.conflictingNotificationIds)) {
+        forceDeleteConflictingIds.value = error.conflictingNotificationIds.filter((id): id is string => typeof id === 'string')
+      }
+      throw error
+    }
     forceDeleteOpen.value = false
     toast.success(translate('竞赛及其作用域数据已永久删除，平台审计记录已保留'))
     await navigateTo('/admin/competitions')
@@ -461,7 +470,9 @@ async function submitDelete() {
             <span v-if="isAdministrator" class="text-destructive">
               {{ hardDeletePreview.canForceDelete
                 ? $t('平台管理员可使用强制级联删除。该操作会永久移除比赛作用域数据，只保留一条平台审计记录。')
-                : $t('强制级联删除当前受阻：请先结束比赛并清理全部活动运行环境资源。') }}
+                : hardDeletePreview.references?.some(reference => reference.code === 'NotificationScopeConflict')
+                  ? $t('强制删除受阻：通知线程存在跨作用域或归属不明的引用，请先排查通知归属。')
+                  : $t('强制级联删除当前受阻：请先结束比赛并清理全部活动运行环境资源。') }}
             </span>
           </AlertDescription>
         </Alert>
@@ -501,7 +512,12 @@ async function submitDelete() {
           </DialogDescription>
         </DialogHeader>
         <Alert v-if="forceDeleteError" variant="destructive">
-          <AlertDescription>{{ forceDeleteError }}</AlertDescription>
+          <AlertDescription>
+            {{ forceDeleteError }}
+            <span v-if="forceDeleteConflictingIds.length" class="mt-2 block break-all font-mono text-xs">
+              {{ $t('冲突通知 ID') }}：{{ forceDeleteConflictingIds.join(', ') }}
+            </span>
+          </AlertDescription>
         </Alert>
         <FieldGroup>
           <Field>

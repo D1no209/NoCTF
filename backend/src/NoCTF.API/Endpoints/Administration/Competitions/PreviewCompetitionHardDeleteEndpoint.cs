@@ -18,7 +18,8 @@ public enum CompetitionHardDeleteReferenceCode
     PatchUpload,
     Notification,
     PosterFile,
-    ActiveRuntimeResource
+    ActiveRuntimeResource,
+    NotificationScopeConflict
 }
 
 public sealed record CompetitionHardDeleteReferenceResponse(

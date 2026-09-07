@@ -112,10 +112,10 @@ public sealed class CompetitionHardDeletePersistenceTests
                     CompetitionChallengeId = competitionChallengeId,
                     TeamId = teamId,
                     ActorUserId = ownerId,
-                    Kind = GameplayFactKind.FlagAttempt,
+                    Kind = GameplayFactKind.FixAttempt,
+                    ReferenceKind = GameplayFactReferenceKind.PatchUpload,
+                    ReferenceId = patchUploadId,
                     OccurredAt = now,
-                    Value = "flag{historical}",
-                    ValueSha256 = new byte[32],
                     State = GameplayFactState.Completed,
                     Result = GameplayFactResult.Correct,
                     UpdatedAt = now
@@ -123,10 +123,11 @@ public sealed class CompetitionHardDeletePersistenceTests
                 setup.RuntimeInstances.Add(new RuntimeInstance
                 {
                     Id = runtimeId,
+                    GameplayFactId = gameplayFactId,
                     CompetitionId = historicalCompetitionId,
                     CompetitionChallengeId = competitionChallengeId,
                     TeamId = teamId,
-                    Purpose = RuntimePurpose.Player,
+                    Purpose = RuntimePurpose.AwdpTarget,
                     RuntimeKind = RuntimeKind.Container,
                     RuntimeProvider = RuntimeProvider.Docker,
                     State = RuntimeState.Stopped,
@@ -136,6 +137,7 @@ public sealed class CompetitionHardDeletePersistenceTests
                 setup.PatchUploads.Add(new PatchUpload
                 {
                     Id = patchUploadId,
+                    RuntimeInstanceId = runtimeId,
                     CompetitionId = historicalCompetitionId,
                     CompetitionChallengeId = competitionChallengeId,
                     TeamId = teamId,

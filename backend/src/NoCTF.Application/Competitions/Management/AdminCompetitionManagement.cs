@@ -31,7 +31,8 @@ public enum CompetitionHardDeleteReferenceKind
     PatchUpload,
     Notification,
     PosterFile,
-    ActiveRuntimeResource
+    ActiveRuntimeResource,
+    NotificationScopeConflict
 }
 
 public sealed record CompetitionHardDeleteReference(
@@ -71,12 +72,14 @@ public enum CompetitionForceDeleteState
     ActiveCompetition,
     ActiveRuntimeResource,
     ConfirmationMismatch,
-    InvalidReason
+    InvalidReason,
+    NotificationScopeConflict
 }
 
 public sealed record CompetitionForceDeleteResult(
     CompetitionForceDeleteState State,
-    CompetitionHardDeletePreview? Preview = null);
+    CompetitionHardDeletePreview? Preview = null,
+    IReadOnlyList<Guid>? ConflictingNotificationIds = null);
 
 public sealed record CompetitionForceDeletionFact(
     int SchemaVersion,

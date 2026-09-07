@@ -9,13 +9,16 @@ using NoCTF.Application.Messaging;
 using NoCTF.Infrastructure.Messaging;
 using NoCTF.Domain.Runtime;
 using System.Text.Json;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace NoCTF.Infrastructure.Competitions.Administration;
 
 public sealed class AdminCompetitionStore(
     NoCtfDbContext db,
     NoCTF.Infrastructure.Competitions.Management.CompetitionReadModelCache? readModels = null,
-    ITransactionalMessageOutbox? messageOutbox = null)
+    ITransactionalMessageOutbox? messageOutbox = null,
+    ILogger<AdminCompetitionStore>? logger = null)
     : IAdminCompetitionStore
 {
     private static readonly JsonSerializerOptions JsonOptions =
@@ -251,6 +254,8 @@ public sealed class AdminCompetitionStore(
         if (competition.Status is CompetitionStatus.Running or CompetitionStatus.Paused)
             return new(CompetitionForceDeleteState.ActiveCompetition);
 
+        var notificationScope = await CompetitionNotificationDeletionScope.LoadAsync(
+            db, competition.Id, true, ct);
         var preview = await BuildHardDeletePreviewAsync(
             competition.Id,
             competition.Title,
@@ -258,12 +263,15 @@ public sealed class AdminCompetitionStore(
             competition.Status,
             isAdministrator: true,
             competition.PosterFileId,
-            ct);
+            ct,
+            notificationScope);
         if (preview.References.Any(reference =>
                 reference.Kind == CompetitionHardDeleteReferenceKind.ActiveRuntimeResource))
         {
             return new(CompetitionForceDeleteState.ActiveRuntimeResource, preview);
         }
+        if (notificationScope.ConflictingIds.Length > 0)
+            return new(CompetitionForceDeleteState.NotificationScopeConflict, preview, notificationScope.ConflictingIds);
 
         var fileIds = await CollectCompetitionFileIdsAsync(
             command.CompetitionId,
@@ -287,17 +295,26 @@ public sealed class AdminCompetitionStore(
             RelatedType = EntityReferenceKind.Competition,
             RelatedId = competition.Id
         };
+        await DeleteCompetitionScopeAsync(command.CompetitionId, notificationScope.Ids, ct);
         db.Notifications.Add(audit);
-        await db.SaveChangesAsync(ct);
-
-        await DeleteCompetitionScopeAsync(command.CompetitionId, ct);
         foreach (var fileId in fileIds)
             await outbox.PublishAsync(new CleanupFile(fileId));
+        await outbox.PublishAsync(new InvalidateDeletedCompetitionReadModels(command.CompetitionId));
 
+        // Persist audit and outgoing envelopes in the deletion transaction, not just in memory.
+        await db.SaveChangesAsync(ct);
         await transaction.CommitAsync(ct);
-        await outbox.FlushOutgoingMessagesAsync();
-        if (readModels is not null)
-            await readModels.InvalidateAsync(command.CompetitionId, ct);
+        try
+        {
+            await outbox.FlushOutgoingMessagesAsync();
+        }
+        catch (Exception exception)
+        {
+            // The deletion has committed. Wolverine's persisted outbox owns delivery retries.
+            (logger ?? NullLogger<AdminCompetitionStore>.Instance).LogError(exception,
+                "Competition {CompetitionId} was permanently deleted; committed outbox delivery will be retried.",
+                command.CompetitionId);
+        }
         return new(CompetitionForceDeleteState.Deleted, preview);
     }
 
@@ -419,7 +436,8 @@ public sealed class AdminCompetitionStore(
         CompetitionStatus status,
         bool isAdministrator,
         Guid? posterFileId,
-        CancellationToken ct)
+        CancellationToken ct,
+        CompetitionNotificationDeletionScope? notificationScope = null)
     {
         var references = new List<CompetitionHardDeleteReference>();
         AddReference(
@@ -458,47 +476,9 @@ public sealed class AdminCompetitionStore(
             await db.PatchUploads.CountAsync(
                 item => item.CompetitionId == competitionId,
                 ct));
-        AddReference(
-            references,
-            CompetitionHardDeleteReferenceKind.Notification,
-            await db.Notifications.CountAsync(
-                item =>
-                    (item.RelatedType == EntityReferenceKind.Competition
-                        && item.RelatedId == competitionId)
-                    || (item.RelatedType == EntityReferenceKind.Team
-                        && db.Teams.IgnoreQueryFilters().Any(team =>
-                            team.CompetitionId == competitionId
-                            && team.Id == item.RelatedId))
-                    || (item.RelatedType == EntityReferenceKind.CompetitionChallenge
-                        && db.CompetitionChallenges.IgnoreQueryFilters().Any(challenge =>
-                            challenge.CompetitionId == competitionId
-                            && challenge.Id == item.RelatedId))
-                    || (item.RelatedType == EntityReferenceKind.GameplayFact
-                        && db.GameplayFacts.IgnoreQueryFilters().Any(fact =>
-                            fact.CompetitionId == competitionId
-                            && fact.Id == item.RelatedId))
-                    || (item.RelatedType == EntityReferenceKind.RuntimeInstance
-                        && db.RuntimeInstances.Any(runtime =>
-                            runtime.CompetitionId == competitionId
-                            && runtime.Id == item.RelatedId))
-                    || (item.RelatedType == EntityReferenceKind.CompetitionEvent
-                        && db.CompetitionEvents.Any(@event =>
-                            @event.CompetitionId == competitionId
-                            && @event.Id == item.RelatedId))
-                    || (item.SourceType == NotificationSourceType.Competition
-                        && item.SourceId == competitionId)
-                    || (item.SourceType == NotificationSourceType.Team
-                        && db.Teams.IgnoreQueryFilters().Any(team =>
-                            team.CompetitionId == competitionId
-                            && team.Id == item.SourceId))
-                    || ((item.TargetType == NotificationTargetType.CompetitionCollaborators
-                            || item.TargetType == NotificationTargetType.CompetitionParticipants)
-                        && item.TargetId == competitionId)
-                    || (item.TargetType == NotificationTargetType.TeamMembers
-                        && db.Teams.IgnoreQueryFilters().Any(team =>
-                            team.CompetitionId == competitionId
-                            && team.Id == item.TargetId)),
-                ct));
+        notificationScope ??= await CompetitionNotificationDeletionScope.LoadAsync(db, competitionId, false, ct);
+        AddReference(references, CompetitionHardDeleteReferenceKind.Notification, notificationScope.Ids.Length);
+        AddReference(references, CompetitionHardDeleteReferenceKind.NotificationScopeConflict, notificationScope.ConflictingIds.Length);
         AddReference(
             references,
             CompetitionHardDeleteReferenceKind.PosterFile,
@@ -523,7 +503,8 @@ public sealed class AdminCompetitionStore(
             isAdministrator
                 && status is not CompetitionStatus.Running and not CompetitionStatus.Paused
                 && references.All(reference =>
-                    reference.Kind != CompetitionHardDeleteReferenceKind.ActiveRuntimeResource),
+                    reference.Kind is not CompetitionHardDeleteReferenceKind.ActiveRuntimeResource
+                        and not CompetitionHardDeleteReferenceKind.NotificationScopeConflict),
             references);
     }
 
@@ -548,40 +529,19 @@ public sealed class AdminCompetitionStore(
 
     private async Task DeleteCompetitionScopeAsync(
         Guid competitionId,
+        Guid[] notificationIds,
         CancellationToken ct)
     {
+        await db.Notifications.Where(n => notificationIds.Contains(n.Id)).ExecuteDeleteAsync(ct);
+        // Restrict FKs: PatchUpload -> RuntimeInstance -> GameplayFact.
         await db.Database.ExecuteSqlInterpolatedAsync(
-            $"""
-             WITH RECURSIVE scoped_notifications AS (
-                 SELECT id
-                 FROM notifications
-                 WHERE kind <> {(short)NotificationKind.CompetitionForceDeleted}
-                   AND ((related_type = {(short)EntityReferenceKind.Competition} AND related_id = {competitionId})
-                    OR (related_type = {(short)EntityReferenceKind.Team} AND related_id IN (SELECT id FROM teams WHERE competition_id = {competitionId}))
-                    OR (related_type = {(short)EntityReferenceKind.CompetitionChallenge} AND related_id IN (SELECT id FROM competition_challenges WHERE competition_id = {competitionId}))
-                    OR (related_type = {(short)EntityReferenceKind.GameplayFact} AND related_id IN (SELECT id FROM gameplay_facts WHERE competition_id = {competitionId}))
-                    OR (related_type = {(short)EntityReferenceKind.RuntimeInstance} AND related_id IN (SELECT id FROM runtime_instances WHERE competition_id = {competitionId}))
-                    OR (related_type = {(short)EntityReferenceKind.CompetitionEvent} AND related_id IN (SELECT id FROM competition_events WHERE competition_id = {competitionId}))
-                    OR (source_type = {(short)NotificationSourceType.Competition} AND source_id = {competitionId})
-                    OR (source_type = {(short)NotificationSourceType.Team} AND source_id IN (SELECT id FROM teams WHERE competition_id = {competitionId}))
-                    OR (target_type IN ({(short)NotificationTargetType.CompetitionCollaborators}, {(short)NotificationTargetType.CompetitionParticipants}) AND target_id = {competitionId})
-                    OR (target_type = {(short)NotificationTargetType.TeamMembers} AND target_id IN (SELECT id FROM teams WHERE competition_id = {competitionId})))
-                 UNION
-                 SELECT child.id
-                 FROM notifications child
-                 INNER JOIN scoped_notifications parent ON child.reply_to_id = parent.id
-             )
-             DELETE FROM notifications
-             WHERE id IN (SELECT id FROM scoped_notifications)
-             """, ct);
+            $"DELETE FROM patch_uploads WHERE competition_id = {competitionId}", ct);
         await db.Database.ExecuteSqlInterpolatedAsync(
             $"DELETE FROM runtime_instances WHERE competition_id = {competitionId}", ct);
         await db.Database.ExecuteSqlInterpolatedAsync(
             $"DELETE FROM gameplay_facts WHERE competition_id = {competitionId}", ct);
         await db.Database.ExecuteSqlInterpolatedAsync(
-            $"DELETE FROM challenge_flags WHERE competition_challenge_id IN (SELECT id FROM competition_challenges WHERE competition_id = {competitionId}) OR team_id IN (SELECT id FROM teams WHERE competition_id = {competitionId})", ct);
-        await db.Database.ExecuteSqlInterpolatedAsync(
-            $"DELETE FROM patch_uploads WHERE competition_id = {competitionId}", ct);
+            $"DELETE FROM challenge_flags WHERE competition_challenge_id IN (SELECT id FROM competition_challenges WHERE competition_id = {competitionId})", ct);
         await db.Database.ExecuteSqlInterpolatedAsync(
             $"DELETE FROM competition_events WHERE competition_id = {competitionId}", ct);
         await db.Database.ExecuteSqlInterpolatedAsync(
