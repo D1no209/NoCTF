@@ -39,6 +39,7 @@ public static class MessageRouting
         Route<SendPasswordReset>(options, WorkerQueue.Background);
         Route<SendPasswordChangedNotification>(options, WorkerQueue.Background);
         Route<CleanupFile>(options, WorkerQueue.Background, durableOutbox: true);
+        Route<ExpireAccountSourceAddresses>(options, WorkerQueue.Background, durableOutbox: true);
         Route<InvalidateDeletedCompetitionReadModels>(options, WorkerQueue.Background, durableOutbox: true);
         Route<ChallengePublished>(options, WorkerQueue.Background);
         Route<PublishHintNotification>(options, WorkerQueue.Background);

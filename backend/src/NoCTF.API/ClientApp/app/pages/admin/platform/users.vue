@@ -381,6 +381,8 @@ onMounted(() => {
           <Skeleton v-for="i in 5" :key="i" class="h-8 w-full" />
         </div>
         <div v-else-if="detail" class="flex flex-col gap-6 px-4 pb-6">
+          <PrivateAccountPanel v-if="detail.id" :key="detail.id" :user-id="detail.id" />
+          <Separator />
           <dl class="grid grid-cols-2 gap-x-4 gap-y-3 text-sm">
             <dt class="text-muted-foreground">{{ $t('用户 ID') }}</dt>
             <dd class="font-mono break-all">{{ detail.id }}</dd>

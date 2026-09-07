@@ -75,6 +75,8 @@ public static class ServiceRegistration
             throw new InvalidOperationException(string.Join(" ", uploadLimitErrors));
         services.AddSingleton(uploadLimits);
         services.AddProblemDetails();
+        services.AddHttpContextAccessor();
+        services.AddScoped<NoCTF.Application.Authentication.Privacy.IRequestSourceAddress, NoCTF.API.Security.RequestSourceAddress>();
         services.AddNoCtfForwardedHeaders(configuration);
         if (endpointAssemblies is null)
             services.AddFastEndpoints();

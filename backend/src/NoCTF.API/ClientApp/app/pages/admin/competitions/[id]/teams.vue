@@ -394,7 +394,7 @@ onMounted(() => {
               <Spinner class="size-4" />{{ $t('加载中') }}
             </div>
             <div v-else class="flex flex-col divide-y rounded-md border">
-              <div v-for="member in teamMembers" :key="member.userId" class="flex items-center gap-3 p-3">
+              <div v-for="member in teamMembers" :key="member.userId" class="flex flex-wrap items-center gap-3 p-3">
                 <Avatar class="size-9">
                   <AvatarImage v-if="member.avatarUrl" :src="member.avatarUrl" :alt="member.userName ?? ''" />
                   <AvatarFallback>{{ member.userName?.slice(0, 2) }}</AvatarFallback>
@@ -405,6 +405,10 @@ onMounted(() => {
                   </NuxtLink>
                 </div>
                 <Badge v-if="member.userId === selectedTeam.captainId" variant="secondary">{{ $t('队长') }}</Badge>
+                <Collapsible v-if="canJudge && member.userId && selectedTeam.id" class="w-full">
+                  <CollapsibleTrigger as-child><Button variant="outline" size="sm">{{ $t('队员私密详情') }}</Button></CollapsibleTrigger>
+                  <CollapsibleContent class="pt-4"><PrivateAccountPanel :user-id="member.userId" :competition-id="competitionId" :team-id="selectedTeam.id" /></CollapsibleContent>
+                </Collapsible>
               </div>
               <p v-if="!teamMembers.length" class="p-3 text-sm text-muted-foreground">{{ $t('暂无成员') }}</p>
             </div>

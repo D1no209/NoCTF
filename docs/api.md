@@ -4,6 +4,15 @@
 
 ## Platform
 
+### 私密账户资料（不属于公开用户协议）
+
+```text
+GET /api/v1/auth/me/school-identity
+PUT /api/v1/auth/me/school-identity
+GET /api/v1/admin/platform/users/{userId}/private-profile
+GET /api/v1/admin/competitions/{competitionId}/teams/{teamId}/members/{userId}/private-profile
+```
+
 ```text
 GET  /api/v1/platform/configuration
 GET  /api/v1/platform/logo

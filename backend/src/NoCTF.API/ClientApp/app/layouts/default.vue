@@ -38,7 +38,7 @@ onBeforeUnmount(() => {
 <template>
   <div class="flex min-h-screen flex-col">
     <header class="sticky top-0 z-40 border-b bg-background/80 backdrop-blur">
-      <div class="mx-auto flex h-16 max-w-7xl items-center gap-6 px-4 md:px-6">
+      <div class="mx-auto flex h-16 max-w-7xl items-center gap-2 px-4 sm:gap-6 md:px-6">
         <NuxtLink to="/" class="flex shrink-0 items-baseline gap-1.5 font-mono text-base font-semibold tracking-tight">
           <span class="text-primary">&gt;</span>
           <span>{{ configuration?.name ?? 'NoCTF' }}</span>
@@ -80,12 +80,12 @@ onBeforeUnmount(() => {
             </Button>
             <DropdownMenu>
               <DropdownMenuTrigger as-child>
-                <Button variant="ghost" class="flex items-center gap-2">
+                <Button variant="ghost" class="flex items-center gap-2" :aria-label="user?.userName">
                   <Avatar class="size-7">
                     <AvatarImage v-if="user?.avatarUrl" :src="user.avatarUrl" :alt="user?.userName ?? ''" />
                     <AvatarFallback>{{ user?.userName?.slice(0, 2) ?? '?' }}</AvatarFallback>
                   </Avatar>
-                  <span class="text-sm">{{ user?.userName }}</span>
+                  <span class="hidden max-w-40 truncate text-sm sm:inline">{{ user?.userName }}</span>
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" class="w-48">

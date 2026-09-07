@@ -4207,6 +4207,92 @@
         ]
       }
     },
+    "/api/v1/auth/me/school-identity": {
+      "get": {
+        "tags": [
+          "Auth"
+        ],
+        "summary": "Reads the current user's private, self-reported school identity.",
+        "description": "Executes GET /api/v1/auth/me/school-identity.",
+        "operationId": "AuthenticationGetMySchoolIdentity",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsAuthenticationSchoolIdentityResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ]
+      },
+      "put": {
+        "tags": [
+          "Auth"
+        ],
+        "summary": "Updates or clears optional school identity without verifying it.",
+        "description": "Executes PUT /api/v1/auth/me/school-identity.",
+        "operationId": "AuthenticationUpdateMySchoolIdentity",
+        "requestBody": {
+          "x-name": "UpdateMySchoolIdentityRequest",
+          "description": "",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsAuthenticationUpdateMySchoolIdentityRequest"
+              }
+            }
+          },
+          "required": true,
+          "x-position": 1
+        },
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcValidationProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ]
+      }
+    },
     "/api/v1/users/{userId}/avatar": {
       "get": {
         "tags": [
@@ -5113,6 +5199,68 @@
                 }
               }
             }
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/admin/competitions/{competitionId}/teams/{teamId}/members/{userId}/private-profile": {
+      "get": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "Reads a participant's private identity and this competition's source-IP activity.",
+        "description": "Owner, Manager, Judge and platform administrators only; Observer and other participants are denied. All route scopes are checked. Authentication history is never included.",
+        "operationId": "AdminGetPrivateTeamMember",
+        "parameters": [
+          {
+            "name": "competitionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "teamId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "userId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationPlatformPrivateAccountResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
           }
         },
         "security": [
@@ -6942,6 +7090,54 @@
                 }
               }
             }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "Bearer": [
+              "Administrator"
+            ]
+          }
+        ]
+      }
+    },
+    "/api/v1/admin/platform/users/{userId}/private-profile": {
+      "get": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "Reads private school identity and recent source-IP activity.",
+        "description": "Platform administrators only. Returns at most 50 events within the configured retention window. Self-reported identity is not verified.",
+        "operationId": "AdminGetPrivatePlatformUser",
+        "parameters": [
+          {
+            "name": "userId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationPlatformPrivateAccountResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found"
           },
           "401": {
             "description": "Unauthorized"
@@ -17747,6 +17943,25 @@
           "Bot"
         ]
       },
+      "NoCTFAPIEndpointsAuthenticationSchoolIdentityResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "fullName": {
+            "type": "string",
+            "nullable": true
+          },
+          "studentNumber": {
+            "type": "string",
+            "nullable": true
+          },
+          "ipRetentionDays": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          }
+        }
+      },
       "NoCTFAPIEndpointsAuthenticationPublicUserProfileResponse": {
         "type": "object",
         "additionalProperties": false,
@@ -17970,6 +18185,24 @@
           }
         }
       },
+      "NoCTFAPIEndpointsAuthenticationUpdateMySchoolIdentityRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "fullName": {
+            "type": "string",
+            "maxLength": 100,
+            "minLength": 0,
+            "nullable": true
+          },
+          "studentNumber": {
+            "type": "string",
+            "maxLength": 64,
+            "minLength": 0,
+            "nullable": true
+          }
+        }
+      },
       "NoCTFAPIEndpointsAuthenticationAvatarUploadFailureResponse": {
         "type": "object",
         "additionalProperties": false,
@@ -18135,6 +18368,56 @@
             "type": "string",
             "maxLength": 512,
             "minLength": 8
+          }
+        }
+      },
+      "NoCTFAPIEndpointsAdministrationPlatformPrivateAccountResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "identity": {
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsAuthenticationSchoolIdentityResponse"
+          },
+          "activities": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationPlatformPrivateActivityResponse"
+            }
+          },
+          "retentionDays": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
+      "NoCTFAPIEndpointsAdministrationPlatformPrivateActivityResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "guid"
+          },
+          "kind": {
+            "type": "string"
+          },
+          "occurredAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "ipAddress": {
+            "type": "string",
+            "nullable": true
+          },
+          "competitionId": {
+            "type": "string",
+            "format": "guid",
+            "nullable": true
+          },
+          "gameplayFactId": {
+            "type": "string",
+            "format": "guid",
+            "nullable": true
           }
         }
       },

@@ -23,7 +23,8 @@ public enum LoginFailureCode
 public sealed class LoginUser(
     IUserAuthenticationStore store,
     IAccessTokenIssuer issuer,
-    TimeProvider timeProvider)
+    TimeProvider timeProvider,
+    NoCTF.Application.Authentication.Privacy.IAccountActivityRecorder? activities = null)
 {
     public async Task<OperationResult<LoginResult, LoginFailureCode>> ExecuteAsync(
         LoginCommand command,
@@ -33,12 +34,18 @@ public sealed class LoginUser(
         if (user is null
             || user.Kind != UserKind.Human
             || !await store.VerifyPasswordAsync(user.Id, command.Password, cancellationToken))
+        {
+            if (activities is not null)
+                await activities.RecordLoginAsync(null, timeProvider.GetUtcNow(), cancellationToken);
             return OperationResult<LoginResult, LoginFailureCode>.Failure(
                 LoginFailureCode.InvalidCredentials,
                 "Invalid credentials.");
+        }
 
         var token = issuer.Issue(user, timeProvider.GetUtcNow());
         var refreshToken = issuer.IssueRefresh(user);
+        if (activities is not null)
+            await activities.RecordLoginAsync(user.Id, timeProvider.GetUtcNow(), cancellationToken);
         return OperationResult<LoginResult, LoginFailureCode>.Success(new(
             user.Id,
             user.UserName,

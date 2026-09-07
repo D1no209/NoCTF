@@ -16,6 +16,9 @@ public sealed class EmailVerificationGateMiddleware(RequestDelegate next)
     private static readonly HashSet<PathString> AllowedPaths =
     [
         new("/api/v1/auth/me"),
+        new("/api/v1/auth/me/profile"),
+        new("/api/v1/auth/me/avatar"),
+        new("/api/v1/auth/me/school-identity"),
         new("/api/v1/auth/refresh"),
         new("/api/v1/auth/logout"),
         new("/api/v1/auth/logout-all"),

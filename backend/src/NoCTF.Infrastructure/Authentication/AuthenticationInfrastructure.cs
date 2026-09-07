@@ -46,6 +46,14 @@ internal static class AuthenticationInfrastructure
         services.AddSingleton<IRunnerScoringTokenIssuer, RunnerScoringTokenIssuer>();
         services.AddScoped<IUserAuthenticationStore, AuthenticationStore>();
         services.AddScoped<IUserRegistrationStore, AuthenticationStore>();
+        services.AddOptions<NoCTF.Application.Authentication.Privacy.AccountPrivacyOptions>()
+            .Bind(configuration.GetSection("AccountPrivacy"))
+            .Validate(value => value.IpRetentionDays is >= 1 and <= 365, "AccountPrivacy:IpRetentionDays must be between 1 and 365.")
+            .ValidateOnStart();
+        services.AddScoped<Privacy.AccountPrivacyStore>();
+        services.AddScoped<NoCTF.Application.Authentication.Privacy.IAccountPrivacyStore, Privacy.AccountPrivacyStore>();
+        services.AddScoped<NoCTF.Application.Authentication.Privacy.IAccountActivityRecorder, Privacy.AccountPrivacyStore>();
+        services.AddScoped<NoCTF.Application.Authentication.Privacy.AccountPrivacy>();
         services.Configure<PasswordHasherOptions>(options =>
             options.IterationCount = 210_000);
         services.AddScoped<IPasswordHasher<User>, PasswordHasher<User>>();

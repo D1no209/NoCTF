@@ -11,6 +11,8 @@ public sealed class GameplayFact
     public Guid? TeamId { get; set; }
     public Guid? VictimTeamId { get; set; }
     public Guid? ActorUserId { get; set; }
+    [System.ComponentModel.DataAnnotations.MaxLength(45), System.Text.Json.Serialization.JsonIgnore]
+    public string? SourceIpAddress { get; set; }
     public GameplayFactKind Kind { get; set; }
     public DateTimeOffset OccurredAt { get; set; }
     public GameplayFactReferenceKind? ReferenceKind { get; set; }

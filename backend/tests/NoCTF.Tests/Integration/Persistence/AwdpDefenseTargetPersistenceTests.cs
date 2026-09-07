@@ -40,6 +40,38 @@ public sealed class AwdpDefenseTargetPersistenceTests
 {
     private static readonly JsonSerializerOptions JsonOptions =
         new(JsonSerializerDefaults.Web);
+    private sealed class PatchSourceAddress : NoCTF.Application.Authentication.Privacy.IRequestSourceAddress
+    {
+        public string Address => "2001:db8::42";
+    }
+
+    [Test, Timeout(300_000)]
+    public async Task Flag_source_address_is_persisted_without_entering_broadcast_payloads(CancellationToken ct)
+    {
+        await DockerIntegrationTest.RunAsync(async () =>
+        {
+            await using var postgres = await StartPostgresAsync(ct);
+            var options = Options(postgres);
+            var fixture = await SeedAsync(options, ct);
+            await using var db = new NoCtfDbContext(options);
+            var outbox = new RecordingOutbox();
+            var intake = new GameplayFactIntakeStore(db, outbox,
+                new GameplayFactAttemptCriticalSection(new AsyncKeyedLock.AsyncKeyedLocker<string>()),
+                new CompetitionEventStore(db, outbox), new PatchSourceAddress());
+            var admission = await intake.LoadAdmissionAsync(fixture.CompetitionId, fixture.CompetitionChallengeId, fixture.UserId, ct);
+            var id = Guid.NewGuid();
+            const string flag = "flag{source-address-test}";
+            var result = await intake.TryAcceptFlagAsync(new(id, fixture.CompetitionId, fixture.TeamId,
+                fixture.CompetitionChallengeId, fixture.UserId, GameplayFactKind.BreakAttempt,
+                flag, SHA256.HashData(Encoding.UTF8.GetBytes(flag)), fixture.Now), admission!, null, ct);
+            await Assert.That(result.State).IsEqualTo(GameplayFactAcceptanceState.Created);
+            await Assert.That(await db.GameplayFacts.Where(x => x.Id == id).Select(x => x.SourceIpAddress).SingleAsync(ct)).IsEqualTo("2001:db8::42");
+            foreach (var message in outbox.Messages)
+                await Assert.That(JsonSerializer.Serialize(message)).DoesNotContain("2001:db8::42");
+            foreach (var item in await db.CompetitionEvents.ToArrayAsync(ct))
+                await Assert.That(JsonSerializer.Serialize(item)).DoesNotContain("2001:db8::42");
+        });
+    }
 
     [Test]
     [Timeout(300_000)]
@@ -73,6 +105,8 @@ public sealed class AwdpDefenseTargetPersistenceTests
                 item => item.Id == runtimeId,
                 cancellationToken);
             var factId = saved.Result.GameplayFactId!.Value;
+            await Assert.That(await db.GameplayFacts.Where(item => item.Id == factId)
+                .Select(item => item.SourceIpAddress).SingleAsync(cancellationToken)).IsEqualTo("2001:db8::42");
             var start = new StartAwdpFixVerification(factId, runtimeId);
             var clock = new FakeTimeProvider(fixture.Now.AddSeconds(2));
             var outbox = new RecordingOutbox();
@@ -389,7 +423,8 @@ public sealed class AwdpDefenseTargetPersistenceTests
                 new AsyncKeyedLock.AsyncKeyedLocker<string>()),
             new FileReferenceLock(),
             NullLogger<PatchUploadStore>.Instance,
-            new CompetitionEventStore(db, outbox));
+            new CompetitionEventStore(db, outbox),
+            new PatchSourceAddress());
         var scope = await store.ResolveScopeAsync(
             fixture.CompetitionId,
             fixture.CompetitionChallengeId,
