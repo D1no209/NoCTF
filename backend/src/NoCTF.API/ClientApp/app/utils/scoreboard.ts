@@ -15,6 +15,7 @@ import type {
   NoCtfapiEndpointsCompetitionsScoreboardTeamResponse,
 } from '~/api'
 import { translate } from './i18n'
+import { directionKey, directionLabel } from './directions'
 
 export interface ScoreboardChallengeColumnGroup {
   competitionChallengeId: string
@@ -234,8 +235,8 @@ export function scoreboardDirectionGroups(
 ): ScoreboardDirectionGroup[] {
   const directions = new Map<string, ScoreboardDirectionGroup>()
   for (const group of columnGroups) {
-    const name = group.challenge?.direction?.trim() || translate('未分类')
-    const key = name.toLocaleLowerCase()
+    const name = directionLabel(group.challenge?.direction) || translate('未分类')
+    const key = directionKey(name)
     const existing = directions.get(key)
     if (existing) existing.groups.push(group)
     else directions.set(key, { key, name, groups: [group] })

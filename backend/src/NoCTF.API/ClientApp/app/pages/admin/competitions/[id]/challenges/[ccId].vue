@@ -451,7 +451,7 @@ onMounted(() => {
         <Badge :variant="challenge.isPublished ? 'default' : 'outline'">
           {{ challenge.isPublished ? $t('已发布') : $t('未发布') }}
         </Badge>
-        <Badge variant="secondary">{{ challenge.direction }}</Badge>
+        <Badge variant="secondary">{{ directionLabel(challenge.direction) }}</Badge>
       </div>
 
       <Tabs v-model="activeSection" default-value="general" class="grid gap-6 lg:grid-cols-[minmax(0,1fr)_14rem] lg:items-start">

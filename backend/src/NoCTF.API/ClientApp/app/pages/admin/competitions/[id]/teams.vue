@@ -434,7 +434,7 @@ onMounted(() => {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem v-for="challenge in scoreAdjustmentChallenges" :key="challenge.id" :value="challenge.id!">
-                  {{ challenge.title }} · {{ challenge.direction }}
+                  {{ challenge.title }} · {{ directionLabel(challenge.direction) }}
                 </SelectItem>
               </SelectContent>
             </Select>

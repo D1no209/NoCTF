@@ -161,13 +161,13 @@ const mode = computed(() => ctx.competition.value?.mode)
       <header class="flex flex-wrap items-center gap-3 border-b pb-5">
         <h2 class="text-display text-2xl">{{ challenge.title }}</h2>
         <Badge variant="outline" :class="directionBadgeClass(challenge.direction)">
-          {{ challenge.direction }}
+          {{ directionLabel(challenge.direction) }}
         </Badge>
         <Badge v-if="mode === 'Awdp'" variant="secondary">{{ $t('分值按轮结算') }}</Badge>
       </header>
 
       <section v-if="challenge.description" class="border-b py-5" :aria-label="challenge.title">
-        <p class="whitespace-pre-line text-sm leading-7 text-foreground/90">{{ challenge.description }}</p>
+        <MarkdownContent :source="challenge.description" class="text-foreground/90" />
       </section>
 
       <section

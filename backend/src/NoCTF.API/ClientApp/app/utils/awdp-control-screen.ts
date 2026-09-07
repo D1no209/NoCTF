@@ -6,6 +6,7 @@ import type {
   NoCtfapiEndpointsCompetitionsScoreboardTeamResponse,
 } from '~/api'
 import { scoreboardBreakdown } from './scoreboard'
+import { directionLabel } from './directions'
 
 export type AwdpControlAction = 'attack' | 'defense'
 export type AwdpControlOutcome = 'pending' | 'success' | 'failure'
@@ -278,7 +279,7 @@ export function awdpTeamChallengeStates(
     return {
       competitionChallengeId: challengeId,
       title: challenge.title ?? '—',
-      direction: challenge.direction ?? 'MISC',
+      direction: directionLabel(challenge.direction) || 'Misc',
       attackScore,
       defenseScore,
       attackOutcome,

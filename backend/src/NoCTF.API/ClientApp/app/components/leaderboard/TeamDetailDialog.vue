@@ -55,14 +55,14 @@ const solves = computed(() =>
 const radarOption = computed<echarts.EChartsCoreOption>(() => {
   const counts = new Map<string, number>()
   for (const challenge of props.challenges) {
-    const direction = challenge.direction || translate('未分类')
+    const direction = directionLabel(challenge.direction) || translate('未分类')
     if (!counts.has(direction)) counts.set(direction, 0)
   }
   for (const solve of props.series?.solves ?? []) {
     const challenge = props.challenges.find(
       (c) => normalizeChallengeKey(c.competitionChallengeId) === normalizeChallengeKey(solve.competitionChallengeId),
     )
-    const direction = challenge?.direction || translate('未分类')
+    const direction = directionLabel(challenge?.direction) || translate('未分类')
     counts.set(direction, (counts.get(direction) ?? 0) + 1)
   }
   const indicators = [...counts.entries()].map(([name, value]) => ({

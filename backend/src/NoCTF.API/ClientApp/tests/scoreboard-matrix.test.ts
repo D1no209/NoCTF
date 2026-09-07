@@ -336,6 +336,7 @@ describe('normalized scoreboard matrix', () => {
       { ...settledGroup, challenge: { direction: 'pwn' } },
     ])
     expect(directions).toHaveLength(1)
+    expect(directions[0]!.name).toBe('Pwn')
     expect(scoreboardTeamDirectionScore(team, directions[0]!, 'Ctf').total).toBe(300)
     expect(scoreboardTeamDirectionScore(team, directions[0]!, 'Awdp')).toEqual({
       attack: 240,

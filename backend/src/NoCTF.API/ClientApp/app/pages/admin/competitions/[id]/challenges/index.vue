@@ -210,7 +210,7 @@ async function restoreChallenge(c: NoCtfapiEndpointsChallengesChallengeResponse)
           </TableCell>
           <TableCell>
             <Badge variant="outline" :class="directionBadgeClass(c.direction)">
-              {{ c.direction }}
+              {{ directionLabel(c.direction) }}
             </Badge>
           </TableCell>
           <TableCell>
@@ -262,7 +262,7 @@ async function restoreChallenge(c: NoCtfapiEndpointsChallengesChallengeResponse)
               <SelectContent>
                 <SelectGroup>
                   <SelectItem v-for="t in modeTemplates" :key="t.id" :value="t.id!">
-                    {{ t.title }}({{ t.direction }})
+                    {{ t.title }}({{ directionLabel(t.direction) }})
                   </SelectItem>
                 </SelectGroup>
               </SelectContent>
