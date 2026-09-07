@@ -4,12 +4,15 @@ using NoCTF.Application.Competitions.Configuration;
 using NoCTF.Domain.Competitions;
 using NoCTF.Domain.Teams;
 using NoCTF.Application.Messaging;
+using NoCTF.Application.Competitions.Events;
+using NoCTF.Domain.Competitions.Events;
 
 namespace NoCTF.Infrastructure.Competitions.Configuration;
 
 public sealed class CompetitionConfigurationStore(
     NoCtfDbContext db,
-    ITransactionalMessageOutbox outbox) : ICompetitionConfigurationStore
+    ITransactionalMessageOutbox outbox,
+    ICompetitionEventRecorder events) : ICompetitionConfigurationStore
 {
     public Task<CompetitionConfigurationView?> FindAsync(Guid competitionId, CancellationToken ct) =>
         db.Competitions.AsNoTracking()
@@ -85,10 +88,18 @@ public sealed class CompetitionConfigurationStore(
                     now));
             }
         }
-        if (!db.Database.IsRelational())
-            await db.SaveChangesAsync(ct);
+        await events.RecordAsync(new(
+            competitionId,
+            CompetitionEventKind.CompetitionUpdated,
+            CompetitionEventLevel.Information,
+            CompetitionEventVisibility.Staff,
+            now,
+            CompetitionStatus: status), ct);
+        // ExecuteUpdate does not persist the event or pending Outbox envelopes.
+        await db.SaveChangesAsync(ct);
+        var result = await FindAsync(competitionId, ct);
         await transaction.CommitAsync(ct);
-        await outbox.FlushOutgoingMessagesAsync();
-        return new(await FindAsync(competitionId, ct));
+        await outbox.FlushCommittedMessagesAsync();
+        return new(result);
     }
 }

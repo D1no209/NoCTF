@@ -9,6 +9,7 @@ using NoCTF.Infrastructure.Persistence;
 using NoCTF.Infrastructure.Challenges.Configuration;
 using NoCTF.Infrastructure.Competitions.Configuration;
 using NoCTF.Infrastructure.Messaging;
+using NoCTF.Infrastructure.Competitions.Events;
 using Testcontainers.PostgreSql;
 
 namespace NoCTF.Tests.Integration.Persistence;
@@ -39,7 +40,8 @@ public sealed class ConfigurationLastWriteWinsTests
             {
                 var result = await new CompetitionConfigurationStore(
                     updateDb,
-                    new NoOpTransactionalMessageOutbox()).TryUpdateAsync(
+                    new NoOpTransactionalMessageOutbox(),
+                    new CompetitionEventStore(updateDb, new NoOpTransactionalMessageOutbox())).TryUpdateAsync(
                     ids.CompetitionId,
                     """{"schemaVersion":2,"defaultScoreCurve":{"initialPoints":600,"minimumPoints":100,"decayTeamCount":10,"decayMode":2},"bloodRewards":[]}""",
                     true,
@@ -53,7 +55,8 @@ public sealed class ConfigurationLastWriteWinsTests
             {
                 var result = await new ChallengeConfigurationStore(
                     updateDb,
-                    new NoOpTransactionalMessageOutbox()).TryUpdateAsync(
+                    new NoOpTransactionalMessageOutbox(),
+                    new CompetitionEventStore(updateDb, new NoOpTransactionalMessageOutbox())).TryUpdateAsync(
                     ids.CompetitionId,
                     ids.CompetitionChallengeId,
                     """{"schemaVersion":2,"scoreCurve":{"initialPoints":700,"minimumPoints":100,"decayTeamCount":10,"decayMode":2},"bloodRewards":[]}""",

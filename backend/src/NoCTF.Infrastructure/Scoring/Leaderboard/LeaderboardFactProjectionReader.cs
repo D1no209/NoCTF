@@ -7,6 +7,7 @@ using NoCTF.Domain.Competitions;
 using NoCTF.Domain.Gameplay;
 using NoCTF.Infrastructure.Persistence;
 using NoCTF.GameModes.Awd.Configuration;
+using NoCTF.GameModes.Awd.Scheduling;
 
 namespace NoCTF.Infrastructure.Scoring.Leaderboard;
 
@@ -737,10 +738,12 @@ internal static class LeaderboardFactProjectionReader
         var elapsed = EffectiveElapsed(lifecycle, competitionStart, projectedAt);
         var elapsedSeconds = Math.Max(0, elapsed.TotalSeconds);
         var completedRounds = checked((int)(elapsedSeconds / duration));
-        var latestRound = Math.Max(1, checked(completedRounds + 1));
+        var competitionFinished = competitionStatus == CompetitionStatus.Finished;
+        var latestRound = Math.Max(1, competitionFinished
+            ? checked((int)Math.Ceiling(elapsedSeconds / duration))
+            : checked(completedRounds + 1));
         var endRound = Math.Clamp(endingRound ?? latestRound, 1, latestRound);
         var startRound = Math.Max(1, endRound - ScoreboardRoundWindow.DefaultSize + 1);
-        var competitionFinished = competitionStatus == CompetitionStatus.Finished;
         var settledPenaltyCutoff = competitionFinished
             ? lifecycle.LastOrDefault(item => item.To == CompetitionStatus.Finished)?.OccurredAt
                 ?? projectedAt
@@ -813,32 +816,8 @@ internal static class LeaderboardFactProjectionReader
     private static DateTimeOffset EffectiveClockToWallTime(
         IReadOnlyList<CompetitionLifecycleTransition> lifecycle,
         DateTimeOffset? competitionStart,
-        TimeSpan target)
-    {
-        var transitions = lifecycle.OrderBy(item => item.OccurredAt).ThenBy(item => item.Id).ToArray();
-        if (transitions.Length == 0)
-            return competitionStart.GetValueOrDefault() + target;
-        var accumulated = TimeSpan.Zero;
-        DateTimeOffset? runningSince = null;
-        foreach (var transition in transitions)
-        {
-            if (transition.To == CompetitionStatus.Running && runningSince is null)
-            {
-                runningSince = transition.OccurredAt;
-                continue;
-            }
-            if (transition.From != CompetitionStatus.Running
-                || transition.To == CompetitionStatus.Running
-                || runningSince is not DateTimeOffset segmentStart)
-                continue;
-            var segment = transition.OccurredAt - segmentStart;
-            if (accumulated + segment >= target)
-                return segmentStart + (target - accumulated);
-            accumulated += segment;
-            runningSince = null;
-        }
-        return (runningSince ?? competitionStart.GetValueOrDefault()) + (target - accumulated);
-    }
+        TimeSpan target) => AwdEffectiveRunningClock.ToWallTime(
+            lifecycle, competitionStart.GetValueOrDefault(), target);
 
     private sealed record AwdpGroupingKey(
         Guid? TeamId,

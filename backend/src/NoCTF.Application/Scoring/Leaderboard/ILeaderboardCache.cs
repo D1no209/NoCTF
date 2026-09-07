@@ -42,6 +42,9 @@ public sealed record LeaderboardProjectionBundle(
     LeaderboardResponse Legacy,
     ScoreboardProjection Scoreboard)
 {
+    /// <summary>Cache-only format marker; old AWDP round projections must be rebuilt after upgrade.</summary>
+    public int AwdpRoundProjectionFormat { get; init; }
+
     /// <summary>
     /// The first wall-clock boundary after which this time-derived projection must be
     /// rebuilt even when no business event has been committed. This is cache metadata,

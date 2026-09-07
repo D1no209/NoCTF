@@ -26,6 +26,7 @@ import {
   isScoreboardVersionAtLeast,
   isCoherentScoreboardBundle,
   newestScoreboardVersion,
+  needsAwdpRoundRefresh,
   shouldRestoreRequestedRoundWindow,
 } from '../app/utils/scoreboard-coherence'
 
@@ -43,6 +44,20 @@ const scoreboardSlotStatus = await Bun.file(
 ).text()
 
 describe('normalized scoreboard matrix', () => {
+  test('AWDP clock refresh covers anonymous live viewers but stops at settlement or freeze', () => {
+    const schema: NoCtfapiEndpointsCompetitionsScoreboardSchemaResponse = {
+      mode: 'Awdp', rounds: [{ state: 'Settled' }, { state: 'Running' }],
+    }
+    expect(needsAwdpRoundRefresh(schema, { dataScope: 'Live' })).toBeTrue()
+    expect(needsAwdpRoundRefresh(schema, { dataScope: 'Frozen' })).toBeFalse()
+    expect(needsAwdpRoundRefresh(schema, { dataScope: 'Hidden' })).toBeFalse()
+    expect(needsAwdpRoundRefresh({ ...schema, mode: 'Ctf' }, { dataScope: 'Live' })).toBeFalse()
+    expect(needsAwdpRoundRefresh({ ...schema, rounds: [{ state: 'Settled' }] }, { dataScope: 'Live' })).toBeFalse()
+    expect(needsAwdpRoundRefresh(null, null)).toBeFalse()
+    expect(composable).toContain('clearInterval(roundRefreshTimer)')
+    expect(composable).toContain('competitionLifecycleChanged:')
+  })
+
   test('loads catalog, schema and snapshot concurrently with stale-response fencing', () => {
     expect(composable).toContain('await Promise.all([')
     expect(composable).toContain('getScoreboardChallengeCatalogEndpoint')

@@ -12,6 +12,8 @@ public static class ScoreboardAudienceProjection
     {
         ScoreboardSnapshot Apply(ScoreboardSnapshot snapshot) => snapshot with
         {
+            // A historical window is a view of this published generation, not an older publication.
+            Version = source.Version,
             Visibility = source.Visibility,
             DataScope = source.DataScope,
             DataAsOf = source.DataAsOf

@@ -43,7 +43,8 @@ const route = useRoute()
 const competitionId = route.params.id as string
 const { configuration, ensureLoaded } = usePlatform()
 const { t } = useLocale()
-const board = useScoreboardMatrix(competitionId)
+// This page already refreshes the entire screen every ten seconds.
+const board = useScoreboardMatrix(competitionId, { pollRounds: false })
 
 const competition = ref<NoCtfapiEndpointsCompetitionsCompetitionResponse | null>(null)
 const events = ref<AwdpControlEvent[]>([])
