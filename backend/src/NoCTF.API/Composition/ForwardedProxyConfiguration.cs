@@ -21,13 +21,18 @@ internal static class ForwardedProxyConfiguration
 
         var parsedNetworks = knownNetworks.Select(ParseNetwork).ToArray();
         var parsedProxies = knownProxies.Select(ParseAddress).ToArray();
+        var forwardLimit = configuration.GetValue("ForwardedHeaders:ForwardLimit", 1);
+        if (forwardLimit is < 1 or > 10)
+            throw new InvalidOperationException("ForwardedHeaders:ForwardLimit must be between 1 and 10.");
 
         services.Configure<ForwardedHeadersOptions>(options =>
         {
-            options.ForwardedHeaders = ForwardedHeaders.XForwardedFor
+            // Empty known lists mean trust nobody, not the middleware's trust-everyone mode.
+            options.ForwardedHeaders = parsedNetworks.Length == 0 && parsedProxies.Length == 0
+                ? ForwardedHeaders.None : ForwardedHeaders.XForwardedFor
                 | ForwardedHeaders.XForwardedProto
                 | ForwardedHeaders.XForwardedHost;
-            options.ForwardLimit = 1;
+            options.ForwardLimit = forwardLimit;
             options.RequireHeaderSymmetry = true;
             options.KnownIPNetworks.Clear();
             options.KnownProxies.Clear();

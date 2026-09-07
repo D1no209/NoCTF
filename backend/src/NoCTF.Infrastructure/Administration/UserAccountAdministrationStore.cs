@@ -97,6 +97,8 @@ public sealed class UserAccountAdministrationStore(
         user.TokenVersion = checked(user.TokenVersion + 1);
         user.EmailVerifiedAt = null;
         user.Description = null;
+        user.SchoolFullName = null;
+        user.SchoolStudentNumber = null;
         user.AvatarFileId = null;
         user.AvatarFile = null;
         user.UpdatedAt = now;

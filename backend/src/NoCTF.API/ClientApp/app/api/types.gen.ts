@@ -1035,6 +1035,12 @@ export type NoCtfapiEndpointsAuthenticationUserRoleProtocol = 'User' | 'Organize
 
 export type NoCtfapiEndpointsAuthenticationUserKindProtocol = 'Human' | 'Bot';
 
+export type NoCtfapiEndpointsAuthenticationSchoolIdentityResponse = {
+    fullName?: string | null;
+    studentNumber?: string | null;
+    ipRetentionDays?: number | null;
+};
+
 export type NoCtfapiEndpointsAuthenticationPublicUserProfileResponse = {
     userId?: string;
     userName?: string;
@@ -1105,6 +1111,11 @@ export type NoCtfapiEndpointsAuthenticationUpdateMyProfileRequest = {
     description?: string | null;
 };
 
+export type NoCtfapiEndpointsAuthenticationUpdateMySchoolIdentityRequest = {
+    fullName?: string | null;
+    studentNumber?: string | null;
+};
+
 export type NoCtfapiEndpointsAuthenticationAvatarUploadFailureResponse = {
     code?: NoCtfapiEndpointsAuthenticationAvatarUploadFailureCode;
 };
@@ -1147,6 +1158,21 @@ export type NoCtfapiEndpointsAdministrationTeamsBanTeamRequest = {
 
 export type NoCtfapiEndpointsAdministrationTeamsCorrectTeamBanRequest = {
     reason?: string;
+};
+
+export type NoCtfapiEndpointsAdministrationPlatformPrivateAccountResponse = {
+    identity?: NoCtfapiEndpointsAuthenticationSchoolIdentityResponse;
+    activities?: Array<NoCtfapiEndpointsAdministrationPlatformPrivateActivityResponse>;
+    retentionDays?: number;
+};
+
+export type NoCtfapiEndpointsAdministrationPlatformPrivateActivityResponse = {
+    id?: string;
+    kind?: string;
+    occurredAt?: string;
+    ipAddress?: string | null;
+    competitionId?: string | null;
+    gameplayFactId?: string | null;
 };
 
 export type NoCtfapiEndpointsAdministrationTeamsAdminTeamBanAppealListResponse = {
@@ -4473,6 +4499,74 @@ export type GetMeEndpointResponses = {
 
 export type GetMeEndpointResponse = GetMeEndpointResponses[keyof GetMeEndpointResponses];
 
+export type AuthenticationGetMySchoolIdentityData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/v1/auth/me/school-identity';
+};
+
+export type AuthenticationGetMySchoolIdentityErrors = {
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+    /**
+     * Not Found
+     */
+    404: unknown;
+};
+
+export type AuthenticationGetMySchoolIdentityResponses = {
+    /**
+     * Success
+     */
+    200: NoCtfapiEndpointsAuthenticationSchoolIdentityResponse;
+};
+
+export type AuthenticationGetMySchoolIdentityResponse = AuthenticationGetMySchoolIdentityResponses[keyof AuthenticationGetMySchoolIdentityResponses];
+
+export type AuthenticationUpdateMySchoolIdentityData = {
+    body: NoCtfapiEndpointsAuthenticationUpdateMySchoolIdentityRequest;
+    path?: never;
+    query?: never;
+    url: '/api/v1/auth/me/school-identity';
+};
+
+export type AuthenticationUpdateMySchoolIdentityErrors = {
+    /**
+     * Bad Request
+     */
+    400: MicrosoftAspNetCoreMvcValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+    /**
+     * Not Found
+     */
+    404: unknown;
+};
+
+export type AuthenticationUpdateMySchoolIdentityError = AuthenticationUpdateMySchoolIdentityErrors[keyof AuthenticationUpdateMySchoolIdentityErrors];
+
+export type AuthenticationUpdateMySchoolIdentityResponses = {
+    /**
+     * No Content
+     */
+    204: void;
+};
+
+export type AuthenticationUpdateMySchoolIdentityResponse = AuthenticationUpdateMySchoolIdentityResponses[keyof AuthenticationUpdateMySchoolIdentityResponses];
+
 export type UserAvatarGetData = {
     body?: never;
     path: {
@@ -5017,6 +5111,41 @@ export type AdminCorrectTeamBanResponses = {
 };
 
 export type AdminCorrectTeamBanResponse = AdminCorrectTeamBanResponses[keyof AdminCorrectTeamBanResponses];
+
+export type AdminGetPrivateTeamMemberData = {
+    body?: never;
+    path: {
+        competitionId: string;
+        teamId: string;
+        userId: string;
+    };
+    query?: never;
+    url: '/api/v1/admin/competitions/{competitionId}/teams/{teamId}/members/{userId}/private-profile';
+};
+
+export type AdminGetPrivateTeamMemberErrors = {
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+    /**
+     * Not Found
+     */
+    404: unknown;
+};
+
+export type AdminGetPrivateTeamMemberResponses = {
+    /**
+     * Success
+     */
+    200: NoCtfapiEndpointsAdministrationPlatformPrivateAccountResponse;
+};
+
+export type AdminGetPrivateTeamMemberResponse = AdminGetPrivateTeamMemberResponses[keyof AdminGetPrivateTeamMemberResponses];
 
 export type AdminListTeamsData = {
     body?: never;
@@ -5977,6 +6106,39 @@ export type AdminPlatformGetMonitoringResponses = {
 };
 
 export type AdminPlatformGetMonitoringResponse = AdminPlatformGetMonitoringResponses[keyof AdminPlatformGetMonitoringResponses];
+
+export type AdminGetPrivatePlatformUserData = {
+    body?: never;
+    path: {
+        userId: string;
+    };
+    query?: never;
+    url: '/api/v1/admin/platform/users/{userId}/private-profile';
+};
+
+export type AdminGetPrivatePlatformUserErrors = {
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+    /**
+     * Not Found
+     */
+    404: unknown;
+};
+
+export type AdminGetPrivatePlatformUserResponses = {
+    /**
+     * Success
+     */
+    200: NoCtfapiEndpointsAdministrationPlatformPrivateAccountResponse;
+};
+
+export type AdminGetPrivatePlatformUserResponse = AdminGetPrivatePlatformUserResponses[keyof AdminGetPrivatePlatformUserResponses];
 
 export type AdminPlatformInvalidateUserTokensData = {
     body?: never;

@@ -14,7 +14,8 @@ public sealed class GameplayFactIntakeStore(
     NoCtfDbContext db,
     ITransactionalMessageOutbox outbox,
     GameplayFactAttemptCriticalSection attemptCriticalSection,
-    ICompetitionEventRecorder? eventRecorder = null) : IGameplayFactIntakeStore
+    ICompetitionEventRecorder? eventRecorder = null,
+    NoCTF.Application.Authentication.Privacy.IRequestSourceAddress? source = null) : IGameplayFactIntakeStore
 {
     public GameplayFactIntakeStore(
         NoCtfDbContext db,
@@ -94,7 +95,8 @@ public sealed class GameplayFactIntakeStore(
             CompetitionId = item.CompetitionId,
             CompetitionChallengeId = item.CompetitionChallengeId,
             TeamId = item.TeamId,
-            ActorUserId = item.UserId,
+                ActorUserId = item.UserId,
+                SourceIpAddress = source?.Address,
             Kind = item.Kind,
             Value = item.Value,
             ValueSha256 = item.ValueSha256,

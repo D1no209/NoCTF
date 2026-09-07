@@ -22,7 +22,8 @@ public sealed class PatchUploadStore(
     GameplayFactAttemptCriticalSection attemptCriticalSection,
     FileReferenceLock fileLock,
     ILogger<PatchUploadStore> logger,
-    ICompetitionEventRecorder? eventRecorder = null) : IPatchUploadStore
+    ICompetitionEventRecorder? eventRecorder = null,
+    NoCTF.Application.Authentication.Privacy.IRequestSourceAddress? source = null) : IPatchUploadStore
 {
     private readonly ICompetitionEventRecorder events =
         eventRecorder ?? NullCompetitionEventRecorder.Instance;
@@ -217,6 +218,7 @@ public sealed class PatchUploadStore(
             CompetitionChallengeId = scope.CompetitionChallengeId,
             TeamId = scope.TeamId,
             ActorUserId = scope.UserId,
+            SourceIpAddress = source?.Address,
             Kind = GameplayFactKind.FixAttempt,
             ReferenceKind = GameplayFactReferenceKind.PatchUpload,
             ReferenceId = patchUploadId,

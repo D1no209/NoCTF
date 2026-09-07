@@ -61,5 +61,6 @@ public enum NotificationKind : short
     TeamBanAppealSubmitted,
     PlatformAuditExported,
     UserAccountLifecycleChanged,
-    CompetitionForceDeleted
+    CompetitionForceDeleted,
+    AuthenticationSecurityActivity
 }

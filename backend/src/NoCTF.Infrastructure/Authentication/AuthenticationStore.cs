@@ -24,7 +24,8 @@ public sealed class AuthenticationStore(
     FileReferenceLock? fileReferenceLock = null,
     TimeProvider? clock = null,
     IEmailVerificationConfigurationStore? emailVerificationConfiguration = null,
-    ILogger<AuthenticationStore>? logger = null)
+    ILogger<AuthenticationStore>? logger = null,
+    NoCTF.Application.Authentication.Privacy.IRequestSourceAddress? source = null)
     : IUserAuthenticationStore,
         IUserRegistrationStore
 {
@@ -222,6 +223,8 @@ public sealed class AuthenticationStore(
         db.Users.Add(user);
 
         string? verificationToken = null;
+        db.Notifications.Add(Privacy.AuthenticationActivity.Create(userId,
+            NoCTF.Application.Authentication.Privacy.AccountActivityKind.Registered, source?.Address, now));
         if (verificationState == EmailVerificationState.Issued)
         {
             verificationToken = Microsoft.AspNetCore.WebUtilities.WebEncoders.Base64UrlEncode(
