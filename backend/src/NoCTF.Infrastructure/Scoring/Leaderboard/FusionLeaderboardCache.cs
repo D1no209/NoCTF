@@ -624,7 +624,10 @@ public sealed class FusionLeaderboardCache(
     }
 
     private bool IsExpired(LeaderboardProjectionBundle? bundle) =>
-        bundle?.ValidUntil is { } validUntil && timeProvider.GetUtcNow() >= validUntil;
+        bundle?.ValidUntil is { } validUntil && timeProvider.GetUtcNow() >= validUntil
+        || bundle is not null && bundle.Scoreboard.Snapshot.DataScope == LeaderboardDataScope.Live
+            && bundle.Scoreboard.Schema.Mode is GameMode.Ctf or GameMode.Awdp
+            && bundle.Scoreboard.Snapshot.Teams.Any(team => team.Achievements is null);
 
     private async Task RepairFusionCacheAsync(Guid competitionId, CancellationToken ct)
     {

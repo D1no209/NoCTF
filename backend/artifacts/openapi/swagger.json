@@ -15882,6 +15882,13 @@
             "items": {
               "$ref": "#/components/schemas/NoCTFAPIEndpointsCompetitionsScoreboardSlotResponse"
             }
+          },
+          "achievements": {
+            "type": "array",
+            "nullable": true,
+            "items": {
+              "$ref": "#/components/schemas/NoCTFAPIEndpointsCompetitionsScoreboardChallengeAchievementResponse"
+            }
           }
         }
       },
@@ -16232,6 +16239,32 @@
           "Failed",
           "Succeeded"
         ]
+      },
+      "NoCTFAPIEndpointsCompetitionsScoreboardChallengeAchievementResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "competitionChallengeId": {
+            "type": "string",
+            "format": "guid"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsCompetitionsScoreboardEntryKindProtocol"
+          },
+          "userId": {
+            "type": "string",
+            "format": "guid",
+            "nullable": true
+          },
+          "displayName": {
+            "type": "string",
+            "nullable": true
+          },
+          "occurredAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
       },
       "NoCTFAPIEndpointsCompetitionsScoreboardTrackResponse": {
         "type": "object",

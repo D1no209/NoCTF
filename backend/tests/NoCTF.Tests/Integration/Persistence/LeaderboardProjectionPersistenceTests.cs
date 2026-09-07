@@ -407,6 +407,11 @@ public sealed class LeaderboardProjectionPersistenceTests
             await Assert.That(full).IsNotNull();
             await Assert.That(full!.ParticipantView).IsNotNull();
             var participant = full.ParticipantView!.ToProjection();
+            await Assert.That(full.Snapshot.Teams.Single().Achievements!.Count).IsEqualTo(2);
+            var visibleAchievement = participant.Snapshot.Teams.Single().Achievements!.Single();
+            await Assert.That(visibleAchievement.CompetitionChallengeId).IsEqualTo(fixture.CompetitionChallenge.Id);
+            await Assert.That(full.Snapshot.Teams.Single().Achievements!.Single(x => x.CompetitionChallengeId == hiddenChallenge.Id).DisplayName)
+                .IsEqualTo(owner.UserName);
             await Assert.That(full.ChallengeCatalog.Challenges).Count().IsEqualTo(2);
             await Assert.That(participant.ChallengeCatalog.Challenges).HasSingleItem();
             await Assert.That(participant.ChallengeCatalog.Challenges[0].CompetitionChallengeId)
@@ -515,6 +520,9 @@ public sealed class LeaderboardProjectionPersistenceTests
                 .IsEqualTo(100L * (elapsedSeconds - 1) + 14);
             await Assert.That(latest.Scoreboard.Snapshot.Teams.Single().ScoreOutsideWindow)
                 .IsGreaterThan(0);
+            var historicalAchievement = latest.Scoreboard.Snapshot.Teams.Single().Achievements!.Single();
+            await Assert.That(historicalAchievement.Kind).IsEqualTo(ScoreboardEntryKind.Attack);
+            await Assert.That(historicalAchievement.OccurredAt.UtcTicks / 10).IsEqualTo(firstBreak.OccurredAt.UtcTicks / 10);
 
             fixture.Competition.Status = CompetitionStatus.Finished;
             fixture.Competition.UpdatedAt = projectedAt.AddMinutes(1);

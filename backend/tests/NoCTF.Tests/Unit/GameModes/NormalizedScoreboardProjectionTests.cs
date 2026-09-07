@@ -23,6 +23,47 @@ public sealed class NormalizedScoreboardProjectionTests
     private readonly LeaderboardProjectionEngine engine = new(new LeaderboardProjectorCatalog());
 
     [Test]
+    public async Task Ctf_achievements_keep_first_solver_even_when_compact_entries_are_truncated()
+    {
+        var team = Team(1, "Solved"); var challenge = Challenge(1, "Web"); var unsolved = Challenge(2, "Pwn");
+        var first = Fact(team.Id, challenge.Id, GameplayFactKind.FlagAttempt, 1, GameplayFactResult.Correct,
+            Guid.NewGuid(), "First solver");
+        var facts = new[] { first,
+            Fact(team.Id, challenge.Id, GameplayFactKind.FlagAttempt, 2, GameplayFactResult.Correct, Guid.NewGuid(), "Later solver"),
+            Fact(team.Id, unsolved.Id, GameplayFactKind.ManualAdjustment, 3, GameplayFactResult.Applied, value: "9999"),
+            Fact(team.Id, unsolved.Id, GameplayFactKind.FlagAttempt, 4, GameplayFactResult.Correct) with { State = GameplayFactState.Processing } }
+            .Concat(Enumerable.Range(10, 10).Select(second => Fact(team.Id, challenge.Id, GameplayFactKind.FlagAttempt,
+                second, GameplayFactResult.Wrong))).ToArray();
+        var board = ProjectNormalized(engine, new(Guid.NewGuid(), GameMode.Ctf, [team], facts, [challenge, unsolved],
+            ProjectedAt: Start.AddMinutes(1), CompetitionStatus: CompetitionStatus.Running));
+        var achievement = board.Snapshot.Teams.Single().Achievements!.Single();
+        await Assert.That(achievement.CompetitionChallengeId).IsEqualTo(challenge.Id);
+        await Assert.That(achievement.UserId).IsEqualTo(first.ActorUserId);
+        await Assert.That(achievement.DisplayName).IsEqualTo("First solver");
+        await Assert.That(achievement.OccurredAt).IsEqualTo(first.OccurredAt);
+        await Assert.That(achievement.Kind).IsEqualTo(ScoreboardEntryKind.Solve);
+    }
+
+    [Test]
+    public async Task Awdp_achievements_retain_both_actors_and_original_times_outside_round_window()
+    {
+        var team = Team(1, "Historical"); var challenge = Challenge(1, "Pwn", "{\"schemaVersion\":4}");
+        var attack = Fact(team.Id, challenge.Id, GameplayFactKind.BreakAttempt, 1, GameplayFactResult.Correct, Guid.NewGuid(), "Attacker");
+        var defense = Fact(team.Id, challenge.Id, GameplayFactKind.FixAttempt, 2, GameplayFactResult.Correct, Guid.NewGuid(), "Defender");
+        var config = JsonSerializer.Serialize(new AwdpConfiguration(AwdpConfiguration.CurrentSchemaVersion, 60,
+            FixedCurve(100), FixedCurve(40), RequireBreakBeforeFix: false), JsonOptions);
+        var board = ProjectNormalized(engine, new(Guid.NewGuid(), GameMode.Awdp, [team], [attack, defense], [challenge], config, Start,
+            ProjectedAt: Start.AddHours(5), CompetitionStatus: CompetitionStatus.Running, ScoreboardGameplayFacts: []));
+        var achievements = board.Snapshot.Teams.Single().Achievements!;
+        await Assert.That(achievements.Count).IsEqualTo(2);
+        await Assert.That(achievements.Single(x => x.Kind == ScoreboardEntryKind.Attack).DisplayName).IsEqualTo("Attacker");
+        await Assert.That(achievements.Single(x => x.Kind == ScoreboardEntryKind.Defense).OccurredAt).IsEqualTo(defense.OccurredAt);
+        var defenseOnly = ProjectNormalized(engine, new(Guid.NewGuid(), GameMode.Awdp, [team], [defense], [challenge], config, Start,
+            ProjectedAt: Start.AddHours(5), CompetitionStatus: CompetitionStatus.Running));
+        await Assert.That(defenseOnly.Snapshot.Teams.Single().Achievements!.Single().Kind).IsEqualTo(ScoreboardEntryKind.Defense);
+    }
+
+    [Test]
     public async Task Ctf_projection_is_sparse_deterministic_and_preserves_blood_and_actor_identity()
     {
         var competitionId = Guid.Parse("00000000-0000-0000-0000-000000000100");

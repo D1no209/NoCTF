@@ -46,6 +46,17 @@ export interface ScoreboardSlotSignals {
   shieldSucceeded: boolean
 }
 
+/** Completed achievements are independent of score sign, compact entries and round windows. */
+export function scoreboardTeamAchievements(
+  team: NoCtfapiEndpointsCompetitionsScoreboardTeamResponse | null,
+  competitionChallengeId: string,
+  mode: NoCtfapiEndpointsCompetitionsGameModeProtocol | null | undefined,
+) {
+  return (team?.achievements ?? []).filter(item => item.competitionChallengeId === competitionChallengeId
+    && (mode === 'Ctf' ? item.kind === 'Solve' : item.kind === 'Attack' || item.kind === 'Defense'))
+    .sort((a, b) => String(a.occurredAt).localeCompare(String(b.occurredAt)))
+}
+
 export interface ScoreboardMemberContributionSlice {
   name: string
   value: number

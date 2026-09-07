@@ -16,6 +16,33 @@ internal static class NormalizedScoreboardProjection
     private const int CompactEntryLimit = 5;
     private const int CompactAdjustmentLimit = 5;
 
+    private static Dictionary<Guid, ScoreboardChallengeAchievement[]> BuildAchievements(
+        LeaderboardProjectionInput input, IReadOnlyDictionary<Guid, LeaderboardChallengeFact> challenges)
+    {
+        if (input.Mode is not (GameMode.Ctf or GameMode.Awdp)) return [];
+        // All-history bounded summaries retain the first success outside the visible round window.
+        var facts = input.GameplayFacts.Where(fact => fact.TeamId is not null
+                && fact.CompetitionChallengeId is Guid challengeId && challenges.ContainsKey(challengeId)
+                && fact.State == GameplayFactState.Completed && fact.Result == GameplayFactResult.Correct
+                && fact.OccurredAt <= input.ProjectedAt
+                && (input.Mode == GameMode.Ctf ? fact.Kind == GameplayFactKind.FlagAttempt
+                    : fact.Kind is GameplayFactKind.BreakAttempt or GameplayFactKind.FixAttempt))
+            .OrderBy(fact => fact.OccurredAt).ThenBy(fact => fact.GameplayFactId).ToArray();
+        var configuration = input.Mode == GameMode.Awdp ? ParseAwdpCompetition(input.CompetitionConfigurationJson) : null;
+        return facts.Where(fact => fact.Kind != GameplayFactKind.FixAttempt
+                || !EffectiveAwdp(configuration!, challenges[fact.CompetitionChallengeId!.Value].ConfigurationJson).RequireBreakBeforeFix
+                || facts.Any(candidate => candidate.Kind == GameplayFactKind.BreakAttempt
+                    && candidate.TeamId == fact.TeamId && candidate.CompetitionChallengeId == fact.CompetitionChallengeId
+                    && IsBefore(candidate, fact)))
+            .GroupBy(fact => (fact.TeamId, fact.CompetitionChallengeId, fact.Kind))
+            .Select(group => group.First()).GroupBy(fact => fact.TeamId!.Value)
+            .ToDictionary(group => group.Key, group => group.Select(fact => new ScoreboardChallengeAchievement(
+                fact.CompetitionChallengeId!.Value,
+                fact.Kind switch { GameplayFactKind.FlagAttempt => ScoreboardEntryKind.Solve,
+                    GameplayFactKind.BreakAttempt => ScoreboardEntryKind.Attack, _ => ScoreboardEntryKind.Defense },
+                fact.ActorUserId, fact.SubmitterName, fact.OccurredAt)).ToArray());
+    }
+
     public static ScoreboardProjection Project(
         LeaderboardProjectionInput input,
         LeaderboardProjectionResult legacy)
@@ -79,6 +106,7 @@ internal static class NormalizedScoreboardProjection
             .ToArray();
         var actorIndexes = actors.ToDictionary(actor => actor.UserId, actor => actor.Index);
         var actorsByIndex = actors.ToDictionary(actor => actor.Index);
+        var achievementsByTeam = BuildAchievements(input, challengeById);
         var columnsByKey = columns.ToDictionary(
             column => (column.CompetitionChallengeId, column.RoundId),
             column => column);
@@ -206,7 +234,8 @@ internal static class NormalizedScoreboardProjection
                 AttackScore = attackScore,
                 DefenseScore = defenseScore,
                 ChallengeScores = challengeScores,
-                MemberContributions = memberContributions
+                MemberContributions = memberContributions,
+                Achievements = achievementsByTeam.GetValueOrDefault(team.Id, [])
             });
         }
 
