@@ -29,6 +29,7 @@ public static class ObservabilityExtensions
                 ]))
             .WithMetrics(metrics => metrics
                 .AddMeter(NoCtfTelemetry.MeterName)
+                .AddNoCtfDurationViews()
                 .AddMeter("Wolverine*")
                 .AddMeter("Npgsql")
                 .AddAspNetCoreInstrumentation()
@@ -52,6 +53,26 @@ public static class ObservabilityExtensions
             openTelemetry.WithTracing(tracing => tracing.AddOtlpExporter());
 
         return services;
+    }
+
+    internal static MeterProviderBuilder AddNoCtfDurationViews(this MeterProviderBuilder metrics)
+    {
+        // Instrument names, not the names rewritten by the Prometheus exporter. All values are seconds.
+        foreach (var name in new[]
+        {
+            "noctf.api.request.duration", "noctf.redis.operation.duration",
+            "noctf.signalr.publish.duration", "noctf.runner.claim.duration",
+            "noctf.leaderboard.projection.duration", "noctf.scheduler.rebuild.duration",
+            "noctf.scheduler.dispatch.lateness"
+        })
+        {
+            metrics.AddView(name, new ExplicitBucketHistogramConfiguration
+            {
+                Boundaries = [0.0001, 0.00025, 0.0005, 0.001, 0.0025, 0.005, 0.01, 0.025,
+                    0.05, 0.1, 0.25, 0.5, 0.8, 1, 2.5, 5, 10, 30, 60, 120, 300]
+            });
+        }
+        return metrics;
     }
 
     public static WebApplication UseNoCtfObservability(this WebApplication app)
