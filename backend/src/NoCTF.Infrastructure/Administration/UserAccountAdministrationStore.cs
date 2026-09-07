@@ -94,7 +94,7 @@ public sealed class UserAccountAdministrationStore(
         user.PasswordHash = string.Empty;
         user.Role = UserRole.User;
         user.AccountStatus = UserAccountStatus.Anonymized;
-        user.TokenVersion = checked(user.TokenVersion + 1);
+        await NoCTF.Infrastructure.Authentication.UserCredentialWrite.InvalidateTokensAsync(db, user, ct);
         user.EmailVerifiedAt = null;
         user.Description = null;
         user.SchoolFullName = null;

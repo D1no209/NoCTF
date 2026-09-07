@@ -37,6 +37,7 @@ public sealed class CreateManualAdjustmentEndpoint(
     {
         Post("/admin/competitions/{competitionId}/gameplay-facts/manual-adjustments");
         AuthSchemes("Bearer");
+        Options(builder => builder.WithMetadata(new NoCTF.API.Security.ProtectedEntryMetadata(NoCTF.API.Security.ProtectedEntry.ManualAdjustment)));
         Description(builder => builder.WithName("AdminCreateManualAdjustment"));
         Summary(summary =>
         {

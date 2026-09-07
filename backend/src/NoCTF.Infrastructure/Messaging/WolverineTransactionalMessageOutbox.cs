@@ -11,10 +11,16 @@ namespace NoCTF.Infrastructure.Messaging;
 public sealed class WolverineTransactionalMessageOutbox : ITransactionalMessageOutbox
 {
     private readonly IDbContextOutbox<NoCtfDbContext> outbox;
+    private readonly Microsoft.Extensions.Logging.ILogger<WolverineTransactionalMessageOutbox>? logger;
+    private readonly PostCommitDispatchStatus? dispatchStatus;
 
-    public WolverineTransactionalMessageOutbox(IDbContextOutbox<NoCtfDbContext> outbox)
+    public WolverineTransactionalMessageOutbox(IDbContextOutbox<NoCtfDbContext> outbox,
+        Microsoft.Extensions.Logging.ILogger<WolverineTransactionalMessageOutbox>? logger = null,
+        PostCommitDispatchStatus? dispatchStatus = null)
     {
         this.outbox = outbox;
+        this.logger = logger;
+        this.dispatchStatus = dispatchStatus;
         if (outbox is not MessageContext context)
         {
             throw new InvalidOperationException(
@@ -47,6 +53,19 @@ public sealed class WolverineTransactionalMessageOutbox : ITransactionalMessageO
         outbox.DbContext.Database.CurrentTransaction is null
             ? outbox.FlushOutgoingMessagesAsync()
             : Task.CompletedTask;
+
+    public async Task FlushCommittedMessagesAsync()
+    {
+        try { await FlushOutgoingMessagesAsync(); }
+        catch (Exception exception)
+        {
+            // The explicit caller contract is SaveChanges -> Commit -> this method.
+            // PostgreSQL Wolverine recovery owns retransmission; never recreate the business operation.
+            dispatchStatus?.MarkPending();
+            if (logger is not null) Microsoft.Extensions.Logging.LoggerExtensions.LogWarning(logger,
+                "Business transaction committed; durable Outbox delivery is pending after {FailureType}.", exception.GetType().Name);
+        }
+    }
 
     private static Uri ToNatsSubjectUri(string queueName)
     {

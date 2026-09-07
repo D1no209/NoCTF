@@ -47,6 +47,8 @@ public sealed class ChangePasswordEndpoint(
     public override void Configure()
     {
         Put("/auth/password");
+        Options(builder => builder.WithMetadata(new ProtectedEntryMetadata(ProtectedEntry.Authentication)));
+        MaxRequestBodySize(16 * 1024);
         AuthSchemes("Bearer");
         Summary(summary =>
         {

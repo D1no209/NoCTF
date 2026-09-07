@@ -8,6 +8,7 @@ using NoCTF.Domain.Challenges;
 using NoCTF.Domain.Runtime;
 using NoCTF.GameModes.Registration;
 using NoCTF.Infrastructure.Persistence;
+using NoCTF.Application.Commands.Idempotency;
 
 namespace NoCTF.Infrastructure.Challenges.Testing;
 
@@ -15,7 +16,8 @@ public sealed class ChallengeTestRuntimeStore(
     NoCtfDbContext db,
     IChallengeRuntimeTemplateCatalog templates,
     IRuntimePlacementPolicy placementPolicy,
-    ITransactionalMessageOutbox outbox) : IChallengeTestRuntimeStore
+    ITransactionalMessageOutbox outbox,
+    IRequestReplay? replay = null) : IChallengeTestRuntimeStore
 {
     public async Task<ChallengeTestRuntimeView?> FindAsync(
         Guid challengeId,
@@ -54,6 +56,14 @@ public sealed class ChallengeTestRuntimeStore(
             return new(null, RuntimeMutationFailure.NotFound);
         }
 
+        var prior = replay is null ? null : await replay.FindAsync<RuntimeCommandReceipt>(
+            new(command.ActorUserId, ReplayOperation.TemplateTestRuntimeMutation, Guid.Empty, command.ChallengeId),
+            new { command.Action, command.Extension }, cancellationToken);
+        if (prior is not null)
+        {
+            var original = await db.RuntimeInstances.AsNoTracking().SingleOrDefaultAsync(item => item.Id == prior.RuntimeInstanceId, cancellationToken);
+            return original is null ? new(null, RuntimeMutationFailure.NotFound) : new(await MapAsync(original, cancellationToken));
+        }
         var current = await db.RuntimeInstances
             .Where(instance =>
                 instance.ChallengeId == command.ChallengeId
@@ -145,12 +155,13 @@ public sealed class ChallengeTestRuntimeStore(
 
         try
         {
+            replay?.Store(new RuntimeCommandReceipt(entity.Id));
             await db.SaveChangesAsync(cancellationToken);
             await transaction.CommitAsync(cancellationToken);
-            await outbox.FlushOutgoingMessagesAsync();
+            await outbox.FlushCommittedMessagesAsync();
             return new(await MapAsync(entity, cancellationToken));
         }
-        catch (DbUpdateException)
+        catch (DbUpdateException exception) when (!TransactionFailureClassifier.IsRetryable(exception))
         {
             await transaction.RollbackAsync(cancellationToken);
             db.ChangeTracker.Clear();

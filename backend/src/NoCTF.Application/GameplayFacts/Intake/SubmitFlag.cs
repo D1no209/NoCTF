@@ -44,6 +44,8 @@ public sealed class SubmitFlag(IGameplayFactIntakeStore store, IGameplayFactAdmi
         if (byteLength is < 1 or > 4096 || command.Flag.Contains('\0', StringComparison.Ordinal))
             return OperationResult<GameplayFactAccepted, GameplayFactAdmissionFailureCode>.Failure(
                 GameplayFactAdmissionFailureCode.FlagInvalid, "Flag must contain 1 to 4096 UTF-8 bytes and cannot contain NUL.");
+        var replay = await store.FindFlagReplayAsync(command.CompetitionId, command.CompetitionChallengeId, command.UserId, [command.Flag], cancellationToken);
+        if (replay is { Length: > 0 }) return Map(replay[0]);
 
         var snapshot = await store.LoadAdmissionAsync(
             command.CompetitionId, command.CompetitionChallengeId, command.UserId, cancellationToken);
@@ -88,6 +90,10 @@ public sealed class SubmitFlag(IGameplayFactIntakeStore store, IGameplayFactAdmi
         if (flags.Count == 0)
             return OperationResult<IReadOnlyList<GameplayFactAccepted>, GameplayFactAdmissionFailureCode>.Failure(
                 GameplayFactAdmissionFailureCode.FlagInvalid, "At least one Flag is required.");
+        var replay = await store.FindFlagReplayAsync(competitionId, competitionChallengeId, userId, flags, cancellationToken);
+        if (replay is not null)
+            return OperationResult<IReadOnlyList<GameplayFactAccepted>, GameplayFactAdmissionFailureCode>.Success(
+                replay.Select(item => new GameplayFactAccepted(item.GameplayFactId!.Value, item.OccurredAt!.Value)).ToArray());
         foreach (var flag in flags)
         {
             var byteLength = Encoding.UTF8.GetByteCount(flag);

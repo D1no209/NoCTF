@@ -119,7 +119,7 @@ public sealed class PlatformAdministrationStore(
             }
         }
         user.Role = role;
-        user.TokenVersion = checked(user.TokenVersion + 1);
+        await NoCTF.Infrastructure.Authentication.UserCredentialWrite.InvalidateTokensAsync(db, user, ct);
         user.UpdatedAt = now;
         await db.SaveChangesAsync(ct);
         await transaction.CommitAsync(ct);
@@ -153,7 +153,7 @@ public sealed class PlatformAdministrationStore(
         }
 
         user.AccountStatus = accountStatus;
-        user.TokenVersion = checked(user.TokenVersion + 1);
+        await NoCTF.Infrastructure.Authentication.UserCredentialWrite.InvalidateTokensAsync(db, user, ct);
         user.UpdatedAt = now;
         RecordAccountStatusChange(user, actorUserId, accountStatus, now);
         await db.SaveChangesAsync(ct);
@@ -185,7 +185,7 @@ public sealed class PlatformAdministrationStore(
         }
 
         user.EmailVerifiedAt = emailVerified ? now : null;
-        user.TokenVersion = checked(user.TokenVersion + 1);
+        await NoCTF.Infrastructure.Authentication.UserCredentialWrite.InvalidateTokensAsync(db, user, ct);
         user.UpdatedAt = now;
         RecordEmailVerificationChange(user, actorUserId, emailVerified, now);
         await db.SaveChangesAsync(ct);
@@ -201,7 +201,7 @@ public sealed class PlatformAdministrationStore(
         var user = await db.Users.SingleOrDefaultAsync(item => item.Id == userId, ct);
         if (user is null)
             return null;
-        user.TokenVersion = checked(user.TokenVersion + 1);
+        await NoCTF.Infrastructure.Authentication.UserCredentialWrite.InvalidateTokensAsync(db, user, ct);
         user.UpdatedAt = now;
         await db.SaveChangesAsync(ct);
         return Map(user);

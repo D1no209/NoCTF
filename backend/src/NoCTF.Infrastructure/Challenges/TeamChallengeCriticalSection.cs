@@ -21,6 +21,7 @@ public sealed class TeamChallengeCriticalSection(
         }
 
         using var budget = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        await NoCTF.Infrastructure.Competitions.Participation.CompetitionParticipationLock.AcquireForChallengeAsync(db, competitionChallengeId, cancellationToken);
         budget.CancelAfter(TimeSpan.FromSeconds(2));
         try
         {

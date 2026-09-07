@@ -37,14 +37,17 @@ public sealed class RequestPasswordReset(IPasswordResetStore store)
         _ = await store.IssueAsync(email.Trim(), now, ct);
 }
 
-public sealed class CompletePasswordReset(IPasswordResetStore store)
+public sealed class CompletePasswordReset(IPasswordResetStore store, NoCTF.Application.Admission.ICredentialWorkAdmission? admission = null)
 {
-    public Task<PasswordResetCompletionState> ExecuteAsync(
+    public async Task<PasswordResetCompletionState> ExecuteAsync(
         string token,
         string newPassword,
         DateTimeOffset now,
-        CancellationToken ct = default) =>
-        store.CompleteAsync(token, newPassword, now, ct);
+        CancellationToken ct = default)
+    {
+        await using var lease = admission is null ? null : await admission.AcquireAsync($"reset:{token}", ct);
+        return await store.CompleteAsync(token, newPassword, now, lease?.Token ?? ct);
+    }
 }
 
 public enum PasswordResetEmailDeliveryState

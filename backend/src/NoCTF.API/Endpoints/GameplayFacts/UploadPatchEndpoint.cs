@@ -63,6 +63,7 @@ public sealed class UploadPatchEndpoint(
             NoCTF.Application.Observability.ApiRequestKind.Upload)));
         Post("/competitions/{competitionId}/challenges/{competitionChallengeId}/awdp-defense-targets/{runtimeInstanceId}/fix");
         AuthSchemes("Bearer");
+        Options(builder => builder.WithMetadata(new ProtectedEntryMetadata(ProtectedEntry.PatchUpload)));
         AllowFileUploads();
         MaxRequestBodySize(FileUploadLimits.MaximumRequestBytes(
             PatchUploadRules.HardMaximumArchiveBytes));

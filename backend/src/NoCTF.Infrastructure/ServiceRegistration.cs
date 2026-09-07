@@ -53,7 +53,7 @@ public static class ServiceRegistration
         services.AddNoCtfChallenges();
         services.AddNoCtfStorage(configuration);
         services.AddNoCtfCompetitions(development);
-        services.AddNoCtfAuthentication(configuration);
+        services.AddNoCtfAuthentication(configuration, development);
         services.AddNoCtfAdministration(configuration, exporting, development);
         services.AddNoCtfSynchronousArchives(configuration);
         if (!exporting && configuration.GetValue("Observability:Enabled", true))

@@ -19,6 +19,7 @@ public sealed class StopSharedRuntimeEndpoint(
     {
         Post("/admin/competitions/{competitionId}/challenges/{competitionChallengeId}/runtime/stop");
         AuthSchemes("Bearer");
+        Options(builder => builder.WithMetadata(new NoCTF.API.Security.ProtectedEntryMetadata(NoCTF.API.Security.ProtectedEntry.RuntimeCommand)));
         Description(builder => builder.WithName("AdminStopSharedRuntime")
             .ProducesProblemFE(StatusCodes.Status409Conflict));
         Summary(summary =>

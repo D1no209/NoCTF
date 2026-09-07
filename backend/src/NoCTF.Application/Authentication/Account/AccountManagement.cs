@@ -27,7 +27,8 @@ public enum LogoutAllFailureCode
 }
 
 public sealed class RegisterUser(
-    IUserRegistrationStore store)
+    IUserRegistrationStore store,
+    NoCTF.Application.Admission.ICredentialWorkAdmission? admission = null)
 {
     public async Task<OperationResult<RegisterUserResult, RegisterUserFailureCode>> ExecuteAsync(
         RegisterUserCommand command,
@@ -35,6 +36,8 @@ public sealed class RegisterUser(
     {
         var userName = command.UserName.Trim();
         var email = EmailCanonicalizer.Canonicalize(command.Email);
+        await using var lease = admission is null ? null : await admission.AcquireAsync(email, ct);
+        ct = lease?.Token ?? ct;
         var id = Guid.CreateVersion7(command.Now);
         var result = await store.RegisterAsync(
             id,
@@ -90,15 +93,18 @@ public sealed class GetPublicUserProfile(IUserAuthenticationStore store)
     }
 }
 
-public sealed class ChangePassword(IUserAuthenticationStore store)
+public sealed class ChangePassword(IUserAuthenticationStore store, NoCTF.Application.Admission.ICredentialWorkAdmission? admission = null)
 {
-    public Task<ChangePasswordState> ExecuteAsync(
+    public async Task<ChangePasswordState> ExecuteAsync(
         Guid userId,
         string currentPassword,
         string newPassword,
         DateTimeOffset now,
-        CancellationToken ct = default) =>
-        store.ChangePasswordAsync(userId, currentPassword, newPassword, now, ct);
+        CancellationToken ct = default)
+    {
+        await using var lease = admission is null ? null : await admission.AcquireAsync(userId.ToString("N"), ct);
+        return await store.ChangePasswordAsync(userId, currentPassword, newPassword, now, lease?.Token ?? ct);
+    }
 }
 
 public sealed class LogoutAll(IUserAuthenticationStore store)

@@ -2,6 +2,7 @@ import { client } from '~/api/client.gen'
 import { shouldRefreshSession } from '~/lib/auth-refresh'
 import { getAccessToken, refreshSession } from '~/lib/session'
 import { statusErrorMessage } from '~/utils/api-error'
+import { prepareCommandRequest, observeCommandResponse } from '~/utils/command-attempt'
 
 /**
  * Configure the generated hey-api client:
@@ -11,16 +12,18 @@ import { statusErrorMessage } from '~/utils/api-error'
  *   synthesize a status-based message so callers never see a bare「请求失败」.
  */
 export default defineNuxtPlugin(() => {
-  client.interceptors.request.use((request) => {
+  client.interceptors.request.use(async (request, options) => {
     const token = getAccessToken()
     if (token) {
       request.headers.set('Authorization', `Bearer ${token}`)
     }
+    await prepareCommandRequest(request, options.body)
     return request
   })
 
   client.interceptors.response.use(async (response, request, options) => {
     if (!shouldRefreshSession(response.status, request.headers)) {
+      if (response.ok) observeCommandResponse(request, response.status)
       return response
     }
     const refreshed = await refreshSession()
@@ -30,7 +33,7 @@ export default defineNuxtPlugin(() => {
     const headers = new Headers(request.headers)
     headers.set('Authorization', `Bearer ${getAccessToken()}`)
     const body = (options.serializedBody as BodyInit | undefined) ?? (options.body as BodyInit | undefined)
-    return fetch(
+    const retried = await fetch(
       new Request(request.url, {
         method: options.method ?? 'GET',
         headers,
@@ -38,9 +41,14 @@ export default defineNuxtPlugin(() => {
         credentials: 'same-origin',
       }),
     )
+    if (retried.ok) observeCommandResponse(request, retried.status)
+    return retried
   })
 
   client.interceptors.error.use((error, response, request) => {
+    observeCommandResponse(request, response?.status, true)
+    if (error instanceof Error && (error.name === 'TimeoutError' || error.name === 'AbortError'))
+      return { status: 503, code: 'RequestTimeout', detail: translate('请求超时，结果暂未确认，请重试。') }
     const status = response?.ok === false ? response.status : undefined
     // 保留真实的 problem+json 及强类型失败响应体。很多业务冲突只携带
     // code/message；丢弃它们会把明确原因退化成笼统的 HTTP 状态提示。

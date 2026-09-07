@@ -13,6 +13,7 @@ using NoCTF.Domain.Shared;
 using NoCTF.Infrastructure.GameplayFacts.Awdp;
 using NoCTF.Infrastructure.Challenges;
 using NoCTF.Domain.Challenges;
+using NoCTF.Application.Commands.Idempotency;
 
 namespace NoCTF.Infrastructure.Runtime.Administration;
 
@@ -24,7 +25,8 @@ public sealed class AdminRuntimeStore(
     ITransactionalMessageOutbox outbox,
     TeamRuntimeQuota runtimeQuota,
     SharedRuntimeCriticalSection sharedRuntimeCriticalSection,
-    ICompetitionEventRecorder? eventRecorder = null) : IAdminRuntimeStore
+    ICompetitionEventRecorder? eventRecorder = null,
+    IRequestReplay? replay = null) : IAdminRuntimeStore
 {
     public AdminRuntimeStore(
         NoCtfDbContext db,
@@ -380,7 +382,7 @@ public sealed class AdminRuntimeStore(
             Reason: reason), ct);
         await db.SaveChangesAsync(ct);
         await transaction.CommitAsync(ct);
-        await outbox.FlushOutgoingMessagesAsync();
+        await outbox.FlushCommittedMessagesAsync();
         return new(Map(instance, now));
     }
 
@@ -429,7 +431,7 @@ public sealed class AdminRuntimeStore(
                 ct);
             await db.SaveChangesAsync(ct);
             await transaction.CommitAsync(ct);
-            await outbox.FlushOutgoingMessagesAsync();
+            await outbox.FlushCommittedMessagesAsync();
             return new(Map(instance));
         }
         if (instance.State == RuntimeState.Stopped ||
@@ -474,7 +476,7 @@ public sealed class AdminRuntimeStore(
                 RuntimeState: instance.State), ct);
         await db.SaveChangesAsync(ct);
         await transaction.CommitAsync(ct);
-        await outbox.FlushOutgoingMessagesAsync();
+        await outbox.FlushCommittedMessagesAsync();
         return new(Map(instance));
     }
 
@@ -573,7 +575,7 @@ public sealed class AdminRuntimeStore(
             ct);
         await db.SaveChangesAsync(ct);
         await transaction.CommitAsync(ct);
-        await outbox.FlushOutgoingMessagesAsync();
+        await outbox.FlushCommittedMessagesAsync();
         return new(Map(instance));
     }
 
@@ -618,7 +620,7 @@ public sealed class AdminRuntimeStore(
             now));
         await db.SaveChangesAsync(ct);
         await transaction.CommitAsync(ct);
-        await outbox.FlushOutgoingMessagesAsync();
+        await outbox.FlushCommittedMessagesAsync();
         return new(Map(instance, now));
     }
 
@@ -651,6 +653,7 @@ public sealed class AdminRuntimeStore(
         CancellationToken ct)
     {
         await using var transaction = await db.Database.BeginTransactionAsync(ct);
+        await NoCTF.Infrastructure.Competitions.Participation.CompetitionParticipationLock.AcquireAsync(db, competitionId, ct);
         var scope = await db.CompetitionChallenges.AsNoTracking()
             .Where(challenge =>
                 challenge.Id == competitionChallengeId &&
@@ -706,6 +709,15 @@ public sealed class AdminRuntimeStore(
                 db,
                 competitionChallengeId,
                 ct);
+        if (replay?.ActorId is Guid actorId) {
+            var prior = await replay.FindAsync<RuntimeCommandReceipt>(
+                new(actorId, ReplayOperation.AdminRuntimeMutation, competitionId, competitionChallengeId),
+                new { teamId, action, extension }, ct);
+            if (prior is not null) {
+                var original = await db.RuntimeInstances.AsNoTracking().SingleOrDefaultAsync(item => item.Id == prior.RuntimeInstanceId, ct);
+                return original is null ? new(null, RuntimeMutationFailure.NotFound) : new(Map(original));
+            }
+        }
         var current = await db.RuntimeInstances
             .Where(item =>
                 item.CompetitionChallengeId == competitionChallengeId &&
@@ -890,12 +902,13 @@ public sealed class AdminRuntimeStore(
                 CompetitionChallengeId: entity.CompetitionChallengeId,
                 RuntimeInstanceId: entity.Id,
                 RuntimeState: entity.State), ct);
+            if (replay?.ActorId is not null) replay.Store(new RuntimeCommandReceipt(entity.Id));
             await db.SaveChangesAsync(ct);
             await transaction.CommitAsync(ct);
-            await outbox.FlushOutgoingMessagesAsync();
+            await outbox.FlushCommittedMessagesAsync();
             return new(Map(entity));
         }
-        catch (DbUpdateException)
+        catch (DbUpdateException exception) when (!TransactionFailureClassifier.IsRetryable(exception))
         {
             return new(null, RuntimeMutationFailure.Conflict);
         }

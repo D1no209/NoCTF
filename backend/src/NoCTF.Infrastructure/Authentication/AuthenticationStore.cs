@@ -54,7 +54,7 @@ public sealed class AuthenticationStore(
         string password,
         CancellationToken ct)
     {
-        var user = await db.Users.SingleOrDefaultAsync(item =>
+        var user = await db.Users.AsNoTracking().SingleOrDefaultAsync(item =>
             item.Id == userId && item.AccountStatus == UserAccountStatus.Active,
             ct);
         if (user is null || user.Kind != UserKind.Human)
@@ -62,9 +62,8 @@ public sealed class AuthenticationStore(
         var result = passwordHasher.VerifyHashedPassword(user, user.PasswordHash, password);
         if (result == PasswordVerificationResult.SuccessRehashNeeded)
         {
-            user.PasswordHash = passwordHasher.HashPassword(user, password);
-            user.UpdatedAt = timeProvider.GetUtcNow();
-            await db.SaveChangesAsync(ct);
+            return await UserCredentialWrite.ReplaceAsync(db, user, passwordHasher.HashPassword(user, password),
+                invalidateTokens: false, timeProvider.GetUtcNow(), ct);
         }
         return result != PasswordVerificationResult.Failed;
     }
@@ -129,7 +128,7 @@ public sealed class AuthenticationStore(
             await outbox.PublishAsync(new CleanupFile(previous));
         await db.SaveChangesAsync(ct);
         await transaction.CommitAsync(ct);
-        await outbox.FlushOutgoingMessagesAsync();
+        await outbox.FlushCommittedMessagesAsync();
         return new UserAvatarReplacement(ToProfile(user), previousFileId);
     }
 
@@ -267,7 +266,7 @@ public sealed class AuthenticationStore(
 
         await transaction.CommitAsync(ct);
         if (verificationToken is not null)
-            await outbox.FlushOutgoingMessagesAsync();
+            await outbox.FlushCommittedMessagesAsync();
         ObserveRegistrationVerification(verificationState, userId);
         return new(CreateUserState.Created, verificationState);
     }
@@ -279,7 +278,7 @@ public sealed class AuthenticationStore(
         DateTimeOffset now,
         CancellationToken ct)
     {
-        var user = await db.Users.SingleOrDefaultAsync(item =>
+        var user = await db.Users.AsNoTracking().SingleOrDefaultAsync(item =>
             item.Id == userId && item.AccountStatus == UserAccountStatus.Active,
             ct);
         if (user is null
@@ -288,12 +287,15 @@ public sealed class AuthenticationStore(
                 user, user.PasswordHash, currentPassword) == PasswordVerificationResult.Failed)
             return ChangePasswordState.CurrentPasswordInvalid;
 
-        user.PasswordHash = passwordHasher.HashPassword(user, newPassword);
-        user.TokenVersion = checked(user.TokenVersion + 1);
-        user.UpdatedAt = now;
+        var replacement = passwordHasher.HashPassword(user, newPassword);
+        await using var transaction = await db.Database.BeginTransactionAsync(IsolationLevel.ReadCommitted, ct);
+        if (!await UserCredentialWrite.ReplaceAsync(db, user, replacement, invalidateTokens: true, now, ct))
+            return ChangePasswordState.CurrentPasswordInvalid;
+        await UserCredentialWrite.InvalidateResetTokensAsync(db, user.Id, null, now, ct);
         await outbox.PublishAsync(new SendPasswordChangedNotification(user.Id));
         await db.SaveChangesAsync(ct);
-        await outbox.FlushOutgoingMessagesAsync();
+        await transaction.CommitAsync(ct);
+        await outbox.FlushCommittedMessagesAsync();
         return ChangePasswordState.Changed;
     }
 

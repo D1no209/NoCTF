@@ -19,6 +19,7 @@ public sealed class ResetSharedRuntimeEndpoint(
     {
         Post("/admin/competitions/{competitionId}/challenges/{competitionChallengeId}/runtime/reset");
         AuthSchemes("Bearer");
+        Options(builder => builder.WithMetadata(new NoCTF.API.Security.ProtectedEntryMetadata(NoCTF.API.Security.ProtectedEntry.RuntimeCommand)));
         Description(builder => builder.WithName("AdminResetSharedRuntime")
             .ProducesProblemFE(StatusCodes.Status409Conflict));
         Summary(summary =>

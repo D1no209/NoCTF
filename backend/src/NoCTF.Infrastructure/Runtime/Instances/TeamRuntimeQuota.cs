@@ -20,6 +20,7 @@ public sealed class TeamRuntimeQuota(
                 ?? throw new FeatureCriticalSectionTimeoutException("team-runtime-quota");
 
         using var budget = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        await NoCTF.Infrastructure.Competitions.Participation.CompetitionParticipationLock.AcquireAsync(db, competitionId, cancellationToken);
         budget.CancelAfter(TimeSpan.FromSeconds(2));
         try
         {

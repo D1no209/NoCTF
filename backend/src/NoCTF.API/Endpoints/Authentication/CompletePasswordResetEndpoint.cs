@@ -43,6 +43,8 @@ public sealed class CompletePasswordResetEndpoint(
     {
         Post("/auth/password-reset/complete");
         AllowAnonymous();
+        Options(builder => builder.WithMetadata(new NoCTF.API.Security.ProtectedEntryMetadata(NoCTF.API.Security.ProtectedEntry.Authentication)));
+        MaxRequestBodySize(16 * 1024);
         Description(builder => builder.WithName("AuthenticationCompletePasswordReset"));
         Summary(summary =>
         {

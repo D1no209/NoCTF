@@ -19,6 +19,7 @@ public sealed class StopTeamRuntimeEndpoint(
     {
         Post("/admin/competitions/{competitionId}/teams/{teamId}/challenges/{competitionChallengeId}/runtime/stop");
         AuthSchemes("Bearer");
+        Options(builder => builder.WithMetadata(new NoCTF.API.Security.ProtectedEntryMetadata(NoCTF.API.Security.ProtectedEntry.RuntimeCommand)));
         Description(builder => builder.WithName("AdminStopTeamRuntime")
             .ProducesProblemFE(StatusCodes.Status409Conflict));
         Summary(summary =>

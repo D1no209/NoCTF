@@ -50,6 +50,7 @@ public sealed class RequestAwdpDefenseTargetEndpoint(
     {
         Post("/competitions/{competitionId}/challenges/{competitionChallengeId}/awdp-defense-targets");
         AuthSchemes("Bearer");
+        Options(builder => builder.WithMetadata(new NoCTF.API.Security.ProtectedEntryMetadata(NoCTF.API.Security.ProtectedEntry.RuntimeCommand)));
         Options(options => options.WithMetadata(
             new EnableRateLimitingAttribute("submission")));
         Summary(summary =>

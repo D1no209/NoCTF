@@ -1,6 +1,13 @@
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using System.Net.Http.Json;
+using FastEndpoints;
+using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.TestHost;
+using Microsoft.AspNetCore.RateLimiting;
+using Microsoft.Extensions.DependencyInjection;
+using NoCTF.API.Composition;
 using Microsoft.EntityFrameworkCore;
 using NoCTF.Application.Competitions.Management;
 using NoCTF.Application.GameplayFacts.Practice;
@@ -27,6 +34,68 @@ namespace NoCTF.Tests.Integration.Persistence;
 [NotInParallel]
 public sealed class CompetitionPracticeModePersistenceTests
 {
+    [Test, Timeout(300_000)]
+    public async Task Practice_HTTP_returns_final_judgements_and_explicit_access_failures_without_formal_facts(CancellationToken ct)
+    {
+        await DockerIntegrationTest.RunAsync(async () => {
+            await using var postgres = new PostgreSqlBuilder("postgres:17.10-alpine3.24@sha256:742f40ea20b9ff2ff31db5458d127452988a2164df9e17441e191f3b72252193").Build();
+            await postgres.StartAsync(ct);
+            var options = new DbContextOptionsBuilder<NoCtfDbContext>().UseNpgsql(postgres.GetConnectionString()).UseSnakeCaseNamingConvention().Options;
+            var fixture = await SeedAsync(options, ct);
+            await using (var setup = new NoCtfDbContext(options)) {
+                (await setup.Challenges.SingleAsync(ct)).DefinitionJson = new GameModeChallengeConfigurationCatalog().GetDefaultDefinitionJson(GameMode.Ctf);
+                await setup.SaveChangesAsync(ct);
+            }
+            var builder = Microsoft.AspNetCore.Builder.WebApplication.CreateBuilder();
+            builder.WebHost.UseTestServer();
+            builder.Services.AddFastEndpoints(config => { config.DisableAutoDiscovery = true;
+                config.Assemblies = [typeof(NoCTF.API.Endpoints.GameplayFacts.JudgePracticeFlagEndpoint).Assembly];
+                config.Filter = type => type == typeof(NoCTF.API.Endpoints.GameplayFacts.JudgePracticeFlagEndpoint)
+                    || type == typeof(NoCTF.API.Endpoints.GameplayFacts.JudgePracticeFlagValidator); });
+            builder.Services.AddAuthentication("Bearer").AddScheme<Microsoft.AspNetCore.Authentication.AuthenticationSchemeOptions, PracticeBearer>("Bearer", _ => { });
+            builder.Services.AddAuthorization(); builder.Services.AddHttpContextAccessor();
+            builder.Services.AddScoped<NoCTF.API.Security.IUserContext, PracticeActor>(); builder.Services.AddSingleton(TimeProvider.System);
+            builder.Services.AddDbContext<NoCtfDbContext>(db => db.UseNpgsql(postgres.GetConnectionString()).UseSnakeCaseNamingConvention());
+            builder.Services.AddScoped<IPracticeFlagJudge, PracticeFlagJudge>(); builder.Services.AddScoped<JudgePracticeFlag>();
+            builder.Services.AddSingleton<NoCTF.Application.Runtime.Provisioning.IChallengeRuntimeTemplateCatalog, ChallengeRuntimeTemplateCatalog>();
+            builder.Services.AddRateLimiter(limit => limit.AddFixedWindowLimiter("submission", quota => { quota.PermitLimit = 100; quota.Window = TimeSpan.FromMinutes(1); }));
+            await using var app = builder.Build(); app.UseAuthentication(); app.UseAuthorization(); app.UseRateLimiter(); app.UseNoCtfEndpoints(); await app.StartAsync(ct);
+            using var client = app.GetTestClient();
+            var route = $"/api/v1/competitions/{fixture.CompetitionId}/challenges/{fixture.CompetitionChallengeId}/practice-flag";
+            client.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", fixture.UserId.ToString());
+            foreach (var value in new[] { fixture.Flag, "wrong", fixture.Flag }) {
+                using var response = await client.PostAsJsonAsync(route, new { flag = value }, ct);
+                await Assert.That(response.StatusCode).IsEqualTo(System.Net.HttpStatusCode.OK);
+                await Assert.That((await response.Content.ReadFromJsonAsync<NoCTF.API.Endpoints.GameplayFacts.PracticeFlagJudgementResponse>(ct))!.Result)
+                    .IsEqualTo(value == fixture.Flag ? NoCTF.API.Endpoints.GameplayFacts.PracticeFlagJudgementProtocol.Correct : NoCTF.API.Endpoints.GameplayFacts.PracticeFlagJudgementProtocol.Wrong);
+            }
+            client.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", Guid.NewGuid().ToString());
+            using (var denied = await client.PostAsJsonAsync(route, new { flag = fixture.Flag }, ct)) await Assert.That(denied.StatusCode).IsEqualTo(System.Net.HttpStatusCode.Forbidden);
+            client.DefaultRequestHeaders.Authorization = null;
+            using (var anonymous = await client.PostAsJsonAsync(route, new { flag = fixture.Flag }, ct)) await Assert.That(anonymous.StatusCode).IsEqualTo(System.Net.HttpStatusCode.Unauthorized);
+            await using var verify = new NoCtfDbContext(options);
+            await Assert.That(await verify.GameplayFacts.CountAsync(ct)).IsEqualTo(0);
+            await Assert.That(await verify.CompetitionEvents.CountAsync(ct)).IsEqualTo(0);
+            await Assert.That(await verify.RuntimeInstances.CountAsync(ct)).IsEqualTo(0);
+        });
+    }
+
+    private sealed class PracticeActor(Microsoft.AspNetCore.Http.IHttpContextAccessor accessor) : NoCTF.API.Security.IUserContext
+    {
+        public Guid UserId => Guid.Parse(accessor.HttpContext!.User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)!.Value);
+        public bool IsAdministrator => false;
+    }
+    private sealed class PracticeBearer(Microsoft.Extensions.Options.IOptionsMonitor<Microsoft.AspNetCore.Authentication.AuthenticationSchemeOptions> options,
+        Microsoft.Extensions.Logging.ILoggerFactory logger, System.Text.Encodings.Web.UrlEncoder encoder)
+        : Microsoft.AspNetCore.Authentication.AuthenticationHandler<Microsoft.AspNetCore.Authentication.AuthenticationSchemeOptions>(options, logger, encoder)
+    {
+        protected override Task<Microsoft.AspNetCore.Authentication.AuthenticateResult> HandleAuthenticateAsync()
+        {
+            if (!Guid.TryParse(Request.Headers.Authorization.ToString().Replace("Bearer ", ""), out var id)) return Task.FromResult(Microsoft.AspNetCore.Authentication.AuthenticateResult.NoResult());
+            return Task.FromResult(Microsoft.AspNetCore.Authentication.AuthenticateResult.Success(new Microsoft.AspNetCore.Authentication.AuthenticationTicket(
+                new System.Security.Claims.ClaimsPrincipal(new System.Security.Claims.ClaimsIdentity([new System.Security.Claims.Claim(System.Security.Claims.ClaimTypes.NameIdentifier, id.ToString())], Scheme.Name)), Scheme.Name)));
+        }
+    }
     [Test]
     [Timeout(300_000)]
     public async Task Static_practice_flags_do_not_require_a_runtime_or_accept_unassigned_attachment_flags(CancellationToken ct)

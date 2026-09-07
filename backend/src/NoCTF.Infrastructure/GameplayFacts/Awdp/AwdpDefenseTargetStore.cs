@@ -14,6 +14,7 @@ using NoCTF.GameModes.Awdp.Runtime;
 using NoCTF.GameModes.Registration;
 using NoCTF.Infrastructure.GameplayFacts.Intake;
 using NoCTF.Infrastructure.Persistence;
+using NoCTF.Application.Commands.Idempotency;
 
 namespace NoCTF.Infrastructure.GameplayFacts.Awdp;
 
@@ -22,7 +23,8 @@ public sealed class AwdpDefenseTargetStore(
     GameplayFactAttemptCriticalSection criticalSection,
     IRuntimePlacementPolicy placementPolicy,
     ITransactionalMessageOutbox outbox,
-    ICompetitionEventRecorder? eventRecorder = null) : IAwdpDefenseTargetStore
+    ICompetitionEventRecorder? eventRecorder = null,
+    IRequestReplay? replay = null) : IAwdpDefenseTargetStore
 {
     private readonly ICompetitionEventRecorder events =
         eventRecorder ?? NullCompetitionEventRecorder.Instance;
@@ -64,6 +66,9 @@ public sealed class AwdpDefenseTargetStore(
             cancellationToken);
         if (!teamIsStillEligible)
             return new(AwdpDefenseTargetRequestState.ScopeNotFound);
+        var prior = replay is null ? null : await replay.FindAsync<AwdpDefenseTargetRequestResult>(
+            new(userId, ReplayOperation.AwdpDefenseTarget, competitionId, competitionChallengeId), new { }, cancellationToken);
+        if (prior is not null) return prior;
 
         var context = await db.CompetitionChallenges
             .Where(challenge => challenge.Id == competitionChallengeId
@@ -185,15 +190,16 @@ public sealed class AwdpDefenseTargetStore(
             RuntimeState: target.State), cancellationToken);
         try
         {
+            replay?.Store(new AwdpDefenseTargetRequestResult(AwdpDefenseTargetRequestState.Created, target.Id, target.State));
             await db.SaveChangesAsync(cancellationToken);
             await transaction.CommitAsync(cancellationToken);
-            await outbox.FlushOutgoingMessagesAsync();
+            await outbox.FlushCommittedMessagesAsync();
             return new(
                 AwdpDefenseTargetRequestState.Created,
                 target.Id,
                 target.State);
         }
-        catch (DbUpdateException)
+        catch (DbUpdateException exception) when (!TransactionFailureClassifier.IsRetryable(exception))
         {
             return new(AwdpDefenseTargetRequestState.ConcurrencyConflict);
         }

@@ -110,7 +110,7 @@ public sealed class PasswordResetStore(
             return Observe(PasswordResetRequestState.RateLimited, userId);
         }
         await transaction.CommitAsync(ct);
-        await outbox.FlushOutgoingMessagesAsync();
+        await outbox.FlushCommittedMessagesAsync();
         return Observe(PasswordResetRequestState.Queued, userId);
     }
 
@@ -154,29 +154,11 @@ public sealed class PasswordResetStore(
             return PasswordResetCompletionState.InvalidOrExpired;
 
         var passwordHash = passwordHasher.HashPassword(user, newPassword);
-        var updated = await db.Users
-            .Where(candidate => candidate.Id == user.Id
-                && candidate.Kind == UserKind.Human
-                && candidate.AccountStatus == UserAccountStatus.Active
-                && candidate.EmailVerifiedAt != null)
-            .ExecuteUpdateAsync(setters => setters
-                .SetProperty(candidate => candidate.PasswordHash, passwordHash)
-                .SetProperty(
-                    candidate => candidate.TokenVersion,
-                    candidate => candidate.TokenVersion + 1)
-                .SetProperty(candidate => candidate.UpdatedAt, now), ct);
-        if (updated != 1)
+        if (!await UserCredentialWrite.ReplaceAsync(db, user, passwordHash, invalidateTokens: true, now, ct))
             return PasswordResetCompletionState.InvalidOrExpired;
 
         resetToken.ConsumedAt = now;
-        await db.AccountTokens
-            .Where(candidate => candidate.UserId == user.Id
-                && candidate.Kind == AccountTokenKind.PasswordReset
-                && candidate.Id != resetToken.Id
-                && candidate.ConsumedAt == null
-                && candidate.InvalidatedAt == null)
-            .ExecuteUpdateAsync(setters => setters
-                .SetProperty(candidate => candidate.InvalidatedAt, now), ct);
+        await UserCredentialWrite.InvalidateResetTokensAsync(db, user.Id, resetToken.Id, now, ct);
         await outbox.PublishAsync(new SendPasswordChangedNotification(user.Id));
         try
         {
@@ -189,7 +171,7 @@ public sealed class PasswordResetStore(
             return PasswordResetCompletionState.InvalidOrExpired;
         }
         await transaction.CommitAsync(ct);
-        await outbox.FlushOutgoingMessagesAsync();
+        await outbox.FlushCommittedMessagesAsync();
         return PasswordResetCompletionState.Reset;
     }
 
@@ -202,7 +184,8 @@ public sealed class PasswordResetStore(
         }
 
         _ = await db.Users
-            .FromSqlInterpolated($"SELECT * FROM users WHERE id = {userId} FOR UPDATE")
+            .FromSqlInterpolated($"SELECT * FROM users WHERE id = {userId} FOR NO KEY UPDATE")
+            .AsNoTracking()
             .SingleOrDefaultAsync(ct);
     }
 

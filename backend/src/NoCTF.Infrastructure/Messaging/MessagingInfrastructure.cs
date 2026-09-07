@@ -10,6 +10,7 @@ internal static class MessagingInfrastructure
         bool exporting,
         bool development)
     {
+        services.AddScoped<PostCommitDispatchStatus>();
         if (exporting)
             services.AddScoped<ITransactionalMessageOutbox, NoOpTransactionalMessageOutbox>();
         else if (development)

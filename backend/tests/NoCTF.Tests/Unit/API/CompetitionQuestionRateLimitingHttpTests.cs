@@ -61,8 +61,8 @@ public sealed class CompetitionQuestionRateLimitingHttpTests
         using var rejected = await client.PostAsJsonAsync(route, request);
         await Assert.That(rejected.StatusCode)
             .IsEqualTo(HttpStatusCode.TooManyRequests);
-        await Assert.That(await rejected.Content.ReadAsByteArrayAsync())
-            .IsEmpty();
+        await Assert.That(await rejected.Content.ReadAsStringAsync()).Contains("RateLimited");
+        await Assert.That(rejected.Headers.RetryAfter).IsNotNull();
     }
 
     private static async Task<WebApplication> CreateApplicationAsync()
