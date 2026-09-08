@@ -3,7 +3,7 @@ from pathlib import Path
 import unittest
 from unittest.mock import patch
 from types import SimpleNamespace
-from update_image import application_containers, validate_existing_config, deploy
+from update_image import application_containers, validate_existing_config, deploy, managed_ssh_client
 
 
 def fixture():
@@ -18,6 +18,27 @@ def fixture():
 
 
 class DeploymentSafetyTests(unittest.TestCase):
+    def test_only_the_updated_runners_ephemeral_ssh_master_may_be_replaced(self):
+        runner, _ = fixture()
+        runner["Config"]["Labels"]["com.docker.compose.service"] = "runner"
+        runner["Config"]["Env"] = ["PublicGateway__Transport=SharedSsh",
+            "PublicGateway__ConnectorId=test", "PublicGateway__RunnerId=runner-1"]
+        client = {"Config": {"Labels": {"noctf.io/gateway-role": "client",
+            "noctf.io/public-gateway-connector": "test", "noctf.io/public-gateway-runner": "runner-1",
+            "noctf.io/gateway-session": "00000000-0000-4000-8000-000000000001"}}}
+        self.assertTrue(managed_ssh_client(client, [runner]))
+        for key, value in [("noctf.io/gateway-role", "relay"), ("noctf.io/gateway-role", "website"),
+                           ("noctf.io/public-gateway-connector", "other"), ("noctf.io/public-gateway-runner", "other"),
+                           ("noctf.io/gateway-session", "invalid"),
+                           ("noctf.io/gateway-session", "00000000-0000-0000-0000-000000000000")]:
+            foreign = copy.deepcopy(client)
+            foreign["Config"]["Labels"][key] = value
+            self.assertFalse(managed_ssh_client(foreign, [runner]))
+        self.assertFalse(managed_ssh_client({"Config": {"Labels": {}}}, [runner]))
+        self.assertFalse(managed_ssh_client(client, []))
+        runner["Config"]["Labels"]["com.docker.compose.service"] = "backend"
+        self.assertFalse(managed_ssh_client(client, [runner]))
+
     def test_ci_rejects_the_production_host_before_any_deployment_io(self):
         with patch("update_image.socket.gethostname", return_value="dino209"):
             with self.assertRaisesRegex(RuntimeError, "CI must never deploy to production"):
