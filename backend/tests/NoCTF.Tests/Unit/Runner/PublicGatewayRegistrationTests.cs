@@ -4,11 +4,39 @@ using NoCTF.Application.Runtime.PublicAccess;
 using NoCTF.Domain.Platform;
 using NoCTF.Runner.Composition;
 using NoCTF.Runtime.Docker.PublicAccess;
+using NoCTF.Hosting.Health;
+using NoCTF.Runner.PublicAccess;
+using Microsoft.Extensions.Diagnostics.HealthChecks;
 
 namespace NoCTF.Tests.Unit.Runner;
 
 public sealed class PublicGatewayRegistrationTests
 {
+    [Test]
+    [Arguments("PublicGateway:ConnectorId", "")]
+    [Arguments("PublicGateway:RunnerId", "other-runner")]
+    public async Task Unconfigured_or_non_designated_runner_has_no_gateway_readiness(string key, string value)
+    {
+        var config = Configuration(); config[key] = value;
+        var services = new ServiceCollection(); services.AddLogging(); services.AddNoCtfRunner(config);
+        await Assert.That(services.Any(item => item.ImplementationType == typeof(PublicGatewayReadinessDependency))).IsFalse();
+    }
+
+    [Test]
+    public async Task Configured_but_missing_agent_is_a_critical_readiness_failure()
+    {
+        var config = Configuration(); config["PublicGateway:Transport"] = "invalid";
+        var services = new ServiceCollection(); services.AddLogging(); services.AddNoCtfRunner(config);
+        await Assert.That(services.Count(item => item.ImplementationType == typeof(PublicGatewayReadinessDependency))).IsEqualTo(1);
+        using var provider = services.BuildServiceProvider();
+        var dependency = new PublicGatewayReadinessDependency(provider);
+        await Assert.That(dependency.FailureIsCritical).IsTrue();
+        var health = await new RoleReadinessHealthCheck([dependency]).CheckHealthAsync(new HealthCheckContext());
+        await Assert.That(health.Status).IsEqualTo(HealthStatus.Unhealthy);
+        await Assert.That(health.Description).Contains("public-gateway");
+        await Assert.That(health.Exception).IsNull();
+    }
+
     [Test]
     public async Task Shared_SSH_is_opt_in_and_is_rejected_on_non_Linux_runners()
     {
@@ -21,6 +49,7 @@ public sealed class PublicGatewayRegistrationTests
         await Assert.That(services.Any(item => item.ServiceType == typeof(IPublicGatewayTransport) && item.ImplementationType == typeof(DockerSharedSshGateway)))
             .IsEqualTo(OperatingSystem.IsLinux());
         await Assert.That(capability.ReservedPorts).Contains(60999).And.Contains(60998).And.Contains(36632);
+        await Assert.That(services.Count(item => item.ImplementationType == typeof(PublicGatewayReadinessDependency))).IsEqualTo(1);
         if (OperatingSystem.IsLinux())
         {
             services.AddSingleton(TimeProvider.System);
