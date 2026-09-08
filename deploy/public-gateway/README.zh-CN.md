@@ -4,8 +4,8 @@
 
 ## 组件与端口
 
-- 跳板网站 FRPS：7000/TCP 控制入口，双向 TLS；只允许将网站映射至回环 9999。
-- 跳板题目 FRPS：7001/TCP 控制入口，独立 CA 和令牌；允许题目端口 32768–60999，明确排除已占用的 36632。
+- 跳板网站 FRPS：60998/TCP 控制入口，双向 TLS；只允许将网站映射至回环 9999。
+- 跳板题目 FRPS：60999/TCP 控制入口，独立 CA 和令牌；允许题目端口 32768–60997，明确排除已占用的 36632。两个控制端口不得用于题目映射；Docker 若分配到保留端口，直连不变，公网发布应明确拒绝。
 - 测试平台网站 FRPC：固定连接本机 `127.0.0.1:8080`，不能由平台表单指定任意上游。
 - 动态题目 FRPC：由配对 Runner 管理，每个实例一个，无 Docker socket，不共享目标的文件系统或 PID；仅共享原目标的网络命名空间，连接该命名空间内的服务端口。
 
@@ -26,8 +26,8 @@
 ```ini
 # website-server.env
 NOCTF_GATEWAY_COMPONENT=server
-FRP_BIND_PORT=7000
-# challenge-server.env 使用 FRP_BIND_PORT=7001
+FRP_BIND_PORT=60998
+# challenge-server.env 使用 FRP_BIND_PORT=60999
 # website-client.env 使用 NOCTF_GATEWAY_COMPONENT=website-client
 ```
 
@@ -44,7 +44,7 @@ PublicGateway__ConnectorId=noctf-test-gateway
 PublicGateway__RunnerId=填写已确认的RunnerID
 PublicGateway__ApprovedOrigins__0=https://challenge.fa1lsnow.com
 PublicGateway__FirstPort=32768
-PublicGateway__LastPort=60999
+PublicGateway__LastPort=60997
 PublicGateway__ReservedPorts__0=36632
 PublicGateway__MaximumPorts=8
 PublicGateway__NamespaceIsolationAvailable=true
@@ -55,7 +55,7 @@ PublicGateway__NamespaceIsolationAvailable=true
 ```ini
 PublicGateway__HelperImage=CI产出的不可变镜像引用
 PublicGateway__ServerHost=8.156.82.215
-PublicGateway__ServerPort=7001
+PublicGateway__ServerPort=60999
 PublicGateway__ServerName=noctf-challenge-gateway
 PublicGateway__CaFile=/run/noctf-gateway-credentials/ca.crt
 PublicGateway__CertificateFile=/run/noctf-gateway-credentials/client.crt
@@ -78,5 +78,7 @@ FRPC 的状态接口只在目标网络命名空间内的回环上开启，使用
 如需回滚，只停止本目录 Compose 项目和本连接器持有的发布，恢复该站点原上游／本次增加的请求头。不要运行全局 prune、删除网络或数据库降级。新增数据库列保留，关闭功能即可。
 
 ## 验收
+
+升级旧部署前先确认 API 的 `Database__AutoMigrate=true`。测试环境曾遗留 `false`，导致镜像升级后新增网关字段未应用；必须备份数据库后由平台启动流程执行 EF 迁移，不用手工建列或重建数据库。独立 Runner 也必须使用 `AddDbContextWithWolverineIntegration`，保证运行时状态与持久化赛事事件在同一事务提交；仅看到消息被标记为 Handled 不能证明业务状态已写回。
 
 至少验证：网站 HTTPS/登录/刷新/上传/下载/SignalR、内外网地址选择、容器开始／停止／重置、错误身份与端口拒绝、租约失效、重启、端口复用、不支持的模式提示、关闭后内网仍可用，以及原有站点／服务／网络不变。`PublicGatewaySafetyPrototypeTests` 包含不安全方案的负对照，负对照测试通过不等于那些方案可上线。

@@ -20,7 +20,7 @@ public static class PublicGatewayInfrastructure
             var runnerId = configuration["PublicGateway:RunnerId"];
             var origins = configuration.GetSection("PublicGateway:ApprovedOrigins").Get<string[]>() ?? [];
             var firstPort = configuration.GetValue("PublicGateway:FirstPort", 32768);
-            var lastPort = configuration.GetValue("PublicGateway:LastPort", 60999);
+            var lastPort = configuration.GetValue("PublicGateway:LastPort", 60997);
             var maximumPorts = configuration.GetValue("PublicGateway:MaximumPorts", 8);
             var docker = string.Equals(configuration["Runtime:Provider"] ?? configuration["Runner:Provider"] ?? "Docker", "Docker", StringComparison.OrdinalIgnoreCase);
             var valid = !(connectorId.Length > 128 || string.IsNullOrWhiteSpace(runnerId) || runnerId.Length > 128

@@ -1,5 +1,5 @@
 serverAddr = "8.156.82.215"
-serverPort = 7000
+serverPort = 60998
 loginFailExit = false
 auth.token = "{{ .Envs.NOCTF_FRP_TOKEN }}"
 transport.tls.enable = true
