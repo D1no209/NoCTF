@@ -90,6 +90,19 @@ public sealed class SharedSshPortControllerTests
         await Assert.That(transport.Bindings).IsEmpty();
     }
 
+    [Test]
+    public async Task Confirmed_absent_publication_releases_a_failed_publish_reservation()
+    {
+        var transport = new Control { RejectPublish = true };
+        using var controller = new SharedSshPortController(transport, [40000]);
+        var publication = Guid.NewGuid();
+        await Assert.That(async () => { await controller.PublishAsync(publication, 8080, default); }).Throws<PublicTunnelException>();
+        transport.ReportAbsent = true;
+        await controller.RevokePublicationAsync(publication, default);
+        transport.RejectPublish = false;
+        await Assert.That((await controller.PublishAsync(Guid.NewGuid(), 8080, default)).PublicPort).IsEqualTo(40000);
+    }
+
     private sealed class Control : ISharedSshControl
     {
         private string session = Guid.NewGuid().ToString();
@@ -99,9 +112,14 @@ public sealed class SharedSshPortControllerTests
         public bool RestartAfterPublish { get; set; }
         public bool RejectCancellation { get; set; }
         public bool Unavailable { get; set; }
+        public bool RejectPublish { get; set; }
+        public bool ReportAbsent { get; set; }
         public Dictionary<int, SshPortLease> Bindings { get; } = [];
         public Task<string?> ReadSessionAsync(CancellationToken ct) => Task.FromResult(Unavailable ? null : session);
         public void Restart() { session = Guid.NewGuid().ToString(); Bindings.Clear(); }
+        public async Task<SshRevocationResult> RevokeAsync(SshPortLease lease, CancellationToken ct) => ReportAbsent
+            ? SshRevocationResult.AlreadyAbsent
+            : await ForwardAsync(lease, SshForwardOperation.Revoke, ct) ? SshRevocationResult.Applied : SshRevocationResult.Uncertain;
         public async Task<bool> ForwardAsync(SshPortLease lease, SshForwardOperation operation, CancellationToken ct)
         {
             MaximumConcurrentCommands = Math.Max(MaximumConcurrentCommands, Interlocked.Increment(ref active));
@@ -110,6 +128,7 @@ public sealed class SharedSshPortControllerTests
                 await Task.Yield();
                 if (operation == SshForwardOperation.Revoke)
                     return !RejectCancellation && Bindings.Remove(lease.PublicPort);
+                if (RejectPublish) return false;
                 Bindings[lease.PublicPort] = lease;
                 if (RestartAfterPublish) Restart();
                 if (ThrowAfterPublish) throw new OperationCanceledException("Synthetic lost acknowledgment.");

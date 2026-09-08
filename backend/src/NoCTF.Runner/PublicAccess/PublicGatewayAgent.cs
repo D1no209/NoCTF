@@ -17,8 +17,8 @@ using StackExchange.Redis;
 
 namespace NoCTF.Runner.PublicAccess;
 
-/// <summary>Optional bounded control plane; FRP sidecars alone carry player traffic.</summary>
-public sealed class PublicGatewayAgent(IServiceScopeFactory scopes, DockerPublicGateway docker,
+/// <summary>Optional bounded control plane; isolated gateway endpoints alone carry player traffic.</summary>
+public sealed class PublicGatewayAgent(IServiceScopeFactory scopes, IPublicGatewayTransport docker,
     PublicGatewayCapability capability, IPublicGatewayStatusStore statuses, IConnectionMultiplexer redis,
     TimeProvider clock, ILogger<PublicGatewayAgent> logger) : BackgroundService
 {
@@ -28,9 +28,12 @@ public sealed class PublicGatewayAgent(IServiceScopeFactory scopes, DockerPublic
     private volatile bool enabled;
     private readonly string ownerToken = Guid.NewGuid().ToString("N");
     private string LeaderKey => "noctf:public-gateway:owner:" + capability.ConnectorId;
-    private bool ownsLease;
-    private bool waitingForOwnership;
-    private bool cleanupNeeded = true;
+    private volatile bool ownsLease;
+    private volatile bool waitingForOwnership;
+    private volatile bool cleanupNeeded = true;
+    private readonly object ownershipSync = new();
+    private CancellationTokenSource? ownershipCancellation;
+    private PublicGatewayPolicy renewalPolicy = PublicGatewayPolicy.Disabled;
     public void Signal()
     {
         try { if (wake.CurrentCount == 0) wake.Release(); }
@@ -40,6 +43,9 @@ public sealed class PublicGatewayAgent(IServiceScopeFactory scopes, DockerPublic
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         ChannelMessageQueue? events = null;
+        using var loops = CancellationTokenSource.CreateLinkedTokenSource(stoppingToken);
+        var ownershipLoop = MaintainOwnershipAsync(loops.Token);
+        var renewalLoop = RenewPublicationsAsync(loops.Token);
         try
         {
             try
@@ -52,10 +58,12 @@ public sealed class PublicGatewayAgent(IServiceScopeFactory scopes, DockerPublic
             while (!stoppingToken.IsCancellationRequested)
             {
                 while (wake.Wait(0)) { }
-                using var budget = CancellationTokenSource.CreateLinkedTokenSource(stoppingToken);
+                var ownership = OwnershipToken();
+                if (ownership is null) { await wake.WaitAsync(stoppingToken); continue; }
+                using var budget = CancellationTokenSource.CreateLinkedTokenSource(stoppingToken, ownership.Value);
                 budget.CancelAfter(TimeSpan.FromSeconds(15));
                 var retry = false;
-                try { await ReconcileAsync(budget.Token); }
+                try { await ReconcileAsync(ownership.Value, budget.Token); }
                 catch (Exception exception) when (!stoppingToken.IsCancellationRequested)
                 {
                     // No runtime or gameplay state is rewritten on gateway failure. Leases expire independently.
@@ -70,8 +78,15 @@ public sealed class PublicGatewayAgent(IServiceScopeFactory scopes, DockerPublic
         }
         finally
         {
+            await loops.CancelAsync();
+            try { await Task.WhenAll(ownershipLoop, renewalLoop); }
+            catch (OperationCanceledException) when (loops.IsCancellationRequested) { }
             if (events is not null) await events.UnsubscribeAsync();
             using var cleanup = new CancellationTokenSource(TimeSpan.FromSeconds(2));
+            // Close the shared data path first; do not spend the entire shutdown budget canceling
+            // individual forwards while leaving the shared client alive.
+            try { await docker.StopAsync(cleanup.Token); }
+            catch (Exception exception) { logger.LogWarning("Gateway transport shutdown deferred: {FailureType}.", exception.GetType().Name); }
             await Parallel.ForEachAsync(publications.Values, new ParallelOptions { MaxDegreeOfParallelism = 2 }, async (publication, _) =>
             {
                 try { await docker.RevokeAsync(publication, cleanup.Token); }
@@ -82,23 +97,100 @@ public sealed class PublicGatewayAgent(IServiceScopeFactory scopes, DockerPublic
         }
     }
 
-    private async Task ReconcileAsync(CancellationToken ct)
+    private CancellationToken? OwnershipToken()
     {
-        var coordination = redis.GetDatabase();
-        var held = ownsLease && await coordination.LockExtendAsync(LeaderKey, ownerToken, TimeSpan.FromSeconds(9));
-        if (!held) held = await coordination.LockTakeAsync(LeaderKey, ownerToken, TimeSpan.FromSeconds(9));
-        waitingForOwnership = !held;
-        if (!held) { ownsLease = false; cleanupNeeded = true; return; }
-        ownsLease = true;
+        lock (ownershipSync) return ownsLease ? ownershipCancellation?.Token : null;
+    }
+
+    private void LoseOwnership()
+    {
+        CancellationTokenSource? previous;
+        lock (ownershipSync)
+        {
+            ownsLease = false; cleanupNeeded = true;
+            previous = ownershipCancellation; ownershipCancellation = null;
+        }
+        previous?.Cancel(); previous?.Dispose();
+        Signal();
+    }
+
+    private async Task MaintainOwnershipAsync(CancellationToken ct)
+    {
+        try
+        {
+            while (!ct.IsCancellationRequested)
+            {
+                using var budget = CancellationTokenSource.CreateLinkedTokenSource(ct);
+                budget.CancelAfter(TimeSpan.FromSeconds(1));
+                try
+                {
+                    var coordination = redis.GetDatabase();
+                    var held = ownsLease
+                        ? await coordination.LockExtendAsync(LeaderKey, ownerToken, TimeSpan.FromSeconds(9)).WaitAsync(budget.Token)
+                        : await coordination.LockTakeAsync(LeaderKey, ownerToken, TimeSpan.FromSeconds(9)).WaitAsync(budget.Token);
+                    waitingForOwnership = !held;
+                    if (!held) LoseOwnership();
+                    else if (!ownsLease)
+                    {
+                        lock (ownershipSync)
+                        {
+                            ownershipCancellation = CancellationTokenSource.CreateLinkedTokenSource(ct);
+                            cleanupNeeded = true; ownsLease = true;
+                        }
+                        Signal();
+                    }
+                }
+                catch (Exception exception) when (!ct.IsCancellationRequested)
+                {
+                    LoseOwnership();
+                    logger.LogWarning("Gateway ownership unavailable: {FailureType}.", exception.GetType().Name);
+                }
+                await Task.Delay(TimeSpan.FromSeconds(2), clock, ct);
+            }
+        }
+        finally { LoseOwnership(); }
+    }
+
+    private async Task RenewPublicationsAsync(CancellationToken ct)
+    {
+        while (!ct.IsCancellationRequested)
+        {
+            var ownership = OwnershipToken();
+            if (docker.UsesIndependentPublicPorts && !cleanupNeeded && ownership is { } owned)
+            {
+                using var budget = CancellationTokenSource.CreateLinkedTokenSource(ct, owned);
+                budget.CancelAfter(TimeSpan.FromMilliseconds(1500));
+                try
+                {
+                    await Parallel.ForEachAsync(publications.Values, new ParallelOptions { MaxDegreeOfParallelism = 4, CancellationToken = budget.Token }, async (publication, token) =>
+                    {
+                        try { await RenewEligibleAsync(publication, Volatile.Read(ref renewalPolicy), token); }
+                        catch (Exception exception) when (!token.IsCancellationRequested)
+                        { logger.LogDebug("Gateway lease not renewed for {RuntimeId}: {FailureType}.", publication.RuntimeId, exception.GetType().Name); }
+                    });
+                }
+                catch (OperationCanceledException) when (budget.IsCancellationRequested) { }
+            }
+            await Task.Delay(TimeSpan.FromSeconds(2), clock, ct);
+        }
+    }
+
+    private async Task ReconcileAsync(CancellationToken ownership, CancellationToken ct)
+    {
         if (cleanupNeeded)
         {
             await docker.RevokeStaleHelpersAsync(ct);
             publications.Clear();
-            cleanupNeeded = false;
+            lock (ownershipSync)
+            {
+                if (!ownsLease || ownershipCancellation?.Token != ownership) throw new OperationCanceledException(ct);
+                cleanupNeeded = false;
+            }
         }
         using var scope = scopes.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<NoCtfDbContext>();
         var policy = ReadPolicy(await db.PlatformSettings.AsNoTracking().SingleAsync(x => x.Id == 1, ct));
+        Volatile.Write(ref renewalPolicy, policy);
         enabled = policy.Enabled;
         var now = clock.GetUtcNow();
         var rows = !enabled ? [] : await db.RuntimeInstances.AsNoTracking()
@@ -143,7 +235,7 @@ public sealed class PublicGatewayAgent(IServiceScopeFactory scopes, DockerPublic
                 var failure = !policyValid ? PublicAccessFailure.GatewaySafetyCheckFailed
                     : receipt is null || ports.Length == 0 || ports.Select(port => port.ContainerPort).Distinct().Count() != ports.Length
                         ? PublicAccessFailure.RuntimeBindingUnavailable
-                    : ports.Any(port => !capability.AllowsPort(port.HostPort)) ? PublicAccessFailure.PublicPortUnavailable
+                    : !docker.UsesIndependentPublicPorts && ports.Any(port => !capability.AllowsPort(port.HostPort)) ? PublicAccessFailure.PublicPortUnavailable
                     : ports.Length > remaining ? PublicAccessFailure.GatewayCapacityExceeded : (PublicAccessFailure?)null;
                 if (failure is not null)
                 {
@@ -162,6 +254,7 @@ public sealed class PublicGatewayAgent(IServiceScopeFactory scopes, DockerPublic
             {
                 using var revoke = CancellationTokenSource.CreateLinkedTokenSource(ct);
                 revoke.CancelAfter(TimeSpan.FromSeconds(1));
+                await statuses.SetAsync(State(pair.Key, pair.Value.Ports, PublicAccessState.Revoking, PublicAccessFailure.GatewayReconciliationPending), ct);
                 await docker.RevokeAsync(pair.Value, revoke.Token);
                 publications.TryRemove(pair.Key, out _);
                 await statuses.RemoveAsync(pair.Key, ct);
@@ -178,6 +271,9 @@ public sealed class PublicGatewayAgent(IServiceScopeFactory scopes, DockerPublic
             {
                 if (!publications.TryGetValue(candidate.RuntimeId, out var publication))
                 {
+                    // Invalidate old Ready before creating a replacement; cache consumers must not
+                    // mistake the former publication's short-lived status for the new endpoint.
+                    await statuses.SetAsync(State(candidate.RuntimeId, candidate.Ports, PublicAccessState.Pending, PublicAccessFailure.GatewayReconciliationPending), token);
                     publication = await docker.StartAsync(candidate.RuntimeId, candidate.TargetId, candidate.Ports, token);
                     publications[candidate.RuntimeId] = publication;
                 }
@@ -192,8 +288,10 @@ public sealed class PublicGatewayAgent(IServiceScopeFactory scopes, DockerPublic
             }
             catch (Exception exception) when (!ct.IsCancellationRequested)
             {
-                logger.LogWarning("Gateway publication unavailable for {RuntimeId}: {FailureType}.", candidate.RuntimeId, exception.GetType().Name);
-                states[candidate.RuntimeId] = State(candidate.RuntimeId, candidate.Ports, PublicAccessState.Unavailable, PublicAccessFailure.GatewayIdentityRejected);
+                logger.LogWarning("Gateway publication unavailable for {RuntimeId}: {FailureType}, {FailureCode}.", candidate.RuntimeId,
+                    exception.GetType().Name, exception is PublicTunnelException classified ? classified.Failure : (PublicAccessFailure?)null);
+                states[candidate.RuntimeId] = State(candidate.RuntimeId, candidate.Ports, PublicAccessState.Unavailable,
+                    exception is PublicTunnelException tunnel ? tunnel.Failure : PublicAccessFailure.GatewayIdentityRejected);
                 await statuses.SetAsync(states[candidate.RuntimeId], token);
                 if (publications.TryRemove(candidate.RuntimeId, out var stale))
                 {
@@ -202,6 +300,7 @@ public sealed class PublicGatewayAgent(IServiceScopeFactory scopes, DockerPublic
                 }
             }
         });
+        if (docker.RequiresReset) { cleanupNeeded = true; Signal(); }
         foreach (var status in states.Values) await statuses.SetAsync(status, ct);
         await statuses.SetConnectorAsync(new(capability.ConnectorId, policy.Fingerprint(), !enabled && publications.IsEmpty ? DateTimeOffset.MaxValue : clock.GetUtcNow().AddSeconds(10),
             states.Values.OrderBy(value => value.RuntimeId).ToArray(), policyValid ? null : PublicAccessFailure.GatewaySafetyCheckFailed), ct);

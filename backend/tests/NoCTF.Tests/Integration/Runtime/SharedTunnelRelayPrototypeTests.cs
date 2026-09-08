@@ -342,6 +342,7 @@ public sealed class SharedTunnelRelayPrototypeTests
                 await ExpectAsync(http, publicB, "B", ct);
                 await Assert.That(await sshPorts.RevokeAsync(firstA!, ct)).IsFalse().Because("C# rejects the superseded A handle");
                 await Assert.That(await sshControl!.ForwardAsync(firstA!, SshForwardOperation.Revoke, ct)).IsFalse().Because("OpenSSH rejects A's absent Unix target rather than canceling B");
+                await Assert.That(await sshControl.RevokeAsync(firstA!, ct)).IsEqualTo(SshRevocationResult.AlreadyAbsent);
                 await ExpectAsync(http, publicB, "B", ct);
                 Console.WriteLine("C# SSH controller: old A cancellation after public-port reassignment cannot cancel B PASS.");
             }

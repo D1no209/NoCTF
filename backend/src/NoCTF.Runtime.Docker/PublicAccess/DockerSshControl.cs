@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Net;
 using System.Text;
 using System.Text.RegularExpressions;
 using Docker.DotNet;
@@ -26,7 +27,9 @@ public sealed partial class DockerSshControl : ISharedSshControl
 
     public async Task<string?> ReadSessionAsync(CancellationToken ct)
     {
-        var container = await docker.Containers.InspectContainerAsync(clientId, ct);
+        ContainerInspectResponse container;
+        try { container = await docker.Containers.InspectContainerAsync(clientId, ct); }
+        catch (DockerApiException exception) when (exception.StatusCode == HttpStatusCode.NotFound) { return null; }
         if (container.State?.Running != true) return null;
         var check = await ExecuteAsync(["ssh", "-F", "none", "-S", "/control/master", "-O", "check", "gateway"], ct);
         if (check.Code != 0) return null;
@@ -44,6 +47,23 @@ public sealed partial class DockerSshControl : ISharedSshControl
 
     public async Task<bool> ForwardAsync(SshPortLease lease, SshForwardOperation operation, CancellationToken ct)
     {
+        var result = await ForwardCommandAsync(lease, operation, ct);
+        return result.Code == 0 && string.IsNullOrWhiteSpace(result.Output);
+    }
+
+    public async Task<SshRevocationResult> RevokeAsync(SshPortLease lease, CancellationToken ct)
+    {
+        var result = await ForwardCommandAsync(lease, SshForwardOperation.Revoke, ct);
+        if (result.Code == 0 && string.IsNullOrWhiteSpace(result.Output)) return SshRevocationResult.Applied;
+        // This message is emitted by the LOCAL master after exact listen+Unix-target comparison.
+        // It confirms this publication is absent, not that the numeric public port is globally free.
+        if (result.Code == 0 && result.Output.Contains("forwarding request failed: port not forwarded", StringComparison.Ordinal))
+            return SshRevocationResult.AlreadyAbsent;
+        return SshRevocationResult.Uncertain;
+    }
+
+    private async Task<(long Code, string Output)> ForwardCommandAsync(SshPortLease lease, SshForwardOperation operation, CancellationToken ct)
+    {
         if (lease.PublicationId == Guid.Empty || lease.PublicPort is < 1024 or > 65535 || lease.ContainerPort is < 1 or > 65535)
             throw new ArgumentException("Invalid SSH publication binding.", nameof(lease));
         var command = operation switch
@@ -57,9 +77,9 @@ public sealed partial class DockerSshControl : ISharedSshControl
         var specification = FormattableString.Invariant($"0.0.0.0:{lease.PublicPort}:/endpoints/{lease.PublicationId:D}/listen/{lease.ContainerPort}.sock");
         var result = await ExecuteAsync(["ssh", "-F", "none", "-S", "/control/master", "-O", command, "-R", specification, "gateway"], ct);
         // OpenSSH 10.3's `-O cancel` prints a master rejection but still exits 0. With fixed ports
-        // and `-F none`, an acknowledged operation is silent. Treat any diagnostic as uncertain;
-        // never free a reservation solely because the CLI exit status was zero.
-        return result.Code == 0 && string.IsNullOrWhiteSpace(result.Output);
+        // and `-F none`, an acknowledged operation is silent. RevokeAsync separately recognizes
+        // the exact already-absent reply; other diagnostics never authorize releasing a reservation.
+        return result;
     }
 
     private async Task<(long Code, string Output)> ExecuteAsync(string[] command, CancellationToken ct)

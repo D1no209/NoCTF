@@ -31,7 +31,8 @@ public sealed record PublicGatewayCapability(
     IReadOnlyList<int> ReservedPorts,
     int MaximumPorts,
     bool NamespaceIsolationAvailable,
-    string? ConfigurationError = null)
+    string? ConfigurationError = null,
+    PublicGatewayTransportKind Transport = PublicGatewayTransportKind.IsolatedFrp)
 {
     public bool AllowsPort(int port) => port >= FirstPort && port <= LastPort && !ReservedPorts.Contains(port);
 }
