@@ -1,8 +1,8 @@
 bindAddr = "0.0.0.0"
-bindPort = 7001
+bindPort = 60999
 proxyBindAddr = "0.0.0.0"
-# Current jump host reserves 36632. Re-inventory before applying this example elsewhere.
-allowPorts = [{ start = 32768, end = 36631 }, { start = 36633, end = 60999 }]
+# Reserve 36632 and the control ports 60998/60999. Re-inventory before use elsewhere.
+allowPorts = [{ start = 32768, end = 36631 }, { start = 36633, end = 60997 }]
 maxPortsPerClient = 8
 auth.token = "{{ .Envs.NOCTF_FRP_TOKEN }}"
 transport.tls.force = true

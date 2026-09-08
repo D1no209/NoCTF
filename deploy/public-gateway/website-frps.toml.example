@@ -1,5 +1,5 @@
 bindAddr = "0.0.0.0"
-bindPort = 7000
+bindPort = 60998
 proxyBindAddr = "127.0.0.1"
 allowPorts = [{ single = 9999 }]
 maxPortsPerClient = 1

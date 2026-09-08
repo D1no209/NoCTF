@@ -29,7 +29,7 @@ internal static class PublicGatewayRegistration
         string Required(string key) => configuration["PublicGateway:" + key]
             ?? throw new InvalidOperationException($"PublicGateway:{key} is required for the paired Runner.");
         services.AddSingleton(new GatewayTransportOptions(connector, runnerId!, image,
-            Required("ServerHost"), configuration.GetValue("PublicGateway:ServerPort", 7001), Required("ServerName"),
+            Required("ServerHost"), configuration.GetValue("PublicGateway:ServerPort", 60999), Required("ServerName"),
             Required("CaFile"), Required("CertificateFile"), Required("KeyFile"), Required("TokenFile")));
         services.AddSingleton<DockerPublicGateway>();
         services.AddSingleton<PublicGatewayAgent>();
