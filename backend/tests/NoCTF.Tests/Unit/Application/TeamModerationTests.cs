@@ -6,7 +6,7 @@ namespace NoCTF.Tests.Unit.Application;
 public class TeamModerationTests
 {
     [Test]
-    public async Task ExecuteAsync_FinishedCompetition_DoesNotMutate()
+    public async Task ExecuteAsync_FinishedCompetition_StillAllowsModeration()
     {
         var store = new Store { Status = CompetitionStatus.Finished };
         var useCase = new ModerateTeam(store);
@@ -14,8 +14,8 @@ public class TeamModerationTests
         var result = await useCase.ExecuteAsync(new(
             Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), true, "reason", DateTimeOffset.UtcNow));
 
-        await Assert.That(result.FailureCode).IsEqualTo(TeamModerationFailure.CompetitionFinished);
-        await Assert.That(store.ApplyCalls).IsEqualTo(0);
+        await Assert.That(result.Succeeded).IsTrue();
+        await Assert.That(store.ApplyCalls).IsEqualTo(1);
     }
 
     private sealed class Store : ITeamModerationStore

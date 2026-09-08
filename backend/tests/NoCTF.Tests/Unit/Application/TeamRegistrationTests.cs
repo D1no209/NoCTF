@@ -7,6 +7,19 @@ namespace NoCTF.Tests.Unit.Application;
 public class TeamRegistrationTests
 {
     [Test]
+    [Arguments(GameMode.Ctf, true, true)]
+    [Arguments(GameMode.Ctf, false, false)]
+    [Arguments(GameMode.Awdp, true, false)]
+    public async Task Finished_competition_allows_only_enabled_CTF_practice_registration(GameMode mode, bool enabled, bool allowed)
+    {
+        var store = new Store(new(CompetitionStatus.Finished, false, false, Mode: mode, PracticeModeEnabled: enabled));
+        var result = await new CreateTeam(store).ExecuteAsync(new(Guid.NewGuid(), Guid.NewGuid(), "practice", DateTimeOffset.UtcNow, "default"));
+        await Assert.That(result.Succeeded).IsEqualTo(allowed);
+        if (allowed) await Assert.That(store.Status).IsEqualTo(TeamRegistrationStatus.Approved);
+        else await Assert.That(result.FailureCode).IsEqualTo(TeamRegistrationFailure.RegistrationClosed);
+    }
+
+    [Test]
     public async Task CreateTeam_AutoApproveCreatesCaptainTeam()
     {
         var store = new Store(new(CompetitionStatus.Published, true, false));

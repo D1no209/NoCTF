@@ -23,14 +23,19 @@ public sealed record TeamView(
     bool IsBanned,
     DateTimeOffset RegisteredAt,
     string TrackKey = CompetitionTrackConfiguration.DefaultTrackKey,
-    string TrackName = "Default");
+    string TrackName = "Default",
+    bool IsPracticeTeam = false);
 public sealed record TeamRegistrationPolicy(
     CompetitionStatus Status,
     bool AutoApprove,
     bool CompetitionDeleted,
     bool AllowWhileRunning = false,
     GameMode Mode = GameMode.Ctf,
-    string? TrackConfigurationJson = null);
+    string? TrackConfigurationJson = null,
+    bool PracticeModeEnabled = false)
+{
+    public bool PracticeOpen => Mode == GameMode.Ctf && Status == CompetitionStatus.Finished && PracticeModeEnabled && !CompetitionDeleted;
+}
 public enum TeamRegistrationFailure
 {
     InvalidTeamName,
@@ -134,15 +139,15 @@ public sealed class CreateTeam(ITeamRegistrationStore store)
                 "The competition track invitation code is invalid.");
         }
         var created = await store.TryCreateAsync(command with { Name = name, TrackKey = requestedTrack.Key },
-            policy.AutoApprove ? TeamRegistrationStatus.Approved : TeamRegistrationStatus.Pending, ct);
+            policy.PracticeOpen || policy.AutoApprove ? TeamRegistrationStatus.Approved : TeamRegistrationStatus.Pending, ct);
         return created.Team is not null
             ? OperationResult<TeamView, TeamRegistrationFailure>.Success(created.Team)
             : OperationResult<TeamView, TeamRegistrationFailure>.Failure(created.Failure ?? TeamRegistrationFailure.TeamConflict, "The team could not be created.");
     }
 
     private static bool RegistrationIsClosed(TeamRegistrationPolicy policy) =>
-        policy.Status is CompetitionStatus.Paused or CompetitionStatus.Finished
-        || policy.Status == CompetitionStatus.Running && !policy.AllowWhileRunning;
+        !policy.PracticeOpen && (policy.Status is CompetitionStatus.Paused or CompetitionStatus.Finished
+        || policy.Status == CompetitionStatus.Running && !policy.AllowWhileRunning);
 }
 
 public sealed class ListCompetitionTeams(ITeamRegistrationStore store)

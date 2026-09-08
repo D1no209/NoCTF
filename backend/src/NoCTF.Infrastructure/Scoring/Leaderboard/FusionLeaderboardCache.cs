@@ -133,6 +133,7 @@ public sealed class FusionLeaderboardCache(
 
         var teams = await db.Teams.AsNoTracking()
             .Where(team => team.CompetitionId == competitionId
+                && !team.IsPracticeTeam
                 && team.RegistrationStatus == TeamRegistrationStatus.Approved)
             .Select(team => new
             {
