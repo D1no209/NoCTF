@@ -1,6 +1,7 @@
 namespace NoCTF.Domain.Platform;
 
 public enum RuntimeAccessRoute : short { Direct, Gateway }
+public enum PublicGatewayTransportKind : short { IsolatedFrp, SharedSsh }
 public enum PublicAccessState : short { Disabled, Pending, Ready, Unavailable, Revoking, Unsupported }
 public enum PublicAccessFailure : short
 {

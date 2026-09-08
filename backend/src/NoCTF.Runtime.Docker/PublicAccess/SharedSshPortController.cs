@@ -7,12 +7,15 @@ public sealed record SshPortLease(Guid PublicationId, int ContainerPort, int Pub
 
 /// <summary>Only the OpenSSH adapter translates these operations to command-line arguments.</summary>
 public enum SshForwardOperation { Publish, Revoke }
+public enum SshRevocationResult { Applied, AlreadyAbsent, Uncertain }
 
 /// <summary>Controls a dedicated, already authenticated SSH master; it does not carry player traffic.</summary>
 public interface ISharedSshControl
 {
     Task<string?> ReadSessionAsync(CancellationToken ct);
     Task<bool> ForwardAsync(SshPortLease lease, SshForwardOperation operation, CancellationToken ct);
+    async Task<SshRevocationResult> RevokeAsync(SshPortLease lease, CancellationToken ct) =>
+        await ForwardAsync(lease, SshForwardOperation.Revoke, ct) ? SshRevocationResult.Applied : SshRevocationResult.Uncertain;
 }
 
 /// <summary>A stable, safe-to-log classification without raw SSH output or credentials.</summary>
@@ -82,7 +85,7 @@ public sealed class SharedSshPortController : IDisposable
             var session = await control.ReadSessionAsync(ct);
             // No master is not proof it has exited: a stalled process could still hold old listeners.
             if (session is null) throw new PublicTunnelException(PublicAccessFailure.ConnectorOffline);
-            if (session == lease.SessionId && !await control.ForwardAsync(lease, SshForwardOperation.Revoke, ct))
+            if (session == lease.SessionId && await control.RevokeAsync(lease, ct) == SshRevocationResult.Uncertain)
                 throw new PublicTunnelException(PublicAccessFailure.PublicPortUnavailable);
             reservations.Remove(lease.PublicPort);
             return true;
@@ -105,7 +108,7 @@ public sealed class SharedSshPortController : IDisposable
                 ?? throw new PublicTunnelException(PublicAccessFailure.ConnectorOffline);
             foreach (var lease in owned)
             {
-                if (session == lease.SessionId && !await control.ForwardAsync(lease, SshForwardOperation.Revoke, ct))
+                if (session == lease.SessionId && await control.RevokeAsync(lease, ct) == SshRevocationResult.Uncertain)
                     throw new PublicTunnelException(PublicAccessFailure.PublicPortUnavailable);
                 reservations.Remove(lease.PublicPort);
             }

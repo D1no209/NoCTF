@@ -20,8 +20,9 @@ public sealed record GatewayPublication(Guid Id, Guid RuntimeId, string TargetId
     IReadOnlyList<RuntimePublishedPortView> Ports, int AdminPort = 0);
 
 /// <summary>Controls isolated FRP containers. No player bytes pass through this adapter.</summary>
-public sealed class DockerPublicGateway : IDisposable
+public sealed class DockerPublicGateway : IPublicGatewayTransport, IDisposable
 {
+    public bool UsesIndependentPublicPorts => false;
     private const string ConnectorLabel = "noctf.io/public-gateway-connector";
     private readonly DockerClient docker;
     private readonly GatewayTransportOptions options;
@@ -186,11 +187,26 @@ public sealed class DockerPublicGateway : IDisposable
             All = true,
             Filters = new Dictionary<string, IDictionary<string, bool>> { ["label"] = new Dictionary<string, bool> { [$"{ConnectorLabel}={options.ConnectorId}"] = true } }
         }, ct);
-        foreach (var helper in helpers.Take(128))
+        foreach (var helper in helpers.OrderBy(item => Label(item.Labels, "noctf.io/gateway-role") == "client" ? 0 : 1).Take(256))
         {
             var labels = helper.Labels;
-            if (labels is null || Label(labels, "noctf.io/public-gateway-runner") != options.RunnerId
-                || !Guid.TryParse(Label(labels, "noctf.io/publication-id"), out var id)
+            if (labels is null || Label(labels, "noctf.io/public-gateway-runner") != options.RunnerId) continue;
+            if (Guid.TryParse(Label(labels, "noctf.io/gateway-session"), out var session))
+            {
+                // Switching back from the managed SSH transport in the same deployment. Only reserved
+                // gateway labels, generated names and (for relays) immutable target bindings qualify.
+                var inspected = await docker.Containers.InspectContainerAsync(helper.ID, ct);
+                var role = Label(labels, "noctf.io/gateway-role");
+                var name = inspected.Name?.TrimStart('/') ?? "";
+                var knownClient = role == "client" && name.StartsWith($"noctf-ssh-{session:N}-", StringComparison.Ordinal);
+                var knownRelay = role == "relay" && Guid.TryParse(Label(labels, "noctf.io/publication-id"), out var publication)
+                    && name == $"noctf-relay-{publication:N}" && Label(labels, "noctf.io/publication-target") is { Length: 64 } target
+                    && inspected.HostConfig?.NetworkMode == "container:" + target;
+                if (knownClient || knownRelay)
+                    await docker.Containers.RemoveContainerAsync(helper.ID, new ContainerRemoveParameters { Force = true }, ct);
+                continue;
+            }
+            if (!Guid.TryParse(Label(labels, "noctf.io/publication-id"), out var id)
                 || !Guid.TryParse(Label(labels, "noctf.io/publication-runtime"), out var runtimeId)
                 || Label(labels, "noctf.io/publication-target") is not { } targetId) continue;
             await RevokeAsync(new(id, runtimeId, targetId, helper.ID, []), ct);
