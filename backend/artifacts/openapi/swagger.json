@@ -13890,6 +13890,9 @@
           "registeredAt": {
             "type": "string",
             "format": "date-time"
+          },
+          "isPracticeTeam": {
+            "type": "boolean"
           }
         }
       },

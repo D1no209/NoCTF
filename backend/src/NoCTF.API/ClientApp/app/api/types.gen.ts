@@ -23,6 +23,7 @@ export type NoCtfapiEndpointsTeamsTeamResponse = {
     isLocked?: boolean;
     isBanned?: boolean;
     registeredAt?: string;
+    isPracticeTeam?: boolean;
 };
 
 export type NoCtfapiEndpointsTeamsTeamRegistrationStatusProtocol = 'Pending' | 'Approved' | 'Rejected';
