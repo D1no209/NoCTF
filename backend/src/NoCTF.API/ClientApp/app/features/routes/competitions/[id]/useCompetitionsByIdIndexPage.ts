@@ -1,6 +1,6 @@
 import { markRaw } from 'vue'
 
-import { canEnterCompetition, isCtfPracticeOpen } from '../../../../lib/competition-participation'
+import { canEnterCompetition, canRegisterForCompetition, isCtfPracticeOpen } from '../../../../lib/competition-participation'
 import { toast } from 'vue-sonner'
 import { ArrowRight, Box, CalendarRange, Clock, FileText, KeyRound, LogIn, ShieldCheck, Trophy, UserPlus, Users } from '@lucide/vue'
 import { createTeamEndpoint, getMyTeamEndpoint, joinTeamByInvitationEndpoint, listCompetitionTeamsEndpoint, listCompetitionTracks } from '../../../../api'
@@ -127,13 +127,7 @@ export function useCompetitionsByIdIndexPage() {
 
   const canParticipate = computed(() => canEnterCompetition(competition.value, myTeam.value))
 
-  const teamRegistrationOpen = computed(() => {
-    const status = competition.value?.status
-    return status === 'Visible'
-      || status === 'Published'
-      || status === 'Running'
-        && competition.value?.allowTeamRegistrationWhileRunning === true
-  })
+  const teamRegistrationOpen = computed(() => canRegisterForCompetition(competition.value))
 
   const createOpen = ref(false)
 
