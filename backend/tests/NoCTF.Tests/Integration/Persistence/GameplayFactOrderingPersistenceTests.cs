@@ -7,6 +7,8 @@ using NoCTF.Application.Competitions.Events;
 using NoCTF.Application.GameplayFacts.Processing;
 using NoCTF.Application.Messaging;
 using NoCTF.Application.Runtime.Provisioning;
+using NoCTF.Application.Runtime.Capacity;
+using NoCTF.Worker;
 using NoCTF.Application.Scoring.Leaderboard;
 using NoCTF.Domain.Challenges;
 using NoCTF.Domain.Competitions;
@@ -27,6 +29,140 @@ namespace NoCTF.Tests.Integration.Persistence;
 [Category("Integration")]
 public sealed class GameplayFactOrderingPersistenceTests
 {
+    [Test]
+    [Arguments(GameMode.Ctf, GameplayFactKind.FlagAttempt, RuntimePurpose.Player, RuntimeKind.Container, false)]
+    [Arguments(GameMode.Ctf, GameplayFactKind.FlagAttempt, RuntimePurpose.Player, RuntimeKind.Compose, false)]
+    [Arguments(GameMode.Awdp, GameplayFactKind.BreakAttempt, RuntimePurpose.AwdpAttack, RuntimeKind.Container, false)]
+    [Arguments(GameMode.Awdp, GameplayFactKind.BreakAttempt, RuntimePurpose.AwdpAttack, RuntimeKind.Compose, false)]
+    [Arguments(GameMode.Ctf, GameplayFactKind.FlagAttempt, RuntimePurpose.Player, RuntimeKind.Container, true)]
+    [Arguments(GameMode.Ctf, GameplayFactKind.FlagAttempt, RuntimePurpose.Player, RuntimeKind.Compose, true)]
+    [Arguments(GameMode.Awdp, GameplayFactKind.BreakAttempt, RuntimePurpose.AwdpAttack, RuntimeKind.Container, true)]
+    [Arguments(GameMode.Awdp, GameplayFactKind.BreakAttempt, RuntimePurpose.AwdpAttack, RuntimeKind.Compose, true)]
+    [Timeout(300_000)]
+    public async Task Old_correct_submission_never_stops_a_reopened_runtime_but_TTL_still_does(
+        GameMode mode, GameplayFactKind kind, RuntimePurpose purpose, RuntimeKind runtimeKind,
+        bool delayedResult, CancellationToken ct)
+    {
+        await DockerIntegrationTest.RunAsync(async () =>
+        {
+            await using var postgres = await StartPostgresAsync("noctf_reopened_runtime", ct);
+            var options = Options(postgres);
+            var fixture = await SeedAsync(options, 2, ct, mode);
+            var factId = Guid.NewGuid();
+            var originalId = Guid.NewGuid();
+            var reopenedId = Guid.NewGuid();
+            var unrelatedId = Guid.NewGuid();
+            await using (var setup = new NoCtfDbContext(options))
+            {
+                var original = Runtime(fixture, originalId, fixture.TeamIds[0], purpose);
+                original.RuntimeKind = runtimeKind;
+                if (delayedResult)
+                {
+                    original.State = RuntimeState.Stopped;
+                    original.StoppedAt = fixture.Now.AddMilliseconds(500);
+                }
+                setup.RuntimeInstances.Add(original);
+                setup.GameplayFacts.Add(Fact(fixture, factId, fixture.TeamIds[0], fixture.Now, kind: kind));
+                var unrelated = Runtime(fixture, unrelatedId, fixture.TeamIds[1], purpose);
+                setup.RuntimeInstances.Add(unrelated);
+                await setup.SaveChangesAsync(ct);
+            }
+            var outbox = new RecordingOutbox();
+            if (!delayedResult)
+            {
+                await ProcessAsync(options, factId, outbox, ct, new FixedResultEvaluatorCatalog(new(GameplayFactResult.Correct)));
+                await using var stopped = new NoCtfDbContext(options);
+                var original = await stopped.RuntimeInstances.SingleAsync(x => x.Id == originalId, ct);
+                await Assert.That(original.State).IsEqualTo(RuntimeState.Stopping);
+                await Assert.That(outbox.Messages.OfType<StopRuntime>().Select(x => x.RuntimeInstanceId)).IsEquivalentTo([originalId]);
+                original.State = RuntimeState.Stopped;
+                original.StoppedAt = fixture.Now.AddMilliseconds(500);
+                await stopped.SaveChangesAsync(ct);
+            }
+            await using (var setup = new NoCtfDbContext(options))
+            {
+                var reopened = Runtime(fixture, reopenedId, fixture.TeamIds[0], purpose);
+                reopened.RuntimeKind = runtimeKind;
+                reopened.CreatedAt = fixture.Now.AddSeconds(1);
+                reopened.RunningAt = reopened.CreatedAt;
+                setup.RuntimeInstances.Add(reopened);
+                await setup.SaveChangesAsync(ct);
+            }
+            // A delayed result (or redelivery of the completed fact) must not target the new UUID.
+            await ProcessAsync(options, factId, outbox, ct, new FixedResultEvaluatorCatalog(new(GameplayFactResult.Correct)));
+            await using (var verify = new NoCtfDbContext(options))
+            {
+                await Assert.That((await verify.RuntimeInstances.SingleAsync(x => x.Id == reopenedId, ct)).State).IsEqualTo(RuntimeState.Running);
+                await Assert.That((await verify.RuntimeInstances.SingleAsync(x => x.Id == unrelatedId, ct)).State).IsEqualTo(RuntimeState.Running);
+                await Assert.That((await verify.GameplayFacts.SingleAsync(x => x.Id == factId, ct)).Result).IsEqualTo(GameplayFactResult.Correct);
+            }
+            await ReconcileAsync(options, outbox, fixture.Now.AddSeconds(10), ct);
+            await ReconcileAsync(options, outbox, fixture.Now.AddSeconds(11), ct);
+            await using (var verify = new NoCtfDbContext(options))
+                await Assert.That((await verify.RuntimeInstances.SingleAsync(x => x.Id == reopenedId, ct)).State).IsEqualTo(RuntimeState.Running);
+            await Assert.That(outbox.Messages.OfType<StopRuntime>().Any(x => x.RuntimeInstanceId == reopenedId)).IsFalse();
+
+            await ReconcileAsync(options, outbox, fixture.Now.AddMinutes(31), ct);
+            await ReconcileAsync(options, outbox, fixture.Now.AddMinutes(32), ct);
+            await using (var verify = new NoCtfDbContext(options))
+                await Assert.That((await verify.RuntimeInstances.SingleAsync(x => x.Id == reopenedId, ct)).State).IsEqualTo(RuntimeState.Stopping);
+            await Assert.That(outbox.Messages.OfType<StopRuntime>().Count(x => x.RuntimeInstanceId == reopenedId)).IsEqualTo(1);
+        });
+    }
+
+    [Test]
+    [Arguments(GameMode.Ctf, GameplayFactKind.FlagAttempt, RuntimePurpose.Player)]
+    [Arguments(GameMode.Awdp, GameplayFactKind.BreakAttempt, RuntimePurpose.AwdpAttack)]
+    [Timeout(300_000)]
+    public async Task Wrong_result_keeps_current_runtime_running_and_reconciliation_recovers_only_current_correct_results(
+        GameMode mode, GameplayFactKind kind, RuntimePurpose purpose, CancellationToken ct)
+    {
+        await DockerIntegrationTest.RunAsync(async () =>
+        {
+            await using var postgres = await StartPostgresAsync("noctf_current_runtime", ct);
+            var options = Options(postgres);
+            var fixture = await SeedAsync(options, 1, ct, mode);
+            var runtimeId = Guid.NewGuid();
+            var factId = Guid.NewGuid();
+            await using (var setup = new NoCtfDbContext(options))
+            {
+                setup.RuntimeInstances.Add(Runtime(fixture, runtimeId, fixture.TeamIds[0], purpose));
+                setup.GameplayFacts.Add(Fact(fixture, factId, fixture.TeamIds[0], fixture.Now, kind: kind));
+                await setup.SaveChangesAsync(ct);
+            }
+            var outbox = new RecordingOutbox();
+            await ProcessAsync(options, factId, outbox, ct, new FixedResultEvaluatorCatalog(new(GameplayFactResult.Wrong)));
+            await ReconcileAsync(options, outbox, fixture.Now.AddSeconds(1), ct);
+            await using (var verify = new NoCtfDbContext(options))
+            {
+                await Assert.That((await verify.RuntimeInstances.SingleAsync(x => x.Id == runtimeId, ct)).State).IsEqualTo(RuntimeState.Running);
+                // Model recovery of a persisted correct result whose stop command was not yet applied.
+                var fact = await verify.GameplayFacts.SingleAsync(x => x.Id == factId, ct);
+                fact.Result = GameplayFactResult.Correct;
+                await verify.SaveChangesAsync(ct);
+            }
+            await ReconcileAsync(options, outbox, fixture.Now.AddSeconds(2), ct);
+            await ReconcileAsync(options, outbox, fixture.Now.AddSeconds(3), ct);
+            await using var final = new NoCtfDbContext(options);
+            await Assert.That((await final.RuntimeInstances.SingleAsync(x => x.Id == runtimeId, ct)).State).IsEqualTo(RuntimeState.Stopping);
+            await Assert.That(outbox.Messages.OfType<StopRuntime>().Count(x => x.RuntimeInstanceId == runtimeId)).IsEqualTo(1);
+        });
+    }
+
+    private static async Task ReconcileAsync(DbContextOptions<NoCtfDbContext> options, RecordingOutbox outbox,
+        DateTimeOffset now, CancellationToken ct)
+    {
+        var capacity = Substitute.For<IRunnerCapacityGate>();
+        capacity.GetHeartbeatAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>()).Returns(RunnerHeartbeatStatus.Online);
+        capacity.GetPoolInventoryAsync(Arg.Any<string>(), Arg.Any<CancellationToken>())
+            .Returns(new RunnerPoolInventory(RunnerPoolInventoryAvailability.Available, []));
+        var placement = Substitute.For<IRuntimePlacementPolicy>();
+        placement.Resolve(Arg.Any<RuntimeKind>()).Returns(new RuntimePlacement(RuntimeProvider.Docker, "default"));
+        await using var db = new NoCtfDbContext(options);
+        await BackendMessageOperations.ExecuteRunnerAssignmentReconciliationAsync(new ReconcileRunnerAssignments(now),
+            db, capacity, placement, outbox, TimeProvider.System, ct);
+    }
+
     [Test]
     [Arguments(GameMode.Ctf, GameplayFactKind.FlagAttempt, RuntimePurpose.Player)]
     [Arguments(GameMode.Awdp, GameplayFactKind.BreakAttempt, RuntimePurpose.AwdpAttack)]

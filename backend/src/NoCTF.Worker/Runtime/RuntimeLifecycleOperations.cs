@@ -235,6 +235,8 @@ internal static partial class BackendMessageOperations
                         && fact.CompetitionChallengeId == instance.CompetitionChallengeId
                         && fact.TeamId == instance.TeamId
                         && fact.Kind == GameplayFactKind.FlagAttempt
+                        // Historical solves must not reclaim a subsequently opened instance.
+                        && fact.OccurredAt >= instance.CreatedAt
                         && fact.State == GameplayFactState.Completed
                         && fact.Result == GameplayFactResult.Correct)
                     || instance.Purpose == RuntimePurpose.AwdpAttack
@@ -243,6 +245,7 @@ internal static partial class BackendMessageOperations
                         && fact.CompetitionChallengeId == instance.CompetitionChallengeId
                         && fact.TeamId == instance.TeamId
                         && fact.Kind == GameplayFactKind.BreakAttempt
+                        && fact.OccurredAt >= instance.CreatedAt
                         && fact.State == GameplayFactState.Completed
                         && fact.Result == GameplayFactResult.Correct)))
             .OrderBy(instance => instance.Id)

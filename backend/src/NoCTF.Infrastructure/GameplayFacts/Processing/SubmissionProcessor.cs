@@ -601,6 +601,9 @@ public sealed class GameplayFactProcessor(
                 && instance.CompetitionChallengeId == submission.CompetitionChallengeId
                 && instance.TeamId == submission.TeamId
                 && instance.Purpose == runtimePurpose.Value
+                // Judge completion/redelivery can arrive after a reset or a fresh start.
+                // Only instances already created at submission intake belong to this solve.
+                && instance.CreatedAt <= submission.OccurredAt
                 && (instance.RuntimeKind == RuntimeKind.Container
                     || instance.RuntimeKind == RuntimeKind.Compose)
                 && (instance.State == RuntimeState.Queued
