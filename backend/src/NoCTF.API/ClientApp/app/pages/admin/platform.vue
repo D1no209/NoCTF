@@ -19,7 +19,7 @@ const navGroups = computed<WorkspaceNavGroup[]>(() => [
     items: [
       { to: '/admin/platform/monitoring', label: translate("监控"), icon: Activity },
       { to: '/admin/platform/runtimes', label: translate("运行容器"), icon: Container },
-      { to: '/admin/platform/public-gateway', label: translate("公网访问"), icon: Globe },
+      { to: '/admin/platform/public-gateway', label: translate("内网穿透"), icon: Globe },
       { to: '/admin/platform/logs', label: translate("日志"), icon: ScrollText },
       { to: '/admin/platform/audit', label: translate("审计"), icon: History },
     ],

@@ -103,7 +103,7 @@ onBeforeUnmount(() => { generation++; if (statusTimer) clearInterval(statusTimer
   <section class="flex min-w-0 flex-col gap-6">
     <header class="flex flex-wrap items-start justify-between gap-3">
       <div class="flex flex-col gap-1">
-        <h2 class="text-lg font-semibold">{{ $t('公网访问') }}</h2>
+        <h2 class="text-lg font-semibold">{{ $t('内网穿透') }}</h2>
         <p class="max-w-2xl text-sm text-muted-foreground">{{ $t('公网连接独立于题目运行；关闭公网不会停止题目或固定网站隧道。') }}</p>
       </div>
       <Button variant="outline" :disabled="loading || application.polling.value" @click="application.start()"><RefreshCw data-icon="inline-start" />{{ $t('检查网关状态') }}</Button>
@@ -117,7 +117,7 @@ onBeforeUnmount(() => { generation++; if (statusTimer) clearInterval(statusTimer
         <FieldGroup>
           <Field orientation="horizontal">
             <Switch id="gateway-enabled" v-model="form.enabled" :disabled="!capability?.namespaceIsolationAvailable || saving" />
-            <FieldContent><FieldLabel for="gateway-enabled">{{ $t('启用题目公网访问') }}</FieldLabel><FieldDescription>{{ $t('仅公开获准的选手与练习容器，不公开 Checker、Fix Target 或题库测试容器。') }}</FieldDescription></FieldContent>
+            <FieldContent><FieldLabel for="gateway-enabled">{{ $t('启用题目内网穿透') }}</FieldLabel><FieldDescription>{{ $t('仅公开获准的选手与练习容器，不公开 Checker、Fix Target 或题库测试容器。') }}</FieldDescription></FieldContent>
           </Field>
           <Field><FieldLabel>{{ $t('已配对连接器') }}</FieldLabel><p class="break-all font-mono text-sm">{{ capability?.connectorId ?? '—' }} · {{ capability?.runnerId ?? '—' }}</p><FieldDescription>{{ $t('连接器和端口范围由部署配置决定，页面不能指定任意代理目标。') }}</FieldDescription></Field>
           <Field :data-invalid="Boolean(fieldErrors.publicOrigin)">
