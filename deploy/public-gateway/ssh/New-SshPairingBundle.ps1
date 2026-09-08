@@ -117,9 +117,27 @@ Host gateway
   ControlPath /control/master
   ControlPersist no
 "@
-Write-PairingFile 'client.env' "AUTOSSH_GATETIME=0`nAUTOSSH_POLL=3`n"
-Write-PairingFile '.env' "NOCTF_SSH_SERVER_IMAGE=$ServerImage`nNOCTF_SSH_CLIENT_IMAGE=$ClientImage`nNOCTF_GATEWAY_RELAY_IMAGE=$RelayImage`n"
+Write-PairingFile '.env' @"
+NOCTF_SSH_SERVER_IMAGE=$ServerImage
+NOCTF_SSH_CLIENT_IMAGE=$ClientImage
+NOCTF_GATEWAY_RELAY_IMAGE=$RelayImage
+NOCTF_GATEWAY_SERVER_HOST=$ServerHost
+NOCTF_GATEWAY_CONTROL_PORT=$ControlPort
+NOCTF_GATEWAY_FIRST_PORT=$FirstPublicPort
+NOCTF_GATEWAY_LAST_PORT=$($ports[-1])
+NOCTF_GATEWAY_MAXIMUM_PORTS=8
+NOCTF_GATEWAY_SAFETY_APPROVED=false
+# Fill these deployment identities and Linux paths before using the optional platform overlay.
+NOCTF_GATEWAY_CONNECTOR_ID=
+NOCTF_GATEWAY_RUNNER_ID=
+NOCTF_GATEWAY_PUBLIC_ORIGIN=
+NOCTF_GATEWAY_STATE_DIRECTORY=
+NOCTF_GATEWAY_CLIENT_DIRECTORY=
+NOCTF_GATEWAY_ENV_FILE=
+"@
 Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'server.compose.yml') -Destination $bundlePath
+Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'platform.compose.yml') -Destination $bundlePath
+Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'platform.env.example') -Destination (Join-Path $bundlePath 'platform.env')
 Write-Output "已生成专用配对目录：$bundlePath"
 Write-Output "仅生成配置，未部署。控制端口 $ControlPort；公网端口池 $FirstPublicPort-$($ports[-1])。"
 Write-Output 'server 目录只交给跳板；client 目录只交给对应 Runner。不要上传 Git，不使用个人 SSH 密钥。'
