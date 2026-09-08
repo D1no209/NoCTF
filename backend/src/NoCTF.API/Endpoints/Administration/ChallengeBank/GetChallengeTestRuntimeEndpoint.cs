@@ -7,6 +7,8 @@ using NoCTF.API.Serialization;
 using NoCTF.Application.Challenges.Testing;
 using NoCTF.Domain.Runtime;
 using System.Text.Json.Serialization;
+using NoCTF.Application.Runtime.PublicAccess;
+using NoCTF.Domain.Platform;
 
 namespace NoCTF.API.Endpoints.Administration.ChallengeBank;
 
@@ -33,7 +35,10 @@ public sealed record ChallengeTestRuntimeResponse(
     DateTimeOffset CreatedAt,
     DateTimeOffset? RunningAt,
     DateTimeOffset? ExpiresAt,
-    DateTimeOffset? StoppedAt);
+    DateTimeOffset? StoppedAt)
+{
+    public PublicAccessFailureProtocol? PublicAccessFailure { get; init; }
+}
 
 internal static class ChallengeTestRuntimeMapping
 {
@@ -66,8 +71,9 @@ internal static class ChallengeTestRuntimeMapping
 
 public sealed class GetChallengeTestRuntimeEndpoint(
     GetChallengeTestRuntime get,
-    IUserContext user)
-    : EndpointWithoutRequest<Results<Ok<ChallengeTestRuntimeResponse>, NotFound>>
+    IUserContext user,
+    ReadRuntimePublicAccess access)
+    : EndpointWithoutRequest<Results<Ok<ChallengeTestRuntimeResponse>, NotFound, ProblemHttpResult>>
 {
     public override void Configure()
     {
@@ -83,7 +89,7 @@ public sealed class GetChallengeTestRuntimeEndpoint(
         });
     }
 
-    public override async Task<Results<Ok<ChallengeTestRuntimeResponse>, NotFound>> ExecuteAsync(
+    public override async Task<Results<Ok<ChallengeTestRuntimeResponse>, NotFound, ProblemHttpResult>> ExecuteAsync(
         CancellationToken cancellationToken)
     {
         HttpContext.Response.GetTypedHeaders().CacheControl = new CacheControlHeaderValue
@@ -96,8 +102,11 @@ public sealed class GetChallengeTestRuntimeEndpoint(
             user.UserId,
             user.IsAdministrator,
             cancellationToken);
-        return runtime is null
-            ? TypedResults.NotFound()
-            : TypedResults.Ok(ChallengeTestRuntimeMapping.ToResponse(runtime));
+        if (runtime is null) return TypedResults.NotFound();
+        var route = await access.RouteAsync($"{HttpContext.Request.Scheme}://{HttpContext.Request.Host}", cancellationToken);
+        if (route is null) return RuntimeEndpointMapping.UnknownOrigin();
+        var response = ChallengeTestRuntimeMapping.ToResponse(runtime);
+        return TypedResults.Ok(route == RuntimeAccessRoute.Direct ? response : response with
+        { Urls = [], PublicAccessFailure = PublicAccessFailureProtocol.UnsupportedRuntimeKind });
     }
 }
