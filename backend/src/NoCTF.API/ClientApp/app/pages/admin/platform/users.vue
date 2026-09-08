@@ -284,11 +284,11 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="flex flex-col gap-4">
-    <div class="flex flex-wrap items-center gap-4">
-      <Input v-model="search" class="max-w-xs" :placeholder="$t('搜索用户名或邮箱')" />
+  <div class="flex min-w-0 flex-col gap-6">
+    <div class="flex flex-wrap items-center gap-3">
+      <Input v-model="search" class="w-full sm:max-w-sm" :placeholder="$t('搜索用户名或邮箱')" :aria-label="$t('搜索用户名或邮箱')" />
       <Select v-model="roleFilter">
-        <SelectTrigger class="w-36">
+        <SelectTrigger class="w-full sm:w-44" :aria-label="$t('角色')">
           <SelectValue />
         </SelectTrigger>
         <SelectContent>
@@ -300,17 +300,16 @@ onMounted(() => {
           </SelectGroup>
         </SelectContent>
       </Select>
+      <p class="text-sm text-muted-foreground sm:ml-auto">{{ $t('当前显示 {count} 位用户', { count: filteredUsers.length }) }}</p>
     </div>
 
     <Alert v-if="loadError" variant="destructive">
       <AlertDescription>{{ loadError }}</AlertDescription>
     </Alert>
 
-    <Card v-if="loading">
-      <CardContent class="flex flex-col gap-3 pt-6">
-        <Skeleton v-for="i in 6" :key="i" class="h-10 w-full" />
-      </CardContent>
-    </Card>
+    <div v-if="loading" class="flex flex-col gap-3">
+      <Skeleton v-for="i in 6" :key="i" class="h-14 w-full" />
+    </div>
 
     <Empty v-else-if="filteredUsers.length === 0" class="border border-dashed py-12">
       <EmptyHeader>
@@ -319,197 +318,201 @@ onMounted(() => {
       </EmptyHeader>
     </Empty>
 
-    <Card v-else>
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead>{{ $t('用户名') }}</TableHead>
-            <TableHead>{{ $t('邮箱') }}</TableHead>
-            <TableHead>{{ $t('类型') }}</TableHead>
-            <TableHead>{{ $t('角色') }}</TableHead>
-            <TableHead>{{ $t('状态') }}</TableHead>
-            <TableHead>{{ $t('注册时间') }}</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          <TableRow
-            v-for="user in filteredUsers"
-            :key="user.id"
-            class="cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset"
-            role="button"
-            tabindex="0"
-            :aria-label="$t('查看用户 {name} 详情', { name: user.userName ?? '' })"
-            @click="openDetail(user)"
-            @keydown.enter="openDetail(user)"
-            @keydown.space.prevent="openDetail(user)"
-          >
-            <TableCell class="font-medium">
-              {{ user.userName }}
-              <Badge v-if="user.id === currentUser?.userId" variant="outline" class="ml-2">{{ $t('我') }}</Badge>
-            </TableCell>
-            <TableCell class="text-muted-foreground">{{ user.email }}</TableCell>
-            <TableCell>
-              <Badge :variant="user.kind === 'Bot' ? 'secondary' : 'outline'">
-                {{ user.kind === 'Bot' ? 'Bot' : $t('用户') }}
-              </Badge>
-            </TableCell>
-            <TableCell>
-              <Badge :variant="user.role === 'Administrator' ? 'default' : 'secondary'">
-                {{ ROLE_LABELS[String(user.role)] ? $t(ROLE_LABELS[String(user.role)]!) : user.role }}
-              </Badge>
-            </TableCell>
-            <TableCell>
-              <Badge :variant="user.accountStatus === 'Active' ? 'outline' : 'destructive'">
-                {{ STATUS_LABELS[String(user.accountStatus)] ? $t(STATUS_LABELS[String(user.accountStatus)]!) : user.accountStatus }}
-              </Badge>
-            </TableCell>
-            <TableCell>
-              <AdminDateTime :value="user.createdAt" />
-            </TableCell>
-          </TableRow>
-        </TableBody>
-      </Table>
-    </Card>
+    <Table v-else class="min-w-[860px] [&_th]:px-4 [&_th]:py-3 [&_td]:px-4 [&_td]:py-4">
+      <TableHeader class="bg-muted/30">
+        <TableRow>
+          <TableHead class="w-[26%]">{{ $t('用户名') }}</TableHead>
+          <TableHead class="w-[28%]">{{ $t('邮箱') }}</TableHead>
+          <TableHead>{{ $t('类型') }}</TableHead>
+          <TableHead>{{ $t('角色') }}</TableHead>
+          <TableHead>{{ $t('状态') }}</TableHead>
+          <TableHead>{{ $t('注册时间') }}</TableHead>
+        </TableRow>
+      </TableHeader>
+      <TableBody>
+        <TableRow
+          v-for="user in filteredUsers"
+          :key="user.id"
+          class="cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset"
+          role="button"
+          tabindex="0"
+          :aria-label="$t('查看用户 {name} 详情', { name: user.userName ?? '' })"
+          @click="openDetail(user)"
+          @keydown.enter="openDetail(user)"
+          @keydown.space.prevent="openDetail(user)"
+        >
+          <TableCell class="max-w-sm whitespace-normal break-words font-medium">
+            {{ user.userName }}
+            <Badge v-if="user.id === currentUser?.userId" variant="outline" class="ml-2">{{ $t('我') }}</Badge>
+          </TableCell>
+          <TableCell class="max-w-sm whitespace-normal break-all text-muted-foreground">{{ user.email || '—' }}</TableCell>
+          <TableCell>
+            <Badge :variant="user.kind === 'Bot' ? 'secondary' : 'outline'">
+              {{ user.kind === 'Bot' ? 'Bot' : $t('用户') }}
+            </Badge>
+          </TableCell>
+          <TableCell>
+            <Badge :variant="user.role === 'Administrator' ? 'default' : 'secondary'">
+              {{ ROLE_LABELS[String(user.role)] ? $t(ROLE_LABELS[String(user.role)]!) : user.role }}
+            </Badge>
+          </TableCell>
+          <TableCell>
+            <Badge :variant="user.accountStatus === 'Active' ? 'outline' : 'destructive'">
+              {{ STATUS_LABELS[String(user.accountStatus)] ? $t(STATUS_LABELS[String(user.accountStatus)]!) : user.accountStatus }}
+            </Badge>
+          </TableCell>
+          <TableCell>
+            <AdminDateTime :value="user.createdAt" />
+          </TableCell>
+        </TableRow>
+      </TableBody>
+    </Table>
 
     <Sheet v-model:open="detailOpen">
-      <SheetContent class="overflow-y-auto">
-        <SheetHeader>
+      <SheetContent class="gap-0 overflow-hidden data-[side=right]:w-full data-[side=right]:sm:max-w-2xl">
+        <SheetHeader class="shrink-0 border-b px-6 py-5 pr-14">
           <SheetTitle>{{ $t('用户详情') }}</SheetTitle>
           <SheetDescription>{{ detail?.userName ?? $t('加载中…') }}</SheetDescription>
         </SheetHeader>
-        <div v-if="detailLoading" class="flex flex-col gap-3 px-4">
+        <div v-if="detailLoading" class="flex flex-col gap-3 p-6">
           <Skeleton v-for="i in 5" :key="i" class="h-8 w-full" />
         </div>
-        <div v-else-if="detail" class="flex flex-col gap-6 px-4 pb-6">
-          <PrivateAccountPanel v-if="detail.id" :key="detail.id" :user-id="detail.id" />
-          <Separator />
-          <dl class="grid grid-cols-2 gap-x-4 gap-y-3 text-sm">
-            <dt class="text-muted-foreground">{{ $t('用户 ID') }}</dt>
-            <dd class="font-mono break-all">{{ detail.id }}</dd>
-            <dt class="text-muted-foreground">{{ $t('用户名') }}</dt>
-            <dd>{{ detail.userName }}</dd>
-            <dt class="text-muted-foreground">{{ $t('邮箱') }}</dt>
-            <dd class="break-all">
-              {{ detail.email }}
-              <Badge v-if="detail.emailVerified" variant="secondary" class="ml-1">{{ $t('已验证') }}</Badge>
-              <Badge v-else variant="outline" class="ml-1">{{ $t('未验证') }}</Badge>
-            </dd>
-            <dt class="text-muted-foreground">{{ $t('类型') }}</dt>
-            <dd>{{ detail.kind === 'Bot' ? 'Bot' : $t('用户') }}</dd>
-            <dt class="text-muted-foreground">{{ $t('状态') }}</dt>
-            <dd>{{ STATUS_LABELS[String(detail.accountStatus)] ? $t(STATUS_LABELS[String(detail.accountStatus)]!) : detail.accountStatus }}</dd>
-            <dt class="text-muted-foreground">{{ $t('令牌版本') }}</dt>
-            <dd class="font-mono tabular-nums">{{ detail.tokenVersion ?? 0 }}</dd>
-            <dt class="text-muted-foreground">{{ $t('注册时间') }}</dt>
-            <dd><AdminDateTime :value="detail.createdAt" /></dd>
-            <dt class="text-muted-foreground">{{ $t('更新时间') }}</dt>
-            <dd><AdminDateTime :value="detail.updatedAt" /></dd>
-          </dl>
+        <div v-else-if="detail" :key="detail.id" class="flex min-h-0 flex-1 flex-col gap-6 overflow-y-auto p-6">
+          <section class="flex flex-col gap-4" aria-labelledby="user-account-overview">
+            <h3 id="user-account-overview" class="font-semibold">{{ $t('账号信息') }}</h3>
+            <dl class="grid grid-cols-[6rem_minmax(0,1fr)] gap-x-5 gap-y-2.5 text-sm sm:grid-cols-[7rem_minmax(0,1fr)]">
+              <dt class="text-muted-foreground">{{ $t('用户 ID') }}</dt>
+              <dd class="select-all break-all font-mono">{{ detail.id }}</dd>
+              <dt class="text-muted-foreground">{{ $t('用户名') }}</dt>
+              <dd class="break-words font-medium">{{ detail.userName }}</dd>
+              <dt class="text-muted-foreground">{{ $t('邮箱') }}</dt>
+              <dd class="break-all">
+                {{ detail.email || '—' }}
+                <Badge v-if="detail.emailVerified" variant="secondary" class="ml-1">{{ $t('已验证') }}</Badge>
+                <Badge v-else variant="outline" class="ml-1">{{ $t('未验证') }}</Badge>
+              </dd>
+              <dt class="text-muted-foreground">{{ $t('类型') }}</dt>
+              <dd>{{ detail.kind === 'Bot' ? 'Bot' : $t('用户') }}</dd>
+              <dt class="text-muted-foreground">{{ $t('状态') }}</dt>
+              <dd>{{ STATUS_LABELS[String(detail.accountStatus)] ? $t(STATUS_LABELS[String(detail.accountStatus)]!) : detail.accountStatus }}</dd>
+              <dt class="text-muted-foreground">{{ $t('令牌版本') }}</dt>
+              <dd class="font-mono tabular-nums">{{ detail.tokenVersion ?? 0 }}</dd>
+              <dt class="text-muted-foreground">{{ $t('注册时间') }}</dt>
+              <dd><AdminDateTime :value="detail.createdAt" /></dd>
+              <dt class="text-muted-foreground">{{ $t('更新时间') }}</dt>
+              <dd><AdminDateTime :value="detail.updatedAt" /></dd>
+            </dl>
+          </section>
+
+          <PrivateAccountPanel v-if="detail.id" :key="detail.id" :user-id="detail.id" :show-activities="false" />
 
           <Separator />
 
-          <FieldGroup>
-            <Field>
-              <FieldLabel for="user-role">{{ $t('平台角色') }}</FieldLabel>
-              <div class="flex items-center gap-2">
-                <Select v-model="pendingRole" :disabled="detail.id === currentUser?.userId">
-                  <SelectTrigger id="user-role" class="w-full">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectGroup>
-                      <SelectItem value="User">{{ $t('用户') }}</SelectItem>
-                      <SelectItem value="Organizer">{{ $t('组织者') }}</SelectItem>
-                      <SelectItem value="Administrator">{{ $t('管理员') }}</SelectItem>
-                    </SelectGroup>
-                  </SelectContent>
-                </Select>
-                <Button
-                  :disabled="roleSaving || pendingRole === String(detail.role ?? 'User') || detail.id === currentUser?.userId"
-                  @click="saveRole"
-                >
-                  <Spinner v-if="roleSaving" data-icon="inline-start" /> {{ $t('保存') }} </Button>
-              </div>
-              <FieldDescription v-if="detail.id === currentUser?.userId">{{ $t('不能修改自己的角色。') }}</FieldDescription>
-            </Field>
-            <Field>
-              <FieldLabel for="user-account-status">{{ $t('账户状态') }}</FieldLabel>
-              <div class="flex items-center gap-2">
-                <Select
-                  v-model="pendingAccountStatus"
-                  :disabled="detail.id === currentUser?.userId || detail.accountStatus === 'Anonymized'"
-                >
-                  <SelectTrigger id="user-account-status" class="w-full">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectGroup>
-                      <SelectItem
-                        v-for="option in MANAGED_ACCOUNT_STATUS_OPTIONS"
-                        :key="option.value"
-                        :value="option.value"
-                      >
-                        {{ $t(option.label) }}
-                      </SelectItem>
-                    </SelectGroup>
-                  </SelectContent>
-                </Select>
-                <Button
-                  :disabled="accountStatusSaving
-                    || pendingAccountStatus === detail.accountStatus
-                    || detail.id === currentUser?.userId
-                    || detail.accountStatus === 'Anonymized'"
-                  @click="saveAccountStatus"
-                >
-                  <Spinner v-if="accountStatusSaving" data-icon="inline-start" />
-                  {{ $t('保存') }}
-                </Button>
-              </div>
-              <FieldDescription v-if="detail.id === currentUser?.userId">
-                {{ $t('不能修改自己的账户状态。') }}
-              </FieldDescription>
-              <FieldDescription v-else-if="detail.accountStatus === 'Anonymized'">
-                {{ $t('已匿名化账户不可修改。') }}
-              </FieldDescription>
-              <FieldDescription v-else>
-                {{ $t('修改账户状态会吊销该用户的现有访问与刷新令牌。') }}
-              </FieldDescription>
-            </Field>
-            <Field>
-              <FieldLabel for="user-email-verification">{{ $t('邮箱激活状态') }}</FieldLabel>
-              <div class="flex items-center gap-2">
-                <Select
-                  v-model="pendingEmailVerification"
-                  :disabled="detail.accountStatus === 'Anonymized'"
-                >
-                  <SelectTrigger id="user-email-verification" class="w-full">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectGroup>
-                      <SelectItem value="Verified">{{ $t('已激活') }}</SelectItem>
-                      <SelectItem value="Unverified">{{ $t('未激活') }}</SelectItem>
-                    </SelectGroup>
-                  </SelectContent>
-                </Select>
-                <Button
-                  :disabled="emailVerificationSaving
-                    || (pendingEmailVerification === 'Verified') === detail.emailVerified
-                    || detail.accountStatus === 'Anonymized'"
-                  @click="saveEmailVerification"
-                >
-                  <Spinner v-if="emailVerificationSaving" data-icon="inline-start" />
-                  {{ $t('保存') }}
-                </Button>
-              </div>
-              <FieldDescription v-if="detail.accountStatus === 'Anonymized'">
-                {{ $t('已匿名化账户不可修改。') }}
-              </FieldDescription>
-              <FieldDescription v-else>
-                {{ $t('修改邮箱激活状态会吊销该用户的现有访问与刷新令牌。') }}
-              </FieldDescription>
-            </Field>
-          </FieldGroup>
+          <section class="flex flex-col gap-4" aria-labelledby="user-account-management">
+            <h3 id="user-account-management" class="font-semibold">{{ $t('角色与账户管理') }}</h3>
+            <FieldGroup>
+              <Field>
+                <FieldLabel for="user-role">{{ $t('平台角色') }}</FieldLabel>
+                <div class="flex items-center gap-2">
+                  <Select v-model="pendingRole" :disabled="detail.id === currentUser?.userId">
+                    <SelectTrigger id="user-role" class="w-full">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectGroup>
+                        <SelectItem value="User">{{ $t('用户') }}</SelectItem>
+                        <SelectItem value="Organizer">{{ $t('组织者') }}</SelectItem>
+                        <SelectItem value="Administrator">{{ $t('管理员') }}</SelectItem>
+                      </SelectGroup>
+                    </SelectContent>
+                  </Select>
+                  <Button
+                    :disabled="roleSaving || pendingRole === String(detail.role ?? 'User') || detail.id === currentUser?.userId"
+                    @click="saveRole"
+                  >
+                    <Spinner v-if="roleSaving" data-icon="inline-start" /> {{ $t('保存') }} </Button>
+                </div>
+                <FieldDescription v-if="detail.id === currentUser?.userId">{{ $t('不能修改自己的角色。') }}</FieldDescription>
+              </Field>
+              <Field>
+                <FieldLabel for="user-account-status">{{ $t('账户状态') }}</FieldLabel>
+                <div class="flex items-center gap-2">
+                  <Select
+                    v-model="pendingAccountStatus"
+                    :disabled="detail.id === currentUser?.userId || detail.accountStatus === 'Anonymized'"
+                  >
+                    <SelectTrigger id="user-account-status" class="w-full">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectGroup>
+                        <SelectItem
+                          v-for="option in MANAGED_ACCOUNT_STATUS_OPTIONS"
+                          :key="option.value"
+                          :value="option.value"
+                        >
+                          {{ $t(option.label) }}
+                        </SelectItem>
+                      </SelectGroup>
+                    </SelectContent>
+                  </Select>
+                  <Button
+                    :disabled="accountStatusSaving
+                      || pendingAccountStatus === detail.accountStatus
+                      || detail.id === currentUser?.userId
+                      || detail.accountStatus === 'Anonymized'"
+                    @click="saveAccountStatus"
+                  >
+                    <Spinner v-if="accountStatusSaving" data-icon="inline-start" />
+                    {{ $t('保存') }}
+                  </Button>
+                </div>
+                <FieldDescription v-if="detail.id === currentUser?.userId">
+                  {{ $t('不能修改自己的账户状态。') }}
+                </FieldDescription>
+                <FieldDescription v-else-if="detail.accountStatus === 'Anonymized'">
+                  {{ $t('已匿名化账户不可修改。') }}
+                </FieldDescription>
+                <FieldDescription v-else>
+                  {{ $t('修改账户状态会吊销该用户的现有访问与刷新令牌。') }}
+                </FieldDescription>
+              </Field>
+              <Field>
+                <FieldLabel for="user-email-verification">{{ $t('邮箱激活状态') }}</FieldLabel>
+                <div class="flex items-center gap-2">
+                  <Select
+                    v-model="pendingEmailVerification"
+                    :disabled="detail.accountStatus === 'Anonymized'"
+                  >
+                    <SelectTrigger id="user-email-verification" class="w-full">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectGroup>
+                        <SelectItem value="Verified">{{ $t('已激活') }}</SelectItem>
+                        <SelectItem value="Unverified">{{ $t('未激活') }}</SelectItem>
+                      </SelectGroup>
+                    </SelectContent>
+                  </Select>
+                  <Button
+                    :disabled="emailVerificationSaving
+                      || (pendingEmailVerification === 'Verified') === detail.emailVerified
+                      || detail.accountStatus === 'Anonymized'"
+                    @click="saveEmailVerification"
+                  >
+                    <Spinner v-if="emailVerificationSaving" data-icon="inline-start" />
+                    {{ $t('保存') }}
+                  </Button>
+                </div>
+                <FieldDescription v-if="detail.accountStatus === 'Anonymized'">
+                  {{ $t('已匿名化账户不可修改。') }}
+                </FieldDescription>
+                <FieldDescription v-else>
+                  {{ $t('修改邮箱激活状态会吊销该用户的现有访问与刷新令牌。') }}
+                </FieldDescription>
+              </Field>
+            </FieldGroup>
+          </section>
 
           <Separator />
 
