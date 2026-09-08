@@ -1,3 +1,4 @@
+import { sourceFile } from './support/feature-source'
 import { describe, expect, test } from 'bun:test'
 import {
   validateAppealStatement,
@@ -29,7 +30,7 @@ describe('participant action validation', () => {
 
 describe('participant action page wiring', () => {
   test('submits appeals explicitly and keeps failures visible in the dialog', async () => {
-    const page = await Bun.file(
+    const page = await sourceFile(
       new URL('../app/pages/competitions/[id]/my/team.vue', import.meta.url),
     ).text()
 
@@ -40,7 +41,7 @@ describe('participant action page wiring', () => {
   })
 
   test('uses a larger consultation dialog with explicit submission feedback', async () => {
-    const page = await Bun.file(
+    const page = await sourceFile(
       new URL('../app/pages/competitions/[id]/questions.vue', import.meta.url),
     ).text()
 
@@ -48,13 +49,13 @@ describe('participant action page wiring', () => {
     expect(page).toContain('class="min-h-44"')
     expect(page).toContain(':disabled="createPending || createSubject === \'Challenge\' && (challengesLoading || Boolean(challengeLoadError))"')
     expect(page).toContain('@click="submitCreate"')
-    expect(page).toContain('关联题目(必选)')
+    expect(page).toContain("ui.relatedQuestionsRequired")
     expect(page).toContain('<Alert v-else-if="challengeLoadError" variant="destructive">')
     expect(page).toContain('@click="loadChallengeOptions"')
   })
 
   test('accepts the password reset route emitted by email delivery', async () => {
-    const page = await Bun.file(
+    const page = await sourceFile(
       new URL('../app/pages/auth/password-reset.vue', import.meta.url),
     ).text()
 
@@ -62,10 +63,10 @@ describe('participant action page wiring', () => {
   })
 
   test('offers an anonymous non-disclosing verification email resend flow', async () => {
-    const register = await Bun.file(
+    const register = await sourceFile(
       new URL('../app/pages/auth/register.vue', import.meta.url),
     ).text()
-    const verification = await Bun.file(
+    const verification = await sourceFile(
       new URL('../app/pages/auth/verify-email.vue', import.meta.url),
     ).text()
 
@@ -75,22 +76,22 @@ describe('participant action page wiring', () => {
     expect(verification).toContain('authenticationRequestEmailVerification')
     expect(verification).toContain('v-model="email"')
     expect(verification).toContain("isLoggedIn.value")
-    expect(register).not.toContain('验证邮件已发送,请查收邮箱完成验证后登录。')
+    expect(register).not.toContain("ui.theVerificationEmailHasBeenSentPleaseCheckYourEmail")
   })
 
   test('offers an accessible password visibility toggle on every password form', async () => {
-    const component = await Bun.file(
-      new URL('../app/components/PasswordInput.vue', import.meta.url),
+    const component = await sourceFile(
+      new URL('../app/components/ui/password-input/PasswordInput.vue', import.meta.url),
     ).text()
     const pages = await Promise.all([
       '../app/pages/auth/login.vue',
       '../app/pages/auth/register.vue',
       '../app/pages/auth/password-reset.vue',
       '../app/pages/account/index.vue',
-    ].map(path => Bun.file(new URL(path, import.meta.url)).text()))
+    ].map(path => sourceFile(new URL(path, import.meta.url)).text()))
 
     expect(component).toContain(":type=\"visible ? 'text' : 'password'\"")
-    expect(component).toContain(":aria-label=\"$t(visible ? '隐藏密码' : '显示密码')\"")
+    expect(component).toContain(":aria-label=\"$t(visible ? 'ui.hidePassword' : 'ui.showPassword')\"")
     expect(component).toContain(':aria-pressed="visible"')
     expect(pages.every(page => page.includes('<PasswordInput'))).toBe(true)
     expect(pages.some(page => page.includes('type="password"'))).toBe(false)

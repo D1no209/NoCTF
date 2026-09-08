@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import { readFileSync } from 'node:fs'
+import { readFeatureSource as readFileSync } from './support/feature-source'
 
 const source = readFileSync(
   new URL('../app/pages/admin/competitions/[id]/submissions.vue', import.meta.url),
@@ -17,8 +17,8 @@ describe('protected Flag access', () => {
   })
 
   test('explains the role-specific audit behavior and keeps retry feedback', () => {
-    expect(source).toContain("$t('平台管理员读取 Flag 不记录审计日志。')")
-    expect(source).toContain("$t('比赛工作人员读取 Flag 会记录审计日志。')")
+    expect(source).toContain("$t('ui.platformAdministratorFlagAccessIsNotWrittenToTheAudit')")
+    expect(source).toContain("$t('ui.competitionStaffFlagAccessIsWrittenToTheAuditLog')")
     expect(source).toContain('v-else-if="flagError"')
     expect(source).toContain('@click="() => accessFlag()"')
   })

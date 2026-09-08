@@ -1,4 +1,4 @@
-import { platformConfigurationGet } from '~/api'
+import { platformConfigurationGet } from '../api'
 
 /** Platform branding (name/description/logo), loaded once for the whole app. */
 export function usePlatform() {
@@ -9,7 +9,7 @@ export function usePlatform() {
   async function load() {
     const { data, error: requestError } = await platformConfigurationGet()
     if (requestError || !data)
-      throw parseApiError(requestError, translate('加载平台配置失败'))
+      throw parseApiError(requestError, translate("ui.failedToLoadPlatformConfiguration"))
     return data ?? null
   }
 
@@ -21,7 +21,7 @@ export function usePlatform() {
       error.value = null
     }
     catch (requestError) {
-      error.value = parseApiError(requestError, translate('加载平台配置失败')).message
+      error.value = parseApiError(requestError, translate("ui.failedToLoadPlatformConfiguration")).message
     }
     finally {
       loading.value = false

@@ -1,6 +1,7 @@
+import { sourceFile } from './support/feature-source'
 import { describe, expect, test } from 'bun:test'
 
-const page = () => Bun.file(new URL('../app/pages/admin/competitions/[id]/teams.vue', import.meta.url)).text()
+const page = () => sourceFile(new URL('../app/pages/admin/competitions/[id]/teams.vue', import.meta.url)).text()
 
 describe('admin competition team details', () => {
   test('opens a detail sheet from the team name and resolves member profiles through the generated SDK', async () => {
@@ -8,7 +9,7 @@ describe('admin competition team details', () => {
 
     expect(source).toContain('userProfileGet')
     expect(source).toContain('@click="openTeamDetail(t)"')
-    expect(source).toContain("$t('队伍详情')")
+    expect(source).toContain("$t('ui.teamDetails')")
     expect(source).toContain('member.userId === selectedTeam.captainId')
   })
 
@@ -23,7 +24,7 @@ describe('admin competition team details', () => {
     expect(source).toContain('if (!teamId || !scoreAdjustmentValid.value || scoreAdjustmentPending.value) return')
     expect(source).toContain('competitionChallengeId: scoreAdjustmentChallengeId.value')
     expect(source).toContain('delta: scoreAdjustmentDelta.value')
-    expect(source).toContain("scoreAdjustmentError.value = parseApiError(requestError, translate('记录得分修正失败')).message")
+    expect(source).toContain("scoreAdjustmentError.value = parseApiError(requestError, translate(\"ui.failedToRecordTheScoreAdjustment\")).message")
 
     const catchStart = source.indexOf('catch (requestError)', source.indexOf('async function submitScoreAdjustment'))
     const finallyStart = source.indexOf('finally', catchStart)

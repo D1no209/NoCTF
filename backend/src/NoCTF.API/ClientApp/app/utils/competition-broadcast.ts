@@ -1,7 +1,7 @@
 import type {
   NoCtfapiEndpointsCompetitionsEventsCompetitionEventKindProtocol,
   NoCtfapiEndpointsCompetitionsEventsCompetitionEventResponse,
-} from '~/api'
+} from '../api'
 import { translate } from './i18n'
 
 export const competitionBroadcastKinds = [
@@ -65,29 +65,29 @@ export function mergeCompetitionBroadcasts(
 export function competitionBroadcastText(
   event: NoCtfapiEndpointsCompetitionsEventsCompetitionEventResponse,
 ): string {
-  const team = event.teamDisplayName ?? translate('某队伍')
-  const challenge = event.challengeTitle ?? translate('某题目')
-  if (!event.kind) return translate("赛事状态已更新")
+  const team = event.teamDisplayName ?? translate("ui.aTeam")
+  const challenge = event.challengeTitle ?? translate("ui.aChallenge")
+  if (!event.kind) return translate("ui.competitionStatusUpdated")
   const awdpSucceeded = event.gameplayFactState === 'Completed'
     && event.gameplayFactResult === 'Correct'
   const messages: Partial<Record<NoCtfapiEndpointsCompetitionsEventsCompetitionEventKindProtocol, string>> = {
-    FirstBloodAwarded: translate('队伍「{team}」获得题目「{challenge}」一血', { team, challenge }),
-    SecondBloodAwarded: translate('队伍「{team}」获得题目「{challenge}」二血', { team, challenge }),
-    ThirdBloodAwarded: translate('队伍「{team}」获得题目「{challenge}」三血', { team, challenge }),
-    TeamBanned: translate('队伍「{team}」由于「作弊」被封禁', { team }),
-    TeamBanCorrectionPublished: translate('队伍「{team}」申诉成功，封禁已撤销', { team }),
-    HintPublished: translate('题目「{challenge}」发布了新的提示', { challenge }),
-    ChallengeDescriptionUpdated: translate('题目「{challenge}」已更新描述', { challenge }),
-    ChallengePublished: translate('题目「{challenge}」已开放', { challenge }),
+    FirstBloodAwarded: translate("ui.teamEarnedFirstBloodOn2", { team, challenge }),
+    SecondBloodAwarded: translate("ui.teamEarnedSecondBloodOn2", { team, challenge }),
+    ThirdBloodAwarded: translate("ui.teamEarnedThirdBloodOn2", { team, challenge }),
+    TeamBanned: translate("ui.teamWasBannedForCheating", { team }),
+    TeamBanCorrectionPublished: translate("ui.teamWonItsAppealAndTheBanWasRevoked", { team }),
+    HintPublished: translate("ui.challengeHasANewHint", { challenge }),
+    ChallengeDescriptionUpdated: translate("ui.challengeHasAnUpdatedDescription", { challenge }),
+    ChallengePublished: translate("ui.challengeIsNowOpen", { challenge }),
     AwdpBreakResolved: awdpSucceeded
-      ? translate('队伍「{team}」攻击题目「{challenge}」成功', { team, challenge })
-      : translate('队伍「{team}」攻击题目「{challenge}」失败', { team, challenge }),
+      ? translate("ui.teamSuccessfullyAttackedChallenge", { team, challenge })
+      : translate("ui.teamFailedToAttackChallenge", { team, challenge }),
     AwdpFixResolved: awdpSucceeded
-      ? translate('队伍「{team}」防御题目「{challenge}」成功', { team, challenge })
-      : translate('队伍「{team}」防御题目「{challenge}」失败', { team, challenge }),
-    AnnouncementPublished: translate('赛事发布了新通知'),
+      ? translate("ui.teamSuccessfullyDefendedChallenge", { team, challenge })
+      : translate("ui.teamFailedToDefendChallenge", { team, challenge }),
+    AnnouncementPublished: translate("ui.aNewCompetitionNoticeWasPublished"),
   }
-  return messages[event.kind] ?? translate('赛事状态已更新')
+  return messages[event.kind] ?? translate("ui.competitionStatusUpdated")
 }
 
 export function competitionBroadcastTargetPath(

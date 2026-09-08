@@ -36,11 +36,11 @@ async function readSdkDownload(
   if (error || response?.ok === false) {
     throw parseApiError(
       error,
-      translate('下载失败（HTTP {status}）', { status: response?.status ?? '-' }),
+      translate("ui.downloadFailedHttp", { status: response?.status ?? '-' }),
     )
   }
   if (!(data instanceof Blob)) {
-    throw new ApiError(translate('下载响应格式无效'))
+    throw new ApiError(translate("ui.theDownloadResponseFormatIsInvalid"))
   }
   return {
     blob: data,

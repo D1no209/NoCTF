@@ -1,21 +1,22 @@
+import { sourceFile } from './support/feature-source'
 import { describe, expect, test } from 'bun:test'
 import { competitionChallengeConflictMessage } from '../app/lib/competition-challenge-conflict'
 import { statusErrorMessage } from '../app/utils/api-error'
 
 describe('competition challenge custom title', () => {
   test('allows an optional competition-only title while adding from the question bank', async () => {
-    const page = await Bun.file(
+    const page = await sourceFile(
       new URL('../app/pages/admin/competitions/[id]/challenges/index.vue', import.meta.url),
     ).text()
 
     expect(page).toContain('v-model="newCustomTitle"')
     expect(page).toContain('customTitle: newCustomTitle.value.trim() || null')
-    expect(page).toContain("$t('留空时使用题库模板标题')")
-    expect(page).toContain("$t('只修改本场比赛中的展示名称,不会更改题库模板')")
+    expect(page).toContain("$t('ui.leaveBlankToUseTheQuestionBankTemplateTitle')")
+    expect(page).toContain("$t('ui.changesTheDisplayNameForThisCompetitionOnlyAndDoes')")
   })
 
   test('allows restoring the template fallback from challenge settings', async () => {
-    const page = await Bun.file(
+    const page = await sourceFile(
       new URL('../app/pages/admin/competitions/[id]/challenges/[ccId].vue', import.meta.url),
     ).text()
 
@@ -40,10 +41,10 @@ describe('competition challenge custom title', () => {
   })
 
   test('keeps the add dialog and its inputs after an SDK error', async () => {
-    const page = await Bun.file(
+    const page = await sourceFile(
       new URL('../app/pages/admin/competitions/[id]/challenges/index.vue', import.meta.url),
     ).text()
-    const addHandler = page.slice(page.indexOf('async function addChallenge()'), page.indexOf('// ---- Delete / restore ----'))
+    const addHandler = page.slice(page.indexOf('async function addChallenge()'), page.indexOf('function closeDeleteDialog'))
 
     expect(addHandler).toContain('competitionChallengeConflictMessage(error)')
     expect(addHandler).not.toContain("selectedTemplateId.value = ''")

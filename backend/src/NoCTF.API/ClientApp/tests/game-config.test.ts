@@ -24,7 +24,7 @@ describe('CTF blood reward policies', () => {
     expect(BloodRewardPolicy.CurrentPointsPercentage).toBe(3)
     expect(BLOOD_REWARD_POLICIES).toContainEqual({
       value: BloodRewardPolicy.CurrentPointsPercentage,
-      label: '当前分值百分比',
+      label: 'ui.currentScorePercentage',
     })
   })
 })

@@ -1,3 +1,4 @@
+import { sourceFile } from './support/feature-source'
 import { describe, expect, test } from 'bun:test'
 import {
   emptyDefinition,
@@ -56,16 +57,16 @@ describe('AWDP Checker Fix input', () => {
       direction: 'Pwn',
       definitionJson: serializeDefinition('Awdp', model),
     })
-    const component = await Bun.file(
-      new URL('../app/components/admin/DefinitionCheckerSection.vue', import.meta.url),
+    const component = await sourceFile(
+      new URL('../app/features/admin/DefinitionCheckerSection.vue', import.meta.url),
     ).text()
-    const translations = await Bun.file(
+    const translations = await sourceFile(
       new URL('../app/locales/en.ts', import.meta.url),
     ).text()
 
-    expect(issues).toContain('向 Checker 提供 Fix 包前必须启用 Checker')
+    expect(issues).toContain("向 Checker 提供 Fix 包前必须启用 Checker")
     expect(component).toContain('v-model="model.checkerFixInput"')
-    expect(component).toContain('/noctf/fix')
+    expect(component).toContain('ui.beforeItStartsTheCheckerReceivesThePlatformValidatedFix')
     expect(translations).toContain('Provide the Fix package to the Checker')
   })
 })

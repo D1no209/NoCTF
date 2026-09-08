@@ -1,3 +1,4 @@
+import { sourceFile } from './support/feature-source'
 import { describe, expect, test } from 'bun:test'
 import type {
   NoCtfapiEndpointsAdministrationCompetitionsCompetitionTrackFailureCodeProtocol,
@@ -76,8 +77,8 @@ describe('competition track error presentation', () => {
 
 describe('competition track pages', () => {
   test('uses generated SDK operations and keeps pending/error state explicit', async () => {
-    const admin = await Bun.file(new URL('../app/pages/admin/competitions/[id]/tracks.vue', import.meta.url)).text()
-    const teams = await Bun.file(new URL('../app/pages/admin/competitions/[id]/teams.vue', import.meta.url)).text()
+    const admin = await sourceFile(new URL('../app/pages/admin/competitions/[id]/tracks.vue', import.meta.url)).text()
+    const teams = await sourceFile(new URL('../app/pages/admin/competitions/[id]/teams.vue', import.meta.url)).text()
 
     expect(admin).toContain('adminCompetitionTracksGet')
     expect(admin).toContain('adminCompetitionTracksUpdate')
@@ -87,7 +88,7 @@ describe('competition track pages', () => {
     expect(admin).toContain('clientId: crypto.randomUUID()')
     expect(admin).toContain(':key="track.clientId"')
     expect(admin).not.toContain(':key="`${track.key}-${index}`"')
-    expect(admin).toContain('需要填写邀请码')
+    expect(admin).toContain("ui.trackRequiresAnInvitationCode")
     expect(admin).toContain('error.value = competitionTrackErrorMessage')
     expect(teams).toContain('adminTeamTrackAssign')
     expect(teams).toContain('body: { trackKey }')
@@ -95,8 +96,8 @@ describe('competition track pages', () => {
   })
 
   test('exposes participant selection and per-track leaderboard switching', async () => {
-    const overview = await Bun.file(new URL('../app/pages/competitions/[id]/index.vue', import.meta.url)).text()
-    const leaderboard = await Bun.file(new URL('../app/pages/competitions/[id]/leaderboard.vue', import.meta.url)).text()
+    const overview = await sourceFile(new URL('../app/pages/competitions/[id]/index.vue', import.meta.url)).text()
+    const leaderboard = await sourceFile(new URL('../app/pages/competitions/[id]/leaderboard.vue', import.meta.url)).text()
 
     expect(overview).toContain('listCompetitionTracks')
     expect(overview).toContain('trackKey: createTrackKey.value')
@@ -109,7 +110,7 @@ describe('competition track pages', () => {
     expect(overview).toContain('response?.status === 404')
     expect(overview).toContain('teamLoadError')
     expect(overview).toContain('trackLoadError')
-    expect(overview).toContain("translate('请选择参赛赛道。')")
+    expect(overview).toContain("translate(\"ui.selectACompetitionTrack\")")
     expect(overview).toContain('createValidationError')
     expect(overview).toContain('teamMembershipErrorMessage')
     expect(overview).toContain("invitationToken.length !== 32")
@@ -125,11 +126,11 @@ describe('competition track pages', () => {
     expect(leaderboard).toContain('isAdministrator.value')
     expect(leaderboard).toContain('!track.isInternal && (track.isViewerTrack || track.visibleOnLeaderboard)')
     expect(leaderboard).toContain("const allTracksKey = '__all_tracks__'")
-    expect(leaderboard).toContain('<SelectItem :value="allTracksKey">{{ $t(\'所有赛道\') }}</SelectItem>')
+    expect(leaderboard).toContain("<SelectItem :value=\"allTracksKey\">{{ $t('ui.allTracks') }}</SelectItem>")
     expect(leaderboard).toContain('const displayRanks = computed')
     expect(leaderboard).toContain("(right.totalScore ?? 0) - (left.totalScore ?? 0)")
     expect(leaderboard).toContain('displayRank(team)')
-    expect(leaderboard).not.toContain("selectedAllTracks.value ? translate('赛道名次')")
+    expect(leaderboard).not.toContain("selectedAllTracks.value ? translate(\"ui.trackRank\")")
     expect(leaderboard).toContain('trackName(team.trackKey)')
   })
 })

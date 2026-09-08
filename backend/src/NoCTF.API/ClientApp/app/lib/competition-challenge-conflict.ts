@@ -27,11 +27,11 @@ export function competitionChallengeConflictMessage(error: unknown): string | un
 
   switch (code) {
     case 'ChallengeTemplateConflict':
-      return translate('该题目已加入当前比赛,请编辑已有题目。')
+      return translate("ui.thisChallengeIsAlreadyInTheCompetitionEditTheExisting")
     case 'ChallengeOrderConflict':
-      return translate('该顺序已被其他题目占用,请更换顺序。')
+      return translate("ui.thisOrderIsAlreadyUsedByAnotherChallengeChooseA")
     case 'ResourceIdConflict':
-      return translate('题目资源标识冲突,请重新添加。')
+      return translate("ui.theChallengeResourceIdentifierConflictsWithAnExistingResourceAdd")
     default:
       return undefined
   }

@@ -1,3 +1,4 @@
+import { sourceFile } from './support/feature-source'
 import { describe, expect, test } from 'bun:test'
 import type {
   NoCtfapiEndpointsCompetitionsEventsCompetitionEventResponse,
@@ -398,7 +399,7 @@ describe('AWDP control screen implementation contract', () => {
       const states = awdpTeamChallengeStates({ ...catalog, items }, schema, snapshot.teams![0]!, [])
       expect(states.map(state => state.competitionChallengeId)).toEqual(items.map(item => item.id))
     }
-    const page = await Bun.file(new URL('../app/pages/competitions/[id]/awdp-live.vue', import.meta.url)).text()
+    const page = await sourceFile(new URL('../app/pages/competitions/[id]/awdp-live.vue', import.meta.url)).text()
     expect(page).toContain('v-for="challenge in selectedChallengeStates"')
     expect(page).not.toContain('selectedChallengeStates.slice(')
     expect(page).toContain('grid-auto-rows: minmax(150px, max-content)')
@@ -406,24 +407,24 @@ describe('AWDP control screen implementation contract', () => {
     expect(page).toContain('overflow-y: auto')
     expect(page).toContain(':key="selectedTeam.teamId"')
     expect(page).toContain('tabindex="0"')
-    expect(page).toContain('@mouseenter="teamPanelHovered = true"')
-    expect(page).toContain('@focusin="teamPanelFocused = true"')
+    expect(page).toContain('@mouseenter="onMouseenterTeamPanelHovered(true)"')
+    expect(page).toContain('@focusin="onFocusinTeamPanelFocused(true)"')
     expect(page).toContain('if (!teamCarouselPaused.value) selectNextTeam()')
     expect(page).toContain(':title="challenge.title"')
   })
 
   test('uses generated SDK data, FIFO playback, SignalR invalidation, and four code-native animations', async () => {
-    const page = await Bun.file(
+    const page = await sourceFile(
       new URL('../app/pages/competitions/[id]/awdp-live.vue', import.meta.url),
     ).text()
-    const shell = await Bun.file(
+    const shell = await sourceFile(
       new URL('../app/pages/admin/competitions/[id].vue', import.meta.url),
     ).text()
-    const stage = await Bun.file(
-      new URL('../app/components/awdp-control/AwdpEventStage.vue', import.meta.url),
+    const stage = await sourceFile(
+      new URL('../app/features/awdp-control/AwdpEventStage.vue', import.meta.url),
     ).text()
-    const ticker = await Bun.file(
-      new URL('../app/components/awdp-control/AwdpEventTicker.vue', import.meta.url),
+    const ticker = await sourceFile(
+      new URL('../app/features/awdp-control/AwdpEventTicker.vue', import.meta.url),
     ).text()
 
     expect(page).toContain('definePageMeta({ layout: false })')
@@ -433,7 +434,7 @@ describe('AWDP control screen implementation contract', () => {
     expect(page).toContain('competitionEventChanged: () => void refreshLatest()')
     expect(page).toContain('playbackQueue')
     expect(page).toContain('const resolvedEvents = computed(() => awdpPlaybackEvents(events.value))')
-    expect(page).not.toContain("t('操作已提交')")
+    expect(page).not.toContain("t('ui.operationSubmitted')")
     expect(page).toContain('PLAYBACK_DURATION_MS = 5_400')
     expect(page).toContain('carouselTimer = setInterval(advanceTeamCarousel, 8_000)')
     expect(page).toContain("directionIcon(challenge.direction)")
@@ -459,7 +460,7 @@ describe('AWDP control screen implementation contract', () => {
     expect(stage).toContain('AwdpDefenseSuccessAnimation')
     expect(stage).toContain('AwdpDefenseFailureAnimation')
     expect(ticker).toContain('requestAnimationFrame(tick)')
-    expect(ticker).not.toContain("t('操作已提交')")
+    expect(ticker).not.toContain("t('ui.operationSubmitted')")
     expect(ticker).not.toContain('<marquee')
     expect(ticker).not.toContain('@keyframes marquee')
   })

@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import { updateNullableNumber } from '../app/components/admin/number-list'
+import { updateNullableNumber } from "../app/components/ui/list-editor/number-list"
 
 describe('number list editor', () => {
   test('keeps the row when a numeric input is temporarily empty', () => {

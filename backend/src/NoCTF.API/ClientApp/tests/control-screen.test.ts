@@ -1,3 +1,4 @@
+import { sourceFile } from './support/feature-source'
 import { describe, expect, test } from 'bun:test'
 import type {
   NoCtfapiEndpointsCompetitionsScoreboardChallengeCatalogResponse,
@@ -147,16 +148,16 @@ describe('CTF control screen projection', () => {
   })
 
   test('keeps challenge telemetry wired to the responsive city camera', async () => {
-    const page = await Bun.file(
+    const page = await sourceFile(
       new URL('../app/pages/competitions/[id]/live.vue', import.meta.url),
     ).text()
-    const shell = await Bun.file(
+    const shell = await sourceFile(
       new URL('../app/pages/admin/competitions/[id].vue', import.meta.url),
     ).text()
-    const scene = await Bun.file(
+    const scene = await sourceFile(
       new URL('../app/lib/live-city-3d.ts', import.meta.url),
     ).text()
-    const oldScreenExists = await Bun.file(
+    const oldScreenExists = await sourceFile(
       new URL('../app/pages/competitions/[id]/screen.vue', import.meta.url),
     ).exists()
 
@@ -168,10 +169,10 @@ describe('CTF control screen projection', () => {
     expect(page).toContain('celebrationQueue')
     expect(page).toContain('LiveCityScene')
     expect(page).toContain('controlScreenPublicEntries')
-    expect(page).toContain("entry.rank ?? '—'")
+    expect(page).toContain("entry.rank ?? $t('ui.symbol')")
     expect(page).toContain('scoreboardRankingStateLabel(entry.rankingState)')
     expect(page).not.toContain('rankClass(index + 1)')
-    expect(page).toContain("t('全部公开赛道')")
+    expect(page).toContain("t('ui.allPublicTracks')")
     expect(page).not.toContain('selectedTrackKey')
     expect(page).toContain("competition.value.mode !== 'Ctf'")
     expect(page).not.toContain('$fetch(')
@@ -179,8 +180,8 @@ describe('CTF control screen projection', () => {
     expect(oldScreenExists).toBe(false)
     expect(shell).not.toContain('/screen')
     expect(shell).toContain("competition.value?.mode === 'Awdp'")
-    expect(shell).toContain('label: translate("中控大屏")')
-    expect(shell).toContain('label: translate("3D 大屏")')
+    expect(shell).toContain("label: translate(\"ui.controlScreen\")")
+    expect(shell).toContain("label: translate(\"ui.3dLiveScreen\")")
     expect(scene).toContain('fitLiveCityFrame(this.worldRadius, this.worldHeight,')
     expect(scene).toContain("window.addEventListener('resize', this.resize)")
     expect(scene).toContain("window.removeEventListener('resize', this.resize)")

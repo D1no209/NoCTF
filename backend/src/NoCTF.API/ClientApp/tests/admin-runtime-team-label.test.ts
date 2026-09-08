@@ -2,9 +2,7 @@ import { describe, expect, test } from 'bun:test'
 import type { NoCtfapiEndpointsAdministrationRuntimeAdminRuntimeResponse } from '../app/api'
 import { adminRuntimeTeamLabel } from '../app/utils/admin-runtime'
 
-const t = (source: string, values: Record<string, string | number> = {}) =>
-  source.replace(/\{(\w+)\}/g, (match, key: string) =>
-    values[key] === undefined ? match : String(values[key]))
+import { translate as t } from '../app/utils/i18n'
 
 function runtime(
   purpose: NoCtfapiEndpointsAdministrationRuntimeAdminRuntimeResponse['purpose'],

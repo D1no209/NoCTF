@@ -3,9 +3,9 @@ import {
   loginEndpoint,
   logoutAllEndpoint,
   logoutEndpoint,
-} from '~/api'
-import type { NoCtfapiEndpointsAuthenticationCurrentUserResponse } from '~/api'
-import { getAccessToken, refreshSession, setAccessToken } from '~/lib/session'
+} from '../api'
+import type { NoCtfapiEndpointsAuthenticationCurrentUserResponse } from '../api'
+import { getAccessToken, refreshSession, setAccessToken } from '../lib/session'
 
 export type CurrentUser = NoCtfapiEndpointsAuthenticationCurrentUserResponse
 

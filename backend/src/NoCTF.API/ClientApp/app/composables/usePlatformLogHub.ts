@@ -1,8 +1,8 @@
 import { HubConnectionBuilder, HubConnectionState, HttpTransportType, LogLevel } from '@microsoft/signalr'
 import type { HubConnection } from '@microsoft/signalr'
-import type { NoCtfapiEndpointsAdministrationPlatformPlatformLogResponse } from '~/api'
-import { getRealtimeAccessToken } from '~/lib/session'
-import { startRealtimeWithRetry } from '~/lib/realtime-retry'
+import type { NoCtfapiEndpointsAdministrationPlatformPlatformLogResponse } from '../api'
+import { getRealtimeAccessToken } from '../lib/session'
+import { startRealtimeWithRetry } from '../lib/realtime-retry'
 
 export type PlatformLogHubState = 'disconnected' | 'connecting' | 'connected' | 'reconnecting'
 

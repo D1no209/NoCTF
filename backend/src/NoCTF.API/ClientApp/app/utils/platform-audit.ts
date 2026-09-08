@@ -1,82 +1,82 @@
 import type {
   NoCtfapiEndpointsAdministrationPlatformPlatformAuditLogResponse,
   NoCtfapiEndpointsCompetitionsEventsCompetitionEventKindProtocol,
-} from '~/api'
+} from '../api'
 import { translate } from './i18n'
 
 type AuditLog = NoCtfapiEndpointsAdministrationPlatformPlatformAuditLogResponse
 
 const COMPETITION_STATUS_LABELS: Record<string, string> = {
-  Draft: '草稿',
-  Visible: '可见',
-  Published: '已发布',
-  Running: '进行中',
-  Paused: '已暂停',
-  Finished: '已结束',
+  Draft: "ui.draft",
+  Visible: "ui.visible",
+  Published: "ui.published",
+  Running: "ui.running",
+  Paused: "ui.suspended",
+  Finished: "ui.finished",
 }
 
 const VISIBILITY_LABELS: Record<string, string> = {
-  Normal: '正常',
-  Frozen: '冻结',
-  Blackout: '封榜',
+  Normal: "ui.normal",
+  Frozen: "ui.freeze",
+  Blackout: "ui.banTheList",
 }
 
 const ACCOUNT_ACTION_LABELS: Record<string, string> = {
-  Activated: '激活账户',
-  Banned: '封禁账户',
-  Disabled: '禁用账户',
-  EmailVerified: '激活用户邮箱',
-  EmailUnverified: '撤销用户邮箱激活',
-  Anonymized: '匿名化账户',
-  PhysicallyDeleted: '物理删除账户',
+  Activated: "ui.activateAccount",
+  Banned: "ui.banAccount",
+  Disabled: "ui.disableAccount",
+  EmailVerified: "ui.activateUserEmail",
+  EmailUnverified: "ui.revokeUserEmailActivation",
+  Anonymized: "ui.anonymizeAccount",
+  PhysicallyDeleted: "ui.permanentlyDeleteAccount",
 }
 
 const LIFECYCLE_REASON_LABELS: Record<string, string> = {
-  manual_make_visible: '公开竞赛',
-  manual_publish: '发布竞赛',
-  manual_start: '启动竞赛',
-  manual_pause: '暂停竞赛',
-  manual_resume: '恢复竞赛',
-  manual_finish: '结束竞赛',
+  manual_make_visible: "ui.makeCompetitionVisible",
+  manual_publish: "ui.postAContest",
+  manual_start: "ui.startCompetition",
+  manual_pause: "ui.pauseCompetition",
+  manual_resume: "ui.resumeCompetition",
+  manual_finish: "ui.finishCompetition",
 }
 
 const EVENT_ACTION_LABELS: Partial<Record<NoCtfapiEndpointsCompetitionsEventsCompetitionEventKindProtocol, string>> = {
-  CompetitionCreated: '创建竞赛',
-  CompetitionUpdated: '更新竞赛',
-  CompetitionDeleted: '删除竞赛',
-  ChallengeCreated: '添加竞赛题目',
-  ChallengeUpdated: '更新竞赛题目',
-  ChallengePublished: '发布竞赛题目',
-  ChallengeUnpublished: '下线竞赛题目',
-  ChallengeDeleted: '删除竞赛题目',
-  HintPublished: '发布题目提示',
-  TeamRegistrationChanged: '审核队伍报名',
-  TeamDeleted: '解散参赛队伍',
-  TeamBanned: '封禁参赛队伍',
-  TeamUnbanned: '解除队伍封禁',
-  ProtectedGameplayFactValueAccessed: '查看受保护 Flag',
-  GameplayFactPatchDownloaded: '下载提交 Patch',
-  CheatIncidentConfirmed: '确认作弊并封禁队伍',
-  CheatIncidentDismissed: '驳回作弊事件',
-  CheatIncidentSuperseded: '取代作弊事件处置',
-  CheatIncidentCorrected: '纠正作弊事件处置',
-  CompetitionArchiveExported: '导出竞赛归档',
-  TeamBanAppealUpheld: '维持队伍封禁',
-  TeamBanAppealAccepted: '通过队伍申诉',
-  TeamBanCorrectionPublished: '发布队伍封禁纠正',
-  RuntimeForceTerminationRequested: '请求强制终止运行环境',
-  RuntimeForceTerminationCompleted: '完成强制终止运行环境',
-  RuntimeForceTerminationFailed: '强制终止运行环境失败',
-  AnnouncementPublished: '发布竞赛公告',
-  ChallengeDescriptionUpdated: '更新题目描述',
-  TrackConfigurationUpdated: '更新赛道配置',
-  TeamTrackChanged: '调整队伍赛道',
+  CompetitionCreated: "ui.createContest",
+  CompetitionUpdated: "ui.updateCompetition",
+  CompetitionDeleted: "ui.deleteContest",
+  ChallengeCreated: "ui.addCompetitionChallenge",
+  ChallengeUpdated: "ui.updateCompetitionChallenge",
+  ChallengePublished: "ui.publishCompetitionChallenge",
+  ChallengeUnpublished: "ui.unpublishCompetitionChallenge",
+  ChallengeDeleted: "ui.deleteCompetitionChallenge",
+  HintPublished: "ui.publishChallengeHint",
+  TeamRegistrationChanged: "ui.reviewTeamRegistration",
+  TeamDeleted: "ui.disbandCompetitionTeam",
+  TeamBanned: "ui.banCompetitionTeam",
+  TeamUnbanned: "ui.unbanCompetitionTeam",
+  ProtectedGameplayFactValueAccessed: "ui.viewProtectedFlag",
+  GameplayFactPatchDownloaded: "ui.downloadSubmissionPatch",
+  CheatIncidentConfirmed: "ui.confirmCheatingAndBanTeam",
+  CheatIncidentDismissed: "ui.dismissCheatingIncident",
+  CheatIncidentSuperseded: "ui.supersedeCheatIncidentResolution",
+  CheatIncidentCorrected: "ui.correctCheatIncidentResolution",
+  CompetitionArchiveExported: "ui.exportCompetitionArchive",
+  TeamBanAppealUpheld: "ui.upholdTeamBan",
+  TeamBanAppealAccepted: "ui.acceptTeamAppeal",
+  TeamBanCorrectionPublished: "ui.publishTeamBanCorrection",
+  RuntimeForceTerminationRequested: "ui.requestForcedRuntimeTermination",
+  RuntimeForceTerminationCompleted: "ui.completeForcedRuntimeTermination",
+  RuntimeForceTerminationFailed: "ui.forcedRuntimeTerminationFailed",
+  AnnouncementPublished: "ui.publishCompetitionAnnouncement",
+  ChallengeDescriptionUpdated: "ui.updateChallengeDescription",
+  TrackConfigurationUpdated: "ui.updateTrackConfiguration",
+  TeamTrackChanged: "ui.changeTeamTrack",
 }
 
 function withReason(action: string, reason: string | null | undefined): string {
   const normalized = reason?.trim()
   return normalized && !normalized.startsWith('manual_')
-    ? translate('{action} · 原因：{reason}', { action: translate(action), reason: normalized })
+    ? translate("ui.reason2", { action: translate(action), reason: normalized })
     : translate(action)
 }
 
@@ -95,16 +95,16 @@ export function platformAuditActionText(log: AuditLog): string {
     const reasonAction = log.reason ? LIFECYCLE_REASON_LABELS[log.reason] : null
     if (reasonAction) return translate(reasonAction)
     if (log.fromCompetitionStatus !== null && log.fromCompetitionStatus !== undefined) {
-      return translate('变更竞赛状态：{from} → {to}', {
+      return translate("ui.changeCompetitionStatus", {
         from: statusLabel(log.fromCompetitionStatus),
         to: statusLabel(log.toCompetitionStatus),
       })
     }
-    return translate('变更竞赛生命周期')
+    return translate("ui.changeCompetitionLifecycle")
   }
 
   if (log.kind === 'CompetitionLeaderboardVisibility') {
-    return translate('调整排行榜可见性：{from} → {to}', {
+    return translate("ui.changeLeaderboardVisibility", {
       from: visibilityLabel(log.fromLeaderboardVisibility),
       to: visibilityLabel(log.toLeaderboardVisibility),
     })
@@ -112,19 +112,19 @@ export function platformAuditActionText(log: AuditLog): string {
 
   if (log.kind === 'UserAccountLifecycle') {
     const action = log.userAccountAction ? ACCOUNT_ACTION_LABELS[String(log.userAccountAction)] : null
-    return withReason(action ?? '变更账户状态', log.reason)
+    return withReason(action ?? "ui.changeAccountStatus", log.reason)
   }
 
   if (log.kind === 'CompetitionAdministration') {
-    return withReason('强制级联删除竞赛', log.reason)
+    return withReason("ui.forceDeleteCompetition", log.reason)
   }
 
   if (log.kind === 'PlatformAdministration') {
     return log.platformAdministrationAction === 'AuditArchiveExported'
-      ? translate('导出平台审计归档')
-      : translate('执行平台管理操作')
+      ? translate("ui.exportPlatformAuditArchive")
+      : translate("ui.performPlatformAdministrationAction")
   }
 
   const action = log.competitionEventKind ? EVENT_ACTION_LABELS[log.competitionEventKind] : null
-  return withReason(action ?? '执行竞赛管理操作', log.reason)
+  return withReason(action ?? "ui.performCompetitionAdministrationAction", log.reason)
 }

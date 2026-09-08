@@ -1,3 +1,4 @@
+import { sourceFile } from './support/feature-source'
 import { describe, expect, test } from 'bun:test'
 import { accessTokenNeedsRefresh, shouldRefreshSession } from '../app/lib/auth-refresh'
 import { statusErrorMessage } from '../app/utils/api-error'
@@ -34,9 +35,9 @@ describe('authentication response refresh', () => {
   })
 
   test('uses generated refresh and realtime token factories without handwritten routes', async () => {
-    const session = await Bun.file(new URL('../app/lib/session.ts', import.meta.url)).text()
-    const competitionHub = await Bun.file(new URL('../app/composables/useCompetitionHub.ts', import.meta.url)).text()
-    const platformHub = await Bun.file(new URL('../app/composables/usePlatformLogHub.ts', import.meta.url)).text()
+    const session = await sourceFile(new URL('../app/lib/session.ts', import.meta.url)).text()
+    const competitionHub = await sourceFile(new URL('../app/composables/useCompetitionHub.ts', import.meta.url)).text()
+    const platformHub = await sourceFile(new URL('../app/composables/usePlatformLogHub.ts', import.meta.url)).text()
 
     expect(session).toContain('refreshTokenEndpoint({ client: refreshClient })')
     expect(session).not.toContain("fetch('/api/v1/auth/refresh'")

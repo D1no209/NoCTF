@@ -1,3 +1,4 @@
+import { sourceFile } from './support/feature-source'
 import { expect, test } from 'bun:test'
 import { gatewayHost, gatewayOrigin, publicGatewayFailure, publicGatewayState } from '../app/utils/public-gateway'
 
@@ -15,12 +16,12 @@ test('gateway origins reject credentials paths query fragments and insecure publ
   expect(gatewayOrigin('http://192.0.2.1:8080')).toBe('http://192.0.2.1:8080')
 })
 test('independent gateway failures have specific user-facing explanations', () => {
-  expect(publicGatewayFailure('GatewayDisabled')).toContain('已关闭')
-  expect(publicGatewayFailure('RuntimeBindingUnavailable')).toContain('端口绑定')
-  expect(publicGatewayState('Ready')).toContain('已就绪')
+  expect(publicGatewayFailure('GatewayDisabled')).toContain("关闭")
+  expect(publicGatewayFailure('RuntimeBindingUnavailable')).toContain("无法确认该实例的端口绑定")
+  expect(publicGatewayState('Ready')).toContain("公网入口已就绪")
 })
 test('gateway page uses generated contracts and preserves async application and field errors', async () => {
-  const page = await Bun.file(new URL('../app/pages/admin/platform/public-gateway.vue', import.meta.url)).text()
+  const page = await sourceFile(new URL('../app/pages/admin/platform/public-gateway.vue', import.meta.url)).text()
   expect(page).toContain('adminPlatformGetPublicGatewayStatus')
   expect(page).toContain('adminPlatformUpdatePublicGateway')
   expect(page).toContain('usePolling(readStatus')
@@ -29,14 +30,14 @@ test('gateway page uses generated contracts and preserves async application and 
   expect(page).toContain('gatewayHost(form.publicRuntimeHost)')
   expect(page).toContain('gatewayHost(form.directRuntimeHostOverride)')
   expect(page).toContain('namespaceIsolationAvailable')
-  expect(page).toContain("$t('内网穿透')")
+  expect(page).toContain("$t('ui.intranetTunneling')")
   expect(page).not.toContain("$t('公网访问')")
-  expect(page).toContain("$t('直连端口')")
-  expect(page).toContain("$t('公网端口')")
-  expect(page).toContain("endpoint.publicPort ?? '—'")
+  expect(page).toContain("$t('ui.directPort')")
+  expect(page).toContain("$t('ui.publicPort')")
+  expect(page).toContain("endpoint.publicPort ?? $t('ui.symbol')")
   expect(page).not.toContain('endpoint.publicPort ?? endpoint.hostPort')
   expect(page).not.toContain('webServer.password')
-  const runtime = await Bun.file(new URL('../app/components/challenges/RuntimeCard.vue', import.meta.url)).text()
+  const runtime = await sourceFile(new URL('../app/features/challenges/RuntimeCard.vue', import.meta.url)).text()
   expect(runtime).toContain("runtime.value?.access?.route !== 'Gateway'")
   expect(runtime).toContain('clearInterval(publicTimer)')
 })

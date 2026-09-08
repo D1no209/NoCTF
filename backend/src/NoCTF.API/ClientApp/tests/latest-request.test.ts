@@ -1,3 +1,4 @@
+import { sourceFile } from './support/feature-source'
 import { describe, expect, test } from 'bun:test'
 import { createLatestRequestGuard } from '../app/lib/latest-request'
 
@@ -24,12 +25,12 @@ describe('latest request guard', () => {
     const files = [
       '../app/pages/admin/competitions/[id]/cheats.vue',
       '../app/pages/competitions/[id]/questions.vue',
-      '../app/components/notifications/NotificationCenter.vue',
+      '../app/features/notifications/NotificationCenter.vue',
       '../app/pages/admin/platform/users.vue',
     ]
 
     for (const file of files) {
-      const source = await Bun.file(new URL(file, import.meta.url)).text()
+      const source = await sourceFile(new URL(file, import.meta.url)).text()
       expect(source).toContain('createLatestRequestGuard')
       expect(source).toContain('.isCurrent(request)')
     }

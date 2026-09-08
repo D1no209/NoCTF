@@ -2,7 +2,7 @@ import type { InjectionKey } from 'vue'
 import type {
   NoCtfapiEndpointsCompetitionsCompetitionAdministrationRoleProtocol,
   NoCtfapiEndpointsCompetitionsCompetitionResponse,
-} from '~/api'
+} from '../api'
 
 /**
  * My role inside one competition, derived in the [id] shell:

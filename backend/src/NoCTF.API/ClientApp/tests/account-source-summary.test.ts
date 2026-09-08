@@ -1,6 +1,6 @@
 import { expect, test } from 'bun:test'
 import { summarizeAccountSources } from '../app/utils/account-source-summary'
-import { readFileSync } from 'node:fs'
+import { readFeatureSource as readFileSync } from './support/feature-source'
 
 test('common IPs summarize known addresses without exposing individual submissions', () => {
   const input = [
@@ -34,15 +34,15 @@ test('platform user sheet prioritizes account information and hides the activity
   const page = read('pages/admin/platform/users.vue')
   expect(page).not.toContain('<Card')
   expect(page).toContain(':show-activities="false"')
-  expect(page.indexOf('id="user-account-overview"')).toBeLessThan(page.indexOf('<PrivateAccountPanel'))
-  expect(page.indexOf('<PrivateAccountPanel')).toBeLessThan(page.indexOf('id="user-account-management"'))
+  expect(page.indexOf('id="user-account-overview"')).toBeLessThan(page.indexOf("<component :is=\"PrivateAccountPanel\""))
+  expect(page.indexOf("<component :is=\"PrivateAccountPanel\"")).toBeLessThan(page.indexOf('id="user-account-management"'))
   expect(page).toContain('data-[side=right]:sm:max-w-2xl')
   expect(page).toContain('flex min-h-0 flex-1 flex-col gap-6 overflow-y-auto')
   for (const field of ['id', 'userName', 'email', 'kind', 'accountStatus', 'tokenVersion', 'createdAt', 'updatedAt']) {
     expect(page).toContain(`detail.${field}`)
   }
-  const panel = read('components/account/PrivateAccountPanel.vue')
+  const panel = read('features/account/PrivateAccountPanel.vue')
   expect(panel).toContain('showActivities: true')
   expect(panel).toContain('<template v-if="showActivities">')
-  expect(read('components/account/SchoolIdentityForm.vue')).toContain("$t('个人信息')")
+  expect(read('features/account/SchoolIdentityForm.vue')).toContain("$t('ui.personalInformation')")
 })

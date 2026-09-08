@@ -1,7 +1,8 @@
+import { sourceFile } from './support/feature-source'
 import { describe, expect, test } from 'bun:test'
 
 async function pageSource(path: string): Promise<string> {
-  return Bun.file(new URL(`../app/pages/${path}`, import.meta.url)).text()
+  return sourceFile(new URL(`../app/pages/${path}`, import.meta.url)).text()
 }
 
 describe('admin list error presentation', () => {

@@ -1,3 +1,4 @@
+import { sourceFile } from './support/feature-source'
 import { describe, expect, test } from 'bun:test'
 import { competitionEventHistoryRange } from '../app/lib/competition-event-history'
 
@@ -34,12 +35,12 @@ describe('competition event history scope', () => {
   })
 
   test('wires staff detection through the generated administration SDK', async () => {
-    const source = await Bun.file(
+    const source = await sourceFile(
       new URL('../app/pages/competitions/[id]/events.vue', import.meta.url),
     ).text()
 
     expect(source).toContain('adminGetCompetition({')
     expect(source).toMatch(/competitionEventHistoryRange\(\s*hasStaffHistory\.value,/)
-    expect(source).toContain("$t(hasStaffHistory ? '完整历史' : '最近 30 天')")
+    expect(source).toContain("$t(hasStaffHistory ? 'ui.fullHistory' : 'ui.last30Days')")
   })
 })

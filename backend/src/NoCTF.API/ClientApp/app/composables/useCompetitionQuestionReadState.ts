@@ -1,6 +1,6 @@
-import type { NoCtfapiEndpointsChallengesQuestionsCompetitionQuestionResponse } from '~/api'
-import { competitionQuestionUnreadCount } from '~/lib/competition-question'
-import { safeLocalStorage } from '~/lib/safe-storage'
+import type { NoCtfapiEndpointsChallengesQuestionsCompetitionQuestionResponse } from '../api'
+import { competitionQuestionUnreadCount } from '../lib/competition-question'
+import { safeLocalStorage } from '../lib/safe-storage'
 
 type Question = NoCtfapiEndpointsChallengesQuestionsCompetitionQuestionResponse
 

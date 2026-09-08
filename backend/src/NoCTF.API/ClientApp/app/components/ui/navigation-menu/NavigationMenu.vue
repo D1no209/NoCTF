@@ -6,8 +6,8 @@ import {
   NavigationMenuRoot,
   useForwardPropsEmits,
 } from 'reka-ui'
-import { cn } from '@/lib/utils'
-import NavigationMenuViewport from './NavigationMenuViewport.vue'
+import { cn } from '~/lib/utils'
+import NavigationMenuViewport from '~/components/ui/navigation-menu/NavigationMenuViewport.vue'
 
 const props = withDefaults(defineProps<NavigationMenuRootProps & {
   class?: HTMLAttributes['class']

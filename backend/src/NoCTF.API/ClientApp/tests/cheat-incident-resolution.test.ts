@@ -1,3 +1,4 @@
+import { sourceFile } from './support/feature-source'
 import type {
   CheatIncidentResolutionAction,
   CheatIncidentResolutionRequest,
@@ -200,7 +201,7 @@ describe('useCheatIncidentResolution', () => {
 
 describe('cheat incident page wiring', () => {
   test('uses a non-closing submit button and refreshes detail and list after success', async () => {
-    const page = await Bun.file(
+    const page = await sourceFile(
       new URL('../app/pages/admin/competitions/[id]/cheats.vue', import.meta.url),
     ).text()
 
@@ -208,7 +209,7 @@ describe('cheat incident page wiring', () => {
     expect(page).toContain("@click=\"openAction('confirm')\"")
     expect(page).toContain('@click="handleResolutionSubmit"')
     expect(page).not.toMatch(/<AlertDialogAction[\s\S]*?@click="handleResolutionSubmit"/)
-    expect(page).toContain('理由至少需要 8 个字符')
+    expect(page).toContain("ui.theReasonMustBeAtLeast8CharactersMoreRequired")
     expect(page).toContain('await openDetail(request.gameplayFactId)')
     expect(page).toContain('await refreshLatest()')
     expect(page).toContain('watchCompetition(competitionId')

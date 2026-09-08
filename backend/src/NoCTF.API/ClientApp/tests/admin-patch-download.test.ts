@@ -1,3 +1,4 @@
+import { sourceFile } from './support/feature-source'
 import { expect, test } from 'bun:test'
 import { adminPatchFailureMessage } from '../app/utils/admin-patch'
 import { parseApiError } from '../app/utils/api-error'
@@ -24,7 +25,7 @@ test('Patch download failures retain clear Chinese diagnostics', () => {
 })
 
 test('existing submissions page uses staff-gated SDK download without preview or internal credentials', async () => {
-  const source = await Bun.file(new URL('../app/pages/admin/competitions/[id]/submissions.vue', import.meta.url)).text()
+  const source = await sourceFile(new URL('../app/pages/admin/competitions/[id]/submissions.vue', import.meta.url)).text()
   expect(source).toContain("canDownloadPatch && s.kind === 'FixAttempt'")
   expect(source).toContain("role.value === 'Owner' || role.value === 'Manager' || role.value === 'Judge'")
   expect(source).toContain('downloadSdkFile(adminDownloadGameplayFactPatch({')

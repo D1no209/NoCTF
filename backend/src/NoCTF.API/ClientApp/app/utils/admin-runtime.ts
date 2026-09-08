@@ -1,4 +1,4 @@
-import type { NoCtfapiEndpointsAdministrationRuntimeAdminRuntimeResponse } from '~/api'
+import type { NoCtfapiEndpointsAdministrationRuntimeAdminRuntimeResponse } from '../api'
 
 type Translate = (
   source: string,
@@ -16,17 +16,17 @@ export function adminRuntimeTeamLabel(
 
   if (runtime.purpose === 'AwdpTarget') {
     return sourceTeamName
-      ? t('一次性 Fix 验证 Target · {team}', { team: sourceTeamName })
-      : t('一次性 Fix 验证 Target')
+      ? t("ui.oneTimeFixVerificationTarget2", { team: sourceTeamName })
+      : t("ui.oneTimeFixVerificationTarget")
   }
   if (runtime.purpose === 'TemplateTest')
-    return t('题目测试')
+    return t("ui.challengeTest")
 
   if (sourceTeamName)
     return sourceTeamName
   if (sourceTeamId)
     return sourceTeamId
   if (runtime.purpose === 'AwdpAttack')
-    return t('未绑定队伍的 AWDP 攻击环境')
-  return t('共享')
+    return t("ui.awdpAttackRuntimeWithoutABoundTeam")
+  return t("ui.share")
 }

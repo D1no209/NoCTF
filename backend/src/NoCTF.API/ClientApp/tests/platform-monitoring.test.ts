@@ -1,10 +1,11 @@
+import { sourceFile } from './support/feature-source'
 import { describe, expect, test } from 'bun:test'
 
 describe('platform monitoring', () => {
   test('uses the generated administration endpoint without exposing scrape details', async () => {
-    const page = await Bun.file('app/pages/admin/platform/monitoring.vue').text()
-    const navigation = await Bun.file('app/pages/admin/platform.vue').text()
-    const sdk = await Bun.file('app/api/sdk.gen.ts').text()
+    const page = await sourceFile('app/pages/admin/platform/monitoring.vue').text()
+    const navigation = await sourceFile('app/pages/admin/platform.vue').text()
+    const sdk = await sourceFile('app/api/sdk.gen.ts').text()
 
     expect(navigation).toContain("to: '/admin/platform/monitoring'")
     expect(page).toContain('adminPlatformGetMonitoring()')
@@ -16,7 +17,7 @@ describe('platform monitoring', () => {
   })
 
   test('refreshes only while the page is visible and preserves the last snapshot on failure', async () => {
-    const page = await Bun.file('app/pages/admin/platform/monitoring.vue').text()
+    const page = await sourceFile('app/pages/admin/platform/monitoring.vue').text()
 
     expect(page).toContain("document.visibilityState === 'visible'")
     expect(page).toContain('setInterval(refreshWhenVisible, 15_000)')
@@ -24,11 +25,11 @@ describe('platform monitoring', () => {
   })
 
   test('separates Prometheus, JetStream, transaction messaging, and idle samples', async () => {
-    const page = await Bun.file('app/pages/admin/platform/monitoring.vue').text()
-    const types = await Bun.file('app/api/types.gen.ts').text()
+    const page = await sourceFile('app/pages/admin/platform/monitoring.vue').text()
+    const types = await sourceFile('app/api/types.gen.ts').text()
 
     expect(page).toContain("title: 'NATS JetStream'")
-    expect(page).toContain("title: '事务消息'")
+    expect(page).toContain("title: \"ui.transactionalMessaging\"")
     expect(page).toContain('METRIC.criticalQueuePendingCount')
     expect(page).toContain('METRIC.criticalQueueAckPendingCount')
     expect(page).toContain('METRIC.criticalQueueRedeliveredCount')

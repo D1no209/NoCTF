@@ -1,5 +1,5 @@
-import type { DefinitionModel, GameModeValue } from '~/utils/game-config'
-import { parseDefinition, serializeDefinition } from '~/utils/game-config'
+import type { DefinitionModel, GameModeValue } from '../utils/game-config'
+import { parseDefinition, serializeDefinition } from '../utils/game-config'
 
 /**
  * definitionJson 字符串 v-model 与结构化 DefinitionModel 的桥接。

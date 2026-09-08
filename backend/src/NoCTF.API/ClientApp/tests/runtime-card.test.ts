@@ -1,3 +1,4 @@
+import { sourceFile } from './support/feature-source'
 import { describe, expect, test } from 'bun:test'
 import {
   classifyPlayerRuntimeLookup,
@@ -40,20 +41,20 @@ describe('player runtime presentation', () => {
   })
 
   test('shows load failures without rendering runtime actions', async () => {
-    const source = await Bun.file(
-      new URL('../app/components/challenges/RuntimeCard.vue', import.meta.url),
+    const source = await sourceFile(
+      new URL('../app/features/challenges/RuntimeCard.vue', import.meta.url),
     ).text()
 
     expect(source).toContain('classifyPlayerRuntimeLookup(response?.status')
     expect(source).toContain('<Alert v-if="loadError" variant="destructive">')
     expect(source).toContain('<div v-if="!loadError" class="flex flex-wrap items-center gap-2">')
-    expect(source).toContain('defineExpose({ refreshUntilStopped })')
+    expect(source).toContain("defineExpose({ refreshUntilStopped: state.refreshUntilStopped })")
     expect(source).toContain('if (forceUntilStopped.value)')
   })
 
   test('does not render or request a runtime for static CTF challenges', async () => {
-    const source = await Bun.file(
-      new URL('../app/components/challenges/panels/CtfPanel.vue', import.meta.url),
+    const source = await sourceFile(
+      new URL('../app/features/challenges/panels/CtfPanel.vue', import.meta.url),
     ).text()
 
     expect(source).toContain('v-if="challenge.hasRuntime === true &&')

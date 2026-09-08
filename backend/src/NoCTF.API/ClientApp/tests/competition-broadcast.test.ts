@@ -1,3 +1,4 @@
+import { sourceFile } from './support/feature-source'
 import { describe, expect, test } from 'bun:test'
 import type { NoCtfapiEndpointsCompetitionsEventsCompetitionEventResponse } from '../app/api'
 import {
@@ -127,29 +128,29 @@ describe('competition broadcast projection', () => {
   })
 
   test('mounts the compact panel beside challenges and removes the overlapping tab', async () => {
-    const challengePage = await Bun.file(
+    const challengePage = await sourceFile(
       new URL('../app/pages/competitions/[id]/challenges/index.vue', import.meta.url),
     ).text()
-    const participantWorkspace = await Bun.file(
-      new URL('../app/components/competition/CompetitionParticipantWorkspace.vue', import.meta.url),
+    const participantWorkspace = await sourceFile(
+      new URL('../app/features/competition/CompetitionParticipantWorkspace.vue', import.meta.url),
     ).text()
-    const challengeNavigator = await Bun.file(
-      new URL('../app/components/competition/CompetitionChallengeNavigator.vue', import.meta.url),
+    const challengeNavigator = await sourceFile(
+      new URL('../app/features/competition/CompetitionChallengeNavigator.vue', import.meta.url),
     ).text()
-    const shell = await Bun.file(
+    const shell = await sourceFile(
       new URL('../app/pages/competitions/[id].vue', import.meta.url),
     ).text()
-    const panel = await Bun.file(
-      new URL('../app/components/competition/CompetitionBroadcastPanel.vue', import.meta.url),
+    const panel = await sourceFile(
+      new URL('../app/features/competition/CompetitionBroadcastPanel.vue', import.meta.url),
     ).text()
 
-    expect(challengePage).toContain('<CompetitionParticipantWorkspace')
-    expect(participantWorkspace).toContain('<CompetitionBroadcastPanel')
+    expect(challengePage).toContain("<component :is=\"CompetitionParticipantWorkspace\"")
+    expect(participantWorkspace).toContain("<component :is=\"CompetitionBroadcastPanel\"")
     expect(participantWorkspace).toContain('xl:grid-cols-[15rem_minmax(0,1fr)_19rem]')
-    expect(participantWorkspace).toContain('<CompetitionWorkspaceNavigation')
-    expect(challengePage).toContain('<CompetitionChallengeDetail')
+    expect(participantWorkspace).toContain("<component :is=\"CompetitionWorkspaceNavigation\"")
+    expect(challengePage).toContain("<component :is=\"CompetitionChallengeDetail\"")
     expect(challengeNavigator).toContain("@click=\"emit('select', challenge.id!)\"")
-    expect(shell).not.toContain('<AppWorkspaceNav')
+    expect(shell).not.toContain("<component :is=\"AppWorkspaceNav\"")
     expect(shell).toContain('v-else-if="competition"')
     expect(shell).not.toContain("label: '公告/通知'")
     expect(panel).toContain('kinds: competitionBroadcastKinds')
@@ -170,7 +171,7 @@ describe('competition broadcast projection', () => {
 
 describe('competition administration role label', () => {
   test('uses the strongly typed role returned by the list endpoint', async () => {
-    const page = await Bun.file(
+    const page = await sourceFile(
       new URL('../app/pages/admin/competitions/index.vue', import.meta.url),
     ).text()
 

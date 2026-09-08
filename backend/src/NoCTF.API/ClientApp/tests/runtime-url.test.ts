@@ -1,3 +1,4 @@
+import { sourceFile } from './support/feature-source'
 import { describe, expect, test } from 'bun:test'
 import { isRuntimeUrlClickable } from '../app/utils/runtime-url'
 
@@ -15,19 +16,19 @@ describe('runtime access URL presentation', () => {
 
   test('all runtime URL surfaces use the safe shared renderer', async () => {
     const paths = [
-      '../app/components/challenges/RuntimeCard.vue',
-      '../app/components/challenges/panels/AwdPanel.vue',
-      '../app/components/challenges/panels/KohPanel.vue',
+      '../app/features/challenges/RuntimeCard.vue',
+      '../app/features/challenges/panels/AwdPanel.vue',
+      '../app/features/challenges/panels/KohPanel.vue',
       '../app/pages/admin/competitions/[id]/runtimes.vue',
     ]
 
     for (const path of paths) {
-      const source = await Bun.file(new URL(path, import.meta.url)).text()
-      expect(source).toContain('<RuntimeAccessUrl')
+      const source = await sourceFile(new URL(path, import.meta.url)).text()
+      expect(source).toContain("<component :is=\"RuntimeAccessUrl\"")
     }
 
-    const renderer = await Bun.file(
-      new URL('../app/components/challenges/RuntimeAccessUrl.vue', import.meta.url),
+    const renderer = await sourceFile(
+      new URL('../app/features/challenges/RuntimeAccessUrl.vue', import.meta.url),
     ).text()
     expect(renderer).toContain('v-if="clickable"')
     expect(renderer).toContain('navigator.clipboard.writeText(props.url)')

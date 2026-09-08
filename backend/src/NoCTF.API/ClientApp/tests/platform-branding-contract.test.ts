@@ -1,8 +1,9 @@
+import { sourceFile } from './support/feature-source'
 import { describe, expect, test } from 'bun:test'
 
 describe('platform branding contract', () => {
   test('uses the configured platform logo as the browser icon', async () => {
-    const source = await Bun.file(
+    const source = await sourceFile(
       new URL('../app/app.vue', import.meta.url),
     ).text()
 
@@ -12,7 +13,7 @@ describe('platform branding contract', () => {
   })
 
   test('renders the revisioned logo URL supplied by the API', async () => {
-    const source = await Bun.file(
+    const source = await sourceFile(
       new URL('../app/pages/admin/platform/index.vue', import.meta.url),
     ).text()
 

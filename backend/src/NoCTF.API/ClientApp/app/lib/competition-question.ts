@@ -15,23 +15,23 @@ type QuestionAccess = NoCtfapiEndpointsChallengesQuestionsCompetitionQuestionAcc
 type CompetitionQuestion = NoCtfapiEndpointsChallengesQuestionsCompetitionQuestionResponse
 
 const staticFailureMessages = {
-  InvalidRequest: '咨询内容或请求参数无效，请检查后重试。',
-  SpamRejected: '咨询内容疑似重复或无效文本，请补充清晰的问题描述。',
-  CompetitionNotAcceptingQuestions: '当前比赛状态不允许创建咨询。',
-  TeamNotEligible: '当前队伍尚不具备发起咨询的资格。',
-  InvalidChallengeReference: '关联题目无效、未发布或不属于当前比赛。',
-  InvalidTransition: '当前咨询状态不允许执行此操作。',
-  QuestionClosed: '该咨询已关闭；如需继续沟通，请重新创建咨询。',
+  InvalidRequest: "ui.theQuestionContentOrRequestIsInvalidCheckItAnd",
+  SpamRejected: "ui.theQuestionAppearsDuplicatedOrUnclearPleaseProvideAClearer",
+  CompetitionNotAcceptingQuestions: "ui.questionsCannotBeOpenedInTheCurrentCompetitionState",
+  TeamNotEligible: "ui.thisTeamIsNotEligibleToOpenAQuestion",
+  InvalidChallengeReference: "ui.theLinkedChallengeIsInvalidUnpublishedOrBelongsToAnother",
+  InvalidTransition: "ui.thisActionIsNotAllowedInTheCurrentQuestionState",
+  QuestionClosed: "ui.thisQuestionIsClosedOpenANewQuestionToContinue",
 } satisfies Partial<Record<FailureCode, string>>
 
 export const competitionQuestionRoleLabel = {
-  Asker: '选手',
-  Participant: '选手',
-  Handler: '工作人员',
-  Judge: '裁判',
-  ChallengeOwner: '题目所有者',
-  CompetitionManager: '比赛管理员',
-  PlatformAdministrator: '平台管理员',
+  Asker: "ui.participant",
+  Participant: "ui.participant",
+  Handler: "ui.staff",
+  Judge: "ui.judge",
+  ChallengeOwner: "ui.challengeOwner",
+  CompetitionManager: "ui.competitionManager",
+  PlatformAdministrator: "ui.platformAdministrator",
 } satisfies Record<ParticipantRole, string>
 
 export function isCompetitionQuestionHandlerRole(role?: ParticipantRole): boolean {
@@ -48,9 +48,9 @@ export function competitionQuestionErrorMessage(
 
   const limit = payload.limit ?? undefined
   if (payload.code === 'TeamActiveQuestionLimitReached')
-    return translate('本队已有 {limit} 个活跃咨询，请先解决已有咨询。', { limit: limit ?? 5 })
+    return translate("ui.yourTeamAlreadyHasActiveQuestionsResolveAnExistingOne", { limit: limit ?? 5 })
   if (payload.code === 'ParticipantMessageLimitReached')
-    return translate('工作人员回复前最多连续发送 {limit} 条消息，请等待回复。', { limit: limit ?? 3 })
+    return translate("ui.youCanSendUpToConsecutiveMessagesBeforeAStaff", { limit: limit ?? 3 })
 
   const message = staticFailureMessages[payload.code]
   return message ? translate(message) : fallback

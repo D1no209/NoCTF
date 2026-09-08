@@ -1,3 +1,4 @@
+import { sourceFile } from './support/feature-source'
 import { describe, expect, test } from 'bun:test'
 import { readProtectedDownload } from '../app/utils/download'
 
@@ -46,12 +47,12 @@ describe('protected downloads', () => {
 
   test('all protected download pages use generated SDK operations', async () => {
     const paths = [
-      '../app/components/challenges/CompetitionChallengeDetail.vue',
+      '../app/features/challenges/CompetitionChallengeDetail.vue',
       '../app/pages/admin/platform/logs.vue',
       '../app/pages/admin/platform/audit.vue',
       '../app/pages/admin/competitions/[id]/exports.vue',
     ]
-    const sources = await Promise.all(paths.map(path => Bun.file(new URL(path, import.meta.url)).text()))
+    const sources = await Promise.all(paths.map(path => sourceFile(new URL(path, import.meta.url)).text()))
     const source = sources.join('\n')
 
     expect(source).not.toContain('downloadProtectedFile(`/api/')

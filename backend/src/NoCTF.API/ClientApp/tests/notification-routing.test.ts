@@ -1,3 +1,4 @@
+import { sourceFile } from './support/feature-source'
 import { afterEach, describe, expect, test } from 'bun:test'
 import type { NoCtfapiEndpointsNotificationsNotificationResponse } from '../app/api'
 import { setLocale } from '../app/utils/i18n'
@@ -131,10 +132,10 @@ describe('notificationTargetPath', () => {
   })
 
   test('notification centers open readable detail and use the generated thread SDK', async () => {
-    const component = await Bun.file(
-      new URL('../app/components/notifications/NotificationCenter.vue', import.meta.url),
+    const component = await sourceFile(
+      new URL('../app/features/notifications/NotificationCenter.vue', import.meta.url),
     ).text()
-    const competitionPage = await Bun.file(
+    const competitionPage = await sourceFile(
       new URL('../app/pages/competitions/[id]/notifications.vue', import.meta.url),
     ).text()
 

@@ -1,10 +1,8 @@
 <script setup lang="ts">
-const route = useRoute()
-const competitionId = route.params.id as string
-const competitionChallengeId = route.params.ccId as string
+import Feature from '~/features/routes/competitions/[id]/challenges/[ccId]/CompetitionsByIdChallengesByCcIdIndexPage.vue'
 
-await navigateTo({
-  path: `/competitions/${competitionId}/challenges`,
-  query: { challenge: competitionChallengeId },
-}, { replace: true })
 </script>
+
+<template>
+  <Feature><slot /></Feature>
+</template>

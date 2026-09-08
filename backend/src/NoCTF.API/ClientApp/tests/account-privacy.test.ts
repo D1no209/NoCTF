@@ -1,10 +1,10 @@
 import { expect, test } from 'bun:test'
-import { readFileSync } from 'node:fs'
+import { readFeatureSource as readFileSync } from './support/feature-source'
 
 const read = (path: string) => readFileSync(new URL(`../app/${path}`, import.meta.url), 'utf8')
 
 test('school identity uses its own private SDK and string input without blocking participation', () => {
-  const source = read('components/account/SchoolIdentityForm.vue')
+  const source = read('features/account/SchoolIdentityForm.vue')
   expect(source).toContain('authenticationGetMySchoolIdentity')
   expect(source).toContain('authenticationUpdateMySchoolIdentity')
   expect(source).toContain('type="text"')
@@ -28,7 +28,7 @@ test('account workspace retains independent drafts, field errors and mobile layo
 
 test('private views are confined to staff pages and clear stale member responses', () => {
   expect(read('pages/admin/competitions/[id]/teams.vue')).toContain('v-if="canJudge && member.userId && selectedTeam.id"')
-  expect(read('components/account/PrivateAccountPanel.vue')).toContain('if (ticket !== revision) return')
+  expect(read('features/account/PrivateAccountPanel.vue')).toContain('if (ticket !== revision) return')
   expect(read('pages/users/[id].vue')).not.toContain('PrivateAccountPanel')
   expect(read('pages/competitions/[id]/teams/[teamId].vue')).not.toContain('PrivateAccountPanel')
 })

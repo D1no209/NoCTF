@@ -1,3 +1,4 @@
+import { sourceFile } from './support/feature-source'
 import { describe, expect, test } from 'bun:test'
 import {
   challengeTemplateWriteErrorMessage,
@@ -58,13 +59,13 @@ describe('challenge definition defaults', () => {
   })
 
   test('initializes creation and resets the definition before a mode switch', async () => {
-    const createPage = (await Bun.file(new URL('../app/pages/admin/challenges/new.vue', import.meta.url)).text())
+    const createPage = (await sourceFile(new URL('../app/pages/admin/challenges/new.vue', import.meta.url)).text())
       .replaceAll('\r\n', '\n')
-    const editPage = (await Bun.file(new URL('../app/pages/admin/challenges/[id].vue', import.meta.url)).text())
+    const editPage = (await sourceFile(new URL('../app/pages/admin/challenges/[id].vue', import.meta.url)).text())
       .replaceAll('\r\n', '\n')
 
     expect(createPage).toContain('ref(defaultDefinitionJson(mode.value))')
-    expect(createPage).toContain('definitionJson.value = defaultDefinitionJson(value)\n  mode.value = value')
+    expect(createPage).toContain('definitionJson.value = defaultDefinitionJson(value)\n    mode.value = value')
     expect(editPage).toContain('form.definitionJson = value.definitionJson ??')
     expect(editPage).toContain("form.mode = value.mode ?? 'Ctf'")
     expect(createPage).toContain('normalizeDefinitionJson(mode.value, definitionJson.value)')
@@ -116,31 +117,31 @@ describe('challenge definition defaults', () => {
       code: 'ActiveRuntimeDefinitionConflict',
     })).toEqual(['该模板仍有活动运行环境，请停止相关实例后再修改技术定义'])
 
-    const createPage = await Bun.file(new URL('../app/pages/admin/challenges/new.vue', import.meta.url)).text()
-    const submit = createPage.slice(createPage.indexOf('async function submit'), createPage.indexOf('</script>'))
+    const createPage = await sourceFile(new URL('../app/pages/admin/challenges/new.vue', import.meta.url)).text()
+    const submit = createPage.slice(createPage.indexOf('async function submit'), createPage.indexOf('export type', createPage.indexOf('async function submit')))
     expect(submit).toContain('challengeTemplateWriteErrorMessages(apiError)')
     expect(submit).not.toContain("title.value = ''")
     expect(submit).not.toContain("definitionJson.value = ''")
   })
 
   test('offers explicit repair and in-place save actions for definition editors', async () => {
-    const competitionEditor = await Bun.file(
-      new URL('../app/components/admin/CompetitionModeConfigEditor.vue', import.meta.url),
+    const competitionEditor = await sourceFile(
+      new URL('../app/features/admin/CompetitionModeConfigEditor.vue', import.meta.url),
     ).text()
-    const templatePage = await Bun.file(
+    const templatePage = await sourceFile(
       new URL('../app/pages/admin/challenges/[id].vue', import.meta.url),
     ).text()
 
     expect(competitionEditor).toContain('function resetToCurrentDefaults()')
-    expect(competitionEditor).toContain("$t('重置为当前模式默认配置')")
-    expect(competitionEditor).toContain("$t('重置后仍需保存配置才会生效')")
+    expect(competitionEditor).toContain("$t('ui.resetToCurrentModeDefaults')")
+    expect(competitionEditor).toContain("$t('ui.saveTheConfigurationAfterResettingToApplyIt')")
     expect(templatePage).toContain('function resetDefinitionToCurrentMode(): void')
     expect(templatePage).toContain('form.definitionJson = defaultDefinitionJson(form.mode)')
-    expect(templatePage).toContain("$t('重置为当前模式默认题目定义')")
+    expect(templatePage).toContain("$t('ui.resetToCurrentModeDefinition')")
     expect(templatePage).toContain('data-testid="runtime-definition-save"')
     expect(templatePage).toContain('data-testid="mode-definition-save"')
     expect(templatePage).toContain('serializeDefinition(form.mode, definitionModel.value)')
-    expect(templatePage).not.toContain("$t('重置后请返回基本信息保存修改')")
+    expect(templatePage).not.toContain("$t('ui.afterResettingReturnToBasicInformationAndSaveYourChanges')")
   })
 
   test('lists every blocking AWDP runtime field before sending the save request', () => {
@@ -154,10 +155,10 @@ describe('challenge definition defaults', () => {
       definitionJson: serializeDefinition('Awdp', model),
     })
 
-    expect(issues).toContain('容器镜像不能为空')
-    expect(issues).toContain('AWDP 必须且只能填写 1 个内部端口')
-    expect(issues).toContain('AWDP 必须且只能填写 1 个对外端口')
-    expect(issues).toContain('AWDP 必须添加至少 1 个访问入口')
+    expect(issues).toContain("容器镜像不能为空")
+    expect(issues).toContain("AWDP 必须且只能填写 1 个内部端口")
+    expect(issues).toContain("AWDP 必须且只能填写 1 个对外端口")
+    expect(issues).toContain("AWDP 必须添加至少 1 个访问入口")
   })
 
   test('reports every unsafe AWDP Fix execution setting before save', async () => {
@@ -180,16 +181,16 @@ describe('challenge definition defaults', () => {
       definitionJson: serializeDefinition('Awdp', model),
     })
 
-    expect(issues).toContain('非空补丁应用命令必须恰好包含一个独立的 {entrypoint} 参数')
-    expect(issues).toContain('补丁超时必须在 1 到 300 秒之间')
-    expect(issues).toContain('就绪超时不能超过 Checker 超时')
+    expect(issues).toContain("非空补丁应用命令必须恰好包含一个独立的 {entrypoint} 参数")
+    expect(issues).toContain("补丁超时必须在 1 到 300 秒之间")
+    expect(issues).toContain("就绪超时不能超过 Checker 超时")
 
-    const editor = await Bun.file(
-      new URL('../app/components/admin/DefinitionPatchSection.vue', import.meta.url),
+    const editor = await sourceFile(
+      new URL('../app/features/admin/DefinitionPatchSection.vue', import.meta.url),
     ).text()
     expect(editor).toContain(':max="300"')
     expect(editor).toContain(':max="model.checkerJob?.timeoutSeconds ?? undefined"')
-    expect(editor).toContain('{entrypoint} 作为恰好一个独立参数')
+    expect(editor).toContain("ui.leaveBlankToExecuteTheEntrypointFileACustomCommand")
   })
 
   test('rejects AWD Flag injection timeouts beyond the dedicated handler budget', async () => {
@@ -208,9 +209,9 @@ describe('challenge definition defaults', () => {
       definitionJson: serializeDefinition('Awd', model),
     })
 
-    expect(issues).toContain('AWD Flag 注入超时必须在 1 到 300 秒之间')
-    const editor = await Bun.file(
-      new URL('../app/components/admin/DefinitionFlagInjectionSection.vue', import.meta.url),
+    expect(issues).toContain("AWD Flag 注入超时必须在 1 到 300 秒之间")
+    const editor = await sourceFile(
+      new URL('../app/features/admin/DefinitionFlagInjectionSection.vue', import.meta.url),
     ).text()
     expect(editor).toContain(':max="300"')
   })
@@ -239,8 +240,8 @@ describe('challenge definition defaults', () => {
       definitionJson: serializeDefinition('Awd', model),
     })
 
-    expect(issues).toContain('AWD 运行环境必须使用轮换 Flag')
-    expect(issues).toContain('AWD 运行环境必须至少提供一个参赛队伍可见入口')
+    expect(issues).toContain("AWD 运行环境必须使用轮换 Flag")
+    expect(issues).toContain("AWD 运行环境必须至少提供一个参赛队伍可见入口")
   })
 
   test.each([
@@ -294,12 +295,12 @@ describe('challenge definition defaults', () => {
       message: 'schemaVersion 1 is unsupported; supported versions are 4.',
     })).toBe('题目规则版本过旧，请重新保存题目规则。')
 
-    const page = await Bun.file(
+    const page = await sourceFile(
       new URL('../app/pages/admin/competitions/[id]/index.vue', import.meta.url),
     ).text()
     expect(page).toContain('startGateErrorMessage(ve)')
     expect(page).toContain('v-if="ve.competitionChallengeId"')
-    expect(page).toContain("$t('查看题目')")
+    expect(page).toContain("$t('ui.viewQuestions')")
   })
 
   test('localizes every stable start-gate failure and only offers validation before start', async () => {
@@ -320,7 +321,7 @@ describe('challenge definition defaults', () => {
       expect(startGateErrorMessage({ code, message: 'Unlocalized backend detail.' })).toBe(expected)
     }
 
-    const page = await Bun.file(
+    const page = await sourceFile(
       new URL('../app/pages/admin/competitions/[id]/index.vue', import.meta.url),
     ).text()
     expect(page).toContain('v-if="status === \'Published\'"')
@@ -339,7 +340,7 @@ describe('CTF score decay preview', () => {
   })
 
   test('renders a detailed accessible curve with hover inspection', async () => {
-    const source = await Bun.file(new URL('../app/components/admin/PointsDecayCurve.vue', import.meta.url)).text()
+    const source = await sourceFile(new URL('../app/features/admin/PointsDecayCurve.vue', import.meta.url)).text()
     expect(source).toContain('ctfPointsAtSolveCount')
     expect(source).toContain('@pointermove="onPointerMove"')
     expect(source).toContain('hoverPointer.value')
@@ -350,14 +351,14 @@ describe('CTF score decay preview', () => {
     expect(source).toContain('preview.active.score')
     expect(source).toContain('yTickCount = 8')
     expect(source).toContain('xTickCount')
-    expect(source).toContain("$t('解题队伍数')")
-    expect(source).toContain("$t('第 {count} 支解题队伍'")
+    expect(source).toContain("$t('ui.solvedTeams')")
+    expect(source).toContain("$t('ui.solvedTeam'")
     expect(source).toContain('role="img"')
   })
 
   test('uses competition defaults while a challenge curve is inherited', async () => {
-    const editor = await Bun.file(new URL('../app/components/admin/ChallengeRulesEditor.vue', import.meta.url)).text()
-    const page = await Bun.file(new URL('../app/pages/admin/competitions/[id]/challenges/[ccId].vue', import.meta.url)).text()
+    const editor = await sourceFile(new URL('../app/features/admin/ChallengeRulesEditor.vue', import.meta.url)).text()
+    const page = await sourceFile(new URL('../app/pages/admin/competitions/[id]/challenges/[ccId].vue', import.meta.url)).text()
     expect(editor).toContain('inheritedValues.value[field.key]')
     expect(editor).toContain(':model-value="displayedValue(field)"')
     expect(page).toContain(':inherited-json="inheritedConfigJson"')

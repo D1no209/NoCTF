@@ -1,7 +1,8 @@
+import { sourceFile } from './support/feature-source'
 import { describe, expect, test } from 'bun:test'
 
 async function source(path: string): Promise<string> {
-  return Bun.file(new URL(path, import.meta.url)).text()
+  return sourceFile(new URL(path, import.meta.url)).text()
 }
 
 describe('participant error feedback', () => {
@@ -9,7 +10,7 @@ describe('participant error feedback', () => {
     const [home, questions, detail] = await Promise.all([
       source('../app/pages/index.vue'),
       source('../app/pages/competitions/[id]/questions.vue'),
-      source('../app/components/challenges/CompetitionChallengeDetail.vue'),
+      source('../app/features/challenges/CompetitionChallengeDetail.vue'),
     ])
 
     expect(home).toContain('<Alert v-else-if="competitionsError" variant="destructive">')
@@ -23,10 +24,10 @@ describe('participant error feedback', () => {
 
   test('keeps failed polling visible and recoverable', async () => {
     const [history, submissions, flag, awdp] = await Promise.all([
-      source('../app/components/challenges/ChallengeSubmissionHistory.vue'),
+      source('../app/features/challenges/ChallengeSubmissionHistory.vue'),
       source('../app/pages/competitions/[id]/my/submissions.vue'),
-      source('../app/components/challenges/FlagSubmit.vue'),
-      source('../app/components/challenges/panels/AwdpPanel.vue'),
+      source('../app/features/challenges/FlagSubmit.vue'),
+      source('../app/features/challenges/panels/AwdpPanel.vue'),
     ])
 
     expect(history).toContain('pendingPollingError')
@@ -35,7 +36,7 @@ describe('participant error feedback', () => {
       expect(component).toContain('pollingError')
       expect(component).toContain('timedOut')
     }
-    expect(flag).toContain("throw parseApiError(error, translate('刷新提交状态失败'))")
+    expect(flag).toContain("throw parseApiError(error, translate(\"ui.failedToRefreshSubmissionStatus\"))")
     expect(flag).toContain('void refreshOne(id).catch((error) => {')
     expect(history).toContain('@click="startPendingPolling"')
     expect(submissions).toContain('@click="startPolling"')
@@ -48,7 +49,7 @@ describe('participant error feedback', () => {
     const [layout, team, members, submissions, appLayout, live, awdpLive] = await Promise.all([
       source('../app/pages/competitions/[id].vue'),
       source('../app/pages/competitions/[id]/my/team.vue'),
-      source('../app/components/teams/TeamMembers.vue'),
+      source('../app/features/teams/TeamMembers.vue'),
       source('../app/pages/competitions/[id]/my/submissions.vue'),
       source('../app/layouts/default.vue'),
       source('../app/pages/competitions/[id]/live.vue'),
@@ -58,13 +59,13 @@ describe('participant error feedback', () => {
     expect(layout).toContain('teamLoadError')
     expect(layout).toContain('standingError')
     expect(team).toContain('banCaseError')
-    expect(team).toContain('队伍中没有其他成员，暂时无法转让队长。')
+    expect(team).toContain("ui.thereAreNoOtherTeamMembersToTransferTheCaptain")
     expect(members).toContain('loadError')
     expect(submissions).toContain('challengeTitlesError')
     expect(appLayout).toContain('platformError')
     expect(appLayout).toContain(':disabled="platformLoading"')
-    expect(live).toContain("toast.error(translate('浏览器拒绝进入全屏")
-    expect(awdpLive).toContain("toast.error(translate('浏览器拒绝进入全屏")
+    expect(live).toContain("toast.error(translate(\"ui.theBrowserDeniedFullscreenAccessCheckSitePermissionsOrUse")
+    expect(awdpLive).toContain("toast.error(translate(\"ui.theBrowserDeniedFullscreenAccessCheckSitePermissionsOrUse")
   })
 
   test('loads expensive visualizations only on the routes that need them', async () => {
@@ -72,12 +73,12 @@ describe('participant error feedback', () => {
       source('../app/pages/competitions/[id]/leaderboard.vue'),
       source('../app/pages/competitions/[id]/live.vue'),
       source('../app/utils/echarts.ts'),
-      source('../app/components/leaderboard/MiniChart.vue'),
-      source('../app/components/leaderboard/ScoreTrendChart.vue'),
+      source('../app/components/ui/chart/MiniChart.vue'),
+      source('../app/features/leaderboard/ScoreTrendChart.vue'),
     ])
 
-    expect(leaderboard).toContain('<LazyScoreTrendChart')
-    expect(leaderboard).toContain('<LazyScoreboardTeamDetailDialog')
+    expect(leaderboard).toContain("<component :is=\"LazyScoreTrendChart\"")
+    expect(leaderboard).toContain("<component :is=\"LazyScoreboardTeamDetailDialog\"")
     expect(live).toContain("import('~/lib/live-city-3d')")
     expect(live).not.toContain("import { LiveCityScene } from '~/lib/live-city-3d'")
     expect(chart).toContain('getComputedStyle(element ?? document.documentElement)')
