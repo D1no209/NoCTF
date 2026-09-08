@@ -29,7 +29,8 @@ public sealed class TeamRegistrationStore(
                 x.DeletedAt != null,
                 x.AllowTeamRegistrationWhileRunning,
                 x.Mode,
-                x.TrackConfigurationJson))
+                x.TrackConfigurationJson,
+                x.PracticeModeEnabled))
             .SingleOrDefaultAsync(ct);
 
     public async Task<TeamCreateStoreResult> TryCreateAsync(CreateTeamCommand command, TeamRegistrationStatus status, CancellationToken ct)
@@ -43,9 +44,10 @@ public sealed class TeamRegistrationStore(
             command.CompetitionId,
             ct);
         if (competition is null) return new(null, TeamRegistrationFailure.CompetitionNotFound);
-        if (competition.Status is CompetitionStatus.Paused or CompetitionStatus.Finished
+        var practice = competition.Mode == GameMode.Ctf && competition.Status == CompetitionStatus.Finished && competition.PracticeModeEnabled;
+        if (!practice && (competition.Status is CompetitionStatus.Paused or CompetitionStatus.Finished
             || competition.Status == CompetitionStatus.Running
-                && !competition.AllowTeamRegistrationWhileRunning)
+                && !competition.AllowTeamRegistrationWhileRunning))
             return new(null, TeamRegistrationFailure.RegistrationClosed);
         var tracks = CompetitionTrackConfiguration.ParseOrDefault(
             competition.Mode,
@@ -86,7 +88,8 @@ public sealed class TeamRegistrationStore(
             CaptainId = command.UserId,
             MemberIds = [command.UserId],
             InvitationToken = CreateInvitationToken(),
-            RegistrationStatus = status,
+            RegistrationStatus = practice ? TeamRegistrationStatus.Approved : status,
+            IsPracticeTeam = practice,
             RegisteredAt = command.RegisteredAt
         };
         db.Teams.Add(team);
@@ -94,14 +97,14 @@ public sealed class TeamRegistrationStore(
             team.CompetitionId,
             CompetitionEventKind.TeamRegistered,
             CompetitionEventLevel.Information,
-            status == TeamRegistrationStatus.Approved && !track.IsInternal
+            !practice && status == TeamRegistrationStatus.Approved && !track.IsInternal
                 ? CompetitionEventVisibility.Public
                 : CompetitionEventVisibility.Staff,
             command.RegisteredAt,
             ActorUserId: command.UserId,
             RelatedUserId: command.UserId,
             TeamId: team.Id,
-            TeamRegistrationStatus: status,
+            TeamRegistrationStatus: team.RegistrationStatus,
             TrackKey: track.Key), ct);
         try
         {
@@ -384,7 +387,7 @@ public sealed class TeamRegistrationStore(
 
     private static TeamView Map(Team x) => new(
         x.Id, x.CompetitionId, x.Name, x.AvatarFileId, x.CaptainId, x.MemberIds,
-        x.RegistrationStatus, x.IsLocked, x.IsBanned, x.RegisteredAt, x.TrackKey, x.TrackKey);
+        x.RegistrationStatus, x.IsLocked, x.IsBanned, x.RegisteredAt, x.TrackKey, x.TrackKey, x.IsPracticeTeam);
 
     private static TeamView Map(Team team, CompetitionTrackConfiguration configuration) => new(
         team.Id,
@@ -398,7 +401,8 @@ public sealed class TeamRegistrationStore(
         team.IsBanned,
         team.RegisteredAt,
         team.TrackKey,
-        configuration.Find(team.TrackKey)?.Name ?? team.TrackKey);
+        configuration.Find(team.TrackKey)?.Name ?? team.TrackKey,
+        team.IsPracticeTeam);
 
     private static string CreateInvitationToken()
     {

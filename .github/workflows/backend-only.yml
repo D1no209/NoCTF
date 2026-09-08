@@ -1,0 +1,73 @@
+name: Build backend only
+
+on:
+  workflow_dispatch:
+    inputs:
+      base_image:
+        description: Existing deployed Host image with frontend to preserve (immutable digest)
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+# This workflow publishes an immutable image only. Production deployment remains manual.
+jobs:
+  image:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    permissions:
+      contents: read
+      packages: write
+    env:
+      BASE_IMAGE: ${{ inputs.base_image }}
+      CUSTOM_REGISTRY: ${{ vars.CUSTOM_REGISTRY }}
+      CUSTOM_NAMESPACE: ${{ vars.CUSTOM_REGISTRY_NAMESPACE }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - name: Prepare backend-only image
+        id: image
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          [[ "$BASE_IMAGE" =~ ^[A-Za-z0-9.-]+(:[0-9]+)?/[A-Za-z0-9._/-]+@sha256:[a-f0-9]{64}$ ]]
+          repository="ghcr.io/${GITHUB_REPOSITORY,,}"
+          if [[ -n "$CUSTOM_REGISTRY" ]]; then
+            [[ "$CUSTOM_REGISTRY" =~ ^[A-Za-z0-9.-]+(:[0-9]+)?$ ]]
+            namespace="${CUSTOM_NAMESPACE:-${GITHUB_REPOSITORY_OWNER,,}}"
+            [[ "$namespace" =~ ^[A-Za-z0-9._-]+(/[A-Za-z0-9._-]+)*$ ]]
+            repository="$CUSTOM_REGISTRY/${namespace,,}/noctf"
+          fi
+          echo "repository=$repository" >> "$GITHUB_OUTPUT"
+          echo "tag=$repository:backend-$GITHUB_SHA" >> "$GITHUB_OUTPUT"
+      - uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e
+      - uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f
+        if: env.CUSTOM_REGISTRY != ''
+        with:
+          registry: ${{ env.CUSTOM_REGISTRY }}
+          username: ${{ secrets.CUSTOM_REGISTRY_USERNAME }}
+          password: ${{ secrets.CUSTOM_REGISTRY_PASSWORD }}
+      - name: Build and publish backend only
+        id: build
+        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a
+        with:
+          context: .
+          file: backend/Dockerfile.backend-only
+          push: true
+          provenance: false
+          sbom: false
+          tags: ${{ steps.image.outputs.tag }}
+          build-args: |
+            BASE_IMAGE=${{ inputs.base_image }}
+            REVISION=${{ github.sha }}
+          cache-from: type=gha,scope=noctf-backend-only
+          cache-to: type=gha,mode=max,scope=noctf-backend-only,ignore-error=true
+      - name: Record immutable image
+        env:
+          IMAGE: ${{ steps.image.outputs.repository }}@${{ steps.build.outputs.digest }}
+        run: echo "$IMAGE" >> "$GITHUB_STEP_SUMMARY"

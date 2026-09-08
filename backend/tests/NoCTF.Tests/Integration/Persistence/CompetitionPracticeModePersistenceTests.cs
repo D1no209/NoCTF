@@ -9,6 +9,8 @@ using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.Extensions.DependencyInjection;
 using NoCTF.API.Composition;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using NoCTF.Application.Competitions.Management;
 using NoCTF.Application.GameplayFacts.Practice;
 using NoCTF.Application.Messaging;
@@ -27,6 +29,21 @@ using NoCTF.Infrastructure.GameplayFacts.Practice;
 using NoCTF.Infrastructure.Persistence;
 using NoCTF.Infrastructure.Runtime.Instances;
 using Testcontainers.PostgreSql;
+using NoCTF.Application.Teams.Registration;
+using NoCTF.Application.Teams.Membership;
+using NoCTF.Application.Teams.Moderation;
+using NoCTF.Infrastructure.Teams.Registration;
+using NoCTF.Infrastructure.Teams.Membership;
+using NoCTF.Infrastructure.Teams.Moderation;
+using NoCTF.Infrastructure.Competitions.Events;
+using NoCTF.Infrastructure.Scoring.Leaderboard;
+using NoCTF.Infrastructure.Caching;
+using NoCTF.Application.Scoring.Leaderboard;
+using NoCTF.Application.Notifications;
+using NoCTF.GameModes.Scoring;
+using NoCTF.GameModes.Leaderboard;
+using NSubstitute;
+using ZiggyCreatures.Caching.Fusion;
 
 namespace NoCTF.Tests.Integration.Persistence;
 
@@ -34,6 +51,125 @@ namespace NoCTF.Tests.Integration.Persistence;
 [NotInParallel]
 public sealed class CompetitionPracticeModePersistenceTests
 {
+    [Test, Timeout(300_000)]
+    public async Task Generated_practice_team_migration_preserves_existing_formal_team(CancellationToken ct)
+    {
+        await DockerIntegrationTest.RunAsync(async () =>
+        {
+            await using var postgres = new PostgreSqlBuilder("postgres:17.10-alpine3.24@sha256:742f40ea20b9ff2ff31db5458d127452988a2164df9e17441e191f3b72252193").Build();
+            await postgres.StartAsync(ct);
+            var options = new DbContextOptionsBuilder<NoCtfDbContext>().UseNpgsql(postgres.GetConnectionString()).UseSnakeCaseNamingConvention().Options;
+            await using var db = new NoCtfDbContext(options);
+            await db.GetService<IMigrator>().MigrateAsync("20260908040028_OptionalPublicGateway", ct);
+            var now = DateTimeOffset.UtcNow;
+            var user = User(Guid.NewGuid(), "migration-team-owner", now);
+            var competition = new Competition { Id = Guid.NewGuid(), OwnerId = user.Id, Title = "Existing competition",
+                Mode = GameMode.Ctf, Status = CompetitionStatus.Finished, ConfigurationJson = "{}",
+                FlagDerivationSecret = new byte[32], StartAt = now.AddHours(-2), EndAt = now.AddHours(-1), CreatedAt = now, UpdatedAt = now };
+            db.Users.Add(user); db.Competitions.Add(competition);
+            await db.SaveChangesAsync(ct);
+            var teamId = Guid.NewGuid();
+            await db.Database.ExecuteSqlInterpolatedAsync($"""
+                INSERT INTO teams (id, competition_id, name, captain_id, member_ids, invitation_token,
+                    registration_status, registered_at, track_key, is_locked, is_banned)
+                VALUES ({teamId}, {competition.Id}, {"Existing formal team"}, {user.Id}, {new[] { user.Id }},
+                    {Guid.NewGuid().ToString("N")}, {(short)TeamRegistrationStatus.Approved}, {now}, {"default"}, false, false)
+                """, ct);
+            await db.Database.MigrateAsync(ct);
+            var team = await db.Teams.AsNoTracking().SingleAsync(ct);
+            await Assert.That(team.Id).IsEqualTo(teamId);
+            await Assert.That(team.IsPracticeTeam).IsFalse();
+            await Assert.That(team.MemberIds).IsEquivalentTo([user.Id]);
+            await Assert.That(team.RegistrationStatus).IsEqualTo(TeamRegistrationStatus.Approved);
+        });
+    }
+
+    [Test, Timeout(300_000)]
+    public async Task Late_practice_teams_can_join_and_judge_without_entering_official_rankings_and_can_be_banned(CancellationToken ct)
+    {
+        await DockerIntegrationTest.RunAsync(async () =>
+        {
+            await using var postgres = new PostgreSqlBuilder("postgres:17.10-alpine3.24@sha256:742f40ea20b9ff2ff31db5458d127452988a2164df9e17441e191f3b72252193").Build();
+            await postgres.StartAsync(ct);
+            var options = new DbContextOptionsBuilder<NoCtfDbContext>().UseNpgsql(postgres.GetConnectionString()).UseSnakeCaseNamingConvention().Options;
+            var fixture = await SeedAsync(options, ct);
+            var joiner = Guid.NewGuid();
+            await using var db = new NoCtfDbContext(options);
+            db.Users.Add(User(joiner, "late-practice-member", fixture.Now));
+            (await db.Competitions.SingleAsync(ct)).MaxTeamMembers = 3;
+            (await db.Challenges.SingleAsync(ct)).DefinitionJson = new GameModeChallengeConfigurationCatalog().GetDefaultDefinitionJson(GameMode.Ctf);
+            await db.SaveChangesAsync(ct);
+            var outbox = new RecordingOutbox();
+            var events = new CompetitionEventStore(db, outbox);
+            var registration = new TeamRegistrationStore(db, outbox, eventRecorder: events);
+            var created = await new CreateTeam(registration).ExecuteAsync(new(fixture.CompetitionId, fixture.OwnerId,
+                "Late practice team", fixture.Now.AddMinutes(1), "default"), ct);
+            await Assert.That(created.Succeeded).IsTrue();
+            var practiceId = created.Value!.Id;
+            await Assert.That(created.Value.IsPracticeTeam).IsTrue();
+            await Assert.That(created.Value.RegistrationStatus).IsEqualTo(TeamRegistrationStatus.Approved);
+            var practice = await db.Teams.SingleAsync(team => team.Id == practiceId, ct);
+            var membership = new TeamMembershipStore(db, outbox, eventRecorder: events);
+            // Joining an old formal team after the contest would rewrite historical membership.
+            var formal = await db.Teams.SingleAsync(team => team.Id == fixture.TeamId, ct);
+            await Assert.That(await membership.JoinByInvitationAsync(fixture.CompetitionId, formal.InvitationToken, joiner, fixture.Now, ct))
+                .IsEqualTo(TeamMembershipFailure.MembershipLocked);
+            await Assert.That(await membership.JoinByInvitationAsync(fixture.CompetitionId, practice.InvitationToken, joiner, fixture.Now, ct)).IsNull();
+            var judgement = await new PracticeFlagJudge(db).JudgeAsync(new(fixture.CompetitionId, fixture.CompetitionChallengeId, joiner, fixture.Flag, fixture.Now.AddMinutes(2)), ct);
+            await Assert.That(judgement.Judgement).IsEqualTo(PracticeFlagJudgement.Correct);
+            await Assert.That(await db.GameplayFacts.CountAsync(ct)).IsEqualTo(0);
+            using var cacheServices = new ServiceCollection().AddFusionCache(NoCtfCacheNames.Leaderboards).Services.BuildServiceProvider();
+            var cache = new FusionLeaderboardCache(db, new LeaderboardProjectionEngine(new LeaderboardProjectorCatalog()),
+                Substitute.For<ILeaderboardRefreshPublisher>(), cacheServices.GetRequiredService<IFusionCacheProvider>());
+            var board = await cache.CreateAsync(fixture.CompetitionId, fixture.Now.AddMinutes(3), ct);
+            await Assert.That(board).IsNotNull();
+            await Assert.That(board!.Entries.Any(entry => entry.TeamId == practiceId)).IsFalse();
+            await Assert.That(board.Entries.Any(entry => entry.TeamId == fixture.TeamId)).IsTrue();
+            var runtime = Runtime(fixture, RuntimeState.Running);
+            runtime.TeamId = practiceId;
+            runtime.RunnerId = "practice-runner";
+            runtime.ProviderReceiptJson = "{}";
+            db.RuntimeInstances.Add(runtime);
+            await db.SaveChangesAsync(ct);
+            var moderation = new ModerateTeam(new TeamModerationStore(db, outbox, events));
+            var command = new TeamModerationCommand(fixture.CompetitionId, practiceId, fixture.OwnerId, true, "Practice abuse", fixture.Now.AddMinutes(4));
+            await Assert.That((await moderation.ExecuteAsync(command, ct)).Succeeded).IsTrue();
+            await Assert.That((await moderation.ExecuteAsync(command, ct)).Succeeded).IsTrue();
+            await Assert.That(outbox.Published.OfType<StopRuntime>().Count(message => message.RuntimeInstanceId == runtime.Id)).IsEqualTo(1);
+            await db.Entry(runtime).ReloadAsync(ct);
+            await Assert.That(runtime.State).IsEqualTo(RuntimeState.Stopping);
+            var rejected = await new PracticeFlagJudge(db).JudgeAsync(new(fixture.CompetitionId, fixture.CompetitionChallengeId, joiner, fixture.Flag, fixture.Now.AddMinutes(5)), ct);
+            await Assert.That(rejected.FailureCode).IsEqualTo(PracticeFlagFailureCode.TeamNotEligible);
+            await Assert.That((await moderation.ExecuteAsync(command with { Ban = false }, ct)).Succeeded).IsTrue();
+            await Assert.That((await new PracticeFlagJudge(db).JudgeAsync(new(fixture.CompetitionId, fixture.CompetitionChallengeId, joiner, fixture.Flag, fixture.Now.AddMinutes(6)), ct)).Judgement)
+                .IsEqualTo(PracticeFlagJudgement.Correct);
+            await Assert.That(await db.GameplayFacts.CountAsync(ct)).IsEqualTo(0);
+        });
+    }
+
+    [Test, Timeout(300_000)]
+    public async Task Closed_practice_rejects_late_team_creation_and_existing_teams_remain_formal(CancellationToken ct)
+    {
+        await DockerIntegrationTest.RunAsync(async () =>
+        {
+            await using var postgres = new PostgreSqlBuilder("postgres:17.10-alpine3.24@sha256:742f40ea20b9ff2ff31db5458d127452988a2164df9e17441e191f3b72252193").Build();
+            await postgres.StartAsync(ct);
+            var options = new DbContextOptionsBuilder<NoCtfDbContext>().UseNpgsql(postgres.GetConnectionString()).UseSnakeCaseNamingConvention().Options;
+            var fixture = await SeedAsync(options, ct);
+            await using var db = new NoCtfDbContext(options);
+            var competition = await db.Competitions.SingleAsync(ct);
+            competition.PracticeModeEnabled = false;
+            await db.SaveChangesAsync(ct);
+            var outbox = new RecordingOutbox();
+            var store = new TeamRegistrationStore(db, outbox);
+            var command = new CreateTeamCommand(fixture.CompetitionId, fixture.OwnerId, "Not open", fixture.Now, "default");
+            await Assert.That((await new CreateTeam(store).ExecuteAsync(command, ct)).FailureCode).IsEqualTo(TeamRegistrationFailure.RegistrationClosed);
+            await Assert.That((await store.TryCreateAsync(command, TeamRegistrationStatus.Approved, ct)).Failure).IsEqualTo(TeamRegistrationFailure.RegistrationClosed);
+            await Assert.That(await db.Teams.CountAsync(ct)).IsEqualTo(1);
+            await Assert.That((await db.Teams.SingleAsync(ct)).IsPracticeTeam).IsFalse();
+        });
+    }
+
     [Test, Timeout(300_000)]
     public async Task Practice_HTTP_returns_final_judgements_and_explicit_access_failures_without_formal_facts(CancellationToken ct)
     {

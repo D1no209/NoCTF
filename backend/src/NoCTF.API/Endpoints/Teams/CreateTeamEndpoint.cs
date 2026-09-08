@@ -85,7 +85,8 @@ public sealed record TeamResponse(
     TeamRegistrationStatusProtocol RegistrationStatus,
     bool IsLocked,
     bool IsBanned,
-    DateTimeOffset RegisteredAt);
+    DateTimeOffset RegisteredAt,
+    bool IsPracticeTeam = false);
 
 public sealed record TeamListResponse(IReadOnlyList<TeamResponse> Items);
 
@@ -139,7 +140,8 @@ internal static partial class TeamMapper
             ToProtocol(view.RegistrationStatus),
             view.IsLocked,
             view.IsBanned,
-            view.RegisteredAt);
+            view.RegisteredAt,
+            view.IsPracticeTeam);
     }
 
     [MapEnum(EnumMappingStrategy.ByName)]
