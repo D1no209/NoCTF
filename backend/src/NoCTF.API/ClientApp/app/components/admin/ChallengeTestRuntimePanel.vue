@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { Check, Clipboard, FlaskConical, RefreshCw } from '@lucide/vue'
 import { toast } from 'vue-sonner'
+import { publicGatewayFailure } from '~/utils/public-gateway'
 import {
   adminChallengeBankExtendTestRuntime,
   adminChallengeBankGetTestRuntime,
@@ -265,6 +266,7 @@ function flagStateLabel(state?: NoCtfapiEndpointsAdministrationChallengeBankRunt
     </Alert>
 
     <template v-if="!loading && !loadError">
+      <Alert v-if="runtime?.publicAccessFailure"><AlertDescription>{{ publicGatewayFailure(runtime.publicAccessFailure) }}</AlertDescription></Alert>
       <div v-if="runtime" class="grid gap-3 text-sm sm:grid-cols-2">
         <div class="grid gap-1">
           <span class="text-muted-foreground">{{ $t('运行位置') }}</span>

@@ -13,6 +13,7 @@ using NoCTF.Hosting;
 using NoCTF.Runner.Messages;
 using Wolverine;
 using Wolverine.ErrorHandling;
+using Wolverine.EntityFrameworkCore;
 using Wolverine.Nats;
 
 namespace NoCTF.Runner;
@@ -25,7 +26,9 @@ public static class RunnerRole
     {
         var postgres = configuration.GetConnectionString("PostgreSql")
             ?? throw new InvalidOperationException("ConnectionStrings:PostgreSql is required.");
-        services.AddDbContext<NoCtfDbContext>(
+        // Runner writebacks update state and publish durable events in the same unit of work.
+        // Plain AddDbContext leaves the transaction opened by the EF outbox uncommitted.
+        services.AddDbContextWithWolverineIntegration<NoCtfDbContext>(
             options => options.UseNpgsql(postgres).UseSnakeCaseNamingConvention());
         services.AddScoped<ITransactionalMessageOutbox, WolverineTransactionalMessageOutbox>();
         return services;

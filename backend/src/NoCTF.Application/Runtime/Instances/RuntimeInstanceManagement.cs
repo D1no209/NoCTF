@@ -32,7 +32,9 @@ public sealed record RuntimeInstanceView(
     IReadOnlyList<RuntimePublishedPortView>? PublishedPorts = null,
     DateTimeOffset? StateChangedAt = null,
     Guid? SourceTeamId = null,
-    string? SourceTeamName = null);
+    string? SourceTeamName = null,
+    GameMode? Mode = null,
+    IReadOnlyList<NoCTF.Application.Runtime.Provisioning.RuntimeUrlBinding>? AccessBindings = null);
 
 public sealed record RuntimePublishedPortView(
     string? ServiceName,

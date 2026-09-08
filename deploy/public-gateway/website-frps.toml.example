@@ -1,0 +1,10 @@
+bindAddr = "0.0.0.0"
+bindPort = 60998
+proxyBindAddr = "127.0.0.1"
+allowPorts = [{ single = 9999 }]
+maxPortsPerClient = 1
+auth.token = "{{ .Envs.NOCTF_FRP_TOKEN }}"
+transport.tls.force = true
+transport.tls.certFile = "/config/server.crt"
+transport.tls.keyFile = "/config/server.key"
+transport.tls.trustedCaFile = "/config/ca.crt"

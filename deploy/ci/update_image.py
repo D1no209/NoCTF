@@ -11,6 +11,7 @@ import shutil
 import socket
 import subprocess
 import tempfile
+import uuid
 
 
 APPLICATIONS = {"backend", "worker", "runner", "noctf"}
@@ -35,6 +36,33 @@ def labels(container):
 
 def environment(container):
     return dict(value.split("=", 1) for value in container["Config"].get("Env", []))
+
+
+def managed_ssh_client(container, apps):
+    """Only the updated Runner's ephemeral master may disappear during reconciliation.
+
+    A master is created lazily, so no replacement is required without publications.
+    Runtime targets, relays, fixed website tunnels and other connectors stay protected.
+    """
+    meta = labels(container)
+    if meta.get("noctf.io/gateway-role") != "client":
+        return False
+    try:
+        if uuid.UUID(meta.get("noctf.io/gateway-session", "")).int == 0:
+            return False
+    except ValueError:
+        return False
+    for app in apps:
+        if labels(app).get("com.docker.compose.service") not in {"runner", "noctf"}:
+            continue
+        env = environment(app)
+        connector = env.get("PublicGateway__ConnectorId")
+        runner = env.get("PublicGateway__RunnerId")
+        if (connector and runner and env.get("PublicGateway__Transport") == "SharedSsh"
+                and meta.get("noctf.io/public-gateway-connector") == connector
+                and meta.get("noctf.io/public-gateway-runner") == runner):
+            return True
+    return False
 
 
 def application_containers(containers, root):
@@ -210,7 +238,8 @@ def _deploy_locked(args, root):
         for name, identity in networks.items():
             if output(["docker", "network", "inspect", name, "--format", "{{.Id}}"] ) != identity:
                 raise RuntimeError("Network identity changed: " + name)
-        other_ids = [c["Id"] for c in all_containers if c["Id"] not in {app["Id"] for app in apps}]
+        other_ids = [c["Id"] for c in all_containers if c["Id"] not in {app["Id"] for app in apps}
+                     and not managed_ssh_client(c, apps)]
         if any(not c["State"]["Running"] for c in docker_inspect(other_ids)):
             raise RuntimeError("An unrelated container is no longer running.")
         write_private(backup / "verified.json", {"commit": args.commit, "image": args.image,
