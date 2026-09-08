@@ -7,6 +7,7 @@ using NoCTF.Application.Competitions.Events;
 using NoCTF.Domain.Competitions.Events;
 using NoCTF.Domain.Shared;
 using NoCTF.Infrastructure.Observability;
+using NoCTF.Domain.Runtime;
 
 namespace NoCTF.Infrastructure.Teams.Moderation;
 
@@ -27,13 +28,11 @@ public sealed class TeamModerationStore(
         CancellationToken cancellationToken)
     {
         await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
-        var status = await CompetitionStateReader.ReadAsync(db, command.CompetitionId, cancellationToken);
-        if (status is null)
+        var competition = await CompetitionTeamMutationCriticalSection.AcquireAsync(db, command.CompetitionId, cancellationToken);
+        if (competition is null)
             return new(TeamModerationFailure.CompetitionNotFound);
-        if (status == CompetitionStatus.Finished)
-            return new(TeamModerationFailure.CompetitionFinished);
         var team = await db.Teams.SingleOrDefaultAsync(
-            item => item.CompetitionId == command.CompetitionId && item.Id == command.TeamId,
+            item => item.CompetitionId == command.CompetitionId && item.Id == command.TeamId && item.DeletedAt == null,
             cancellationToken);
         if (team is null)
             return new(TeamModerationFailure.TeamNotFound);
@@ -75,9 +74,27 @@ public sealed class TeamModerationStore(
             TeamId: team.Id,
             ParentEventId: ban?.Id,
             Reason: safeReason), cancellationToken);
-        await db.SaveChangesAsync(cancellationToken);
         if (command.Ban)
         {
+            // A post-contest ban must also revoke direct access to active practice environments.
+            var practiceRuntimes = await db.RuntimeInstances.Where(runtime =>
+                runtime.CompetitionId == command.CompetitionId && runtime.TeamId == team.Id
+                && runtime.Purpose == RuntimePurpose.Practice
+                && (runtime.State == RuntimeState.Queued || runtime.State == RuntimeState.Provisioning || runtime.State == RuntimeState.Running))
+                .ToListAsync(cancellationToken);
+            foreach (var runtime in practiceRuntimes)
+            {
+                if (runtime.State == RuntimeState.Queued && runtime.RunnerId is null && runtime.ProviderReceiptJson is null)
+                {
+                    runtime.State = RuntimeState.Stopped;
+                    runtime.StoppedAt = command.OccurredAt;
+                }
+                else
+                {
+                    runtime.State = RuntimeState.Stopping;
+                    await outbox.PublishAsync(new StopRuntime(runtime.Id));
+                }
+            }
             await outbox.PublishAsync(new TeamBanned(
                 command.CompetitionId,
                 team.Id,
@@ -87,8 +104,9 @@ public sealed class TeamModerationStore(
                     ? TeamBanAnnouncementKind.RuleViolation
                     : null));
         }
+        await db.SaveChangesAsync(cancellationToken);
         await transaction.CommitAsync(cancellationToken);
-        await outbox.FlushOutgoingMessagesAsync();
+        await outbox.FlushCommittedMessagesAsync();
         return new();
     }
 }

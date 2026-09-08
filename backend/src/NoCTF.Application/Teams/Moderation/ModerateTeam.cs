@@ -60,8 +60,6 @@ public sealed class ModerateTeam(ITeamModerationStore store)
         var status = await store.GetCompetitionStatusAsync(command.CompetitionId, cancellationToken);
         if (status is null)
             return OperationResult<TeamModerationFailure>.Failure(TeamModerationFailure.CompetitionNotFound, "Competition was not found.");
-        if (status == CompetitionStatus.Finished)
-            return OperationResult<TeamModerationFailure>.Failure(TeamModerationFailure.CompetitionFinished, "Finished competitions are read-only.");
 
         var result = await store.ApplyAsync(command, cancellationToken);
         if (!result.Succeeded) return result.Failure switch

@@ -55,7 +55,9 @@ public sealed class TeamMembershipStore(
                 ct))
             return TeamMembershipFailure.UserAlreadyRegistered;
 
-        if (TeamMembershipPolicy.IsInvitationJoinLocked(
+        var practiceJoin = team.IsPracticeTeam && competition.Mode == GameMode.Ctf
+            && competition.Status == CompetitionStatus.Finished && competition.PracticeModeEnabled;
+        if (!practiceJoin && TeamMembershipPolicy.IsInvitationJoinLocked(
                 competition.Status,
                 competition.AllowTeamRegistrationWhileRunning))
             return TeamMembershipFailure.MembershipLocked;
