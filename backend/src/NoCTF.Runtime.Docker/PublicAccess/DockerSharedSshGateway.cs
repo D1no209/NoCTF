@@ -236,7 +236,9 @@ public sealed class DockerSharedSshGateway : IPublicGatewayTransport, IDisposabl
                 HostConfig = new HostConfig
                 {
                     Binds = [$"{directories.HostSession}:/endpoints:ro"], Memory = 64 * 1024 * 1024, NanoCPUs = 250_000_000,
-                    PidsLimit = 64, RestartPolicy = new RestartPolicy { Name = RestartPolicyKind.UnlessStopped }, LogConfig = Logs()
+                    // autossh does not reap the orphaned watchdog children of BusyBox timeout execs.
+                    // Docker's tiny init must own PID 1, otherwise repeated control probes exhaust PIDs.
+                    Init = true, PidsLimit = 64, RestartPolicy = new RestartPolicy { Name = RestartPolicyKind.UnlessStopped }, LogConfig = Logs()
                 }
             }, ct);
             try

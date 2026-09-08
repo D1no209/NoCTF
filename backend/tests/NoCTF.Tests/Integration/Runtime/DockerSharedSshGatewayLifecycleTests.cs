@@ -130,6 +130,23 @@ public sealed class DockerSharedSshGatewayLifecycleTests
                     var publicPort = ready.Endpoints.Single().PublicPort!.Value;
                     var address = new Uri($"http://{server.Hostname}:{server.GetMappedPublicPort(publicPort)}/");
                     await Assert.That(await http.GetStringAsync(address, ct)).IsEqualTo("linux-target");
+                    var sharedClient = (await ResourcesAsync(docker, connector, ct)).Single(item => item.Labels["noctf.io/gateway-role"] == "client");
+                    await Assert.That((await docker.Containers.InspectContainerAsync(sharedClient.ID, ct)).HostConfig!.Init ?? false).IsTrue();
+                    var controlProbe = new DockerSshControl(docker, sharedClient.ID);
+                    for (var probe = 0; probe < 80; probe++)
+                    {
+                        await Assert.That(await controlProbe.ReadSessionAsync(ct)).IsNotNull();
+                        await Task.Delay(250, ct); // bounded live watchdog concurrency, but >64 lifetime execs
+                    }
+                    await Task.Delay(5000, ct); // all four-second timeout watchdogs have exited
+                    var processCheck = await docker.Exec.CreateContainerExecAsync(sharedClient.ID,
+                        new ContainerExecCreateParameters { Cmd = ["cat", "/sys/fs/cgroup/pids.current"], AttachStdout = true }, ct);
+                    using (var stream = await docker.Exec.StartContainerExecAsync(processCheck.ID, new ContainerExecStartParameters(), ct))
+                    {
+                        var (count, _) = await stream.ReadOutputToEndAsync(ct);
+                        await Assert.That(int.Parse(count.Trim(), System.Globalization.CultureInfo.InvariantCulture)).IsLessThan(24);
+                    }
+                    Console.WriteLine("Repeated SSH control probes: no zombie/PID accumulation PASS.");
                     var oldRelay = (await ResourcesAsync(docker, connector, ct)).Single(item => item.Labels["noctf.io/gateway-role"] == "relay");
                     var inspected = await docker.Containers.InspectContainerAsync(oldRelay.ID, ct);
                     await Assert.That(inspected.Config!.User.StartsWith("0:", StringComparison.Ordinal)).IsFalse();
