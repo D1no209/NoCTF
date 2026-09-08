@@ -1,0 +1,22 @@
+# Optional, separate project on the approved jump host. Never merge into the main platform stack.
+services:
+  website-gateway:
+    image: ${NOCTF_GATEWAY_IMAGE:?CI-produced digest reference is required}
+    entrypoint: [/usr/local/bin/frps, -c, /config/frps.toml]
+    network_mode: host
+    env_file: ./website-server.env
+    volumes:
+      - ./website-server:/config
+    restart: unless-stopped
+    mem_limit: 64m
+    cpus: 0.25
+  challenge-gateway:
+    image: ${NOCTF_GATEWAY_IMAGE:?CI-produced digest reference is required}
+    entrypoint: [/usr/local/bin/frps, -c, /config/frps.toml]
+    network_mode: host
+    env_file: ./challenge-server.env
+    volumes:
+      - ./challenge-server:/config
+    restart: unless-stopped
+    mem_limit: 64m
+    cpus: 0.25

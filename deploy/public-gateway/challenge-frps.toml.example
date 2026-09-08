@@ -1,0 +1,11 @@
+bindAddr = "0.0.0.0"
+bindPort = 7001
+proxyBindAddr = "0.0.0.0"
+# Current jump host reserves 36632. Re-inventory before applying this example elsewhere.
+allowPorts = [{ start = 32768, end = 36631 }, { start = 36633, end = 60999 }]
+maxPortsPerClient = 8
+auth.token = "{{ .Envs.NOCTF_FRP_TOKEN }}"
+transport.tls.force = true
+transport.tls.certFile = "/config/server.crt"
+transport.tls.keyFile = "/config/server.key"
+transport.tls.trustedCaFile = "/config/ca.crt"
