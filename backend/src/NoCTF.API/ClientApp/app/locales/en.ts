@@ -1,11 +1,11 @@
 /** English UI resources keyed by the canonical Simplified Chinese source text. */
 export const englishMessages: Record<string, string> = {
-  "公网访问": "Public access",
-  "题目公网访问已关闭": "Public challenge access is disabled",
+  "内网穿透": "Intranet tunneling",
+  "题目内网穿透已关闭": "Challenge tunneling is disabled",
   "公网连接器暂时离线": "The public connector is temporarily offline",
   "该端口不在允许范围或已被占用": "The port is not allowed or is already occupied",
   "无法确认该实例的端口绑定": "The instance port binding could not be verified",
-  "该运行类型暂不支持公网访问": "This runtime type does not support public access yet",
+  "该运行类型暂不支持内网穿透": "This runtime type does not support tunneling yet",
   "连接文案需要包含 {HOST} 和 {PORT}": "Connection text must include {HOST} and {PORT}",
   "公网端口配额已满": "The public port quota is exhausted",
   "公网实例身份校验失败": "Public instance identity verification failed",
@@ -23,7 +23,7 @@ export const englishMessages: Record<string, string> = {
   "公网连接独立于题目运行；关闭公网不会停止题目或固定网站隧道。": "Public connectivity is independent of runtimes. Disabling it does not stop challenges or the fixed website tunnel.",
   "检查网关状态": "Check gateway status",
   "此部署尚未配对公网连接器，请联系运维完成独立部署。": "No public connector is paired. Contact operations to complete the optional deployment.",
-  "启用题目公网访问": "Enable public challenge access",
+  "启用题目内网穿透": "Enable challenge tunneling",
   "仅公开获准的选手与练习容器，不公开 Checker、Fix Target 或题库测试容器。": "Only approved player and practice containers are published, excluding Checkers, Fix Targets, and template-test containers.",
   "已配对连接器": "Paired connector",
   "连接器和端口范围由部署配置决定，页面不能指定任意代理目标。": "Connector and port capabilities are deployment-controlled. Arbitrary proxy targets cannot be entered here.",

@@ -20,6 +20,8 @@ test('gateway page uses generated contracts and preserves async application and 
   expect(page).toContain('finally { saving.value = false }')
   expect(page).toContain('FieldError')
   expect(page).toContain('namespaceIsolationAvailable')
+  expect(page).toContain("$t('内网穿透')")
+  expect(page).not.toContain("$t('公网访问')")
   expect(page).toContain("$t('直连端口')")
   expect(page).toContain("$t('公网端口')")
   expect(page).toContain("endpoint.publicPort ?? '—'")
