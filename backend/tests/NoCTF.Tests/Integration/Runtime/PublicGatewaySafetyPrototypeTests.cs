@@ -43,9 +43,9 @@ namespace NoCTF.Tests.Integration.Runtime;
 [Category("Integration"), Category("GatewaySafetyPrototype"), NotInParallel]
 public sealed class PublicGatewaySafetyPrototypeTests
 {
-    private const string Image = "m.daocloud.io/docker.io/library/python:3.13-alpine@sha256:540c7d91f98ff6880174c40e99067bf5941eb54d818a7a5e094d188b196a934d";
+    internal const string Image = "m.daocloud.io/docker.io/library/python:3.13-alpine@sha256:540c7d91f98ff6880174c40e99067bf5941eb54d818a7a5e094d188b196a934d";
     private const string ArchiveHash = "3CF934477F4FB1EE9E19E49C31FB33F5FFE3283300076F59AFAD8B8CCF1E1621";
-    private static readonly Lazy<Task<Dictionary<string, byte[]>>> Binaries = new(ReadBinariesAsync);
+    internal static readonly Lazy<Task<Dictionary<string, byte[]>>> Binaries = new(ReadBinariesAsync);
 
     [Test, Timeout(180_000)]
     public async Task Actual_agent_reconciles_postgres_facts_and_disables_without_stopping_the_target(CancellationToken ct)
@@ -433,7 +433,7 @@ public sealed class PublicGatewaySafetyPrototypeTests
         return files;
     }
 
-    private static (byte[] Ca, byte[] ServerCert, byte[] ServerKey, byte[] ClientCert, byte[] ClientKey) CreateCertificates()
+    internal static (byte[] Ca, byte[] ServerCert, byte[] ServerKey, byte[] ClientCert, byte[] ClientKey) CreateCertificates()
     {
         using var caKey = RSA.Create(2048);
         var request = new CertificateRequest("CN=NoCTF isolated test CA", caKey, HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1);
