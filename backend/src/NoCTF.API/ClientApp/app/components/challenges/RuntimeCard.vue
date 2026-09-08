@@ -8,6 +8,7 @@ import {
   stopRuntimeEndpoint,
 } from '~/api'
 import type { NoCtfapiEndpointsRuntimeRuntimeResponse } from '~/api'
+import { publicGatewayFailure, publicGatewayState } from '~/utils/public-gateway'
 import {
   classifyPlayerRuntimeLookup,
   normalizePlayerRuntime,
@@ -142,13 +143,27 @@ const extend = () =>
 
 // TTL 倒计时
 let timer: ReturnType<typeof setInterval> | undefined
+let publicTimer: ReturnType<typeof setInterval> | undefined
+let publicRefreshing = false
 onMounted(() => {
   timer = setInterval(() => {
     now.value = Date.now()
   }, 1000)
 })
+watch(() => runtime.value?.access?.route === 'Gateway' && runtime.value.state === 'Running', (needsPublicRefresh) => {
+  if (publicTimer) clearInterval(publicTimer)
+  publicTimer = undefined
+  if (!needsPublicRefresh) return
+  publicTimer = setInterval(async () => {
+    if (publicRefreshing || acting.value || polling.value || runtime.value?.access?.route !== 'Gateway' || runtime.value.state !== 'Running') return
+    publicRefreshing = true
+    try { await load() }
+    finally { publicRefreshing = false }
+  }, 5000)
+})
 onUnmounted(() => {
   if (timer) clearInterval(timer)
+  if (publicTimer) clearInterval(publicTimer)
 })
 
 const ttl = computed(() => {
@@ -197,6 +212,13 @@ const stateVariant = computed(() => {
         </Alert>
 
         <template v-if="!loadError && runtime">
+          <Alert v-if="isRunning && (runtime.access?.route === 'Gateway' || runtime.access?.failure)" aria-live="polite">
+            <AlertDescription>
+              <span v-if="runtime.access?.route === 'Gateway'">{{ publicGatewayState(runtime.access.state) }}</span>
+              <span v-if="runtime.access?.failure"> {{ publicGatewayFailure(runtime.access.failure) }}</span>
+              <p v-if="runtime.access?.route === 'Gateway'" class="mt-1">{{ $t('公网连接状态不会改变题目运行状态。') }}</p>
+            </AlertDescription>
+          </Alert>
           <div v-if="isRunning && runtime.urls?.length" class="flex flex-col gap-1">
             <span class="text-sm text-muted-foreground">{{ $t('访问地址') }}</span>
             <RuntimeAccessUrl
