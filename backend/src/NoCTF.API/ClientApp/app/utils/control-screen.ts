@@ -4,7 +4,7 @@ import type {
   NoCtfapiEndpointsCompetitionsScoreboardSchemaResponse,
   NoCtfapiEndpointsCompetitionsScoreboardSnapshotResponse,
   NoCtfapiEndpointsCompetitionsScoreboardTeamResponse,
-} from '~/api'
+} from '../api'
 import { scoreboardBreakdown, scoreboardColumnsForChallenge, scoreboardSlot } from './scoreboard'
 import { directionLabel } from './directions'
 

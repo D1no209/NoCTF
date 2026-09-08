@@ -1,6 +1,7 @@
+import { sourceFile } from './support/feature-source'
 import { describe, expect, test } from 'bun:test'
 
-const page = () => Bun.file(new URL('../app/pages/admin/competitions/[id]/challenges/[ccId].vue', import.meta.url)).text()
+const page = () => sourceFile(new URL('../app/pages/admin/competitions/[id]/challenges/[ccId].vue', import.meta.url)).text()
 
 describe('admin competition challenge navigation', () => {
   test('places the challenge sections in a sticky right rail on desktop', async () => {

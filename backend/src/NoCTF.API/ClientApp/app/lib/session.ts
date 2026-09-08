@@ -1,5 +1,5 @@
-import { refreshTokenEndpoint } from '~/api'
-import { createClient } from '~/api/client'
+import { refreshTokenEndpoint } from '../api'
+import { createClient } from '../api/client'
 import { accessTokenNeedsRefresh } from './auth-refresh'
 
 /**

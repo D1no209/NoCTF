@@ -1,3 +1,4 @@
+import { sourceFile } from './support/feature-source'
 import { describe, expect, test } from 'bun:test'
 import { affectsChallengeHints, hintUnlockState, readableHintContent } from '../app/lib/challenge-hints'
 
@@ -25,9 +26,9 @@ describe('participant hints', () => {
   })
 
   test('uses participant APIs, inline cost confirmation, polling and safe text rendering', async () => {
-    const component = await Bun.file(new URL('../app/components/challenges/ChallengeHints.vue', import.meta.url)).text()
-    const detail = await Bun.file(new URL('../app/components/challenges/CompetitionChallengeDetail.vue', import.meta.url)).text()
-    expect(detail).toContain('<ChallengeHints')
+    const component = await sourceFile(new URL('../app/features/challenges/ChallengeHints.vue', import.meta.url)).text()
+    const detail = await sourceFile(new URL('../app/features/challenges/CompetitionChallengeDetail.vue', import.meta.url)).text()
+    expect(detail).toContain("<component :is=\"ChallengeHints\"")
     expect(detail).toContain(':hints="challenge.hints"')
     expect(component).toContain('confirmingId.value !== hint.id')
     expect(component).toContain('unlockChallengeHintEndpoint({')
@@ -41,14 +42,14 @@ describe('participant hints', () => {
 
 describe('native scrollbar theme and main navigation', () => {
   test('keeps the header horizontally accessible without a vertical scrollbar', async () => {
-    const layout = await Bun.file(new URL('../app/layouts/default.vue', import.meta.url)).text()
+    const layout = await sourceFile(new URL('../app/layouts/default.vue', import.meta.url)).text()
     expect(layout).toContain('overflow-x-auto overflow-y-hidden')
     expect(layout).toContain('scrollbar-none')
     expect(layout).toContain('py-1')
   })
 
   test('declares native light and dark schemes instead of globally hiding scrollbars', async () => {
-    const css = await Bun.file(new URL('../app/assets/css/main.css', import.meta.url)).text()
+    const css = await sourceFile(new URL('../app/assets/css/main.css', import.meta.url)).text()
     expect(css).toMatch(/:root\s*\{\s*color-scheme: light;/)
     expect(css).toMatch(/\.dark\s*\{\s*color-scheme: dark;/)
     expect(css).toContain('@utility scrollbar-none')

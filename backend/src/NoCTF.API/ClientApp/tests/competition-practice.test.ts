@@ -1,3 +1,4 @@
+import { sourceFile } from './support/feature-source'
 import { describe, expect, test } from 'bun:test'
 import { canEnterCompetition, isCtfPracticeOpen } from '../app/lib/competition-participation'
 
@@ -34,11 +35,11 @@ describe('competition practice entry', () => {
   })
 
   test('overview and CTF controls share the same practice predicate and use the unscored endpoint', async () => {
-    const overview = await Bun.file(new URL('../app/pages/competitions/[id]/index.vue', import.meta.url)).text()
-    const panel = await Bun.file(new URL('../app/components/challenges/panels/CtfPanel.vue', import.meta.url)).text()
-    const submit = await Bun.file(new URL('../app/components/challenges/FlagSubmit.vue', import.meta.url)).text()
+    const overview = await sourceFile(new URL('../app/pages/competitions/[id]/index.vue', import.meta.url)).text()
+    const panel = await sourceFile(new URL('../app/features/challenges/panels/CtfPanel.vue', import.meta.url)).text()
+    const submit = await sourceFile(new URL('../app/features/challenges/FlagSubmit.vue', import.meta.url)).text()
     expect(overview).toContain('canEnterCompetition(competition.value, myTeam.value)')
-    expect(overview).toContain("practiceOpen ? $t('进入练习') : $t('进入比赛')")
+    expect(overview).toContain("practiceOpen ? $t('ui.enterPractice') : $t('ui.enterTheCompetition')")
     expect(panel).toContain('isCtfPracticeOpen(props.competition)')
     expect(panel).toContain(':practice="practiceOpen"')
     expect(submit).toContain('if (props.practice)')

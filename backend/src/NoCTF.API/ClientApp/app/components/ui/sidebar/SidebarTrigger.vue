@@ -2,9 +2,9 @@
 import type { HTMLAttributes } from 'vue'
 
 import { PanelLeftIcon } from '@lucide/vue'
-import { cn } from '@/lib/utils'
-import { Button } from '@/components/ui/button'
-import { useSidebar } from './utils'
+import { cn } from '~/lib/utils'
+import { Button } from '~/components/ui/button'
+import { useSidebar } from '~/components/ui/sidebar/utils'
 
 const props = defineProps<{
   class?: HTMLAttributes['class']
@@ -23,6 +23,6 @@ const { toggleSidebar } = useSidebar()
     @click="toggleSidebar"
   >
     <PanelLeftIcon class="cn-rtl-flip" />
-    <span class="sr-only">Toggle Sidebar</span>
+    <span class="sr-only">{{ $t('ui.toggleSidebar') }}</span>
   </Button>
 </template>

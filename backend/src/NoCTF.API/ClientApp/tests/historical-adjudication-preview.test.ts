@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import { readFileSync } from 'node:fs'
+import { readFeatureSource as readFileSync } from './support/feature-source'
 
 const source = readFileSync(
   new URL('../app/pages/admin/competitions/[id]/submissions.vue', import.meta.url),
@@ -17,20 +17,20 @@ describe('historical adjudication difference preview', () => {
 
   test('distinguishes deterministic differences from manual review without an apply action', () => {
     expect(source).toContain("difference.certainty === 'Deterministic'")
-    expect(source).toContain("$t('确定性差异')")
-    expect(source).toContain("$t('需人工复核')")
+    expect(source).toContain("$t('ui.deterministicDifference')")
+    expect(source).toContain("$t('ui.needsManualReview')")
     const previewTemplate = source.slice(
-      source.indexOf("$t('历史裁决差异预览')"),
-      source.indexOf('<Card>', source.indexOf("$t('历史裁决差异预览')") + 1),
+      source.indexOf("$t('ui.historicalAdjudicationDifferencePreview')"),
+      source.indexOf('<Card>', source.indexOf("$t('ui.historicalAdjudicationDifferencePreview')") + 1),
     )
     expect(previewTemplate).not.toContain('rejudge')
     expect(previewTemplate).not.toContain('纠正按钮')
   })
 
   test('describes the narrow legacy AWDP break analysis accurately', () => {
-    expect(source).toContain('当前分析 CTF Flag，并识别旧版本错误判为重复成就的 AWDP Break；AWD、KoH 与其他事实类型不在此预览中。')
-    expect(source).toContain("CurrentDuplicateShouldBeCorrect: '当前重复结果来自旧版错误，应恢复为正确'")
-    expect(source).toContain("MissingAdjudicationRecord: '当前结果缺少不可变裁决事件'")
-    expect(source).toContain("TeamEligibilityHistoryRequiresReview: '队伍当前资格无法证明发生时血榜资格'")
+    expect(source).toContain("ui.thisPreviewAnalyzesCtfFlagFactsAndAwdpBreakFacts")
+    expect(source).toContain("CurrentDuplicateShouldBeCorrect: translate(\"ui.theCurrentDuplicateResultComesFromALegacyDefectAnd\")")
+    expect(source).toContain("MissingAdjudicationRecord: translate(\"ui.theCurrentResultHasNoImmutableAdjudicationEvent\")")
+    expect(source).toContain("TeamEligibilityHistoryRequiresReview: translate(\"ui.currentTeamEligibilityCannotProveBloodAwardEligibilityAtThe\")")
   })
 })

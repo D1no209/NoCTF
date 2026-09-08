@@ -6,18 +6,23 @@ Nuxt 4 SPA(`ssr: false`),Bun 管理依赖,TypeScript strict,Vue 用 `<script set
 
 - `bun run dev`:开发(端口 3000,vite proxy 把 `/api`、`/hubs`、`/health` 转发到 `http://localhost:5080`)。
 - `bun run typecheck`:全量类型检查,改动后必须通过。
+- `bun run audit:architecture`:检查 i18n、渲染层、路由壳与 UI 原语边界；改动后必须通过。`bun test` 包含同一架构检查及行为回归。
 - `bun run api:gen`:从 `../wwwroot/openapi/v1.json` 重新生成 API SDK 到 `app/api/`(@hey-api/openapi-ts,配置在 `openapi-ts.config.ts`)。后端接口变更后先重新导出 OpenAPI(`dotnet run -- --export-openapi`)再跑此命令;生成产物提交入库。
 - shadcn-vue 组件用 `bunx --bun shadcn-vue@latest add <name>` 添加(CLI 一律走 bunx)。
 
 ## 结构(app/ 下)
 
 - `api/`:hey-api 生成产物(sdk.gen.ts / types.gen.ts / client),不要手改。
-- `components/ui/`:shadcn-vue 组件,自动导入无前缀(`<Button>` 等);`components/<领域>/` 放业务组件,组件名 = 文件名(nuxt.config 已设 `pathPrefix: false`,**全局禁止重名**)。`components/app/` 放应用级共享组件:`AppWorkspaceNav`(路由级多分区工作区的侧边栏导航,配置走 `workspace-nav.ts` 的 `WorkspaceNavGroup`)。
+- `components/ui/`:唯一的共享 UI 原语目录，shadcn-vue 与项目通用控件均在此处。只有此目录自动导入，无前缀(`<Button>` 等)。新增通用交互控件必须集中放在这里，禁止页面或业务组件私建按钮、输入框、弹层、表格等原语。
+- `components/views/`:纯渲染视图。setup 只声明 props、类型和 `toRefs` 绑定；不请求 API，不访问会话，不创建业务状态、watch、轮询或事件处理函数。模板允许布局 HTML、原语组合、条件渲染、列表、i18n、格式化、v-model 与命令转发；禁止事件中的赋值、控制流和业务转换。通过类型引用功能层契约可以，但禁止运行时导入功能层。
+- `features/<领域>/`:功能逻辑与组合入口。`use<Name>.ts` 管理状态、校验、转换、权限判断、API、轮询、订阅和事件处理；`<Name>.vue` 只连接 props/emits/model、控制器和对应 View。子功能组件由控制器显式提供，视图通过 `<component :is>` 渲染，禁止隐式自动导入业务组件。`features/routes/` 对应路由功能，`features/shell/` 对应应用壳，`features/shared/view-state.ts` 统一连接功能状态与视图。所有 Vue 文件名保持唯一。
+- `features/app/`:应用工作区组合与导航契约；`AppWorkspaceNav` 与 `workspace-nav.ts` 的 `WorkspaceNavGroup` 在这里。
 - `composables/`:`useAuth`(会话/角色)、`usePlatform`(品牌)、`useCursorPagination`(keyset「加载更多」)、`usePolling`(202+statusUrl 轮询)、`useCompetitionHub` / `usePlatformLogHub`(SignalR 实时失效)、`useDefinitionModel`(题目 definitionJson 的 parse/serialize/回灌去重,供 DefinitionEditor 与各切片组件共享一份 model)。
 - `lib/`:`session.ts`(内存 access token + refresh 单飞,供拦截器使用,禁 localStorage)、`admin-competition.ts`(竞赛管理角色注入)。
 - `utils/`:`api-error.ts`(ApiError/parseApiError/statusErrorMessage,problem+json 解析与空响应体的状态码兜底文案)、`labels.ts`(枚举中文标签)、`admin-format.ts`、`download.ts`(带 Bearer 的 blob 下载)、`game-config.ts`(游戏模式专属配置 JSON 的解析/序列化模型与字段描述)。
 - `middleware/`:`auth` / `guest` / `platform-admin`,经 `definePageMeta` 使用。
-- `pages/`:公开区(`/competitions/**`、首页)、选手区(竞赛工作区子路由含 my/*)、认证(`/auth/*`)、账户(`/account`)、竞赛管理(`/admin/competitions/**`)、题库(`/admin/challenges/**`)、平台管理(`/admin/platform/**`)。
+- `pages/`、`layouts/`、`app.vue`:仅路由/布局元数据与功能入口组合，不持有业务代码或私有原语。路由仍为公开区、选手区、认证、账户、竞赛管理、题库与平台管理。
+- `locales/zh-CN.ts`、`locales/en.ts`:使用同一组稳定资源 key，中英文 key 与插值参数必须一致。修改文案不修改 key。页面、组件、默认属性、占位符、无障碍名称、通知与错误文案不得硬编码中文或英文；用户内容、协议值、URL 和代码示例数据按其真实语义处理，不翻译用户内容。
 
 ## 约定
 
@@ -32,7 +37,7 @@ Nuxt 4 SPA(`ssr: false`),Bun 管理依赖,TypeScript strict,Vue 用 `<script set
 - 组件 style preset 为 `reka-vega`(components.json),正文 Inter;新增/更新组件统一 `bunx --bun shadcn-vue@latest add <name>`,apply/init preset 会重写 `main.css` 配色变量,之后需回合下方品牌色定制。
 - 主题默认深色,切换走 `useTheme()`(vueuse `vueuse-color-scheme` 持久化,nuxt.config head 脚本防首帧闪烁);品牌蓝(#2563eb)token 与浅/深两套配色在 `assets/css/main.css`,背景刻意带蓝色调、不做纯白。
 - 排版约定:标题用 `text-display` 工具类(main.css 定义,字重+字距),全局 h1-h3 已带 `tracking-tight`;终端光标闪烁用 `animate-blink`(如品牌 wordmark `> name _`,见 layouts/default.vue);数据用 `font-mono`(JetBrains Mono)+ `tabular-nums`。
-- 新写中文 UI 文案必须在 `app/locales/en.ts` 补英文资源(tests/i18n.test.ts 强制),英文值不得含汉字。
+- 新 UI 文案在两个 locale 文件同时添加资源；静态文案用稳定 key 调用 `$t` / `t` / `translate`。配置标签保存 key，渲染时翻译，禁止在模块加载时固定当前语言。已解析的错误/反馈用 `$message` 渲染，已知中英文反馈随语言切换，未知服务端文本和用户内容原样保留。不得恢复中文原文作 key。
 - 题目方向(Web/Pwn/Crypto 等)的图标与颜色一律走 `utils/directions.ts` 映射表(`directionIcon`/`directionTextClass`/`directionBadgeClass`),禁止局部硬编码方向色;分数、排名、时间等数据用 `font-mono`(JetBrains Mono)+ `tabular-nums`。
 - 发布构建由 `NoCTF.API.csproj` 驱动(`bun install --frozen-lockfile` + `bun run generate`),产物在 `.output/public`。
 - 改依赖后提交更新后的 `bun.lock`。

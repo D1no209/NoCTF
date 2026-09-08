@@ -1,3 +1,4 @@
+import { sourceFile } from './support/feature-source'
 import { describe, expect, test } from 'bun:test'
 import { renderMarkdown } from '../app/lib/markdown'
 import { readableHintContent } from '../app/lib/challenge-hints'
@@ -26,10 +27,10 @@ describe('safe challenge Markdown', () => {
   })
 
   test('removes scripts, embedded documents, forms, metadata and DOM-clobbering attributes', () => {
-    const html = renderMarkdown('<div id="app" name="location"><script>alert(1)</script><style>body{display:none}</style><iframe src="https://example.com"></iframe><object data="bad"></object><form action="/api/delete"><input name="password"><button>提交</button></form><base href="https://example.com"><meta http-equiv="refresh" content="0;url=https://example.com"><svg onload="alert(1)"></svg><math></math>正文</div>')
+    const html = renderMarkdown("<div id=\"app\" name=\"location\"><script>alert(1)</script><style>body{display:none}</style><iframe src=\"https://example.com\"></iframe><object data=\"bad\"></object><form action=\"/api/delete\"><input name=\"password\"><ActionButton>提交</button></form><base href=\"https://example.com\"><meta http-equiv=\"refresh\" content=\"0;url=https://example.com\"><svg onload=\"alert(1)\"></svg><math></math>正文</div>")
     expect(html).not.toMatch(/<(script|style|iframe|object|form|input|button|base|meta|svg|math)\b/)
     expect(html).not.toMatch(/\s(?:id|name|onload|action)=/)
-    expect(html).toContain('正文')
+    expect(html).toContain("正文")
   })
 
   test('sanitizes raw HTML links and images, including encoded protocols and events', () => {
@@ -91,13 +92,13 @@ describe('safe challenge Markdown', () => {
 
   test('locked hints never reach the Markdown renderer', async () => {
     expect(readableHintContent({ isUnlocked: false, content: '![private](https://example.com/secret)' })).toBeNull()
-    const hints = await Bun.file(new URL('../app/components/challenges/ChallengeHints.vue', import.meta.url)).text()
-    const detail = await Bun.file(new URL('../app/components/challenges/CompetitionChallengeDetail.vue', import.meta.url)).text()
+    const hints = await sourceFile(new URL('../app/features/challenges/ChallengeHints.vue', import.meta.url)).text()
+    const detail = await sourceFile(new URL('../app/features/challenges/CompetitionChallengeDetail.vue', import.meta.url)).text()
     expect(hints).toContain('<MarkdownContent v-if="readableHintContent(hint) !== null"')
     expect(detail).toContain('<MarkdownContent :source="challenge.description"')
-    expect(hints).not.toContain("$t('免费')")
+    expect(hints).not.toContain("$t('ui.free')")
     expect(hints).toContain('v-if="hint.isUnlocked && (hint.cost ?? 0) > 0"')
     expect(hints).toContain('<Button v-else-if="!hint.isUnlocked"')
-    expect(hints).toContain("$t('解锁提示（{cost} 分）'")
+    expect(hints).toContain("$t('ui.unlockHintPoints'")
   })
 })

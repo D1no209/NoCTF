@@ -1,9 +1,10 @@
+import { sourceFile } from './support/feature-source'
 import { afterEach, describe, expect, test } from 'bun:test'
 import { readdirSync, statSync } from 'node:fs'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { effect, stop } from 'vue'
-import { bloodRankLabel } from '../app/components/leaderboard/types'
+import { bloodRankLabel } from "../app/features/leaderboard/types"
 import { competitionQuestionRoleLabel } from '../app/lib/competition-question'
 import { englishMessages } from '../app/locales/en'
 import { CompetitionStatusLabel, enumLabel } from '../app/utils/admin-format'
@@ -26,15 +27,15 @@ describe('platform locale', () => {
 
   test('uses source Chinese in the default locale and English resources after switching', () => {
     setLocale('zh-CN')
-    expect(translate('竞赛管理')).toBe('竞赛管理')
+    expect(translate('ui.competitionAdmin')).toBe('竞赛管理')
 
     setLocale('en')
-    expect(translate('竞赛管理')).toBe('Competition Admin')
+    expect(translate('ui.competitionAdmin')).toBe('Competition Admin')
   })
 
   test('keeps user data intact while interpolating localized text', () => {
     setLocale('en')
-    expect(translate('队伍「{team}」已被封禁', { team: 'AAA' }))
+    expect(translate('ui.teamHasBeenBanned2', { team: 'AAA' }))
       .toBe('Team “AAA” has been banned')
   })
 
@@ -48,7 +49,7 @@ describe('platform locale', () => {
   test('reactively updates translated consumers in place', () => {
     setLocale('zh-CN')
     const rendered: string[] = []
-    const runner = effect(() => rendered.push(translate('竞赛管理')))
+    const runner = effect(() => rendered.push(translate('ui.competitionAdmin')))
 
     setLocale('en')
 
@@ -82,7 +83,7 @@ describe('platform locale', () => {
     const missing = new Set<string>()
 
     for (const file of files) {
-      const source = await Bun.file(file).text()
+      const source = await sourceFile(file).text()
       for (const match of source.matchAll(callPattern)) {
         const key = match[2]!.replace(/\\'/g, "'").replace(/\\"/g, '"')
         if (/\p{Script=Han}/u.test(key) && !(key in englishMessages))
@@ -97,18 +98,18 @@ describe('platform locale', () => {
 
 describe('locale switch placement', () => {
   test('renders the language switch directly beside the theme switch', async () => {
-    const layout = await Bun.file(
+    const layout = await sourceFile(
       new URL('../app/layouts/default.vue', import.meta.url),
     ).text()
 
-    expect(layout.replaceAll('\r\n', '\n')).toContain('<ThemeToggle />\n          <LanguageToggle />')
+    expect(layout.replaceAll('\r\n', '\n')).toContain("<component :is=\"ThemeToggle\" />\n          <component :is=\"LanguageToggle\" />")
   })
 
   test('switches the selected locale without reloading or remounting the SPA page', async () => {
-    const composable = await Bun.file(
+    const composable = await sourceFile(
       new URL('../app/composables/useLocale.ts', import.meta.url),
     ).text()
-    const app = await Bun.file(
+    const app = await sourceFile(
       new URL('../app/app.vue', import.meta.url),
     ).text()
 
@@ -120,19 +121,19 @@ describe('locale switch placement', () => {
   })
 
   test('renders localized dynamic labels and question subjects after switching', async () => {
-    const configInput = await Bun.file(
-      new URL('../app/components/admin/ConfigFieldInput.vue', import.meta.url),
+    const configInput = await sourceFile(
+      new URL('../app/features/admin/ConfigFieldInput.vue', import.meta.url),
     ).text()
-    const questions = await Bun.file(
+    const questions = await sourceFile(
       new URL('../app/pages/competitions/[id]/questions.vue', import.meta.url),
     ).text()
-    const scoreTrend = await Bun.file(
-      new URL('../app/components/leaderboard/ScoreTrendChart.vue', import.meta.url),
+    const scoreTrend = await sourceFile(
+      new URL('../app/features/leaderboard/ScoreTrendChart.vue', import.meta.url),
     ).text()
 
     expect(configInput).toContain('{{ $t(option.label) }}')
-    expect(questions).toContain("$t('题目 · {title}'")
-    expect(questions).toContain("$t('题目咨询 · {title}'")
+    expect(questions).toContain("$t('ui.challenge2'")
+    expect(questions).toContain("$t('ui.challengeQuestion'")
     expect(questions).not.toContain('`题目 · ${')
     expect(questions).not.toContain('`题目咨询 · ${')
     expect(scoreTrend).toContain('props.title, locale.value')

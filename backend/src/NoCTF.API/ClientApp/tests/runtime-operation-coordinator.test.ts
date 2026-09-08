@@ -1,3 +1,4 @@
+import { sourceFile } from './support/feature-source'
 import { describe, expect, test } from 'bun:test'
 import { createRuntimeOperationCoordinator } from '../app/lib/runtime-operation-coordinator'
 
@@ -73,7 +74,7 @@ describe('runtime operation coordinator', () => {
 
 describe('runtime administration operation wiring', () => {
   test('keeps accepted operations in the background and only disables their target row', async () => {
-    const source = await Bun.file(
+    const source = await sourceFile(
       new URL('../app/pages/admin/competitions/[id]/runtimes.vue', import.meta.url),
     ).text()
 
@@ -85,7 +86,7 @@ describe('runtime administration operation wiring', () => {
   })
 
   test('surfaces request failures without changing a runtime snapshot', async () => {
-    const source = await Bun.file(
+    const source = await sourceFile(
       new URL('../app/pages/admin/competitions/[id]/runtimes.vue', import.meta.url),
     ).text()
 

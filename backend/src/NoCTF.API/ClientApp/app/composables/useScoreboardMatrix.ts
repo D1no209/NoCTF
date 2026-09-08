@@ -2,22 +2,22 @@ import {
   getLeaderboardEndpoint,
   getScoreboardChallengeCatalogEndpoint,
   getScoreboardSchemaEndpoint,
-} from '~/api'
+} from '../api'
 import type {
   NoCtfapiEndpointsCompetitionsScoreboardChallengeCatalogResponse,
   NoCtfapiEndpointsCompetitionsScoreboardSchemaResponse,
   NoCtfapiEndpointsCompetitionsScoreboardSnapshotResponse,
-} from '~/api'
-import type { ScoreboardUpdatedNotification } from '~/composables/useCompetitionHub'
-import { createTrailingRefresh } from '~/lib/latest-page-refresh'
+} from '../api'
+import type { ScoreboardUpdatedNotification } from './useCompetitionHub'
+import { createTrailingRefresh } from '../lib/latest-page-refresh'
 import {
   isScoreboardVersionAtLeast,
   isCoherentScoreboardBundle,
   newestScoreboardVersion,
   needsAwdpRoundRefresh,
   shouldRestoreRequestedRoundWindow,
-} from '~/utils/scoreboard-coherence'
-import type { ScoreboardRefreshOutcome } from '~/utils/scoreboard-coherence'
+} from '../utils/scoreboard-coherence'
+import type { ScoreboardRefreshOutcome } from '../utils/scoreboard-coherence'
 
 interface ScoreboardUpdatedPayload {
   competitionId: string | null
@@ -79,7 +79,7 @@ export function useScoreboardMatrix(competitionId: string, options: { pollRounds
   function scheduleCoherenceRetry(): void {
     if (coherenceRetryTimer || stopped) return
     if (coherenceRetryCount >= 3) {
-      error.value = translate('记分板数据版本尚未同步，请稍后重试')
+      error.value = translate("ui.scoreboardDataRevisionsAreNotSynchronizedYetPleaseTryAgain")
       return
     }
     coherenceRetryCount += 1
@@ -119,10 +119,10 @@ export function useScoreboardMatrix(competitionId: string, options: { pollRounds
 
     const failures = [catalogResult, schemaResult, snapshotResult]
       .filter(result => result?.error)
-      .map(result => parseApiError(result?.error, translate('加载记分板失败')).message)
+      .map(result => parseApiError(result?.error, translate("ui.failedToLoadScoreboard")).message)
     let outcome: ScoreboardRefreshOutcome = 'failed'
     if (failures.length) {
-      error.value = failures[0] ?? translate('加载记分板失败')
+      error.value = failures[0] ?? translate("ui.failedToLoadScoreboard")
     }
     else {
       if (snapshotResult?.response?.status === 202) {

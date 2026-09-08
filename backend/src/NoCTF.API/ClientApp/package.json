@@ -5,10 +5,11 @@
   "scripts": {
     "dev": "nuxt dev --host 127.0.0.1 --port 3000",
     "start": "nuxt dev --host 127.0.0.1 --port 3000",
-    "build": "nuxt build",
-    "generate": "nuxt generate",
+    "build": "bun run audit:architecture && nuxt build",
+    "generate": "bun run audit:architecture && nuxt generate",
     "preview": "nuxt preview",
     "test": "bun test",
+    "audit:architecture": "bun scripts/check-architecture.ts",
     "postinstall": "nuxt prepare",
     "api:gen": "openapi-ts",
     "typecheck": "nuxi typecheck"
@@ -39,7 +40,10 @@
     "@tailwindcss/vite": "^4.3.3",
     "@types/sanitize-html": "2.16.1",
     "@types/three": "^0.185.4",
-    "tailwindcss": "^4.3.3"
+    "@vue/compiler-dom": "3.5.41",
+    "@vue/compiler-sfc": "3.5.41",
+    "tailwindcss": "^4.3.3",
+    "typescript": "5.9.3"
   },
   "overrides": {
     "js-yaml": "4.3.1",

@@ -2,60 +2,60 @@ import { parseApiError } from '../utils/api-error'
 import { currentLocale, translate } from '../utils/i18n'
 
 const definitionDiagnostics: Record<string, string> = {
-  'Runtime image is required.': '容器镜像不能为空',
-  'Runtime image cannot exceed 512 characters.': '容器镜像最多 512 个字符',
-  'Runtime internal ports must be between 1 and 65535.': '内部端口必须是 1 到 65535 之间的整数',
-  'Runtime internal ports cannot contain duplicates.': '内部端口不能重复',
-  'Runtime security must drop all capabilities.': '容器安全选项必须在 cap-drop 中包含 ALL',
-  'Runtime TtlSeconds must be between 1 and 604800 when configured.': '实例存活时间必须在 1 到 604800 秒之间',
-  'Runtime OperationTimeoutSeconds must be between 1 and 300 when configured.': '运行环境操作超时必须在 1 到 300 秒之间',
-  'Runtime resource limits are required.': '运行环境必须配置资源限制',
-  'Runtime resource limits must be positive.': '运行环境的内存、CPU 和进程数上限必须为正数',
-  'Runtime URL bindings require a valid exposure and template.': '入口必须填写有效的暴露范围与模板',
-  'Runtime URL bindings only allow HOST and PORT placeholders.': '访问入口的显示模板只能使用 {HOST} 和 {PORT} 占位符',
-  'Runtime URL bindings must expand to an absolute URI.': '控制检查入口的 URL 模板必须能展开为完整 URL',
-  'Runtime URL binding ports must be between 1 and 65535.': '访问入口端口必须是 1 到 65535 之间的整数',
-  'Container URL bindings require ContainerPort.': '每个容器访问入口都必须填写容器端口',
-  'Container URL bindings require a dynamic port mapping.': '访问入口端口必须同时存在于对外端口列表',
-  'PerTeam Container runtimes require FlagEnvironmentVariableName.': '每队独立 Flag 必须填写 Flag 环境变量名',
-  'Flag environment variables cannot use the NOCTF_ prefix.': 'Flag 环境变量名不能使用 NOCTF_ 前缀',
-  'CTF runtimes must use PerTeam allocation.': 'CTF 运行环境必须采用每队独立分配',
-  'CTF runtimes must use PerTeam flags injected into the runtime environment.': 'CTF 容器题必须使用每队独立 Flag',
-  'CTF runtime URL bindings must use OwnerOnly exposure.': 'CTF 访问入口必须设为仅队伍自己可见',
-  'AWD runtimes must use PerTeam allocation.': 'AWD 运行环境必须采用每队独立分配',
-  'AWD runtimes must use AwdRotation flags.': 'AWD 运行环境必须使用轮换 Flag',
-  'AWD runtimes only support Container or Compose.': 'AWD 只支持单容器或 Docker Compose 运行环境',
-  'AWD runtimes require at least one Participants access URL.': 'AWD 运行环境必须至少提供一个参赛队伍可见入口',
-  'FlagInjection is required when Runtime is configured.': '启用 AWD 运行环境后必须配置 Flag 注入命令',
-  'FlagInjection.Command must be a non-empty raw template containing ${FLAG}.': 'AWD Flag 注入命令必须包含 ${FLAG}',
-  'FlagInjection.TimeoutSeconds must be between 1 and 300.': 'AWD Flag 注入超时必须在 1 到 300 秒之间',
-  'FlagInjection.ServiceName is required for Compose runtimes.': 'Compose 运行环境必须填写 Flag 注入目标服务名',
-  'Runtime is required when Checker is configured.': '启用 Checker 前必须先启用运行环境',
-  'Checker.Image is required.': 'Checker 镜像不能为空',
-  'Checker.TargetServiceName is required only for Compose Runtime.': 'Compose Checker 必须填写目标服务名',
-  'AWDP player Runtime allocation must be PerTeam.': 'AWDP 运行环境必须采用每队独立分配',
-  'AWDP player Runtime FlagSource must be PerTeam.': 'AWDP 运行环境必须使用每队独立 Flag',
-  'AWDP requires a Docker or Kubernetes Container runtime.': 'AWDP 只支持单容器运行环境',
-  'AWDP target Runtime must declare exactly one InternalPort.': 'AWDP 必须且只能填写 1 个内部端口',
-  'AWDP player Runtime must publish exactly one attack port.': 'AWDP 必须且只能填写 1 个对外端口',
-  'AWDP player Runtime must publish its single checker target port.': 'AWDP 的内部端口与对外端口必须相同',
-  'AWDP player Runtime must publish an OwnerOnly access URL.': 'AWDP 必须添加至少 1 个仅队伍自己可见的访问入口',
-  'AWDP player Runtime URL bindings must use OwnerOnly exposure.': 'AWDP 访问入口必须设为仅队伍自己可见',
-  'AWDP player Runtime URL bindings must target its checker port.': 'AWDP 访问入口端口必须与内部端口相同',
-  'PatchEntrypoint is required.': '补丁入口不能为空',
-  'PatchEntrypoint cannot exceed 256 characters.': '补丁入口最多 256 个字符',
-  'PatchEntrypoint must be a safe relative path.': '补丁入口必须是安全的相对路径',
-  'PatchTimeoutSeconds must be between 1 and 300 when configured.': '补丁超时必须在 1 到 300 秒之间',
-  'PatchTimeoutSeconds must be between 1 and 300.': '补丁超时必须在 1 到 300 秒之间',
-  'ReadyTimeoutSeconds must be positive when configured.': '就绪超时必须为正数',
-  'ReadyTimeoutSeconds must be positive.': '就绪超时必须为正数',
-  'ReadyTimeoutSeconds cannot exceed Checker.TimeoutSeconds.': '就绪超时不能超过 Checker 超时',
-  'PatchCommand cannot contain more than 64 arguments.': '补丁应用命令最多包含 64 个参数',
-  'PatchCommand cannot contain blank arguments.': '补丁应用命令不能包含空参数',
-  'PatchCommand arguments cannot exceed 4096 characters.': '补丁应用命令的单个参数最多 4096 个字符',
-  'PatchCommand must contain exactly one standalone {entrypoint} argument.': '非空补丁应用命令必须恰好包含一个独立的 {entrypoint} 参数',
-  'AWDP Fix execution budget must remain below the dedicated handler timeout.': 'Fix 总执行预算必须小于专用处理器超时',
-  'Checker.TimeoutSeconds must be between 1 and 1800.': 'Checker 超时必须在 1 到 1800 秒之间',
+  'Runtime image is required.': "ui.containerImageIsRequired",
+  'Runtime image cannot exceed 512 characters.': "ui.containerImageCannotExceed512Characters",
+  'Runtime internal ports must be between 1 and 65535.': "ui.internalPortsMustBeIntegersBetween1And65535",
+  'Runtime internal ports cannot contain duplicates.': "ui.internalPortsCannotContainDuplicates",
+  'Runtime security must drop all capabilities.': "ui.capDropAll",
+  'Runtime TtlSeconds must be between 1 and 604800 when configured.': "ui.runtimeLifetimeMustBeBetween1And604800Seconds",
+  'Runtime OperationTimeoutSeconds must be between 1 and 300 when configured.': "ui.runtimeOperationTimeoutMustBeBetween1And300Seconds",
+  'Runtime resource limits are required.': "ui.message4",
+  'Runtime resource limits must be positive.': "ui.runtimeMemoryCpuAndProcessLimitsMustBePositive",
+  'Runtime URL bindings require a valid exposure and template.': "ui.theBindingRequiresAValidExposureAndTemplate",
+  'Runtime URL bindings only allow HOST and PORT placeholders.': "ui.theAccessDisplayTemplateCanOnlyUseTheAndPlaceholders",
+  'Runtime URL bindings must expand to an absolute URI.': "ui.theControlCheckUrlTemplateMustExpandToAnAbsolute",
+  'Runtime URL binding ports must be between 1 and 65535.': "ui.165535",
+  'Container URL bindings require ContainerPort.': "ui.message5",
+  'Container URL bindings require a dynamic port mapping.': "ui.theAccessUrlPortMustAlsoAppearInThePublished",
+  'PerTeam Container runtimes require FlagEnvironmentVariableName.': "ui.perTeamFlagsRequireAFlagEnvironmentVariableName",
+  'Flag environment variables cannot use the NOCTF_ prefix.': "ui.theFlagEnvironmentVariableNameCannotUseTheNoctfPrefix",
+  'CTF runtimes must use PerTeam allocation.': "ui.ctfRuntimesMustUsePerTeamAllocation",
+  'CTF runtimes must use PerTeam flags injected into the runtime environment.': "ui.ctfContainerChallengesMustUsePerTeamFlags",
+  'CTF runtime URL bindings must use OwnerOnly exposure.': "ui.ctfAccessUrlsMustBeVisibleOnlyToTheirOwning",
+  'AWD runtimes must use PerTeam allocation.': "ui.awdRuntimesMustUsePerTeamAllocation",
+  'AWD runtimes must use AwdRotation flags.': "ui.awdRuntimesMustUseRotatingFlags",
+  'AWD runtimes only support Container or Compose.': "ui.awdDockerCompose",
+  'AWD runtimes require at least one Participants access URL.': "ui.awdRuntimesMustProvideAtLeastOneParticipantVisibleAccess",
+  'FlagInjection is required when Runtime is configured.': "ui.anAwdRuntimeRequiresAFlagInjectionCommand",
+  'FlagInjection.Command must be a non-empty raw template containing ${FLAG}.': "ui.theAwdFlagInjectionCommandMustContain",
+  'FlagInjection.TimeoutSeconds must be between 1 and 300.': "ui.theAwdFlagInjectionTimeoutMustBeBetween1And",
+  'FlagInjection.ServiceName is required for Compose runtimes.': "ui.aComposeRuntimeRequiresAFlagInjectionTargetService",
+  'Runtime is required when Checker is configured.': "ui.enableTheRuntimeBeforeEnablingTheChecker",
+  'Checker.Image is required.': "ui.checker",
+  'Checker.TargetServiceName is required only for Compose Runtime.': "ui.aComposeCheckerRequiresATargetServiceName",
+  'AWDP player Runtime allocation must be PerTeam.': "ui.awdpRuntimesMustUsePerTeamAllocation",
+  'AWDP player Runtime FlagSource must be PerTeam.': "ui.awdpRuntimesMustUsePerTeamFlags",
+  'AWDP requires a Docker or Kubernetes Container runtime.': "ui.awdpOnlySupportsSingleContainerRuntimes",
+  'AWDP target Runtime must declare exactly one InternalPort.': "ui.awdpRequiresExactlyOneInternalPort",
+  'AWDP player Runtime must publish exactly one attack port.': "ui.awdpRequiresExactlyOnePublishedPort",
+  'AWDP player Runtime must publish its single checker target port.': "ui.theAwdpInternalAndPublishedPortsMustMatch",
+  'AWDP player Runtime must publish an OwnerOnly access URL.': "ui.awdp1",
+  'AWDP player Runtime URL bindings must use OwnerOnly exposure.': "ui.awdpAccessUrlsMustBeVisibleOnlyToTheirOwning",
+  'AWDP player Runtime URL bindings must target its checker port.': "ui.theAwdpAccessUrlPortMustMatchTheInternalPort",
+  'PatchEntrypoint is required.': "ui.message6",
+  'PatchEntrypoint cannot exceed 256 characters.': "ui.thePatchEntrypointCannotExceed256Characters",
+  'PatchEntrypoint must be a safe relative path.': "ui.thePatchEntrypointMustBeASafeRelativePath",
+  'PatchTimeoutSeconds must be between 1 and 300 when configured.': "ui.patchTimeoutMustBeBetween1And300Seconds",
+  'PatchTimeoutSeconds must be between 1 and 300.': "ui.patchTimeoutMustBeBetween1And300Seconds",
+  'ReadyTimeoutSeconds must be positive when configured.': "ui.readyTimeoutMustBePositive",
+  'ReadyTimeoutSeconds must be positive.': "ui.readyTimeoutMustBePositive",
+  'ReadyTimeoutSeconds cannot exceed Checker.TimeoutSeconds.': "ui.theReadinessTimeoutCannotExceedTheCheckerTimeout",
+  'PatchCommand cannot contain more than 64 arguments.': "ui.thePatchCommandCanContainAtMost64Arguments",
+  'PatchCommand cannot contain blank arguments.': "ui.thePatchCommandCannotContainBlankArguments",
+  'PatchCommand arguments cannot exceed 4096 characters.': "ui.eachPatchCommandArgumentCanContainAtMost4096Characters",
+  'PatchCommand must contain exactly one standalone {entrypoint} argument.': "ui.aNonEmptyPatchCommandMustContainExactlyOneStandalone",
+  'AWDP Fix execution budget must remain below the dedicated handler timeout.': "ui.theTotalFixExecutionBudgetMustRemainBelowTheDedicated",
+  'Checker.TimeoutSeconds must be between 1 and 1800.': "ui.checkerTimeoutMustBeBetween1And1800Seconds",
 }
 
 function splitDiagnostics(message: string): string[] {
@@ -69,9 +69,9 @@ function localizeDiagnostic(message: string): string {
   const direct = definitionDiagnostics[message]
   if (direct) return translate(direct)
   if (/definition|schemaVersion|JSON/i.test(message))
-    return translate('题目定义版本或 JSON 格式无效')
+    return translate("ui.theChallengeDefinitionVersionOrJsonFormatIsInvalid")
   if (currentLocale() === 'en') return message
-  return translate('后端返回了未识别的校验原因：{reason}', { reason: message })
+  return translate("ui.theServerReturnedAnUnrecognizedValidationReason", { reason: message })
 }
 
 export function challengeTemplateWriteErrorMessages(error: unknown): string[] {
@@ -80,17 +80,17 @@ export function challengeTemplateWriteErrorMessages(error: unknown): string[] {
     : null
   switch (problem?.code) {
     case 'ResourceIdConflict':
-      return [translate('题目模板资源标识冲突，请重新创建')]
+      return [translate("ui.theChallengeTemplateResourceIdentifierConflictsWithAnExistingResource")]
     case 'ActiveCompetitionModeConflict':
-      return [translate('该模板正被进行中的比赛引用，不能修改游戏模式')]
+      return [translate("ui.thisTemplateIsReferencedByAnActiveCompetitionSoIts")]
     case 'ActiveRuntimeDefinitionConflict':
-      return [translate('该模板仍有活动运行环境，请停止相关实例后再修改技术定义')]
+      return [translate("ui.thisTemplateStillHasActiveRuntimesStopThemBeforeChanging")]
     case 'OwnerIncludedInManagerSet':
-      return [translate('模板负责人不能同时出现在协作者列表中')]
+      return [translate("ui.theTemplateOwnerCannotAlsoAppearInTheCollaboratorList")]
     case 'UserNotFound':
-      return [translate('协作者中包含不存在的用户')]
+      return [translate("ui.theCollaboratorListContainsAUserThatDoesNotExist")]
     case 'RoleNotEligible':
-      return [translate('协作者必须具备组织者或管理员角色')]
+      return [translate("ui.collaboratorsMustHaveTheOrganizerOrAdministratorRole")]
   }
   const diagnostics = [
     problem?.detail,

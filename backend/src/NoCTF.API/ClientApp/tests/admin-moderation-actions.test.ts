@@ -1,6 +1,7 @@
+import { sourceFile } from './support/feature-source'
 import { describe, expect, test } from 'bun:test'
 
-const readPage = (name: 'runtimes' | 'teams') => Bun.file(
+const readPage = (name: 'runtimes' | 'teams') => sourceFile(
   new URL(`../app/pages/admin/competitions/[id]/${name}.vue`, import.meta.url),
 ).text()
 
@@ -17,10 +18,10 @@ describe('administrator destructive action wiring', () => {
 
     expect(page).not.toContain('adminUnbanTeam')
     expect(page).not.toContain('openUnban')
-    expect(page).not.toContain("$t('解封')")
+    expect(page).not.toContain("$t('ui.unban')")
     expect(page).toContain("@click.stop=\"openBan(t, 'correct')\"")
     expect(page).toContain("mode === 'correct' ? length >= 8")
-    expect(page).toContain('至少 8 个字符')
+    expect(page).toContain("ui.atLeast8CharactersCurrently512")
   })
 
   test('keeps manual ban announcements opt-in and sends the generated request field', async () => {
@@ -30,7 +31,7 @@ describe('administrator destructive action wiring', () => {
     expect(page).toContain('banAnnouncePublicly.value = false')
     expect(page).toContain('announcePublicly: banAnnouncePublicly.value')
     expect(page).toContain('id="ban-announce-publicly"')
-    expect(page).toContain('封禁后发布赛事纪律公告')
+    expect(page).toContain("ui.releaseOfEventDisciplineAnnouncementAfterBan")
   })
 
   test('lets judges ban teams and resolve appeals without exposing manager-only reversal and registration actions', async () => {

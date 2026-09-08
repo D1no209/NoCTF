@@ -1,3 +1,4 @@
+import { sourceFile } from './support/feature-source'
 import { expect, test } from 'bun:test'
 import { computed, ref } from 'vue'
 import { createTrailingRefresh } from '../app/lib/latest-page-refresh'
@@ -5,7 +6,7 @@ import * as coherence from '../app/utils/scoreboard-coherence'
 
 // Execute the actual composable with controlled REST/Hub/lifecycle boundaries.
 // No global module mocks: other tests retain the real SDK and Vue modules.
-const source = await Bun.file(new URL('../app/composables/useScoreboardMatrix.ts', import.meta.url)).text()
+const source = await sourceFile(new URL('../app/composables/useScoreboardMatrix.ts', import.meta.url)).text()
 const compiled = new Bun.Transpiler({ loader: 'ts' }).transformSync(source)
   .replace(/^import[\s\S]*?from ["'][^"']+["'];?\s*$/gm, '')
   .replace('export function useScoreboardMatrix', 'function useScoreboardMatrix')

@@ -1,7 +1,18 @@
 # NoCTF ClientApp
 
 This directory contains the Bun-managed Nuxt 4 SPA hosted by `NoCTF.API`.
-It is currently a minimal skeleton: no UI framework, no pages, no API client.
+It uses shadcn-vue primitives, a generated API SDK and separate feature and rendering layers.
+
+See [ARCHITECTURE.md](ARCHITECTURE.md) for boundaries and the completed architecture audit.
+
+- `app/pages/`, `app/layouts/`, `app/app.vue`: route metadata and feature entry points.
+- `app/features/`: feature controllers, state, commands and composition.
+- `app/components/views/`: rendering, bindings and command forwarding.
+- `app/components/ui/`: the only shared UI primitive implementations.
+- `app/locales/`: stable message keys with Chinese and English resources.
+
+Run `bun run audit:architecture`, `bun test`, `bun run typecheck` and
+`bun run generate` before delivering an architecture change.
 
 - `dotnet run --project ../NoCTF.API.csproj` starts the API and lets ASP.NET Core
   SpaProxy launch the Nuxt development server at `http://127.0.0.1:3000`.

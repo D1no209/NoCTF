@@ -1,3 +1,4 @@
+import { sourceFile } from './support/feature-source'
 import { describe, expect, test } from 'bun:test'
 import type {
   NoCtfapiEndpointsCompetitionsScoreboardSchemaResponse,
@@ -30,17 +31,17 @@ import {
   shouldRestoreRequestedRoundWindow,
 } from '../app/utils/scoreboard-coherence'
 
-const composable = await Bun.file(
+const composable = await sourceFile(
   new URL('../app/composables/useScoreboardMatrix.ts', import.meta.url),
 ).text()
-const leaderboardPage = await Bun.file(
+const leaderboardPage = await sourceFile(
   new URL('../app/pages/competitions/[id]/leaderboard.vue', import.meta.url),
 ).text()
-const scoreboardTeamDetailDialog = await Bun.file(
-  new URL('../app/components/leaderboard/ScoreboardTeamDetailDialog.vue', import.meta.url),
+const scoreboardTeamDetailDialog = await sourceFile(
+  new URL('../app/features/leaderboard/ScoreboardTeamDetailDialog.vue', import.meta.url),
 ).text()
-const scoreboardSlotStatus = await Bun.file(
-  new URL('../app/components/leaderboard/ScoreboardSlotStatus.vue', import.meta.url),
+const scoreboardSlotStatus = await sourceFile(
+  new URL('../app/features/leaderboard/ScoreboardSlotStatus.vue', import.meta.url),
 ).text()
 
 describe('normalized scoreboard matrix', () => {
@@ -113,9 +114,9 @@ describe('normalized scoreboard matrix', () => {
     expect(composable).toContain('await selectRoundWindow(nextEnd >= latestRound ? null : nextEnd)')
     expect(composable).toContain('const detailEndingRound = computed')
     expect(leaderboardPage).toContain('endingRound: board.detailEndingRound.value')
-    expect(leaderboardPage).toContain("$t('较早轮次')")
-    expect(leaderboardPage).toContain("$t('较新轮次')")
-    expect(leaderboardPage).toContain("$t('返回最新轮次')")
+    expect(leaderboardPage).toContain("$t('ui.earlierRounds')")
+    expect(leaderboardPage).toContain("$t('ui.laterRounds')")
+    expect(leaderboardPage).toContain("$t('ui.backToLatestRounds')")
   })
 
   test('pins ranking, team and total score while preserving readable matrix widths', () => {
@@ -155,7 +156,7 @@ describe('normalized scoreboard matrix', () => {
     expect(groups[1]?.competitionChallengeId).toBe(missingChallengeId)
     expect(groups[1]?.challenge).toBeNull()
     expect(groups[1]?.columns.map(column => column.index)).toEqual([1])
-    expect(leaderboardPage).toContain("group.challenge?.title ?? $t('未知题目')")
+    expect(leaderboardPage).toContain("group.challenge?.title ?? $t('ui.unknownQuestion')")
   })
 
   test('refreshes a missing challenge catalog at most once for each revision', () => {
@@ -313,7 +314,7 @@ describe('normalized scoreboard matrix', () => {
     expect(scoreboardSlotStatus).toContain('aria-hidden="true">-</span>')
     expect(scoreboardSlotStatus).not.toContain('rounded-md border')
 
-    expect(leaderboardPage).toContain('<ScoreboardSlotStatus')
+    expect(leaderboardPage).toContain("<component :is=\"ScoreboardSlotStatus\"")
     expect(leaderboardPage).toContain('@click="openDetail(team, column)"')
     expect(leaderboardPage).not.toContain('scoreboardSlot(team, column.index!)?.netPoints ?? 0 }} pts')
     expect(leaderboardPage).not.toContain('breakdownText(scoreboardSlot(team, column.index!)!)')
@@ -367,7 +368,7 @@ describe('normalized scoreboard matrix', () => {
       { name: '团队/系统', value: 200, userId: '' },
     ])
     expect(leaderboardPage).toContain('@click="openTeamDetail(team)"')
-    expect(leaderboardPage).toContain('<LazyScoreboardTeamDetailDialog')
+    expect(leaderboardPage).toContain("<component :is=\"LazyScoreboardTeamDetailDialog\"")
     expect(scoreboardTeamDetailDialog).toContain("type: 'radar'")
     expect(scoreboardTeamDetailDialog).toContain("type: 'pie'")
     expect(scoreboardTeamDetailDialog).toContain('scoreboardMemberContributionSlices')
@@ -377,9 +378,9 @@ describe('normalized scoreboard matrix', () => {
     expect(scoreboardTeamDetailDialog).toContain('scoreboardTeamDirectionScore')
     expect(scoreboardTeamDetailDialog).toContain("radius: '62%'")
     expect(scoreboardTeamDetailDialog).toContain('splitNumber: 3')
-    expect(scoreboardTeamDetailDialog).toContain("name: translate('攻击分')")
-    expect(scoreboardTeamDetailDialog).toContain("name: translate('防御分')")
-    expect(scoreboardTeamDetailDialog).toContain("usesCurrentScore.value ? '当前得分' : '已结算得分'")
+    expect(scoreboardTeamDetailDialog).toContain("name: translate(\"ui.attackScore\")")
+    expect(scoreboardTeamDetailDialog).toContain("name: translate(\"ui.defenseScore\")")
+    expect(scoreboardTeamDetailDialog).toContain("usesCurrentScore.value ? translate(\"ui.currentScore\") : translate(\"ui.settledScore\")")
     expect(scoreboardTeamDetailDialog.match(/areaStyle: \{ opacity: 0\.2 \}/g)).toHaveLength(2)
     expect(scoreboardTeamDetailDialog).not.toContain("color: '#ef4444'")
     expect(scoreboardTeamDetailDialog).not.toContain("color: '#0ea5e9'")

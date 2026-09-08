@@ -1,21 +1,22 @@
+import { sourceFile } from './support/feature-source'
 import { describe, expect, test } from 'bun:test'
 
-const page = await Bun.file(
+const page = await sourceFile(
   new URL('../app/pages/competitions/[id]/leaderboard.vue', import.meta.url),
 ).text()
-const scoreboard = await Bun.file(
+const scoreboard = await sourceFile(
   new URL('../app/utils/scoreboard.ts', import.meta.url),
 ).text()
-const slotStatus = await Bun.file(
-  new URL('../app/components/leaderboard/ScoreboardSlotStatus.vue', import.meta.url),
+const slotStatus = await sourceFile(
+  new URL('../app/features/leaderboard/ScoreboardSlotStatus.vue', import.meta.url),
 ).text()
-const teamDetail = await Bun.file(
-  new URL('../app/components/leaderboard/ScoreboardTeamDetailDialog.vue', import.meta.url),
+const teamDetail = await sourceFile(
+  new URL('../app/features/leaderboard/ScoreboardTeamDetailDialog.vue', import.meta.url),
 ).text()
-const trendChart = await Bun.file(
-  new URL('../app/components/leaderboard/ScoreTrendChart.vue', import.meta.url),
+const trendChart = await sourceFile(
+  new URL('../app/features/leaderboard/ScoreTrendChart.vue', import.meta.url),
 ).text()
-const theme = await Bun.file(
+const theme = await sourceFile(
   new URL('../app/assets/css/main.css', import.meta.url),
 ).text()
 
@@ -50,15 +51,15 @@ describe('leaderboard progressive display', () => {
     expect(scoreboard).toContain("scoreboardActivity(slot, ['Defense'])")
     expect(slotStatus).toContain('<Flag')
     expect(slotStatus).toContain('<ShieldCheck')
-    expect(page).toContain('<ScoreboardSlotStatus')
+    expect(page).toContain("<component :is=\"ScoreboardSlotStatus\"")
     expect(page).toContain("slot?.scoreState === 'Settled'")
     expect(page).toContain("slot?.scoreState === 'Settled' ? slot.netPoints ?? 0 : ''")
     expect(page).toContain('getScoreboardSlotDetailEndpoint')
     expect(page).toContain('getScoreboardAdjustmentDetailEndpoint')
     expect(page).toContain('(team.globalAdjustmentCount ?? 0) > 0')
-    expect(page).toContain('完整调分记录均来自服务端权威事实。')
-    expect(page).toContain('分值与状态均来自服务端权威结算结果。')
-    expect(page).toContain("isCtf ? $t('分值来自服务端权威计分结果。') : $t('分值与状态均来自服务端权威结算结果。')")
+    expect(page).toContain("ui.theCompleteAdjustmentHistoryComesFromAuthoritativeServerFacts")
+    expect(page).toContain("ui.scoresAndStatesComeFromAuthoritativeServerSettlement")
+    expect(page).toContain("isCtf ? $t('ui.scoresComeFromTheAuthoritativeServerSideScoringResult') : $t('ui.scoresAndStatesComeFromAuthoritativeServerSettlement')")
     expect(page).toContain(":class=\"isCtf ? 'grid-cols-2' : 'grid-cols-3'\"")
     expect(page).toContain('<div v-if="!isCtf" class="rounded-lg border p-3">')
     expect(page).not.toContain('entry.attackScore')
@@ -69,14 +70,14 @@ describe('leaderboard progressive display', () => {
     expect(page).toContain('getLeaderboardTrendsEndpoint')
     expect(page).toContain("const visibleTrendSeries = computed<TrendSeries[]>")
     expect(page).toContain("teams.value")
-    expect(page).toContain("$t('总分趋势')")
-    expect(page).toContain('<LazyScoreTrendChart v-else :series="visibleTrendSeries"')
-    expect(page).toContain('<LazyScoreboardTeamDetailDialog')
+    expect(page).toContain("$t('ui.overallScoreTrend')")
+    expect(page).toContain('<component :is="LazyScoreTrendChart" v-else :series="visibleTrendSeries"')
+    expect(page).toContain("<component :is=\"LazyScoreboardTeamDetailDialog\"")
     expect(page).toContain(':trend-series="teamDetailTrendSeries"')
     expect(page).not.toContain('selectedTrendTeamId')
     expect(page).not.toContain('selectedTrendSeries')
-    expect(teamDetail).toContain("$t('队伍得分趋势')")
-    expect(teamDetail).toContain('<LazyScoreTrendChart')
+    expect(teamDetail).toContain("$t('ui.teamScoreTrend')")
+    expect(teamDetail).toContain("<component :is=\"LazyScoreTrendChart\"")
     expect(teamDetail.indexOf('scoreboard-team-trend-title'))
       .toBeLessThan(teamDetail.indexOf('scoreboard-team-radar-title'))
   })

@@ -1,3 +1,4 @@
+import { sourceFile } from './support/feature-source'
 import { describe, expect, test } from 'bun:test'
 import { isNotificationUnread } from '../app/composables/useNotificationUnread'
 
@@ -10,31 +11,31 @@ describe('notification unread state', () => {
   })
 
   test('renders a color-independent unread indicator and marks the newest item read', async () => {
-    const layout = await Bun.file(
+    const layout = await sourceFile(
       new URL('../app/layouts/default.vue', import.meta.url),
     ).text()
-    const page = await Bun.file(
+    const page = await sourceFile(
       new URL('../app/pages/notifications.vue', import.meta.url),
     ).text()
-    const center = await Bun.file(
-      new URL('../app/components/notifications/NotificationCenter.vue', import.meta.url),
+    const center = await sourceFile(
+      new URL('../app/features/notifications/NotificationCenter.vue', import.meta.url),
     ).text()
 
-    expect(layout).toContain(":aria-label=\"hasUnread ? t('通知，有未读消息') : t('通知')\"")
-    expect(layout).toContain('<span v-if="hasUnread" class="sr-only">{{ t(\'有未读通知\') }}</span>')
-    expect(page).toContain('<NotificationCenter />')
+    expect(layout).toContain(":aria-label=\"hasUnread ? t('ui.notificationsUnreadMessages') : t('ui.notifications')\"")
+    expect(layout).toContain("<span v-if=\"hasUnread\" class=\"sr-only\">{{ t('ui.unreadNotifications') }}</span>")
+    expect(page).toContain("<component :is=\"NotificationCenter\" />")
     expect(center).toContain('markAllRead(items.value[0]?.id)')
     expect(center).toContain("scope: 'Inbox'")
-    expect(center).toContain('官方通知，以及与你的账号、队伍或管理职责直接相关的消息')
+    expect(center).toContain("ui.officialAnnouncementsAndMessagesDirectlyRelatedToYourAccountTeam")
   })
 })
 
 describe('competition announcement access', () => {
   test('exposes the generated announcement SDK to judges and uses participant delivery by default', async () => {
-    const page = await Bun.file(
+    const page = await sourceFile(
       new URL('../app/pages/admin/competitions/[id].vue', import.meta.url),
     ).text()
-    const endpoint = await Bun.file(
+    const endpoint = await sourceFile(
       new URL('../../Endpoints/Administration/Competitions/CreateCompetitionAnnouncementEndpoint.cs', import.meta.url),
     ).text()
 
@@ -45,7 +46,7 @@ describe('competition announcement access', () => {
   })
 
   test('renders both the announcement title and its public body', async () => {
-    const labels = await Bun.file(
+    const labels = await sourceFile(
       new URL('../app/utils/labels.ts', import.meta.url),
     ).text()
 

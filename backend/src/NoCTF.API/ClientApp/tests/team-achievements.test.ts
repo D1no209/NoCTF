@@ -1,3 +1,4 @@
+import { sourceFile } from './support/feature-source'
 import { expect, test } from 'bun:test'
 import { scoreboardTeamAchievements } from '../app/utils/scoreboard'
 import type { NoCtfapiEndpointsCompetitionsScoreboardTeamResponse } from '../app/api'
@@ -24,11 +25,11 @@ test('AWDP keeps successful attack and defense attribution outside the displayed
 })
 
 test('team detail scrolls within its opaque dialog and presents solver and time columns', async () => {
-  const source = await Bun.file(new URL('../app/components/leaderboard/ScoreboardTeamDetailDialog.vue', import.meta.url)).text()
+  const source = await sourceFile(new URL('../app/features/leaderboard/ScoreboardTeamDetailDialog.vue', import.meta.url)).text()
   expect(source).toContain('<DialogContent class="flex max-h-[calc(100dvh-2rem)]')
   expect(source).toContain('overflow-y-auto overscroll-contain')
   expect(source).toContain('row.achievements.length > 0')
-  expect(source).toContain("$t('解出人')")
-  expect(source).toContain("$t('解题时间')")
+  expect(source).toContain("$t('ui.solvedBy')")
+  expect(source).toContain("$t('ui.solvedAt')")
   expect(source).not.toContain('DialogScrollContent')
 })

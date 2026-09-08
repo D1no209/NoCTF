@@ -2,7 +2,7 @@ import type {
   NoCtfapiEndpointsChallengesParticipantChallengeHintResponse,
   NoCtfapiEndpointsCompetitionsEventsCompetitionEventKindProtocol,
   NoCtfapiEndpointsGameplayFactsGameplayFactStatusResponse,
-} from '~/api'
+} from '../api'
 
 export function readableHintContent(hint: NoCtfapiEndpointsChallengesParticipantChallengeHintResponse): string | null {
   return hint.isUnlocked === true && typeof hint.content === 'string' ? hint.content : null

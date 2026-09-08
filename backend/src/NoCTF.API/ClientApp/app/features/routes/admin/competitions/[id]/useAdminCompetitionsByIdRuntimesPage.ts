@@ -1,0 +1,381 @@
+import { proxyRefs } from 'vue'
+import { markRaw } from 'vue'
+
+import { toast } from 'vue-sonner'
+import { adminExtendTeamRuntime, adminForceTerminateRuntime, adminGetRuntime, adminListCompetitionChallenges, adminListRuntimes, adminListTeams, adminResetSharedRuntime, adminResetTeamRuntime, adminStartSharedRuntime, adminStartTeamRuntime, adminTerminateRuntime } from '../../../../../api'
+import type { NoCtfapiEndpointsAdministrationRuntimeAdminRuntimeResponse, NoCtfapiEndpointsRuntimeRuntimeKindProtocol, NoCtfapiEndpointsRuntimeRuntimeStateProtocol } from '../../../../../api'
+import { useCompetitionAdmin } from '../../../../../lib/admin-competition'
+import { createLatestPageRefresh } from '../../../../../lib/latest-page-refresh'
+import { adminRuntimeTeamLabel } from '../../../../../utils/admin-runtime'
+import { createRuntimeOperationCoordinator, type RuntimeOperationKind, type RuntimeOperationToken } from '../../../../../lib/runtime-operation-coordinator'
+import RuntimeAccessUrlComponent from '../../../../challenges/RuntimeAccessUrl.vue'
+
+/** Owns state, effects and commands for AdminCompetitionsByIdRuntimesPage. */
+export function useAdminCompetitionsByIdRuntimesPage() {
+  const { competitionId, canWrite } = useCompetitionAdmin()
+
+  const { isAdministrator } = useAuth()
+
+  const challengeOptions = ref<{ id: string; title: string }[]>([])
+
+  const teamOptions = ref<{ id: string; name: string }[]>([])
+
+  const runtimeTeamLabel = (
+    runtime: NoCtfapiEndpointsAdministrationRuntimeAdminRuntimeResponse | null | undefined,
+  ) => runtime
+    ? adminRuntimeTeamLabel(
+        runtime,
+        translate,
+        id => teamOptions.value.find(team => team.id === id)?.name,
+      )
+    : '-'
+
+  const isPlayerManagedRuntime = (
+    runtime: NoCtfapiEndpointsAdministrationRuntimeAdminRuntimeResponse,
+  ) => runtime.purpose !== 'AwdpTarget'
+
+  const challengeTitle = (id?: string | null) => challengeOptions.value.find(c => c.id === id)?.title ?? id ?? '-'
+
+  async function loadRefs() {
+    const [challenges, teams] = await Promise.all([
+      adminListCompetitionChallenges({ path: { competitionId }, query: { includeDeleted: false } }),
+      adminListTeams({ path: { competitionId } }),
+    ])
+    challengeOptions.value = (challenges.data?.items ?? []).map(c => ({ id: c.id!, title: c.title ?? '' }))
+    teamOptions.value = (teams.data?.items ?? []).map(t => ({ id: t.id!, name: t.name ?? '' }))
+  }
+
+  const filterChallenge = ref('')
+
+  const filterTeam = ref('')
+
+  const filterState = ref('')
+
+  const filterKind = ref('')
+
+  const { items, loading, error: listError, hasMore, loadMore: loadRuntimePage, reset, initialized } = useCursorPagination<
+    NoCtfapiEndpointsAdministrationRuntimeAdminRuntimeResponse
+  >(async (cursor) => {
+    const { data, error } = await adminListRuntimes({
+      path: { competitionId },
+      query: {
+        competitionChallengeId: filterChallenge.value || null,
+        teamId: filterTeam.value || null,
+        state: filterState.value === '' ? null : filterState.value as NoCtfapiEndpointsRuntimeRuntimeStateProtocol,
+        runtimeKind: filterKind.value === '' ? null : filterKind.value as NoCtfapiEndpointsRuntimeRuntimeKindProtocol,
+        cursor,
+        limit: 30,
+      },
+    })
+    if (error || !data) throw parseApiError(error)
+    return data
+  })
+
+  const {
+    loadNextPage: loadMore,
+    refreshLatest: refreshRuntimeList,
+  } = createLatestPageRefresh({
+    loadMore: loadRuntimePage,
+    reset: () => reset({ preserveItems: true }),
+  })
+
+  function applyFilters() {
+    void refreshRuntimeList()
+  }
+
+  function refreshList() {
+    return refreshRuntimeList()
+  }
+
+  const detail = ref<NoCtfapiEndpointsAdministrationRuntimeAdminRuntimeResponse | null>(null)
+
+  const detailOpen = ref(false)
+
+  const detailLoading = ref(false)
+
+  async function openDetail(id?: string) {
+    if (!id) return
+    detailOpen.value = true
+    detailLoading.value = true
+    const { data, error } = await adminGetRuntime({ path: { competitionId, runtimeInstanceId: id } })
+    if (error) toast.error(parseApiError(error).message)
+    else detail.value = data ?? null
+    detailLoading.value = false
+  }
+
+  const runtimeOperations = createRuntimeOperationCoordinator()
+
+  const opMessage = ref<string | null>(null)
+
+  function runtimeOperationKey(rt: NoCtfapiEndpointsAdministrationRuntimeAdminRuntimeResponse | null): string | null {
+    return rt?.id ?? null
+  }
+
+  function isRuntimePending(rt: NoCtfapiEndpointsAdministrationRuntimeAdminRuntimeResponse | null): boolean {
+    const key = runtimeOperationKey(rt)
+    return key !== null && runtimeOperations.pending.has(key)
+  }
+
+  function isRuntimeOperationPending(
+    rt: NoCtfapiEndpointsAdministrationRuntimeAdminRuntimeResponse | null,
+    operation: RuntimeOperationKind,
+  ): boolean {
+    const key = runtimeOperationKey(rt)
+    return key !== null && runtimeOperations.pending.get(key) === operation
+  }
+
+  function beginRuntimeOperation(
+    rt: NoCtfapiEndpointsAdministrationRuntimeAdminRuntimeResponse,
+    operation: RuntimeOperationKind,
+  ): RuntimeOperationToken | null {
+    const key = runtimeOperationKey(rt)
+    if (!key) return null
+    opMessage.value = null
+    return runtimeOperations.begin(key, operation)
+  }
+
+  function refreshRuntimeInBackground(
+    token: RuntimeOperationToken,
+    runtimeInstanceId: string,
+    done: (state?: string | null) => boolean,
+  ): void {
+    void runtimeOperations.poll(token, async (signal) => {
+      const { data, error } = await adminGetRuntime({
+        path: { competitionId, runtimeInstanceId },
+        signal,
+      })
+      if (error || !data) return false
+  
+      if (detailOpen.value && detail.value?.id === data.id)
+        detail.value = data
+      await refreshList()
+      return done(data.state)
+    }).then((result) => {
+      if (result === 'exhausted')
+        opMessage.value = translate("ui.theRequestWasAcceptedStatusUpdatesAreTakingLongerThan")
+    }).finally(() => {
+      runtimeOperations.finish(token)
+    })
+  }
+
+  async function runRuntimeOp(
+    rt: NoCtfapiEndpointsAdministrationRuntimeAdminRuntimeResponse,
+    op: 'start' | 'reset',
+  ) {
+    if (!rt.id || !rt.competitionChallengeId) return
+    const token = beginRuntimeOperation(rt, op)
+    if (!token) return
+    try {
+      const ccPath = { competitionId, competitionChallengeId: rt.competitionChallengeId }
+      const teamPath = { ...ccPath, teamId: rt.teamId ?? '' }
+      const { data, error } =
+        op === 'start'
+          ? (rt.teamId ? await adminStartTeamRuntime({ path: teamPath }) : await adminStartSharedRuntime({ path: ccPath }))
+          : (rt.teamId ? await adminResetTeamRuntime({ path: teamPath }) : await adminResetSharedRuntime({ path: ccPath }))
+      if (!runtimeOperations.isActive(token)) return
+      if (error) throw error
+      const label = op === 'start' ? translate("ui.start") : translate("ui.reset")
+      toast.success(translate("ui.requestAccepted", { action: label }))
+      void refreshList()
+      refreshRuntimeInBackground(token, data?.runtimeInstanceId ?? rt.id, state =>
+        op === 'reset' ? state === 'Stopped' : state === 'Running' || state === 'Failed')
+    }
+    catch (e) {
+      const shouldNotify = runtimeOperations.isActive(token)
+      runtimeOperations.finish(token)
+      if (shouldNotify) toast.error(parseApiError(e).message)
+    }
+  }
+
+  const terminateDialog = ref<NoCtfapiEndpointsAdministrationRuntimeAdminRuntimeResponse | null>(null)
+
+  const terminatePending = computed(() => isRuntimeOperationPending(terminateDialog.value, 'terminate'))
+
+  function canTerminate(rt: NoCtfapiEndpointsAdministrationRuntimeAdminRuntimeResponse) {
+    return rt.state === 'Queued'
+      || rt.state === 'Provisioning'
+      || rt.state === 'Running'
+      || rt.state === 'Failed'
+  }
+
+  async function submitTermination() {
+    const rt = terminateDialog.value
+    if (!rt?.id) return
+    const token = beginRuntimeOperation(rt, 'terminate')
+    if (!token) return
+    try {
+      const { data, error } = await adminTerminateRuntime({
+        path: { competitionId, runtimeInstanceId: rt.id },
+      })
+      if (!runtimeOperations.isActive(token)) return
+      if (error) throw error
+      toast.success(translate("ui.instanceTerminationOperationHasBeenAccepted"))
+      terminateDialog.value = null
+      void refreshList()
+      refreshRuntimeInBackground(token, data?.runtimeInstanceId ?? rt.id, state => state === 'Stopped' || state === 'Failed')
+    }
+    catch (e) {
+      const shouldNotify = runtimeOperations.isActive(token)
+      runtimeOperations.finish(token)
+      if (shouldNotify) toast.error(parseApiError(e).message)
+    }
+  }
+
+  const forceTerminateDialog = ref<NoCtfapiEndpointsAdministrationRuntimeAdminRuntimeResponse | null>(null)
+
+  const forceTerminateReason = ref('')
+
+  const forceTerminateConfirmed = ref(false)
+
+  const forceTerminatePending = computed(() => isRuntimeOperationPending(forceTerminateDialog.value, 'force-terminate'))
+
+  function openForceTermination(rt: NoCtfapiEndpointsAdministrationRuntimeAdminRuntimeResponse) {
+    forceTerminateReason.value = ''
+    forceTerminateConfirmed.value = false
+    forceTerminateDialog.value = rt
+  }
+
+  async function submitForceTermination() {
+    const rt = forceTerminateDialog.value
+    const reason = forceTerminateReason.value.trim()
+    if (!rt?.id || reason.length < 8 || !forceTerminateConfirmed.value) return
+    const token = beginRuntimeOperation(rt, 'force-terminate')
+    if (!token) return
+    try {
+      const { data, error } = await adminForceTerminateRuntime({
+        path: { competitionId, runtimeInstanceId: rt.id },
+        body: {
+          reason,
+        },
+      })
+      if (!runtimeOperations.isActive(token)) return
+      if (error) throw error
+      toast.success(translate("ui.forcedFinalizationHasBeenHandedOverToRunnerForCleanup"))
+      forceTerminateDialog.value = null
+      void refreshList()
+      refreshRuntimeInBackground(token, data?.runtimeInstanceId ?? rt.id, state => state === 'Stopped')
+    }
+    catch (e) {
+      const shouldNotify = runtimeOperations.isActive(token)
+      runtimeOperations.finish(token)
+      if (shouldNotify) toast.error(parseApiError(e).message)
+    }
+  }
+
+  const extendDialog = ref<NoCtfapiEndpointsAdministrationRuntimeAdminRuntimeResponse | null>(null)
+
+  const extendSeconds = ref(1800)
+
+  const extendPending = computed(() => isRuntimeOperationPending(extendDialog.value, 'extend'))
+
+  async function submitExtend() {
+    const rt = extendDialog.value
+    if (!rt?.id || !rt.teamId || !rt.competitionChallengeId) return
+    const token = beginRuntimeOperation(rt, 'extend')
+    if (!token) return
+    try {
+      const { error } = await adminExtendTeamRuntime({
+        path: { competitionId, teamId: rt.teamId, competitionChallengeId: rt.competitionChallengeId },
+        body: { seconds: extendSeconds.value },
+      })
+      if (!runtimeOperations.isActive(token)) return
+      if (error) throw error
+      toast.success(translate("ui.renewalOperationHasBeenAccepted"))
+      extendDialog.value = null
+      void refreshList()
+      refreshRuntimeInBackground(token, rt.id, () => true)
+    }
+    catch (e) {
+      const shouldNotify = runtimeOperations.isActive(token)
+      runtimeOperations.finish(token)
+      if (shouldNotify) toast.error(parseApiError(e).message)
+    }
+  }
+
+  onMounted(() => {
+    void loadRefs()
+    void loadMore()
+  })
+
+  onBeforeUnmount(() => runtimeOperations.cancelAll())
+
+  const RuntimeAccessUrl = markRaw(RuntimeAccessUrlComponent)
+
+  const viewBindings = {
+      canWrite,
+      isAdministrator,
+      challengeOptions,
+      teamOptions,
+      runtimeTeamLabel,
+      isPlayerManagedRuntime,
+      challengeTitle,
+      filterChallenge,
+      filterTeam,
+      filterState,
+      filterKind,
+      items,
+      loading,
+      listError,
+      hasMore,
+      reset,
+      initialized,
+      loadMore,
+      applyFilters,
+      detail,
+      detailOpen,
+      detailLoading,
+      openDetail,
+      opMessage,
+      isRuntimePending,
+      isRuntimeOperationPending,
+      runRuntimeOp,
+      terminateDialog,
+      terminatePending,
+      canTerminate,
+      submitTermination,
+      forceTerminateDialog,
+      forceTerminateReason,
+      forceTerminateConfirmed,
+      forceTerminatePending,
+      openForceTermination,
+      submitForceTermination,
+      extendDialog,
+      extendSeconds,
+      extendPending,
+      submitExtend,
+      RuntimeAccessUrl
+    }
+  const viewState = proxyRefs(viewBindings)
+
+  function onClickFilterChallenge() {
+    viewState.filterChallenge = ''; viewState.filterTeam = ''; viewState.filterState = ''; viewState.filterKind = ''; viewState.applyFilters()
+  }
+
+  function onClickTerminateDialog(value: typeof viewState.terminateDialog) {
+    viewState.terminateDialog = value
+  }
+
+  function onClickExtendDialog(rt: typeof viewState.extendDialog) {
+    viewState.extendDialog = rt; viewState.extendSeconds = 1800
+  }
+
+  function onUpdateOpenExtendDialog(v: boolean) {
+     if (!v) viewState.extendDialog = null 
+  }
+
+  function onClickExtendDialog2(value: typeof viewState.extendDialog) {
+    viewState.extendDialog = value
+  }
+
+  function onUpdateOpenTerminateDialog(open: boolean) {
+     if (!open && !viewState.terminatePending) viewState.terminateDialog = null 
+  }
+
+  function onUpdateOpenForceTerminateDialog(open: boolean) {
+     if (!open && !viewState.forceTerminatePending) viewState.forceTerminateDialog = null 
+  }
+
+  return { ...viewBindings, onClickFilterChallenge, onClickTerminateDialog, onClickExtendDialog, onUpdateOpenExtendDialog, onClickExtendDialog2, onUpdateOpenTerminateDialog, onUpdateOpenForceTerminateDialog }
+}
+
+export type AdminCompetitionsByIdRuntimesPageViewState = import('vue').ShallowUnwrapRef<Awaited<ReturnType<typeof useAdminCompetitionsByIdRuntimesPage>>>

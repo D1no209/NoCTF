@@ -1,8 +1,9 @@
+import { sourceFile } from './support/feature-source'
 import { describe, expect, test } from 'bun:test'
 
 describe('administrator gameplay fact filters', () => {
   test('uses generated protocol values without type assertions', async () => {
-    const page = await Bun.file(
+    const page = await sourceFile(
       new URL('../app/pages/admin/competitions/[id]/submissions.vue', import.meta.url),
     ).text()
 
@@ -15,7 +16,7 @@ describe('administrator gameplay fact filters', () => {
     expect(page).not.toContain('filterKind.value as NoCtfapiEndpointsGameplayFactsGameplayFactKindProtocol')
     const resultOptions = page.slice(
       page.indexOf('const gameplayFactResultOptions'),
-      page.indexOf('// ---- Reference data for filters ----'),
+      page.indexOf('] satisfies', page.indexOf('const gameplayFactResultOptions')),
     )
     expect(resultOptions).not.toContain('PlatformFailed')
   })

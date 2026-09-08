@@ -1,3 +1,4 @@
+import { sourceFile } from './support/feature-source'
 import { describe, expect, test } from 'bun:test'
 import { Bot, CircuitBoard, Cloud, Flag, Link2, ScanSearch, Search } from '@lucide/vue'
 import { directionIcon, directionKey, directionLabel, directionTextClass } from '../app/utils/directions'
@@ -71,11 +72,11 @@ describe('case-insensitive challenge directions', () => {
   })
 
   test('normalizes navigator groups before collapse/filter operations and normalizes editor values', async () => {
-    const navigator = await Bun.file(new URL('../app/components/competition/CompetitionChallengeNavigator.vue', import.meta.url)).text()
-    expect(navigator).toContain("const direction = directionLabel(item.direction) || translate('未分类')")
+    const navigator = await sourceFile(new URL('../app/features/competition/CompetitionChallengeNavigator.vue', import.meta.url)).text()
+    expect(navigator).toContain("const direction = directionLabel(item.direction) || translate(\"ui.uncategorized\")")
     expect(navigator).toContain('grouped.get(direction)')
     expect(navigator).toContain('toggleDirection(group.direction)')
-    const editor = await Bun.file(new URL('../app/pages/admin/challenges/[id].vue', import.meta.url)).text()
+    const editor = await sourceFile(new URL('../app/pages/admin/challenges/[id].vue', import.meta.url)).text()
     expect(editor).toContain('form.direction = directionLabel(value.direction)')
     expect(editor).toContain('direction: directionLabel(form.direction)')
   })

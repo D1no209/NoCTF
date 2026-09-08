@@ -1,12 +1,13 @@
+import { sourceFile } from './support/feature-source'
 import { describe, expect, test } from 'bun:test'
 import { emptyPlatformRuntimeFilters, platformRuntimeQuery } from '../app/utils/platform-runtime-filters'
 
 describe('platform runtime administration', () => {
   test('adds an administrator-only global container inventory to the platform workspace', async () => {
-    const shell = await Bun.file(
+    const shell = await sourceFile(
       new URL('../app/pages/admin/platform.vue', import.meta.url),
     ).text()
-    const page = await Bun.file(
+    const page = await sourceFile(
       new URL('../app/pages/admin/platform/runtimes.vue', import.meta.url),
     ).text()
 
@@ -35,12 +36,12 @@ describe('platform runtime administration', () => {
   })
 
   test('uses a compact filter form, wrapping cells and a detail sheet instead of an oversized card table', async () => {
-    const page = await Bun.file(new URL('../app/pages/admin/platform/runtimes.vue', import.meta.url)).text()
-    const workspace = await Bun.file(new URL('../app/components/app/AppWorkspaceNav.vue', import.meta.url)).text()
+    const page = await sourceFile(new URL('../app/pages/admin/platform/runtimes.vue', import.meta.url)).text()
+    const workspace = await sourceFile(new URL('../app/features/app/AppWorkspaceNav.vue', import.meta.url)).text()
     expect(workspace).toContain('<SidebarInset class="min-w-0">')
     expect(page).toContain('<form @submit.prevent="applyFilters">')
     expect(page).toContain('query: { ...appliedQuery.value, cursor, limit: 50 }')
-    expect(page).toContain('appliedQuery.value = platformRuntimeQuery(filters)\n  reset()')
+    expect(page).toContain('appliedQuery.value = platformRuntimeQuery(filters)\n    reset()')
     expect(page).toContain('whitespace-normal break-words')
     expect(page).toContain('<SheetTitle>')
     expect(page).not.toContain('min-w-64')
@@ -48,14 +49,14 @@ describe('platform runtime administration', () => {
   })
 
   test('keeps destructive runtime targets until the generated SDK request completes', async () => {
-    const page = await Bun.file(
+    const page = await sourceFile(
       new URL('../app/pages/admin/platform/runtimes.vue', import.meta.url),
     ).text()
 
     expect(page).toContain(':open="terminateTarget !== null"')
-    expect(page).toContain('if (!open && !terminatePending) terminateTarget = null')
+    expect(page).toContain('if (!open && !viewState.terminatePending) viewState.terminateTarget = null')
     expect(page).toContain(':open="forceTerminateTarget !== null"')
-    expect(page).toContain('if (!open && !forceTerminatePending) forceTerminateTarget = null')
+    expect(page).toContain('if (!open && !viewState.forceTerminatePending) viewState.forceTerminateTarget = null')
     expect(page).toContain('terminateTarget.value = null')
     expect(page).toContain('forceTerminateTarget.value = null')
     expect(page).toContain('terminationError.value = parseApiError(requestError).message')

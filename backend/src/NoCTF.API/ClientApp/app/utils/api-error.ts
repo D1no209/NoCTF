@@ -42,7 +42,7 @@ function isUntranslatedEnglish(message: string): boolean {
  */
 export function userFacingErrorMessage(
   message: string | null | undefined,
-  fallback = translate("请求失败,请稍后重试"),
+  fallback = translate("ui.requestFailedPleaseTryAgainLater"),
   allowUntranslated = false,
 ): string {
   const source = message?.trim()
@@ -63,7 +63,7 @@ function normalizeFieldErrors(
 }
 
 /** Convert an SDK error payload into a user-facing ApiError. */
-export function parseApiError(error: unknown, fallback = translate("请求失败,请稍后重试")): ApiError {
+export function parseApiError(error: unknown, fallback = translate("ui.requestFailedPleaseTryAgainLater")): ApiError {
   if (error instanceof ApiError) return error
   if (error && typeof error === 'object') {
     const problem = error as ProblemDetailsLike
@@ -91,17 +91,17 @@ export function parseApiError(error: unknown, fallback = translate("请求失败
 /** 无 problem+json 响应体时,按 HTTP 状态码给出有意义的提示。 */
 export function statusErrorMessage(status: number | undefined, authenticatedRequest = false): string {
   switch (status) {
-    case 400: return translate("请求参数有误,请检查输入")
+    case 400: return translate("ui.theRequestParametersAreIncorrectPleaseCheckYourInput")
     case 401:
-      return authenticatedRequest ? translate("登录状态已失效,请重新登录") : translate("用户名或密码错误")
-    case 403: return translate("没有权限执行此操作")
-    case 404: return translate("请求的资源不存在")
-    case 409: return translate("资源状态已发生变化,请刷新页面获取最新状态后重试")
-    case 413: return translate("上传的文件过大")
-    case 429: return translate("请求过于频繁,请稍后重试")
+      return authenticatedRequest ? translate("ui.loginStatusHasExpiredPleaseLogInAgain") : translate("ui.wrongUsernameOrPassword")
+    case 403: return translate("ui.noPermissionToPerformThisOperation")
+    case 404: return translate("ui.theRequestedResourceDoesNotExist")
+    case 409: return translate("ui.theResourceStateChangedRefreshThePageToLoadThe")
+    case 413: return translate("ui.theUploadedFileIsTooLarge")
+    case 429: return translate("ui.theRequestIsTooFrequentPleaseTryAgainLater")
     default:
-      if (status !== undefined && status >= 500) return translate("服务器内部错误,请稍后重试")
-      if (status === undefined) return translate("无法连接到服务器,请检查网络后重试")
-      return translate("请求失败,请稍后重试")
+      if (status !== undefined && status >= 500) return translate("ui.internalServerErrorPleaseTryAgainLater")
+      if (status === undefined) return translate("ui.unableToConnectToTheServerPleaseCheckTheNetwork")
+      return translate("ui.requestFailedPleaseTryAgainLater")
   }
 }

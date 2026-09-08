@@ -14,7 +14,7 @@ import type {
   NoCtfapiEndpointsGameplayFactsGameplayFactFailureCodeProtocol,
   NoCtfapiEndpointsCompetitionsEventsCompetitionEventKindProtocol,
   NoCtfapiEndpointsNotificationsNotificationKindProtocol,
-} from '~/api'
+} from '../api'
 
 /** 竞赛上下文:由 pages/competitions/[id].vue provide,子路由 inject。 */
 export interface CompetitionContext {
@@ -27,83 +27,83 @@ export interface CompetitionContext {
 export const competitionContextKey: InjectionKey<CompetitionContext> = Symbol('competition-context')
 
 export function gameModeLabel(mode?: NoCtfapiEndpointsCompetitionsGameModeProtocol): string {
-  if (!mode) return translate('未知')
+  if (!mode) return translate("ui.unknown")
   const labels = { Ctf: 'CTF', Awd: 'AWD', Awdp: 'AWDP', Koh: 'KoH' } satisfies Record<NoCtfapiEndpointsCompetitionsGameModeProtocol, string>
   return labels[mode]
 }
 
 export function competitionStatusLabel(status?: NoCtfapiEndpointsCompetitionsCompetitionStatusProtocol): string {
-  if (!status) return translate('未知')
-  const labels = { Draft: translate('草稿'), Visible: translate('即将发布'), Published: translate('即将开始'), Running: translate('进行中'), Paused: translate('已暂停'), Finished: translate('已结束') } satisfies Record<NoCtfapiEndpointsCompetitionsCompetitionStatusProtocol, string>
+  if (!status) return translate("ui.unknown")
+  const labels = { Draft: translate("ui.draft"), Visible: translate("ui.comingSoon"), Published: translate("ui.aboutToStart"), Running: translate("ui.running"), Paused: translate("ui.suspended"), Finished: translate("ui.finished") } satisfies Record<NoCtfapiEndpointsCompetitionsCompetitionStatusProtocol, string>
   return labels[status]
 }
 
 export function teamRegistrationStatusLabel(status?: NoCtfapiEndpointsTeamsTeamRegistrationStatusProtocol): string {
-  if (!status) return translate('未知')
-  const labels = { Pending: translate('待审核'), Approved: translate('已通过'), Rejected: translate('已拒绝') } satisfies Record<NoCtfapiEndpointsTeamsTeamRegistrationStatusProtocol, string>
+  if (!status) return translate("ui.unknown")
+  const labels = { Pending: translate("ui.pendingReview"), Approved: translate("ui.passed"), Rejected: translate("ui.rejected") } satisfies Record<NoCtfapiEndpointsTeamsTeamRegistrationStatusProtocol, string>
   return labels[status]
 }
 
 export function runtimeStateLabel(state?: NoCtfapiEndpointsRuntimeRuntimeStateProtocol): string {
-  if (!state) return translate('未知')
-  const labels = { Queued: translate('排队中'), Provisioning: translate('部署中'), Running: translate('运行中'), Stopping: translate('停止中'), Stopped: translate('已停止'), Failed: translate('失败') } satisfies Record<NoCtfapiEndpointsRuntimeRuntimeStateProtocol, string>
+  if (!state) return translate("ui.unknown")
+  const labels = { Queued: translate("ui.queuing"), Provisioning: translate("ui.deploying"), Running: translate("ui.running2"), Stopping: translate("ui.stopping"), Stopped: translate("ui.stopped"), Failed: translate("ui.failed") } satisfies Record<NoCtfapiEndpointsRuntimeRuntimeStateProtocol, string>
   return labels[state]
 }
 
 export function gameplayFactKindLabel(kind?: NoCtfapiEndpointsGameplayFactsGameplayFactKindProtocol): string {
-  if (!kind) return translate('比赛事实')
-  const labels = { FlagAttempt: 'Flag', BreakAttempt: 'Break', FixAttempt: 'Fix', HintUnlock: translate('提示解锁'), ManualAdjustment: translate('人工调分'), AwdServiceTransition: translate('AWD 服务状态'), KohControlObservation: translate('KoH 控制观测') } satisfies Record<NoCtfapiEndpointsGameplayFactsGameplayFactKindProtocol, string>
+  if (!kind) return translate("ui.gameplayFacts")
+  const labels = { FlagAttempt: 'Flag', BreakAttempt: 'Break', FixAttempt: 'Fix', HintUnlock: translate("ui.promptToUnlock"), ManualAdjustment: translate("ui.manualAdjustment"), AwdServiceTransition: translate("ui.awdServiceStatus"), KohControlObservation: translate("ui.kohControlObservation") } satisfies Record<NoCtfapiEndpointsGameplayFactsGameplayFactKindProtocol, string>
   return labels[kind]
 }
 
 export function gameplayFactStateLabel(state?: NoCtfapiEndpointsGameplayFactsGameplayFactStateProtocol): string {
-  if (!state) return translate('未知')
-  const labels = { Pending: translate('待评测'), Queued: translate('排队中'), Processing: translate('评测中'), Completed: translate('已完成'), PlatformFailed: translate('平台故障') } satisfies Record<NoCtfapiEndpointsGameplayFactsGameplayFactStateProtocol, string>
+  if (!state) return translate("ui.unknown")
+  const labels = { Pending: translate("ui.awaitingEvaluation"), Queued: translate("ui.queuing"), Processing: translate("ui.underEvaluation"), Completed: translate("ui.completed"), PlatformFailed: translate("ui.platformFailure") } satisfies Record<NoCtfapiEndpointsGameplayFactsGameplayFactStateProtocol, string>
   return labels[state]
 }
 
 export function gameplayFactResultLabel(result?: NoCtfapiEndpointsGameplayFactsGameplayFactResultProtocol | null): string {
-  if (result === null || result === undefined) return translate('评测中')
-  const labels = { Correct: translate("正确"), Wrong: translate("错误"), Duplicate: translate("重复"), AttemptsExhausted: translate("次数耗尽"), Rejected: translate("已拒绝"), Unlocked: translate("已解锁"), Applied: translate("已应用"), ServiceUp: translate("服务正常"), ServiceDown: translate("服务异常"), Controlled: translate("已控制"), Uncontrolled: translate("未控制") } satisfies Record<NoCtfapiEndpointsGameplayFactsGameplayFactResultProtocol, string>
+  if (result === null || result === undefined) return translate("ui.underEvaluation")
+  const labels = { Correct: translate("ui.correct"), Wrong: translate("ui.wrong"), Duplicate: translate("ui.repeat"), AttemptsExhausted: translate("ui.exhausted"), Rejected: translate("ui.rejected"), Unlocked: translate("ui.unlocked"), Applied: translate("ui.applied"), ServiceUp: translate("ui.serviceIsNormal"), ServiceDown: translate("ui.serviceException"), Controlled: translate("ui.controlled"), Uncontrolled: translate("ui.uncontrolled") } satisfies Record<NoCtfapiEndpointsGameplayFactsGameplayFactResultProtocol, string>
   return labels[result]
 }
 
 export function gameplayFactFailureCodeLabel(code?: NoCtfapiEndpointsGameplayFactsGameplayFactFailureCodeProtocol | null): string {
   if (!code) return '—'
   const labels = {
-    FlagNotSupported: translate('当前模式不支持 Flag 提交'),
-    FixNotSupported: translate('当前模式不支持 Fix 提交'),
-    BreakAttemptsExhausted: translate('Break 提交次数已用尽'),
-    FixAttemptsExhausted: translate('Fix 提交次数已用尽'),
-    BreakRequired: translate('需要先完成 Break'),
-    ArchiveValidationUnavailable: translate('Fix 归档验证不可用'),
-    FixArchiveMissing: translate('缺少 Fix 归档'),
-    FixArchiveLengthMismatch: translate('Fix 归档大小不一致'),
-    FixArchiveContentTypeMismatch: translate('Fix 归档类型不一致'),
-    FixArchiveHashMismatch: translate('Fix 归档哈希不一致'),
-    StorageTimeout: translate('存储访问超时'),
-    StorageUnavailable: translate('存储不可用'),
-    CheckerPlatformError: translate('Checker 平台错误'),
-    SelfAttackRejected: translate('不能攻击本队'),
-    DuplicateAttack: translate('重复攻击'),
-    DuplicateAchievement: translate('重复达成'),
-    UnknownTeamIdentifier: translate('未知队伍标识'),
-    InvalidObservation: translate('观测结果无效'),
-    ProducerTimeout: translate('Flag 生成超时'),
-    ProducerUnavailable: translate('Flag 生成器不可用'),
-    AmbiguousFlagMatch: translate('Flag 匹配不唯一'),
-    FlagExpired: translate('Flag 已过期'),
-    RoundOutOfRange: translate('轮次超出范围'),
-    HardeningActive: translate('黑灯期暂不可提交'),
-    AwdpExploitSucceeded: translate('EXP 仍可利用'),
-    AwdpPatchFailed: translate('Patch 执行失败'),
-    AwdpPatchTimeout: translate('Patch 执行超时'),
-    AwdpServiceAbnormal: translate('服务异常'),
-    AwdpPlatformFailed: translate('AWDP 平台错误'),
-    AwdpViolation: translate('旧 AWDP 违规记录'),
-    ForeignTeamFlagDetected: translate('提交了非本队 Flag'),
-    InsufficientScore: translate('分数不足'),
-    HintUnavailable: translate('提示不可用'),
+    FlagNotSupported: translate("ui.thisModeDoesNotSupportFlagSubmissions"),
+    FixNotSupported: translate("ui.thisModeDoesNotSupportFixSubmissions"),
+    BreakAttemptsExhausted: translate("ui.breakSubmissionAttemptsAreExhausted"),
+    FixAttemptsExhausted: translate("ui.fixSubmissionAttemptsAreExhausted"),
+    BreakRequired: translate("ui.breakMustBeCompletedFirst"),
+    ArchiveValidationUnavailable: translate("ui.fixArchiveValidationIsUnavailable"),
+    FixArchiveMissing: translate("ui.fixArchiveIsMissing"),
+    FixArchiveLengthMismatch: translate("ui.fixArchiveSizeMismatch"),
+    FixArchiveContentTypeMismatch: translate("ui.fixArchiveContentTypeMismatch"),
+    FixArchiveHashMismatch: translate("ui.fixArchiveHashMismatch"),
+    StorageTimeout: translate("ui.storageAccessTimedOut"),
+    StorageUnavailable: translate("ui.storageIsUnavailable"),
+    CheckerPlatformError: translate("ui.checkerPlatformError"),
+    SelfAttackRejected: translate("ui.cannotAttackYourOwnTeam"),
+    DuplicateAttack: translate("ui.duplicateAttack"),
+    DuplicateAchievement: translate("ui.duplicateAchievement"),
+    UnknownTeamIdentifier: translate("ui.unknownTeamIdentifier"),
+    InvalidObservation: translate("ui.invalidObservation"),
+    ProducerTimeout: translate("ui.flagGenerationTimedOut"),
+    ProducerUnavailable: translate("ui.flagGeneratorUnavailable"),
+    AmbiguousFlagMatch: translate("ui.flagMatchIsAmbiguous"),
+    FlagExpired: translate("ui.flagHasExpired"),
+    RoundOutOfRange: translate("ui.roundIsOutOfRange"),
+    HardeningActive: translate("ui.submissionsAreDisabledDuringTheBlackoutPeriod"),
+    AwdpExploitSucceeded: translate("ui.expStillSucceeds"),
+    AwdpPatchFailed: translate("ui.patchExecutionFailed"),
+    AwdpPatchTimeout: translate("ui.patchExecutionTimedOut"),
+    AwdpServiceAbnormal: translate("ui.serviceException"),
+    AwdpPlatformFailed: translate("ui.awdpPlatformError"),
+    AwdpViolation: translate("ui.legacyAwdpViolationRecord"),
+    ForeignTeamFlagDetected: translate("ui.submittedAFlagAssignedToAnotherTeam"),
+    InsufficientScore: translate("ui.insufficientScore"),
+    HintUnavailable: translate("ui.hintIsUnavailable"),
   } satisfies Record<NoCtfapiEndpointsGameplayFactsGameplayFactFailureCodeProtocol, string>
   return labels[code]
 }
@@ -136,10 +136,10 @@ export function formatDuration(ms: number): string {
   const minutes = Math.floor((total % 3600) / 60)
   const seconds = total % 60
   const parts: string[] = []
-  if (days > 0) parts.push(translate('{count} 天', { count: days }))
-  if (hours > 0) parts.push(translate('{count} 小时', { count: hours }))
-  if (minutes > 0 && days === 0) parts.push(translate('{count} 分', { count: minutes }))
-  if (days === 0 && hours === 0) parts.push(translate('{count} 秒', { count: seconds }))
+  if (days > 0) parts.push(translate("ui.d", { count: days }))
+  if (hours > 0) parts.push(translate("ui.h", { count: hours }))
+  if (minutes > 0 && days === 0) parts.push(translate("ui.m", { count: minutes }))
+  if (days === 0 && hours === 0) parts.push(translate("ui.s", { count: seconds }))
   return parts.join(' ')
 }
 
@@ -147,34 +147,34 @@ export function formatDuration(ms: number): string {
 export function competitionEventText(
   event: NoCtfapiEndpointsCompetitionsEventsCompetitionEventResponse,
 ): string {
-  const actor = event.actorDisplayName ?? translate('系统')
-  const team = event.teamDisplayName ?? translate('某队伍')
-  const challenge = event.challengeTitle ?? translate('某题目')
+  const actor = event.actorDisplayName ?? translate("ui.system")
+  const team = event.teamDisplayName ?? translate("ui.aTeam")
+  const challenge = event.challengeTitle ?? translate("ui.aChallenge")
   const resolvedSuccessfully = event.gameplayFactState === 'Completed'
     && event.gameplayFactResult === 'Correct'
   if (event.kind === 'AwdpBreakResolved') {
     return resolvedSuccessfully
-      ? translate('队伍「{team}」对题目「{challenge}」的攻击验证成功', { team, challenge })
-      : translate('队伍「{team}」对题目「{challenge}」的攻击验证失败', { team, challenge })
+      ? translate("ui.teamPassedAttackVerificationOn", { team, challenge })
+      : translate("ui.teamFailedAttackVerificationOn", { team, challenge })
   }
   if (event.kind === 'AwdpFixResolved') {
     return resolvedSuccessfully
-      ? translate('队伍「{team}」对题目「{challenge}」的防御验证成功', { team, challenge })
-      : translate('队伍「{team}」对题目「{challenge}」的防御验证失败', { team, challenge })
+      ? translate("ui.teamPassedDefenseVerificationOn", { team, challenge })
+      : translate("ui.teamFailedDefenseVerificationOn", { team, challenge })
   }
   const templates: Partial<Record<NoCtfapiEndpointsCompetitionsEventsCompetitionEventKindProtocol, string>> = {
-    GameplayFactPatchDownloaded: translate('{actor}下载了队伍「{team}」的 Patch 包', { actor, team }),
-    CompetitionCreated: translate('竞赛已创建'), CompetitionUpdated: translate('竞赛信息已更新'), CompetitionLifecycleChanged: translate('竞赛生命周期变更'),
-    LeaderboardVisibilityChanged: translate('排行榜可见性已变更'), ChallengeCreated: translate('题目「{challenge}」已加入竞赛', { challenge }), ChallengeUpdated: translate('题目「{challenge}」已更新', { challenge }),
-    ChallengePublished: translate('题目「{challenge}」已发布', { challenge }), ChallengeDescriptionUpdated: translate('题目「{challenge}」已更新描述', { challenge }), ChallengeUnpublished: translate('题目「{challenge}」已下线', { challenge }), HintPublished: translate('题目「{challenge}」发布了新提示', { challenge }),
-    HintUnlocked: translate('队伍「{team}」解锁了题目「{challenge}」的提示', { team, challenge }), TeamRegistered: translate('队伍「{team}」报名参赛', { team }), TeamRegistrationChanged: translate('队伍「{team}」的报名状态已变更', { team }),
-    TeamMemberJoined: translate('队伍「{team}」加入了新成员', { team }), TeamBanned: translate('队伍「{team}」被封禁', { team }), TeamUnbanned: translate('队伍「{team}」已解除封禁', { team }), TeamBanCorrectionPublished: translate('队伍「{team}」的封禁纠正已发布', { team }), GameplayFactReceived: translate('队伍「{team}」提交了题目「{challenge}」', { team, challenge }),
-    GameplayFactAdjudicated: translate('队伍「{team}」在题目「{challenge}」的提交已评测', { team, challenge }), FirstBloodAwarded: translate('队伍「{team}」拿下了题目「{challenge}」的一血', { team, challenge }), SecondBloodAwarded: translate('队伍「{team}」拿下了题目「{challenge}」的二血', { team, challenge }),
-    ThirdBloodAwarded: translate('队伍「{team}」拿下了题目「{challenge}」的三血', { team, challenge }), RuntimeCreated: translate('队伍「{team}」申请了题目「{challenge}」的环境', { team, challenge }), RuntimeStateChanged: translate('队伍「{team}」的题目「{challenge}」环境状态已变更', { team, challenge }),
-    AwdpBreakAttempted: translate('队伍「{team}」对题目「{challenge}」进行了一次攻击操作', { team, challenge }), AwdpFixAttempted: translate('队伍「{team}」对题目「{challenge}」提交了一次防御操作', { team, challenge }),
-    AnnouncementPublished: translate('官方发布了一条公告'), QuestionOpened: translate('{actor}提出了咨询', { actor }), QuestionReplied: translate('咨询已有回复'), QuestionStatusChanged: translate('咨询状态已变更'),
+    GameplayFactPatchDownloaded: translate("ui.downloadedThePatchArchiveForTeam", { actor, team }),
+    CompetitionCreated: translate("ui.contestCreated"), CompetitionUpdated: translate("ui.competitionInformationHasBeenUpdated"), CompetitionLifecycleChanged: translate("ui.competitionLifeCycleChanges"),
+    LeaderboardVisibilityChanged: translate("ui.leaderboardVisibilityChanged"), ChallengeCreated: translate("ui.challengeWasAddedToTheCompetition", { challenge }), ChallengeUpdated: translate("ui.challengeWasUpdated", { challenge }),
+    ChallengePublished: translate("ui.challengeWasPublished", { challenge }), ChallengeDescriptionUpdated: translate("ui.challengeHasAnUpdatedDescription", { challenge }), ChallengeUnpublished: translate("ui.challengeWasUnpublished", { challenge }), HintPublished: translate("ui.challengeHasANewHint2", { challenge }),
+    HintUnlocked: translate("ui.teamUnlockedAHintFor", { team, challenge }), TeamRegistered: translate("ui.teamRegisteredForTheCompetition", { team }), TeamRegistrationChanged: translate("ui.teamSRegistrationStatusChanged", { team }),
+    TeamMemberJoined: translate("ui.aNewMemberJoinedTeam", { team }), TeamBanned: translate("ui.teamWasBanned", { team }), TeamUnbanned: translate("ui.teamWasUnbanned", { team }), TeamBanCorrectionPublished: translate("ui.aBanCorrectionWasPublishedForTeam", { team }), GameplayFactReceived: translate("ui.teamSubmitted", { team, challenge }),
+    GameplayFactAdjudicated: translate("ui.teamSSubmissionForWasJudged", { team, challenge }), FirstBloodAwarded: translate("ui.teamEarnedFirstBloodOn", { team, challenge }), SecondBloodAwarded: translate("ui.teamEarnedSecondBloodOn", { team, challenge }),
+    ThirdBloodAwarded: translate("ui.teamEarnedThirdBloodOn", { team, challenge }), RuntimeCreated: translate("ui.teamRequestedARuntimeFor", { team, challenge }), RuntimeStateChanged: translate("ui.teamSRuntimeForChangedState", { team, challenge }),
+    AwdpBreakAttempted: translate("ui.teamMadeAnAttackAttemptOn", { team, challenge }), AwdpFixAttempted: translate("ui.teamSubmittedADefenseAttemptFor", { team, challenge }),
+    AnnouncementPublished: translate("ui.anOfficialAnnouncementWasMade"), QuestionOpened: translate("ui.openedAQuestion", { actor }), QuestionReplied: translate("ui.questionReceivedAReply"), QuestionStatusChanged: translate("ui.questionStatusChanged"),
   }
-  return event.kind ? templates[event.kind] ?? translate('发生了一条竞赛动态') : translate('发生了一条竞赛动态')
+  return event.kind ? templates[event.kind] ?? translate("ui.aCompetitionEventOccurred") : translate("ui.aCompetitionEventOccurred")
 }
 
 function notificationContent(
@@ -314,7 +314,7 @@ export function notificationTitle(
 ): string {
   const payload = notificationContent(notification)
   if (notification.kind === 'CompetitionAnnouncement')
-    return typeof payload.title === 'string' ? payload.title : translate("赛事公告")
+    return typeof payload.title === 'string' ? payload.title : translate("ui.eventAnnouncement")
   if (notification.kind === 'QuestionOpened' || notification.kind === 'Message' || notification.kind === 'QuestionStatusChanged')
     return typeof payload.title === 'string' ? payload.title : notificationText(notification)
   return notificationText(notification)
@@ -327,18 +327,18 @@ export function notificationBody(
   if (notification.kind === 'UserAccountLifecycleChanged') {
     const user = typeof payload.targetUserName === 'string' && payload.targetUserName.trim().length > 0
       ? payload.targetUserName
-      : translate('未知用户')
+      : translate("ui.unknownUser")
     const action = typeof payload.action === 'string' ? payload.action : null
     const templates: Record<string, string> = {
-      Activated: '已激活用户「{user}」的账户。',
-      Banned: '已封禁用户「{user}」的账户。',
-      Disabled: '已停用用户「{user}」的账户。',
-      EmailVerified: '已手动验证用户「{user}」的邮箱。',
-      EmailUnverified: '已撤销用户「{user}」的邮箱验证。',
-      Anonymized: '已匿名化用户「{user}」的账户。',
-      PhysicallyDeleted: '已彻底删除用户「{user}」的账户。',
+      Activated: "ui.activatedTheAccountFor",
+      Banned: "ui.bannedTheAccountFor",
+      Disabled: "ui.disabledTheAccountFor",
+      EmailVerified: "ui.manuallyVerifiedTheEmailAddressFor",
+      EmailUnverified: "ui.revokedEmailVerificationFor",
+      Anonymized: "ui.anonymizedTheAccountFor",
+      PhysicallyDeleted: "ui.permanentlyDeletedTheAccountFor",
     }
-    return translate(templates[action ?? ''] ?? '用户「{user}」的账户状态已由管理员更新。', { user })
+    return translate(templates[action ?? ''] ?? "ui.anAdministratorUpdatedTheAccountStatusFor", { user })
   }
   for (const key of ['body', 'reason', 'detail', 'message']) {
     const value = payload[key]
@@ -352,28 +352,28 @@ export function notificationActionLabel(
   notification: NoCtfapiEndpointsNotificationsNotificationResponse,
 ): string {
   const labels = {
-    Message: '查看咨询',
-    CompetitionAnnouncement: '查看通知详情',
-    QuestionOpened: '查看咨询',
-    QuestionStatusChanged: '查看咨询',
-    CompetitionLifecycleChanged: '查看比赛动态',
-    TeamRegistrationChanged: '查看我的队伍',
-    GameplayFactAdjudicated: '查看提交',
-    RuntimeStateChanged: '查看题目',
-    StartGateFailed: '查看通知详情',
-    ManagementFailure: '查看通知详情',
-    BloodAwarded: '查看题目',
-    ChallengePublished: '查看题目',
-    HintPublished: '查看题目',
-    TeamBanned: '查看封禁与申诉',
-    CheatIncidentDetected: '查看作弊事件',
-    TeamBanCorrected: '查看封禁与申诉',
-    TeamBanAppealSubmitted: '查看封禁申诉',
-    PlatformAuditExported: '查看通知详情',
-    UserAccountLifecycleChanged: '查看通知详情',
-    CompetitionForceDeleted: '查看通知详情',
+    Message: "ui.viewConsultation",
+    CompetitionAnnouncement: "ui.viewNotificationDetails",
+    QuestionOpened: "ui.viewConsultation",
+    QuestionStatusChanged: "ui.viewConsultation",
+    CompetitionLifecycleChanged: "ui.viewGameUpdates",
+    TeamRegistrationChanged: "ui.viewMyTeam",
+    GameplayFactAdjudicated: "ui.viewSubmissions",
+    RuntimeStateChanged: "ui.viewQuestions",
+    StartGateFailed: "ui.viewNotificationDetails",
+    ManagementFailure: "ui.viewNotificationDetails",
+    BloodAwarded: "ui.viewQuestions",
+    ChallengePublished: "ui.viewQuestions",
+    HintPublished: "ui.viewQuestions",
+    TeamBanned: "ui.viewBansAndAppeals",
+    CheatIncidentDetected: "ui.viewCheatingIncidents",
+    TeamBanCorrected: "ui.viewBansAndAppeals",
+    TeamBanAppealSubmitted: "ui.reviewBanAppeal",
+    PlatformAuditExported: "ui.viewNotificationDetails",
+    UserAccountLifecycleChanged: "ui.viewNotificationDetails",
+    CompetitionForceDeleted: "ui.viewNotificationDetails",
   } satisfies Record<NoCtfapiEndpointsNotificationsNotificationKindProtocol, string>
-  return translate(notification.kind ? labels[notification.kind] : '查看通知详情')
+  return translate(notification.kind ? labels[notification.kind] : "ui.viewNotificationDetails")
 }
 
 /** 通知文案(NoCTF.Domain.Notifications.NotificationKind),content 为松散 JSON。 */
@@ -384,18 +384,18 @@ export function notificationText(
   const title = typeof payload.competitionTitle === 'string' ? `「${payload.competitionTitle}」` : ''
   const team = typeof payload.teamName === 'string' ? `「${payload.teamName}」` : ''
   const challenge = typeof payload.challengeTitle === 'string' ? `「${payload.challengeTitle}」` : ''
-  const announcementTitle = typeof payload.title === 'string' ? payload.title : translate("赛事公告")
+  const announcementTitle = typeof payload.title === 'string' ? payload.title : translate("ui.eventAnnouncement")
   const announcementBody = typeof payload.body === 'string' ? payload.body : ''
   const announcement = announcementBody
     ? `${announcementTitle}：${announcementBody}`
     : announcementTitle
   const templates: Partial<Record<NoCtfapiEndpointsNotificationsNotificationKindProtocol, string>> = {
-    CompetitionLifecycleChanged: translate('竞赛{title}的生命周期已变更', { title }), TeamRegistrationChanged: translate('你的队伍{team}报名状态已变更', { team }), GameplayFactAdjudicated: translate('你在{challenge}的提交已完成评测', { challenge }),
-    RuntimeStateChanged: translate('{challenge}的运行环境状态已变更', { challenge }), StartGateFailed: translate('竞赛{title}启动检查未通过', { title }), ManagementFailure: translate('竞赛{title}出现管理侧故障', { title }),
-    BloodAwarded: translate('恭喜，你在{challenge}拿下了血榜名次', { challenge }), ChallengePublished: translate('竞赛{title}发布了新题目{challenge}', { title, challenge }), HintPublished: translate('{challenge}发布了新提示', { challenge }),
-    TeamBanned: translate('你的队伍{team}已被封禁', { team }), QuestionOpened: translate('竞赛{title}有新的咨询', { title }), Message: translate('你的咨询已有新回复'),
-    QuestionStatusChanged: translate("你的咨询状态已变更"), CheatIncidentDetected: translate("检测到疑似作弊行为"), TeamBanCorrected: translate("队伍封禁已被纠正"), TeamBanAppealSubmitted: translate('队伍{team}提交了封禁申诉', { team }), PlatformAuditExported: translate("平台审计归档已导出"),
-    UserAccountLifecycleChanged: translate("用户账号状态已变更"), CompetitionForceDeleted: translate("竞赛已被强制删除"), CompetitionAnnouncement: announcement,
+    CompetitionLifecycleChanged: translate("ui.competitionSLifecycleHasChanged", { title }), TeamRegistrationChanged: translate("ui.yourTeamSRegistrationStatusHasChanged", { team }), GameplayFactAdjudicated: translate("ui.yourSubmissionForHasBeenJudged", { challenge }),
+    RuntimeStateChanged: translate("ui.theRuntimeEnvironmentForHasChanged", { challenge }), StartGateFailed: translate("ui.competitionFailedItsStartChecks", { title }), ManagementFailure: translate("ui.competitionEncounteredAManagementFailure", { title }),
+    BloodAwarded: translate("ui.congratulationsYouEarnedABloodRankOn", { challenge }), ChallengePublished: translate("ui.competitionPublishedANewChallenge", { title, challenge }), HintPublished: translate("ui.hasANewHint", { challenge }),
+    TeamBanned: translate("ui.yourTeamHasBeenBanned", { team }), QuestionOpened: translate("ui.competitionHasANewQuestion", { title }), Message: translate("ui.thereAreNewRepliesToYourInquiry"),
+    QuestionStatusChanged: translate("ui.yourInquiryStatusHasChanged"), CheatIncidentDetected: translate("ui.suspectedCheatingDetected"), TeamBanCorrected: translate("ui.teamBanHasBeenCorrected"), TeamBanAppealSubmitted: translate("ui.teamSubmittedABanAppeal", { team }), PlatformAuditExported: translate("ui.platformAuditArchiveExported"),
+    UserAccountLifecycleChanged: translate("ui.userAccountStatusHasChanged"), CompetitionForceDeleted: translate("ui.competitionForceDeleted"), CompetitionAnnouncement: announcement,
   }
-  return notification.kind ? templates[notification.kind] ?? translate('你有一条新通知') : translate('你有一条新通知')
+  return notification.kind ? templates[notification.kind] ?? translate("ui.youHaveANewNotification") : translate("ui.youHaveANewNotification")
 }

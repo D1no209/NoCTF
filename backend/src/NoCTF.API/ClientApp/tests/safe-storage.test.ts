@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import { readFileSync } from 'node:fs'
+import { readFeatureSource as readFileSync } from './support/feature-source'
 import { resolve } from 'node:path'
 import { createSafeStorage, type StringStorage } from '../app/lib/safe-storage'
 

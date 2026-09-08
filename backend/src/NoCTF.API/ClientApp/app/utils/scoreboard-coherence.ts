@@ -2,7 +2,7 @@ import type {
   NoCtfapiEndpointsCompetitionsScoreboardChallengeCatalogResponse,
   NoCtfapiEndpointsCompetitionsScoreboardSchemaResponse,
   NoCtfapiEndpointsCompetitionsScoreboardSnapshotResponse,
-} from '~/api'
+} from '../api'
 
 export type ScoreboardRefreshOutcome = 'accepted' | 'retrying' | 'failed' | 'superseded'
 

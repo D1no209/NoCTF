@@ -1,9 +1,10 @@
+import { sourceFile } from './support/feature-source'
 import { describe, expect, test } from 'bun:test'
 
-const panel = await Bun.file(
-  new URL('../app/components/admin/ChallengeTestRuntimePanel.vue', import.meta.url),
+const panel = await sourceFile(
+  new URL('../app/features/admin/ChallengeTestRuntimePanel.vue', import.meta.url),
 ).text()
-const page = await Bun.file(
+const page = await sourceFile(
   new URL('../app/pages/admin/challenges/[id].vue', import.meta.url),
 ).text()
 
@@ -20,7 +21,7 @@ describe('challenge template test runtime', () => {
   })
 
   test('shows access URLs, protected test Flag and every asynchronous state', () => {
-    expect(panel).toContain('<RuntimeAccessUrl')
+    expect(panel).toContain("<component :is=\"RuntimeAccessUrl\"")
     expect(panel).toContain('runtime.testFlag')
     expect(panel).toContain('navigator.clipboard.writeText')
     expect(panel).toContain('shouldContinuePolling(outcome)')
@@ -33,9 +34,9 @@ describe('challenge template test runtime', () => {
 
   test('runs only saved definitions and explains image-cache prewarming', () => {
     expect(page).toContain('const runtimeDefinitionDirty = computed(() => {')
-    expect(page).toContain('<ChallengeTestRuntimePanel')
+    expect(page).toContain("<component :is=\"ChallengeTestRuntimePanel\"")
     expect(page).toContain(':definition-dirty="runtimeDefinitionDirty"')
     expect(panel).toContain(':disabled="busy || definitionDirty"')
-    expect(panel).toContain('停止测试实例只清理容器与网络，不会主动删除 Runner 节点的镜像缓存。')
+    expect(panel).toContain("ui.stoppingATestInstanceRemovesItsContainerAndNetworkBut")
   })
 })

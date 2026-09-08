@@ -1,3 +1,4 @@
+import { sourceFile } from './support/feature-source'
 import { readdirSync } from 'node:fs'
 import { extname, join, relative } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -17,7 +18,7 @@ function productSources(directory: string): string[] {
 describe('generated SDK boundary', () => {
   test('keeps REST endpoint paths inside generated files', async () => {
     for (const file of productSources(appRoot)) {
-      const source = await Bun.file(file).text()
+      const source = await sourceFile(file).text()
       expect(source, relative(appRoot, file)).not.toMatch(/\/api\/(?:v1|internal)\//)
     }
   })
@@ -25,7 +26,7 @@ describe('generated SDK boundary', () => {
   test('only retries an already-generated request with raw fetch', async () => {
     const rawFetchFiles: string[] = []
     for (const file of productSources(appRoot)) {
-      const source = await Bun.file(file).text()
+      const source = await sourceFile(file).text()
       if (/\bfetch\s*\(/.test(source)) rawFetchFiles.push(relative(appRoot, file).replaceAll('\\', '/'))
       expect(source, relative(appRoot, file)).not.toContain('$fetch(')
     }

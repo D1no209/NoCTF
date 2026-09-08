@@ -1,10 +1,11 @@
+import { sourceFile } from './support/feature-source'
 import { describe, expect, test } from 'bun:test'
 import {
   avatarDrawMetrics,
   clampAvatarCropState,
   moveAvatarCrop,
   zoomAvatarCropAtPoint,
-} from '../app/components/account/avatar-crop'
+} from "../app/features/account/avatar-crop"
 
 describe('avatar crop geometry', () => {
   test('uses rotated dimensions for a quarter turn', () => {
@@ -54,12 +55,12 @@ describe('avatar crop geometry', () => {
 
 describe('account avatar integration', () => {
   test('selects the native file input by change event before opening the crop dialog', async () => {
-    const accountPage = await Bun.file(
+    const accountPage = await sourceFile(
       new URL('../app/pages/account/index.vue', import.meta.url),
     ).text()
 
     expect(accountPage).toContain('@change="selectAvatar"')
-    expect(accountPage).toContain('<AvatarCropDialog')
+    expect(accountPage).toContain("<component :is=\"AvatarCropDialog\"")
     expect(accountPage).toContain('@save="uploadAvatar"')
     expect(accountPage).not.toContain('<Input ref="avatarInput"')
   })

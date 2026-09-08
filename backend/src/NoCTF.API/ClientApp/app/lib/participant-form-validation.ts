@@ -10,9 +10,9 @@ export const maximumQuestionBodyLength = 4000
 export function validateAppealStatement(value: string): string | null {
   const length = value.trim().length
   if (length < minimumAppealStatementLength)
-    return translate('申诉陈述至少需要 {minimum} 个字符，当前为 {length} 个字符。', { minimum: minimumAppealStatementLength, length })
+    return translate("ui.theAppealStatementMustBeAtLeastCharactersItCurrently", { minimum: minimumAppealStatementLength, length })
   if (length > maximumAppealStatementLength)
-    return translate('申诉陈述不能超过 {maximum} 个字符。', { maximum: maximumAppealStatementLength })
+    return translate("ui.theAppealStatementCannotExceedCharacters", { maximum: maximumAppealStatementLength })
   return null
 }
 
@@ -27,19 +27,19 @@ export function validateCompetitionQuestionDraft(
   draft: CompetitionQuestionDraft,
 ): string | null {
   if (draft.requiresChallenge && !draft.challengeId)
-    return translate("题目相关咨询必须选择一个关联题目。")
+    return translate("ui.forTopicRelatedInquiriesYouMustSelectARelatedTopic")
 
   const titleLength = draft.title.trim().length
   if (titleLength < minimumQuestionTitleLength)
-    return translate('标题至少需要 {minimum} 个字符，当前为 {length} 个字符。', { minimum: minimumQuestionTitleLength, length: titleLength })
+    return translate("ui.theTitleMustBeAtLeastCharactersItCurrentlyHas", { minimum: minimumQuestionTitleLength, length: titleLength })
   if (titleLength > maximumQuestionTitleLength)
-    return translate('标题不能超过 {maximum} 个字符。', { maximum: maximumQuestionTitleLength })
+    return translate("ui.theTitleCannotExceedCharacters", { maximum: maximumQuestionTitleLength })
 
   const bodyLength = draft.body.trim().length
   if (bodyLength < minimumQuestionBodyLength)
-    return translate('内容至少需要 {minimum} 个字符，当前为 {length} 个字符。', { minimum: minimumQuestionBodyLength, length: bodyLength })
+    return translate("ui.theContentMustBeAtLeastCharactersItCurrentlyHas", { minimum: minimumQuestionBodyLength, length: bodyLength })
   if (bodyLength > maximumQuestionBodyLength)
-    return translate('内容不能超过 {maximum} 个字符。', { maximum: maximumQuestionBodyLength })
+    return translate("ui.theContentCannotExceedCharacters", { maximum: maximumQuestionBodyLength })
 
   return null
 }

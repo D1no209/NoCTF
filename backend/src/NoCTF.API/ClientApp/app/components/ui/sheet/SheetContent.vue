@@ -10,9 +10,9 @@ import {
   DialogPortal,
   useForwardPropsEmits,
 } from 'reka-ui'
-import { cn } from '@/lib/utils'
-import { Button } from '@/components/ui/button'
-import SheetOverlay from './SheetOverlay.vue'
+import { cn } from '~/lib/utils'
+import { Button } from '~/components/ui/button'
+import SheetOverlay from '~/components/ui/sheet/SheetOverlay.vue'
 
 interface SheetContentProps extends DialogContentProps {
   class?: HTMLAttributes['class']
@@ -51,9 +51,9 @@ const forwarded = useForwardPropsEmits(delegatedProps, emits)
         data-slot="sheet-close"
         as-child
       >
-        <Button variant="ghost" class="absolute top-3 right-3" size="icon-sm" :aria-label="$t('关闭')">
+        <Button variant="ghost" class="absolute top-3 right-3" size="icon-sm" :aria-label="$t('ui.close')">
           <XIcon aria-hidden="true" />
-          <span class="sr-only">{{ $t('关闭') }}</span>
+          <span class="sr-only">{{ $t('ui.close') }}</span>
         </Button>
       </DialogClose>
     </DialogContent>

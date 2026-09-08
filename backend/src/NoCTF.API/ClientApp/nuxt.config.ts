@@ -12,7 +12,8 @@ export default defineNuxtConfig({
     enabled: true,
   },
   css: ['~/assets/css/main.css'],
-  components: [{ path: '~/components', pathPrefix: false, extensions: ['vue'] }],
+  // Only shared primitives are auto-imported. Features explicitly compose views.
+  components: [{ path: '~/components/ui', pathPrefix: false, extensions: ['vue'] }],
   app: {
     head: {
       script: [

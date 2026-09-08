@@ -1,34 +1,35 @@
+import { sourceFile } from './support/feature-source'
 import { describe, expect, test } from 'bun:test'
 
 describe('AWDP participant panel', () => {
   test('separates team attack runtime from one-shot fix verification', async () => {
-    const source = await Bun.file(
-      new URL('../app/components/challenges/panels/AwdpPanel.vue', import.meta.url),
+    const source = await sourceFile(
+      new URL('../app/features/challenges/panels/AwdpPanel.vue', import.meta.url),
     ).text()
-    const types = await Bun.file(
+    const types = await sourceFile(
       new URL('../app/api/types.gen.ts', import.meta.url),
     ).text()
 
-    expect(source).toContain('攻击靶机 · Break 环境')
-    expect(source).toContain('防御轨 · Fix')
-    expect(source).toContain('<RuntimeCard')
+    expect(source).toContain("ui.attackTargetBreakEnvironment")
+    expect(source).toContain("ui.defenseFix")
+    expect(source).toContain("<component :is=\"RuntimeCard\"")
     expect(source).toContain(":controls=\"state?.breakActivation ? 'readonly' : 'full'\"")
-    expect(source).toContain('<FlagSubmit')
-    expect(source).toContain('<FixSubmit')
+    expect(source).toContain("<component :is=\"FlagSubmit\"")
+    expect(source).toContain("<component :is=\"FixSubmit\"")
     expect(source).toContain('state?.maximumFixAttempts !== null')
     expect(source).toContain('state.remainingFixAttempts ?? 0')
-    expect(source).toContain("$t('剩余 {count} 次提交'")
+    expect(source).toContain("$t('ui.submissionsRemaining'")
     expect(types).toContain('maximumFixAttempts?: number | null')
     expect(types).toContain('acceptedFixAttempts?: number')
     expect(types).toContain('remainingFixAttempts?: number | null')
-    expect(source).not.toContain('创建本队独立攻击实例')
-    expect(source).not.toContain('只执行一次 Checker')
+    expect(source).not.toContain("ui.createAnIsolatedAttackInstanceForYourTeamAndExploit")
+    expect(source).not.toContain("ui.defenseIsIndependentFromBreakThePlatformCreatesAFresh")
     expect(source).not.toContain('Fix 历史')
   })
 
   test('models defense as an explicit one-shot target with one upload', async () => {
-    const source = await Bun.file(
-      new URL('../app/components/challenges/FixSubmit.vue', import.meta.url),
+    const source = await sourceFile(
+      new URL('../app/features/challenges/FixSubmit.vue', import.meta.url),
     ).text()
 
     expect(source).toContain('requestAwdpDefenseTargetEndpoint')
@@ -37,94 +38,94 @@ describe('AWDP participant panel', () => {
     expect(source).toContain("props.defense?.runtimeState === 'Provisioning'")
     expect(source).toContain("props.defense?.runtimeState === 'Running'")
     expect(source).toContain('!props.defense.gameplayFactId')
-    expect(source).toContain('申请防御环境')
-    expect(source).toContain('上传本次 Fix 包')
-    expect(source).toContain('防御环境正在启动，可立即上传 Fix；环境就绪后将自动开始验证。')
-    expect(source).toContain('Fix 已上传，防御环境就绪后将自动开始验证…')
+    expect(source).toContain("ui.requestDefenseEnvironment")
+    expect(source).toContain("ui.uploadThisFixPackage")
+    expect(source).toContain("ui.theDefenseEnvironmentIsStartingYouCanUploadTheFix")
+    expect(source).toContain("ui.theFixHasBeenUploadedVerificationWillStartAutomaticallyWhen")
     expect(source).toContain('patchWaitingForTarget')
-    expect(source).toContain('正在验证本次 Fix')
-    expect(source).toContain('本次 Fix 验证已完成')
-    expect(source).not.toContain('创建干净验证环境')
-    expect(source).not.toContain('应用补丁')
-    expect(source).not.toContain('执行一次 Checker')
+    expect(source).toContain("ui.verifyingThisFix")
+    expect(source).toContain("ui.thisFixVerificationIsComplete")
+    expect(source).not.toContain("ui.provisionCleanVerificationTarget")
+    expect(source).not.toContain("ui.applyPatch")
+    expect(source).not.toContain("ui.runCheckerOnce")
     expect(source).not.toContain('submitFixEndpoint')
   })
 
   test('does not expose AWD service-state or hardening language', async () => {
-    const source = await Bun.file(
-      new URL('../app/components/challenges/panels/AwdpPanel.vue', import.meta.url),
+    const source = await sourceFile(
+      new URL('../app/features/challenges/panels/AwdpPanel.vue', import.meta.url),
     ).text()
 
     expect(source).not.toContain('硬化')
     expect(source).not.toContain('Hardening')
     expect(source).not.toContain('服务 Up')
     expect(source).not.toContain('服务 Down')
-    expect(source).not.toContain('轮换')
+    expect(source).not.toContain("ui.awdRuntimesMustUseRotatingFlags")
     expect(source).not.toContain('AwdRotation')
   })
 
   test('keeps participant-state failures visible and retryable', async () => {
-    const source = await Bun.file(
-      new URL('../app/components/challenges/panels/AwdpPanel.vue', import.meta.url),
+    const source = await sourceFile(
+      new URL('../app/features/challenges/panels/AwdpPanel.vue', import.meta.url),
     ).text()
 
     expect(source).toContain('stateError.value = parseApiError(error')
-    expect(source).toContain('加载 AWDP 题目状态失败')
+    expect(source).toContain("ui.failedToLoadTheAwdpChallengeState")
     expect(source).toContain('statePollingTimedOut')
     expect(source).toContain('@click="refreshAndPoll"')
   })
 
   test('locks scoring changes but keeps read-only Break validation after first success', async () => {
-    const source = await Bun.file(
-      new URL('../app/components/challenges/panels/AwdpPanel.vue', import.meta.url),
+    const source = await sourceFile(
+      new URL('../app/features/challenges/panels/AwdpPanel.vue', import.meta.url),
     ).text()
 
-    expect(source).toContain('<FlagSubmit')
-    expect(source).toContain(":title=\"state?.breakActivation ? $t('验证 Flag') : $t('提交 Flag')\"")
+    expect(source).toContain("<component :is=\"FlagSubmit\"")
+    expect(source).toContain(":title=\"state?.breakActivation ? $t('ui.checkFlag') : $t('ui.submitFlag')\"")
     expect(source).toContain(':read-only-judgement="!!state?.breakActivation"')
-    expect(source).not.toContain('攻击已锁定，后续 Flag 不再受理')
-    expect(source).not.toContain('后续 Flag 不再受理')
+    expect(source).not.toContain("ui.breakLockedFurtherFlagsAreNotAccepted")
+    expect(source).not.toContain("ui.breakLockedFurtherFlagsAreNotAccepted")
     expect(source).toContain('<Alert v-if="state?.fixActivation"')
-    expect(source).toContain('<FixSubmit')
-    expect(source).toContain('防御已锁定，无需再次申请防御验证')
-    expect(source).toContain('无需再次申请防御验证')
+    expect(source).toContain("<component :is=\"FixSubmit\"")
+    expect(source).toContain("ui.defenseLockedNoFurtherVerificationIsRequired")
+    expect(source).toContain("ui.defenseLockedNoFurtherVerificationIsRequired")
   })
 
   test('surfaces stable success-lock failures from generated SDK contracts', async () => {
-    const flag = await Bun.file(
-      new URL('../app/components/challenges/FlagSubmit.vue', import.meta.url),
+    const flag = await sourceFile(
+      new URL('../app/features/challenges/FlagSubmit.vue', import.meta.url),
     ).text()
-    const fix = await Bun.file(
-      new URL('../app/components/challenges/FixSubmit.vue', import.meta.url),
+    const fix = await sourceFile(
+      new URL('../app/features/challenges/FixSubmit.vue', import.meta.url),
     ).text()
 
     expect(flag).toContain('NoCtfapiEndpointsGameplayFactsGameplayFactAdmissionFailureCodeProtocol')
     expect(flag).toContain('judgeAwdpBreakFlag')
     expect(flag).toContain('readOnlyJudgement')
     expect(flag).toContain("code === 'AchievementAlreadySucceeded'")
-    expect(flag).toContain('本题攻击已成功，请使用验证模式确认 Flag 正误。')
-    expect(flag).toContain('Flag 正确；本次验证不产生任何比赛记录')
+    expect(flag).toContain("ui.breakHasAlreadySucceededUseVerificationModeToCheckWhether")
+    expect(flag).toContain("ui.flagIsCorrectThisCheckCreatesNoCompetitionRecords")
     expect(fix).toContain('DefenseAlreadySucceeded')
-    expect(fix).toContain('本题防御已成功，后续 Fix 不再受理。')
+    expect(fix).toContain("ui.fixHasAlreadySucceededFurtherFixAttemptsAreNotAccepted")
   })
 
   test('keeps challenge details in the workspace and removes the duplicate Fix history surface', async () => {
-    const challengePage = Bun.file(
+    const challengePage = sourceFile(
       new URL('../app/pages/competitions/[id]/challenges/[ccId]/index.vue', import.meta.url),
     )
-    const historyPage = Bun.file(
+    const historyPage = sourceFile(
       new URL('../app/pages/competitions/[id]/challenges/[ccId]/fix-history.vue', import.meta.url),
     )
-    const historyComponent = Bun.file(
+    const historyComponent = sourceFile(
       new URL('../app/components/challenges/AwdpFixHistory.vue', import.meta.url),
     )
-    const panel = await Bun.file(
-      new URL('../app/components/challenges/panels/AwdpPanel.vue', import.meta.url),
+    const panel = await sourceFile(
+      new URL('../app/features/challenges/panels/AwdpPanel.vue', import.meta.url),
     ).text()
-    const challengeDetail = await Bun.file(
-      new URL('../app/components/challenges/CompetitionChallengeDetail.vue', import.meta.url),
+    const challengeDetail = await sourceFile(
+      new URL('../app/features/challenges/CompetitionChallengeDetail.vue', import.meta.url),
     ).text()
-    const obsoleteNestedParent = Bun.file(
+    const obsoleteNestedParent = sourceFile(
       new URL('../app/pages/competitions/[id]/challenges/[ccId].vue', import.meta.url),
     )
 
@@ -134,33 +135,33 @@ describe('AWDP participant panel', () => {
     expect(await obsoleteNestedParent.exists()).toBe(false)
     expect(panel).not.toContain('<AwdpFixHistory')
     expect(panel).not.toContain('fixHistory')
-    expect(challengeDetail).toContain('<ChallengeSubmissionHistory')
+    expect(challengeDetail).toContain("<component :is=\"ChallengeSubmissionHistory\"")
   })
 
   test('labels the AWDP checker as a one-shot Fix verifier', async () => {
-    const source = await Bun.file(
-      new URL('../app/components/admin/DefinitionCheckerSection.vue', import.meta.url),
+    const source = await sourceFile(
+      new URL('../app/features/admin/DefinitionCheckerSection.vue', import.meta.url),
     ).text()
     const awdpBranch = source.slice(source.indexOf("v-else-if=\"mode === 'Awdp'\""))
 
-    expect(awdpBranch).toContain('Fix 一次性验证 Checker')
-    expect(awdpBranch).toContain('启用 Fix 一次性验证 Checker')
-    expect(awdpBranch).not.toContain('周期性服务检查')
-    expect(awdpBranch).not.toContain('服务健康检查')
+    expect(awdpBranch).toContain("ui.oneShotFixVerificationChecker")
+    expect(awdpBranch).toContain("ui.enableTheOneShotFixVerificationChecker")
+    expect(awdpBranch).not.toContain("ui.enablePeriodicServiceChecks")
+    expect(awdpBranch).not.toContain("ui.checkerServiceHealthCheck")
   })
 
   test('shows safe defense outcomes in the unified challenge history', async () => {
-    const panel = await Bun.file(
-      new URL('../app/components/challenges/panels/AwdpPanel.vue', import.meta.url),
+    const panel = await sourceFile(
+      new URL('../app/features/challenges/panels/AwdpPanel.vue', import.meta.url),
     ).text()
-    const history = await Bun.file(
-      new URL('../app/components/challenges/ChallengeSubmissionHistory.vue', import.meta.url),
+    const history = await sourceFile(
+      new URL('../app/features/challenges/ChallengeSubmissionHistory.vue', import.meta.url),
     ).text()
 
-    expect(panel).toContain('防御异常：EXP 利用成功')
-    expect(panel).toContain('防御异常：服务异常')
+    expect(panel).toContain("ui.defenseFailedExploitSucceeded")
+    expect(panel).toContain("ui.defenseFailedServiceAbnormal")
     expect(panel).not.toContain('防御未通过')
-    expect(panel).not.toContain('失败原因')
+    expect(panel).not.toContain("ui.failureReason")
     expect(history).toContain('listGameplayFactsEndpoint')
     expect(history).toContain('competitionChallengeId')
     expect(history).not.toContain('kind:')

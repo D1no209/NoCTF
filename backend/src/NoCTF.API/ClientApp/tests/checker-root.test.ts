@@ -1,3 +1,4 @@
+import { sourceFile } from './support/feature-source'
 import { describe, expect, test } from 'bun:test'
 import { emptyDefinition, emptyRunnerJob, parseDefinition, serializeDefinition } from '../app/utils/game-config'
 import { validateChallengeTemplateDraft } from '../app/lib/challenge-template-validation'
@@ -21,7 +22,7 @@ describe('Checker root permission', () => {
       const model = emptyDefinition(mode)
       model.checkerAllowRoot = true
       expect(validateChallengeTemplateDraft({ mode, title: 'Test', direction: 'Pwn', definitionJson: serializeDefinition(mode, model) }))
-        .toContain('允许 Checker 以 root 运行前必须启用 Checker')
+        .toContain("允许 Checker 以 root 运行前必须启用 Checker")
     })
   }
 
@@ -35,7 +36,7 @@ describe('Checker root permission', () => {
   })
 
   test('the setting is labeled, disabled for read-only users, and cleared when Checker is disabled', async () => {
-    const source = await Bun.file(new URL('../app/components/admin/DefinitionCheckerSection.vue', import.meta.url)).text()
+    const source = await sourceFile(new URL('../app/features/admin/DefinitionCheckerSection.vue', import.meta.url)).text()
     expect(source).toContain('v-model="model.checkerAllowRoot" :disabled="disabled"')
     expect(source).toContain('for="def-checker-allow-root"')
     expect(source.match(/if \(!enabled\) props.model.checkerAllowRoot = false/g)).toHaveLength(2)

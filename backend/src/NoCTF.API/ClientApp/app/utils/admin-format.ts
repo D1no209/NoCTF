@@ -26,37 +26,37 @@ export const GameModeLabel = {
 } satisfies Record<NoCtfapiEndpointsCompetitionsGameModeProtocol, string>
 
 export const CompetitionStatusLabel = {
-  Draft: '草稿', Visible: '可见', Published: '已发布', Running: '进行中', Paused: '已暂停', Finished: '已结束',
+  Draft: "ui.draft", Visible: "ui.visible", Published: "ui.published", Running: "ui.running", Paused: "ui.suspended", Finished: "ui.finished",
 } satisfies Record<NoCtfapiEndpointsCompetitionsCompetitionStatusProtocol, string>
 
 export const TeamRegistrationStatusLabel = {
-  Pending: '待审批', Approved: '已通过', Rejected: '已拒绝',
+  Pending: "ui.pendingApproval", Approved: "ui.passed", Rejected: "ui.rejected",
 } satisfies Record<NoCtfapiEndpointsTeamsTeamRegistrationStatusProtocol, string>
 
 export const TeamBanSourceLabel = {
-  ManualModeration: '人工封禁', CheatIncident: '作弊事件',
+  ManualModeration: "ui.manualBan", CheatIncident: "ui.cheatIncident",
 } satisfies Record<NoCtfapiEndpointsTeamsTeamBanSourceProtocol, string>
 
 export const TeamBanAppealStatusLabel = {
-  Submitted: '待裁决', Upheld: '已维持', Accepted: '已接受',
+  Submitted: "ui.pendingDecision", Upheld: "ui.maintained", Accepted: "ui.accepted",
 } satisfies Record<NoCtfapiEndpointsTeamsTeamBanAppealStatusProtocol, string>
 
 export const GameplayFactKindLabel = {
-  FlagAttempt: 'Flag', BreakAttempt: 'Break', FixAttempt: 'Fix', HintUnlock: '提示解锁',
-  ManualAdjustment: '人工调分', AwdServiceTransition: 'AWD 服务状态', KohControlObservation: 'KoH 控制观测',
+  FlagAttempt: 'Flag', BreakAttempt: 'Break', FixAttempt: 'Fix', HintUnlock: "ui.promptToUnlock",
+  ManualAdjustment: "ui.manualAdjustment", AwdServiceTransition: "ui.awdServiceStatus", KohControlObservation: "ui.kohControlObservation",
 } satisfies Record<NoCtfapiEndpointsGameplayFactsGameplayFactKindProtocol, string>
 
 export const GameplayFactStateLabel = {
-  Pending: '待处理', Queued: '排队中', Processing: '评测中', Completed: '已完成', PlatformFailed: '平台失败',
+  Pending: "ui.pending", Queued: "ui.queuing", Processing: "ui.underEvaluation", Completed: "ui.completed", PlatformFailed: "ui.platformFailed",
 } satisfies Record<NoCtfapiEndpointsGameplayFactsGameplayFactStateProtocol, string>
 
 export const GameplayFactResultLabel = {
-  Correct: '正确', Wrong: '错误', Duplicate: '重复', AttemptsExhausted: '次数耗尽', Rejected: '已拒绝',
-  Unlocked: '已解锁', Applied: '已应用', ServiceUp: '服务正常', ServiceDown: '服务异常', Controlled: '已控制', Uncontrolled: '未控制',
+  Correct: "ui.correct", Wrong: "ui.wrong", Duplicate: "ui.repeat", AttemptsExhausted: "ui.exhausted", Rejected: "ui.rejected",
+  Unlocked: "ui.unlocked", Applied: "ui.applied", ServiceUp: "ui.serviceIsNormal", ServiceDown: "ui.serviceException", Controlled: "ui.controlled", Uncontrolled: "ui.uncontrolled",
 } satisfies Record<NoCtfapiEndpointsGameplayFactsGameplayFactResultProtocol, string>
 
 export const RuntimeKindLabel = {
-  Container: '容器', Compose: 'Compose', OvaVm: '虚拟机',
+  Container: "ui.container", Compose: 'Compose', OvaVm: "ui.virtualMachine",
 } satisfies Record<NoCtfapiEndpointsRuntimeRuntimeKindProtocol, string>
 
 export const RuntimeProviderLabel = {
@@ -64,29 +64,29 @@ export const RuntimeProviderLabel = {
 } satisfies Record<NoCtfapiEndpointsRuntimeRuntimeProviderProtocol, string>
 
 export const RuntimeStateLabel = {
-  Queued: '排队中', Provisioning: '准备中', Running: '运行中', Stopping: '停止中', Stopped: '已停止', Failed: '失败',
+  Queued: "ui.queuing", Provisioning: "ui.inPreparation", Running: "ui.running2", Stopping: "ui.stopping", Stopped: "ui.stopped", Failed: "ui.failed",
 } satisfies Record<NoCtfapiEndpointsRuntimeRuntimeStateProtocol, string>
 
 export const RuntimeFailureCodeLabel = {
-  InvalidConfiguration: '运行配置无效',
-  RunnerUnavailable: 'Runner 不可用',
-  ProviderUnavailable: '运行提供方不可用',
-  ProvisionTimeout: '创建环境超时',
-  ProviderRejected: '运行提供方拒绝请求',
-  CleanupFailed: '资源清理失败',
-  UrlExpansionFailed: '访问地址生成失败',
+  InvalidConfiguration: "ui.invalidRuntimeConfiguration",
+  RunnerUnavailable: "ui.runnerUnavailable",
+  ProviderUnavailable: "ui.runtimeProviderUnavailable",
+  ProvisionTimeout: "ui.runtimeProvisioningTimedOut",
+  ProviderRejected: "ui.runtimeProviderRejectedTheRequest",
+  CleanupFailed: "ui.resourceCleanupFailed",
+  UrlExpansionFailed: "ui.accessUrlExpansionFailed",
 } satisfies Record<NoCtfapiEndpointsRuntimeRuntimeFailureCodeProtocol, string>
 
 export const CheatIncidentStatusLabel = {
-  Pending: '待处理', Confirmed: '已确认', Dismissed: '已驳回', Superseded: '已取代', Corrected: '已纠正',
+  Pending: "ui.pending", Confirmed: "ui.confirmed", Dismissed: "ui.dismissed", Superseded: "ui.superseded", Corrected: "ui.corrected",
 } satisfies Record<NoCtfapiEndpointsAdministrationCheatIncidentsCheatIncidentStatusProtocol, string>
 
 export const LeaderboardVisibilityLabel = {
-  Normal: '正常', Frozen: '冻结', Blackout: '遮蔽',
+  Normal: "ui.normal", Frozen: "ui.freeze", Blackout: "ui.cover2",
 } satisfies Record<NoCtfapiEndpointsCompetitionsLeaderboardVisibilityProtocol, string>
 
 export const SpecificationKindLabel = {
-  Attachment: '附件', AwdRound: 'AWD 轮次', RuntimeDefinition: '运行时定义', RuntimeInstance: 'Runtime 实例', Hint: '提示',
+  Attachment: "ui.accessories", AwdRound: "ui.awdRounds", RuntimeDefinition: "ui.runtimeDefinition", RuntimeInstance: "ui.runtime2", Hint: "ui.hint",
 } satisfies Record<NoCtfapiEndpointsAdministrationChallengeBankSpecificationKindProtocol, string>
 
 export function enumLabel<T extends string>(

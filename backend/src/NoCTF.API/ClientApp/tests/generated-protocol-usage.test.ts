@@ -1,8 +1,9 @@
+import { sourceFile } from './support/feature-source'
 import { describe, expect, test } from 'bun:test'
 
 describe('generated protocol usage', () => {
   test('does not mirror the generated account role as a runtime enum', async () => {
-    const source = await Bun.file(new URL('../app/composables/useAuth.ts', import.meta.url)).text()
+    const source = await sourceFile(new URL('../app/composables/useAuth.ts', import.meta.url)).text()
 
     expect(source).not.toContain('export const UserRole')
     expect(source).toContain("user.value?.role === 'Administrator'")
@@ -10,8 +11,8 @@ describe('generated protocol usage', () => {
   })
 
   test('does not mirror generated competition, team, runtime, or gameplay enums', async () => {
-    const labels = await Bun.file(new URL('../app/utils/labels.ts', import.meta.url)).text()
-    const gameConfig = await Bun.file(new URL('../app/utils/game-config.ts', import.meta.url)).text()
+    const labels = await sourceFile(new URL('../app/utils/labels.ts', import.meta.url)).text()
+    const gameConfig = await sourceFile(new URL('../app/utils/game-config.ts', import.meta.url)).text()
 
     for (const name of [
       'GameMode',
@@ -31,7 +32,7 @@ describe('generated protocol usage', () => {
   })
 
   test('uses the generated competition administration role', async () => {
-    const source = await Bun.file(new URL('../app/lib/admin-competition.ts', import.meta.url)).text()
+    const source = await sourceFile(new URL('../app/lib/admin-competition.ts', import.meta.url)).text()
 
     expect(source).toContain(
       'export type CompetitionAdminRole = NoCtfapiEndpointsCompetitionsCompetitionAdministrationRoleProtocol',
@@ -40,7 +41,7 @@ describe('generated protocol usage', () => {
   })
 
   test('constrains admin label maps to generated protocol unions', async () => {
-    const source = await Bun.file(new URL('../app/utils/admin-format.ts', import.meta.url)).text()
+    const source = await sourceFile(new URL('../app/utils/admin-format.ts', import.meta.url)).text()
 
     expect(source).not.toContain('Record<string, string> =')
     expect(source).toContain(
@@ -52,9 +53,9 @@ describe('generated protocol usage', () => {
   })
 
   test('uses generated protocol types in the strongly typed hub contract', async () => {
-    const hub = await Bun.file(new URL('../app/composables/useCompetitionHub.ts', import.meta.url)).text()
-    const flagSubmit = await Bun.file(new URL('../app/components/challenges/FlagSubmit.vue', import.meta.url)).text()
-    const fixSubmit = await Bun.file(new URL('../app/components/challenges/FixSubmit.vue', import.meta.url)).text()
+    const hub = await sourceFile(new URL('../app/composables/useCompetitionHub.ts', import.meta.url)).text()
+    const flagSubmit = await sourceFile(new URL('../app/features/challenges/FlagSubmit.vue', import.meta.url)).text()
+    const fixSubmit = await sourceFile(new URL('../app/features/challenges/FixSubmit.vue', import.meta.url)).text()
 
     expect(hub).toContain("competitionHubString(payload, 'competitionId')")
     expect(hub).toContain('export interface CompetitionHubClientEvents')

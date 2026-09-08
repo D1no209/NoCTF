@@ -1,8 +1,9 @@
+import { sourceFile } from './support/feature-source'
 import { describe, expect, test } from 'bun:test'
 
 describe('competition countdown', () => {
   test('refreshes the overview countdown every second and disposes its timer', async () => {
-    const source = (await Bun.file(
+    const source = (await sourceFile(
       new URL('../app/pages/competitions/[id]/index.vue', import.meta.url),
     ).text()).replaceAll('\r\n', '\n')
 

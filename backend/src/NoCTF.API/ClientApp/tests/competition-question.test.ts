@@ -1,3 +1,5 @@
+import { translate } from '../app/utils/i18n'
+import { sourceFile } from './support/feature-source'
 import { describe, expect, test } from 'bun:test'
 import type {
   NoCtfapiEndpointsChallengesQuestionsCompetitionQuestionFailureCode,
@@ -44,11 +46,11 @@ describe('competition question errors', () => {
 
 describe('competition question presentation state', () => {
   test('distinguishes every participant and handler role', () => {
-    expect(competitionQuestionRoleLabel.Participant).toBe('选手')
-    expect(competitionQuestionRoleLabel.Judge).toBe('裁判')
-    expect(competitionQuestionRoleLabel.ChallengeOwner).toBe('题目所有者')
-    expect(competitionQuestionRoleLabel.CompetitionManager).toBe('比赛管理员')
-    expect(competitionQuestionRoleLabel.PlatformAdministrator).toBe('平台管理员')
+    expect(translate(competitionQuestionRoleLabel.Participant)).toBe('选手')
+    expect(translate(competitionQuestionRoleLabel.Judge)).toBe('裁判')
+    expect(translate(competitionQuestionRoleLabel.ChallengeOwner)).toBe('题目所有者')
+    expect(translate(competitionQuestionRoleLabel.CompetitionManager)).toBe('比赛管理员')
+    expect(translate(competitionQuestionRoleLabel.PlatformAdministrator)).toBe('平台管理员')
   })
 
   test('marks a thread unread when its immutable activity timestamp advances', () => {
@@ -131,12 +133,12 @@ describe('competition question cursor collection', () => {
 
 describe('competition question page wiring', () => {
   test('keeps failed drafts and guards duplicate reply submissions', async () => {
-    const page = await Bun.file(
+    const page = await sourceFile(
       new URL('../app/pages/competitions/[id]/questions.vue', import.meta.url),
     ).text()
 
     expect(page).toContain('if (replyPending.value || !reply.value.trim() || !detail.value?.canReply) return')
-    expect(page).toContain('competitionQuestionErrorMessage(error, translate("发送失败"))')
+    expect(page).toContain("competitionQuestionErrorMessage(error, translate(\"ui.sendingFailed\"))")
     expect(page).toContain('finally {')
     expect(page).toContain('replyPending.value = false')
     expect(page).toContain('applyDetailQuestion(data)')
@@ -145,7 +147,7 @@ describe('competition question page wiring', () => {
   })
 
   test('uses generated signed cursors and exposes load-more without truncating older threads', async () => {
-    const page = await Bun.file(
+    const page = await sourceFile(
       new URL('../app/pages/competitions/[id]/questions.vue', import.meta.url),
     ).text()
 
@@ -162,7 +164,7 @@ describe('competition question page wiring', () => {
   })
 
   test('keeps the thread list narrow and gives the conversation the remaining width', async () => {
-    const page = await Bun.file(
+    const page = await sourceFile(
       new URL('../app/pages/competitions/[id]/questions.vue', import.meta.url),
     ).text()
 

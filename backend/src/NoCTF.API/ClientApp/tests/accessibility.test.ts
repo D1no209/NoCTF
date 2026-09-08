@@ -1,7 +1,8 @@
+import { sourceFile } from './support/feature-source'
 import { describe, expect, test } from 'bun:test'
 
 async function source(path: string) {
-  return Bun.file(new URL(path, import.meta.url)).text()
+  return sourceFile(new URL(path, import.meta.url)).text()
 }
 
 describe('keyboard and icon accessibility', () => {
@@ -19,7 +20,7 @@ describe('keyboard and icon accessibility', () => {
     }
 
     const leaderboard = await source('../app/pages/competitions/[id]/leaderboard.vue')
-    expect(leaderboard).toContain('<button')
+    expect(leaderboard).toContain("<ActionButton")
     expect(leaderboard).toContain('type="button"')
     expect(leaderboard).toContain('@click="openDetail(team, column)"')
     expect(leaderboard).toContain('focus-visible:ring-2')
@@ -29,7 +30,7 @@ describe('keyboard and icon accessibility', () => {
     const dialog = await source('../app/components/ui/dialog/DialogContent.vue')
     const sheet = await source('../app/components/ui/sheet/SheetContent.vue')
 
-    expect(dialog).toContain(':aria-label="$t(\'关闭\')"')
-    expect(sheet).toContain(':aria-label="$t(\'关闭\')"')
+    expect(dialog).toContain(":aria-label=\"$t('ui.close')\"")
+    expect(sheet).toContain(":aria-label=\"$t('ui.close')\"")
   })
 })

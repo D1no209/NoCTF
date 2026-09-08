@@ -61,4 +61,4 @@
 ## Frontend (ClientApp)
 
 - The SPA lives in `backend/src/NoCTF.API/ClientApp` (Nuxt 4, Bun, `ssr: false`). See `ClientApp/AGENTS.md` for the conventions.
-- It is currently a minimal skeleton without a UI framework, pages, or an API SDK; frontend features are rebuilt on top of this base as needed.
+- The frontend separates feature controllers/composition (`features/`), rendering views (`components/views/`), shared UI primitives (`components/ui/`), and stable bilingual catalogs (`locales/`). Pages and layouts are thin feature entry points. Follow `ClientApp/AGENTS.md` and run its architecture audit when changing frontend code.

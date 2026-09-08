@@ -1,3 +1,4 @@
+import { sourceFile } from './support/feature-source'
 import { describe, expect, test } from 'bun:test'
 import {
   defaultCheatIncidentQueryRange,
@@ -50,12 +51,12 @@ describe('cheat incident query range', () => {
 
 describe('cheat incident filter wiring', () => {
   test('defaults status to all and uses frozen applied filters for the SDK query', async () => {
-    const page = await Bun.file(
+    const page = await sourceFile(
       new URL('../app/pages/admin/competitions/[id]/cheats.vue', import.meta.url),
     ).text()
 
     expect(page).toContain("const filterStatus = ref<CheatIncidentStatusFilter>('All')")
-    expect(page).toContain('<SelectItem value="All">{{ $t(\'全部\') }}</SelectItem>')
+    expect(page).toContain("<SelectItem value=\"All\">{{ $t('ui.all') }}</SelectItem>")
     expect(page).toContain("status: appliedStatus.value === 'All' ? null : appliedStatus.value")
     expect(page).toContain('from: appliedRange.value.from')
     expect(page).toContain('to: appliedRange.value.to')

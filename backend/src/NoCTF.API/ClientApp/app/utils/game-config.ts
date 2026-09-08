@@ -39,29 +39,29 @@ export const ScoreDecayMode = {
 export const EvaluationDispatch = { Automatic: 0, ManualBatch: 1 } as const
 
 export const ATTACK_REWARD_MODES = [
-  { value: 'FixedPerAttack', label: '每次攻击固定得分' },
-  { value: 'SplitVictimDefensePool', label: '瓜分受害方防御分池' },
+  { value: 'FixedPerAttack', label: "ui.fixedScoreForEachAttack" },
+  { value: 'SplitVictimDefensePool', label: "ui.divideTheVictimDefensePool" },
 ] as const
 
 export const BLOOD_REWARD_POLICIES = [
-  { value: BloodRewardPolicy.FixedPoints, label: '固定分值' },
-  { value: BloodRewardPolicy.InitialPointsPercentage, label: '初始分百分比' },
-  { value: BloodRewardPolicy.SolveTimePointsPercentage, label: '解题时分值百分比' },
-  { value: BloodRewardPolicy.CurrentPointsPercentage, label: '当前分值百分比' },
+  { value: BloodRewardPolicy.FixedPoints, label: "ui.fixedPoints" },
+  { value: BloodRewardPolicy.InitialPointsPercentage, label: "ui.initialScorePercentage" },
+  { value: BloodRewardPolicy.SolveTimePointsPercentage, label: "ui.problemSolvingTimeScoreValuePercentage" },
+  { value: BloodRewardPolicy.CurrentPointsPercentage, label: "ui.currentScorePercentage" },
 ] as const
 
 export const SCORE_DECAY_MODES = [
-  { value: ScoreDecayMode.Fixed, label: '固定分值' },
-  { value: ScoreDecayMode.Linear, label: '线性衰减' },
-  { value: ScoreDecayMode.Quadratic, label: '二次衰减' },
-  { value: ScoreDecayMode.Exponential, label: '指数衰减' },
-  { value: ScoreDecayMode.Logarithmic, label: '对数衰减' },
-  { value: ScoreDecayMode.Custom, label: '自定义公式' },
+  { value: ScoreDecayMode.Fixed, label: "ui.fixedPoints" },
+  { value: ScoreDecayMode.Linear, label: "ui.linearDecay" },
+  { value: ScoreDecayMode.Quadratic, label: "ui.quadraticDecay" },
+  { value: ScoreDecayMode.Exponential, label: "ui.exponentialDecay" },
+  { value: ScoreDecayMode.Logarithmic, label: "ui.logarithmicDecay" },
+  { value: ScoreDecayMode.Custom, label: "ui.customFormula" },
 ] as const
 
 export const EVALUATION_DISPATCH_MODES = [
-  { value: EvaluationDispatch.Automatic, label: '自动评测' },
-  { value: EvaluationDispatch.ManualBatch, label: '手动批量评测' },
+  { value: EvaluationDispatch.Automatic, label: "ui.automaticAssessment" },
+  { value: EvaluationDispatch.ManualBatch, label: "ui.manualBatchEvaluation" },
 ] as const
 
 // ---------- 题目模板 Definition 模型 ----------
@@ -732,41 +732,41 @@ export function competitionConfigFields(mode: GameModeValue): ConfigFieldDef[] {
   switch (mode) {
     case 'Ctf':
       return [
-        { key: 'defaultScoreCurve', label: translate("默认分值曲线"), type: 'pointsCurve', defaultValue: POINTS_CURVE_DEFAULT, description: translate("未单独设置规则的题目继承此衰减曲线") },
-        { key: 'bloodRewards', label: translate("血榜奖励"), type: 'bloodRewards', defaultValue: [], description: translate("前三个解题队伍的额外奖励,最多 3 条") },
-        { key: 'wrongSubmissionPenalty', label: translate("错误提交扣分"), type: 'int', min: 0, defaultValue: 0 },
-        { key: 'flagTemplate', label: translate("动态 Flag 模板"), type: 'flagTemplate', description: translate("仅用于系统今后生成的每队容器 Flag；手工或静态 Flag 不受影响") },
+        { key: 'defaultScoreCurve', label: translate("ui.defaultScoreCurve"), type: 'pointsCurve', defaultValue: POINTS_CURVE_DEFAULT, description: translate("ui.challengesWithoutAnOverrideInheritThisDecayCurve") },
+        { key: 'bloodRewards', label: translate("ui.bloodListReward"), type: 'bloodRewards', defaultValue: [], description: translate("ui.additionalRewardsForTheFirstThreeProblemSolvingTeamsUp") },
+        { key: 'wrongSubmissionPenalty', label: translate("ui.pointsDeductedForIncorrectSubmission"), type: 'int', min: 0, defaultValue: 0 },
+        { key: 'flagTemplate', label: translate("ui.dynamicFlagTemplate"), type: 'flagTemplate', description: translate("ui.onlyUsedForEachFleetOfContainerFlagsGeneratedBy") },
       ]
     case 'Awd':
       return [
-        { key: 'hardeningDurationSeconds', label: translate("加固阶段时长(秒)"), type: 'int', min: 0, defaultValue: 0, description: translate("开赛后的加固时间,期间不开放攻击") },
-        { key: 'roundDurationSeconds', label: translate("轮次时长(秒)"), type: 'int', min: 1, defaultValue: 300 },
-        { key: 'attackRewardMode', label: translate("攻击得分方式"), type: 'select', options: ATTACK_REWARD_MODES, defaultValue: 'FixedPerAttack' },
-        { key: 'attackPoints', label: translate("每次攻击得分"), type: 'int', min: 0, defaultValue: 50 },
-        { key: 'victimDefensePoolPoints', label: translate("受害方防御分池"), type: 'int', min: 0, defaultValue: 100 },
-        { key: 'checkerIntervalSeconds', label: translate("检查间隔(秒)"), type: 'int', min: 1, defaultValue: 30 },
-        { key: 'serviceHealthyPoints', label: translate("服务正常得分"), type: 'int', min: 0, defaultValue: 100 },
-        { key: 'serviceUnhealthyPenalty', label: translate("服务异常扣分"), type: 'int', min: 0, defaultValue: 50 },
-        { key: 'flagTemplate', label: translate("队伍 Flag 模板"), type: 'flagTemplate', description: translate("可选;用于生成每队每轮的 Flag") },
+        { key: 'hardeningDurationSeconds', label: translate("ui.reinforcementPhaseDurationSeconds"), type: 'int', min: 0, defaultValue: 0, description: translate("ui.reinforcementTimeAfterTheStartOfTheGameDuringWhich") },
+        { key: 'roundDurationSeconds', label: translate("ui.roundDurationSeconds"), type: 'int', min: 1, defaultValue: 300 },
+        { key: 'attackRewardMode', label: translate("ui.attackScoringMethod"), type: 'select', options: ATTACK_REWARD_MODES, defaultValue: 'FixedPerAttack' },
+        { key: 'attackPoints', label: translate("ui.scorePerAttack"), type: 'int', min: 0, defaultValue: 50 },
+        { key: 'victimDefensePoolPoints', label: translate("ui.victimDefensePool"), type: 'int', min: 0, defaultValue: 100 },
+        { key: 'checkerIntervalSeconds', label: translate("ui.checkIntervalSeconds"), type: 'int', min: 1, defaultValue: 30 },
+        { key: 'serviceHealthyPoints', label: translate("ui.serviceNormalScore"), type: 'int', min: 0, defaultValue: 100 },
+        { key: 'serviceUnhealthyPenalty', label: translate("ui.pointsDeductedForAbnormalService"), type: 'int', min: 0, defaultValue: 50 },
+        { key: 'flagTemplate', label: translate("ui.teamFlagTemplate"), type: 'flagTemplate', description: translate("ui.optionalUsedToGenerateFlagsForEachTeamForEach") },
       ]
     case 'Awdp':
       return [
-        { key: 'roundDurationSeconds', label: translate("轮次时长(秒)"), type: 'int', min: 1, defaultValue: 300 },
-        { key: 'break', label: translate("Break 分值曲线"), type: 'pointsCurve', defaultValue: POINTS_CURVE_DEFAULT, description: translate("每轮按本轮成功攻击队伍数独立结算") },
-        { key: 'fix', label: translate("Fix 分值曲线"), type: 'pointsCurve', defaultValue: POINTS_CURVE_DEFAULT, description: translate("每轮按本轮成功修复队伍数独立结算") },
-        { key: 'requireBreakBeforeFix', label: translate("Fix 前必须先完成 Break"), type: 'bool', defaultValue: false },
-        { key: 'maxBreakSubmissions', label: translate("Break 提交次数上限"), type: 'int', min: 1, defaultValue: 10 },
-        { key: 'maxFixSubmissions', label: translate("Fix 提交次数上限"), type: 'int', min: 1, defaultValue: 10 },
-        { key: 'flagWrongPenalty', label: translate("Flag 错误扣分"), type: 'int', min: 0, defaultValue: 0 },
-        { key: 'exploitSucceededPenalty', label: translate("EXP 成功扣分"), type: 'int', min: 0, defaultValue: 0 },
-        { key: 'serviceAbnormalPenalty', label: translate("服务异常扣分"), type: 'int', min: 0, defaultValue: 0 },
-        { key: 'evaluationDispatchMode', label: translate("评测调度方式"), type: 'select', options: EVALUATION_DISPATCH_MODES, defaultValue: EvaluationDispatch.Automatic },
-        { key: 'flagTemplate', label: translate("Break Flag 模板"), type: 'flagTemplate', description: translate("可选;用于生成每队攻击实例的动态 Flag") },
+        { key: 'roundDurationSeconds', label: translate("ui.roundDurationSeconds"), type: 'int', min: 1, defaultValue: 300 },
+        { key: 'break', label: translate("ui.breakScoreCurve"), type: 'pointsCurve', defaultValue: POINTS_CURVE_DEFAULT, description: translate("ui.settleEachRoundIndependentlyFromThatRoundSSuccessfulAttacking") },
+        { key: 'fix', label: translate("ui.fixScoreCurve"), type: 'pointsCurve', defaultValue: POINTS_CURVE_DEFAULT, description: translate("ui.settleEachRoundIndependentlyFromThatRoundSSuccessfulFixing") },
+        { key: 'requireBreakBeforeFix', label: translate("ui.requireBreakBeforeFix"), type: 'bool', defaultValue: false },
+        { key: 'maxBreakSubmissions', label: translate("ui.breakMaximumNumberOfSubmissions"), type: 'int', min: 1, defaultValue: 10 },
+        { key: 'maxFixSubmissions', label: translate("ui.fixMaximumNumberOfSubmissions"), type: 'int', min: 1, defaultValue: 10 },
+        { key: 'flagWrongPenalty', label: translate("ui.wrongFlagPenalty"), type: 'int', min: 0, defaultValue: 0 },
+        { key: 'exploitSucceededPenalty', label: translate("ui.exploitSuccessPenalty"), type: 'int', min: 0, defaultValue: 0 },
+        { key: 'serviceAbnormalPenalty', label: translate("ui.pointsDeductedForAbnormalService"), type: 'int', min: 0, defaultValue: 0 },
+        { key: 'evaluationDispatchMode', label: translate("ui.evaluationSchedulingMethod"), type: 'select', options: EVALUATION_DISPATCH_MODES, defaultValue: EvaluationDispatch.Automatic },
+        { key: 'flagTemplate', label: translate("ui.breakFlagTemplate"), type: 'flagTemplate', description: translate("ui.optionalUsedToGenerateDynamicFlagsForEachTeamS") },
       ]
     case 'Koh':
       return [
-        { key: 'pollIntervalSeconds', label: translate("控制检查间隔(秒)"), type: 'int', min: 1, defaultValue: 5 },
-        { key: 'controlPointsPerInterval', label: translate("每间隔控制得分"), type: 'int', min: 0, defaultValue: 10 },
+        { key: 'pollIntervalSeconds', label: translate("ui.controlCheckIntervalSeconds"), type: 'int', min: 1, defaultValue: 5 },
+        { key: 'controlPointsPerInterval', label: translate("ui.controlScorePerInterval"), type: 'int', min: 0, defaultValue: 10 },
       ]
   }
 }
@@ -776,39 +776,39 @@ export function challengeRuleFields(mode: GameModeValue): ConfigFieldDef[] {
   switch (mode) {
     case 'Ctf':
       return [
-        { key: 'scoreCurve', label: translate("分值曲线"), type: 'pointsCurve' },
-        { key: 'bloodRewards', label: translate("血榜奖励"), type: 'bloodRewards', description: translate("最多 3 条") },
-        { key: 'maxFlagAttempts', label: translate("Flag 提交次数上限"), type: 'int', min: 1 },
-        { key: 'wrongSubmissionPenalty', label: translate("错误提交扣分"), type: 'int', min: 0 },
-        { key: 'flagTemplate', label: translate("动态 Flag 模板"), type: 'flagTemplate', description: translate("仅用于本场比赛该题目今后生成的每队容器 Flag；未覆盖时继承竞赛默认") },
+        { key: 'scoreCurve', label: translate("ui.scoreCurve"), type: 'pointsCurve' },
+        { key: 'bloodRewards', label: translate("ui.bloodListReward"), type: 'bloodRewards', description: translate("ui.upTo3Items") },
+        { key: 'maxFlagAttempts', label: translate("ui.flagMaximumNumberOfSubmissions"), type: 'int', min: 1 },
+        { key: 'wrongSubmissionPenalty', label: translate("ui.pointsDeductedForIncorrectSubmission"), type: 'int', min: 0 },
+        { key: 'flagTemplate', label: translate("ui.dynamicFlagTemplate"), type: 'flagTemplate', description: translate("ui.usedOnlyForFuturePerTeamRuntimeFlagsGeneratedFor") },
       ]
     case 'Awd':
       return [
-        { key: 'attackRewardMode', label: translate("攻击得分方式"), type: 'select', options: ATTACK_REWARD_MODES },
-        { key: 'attackPoints', label: translate("每次攻击得分"), type: 'int', min: 0 },
-        { key: 'victimDefensePoolPoints', label: translate("受害方防御分池"), type: 'int', min: 0 },
-        { key: 'checkerIntervalSeconds', label: translate("检查间隔(秒)"), type: 'int', min: 1 },
-        { key: 'serviceHealthyPoints', label: translate("服务正常得分"), type: 'int', min: 0 },
-        { key: 'serviceUnhealthyPenalty', label: translate("服务异常扣分"), type: 'int', min: 0 },
-        { key: 'flagTemplate', label: translate("队伍 Flag 模板"), type: 'flagTemplate', description: translate("仅用于本场比赛该题目今后生成的每队每轮 Flag；未覆盖时继承竞赛默认") },
+        { key: 'attackRewardMode', label: translate("ui.attackScoringMethod"), type: 'select', options: ATTACK_REWARD_MODES },
+        { key: 'attackPoints', label: translate("ui.scorePerAttack"), type: 'int', min: 0 },
+        { key: 'victimDefensePoolPoints', label: translate("ui.victimDefensePool"), type: 'int', min: 0 },
+        { key: 'checkerIntervalSeconds', label: translate("ui.checkIntervalSeconds"), type: 'int', min: 1 },
+        { key: 'serviceHealthyPoints', label: translate("ui.serviceNormalScore"), type: 'int', min: 0 },
+        { key: 'serviceUnhealthyPenalty', label: translate("ui.pointsDeductedForAbnormalService"), type: 'int', min: 0 },
+        { key: 'flagTemplate', label: translate("ui.teamFlagTemplate"), type: 'flagTemplate', description: translate("ui.usedOnlyForFuturePerTeamPerRoundFlagsGenerated") },
       ]
     case 'Awdp':
       return [
-        { key: 'break', label: translate("Break 分值曲线"), type: 'pointsCurve' },
-        { key: 'fix', label: translate("Fix 分值曲线"), type: 'pointsCurve' },
-        { key: 'requireBreakBeforeFix', label: translate("Fix 前必须先完成 Break"), type: 'bool' },
-        { key: 'maxBreakSubmissions', label: translate("Break 提交次数上限"), type: 'int', min: 1 },
-        { key: 'maxFixSubmissions', label: translate("Fix 提交次数上限"), type: 'int', min: 1 },
-        { key: 'flagWrongPenalty', label: translate("Flag 错误扣分"), type: 'int', min: 0 },
-        { key: 'exploitSucceededPenalty', label: translate("EXP 成功扣分"), type: 'int', min: 0 },
-        { key: 'serviceAbnormalPenalty', label: translate("服务异常扣分"), type: 'int', min: 0 },
-        { key: 'evaluationDispatchMode', label: translate("评测调度方式"), type: 'select', options: EVALUATION_DISPATCH_MODES },
-        { key: 'flagTemplate', label: translate("Break Flag 模板"), type: 'flagTemplate', description: translate("仅用于本场比赛该题目今后生成的每队攻击实例 Flag；未覆盖时继承竞赛默认") },
+        { key: 'break', label: translate("ui.breakScoreCurve"), type: 'pointsCurve' },
+        { key: 'fix', label: translate("ui.fixScoreCurve"), type: 'pointsCurve' },
+        { key: 'requireBreakBeforeFix', label: translate("ui.requireBreakBeforeFix"), type: 'bool' },
+        { key: 'maxBreakSubmissions', label: translate("ui.breakMaximumNumberOfSubmissions"), type: 'int', min: 1 },
+        { key: 'maxFixSubmissions', label: translate("ui.fixMaximumNumberOfSubmissions"), type: 'int', min: 1 },
+        { key: 'flagWrongPenalty', label: translate("ui.wrongFlagPenalty"), type: 'int', min: 0 },
+        { key: 'exploitSucceededPenalty', label: translate("ui.exploitSuccessPenalty"), type: 'int', min: 0 },
+        { key: 'serviceAbnormalPenalty', label: translate("ui.pointsDeductedForAbnormalService"), type: 'int', min: 0 },
+        { key: 'evaluationDispatchMode', label: translate("ui.evaluationSchedulingMethod"), type: 'select', options: EVALUATION_DISPATCH_MODES },
+        { key: 'flagTemplate', label: translate("ui.breakFlagTemplate"), type: 'flagTemplate', description: translate("ui.usedOnlyForFuturePerTeamAttackInstanceFlagsGenerated") },
       ]
     case 'Koh':
       return [
-        { key: 'pollIntervalSeconds', label: translate("控制检查间隔(秒)"), type: 'int', min: 1 },
-        { key: 'controlPointsPerInterval', label: translate("每间隔控制得分"), type: 'int', min: 0 },
+        { key: 'pollIntervalSeconds', label: translate("ui.controlCheckIntervalSeconds"), type: 'int', min: 1 },
+        { key: 'controlPointsPerInterval', label: translate("ui.controlScorePerInterval"), type: 'int', min: 0 },
       ]
   }
 }

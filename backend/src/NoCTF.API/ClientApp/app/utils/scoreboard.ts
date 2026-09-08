@@ -13,7 +13,7 @@ import type {
   NoCtfapiEndpointsCompetitionsScoreboardSnapshotResponse,
   NoCtfapiEndpointsCompetitionsScoreboardSlotResponse,
   NoCtfapiEndpointsCompetitionsScoreboardTeamResponse,
-} from '~/api'
+} from '../api'
 import { translate } from './i18n'
 import { directionKey, directionLabel } from './directions'
 
@@ -64,28 +64,28 @@ export interface ScoreboardMemberContributionSlice {
 }
 
 const rankingStateLabels = {
-  Eligible: '符合排名资格',
-  Banned: '已封禁',
-  Disqualified: '已取消资格',
+  Eligible: "ui.eligible",
+  Banned: "ui.banned2",
+  Disqualified: "ui.disqualified",
 } satisfies Record<NoCtfapiEndpointsCompetitionsScoreboardRankingStateProtocol, string>
 
 const entryKindLabels = {
-  Solve: '解题',
-  Attack: '攻击',
-  Defense: '防御',
-  Availability: '可用性',
-  Control: '控制',
-  Penalty: '处罚',
-  BloodAward: '血榜奖励',
-  Hint: '提示',
-  ManualAdjustment: '人工调分',
+  Solve: "ui.solve2",
+  Attack: "ui.attack",
+  Defense: "ui.defense",
+  Availability: "ui.availability",
+  Control: "ui.control",
+  Penalty: "ui.penalty2",
+  BloodAward: "ui.bloodListReward",
+  Hint: "ui.hint",
+  ManualAdjustment: "ui.manualAdjustment",
 } satisfies Record<NoCtfapiEndpointsCompetitionsScoreboardEntryKindProtocol, string>
 
 const entryOutcomeLabels = {
-  Pending: '待处理',
-  Succeeded: '成功',
-  Failed: '失败',
-  Rejected: '已拒绝',
+  Pending: "ui.pending",
+  Succeeded: "ui.success",
+  Failed: "ui.failed",
+  Rejected: "ui.rejected",
 } satisfies Record<NoCtfapiEndpointsCompetitionsScoreboardEntryOutcomeProtocol, string>
 
 export function scoreboardRankingStateLabel(
@@ -101,14 +101,14 @@ export function scoreboardMemberContributionSlices(
   const members = (team?.memberContributions ?? [])
     .filter(contribution => (contribution.earnedPoints ?? 0) > 0)
     .map(contribution => ({
-      name: contribution.displayName ?? translate('未知用户'),
+      name: contribution.displayName ?? translate("ui.unknownUser"),
       value: contribution.earnedPoints ?? 0,
       userId: contribution.userId ?? '',
     }))
   const attributed = members.reduce((total, contribution) => total + contribution.value, 0)
   const unattributed = Math.max(0, (team?.totalScore ?? 0) - attributed)
   return unattributed > 0
-    ? [...members, { name: translate('团队/系统'), value: unattributed, userId: '' }]
+    ? [...members, { name: translate("ui.teamSystem"), value: unattributed, userId: '' }]
     : members
 }
 
@@ -246,7 +246,7 @@ export function scoreboardDirectionGroups(
 ): ScoreboardDirectionGroup[] {
   const directions = new Map<string, ScoreboardDirectionGroup>()
   for (const group of columnGroups) {
-    const name = directionLabel(group.challenge?.direction) || translate('未分类')
+    const name = directionLabel(group.challenge?.direction) || translate("ui.uncategorized")
     const key = directionKey(name)
     const existing = directions.get(key)
     if (existing) existing.groups.push(group)
@@ -295,9 +295,9 @@ export function scoreboardBloodAward(
   const entry = slot?.entries?.find(item => item.award)
   if (!entry?.award) return null
   const labels = {
-    FirstBlood: '一血',
-    SecondBlood: '二血',
-    ThirdBlood: '三血',
+    FirstBlood: "ui.firstBlood",
+    SecondBlood: "ui.secondBlood",
+    ThirdBlood: "ui.thirdBlood",
   } as const
   return {
     award: entry.award,

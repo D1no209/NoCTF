@@ -34,20 +34,20 @@ export function resolveCheatIncidentQueryRange(
   if (hasFrom !== hasTo) {
     return {
       range: null,
-      error: translate("请同时填写起始和结束时间，或全部留空查询最近 31 天。"),
+      error: translate("ui.pleaseFillInBothTheStartAndEndTimesOr"),
     }
   }
 
   const from = new Date(fromValue)
   const to = new Date(toValue)
   if (Number.isNaN(from.getTime()) || Number.isNaN(to.getTime()))
-    return { range: null, error: translate("请输入有效的起始和结束时间。") }
+    return { range: null, error: translate("ui.pleaseEnterValidStartAndEndTimes") }
 
   if (from > to)
-    return { range: null, error: translate("起始时间不能晚于结束时间。") }
+    return { range: null, error: translate("ui.theStartTimeCannotBeLaterThanTheEndTime") }
 
   if (to.getTime() - from.getTime() > MaximumIncidentQueryRangeMilliseconds)
-    return { range: null, error: translate("查询时间范围不能超过 31 天。") }
+    return { range: null, error: translate("ui.theQueryTimeRangeCannotExceed31Days") }
 
   return {
     range: { from: from.toISOString(), to: to.toISOString() },

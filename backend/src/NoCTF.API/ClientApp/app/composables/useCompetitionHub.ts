@@ -4,9 +4,9 @@ import type {
   NoCtfapiEndpointsCompetitionsEventsCompetitionEventKindProtocol,
   NoCtfapiEndpointsCompetitionsEventsCompetitionEventLevelProtocol,
   NoCtfapiEndpointsGameplayFactsGameplayFactStatusResponse,
-} from '~/api'
-import { getAccessToken, getRealtimeAccessToken } from '~/lib/session'
-import { startRealtimeWithRetry } from '~/lib/realtime-retry'
+} from '../api'
+import { getAccessToken, getRealtimeAccessToken } from '../lib/session'
+import { startRealtimeWithRetry } from '../lib/realtime-retry'
 
 /**
  * 竞赛实时 hub(/hubs/v1/competitions)。

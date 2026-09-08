@@ -1,4 +1,5 @@
 import { englishMessages } from '../locales/en'
+import { chineseMessages, type MessageKey } from '../locales/zh-CN'
 import { shallowRef } from 'vue'
 
 export const supportedLocales = ['zh-CN', 'en'] as const
@@ -31,7 +32,8 @@ export function detectLocale(): AppLocale {
 // UI consumers translate during render/computed evaluation so this ref remains reactive.
 const activeLocale = shallowRef<AppLocale>(detectLocale())
 const englishMessageSources = new Map<string, string>(
-  Object.entries(englishMessages).map(([source, english]) => [english.trim(), source]),
+  [...Object.entries(englishMessages), ...Object.entries(chineseMessages)]
+    .map(([key, message]) => [message.trim(), key]),
 )
 
 export function initializeLocale(): AppLocale {
@@ -68,13 +70,18 @@ export function translate(
   source: string,
   values: Record<string, string | number> = {},
 ): string {
-  const template = activeLocale.value === 'en'
-    ? englishMessages[source] ?? source
-    : source
+  const messages = activeLocale.value === 'en' ? englishMessages : chineseMessages
+  const template = Object.hasOwn(messages, source) ? messages[source as MessageKey] : source
   return template.replace(/\{(\w+)\}/g, (match, key: string) =>
     values[key] === undefined ? match : String(values[key]))
 }
 
-export function localizeMessage(message: string): string {
+/** UI-owned messages use a stable, type-checked catalog key. */
+export function t(key: MessageKey, values: Record<string, string | number> = {}): string {
+  return translate(key, values)
+}
+
+export function localizeMessage(message: string | null | undefined): string {
+  if (!message) return ''
   return translate(englishMessageSources.get(message.trim()) ?? message)
 }

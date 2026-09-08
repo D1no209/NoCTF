@@ -1,8 +1,8 @@
-import { client } from '~/api/client.gen'
-import { shouldRefreshSession } from '~/lib/auth-refresh'
-import { getAccessToken, refreshSession } from '~/lib/session'
-import { statusErrorMessage } from '~/utils/api-error'
-import { prepareCommandRequest, observeCommandResponse } from '~/utils/command-attempt'
+import { client } from '../api/client.gen'
+import { shouldRefreshSession } from '../lib/auth-refresh'
+import { getAccessToken, refreshSession } from '../lib/session'
+import { statusErrorMessage } from '../utils/api-error'
+import { prepareCommandRequest, observeCommandResponse } from '../utils/command-attempt'
 
 /**
  * Configure the generated hey-api client:
@@ -48,7 +48,7 @@ export default defineNuxtPlugin(() => {
   client.interceptors.error.use((error, response, request) => {
     observeCommandResponse(request, response?.status, true)
     if (error instanceof Error && (error.name === 'TimeoutError' || error.name === 'AbortError'))
-      return { status: 503, code: 'RequestTimeout', detail: translate('请求超时，结果暂未确认，请重试。') }
+      return { status: 503, code: 'RequestTimeout', detail: translate("ui.theRequestTimedOutAndItsOutcomeIsNotYet") }
     const status = response?.ok === false ? response.status : undefined
     // 保留真实的 problem+json 及强类型失败响应体。很多业务冲突只携带
     // code/message；丢弃它们会把明确原因退化成笼统的 HTTP 状态提示。

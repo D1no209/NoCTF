@@ -1,3 +1,4 @@
+import { sourceFile } from './support/feature-source'
 import { describe, expect, test } from 'bun:test'
 import {
   REALTIME_RETRY_DELAYS_MS,
@@ -77,8 +78,8 @@ describe('realtime initial connection retry', () => {
   })
 
   test('both hubs use the shared retry and cancel it during teardown', async () => {
-    const competitionHub = await Bun.file(new URL('../app/composables/useCompetitionHub.ts', import.meta.url)).text()
-    const platformHub = await Bun.file(new URL('../app/composables/usePlatformLogHub.ts', import.meta.url)).text()
+    const competitionHub = await sourceFile(new URL('../app/composables/useCompetitionHub.ts', import.meta.url)).text()
+    const platformHub = await sourceFile(new URL('../app/composables/usePlatformLogHub.ts', import.meta.url)).text()
 
     for (const source of [competitionHub, platformHub]) {
       expect(source).toContain('startRealtimeWithRetry(')

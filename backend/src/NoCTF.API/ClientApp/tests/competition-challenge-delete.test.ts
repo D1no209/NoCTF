@@ -1,12 +1,13 @@
+import { sourceFile } from './support/feature-source'
 import { describe, expect, test } from 'bun:test'
 
 describe('competition challenge deletion', () => {
   test('keeps the selected challenge while deletion is pending or fails', async () => {
-    const page = await Bun.file(
+    const page = await sourceFile(
       new URL('../app/pages/admin/competitions/[id]/challenges/index.vue', import.meta.url),
     ).text()
 
-    const deleteSection = page.slice(page.indexOf('// ---- Delete / restore ----'))
+    const deleteSection = page.slice(page.indexOf('function closeDeleteDialog'))
 
     expect(deleteSection).toContain('function closeDeleteDialog(open: boolean)')
     expect(deleteSection).toContain('if (!open && !deletePending.value)')
@@ -23,7 +24,7 @@ describe('competition challenge deletion', () => {
   })
 
   test('calls the generated delete SDK without a stale-write token', async () => {
-    const page = await Bun.file(
+    const page = await sourceFile(
       new URL('../app/pages/admin/competitions/[id]/challenges/index.vue', import.meta.url),
     ).text()
 
@@ -32,7 +33,7 @@ describe('competition challenge deletion', () => {
     expect(deleteHandler).toContain('adminDeleteCompetitionChallenge')
     expect(deleteHandler).toContain('path: { competitionId, competitionChallengeId: target.id }')
     expect(deleteHandler).not.toContain('query:')
-    expect(deleteHandler).toContain('toast.success(translate("题目已删除"))')
+    expect(deleteHandler).toContain("toast.success(translate(\"ui.questionHasBeenDeleted\"))")
     expect(deleteHandler).toContain('deleteTarget.value = null')
   })
 })

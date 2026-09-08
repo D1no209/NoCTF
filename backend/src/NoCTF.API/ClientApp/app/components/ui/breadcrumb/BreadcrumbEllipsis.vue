@@ -2,7 +2,7 @@
 import type { HTMLAttributes } from 'vue'
 
 import { MoreHorizontalIcon } from '@lucide/vue'
-import { cn } from '@/lib/utils'
+import { cn } from '~/lib/utils'
 
 const props = defineProps<{
   class?: HTMLAttributes['class']
@@ -19,6 +19,6 @@ const props = defineProps<{
     <slot>
       <MoreHorizontalIcon />
     </slot>
-    <span class="sr-only">More</span>
+    <span class="sr-only">{{ $t('ui.more') }}</span>
   </span>
 </template>

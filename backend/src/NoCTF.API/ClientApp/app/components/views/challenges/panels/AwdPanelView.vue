@@ -1,0 +1,64 @@
+<script setup lang="ts">
+import { toRefs } from 'vue'
+import type { AwdPanelViewState } from '~/features/challenges/panels/useAwdPanel'
+
+const viewProps = defineProps<{ state: AwdPanelViewState }>()
+const { emit, targets, targetsError, targetsLoaded, FlagSubmit, RuntimeAccessUrl, RuntimeCard, competition, challenge } = toRefs(viewProps.state)
+</script>
+
+<template>
+  <div class="flex flex-col divide-y">
+    <component :is="RuntimeCard"
+      class="pb-5"
+      :competition-id="competition.id!"
+      :competition-challenge-id="challenge.id!"
+      controls="reset-only"
+    />
+
+    <section class="py-5" aria-labelledby="awd-targets-title">
+      <h3 id="awd-targets-title" class="mb-4 text-sm font-semibold">{{ $t('ui.attackTarget') }}</h3>
+        <Skeleton v-if="!targetsLoaded" class="h-16 w-full" />
+        <Alert v-else-if="targetsError">
+          <AlertDescription>{{ $message(targetsError) }}</AlertDescription>
+        </Alert>
+        <Empty v-else-if="!targets.length" class="border py-8">
+          <EmptyHeader>
+            <EmptyTitle>{{ $t('ui.noTargetToAttackYet') }}</EmptyTitle>
+          </EmptyHeader>
+        </Empty>
+        <Table v-else>
+          <TableHeader>
+            <TableRow>
+              <TableHead>{{ $t('ui.team') }}</TableHead>
+              <TableHead>{{ $t('ui.targetHost') }}</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            <TableRow v-for="target in targets" :key="target.teamId">
+              <TableCell class="font-medium">{{ target.teamName }}</TableCell>
+              <TableCell>
+                <div class="flex flex-col gap-1">
+                  <component :is="RuntimeAccessUrl"
+                    v-for="url in target.urls ?? []"
+                    :key="url"
+                    :url="url"
+                  />
+                </div>
+              </TableCell>
+            </TableRow>
+          </TableBody>
+        </Table>
+    </section>
+
+    <component :is="FlagSubmit"
+      class="pt-5"
+      :competition-id="competition.id!"
+      :competition-challenge-id="challenge.id!"
+      multiple
+      :title="$t('ui.batchSubmitFlag')"
+      :maximum-attempts="challenge.maximumFlagAttempts"
+      :remaining-attempts="challenge.remainingFlagAttempts"
+      @submitted="emit('submitted')"
+    />
+  </div>
+</template>
