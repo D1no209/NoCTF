@@ -116,7 +116,7 @@ public enum PublicAccessFailureProtocol
     GatewayDisabled, ConnectorOffline, PublicPortUnavailable, RuntimeBindingUnavailable, UnsupportedRuntimeKind,
     AccessDisplayUnsupported, GatewayCapacityExceeded, GatewayIdentityRejected, GatewaySafetyCheckFailed, GatewayReconciliationPending
 }
-public sealed record PublicEndpointResponse(int ContainerPort, int HostPort, PublicAccessStateProtocol State, PublicAccessFailureProtocol? Failure);
+public sealed record PublicEndpointResponse(int ContainerPort, int HostPort, PublicAccessStateProtocol State, PublicAccessFailureProtocol? Failure, int? PublicPort = null);
 public sealed record RuntimeAccessResponse(RuntimeAccessRouteProtocol Route, PublicAccessStateProtocol State,
     PublicAccessFailureProtocol? Failure, IReadOnlyList<PublicEndpointResponse> Endpoints);
 [Mapper]
@@ -131,7 +131,7 @@ internal static partial class RuntimeAccessMapping
     public static RuntimeAccessResponse ToResponse(RuntimeAccessProjection access) => new(ToProtocol(access.Route),
         ToProtocol(access.State), access.Failure is { } failure ? ToProtocol(failure) : null,
         access.Endpoints.Select(item => new PublicEndpointResponse(item.ContainerPort, item.HostPort,
-            ToProtocol(item.State), item.Failure is { } code ? ToProtocol(code) : null)).ToArray());
+            ToProtocol(item.State), item.Failure is { } code ? ToProtocol(code) : null, item.PublicPort)).ToArray());
 }
 
 public sealed record RuntimeAcceptedResponse(

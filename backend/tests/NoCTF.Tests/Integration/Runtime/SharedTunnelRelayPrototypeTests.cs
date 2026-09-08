@@ -9,6 +9,7 @@ using Docker.DotNet.Models;
 using DotNet.Testcontainers.Builders;
 using DotNet.Testcontainers.Configurations;
 using DotNet.Testcontainers.Containers;
+using NoCTF.Runtime.Docker.PublicAccess;
 
 namespace NoCTF.Tests.Integration.Runtime;
 
@@ -90,13 +91,14 @@ public sealed class SharedTunnelRelayPrototypeTests
                 ?? (OperatingSystem.IsWindows() ? "npipe://./pipe/docker_engine" : "unix:///var/run/docker.sock"))).Build();
             var mountpoint = (await docker.Volumes.InspectAsync(volume.Name, ct)).Mountpoint;
             await using var leases = new ContainerBuilder(PublicGatewaySafetyPrototypeTests.Image)
+                .WithNetwork(network)
                 .WithVolumeMount(volume, "/endpoints")
                 .WithResourceMapping(Bytes(LeaseWriter), "/renew.py")
                 .WithEntrypoint("python", "/renew.py", a, b)
                 .WithWaitStrategy(Wait.ForUnixContainer().UntilFileExists("/initialized", FileSystem.Container))
                 .Build();
             await leases.StartAsync(ct);
-            await using var targetA = Target("A").WithNetwork(network).WithPortBinding(8080, true).WithPortBinding(8081, true)
+            await using var targetA = Target("A").WithNetwork(network).WithNetworkAliases("target-a").WithPortBinding(8080, true).WithPortBinding(8081, true)
                 .WithResourceMapping(targetTls.ServerCert, "/target.crt").WithResourceMapping(targetTls.ServerKey, "/target.key").Build();
             await using var targetB = Target("B").WithNetwork(network).WithPortBinding(8080, true).Build();
             await Task.WhenAll(targetA.StartAsync(ct), targetB.StartAsync(ct));
@@ -212,6 +214,10 @@ public sealed class SharedTunnelRelayPrototypeTests
                     .WithResourceMapping(Bytes(SshClientConfiguration), "/config/client.conf");
             await using var client = (ssh ? sshClient : frpClient).Build();
             await client.StartAsync(ct);
+            var sshControl = ssh ? new DockerSshControl(docker, client.Id) : null;
+            using var sshPorts = sshControl is null ? null : new SharedSshPortController(sshControl, Enumerable.Range(31001, 5).ToArray());
+            SshPortLease? firstA = null;
+            SshPortLease? currentB = null;
             using var http = new HttpClient(new SocketsHttpHandler { UseProxy = false }) { Timeout = TimeSpan.FromSeconds(2) };
             var publicA = new Uri($"http://{server.Hostname}:{server.GetMappedPublicPort(31001)}/");
             var publicB = new Uri($"http://{server.Hostname}:{server.GetMappedPublicPort(31002)}/");
@@ -220,11 +226,11 @@ public sealed class SharedTunnelRelayPrototypeTests
                 // Start with an empty master; only a control-plane decision adds publications.
                 await Assert.That(await ReadAsync(http, publicA, ct)).IsNull();
                 await Assert.That(await ReadAsync(http, publicB, ct)).IsNull();
-                await AddSshForwardAsync(client, a, 31001, 8080, ct);
-                await AddSshForwardAsync(client, b, 31002, 8080, ct);
-                await AddSshForwardAsync(client, a, 31003, 8081, ct);
-                await AddSshForwardAsync(client, a, 31004, 8082, ct);
-                await AddSshForwardAsync(client, a, 31005, 8083, ct);
+                firstA = await AddSshForwardAsync(sshPorts!, a, 31001, 8080, ct);
+                currentB = await AddSshForwardAsync(sshPorts!, b, 31002, 8080, ct);
+                await AddSshForwardAsync(sshPorts!, a, 31003, 8081, ct);
+                await AddSshForwardAsync(sshPorts!, a, 31004, 8082, ct);
+                await AddSshForwardAsync(sshPorts!, a, 31005, 8083, ct);
             }
             await ExpectAsync(http, publicA, "A", ct);
             await ExpectAsync(http, publicB, "B", ct);
@@ -232,7 +238,9 @@ public sealed class SharedTunnelRelayPrototypeTests
             // No HTTP parser in the data plane: duplicate headers, chunk syntax and arbitrary bytes remain intact.
             var prefix = Bytes("POST /a%2fb HTTP/1.1\r\nHost: original.test\r\nX-Test: a\r\nx-test: b\r\nTransfer-Encoding: chunked\r\n\r\n");
             var payload = prefix.Concat(RandomNumberGenerator.GetBytes(1024 * 1024)).ToArray();
-            await Assert.That(await CheckHalfCloseAsync(targetA.Hostname, targetA.GetMappedPublicPort(8081), payload, "direct", ct)).IsTrue();
+            // Exercise Linux TCP directly: Docker Desktop's Windows published-port forwarder is not
+            // deployed in production and can abort half-closed sockets before they reach this fixture.
+            await Assert.That(await CheckHalfCloseAsync(leases, "target-a", 8081, "direct Linux", ct)).IsTrue();
             var local = await leases.ExecAsync(["python", "-c", $$"""
                 import socket, hashlib
                 s=socket.socket(socket.AF_UNIX,socket.SOCK_STREAM)
@@ -247,7 +255,7 @@ public sealed class SharedTunnelRelayPrototypeTests
                 """], ct);
             await Assert.That(local.ExitCode).IsEqualTo(0L);
             Console.WriteLine(local.Stdout);
-            var sharedHalfClosePassed = await CheckHalfCloseAsync(server.Hostname, server.GetMappedPublicPort(31003), payload, ssh ? "shared SSH" : "shared FRP", ct);
+            var sharedHalfClosePassed = await CheckHalfCloseAsync(leases, ssh ? "tunnel" : "frps", 31003, ssh ? "shared SSH" : "shared FRP", ct);
             using (var framed = new TcpClient())
             {
                 await framed.ConnectAsync(server.Hostname, server.GetMappedPublicPort(31004), ct);
@@ -280,12 +288,10 @@ public sealed class SharedTunnelRelayPrototypeTests
                 await Assert.That(forbiddenLocalForward.ExitCode).IsNotEqualTo(0L);
                 var badIdentity = await client.ExecAsync(["ssh", "-F", "/config/client.conf", "-S", "none", "-o", "ControlMaster=no", "-o", "ClearAllForwardings=yes", "-o", "UserKnownHostsFile=/config/wrong_known_hosts", "-N", "gateway"], ct);
                 await Assert.That(badIdentity.ExitCode).IsNotEqualTo(0L);
-                var canceled = await client.ExecAsync(["ssh", "-F", "none", "-S", "/control/master", "-O", "cancel", "-R", $"0.0.0.0:31002:/endpoints/{b}/listen/8080.sock", "gateway"], ct);
-                await Assert.That(canceled.ExitCode).IsEqualTo(0L);
+                await Assert.That(await sshPorts!.RevokeAsync(currentB!, ct)).IsTrue();
                 await Assert.That(await ReadAsync(http, publicB, ct)).IsNull();
                 await ExpectAsync(http, publicA, "A", ct);
-                var added = await client.ExecAsync(["ssh", "-F", "none", "-S", "/control/master", "-O", "forward", "-R", $"0.0.0.0:31002:/endpoints/{b}/listen/8080.sock", "gateway"], ct);
-                await Assert.That(added.ExitCode).IsEqualTo(0L);
+                currentB = await AddSshForwardAsync(sshPorts, b, 31002, 8080, ct);
                 await ExpectAsync(http, publicB, "B", ct);
                 Console.WriteLine("SSH: wrong host identity, unapproved port, command, SFTP and local forwarding rejected; live cancel/add B preserved A.");
             }
@@ -307,7 +313,7 @@ public sealed class SharedTunnelRelayPrototypeTests
             if (ssh)
             {
                 await Assert.That(await ReadAsync(http, publicB, ct)).IsNull();
-                await AddSshForwardAsync(client, b, 31002, 8080, ct);
+                currentB = await AddSshForwardAsync(sshPorts!, b, 31002, 8080, ct);
             }
             await ExpectAsync(http, publicB, "B", ct);
             await Assert.That(await ReadAsync(http, publicA, ct)).IsNull();
@@ -319,12 +325,26 @@ public sealed class SharedTunnelRelayPrototypeTests
             if (ssh)
             {
                 await Assert.That(await ReadAsync(http, publicB, ct)).IsNull();
-                await AddSshForwardAsync(client, b, 31002, 8080, ct);
+                currentB = await AddSshForwardAsync(sshPorts!, b, 31002, 8080, ct);
             }
             await ExpectAsync(http, publicB, "B", ct);
             await Assert.That(await ReadAsync(http, publicA, ct)).IsNull();
             await relayA.StopAsync(ct);
             await ExpectAsync(http, publicB, "B", ct);
+            if (ssh)
+            {
+                // Explicit reassignment of A's released PUBLIC port to live B is authorized here.
+                // Both the C# owner check and OpenSSH's exact Unix-path cancellation must protect B.
+                await Assert.That(await sshPorts!.RevokeAsync(firstA!, ct)).IsTrue();
+                await Assert.That(await sshPorts.RevokeAsync(currentB!, ct)).IsTrue();
+                currentB = await AddSshForwardAsync(sshPorts, b, 31001, 8080, ct);
+                publicB = publicA;
+                await ExpectAsync(http, publicB, "B", ct);
+                await Assert.That(await sshPorts.RevokeAsync(firstA!, ct)).IsFalse().Because("C# rejects the superseded A handle");
+                await Assert.That(await sshControl!.ForwardAsync(firstA!, SshForwardOperation.Revoke, ct)).IsFalse().Because("OpenSSH rejects A's absent Unix target rather than canceling B");
+                await ExpectAsync(http, publicB, "B", ct);
+                Console.WriteLine("C# SSH controller: old A cancellation after public-port reassignment cannot cancel B PASS.");
+            }
             // Missing renewal revokes only B. Its ordinary Docker endpoint remains healthy.
             await leases.ExecAsync(["touch", $"/endpoints/{b}/stop-renew"], ct);
             await Task.Delay(TimeSpan.FromSeconds(11), ct);
@@ -378,15 +398,19 @@ public sealed class SharedTunnelRelayPrototypeTests
         Compression no
         LogLevel ERROR
         """;
-    private static async Task AddSshForwardAsync(IContainer client, string publication, int publicPort, int containerPort, CancellationToken ct)
+    private static async Task<SshPortLease> AddSshForwardAsync(SharedSshPortController controller, string publication, int publicPort, int containerPort, CancellationToken ct)
     {
         // Local disposable fixture only: retry the same OpenSSH master forwarding command
         // while autossh reconnects. No business facts or external platform side effects.
         for (var attempt = 0; attempt < 60; attempt++)
         {
-            var result = await client.ExecAsync(["ssh", "-F", "none", "-S", "/control/master", "-O", "forward", "-R",
-                $"0.0.0.0:{publicPort}:/endpoints/{publication}/listen/{containerPort}.sock", "gateway"], ct);
-            if (result.ExitCode == 0) return;
+            try
+            {
+                var lease = await controller.PublishAsync(Guid.Parse(publication), containerPort, ct);
+                await Assert.That(lease.PublicPort).IsEqualTo(publicPort);
+                return lease;
+            }
+            catch (PublicTunnelException) { /* Only this isolated fixture retries while autossh reconnects. */ }
             await Task.Delay(250, ct);
         }
         throw new InvalidOperationException("Shared SSH master could not bind the isolated fixture publication.");
@@ -489,17 +513,23 @@ public sealed class SharedTunnelRelayPrototypeTests
         }
         public void Dispose() => directory.Delete(recursive: true);
     }
-    private static async Task<bool> CheckHalfCloseAsync(string host, int port, byte[] payload, string label, CancellationToken ct)
+    private static async Task<bool> CheckHalfCloseAsync(IContainer probe, string host, int port, string label, CancellationToken ct)
     {
-        using var connection = new TcpClient();
-        await connection.ConnectAsync(host, port, ct);
-        var stream = connection.GetStream();
-        await stream.WriteAsync(payload, ct);
-        connection.Client.Shutdown(SocketShutdown.Send);
-        using var received = new MemoryStream();
-        await stream.CopyToAsync(received, ct);
-        Console.WriteLine($"{label} half-close: sent={payload.Length}, received={received.Length}");
-        return received.ToArray().SequenceEqual(payload);
+        var result = await probe.ExecAsync(["python", "-c", """
+            import socket, sys
+            body=b'POST /a%2fb HTTP/1.1\r\nHost: original.test\r\nX-Test: a\r\nx-test: b\r\nTransfer-Encoding: chunked\r\n\r\n'+bytes(range(256))*4096
+            with socket.create_connection((sys.argv[1],int(sys.argv[2])),timeout=5) as connection:
+                connection.sendall(body)
+                connection.shutdown(socket.SHUT_WR)
+                received=bytearray()
+                try:
+                    while data:=connection.recv(16384): received.extend(data)
+                except ConnectionResetError: pass
+                print('PASS' if received==body else 'FAIL', 'sent='+str(len(body)), 'received='+str(len(received)))
+            """, host, port.ToString(System.Globalization.CultureInfo.InvariantCulture)], ct);
+        await Assert.That(result.ExitCode).IsEqualTo(0L).Because(result.Stderr);
+        Console.WriteLine($"{label} half-close: {result.Stdout.Trim()}");
+        return result.Stdout.StartsWith("PASS ", StringComparison.Ordinal);
     }
     private static async Task<string?> ReadAsync(HttpClient http, Uri address, CancellationToken ct)
     {

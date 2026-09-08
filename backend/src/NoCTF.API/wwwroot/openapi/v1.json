@@ -14623,6 +14623,11 @@
                 "$ref": "#/components/schemas/NoCTFAPIEndpointsRuntimePublicAccessFailureProtocol"
               }
             ]
+          },
+          "publicPort": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
           }
         }
       },

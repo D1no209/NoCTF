@@ -36,7 +36,8 @@ public sealed record PublicGatewayCapability(
     public bool AllowsPort(int port) => port >= FirstPort && port <= LastPort && !ReservedPorts.Contains(port);
 }
 
-public sealed record PublicEndpointStatus(int ContainerPort, int HostPort, PublicAccessState State, PublicAccessFailure? Failure);
+/// <summary>HostPort identifies the unchanged Docker mapping; PublicPort is an independently acknowledged gateway listener.</summary>
+public sealed record PublicEndpointStatus(int ContainerPort, int HostPort, PublicAccessState State, PublicAccessFailure? Failure, int? PublicPort = null);
 public sealed record PublicRuntimeStatus(Guid RuntimeId, string ConnectorId, string RunnerId,
     DateTimeOffset ValidUntil, IReadOnlyList<PublicEndpointStatus> Endpoints, PublicAccessFailure? Failure = null);
 public sealed record RuntimeAccessProjection(RuntimeAccessRoute Route, PublicAccessState State,
@@ -142,8 +143,8 @@ public static class PublicGatewayPolicyRules
             if (binding.ServiceName is not null || binding.ContainerPort is not int containerPort)
                 return Unavailable(PublicAccessState.Unsupported, PublicAccessFailure.RuntimeBindingUnavailable);
             var matches = ports.Where(port => port.ServiceName is null && port.ContainerPort == containerPort).ToArray();
-            if (matches.Length != 1 || !capability.AllowsPort(matches[0].HostPort))
-                return Unavailable(PublicAccessState.Unavailable, PublicAccessFailure.PublicPortUnavailable);
+            if (matches.Length != 1)
+                return Unavailable(PublicAccessState.Unavailable, PublicAccessFailure.RuntimeBindingUnavailable);
             if (!binding.UrlTemplate.Contains("{HOST}", StringComparison.Ordinal)
                 || !binding.UrlTemplate.Contains("{PORT}", StringComparison.Ordinal))
                 return Unavailable(PublicAccessState.Unsupported, PublicAccessFailure.AccessDisplayUnsupported);
@@ -151,12 +152,21 @@ public static class PublicGatewayPolicyRules
             var states = status.Endpoints.Where(item => item.ContainerPort == containerPort && item.HostPort == match.HostPort).Take(2).ToArray();
             if (states.Length > 1) return Unavailable(PublicAccessState.Unavailable, PublicAccessFailure.RuntimeBindingUnavailable);
             var state = states.FirstOrDefault() ?? new(containerPort, match.HostPort, PublicAccessState.Pending, PublicAccessFailure.GatewayReconciliationPending);
+            if (state.State == PublicAccessState.Ready && state.Failure is { } invalidFailure)
+                return Unavailable(PublicAccessState.Unavailable, invalidFailure);
+            if (state.State == PublicAccessState.Ready && (state.PublicPort is not int publicPort || !capability.AllowsPort(publicPort)))
+                return Unavailable(PublicAccessState.Unavailable, PublicAccessFailure.PublicPortUnavailable);
+            if (state.PublicPort is not null && endpoints.Any(item => item.PublicPort == state.PublicPort && item.ContainerPort != containerPort))
+                return Unavailable(PublicAccessState.Unavailable, PublicAccessFailure.RuntimeBindingUnavailable);
             if (!endpoints.Contains(state)) endpoints.Add(state);
             if (state.State == PublicAccessState.Ready)
                 urls.Add(binding.UrlTemplate.Replace("{HOST}", policy.PublicRuntimeHost, StringComparison.Ordinal)
-                    .Replace("{PORT}", match.HostPort.ToString(CultureInfo.InvariantCulture), StringComparison.Ordinal));
+                    .Replace("{PORT}", state.PublicPort!.Value.ToString(CultureInfo.InvariantCulture), StringComparison.Ordinal));
         }
         var complete = endpoints.Count > 0 && endpoints.All(item => item.State == PublicAccessState.Ready);
+        var unavailable = endpoints.FirstOrDefault(item => item.State is PublicAccessState.Unavailable or PublicAccessState.Unsupported or PublicAccessState.Revoking);
+        if (unavailable is not null)
+            return new(route, unavailable.State, unavailable.Failure ?? PublicAccessFailure.GatewayReconciliationPending, urls, endpoints);
         return new(route, complete ? PublicAccessState.Ready : PublicAccessState.Pending,
             complete ? null : PublicAccessFailure.GatewayReconciliationPending, urls, endpoints);
     }
