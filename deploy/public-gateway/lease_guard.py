@@ -38,6 +38,24 @@ def lease_deadline(path, publication_id, wall_time, monotonic_time):
     return monotonic_time + remaining
 
 
+def reap_child(child):
+    """SIGKILL then bounded reap. PID 1 must exit rather than wait indefinitely."""
+    if child is None:
+        return True
+    try:
+        if child.poll() is None:
+            try:
+                child.kill()
+            except ProcessLookupError:
+                pass  # Exited between poll and kill; still reap it.
+        child.wait(timeout=1)
+        return True
+    except (subprocess.TimeoutExpired, OSError):
+        # Do not print subprocess args, credentials, or claim successful cleanup.
+        print("gateway child reap failed; exiting lease guard", flush=True)
+        return False
+
+
 def main():
     publication_id = str(uuid.UUID(os.environ["NOCTF_PUBLICATION_ID"]))
     path = Path("/run/noctf-gateway/lease.json")
@@ -70,10 +88,8 @@ def main():
         # No lease contents, keys or credentials in diagnostics.
         print("gateway lease invalid; revoking publication", flush=True)
     finally:
-        if child is not None and child.poll() is None:
-            child.kill()
-            child.wait(timeout=1)
-    return 0
+        reaped = reap_child(child)
+    return 0 if reaped else 1
 
 
 if __name__ == "__main__":

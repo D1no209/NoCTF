@@ -55,9 +55,22 @@ public static class PublicGatewayPolicyRules
         return uri.GetLeftPart(UriPartial.Authority).ToLowerInvariant();
     }
 
-    public static bool Host(string value) => value.Length is > 0 and <= 253
-        && value.All(character => char.IsAsciiLetterOrDigit(character) || character is '.' or '-')
-        && Uri.CheckHostName(value) is UriHostNameType.Dns or UriHostNameType.IPv4;
+    // Keep this contract aligned with gatewayHost in ClientApp (including numeric hosts).
+    public static bool Host(string value)
+    {
+        if (value.Length is 0 or > 253) return false;
+        if (value.All(character => char.IsAsciiDigit(character) || character == '.'))
+        {
+            var octets = value.Split('.');
+            return octets.Length == 4 && octets.All(octet => octet.Length is > 0 and <= 3
+                && (octet.Length == 1 || octet[0] != '0')
+                && int.TryParse(octet, NumberStyles.None, CultureInfo.InvariantCulture, out var number) && number <= 255);
+        }
+        var host = value.EndsWith('.') ? value[..^1] : value;
+        return host.Split('.').All(label => label.Length is > 0 and <= 63
+            && char.IsAsciiLetterOrDigit(label[0]) && char.IsAsciiLetterOrDigit(label[^1])
+            && label.All(character => char.IsAsciiLetterOrDigit(character) || character == '-'));
+    }
 
     public static IReadOnlyList<string> Validate(PublicGatewayPolicy policy, PublicGatewayCapability? capability)
     {

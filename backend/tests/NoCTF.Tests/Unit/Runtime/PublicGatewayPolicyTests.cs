@@ -9,6 +9,37 @@ namespace NoCTF.Tests.Unit.Runtime;
 
 public sealed class PublicGatewayPolicyTests
 {
+    [Test]
+    [Arguments("example.com", true)]
+    [Arguments("EXAMPLE.com.", true)]
+    [Arguments("my-host.local", true)]
+    [Arguments("localhost", true)]
+    [Arguments("192.0.2.1", true)]
+    [Arguments("0.0.0.0", true)]
+    [Arguments("a..b", false)]
+    [Arguments("-a.com", false)]
+    [Arguments("a-.com", false)]
+    [Arguments("a.com-", false)]
+    [Arguments("a_b.com", false)]
+    [Arguments("999.999.999.999", false)]
+    [Arguments("192.168.01.1", false)]
+    [Arguments("127.1", false)]
+    [Arguments("::1", false)]
+    [Arguments("https://example.com", false)]
+    [Arguments("example.com:80", false)]
+    [Arguments("example.com\n", false)]
+    [Arguments("", false)]
+    public async Task Host_uses_explicit_DNS_and_IPv4_rules(string value, bool expected) =>
+        await Assert.That(PublicGatewayPolicyRules.Host(value)).IsEqualTo(expected);
+
+    [Test]
+    public async Task Host_bounds_label_and_total_lengths()
+    {
+        await Assert.That(PublicGatewayPolicyRules.Host(new string('a', 63) + ".com")).IsTrue();
+        await Assert.That(PublicGatewayPolicyRules.Host(new string('a', 64) + ".com")).IsFalse();
+        await Assert.That(PublicGatewayPolicyRules.Host(string.Join('.', Enumerable.Repeat(new string('a', 63), 4)))).IsFalse();
+    }
+
     private static readonly DateTimeOffset Now = DateTimeOffset.Parse("2026-09-08T00:00:00Z");
     private static readonly PublicGatewayPolicy Policy = new(true, "gateway", "https://challenge.example.test",
         ["https://direct.example.test"], "203.0.113.1", null, 8);

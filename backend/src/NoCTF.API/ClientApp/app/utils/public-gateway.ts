@@ -32,3 +32,15 @@ export function gatewayOrigin(value: string, https = false): string | null {
   }
   catch { return null }
 }
+
+/** Same ASCII DNS / canonical IPv4 contract as PublicGatewayPolicyRules.Host. */
+export function gatewayHost(value: string): boolean {
+  if (!value.length || value.length > 253) return false
+  if (/^[0-9.]+$/.test(value)) {
+    const octets = value.split('.')
+    return octets.length === 4 && octets.every(octet => /^(0|[1-9][0-9]{0,2})$/.test(octet) && Number(octet) <= 255)
+  }
+  const host = value.endsWith('.') ? value.slice(0, -1) : value
+  return host.split('.').every(label => label.length > 0 && label.length <= 63
+    && /^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$/i.test(label))
+}

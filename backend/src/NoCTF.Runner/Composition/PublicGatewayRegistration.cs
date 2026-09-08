@@ -3,6 +3,7 @@ using NoCTF.Runtime.Docker.PublicAccess;
 using NoCTF.Application.Runtime.PublicAccess;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using NoCTF.Domain.Platform;
+using NoCTF.Hosting.Health;
 
 namespace NoCTF.Runner.PublicAccess;
 
@@ -12,11 +13,13 @@ internal static class PublicGatewayRegistration
     {
         var connector = configuration["PublicGateway:ConnectorId"];
         if (string.IsNullOrWhiteSpace(connector)) return services;
+        var runnerId = configuration["PublicGateway:RunnerId"];
+        // Shared deployment configuration may also be present on non-designated Runners.
+        if (!string.IsNullOrWhiteSpace(runnerId) && runnerId != configuration["Runner:Id"]) return services;
+        services.TryAddEnumerable(ServiceDescriptor.Singleton<IReadinessDependency, PublicGatewayReadinessDependency>());
         services.AddNoCtfPublicGateway(configuration, standaloneRunner: true);
         var capability = services.LastOrDefault(item => item.ServiceType == typeof(PublicGatewayCapability))?.ImplementationInstance as PublicGatewayCapability;
         if (capability?.NamespaceIsolationAvailable != true) return services;
-        var runnerId = configuration["PublicGateway:RunnerId"];
-        if (runnerId != configuration["Runner:Id"]) return services;
         if (capability.Transport == PublicGatewayTransportKind.SharedSsh)
         {
             string Read(string key) => configuration["PublicGateway:" + key] ?? "";

@@ -1,5 +1,12 @@
 import { expect, test } from 'bun:test'
-import { gatewayOrigin, publicGatewayFailure, publicGatewayState } from '../app/utils/public-gateway'
+import { gatewayHost, gatewayOrigin, publicGatewayFailure, publicGatewayState } from '../app/utils/public-gateway'
+
+test('hosts use the backend ASCII DNS and canonical IPv4 contract', () => {
+  for (const value of ['example.com', 'EXAMPLE.com.', 'my-host.local', 'localhost', '192.0.2.1', '0.0.0.0', 'a'.repeat(63) + '.com'])
+    expect(gatewayHost(value)).toBe(true)
+  for (const value of ['a..b', '-a.com', 'a-.com', 'a.com-', 'a_b.com', '999.999.999.999', '192.168.01.1', '127.1', '::1', 'https://example.com', 'example.com:80', 'example.com\n', '', 'a'.repeat(64) + '.com', Array(4).fill('a'.repeat(63)).join('.')])
+    expect(gatewayHost(value)).toBe(false)
+})
 
 test('gateway origins reject credentials paths query fragments and insecure public origins', () => {
   expect(gatewayOrigin('https://Gateway.Example.test:443/', true)).toBe('https://gateway.example.test')
@@ -19,6 +26,8 @@ test('gateway page uses generated contracts and preserves async application and 
   expect(page).toContain('usePolling(readStatus')
   expect(page).toContain('finally { saving.value = false }')
   expect(page).toContain('FieldError')
+  expect(page).toContain('gatewayHost(form.publicRuntimeHost)')
+  expect(page).toContain('gatewayHost(form.directRuntimeHostOverride)')
   expect(page).toContain('namespaceIsolationAvailable')
   expect(page).toContain("$t('内网穿透')")
   expect(page).not.toContain("$t('公网访问')")

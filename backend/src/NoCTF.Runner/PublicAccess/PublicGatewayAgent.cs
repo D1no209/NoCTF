@@ -31,9 +31,21 @@ public sealed class PublicGatewayAgent(IServiceScopeFactory scopes, IPublicGatew
     private volatile bool ownsLease;
     private volatile bool waitingForOwnership;
     private volatile bool cleanupNeeded = true;
+    private volatile bool reconciled;
     private readonly object ownershipSync = new();
     private CancellationTokenSource? ownershipCancellation;
     private PublicGatewayPolicy renewalPolicy = PublicGatewayPolicy.Disabled;
+    public async Task CheckReadinessAsync(CancellationToken ct)
+    {
+        var ownership = OwnershipToken();
+        if (ownership is null || !reconciled || cleanupNeeded || ExecuteTask is not { IsCompleted: false })
+            throw new InvalidOperationException("Public gateway ownership or initialization is unavailable.");
+        // Verify the actual Redis owner, without acquiring/renewing a lease or exposing its token.
+        var owner = await redis.GetDatabase().LockQueryAsync(LeaderKey).WaitAsync(ct);
+        if (owner != ownerToken || OwnershipToken() != ownership || !reconciled || cleanupNeeded
+            || ExecuteTask is not { IsCompleted: false })
+            throw new InvalidOperationException("Public gateway ownership is unavailable.");
+    }
     public void Signal()
     {
         try { if (wake.CurrentCount == 0) wake.Release(); }
@@ -63,11 +75,17 @@ public sealed class PublicGatewayAgent(IServiceScopeFactory scopes, IPublicGatew
                 using var budget = CancellationTokenSource.CreateLinkedTokenSource(stoppingToken, ownership.Value);
                 budget.CancelAfter(TimeSpan.FromSeconds(15));
                 var retry = false;
-                try { await ReconcileAsync(ownership.Value, budget.Token); }
+                try
+                {
+                    await ReconcileAsync(ownership.Value, budget.Token);
+                    lock (ownershipSync)
+                        reconciled = ownsLease && ownershipCancellation?.Token == ownership.Value;
+                }
                 catch (Exception exception) when (!stoppingToken.IsCancellationRequested)
                 {
                     // No runtime or gameplay state is rewritten on gateway failure. Leases expire independently.
                     logger.LogWarning("Gateway reconciliation deferred after {FailureType}.", exception.GetType().Name);
+                    reconciled = false;
                     retry = true;
                 }
                 using var wait = CancellationTokenSource.CreateLinkedTokenSource(stoppingToken);
@@ -78,6 +96,7 @@ public sealed class PublicGatewayAgent(IServiceScopeFactory scopes, IPublicGatew
         }
         finally
         {
+            reconciled = false;
             await loops.CancelAsync();
             try { await Task.WhenAll(ownershipLoop, renewalLoop); }
             catch (OperationCanceledException) when (loops.IsCancellationRequested) { }
@@ -107,7 +126,7 @@ public sealed class PublicGatewayAgent(IServiceScopeFactory scopes, IPublicGatew
         CancellationTokenSource? previous;
         lock (ownershipSync)
         {
-            ownsLease = false; cleanupNeeded = true;
+            ownsLease = false; cleanupNeeded = true; reconciled = false;
             previous = ownershipCancellation; ownershipCancellation = null;
         }
         previous?.Cancel(); previous?.Dispose();

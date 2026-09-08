@@ -31,6 +31,16 @@ public sealed class PublicGatewayPersistenceTests
                 await setup.Database.EnsureCreatedAsync(ct); await fixture.SeedAsync(setup, ct);
                 var runtime = await setup.RuntimeInstances.SingleAsync(x => x.Id == fixture.RuntimeIds[0], ct);
                 runtime.State = NoCTF.Domain.Runtime.RuntimeState.Running; runtime.RunnerId = "runner"; runtime.ExpiresAt = DateTimeOffset.UtcNow.AddMinutes(1);
+                // The deletion fixture deliberately contains an unpublished Fix Target in a finished
+                // competition. Lease tests need a publishable attack instance, not that forbidden target.
+                runtime.Purpose = NoCTF.Domain.Runtime.RuntimePurpose.AwdpAttack;
+                runtime.GameplayFactId = null;
+                runtime.StoppedAt = null;
+                var competition = await setup.Competitions.SingleAsync(x => x.Id == fixture.Id, ct);
+                competition.Status = NoCTF.Domain.Competitions.CompetitionStatus.Running;
+                competition.EndAt = DateTimeOffset.UtcNow.AddMinutes(10);
+                var challenge = await setup.CompetitionChallenges.SingleAsync(x => x.Id == runtime.CompetitionChallengeId, ct);
+                challenge.IsPublished = true;
                 var settings = await setup.PlatformSettings.SingleAsync(ct);
                 settings.PublicGatewayEnabled = true; settings.PublicGatewayConnectorId = policy.ConnectorId;
                 settings.PublicGatewayOrigin = policy.PublicOrigin; settings.PublicGatewayDirectOrigins = policy.DirectOrigins.ToArray();
@@ -43,6 +53,8 @@ public sealed class PublicGatewayPersistenceTests
             await using var stopDb = new NoCtfDbContext(options);
             var lease = new PublicGatewayLeaseGuard(leaseDb, TimeProvider.System).RenewAsync(fixture.RuntimeIds[0], "runner", policy,
                 async (_, token) => { entered.SetResult(); await release.Task.WaitAsync(token); }, ct);
+            await Task.WhenAny(entered.Task, lease).WaitAsync(TimeSpan.FromSeconds(5), ct);
+            if (lease.IsCompleted) await lease; // Surface setup failures rather than a misleading timeout.
             await entered.Task.WaitAsync(TimeSpan.FromSeconds(5), ct);
             var stop = stopDb.RuntimeInstances.Where(x => x.Id == fixture.RuntimeIds[0])
                 .ExecuteUpdateAsync(setters => setters.SetProperty(x => x.State, NoCTF.Domain.Runtime.RuntimeState.Stopped), ct);

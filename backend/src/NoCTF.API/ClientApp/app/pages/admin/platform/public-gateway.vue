@@ -3,7 +3,7 @@ import { Globe, RefreshCw } from '@lucide/vue'
 import { toast } from 'vue-sonner'
 import { adminPlatformGetPublicGateway, adminPlatformGetPublicGatewayStatus, adminPlatformUpdatePublicGateway } from '~/api'
 import type { NoCtfapiEndpointsAdministrationPlatformPublicGatewayConfigurationResponse as Configuration, NoCtfapiEndpointsAdministrationPlatformPublicGatewayStatusResponse as GatewayStatus } from '~/api'
-import { gatewayOrigin, publicGatewayFailure, publicGatewayState } from '~/utils/public-gateway'
+import { gatewayHost, gatewayOrigin, publicGatewayFailure, publicGatewayState } from '~/utils/public-gateway'
 
 definePageMeta({ middleware: 'platform-admin' })
 const configuration = ref<Configuration | null>(null)
@@ -69,9 +69,8 @@ async function save() {
     || new Set(directOrigins.map(value => gatewayOrigin(value))).size !== directOrigins.length
     || directOrigins.some(value => gatewayOrigin(value) === origin))
     issues.directOrigins = translate('填写 1 至 16 个不重复的内网入口，每行一个，不得包含公网入口')
-  const validHost = (value: string) => /^[a-z0-9.-]{1,253}$/i.test(value) && !value.startsWith('.') && !value.endsWith('-')
-  if (!validHost(form.publicRuntimeHost)) issues.publicRuntimeHost = translate('填写主机名或 IPv4 地址，不包含协议、路径或端口')
-  if (form.directRuntimeHostOverride && !validHost(form.directRuntimeHostOverride))
+  if (!gatewayHost(form.publicRuntimeHost)) issues.publicRuntimeHost = translate('填写主机名或 IPv4 地址，不包含协议、路径或端口')
+  if (form.directRuntimeHostOverride && !gatewayHost(form.directRuntimeHostOverride))
     issues.directRuntimeHostOverride = translate('填写主机名或 IPv4 地址，不包含协议、路径或端口')
   if (!Number.isInteger(form.maxPublishedPorts) || form.maxPublishedPorts < 1 || form.maxPublishedPorts > (capability.value?.maximumPorts ?? 0))
     issues.maxPublishedPorts = translate('公开端口数量必须在部署允许的配额内')
