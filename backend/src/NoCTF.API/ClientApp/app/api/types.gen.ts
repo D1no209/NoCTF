@@ -179,6 +179,7 @@ export type NoCtfapiEndpointsRuntimeRuntimeResponse = {
     runningAt?: string | null;
     expiresAt?: string | null;
     stoppedAt?: string | null;
+    access?: NoCtfapiEndpointsRuntimeRuntimeAccessResponse | null;
 };
 
 export type NoCtfapiEndpointsRuntimeRuntimeKindProtocol = 'Container' | 'Compose' | 'OvaVm';
@@ -189,8 +190,29 @@ export type NoCtfapiEndpointsRuntimeRuntimeStateProtocol = 'Queued' | 'Provision
 
 export type NoCtfapiEndpointsRuntimeRuntimeFailureCodeProtocol = 'InvalidConfiguration' | 'RunnerUnavailable' | 'ProviderUnavailable' | 'ProvisionTimeout' | 'ProviderRejected' | 'CleanupFailed' | 'UrlExpansionFailed';
 
+export type NoCtfapiEndpointsRuntimeRuntimeAccessResponse = {
+    route?: NoCtfapiEndpointsRuntimeRuntimeAccessRouteProtocol;
+    state?: NoCtfapiEndpointsRuntimePublicAccessStateProtocol;
+    failure?: NoCtfapiEndpointsRuntimePublicAccessFailureProtocol | null;
+    endpoints?: Array<NoCtfapiEndpointsRuntimePublicEndpointResponse>;
+};
+
+export type NoCtfapiEndpointsRuntimeRuntimeAccessRouteProtocol = 'Direct' | 'Gateway';
+
+export type NoCtfapiEndpointsRuntimePublicAccessStateProtocol = 'Disabled' | 'Pending' | 'Ready' | 'Unavailable' | 'Revoking' | 'Unsupported';
+
+export type NoCtfapiEndpointsRuntimePublicAccessFailureProtocol = 'GatewayDisabled' | 'ConnectorOffline' | 'PublicPortUnavailable' | 'RuntimeBindingUnavailable' | 'UnsupportedRuntimeKind' | 'AccessDisplayUnsupported' | 'GatewayCapacityExceeded' | 'GatewayIdentityRejected' | 'GatewaySafetyCheckFailed' | 'GatewayReconciliationPending';
+
+export type NoCtfapiEndpointsRuntimePublicEndpointResponse = {
+    containerPort?: number;
+    hostPort?: number;
+    state?: NoCtfapiEndpointsRuntimePublicAccessStateProtocol;
+    failure?: NoCtfapiEndpointsRuntimePublicAccessFailureProtocol | null;
+};
+
 export type NoCtfapiEndpointsRuntimeRuntimeTargetListResponse = {
     items?: Array<NoCtfapiEndpointsRuntimeRuntimeTargetResponse>;
+    publicAccessFailure?: NoCtfapiEndpointsRuntimePublicAccessFailureProtocol | null;
 };
 
 export type NoCtfapiEndpointsRuntimeRuntimeTargetResponse = {
@@ -865,6 +887,7 @@ export type NoCtfapiEndpointsChallengesChallengeResponse = {
     remainingFlagAttempts?: number | null;
     usesDynamicFlag?: boolean;
     hints?: Array<NoCtfapiEndpointsChallengesParticipantChallengeHintResponse> | null;
+    publicAccessFailure?: NoCtfapiEndpointsRuntimePublicAccessFailureProtocol | null;
 };
 
 export type NoCtfapiEndpointsChallengesParticipantChallengeHintResponse = {
@@ -1435,6 +1458,49 @@ export type NoCtfApplicationAdministrationMonitoringPlatformMonitoringPoolResour
 
 export type NoCtfApplicationAdministrationMonitoringPlatformMonitoringResource = 0 | 1 | 2;
 
+export type NoCtfapiEndpointsAdministrationPlatformPublicGatewayConfigurationResponse = {
+    policy?: NoCtfapiEndpointsAdministrationPlatformPublicGatewayPolicyResponse;
+    capability?: NoCtfapiEndpointsAdministrationPlatformPublicGatewayCapabilityResponse | null;
+};
+
+export type NoCtfapiEndpointsAdministrationPlatformPublicGatewayPolicyResponse = {
+    enabled?: boolean;
+    connectorId?: string;
+    publicOrigin?: string;
+    directOrigins?: Array<string>;
+    publicRuntimeHost?: string;
+    directRuntimeHostOverride?: string | null;
+    maxPublishedPorts?: number;
+};
+
+export type NoCtfapiEndpointsAdministrationPlatformPublicGatewayCapabilityResponse = {
+    connectorId?: string;
+    runnerId?: string;
+    approvedOrigins?: Array<string>;
+    firstPort?: number;
+    lastPort?: number;
+    reservedPorts?: Array<number>;
+    maximumPorts?: number;
+    namespaceIsolationAvailable?: boolean;
+    configurationError?: string | null;
+};
+
+export type NoCtfapiEndpointsAdministrationPlatformPublicGatewayStatusResponse = {
+    configured?: boolean;
+    enabled?: boolean;
+    applied?: boolean;
+    validUntil?: string | null;
+    failure?: NoCtfapiEndpointsRuntimePublicAccessFailureProtocol | null;
+    runtimes?: Array<NoCtfapiEndpointsAdministrationPlatformPublicGatewayRuntimeStatusResponse>;
+};
+
+export type NoCtfapiEndpointsAdministrationPlatformPublicGatewayRuntimeStatusResponse = {
+    runtimeId?: string;
+    validUntil?: string;
+    endpoints?: Array<NoCtfapiEndpointsRuntimePublicEndpointResponse>;
+    failure?: NoCtfapiEndpointsRuntimePublicAccessFailureProtocol | null;
+};
+
 export type NoCtfapiEndpointsAdministrationPlatformIssuePlatformBotTokenResponse = {
     accessToken?: string;
     expiresAt?: string;
@@ -1601,6 +1667,21 @@ export type NoCtfapiEndpointsAdministrationPlatformUpdatePlatformUserRoleConflic
 
 export type NoCtfapiEndpointsAdministrationPlatformUpdatePlatformUserRoleRequest = {
     role?: NoCtfapiEndpointsAuthenticationUserRoleProtocol;
+};
+
+export type NoCtfapiEndpointsAdministrationPlatformPublicGatewayAcceptedResponse = {
+    configuration?: NoCtfapiEndpointsAdministrationPlatformPublicGatewayConfigurationResponse;
+    statusUrl?: string;
+};
+
+export type NoCtfapiEndpointsAdministrationPlatformUpdatePublicGatewayRequest = {
+    enabled?: boolean;
+    connectorId: string;
+    publicOrigin: string;
+    directOrigins: Array<string>;
+    publicRuntimeHost: string;
+    directRuntimeHostOverride?: string | null;
+    maxPublishedPorts?: number;
 };
 
 export type NoCtfapiEndpointsAdministrationPlatformUploadPlatformLogoRequest = {
@@ -2179,6 +2260,7 @@ export type NoCtfapiEndpointsAdministrationChallengeBankChallengeTestRuntimeResp
     runningAt?: string | null;
     expiresAt?: string | null;
     stoppedAt?: string | null;
+    publicAccessFailure?: NoCtfapiEndpointsRuntimePublicAccessFailureProtocol | null;
 };
 
 export type NoCtfapiEndpointsAdministrationChallengeBankRuntimeTestFlagStateProtocol = 'NotRequired' | 'Pending' | 'Succeeded' | 'Failed' | 'Canceled';
@@ -6148,6 +6230,93 @@ export type AdminGetPrivatePlatformUserResponses = {
 };
 
 export type AdminGetPrivatePlatformUserResponse = AdminGetPrivatePlatformUserResponses[keyof AdminGetPrivatePlatformUserResponses];
+
+export type AdminPlatformGetPublicGatewayData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/v1/admin/platform/public-gateway';
+};
+
+export type AdminPlatformGetPublicGatewayErrors = {
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+};
+
+export type AdminPlatformGetPublicGatewayResponses = {
+    /**
+     * Success
+     */
+    200: NoCtfapiEndpointsAdministrationPlatformPublicGatewayConfigurationResponse;
+};
+
+export type AdminPlatformGetPublicGatewayResponse = AdminPlatformGetPublicGatewayResponses[keyof AdminPlatformGetPublicGatewayResponses];
+
+export type AdminPlatformUpdatePublicGatewayData = {
+    body: NoCtfapiEndpointsAdministrationPlatformUpdatePublicGatewayRequest;
+    path?: never;
+    query?: never;
+    url: '/api/v1/admin/platform/public-gateway';
+};
+
+export type AdminPlatformUpdatePublicGatewayErrors = {
+    /**
+     * Bad Request
+     */
+    400: MicrosoftAspNetCoreMvcValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+};
+
+export type AdminPlatformUpdatePublicGatewayError = AdminPlatformUpdatePublicGatewayErrors[keyof AdminPlatformUpdatePublicGatewayErrors];
+
+export type AdminPlatformUpdatePublicGatewayResponses = {
+    /**
+     * Accepted
+     */
+    202: NoCtfapiEndpointsAdministrationPlatformPublicGatewayAcceptedResponse;
+};
+
+export type AdminPlatformUpdatePublicGatewayResponse = AdminPlatformUpdatePublicGatewayResponses[keyof AdminPlatformUpdatePublicGatewayResponses];
+
+export type AdminPlatformGetPublicGatewayStatusData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/v1/admin/platform/public-gateway/status';
+};
+
+export type AdminPlatformGetPublicGatewayStatusErrors = {
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+};
+
+export type AdminPlatformGetPublicGatewayStatusResponses = {
+    /**
+     * Success
+     */
+    200: NoCtfapiEndpointsAdministrationPlatformPublicGatewayStatusResponse;
+};
+
+export type AdminPlatformGetPublicGatewayStatusResponse = AdminPlatformGetPublicGatewayStatusResponses[keyof AdminPlatformGetPublicGatewayStatusResponses];
 
 export type AdminPlatformInvalidateUserTokensData = {
     body?: never;

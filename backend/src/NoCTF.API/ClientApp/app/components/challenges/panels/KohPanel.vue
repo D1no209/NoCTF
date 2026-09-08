@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { toast } from 'vue-sonner'
 import { Copy } from '@lucide/vue'
+import { publicGatewayFailure } from '~/utils/public-gateway'
 import type {
   NoCtfapiEndpointsChallengesChallengeResponse,
   NoCtfapiEndpointsCompetitionsCompetitionResponse,
@@ -26,7 +27,8 @@ async function copyControlFlag(flag: string) {
   <div class="grid gap-6 md:grid-cols-2 md:gap-0 md:divide-x">
     <section class="flex flex-col gap-4 md:pr-6" aria-labelledby="koh-hill-title">
         <h3 id="koh-hill-title" class="text-sm font-semibold">{{ $t('山头(Hill)入口') }}</h3>
-        <div v-if="challenge.urls?.length" class="flex flex-col gap-1">
+        <Alert v-if="challenge.publicAccessFailure"><AlertDescription>{{ publicGatewayFailure(challenge.publicAccessFailure) }}</AlertDescription></Alert>
+        <div v-else-if="challenge.urls?.length" class="flex flex-col gap-1">
           <RuntimeAccessUrl
             v-for="url in challenge.urls"
             :key="url"
