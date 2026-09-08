@@ -25,6 +25,8 @@ public sealed class RawSqlPersistenceRulesTests
     private static readonly IReadOnlyDictionary<string, HashSet<string>> ApprovedProviderSql =
         new Dictionary<string, HashSet<string>>(StringComparer.Ordinal)
         {
+            // Parameterized settings/runtime SHARE locks fence only the bounded local gateway lease write.
+            ["backend/src/NoCTF.Infrastructure/Runtime/PublicAccess/PublicGatewayLeaseGuard.cs"] = ["ExecuteSqlInterpolated"],
             // Competition-scoped shared admission lock, with a bound UUID parameter.
             ["backend/src/NoCTF.Infrastructure/Competitions/Participation/CompetitionParticipationLock.cs"] = ["ExecuteSqlInterpolated"],
             ["backend/src/NoCTF.Infrastructure/Commands/Idempotency/TransactionalRequestReplay.cs"] = ["ExecuteSqlInterpolated", "pg_advisory_"],

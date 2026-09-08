@@ -4,6 +4,7 @@ using NoCTF.API.Endpoints.Runtime;
 using NoCTF.API.Security;
 using NoCTF.Application.GameplayFacts.Awdp;
 using NoCTF.Domain.Runtime;
+using NoCTF.Application.Runtime.PublicAccess;
 
 namespace NoCTF.API.Endpoints.GameplayFacts;
 
@@ -39,10 +40,10 @@ public sealed record AwdpParticipantStateResponse(
 
 internal static class AwdpParticipantStateMapping
 {
-    internal static AwdpParticipantStateResponse ToResponse(AwdpParticipantStateView view) =>
+    internal static AwdpParticipantStateResponse ToResponse(AwdpParticipantStateView view, RuntimeAccessProjection? access = null) =>
         new(
             view.CurrentRound,
-            view.AttackRuntime is null ? null : RuntimeEndpointMapping.ToResponse(view.AttackRuntime),
+            view.AttackRuntime is null ? null : RuntimeEndpointMapping.ToResponse(view.AttackRuntime, access),
             view.LatestBreakAttempt is null
                 ? null
                 : GameplayFactMapper.ToStatusResponse(view.LatestBreakAttempt),
@@ -83,8 +84,9 @@ internal static class AwdpParticipantStateMapping
 public sealed class GetAwdpParticipantStateEndpoint(
     GetAwdpParticipantState get,
     IUserContext user,
-    TimeProvider timeProvider)
-    : EndpointWithoutRequest<Results<Ok<AwdpParticipantStateResponse>, NotFound>>
+    TimeProvider timeProvider,
+    ReadRuntimePublicAccess access)
+    : EndpointWithoutRequest<Results<Ok<AwdpParticipantStateResponse>, NotFound, ProblemHttpResult>>
 {
     public override void Configure()
     {
@@ -98,7 +100,7 @@ public sealed class GetAwdpParticipantStateEndpoint(
         });
     }
 
-    public override async Task<Results<Ok<AwdpParticipantStateResponse>, NotFound>> ExecuteAsync(
+    public override async Task<Results<Ok<AwdpParticipantStateResponse>, NotFound, ProblemHttpResult>> ExecuteAsync(
         CancellationToken cancellationToken)
     {
         var view = await get.ExecuteAsync(
@@ -107,8 +109,10 @@ public sealed class GetAwdpParticipantStateEndpoint(
             user.UserId,
             timeProvider.GetUtcNow(),
             cancellationToken);
-        return view is null
-            ? TypedResults.NotFound()
-            : TypedResults.Ok(AwdpParticipantStateMapping.ToResponse(view));
+        if (view is null) return TypedResults.NotFound();
+        var projection = view.AttackRuntime is null ? null : await access.ExecuteAsync(view.AttackRuntime,
+            $"{HttpContext.Request.Scheme}://{HttpContext.Request.Host}", cancellationToken);
+        if (view.AttackRuntime is not null && projection is null) return RuntimeEndpointMapping.UnknownOrigin();
+        return TypedResults.Ok(AwdpParticipantStateMapping.ToResponse(view, projection));
     }
 }

@@ -9,6 +9,9 @@ using NoCTF.Domain.Competitions;
 using NoCTF.API.Endpoints.Competitions;
 using NoCTF.Application.GameplayFacts.Intake;
 using NoCTF.Application.Challenges.Hints;
+using NoCTF.Application.Runtime.PublicAccess;
+using NoCTF.Domain.Platform;
+using NoCTF.API.Endpoints.Runtime;
 
 namespace NoCTF.API.Endpoints.Challenges;
 
@@ -34,7 +37,10 @@ public sealed record ChallengeResponse(
     int? AcceptedFlagAttempts = null,
     int? RemainingFlagAttempts = null,
     bool UsesDynamicFlag = false,
-    IReadOnlyList<ParticipantChallengeHintResponse>? Hints = null);
+    IReadOnlyList<ParticipantChallengeHintResponse>? Hints = null)
+{
+    public PublicAccessFailureProtocol? PublicAccessFailure { get; init; }
+}
 
 public sealed record ParticipantChallengeHintResponse(
     Guid Id,
@@ -110,7 +116,8 @@ public sealed class GetChallengeEndpoint(
     GetFlagAttemptBudget getAttemptBudget,
     ReadParticipantChallengeHints getHints,
     IUserContext user,
-    TimeProvider timeProvider) : Endpoint<GetChallengeRequest, Results<Ok<ChallengeResponse>, NotFound>>
+    TimeProvider timeProvider,
+    ReadRuntimePublicAccess runtimeAccess) : Endpoint<GetChallengeRequest, Results<Ok<ChallengeResponse>, NotFound, ProblemHttpResult>>
 {
     public override void Configure()
     {
@@ -119,7 +126,7 @@ public sealed class GetChallengeEndpoint(
         Summary(summary => summary.Summary = "Gets a published challenge.");
     }
 
-    public override async Task<Results<Ok<ChallengeResponse>, NotFound>> ExecuteAsync(
+    public override async Task<Results<Ok<ChallengeResponse>, NotFound, ProblemHttpResult>> ExecuteAsync(
         GetChallengeRequest request,
         CancellationToken ct)
     {
@@ -158,12 +165,17 @@ public sealed class GetChallengeEndpoint(
                 item.Id,
                 user.UserId,
                 ct);
-        return TypedResults.Ok(ChallengeMapper.ToResponse(
+        var response = ChallengeMapper.ToResponse(
             item,
             access,
             visibility.Visibility,
             visibility.DataScope,
             attemptBudget,
-            await getHints.ExecuteAsync(item.CompetitionId, item.Id, user.UserId, timeProvider.GetUtcNow(), ct)));
+            await getHints.ExecuteAsync(item.CompetitionId, item.Id, user.UserId, timeProvider.GetUtcNow(), ct));
+        if (access is null) return TypedResults.Ok(response);
+        var route = await runtimeAccess.RouteAsync($"{HttpContext.Request.Scheme}://{HttpContext.Request.Host}", ct);
+        if (route is null) return RuntimeEndpointMapping.UnknownOrigin();
+        return TypedResults.Ok(route == RuntimeAccessRoute.Direct ? response : response with
+        { Urls = [], PublicAccessFailure = PublicAccessFailureProtocol.UnsupportedRuntimeKind });
     }
 }

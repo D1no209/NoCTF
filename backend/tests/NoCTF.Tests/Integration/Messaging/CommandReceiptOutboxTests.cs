@@ -80,6 +80,14 @@ public sealed class CommandReceiptOutboxTests
                         || x.Kind == NoCTF.Domain.Competitions.Events.CompetitionEventKind.ChallengeUpdated), ct)).IsEqualTo(2);
                 // Observe real database rows inside each transaction, before dispatch can remove them.
                 await Assert.That(commits.EnvelopeCounts).IsEquivalentTo([2, 2]);
+                using var gatewayCaches = new ServiceCollection().AddFusionCache(NoCTF.Infrastructure.Caching.NoCtfCacheNames.ReadModels).Services.BuildServiceProvider();
+                var gatewayPolicy = new NoCTF.Application.Runtime.PublicAccess.PublicGatewayPolicy(true, "test-gateway", "https://public.example.test",
+                    ["https://direct.example.test"], "203.0.113.1", null, 8);
+                var gateway = new NoCTF.Infrastructure.Runtime.PublicAccess.PublicGatewayPolicyStore(db,
+                    gatewayCaches.GetRequiredService<ZiggyCreatures.Caching.Fusion.IFusionCacheProvider>(), outbox,
+                    new("test-gateway", "receipt-runner", [gatewayPolicy.PublicOrigin], 32768, 60999, [], 8, true));
+                await gateway.SaveAsync(gatewayPolicy, fixture.Now, ct);
+                await Assert.That(commits.EnvelopeCounts).IsEquivalentTo([2, 2, 1]);
                 commits.FailCommit = true;
                 await Assert.That(async () => await store.TryUpdateAsync(fixture.Id,
                     """{"schemaVersion":4,"roundDurationSeconds":99}""", true, fixture.Now.AddSeconds(1), ct))

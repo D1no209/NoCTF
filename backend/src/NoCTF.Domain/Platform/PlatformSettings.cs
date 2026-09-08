@@ -47,5 +47,17 @@ public sealed class PlatformSettings
 
     public int EmailSmtpTimeoutSeconds { get; set; }
 
+    public bool PublicGatewayEnabled { get; set; }
+    [MaxLength(128)]
+    public string PublicGatewayConnectorId { get; set; } = string.Empty;
+    [MaxLength(2048)]
+    public string PublicGatewayOrigin { get; set; } = string.Empty;
+    public string[] PublicGatewayDirectOrigins { get; set; } = [];
+    [MaxLength(253)]
+    public string PublicGatewayRuntimeHost { get; set; } = string.Empty;
+    [MaxLength(253)]
+    public string? PublicGatewayDirectHostOverride { get; set; }
+    public int PublicGatewayMaxPorts { get; set; }
+
     public DateTimeOffset UpdatedAt { get; set; }
 }
