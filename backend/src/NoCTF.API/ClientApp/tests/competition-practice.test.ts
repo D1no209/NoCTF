@@ -1,10 +1,18 @@
 import { sourceFile } from './support/feature-source'
 import { describe, expect, test } from 'bun:test'
-import { canEnterCompetition, isCtfPracticeOpen } from '../app/lib/competition-participation'
+import { canEnterCompetition, canRegisterForCompetition, isCtfPracticeOpen } from '../app/lib/competition-participation'
 
 describe('competition practice entry', () => {
   const eligible = { registrationStatus: 'Approved', isBanned: false } as const
   const practice = { mode: 'Ctf', status: 'Finished', practiceModeEnabled: true } as const
+
+  test('post-contest practice allows late teams without reopening ordinary registration', () => {
+    expect(canRegisterForCompetition(practice)).toBeTrue()
+    expect(canRegisterForCompetition({ ...practice, practiceModeEnabled: false })).toBeFalse()
+    expect(canRegisterForCompetition({ ...practice, mode: 'Awdp' })).toBeFalse()
+    expect(canRegisterForCompetition({ ...practice, status: 'Running' })).toBeFalse()
+    expect(canRegisterForCompetition({ ...practice, status: 'Paused' })).toBeFalse()
+  })
 
   test('finished CTF with practice enabled has an entry for approved teams', () => {
     expect(isCtfPracticeOpen(practice)).toBeTrue()

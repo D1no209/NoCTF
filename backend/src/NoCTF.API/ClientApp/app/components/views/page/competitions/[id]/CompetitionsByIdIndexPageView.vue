@@ -65,7 +65,7 @@ const { ArrowRight, Box, CalendarRange, Clock, FileText, KeyRound, LogIn, Shield
               <Dialog v-if="teamRegistrationOpen" v-model:open="createOpen">
                 <DialogTrigger as-child>
                   <Button size="lg">
-                    <UserPlus data-icon="inline-start" /> {{ $t('ui.signUpNow') }} </Button>
+                    <UserPlus data-icon="inline-start" /> {{ practiceOpen ? $t('ui.createPracticeTeam') : $t('ui.signUpNow') }} </Button>
                 </DialogTrigger>
                 <DialogContent>
                   <DialogHeader>
