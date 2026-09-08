@@ -28,6 +28,18 @@ jobs:
             repository: noctf-public-gateway
             dockerfile: deploy/public-gateway/Dockerfile
             target: ''
+          - component: ssh-server
+            repository: noctf-gateway-ssh-server
+            dockerfile: deploy/public-gateway/ssh/Dockerfile
+            target: server
+          - component: ssh-client
+            repository: noctf-gateway-ssh-client
+            dockerfile: deploy/public-gateway/ssh/Dockerfile
+            target: client
+          - component: relay
+            repository: noctf-gateway-relay
+            dockerfile: deploy/public-gateway/relay/Dockerfile
+            target: ''
     env:
       CUSTOM_REGISTRY: ${{ vars.CUSTOM_REGISTRY }}
       CUSTOM_NAMESPACE: ${{ vars.CUSTOM_REGISTRY_NAMESPACE }}
