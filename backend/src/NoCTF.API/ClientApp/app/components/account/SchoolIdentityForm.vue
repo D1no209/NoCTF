@@ -60,7 +60,7 @@ onMounted(load)
 <template>
   <section class="flex flex-col gap-6">
     <header class="flex flex-col gap-2">
-      <h2 class="flex items-center gap-2 text-xl font-semibold"><LockKeyhole class="size-5" />{{ $t('校级比赛信息') }}</h2>
+      <h2 class="flex items-center gap-2 text-xl font-semibold"><LockKeyhole class="size-5" />{{ $t('个人信息') }}</h2>
       <p class="max-w-prose text-sm text-muted-foreground">{{ $t('仅用于赛事身份核验，不公开，仅平台管理员及你参加比赛的授权管理人员可见。') }}</p>
       <p class="text-sm text-muted-foreground">{{ $t('以下信息由你自行填写，不代表已实名认证。选填或清空均不影响参赛。') }}</p>
     </header>
@@ -82,7 +82,7 @@ onMounted(load)
       </FieldGroup>
       <Alert v-if="error" variant="destructive"><AlertDescription>{{ error }}</AlertDescription></Alert>
       <div class="flex flex-wrap items-center gap-3">
-        <Button type="submit" :disabled="pending || !dirty"><Spinner v-if="pending" data-icon="inline-start" />{{ $t('保存校级比赛信息') }}</Button>
+        <Button type="submit" :disabled="pending || !dirty"><Spinner v-if="pending" data-icon="inline-start" />{{ $t('保存个人信息') }}</Button>
         <Button v-if="error && !dirty" type="button" variant="outline" @click="load">{{ $t('重试') }}</Button>
         <span role="status" class="text-sm text-muted-foreground">{{ dirty ? $t('有未保存的修改') : success ? $t('已保存') : '' }}</span>
       </div>

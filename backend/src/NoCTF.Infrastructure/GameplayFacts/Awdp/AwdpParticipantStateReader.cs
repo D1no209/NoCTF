@@ -110,8 +110,11 @@ public sealed class AwdpParticipantStateReader(NoCtfDbContext db) : IAwdpPartici
                 runtime.CreatedAt,
                 runtime.RunningAt,
                 runtime.ExpiresAt,
-                runtime.StoppedAt))
+                runtime.StoppedAt, runtime.RunnerId,
+                runtime.PublishedPorts.Select(port => new RuntimePublishedPortView(port.ServiceName, port.ContainerPort, port.HostPort)).ToArray()))
             .FirstOrDefaultAsync(cancellationToken);
+        if (attackRuntime is not null)
+            attackRuntime = attackRuntime with { Mode = GameMode.Awdp, AccessBindings = configuration.Runtime?.UrlBindings ?? [] };
 
         var fixRuntime = await db.RuntimeInstances.AsNoTracking()
             .Where(runtime => runtime.CompetitionId == competitionId

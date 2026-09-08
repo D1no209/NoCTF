@@ -1063,6 +1063,42 @@ namespace NoCTF.Infrastructure.Migrations
                         .HasColumnType("character varying(100)")
                         .HasColumnName("name");
 
+                    b.Property<string>("PublicGatewayConnectorId")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("public_gateway_connector_id");
+
+                    b.Property<string>("PublicGatewayDirectHostOverride")
+                        .HasMaxLength(253)
+                        .HasColumnType("character varying(253)")
+                        .HasColumnName("public_gateway_direct_host_override");
+
+                    b.PrimitiveCollection<string[]>("PublicGatewayDirectOrigins")
+                        .IsRequired()
+                        .HasColumnType("text[]")
+                        .HasColumnName("public_gateway_direct_origins");
+
+                    b.Property<bool>("PublicGatewayEnabled")
+                        .HasColumnType("boolean")
+                        .HasColumnName("public_gateway_enabled");
+
+                    b.Property<int>("PublicGatewayMaxPorts")
+                        .HasColumnType("integer")
+                        .HasColumnName("public_gateway_max_ports");
+
+                    b.Property<string>("PublicGatewayOrigin")
+                        .IsRequired()
+                        .HasMaxLength(2048)
+                        .HasColumnType("character varying(2048)")
+                        .HasColumnName("public_gateway_origin");
+
+                    b.Property<string>("PublicGatewayRuntimeHost")
+                        .IsRequired()
+                        .HasMaxLength(253)
+                        .HasColumnType("character varying(253)")
+                        .HasColumnName("public_gateway_runtime_host");
+
                     b.Property<DateTimeOffset>("UpdatedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("updated_at");
@@ -1096,6 +1132,12 @@ namespace NoCTF.Infrastructure.Migrations
                             EmailVerificationResendCooldownSeconds = 60,
                             EmailVerificationTokenLifetimeMinutes = 1440,
                             Name = "NoCTF",
+                            PublicGatewayConnectorId = "",
+                            PublicGatewayDirectOrigins = new string[0],
+                            PublicGatewayEnabled = false,
+                            PublicGatewayMaxPorts = 0,
+                            PublicGatewayOrigin = "",
+                            PublicGatewayRuntimeHost = "",
                             UpdatedAt = new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0))
                         });
                 });

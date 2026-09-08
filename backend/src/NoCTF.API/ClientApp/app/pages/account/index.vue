@@ -163,7 +163,7 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
     <Tabs default-value="profile" orientation="vertical" class="flex-col gap-8 md:flex-row md:gap-12">
       <TabsList variant="line" class="w-full shrink-0 items-stretch md:w-48">
         <TabsTrigger value="profile" class="justify-start gap-2"><UserRound />{{ $t('公开资料') }}<span v-if="profileDirty" :aria-label="$t('有未保存的修改')">•</span></TabsTrigger>
-        <TabsTrigger value="school" class="justify-start gap-2"><LockKeyhole />{{ $t('校级比赛信息') }}<span v-if="schoolDirty" :aria-label="$t('有未保存的修改')">•</span></TabsTrigger>
+        <TabsTrigger value="school" class="justify-start gap-2"><LockKeyhole />{{ $t('个人信息') }}<span v-if="schoolDirty" :aria-label="$t('有未保存的修改')">•</span></TabsTrigger>
         <TabsTrigger value="security" class="justify-start gap-2"><ShieldCheck />{{ $t('账户安全') }}</TabsTrigger>
       </TabsList>
       <div class="min-w-0 flex-1">

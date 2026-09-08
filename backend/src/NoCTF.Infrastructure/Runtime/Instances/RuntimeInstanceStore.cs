@@ -23,7 +23,8 @@ public sealed class RuntimeInstanceStore(
     ITransactionalMessageOutbox outbox,
     TeamRuntimeQuota runtimeQuota,
     ICompetitionEventRecorder? eventRecorder = null,
-    IRequestReplay? replay = null) : IRuntimeInstanceStore
+    IRequestReplay? replay = null,
+    NoCTF.Application.Runtime.PublicAccess.PublicGatewayCapability? gatewayCapability = null) : IRuntimeInstanceStore
 {
     public RuntimeInstanceStore(
         NoCtfDbContext db,
@@ -57,7 +58,7 @@ public sealed class RuntimeInstanceStore(
             || scope.Mode == GameMode.Koh)
             return null;
         var purpose = PurposeFor(scope);
-        return await db.RuntimeInstances.AsNoTracking()
+        var runtime = await db.RuntimeInstances.AsNoTracking()
             .Where(instance =>
                 instance.CompetitionId == competitionId &&
                 instance.CompetitionChallengeId == competitionChallengeId &&
@@ -69,8 +70,22 @@ public sealed class RuntimeInstanceStore(
                 instance.Id, instance.CompetitionId, instance.CompetitionChallengeId, instance.ChallengeId, instance.TeamId,
                 instance.Purpose, instance.RuntimeKind, instance.RuntimeProvider,
                 instance.State, instance.FailureCode, instance.Urls,
-                instance.CreatedAt, instance.RunningAt, instance.ExpiresAt, instance.StoppedAt))
+                instance.CreatedAt, instance.RunningAt, instance.ExpiresAt, instance.StoppedAt,
+                instance.RunnerId, instance.PublishedPorts.Select(port => new RuntimePublishedPortView(
+                    port.ServiceName, port.ContainerPort, port.HostPort)).ToArray()))
             .FirstOrDefaultAsync(ct);
+        return runtime is null ? null : runtime with
+        {
+            Mode = scope.Mode,
+            AccessBindings = gatewayCapability is null ? [] : ReadAccessBindings(scope)
+        };
+    }
+
+    private IReadOnlyList<RuntimeUrlBinding> ReadAccessBindings(RuntimeScope scope)
+    {
+        try { return templates.Get(scope.Mode, scope.DefinitionJson)?.UrlBindings ?? []; }
+        catch (GameModeConfigurationException) { return []; }
+        catch (System.Text.Json.JsonException) { return []; }
     }
 
     public async Task<RuntimeMutationResult> MutatePlayerRuntimeAsync(

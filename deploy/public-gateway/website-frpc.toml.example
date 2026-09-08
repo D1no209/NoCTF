@@ -1,0 +1,15 @@
+serverAddr = "8.156.82.215"
+serverPort = 60998
+loginFailExit = false
+auth.token = "{{ .Envs.NOCTF_FRP_TOKEN }}"
+transport.tls.enable = true
+transport.tls.serverName = "noctf-website-gateway"
+transport.tls.trustedCaFile = "/config/ca.crt"
+transport.tls.certFile = "/config/client.crt"
+transport.tls.keyFile = "/config/client.key"
+[[proxies]]
+name = "noctf-website"
+type = "tcp"
+localIP = "127.0.0.1"
+localPort = 8080
+remotePort = 9999

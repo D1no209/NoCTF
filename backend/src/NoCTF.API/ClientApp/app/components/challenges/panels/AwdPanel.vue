@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { listRuntimeTargetsEndpoint } from '~/api'
+import { publicGatewayFailure } from '~/utils/public-gateway'
 import type {
   NoCtfapiEndpointsChallengesChallengeResponse,
   NoCtfapiEndpointsCompetitionsCompetitionResponse,
@@ -27,6 +28,7 @@ onMounted(async () => {
     return
   }
   targets.value = data.items ?? []
+  if (data.publicAccessFailure) targetsError.value = publicGatewayFailure(data.publicAccessFailure)
 })
 </script>
 

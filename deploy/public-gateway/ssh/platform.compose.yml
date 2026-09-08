@@ -1,0 +1,18 @@
+# Optional overlay for deploy/docker-compose.yml's combined-host service.
+# Separate Api/Runner deployments apply equivalent mounts only to the Runner.
+services:
+  noctf:
+    env_file:
+      - ${NOCTF_GATEWAY_ENV_FILE:?Set the absolute gateway env file path}
+    volumes:
+      - type: bind
+        source: ${NOCTF_GATEWAY_STATE_DIRECTORY:?Prepare a private Linux state directory}
+        target: /app/public-gateway-state
+        bind:
+          create_host_path: false
+      - type: bind
+        source: ${NOCTF_GATEWAY_CLIENT_DIRECTORY:?Set the dedicated client pairing directory}
+        target: /app/public-gateway-keys
+        read_only: true
+        bind:
+          create_host_path: false
