@@ -143,7 +143,13 @@ onBeforeUnmount(() => { generation++; if (statusTimer) clearInterval(statusTimer
         <div v-for="runtime in status?.runtimes ?? []" :key="runtime.runtimeId" class="flex min-w-0 flex-col gap-2 border-b pb-3">
           <span class="break-all font-mono text-xs">{{ runtime.runtimeId }}</span>
           <p v-if="runtime.failure" class="text-sm text-destructive">{{ publicGatewayFailure(runtime.failure) }}</p>
-          <div v-for="endpoint in runtime.endpoints ?? []" :key="endpoint.containerPort" class="flex flex-wrap items-center gap-2 text-sm"><span class="font-mono">{{ endpoint.containerPort }} → {{ endpoint.hostPort }}</span><Badge :variant="endpoint.state === 'Ready' ? 'default' : 'outline'">{{ publicGatewayState(endpoint.state) }}</Badge><span v-if="endpoint.failure" class="text-muted-foreground">{{ publicGatewayFailure(endpoint.failure) }}</span></div>
+          <div v-for="endpoint in runtime.endpoints ?? []" :key="endpoint.containerPort" class="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm">
+            <span>{{ $t('容器端口') }} <span class="font-mono tabular-nums">{{ endpoint.containerPort }}</span></span>
+            <span>{{ $t('直连端口') }} <span class="font-mono tabular-nums">{{ endpoint.hostPort }}</span></span>
+            <span>{{ $t('公网端口') }} <span class="font-mono tabular-nums">{{ endpoint.publicPort ?? '—' }}</span></span>
+            <Badge :variant="endpoint.state === 'Ready' ? 'default' : 'outline'">{{ publicGatewayState(endpoint.state) }}</Badge>
+            <span v-if="endpoint.failure" class="text-muted-foreground">{{ publicGatewayFailure(endpoint.failure) }}</span>
+          </div>
         </div>
       </section>
     </template>

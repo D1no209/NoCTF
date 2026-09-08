@@ -39,7 +39,7 @@ public sealed class GetPublicGatewayStatusEndpoint(ManagePublicGateway gateway, 
                 : status is null && configuration.Capability is not null ? PublicAccessFailureProtocol.ConnectorOffline : null,
             status?.Runtimes.Select(runtime => new PublicGatewayRuntimeStatusResponse(runtime.RuntimeId, runtime.ValidUntil,
                 runtime.Endpoints.Select(item => new PublicEndpointResponse(item.ContainerPort, item.HostPort,
-                    RuntimeAccessMapping.ToProtocol(item.State), item.Failure is { } code ? RuntimeAccessMapping.ToProtocol(code) : null)).ToArray(),
+                    RuntimeAccessMapping.ToProtocol(item.State), item.Failure is { } code ? RuntimeAccessMapping.ToProtocol(code) : null, item.PublicPort)).ToArray(),
                 runtime.Failure is { } runtimeFailure ? RuntimeAccessMapping.ToProtocol(runtimeFailure) : null)).ToArray() ?? []));
     }
 }

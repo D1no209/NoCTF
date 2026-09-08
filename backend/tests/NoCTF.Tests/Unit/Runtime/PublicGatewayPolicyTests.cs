@@ -86,7 +86,47 @@ public sealed class PublicGatewayPolicyTests
     }
 
     private static PublicRuntimeStatus Ready() => new(Runtime.Id, "gateway", "runner", Now.AddSeconds(5),
-        [new(31337, 32777, PublicAccessState.Ready, null)]);
+        [new(31337, 32777, PublicAccessState.Ready, null, 32777)]);
+
+    [Test]
+    public async Task Independent_public_pool_never_changes_the_Docker_direct_port()
+    {
+        var capability = Capability with { FirstPort = 40000, LastPort = 40255 };
+        var status = Ready() with { Endpoints = [new(31337, 32777, PublicAccessState.Ready, null, 40001)] };
+        var result = PublicGatewayPolicyRules.Project(Policy, RuntimeAccessRoute.Gateway, capability, Runtime,
+            GameMode.Ctf, [new("nc {HOST} {PORT}", RuntimeExposure.OwnerOnly, 31337)], status, Now);
+        await Assert.That(result.Urls).IsEquivalentTo(["nc 203.0.113.1 40001"]);
+        await Assert.That(result.Endpoints.Single().HostPort).IsEqualTo(32777);
+        await Assert.That(Runtime.PublishedPorts!.Single().HostPort).IsEqualTo(32777);
+        await Assert.That(PublicGatewayPolicyRules.Project(Policy, RuntimeAccessRoute.Direct, capability, Runtime,
+            GameMode.Ctf, [], status, Now).Urls).IsEquivalentTo(Runtime.Urls);
+    }
+
+    [Test]
+    [Arguments(null)]
+    [Arguments(36632)]
+    [Arguments(1)]
+    [Arguments(65536)]
+    public async Task Missing_reserved_or_out_of_pool_public_ports_fail_closed(int? publicPort)
+    {
+        var status = Ready() with { Endpoints = [new(31337, 32777, PublicAccessState.Ready, null, publicPort)] };
+        var result = Project(Policy, Runtime, status);
+        await Assert.That(result.Urls).IsEmpty();
+        await Assert.That(result.Failure).IsEqualTo(PublicAccessFailure.PublicPortUnavailable);
+    }
+
+    [Test]
+    public async Task Endpoint_failure_is_not_hidden_behind_pending_and_contradictory_ready_never_publishes()
+    {
+        foreach (var state in new[] { PublicAccessState.Unavailable, PublicAccessState.Ready })
+        {
+            var status = Ready() with { Endpoints = [new(31337, 32777, state, PublicAccessFailure.PublicPortUnavailable, 40001)] };
+            var result = Project(Policy, Runtime, status);
+            await Assert.That(result.State).IsEqualTo(PublicAccessState.Unavailable);
+            await Assert.That(result.Failure).IsEqualTo(PublicAccessFailure.PublicPortUnavailable);
+            await Assert.That(result.Urls).IsEmpty();
+        }
+    }
 
     [Test]
     public async Task Direct_override_expands_templates_without_rewriting_stored_urls()

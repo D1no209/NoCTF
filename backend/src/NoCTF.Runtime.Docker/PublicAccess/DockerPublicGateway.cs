@@ -161,7 +161,7 @@ public sealed class DockerPublicGateway : IDisposable
             var status = entries.FirstOrDefault(item => item.Name == ProxyName(publication.Id, port.ContainerPort))?.State;
             return status switch
             {
-                "running" => new PublicEndpointStatus(port.ContainerPort, port.HostPort, PublicAccessState.Ready, null),
+                "running" => new PublicEndpointStatus(port.ContainerPort, port.HostPort, PublicAccessState.Ready, null, port.HostPort),
                 "start error" or "closed" => new PublicEndpointStatus(port.ContainerPort, port.HostPort, PublicAccessState.Unavailable, PublicAccessFailure.PublicPortUnavailable),
                 _ => new PublicEndpointStatus(port.ContainerPort, port.HostPort, PublicAccessState.Pending, PublicAccessFailure.GatewayReconciliationPending)
             };

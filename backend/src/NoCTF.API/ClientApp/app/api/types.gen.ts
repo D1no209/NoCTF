@@ -208,6 +208,7 @@ export type NoCtfapiEndpointsRuntimePublicEndpointResponse = {
     hostPort?: number;
     state?: NoCtfapiEndpointsRuntimePublicAccessStateProtocol;
     failure?: NoCtfapiEndpointsRuntimePublicAccessFailureProtocol | null;
+    publicPort?: number | null;
 };
 
 export type NoCtfapiEndpointsRuntimeRuntimeTargetListResponse = {

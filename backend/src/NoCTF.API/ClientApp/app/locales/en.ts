@@ -35,6 +35,8 @@ export const englishMessages: Record<string, string> = {
   "留空保留现有内网连接文案。": "Leave blank to keep existing direct connection text.",
   "最大公开端口数": "Maximum public ports",
   "网关允许端口范围": "Gateway allowed port range",
+  "直连端口": "Direct port",
+  "公网端口": "Public port",
   "网关保留端口": "Gateway reserved ports",
   "网关变更可能中断已有公网连接，内网实例不会重启。": "Gateway changes may interrupt public connections. Direct runtimes are not restarted.",
   "有未保存的网关修改": "Unsaved gateway changes",
