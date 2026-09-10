@@ -69,7 +69,7 @@ emit: { (event: "update:open", ...args: [value: boolean]): void; (event: "save",
     loadError.value = false
     if (!file)
       return
-  
+
     const generation = loadGeneration
     sourceUrl = URL.createObjectURL(file)
     const image = new Image()
@@ -175,7 +175,7 @@ emit: { (event: "update:open", ...args: [value: boolean]): void; (event: "save",
   async function createCroppedFile() {
     if (!sourceImage.value || props.saving || encoding.value)
       return
-  
+
     encoding.value = true
     try {
       const canvas = document.createElement('canvas')
@@ -189,7 +189,7 @@ emit: { (event: "update:open", ...args: [value: boolean]): void; (event: "save",
         ?? (await new Promise<Blob | null>(resolve => canvas.toBlob(resolve, 'image/png')))
       if (!blob)
         throw new Error(translate("ui.unableToEncodeCroppedAvatar"))
-  
+
       emit('save', new File([blob], webp ? 'avatar.webp' : 'avatar.png', { type: blob.type }))
     }
     catch (error) {

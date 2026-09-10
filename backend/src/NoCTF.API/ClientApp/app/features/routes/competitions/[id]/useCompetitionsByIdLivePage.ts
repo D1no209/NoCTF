@@ -202,13 +202,13 @@ export function useCompetitionsByIdLivePage() {
     const reconciled = reconcileControlScreenSolves(seenSolveKeys, currentSolves)
     seenSolveKeys = reconciled.seenKeys
     if (!reconciled.newSolves.length) return
-  
+
     const activeChallengeId = challengeKey(featuredSolve.value?.competitionChallengeId)
     const sameChallengeUpdates = activeChallengeId
       ? reconciled.newSolves.filter(solve => challengeKey(solve.competitionChallengeId) === activeChallengeId)
       : []
     if (sameChallengeUpdates.length) focusSolve(sameChallengeUpdates.at(-1)!)
-  
+
     celebrationQueue.value.push(...reconciled.newSolves.filter(
       solve => !activeChallengeId || challengeKey(solve.competitionChallengeId) !== activeChallengeId,
     ))
@@ -220,7 +220,7 @@ export function useCompetitionsByIdLivePage() {
     const competitionResult = await getCompetitionEndpoint({ path: { competitionId } })
     loading.value = false
     refreshing.value = false
-  
+
     if (competitionResult.error || !competitionResult.data) {
       error.value = parseApiError(competitionResult.error, t("ui.loadingCompetitionFailed")).message
       return

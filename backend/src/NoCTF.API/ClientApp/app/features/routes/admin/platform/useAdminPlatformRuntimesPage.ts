@@ -206,15 +206,15 @@ export function useAdminPlatformRuntimesPage() {
   }
 
   function onUpdateOpenDetailTarget(open: boolean) {
-     if (!open) viewState.detailTarget = null 
+     if (!open) viewState.detailTarget = null
   }
 
   function onUpdateOpenTerminateTarget(open: boolean) {
-     if (!open && !viewState.terminatePending) viewState.terminateTarget = null 
+     if (!open && !viewState.terminatePending) viewState.terminateTarget = null
   }
 
   function onUpdateOpenForceTerminateTarget(open: boolean) {
-     if (!open && !viewState.forceTerminatePending) viewState.forceTerminateTarget = null 
+     if (!open && !viewState.forceTerminatePending) viewState.forceTerminateTarget = null
   }
 
   return { ...viewBindings, onClickDetailTarget, onUpdateOpenDetailTarget, onUpdateOpenTerminateTarget, onUpdateOpenForceTerminateTarget }

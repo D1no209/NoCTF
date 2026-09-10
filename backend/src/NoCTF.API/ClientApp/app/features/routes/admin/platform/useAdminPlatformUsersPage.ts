@@ -178,7 +178,7 @@ export function useAdminPlatformUsersPage() {
       toast.error(accountStatusConflictMessage(apiError.code) ?? apiError.message)
       return
     }
-  
+
     if (data) {
       detail.value = data
       const index = users.value.findIndex(user => user.id === data.id)
@@ -204,7 +204,7 @@ export function useAdminPlatformUsersPage() {
         : apiError.message)
       return
     }
-  
+
     if (data) {
       detail.value = data
       const index = users.value.findIndex(user => user.id === data.id)

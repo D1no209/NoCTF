@@ -393,7 +393,7 @@ export function useAdminCompetitionsByIdIndexPage() {
   }
 
   function onUpdateOpenConfirmTarget(v: boolean) {
-     if (!v) viewState.confirmTarget = null 
+     if (!v) viewState.confirmTarget = null
   }
 
   function onClickForceDeleteOpen(value: typeof viewState.forceDeleteOpen) {
@@ -401,7 +401,7 @@ export function useAdminCompetitionsByIdIndexPage() {
   }
 
   function onUpdateOpenDeleteConfirm(v: boolean) {
-     if (!v) viewState.deleteConfirm = null 
+     if (!v) viewState.deleteConfirm = null
   }
 
   return { ...viewBindings, onClickDeleteConfirm, onClickDeleteConfirm2, onUpdateOpenConfirmTarget, onClickForceDeleteOpen, onUpdateOpenDeleteConfirm }

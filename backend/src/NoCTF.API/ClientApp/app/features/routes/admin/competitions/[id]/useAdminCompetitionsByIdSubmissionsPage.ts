@@ -401,7 +401,7 @@ export function useAdminCompetitionsByIdSubmissionsPage() {
   }
 
   function onUpdateOpenChange(v: boolean) {
-     if (!v) viewState.closeFlagAccess() 
+     if (!v) viewState.closeFlagAccess()
   }
 
   return { ...viewBindings, onClickFilterChallenge, onUpdateOpenChange }

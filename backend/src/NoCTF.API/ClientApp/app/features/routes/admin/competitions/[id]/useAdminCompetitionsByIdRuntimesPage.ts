@@ -145,7 +145,7 @@ export function useAdminCompetitionsByIdRuntimesPage() {
         signal,
       })
       if (error || !data) return false
-  
+
       if (detailOpen.value && detail.value?.id === data.id)
         detail.value = data
       await refreshList()
@@ -360,7 +360,7 @@ export function useAdminCompetitionsByIdRuntimesPage() {
   }
 
   function onUpdateOpenExtendDialog(v: boolean) {
-     if (!v) viewState.extendDialog = null 
+     if (!v) viewState.extendDialog = null
   }
 
   function onClickExtendDialog2(value: typeof viewState.extendDialog) {
@@ -368,11 +368,11 @@ export function useAdminCompetitionsByIdRuntimesPage() {
   }
 
   function onUpdateOpenTerminateDialog(open: boolean) {
-     if (!open && !viewState.terminatePending) viewState.terminateDialog = null 
+     if (!open && !viewState.terminatePending) viewState.terminateDialog = null
   }
 
   function onUpdateOpenForceTerminateDialog(open: boolean) {
-     if (!open && !viewState.forceTerminatePending) viewState.forceTerminateDialog = null 
+     if (!open && !viewState.forceTerminatePending) viewState.forceTerminateDialog = null
   }
 
   return { ...viewBindings, onClickFilterChallenge, onClickTerminateDialog, onClickExtendDialog, onUpdateOpenExtendDialog, onClickExtendDialog2, onUpdateOpenTerminateDialog, onUpdateOpenForceTerminateDialog }

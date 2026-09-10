@@ -61,7 +61,7 @@ export function useAdminCompetitionsByIdCheatsPage() {
       filterError.value = resolved.error
       return
     }
-  
+
     filterError.value = null
     appliedStatus.value = filterStatus.value
     appliedRange.value = resolved.range
@@ -113,7 +113,7 @@ export function useAdminCompetitionsByIdCheatsPage() {
   async function refreshResolvedIncident(request: CheatIncidentResolutionRequest) {
     if (detailOpen.value)
       await openDetail(request.gameplayFactId)
-  
+
     await refreshLatest()
   }
 
@@ -146,7 +146,7 @@ export function useAdminCompetitionsByIdCheatsPage() {
     const current = detail.value
     if (!current?.gameplayFactId)
       return
-  
+
     beginResolution(mode, {
       gameplayFactId: current.gameplayFactId,
       sourceTeamId: current.sourceTeamId,

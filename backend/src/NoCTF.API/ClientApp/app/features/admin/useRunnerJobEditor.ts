@@ -14,7 +14,7 @@ export function useRunnerJobEditor(props: Readonly<Omit<{
 
   const viewBindings = {
       ...toRefs(props),
-      
+
     }
   const viewState = proxyRefs(viewBindings)
 

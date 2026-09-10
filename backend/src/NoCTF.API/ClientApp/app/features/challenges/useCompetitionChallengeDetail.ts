@@ -60,7 +60,7 @@ export function useCompetitionChallengeDetail(props: Readonly<{
     challenge.value = null
     attachments.value = []
     attachmentDeliveryPolicy.value = 'All'
-  
+
     const { data, error: requestError } = await getChallengeEndpoint({
       signal: reads.signal,
       path: {

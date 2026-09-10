@@ -17,7 +17,7 @@ export function useCompetitionsByIdChallengesByCcIdIndexPage() {
 
   return {
       initialize,
-      
+
     }
 }
 

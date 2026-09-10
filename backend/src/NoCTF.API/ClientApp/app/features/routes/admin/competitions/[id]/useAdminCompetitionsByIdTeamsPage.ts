@@ -345,7 +345,7 @@ export function useAdminCompetitionsByIdTeamsPage() {
   const viewState = proxyRefs(viewBindings)
 
   function onUpdateOpenOpen(open: boolean) {
-     if (!open) viewState.selectedTeam = null 
+     if (!open) viewState.selectedTeam = null
   }
 
   function onClickScoreAdjustmentTeam(value: typeof viewState.scoreAdjustmentTeam) {
@@ -353,7 +353,7 @@ export function useAdminCompetitionsByIdTeamsPage() {
   }
 
   function onUpdateOpenBanDialog(v: boolean) {
-     if (!v) viewState.banDialog = null 
+     if (!v) viewState.banDialog = null
   }
 
   function onClickBanDialog(value: typeof viewState.banDialog) {
@@ -361,7 +361,7 @@ export function useAdminCompetitionsByIdTeamsPage() {
   }
 
   function onUpdateOpenAppealDialog(v: boolean) {
-     if (!v) viewState.appealDialog = null 
+     if (!v) viewState.appealDialog = null
   }
 
   function onClickAppealDialog(value: typeof viewState.appealDialog) {

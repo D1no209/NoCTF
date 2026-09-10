@@ -204,7 +204,7 @@ export function useCompetitionsByIdMyTeamPage() {
     if (appealPending.value) return
     appealError.value = validateAppealStatement(appealStatement.value)
     if (appealError.value) return
-  
+
     appealPending.value = true
     try {
       const { error } = await submitTeamBanAppeal({
