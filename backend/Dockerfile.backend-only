@@ -1,0 +1,16 @@
+# Build backend binaries only. BASE_IMAGE must be the deployed Host image pinned by digest.
+ARG BASE_IMAGE
+FROM ${BASE_IMAGE} AS deployed
+FROM mcr.microsoft.com/dotnet/sdk:10.0.302@sha256:72dd743782f2ae7e5476fd64f6a460045e3998dc862218b80e6944cba79a01b0 AS build
+WORKDIR /src
+COPY backend/ ./backend/
+WORKDIR /src/backend
+RUN dotnet publish src/NoCTF.Host/NoCTF.Host.csproj -c Release -o /app/backend /p:BuildSpaOnPublish=false \
+    && rm -rf /app/backend/wwwroot
+
+FROM deployed
+WORKDIR /app
+# wwwroot is absent from this output, so all deployed frontend files remain untouched.
+COPY --from=build /app/backend/ ./
+ARG REVISION
+LABEL org.opencontainers.image.revision=$REVISION
