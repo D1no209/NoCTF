@@ -1,8 +1,6 @@
 <script setup lang="ts">
 import { bindViewState } from '~/features/shared/view-state'
 
-import type { NoCtfapiEndpointsAdministrationPlatformPlatformRuntimeResponse } from '~/api'
-
 import { useAdminPlatformRuntimesPage } from './useAdminPlatformRuntimesPage'
 import View from '~/components/views/page/admin/platform/AdminPlatformRuntimesPageView.vue'
 

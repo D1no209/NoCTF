@@ -3,7 +3,7 @@ import { toRefs } from 'vue'
 import type { AdminCompetitionsByIdCheatsPageViewState } from '~/features/routes/admin/competitions/[id]/useAdminCompetitionsByIdCheatsPage'
 
 const viewProps = defineProps<{ state: AdminCompetitionsByIdCheatsPageViewState }>()
-const { filterStatus, filterFrom, filterTo, filterError, pendingCount, items, loading, listError, hasMore, loadMore, initialized, loadNextPage, applyFilters, detail, detailOpen, detailLoading, showFlag, openDetail, ActionMeta, resolutionAction, canSubmitResolution, resolutionError, resolutionOpen, resolutionPending, resolutionReason, remainingCharacters, resolutionTargetLabel, openAction, handleResolutionSubmit, handleResolutionOpen, onClickShowFlag } = toRefs(viewProps.state)
+const { filterStatus, filterFrom, filterTo, filterError, pendingCount, items, loading, listError, hasMore, initialized, loadNextPage, applyFilters, detail, detailOpen, detailLoading, showFlag, openDetail, ActionMeta, resolutionAction, canSubmitResolution, resolutionError, resolutionOpen, resolutionPending, resolutionReason, remainingCharacters, resolutionTargetLabel, openAction, handleResolutionSubmit, handleResolutionOpen, onClickShowFlag } = toRefs(viewProps.state)
 </script>
 
 <template>
@@ -24,9 +24,9 @@ const { filterStatus, filterFrom, filterTo, filterError, pendingCount, items, lo
           </SelectGroup>
         </SelectContent>
       </Select>
-      <Input v-model="filterFrom" type="datetime-local" class="w-52" :aria-label="$t('ui.startTime2')" />
+      <DateTimePicker v-model="filterFrom"  class="w-52" :aria-label="$t('ui.startTime2')" />
       <span class="text-sm text-muted-foreground">{{ $t('ui.to') }}</span>
-      <Input v-model="filterTo" type="datetime-local" class="w-52" :aria-label="$t('ui.endTime')" />
+      <DateTimePicker v-model="filterTo"  class="w-52" :aria-label="$t('ui.endTime')" />
       <Button size="sm" @click="applyFilters">{{ $t('ui.applyFilters') }}</Button>
       <Badge v-if="pendingCount !== null && pendingCount > 0" variant="destructive">
         {{ $t('ui.pending2', { count: pendingCount }) }}
@@ -86,7 +86,7 @@ const { filterStatus, filterFrom, filterTo, filterError, pendingCount, items, lo
     </template>
 
     <Sheet v-model:open="detailOpen">
-      <SheetContent class="overflow-y-auto">
+      <SheetContent data-scroll-surface class="overflow-y-auto">
         <SheetHeader>
           <SheetTitle>{{ $t('ui.cheatIncidentDetails') }}</SheetTitle>
           <SheetDescription>{{ $t('ui.eventId', { id: detail?.gameplayFactId ?? '-' }) }}</SheetDescription>

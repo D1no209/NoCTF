@@ -8,7 +8,8 @@ import { englishMessages } from '../app/locales/en'
 
 export interface ArchitectureIssue { file: string; rule: string; detail: string }
 const visibleAttributes = new Set(['title', 'aria-label', 'aria-description', 'alt', 'placeholder', 'label', 'description'])
-const nativeControls = new Set(['button', 'input', 'textarea', 'select', 'option', 'label', 'a', 'table', 'hr', 'progress', 'dialog'])
+const nativeControls = new Set(['form', 'button', 'input', 'textarea', 'select', 'option', 'label', 'a', 'table', 'hr', 'progress', 'dialog', 'details', 'summary', 'datalist', 'meter', 'fieldset', 'legend'])
+const nativePickerTypes = new Set(['number', 'date', 'datetime-local', 'time', 'month', 'week', 'file', 'color', 'range'])
 const messages = chineseMessages as Record<string, string>
 
 /** No allowlist of existing violations: new and existing files obey the same rules. */
@@ -24,6 +25,8 @@ export function auditVueSource(file: string, source: string): ArchitectureIssue[
   const ast = ts.createSourceFile(file + '.ts', setup, ts.ScriptTarget.Latest, true)
 
   function inspectScript(node: ts.Node) {
+    if (ts.isImportDeclaration(node) && /native-select/.test((node.moduleSpecifier as ts.StringLiteral).text))
+      report('native-defaults', 'Use the themed Select primitive, including inside composite controls')
     if ((ts.isStringLiteral(node) || ts.isNoSubstitutionTemplateLiteral(node)) && /\p{Script=Han}/u.test(node.text))
       report('i18n', 'UI text must live in the locale catalog, including defaults and accessibility text')
     if (isView && ts.isImportDeclaration(node) && !node.importClause?.isTypeOnly) {
@@ -49,11 +52,24 @@ export function auditVueSource(file: string, source: string): ArchitectureIssue[
         if (node.type === 2 && /[\p{L}\p{N}]/u.test(node.content)) report('i18n', `Literal template text: ${node.content.trim()}`)
         if (node.type === 1) {
           if (!isPrimitive && nativeControls.has(node.tag)) report('primitive-boundary', `Use a shared primitive instead of <${node.tag}>`)
+          if (/^NativeSelect/.test(node.tag)) report('native-defaults', 'Native Select is not part of the design system')
+          if (isView) {
+            const marker = node.props.some((prop: any) => prop.type === 6 && prop.name === 'data-scroll-surface')
+            const classes = node.props.find((prop: any) => prop.type === 6 && prop.name === 'class')?.value?.content ?? ''
+            if (/overflow-(?:x-|y-)?(?:auto|scroll)/.test(classes) && node.tag !== 'ScrollSurface' && !marker)
+              report('scroll-boundary', 'Declare a shared scroll surface for constrained overflow')
+          }
           for (const prop of node.props) {
+            if (isView && prop.type === 7 && prop.name === 'html')
+              report('primitive-boundary', 'Render user markup through the sanitized Markdown primitive')
+            if (isView && prop.type === 6 && prop.name === 'type' && nativePickerTypes.has(prop.value?.content))
+              report('native-defaults', `Use the dedicated themed control for ${prop.value.content}`)
+            if (isView && prop.type === 7 && prop.name === 'bind' && prop.arg?.content === 'title' && !['component', 'DefinitionSection'].includes(node.tag))
+              report('native-defaults', 'Use Hint for DOM tooltips; do not expose browser title tooltips')
             if (prop.type === 6 && visibleAttributes.has(prop.name) && prop.value?.content.trim())
               report('i18n', `Literal ${prop.name}: ${prop.value.content}`)
             if (prop.type === 7 && prop.exp) {
-              if (isView && prop.name === 'on' && /(?:\s=\s|=>\s*\{|;|\+\+|--)/.test(prop.exp.content))
+              if (isView && prop.name === 'on' && containsEventProcessing(prop.exp.content))
                 report('render-only', 'Event processing belongs to the feature; forward the event to a command')
               inspectExpression(prop.exp.content)
             }
@@ -74,8 +90,38 @@ export function auditVueSource(file: string, source: string): ArchitectureIssue[
         }
         visit(expression)
       }
+      function containsEventProcessing(value: string): boolean {
+        const expression = ts.createSourceFile('event-expression.ts', `const value = (${value})`, ts.ScriptTarget.Latest, true)
+        let processing = false
+        const visit = (node: ts.Node) => {
+          if (ts.isArrowFunction(node) || ts.isFunctionExpression(node)) {
+            processing = true
+            return
+          }
+          if (ts.isBinaryExpression(node)
+            && node.operatorToken.kind >= ts.SyntaxKind.FirstAssignment
+            && node.operatorToken.kind <= ts.SyntaxKind.LastAssignment) {
+            processing = true
+            return
+          }
+          if ((ts.isPrefixUnaryExpression(node) || ts.isPostfixUnaryExpression(node))
+            && (node.operator === ts.SyntaxKind.PlusPlusToken || node.operator === ts.SyntaxKind.MinusMinusToken)) {
+            processing = true
+            return
+          }
+          ts.forEachChild(node, visit)
+        }
+        visit(expression)
+        return processing
+      }
       visit(template)
     } catch (error) { report('syntax', String(error)) }
+  }
+  if (isView) for (const style of descriptor.styles) {
+    if (/#[\da-f]{3,8}\b|\b(?:rgb|rgba|hsl|hsla)\(\s*[\d.]/i.test(style.content))
+      report('theme-boundary', 'View colors must come from semantic theme tokens')
+    for (const shadow of style.content.matchAll(/(?:box-shadow|text-shadow)\s*:\s*([^;}]+)/g))
+      if (!/^(?:var\(|none\b)/.test(shadow[1]!.trim())) report('theme-boundary', 'Use the shared shadow tokens')
   }
   return issues
 }
@@ -87,6 +133,11 @@ export function auditArchitecture(appRoot = resolve('app')): ArchitectureIssue[]
   })
   const vueFiles = walk(appRoot).filter(file => file.endsWith('.vue'))
   const issues = vueFiles.flatMap(file => auditVueSource(relative(appRoot, file).replaceAll('\\', '/'), readFileSync(file, 'utf8')))
+  for (const file of walk(appRoot).filter(file => file.endsWith('.ts') && !relative(appRoot, file).replaceAll('\\', '/').startsWith('api/'))) {
+    const source = readFileSync(file, 'utf8')
+    if (/\bwindow\.(?:alert|confirm|prompt)\s*\(/.test(source))
+      issues.push({ file: relative(appRoot, file), rule: 'native-defaults', detail: 'Route app confirmations through the shared dialog system' })
+  }
   const primitives = new Set(vueFiles.filter(file => relative(appRoot, file).replaceAll('\\', '/').startsWith('components/ui/')).map(file => basename(file, '.vue')))
   const frameworkComponents = new Set(['NuxtPage', 'NuxtLayout', 'NuxtLink', 'ClientOnly', 'Transition', 'TransitionGroup', 'KeepAlive', 'Suspense', 'Teleport'])
   for (const file of vueFiles.filter(file => relative(appRoot, file).replaceAll('\\', '/').startsWith('components/views/'))) {

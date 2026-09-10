@@ -13,9 +13,10 @@ describe('participant error feedback', () => {
       source('../app/features/challenges/CompetitionChallengeDetail.vue'),
     ])
 
-    expect(home).toContain('<Alert v-else-if="competitionsError" variant="destructive">')
+    expect(home).toContain('<Alert v-if="competitionsError" variant="destructive">')
     expect(home).toContain('@click="loadCompetitions"')
-    expect(home).toContain('v-if="competitionsLoading"')
+    expect(home).toContain('<PseudoTerminal')
+    expect(home).toContain("competitionsLoading.value ? translate('ui.loading')")
     expect(questions).toContain('<Alert v-else-if="challengeLoadError" variant="destructive">')
     expect(questions).toContain('@click="loadChallengeOptions"')
     expect(detail).toContain('v-else-if="attachmentError" variant="destructive"')
@@ -81,9 +82,11 @@ describe('participant error feedback', () => {
     expect(leaderboard).toContain("<component :is=\"LazyScoreboardTeamDetailDialog\"")
     expect(live).toContain("import('~/lib/live-city-3d')")
     expect(live).not.toContain("import { LiveCityScene } from '~/lib/live-city-3d'")
-    expect(chart).toContain('getComputedStyle(element ?? document.documentElement)')
+    expect(chart).toContain('themeColor(property, element ?? undefined)')
+    expect(chart).toContain('chartTooltipTheme')
+    expect(miniChart).toContain('chartPalette(el.value)')
+    expect(trendChart).toContain('trendChartPalette(el.value)')
     for (const component of [miniChart, trendChart]) {
-      expect(component).toContain('chartPalette(el.value)')
       expect(component).toContain('watch(isDark, () => void nextTick(render))')
     }
   })

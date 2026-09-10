@@ -101,7 +101,6 @@ export function useCompetitionsByIdAwdpLivePage() {
   const selectedChallengeStates = computed(() => {
     const states = awdpTeamChallengeStates(
       board.catalog.value,
-      board.schema.value,
       selectedTeam.value,
       currentRoundEvents.value,
     )

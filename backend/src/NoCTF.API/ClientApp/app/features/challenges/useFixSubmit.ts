@@ -4,8 +4,6 @@ import { toast } from 'vue-sonner'
 import { requestAwdpDefenseTargetEndpoint, uploadPatchEndpoint } from '../../api'
 import type { NoCtfapiEndpointsGameplayFactsAwdpDefenseProgressResponse, NoCtfapiEndpointsGameplayFactsAwdpDefenseTargetRequestFailureCodeProtocol, NoCtfapiEndpointsGameplayFactsUploadPatchFailureCodeProtocol } from '../../api'
 
-type Events = { changed: [], accepted: [] }
-
 /** Owns state, effects and commands for FixSubmit. */
 export function useFixSubmit(props: Readonly<{
   competitionId: string
@@ -18,22 +16,22 @@ emit: { (event: "changed", ...args: []): void; (event: "accepted", ...args: []):
   const pendingAction = ref<'request' | 'upload' | null>(null)
 
   const requestFailureLabels: Record<NoCtfapiEndpointsGameplayFactsAwdpDefenseTargetRequestFailureCodeProtocol, string> = {
-    DefenseNotAvailable: translate("ui.thisCompetitionTeamOrChallengeDoesNotCurrentlyAllowA"),
-    ActiveDefenseTargetExists: translate("ui.aOneShotDefenseVerificationEnvironmentAlreadyExistsCompleteIt"),
-    DefenseAlreadySucceeded: translate("ui.fixHasAlreadySucceededFurtherFixAttemptsAreNotAccepted"),
-    BreakRequired: translate("ui.thisChallengeRequiresAValidBreakBeforeDefenseVerificationCan"),
-    FixAttemptsExhausted: translate("ui.thisChallengeSFixAttemptsAreExhausted"),
-    InvalidRuntimeConfiguration: translate("ui.theOneShotDefenseVerificationEnvironmentIsMisconfiguredContactCompetition"),
-    DefenseTargetConcurrency: translate("ui.theDefenseVerificationStateChangedRefreshAndTryAgain"),
+    DefenseNotAvailable: "ui.thisCompetitionTeamOrChallengeDoesNotCurrentlyAllowA",
+    ActiveDefenseTargetExists: "ui.aOneShotDefenseVerificationEnvironmentAlreadyExistsCompleteIt",
+    DefenseAlreadySucceeded: "ui.fixHasAlreadySucceededFurtherFixAttemptsAreNotAccepted",
+    BreakRequired: "ui.thisChallengeRequiresAValidBreakBeforeDefenseVerificationCan",
+    FixAttemptsExhausted: "ui.thisChallengeSFixAttemptsAreExhausted",
+    InvalidRuntimeConfiguration: "ui.theOneShotDefenseVerificationEnvironmentIsMisconfiguredContactCompetition",
+    DefenseTargetConcurrency: "ui.theDefenseVerificationStateChangedRefreshAndTryAgain",
   }
 
   const uploadFailureLabels: Record<NoCtfapiEndpointsGameplayFactsUploadPatchFailureCodeProtocol, string> = {
-    ArchiveStreamNotSeekable: translate("ui.theFixArchiveCannotBeValidatedSelectTheFileAgain"),
-    ArchiveInvalid: translate("ui.theFixArchiveIsInvalidUploadAValidTarGz"),
-    DefenseTargetNotReady: translate("ui.thisOneShotDefenseVerificationEnvironmentHasExpiredOrNo"),
-    DefenseAlreadySucceeded: translate("ui.fixHasAlreadySucceededFurtherFixAttemptsAreNotAccepted"),
-    FixAttemptsExhausted: translate("ui.thisChallengeSFixAttemptsAreExhausted"),
-    DefenseTargetConsumed: translate("ui.thisOneShotDefenseVerificationEnvironmentAlreadyHasAFix"),
+    ArchiveStreamNotSeekable: "ui.theFixArchiveCannotBeValidatedSelectTheFileAgain",
+    ArchiveInvalid: "ui.theFixArchiveIsInvalidUploadAValidTarGz",
+    DefenseTargetNotReady: "ui.thisOneShotDefenseVerificationEnvironmentHasExpiredOrNo",
+    DefenseAlreadySucceeded: "ui.fixHasAlreadySucceededFurtherFixAttemptsAreNotAccepted",
+    FixAttemptsExhausted: "ui.thisChallengeSFixAttemptsAreExhausted",
+    DefenseTargetConsumed: "ui.thisOneShotDefenseVerificationEnvironmentAlreadyHasAFix",
   }
 
   const runtimeActive = computed(() => {

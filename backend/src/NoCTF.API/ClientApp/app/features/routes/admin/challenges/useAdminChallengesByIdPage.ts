@@ -37,8 +37,6 @@ export function useAdminChallengesByIdPage() {
 
   const loadError = ref<string | null>(null)
 
-  const MODE_NAMES: NoCtfapiEndpointsCompetitionsGameModeProtocol[] = ['Ctf', 'Awd', 'Awdp', 'Koh']
-
   const form = reactive({
     title: '',
     mode: 'Ctf' as NoCtfapiEndpointsCompetitionsGameModeProtocol,

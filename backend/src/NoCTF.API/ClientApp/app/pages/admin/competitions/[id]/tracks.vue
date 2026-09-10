@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import Feature from '~/features/routes/admin/competitions/[id]/AdminCompetitionsByIdTracksPage.vue'
-definePageMeta({ middleware: 'auth' })
+definePageMeta({ middleware: 'platform-admin' })
 </script>
 
 <template>

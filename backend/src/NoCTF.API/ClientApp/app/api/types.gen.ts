@@ -887,6 +887,7 @@ export type NoCtfapiEndpointsChallengesChallengeResponse = {
     maximumFlagAttempts?: number | null;
     acceptedFlagAttempts?: number | null;
     remainingFlagAttempts?: number | null;
+    solvedByMyTeam?: boolean;
     usesDynamicFlag?: boolean;
     hints?: Array<NoCtfapiEndpointsChallengesParticipantChallengeHintResponse> | null;
     publicAccessFailure?: NoCtfapiEndpointsRuntimePublicAccessFailureProtocol | null;
@@ -1063,6 +1064,8 @@ export type NoCtfapiEndpointsAuthenticationCurrentUserResponse = {
     emailVerified?: boolean;
     description?: string | null;
     avatarUrl?: string | null;
+    wallpaperRevision?: string | null;
+    wallpaperEnabled?: boolean;
 };
 
 export type NoCtfapiEndpointsAuthenticationUserRoleProtocol = 'User' | 'Organizer' | 'Administrator';
@@ -1150,6 +1153,16 @@ export type NoCtfapiEndpointsAuthenticationUpdateMySchoolIdentityRequest = {
     studentNumber?: string | null;
 };
 
+export type NoCtfapiEndpointsAuthenticationWallpaperPreferenceFailureResponse = {
+    code?: NoCtfapiEndpointsAuthenticationWallpaperPreferenceFailureCode;
+};
+
+export type NoCtfapiEndpointsAuthenticationWallpaperPreferenceFailureCode = 'WallpaperNotUploaded';
+
+export type NoCtfapiEndpointsAuthenticationUpdateMyWallpaperPreferenceRequest = {
+    enabled?: boolean;
+};
+
 export type NoCtfapiEndpointsAuthenticationAvatarUploadFailureResponse = {
     code?: NoCtfapiEndpointsAuthenticationAvatarUploadFailureCode;
 };
@@ -1157,6 +1170,16 @@ export type NoCtfapiEndpointsAuthenticationAvatarUploadFailureResponse = {
 export type NoCtfapiEndpointsAuthenticationAvatarUploadFailureCode = 'SizeInvalid' | 'SourceMetadataMismatch' | 'UnsupportedFormat' | 'InvalidDimensions' | 'PixelLimitExceeded' | 'MultipleFrames' | 'MalformedImage';
 
 export type NoCtfapiEndpointsAuthenticationUploadMyAvatarRequest = {
+    file: Blob | File;
+};
+
+export type NoCtfapiEndpointsAuthenticationWallpaperUploadFailureResponse = {
+    code?: NoCtfapiEndpointsAuthenticationWallpaperUploadFailureCode;
+};
+
+export type NoCtfapiEndpointsAuthenticationWallpaperUploadFailureCode = 'SizeInvalid' | 'SourceMetadataMismatch' | 'UnsupportedFormat' | 'InvalidDimensions' | 'PixelLimitExceeded' | 'MultipleFrames' | 'MalformedImage';
+
+export type NoCtfapiEndpointsAuthenticationUploadMyWallpaperRequest = {
     file: Blob | File;
 };
 
@@ -4660,6 +4683,66 @@ export type AuthenticationUpdateMySchoolIdentityResponses = {
 
 export type AuthenticationUpdateMySchoolIdentityResponse = AuthenticationUpdateMySchoolIdentityResponses[keyof AuthenticationUpdateMySchoolIdentityResponses];
 
+export type AuthenticationGetMyWallpaperData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/v1/auth/me/wallpaper';
+};
+
+export type AuthenticationGetMyWallpaperErrors = {
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+    /**
+     * Not Found
+     */
+    404: unknown;
+};
+
+export type AuthenticationUploadMyWallpaperData = {
+    body: NoCtfapiEndpointsAuthenticationUploadMyWallpaperRequest;
+    path?: never;
+    query?: never;
+    url: '/api/v1/auth/me/wallpaper';
+};
+
+export type AuthenticationUploadMyWallpaperErrors = {
+    /**
+     * Bad Request
+     */
+    400: NoCtfapiEndpointsAuthenticationWallpaperUploadFailureResponse;
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+    /**
+     * Not Found
+     */
+    404: unknown;
+    413: MicrosoftAspNetCoreMvcProblemDetails;
+};
+
+export type AuthenticationUploadMyWallpaperError = AuthenticationUploadMyWallpaperErrors[keyof AuthenticationUploadMyWallpaperErrors];
+
+export type AuthenticationUploadMyWallpaperResponses = {
+    /**
+     * Success
+     */
+    200: NoCtfapiEndpointsAuthenticationCurrentUserResponse;
+};
+
+export type AuthenticationUploadMyWallpaperResponse = AuthenticationUploadMyWallpaperResponses[keyof AuthenticationUploadMyWallpaperResponses];
+
 export type UserAvatarGetData = {
     body?: never;
     path: {
@@ -4936,6 +5019,43 @@ export type AuthenticationUpdateMyProfileResponses = {
 };
 
 export type AuthenticationUpdateMyProfileResponse = AuthenticationUpdateMyProfileResponses[keyof AuthenticationUpdateMyProfileResponses];
+
+export type AuthenticationUpdateMyWallpaperPreferenceData = {
+    body: NoCtfapiEndpointsAuthenticationUpdateMyWallpaperPreferenceRequest;
+    path?: never;
+    query?: never;
+    url: '/api/v1/auth/me/wallpaper-preference';
+};
+
+export type AuthenticationUpdateMyWallpaperPreferenceErrors = {
+    /**
+     * Bad Request
+     */
+    400: NoCtfapiEndpointsAuthenticationWallpaperPreferenceFailureResponse;
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+    /**
+     * Not Found
+     */
+    404: unknown;
+};
+
+export type AuthenticationUpdateMyWallpaperPreferenceError = AuthenticationUpdateMyWallpaperPreferenceErrors[keyof AuthenticationUpdateMyWallpaperPreferenceErrors];
+
+export type AuthenticationUpdateMyWallpaperPreferenceResponses = {
+    /**
+     * Success
+     */
+    200: NoCtfapiEndpointsAuthenticationCurrentUserResponse;
+};
+
+export type AuthenticationUpdateMyWallpaperPreferenceResponse = AuthenticationUpdateMyWallpaperPreferenceResponses[keyof AuthenticationUpdateMyWallpaperPreferenceResponses];
 
 export type AuthenticationUploadMyAvatarData = {
     body: NoCtfapiEndpointsAuthenticationUploadMyAvatarRequest;

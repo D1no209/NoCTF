@@ -1,6 +1,7 @@
 import { sourceFile } from './support/feature-source'
 import { describe, expect, test } from 'bun:test'
 import { renderMarkdown } from '../app/lib/markdown'
+import { highlightMarkdownCode, normalizeMarkdownCodeLanguage } from '../app/lib/markdown-highlighter'
 import { readableHintContent } from '../app/lib/challenge-hints'
 
 describe('safe challenge Markdown', () => {
@@ -60,10 +61,23 @@ describe('safe challenge Markdown', () => {
 
   test('supports headings, lists, quotes, inline code, fenced code, tables and links', () => {
     const html = renderMarkdown('# 标题\n\n- 第一项\n- 第二项\n\n1. 步骤\n\n> 引用\n\n`flag{...}`\n\n```python\nprint("hello")\n```\n\n| 字段 | 值 |\n| --- | --- |\n| A | B |\n\n[文档](https://example.com/docs)')
-    for (const tag of ['<h1>', '<ul>', '<ol>', '<blockquote>', '<code>', '<pre tabindex="0">', '<table tabindex="0">', '<th>'])
+    for (const tag of ['<h1>', '<ul>', '<ol>', '<blockquote>', '<code>', '<pre tabindex="0" data-language="python">', '<table tabindex="0">', '<th>'])
       expect(html).toContain(tag)
-    expect(html).toContain('class="language-python"')
+    expect(html).toContain('class="hljs language-python"')
+    expect(html).toContain('class="hljs-built_in"')
     expect(html).toContain('href="https://example.com/docs" rel="noopener noreferrer" target="_blank"')
+  })
+
+  test('highlights registered fence languages and safely falls back for unknown or malformed info strings', () => {
+    expect(normalizeMarkdownCodeLanguage(' TypeScript extra')).toBe('typescript')
+    expect(normalizeMarkdownCodeLanguage('\"><img/src=x>')).toBe('')
+    expect(highlightMarkdownCode('const answer: number = 42', 'typescript')).toContain('hljs-keyword')
+    expect(highlightMarkdownCode('<script>alert(1)</script>', 'unknown')).toBeNull()
+
+    const fallback = renderMarkdown('```unknown\n<script>alert(1)</script>\n```')
+    expect(fallback).toContain('<pre tabindex="0" data-language="unknown"><code class="hljs language-unknown">')
+    expect(fallback).toContain('&lt;script&gt;alert(1)&lt;/script&gt;')
+    expect(fallback).not.toContain('<script>')
   })
 
   test('filters unsafe HTML and attributes while keeping code and escaped tags literal', () => {
@@ -73,7 +87,9 @@ describe('safe challenge Markdown', () => {
     expect(html).not.toContain('<script>')
     expect(renderMarkdown('`<br>`')).toContain('<code>&lt;br&gt;</code>')
     expect(renderMarkdown('\\<br>')).toContain('&lt;br&gt;')
-    expect(renderMarkdown('```html\n<br>\n<script>alert(1)</script>\n```')).toContain('&lt;script&gt;')
+    const highlightedHtml = renderMarkdown('```html\n<br>\n<script>alert(1)</script>\n```')
+    expect(highlightedHtml).toContain('class="hljs-tag"')
+    expect(highlightedHtml).not.toContain('<script>')
   })
 
   for (const url of ['javascript:alert(1)', 'JaVaScRiPt:alert(1)', 'jav&#x61;script:alert(1)', 'vbscript:msgbox(1)', 'file:///etc/passwd', 'data:text/html;base64,PHNjcmlwdD4=']) {
@@ -94,7 +110,7 @@ describe('safe challenge Markdown', () => {
     expect(readableHintContent({ isUnlocked: false, content: '![private](https://example.com/secret)' })).toBeNull()
     const hints = await sourceFile(new URL('../app/features/challenges/ChallengeHints.vue', import.meta.url)).text()
     const detail = await sourceFile(new URL('../app/features/challenges/CompetitionChallengeDetail.vue', import.meta.url)).text()
-    expect(hints).toContain('<MarkdownContent v-if="readableHintContent(hint) !== null"')
+    expect(hints).toContain('<MarkdownQuote v-if="readableHintContent(hint) !== null"')
     expect(detail).toContain('<MarkdownContent :source="challenge.description"')
     expect(hints).not.toContain("$t('ui.free')")
     expect(hints).toContain('v-if="hint.isUnlocked && (hint.cost ?? 0) > 0"')

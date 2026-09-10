@@ -4,8 +4,6 @@ import type { ConfigFieldDef, ConfigValues, GameModeValue } from '../../utils/ga
 import { challengeRuleFields, parseConfigValues, serializeConfigValues } from '../../utils/game-config'
 import ConfigFieldInputComponent from './ConfigFieldInput.vue'
 
-type Events = { save: [json: string] }
-
 /** Owns state, effects and commands for ChallengeRulesEditor. */
 export function useChallengeRulesEditor(props: Readonly<Omit<{
   mode: GameModeValue

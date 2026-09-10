@@ -14,6 +14,11 @@ See [ARCHITECTURE.md](ARCHITECTURE.md) for boundaries and the completed architec
 Run `bun run audit:architecture`, `bun test`, `bun run typecheck` and
 `bun run generate` before delivering an architecture change.
 
+The approved UI contract is documented in the repository's `DESIGN.md` and
+[UI-REDESIGN-PROPOSAL.md](UI-REDESIGN-PROPOSAL.md). In development,
+`/__ui-check` previews themes, cards, form controls and notifications without
+submitting business data. Production builds exclude that route.
+
 - `dotnet run --project ../NoCTF.API.csproj` starts the API and lets ASP.NET Core
   SpaProxy launch the Nuxt development server at `http://127.0.0.1:3000`.
 - `bun run dev` starts Nuxt directly when backend proxying is not needed.

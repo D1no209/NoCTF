@@ -26,7 +26,7 @@ const { configuration, token, email, requested, newPassword, confirmPassword, co
         <Alert v-if="completed" class="mb-4">
           <AlertDescription>{{ $t('ui.thePasswordHasBeenResetPleaseUseTheNewPassword') }}</AlertDescription>
         </Alert>
-        <form v-if="!completed" @submit.prevent="completeReset">
+        <UiForm v-if="!completed" @submit.prevent="completeReset">
           <FieldGroup>
             <Alert v-if="error" variant="destructive">
               <AlertDescription>{{ $message(error) }}</AlertDescription>
@@ -44,7 +44,7 @@ const { configuration, token, email, requested, newPassword, confirmPassword, co
                 <Spinner v-if="pending" data-icon="inline-start" /> {{ $t('ui.resetPassword') }} </Button>
             </Field>
           </FieldGroup>
-        </form>
+        </UiForm>
       </CardContent>
       <CardFooter>
         <Button as-child variant="outline" class="w-full">
@@ -63,7 +63,7 @@ const { configuration, token, email, requested, newPassword, confirmPassword, co
         <Alert v-if="requested" class="mb-4">
           <AlertDescription>{{ $t('ui.ifTheEmailAddressHasBeenRegisteredAndTheReset') }}</AlertDescription>
         </Alert>
-        <form v-if="!requested" @submit.prevent="requestReset">
+        <UiForm v-if="!requested" @submit.prevent="requestReset">
           <FieldGroup>
             <Alert v-if="error" variant="destructive">
               <AlertDescription>{{ $message(error) }}</AlertDescription>
@@ -77,7 +77,7 @@ const { configuration, token, email, requested, newPassword, confirmPassword, co
                 <Spinner v-if="pending" data-icon="inline-start" /> {{ $t('ui.sendResetEmail') }} </Button>
             </Field>
           </FieldGroup>
-        </form>
+        </UiForm>
       </CardContent>
       <CardFooter class="justify-center text-sm text-muted-foreground">
         <NuxtLink to="/auth/login" class="underline">{{ $t('ui.returnToLogin') }}</NuxtLink>

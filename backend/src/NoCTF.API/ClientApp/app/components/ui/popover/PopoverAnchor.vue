@@ -1,0 +1,14 @@
+<script setup lang="ts">
+import type { PopoverAnchorProps } from 'reka-ui'
+import { PopoverAnchor } from 'reka-ui'
+
+const props = defineProps<PopoverAnchorProps>()
+</script>
+
+<template>
+  <PopoverAnchor
+    v-bind="{ ...props, ...(!props.asChild ? { 'data-slot': 'popover-anchor' } : {}) }"
+  >
+    <slot />
+  </PopoverAnchor>
+</template>

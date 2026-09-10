@@ -3,8 +3,24 @@ import { fileURLToPath } from 'node:url'
 import { auditArchitecture, auditVueSource } from '../scripts/check-architecture'
 
 describe('frontend architecture', () => {
+  test('rejects default pickers, browser tooltips, private scrollbars and literal view colors', () => {
+    const issues = auditVueSource('components/views/Example.vue', `<template><div class="overflow-y-auto"><Input type="datetime-local" :title="label" /></div></template><style scoped>.panel { color: #fff; box-shadow: 2px 4px black; }</style>`)
+    expect(issues.some(issue => issue.rule === 'native-defaults')).toBe(true)
+    expect(issues.some(issue => issue.rule === 'scroll-boundary')).toBe(true)
+    expect(issues.some(issue => issue.rule === 'theme-boundary')).toBe(true)
+  })
   test('all existing surfaces obey the rendering, primitive and locale boundaries', () => {
     expect(auditArchitecture(fileURLToPath(new URL('../app', import.meta.url)))).toEqual([])
+  })
+
+  test('shared cards and focus states use shadows instead of visible rings or outlines', async () => {
+    const card = await Bun.file(new URL('../app/components/ui/card/Card.vue', import.meta.url)).text()
+    const css = await Bun.file(new URL('../app/assets/css/main.css', import.meta.url)).text()
+    const cardSurface = css.slice(css.indexOf('.card-surface.card-surface'), css.indexOf('.card-surface.card-surface > img'))
+
+    expect(card).not.toContain('ring-1')
+    expect(cardSurface).toContain('border: 0')
+    expect(css).toContain("outline: none; box-shadow: 0 0 14px color-mix(in oklch, var(--ring) 28%, transparent)")
   })
 
   test('rejects English/CJK copy, accessible-name literals and missing keys', () => {
@@ -17,5 +33,10 @@ describe('frontend architecture', () => {
     const issues = auditVueSource('components/views/Example.vue', `<script setup lang="ts">import { fetchData } from '~/api'; const load = () => fetchData()</script><template><button @click="open = true" /></template>`)
     expect(issues.some(issue => issue.rule === 'render-only')).toBe(true)
     expect(issues.some(issue => issue.rule === 'primitive-boundary')).toBe(true)
+  })
+
+  test('rejects compound assignments and inline event functions in views', () => {
+    const issues = auditVueSource('components/views/Example.vue', `<template><Button @click="count += 1" @focus="value ??= 1" @update:model-value="next => save(next)" /></template>`)
+    expect(issues.filter(issue => issue.rule === 'render-only')).toHaveLength(3)
   })
 })

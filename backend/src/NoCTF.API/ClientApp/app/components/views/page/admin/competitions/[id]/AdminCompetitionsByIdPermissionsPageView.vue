@@ -3,7 +3,7 @@ import { toRefs } from 'vue'
 import type { AdminCompetitionsByIdPermissionsPageViewState } from '~/features/routes/admin/competitions/[id]/useAdminCompetitionsByIdPermissionsPage'
 
 const viewProps = defineProps<{ state: AdminCompetitionsByIdPermissionsPageViewState }>()
-const { X, canManagePermissions, permissions, candidates, loading, error, user, candidateName, search, filteredCandidates, assigned, add, remove, saving, save, transferTarget, transferConfirm, transferring, transfer, roles, onClickTransferConfirm } = toRefs(viewProps.state)
+const { X, canManagePermissions, permissions, candidates, loading, error, candidateName, search, filteredCandidates, assigned, add, remove, saving, save, transferTarget, transferConfirm, transferring, transfer, roles, onClickTransferConfirm } = toRefs(viewProps.state)
 </script>
 
 <template>

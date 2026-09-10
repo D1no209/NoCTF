@@ -1,8 +1,6 @@
 <script setup lang="ts">
 import { bindViewState } from '~/features/shared/view-state'
 
-import type { NoCtfapiEndpointsAdministrationChallengeBankChallengeAttachmentResponse, NoCtfapiEndpointsAdministrationChallengeBankChallengeFlagResponse, NoCtfapiEndpointsAdministrationChallengeBankChallengeTemplateResponse } from '~/api'
-
 import { useAdminChallengesByIdPage } from './useAdminChallengesByIdPage'
 import View from '~/components/views/page/admin/challenges/AdminChallengesByIdPageView.vue'
 

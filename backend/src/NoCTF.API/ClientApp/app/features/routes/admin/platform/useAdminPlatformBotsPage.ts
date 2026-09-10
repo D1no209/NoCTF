@@ -11,7 +11,7 @@ type PlatformUser = NoCtfapiEndpointsAdministrationPlatformPlatformUserResponse
 
 /** Owns state, effects and commands for AdminPlatformBotsPage. */
 export function useAdminPlatformBotsPage() {
-  const ROLE_LABELS: Record<string, string> = { User: translate("ui.user"), Organizer: translate("ui.organizer"), Administrator: translate("ui.administrator") }
+  const ROLE_LABELS: Record<string, string> = { User: "ui.user", Organizer: "ui.organizer", Administrator: "ui.administrator" }
 
   const bots = ref<PlatformUser[]>([])
 

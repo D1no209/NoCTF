@@ -128,7 +128,7 @@ const { Plus, competitionId, competition, canWrite, items, loading, error, inclu
           </Field>
           <Field>
             <FieldLabel for="new-order">{{ $t('ui.order') }}</FieldLabel>
-            <Input id="new-order" v-model.number="newOrder" type="number" min="0" />
+            <NumberInput id="new-order" v-model.number="newOrder"  min="0" />
           </Field>
         </FieldGroup>
         <DialogFooter>

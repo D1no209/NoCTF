@@ -3,7 +3,7 @@ import { toRefs } from 'vue'
 import type { AdminPlatformLogsPageViewState } from '~/features/routes/admin/platform/useAdminPlatformLogsPage'
 
 const viewProps = defineProps<{ state: AdminPlatformLogsPageViewState }>()
-const { Download, Radio, LEVEL_LABELS, SERVICE_LABELS, levelOrdinal, minimumLevel, service, search, from, to, exporting, items, loading, listError, hasMore, initialized, loadMore, applyFilters, live, start, hubStateBadge, exportLogs, AdminDateTime } = toRefs(viewProps.state)
+const { Download, Radio, LEVEL_LABELS, SERVICE_LABELS, levelOrdinal, minimumLevel, service, search, from, to, exporting, items, loading, listError, hasMore, initialized, loadMore, applyFilters, live, hubStateBadge, exportLogs, AdminDateTime } = toRefs(viewProps.state)
 </script>
 
 <template>
@@ -46,11 +46,11 @@ const { Download, Radio, LEVEL_LABELS, SERVICE_LABELS, levelOrdinal, minimumLeve
       </Field>
       <Field>
         <FieldLabel for="log-from">{{ $t('ui.startTime2') }}</FieldLabel>
-        <Input id="log-from" v-model="from" type="datetime-local" />
+        <DateTimePicker id="log-from" v-model="from"  />
       </Field>
       <Field>
         <FieldLabel for="log-to">{{ $t('ui.endTime') }}</FieldLabel>
-        <Input id="log-to" v-model="to" type="datetime-local" />
+        <DateTimePicker id="log-to" v-model="to"  />
       </Field>
       <Field class="min-w-56 flex-1">
         <FieldLabel for="log-search">{{ $t('ui.search') }}</FieldLabel>
@@ -109,15 +109,15 @@ const { Download, Radio, LEVEL_LABELS, SERVICE_LABELS, levelOrdinal, minimumLeve
                 {{ LEVEL_LABELS[String(log.level)] ? $t(LEVEL_LABELS[String(log.level)]!) : log.level }}
               </Badge>
             </TableCell>
-            <TableCell class="text-muted-foreground">{{ SERVICE_LABELS[String(log.service)] ?? log.service }}</TableCell>
-            <TableCell class="max-w-56 truncate font-mono text-xs text-muted-foreground" :title="log.category">
+            <TableCell class="text-muted-foreground">{{ SERVICE_LABELS[String(log.service)] ? $t(SERVICE_LABELS[String(log.service)]!) : log.service }}</TableCell>
+            <Hint :content="log.category" ><TableCell tabindex="0" class="max-w-56 truncate font-mono text-xs text-muted-foreground" >
               {{ log.category }}
-            </TableCell>
+            </TableCell></Hint>
             <TableCell class="max-w-xl">
-              <div class="truncate" :title="log.message">{{ $message(log.message) }}</div>
-              <div v-if="log.exceptionType" class="truncate text-xs text-destructive" :title="log.exceptionMessage ?? ''">
+              <Hint :content="log.message" ><div tabindex="0" class="truncate" >{{ $message(log.message) }}</div></Hint>
+              <Hint :content="log.exceptionMessage ?? ''" v-if="log.exceptionType"><div tabindex="0"  class="truncate text-xs text-destructive" >
                 {{ log.exceptionType }}: {{ log.exceptionMessage }}
-              </div>
+              </div></Hint>
             </TableCell>
           </TableRow>
         </TableBody>

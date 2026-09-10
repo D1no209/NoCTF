@@ -28,7 +28,7 @@ describe('platform monitoring', () => {
     const page = await sourceFile('app/pages/admin/platform/monitoring.vue').text()
     const types = await sourceFile('app/api/types.gen.ts').text()
 
-    expect(page).toContain("title: 'NATS JetStream'")
+    expect(page).toContain("title: \"ui.natsJetstream\"")
     expect(page).toContain("title: \"ui.transactionalMessaging\"")
     expect(page).toContain('METRIC.criticalQueuePendingCount')
     expect(page).toContain('METRIC.criticalQueueAckPendingCount')
@@ -40,5 +40,21 @@ describe('platform monitoring', () => {
     expect(page).toContain('STATUS.noSamples')
     expect(types).toContain('prometheusAvailable?: boolean')
     expect(types).toContain('natsAvailable?: boolean')
+  })
+
+  test('renders current snapshot data as dense status, latency, and quota visualizations', async () => {
+    const view = await sourceFile('app/components/views/page/admin/platform/AdminPlatformMonitoringPageView.vue').text()
+    const controller = await sourceFile('app/features/routes/admin/platform/useAdminPlatformMonitoringPage.ts').text()
+    const mock = await sourceFile('mock/api.ts').text()
+
+    expect(view).toContain('data-slot="monitoring-health-orbit"')
+    expect(view).toContain('data-slot="monitoring-meter"')
+    expect(view).toContain('data-slot="monitoring-latency-meter"')
+    expect(view).toContain('v-for="kind in HERO_KINDS"')
+    expect(view).toContain('v-for="row in snapshot.poolResources"')
+    expect(controller).toContain('const healthPercent = computed')
+    expect(controller).toContain('function latencyVisualPercent')
+    expect(mock).toContain("route === '/admin/platform/monitoring'")
+    expect(mock).toContain('function mockMonitoringSnapshot()')
   })
 })

@@ -1,16 +1,13 @@
-import { markRaw } from 'vue'
-
-import { ArrowRight, Crosshair, Flag, Mountain, Swords } from '@lucide/vue'
-import { cn } from '../../lib/utils'
+import { ArrowRight } from '@lucide/vue'
 import { listCompetitionsEndpoint } from '../../api'
 import type { NoCtfapiEndpointsCompetitionsCompetitionResponse } from '../../api'
-import CompetitionCardComponent from '../competitions/CompetitionCard.vue'
+import { executeHomeTerminalInput, homeTerminalCommands, homeTerminalIdentity, type HomeTerminalCommand } from './home-terminal'
 
 /** Owns state, effects and commands for IndexPage. */
 export function useIndexPage() {
   const { configuration } = usePlatform()
 
-  const { isLoggedIn } = useAuth()
+  const { isLoggedIn, user } = useAuth()
 
   const items = ref<NoCtfapiEndpointsCompetitionsCompetitionResponse[]>([])
 
@@ -32,20 +29,6 @@ export function useIndexPage() {
 
   onMounted(() => void loadCompetitions())
 
-  const activeStatuses: string[] = [
-    'Running',
-    'Paused',
-    'Published',
-    'Visible',
-  ]
-
-  const recent = computed(() =>
-    items.value
-      .filter((c) => activeStatuses.includes(String(c.status)))
-      .sort((a, b) => (a.endTime ?? '').localeCompare(b.endTime ?? ''))
-      .slice(0, 6),
-  )
-
   const liveCount = computed(
     () => items.value.filter((c) => c.status === 'Running').length,
   )
@@ -57,29 +40,58 @@ export function useIndexPage() {
       ).length,
   )
 
-  const modes = [
-    { key: 'Ctf', icon: Flag, title: "ui.ctfProblemSolvingCompetition", description: "ui.webPwnCryptoReverseMultiDirectionalQuestionsSolveTheProblem", featured: true },
-    { key: 'Awd', icon: Swords, title: "ui.awdAttackAndDefenseGame", description: "ui.realTimeConfrontationIntegratingAttackAndDefenseDoubleTestOf", featured: false },
-    { key: 'Awdp', icon: Crosshair, title: "ui.awdpAttackAndDefenseEnhancement", description: "ui.introduceTheRepairLinkOnTopOfAwdAndAttack", featured: false },
-    { key: 'Koh', icon: Mountain, title: "ui.kohIsTheKingOfTheMountain", description: "ui.continueToOccupyTheTargetAccumulatePointsOverTimeAnd", featured: true },
-  ]
+  const terminalInput = ref('')
+  const terminalCommand = ref<HomeTerminalCommand | null>('status')
+  const unknownTerminalCommand = ref('')
 
-  const CompetitionCard = markRaw(CompetitionCardComponent)
+  const statusRows = computed(() => [
+    { label: translate('ui.modes'), value: translate('ui.ctfAwdAwdpKoh') },
+    { label: translate('ui.live2'), value: competitionsLoading.value ? translate('ui.loading') : competitionsError.value ? '—' : translate('ui.running4', { count: liveCount.value }) },
+    { label: translate('ui.upcoming3'), value: competitionsLoading.value ? translate('ui.loading') : competitionsError.value ? '—' : translate('ui.upcoming2', { count: upcomingCount.value }) },
+  ])
+
+  const terminalOutput = computed(() => {
+    if (terminalCommand.value === 'help') {
+      return homeTerminalCommands.map(command => ({ value: command }))
+    }
+    if (terminalCommand.value === 'ls') {
+      if (competitionsLoading.value) return [{ value: translate('ui.loading') }]
+      if (competitionsError.value) return [{ value: '—' }]
+      if (!items.value.length) return [{ value: translate('terminal.noCompetitions') }]
+      return items.value.map((competition, index) => ({
+        label: String(index + 1).padStart(2, '0'),
+        value: competition.title ?? '—',
+      }))
+    }
+    if (terminalCommand.value === 'status') return statusRows.value
+    if (terminalCommand.value === 'whoami') {
+      return [{ value: homeTerminalIdentity(isLoggedIn.value ? user.value?.userName : null) }]
+    }
+    return [{ value: translate('terminal.commandNotFound', { command: unknownTerminalCommand.value }) }]
+  })
+
+  function executeTerminalCommand(): void {
+    const execution = executeHomeTerminalInput(terminalInput.value)
+    terminalInput.value = execution.input
+    terminalCommand.value = execution.command
+    unknownTerminalCommand.value = execution.unknownCommand
+  }
 
   return {
       ArrowRight,
-      cn,
+
       configuration,
       isLoggedIn,
       items,
       competitionsLoading,
       competitionsError,
       loadCompetitions,
-      recent,
       liveCount,
       upcomingCount,
-      modes,
-      CompetitionCard
+
+      terminalInput,
+      terminalOutput,
+      executeTerminalCommand,
     }
 }
 

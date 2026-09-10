@@ -3,18 +3,13 @@ import { toRefs } from 'vue'
 import type { AdminCompetitionsByIdTracksPageViewState } from '~/features/routes/admin/competitions/[id]/useAdminCompetitionsByIdTracksPage'
 
 const viewProps = defineProps<{ state: AdminCompetitionsByIdTracksPageViewState }>()
-const { Plus, Save, Trash2, canWrite, mode, frozen, tracks, loading, saving, error, load, addTrack, removeTrack, setDefault, setPublicSelectable, setInternal, setInvitationRequired, save } = toRefs(viewProps.state)
+const { Plus, Save, Trash2, canWrite, mode, frozen, tracks, loading, saving, error, load, addTrack, removeTrack, updateDefault, updatePublicSelectable, updateInternal, updateInvitationRequired, save } = toRefs(viewProps.state)
 </script>
 
 <template>
   <div class="flex flex-col gap-5">
     <header class="flex flex-wrap items-end justify-between gap-3 border-b pb-4">
-      <div class="space-y-1">
-        <h2 class="text-xl font-semibold">{{ $t('ui.trackConfiguration') }}</h2>
-        <p class="text-sm text-muted-foreground">
-          {{ $t('ui.createIndependentRankingsScoringAndVisibilityGroupsWithinOneCompetition') }}
-        </p>
-      </div>
+      <h2 class="text-xl font-semibold">{{ $t('ui.trackConfiguration') }}</h2>
       <div v-if="canWrite && !frozen" class="flex gap-2">
         <Button variant="outline" @click="addTrack">
           <Plus data-icon="inline-start" /> {{ $t('ui.addTrack') }}
@@ -37,7 +32,7 @@ const { Plus, Save, Trash2, canWrite, mode, frozen, tracks, loading, saving, err
     </Alert>
     <Skeleton v-if="loading" class="h-64 w-full" />
 
-    <div v-else class="overflow-x-auto border">
+    <ScrollSurface as="div" axis="x" v-else class="overflow-x-auto border">
       <Table>
         <TableHeader>
           <TableRow>
@@ -59,9 +54,9 @@ const { Plus, Save, Trash2, canWrite, mode, frozen, tracks, loading, saving, err
           <TableRow v-for="(track, index) in tracks" :key="track.clientId">
             <TableCell><Input v-model="track.key" :disabled="!canWrite || frozen" maxlength="64" class="font-mono" /></TableCell>
             <TableCell><Input v-model="track.name" :disabled="!canWrite || frozen" maxlength="80" /></TableCell>
-            <TableCell><Checkbox :model-value="track.isDefault" :disabled="!canWrite || frozen" @update:model-value="value => value && setDefault(index)" /></TableCell>
-            <TableCell><Checkbox :model-value="track.isPublicSelectable" :disabled="!canWrite || frozen || track.isInternal" @update:model-value="value => setPublicSelectable(track, value === true)" /></TableCell>
-            <TableCell><Checkbox :model-value="track.isInternal" :disabled="!canWrite || frozen" @update:model-value="value => setInternal(track, value === true)" /></TableCell>
+            <TableCell><Checkbox :model-value="track.isDefault" :disabled="!canWrite || frozen" @update:model-value="updateDefault(index, $event)" /></TableCell>
+            <TableCell><Checkbox :model-value="track.isPublicSelectable" :disabled="!canWrite || frozen || track.isInternal" @update:model-value="updatePublicSelectable(track, $event)" /></TableCell>
+            <TableCell><Checkbox :model-value="track.isInternal" :disabled="!canWrite || frozen" @update:model-value="updateInternal(track, $event)" /></TableCell>
             <TableCell><Checkbox v-model="track.earnsScore" :disabled="!canWrite || frozen || track.isInternal" /></TableCell>
             <TableCell><Checkbox v-model="track.earnsBlood" :disabled="!canWrite || frozen || track.isInternal || mode !== 'Ctf'" /></TableCell>
             <TableCell><Checkbox v-model="track.affectsDynamicChallengeScore" :disabled="!canWrite || frozen || track.isInternal || mode !== 'Ctf'" /></TableCell>
@@ -73,7 +68,7 @@ const { Plus, Save, Trash2, canWrite, mode, frozen, tracks, loading, saving, err
                   :model-value="track.requiresInvitationCode"
                   :disabled="!canWrite || frozen || track.isInternal || !track.isPublicSelectable"
                   :aria-label="$t('ui.requireATrackInvitationCode')"
-                  @update:model-value="value => setInvitationRequired(track, value === true)"
+                  @update:model-value="updateInvitationRequired(track, $event)"
                 />
                 <Input
                   v-if="track.requiresInvitationCode"
@@ -95,7 +90,7 @@ const { Plus, Save, Trash2, canWrite, mode, frozen, tracks, loading, saving, err
           </TableRow>
         </TableBody>
       </Table>
-    </div>
+    </ScrollSurface>
     <p v-if="!loading" class="text-xs text-muted-foreground">
       {{ $t('ui.bloodAwardsRequireScoringInternalTracksAreAlwaysPrivateUnscored') }}
     </p>

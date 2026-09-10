@@ -7,14 +7,14 @@ import FixSubmitComponent from '../FixSubmit.vue'
 import FlagSubmitComponent from '../FlagSubmit.vue'
 import RuntimeCardComponent from '../RuntimeCard.vue'
 
-type Events = { submitted: [] }
-
 /** Owns state, effects and commands for AwdpPanel. */
 export function useAwdpPanel(props: Readonly<{
   competition: NoCtfapiEndpointsCompetitionsCompetitionResponse
   challenge: NoCtfapiEndpointsChallengesChallengeResponse
+  flagDockTarget?: string
+  runtimeDockTarget?: string
 }>,
-emit: { (event: "submitted", ...args: []): void }) {
+emit: { (event: "submitted", ...args: []): void; (event: "remainingChanged", ...args: [remaining: number | null]): void }) {
   const state = ref<NoCtfapiEndpointsGameplayFactsAwdpParticipantStateResponse | null>(null)
 
   const loading = ref(true)

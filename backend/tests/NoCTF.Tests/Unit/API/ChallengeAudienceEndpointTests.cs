@@ -92,7 +92,7 @@ public sealed class ChallengeAudienceEndpointTests
         builder.Services.AddSingleton(Substitute.For<IGameplayFactAdmissionModePolicy>());
         builder.Services.AddScoped<ListChallenges>();
         builder.Services.AddScoped<GetChallenge>();
-        builder.Services.AddScoped<GetFlagAttemptBudget>();
+        builder.Services.AddScoped<GetFlagAttemptState>();
         var hintStore = Substitute.For<IParticipantChallengeHintStore>();
         var now = DateTimeOffset.UtcNow.AddMinutes(-1);
         hintStore.ReadAsync(Arg.Any<Guid>(), Arg.Any<Guid>(), Arg.Any<Guid>(), Arg.Any<CancellationToken>())

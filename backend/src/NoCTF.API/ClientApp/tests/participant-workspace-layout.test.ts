@@ -17,6 +17,7 @@ describe('participant competition workspace layout', () => {
     const adminParent = await page('../app/pages/admin/competitions/[id].vue')
 
     expect(parent).toContain('isControlScreen')
+    expect(parent).toContain('`/competitions/${competitionId.value}/live-`')
     expect(parent).not.toContain("label: translate(\"ui.controlScreen\")")
     expect(parent).not.toContain("label: translate(\"ui.3dLiveScreen\")")
     expect(parent).not.toContain("label: translate(\"ui.team\")")
@@ -25,13 +26,14 @@ describe('participant competition workspace layout', () => {
     expect(adminParent).toContain("label: translate(\"ui.3dLiveScreen\")")
     expect(adminParent).toContain("label: translate(\"ui.teamManagement\")")
     expect(adminParent).toContain("label: translate(\"ui.activity\")")
+    expect(adminParent).toContain("middleware: 'platform-admin'")
   })
 
   test('only enables the challenge navigator when explicitly requested', async () => {
     const shell = await page('../app/features/competition/CompetitionParticipantWorkspace.vue')
     const challenges = await page('../app/pages/competitions/[id]/challenges/index.vue')
 
-    expect(shell).toContain('xl:grid-cols-[15rem_minmax(0,1fr)_19rem]')
+    expect(shell).toContain('challenge-workspace')
     expect(shell).toContain('v-if="showChallengeNavigator"')
     expect(shell).toContain("'xl:grid-cols-[minmax(0,1fr)_19rem]'")
     expect(shell).toContain('<slot />')
@@ -52,6 +54,8 @@ describe('participant competition workspace layout', () => {
       expect(source).toContain("<component :is=\"CompetitionParticipantWorkspace\"")
     expect(leaderboard).not.toContain("<component :is=\"CompetitionParticipantWorkspace\"")
     expect(leaderboard).toContain("$t('ui.backToCompetition')")
+    expect(leaderboard).toContain('data-scoreboard-page-scroll')
+    expect(leaderboard).not.toContain('<ScrollSurface axis="y"')
   })
 
   test('removes the standalone submissions navigation item', async () => {

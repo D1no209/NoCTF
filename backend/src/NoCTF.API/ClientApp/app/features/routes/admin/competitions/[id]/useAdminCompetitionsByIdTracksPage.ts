@@ -123,6 +123,22 @@ export function useAdminCompetitionsByIdTracksPage() {
     track.clearInvitationCode = false
   }
 
+  function updateDefault(index: number, value: boolean | 'indeterminate'): void {
+    if (value === true) setDefault(index)
+  }
+
+  function updatePublicSelectable(track: TrackForm, value: boolean | 'indeterminate'): void {
+    setPublicSelectable(track, value === true)
+  }
+
+  function updateInternal(track: TrackForm, value: boolean | 'indeterminate'): void {
+    setInternal(track, value === true)
+  }
+
+  function updateInvitationRequired(track: TrackForm, value: boolean | 'indeterminate'): void {
+    setInvitationRequired(track, value === true)
+  }
+
   async function save() {
     if (saving.value || frozen.value || !canWrite.value) return
     const invalidInvitationTrack = tracks.value.find(track =>
@@ -186,6 +202,10 @@ export function useAdminCompetitionsByIdTracksPage() {
       setPublicSelectable,
       setInternal,
       setInvitationRequired,
+      updateDefault,
+      updatePublicSelectable,
+      updateInternal,
+      updateInvitationRequired,
       save
     }
 }

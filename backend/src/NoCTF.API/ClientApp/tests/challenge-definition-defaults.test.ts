@@ -59,7 +59,7 @@ describe('challenge definition defaults', () => {
   })
 
   test('initializes creation and resets the definition before a mode switch', async () => {
-    const createPage = (await sourceFile(new URL('../app/pages/admin/challenges/new.vue', import.meta.url)).text())
+    const createPage = (await sourceFile(new URL('../app/features/admin/ChallengeTemplateCreateDialog.vue', import.meta.url)).text())
       .replaceAll('\r\n', '\n')
     const editPage = (await sourceFile(new URL('../app/pages/admin/challenges/[id].vue', import.meta.url)).text())
       .replaceAll('\r\n', '\n')
@@ -70,8 +70,9 @@ describe('challenge definition defaults', () => {
     expect(editPage).toContain("form.mode = value.mode ?? 'Ctf'")
     expect(createPage).toContain('normalizeDefinitionJson(mode.value, definitionJson.value)')
     expect(editPage).toContain('normalizeDefinitionJson(form.mode, currentDefinition)')
-    expect(createPage).toContain('<form novalidate @submit.prevent="submit">')
-    expect(editPage).toContain('<form novalidate @submit.prevent="save">')
+    expect(createPage).toContain('<UiForm validation="feature"')
+    expect(createPage).toContain('@submit.prevent="submit"')
+    expect(editPage).toContain('<UiForm validation="feature" @submit.prevent="save">')
     expect(createPage).toContain('v-if="saveErrors.length"')
     expect(editPage).toContain('v-if="saveErrors.length"')
   })
@@ -117,9 +118,9 @@ describe('challenge definition defaults', () => {
       code: 'ActiveRuntimeDefinitionConflict',
     })).toEqual(['该模板仍有活动运行环境，请停止相关实例后再修改技术定义'])
 
-    const createPage = await sourceFile(new URL('../app/pages/admin/challenges/new.vue', import.meta.url)).text()
+    const createPage = await sourceFile(new URL('../app/features/admin/ChallengeTemplateCreateDialog.vue', import.meta.url)).text()
     const submit = createPage.slice(createPage.indexOf('async function submit'), createPage.indexOf('export type', createPage.indexOf('async function submit')))
-    expect(submit).toContain('challengeTemplateWriteErrorMessages(apiError)')
+    expect(submit).toContain('challengeTemplateWriteErrorMessages(error)')
     expect(submit).not.toContain("title.value = ''")
     expect(submit).not.toContain("definitionJson.value = ''")
   })

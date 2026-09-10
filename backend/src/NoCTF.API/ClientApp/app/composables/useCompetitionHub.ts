@@ -188,7 +188,8 @@ async function ensureStarted(): Promise<void> {
   if (!getAccessToken() && !connection) return
   const hub = ensureConnection()
   if (hub.state === signalR.HubConnectionState.Connected) {
-    await rejoinAll()
+    // Adding a subscriber to a healthy connection is not a reconnection.
+    // watchCompetition joins its own group; existing consumers keep their snapshots.
     return
   }
   if (startPromise) return startPromise

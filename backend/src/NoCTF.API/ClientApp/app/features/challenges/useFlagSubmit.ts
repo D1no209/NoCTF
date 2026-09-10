@@ -1,4 +1,3 @@
-import { proxyRefs } from 'vue'
 import { toRefs } from 'vue'
 
 import { PartyPopper } from '@lucide/vue'
@@ -13,10 +12,7 @@ type TrackedSubmission = Pick<
   id: string
 }
 
-type Events = {
-  evaluated: [result: TrackedSubmission['result']]
-  submitted: [gameplayFactIds: string[]]
-}
+const solvedChallengeKeys = new Set<string>()
 
 /** Owns state, effects and commands for FlagSubmit. */
 export function useFlagSubmit(props: Readonly<Omit<{
@@ -28,9 +24,11 @@ export function useFlagSubmit(props: Readonly<Omit<{
     description?: string
     practice?: boolean
     readOnlyJudgement?: boolean
+    dockTarget?: string
     maximumAttempts?: number | null
     remainingAttempts?: number | null
-  }, "multiple" | "title" | "description" | "practice" | "readOnlyJudgement"> & Required<Pick<{
+    initiallySolved?: boolean
+  }, "multiple" | "title" | "description" | "practice" | "readOnlyJudgement" | "dockTarget" | "initiallySolved"> & Required<Pick<{
     competitionId: string
     competitionChallengeId: string
     /** AWD 批量提交:多行输入,一次提交多个 flag */
@@ -39,10 +37,14 @@ export function useFlagSubmit(props: Readonly<Omit<{
     description?: string
     practice?: boolean
     readOnlyJudgement?: boolean
+    dockTarget?: string
     maximumAttempts?: number | null
     remainingAttempts?: number | null
-  }, "multiple" | "title" | "description" | "practice" | "readOnlyJudgement">>>,
-emit: { (event: "evaluated", ...args: [result: TrackedSubmission['result']]): void; (event: "submitted", ...args: [gameplayFactIds: string[]]): void }) {
+    initiallySolved?: boolean
+  }, "multiple" | "title" | "description" | "practice" | "readOnlyJudgement" | "dockTarget" | "initiallySolved">>>,
+emit: { (event: "evaluated", ...args: [result: TrackedSubmission['result']]): void; (event: "submitted", ...args: [gameplayFactIds: string[]]): void; (event: "remainingChanged", ...args: [remaining: number | null]): void }) {
+  const { user } = useAuth()
+  const challengeKey = () => `${user.value?.userId ?? 'anonymous'}:${props.competitionId}:${props.competitionChallengeId}`
   const input = ref('')
 
   const commandAttempt = createCommandAttempt()
@@ -57,15 +59,15 @@ emit: { (event: "evaluated", ...args: [result: TrackedSubmission['result']]): vo
 
   const persistentResult = ref<{ correct: boolean | null; message: string } | null>(null)
 
+  const solved = ref(props.initiallySolved || solvedChallengeKeys.has(challengeKey()))
+
   let requestGeneration = 0
 
-  const resultDialog = ref<{ correct: boolean; title: string; message: string } | null>(null)
 
   const remainingAttempts = ref<number | null>(props.remainingAttempts ?? null)
 
   let celebrationTimer: ReturnType<typeof setTimeout> | undefined
 
-  let resultTimer: ReturnType<typeof setTimeout> | undefined
 
   const celebrationParticles = Array.from({ length: 20 }, (_, index) => ({
     id: index,
@@ -81,24 +83,21 @@ emit: { (event: "evaluated", ...args: [result: TrackedSubmission['result']]): vo
     remainingAttempts.value = value ?? null
   })
 
+  watch(() => props.initiallySolved, value => {
+    if (!value) return
+    solvedChallengeKeys.add(challengeKey())
+    solved.value = true
+    input.value = ''
+    persistentResult.value = null
+  })
+
   const attemptsExhausted = computed(() =>
     !props.practice && !props.readOnlyJudgement && remainingAttempts.value === 0)
 
+  const inputDisabled = computed(() => attemptsExhausted.value || solved.value)
+
   function showResult(correct: boolean, message: string): void {
     persistentResult.value = { correct, message }
-    if (resultTimer) clearTimeout(resultTimer)
-    resultDialog.value = {
-      correct,
-      title: correct ? translate("ui.flagCorrect") : translate("ui.incorrectFlag"),
-      message,
-    }
-    resultTimer = setTimeout(closeResultDialog, 3200)
-  }
-
-  function closeResultDialog(): void {
-    if (resultTimer) clearTimeout(resultTimer)
-    resultTimer = undefined
-    resultDialog.value = null
   }
 
   function celebrateCorrectFlag(): void {
@@ -112,7 +111,7 @@ emit: { (event: "evaluated", ...args: [result: TrackedSubmission['result']]): vo
     })
   }
 
-  const { polling, timedOut, error: pollingError, start: startPolling, stop: stopPolling } = usePolling(
+  const { timedOut, error: pollingError, start: startPolling, stop: stopPolling } = usePolling(
     async () => {
       await refreshPending()
       return !tracked.value.some((t) => isGameplayFactPending(t.state))
@@ -148,7 +147,8 @@ emit: { (event: "evaluated", ...args: [result: TrackedSubmission['result']]): vo
     if (wasPending && !isGameplayFactPending(data.state) && !toasted.has(id)) {
       toasted.add(id)
       if (data.result === 'Correct') {
-        showResult(true, translate("ui.thisFlagIsCorrect"))
+        solvedChallengeKeys.add(challengeKey())
+        solved.value = true
         celebrateCorrectFlag()
       }
       else {
@@ -169,7 +169,7 @@ emit: { (event: "evaluated", ...args: [result: TrackedSubmission['result']]): vo
   }
 
   async function submit() {
-    if (submitting.value || attemptsExhausted.value) return
+    if (submitting.value || inputDisabled.value) return
     const generation = requestGeneration
     persistentResult.value = null
     try {
@@ -259,10 +259,13 @@ emit: { (event: "evaluated", ...args: [result: TrackedSubmission['result']]): vo
     if (error || !data) {
       const parsed = parseApiError(error, translate("ui.submissionFailed"))
       const code = parsed.code as NoCtfapiEndpointsGameplayFactsGameplayFactAdmissionFailureCodeProtocol | undefined
-      if (code === 'AttemptsExhausted') remainingAttempts.value = 0
-      showResult(false, code === 'AchievementAlreadySucceeded'
+      if (code === 'AttemptsExhausted') {
+        remainingAttempts.value = 0
+        emit('remainingChanged', 0)
+      }
+      persistentResult.value = { correct: null, message: code === 'AchievementAlreadySucceeded'
         ? translate("ui.breakHasAlreadySucceededUseVerificationModeToCheckWhether")
-        : parsed.message)
+        : parsed.message }
       return
     }
     const ids = [
@@ -277,9 +280,10 @@ emit: { (event: "evaluated", ...args: [result: TrackedSubmission['result']]): vo
     if (!ids.length) throw new Error(translate("ui.theJudgingEndpointReturnedNoValidResultPleaseRetry"))
     commandAttempt.completed()
     input.value = ''
-    if (remainingAttempts.value !== null)
+    if (remainingAttempts.value !== null) {
       remainingAttempts.value = Math.max(0, remainingAttempts.value - ids.length)
-    toast.success(translate("ui.acceptedSubmissionsForJudging", { count: ids.length }))
+      emit('remainingChanged', remainingAttempts.value)
+    }
     emit('submitted', ids)
     startPolling()
     } catch (error) {
@@ -291,13 +295,14 @@ emit: { (event: "evaluated", ...args: [result: TrackedSubmission['result']]): vo
     }
   }
 
-  watch(() => [props.competitionId, props.competitionChallengeId, props.practice], () => {
+  watch(() => [user.value?.userId, props.competitionId, props.competitionChallengeId, props.practice], () => {
     requestGeneration++
     submitting.value = false
     persistentResult.value = null
+    solved.value = props.initiallySolved || solvedChallengeKeys.has(challengeKey())
     input.value = ''
     tracked.value = []
-    closeResultDialog()
+
     stopPolling()
   })
 
@@ -321,7 +326,7 @@ emit: { (event: "evaluated", ...args: [result: TrackedSubmission['result']]): vo
     unwatch?.()
     stopPolling()
     if (celebrationTimer) clearTimeout(celebrationTimer)
-    if (resultTimer) clearTimeout(resultTimer)
+
   })
 
   const viewBindings = {
@@ -331,22 +336,18 @@ emit: { (event: "evaluated", ...args: [result: TrackedSubmission['result']]): vo
       submitting,
       celebrating,
       persistentResult,
-      resultDialog,
+      solved,
+
       remainingAttempts,
       celebrationParticles,
       attemptsExhausted,
-      closeResultDialog,
+      inputDisabled,
+
       timedOut,
       pollingErrorMessage,
       submit
     }
-  const viewState = proxyRefs(viewBindings)
-
-  function onUpdateOpenOpen(open: boolean) {
-     if (!open) viewState.closeResultDialog() 
-  }
-
-  return { ...viewBindings, onUpdateOpenOpen }
+  return viewBindings
 }
 
 export type FlagSubmitViewState = import('vue').ShallowUnwrapRef<Awaited<ReturnType<typeof useFlagSubmit>>>

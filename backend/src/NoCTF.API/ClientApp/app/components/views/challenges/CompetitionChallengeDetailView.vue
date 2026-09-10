@@ -3,7 +3,7 @@ import { toRefs } from 'vue'
 import type { CompetitionChallengeDetailViewState } from '~/features/challenges/useCompetitionChallengeDetail'
 
 const viewProps = defineProps<{ state: CompetitionChallengeDetailViewState }>()
-const { Dice5, Download, FileDown, ctx, isLoggedIn, user, challenge, loading, error, attachments, attachmentDeliveryPolicy, attachmentsLoading, attachmentError, downloading, historyRefreshKey, refreshSubmissionHistory, loadAttachments, downloadAttachment, downloadRandom, mode, ChallengeHints, ChallengeSubmissionHistory, AwdPanel, AwdpPanel, CtfPanel, KohPanel, competitionId, competitionChallengeId } = toRefs(viewProps.state)
+const { Dice5, FileDown, History, ctx, isLoggedIn, user, challenge, loading, error, attachments, attachmentDeliveryPolicy, attachmentsLoading, attachmentError, downloading, historyRefreshKey, historyOpen, refreshSubmissionHistory, updateRemainingAttempts, loadAttachments, downloadAttachment, downloadRandom, mode, ChallengeHints, ChallengeSubmissionHistory, AwdPanel, AwdpPanel, CtfPanel, KohPanel, competitionId, competitionChallengeId, flagDockTarget } = toRefs(viewProps.state)
 </script>
 
 <template>
@@ -19,11 +19,28 @@ const { Dice5, Download, FileDown, ctx, isLoggedIn, user, challenge, loading, er
     </div>
 
     <div v-else-if="challenge" class="flex flex-col">
-      <header class="flex flex-wrap items-center gap-3 border-b pb-5">
-        <h2 class="text-display text-2xl">{{ challenge.title }}</h2>
-        <Badge variant="outline" :class="directionBadgeClass(challenge.direction)">
-          {{ directionLabel(challenge.direction) }}
-        </Badge>
+      <header class="relative isolate flex min-h-28 flex-wrap items-center gap-3 overflow-hidden pb-5">
+        <TypeWatermark :text="directionLabel(challenge.direction)" :class="directionWatermarkClass(challenge.direction)" />
+        <h2 class="relative z-10 font-sans text-2xl font-bold italic">{{ challenge.title }}</h2>
+        <RemainingAttempts
+          v-if="isLoggedIn && challenge.remainingFlagAttempts !== null && challenge.remainingFlagAttempts !== undefined"
+          :count="challenge.remainingFlagAttempts"
+          class="relative z-10 font-sans text-lg font-bold italic tabular-nums text-primary"
+        />
+        <Dialog v-if="isLoggedIn" v-model:open="historyOpen">
+          <Hint :content="$t('ui.challengeSubmissionHistory')">
+            <DialogTrigger as-child>
+              <Button variant="ghost" size="icon-sm" class="relative z-10" :aria-label="$t('ui.challengeSubmissionHistory')"><History /></Button>
+            </DialogTrigger>
+          </Hint>
+          <DialogContent class="sm:max-w-3xl">
+            <DialogHeader class="sr-only"><DialogTitle>{{ $t('ui.challengeSubmissionHistory') }}</DialogTitle><DialogDescription>{{ $t('ui.onlyTeamMembersCanViewFlagValuesSubmittedByTheir') }}</DialogDescription></DialogHeader>
+            <ScrollSurface axis="y" class="max-h-[65dvh]" :aria-label="$t('ui.challengeSubmissionHistory')">
+              <component :is="ChallengeSubmissionHistory" v-if="historyOpen" :key="challenge.id" :competition-id="competitionId" :competition-challenge-id="competitionChallengeId" :refresh-key="historyRefreshKey" />
+            </ScrollSurface>
+          </DialogContent>
+        </Dialog>
+        <span class="sr-only">{{ directionLabel(challenge.direction) }}</span>
         <Badge v-if="mode === 'Awdp'" variant="secondary">{{ $t('ui.scoresSettleByRound') }}</Badge>
       </header>
 
@@ -31,9 +48,12 @@ const { Dice5, Download, FileDown, ctx, isLoggedIn, user, challenge, loading, er
         <MarkdownContent :source="challenge.description" class="text-foreground/90" />
       </section>
 
+      <div data-slot="challenge-resource-row">
+      <div id="challenge-runtime-dock" data-slot="challenge-runtime-dock" />
       <section
         v-if="isLoggedIn && (attachmentsLoading || attachmentError || attachments.length || attachmentDeliveryPolicy === 'RandomOnePerTeam')"
-        class="border-b py-5"
+        data-slot="challenge-attachments"
+        class="min-w-0 py-5"
         aria-labelledby="challenge-attachments-title"
       >
         <div class="flex items-center justify-between gap-3">
@@ -55,28 +75,25 @@ const { Dice5, Download, FileDown, ctx, isLoggedIn, user, challenge, loading, er
               <Button type="button" size="sm" variant="outline" @click="loadAttachments">{{ $t('ui.reload') }}</Button>
             </AlertDescription>
           </Alert>
-          <ul v-else-if="attachmentDeliveryPolicy !== 'RandomOnePerTeam'" class="mt-3 divide-y border-y">
+          <ul v-else-if="attachmentDeliveryPolicy !== 'RandomOnePerTeam'" class="mt-3 flex flex-wrap gap-2">
             <li
               v-for="attachment in attachments"
               :key="attachment.id"
-              class="flex items-center justify-between gap-3 py-2.5"
+              class="min-w-0"
             >
-              <span class="flex min-w-0 items-center gap-2 text-sm">
-                <FileDown class="size-4 shrink-0 text-muted-foreground" />
-                <span class="truncate">{{ attachment.fileName }}</span>
-                <span class="shrink-0 text-muted-foreground">{{ formatBytes(attachment.byteLength) }}</span>
-              </span>
               <Button
-                variant="ghost"
+                variant="outline"
                 size="sm"
+                class="max-w-full"
                 :disabled="downloading"
                 @click="downloadAttachment(attachment.id!, attachment.fileName ?? 'attachment')"
               >
-                <Download data-icon="inline-start" /> {{ $t('ui.download') }}
+                <FileDown data-icon="inline-start" /> <span class="truncate">{{ attachment.fileName }}</span>
               </Button>
             </li>
           </ul>
       </section>
+      </div>
 
       <component :is="ChallengeHints"
         :key="`${competitionId}:${challenge.id}:${user?.userId ?? 'anonymous'}`"
@@ -92,21 +109,30 @@ const { Dice5, Download, FileDown, ctx, isLoggedIn, user, challenge, loading, er
           :key="challenge.id"
           :competition="ctx.competition.value"
           :challenge="challenge"
+          :flag-dock-target="flagDockTarget"
+          runtime-dock-target="#challenge-runtime-dock"
           @submitted="refreshSubmissionHistory"
+          @remaining-changed="updateRemainingAttempts"
         />
         <component :is="AwdPanel"
           v-else-if="mode === 'Awd'"
           :key="challenge.id"
           :competition="ctx.competition.value"
           :challenge="challenge"
+          :flag-dock-target="flagDockTarget"
+          runtime-dock-target="#challenge-runtime-dock"
           @submitted="refreshSubmissionHistory"
+          @remaining-changed="updateRemainingAttempts"
         />
         <component :is="AwdpPanel"
           v-else-if="mode === 'Awdp'"
           :key="challenge.id"
           :competition="ctx.competition.value"
           :challenge="challenge"
+          :flag-dock-target="flagDockTarget"
+          runtime-dock-target="#challenge-runtime-dock"
           @submitted="refreshSubmissionHistory"
+          @remaining-changed="updateRemainingAttempts"
         />
         <component :is="KohPanel"
           v-else-if="mode === 'Koh'"
@@ -116,14 +142,6 @@ const { Dice5, Download, FileDown, ctx, isLoggedIn, user, challenge, loading, er
         />
       </div>
 
-      <component :is="ChallengeSubmissionHistory"
-        v-if="isLoggedIn"
-        :key="challenge.id"
-        class="mt-5"
-        :competition-id="competitionId"
-        :competition-challenge-id="competitionChallengeId"
-        :refresh-key="historyRefreshKey"
-      />
     </div>
   </section>
 </template>

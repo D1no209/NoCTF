@@ -7,7 +7,7 @@ const { NotificationCenter } = toRefs(viewProps.state)
 </script>
 
 <template>
-  <div class="mx-auto w-full max-w-6xl px-4 py-8">
+  <div class="h-full min-h-0">
     <component :is="NotificationCenter" />
   </div>
 </template>

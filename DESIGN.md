@@ -1,285 +1,160 @@
 ---
-name: NoCTF Developer Theme System
-description: A developer-curated visual theme contract for a precise live competition platform.
-colors:
-  pixel-canvas: "#e4e4e4"
-  pixel-ink: "#242424"
-  pixel-card: "#eeeeee"
-  pixel-popover: "#ededed"
-  pixel-command: "#2f2f2f"
-  pixel-command-foreground: "#f5f5f5"
-  pixel-secondary: "#d6d6d6"
-  pixel-muted: "#dddddd"
-  pixel-muted-foreground: "#5a5a5a"
-  pixel-accent: "#cdcdcd"
-  pixel-fault: "#a13e34"
-  pixel-border: "#8b8b8b"
-  pixel-input: "#a2a2a2"
-  pixel-focus: "#3a3a3a"
-  pixel-sidebar: "#c9c9c9"
-  pixel-sidebar-accent: "#bdbdbd"
-  category-web: "#ff9e42"
-  category-pwn: "#ff5e36"
-  category-misc: "#c47aff"
-  category-reverse: "#66ccff"
-  category-mobile: "#f06eff"
-  category-crypto: "#ffe14d"
-  category-forensics: "#ffb86c"
-  category-ai: "#4deaff"
-  category-blockchain: "#ff7ec7"
-  category-hardware: "#ff8c42"
-  category-osint: "#ff9f7a"
-  category-cloud: "#7ab8ff"
-typography:
-  pixel-display:
-    fontFamily: "Fusion Pixel 10px, Courier New, Lucida Console, MS Gothic, ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace"
-    fontSize: "3rem"
-    fontWeight: 700
-    lineHeight: 1.25
-    letterSpacing: "normal"
-  pixel-headline:
-    fontFamily: "Fusion Pixel 10px, Courier New, Lucida Console, MS Gothic, ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace"
-    fontSize: "1.5rem"
-    fontWeight: 700
-    lineHeight: 1.25
-    letterSpacing: "normal"
-  pixel-title:
-    fontFamily: "Fusion Pixel 10px, Courier New, Lucida Console, MS Gothic, ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace"
-    fontSize: "1.25rem"
-    fontWeight: 700
-    lineHeight: 1.25
-    letterSpacing: "normal"
-  pixel-body:
-    fontFamily: "Fusion Pixel 10px, Courier New, Lucida Console, MS Gothic, ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace"
-    fontSize: "0.9rem"
-    fontWeight: 400
-    lineHeight: 1.5
-    letterSpacing: "normal"
-  pixel-label:
-    fontFamily: "Fusion Pixel 10px, Courier New, Lucida Console, MS Gothic, ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace"
-    fontSize: "0.9rem"
-    fontWeight: 700
-    lineHeight: 1.25
-    letterSpacing: "0.12em"
-rounded:
-  square: "0px"
-  pill: "9999px"
-spacing:
-  pixel-cell: "8px"
-  grid-unit: "16px"
-  xs: "0.25rem"
-  sm: "0.5rem"
-  md: "1rem"
-  lg: "1.5rem"
-  xl: "2rem"
-components:
-  pixel-button-primary:
-    backgroundColor: "{colors.pixel-command}"
-    textColor: "{colors.pixel-command-foreground}"
-    typography: "{typography.pixel-label}"
-    rounded: "{rounded.square}"
-    padding: "0.5rem 1rem"
-    height: "2.5rem"
-  pixel-button-outline:
-    backgroundColor: "{colors.pixel-canvas}"
-    textColor: "{colors.pixel-ink}"
-    typography: "{typography.pixel-label}"
-    rounded: "{rounded.square}"
-    padding: "0.5rem 1rem"
-    height: "2.5rem"
-  pixel-input:
-    backgroundColor: "{colors.pixel-card}"
-    textColor: "{colors.pixel-ink}"
-    typography: "{typography.pixel-body}"
-    rounded: "{rounded.square}"
-    padding: "0.25rem 0.75rem"
-    height: "2.5rem"
-  pixel-badge:
-    backgroundColor: "{colors.pixel-command}"
-    textColor: "{colors.pixel-command-foreground}"
-    typography: "{typography.pixel-label}"
-    rounded: "{rounded.pill}"
-    padding: "0.125rem 0.5rem"
-  pixel-card-default:
-    backgroundColor: "{colors.pixel-card}"
-    textColor: "{colors.pixel-ink}"
-    rounded: "{rounded.square}"
-    padding: "1rem"
+name: NoCTF Shared UI Design System
+register: product
 ---
 
-# Design System: NoCTF
+# NoCTF 全站 UI 设计系统
 
-## Overview
+本规范对应已批准的组件改造及后续卡片透明度补充。实际 token 的唯一来源为 `backend/src/NoCTF.API/ClientApp/app/assets/css/main.css`。
 
-**Creative North Star: "The Curated Competition Control Room"**
+## 方向与主题
 
-NoCTF is one product with a developer-curated catalog of complete visual themes. Platform developers author, review, test, and ship every theme. Users may select a registered theme, but they never upload CSS, edit token values, inject fonts, or provide external visual resources. Theme choice changes presentation only. It must never alter layout, information hierarchy, permissions, status meaning, game-mode behavior, or API interaction.
+浅色主题保留品牌蓝与冷蓝灰，深色主题强调色统一为 #39FF14；默认深色，同时维护完整浅色主题。全站正文、标题、按钮、数值、代码、图表及大屏文字统一使用 Microsoft YaHei / 微软雅黑；错误提醒和通知保留 14px 加粗。主题只改变呈现，不改变路由、权限、游戏规则、数据或业务行为。
 
-The shared interface contract is calm, precise, trustworthy, sharp, energetic, and technical. Every theme must make live competition state and operational truth easy to inspect. Pixel Industrial is the current implemented default: a participant or operator reads dense state on a laptop in a brightly lit event hall, where monochrome contrast, hard edges, and tactile offset shadows remain legible through glare and pressure.
+- 背景、卡片、控件、弹层、边框、焦点分别使用 `background`、`card`、`control`、`popover`、`border/input`、`ring` 语义 token。
+- 操作与选择强调使用 `primary/accent`。成功、危险、警告及题目分类保留语义，通过统一 token 适配亮暗模式。
+- 图表 tooltip 与界面弹层使用相同背景、边框和字体。Canvas/WebGL 通过 `themeColor` 将 CSS 色转换为 sRGB；主题变化时刷新场景材料与纹理，保留比赛数据与相机状态。
+- 页面和业务组件不定义原始颜色或私有阴影。
 
-Future themes may use different palettes, fonts, radii, elevation, textures, and motion intensity, but they must preserve the same semantic CSS roles and component states. The root frontmatter records the current Pixel Industrial implementation. Additional themes require their own reviewed token set and theme-specific design document before registration.
+顶部栏提供“主题调色板”，用户可通过共享 ColorPicker 的色板、HSV 滑块、HEX 输入及预设颜色自定义强调色，分别保存在浏览器的亮色/深色配置中。primary、按钮前景、accent、ring 与 sidebar 强调 token 统一联动，文字前景按较高对比度选择；分类和危险/成功语义色保持独立。支持恢复当前模式默认色，刷新和跨标签页同步；存储只接受经过校验的 HEX 值。颜色即时预览，持久化合并写入，3D 主题刷新合并到拖动间隙。
 
-**Key Characteristics:**
+顶部使用 80px 透明承载层和左、中、右三个独立腰圆，腰圆宽度由内部按钮实际占用宽度决定。左侧显示平台 Logo 锁定：有 Logo 时显示图片和平台名，无图时使用现有终端品牌标识。中间腰圆放置竞赛、题库管理、平台设置、消息中心和中英切换；右侧放置主题调色板、明暗切换和 32px 无框头像。导航入口保留固定宽度槽位与 380ms 展开，活动入口继续显示主题色下划线和 `aria-current`。三个腰圆使用主题卡片背景、12px 模糊和统一投影，外层顶栏不覆盖壁纸。
 
-- Developer-curated themes selected from a closed registry.
-- Stable semantic roles across every theme and game mode.
-- Pixel Industrial as the current square, grayscale, tactile default.
-- Dense but legible operational surfaces with visible fairness and system state.
-- Fast state feedback, stable dimensions, and reduced-motion support.
-- Category accents used for recognition, never as decorative page themes.
+普通路由切换使用全局 `noctf-page-slide`：旧页面主体向左退出，新页面主体从右侧进入。过渡只应用于 DefaultLayout 的 main 内容，顶部导航和布局壁纸保持原位；主内容视口裁切横向溢出。竞赛页和消息中心的 ChoiceSidebar 在页面网格内稳定占位，与标题和右侧 Card 同步横移，避免 fixed 元素在 transform 期间改变定位包含块。减少动态效果模式取消过渡和位移。
 
-**The Theme Contract Rule.** Every registered theme implements the complete semantic token contract. A missing token, unreadable state, or component-specific fallback is a release blocker.
+使用嵌套 `NuxtPage` 和多层功能组件的平台管理路由在页面入口提供真实的 `platform-admin-page` DOM 根节点，确保 Nuxt leave 动效保留完整侧栏与设置内容直至离场结束，不允许过渡期间先卸载内容形成空白。
 
-**The Closed Catalog Rule.** Users choose a theme identifier from the platform registry. Custom CSS, custom token payloads, external fonts, remote backgrounds, and arbitrary theme URLs are forbidden.
+固定高度竞赛工作区必须以 `data-contained-workspace-page` 明确标记。DefaultLayout 使用稳定的 `data-slot="default-layout"`，只有当前实际渲染的 main 子页面带此标记时才启用 `100dvh` 和纵向裁切；退出页面在离场完成前继续保持高度，普通长页面进入时不继承旧页面的限制，避免卡片高度在过渡中变化或被截断。
 
-**The Presentation Only Rule.** A theme may change visual expression. It may not change workflow, component purpose, data density, status meaning, or competition logic.
+除首页 `/` 外，浅色和深色页面分别使用本地 `light-pages-wallpaper.jpg` 与 `dark-pages-wallpaper.jpg` 作为固定、居中、cover 的布局壁纸。两张壁纸都以 35% 图像强度与 65% 当前主题 background token 合成，透明度只作用于背景层，不降低正文、控件或卡片的不透明度。
 
-## Colors
+独立个人设置页与旧头像 DropdownMenu 已删除。头像正下方使用 Popover 承载账户面板：上层 Card 显示账户摘要、退出登录和三个圆角方形入口；入口切换公开资料、账户信息与账户安全，下层 Card 按需展开并通过共享 ScrollSurface 承载精简表单。账户草稿由常驻功能层保留，切换路由或暂时关闭面板不会清空。
 
-Pixel Industrial uses a restrained achromatic control palette with small, deliberate category signals. Every future theme may reinterpret the visual palette, but success, warning, fault, focus, selection, and category roles must remain distinguishable and stable.
+登录与注册使用独立路由页面，顶部栏、首页 CTA 与鉴权拦截直接进入 `/auth/login`、`/auth/register`。两个页面保留注册成功、验证邮件重发与登录错误反馈，登录成功后消费安全的站内 `redirect` 返回原目标。认证 Card 从紧凑宽度扩展为 `max-w-xl`，为后续横向内容保留空间。
 
-### Primary
+Dialog、可滚动 Dialog 和 AlertDialog 都以 Card 原语作为实际 Reka 内容节点，不再复制一套弹窗卡片。弹窗由 Card 提供 45% 表面、12px 背景模糊、20px 圆角、右下阴影与电路装饰；定位、焦点圈定、遮罩和开合动画仍由 Dialog 语义负责。业务弹窗直接组合 CardHeader、CardContent 与 CardFooter，不嵌套第二张 Card。
 
-- **Graphite Command** (`pixel-command`, `#2f2f2f`): Primary actions, selected controls, and the strongest interface decisions.
-- **Paper Signal** (`pixel-command-foreground`, `#f5f5f5`): Text and icons placed on Graphite Command.
+## 卡片
 
-### Secondary
+- 外轮廓及卡片图片外沿采用 **20px** 圆角，内部控件采用 **10px** 圆角。
+- 按用户补充，卡片背景采用 **45% 不透明度（alpha 0.45）**，叠加 **12px 背景高斯模糊**；文字和图标保持正常不透明度。卡片透明度不作用于整棵内容树。
+- 光源来自左上，阴影投向右下。静止阴影为 `1px 2px 3px` 与 `4px 6px 16px` 两层；悬浮阴影为 `1px 2px 3px` 与 `6px 10px 24px`，透明度按主题定义。
+- 指针悬停时上移 **4px**，**180ms** ease-out，无弹跳；只有可点击卡片使用手形指针。
+- 减少动态效果模式关闭位移和过渡。
+- 普通文本、密码、数值、多行及组合输入框采用 **80%** 背景不透明度（比卡片高 35 个百分点），使用独立 field-surface 色调与卡片区分，悬停和聚焦仍保持 80%；Flag 伪终端保持透明。卡片内选择触发器与上传区保持 **45%**，弹层和菜单保持不透明。
 
-- **Machine Wash** (`pixel-secondary`, `#d6d6d6`): Secondary controls and grouped inactive surfaces.
-- **Interaction Zinc** (`pixel-accent`, `#cdcdcd`): Hover, active, and low-intensity selection feedback.
-- **Quiet Alloy** (`pixel-muted`, `#dddddd`): Muted sections, disabled groupings, and low-priority backgrounds.
+## 统一控件
 
-### Tertiary
+控件和菜单使用 **10px** 圆角，常规高度 **40px**、紧凑模式 **32px**；触屏命中区域至少 **44px**。默认、悬停、按下、焦点、禁用、加载和错误状态使用共享语义色。
 
-- **Web Amber** (`category-web`, `#ff9e42`), **Pwn Vermilion** (`category-pwn`, `#ff5e36`), **Misc Violet** (`category-misc`, `#c47aff`), and **Reverse Cyan** (`category-reverse`, `#66ccff`) identify challenge categories.
-- **Mobile Magenta** (`category-mobile`, `#f06eff`), **Crypto Yellow** (`category-crypto`, `#ffe14d`), **Forensics Apricot** (`category-forensics`, `#ffb86c`), and **AI Electric Cyan** (`category-ai`, `#4deaff`) extend that category vocabulary.
-- **Blockchain Pink** (`category-blockchain`, `#ff7ec7`), **Hardware Orange** (`category-hardware`, `#ff8c42`), **OSINT Coral** (`category-osint`, `#ff9f7a`), and **Cloud Blue** (`category-cloud`, `#7ab8ff`) complete the shipped category set.
+卡片内纵向表单字段按内容长度限制宽度：表单容器达到 36rem 时，数量框最多 12rem、日期框 20rem、选择器 24rem、文本输入 36rem、多行输入与上传区域 42rem。窄卡片取消这些上限，随容器铺满；上传按钮按内容宽度显示。预览表单采用名称/数量约 2:1、日期/选择器双列的布局，窄屏恢复单列，操作按钮允许换行。
 
-### Neutral
+主按钮底色与文字强调色共用 primary：浅色保留现有蓝色、搭配浅色前景，深色使用 #39FF14、搭配深色前景。相同 variant 的按钮在卡片内外完全一致，不再按容器覆盖底色、文字色或透明度。主按钮光晕保持克制，悬停轻度增强；次按钮采用中性色文字、主题边框，常态不发光。危险操作保留危险色，禁用状态关闭光晕，键盘焦点保留清晰轮廓。
 
-- **Industrial Canvas** (`pixel-canvas`, `#e4e4e4`): Main page background beneath the 16px technical grid.
-- **Console Ink** (`pixel-ink`, `#242424`): Default foreground and dense operational text.
-- **Equipment Face** (`pixel-card`, `#eeeeee`): Cards, inputs, tables, and control faces.
-- **Raised Sheet** (`pixel-popover`, `#ededed`): Popovers, menus, and temporary surfaces.
-- **Structural Steel** (`pixel-border`, `#8b8b8b`): Two-pixel borders and strong separators.
-- **Input Rail** (`pixel-input`, `#a2a2a2`): Default form-control border.
-- **Focus Graphite** (`pixel-focus`, `#3a3a3a`): Keyboard focus and high-confidence interactive emphasis.
-- **Navigation Alloy** (`pixel-sidebar`, `#c9c9c9`): Sidebar and authoritative navigation surfaces.
-- **Navigation Press** (`pixel-sidebar-accent`, `#bdbdbd`): Active and hovered navigation items.
-- **Fault Brick** (`pixel-fault`, `#a13e34`): Errors and destructive actions only.
+- `UiForm`：统一提交、右下角校验提示与首个无效字段定位，不显示原生校验气泡。已有完整功能层校验的表单显式使用 `validation="feature"`。
+- `Input` / `PasswordInput` / `Textarea`：保留输入法、键盘和自动填充语义；多行输入自动增长，由外层共享滚动区域承载长内容。
+- `NumberInput` / `NullableNumberInput`：主题化步进按钮，支持上下限、步长和空值；页面滚轮不会误改数值。
+- `DateTimePicker`：自定义日历、年月选择与时间输入，保留本地日期时间字符串的 API 契约，不在控件内转换为 UTC。
+- `FileUpload`：自定义选择入口、拖放、已选文件、移除、上传状态和错误展示；系统 input 仅作为隐藏的文件选择接口。简单上传入口可继续使用隐藏 `FileInput` 配合共享 Button。
+- `Select`：不透明面板，选中项有强调底色与勾选标识，长列表使用共享滚动条，不含上下滚动箭头。日历内部也使用此选择器。
+- `Hint` / `Tooltip`：替代 DOM title 气泡；Markdown 中的 title 内容也通过共享 Hint 渲染。
+- 站内未保存离开确认使用自定义 AlertDialog，由功能层处理决策与导航。
 
-**The Semantic Stability Rule.** A theme can change a color value, but it cannot exchange semantic roles. Fault must remain fault, focus must remain focus, and category identity must remain recognizable.
+## 错误提醒与通知
 
-**The Category Restraint Rule.** Category colors label challenges and related data. They never flood inactive pages, replace primary actions, or become a competition-mode skin.
+- 统一在页面右下角显示小型提示窗，距右侧和底部约 24px，宽度最多 360px。
+- 从右向左滑入，240ms ease-out；关闭时向右退出，减少动态效果模式不播放过渡。
+- 字体使用 Microsoft YaHei / 微软雅黑，字重 700、字号 14px；SVG 角线与状态图标使用对应语义色。
+- 标准 toast 与条件反馈 Alert 使用同一 Sonner 队列，避免多个浮层重叠；同时显示最多三个。
+- Alert 跟随所属界面的显示和生命周期。表单错误保留到修正或关闭；重新提交会重新提示。字段保留错误标记、辅助技术错误文本和定位入口。
+- 点击通知中的操作不会意外关闭原有对话框；全屏页面内的通知跟随全屏容器。
+- 提示窗保持不透明，确认型对话框保留独立确认流程。
 
-**The No Neon Spectacle Rule.** Bright category colors are small signals. Neon black-purple surfaces, decorative glow, and saturated full-page effects are prohibited.
+## 滚动
 
-## Typography
+使用 OverlayScrollbars 原位增强共享视口，保留滚动坐标和默认滚轮/触控板物理行为，不做平滑滚动劫持。
 
-**Display Font:** Fusion Pixel 10px with Courier New, Lucida Console, MS Gothic, and system monospace fallbacks.
+- 页面主滚动、表格、菜单、弹层和局部列表统一使用自定义轨道/滑块，无上下箭头。
+- 轨道宽 **8px**、视觉滑块约 **4px**，悬停和拖动时加粗。
+- 默认隐藏；悬停、滚动、拖动或键盘焦点进入时可见，停止交互约 **800ms** 后隐藏。
+- 颜色使用 `scroll-thumb`、`scroll-thumb-hover`、`primary` 和 `scroll-track`，随亮暗主题变化。
+- 业务视图通过 `ScrollSurface` 或共享组件的 `data-scroll-surface` 声明滚动需求；不自行实现滑块或原生滚动条皮肤。
+- 弹层遵守视口留白和最大高度，超出内容在内部滚动，不裁掉操作按钮。
 
-**Body Font:** Fusion Pixel 10px with the same monospace fallback stack. Pixel Industrial keeps its mosaic character across headings, body copy, tables, forms, descriptions, and captions.
+## 架构、内容与边界
 
-**Label/Mono Font:** Fusion Pixel 10px. Pixel Industrial is mono-forward by design.
+功能状态、API、业务校验、导航决策留在 `features/`。视图负责共享原语组合、数据绑定和命令转发。所有应用文案使用稳定 i18n key，未知用户内容不作为翻译 key。页面、分区与列表标题保持精简，不附加页面用途、内容范围或键盘操作等解释性文案；权限、风险、表单约束、错误与空状态等会影响操作判断的信息保留。
 
-**Character:** Pixel Industrial is direct, mechanical, and visibly constructed. Its 20px root size makes compact rem-based controls physically larger than typical browser defaults, which supports event-floor readability. Future themes may register a different developer-supplied font stack, but fonts must ship with the platform or use trusted local system families.
+控件内部必须保留必要的 HTML 语义。系统文件选择窗口、浏览器自动填充以及关闭标签页的未保存保护由系统/浏览器管理，不伪造这些安全交互；应用页面内的选择、提示、校验和确认使用设计系统。
 
-### Hierarchy
+`audit:architecture` 对原生表单/选择类型、title 提示、原生对话框、私有滚动区域与原始颜色进行检查，且已接入构建。交互通过行为测试、类型检查和浏览器验证补充，静态扫描不能代替实际使用验证。
 
-- **Display** (700, `3rem`, `1.25`): Authentication statements and rare identity-led headings.
-- **Headline** (700, `1.5rem`, `1.25`): Page headings and major administrative workspaces.
-- **Title** (700, `1.25rem`, `1.25`): Cards, dialogs, operational panels, and competition regions.
-- **Body** (400, `0.9rem`, `1.5`): Default UI copy, tables, forms, and descriptions. Narrative copy stays within 65 to 75 characters per line.
-- **Label** (700, `0.9rem`, `0.12em`, uppercase for pixel-styled actions): Buttons and prominent state markers. Compact badges may step down to the `0.8rem` pixel minimum.
+开发环境的 `/__ui-check` 提供交互预览；发布构建通过 pages hook 排除此路由，不包含预览逻辑。
 
-**The Pixel Minimum Rule.** Pixel glyphs are never rendered below `0.8rem`. Compact roles gain space or truncate rather than switching fonts or shrinking the bitmap face further.
+首页仅保留品牌介绍与透明伪终端，主视觉至少填满导航栏下方的视口，移除“四种游戏模式”和“近期竞赛”展示区。伪终端使用固定高度，输入行锚定在终端左上方，提示符 `noctf $` 不随输出长度移动；空输入时提示符后持续显示 `|` 闪烁光标，输入文字时由原生光标接管。回显位于下方固定滚动区域。终端支持 `help`、`ls`、`status`、`whoami`，其中 `ls` 使用已加载的完整公开竞赛列表，`whoami` 未登录时返回 `unknow`。回车执行后立即清空输入并用当前结果替换旧回显，不累计命令记录、不响应历史导航、不写入持久化存储。当前回显通过共享 useTypewriterMotion 逐字呈现；内容变化时从头播放，隐藏页面时暂停，减少动态效果时直接显示全文，完整结果一次性提供给辅助技术。品牌区与终端之间由首页 View 直接组合信号背景，四条低透明度主题色线路、节点与移动高光使用独立 SVG 遮罩和共享 motion 动效，不改变内容布局或接收指针事件。竞赛详情介绍使用共享安全 Markdown 渲染；列表卡片使用纯文本 Markdown 摘要，不在整卡链接中嵌套文章链接。
 
-**The Theme Typography Rule.** A theme may change its developer-supplied family and character, but it must preserve the five hierarchy roles, readable CJK coverage, stable control dimensions, and code-safe fallbacks.
+公开竞赛页采用列表/详情布局，左侧状态筛选与选择列表，右侧展示对应竞赛介绍、报名与比赛入口。选择写入 URL，旧介绍链接重定向到对应选择。手机端按列表、详情上下排列。通用 SelectionList 原语负责方向键焦点与回车选择，不劫持 Tab；数据和路由状态由功能层管理。入场和过渡效果通过独立 `app/motion/` 库调用，减少动态效果时关闭。
 
-**The Operational Numeral Rule.** Scores, IDs, ports, timestamps, attempts, and live counters use tabular numeral behavior whenever the chosen theme font supports it.
+消息中心复用同一 `ChoiceSidebar` / `WaveSelectionList` 侧边栏组合与 `Card` 详情容器；列表分页入口使用侧边栏 footer 插槽，详情标题固定在卡片顶部，消息正文与后续记录通过共享 `ScrollSurface` 独立滚动。切换通知复用竞赛详情的 `MotionSwap` / `film-up` 上卷动效，外层 Card 保持固定，只按通知 ID 替换内部内容。选中项与 URL 同步、消息线程加载和操作目标解析继续由通知功能层负责。
 
-## Elevation
+右侧详情统一为一张卡片：海报直接作为标题、时间、倒计时、操作和赛道信息区域的背景，不新增顶部横幅；旁边/下方保留报名摘要，底部为 Markdown 介绍。背景遮罩使用主题卡片色，保证文字可读。海报通过 SDK 获取，由共享 CoverImage 原语默认等比 cover 填充（裁切而不拉伸），加载和缺失状态均有占位。测试海报只存在 Mock 数据目录。
 
-Pixel Industrial uses structural elevation, not ambient blur. Two-pixel borders define equipment edges; solid offset shadows make controls feel pressed from a mechanical panel. The result is deliberately tactile and flat-faced. Other developer themes may use softer or flatter elevation, but every theme must distinguish page, surface, overlay, focus, and pressed states without decorative glass effects.
+切换竞赛使用影片式上卷：外层卡片不参与位移动画，旧内容向上退出后，新内容从下方进入。动效顺序、缓动和高度占位由 `app/motion/useContentSwap.ts` 与 `motion.css` 统一管理；业务详情按竞赛 ID 重建，快速切换以最终选择为准。当前优先验证桌面端，移动端专项适配暂缓。
 
-### Shadow Vocabulary
+竞赛列表侧栏直接固定于页面背景，没有卡片容器、投影或外框。列表项默认透明，选中/悬停时以主题色轻量强调并向右凸起，相邻项按照与指针的垂直距离逐渐位移，形成连续波浪。侧栏预留位移空间，避免覆盖详情；滚动仍使用共享 ScrollSurface。业务侧栏组件位于 features/competitions，对应纯视图位于 components/views/competitions，固定定位与列表交互原语位于 components/ui，波浪模型与过渡位于 motion。
 
-- **Button Detent** (`box-shadow: 2px 2px 0 #8c8c8c`): Primary control depth at rest.
-- **Card Detent** (`box-shadow: 2px 2px 0 #bdbdbd`): Default cards and repeated item containers.
-- **Panel Chassis** (`box-shadow: 4px 4px 0 #d4d4d4`): Layered operational panels.
-- **Dark Panel Chassis** (`box-shadow: 6px 6px 0 #7d7d7d`): Dark Pixel Industrial panel variant used by game dashboards.
-- **Floating Equipment** (`box-shadow: 6px 6px 0 #bdbdbd`): Menus and higher temporary surfaces.
+最新全局规则：所有组件与原语取消 border、outline、ring 框线。保留投影与光晕，焦点使用主题光晕，输入错误使用危险色光晕；SVG 图标笔画不受影响。竞赛侧栏状态选择器、下拉面板及选中/悬停项的背景完全透明，文字、图标和波浪反馈保留。
 
-**The Solid Offset Rule.** Pixel Industrial shadows have zero blur and small positive offsets. If a shadow looks soft, cinematic, or luminous, it does not belong to this theme.
+竞赛状态筛选改为横向三段选择（进行中 / 即将开始 / 已结束），背景透明、无边框；竞赛条目列表仍保持纵向波浪布局。重复点击当前状态不会清空筛选。
 
-**The State Before Decoration Rule.** Elevation communicates clickability, pressed state, stacking, or temporary focus. It never exists only to make a screen look expensive.
+公开竞赛浏览页采用最大 1640px 的宽布局，内侧留白为 clamp(24px, 3vw, 48px)，宽屏居中后额外增加外侧留白；固定列表与页面内容左边缘对齐，详情卡片填满列表以外的剩余宽度。页面宽度与侧栏定位共用 competition-page-width / competition-page-gutter，保留 24px 列间距及波浪、卡片阴影所需余量。页面限制在导航栏下方视口内，取消整页滚动，详情卡片内容使用共享 ScrollSurface 内部滚动，切换竞赛重置滚动位置。海报取消固定宽高比，由叠放的标题、时间与操作内容自然决定高度，图片仍等比 cover 填充，不新增空白海报区域。
 
-## Components
+独立竞赛管理列表不再作为页面存在，`/admin/competitions` 重定向到公开竞赛浏览页。平台管理员在竞赛页标题右侧使用“新建竞赛”打开受控 Dialog；创建成功后弹窗关闭、返回对象写入现有列表并自动选中新竞赛。旧 `/admin/competitions/new` 地址只作权限保护后的兼容重定向，并通过查询参数自动打开同一弹窗。选中竞赛的“我的队伍”右侧保留“管理竞赛”；草稿纳入“即将开始”，已删除竞赛进入仅管理员可见的分类，以保留恢复入口。管理员使用管理列表数据，其他用户继续使用公开列表。全部竞赛管理详情路由只允许平台管理员进入。
 
-All themes render the same component tree and preserve the same variant names. Theme-specific CSS may adjust visual primitives, but it cannot create alternate business components or route-specific forks.
+题库管理列表按“包含已删除”筛选在应用内保留最近一次成功快照。重新进入页面时立即恢复快照并后台请求最新结果；刷新失败时保留现有列表并显示错误，不先清空为骨架或空态。快速切换筛选或离开页面时，过期响应不得覆盖当前列表。
 
-### Buttons
+题目列表与竞赛列表共用 ChoiceSidebar、FloatingSidebar、WaveSelectionList，保留类型筛选、分数与解题状态。题目侧栏提供按名称、不区分大小写的即时搜索，并与隐藏已解出组合过滤。切题共用 film-up 动效，详情按题目 ID 重建并取消旧读取；类型标签改为同色的艺术字水印，使用原方向颜色映射，装饰不接收指针事件。
 
-- **Shape:** Square mechanical controls (`0px`) with a two-pixel frame.
-- **Primary:** Graphite Command face, Paper Signal text, bold uppercase label, `0.5rem 1rem` padding, and Button Detent shadow.
-- **Hover / Focus:** Hover shifts to `#3a3a3a`. Keyboard focus uses a visible two-pixel ring. Active state moves one pixel right and down to imitate a physical press. State transitions complete in 75ms.
-- **Secondary / Ghost / Tertiary:** Outline and secondary variants use light alloy faces with visible borders. Ghost actions gain a border and Interaction Zinc background only on hover. Link actions remain text-only and underlined on interaction.
+题目页固定在视口内，列表、详情和赛事信息分别使用共享内部滚动区；切题后详情滚动位置重置。默认布局不再显示底部站点信息栏。
 
-### Chips
+题目列表按方向使用独立折叠抽屉，默认展开，允许多个方向同时展开。折叠方向不改变当前题目，切换到收起方向中的题目会自动展开对应抽屉。共享 ChoiceSidebar / WaveSelectionList 原语承载分组，保留透明背景、水印、主题色粗斜体标题及波浪反馈；展开/收起动效统一放在 motion 库。提交记录通过弹窗入口查看，仅弹窗打开时挂载历史功能组件。Flag 输入使用共享 TerminalCommand 原语，提示符为 `>_`，空输入显示主题色、微软雅黑斜体 `Type Your Flag ~~`；回车提交，不显示提交按钮。普通 CTF Flag 判定正确后由 `Challenge is Solved ！` 直接替换原占位文字并锁定当前题目的输入，不另显示成功结果 Alert；题目详情响应中的 `SolvedByMyTeam` 从 PostgreSQL GameplayFact 恢复该状态，刷新页面不会解除锁定。输入法组合确认、空输入、长按重复 Enter 及提交中状态均不触发新提交；批量模式使用 Shift+Enter 换行。
 
-- **Style:** Status badges use a pixel-ellipse silhouette, compact `0.125rem 0.5rem` padding, and a readable text label.
-- **State:** Selected and important badges use the primary semantic role. Secondary, destructive, and outline variants keep identical geometry. No state may rely on fill color alone.
+题目列表标题与搜索框位于同一行，隐藏已解出开关单独位于下一行。列表底部的一血、二血、三血按名次横向排列，只常驻显示三个独立 SVG 标记；悬停或键盘聚焦时显示“血榜名次 · 队伍名”。只有旧快照缺少队伍名时才在提示中显示带标签的 Team ID，常驻界面不显示队名或 UUID。
 
-### Cards / Containers
+竞赛计分板位于固定高度竞赛工作区时，标题、筛选、趋势图和队伍矩阵由整页纵向 ScrollSurface 承载，矩阵内部继续独立横向滚动，避免工作区的 overflow 裁掉下半页。CTF 3D 大屏的 WebGL 场景始终从大屏自身 `.dark` 容器解析专用语义色，使浅色站点主题下的建筑、网格和背景仍与深色 HUD 一致；场景采用近黑紫背景、紫蓝网格、冷蓝未攻克建筑、高饱和红色已攻克建筑，绿色只承担成功分值和实时状态。`/live-` 兼容地址与 `/live` 渲染同一大屏。
 
-- **Corner Style:** Square equipment faces (`0px`).
-- **Background:** Equipment Face over Industrial Canvas.
-- **Shadow Strategy:** Card Detent at rest. Clickable cards may move by one or two pixels, but large floating lifts are foreign to Pixel Industrial.
-- **Border:** Two-pixel Structural Steel frame.
-- **Internal Padding:** `1rem` base rhythm with `1.5rem` for broad content regions. The card component itself provides vertical rhythm while consumers define horizontal density.
-- **Decoration:** The canonical card may render a black eight-pixel corner raster. It is an identity marker, not a generic decoration for every nested surface.
+3D 建筑浮标的一血、二血、三血来自完整公开解题记录，按题目归组并按血榜名次排序；右侧实时战报独立截取最新 10 条。血榜产生较早时仍必须留在对应建筑浮标中，不能因战报窗口滚动而消失。
 
-### Inputs / Fields
+AWDP 大屏使用独立深黑青 HUD 色域，不继承站点绿色品牌主色：青蓝承担结构线、面板标题、控件和等待态，攻击成功为红色，防御成功为青绿色，攻击与防御失败统一为橙色，排行榜与正文使用冷白和蓝灰建立层级。顶部统计、队伍动态、中央动画、排行榜、题目卡片及底部战况 ticker 共用这组语义 token。
 
-- **Style:** Equipment Face background, two-pixel Input Rail border, square corners, `2.5rem` nominal height, and `0.25rem 0.75rem` internal padding.
-- **Focus:** Border changes to the primary semantic role with a clear two-pixel focus ring.
-- **Error / Disabled:** Fault Brick marks invalid fields with accompanying text. Disabled controls retain their shape, reduce opacity, and reject pointer interaction.
+AWDP 顶部统计、左侧动态流、中央播报、右侧排行榜与队伍动态、底部战况带使用清晰青蓝内描边界定板块；标题栏、页脚和列表行使用低强度分隔线，题目卡片与 ticker 卡片使用各自状态色细描边。描边通过 inset shadow 与原有 panel shadow 叠加，适配全站无原生边框约束。
 
-### Navigation
+终端不显示“回车提交 Flag”操作说明，也不使用中心判定模态弹窗。正确、错误、重复等判定反馈通过右下角划出的小提示显示，提交记录仍可查看；请求异常和超时反馈保留。输入内容与提示符统一为微软雅黑、20px、700 字重、主题强调色。
 
-- **Style:** Public navigation uses a muted alloy bar, a two-pixel divider, pixel logo, and compact icon-label links. Admin navigation uses the sidebar semantic roles without introducing a separate theme.
-- **Active State:** The current route receives a primary bottom rule and Interaction Zinc surface. Hover and focus remain visibly distinct.
-- **Mobile Treatment:** Navigation collapses into the existing sheet/dialog system while preserving label order and authorization boundaries.
+CTF / AWD / AWDP / KoH 在竞赛标题、详情、侧栏列表和首页卡片中使用共享 TypeWatermark 艺术字水印；列表使用紧凑尺寸，状态徽标继续独立显示。共享滚动条增强必须保留 fixed / absolute 定位，确保对话框始终相对视口居中。
 
-### Layered Panel
+题目列表条目中的方向水印使用同色 IconWatermark，图形来自方向 SVG 资源，置于标题和分数背后，不占据独立文本行，不接收指针事件；方向名称保留为辅助技术可读文本。方向抽屉标题仍使用小尺寸图标和文字。
 
-The stacked Panel is Pixel Industrial's signature container. A face layer sits above a ten-pixel offset base, producing a chassis-like silhouette with solid shadows. The dark panel variant is a component variant within Pixel Industrial, not a separate user theme.
+题目标题右侧使用共享 StatusIcon 表达完成状态，SVG 独立存放在 `app/assets/svg/status/`。CTF 已解出使用 56px 粗线胜利战旗，旗面留空，不包含闪电、勾形或其他内部符号。AWDP 图形强调夸张但清晰：攻击成功仅使用粗线靶心与贯穿箭头；防御成功使用厚重盾牌与大号确认符号；攻防均成功使用左右分区盾徽，左侧攻击箭头、右侧防御确认。AWDP 普通状态图形采用 44px，组合图形 52px，配合语义色光晕、轻微倾斜和 320ms 快速显现；图形分别使用 primary、destructive、success、warning 语义色，并携带完整 aria-label。组合状态使用专属图形，不由单一攻击图标覆盖，减少动态效果时取消显现动画。
 
-### Theme Registration Contract
+题目详情卡片使用双区域布局：描述、附件、提示、环境与 Fix 信息位于上方 ScrollSurface；FlagSubmit 通过可选 dockTarget 挂载到独立的 `challenge-flag-dock`，固定在卡片底部，不参与详情滚动。底栏常规状态只保留单行伪终端，隐藏可见的“提交 Flag”标题，内边距压缩为 6px / 8px，终端最小高度 40px。剩余次数移到题目标题右侧，使用主题色、18px 微软雅黑、700 字重与斜体，无徽标背景；题目标题也使用微软雅黑粗斜体。“本题提交记录”入口紧邻剩余次数，弹窗读取逻辑保持按需挂载。次数变化通过 FlagSubmit → 模式面板 → 详情功能层事件同步。CTF、AWD、AWDP 共用该机制，其他 FlagSubmit 使用场景在未传入目标时保持原位。切题时 dock 与详情状态一同销毁重建，避免旧题输入残留。
 
-A developer theme is complete only when it defines every semantic CSS variable, all component states, a bundled or trusted font stack, a color-scheme declaration, localized name and description keys, a static preview asset, and an allowlisted registry identifier. User preference stores only that identifier. Unknown or retired identifiers fall back to Pixel Industrial before the application renders.
+题目描述下方为双列资源行：RuntimeCard 通过可选 dockTarget 移到左侧，附件位于右侧；只有一项资源时自动占满宽度。RuntimeCard 使用 Vue 延迟 Teleport，在同一详情组件完成挂载后解析资源行目标，避免环境组件丢失。CTF、AWD、AWDP 面板继续拥有环境控制状态，只转发布局目标。All 策略附件不再显示“文件信息 + 下载按钮”两段结构，每个附件压缩为一个以文件名命名的按钮，文件图标与文件名共同构成入口；RandomOnePerTeam 因不公开文件名，继续显示通用下载入口。
 
-## Do's and Don'ts
+标题旁的 RemainingAttempts 原语将文案拆成可视前缀、数字、后缀，同时为辅助技术保留完整本地化句子。剩余次数小于 5 时只有数字使用固定纯红色 `#ff0000`，其余文字继续使用主题色。ChallengeHints 使用 MarkdownQuote 包裹已解锁内容，以语义 blockquote 和可见 `>` 提示符渲染；内部仍使用共享安全 Markdown 渲染器。
 
-### Do:
+Markdown 各语义块使用统一装饰：一级、二级标题采用主题色导线与渐隐分隔，低级标题使用 `>` 标记；列表标记使用主题色；引用使用浅色表面、内嵌强调线与 `>`；行内代码使用轻量强调底色；Fence 代码块显示语言顶栏和 `>_` 标记；表格使用主题表头、行分隔和交替底色；图片、音视频、details 与 hr 使用同一圆角、阴影和主题规则。代码高亮采用 Highlight.js core 并仅注册常用语言，未知语言安全回退为纯文本；所有输出仍经过 sanitize-html 白名单，亮暗主题共用语义 token。
 
-- **Do** keep the developer theme registry closed, typed, versioned, and shipped with the frontend build.
-- **Do** store only an allowlisted theme identifier in user preference, then validate it again before application.
-- **Do** apply the selected theme before Vue mounts so the first frame never flashes another theme.
-- **Do** require every theme to pass contrast, keyboard focus, reduced-motion, CJK coverage, responsive, and critical-state checks.
-- **Do** preserve component structure, permissions, data density, layout, and semantic status roles across themes.
-- **Do** make fairness visible with score state, audit state, traceable action feedback, and stable live updates.
-- **Do** keep administrator screens dense, calm, and operational in every theme.
-- **Do** use labels and icons with color for severity, connection, mode, and delivery state.
+独立 Mock 站为 14 个已支持方向分别提供一道题，并给每个题库模板配置一个 All 策略的可下载文本附件；附件元数据与内容仅存于 mock/，播放器界面继续使用生产的附件列表、鉴权下载和错误反馈流程。
 
-### Don't:
+每道 Mock 题预置一个运行中的内存 Runtime，并展示以 `tcp://challenge.mock.invalid:31xxx` 生成的唯一虚构套接字。`.invalid` 保证域名不可用于真实服务，界面仅允许复制该非 HTTP 地址；Mock 不监听这些端口。
 
-- **Don't** expose theme editing, CSS uploads, token JSON, arbitrary font URLs, remote backgrounds, theme imports, or user-authored visual code.
-- **Don't** allow themes to change API behavior, competition logic, score presentation meaning, permissions, workflow, or component purpose.
-- **Don't** bind a user theme to CTF, AWD, AWDP, KoH, a route, or a plugin. Theme selection is a visual preference, not a game-mode branch.
-- **Don't** make the interface feel like generic SaaS admin design: white cards everywhere, soft marketing polish, flat dashboards, and no sense of competition.
-- **Don't** use overdone cyberpunk: neon black-purple surfaces, decorative glow, heavy visual effects, or anything that makes status and scores harder to read.
-- **Don't** drift into the default CTFd feel: traditional list-heavy competition pages, weak hierarchy, and a lack of modern control-room presence.
-- **Don't** hide operational truth. Health, logs, scoring, audit trails, round state, and container status must be straightforward to inspect.
-- **Don't** use side-stripe colored borders, gradient text, decorative glassmorphism, hero-metric templates, or identical card grids.
-- **Don't** use modals as the first answer when inline editing, sheets, or progressive disclosure can preserve workflow context.
+题目列表的标题和分数统一使用主题强调色、微软雅黑、700 字重和斜体。分数单独放在条目右下角，数值 20px、pts 单位 12px；解题状态标识位于标题右侧。条目左下角使用三个独立 SVG BloodMark 表示一、二、三血：菱形单线、圆形双线、六边形三线，并使用危险色、警告色、主题色区分；悬停或键盘聚焦显示对应队伍 ID。
+
+竞赛管理和平台管理共用的 AppWorkspaceNav 使用 ChoiceSidebar / WaveSelectionList 分组导航，替代旧 SidebarProvider / SidebarInset。导航在桌面端以网格内 sticky 侧栏呈现，移动端回到页面上方的有限高度列表；路由选中和跳转由 features/app 控制，右侧继续组合现有设置 Card、表单、表格和弹层原语。
+
+竞赛咨询页采用聊天布局：左侧咨询列表独立滚动，当前咨询的“标记已解决”和“关闭咨询”操作位于该条目下方，按服务端权限显示。右侧使用 ConversationPanel / MessageBubble 原语，标题下方历史消息区与输入区高度比为 3:1，发送按钮位于右下角。消息按当前用户 ID 判断左右归属，自己的消息靠右，其他人的靠左；状态变更居中。聊天历史和输入分别内部滚动，阅读旧消息时新消息不抢滚动位置，底部阅读时跟随更新。功能层保留鉴权、请求、状态迁移及切换竞态保护，Mock 对话与操作实现独立存放在 mock/。
+
+方向抽屉标题前使用共享 TechnicalIcon 手绘 SVG，24 单位画布、20px 显示、1.75 单位圆头描边，继承方向文字颜色，不加底框。全部静态 SVG 文件集中在 `app/assets/svg/`，方向图标位于 `directions/`，卡片与通知装饰位于 `decorations/`；Vue / TypeScript 不内联 path 数据，CSS 只负责解析资源 URL 与主题色遮罩。方向到图形的映射统一放在 directions.ts，覆盖基础方向及 Penetration、OSINT、AI、Hardware、Blockchain、Forensics、Mobile、IoT、Cloud；别名共用图形，未知方向使用旗帜。图标仅作装饰，由相邻文字提供可访问名称。运行时数据驱动的积分曲线仍由图表视图生成，不属于静态 SVG 资源。
+
+组件预览使用多色拼接背景来观察玻璃透色与背景模糊，正式页面背景仍由现有主题决定。卡片右上使用轻量 SVG 线路与圆弧装饰，不参与交互。

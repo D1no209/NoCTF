@@ -7,5 +7,5 @@ const { formatted, value } = toRefs(viewProps.state)
 </script>
 
 <template>
-  <time :datetime="value ?? undefined" :title="value ?? undefined" class="font-mono whitespace-nowrap tabular-nums">{{ formatted }}</time>
+  <Hint :content="value ?? undefined" ><time :datetime="value ?? undefined"  class="font-mono whitespace-nowrap tabular-nums">{{ formatted }}</time></Hint>
 </template>

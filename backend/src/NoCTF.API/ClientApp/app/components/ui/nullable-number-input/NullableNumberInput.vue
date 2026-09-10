@@ -20,8 +20,7 @@ withDefaults(defineProps<{
 
 const emit = defineEmits<{ 'update:modelValue': [value: number | null] }>()
 
-function onInput(event: Event): void {
-  const raw = (event.target as HTMLInputElement).value
+function onInput(raw: string | number): void {
   if (raw === '') {
     emit('update:modelValue', null)
     return
@@ -32,9 +31,8 @@ function onInput(event: Event): void {
 </script>
 
 <template>
-  <Input
+  <NumberInput
     :id="id"
-    type="number"
     :model-value="modelValue === null ? '' : String(modelValue)"
     :min="min"
     :max="max"
@@ -42,6 +40,6 @@ function onInput(event: Event): void {
     :placeholder="placeholder"
     :disabled="disabled"
     :aria-invalid="invalid || undefined"
-    @input="onInput"
+    @update:model-value="onInput"
   />
 </template>

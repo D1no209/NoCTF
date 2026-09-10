@@ -44,5 +44,5 @@ test('platform user sheet prioritizes account information and hides the activity
   const panel = read('features/account/PrivateAccountPanel.vue')
   expect(panel).toContain('showActivities: true')
   expect(panel).toContain('<template v-if="showActivities">')
-  expect(read('features/account/SchoolIdentityForm.vue')).toContain("$t('ui.personalInformation')")
+  expect(read('features/account/AccountPanel.vue')).toContain("$t('accountPanel.accountInformation')")
 })

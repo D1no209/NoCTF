@@ -161,6 +161,10 @@ export function useAdminCompetitionsByIdTeamsPage() {
     }
   }
 
+  function assignTrackValue(team: NoCtfapiEndpointsTeamsTeamResponse, value: unknown): void {
+    if (typeof value === 'string') void assignTrack(team, value)
+  }
+
   async function simpleAction(team: NoCtfapiEndpointsTeamsTeamResponse, action: 'approve' | 'reject') {
     if (!team.id) return
     pendingId.value = team.id
@@ -319,6 +323,7 @@ export function useAdminCompetitionsByIdTeamsPage() {
       submitScoreAdjustment,
       openTeamDetail,
       assignTrack,
+      assignTrackValue,
       simpleAction,
       banDialog,
       banReason,

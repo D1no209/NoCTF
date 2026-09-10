@@ -39,15 +39,15 @@ const { canWrite, current, loading, error, frozenStartAt, hiddenStartAt, reason,
           <CardDescription>{{ $t('ui.freezeRetainsASnapshotOfTheLastStandingsMaskCompletely') }}</CardDescription>
         </CardHeader>
         <CardContent>
-          <form @submit.prevent="save">
+          <UiForm @submit.prevent="save">
             <FieldGroup>
               <Field>
                 <FieldLabel for="frozen-start">{{ $t('ui.freezeStartTimeOptional') }}</FieldLabel>
-                <Input id="frozen-start" v-model="frozenStartAt" type="datetime-local" class="max-w-sm" :readonly="!canWrite" />
+                <DateTimePicker id="frozen-start" v-model="frozenStartAt"  class="max-w-sm" :readonly="!canWrite" />
               </Field>
               <Field>
                 <FieldLabel for="hidden-start">{{ $t('ui.blackoutStartTimeOptional') }}</FieldLabel>
-                <Input id="hidden-start" v-model="hiddenStartAt" type="datetime-local" class="max-w-sm" :readonly="!canWrite" />
+                <DateTimePicker id="hidden-start" v-model="hiddenStartAt"  class="max-w-sm" :readonly="!canWrite" />
               </Field>
               <Field>
                 <FieldLabel for="vis-reason">{{ $t('ui.reasonOptionalRecordedInAudit') }}</FieldLabel>
@@ -58,7 +58,7 @@ const { canWrite, current, loading, error, frozenStartAt, hiddenStartAt, reason,
                   <Spinner v-if="saving" data-icon="inline-start" /> {{ $t('ui.save') }} </Button>
               </Field>
             </FieldGroup>
-          </form>
+          </UiForm>
         </CardContent>
       </Card>
     </template>

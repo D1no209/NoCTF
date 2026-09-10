@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { chartPalette, echarts } from '~/utils/echarts'
+import { chartPalette, chartTooltipTheme, echarts } from '~/utils/echarts'
 
 const props = withDefaults(
   defineProps<{
@@ -22,6 +22,9 @@ function render() {
       color: chartPalette(el.value),
       textStyle: { color: foreground },
       ...props.option,
+      tooltip: Array.isArray(props.option.tooltip)
+        ? props.option.tooltip.map(option => ({ ...option, ...chartTooltipTheme(el.value) }))
+        : { ...(props.option.tooltip ?? {}), ...chartTooltipTheme(el.value) },
     },
     { notMerge: true },
   )

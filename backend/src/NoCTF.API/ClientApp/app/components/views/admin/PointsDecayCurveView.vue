@@ -3,7 +3,7 @@ import { toRefs } from 'vue'
 import type { PointsDecayCurveViewState } from '~/features/admin/usePointsDecayCurve'
 
 const viewProps = defineProps<{ state: PointsDecayCurveViewState }>()
-const { ScoreDecayMode, width, height, inset, tooltipBox, hoveredCount, preview, formatInteger, tooltipTransform, onPointerMove, onPointerLeave, onKeydown, setSvgElementRef, curve } = toRefs(viewProps.state)
+const { ScoreDecayMode, width, height, inset, tooltipBox, preview, formatInteger, tooltipTransform, onPointerMove, onPointerLeave, onFocus, onKeydown, setSvgElementRef, curve } = toRefs(viewProps.state)
 </script>
 
 <template>
@@ -24,7 +24,7 @@ const { ScoreDecayMode, width, height, inset, tooltipBox, hoveredCount, preview,
       preserveAspectRatio="xMidYMid meet"
       @pointermove="onPointerMove"
       @pointerleave="onPointerLeave"
-      @focus="hoveredCount ??= 1"
+      @focus="onFocus"
       @keydown="onKeydown"
     >
       <g aria-hidden="true">

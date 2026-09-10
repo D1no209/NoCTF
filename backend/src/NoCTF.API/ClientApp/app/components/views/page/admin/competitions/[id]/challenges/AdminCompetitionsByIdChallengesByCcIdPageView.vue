@@ -27,7 +27,7 @@ const { Plus, competitionId, competition, canWrite, canJudge, challenge, loading
       </div>
 
       <Tabs v-model="activeSection" default-value="general" class="grid gap-6 lg:grid-cols-[minmax(0,1fr)_14rem] lg:items-start">
-        <TabsList class="h-auto w-full justify-start overflow-x-auto p-1.5 lg:sticky lg:top-24 lg:col-start-2 lg:row-start-1 lg:flex-col lg:overflow-visible">
+        <TabsList data-scroll-surface class="h-auto w-full justify-start overflow-x-auto p-1.5 lg:sticky lg:top-24 lg:col-start-2 lg:row-start-1 lg:flex-col lg:overflow-visible">
           <TabsTrigger value="general" class="h-10 flex-1 px-4 text-sm lg:w-full lg:flex-none lg:justify-start">{{ $t('ui.basicSettings') }}</TabsTrigger>
           <TabsTrigger value="config" class="h-10 flex-1 px-4 text-sm lg:w-full lg:flex-none lg:justify-start">{{ $t('ui.questionConfiguration') }}</TabsTrigger>
           <TabsTrigger value="hints" class="h-10 flex-1 px-4 text-sm lg:w-full lg:flex-none lg:justify-start">{{ $t('ui.hint') }}</TabsTrigger>
@@ -40,7 +40,7 @@ const { Plus, competitionId, competition, canWrite, canJudge, challenge, loading
               <CardTitle>{{ $t('ui.basicSettings') }}</CardTitle>
             </CardHeader>
             <CardContent>
-              <form @submit.prevent="saveEdit">
+              <UiForm @submit.prevent="saveEdit">
                 <FieldGroup>
                   <Field>
                     <FieldLabel for="cc-title">{{ $t('ui.competitionChallengeName') }}</FieldLabel>
@@ -55,7 +55,7 @@ const { Plus, competitionId, competition, canWrite, canJudge, challenge, loading
                   </Field>
                   <Field>
                     <FieldLabel for="cc-order">{{ $t('ui.order') }}</FieldLabel>
-                    <Input id="cc-order" v-model.number="editOrder" type="number" min="0" :readonly="!canWrite" />
+                    <NumberInput id="cc-order" v-model.number="editOrder"  min="0" :readonly="!canWrite" />
                   </Field>
                   <Field orientation="horizontal">
                     <Switch id="cc-published" v-model="editPublished" :disabled="!canWrite" />
@@ -66,7 +66,7 @@ const { Plus, competitionId, competition, canWrite, canJudge, challenge, loading
                       <Spinner v-if="savingEdit" data-icon="inline-start" /> {{ $t('ui.saveSettings') }} </Button>
                   </Field>
                 </FieldGroup>
-              </form>
+              </UiForm>
             </CardContent>
           </Card>
         </TabsContent>
@@ -150,10 +150,7 @@ const { Plus, competitionId, competition, canWrite, canJudge, challenge, loading
         <TabsContent value="scoring" class="mt-0 lg:col-start-1 lg:row-start-1">
           <div class="flex flex-col gap-4">
             <div class="flex flex-wrap items-center justify-between gap-3">
-              <div>
-                <h3 class="text-lg font-semibold">{{ $t('ui.challengeTeamScoring') }}</h3>
-                <p class="text-sm text-muted-foreground">{{ $t('ui.reviewEveryRegisteredTeamSCompletionStateAndScoreFor') }}</p>
-              </div>
+              <h3 class="text-lg font-semibold">{{ $t('ui.challengeTeamScoring') }}</h3>
               <Button variant="outline" size="sm" :disabled="scoringLoading" @click="loadChallengeTeamScoring">
                 <Spinner v-if="scoringLoading" data-icon="inline-start" />{{ $t('ui.refresh') }}
               </Button>
@@ -227,7 +224,7 @@ const { Plus, competitionId, competition, canWrite, canJudge, challenge, loading
             </dl>
             <Field>
               <FieldLabel for="challenge-score-delta">{{ $t('ui.scoreDelta') }}</FieldLabel>
-              <Input id="challenge-score-delta" v-model.number="adjustmentDelta" type="number" step="1" />
+              <NumberInput id="challenge-score-delta" v-model.number="adjustmentDelta"  step="1" />
               <FieldDescription>{{ $t('ui.enterANonZeroIntegerSuchAs25Or10') }}</FieldDescription>
             </Field>
           </FieldGroup>
@@ -257,11 +254,11 @@ const { Plus, competitionId, competition, canWrite, canJudge, challenge, loading
             <div class="grid gap-4 sm:grid-cols-2">
               <Field>
                 <FieldLabel for="hint-cost">{{ $t('ui.pointsDeducted') }}</FieldLabel>
-                <Input id="hint-cost" v-model.number="hintForm.cost" type="number" min="0" />
+                <NumberInput id="hint-cost" v-model.number="hintForm.cost"  min="0" />
               </Field>
               <Field>
                 <FieldLabel for="hint-publish">{{ $t('ui.releaseTimeOptional') }}</FieldLabel>
-                <Input id="hint-publish" v-model="hintForm.publishedAt" type="datetime-local" />
+                <DateTimePicker id="hint-publish" v-model="hintForm.publishedAt"  />
               </Field>
             </div>
           </FieldGroup>

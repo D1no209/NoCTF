@@ -3,11 +3,11 @@ import { toRefs } from 'vue'
 import type { CompetitionsByIdLeaderboardPageViewState } from '~/features/routes/competitions/[id]/useCompetitionsByIdLeaderboardPage'
 
 const viewProps = defineProps<{ state: CompetitionsByIdLeaderboardPageViewState }>()
-const { ArrowLeft, ChevronLeft, ChevronRight, Download, History, Medal, Trophy, medalBloodRankClass, medalRankClass, scoreboardBloodAward, scoreboardEntryKindLabel, scoreboardEntryOutcomeLabel, scoreboardRankingStateLabel, scoreboardSlot, competitionId, board, allTracksKey, selectedTrackKey, visibleTeamCount, availableTracks, selectedAllTracks, trackName, teams, displayRank, visibleTeams, displayTeamName, columnGroups, isCtf, trends, trendsLoading, trendsError, visibleTrendSeries, trendRangeStart, trendRangeEnd, loadTrends, roundWindowLabel, roundLabel, slotTitle, ctfScore, exportCsv, detailOpen, teamDetailOpen, teamDetailTeam, teamDetailTrendSeries, detailLoading, detailLoadingMore, detailError, detail, detailEntries, detailTeam, detailColumn, loadDetailPage, openDetail, openTeamDetail, showOlderRoundWindow, showNewerRoundWindow, showLatestRoundWindow, entryActor, adjustmentOpen, adjustmentLoading, adjustmentLoadingMore, adjustmentError, adjustmentDetail, adjustmentEntries, adjustmentTeam, loadAdjustmentPage, openAdjustments, adjustmentActor, adjustmentKind, ScoreboardSlotStatus, LazyScoreTrendChart, LazyScoreboardTeamDetailDialog } = toRefs(viewProps.state)
+const { ArrowLeft, ChevronLeft, ChevronRight, Download, History, Medal, Trophy, medalBloodRankClass, medalRankClass, scoreboardBloodAward, scoreboardEntryKindLabel, scoreboardEntryOutcomeLabel, scoreboardRankingStateLabel, scoreboardSlot, competitionId, board, allTracksKey, selectedTrackKey, availableTracks, selectedAllTracks, trackName, teams, displayRank, visibleTeams, showMoreTeams, displayTeamName, columnGroups, isCtf, trends, trendsLoading, trendsError, visibleTrendSeries, trendRangeStart, trendRangeEnd, loadTrends, roundWindowLabel, roundLabel, slotTitle, ctfScore, exportCsv, detailOpen, teamDetailOpen, teamDetailTeam, teamDetailTrendSeries, detailLoading, detailLoadingMore, detailError, detail, detailEntries, detailTeam, detailColumn, loadDetailPage, openDetail, openTeamDetail, showOlderRoundWindow, showNewerRoundWindow, showLatestRoundWindow, entryActor, adjustmentOpen, adjustmentLoading, adjustmentLoadingMore, adjustmentError, adjustmentDetail, adjustmentEntries, adjustmentTeam, loadAdjustmentPage, openAdjustments, adjustmentActor, adjustmentKind, ScoreboardSlotStatus, LazyScoreTrendChart, LazyScoreboardTeamDetailDialog } = toRefs(viewProps.state)
 </script>
 
 <template>
-  <div class="flex flex-col gap-6">
+  <div data-scoreboard-page-scroll class="flex flex-col gap-6 pb-4">
     <div>
       <Button variant="ghost" size="sm" as-child>
         <NuxtLink :to="`/competitions/${competitionId}`">
@@ -53,16 +53,12 @@ const { ArrowLeft, ChevronLeft, ChevronRight, Download, History, Medal, Trophy, 
       <Empty v-if="board.snapshot.value.dataScope === 'Hidden'" class="border py-12"><EmptyHeader><EmptyTitle>{{ $t('ui.theRankingsAreNotPublicYet') }}</EmptyTitle><EmptyDescription>{{ $t('ui.theOrganizerCurrentlyHidesRankingData') }}</EmptyDescription></EmptyHeader></Empty>
       <template v-else>
         <Alert v-if="isCtf && trendsError" variant="destructive"><AlertDescription class="flex items-center justify-between gap-3"><span>{{ $message(trendsError) }}</span><Button variant="outline" size="sm" @click="loadTrends">{{ $t('ui.retry') }}</Button></AlertDescription></Alert>
-        <div v-if="isCtf">
-          <Card>
-            <CardHeader class="pb-0">
-              <CardTitle class="text-base">{{ $t('ui.overallScoreTrend') }}</CardTitle>
-              <CardDescription>{{ $t('ui.cumulativeScoreChangesForAllTeamsInTheCurrentTrack') }}</CardDescription>
-            </CardHeader>
-            <CardContent class="pt-2">
+        <div v-if="isCtf" data-slot="leaderboard-trend-panel">
+          <Card class="overflow-visible">
+            <CardContent class="py-4">
               <Skeleton v-if="trendsLoading && !trends" class="h-[320px] w-full" />
               <Empty v-else-if="!visibleTrendSeries.length" class="h-[320px]"><EmptyHeader><EmptyTitle>{{ $t('ui.noScoreTrendDataYet') }}</EmptyTitle></EmptyHeader></Empty>
-              <component :is="LazyScoreTrendChart" v-else :series="visibleTrendSeries" :range-start="trendRangeStart" :range-end="trendRangeEnd" height="320px" />
+              <component :is="LazyScoreTrendChart" v-else :series="visibleTrendSeries" :range-start="trendRangeStart" :range-end="trendRangeEnd" height="clamp(220px, 32vh, 320px)" />
             </CardContent>
           </Card>
         </div>
@@ -85,7 +81,7 @@ const { ArrowLeft, ChevronLeft, ChevronRight, Download, History, Medal, Trophy, 
               <TableBody>
                 <TableRow v-for="team in visibleTeams" :key="team.teamId" :class="(displayRank(team) ?? 99) <= 3 ? 'bg-primary/5' : ''">
                   <TableCell class="sticky left-0 z-20 w-20 min-w-20 max-w-20 bg-card text-center"><Medal v-if="(displayRank(team) ?? 99) <= 3" class="size-5" :class="medalRankClass[displayRank(team) ?? 0]" /><span v-else class="font-mono tabular-nums">{{ displayRank(team) ?? $t('ui.symbol') }}</span></TableCell>
-                  <TableCell class="sticky left-20 z-20 w-56 min-w-56 max-w-56 bg-card"><div class="flex min-w-0 flex-col items-start gap-1"><ActionButton type="button" class="w-full whitespace-normal break-words rounded-sm text-left font-medium underline-offset-4 hover:text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" :title="displayTeamName(team)" :aria-label="$t('ui.viewDetailsForTeam', { team: displayTeamName(team) })" @click="openTeamDetail(team)">{{ displayTeamName(team) }}</ActionButton><div v-if="(selectedAllTracks && availableTracks.length > 1) || team.rankingState !== 'Eligible'" class="flex flex-wrap items-center gap-1"><Badge v-if="selectedAllTracks && availableTracks.length > 1" variant="outline" class="whitespace-normal break-words text-left" :title="trackName(team.trackKey)">{{ trackName(team.trackKey) }}</Badge><Badge v-if="team.rankingState !== 'Eligible'" variant="destructive">{{ scoreboardRankingStateLabel(team.rankingState) }}</Badge></div></div></TableCell>
+                  <TableCell class="sticky left-20 z-20 w-56 min-w-56 max-w-56 bg-card"><div class="flex min-w-0 flex-col items-start gap-1"><Hint :content="displayTeamName(team)" ><ActionButton type="button" class="w-full whitespace-normal break-words rounded-sm text-left font-medium underline-offset-4 hover:text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"  :aria-label="$t('ui.viewDetailsForTeam', { team: displayTeamName(team) })" @click="openTeamDetail(team)">{{ displayTeamName(team) }}</ActionButton></Hint><div v-if="(selectedAllTracks && availableTracks.length > 1) || team.rankingState !== 'Eligible'" class="flex flex-wrap items-center gap-1"><Hint :content="trackName(team.trackKey)" v-if="selectedAllTracks && availableTracks.length > 1"><Badge  variant="outline" class="whitespace-normal break-words text-left" >{{ trackName(team.trackKey) }}</Badge></Hint><Badge v-if="team.rankingState !== 'Eligible'" variant="destructive">{{ scoreboardRankingStateLabel(team.rankingState) }}</Badge></div></div></TableCell>
                   <TableCell class="sticky left-76 z-20 w-28 min-w-28 max-w-28 border-r bg-card text-right">
                     <ActionButton v-if="(team.globalAdjustmentCount ?? 0) > 0" type="button" class="w-full rounded-md px-2 py-1 text-right transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" @click="openAdjustments(team)">
                       <span class="block font-mono font-semibold tabular-nums">{{ team.totalScore ?? 0 }} {{ $t('ui.pts2') }}</span>
@@ -99,10 +95,10 @@ const { ArrowLeft, ChevronLeft, ChevronRight, Download, History, Medal, Trophy, 
                         <template v-if="isCtf">
                           <span v-if="ctfScore(scoreboardSlot(team, column.index!)) !== null" class="inline-flex items-center justify-center gap-2 whitespace-nowrap">
                             <span class="font-mono text-lg font-bold tabular-nums">{{ ctfScore(scoreboardSlot(team, column.index!)) }} {{ $t('ui.pts2') }}</span>
-                            <span
-                              v-if="scoreboardBloodAward(scoreboardSlot(team, column.index!))"
+                            <Hint :content="`${scoreboardBloodAward(scoreboardSlot(team, column.index!))?.label} +${scoreboardBloodAward(scoreboardSlot(team, column.index!))?.points} pts`" v-if="scoreboardBloodAward(scoreboardSlot(team, column.index!))"><span tabindex="0"
+
                               class="inline-flex items-center gap-1 text-primary"
-                              :title="`${scoreboardBloodAward(scoreboardSlot(team, column.index!))?.label} +${scoreboardBloodAward(scoreboardSlot(team, column.index!))?.points} pts`"
+
                             >
                               <Medal
                                 class="size-4 shrink-0"
@@ -111,7 +107,7 @@ const { ArrowLeft, ChevronLeft, ChevronRight, Download, History, Medal, Trophy, 
                               />
                               <span class="sr-only">{{ scoreboardBloodAward(scoreboardSlot(team, column.index!))?.label }}</span>
                               <span class="font-mono text-xs font-semibold tabular-nums">+{{ scoreboardBloodAward(scoreboardSlot(team, column.index!))?.points }} {{ $t('ui.pts2') }}</span>
-                            </span>
+                            </span></Hint>
                           </span>
                           <span v-else class="font-mono text-sm text-muted-foreground/60">-</span>
                         </template>
@@ -124,7 +120,7 @@ const { ArrowLeft, ChevronLeft, ChevronRight, Download, History, Medal, Trophy, 
               </TableBody>
             </Table>
           </div>
-          <div v-if="visibleTeams.length < teams.length" class="mt-4 flex justify-center"><Button variant="outline" @click="visibleTeamCount += 50">{{ $t('ui.loadMore') }}</Button></div>
+          <div v-if="visibleTeams.length < teams.length" class="mt-4 flex justify-center"><Button variant="outline" @click="showMoreTeams">{{ $t('ui.loadMore') }}</Button></div>
         </CardContent>
       </Card>
       </template>

@@ -69,7 +69,9 @@ export function useCompetitionsByIdLivePage() {
     board.snapshot.value?.currentChallengeScores,
   ))
 
-  const solveFeed = computed(() => controlScreenSolveFeed(board.catalog.value, board.schema.value, entries.value).slice(0, 10))
+  const allSolves = computed(() => controlScreenSolveFeed(board.catalog.value, board.schema.value, entries.value))
+
+  const solveFeed = computed(() => allSolves.value.slice(0, 10))
 
   const solvedChallengeCount = computed(() => challenges.value.filter(challenge => challenge.solveCount > 0).length)
 
@@ -140,7 +142,7 @@ export function useCompetitionsByIdLivePage() {
 
   const bloodsByChallenge = computed(() => {
     const map = new Map<string, LiveCityBlood[]>()
-    for (const solve of solveFeed.value) {
+    for (const solve of allSolves.value) {
         if (!solve.bloodRank) continue
         const tone: LiveCityBlood['tone'] = solve.bloodRank === 'First'
           ? 'first'
@@ -249,7 +251,7 @@ export function useCompetitionsByIdLivePage() {
     projectionPending.value = false
     error.value = null
     await nextTick()
-    reconcileCelebrations(controlScreenSolveFeed(board.catalog.value, board.schema.value, entries.value))
+    reconcileCelebrations(allSolves.value)
   }
 
   const refreshLatest = createTrailingRefresh(loadData)

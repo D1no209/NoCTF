@@ -14,7 +14,7 @@ const { ChartSpline, Flag, ShieldCheck, Target, Trophy, scoreboardRankingStateLa
         <DialogDescription>{{ $t('ui.eachAxisAggregatesEffectiveScoresIncludedInTheTotalBy') }}</DialogDescription>
       </DialogHeader>
 
-      <div v-if="team" class="flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto overscroll-contain p-4 *:shrink-0 sm:p-5" data-testid="team-detail-scroll">
+      <ScrollSurface as="div" v-if="team" class="flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto overscroll-contain p-4 *:shrink-0 sm:p-5" data-testid="team-detail-scroll">
         <div class="grid gap-px overflow-hidden rounded-lg border bg-border sm:grid-cols-3">
           <div class="bg-background p-4"><p class="text-xs text-muted-foreground">{{ $t('ui.ranking2') }}</p><p class="mt-1 font-mono text-lg font-semibold tabular-nums">#{{ team.rank ?? $t('ui.symbol') }}</p></div>
           <div class="bg-background p-4"><p class="text-xs text-muted-foreground">{{ $t('ui.totalScore') }}</p><p class="mt-1 font-mono text-lg font-semibold tabular-nums">{{ team.totalScore ?? 0 }} {{ $t('ui.pts2') }}</p></div>
@@ -120,7 +120,7 @@ const { ChartSpline, Flag, ShieldCheck, Target, Trophy, scoreboardRankingStateLa
             </Table>
           </div>
         </section>
-      </div>
+      </ScrollSurface>
     </DialogContent>
   </Dialog>
 </template>

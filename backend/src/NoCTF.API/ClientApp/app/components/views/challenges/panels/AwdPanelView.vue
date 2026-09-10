@@ -3,7 +3,7 @@ import { toRefs } from 'vue'
 import type { AwdPanelViewState } from '~/features/challenges/panels/useAwdPanel'
 
 const viewProps = defineProps<{ state: AwdPanelViewState }>()
-const { emit, targets, targetsError, targetsLoaded, FlagSubmit, RuntimeAccessUrl, RuntimeCard, competition, challenge } = toRefs(viewProps.state)
+const { emit, targets, targetsError, targetsLoaded, FlagSubmit, RuntimeAccessUrl, RuntimeCard, competition, challenge, flagDockTarget, runtimeDockTarget } = toRefs(viewProps.state)
 </script>
 
 <template>
@@ -13,6 +13,7 @@ const { emit, targets, targetsError, targetsLoaded, FlagSubmit, RuntimeAccessUrl
       :competition-id="competition.id!"
       :competition-challenge-id="challenge.id!"
       controls="reset-only"
+      :dock-target="runtimeDockTarget"
     />
 
     <section class="py-5" aria-labelledby="awd-targets-title">
@@ -51,7 +52,7 @@ const { emit, targets, targetsError, targetsLoaded, FlagSubmit, RuntimeAccessUrl
     </section>
 
     <component :is="FlagSubmit"
-      class="pt-5"
+      :dock-target="flagDockTarget"
       :competition-id="competition.id!"
       :competition-challenge-id="challenge.id!"
       multiple
@@ -59,6 +60,7 @@ const { emit, targets, targetsError, targetsLoaded, FlagSubmit, RuntimeAccessUrl
       :maximum-attempts="challenge.maximumFlagAttempts"
       :remaining-attempts="challenge.remainingFlagAttempts"
       @submitted="emit('submitted')"
+      @remaining-changed="emit('remainingChanged', $event)"
     />
   </div>
 </template>

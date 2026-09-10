@@ -22,7 +22,7 @@ const { ExternalLink, RefreshCw, filters, detailTarget, items, loading, error, h
         <CardDescription>{{ $t('ui.activeContainersOnlySearchByCompetitionChallengeOrAttributedTeam') }}</CardDescription>
       </CardHeader>
       <CardContent>
-        <form @submit.prevent="applyFilters">
+        <UiForm @submit.prevent="applyFilters">
           <FieldGroup class="grid gap-3 sm:grid-cols-2 xl:grid-cols-[minmax(12rem,1fr)_repeat(3,minmax(7rem,9rem))_auto] xl:items-end">
             <Field>
               <FieldLabel for="platform-runtime-search" class="sr-only">{{ $t('ui.searchCompetitionChallengeOrTeam') }}</FieldLabel>
@@ -70,7 +70,7 @@ const { ExternalLink, RefreshCw, filters, detailTarget, items, loading, error, h
               <Button type="button" variant="ghost" size="sm" :disabled="loading" @click="clearFilters">{{ $t('ui.clear') }}</Button>
             </Field>
           </FieldGroup>
-        </form>
+        </UiForm>
       </CardContent>
     </Card>
     <div class="flex flex-wrap justify-between gap-2 text-xs text-muted-foreground" role="status">
@@ -156,7 +156,7 @@ const { ExternalLink, RefreshCw, filters, detailTarget, items, loading, error, h
     </template>
 
     <Sheet :open="detailTarget !== null" @update:open="onUpdateOpenDetailTarget">
-      <SheetContent class="overflow-y-auto">
+      <SheetContent data-scroll-surface class="overflow-y-auto">
         <SheetHeader>
           <SheetTitle>{{ $t('ui.runtimeDetails') }}</SheetTitle>
           <SheetDescription class="break-all font-mono text-xs">{{ detail?.runtime?.id }}</SheetDescription>

@@ -3,7 +3,7 @@ import { toRefs } from 'vue'
 import type { AdminCompetitionsByIdRuntimesPageViewState } from '~/features/routes/admin/competitions/[id]/useAdminCompetitionsByIdRuntimesPage'
 
 const viewProps = defineProps<{ state: AdminCompetitionsByIdRuntimesPageViewState }>()
-const { canWrite, isAdministrator, challengeOptions, teamOptions, runtimeTeamLabel, isPlayerManagedRuntime, challengeTitle, filterChallenge, filterTeam, filterState, filterKind, items, loading, listError, hasMore, reset, initialized, loadMore, applyFilters, detail, detailOpen, detailLoading, openDetail, opMessage, isRuntimePending, isRuntimeOperationPending, runRuntimeOp, terminateDialog, terminatePending, canTerminate, submitTermination, forceTerminateDialog, forceTerminateReason, forceTerminateConfirmed, forceTerminatePending, openForceTermination, submitForceTermination, extendDialog, extendSeconds, extendPending, submitExtend, RuntimeAccessUrl, onClickFilterChallenge, onClickTerminateDialog, onClickExtendDialog, onUpdateOpenExtendDialog, onClickExtendDialog2, onUpdateOpenTerminateDialog, onUpdateOpenForceTerminateDialog } = toRefs(viewProps.state)
+const { canWrite, isAdministrator, challengeOptions, teamOptions, runtimeTeamLabel, isPlayerManagedRuntime, challengeTitle, filterChallenge, filterTeam, filterState, filterKind, items, loading, listError, hasMore, initialized, loadMore, applyFilters, detail, detailOpen, detailLoading, openDetail, opMessage, isRuntimePending, isRuntimeOperationPending, runRuntimeOp, terminateDialog, terminatePending, canTerminate, submitTermination, forceTerminateDialog, forceTerminateReason, forceTerminateConfirmed, forceTerminatePending, openForceTermination, submitForceTermination, extendDialog, extendSeconds, extendPending, submitExtend, RuntimeAccessUrl, onClickFilterChallenge, onClickTerminateDialog, onClickExtendDialog, onUpdateOpenExtendDialog, onClickExtendDialog2, onUpdateOpenTerminateDialog, onUpdateOpenForceTerminateDialog } = toRefs(viewProps.state)
 </script>
 
 <template>
@@ -144,7 +144,7 @@ const { canWrite, isAdministrator, challengeOptions, teamOptions, runtimeTeamLab
     </template>
 
     <Sheet v-model:open="detailOpen">
-      <SheetContent class="overflow-y-auto">
+      <SheetContent data-scroll-surface class="overflow-y-auto">
         <SheetHeader>
           <SheetTitle>{{ $t('ui.runtimeDetails') }}</SheetTitle>
           <SheetDescription class="font-mono text-xs break-all">{{ detail?.id }}</SheetDescription>
@@ -187,7 +187,7 @@ const { canWrite, isAdministrator, challengeOptions, teamOptions, runtimeTeamLab
         <FieldGroup>
           <Field>
             <FieldLabel for="extend-seconds">{{ $t('ui.extendSeconds') }}</FieldLabel>
-            <Input id="extend-seconds" v-model.number="extendSeconds" type="number" min="60" step="60" />
+            <NumberInput id="extend-seconds" v-model.number="extendSeconds"  min="60" step="60" />
           </Field>
         </FieldGroup>
         <DialogFooter>

@@ -6,8 +6,6 @@ import DefinitionFlagInjectionSectionComponent from './DefinitionFlagInjectionSe
 import DefinitionPatchSectionComponent from './DefinitionPatchSection.vue'
 import DefinitionRuntimeSectionComponent from './DefinitionRuntimeSection.vue'
 
-type Events = { 'update:modelValue': [json: string] }
-
 /** Owns state, effects and commands for DefinitionEditor. */
 export function useDefinitionEditor(props: Readonly<Omit<{
   /** definitionJson 字符串(v-model)。 */

@@ -37,6 +37,7 @@ describe('participant hints', () => {
     expect(component).toContain('pendingFactId.value = data.gameplayFactId')
     expect(component).not.toContain('adminListCompetitionChallengeHints')
     expect(component).not.toContain('v-html')
+    expect(component).toContain('<MarkdownQuote v-if="readableHintContent(hint) !== null"')
   })
 })
 
@@ -45,7 +46,8 @@ describe('native scrollbar theme and main navigation', () => {
     const layout = await sourceFile(new URL('../app/layouts/default.vue', import.meta.url)).text()
     expect(layout).toContain('overflow-x-auto overflow-y-hidden')
     expect(layout).toContain('scrollbar-none')
-    expect(layout).toContain('py-1')
+    expect(layout).toContain('data-position="center"')
+    expect(layout).not.toContain("{ to: '/admin/competitions'")
   })
 
   test('declares native light and dark schemes instead of globally hiding scrollbars', async () => {

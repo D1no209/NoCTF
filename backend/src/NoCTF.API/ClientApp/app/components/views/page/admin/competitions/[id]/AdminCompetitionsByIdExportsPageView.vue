@@ -16,11 +16,11 @@ const { canWrite, eventsFrom, eventsTo, exportingEvents, exportEvents, includePr
       <CardContent class="flex flex-wrap items-end gap-3">
         <Field>
           <FieldLabel for="ev-from">{{ $t('ui.startTime2') }}</FieldLabel>
-          <Input id="ev-from" v-model="eventsFrom" type="datetime-local" />
+          <DateTimePicker id="ev-from" v-model="eventsFrom"  />
         </Field>
         <Field>
           <FieldLabel for="ev-to">{{ $t('ui.endTime') }}</FieldLabel>
-          <Input id="ev-to" v-model="eventsTo" type="datetime-local" />
+          <DateTimePicker id="ev-to" v-model="eventsTo"  />
         </Field>
         <Button :disabled="exportingEvents" @click="exportEvents">
           <Spinner v-if="exportingEvents" data-icon="inline-start" /> {{ $t('ui.exportEvents') }} </Button>

@@ -14,17 +14,27 @@ export interface ProtectedDownload {
   fileName: string
 }
 
+export function sanitizeDownloadFileName(value: string, fallbackName = 'download'): string {
+  const safe = value
+    .replace(/[\u0000-\u001f\u007f/\\:*?"<>|]/g, '_')
+    .replace(/[\u202a-\u202e\u2066-\u2069]/gi, '')
+    .replace(/^\.+/, '')
+    .trim()
+    .slice(0, 180)
+  return safe || fallbackName
+}
+
 function contentDispositionFileName(disposition: string, fallbackName: string): string {
   // Prefer the UTF-8 name over the server's ASCII fallback (important for Chinese Patch names).
   const match = /filename\*=(?:UTF-8''|")?([^";]+)/i.exec(disposition)
     ?? /filename=(?:")?([^";]+)/i.exec(disposition)
-  if (!match?.[1]) return fallbackName
+  if (!match?.[1]) return sanitizeDownloadFileName(fallbackName)
   const encoded = match[1].replace(/"$/, '')
   try {
-    return decodeURIComponent(encoded)
+    return sanitizeDownloadFileName(decodeURIComponent(encoded), fallbackName)
   }
   catch {
-    return encoded
+    return sanitizeDownloadFileName(encoded, fallbackName)
   }
 }
 
@@ -67,9 +77,12 @@ export async function downloadSdkFile(
   const anchor = document.createElement('a')
   const objectUrl = URL.createObjectURL(blob)
   anchor.href = objectUrl
-  anchor.download = fileName
+  anchor.download = sanitizeDownloadFileName(fileName, fallbackName)
+  anchor.hidden = true
+  document.body.append(anchor)
   anchor.click()
-  URL.revokeObjectURL(objectUrl)
+  anchor.remove()
+  setTimeout(() => URL.revokeObjectURL(objectUrl), 1_000)
 }
 
 /** @deprecated Prefer downloadSdkFile with the generated SDK promise directly. */

@@ -1,16 +1,25 @@
 import { markRaw } from 'vue'
 
-import { Bell, CalendarCog, Database, Flag, LogOut, ShieldCheck, User } from '@lucide/vue'
+import { Bell, Database, Flag } from '@lucide/vue'
+import AccountPanelComponent from '../account/AccountPanel.vue'
 import LanguageToggleComponent from '../LanguageToggle.vue'
 import ThemeToggleComponent from '../ThemeToggle.vue'
+import ThemePalettePanelComponent from '../theme/ThemePalettePanel.vue'
 
 /** Owns state, effects and commands for DefaultLayout. */
 export function useDefaultLayout() {
-  const { user, isLoggedIn, isAdministrator, canOrganize, logout } = useAuth()
+  const { user, isLoggedIn, isAdministrator, canOrganize } = useAuth()
 
   const { configuration, error: platformError, loading: platformLoading, ensureLoaded } = usePlatform()
 
   const route = useRoute()
+  const isHome = computed(() => route.path === '/')
+  const {
+    wallpaperActive,
+    wallpaperStyle,
+    refreshWallpaper,
+    clearWallpaper,
+  } = usePersonalWallpaper()
 
   const { hasUnread, refreshUnread } = useNotificationUnread()
 
@@ -20,9 +29,7 @@ export function useDefaultLayout() {
 
   const navItems = computed(() => [
     { to: '/competitions', label: t("ui.competitions"), icon: Flag, show: true },
-    { to: '/admin/competitions', label: t("ui.competitionAdmin"), icon: CalendarCog, show: isLoggedIn.value },
     { to: '/admin/challenges', label: t("ui.challengeLibrary2"), icon: Database, show: canOrganize.value },
-    { to: '/admin/platform', label: t("ui.platformAdmin"), icon: ShieldCheck, show: isAdministrator.value },
   ])
 
   function isActive(to: string) {
@@ -39,23 +46,30 @@ export function useDefaultLayout() {
     () => void refreshUnread(),
   )
 
+  watch(
+    () => [user.value?.userId, user.value?.wallpaperRevision],
+    () => void refreshWallpaper(),
+    { immediate: true },
+  )
+
   onBeforeUnmount(() => {
     if (notificationTimer) clearInterval(notificationTimer)
+    clearWallpaper()
   })
 
   const LanguageToggle = markRaw(LanguageToggleComponent)
 
   const ThemeToggle = markRaw(ThemeToggleComponent)
+  const ThemePalettePanel = markRaw(ThemePalettePanelComponent)
+  const AccountPanel = markRaw(AccountPanelComponent)
 
   return {
       Bell,
-      LogOut,
-      ShieldCheck,
-      User,
-      user,
+      isHome,
+      wallpaperActive,
+      wallpaperStyle,
       isLoggedIn,
       isAdministrator,
-      logout,
       configuration,
       platformError,
       platformLoading,
@@ -65,7 +79,9 @@ export function useDefaultLayout() {
       navItems,
       isActive,
       LanguageToggle,
-      ThemeToggle
+      ThemeToggle,
+      ThemePalettePanel,
+      AccountPanel
     }
 }
 

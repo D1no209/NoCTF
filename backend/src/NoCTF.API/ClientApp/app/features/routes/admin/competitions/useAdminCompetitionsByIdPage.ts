@@ -49,10 +49,10 @@ export function useAdminCompetitionsByIdPage() {
   const announcementError = ref<string | null>(null)
 
   const RoleLabel: Record<CompetitionAdminRole, string> = {
-    Owner: translate("ui.owner"),
-    Manager: translate("ui.administrator"),
-    Judge: translate("ui.judge"),
-    Observer: translate("ui.observer"),
+    Owner: "ui.owner",
+    Manager: "ui.administrator",
+    Judge: "ui.judge",
+    Observer: "ui.observer",
   }
 
   async function refresh() {

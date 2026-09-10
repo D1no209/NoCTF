@@ -26,7 +26,24 @@ describe('notification unread state', () => {
     expect(page).toContain("<component :is=\"NotificationCenter\" />")
     expect(center).toContain('markAllRead(items.value[0]?.id)')
     expect(center).toContain("scope: 'Inbox'")
-    expect(center).toContain("ui.officialAnnouncementsAndMessagesDirectlyRelatedToYourAccountTeam")
+    expect(center).not.toContain("ui.officialAnnouncementsAndMessagesDirectlyRelatedToYourAccountTeam")
+  })
+
+  test('reuses the shared choice sidebar, card and scroll surface for the message center', async () => {
+    const view = await sourceFile(
+      new URL('../app/components/views/notifications/NotificationCenterView.vue', import.meta.url),
+    ).text()
+    const sidebar = await sourceFile(
+      new URL('../app/components/ui/sidebar/ChoiceSidebar.vue', import.meta.url),
+    ).text()
+
+    expect(view).toContain('<ChoiceSidebar')
+    expect(view).toContain('<Card id="notification-center-detail"')
+    expect(view).toContain('<ScrollSurface axis="y"')
+    expect(view).toContain('<MotionSwap :identity="selectedId || \'\'" preset="film-up">')
+    expect(view).toContain('class="notification-detail-card')
+    expect(view).not.toContain('<ActionButton')
+    expect(sidebar).toContain('<slot name="footer" />')
   })
 })
 

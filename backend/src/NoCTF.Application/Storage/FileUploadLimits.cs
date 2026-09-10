@@ -2,6 +2,7 @@ namespace NoCTF.Application.Storage;
 
 public sealed record FileUploadLimits(
     long MaximumAvatarBytes,
+    long MaximumWallpaperBytes,
     long MaximumLogoBytes,
     long MaximumPosterBytes,
     long MaximumAttachmentBytes)
@@ -15,12 +16,14 @@ public sealed record FileUploadLimits(
         DefaultImageBytes,
         DefaultImageBytes,
         DefaultImageBytes,
+        DefaultImageBytes,
         DefaultAttachmentBytes);
 
     public IReadOnlyList<string> Validate()
     {
         var errors = new List<string>();
         ValidateValue(nameof(MaximumAvatarBytes), MaximumAvatarBytes, errors);
+        ValidateValue(nameof(MaximumWallpaperBytes), MaximumWallpaperBytes, errors);
         ValidateValue(nameof(MaximumLogoBytes), MaximumLogoBytes, errors);
         ValidateValue(nameof(MaximumPosterBytes), MaximumPosterBytes, errors);
         ValidateValue(nameof(MaximumAttachmentBytes), MaximumAttachmentBytes, errors);

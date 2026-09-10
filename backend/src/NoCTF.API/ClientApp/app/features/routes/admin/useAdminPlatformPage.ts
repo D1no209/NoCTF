@@ -6,13 +6,17 @@ import AppWorkspaceNavComponent from '../../app/AppWorkspaceNav.vue'
 
 /** Owns state, effects and commands for AdminPlatformPage. */
 export function useAdminPlatformPage() {
+  const route = useRoute()
+
+  const activePath = computed(() => route.path)
+
   const navGroups = computed<WorkspaceNavGroup[]>(() => [
     {
       label: translate("ui.platform"),
       items: [
         { to: '/admin/platform', label: translate("ui.platformInformation"), icon: Info, exact: true },
         { to: '/admin/platform/users', label: translate("ui.user"), icon: Users },
-        { to: '/admin/platform/bots', label: 'Bot', icon: Bot },
+        { to: '/admin/platform/bots', label: translate("ui.bot"), icon: Bot },
         { to: '/admin/platform/email', label: translate("ui.emailVerification"), icon: MailCheck },
       ],
     },
@@ -32,6 +36,7 @@ export function useAdminPlatformPage() {
 
   return {
       navGroups,
+      activePath,
       AppWorkspaceNav
     }
 }

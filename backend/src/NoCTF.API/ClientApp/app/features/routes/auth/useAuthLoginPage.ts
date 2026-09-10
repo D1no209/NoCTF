@@ -1,38 +1,36 @@
-
-
 import { toast } from 'vue-sonner'
+import loginCharacter from '~/assets/images/auth/login-character.png'
+import registerCharacter from '~/assets/images/auth/register-character.png'
 
-/** Owns state, effects and commands for AuthLoginPage. */
+/** Owns the standalone login page workflow. */
 export function useAuthLoginPage() {
   const route = useRoute()
-
   const { login } = useAuth()
-
   const { configuration } = usePlatform()
-
   const loginName = ref('')
-
   const password = ref('')
-
   const error = ref<string | null>(null)
-
   const pending = ref(false)
 
   async function submit() {
     error.value = null
     if (!loginName.value || !password.value) {
-      error.value = translate("ui.pleaseEnterUsernameEmailAndPassword")
+      error.value = translate('ui.pleaseEnterUsernameEmailAndPassword')
       return
     }
     pending.value = true
     try {
       await login(loginName.value, password.value)
-      toast.success(translate("ui.loginSuccessful"))
-      const redirect = typeof route.query.redirect === 'string' ? route.query.redirect : '/'
+      password.value = ''
+      toast.success(translate('ui.loginSuccessful'))
+      const candidate = route.query.redirect
+      const redirect = typeof candidate === 'string' && candidate.startsWith('/') && !candidate.startsWith('//')
+        ? candidate
+        : '/'
       await navigateTo(redirect)
     }
-    catch (e) {
-      error.value = parseApiError(e, translate("ui.loginFailedPleaseCheckUsernameOrPassword")).message
+    catch (requestError) {
+      error.value = parseApiError(requestError, translate('ui.loginFailedPleaseCheckUsernameOrPassword')).message
     }
     finally {
       pending.value = false
@@ -40,14 +38,15 @@ export function useAuthLoginPage() {
   }
 
   return {
-      login,
-      configuration,
-      loginName,
-      password,
-      error,
-      pending,
-      submit
-    }
+    loginCharacter,
+    registerCharacter,
+    configuration,
+    loginName,
+    password,
+    error,
+    pending,
+    submit,
+  }
 }
 
-export type AuthLoginPageViewState = import('vue').ShallowUnwrapRef<Awaited<ReturnType<typeof useAuthLoginPage>>>
+export type AuthLoginPageViewState = import('vue').ShallowUnwrapRef<ReturnType<typeof useAuthLoginPage>>

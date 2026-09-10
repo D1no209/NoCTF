@@ -2,6 +2,7 @@ import { sourceFile } from './support/feature-source'
 import { describe, expect, test } from 'bun:test'
 import { accessTokenNeedsRefresh, shouldRefreshSession } from '../app/lib/auth-refresh'
 import { statusErrorMessage } from '../app/utils/api-error'
+import { getAccessToken, refreshSession, setAccessToken, setSessionInvalidationHandler } from '../app/lib/session'
 
 function accessToken(exp: number): string {
   const payload = btoa(JSON.stringify({ exp }))
@@ -43,6 +44,24 @@ describe('authentication response refresh', () => {
     expect(session).not.toContain("fetch('/api/v1/auth/refresh'")
     expect(competitionHub).toContain('accessTokenFactory: getRealtimeAccessToken')
     expect(platformHub).toContain('accessTokenFactory: getRealtimeAccessToken')
+  })
+
+  test('invalidates shared authenticated state when refresh fails', async () => {
+    const originalFetch = globalThis.fetch
+    let invalidations = 0
+    setAccessToken('expired')
+    setSessionInvalidationHandler(() => { invalidations += 1 })
+    globalThis.fetch = (() => Promise.reject(new TypeError('offline'))) as typeof fetch
+    try {
+      expect(await refreshSession()).toBeFalse()
+      expect(getAccessToken()).toBeNull()
+      expect(invalidations).toBe(1)
+    }
+    finally {
+      globalThis.fetch = originalFetch
+      setSessionInvalidationHandler(null)
+      await new Promise(resolve => setTimeout(resolve, 0))
+    }
   })
 })
 

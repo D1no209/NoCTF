@@ -8,8 +8,7 @@ const { Bot, Copy, KeyRound, Plus, ROLE_LABELS, bots, loading, loadError, create
 
 <template>
   <div class="flex flex-col gap-4">
-    <div class="flex items-center justify-between gap-4">
-      <p class="text-sm text-muted-foreground">{{ $t('ui.botIsAServiceAccountUsedForApiIntegrationCalling') }}</p>
+    <div class="flex justify-end">
       <Button @click="openCreate">
         <Plus data-icon="inline-start" /> {{ $t('ui.createBot') }} </Button>
     </div>
@@ -111,7 +110,7 @@ const { Bot, Copy, KeyRound, Plus, ROLE_LABELS, bots, loading, loadError, create
           <FieldGroup>
             <Field>
               <FieldLabel for="token-ttl">{{ $t('ui.validityPeriodSeconds') }}</FieldLabel>
-              <Input id="token-ttl" v-model.number="expiresInSeconds" type="number" min="60" step="60" />
+              <NumberInput id="token-ttl" v-model.number="expiresInSeconds"  min="60" step="60" />
               <FieldDescription>{{ $t('ui.defaultIs3600Seconds1Hour') }}</FieldDescription>
             </Field>
           </FieldGroup>

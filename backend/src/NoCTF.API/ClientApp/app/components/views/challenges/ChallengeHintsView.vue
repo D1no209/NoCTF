@@ -3,7 +3,7 @@ import { toRefs } from 'vue'
 import type { ChallengeHintsViewState } from '~/features/challenges/useChallengeHints'
 
 const viewProps = defineProps<{ state: ChallengeHintsViewState }>()
-const { Lightbulb, LockKeyhole, readableHintContent, isLoggedIn, headingId, hints, refreshing, refreshError, unlockError, confirmingId, submitting, pendingFactId, busy, refreshHints, start, pollingError, timedOut, unlock, retry, onClickConfirmingId, onClickConfirmingId2 } = toRefs(viewProps.state)
+const { Lightbulb, LockKeyhole, readableHintContent, isLoggedIn, headingId, hints, refreshing, refreshError, unlockError, confirmingId, submitting, pendingFactId, busy, pollingError, timedOut, unlock, retry, onClickConfirmingId, onClickConfirmingId2 } = toRefs(viewProps.state)
 </script>
 
 <template>
@@ -35,7 +35,7 @@ const { Lightbulb, LockKeyhole, readableHintContent, isLoggedIn, headingId, hint
             <LockKeyhole data-icon="inline-start" />{{ $t('ui.unlockHintPoints', { cost: hint.cost ?? 0 }) }}
           </Button>
         </div>
-        <MarkdownContent v-if="readableHintContent(hint) !== null" :source="readableHintContent(hint) ?? ''" class="mt-2" />
+        <MarkdownQuote v-if="readableHintContent(hint) !== null" :source="readableHintContent(hint) ?? ''" class="mt-2" />
         <p v-else-if="!hint.canUnlock" class="mt-2 text-sm text-muted-foreground">
           {{ isLoggedIn ? $t('ui.hintsCannotBeUnlockedInTheCurrentState') : $t('ui.signInToUnlockHints') }}
         </p>

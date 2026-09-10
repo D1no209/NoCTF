@@ -36,6 +36,7 @@ public sealed record ChallengeResponse(
     int? MaximumFlagAttempts = null,
     int? AcceptedFlagAttempts = null,
     int? RemainingFlagAttempts = null,
+    bool SolvedByMyTeam = false,
     bool UsesDynamicFlag = false,
     IReadOnlyList<ParticipantChallengeHintResponse>? Hints = null)
 {
@@ -62,7 +63,7 @@ internal static class ChallengeMapper
         KohChallengeAccessView? koh = null,
         CompetitionLeaderboardVisibility visibility = CompetitionLeaderboardVisibility.Normal,
         LeaderboardDataScope dataScope = LeaderboardDataScope.Live,
-        FlagAttemptBudget? attemptBudget = null,
+        FlagAttemptState? attemptState = null,
         IReadOnlyList<ParticipantChallengeHintView>? hints = null) =>
         new(
             view.Id,
@@ -82,9 +83,10 @@ internal static class ChallengeMapper
             koh?.Urls,
             CompetitionProtocolMapper.ToProtocol(visibility),
             ScoreboardProtocolMapper.ToProtocol(dataScope),
-            attemptBudget?.Maximum,
-            attemptBudget?.Accepted,
-            attemptBudget?.Remaining,
+            attemptState?.Maximum,
+            attemptState?.Accepted,
+            attemptState?.Remaining,
+            attemptState?.Solved ?? false,
             view.UsesDynamicFlag,
             hints?.Select(hint => new ParticipantChallengeHintResponse(
                 hint.Id, hint.Cost, hint.PublishedAt, hint.Content, hint.IsUnlocked, hint.CanUnlock)).ToArray());
@@ -113,7 +115,7 @@ public sealed class GetChallengeEndpoint(
     IKohChallengeAccessReader kohAccess,
     ICompetitionChallengeAudienceAccess audienceAccess,
     ICompetitionVisibilityAccess visibilityAccess,
-    GetFlagAttemptBudget getAttemptBudget,
+    GetFlagAttemptState getAttemptState,
     ReadParticipantChallengeHints getHints,
     IUserContext user,
     TimeProvider timeProvider,
@@ -158,9 +160,9 @@ public sealed class GetChallengeEndpoint(
             item.Id,
             user.UserId,
             ct);
-        var attemptBudget = user.UserId == Guid.Empty
+        var attemptState = user.UserId == Guid.Empty
             ? null
-            : await getAttemptBudget.ExecuteAsync(
+            : await getAttemptState.ExecuteAsync(
                 item.CompetitionId,
                 item.Id,
                 user.UserId,
@@ -170,7 +172,7 @@ public sealed class GetChallengeEndpoint(
             access,
             visibility.Visibility,
             visibility.DataScope,
-            attemptBudget,
+            attemptState,
             await getHints.ExecuteAsync(item.CompetitionId, item.Id, user.UserId, timeProvider.GetUtcNow(), ct));
         if (access is null) return TypedResults.Ok(response);
         var route = await runtimeAccess.RouteAsync($"{HttpContext.Request.Scheme}://{HttpContext.Request.Host}", ct);

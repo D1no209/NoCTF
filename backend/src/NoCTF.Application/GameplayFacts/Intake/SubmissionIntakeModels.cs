@@ -23,7 +23,8 @@ public sealed record GameplayFactAdmissionSnapshot(
     bool TeamApproved,
     bool UserBelongsToTeam,
     bool HasCorrectBreak = false,
-    bool HasCorrectFix = false);
+    bool HasCorrectFix = false,
+    bool HasCorrectFlag = false);
 
 public sealed record GameplayFactAdmissionRules(
     bool AllowsFlag,
@@ -55,7 +56,11 @@ public sealed record GameplayFactAcceptanceResult(
 
 public sealed record GameplayFactAccepted(Guid GameplayFactId, DateTimeOffset OccurredAt);
 
-public sealed record FlagAttemptBudget(int Maximum, int Accepted, int Remaining);
+public sealed record FlagAttemptState(
+    int? Maximum,
+    int Accepted,
+    int? Remaining,
+    bool Solved);
 
 public sealed record FlagGameplayFactCommand(
     Guid CompetitionId,

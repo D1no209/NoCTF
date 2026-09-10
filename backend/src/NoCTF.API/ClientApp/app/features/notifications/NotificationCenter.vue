@@ -1,8 +1,6 @@
 <script setup lang="ts">
 import { bindViewState } from '~/features/shared/view-state'
 
-import type { NoCtfapiEndpointsNotificationsNotificationResponse } from '~/api'
-
 import { useNotificationCenter } from './useNotificationCenter'
 import View from '~/components/views/notifications/NotificationCenterView.vue'
 

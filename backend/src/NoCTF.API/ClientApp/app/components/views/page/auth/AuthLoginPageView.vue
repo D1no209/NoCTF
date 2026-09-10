@@ -3,11 +3,11 @@ import { toRefs } from 'vue'
 import type { AuthLoginPageViewState } from '~/features/routes/auth/useAuthLoginPage'
 
 const viewProps = defineProps<{ state: AuthLoginPageViewState }>()
-const { login, configuration, loginName, password, error, pending, submit } = toRefs(viewProps.state)
+const { loginCharacter, registerCharacter, configuration, loginName, password, error, pending, submit } = toRefs(viewProps.state)
 </script>
 
 <template>
-  <div class="mx-auto flex max-w-md flex-col px-4 py-12">
+  <div class="mx-auto flex w-full max-w-xl flex-col px-4 py-12">
     <div class="mb-8 flex flex-col items-center gap-2 text-center">
       <NuxtLink to="/" class="flex items-baseline gap-1.5 font-mono text-2xl font-semibold tracking-tight">
         <span class="text-primary">&gt;</span>
@@ -16,20 +16,21 @@ const { login, configuration, loginName, password, error, pending, submit } = to
       </NuxtLink>
       <p v-if="configuration?.description" class="text-sm text-muted-foreground">{{ configuration.description }}</p>
     </div>
-    <Card>
-      <CardHeader>
-        <CardTitle>{{ $t('ui.signIn') }}</CardTitle>
-        <CardDescription>{{ $t('ui.logInToYourAccountUsingYourUsernameOrEmail') }}</CardDescription>
+    <Card class="auth-card">
+      <img data-slot="auth-character-cutout" data-theme-character="dark" data-corner="left-bottom" :src="loginCharacter" alt="" aria-hidden="true">
+      <img data-slot="auth-character-cutout" data-theme-character="light" data-corner="right-top" :src="registerCharacter" alt="" aria-hidden="true">
+      <CardHeader class="relative z-10 pt-3">
+        <CardTitle class="text-xl font-semibold">{{ $t('ui.signIn') }}</CardTitle>
       </CardHeader>
-      <CardContent>
-        <form @submit.prevent="submit">
+      <CardContent class="relative z-10">
+        <UiForm @submit.prevent="submit">
           <FieldGroup>
             <Alert v-if="error" variant="destructive">
               <AlertDescription>{{ $message(error) }}</AlertDescription>
             </Alert>
             <Field>
               <FieldLabel for="login">{{ $t('ui.usernameOrEmail') }}</FieldLabel>
-              <Input id="login" v-model="loginName" autocomplete="username" required />
+              <Input id="login" v-model="loginName" autocomplete="username" required class="max-w-none" />
             </Field>
             <Field>
               <FieldLabel for="password">{{ $t('ui.password') }}</FieldLabel>
@@ -39,13 +40,17 @@ const { login, configuration, loginName, password, error, pending, submit } = to
               </FieldDescription>
             </Field>
             <Field>
-              <Button type="submit" :disabled="pending" class="w-full">
-                <Spinner v-if="pending" data-icon="inline-start" /> {{ $t('ui.signIn') }} </Button>
+              <Button type="submit" :disabled="pending" class="w-full sm:mx-auto sm:w-2/3">
+                <Spinner v-if="pending" data-icon="inline-start" />
+                {{ $t('ui.signIn') }}
+              </Button>
             </Field>
           </FieldGroup>
-        </form>
+        </UiForm>
       </CardContent>
-      <CardFooter class="justify-center text-sm text-muted-foreground"> {{ $t('ui.donTHaveAnAccountYet') }} <NuxtLink to="/auth/register" class="ml-1 underline">{{ $t('ui.registerNow') }}</NuxtLink>
+      <CardFooter class="relative z-10 justify-center text-sm text-muted-foreground">
+        {{ $t('ui.donTHaveAnAccountYet') }}
+        <NuxtLink to="/auth/register" class="ml-1 underline">{{ $t('ui.registerNow') }}</NuxtLink>
       </CardFooter>
     </Card>
   </div>

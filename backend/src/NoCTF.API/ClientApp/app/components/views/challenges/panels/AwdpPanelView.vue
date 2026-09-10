@@ -3,7 +3,7 @@ import { toRefs } from 'vue'
 import type { AwdpPanelViewState } from '~/features/challenges/panels/useAwdpPanel'
 
 const viewProps = defineProps<{ state: AwdpPanelViewState }>()
-const { ShieldCheck, emit, state, loading, stateError, defenseOutcome, statePollingTimedOut, refreshAndPoll, handleBreakEvaluation, handleFixAccepted, FixSubmit, FlagSubmit, RuntimeCard, setAttackRuntimeCardRef, competition, challenge } = toRefs(viewProps.state)
+const { ShieldCheck, emit, state, loading, stateError, defenseOutcome, statePollingTimedOut, refreshAndPoll, handleBreakEvaluation, handleFixAccepted, FixSubmit, FlagSubmit, RuntimeCard, setAttackRuntimeCardRef, competition, challenge, flagDockTarget, runtimeDockTarget } = toRefs(viewProps.state)
 </script>
 
 <template>
@@ -42,10 +42,11 @@ const { ShieldCheck, emit, state, loading, stateError, defenseOutcome, statePoll
           :competition-id="competition.id!"
           :competition-challenge-id="challenge.id!"
           :controls="state?.breakActivation ? 'readonly' : 'full'"
+          :dock-target="runtimeDockTarget"
         />
 
         <component :is="FlagSubmit"
-          class="border-t pt-5"
+          :dock-target="flagDockTarget"
           :competition-id="competition.id!"
           :competition-challenge-id="challenge.id!"
           :title="state?.breakActivation ? $t('ui.checkFlag') : $t('ui.submitFlag')"
@@ -54,6 +55,7 @@ const { ShieldCheck, emit, state, loading, stateError, defenseOutcome, statePoll
           :remaining-attempts="challenge.remainingFlagAttempts"
           @evaluated="handleBreakEvaluation"
           @submitted="emit('submitted')"
+          @remaining-changed="emit('remainingChanged', $event)"
         />
       </section>
 

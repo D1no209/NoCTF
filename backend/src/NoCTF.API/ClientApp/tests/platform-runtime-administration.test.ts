@@ -38,8 +38,10 @@ describe('platform runtime administration', () => {
   test('uses a compact filter form, wrapping cells and a detail sheet instead of an oversized card table', async () => {
     const page = await sourceFile(new URL('../app/pages/admin/platform/runtimes.vue', import.meta.url)).text()
     const workspace = await sourceFile(new URL('../app/features/app/AppWorkspaceNav.vue', import.meta.url)).text()
-    expect(workspace).toContain('<SidebarInset class="min-w-0">')
-    expect(page).toContain('<form @submit.prevent="applyFilters">')
+    expect(workspace).toContain('<ChoiceSidebar')
+    expect(workspace).toContain('class="settings-workspace-layout"')
+    expect(workspace).not.toContain('<SidebarInset')
+    expect(page).toContain('<UiForm @submit.prevent="applyFilters">')
     expect(page).toContain('query: { ...appliedQuery.value, cursor, limit: 50 }')
     expect(page).toContain('appliedQuery.value = platformRuntimeQuery(filters)\n    reset()')
     expect(page).toContain('whitespace-normal break-words')

@@ -1,5 +1,6 @@
 import { sourceFile } from './support/feature-source'
 import { describe, expect, test } from 'bun:test'
+import { challengeProgressIcon } from '../app/features/competition/challenge-progress-icon'
 
 describe('participant challenge progress', () => {
   test('shows solve counts and a color-independent solved marker', async () => {
@@ -19,20 +20,40 @@ describe('participant challenge progress', () => {
     expect(navigator).toContain('bloodRankLabel')
     expect(navigator).toContain("ui.solvedByTeams")
     expect(navigator).toContain("ui.solved")
-    expect(navigator).toContain('<Flag')
+    expect(navigator).toContain("ui.attackAndDefenseSucceeded")
+    expect(challengeProgressIcon({ solvedByMyTeam: true, attackSucceeded: false, defenseSucceeded: false }, false)).toBe('solved')
+    expect(challengeProgressIcon({ solvedByMyTeam: false, attackSucceeded: true, defenseSucceeded: false }, true)).toBe('attack-success')
+    expect(challengeProgressIcon({ solvedByMyTeam: false, attackSucceeded: false, defenseSucceeded: true }, true)).toBe('defense-success')
+    expect(challengeProgressIcon({ solvedByMyTeam: true, attackSucceeded: true, defenseSucceeded: true }, true)).toBe('attack-defense-success')
+    expect(challengeProgressIcon({ solvedByMyTeam: false, attackSucceeded: false, defenseSucceeded: false }, true)).toBeNull()
+    expect(navigator).toContain('<StatusIcon')
+    expect(navigator).not.toContain('<Flag')
     expect(navigator).toContain('useScoreboardMatrix(props.competitionId)')
     expect(navigator).toContain('const hideSolved = ref(false)')
-    expect(navigator).toContain('const collapsedDirections = ref<Set<string>>(new Set())')
-    expect(navigator).toContain("group.challenges.filter(challenge => !progressFor(challenge.id)?.solvedByMyTeam)")
+    expect(navigator).toContain("const search = ref('')")
+    expect(navigator).toContain("(challenge.title ?? '').toLocaleLowerCase().includes(normalizedSearch.value)")
+    expect(navigator).toContain('challengeNavigator.searchPlaceholder')
+    expect(navigator).toContain('<div class="flex min-w-0 items-center gap-3">')
+    expect(navigator).toContain('<h2 class="shrink-0 text-base font-semibold">')
+    expect(navigator).toContain('class="min-w-0 flex-1"')
+    expect(navigator).toContain('const groupOptions = computed(')
+    expect(navigator).toContain('!hideSolved.value || !progressFor(challenge.id)?.solvedByMyTeam')
     expect(navigator).toContain('progress.attackSucceeded && progress.defenseSucceeded')
-    expect(navigator).toContain(':aria-expanded="!isDirectionCollapsed(group.direction)"')
-    expect(navigator).toContain('@click="toggleDirection(group.direction)"')
-    expect(navigator).toContain('v-show="!isDirectionCollapsed(group.direction)"')
+    expect(navigator).toContain(':groups="groupOptions"')
+    expect(navigator).toContain('@update:model-value="selectChallenge"')
+    expect(navigator).toContain('groupOptions.value.flatMap(group => group.items)')
     expect(navigator).toContain('<Switch :id="`hide-solved-${competitionId}`" v-model="hideSolved" />')
-    expect(navigator).toContain("$t('ui.noUnsolvedChallenges')")
+    expect(navigator).toContain("translate('ui.noUnsolvedChallenges')")
     expect(navigator).toContain('scoreboardCurrentChallengeScore(board.snapshot.value, challengeId)')
-    expect(navigator).toContain("{{ currentScore(challenge.id) }} {{ $t('ui.pts2') }}")
-    expect(navigator).toContain('v-if="board.error.value"')
+    expect(navigator).toContain('{{ currentScore(item.challenge.id) }}')
+    expect(navigator).toContain("{{ $t('ui.pts2') }}")
+    expect(navigator).toContain('v-else-if="board.error.value"')
+    expect(navigator).toContain('slot.entries?.find(entry => entry.award)?.award')
+    expect(navigator).toContain('teamName: team.teamName?.trim() || null')
+    expect(navigator).toContain('<BloodMark :rank="blood.rank"')
+    expect(navigator).toContain(':content="bloodTooltip(blood)"')
+    expect(navigator).toContain('return `${bloodRankLabel(blood.rank)} · ${bloodTeamName(blood)}`')
+    expect(navigator).not.toContain('{{ bloodTeamName(blood) }}')
   })
 
   test('hides the challenge tab before start and from ineligible participants', async () => {
@@ -51,18 +72,30 @@ describe('participant challenge progress', () => {
     const submit = await sourceFile(
       new URL('../app/features/challenges/FlagSubmit.vue', import.meta.url),
     ).text()
+    const panel = await sourceFile(
+      new URL('../app/features/challenges/panels/CtfPanel.vue', import.meta.url),
+    ).text()
 
     expect(submit).toContain('celebrateCorrectFlag()')
     expect(submit).toContain('celebrationParticles')
     expect(submit).toContain('<PartyPopper')
     expect(submit).toContain('flag-celebration-particle')
-    expect(submit).toContain('resultTimer = setTimeout(closeResultDialog, 3200)')
-    expect(submit).toContain('@pointer-down-outside="closeResultDialog"')
+    expect(submit).not.toContain('resultTimer')
+    expect(submit).not.toContain('<Dialog :open="resultDialog')
     expect(submit).toContain('@media (prefers-reduced-motion: reduce)')
     expect(submit).toContain("if (wasPending && !isGameplayFactPending(data.state) && !toasted.has(id))")
-    expect(submit).toContain('resultDialog')
-    expect(submit).toContain("$t('ui.submissionsRemaining'")
-    expect(submit).toContain(':disabled="submitting || !input.trim() || attemptsExhausted"')
+    expect(submit).not.toContain('resultDialog')
+    expect(submit).not.toContain("$t('ui.submissionsRemaining'")
+    expect(submit).toContain("emit('remainingChanged', remainingAttempts.value)")
+    expect(submit).toContain(':pending="submitting" :disabled="inputDisabled"')
+    expect(submit).toContain(":placeholder=\"solved ? $t('terminal.challengeSolved') : $t('terminal.flagPlaceholder')\"")
+    expect(submit).not.toContain("showResult(true, translate('terminal.challengeSolved'))")
+    expect(submit).toContain('solved.value = true')
+    expect(submit).toContain('solvedChallengeKeys.add(challengeKey())')
+    expect(submit).toContain('props.initiallySolved || solvedChallengeKeys.has(challengeKey())')
+    expect(submit).toContain('watch(() => props.initiallySolved')
+    expect(panel).toContain(':initially-solved="challenge.solvedByMyTeam"')
+    expect(submit).toContain('const inputDisabled = computed(() => attemptsExhausted.value || solved.value)')
     expect(submit).not.toContain('v-for="item in tracked"')
   })
 
@@ -74,7 +107,7 @@ describe('participant challenge progress', () => {
       new URL('../app/features/challenges/FlagSubmit.vue', import.meta.url),
     ).text()
     const create = await sourceFile(
-      new URL('../app/pages/admin/competitions/new.vue', import.meta.url),
+      new URL('../app/features/competitions/CreateCompetitionDialog.vue', import.meta.url),
     ).text()
 
     expect(panel).toContain('isCtfPracticeOpen(props.competition)')

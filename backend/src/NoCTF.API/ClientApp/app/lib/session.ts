@@ -10,6 +10,7 @@ import { accessTokenNeedsRefresh } from './auth-refresh'
  * Module scope is safe because the app is a client-only SPA (ssr: false).
  */
 let accessToken: string | null = null
+let sessionInvalidated: (() => void) | null = null
 
 export function getAccessToken(): string | null {
   return accessToken
@@ -17,6 +18,18 @@ export function getAccessToken(): string | null {
 
 export function setAccessToken(token: string | null): void {
   accessToken = token
+}
+
+export function setSessionInvalidationHandler(handler: (() => void) | null): () => void {
+  sessionInvalidated = handler
+  return () => {
+    if (sessionInvalidated === handler) sessionInvalidated = null
+  }
+}
+
+function invalidateSession(): void {
+  accessToken = null
+  sessionInvalidated?.()
 }
 
 let refreshPromise: Promise<boolean> | null = null
@@ -32,14 +45,14 @@ export function refreshSession(): Promise<boolean> {
       const refreshClient = createClient({ credentials: 'same-origin', fetch: globalThis.fetch })
       const { data, error } = await refreshTokenEndpoint({ client: refreshClient })
       if (error || !data?.accessToken) {
-        setAccessToken(null)
+        invalidateSession()
         return false
       }
       setAccessToken(data.accessToken)
       return true
     }
     catch {
-      setAccessToken(null)
+      invalidateSession()
       return false
     }
     finally {

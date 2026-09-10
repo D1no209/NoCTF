@@ -82,6 +82,10 @@ export function useCompetitionsByIdLeaderboardPage() {
 
   const visibleTeams = computed(() => teams.value.slice(0, visibleTeamCount.value))
 
+  function showMoreTeams(): void {
+    visibleTeamCount.value += 50
+  }
+
   const teamDisplayNames = computed(() => buildTeamDisplayNames(teams.value))
 
   const displayTeamName = (team: NoCtfapiEndpointsCompetitionsScoreboardTeamResponse) =>
@@ -498,6 +502,7 @@ export function useCompetitionsByIdLeaderboardPage() {
       teams,
       displayRank,
       visibleTeams,
+      showMoreTeams,
       displayTeamName,
       columnGroups,
       isCtf,

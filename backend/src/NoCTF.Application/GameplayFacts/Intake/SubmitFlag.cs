@@ -7,11 +7,11 @@ using NoCTF.Domain.Gameplay;
 
 namespace NoCTF.Application.GameplayFacts.Intake;
 
-public sealed class GetFlagAttemptBudget(
+public sealed class GetFlagAttemptState(
     IGameplayFactIntakeStore store,
     IGameplayFactAdmissionModePolicy modePolicy)
 {
-    public async Task<FlagAttemptBudget?> ExecuteAsync(
+    public async Task<FlagAttemptState?> ExecuteAsync(
         Guid competitionId,
         Guid competitionChallengeId,
         Guid userId,
@@ -25,12 +25,14 @@ public sealed class GetFlagAttemptBudget(
             snapshot.Mode,
             snapshot.CompetitionConfigurationJson,
             snapshot.ChallengeConfigurationJson);
-        if (rules.MaxFlagAttempts is not > 0)
-            return null;
+        var maximum = rules.MaxFlagAttempts is > 0 ? rules.MaxFlagAttempts : null;
         return new(
-            rules.MaxFlagAttempts.Value,
+            maximum,
             snapshot.AcceptedFlagAttempts,
-            Math.Max(0, rules.MaxFlagAttempts.Value - snapshot.AcceptedFlagAttempts));
+            maximum is { } limit
+                ? Math.Max(0, limit - snapshot.AcceptedFlagAttempts)
+                : null,
+            snapshot.Mode == GameMode.Ctf && snapshot.HasCorrectFlag);
     }
 }
 

@@ -45,21 +45,16 @@ internal static class GameplayFactAdmissionPersistence
                 && submission.CompetitionChallengeId == competitionChallengeId
                 && submission.State != GameplayFactState.PlatformFailed)
             .GroupBy(submission => submission.Kind)
-            .Select(group => new { Kind = group.Key, Count = group.Count() })
-            .ToDictionaryAsync(item => item.Kind, item => item.Count, cancellationToken);
-
-        var successfulAwdpKinds = scope.Competition.Mode == GameMode.Awdp
-            ? await db.GameplayFacts.AsNoTracking()
-                .Where(fact => fact.CompetitionId == competitionId
-                    && fact.TeamId == scope.Team.Id
-                    && fact.CompetitionChallengeId == competitionChallengeId
-                    && fact.Result == GameplayFactResult.Correct
-                    && (fact.Kind == GameplayFactKind.BreakAttempt
-                        || fact.Kind == GameplayFactKind.FixAttempt))
-                .Select(fact => fact.Kind)
-                .Distinct()
-                .ToArrayAsync(cancellationToken)
-            : [];
+            .Select(group => new
+            {
+                Kind = group.Key,
+                Count = group.Count(),
+                HasCorrect = group.Any(fact => fact.Result == GameplayFactResult.Correct)
+            })
+            .ToDictionaryAsync(item => item.Kind, cancellationToken);
+        var flagAttempts = attempts.GetValueOrDefault(GameplayFactKind.FlagAttempt);
+        var breakAttempts = attempts.GetValueOrDefault(GameplayFactKind.BreakAttempt);
+        var fixAttempts = attempts.GetValueOrDefault(GameplayFactKind.FixAttempt);
 
         return new(
             competitionId,
@@ -68,9 +63,8 @@ internal static class GameplayFactAdmissionPersistence
             scope.Competition.Mode,
             scope.Competition.ConfigurationJson,
             scope.CompetitionChallenge.RulesJson,
-            attempts.GetValueOrDefault(GameplayFactKind.FlagAttempt)
-                + attempts.GetValueOrDefault(GameplayFactKind.BreakAttempt),
-            attempts.GetValueOrDefault(GameplayFactKind.FixAttempt),
+            (flagAttempts?.Count ?? 0) + (breakAttempts?.Count ?? 0),
+            fixAttempts?.Count ?? 0,
             scope.Competition.Status,
             scope.Competition.StartAt,
             scope.Competition.EndAt,
@@ -81,8 +75,9 @@ internal static class GameplayFactAdmissionPersistence
             scope.Team.IsBanned,
             scope.Team.RegistrationStatus == TeamRegistrationStatus.Approved,
             true,
-            successfulAwdpKinds.Contains(GameplayFactKind.BreakAttempt),
-            successfulAwdpKinds.Contains(GameplayFactKind.FixAttempt));
+            breakAttempts?.HasCorrect == true,
+            fixAttempts?.HasCorrect == true,
+            flagAttempts?.HasCorrect == true);
     }
 
     public static bool Matches(

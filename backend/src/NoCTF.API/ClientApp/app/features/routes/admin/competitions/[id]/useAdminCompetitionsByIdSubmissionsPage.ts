@@ -108,16 +108,16 @@ export function useAdminCompetitionsByIdSubmissionsPage() {
   let previewGeneration = 0
 
   const differenceLabels: Record<NoCtfapiEndpointsAdministrationGameplayFactsAdjudicationDifferenceKindProtocol, string> = {
-    CurrentCorrectShouldBeDuplicate: translate("ui.theCurrentCorrectResultShouldBeDuplicateUnderAuthoritativeOrdering"),
-    CurrentDuplicateShouldBeCorrect: translate("ui.theCurrentDuplicateResultComesFromALegacyDefectAnd"),
-    DuplicateWithoutCurrentPredecessor: translate("ui.theCurrentDuplicateResultHasNoPrecedingFactThatRemains"),
-    HistoricalResultChanged: translate("ui.historicalAdjudicationConflictsWithTheCurrentResultOrChangedOver"),
-    MissingAdjudicationRecord: translate("ui.theCurrentResultHasNoImmutableAdjudicationEvent"),
-    TeamEligibilityHistoryRequiresReview: translate("ui.currentTeamEligibilityCannotProveBloodAwardEligibilityAtThe"),
-    MissingBloodAward: translate("ui.aDeterministicallyExpectedBloodAwardIsMissing"),
-    UnexpectedBloodAward: translate("ui.aRecordedBloodAwardIsNotSupportedByTheCurrent"),
-    WrongBloodRank: translate("ui.theRecordedBloodRankDiffersFromAuthoritativeOrdering"),
-    DuplicateBloodAward: translate("ui.theSameGameplayFactHasDuplicateBloodAwards"),
+    CurrentCorrectShouldBeDuplicate: "ui.theCurrentCorrectResultShouldBeDuplicateUnderAuthoritativeOrdering",
+    CurrentDuplicateShouldBeCorrect: "ui.theCurrentDuplicateResultComesFromALegacyDefectAnd",
+    DuplicateWithoutCurrentPredecessor: "ui.theCurrentDuplicateResultHasNoPrecedingFactThatRemains",
+    HistoricalResultChanged: "ui.historicalAdjudicationConflictsWithTheCurrentResultOrChangedOver",
+    MissingAdjudicationRecord: "ui.theCurrentResultHasNoImmutableAdjudicationEvent",
+    TeamEligibilityHistoryRequiresReview: "ui.currentTeamEligibilityCannotProveBloodAwardEligibilityAtThe",
+    MissingBloodAward: "ui.aDeterministicallyExpectedBloodAwardIsMissing",
+    UnexpectedBloodAward: "ui.aRecordedBloodAwardIsNotSupportedByTheCurrent",
+    WrongBloodRank: "ui.theRecordedBloodRankDiffersFromAuthoritativeOrdering",
+    DuplicateBloodAward: "ui.theSameGameplayFactHasDuplicateBloodAwards",
   }
 
   const bloodRankLabel = (rank?: string | null) => rank === 'First'

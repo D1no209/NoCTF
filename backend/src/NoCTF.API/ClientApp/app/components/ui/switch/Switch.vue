@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { SwitchRootEmits, SwitchRootProps } from 'reka-ui'
 import type { HTMLAttributes } from 'vue'
+import { computed } from 'vue'
 import { reactiveOmit } from '@vueuse/core'
 import {
   SwitchRoot,
@@ -8,6 +9,7 @@ import {
   useForwardPropsEmits,
 } from 'reka-ui'
 import { cn } from '~/lib/utils'
+import { currentLocale } from '~/utils/i18n'
 
 const props = withDefaults(defineProps<SwitchRootProps & {
   class?: HTMLAttributes['class']
@@ -21,10 +23,12 @@ const emits = defineEmits<SwitchRootEmits>()
 const delegatedProps = reactiveOmit(props, 'class', 'size')
 
 const forwarded = useForwardPropsEmits(delegatedProps, emits)
+const localeKey = computed(currentLocale)
 </script>
 
 <template>
   <SwitchRoot
+    :key="localeKey"
     v-slot="slotProps"
     data-slot="switch"
     :data-size="size"

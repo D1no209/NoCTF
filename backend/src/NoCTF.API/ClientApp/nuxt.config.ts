@@ -8,6 +8,14 @@ const apiProxySecure = environment?.NUXT_API_PROXY_SECURE !== 'false'
 
 export default defineNuxtConfig({
   ssr: false,
+  modules: [(_options, nuxt) => {
+    if (!nuxt.options.dev) {
+      nuxt.hook('pages:extend', (pages) => {
+        const index = pages.findIndex(page => page.path === '/__ui-check')
+        if (index >= 0) pages.splice(index, 1)
+      })
+    }
+  }],
   devtools: {
     enabled: true,
   },
@@ -37,6 +45,12 @@ export default defineNuxtConfig({
   },
   typescript: {
     strict: true,
+    tsConfig: {
+      compilerOptions: {
+        noUnusedLocals: true,
+        noUnusedParameters: true,
+      },
+    },
   },
   vite: {
     plugins: [tailwindcss()],

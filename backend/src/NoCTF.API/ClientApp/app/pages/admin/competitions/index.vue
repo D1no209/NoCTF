@@ -1,8 +1,7 @@
 <script setup lang="ts">
-import Feature from '~/features/routes/admin/competitions/AdminCompetitionsIndexPage.vue'
-definePageMeta({ middleware: 'auth' })
+definePageMeta({ redirect: '/competitions' })
 </script>
 
 <template>
-  <Feature><slot /></Feature>
+  <NuxtPage />
 </template>

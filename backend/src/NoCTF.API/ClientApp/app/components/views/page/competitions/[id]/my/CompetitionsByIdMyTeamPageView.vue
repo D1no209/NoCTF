@@ -93,7 +93,7 @@ const { Copy, RefreshCw, maximumAppealStatementLength, minimumAppealStatementLen
                   <DialogTitle>{{ $t('ui.banAppeal') }}</DialogTitle>
                   <DialogDescription>{{ $t('ui.stateTheReasonsForYourComplaintToTheOrganizerAnd') }}</DialogDescription>
                 </DialogHeader>
-                <form @submit.prevent>
+                <UiForm @submit.prevent>
                   <FieldGroup>
                     <Field>
                       <FieldLabel for="appeal-statement">{{ $t('ui.statementOfGrievance') }}</FieldLabel>
@@ -119,7 +119,7 @@ const { Copy, RefreshCw, maximumAppealStatementLength, minimumAppealStatementLen
                         <Spinner v-if="appealPending" data-icon="inline-start" /> {{ $t('ui.submitAppeal') }} </Button>
                     </Field>
                   </FieldGroup>
-                </form>
+                </UiForm>
               </DialogContent>
             </Dialog>
           </div>
@@ -177,7 +177,7 @@ const { Copy, RefreshCw, maximumAppealStatementLength, minimumAppealStatementLen
                 <DialogHeader>
                   <DialogTitle>{{ $t('ui.modifyTeamName') }}</DialogTitle>
                 </DialogHeader>
-                <form @submit.prevent="submitRename">
+                <UiForm @submit.prevent="submitRename">
                   <FieldGroup>
                     <Field>
                       <FieldLabel for="rename-input">{{ $t('ui.newTeamName') }}</FieldLabel>
@@ -188,7 +188,7 @@ const { Copy, RefreshCw, maximumAppealStatementLength, minimumAppealStatementLen
                         <Spinner v-if="renamePending" data-icon="inline-start" /> {{ $t('ui.save') }} </Button>
                     </Field>
                   </FieldGroup>
-                </form>
+                </UiForm>
               </DialogContent>
             </Dialog>
 
@@ -201,7 +201,7 @@ const { Copy, RefreshCw, maximumAppealStatementLength, minimumAppealStatementLen
                   <DialogTitle>{{ $t('ui.transferCaptain') }}</DialogTitle>
                   <DialogDescription>{{ $t('ui.afterTheTransferYouWillBecomeAnOrdinaryMember') }}</DialogDescription>
                 </DialogHeader>
-                <form @submit.prevent="submitTransfer">
+                <UiForm @submit.prevent="submitTransfer">
                   <FieldGroup>
                     <Field>
                       <FieldLabel>{{ $t('ui.newCaptain') }}</FieldLabel>
@@ -221,7 +221,7 @@ const { Copy, RefreshCw, maximumAppealStatementLength, minimumAppealStatementLen
                         <Spinner v-if="transferPending" data-icon="inline-start" /> {{ $t('ui.confirmTransfer') }} </Button>
                     </Field>
                   </FieldGroup>
-                </form>
+                </UiForm>
               </DialogContent>
             </Dialog>
             <p v-if="!transferableMembers.length" class="text-xs text-muted-foreground">

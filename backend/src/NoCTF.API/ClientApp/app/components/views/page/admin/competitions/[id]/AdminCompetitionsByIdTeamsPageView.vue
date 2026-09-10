@@ -3,7 +3,7 @@ import { toRefs } from 'vue'
 import type { AdminCompetitionsByIdTeamsPageViewState } from '~/features/routes/admin/competitions/[id]/useAdminCompetitionsByIdTeamsPage'
 
 const viewProps = defineProps<{ state: AdminCompetitionsByIdTeamsPageViewState }>()
-const { competitionId, canJudge, canWrite, teams, loading, error, pendingId, tracks, selectedTeam, teamMembers, teamDetailLoading, teamDisplayNames, displayTeamName, scoreAdjustmentTeam, scoreAdjustmentChallenges, scoreAdjustmentChallengeId, scoreAdjustmentDelta, scoreAdjustmentLoading, scoreAdjustmentPending, scoreAdjustmentError, scoreAdjustmentValid, openScoreAdjustment, closeScoreAdjustment, submitScoreAdjustment, openTeamDetail, assignTrack, simpleAction, banDialog, banReason, banAnnouncePublicly, banPending, banReasonValid, openBan, submitBan, appeals, appealsLoading, appealsError, appealDialog, appealReason, appealPending, openAppeal, submitAppeal, PrivateAccountPanel, onUpdateOpenOpen, onClickScoreAdjustmentTeam, onUpdateOpenBanDialog, onClickBanDialog, onUpdateOpenAppealDialog, onClickAppealDialog } = toRefs(viewProps.state)
+const { competitionId, canJudge, canWrite, teams, loading, error, pendingId, tracks, selectedTeam, teamMembers, teamDetailLoading, teamDisplayNames, displayTeamName, scoreAdjustmentTeam, scoreAdjustmentChallenges, scoreAdjustmentChallengeId, scoreAdjustmentDelta, scoreAdjustmentLoading, scoreAdjustmentPending, scoreAdjustmentError, scoreAdjustmentValid, openScoreAdjustment, closeScoreAdjustment, submitScoreAdjustment, openTeamDetail, assignTrackValue, simpleAction, banDialog, banReason, banAnnouncePublicly, banPending, banReasonValid, openBan, submitBan, appeals, appealsLoading, appealsError, appealDialog, appealReason, appealPending, openAppeal, submitAppeal, PrivateAccountPanel, onUpdateOpenOpen, onClickScoreAdjustmentTeam, onUpdateOpenBanDialog, onClickBanDialog, onUpdateOpenAppealDialog, onClickAppealDialog } = toRefs(viewProps.state)
 </script>
 
 <template>
@@ -47,7 +47,7 @@ const { competitionId, canJudge, canWrite, teams, loading, error, pendingId, tra
                 v-if="canWrite"
                 :model-value="t.trackKey"
                 :disabled="pendingId === t.id"
-                @update:model-value="value => assignTrack(t, String(value))"
+                @update:model-value="assignTrackValue(t, $event)"
               >
                 <SelectTrigger class="min-w-32"><SelectValue /></SelectTrigger>
                 <SelectContent>
@@ -92,7 +92,7 @@ const { competitionId, canJudge, canWrite, teams, loading, error, pendingId, tra
     </div>
 
     <Sheet :open="selectedTeam !== null" @update:open="onUpdateOpenOpen">
-      <SheetContent class="overflow-y-auto sm:max-w-lg">
+      <SheetContent data-scroll-surface class="overflow-y-auto sm:max-w-lg">
         <SheetHeader>
           <SheetTitle>{{ $t('ui.teamDetails') }}</SheetTitle>
           <SheetDescription>{{ selectedTeam ? displayTeamName(selectedTeam) : '' }}</SheetDescription>
@@ -169,7 +169,7 @@ const { competitionId, canJudge, canWrite, teams, loading, error, pendingId, tra
           </Field>
           <Field>
             <FieldLabel for="score-adjustment-delta">{{ $t('ui.scoreDelta') }}</FieldLabel>
-            <Input id="score-adjustment-delta" v-model.number="scoreAdjustmentDelta" type="number" step="1" />
+            <NumberInput id="score-adjustment-delta" v-model.number="scoreAdjustmentDelta"  step="1" />
             <FieldDescription>{{ $t('ui.enterANonZeroIntegerSuchAs25Or10') }}</FieldDescription>
           </Field>
         </FieldGroup>

@@ -73,7 +73,7 @@ const { Check, Clipboard, FlaskConical, RefreshCw, publicGatewayFailure, runtime
         <div v-if="runtime.testFlag" class="grid gap-2 sm:col-span-2">
           <span class="text-muted-foreground">{{ $t('ui.testFlagForThisInstance') }}</span>
           <div class="flex min-w-0 items-center gap-2">
-            <code class="min-w-0 flex-1 overflow-x-auto border bg-muted px-3 py-2 font-mono text-xs">{{ runtime.testFlag }}</code>
+            <ScrollSurface as="code" axis="x" class="min-w-0 flex-1 overflow-x-auto border bg-muted px-3 py-2 font-mono text-xs">{{ runtime.testFlag }}</ScrollSurface>
             <Button type="button" variant="outline" size="sm" @click="copyTestFlag">
               <Check v-if="copied" data-icon="inline-start" />
               <Clipboard v-else data-icon="inline-start" />
@@ -112,7 +112,7 @@ const { Check, Clipboard, FlaskConical, RefreshCw, publicGatewayFailure, runtime
           <Spinner v-if="busy" data-icon="inline-start" />{{ $t('ui.resetTestContainer') }}
         </Button>
         <div v-if="canExtend" class="flex items-center gap-2">
-          <Input v-model.number="extendMinutes" type="number" min="1" max="1440" class="w-20" :aria-label="$t('ui.renewalMinutes2')" />
+          <NumberInput v-model.number="extendMinutes"  min="1" max="1440" class="w-20" :aria-label="$t('ui.renewalMinutes2')" />
           <Button type="button" variant="outline" :disabled="busy" @click="extend">{{ $t('ui.renewalMinutes') }}</Button>
         </div>
       </div>

@@ -12,11 +12,11 @@ type PlatformLog = NoCtfapiEndpointsAdministrationPlatformPlatformLogResponse
 /** Owns state, effects and commands for AdminPlatformLogsPage. */
 export function useAdminPlatformLogsPage() {
   const LEVEL_LABELS: Record<string, string> = {
-    Trace: translate("ui.track"), Debug: translate("ui.debugging"), Information: translate("ui.information"), Warning: translate("ui.warning"), Error: translate("ui.wrong"), Critical: translate("ui.serious"),
+    Trace: "ui.track", Debug: "ui.debugging", Information: "ui.information", Warning: "ui.warning", Error: "ui.wrong", Critical: "ui.serious",
   }
 
   const SERVICE_LABELS: Record<string, string> = {
-    Api: 'API', Worker: 'Worker', Runner: 'Runner', Host: 'Host',
+    Api: "ui.api", Worker: "ui.worker", Runner: "ui.runner", Host: "ui.host3",
   }
 
   const LEVEL_ORDER = ['Trace', 'Debug', 'Information', 'Warning', 'Error', 'Critical'] as const

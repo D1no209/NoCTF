@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { bindViewState } from '~/features/shared/view-state'
 
-import type { NoCtfapiEndpointsAdministrationPlatformPlatformLogResponse } from '~/api'
 import { useAdminPlatformLogsPage } from './useAdminPlatformLogsPage'
 import View from '~/components/views/page/admin/platform/AdminPlatformLogsPageView.vue'
 

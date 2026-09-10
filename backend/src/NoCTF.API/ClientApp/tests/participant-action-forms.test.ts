@@ -87,7 +87,7 @@ describe('participant action page wiring', () => {
       '../app/pages/auth/login.vue',
       '../app/pages/auth/register.vue',
       '../app/pages/auth/password-reset.vue',
-      '../app/pages/account/index.vue',
+      '../app/features/account/AccountPanel.vue',
     ].map(path => sourceFile(new URL(path, import.meta.url)).text()))
 
     expect(component).toContain(":type=\"visible ? 'text' : 'password'\"")

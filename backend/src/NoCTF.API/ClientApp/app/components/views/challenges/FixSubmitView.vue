@@ -10,7 +10,7 @@ const { file, pendingAction, targetCreating, canUpload, validating, recycling, p
   <section class="flex flex-col gap-4" aria-labelledby="fix-submit-title">
     <h3 id="fix-submit-title" class="text-sm font-semibold">{{ $t('ui.defenseVerification') }}</h3>
     <div class="flex flex-col gap-4">
-      <form v-if="canUpload" class="flex flex-col gap-4" @submit.prevent="uploadFix">
+      <UiForm v-if="canUpload" class="flex flex-col gap-4" @submit.prevent="uploadFix">
         <Alert>
           <Spinner v-if="targetCreating" class="mr-2 inline size-3" />
           <AlertDescription>
@@ -22,9 +22,10 @@ const { file, pendingAction, targetCreating, canUpload, validating, recycling, p
         <FieldGroup>
           <Field>
             <FieldLabel :for="`patch-file-${competitionChallengeId}`">{{ $t('ui.fixArchiveForThisAttemptTarGz') }}</FieldLabel>
-            <Input
+            <FileUpload
+              :pending="pendingAction === 'upload'"
               :id="`patch-file-${competitionChallengeId}`"
-              type="file"
+
               accept=".tar.gz,.tgz,application/gzip"
               :disabled="pendingAction !== null"
               @change="onFileChange"
@@ -40,7 +41,7 @@ const { file, pendingAction, targetCreating, canUpload, validating, recycling, p
             </Button>
           </Field>
         </FieldGroup>
-      </form>
+      </UiForm>
 
       <Alert v-else-if="validating">
         <Spinner class="mr-2 inline size-3" />

@@ -105,9 +105,9 @@ export function useAdminCompetitionsByIdCheatsPage() {
   } as const
 
   const SuccessMessage = {
-    confirm: translate("ui.cheatingHasBeenConfirmedAndTheSourceTeamHasBeen"),
-    dismiss: translate("ui.cheatingIncidentDismissed"),
-    correct: translate("ui.theCheatingIncidentHasBeenCorrectedAndTheRelatedBan"),
+    confirm: "ui.cheatingHasBeenConfirmedAndTheSourceTeamHasBeen",
+    dismiss: "ui.cheatingIncidentDismissed",
+    correct: "ui.theCheatingIncidentHasBeenCorrectedAndTheRelatedBan",
   } as const
 
   async function refreshResolvedIncident(request: CheatIncidentResolutionRequest) {

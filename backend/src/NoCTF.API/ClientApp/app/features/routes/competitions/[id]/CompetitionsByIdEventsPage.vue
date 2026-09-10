@@ -1,8 +1,6 @@
 <script setup lang="ts">
 import { bindViewState } from '~/features/shared/view-state'
 
-import type { NoCtfapiEndpointsCompetitionsEventsCompetitionEventResponse } from '~/api'
-
 import { useCompetitionsByIdEventsPage } from './useCompetitionsByIdEventsPage'
 import View from '~/components/views/page/competitions/[id]/CompetitionsByIdEventsPageView.vue'
 

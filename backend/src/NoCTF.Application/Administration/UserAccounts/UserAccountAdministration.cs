@@ -51,7 +51,8 @@ public enum UserDeletionState
 public sealed record UserDeletionStoreResult(
     UserDeletionState State,
     UserDeletionPreview? Preview = null,
-    Guid? PreviousAvatarFileId = null);
+    Guid? PreviousAvatarFileId = null,
+    Guid? PreviousWallpaperFileId = null);
 
 public sealed record UserAccountLifecycleFact(
     int SchemaVersion,

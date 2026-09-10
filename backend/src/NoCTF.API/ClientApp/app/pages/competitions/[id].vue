@@ -4,5 +4,7 @@ import Feature from '~/features/routes/competitions/CompetitionsByIdPage.vue'
 </script>
 
 <template>
-  <Feature><slot /></Feature>
+  <div data-slot="competition-page-route">
+    <Feature><slot /></Feature>
+  </div>
 </template>

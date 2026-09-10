@@ -3,7 +3,7 @@ import { toRefs } from 'vue'
 import type { CompetitionsByIdPageViewState } from '~/features/routes/competitions/useCompetitionsByIdPage'
 
 const viewProps = defineProps<{ state: CompetitionsByIdPageViewState }>()
-const { isControlScreen, competition, myStanding, standingLoading, teamLoadError, standingError, error, refreshMyTeam, refreshMyStanding, CompetitionCountdown, LifecycleBadge, ModeBadge } = toRefs(viewProps.state)
+const { isControlScreen, competition, myStanding, standingLoading, teamLoadError, standingError, error, refreshMyTeam, refreshMyStanding, CompetitionCountdown, LifecycleBadge } = toRefs(viewProps.state)
 </script>
 
 <template>
@@ -11,16 +11,18 @@ const { isControlScreen, competition, myStanding, standingLoading, teamLoadError
 
   <div
     v-else-if="competition"
+    data-contained-workspace-page
     class="mx-auto flex w-full max-w-[120rem] flex-col gap-4 px-3 py-4 md:px-5"
   >
     <div class="flex flex-col justify-between gap-3 border-b pb-4 sm:flex-row sm:items-start">
-      <div class="flex flex-col gap-1">
-        <div class="flex flex-wrap items-center gap-x-3 gap-y-2">
+      <div class="relative isolate flex min-w-0 flex-1 flex-col gap-1">
+        <TypeWatermark :text="gameModeLabel(competition.mode)" class="text-primary" />
+        <span class="sr-only">{{ gameModeLabel(competition.mode) }}</span>
+        <div class="relative z-10 flex flex-wrap items-center gap-x-3 gap-y-2">
           <h1 class="text-display text-2xl md:text-3xl">{{ competition.title }}</h1>
-          <component :is="ModeBadge" :mode="competition.mode" />
           <component :is="LifecycleBadge" :status="competition.status" />
         </div>
-        <div class="flex flex-wrap items-center gap-x-3 gap-y-1 font-mono text-xs tabular-nums md:text-sm">
+        <div class="relative z-10 flex flex-wrap items-center gap-x-3 gap-y-1 font-mono text-xs tabular-nums md:text-sm">
           <span class="text-muted-foreground">
             {{ formatDateTime(competition.startTime) }} ~ {{ formatDateTime(competition.endTime) }}
           </span>
@@ -63,7 +65,7 @@ const { isControlScreen, competition, myStanding, standingLoading, teamLoadError
     <NuxtPage />
   </div>
 
-  <div v-else class="mx-auto flex w-full max-w-5xl flex-col gap-6 px-4 py-8">
+  <div v-else data-contained-workspace-page class="mx-auto flex w-full max-w-5xl flex-col gap-6 px-4 py-8">
     <Alert v-if="error" variant="destructive">
       <AlertDescription>{{ $message(error) }}</AlertDescription>
     </Alert>

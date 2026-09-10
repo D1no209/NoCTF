@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { bindViewState } from '~/features/shared/view-state'
 
-import type { NoCtfapiEndpointsAdministrationPlatformPlatformUserResponse } from '~/api'
 import { useAdminPlatformBotsPage } from './useAdminPlatformBotsPage'
 import View from '~/components/views/page/admin/platform/AdminPlatformBotsPageView.vue'
 

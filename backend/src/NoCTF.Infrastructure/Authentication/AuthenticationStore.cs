@@ -85,7 +85,9 @@ public sealed class AuthenticationStore(
                 user.Kind,
                 user.EmailVerifiedAt != null,
                 user.Description,
-                user.AvatarFileId))
+                user.AvatarFileId,
+                user.WallpaperFileId,
+                user.WallpaperEnabled))
             .SingleOrDefaultAsync(ct);
 
     public async Task<UserProfile?> UpdateProfileAsync(
@@ -138,6 +140,65 @@ public sealed class AuthenticationStore(
                 && user.AccountStatus == UserAccountStatus.Active
                 && user.AvatarFileId != null)
             .Join(db.Files.AsNoTracking(), user => user.AvatarFileId, file => file.Id,
+                (_, file) => new BusinessFileReference(
+                    file.Id, file.ObjectKey, file.FileName, file.ContentType))
+            .SingleOrDefaultAsync(ct);
+
+    public async Task<UserWallpaperReplacement?> ReplaceWallpaperAsync(
+        Guid userId,
+        Guid fileId,
+        DateTimeOffset now,
+        CancellationToken ct)
+    {
+        await using var transaction = await db.Database.BeginTransactionAsync(ct);
+        var user = await db.Users.SingleOrDefaultAsync(item =>
+            item.Id == userId && item.AccountStatus == UserAccountStatus.Active,
+            ct);
+        if (user is null)
+            return null;
+        if (!await fileLock.AcquireAsync(db, fileId, ct))
+            return null;
+
+        var previousFileId = user.WallpaperFileId;
+        user.WallpaperFileId = fileId;
+        user.WallpaperEnabled = true;
+        user.UpdatedAt = now;
+        if (previousFileId is { } previous && previous != fileId)
+            await outbox.PublishAsync(new CleanupFile(previous));
+        await db.SaveChangesAsync(ct);
+        await transaction.CommitAsync(ct);
+        await outbox.FlushCommittedMessagesAsync();
+        return new UserWallpaperReplacement(ToProfile(user), previousFileId);
+    }
+
+    public async Task<UserWallpaperPreferenceResult> SetWallpaperEnabledAsync(
+        Guid userId,
+        bool enabled,
+        DateTimeOffset now,
+        CancellationToken ct)
+    {
+        var user = await db.Users.SingleOrDefaultAsync(item =>
+            item.Id == userId && item.AccountStatus == UserAccountStatus.Active,
+            ct);
+        if (user is null)
+            return new(UserWallpaperPreferenceState.UserNotFound);
+        if (enabled && user.WallpaperFileId is null)
+            return new(UserWallpaperPreferenceState.WallpaperNotUploaded);
+
+        user.WallpaperEnabled = enabled;
+        user.UpdatedAt = now;
+        await db.SaveChangesAsync(ct);
+        return new(UserWallpaperPreferenceState.Updated, ToProfile(user));
+    }
+
+    public Task<BusinessFileReference?> GetWallpaperFileAsync(
+        Guid userId,
+        CancellationToken ct) =>
+        db.Users.AsNoTracking()
+            .Where(user => user.Id == userId
+                && user.AccountStatus == UserAccountStatus.Active
+                && user.WallpaperFileId != null)
+            .Join(db.Files.AsNoTracking(), user => user.WallpaperFileId, file => file.Id,
                 (_, file) => new BusinessFileReference(
                     file.Id, file.ObjectKey, file.FileName, file.ContentType))
             .SingleOrDefaultAsync(ct);
@@ -331,7 +392,9 @@ public sealed class AuthenticationStore(
             user.Kind,
             user.EmailVerifiedAt is not null,
             user.Description,
-            user.AvatarFileId);
+            user.AvatarFileId,
+            user.WallpaperFileId,
+            user.WallpaperEnabled);
 
     private User CreateUser(
         Guid userId,

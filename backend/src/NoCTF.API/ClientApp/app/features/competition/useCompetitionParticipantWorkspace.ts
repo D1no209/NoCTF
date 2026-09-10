@@ -5,10 +5,6 @@ import CompetitionBroadcastPanelComponent from './CompetitionBroadcastPanel.vue'
 import CompetitionChallengeNavigatorComponent from './CompetitionChallengeNavigator.vue'
 import CompetitionWorkspaceNavigationComponent from './CompetitionWorkspaceNavigation.vue'
 
-type Events = {
-  selectChallenge: [challengeId: string]
-}
-
 /** Owns state, effects and commands for CompetitionParticipantWorkspace. */
 export function useCompetitionParticipantWorkspace(props: Readonly<Omit<{
   competitionId: string

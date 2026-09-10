@@ -31,7 +31,7 @@ const { Megaphone, items, loading, error, refreshLatest, fill } = toRefs(viewPro
       <p class="text-sm text-muted-foreground">{{ $t('ui.thereIsNoMatchReportYet') }}</p>
       <p class="mt-1 text-xs text-muted-foreground/80">{{ $t('ui.bloodListQuestionsAndDisciplineInformationWillBeUpdatedHere') }}</p>
     </div>
-    <TransitionGroup
+    <TransitionGroup data-scroll-surface
       v-else
       tag="ol"
       name="broadcast"

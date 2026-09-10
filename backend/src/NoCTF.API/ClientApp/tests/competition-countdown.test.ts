@@ -4,7 +4,7 @@ import { describe, expect, test } from 'bun:test'
 describe('competition countdown', () => {
   test('refreshes the overview countdown every second and disposes its timer', async () => {
     const source = (await sourceFile(
-      new URL('../app/pages/competitions/[id]/index.vue', import.meta.url),
+      new URL('../app/features/competitions/CompetitionOverview.vue', import.meta.url),
     ).text()).replaceAll('\r\n', '\n')
 
     expect(source).toMatch(/timer = setInterval\(\(\) => \{\n\s+now\.value = Date\.now\(\)\n\s+\}, 1_000\)/)

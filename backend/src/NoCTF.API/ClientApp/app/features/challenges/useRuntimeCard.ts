@@ -15,12 +15,14 @@ export function useRuntimeCard(props: Readonly<Omit<{
     competitionChallengeId: string
     /** full = CTF 全操作;reset-only = AWD 仅重置;readonly = 只显示最终状态 */
     controls?: 'full' | 'reset-only' | 'readonly'
-  }, "controls"> & Required<Pick<{
+    dockTarget?: string
+  }, "controls" | "dockTarget"> & Required<Pick<{
     competitionId: string
     competitionChallengeId: string
     /** full = CTF 全操作;reset-only = AWD 仅重置;readonly = 只显示最终状态 */
     controls?: 'full' | 'reset-only' | 'readonly'
-  }, "controls">>>) {
+    dockTarget?: string
+  }, "controls" | "dockTarget">>>) {
   const runtime = ref<Runtime | null>(null)
 
   const loading = ref(true)

@@ -20,7 +20,7 @@ describe('protected Flag access', () => {
     expect(source).toContain("$t('ui.platformAdministratorFlagAccessIsNotWrittenToTheAudit')")
     expect(source).toContain("$t('ui.competitionStaffFlagAccessIsWrittenToTheAuditLog')")
     expect(source).toContain('v-else-if="flagError"')
-    expect(source).toContain('@click="() => accessFlag()"')
+    expect(source).toContain('@click="accessFlag"')
   })
 
   test('ignores a response after the dialog has switched or closed', () => {
