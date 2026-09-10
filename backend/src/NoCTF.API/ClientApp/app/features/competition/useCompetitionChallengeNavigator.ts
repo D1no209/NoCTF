@@ -91,7 +91,7 @@ emit: { (event: "ready", ...args: [challengeId: string | null]): void; (event: "
   const progressByChallenge = computed(() => {
     const progress = new Map<string, ChallengeProgress>()
     if (board.snapshot.value?.dataScope === 'Hidden') return progress
-  
+
     for (const challenge of board.catalog.value?.items ?? []) {
       if (!challenge.id) continue
       const columns = scoreboardColumnsForChallenge(board.schema.value, challenge.id)

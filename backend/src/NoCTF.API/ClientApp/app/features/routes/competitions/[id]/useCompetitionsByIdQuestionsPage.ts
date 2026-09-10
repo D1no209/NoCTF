@@ -58,7 +58,7 @@ export function useCompetitionsByIdQuestionsPage() {
       await loadMoreQuestions()
       return
     }
-  
+
     refreshError.value = null
     try {
       const page = await fetchQuestionPage(null)
@@ -121,7 +121,7 @@ export function useCompetitionsByIdQuestionsPage() {
       body: createBody.value,
     })
     if (createError.value) return
-  
+
     createPending.value = true
     try {
       const { data, error } = await createCompetitionQuestion({
@@ -220,7 +220,7 @@ export function useCompetitionsByIdQuestionsPage() {
   const refreshSelectedDetail = createTrailingRefresh(async () => {
     const questionId = selectedId.value
     if (!questionId) return
-  
+
     try {
       const { data, error } = await getCompetitionQuestion({ path: { competitionId, threadRootId: questionId } })
       if (error || !data || selectedId.value !== questionId) return

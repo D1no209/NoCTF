@@ -53,7 +53,7 @@ export function useRuntimeCard(props: Readonly<Omit<{
       loadError.value = parseApiError(error, translate("ui.failedToLoadTheEnvironmentStatus")).message
       return outcome
     }
-  
+
     runtime.value = normalizePlayerRuntime(data ?? null)
     loadError.value = null
     return outcome

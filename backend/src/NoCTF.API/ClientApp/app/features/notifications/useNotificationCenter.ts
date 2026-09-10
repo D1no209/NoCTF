@@ -102,7 +102,7 @@ export function useNotificationCenter() {
       })
       if (!threadRequests.isCurrent(request)) return
     }
-  
+
     const rootId = notificationThreadRootId(notification)
     if (!rootId) return
     threadLoading.value = true
@@ -151,7 +151,7 @@ export function useNotificationCenter() {
       await openNotification(notification, false)
       return
     }
-  
+
     const request = threadRequests.begin()
     selected.value = null
     thread.value = []

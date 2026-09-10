@@ -257,7 +257,7 @@ export function useCompetitionsByIdAwdpLivePage() {
       error.value = t("ui.theAwdpControlScreenIsOnlyAvailableForAwdpCompetitions")
       return
     }
-  
+
     const now = Date.now()
     const knownStart = competition.value.startTime ? new Date(competition.value.startTime).getTime() : now
     const from = new Date(Math.max(knownStart, now - 31 * 24 * 60 * 60 * 1000)).toISOString()
@@ -268,7 +268,7 @@ export function useCompetitionsByIdAwdpLivePage() {
     ])
     loading.value = false
     refreshing.value = false
-  
+
     if (eventResult.error || !eventResult.data) {
       error.value = parseApiError(eventResult.error, t("ui.failedToLoadCompetitionActivity")).message
       return
@@ -278,7 +278,7 @@ export function useCompetitionsByIdAwdpLivePage() {
     seenEventIds = reconciliation.seenIds
     events.value = nextEvents
     enqueueResolvedEvents(reconciliation.newEvents)
-  
+
     if (board.processing.value) {
       projectionPending.value = true
       error.value = null

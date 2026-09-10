@@ -84,7 +84,7 @@ export function useAdminCompetitionsByIdPage() {
         ? translate("ui.pleaseEnterNotificationContent")
         : null
     if (announcementError.value) return
-  
+
     announcementPending.value = true
     try {
       const { error: requestError } = await adminCreateCompetitionAnnouncement({

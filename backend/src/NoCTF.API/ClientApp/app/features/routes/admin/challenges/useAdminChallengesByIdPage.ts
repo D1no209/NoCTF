@@ -707,7 +707,7 @@ export function useAdminChallengesByIdPage() {
   }
 
   function onUpdateOpenDeletingAttachment(open: boolean) {
-     if (!open) viewState.deletingAttachment = null 
+     if (!open) viewState.deletingAttachment = null
   }
 
   function onClickRandomBatchOpen2(value: typeof viewState.randomBatchOpen) {
@@ -719,7 +719,7 @@ export function useAdminChallengesByIdPage() {
   }
 
   function onUpdateOpenDeletingFlag(open: boolean) {
-     if (!open) viewState.deletingFlag = null 
+     if (!open) viewState.deletingFlag = null
   }
 
   return { ...viewBindings, onBlurFormDirection, onClickRandomBatchOpen, onClickDeletingAttachment, onClickDeletingFlag, onClickTransferOpen, onUpdateOpenDeletingAttachment, onClickRandomBatchOpen2, onClickFlagCreateOpen, onUpdateOpenDeletingFlag }

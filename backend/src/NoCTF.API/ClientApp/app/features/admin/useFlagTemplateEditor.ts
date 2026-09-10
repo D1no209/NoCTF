@@ -13,7 +13,7 @@ export function useFlagTemplateEditor(props: Readonly<Omit<{
 
   return {
       ...toRefs(props),
-      
+
     }
 }
 
