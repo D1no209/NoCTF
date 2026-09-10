@@ -11,8 +11,6 @@ import { createTrailingRefresh } from '../../lib/latest-page-refresh'
 
 type Hint = NoCtfapiEndpointsChallengesParticipantChallengeHintResponse
 
-type Events = { unlocked: [] }
-
 /** Owns state, effects and commands for ChallengeHints. */
 export function useChallengeHints(props: Readonly<{
   competitionId: string

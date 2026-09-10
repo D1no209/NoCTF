@@ -18,7 +18,7 @@ public sealed class UserProfilePersistenceTests
 {
     [Test]
     [Timeout(300_000)]
-    public async Task Description_and_avatar_metadata_survive_a_new_database_context(
+    public async Task Description_avatar_and_wallpaper_preferences_survive_a_new_database_context(
         CancellationToken cancellationToken)
     {
         await DockerIntegrationTest.RunAsync(async () =>
@@ -40,7 +40,9 @@ public sealed class UserProfilePersistenceTests
             var now = DateTimeOffset.UtcNow;
             var userId = Guid.CreateVersion7(now);
             var avatarFileId = Guid.CreateVersion7(now.AddMinutes(2));
+            var wallpaperFileId = Guid.CreateVersion7(now.AddMinutes(3));
             const string avatarObjectKey = "users/profile/avatar.webp";
+            const string wallpaperObjectKey = "users/profile/wallpaper.webp";
 
             await using (var db = new NoCtfDbContext(options))
             {
@@ -71,11 +73,31 @@ public sealed class UserProfilePersistenceTests
                     Sha256 = new byte[32],
                     CreatedAt = now.AddMinutes(2)
                 });
+                db.Files.Add(new StoredFile
+                {
+                    Id = wallpaperFileId,
+                    ObjectKey = wallpaperObjectKey,
+                    FileName = "wallpaper.webp",
+                    ContentType = "image/webp",
+                    ByteLength = 4,
+                    Sha256 = new byte[32],
+                    CreatedAt = now.AddMinutes(3)
+                });
                 await db.SaveChangesAsync(cancellationToken);
                 await users.ReplaceAvatarAsync(
                     userId,
                     avatarFileId,
                     now.AddMinutes(2),
+                    cancellationToken);
+                await users.ReplaceWallpaperAsync(
+                    userId,
+                    wallpaperFileId,
+                    now.AddMinutes(3),
+                    cancellationToken);
+                await users.SetWallpaperEnabledAsync(
+                    userId,
+                    false,
+                    now.AddMinutes(4),
                     cancellationToken);
             }
 
@@ -87,6 +109,8 @@ public sealed class UserProfilePersistenceTests
                 await Assert.That(profile).IsNotNull();
                 await Assert.That(profile!.Description).IsEqualTo("Persistent profile");
                 await Assert.That(profile.AvatarFileId).IsNotNull();
+                await Assert.That(profile.WallpaperFileId).IsEqualTo(wallpaperFileId);
+                await Assert.That(profile.WallpaperEnabled).IsFalse();
                 var storedFile = await db.Files.SingleAsync(
                     file => file.Id == profile.AvatarFileId,
                     cancellationToken);

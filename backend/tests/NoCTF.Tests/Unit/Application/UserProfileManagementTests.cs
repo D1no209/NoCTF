@@ -212,9 +212,65 @@ public sealed class UserProfileManagementTests
         await Assert.That(result).IsNull();
     }
 
+    [Test]
+    public async Task Wallpaper_upload_attaches_the_normalized_file_and_enables_it()
+    {
+        var users = Substitute.For<IUserAuthenticationStore>();
+        var objects = Substitute.For<IStore>();
+        var registry = Substitute.For<IManagedFileUploadRegistry>();
+        var images = Substitute.For<IWallpaperImageProcessor>();
+        var normalized = new byte[] { 9, 8, 7 };
+        Guid attachedFileId = default;
+        images.Process(Arg.Any<ReadOnlyMemory<byte>>())
+            .Returns(WallpaperImageProcessingResult.Success(new(
+                normalized,
+                "image/webp",
+                "webp",
+                "image/png")));
+        objects.SetObject(
+                Arg.Any<string>(),
+                Arg.Any<Stream>(),
+                "image/webp",
+                false,
+                Arg.Any<CancellationToken>())
+            .Returns(Task.CompletedTask);
+        registry.RegisterAsync(
+                Arg.Any<ManagedFileUpload>(),
+                Now,
+                Arg.Any<CancellationToken>())
+            .Returns(Task.CompletedTask);
+        users.ReplaceWallpaperAsync(
+                UserId,
+                Arg.Do<Guid>(value => attachedFileId = value),
+                Now,
+                Arg.Any<CancellationToken>())
+            .Returns(call => new UserWallpaperReplacement(
+                Profile(
+                    wallpaperFileId: call.ArgAt<Guid>(1),
+                    wallpaperEnabled: true),
+                null));
+
+        var result = await new ReplaceCurrentUserWallpaper(
+            users,
+            new ManagedFileUploads(registry, objects),
+            images).ExecuteAsync(
+            UserId,
+            "wallpaper.png",
+            "image/png",
+            new byte[] { 1, 2, 3, 4 },
+            maximumBytes: 1024,
+            Now);
+
+        await Assert.That(attachedFileId).IsNotEqualTo(Guid.Empty);
+        await Assert.That(result.Profile!.WallpaperFileId).IsEqualTo(attachedFileId);
+        await Assert.That(result.Profile.WallpaperEnabled).IsTrue();
+    }
+
     private static UserProfile Profile(
         string? description = null,
-        Guid? avatarFileId = null) =>
+        Guid? avatarFileId = null,
+        Guid? wallpaperFileId = null,
+        bool wallpaperEnabled = false) =>
         new(
             UserId,
             "Player",
@@ -223,5 +279,7 @@ public sealed class UserProfileManagementTests
             UserKind.Human,
             true,
             description,
-            avatarFileId);
+            avatarFileId,
+            wallpaperFileId,
+            wallpaperEnabled);
 }

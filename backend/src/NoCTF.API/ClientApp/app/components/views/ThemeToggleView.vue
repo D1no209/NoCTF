@@ -3,7 +3,7 @@ import { toRefs } from 'vue'
 import type { ThemeToggleViewState } from '~/features/useThemeToggle'
 
 const viewProps = defineProps<{ state: ThemeToggleViewState }>()
-const { Moon, Sun, isDark, toggle, t } = toRefs(viewProps.state)
+const { Moon, Sun, isDark, themeTransitioning, toggle, t } = toRefs(viewProps.state)
 </script>
 
 <template>
@@ -11,6 +11,8 @@ const { Moon, Sun, isDark, toggle, t } = toRefs(viewProps.state)
     variant="ghost"
     size="icon"
     :aria-label="isDark ? t('ui.switchToLightTheme') : t('ui.switchToDarkTheme')"
+    :aria-busy="themeTransitioning || undefined"
+    :disabled="themeTransitioning"
     @click="toggle()"
   >
     <Sun v-if="isDark" />

@@ -159,6 +159,12 @@ internal sealed class SwaggerAvatarImageProcessor : IAvatarImageProcessor
         AvatarImageProcessingResult.Rejected(AvatarImageFailure.MalformedImage);
 }
 
+internal sealed class SwaggerWallpaperImageProcessor : IWallpaperImageProcessor
+{
+    public WallpaperImageProcessingResult Process(ReadOnlyMemory<byte> content) =>
+        WallpaperImageProcessingResult.Rejected(WallpaperImageFailure.MalformedImage);
+}
+
 internal sealed class SwaggerEmailVerificationStore : IEmailVerificationStore
 {
     public Task<bool> IsRequiredAsync(CancellationToken cancellationToken) =>

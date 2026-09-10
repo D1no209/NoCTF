@@ -859,6 +859,14 @@ namespace NoCTF.Infrastructure.Migrations
                         .HasColumnType("character varying(64)")
                         .HasColumnName("user_name");
 
+                    b.Property<bool>("WallpaperEnabled")
+                        .HasColumnType("boolean")
+                        .HasColumnName("wallpaper_enabled");
+
+                    b.Property<Guid?>("WallpaperFileId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("wallpaper_file_id");
+
                     b.HasKey("Id")
                         .HasName("pk_users");
 
@@ -874,9 +882,14 @@ namespace NoCTF.Infrastructure.Migrations
                         .IsUnique()
                         .HasDatabaseName("ix_users_normalized_user_name");
 
+                    b.HasIndex("WallpaperFileId")
+                        .HasDatabaseName("ix_users_wallpaper_file_id");
+
                     b.ToTable("users", null, t =>
                         {
                             t.HasCheckConstraint("ck_users_bot_role", "\"kind\" <> 1 OR \"role\" IN (0, 1)");
+
+                            t.HasCheckConstraint("ck_users_wallpaper_enabled", "NOT \"wallpaper_enabled\" OR \"wallpaper_file_id\" IS NOT NULL");
                         });
                 });
 
@@ -1676,7 +1689,15 @@ namespace NoCTF.Infrastructure.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .HasConstraintName("fk_users_files_avatar_file_id");
 
+                    b.HasOne("NoCTF.Domain.Storage.StoredFile", "WallpaperFile")
+                        .WithMany()
+                        .HasForeignKey("WallpaperFileId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_users_files_wallpaper_file_id");
+
                     b.Navigation("AvatarFile");
+
+                    b.Navigation("WallpaperFile");
                 });
 
             modelBuilder.Entity("NoCTF.Domain.Notifications.Notification", b =>

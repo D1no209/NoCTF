@@ -12,18 +12,19 @@ const { Upload, information, loading, loadError, name, description, saving, logo
       <AlertDescription>{{ $message(loadError) }}</AlertDescription>
     </Alert>
 
-    <div v-if="loading" class="grid gap-6 lg:grid-cols-2">
-      <Skeleton class="h-56 w-full" />
-      <Skeleton class="h-56 w-full" />
-    </div>
+    <Skeleton v-if="loading" class="h-[34rem] w-full" />
 
-    <div v-else class="grid gap-6 lg:grid-cols-2">
-      <Card>
-        <CardHeader>
-          <CardTitle>{{ $t('ui.platformInformation') }}</CardTitle>
-          <CardDescription>{{ $t('ui.backendVersionsAndProjectContributors') }}</CardDescription>
-        </CardHeader>
-        <CardContent class="flex flex-col gap-4">
+    <Card v-else>
+      <CardHeader>
+        <CardTitle>{{ $t('ui.platformConfiguration') }}</CardTitle>
+        <CardDescription>{{ $t('ui.platformNameDescriptionAndLogo') }}</CardDescription>
+      </CardHeader>
+      <CardContent class="flex flex-col gap-6">
+        <section class="flex flex-col gap-4" aria-labelledby="platform-runtime-information">
+          <div>
+            <h2 id="platform-runtime-information" class="font-semibold">{{ $t('ui.platformInformation') }}</h2>
+            <p class="mt-1 text-xs text-muted-foreground">{{ $t('ui.backendVersionsAndProjectContributors') }}</p>
+          </div>
           <div class="flex items-center gap-2">
             <span class="text-sm text-muted-foreground">{{ $t('ui.version') }}</span>
             <Badge variant="secondary" class="font-mono">{{ information?.version ?? '-' }}</Badge>
@@ -38,16 +39,13 @@ const { Upload, information, loading, loadError, name, description, saving, logo
             </div>
             <span v-else class="text-sm text-muted-foreground">-</span>
           </div>
-        </CardContent>
-      </Card>
+        </section>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>{{ $t('ui.platformConfiguration') }}</CardTitle>
-          <CardDescription>{{ $t('ui.platformNameDescriptionAndLogo') }}</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <form @submit.prevent="save">
+        <Separator />
+
+        <section aria-labelledby="platform-identity-configuration">
+          <h2 id="platform-identity-configuration" class="sr-only">{{ $t('ui.platformConfiguration') }}</h2>
+          <UiForm @submit.prevent="save">
             <FieldGroup>
               <Field>
                 <FieldLabel for="platform-name">{{ $t('ui.platformName') }}</FieldLabel>
@@ -67,7 +65,7 @@ const { Upload, information, loading, loadError, name, description, saving, logo
                     class="size-16 rounded-md border object-contain"
                   >
                   <span v-else class="text-sm text-muted-foreground">{{ $t('ui.logoNotSetYet') }}</span>
-                  <FileInput :ref="setLogoInputRef" type="file" accept="image/*" class="hidden" @change="uploadLogo" />
+                  <FileInput :ref="setLogoInputRef"  accept="image/*" class="hidden" @change="uploadLogo" />
                   <Button type="button" variant="outline" :disabled="logoUploading" @click="logoInput?.click()">
                     <Spinner v-if="logoUploading" data-icon="inline-start" />
                     <Upload v-else data-icon="inline-start" /> {{ $t('ui.uploadLogo') }} </Button>
@@ -78,9 +76,9 @@ const { Upload, information, loading, loadError, name, description, saving, logo
                   <Spinner v-if="saving" data-icon="inline-start" /> {{ $t('ui.saveConfiguration') }} </Button>
               </Field>
             </FieldGroup>
-          </form>
-        </CardContent>
-      </Card>
-    </div>
+          </UiForm>
+        </section>
+      </CardContent>
+    </Card>
   </div>
 </template>

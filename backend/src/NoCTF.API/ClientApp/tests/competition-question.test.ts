@@ -168,9 +168,9 @@ describe('competition question page wiring', () => {
       new URL('../app/pages/competitions/[id]/questions.vue', import.meta.url),
     ).text()
 
-    expect(page).toContain("lg:grid-cols-[minmax(17rem,22rem)_minmax(0,1fr)]")
-    expect(page).toContain("xl:grid-cols-[22rem_minmax(0,1fr)]")
-    expect(page).toContain('min-h-[36rem]')
-    expect(page).toContain('rows="7"')
+    expect(page).toContain('questions-chat-layout')
+    expect(page).toContain('<ConversationPanel')
+    expect(page).toContain(':own="isOwnMessage(entry.actorUserId)"')
+    expect(page).toContain('selectedId === q.threadRootId && detail && !detailLoading')
   })
 })

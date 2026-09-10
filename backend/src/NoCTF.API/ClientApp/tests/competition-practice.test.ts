@@ -43,7 +43,7 @@ describe('competition practice entry', () => {
   })
 
   test('overview and CTF controls share the same practice predicate and use the unscored endpoint', async () => {
-    const overview = await sourceFile(new URL('../app/pages/competitions/[id]/index.vue', import.meta.url)).text()
+    const overview = await sourceFile(new URL('../app/features/competitions/CompetitionOverview.vue', import.meta.url)).text()
     const panel = await sourceFile(new URL('../app/features/challenges/panels/CtfPanel.vue', import.meta.url)).text()
     const submit = await sourceFile(new URL('../app/features/challenges/FlagSubmit.vue', import.meta.url)).text()
     expect(overview).toContain('canEnterCompetition(competition.value, myTeam.value)')

@@ -3,12 +3,14 @@ import { toRefs } from 'vue'
 import type { ApplicationRootViewState } from '~/features/shell/useApplicationRoot'
 
 const viewProps = defineProps<{ state: ApplicationRootViewState }>()
-const { isDark } = toRefs(viewProps.state)
+const { isDark, pageTransition } = toRefs(viewProps.state)
 </script>
 
 <template>
+  <TooltipProvider :delay-duration="350">
   <NuxtLayout>
-    <NuxtPage />
+    <NuxtPage :transition="pageTransition" />
   </NuxtLayout>
-  <Sonner rich-colors close-button position="top-right" :theme="isDark ? 'dark' : 'light'" />
+  <Sonner rich-colors close-button position="bottom-right" :visible-toasts="3" expand :theme="isDark ? 'dark' : 'light'" />
+  </TooltipProvider>
 </template>

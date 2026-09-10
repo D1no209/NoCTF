@@ -1,8 +1,7 @@
 <script setup lang="ts">
-import Feature from '~/features/routes/admin/competitions/AdminCompetitionsNewPage.vue'
-definePageMeta({ middleware: 'auth' })
+definePageMeta({ middleware: 'platform-admin', redirect: '/competitions?create=1' })
 </script>
 
 <template>
-  <Feature><slot /></Feature>
+  <NuxtPage />
 </template>

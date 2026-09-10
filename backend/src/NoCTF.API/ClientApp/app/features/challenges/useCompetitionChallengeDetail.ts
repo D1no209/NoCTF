@@ -1,7 +1,7 @@
 import { markRaw, toRefs } from 'vue'
 
 import { toast } from 'vue-sonner'
-import { Dice5, Download, FileDown } from '@lucide/vue'
+import { Dice5, FileDown, History } from '@lucide/vue'
 import { downloadChallengeAttachmentEndpoint, downloadRandomChallengeAttachmentEndpoint, getChallengeEndpoint, listChallengeAttachmentsEndpoint } from '../../api'
 import type { NoCtfapiEndpointsAdministrationChallengeBankAttachmentDeliveryPolicyProtocol, NoCtfapiEndpointsAdministrationChallengeBankChallengeAttachmentResponse, NoCtfapiEndpointsChallengesChallengeResponse } from '../../api'
 import { downloadSdkFile } from '../../utils/download'
@@ -16,6 +16,7 @@ import KohPanelComponent from './panels/KohPanel.vue'
 export function useCompetitionChallengeDetail(props: Readonly<{
   competitionId: string
   competitionChallengeId: string
+  flagDockTarget?: string
 }>) {
   const ctx = inject(competitionContextKey)!
 
@@ -38,11 +39,18 @@ export function useCompetitionChallengeDetail(props: Readonly<{
   const downloading = ref(false)
 
   const historyRefreshKey = ref(0)
+  const historyOpen = ref(false)
 
   let loadSequence = 0
+  const reads = new AbortController()
+  onBeforeUnmount(() => { loadSequence++; reads.abort() })
 
   function refreshSubmissionHistory(): void {
     historyRefreshKey.value += 1
+  }
+
+  function updateRemainingAttempts(remaining: number | null): void {
+    if (challenge.value) challenge.value = { ...challenge.value, remainingFlagAttempts: remaining }
   }
 
   async function loadChallenge(): Promise<void> {
@@ -54,6 +62,7 @@ export function useCompetitionChallengeDetail(props: Readonly<{
     attachmentDeliveryPolicy.value = 'All'
   
     const { data, error: requestError } = await getChallengeEndpoint({
+      signal: reads.signal,
       path: {
         competitionId: props.competitionId,
         competitionChallengeId: props.competitionChallengeId,
@@ -80,12 +89,13 @@ export function useCompetitionChallengeDetail(props: Readonly<{
     attachmentsLoading.value = true
     attachmentError.value = null
     const { data, error: requestError } = await listChallengeAttachmentsEndpoint({
+      signal: reads.signal,
       path: {
         competitionId: props.competitionId,
         competitionChallengeId: challengeId,
       },
     })
-    if (challengeId !== props.competitionChallengeId) return
+    if (reads.signal.aborted || challengeId !== props.competitionChallengeId) return
     attachmentsLoading.value = false
     if (requestError || !data) {
       attachmentError.value = parseApiError(requestError, translate("ui.failedToLoadChallengeAttachments")).message
@@ -170,8 +180,8 @@ export function useCompetitionChallengeDetail(props: Readonly<{
   return {
       ...toRefs(props),
       Dice5,
-      Download,
       FileDown,
+      History,
       ctx,
       isLoggedIn,
       user,
@@ -184,7 +194,9 @@ export function useCompetitionChallengeDetail(props: Readonly<{
       attachmentError,
       downloading,
       historyRefreshKey,
+      historyOpen,
       refreshSubmissionHistory,
+      updateRemainingAttempts,
       loadAttachments,
       downloadAttachment,
       downloadRandom,

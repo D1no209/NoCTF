@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { bindViewState } from '~/features/shared/view-state'
 
-import type { NoCtfapiEndpointsAdministrationPlatformPlatformMonitoringMetricResponse, NoCtfapiEndpointsAdministrationPlatformPlatformMonitoringResponse, NoCtfApplicationAdministrationMonitoringPlatformMonitoringMetricKind, NoCtfApplicationAdministrationMonitoringPlatformMonitoringStatus, NoCtfApplicationAdministrationMonitoringPlatformMonitoringUnit } from '~/api'
 import { useAdminPlatformMonitoringPage } from './useAdminPlatformMonitoringPage'
 import View from '~/components/views/page/admin/platform/AdminPlatformMonitoringPageView.vue'
 

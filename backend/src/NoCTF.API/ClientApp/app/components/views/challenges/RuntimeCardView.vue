@@ -3,10 +3,11 @@ import { toRefs } from 'vue'
 import type { RuntimeCardViewState } from '~/features/challenges/useRuntimeCard'
 
 const viewProps = defineProps<{ state: RuntimeCardViewState }>()
-const { publicGatewayFailure, publicGatewayState, runtime, loading, loadError, extendMinutes, polling, timedOut, retryLoad, start, stop, reset, extend, ttl, isRunning, busy, stateVariant, RuntimeAccessUrl, controls } = toRefs(viewProps.state)
+const { publicGatewayFailure, publicGatewayState, runtime, loading, loadError, extendMinutes, polling, timedOut, retryLoad, start, stop, reset, extend, ttl, isRunning, busy, stateVariant, RuntimeAccessUrl, controls, dockTarget } = toRefs(viewProps.state)
 </script>
 
 <template>
+  <Teleport defer :to="dockTarget || 'body'" :disabled="!dockTarget">
   <section class="flex flex-col gap-4" aria-labelledby="runtime-card-title">
     <header class="flex items-center justify-between gap-2">
         <h3 id="runtime-card-title" class="text-sm font-semibold">{{ $t('ui.questionEnvironment') }}</h3>
@@ -60,9 +61,9 @@ const { publicGatewayFailure, publicGatewayState, runtime, loading, loadError, e
             <Spinner v-if="polling" data-icon="inline-start" /> {{ $t('ui.resetEnvironment') }} </Button>
           <template v-if="controls === 'full' && isRunning">
             <div class="flex items-center gap-2">
-              <Input
+              <NumberInput
                 v-model.number="extendMinutes"
-                type="number"
+
                 min="1"
                 max="720"
                 class="w-20"
@@ -75,4 +76,5 @@ const { publicGatewayFailure, publicGatewayState, runtime, loading, loadError, e
       </template>
     </div>
   </section>
+  </Teleport>
 </template>

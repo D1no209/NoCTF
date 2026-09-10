@@ -1,8 +1,6 @@
 <script setup lang="ts">
 import { bindViewState } from '~/features/shared/view-state'
 
-import type { NoCtfapiEndpointsCompetitionsEventsCompetitionEventResponse } from '~/api'
-
 import { useCompetitionBroadcastPanel } from './useCompetitionBroadcastPanel'
 import View from '~/components/views/competition/CompetitionBroadcastPanelView.vue'
 

@@ -20,6 +20,11 @@ export function useAuth() {
     () => user.value?.role === 'Organizer' || user.value?.role === 'Administrator',
   )
 
+  function invalidate(): void {
+    setAccessToken(null)
+    user.value = null
+  }
+
   async function fetchMe(): Promise<void> {
     const { data, error } = await getMeEndpoint()
     if (error || !data) {
@@ -53,16 +58,14 @@ export function useAuth() {
 
   async function logout(): Promise<void> {
     await logoutEndpoint().catch(() => undefined)
-    setAccessToken(null)
-    user.value = null
+    invalidate()
     await navigateTo('/')
   }
 
   /** Revoke every session platform-wide (password change / security). */
   async function logoutAll(): Promise<void> {
     await logoutAllEndpoint().catch(() => undefined)
-    setAccessToken(null)
-    user.value = null
+    invalidate()
     await navigateTo('/auth/login')
   }
 
@@ -72,6 +75,7 @@ export function useAuth() {
     isLoggedIn,
     isAdministrator,
     canOrganize,
+    invalidate,
     restore,
     login,
     logout,

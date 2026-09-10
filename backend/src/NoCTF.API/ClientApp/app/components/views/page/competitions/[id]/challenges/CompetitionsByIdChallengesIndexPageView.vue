@@ -14,11 +14,21 @@ const { competitionId, selectedChallengeId, selectChallenge, CompetitionChalleng
     show-challenge-navigator
     @select-challenge="selectChallenge"
   >
-    <component :is="CompetitionChallengeDetail"
-      v-if="selectedChallengeId"
-      :competition-id="competitionId"
-      :competition-challenge-id="selectedChallengeId"
-    />
+    <Card v-if="selectedChallengeId" class="challenge-detail-card overflow-hidden gap-0 py-0">
+      <div id="challenge-flag-dock" data-slot="challenge-flag-dock" />
+      <MotionSwap :identity="selectedChallengeId" preset="film-up">
+        <ScrollSurface axis="y" class="h-full" :aria-label="$t('ui.challenge')">
+        <div class="p-5 lg:p-6">
+          <component :is="CompetitionChallengeDetail"
+            :key="`${competitionId}:${selectedChallengeId}`"
+            :competition-id="competitionId"
+            :competition-challenge-id="selectedChallengeId"
+            flag-dock-target="#challenge-flag-dock"
+          />
+        </div>
+        </ScrollSurface>
+      </MotionSwap>
+    </Card>
     <Empty v-else class="h-full min-h-80 border-0">
       <EmptyHeader>
         <EmptyTitle>{{ $t('ui.selectAChallengeToViewDetails') }}</EmptyTitle>

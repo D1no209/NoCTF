@@ -7,7 +7,7 @@ const { Flag, Shield, ShieldCheck, ShieldX, signals, combinedSuccess, combinedFa
 </script>
 
 <template>
-  <span class="inline-flex min-w-12 items-center justify-center gap-2" :title="accessibleLabel">
+  <Hint :content="accessibleLabel" ><span tabindex="0" class="inline-flex min-w-12 items-center justify-center gap-2" >
     <ShieldCheck v-if="combinedSuccess" class="size-5 text-emerald-600 dark:text-emerald-400" aria-hidden="true" />
     <ShieldX v-else-if="combinedFailure" class="size-5 text-destructive" aria-hidden="true" />
     <span v-else-if="noOperation" class="font-mono text-sm text-muted-foreground/60" aria-hidden="true">-</span>
@@ -22,5 +22,5 @@ const { Flag, Shield, ShieldCheck, ShieldX, signals, combinedSuccess, combinedFa
       </template>
     </template>
     <span class="sr-only">{{ accessibleLabel }}</span>
-  </span>
+  </span></Hint>
 </template>

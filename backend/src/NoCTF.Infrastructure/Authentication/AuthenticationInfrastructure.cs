@@ -79,6 +79,10 @@ internal static class AuthenticationInfrastructure
         services.AddSingleton<IAvatarImageProcessor, ImageSharpAvatarImageProcessor>();
         services.AddScoped<ReplaceCurrentUserAvatar>();
         services.AddScoped<GetUserAvatar>();
+        services.AddSingleton<IWallpaperImageProcessor, ImageSharpWallpaperImageProcessor>();
+        services.AddScoped<ReplaceCurrentUserWallpaper>();
+        services.AddScoped<GetCurrentUserWallpaper>();
+        services.AddScoped<UpdateCurrentUserWallpaperPreference>();
         services.AddScoped<ChangePassword>();
         services.AddScoped<LogoutAll>();
         services.AddScoped<IEmailVerificationStore, EmailVerificationStore>();

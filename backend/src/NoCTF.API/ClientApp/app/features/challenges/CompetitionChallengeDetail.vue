@@ -4,10 +4,11 @@ import { bindViewState } from '~/features/shared/view-state'
 import { useCompetitionChallengeDetail } from './useCompetitionChallengeDetail'
 import View from '~/components/views/challenges/CompetitionChallengeDetailView.vue'
 
-const props = defineProps<{
+const props = withDefaults(defineProps<{
   competitionId: string
   competitionChallengeId: string
-}>()
+  flagDockTarget?: string
+}>(), { flagDockTarget: '' })
 const state = bindViewState(useCompetitionChallengeDetail(props))
 
 </script>

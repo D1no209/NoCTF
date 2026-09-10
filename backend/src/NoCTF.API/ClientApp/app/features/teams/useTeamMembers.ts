@@ -5,8 +5,6 @@ import { Crown, UserMinus } from '@lucide/vue'
 import { removeTeamMemberEndpoint, userProfileGet } from '../../api'
 import type { NoCtfapiEndpointsAuthenticationPublicUserProfileResponse, NoCtfapiEndpointsTeamsTeamResponse } from '../../api'
 
-type Events = { changed: [] }
-
 /** Owns state, effects and commands for TeamMembers. */
 export function useTeamMembers(props: Readonly<{
   competitionId: string

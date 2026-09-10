@@ -90,7 +90,7 @@ describe('attachment delivery editor', () => {
     expect(page).toContain('attachment.exactFlag')
     expect(page).toContain("$t('ui.hash')")
     expect(page).toContain("attachment.sha256?.slice(0, 8) ?? $t('ui.symbol')")
-    expect(page).toContain(':title="attachment.sha256"')
+    expect(page).toContain(':content="attachment.sha256"')
     expect(page).toContain('id="attachment-delivery-policy"')
     expect(page).toContain('requestAttachmentDeliveryPolicy')
     expect(page).toContain('value="All"')

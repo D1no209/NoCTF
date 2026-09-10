@@ -4,7 +4,7 @@ import { Moon, Sun } from '@lucide/vue'
 
 /** Owns state, effects and commands for ThemeToggle. */
 export function useThemeToggle() {
-  const { isDark, toggle } = useTheme()
+  const { isDark, themeTransitioning, toggle } = useTheme()
 
   const { t } = useLocale()
 
@@ -12,6 +12,7 @@ export function useThemeToggle() {
       Moon,
       Sun,
       isDark,
+      themeTransitioning,
       toggle,
       t
     }

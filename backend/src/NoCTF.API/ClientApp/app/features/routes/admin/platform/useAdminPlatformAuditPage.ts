@@ -13,7 +13,7 @@ type AuditLog = NoCtfapiEndpointsAdministrationPlatformPlatformAuditLogResponse
 /** Owns state, effects and commands for AdminPlatformAuditPage. */
 export function useAdminPlatformAuditPage() {
   const KIND_LABELS: Record<string, string> = {
-    CompetitionLifecycle: translate("ui.competitionLifeCycle"), UserAccountLifecycle: translate("ui.accountLifeCycle"), PlatformAdministration: translate("ui.platformAdmin"), CompetitionAdministration: translate("ui.competitionAdmin"), CompetitionLeaderboardVisibility: translate("ui.listVisibility"), CompetitionEvent: translate("ui.competitionEvent"),
+    CompetitionLifecycle: "ui.competitionLifeCycle", UserAccountLifecycle: "ui.accountLifeCycle", PlatformAdministration: "ui.platformAdmin", CompetitionAdministration: "ui.competitionAdmin", CompetitionLeaderboardVisibility: "ui.listVisibility", CompetitionEvent: "ui.competitionEvent",
   }
 
   const kind = ref('all')

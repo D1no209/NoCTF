@@ -1,8 +1,6 @@
 <script setup lang="ts">
 import { bindViewState } from '~/features/shared/view-state'
 
-import type { NoCtfapiEndpointsTeamsTeamResponse } from '~/api'
-
 import { useAdminCompetitionsByIdChallengesByCcIdPage } from './useAdminCompetitionsByIdChallengesByCcIdPage'
 import View from '~/components/views/page/admin/competitions/[id]/challenges/AdminCompetitionsByIdChallengesByCcIdPageView.vue'
 

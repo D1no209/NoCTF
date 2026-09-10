@@ -2,12 +2,14 @@
 import { toRefs } from 'vue'
 import type { FlagSubmitViewState } from '~/features/challenges/useFlagSubmit'
 
+defineOptions({ inheritAttrs: false })
 const viewProps = defineProps<{ state: FlagSubmitViewState }>()
-const { PartyPopper, input, submitting, celebrating, persistentResult, resultDialog, remainingAttempts, celebrationParticles, attemptsExhausted, closeResultDialog, timedOut, pollingErrorMessage, submit, competitionChallengeId, multiple, title, description, practice, readOnlyJudgement, onUpdateOpenOpen } = toRefs(viewProps.state)
+const { PartyPopper, input, submitting, celebrating, persistentResult, solved, celebrationParticles, inputDisabled, timedOut, pollingErrorMessage, submit, competitionChallengeId, multiple, title, description, practice, dockTarget } = toRefs(viewProps.state)
 </script>
 
 <template>
-  <section class="relative flex flex-col gap-4 overflow-hidden" aria-labelledby="flag-submit-title">
+  <Teleport :to="dockTarget || 'body'" :disabled="!dockTarget">
+  <section v-bind="$attrs" data-slot="flag-submit" class="relative flex flex-col gap-4 overflow-hidden" aria-labelledby="flag-submit-title">
     <Transition name="flag-celebration">
       <div
         v-if="celebrating"
@@ -34,45 +36,11 @@ const { PartyPopper, input, submitting, celebrating, persistentResult, resultDia
         </span>
       </div>
     </Transition>
-    <header class="flex flex-col gap-1">
-      <div class="flex flex-wrap items-center justify-between gap-2">
-        <h3 id="flag-submit-title" class="text-sm font-semibold">{{ title }}</h3>
-        <Badge v-if="remainingAttempts !== null && !readOnlyJudgement && !practice" :variant="attemptsExhausted ? 'destructive' : 'secondary'">
-          {{ attemptsExhausted ? $t('ui.noSubmissionAttemptsRemain') : $t('ui.submissionsRemaining', { count: remainingAttempts }) }}
-        </Badge>
-      </div>
-      <p v-if="description" class="text-sm text-muted-foreground">{{ description }}</p>
-      <p v-else-if="practice" class="text-sm text-muted-foreground">{{ $t('ui.practiceModeOnlyChecksWhetherAFlagIsCorrectIt') }}</p>
-    </header>
+    <h3 id="flag-submit-title" class="sr-only">{{ title }}</h3>
+    <p v-if="description" class="text-xs text-muted-foreground">{{ description }}</p>
+    <p v-else-if="practice" class="text-xs text-muted-foreground">{{ $t('ui.practiceModeOnlyChecksWhetherAFlagIsCorrectIt') }}</p>
     <div>
-      <form @submit.prevent="submit">
-        <FieldGroup>
-          <Field>
-            <FieldLabel :for="`flag-input-${competitionChallengeId}`">
-              {{ multiple ? $t('ui.flagListOnePerLine') : $t('ui.flag4') }}
-            </FieldLabel>
-            <Textarea
-              v-if="multiple"
-              :id="`flag-input-${competitionChallengeId}`"
-              v-model="input"
-              rows="4"
-              class="font-mono"
-              :placeholder="$t('ui.flag3')"
-            />
-            <Input
-              v-else
-              :id="`flag-input-${competitionChallengeId}`"
-              v-model="input"
-              class="font-mono"
-              :placeholder="$t('ui.flag3')"
-            />
-          </Field>
-          <Field>
-            <Button type="submit" :disabled="submitting || !input.trim() || attemptsExhausted">
-              <Spinner v-if="submitting" data-icon="inline-start" /> {{ $t('ui.submissions') }} </Button>
-          </Field>
-        </FieldGroup>
-      </form>
+      <TerminalCommand :id="`flag-input-${competitionChallengeId}`" v-model="input" :label="multiple ? $t('ui.flagListOnePerLine') : $t('ui.flag4')" :multiple="multiple" :pending="submitting" :disabled="inputDisabled" :placeholder="solved ? $t('terminal.challengeSolved') : $t('terminal.flagPlaceholder')" :hint="multiple ? $t('terminal.multipleHint') : $t('terminal.submitHint')" @submit="submit" />
 
       <Alert v-if="persistentResult" class="mt-4" :variant="persistentResult.correct === true ? 'default' : 'destructive'" role="status"><AlertTitle>{{ persistentResult.correct === null ? $t('ui.noJudgementReceived') : $t('ui.latestJudgement') }}</AlertTitle><AlertDescription>{{ $message(persistentResult.message) }}</AlertDescription></Alert>
       <Alert v-if="timedOut" class="mt-4">
@@ -83,18 +51,9 @@ const { PartyPopper, input, submitting, celebrating, persistentResult, resultDia
       </Alert>
     </div>
   </section>
+  </Teleport>
 
-  <Dialog :open="resultDialog !== null" @update:open="onUpdateOpenOpen">
-    <DialogContent class="sm:max-w-md" @pointer-down-outside="closeResultDialog">
-      <DialogHeader>
-        <DialogTitle>{{ resultDialog?.title }}</DialogTitle>
-        <DialogDescription>{{ $message(resultDialog?.message) }}</DialogDescription>
-      </DialogHeader>
-      <DialogFooter>
-        <Button @click="closeResultDialog">{{ $t('ui.ok') }}</Button>
-      </DialogFooter>
-    </DialogContent>
-  </Dialog>
+
 </template>
 
 <style scoped>

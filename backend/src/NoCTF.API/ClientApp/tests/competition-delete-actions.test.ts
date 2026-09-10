@@ -17,9 +17,10 @@ describe('competition deletion actions', () => {
     const detailPage = await sourceFile(
       new URL('../app/pages/admin/competitions/[id]/index.vue', import.meta.url),
     ).text()
-    const listPage = await sourceFile(
-      new URL('../app/pages/admin/competitions/index.vue', import.meta.url),
-    ).text()
+    const [listPage, sidebar] = await Promise.all([
+      sourceFile(new URL('../app/pages/competitions/index.vue', import.meta.url)).text(),
+      sourceFile(new URL('../app/features/competitions/CompetitionSidebar.vue', import.meta.url)).text(),
+    ])
 
     expect(detailPage).toContain('const isDeleted = computed(() => !!competition.value?.deletedAt)')
     expect(detailPage).toContain('v-if="!isDeleted"')
@@ -34,7 +35,9 @@ describe('competition deletion actions', () => {
     expect(detailPage).toContain("ui.theCompetitionAndItsScopedDataWerePermanentlyDeletedThe")
     expect(detailPage).toContain("reference.code === 'HistoricalEvent'")
     expect(detailPage).toContain("ui.impactCheckPassedThisCompetitionHasNoPermanentHistoryOr")
-    expect(listPage).toContain('query: { includeDeleted: includeDeleted.value }')
-    expect(listPage).toContain("<Badge v-if=\"c.deletedAt\" variant=\"destructive\">{{ $t('ui.deleted') }}</Badge>")
+    expect(detailPage).toContain("await navigateTo('/competitions')")
+    expect(listPage).toContain('adminListCompetitions({ query: { includeDeleted: true } })')
+    expect(sidebar).toContain("<Badge v-if=\"item.competition.deletedAt\" variant=\"destructive\">{{ $t('ui.deleted') }}</Badge>")
+    expect(sidebar).toContain("value=\"deleted\"")
   })
 })

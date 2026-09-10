@@ -22,8 +22,17 @@ internal sealed class UserConfiguration : IEntityTypeConfiguration<User>
         builder.HasOne(user => user.AvatarFile).WithMany()
             .HasForeignKey(user => user.AvatarFileId)
             .OnDelete(DeleteBehavior.Restrict);
-        builder.ToTable(table => table.HasCheckConstraint(
-            "ck_users_bot_role",
-            "\"kind\" <> 1 OR \"role\" IN (0, 1)"));
+        builder.HasOne(user => user.WallpaperFile).WithMany()
+            .HasForeignKey(user => user.WallpaperFileId)
+            .OnDelete(DeleteBehavior.Restrict);
+        builder.ToTable(table =>
+        {
+            table.HasCheckConstraint(
+                "ck_users_bot_role",
+                "\"kind\" <> 1 OR \"role\" IN (0, 1)");
+            table.HasCheckConstraint(
+                "ck_users_wallpaper_enabled",
+                "NOT \"wallpaper_enabled\" OR \"wallpaper_file_id\" IS NOT NULL");
+        });
     }
 }

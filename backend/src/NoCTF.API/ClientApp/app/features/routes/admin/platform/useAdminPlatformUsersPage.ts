@@ -32,9 +32,9 @@ export function useAdminPlatformUsersPage() {
 
   const roleFilter = ref('all')
 
-  const ROLE_LABELS: Record<string, string> = { User: translate("ui.user"), Organizer: translate("ui.organizer"), Administrator: translate("ui.administrator") }
+  const ROLE_LABELS: Record<string, string> = { User: "ui.user", Organizer: "ui.organizer", Administrator: "ui.administrator" }
 
-  const STATUS_LABELS: Record<string, string> = { Active: translate("ui.normal"), Banned: translate("ui.banned2"), Disabled: translate("ui.disabled"), Anonymized: translate("ui.anonymous") }
+  const STATUS_LABELS: Record<string, string> = { Active: "ui.normal", Banned: "ui.banned2", Disabled: "ui.disabled", Anonymized: "ui.anonymous" }
 
   const MANAGED_ACCOUNT_STATUS_OPTIONS: ReadonlyArray<{ value: ManagedAccountStatus, label: string }> = [
     { value: 'Active', label: "ui.normal" },
@@ -43,21 +43,21 @@ export function useAdminPlatformUsersPage() {
   ]
 
   const REFERENCE_LABELS: Record<string, string> = {
-    CompetitionOwner: translate("ui.competitionLeader"),
-    CompetitionCollaborator: translate("ui.competitionCollaborator"),
-    ChallengeOwner: translate("ui.questionBankTemplatePersonInCharge"),
-    ChallengeManager: translate("ui.questionBankTemplateManager"),
-    TeamCaptain: translate("ui.teamCaptain"),
-    TeamMember: translate("ui.teamMembers"),
-    Submission: translate("ui.submitRecord"),
-    PatchUpload: translate("ui.patchUpload2"),
-    Notification: translate("ui.notifications"),
-    GameplayFact: translate("ui.gameplayFacts"),
-    CompetitionLifecycleAudit: translate("ui.competitionLifeCycleAudit"),
-    CompetitionQuestion: translate("ui.competitionQuestions"),
-    CompetitionQuestionEntry: translate("ui.qAReply"),
-    CompetitionEvent: translate("ui.competitionEvent"),
-    UserAccountLifecycleAudit: translate("ui.accountLifeCycleAudit"),
+    CompetitionOwner: "ui.competitionLeader",
+    CompetitionCollaborator: "ui.competitionCollaborator",
+    ChallengeOwner: "ui.questionBankTemplatePersonInCharge",
+    ChallengeManager: "ui.questionBankTemplateManager",
+    TeamCaptain: "ui.teamCaptain",
+    TeamMember: "ui.teamMembers",
+    Submission: "ui.submitRecord",
+    PatchUpload: "ui.patchUpload2",
+    Notification: "ui.notifications",
+    GameplayFact: "ui.gameplayFacts",
+    CompetitionLifecycleAudit: "ui.competitionLifeCycleAudit",
+    CompetitionQuestion: "ui.competitionQuestions",
+    CompetitionQuestionEntry: "ui.qAReply",
+    CompetitionEvent: "ui.competitionEvent",
+    UserAccountLifecycleAudit: "ui.accountLifeCycleAudit",
   }
 
   const filteredUsers = computed(() => {

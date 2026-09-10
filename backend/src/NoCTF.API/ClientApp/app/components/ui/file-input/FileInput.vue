@@ -3,5 +3,5 @@
 </script>
 
 <template>
-  <input type="file" data-slot="file-input">
+  <input type="file" data-slot="file-input" class="sr-only" tabindex="-1" aria-hidden="true">
 </template>

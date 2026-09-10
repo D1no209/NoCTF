@@ -4,12 +4,6 @@ import { RotateCcw, RotateCw, Scan } from '@lucide/vue'
 import type { AvatarCropState } from './avatar-crop'
 import { AVATAR_CROP_SIZE, AVATAR_OUTPUT_SIZE, clampAvatarCropState, drawAvatarCrop, moveAvatarCrop, zoomAvatarCropAtPoint } from './avatar-crop'
 
-type Events = {
-  'update:open': [value: boolean]
-  'save': [file: File]
-  'error': [error: Error]
-}
-
 /** Owns state, effects and commands for AvatarCropDialog. */
 export function useAvatarCropDialog(props: Readonly<{
   open: boolean

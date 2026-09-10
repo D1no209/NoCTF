@@ -28,8 +28,7 @@ public sealed class PublicGatewayRegistrationTests
         var config = Configuration(); config["PublicGateway:Transport"] = "invalid";
         var services = new ServiceCollection(); services.AddLogging(); services.AddNoCtfRunner(config);
         await Assert.That(services.Count(item => item.ImplementationType == typeof(PublicGatewayReadinessDependency))).IsEqualTo(1);
-        using var provider = services.BuildServiceProvider();
-        var dependency = new PublicGatewayReadinessDependency(provider);
+        var dependency = new PublicGatewayReadinessDependency();
         await Assert.That(dependency.FailureIsCritical).IsTrue();
         var health = await new RoleReadinessHealthCheck([dependency]).CheckHealthAsync(new HealthCheckContext());
         await Assert.That(health.Status).IsEqualTo(HealthStatus.Unhealthy);

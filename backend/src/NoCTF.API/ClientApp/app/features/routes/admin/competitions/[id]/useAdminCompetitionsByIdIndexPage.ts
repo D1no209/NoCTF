@@ -179,16 +179,16 @@ export function useAdminCompetitionsByIdIndexPage() {
   let hardDeletePreviewRequest = 0
 
   const hardDeleteReferenceLabels: Record<NoCtfapiEndpointsAdministrationCompetitionsCompetitionHardDeleteReferenceCode, string> = {
-    HistoricalEvent: translate("ui.permanentCompetitionEvents"),
-    Team: translate("ui.team"),
-    CompetitionChallenge: translate("ui.competitionChallenges"),
-    GameplayFact: translate("ui.gameplayFacts"),
-    RuntimeInstance: translate("ui.runtimeEnvironment"),
-    PatchUpload: translate("ui.patchUpload2"),
-    Notification: translate("ui.notificationsAndQuestions"),
-    PosterFile: translate("ui.competitionPoster"),
-    ActiveRuntimeResource: translate("ui.message9"),
-    NotificationScopeConflict: translate("ui.crossScopeOrUnprovenNotificationReferences"),
+    HistoricalEvent: "ui.permanentCompetitionEvents",
+    Team: "ui.team",
+    CompetitionChallenge: "ui.competitionChallenges",
+    GameplayFact: "ui.gameplayFacts",
+    RuntimeInstance: "ui.runtimeEnvironment",
+    PatchUpload: "ui.patchUpload2",
+    Notification: "ui.notificationsAndQuestions",
+    PosterFile: "ui.competitionPoster",
+    ActiveRuntimeResource: "ui.message9",
+    NotificationScopeConflict: "ui.crossScopeOrUnprovenNotificationReferences",
   }
 
   function hardDeleteReferenceLabel(code?: NoCtfapiEndpointsAdministrationCompetitionsCompetitionHardDeleteReferenceCode) {
@@ -271,7 +271,7 @@ export function useAdminCompetitionsByIdIndexPage() {
       const { error } = await adminHardDeleteCompetition({ path: { competitionId } })
       if (error) throw error
       toast.success(translate("ui.contestHasBeenCompletelyDeleted"))
-      await navigateTo('/admin/competitions')
+      await navigateTo('/competitions')
     }
     catch (e) {
       if (isHardDeletePreview(e)) {
@@ -323,7 +323,7 @@ export function useAdminCompetitionsByIdIndexPage() {
       }
       forceDeleteOpen.value = false
       toast.success(translate("ui.theCompetitionAndItsScopedDataWerePermanentlyDeletedThe"))
-      await navigateTo('/admin/competitions')
+      await navigateTo('/competitions')
     }
     catch (error) {
       forceDeleteError.value = parseApiError(error).message

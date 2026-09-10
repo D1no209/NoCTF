@@ -213,7 +213,7 @@ const { Download, canWrite, canJudge, isAdministrator, canDownloadPatch, patchDo
     </template>
 
     <Sheet v-model:open="detailOpen">
-      <SheetContent class="overflow-y-auto">
+      <SheetContent data-scroll-surface class="overflow-y-auto">
         <SheetHeader>
           <SheetTitle>{{ $t('ui.submitDetails') }}</SheetTitle>
           <SheetDescription>{{ $t('ui.submissionId', { id: detail?.gameplayFactId ?? '-' }) }}</SheetDescription>
@@ -272,7 +272,7 @@ const { Download, canWrite, canJudge, isAdministrator, canDownloadPatch, patchDo
           <div class="rounded-md border bg-muted p-3 font-mono text-sm break-all">{{ flagResult }}</div>
         </template>
         <DialogFooter>
-          <Button v-if="flagError" variant="outline" :disabled="flagPending" @click="() => accessFlag()">
+          <Button v-if="flagError" variant="outline" :disabled="flagPending" @click="accessFlag">
             {{ $t('ui.retry') }}
           </Button>
           <Button @click="closeFlagAccess">{{ $t('ui.close') }}</Button>

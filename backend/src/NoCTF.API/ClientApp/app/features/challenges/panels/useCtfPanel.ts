@@ -5,14 +5,14 @@ import type { NoCtfapiEndpointsChallengesChallengeResponse, NoCtfapiEndpointsCom
 import FlagSubmitComponent from '../FlagSubmit.vue'
 import RuntimeCardComponent from '../RuntimeCard.vue'
 
-type Events = { submitted: [] }
-
 /** Owns state, effects and commands for CtfPanel. */
 export function useCtfPanel(props: Readonly<{
   competition: NoCtfapiEndpointsCompetitionsCompetitionResponse
   challenge: NoCtfapiEndpointsChallengesChallengeResponse
+  flagDockTarget?: string
+  runtimeDockTarget?: string
 }>,
-emit: { (event: "submitted", ...args: []): void }) {
+emit: { (event: "submitted", ...args: []): void; (event: "remainingChanged", ...args: [remaining: number | null]): void }) {
   const practiceOpen = computed(() => isCtfPracticeOpen(props.competition))
 
   const actionsAvailable = computed(() => props.competition.status === 'Running' || practiceOpen.value)

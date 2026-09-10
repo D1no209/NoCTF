@@ -182,13 +182,13 @@ const { Clock3, Expand, Minimize, Radio, RefreshCw, ShieldCheck, Trophy, Users, 
             <div class="flex items-center gap-2"><Radio class="size-4 text-primary" />{{ t('ui.liveFeed') }}</div>
             <span>{{ $t('ui.live') }}</span>
           </header>
-          <ol v-if="solveFeed.length" class="live-feed">
+          <ScrollSurface as="ol" v-if="solveFeed.length" class="live-feed">
             <li v-for="solve in solveFeed" :key="solve.key">
               <time :datetime="solve.solvedAt">{{ new Date(solve.solvedAt).toLocaleTimeString(localeTag(), { hour12: false }) }}</time>
               <span :class="bloodClass(solve.bloodRank)">{{ bloodLabel(solve.bloodRank) }}</span>
               <p><strong>{{ solve.teamName }}</strong> {{ t('ui.solved3') }} <b>{{ solve.challengeTitle }}</b> <em>+{{ solve.score }}</em></p>
             </li>
-          </ol>
+          </ScrollSurface>
           <div v-else class="live-empty h-full">{{ t('ui.waitingForTheFirstSolve') }}</div>
         </section>
       </aside>
@@ -204,12 +204,27 @@ const { Clock3, Expand, Minimize, Radio, RefreshCw, ShieldCheck, Trophy, Users, 
 
 <style scoped>
 .live-screen {
-  --live-panel: rgba(12, 8, 25, .94);
-  --live-line: rgba(158, 119, 237, .2);
+  --live-city-background: oklch(0.075 0.028 285);
+  --live-city-facade-top: oklch(0.145 0.045 272);
+  --live-city-facade-bottom: oklch(0.09 0.028 284);
+  --live-city-locked: oklch(0.65 0.205 252);
+  --live-city-solved: oklch(0.62 0.25 24);
+  --live-city-accent: oklch(0.68 0.2 302);
+  --live-city-grid-major: oklch(0.48 0.14 300);
+  --live-city-grid-minor: oklch(0.37 0.11 254);
+  --live-city-backdrop: oklch(0.43 0.1 292);
+  --live-city-radar: oklch(0.72 0.19 155);
   --live-green: oklch(0.78 0.22 149);
-  --live-purple: oklch(0.67 0.19 300);
-  --live-blue: #3ea6ff;
-  --live-red: #ff3d5e;
+  --live-purple: var(--live-city-accent);
+  --live-blue: var(--live-city-locked);
+  --live-red: var(--live-city-solved);
+  --background: var(--live-city-background);
+  --card: var(--live-city-facade-top);
+  --primary: var(--live-blue);
+  --destructive: var(--live-red);
+  --success: var(--live-green);
+  --live-panel: color-mix(in oklch, var(--live-city-background) 94%, transparent);
+  --live-line: color-mix(in oklch, var(--live-city-accent) 34%, transparent);
   position: relative;
   display: grid;
   grid-template-rows: auto minmax(0, 1fr) auto;
@@ -227,8 +242,8 @@ const { Clock3, Expand, Minimize, Radio, RefreshCw, ShieldCheck, Trophy, Users, 
   pointer-events: none;
   opacity: .55;
   background-image:
-    linear-gradient(rgba(158, 119, 237, .035) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(158, 119, 237, .035) 1px, transparent 1px);
+    linear-gradient(color-mix(in oklch, var(--primary) 4%, transparent) 1px, transparent 1px),
+    linear-gradient(90deg, color-mix(in oklch, var(--primary) 4%, transparent) 1px, transparent 1px);
   background-size: 42px 42px;
 }
 .live-screen-aurora {
@@ -236,8 +251,8 @@ const { Clock3, Expand, Minimize, Radio, RefreshCw, ShieldCheck, Trophy, Users, 
   inset: 0;
   pointer-events: none;
   background:
-    radial-gradient(circle at 18% 12%, rgba(160, 107, 255, .1), transparent 34%),
-    radial-gradient(circle at 84% 78%, rgba(45, 255, 143, .07), transparent 38%);
+    radial-gradient(circle at 18% 12%, color-mix(in oklch, var(--primary) 10%, transparent), transparent 34%),
+    radial-gradient(circle at 84% 78%, color-mix(in oklch, var(--success) 7%, transparent), transparent 38%);
 }
 .live-screen-header,
 .live-screen-footer {
@@ -246,21 +261,21 @@ const { Clock3, Expand, Minimize, Radio, RefreshCw, ShieldCheck, Trophy, Users, 
   display: flex;
   align-items: center;
   gap: 1.5rem;
-  border-color: rgba(148, 163, 184, .13);
-  background: rgba(7, 5, 16, .95);
+  border-color: color-mix(in oklch, var(--primary) 13%, transparent);
+  background: color-mix(in oklch, var(--background) 95%, transparent);
 }
 .live-screen-header { min-height: 5.5rem; border-bottom-width: 1px; padding: 1rem 1.5rem; }
 .live-screen-title { flex: 1; }
 .live-screen-controls { flex-shrink: 0; }
-.live-screen-footer { min-height: 2rem; border-top-width: 1px; padding: .4rem 1.5rem; font-size: .625rem; text-transform: uppercase; letter-spacing: .14em; color: #64748b; }
+.live-screen-footer { min-height: 2rem; border-top-width: 1px; padding: .4rem 1.5rem; font-size: .625rem; text-transform: uppercase; letter-spacing: .14em; color: var(--primary); }
 .live-screen-wordmark { font-family: var(--font-mono); font-weight: 700; letter-spacing: .18em; color: var(--live-purple); text-transform: uppercase; }
-.live-screen-divider { width: 1px; height: 1.75rem; background: rgba(148, 163, 184, .18); }
+.live-screen-divider { width: 1px; height: 1.75rem; background: color-mix(in oklch, var(--primary) 18%, transparent); }
 .live-screen-metrics { margin-left: auto; display: grid; grid-auto-flow: column; gap: 1.75rem; }
 .live-screen-metrics div { min-width: 4rem; text-align: center; }
-.live-screen-metrics dt { font-size: .625rem; text-transform: uppercase; letter-spacing: .18em; color: #64748b; }
-.live-screen-metrics dd { margin-top: .2rem; font-family: var(--font-mono); font-size: 1.4rem; font-weight: 700; color: #f8fafc; }
-.live-screen-metrics dd span { margin-left: .15rem; font-size: .7rem; color: #64748b; }
-.live-screen-countdown { color: var(--live-green); text-shadow: 0 0 18px rgba(45, 255, 143, .45); }
+.live-screen-metrics dt { font-size: .625rem; text-transform: uppercase; letter-spacing: .18em; color: var(--primary); }
+.live-screen-metrics dd { margin-top: .2rem; font-family: var(--font-mono); font-size: 1.4rem; font-weight: 700; color: var(--foreground); }
+.live-screen-metrics dd span { margin-left: .15rem; font-size: .7rem; color: var(--primary); }
+.live-screen-countdown { color: var(--live-green); text-shadow:none; }
 
 .live-screen-layout { position: relative; z-index: 1; display: grid; grid-template-columns: minmax(0, 1fr) clamp(16rem, 23vw, 32rem); min-height: 0; min-width: 0; gap: .75rem; padding: .75rem; }
 .live-arena {
@@ -269,7 +284,7 @@ const { Clock3, Expand, Minimize, Radio, RefreshCw, ShieldCheck, Trophy, Users, 
   min-width: 0;
   overflow: hidden;
   border: 1px solid var(--live-line);
-  background: #070312;
+  background: var(--background);
   isolation: isolate;
 }
 .live-arena :deep(.live-city-canvas) { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
@@ -280,14 +295,14 @@ const { Clock3, Expand, Minimize, Radio, RefreshCw, ShieldCheck, Trophy, Users, 
   z-index: 4;
   pointer-events: none;
   opacity: .5;
-  background: repeating-linear-gradient(180deg, rgba(255, 255, 255, .022) 0 1px, transparent 1px 4px);
+  background: repeating-linear-gradient(180deg, color-mix(in oklch, var(--foreground) 2%, transparent) 0 1px, transparent 1px 4px);
 }
 .live-arena-vignette {
   position: absolute;
   inset: 0;
   z-index: 4;
   pointer-events: none;
-  background: radial-gradient(ellipse at center, transparent 52%, rgba(4, 2, 10, .55) 100%);
+  background: radial-gradient(ellipse at center, transparent 52%, color-mix(in oklch, var(--background) 55%, transparent) 100%);
 }
 .live-arena-heading {
   position: absolute;
@@ -300,11 +315,11 @@ const { Clock3, Expand, Minimize, Radio, RefreshCw, ShieldCheck, Trophy, Users, 
   font-weight: 700;
   letter-spacing: .16em;
   text-transform: uppercase;
-  color: #94a3b8;
+  color: var(--primary);
   pointer-events: none;
 }
-.live-arena-pulse { width: .5rem; height: .5rem; border-radius: 999px; background: var(--live-green); box-shadow: 0 0 18px rgba(45, 255, 143, .9); animation: live-dot-pulse 1.6s ease-in-out infinite; }
-.live-frozen { color: #fbbf24; }
+.live-arena-pulse { width: .5rem; height: .5rem; border-radius: 999px; background: var(--live-green); box-shadow:var(--panel-shadow); animation: live-dot-pulse 1.6s ease-in-out infinite; }
+.live-frozen { color: var(--warning); }
 .live-overlay {
   position: absolute;
   inset: 0;
@@ -314,11 +329,11 @@ const { Clock3, Expand, Minimize, Radio, RefreshCw, ShieldCheck, Trophy, Users, 
   align-items: center;
   justify-content: center;
   gap: 1rem;
-  background: rgba(7, 3, 18, .82);
-  color: #64748b;
+  background: color-mix(in oklch, var(--background) 82%, transparent);
+  color: var(--primary);
 }
 .live-overlay-icon { color: var(--live-purple); }
-.live-corners i { position: absolute; z-index: 5; width: 1.4rem; height: 1.4rem; border-color: rgba(160, 107, 255, .7); }
+.live-corners i { position: absolute; z-index: 5; width: 1.4rem; height: 1.4rem; border-color: color-mix(in oklch, var(--primary) 70%, transparent); }
 .live-corners i:nth-child(1) { left: .6rem; top: .6rem; border-left: 2px solid; border-top: 2px solid; }
 .live-corners i:nth-child(2) { right: .6rem; top: .6rem; border-right: 2px solid; border-top: 2px solid; }
 .live-corners i:nth-child(3) { left: .6rem; bottom: .6rem; border-left: 2px solid; border-bottom: 2px solid; }
@@ -333,16 +348,16 @@ const { Clock3, Expand, Minimize, Radio, RefreshCw, ShieldCheck, Trophy, Users, 
   min-width: 8.5rem;
   max-width: 14rem;
   padding: .42rem .7rem .48rem;
-  border: 1px solid rgba(62, 166, 255, .5);
-  background: linear-gradient(180deg, rgba(8, 6, 20, .94), rgba(8, 6, 20, .84));
-  box-shadow: 0 0 16px rgba(62, 166, 255, .18), inset 0 0 12px rgba(62, 166, 255, .07);
+  border: 1px solid color-mix(in oklch, var(--primary) 50%, transparent);
+  background: linear-gradient(180deg, color-mix(in oklch, var(--background) 94%, transparent), color-mix(in oklch, var(--background) 84%, transparent));
+  box-shadow:var(--panel-shadow);
   clip-path: polygon(0 0, calc(100% - .55rem) 0, 100% .55rem, 100% 100%, .55rem 100%, 0 calc(100% - .55rem));
   text-align: center;
   transition: opacity .5s ease, filter .5s ease, border-color .5s ease, box-shadow .5s ease;
 }
 .live-arena :deep(.live-label[data-state="solved"]) {
-  border-color: rgba(255, 61, 94, .6);
-  box-shadow: 0 0 16px rgba(255, 61, 94, .24), inset 0 0 12px rgba(255, 61, 94, .09);
+  border-color: color-mix(in oklch, var(--destructive) 60%, transparent);
+  box-shadow:var(--panel-shadow);
 }
 .live-arena-focusing :deep(.live-label) { opacity: .16; filter: saturate(.4) blur(.4px); }
 .live-arena-focusing :deep(.live-label[data-focus="true"]) { opacity: 1; filter: none; }
@@ -354,12 +369,12 @@ const { Clock3, Expand, Minimize, Radio, RefreshCw, ShieldCheck, Trophy, Users, 
   font-size: .74rem;
   font-weight: 700;
   letter-spacing: .04em;
-  color: #eaf2ff;
+  color: var(--foreground);
 }
 .live-arena :deep(.live-label-meta) { display: flex; align-items: baseline; gap: .5rem; }
-.live-arena :deep(.live-label-pts) { font-family: var(--font-mono); font-size: .78rem; font-weight: 700; color: var(--live-blue); text-shadow: 0 0 10px rgba(62, 166, 255, .6); }
-.live-arena :deep(.live-label[data-state="solved"] .live-label-pts) { color: var(--live-red); text-shadow: 0 0 10px rgba(255, 61, 94, .55); }
-.live-arena :deep(.live-label-solves) { font-family: var(--font-mono); font-size: .62rem; color: #a9b5ca; }
+.live-arena :deep(.live-label-pts) { font-family: var(--font-mono); font-size: .78rem; font-weight: 700; color: var(--live-blue); text-shadow:none; }
+.live-arena :deep(.live-label[data-state="solved"] .live-label-pts) { color: var(--live-red); text-shadow:none; }
+.live-arena :deep(.live-label-solves) { font-family: var(--font-mono); font-size: .62rem; color: var(--primary); }
 .live-arena :deep(.live-label-bloods) { display: flex; flex-direction: column; gap: .12rem; margin-top: .08rem; }
 .live-arena :deep(.live-label-blood) {
   max-width: 11rem;
@@ -372,9 +387,9 @@ const { Clock3, Expand, Minimize, Radio, RefreshCw, ShieldCheck, Trophy, Users, 
   font-size: .56rem;
   font-weight: 700;
 }
-.live-arena :deep(.live-label-blood-first) { color: #ffd166; text-shadow: 0 0 8px rgba(255, 209, 102, .6); }
-.live-arena :deep(.live-label-blood-second) { color: #cbd5e1; }
-.live-arena :deep(.live-label-blood-third) { color: #fb923c; }
+.live-arena :deep(.live-label-blood-first) { color: var(--warning); text-shadow:none; }
+.live-arena :deep(.live-label-blood-second) { color: var(--foreground); }
+.live-arena :deep(.live-label-blood-third) { color: var(--destructive); }
 
 /* Dense/narrow overviews keep names and points; a focused challenge retains its full label. */
 .live-arena[data-compact-labels="true"] :deep(.live-label:not([data-focus="true"])) {
@@ -390,14 +405,14 @@ const { Clock3, Expand, Minimize, Radio, RefreshCw, ShieldCheck, Trophy, Users, 
 
 /* 解题聚焦横幅。 */
 .live-celebration { position: absolute; z-index: 9; inset: 0; display: grid; place-items: center; pointer-events: none; }
-.live-celebration-flash { position: absolute; inset: 0; background: radial-gradient(circle at center, rgba(111, 255, 169, .3), transparent 48%); animation: live-flash 1.15s ease-out both; }
+.live-celebration-flash { position: absolute; inset: 0; background: radial-gradient(circle at center, color-mix(in oklch, var(--success) 30%, transparent), transparent 48%); animation: live-flash 1.15s ease-out both; }
 .live-celebration-impact { position: absolute; left: 50%; top: 59%; width: 1px; height: 1px; }
-.live-impact-ring { position: absolute; left: 0; top: 0; width: 5rem; aspect-ratio: 1; border: 2px solid var(--live-green); border-radius: 50%; transform: translate(-50%, -50%) scale(.12); box-shadow: 0 0 18px rgba(36, 231, 118, .5); animation: live-impact-ring 1.5s cubic-bezier(.16, 1, .3, 1) both; }
+.live-impact-ring { position: absolute; left: 0; top: 0; width: 5rem; aspect-ratio: 1; border: 2px solid var(--live-green); border-radius: 50%; transform: translate(-50%, -50%) scale(.12); box-shadow:var(--panel-shadow); animation: live-impact-ring 1.5s cubic-bezier(.16, 1, .3, 1) both; }
 .live-impact-ring-two { animation-delay: .18s; border-color: var(--live-purple); }
 .live-impact-ring-three { animation-delay: .36s; }
-.live-celebration-particle { --particle-angle: 0deg; --particle-distance: 12rem; --particle-delay: 0ms; position: absolute; left: 0; top: 0; width: .35rem; height: .35rem; background: var(--live-green); box-shadow: 0 0 12px rgba(38, 239, 126, .85); animation: live-particle 1.25s cubic-bezier(.16, 1, .3, 1) var(--particle-delay) both; }
-.live-celebration-particle:nth-of-type(3n) { width: .24rem; height: .7rem; background: var(--live-purple); box-shadow: 0 0 12px rgba(170, 104, 236, .85); }
-.live-celebration-card { position: relative; display: flex; min-width: min(31rem, 74%); flex-direction: column; align-items: center; border: 1px solid rgba(193, 153, 244, .55); background: rgba(9, 5, 19, .94); padding: 1.45rem 3rem 1.25rem; text-align: center; box-shadow: 0 0 0 1px rgba(41, 230, 120, .12), 0 0 58px rgba(93, 40, 153, .3); animation: live-card-arrive 5.2s cubic-bezier(.16, 1, .3, 1) both; }
+.live-celebration-particle { --particle-angle: 0deg; --particle-distance: 12rem; --particle-delay: 0ms; position: absolute; left: 0; top: 0; width: .35rem; height: .35rem; background: var(--live-green); box-shadow:var(--panel-shadow); animation: live-particle 1.25s cubic-bezier(.16, 1, .3, 1) var(--particle-delay) both; }
+.live-celebration-particle:nth-of-type(3n) { width: .24rem; height: .7rem; background: var(--live-purple); box-shadow:var(--panel-shadow); }
+.live-celebration-card { position: relative; display: flex; min-width: min(31rem, 74%); flex-direction: column; align-items: center; border: 1px solid color-mix(in oklch, var(--primary) 55%, transparent); background: color-mix(in oklch, var(--background) 94%, transparent); padding: 1.45rem 3rem 1.25rem; text-align: center; box-shadow:var(--panel-shadow); animation: live-card-arrive 5.2s cubic-bezier(.16, 1, .3, 1) both; }
 .live-celebration-card::before, .live-celebration-card::after { content: ''; position: absolute; top: .55rem; bottom: .55rem; width: 1px; background: var(--live-green); opacity: .8; }
 .live-celebration-card::before { left: .65rem; }
 .live-celebration-card::after { right: .65rem; }
@@ -409,37 +424,37 @@ const { Clock3, Expand, Minimize, Radio, RefreshCw, ShieldCheck, Trophy, Users, 
 .live-celebration-score { display: flex; align-items: baseline; gap: .35rem; margin-top: .6rem; font-family: var(--font-mono); color: var(--live-green); }
 .live-celebration-score span { font-size: 1.45rem; font-weight: 800; }
 .live-celebration-score small { font-size: .55rem; letter-spacing: .18em; }
-.live-celebration-progress { position: absolute; left: .65rem; right: .65rem; bottom: .42rem; height: 2px; background: rgba(255, 255, 255, .06); overflow: hidden; }
+.live-celebration-progress { position: absolute; left: .65rem; right: .65rem; bottom: .42rem; height: 2px; background: color-mix(in oklch, var(--foreground) 6%, transparent); overflow: hidden; }
 .live-celebration-progress i { display: block; height: 100%; background: var(--live-green); transform-origin: left; animation: live-celebration-progress 5.2s linear both; }
 .live-blood-solve { color: var(--live-green); }
-.live-blood-first { color: #fbbf24; }
-.live-blood-second { color: #cbd5e1; }
-.live-blood-third { color: #fb923c; }
+.live-blood-first { color: var(--warning); }
+.live-blood-second { color: var(--foreground); }
+.live-blood-third { color: var(--destructive); }
 
 /* 右侧面板。 */
 .live-rail { display: flex; min-height: 0; min-width: 0; flex-direction: column; gap: .75rem; }
 .live-panel { display: flex; flex-direction: column; overflow: hidden; border: 1px solid var(--live-line); background: var(--live-panel); }
-.live-panel-heading { display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid rgba(148, 163, 184, .12); padding: .75rem 1rem; font-size: .7rem; font-weight: 700; letter-spacing: .16em; text-transform: uppercase; }
-.live-panel-heading span { font-family: var(--font-mono); font-size: .55rem; color: #64748b; }
+.live-panel-heading { display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid color-mix(in oklch, var(--primary) 12%, transparent); padding: .75rem 1rem; font-size: .7rem; font-weight: 700; letter-spacing: .16em; text-transform: uppercase; }
+.live-panel-heading span { font-family: var(--font-mono); font-size: .55rem; color: var(--primary); }
 .live-rank-viewport { min-height: 0; flex: 1; overflow: hidden; }
 .live-rank-track-scroll { animation: live-rank-scroll linear infinite; }
 .live-ranking { padding: .4rem; }
-.live-ranking li { display: flex; min-height: 2.55rem; align-items: center; gap: .7rem; border-bottom: 1px solid rgba(148, 163, 184, .08); padding: .35rem .55rem; font-size: .75rem; }
+.live-ranking li { display: flex; min-height: 2.55rem; align-items: center; gap: .7rem; border-bottom: 1px solid color-mix(in oklch, var(--primary) 8%, transparent); padding: .35rem .55rem; font-size: .75rem; }
 .live-ranking li:last-child { border-bottom: 0; }
 .live-ranking strong { min-width: 4.5rem; text-align: right; color: var(--live-green); }
-.live-rank { width: 1.5rem; font-family: var(--font-mono); font-weight: 700; color: #64748b; }
-.live-rank-first { background: linear-gradient(90deg, rgba(251, 191, 36, .13), transparent); }
-.live-rank-first .live-rank { color: #fbbf24; }
-.live-rank-second .live-rank { color: #cbd5e1; }
-.live-rank-third .live-rank { color: #fb923c; }
+.live-rank { width: 1.5rem; font-family: var(--font-mono); font-weight: 700; color: var(--primary); }
+.live-rank-first { background: linear-gradient(90deg, color-mix(in oklch, var(--warning) 13%, transparent), transparent); }
+.live-rank-first .live-rank { color: var(--warning); }
+.live-rank-second .live-rank { color: var(--foreground); }
+.live-rank-third .live-rank { color: var(--destructive); }
 .live-feed { min-height: 0; overflow: auto; padding: .4rem; }
-.live-feed li { display: grid; grid-template-columns: 3.7rem auto minmax(0, 1fr); align-items: start; gap: .5rem; border-bottom: 1px solid rgba(148, 163, 184, .08); padding: .55rem .35rem; }
-.live-feed time { padding-top: .12rem; font-family: var(--font-mono); font-size: .55rem; color: #475569; }
+.live-feed li { display: grid; grid-template-columns: 3.7rem auto minmax(0, 1fr); align-items: start; gap: .5rem; border-bottom: 1px solid color-mix(in oklch, var(--primary) 8%, transparent); padding: .55rem .35rem; }
+.live-feed time { padding-top: .12rem; font-family: var(--font-mono); font-size: .55rem; color: var(--primary); }
 .live-feed > li > span { border: 1px solid currentColor; border-radius: 999px; padding: .06rem .32rem; font-size: .52rem; font-weight: 700; white-space: nowrap; }
-.live-feed p { font-size: .66rem; line-height: 1.35; color: #94a3b8; }
-.live-feed strong, .live-feed b { color: #e2e8f0; font-style: normal; }
+.live-feed p { font-size: .66rem; line-height: 1.35; color: var(--primary); }
+.live-feed strong, .live-feed b { color: var(--foreground); font-style: normal; }
 .live-feed em { color: var(--live-green); font-family: var(--font-mono); font-style: normal; font-weight: 700; }
-.live-empty { display: flex; align-items: center; justify-content: center; color: #64748b; font-size: .75rem; }
+.live-empty { display: flex; align-items: center; justify-content: center; color: var(--primary); font-size: .75rem; }
 
 .live-celebration-enter-active, .live-celebration-leave-active { transition: opacity .42s cubic-bezier(.16, 1, .3, 1); }
 .live-celebration-enter-from, .live-celebration-leave-to { opacity: 0; }
@@ -454,7 +469,7 @@ const { Clock3, Expand, Minimize, Radio, RefreshCw, ShieldCheck, Trophy, Users, 
 
 @media (max-width: 1280px) {
   .live-screen-header { flex-wrap: wrap; gap: .75rem; padding: .75rem 1rem; }
-  .live-screen-metrics { order: 3; width: 100%; justify-content: space-around; border-top: 1px solid rgba(148, 163, 184, .1); padding-top: .7rem; }
+  .live-screen-metrics { order: 3; width: 100%; justify-content: space-around; border-top: 1px solid color-mix(in oklch, var(--primary) 10%, transparent); padding-top: .7rem; }
 }
 @media (max-width: 900px) {
   .live-screen { height: auto; min-height: 100dvh; overflow: clip; }

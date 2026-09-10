@@ -97,7 +97,7 @@ const { Paperclip, RotateCcw, Trash2, Upload, challengeId, canOrganize, template
           <TabsContent value="basic" class="mt-0">
             <Card>
               <CardContent class="pt-6">
-                <form novalidate @submit.prevent="save">
+                <UiForm validation="feature" @submit.prevent="save">
                   <FieldGroup>
                     <Field :data-invalid="titleInvalid || undefined">
                       <FieldLabel for="edit-title">{{ $t('ui.title') }}</FieldLabel>
@@ -169,7 +169,7 @@ const { Paperclip, RotateCcw, Trash2, Upload, challengeId, canOrganize, template
                         <Spinner v-if="saving" data-icon="inline-start" /> {{ $t('ui.saveChanges') }} </Button>
                     </Field>
                   </FieldGroup>
-                </form>
+                </UiForm>
               </CardContent>
             </Card>
           </TabsContent>
@@ -294,7 +294,7 @@ const { Paperclip, RotateCcw, Trash2, Upload, challengeId, canOrganize, template
                       </Select>
                     </div>
                     <template v-if="attachmentDeliveryPolicy === 'All'">
-                      <FileInput :ref="setUploadInputRef" type="file" multiple class="hidden" @change="uploadAttachment" />
+                      <FileInput :ref="setUploadInputRef"  multiple class="hidden" @change="uploadAttachment" />
                       <Button :disabled="uploading || isDeleted" @click="uploadInput?.click()">
                         <Spinner v-if="uploading" data-icon="inline-start" />
                         <Upload v-else data-icon="inline-start" /> {{ $t('ui.uploadStandardAttachments') }}
@@ -348,12 +348,12 @@ const { Paperclip, RotateCcw, Trash2, Upload, challengeId, canOrganize, template
                         {{ attachment.exactFlag ?? $t('ui.symbol') }}
                       </TableCell>
                       <TableCell v-else class="text-muted-foreground">{{ attachment.contentType }}</TableCell>
-                      <TableCell
+                      <Hint :content="attachment.sha256" ><TableCell tabindex="0"
                         class="font-mono text-xs tabular-nums text-muted-foreground"
-                        :title="attachment.sha256"
+
                       >
                         {{ attachment.sha256?.slice(0, 8) ?? $t('ui.symbol') }}
-                      </TableCell>
+                      </TableCell></Hint>
                       <TableCell>{{ formatBytes(attachment.byteLength) }}</TableCell>
                       <TableCell>
                         <component :is="AdminDateTime" :value="attachment.createdAt" />
@@ -424,14 +424,14 @@ const { Paperclip, RotateCcw, Trash2, Upload, challengeId, canOrganize, template
                   </TableHeader>
                   <TableBody>
                     <TableRow v-for="flag in staticFlags" :key="flag.id">
-                      <TableCell class="max-w-md" :title="flag.flag">
+                      <Hint :content="flag.flag" ><TableCell tabindex="0" class="max-w-md" >
                         <div class="flex min-w-0 items-center gap-2">
                           <Badge variant="outline">
                             {{ flag.matchKind === 'RegularExpression' ? $t('ui.regularExpression') : $t('ui.exactMatch') }}
                           </Badge>
                           <span class="truncate font-mono text-sm">{{ flag.flag }}</span>
                         </div>
-                      </TableCell>
+                      </TableCell></Hint>
                       <TableCell>
                         <Badge v-if="flag.deletedAt" variant="destructive">{{ $t('ui.deleted') }}</Badge>
                         <Badge v-else variant="secondary">{{ $t('ui.normal') }}</Badge>
@@ -468,7 +468,7 @@ const { Paperclip, RotateCcw, Trash2, Upload, challengeId, canOrganize, template
                       </TableHeader>
                       <TableBody>
                         <TableRow v-for="flag in systemFlags" :key="flag.id">
-                          <TableCell class="max-w-md truncate font-mono text-sm" :title="flag.flag">{{ flag.flag }}</TableCell>
+                          <Hint :content="flag.flag" ><TableCell tabindex="0" class="max-w-md truncate font-mono text-sm" >{{ flag.flag }}</TableCell></Hint>
                           <TableCell class="font-mono text-xs">{{ flag.teamId ?? $t('ui.symbol') }}</TableCell>
                           <TableCell class="font-mono text-xs">
                             {{ flag.specificationKind ?? $t('ui.symbol') }}<span v-if="flag.specificationId"> · {{ flag.specificationId }}</span>
@@ -583,17 +583,17 @@ const { Paperclip, RotateCcw, Trash2, Upload, challengeId, canOrganize, template
           </Field>
           <Field>
             <FieldLabel>{{ $t('ui.attachmentVariants') }}</FieldLabel>
-            <FileInput :ref="setRandomUploadInputRef" type="file" multiple class="hidden" @change="selectRandomFiles" />
+            <FileInput :ref="setRandomUploadInputRef"  multiple class="hidden" @change="selectRandomFiles" />
             <Button variant="outline" :disabled="randomUploading" @click="randomUploadInput?.click()">
               <Upload data-icon="inline-start" /> {{ $t('ui.selectMultipleFiles') }}
             </Button>
             <FieldDescription>{{ $t('ui.selectedVariantsOriginalFilenamesMustBeUniqueWithinTheBatch', { count: randomFiles.length }) }}</FieldDescription>
-            <div v-if="randomFiles.length" class="max-h-56 overflow-auto rounded-md border p-3">
+            <ScrollSurface as="div" v-if="randomFiles.length" class="max-h-56 overflow-auto rounded-md border p-3">
               <div v-for="file in randomFiles" :key="`${file.name}-${file.size}-${file.lastModified}`" class="flex justify-between gap-4 py-1 text-sm">
                 <span class="truncate font-mono">{{ file.name }}</span>
                 <span class="shrink-0 text-muted-foreground">{{ formatBytes(file.size) }}</span>
               </div>
-            </div>
+            </ScrollSurface>
           </Field>
         </FieldGroup>
         <DialogFooter>

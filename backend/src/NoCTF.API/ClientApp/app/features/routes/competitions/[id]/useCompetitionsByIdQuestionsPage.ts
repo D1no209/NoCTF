@@ -19,6 +19,8 @@ export function useCompetitionsByIdQuestionsPage() {
   const router = useRouter()
 
   const competitionId = route.params.id as string
+  const { user } = useAuth()
+  const isOwnMessage = (actorUserId?: string | null) => Boolean(actorUserId && actorUserId === user.value?.userId)
 
   const { markRead, unreadCount } = useCompetitionQuestionReadState(competitionId)
 
@@ -183,6 +185,7 @@ export function useCompetitionsByIdQuestionsPage() {
 
   async function select(id: string, syncRoute = true) {
     if (detailLoading.value && selectedId.value === id) return
+    if (selectedId.value !== id) { detail.value = null; reply.value = ''; replyError.value = null }
     const request = detailRequests.begin()
     selectedId.value = id
     detailLoading.value = true
@@ -263,20 +266,24 @@ export function useCompetitionsByIdQuestionsPage() {
 
   async function submitReply() {
     if (replyPending.value || !reply.value.trim() || !detail.value?.canReply) return
+    const questionId = detail.value.threadRootId!
+    const submittedReply = reply.value
     replyError.value = null
     replyPending.value = true
     try {
       const { data, error } = await addCompetitionQuestionMessage({
-        path: { competitionId, threadRootId: detail.value.threadRootId! },
-        body: { body: reply.value.trim() },
+        path: { competitionId, threadRootId: questionId },
+        body: { body: submittedReply.trim() },
       })
       if (error || !data) {
         replyError.value = competitionQuestionErrorMessage(error, translate("ui.sendingFailed"))
         toast.error(replyError.value)
         return
       }
-      applyDetailQuestion(data)
-      reply.value = ''
+      if (selectedId.value === questionId) {
+        applyDetailQuestion(data)
+        if (reply.value === submittedReply) reply.value = ''
+      } else upsertQuestion(data)
       toast.success(translate("ui.messageSent"))
     }
     catch (error) {
@@ -292,17 +299,20 @@ export function useCompetitionsByIdQuestionsPage() {
 
   async function changeStatus(status: 'Resolved' | 'Closed') {
     if (!detail.value || statusPending.value) return
+    const questionId = detail.value.threadRootId!
+    if (status === 'Resolved' ? !detail.value.canResolve : !detail.value.canClose) return
     statusPending.value = true
     try {
       const { data, error } = await changeCompetitionQuestionStatus({
-        path: { competitionId, threadRootId: detail.value.threadRootId! },
+        path: { competitionId, threadRootId: questionId },
         body: { status },
       })
       if (error || !data) {
         toast.error(competitionQuestionErrorMessage(error, translate("ui.statusUpdateFailed")))
         return
       }
-      applyDetailQuestion(data)
+      if (selectedId.value === questionId) applyDetailQuestion(data)
+      else upsertQuestion(data)
       toast.success(status === 'Resolved' ? translate("ui.advisoryMarkedAsResolved") : translate("ui.inquiryIsClosed"))
     }
     catch (error) {
@@ -343,6 +353,7 @@ export function useCompetitionsByIdQuestionsPage() {
       minimumQuestionBodyLength,
       minimumQuestionTitleLength,
       competitionId,
+      isOwnMessage,
       unreadCount,
       questions,
       loading,

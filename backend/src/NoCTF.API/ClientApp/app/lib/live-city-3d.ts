@@ -1,3 +1,4 @@
+import { themeColor, themeColorAlpha } from '../utils/theme-color'
 import * as THREE from 'three'
 import { CSS2DObject, CSS2DRenderer } from 'three/addons/renderers/CSS2DRenderer.js'
 import {
@@ -92,12 +93,6 @@ interface TimedEffect {
   dispose: () => void
 }
 
-const COLOR_LOCKED = new THREE.Color('#3ea6ff')
-const COLOR_SOLVED = new THREE.Color('#ff3d5e')
-const COLOR_GREEN = new THREE.Color('#2dff8f')
-const COLOR_PURPLE = new THREE.Color('#a06bff')
-const COLOR_GOLD = new THREE.Color('#ffd166')
-const BG_COLOR = new THREE.Color('#070312')
 
 const TWO_PI = Math.PI * 2
 
@@ -132,11 +127,11 @@ function lerpAngle(from: number, to: number, t: number): number {
   return from + delta * t
 }
 
-function makeFacadeTextures(variant: number, solved: boolean): { map: THREE.CanvasTexture; emissive: THREE.CanvasTexture } {
+function makeFacadeTextures(variant: number, solved: boolean, themeSource: Element): { map: THREE.CanvasTexture; emissive: THREE.CanvasTexture } {
   const width = 128
   const height = 256
-  const stateColor = solved ? '#ff3d5e' : '#3ea6ff'
-  const stateSoft = solved ? 'rgba(255,61,94,0.28)' : 'rgba(62,166,255,0.28)'
+  const stateColor = solved ? themeColor('--live-city-solved', themeSource) : themeColor('--live-city-locked', themeSource)
+  const stateSoft = solved ? themeColorAlpha('--live-city-solved', 0.28, themeSource) : themeColorAlpha('--live-city-locked', 0.28, themeSource)
   const rand = mulberry32(variant * 7919 + (solved ? 13 : 7))
 
   const mapCanvas = document.createElement('canvas')
@@ -144,8 +139,8 @@ function makeFacadeTextures(variant: number, solved: boolean): { map: THREE.Canv
   mapCanvas.height = height
   const mapCtx = mapCanvas.getContext('2d')!
   const gradient = mapCtx.createLinearGradient(0, 0, 0, height)
-  gradient.addColorStop(0, '#131a2e')
-  gradient.addColorStop(1, '#080b16')
+  gradient.addColorStop(0, themeColor('--live-city-facade-top', themeSource))
+  gradient.addColorStop(1, themeColor('--live-city-facade-bottom', themeSource))
   mapCtx.fillStyle = gradient
   mapCtx.fillRect(0, 0, width, height)
 
@@ -167,7 +162,7 @@ function makeFacadeTextures(variant: number, solved: boolean): { map: THREE.Canv
       const w = cellW * 0.56
       const h = cellH * 0.46
       const lit = rand() < (solved ? 0.5 : 0.38)
-      mapCtx.fillStyle = lit ? stateSoft : '#0c1220'
+      mapCtx.fillStyle = lit ? stateSoft : themeColor('--live-city-facade-bottom', themeSource)
       mapCtx.fillRect(x, y, w, h)
       if (lit) {
         emissiveCtx.globalAlpha = 0.5 + rand() * 0.5
@@ -229,23 +224,29 @@ export class LiveCityScene {
   private readonly comets: Comet[] = []
   private readonly dataColumns: DataColumn[] = []
   private readonly backdropGroup = new THREE.Group()
-  private readonly silhouetteMaterial = new THREE.MeshBasicMaterial({
-    color: '#0a0616',
-    transparent: true,
-    opacity: 0.96,
-    depthWrite: false,
-  })
-  private readonly silhouetteEdgeMaterial = new THREE.LineBasicMaterial({
-    color: COLOR_PURPLE,
-    transparent: true,
-    opacity: 0.3,
-  })
+  private readonly silhouetteMaterial: THREE.MeshBasicMaterial
+  private readonly silhouetteEdgeMaterial: THREE.LineBasicMaterial
   private readonly radar: THREE.Mesh
   private readonly radarMaterial: THREE.MeshBasicMaterial
   private readonly glowTexture = makeGlowTexture()
   private readonly groundMaterial = new THREE.MeshStandardMaterial()
   private readonly podiumMaterial = new THREE.MeshStandardMaterial()
   private readonly grid: THREE.GridHelper
+  private readonly themeTokens = [
+    '--live-city-background',
+    '--live-city-facade-top',
+    '--live-city-facade-bottom',
+    '--live-city-locked',
+    '--live-city-solved',
+    '--live-city-accent',
+    '--live-city-grid-major',
+    '--live-city-grid-minor',
+    '--live-city-backdrop',
+    '--live-city-radar',
+  ]
+  private themeColors = new Map<string, string>()
+  private readonly themeObserver: MutationObserver
+  private themeTimer: ReturnType<typeof setTimeout> | undefined
 
   private rig: CameraRig = { azimuth: 0.7, radius: 96, height: 101, lookX: 0, lookY: 5, lookZ: 0 }
   private cruise: CameraRig = { ...this.rig }
@@ -260,6 +261,23 @@ export class LiveCityScene {
 
   constructor(container: HTMLElement) {
     this.container = container
+    this.silhouetteMaterial = new THREE.MeshBasicMaterial({
+      color: this.color('--live-city-background'),
+      transparent: true,
+      opacity: 0.96,
+      depthWrite: false,
+    })
+    this.silhouetteEdgeMaterial = new THREE.LineBasicMaterial({
+      color: new THREE.Color(this.color('--live-city-backdrop')),
+      transparent: true,
+      opacity: 0.3,
+    })
+    this.themeTokens.forEach(token => this.themeColors.set(new THREE.Color(this.color(token)).getHexString(), token))
+    this.themeObserver = new MutationObserver(() => {
+      if (this.themeTimer !== undefined) clearTimeout(this.themeTimer)
+      this.themeTimer = setTimeout(() => { this.themeTimer = undefined; if (!this.disposed) this.refreshTheme() }, 150)
+    })
+    this.themeObserver.observe(document.documentElement, { attributes: true, attributeFilter: ['class', 'style'] })
     this.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false })
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping
     this.renderer.toneMappingExposure = 1.05
@@ -271,38 +289,38 @@ export class LiveCityScene {
     container.appendChild(this.labelRenderer.domElement)
 
     this.camera = new THREE.PerspectiveCamera(LIVE_CITY_FOV, 1, 0.1, 600)
-    this.scene.background = BG_COLOR
-    this.scene.fog = new THREE.FogExp2(BG_COLOR, 0.0032)
+    this.scene.background = new THREE.Color(this.color('--live-city-background'))
+    this.scene.fog = new THREE.FogExp2(new THREE.Color(this.color('--live-city-background')), 0.0032)
 
-    this.scene.add(new THREE.HemisphereLight(0x8a6bff, 0x0a0518, 0.55))
-    const keyLight = new THREE.DirectionalLight(0xbfaeff, 0.85)
+    this.scene.add(new THREE.HemisphereLight(this.color('--live-city-locked'), this.color('--live-city-background'), 0.55))
+    const keyLight = new THREE.DirectionalLight(this.color('--live-city-locked'), 0.85)
     keyLight.position.set(70, 110, 40)
     this.scene.add(keyLight)
-    const rimLight = new THREE.DirectionalLight(0x2dff8f, 0.35)
+    const rimLight = new THREE.DirectionalLight(this.color('--live-city-accent'), 0.35)
     rimLight.position.set(-60, 50, -70)
     this.scene.add(rimLight)
 
-    this.groundMaterial.color.set('#05030d')
+    this.groundMaterial.color.set(this.color('--live-city-background'))
     this.groundMaterial.roughness = 0.92
     this.groundMaterial.metalness = 0.25
     const ground = new THREE.Mesh(new THREE.CircleGeometry(240, 72), this.groundMaterial)
     ground.rotation.x = -Math.PI / 2
     this.scene.add(ground)
 
-    this.grid = new THREE.GridHelper(340, 68, 0x37ff8b, 0x4b2a8f)
+    this.grid = new THREE.GridHelper(340, 68, this.color('--live-city-grid-major'), this.color('--live-city-grid-minor'))
     const gridMaterial = this.grid.material as THREE.Material
     gridMaterial.transparent = true
     gridMaterial.opacity = 0.38
     this.grid.position.y = 0.05
     this.scene.add(this.grid)
 
-    this.podiumMaterial.color.set('#0d0a1c')
+    this.podiumMaterial.color.set(this.color('--live-city-facade-bottom'))
     this.podiumMaterial.roughness = 0.7
     this.podiumMaterial.metalness = 0.45
 
     this.edgeMaterials = {
-      locked: new THREE.LineBasicMaterial({ color: COLOR_LOCKED, transparent: true, opacity: 0.4 }),
-      solved: new THREE.LineBasicMaterial({ color: COLOR_SOLVED, transparent: true, opacity: 0.55 }),
+      locked: new THREE.LineBasicMaterial({ color: new THREE.Color(this.color('--live-city-locked')), transparent: true, opacity: 0.48 }),
+      solved: new THREE.LineBasicMaterial({ color: new THREE.Color(this.color('--live-city-solved')), transparent: true, opacity: 0.62 }),
     }
 
     this.scene.add(this.cityGroup)
@@ -313,7 +331,7 @@ export class LiveCityScene {
     this.buildDataColumns()
 
     this.radarMaterial = new THREE.MeshBasicMaterial({
-      color: COLOR_GREEN,
+      color: new THREE.Color(this.color('--live-city-radar')),
       transparent: true,
       opacity: 0.35,
       side: THREE.DoubleSide,
@@ -333,6 +351,48 @@ export class LiveCityScene {
     this.tick()
   }
 
+  private color(token: string): string {
+    return themeColor(token, this.container)
+  }
+
+  private refreshTheme(): void {
+    if (this.disposed) return
+    const updateColor = (color: THREE.Color) => {
+      const token = this.themeColors.get(color.getHexString())
+      if (token) color.set(this.color(token))
+    }
+    this.scene.traverse(object => {
+      if (object instanceof THREE.Light) updateColor(object.color)
+      if (object instanceof THREE.HemisphereLight) updateColor(object.groundColor)
+      if (object instanceof THREE.Mesh || object instanceof THREE.Line || object instanceof THREE.Points) {
+        for (const material of Array.isArray(object.material) ? object.material : [object.material]) {
+          if ('color' in material && material.color instanceof THREE.Color) updateColor(material.color)
+          if ('emissive' in material && material.emissive instanceof THREE.Color) updateColor(material.emissive)
+        }
+      }
+    })
+    this.scene.background = new THREE.Color(this.color('--live-city-background'))
+    if (this.scene.fog) this.scene.fog.color.set(this.color('--live-city-background'))
+    for (const [key, material] of this.materialCache) {
+      const [variant, solved] = key.split(':')
+      const old = this.facadeCache.get(key)
+      const textures = makeFacadeTextures(Number(variant), solved === '1', this.container)
+      this.facadeCache.set(key, textures)
+      material.map = textures.map
+      material.emissiveMap = textures.emissive
+      material.needsUpdate = true
+      old?.map.dispose()
+      old?.emissive.dispose()
+    }
+    const replacement = new THREE.GridHelper(340, 68, this.color('--live-city-grid-major'), this.color('--live-city-grid-minor'))
+    this.grid.geometry.dispose()
+    this.grid.geometry = replacement.geometry
+    const materials = Array.isArray(replacement.material) ? replacement.material : [replacement.material]
+    materials.forEach(material => material.dispose())
+    this.themeColors.clear()
+    this.themeTokens.forEach(token => this.themeColors.set(new THREE.Color(this.color(token)).getHexString(), token))
+  }
+
   /** 更新题目集合;题目 id 集合变化时整体重建城市,否则原地刷新状态。 */
   setChallenges(states: readonly LiveCityChallengeState[]): void {
     if (this.disposed) return
@@ -350,7 +410,7 @@ export class LiveCityScene {
     this.focusing = true
     this.focusedId = id
     this.startTween(this.frameBuilding(building), 1.15)
-    const color = building.solved ? COLOR_SOLVED : COLOR_GREEN
+    const color = building.solved ? new THREE.Color(this.color('--live-city-solved')) : new THREE.Color(this.color('--live-city-locked'))
     this.spawnBeam(building, color)
     this.spawnShockRings(building, color)
     this.spawnBurst(building, color)
@@ -417,6 +477,8 @@ export class LiveCityScene {
 
   dispose(): void {
     this.disposed = true
+    this.themeObserver.disconnect()
+    if (this.themeTimer !== undefined) clearTimeout(this.themeTimer)
     cancelAnimationFrame(this.frameId)
     this.resizeObserver.disconnect()
     this.labelResizeObserver.disconnect()
@@ -465,15 +527,15 @@ export class LiveCityScene {
     const texturesKey = key
     let textures = this.facadeCache.get(texturesKey)
     if (!textures) {
-      textures = makeFacadeTextures(variant, solved)
+      textures = makeFacadeTextures(variant, solved, this.container)
       this.facadeCache.set(texturesKey, textures)
     }
     const material = new THREE.MeshStandardMaterial({
       map: textures.map,
       emissiveMap: textures.emissive,
-      emissive: solved ? COLOR_SOLVED.clone() : COLOR_LOCKED.clone(),
+      emissive: solved ? new THREE.Color(this.color('--live-city-solved')).clone() : new THREE.Color(this.color('--live-city-locked')).clone(),
       emissiveIntensity: 1.5,
-      color: new THREE.Color('#39415c'),
+      color: new THREE.Color(this.color('--live-city-locked')),
       roughness: 0.82,
       metalness: 0.2,
     })
@@ -572,7 +634,7 @@ export class LiveCityScene {
 
     const topY = cursor
     const glowMaterial = new THREE.MeshBasicMaterial({
-      color: state.solved ? COLOR_SOLVED : COLOR_LOCKED,
+      color: state.solved ? new THREE.Color(this.color('--live-city-solved')) : new THREE.Color(this.color('--live-city-locked')),
       transparent: true,
       opacity: 0.18,
       blending: THREE.AdditiveBlending,
@@ -584,7 +646,7 @@ export class LiveCityScene {
     group.add(glow)
 
     const beaconMaterial = new THREE.MeshBasicMaterial({
-      color: state.solved ? COLOR_SOLVED : COLOR_LOCKED,
+      color: state.solved ? new THREE.Color(this.color('--live-city-solved')) : new THREE.Color(this.color('--live-city-locked')),
       transparent: true,
       opacity: 0.95,
     })
@@ -679,8 +741,8 @@ export class LiveCityScene {
       for (const tier of building.tiers) tier.material = material
       const edgeMaterial = state.solved ? this.edgeMaterials.solved : this.edgeMaterials.locked
       for (const edge of building.edges) edge.material = edgeMaterial
-      building.beaconMaterial.color.set(state.solved ? COLOR_SOLVED : COLOR_LOCKED)
-      building.glowMaterial.color.set(state.solved ? COLOR_SOLVED : COLOR_LOCKED)
+      building.beaconMaterial.color.set(state.solved ? new THREE.Color(this.color('--live-city-solved')) : new THREE.Color(this.color('--live-city-locked')))
+      building.glowMaterial.color.set(state.solved ? new THREE.Color(this.color('--live-city-solved')) : new THREE.Color(this.color('--live-city-locked')))
       const root = building.label.element
       root.dataset.state = state.solved ? 'solved' : 'locked'
     }
@@ -703,8 +765,8 @@ export class LiveCityScene {
 
   private buildParticles(): void {
     const specs = [
-      { color: COLOR_GREEN, count: 420, size: 0.55 },
-      { color: COLOR_PURPLE, count: 420, size: 0.7 },
+      { color: new THREE.Color(this.color('--live-city-accent')), count: 420, size: 0.55 },
+      { color: new THREE.Color(this.color('--live-city-locked')), count: 420, size: 0.7 },
     ]
     for (const spec of specs) {
       const positions = new Float32Array(spec.count * 3)
@@ -732,8 +794,8 @@ export class LiveCityScene {
 
   private buildOrbitRings(): void {
     const specs = [
-      { radius: 30, color: COLOR_PURPLE, tilt: 0.42, speed: 0.05 },
-      { radius: 40, color: COLOR_GREEN, tilt: -0.3, speed: -0.034 },
+      { radius: 30, color: new THREE.Color(this.color('--live-city-locked')), tilt: 0.42, speed: 0.05 },
+      { radius: 40, color: new THREE.Color(this.color('--live-city-accent')), tilt: -0.3, speed: -0.034 },
     ]
     for (const spec of specs) {
       const ring = new THREE.Mesh(
@@ -760,7 +822,7 @@ export class LiveCityScene {
       const geometry = new THREE.BufferGeometry()
       geometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array(6), 3))
       const material = new THREE.LineBasicMaterial({
-        color: index % 2 ? COLOR_PURPLE : COLOR_GREEN,
+        color: index % 2 ? new THREE.Color(this.color('--live-city-locked')) : new THREE.Color(this.color('--live-city-accent')),
         transparent: true,
         opacity: 0.75,
         blending: THREE.AdditiveBlending,
@@ -800,7 +862,7 @@ export class LiveCityScene {
       const geometry = new THREE.BufferGeometry()
       geometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array(6), 3))
       const material = new THREE.LineBasicMaterial({
-        color: index % 3 ? COLOR_GREEN : COLOR_PURPLE,
+        color: index % 3 ? new THREE.Color(this.color('--live-city-radar')) : new THREE.Color(this.color('--live-city-accent')),
         transparent: true,
         opacity: 0,
         blending: THREE.AdditiveBlending,

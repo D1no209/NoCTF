@@ -14,7 +14,7 @@ const { competition, canWrite, title, description, startTime, endTime, teamRegis
         <CardDescription>{{ $t('ui.titleTimeAndTeamRestrictionsGameModeCannotBeModified') }}</CardDescription>
       </CardHeader>
       <CardContent>
-        <form @submit.prevent="saveMeta">
+        <UiForm @submit.prevent="saveMeta">
           <FieldGroup>
             <Alert v-if="metaError" variant="destructive">
               <AlertDescription>{{ $message(metaError) }}</AlertDescription>
@@ -30,21 +30,21 @@ const { competition, canWrite, title, description, startTime, endTime, teamRegis
             <div class="grid gap-4 sm:grid-cols-2">
               <Field>
                 <FieldLabel for="c-start">{{ $t('ui.startTime') }}</FieldLabel>
-                <Input id="c-start" v-model="startTime" type="datetime-local" :readonly="!canWrite" required />
+                <DateTimePicker id="c-start" v-model="startTime"  :readonly="!canWrite" required />
               </Field>
               <Field>
                 <FieldLabel for="c-end">{{ $t('ui.endTime') }}</FieldLabel>
-                <Input id="c-end" v-model="endTime" type="datetime-local" :readonly="!canWrite" required />
+                <DateTimePicker id="c-end" v-model="endTime"  :readonly="!canWrite" required />
               </Field>
             </div>
             <div class="grid gap-4 sm:grid-cols-2">
               <Field>
                 <FieldLabel for="c-max-members">{{ $t('ui.maximumNumberOfPeoplePerTeam') }}</FieldLabel>
-                <Input id="c-max-members" v-model.number="maxTeamMembers" type="number" min="1" :readonly="!canWrite" required />
+                <NumberInput id="c-max-members" v-model.number="maxTeamMembers"  min="1" :readonly="!canWrite" required />
               </Field>
               <Field>
                 <FieldLabel for="c-max-runtime">{{ $t('ui.maximumConcurrentRuntimePerTeam') }}</FieldLabel>
-                <Input id="c-max-runtime" v-model.number="maxConcurrentRuntimeInstancesPerTeam" type="number" min="1" :readonly="!canWrite" required />
+                <NumberInput id="c-max-runtime" v-model.number="maxConcurrentRuntimeInstancesPerTeam"  min="1" :readonly="!canWrite" required />
               </Field>
             </div>
             <Field orientation="horizontal">
@@ -68,12 +68,12 @@ const { competition, canWrite, title, description, startTime, endTime, teamRegis
             <div class="grid gap-4 sm:grid-cols-2">
               <Field>
                 <FieldLabel for="c-max-active-questions">{{ $t('ui.activeConsultationLimitPerTeam') }}</FieldLabel>
-                <Input id="c-max-active-questions" v-model.number="maxActiveQuestionsPerTeam" type="number" min="1" :readonly="!canWrite" required />
+                <NumberInput id="c-max-active-questions" v-model.number="maxActiveQuestionsPerTeam"  min="1" :readonly="!canWrite" required />
                 <FieldDescription>{{ $t('ui.pendingAndRespondedInquiriesCountTowardsTheCap') }}</FieldDescription>
               </Field>
               <Field>
                 <FieldLabel for="c-max-participant-messages">{{ $t('ui.maximumNumberOfContinuousSupplementaryMessages') }}</FieldLabel>
-                <Input id="c-max-participant-messages" v-model.number="maxParticipantMessagesBeforeHandlerReply" type="number" min="1" :readonly="!canWrite" required />
+                <NumberInput id="c-max-participant-messages" v-model.number="maxParticipantMessagesBeforeHandlerReply"  min="1" :readonly="!canWrite" required />
                 <FieldDescription>{{ $t('ui.initialQuestionsAreIncludedInTheQuotaTheyWillBe') }}</FieldDescription>
               </Field>
             </div>
@@ -89,7 +89,7 @@ const { competition, canWrite, title, description, startTime, endTime, teamRegis
                 <Spinner v-if="savingMeta" data-icon="inline-start" /> {{ $t('ui.saveBasicInformation') }} </Button>
             </Field>
           </FieldGroup>
-        </form>
+        </UiForm>
       </CardContent>
     </Card>
 

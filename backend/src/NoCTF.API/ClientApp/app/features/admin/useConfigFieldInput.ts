@@ -4,8 +4,6 @@ import type { BloodRewardValue, ConfigFieldDef, FlagTemplateModel, PointsCurveVa
 import { BLOOD_REWARD_POLICIES, BloodRewardPolicy, emptyFlagTemplate, SCORE_DECAY_MODES, ScoreDecayMode } from '../../utils/game-config'
 import PointsDecayCurveComponent from './PointsDecayCurve.vue'
 
-type Events = { 'update:modelValue': [value: unknown] }
-
 /** Owns state, effects and commands for ConfigFieldInput. */
 export function useConfigFieldInput(props: Readonly<Omit<{
   field: ConfigFieldDef

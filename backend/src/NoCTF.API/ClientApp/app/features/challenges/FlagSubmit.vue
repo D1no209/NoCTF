@@ -22,14 +22,17 @@ const props = withDefaults(
     description?: string
     practice?: boolean
     readOnlyJudgement?: boolean
+    dockTarget?: string
     maximumAttempts?: number | null
     remainingAttempts?: number | null
+    initiallySolved?: boolean
   }>(),
-  { multiple: false, title: translate("ui.submitFlag"), description: '', practice: false, readOnlyJudgement: false },
+  { multiple: false, title: translate("ui.submitFlag"), description: '', practice: false, readOnlyJudgement: false, dockTarget: '', initiallySolved: false },
 )
 const emit = defineEmits<{
   evaluated: [result: TrackedSubmission['result']]
   submitted: [gameplayFactIds: string[]]
+  remainingChanged: [remaining: number | null]
 }>()
 const state = bindViewState(useFlagSubmit(props, emit))
 

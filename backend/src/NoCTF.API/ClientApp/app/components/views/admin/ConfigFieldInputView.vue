@@ -7,9 +7,9 @@ const { BLOOD_REWARD_POLICIES, SCORE_DECAY_MODES, ScoreDecayMode, emitValue, par
 </script>
 
 <template>
-  <Input
+  <NumberInput
     v-if="field.type === 'int' || field.type === 'decimal'"
-    type="number"
+
     :model-value="numberText"
     :min="field.min"
     :max="field.max"
@@ -80,8 +80,8 @@ const { BLOOD_REWARD_POLICIES, SCORE_DECAY_MODES, ScoreDecayMode, emitValue, par
       </div>
       <div class="flex flex-col gap-1.5">
         <span class="text-xs text-muted-foreground">{{ $t('ui.initialScore') }}</span>
-        <Input
-          type="number"
+        <NumberInput
+
           :model-value="curve.initialPoints ?? ''"
           :disabled="disabled"
           @update:model-value="updateCurve({ initialPoints: parseNullableNumber($event) })"
@@ -89,8 +89,8 @@ const { BLOOD_REWARD_POLICIES, SCORE_DECAY_MODES, ScoreDecayMode, emitValue, par
       </div>
       <div class="flex flex-col gap-1.5">
         <span class="text-xs text-muted-foreground">{{ $t('ui.lowestScore') }}</span>
-        <Input
-          type="number"
+        <NumberInput
+
           :model-value="curve.minimumPoints ?? ''"
           :disabled="disabled"
           @update:model-value="updateCurve({ minimumPoints: parseNullableNumber($event) })"
@@ -98,8 +98,8 @@ const { BLOOD_REWARD_POLICIES, SCORE_DECAY_MODES, ScoreDecayMode, emitValue, par
       </div>
       <div class="flex flex-col gap-1.5">
         <span class="text-xs text-muted-foreground">{{ $t('ui.teamsAtMinimumScore') }}</span>
-        <Input
-          type="number"
+        <NumberInput
+
           min="2"
           step="1"
           :model-value="curve.decayTeamCount ?? ''"
@@ -141,8 +141,8 @@ const { BLOOD_REWARD_POLICIES, SCORE_DECAY_MODES, ScoreDecayMode, emitValue, par
           </SelectGroup>
         </SelectContent>
       </Select>
-      <Input
-        type="number"
+      <NumberInput
+
         step="any"
         class="w-32"
         :model-value="reward.value ?? ''"

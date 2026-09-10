@@ -3,25 +3,25 @@ import { toRefs } from 'vue'
 import type { CompetitionsByIdQuestionsPageViewState } from '~/features/routes/competitions/[id]/useCompetitionsByIdQuestionsPage'
 
 const viewProps = defineProps<{ state: CompetitionsByIdQuestionsPageViewState }>()
-const { maximumQuestionBodyLength, maximumQuestionTitleLength, minimumQuestionBodyLength, minimumQuestionTitleLength, competitionId, unreadCount, questions, loading, hasMore, initialized, loadMore, listError, loadMoreQuestions, createOpen, createSubject, createChallengeId, createTitle, createBody, createPending, createError, challenges, challengesLoading, challengeLoadError, loadChallengeOptions, submitCreate, setCreateOpen, selectedId, detail, detailLoading, select, reply, replyPending, replyError, submitReply, statusPending, changeStatus, statusVariant, statusLabel, roleLabel, isHandlerRole, participantLimitReached, CompetitionParticipantWorkspace, onInputCreateError, onInputReplyError } = toRefs(viewProps.state)
+const { maximumQuestionBodyLength, maximumQuestionTitleLength, minimumQuestionBodyLength, minimumQuestionTitleLength, competitionId, isOwnMessage, unreadCount, questions, loading, hasMore, initialized, listError, loadMoreQuestions, createOpen, createSubject, createChallengeId, createTitle, createBody, createPending, createError, challenges, challengesLoading, challengeLoadError, loadChallengeOptions, submitCreate, setCreateOpen, selectedId, detail, detailLoading, select, reply, replyPending, replyError, submitReply, statusPending, changeStatus, statusVariant, statusLabel, roleLabel, isHandlerRole, participantLimitReached, CompetitionParticipantWorkspace, onInputCreateError, onInputReplyError } = toRefs(viewProps.state)
 </script>
 
 <template>
-  <component :is="CompetitionParticipantWorkspace" :competition-id="competitionId">
-    <div class="grid items-start gap-5 lg:grid-cols-[minmax(17rem,22rem)_minmax(0,1fr)] xl:grid-cols-[22rem_minmax(0,1fr)]">
-    <div class="flex min-w-0 flex-col gap-4">
+  <component :is="CompetitionParticipantWorkspace" :competition-id="competitionId" class="question-participant-workspace">
+    <div class="questions-chat-layout">
+    <div class="flex min-h-0 min-w-0 flex-col gap-4">
       <div class="flex items-center justify-between">
         <h2 class="text-lg font-semibold">{{ $t('ui.consultationQA') }}</h2>
         <Dialog :open="createOpen" @update:open="setCreateOpen">
           <DialogTrigger as-child>
             <Button size="sm">{{ $t('ui.initiateConsultation') }}</Button>
           </DialogTrigger>
-          <DialogContent class="max-h-[calc(100vh-2rem)] overflow-y-auto sm:max-w-2xl">
+          <DialogContent data-scroll-surface class="max-h-[calc(100vh-2rem)] overflow-y-auto sm:max-w-2xl">
             <DialogHeader>
               <DialogTitle>{{ $t('ui.initiateConsultation') }}</DialogTitle>
               <DialogDescription>{{ $t('ui.byDefaultConsultationContentIsOnlyVisibleToTheTeam') }}</DialogDescription>
             </DialogHeader>
-            <form @submit.prevent>
+            <UiForm @submit.prevent>
               <FieldGroup>
                 <Field>
                   <FieldLabel>{{ $t('ui.type') }}</FieldLabel>
@@ -93,11 +93,12 @@ const { maximumQuestionBodyLength, maximumQuestionTitleLength, minimumQuestionBo
                     <Spinner v-if="createPending" data-icon="inline-start" /> {{ $t('ui.submissions') }} </Button>
                 </Field>
               </FieldGroup>
-            </form>
+            </UiForm>
           </DialogContent>
         </Dialog>
       </div>
 
+      <ScrollSurface axis="y" class="min-h-0 flex-1" :aria-label="$t('ui.consultationQA')">
       <Alert v-if="listError" variant="destructive">
         <AlertDescription>{{ $message(listError) }}</AlertDescription>
       </Alert>
@@ -113,7 +114,7 @@ const { maximumQuestionBodyLength, maximumQuestionTitleLength, minimumQuestionBo
           <ActionButton
             type="button"
             class="w-full rounded-md border px-3 py-2 text-left transition-colors hover:border-primary/50"
-            :class="selectedId === q.threadRootId ? 'border-primary' : ''"
+            :class="selectedId === q.threadRootId ? 'text-primary' : ''"
             @click="select(q.threadRootId!)"
           >
             <div class="flex items-center justify-between gap-2">
@@ -132,6 +133,10 @@ const { maximumQuestionBodyLength, maximumQuestionTitleLength, minimumQuestionBo
               {{ $t('ui.lastUpdatedBy', { role: roleLabel(q.lastActorRole), actor: q.lastActorDisplayName ?? '-', time: formatDateTime(q.updatedAt) }) }}
             </p>
           </ActionButton>
+          <div v-if="selectedId === q.threadRootId && detail && !detailLoading" class="flex flex-wrap gap-2 px-3 pb-3">
+            <Button v-if="detail.canResolve" size="sm" variant="outline" :disabled="statusPending" @click="changeStatus('Resolved')">{{ $t('ui.flagResolved') }}</Button>
+            <Button v-if="detail.canClose" size="sm" variant="outline" :disabled="statusPending" @click="changeStatus('Closed')">{{ $t('ui.closeConsultation') }}</Button>
+          </div>
         </li>
       </ul>
       <div v-if="!initialized && listError" class="flex justify-center">
@@ -142,97 +147,65 @@ const { maximumQuestionBodyLength, maximumQuestionTitleLength, minimumQuestionBo
         <Button variant="outline" :disabled="loading" @click="loadMoreQuestions">
           <Spinner v-if="loading" data-icon="inline-start" /> {{ $t('ui.loadMore') }} </Button>
       </div>
+      </ScrollSurface>
     </div>
 
-    <div class="min-w-0">
-      <Empty v-if="!selectedId" class="border py-16">
-        <EmptyHeader>
-          <EmptyTitle>{{ $t('ui.selectConsultationOnTheLeftToViewTheConversation') }}</EmptyTitle>
-        </EmptyHeader>
+    <div class="min-h-0 min-w-0">
+      <Empty v-if="!selectedId" class="h-full">
+        <EmptyHeader><EmptyTitle>{{ $t('ui.selectConsultationOnTheLeftToViewTheConversation') }}</EmptyTitle></EmptyHeader>
       </Empty>
-      <Skeleton v-else-if="detailLoading" class="h-64 w-full" />
-      <Card v-else-if="detail" class="min-h-[36rem]">
-        <CardHeader>
+      <Skeleton v-else-if="detailLoading" class="h-full w-full" />
+      <ConversationPanel v-else-if="detail" :key="detail.threadRootId" :identity="detail.threadRootId" :item-count="detail.entries?.length" :history-label="$t('ui.consultationQA')">
+        <template #header>
           <div class="flex items-center justify-between gap-2">
-            <CardTitle class="text-base">{{ detail.title }}</CardTitle>
+            <h2 class="text-base font-semibold">{{ detail.title }}</h2>
             <Badge :variant="statusVariant(detail.status)">{{ statusLabel(detail.status) }}</Badge>
           </div>
-          <CardDescription>
+          <p class="mt-1 text-sm text-muted-foreground">
             {{ detail.subject === 'Challenge' ? $t('ui.challengeQuestion', { title: detail.challengeTitle ?? $t('ui.unknownQuestion') }) : $t('ui.platformEventConsultation') }}
             · {{ detail.teamDisplayName ?? detail.askerDisplayName }}
-          </CardDescription>
-        </CardHeader>
-        <CardContent class="flex flex-col gap-4">
-          <Separator />
-          <ul class="flex flex-col gap-3">
-            <li v-for="entry in detail.entries ?? []" :key="entry.id" class="flex flex-col gap-1">
-              <template v-if="entry.kind === 'Message'">
-                <div class="flex items-center gap-2 text-xs text-muted-foreground">
-                  <Badge :variant="isHandlerRole(entry.actorRole) ? 'default' : 'secondary'">
-                    {{ roleLabel(entry.actorRole) }}
-                  </Badge>
-                  <span>{{ entry.actorDisplayName }}</span>
-                  <span>{{ formatDateTime(entry.createdAt) }}</span>
-                </div>
-                <p
-                  class="rounded-md border px-3 py-2 text-sm whitespace-pre-line"
-                  :class="isHandlerRole(entry.actorRole) ? 'border-primary/20 bg-primary/5' : 'border-border bg-muted'"
-                >
-                  {{ entry.body }}
-                </p>
+          </p>
+        </template>
+        <template #history>
+          <template v-for="entry in detail.entries ?? []" :key="entry.id">
+            <MessageBubble v-if="entry.kind === 'Message'" :own="isOwnMessage(entry.actorUserId)">
+              <template #meta>
+                <Badge :variant="isHandlerRole(entry.actorRole) ? 'default' : 'secondary'">{{ roleLabel(entry.actorRole) }}</Badge>
+                <span>{{ entry.actorDisplayName }}</span>
+                <span>{{ formatDateTime(entry.createdAt) }}</span>
               </template>
-              <p v-else-if="entry.kind === 'StatusTransition'" class="text-xs text-muted-foreground">
-                {{ $t('ui.statusChanged', { from: statusLabel(entry.fromStatus ?? undefined) ?? '-', to: statusLabel(entry.toStatus ?? undefined) ?? '-' }) }}
-                · {{ roleLabel(entry.actorRole) }} {{ entry.actorDisplayName }}
-                · {{ formatDateTime(entry.createdAt) }}
-              </p>
+              {{ entry.body }}
+            </MessageBubble>
+            <li v-else-if="entry.kind === 'StatusTransition'" class="self-center text-center text-xs leading-relaxed text-muted-foreground">
+              {{ $t('ui.statusChanged', { from: statusLabel(entry.fromStatus ?? undefined) ?? '-', to: statusLabel(entry.toStatus ?? undefined) ?? '-' }) }}
+              · {{ roleLabel(entry.actorRole) }} {{ entry.actorDisplayName }}
+              · {{ formatDateTime(entry.createdAt) }}
             </li>
-          </ul>
-
-          <template v-if="detail.canReply">
-            <Separator />
-            <form @submit.prevent="submitReply">
-              <FieldGroup>
-                <Field>
-                  <FieldLabel for="q-reply">{{ $t('ui.addMessage') }}</FieldLabel>
-                  <Textarea id="q-reply" v-model="reply" class="min-h-36" rows="7" required @input="onInputReplyError(null)" />
-                  <FieldDescription v-if="detail.access === 'Asker'">
-                    {{ $t('ui.youCanSendOfConsecutiveMessagesTheAllowanceResetsAfter', { remaining: detail.participantMessagesRemaining ?? 0, maximum: detail.maxParticipantMessagesBeforeHandlerReply ?? 3 }) }}
-                    <span v-if="detail.status === 'Resolved'">{{ $t('ui.continuingToAskWillResetTheInquiryToPending') }}</span>
-                  </FieldDescription>
-                  <FieldDescription v-else>{{ $t('ui.staffRepliesAreNotSubjectToTheContinuousMessageQuota') }}</FieldDescription>
-                </Field>
-                <p v-if="replyError" role="alert" class="text-sm text-destructive">{{ $message(replyError) }}</p>
-                <div class="flex flex-wrap items-center gap-2">
-                  <Button type="submit" :disabled="replyPending || !reply.trim()">
-                    <Spinner v-if="replyPending" data-icon="inline-start" /> {{ $t('ui.send') }} </Button>
-                  <Button
-                    v-if="detail.canResolve"
-                    type="button"
-                    variant="outline"
-                    :disabled="statusPending"
-                    @click="changeStatus('Resolved')"
-                  > {{ $t('ui.flagResolved') }} </Button>
-                  <Button
-                    v-if="detail.canClose"
-                    type="button"
-                    variant="outline"
-                    :disabled="statusPending"
-                    @click="changeStatus('Closed')"
-                  > {{ $t('ui.closeConsultation') }} </Button>
-                </div>
-              </FieldGroup>
-            </form>
           </template>
-          <Alert v-else-if="participantLimitReached">
-            <AlertDescription>
-              {{ $t('ui.youCanSendUpToConsecutiveMessagesBeforeAStaff2', { maximum: detail.maxParticipantMessagesBeforeHandlerReply ?? 3 }) }}
-            </AlertDescription>
-          </Alert>
+        </template>
+        <template #composer>
+          <UiForm v-if="detail.canReply" validation="feature" class="flex h-full min-h-0 flex-col gap-2" @submit.prevent="submitReply">
+            <Label for="q-reply" class="sr-only">{{ $t('ui.addMessage') }}</Label>
+            <ScrollSurface axis="y" class="min-h-0 flex-1" :aria-label="$t('ui.addMessage')">
+              <Textarea id="q-reply" v-model="reply" class="min-h-full w-full" :maxlength="maximumQuestionBodyLength" :disabled="replyPending" required @input="onInputReplyError(null)" />
+            </ScrollSurface>
+            <Alert v-if="replyError" variant="destructive"><AlertDescription>{{ $message(replyError) }}</AlertDescription></Alert>
+            <div class="flex shrink-0 items-end justify-between gap-4">
+              <p v-if="detail.access === 'Asker'" class="text-xs leading-relaxed text-muted-foreground">
+                {{ $t('ui.youCanSendOfConsecutiveMessagesTheAllowanceResetsAfter', { remaining: detail.participantMessagesRemaining ?? 0, maximum: detail.maxParticipantMessagesBeforeHandlerReply ?? 3 }) }}
+                <span v-if="detail.status === 'Resolved'">{{ $t('ui.continuingToAskWillResetTheInquiryToPending') }}</span>
+              </p>
+              <p v-else class="text-xs text-muted-foreground">{{ $t('ui.staffRepliesAreNotSubjectToTheContinuousMessageQuota') }}</p>
+              <Button type="submit" class="ml-auto shrink-0" :disabled="replyPending || !reply.trim()">
+                <Spinner v-if="replyPending" data-icon="inline-start" />{{ $t('ui.send') }}
+              </Button>
+            </div>
+          </UiForm>
+          <p v-else-if="participantLimitReached" class="text-sm text-muted-foreground">{{ $t('ui.youCanSendUpToConsecutiveMessagesBeforeAStaff2', { maximum: detail.maxParticipantMessagesBeforeHandlerReply ?? 3 }) }}</p>
           <p v-else-if="detail.access === 'Observer'" class="text-sm text-muted-foreground">{{ $t('ui.youHaveReadOnlyAccessToThisInquiry') }}</p>
           <p v-else class="text-sm text-muted-foreground">{{ $t('ui.thisQuestionIsAndCannotReceiveFurtherReplies', { status: statusLabel(detail.status) ?? '-' }) }}</p>
-        </CardContent>
-      </Card>
+        </template>
+      </ConversationPanel>
     </div>
     </div>
   </component>

@@ -22,13 +22,20 @@ public sealed record UserProfile(
     UserKind Kind,
     bool EmailVerified,
     string? Description = null,
-    Guid? AvatarFileId = null);
+    Guid? AvatarFileId = null,
+    Guid? WallpaperFileId = null,
+    bool WallpaperEnabled = false);
 public sealed record PublicUserProfile(
     Guid Id,
     string UserName,
     string? Description,
     Guid? AvatarFileId);
 public sealed record UserAvatarReplacement(UserProfile Profile, Guid? PreviousFileId);
+public sealed record UserWallpaperReplacement(UserProfile Profile, Guid? PreviousFileId);
+public enum UserWallpaperPreferenceState { Updated, UserNotFound, WallpaperNotUploaded }
+public sealed record UserWallpaperPreferenceResult(
+    UserWallpaperPreferenceState State,
+    UserProfile? Profile = null);
 public enum CreateUserState { Created, UserNameConflict, EmailConflict }
 public enum ChangePasswordState { Changed, CurrentPasswordInvalid }
 
@@ -64,6 +71,23 @@ public interface IUserAuthenticationStore
         DateTimeOffset now,
         CancellationToken cancellationToken);
     Task<BusinessFileReference?> GetAvatarFileAsync(
+        Guid userId,
+        CancellationToken cancellationToken) =>
+        Task.FromResult<BusinessFileReference?>(null);
+    Task<UserWallpaperReplacement?> ReplaceWallpaperAsync(
+        Guid userId,
+        Guid fileId,
+        DateTimeOffset now,
+        CancellationToken cancellationToken) =>
+        Task.FromResult<UserWallpaperReplacement?>(null);
+    Task<UserWallpaperPreferenceResult> SetWallpaperEnabledAsync(
+        Guid userId,
+        bool enabled,
+        DateTimeOffset now,
+        CancellationToken cancellationToken) =>
+        Task.FromResult(new UserWallpaperPreferenceResult(
+            UserWallpaperPreferenceState.UserNotFound));
+    Task<BusinessFileReference?> GetWallpaperFileAsync(
         Guid userId,
         CancellationToken cancellationToken) =>
         Task.FromResult<BusinessFileReference?>(null);

@@ -96,7 +96,7 @@ describe('competition track pages', () => {
   })
 
   test('exposes participant selection and per-track leaderboard switching', async () => {
-    const overview = await sourceFile(new URL('../app/pages/competitions/[id]/index.vue', import.meta.url)).text()
+    const overview = await sourceFile(new URL('../app/features/competitions/CompetitionOverview.vue', import.meta.url)).text()
     const leaderboard = await sourceFile(new URL('../app/pages/competitions/[id]/leaderboard.vue', import.meta.url)).text()
 
     expect(overview).toContain('listCompetitionTracks')

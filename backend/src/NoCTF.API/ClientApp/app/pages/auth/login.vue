@@ -4,5 +4,5 @@ definePageMeta({ middleware: 'guest' })
 </script>
 
 <template>
-  <Feature><slot /></Feature>
+  <Feature />
 </template>

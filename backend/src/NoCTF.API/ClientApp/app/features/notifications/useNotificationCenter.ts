@@ -40,6 +40,12 @@ export function useNotificationCenter() {
       return { items: data.items, nextCursor: data.nextCursor }
     })
 
+  const notificationOptions = computed(() => items.value.flatMap(notification => notification.id
+    ? [{ value: notification.id, label: notificationTitle(notification), notification }]
+    : []))
+
+  const selectedId = computed(() => selected.value?.id ?? null)
+
   function sourceLabel(notification: Notification): string {
     if (notification.sourceDisplayName) return notification.sourceDisplayName
     return notification.sourceType === 0 ? translate("ui.eventSystem") : translate("ui.eventStaff")
@@ -118,6 +124,11 @@ export function useNotificationCenter() {
     }
   }
 
+  async function selectNotification(id: string): Promise<void> {
+    const notification = items.value.find(item => item.id === id)
+    if (notification) await openNotification(notification)
+  }
+
   async function closeDetail(): Promise<void> {
     threadRequests.invalidate()
     selected.value = null
@@ -194,6 +205,8 @@ export function useNotificationCenter() {
       threadError,
       routeError,
       items,
+      notificationOptions,
+      selectedId,
       loading,
       error,
       hasMore,
@@ -204,6 +217,7 @@ export function useNotificationCenter() {
       categoryLabel,
       threadText,
       openNotification,
+      selectNotification,
       closeDetail,
       actionPath,
       showAction

@@ -201,18 +201,22 @@ public sealed class AwdpV2TemplateTests
         var client = Path.GetFullPath(Path.Combine(TemplateRoot(), "..", "..", "backend", "src", "NoCTF.API", "ClientApp", "app"));
         var components = new Dictionary<string, string[]>
         {
-            ["components/admin/DefinitionContainer.vue"] = ["镜像", "启动命令", "Flag 环境变量名", "对外端口", "内部端口", "环境变量", "标签", "禁止提权(no-new-privileges)", "只读根文件系统", "以非 root 用户运行", "移除的能力(cap-drop)", "增加的能力(cap-add)"],
-            ["components/admin/DefinitionRuntime.vue"] = ["分配方式", "运行环境类型", "内存(MiB)", "CPU(核)", "进程数上限", "实例存活时间(秒)", "操作超时(秒)", "Flag 来源", "访问入口"],
-            ["components/admin/DefinitionPatchSection.vue"] = ["补丁入口", "补丁应用命令", "补丁超时(秒)", "就绪超时(秒)", "Fix 包上传上限(MiB)"],
-            ["components/admin/DefinitionCheckerSection.vue"] = ["启用 Fix 一次性验证 Checker", "向 Checker 提供 Fix 包"],
-            ["components/admin/RunnerJobEditor.vue"] = ["超时(秒)"],
-            ["components/admin/UrlBindingList.vue"] = ["显示模板", "暴露范围", "容器端口"],
-            ["pages/admin/challenges/new.vue"] = ["标题", "游戏模式", "可见性", "方向", "题面"],
-            ["pages/admin/competitions/[id]/challenges/[ccId].vue"] = ["提示内容", "扣分", "发布时间(可选)"]
+            ["components/views/admin/DefinitionContainerView.vue"] = ["镜像", "启动命令", "Flag 环境变量名", "对外端口", "内部端口", "环境变量", "标签", "禁止提权(no-new-privileges)", "只读根文件系统", "以非 root 用户运行", "移除的能力(cap-drop)", "增加的能力(cap-add)"],
+            ["components/views/admin/DefinitionRuntimeView.vue"] = ["分配方式", "运行环境类型", "内存(MiB)", "CPU(核)", "进程数上限", "实例存活时间(秒)", "操作超时(秒)", "Flag 来源", "访问入口"],
+            ["components/views/admin/DefinitionPatchSectionView.vue"] = ["补丁入口", "补丁应用命令", "补丁超时(秒)", "就绪超时(秒)", "Fix 包上传上限(MiB)"],
+            ["components/views/admin/DefinitionCheckerSectionView.vue"] = ["启用 Fix 一次性验证 Checker", "向 Checker 提供 Fix 包"],
+            ["components/views/admin/RunnerJobEditorView.vue"] = ["超时(秒)"],
+            ["components/views/admin/UrlBindingListView.vue"] = ["显示模板", "暴露范围", "容器端口"],
+            ["components/views/admin/ChallengeTemplateCreateDialogView.vue"] = ["标题", "游戏模式", "可见性", "方向", "题面"],
+            ["components/views/page/admin/competitions/[id]/challenges/AdminCompetitionsByIdChallengesByCcIdPageView.vue"] = ["提示内容", "扣分", "发布时间(可选)"]
         };
+        var localizedLabels = await File.ReadAllTextAsync(
+            Path.Combine(client, "locales", "zh-CN.ts"));
         foreach (var component in components)
         {
-            var source = await File.ReadAllTextAsync(Path.Combine(client, component.Key));
+            var source = string.Join('\n',
+                await File.ReadAllTextAsync(Path.Combine(client, component.Key)),
+                localizedLabels);
             foreach (var label in component.Value)
             {
                 await Assert.That(source).Contains(label);

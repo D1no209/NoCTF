@@ -14,8 +14,11 @@ export function useApplicationRoot() {
 
   void ensureLoaded()
 
+  const pageTransition = { name: 'noctf-page-slide', mode: 'out-in' as const }
+
   return {
-      isDark
+      isDark,
+      pageTransition
     }
 }
 

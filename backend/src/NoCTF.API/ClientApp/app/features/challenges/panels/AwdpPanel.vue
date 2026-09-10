@@ -8,8 +8,10 @@ import View from '~/components/views/challenges/panels/AwdpPanelView.vue'
 const props = defineProps<{
   competition: NoCtfapiEndpointsCompetitionsCompetitionResponse
   challenge: NoCtfapiEndpointsChallengesChallengeResponse
+  flagDockTarget?: string
+  runtimeDockTarget?: string
 }>()
-const emit = defineEmits<{ submitted: [] }>()
+const emit = defineEmits<{ submitted: []; remainingChanged: [remaining: number | null] }>()
 const state = bindViewState(useAwdpPanel(props, emit))
 
 </script>

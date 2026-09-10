@@ -49,7 +49,9 @@ internal static partial class BackendMessageOperations
         var file = await db.Files.SingleOrDefaultAsync(item => item.Id == message.FileId, cancellationToken);
         if (file is null)
             return;
-        var referenced = await db.Users.AnyAsync(item => item.AvatarFileId == file.Id, cancellationToken)
+        var referenced = await db.Users.AnyAsync(item =>
+                item.AvatarFileId == file.Id || item.WallpaperFileId == file.Id,
+                cancellationToken)
             || await db.Teams.IgnoreQueryFilters().AnyAsync(item => item.AvatarFileId == file.Id, cancellationToken)
             || await db.Competitions.IgnoreQueryFilters().AnyAsync(item => item.PosterFileId == file.Id, cancellationToken)
             || await db.PlatformSettings.AnyAsync(item => item.LogoFileId == file.Id, cancellationToken)

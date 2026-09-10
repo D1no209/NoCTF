@@ -1,8 +1,18 @@
 import MarkdownIt from 'markdown-it'
 import sanitizeHtml from 'sanitize-html'
+import { highlightMarkdownCode, normalizeMarkdownCodeLanguage } from './markdown-highlighter'
 
 // HTML must pass the allowlist below after Markdown parsing and before v-html.
 const markdown = new MarkdownIt({ html: true, linkify: true })
+markdown.renderer.rules.fence = (tokens, index) => {
+  const token = tokens[index]!
+  const language = normalizeMarkdownCodeLanguage(token.info)
+  const highlighted = highlightMarkdownCode(token.content, language)
+    ?? markdown.utils.escapeHtml(token.content)
+  const displayLanguage = language || 'text'
+  const languageClass = language ? ` language-${displayLanguage}` : ''
+  return `<pre tabindex="0" data-language="${displayLanguage}"><code class="hljs${languageClass}">${highlighted}</code></pre>\n`
+}
 
 const color = /^(?:#[\da-f]{3,8}|[a-z]+|(?:rgb|hsl)a?\([\d\s.,%/+-]+\))$/i
 const length = /^(?:0|auto|\d{1,4}(?:\.\d+)?(?:px|em|rem|%))$/i
@@ -21,7 +31,8 @@ const htmlOptions: sanitizeHtml.IOptions = {
     a: ['href', 'rel', { name: 'target', values: ['_blank'] }],
     img: ['src', 'alt', 'width', 'height', 'loading', 'referrerpolicy'],
     code: ['class'],
-    pre: [{ name: 'tabindex', values: ['0'] }],
+    span: ['class'],
+    pre: [{ name: 'tabindex', values: ['0'] }, 'data-language'],
     table: [{ name: 'tabindex', values: ['0'] }],
     th: ['colspan', 'rowspan', 'scope'],
     td: ['colspan', 'rowspan'],
@@ -34,7 +45,10 @@ const htmlOptions: sanitizeHtml.IOptions = {
     video: ['src', 'poster', 'width', 'height', 'controls', 'preload', 'playsinline'],
     source: ['src', 'type', 'media'],
   },
-  allowedClasses: { code: [/^language-[a-z\d_+.#-]+$/i] },
+  allowedClasses: {
+    code: ['hljs', /^language-[a-z\d_+.#-]+$/i],
+    span: [/^hljs-[a-z\d_-]+$/i],
+  },
   allowedStyles: {
     '*': {
       'text-align': [/^(left|center|right|justify|start|end)$/i],

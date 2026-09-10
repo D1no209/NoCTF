@@ -264,7 +264,6 @@ function latestOutcome(
 
 export function awdpTeamChallengeStates(
   catalog: NoCtfapiEndpointsCompetitionsScoreboardChallengeCatalogResponse | null,
-  schema: NoCtfapiEndpointsCompetitionsScoreboardSchemaResponse | null,
   entry: NoCtfapiEndpointsCompetitionsScoreboardTeamResponse | null,
   events: readonly AwdpControlEvent[],
 ): AwdpTeamChallengeState[] {

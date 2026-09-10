@@ -1,8 +1,6 @@
 <script setup lang="ts">
 import { bindViewState } from '~/features/shared/view-state'
 
-import type { NoCtfapiEndpointsChallengesQuestionsCompetitionQuestionResponse } from '~/api'
-
 import { useCompetitionsByIdQuestionsPage } from './useCompetitionsByIdQuestionsPage'
 import View from '~/components/views/page/competitions/[id]/CompetitionsByIdQuestionsPageView.vue'
 

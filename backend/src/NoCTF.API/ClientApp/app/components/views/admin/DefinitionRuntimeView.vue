@@ -54,7 +54,7 @@ const { bytesToMib, coresToNanoCpus, mibToBytes, nanoCpusToCores, RuntimeAllocat
       :disabled="disabled"
     />
 
-    <DefinitionSection :title="$t('ui.resourcesLifecycle')" :collapsible="false">
+    <DefinitionSection :title="$t('ui.resourcesLifecycle')"  :collapsible="false">
       <div class="grid gap-4 sm:grid-cols-3">
         <Field>
           <FieldLabel>{{ $t('ui.memoryMib') }}</FieldLabel>
@@ -113,7 +113,7 @@ const { bytesToMib, coresToNanoCpus, mibToBytes, nanoCpusToCores, RuntimeAllocat
       <FieldDescription>{{ $t('ui.blankValuesUseThePlatformDefaultResourceLimitsAndLifecycle') }}</FieldDescription>
     </DefinitionSection>
 
-    <DefinitionSection :title="$t('ui.flagAccess')" :collapsible="false">
+    <DefinitionSection :title="$t('ui.flagAccess')"  :collapsible="false">
       <Field v-if="mode !== 'Ctf' && mode !== 'Awdp'">
         <FieldLabel>{{ $t('ui.flagSource') }}</FieldLabel>
         <Select

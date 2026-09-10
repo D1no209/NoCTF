@@ -122,7 +122,7 @@ const snapshot: NoCtfapiEndpointsCompetitionsScoreboardSnapshotResponse = {
 
 describe('AWDP control screen data adapter', () => {
   test('uses the shared direction display convention for challenge cards', () => {
-    const challenges = awdpTeamChallengeStates(catalog, schema, snapshot.teams?.[0] ?? null, [])
+    const challenges = awdpTeamChallengeStates(catalog, snapshot.teams?.[0] ?? null, [])
     expect(challenges.map(challenge => challenge.direction)).toEqual(['Pwn'])
   })
 
@@ -201,7 +201,7 @@ describe('AWDP control screen data adapter', () => {
       event('AwdpBreakResolved', { gameplayFactState: 'Completed', gameplayFactResult: 'Correct' }),
       event('AwdpFixResolved', { gameplayFactState: 'Completed', gameplayFactResult: 'Wrong' }),
     ])
-    expect(awdpTeamChallengeStates(catalog, schema, awdpPublicEntries(snapshot)[0]!, events)[0])
+    expect(awdpTeamChallengeStates(catalog, awdpPublicEntries(snapshot)[0]!, events)[0])
       .toMatchObject({
         title: 'Pwn-02',
         attackScore: 3_300,
@@ -349,7 +349,6 @@ describe('AWDP control screen data adapter', () => {
     expect(currentRoundEvents.map(item => item.action)).toEqual(['defense'])
     expect(awdpTeamChallengeStates(
       catalog,
-      schema,
       awdpPublicEntries(snapshot)[0]!,
       currentRoundEvents,
     )[0]).toMatchObject({
@@ -396,7 +395,7 @@ describe('AWDP control screen implementation contract', () => {
       const items = Array.from({ length: count }, (_, index) => ({
         id: crypto.randomUUID(), title: `Challenge ${index + 1}`, direction: 'PWN', published: true,
       }))
-      const states = awdpTeamChallengeStates({ ...catalog, items }, schema, snapshot.teams![0]!, [])
+      const states = awdpTeamChallengeStates({ ...catalog, items }, snapshot.teams![0]!, [])
       expect(states.map(state => state.competitionChallengeId)).toEqual(items.map(item => item.id))
     }
     const page = await sourceFile(new URL('../app/pages/competitions/[id]/awdp-live.vue', import.meta.url)).text()
@@ -410,7 +409,7 @@ describe('AWDP control screen implementation contract', () => {
     expect(page).toContain('@mouseenter="onMouseenterTeamPanelHovered(true)"')
     expect(page).toContain('@focusin="onFocusinTeamPanelFocused(true)"')
     expect(page).toContain('if (!teamCarouselPaused.value) selectNextTeam()')
-    expect(page).toContain(':title="challenge.title"')
+    expect(page).toContain(':content="challenge.title"')
   })
 
   test('uses generated SDK data, FIFO playback, SignalR invalidation, and four code-native animations', async () => {
@@ -426,6 +425,8 @@ describe('AWDP control screen implementation contract', () => {
     const ticker = await sourceFile(
       new URL('../app/features/awdp-control/AwdpEventTicker.vue', import.meta.url),
     ).text()
+    const attackFailure = await Bun.file(new URL('../app/components/views/awdp-control/AwdpAttackFailureAnimationView.vue', import.meta.url)).text()
+    const defenseFailure = await Bun.file(new URL('../app/components/views/awdp-control/AwdpDefenseFailureAnimationView.vue', import.meta.url)).text()
 
     expect(page).toContain('definePageMeta({ layout: false })')
     expect(page).toContain('useScoreboardMatrix(competitionId, { pollRounds: false })')
@@ -433,6 +434,9 @@ describe('AWDP control screen implementation contract', () => {
     expect(page).toContain('listCompetitionEvents({')
     expect(page).toContain('competitionEventChanged: () => void refreshLatest()')
     expect(page).toContain('playbackQueue')
+    expect(stage).toContain("import AwdpAttackSuccessAnimationComponent from './AwdpAttackSuccessAnimation.vue'")
+    expect(stage).toContain('markRaw(AwdpDefenseFailureAnimationComponent)')
+    expect(stage).not.toContain('resolveComponent(')
     expect(page).toContain('const resolvedEvents = computed(() => awdpPlaybackEvents(events.value))')
     expect(page).not.toContain("t('ui.operationSubmitted')")
     expect(page).toContain('PLAYBACK_DURATION_MS = 5_400')
@@ -450,6 +454,20 @@ describe('AWDP control screen implementation contract', () => {
     expect(page).not.toContain('totalDefenseScore')
     expect(page).toContain('width:1920px')
     expect(page).toContain('height:1080px')
+    expect(page).toContain('--awdp-stage-bg: oklch(')
+    expect(page).toContain('--primary: var(--awdp-cyan)')
+    expect(page).toContain('--destructive: var(--awdp-red)')
+    expect(page).toContain('--success: var(--awdp-teal)')
+    expect(page).toContain('--warning: var(--awdp-orange)')
+    expect(page).toContain('--awdp-panel-line: color-mix(')
+    expect(page).toContain('--awdp-panel-boundary-shadow: inset 0 0 0 1px')
+    expect(page).toContain('.hud-heading { box-shadow: var(--awdp-divider-bottom-shadow); }')
+    expect(page).toContain('.challenge-strip article { box-shadow: var(--awdp-control-boundary-shadow); }')
+    expect(page).toContain('.ticker-card { box-shadow: var(--awdp-tone-boundary-shadow); }')
+    expect(page).toContain('.feed-list li.failure { --tone: var(--warning)')
+    expect(page).toContain('.ticker-card.failure { --tone: var(--warning)')
+    expect(attackFailure).toContain('.attack-failure { --destructive: var(--warning); }')
+    expect(defenseFailure).toContain('.defense-failure { --destructive: var(--warning); }')
     expect(page).not.toContain('$fetch(')
     expect(page).not.toContain('/api/v1')
     expect(page).not.toContain('.mp4')

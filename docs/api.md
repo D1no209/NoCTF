@@ -46,6 +46,9 @@ POST /api/v1/auth/password-reset/complete
 GET  /api/v1/auth/me
 PUT  /api/v1/auth/me/profile
 POST /api/v1/auth/me/avatar
+GET  /api/v1/auth/me/wallpaper
+POST /api/v1/auth/me/wallpaper
+PUT  /api/v1/auth/me/wallpaper-preference
 PUT  /api/v1/auth/password
 POST /api/v1/auth/logout-all
 GET  /api/v1/users/{userId}

@@ -30,7 +30,7 @@ const { KeyRound, Send, configuration, loading, loadError, form, saving, passwor
           </div>
         </CardHeader>
         <CardContent>
-          <form @submit.prevent="save">
+          <UiForm @submit.prevent="save">
             <FieldGroup>
               <Field>
                 <FieldLabel for="public-base-url">{{ $t('ui.publiclyAccessibleAddress') }}</FieldLabel>
@@ -40,29 +40,29 @@ const { KeyRound, Send, configuration, loading, loadError, form, saving, passwor
               <div class="grid gap-4 sm:grid-cols-3">
                 <Field>
                   <FieldLabel for="token-lifetime">{{ $t('ui.verificationTokenValidityPeriodMinutes') }}</FieldLabel>
-                  <Input id="token-lifetime" v-model.number="form.tokenLifetimeMinutes" type="number" min="1" required />
+                  <NumberInput id="token-lifetime" v-model.number="form.tokenLifetimeMinutes"  min="1" required />
                 </Field>
                 <Field>
                   <FieldLabel for="resend-cooldown">{{ $t('ui.resendCooldownSeconds') }}</FieldLabel>
-                  <Input id="resend-cooldown" v-model.number="form.resendCooldownSeconds" type="number" min="0" required />
+                  <NumberInput id="resend-cooldown" v-model.number="form.resendCooldownSeconds"  min="0" required />
                 </Field>
                 <Field>
                   <FieldLabel for="smtp-timeout">{{ $t('ui.smtpTimeoutSeconds') }}</FieldLabel>
-                  <Input id="smtp-timeout" v-model.number="form.smtpTimeoutSeconds" type="number" min="1" required />
+                  <NumberInput id="smtp-timeout" v-model.number="form.smtpTimeoutSeconds"  min="1" required />
                 </Field>
               </div>
               <div class="grid gap-4 sm:grid-cols-3">
                 <Field>
                   <FieldLabel for="reset-lifetime">{{ $t('ui.resetTokenValidityPeriodMinutes') }}</FieldLabel>
-                  <Input id="reset-lifetime" v-model.number="form.passwordResetTokenLifetimeMinutes" type="number" min="1" required />
+                  <NumberInput id="reset-lifetime" v-model.number="form.passwordResetTokenLifetimeMinutes"  min="1" required />
                 </Field>
                 <Field>
                   <FieldLabel for="reset-cooldown">{{ $t('ui.resetCooldownSeconds') }}</FieldLabel>
-                  <Input id="reset-cooldown" v-model.number="form.passwordResetCooldownSeconds" type="number" min="0" required />
+                  <NumberInput id="reset-cooldown" v-model.number="form.passwordResetCooldownSeconds"  min="0" required />
                 </Field>
                 <Field>
                   <FieldLabel for="reset-max">{{ $t('ui.resetFrequencyUpperLimitTimesHour') }}</FieldLabel>
-                  <Input id="reset-max" v-model.number="form.passwordResetMaxRequestsPerHour" type="number" min="1" required />
+                  <NumberInput id="reset-max" v-model.number="form.passwordResetMaxRequestsPerHour"  min="1" required />
                 </Field>
               </div>
 
@@ -75,7 +75,7 @@ const { KeyRound, Send, configuration, loading, loadError, form, saving, passwor
                 </Field>
                 <Field>
                   <FieldLabel for="smtp-port">{{ $t('ui.port') }}</FieldLabel>
-                  <Input id="smtp-port" v-model.number="form.smtpPort" type="number" min="1" max="65535" required />
+                  <NumberInput id="smtp-port" v-model.number="form.smtpPort"  min="1" max="65535" required />
                 </Field>
               </div>
               <div class="grid gap-4 sm:grid-cols-3">
@@ -123,7 +123,7 @@ const { KeyRound, Send, configuration, loading, loadError, form, saving, passwor
               </Field>
               <p class="text-sm text-muted-foreground"> {{ $t('ui.theTestEmailWillBeSentToTheEmailAddress') }} </p>
             </FieldGroup>
-          </form>
+          </UiForm>
         </CardContent>
       </Card>
     </template>

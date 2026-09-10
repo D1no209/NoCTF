@@ -97,12 +97,14 @@ describe('platform locale', () => {
 })
 
 describe('locale switch placement', () => {
-  test('renders the language switch directly beside the theme switch', async () => {
+  test('renders the language switch in the center capsule', async () => {
     const layout = await sourceFile(
       new URL('../app/layouts/default.vue', import.meta.url),
     ).text()
 
-    expect(layout.replaceAll('\r\n', '\n')).toContain("<component :is=\"ThemeToggle\" />\n          <component :is=\"LanguageToggle\" />")
+    const center = layout.slice(layout.indexOf('data-position="center"'), layout.indexOf('data-position="right"'))
+    expect(center).toContain('<component :is="LanguageToggle" />')
+    expect(center).not.toContain('<component :is="ThemeToggle" />')
   })
 
   test('switches the selected locale without reloading or remounting the SPA page', async () => {
@@ -115,7 +117,7 @@ describe('locale switch placement', () => {
 
     expect(composable).toContain("setLocale(isEnglish.value ? 'zh-CN' : 'en')")
     expect(composable).not.toContain('window.location.reload()')
-    expect(app).toContain('<NuxtPage />')
+    expect(app).toContain('<NuxtPage :transition="pageTransition" />')
     expect(app).not.toContain('const { locale } = useLocale()')
     expect(app).not.toMatch(/<NuxtPage\s+[^>]*:key=/)
   })
@@ -137,5 +139,17 @@ describe('locale switch placement', () => {
     expect(questions).not.toContain('`题目 · ${')
     expect(questions).not.toContain('`题目咨询 · ${')
     expect(scoreTrend).toContain('props.title, locale.value')
+  })
+
+  test('keeps controller catalogs as keys and remounts cached controls after a locale switch', async () => {
+    const logs = await sourceFile(new URL('../app/features/routes/admin/platform/AdminPlatformLogsPage.vue', import.meta.url)).text()
+    const select = await Bun.file(new URL('../app/components/ui/select/Select.vue', import.meta.url)).text()
+    const toggle = await Bun.file(new URL('../app/components/ui/switch/Switch.vue', import.meta.url)).text()
+
+    expect(logs).toContain('Warning: "ui.warning"')
+    expect(logs).toContain('Worker: "ui.worker"')
+    expect(logs).not.toContain('Warning: translate(')
+    expect(select).toContain(':key="localeKey"')
+    expect(toggle).toContain(':key="localeKey"')
   })
 })

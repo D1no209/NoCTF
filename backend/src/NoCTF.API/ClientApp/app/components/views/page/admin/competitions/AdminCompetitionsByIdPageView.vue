@@ -23,7 +23,7 @@ const { Megaphone, competition, role, loading, error, canAnnounce, announcementO
     </div>
 
     <Dialog :open="announcementOpen" @update:open="setAnnouncementOpen">
-        <DialogContent class="max-h-[calc(100vh-2rem)] overflow-y-auto sm:max-w-2xl">
+        <DialogContent data-scroll-surface class="max-h-[calc(100vh-2rem)] overflow-y-auto sm:max-w-2xl">
           <DialogHeader>
             <DialogTitle>{{ $t('ui.publishCompetitionNotice') }}</DialogTitle>
             <DialogDescription>{{ $t('ui.sendAPermanentNotificationToAllParticipantsOrEventStaff') }}</DialogDescription>

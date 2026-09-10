@@ -4293,6 +4293,99 @@
         ]
       }
     },
+    "/api/v1/auth/me/wallpaper": {
+      "get": {
+        "tags": [
+          "Auth"
+        ],
+        "summary": "Returns the current user's uploaded wallpaper.",
+        "description": "Executes GET /api/v1/auth/me/wallpaper.",
+        "operationId": "Authentication_GetMyWallpaper",
+        "responses": {
+          "404": {
+            "description": "Not Found"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "Auth"
+        ],
+        "summary": "Replaces and enables the current user's wallpaper.",
+        "description": "Executes POST /api/v1/auth/me/wallpaper.",
+        "operationId": "Authentication_UploadMyWallpaper",
+        "requestBody": {
+          "x-name": "UploadMyWallpaperRequest",
+          "description": "",
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsAuthenticationUploadMyWallpaperRequest"
+              }
+            }
+          },
+          "required": true,
+          "x-position": 1
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsAuthenticationCurrentUserResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsAuthenticationWallpaperUploadFailureResponse"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ]
+      }
+    },
     "/api/v1/users/{userId}/avatar": {
       "get": {
         "tags": [
@@ -4692,6 +4785,65 @@
                 }
               }
             }
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/auth/me/wallpaper-preference": {
+      "put": {
+        "tags": [
+          "Auth"
+        ],
+        "summary": "Enables or disables the current user's wallpaper.",
+        "description": "Executes PUT /api/v1/auth/me/wallpaper-preference.",
+        "operationId": "Authentication_UpdateMyWallpaperPreference",
+        "requestBody": {
+          "x-name": "UpdateMyWallpaperPreferenceRequest",
+          "description": "",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsAuthenticationUpdateMyWallpaperPreferenceRequest"
+              }
+            }
+          },
+          "required": true,
+          "x-position": 1
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsAuthenticationCurrentUserResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsAuthenticationWallpaperPreferenceFailureResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
           }
         },
         "security": [
@@ -17552,6 +17704,9 @@
             "format": "int32",
             "nullable": true
           },
+          "solvedByMyTeam": {
+            "type": "boolean"
+          },
           "usesDynamicFlag": {
             "type": "boolean"
           },
@@ -18216,6 +18371,14 @@
           "avatarUrl": {
             "type": "string",
             "nullable": true
+          },
+          "wallpaperRevision": {
+            "type": "string",
+            "format": "guid",
+            "nullable": true
+          },
+          "wallpaperEnabled": {
+            "type": "boolean"
           }
         }
       },
@@ -18505,6 +18668,34 @@
           }
         }
       },
+      "NoCTFAPIEndpointsAuthenticationWallpaperPreferenceFailureResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "code": {
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsAuthenticationWallpaperPreferenceFailureCode"
+          }
+        }
+      },
+      "NoCTFAPIEndpointsAuthenticationWallpaperPreferenceFailureCode": {
+        "type": "string",
+        "description": "",
+        "x-enumNames": [
+          "WallpaperNotUploaded"
+        ],
+        "enum": [
+          "WallpaperNotUploaded"
+        ]
+      },
+      "NoCTFAPIEndpointsAuthenticationUpdateMyWallpaperPreferenceRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "enabled": {
+            "type": "boolean"
+          }
+        }
+      },
       "NoCTFAPIEndpointsAuthenticationAvatarUploadFailureResponse": {
         "type": "object",
         "additionalProperties": false,
@@ -18537,6 +18728,51 @@
         ]
       },
       "NoCTFAPIEndpointsAuthenticationUploadMyAvatarRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "file"
+        ],
+        "properties": {
+          "file": {
+            "type": "string",
+            "format": "binary",
+            "nullable": false
+          }
+        }
+      },
+      "NoCTFAPIEndpointsAuthenticationWallpaperUploadFailureResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "code": {
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsAuthenticationWallpaperUploadFailureCode"
+          }
+        }
+      },
+      "NoCTFAPIEndpointsAuthenticationWallpaperUploadFailureCode": {
+        "type": "string",
+        "description": "",
+        "x-enumNames": [
+          "SizeInvalid",
+          "SourceMetadataMismatch",
+          "UnsupportedFormat",
+          "InvalidDimensions",
+          "PixelLimitExceeded",
+          "MultipleFrames",
+          "MalformedImage"
+        ],
+        "enum": [
+          "SizeInvalid",
+          "SourceMetadataMismatch",
+          "UnsupportedFormat",
+          "InvalidDimensions",
+          "PixelLimitExceeded",
+          "MultipleFrames",
+          "MalformedImage"
+        ]
+      },
+      "NoCTFAPIEndpointsAuthenticationUploadMyWallpaperRequest": {
         "type": "object",
         "additionalProperties": false,
         "required": [

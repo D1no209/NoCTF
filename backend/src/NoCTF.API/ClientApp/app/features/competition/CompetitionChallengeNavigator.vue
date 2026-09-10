@@ -1,8 +1,6 @@
 <script setup lang="ts">
 import { bindViewState } from '~/features/shared/view-state'
 
-import type { NoCtfapiEndpointsChallengesChallengeResponse } from '~/api'
-
 import { useCompetitionChallengeNavigator } from './useCompetitionChallengeNavigator'
 import View from '~/components/views/competition/CompetitionChallengeNavigatorView.vue'
 

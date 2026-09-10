@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { bindViewState } from '~/features/shared/view-state'
 
-import type { NoCtfapiEndpointsAdministrationPlatformEmailVerificationConfigurationResponse } from '~/api'
 import { useAdminPlatformEmailPage } from './useAdminPlatformEmailPage'
 import View from '~/components/views/page/admin/platform/AdminPlatformEmailPageView.vue'
 

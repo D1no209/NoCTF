@@ -1,8 +1,6 @@
 <script setup lang="ts">
 import { bindViewState } from '~/features/shared/view-state'
 
-import type { NoCtfapiEndpointsRuntimeRuntimeResponse } from '~/api'
-
 import { useRuntimeCard } from './useRuntimeCard'
 import View from '~/components/views/challenges/RuntimeCardView.vue'
 
@@ -12,8 +10,9 @@ const props = withDefaults(
     competitionChallengeId: string
     /** full = CTF 全操作;reset-only = AWD 仅重置;readonly = 只显示最终状态 */
     controls?: 'full' | 'reset-only' | 'readonly'
+    dockTarget?: string
   }>(),
-  { controls: 'full' },
+  { controls: 'full', dockTarget: '' },
 )
 const state = bindViewState(useRuntimeCard(props))
 defineExpose({ refreshUntilStopped: state.refreshUntilStopped })

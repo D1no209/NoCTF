@@ -3,7 +3,7 @@ import { toRefs } from 'vue'
 import type { DefinitionComposeViewState } from '~/features/admin/useDefinitionCompose'
 
 const viewProps = defineProps<{ state: DefinitionComposeViewState }>()
-const { Plus, X, bytesToMib, coresToNanoCpus, mibToBytes, nanoCpusToCores, addService, hasMetadata, definition, disabled, onUpdateModelValueResourceMemoryBytes, onUpdateModelValueResourceNanoCpus, onUpdateModelValueResourcePidsLimit, onUpdateModelValueDefinitionEnvironment, onUpdateModelValueDefinitionLabels, onUpdateModelValueDefinitionFlagEnvironmentVariables } = toRefs(viewProps.state)
+const { Plus, X, bytesToMib, nanoCpusToCores, addService, hasMetadata, definition, disabled, onUpdateModelValueResourceMemoryBytes, onUpdateModelValueResourceNanoCpus, onUpdateModelValueResourcePidsLimit, onUpdateModelValueDefinitionEnvironment, onUpdateModelValueDefinitionLabels, onUpdateModelValueDefinitionFlagEnvironmentVariables } = toRefs(viewProps.state)
 </script>
 
 <template>
@@ -85,8 +85,8 @@ const { Plus, X, bytesToMib, coresToNanoCpus, mibToBytes, nanoCpusToCores, addSe
       <FieldDescription>{{ $t('ui.everyServiceInComposeMustHaveResourceLimitsConfigured') }}</FieldDescription>
     </Field>
 
-    <DefinitionSection
-      :title="$t('ui.environmentMetadata')"
+    <DefinitionSection :title="$t('ui.environmentMetadata')"
+
       :hint="$t('ui.environmentVariablesLabelsAndFlagInjectionTargetsMostChallengesDo')"
       :default-open="hasMetadata"
     >

@@ -1,23 +1,23 @@
 <script lang="ts" setup>
 import type { ToasterProps } from 'vue-sonner'
 
-import {
-  CircleCheckIcon,
-  InfoIcon,
-  Loader2Icon,
-  OctagonXIcon,
-  TriangleAlertIcon,
-  XIcon,
-} from '@lucide/vue'
+import { Loader2Icon, XIcon } from '@lucide/vue'
+import NoticeIcon from './NoticeIcon.vue'
 import { reactiveOmit } from '@vueuse/core'
 import { Toaster as Sonner } from 'vue-sonner'
 import { cn } from '~/lib/utils'
+import { onBeforeUnmount, onMounted, shallowRef } from 'vue'
 
 const props = defineProps<ToasterProps>()
 const delegatedProps = reactiveOmit(props, 'class', 'toastOptions', 'containerAriaLabel')
+const target = shallowRef<Element | string>('body')
+function updateTarget() { target.value = document.fullscreenElement ?? 'body' }
+onMounted(() => { updateTarget(); document.addEventListener('fullscreenchange', updateTarget) })
+onBeforeUnmount(() => document.removeEventListener('fullscreenchange', updateTarget))
 </script>
 
 <template>
+  <Teleport :to="target">
   <Sonner
     :container-aria-label="props.containerAriaLabel ?? $t('ui.notifications')"
     :class="cn('toaster group', props.class)"
@@ -39,16 +39,16 @@ const delegatedProps = reactiveOmit(props, 'class', 'toastOptions', 'containerAr
     v-bind="delegatedProps"
   >
     <template #success-icon>
-      <CircleCheckIcon class="size-4" />
+      <NoticeIcon tone="success" />
     </template>
     <template #info-icon>
-      <InfoIcon class="size-4" />
+      <NoticeIcon tone="info" />
     </template>
     <template #warning-icon>
-      <TriangleAlertIcon class="size-4" />
+      <NoticeIcon tone="warning" />
     </template>
     <template #error-icon>
-      <OctagonXIcon class="size-4" />
+      <NoticeIcon tone="error" />
     </template>
     <template #loading-icon>
       <div>
@@ -59,4 +59,5 @@ const delegatedProps = reactiveOmit(props, 'class', 'toastOptions', 'containerAr
       <XIcon class="size-4" />
     </template>
   </Sonner>
+  </Teleport>
 </template>

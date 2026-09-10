@@ -4,8 +4,6 @@ import { Plus, X } from '@lucide/vue'
 import type { UrlBindingModel } from '../../utils/game-config'
 import { UrlExposure } from '../../utils/game-config'
 
-type Events = { 'update:modelValue': [value: UrlBindingModel[]] }
-
 /** Owns state, effects and commands for UrlBindingList. */
 export function useUrlBindingList(props: Readonly<Omit<{
   modelValue: UrlBindingModel[]

@@ -1,22 +1,28 @@
 import { toRefs } from 'vue'
 
-import { ChevronRight, Flag, ShieldCheck, Swords, Users } from '@lucide/vue'
+import { ShieldCheck, Swords, Users } from '@lucide/vue'
 import { getMyTeamEndpoint, listChallengesEndpoint } from '../../api'
 import type { NoCtfapiEndpointsChallengesChallengeResponse, NoCtfapiEndpointsCompetitionsLeaderboardDataScopeProtocol } from '../../api'
 import { bloodRankLabel } from '../leaderboard/types'
+import { directionGlyph } from '../../utils/directions'
+import { challengeProgressIcon } from './challenge-progress-icon'
 import { scoreboardBreakdown, scoreboardColumnsForChallenge, scoreboardCurrentChallengeScore, scoreboardSlot } from '../../utils/scoreboard'
 
 type Challenge = NoCtfapiEndpointsChallengesChallengeResponse
+type BloodRank = 'First' | 'Second' | 'Third'
+const bloodOrder: Record<BloodRank, number> = { First: 0, Second: 1, Third: 2 }
 
-type Events = {
-  ready: [challengeId: string | null]
-  select: [challengeId: string]
+interface ChallengeBloodMark {
+  rank: BloodRank
+  teamId: string
+  teamName: string | null
 }
 
 interface ChallengeProgress {
   solveCount: number
   solvedByMyTeam: boolean
-  bloodRank: string | null
+  bloodRank: BloodRank | null
+  bloods: ChallengeBloodMark[]
   attackCount: number
   defenseCount: number
   attackSucceeded: boolean
@@ -47,7 +53,9 @@ emit: { (event: "ready", ...args: [challengeId: string | null]): void; (event: "
 
   const hideSolved = ref(false)
 
-  const collapsedDirections = ref<Set<string>>(new Set())
+  const search = ref('')
+
+
 
   const board = useScoreboardMatrix(props.competitionId)
 
@@ -75,20 +83,10 @@ emit: { (event: "ready", ...args: [challengeId: string | null]): void; (event: "
     }
     items.value = (data.items ?? []).filter(challenge => challenge.isPublished)
     dataScope.value = data.dataScope ?? 'Live'
-    const selectedExists = items.value.some(item => item.id === props.selectedChallengeId)
-    emit('ready', selectedExists ? props.selectedChallengeId ?? null : items.value[0]?.id ?? null)
   })
 
   watch(isLoggedIn, () => void loadMyTeam())
 
-  watch(
-    () => props.selectedChallengeId,
-    (selectedChallengeId) => {
-      if (loading.value || !items.value.length) return
-      if (!selectedChallengeId || !items.value.some(item => item.id === selectedChallengeId))
-        emit('ready', items.value[0]?.id ?? null)
-    },
-  )
 
   const progressByChallenge = computed(() => {
     const progress = new Map<string, ChallengeProgress>()
@@ -101,6 +99,7 @@ emit: { (event: "ready", ...args: [challengeId: string | null]): void; (event: "
         solveCount: 0,
         solvedByMyTeam: false,
         bloodRank: null,
+        bloods: [],
         attackCount: 0,
         defenseCount: 0,
         attackSucceeded: false,
@@ -117,11 +116,19 @@ emit: { (event: "ready", ...args: [challengeId: string | null]): void; (event: "
           teamSolved ||= (scoreboardBreakdown(slot, 'Solve')?.successfulCount ?? 0) > 0
           teamAttack ||= (scoreboardBreakdown(slot, 'Attack')?.successfulCount ?? 0) > 0
           teamDefense ||= (scoreboardBreakdown(slot, 'Defense')?.successfulCount ?? 0) > 0
+          const award = slot.entries?.find(entry => entry.award)?.award
+          const bloodRank: BloodRank | null = award === 'FirstBlood' ? 'First'
+            : award === 'SecondBlood' ? 'Second'
+              : award === 'ThirdBlood' ? 'Third' : null
+          if (bloodRank && team.teamId && !current.bloods.some(blood => blood.rank === bloodRank)) {
+            current.bloods.push({
+              rank: bloodRank,
+              teamId: team.teamId,
+              teamName: team.teamName?.trim() || null,
+            })
+          }
           if (team.teamId === myTeamId.value && !current.bloodRank) {
-            const award = slot.entries?.find(entry => entry.award)?.award
-            current.bloodRank = award === 'FirstBlood' ? 'First'
-              : award === 'SecondBlood' ? 'Second'
-                : award === 'ThirdBlood' ? 'Third' : null
+            current.bloodRank = bloodRank
           }
         }
         if (teamSolved) current.solveCount += 1
@@ -133,6 +140,7 @@ emit: { (event: "ready", ...args: [challengeId: string | null]): void; (event: "
           current.solvedByMyTeam = isAwdp.value ? teamAttack && teamDefense : teamSolved
         }
       }
+      current.bloods.sort((left, right) => bloodOrder[left.rank] - bloodOrder[right.rank])
       progress.set(challenge.id, current)
     }
     return progress
@@ -144,6 +152,7 @@ emit: { (event: "ready", ...args: [challengeId: string | null]): void; (event: "
       solveCount: 0,
       solvedByMyTeam: false,
       bloodRank: null,
+      bloods: [],
       attackCount: 0,
       defenseCount: 0,
       attackSucceeded: false,
@@ -153,14 +162,38 @@ emit: { (event: "ready", ...args: [challengeId: string | null]): void; (event: "
 
   function awdpProgressLabel(progress: ChallengeProgress | null): string | null {
     if (!progress) return null
-    if (progress.attackSucceeded && progress.defenseSucceeded) return translate("ui.solved")
+    if (progress.attackSucceeded && progress.defenseSucceeded) return translate("ui.attackAndDefenseSucceeded")
     if (progress.attackSucceeded) return translate("ui.attackSucceeded")
     if (progress.defenseSucceeded) return translate("ui.defenseSucceeded")
     return null
   }
 
+  function progressIcon(challengeId?: string) {
+    return challengeProgressIcon(progressFor(challengeId), isAwdp.value)
+  }
+
+  function progressIconLabel(challengeId?: string): string | null {
+    const progress = progressFor(challengeId)
+    if (!progress) return null
+    if (isAwdp.value) return awdpProgressLabel(progress)
+    if (!progress.solvedByMyTeam) return null
+    return progress.bloodRank ? bloodRankLabel(progress.bloodRank) : translate("ui.solved")
+  }
+
   function currentScore(challengeId?: string): number | null {
     return scoreboardCurrentChallengeScore(board.snapshot.value, challengeId)
+  }
+
+  function bloodsFor(challengeId?: string): ChallengeBloodMark[] {
+    return progressFor(challengeId)?.bloods ?? []
+  }
+
+  function bloodTooltip(blood: ChallengeBloodMark): string {
+    return `${bloodRankLabel(blood.rank)} · ${bloodTeamName(blood)}`
+  }
+
+  function bloodTeamName(blood: ChallengeBloodMark): string {
+    return blood.teamName ?? `${translate('ui.teamId')}: ${blood.teamId}`
   }
 
   const groups = computed(() => {
@@ -177,44 +210,39 @@ emit: { (event: "ready", ...args: [challengeId: string | null]): void; (event: "
     }))
   })
 
+  const normalizedSearch = computed(() => search.value.trim().toLocaleLowerCase())
+
   const visibleGroups = computed(() => groups.value
     .map(group => ({
       ...group,
-      challenges: hideSolved.value
-        ? group.challenges.filter(challenge => !progressFor(challenge.id)?.solvedByMyTeam)
-        : group.challenges,
+      challenges: group.challenges.filter(challenge =>
+        (!hideSolved.value || !progressFor(challenge.id)?.solvedByMyTeam)
+        && (!normalizedSearch.value || (challenge.title ?? '').toLocaleLowerCase().includes(normalizedSearch.value))),
     }))
     .filter(group => group.challenges.length > 0))
 
-  const visibleChallengeIds = computed(() => visibleGroups.value
-    .flatMap(group => group.challenges)
-    .map(challenge => challenge.id)
-    .filter((id): id is string => Boolean(id)))
+  const emptyLabel = computed(() => normalizedSearch.value
+    ? translate('challengeNavigator.noMatches')
+    : hideSolved.value ? translate('ui.noUnsolvedChallenges') : translate('ui.thereAreNoPublishedTopicsYet'))
 
-  watch(
-    [hideSolved, visibleChallengeIds],
-    ([hidden, challengeIds]) => {
-      if (!hidden || !challengeIds.length || !props.selectedChallengeId) return
-      if (!challengeIds.includes(props.selectedChallengeId)) emit('ready', challengeIds[0]!)
-    },
-    { flush: 'post' },
-  )
+  const groupOptions = computed(() => visibleGroups.value.map(group => ({
+    value: group.direction,
+    label: group.direction,
+    items: group.challenges.filter(challenge => Boolean(challenge.id))
+      .map(challenge => ({ value: challenge.id!, label: challenge.title ?? '', challenge })),
+  })))
+  const listOptions = computed(() => groupOptions.value.flatMap(group => group.items))
+  const visibleChallengeIds = computed(() => listOptions.value.map(item => item.value))
 
-  function isDirectionCollapsed(direction: string): boolean {
-    return collapsedDirections.value.has(direction)
-  }
+  watch([visibleChallengeIds, () => props.selectedChallengeId], ([ids, selectedId]) => {
+    if (!loading.value && ids.length && !ids.includes(selectedId ?? '')) emit('ready', ids[0]!)
+  }, { flush: 'post' })
 
-  function toggleDirection(direction: string): void {
-    const next = new Set(collapsedDirections.value)
-    if (next.has(direction)) next.delete(direction)
-    else next.add(direction)
-    collapsedDirections.value = next
-  }
+  function selectChallenge(challengeId: string) { emit('select', challengeId) }
 
   return {
+      directionGlyph,
       ...toRefs(props),
-      ChevronRight,
-      Flag,
       ShieldCheck,
       Swords,
       Users,
@@ -226,13 +254,21 @@ emit: { (event: "ready", ...args: [challengeId: string | null]): void; (event: "
       error,
       dataScope,
       hideSolved,
+      search,
       board,
       progressFor,
       awdpProgressLabel,
+      progressIcon,
+      progressIconLabel,
       currentScore,
+      bloodsFor,
+      bloodTooltip,
+      bloodTeamName,
       visibleGroups,
-      isDirectionCollapsed,
-      toggleDirection
+      emptyLabel,
+      listOptions,
+      groupOptions,
+      selectChallenge
     }
 }
 

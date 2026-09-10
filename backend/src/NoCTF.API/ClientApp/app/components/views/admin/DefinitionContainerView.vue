@@ -8,7 +8,7 @@ const { FlagSource, isAwdp, flagEnvDisabled, hasMetadata, hasSecurity, definitio
 
 <template>
   <FieldGroup>
-    <DefinitionSection :title="$t('ui.basics')" :collapsible="false">
+    <DefinitionSection :title="$t('ui.basics')"  :collapsible="false">
       <Field>
         <FieldLabel>{{ $t('ui.mirror') }}</FieldLabel>
         <Input
@@ -43,7 +43,7 @@ const { FlagSource, isAwdp, flagEnvDisabled, hasMetadata, hasSecurity, definitio
       </Field>
     </DefinitionSection>
 
-    <DefinitionSection :title="$t('ui.network')" :collapsible="false">
+    <DefinitionSection :title="$t('ui.network')"  :collapsible="false">
       <div class="grid gap-4 sm:grid-cols-2">
         <Field>
           <FieldLabel>{{ $t('ui.externalPort') }}</FieldLabel>
@@ -71,8 +71,8 @@ const { FlagSource, isAwdp, flagEnvDisabled, hasMetadata, hasSecurity, definitio
       </div>
     </DefinitionSection>
 
-    <DefinitionSection
-      :title="$t('ui.environmentMetadata')"
+    <DefinitionSection :title="$t('ui.environmentMetadata')"
+
       :hint="$t('ui.environmentVariablesAndLabelsMostChallengesDoNotNeedThese')"
       :default-open="hasMetadata"
     >
@@ -100,8 +100,8 @@ const { FlagSource, isAwdp, flagEnvDisabled, hasMetadata, hasSecurity, definitio
       </Field>
     </DefinitionSection>
 
-    <DefinitionSection
-      :title="$t('ui.securityOptions')"
+    <DefinitionSection :title="$t('ui.securityOptions')"
+
       :hint="$t('ui.privilegeEscalationIsDisabledAndAllLinuxCapabilitiesAreDropped')"
       :default-open="hasSecurity"
     >

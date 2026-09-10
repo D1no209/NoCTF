@@ -1,7 +1,9 @@
 import { toRefs } from 'vue'
 import type { ComponentPublicInstance } from 'vue'
-import { chartPalette, echarts } from '../../utils/echarts'
+import { chartTooltipTheme, echarts, trendChartPalette } from '../../utils/echarts'
+import { themeColor } from '../../utils/theme-color'
 import type { TrendSeries } from './types'
+import { scoreTrendTimeRange } from './score-trend-range'
 
 /** Owns state, effects and commands for ScoreTrendChart. */
 export function useScoreTrendChart(props: Readonly<Omit<{
@@ -27,13 +29,109 @@ export function useScoreTrendChart(props: Readonly<Omit<{
 
   let chart: echarts.ECharts | null = null
 
+  let timeRange = scoreTrendTimeRange(props.series, props.rangeStart, props.rangeEnd)
+
+  let selectedWindow: { start: number, end: number } | null = null
+
+  let selectedScoreRange: { start: number, end: number } | null = null
+
+  let focusedTeamName: string | null = null
+
+  let applyingOption = false
+
+  function zoomValue(value: unknown, percent: unknown, edge: 'start' | 'end'): number {
+    const numeric = typeof value === 'number' ? value : Number.NaN
+    if (Number.isFinite(numeric)) return numeric
+    const ratio = typeof percent === 'number' && Number.isFinite(percent)
+      ? Math.min(100, Math.max(0, percent)) / 100
+      : edge === 'start' ? 0 : 1
+    return timeRange.axisMin + (timeRange.axisMax - timeRange.axisMin) * ratio
+  }
+
+  function rememberZoom(...args: unknown[]) {
+    const event = (args[0] ?? {}) as {
+    start?: number
+    end?: number
+    startValue?: number
+    endValue?: number
+    batch?: Array<{
+      start?: number
+      end?: number
+      startValue?: number
+      endValue?: number
+      dataZoomId?: string
+      dataZoomIndex?: number
+    }>
+    dataZoomId?: string
+    dataZoomIndex?: number
+    }
+    if (applyingOption) return
+    const change = event.batch?.[0] ?? event
+    const dataZoomId = change.dataZoomId ?? event.dataZoomId
+    const dataZoomIndex = change.dataZoomIndex ?? event.dataZoomIndex
+    if (dataZoomId === 'score-trend-score-inside' || dataZoomIndex === 2) {
+      const start = Math.min(100, Math.max(0, change.start ?? 0))
+      const end = Math.min(100, Math.max(0, change.end ?? 100))
+      selectedScoreRange = start <= 0 && end >= 100 || start >= end
+        ? null
+        : { start, end }
+      return
+    }
+    if ((change.start ?? 0) <= 0 && (change.end ?? 100) >= 100) {
+      selectedWindow = null
+      return
+    }
+    const start = zoomValue(change.startValue, change.start, 'start')
+    const end = zoomValue(change.endValue, change.end, 'end')
+    selectedWindow = start < end ? { start, end } : null
+  }
+
+  function restoreChartView() {
+    if (!applyingOption) {
+      selectedWindow = null
+      selectedScoreRange = null
+      focusedTeamName = null
+    }
+  }
+
+  function toggleTeamFocus(...args: unknown[]) {
+    if (applyingOption) return
+    const name = (args[0] as { name?: unknown } | undefined)?.name
+    if (typeof name !== 'string' || !name) return
+    focusedTeamName = focusedTeamName === name ? null : name
+    render()
+  }
+
   function buildOption(): echarts.EChartsCoreOption {
-    const end = props.rangeEnd ?? new Date().toISOString()
-    const start = props.rangeStart ?? end
+    timeRange = scoreTrendTimeRange(
+      props.series,
+      props.rangeStart,
+      props.rangeEnd,
+    )
+    const zoomWindow = selectedWindow
+      ? {
+          startValue: Math.max(timeRange.axisMin, selectedWindow.start),
+          endValue: Math.min(timeRange.axisMax, selectedWindow.end),
+        }
+      : { start: 0, end: 100 }
+    const scoreZoom = selectedScoreRange ?? { start: 0, end: 100 }
     const foreground = el.value ? getComputedStyle(el.value).color : undefined
+    const fontFamily = el.value ? getComputedStyle(el.value).fontFamily : undefined
+    const palette = trendChartPalette(el.value)
+    const border = themeColor('--border', el.value ?? undefined)
+    const primary = themeColor('--primary', el.value ?? undefined)
+    const muted = themeColor('--muted-foreground', el.value ?? undefined)
+    const teamNames = props.series.map(team => team.teamName ?? translate('ui.team'))
+    if (focusedTeamName && !teamNames.includes(focusedTeamName))
+      focusedTeamName = null
+    const selectedTeams = Object.fromEntries(teamNames.map(name => [
+      name,
+      focusedTeamName === null || focusedTeamName === name,
+    ]))
     return {
       backgroundColor: 'transparent',
-      color: chartPalette(el.value),
+      textStyle: { fontFamily },
+      color: palette,
       title: props.title
         ? {
             text: props.title,
@@ -43,19 +141,33 @@ export function useScoreTrendChart(props: Readonly<Omit<{
         : undefined,
       grid: { left: 64, right: 32, top: props.title ? 44 : 24, bottom: 88 },
       tooltip: {
+        ...chartTooltipTheme(el.value),
         trigger: 'axis',
-        valueFormatter: (value: number | string) => `${value} pts`,
+        appendTo: 'body',
+        confine: true,
+        className: 'noctf-chart-tooltip',
+        axisPointer: {
+          type: 'line',
+          lineStyle: { color: primary, width: 1, type: 'dashed', opacity: 0.7 },
+        },
+        valueFormatter: (value: number | string) => `${value} ${translate('ui.pts2')}`,
       },
       legend: {
         bottom: 36,
         type: 'scroll',
         itemGap: 16,
-        hoverLink: false,
-        selectedMode: false,
+        hoverLink: true,
+        selectedMode: 'multiple',
+        selected: selectedTeams,
+        inactiveColor: muted,
         textStyle: { color: foreground },
       },
       toolbox: {
-        right: 16,
+        top: 4,
+        right: 32,
+        itemGap: 14,
+        iconStyle: { borderColor: foreground },
+        emphasis: { iconStyle: { borderColor: primary } },
         feature: {
           saveAsImage: { title: translate("ui.downloadAsImage") },
           dataZoom: { title: { zoom: translate("ui.areaZoom"), back: translate("ui.zoomRestore") }, yAxisIndex: 'none' },
@@ -64,35 +176,91 @@ export function useScoreTrendChart(props: Readonly<Omit<{
       },
       xAxis: {
         type: 'time',
-        axisLabel: { hideOverlap: true, color: foreground },
+        min: timeRange.axisMin,
+        max: timeRange.axisMax,
+        axisLine: { lineStyle: { color: border } },
+        axisTick: { lineStyle: { color: border } },
+        axisLabel: { hideOverlap: true, color: muted },
       },
       yAxis: {
         type: 'value',
         name: translate("ui.score"),
-        nameTextStyle: { color: foreground },
-        axisLabel: { color: foreground },
-        splitLine: { lineStyle: { opacity: 0.35 } },
+        nameTextStyle: { color: muted },
+        axisLine: { lineStyle: { color: border } },
+        axisTick: { lineStyle: { color: border } },
+        axisLabel: { color: muted },
+        splitLine: { lineStyle: { color: border, opacity: 0.45, type: 'dashed' } },
       },
       dataZoom: [
-        { type: 'slider', bottom: 4, height: 24 },
-        { type: 'inside' },
+        {
+          id: 'score-trend-time-slider',
+          type: 'slider',
+          bottom: 4,
+          height: 24,
+          filterMode: 'none',
+          ...zoomWindow,
+        },
+        {
+          id: 'score-trend-time-inside',
+          type: 'inside',
+          filterMode: 'none',
+          zoomOnMouseWheel: false,
+          moveOnMouseWheel: false,
+          moveOnMouseMove: false,
+          ...zoomWindow,
+        },
+        {
+          id: 'score-trend-score-inside',
+          type: 'inside',
+          yAxisIndex: 0,
+          filterMode: 'none',
+          zoomOnMouseWheel: 'ctrl',
+          moveOnMouseWheel: false,
+          moveOnMouseMove: false,
+          ...scoreZoom,
+        },
       ],
-      series: props.series.map((team) => {
-        const raw = (team.points ?? [])
+      series: props.series.map((team, index) => {
+        const raw = [...new Map((team.points ?? [])
           .filter((p) => p.at)
           .map((p) => [new Date(p.at!).getTime(), p.score ?? 0] as [number, number])
-        const data: [number, number][] = raw.length
-          ? [[new Date(start).getTime(), 0], ...raw, [new Date(end).getTime(), raw[raw.length - 1]![1]]]
-          : [[new Date(start).getTime(), 0], [new Date(end).getTime(), 0]]
+          .filter(([at]) => Number.isFinite(at))).entries()]
+          .sort((left, right) => left[0] - right[0])
+        const data: [number, number][] = []
+        if (!raw.length) {
+          data.push([timeRange.start, 0], [timeRange.end, 0])
+        }
+        else {
+          if (raw[0]![0] > timeRange.start)
+            data.push([timeRange.start, 0])
+          data.push(...raw)
+          if (raw[raw.length - 1]![0] < timeRange.end)
+            data.push([timeRange.end, raw[raw.length - 1]![1]])
+        }
+        const lineColor = palette[index % Math.max(1, palette.length)]
         return {
           type: 'line' as const,
           colorBy: 'series' as const,
           name: team.teamName ?? translate("ui.team"),
           step: 'end' as const,
           showSymbol: false,
-          emphasis: { disabled: true },
-          blur: { lineStyle: { opacity: 1 }, itemStyle: { opacity: 1 } },
-          lineStyle: { width: 2 },
+          symbol: 'circle',
+          symbolSize: 7,
+          lineStyle: {
+            color: lineColor,
+            width: focusedTeamName ? 3.2 : 2.4,
+            opacity: 1,
+            shadowBlur: focusedTeamName ? 16 : 0,
+            shadowColor: focusedTeamName ? lineColor : 'transparent',
+          },
+          itemStyle: { color: lineColor, borderColor: foreground, borderWidth: 1 },
+          emphasis: {
+            focus: 'series' as const,
+            lineStyle: { width: 4, opacity: 1, shadowBlur: 18, shadowColor: lineColor },
+            itemStyle: { opacity: 1 },
+          },
+          blur: { lineStyle: { opacity: 0.14 }, itemStyle: { opacity: 0.14 } },
+          animationDurationUpdate: 420,
           data,
         }
       }),
@@ -101,11 +269,20 @@ export function useScoreTrendChart(props: Readonly<Omit<{
 
   function render() {
     if (!chart) return
-    chart.setOption(buildOption(), { notMerge: true })
+    applyingOption = true
+    try {
+      chart.setOption(buildOption(), { notMerge: true })
+    }
+    finally {
+      applyingOption = false
+    }
   }
 
   onMounted(() => {
     chart = echarts.init(el.value!)
+    chart.on('datazoom', rememberZoom)
+    chart.on('restore', restoreChartView)
+    chart.on('legendselectchanged', toggleTeamFocus)
     render()
   })
 
@@ -124,6 +301,9 @@ export function useScoreTrendChart(props: Readonly<Omit<{
 
   onUnmounted(() => {
     observer?.disconnect()
+    chart?.off('datazoom', rememberZoom)
+    chart?.off('restore', restoreChartView)
+    chart?.off('legendselectchanged', toggleTeamFocus)
     chart?.dispose()
     chart = null
   })

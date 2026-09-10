@@ -3,11 +3,11 @@ import { toRefs } from 'vue'
 import type { AuthRegisterPageViewState } from '~/features/routes/auth/useAuthRegisterPage'
 
 const viewProps = defineProps<{ state: AuthRegisterPageViewState }>()
-const { configuration, userName, email, password, confirmPassword, error, pending, registered, resendPending, resendDone, resendError, submit, resendVerification } = toRefs(viewProps.state)
+const { registerCharacter, loginCharacter, configuration, userName, email, password, confirmPassword, error, pending, registered, resendPending, resendDone, resendError, submit, resendVerification } = toRefs(viewProps.state)
 </script>
 
 <template>
-  <div class="mx-auto flex max-w-md flex-col px-4 py-12">
+  <div class="mx-auto flex w-full max-w-xl flex-col px-4 py-12">
     <div class="mb-8 flex flex-col items-center gap-2 text-center">
       <NuxtLink to="/" class="flex items-baseline gap-1.5 font-mono text-2xl font-semibold tracking-tight">
         <span class="text-primary">&gt;</span>
@@ -16,8 +16,10 @@ const { configuration, userName, email, password, confirmPassword, error, pendin
       </NuxtLink>
       <p v-if="configuration?.description" class="text-sm text-muted-foreground">{{ configuration.description }}</p>
     </div>
-    <Card v-if="registered">
-      <CardHeader>
+    <Card v-if="registered" class="auth-card">
+      <img data-slot="auth-character-cutout" data-theme-character="dark" data-corner="left-bottom" :src="loginCharacter" alt="" aria-hidden="true">
+      <img data-slot="auth-character-cutout" data-theme-character="light" data-corner="right-top" :src="registerCharacter" alt="" aria-hidden="true">
+      <CardHeader class="relative z-10">
         <CardTitle>{{ $t('ui.registrationSuccessful') }}</CardTitle>
         <CardDescription>
           {{ registered.requiresEmailVerification
@@ -27,48 +29,43 @@ const { configuration, userName, email, password, confirmPassword, error, pendin
             : $t('ui.youCanNowLogIn') }}
         </CardDescription>
       </CardHeader>
-      <CardContent v-if="registered.requiresEmailVerification" class="space-y-3">
+      <CardContent v-if="registered.requiresEmailVerification" class="relative z-10 space-y-3">
         <Alert v-if="resendDone">
           <AlertDescription>{{ $t('ui.ifThisEmailBelongsToAnUnverifiedAccountAnotherVerification') }}</AlertDescription>
         </Alert>
         <Alert v-if="resendError" variant="destructive">
           <AlertDescription>{{ $message(resendError) }}</AlertDescription>
         </Alert>
-        <Button
-          type="button"
-          variant="outline"
-          class="w-full"
-          :disabled="resendPending"
-          @click="resendVerification"
-        >
+        <Button type="button" variant="outline" class="w-full" :disabled="resendPending" @click="resendVerification">
           <Spinner v-if="resendPending" data-icon="inline-start" />
           {{ $t('ui.resendVerificationEmail') }}
         </Button>
       </CardContent>
-      <CardFooter>
+      <CardFooter class="relative z-10">
         <Button as-child class="w-full">
           <NuxtLink to="/auth/login">{{ $t('ui.goToLogin') }}</NuxtLink>
         </Button>
       </CardFooter>
     </Card>
-    <Card v-else>
-      <CardHeader>
-        <CardTitle>{{ $t('ui.createAccount') }}</CardTitle>
-        <CardDescription>{{ $t('ui.createANewAccountToEnterTheContest') }}</CardDescription>
+    <Card v-else class="auth-card">
+      <img data-slot="auth-character-cutout" data-theme-character="dark" data-corner="left-bottom" :src="loginCharacter" alt="" aria-hidden="true">
+      <img data-slot="auth-character-cutout" data-theme-character="light" data-corner="right-top" :src="registerCharacter" alt="" aria-hidden="true">
+      <CardHeader class="relative z-10 pt-3">
+        <CardTitle class="text-xl font-semibold">{{ $t('ui.createAccount') }}</CardTitle>
       </CardHeader>
-      <CardContent>
-        <form @submit.prevent="submit">
+      <CardContent class="relative z-10">
+        <UiForm @submit.prevent="submit">
           <FieldGroup>
             <Alert v-if="error" variant="destructive">
               <AlertDescription>{{ $message(error) }}</AlertDescription>
             </Alert>
             <Field>
               <FieldLabel for="userName">{{ $t('ui.username') }}</FieldLabel>
-              <Input id="userName" v-model="userName" autocomplete="username" required />
+              <Input id="userName" v-model="userName" autocomplete="username" required class="max-w-none" />
             </Field>
             <Field>
               <FieldLabel for="email">{{ $t('ui.email') }}</FieldLabel>
-              <Input id="email" v-model="email" type="email" autocomplete="email" required />
+              <Input id="email" v-model="email" type="email" autocomplete="email" required class="max-w-none" />
             </Field>
             <Field>
               <FieldLabel for="password">{{ $t('ui.password') }}</FieldLabel>
@@ -79,13 +76,17 @@ const { configuration, userName, email, password, confirmPassword, error, pendin
               <PasswordInput id="confirmPassword" v-model="confirmPassword" autocomplete="new-password" required />
             </Field>
             <Field>
-              <Button type="submit" :disabled="pending" class="w-full">
-                <Spinner v-if="pending" data-icon="inline-start" /> {{ $t('ui.createAccount') }} </Button>
+              <Button type="submit" :disabled="pending" class="w-full sm:mx-auto sm:w-2/3">
+                <Spinner v-if="pending" data-icon="inline-start" />
+                {{ $t('ui.createAccount') }}
+              </Button>
             </Field>
           </FieldGroup>
-        </form>
+        </UiForm>
       </CardContent>
-      <CardFooter class="justify-center text-sm text-muted-foreground"> {{ $t('ui.alreadyHaveAnAccount') }} <NuxtLink to="/auth/login" class="ml-1 underline">{{ $t('ui.logInDirectly') }}</NuxtLink>
+      <CardFooter class="relative z-10 justify-center text-sm text-muted-foreground">
+        {{ $t('ui.alreadyHaveAnAccount') }}
+        <NuxtLink to="/auth/login" class="ml-1 underline">{{ $t('ui.logInDirectly') }}</NuxtLink>
       </CardFooter>
     </Card>
   </div>

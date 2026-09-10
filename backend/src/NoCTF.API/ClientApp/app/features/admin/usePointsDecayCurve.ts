@@ -146,6 +146,10 @@ export function usePointsDecayCurve(props: Readonly<{ curve: PointsCurveValue }>
     hoverPointer.value = null
   }
 
+  function onFocus() {
+    hoveredCount.value ??= 1
+  }
+
   function onKeydown(event: KeyboardEvent) {
     if (!preview.value || !['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return
     event.preventDefault()
@@ -174,6 +178,7 @@ export function usePointsDecayCurve(props: Readonly<{ curve: PointsCurveValue }>
       tooltipTransform,
       onPointerMove,
       onPointerLeave,
+      onFocus,
       onKeydown,
       setSvgElementRef
     }

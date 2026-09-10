@@ -3,19 +3,15 @@ import { toRefs } from 'vue'
 import type { AdminChallengesIndexPageViewState } from '~/features/routes/admin/challenges/useAdminChallengesIndexPage'
 
 const viewProps = defineProps<{ state: AdminChallengesIndexPageViewState }>()
-const { Plus, canOrganize, templates, loading, loadError, includeDeleted, visibilityLabel, AdminDateTime, AdminGameModeBadge } = toRefs(viewProps.state)
+const { Plus, canOrganize, templates, loading, loadError, includeDeleted, createOpen, setCreateOpen, templateCreated, visibilityLabel, AdminDateTime, AdminGameModeBadge, ChallengeTemplateCreateDialog } = toRefs(viewProps.state)
 </script>
 
 <template>
   <div class="mx-auto flex max-w-7xl flex-col gap-6 px-4 py-8">
     <div class="flex items-center justify-between gap-4">
-      <div>
-        <h1 class="text-2xl font-semibold">{{ $t('ui.challengeLibrary2') }}</h1>
-        <p class="text-sm text-muted-foreground">{{ $t('ui.globalQuestionTemplateWhichCanBeInstantiatedIntoEachCompetition') }}</p>
-      </div>
-      <Button v-if="canOrganize" as-child>
-        <NuxtLink to="/admin/challenges/new">
-          <Plus data-icon="inline-start" /> {{ $t('ui.createNewTemplate') }} </NuxtLink>
+      <h1 class="text-2xl font-semibold">{{ $t('ui.challengeLibrary2') }}</h1>
+      <Button v-if="canOrganize" @click="setCreateOpen(true)">
+          <Plus data-icon="inline-start" /> {{ $t('ui.createNewTemplate') }}
       </Button>
     </div>
 
@@ -86,5 +82,12 @@ const { Plus, canOrganize, templates, loading, loadError, includeDeleted, visibi
         </Table>
       </Card>
     </template>
+
+    <component
+      :is="ChallengeTemplateCreateDialog"
+      :open="createOpen"
+      @update:open="setCreateOpen"
+      @created="templateCreated"
+    />
   </div>
 </template>

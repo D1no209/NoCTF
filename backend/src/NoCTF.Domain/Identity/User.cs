@@ -22,6 +22,9 @@ public sealed class User
     public string? SchoolStudentNumber { get; set; }
     public Guid? AvatarFileId { get; set; }
     public NoCTF.Domain.Storage.StoredFile? AvatarFile { get; set; }
+    public Guid? WallpaperFileId { get; set; }
+    public NoCTF.Domain.Storage.StoredFile? WallpaperFile { get; set; }
+    public bool WallpaperEnabled { get; set; }
     public DateTimeOffset? EmailVerifiedAt { get; set; }
     public DateTimeOffset CreatedAt { get; set; }
     public DateTimeOffset UpdatedAt { get; set; }

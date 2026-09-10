@@ -1,4 +1,3 @@
-import { proxyRefs } from 'vue'
 import { toRefs } from 'vue'
 
 import type { DefinitionModel } from '../../utils/game-config'
@@ -22,8 +21,6 @@ export function useDefinitionFlagInjectionSection(props: Readonly<Omit<{
       isCompose,
       toggleFlagInjection
     }
-  const viewState = proxyRefs(viewBindings)
-
   function onUpdateModelValueTimeoutSeconds(value: number | null) {
     if (props.model.flagInjection) props.model.flagInjection.timeoutSeconds = value
   }

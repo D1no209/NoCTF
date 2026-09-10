@@ -7,14 +7,14 @@ import FlagSubmitComponent from '../FlagSubmit.vue'
 import RuntimeAccessUrlComponent from '../RuntimeAccessUrl.vue'
 import RuntimeCardComponent from '../RuntimeCard.vue'
 
-type Events = { submitted: [] }
-
 /** Owns state, effects and commands for AwdPanel. */
 export function useAwdPanel(props: Readonly<{
   competition: NoCtfapiEndpointsCompetitionsCompetitionResponse
   challenge: NoCtfapiEndpointsChallengesChallengeResponse
+  flagDockTarget?: string
+  runtimeDockTarget?: string
 }>,
-emit: { (event: "submitted", ...args: []): void }) {
+emit: { (event: "submitted", ...args: []): void; (event: "remainingChanged", ...args: [remaining: number | null]): void }) {
   const targets = ref<NoCtfapiEndpointsRuntimeRuntimeTargetResponse[]>([])
 
   const targetsError = ref<string | null>(null)

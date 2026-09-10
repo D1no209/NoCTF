@@ -9,6 +9,8 @@ public sealed class FileUploadLimitsTests
     {
         await Assert.That(FileUploadLimits.Default.MaximumAvatarBytes)
             .IsEqualTo(12L * 1024 * 1024);
+        await Assert.That(FileUploadLimits.Default.MaximumWallpaperBytes)
+            .IsEqualTo(12L * 1024 * 1024);
         await Assert.That(FileUploadLimits.Default.MaximumLogoBytes)
             .IsEqualTo(12L * 1024 * 1024);
         await Assert.That(FileUploadLimits.Default.MaximumPosterBytes)
@@ -24,6 +26,7 @@ public sealed class FileUploadLimitsTests
         var limits = new FileUploadLimits(
             0,
             FileUploadLimits.MaximumConfigurableBytes + 1,
+            1,
             1,
             1);
 

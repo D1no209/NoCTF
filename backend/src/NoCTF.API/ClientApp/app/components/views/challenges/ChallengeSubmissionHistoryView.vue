@@ -3,7 +3,7 @@ import { toRefs } from 'vue'
 import type { ChallengeSubmissionHistoryViewState } from '~/features/challenges/useChallengeSubmissionHistory'
 
 const viewProps = defineProps<{ state: ChallengeSubmissionHistoryViewState }>()
-const { valueDialogOpen, valueSubmission, submittedValue, valueLoading, valueError, items, loading, error, hasMore, initialized, loadMore, loadNextPage, pendingPollingTimedOut, startPendingPolling, pendingPollingErrorMessage, resultVariant, resultText, canReadSubmittedValue, closeValueDialog, openSubmittedValue, setValueDialogOpen } = toRefs(viewProps.state)
+const { valueDialogOpen, valueSubmission, submittedValue, valueLoading, valueError, items, loading, error, hasMore, initialized, loadNextPage, pendingPollingTimedOut, startPendingPolling, pendingPollingErrorMessage, resultVariant, resultText, canReadSubmittedValue, closeValueDialog, openSubmittedValue, setValueDialogOpen } = toRefs(viewProps.state)
 </script>
 
 <template>
@@ -88,10 +88,10 @@ const { valueDialogOpen, valueSubmission, submittedValue, valueLoading, valueErr
         <Alert v-else-if="valueError" variant="destructive">
           <AlertDescription>{{ $message(valueError) }}</AlertDescription>
         </Alert>
-        <pre
+        <ScrollSurface as="pre"
           v-else-if="submittedValue"
           class="max-h-64 overflow-auto whitespace-pre-wrap break-all rounded-md border bg-muted/40 p-4 font-mono text-sm select-text"
-        >{{ submittedValue }}</pre>
+        >{{ submittedValue }}</ScrollSurface>
         <p v-else class="text-sm text-muted-foreground">{{ $t('ui.noFlagValueIsAvailable') }}</p>
 
         <DialogFooter>

@@ -8,7 +8,6 @@ import type { WorkspaceNavGroup } from '../../app/workspace-nav'
 import { createTrailingRefresh } from '../../../lib/latest-page-refresh'
 import CompetitionCountdownComponent from '../../competitions/CompetitionCountdown.vue'
 import LifecycleBadgeComponent from '../../competitions/LifecycleBadge.vue'
-import ModeBadgeComponent from '../../competitions/ModeBadge.vue'
 
 /** Owns state, effects and commands for CompetitionsByIdPage. */
 export function useCompetitionsByIdPage() {
@@ -18,6 +17,7 @@ export function useCompetitionsByIdPage() {
 
   const isControlScreen = computed(() => [
     `/competitions/${competitionId.value}/live`,
+    `/competitions/${competitionId.value}/live-`,
     `/competitions/${competitionId.value}/awdp-live`,
   ].includes(route.path))
 
@@ -144,7 +144,7 @@ export function useCompetitionsByIdPage() {
       {
         label: translate("ui.competitions"),
         items: [
-          { to: base, label: translate("ui.overview"), icon: LayoutDashboard, exact: true },
+          { to: `/competitions?competition=${competitionId.value}`, label: translate("ui.overview"), icon: LayoutDashboard, exact: true },
           ...(challengesVisible && canReadChallenges ? [{ to: `${base}/challenges`, label: translate("ui.challenge"), icon: Puzzle }] : []),
           { to: `${base}/leaderboard`, label: translate("ui.leaderboard"), icon: Trophy },
         ],
@@ -170,7 +170,6 @@ export function useCompetitionsByIdPage() {
 
   const LifecycleBadge = markRaw(LifecycleBadgeComponent)
 
-  const ModeBadge = markRaw(ModeBadgeComponent)
 
   async function initialize() {
     await refresh()
@@ -190,7 +189,6 @@ export function useCompetitionsByIdPage() {
       refreshMyStanding,
       CompetitionCountdown,
       LifecycleBadge,
-      ModeBadge
     }
 }
 

@@ -4,5 +4,7 @@ definePageMeta({ middleware: 'platform-admin' })
 </script>
 
 <template>
-  <Feature><slot /></Feature>
+  <div data-slot="platform-admin-page" class="min-w-0">
+    <Feature><slot /></Feature>
+  </div>
 </template>

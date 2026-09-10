@@ -8,8 +8,6 @@ import { scoreboardDirectionGroups, scoreboardMemberContributionSlices, scoreboa
 import type { ScoreboardChallengeColumnGroup } from '../../utils/scoreboard'
 import type { TrendSeries } from './types'
 
-type Events = { retryTrends: [] }
-
 /** Owns state, effects and commands for ScoreboardTeamDetailDialog. */
 export function useScoreboardTeamDetailDialog(props: Readonly<{
   mode?: NoCtfapiEndpointsCompetitionsGameModeProtocol | null

@@ -5,8 +5,6 @@ import type { ConfigValues, GameModeValue } from '../../utils/game-config'
 import { competitionConfigFields, fieldDefaultValue, parseConfigValues, serializeConfigValues } from '../../utils/game-config'
 import ConfigFieldInputComponent from './ConfigFieldInput.vue'
 
-type Events = { save: [json: string] }
-
 /** Owns state, effects and commands for CompetitionModeConfigEditor. */
 export function useCompetitionModeConfigEditor(props: Readonly<Omit<{
   mode: GameModeValue

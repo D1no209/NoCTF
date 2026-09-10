@@ -29,8 +29,8 @@ describe('historical adjudication difference preview', () => {
 
   test('describes the narrow legacy AWDP break analysis accurately', () => {
     expect(source).toContain("ui.thisPreviewAnalyzesCtfFlagFactsAndAwdpBreakFacts")
-    expect(source).toContain("CurrentDuplicateShouldBeCorrect: translate(\"ui.theCurrentDuplicateResultComesFromALegacyDefectAnd\")")
-    expect(source).toContain("MissingAdjudicationRecord: translate(\"ui.theCurrentResultHasNoImmutableAdjudicationEvent\")")
-    expect(source).toContain("TeamEligibilityHistoryRequiresReview: translate(\"ui.currentTeamEligibilityCannotProveBloodAwardEligibilityAtThe\")")
+    expect(source).toContain('CurrentDuplicateShouldBeCorrect: "ui.theCurrentDuplicateResultComesFromALegacyDefectAnd"')
+    expect(source).toContain('MissingAdjudicationRecord: "ui.theCurrentResultHasNoImmutableAdjudicationEvent"')
+    expect(source).toContain('TeamEligibilityHistoryRequiresReview: "ui.currentTeamEligibilityCannotProveBloodAwardEligibilityAtThe"')
   })
 })

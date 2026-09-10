@@ -1,8 +1,6 @@
 <script setup lang="ts">
 import { bindViewState } from '~/features/shared/view-state'
 
-import type { NoCtfapiEndpointsGameplayFactsGameplayFactListItemResponse } from '~/api'
-
 import { useChallengeSubmissionHistory } from './useChallengeSubmissionHistory'
 import View from '~/components/views/challenges/ChallengeSubmissionHistoryView.vue'
 

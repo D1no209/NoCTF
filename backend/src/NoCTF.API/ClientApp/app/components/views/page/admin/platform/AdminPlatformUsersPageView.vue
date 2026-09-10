@@ -100,7 +100,7 @@ const { KeyRound, Trash2, currentUser, loading, loadError, search, roleFilter, R
         <div v-if="detailLoading" class="flex flex-col gap-3 p-6">
           <Skeleton v-for="i in 5" :key="i" class="h-8 w-full" />
         </div>
-        <div v-else-if="detail" :key="detail.id" class="flex min-h-0 flex-1 flex-col gap-6 overflow-y-auto p-6">
+        <ScrollSurface as="div" v-else-if="detail" :key="detail.id" class="flex min-h-0 flex-1 flex-col gap-6 overflow-y-auto p-6">
           <section class="flex flex-col gap-4" aria-labelledby="user-account-overview">
             <h3 id="user-account-overview" class="font-semibold">{{ $t('ui.accountInformation') }}</h3>
             <dl class="grid grid-cols-[6rem_minmax(0,1fr)] gap-x-5 gap-y-2.5 text-sm sm:grid-cols-[7rem_minmax(0,1fr)]">
@@ -265,7 +265,7 @@ const { KeyRound, Trash2, currentUser, loading, loadError, search, roleFilter, R
                 <Trash2 data-icon="inline-start" /> {{ $t('ui.deleteUser') }} </Button>
             </div>
           </div>
-        </div>
+        </ScrollSurface>
       </SheetContent>
     </Sheet>
 

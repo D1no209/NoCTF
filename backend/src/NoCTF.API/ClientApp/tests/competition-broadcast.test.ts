@@ -146,10 +146,10 @@ describe('competition broadcast projection', () => {
 
     expect(challengePage).toContain("<component :is=\"CompetitionParticipantWorkspace\"")
     expect(participantWorkspace).toContain("<component :is=\"CompetitionBroadcastPanel\"")
-    expect(participantWorkspace).toContain('xl:grid-cols-[15rem_minmax(0,1fr)_19rem]')
+    expect(participantWorkspace).toContain('challenge-workspace')
     expect(participantWorkspace).toContain("<component :is=\"CompetitionWorkspaceNavigation\"")
     expect(challengePage).toContain("<component :is=\"CompetitionChallengeDetail\"")
-    expect(challengeNavigator).toContain("@click=\"emit('select', challenge.id!)\"")
+    expect(challengeNavigator).toContain("@update:model-value=\"selectChallenge\"")
     expect(shell).not.toContain("<component :is=\"AppWorkspaceNav\"")
     expect(shell).toContain('v-else-if="competition"')
     expect(shell).not.toContain("label: '公告/通知'")
@@ -169,14 +169,38 @@ describe('competition broadcast projection', () => {
   })
 })
 
-describe('competition administration role label', () => {
-  test('uses the strongly typed role returned by the list endpoint', async () => {
-    const page = await sourceFile(
-      new URL('../app/pages/admin/competitions/index.vue', import.meta.url),
-    ).text()
+describe('competition administration entry', () => {
+  test('loads the administrator list inside the public competition browser without role probing', async () => {
+    const [page, overview] = await Promise.all([
+      sourceFile(new URL('../app/pages/competitions/index.vue', import.meta.url)).text(),
+      sourceFile(new URL('../app/features/competitions/CompetitionOverview.vue', import.meta.url)).text(),
+    ])
 
-    expect(page).toContain("return competition.administrationRole ?? 'Observer'")
+    expect(page).toContain('adminListCompetitions({ query: { includeDeleted: true } })')
+    expect(page).toContain("v-if=\"isAdministrator\"")
+    expect(page).toContain('@click="openCreateDialog"')
+    expect(page).toContain(':is="CreateCompetitionDialog"')
+    expect(page).toContain('@created="handleCompetitionCreated"')
+    expect(page).toContain('const { create: _create, ...query } = route.query')
+    expect(page).not.toContain('to="/admin/competitions/new"')
+    expect(overview).toContain("$t('ui.manageCompetition')")
+    expect(overview.indexOf("$t('ui.myTeam')")).toBeLessThan(overview.indexOf("$t('ui.manageCompetition')"))
     expect(page).not.toContain('adminListCheatIncidents')
     expect(page).not.toContain('probeRole')
+  })
+
+  test('creates competitions in a dialog and keeps the old page URL as a redirect', async () => {
+    const dialog = await sourceFile(
+      new URL('../app/features/competitions/CreateCompetitionDialog.vue', import.meta.url),
+    ).text()
+    const legacyRoute = await Bun.file(
+      new URL('../app/pages/admin/competitions/new.vue', import.meta.url),
+    ).text()
+
+    expect(dialog).toContain('<Dialog :open="open" @update:open="setOpen">')
+    expect(dialog).toContain('sm:max-w-3xl')
+    expect(dialog).toContain("emit('created', data)")
+    expect(dialog).not.toContain('navigateTo(`/admin/competitions/')
+    expect(legacyRoute).toContain("redirect: '/competitions?create=1'")
   })
 })

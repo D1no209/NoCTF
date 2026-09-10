@@ -62,6 +62,9 @@ public static class ServiceRegistration
                 "Uploads:MaximumAvatarBytes",
                 FileUploadLimits.Default.MaximumAvatarBytes),
             configuration.GetValue(
+                "Uploads:MaximumWallpaperBytes",
+                FileUploadLimits.Default.MaximumWallpaperBytes),
+            configuration.GetValue(
                 "Uploads:MaximumLogoBytes",
                 FileUploadLimits.Default.MaximumLogoBytes),
             configuration.GetValue(
@@ -149,6 +152,9 @@ public static class ServiceRegistration
             services.AddScoped<UpdateCurrentUserProfile>();
             services.AddScoped<ReplaceCurrentUserAvatar>();
             services.AddScoped<GetUserAvatar>();
+            services.AddScoped<ReplaceCurrentUserWallpaper>();
+            services.AddScoped<GetCurrentUserWallpaper>();
+            services.AddScoped<UpdateCurrentUserWallpaperPreference>();
             services.AddScoped<ChangePassword>();
             services.AddScoped<LogoutAll>();
             services.AddScoped<ModerateTeam>();
@@ -161,6 +167,7 @@ public static class ServiceRegistration
             services.AddScoped<IManagedFileUploadRegistry, SwaggerManagedFileUploadRegistry>();
             services.AddScoped<ManagedFileUploads>();
             services.AddSingleton<IAvatarImageProcessor, SwaggerAvatarImageProcessor>();
+            services.AddSingleton<IWallpaperImageProcessor, SwaggerWallpaperImageProcessor>();
             services.AddScoped<IPasswordResetStore, SwaggerPasswordResetStore>();
             services.AddScoped<RequestPasswordReset>();
             services.AddScoped<CompletePasswordReset>();
