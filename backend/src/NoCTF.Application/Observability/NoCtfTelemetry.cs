@@ -1,6 +1,7 @@
 using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Diagnostics.Metrics;
+using NoCTF.Domain.Gameplay;
 
 namespace NoCTF.Application.Observability;
 
@@ -36,6 +37,8 @@ public static class NoCtfTelemetry
         "noctf.runner.claim.attempts", unit: "{attempt}");
     private static readonly Counter<long> RuntimeOperations = Meter.CreateCounter<long>(
         "noctf.runtime.operations", unit: "{operation}");
+    private static readonly Counter<long> GameplayFactSubmissions = Meter.CreateCounter<long>(
+        "noctf.gameplay_fact.submissions", unit: "{submission}");
     private static readonly Histogram<double> LeaderboardProjectionDuration = Meter.CreateHistogram<double>(
         "noctf.leaderboard.projection.duration", unit: "s");
     private static readonly Histogram<long> LeaderboardProjectionFacts = Meter.CreateHistogram<long>(
@@ -143,6 +146,27 @@ public static class NoCtfTelemetry
 
     public static void RecordRuntimeOperation(string endpoint, string outcome) =>
         RuntimeOperations.Add(1, new TagList { { "endpoint", endpoint }, { "outcome", outcome } });
+
+    public static void RecordGameplayFactSubmissions(
+        GameplayFactKind kind,
+        long count = 1)
+    {
+        if (count <= 0)
+            return;
+        var submissionKind = kind switch
+        {
+            GameplayFactKind.FlagAttempt => "flag",
+            GameplayFactKind.BreakAttempt => "break",
+            GameplayFactKind.FixAttempt => "fix",
+            _ => null
+        };
+        if (submissionKind is not null)
+        {
+            GameplayFactSubmissions.Add(
+                count,
+                new TagList { { "kind", submissionKind } });
+        }
+    }
 
     public static void RecordLeaderboardProjection(
         string mode,

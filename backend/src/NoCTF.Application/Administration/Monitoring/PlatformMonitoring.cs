@@ -35,7 +35,11 @@ public enum PlatformMonitoringMetricKind : short
     RunnerMinimumAvailablePercent,
     PostgreSqlConnectionUsagePercent,
     RedisP99Milliseconds,
-    DiskAvailablePercent
+    DiskAvailablePercent,
+    FlagSubmissionsPerSecond,
+    FlagSubmissionsLastFiveMinutes,
+    FixSubmissionsPerSecond,
+    FixSubmissionsLastFiveMinutes
 }
 
 public enum PlatformMonitoringUnit : short
@@ -134,6 +138,10 @@ public sealed record PlatformMonitoringMeasurements(
     PlatformMonitoringSample PostgreSqlConnectionUsageRatio,
     PlatformMonitoringSample RedisP99Seconds,
     PlatformMonitoringSample DiskAvailableRatio,
+    PlatformMonitoringSample FlagSubmissionsPerSecond,
+    PlatformMonitoringSample FlagSubmissionsLastFiveMinutes,
+    PlatformMonitoringSample FixSubmissionsPerSecond,
+    PlatformMonitoringSample FixSubmissionsLastFiveMinutes,
     IReadOnlyList<PlatformMonitoringLatencyMeasurement>? LatencyDetails = null,
     IReadOnlyList<PlatformMonitoringPoolResource>? PoolResources = null);
 
@@ -199,6 +207,18 @@ public sealed class ObservePlatformMonitoring(
                 criticalAbove: 2),
             Metric(PlatformMonitoringMetricKind.SignalRConnections,
                 PlatformMonitoringUnit.Count, measurements.SignalRConnections),
+            Metric(PlatformMonitoringMetricKind.FlagSubmissionsPerSecond,
+                PlatformMonitoringUnit.PerSecond,
+                measurements.FlagSubmissionsPerSecond),
+            Metric(PlatformMonitoringMetricKind.FlagSubmissionsLastFiveMinutes,
+                PlatformMonitoringUnit.Count,
+                measurements.FlagSubmissionsLastFiveMinutes),
+            Metric(PlatformMonitoringMetricKind.FixSubmissionsPerSecond,
+                PlatformMonitoringUnit.PerSecond,
+                measurements.FixSubmissionsPerSecond),
+            Metric(PlatformMonitoringMetricKind.FixSubmissionsLastFiveMinutes,
+                PlatformMonitoringUnit.Count,
+                measurements.FixSubmissionsLastFiveMinutes),
             Metric(PlatformMonitoringMetricKind.NatsAvailability,
                 PlatformMonitoringUnit.Count, measurements.NatsAvailability,
                 criticalBelow: 1,

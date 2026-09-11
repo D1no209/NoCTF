@@ -40,6 +40,18 @@ public sealed class PlatformMonitoringTests
             .IsEqualTo(0.5);
         await Assert.That(Metric(result, PlatformMonitoringMetricKind.DiskAvailablePercent).Value)
             .IsEqualTo(60);
+        await Assert.That(Metric(result,
+                PlatformMonitoringMetricKind.FlagSubmissionsPerSecond).Value)
+            .IsEqualTo(8);
+        await Assert.That(Metric(result,
+                PlatformMonitoringMetricKind.FlagSubmissionsLastFiveMinutes).Value)
+            .IsEqualTo(2400);
+        await Assert.That(Metric(result,
+                PlatformMonitoringMetricKind.FixSubmissionsPerSecond).Value)
+            .IsEqualTo(0.2);
+        await Assert.That(Metric(result,
+                PlatformMonitoringMetricKind.FixSubmissionsLastFiveMinutes).Value)
+            .IsEqualTo(60);
     }
 
     [Test]
@@ -199,7 +211,11 @@ public sealed class PlatformMonitoringTests
             Value(0.75),
             Value(0.45),
             Value(0.01),
-            Value(0.60));
+            Value(0.60),
+            Value(8) with { WindowSeconds = 300 },
+            Value(2400) with { WindowSeconds = 300 },
+            Value(0.2) with { WindowSeconds = 300 },
+            Value(60) with { WindowSeconds = 300 });
     }
 
     private sealed class StubReader(PlatformMonitoringMeasurements measurements)

@@ -48,6 +48,10 @@ export function useAdminPlatformMonitoringPage() {
     postgreSqlConnectionUsagePercent: 20,
     redisP99Milliseconds: 21,
     diskAvailablePercent: 22,
+    flagSubmissionsPerSecond: 23,
+    flagSubmissionsLastFiveMinutes: 24,
+    fixSubmissionsPerSecond: 25,
+    fixSubmissionsLastFiveMinutes: 26,
   } as const
 
   const UNIT = {
@@ -71,6 +75,15 @@ export function useAdminPlatformMonitoringPage() {
         METRIC.criticalQueuePendingCount,
         METRIC.criticalQueueAckPendingCount,
         METRIC.criticalQueueRedeliveredCount,
+      ],
+    },
+    {
+      title: "ui.gameplaySubmissions",
+      kinds: [
+        METRIC.flagSubmissionsPerSecond,
+        METRIC.flagSubmissionsLastFiveMinutes,
+        METRIC.fixSubmissionsPerSecond,
+        METRIC.fixSubmissionsLastFiveMinutes,
       ],
     },
     {
@@ -130,6 +143,10 @@ export function useAdminPlatformMonitoringPage() {
     [METRIC.postgreSqlConnectionUsagePercent]: "ui.postgresqlConnectionUsage",
     [METRIC.redisP99Milliseconds]: "ui.platformRedisOperationP99Duration",
     [METRIC.diskAvailablePercent]: "ui.lowestDiskAvailability",
+    [METRIC.flagSubmissionsPerSecond]: "ui.flagSubmissionRateFiveMinutes",
+    [METRIC.flagSubmissionsLastFiveMinutes]: "ui.flagSubmissionsLastFiveMinutes",
+    [METRIC.fixSubmissionsPerSecond]: "ui.fixSubmissionRateFiveMinutes",
+    [METRIC.fixSubmissionsLastFiveMinutes]: "ui.fixSubmissionsLastFiveMinutes",
   }
 
   const snapshot = ref<MonitoringSnapshot | null>(null)
@@ -204,6 +221,10 @@ export function useAdminPlatformMonitoringPage() {
       [METRIC.runtimeOldestWaitingSeconds]: 60,
       [METRIC.leaderboardProjectionP95Milliseconds]: 1000,
       [METRIC.runnerOnlineCount]: 12,
+      [METRIC.flagSubmissionsPerSecond]: 100,
+      [METRIC.flagSubmissionsLastFiveMinutes]: 30_000,
+      [METRIC.fixSubmissionsPerSecond]: 5,
+      [METRIC.fixSubmissionsLastFiveMinutes]: 1_500,
     }
     const maximum = maximumByKind[metric.kind ?? -1]
       ?? (metric.unit === UNIT.perSecond ? 5 : 100)

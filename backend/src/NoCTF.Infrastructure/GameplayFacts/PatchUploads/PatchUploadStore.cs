@@ -14,6 +14,7 @@ using NoCTF.Infrastructure.Storage;
 using NoCTF.Infrastructure.GameplayFacts.Intake;
 using NoCTF.GameModes.Awdp.Configuration;
 using NoCTF.Application.Commands.Idempotency;
+using NoCTF.Application.Observability;
 
 namespace NoCTF.Infrastructure.GameplayFacts.PatchUploads;
 
@@ -274,6 +275,7 @@ public sealed class PatchUploadStore(
             replay?.Store(new AcceptedAwdpFix(patchUploadId, fact.Id, fact.State));
             await db.SaveChangesAsync(ct);
             await transaction.CommitAsync(ct);
+            NoCtfTelemetry.RecordGameplayFactSubmissions(GameplayFactKind.FixAttempt);
             try
             {
                 await outbox.FlushCommittedMessagesAsync();
