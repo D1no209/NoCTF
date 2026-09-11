@@ -149,13 +149,17 @@ export function useCreateCompetitionDialog(
       }
 
       if (posterFile.value && createdCompetition.value.id) {
-        const { error: uploadError } = await adminCompetitionPosterReplace({
+        const { data: uploadedPoster, error: uploadError } = await adminCompetitionPosterReplace({
           path: { competitionId: createdCompetition.value.id },
           body: { file: posterFile.value },
         })
-        if (uploadError) {
+        if (uploadError || !uploadedPoster?.url) {
           error.value = posterUploadError(uploadError)
           return
+        }
+        createdCompetition.value = {
+          ...createdCompetition.value,
+          posterUrl: uploadedPoster.url,
         }
       }
 

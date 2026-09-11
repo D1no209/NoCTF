@@ -11,9 +11,9 @@ watch(() => props.src, () => { failed.value = false })
 
 <template>
   <div data-slot="cover-image" class="relative isolate overflow-hidden bg-muted" :style="{ aspectRatio }" :aria-busy="pending">
-    <Skeleton v-if="pending" class="absolute inset-0 size-full rounded-none" />
-    <img v-else-if="src && !failed" :src="src" :alt="alt" :style="{ objectFit: fit }" class="absolute inset-0 size-full object-center" decoding="async" @error="failed = true">
-    <div v-else-if="!$slots.default" class="absolute inset-0 flex flex-col items-center justify-center gap-2 text-muted-foreground" role="img" :aria-label="fallback || alt">
+    <Skeleton v-if="pending" class="pointer-events-none absolute inset-0 size-full rounded-none" />
+    <img v-else-if="src && !failed" :src="src" :alt="alt" :style="{ objectFit: fit }" class="pointer-events-none absolute inset-0 size-full object-center" decoding="async" @error="failed = true">
+    <div v-else-if="!$slots.default" class="pointer-events-none absolute inset-0 flex flex-col items-center justify-center gap-2 text-muted-foreground" role="img" :aria-label="fallback || alt">
       <ImageIcon class="size-8" aria-hidden="true" />
       <span v-if="fallback" class="text-sm">{{ fallback }}</span>
     </div>

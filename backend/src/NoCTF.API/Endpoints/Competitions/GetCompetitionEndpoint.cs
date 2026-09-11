@@ -72,6 +72,7 @@ public sealed record CompetitionResponse(
     Guid Id,
     string Title,
     string? Description,
+    string? PosterUrl,
     GameModeProtocol Mode,
     DateTimeOffset StartTime,
     DateTimeOffset EndTime,
@@ -98,6 +99,9 @@ internal static class CompetitionMapper
             view.Id,
             view.Title,
             view.Description,
+            view.PosterFileId is { } posterFileId
+                ? PosterUrl(view.Id, posterFileId)
+                : null,
             CompetitionProtocolMapper.ToProtocol(view.Mode),
             view.StartTime,
             view.EndTime,
@@ -118,6 +122,9 @@ internal static class CompetitionMapper
             view.MaxParticipantMessagesBeforeHandlerReply,
             view.AllowChallengeOwnersToHandleQuestions,
             view.PracticeModeEnabled);
+
+    internal static string PosterUrl(Guid competitionId, Guid posterFileId) =>
+        $"/api/v1/competitions/{competitionId}/poster?revision={posterFileId:N}";
 }
 
 internal static class CompetitionAdministrationRoleResolver

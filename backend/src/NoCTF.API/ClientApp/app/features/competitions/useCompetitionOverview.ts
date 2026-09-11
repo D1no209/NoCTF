@@ -7,7 +7,6 @@ import { adminGetCompetition, getCompetitionEndpoint, createTeamEndpoint, getMyT
 import type { NoCtfapiEndpointsAdministrationCompetitionsAdminCompetitionResponse, NoCtfapiEndpointsCompetitionsCompetitionResponse, NoCtfapiEndpointsCompetitionsTracksCompetitionTrackResponse, NoCtfapiEndpointsTeamsTeamResponse } from '../../api'
 import { teamMembershipErrorMessage, teamRegistrationErrorMessage } from '../../lib/competition-track'
 import LifecycleBadgeComponent from './LifecycleBadge.vue'
-import { useCompetitionPoster } from './useCompetitionPoster'
 
 /** Owns state, effects and commands for CompetitionOverview. */
 export function useCompetitionOverview(props: Readonly<{ competition: NoCtfapiEndpointsCompetitionsCompetitionResponse }>) {
@@ -18,8 +17,7 @@ export function useCompetitionOverview(props: Readonly<{ competition: NoCtfapiEn
   const detailError = ref<string | null>(null)
   const reads = new AbortController()
   onUnmounted(() => reads.abort())
-  const { posterUrl, posterLoading, refreshPoster } = useCompetitionPoster(competitionId)
-  onMounted(refreshPoster)
+  const posterUrl = computed(() => competition.value.posterUrl ?? null)
   async function refreshCompetition() {
     detailError.value = null
     try {
@@ -310,7 +308,6 @@ export function useCompetitionOverview(props: Readonly<{ competition: NoCtfapiEn
       Users,
       detailError,
       posterUrl,
-      posterLoading,
       refreshCompetition,
       competitionId,
       isLoggedIn,

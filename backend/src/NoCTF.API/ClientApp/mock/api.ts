@@ -230,8 +230,17 @@ export function createMockApi() {
         const storedPoster = competitionPosters.get(p.competitionId!)
         if (storedPoster === null) return problem(404, '演示海报不存在 / No poster')
         const poster = storedPoster ?? Bun.file(new URL('./data/competition-poster.png', import.meta.url))
+        const currentRevision = competition?.posterUrl
+          ? new URL(competition.posterUrl, url).searchParams.get('revision')
+          : null
         return new Response(poster, {
-          headers: { 'Content-Type': poster.type || 'image/png', 'Cache-Control': 'no-store', 'X-NoCTF-Mock': 'true' },
+          headers: {
+            'Content-Type': poster.type || 'image/png',
+            'Cache-Control': currentRevision && url.searchParams.get('revision') === currentRevision
+              ? 'public,max-age=31536000,immutable'
+              : 'no-store',
+            'X-NoCTF-Mock': 'true',
+          },
         })
       }
       if (route === '/competitions/{competitionId}/challenges/{competitionChallengeId}/attachments/{attachmentId}') {
@@ -366,10 +375,14 @@ export function createMockApi() {
         if (!(file instanceof Blob) || !['image/jpeg', 'image/png', 'image/webp'].includes(file.type))
           return json({ code: 'UnsupportedFormat' }, 400)
         competitionPosters.set(p.competitionId!, file)
-        value = { fileId: crypto.randomUUID(), contentType: file.type }
+        const fileId = crypto.randomUUID()
+        const posterUrl = `/api/v1/competitions/${p.competitionId}/poster?revision=${fileId.replaceAll('-', '')}`
+        competition!.posterUrl = posterUrl
+        value = { fileId, contentType: file.type, url: posterUrl }
       }
       else if (route === '/admin/competitions/{competitionId}/poster' && request.method === 'DELETE') {
         competitionPosters.set(p.competitionId!, null)
+        competition!.posterUrl = null
         return new Response(null, { status: 204, headers: { 'X-NoCTF-Mock': 'true' } })
       }
       else if (route === '/admin/platform/configuration' && request.method === 'PATCH') {

@@ -2,6 +2,7 @@ using FastEndpoints;
 using FluentValidation;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Http;
+using NoCTF.API.Endpoints.Competitions;
 using NoCTF.API.Security;
 using NoCTF.Application.Storage;
 
@@ -28,7 +29,10 @@ public sealed class UploadCompetitionPosterValidator : Validator<UploadCompetiti
     }
 }
 
-public sealed record CompetitionPosterResponse(Guid FileId, string ContentType);
+public sealed record CompetitionPosterResponse(
+    Guid FileId,
+    string ContentType,
+    string Url);
 
 public sealed class UploadCompetitionPosterEndpoint(
     ManageBusinessImages images,
@@ -84,7 +88,12 @@ public sealed class UploadCompetitionPosterEndpoint(
         return result.State switch
         {
             BusinessFileReferenceState.Updated => TypedResults.Ok(
-                new CompetitionPosterResponse(result.File!.FileId, result.File.ContentType)),
+                new CompetitionPosterResponse(
+                    result.File!.FileId,
+                    result.File.ContentType,
+                    CompetitionMapper.PosterUrl(
+                        Route<Guid>("competitionId"),
+                        result.File.FileId))),
             BusinessFileReferenceState.NotFound => TypedResults.NotFound(),
             BusinessFileReferenceState.Forbidden => TypedResults.Forbid(),
             _ => throw new InvalidOperationException($"Unexpected poster state {result.State}.")

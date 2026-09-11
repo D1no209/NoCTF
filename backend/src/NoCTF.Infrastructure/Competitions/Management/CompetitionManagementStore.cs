@@ -226,7 +226,8 @@ public sealed class CompetitionManagementStore(
             x.MaxActiveQuestionsPerTeam,
             x.MaxParticipantMessagesBeforeHandlerReply,
             x.AllowChallengeOwnersToHandleQuestions,
-            x.PracticeModeEnabled));
+            x.PracticeModeEnabled,
+            x.PosterFileId));
 
     private static CompetitionView Map(Competition x) =>
         new(x.Id, x.Title, x.Description, x.Mode, x.StartAt, x.EndAt, x.Status,
@@ -238,5 +239,6 @@ public sealed class CompetitionManagementStore(
             x.MaxActiveQuestionsPerTeam,
             x.MaxParticipantMessagesBeforeHandlerReply,
             x.AllowChallengeOwnersToHandleQuestions,
-            x.PracticeModeEnabled);
+            x.PracticeModeEnabled,
+            x.PosterFileId);
 }

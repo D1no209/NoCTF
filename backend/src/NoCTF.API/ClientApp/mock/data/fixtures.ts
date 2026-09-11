@@ -15,6 +15,7 @@ export function createFixtures() {
   }))
   const competitions = ['Ctf', 'Awd', 'Awdp', 'Koh'].map((mode, index) => model('CompetitionsCompetitionResponse', {
     id: id(2, index + 1), title: ['NoCTF 春季挑战赛 · MOCK', '攻防训练场 · MOCK', 'AWDP 修复演练 · MOCK', 'KoH 占领演练 · MOCK'][index],
+    posterUrl: `/api/v1/competitions/${id(2, index + 1)}/poster?revision=${id(12, index + 1).replaceAll('-', '')}`,
     description: '## 本地演示环境 / Local demo\n\n所有数据均为虚构，操作只影响内存。\n\n- 演示 Flag：`flag{mock_success}`\n- 支持浏览题目、队伍、排行榜与管理页面\n- 重启 Mock 服务即可重置数据',
     mode, status: index === 2 ? 'Published' : 'Running', startTime: date(index === 2 ? 24 : -4), endTime: date(index === 2 ? 72 : 48),
     ownerId: id(1), administrationRole: 'Owner', leaderboardVisibility: 'Normal', maxTeamMembers: 5,
@@ -23,9 +24,11 @@ export function createFixtures() {
   }))
   competitions.push(model('CompetitionsCompetitionResponse', {
     ...competitions[0], id: id(2, 5), title: '秋季公开赛 · MOCK', status: 'Visible', startTime: date(120), endTime: date(144),
+    posterUrl: `/api/v1/competitions/${id(2, 5)}/poster?revision=${id(12, 5).replaceAll('-', '')}`,
   }))
   competitions.push(model('CompetitionsCompetitionResponse', {
     ...competitions[0], id: id(2, 6), title: '夏季邀请赛 · MOCK', status: 'Finished', startTime: date(-120), endTime: date(-72),
+    posterUrl: `/api/v1/competitions/${id(2, 6)}/poster?revision=${id(12, 6).replaceAll('-', '')}`,
   }))
   const challengeCatalog = [
     { direction: 'Misc', title: 'Welcome to NoCTF', slug: 'misc' },
