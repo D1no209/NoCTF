@@ -422,6 +422,9 @@ describe('AWDP control screen implementation contract', () => {
     const stage = await sourceFile(
       new URL('../app/features/awdp-control/AwdpEventStage.vue', import.meta.url),
     ).text()
+    const stageView = await sourceFile(
+      new URL('../app/components/views/awdp-control/AwdpEventStageView.vue', import.meta.url),
+    ).text()
     const ticker = await sourceFile(
       new URL('../app/features/awdp-control/AwdpEventTicker.vue', import.meta.url),
     ).text()
@@ -477,6 +480,10 @@ describe('AWDP control screen implementation contract', () => {
     expect(stage).toContain('AwdpAttackFailureAnimation')
     expect(stage).toContain('AwdpDefenseSuccessAnimation')
     expect(stage).toContain('AwdpDefenseFailureAnimation')
+    expect(stageView).toContain('repeating-conic-gradient')
+    expect(stageView).toContain('mask:radial-gradient')
+    expect(stageView).not.toContain('.idle-orbit{position:absolute;left:50%;top:47%;translate:-50% -50%;border:')
+    expect(stageView).not.toContain('border-style:dashed')
     expect(ticker).toContain('requestAnimationFrame(tick)')
     expect(ticker).not.toContain("t('ui.operationSubmitted')")
     expect(ticker).not.toContain('<marquee')
