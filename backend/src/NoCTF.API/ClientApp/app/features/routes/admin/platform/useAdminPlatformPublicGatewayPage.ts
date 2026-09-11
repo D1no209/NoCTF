@@ -2,7 +2,7 @@
 
 import { Globe, RefreshCw } from '@lucide/vue'
 import { toast } from 'vue-sonner'
-import { adminPlatformGetPublicGateway, adminPlatformGetPublicGatewayStatus, adminPlatformUpdatePublicGateway } from '../../../../api'
+import { adminPlatformGetConfiguration, adminPlatformGetPublicGatewayStatus, adminPlatformPatchConfiguration } from '../../../../api'
 import type { NoCtfapiEndpointsAdministrationPlatformPublicGatewayConfigurationResponse as Configuration, NoCtfapiEndpointsAdministrationPlatformPublicGatewayStatusResponse as GatewayStatus } from '../../../../api'
 import { gatewayHost, gatewayOrigin, publicGatewayFailure, publicGatewayState } from '../../../../utils/public-gateway'
 
@@ -60,15 +60,15 @@ export function useAdminPlatformPublicGatewayPage() {
     loading.value = true
     error.value = null
     try {
-      const result = await adminPlatformGetPublicGateway()
+      const result = await adminPlatformGetConfiguration()
       if (current !== generation) return
       if (result.error || !result.data) throw result.error
-      configuration.value = result.data
-      const policy = result.data.policy
-      Object.assign(form, { enabled: policy?.enabled ?? false, connectorId: policy?.connectorId || result.data.capability?.connectorId || '',
-        publicOrigin: policy?.publicOrigin || result.data.capability?.approvedOrigins?.[0] || '',
+      configuration.value = result.data.publicGateway ?? null
+      const policy = result.data.publicGateway?.policy
+      Object.assign(form, { enabled: policy?.enabled ?? false, connectorId: policy?.connectorId || result.data.publicGateway?.capability?.connectorId || '',
+        publicOrigin: policy?.publicOrigin || result.data.publicGateway?.capability?.approvedOrigins?.[0] || '',
         directOrigins: (policy?.directOrigins ?? []).join('\n'), publicRuntimeHost: policy?.publicRuntimeHost ?? '',
-        directRuntimeHostOverride: policy?.directRuntimeHostOverride ?? '', maxPublishedPorts: policy?.maxPublishedPorts || result.data.capability?.maximumPorts || 8 })
+        directRuntimeHostOverride: policy?.directRuntimeHostOverride ?? '', maxPublishedPorts: policy?.maxPublishedPorts || result.data.publicGateway?.capability?.maximumPorts || 8 })
       saved.value = JSON.stringify(form)
       await readStatus()
     }
@@ -97,9 +97,17 @@ export function useAdminPlatformPublicGatewayPage() {
     saving.value = true
     error.value = null
     try {
-      const result = await adminPlatformUpdatePublicGateway({ body: { ...form, directOrigins, directRuntimeHostOverride: form.directRuntimeHostOverride || null } })
+      const result = await adminPlatformPatchConfiguration({
+        body: {
+          publicGateway: {
+            ...form,
+            directOrigins,
+            directRuntimeHostOverride: form.directRuntimeHostOverride || null,
+          },
+        },
+      })
       if (result.error || !result.data) throw result.error
-      configuration.value = result.data.configuration ?? configuration.value
+      configuration.value = result.data.publicGateway ?? configuration.value
       saved.value = JSON.stringify(form)
       toast.success(translate("ui.gatewaySettingsSavedAndBeingApplied"))
       application.start()

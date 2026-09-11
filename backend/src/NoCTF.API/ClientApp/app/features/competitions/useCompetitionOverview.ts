@@ -4,7 +4,7 @@ import { canEnterCompetition, canRegisterForCompetition, isCtfPracticeOpen } fro
 import { toast } from 'vue-sonner'
 import { ArrowRight, Box, CalendarRange, Clock, FileText, KeyRound, LogIn, Settings, ShieldCheck, Trophy, UserPlus, Users } from '@lucide/vue'
 import { adminGetCompetition, competitionPosterGet, getCompetitionEndpoint, createTeamEndpoint, getMyTeamEndpoint, joinTeamByInvitationEndpoint, listCompetitionTeamsEndpoint, listCompetitionTracks } from '../../api'
-import type { NoCtfapiEndpointsCompetitionsCompetitionResponse, NoCtfapiEndpointsCompetitionsTracksCompetitionTrackResponse, NoCtfapiEndpointsTeamsTeamResponse } from '../../api'
+import type { NoCtfapiEndpointsAdministrationCompetitionsAdminCompetitionResponse, NoCtfapiEndpointsCompetitionsCompetitionResponse, NoCtfapiEndpointsCompetitionsTracksCompetitionTrackResponse, NoCtfapiEndpointsTeamsTeamResponse } from '../../api'
 import { teamMembershipErrorMessage, teamRegistrationErrorMessage } from '../../lib/competition-track'
 import LifecycleBadgeComponent from './LifecycleBadge.vue'
 
@@ -41,7 +41,11 @@ export function useCompetitionOverview(props: Readonly<{ competition: NoCtfapiEn
         : await getCompetitionEndpoint({ path: { competitionId }, signal: reads.signal })
       if (reads.signal.aborted) return
       if (error || !data) detailError.value = parseApiError(error).message
-      else competition.value = data
+      else {
+        competition.value = managementOnly.value
+          ? (data as NoCtfapiEndpointsAdministrationCompetitionsAdminCompetitionResponse).competition!
+          : data as NoCtfapiEndpointsCompetitionsCompetitionResponse
+      }
     } catch (error) {
       if (!reads.signal.aborted) detailError.value = parseApiError(error).message
     }

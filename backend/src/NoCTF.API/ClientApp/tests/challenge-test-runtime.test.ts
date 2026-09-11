@@ -11,9 +11,9 @@ const page = await sourceFile(
 describe('challenge template test runtime', () => {
   test('uses generated SDK operations for the full lifecycle', () => {
     expect(panel).toContain('adminChallengeBankGetTestRuntime')
-    expect(panel).toContain('adminChallengeBankStartTestRuntime')
+    expect(panel).toContain('adminChallengeBankCreateTestRuntime')
     expect(panel).toContain('adminChallengeBankStopTestRuntime')
-    expect(panel).toContain('adminChallengeBankResetTestRuntime')
+    expect(panel).toContain('replacesRuntimeId')
     expect(panel).toContain('adminChallengeBankExtendTestRuntime')
     expect(panel).toContain('evaluateChallengeTestRuntimePolling')
     expect(panel).toContain('const outcome = await load()')

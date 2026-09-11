@@ -20,7 +20,8 @@ emit: { (event: "submitted", ...args: []): void; (event: "remainingChanged", ...
   const runtimeCard = ref<{ refreshUntilStopped: () => Promise<void> } | null>(null)
 
   function handleEvaluation(result?: string | null): void {
-    if (result === 'Correct') void runtimeCard.value?.refreshUntilStopped()
+    if (result === 'Correct' && !practiceOpen.value)
+      void runtimeCard.value?.refreshUntilStopped()
   }
 
   const FlagSubmit = markRaw(FlagSubmitComponent)

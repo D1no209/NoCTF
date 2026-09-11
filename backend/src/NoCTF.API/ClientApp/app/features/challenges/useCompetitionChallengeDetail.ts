@@ -118,6 +118,11 @@ export function useCompetitionChallengeDetail(props: Readonly<{
 
   watch(() => user.value?.userId, () => void loadChallenge())
 
+  watch(() => ctx.competition.value?.status, (status, previousStatus) => {
+    if (previousStatus && status !== previousStatus)
+      void loadChallenge()
+  })
+
   async function downloadAttachment(attachmentId: string, fileName: string): Promise<void> {
     downloading.value = true
     try {

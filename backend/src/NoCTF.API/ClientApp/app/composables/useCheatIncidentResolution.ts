@@ -1,8 +1,4 @@
-import {
-  adminConfirmCheatIncident,
-  adminCorrectCheatIncident,
-  adminDismissCheatIncident,
-} from '../api'
+import { adminUpdateCheatIncidentStatus } from '../api'
 import { computed, ref } from 'vue'
 
 export type CheatIncidentResolutionAction = 'confirm' | 'dismiss' | 'correct'
@@ -34,15 +30,15 @@ interface CheatIncidentResolutionSdkResult {
 }
 
 interface CheatIncidentResolutionClients {
-  confirm: (options: Parameters<typeof adminConfirmCheatIncident>[0]) => Promise<CheatIncidentResolutionSdkResult>
-  correct: (options: Parameters<typeof adminCorrectCheatIncident>[0]) => Promise<CheatIncidentResolutionSdkResult>
-  dismiss: (options: Parameters<typeof adminDismissCheatIncident>[0]) => Promise<CheatIncidentResolutionSdkResult>
+  confirm: (options: Parameters<typeof adminUpdateCheatIncidentStatus>[0]) => Promise<CheatIncidentResolutionSdkResult>
+  correct: (options: Parameters<typeof adminUpdateCheatIncidentStatus>[0]) => Promise<CheatIncidentResolutionSdkResult>
+  dismiss: (options: Parameters<typeof adminUpdateCheatIncidentStatus>[0]) => Promise<CheatIncidentResolutionSdkResult>
 }
 
 const clients: CheatIncidentResolutionClients = {
-  confirm: async options => adminConfirmCheatIncident(options),
-  correct: async options => adminCorrectCheatIncident(options),
-  dismiss: async options => adminDismissCheatIncident(options),
+  confirm: async options => adminUpdateCheatIncidentStatus(options),
+  correct: async options => adminUpdateCheatIncidentStatus(options),
+  dismiss: async options => adminUpdateCheatIncidentStatus(options),
 }
 
 export const cheatIncidentResolutionMinimumReasonLength = 8
@@ -52,12 +48,18 @@ async function executeResolution(
   competitionId: string,
   request: CheatIncidentResolutionRequest,
 ) {
+  const status: 'Confirmed' | 'Dismissed' | 'Corrected' = request.action === 'confirm'
+    ? 'Confirmed'
+    : request.action === 'dismiss' ? 'Dismissed' : 'Corrected'
   const options = {
     path: {
       competitionId,
       gameplayFactId: request.gameplayFactId,
     },
-    body: { reason: request.reason },
+    body: {
+      status,
+      reason: request.reason,
+    },
   }
 
   const { error } = request.action === 'confirm'

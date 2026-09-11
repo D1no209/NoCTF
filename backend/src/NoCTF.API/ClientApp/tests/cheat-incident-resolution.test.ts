@@ -93,7 +93,7 @@ describe('useCheatIncidentResolution', () => {
       action: 'dismiss',
       options: {
         path: { competitionId, gameplayFactId: 'incident-1' },
-        body: { reason: 'reviewed evidence' },
+        body: { status: 'Dismissed', reason: 'reviewed evidence' },
       },
     }])
   })
@@ -110,7 +110,7 @@ describe('useCheatIncidentResolution', () => {
       action: 'confirm',
       options: {
         path: { competitionId, gameplayFactId: 'incident-1' },
-        body: { reason: 'confirmed cross-team flag' },
+        body: { status: 'Confirmed', reason: 'confirmed cross-team flag' },
       },
     }])
   })

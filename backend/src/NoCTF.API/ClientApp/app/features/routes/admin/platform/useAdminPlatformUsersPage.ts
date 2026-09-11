@@ -2,8 +2,8 @@ import { markRaw } from 'vue'
 
 import { KeyRound, Trash2 } from '@lucide/vue'
 import { toast } from 'vue-sonner'
-import { adminPlatformDeleteUser, adminPlatformGetUser, adminPlatformInvalidateUserTokens, adminPlatformListUsers, adminPlatformPreviewUserDeletion, adminPlatformUpdateUserAccountStatus, adminPlatformUpdateUserEmailVerification, adminPlatformUpdateUserRole } from '../../../../api'
-import type { NoCtfapiEndpointsAdministrationPlatformPlatformUserDeletionMode, NoCtfapiEndpointsAdministrationPlatformPlatformUserDeletionPreviewResponse, NoCtfapiEndpointsAdministrationPlatformPlatformUserResponse, NoCtfapiEndpointsAdministrationPlatformPlatformManagedUserAccountStatusProtocol, NoCtfapiEndpointsAdministrationPlatformUpdatePlatformUserAccountStatusConflictCode } from '../../../../api'
+import { adminPlatformDeleteUser, adminPlatformGetUser, adminPlatformInvalidateUserTokens, adminPlatformListUsers, adminPlatformPatchUser, adminPlatformPreviewUserDeletion } from '../../../../api'
+import type { NoCtfapiEndpointsAdministrationPlatformPlatformUserDeletionMode, NoCtfapiEndpointsAdministrationPlatformPlatformUserDeletionPreviewResponse, NoCtfapiEndpointsAdministrationPlatformPlatformUserResponse, NoCtfapiEndpointsAdministrationPlatformPlatformManagedUserAccountStatusProtocol } from '../../../../api'
 import { createLatestRequestGuard } from '../../../../lib/latest-request'
 import PrivateAccountPanelComponent from '../../../account/PrivateAccountPanel.vue'
 import AdminDateTimeComponent from '../../../admin/AdminDateTime.vue'
@@ -13,8 +13,6 @@ type PlatformUser = NoCtfapiEndpointsAdministrationPlatformPlatformUserResponse
 type DeletionPreview = NoCtfapiEndpointsAdministrationPlatformPlatformUserDeletionPreviewResponse
 
 type ManagedAccountStatus = NoCtfapiEndpointsAdministrationPlatformPlatformManagedUserAccountStatusProtocol
-
-type AccountStatusConflictCode = NoCtfapiEndpointsAdministrationPlatformUpdatePlatformUserAccountStatusConflictCode
 
 type EmailVerificationDraft = 'Verified' | 'Unverified'
 
@@ -124,18 +122,18 @@ export function useAdminPlatformUsersPage() {
       detailOpen.value = false
       return
     }
-    detail.value = data ?? null
-    pendingRole.value = data?.role ?? 'User'
-    if (data?.accountStatus === 'Active' || data?.accountStatus === 'Banned' || data?.accountStatus === 'Disabled') {
-      pendingAccountStatus.value = data.accountStatus
+    detail.value = data?.user ?? null
+    pendingRole.value = data?.user?.role ?? 'User'
+    if (data?.user?.accountStatus === 'Active' || data?.user?.accountStatus === 'Banned' || data?.user?.accountStatus === 'Disabled') {
+      pendingAccountStatus.value = data.user.accountStatus
     }
-    pendingEmailVerification.value = data?.emailVerified ? 'Verified' : 'Unverified'
+    pendingEmailVerification.value = data?.user?.emailVerified ? 'Verified' : 'Unverified'
   }
 
   async function saveRole(): Promise<void> {
     if (!detail.value?.id) return
     roleSaving.value = true
-    const { data, error, response } = await adminPlatformUpdateUserRole({
+    const { data, error, response } = await adminPlatformPatchUser({
       path: { userId: detail.value.id },
       body: { role: pendingRole.value as 'User' | 'Organizer' | 'Administrator' },
     })
@@ -149,13 +147,13 @@ export function useAdminPlatformUsersPage() {
       }
       return
     }
-    detail.value = data ?? detail.value
+    detail.value = data?.user ?? detail.value
     toast.success(translate("ui.roleUpdated"))
     await load()
   }
 
   function accountStatusConflictMessage(code: string | undefined): string | null {
-    switch (code as AccountStatusConflictCode | undefined) {
+    switch (code) {
       case 'LastAdministratorProtected':
         return translate("ui.theLastActiveAdministratorCannotBeDeactivated")
       case 'AnonymizedAccountImmutable':
@@ -168,7 +166,7 @@ export function useAdminPlatformUsersPage() {
   async function saveAccountStatus(): Promise<void> {
     if (!detail.value?.id || detail.value.accountStatus === 'Anonymized') return
     accountStatusSaving.value = true
-    const { data, error } = await adminPlatformUpdateUserAccountStatus({
+    const { data, error } = await adminPlatformPatchUser({
       path: { userId: detail.value.id },
       body: { accountStatus: pendingAccountStatus.value },
     })
@@ -179,10 +177,10 @@ export function useAdminPlatformUsersPage() {
       return
     }
 
-    if (data) {
-      detail.value = data
-      const index = users.value.findIndex(user => user.id === data.id)
-      if (index >= 0) users.value.splice(index, 1, data)
+    if (data?.user) {
+      detail.value = data.user
+      const index = users.value.findIndex(user => user.id === data.user?.id)
+      if (index >= 0) users.value.splice(index, 1, data.user)
     }
     toast.success(pendingAccountStatus.value === 'Active'
       ? translate("ui.accountActivated")
@@ -192,7 +190,7 @@ export function useAdminPlatformUsersPage() {
   async function saveEmailVerification(): Promise<void> {
     if (!detail.value?.id || detail.value.accountStatus === 'Anonymized') return
     emailVerificationSaving.value = true
-    const { data, error } = await adminPlatformUpdateUserEmailVerification({
+    const { data, error } = await adminPlatformPatchUser({
       path: { userId: detail.value.id },
       body: { emailVerified: pendingEmailVerification.value === 'Verified' },
     })
@@ -205,10 +203,10 @@ export function useAdminPlatformUsersPage() {
       return
     }
 
-    if (data) {
-      detail.value = data
-      const index = users.value.findIndex(user => user.id === data.id)
-      if (index >= 0) users.value.splice(index, 1, data)
+    if (data?.user) {
+      detail.value = data.user
+      const index = users.value.findIndex(user => user.id === data.user?.id)
+      if (index >= 0) users.value.splice(index, 1, data.user)
     }
     toast.success(pendingEmailVerification.value === 'Verified'
       ? translate("ui.emailMarkedAsVerifiedByAnAdministrator")

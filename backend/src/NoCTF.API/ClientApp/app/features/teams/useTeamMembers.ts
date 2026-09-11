@@ -2,7 +2,7 @@ import { toRefs } from 'vue'
 
 import { toast } from 'vue-sonner'
 import { Crown, UserMinus } from '@lucide/vue'
-import { removeTeamMemberEndpoint, userProfileGet } from '../../api'
+import { patchCompetitionTeam, userProfileGet } from '../../api'
 import type { NoCtfapiEndpointsAuthenticationPublicUserProfileResponse, NoCtfapiEndpointsTeamsTeamResponse } from '../../api'
 
 /** Owns state, effects and commands for TeamMembers. */
@@ -49,8 +49,14 @@ emit: { (event: "changed", ...args: []): void }) {
 
   async function remove(userId: string) {
     removing.value = userId
-    const { error } = await removeTeamMemberEndpoint({
-      path: { competitionId: props.competitionId, teamId: props.team.id!, userId },
+    const { error } = await patchCompetitionTeam({
+      path: { competitionId: props.competitionId, teamId: props.team.id! },
+      body: {
+        membership: {
+          captainId: props.team.captainId!,
+          memberIds: (props.team.memberIds ?? []).filter(id => id !== userId),
+        },
+      },
     })
     removing.value = null
     if (error) {

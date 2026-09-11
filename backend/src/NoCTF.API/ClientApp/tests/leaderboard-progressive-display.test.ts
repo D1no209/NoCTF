@@ -89,7 +89,7 @@ describe('leaderboard progressive display', () => {
     expect(page).not.toContain('<ScrollSurface axis="y"')
     expect(page).toContain('data-slot="leaderboard-trend-panel"')
     expect(page).not.toContain('md:sticky md:top-24 md:z-20')
-    expect(theme).toContain(':has(> main > [data-contained-workspace-page] > [data-scoreboard-page-scroll])')
+    expect(theme).toContain(':has(> main [data-contained-workspace-page] > [data-scoreboard-page-scroll])')
   })
 
   test('keeps every team visible on hover and assigns series colors from a diverse theme palette', () => {

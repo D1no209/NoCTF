@@ -2,7 +2,7 @@ import { toRefs } from 'vue'
 
 import { PartyPopper } from '@lucide/vue'
 import { toast } from 'vue-sonner'
-import { getGameplayFactStatusEndpoint, judgeAwdpBreakFlag, judgePracticeFlag, submitFlagEndpoint } from '../../api'
+import { getGameplayFactStatusEndpoint, judgeAwdpBreakFlag, submitFlagEndpoint } from '../../api'
 import type { NoCtfapiEndpointsGameplayFactsGameplayFactAdmissionFailureCodeProtocol, NoCtfapiEndpointsGameplayFactsGameplayFactStatusResponse } from '../../api'
 import { useHumanVerification } from '~/features/security/useHumanVerification'
 
@@ -46,7 +46,8 @@ export function useFlagSubmit(props: Readonly<Omit<{
 emit: { (event: "evaluated", ...args: [result: TrackedSubmission['result']]): void; (event: "submitted", ...args: [gameplayFactIds: string[]]): void; (event: "remainingChanged", ...args: [remaining: number | null]): void }) {
   const { user } = useAuth()
   const { request: requestHumanVerification } = useHumanVerification()
-  const challengeKey = () => `${user.value?.userId ?? 'anonymous'}:${props.competitionId}:${props.competitionChallengeId}`
+  const challengeKey = () =>
+    `${user.value?.userId ?? 'anonymous'}:${props.competitionId}:${props.competitionChallengeId}:${props.practice ? 'practice' : 'official'}`
   const input = ref('')
 
   const commandAttempt = createCommandAttempt()
@@ -151,6 +152,8 @@ emit: { (event: "evaluated", ...args: [result: TrackedSubmission['result']]): vo
       if (data.result === 'Correct') {
         solvedChallengeKeys.add(challengeKey())
         solved.value = true
+        if (props.practice)
+          showResult(true, translate("ui.correctFlagPracticeAttemptsDoNotAwardPoints"))
         celebrateCorrectFlag()
       }
       else {
@@ -216,45 +219,6 @@ emit: { (event: "evaluated", ...args: [result: TrackedSubmission['result']]): vo
       }
       return
     }
-    if (props.practice) {
-      const { data, error } = await judgePracticeFlag({
-        headers: verificationHeaders,
-        path: {
-          competitionId: props.competitionId,
-          competitionChallengeId: props.competitionChallengeId,
-        },
-        body: { flag: lines[0]! },
-        signal: AbortSignal.timeout(30_000),
-      })
-      if (generation !== requestGeneration) return
-      if (error || !data) {
-        const parsed = parseApiError(error, translate("ui.failedToVerifyThePracticeFlag"))
-        const message = parsed.code === 'PracticeUnavailable'
-          ? translate("ui.practiceModeIsNotEnabledForThisCompetition")
-          : parsed.code === 'RuntimeNotRunning'
-            ? translate("ui.startTheChallengeEnvironmentAndWaitUntilItIsRunning")
-            : parsed.code === 'FlagInvalid'
-              ? translate("ui.theFlagFormatIsInvalid")
-              : parsed.status === 403
-                ? translate("ui.thisAccountDoesNotBelongToAnApprovedTeamEligible")
-                : parsed.message
-        persistentResult.value = { correct: null, message }
-        return
-      }
-      if (data.result !== 'Correct' && data.result !== 'Wrong') {
-        persistentResult.value = { correct: null, message: translate("ui.theJudgingEndpointReturnedNoValidResultPleaseRetry") }
-        return
-      }
-      if (data.result === 'Correct') {
-        input.value = ''
-        showResult(true, translate("ui.correctFlagPracticeAttemptsDoNotAwardPoints"))
-        celebrateCorrectFlag()
-      }
-      else {
-        showResult(false, translate("ui.incorrectFlag"))
-      }
-      return
-    }
     const { data, error } = await submitFlagEndpoint({
       signal: AbortSignal.timeout(30_000),
       headers: { ...commandAttempt.headers({ competitionId: props.competitionId, challengeId: props.competitionChallengeId, lines }), ...verificationHeaders },
@@ -271,7 +235,9 @@ emit: { (event: "evaluated", ...args: [result: TrackedSubmission['result']]): vo
       }
       persistentResult.value = { correct: null, message: code === 'AchievementAlreadySucceeded'
         ? translate("ui.breakHasAlreadySucceededUseVerificationModeToCheckWhether")
-        : parsed.message }
+        : code === 'RuntimeNotRunning'
+          ? translate("ui.startTheChallengeEnvironmentAndWaitUntilItIsRunning")
+          : parsed.message }
       return
     }
     const ids = [

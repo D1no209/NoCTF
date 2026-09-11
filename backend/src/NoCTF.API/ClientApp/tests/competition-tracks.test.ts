@@ -1,7 +1,6 @@
 import { sourceFile } from './support/feature-source'
 import { describe, expect, test } from 'bun:test'
 import type {
-  NoCtfapiEndpointsAdministrationCompetitionsCompetitionTrackFailureCodeProtocol,
   NoCtfapiEndpointsTeamsTeamMembershipFailureCodeProtocol,
   NoCtfapiEndpointsTeamsTeamRegistrationFailureCodeProtocol,
 } from '../app/api'
@@ -23,7 +22,7 @@ describe('competition track error presentation', () => {
     'TrackNotPublicSelectable',
     'AssignmentLocked',
     'AssignmentConflict',
-  ] satisfies NoCtfapiEndpointsAdministrationCompetitionsCompetitionTrackFailureCodeProtocol[]
+  ]
 
   const registrationCodes = [
     'InvalidTeamName',
@@ -80,8 +79,8 @@ describe('competition track pages', () => {
     const admin = await sourceFile(new URL('../app/pages/admin/competitions/[id]/tracks.vue', import.meta.url)).text()
     const teams = await sourceFile(new URL('../app/pages/admin/competitions/[id]/teams.vue', import.meta.url)).text()
 
-    expect(admin).toContain('adminCompetitionTracksGet')
-    expect(admin).toContain('adminCompetitionTracksUpdate')
+    expect(admin).toContain('adminGetCompetition')
+    expect(admin).toContain('adminPatchCompetition')
     expect(admin).toContain('if (saving.value || frozen.value || !canWrite.value) return')
     expect(admin).toContain('setInvitationRequired')
     expect(admin).toContain('clearInvitationRequirement')
@@ -90,8 +89,8 @@ describe('competition track pages', () => {
     expect(admin).not.toContain(':key="`${track.key}-${index}`"')
     expect(admin).toContain("ui.trackRequiresAnInvitationCode")
     expect(admin).toContain('error.value = competitionTrackErrorMessage')
-    expect(teams).toContain('adminTeamTrackAssign')
-    expect(teams).toContain('body: { trackKey }')
+    expect(teams).toContain('patchCompetitionTeam')
+    expect(teams).toContain('body: { administration: { trackKey, registrationStatus: team.registrationStatus } }')
     expect(teams).not.toContain('tracksFrozen.value || team.trackKey === trackKey')
   })
 

@@ -7,13 +7,14 @@ const { Compass, isActive, groups } = toRefs(viewProps.state)
 </script>
 
 <template>
-  <nav class="rounded-xl border bg-card" :aria-label="$t('ui.competitionNavigation')">
-    <header class="flex items-center gap-2 border-b px-4 py-3">
+  <Card as="nav" size="sm" class="gap-0 py-0" :aria-label="$t('ui.competitionNavigation')">
+    <CardHeader class="flex flex-row items-center gap-2 px-4 py-3">
       <Compass class="size-4 text-primary" aria-hidden="true" />
-      <h2 class="text-sm font-semibold">{{ $t('ui.competitionNavigation') }}</h2>
-    </header>
+      <CardTitle>{{ $t('ui.competitionNavigation') }}</CardTitle>
+    </CardHeader>
 
-    <div class="flex flex-col gap-4 p-3">
+    <ScrollSurface axis="y" class="min-h-0 flex-1" :aria-label="$t('ui.competitionNavigation')">
+    <CardContent class="flex flex-col gap-4 px-3 pb-3">
       <section v-for="(group, groupIndex) in groups" :key="group.label ?? groupIndex" class="flex flex-col gap-2">
         <h3 v-if="group.label" class="px-1 text-[0.6875rem] font-medium uppercase tracking-[0.14em] text-muted-foreground">
           {{ group.label }}
@@ -23,16 +24,17 @@ const { Compass, isActive, groups } = toRefs(viewProps.state)
             v-for="item in group.items"
             :key="item.to"
             :to="item.to"
-            class="flex min-h-10 items-center gap-2 rounded-md border px-3 py-2 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            class="flex min-h-10 items-center gap-2 rounded-md px-3 py-2 text-xs font-medium transition-colors focus-visible:outline-none"
             :class="isActive(item)
-              ? 'border-primary bg-primary text-primary-foreground'
-              : 'border-border bg-background text-muted-foreground hover:border-primary/50 hover:text-foreground'"
+              ? 'bg-primary text-primary-foreground shadow-sm'
+              : 'bg-background/60 text-muted-foreground hover:bg-muted/70 hover:text-foreground focus-visible:shadow-[0_0_14px_color-mix(in_oklch,var(--ring)_22%,transparent)]'"
           >
             <component :is="item.icon" class="size-4 shrink-0" aria-hidden="true" />
             <span class="truncate">{{ item.label }}</span>
           </NuxtLink>
         </div>
       </section>
-    </div>
-  </nav>
+    </CardContent>
+    </ScrollSurface>
+  </Card>
 </template>

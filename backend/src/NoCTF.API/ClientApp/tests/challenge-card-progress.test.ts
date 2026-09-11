@@ -99,7 +99,7 @@ describe('participant challenge progress', () => {
     expect(submit).not.toContain('v-for="item in tracked"')
   })
 
-  test('uses the generated no-score practice judgement after a CTF competition finishes', async () => {
+  test('uses the standard fact submission flow after a CTF competition finishes', async () => {
     const panel = await sourceFile(
       new URL('../app/features/challenges/panels/CtfPanel.vue', import.meta.url),
     ).text()
@@ -112,9 +112,9 @@ describe('participant challenge progress', () => {
 
     expect(panel).toContain('isCtfPracticeOpen(props.competition)')
     expect(panel).toContain(':practice="practiceOpen"')
-    expect(submit).toContain('judgePracticeFlag({')
+    expect(submit).toContain('submitFlagEndpoint({')
     expect(submit).toContain("ui.correctFlagPracticeAttemptsDoNotAwardPoints")
-    expect(submit).not.toContain('judgePracticeFlagEndpoint')
+    expect(submit).not.toContain('judgePracticeFlag')
     expect(create).toContain("practiceModeEnabled: mode.value === 'Ctf' && practiceModeEnabled.value")
   })
 

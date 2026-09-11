@@ -3,7 +3,7 @@ import { markRaw, toRefs } from 'vue'
 import { Check, Clipboard, FlaskConical, RefreshCw } from '@lucide/vue'
 import { toast } from 'vue-sonner'
 import { publicGatewayFailure } from '../../utils/public-gateway'
-import { adminChallengeBankExtendTestRuntime, adminChallengeBankGetTestRuntime, adminChallengeBankResetTestRuntime, adminChallengeBankStartTestRuntime, adminChallengeBankStopTestRuntime } from '../../api'
+import { adminChallengeBankCreateTestRuntime, adminChallengeBankExtendTestRuntime, adminChallengeBankGetTestRuntime, adminChallengeBankStopTestRuntime } from '../../api'
 import type { NoCtfapiEndpointsAdministrationChallengeBankChallengeTestRuntimeAcceptedResponse, NoCtfapiEndpointsAdministrationChallengeBankChallengeTestRuntimeResponse, NoCtfapiEndpointsAdministrationChallengeBankRuntimeTestFlagStateProtocol } from '../../api'
 import type { ChallengeTestRuntimeLoadOutcome, ChallengeTestRuntimeMutationKind, PendingChallengeTestRuntimeMutation } from '../../utils/challenge-test-runtime-polling'
 import RuntimeAccessUrlComponent from '../challenges/RuntimeAccessUrl.vue'
@@ -137,27 +137,40 @@ export function useChallengeTestRuntimePanel(props: Readonly<{
 
   const start = () => act(
     'start',
-    () => adminChallengeBankStartTestRuntime({ path: path.value }),
+    () => adminChallengeBankCreateTestRuntime({
+      path: path.value,
+      body: { replacesRuntimeId: null },
+    }),
     translate("ui.failedToStartTheChallengeTestContainer"),
   )
 
   const stop = () => act(
     'stop',
-    () => adminChallengeBankStopTestRuntime({ path: path.value }),
+    () => adminChallengeBankStopTestRuntime({
+      path: { ...path.value, runtimeInstanceId: runtime.value!.id! },
+    }),
     translate("ui.failedToStopTheChallengeTestContainer"),
   )
 
   const reset = () => act(
     'reset',
-    () => adminChallengeBankResetTestRuntime({ path: path.value }),
+    () => adminChallengeBankCreateTestRuntime({
+      path: path.value,
+      body: { replacesRuntimeId: runtime.value!.id! },
+    }),
     translate("ui.failedToResetTheChallengeTestContainer"),
   )
 
   const extend = () => act(
     'extend',
     () => adminChallengeBankExtendTestRuntime({
-      path: path.value,
-      body: { seconds: Math.max(60, Math.round(extendMinutes.value * 60)) },
+      path: { ...path.value, runtimeInstanceId: runtime.value!.id! },
+      body: {
+        expiresAt: new Date(
+          new Date(runtime.value!.expiresAt!).getTime()
+          + Math.max(60, Math.round(extendMinutes.value * 60)) * 1000,
+        ).toISOString(),
+      },
     }),
     translate("ui.failedToExtendTheChallengeTestContainer"),
   )

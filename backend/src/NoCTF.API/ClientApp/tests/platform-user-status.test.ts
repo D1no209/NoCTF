@@ -7,7 +7,7 @@ describe('platform user account status management', () => {
   test('uses the generated status endpoint and keeps the sheet open on failure', async () => {
     const source = await sourceFile(pageUrl).text()
 
-    expect(source).toContain('adminPlatformUpdateUserAccountStatus')
+    expect(source).toContain('adminPlatformPatchUser')
     expect(source).toContain("body: { accountStatus: pendingAccountStatus.value }")
     expect(source).toContain('accountStatusConflictMessage(apiError.code) ?? apiError.message')
     const handler = source.slice(
@@ -39,7 +39,7 @@ describe('platform user account status management', () => {
   test('manages email activation independently through the generated SDK', async () => {
     const source = await sourceFile(pageUrl).text()
 
-    expect(source).toContain('adminPlatformUpdateUserEmailVerification')
+    expect(source).toContain('adminPlatformPatchUser')
     expect(source).toContain("body: { emailVerified: pendingEmailVerification.value === 'Verified' }")
     expect(source).toContain("(pendingEmailVerification === 'Verified') === detail.emailVerified")
     expect(source).toContain("$t('ui.emailActivationStatus')")

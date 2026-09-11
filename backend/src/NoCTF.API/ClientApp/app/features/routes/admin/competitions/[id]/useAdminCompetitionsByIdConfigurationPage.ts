@@ -1,7 +1,7 @@
 import { markRaw } from 'vue'
 
 import { toast } from 'vue-sonner'
-import { adminCompetitionConfigurationGet, adminCompetitionConfigurationUpdate, adminUpdateCompetition } from '../../../../../api'
+import { adminGetCompetition, adminPatchCompetition } from '../../../../../api'
 import type { NoCtfapiEndpointsAdministrationCompetitionsCompetitionConfigurationResponse } from '../../../../../api'
 
 import { useCompetitionAdmin } from '../../../../../lib/admin-competition'
@@ -65,21 +65,23 @@ export function useAdminCompetitionsByIdConfigurationPage() {
     }
     savingMeta.value = true
     try {
-      const { error } = await adminUpdateCompetition({
+      const { error } = await adminPatchCompetition({
         path: { competitionId },
         body: {
-          title: title.value.trim(),
-          description: description.value.trim() || null,
-          startTime: start,
-          endTime: end,
-          teamRegistrationAutoApprove: teamRegistrationAutoApprove.value,
-          allowTeamRegistrationWhileRunning: allowTeamRegistrationWhileRunning.value,
-          maxTeamMembers: maxTeamMembers.value,
-          maxConcurrentRuntimeInstancesPerTeam: maxConcurrentRuntimeInstancesPerTeam.value,
-          maxActiveQuestionsPerTeam: maxActiveQuestionsPerTeam.value,
-          maxParticipantMessagesBeforeHandlerReply: maxParticipantMessagesBeforeHandlerReply.value,
-          allowChallengeOwnersToHandleQuestions: allowChallengeOwnersToHandleQuestions.value,
-          practiceModeEnabled: practiceModeEnabled.value,
+          metadata: {
+            title: title.value.trim(),
+            description: description.value.trim() || null,
+            startTime: start,
+            endTime: end,
+            teamRegistrationAutoApprove: teamRegistrationAutoApprove.value,
+            allowTeamRegistrationWhileRunning: allowTeamRegistrationWhileRunning.value,
+            maxTeamMembers: maxTeamMembers.value,
+            maxConcurrentRuntimeInstancesPerTeam: maxConcurrentRuntimeInstancesPerTeam.value,
+            maxActiveQuestionsPerTeam: maxActiveQuestionsPerTeam.value,
+            maxParticipantMessagesBeforeHandlerReply: maxParticipantMessagesBeforeHandlerReply.value,
+            allowChallengeOwnersToHandleQuestions: allowChallengeOwnersToHandleQuestions.value,
+            practiceModeEnabled: practiceModeEnabled.value,
+          },
         },
       })
       if (error) throw error
@@ -102,8 +104,8 @@ export function useAdminCompetitionsByIdConfigurationPage() {
 
   async function loadConfig() {
     configLoading.value = true
-    const { data, error } = await adminCompetitionConfigurationGet({ path: { competitionId } })
-    if (!error && data) config.value = data
+    const { data, error } = await adminGetCompetition({ path: { competitionId } })
+    if (!error && data) config.value = data.modeConfiguration ?? null
     configLoading.value = false
   }
 
@@ -111,12 +113,12 @@ export function useAdminCompetitionsByIdConfigurationPage() {
     if (!config.value) return
     savingConfig.value = true
     try {
-      const { data, error } = await adminCompetitionConfigurationUpdate({
+      const { data, error } = await adminPatchCompetition({
         path: { competitionId },
-        body: { json },
+        body: { modeConfiguration: { json } },
       })
       if (error) throw error
-      config.value = data ?? config.value
+      config.value = data?.modeConfiguration ?? config.value
       toast.success(translate("ui.modeConfigurationSaved"))
     }
     catch (e) {

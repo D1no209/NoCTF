@@ -42,15 +42,18 @@ describe('competition practice entry', () => {
       expect(canEnterCompetition(practice, { ...eligible, registrationStatus })).toBeFalse()
   })
 
-  test('overview and CTF controls share the same practice predicate and use the unscored endpoint', async () => {
+  test('overview and CTF controls share the same practice predicate and use the standard fact endpoint', async () => {
     const overview = await sourceFile(new URL('../app/features/competitions/CompetitionOverview.vue', import.meta.url)).text()
     const panel = await sourceFile(new URL('../app/features/challenges/panels/CtfPanel.vue', import.meta.url)).text()
     const submit = await sourceFile(new URL('../app/features/challenges/FlagSubmit.vue', import.meta.url)).text()
+    const detail = await sourceFile(new URL('../app/features/challenges/CompetitionChallengeDetail.vue', import.meta.url)).text()
     expect(overview).toContain('canEnterCompetition(competition.value, myTeam.value)')
     expect(overview).toContain("practiceOpen ? $t('ui.enterPractice') : $t('ui.enterTheCompetition')")
     expect(panel).toContain('isCtfPracticeOpen(props.competition)')
     expect(panel).toContain(':practice="practiceOpen"')
-    expect(submit).toContain('if (props.practice)')
-    expect(submit).toContain('await judgePracticeFlag(')
+    expect(submit).toContain('await submitFlagEndpoint({')
+    expect(submit).not.toContain('judgePracticeFlag')
+    expect(panel).toContain("result === 'Correct' && !practiceOpen.value")
+    expect(detail).toContain('ctx.competition.value?.status')
   })
 })

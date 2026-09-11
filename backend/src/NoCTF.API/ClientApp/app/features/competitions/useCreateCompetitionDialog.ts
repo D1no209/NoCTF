@@ -1,6 +1,6 @@
 import { toRefs } from 'vue'
 import { toast } from 'vue-sonner'
-import { adminCreateCompetition } from '../../api'
+import { adminCompetitionPosterReplace, adminCreateCompetition } from '../../api'
 import type { NoCtfapiEndpointsCompetitionsCompetitionResponse, NoCtfapiEndpointsCompetitionsGameModeProtocol } from '../../api'
 
 type Events = {
@@ -27,9 +27,20 @@ export function useCreateCompetitionDialog(
   const maxParticipantMessagesBeforeHandlerReply = ref(3)
   const allowChallengeOwnersToHandleQuestions = ref(true)
   const practiceModeEnabled = ref(false)
+  const posterFile = ref<File | null>(null)
+  const posterError = ref<string | null>(null)
+  const posterInputKey = ref(0)
+  const createdCompetition = ref<NoCtfapiEndpointsCompetitionsCompetitionResponse | null>(null)
   const error = ref<string | null>(null)
   const pending = ref(false)
   let resetBeforeNextOpen = false
+
+  const submitLabel = computed(() => {
+    if (!createdCompetition.value) return translate('ui.createContest')
+    return posterFile.value
+      ? translate('createCompetition.retryPosterUpload')
+      : translate('createCompetition.finishCreation')
+  })
 
   function reset() {
     title.value = ''
@@ -45,7 +56,19 @@ export function useCreateCompetitionDialog(
     maxParticipantMessagesBeforeHandlerReply.value = 3
     allowChallengeOwnersToHandleQuestions.value = true
     practiceModeEnabled.value = false
+    posterFile.value = null
+    posterError.value = null
+    posterInputKey.value += 1
+    createdCompetition.value = null
     error.value = null
+  }
+
+  function completeCreation() {
+    const competition = createdCompetition.value
+    if (!competition) return
+    createdCompetition.value = null
+    toast.success(translate('ui.contestCreated'))
+    emit('created', competition)
   }
 
   function setOpen(value: boolean) {
@@ -54,48 +77,89 @@ export function useCreateCompetitionDialog(
       reset()
       resetBeforeNextOpen = false
     }
-    if (!value) resetBeforeNextOpen = true
+    if (!value) {
+      completeCreation()
+      resetBeforeNextOpen = true
+    }
     emit('update:open', value)
   }
 
+  function selectPoster(event: Event) {
+    const input = event.target as HTMLInputElement
+    const file = input.files?.[0] ?? null
+    posterFile.value = null
+    posterError.value = null
+    if (!file) return
+    if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
+      posterError.value = translate('ui.posterMustBeAJpegPngOrWebpImage')
+      return
+    }
+    posterFile.value = file
+  }
+
+  function posterUploadError(requestError: unknown): string {
+    const parsed = parseApiError(requestError)
+    const message = parsed.code === 'UploadTooLarge'
+      ? translate('ui.theUploadedFileIsTooLarge')
+      : ['SizeInvalid', 'SourceMetadataMismatch', 'UnsupportedFormat', 'InvalidDimensions', 'PixelLimitExceeded', 'MultipleFrames', 'MalformedImage'].includes(parsed.code ?? '')
+        ? translate('ui.posterMustBeAJpegPngOrWebpImage')
+        : parsed.message
+    return translate('createCompetition.posterUploadFailed', { message })
+  }
+
   async function submit() {
+    if (pending.value || posterError.value) return
     error.value = null
-    if (!title.value.trim()) {
-      error.value = translate('ui.pleaseEnterAContestTitle')
-      return
-    }
-    const start = localInputToIso(startTime.value)
-    const end = localInputToIso(endTime.value)
-    if (!start || !end) {
-      error.value = translate('ui.pleaseSelectStartAndEndTime')
-      return
-    }
-    if (new Date(start) >= new Date(end)) {
-      error.value = translate('ui.startTimeMustBeEarlierThanEndTime')
-      return
-    }
     pending.value = true
     try {
-      const { data, error: requestError } = await adminCreateCompetition({
-        body: {
-          title: title.value.trim(),
-          description: description.value.trim() || null,
-          mode: mode.value,
-          startTime: start,
-          endTime: end,
-          teamRegistrationAutoApprove: teamRegistrationAutoApprove.value,
-          allowTeamRegistrationWhileRunning: allowTeamRegistrationWhileRunning.value,
-          maxTeamMembers: maxTeamMembers.value,
-          maxConcurrentRuntimeInstancesPerTeam: maxConcurrentRuntimeInstancesPerTeam.value,
-          maxActiveQuestionsPerTeam: maxActiveQuestionsPerTeam.value,
-          maxParticipantMessagesBeforeHandlerReply: maxParticipantMessagesBeforeHandlerReply.value,
-          allowChallengeOwnersToHandleQuestions: allowChallengeOwnersToHandleQuestions.value,
-          practiceModeEnabled: mode.value === 'Ctf' && practiceModeEnabled.value,
-        },
-      })
-      if (requestError || !data) throw requestError
-      toast.success(translate('ui.contestCreated'))
-      emit('created', data)
+      if (!createdCompetition.value) {
+        if (!title.value.trim()) {
+          error.value = translate('ui.pleaseEnterAContestTitle')
+          return
+        }
+        const start = localInputToIso(startTime.value)
+        const end = localInputToIso(endTime.value)
+        if (!start || !end) {
+          error.value = translate('ui.pleaseSelectStartAndEndTime')
+          return
+        }
+        if (new Date(start) >= new Date(end)) {
+          error.value = translate('ui.startTimeMustBeEarlierThanEndTime')
+          return
+        }
+        const { data, error: requestError } = await adminCreateCompetition({
+          body: {
+            title: title.value.trim(),
+            description: description.value.trim() || null,
+            mode: mode.value,
+            startTime: start,
+            endTime: end,
+            teamRegistrationAutoApprove: teamRegistrationAutoApprove.value,
+            allowTeamRegistrationWhileRunning: allowTeamRegistrationWhileRunning.value,
+            maxTeamMembers: maxTeamMembers.value,
+            maxConcurrentRuntimeInstancesPerTeam: maxConcurrentRuntimeInstancesPerTeam.value,
+            maxActiveQuestionsPerTeam: maxActiveQuestionsPerTeam.value,
+            maxParticipantMessagesBeforeHandlerReply: maxParticipantMessagesBeforeHandlerReply.value,
+            allowChallengeOwnersToHandleQuestions: allowChallengeOwnersToHandleQuestions.value,
+            practiceModeEnabled: mode.value === 'Ctf' && practiceModeEnabled.value,
+          },
+        })
+        if (requestError || !data) throw requestError
+        createdCompetition.value = data
+      }
+
+      if (posterFile.value && createdCompetition.value.id) {
+        const { error: uploadError } = await adminCompetitionPosterReplace({
+          path: { competitionId: createdCompetition.value.id },
+          body: { file: posterFile.value },
+        })
+        if (uploadError) {
+          error.value = posterUploadError(uploadError)
+          return
+        }
+      }
+
+      completeCreation()
       pending.value = false
       setOpen(false)
     }
@@ -123,8 +187,13 @@ export function useCreateCompetitionDialog(
     maxParticipantMessagesBeforeHandlerReply,
     allowChallengeOwnersToHandleQuestions,
     practiceModeEnabled,
+    posterFile,
+    posterError,
+    posterInputKey,
+    submitLabel,
     error,
     pending,
+    selectPoster,
     setOpen,
     submit,
   }

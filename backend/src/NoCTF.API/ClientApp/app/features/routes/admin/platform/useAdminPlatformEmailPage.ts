@@ -3,7 +3,7 @@ import { markRaw } from 'vue'
 
 import { KeyRound, Send } from '@lucide/vue'
 import { toast } from 'vue-sonner'
-import { adminPlatformGetEmailVerificationConfiguration, adminPlatformReplaceEmailVerificationPassword, adminPlatformSendEmailVerificationTest, adminPlatformUpdateEmailVerificationConfiguration } from '../../../../api'
+import { adminPlatformGetConfiguration, adminPlatformPatchConfiguration, adminPlatformReplaceEmailVerificationPassword, adminPlatformSendEmailVerificationTest } from '../../../../api'
 import type { NoCtfapiEndpointsAdministrationPlatformEmailVerificationConfigurationResponse, NoCtfapiEndpointsAdministrationPlatformSmtpSecurityModeProtocol } from '../../../../api'
 import AdminDateTimeComponent from '../../../admin/AdminDateTime.vue'
 
@@ -64,28 +64,28 @@ export function useAdminPlatformEmailPage() {
   async function load(): Promise<void> {
     loading.value = true
     loadError.value = null
-    const { data, error } = await adminPlatformGetEmailVerificationConfiguration()
+    const { data, error } = await adminPlatformGetConfiguration()
     loading.value = false
     if (error || !data) {
       loadError.value = parseApiError(error).message
       return
     }
-    configuration.value = data
-    syncForm(data)
+    configuration.value = data.emailVerification ?? null
+    if (data.emailVerification) syncForm(data.emailVerification)
   }
 
   async function save(): Promise<void> {
     if (!configuration.value) return
     saving.value = true
-    const { data, error } = await adminPlatformUpdateEmailVerificationConfiguration({
-      body: { ...form },
+    const { data, error } = await adminPlatformPatchConfiguration({
+      body: { emailVerification: { ...form } },
     })
     saving.value = false
     if (error) {
       toast.error(parseApiError(error).message)
       return
     }
-    if (data) configuration.value = data
+    if (data?.emailVerification) configuration.value = data.emailVerification
     toast.success(translate("ui.emailVerificationConfigurationSaved"))
   }
 

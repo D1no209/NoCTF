@@ -2,7 +2,7 @@ import { proxyRefs } from 'vue'
 import { markRaw } from 'vue'
 
 import { toast } from 'vue-sonner'
-import { adminExtendTeamRuntime, adminForceTerminateRuntime, adminGetRuntime, adminListCompetitionChallenges, adminListRuntimes, adminListTeams, adminResetSharedRuntime, adminResetTeamRuntime, adminStartSharedRuntime, adminStartTeamRuntime, adminTerminateRuntime } from '../../../../../api'
+import { adminCreateRuntimeForceTermination, adminCreateSharedRuntime, adminCreateTeamRuntime, adminExtendTeamRuntime, adminGetRuntime, adminListCompetitionChallenges, adminListRuntimes, adminListTeams, adminTerminateRuntime } from '../../../../../api'
 import type { NoCtfapiEndpointsAdministrationRuntimeAdminRuntimeResponse, NoCtfapiEndpointsRuntimeRuntimeKindProtocol, NoCtfapiEndpointsRuntimeRuntimeStateProtocol } from '../../../../../api'
 import { useCompetitionAdmin } from '../../../../../lib/admin-competition'
 import { createLatestPageRefresh } from '../../../../../lib/latest-page-refresh'
@@ -97,7 +97,7 @@ export function useAdminCompetitionsByIdRuntimesPage() {
     if (!id) return
     detailOpen.value = true
     detailLoading.value = true
-    const { data, error } = await adminGetRuntime({ path: { competitionId, runtimeInstanceId: id } })
+    const { data, error } = await adminGetRuntime({ path: { runtimeInstanceId: id } })
     if (error) toast.error(parseApiError(error).message)
     else detail.value = data ?? null
     detailLoading.value = false
@@ -141,7 +141,7 @@ export function useAdminCompetitionsByIdRuntimesPage() {
   ): void {
     void runtimeOperations.poll(token, async (signal) => {
       const { data, error } = await adminGetRuntime({
-        path: { competitionId, runtimeInstanceId },
+        path: { runtimeInstanceId },
         signal,
       })
       if (error || !data) return false
@@ -168,10 +168,10 @@ export function useAdminCompetitionsByIdRuntimesPage() {
     try {
       const ccPath = { competitionId, competitionChallengeId: rt.competitionChallengeId }
       const teamPath = { ...ccPath, teamId: rt.teamId ?? '' }
-      const { data, error } =
-        op === 'start'
-          ? (rt.teamId ? await adminStartTeamRuntime({ path: teamPath }) : await adminStartSharedRuntime({ path: ccPath }))
-          : (rt.teamId ? await adminResetTeamRuntime({ path: teamPath }) : await adminResetSharedRuntime({ path: ccPath }))
+      const body = { replacesRuntimeId: op === 'reset' ? rt.id : null }
+      const { data, error } = rt.teamId
+        ? await adminCreateTeamRuntime({ path: teamPath, body })
+        : await adminCreateSharedRuntime({ path: ccPath, body })
       if (!runtimeOperations.isActive(token)) return
       if (error) throw error
       const label = op === 'start' ? translate("ui.start") : translate("ui.reset")
@@ -205,7 +205,7 @@ export function useAdminCompetitionsByIdRuntimesPage() {
     if (!token) return
     try {
       const { data, error } = await adminTerminateRuntime({
-        path: { competitionId, runtimeInstanceId: rt.id },
+        path: { runtimeInstanceId: rt.id },
       })
       if (!runtimeOperations.isActive(token)) return
       if (error) throw error
@@ -242,8 +242,8 @@ export function useAdminCompetitionsByIdRuntimesPage() {
     const token = beginRuntimeOperation(rt, 'force-terminate')
     if (!token) return
     try {
-      const { data, error } = await adminForceTerminateRuntime({
-        path: { competitionId, runtimeInstanceId: rt.id },
+      const { data, error } = await adminCreateRuntimeForceTermination({
+        path: { runtimeInstanceId: rt.id },
         body: {
           reason,
         },
@@ -275,8 +275,17 @@ export function useAdminCompetitionsByIdRuntimesPage() {
     if (!token) return
     try {
       const { error } = await adminExtendTeamRuntime({
-        path: { competitionId, teamId: rt.teamId, competitionChallengeId: rt.competitionChallengeId },
-        body: { seconds: extendSeconds.value },
+        path: {
+          competitionId,
+          teamId: rt.teamId,
+          competitionChallengeId: rt.competitionChallengeId,
+          runtimeInstanceId: rt.id,
+        },
+        body: {
+          expiresAt: new Date(
+            new Date(rt.expiresAt!).getTime() + extendSeconds.value * 1000,
+          ).toISOString(),
+        },
       })
       if (!runtimeOperations.isActive(token)) return
       if (error) throw error

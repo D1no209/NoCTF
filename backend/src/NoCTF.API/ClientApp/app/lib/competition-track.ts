@@ -1,6 +1,4 @@
 import type {
-  NoCtfapiEndpointsAdministrationCompetitionsCompetitionTrackFailureCodeProtocol,
-  NoCtfapiEndpointsAdministrationCompetitionsCompetitionTrackFailureResponse,
   NoCtfapiEndpointsTeamsTeamRegistrationFailureCodeProtocol,
   NoCtfapiEndpointsTeamsTeamRegistrationFailureResponse,
   NoCtfapiEndpointsTeamsTeamMembershipFailureCodeProtocol,
@@ -20,7 +18,7 @@ const trackMessages = {
   TrackNotPublicSelectable: "ui.participantsCannotSelectThisTrack",
   AssignmentLocked: "ui.theCompetitionHasStartedAndTeamTrackAssignmentsAreFrozen",
   AssignmentConflict: "ui.theTeamWasUpdatedRefreshAndTryAgain",
-} satisfies Record<NoCtfapiEndpointsAdministrationCompetitionsCompetitionTrackFailureCodeProtocol, string>
+} as const
 
 const registrationMessages = {
   InvalidTeamName: "ui.theTeamNameIsInvalid",
@@ -58,8 +56,10 @@ const membershipMessages = {
 } satisfies Record<NoCtfapiEndpointsTeamsTeamMembershipFailureCodeProtocol, string>
 
 export function competitionTrackErrorMessage(error: unknown, fallback: string): string {
-  const payload = error as Partial<NoCtfapiEndpointsAdministrationCompetitionsCompetitionTrackFailureResponse> | null
-  return payload?.code ? translate(trackMessages[payload.code]) : parseApiError(error, fallback).message
+  const payload = error as { code?: keyof typeof trackMessages } | null
+  return payload?.code && payload.code in trackMessages
+    ? translate(trackMessages[payload.code])
+    : parseApiError(error, fallback).message
 }
 
 export function teamRegistrationErrorMessage(error: unknown, fallback: string): string {

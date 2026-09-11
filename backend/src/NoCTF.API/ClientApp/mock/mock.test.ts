@@ -63,7 +63,7 @@ describe('isolated Mock API', () => {
       expect(download.headers.get('cross-origin-resource-policy')).toBe('same-origin')
       expect(download.headers.get('content-type')).toContain('text/plain')
       expect(await download.text()).toContain(`Direction: ${challenge.direction}`)
-      const runtime = await (await send(`${competition}/challenges/${challenge.id}/runtime`)).json()
+      const runtime = await (await send(`${competition}/challenges/${challenge.id}/runtimes/current`)).json()
       expect(runtime.state).toBe('Running')
       expect(runtime.urls).toHaveLength(1)
       expect(runtime.urls[0]).toMatch(/^tcp:\/\/challenge\.mock\.invalid:31\d{3}$/)
@@ -182,9 +182,9 @@ describe('isolated Mock API', () => {
 
   test('profile and platform edits persist in memory and reset with a fresh Mock instance', async () => {
     const { send } = await setup()
-    await send('/api/v1/auth/me/profile', 'PUT', { userName: 'Changed Mock Admin', description: 'Mock profile' })
-    expect((await (await send('/api/v1/auth/me')).json()).userName).toBe('Changed Mock Admin')
-    await send('/api/v1/admin/platform/configuration', 'PUT', { name: 'Mock edited', description: 'Local' })
+    await send('/api/v1/auth/me/profile', 'PATCH', { profile: { description: 'Mock profile' } })
+    expect((await (await send('/api/v1/auth/me/profile')).json()).description).toBe('Mock profile')
+    await send('/api/v1/admin/platform/configuration', 'PATCH', { branding: { name: 'Mock edited', description: 'Local' } })
     const publicConfiguration = await (await send('/api/v1/platform/configuration')).json()
     expect(publicConfiguration.name).toBe('Mock edited')
     expect(publicConfiguration.imageUploadLimits).toEqual({ maximumAvatarBytes: 12 * 1024 * 1024, maximumWallpaperBytes: 16 * 1024 * 1024 })
@@ -213,12 +213,12 @@ describe('isolated Mock API', () => {
     const before = await (await send('/api/v1/auth/me')).json()
     expect(before.wallpaperRevision).toBeNull()
     expect(before.wallpaperEnabled).toBe(false)
-    expect((await send('/api/v1/auth/me/wallpaper-preference', 'PUT', { enabled: true })).status).toBe(400)
+    expect((await send('/api/v1/auth/me/profile', 'PATCH', { appearance: { wallpaperEnabled: true } })).status).toBe(400)
 
     const form = new FormData()
     form.set('file', new File(['mock wallpaper'], 'wallpaper.png', { type: 'image/png' }))
     const uploaded = await api.handle(new Request(base + '/api/v1/auth/me/wallpaper', {
-      method: 'POST',
+      method: 'PUT',
       headers: { Authorization: `Bearer ${accessToken}` },
       body: form,
     }))
@@ -230,9 +230,27 @@ describe('isolated Mock API', () => {
     const image = await send('/api/v1/auth/me/wallpaper')
     expect(image.status).toBe(200)
     expect(image.headers.get('content-type')).toContain('image/png')
-    const disabled = await (await send('/api/v1/auth/me/wallpaper-preference', 'PUT', { enabled: false })).json()
-    expect(disabled.wallpaperEnabled).toBe(false)
-    expect(disabled.wallpaperRevision).toBe(current.wallpaperRevision)
+    const disabled = await (await send('/api/v1/auth/me/profile', 'PATCH', { appearance: { wallpaperEnabled: false } })).json()
+    expect(disabled.appearance.wallpaperEnabled).toBe(false)
+    expect((await (await send('/api/v1/auth/me')).json()).wallpaperRevision).toBe(current.wallpaperRevision)
+  })
+
+  test('competition poster upload is available to the create-competition flow', async () => {
+    const { api, accessToken, send } = await setup()
+    const form = new FormData()
+    form.set('file', new File(['new poster'], 'poster.webp', { type: 'image/webp' }))
+    const uploaded = await api.handle(new Request(base + `/api/v1/admin/competitions/${id(2)}/poster`, {
+      method: 'PUT',
+      headers: { Authorization: `Bearer ${accessToken}` },
+      body: form,
+    }))
+    expect(uploaded.status).toBe(200)
+    expect((await uploaded.json()).contentType).toBe('image/webp')
+
+    const poster = await send(`/api/v1/competitions/${id(2)}/poster`)
+    expect(poster.status).toBe(200)
+    expect(poster.headers.get('content-type')).toContain('image/webp')
+    expect(await poster.text()).toBe('new poster')
   })
 
   test('unimplemented writes and unknown routes fail explicitly; roles are enforced', async () => {
@@ -260,16 +278,16 @@ describe('isolated Mock API', () => {
     const next = await (await send(`${competition}/gameplay-facts?limit=1&cursor=${first.nextCursor}`)).json()
     expect(first.items).toHaveLength(1)
     expect(next.items[0].id).not.toBe(first.items[0].id)
-    const path = `${competition}/challenges/${id(4, 2)}/runtime`
-    const started = await (await send(path + '/start', 'POST', {})).json()
-    const afterStart = await (await send(path)).json()
+    const path = `${competition}/challenges/${id(4, 2)}/runtimes`
+    const started = await (await send(path, 'POST', { replacesRuntimeId: null })).json()
+    const afterStart = await (await send(path + '/current')).json()
     expect(afterStart.state).toBe('Running')
     expect(afterStart.urls).toEqual(['tcp://challenge.mock.invalid:31002'])
-    const reset = await (await send(path + '/reset', 'POST', {})).json()
+    const reset = await (await send(path, 'POST', { replacesRuntimeId: started.runtimeInstanceId })).json()
     expect(reset.runtimeInstanceId).not.toBe(started.runtimeInstanceId)
-    expect((await (await send(path)).json()).urls).toEqual(['tcp://challenge.mock.invalid:31002'])
-    await send(path + '/stop', 'POST', {})
-    expect((await (await send(path)).json()).state).toBe('Stopped')
+    expect((await (await send(path + '/current')).json()).urls).toEqual(['tcp://challenge.mock.invalid:31002'])
+    await send(path + `/${reset.runtimeInstanceId}`, 'DELETE', {})
+    expect((await (await send(path + '/current')).json()).state).toBe('Stopped')
   })
 
   test('SignalR handshake, group subscription and score invalidation work locally', async () => {

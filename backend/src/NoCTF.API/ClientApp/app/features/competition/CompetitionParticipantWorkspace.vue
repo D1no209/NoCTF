@@ -9,10 +9,12 @@ const props = withDefaults(defineProps<{
   selectedChallengeId?: string | null
   challengeSelectionMode?: 'inline' | 'navigate'
   showChallengeNavigator?: boolean
+  contentScroll?: boolean
 }>(), {
   selectedChallengeId: null,
   challengeSelectionMode: 'navigate',
   showChallengeNavigator: false,
+  contentScroll: true,
 })
 const emit = defineEmits<{
   selectChallenge: [challengeId: string]

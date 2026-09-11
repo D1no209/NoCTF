@@ -2,18 +2,28 @@
 
 import { markRaw } from 'vue'
 import HumanVerificationGateComponent from '~/features/security/HumanVerificationGate.vue'
+import { formatDocumentTitle, routeTitleKey } from './page-title'
 
 /** Owns state, effects and commands for ApplicationRoot. */
 export function useApplicationRoot() {
   const { configuration, ensureLoaded } = usePlatform()
 
+  const route = useRoute()
+
   const { isDark } = useTheme()
 
-  useHead(() => ({
-    link: configuration.value?.logoUrl
-      ? [{ key: 'platform-icon', rel: 'icon', href: configuration.value.logoUrl }]
-      : [],
-  }))
+  useHead(() => {
+    const titleKey = routeTitleKey(route.path)
+    return {
+      title: formatDocumentTitle(
+        configuration.value?.name,
+        titleKey ? translate(titleKey) : null,
+      ),
+      link: configuration.value?.logoUrl
+        ? [{ key: 'platform-icon', rel: 'icon', href: configuration.value.logoUrl }]
+        : [],
+    }
+  })
 
   void ensureLoaded()
 

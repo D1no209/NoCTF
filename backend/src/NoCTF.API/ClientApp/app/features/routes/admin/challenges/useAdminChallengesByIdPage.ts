@@ -3,8 +3,8 @@ import { markRaw } from 'vue'
 import type { ComponentPublicInstance } from 'vue'
 import { Paperclip, RotateCcw, Trash2, Upload } from '@lucide/vue'
 import { toast } from 'vue-sonner'
-import { adminChallengeBankCreateFlag, adminChallengeBankDeleteAttachment, adminChallengeBankDeleteFlag, adminChallengeBankDeleteTemplate, adminChallengeBankGetTemplate, adminChallengeBankListAttachments, adminChallengeBankListFlags, adminChallengeBankRestoreAttachment, adminChallengeBankRestoreFlag, adminChallengeBankRestoreTemplate, adminChallengeBankTransferOwner, adminChallengeBankUpdatePermissions, adminChallengeBankUpdateTemplate, adminChallengeBankUploadAttachment, adminChallengeBankUploadRandomAttachmentBatch } from '../../../../api'
-import type { NoCtfapiEndpointsAdministrationChallengeBankChallengeAttachmentResponse, NoCtfapiEndpointsAdministrationChallengeBankChallengeFlagResponse, NoCtfapiEndpointsAdministrationChallengeBankChallengeFlagMatchKindProtocol, NoCtfapiEndpointsAdministrationChallengeBankChallengeTemplateResponse, NoCtfapiEndpointsAdministrationChallengeBankChallengeVisibilityProtocol, NoCtfapiEndpointsCompetitionsGameModeProtocol, NoCtfapiEndpointsAdministrationChallengeBankAttachmentDeliveryPolicyProtocol, NoCtfapiEndpointsAdministrationChallengeBankChallengeFlagFailureResponse, NoCtfapiEndpointsAdministrationChallengeBankRandomAttachmentBatchFailureResponse } from '../../../../api'
+import { adminChallengeBankCreateFlag, adminChallengeBankDeleteAttachment, adminChallengeBankDeleteFlag, adminChallengeBankDeleteTemplate, adminChallengeBankGetTemplate, adminChallengeBankListAttachments, adminChallengeBankListFlags, adminChallengeBankPatchTemplate, adminChallengeBankRestoreAttachment, adminChallengeBankRestoreFlag, adminChallengeBankRestoreTemplate, adminChallengeBankUploadAttachments } from '../../../../api'
+import type { NoCtfapiEndpointsAdministrationChallengeBankChallengeAttachmentResponse, NoCtfapiEndpointsAdministrationChallengeBankChallengeFlagResponse, NoCtfapiEndpointsAdministrationChallengeBankChallengeFlagMatchKindProtocol, NoCtfapiEndpointsAdministrationChallengeBankChallengeTemplateResponse, NoCtfapiEndpointsAdministrationChallengeBankChallengeVisibilityProtocol, NoCtfapiEndpointsCompetitionsGameModeProtocol, NoCtfapiEndpointsAdministrationChallengeBankAttachmentDeliveryPolicyProtocol, NoCtfapiEndpointsAdministrationChallengeBankChallengeFlagFailureResponse, NoCtfapiEndpointsAdministrationChallengeBankAttachmentBatchFailureResponse } from '../../../../api'
 import { challengeTemplateWriteErrorMessages } from '../../../../lib/challenge-template-error'
 import { validateChallengeTemplateDraft } from '../../../../lib/challenge-template-validation'
 import { defaultDefinitionJson, FlagSource, normalizeDefinitionJson, serializeDefinition } from '../../../../utils/game-config'
@@ -165,15 +165,17 @@ export function useAdminChallengesByIdPage() {
       return
     }
     saving.value = true
-    const { data, error } = await adminChallengeBankUpdateTemplate({
+    const { data, error } = await adminChallengeBankPatchTemplate({
       path: { challengeId },
       body: {
-        title: form.title.trim(),
-        mode: form.mode,
-        visibility: form.visibility,
-        direction: directionLabel(form.direction),
-        description: form.description.trim() || null,
-        definitionJson: normalizedDefinition,
+        content: {
+          title: form.title.trim(),
+          mode: form.mode,
+          visibility: form.visibility,
+          direction: directionLabel(form.direction),
+          description: form.description.trim() || null,
+          definitionJson: normalizedDefinition,
+        },
       },
     })
     saving.value = false
@@ -275,17 +277,10 @@ export function useAdminChallengesByIdPage() {
     input.value = ''
     if (files.length === 0) return
     uploading.value = true
-    let failed: unknown
-    for (const file of files) {
-      const { error } = await adminChallengeBankUploadAttachment({
-        path: { challengeId },
-        body: { file },
-      })
-      if (error) {
-        failed = error
-        break
-      }
-    }
+    const { error: failed } = await adminChallengeBankUploadAttachments({
+      path: { challengeId },
+      body: { deliveryPolicy: 'All', files },
+    })
     uploading.value = false
     if (failed) {
       toast.error(parseApiError(failed).message)
@@ -305,9 +300,10 @@ export function useAdminChallengesByIdPage() {
   async function uploadRandomBatch(): Promise<void> {
     if (!randomDownloadFileName.value.trim() || randomFiles.value.length === 0) return
     randomUploading.value = true
-    const { error } = await adminChallengeBankUploadRandomAttachmentBatch({
+    const { error } = await adminChallengeBankUploadAttachments({
       path: { challengeId },
       body: {
+        deliveryPolicy: 'RandomOnePerTeam',
         downloadFileName: randomDownloadFileName.value,
         files: randomFiles.value,
       },
@@ -324,7 +320,7 @@ export function useAdminChallengesByIdPage() {
   }
 
   function randomAttachmentErrorMessage(error: unknown): string {
-    const failure = error as NoCtfapiEndpointsAdministrationChallengeBankRandomAttachmentBatchFailureResponse
+    const failure = error as NoCtfapiEndpointsAdministrationChallengeBankAttachmentBatchFailureResponse
     switch (failure.code) {
       case 'UploadTooLarge': return translate("ui.anAttachmentVariantExceedsTheUploadSizeLimit")
       case 'InvalidFileName': return translate("ui.theSharedDownloadFilenameIsInvalid")
@@ -536,10 +532,13 @@ export function useAdminChallengesByIdPage() {
   async function savePermissions(): Promise<void> {
     if (!template.value) return
     permissionsSaving.value = true
-    const { data, error } = await adminChallengeBankUpdatePermissions({
+    const { data, error } = await adminChallengeBankPatchTemplate({
       path: { challengeId },
       body: {
-        managerIds: parseUserIds(managersText.value),
+        permissions: {
+          ownerId: template.value.ownerId!,
+          managerIds: parseUserIds(managersText.value),
+        },
       },
     })
     permissionsSaving.value = false
@@ -554,10 +553,15 @@ export function useAdminChallengesByIdPage() {
   async function transferOwner(): Promise<void> {
     if (!template.value || !newOwnerId.value.trim()) return
     transferring.value = true
-    const { data, error } = await adminChallengeBankTransferOwner({
+    const managerIds = new Set(parseUserIds(managersText.value))
+    managerIds.add(template.value.ownerId!)
+    const { data, error } = await adminChallengeBankPatchTemplate({
       path: { challengeId },
       body: {
-        ownerId: newOwnerId.value.trim(),
+        permissions: {
+          ownerId: newOwnerId.value.trim(),
+          managerIds: [...managerIds],
+        },
       },
     })
     transferring.value = false

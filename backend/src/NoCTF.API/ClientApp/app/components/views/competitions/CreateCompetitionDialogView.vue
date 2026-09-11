@@ -3,12 +3,12 @@ import { toRefs } from 'vue'
 import type { CreateCompetitionDialogViewState } from '~/features/competitions/useCreateCompetitionDialog'
 
 const viewProps = defineProps<{ state: CreateCompetitionDialogViewState }>()
-const { open, canOrganize, title, description, mode, startTime, endTime, teamRegistrationAutoApprove, allowTeamRegistrationWhileRunning, maxTeamMembers, maxConcurrentRuntimeInstancesPerTeam, maxActiveQuestionsPerTeam, maxParticipantMessagesBeforeHandlerReply, allowChallengeOwnersToHandleQuestions, practiceModeEnabled, error, pending, setOpen, submit } = toRefs(viewProps.state)
+const { open, canOrganize, title, description, mode, startTime, endTime, teamRegistrationAutoApprove, allowTeamRegistrationWhileRunning, maxTeamMembers, maxConcurrentRuntimeInstancesPerTeam, maxActiveQuestionsPerTeam, maxParticipantMessagesBeforeHandlerReply, allowChallengeOwnersToHandleQuestions, practiceModeEnabled, posterError, posterInputKey, submitLabel, error, pending, selectPoster, setOpen, submit } = toRefs(viewProps.state)
 </script>
 
 <template>
   <Dialog :open="open" @update:open="setOpen">
-    <DialogContent class="max-h-[calc(100dvh-2rem)] p-0 sm:max-w-3xl">
+    <DialogContent class="flex max-h-[calc(100dvh-2rem)] flex-col p-0 sm:max-w-3xl">
       <DialogHeader class="px-6 pt-6">
         <DialogTitle>{{ $t('ui.newCompetition') }}</DialogTitle>
         <DialogDescription>{{ $t('ui.theGameModeCannotBeModifiedAfterCreationAndThe') }}</DialogDescription>
@@ -18,8 +18,9 @@ const { open, canOrganize, title, description, mode, startTime, endTime, teamReg
         <AlertDescription>{{ $t('ui.theCurrentAccountDoesNotHavePermissionToCreateCompetitions') }}</AlertDescription>
       </Alert>
 
-      <UiForm class="flex flex-col gap-5" @submit.prevent="submit">
-        <FieldGroup class="px-6">
+      <UiForm class="flex min-h-0 flex-1 flex-col gap-5" @submit.prevent="submit">
+        <ScrollSurface axis="y" class="min-h-0 flex-1 overscroll-contain" :aria-label="$t('ui.newCompetition')">
+          <FieldGroup class="px-6 pb-1">
           <Alert v-if="error" variant="destructive">
             <AlertDescription>{{ $message(error) }}</AlertDescription>
           </Alert>
@@ -105,12 +106,25 @@ const { open, canOrganize, title, description, mode, startTime, endTime, teamReg
               <FieldDescription>{{ $t('ui.approvedNonBannedCompetitionTeamsCanStartContainerChallengesAnd') }}</FieldDescription>
             </div>
           </Field>
-        </FieldGroup>
+          <Field>
+            <FieldLabel for="create-competition-poster">{{ $t('ui.competitionPoster') }}</FieldLabel>
+            <FileUpload
+              :key="posterInputKey"
+              id="create-competition-poster"
+              accept="image/jpeg,image/png,image/webp"
+              :disabled="pending"
+              :error="posterError"
+              @change="selectPoster"
+            />
+            <FieldDescription>{{ $t('createCompetition.posterDescription') }}</FieldDescription>
+          </Field>
+          </FieldGroup>
+        </ScrollSurface>
 
         <DialogFooter class="m-0 shrink-0 rounded-b-xl px-6 py-4">
           <Button type="button" variant="outline" :disabled="pending" @click="setOpen(false)">{{ $t('ui.cancel') }}</Button>
-          <Button type="submit" :disabled="pending || !canOrganize">
-            <Spinner v-if="pending" data-icon="inline-start" />{{ $t('ui.createContest') }}
+          <Button type="submit" :disabled="pending || !canOrganize || Boolean(posterError)">
+            <Spinner v-if="pending" data-icon="inline-start" />{{ submitLabel }}
           </Button>
         </DialogFooter>
       </UiForm>

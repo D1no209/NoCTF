@@ -3,10 +3,8 @@ import type { ComponentPublicInstance } from 'vue'
 import { Image as ImageIcon, LockKeyhole, LogOut, ShieldCheck, UserRound } from '@lucide/vue'
 import { toast } from 'vue-sonner'
 import {
-  authenticationGetMySchoolIdentity,
-  authenticationUpdateMyWallpaperPreference,
-  authenticationUpdateMyProfile,
-  authenticationUpdateMySchoolIdentity,
+  authenticationGetMyProfile,
+  authenticationPatchMyProfile,
   authenticationUploadMyAvatar,
   authenticationUploadMyWallpaper,
   changePasswordEndpoint,
@@ -63,23 +61,17 @@ export function useAccountPanel() {
 
   function selectSection(section: AccountPanelSection) {
     activeSection.value = activeSection.value === section ? null : section
-    if (section === 'identity' && !identityLoaded.value && !identityLoading.value)
+    if ((section === 'profile' || section === 'identity' || section === 'wallpaper')
+      && !identityLoaded.value && !identityLoading.value)
       void loadIdentity()
   }
 
-  const description = ref(user.value?.description ?? '')
+  const description = ref('')
   const savedDescription = ref(description.value)
   const profilePending = ref(false)
   const profileError = ref<string | null>(null)
   const profileSuccess = ref(false)
   const profileDirty = computed(() => description.value !== savedDescription.value)
-
-  watch(user, current => {
-    if (!profileDirty.value) {
-      description.value = current?.description ?? ''
-      savedDescription.value = description.value
-    }
-  })
 
   async function saveProfile() {
     if (profilePending.value || !profileDirty.value) return
@@ -88,10 +80,11 @@ export function useAccountPanel() {
     profileSuccess.value = false
     const draft = description.value
     try {
-      const { data, error } = await authenticationUpdateMyProfile({ body: { description: draft || null } })
+      const { data, error } = await authenticationPatchMyProfile({
+        body: { profile: { description: draft || null } },
+      })
       if (error || !data) throw error
       savedDescription.value = draft
-      user.value = data
       profileSuccess.value = true
       toast.success(translate('ui.dataSaved'))
     }
@@ -191,9 +184,11 @@ export function useAccountPanel() {
     if (wallpaperPending.value || enabled === Boolean(user.value?.wallpaperEnabled)) return
     wallpaperPending.value = true
     try {
-      const { data, error } = await authenticationUpdateMyWallpaperPreference({ body: { enabled } })
+      const { data, error } = await authenticationPatchMyProfile({
+        body: { appearance: { wallpaperEnabled: enabled } },
+      })
       if (error || !data) throw error
-      user.value = data
+      await fetchMe()
       toast.success(translate(enabled
         ? 'accountPanel.wallpaperEnabled'
         : 'accountPanel.wallpaperDisabled'))
@@ -225,10 +220,12 @@ export function useAccountPanel() {
     identityLoading.value = true
     identityError.value = null
     try {
-      const { data, error } = await authenticationGetMySchoolIdentity()
+      const { data, error } = await authenticationGetMyProfile()
       if (error || !data) throw error
-      fullName.value = data.fullName ?? ''
-      studentNumber.value = data.studentNumber ?? ''
+      description.value = data.description ?? ''
+      savedDescription.value = description.value
+      fullName.value = data.schoolIdentity?.fullName ?? ''
+      studentNumber.value = data.schoolIdentity?.studentNumber ?? ''
       savedIdentity.value = { fullName: fullName.value, studentNumber: studentNumber.value }
       identityLoaded.value = true
     }
@@ -248,7 +245,9 @@ export function useAccountPanel() {
     identityFieldErrors.value = {}
     const draft = { fullName: fullName.value.trim(), studentNumber: studentNumber.value.trim() }
     try {
-      const { error } = await authenticationUpdateMySchoolIdentity({ body: draft })
+      const { error } = await authenticationPatchMyProfile({
+        body: { schoolIdentity: draft },
+      })
       if (error) throw error
       fullName.value = draft.fullName
       studentNumber.value = draft.studentNumber
