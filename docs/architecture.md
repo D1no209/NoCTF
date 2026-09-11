@@ -65,6 +65,8 @@ Domain <- Application <- API / Worker / Runner / Host
 
 分数投影不写回 GameplayFact。影响排行榜的业务提交发布 NATS 失效消息；Worker 按比赛合并 500ms 内的失效并从 PostgreSQL 全量投影到命名 FusionCache。缓存丢失时由 PostgreSQL 重建，不扫描 Dirty 业务列。
 
+Flag、AWDP Break 与 Fix 只有在 GameplayFact 事务提交成功后才增加低基数 Prometheus counter；幂等重放与拒绝请求不重复计数。平台监控将 Flag 与 Break 合并展示为 Flag 流量，并分别提供 Flag/Fix 的五分钟平均速率与近五分钟提交量。
+
 ## Runner Pool
 
 平台部署配置一个活动 RuntimeProvider（Docker 或 Kubernetes）与 RunnerPool；Challenge/Competition 不引用 Provider 或 RunnerPool。节点通过 Redis TTL heartbeat 发布容量，Worker 从 Registry 原子选择具体 RunnerId，并将 durable 命令直接投递到该节点的 `runner-node-{runnerId}` PostgreSQL queue。RuntimeInstance 只持久化本次调度实际使用的 RunnerId、RuntimeProvider、ProviderReceiptJson 与展开 URL，不保存 pool 路由状态。

@@ -85,6 +85,10 @@ internal sealed class PrometheusPlatformMonitoringReader(
             Sample(values, PrometheusMeasurementKind.PostgreSqlConnectionUsageRatio),
             LatencySample(values, PrometheusMeasurementKind.RedisP99Seconds, PrometheusMeasurementKind.RedisSamples, PrometheusMeasurementKind.RedisSustainedSeconds),
             Sample(values, PrometheusMeasurementKind.DiskAvailableRatio),
+            WindowSample(values, PrometheusMeasurementKind.FlagSubmissionsPerSecond),
+            WindowSample(values, PrometheusMeasurementKind.FlagSubmissionsLastFiveMinutes),
+            WindowSample(values, PrometheusMeasurementKind.FixSubmissionsPerSecond),
+            WindowSample(values, PrometheusMeasurementKind.FixSubmissionsLastFiveMinutes),
             BuildLatencyDetails(values), BuildPoolResources(values));
     }
 
@@ -264,6 +268,11 @@ internal sealed class PrometheusPlatformMonitoringReader(
         return PlatformMonitoringSample.From(result.Value.Value, thresholdResult.Value.Value);
     }
 
+    private static PlatformMonitoringSample WindowSample(
+        IReadOnlyDictionary<PrometheusMeasurementKind, PrometheusQueryResult> values,
+        PrometheusMeasurementKind kind) =>
+        Sample(values, kind) with { WindowSeconds = 300 };
+
     private static PrometheusQueryResult Result(
         IReadOnlyDictionary<PrometheusMeasurementKind, PrometheusQueryResult> values,
         PrometheusMeasurementKind kind) =>
@@ -305,7 +314,9 @@ internal sealed class PrometheusPlatformMonitoringReader(
         ApiSamples, ApiSustainedSeconds, RedisSamples, RedisSustainedSeconds, ProjectionSamples,
         HttpSamples, HttpP95, HttpP99, HttpMean, HttpRate, HttpErrors, HttpSustained,
         RedisDetailSamples, RedisDetailP95, RedisDetailP99, RedisDetailMean, RedisDetailRate, RedisDetailErrors, RedisDetailSustained,
-        PoolAvailable, PoolTotal, PoolOnline
+        PoolAvailable, PoolTotal, PoolOnline,
+        FlagSubmissionsPerSecond, FlagSubmissionsLastFiveMinutes,
+        FixSubmissionsPerSecond, FixSubmissionsLastFiveMinutes
     }
 
     private sealed record PrometheusQueryDefinition(
@@ -325,6 +336,10 @@ internal sealed class PrometheusPlatformMonitoringReader(
         private const string Rest = "{role=\"api\",request_kind=\"rest\"}";
         private const string ApiHistogram = "noctf_api_request_duration_seconds";
         private const string RedisHistogram = "noctf_redis_operation_duration_seconds";
+        private const string FlagSubmissions =
+            "noctf_gameplay_fact_submissions_total{role=\"api\",kind=~\"flag|break\"}";
+        private const string FixSubmissions =
+            "noctf_gameplay_fact_submissions_total{role=\"api\",kind=\"fix\"}";
 
         public static IReadOnlyList<PrometheusQueryDefinition> Create(
             PlatformMonitoringThresholds thresholds)
@@ -390,6 +405,14 @@ internal sealed class PrometheusPlatformMonitoringReader(
                     Quantile(RedisHistogram, "", "", "0.99")),
                 new(PrometheusMeasurementKind.DiskAvailableRatio,
                     "min(node_filesystem_avail_bytes{fstype!~\"tmpfs|overlay\"} / node_filesystem_size_bytes{fstype!~\"tmpfs|overlay\"})"),
+                new(PrometheusMeasurementKind.FlagSubmissionsPerSecond,
+                    $"sum(rate({FlagSubmissions}[5m])) or vector(0)"),
+                new(PrometheusMeasurementKind.FlagSubmissionsLastFiveMinutes,
+                    $"sum(increase({FlagSubmissions}[5m])) or vector(0)"),
+                new(PrometheusMeasurementKind.FixSubmissionsPerSecond,
+                    $"sum(rate({FixSubmissions}[5m])) or vector(0)"),
+                new(PrometheusMeasurementKind.FixSubmissionsLastFiveMinutes,
+                    $"sum(increase({FixSubmissions}[5m])) or vector(0)"),
                 new(PrometheusMeasurementKind.ApiSamples, Count(ApiHistogram, Rest, "")),
                 new(PrometheusMeasurementKind.ApiSustainedSeconds,
                     SustainedLatency(Quantile(ApiHistogram, Rest, "", "0.95"), Count(ApiHistogram, Rest, ""), thresholds)),
@@ -457,6 +480,10 @@ file static class EmptyPlatformMonitoringMeasurements
             false,
             capturedAt,
             dashboardUri,
+            unavailable,
+            unavailable,
+            unavailable,
+            unavailable,
             unavailable,
             unavailable,
             unavailable,

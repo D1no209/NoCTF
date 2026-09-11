@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
 using NoCTF.Application.Observability;
+using NoCTF.Domain.Gameplay;
 using NoCTF.Hosting.Observability;
 using OpenTelemetry.Metrics;
 
@@ -32,6 +33,9 @@ public sealed class ObservabilityHistogramTests
         NoCtfTelemetry.RecordLeaderboardProjection("histogram-test", "success", 0.012, 12, 40);
         NoCtfTelemetry.RecordSchedulerRebuild("histogram-test", 0.012, 40);
         NoCtfTelemetry.RecordSchedulerDispatch("histogram-test", "success", 0.012);
+        NoCtfTelemetry.RecordGameplayFactSubmissions(GameplayFactKind.FlagAttempt, 4);
+        NoCtfTelemetry.RecordGameplayFactSubmissions(GameplayFactKind.BreakAttempt, 2);
+        NoCtfTelemetry.RecordGameplayFactSubmissions(GameplayFactKind.FixAttempt);
         app.Services.GetRequiredService<MeterProvider>().ForceFlush();
         using var client = app.GetTestClient();
         var exported = await client.GetStringAsync("/metrics");
@@ -59,6 +63,18 @@ public sealed class ObservabilityHistogramTests
             && line.Contains("le=\"0.05\"", StringComparison.Ordinal))).IsFalse();
         await Assert.That(exported.Split('\n').Any(line => line.StartsWith("noctf_leaderboard_projection_teams", StringComparison.Ordinal)
             && line.Contains("le=\"50\"", StringComparison.Ordinal))).IsTrue();
+        var submissionLines = exported.Split('\n').Where(line => line.StartsWith(
+            "noctf_gameplay_fact_submissions_total{",
+            StringComparison.Ordinal)).ToArray();
+        await Assert.That(submissionLines.Any(line => line.Contains(
+            "kind=\"flag\"",
+            StringComparison.Ordinal))).IsTrue();
+        await Assert.That(submissionLines.Any(line => line.Contains(
+            "kind=\"break\"",
+            StringComparison.Ordinal))).IsTrue();
+        await Assert.That(submissionLines.Any(line => line.Contains(
+            "kind=\"fix\"",
+            StringComparison.Ordinal))).IsTrue();
     }
 
     private static SortedDictionary<double, double> Buckets(string text, string metric)

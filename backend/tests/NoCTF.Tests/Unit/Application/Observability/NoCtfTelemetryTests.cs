@@ -1,11 +1,47 @@
 using System.Collections.Concurrent;
 using System.Diagnostics.Metrics;
 using NoCTF.Application.Observability;
+using NoCTF.Domain.Gameplay;
 
 namespace NoCTF.Tests.Unit.Application.Observability;
 
 public sealed class NoCtfTelemetryTests
 {
+    [Test]
+    public async Task Gameplay_submission_counter_uses_bounded_kinds_and_batch_counts()
+    {
+        var measurements = new ConcurrentBag<(string Kind, long Value)>();
+        using var listener = new MeterListener();
+        listener.InstrumentPublished = (instrument, meterListener) =>
+        {
+            if (instrument.Meter.Name == NoCtfTelemetry.MeterName
+                && instrument.Name == "noctf.gameplay_fact.submissions")
+            {
+                meterListener.EnableMeasurementEvents(instrument);
+            }
+        };
+        listener.SetMeasurementEventCallback<long>((_, value, tags, _) =>
+        {
+            var kind = tags.ToArray()
+                .Single(tag => tag.Key == "kind")
+                .Value?.ToString();
+            measurements.Add((kind ?? string.Empty, value));
+        });
+        listener.Start();
+
+        NoCtfTelemetry.RecordGameplayFactSubmissions(GameplayFactKind.FlagAttempt, 4);
+        NoCtfTelemetry.RecordGameplayFactSubmissions(GameplayFactKind.BreakAttempt, 2);
+        NoCtfTelemetry.RecordGameplayFactSubmissions(GameplayFactKind.FixAttempt);
+        NoCtfTelemetry.RecordGameplayFactSubmissions(GameplayFactKind.HintUnlock, 5);
+
+        await Assert.That(measurements).IsEquivalentTo(
+        [
+            ("flag", 4L),
+            ("break", 2L),
+            ("fix", 1L)
+        ]);
+    }
+
     [Test]
     public async Task Pools_remain_separate_and_offline_nodes_change_quota_and_online_count_independently()
     {

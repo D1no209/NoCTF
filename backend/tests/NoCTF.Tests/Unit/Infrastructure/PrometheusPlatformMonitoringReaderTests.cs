@@ -43,6 +43,21 @@ public sealed class PrometheusPlatformMonitoringReaderTests
             .All(x => x.Query.Contains("request_kind=\"rest\"", StringComparison.Ordinal))).IsTrue();
         await Assert.That(handler.Queries.Where(x => x.Query.Contains("_bucket", StringComparison.Ordinal))
             .All(x => !x.Query.Contains("outcome=\"success\"", StringComparison.Ordinal))).IsTrue();
+        await Assert.That(result.Metrics.Single(metric =>
+                metric.Kind == PlatformMonitoringMetricKind.FlagSubmissionsLastFiveMinutes).Value)
+            .IsEqualTo(samples);
+        await Assert.That(result.Metrics.Single(metric =>
+                metric.Kind == PlatformMonitoringMetricKind.FixSubmissionsPerSecond).Value)
+            .IsEqualTo(1);
+        var submissionQueries = handler.Queries.Where(item =>
+            item.Query.Contains("noctf_gameplay_fact_submissions_total", StringComparison.Ordinal)).ToArray();
+        await Assert.That(submissionQueries).Count().IsEqualTo(4);
+        await Assert.That(submissionQueries.All(item =>
+            item.Query.Contains("[5m]", StringComparison.Ordinal))).IsTrue();
+        await Assert.That(submissionQueries.Any(item =>
+            item.Query.Contains("kind=~\"flag|break\"", StringComparison.Ordinal))).IsTrue();
+        await Assert.That(submissionQueries.Any(item =>
+            item.Query.Contains("kind=\"fix\"", StringComparison.Ordinal))).IsTrue();
     }
 
     private sealed class ClientFactory(HttpClient client) : IHttpClientFactory

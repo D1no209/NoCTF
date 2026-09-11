@@ -9,6 +9,7 @@ using NoCTF.Application.Competitions.Events;
 using NoCTF.Domain.Competitions.Events;
 using NoCTF.Application.Commands.Idempotency;
 using NoCTF.Application.Runtime.Provisioning;
+using NoCTF.Application.Observability;
 using NoCTF.GameModes.Registration;
 
 namespace NoCTF.Infrastructure.GameplayFacts.Intake;
@@ -170,6 +171,9 @@ public sealed class GameplayFactIntakeStore(
         replay?.Store(response);
         await db.SaveChangesAsync(cancellationToken);
         await transaction.CommitAsync(cancellationToken);
+        NoCtfTelemetry.RecordGameplayFactSubmissions(
+            entities[0].Kind,
+            entities.LongLength);
         await outbox.FlushCommittedMessagesAsync();
         return entities.Select(entity => new GameplayFactAcceptanceResult(
             GameplayFactAcceptanceState.Created,

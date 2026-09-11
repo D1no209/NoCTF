@@ -210,8 +210,14 @@ describe('isolated Mock API', () => {
     expect(snapshot.status).toBe(1)
     expect(snapshot.prometheusAvailable).toBe(true)
     expect(snapshot.natsAvailable).toBe(true)
-    expect(snapshot.metrics).toHaveLength(23)
-    expect(new Set(snapshot.metrics.map((item: Data) => item.kind)).size).toBe(23)
+    expect(snapshot.metrics).toHaveLength(27)
+    expect(snapshot.metrics).toEqual(expect.arrayContaining([
+      expect.objectContaining({ kind: 23, unit: 1, value: 38.4, windowSeconds: 300 }),
+      expect.objectContaining({ kind: 24, unit: 0, value: 11_520, windowSeconds: 300 }),
+      expect.objectContaining({ kind: 25, unit: 1, value: 0.18, windowSeconds: 300 }),
+      expect.objectContaining({ kind: 26, unit: 0, value: 54, windowSeconds: 300 }),
+    ]))
+    expect(new Set(snapshot.metrics.map((item: Data) => item.kind)).size).toBe(27)
     expect(snapshot.metrics.some((item: Data) => item.status === 1)).toBe(true)
     expect(snapshot.latencyDetails).toHaveLength(5)
     expect(snapshot.poolResources).toHaveLength(6)

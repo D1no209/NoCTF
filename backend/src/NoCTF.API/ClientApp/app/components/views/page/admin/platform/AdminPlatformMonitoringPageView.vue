@@ -167,7 +167,7 @@ const {
                 <div v-for="kind in group.kinds" :key="kind" class="grid grid-cols-[minmax(0,1fr)_auto] gap-x-4 gap-y-2 py-3">
                   <div class="min-w-0">
                     <p class="truncate text-xs text-muted-foreground">{{ $t(metricLabel(kind)) }}</p>
-                    <p v-if="metricByKind(kind)?.windowSeconds" class="mt-0.5 text-[0.68rem] text-muted-foreground/75">
+                    <p v-if="metricByKind(kind)?.minimumSamples" class="mt-0.5 text-[0.68rem] text-muted-foreground/75">
                       {{ monitoringNumber(metricByKind(kind)?.sampleCount, 0) }} / {{ $t('ui.minimumSamples') }} {{ metricByKind(kind)?.minimumSamples }}
                     </p>
                   </div>
