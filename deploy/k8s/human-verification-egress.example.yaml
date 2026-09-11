@@ -1,0 +1,62 @@
+# Copy this file outside the repository and keep only the policy for the
+# selected provider. Replace cap.example.com with the exact configured Cap
+# Standalone FQDN. Do not use wildcard FQDNs or broad CIDR egress.
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: noctf-turnstile-egress
+  namespace: noctf
+  labels:
+    app.kubernetes.io/part-of: noctf
+spec:
+  endpointSelector:
+    matchLabels:
+      app: backend
+  egress:
+    - toEndpoints:
+        - matchLabels:
+            "k8s:io.kubernetes.pod.namespace": kube-system
+            "k8s:k8s-app": kube-dns
+      toPorts:
+        - ports:
+            - port: "53"
+              protocol: ANY
+          rules:
+            dns:
+              - matchName: challenges.cloudflare.com
+    - toFQDNs:
+        - matchName: challenges.cloudflare.com
+      toPorts:
+        - ports:
+            - port: "443"
+              protocol: TCP
+---
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: noctf-cap-egress
+  namespace: noctf
+  labels:
+    app.kubernetes.io/part-of: noctf
+spec:
+  endpointSelector:
+    matchLabels:
+      app: backend
+  egress:
+    - toEndpoints:
+        - matchLabels:
+            "k8s:io.kubernetes.pod.namespace": kube-system
+            "k8s:k8s-app": kube-dns
+      toPorts:
+        - ports:
+            - port: "53"
+              protocol: ANY
+          rules:
+            dns:
+              - matchName: cap.example.com
+    - toFQDNs:
+        - matchName: cap.example.com
+      toPorts:
+        - ports:
+            - port: "443"
+              protocol: TCP

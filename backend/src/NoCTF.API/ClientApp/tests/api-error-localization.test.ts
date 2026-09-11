@@ -85,4 +85,18 @@ describe('api error localization', () => {
       title: 'An error occurred while processing your request.',
     }).message).toBe('An error occurred while processing your request.')
   })
+
+  test('localizes stable human verification problem codes', () => {
+    setLocale('zh-CN')
+
+    expect(parseApiError({
+      status: 403,
+      code: 'HumanVerificationRequired',
+      detail: 'Complete human verification before retrying this operation.',
+    }).message).toBe('请完成人机验证后重试。')
+    expect(parseApiError({
+      status: 503,
+      code: 'HumanVerificationUnavailable',
+    }).message).toBe('人机验证服务暂不可用，请稍后重新验证。')
+  })
 })

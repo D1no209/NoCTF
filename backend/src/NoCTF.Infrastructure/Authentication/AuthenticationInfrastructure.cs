@@ -55,7 +55,8 @@ internal static class AuthenticationInfrastructure
         services.AddOptions<NoCTF.Application.Admission.RequestAdmissionOptions>()
             .Bind(configuration.GetSection("RequestAdmission"))
             .Validate(value => value.AuthenticationIpPerMinute > 0 && value.AuthenticationAccountPerMinute > 0
-                && value.PasswordConcurrency is >= 1 and <= 128 && value.PatchConcurrency is >= 1 and <= 32
+                && value.PasswordConcurrency is >= 1 and <= 128 && value.SensitiveIpPerMinute > 0
+                && value.RuntimeCommandPerUserPerMinute > 0 && value.PatchConcurrency is >= 1 and <= 32
                 && value.PatchPerUserConcurrency > 0 && value.SubmissionPerUserPerMinute > 0
                 && value.SubmissionConcurrency is >= 1 and <= 128 && value.SubmissionPerUserConcurrency > 0,
                 "RequestAdmission limits must be positive and concurrency budgets must be within platform bounds.")
@@ -121,4 +122,5 @@ internal static class AuthenticationInfrastructure
         return Convert.TryFromBase64String(value, key, out var bytesWritten)
             && bytesWritten == key.Length;
     }
+
 }

@@ -5,6 +5,7 @@ using NoCTF.Application.Authentication.Login;
 using NoCTF.Domain.Identity;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Options;
+using NoCTF.Application.Admission;
 
 namespace NoCTF.API.Endpoints.Authentication;
 
@@ -39,6 +40,7 @@ public sealed class LoginEndpoint(LoginUser login, IOptions<RefreshHttpOptions> 
         Post("/auth/login");
         AllowAnonymous();
         Options(builder => builder.WithMetadata(new NoCTF.API.Security.ProtectedEntryMetadata(NoCTF.API.Security.ProtectedEntry.Authentication)));
+        Options(builder => builder.WithMetadata(new NoCTF.API.Security.HumanVerificationMetadata(HumanVerificationAction.Login)));
         MaxRequestBodySize(16 * 1024);
     }
 

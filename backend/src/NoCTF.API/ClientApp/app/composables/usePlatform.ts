@@ -1,5 +1,7 @@
 import { platformConfigurationGet } from '../api'
 
+let platformLoadPromise: Promise<void> | null = null
+
 /** Public branding and deployment capabilities, loaded once for the whole app. */
 export function usePlatform() {
   const configuration = useState<Awaited<ReturnType<typeof load>> | null>('platform:configuration', () => null)
@@ -14,18 +16,22 @@ export function usePlatform() {
   }
 
   async function ensureLoaded(): Promise<void> {
-    if (configuration.value || loading.value) return
-    loading.value = true
-    try {
-      configuration.value = await load()
-      error.value = null
-    }
-    catch (requestError) {
-      error.value = parseApiError(requestError, translate("ui.failedToLoadPlatformConfiguration")).message
-    }
-    finally {
-      loading.value = false
-    }
+    if (configuration.value) return
+    platformLoadPromise ??= (async () => {
+      loading.value = true
+      try {
+        configuration.value = await load()
+        error.value = null
+      }
+      catch (requestError) {
+        error.value = parseApiError(requestError, translate("ui.failedToLoadPlatformConfiguration")).message
+      }
+      finally {
+        loading.value = false
+        platformLoadPromise = null
+      }
+    })()
+    await platformLoadPromise
   }
 
   return { configuration, error, loading, ensureLoaded }

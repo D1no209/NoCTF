@@ -42,9 +42,14 @@ public sealed class RequestAdmissionMiddleware(RequestDelegate next)
         else
         {
             if (userId is null) { await next(context); return; } // Authentication supplies the 401 without consuming another user's quota.
-            rates.Add(new($"entry-ip:{ip}", 1200, 60));
+            rates.Add(new($"entry-ip:{ip}", options.Value.SensitiveIpPerMinute, 60));
             rates.Add(new($"entry-user:{policy ?? entry.ToString()}:{userId}",
-                policy == "submission" ? options.Value.SubmissionPerUserPerMinute : 30, 60));
+                policy == "submission"
+                    ? options.Value.SubmissionPerUserPerMinute
+                    : entry == ProtectedEntry.RuntimeCommand
+                        ? options.Value.RuntimeCommandPerUserPerMinute
+                        : 30,
+                60));
         }
         if (entry == ProtectedEntry.PatchUpload)
         {

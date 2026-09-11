@@ -6,6 +6,7 @@ using Microsoft.AspNetCore.Http.HttpResults;
 using NoCTF.API.Security;
 using NoCTF.API.Serialization;
 using NoCTF.Application.GameplayFacts.Practice;
+using NoCTF.Application.Admission;
 
 namespace NoCTF.API.Endpoints.GameplayFacts;
 
@@ -57,6 +58,8 @@ public sealed class JudgePracticeFlagEndpoint(
         AuthSchemes("Bearer");
         Options(options => options.WithMetadata(
             new Microsoft.AspNetCore.RateLimiting.EnableRateLimitingAttribute("submission")));
+        Options(options => options.WithMetadata(
+            new HumanVerificationMetadata(HumanVerificationAction.Evaluation)));
         Description(builder => builder.WithName("JudgePracticeFlag"));
         Summary(summary =>
         {

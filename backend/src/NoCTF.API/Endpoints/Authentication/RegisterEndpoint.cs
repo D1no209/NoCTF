@@ -7,6 +7,7 @@ using NoCTF.API.Serialization;
 using Riok.Mapperly.Abstractions;
 using System.Text.Json.Serialization;
 using MvcProblemDetails = Microsoft.AspNetCore.Mvc.ProblemDetails;
+using NoCTF.Application.Admission;
 
 namespace NoCTF.API.Endpoints.Authentication;
 
@@ -66,6 +67,7 @@ public sealed class RegisterEndpoint(RegisterUser register, TimeProvider timePro
         Post("/auth/register");
         AllowAnonymous();
         Options(builder => builder.WithMetadata(new NoCTF.API.Security.ProtectedEntryMetadata(NoCTF.API.Security.ProtectedEntry.Registration)));
+        Options(builder => builder.WithMetadata(new NoCTF.API.Security.HumanVerificationMetadata(HumanVerificationAction.Registration)));
         MaxRequestBodySize(16 * 1024);
         Summary(summary =>
         {

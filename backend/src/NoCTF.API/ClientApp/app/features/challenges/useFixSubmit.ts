@@ -3,6 +3,7 @@ import { toRefs } from 'vue'
 import { toast } from 'vue-sonner'
 import { requestAwdpDefenseTargetEndpoint, uploadPatchEndpoint } from '../../api'
 import type { NoCtfapiEndpointsGameplayFactsAwdpDefenseProgressResponse, NoCtfapiEndpointsGameplayFactsAwdpDefenseTargetRequestFailureCodeProtocol, NoCtfapiEndpointsGameplayFactsUploadPatchFailureCodeProtocol } from '../../api'
+import { useHumanVerification } from '~/features/security/useHumanVerification'
 
 /** Owns state, effects and commands for FixSubmit. */
 export function useFixSubmit(props: Readonly<{
@@ -11,6 +12,7 @@ export function useFixSubmit(props: Readonly<{
   defense?: NoCtfapiEndpointsGameplayFactsAwdpDefenseProgressResponse
 }>,
 emit: { (event: "changed", ...args: []): void; (event: "accepted", ...args: []): void }) {
+  const { request: requestHumanVerification } = useHumanVerification()
   const file = ref<File | null>(null)
 
   const pendingAction = ref<'request' | 'upload' | null>(null)
@@ -88,8 +90,10 @@ emit: { (event: "changed", ...args: []): void; (event: "accepted", ...args: []):
     if (!canRequest.value || pendingAction.value) return
     pendingAction.value = 'request'
     try {
+      const verificationHeaders = await requestHumanVerification('evaluation')
+      if (verificationHeaders === null) return
       const { data, error } = await requestAwdpDefenseTargetEndpoint({
-        headers: targetCommandAttempt.headers({ competitionId: props.competitionId, challengeId: props.competitionChallengeId }),
+        headers: { ...targetCommandAttempt.headers({ competitionId: props.competitionId, challengeId: props.competitionChallengeId }), ...verificationHeaders },
         signal: AbortSignal.timeout(30_000),
         path: {
           competitionId: props.competitionId,
@@ -117,9 +121,11 @@ emit: { (event: "changed", ...args: []): void; (event: "accepted", ...args: []):
     if (!file.value || !canUpload.value || !runtimeInstanceId || pendingAction.value) return
     pendingAction.value = 'upload'
     try {
+      const verificationHeaders = await requestHumanVerification('evaluation')
+      if (verificationHeaders === null) return
       const { data, error } = await uploadPatchEndpoint({
         signal: AbortSignal.timeout(360_000),
-        headers: patchCommandAttempt.headers({ runtimeInstanceId, name: file.value.name, size: file.value.size, modified: file.value.lastModified }),
+        headers: { ...patchCommandAttempt.headers({ runtimeInstanceId, name: file.value.name, size: file.value.size, modified: file.value.lastModified }), ...verificationHeaders },
         path: {
           competitionId: props.competitionId,
           competitionChallengeId: props.competitionChallengeId,

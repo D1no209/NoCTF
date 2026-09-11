@@ -7,6 +7,7 @@ using NoCTF.API.Security;
 using NoCTF.API.Serialization;
 using NoCTF.Application.GameplayFacts.Awdp;
 using Riok.Mapperly.Abstractions;
+using NoCTF.Application.Admission;
 
 namespace NoCTF.API.Endpoints.GameplayFacts;
 
@@ -53,6 +54,8 @@ public sealed class RequestAwdpDefenseTargetEndpoint(
         Options(builder => builder.WithMetadata(new NoCTF.API.Security.ProtectedEntryMetadata(NoCTF.API.Security.ProtectedEntry.RuntimeCommand)));
         Options(options => options.WithMetadata(
             new EnableRateLimitingAttribute("submission")));
+        Options(options => options.WithMetadata(
+            new HumanVerificationMetadata(HumanVerificationAction.Evaluation)));
         Summary(summary =>
         {
             summary.Summary = "Request a clean one-shot AWDP defense target.";

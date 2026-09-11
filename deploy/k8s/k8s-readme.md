@@ -164,6 +164,23 @@ second exact `matchName` or port entry only when the configured mail service
 actually requires it; do not use a wildcard FQDN, `0.0.0.0/0`, or commit the
 production endpoint or credentials.
 
+Human verification is also optional and fail-closed. Keep
+`HumanVerification__Provider` as `None`, or set it to `Cap` or `Turnstile` and
+add the selected provider's public settings to `configmap.yaml`:
+
+- Cap: `HumanVerification__Cap__ServerUrl` and `HumanVerification__Cap__SiteKey`.
+- Turnstile: `HumanVerification__Turnstile__SiteKey` and
+  `HumanVerification__Turnstile__AllowedHostnames__0`.
+
+Add only the corresponding `cap-secret` or `turnstile-secret` key to
+`noctf-secrets`. Copy `human-verification-egress.example.yaml` outside the
+repository, remove the unused provider policy, replace the Cap example FQDN
+and port when applicable, then apply it before enabling the provider. The
+Turnstile policy admits only `challenges.cloudflare.com:443`. Cap Standalone is
+operated separately; enable its version-pinned asset server so the browser can
+load the solver WASM from the same instance, and restrict its CORS list to the
+actual NoCTF origins.
+
 Do not replace the staged sequence with a single directory-wide apply. The
 platform `networkpolicy.yaml` must be active before any `noctf` workload Pod is
 created. When this cluster hosts Kubernetes Runner Pools, the `runtime`

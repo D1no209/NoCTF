@@ -6,6 +6,7 @@ import type { NoCtfapiEndpointsRuntimeRuntimeResponse } from '../../api'
 import { publicGatewayFailure, publicGatewayState } from '../../utils/public-gateway'
 import { classifyPlayerRuntimeLookup, normalizePlayerRuntime, shouldPollPlayerRuntime, type PlayerRuntimeLookupOutcome } from '../../utils/player-runtime'
 import RuntimeAccessUrlComponent from './RuntimeAccessUrl.vue'
+import { useHumanVerification } from '~/features/security/useHumanVerification'
 
 type Runtime = NoCtfapiEndpointsRuntimeRuntimeResponse
 
@@ -24,6 +25,7 @@ export function useRuntimeCard(props: Readonly<Omit<{
     dockTarget?: string
   }, "controls" | "dockTarget">>>) {
   const runtime = ref<Runtime | null>(null)
+  const { request: requestHumanVerification } = useHumanVerification()
 
   const loading = ref(true)
 
@@ -106,11 +108,16 @@ export function useRuntimeCard(props: Readonly<Omit<{
       startPolling()
   }
 
-  async function act(action: () => Promise<{ error?: unknown }>, failMessage: string) {
+  async function act(
+    action: (humanVerificationHeaders: Record<string, string>) => Promise<{ error?: unknown }>,
+    failMessage: string,
+  ) {
     if (acting.value) return
     acting.value = true
     try {
-    const { error } = await action()
+    const verificationHeaders = await requestHumanVerification('runtime')
+    if (verificationHeaders === null) return
+    const { error } = await action(verificationHeaders)
     if (error) {
       toast.error(parseApiError(error, failMessage).message)
       return
@@ -127,17 +134,17 @@ export function useRuntimeCard(props: Readonly<Omit<{
     competitionChallengeId: props.competitionChallengeId,
   }))
 
-  const start = () => act(() => startRuntimeEndpoint({ path: path.value, headers: commandAttempt.headers({ ...path.value, action: 'start' }) }), translate("ui.failedToStartEnvironment"))
+  const start = () => act(verificationHeaders => startRuntimeEndpoint({ path: path.value, headers: { ...commandAttempt.headers({ ...path.value, action: 'start' }), ...verificationHeaders } }), translate("ui.failedToStartEnvironment"))
 
-  const stop = () => act(() => stopRuntimeEndpoint({ path: path.value, headers: commandAttempt.headers({ ...path.value, action: 'stop' }) }), translate("ui.stopEnvironmentFailed"))
+  const stop = () => act(verificationHeaders => stopRuntimeEndpoint({ path: path.value, headers: { ...commandAttempt.headers({ ...path.value, action: 'stop' }), ...verificationHeaders } }), translate("ui.stopEnvironmentFailed"))
 
-  const reset = () => act(() => resetRuntimeEndpoint({ path: path.value, headers: commandAttempt.headers({ ...path.value, action: 'reset' }) }), translate("ui.failedToResetEnvironment"))
+  const reset = () => act(verificationHeaders => resetRuntimeEndpoint({ path: path.value, headers: { ...commandAttempt.headers({ ...path.value, action: 'reset' }), ...verificationHeaders } }), translate("ui.failedToResetEnvironment"))
 
   const extend = () =>
     act(
-      () =>
+      verificationHeaders =>
         extendRuntimeEndpoint({
-          headers: commandAttempt.headers({ ...path.value, action: 'extend', minutes: extendMinutes.value }),
+          headers: { ...commandAttempt.headers({ ...path.value, action: 'extend', minutes: extendMinutes.value }), ...verificationHeaders },
           path: path.value,
           body: { seconds: Math.max(60, Math.round(extendMinutes.value * 60)) },
         }),

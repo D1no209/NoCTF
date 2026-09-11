@@ -78,6 +78,17 @@ dotnet ef database update
 
 结构化日志包含 Competition/Challenge/Team/GameplayFact/RuntimeInstance/Message Id。比赛 Owner、Manager、Judge 的受保护 Flag 访问必须有审计；平台 Administrator 读取不写审计。密码、任何 JWT/Token、InvitationToken、FlagDerivationSecret 不记录。异常不作为业务分支；Result/enum 表达预期失败。
 
+## 人机验证
+
+`HumanVerification:Provider` 支持 `None`、`Cap`、`Turnstile`，默认 `None`。Cap 使用独立的官方
+Standalone 服务和站点密钥；Turnstile 仅在后端调用固定 Siteverify 地址。Provider token 通过
+`X-NoCTF-Human-Verification` 交给登录、注册和玩家 Runtime／评测端点，不写日志或持久化，且每次
+请求后立即丢弃。管理员操作与内部 Checker 回调不要求验证码。
+
+本地测试 Turnstile 时使用 Cloudflare 官方测试 site key/secret，并将 `localhost` 放入开发环境的
+`AllowedHostnames`；生产配置会拒绝 loopback hostname。Cap 本地实例可以使用 HTTP，生产启动校验只
+接受 HTTPS。测试适配器使用受控 HTTP handler，不让 CI 依赖公网 Provider。
+
 ## 文档同步
 
 修改领域契约必须同时更新 docs、OpenAPI 和测试。不得以代码现状为理由恢复已废弃的 Penetration 模式、RuntimeOperation、Artifact、TeamMember 或 Collaborator 表。

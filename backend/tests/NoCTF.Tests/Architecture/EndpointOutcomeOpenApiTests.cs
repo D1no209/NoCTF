@@ -23,7 +23,8 @@ public sealed class EndpointOutcomeOpenApiTests
                     ["401"] = ResponseBodyKind.Empty,
                     ["403"] = ResponseBodyKind.Problem,
                     ["409"] = ResponseBodyKind.Json,
-                    ["429"] = ResponseBodyKind.Empty
+                    ["429"] = ResponseBodyKind.Empty,
+                    ["503"] = ResponseBodyKind.Problem
                 }),
             new OutcomeContract(
                 $"{ChallengePrefix}/awdp-defense-targets",
@@ -31,9 +32,10 @@ public sealed class EndpointOutcomeOpenApiTests
                 {
                     ["202"] = ResponseBodyKind.Json,
                     ["401"] = ResponseBodyKind.Empty,
-                    ["403"] = ResponseBodyKind.Empty,
+                    ["403"] = ResponseBodyKind.Problem,
                     ["404"] = ResponseBodyKind.Empty,
-                    ["409"] = ResponseBodyKind.Json
+                    ["409"] = ResponseBodyKind.Json,
+                    ["503"] = ResponseBodyKind.Problem
                 }),
             new OutcomeContract(
                 $"{ChallengePrefix}/awdp-defense-targets/{{runtimeInstanceId}}/fix",
@@ -42,11 +44,12 @@ public sealed class EndpointOutcomeOpenApiTests
                     ["202"] = ResponseBodyKind.Json,
                     ["400"] = ResponseBodyKind.Problem,
                     ["401"] = ResponseBodyKind.Empty,
-                    ["403"] = ResponseBodyKind.Empty,
+                    ["403"] = ResponseBodyKind.Problem,
                     ["404"] = ResponseBodyKind.Empty,
                     ["409"] = ResponseBodyKind.Json,
                     ["413"] = ResponseBodyKind.Problem,
-                    ["422"] = ResponseBodyKind.Json
+                    ["422"] = ResponseBodyKind.Json,
+                    ["503"] = ResponseBodyKind.Problem
                 }),
             RuntimeContract("start", includesValidationProblem: false),
             RuntimeContract("reset", includesValidationProblem: false),
@@ -80,7 +83,7 @@ public sealed class EndpointOutcomeOpenApiTests
         {
             ["202"] = ResponseBodyKind.Json,
             ["401"] = ResponseBodyKind.Empty,
-            ["403"] = ResponseBodyKind.Empty,
+            ["403"] = ResponseBodyKind.Problem,
             ["404"] = ResponseBodyKind.Empty,
             ["409"] = ResponseBodyKind.Problem,
             ["503"] = ResponseBodyKind.Problem

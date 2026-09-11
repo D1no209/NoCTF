@@ -1,11 +1,13 @@
 import { toast } from 'vue-sonner'
 import loginCharacter from '~/assets/images/auth/login-character.png'
 import registerCharacter from '~/assets/images/auth/register-character.png'
+import { useHumanVerification } from '~/features/security/useHumanVerification'
 
 /** Owns the standalone login page workflow. */
 export function useAuthLoginPage() {
   const route = useRoute()
   const { login } = useAuth()
+  const { request: requestHumanVerification } = useHumanVerification()
   const { configuration } = usePlatform()
   const loginName = ref('')
   const password = ref('')
@@ -20,7 +22,9 @@ export function useAuthLoginPage() {
     }
     pending.value = true
     try {
-      await login(loginName.value, password.value)
+      const verificationHeaders = await requestHumanVerification('login')
+      if (verificationHeaders === null) return
+      await login(loginName.value, password.value, verificationHeaders)
       password.value = ''
       toast.success(translate('ui.loginSuccessful'))
       const candidate = route.query.redirect

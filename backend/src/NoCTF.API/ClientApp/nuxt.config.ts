@@ -8,7 +8,7 @@ const apiProxySecure = environment?.NUXT_API_PROXY_SECURE !== 'false'
 
 export default defineNuxtConfig({
   ssr: false,
-  modules: [(_options, nuxt) => {
+  modules: ['@nuxtjs/turnstile', (_options, nuxt) => {
     if (!nuxt.options.dev) {
       nuxt.hook('pages:extend', (pages) => {
         const index = pages.findIndex(page => page.path === '/__ui-check')
@@ -16,6 +16,11 @@ export default defineNuxtConfig({
       })
     }
   }],
+  turnstile: {
+    // Every rendered widget overrides this non-secret build marker with the
+    // site key returned by the backend's public platform configuration.
+    siteKey: 'runtime-configured-by-noctf',
+  },
   devtools: {
     enabled: true,
   },

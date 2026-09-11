@@ -314,7 +314,7 @@ public sealed class DeploymentTopologyTests
             .Select(match =>
                 $"{match.Groups["apiVersion"].Value}:{match.Groups["kind"].Value}")
             .ToArray();
-        await Assert.That(customResources).Count().IsEqualTo(3);
+        await Assert.That(customResources).Count().IsEqualTo(5);
         await Assert.That(customResources.All(resource =>
             resource == "cilium.io/v2:CiliumNetworkPolicy")).IsTrue();
     }

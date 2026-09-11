@@ -228,12 +228,21 @@ export type NoCtfapiEndpointsPlatformPublicPlatformConfigurationResponse = {
     description?: string | null;
     logoUrl?: string | null;
     imageUploadLimits?: NoCtfapiEndpointsPlatformPublicImageUploadLimitsResponse;
+    humanVerification?: NoCtfapiEndpointsPlatformPublicHumanVerificationResponse;
 };
 
 export type NoCtfapiEndpointsPlatformPublicImageUploadLimitsResponse = {
     maximumAvatarBytes?: number;
     maximumWallpaperBytes?: number;
 };
+
+export type NoCtfapiEndpointsPlatformPublicHumanVerificationResponse = {
+    provider?: NoCtfapiEndpointsPlatformHumanVerificationProviderProtocol;
+    siteKey?: string | null;
+    apiEndpoint?: string | null;
+};
+
+export type NoCtfapiEndpointsPlatformHumanVerificationProviderProtocol = 'None' | 'Cap' | 'Turnstile';
 
 export type NoCtfapiEndpointsNotificationsNotificationListResponse = {
     items?: Array<NoCtfapiEndpointsNotificationsNotificationResponse>;
@@ -2932,6 +2941,12 @@ export type TransferTeamCaptainEndpointResponse = TransferTeamCaptainEndpointRes
 
 export type ExtendRuntimeEndpointData = {
     body: NoCtfapiEndpointsRuntimeExtendRuntimeRequest;
+    headers?: {
+        /**
+         * One-time token from the provider selected by public platform configuration. Omit only when that provider is None.
+         */
+        'X-NoCTF-Human-Verification'?: string;
+    };
     path: {
         competitionId: string;
         competitionChallengeId: string;
@@ -2950,9 +2965,9 @@ export type ExtendRuntimeEndpointErrors = {
      */
     401: unknown;
     /**
-     * Forbidden
+     * Human verification is required or was rejected.
      */
-    403: unknown;
+    403: MicrosoftAspNetCoreMvcProblemDetails;
     /**
      * Not Found
      */
@@ -3042,6 +3057,12 @@ export type ListRuntimeTargetsEndpointResponse = ListRuntimeTargetsEndpointRespo
 
 export type ResetRuntimeEndpointData = {
     body?: never;
+    headers?: {
+        /**
+         * One-time token from the provider selected by public platform configuration. Omit only when that provider is None.
+         */
+        'X-NoCTF-Human-Verification'?: string;
+    };
     path: {
         competitionId: string;
         competitionChallengeId: string;
@@ -3056,9 +3077,9 @@ export type ResetRuntimeEndpointErrors = {
      */
     401: unknown;
     /**
-     * Forbidden
+     * Human verification is required or was rejected.
      */
-    403: unknown;
+    403: MicrosoftAspNetCoreMvcProblemDetails;
     /**
      * Not Found
      */
@@ -3080,6 +3101,12 @@ export type ResetRuntimeEndpointResponse = ResetRuntimeEndpointResponses[keyof R
 
 export type StartRuntimeEndpointData = {
     body?: never;
+    headers?: {
+        /**
+         * One-time token from the provider selected by public platform configuration. Omit only when that provider is None.
+         */
+        'X-NoCTF-Human-Verification'?: string;
+    };
     path: {
         competitionId: string;
         competitionChallengeId: string;
@@ -3094,9 +3121,9 @@ export type StartRuntimeEndpointErrors = {
      */
     401: unknown;
     /**
-     * Forbidden
+     * Human verification is required or was rejected.
      */
-    403: unknown;
+    403: MicrosoftAspNetCoreMvcProblemDetails;
     /**
      * Not Found
      */
@@ -3118,6 +3145,12 @@ export type StartRuntimeEndpointResponse = StartRuntimeEndpointResponses[keyof S
 
 export type StopRuntimeEndpointData = {
     body?: never;
+    headers?: {
+        /**
+         * One-time token from the provider selected by public platform configuration. Omit only when that provider is None.
+         */
+        'X-NoCTF-Human-Verification'?: string;
+    };
     path: {
         competitionId: string;
         competitionChallengeId: string;
@@ -3132,9 +3165,9 @@ export type StopRuntimeEndpointErrors = {
      */
     401: unknown;
     /**
-     * Forbidden
+     * Human verification is required or was rejected.
      */
-    403: unknown;
+    403: MicrosoftAspNetCoreMvcProblemDetails;
     /**
      * Not Found
      */
@@ -3503,6 +3536,12 @@ export type GetGameplayFactStatusEndpointResponse = GetGameplayFactStatusEndpoin
 
 export type JudgeAwdpBreakFlagData = {
     body: NoCtfapiEndpointsGameplayFactsJudgeAwdpBreakFlagRequest;
+    headers?: {
+        /**
+         * One-time token from the provider selected by public platform configuration. Omit only when that provider is None.
+         */
+        'X-NoCTF-Human-Verification'?: string;
+    };
     path: {
         competitionId: string;
         competitionChallengeId: string;
@@ -3521,10 +3560,14 @@ export type JudgeAwdpBreakFlagErrors = {
      */
     401: unknown;
     /**
-     * Forbidden
+     * Human verification is required or was rejected.
      */
-    403: unknown;
+    403: MicrosoftAspNetCoreMvcProblemDetails;
     409: NoCtfapiEndpointsGameplayFactsAwdpBreakFlagJudgementConflictResponse;
+    /**
+     * The selected human verification provider is unavailable.
+     */
+    503: MicrosoftAspNetCoreMvcProblemDetails;
 };
 
 export type JudgeAwdpBreakFlagError = JudgeAwdpBreakFlagErrors[keyof JudgeAwdpBreakFlagErrors];
@@ -3540,6 +3583,12 @@ export type JudgeAwdpBreakFlagResponse = JudgeAwdpBreakFlagResponses[keyof Judge
 
 export type JudgePracticeFlagData = {
     body: NoCtfapiEndpointsGameplayFactsJudgePracticeFlagRequest;
+    headers?: {
+        /**
+         * One-time token from the provider selected by public platform configuration. Omit only when that provider is None.
+         */
+        'X-NoCTF-Human-Verification'?: string;
+    };
     path: {
         competitionId: string;
         competitionChallengeId: string;
@@ -3558,10 +3607,14 @@ export type JudgePracticeFlagErrors = {
      */
     401: unknown;
     /**
-     * Forbidden
+     * Human verification is required or was rejected.
      */
-    403: unknown;
+    403: MicrosoftAspNetCoreMvcProblemDetails;
     409: NoCtfapiEndpointsGameplayFactsPracticeFlagConflictResponse;
+    /**
+     * The selected human verification provider is unavailable.
+     */
+    503: MicrosoftAspNetCoreMvcProblemDetails;
 };
 
 export type JudgePracticeFlagError = JudgePracticeFlagErrors[keyof JudgePracticeFlagErrors];
@@ -3621,6 +3674,12 @@ export type ListGameplayFactsEndpointResponse = ListGameplayFactsEndpointRespons
 
 export type RequestAwdpDefenseTargetEndpointData = {
     body?: never;
+    headers?: {
+        /**
+         * One-time token from the provider selected by public platform configuration. Omit only when that provider is None.
+         */
+        'X-NoCTF-Human-Verification'?: string;
+    };
     path: {
         competitionId: string;
         competitionChallengeId: string;
@@ -3635,14 +3694,18 @@ export type RequestAwdpDefenseTargetEndpointErrors = {
      */
     401: unknown;
     /**
-     * Forbidden
+     * Human verification is required or was rejected.
      */
-    403: unknown;
+    403: MicrosoftAspNetCoreMvcProblemDetails;
     /**
      * Not Found
      */
     404: unknown;
     409: NoCtfapiEndpointsGameplayFactsAwdpDefenseTargetConflictResponse;
+    /**
+     * The selected human verification provider is unavailable.
+     */
+    503: MicrosoftAspNetCoreMvcProblemDetails;
 };
 
 export type RequestAwdpDefenseTargetEndpointError = RequestAwdpDefenseTargetEndpointErrors[keyof RequestAwdpDefenseTargetEndpointErrors];
@@ -3658,6 +3721,12 @@ export type RequestAwdpDefenseTargetEndpointResponse = RequestAwdpDefenseTargetE
 
 export type SubmitFlagEndpointData = {
     body: NoCtfapiEndpointsGameplayFactsSubmitFlagRequest;
+    headers?: {
+        /**
+         * One-time token from the provider selected by public platform configuration. Omit only when that provider is None.
+         */
+        'X-NoCTF-Human-Verification'?: string;
+    };
     path: {
         competitionId: string;
         competitionChallengeId: string;
@@ -3676,7 +3745,7 @@ export type SubmitFlagEndpointErrors = {
      */
     401: unknown;
     /**
-     * Forbidden
+     * Human verification is required or was rejected.
      */
     403: MicrosoftAspNetCoreMvcProblemDetails;
     409: NoCtfapiEndpointsGameplayFactsGameplayFactAdmissionFailureResponse;
@@ -3684,6 +3753,10 @@ export type SubmitFlagEndpointErrors = {
      * Too Many Requests
      */
     429: unknown;
+    /**
+     * The selected human verification provider is unavailable.
+     */
+    503: MicrosoftAspNetCoreMvcProblemDetails;
 };
 
 export type SubmitFlagEndpointError = SubmitFlagEndpointErrors[keyof SubmitFlagEndpointErrors];
@@ -3699,6 +3772,12 @@ export type SubmitFlagEndpointResponse = SubmitFlagEndpointResponses[keyof Submi
 
 export type UploadPatchEndpointData = {
     body: NoCtfapiEndpointsGameplayFactsUploadPatchRequest;
+    headers?: {
+        /**
+         * One-time token from the provider selected by public platform configuration. Omit only when that provider is None.
+         */
+        'X-NoCTF-Human-Verification'?: string;
+    };
     path: {
         competitionId: string;
         competitionChallengeId: string;
@@ -3718,9 +3797,9 @@ export type UploadPatchEndpointErrors = {
      */
     401: unknown;
     /**
-     * Forbidden
+     * Human verification is required or was rejected.
      */
-    403: unknown;
+    403: MicrosoftAspNetCoreMvcProblemDetails;
     /**
      * Not Found
      */
@@ -3728,6 +3807,10 @@ export type UploadPatchEndpointErrors = {
     409: NoCtfapiEndpointsGameplayFactsUploadPatchFailureResponse;
     413: MicrosoftAspNetCoreMvcProblemDetails;
     422: NoCtfapiEndpointsGameplayFactsUploadPatchFailureResponse;
+    /**
+     * The selected human verification provider is unavailable.
+     */
+    503: MicrosoftAspNetCoreMvcProblemDetails;
 };
 
 export type UploadPatchEndpointError = UploadPatchEndpointErrors[keyof UploadPatchEndpointErrors];
@@ -4792,6 +4875,12 @@ export type UserProfileGetResponse = UserProfileGetResponses[keyof UserProfileGe
 
 export type LoginEndpointData = {
     body: NoCtfapiEndpointsAuthenticationLoginRequest;
+    headers?: {
+        /**
+         * One-time token from the provider selected by public platform configuration. Omit only when that provider is None.
+         */
+        'X-NoCTF-Human-Verification'?: string;
+    };
     path?: never;
     query?: never;
     url: '/api/v1/auth/login';
@@ -4802,6 +4891,14 @@ export type LoginEndpointErrors = {
      * Bad Request
      */
     400: MicrosoftAspNetCoreMvcValidationProblemDetails;
+    /**
+     * Human verification is required or was rejected.
+     */
+    403: MicrosoftAspNetCoreMvcProblemDetails;
+    /**
+     * The selected human verification provider is unavailable.
+     */
+    503: MicrosoftAspNetCoreMvcProblemDetails;
 };
 
 export type LoginEndpointError = LoginEndpointErrors[keyof LoginEndpointErrors];
@@ -4880,6 +4977,12 @@ export type RefreshTokenEndpointResponse = RefreshTokenEndpointResponses[keyof R
 
 export type RegisterEndpointData = {
     body: NoCtfapiEndpointsAuthenticationRegisterRequest;
+    headers?: {
+        /**
+         * One-time token from the provider selected by public platform configuration. Omit only when that provider is None.
+         */
+        'X-NoCTF-Human-Verification'?: string;
+    };
     path?: never;
     query?: never;
     url: '/api/v1/auth/register';
@@ -4890,7 +4993,15 @@ export type RegisterEndpointErrors = {
      * Bad Request
      */
     400: MicrosoftAspNetCoreMvcValidationProblemDetails;
+    /**
+     * Human verification is required or was rejected.
+     */
+    403: MicrosoftAspNetCoreMvcProblemDetails;
     409: MicrosoftAspNetCoreMvcProblemDetails;
+    /**
+     * The selected human verification provider is unavailable.
+     */
+    503: MicrosoftAspNetCoreMvcProblemDetails;
 };
 
 export type RegisterEndpointError = RegisterEndpointErrors[keyof RegisterEndpointErrors];
