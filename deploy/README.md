@@ -59,6 +59,24 @@ TLS、域名、WebSocket/SignalR 转发及镜像上传请求大小/超时，由�
 6. NoCTF 在启动 HTTP 和后台消费者前自动执行 EF migration 与管理员初始化，数据库短暂未就绪会
    有界重试。错误密码或非法迁移不会被忽略。已有管理员不会被重新设置密码。
 
+## 人机验证
+
+`HUMAN_VERIFICATION_PROVIDER` 仅接受 `None`、`Cap`、`Turnstile`，修改后需重启或滚动部署。
+`None` 只关闭验证码，不关闭 Redis 限流、并发配额和幂等保护。选择 Cap 或 Turnstile 时，配置缺失会让
+NoCTF 启动失败，运行时验证服务不可用则敏感请求返回 503，不会自动放行。
+
+Cap 使用独立部署的官方 Cap Standalone。填写 `CAP_SERVER_URL`、`CAP_SITE_KEY`、`CAP_SECRET`；生产 URL
+必须为 HTTPS。Cap 实例必须同时能被浏览器和 NoCTF 容器访问，并将 CORS 精确限制到 NoCTF 公开来源。
+若 Cap 位于反向代理后，只向代理公开其应用端口，并按实际代理设置来源 IP 头；Cap 会直接信任其配置的
+IP 头，因此不能绕过代理直接暴露源站。启用 Standalone 的 asset server，并固定
+`WIDGET_VERSION=0.1.57` 与 `WASM_VERSION=0.0.7`；NoCTF 会从同一实例加载求解 WASM，避免运行时
+依赖公共 CDN。NoCTF 不把 Cap 或其 Valkey 生命周期并入本 Compose 栈。
+
+Turnstile 填写 `TURNSTILE_SITE_KEY`、`TURNSTILE_SECRET` 和不含 scheme/路径的
+`TURNSTILE_ALLOWED_HOSTNAME`。测试、预发布与生产使用不同 widget；生产 hostname 不得使用 localhost。
+后端固定调用 Cloudflare Siteverify，并将经过可信代理处理的来源 IP 作为验证上下文发送。站点隐私说明已
+同步披露该行为。
+
 ## 题目镜像仓库
 
 Registry 默认启用 htpasswd，外部 TLS 由运维反代终止。Docker 宿主机拉取镜像时不使用容器 DNS，

@@ -77,6 +77,18 @@ spec:
                 secretKeyRef:
                   name: noctf-secrets
                   key: email-verification-encryption-key
+            - name: HumanVerification__Cap__Secret
+              valueFrom:
+                secretKeyRef:
+                  name: noctf-secrets
+                  key: cap-secret
+                  optional: true
+            - name: HumanVerification__Turnstile__Secret
+              valueFrom:
+                secretKeyRef:
+                  name: noctf-secrets
+                  key: turnstile-secret
+                  optional: true
           resources:
             requests:
               cpu: "250m"

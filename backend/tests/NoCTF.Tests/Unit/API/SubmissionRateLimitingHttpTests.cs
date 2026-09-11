@@ -11,6 +11,7 @@ using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using Microsoft.Extensions.Configuration;
 using NSubstitute;
 using NoCTF.API.Composition;
 using NoCTF.API.Endpoints.GameplayFacts;
@@ -27,7 +28,8 @@ public sealed class SubmissionRateLimitingHttpTests
     [Test]
     public async Task Submission_policy_partitions_authenticated_users_and_rejects_excess_with_429()
     {
-        await using var app = await CreateApplicationAsync();
+        const int configuredPermitLimit = 3;
+        await using var app = await CreateApplicationAsync(configuredPermitLimit);
         using var client = app.GetTestClient();
         var firstUserId = Guid.NewGuid();
         var secondUserId = Guid.NewGuid();
@@ -36,7 +38,7 @@ public sealed class SubmissionRateLimitingHttpTests
         var route =
             $"/api/v1/competitions/{Guid.NewGuid()}/challenges/{Guid.NewGuid()}/flag-submissions";
 
-        for (var attempt = 0; attempt < 30; attempt++)
+        for (var attempt = 0; attempt < configuredPermitLimit; attempt++)
         {
             using var acceptedByLimiter = await client.PostAsJsonAsync(
                 route,
@@ -64,10 +66,15 @@ public sealed class SubmissionRateLimitingHttpTests
         await Assert.That(rejected.Headers.RetryAfter).IsNotNull();
     }
 
-    private static async Task<WebApplication> CreateApplicationAsync()
+    private static async Task<WebApplication> CreateApplicationAsync(int submissionPerUserPerMinute)
     {
         var builder = WebApplication.CreateBuilder();
         builder.WebHost.UseTestServer();
+        builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>
+        {
+            ["RequestAdmission:SubmissionPerUserPerMinute"] =
+                submissionPerUserPerMinute.ToString(System.Globalization.CultureInfo.InvariantCulture)
+        });
         builder.Services.AddNoCtfApi(
             builder.Configuration,
             includeInfrastructure: false);

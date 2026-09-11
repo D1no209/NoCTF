@@ -62,6 +62,15 @@ function normalizeFieldErrors(
   ]))
 }
 
+function stableCodeMessage(code: string | undefined): string | null {
+  switch (code) {
+    case 'HumanVerificationRequired': return translate('ui.completeHumanVerificationBeforeRetrying')
+    case 'HumanVerificationFailed': return translate('ui.humanVerificationFailedPleaseRetry')
+    case 'HumanVerificationUnavailable': return translate('ui.humanVerificationProviderUnavailablePleaseRetry')
+    default: return null
+  }
+}
+
 /** Convert an SDK error payload into a user-facing ApiError. */
 export function parseApiError(error: unknown, fallback = translate("ui.requestFailedPleaseTryAgainLater")): ApiError {
   if (error instanceof ApiError) return error
@@ -74,11 +83,11 @@ export function parseApiError(error: unknown, fallback = translate("ui.requestFa
     const statusFallback = status === undefined
       ? fallback
       : statusErrorMessage(status)
-    const message = userFacingErrorMessage(
-      problem.detail ?? firstFieldError ?? problem.message ?? problem.title,
-      statusFallback,
-      status === 409 || status === 422,
-    )
+    const message = stableCodeMessage(problem.code) ?? userFacingErrorMessage(
+        problem.detail ?? firstFieldError ?? problem.message ?? problem.title,
+        statusFallback,
+        status === 409 || status === 422,
+      )
     return new ApiError(message, {
       status,
       code: problem.code,

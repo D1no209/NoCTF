@@ -1,5 +1,8 @@
 
 
+import { markRaw } from 'vue'
+import HumanVerificationGateComponent from '~/features/security/HumanVerificationGate.vue'
+
 /** Owns state, effects and commands for ApplicationRoot. */
 export function useApplicationRoot() {
   const { configuration, ensureLoaded } = usePlatform()
@@ -18,7 +21,8 @@ export function useApplicationRoot() {
 
   return {
       isDark,
-      pageTransition
+      pageTransition,
+      HumanVerificationGate: markRaw(HumanVerificationGateComponent),
     }
 }
 

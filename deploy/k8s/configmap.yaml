@@ -20,6 +20,7 @@ data:
   Authentication__Issuer: "NoCTF"
   Authentication__Audience: "NoCTF.Api"
   Authentication__AccessTokenMinutes: "15"
+  HumanVerification__Provider: "None"
   RunnerScoring__Issuer: "NoCTF.Runner"
   RunnerScoring__Audience: "NoCTF.ScoringInput"
   RunnerScoring__LifetimeSeconds: "300"

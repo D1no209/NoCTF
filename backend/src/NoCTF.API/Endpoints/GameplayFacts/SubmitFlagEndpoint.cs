@@ -11,6 +11,7 @@ using NoCTF.Domain.Gameplay;
 using AdmissionFailureCode = NoCTF.Application.GameplayFacts.Intake.GameplayFactAdmissionFailureCode;
 using Riok.Mapperly.Abstractions;
 using System.Text.Json.Serialization;
+using NoCTF.Application.Admission;
 
 namespace NoCTF.API.Endpoints.GameplayFacts;
 
@@ -266,6 +267,7 @@ public sealed class SubmitFlagEndpoint(SubmitFlag submitFlag, IUserContext userC
         AuthSchemes("Bearer");
         MaxRequestBodySize(4 * 1024 * 1024);
         Options(builder => builder.WithMetadata(new NoCTF.API.Security.ProtectedEntryMetadata(NoCTF.API.Security.ProtectedEntry.FlagSubmission)));
+        Options(builder => builder.WithMetadata(new HumanVerificationMetadata(HumanVerificationAction.Evaluation)));
         Options(options => options
             .WithMetadata(new EnableRateLimitingAttribute("submission"))
             .ProducesProblemFE<Microsoft.AspNetCore.Mvc.ProblemDetails>(

@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.HttpResults;
 using NoCTF.API.Security;
 using NoCTF.Application.Runtime.Instances;
+using NoCTF.Application.Admission;
 
 namespace NoCTF.API.Endpoints.Runtime;
 
@@ -17,6 +18,7 @@ public sealed class StartRuntimeEndpoint(
         Post("/competitions/{competitionId}/challenges/{competitionChallengeId}/runtime/start");
         AuthSchemes("Bearer");
         Options(builder => builder.WithMetadata(new NoCTF.API.Security.ProtectedEntryMetadata(NoCTF.API.Security.ProtectedEntry.RuntimeCommand)));
+        Options(builder => builder.WithMetadata(new HumanVerificationMetadata(HumanVerificationAction.Runtime)));
         Options(options => options
             .ProducesProblemFE<Microsoft.AspNetCore.Mvc.ProblemDetails>(
                 StatusCodes.Status409Conflict)

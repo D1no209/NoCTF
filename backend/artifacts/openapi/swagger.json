@@ -975,6 +975,15 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "name": "X-NoCTF-Human-Verification",
+            "in": "header",
+            "description": "One-time token from the provider selected by public platform configuration. Omit only when that provider is None.",
+            "schema": {
+              "type": "string",
+              "maxLength": 4096
+            }
           }
         ],
         "requestBody": {
@@ -1028,7 +1037,14 @@
             "description": "Unauthorized"
           },
           "403": {
-            "description": "Forbidden"
+            "description": "Human verification is required or was rejected.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcProblemDetails"
+                }
+              }
+            }
           },
           "400": {
             "description": "Bad Request",
@@ -1180,6 +1196,15 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "name": "X-NoCTF-Human-Verification",
+            "in": "header",
+            "description": "One-time token from the provider selected by public platform configuration. Omit only when that provider is None.",
+            "schema": {
+              "type": "string",
+              "maxLength": 4096
+            }
           }
         ],
         "responses": {
@@ -1220,7 +1245,14 @@
             "description": "Unauthorized"
           },
           "403": {
-            "description": "Forbidden"
+            "description": "Human verification is required or was rejected.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcProblemDetails"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -1254,6 +1286,15 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "name": "X-NoCTF-Human-Verification",
+            "in": "header",
+            "description": "One-time token from the provider selected by public platform configuration. Omit only when that provider is None.",
+            "schema": {
+              "type": "string",
+              "maxLength": 4096
+            }
           }
         ],
         "responses": {
@@ -1294,7 +1335,14 @@
             "description": "Unauthorized"
           },
           "403": {
-            "description": "Forbidden"
+            "description": "Human verification is required or was rejected.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcProblemDetails"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -1328,6 +1376,15 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "name": "X-NoCTF-Human-Verification",
+            "in": "header",
+            "description": "One-time token from the provider selected by public platform configuration. Omit only when that provider is None.",
+            "schema": {
+              "type": "string",
+              "maxLength": 4096
+            }
           }
         ],
         "responses": {
@@ -1368,7 +1425,14 @@
             "description": "Unauthorized"
           },
           "403": {
-            "description": "Forbidden"
+            "description": "Human verification is required or was rejected.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcProblemDetails"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -1399,7 +1463,7 @@
           "Platform"
         ],
         "summary": "Returns public platform branding and client capabilities.",
-        "description": "Exposes branding and deployment-selected image upload limits without storage metadata.",
+        "description": "Exposes branding, deployment-selected image upload limits and public human-verification settings without provider secrets or storage metadata.",
         "operationId": "PlatformConfiguration_Get",
         "responses": {
           "200": {
@@ -1973,6 +2037,15 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "name": "X-NoCTF-Human-Verification",
+            "in": "header",
+            "description": "One-time token from the provider selected by public platform configuration. Omit only when that provider is None.",
+            "schema": {
+              "type": "string",
+              "maxLength": 4096
+            }
           }
         ],
         "requestBody": {
@@ -2013,7 +2086,14 @@
             "description": "Unauthorized"
           },
           "403": {
-            "description": "Forbidden"
+            "description": "Human verification is required or was rejected.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcProblemDetails"
+                }
+              }
+            }
           },
           "400": {
             "description": "Bad Request",
@@ -2021,6 +2101,16 @@
               "application/problem+json": {
                 "schema": {
                   "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "The selected human verification provider is unavailable.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcProblemDetails"
                 }
               }
             }
@@ -2056,6 +2146,15 @@
             "required": true,
             "schema": {
               "type": "string"
+            }
+          },
+          {
+            "name": "X-NoCTF-Human-Verification",
+            "in": "header",
+            "description": "One-time token from the provider selected by public platform configuration. Omit only when that provider is None.",
+            "schema": {
+              "type": "string",
+              "maxLength": 4096
             }
           }
         ],
@@ -2097,7 +2196,14 @@
             "description": "Unauthorized"
           },
           "403": {
-            "description": "Forbidden"
+            "description": "Human verification is required or was rejected.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcProblemDetails"
+                }
+              }
+            }
           },
           "400": {
             "description": "Bad Request",
@@ -2105,6 +2211,16 @@
               "application/problem+json": {
                 "schema": {
                   "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "The selected human verification provider is unavailable.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcProblemDetails"
                 }
               }
             }
@@ -2235,6 +2351,15 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "name": "X-NoCTF-Human-Verification",
+            "in": "header",
+            "description": "One-time token from the provider selected by public platform configuration. Omit only when that provider is None.",
+            "schema": {
+              "type": "string",
+              "maxLength": 4096
+            }
           }
         ],
         "responses": {
@@ -2265,7 +2390,24 @@
             "description": "Unauthorized"
           },
           "403": {
-            "description": "Forbidden"
+            "description": "Human verification is required or was rejected.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcProblemDetails"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "The selected human verification provider is unavailable.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcProblemDetails"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -2300,6 +2442,15 @@
             "schema": {
               "type": "string",
               "format": "guid"
+            }
+          },
+          {
+            "name": "X-NoCTF-Human-Verification",
+            "in": "header",
+            "description": "One-time token from the provider selected by public platform configuration. Omit only when that provider is None.",
+            "schema": {
+              "type": "string",
+              "maxLength": 4096
             }
           }
         ],
@@ -2338,7 +2489,7 @@
             }
           },
           "403": {
-            "description": "Forbidden",
+            "description": "Human verification is required or was rejected.",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -2359,6 +2510,16 @@
               "application/problem+json": {
                 "schema": {
                   "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "The selected human verification provider is unavailable.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcProblemDetails"
                 }
               }
             }
@@ -2405,6 +2566,15 @@
             "schema": {
               "type": "string",
               "format": "guid"
+            }
+          },
+          {
+            "name": "X-NoCTF-Human-Verification",
+            "in": "header",
+            "description": "One-time token from the provider selected by public platform configuration. Omit only when that provider is None.",
+            "schema": {
+              "type": "string",
+              "maxLength": 4096
             }
           }
         ],
@@ -2469,7 +2639,14 @@
             "description": "Unauthorized"
           },
           "403": {
-            "description": "Forbidden"
+            "description": "Human verification is required or was rejected.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcProblemDetails"
+                }
+              }
+            }
           },
           "400": {
             "description": "Bad Request",
@@ -2477,6 +2654,16 @@
               "application/problem+json": {
                 "schema": {
                   "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "The selected human verification provider is unavailable.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcProblemDetails"
                 }
               }
             }
@@ -4455,6 +4642,17 @@
         "summary": "Login Endpoint",
         "description": "Executes POST /api/v1/auth/login.",
         "operationId": "LoginEndpoint",
+        "parameters": [
+          {
+            "name": "X-NoCTF-Human-Verification",
+            "in": "header",
+            "description": "One-time token from the provider selected by public platform configuration. Omit only when that provider is None.",
+            "schema": {
+              "type": "string",
+              "maxLength": 4096
+            }
+          }
+        ],
         "requestBody": {
           "x-name": "LoginRequest",
           "description": "",
@@ -4485,6 +4683,26 @@
               "application/problem+json": {
                 "schema": {
                   "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Human verification is required or was rejected.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcProblemDetails"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "The selected human verification provider is unavailable.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcProblemDetails"
                 }
               }
             }
@@ -4566,6 +4784,17 @@
         "summary": "Register a user account",
         "description": "Creates a local account with an Identity V3 password hash.",
         "operationId": "RegisterEndpoint",
+        "parameters": [
+          {
+            "name": "X-NoCTF-Human-Verification",
+            "in": "header",
+            "description": "One-time token from the provider selected by public platform configuration. Omit only when that provider is None.",
+            "schema": {
+              "type": "string",
+              "maxLength": 4096
+            }
+          }
+        ],
         "requestBody": {
           "x-name": "RegisterRequest",
           "description": "",
@@ -4606,6 +4835,26 @@
               "application/problem+json": {
                 "schema": {
                   "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Human verification is required or was rejected.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcProblemDetails"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "The selected human verification provider is unavailable.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcProblemDetails"
                 }
               }
             }
@@ -14842,6 +15091,9 @@
           },
           "imageUploadLimits": {
             "$ref": "#/components/schemas/NoCTFAPIEndpointsPlatformPublicImageUploadLimitsResponse"
+          },
+          "humanVerification": {
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsPlatformPublicHumanVerificationResponse"
           }
         }
       },
@@ -14858,6 +15110,37 @@
             "format": "int64"
           }
         }
+      },
+      "NoCTFAPIEndpointsPlatformPublicHumanVerificationResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "provider": {
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsPlatformHumanVerificationProviderProtocol"
+          },
+          "siteKey": {
+            "type": "string",
+            "nullable": true
+          },
+          "apiEndpoint": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
+      "NoCTFAPIEndpointsPlatformHumanVerificationProviderProtocol": {
+        "type": "string",
+        "description": "",
+        "x-enumNames": [
+          "None",
+          "Cap",
+          "Turnstile"
+        ],
+        "enum": [
+          "None",
+          "Cap",
+          "Turnstile"
+        ]
       },
       "NoCTFAPIEndpointsNotificationsNotificationListResponse": {
         "type": "object",

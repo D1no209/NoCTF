@@ -4,6 +4,7 @@ import { PartyPopper } from '@lucide/vue'
 import { toast } from 'vue-sonner'
 import { getGameplayFactStatusEndpoint, judgeAwdpBreakFlag, judgePracticeFlag, submitFlagEndpoint } from '../../api'
 import type { NoCtfapiEndpointsGameplayFactsGameplayFactAdmissionFailureCodeProtocol, NoCtfapiEndpointsGameplayFactsGameplayFactStatusResponse } from '../../api'
+import { useHumanVerification } from '~/features/security/useHumanVerification'
 
 type TrackedSubmission = Pick<
   NoCtfapiEndpointsGameplayFactsGameplayFactStatusResponse,
@@ -44,6 +45,7 @@ export function useFlagSubmit(props: Readonly<Omit<{
   }, "multiple" | "title" | "description" | "practice" | "readOnlyJudgement" | "dockTarget" | "initiallySolved">>>,
 emit: { (event: "evaluated", ...args: [result: TrackedSubmission['result']]): void; (event: "submitted", ...args: [gameplayFactIds: string[]]): void; (event: "remainingChanged", ...args: [remaining: number | null]): void }) {
   const { user } = useAuth()
+  const { request: requestHumanVerification } = useHumanVerification()
   const challengeKey = () => `${user.value?.userId ?? 'anonymous'}:${props.competitionId}:${props.competitionChallengeId}`
   const input = ref('')
 
@@ -178,8 +180,11 @@ emit: { (event: "evaluated", ...args: [result: TrackedSubmission['result']]): vo
       : [input.value.trim()].filter(Boolean)
     if (!lines.length) return
     submitting.value = true
+    const verificationHeaders = await requestHumanVerification('evaluation')
+    if (verificationHeaders === null) return
     if (props.readOnlyJudgement) {
       const { data, error } = await judgeAwdpBreakFlag({
+        headers: verificationHeaders,
         path: {
           competitionId: props.competitionId,
           competitionChallengeId: props.competitionChallengeId,
@@ -213,6 +218,7 @@ emit: { (event: "evaluated", ...args: [result: TrackedSubmission['result']]): vo
     }
     if (props.practice) {
       const { data, error } = await judgePracticeFlag({
+        headers: verificationHeaders,
         path: {
           competitionId: props.competitionId,
           competitionChallengeId: props.competitionChallengeId,
@@ -251,7 +257,7 @@ emit: { (event: "evaluated", ...args: [result: TrackedSubmission['result']]): vo
     }
     const { data, error } = await submitFlagEndpoint({
       signal: AbortSignal.timeout(30_000),
-      headers: commandAttempt.headers({ competitionId: props.competitionId, challengeId: props.competitionChallengeId, lines }),
+      headers: { ...commandAttempt.headers({ competitionId: props.competitionId, challengeId: props.competitionChallengeId, lines }), ...verificationHeaders },
       path: { competitionId: props.competitionId, competitionChallengeId: props.competitionChallengeId },
       body: props.multiple ? { flags: lines } : { flag: lines[0] },
     })

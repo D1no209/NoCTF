@@ -188,6 +188,7 @@ describe('isolated Mock API', () => {
     const publicConfiguration = await (await send('/api/v1/platform/configuration')).json()
     expect(publicConfiguration.name).toBe('Mock edited')
     expect(publicConfiguration.imageUploadLimits).toEqual({ maximumAvatarBytes: 12 * 1024 * 1024, maximumWallpaperBytes: 16 * 1024 * 1024 })
+    expect(publicConfiguration.humanVerification).toEqual({ provider: 'None', siteKey: null, apiEndpoint: null })
     const fresh = await setup()
     expect((await (await fresh.send('/api/v1/platform/configuration')).json()).name).toBe('NoCTF · MOCK')
   })

@@ -1,10 +1,12 @@
 import { authenticationRequestEmailVerification, registerEndpoint } from '../../../api'
 import registerCharacter from '~/assets/images/auth/register-character.png'
 import loginCharacter from '~/assets/images/auth/login-character.png'
+import { useHumanVerification } from '~/features/security/useHumanVerification'
 
 /** Owns the standalone registration page workflow. */
 export function useAuthRegisterPage() {
   const { configuration } = usePlatform()
+  const { request: requestHumanVerification } = useHumanVerification()
   const userName = ref('')
   const email = ref('')
   const password = ref('')
@@ -27,7 +29,10 @@ export function useAuthRegisterPage() {
     }
     pending.value = true
     try {
+      const verificationHeaders = await requestHumanVerification('registration')
+      if (verificationHeaders === null) return
       const { data, error: requestError } = await registerEndpoint({
+        headers: verificationHeaders,
         body: { userName: userName.value, email: email.value, password: password.value },
       })
       if (requestError) throw parseApiError(requestError)

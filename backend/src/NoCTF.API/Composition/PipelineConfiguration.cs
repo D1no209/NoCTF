@@ -15,6 +15,8 @@ public static class PipelineConfiguration
         if (app.Services.GetService<IServiceProviderIsService>()?.IsService(typeof(NoCTF.Application.Admission.IRequestAdmission)) == true)
             app.UseMiddleware<Security.RequestAdmissionMiddleware>();
         app.UseMiddleware<Security.EmailVerificationGateMiddleware>();
+        if (app.Services.GetService<IServiceProviderIsService>()?.IsService(typeof(NoCTF.Application.Admission.IHumanVerificationVerifier)) == true)
+            app.UseMiddleware<Security.HumanVerificationMiddleware>();
         app.Use(async (context, next) =>
         {
             await next();

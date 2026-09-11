@@ -12,6 +12,7 @@ using NoCTF.Application.Authentication.Account;
 using NoCTF.Application.GameplayFacts.PatchUploads;
 using NoCTF.Application.GameplayFacts.Intake;
 using NoCTF.Infrastructure;
+using NoCTF.Infrastructure.Admission;
 using NoCTF.API.OpenApi;
 using NoCTF.Application.Authentication.RefreshSession;
 using NoCTF.Application.Authentication.PasswordReset;
@@ -22,6 +23,7 @@ using NoCTF.Application.Storage;
 using NoCTF.Application.Notifications;
 using NoCTF.Application.Messaging;
 using NoCTF.Application.Scoring.Leaderboard;
+using NoCTF.Application.Admission;
 using NoCTF.API.SignalR.Publishing;
 using NoCTF.API.Endpoints.Authentication;
 using NoCTF.API.Pagination;
@@ -42,6 +44,13 @@ public static class ServiceRegistration
         IReadOnlyCollection<System.Reflection.Assembly>? endpointAssemblies = null)
     {
         services.TryAddSingleton(TimeProvider.System);
+        var allowDevelopmentHumanVerification = development
+            || configuration.GetValue<bool>("OpenApi:Exporting");
+        services.AddOptions<HumanVerificationOptions>()
+            .Bind(configuration.GetSection(HumanVerificationOptions.SectionName))
+            .Validate(options => options.IsValid(allowDevelopmentHumanVerification),
+                "HumanVerification configuration is invalid for the selected provider and environment.")
+            .ValidateOnStart();
         services.AddOptions<RefreshHttpOptions>()
             .Bind(configuration.GetSection("Authentication"))
             .Validate(options => options.RefreshAllowedOrigins.All(origin =>
@@ -93,6 +102,8 @@ public static class ServiceRegistration
             options.DocumentSettings = settings =>
             {
                 settings.SchemaSettings.ResolveExternalXmlDocumentation = false;
+                settings.OperationProcessors.Add(
+                    new HumanVerificationOperationProcessor());
                 settings.DocumentProcessors.Add(
                     new AwdpFixResultOutcomeDocumentProcessor());
                 settings.DocumentProcessors.Add(
@@ -115,6 +126,7 @@ public static class ServiceRegistration
         });
         if (includeInfrastructure)
         {
+            services.AddNoCtfHumanVerification();
             services.AddNoCtfInfrastructure(configuration, development);
             services.AddScoped<SubmitFlag>();
             services.AddScoped<LoginUser>();
@@ -176,6 +188,9 @@ public static class ServiceRegistration
             services.AddScoped<ResendEmailVerification>();
             services.AddScoped<VerifyEmail>();
         }
+        var requestAdmissionLimits = configuration
+            .GetSection("RequestAdmission")
+            .Get<RequestAdmissionOptions>() ?? new RequestAdmissionOptions();
         var redis = configuration.GetConnectionString("Redis");
         var signalR = services.AddSignalR();
         services.AddScoped<IGameplayFactStatePublisher, SignalRGameplayFactStatePublisher>();
@@ -219,7 +234,7 @@ public static class ServiceRegistration
                         ?? "anonymous"}:{context.Connection.RemoteIpAddress}",
                     _ => new FixedWindowRateLimiterOptions
                     {
-                        PermitLimit = 30,
+                        PermitLimit = requestAdmissionLimits.SubmissionPerUserPerMinute,
                         Window = TimeSpan.FromMinutes(1),
                         QueueLimit = 0
                     }));

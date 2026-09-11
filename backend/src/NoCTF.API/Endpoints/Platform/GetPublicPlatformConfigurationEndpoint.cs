@@ -3,6 +3,10 @@ using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Routing;
 using NoCTF.Application.Administration.PlatformConfiguration;
 using NoCTF.Application.Storage;
+using NoCTF.Application.Admission;
+using NoCTF.API.Serialization;
+using Microsoft.Extensions.Options;
+using System.Text.Json.Serialization;
 
 namespace NoCTF.API.Endpoints.Platform;
 
@@ -10,11 +14,25 @@ public sealed record PublicImageUploadLimitsResponse(
     long MaximumAvatarBytes,
     long MaximumWallpaperBytes);
 
+[JsonConverter(typeof(StrictPascalCaseEnumConverter<HumanVerificationProviderProtocol>))]
+public enum HumanVerificationProviderProtocol
+{
+    None,
+    Cap,
+    Turnstile
+}
+
+public sealed record PublicHumanVerificationResponse(
+    HumanVerificationProviderProtocol Provider,
+    string? SiteKey,
+    string? ApiEndpoint);
+
 public sealed record PublicPlatformConfigurationResponse(
     string Name,
     string? Description,
     string? LogoUrl,
-    PublicImageUploadLimitsResponse ImageUploadLimits);
+    PublicImageUploadLimitsResponse ImageUploadLimits,
+    PublicHumanVerificationResponse HumanVerification);
 
 internal static class PublicPlatformConfigurationMapping
 {
@@ -22,14 +40,36 @@ internal static class PublicPlatformConfigurationMapping
         PlatformConfigurationView configuration,
         LinkGenerator links,
         HttpContext httpContext,
-        FileUploadLimits uploadLimits) =>
+        FileUploadLimits uploadLimits,
+        HumanVerificationOptions humanVerification) =>
         new(
             configuration.Name,
             configuration.Description,
             LogoUrl(configuration, links, httpContext),
             new(
                 uploadLimits.MaximumAvatarBytes,
-                uploadLimits.MaximumWallpaperBytes));
+                uploadLimits.MaximumWallpaperBytes),
+            MapHumanVerification(humanVerification));
+
+    private static PublicHumanVerificationResponse MapHumanVerification(
+        HumanVerificationOptions options) =>
+        options.Provider switch
+        {
+            HumanVerificationProvider.None => new(
+                HumanVerificationProviderProtocol.None,
+                null,
+                null),
+            HumanVerificationProvider.Cap => new(
+                HumanVerificationProviderProtocol.Cap,
+                options.Cap.SiteKey,
+                options.CapApiEndpoint().AbsoluteUri),
+            HumanVerificationProvider.Turnstile => new(
+                HumanVerificationProviderProtocol.Turnstile,
+                options.Turnstile.SiteKey,
+                null),
+            _ => throw new InvalidOperationException(
+                $"Unsupported human verification provider: {options.Provider}.")
+        };
 
     public static string? LogoUrl(
         PlatformConfigurationView configuration,
@@ -47,7 +87,8 @@ internal static class PublicPlatformConfigurationMapping
 public sealed class GetPublicPlatformConfigurationEndpoint(
     ManagePlatformConfiguration configuration,
     LinkGenerator links,
-    FileUploadLimits uploadLimits)
+    FileUploadLimits uploadLimits,
+    IOptions<HumanVerificationOptions> humanVerification)
     : EndpointWithoutRequest<Ok<PublicPlatformConfigurationResponse>>
 {
     public override void Configure()
@@ -58,7 +99,7 @@ public sealed class GetPublicPlatformConfigurationEndpoint(
         Summary(summary =>
         {
             summary.Summary = "Returns public platform branding and client capabilities.";
-            summary.Description = "Exposes branding and deployment-selected image upload limits without storage metadata.";
+            summary.Description = "Exposes branding, deployment-selected image upload limits and public human-verification settings without provider secrets or storage metadata.";
         });
     }
 
@@ -70,6 +111,7 @@ public sealed class GetPublicPlatformConfigurationEndpoint(
             current,
             links,
             HttpContext,
-            uploadLimits));
+            uploadLimits,
+            humanVerification.Value));
     }
 }

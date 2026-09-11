@@ -7,6 +7,7 @@ using NoCTF.API.Security;
 using NoCTF.Application.GameplayFacts.PatchUploads;
 using NoCTF.Application.Storage;
 using NoCTF.API.Serialization;
+using NoCTF.Application.Admission;
 
 namespace NoCTF.API.Endpoints.GameplayFacts;
 
@@ -64,6 +65,8 @@ public sealed class UploadPatchEndpoint(
         Post("/competitions/{competitionId}/challenges/{competitionChallengeId}/awdp-defense-targets/{runtimeInstanceId}/fix");
         AuthSchemes("Bearer");
         Options(builder => builder.WithMetadata(new ProtectedEntryMetadata(ProtectedEntry.PatchUpload)));
+        Options(builder => builder.WithMetadata(
+            new HumanVerificationMetadata(HumanVerificationAction.Evaluation)));
         AllowFileUploads();
         MaxRequestBodySize(FileUploadLimits.MaximumRequestBytes(
             PatchUploadRules.HardMaximumArchiveBytes));

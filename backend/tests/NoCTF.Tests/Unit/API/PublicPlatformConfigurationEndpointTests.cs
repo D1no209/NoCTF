@@ -6,9 +6,11 @@ using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 using NoCTF.API.Composition;
 using NoCTF.API.Endpoints.Platform;
 using NoCTF.Application.Administration.PlatformConfiguration;
+using NoCTF.Application.Admission;
 using NoCTF.Application.Storage;
 using NSubstitute;
 
@@ -17,7 +19,7 @@ namespace NoCTF.Tests.Unit.API;
 public sealed class PublicPlatformConfigurationEndpointTests
 {
     [Test]
-    public async Task Public_configuration_exposes_only_client_image_limits_from_deployment_configuration()
+    public async Task Public_configuration_exposes_client_capabilities_without_provider_secrets()
     {
         var now = DateTimeOffset.UtcNow;
         var settings = Substitute.For<IPlatformConfigurationStore>();
@@ -35,6 +37,16 @@ public sealed class PublicPlatformConfigurationEndpointTests
         builder.Services.AddSingleton(settings);
         builder.Services.AddSingleton(objects);
         builder.Services.AddSingleton(new FileUploadLimits(1_234_567, 7_654_321, 11, 12, 13));
+        builder.Services.AddSingleton<IOptions<HumanVerificationOptions>>(Options.Create(new HumanVerificationOptions
+        {
+            Provider = HumanVerificationProvider.Cap,
+            Cap = new CapHumanVerificationOptions
+            {
+                ServerUrl = "https://cap.example.test/root",
+                SiteKey = "site-key",
+                Secret = "provider-secret"
+            }
+        }));
         builder.Services.AddSingleton(new ManagedFileUploads(
             Substitute.For<IManagedFileUploadRegistry>(),
             objects));
@@ -52,9 +64,14 @@ public sealed class PublicPlatformConfigurationEndpointTests
         await Assert.That(payload).IsNotNull();
         await Assert.That(payload!.ImageUploadLimits.MaximumAvatarBytes).IsEqualTo(1_234_567);
         await Assert.That(payload.ImageUploadLimits.MaximumWallpaperBytes).IsEqualTo(7_654_321);
+        await Assert.That(payload.HumanVerification.Provider).IsEqualTo(HumanVerificationProviderProtocol.Cap);
+        await Assert.That(payload.HumanVerification.SiteKey).IsEqualTo("site-key");
+        await Assert.That(payload.HumanVerification.ApiEndpoint)
+            .IsEqualTo("https://cap.example.test/root/site-key/");
         await Assert.That(content).DoesNotContain("maximumLogoBytes");
         await Assert.That(content).DoesNotContain("maximumPosterBytes");
         await Assert.That(content).DoesNotContain("maximumAttachmentBytes");
         await Assert.That(content).DoesNotContain("objectKey");
+        await Assert.That(content).DoesNotContain("provider-secret");
     }
 }

@@ -47,8 +47,15 @@ export function useAuth() {
     }
   }
 
-  async function login(login: string, password: string): Promise<void> {
-    const { data, error } = await loginEndpoint({ body: { login, password } })
+  async function login(
+    login: string,
+    password: string,
+    humanVerificationHeaders: Record<string, string>,
+  ): Promise<void> {
+    const { data, error } = await loginEndpoint({
+      headers: humanVerificationHeaders,
+      body: { login, password },
+    })
     if (error || !data?.accessToken) {
       throw parseApiError(error)
     }
