@@ -42,7 +42,8 @@ public sealed class UserAccountDeletionPersistenceTests
             var referencedUserId = Guid.CreateVersion7(now.AddTicks(1));
             var unusedUserId = Guid.CreateVersion7(now.AddTicks(2));
             var auditedUserId = Guid.CreateVersion7(now.AddTicks(3));
-            var competitionId = Guid.CreateVersion7(now.AddTicks(4));
+            var detachableUserId = Guid.CreateVersion7(now.AddTicks(4));
+            var competitionId = Guid.CreateVersion7(now.AddTicks(5));
 
             await using (var db = new NoCtfDbContext(options))
             {
@@ -51,10 +52,33 @@ public sealed class UserAccountDeletionPersistenceTests
                     User(actorId, "Admin", "admin@example.test", UserRole.Administrator, now),
                     User(referencedUserId, "Player", "player@example.test", UserRole.User, now),
                     User(unusedUserId, "Unused", "unused@example.test", UserRole.User, now),
-                    User(auditedUserId, "Auditor", "auditor@example.test", UserRole.User, now));
+                    User(auditedUserId, "Auditor", "auditor@example.test", UserRole.User, now),
+                    User(detachableUserId, "Detachable", "detachable@example.test", UserRole.User, now));
                 db.Notifications.Add(new Notification
                 {
                     Id = Guid.CreateVersion7(now.AddTicks(5)),
+                    SourceType = NotificationSourceType.System,
+                    SourceId = null,
+                    TargetType = NotificationTargetType.User,
+                    TargetId = auditedUserId,
+                    Kind = NotificationKind.Message,
+                    ContentJson = "{\"schemaVersion\":1}",
+                    SentAt = now
+                });
+                db.Notifications.Add(new Notification
+                {
+                    Id = Guid.CreateVersion7(now.AddTicks(6)),
+                    SourceType = NotificationSourceType.User,
+                    SourceId = detachableUserId,
+                    TargetType = NotificationTargetType.PlatformAdministrators,
+                    TargetId = Notification.PlatformAdministratorsTargetId,
+                    Kind = NotificationKind.AuthenticationSecurityActivity,
+                    ContentJson = "{\"schemaVersion\":1}",
+                    SentAt = now
+                });
+                db.Notifications.Add(new Notification
+                {
+                    Id = Guid.CreateVersion7(now.AddTicks(7)),
                     SourceType = NotificationSourceType.System,
                     SourceId = null,
                     TargetType = NotificationTargetType.PlatformAdministrators,
@@ -62,15 +86,16 @@ public sealed class UserAccountDeletionPersistenceTests
                     Kind = NotificationKind.Message,
                     ContentJson = "{\"schemaVersion\":1}",
                     RelatedType = EntityReferenceKind.User,
-                    RelatedId = auditedUserId,
+                    RelatedId = detachableUserId,
                     SentAt = now
                 });
-                var challengeId = Guid.CreateVersion7(now.AddTicks(6));
-                var competitionChallengeId = Guid.CreateVersion7(now.AddTicks(7));
+                var challengeId = Guid.CreateVersion7(now.AddTicks(8));
+                var competitionChallengeId = Guid.CreateVersion7(now.AddTicks(9));
                 db.Competitions.Add(new Competition
                 {
                     Id = competitionId,
                     OwnerId = referencedUserId,
+                    ManagerIds = [detachableUserId],
                     Title = "Historical competition",
                     Mode = GameMode.Ctf,
                     Status = CompetitionStatus.Finished,
@@ -86,6 +111,7 @@ public sealed class UserAccountDeletionPersistenceTests
                 {
                     Id = challengeId,
                     OwnerId = referencedUserId,
+                    ManagerIds = [detachableUserId],
                     Mode = GameMode.Ctf,
                     Title = "Historical challenge",
                     Visibility = ChallengeVisibility.Private,
@@ -102,21 +128,21 @@ public sealed class UserAccountDeletionPersistenceTests
                     RulesJson = "{}",
                     UpdatedAt = now
                 });
-                var teamId = Guid.CreateVersion7(now.AddTicks(8));
+                var teamId = Guid.CreateVersion7(now.AddTicks(10));
                 db.Teams.Add(new Team
                 {
                     Id = teamId,
                     CompetitionId = competitionId,
                     Name = "Historical team",
                     CaptainId = referencedUserId,
-                    MemberIds = [referencedUserId],
+                    MemberIds = [referencedUserId, detachableUserId],
                     InvitationToken = new string('a', 32),
                     RegistrationStatus = TeamRegistrationStatus.Approved,
                     RegisteredAt = now
                 });
                 db.GameplayFacts.Add(new GameplayFact
                 {
-                    Id = Guid.CreateVersion7(now.AddTicks(9)),
+                    Id = Guid.CreateVersion7(now.AddTicks(11)),
                     CompetitionId = competitionId,
                     CompetitionChallengeId = competitionChallengeId,
                     TeamId = teamId,
@@ -142,6 +168,10 @@ public sealed class UserAccountDeletionPersistenceTests
                     referencedUserId,
                     actorId,
                     cancellationToken);
+                var detachablePreview = await store.PreviewDeletionAsync(
+                    detachableUserId,
+                    actorId,
+                    cancellationToken);
                 var blocked = await store.DeleteAsync(
                     referencedUserId,
                     actorId,
@@ -163,6 +193,13 @@ public sealed class UserAccountDeletionPersistenceTests
                     "Unused test account",
                     now.AddMinutes(3),
                     cancellationToken);
+                var detached = await store.DeleteAsync(
+                    detachableUserId,
+                    actorId,
+                    UserDeletionMode.HardDelete,
+                    "Remove test collaborator",
+                    now.AddMinutes(4),
+                    cancellationToken);
 
                 await Assert.That(auditedPreview!.CanHardDelete).IsFalse();
                 await Assert.That(auditedPreview.References.Any(reference =>
@@ -172,9 +209,17 @@ public sealed class UserAccountDeletionPersistenceTests
                 await Assert.That(preview.References.Any(reference =>
                     reference.Kind == UserDeletionReferenceKind.CompetitionOwner
                     && reference.Count == 1)).IsTrue();
+                await Assert.That(detachablePreview!.CanHardDelete).IsTrue();
+                await Assert.That(detachablePreview.References.Select(reference => reference.Kind))
+                    .IsEquivalentTo([
+                        UserDeletionReferenceKind.CompetitionCollaborator,
+                        UserDeletionReferenceKind.ChallengeManager,
+                        UserDeletionReferenceKind.TeamMember
+                    ]);
                 await Assert.That(blocked.State).IsEqualTo(UserDeletionState.HardDeleteBlocked);
                 await Assert.That(anonymized.State).IsEqualTo(UserDeletionState.Anonymized);
                 await Assert.That(deleted.State).IsEqualTo(UserDeletionState.PhysicallyDeleted);
+                await Assert.That(detached.State).IsEqualTo(UserDeletionState.PhysicallyDeleted);
             }
 
             await using (var db = new NoCtfDbContext(options))
@@ -196,8 +241,20 @@ public sealed class UserAccountDeletionPersistenceTests
                 await Assert.That(await db.Users.AnyAsync(
                     user => user.Id == unusedUserId,
                     cancellationToken)).IsFalse();
+                await Assert.That(await db.Users.AnyAsync(
+                    user => user.Id == detachableUserId,
+                    cancellationToken)).IsFalse();
+                await Assert.That(await db.Competitions.IgnoreQueryFilters().AnyAsync(
+                    competition => competition.ManagerIds.Contains(detachableUserId),
+                    cancellationToken)).IsFalse();
+                await Assert.That(await db.Challenges.IgnoreQueryFilters().AnyAsync(
+                    challenge => challenge.ManagerIds.Contains(detachableUserId),
+                    cancellationToken)).IsFalse();
+                await Assert.That(await db.Teams.IgnoreQueryFilters().AnyAsync(
+                    team => team.MemberIds.Contains(detachableUserId),
+                    cancellationToken)).IsFalse();
                 await Assert.That(await db.Notifications.CountAsync(cancellationToken))
-                    .IsEqualTo(3);
+                    .IsEqualTo(4);
                 var lifecycleFacts = await new PlatformAuditLogStore(db).QueryAsync(
                     new(
                         PlatformAuditKind.UserAccountLifecycle,
@@ -209,13 +266,16 @@ public sealed class UserAccountDeletionPersistenceTests
                         null,
                         10),
                     cancellationToken);
-                await Assert.That(lifecycleFacts).Count().IsEqualTo(2);
+                await Assert.That(lifecycleFacts).Count().IsEqualTo(3);
                 await Assert.That(lifecycleFacts[0].UserAccountAction)
                     .IsEqualTo(UserAccountLifecycleAction.PhysicallyDeleted);
-                await Assert.That(lifecycleFacts[0].Reason).IsEqualTo("Unused test account");
+                await Assert.That(lifecycleFacts[0].Reason).IsEqualTo("Remove test collaborator");
                 await Assert.That(lifecycleFacts[1].UserAccountAction)
+                    .IsEqualTo(UserAccountLifecycleAction.PhysicallyDeleted);
+                await Assert.That(lifecycleFacts[1].Reason).IsEqualTo("Unused test account");
+                await Assert.That(lifecycleFacts[2].UserAccountAction)
                     .IsEqualTo(UserAccountLifecycleAction.Anonymized);
-                await Assert.That(lifecycleFacts[1].Reason)
+                await Assert.That(lifecycleFacts[2].Reason)
                     .IsEqualTo("Requested account closure");
                 await Assert.That(await new AccessTokenVersionReader(db).IsCurrentAsync(
                     referencedUserId,
