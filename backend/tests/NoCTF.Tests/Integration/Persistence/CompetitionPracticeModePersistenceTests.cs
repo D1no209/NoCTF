@@ -59,6 +59,12 @@ public sealed class CompetitionPracticeModePersistenceTests
             await db.GetService<IMigrator>().MigrateAsync(
                 "20260910145118_UserWallpaperPreferences",
                 cancellationToken);
+            // The current EF model includes columns added after this historical target.
+            // Add the current column only for seeding, then remove it so the generated
+            // migration under test still owns its schema transition.
+            await db.Database.ExecuteSqlRawAsync(
+                "ALTER TABLE competitions ADD COLUMN tracks_enabled boolean NOT NULL DEFAULT TRUE",
+                cancellationToken);
             var now = DateTimeOffset.UtcNow;
             var user = User(Guid.CreateVersion7(now), "migration-team-owner", now);
             var competition = Competition(
@@ -75,6 +81,10 @@ public sealed class CompetitionPracticeModePersistenceTests
                 "Existing team",
                 now.AddHours(-2)));
             await db.SaveChangesAsync(cancellationToken);
+            await db.Database.ExecuteSqlRawAsync(
+                "ALTER TABLE competitions DROP COLUMN tracks_enabled",
+                cancellationToken);
+            db.ChangeTracker.Clear();
 
             await db.Database.MigrateAsync(cancellationToken);
 

@@ -9,7 +9,7 @@ public sealed record CreateTeamCommand(
     Guid UserId,
     string Name,
     DateTimeOffset RegisteredAt,
-    string TrackKey,
+    string? TrackKey,
     string? TrackInvitationCode = null);
 public sealed record TeamView(
     Guid Id,
@@ -31,6 +31,7 @@ public sealed record TeamRegistrationPolicy(
     bool AllowWhileRunning = false,
     GameMode Mode = GameMode.Ctf,
     string? TrackConfigurationJson = null,
+    bool TracksEnabled = false,
     bool PracticeModeEnabled = false)
 {
     public bool PracticeOpen => Mode == GameMode.Ctf && Status == CompetitionStatus.Finished && PracticeModeEnabled && !CompetitionDeleted;
@@ -107,37 +108,45 @@ public sealed class CreateTeam(ITeamRegistrationStore store)
         var tracks = CompetitionTrackConfiguration.ParseOrDefault(
             policy.Mode,
             policy.TrackConfigurationJson);
-        var requestedKey = CompetitionTrackConfiguration.NormalizeKey(command.TrackKey);
-        if (requestedKey is null)
-            return OperationResult<TeamView, TeamRegistrationFailure>.Failure(
-                TeamRegistrationFailure.TrackNotFound,
-                "A competition track must be selected when creating a team.");
-        var requestedTrack = tracks.Find(requestedKey);
-        if (requestedTrack is null)
-            return OperationResult<TeamView, TeamRegistrationFailure>.Failure(
-                TeamRegistrationFailure.TrackNotFound,
-                "The selected competition track was not found.");
-        if (requestedTrack.IsInternal || !requestedTrack.IsPublicSelectable)
-            return OperationResult<TeamView, TeamRegistrationFailure>.Failure(
-                TeamRegistrationFailure.TrackNotPublicSelectable,
-                "The selected competition track cannot be selected by participants.");
-        if (requestedTrack.RequiresInvitationCode
-            && string.IsNullOrWhiteSpace(command.TrackInvitationCode))
+        var requestedTrack = tracks.DefaultTrack;
+        if (policy.TracksEnabled)
         {
-            return OperationResult<TeamView, TeamRegistrationFailure>.Failure(
-                TeamRegistrationFailure.TrackInvitationRequired,
-                "The selected competition track requires an invitation code.");
+            var requestedKey = CompetitionTrackConfiguration.NormalizeKey(command.TrackKey);
+            if (requestedKey is null)
+                return OperationResult<TeamView, TeamRegistrationFailure>.Failure(
+                    TeamRegistrationFailure.TrackNotFound,
+                    "A competition track must be selected when tracks are enabled.");
+            requestedTrack = tracks.Find(requestedKey);
+            if (requestedTrack is null)
+                return OperationResult<TeamView, TeamRegistrationFailure>.Failure(
+                    TeamRegistrationFailure.TrackNotFound,
+                    "The selected competition track was not found.");
+            if (requestedTrack.IsInternal || !requestedTrack.IsPublicSelectable)
+                return OperationResult<TeamView, TeamRegistrationFailure>.Failure(
+                    TeamRegistrationFailure.TrackNotPublicSelectable,
+                    "The selected competition track cannot be selected by participants.");
+            if (requestedTrack.RequiresInvitationCode
+                && string.IsNullOrWhiteSpace(command.TrackInvitationCode))
+            {
+                return OperationResult<TeamView, TeamRegistrationFailure>.Failure(
+                    TeamRegistrationFailure.TrackInvitationRequired,
+                    "The selected competition track requires an invitation code.");
+            }
+            if (requestedTrack.RequiresInvitationCode
+                && !CompetitionTrackInvitationCode.Verify(
+                    requestedTrack.InvitationCode,
+                    command.TrackInvitationCode))
+            {
+                return OperationResult<TeamView, TeamRegistrationFailure>.Failure(
+                    TeamRegistrationFailure.TrackInvitationInvalid,
+                    "The competition track invitation code is invalid.");
+            }
         }
-        if (requestedTrack.RequiresInvitationCode
-            && !CompetitionTrackInvitationCode.Verify(
-                requestedTrack.InvitationCode,
-                command.TrackInvitationCode))
+        var created = await store.TryCreateAsync(command with
         {
-            return OperationResult<TeamView, TeamRegistrationFailure>.Failure(
-                TeamRegistrationFailure.TrackInvitationInvalid,
-                "The competition track invitation code is invalid.");
-        }
-        var created = await store.TryCreateAsync(command with { Name = name, TrackKey = requestedTrack.Key },
+            Name = name,
+            TrackKey = policy.TracksEnabled ? requestedTrack.Key : command.TrackKey
+        },
             policy.PracticeOpen || policy.AutoApprove ? TeamRegistrationStatus.Approved : TeamRegistrationStatus.Pending, ct);
         return created.Team is not null
             ? OperationResult<TeamView, TeamRegistrationFailure>.Success(created.Team)

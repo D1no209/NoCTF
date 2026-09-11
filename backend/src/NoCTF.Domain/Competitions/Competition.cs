@@ -17,6 +17,7 @@ public sealed class Competition
     public Guid[] ObserverIds { get; set; } = [];
     public GameMode Mode { get; set; }
     public string ConfigurationJson { get; set; } = string.Empty;
+    public bool TracksEnabled { get; set; }
     public string? TrackConfigurationJson { get; set; }
     public DateTimeOffset? FrozenStartAt { get; set; }
     public DateTimeOffset? HiddenStartAt { get; set; }

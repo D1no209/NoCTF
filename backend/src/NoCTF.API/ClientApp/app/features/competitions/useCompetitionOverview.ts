@@ -40,6 +40,13 @@ export function useCompetitionOverview(props: Readonly<{ competition: NoCtfapiEn
   onMounted(() => {
     unwatch = watchCompetition(competitionId, {
       competitionLifecycleChanged: () => void refreshCompetition(),
+      competitionEventChanged: (event) => {
+        if (event.kind === 'TrackConfigurationUpdated'
+          || event.kind === 'TrackRegistrationPolicyUpdated') {
+          void refreshCompetition().then(loadRegistrationOptions)
+        }
+        if (event.kind === 'TeamTrackChanged') void loadMyTeam()
+      },
       onReconnected: () => void refreshCompetition(),
     })
   })
@@ -106,21 +113,25 @@ export function useCompetitionOverview(props: Readonly<{ competition: NoCtfapiEn
       return
     }
     try {
-      const [teams, tracks] = await Promise.all([
+      const [teams, trackResult] = await Promise.all([
         listCompetitionTeamsEndpoint({ path: { competitionId }, signal: reads.signal }),
-        listCompetitionTracks({ path: { competitionId }, signal: reads.signal }),
+        tracksEnabled.value
+          ? listCompetitionTracks({ path: { competitionId }, signal: reads.signal })
+          : Promise.resolve(null),
       ])
       if (!teams.error && teams.data) approvedTeamCount.value = (teams.data.items ?? []).filter(
         (team) => team.registrationStatus === 'Approved',
       ).length
-      if (tracks.error || !tracks.data) {
+      if (!tracksEnabled.value) {
+        selectableTracks.value = []
+      } else if (trackResult?.error || !trackResult?.data) {
         selectableTracks.value = []
         trackLoadError.value = parseApiError(
-          tracks.error,
+          trackResult?.error,
           translate("ui.failedToLoadCompetitionTracksPleaseTryAgain"),
         ).message
       } else {
-        selectableTracks.value = (tracks.data.items ?? []).filter(track => track.isPublicSelectable)
+        selectableTracks.value = (trackResult.data.items ?? []).filter(track => track.isPublicSelectable)
       }
     } catch (error: unknown) {
       selectableTracks.value = []
@@ -134,6 +145,8 @@ export function useCompetitionOverview(props: Readonly<{ competition: NoCtfapiEn
   }
 
   onMounted(loadRegistrationOptions)
+
+  watch(() => competition.value.tracksEnabled, () => void loadRegistrationOptions())
 
   const now = ref(Date.now())
 
@@ -163,6 +176,8 @@ export function useCompetitionOverview(props: Readonly<{ competition: NoCtfapiEn
   const canParticipate = computed(() => canEnterCompetition(competition.value, myTeam.value))
 
   const teamRegistrationOpen = computed(() => canRegisterForCompetition(competition.value))
+
+  const tracksEnabled = computed(() => competition.value.tracksEnabled ?? false)
 
   const createOpen = ref(false)
 
@@ -195,11 +210,11 @@ export function useCompetitionOverview(props: Readonly<{ competition: NoCtfapiEn
       createValidationError.value = translate("ui.enterATeamName")
       return
     }
-    if (!createTrackKey.value) {
+    if (tracksEnabled.value && !createTrackKey.value) {
       createValidationError.value = translate("ui.selectACompetitionTrack")
       return
     }
-    if (selectedCreateTrack.value?.requiresInvitationCode
+    if (tracksEnabled.value && selectedCreateTrack.value?.requiresInvitationCode
       && !createTrackInvitationCode.value.trim()) {
       createValidationError.value = translate("ui.enterTheTrackInvitationCode")
       return
@@ -210,10 +225,14 @@ export function useCompetitionOverview(props: Readonly<{ competition: NoCtfapiEn
         path: { competitionId },
         body: {
           name: createName.value.trim(),
-          trackKey: createTrackKey.value,
-          trackInvitationCode: selectedCreateTrack.value?.requiresInvitationCode
-            ? createTrackInvitationCode.value.trim()
-            : null,
+          ...(tracksEnabled.value
+            ? {
+                trackKey: createTrackKey.value,
+                trackInvitationCode: selectedCreateTrack.value?.requiresInvitationCode
+                  ? createTrackInvitationCode.value.trim()
+                  : null,
+              }
+            : {}),
         },
       })
       if (error || !data) {
@@ -327,6 +346,7 @@ export function useCompetitionOverview(props: Readonly<{ competition: NoCtfapiEn
       practiceOpen,
       canParticipate,
       teamRegistrationOpen,
+      tracksEnabled,
       createOpen,
       createName,
       createTrackKey,

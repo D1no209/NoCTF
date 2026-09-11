@@ -343,7 +343,9 @@ public sealed class HistoricalAdjudicationPreviewPersistenceTests
                 fixture.CompetitionId, null, null, null, 20, cancellationToken);
 
             await Assert.That(countedPage.Items).Count().IsEqualTo(20);
-            await Assert.That(counter.ReaderCommandCount).IsLessThanOrEqualTo(6);
+            // Competition metadata, lifecycle-derived official window, candidates,
+            // first-correct facts, audit events, teams, and challenge titles.
+            await Assert.That(counter.ReaderCommandCount).IsLessThanOrEqualTo(7);
         });
     }
 

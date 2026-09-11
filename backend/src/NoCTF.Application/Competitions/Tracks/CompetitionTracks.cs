@@ -23,7 +23,8 @@ public sealed record CompetitionTracksView(
     Guid CompetitionId,
     GameMode Mode,
     CompetitionStatus Status,
-    bool IsFrozen,
+    bool Enabled,
+    bool CanUpdate,
     IReadOnlyList<CompetitionTrackView> Tracks,
     Guid? ViewerTeamId = null);
 
@@ -31,12 +32,13 @@ public enum CompetitionTrackFailureCode
 {
     CompetitionNotFound,
     InvalidConfiguration,
-    ConfigurationLocked,
-    TrackInUse,
+    CompetitionFinished,
+    TracksDisabled,
+    TrackReassignmentRequired,
+    InvalidTrackReassignment,
     TeamNotFound,
     TrackNotFound,
-    TrackNotPublicSelectable,
-    AssignmentLocked
+    TrackNotPublicSelectable
 }
 
 public sealed record CompetitionTrackInvitationCodeUpdate(
@@ -44,12 +46,36 @@ public sealed record CompetitionTrackInvitationCodeUpdate(
     string? InvitationCode,
     bool ClearInvitationCode);
 
+public sealed record RemovedTrackReassignment(
+    string FromTrackKey,
+    string ToTrackKey);
+
 public sealed record UpdateCompetitionTracksCommand(
     Guid CompetitionId,
+    bool Enabled,
     IReadOnlyList<CompetitionTrackDefinition> Tracks,
+    IReadOnlyList<RemovedTrackReassignment> RemovedTrackReassignments,
     Guid ActorUserId,
     DateTimeOffset UpdatedAt,
     IReadOnlyList<CompetitionTrackInvitationCodeUpdate>? InvitationCodeUpdates = null);
+
+public sealed record UpdateCompetitionTracksResult(
+    CompetitionTracksView? Value,
+    CompetitionTrackFailureCode? FailureCode = null,
+    string? ErrorMessage = null,
+    int AffectedTeamCount = 0)
+{
+    public bool Succeeded => Value is not null && FailureCode is null;
+
+    public static UpdateCompetitionTracksResult Success(CompetitionTracksView value) =>
+        new(value);
+
+    public static UpdateCompetitionTracksResult Failure(
+        CompetitionTrackFailureCode code,
+        string message,
+        int affectedTeamCount = 0) =>
+        new(null, code, message, affectedTeamCount);
+}
 
 public sealed record AssignTeamTrackCommand(
     Guid CompetitionId,
@@ -72,7 +98,7 @@ public interface ICompetitionTrackStore
         bool includeInvitationCodes,
         CancellationToken cancellationToken);
 
-    Task<OperationResult<CompetitionTracksView, CompetitionTrackFailureCode>> UpdateAsync(
+    Task<UpdateCompetitionTracksResult> UpdateAsync(
         UpdateCompetitionTracksCommand command,
         CancellationToken cancellationToken);
 
@@ -147,8 +173,8 @@ public static partial class CompetitionTrackPolicy
             Name = track.Name.Trim()
         }).ToArray());
 
-    public static bool IsFrozen(CompetitionStatus status) =>
-        status is CompetitionStatus.Running or CompetitionStatus.Paused or CompetitionStatus.Finished;
+    public static bool CanUpdate(CompetitionStatus status) =>
+        status != CompetitionStatus.Finished;
 }
 
 public sealed class GetCompetitionTracks(ICompetitionTrackStore store)
@@ -169,7 +195,7 @@ public sealed class GetCompetitionTracks(ICompetitionTrackStore store)
 
 public sealed class UpdateCompetitionTracks(ICompetitionTrackStore store)
 {
-    public async Task<OperationResult<CompetitionTracksView, CompetitionTrackFailureCode>> ExecuteAsync(
+    public async Task<UpdateCompetitionTracksResult> ExecuteAsync(
         UpdateCompetitionTracksCommand command,
         GameMode mode,
         CancellationToken cancellationToken = default)
@@ -186,7 +212,7 @@ public sealed class UpdateCompetitionTracks(ICompetitionTrackStore store)
             }
         }
         if (errors.Count > 0)
-            return OperationResult<CompetitionTracksView, CompetitionTrackFailureCode>.Failure(
+            return UpdateCompetitionTracksResult.Failure(
                 CompetitionTrackFailureCode.InvalidConfiguration,
                 string.Join(" ", errors));
         return await store.UpdateAsync(command with
@@ -198,7 +224,15 @@ public sealed class UpdateCompetitionTracks(ICompetitionTrackStore store)
                 InvitationCode = string.IsNullOrWhiteSpace(update.InvitationCode)
                     ? null
                     : update.InvitationCode.Trim()
-            }).ToArray()
+            }).ToArray(),
+            RemovedTrackReassignments = command.RemovedTrackReassignments.Select(reassignment =>
+                reassignment with
+                {
+                    FromTrackKey = CompetitionTrackConfiguration.NormalizeKey(
+                        reassignment.FromTrackKey) ?? string.Empty,
+                    ToTrackKey = CompetitionTrackConfiguration.NormalizeKey(
+                        reassignment.ToTrackKey) ?? string.Empty
+                }).ToArray()
         }, cancellationToken);
     }
 }

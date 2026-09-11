@@ -235,7 +235,13 @@ GET  /api/v1/admin/competitions/{competitionId}/cheat-incidents/{gameplayFactId}
 PUT  /api/v1/admin/competitions/{competitionId}/cheat-incidents/{gameplayFactId}/status
 ```
 
-Lifecycle Endpoint 复用同一 Application state machine，但每个动作仍是独立文件/路由/TypedResults。
+`POST /admin/competitions` 和比赛响应包含 `tracksEnabled`；新比赛默认为 `false`。聚合 PATCH 的
+`tracks` section 使用 `{ enabled, tracks, removedTrackReassignments[] }`。删除仍有队伍的赛道时，
+每条迁移显式给出 `fromTrackKey` 与仍保留在新配置中的 `toTrackKey`；缺失或无效映射返回带稳定
+失败码与 `affectedTeamCount` 的强类型 409。Running/Paused 允许更新，Finished 返回
+`CompetitionFinished`。关闭赛道时服务端在同一事务将所有队伍归并到新配置的默认赛道。
+
+Lifecycle 状态资源复用同一 Application state machine，并通过强类型 `PUT .../status` 表达目标状态。
 
 普通删除是可恢复的软删除，恢复不会清理任何历史。物理删除是独立操作，不要求先软删除；调用方应先读取
 `hard-delete-preview`。预览以稳定引用码和数量报告 Team、CompetitionChallenge、GameplayFact、Runtime、

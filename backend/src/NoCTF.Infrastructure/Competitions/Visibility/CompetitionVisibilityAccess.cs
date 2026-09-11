@@ -22,6 +22,7 @@ public sealed class CompetitionVisibilityAccess(NoCtfDbContext db)
             {
                 candidate.Mode,
                 candidate.Status,
+                candidate.TracksEnabled,
                 candidate.OwnerId,
                 candidate.ManagerIds,
                 candidate.JudgeIds,
@@ -57,7 +58,8 @@ public sealed class CompetitionVisibilityAccess(NoCtfDbContext db)
             competition.Mode,
             competition.Status,
             visibility,
-            scope);
+            scope,
+            competition.TracksEnabled);
     }
 
     private static LeaderboardDataScope DataScope(

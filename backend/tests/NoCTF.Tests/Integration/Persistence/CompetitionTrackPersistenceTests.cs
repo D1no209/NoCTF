@@ -4,6 +4,7 @@ using NoCTF.Application.Competitions.Events;
 using NoCTF.Application.Competitions.Management;
 using NoCTF.Application.Competitions.Tracks;
 using NoCTF.Application.Messaging;
+using NoCTF.Application.Teams.Registration;
 using NoCTF.Domain.Competitions;
 using NoCTF.Domain.Identity;
 using NoCTF.Domain.Teams;
@@ -12,6 +13,7 @@ using NoCTF.Infrastructure.Competitions.Events;
 using NoCTF.Infrastructure.Competitions.Management;
 using NoCTF.Infrastructure.Competitions.Tracks;
 using NoCTF.Infrastructure.Persistence;
+using NoCTF.Infrastructure.Teams.Registration;
 using Testcontainers.PostgreSql;
 
 namespace NoCTF.Tests.Integration.Persistence;
@@ -22,7 +24,7 @@ public sealed class CompetitionTrackPersistenceTests
 {
     [Test]
     [Timeout(300_000)]
-    public async Task Track_configuration_assignment_visibility_and_freeze_are_transactional(
+    public async Task Track_configuration_assignment_reassignment_and_lifecycle_are_transactional(
         CancellationToken cancellationToken)
     {
         await DockerIntegrationTest.RunAsync(async () =>
@@ -39,6 +41,7 @@ public sealed class CompetitionTrackPersistenceTests
                 .Options;
             var now = DateTimeOffset.UtcNow;
             var ownerId = Guid.CreateVersion7(now);
+            var participantId = Guid.CreateVersion7(now.AddTicks(1));
             var teamId = Guid.CreateVersion7(now);
             var competitionId = Guid.CreateVersion7(now);
 
@@ -56,6 +59,17 @@ public sealed class CompetitionTrackPersistenceTests
                     CreatedAt = now,
                     UpdatedAt = now
                 });
+                seed.Users.Add(new User
+                {
+                    Id = participantId,
+                    UserName = "track-participant",
+                    NormalizedUserName = "TRACK-PARTICIPANT",
+                    Email = "track-participant@example.test",
+                    PasswordHash = "test",
+                    Role = UserRole.User,
+                    CreatedAt = now,
+                    UpdatedAt = now
+                });
                 seed.Competitions.Add(new Competition
                 {
                     Id = competitionId,
@@ -63,6 +77,7 @@ public sealed class CompetitionTrackPersistenceTests
                     OwnerId = ownerId,
                     Mode = GameMode.Ctf,
                     Status = CompetitionStatus.Published,
+                    TracksEnabled = true,
                     ConfigurationJson = GameModeDefaultConfiguration.GetCompetitionJson(GameMode.Ctf),
                     StartAt = now.AddHours(1),
                     EndAt = now.AddHours(2),
@@ -108,6 +123,7 @@ public sealed class CompetitionTrackPersistenceTests
                 await Assert.That(defaultConfiguration.DefaultTrack.Key)
                     .IsEqualTo(CompetitionTrackConfiguration.DefaultTrackKey);
                 await Assert.That(defaultConfiguration.DefaultTrack.EarnsScore).IsTrue();
+                await Assert.That(createdCompetition.TracksEnabled).IsFalse();
             }
 
             var tracks = new[]
@@ -121,7 +137,9 @@ public sealed class CompetitionTrackPersistenceTests
                 var store = CreateStore(updateDb);
                 var updated = await store.UpdateAsync(new(
                     competitionId,
+                    true,
                     tracks,
+                    [],
                     ownerId,
                     now,
                     [new("invite", "invite-only", ClearInvitationCode: false)]),
@@ -180,10 +198,187 @@ public sealed class CompetitionTrackPersistenceTests
             {
                 var result = await CreateStore(conflictDb).UpdateAsync(new(
                     competitionId,
+                    true,
                     [Track("default", "Official", isDefault: true)],
+                    [],
                     ownerId,
                     now.AddSeconds(2)), cancellationToken);
-                await Assert.That(result.FailureCode).IsEqualTo(CompetitionTrackFailureCode.TrackInUse);
+                await Assert.That(result.FailureCode)
+                    .IsEqualTo(CompetitionTrackFailureCode.TrackReassignmentRequired);
+                await Assert.That(result.AffectedTeamCount).IsEqualTo(1);
+            }
+
+            await using (var migrateDb = new NoCtfDbContext(options))
+            {
+                var result = await CreateStore(migrateDb).UpdateAsync(new(
+                    competitionId,
+                    true,
+                    [Track("default", "Official", isDefault: true), Track("invite", "Invitation only")],
+                    [new("internal", "default")],
+                    ownerId,
+                    now.AddSeconds(2)), cancellationToken);
+                await Assert.That(result.Succeeded).IsTrue();
+            }
+
+            await using (var migratedVerify = new NoCtfDbContext(options))
+            {
+                var migratedCompetition = await migratedVerify.Competitions.AsNoTracking()
+                    .SingleAsync(item => item.Id == competitionId, cancellationToken);
+                var migratedTeam = await migratedVerify.Teams.AsNoTracking()
+                    .SingleAsync(item => item.Id == teamId, cancellationToken);
+                var migratedConfiguration = CompetitionTrackConfiguration.ParseOrDefault(
+                    migratedCompetition.Mode,
+                    migratedCompetition.TrackConfigurationJson);
+                await Assert.That(migratedConfiguration.Find("internal")).IsNull();
+                await Assert.That(migratedTeam.TrackKey).IsEqualTo("default");
+            }
+
+            await using (var restoreAndDisableDb = new NoCtfDbContext(options))
+            {
+                var store = CreateStore(restoreAndDisableDb);
+                await Assert.That((await store.UpdateAsync(new(
+                    competitionId,
+                    true,
+                    tracks,
+                    [],
+                    ownerId,
+                    now.AddSeconds(3)), cancellationToken)).Succeeded).IsTrue();
+                await Assert.That((await store.AssignAsync(new(
+                    competitionId,
+                    teamId,
+                    "internal",
+                    ownerId,
+                    now.AddSeconds(4)), cancellationToken)).Succeeded).IsTrue();
+
+                var disabled = await store.UpdateAsync(new(
+                    competitionId,
+                    false,
+                    tracks,
+                    [],
+                    ownerId,
+                    now.AddSeconds(5)), cancellationToken);
+                await Assert.That(disabled.Succeeded).IsTrue();
+                await Assert.That(disabled.Value!.Enabled).IsFalse();
+
+                var disabledAssignment = await store.AssignAsync(new(
+                    competitionId,
+                    teamId,
+                    "internal",
+                    ownerId,
+                    now.AddSeconds(6)), cancellationToken);
+                await Assert.That(disabledAssignment.FailureCode)
+                    .IsEqualTo(CompetitionTrackFailureCode.TracksDisabled);
+
+                var registration = await new CreateTeam(new TeamRegistrationStore(
+                        restoreAndDisableDb,
+                        Substitute.For<ITransactionalMessageOutbox>()))
+                    .ExecuteAsync(new(
+                        competitionId,
+                        participantId,
+                        "No track selection",
+                        now.AddSeconds(6),
+                        TrackKey: null,
+                        TrackInvitationCode: "ignored"), cancellationToken);
+                await Assert.That(registration.Succeeded).IsTrue();
+                await Assert.That(registration.Value!.TrackKey).IsEqualTo("default");
+            }
+
+            await using (var disabledVerify = new NoCtfDbContext(options))
+            {
+                await Assert.That(await disabledVerify.Teams.AsNoTracking()
+                    .Where(item => item.Id == teamId)
+                    .Select(item => item.TrackKey)
+                    .SingleAsync(cancellationToken)).IsEqualTo("default");
+            }
+
+            await using (var reenableDb = new NoCtfDbContext(options))
+            {
+                var store = CreateStore(reenableDb);
+                await Assert.That((await store.UpdateAsync(new(
+                    competitionId,
+                    true,
+                    tracks,
+                    [],
+                    ownerId,
+                    now.AddSeconds(7)), cancellationToken)).Succeeded).IsTrue();
+                await Assert.That((await store.UpdateAsync(new(
+                    competitionId,
+                    true,
+                    tracks,
+                    [],
+                    ownerId,
+                    now.AddSeconds(8),
+                    [new("invite", "a-new-secret", ClearInvitationCode: false)]),
+                    cancellationToken)).Succeeded).IsTrue();
+                await Assert.That((await store.AssignAsync(new(
+                    competitionId,
+                    teamId,
+                    "internal",
+                    ownerId,
+                    now.AddSeconds(9)), cancellationToken)).Succeeded).IsTrue();
+            }
+
+            await using (var raceSetupDb = new NoCtfDbContext(options))
+            {
+                await Assert.That((await CreateStore(raceSetupDb).AssignAsync(new(
+                    competitionId,
+                    teamId,
+                    "default",
+                    ownerId,
+                    now.AddSeconds(10)), cancellationToken)).Succeeded).IsTrue();
+            }
+
+            await using (var assignmentRaceDb = new NoCtfDbContext(options))
+            await using (var deletionRaceDb = new NoCtfDbContext(options))
+            {
+                var assignmentTask = CreateStore(assignmentRaceDb).AssignAsync(new(
+                    competitionId,
+                    teamId,
+                    "internal",
+                    ownerId,
+                    now.AddSeconds(11)), cancellationToken);
+                var deletionTask = CreateStore(deletionRaceDb).UpdateAsync(new(
+                    competitionId,
+                    true,
+                    [Track("default", "Official", isDefault: true), Track("invite", "Invitation only")],
+                    [],
+                    ownerId,
+                    now.AddSeconds(11)), cancellationToken);
+                await Task.WhenAll(assignmentTask, deletionTask);
+            }
+
+            await using (var raceVerifyDb = new NoCtfDbContext(options))
+            {
+                var competition = await raceVerifyDb.Competitions.AsNoTracking()
+                    .SingleAsync(item => item.Id == competitionId, cancellationToken);
+                var configuredKeys = CompetitionTrackConfiguration.ParseOrDefault(
+                        competition.Mode,
+                        competition.TrackConfigurationJson)
+                    .Tracks.Select(track => track.Key)
+                    .ToHashSet(StringComparer.OrdinalIgnoreCase);
+                var assignedKeys = await raceVerifyDb.Teams.AsNoTracking()
+                    .Where(item => item.CompetitionId == competitionId && item.DeletedAt == null)
+                    .Select(item => item.TrackKey)
+                    .ToArrayAsync(cancellationToken);
+                await Assert.That(assignedKeys.All(configuredKeys.Contains)).IsTrue();
+            }
+
+            await using (var raceRestoreDb = new NoCtfDbContext(options))
+            {
+                var store = CreateStore(raceRestoreDb);
+                await Assert.That((await store.UpdateAsync(new(
+                    competitionId,
+                    true,
+                    tracks,
+                    [],
+                    ownerId,
+                    now.AddSeconds(12)), cancellationToken)).Succeeded).IsTrue();
+                await Assert.That((await store.AssignAsync(new(
+                    competitionId,
+                    teamId,
+                    "internal",
+                    ownerId,
+                    now.AddSeconds(13)), cancellationToken)).Succeeded).IsTrue();
             }
 
             foreach (var frozenStatus in new[]
@@ -209,15 +404,27 @@ public sealed class CompetitionTrackPersistenceTests
                         "default",
                         ownerId,
                         now.AddSeconds(3)), cancellationToken);
-                await Assert.That(assignment.Succeeded).IsTrue();
-                await Assert.That(assignment.Value!.TrackKey).IsEqualTo("default");
+                var canUpdate = frozenStatus != CompetitionStatus.Finished;
+                await Assert.That(assignment.Succeeded).IsEqualTo(canUpdate);
+                if (canUpdate)
+                    await Assert.That(assignment.Value!.TrackKey).IsEqualTo("default");
+                else
+                    await Assert.That(assignment.FailureCode)
+                        .IsEqualTo(CompetitionTrackFailureCode.CompetitionFinished);
                 var update = await store.UpdateAsync(new(
                         competitionId,
+                        true,
                         tracks,
+                        [],
                         ownerId,
                         now.AddSeconds(4)), cancellationToken);
-                await Assert.That(update.FailureCode)
-                    .IsEqualTo(CompetitionTrackFailureCode.ConfigurationLocked);
+                await Assert.That(update.Succeeded).IsEqualTo(canUpdate);
+                if (!canUpdate)
+                {
+                    await Assert.That(update.FailureCode)
+                        .IsEqualTo(CompetitionTrackFailureCode.CompetitionFinished);
+                    continue;
+                }
 
                 await using var restoreDb = new NoCtfDbContext(options);
                 var restored = await CreateStore(restoreDb).AssignAsync(new(
@@ -240,10 +447,20 @@ public sealed class CompetitionTrackPersistenceTests
             await Assert.That(team.TrackKey).IsEqualTo("internal");
             await Assert.That(eventKinds.Count(kind =>
                     kind == NoCTF.Domain.Competitions.Events.CompetitionEventKind.TrackConfigurationUpdated))
+                .IsGreaterThanOrEqualTo(5);
+            await Assert.That(eventKinds.Count(kind =>
+                    kind == NoCTF.Domain.Competitions.Events.CompetitionEventKind.TrackRegistrationPolicyUpdated))
                 .IsEqualTo(1);
             await Assert.That(eventKinds.Count(kind =>
                     kind == NoCTF.Domain.Competitions.Events.CompetitionEventKind.TeamTrackChanged))
-                .IsEqualTo(7);
+                .IsGreaterThanOrEqualTo(9);
+            var payloads = await verify.CompetitionEvents.AsNoTracking()
+                .Where(item => item.PayloadJson != null)
+                .Select(item => item.PayloadJson!)
+                .ToArrayAsync(cancellationToken);
+            await Assert.That(payloads.Any(payload => payload.Contains(
+                "a-new-secret",
+                StringComparison.Ordinal))).IsFalse();
         });
     }
 

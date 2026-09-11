@@ -119,10 +119,10 @@ public sealed class AccountPrivacyHttpTests
             await db.Teams.Where(x => x.Id == team.Id).ExecuteUpdateAsync(s => s.SetProperty(x => x.RegistrationStatus, NoCTF.Domain.Teams.TeamRegistrationStatus.Approved), ct);
             using (var cross = await client.GetAsync(path.Replace(fixture.Id.ToString(), fixture.OtherId.ToString()), ct))
                 await Assert.That(cross.StatusCode).IsEqualTo(HttpStatusCode.NotFound);
-            using (var detail = await client.GetAsync($"/api/v1/admin/platform/users/{existing}/private-profile", ct))
+            using (var detail = await client.GetAsync($"/api/v1/admin/platform/users/{existing}/activity", ct))
                 await Assert.That((await detail.Content.ReadFromJsonAsync<PrivateAccountResponse>(ct))!.Activities.Any(x => x.Kind == "LoggedIn")).IsTrue();
             Authenticate(judge);
-            using (var forbidden = await client.GetAsync($"/api/v1/admin/platform/users/{existing}/private-profile", ct))
+            using (var forbidden = await client.GetAsync($"/api/v1/admin/platform/users/{existing}/activity", ct))
                 await Assert.That(forbidden.StatusCode).IsEqualTo(HttpStatusCode.Forbidden);
             Authenticate(existing); await SaveAsync(null, "");
             await Assert.That((await store.GetOwnAsync(existing, ct))!.StudentNumber).IsNull();

@@ -1,17 +1,28 @@
-
-
 import { Plus, Save, Trash2 } from '@lucide/vue'
 import { toast } from 'vue-sonner'
-import { adminGetCompetition, adminPatchCompetition } from '../../../../../api'
-import type { NoCtfapiEndpointsAdministrationCompetitionsUpdateCompetitionTrackRequest } from '../../../../../api'
+import { adminGetCompetition, adminListTeams, adminPatchCompetition } from '../../../../../api'
+import type {
+  NoCtfapiEndpointsAdministrationCompetitionsRemovedTrackReassignmentRequest,
+  NoCtfapiEndpointsAdministrationCompetitionsUpdateCompetitionTrackRequest,
+  NoCtfapiEndpointsTeamsTeamResponse,
+} from '../../../../../api'
 import { useCompetitionAdmin } from '../../../../../lib/admin-competition'
 import { competitionTrackErrorMessage } from '../../../../../lib/competition-track'
 
 type TrackForm = Omit<NoCtfapiEndpointsAdministrationCompetitionsUpdateCompetitionTrackRequest, 'invitationCode'> & {
   clientId: string
+  existingKey: string | null
   requiresInvitationCode: boolean
   invitationCodeConfigured: boolean
   invitationCode: string
+}
+
+interface PendingTrackRemoval {
+  index: number
+  key: string
+  name: string
+  affectedTeamCount: number
+  toTrackKey: string
 }
 
 /** Owns state, effects and commands for AdminCompetitionsByIdTracksPage. */
@@ -19,29 +30,58 @@ export function useAdminCompetitionsByIdTracksPage() {
   const { competitionId, canWrite } = useCompetitionAdmin()
 
   const mode = ref<'Ctf' | 'Awd' | 'Awdp' | 'Koh'>('Ctf')
-
-  const frozen = ref(false)
-
+  const enabled = ref(false)
+  const canUpdate = ref(false)
   const tracks = ref<TrackForm[]>([])
-
+  const teams = ref<NoCtfapiEndpointsTeamsTeamResponse[]>([])
+  const removedTrackReassignments = ref<NoCtfapiEndpointsAdministrationCompetitionsRemovedTrackReassignmentRequest[]>([])
+  const pendingRemoval = ref<PendingTrackRemoval | null>(null)
+  const disableConfirmationOpen = ref(false)
   const loading = ref(true)
-
   const saving = ref(false)
-
   const error = ref<string | null>(null)
+
+  const defaultTrack = computed(() => tracks.value.find(track => track.isDefault) ?? null)
+  const removalTargets = computed(() => tracks.value.filter(track =>
+    track.key && track.key !== pendingRemoval.value?.key,
+  ))
+  const disableAffectedTeamCount = computed(() => {
+    const defaultKey = defaultTrack.value?.key
+    return defaultKey
+      ? teams.value.filter(team => team.trackKey !== defaultKey).length
+      : teams.value.length
+  })
 
   async function load() {
     loading.value = true
-    const { data, error: requestError } = await adminGetCompetition({ path: { competitionId } })
+    const [competitionResult, teamResult] = await Promise.all([
+      adminGetCompetition({ path: { competitionId } }),
+      adminListTeams({ path: { competitionId } }),
+    ])
     loading.value = false
-    if (requestError || !data) {
-      error.value = competitionTrackErrorMessage(requestError, translate("ui.failedToLoadTrackConfiguration"))
+    if (competitionResult.error || !competitionResult.data) {
+      error.value = competitionTrackErrorMessage(
+        competitionResult.error,
+        translate('ui.failedToLoadTrackConfiguration'),
+      )
       return
     }
+    if (teamResult.error || !teamResult.data) {
+      error.value = parseApiError(teamResult.error, translate('ui.failedToLoadRegisteredTeams')).message
+      return
+    }
+
+    const data = competitionResult.data
     mode.value = data.competition?.mode ?? 'Ctf'
-    frozen.value = data.tracks?.isFrozen ?? false
+    enabled.value = data.tracks?.enabled ?? data.competition?.tracksEnabled ?? false
+    canUpdate.value = data.tracks?.canUpdate ?? false
+    teams.value = teamResult.data.items ?? []
+    removedTrackReassignments.value = []
+    pendingRemoval.value = null
+    disableConfirmationOpen.value = false
     tracks.value = (data.tracks?.items ?? []).map(item => ({
       clientId: crypto.randomUUID(),
+      existingKey: item.key ?? '',
       key: item.key ?? '',
       name: item.name ?? '',
       isDefault: item.isDefault ?? false,
@@ -64,8 +104,9 @@ export function useAdminCompetitionsByIdTracksPage() {
     const ordinal = tracks.value.length + 1
     tracks.value.push({
       clientId: crypto.randomUUID(),
+      existingKey: null,
       key: `track-${ordinal}`,
-      name: translate("ui.newTrack", { ordinal }),
+      name: translate('ui.newTrack', { ordinal }),
       isDefault: false,
       isPublicSelectable: true,
       isInternal: false,
@@ -81,9 +122,69 @@ export function useAdminCompetitionsByIdTracksPage() {
     })
   }
 
-  function removeTrack(index: number) {
-    if (tracks.value[index]?.isDefault) return
+  function removeTrackAt(index: number) {
+    const removedKey = tracks.value[index]?.key
+    if (!removedKey || tracks.value[index]?.isDefault) return
     tracks.value.splice(index, 1)
+    removedTrackReassignments.value = removedTrackReassignments.value.filter(
+      reassignment => reassignment.fromTrackKey !== removedKey,
+    )
+  }
+
+  function requestRemoveTrack(index: number) {
+    const track = tracks.value[index]
+    if (!track || track.isDefault) return
+    if (!track.existingKey) {
+      removeTrackAt(index)
+      return
+    }
+    const affectedTeamCount = teams.value.filter(team => team.trackKey === track.existingKey).length
+    if (affectedTeamCount === 0) {
+      removeTrackAt(index)
+      return
+    }
+    pendingRemoval.value = {
+      index,
+      key: track.existingKey,
+      name: track.name || track.existingKey,
+      affectedTeamCount,
+      toTrackKey: defaultTrack.value?.key === track.existingKey ? '' : defaultTrack.value?.key ?? '',
+    }
+  }
+
+  function closeRemoval(open: boolean) {
+    if (!open) pendingRemoval.value = null
+  }
+
+  function confirmRemoveTrack() {
+    const removal = pendingRemoval.value
+    if (!removal?.toTrackKey) return
+    removedTrackReassignments.value = [
+      ...removedTrackReassignments.value.filter(item => item.fromTrackKey !== removal.key),
+      { fromTrackKey: removal.key, toTrackKey: removal.toTrackKey },
+    ]
+    tracks.value.splice(removal.index, 1)
+    pendingRemoval.value = null
+  }
+
+  function requestEnabled(value: boolean) {
+    if (value === enabled.value) return
+    if (!value) {
+      disableConfirmationOpen.value = true
+      return
+    }
+    enabled.value = true
+  }
+
+  function confirmDisable() {
+    enabled.value = false
+    disableConfirmationOpen.value = false
+    pendingRemoval.value = null
+    removedTrackReassignments.value = []
+  }
+
+  function setDisableConfirmationOpen(open: boolean) {
+    disableConfirmationOpen.value = open
   }
 
   function setDefault(index: number) {
@@ -140,15 +241,17 @@ export function useAdminCompetitionsByIdTracksPage() {
   }
 
   async function save() {
-    if (saving.value || frozen.value || !canWrite.value) return
+    if (saving.value || !canUpdate.value || !canWrite.value) return
     const invalidInvitationTrack = tracks.value.find(track =>
       track.requiresInvitationCode
       && !track.invitationCodeConfigured
       && !track.invitationCode?.trim(),
     )
     if (invalidInvitationTrack) {
-      const trackName = invalidInvitationTrack.name?.trim() || invalidInvitationTrack.key?.trim() || translate("ui.unnamedTrack")
-      error.value = translate("ui.trackRequiresAnInvitationCode", { name: trackName })
+      const trackName = invalidInvitationTrack.name?.trim()
+        || invalidInvitationTrack.key?.trim()
+        || translate('ui.unnamedTrack')
+      error.value = translate('ui.trackRequiresAnInvitationCode', { name: trackName })
       toast.error(error.value)
       return
     }
@@ -157,6 +260,7 @@ export function useAdminCompetitionsByIdTracksPage() {
       path: { competitionId },
       body: {
         tracks: {
+          enabled: enabled.value,
           tracks: tracks.value.map(track => ({
             key: track.key,
             name: track.name,
@@ -171,45 +275,52 @@ export function useAdminCompetitionsByIdTracksPage() {
             invitationCode: track.requiresInvitationCode ? track.invitationCode.trim() : null,
             clearInvitationCode: track.clearInvitationCode,
           })),
+          removedTrackReassignments: enabled.value ? removedTrackReassignments.value : [],
         },
       },
     })
     saving.value = false
     if (requestError || !data) {
-      error.value = competitionTrackErrorMessage(requestError, translate("ui.failedToSaveTrackConfiguration"))
+      error.value = competitionTrackErrorMessage(requestError, translate('ui.failedToSaveTrackConfiguration'))
       toast.error(error.value)
       return
     }
-    toast.success(translate("ui.trackConfigurationSaved"))
+    toast.success(translate('ui.trackConfigurationSaved'))
     await load()
   }
 
   onMounted(load)
 
   return {
-      Plus,
-      Save,
-      Trash2,
-      canWrite,
-      mode,
-      frozen,
-      tracks,
-      loading,
-      saving,
-      error,
-      load,
-      addTrack,
-      removeTrack,
-      setDefault,
-      setPublicSelectable,
-      setInternal,
-      setInvitationRequired,
-      updateDefault,
-      updatePublicSelectable,
-      updateInternal,
-      updateInvitationRequired,
-      save
-    }
+    Plus,
+    Save,
+    Trash2,
+    canWrite,
+    mode,
+    enabled,
+    canUpdate,
+    tracks,
+    pendingRemoval,
+    removalTargets,
+    disableConfirmationOpen,
+    disableAffectedTeamCount,
+    loading,
+    saving,
+    error,
+    load,
+    addTrack,
+    requestRemoveTrack,
+    closeRemoval,
+    confirmRemoveTrack,
+    requestEnabled,
+    confirmDisable,
+    setDisableConfirmationOpen,
+    updateDefault,
+    updatePublicSelectable,
+    updateInternal,
+    updateInvitationRequired,
+    save,
+  }
 }
 
 export type AdminCompetitionsByIdTracksPageViewState = import('vue').ShallowUnwrapRef<Awaited<ReturnType<typeof useAdminCompetitionsByIdTracksPage>>>

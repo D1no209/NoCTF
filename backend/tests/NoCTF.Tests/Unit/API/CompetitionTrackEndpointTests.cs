@@ -174,17 +174,18 @@ public sealed class CompetitionTrackEndpointTests
                 CompetitionId,
                 GameMode.Ctf,
                 CompetitionStatus.Published,
-                false,
+                true,
+                true,
                 [Track("default", false), Track("internal", true)]));
         }
 
-        public Task<OperationResult<CompetitionTracksView, CompetitionTrackFailureCode>> UpdateAsync(
+        public Task<UpdateCompetitionTracksResult> UpdateAsync(
             UpdateCompetitionTracksCommand command,
             CancellationToken cancellationToken)
         {
             UpdateCalls++;
-            return Task.FromResult(OperationResult<CompetitionTracksView, CompetitionTrackFailureCode>.Success(
-                new(CompetitionId, GameMode.Ctf, CompetitionStatus.Published, false,
+            return Task.FromResult(UpdateCompetitionTracksResult.Success(
+                new(CompetitionId, GameMode.Ctf, CompetitionStatus.Published, true, true,
                     command.Tracks.Select(track => Track(track.Key, track.IsInternal)).ToArray())));
         }
 

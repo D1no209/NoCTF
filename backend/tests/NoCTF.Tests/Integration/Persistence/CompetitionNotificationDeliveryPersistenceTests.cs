@@ -400,9 +400,11 @@ public sealed class CompetitionNotificationDeliveryPersistenceTests
                         AffectsCompetitiveResults: false)
                 ]);
             await db.Competitions.Where(item => item.Id == competitionId)
-                .ExecuteUpdateAsync(setters => setters.SetProperty(
-                    item => item.TrackConfigurationJson,
-                    CompetitionTrackConfiguration.Serialize(internalTracks)), ct);
+                .ExecuteUpdateAsync(setters => setters
+                    .SetProperty(item => item.TracksEnabled, true)
+                    .SetProperty(
+                        item => item.TrackConfigurationJson,
+                        CompetitionTrackConfiguration.Serialize(internalTracks)), ct);
             await db.Teams.Where(team => team.Id == bannedTeamId)
                 .ExecuteUpdateAsync(setters => setters.SetProperty(
                     team => team.TrackKey,

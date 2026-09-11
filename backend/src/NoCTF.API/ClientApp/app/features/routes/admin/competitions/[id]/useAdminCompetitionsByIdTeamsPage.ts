@@ -24,6 +24,8 @@ export function useAdminCompetitionsByIdTeamsPage() {
 
   const tracks = ref<NoCtfapiEndpointsCompetitionsTracksCompetitionTrackResponse[]>([])
 
+  const tracksEnabled = ref(false)
+
   const selectedTeam = ref<NoCtfapiEndpointsTeamsTeamResponse | null>(null)
 
   const teamMembers = ref<NoCtfapiEndpointsAuthenticationPublicUserProfileResponse[]>([])
@@ -137,12 +139,13 @@ export function useAdminCompetitionsByIdTeamsPage() {
     else teams.value = teamResult.data.items ?? []
     if (!trackResult.error && trackResult.data) {
       tracks.value = trackResult.data.tracks?.items ?? []
+      tracksEnabled.value = trackResult.data.tracks?.enabled ?? false
     }
     loading.value = false
   }
 
   async function assignTrack(team: NoCtfapiEndpointsTeamsTeamResponse, trackKey: string) {
-    if (!team.id || !team.registrationStatus || !canWrite.value || team.trackKey === trackKey) return
+    if (!team.id || !team.registrationStatus || !canWrite.value || !tracksEnabled.value || team.trackKey === trackKey) return
     pendingId.value = team.id
     try {
       const { error: requestError } = await patchCompetitionTeam({
@@ -318,6 +321,7 @@ export function useAdminCompetitionsByIdTeamsPage() {
       error,
       pendingId,
       tracks,
+      tracksEnabled,
       selectedTeam,
       teamMembers,
       teamDetailLoading,

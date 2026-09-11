@@ -65,6 +65,7 @@ public sealed class CompetitionManagementStore(
             AllowChallengeOwnersToHandleQuestions =
                 command.AllowChallengeOwnersToHandleQuestions,
             PracticeModeEnabled = command.PracticeModeEnabled,
+            TracksEnabled = command.TracksEnabled,
             CreatedAt = command.CreatedAt,
             UpdatedAt = command.CreatedAt,
             ConfigurationJson = GameModeDefaultConfiguration.GetCompetitionJson(command.Mode),
@@ -227,7 +228,8 @@ public sealed class CompetitionManagementStore(
             x.MaxParticipantMessagesBeforeHandlerReply,
             x.AllowChallengeOwnersToHandleQuestions,
             x.PracticeModeEnabled,
-            x.PosterFileId));
+            x.PosterFileId,
+            x.TracksEnabled));
 
     private static CompetitionView Map(Competition x) =>
         new(x.Id, x.Title, x.Description, x.Mode, x.StartAt, x.EndAt, x.Status,
@@ -240,5 +242,6 @@ public sealed class CompetitionManagementStore(
             x.MaxParticipantMessagesBeforeHandlerReply,
             x.AllowChallengeOwnersToHandleQuestions,
             x.PracticeModeEnabled,
-            x.PosterFileId);
+            x.PosterFileId,
+            x.TracksEnabled);
 }

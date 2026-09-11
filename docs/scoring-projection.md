@@ -68,12 +68,18 @@ Points、Penalty、Hint Cost、ManualAdjustment 与总分使用 checked signed I
 
 ## 赛道和可见性
 
-响应包含可见 `tracks[]`、`challenges[]` 与排序后的 `entries[]` 稀疏矩阵。Entry 带 TrackKey，名次
-按赛道独立计算。普通访问者和 Observer 只读取公开且非内部赛道；即使普通用户被误分配到内部赛道，
-公开协议也不会回显该赛道或其中队伍。平台 Administrator 与比赛 Owner、Manager、Judge 可查看全部赛道。
+响应包含 `tracksEnabled`、可见 `tracks[]`、`challenges[]` 与排序后的 `entries[]` 稀疏矩阵。开启赛道时，
+Entry 带 TrackKey，名次按赛道独立计算。普通访问者和 Observer 只读取公开且非内部赛道；即使普通用户
+被误分配到内部赛道，公开协议也不会回显该赛道或其中队伍。平台 Administrator 与比赛 Owner、Manager、Judge 可查看全部赛道。
 前端提供“所有赛道”视图，在一个矩阵中列出调用者获授权的全部赛道，同时保留服务端按赛道计算的名次，
 不得重算跨赛道综合排名。`EarnsScore=false` 不产生竞争性排名；内部测试事实保留在 PostgreSQL，但不改变
 公开投影、事件或通知。
+
+关闭赛道时，投影层只使用当前默认赛道的“公开综合”有效配置：所有队伍进入同一排名空间，CTF 血榜与
+动态分以及 AWD/AWDP/KoH 竞争资格均按该配置重算。保存的其他赛道定义保持休眠；趋势、详情、CSV 与
+SignalR 刷新都读取同一有效配置，前端不显示赛道筛选或赛道列。启停、计分属性变化和队伍迁移进入排行榜
+失效管线；仅邀请码或报名可选性变化记录 `TrackRegistrationPolicyUpdated`，不触发排行榜投影，且事件
+Payload 不包含邀请码。
 
 ## 验证要求
 

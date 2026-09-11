@@ -1197,6 +1197,7 @@ public sealed class LeaderboardEndpointTests
                     GameMode.Ctf,
                     CompetitionStatus.Running,
                     true,
+                    true,
                     [new CompetitionTrackView(
                         CompetitionTrackConfiguration.DefaultTrackKey,
                         "Default",
@@ -1210,7 +1211,7 @@ public sealed class LeaderboardEndpointTests
                         true)])
                 : null);
 
-        public Task<NoCTF.Application.Common.OperationResult<CompetitionTracksView, CompetitionTrackFailureCode>> UpdateAsync(
+        public Task<UpdateCompetitionTracksResult> UpdateAsync(
             UpdateCompetitionTracksCommand command,
             CancellationToken cancellationToken) => throw new NotSupportedException();
 
@@ -1395,14 +1396,15 @@ public sealed class LeaderboardEndpointTests
                     competitionId,
                     GameMode.Ctf,
                     CompetitionStatus.Running,
-                    false,
+                    true,
+                    true,
                     [
                         new("default", "Default", true, true, false, true, true, true, true, true),
                         new("staff", "Staff", false, false, true, false, false, false, false, false)
                     ])
                 : null);
 
-        public Task<NoCTF.Application.Common.OperationResult<CompetitionTracksView, CompetitionTrackFailureCode>> UpdateAsync(
+        public Task<UpdateCompetitionTracksResult> UpdateAsync(
             UpdateCompetitionTracksCommand command,
             CancellationToken cancellationToken) => throw new NotSupportedException();
 
@@ -1428,7 +1430,8 @@ public sealed class LeaderboardEndpointTests
                     competitionId,
                     GameMode.Ctf,
                     CompetitionStatus.Running,
-                    false,
+                    true,
+                    true,
                     [
                         new("default", "Default", true, true, false, true, true, true, true, true),
                         new("hidden", "Hidden", false, false, true, true, true, true, false, true,
@@ -1439,7 +1442,7 @@ public sealed class LeaderboardEndpointTests
                     viewerTeamId)
                 : null);
 
-        public Task<NoCTF.Application.Common.OperationResult<CompetitionTracksView, CompetitionTrackFailureCode>> UpdateAsync(
+        public Task<UpdateCompetitionTracksResult> UpdateAsync(
             UpdateCompetitionTracksCommand command,
             CancellationToken cancellationToken) => throw new NotSupportedException();
 

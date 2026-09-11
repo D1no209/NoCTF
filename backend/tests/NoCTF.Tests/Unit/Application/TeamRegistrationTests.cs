@@ -74,7 +74,8 @@ public class TeamRegistrationTests
             AutoApprove: true,
             CompetitionDeleted: false,
             Mode: GameMode.Ctf,
-            TrackConfigurationJson: CompetitionTrackConfiguration.Serialize(configuration));
+            TrackConfigurationJson: CompetitionTrackConfiguration.Serialize(configuration),
+            TracksEnabled: true);
         var store = new Store(policy);
         var create = new CreateTeam(store);
 
@@ -108,7 +109,8 @@ public class TeamRegistrationTests
             AutoApprove: true,
             CompetitionDeleted: false,
             Mode: GameMode.Ctf,
-            TrackConfigurationJson: CompetitionTrackConfiguration.Serialize(configuration));
+            TrackConfigurationJson: CompetitionTrackConfiguration.Serialize(configuration),
+            TracksEnabled: true);
         var store = new Store(policy);
         var create = new CreateTeam(store);
 
@@ -123,6 +125,35 @@ public class TeamRegistrationTests
         await Assert.That(invalid.FailureCode).IsEqualTo(TeamRegistrationFailure.TrackInvitationInvalid);
         await Assert.That(valid.Succeeded).IsTrue();
         await Assert.That(valid.Value!.TrackKey).IsEqualTo("invite");
+    }
+
+    [Test]
+    public async Task CreateTeam_Disabled_tracks_allow_omitted_track_and_ignore_invitation_data()
+    {
+        var configuration = new CompetitionTrackConfiguration(1,
+        [
+            Track("formal", isDefault: true),
+            Track("invite", invitationCode: "let-me-in")
+        ]);
+        var store = new Store(new TeamRegistrationPolicy(
+            CompetitionStatus.Published,
+            AutoApprove: true,
+            CompetitionDeleted: false,
+            Mode: GameMode.Ctf,
+            TrackConfigurationJson: CompetitionTrackConfiguration.Serialize(configuration),
+            TracksEnabled: false));
+
+        var result = await new CreateTeam(store).ExecuteAsync(new(
+            Guid.NewGuid(),
+            Guid.NewGuid(),
+            "no-track-selection",
+            DateTimeOffset.UtcNow,
+            TrackKey: null,
+            TrackInvitationCode: "ignored"));
+
+        await Assert.That(result.Succeeded).IsTrue();
+        await Assert.That(store.LastCreateCommand!.TrackKey).IsNull();
+        await Assert.That(store.LastCreateCommand.TrackInvitationCode).IsEqualTo("ignored");
     }
 
     [Test]
@@ -151,9 +182,11 @@ public class TeamRegistrationTests
         public TeamRegistrationStatus? Status { get; private set; }
         public int ReviewWriteCount { get; private set; }
         public bool? LastFindForUserIncludedPending { get; private set; }
+        public CreateTeamCommand? LastCreateCommand { get; private set; }
         public Task<TeamRegistrationPolicy?> GetPolicyAsync(Guid competitionId, CancellationToken cancellationToken) => Task.FromResult<TeamRegistrationPolicy?>(policy);
         public Task<TeamCreateStoreResult> TryCreateAsync(CreateTeamCommand command, TeamRegistrationStatus status, CancellationToken cancellationToken)
         {
+            LastCreateCommand = command;
             Status = status;
             TeamView team = new(
                 Guid.NewGuid(),

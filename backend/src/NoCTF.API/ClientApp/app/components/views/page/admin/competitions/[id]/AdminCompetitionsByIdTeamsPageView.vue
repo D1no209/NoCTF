@@ -3,7 +3,7 @@ import { toRefs } from 'vue'
 import type { AdminCompetitionsByIdTeamsPageViewState } from '~/features/routes/admin/competitions/[id]/useAdminCompetitionsByIdTeamsPage'
 
 const viewProps = defineProps<{ state: AdminCompetitionsByIdTeamsPageViewState }>()
-const { competitionId, canJudge, canWrite, teams, loading, error, pendingId, tracks, selectedTeam, teamMembers, teamDetailLoading, teamDisplayNames, displayTeamName, scoreAdjustmentTeam, scoreAdjustmentChallenges, scoreAdjustmentChallengeId, scoreAdjustmentDelta, scoreAdjustmentLoading, scoreAdjustmentPending, scoreAdjustmentError, scoreAdjustmentValid, openScoreAdjustment, closeScoreAdjustment, submitScoreAdjustment, openTeamDetail, assignTrackValue, simpleAction, banDialog, banReason, banAnnouncePublicly, banPending, banReasonValid, openBan, submitBan, appeals, appealsLoading, appealsError, appealDialog, appealReason, appealPending, openAppeal, submitAppeal, PrivateAccountPanel, onUpdateOpenOpen, onClickScoreAdjustmentTeam, onUpdateOpenBanDialog, onClickBanDialog, onUpdateOpenAppealDialog, onClickAppealDialog } = toRefs(viewProps.state)
+const { competitionId, canJudge, canWrite, teams, loading, error, pendingId, tracks, tracksEnabled, selectedTeam, teamMembers, teamDetailLoading, teamDisplayNames, displayTeamName, scoreAdjustmentTeam, scoreAdjustmentChallenges, scoreAdjustmentChallengeId, scoreAdjustmentDelta, scoreAdjustmentLoading, scoreAdjustmentPending, scoreAdjustmentError, scoreAdjustmentValid, openScoreAdjustment, closeScoreAdjustment, submitScoreAdjustment, openTeamDetail, assignTrackValue, simpleAction, banDialog, banReason, banAnnouncePublicly, banPending, banReasonValid, openBan, submitBan, appeals, appealsLoading, appealsError, appealDialog, appealReason, appealPending, openAppeal, submitAppeal, PrivateAccountPanel, onUpdateOpenOpen, onClickScoreAdjustmentTeam, onUpdateOpenBanDialog, onClickBanDialog, onUpdateOpenAppealDialog, onClickAppealDialog } = toRefs(viewProps.state)
 </script>
 
 <template>
@@ -23,7 +23,7 @@ const { competitionId, canJudge, canWrite, teams, loading, error, pendingId, tra
         <TableHeader>
           <TableRow>
             <TableHead>{{ $t('ui.teamName') }}</TableHead>
-            <TableHead class="min-w-36">{{ $t('ui.tracks') }}</TableHead>
+            <TableHead v-if="tracksEnabled" class="min-w-36">{{ $t('ui.tracks') }}</TableHead>
             <TableHead class="w-24">{{ $t('ui.numberOfPeople') }}</TableHead>
             <TableHead class="w-28">{{ $t('ui.registrationStatus') }}</TableHead>
             <TableHead class="w-28">{{ $t('ui.banStatus') }}</TableHead>
@@ -33,7 +33,7 @@ const { competitionId, canJudge, canWrite, teams, loading, error, pendingId, tra
         </TableHeader>
         <TableBody>
           <TableRow v-for="t in teams" :key="t.id">
-            <TableCell>
+            <TableCell v-if="tracksEnabled">
               <ActionButton
                 type="button"
                 class="rounded-sm font-medium underline-offset-4 hover:text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
@@ -99,8 +99,8 @@ const { competitionId, canJudge, canWrite, teams, loading, error, pendingId, tra
         </SheetHeader>
         <div v-if="selectedTeam" class="mt-6 flex flex-col gap-6">
           <dl class="grid grid-cols-[7rem_minmax(0,1fr)] gap-x-4 gap-y-3 text-sm">
-            <dt class="text-muted-foreground">{{ $t('ui.tracks') }}</dt>
-            <dd>{{ selectedTeam.trackName ?? selectedTeam.trackKey }}</dd>
+            <dt v-if="tracksEnabled" class="text-muted-foreground">{{ $t('ui.tracks') }}</dt>
+            <dd v-if="tracksEnabled">{{ selectedTeam.trackName ?? selectedTeam.trackKey }}</dd>
             <dt class="text-muted-foreground">{{ $t('ui.registrationStatus') }}</dt>
             <dd>{{ enumLabel(TeamRegistrationStatusLabel, selectedTeam.registrationStatus) }}</dd>
             <dt class="text-muted-foreground">{{ $t('ui.banStatus') }}</dt>

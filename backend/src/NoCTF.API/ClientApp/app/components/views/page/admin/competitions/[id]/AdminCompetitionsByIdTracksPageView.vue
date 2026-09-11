@@ -3,14 +3,14 @@ import { toRefs } from 'vue'
 import type { AdminCompetitionsByIdTracksPageViewState } from '~/features/routes/admin/competitions/[id]/useAdminCompetitionsByIdTracksPage'
 
 const viewProps = defineProps<{ state: AdminCompetitionsByIdTracksPageViewState }>()
-const { Plus, Save, Trash2, canWrite, mode, frozen, tracks, loading, saving, error, load, addTrack, removeTrack, updateDefault, updatePublicSelectable, updateInternal, updateInvitationRequired, save } = toRefs(viewProps.state)
+const { Plus, Save, Trash2, canWrite, mode, enabled, canUpdate, tracks, pendingRemoval, removalTargets, disableConfirmationOpen, disableAffectedTeamCount, loading, saving, error, load, addTrack, requestRemoveTrack, closeRemoval, confirmRemoveTrack, requestEnabled, confirmDisable, setDisableConfirmationOpen, updateDefault, updatePublicSelectable, updateInternal, updateInvitationRequired, save } = toRefs(viewProps.state)
 </script>
 
 <template>
   <div class="flex flex-col gap-5">
     <header class="flex flex-wrap items-end justify-between gap-3 border-b pb-4">
       <h2 class="text-xl font-semibold">{{ $t('ui.trackConfiguration') }}</h2>
-      <div v-if="canWrite && !frozen" class="flex gap-2">
+      <div v-if="canWrite && canUpdate" class="flex gap-2">
         <Button variant="outline" @click="addTrack">
           <Plus data-icon="inline-start" /> {{ $t('ui.addTrack') }}
         </Button>
@@ -21,8 +21,22 @@ const { Plus, Save, Trash2, canWrite, mode, frozen, tracks, loading, saving, err
       </div>
     </header>
 
-    <Alert v-if="frozen">
-      <AlertDescription>{{ $t('ui.theCompetitionHasStartedTrackDefinitionsAreFrozenWhileTeam') }}</AlertDescription>
+    <Field orientation="horizontal" class="rounded-md border p-4">
+      <Switch
+        id="tracks-enabled"
+        :model-value="enabled"
+        :disabled="!canWrite || !canUpdate || saving"
+        @update:model-value="requestEnabled($event === true)"
+      />
+      <FieldContent>
+        <FieldLabel for="tracks-enabled">{{ $t('ui.enableCompetitionTracks') }}</FieldLabel>
+        <FieldDescription>
+          {{ enabled ? $t('ui.competitionTracksEnabledDescription') : $t('ui.competitionTracksDisabledDescription') }}
+        </FieldDescription>
+      </FieldContent>
+    </Field>
+    <Alert v-if="!canUpdate">
+      <AlertDescription>{{ $t('ui.finishedCompetitionTracksReadOnly') }}</AlertDescription>
     </Alert>
     <Alert v-if="error" variant="destructive">
       <AlertDescription class="flex items-center justify-between gap-3">
@@ -47,26 +61,28 @@ const { Plus, Save, Trash2, canWrite, mode, frozen, tracks, loading, saving, err
             <TableHead>{{ $t('ui.leaderboardVisibility') }}</TableHead>
             <TableHead>{{ $t('ui.competitiveResults') }}</TableHead>
             <TableHead class="min-w-56">{{ $t('ui.trackInvitationCode') }}</TableHead>
-            <TableHead v-if="canWrite && !frozen" class="w-14"><span class="sr-only">{{ $t('ui.actions') }}</span></TableHead>
+            <TableHead v-if="canWrite && canUpdate" class="w-14"><span class="sr-only">{{ $t('ui.actions') }}</span></TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
           <TableRow v-for="(track, index) in tracks" :key="track.clientId">
-            <TableCell><Input v-model="track.key" :disabled="!canWrite || frozen" maxlength="64" class="font-mono" /></TableCell>
-            <TableCell><Input v-model="track.name" :disabled="!canWrite || frozen" maxlength="80" /></TableCell>
-            <TableCell><Checkbox :model-value="track.isDefault" :disabled="!canWrite || frozen" @update:model-value="updateDefault(index, $event)" /></TableCell>
-            <TableCell><Checkbox :model-value="track.isPublicSelectable" :disabled="!canWrite || frozen || track.isInternal" @update:model-value="updatePublicSelectable(track, $event)" /></TableCell>
-            <TableCell><Checkbox :model-value="track.isInternal" :disabled="!canWrite || frozen" @update:model-value="updateInternal(track, $event)" /></TableCell>
-            <TableCell><Checkbox v-model="track.earnsScore" :disabled="!canWrite || frozen || track.isInternal" /></TableCell>
-            <TableCell><Checkbox v-model="track.earnsBlood" :disabled="!canWrite || frozen || track.isInternal || mode !== 'Ctf'" /></TableCell>
-            <TableCell><Checkbox v-model="track.affectsDynamicChallengeScore" :disabled="!canWrite || frozen || track.isInternal || mode !== 'Ctf'" /></TableCell>
-            <TableCell><Checkbox v-model="track.visibleOnLeaderboard" :disabled="!canWrite || frozen || track.isInternal" /></TableCell>
-            <TableCell><Checkbox v-model="track.affectsCompetitiveResults" :disabled="!canWrite || frozen || track.isInternal" /></TableCell>
+            <TableCell>
+              <Input v-model="track.key" :disabled="!canWrite || !canUpdate || track.existingKey !== null" maxlength="64" class="font-mono" />
+            </TableCell>
+            <TableCell><Input v-model="track.name" :disabled="!canWrite || !canUpdate" maxlength="80" /></TableCell>
+            <TableCell><Checkbox :model-value="track.isDefault" :disabled="!canWrite || !canUpdate" @update:model-value="updateDefault(index, $event)" /></TableCell>
+            <TableCell><Checkbox :model-value="track.isPublicSelectable" :disabled="!canWrite || !canUpdate || track.isInternal" @update:model-value="updatePublicSelectable(track, $event)" /></TableCell>
+            <TableCell><Checkbox :model-value="track.isInternal" :disabled="!canWrite || !canUpdate" @update:model-value="updateInternal(track, $event)" /></TableCell>
+            <TableCell><Checkbox v-model="track.earnsScore" :disabled="!canWrite || !canUpdate || track.isInternal" /></TableCell>
+            <TableCell><Checkbox v-model="track.earnsBlood" :disabled="!canWrite || !canUpdate || track.isInternal || mode !== 'Ctf'" /></TableCell>
+            <TableCell><Checkbox v-model="track.affectsDynamicChallengeScore" :disabled="!canWrite || !canUpdate || track.isInternal || mode !== 'Ctf'" /></TableCell>
+            <TableCell><Checkbox v-model="track.visibleOnLeaderboard" :disabled="!canWrite || !canUpdate || track.isInternal" /></TableCell>
+            <TableCell><Checkbox v-model="track.affectsCompetitiveResults" :disabled="!canWrite || !canUpdate || track.isInternal" /></TableCell>
             <TableCell>
               <div class="flex items-center gap-2">
                 <Checkbox
                   :model-value="track.requiresInvitationCode"
-                  :disabled="!canWrite || frozen || track.isInternal || !track.isPublicSelectable"
+                  :disabled="!canWrite || !canUpdate || track.isInternal || !track.isPublicSelectable"
                   :aria-label="$t('ui.requireATrackInvitationCode')"
                   @update:model-value="updateInvitationRequired(track, $event)"
                 />
@@ -76,14 +92,14 @@ const { Plus, Save, Trash2, canWrite, mode, frozen, tracks, loading, saving, err
                   type="password"
                   minlength="8"
                   maxlength="128"
-                  :disabled="!canWrite || frozen"
+                  :disabled="!canWrite || !canUpdate"
                   :placeholder="track.invitationCodeConfigured ? $t('ui.leaveBlankToKeepTheCurrentInvitationCode') : $t('ui.enterAn8128CharacterInvitationCode')"
                 />
                 <span v-else class="text-xs text-muted-foreground">{{ $t('ui.noRestriction') }}</span>
               </div>
             </TableCell>
-            <TableCell v-if="canWrite && !frozen">
-              <Button variant="ghost" size="icon" :disabled="track.isDefault" :aria-label="$t('ui.deleteTrack')" @click="removeTrack(index)">
+            <TableCell v-if="canWrite && canUpdate">
+              <Button variant="ghost" size="icon" :disabled="track.isDefault" :aria-label="$t('ui.deleteTrack')" @click="requestRemoveTrack(index)">
                 <Trash2 class="size-4" />
               </Button>
             </TableCell>
@@ -94,5 +110,49 @@ const { Plus, Save, Trash2, canWrite, mode, frozen, tracks, loading, saving, err
     <p v-if="!loading" class="text-xs text-muted-foreground">
       {{ $t('ui.bloodAwardsRequireScoringInternalTracksAreAlwaysPrivateUnscored') }}
     </p>
+
+    <Dialog :open="pendingRemoval !== null" @update:open="closeRemoval">
+      <DialogContent v-if="pendingRemoval">
+        <DialogHeader>
+          <DialogTitle>{{ $t('ui.reassignTeamsBeforeDeletingTrack') }}</DialogTitle>
+          <DialogDescription>
+            {{ $t('ui.trackDeletionAffectsTeams', { track: pendingRemoval.name, count: pendingRemoval.affectedTeamCount }) }}
+          </DialogDescription>
+        </DialogHeader>
+        <Field>
+          <FieldLabel for="track-removal-target">{{ $t('ui.targetTrack') }}</FieldLabel>
+          <Select v-model="pendingRemoval.toTrackKey">
+            <SelectTrigger id="track-removal-target"><SelectValue :placeholder="$t('ui.selectATrack')" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem v-for="track in removalTargets" :key="track.clientId" :value="track.key">
+                {{ track.name }}
+              </SelectItem>
+            </SelectContent>
+          </Select>
+          <FieldDescription>{{ $t('ui.trackDeletionReprojectsHistory') }}</FieldDescription>
+        </Field>
+        <DialogFooter>
+          <Button variant="outline" @click="closeRemoval(false)">{{ $t('ui.cancel') }}</Button>
+          <Button variant="destructive" :disabled="!pendingRemoval.toTrackKey" @click="confirmRemoveTrack">
+            {{ $t('ui.confirmReassignmentAndDelete') }}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+
+    <AlertDialog :open="disableConfirmationOpen" @update:open="setDisableConfirmationOpen">
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>{{ $t('ui.disableCompetitionTracks') }}</AlertDialogTitle>
+          <AlertDialogDescription>
+            {{ $t('ui.disableTracksMergeWarning', { count: disableAffectedTeamCount }) }}
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel>{{ $t('ui.cancel') }}</AlertDialogCancel>
+          <AlertDialogAction @click="confirmDisable">{{ $t('ui.continueAndSave') }}</AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
   </div>
 </template>

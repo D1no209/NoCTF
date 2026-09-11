@@ -19,6 +19,7 @@ public sealed record LeaderboardResponse(Guid CompetitionId, DateTimeOffset Gene
 {
     public IReadOnlyList<LeaderboardChallengeInfo> Challenges { get; init; } = [];
     public IReadOnlyList<LeaderboardTrackInfo> Tracks { get; init; } = [];
+    public bool TracksEnabled { get; init; } = true;
     public CompetitionLeaderboardVisibility Visibility { get; init; }
     public LeaderboardDataScope DataScope { get; init; }
     public DateTimeOffset? DataAsOf { get; init; }

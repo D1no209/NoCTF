@@ -155,6 +155,7 @@ public sealed record ScoreboardSnapshotResponse(
     IReadOnlyList<ScoreboardTeamResponse> Teams)
 {
     public IReadOnlyList<ScoreboardTrackResponse> Tracks { get; init; } = [];
+    public bool TracksEnabled { get; init; } = true;
     public IReadOnlyList<ScoreboardCurrentChallengeScoreResponse> CurrentChallengeScores { get; init; } = [];
     public LeaderboardVisibilityProtocol Visibility { get; init; }
     public LeaderboardDataScopeProtocol DataScope { get; init; }
@@ -182,6 +183,7 @@ internal static partial class ScoreboardProtocolMapper
         Tracks = value.Tracks.Select(track => new ScoreboardTrackResponse(
             track.Key, track.Name, track.IsInternal, track.VisibleOnLeaderboard,
             track.IsViewerTrack)).ToArray(),
+        TracksEnabled = value.TracksEnabled,
         CurrentChallengeScores = value.CurrentChallengeScores.Select(score =>
             new ScoreboardCurrentChallengeScoreResponse(
                 score.CompetitionChallengeId,
@@ -333,6 +335,7 @@ public sealed class GetLeaderboardEndpoint(
             return TypedResults.Ok(ScoreboardProtocolMapper.ToResponse(new ScoreboardSnapshot(
                 request.CompetitionId, 0, 0, timeProvider.GetUtcNow(), null, [], [])
             {
+                TracksEnabled = visibility.TracksEnabled,
                 Visibility = visibility.Visibility,
                 DataScope = LeaderboardDataScope.Hidden
             }));

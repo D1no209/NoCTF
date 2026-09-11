@@ -298,7 +298,7 @@ export function createMockApi() {
       else if (route === '/admin/competitions/{competitionId}') value = {
         competition: { ...competition, administrationRole: user?.role === 'Administrator' ? 'Owner' : user?.role === 'Organizer' ? 'Manager' : null },
         modeConfiguration: { competitionId: competition!.id, mode: competition!.mode, competitionStatus: competition!.status, json: '{}', updatedAt: now() },
-        tracks: state.settings.get(`/competitions/{competitionId}/tracks${p.competitionId}`) ?? { mode: competition!.mode, isFrozen: false, items: [] },
+        tracks: state.settings.get(`/competitions/{competitionId}/tracks${p.competitionId}`) ?? { mode: competition!.mode, enabled: competition!.tracksEnabled ?? false, canUpdate: competition!.status !== 'Finished', items: [] },
         permissions: { competitionId: competition!.id, ownerId: competition!.ownerId, managerIds: [], judgeIds: [], observerIds: [] },
         leaderboardVisibility: { competitionId: competition!.id, effectiveVisibility: 'Normal', frozenStartAt: null, hiddenStartAt: null },
         capabilities: { canObserve: true, canModerate: true, canManagePermissions: true },
@@ -494,7 +494,11 @@ export function createMockApi() {
       else if (route === '/admin/competitions/{competitionId}' && request.method === 'PATCH') {
         if (body.metadata) Object.assign(competition!, body.metadata)
         if (body.modeConfiguration) state.settings.set(`${route}/configuration`, body.modeConfiguration)
-        value = { competition, modeConfiguration: body.modeConfiguration ?? { json: '{}' }, tracks: { items: [] }, permissions: body.permissions ?? null, leaderboardVisibility: body.leaderboardVisibility ?? { effectiveVisibility: 'Normal' }, capabilities: { canObserve: true, canModerate: true, canManagePermissions: true } }
+        if (body.tracks) {
+          competition!.tracksEnabled = body.tracks.enabled
+          state.settings.set(`/competitions/{competitionId}/tracks${p.competitionId}`, { mode: competition!.mode, enabled: body.tracks.enabled, canUpdate: competition!.status !== 'Finished', items: body.tracks.tracks })
+        }
+        value = { competition, modeConfiguration: body.modeConfiguration ?? { json: '{}' }, tracks: state.settings.get(`/competitions/{competitionId}/tracks${p.competitionId}`) ?? { enabled: competition!.tracksEnabled ?? false, canUpdate: competition!.status !== 'Finished', items: [] }, permissions: body.permissions ?? null, leaderboardVisibility: body.leaderboardVisibility ?? { effectiveVisibility: 'Normal' }, capabilities: { canObserve: true, canModerate: true, canManagePermissions: true } }
       }
       else if (route === '/admin/competitions/{competitionId}/status' && request.method === 'PUT') { competition!.status = body.status; value = {} }
       else if (route === '/admin/challenges' && request.method === 'POST') { value = { ...state.templates[0], ...body, id: body.id ?? crypto.randomUUID(), ownerId: user!.userId, createdAt: now(), updatedAt: now() }; state.templates.push(value) }

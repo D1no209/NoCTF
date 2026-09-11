@@ -135,8 +135,9 @@ public sealed class FusionLeaderboardCache(
                 competition.StartAt,
                 competition.EndAt);
 
-        var trackConfiguration = CompetitionTrackConfiguration.ParseOrDefault(
+        var trackConfiguration = CompetitionTrackConfiguration.EffectiveFor(
             competition.Mode,
+            competition.TracksEnabled,
             competition.TrackConfigurationJson);
         var trackDefinitions = trackConfiguration.Tracks.ToDictionary(
             track => track.Key,
@@ -295,6 +296,7 @@ public sealed class FusionLeaderboardCache(
                 track.Name,
                 track.IsInternal,
                 track.VisibleOnLeaderboard)).ToArray(),
+            TracksEnabled = competition.TracksEnabled,
             Visibility = CompetitionLeaderboardVisibility.Normal,
             DataScope = LeaderboardDataScope.Live,
             DataAsOf = projectedAt,
@@ -313,6 +315,7 @@ public sealed class FusionLeaderboardCache(
                     track.Name,
                     track.IsInternal,
                     track.VisibleOnLeaderboard)).ToArray(),
+                TracksEnabled = competition.TracksEnabled,
                 Visibility = CompetitionLeaderboardVisibility.Normal,
                 DataScope = LeaderboardDataScope.Live,
                 DataAsOf = projectedAt

@@ -20,6 +20,7 @@ public sealed class CompetitionStartGateStore(NoCtfDbContext db)
                 item.Mode,
                 item.Status,
                 item.ConfigurationJson,
+                item.TracksEnabled,
                 item.TrackConfigurationJson,
                 item.MaxConcurrentRuntimeInstancesPerTeam
             })
@@ -58,6 +59,7 @@ public sealed class CompetitionStartGateStore(NoCtfDbContext db)
             teamTracks.Length,
             competition.MaxConcurrentRuntimeInstancesPerTeam,
             competition.TrackConfigurationJson,
-            teamTracks);
+            teamTracks,
+            competition.TracksEnabled);
     }
 }

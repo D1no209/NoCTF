@@ -410,8 +410,9 @@ public sealed class GameplayFactOrderingPersistenceTests
             var fixture = await SeedAsync(options, 2, cancellationToken);
             await using (var configure = new NoCtfDbContext(options))
             {
-                configure.Competitions.Single().TrackConfigurationJson =
-                    CompetitionTrackConfiguration.Serialize(new(
+                var competition = configure.Competitions.Single();
+                competition.TracksEnabled = true;
+                competition.TrackConfigurationJson = CompetitionTrackConfiguration.Serialize(new(
                         CompetitionTrackConfiguration.CurrentSchemaVersion,
                         [
                             new("default", "Official", true, true, false, true, true, true, true, true),
