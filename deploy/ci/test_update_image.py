@@ -5,11 +5,13 @@ from unittest.mock import patch
 from types import SimpleNamespace
 from update_image import (application_containers, application_service_overrides,
                           validate_effective_application_roles,
-                          validate_existing_config, deploy, managed_ssh_client)
+                          validate_existing_config, deploy, managed_ssh_client,
+                          modern_port_overrides)
 
 
 def fixture():
-    container = {"Config": {"Entrypoint": ["dotnet", "NoCTF.Host.dll"], "Env": ["KEY=original"], "User": "1654", "Labels": {
+    container = {"Config": {"Entrypoint": ["dotnet", "NoCTF.Host.dll"], "Env": [
+        "KEY=original", "ASPNETCORE_URLS=http://+:8080", "ASPNETCORE_HTTP_PORTS=8080"], "User": "1654", "Labels": {
         "com.docker.compose.project": "deploy", "com.docker.compose.service": "backend",
         "com.docker.compose.project.environment_file": "/root/NoCTF/.env,/root/NoCTF/monitoring.env"}},
         "Mounts": [{"Type": "volume", "Name": "deploy_uploads", "Source": "/var/lib/docker/volumes/deploy_uploads/_data",
@@ -29,10 +31,37 @@ class DeploymentSafetyTests(unittest.TestCase):
 
         overrides = application_service_overrides(apps, "registry/noctf@sha256:test")
 
-        self.assertEqual(overrides["backend"]["environment"], {"Hosting__Roles__0": "Api"})
-        self.assertEqual(overrides["worker"]["environment"], {"Hosting__Roles__0": "Worker"})
-        self.assertEqual(overrides["runner"]["environment"], {"Hosting__Roles__0": "Runner"})
-        self.assertNotIn("environment", overrides["noctf"])
+        for service, role in (("backend", "Api"), ("worker", "Worker"), ("runner", "Runner")):
+            self.assertEqual(overrides[service]["environment"], {
+                "ASPNETCORE_URLS": "",
+                "ASPNETCORE_HTTP_PORTS": "8080",
+                "ASPNETCORE_HTTPS_PORTS": "",
+                "Hosting__Roles__0": role,
+            })
+        self.assertEqual(overrides["noctf"]["environment"], {
+            "ASPNETCORE_URLS": "",
+            "ASPNETCORE_HTTP_PORTS": "8080",
+            "ASPNETCORE_HTTPS_PORTS": "",
+        })
+
+    def test_modern_port_override_preserves_all_wildcard_http_and_https_ports(self):
+        app, _ = fixture()
+        app["Config"]["Env"] = [
+            "ASPNETCORE_URLS=http://+:8080;http://[::]:9464;https://*:8443",
+            "ASPNETCORE_HTTP_PORTS=8080",
+        ]
+
+        self.assertEqual(modern_port_overrides(app), {
+            "ASPNETCORE_URLS": "",
+            "ASPNETCORE_HTTP_PORTS": "8080;9464",
+            "ASPNETCORE_HTTPS_PORTS": "8443",
+        })
+
+    def test_modern_port_override_leaves_specific_or_non_url_bindings_unchanged(self):
+        app, _ = fixture()
+        for urls in ("http://127.0.0.1:8080", "http://unix:/tmp/kestrel.sock"):
+            app["Config"]["Env"] = ["ASPNETCORE_URLS=" + urls]
+            self.assertEqual(modern_port_overrides(app), {})
 
     def test_rejects_a_legacy_service_that_starts_extra_host_roles(self):
         worker, _ = fixture()

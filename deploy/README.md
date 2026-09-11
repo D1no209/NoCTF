@@ -117,10 +117,19 @@ NoCTF SDK 拉取单容器/Checker 与 Compose CLI 共用挂载的 `config/docker
 
 CI 只部署测试服务器。它读取现有应用容器记录的 Compose、环境文件与项目名，校验环境变量和数据挂载后，
 仅通过额外的镜像覆盖文件更新 NoCTF 应用，保留现有运行用户。旧版拆分角色和新版统一 Host 都不会在发布时
-被自动换成另一种拓扑。安装用的 `docker-compose.yml` 不覆盖已有环境，目录化迁移必须另行安排。
+被自动换成另一种拓扑。发布覆盖会把可安全等价转换的 wildcard `ASPNETCORE_URLS` 改写为
+`ASPNETCORE_HTTP_PORTS`/`ASPNETCORE_HTTPS_PORTS`，完整保留 8080、9464 等实际监听端口并消除重复配置告警；
+特定 IP 或非 URL 绑定不会自动改写。
+安装用的 `docker-compose.yml` 不覆盖已有环境，目录化迁移必须另行安排。
 发布前备份数据库与配置；发布后检查 readiness、业务记录数量及网络 ID。数据库、Redis、NATS、
 Registry、监控与反代不重建，不清理数据卷或宿主机缓存。失败时仅在数据库结构未变化时回退应用镜像，
 不会自动恢复数据库覆盖新数据。迁移仍由应用按现有 `Database:AutoMigrate` 配置在启动时执行，不创建迁移容器。
+
+`/health/ready` 保持 fail-closed，但相同故障只在状态变化时写一次结构化日志。排查 503 时读取响应中的
+`data`：每个依赖都有 `<dependency>.status`；账户邮件还提供
+`account-notification-delivery.state`。`ConfigurationUnavailable` 表示邮件验证已启用，但 SMTP 配置缺失或
+`EMAIL_VERIFICATION_ENCRYPTION_KEY` 无法解密既有密码；应修正配置或恢复原加密密钥，不能通过关闭
+readiness 掩盖。
 
 生产服务器禁止通过 CI 部署。人工部署使用 CI 发布的同一 digest，通过 SSH 显式调用
 `update_image.py --manual-production`；该参数只接受已确认的生产主机，CI 包装脚本不传此参数且独立拒绝生产主机。

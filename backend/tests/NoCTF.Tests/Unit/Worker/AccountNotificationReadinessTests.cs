@@ -1,5 +1,4 @@
 using System.Security.Cryptography;
-using Microsoft.Extensions.DependencyInjection;
 using NoCTF.Application.Authentication.EmailVerification;
 using NoCTF.Domain.Identity;
 using NoCTF.Worker;
@@ -16,12 +15,12 @@ public sealed class AccountNotificationReadinessTests
         var delivery = Substitute.For<IEmailVerificationDeliveryConfigurationReader>();
         settings.GetAsync(Arg.Any<CancellationToken>())
             .Returns(Configuration(enabled: false));
-        await using var services = Services(settings, delivery);
-        var dependency = new AccountNotificationReadinessDependency(
-            services.GetRequiredService<IServiceScopeFactory>());
+        var dependency = new AccountNotificationReadinessDependency(settings, delivery);
 
         await dependency.CheckAsync(CancellationToken.None);
 
+        await Assert.That(dependency.Describe()["state"])
+            .IsEqualTo(AccountNotificationReadinessState.Disabled.ToString());
         await delivery.DidNotReceiveWithAnyArgs()
             .GetDeliveryConfigurationAsync(default, default);
     }
@@ -35,12 +34,12 @@ public sealed class AccountNotificationReadinessTests
             .Returns(Configuration(enabled: true));
         delivery.GetDeliveryConfigurationAsync(true, Arg.Any<CancellationToken>())
             .Returns((EmailVerificationDeliveryConfiguration?)null);
-        await using var services = Services(settings, delivery);
-        var dependency = new AccountNotificationReadinessDependency(
-            services.GetRequiredService<IServiceScopeFactory>());
+        var dependency = new AccountNotificationReadinessDependency(settings, delivery);
 
         await Assert.That(() => dependency.CheckAsync(CancellationToken.None))
             .Throws<InvalidOperationException>();
+        await Assert.That(dependency.Describe()["state"])
+            .IsEqualTo(AccountNotificationReadinessState.ConfigurationUnavailable.ToString());
     }
 
     [Test]
@@ -53,21 +52,40 @@ public sealed class AccountNotificationReadinessTests
         delivery.GetDeliveryConfigurationAsync(true, Arg.Any<CancellationToken>())
             .Returns(Task.FromException<EmailVerificationDeliveryConfiguration?>(
                 new CryptographicException("Wrong deployment key.")));
-        await using var services = Services(settings, delivery);
-        var dependency = new AccountNotificationReadinessDependency(
-            services.GetRequiredService<IServiceScopeFactory>());
+        var dependency = new AccountNotificationReadinessDependency(settings, delivery);
 
         await Assert.That(() => dependency.CheckAsync(CancellationToken.None))
             .Throws<CryptographicException>();
+        await Assert.That(dependency.Describe()["state"])
+            .IsEqualTo(AccountNotificationReadinessState.ConfigurationUnavailable.ToString());
     }
 
-    private static ServiceProvider Services(
-        IEmailVerificationConfigurationStore settings,
-        IEmailVerificationDeliveryConfigurationReader delivery) =>
-        new ServiceCollection()
-            .AddSingleton(settings)
-            .AddSingleton(delivery)
-            .BuildServiceProvider();
+    [Test]
+    public async Task Enabled_email_verification_is_ready_with_delivery_configuration()
+    {
+        var settings = Substitute.For<IEmailVerificationConfigurationStore>();
+        var delivery = Substitute.For<IEmailVerificationDeliveryConfigurationReader>();
+        settings.GetAsync(Arg.Any<CancellationToken>())
+            .Returns(Configuration(enabled: true));
+        delivery.GetDeliveryConfigurationAsync(true, Arg.Any<CancellationToken>())
+            .Returns(new EmailVerificationDeliveryConfiguration(
+                true,
+                "https://noctf.test",
+                "smtp.noctf.test",
+                587,
+                SmtpSecurityMode.StartTls,
+                "mailer",
+                "secret",
+                "no-reply@noctf.test",
+                "NoCTF",
+                10));
+        var dependency = new AccountNotificationReadinessDependency(settings, delivery);
+
+        await dependency.CheckAsync(CancellationToken.None);
+
+        await Assert.That(dependency.Describe()["state"])
+            .IsEqualTo(AccountNotificationReadinessState.Ready.ToString());
+    }
 
     private static EmailVerificationConfigurationView Configuration(bool enabled) =>
         new(

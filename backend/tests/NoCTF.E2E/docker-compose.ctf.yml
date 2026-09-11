@@ -97,7 +97,7 @@ services:
         ALL_PROXY: ${ALL_PROXY:-}
     environment:
       <<: *api-environment
-      ASPNETCORE_URLS: http://+:8080
+      ASPNETCORE_HTTP_PORTS: "8080"
       Storage__PublicBaseUrl: http://backend:8080
     ports:
       - "127.0.0.1::8080"
@@ -129,7 +129,7 @@ services:
         HTTPS_PROXY: ${NOCTF_E2E_BUILD_HTTPS_PROXY:-}
         ALL_PROXY: ${ALL_PROXY:-}
     environment:
-      ASPNETCORE_URLS: http://+:8080
+      ASPNETCORE_HTTP_PORTS: "8080"
       ConnectionStrings__PostgreSql: Host=postgres;Port=5432;Database=noctf;Username=noctf;Password=${NOCTF_E2E_POSTGRES_PASSWORD}
       ConnectionStrings__Redis: redis:6379
       Runner__Provider: ${NOCTF_E2E_RUNTIME_PROVIDER}

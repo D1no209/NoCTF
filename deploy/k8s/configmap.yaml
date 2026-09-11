@@ -6,7 +6,7 @@ metadata:
   labels:
     app.kubernetes.io/part-of: noctf
 data:
-  ASPNETCORE_URLS: "http://+:8080"
+  ASPNETCORE_HTTP_PORTS: "8080"
   ASPNETCORE_ENVIRONMENT: "Production"
   Worker__Queues__0: "control"
   Worker__Queues__1: "gameplay"

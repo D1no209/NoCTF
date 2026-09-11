@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using NoCTF.Hosting;
 using NoCTF.Hosting.Health;
@@ -26,6 +27,8 @@ public sealed class RoleReadinessHealthCheckTests
         var result = await healthCheck.CheckHealthAsync(new HealthCheckContext());
 
         await Assert.That(result.Status).IsEqualTo(HealthStatus.Healthy);
+        await Assert.That(result.Data["postgresql.status"])
+            .IsEqualTo(HealthStatus.Healthy.ToString());
     }
 
     [Test]
@@ -45,6 +48,8 @@ public sealed class RoleReadinessHealthCheckTests
         await Assert.That(result.Description).Contains("postgresql");
         await Assert.That(result.Description).DoesNotContain("must-not-leak");
         await Assert.That(result.Exception).IsNull();
+        await Assert.That(result.Data["postgresql.status"])
+            .IsEqualTo(HealthStatus.Unhealthy.ToString());
     }
 
     [Test]
@@ -62,6 +67,8 @@ public sealed class RoleReadinessHealthCheckTests
 
         await Assert.That(result.Status).IsEqualTo(HealthStatus.Degraded);
         await Assert.That(result.Description).Contains("redis");
+        await Assert.That(result.Data["redis.status"])
+            .IsEqualTo(HealthStatus.Degraded.ToString());
     }
 
     [Test]
@@ -102,6 +109,78 @@ public sealed class RoleReadinessHealthCheckTests
 
         await Assert.That(registration.Timeout).IsEqualTo(TimeSpan.FromSeconds(2));
         await Assert.That(registration.Tags).Contains("ready");
+        var logging = provider.GetRequiredService<IOptions<LoggerFilterOptions>>().Value;
+        await Assert.That(logging.Rules.Any(rule =>
+                rule.CategoryName
+                    == "Microsoft.Extensions.Diagnostics.HealthChecks.DefaultHealthCheckService"
+                && rule.LogLevel == LogLevel.Critical))
+            .IsTrue();
+    }
+
+    [Test]
+    public async Task Readiness_transition_state_suppresses_unchanged_probe_noise()
+    {
+        var state = new RoleReadinessLogState();
+
+        await Assert.That(state.TryTransition(
+            HealthStatus.Unhealthy,
+            ["postgresql"]))
+            .IsTrue();
+        await Assert.That(state.TryTransition(
+            HealthStatus.Unhealthy,
+            ["postgresql"]))
+            .IsFalse();
+        await Assert.That(state.TryTransition(
+            HealthStatus.Healthy,
+            []))
+            .IsTrue();
+    }
+
+    [Test]
+    public async Task Unchanged_failure_is_logged_once_and_recovery_is_logged_once()
+    {
+        var state = new RoleReadinessLogState();
+        var logger = new RecordingLogger();
+        var unhealthy = new RoleReadinessHealthCheck(
+        [
+            new StubDependency(
+                "postgresql",
+                failureIsCritical: true,
+                new InvalidOperationException("unavailable"))
+        ], state, logger);
+
+        _ = await unhealthy.CheckHealthAsync(new HealthCheckContext());
+        _ = await unhealthy.CheckHealthAsync(new HealthCheckContext());
+        _ = await new RoleReadinessHealthCheck(
+                [new StubDependency("postgresql", failureIsCritical: true)],
+                state,
+                logger)
+            .CheckHealthAsync(new HealthCheckContext());
+
+        await Assert.That(logger.Levels)
+            .IsEquivalentTo([LogLevel.Error, LogLevel.Information]);
+    }
+
+    [Test]
+    public async Task Health_check_execution_resolves_scoped_readiness_dependencies()
+    {
+        var services = new ServiceCollection();
+        services.AddScoped<IReadinessDependency, ScopedReadinessDependency>();
+        services.AddNoCtfRoleHealthChecks(
+            new ConfigurationBuilder().Build(),
+            HostRoles.Only(HostRole.Worker),
+            development: true);
+        await using var provider = services.BuildServiceProvider(new ServiceProviderOptions
+        {
+            ValidateScopes = true
+        });
+
+        var report = await provider.GetRequiredService<HealthCheckService>()
+            .CheckHealthAsync(
+                registration => registration.Name == "role-readiness",
+                CancellationToken.None);
+
+        await Assert.That(report.Status).IsEqualTo(HealthStatus.Healthy);
     }
 
     [Test]
@@ -200,5 +279,27 @@ public sealed class RoleReadinessHealthCheckTests
 
         public Task CheckAsync(CancellationToken cancellationToken) =>
             failure is null ? Task.CompletedTask : Task.FromException(failure);
+    }
+
+    private sealed class RecordingLogger : ILogger<RoleReadinessHealthCheck>
+    {
+        public List<LogLevel> Levels { get; } = [];
+
+        public IDisposable? BeginScope<TState>(TState state) where TState : notnull => null;
+        public bool IsEnabled(LogLevel logLevel) => true;
+        public void Log<TState>(
+            LogLevel logLevel,
+            EventId eventId,
+            TState state,
+            Exception? exception,
+            Func<TState, Exception?, string> formatter) =>
+            Levels.Add(logLevel);
+    }
+
+    private sealed class ScopedReadinessDependency : IReadinessDependency
+    {
+        public string Name => "scoped";
+        public bool FailureIsCritical => true;
+        public Task CheckAsync(CancellationToken cancellationToken) => Task.CompletedTask;
     }
 }

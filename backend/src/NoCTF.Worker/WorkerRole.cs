@@ -50,7 +50,7 @@ public static class WorkerRole
         services.AddSingleton<LeaderboardProjectionMergeQueue>();
         if (WorkerQueues.GetEnabled(configuration).Contains(WorkerQueue.Background))
         {
-            services.AddSingleton<IReadinessDependency,
+            services.AddScoped<IReadinessDependency,
                 AccountNotificationReadinessDependency>();
         }
         if (enableClusterScheduling)

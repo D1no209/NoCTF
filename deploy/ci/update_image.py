@@ -11,6 +11,7 @@ import shutil
 import socket
 import subprocess
 import tempfile
+from urllib.parse import urlsplit
 import uuid
 
 
@@ -39,15 +40,43 @@ def environment(container):
     return dict(value.split("=", 1) for value in container["Config"].get("Env", []))
 
 
+def modern_port_overrides(container):
+    """Translate wildcard URLS bindings without changing their effective ports."""
+    urls = environment(container).get("ASPNETCORE_URLS", "").strip()
+    if not urls:
+        return {}
+    ports = {"http": [], "https": []}
+    for value in urls.split(";"):
+        try:
+            parsed = urlsplit(value.strip())
+            port = parsed.port
+        except ValueError:
+            return {}
+        if (parsed.scheme not in ports or port is None or parsed.hostname not in {"+", "*", "::", "0.0.0.0"}
+                or parsed.path not in {"", "/"} or parsed.query or parsed.fragment or parsed.username):
+            return {}
+        text = str(port)
+        if text not in ports[parsed.scheme]:
+            ports[parsed.scheme].append(text)
+    return {
+        "ASPNETCORE_URLS": "",
+        "ASPNETCORE_HTTP_PORTS": ";".join(ports["http"]),
+        "ASPNETCORE_HTTPS_PORTS": ";".join(ports["https"]),
+    }
+
+
 def application_service_overrides(containers, image):
     """Keep legacy split services on one role when upgrading them to the Host image."""
     services = {}
     for container in containers:
         service = labels(container)["com.docker.compose.service"]
         override = {"image": image, "user": container["Config"]["User"]}
+        port_overrides = modern_port_overrides(container)
         role = LEGACY_SERVICE_ROLES.get(service)
         if role:
-            override["environment"] = {"Hosting__Roles__0": role}
+            port_overrides["Hosting__Roles__0"] = role
+        if port_overrides:
+            override["environment"] = port_overrides
         services[service] = override
     return services
 
@@ -250,6 +279,7 @@ def _deploy_locked(args, root):
     services = application_service_overrides(apps, args.image)
     write_private(overlay, {"services": services})
     updated = compose + ["--file", str(overlay)]
+    updated_config = json.loads(output(updated + ["config", "--format", "json"]))
     names = sorted(services)
     print("Updating application services only: " + ", ".join(names), flush=True)
     try:
@@ -259,7 +289,7 @@ def _deploy_locked(args, root):
             raise RuntimeError("Application readiness did not converge.")
         if any(c["Config"]["Image"] != args.image for c in running):
             raise RuntimeError("An application service did not use the requested image.")
-        validate_existing_config(config, running)
+        validate_existing_config(updated_config, running)
         validate_effective_application_roles(running)
         after_counts = business_counts(postgres)
         if any(after_counts[k] < count for k, count in before_counts.items()):
