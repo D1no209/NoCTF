@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Http.HttpResults;
 using NoCTF.API.Security;
 using NoCTF.Application.Admission;
 using NoCTF.Application.Runtime.Instances;
+using NoCTF.Domain.Runtime;
 
 namespace NoCTF.API.Endpoints.Runtime;
 
@@ -51,9 +52,11 @@ public sealed class CreateRuntimeEndpoint(
             competitionChallengeId,
             user.UserId,
             ct);
-        if (request.ReplacesRuntimeId is null && current is not null
-            || request.ReplacesRuntimeId is Guid expected
-            && current?.Id != expected)
+        var startConflicts = request.ReplacesRuntimeId is null
+            && current is { State: not (RuntimeState.Stopped or RuntimeState.Failed) };
+        var resetConflicts = request.ReplacesRuntimeId is Guid expected
+            && current?.Id != expected;
+        if (startConflicts || resetConflicts)
         {
             return TypedResults.Conflict(new RuntimeConflictResponse(
                 "ReplacesRuntimeId does not match the current runtime state."));
