@@ -88,7 +88,8 @@ public sealed class RefreshAccessTokenTests
         public IssuedAccessToken Issue(
             AuthenticatedUser user,
             DateTimeOffset now,
-            TimeSpan? lifetime = null) =>
+            TimeSpan? lifetime = null,
+            Guid? impersonatorUserId = null) =>
             new("access-token", now.Add(lifetime ?? TimeSpan.FromMinutes(15)));
 
         public IssuedRefreshToken IssueRefresh(AuthenticatedUser user) =>

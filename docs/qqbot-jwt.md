@@ -25,11 +25,11 @@ Content-Type: application/json
 ```
 
 ```http
-POST /api/v1/admin/platform/bots/{userId}/tokens
+POST /api/v1/admin/platform/users/{userId}/tokens
 Authorization: Bearer <administrator-access-token>
 Content-Type: application/json
 
-{"expiresInSeconds":2592000}
+{"expiresInSeconds":2592000,"reason":"QQ notification relay deployment"}
 ```
 
 响应中的 `accessToken` 应直接进入部署平台的 Secret 管理，不要写入仓库、日志、截图或

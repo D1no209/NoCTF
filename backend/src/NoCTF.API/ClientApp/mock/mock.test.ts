@@ -285,6 +285,51 @@ describe('isolated Mock API', () => {
     expect(current.login).toBeUndefined()
   })
 
+  test('administrator-issued user tokens can impersonate and be individually revoked', async () => {
+    const { api, send } = await setup()
+    const targetUserId = id(1, 3)
+    expect((await send(
+      `/api/v1/admin/platform/users/${targetUserId}/tokens`,
+      'POST',
+      { expiresInSeconds: 59, reason: 'support case' },
+    )).status).toBe(400)
+    const issuedResponse = await send(
+      `/api/v1/admin/platform/users/${targetUserId}/tokens`,
+      'POST',
+      { expiresInSeconds: 3600, reason: '  support case  ' },
+    )
+    expect(issuedResponse.status).toBe(200)
+    const issued = await issuedResponse.json()
+    const list = await (await send(`/api/v1/admin/platform/users/${targetUserId}/tokens`)).json()
+    expect(list.items.map((item: Data) => item.jwtId)).toContain(issued.jwtId)
+    expect(list.items.find((item: Data) => item.jwtId === issued.jwtId)?.reason).toBe('support case')
+    const impersonated = await api.handle(new Request(base + '/api/v1/auth/me', {
+      headers: { Authorization: `Bearer ${issued.accessToken}` },
+    }))
+    expect(impersonated.status).toBe(200)
+    expect((await impersonated.json()).userId).toBe(targetUserId)
+
+    expect((await send(
+      `/api/v1/admin/platform/users/${targetUserId}/tokens/${issued.jwtId}`,
+      'DELETE',
+    )).status).toBe(204)
+    const revoked = await api.handle(new Request(base + '/api/v1/auth/me', {
+      headers: { Authorization: `Bearer ${issued.accessToken}` },
+    }))
+    expect(revoked.status).toBe(401)
+
+    const administratorToken = await (await send(
+      `/api/v1/admin/platform/users/${id(1)}/tokens`,
+      'POST',
+      { expiresInSeconds: 3600, reason: 'nested check' },
+    )).json()
+    const nested = await api.handle(new Request(
+      base + `/api/v1/admin/platform/users/${targetUserId}/tokens`,
+      { headers: { Authorization: `Bearer ${administratorToken.accessToken}` } },
+    ))
+    expect(nested.status).toBe(403)
+  })
+
   test('logout blocks cookie restore and rejects the old access token', async () => {
     const { api, send } = await setup()
     const logout = await send('/api/v1/auth/logout', 'POST')

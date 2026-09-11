@@ -10,14 +10,63 @@ import { accessTokenNeedsRefresh } from './auth-refresh'
  * Module scope is safe because the app is a client-only SPA (ssr: false).
  */
 let accessToken: string | null = null
+let sessionRevision = 0
 let sessionInvalidated: (() => void) | null = null
+let impersonationActive = false
+let impersonationTimer: ReturnType<typeof setTimeout> | null = null
+let impersonationExpiresAt = 0
+let impersonationEnded: ((reason: ImpersonationEndReason) => void | Promise<void>) | null = null
+
+export type ImpersonationEndReason = 'expired' | 'unauthorized'
 
 export function getAccessToken(): string | null {
   return accessToken
 }
 
 export function setAccessToken(token: string | null): void {
+  sessionRevision += 1
   accessToken = token
+}
+
+export function isImpersonatingSession(): boolean {
+  return impersonationActive
+}
+
+export function beginImpersonationAccessToken(token: string, expiresAt: string): void {
+  if (impersonationTimer) clearTimeout(impersonationTimer)
+  impersonationActive = true
+  setAccessToken(token)
+  impersonationExpiresAt = Date.parse(expiresAt)
+  scheduleImpersonationExpiry()
+}
+
+function scheduleImpersonationExpiry(): void {
+  const delay = Math.max(0, impersonationExpiresAt - Date.now())
+  impersonationTimer = setTimeout(() => {
+    if (Date.now() < impersonationExpiresAt) scheduleImpersonationExpiry()
+    else void requestImpersonationEnd('expired')
+  }, Math.min(delay, 2_147_483_647))
+}
+
+export function clearImpersonationAccessToken(): void {
+  if (impersonationTimer) clearTimeout(impersonationTimer)
+  impersonationTimer = null
+  impersonationExpiresAt = 0
+  impersonationActive = false
+  setAccessToken(null)
+}
+
+export function setImpersonationEndHandler(
+  handler: ((reason: ImpersonationEndReason) => void | Promise<void>) | null,
+): () => void {
+  impersonationEnded = handler
+  return () => {
+    if (impersonationEnded === handler) impersonationEnded = null
+  }
+}
+
+export function requestImpersonationEnd(reason: ImpersonationEndReason): void {
+  void impersonationEnded?.(reason)
 }
 
 export function setSessionInvalidationHandler(handler: (() => void) | null): () => void {
@@ -28,7 +77,7 @@ export function setSessionInvalidationHandler(handler: (() => void) | null): () 
 }
 
 function invalidateSession(): void {
-  accessToken = null
+  setAccessToken(null)
   sessionInvalidated?.()
 }
 
@@ -40,10 +89,24 @@ let refreshPromise: Promise<boolean> | null = null
  * Concurrent callers share a single in-flight request.
  */
 export function refreshSession(): Promise<boolean> {
-  refreshPromise ??= (async () => {
+  if (impersonationActive) return Promise.resolve(false)
+  return refreshSessionCore()
+}
+
+export function refreshAdministratorSession(): Promise<boolean> {
+  setAccessToken(null)
+  refreshPromise = null
+  return refreshSessionCore()
+}
+
+function refreshSessionCore(): Promise<boolean> {
+  if (refreshPromise) return refreshPromise
+  const expectedRevision = sessionRevision
+  const attempt = (async () => {
     try {
       const refreshClient = createClient({ credentials: 'same-origin', fetch: globalThis.fetch })
       const { data, error } = await refreshTokenEndpoint({ client: refreshClient })
+      if (sessionRevision !== expectedRevision || impersonationActive) return false
       if (error || !data?.accessToken) {
         invalidateSession()
         return false
@@ -52,22 +115,21 @@ export function refreshSession(): Promise<boolean> {
       return true
     }
     catch {
-      invalidateSession()
+      if (sessionRevision === expectedRevision && !impersonationActive) invalidateSession()
       return false
     }
-    finally {
-      // Allow the next expiry to trigger a fresh refresh.
-      setTimeout(() => {
-        refreshPromise = null
-      }, 0)
-    }
   })()
-  return refreshPromise
+  refreshPromise = attempt
+  void attempt.then(() => {
+    if (refreshPromise === attempt) refreshPromise = null
+  })
+  return attempt
 }
 
 /** Return a non-expiring token for SignalR connect/reconnect requests. */
 export async function getRealtimeAccessToken(): Promise<string> {
   const current = getAccessToken()
+  if (current && impersonationActive) return current
   if (current && !accessTokenNeedsRefresh(current)) return current
   return await refreshSession() ? getAccessToken() ?? '' : ''
 }

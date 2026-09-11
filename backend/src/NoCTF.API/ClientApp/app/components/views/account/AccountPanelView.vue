@@ -3,7 +3,7 @@ import { toRefs } from 'vue'
 import type { AccountPanelViewState } from '~/features/account/useAccountPanel'
 
 const viewProps = defineProps<{ state: AccountPanelViewState }>()
-const { UserRound, LockKeyhole, ShieldCheck, ImageIcon, LogOut, user, fetchMe, open, activeSection, setOpen, selectSection, signOut, description, profilePending, profileError, profileSuccess, profileDirty, saveProfile, avatarInput, avatarPending, avatarEditorOpen, avatarSourceFile, avatarRequirements, selectAvatar, setAvatarEditorOpen, uploadAvatar, reportAvatarError, setAvatarInputRef, wallpaperInput, wallpaperPending, wallpaperUrl, wallpaperRequirements, selectWallpaper, setWallpaperEnabled, setWallpaperInputRef, fullName, studentNumber, identityLoading, identityLoaded, identityPending, identityError, identitySuccess, identityDirty, identityFieldError, loadIdentity, saveIdentity, emailPending, emailMessage, emailError, resendEmail, currentPassword, newPassword, confirmNewPassword, passwordPending, passwordError, changePassword, logoutAll, AvatarCropDialog } = toRefs(viewProps.state)
+const { UserRound, LockKeyhole, ShieldCheck, ImageIcon, LogOut, user, isImpersonating, fetchMe, open, activeSection, setOpen, selectSection, signOut, description, profilePending, profileError, profileSuccess, profileDirty, saveProfile, avatarInput, avatarPending, avatarEditorOpen, avatarSourceFile, avatarRequirements, selectAvatar, setAvatarEditorOpen, uploadAvatar, reportAvatarError, setAvatarInputRef, wallpaperInput, wallpaperPending, wallpaperUrl, wallpaperRequirements, selectWallpaper, setWallpaperEnabled, setWallpaperInputRef, fullName, studentNumber, identityLoading, identityLoaded, identityPending, identityError, identitySuccess, identityDirty, identityFieldError, loadIdentity, saveIdentity, emailPending, emailMessage, emailError, resendEmail, currentPassword, newPassword, confirmNewPassword, passwordPending, passwordError, changePassword, logoutAll, AvatarCropDialog } = toRefs(viewProps.state)
 </script>
 
 <template>
@@ -79,7 +79,7 @@ const { UserRound, LockKeyhole, ShieldCheck, ImageIcon, LogOut, user, fetchMe, o
         </div>
 
         <Button type="button" variant="ghost" size="sm" class="mx-4 justify-start" @click="signOut">
-          <LogOut data-icon="inline-start" />{{ $t('ui.signOut') }}
+          <LogOut data-icon="inline-start" />{{ isImpersonating ? $t('ui.exitImpersonation') : $t('ui.signOut') }}
         </Button>
       </Card>
 
@@ -209,7 +209,7 @@ const { UserRound, LockKeyhole, ShieldCheck, ImageIcon, LogOut, user, fetchMe, o
                 <Button type="submit" class="self-start" :disabled="passwordPending"><Spinner v-if="passwordPending" data-icon="inline-start" />{{ $t('ui.changePassword') }}</Button>
               </UiForm>
 
-              <AlertDialog>
+              <AlertDialog v-if="!isImpersonating">
                 <AlertDialogTrigger as-child><Button variant="outline" size="sm" class="self-start">{{ $t('ui.logOutOfAllSessions') }}</Button></AlertDialogTrigger>
                 <AlertDialogContent><AlertDialogHeader><AlertDialogTitle>{{ $t('ui.areYouSureToLogOutOfAllSessions') }}</AlertDialogTitle><AlertDialogDescription>{{ $t('ui.signInStatusWillBeInvalidatedImmediatelyOnAllDevices') }}</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>{{ $t('ui.cancel') }}</AlertDialogCancel><AlertDialogAction @click="logoutAll">{{ $t('ui.confirmLogout') }}</AlertDialogAction></AlertDialogFooter></AlertDialogContent>
               </AlertDialog>

@@ -63,5 +63,8 @@ public enum NotificationKind : short
     UserAccountLifecycleChanged,
     CompetitionForceDeleted,
     AuthenticationSecurityActivity,
-    HttpCommandReceipt
+    HttpCommandReceipt,
+    PlatformUserAccessTokenIssued,
+    PlatformUserAccessTokenRevoked,
+    PlatformUserTokensInvalidated
 }

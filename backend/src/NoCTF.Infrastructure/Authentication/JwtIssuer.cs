@@ -17,30 +17,43 @@ public sealed class JwtIssuer(
     public IssuedAccessToken Issue(
         AuthenticatedUser user,
         DateTimeOffset now,
-        TimeSpan? requestedLifetime = null)
+        TimeSpan? requestedLifetime = null,
+        Guid? impersonatorUserId = null)
     {
         var expires = now.Add(requestedLifetime
             ?? TimeSpan.FromMinutes(options.AccessTokenMinutes));
+        var jwtId = Guid.NewGuid();
         var credentials = new SigningCredentials(new SymmetricSecurityKey(key), SecurityAlgorithms.HmacSha256);
+        var claims = new List<Claim>
+        {
+            new(JwtRegisteredClaimNames.Sub, user.Id.ToString()),
+            new(ClaimTypes.Name, user.UserName),
+            new(ClaimTypes.Role, user.Role.ToString()),
+            new("user_kind", user.Kind.ToString()),
+            new("email_verified", user.EmailVerified ? "true" : "false", ClaimValueTypes.Boolean),
+            new("token_version", user.TokenVersion.ToString()),
+            new(JwtRegisteredClaimNames.Jti, jwtId.ToString("N")),
+            new(JwtRegisteredClaimNames.Iat, now.ToUnixTimeSeconds().ToString(), ClaimValueTypes.Integer64),
+            new("token_type", "access")
+        };
+        if (impersonatorUserId is Guid administratorId)
+        {
+            claims.Add(new(
+                AccessTokenClaims.Impersonation,
+                "true",
+                ClaimValueTypes.Boolean));
+            claims.Add(new(
+                AccessTokenClaims.ImpersonatorId,
+                administratorId.ToString()));
+        }
         var token = new JwtSecurityToken(
             issuer: options.Issuer,
             audience: options.Audience,
-            claims:
-            [
-                new(JwtRegisteredClaimNames.Sub, user.Id.ToString()),
-                new(ClaimTypes.Name, user.UserName),
-                new(ClaimTypes.Role, user.Role.ToString()),
-                new("user_kind", user.Kind.ToString()),
-                new("email_verified", user.EmailVerified ? "true" : "false", ClaimValueTypes.Boolean),
-                new("token_version", user.TokenVersion.ToString()),
-                new(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString("N")),
-                new(JwtRegisteredClaimNames.Iat, now.ToUnixTimeSeconds().ToString(), ClaimValueTypes.Integer64),
-                new("token_type", "access")
-            ],
+            claims: claims,
             notBefore: now.UtcDateTime,
             expires: expires.UtcDateTime,
             signingCredentials: credentials);
-        return new(new JwtSecurityTokenHandler().WriteToken(token), expires);
+        return new(new JwtSecurityTokenHandler().WriteToken(token), expires, jwtId);
     }
 
     public IssuedRefreshToken IssueRefresh(AuthenticatedUser user)

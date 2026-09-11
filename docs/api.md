@@ -426,8 +426,10 @@ GET  /api/v1/admin/platform/logs/export
 GET  /api/v1/admin/platform/audit-logs
 POST /api/v1/admin/platform/audit-logs/data-export
 POST /api/v1/admin/platform/bots
-POST /api/v1/admin/platform/bots/{userId}/tokens
-POST /api/v1/admin/platform/users/{userId}/tokens/invalidate
+GET  /api/v1/admin/platform/users/{userId}/tokens
+POST /api/v1/admin/platform/users/{userId}/tokens
+DELETE /api/v1/admin/platform/users/{userId}/tokens/{jwtId}
+DELETE /api/v1/admin/platform/users/{userId}/tokens
 PUT  /api/v1/admin/platform/email-verification/password
 PUT  /api/v1/admin/platform/human-verification/secret
 POST /api/v1/admin/platform/email-verification/test
@@ -439,10 +441,14 @@ Compose 实例，包含比赛 Runtime 与题库模板测试 Runtime，并按 Cre
 与强制终结按 RuntimeInstanceId 操作两种作用域，复用同一 durable cleanup 链路。比赛 Runtime 继续写入
 比赛审计事件，题库测试 Runtime 不伪造 CompetitionEvent。
 
-Bot 创建请求只包含 UserName 和固定的 `UserRole.Organizer`，不能创建 User 或 Administrator
-Bot，也不接受 Email 或 Password。服务端生成不可用的非空 dummy Email 和 PasswordHash。
-Token 签发请求包含正数 ExpiresInSeconds，只接受 Bot 身份，返回一次普通 AccessToken 与
-ExpiresAt，不签发 Refresh Token。Role 更新与 token invalidate 原子递增 User.TokenVersion。
+Bot 创建请求只包含 UserName 和 Role，仅允许 `UserRole.User` 或 `UserRole.Organizer`，不能创建
+Administrator Bot，也不接受 Email 或 Password。服务端生成不可用的非空 dummy Email 和 PasswordHash。
+管理员可为任意 Active Human、Bot 或 Administrator 签发 60 秒至 1 年的普通 Access JWT，
+请求必须包含审计原因；响应只显示一次完整 Token，不签发 Refresh Token。签发事实登记在
+append-only notifications，JWT 额外携带 impersonation 与 impersonator_id；认证同时检查签发事实和
+单枚吊销事实。GET 只列出当前管理员本人签发、仍有效且未吊销的 JWT 元数据。DELETE 单枚只允许
+原签发管理员操作；DELETE collection 原子递增 User.TokenVersion，使目标账号全部 Access/Refresh JWT
+失效。模拟身份不得嵌套签发或撤销 Token。
 NATS JetStream 的 consumer、重投与 dead-letter 运维由受控基础设施工具负责，不通过平台 HTTP API
 暴露消息正文、异常详情或任意重投能力。比赛管理者不能操作
 DLQ，只能从 Competition/GameplayFact/Runtime 领域 API 重新触发。

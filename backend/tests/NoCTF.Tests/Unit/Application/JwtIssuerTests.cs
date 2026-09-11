@@ -64,6 +64,39 @@ public class JwtIssuerTests
     }
 
     [Test]
+    public async Task Issue_WithAdministratorContext_ContainsImpersonationProvenance()
+    {
+        var options = Options.Create(new AuthenticationTokenOptions
+        {
+            SigningKey = "test-signing-key-with-at-least-32-bytes!"
+        });
+        var administratorId = Guid.NewGuid();
+        var user = new AuthenticatedUser(
+            Guid.NewGuid(),
+            "target",
+            UserRole.User,
+            UserKind.Human,
+            9,
+            EmailVerified: false);
+
+        var issued = new JwtIssuer(options, TimeProvider.System).Issue(
+            user,
+            DateTimeOffset.UtcNow,
+            TimeSpan.FromMinutes(10),
+            administratorId);
+        var token = new JwtSecurityTokenHandler().ReadJwtToken(issued.Token);
+
+        await Assert.That(token.Claims.Single(claim =>
+            claim.Type == AccessTokenClaims.Impersonation).Value).IsEqualTo("true");
+        await Assert.That(token.Claims.Single(claim =>
+            claim.Type == AccessTokenClaims.ImpersonatorId).Value)
+            .IsEqualTo(administratorId.ToString());
+        await Assert.That(token.Claims.Single(claim => claim.Type == "email_verified").Value)
+            .IsEqualTo("false");
+        await Assert.That(Guid.Parse(token.Id)).IsEqualTo(issued.JwtId);
+    }
+
+    [Test]
     public async Task Issue_RejectsShortSigningKey()
     {
         var options = Options.Create(new AuthenticationTokenOptions

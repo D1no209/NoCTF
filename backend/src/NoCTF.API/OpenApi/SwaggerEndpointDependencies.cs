@@ -161,7 +161,11 @@ internal sealed class SwaggerAuthenticationStore
 
 internal sealed class SwaggerAccessTokenVersionReader : IAccessTokenVersionReader
 {
-    public Task<bool> IsCurrentAsync(Guid userId, int tokenVersion, CancellationToken cancellationToken) =>
+    public Task<bool> IsCurrentAsync(
+        Guid userId,
+        int tokenVersion,
+        CancellationToken cancellationToken,
+        AdministratorIssuedAccessToken? administratorIssuedToken = null) =>
         Task.FromResult(false);
 }
 
@@ -220,7 +224,8 @@ internal sealed class SwaggerTokenIssuer : IAccessTokenIssuer
     public IssuedAccessToken Issue(
         AuthenticatedUser user,
         DateTimeOffset now,
-        TimeSpan? lifetime = null) =>
+        TimeSpan? lifetime = null,
+        Guid? impersonatorUserId = null) =>
         new("swagger-export-token", now.Add(lifetime ?? TimeSpan.FromMinutes(15)));
 
     public IssuedRefreshToken IssueRefresh(AuthenticatedUser user) =>

@@ -32,7 +32,10 @@ public enum PlatformAuditKindProtocol
 [JsonConverter(typeof(StrictPascalCaseEnumConverter<PlatformAdministrationActionProtocol>))]
 public enum PlatformAdministrationActionProtocol
 {
-    AuditArchiveExported
+    AuditArchiveExported,
+    UserAccessTokenIssued,
+    UserAccessTokenRevoked,
+    UserTokensInvalidated
 }
 
 [JsonConverter(typeof(StrictPascalCaseEnumConverter<UserAccountLifecycleActionProtocol>))]
@@ -117,7 +120,10 @@ public sealed record PlatformAuditLogResponse(
     string? Reason,
     bool Automatic,
     DateTimeOffset OccurredAt,
-    Guid? FileId = null);
+    Guid? FileId = null,
+    Guid? JwtId = null,
+    DateTimeOffset? TokenExpiresAt = null,
+    int? TokenVersion = null);
 
 public sealed record PlatformAuditLogListResponse(
     IReadOnlyList<PlatformAuditLogResponse> Items,
@@ -196,7 +202,11 @@ public sealed class ListPlatformAuditLogsEndpoint(
                 view.SubjectDisplayName,
                 view.Reason,
                 view.Automatic,
-                view.OccurredAt, view.FileId))
+                view.OccurredAt,
+                view.FileId,
+                view.JwtId,
+                view.TokenExpiresAt,
+                view.TokenVersion))
             .ToArray();
         return TypedResults.Ok(new PlatformAuditLogListResponse(
             responses,

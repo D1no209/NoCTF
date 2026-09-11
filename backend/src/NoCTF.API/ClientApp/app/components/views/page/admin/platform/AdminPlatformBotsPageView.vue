@@ -3,7 +3,7 @@ import { toRefs } from 'vue'
 import type { AdminPlatformBotsPageViewState } from '~/features/routes/admin/platform/useAdminPlatformBotsPage'
 
 const viewProps = defineProps<{ state: AdminPlatformBotsPageViewState }>()
-const { Bot, Copy, KeyRound, Plus, ROLE_LABELS, bots, loading, loadError, createOpen, creating, botName, botRole, openCreate, createBot, issueOpen, issuing, issueTarget, expiresInSeconds, issuedToken, openIssue, issueToken, copyToken, AdminDateTime, onClickCreateOpen, onClickIssueOpen } = toRefs(viewProps.state)
+const { Bot, Copy, KeyRound, Plus, ROLE_LABELS, bots, loading, loadError, createOpen, creating, botName, botRole, openCreate, createBot, issueOpen, issuing, issueTarget, expiresInSeconds, issueReason, issuedToken, openIssue, issueToken, copyToken, AdminDateTime, onClickCreateOpen, onClickIssueOpen } = toRefs(viewProps.state)
 </script>
 
 <template>
@@ -100,7 +100,7 @@ const { Bot, Copy, KeyRound, Plus, ROLE_LABELS, bots, loading, loadError, create
       </DialogContent>
     </Dialog>
 
-    <Dialog v-model:open="issueOpen">
+    <Dialog :open="issueOpen" @update:open="onClickIssueOpen">
       <DialogContent>
         <DialogHeader>
           <DialogTitle>{{ $t('ui.issueAccessToken') }}</DialogTitle>
@@ -110,13 +110,18 @@ const { Bot, Copy, KeyRound, Plus, ROLE_LABELS, bots, loading, loadError, create
           <FieldGroup>
             <Field>
               <FieldLabel for="token-ttl">{{ $t('ui.validityPeriodSeconds') }}</FieldLabel>
-              <NumberInput id="token-ttl" v-model.number="expiresInSeconds"  min="60" step="60" />
-              <FieldDescription>{{ $t('ui.defaultIs3600Seconds1Hour') }}</FieldDescription>
+              <NumberInput id="token-ttl" v-model.number="expiresInSeconds" min="60" max="31536000" step="60" required />
+              <FieldDescription>{{ $t('ui.tokenLifetimeRange') }}</FieldDescription>
+            </Field>
+            <Field>
+              <FieldLabel for="bot-token-reason">{{ $t('ui.issuanceReason') }}</FieldLabel>
+              <Textarea id="bot-token-reason" v-model="issueReason" minlength="3" maxlength="500" rows="3" required />
+              <FieldDescription>{{ $t('ui.issuanceReasonAuditNotice') }}</FieldDescription>
             </Field>
           </FieldGroup>
           <DialogFooter>
             <Button variant="outline" @click="onClickIssueOpen(false)">{{ $t('ui.cancel') }}</Button>
-            <Button :disabled="issuing || !expiresInSeconds" @click="issueToken">
+            <Button :disabled="issuing || issueReason.trim().length < 3 || expiresInSeconds < 60 || expiresInSeconds > 31536000" @click="issueToken">
               <Spinner v-if="issuing" data-icon="inline-start" /> {{ $t('ui.issue') }} </Button>
           </DialogFooter>
         </template>

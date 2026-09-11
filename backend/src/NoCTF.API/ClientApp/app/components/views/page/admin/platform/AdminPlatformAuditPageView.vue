@@ -99,6 +99,11 @@ const { Download, platformAuditActionText, KIND_LABELS, kind, actorId, competiti
                   <span>{{ $t('ui.submissionId2') }}: {{ log.gameplayFactId }}</span>
                   <span>{{ $t('ui.teamId') }}: {{ log.teamId }}</span>
                 </div>
+                <div v-if="log.jwtId || log.tokenExpiresAt || log.tokenVersion !== null && log.tokenVersion !== undefined" class="mt-1 flex flex-col gap-1 break-all font-mono text-xs text-muted-foreground">
+                  <span v-if="log.jwtId">{{ $t('ui.jwtId') }}: {{ log.jwtId }}</span>
+                  <span v-if="log.tokenExpiresAt">{{ $t('ui.expiresAt') }} <component :is="AdminDateTime" :value="log.tokenExpiresAt" /></span>
+                  <span v-if="log.tokenVersion !== null && log.tokenVersion !== undefined">{{ $t('ui.tokenVersion') }}: {{ log.tokenVersion }}</span>
+                </div>
               </TableCell>
               <Hint :content="log.actorId ?? ''" ><TableCell tabindex="0" class="max-w-32 truncate font-mono text-xs text-muted-foreground" >
                 {{ log.actorId ?? $t('ui.system') }}

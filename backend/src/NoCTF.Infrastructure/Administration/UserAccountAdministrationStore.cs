@@ -79,7 +79,10 @@ public sealed class UserAccountAdministrationStore(
             await RemoveTeamMembershipsAsync(userId, ct);
             await db.Notifications
                 .Where(notification =>
-                    (notification.Kind == NotificationKind.AuthenticationSecurityActivity
+                    notification.Kind != NotificationKind.PlatformUserAccessTokenIssued
+                    && notification.Kind != NotificationKind.PlatformUserAccessTokenRevoked
+                    && notification.Kind != NotificationKind.PlatformUserTokensInvalidated
+                    && (notification.Kind == NotificationKind.AuthenticationSecurityActivity
                         || notification.TargetType
                             == NotificationTargetType.PlatformAdministrators
                         && notification.RelatedType == EntityReferenceKind.User

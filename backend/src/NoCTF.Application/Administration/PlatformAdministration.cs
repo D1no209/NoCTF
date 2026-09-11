@@ -83,18 +83,50 @@ public sealed record CreateBotResult(
     CreateBotState State,
     PlatformUserView? User = null);
 
-public enum IssueBotTokenFailure
+public enum IssuePlatformUserTokenFailure
 {
     None,
     UserNotFound,
-    UserIsNotBot,
-    UserInactive,
-    InvalidLifetime
+    AccountInactive,
+    InvalidLifetime,
+    ReasonInvalid
 }
 
-public sealed record IssueBotTokenResult(
+public sealed record IssuePlatformUserTokenResult(
     IssuedAccessToken? Token,
-    IssueBotTokenFailure Failure);
+    PlatformUserView? TargetUser,
+    IssuePlatformUserTokenFailure Failure);
+
+public enum PlatformUserTokenAdministrationAction
+{
+    AccessTokenIssued,
+    AccessTokenRevoked,
+    TokensInvalidated
+}
+
+public sealed record PlatformUserTokenAuditFact(
+    int SchemaVersion,
+    Guid TargetUserId,
+    string TargetUserName,
+    PlatformUserTokenAdministrationAction Action,
+    Guid? JwtId,
+    DateTimeOffset? ExpiresAt,
+    string? Reason,
+    int TokenVersion);
+
+public sealed record AdminIssuedAccessTokenView(
+    Guid JwtId,
+    Guid TargetUserId,
+    string TargetUserName,
+    DateTimeOffset IssuedAt,
+    DateTimeOffset ExpiresAt,
+    string Reason);
+
+public enum RevokeAdminIssuedAccessTokenState
+{
+    Revoked,
+    NotFound
+}
 
 public static class BotIdentity
 {
@@ -134,8 +166,25 @@ public interface IPlatformAdministrationStore
         bool? emailVerified,
         DateTimeOffset now,
         CancellationToken cancellationToken);
+    Task RecordTokenIssuedAsync(
+        Guid actorUserId,
+        PlatformUserTokenAuditFact fact,
+        DateTimeOffset now,
+        CancellationToken cancellationToken);
+    Task<IReadOnlyList<AdminIssuedAccessTokenView>> ListIssuedTokensAsync(
+        Guid actorUserId,
+        Guid targetUserId,
+        DateTimeOffset now,
+        CancellationToken cancellationToken);
+    Task<RevokeAdminIssuedAccessTokenState> RevokeIssuedTokenAsync(
+        Guid actorUserId,
+        Guid targetUserId,
+        Guid jwtId,
+        DateTimeOffset now,
+        CancellationToken cancellationToken);
     Task<PlatformUserView?> InvalidateTokensAsync(
         Guid userId,
+        Guid actorUserId,
         DateTimeOffset now,
         CancellationToken cancellationToken);
 }
@@ -144,8 +193,10 @@ public sealed class ManagePlatform(
     IPlatformAdministrationStore store,
     IAccessTokenIssuer tokenIssuer)
 {
-    public const long MinimumBotTokenLifetimeSeconds = 60;
-    public const long MaximumBotTokenLifetimeSeconds = 31_536_000;
+    public const long MinimumIssuedTokenLifetimeSeconds = 60;
+    public const long MaximumIssuedTokenLifetimeSeconds = 31_536_000;
+    public const int MinimumTokenIssuanceReasonLength = 3;
+    public const int MaximumTokenIssuanceReasonLength = 500;
 
     public Task<IReadOnlyList<PlatformUserView>> ListUsersAsync(CancellationToken ct = default) =>
         store.ListUsersAsync(ct);
@@ -166,22 +217,26 @@ public sealed class ManagePlatform(
             return Task.FromResult(new CreateBotResult(CreateBotState.InvalidRole));
         return store.CreateBotAsync(normalized, role, now, ct);
     }
-    public async Task<IssueBotTokenResult> IssueBotTokenAsync(
+    public async Task<IssuePlatformUserTokenResult> IssueUserTokenAsync(
         Guid userId,
+        Guid actorUserId,
         long expiresInSeconds,
+        string reason,
         DateTimeOffset now,
         CancellationToken ct = default)
     {
-        if (expiresInSeconds is < MinimumBotTokenLifetimeSeconds
-            or > MaximumBotTokenLifetimeSeconds)
-            return new(null, IssueBotTokenFailure.InvalidLifetime);
+        if (expiresInSeconds is < MinimumIssuedTokenLifetimeSeconds
+            or > MaximumIssuedTokenLifetimeSeconds)
+            return new(null, null, IssuePlatformUserTokenFailure.InvalidLifetime);
+        var normalizedReason = reason.Trim();
+        if (normalizedReason.Length is < MinimumTokenIssuanceReasonLength
+            or > MaximumTokenIssuanceReasonLength)
+            return new(null, null, IssuePlatformUserTokenFailure.ReasonInvalid);
         var user = await store.FindUserAsync(userId, ct);
         if (user is null)
-            return new(null, IssueBotTokenFailure.UserNotFound);
-        if (user.Kind != UserKind.Bot)
-            return new(null, IssueBotTokenFailure.UserIsNotBot);
+            return new(null, null, IssuePlatformUserTokenFailure.UserNotFound);
         if (user.AccountStatus != UserAccountStatus.Active)
-            return new(null, IssueBotTokenFailure.UserInactive);
+            return new(null, user, IssuePlatformUserTokenFailure.AccountInactive);
         try
         {
             var lifetime = TimeSpan.FromTicks(checked(expiresInSeconds * TimeSpan.TicksPerSecond));
@@ -191,18 +246,33 @@ public sealed class ManagePlatform(
                     user.UserName,
                     user.Role,
                     user.Kind,
+                    user.TokenVersion,
+                    user.EmailVerified),
+                now,
+                lifetime,
+                actorUserId);
+            await store.RecordTokenIssuedAsync(
+                actorUserId,
+                new(
+                    1,
+                    user.Id,
+                    user.UserName,
+                    PlatformUserTokenAdministrationAction.AccessTokenIssued,
+                    token.JwtId,
+                    token.ExpiresAt,
+                    normalizedReason,
                     user.TokenVersion),
                 now,
-                lifetime);
-            return new(token, IssueBotTokenFailure.None);
+                ct);
+            return new(token, user, IssuePlatformUserTokenFailure.None);
         }
         catch (ArgumentOutOfRangeException)
         {
-            return new(null, IssueBotTokenFailure.InvalidLifetime);
+            return new(null, user, IssuePlatformUserTokenFailure.InvalidLifetime);
         }
         catch (OverflowException)
         {
-            return new(null, IssueBotTokenFailure.InvalidLifetime);
+            return new(null, user, IssuePlatformUserTokenFailure.InvalidLifetime);
         }
     }
     public Task<UpdatePlatformRoleResult> UpdateRoleAsync(
@@ -241,9 +311,23 @@ public sealed class ManagePlatform(
         DateTimeOffset now,
         CancellationToken ct = default) =>
         store.PatchUserAsync(userId, actorUserId, apply, emailVerified, now, ct);
-    public Task<PlatformUserView?> InvalidateTokensAsync(
-        Guid userId,
+    public Task<IReadOnlyList<AdminIssuedAccessTokenView>> ListIssuedTokensAsync(
+        Guid actorUserId,
+        Guid targetUserId,
         DateTimeOffset now,
         CancellationToken ct = default) =>
-        store.InvalidateTokensAsync(userId, now, ct);
+        store.ListIssuedTokensAsync(actorUserId, targetUserId, now, ct);
+    public Task<RevokeAdminIssuedAccessTokenState> RevokeIssuedTokenAsync(
+        Guid actorUserId,
+        Guid targetUserId,
+        Guid jwtId,
+        DateTimeOffset now,
+        CancellationToken ct = default) =>
+        store.RevokeIssuedTokenAsync(actorUserId, targetUserId, jwtId, now, ct);
+    public Task<PlatformUserView?> InvalidateTokensAsync(
+        Guid userId,
+        Guid actorUserId,
+        DateTimeOffset now,
+        CancellationToken ct = default) =>
+        store.InvalidateTokensAsync(userId, actorUserId, now, ct);
 }
