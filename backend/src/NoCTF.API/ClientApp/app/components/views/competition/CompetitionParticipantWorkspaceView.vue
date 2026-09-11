@@ -32,12 +32,16 @@ const { workspaceNavGroups, selectChallenge, handleReady, CompetitionBroadcastPa
     </main>
 
     <aside
-      class="grid h-full min-h-0 grid-cols-2 content-stretch gap-4"
+      class="grid h-full min-h-0 grid-cols-2 content-start gap-4"
       :class="showChallengeNavigator
-        ? 'min-[1440px]:sticky min-[1440px]:top-20 min-[1440px]:max-h-[calc(100svh-6rem)] min-[1440px]:grid-cols-1 min-[1440px]:grid-rows-[auto_minmax(0,1fr)]'
-        : 'xl:sticky xl:top-20 xl:max-h-[calc(100svh-6rem)] xl:grid-cols-1 xl:grid-rows-[auto_minmax(0,1fr)]'"
+        ? 'min-[1440px]:sticky min-[1440px]:top-20 min-[1440px]:max-h-[calc(100svh-6rem)] min-[1440px]:grid-cols-1 min-[1440px]:grid-rows-[auto_18rem]'
+        : 'xl:sticky xl:top-20 xl:max-h-[calc(100svh-6rem)] xl:grid-cols-1 xl:grid-rows-[auto_18rem]'"
     >
-      <component :is="CompetitionWorkspaceNavigation" class="h-full min-h-0" :groups="workspaceNavGroups" />
+      <component :is="CompetitionWorkspaceNavigation"
+        class="h-full min-h-0"
+        :class="showChallengeNavigator ? 'min-[1440px]:h-auto' : 'xl:h-auto'"
+        :groups="workspaceNavGroups"
+      />
       <component :is="CompetitionBroadcastPanel"
         class="h-full min-h-0 min-[1440px]:static min-[1440px]:flex min-[1440px]:flex-col"
         :competition-id="competitionId"

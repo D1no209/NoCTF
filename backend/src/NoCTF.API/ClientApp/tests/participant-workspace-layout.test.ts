@@ -32,6 +32,7 @@ describe('participant competition workspace layout', () => {
   test('only enables the challenge navigator when explicitly requested', async () => {
     const shell = await page('../app/features/competition/CompetitionParticipantWorkspace.vue')
     const challenges = await page('../app/pages/competitions/[id]/challenges/index.vue')
+    const theme = await page('../app/assets/css/main.css')
 
     expect(shell).toContain('challenge-workspace')
     expect(shell).toContain('v-if="showChallengeNavigator"')
@@ -39,7 +40,10 @@ describe('participant competition workspace layout', () => {
     expect(shell).toContain('<slot />')
     expect(shell).toContain("<component :is=\"CompetitionWorkspaceNavigation\"")
     expect(shell).toContain("<component :is=\"CompetitionBroadcastPanel\"")
+    expect(shell).toContain('grid-rows-[auto_18rem]')
     expect(challenges).toContain('show-challenge-navigator')
+    expect(theme).toContain("[data-slot='default-layout-foreground']:has(> main [data-contained-workspace-page])")
+    expect(theme).not.toContain("[data-slot='default-layout']:has(> main [data-contained-workspace-page])")
   })
 
   test('keeps questions and personal pages in the two-column shell but makes the scoreboard standalone', async () => {
