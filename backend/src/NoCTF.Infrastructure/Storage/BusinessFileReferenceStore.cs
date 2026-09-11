@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using NoCTF.Application.Messaging;
 using NoCTF.Application.Storage;
 using NoCTF.Domain.Storage;
+using NoCTF.Infrastructure.Competitions.Management;
 using NoCTF.Infrastructure.Persistence;
 
 namespace NoCTF.Infrastructure.Storage;
@@ -10,6 +11,7 @@ public sealed class BusinessFileReferenceStore(
     NoCtfDbContext db,
     ITransactionalMessageOutbox outbox,
     FileReferenceLock fileLock,
+    CompetitionReadModelCache readModels,
     TimeProvider? clock = null) : IBusinessFileReferenceStore
 {
     private readonly TimeProvider timeProvider = clock ?? TimeProvider.System;
@@ -115,6 +117,7 @@ public sealed class BusinessFileReferenceStore(
         if (previousFileId is { } previous && previous != file.Id)
             await outbox.PublishAsync(new CleanupFile(previous));
         await transaction.CommitAsync(ct);
+        await readModels.InvalidateAsync(competition.Id, ct);
         await outbox.FlushOutgoingMessagesAsync();
         return new(BusinessFileReferenceState.Updated, Map(file));
     }
@@ -141,6 +144,7 @@ public sealed class BusinessFileReferenceStore(
         if (previousFileId is { } previous)
             await outbox.PublishAsync(new CleanupFile(previous));
         await transaction.CommitAsync(ct);
+        await readModels.InvalidateAsync(competition.Id, ct);
         await outbox.FlushOutgoingMessagesAsync();
         return new(BusinessFileReferenceState.Cleared);
     }

@@ -508,6 +508,7 @@ export type NoCtfapiEndpointsCompetitionsCompetitionResponse = {
     id?: string;
     title?: string;
     description?: string | null;
+    posterUrl?: string | null;
     mode?: NoCtfapiEndpointsCompetitionsGameModeProtocol;
     startTime?: string;
     endTime?: string;
@@ -2058,6 +2059,7 @@ export type NoCtfapiEndpointsAdministrationCompetitionsUpdateCompetitionStatusRe
 export type NoCtfapiEndpointsAdministrationCompetitionsCompetitionPosterResponse = {
     fileId?: string;
     contentType?: string;
+    url?: string;
 };
 
 export type NoCtfapiEndpointsAdministrationCompetitionsUploadCompetitionPosterRequest = {

@@ -62,7 +62,11 @@ public interface IBusinessFileReferenceStore
         CancellationToken cancellationToken);
 }
 
-public sealed record BusinessFileContent(Stream Content, string ContentType, string FileName);
+public sealed record BusinessFileContent(
+    Guid FileId,
+    Stream Content,
+    string ContentType,
+    string FileName);
 
 public sealed class ManageBusinessImages(
     IBusinessFileReferenceStore references,
@@ -128,7 +132,7 @@ public sealed class ManageBusinessImages(
         if (file is null)
             return null;
         var content = await objects.OpenRead(file.ObjectKey, ct);
-        return content is null ? null : new(content, file.ContentType, file.FileName);
+        return content is null ? null : new(file.FileId, content, file.ContentType, file.FileName);
     }
 
     public async Task<BusinessFileReferenceResult> ReplaceCompetitionPosterAsync(
@@ -185,7 +189,7 @@ public sealed class ManageBusinessImages(
         if (file is null)
             return null;
         var content = await objects.OpenRead(file.ObjectKey, ct);
-        return content is null ? null : new(content, file.ContentType, file.FileName);
+        return content is null ? null : new(file.FileId, content, file.ContentType, file.FileName);
     }
 
     private static string NormalizeFileName(string value) =>

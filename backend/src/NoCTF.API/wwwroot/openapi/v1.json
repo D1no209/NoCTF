@@ -13574,6 +13574,10 @@
             "type": "string",
             "nullable": true
           },
+          "posterUrl": {
+            "type": "string",
+            "nullable": true
+          },
           "mode": {
             "$ref": "#/components/schemas/NoCTFAPIEndpointsCompetitionsGameModeProtocol"
           },
@@ -19702,6 +19706,9 @@
             "format": "guid"
           },
           "contentType": {
+            "type": "string"
+          },
+          "url": {
             "type": "string"
           }
         }

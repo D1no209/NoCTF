@@ -21,7 +21,12 @@ public sealed class GetCompetitionPosterEndpoint(ManageBusinessImages images)
         CancellationToken ct)
     {
         var file = await images.GetCompetitionPosterAsync(Route<Guid>("competitionId"), ct);
-        HttpContext.Response.Headers.CacheControl = "no-store";
+        var revision = HttpContext.Request.Query["revision"].ToString();
+        HttpContext.Response.Headers.CacheControl = file is not null
+            && Guid.TryParseExact(revision, "N", out var requestedFileId)
+            && requestedFileId == file.FileId
+                ? "public,max-age=31536000,immutable"
+                : "no-store";
         return file is null
             ? TypedResults.NotFound()
             : TypedResults.Stream(file.Content, file.ContentType, file.FileName);

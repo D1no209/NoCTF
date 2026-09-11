@@ -40,7 +40,8 @@ public sealed record CompetitionView(
     int MaxActiveQuestionsPerTeam = 5,
     int MaxParticipantMessagesBeforeHandlerReply = 3,
     bool AllowChallengeOwnersToHandleQuestions = true,
-    bool PracticeModeEnabled = false);
+    bool PracticeModeEnabled = false,
+    Guid? PosterFileId = null);
 
 public enum CompetitionCreationState
 {

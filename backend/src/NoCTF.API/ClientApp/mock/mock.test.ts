@@ -260,13 +260,18 @@ describe('isolated Mock API', () => {
       body: form,
     }))
     expect(uploaded.status).toBe(200)
-    expect((await uploaded.json()).contentType).toBe('image/webp')
+    const uploadedPayload = await uploaded.json()
+    expect(uploadedPayload.contentType).toBe('image/webp')
+    expect(uploadedPayload.url).toContain(`/api/v1/competitions/${id(2)}/poster?revision=`)
 
-    const poster = await send(`/api/v1/competitions/${id(2)}/poster`)
+    const poster = await send(uploadedPayload.url)
     expect(poster.status).toBe(200)
     expect(poster.headers.get('content-type')).toContain('image/webp')
+    expect(poster.headers.get('cache-control')).toContain('immutable')
     expect(await poster.text()).toBe('new poster')
     expect((await send(`/api/v1/admin/competitions/${id(2)}/poster`, 'DELETE')).status).toBe(204)
+    const competition = (await (await send(`/api/v1/admin/competitions/${id(2)}`)).json()).competition
+    expect(competition.posterUrl).toBeNull()
     expect((await send(`/api/v1/competitions/${id(2)}/poster`)).status).toBe(404)
   })
 

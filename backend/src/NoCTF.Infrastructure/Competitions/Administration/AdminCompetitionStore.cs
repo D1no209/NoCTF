@@ -49,7 +49,8 @@ public sealed class AdminCompetitionStore(
                 competition.MaxActiveQuestionsPerTeam,
                 competition.MaxParticipantMessagesBeforeHandlerReply,
                 competition.AllowChallengeOwnersToHandleQuestions,
-                competition.PracticeModeEnabled))
+                competition.PracticeModeEnabled,
+                competition.PosterFileId))
             .ToListAsync(ct);
     }
 
@@ -77,7 +78,8 @@ public sealed class AdminCompetitionStore(
                 competition.MaxActiveQuestionsPerTeam,
                 competition.MaxParticipantMessagesBeforeHandlerReply,
                 competition.AllowChallengeOwnersToHandleQuestions,
-                competition.PracticeModeEnabled))
+                competition.PracticeModeEnabled,
+                competition.PosterFileId))
             .SingleOrDefaultAsync(ct);
     }
 
