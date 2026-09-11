@@ -48,6 +48,11 @@ public static class WorkerRole
         services.AddTransient<RuntimeDispatchMessageHandler>();
         services.AddTransient<GameplayFactDrainMessageHandler>();
         services.AddSingleton<LeaderboardProjectionMergeQueue>();
+        if (WorkerQueues.GetEnabled(configuration).Contains(WorkerQueue.Background))
+        {
+            services.AddSingleton<IReadinessDependency,
+                AccountNotificationReadinessDependency>();
+        }
         if (enableClusterScheduling)
         {
             services.AddSingleton<ClusterSchedulingState>();

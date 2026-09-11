@@ -26,6 +26,9 @@ jobs:
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
+      - name: Test deployment updater
+        run: python3 -m unittest discover -s deploy/ci -p 'test_*.py'
+
       - name: Validate custom registry configuration
         if: env.CUSTOM_REGISTRY != ''
         env:

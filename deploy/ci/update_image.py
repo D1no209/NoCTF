@@ -16,6 +16,7 @@ import uuid
 
 APPLICATIONS = {"backend", "worker", "runner", "noctf"}
 ENTRYPOINTS = {"NoCTF.Host.dll", "NoCTF.API.dll", "NoCTF.Worker.dll", "NoCTF.Runner.dll"}
+LEGACY_SERVICE_ROLES = {"backend": "Api", "worker": "Worker", "runner": "Runner"}
 
 
 def run(args, **kwargs):
@@ -36,6 +37,33 @@ def labels(container):
 
 def environment(container):
     return dict(value.split("=", 1) for value in container["Config"].get("Env", []))
+
+
+def application_service_overrides(containers, image):
+    """Keep legacy split services on one role when upgrading them to the Host image."""
+    services = {}
+    for container in containers:
+        service = labels(container)["com.docker.compose.service"]
+        override = {"image": image, "user": container["Config"]["User"]}
+        role = LEGACY_SERVICE_ROLES.get(service)
+        if role:
+            override["environment"] = {"Hosting__Roles__0": role}
+        services[service] = override
+    return services
+
+
+def validate_effective_application_roles(containers):
+    for container in containers:
+        service = labels(container)["com.docker.compose.service"]
+        expected = LEGACY_SERVICE_ROLES.get(service)
+        if not expected:
+            continue
+        actual = environment(container)
+        roles = [value for key, value in sorted(actual.items())
+                 if key.startswith("Hosting__Roles__") and value]
+        if roles != [expected]:
+            raise RuntimeError(
+                f"Legacy service {service} must run only the {expected} Host role.")
 
 
 def managed_ssh_client(container, apps):
@@ -219,7 +247,7 @@ def _deploy_locked(args, root):
     release = Path(args.release_root).resolve() / args.commit
     release.mkdir(parents=True, exist_ok=True, mode=0o700)
     overlay = release / ("application-image-" + backup.name.rsplit("-", 1)[-1] + ".json")
-    services = {labels(c)["com.docker.compose.service"]: {"image": args.image, "user": c["Config"]["User"]} for c in apps}
+    services = application_service_overrides(apps, args.image)
     write_private(overlay, {"services": services})
     updated = compose + ["--file", str(overlay)]
     names = sorted(services)
@@ -232,6 +260,7 @@ def _deploy_locked(args, root):
         if any(c["Config"]["Image"] != args.image for c in running):
             raise RuntimeError("An application service did not use the requested image.")
         validate_existing_config(config, running)
+        validate_effective_application_roles(running)
         after_counts = business_counts(postgres)
         if any(after_counts[k] < count for k, count in before_counts.items()):
             raise RuntimeError("Business data counts decreased; manual investigation required.")

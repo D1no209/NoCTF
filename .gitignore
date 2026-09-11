@@ -44,6 +44,10 @@ yarn-error.log*
 *.coverage
 *.coveragexml
 
+# Python bytecode
+**/__pycache__/
+*.py[cod]
+
 # Frontend build/dependency outputs
 /node_modules/
 backend/src/NoCTF.API/ClientApp/node_modules/

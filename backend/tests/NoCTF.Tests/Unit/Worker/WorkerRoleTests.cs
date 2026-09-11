@@ -1,6 +1,8 @@
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
 using NoCTF.Application.Messaging;
 using NoCTF.Hosting;
+using NoCTF.Hosting.Health;
 using NoCTF.Worker;
 using Wolverine;
 using Wolverine.Configuration;
@@ -97,6 +99,39 @@ public sealed class WorkerRoleTests
             $"{endpoint}{Environment.NewLine}local://{CompetitionEventFanoutQueueNames.Realtime}");
 
         await Assert.That(action).Throws<InvalidOperationException>();
+    }
+
+    [Test]
+    public async Task Account_delivery_readiness_is_registered_only_for_the_background_queue()
+    {
+        var background = new ServiceCollection();
+        var control = new ServiceCollection();
+        var controlConfiguration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["Worker:Queues:0"] = "control"
+            })
+            .Build();
+
+        background.AddNoCtfWorkerRole(
+            new ConfigurationBuilder().Build(),
+            validateMessageTopology: false,
+            enableClusterScheduling: false);
+        control.AddNoCtfWorkerRole(
+            controlConfiguration,
+            validateMessageTopology: false,
+            enableClusterScheduling: false);
+
+        await Assert.That(background.Any(descriptor =>
+                descriptor.ServiceType == typeof(IReadinessDependency)
+                && descriptor.ImplementationType
+                    == typeof(AccountNotificationReadinessDependency)))
+            .IsTrue();
+        await Assert.That(control.Any(descriptor =>
+                descriptor.ServiceType == typeof(IReadinessDependency)
+                && descriptor.ImplementationType
+                    == typeof(AccountNotificationReadinessDependency)))
+            .IsFalse();
     }
 
     [Test]

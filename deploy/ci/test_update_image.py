@@ -3,11 +3,13 @@ from pathlib import Path
 import unittest
 from unittest.mock import patch
 from types import SimpleNamespace
-from update_image import application_containers, validate_existing_config, deploy, managed_ssh_client
+from update_image import (application_containers, application_service_overrides,
+                          validate_effective_application_roles,
+                          validate_existing_config, deploy, managed_ssh_client)
 
 
 def fixture():
-    container = {"Config": {"Entrypoint": ["dotnet", "NoCTF.Host.dll"], "Env": ["KEY=original"], "Labels": {
+    container = {"Config": {"Entrypoint": ["dotnet", "NoCTF.Host.dll"], "Env": ["KEY=original"], "User": "1654", "Labels": {
         "com.docker.compose.project": "deploy", "com.docker.compose.service": "backend",
         "com.docker.compose.project.environment_file": "/root/NoCTF/.env,/root/NoCTF/monitoring.env"}},
         "Mounts": [{"Type": "volume", "Name": "deploy_uploads", "Source": "/var/lib/docker/volumes/deploy_uploads/_data",
@@ -18,6 +20,30 @@ def fixture():
 
 
 class DeploymentSafetyTests(unittest.TestCase):
+    def test_legacy_split_services_receive_exactly_one_host_role(self):
+        apps = []
+        for service in ("backend", "worker", "runner", "noctf"):
+            app, _ = fixture()
+            app["Config"]["Labels"]["com.docker.compose.service"] = service
+            apps.append(app)
+
+        overrides = application_service_overrides(apps, "registry/noctf@sha256:test")
+
+        self.assertEqual(overrides["backend"]["environment"], {"Hosting__Roles__0": "Api"})
+        self.assertEqual(overrides["worker"]["environment"], {"Hosting__Roles__0": "Worker"})
+        self.assertEqual(overrides["runner"]["environment"], {"Hosting__Roles__0": "Runner"})
+        self.assertNotIn("environment", overrides["noctf"])
+
+    def test_rejects_a_legacy_service_that_starts_extra_host_roles(self):
+        worker, _ = fixture()
+        worker["Config"]["Labels"]["com.docker.compose.service"] = "worker"
+        worker["Config"]["Env"] = ["Hosting__Roles__0=Worker"]
+        validate_effective_application_roles([worker])
+
+        worker["Config"]["Env"].append("Hosting__Roles__1=Runner")
+        with self.assertRaisesRegex(RuntimeError, "only the Worker Host role"):
+            validate_effective_application_roles([worker])
+
     def test_only_the_updated_runners_ephemeral_ssh_master_may_be_replaced(self):
         runner, _ = fixture()
         runner["Config"]["Labels"]["com.docker.compose.service"] = "runner"
