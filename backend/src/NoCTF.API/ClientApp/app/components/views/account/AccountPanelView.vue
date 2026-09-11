@@ -3,7 +3,7 @@ import { toRefs } from 'vue'
 import type { AccountPanelViewState } from '~/features/account/useAccountPanel'
 
 const viewProps = defineProps<{ state: AccountPanelViewState }>()
-const { UserRound, LockKeyhole, ShieldCheck, ImageIcon, LogOut, user, fetchMe, open, activeSection, setOpen, selectSection, signOut, description, profilePending, profileError, profileSuccess, profileDirty, saveProfile, avatarInput, avatarPending, avatarEditorOpen, avatarSourceFile, selectAvatar, setAvatarEditorOpen, uploadAvatar, reportAvatarError, setAvatarInputRef, wallpaperInput, wallpaperPending, wallpaperUrl, selectWallpaper, setWallpaperEnabled, setWallpaperInputRef, fullName, studentNumber, identityLoading, identityLoaded, identityPending, identityError, identitySuccess, identityDirty, identityFieldError, loadIdentity, saveIdentity, emailPending, emailMessage, emailError, resendEmail, currentPassword, newPassword, confirmNewPassword, passwordPending, passwordError, changePassword, logoutAll, AvatarCropDialog } = toRefs(viewProps.state)
+const { UserRound, LockKeyhole, ShieldCheck, ImageIcon, LogOut, user, fetchMe, open, activeSection, setOpen, selectSection, signOut, description, profilePending, profileError, profileSuccess, profileDirty, saveProfile, avatarInput, avatarPending, avatarEditorOpen, avatarSourceFile, avatarRequirements, selectAvatar, setAvatarEditorOpen, uploadAvatar, reportAvatarError, setAvatarInputRef, wallpaperInput, wallpaperPending, wallpaperUrl, wallpaperRequirements, selectWallpaper, setWallpaperEnabled, setWallpaperInputRef, fullName, studentNumber, identityLoading, identityLoaded, identityPending, identityError, identitySuccess, identityDirty, identityFieldError, loadIdentity, saveIdentity, emailPending, emailMessage, emailError, resendEmail, currentPassword, newPassword, confirmNewPassword, passwordPending, passwordError, changePassword, logoutAll, AvatarCropDialog } = toRefs(viewProps.state)
 </script>
 
 <template>
@@ -105,6 +105,7 @@ const { UserRound, LockKeyhole, ShieldCheck, ImageIcon, LogOut, user, fetchMe, o
                       <Spinner v-if="avatarPending" data-icon="inline-start" />{{ $t('ui.selectAndCropAvatar') }}
                     </Button>
                   </div>
+                  <FieldDescription>{{ avatarRequirements }}</FieldDescription>
                 </Field>
                 <Field>
                   <FieldLabel for="account-panel-description">{{ $t('ui.profile') }}</FieldLabel>
@@ -179,7 +180,7 @@ const { UserRound, LockKeyhole, ShieldCheck, ImageIcon, LogOut, user, fetchMe, o
                   <Spinner v-if="wallpaperPending" data-icon="inline-start" />
                   {{ user?.wallpaperRevision ? $t('accountPanel.replaceWallpaper') : $t('accountPanel.chooseWallpaper') }}
                 </Button>
-                <p class="text-xs leading-relaxed text-muted-foreground">{{ $t('accountPanel.wallpaperRequirements') }}</p>
+                <p class="text-xs leading-relaxed text-muted-foreground">{{ wallpaperRequirements }}</p>
               </div>
             </section>
 

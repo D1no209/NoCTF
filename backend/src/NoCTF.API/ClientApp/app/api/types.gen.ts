@@ -227,6 +227,12 @@ export type NoCtfapiEndpointsPlatformPublicPlatformConfigurationResponse = {
     name?: string;
     description?: string | null;
     logoUrl?: string | null;
+    imageUploadLimits?: NoCtfapiEndpointsPlatformPublicImageUploadLimitsResponse;
+};
+
+export type NoCtfapiEndpointsPlatformPublicImageUploadLimitsResponse = {
+    maximumAvatarBytes?: number;
+    maximumWallpaperBytes?: number;
 };
 
 export type NoCtfapiEndpointsNotificationsNotificationListResponse = {

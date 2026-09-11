@@ -120,7 +120,8 @@ export function createFixtures() {
     users, competitions, templates, challenges, attachments, teams, notifications,
     facts, runtimes, questions,
     settings: new Map<string, Data>(),
-    platform: { name: 'NoCTF · MOCK', description: '本地演示站 · Fictional data · No production backend', logoUrl: null, updatedAt: now() },
+    platform: { name: 'NoCTF · MOCK', description: '本地演示站 · Fictional data · No production backend', logoUrl: null,
+      imageUploadLimits: { maximumAvatarBytes: 12 * 1024 * 1024, maximumWallpaperBytes: 16 * 1024 * 1024 }, updatedAt: now() },
   }
 }
 

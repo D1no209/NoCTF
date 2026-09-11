@@ -13,20 +13,38 @@ import {
   resendEmailVerificationEndpoint,
 } from '../../api'
 import AvatarCropDialogComponent from './AvatarCropDialog.vue'
+import { exceedsUploadLimit } from './upload-limits'
 
 export type AccountPanelSection = 'profile' | 'identity' | 'wallpaper' | 'security'
 
 /** Owns the compact account popover, drafts and account commands across route changes. */
 export function useAccountPanel() {
   const { user, fetchMe, logout, logoutAll } = useAuth()
+  const { configuration: platformConfiguration } = usePlatform()
+  const maximumAvatarBytes = computed(() =>
+    platformConfiguration.value?.imageUploadLimits?.maximumAvatarBytes ?? null)
+  const maximumWallpaperBytes = computed(() =>
+    platformConfiguration.value?.imageUploadLimits?.maximumWallpaperBytes ?? null)
+  const avatarRequirements = computed(() => maximumAvatarBytes.value
+    ? translate('accountPanel.avatarRequirements', { limit: formatBytes(maximumAvatarBytes.value) })
+    : translate('ui.pleaseSelectAJpegPngOrWebpImageNoLarger'))
+  const wallpaperRequirements = computed(() => maximumWallpaperBytes.value
+    ? translate('accountPanel.wallpaperRequirements', { limit: formatBytes(maximumWallpaperBytes.value) })
+    : translate('accountPanel.wallpaperRequirementsFallback'))
 
   const open = ref(false)
   const activeSection = ref<AccountPanelSection | null>(null)
 
-  function imageUploadError(error: unknown): string {
+  function uploadTooLarge(maximumBytes: number | null): string {
+    return maximumBytes
+      ? translate('accountPanel.fileExceedsUploadLimit', { limit: formatBytes(maximumBytes) })
+      : translate('ui.theUploadedFileIsTooLarge')
+  }
+
+  function imageUploadError(error: unknown, maximumBytes: number | null): string {
     const parsed = parseApiError(error)
     if (parsed.code === 'UploadTooLarge')
-      return translate('ui.theUploadedFileIsTooLarge')
+      return uploadTooLarge(maximumBytes)
     if (parsed.code === 'SizeInvalid'
       || parsed.code === 'SourceMetadataMismatch'
       || parsed.code === 'UnsupportedFormat'
@@ -110,6 +128,10 @@ export function useAccountPanel() {
   }
 
   async function uploadAvatar(file: File) {
+    if (exceedsUploadLimit(file.size, maximumAvatarBytes.value)) {
+      toast.error(uploadTooLarge(maximumAvatarBytes.value))
+      return
+    }
     avatarPending.value = true
     try {
       const { error } = await authenticationUploadMyAvatar({ body: { file } })
@@ -120,7 +142,7 @@ export function useAccountPanel() {
       toast.success(translate('ui.avatarHasBeenUpdated'))
     }
     catch (error) {
-      toast.error(imageUploadError(error))
+      toast.error(imageUploadError(error, maximumAvatarBytes.value))
     }
     finally {
       avatarPending.value = false
@@ -144,6 +166,10 @@ export function useAccountPanel() {
       toast.error(translate('accountPanel.wallpaperFileInvalid'))
       return
     }
+    if (exceedsUploadLimit(file.size, maximumWallpaperBytes.value)) {
+      toast.error(uploadTooLarge(maximumWallpaperBytes.value))
+      return
+    }
 
     wallpaperPending.value = true
     try {
@@ -154,7 +180,7 @@ export function useAccountPanel() {
       toast.success(translate('accountPanel.wallpaperUpdated'))
     }
     catch (error) {
-      toast.error(imageUploadError(error))
+      toast.error(imageUploadError(error, maximumWallpaperBytes.value))
     }
     finally {
       wallpaperPending.value = false
@@ -343,6 +369,7 @@ export function useAccountPanel() {
     avatarPending,
     avatarEditorOpen,
     avatarSourceFile,
+    avatarRequirements,
     selectAvatar,
     setAvatarEditorOpen,
     uploadAvatar,
@@ -351,6 +378,7 @@ export function useAccountPanel() {
     wallpaperInput,
     wallpaperPending,
     wallpaperUrl,
+    wallpaperRequirements,
     selectWallpaper,
     setWallpaperEnabled,
     setWallpaperInputRef,
