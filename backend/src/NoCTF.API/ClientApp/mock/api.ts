@@ -101,7 +101,7 @@ export function createMockApi() {
   const sessions = new Map<string, string>()
   const tokens = new Map<string, string>()
   const wallpapers = new Map<string, Blob>()
-  const competitionPosters = new Map<string, Blob>()
+  const competitionPosters = new Map<string, Blob | null>()
   const changes = new Set<(competitionId: string) => void>()
   const json = (value: any, status = 200, headers: HeadersInit = {}) => Response.json(value, { status, headers: { 'X-NoCTF-Mock': 'true', 'Cache-Control': 'no-store', ...headers } })
   const problem = (status: number, detail: string) => json({ status, title: 'Mock API', detail }, status)
@@ -198,8 +198,9 @@ export function createMockApi() {
         })
       }
       if (route === '/competitions/{competitionId}/poster') {
-        const poster = competitionPosters.get(p.competitionId!)
-          ?? Bun.file(new URL('./data/competition-poster.png', import.meta.url))
+        const storedPoster = competitionPosters.get(p.competitionId!)
+        if (storedPoster === null) return problem(404, '演示海报不存在 / No poster')
+        const poster = storedPoster ?? Bun.file(new URL('./data/competition-poster.png', import.meta.url))
         return new Response(poster, {
           headers: { 'Content-Type': poster.type || 'image/png', 'Cache-Control': 'no-store', 'X-NoCTF-Mock': 'true' },
         })
@@ -339,6 +340,10 @@ export function createMockApi() {
           return json({ code: 'UnsupportedFormat' }, 400)
         competitionPosters.set(p.competitionId!, file)
         value = { fileId: crypto.randomUUID(), contentType: file.type }
+      }
+      else if (route === '/admin/competitions/{competitionId}/poster' && request.method === 'DELETE') {
+        competitionPosters.set(p.competitionId!, null)
+        return new Response(null, { status: 204, headers: { 'X-NoCTF-Mock': 'true' } })
       }
       else if (route === '/admin/platform/configuration' && request.method === 'PATCH') {
         if (body.branding) Object.assign(state.platform, body.branding, { updatedAt: now() })

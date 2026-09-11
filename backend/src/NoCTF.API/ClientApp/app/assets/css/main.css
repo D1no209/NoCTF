@@ -208,6 +208,11 @@
 }
 
 [data-page-wallpaper='true'] {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  view-transition-name: noctf-page-wallpaper;
   background-color: var(--background);
   background-image:
     linear-gradient(color-mix(in oklch, var(--background) 65%, transparent), color-mix(in oklch, var(--background) 65%, transparent)),
@@ -215,8 +220,8 @@
   background-position: center;
   background-size: cover;
   background-repeat: no-repeat;
-  background-attachment: fixed;
 }
+[data-slot='default-layout-foreground'] { view-transition-name: noctf-page-foreground; }
 .dark [data-page-wallpaper='true'] {
   background-image:
     linear-gradient(color-mix(in oklch, var(--background) 65%, transparent), color-mix(in oklch, var(--background) 65%, transparent)),

@@ -1,10 +1,11 @@
 import { proxyRefs } from 'vue'
 
 import { toast } from 'vue-sonner'
-import { adminDeleteCompetition, adminForceDeleteCompetition, adminGenerateMissingFlags, adminHardDeleteCompetition, adminPreviewCompetitionHardDelete, adminRestoreCompetition, adminUpdateCompetitionStatus, adminValidateCompetitionStart } from '../../../../../api'
+import { adminCompetitionPosterClear, adminCompetitionPosterReplace, adminDeleteCompetition, adminForceDeleteCompetition, adminGenerateMissingFlags, adminHardDeleteCompetition, adminPreviewCompetitionHardDelete, adminRestoreCompetition, adminUpdateCompetitionStatus, adminValidateCompetitionStart } from '../../../../../api'
 import type { NoCtfapiEndpointsAdministrationCompetitionsCompetitionHardDeletePreviewResponse, NoCtfapiEndpointsAdministrationCompetitionsCompetitionHardDeleteReferenceCode, NoCtfapiEndpointsAdministrationCompetitionsStartGateErrorResponse } from '../../../../../api'
 import { useCompetitionAdmin } from '../../../../../lib/admin-competition'
 import { startGateErrorMessage } from '../../../../../lib/start-gate-error'
+import { useCompetitionPoster } from '../../../../competitions/useCompetitionPoster'
 
 interface LifecycleAction {
   key: string
@@ -28,6 +29,87 @@ export function useAdminCompetitionsByIdIndexPage() {
   const status = computed(() => competition.value?.status)
 
   const isDeleted = computed(() => !!competition.value?.deletedAt)
+
+  const {
+    posterUrl,
+    posterLoading,
+    posterError,
+    refreshPoster,
+    clearPoster,
+  } = useCompetitionPoster(competitionId)
+
+  const posterPending = ref(false)
+
+  const posterInputKey = ref(0)
+
+  const posterSelectionError = ref<string | null>(null)
+
+  const posterRemoveOpen = ref(false)
+
+  function posterUploadError(error: unknown): string {
+    const parsed = parseApiError(error)
+    return parsed.code === 'UploadTooLarge'
+      ? translate('ui.theUploadedFileIsTooLarge')
+      : ['SizeInvalid', 'SourceMetadataMismatch', 'UnsupportedFormat', 'InvalidDimensions', 'PixelLimitExceeded', 'MultipleFrames', 'MalformedImage'].includes(parsed.code ?? '')
+        ? translate('ui.posterMustBeAJpegPngOrWebpImage')
+        : parsed.message
+  }
+
+  async function selectPoster(event: Event): Promise<void> {
+    const input = event.target as HTMLInputElement
+    const file = input.files?.[0] ?? null
+    posterSelectionError.value = null
+    if (!file || posterPending.value || !canWrite.value || isDeleted.value) return
+    if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
+      posterSelectionError.value = translate('ui.posterMustBeAJpegPngOrWebpImage')
+      return
+    }
+
+    posterPending.value = true
+    try {
+      const { error } = await adminCompetitionPosterReplace({
+        path: { competitionId },
+        body: { file },
+      })
+      if (error) throw error
+      await refreshPoster()
+      await loadHardDeletePreview()
+      toast.success(translate('ui.competitionPosterUpdated'))
+      posterInputKey.value += 1
+    }
+    catch (error) {
+      toast.error(posterUploadError(error))
+    }
+    finally {
+      posterPending.value = false
+    }
+  }
+
+  async function removePoster(): Promise<void> {
+    if (posterPending.value || !canWrite.value || isDeleted.value) return
+    posterPending.value = true
+    try {
+      const { error } = await adminCompetitionPosterClear({ path: { competitionId } })
+      if (error) throw error
+      clearPoster()
+      posterRemoveOpen.value = false
+      posterInputKey.value += 1
+      await loadHardDeletePreview()
+      toast.success(translate('ui.competitionPosterRemoved'))
+    }
+    catch (error) {
+      toast.error(parseApiError(error).message)
+    }
+    finally {
+      posterPending.value = false
+    }
+  }
+
+  function setPosterRemoveOpen(open: boolean): void {
+    if (!posterPending.value) posterRemoveOpen.value = open
+  }
+
+  onMounted(refreshPoster)
 
   const steps = [
     { value: 'Draft', label: "ui.draft" },
@@ -354,6 +436,17 @@ export function useAdminCompetitionsByIdIndexPage() {
       actionError,
       status,
       isDeleted,
+      posterUrl,
+      posterLoading,
+      posterError,
+      posterPending,
+      posterInputKey,
+      posterSelectionError,
+      posterRemoveOpen,
+      refreshPoster,
+      selectPoster,
+      removePoster,
+      setPosterRemoveOpen,
       steps,
       actions,
       confirmTarget,

@@ -3,10 +3,11 @@ import { markRaw } from 'vue'
 import { canEnterCompetition, canRegisterForCompetition, isCtfPracticeOpen } from '../../lib/competition-participation'
 import { toast } from 'vue-sonner'
 import { ArrowRight, Box, CalendarRange, Clock, FileText, KeyRound, LogIn, Settings, ShieldCheck, Trophy, UserPlus, Users } from '@lucide/vue'
-import { adminGetCompetition, competitionPosterGet, getCompetitionEndpoint, createTeamEndpoint, getMyTeamEndpoint, joinTeamByInvitationEndpoint, listCompetitionTeamsEndpoint, listCompetitionTracks } from '../../api'
+import { adminGetCompetition, getCompetitionEndpoint, createTeamEndpoint, getMyTeamEndpoint, joinTeamByInvitationEndpoint, listCompetitionTeamsEndpoint, listCompetitionTracks } from '../../api'
 import type { NoCtfapiEndpointsAdministrationCompetitionsAdminCompetitionResponse, NoCtfapiEndpointsCompetitionsCompetitionResponse, NoCtfapiEndpointsCompetitionsTracksCompetitionTrackResponse, NoCtfapiEndpointsTeamsTeamResponse } from '../../api'
 import { teamMembershipErrorMessage, teamRegistrationErrorMessage } from '../../lib/competition-track'
 import LifecycleBadgeComponent from './LifecycleBadge.vue'
+import { useCompetitionPoster } from './useCompetitionPoster'
 
 /** Owns state, effects and commands for CompetitionOverview. */
 export function useCompetitionOverview(props: Readonly<{ competition: NoCtfapiEndpointsCompetitionsCompetitionResponse }>) {
@@ -17,22 +18,8 @@ export function useCompetitionOverview(props: Readonly<{ competition: NoCtfapiEn
   const detailError = ref<string | null>(null)
   const reads = new AbortController()
   onUnmounted(() => reads.abort())
-  const posterUrl = ref<string | null>(null)
-  const posterLoading = ref(true)
-  async function loadPoster() {
-    if (managementOnly.value) {
-      posterLoading.value = false
-      return
-    }
-    try {
-      const { data } = await competitionPosterGet({ path: { competitionId }, parseAs: 'blob', signal: reads.signal })
-      if (!reads.signal.aborted && data instanceof Blob && data.type.startsWith('image/')) posterUrl.value = URL.createObjectURL(data)
-    } catch {
-      // Missing or unavailable media uses the shared image fallback, without blocking details.
-    } finally { posterLoading.value = false }
-  }
-  onMounted(loadPoster)
-  onUnmounted(() => { if (posterUrl.value) URL.revokeObjectURL(posterUrl.value) })
+  const { posterUrl, posterLoading, refreshPoster } = useCompetitionPoster(competitionId)
+  onMounted(refreshPoster)
   async function refreshCompetition() {
     detailError.value = null
     try {

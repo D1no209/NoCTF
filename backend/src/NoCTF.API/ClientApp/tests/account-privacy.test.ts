@@ -56,10 +56,11 @@ test('light and dark non-home pages use local wallpapers at the same strength', 
   const layout = read('layouts/default.vue')
   const css = read('assets/css/main.css')
 
-  expect(layout).toContain(':data-page-wallpaper="!isHome || undefined"')
+  expect(layout).toContain('data-slot="page-wallpaper"')
+  expect(layout).toContain('v-if="!isHome"')
   expect(css).toContain("url('../images/backgrounds/light-pages-wallpaper.jpg')")
   expect(css).toContain("url('../images/backgrounds/dark-pages-wallpaper.jpg')")
-  expect(layout).toContain(':data-personal-wallpaper="!isHome && wallpaperActive || undefined"')
+  expect(layout).toContain(':data-personal-wallpaper="wallpaperActive || undefined"')
   expect(css).toContain("[data-page-wallpaper='true'][data-personal-wallpaper='true']")
   expect(css.match(/var\(--background\) 65%/g)?.length).toBeGreaterThanOrEqual(4)
   expect(await Bun.file(new URL('../app/assets/images/backgrounds/dark-pages-wallpaper.jpg', import.meta.url)).exists()).toBe(true)
