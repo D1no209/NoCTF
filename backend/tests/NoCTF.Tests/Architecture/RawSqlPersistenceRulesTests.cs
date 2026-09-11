@@ -62,6 +62,12 @@ public sealed class RawSqlPersistenceRulesTests
                 "FromSqlInterpolated",
                 "FOR UPDATE"
             ],
+            // Serialize revocation facts for one administrator-issued JWT.
+            ["backend/src/NoCTF.Infrastructure/Administration/PlatformUserTokenCriticalSection.cs"] =
+            [
+                "FromSqlInterpolated",
+                "FOR UPDATE"
+            ],
             ["backend/src/NoCTF.Infrastructure/Authentication/PasswordResetStore.cs"] =
             [
                 "FromSqlInterpolated",

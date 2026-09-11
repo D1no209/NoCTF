@@ -6083,6 +6083,179 @@
         ]
       }
     },
+    "/api/v1/admin/platform/users/{userId}/tokens": {
+      "delete": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "Invalidates every access and refresh token for a user.",
+        "description": "Atomically increments the user's global token version.",
+        "operationId": "AdminPlatformDeleteUserTokens",
+        "parameters": [
+          {
+            "name": "userId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationPlatformPlatformUserResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "Bearer": [
+              "Administrator"
+            ]
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "Issues a bounded-lifetime Access JWT for an active user.",
+        "description": "The token uses the target identity and records the issuing administrator without creating a Refresh Token.",
+        "operationId": "AdminPlatformIssueUserToken",
+        "parameters": [
+          {
+            "name": "userId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "x-name": "IssuePlatformUserTokenRequest",
+          "description": "",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationPlatformIssuePlatformUserTokenRequest"
+              }
+            }
+          },
+          "required": true,
+          "x-position": 1
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationPlatformIssuePlatformUserTokenResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "409": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationPlatformIssuePlatformUserTokenFailureResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcValidationProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "Bearer": [
+              "Administrator"
+            ]
+          }
+        ]
+      },
+      "get": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "Lists the caller's active administrator-issued JWTs for one user.",
+        "description": "Executes GET /api/v1/admin/platform/users/{userId}/tokens.",
+        "operationId": "AdminPlatformListUserTokens",
+        "parameters": [
+          {
+            "name": "userId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationPlatformAdminIssuedAccessTokenListResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "Bearer": [
+              "Administrator"
+            ]
+          }
+        ]
+      }
+    },
     "/api/v1/admin/platform/logs/export": {
       "get": {
         "tags": [
@@ -6485,125 +6658,6 @@
           },
           "403": {
             "description": "Forbidden"
-          }
-        },
-        "security": [
-          {
-            "Bearer": [
-              "Administrator"
-            ]
-          }
-        ]
-      }
-    },
-    "/api/v1/admin/platform/users/{userId}/tokens/invalidate": {
-      "post": {
-        "tags": [
-          "Admin"
-        ],
-        "summary": "Invalidates every access and refresh token for a user.",
-        "description": "Atomically increments the user's global token version.",
-        "operationId": "AdminPlatformInvalidateUserTokens",
-        "parameters": [
-          {
-            "name": "userId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Success",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationPlatformPlatformUserResponse"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Not Found"
-          },
-          "401": {
-            "description": "Unauthorized"
-          },
-          "403": {
-            "description": "Forbidden"
-          }
-        },
-        "security": [
-          {
-            "Bearer": [
-              "Administrator"
-            ]
-          }
-        ]
-      }
-    },
-    "/api/v1/admin/platform/bots/{userId}/tokens": {
-      "post": {
-        "tags": [
-          "Admin"
-        ],
-        "summary": "Issues a bounded-lifetime Access JWT for a Bot.",
-        "description": "Uses the ordinary Access scheme and is revoked by the Bot's TokenVersion.",
-        "operationId": "AdminPlatformIssueBotToken",
-        "parameters": [
-          {
-            "name": "userId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "x-name": "IssuePlatformBotTokenRequest",
-          "description": "",
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationPlatformIssuePlatformBotTokenRequest"
-              }
-            }
-          },
-          "required": true,
-          "x-position": 1
-        },
-        "responses": {
-          "200": {
-            "description": "Success",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationPlatformIssuePlatformBotTokenResponse"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Not Found"
-          },
-          "401": {
-            "description": "Unauthorized"
-          },
-          "403": {
-            "description": "Forbidden"
-          },
-          "400": {
-            "description": "Bad Request",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcValidationProblemDetails"
-                }
-              }
-            }
           }
         },
         "security": [
@@ -7209,6 +7263,55 @@
                 }
               }
             }
+          }
+        },
+        "security": [
+          {
+            "Bearer": [
+              "Administrator"
+            ]
+          }
+        ]
+      }
+    },
+    "/api/v1/admin/platform/users/{userId}/tokens/{jwtId}": {
+      "delete": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "Revokes one JWT previously issued by the calling administrator.",
+        "description": "Executes DELETE /api/v1/admin/platform/users/{userId}/tokens/{jwtId}.",
+        "operationId": "AdminPlatformRevokeUserToken",
+        "parameters": [
+          {
+            "name": "userId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "jwtId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
           }
         },
         "security": [
@@ -17779,7 +17882,7 @@
           }
         }
       },
-      "NoCTFAPIEndpointsAdministrationPlatformIssuePlatformBotTokenResponse": {
+      "NoCTFAPIEndpointsAdministrationPlatformIssuePlatformUserTokenResponse": {
         "type": "object",
         "additionalProperties": false,
         "properties": {
@@ -17789,18 +17892,60 @@
           "expiresAt": {
             "type": "string",
             "format": "date-time"
+          },
+          "jwtId": {
+            "type": "string",
+            "format": "guid"
+          },
+          "targetUserId": {
+            "type": "string",
+            "format": "guid"
+          },
+          "targetUserName": {
+            "type": "string"
           }
         }
       },
-      "NoCTFAPIEndpointsAdministrationPlatformIssuePlatformBotTokenRequest": {
+      "NoCTFAPIEndpointsAdministrationPlatformIssuePlatformUserTokenFailureResponse": {
         "type": "object",
         "additionalProperties": false,
+        "properties": {
+          "code": {
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationPlatformIssuePlatformUserTokenFailureCode"
+          },
+          "message": {
+            "type": "string"
+          }
+        }
+      },
+      "NoCTFAPIEndpointsAdministrationPlatformIssuePlatformUserTokenFailureCode": {
+        "type": "string",
+        "description": "",
+        "x-enumNames": [
+          "AccountInactive"
+        ],
+        "enum": [
+          "AccountInactive"
+        ]
+      },
+      "NoCTFAPIEndpointsAdministrationPlatformIssuePlatformUserTokenRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "expiresInSeconds",
+          "reason"
+        ],
         "properties": {
           "expiresInSeconds": {
             "type": "integer",
             "format": "int64",
             "maximum": 31536000.0,
             "minimum": 60.0
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 1,
+            "nullable": false
           }
         }
       },
@@ -17990,6 +18135,21 @@
             "type": "string",
             "format": "guid",
             "nullable": true
+          },
+          "jwtId": {
+            "type": "string",
+            "format": "guid",
+            "nullable": true
+          },
+          "tokenExpiresAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "tokenVersion": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
           }
         }
       },
@@ -18039,10 +18199,16 @@
         "type": "string",
         "description": "",
         "x-enumNames": [
-          "AuditArchiveExported"
+          "AuditArchiveExported",
+          "UserAccessTokenIssued",
+          "UserAccessTokenRevoked",
+          "UserTokensInvalidated"
         ],
         "enum": [
-          "AuditArchiveExported"
+          "AuditArchiveExported",
+          "UserAccessTokenIssued",
+          "UserAccessTokenRevoked",
+          "UserTokensInvalidated"
         ]
       },
       "NoCTFAPIEndpointsAdministrationPlatformListPlatformAuditLogsRequest": {
@@ -18200,6 +18366,46 @@
             "items": {
               "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationPlatformPlatformUserResponse"
             }
+          }
+        }
+      },
+      "NoCTFAPIEndpointsAdministrationPlatformAdminIssuedAccessTokenListResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationPlatformAdminIssuedAccessTokenResponse"
+            }
+          }
+        }
+      },
+      "NoCTFAPIEndpointsAdministrationPlatformAdminIssuedAccessTokenResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "jwtId": {
+            "type": "string",
+            "format": "guid"
+          },
+          "targetUserId": {
+            "type": "string",
+            "format": "guid"
+          },
+          "targetUserName": {
+            "type": "string"
+          },
+          "issuedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "reason": {
+            "type": "string"
           }
         }
       },

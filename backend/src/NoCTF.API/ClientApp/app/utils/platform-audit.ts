@@ -120,9 +120,18 @@ export function platformAuditActionText(log: AuditLog): string {
   }
 
   if (log.kind === 'PlatformAdministration') {
-    return log.platformAdministrationAction === 'AuditArchiveExported'
-      ? translate("ui.exportPlatformAuditArchive")
-      : translate("ui.performPlatformAdministrationAction")
+    switch (log.platformAdministrationAction) {
+      case 'AuditArchiveExported':
+        return translate("ui.exportPlatformAuditArchive")
+      case 'UserAccessTokenIssued':
+        return withReason("ui.issueUserAccessToken", log.reason)
+      case 'UserAccessTokenRevoked':
+        return translate("ui.revokeUserAccessToken")
+      case 'UserTokensInvalidated':
+        return translate("ui.invalidateAllUserTokens")
+      default:
+        return translate("ui.performPlatformAdministrationAction")
+    }
   }
 
   const action = log.competitionEventKind ? EVENT_ACTION_LABELS[log.competitionEventKind] : null

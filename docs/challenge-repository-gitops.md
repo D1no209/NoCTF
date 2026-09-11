@@ -171,7 +171,7 @@ Bot 登录尝试统一返回普通的无效凭据结果，不暴露额外账户�
 
 ```text
 创建 Bot 用户
-为指定 Bot 签发给定有效时长的 Access JWT
+为指定 Active Bot 签发给定有效时长和审计原因的 Access JWT
 递增 Bot.TokenVersion，使该 Bot 的全部现有 JWT 失效
 ```
 
@@ -179,7 +179,8 @@ Bot 登录尝试统一返回普通的无效凭据结果，不暴露额外账户�
 
 ```json
 {
-  "expiresInSeconds": 31536000
+  "expiresInSeconds": 31536000,
+  "reason": "GitOps repository deployment"
 }
 ```
 
@@ -188,7 +189,10 @@ Bot 登录尝试统一返回普通的无效凭据结果，不暴露额外账户�
 ```json
 {
   "accessToken": "...",
-  "expiresAt": "2027-07-29T12:00:00Z"
+  "expiresAt": "2027-07-29T12:00:00Z",
+  "jwtId": "...",
+  "targetUserId": "bot-user-id",
+  "targetUserName": "repository-bot"
 }
 ```
 
@@ -206,9 +210,9 @@ JWT 使用普通 Access Token 格式：
 }
 ```
 
-JWT 只在签发响应中返回一次。NoCTF 不保存完整 JWT。管理员撤销时使用已有的 TokenVersion 机制，不引入单 Token 会话表。
+JWT 只在签发响应中返回一次。NoCTF 不保存完整 JWT。签发管理员可按 jwtId 单枚吊销，平台也可通过 TokenVersion 撤销该账号全部令牌；两种操作都复用 append-only 管理审计事实，不新增 Token 会话表。
 
-平台管理员可在 `/admin/users` 查看 Human/Bot 类型、Role 和 TokenVersion，创建固定为 Organizer 的 Bot、按受控有效期签发一次性显示的 Access JWT，以及使某个身份的全部现有令牌失效。关闭令牌对话框后，前端必须同时清除显示状态和请求缓存中的完整 JWT。
+平台管理员可在 `/admin/platform/users` 查看 Human/Bot 类型、Role 和 TokenVersion，创建 User 或 Organizer 权限的 Bot、按受控有效期签发一次性显示的 Access JWT，以及使某个身份的全部现有令牌失效。关闭令牌对话框后，前端必须同时清除显示状态和请求缓存中的完整 JWT。
 
 题库管理者可在 `/admin/challenges` 以稳定 UUID、可见性和活跃比赛引用数核对 GitOps 清单，并切换查看软删除模板。Delete 和 Restore 必须作用于同一 UUID；仍被活跃比赛引用的模板不得从界面发起删除。
 

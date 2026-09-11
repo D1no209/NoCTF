@@ -97,7 +97,10 @@ public enum PlatformAuditKind : short
 
 public enum PlatformAdministrationAction : short
 {
-    AuditArchiveExported
+    AuditArchiveExported,
+    UserAccessTokenIssued,
+    UserAccessTokenRevoked,
+    UserTokensInvalidated
 }
 
 public sealed record PlatformAuditView(
@@ -128,7 +131,10 @@ public sealed record PlatformAuditView(
     string? Reason,
     bool Automatic,
     DateTimeOffset OccurredAt,
-    Guid? FileId = null);
+    Guid? FileId = null,
+    Guid? JwtId = null,
+    DateTimeOffset? TokenExpiresAt = null,
+    int? TokenVersion = null);
 
 public sealed record PlatformAuditQuery(
     PlatformAuditKind? Kind,

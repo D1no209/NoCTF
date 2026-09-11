@@ -44,4 +44,20 @@ describe('platform audit operation labels', () => {
       reason: 'manual_activate',
     }))).toBe('激活账户')
   })
+
+  test('names administrator token issuance and revocation actions', () => {
+    expect(platformAuditActionText(audit({
+      kind: 'PlatformAdministration',
+      platformAdministrationAction: 'UserAccessTokenIssued',
+      reason: 'support case',
+    }))).toBe('签发用户访问 JWT · 原因：support case')
+    expect(platformAuditActionText(audit({
+      kind: 'PlatformAdministration',
+      platformAdministrationAction: 'UserAccessTokenRevoked',
+    }))).toBe('吊销用户访问 JWT')
+    expect(platformAuditActionText(audit({
+      kind: 'PlatformAdministration',
+      platformAdministrationAction: 'UserTokensInvalidated',
+    }))).toBe('撤销用户全部 JWT')
+  })
 })

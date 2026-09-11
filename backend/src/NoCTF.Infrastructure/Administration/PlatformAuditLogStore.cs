@@ -1,6 +1,7 @@
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using NoCTF.Application.Administration.PlatformLogs;
+using NoCTF.Application.Administration;
 using NoCTF.Application.Administration.UserAccounts;
 using NoCTF.Domain.Competitions;
 using NoCTF.Domain.Competitions.Events;
@@ -149,14 +150,20 @@ public sealed class PlatformAuditLogStore(NoCtfDbContext db) : IPlatformAuditLog
             var auditFacts = db.Notifications.AsNoTracking().Where(notification =>
                 (notification.Kind == NotificationKind.UserAccountLifecycleChanged
                     || notification.Kind == NotificationKind.CompetitionForceDeleted
-                    || notification.Kind == NotificationKind.PlatformAuditExported)
+                    || notification.Kind == NotificationKind.PlatformAuditExported
+                    || notification.Kind == NotificationKind.PlatformUserAccessTokenIssued
+                    || notification.Kind == NotificationKind.PlatformUserAccessTokenRevoked
+                    || notification.Kind == NotificationKind.PlatformUserTokensInvalidated)
                 && notification.TargetType == NotificationTargetType.PlatformAdministrators);
             auditFacts = query.Kind switch
             {
                 PlatformAuditKind.UserAccountLifecycle => auditFacts.Where(notification =>
                     notification.Kind == NotificationKind.UserAccountLifecycleChanged),
                 PlatformAuditKind.PlatformAdministration => auditFacts.Where(notification =>
-                    notification.Kind == NotificationKind.PlatformAuditExported),
+                    notification.Kind == NotificationKind.PlatformAuditExported
+                    || notification.Kind == NotificationKind.PlatformUserAccessTokenIssued
+                    || notification.Kind == NotificationKind.PlatformUserAccessTokenRevoked
+                    || notification.Kind == NotificationKind.PlatformUserTokensInvalidated),
                 PlatformAuditKind.CompetitionAdministration => auditFacts.Where(notification =>
                     notification.Kind == NotificationKind.CompetitionForceDeleted),
                 _ => auditFacts
@@ -282,6 +289,56 @@ public sealed class PlatformAuditLogStore(NoCtfDbContext db) : IPlatformAuditLog
                 Reason: null,
                 Automatic: false,
                 OccurredAt: notification.SentAt);
+        }
+        if (notification.Kind is NotificationKind.PlatformUserAccessTokenIssued
+            or NotificationKind.PlatformUserAccessTokenRevoked
+            or NotificationKind.PlatformUserTokensInvalidated)
+        {
+            var tokenFact = JsonSerializer.Deserialize<PlatformUserTokenAuditFact>(
+                notification.ContentJson,
+                JsonOptions) ?? throw new InvalidOperationException(
+                $"Notification {notification.Id} has no platform token audit payload.");
+            return new(
+                Id: notification.Id,
+                Kind: PlatformAuditKind.PlatformAdministration,
+                SubjectId: tokenFact.TargetUserId,
+                CompetitionId: null,
+                ActorId: notification.SourceId,
+                FromCompetitionStatus: null,
+                ToCompetitionStatus: null,
+                FromLeaderboardVisibility: null,
+                ToLeaderboardVisibility: null,
+                UserAccountAction: null,
+                PlatformAdministrationAction: tokenFact.Action switch
+                {
+                    PlatformUserTokenAdministrationAction.AccessTokenIssued =>
+                        PlatformAdministrationAction.UserAccessTokenIssued,
+                    PlatformUserTokenAdministrationAction.AccessTokenRevoked =>
+                        PlatformAdministrationAction.UserAccessTokenRevoked,
+                    PlatformUserTokenAdministrationAction.TokensInvalidated =>
+                        PlatformAdministrationAction.UserTokensInvalidated,
+                    _ => throw new InvalidOperationException(
+                        $"Unsupported platform token action {tokenFact.Action}.")
+                },
+                CompetitionEventKind: null,
+                CompetitionEventLevel: null,
+                CompetitionEventVisibility: null,
+                RelatedUserId: tokenFact.TargetUserId,
+                TeamId: null,
+                CompetitionChallengeId: null,
+                RuntimeInstanceId: null,
+                GameplayFactId: null,
+                QuestionId: null,
+                GameplayFactKind: null,
+                GameplayFactState: null,
+                GameplayFactResult: null,
+                SubjectDisplayName: tokenFact.TargetUserName,
+                Reason: tokenFact.Reason,
+                Automatic: false,
+                OccurredAt: notification.SentAt,
+                JwtId: tokenFact.JwtId,
+                TokenExpiresAt: tokenFact.ExpiresAt,
+                TokenVersion: tokenFact.TokenVersion);
         }
         var fact = JsonSerializer.Deserialize<UserAccountLifecycleFact>(
             notification.ContentJson,

@@ -3,8 +3,9 @@ import { markRaw } from 'vue'
 
 import { Bot, Copy, KeyRound, Plus } from '@lucide/vue'
 import { toast } from 'vue-sonner'
-import { adminPlatformCreateBot, adminPlatformIssueBotToken, adminPlatformListUsers } from '../../../../api'
-import type { NoCtfapiEndpointsAdministrationPlatformIssuePlatformBotTokenResponse, NoCtfapiEndpointsAdministrationPlatformPlatformUserResponse, NoCtfapiEndpointsAuthenticationUserRoleProtocol } from '../../../../api'
+import { adminPlatformCreateBot, adminPlatformIssueUserToken, adminPlatformListUsers } from '../../../../api'
+import type { NoCtfapiEndpointsAdministrationPlatformIssuePlatformUserTokenResponse, NoCtfapiEndpointsAdministrationPlatformPlatformUserResponse, NoCtfapiEndpointsAuthenticationUserRoleProtocol } from '../../../../api'
+import { createLatestRequestGuard } from '../../../../lib/latest-request'
 import AdminDateTimeComponent from '../../../admin/AdminDateTime.vue'
 
 type PlatformUser = NoCtfapiEndpointsAdministrationPlatformPlatformUserResponse
@@ -69,22 +70,33 @@ export function useAdminPlatformBotsPage() {
 
   const expiresInSeconds = ref(3600)
 
-  const issuedToken = ref<NoCtfapiEndpointsAdministrationPlatformIssuePlatformBotTokenResponse | null>(null)
+  const issueReason = ref('')
+
+  const issuedToken = ref<NoCtfapiEndpointsAdministrationPlatformIssuePlatformUserTokenResponse | null>(null)
+
+  const tokenIssueRequests = createLatestRequestGuard()
 
   function openIssue(bot: PlatformUser): void {
+    tokenIssueRequests.invalidate()
     issueTarget.value = bot
     expiresInSeconds.value = 3600
+    issueReason.value = ''
     issuedToken.value = null
     issueOpen.value = true
   }
 
   async function issueToken(): Promise<void> {
-    if (!issueTarget.value?.id) return
+    if (issuing.value || !issueTarget.value?.id || issueReason.value.trim().length < 3) return
+    const request = tokenIssueRequests.begin()
     issuing.value = true
-    const { data, error } = await adminPlatformIssueBotToken({
+    const { data, error } = await adminPlatformIssueUserToken({
       path: { userId: issueTarget.value.id },
-      body: { expiresInSeconds: expiresInSeconds.value },
+      body: {
+        expiresInSeconds: expiresInSeconds.value,
+        reason: issueReason.value.trim(),
+      },
     })
+    if (!tokenIssueRequests.isCurrent(request) || !issueOpen.value) return
     issuing.value = false
     if (error) {
       toast.error(parseApiError(error).message)
@@ -129,6 +141,7 @@ export function useAdminPlatformBotsPage() {
       issuing,
       issueTarget,
       expiresInSeconds,
+      issueReason,
       issuedToken,
       openIssue,
       issueToken,
@@ -143,6 +156,12 @@ export function useAdminPlatformBotsPage() {
 
   function onClickIssueOpen(value: typeof viewState.issueOpen) {
     viewState.issueOpen = value
+    if (!value) {
+      tokenIssueRequests.invalidate()
+      issuing.value = false
+      issuedToken.value = null
+      issueReason.value = ''
+    }
   }
 
   return { ...viewBindings, onClickCreateOpen, onClickIssueOpen }

@@ -1,6 +1,11 @@
 import { client } from '../api/client.gen'
 import { shouldRefreshSession } from '../lib/auth-refresh'
-import { getAccessToken, refreshSession } from '../lib/session'
+import {
+  getAccessToken,
+  isImpersonatingSession,
+  refreshSession,
+  requestImpersonationEnd,
+} from '../lib/session'
 import { statusErrorMessage } from '../utils/api-error'
 import { prepareCommandRequest, observeCommandResponse } from '../utils/command-attempt'
 
@@ -24,6 +29,10 @@ export default defineNuxtPlugin(() => {
   client.interceptors.response.use(async (response, request, options) => {
     if (!shouldRefreshSession(response.status, request.headers)) {
       if (response.ok) observeCommandResponse(request, response.status)
+      return response
+    }
+    if (isImpersonatingSession()) {
+      requestImpersonationEnd('unauthorized')
       return response
     }
     const refreshed = await refreshSession()

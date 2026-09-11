@@ -3,7 +3,7 @@ import { toRefs } from 'vue'
 import type { DefaultLayoutViewState } from '~/features/shell/useDefaultLayout'
 
 const viewProps = defineProps<{ state: DefaultLayoutViewState }>()
-const { Bell, isHome, wallpaperActive, wallpaperStyle, isLoggedIn, isAdministrator, configuration, platformError, platformLoading, ensureLoaded, hasUnread, t, navItems, isActive, LanguageToggle, ThemeToggle, ThemePalettePanel, AccountPanel } = toRefs(viewProps.state)
+const { Bell, ShieldAlert, isHome, wallpaperActive, wallpaperStyle, isLoggedIn, isAdministrator, impersonation, impersonationEnding, impersonationExpiresAt, endImpersonation, configuration, platformError, platformLoading, ensureLoaded, hasUnread, t, navItems, isActive, LanguageToggle, ThemeToggle, ThemePalettePanel, AccountPanel } = toRefs(viewProps.state)
 </script>
 
 <template>
@@ -90,6 +90,32 @@ const { Bell, isHome, wallpaperActive, wallpaperStyle, isLoggedIn, isAdministrat
         </div>
       </div>
     </header>
+    <div v-if="impersonation" class="sticky top-20 z-30 mx-auto w-full max-w-[96rem] px-4 pb-3 md:px-6">
+      <Card
+        as="aside"
+        size="sm"
+        slot-name="impersonation-banner"
+        data-impersonation-banner="true"
+        aria-live="polite"
+        aria-atomic="true"
+      >
+        <CardContent class="flex flex-wrap items-center justify-between gap-3">
+          <span class="flex min-w-0 items-center gap-2">
+            <component :is="ShieldAlert" class="size-4 shrink-0" aria-hidden="true" />
+            <span class="min-w-0">
+              {{ t('ui.impersonatingUserUntil', {
+                user: impersonation.targetUserName,
+                expiresAt: impersonationExpiresAt,
+              }) }}
+            </span>
+          </span>
+          <Button type="button" size="sm" variant="outline" :disabled="impersonationEnding" @click="endImpersonation">
+            <Spinner v-if="impersonationEnding" data-icon="inline-start" />
+            {{ t('ui.exitImpersonation') }}
+          </Button>
+        </CardContent>
+      </Card>
+    </div>
     <Alert v-if="platformError" variant="destructive" class="m-3">
       <AlertDescription class="flex flex-wrap items-center justify-between gap-3">
         <span>{{ $message(platformError) }}</span>

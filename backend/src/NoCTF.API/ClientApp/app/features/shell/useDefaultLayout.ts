@@ -1,6 +1,6 @@
 import { markRaw } from 'vue'
 
-import { Bell, Database, Flag } from '@lucide/vue'
+import { Bell, Database, Flag, ShieldAlert } from '@lucide/vue'
 import AccountPanelComponent from '../account/AccountPanel.vue'
 import LanguageToggleComponent from '../LanguageToggle.vue'
 import ThemeToggleComponent from '../ThemeToggle.vue'
@@ -8,7 +8,15 @@ import ThemePalettePanelComponent from '../theme/ThemePalettePanel.vue'
 
 /** Owns state, effects and commands for DefaultLayout. */
 export function useDefaultLayout() {
-  const { user, isLoggedIn, isAdministrator, canOrganize } = useAuth()
+  const {
+    user,
+    isLoggedIn,
+    isAdministrator,
+    canOrganize,
+    impersonation,
+    impersonationEnding,
+    endImpersonation,
+  } = useAuth()
 
   const { configuration, error: platformError, loading: platformLoading, ensureLoaded } = usePlatform()
 
@@ -23,7 +31,15 @@ export function useDefaultLayout() {
 
   const { hasUnread, refreshUnread } = useNotificationUnread()
 
-  const { t } = useLocale()
+  const { locale, t } = useLocale()
+
+  const impersonationExpiresAt = computed(() => {
+    if (!impersonation.value) return ''
+    return new Intl.DateTimeFormat(locale.value, {
+      dateStyle: 'medium',
+      timeStyle: 'medium',
+    }).format(new Date(impersonation.value.expiresAt))
+  })
 
   let notificationTimer: ReturnType<typeof setInterval> | undefined
 
@@ -65,11 +81,16 @@ export function useDefaultLayout() {
 
   return {
       Bell,
+      ShieldAlert,
       isHome,
       wallpaperActive,
       wallpaperStyle,
       isLoggedIn,
       isAdministrator,
+      impersonation,
+      impersonationEnding,
+      impersonationExpiresAt,
+      endImpersonation,
       configuration,
       platformError,
       platformLoading,

@@ -3,7 +3,7 @@ import { toRefs } from 'vue'
 import type { AdminPlatformUsersPageViewState } from '~/features/routes/admin/platform/useAdminPlatformUsersPage'
 
 const viewProps = defineProps<{ state: AdminPlatformUsersPageViewState }>()
-const { KeyRound, Trash2, currentUser, loading, loadError, search, roleFilter, ROLE_LABELS, STATUS_LABELS, MANAGED_ACCOUNT_STATUS_OPTIONS, REFERENCE_LABELS, filteredUsers, detailOpen, detailLoading, detail, pendingRole, pendingAccountStatus, pendingEmailVerification, roleSaving, accountStatusSaving, emailVerificationSaving, invalidating, openDetail, saveRole, saveAccountStatus, saveEmailVerification, invalidateTokens, deleteOpen, previewLoading, preview, deletionMode, deletionReason, deleting, startDelete, confirmDelete, PrivateAccountPanel, AdminDateTime } = toRefs(viewProps.state)
+const { Copy, KeyRound, LogIn, ShieldOff, Trash2, currentUser, loading, loadError, search, roleFilter, ROLE_LABELS, STATUS_LABELS, MANAGED_ACCOUNT_STATUS_OPTIONS, REFERENCE_LABELS, filteredUsers, detailOpen, detailLoading, detail, pendingRole, pendingAccountStatus, pendingEmailVerification, roleSaving, accountStatusSaving, emailVerificationSaving, invalidating, activeTokens, activeTokensLoading, revokingTokenId, tokenOpen, tokenIntent, tokenIssuing, tokenExpiresInSeconds, tokenReason, issuedToken, openToken, setTokenOpen, issueToken, copyIssuedToken, revokeIssuedToken, openDetail, saveRole, saveAccountStatus, saveEmailVerification, invalidateTokens, deleteOpen, previewLoading, preview, deletionMode, deletionReason, deleting, startDelete, confirmDelete, PrivateAccountPanel, AdminDateTime } = toRefs(viewProps.state)
 </script>
 
 <template>
@@ -239,6 +239,71 @@ const { KeyRound, Trash2, currentUser, loading, loadError, search, roleFilter, R
 
           <Separator />
 
+          <section class="flex flex-col gap-4" aria-labelledby="user-issued-access">
+            <div class="flex flex-wrap items-center justify-between gap-3">
+              <h3 id="user-issued-access" class="font-semibold">{{ $t('ui.administratorIssuedAccess') }}</h3>
+              <div class="flex flex-wrap gap-2">
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  :disabled="detail.accountStatus !== 'Active'"
+                  @click="openToken(detail, 'issue')"
+                >
+                  <KeyRound data-icon="inline-start" />{{ $t('ui.issueJwt') }}
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  :disabled="detail.accountStatus !== 'Active'"
+                  @click="openToken(detail, 'impersonate')"
+                >
+                  <LogIn data-icon="inline-start" />{{ $t('ui.signInAsThisUser') }}
+                </Button>
+              </div>
+            </div>
+            <p v-if="detail.accountStatus !== 'Active'" class="text-sm text-muted-foreground">
+              {{ $t('ui.onlyActiveAccountsCanReceiveAdministratorIssuedTokens') }}
+            </p>
+            <div v-if="activeTokensLoading" class="flex flex-col gap-2">
+              <Skeleton v-for="i in 2" :key="i" class="h-16 w-full" />
+            </div>
+            <p v-else-if="activeTokens.length === 0" class="text-sm text-muted-foreground">
+              {{ $t('ui.noActiveTokensIssuedByYou') }}
+            </p>
+            <div v-else class="flex flex-col gap-2">
+              <div
+                v-for="token in activeTokens"
+                :key="token.jwtId"
+                class="flex flex-wrap items-center justify-between gap-3 rounded-xl bg-muted/40 px-4 py-3"
+              >
+                <div class="min-w-0 flex-1 basis-64 text-sm">
+                  <p class="break-words font-medium">{{ token.reason }}</p>
+                  <p class="mt-1 text-xs text-muted-foreground">
+                    {{ $t('ui.creationTime') }}: <component :is="AdminDateTime" :value="token.issuedAt" />
+                  </p>
+                  <p class="mt-1 text-xs text-muted-foreground">
+                    {{ $t('ui.expiresAt') }} <component :is="AdminDateTime" :value="token.expiresAt" />
+                  </p>
+                  <p class="mt-1 select-all break-all font-mono text-xs text-muted-foreground">{{ token.jwtId }}</p>
+                </div>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  :disabled="revokingTokenId !== null"
+                  @click="revokeIssuedToken(token)"
+                >
+                  <Spinner v-if="revokingTokenId === token.jwtId" data-icon="inline-start" />
+                  <ShieldOff v-else data-icon="inline-start" />
+                  {{ $t('ui.revokeThisToken') }}
+                </Button>
+              </div>
+            </div>
+          </section>
+
+          <Separator />
+
           <div class="flex flex-col gap-3">
             <h3 class="text-sm font-medium">{{ $t('ui.dangerousOperation') }}</h3>
             <div class="flex flex-wrap gap-2">
@@ -268,6 +333,66 @@ const { KeyRound, Trash2, currentUser, loading, loadError, search, roleFilter, R
         </ScrollSurface>
       </SheetContent>
     </Sheet>
+
+    <Dialog :open="tokenOpen" @update:open="setTokenOpen">
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>
+            {{ tokenIntent === 'impersonate' ? $t('ui.signInAsThisUser') : $t('ui.issueAccessToken') }}
+          </DialogTitle>
+          <DialogDescription>
+            {{ tokenIntent === 'impersonate'
+              ? $t('ui.impersonationTokenDescription', { user: detail?.userName ?? '-' })
+              : $t('ui.issueUserAccessTokenFor', { user: detail?.userName ?? '-' }) }}
+          </DialogDescription>
+        </DialogHeader>
+        <template v-if="!issuedToken">
+          <UiForm validation="feature" class="flex flex-col gap-4" @submit.prevent="issueToken">
+            <FieldGroup>
+              <Field>
+                <FieldLabel for="user-token-ttl">{{ $t('ui.validityPeriodSeconds') }}</FieldLabel>
+                <NumberInput id="user-token-ttl" v-model.number="tokenExpiresInSeconds" min="60" max="31536000" step="60" required />
+                <FieldDescription>{{ $t('ui.tokenLifetimeRange') }}</FieldDescription>
+              </Field>
+              <Field>
+                <FieldLabel for="user-token-reason">{{ $t('ui.issuanceReason') }}</FieldLabel>
+                <Textarea id="user-token-reason" v-model="tokenReason" minlength="3" maxlength="500" rows="3" required />
+                <FieldDescription>{{ $t('ui.issuanceReasonAuditNotice') }}</FieldDescription>
+              </Field>
+            </FieldGroup>
+            <DialogFooter>
+              <Button type="button" variant="outline" @click="setTokenOpen(false)">{{ $t('ui.cancel') }}</Button>
+              <Button type="submit" :disabled="tokenIssuing || tokenReason.trim().length < 3 || tokenExpiresInSeconds < 60 || tokenExpiresInSeconds > 31536000">
+                <Spinner v-if="tokenIssuing" data-icon="inline-start" />
+                {{ tokenIntent === 'impersonate' ? $t('ui.issueAndSignIn') : $t('ui.issue') }}
+              </Button>
+            </DialogFooter>
+          </UiForm>
+        </template>
+        <template v-else>
+          <Alert>
+            <AlertDescription>{{ $t('ui.theTokenIsOnlyDisplayedOncePleaseCopyAndSave') }}</AlertDescription>
+          </Alert>
+          <FieldGroup>
+            <Field>
+              <FieldLabel for="issued-user-token">{{ $t('ui.accessToken') }}</FieldLabel>
+              <div class="flex items-center gap-2">
+                <Input id="issued-user-token" :model-value="issuedToken.accessToken" readonly class="font-mono text-xs" />
+                <Button type="button" size="icon" variant="outline" :aria-label="$t('ui.copyToken')" @click="copyIssuedToken">
+                  <Copy />
+                </Button>
+              </div>
+              <FieldDescription>
+                {{ $t('ui.expirationDate') }} <component :is="AdminDateTime" :value="issuedToken.expiresAt" />
+              </FieldDescription>
+            </Field>
+          </FieldGroup>
+          <DialogFooter>
+            <Button type="button" @click="setTokenOpen(false)">{{ $t('ui.iHaveSavedClose') }}</Button>
+          </DialogFooter>
+        </template>
+      </DialogContent>
+    </Dialog>
 
     <AlertDialog v-model:open="deleteOpen">
       <AlertDialogContent>

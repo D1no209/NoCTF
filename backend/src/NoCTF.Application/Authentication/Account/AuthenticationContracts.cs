@@ -11,9 +11,18 @@ public sealed record AuthenticatedUser(
     UserKind Kind,
     int TokenVersion,
     bool EmailVerified = true);
-public sealed record IssuedAccessToken(string Token, DateTimeOffset ExpiresAt);
+public sealed record IssuedAccessToken(
+    string Token,
+    DateTimeOffset ExpiresAt,
+    Guid JwtId = default);
 public sealed record IssuedRefreshToken(string Token, DateTimeOffset ExpiresAt);
 public sealed record RefreshTokenPrincipal(Guid UserId, int TokenVersion);
+
+public static class AccessTokenClaims
+{
+    public const string Impersonation = "impersonation";
+    public const string ImpersonatorId = "impersonator_id";
+}
 public sealed record UserProfile(
     Guid Id,
     string UserName,
@@ -118,7 +127,8 @@ public interface IAccessTokenIssuer
     IssuedAccessToken Issue(
         AuthenticatedUser user,
         DateTimeOffset now,
-        TimeSpan? lifetime = null);
+        TimeSpan? lifetime = null,
+        Guid? impersonatorUserId = null);
     IssuedRefreshToken IssueRefresh(AuthenticatedUser user);
     RefreshTokenPrincipal? ValidateRefresh(string token);
 }

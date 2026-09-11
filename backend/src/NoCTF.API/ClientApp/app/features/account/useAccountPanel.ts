@@ -18,7 +18,8 @@ export type AccountPanelSection = 'profile' | 'identity' | 'wallpaper' | 'securi
 
 /** Owns the compact account popover, drafts and account commands across route changes. */
 export function useAccountPanel() {
-  const { user, fetchMe, logout, logoutAll } = useAuth()
+  const { user, fetchMe, logout, logoutAll, impersonation } = useAuth()
+  const isImpersonating = computed(() => impersonation.value !== null)
   const { configuration: platformConfiguration } = usePlatform()
   const maximumAvatarBytes = computed(() =>
     platformConfiguration.value?.imageUploadLimits?.maximumAvatarBytes ?? null)
@@ -357,6 +358,7 @@ export function useAccountPanel() {
     ImageIcon,
     LogOut,
     user,
+    isImpersonating,
     fetchMe,
     open,
     activeSection,

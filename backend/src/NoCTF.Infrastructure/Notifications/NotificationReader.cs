@@ -142,7 +142,10 @@ public sealed class NotificationReader(NoCtfDbContext db) : INotificationReader
 
     private IQueryable<NotificationView> Project(IQueryable<Notification> query) =>
         query.Where(notification => notification.Kind != NotificationKind.AuthenticationSecurityActivity
-                && notification.Kind != NotificationKind.HttpCommandReceipt)
+                && notification.Kind != NotificationKind.HttpCommandReceipt
+                && notification.Kind != NotificationKind.PlatformUserAccessTokenIssued
+                && notification.Kind != NotificationKind.PlatformUserAccessTokenRevoked
+                && notification.Kind != NotificationKind.PlatformUserTokensInvalidated)
             .Select(notification => new NotificationView(
                 notification.Id,
                 notification.SourceType,
@@ -211,7 +214,12 @@ public sealed class NotificationReader(NoCtfDbContext db) : INotificationReader
             FROM notifications AS n
             JOIN visible_roots AS visible
               ON n.id = visible.root_id OR n.thread_root_id = visible.root_id
-            """).AsNoTracking().Where(item => item.Kind != NotificationKind.AuthenticationSecurityActivity && item.Kind != NotificationKind.HttpCommandReceipt);
+            """).AsNoTracking().Where(item =>
+                item.Kind != NotificationKind.AuthenticationSecurityActivity
+                && item.Kind != NotificationKind.HttpCommandReceipt
+                && item.Kind != NotificationKind.PlatformUserAccessTokenIssued
+                && item.Kind != NotificationKind.PlatformUserAccessTokenRevoked
+                && item.Kind != NotificationKind.PlatformUserTokensInvalidated);
     }
 
     private async Task<IQueryable<Notification>> VisibleToInMemoryAsync(
@@ -264,7 +272,12 @@ public sealed class NotificationReader(NoCtfDbContext db) : INotificationReader
             .Select(notification => notification.ThreadRootId ?? notification.Id));
 
         return db.Notifications.AsNoTracking()
-            .Where(notification => notification.Kind != NotificationKind.AuthenticationSecurityActivity && notification.Kind != NotificationKind.HttpCommandReceipt)
+            .Where(notification =>
+                notification.Kind != NotificationKind.AuthenticationSecurityActivity
+                && notification.Kind != NotificationKind.HttpCommandReceipt
+                && notification.Kind != NotificationKind.PlatformUserAccessTokenIssued
+                && notification.Kind != NotificationKind.PlatformUserAccessTokenRevoked
+                && notification.Kind != NotificationKind.PlatformUserTokensInvalidated)
             .Where(notification => visibleRootIds.Contains(
                 notification.ThreadRootId ?? notification.Id));
     }
