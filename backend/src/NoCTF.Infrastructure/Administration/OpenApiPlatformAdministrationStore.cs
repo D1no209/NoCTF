@@ -33,6 +33,14 @@ public sealed class NoOpPlatformAdministrationStore : IPlatformAdministrationSto
         CancellationToken cancellationToken) =>
         Task.FromResult(new UpdatePlatformUserEmailVerificationResult(
             UpdatePlatformUserEmailVerificationState.UserNotFound));
+    public Task<PatchPlatformUserResult> PatchUserAsync(
+        Guid userId,
+        Guid actorUserId,
+        Action<User> apply,
+        bool? emailVerified,
+        DateTimeOffset now,
+        CancellationToken cancellationToken) =>
+        Task.FromResult(new PatchPlatformUserResult(PatchPlatformUserState.UserNotFound));
     public Task<PlatformUserView?> InvalidateTokensAsync(
         Guid userId, DateTimeOffset now, CancellationToken cancellationToken) =>
         Task.FromResult<PlatformUserView?>(null);

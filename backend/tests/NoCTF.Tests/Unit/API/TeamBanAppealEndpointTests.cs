@@ -45,12 +45,12 @@ public sealed class TeamBanAppealEndpointTests
         using var listResponse = await client.GetAsync(ListUri());
         var page = await listResponse.Content
             .ReadFromJsonAsync<AdminTeamBanAppealListResponse>();
-        using var acceptResponse = await client.PostAsJsonAsync(
-            $"{ListUri()}/{AppealId}/accept",
-            new { reason = "appeal evidence accepted" });
-        using var upholdResponse = await client.PostAsJsonAsync(
-            $"{ListUri()}/{AppealId}/uphold",
-            new { reason = "appeal evidence rejected" });
+        using var acceptResponse = await client.PutAsJsonAsync(
+            $"{ListUri()}/{AppealId}/resolution",
+            new { resolution = "Accepted", reason = "appeal evidence accepted" });
+        using var upholdResponse = await client.PutAsJsonAsync(
+            $"{ListUri()}/{AppealId}/resolution",
+            new { resolution = "Upheld", reason = "appeal evidence rejected" });
 
         await Assert.That(listResponse.StatusCode).IsEqualTo(HttpStatusCode.OK);
         await Assert.That(page).IsNotNull();
@@ -78,9 +78,9 @@ public sealed class TeamBanAppealEndpointTests
         using var listResponse = await client.GetAsync(ListUri());
         var page = await listResponse.Content
             .ReadFromJsonAsync<AdminTeamBanAppealListResponse>();
-        using var resolveResponse = await client.PostAsJsonAsync(
-            $"{ListUri()}/{AppealId}/accept",
-            new { reason = "observer cannot resolve this appeal" });
+        using var resolveResponse = await client.PutAsJsonAsync(
+            $"{ListUri()}/{AppealId}/resolution",
+            new { resolution = "Accepted", reason = "observer cannot resolve this appeal" });
 
         await Assert.That(listResponse.StatusCode).IsEqualTo(HttpStatusCode.OK);
         await Assert.That(page).IsNotNull();
@@ -107,8 +107,7 @@ public sealed class TeamBanAppealEndpointTests
             options.DisableAutoDiscovery = true;
             options.Assemblies = [typeof(ListTeamBanAppealsEndpoint).Assembly];
             options.Filter = type => type == typeof(ListTeamBanAppealsEndpoint)
-                || type == typeof(AcceptTeamBanAppealEndpoint)
-                || type == typeof(UpholdTeamBanAppealEndpoint);
+                || type == typeof(ResolveTeamBanAppealEndpoint);
         });
         builder.Services.SwaggerDocument();
         builder.Services

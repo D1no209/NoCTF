@@ -62,12 +62,9 @@ public sealed class HumanVerificationOpenApiTests
         {
             "/api/v1/auth/login",
             "/api/v1/auth/register",
-            "/api/v1/competitions/{competitionId}/challenges/{competitionChallengeId}/runtime/start",
-            "/api/v1/competitions/{competitionId}/challenges/{competitionChallengeId}/runtime/stop",
-            "/api/v1/competitions/{competitionId}/challenges/{competitionChallengeId}/runtime/reset",
-            "/api/v1/competitions/{competitionId}/challenges/{competitionChallengeId}/runtime/extend",
+            "/api/v1/competitions/{competitionId}/challenges/{competitionChallengeId}/runtimes",
+            "/api/v1/competitions/{competitionId}/challenges/{competitionChallengeId}/runtimes/{runtimeInstanceId}",
             "/api/v1/competitions/{competitionId}/challenges/{competitionChallengeId}/flag-submissions",
-            "/api/v1/competitions/{competitionId}/challenges/{competitionChallengeId}/practice-flag",
             "/api/v1/competitions/{competitionId}/challenges/{competitionChallengeId}/awdp-break-flag-judgement",
             "/api/v1/competitions/{competitionId}/challenges/{competitionChallengeId}/awdp-defense-targets",
             "/api/v1/competitions/{competitionId}/challenges/{competitionChallengeId}/awdp-defense-targets/{runtimeInstanceId}/fix"

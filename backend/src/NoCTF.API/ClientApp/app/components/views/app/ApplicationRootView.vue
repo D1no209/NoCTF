@@ -12,6 +12,6 @@ const { isDark, pageTransition, HumanVerificationGate } = toRefs(viewProps.state
     <NuxtPage :transition="pageTransition" />
   </NuxtLayout>
   <component :is="HumanVerificationGate" />
-  <Sonner rich-colors close-button position="bottom-right" :visible-toasts="3" expand :theme="isDark ? 'dark' : 'light'" />
+  <Sonner rich-colors close-button position="bottom-right" :visible-toasts="2" :theme="isDark ? 'dark' : 'light'" />
   </TooltipProvider>
 </template>

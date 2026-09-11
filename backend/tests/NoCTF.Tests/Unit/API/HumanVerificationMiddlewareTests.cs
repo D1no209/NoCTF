@@ -2,9 +2,12 @@ using System.Text.Json;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Options;
 using Microsoft.Extensions.DependencyInjection;
+using FluentStorage.Storage;
 using NoCTF.API.Security;
+using NoCTF.Application.Administration.PlatformConfiguration;
 using NoCTF.Application.Admission;
 using NoCTF.Application.Authentication.Privacy;
+using NoCTF.Application.Storage;
 using NSubstitute;
 
 namespace NoCTF.Tests.Unit.API;
@@ -17,7 +20,7 @@ public sealed class HumanVerificationMiddlewareTests
         .BuildServiceProvider();
 
     [Test]
-    public async Task None_and_unmarked_endpoints_bypass_verification()
+    public async Task Disabled_switch_none_provider_and_unmarked_endpoints_bypass_verification()
     {
         var verifier = Substitute.For<IHumanVerificationVerifier>();
         var source = Substitute.For<IRequestSourceAddress>();
@@ -33,16 +36,26 @@ public sealed class HumanVerificationMiddlewareTests
             disabled,
             verifier,
             source,
+            PlatformConfiguration(enabled: true),
             Options.Create(new HumanVerificationOptions()));
+
+        var administrativelyDisabled = Context(HumanVerificationAction.Login);
+        await middleware.InvokeAsync(
+            administrativelyDisabled,
+            verifier,
+            source,
+            PlatformConfiguration(enabled: false),
+            Options.Create(TurnstileOptions()));
 
         var unmarked = Context(action: null);
         await middleware.InvokeAsync(
             unmarked,
             verifier,
             source,
+            PlatformConfiguration(enabled: true),
             Options.Create(TurnstileOptions()));
 
-        await Assert.That(calls).IsEqualTo(2);
+        await Assert.That(calls).IsEqualTo(3);
         await verifier.DidNotReceiveWithAnyArgs().VerifyAsync(default!, default);
     }
 
@@ -58,6 +71,7 @@ public sealed class HumanVerificationMiddlewareTests
             missing,
             verifier,
             source,
+            PlatformConfiguration(enabled: true),
             Options.Create(TurnstileOptions()));
 
         var oversized = Context(HumanVerificationAction.Login);
@@ -67,6 +81,7 @@ public sealed class HumanVerificationMiddlewareTests
             oversized,
             verifier,
             source,
+            PlatformConfiguration(enabled: true),
             Options.Create(TurnstileOptions()));
 
         await Assert.That(missing.Response.StatusCode).IsEqualTo(StatusCodes.Status403Forbidden);
@@ -97,6 +112,7 @@ public sealed class HumanVerificationMiddlewareTests
             context,
             verifier,
             source,
+            PlatformConfiguration(enabled: true),
             Options.Create(TurnstileOptions()));
 
         await Assert.That(reachedEndpoint).IsTrue();
@@ -127,6 +143,7 @@ public sealed class HumanVerificationMiddlewareTests
             context,
             verifier,
             Substitute.For<IRequestSourceAddress>(),
+            PlatformConfiguration(enabled: true),
             Options.Create(TurnstileOptions()));
 
         await Assert.That(context.Response.StatusCode).IsEqualTo(expectedStatus);
@@ -160,6 +177,20 @@ public sealed class HumanVerificationMiddlewareTests
             AllowedHostnames = ["ctf.example.test"]
         }
     };
+
+    private static ManagePlatformConfiguration PlatformConfiguration(bool enabled)
+    {
+        var store = Substitute.For<IPlatformConfigurationStore>();
+        store.GetAsync(Arg.Any<CancellationToken>()).Returns(new PlatformConfigurationView(
+            "NoCTF", null, null, enabled, DateTimeOffset.UnixEpoch));
+        var objects = Substitute.For<IStore>();
+        return new ManagePlatformConfiguration(
+            store,
+            objects,
+            new ManagedFileUploads(
+                Substitute.For<IManagedFileUploadRegistry>(),
+                objects));
+    }
 
     private static async Task<string?> ProblemCodeAsync(DefaultHttpContext context)
     {

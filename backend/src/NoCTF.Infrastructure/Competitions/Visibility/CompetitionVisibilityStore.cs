@@ -34,7 +34,7 @@ public sealed class CompetitionVisibilityStore(
         UpdateCompetitionVisibilityCommand command,
         CancellationToken ct)
     {
-        await using var transaction = await db.Database.BeginTransactionAsync(
+        await using var transaction = await AggregateCompatibleTransaction.BeginAsync(db,
             IsolationLevel.Serializable,
             ct);
         if (await CompetitionStateReader.ReadAsync(db, command.CompetitionId, ct) is null)

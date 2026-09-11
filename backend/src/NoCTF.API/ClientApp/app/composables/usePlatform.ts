@@ -15,8 +15,7 @@ export function usePlatform() {
     return data ?? null
   }
 
-  async function ensureLoaded(): Promise<void> {
-    if (configuration.value) return
+  async function refresh(): Promise<void> {
     platformLoadPromise ??= (async () => {
       loading.value = true
       try {
@@ -24,6 +23,7 @@ export function usePlatform() {
         error.value = null
       }
       catch (requestError) {
+        configuration.value = null
         error.value = parseApiError(requestError, translate("ui.failedToLoadPlatformConfiguration")).message
       }
       finally {
@@ -34,5 +34,10 @@ export function usePlatform() {
     await platformLoadPromise
   }
 
-  return { configuration, error, loading, ensureLoaded }
+  async function ensureLoaded(): Promise<void> {
+    if (configuration.value) return
+    await refresh()
+  }
+
+  return { configuration, error, loading, ensureLoaded, refresh }
 }

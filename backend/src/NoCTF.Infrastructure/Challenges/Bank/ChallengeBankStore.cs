@@ -33,7 +33,7 @@ public sealed class ChallengeBankStore(
         CancellationToken ct)
     {
         var challengeId = command.ChallengeId ?? Guid.CreateVersion7(command.CreatedAt);
-        await using var transaction = await db.Database.BeginTransactionAsync(ct);
+        await using var transaction = await AggregateCompatibleTransaction.BeginAsync(db, ct);
         var eligibility = await ResourceManagerRoleGuard.AcquireAndCheckAsync(
             db,
             [command.OwnerId],
@@ -121,7 +121,7 @@ public sealed class ChallengeBankStore(
         UpdateChallengeTemplateCommand command,
         CancellationToken ct)
     {
-        await using var transaction = await db.Database.BeginTransactionAsync(ct);
+        await using var transaction = await AggregateCompatibleTransaction.BeginAsync(db, ct);
         var entity = await ChallengeTemplateCriticalSection.AcquireAsync(
             db,
             command.ChallengeId,
@@ -241,7 +241,7 @@ public sealed class ChallengeBankStore(
         DateTimeOffset now,
         CancellationToken ct)
     {
-        await using var transaction = await db.Database.BeginTransactionAsync(ct);
+        await using var transaction = await AggregateCompatibleTransaction.BeginAsync(db, ct);
         var entity = await ChallengeTemplateCriticalSection.AcquireAsync(db, challengeId, ct);
         if (entity is null
             || entity.DeletedAt is not null
@@ -276,7 +276,7 @@ public sealed class ChallengeBankStore(
         DateTimeOffset now,
         CancellationToken ct)
     {
-        await using var transaction = await db.Database.BeginTransactionAsync(ct);
+        await using var transaction = await AggregateCompatibleTransaction.BeginAsync(db, ct);
         var entity = await ChallengeTemplateCriticalSection.AcquireAsync(db, challengeId, ct);
         if (entity is null
             || entity.DeletedAt is null
@@ -317,7 +317,7 @@ public sealed class ChallengeBankStore(
         CancellationToken ct)
     {
         var normalized = managerIds.Distinct().Order().ToArray();
-        await using var transaction = await db.Database.BeginTransactionAsync(ct);
+        await using var transaction = await AggregateCompatibleTransaction.BeginAsync(db, ct);
         var entity = await ChallengeTemplateCriticalSection.AcquireAsync(db, challengeId, ct);
         if (entity is null
             || entity.DeletedAt is not null
@@ -363,7 +363,7 @@ public sealed class ChallengeBankStore(
         DateTimeOffset now,
         CancellationToken ct)
     {
-        await using var transaction = await db.Database.BeginTransactionAsync(ct);
+        await using var transaction = await AggregateCompatibleTransaction.BeginAsync(db, ct);
         var entity = await ChallengeTemplateCriticalSection.AcquireAsync(db, challengeId, ct);
         if (entity is null
             || entity.DeletedAt is not null

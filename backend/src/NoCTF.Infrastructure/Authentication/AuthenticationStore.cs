@@ -27,7 +27,8 @@ public sealed class AuthenticationStore(
     ILogger<AuthenticationStore>? logger = null,
     NoCTF.Application.Authentication.Privacy.IRequestSourceAddress? source = null)
     : IUserAuthenticationStore,
-        IUserRegistrationStore
+        IUserRegistrationStore,
+        ICurrentUserProfilePatchStore
 {
     private readonly TimeProvider timeProvider = clock ?? TimeProvider.System;
     private readonly ITransactionalMessageOutbox outbox =
@@ -87,7 +88,9 @@ public sealed class AuthenticationStore(
                 user.Description,
                 user.AvatarFileId,
                 user.WallpaperFileId,
-                user.WallpaperEnabled))
+                user.WallpaperEnabled,
+                user.SchoolFullName,
+                user.SchoolStudentNumber))
             .SingleOrDefaultAsync(ct);
 
     public async Task<UserProfile?> UpdateProfileAsync(
@@ -107,6 +110,15 @@ public sealed class AuthenticationStore(
         await db.SaveChangesAsync(ct);
         return ToProfile(user);
     }
+
+    public Task<User?> FindForPatchAsync(Guid userId, CancellationToken ct) =>
+        db.Users.SingleOrDefaultAsync(user =>
+            user.Id == userId && user.AccountStatus == UserAccountStatus.Active,
+            ct);
+
+    public Task SaveAsync(User user, CancellationToken ct) => db.SaveChangesAsync(ct);
+
+    public void DiscardChanges() => db.ChangeTracker.Clear();
 
     public async Task<UserAvatarReplacement?> ReplaceAvatarAsync(
         Guid userId,
@@ -394,7 +406,9 @@ public sealed class AuthenticationStore(
             user.Description,
             user.AvatarFileId,
             user.WallpaperFileId,
-            user.WallpaperEnabled);
+            user.WallpaperEnabled,
+            user.SchoolFullName,
+            user.SchoolStudentNumber);
 
     private User CreateUser(
         Guid userId,

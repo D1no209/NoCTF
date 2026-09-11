@@ -74,7 +74,8 @@ public sealed class CtfFullBoundaryTests
         using var upload = new MultipartFormDataContent();
         using var attachmentContent = new ByteArrayContent(attachmentBytes);
         attachmentContent.Headers.ContentType = new MediaTypeHeaderValue("text/plain");
-        upload.Add(attachmentContent, "File", "ctf-e2e.txt");
+        upload.Add(new StringContent("All"), "DeliveryPolicy");
+        upload.Add(attachmentContent, "Files", "ctf-e2e.txt");
         using var uploadResponse = await admin.PostAsync(
             $"/api/v1/admin/challenges/{templateId}/attachments",
             upload,
@@ -83,7 +84,7 @@ public sealed class CtfFullBoundaryTests
             uploadResponse,
             HttpStatusCode.Created,
             cancellationToken);
-        var attachmentId = attachment.GetProperty("id").GetGuid();
+        var attachmentId = attachment.GetProperty("items")[0].GetProperty("id").GetGuid();
 
         var challenge = await SendJsonAsync(
             admin,
@@ -103,16 +104,18 @@ public sealed class CtfFullBoundaryTests
         }, JsonOptions);
         await SendJsonAsync(
             admin,
-            HttpMethod.Put,
-            $"/api/v1/admin/competitions/{competitionId}/challenges/{competitionChallengeId}/configuration",
-            new { json = configurationJson },
-            HttpStatusCode.OK,
-            cancellationToken);
-        await SendJsonAsync(
-            admin,
-            HttpMethod.Put,
+            HttpMethod.Patch,
             $"/api/v1/admin/competitions/{competitionId}/challenges/{competitionChallengeId}",
-            new { customTitle = (string?)null, order = 0, isPublished = true },
+            new
+            {
+                presentation = new
+                {
+                    customTitle = (string?)null,
+                    order = 0,
+                    isPublished = true
+                },
+                rules = new { json = configurationJson }
+            },
             HttpStatusCode.OK,
             cancellationToken);
 
@@ -161,33 +164,23 @@ public sealed class CtfFullBoundaryTests
         }, JsonOptions);
         await SendJsonAsync(
             admin,
-            HttpMethod.Put,
-            $"/api/v1/admin/competitions/{competitionId}/challenges/{composeCompetitionChallengeId}/configuration",
-            new
-            {
-                json = composeConfigurationJson
-            },
-            HttpStatusCode.OK,
-            cancellationToken);
-        await SendJsonAsync(
-            admin,
-            HttpMethod.Put,
+            HttpMethod.Patch,
             $"/api/v1/admin/competitions/{competitionId}/challenges/{composeCompetitionChallengeId}",
             new
             {
-                customTitle = (string?)null,
-                order = 1,
-                isPublished = true
+                presentation = new
+                {
+                    customTitle = (string?)null,
+                    order = 1,
+                    isPublished = true
+                },
+                rules = new { json = composeConfigurationJson }
             },
             HttpStatusCode.OK,
             cancellationToken);
 
-        await SendWithoutBodyAsync(
-            admin,
-            HttpMethod.Post,
-            $"/api/v1/admin/competitions/{competitionId}/make-visible",
-            HttpStatusCode.NoContent,
-            cancellationToken);
+        await E2ELifecycle.SetStatusAsync(
+            admin, competitionId, "Visible", cancellationToken);
         await SendJsonAsync(
             anonymous,
             HttpMethod.Post,
@@ -263,12 +256,8 @@ public sealed class CtfFullBoundaryTests
         var teammateId = memberIds.Single(id => id != captainId);
 
         await E2ELifecycle.MakeScheduleDueAsync(admin, competitionId, cancellationToken);
-        await SendWithoutBodyAsync(
-            admin,
-            HttpMethod.Post,
-            $"/api/v1/admin/competitions/{competitionId}/publish",
-            HttpStatusCode.NoContent,
-            cancellationToken);
+        await E2ELifecycle.SetStatusAsync(
+            admin, competitionId, "Published", cancellationToken);
         await E2ELifecycle.StartOrObserveRunningAsync(admin, competitionId, cancellationToken);
 
         var listedAttachments = await GetJsonAsync(
@@ -285,16 +274,17 @@ public sealed class CtfFullBoundaryTests
         Guid? composeRuntimeInstanceId = null;
         try
         {
-            var runtimeAccepted = await SendWithoutBodyForJsonAsync(
+            var runtimeAccepted = await SendJsonAsync(
                 player,
                 HttpMethod.Post,
-                $"/api/v1/competitions/{competitionId}/challenges/{competitionChallengeId}/runtime/start",
+                $"/api/v1/competitions/{competitionId}/challenges/{competitionChallengeId}/runtimes",
+                new { replacesRuntimeId = (Guid?)null },
                 HttpStatusCode.Accepted,
                 cancellationToken);
             runtimeInstanceId = runtimeAccepted.GetProperty("runtimeInstanceId").GetGuid();
             var runtime = await PollJsonAsync(
                 player,
-                $"/api/v1/competitions/{competitionId}/challenges/{competitionChallengeId}/runtime",
+                $"/api/v1/competitions/{competitionId}/challenges/{competitionChallengeId}/runtimes/current",
                 value => value.GetProperty("state").GetString() == "Running",
                 TimeSpan.FromSeconds(90),
                 cancellationToken);
@@ -303,10 +293,11 @@ public sealed class CtfFullBoundaryTests
             var flag = await PollTextAsync(runtimeUrl, TimeSpan.FromSeconds(30), cancellationToken);
             await Assert.That(flag).StartsWith("flag{");
 
-            var composeRuntimeAccepted = await SendWithoutBodyForJsonAsync(
+            var composeRuntimeAccepted = await SendJsonAsync(
                 player,
                 HttpMethod.Post,
-                $"/api/v1/competitions/{competitionId}/challenges/{composeCompetitionChallengeId}/runtime/start",
+                $"/api/v1/competitions/{competitionId}/challenges/{composeCompetitionChallengeId}/runtimes",
+                new { replacesRuntimeId = (Guid?)null },
                 HttpStatusCode.Accepted,
                 cancellationToken);
             composeRuntimeInstanceId = composeRuntimeAccepted
@@ -314,7 +305,7 @@ public sealed class CtfFullBoundaryTests
                 .GetGuid();
             var composeRuntime = await PollJsonAsync(
                 player,
-                $"/api/v1/competitions/{competitionId}/challenges/{composeCompetitionChallengeId}/runtime",
+                $"/api/v1/competitions/{competitionId}/challenges/{composeCompetitionChallengeId}/runtimes/current",
                 value => value.GetProperty("state").GetString() == "Running",
                 TimeSpan.FromSeconds(90),
                 cancellationToken);
@@ -476,10 +467,11 @@ public sealed class CtfFullBoundaryTests
                 expectedScore: 475,
                 cancellationToken);
 
-            var rejudgeAccepted = await SendWithoutBodyForJsonAsync(
+            var rejudgeAccepted = await SendJsonAsync(
                 admin,
                 HttpMethod.Post,
-                $"/api/v1/admin/competitions/{competitionId}/gameplay-facts/{gameplayFactId}/rejudge",
+                $"/api/v1/admin/competitions/{competitionId}/gameplay-fact-rejudgements",
+                new { targetKind = "GameplayFact", targetId = gameplayFactId },
                 HttpStatusCode.Accepted,
                 cancellationToken);
             var rejudgeCutoff = rejudgeAccepted.GetProperty("cutoff").GetDateTimeOffset();
@@ -508,15 +500,14 @@ public sealed class CtfFullBoundaryTests
             {
                 if (runtime.RuntimeId is null)
                     continue;
-                using var stop = await player.PostAsync(
-                    $"/api/v1/competitions/{competitionId}/challenges/{runtime.ChallengeId}/runtime/stop",
-                    null,
+                using var stop = await player.DeleteAsync(
+                    $"/api/v1/competitions/{competitionId}/challenges/{runtime.ChallengeId}/runtimes/{runtime.RuntimeId}",
                     CancellationToken.None);
                 if (stop.StatusCode == HttpStatusCode.Accepted)
                 {
                     await PollJsonAsync(
                         player,
-                        $"/api/v1/competitions/{competitionId}/challenges/{runtime.ChallengeId}/runtime",
+                        $"/api/v1/competitions/{competitionId}/challenges/{runtime.ChallengeId}/runtimes/current",
                         value => value.GetProperty("state").GetString() == "Stopped",
                         TimeSpan.FromSeconds(60),
                         CancellationToken.None);

@@ -18,6 +18,7 @@ internal sealed class PlatformSettingsConfiguration
             Name = "NoCTF",
             Description = null,
             LogoFileId = null,
+            HumanVerificationEnabled = true,
             EmailVerificationEnabled = false,
             EmailPublicBaseUrl = "http://localhost:5000",
             EmailVerificationTokenLifetimeMinutes = 1440,

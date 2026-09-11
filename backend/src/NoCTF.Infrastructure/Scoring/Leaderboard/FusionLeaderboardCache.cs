@@ -12,6 +12,7 @@ using NoCTF.Domain.Gameplay;
 using NoCTF.Domain.Teams;
 using NoCTF.Infrastructure.Caching;
 using NoCTF.Infrastructure.Persistence;
+using NoCTF.Infrastructure.Competitions.Lifecycle;
 using ZiggyCreatures.Caching.Fusion;
 
 namespace NoCTF.Infrastructure.Scoring.Leaderboard;
@@ -123,6 +124,16 @@ public sealed class FusionLeaderboardCache(
             .SingleOrDefaultAsync(candidate => candidate.Id == competitionId, ct);
         if (competition is null)
             return null;
+        var officialWindow = competition.Mode == GameMode.Ctf
+            ? await CompetitionOfficialWindowReader.ReadAsync(
+                db,
+                competition.Id,
+                competition.StartAt,
+                competition.EndAt,
+                ct)
+            : CompetitionOfficialWindow.Resolve(
+                competition.StartAt,
+                competition.EndAt);
 
         var trackConfiguration = CompetitionTrackConfiguration.ParseOrDefault(
             competition.Mode,
@@ -133,7 +144,8 @@ public sealed class FusionLeaderboardCache(
 
         var teams = await db.Teams.AsNoTracking()
             .Where(team => team.CompetitionId == competitionId
-                && !team.IsPracticeTeam
+                && (competition.Mode != GameMode.Ctf
+                    || team.RegisteredAt < officialWindow.EndAt)
                 && team.RegistrationStatus == TeamRegistrationStatus.Approved)
             .Select(team => new
             {
@@ -225,6 +237,7 @@ public sealed class FusionLeaderboardCache(
             competitionStatusAtProjection,
             competitionConfigurationJson ?? competition.ConfigurationJson,
             competition.StartAt,
+            competition.EndAt,
             lifecycle,
             projectedAt,
             hintCosts,

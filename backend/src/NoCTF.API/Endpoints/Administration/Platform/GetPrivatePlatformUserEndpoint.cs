@@ -8,7 +8,7 @@ namespace NoCTF.API.Endpoints.Administration.Platform;
 
 public sealed record PrivateActivityResponse(Guid Id, string Kind, DateTimeOffset OccurredAt, string? IpAddress,
     Guid? CompetitionId, Guid? GameplayFactId);
-public sealed record PrivateAccountResponse(SchoolIdentityResponse Identity, IReadOnlyList<PrivateActivityResponse> Activities, int RetentionDays)
+public sealed record PrivateAccountResponse(CurrentUserSchoolIdentityResponse Identity, IReadOnlyList<PrivateActivityResponse> Activities, int RetentionDays)
 {
     internal static PrivateAccountResponse From(PrivateAccountDetails value) => new(
         new(value.Identity.FullName, value.Identity.StudentNumber),
@@ -21,7 +21,7 @@ public sealed class GetPrivatePlatformUserEndpoint(AccountPrivacy privacy, IUser
 {
     public override void Configure()
     {
-        Get("/admin/platform/users/{userId}/private-profile"); AuthSchemes("Bearer"); Roles("Administrator");
+        Get("/admin/platform/users/{userId}/activity"); AuthSchemes("Bearer"); Roles("Administrator");
         Description(builder => builder.WithName("AdminGetPrivatePlatformUser"));
         Summary(summary => { summary.Summary = "Reads private school identity and recent source-IP activity.";
             summary.Description = "Platform administrators only. Returns at most 50 events within the configured retention window. Self-reported identity is not verified."; });

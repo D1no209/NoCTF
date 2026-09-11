@@ -85,6 +85,10 @@ Standalone 服务和站点密钥；Turnstile 仅在后端调用固定 Siteverify
 `X-NoCTF-Human-Verification` 交给登录、注册和玩家 Runtime／评测端点，不写日志或持久化，且每次
 请求后立即丢弃。管理员操作与内部 Checker 回调不要求验证码。
 
+部署配置只选择 Provider 并保存其密钥；平台管理员在“邮件与人机验证”中独立启用或停用验证。
+只有部署已配置非 `None` Provider 且管理员开关已启用时，公开配置才会暴露 Provider，验证中间件
+才会要求 token。迁移会保留已有已配置 Provider 的启用行为；`Provider=None` 始终视为不可用。
+
 本地测试 Turnstile 时使用 Cloudflare 官方测试 site key/secret，并将 `localhost` 放入开发环境的
 `AllowedHostnames`；生产配置会拒绝 loopback hostname。Cap 本地实例可以使用 HTTP，生产启动校验只
 接受 HTTPS。测试适配器使用受控 HTTP handler，不让 CI 依赖公网 Provider。

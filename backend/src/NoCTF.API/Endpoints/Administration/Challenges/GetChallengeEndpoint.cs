@@ -1,11 +1,19 @@
 using FastEndpoints;
 using Microsoft.AspNetCore.Http.HttpResults;
 using NoCTF.API.Endpoints.Challenges;
+using NoCTF.API.Endpoints.Competitions;
 using NoCTF.API.Security;
+using NoCTF.Application.Challenges.Configuration;
 using NoCTF.Application.Challenges.Management;
 using NoCTF.Application.Teams.Moderation;
 
 namespace NoCTF.API.Endpoints.Administration.Challenges;
+
+public sealed record AdminCompetitionChallengeResponse(
+    ChallengeResponse Challenge,
+    GameModeProtocol Mode,
+    CompetitionStatusProtocol CompetitionStatus,
+    string RulesJson);
 
 public sealed class GetAdminChallengeRequest
 {
@@ -17,9 +25,11 @@ public sealed class GetAdminChallengeRequest
 
 public sealed class GetChallengeEndpoint(
     GetChallenge get,
+    GetChallengeConfiguration getConfiguration,
     ICompetitionModerationAuthorizer authorizer,
     IUserContext user)
-    : Endpoint<GetAdminChallengeRequest, Results<Ok<ChallengeResponse>, NotFound, ForbidHttpResult>>
+    : Endpoint<GetAdminChallengeRequest,
+        Results<Ok<AdminCompetitionChallengeResponse>, NotFound, ForbidHttpResult>>
 {
     public override void Configure()
     {
@@ -33,7 +43,7 @@ public sealed class GetChallengeEndpoint(
         });
     }
 
-    public override async Task<Results<Ok<ChallengeResponse>, NotFound, ForbidHttpResult>> ExecuteAsync(
+    public override async Task<Results<Ok<AdminCompetitionChallengeResponse>, NotFound, ForbidHttpResult>> ExecuteAsync(
         GetAdminChallengeRequest request,
         CancellationToken ct)
     {
@@ -48,8 +58,16 @@ public sealed class GetChallengeEndpoint(
             request.IncludeDeleted,
             ct);
 
-        return item is null
+        var configuration = await getConfiguration.ExecuteAsync(
+            competitionId,
+            request.CompetitionChallengeId,
+            ct);
+        return item is null || configuration is null
             ? TypedResults.NotFound()
-            : TypedResults.Ok(ChallengeMapper.ToResponse(item));
+            : TypedResults.Ok(new AdminCompetitionChallengeResponse(
+                ChallengeMapper.ToResponse(item),
+                CompetitionProtocolMapper.ToProtocol(configuration.Mode),
+                CompetitionProtocolMapper.ToProtocol(configuration.CompetitionStatus),
+                configuration.Json));
     }
 }

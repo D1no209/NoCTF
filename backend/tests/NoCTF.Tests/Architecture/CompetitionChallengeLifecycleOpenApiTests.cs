@@ -20,7 +20,7 @@ public sealed class CompetitionChallengeLifecycleOpenApiTests
         foreach (var operation in new[]
         {
             Operation(root, CollectionPath, "post"),
-            Operation(root, ItemPath, "put"),
+            Operation(root, ItemPath, "patch"),
             Operation(root, ItemPath, "delete"),
             Operation(root, RestorePath, "post")
         })
@@ -72,15 +72,18 @@ public sealed class CompetitionChallengeLifecycleOpenApiTests
         var root = swagger.RootElement;
         var request = ResolveSchema(
             root,
-            Operation(root, ItemPath, "put")
+            Operation(root, ItemPath, "patch")
                 .GetProperty("requestBody")
                 .GetProperty("content")
                 .GetProperty("application/json")
                 .GetProperty("schema"));
 
         await Assert.That(PropertyNames(request))
-            .IsEquivalentTo(["customTitle", "order", "isPublished"]);
-        await Assert.That(RequiredPropertyNames(request))
+            .IsEquivalentTo(["presentation", "rules"]);
+        var presentationProperty = request.GetProperty("properties").GetProperty("presentation");
+        var presentation = ResolveSchema(root,
+            presentationProperty.GetProperty("oneOf").EnumerateArray().First());
+        await Assert.That(PropertyNames(presentation))
             .IsEquivalentTo(["customTitle", "order", "isPublished"]);
     }
 

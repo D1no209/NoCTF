@@ -20,22 +20,3 @@ internal static class PublicGatewayConfigurationMapping
             capability.ApprovedOrigins, capability.FirstPort, capability.LastPort, capability.ReservedPorts,
             capability.MaximumPorts, capability.NamespaceIsolationAvailable, capability.ConfigurationError));
 }
-
-public sealed class GetPublicGatewayEndpoint(ManagePublicGateway gateway)
-    : EndpointWithoutRequest<Ok<PublicGatewayConfigurationResponse>>
-{
-    public override void Configure()
-    {
-        Get("/admin/platform/public-gateway");
-        AuthSchemes("Bearer");
-        Roles("Administrator");
-        Description(builder => builder.WithName("AdminPlatformGetPublicGateway"));
-        Summary(summary =>
-        {
-            summary.Summary = "Reads optional public gateway configuration.";
-            summary.Description = "Returns policy and approved deployment capabilities only to platform administrators; never returns pairing credentials.";
-        });
-    }
-    public override async Task<Ok<PublicGatewayConfigurationResponse>> ExecuteAsync(CancellationToken ct) =>
-        TypedResults.Ok(PublicGatewayConfigurationMapping.ToResponse(await gateway.GetAsync(ct)));
-}

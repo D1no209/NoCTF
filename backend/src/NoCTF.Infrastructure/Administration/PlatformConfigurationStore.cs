@@ -49,12 +49,25 @@ public sealed class PlatformConfigurationStore(
         return await SaveAsync(settings, ct);
     }
 
+    public async Task<PlatformConfigurationView> UpdateHumanVerificationAsync(
+        bool enabled,
+        DateTimeOffset now,
+        CancellationToken ct)
+    {
+        var settings = await db.PlatformSettings.SingleAsync(
+            candidate => candidate.Id == SettingsId,
+            ct);
+        settings.HumanVerificationEnabled = enabled;
+        settings.UpdatedAt = now;
+        return await SaveAsync(settings, ct);
+    }
+
     public async Task<PlatformLogoReplacement> ReplaceLogoAsync(
         Guid fileId,
         DateTimeOffset now,
         CancellationToken ct)
     {
-        await using var transaction = await db.Database.BeginTransactionAsync(ct);
+        await using var transaction = await AggregateCompatibleTransaction.BeginAsync(db, ct);
         var settings = await db.PlatformSettings.SingleAsync(
             candidate => candidate.Id == SettingsId,
             ct);
@@ -103,13 +116,14 @@ public sealed class PlatformConfigurationStore(
             settings.Name,
             settings.Description,
             settings.LogoFileId,
+            settings.HumanVerificationEnabled,
             settings.UpdatedAt);
 }
 
 public sealed class NoOpPlatformConfigurationStore : IPlatformConfigurationStore
 {
     private static readonly PlatformConfigurationView Default =
-        new("NoCTF", null, null, DateTimeOffset.UnixEpoch);
+        new("NoCTF", null, null, true, DateTimeOffset.UnixEpoch);
 
     public Task<PlatformConfigurationView> GetAsync(CancellationToken cancellationToken) =>
         Task.FromResult(Default);
@@ -123,6 +137,16 @@ public sealed class NoOpPlatformConfigurationStore : IPlatformConfigurationStore
         {
             Name = name,
             Description = description,
+            UpdatedAt = now
+        });
+
+    public Task<PlatformConfigurationView> UpdateHumanVerificationAsync(
+        bool enabled,
+        DateTimeOffset now,
+        CancellationToken cancellationToken) =>
+        Task.FromResult(Default with
+        {
+            HumanVerificationEnabled = enabled,
             UpdatedAt = now
         });
 

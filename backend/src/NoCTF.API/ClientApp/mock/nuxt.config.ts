@@ -11,7 +11,7 @@ export default defineNuxtConfig({
   components: [{ path: resolve('../app/components/ui'), pathPrefix: false, extensions: ['vue'] }],
   devtools: { enabled: false },
   plugins: environment?.NOCTF_MOCK_DIAGNOSTICS === '1' ? ['./diagnostics.client.ts'] : [],
-  modules: [(_options, nuxt) => {
+  modules: ['@nuxtjs/turnstile', (_options, nuxt) => {
     // The app source is outside this Mock root. Refresh its component registry
     // when primitives are added/removed instead of retaining the layer scan cache.
     nuxt.hook('builder:watch', (event, path) => {

@@ -1,5 +1,6 @@
 using Microsoft.Extensions.Options;
 using NoCTF.API.Serialization;
+using NoCTF.Application.Administration.PlatformConfiguration;
 using NoCTF.Application.Admission;
 using NoCTF.Application.Authentication.Privacy;
 using NoCTF.Application.Observability;
@@ -29,11 +30,20 @@ public sealed class HumanVerificationMiddleware(RequestDelegate next)
         HttpContext context,
         IHumanVerificationVerifier verifier,
         IRequestSourceAddress sourceAddress,
+        ManagePlatformConfiguration platformConfiguration,
         IOptions<HumanVerificationOptions> configuredOptions)
     {
         var metadata = context.GetEndpoint()?.Metadata.GetMetadata<HumanVerificationMetadata>();
         var provider = configuredOptions.Value.Provider;
-        if (metadata is null || provider == HumanVerificationProvider.None)
+        if (metadata is null)
+        {
+            await next(context);
+            return;
+        }
+
+        var configuration = await platformConfiguration.GetAsync(context.RequestAborted);
+        if (!configuration.HumanVerificationEnabled
+            || provider == HumanVerificationProvider.None)
         {
             await next(context);
             return;

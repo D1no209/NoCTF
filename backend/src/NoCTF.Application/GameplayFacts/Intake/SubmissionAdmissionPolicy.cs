@@ -16,6 +16,7 @@ public enum GameplayFactAdmissionFailureCode
     CompetitionNotStarted,
     CompetitionFinished,
     CompetitionUnavailable,
+    RuntimeNotRunning,
     BreakRequired,
     AchievementAlreadySucceeded,
     AttemptsExhausted,
@@ -29,6 +30,16 @@ public enum GameplayFactAdmissionFailureCode
 /// <summary>Applies transport-independent admission rules using the trusted receive time.</summary>
 public static class GameplayFactAdmissionPolicy
 {
+    public static bool IsPracticeFlagAttempt(
+        GameplayFactAdmissionSnapshot snapshot,
+        GameplayFactKind kind,
+        DateTimeOffset receivedAt) =>
+        snapshot.Mode == GameMode.Ctf
+        && kind == GameplayFactKind.FlagAttempt
+        && snapshot.CompetitionStatus == CompetitionStatus.Finished
+        && snapshot.PracticeModeEnabled
+        && receivedAt >= (snapshot.OfficialEndAt ?? snapshot.EndAt);
+
     public static OperationResult<GameplayFactAdmissionFailureCode> Check(
         GameplayFactAdmissionSnapshot snapshot,
         GameplayFactKind kind,
@@ -46,7 +57,8 @@ public static class GameplayFactAdmissionPolicy
         if (kind is GameplayFactKind.FlagAttempt or GameplayFactKind.BreakAttempt && !rules.AllowsFlag
             || kind == GameplayFactKind.FixAttempt && !rules.AllowsFix)
             return OperationResult<GameplayFactAdmissionFailureCode>.Failure(GameplayFactAdmissionFailureCode.GameplayFactKindUnsupported, "This game mode does not accept this gameplay fact kind.");
-        if (snapshot.CompetitionStatus != CompetitionStatus.Running)
+        var practice = IsPracticeFlagAttempt(snapshot, kind, receivedAt);
+        if (!practice && snapshot.CompetitionStatus != CompetitionStatus.Running)
             return snapshot.CompetitionStatus switch
             {
                 CompetitionStatus.Paused => OperationResult<GameplayFactAdmissionFailureCode>.Failure(GameplayFactAdmissionFailureCode.CompetitionPaused, "The competition is paused."),
@@ -55,10 +67,25 @@ public static class GameplayFactAdmissionPolicy
                 CompetitionStatus.Finished => OperationResult<GameplayFactAdmissionFailureCode>.Failure(GameplayFactAdmissionFailureCode.CompetitionFinished, "The competition has finished."),
                 _ => OperationResult<GameplayFactAdmissionFailureCode>.Failure(GameplayFactAdmissionFailureCode.CompetitionUnavailable, "The competition is not accepting submissions.")
             };
-        if (receivedAt < snapshot.StartAt)
-            return OperationResult<GameplayFactAdmissionFailureCode>.Failure(GameplayFactAdmissionFailureCode.CompetitionNotStarted, "The competition has not started.");
-        if (receivedAt >= snapshot.EndAt)
-            return OperationResult<GameplayFactAdmissionFailureCode>.Failure(GameplayFactAdmissionFailureCode.CompetitionFinished, "The submission arrived after the deadline.");
+        if (!practice)
+        {
+            if (receivedAt < snapshot.StartAt)
+                return OperationResult<GameplayFactAdmissionFailureCode>.Failure(GameplayFactAdmissionFailureCode.CompetitionNotStarted, "The competition has not started.");
+            if (receivedAt >= (snapshot.OfficialEndAt ?? snapshot.EndAt))
+                return OperationResult<GameplayFactAdmissionFailureCode>.Failure(GameplayFactAdmissionFailureCode.CompetitionFinished, "The submission arrived after the deadline.");
+        }
+        else if (snapshot.PracticeRuntimeState == PracticeRuntimeAdmissionState.Unsupported)
+        {
+            return OperationResult<GameplayFactAdmissionFailureCode>.Failure(
+                GameplayFactAdmissionFailureCode.ChallengeUnavailable,
+                "The challenge Runtime is not supported in practice mode.");
+        }
+        else if (snapshot.PracticeRuntimeState == PracticeRuntimeAdmissionState.NotRunning)
+        {
+            return OperationResult<GameplayFactAdmissionFailureCode>.Failure(
+                GameplayFactAdmissionFailureCode.RuntimeNotRunning,
+                "Start the practice Runtime and wait until it is running before submitting a Flag.");
+        }
         if (kind == GameplayFactKind.FixAttempt
             && rules.RequireBreakBeforeFix
             && !snapshot.HasCorrectBreak)
@@ -77,7 +104,7 @@ public static class GameplayFactAdmissionPolicy
         var acceptedAttempts = kind is GameplayFactKind.FlagAttempt or GameplayFactKind.BreakAttempt
             ? snapshot.AcceptedFlagAttempts
             : snapshot.AcceptedFixAttempts;
-        if (maxAttempts is > 0 && acceptedAttempts >= maxAttempts)
+        if (!practice && maxAttempts is > 0 && acceptedAttempts >= maxAttempts)
             return OperationResult<GameplayFactAdmissionFailureCode>.Failure(GameplayFactAdmissionFailureCode.AttemptsExhausted, "The maximum number of accepted attempts has been reached.");
         return OperationResult<GameplayFactAdmissionFailureCode>.Success();
     }

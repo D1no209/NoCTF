@@ -26,7 +26,7 @@ public sealed class CompetitionManagementStore(
         CreateCompetitionCommand command,
         CancellationToken ct)
     {
-        await using var transaction = await db.Database.BeginTransactionAsync(ct);
+        await using var transaction = await AggregateCompatibleTransaction.BeginAsync(db, ct);
         var eligibility = await ResourceManagerRoleGuard.AcquireAndCheckAsync(
             db,
             [command.OwnerId],
@@ -113,7 +113,7 @@ public sealed class CompetitionManagementStore(
         UpdateCompetitionCommand command,
         CancellationToken ct)
     {
-        await using var transaction = await db.Database.BeginTransactionAsync(ct);
+        await using var transaction = await AggregateCompatibleTransaction.BeginAsync(db, ct);
         await db.Database.ExecuteSqlInterpolatedAsync(
             $"SELECT 1 FROM competitions WHERE id = {command.CompetitionId} FOR UPDATE",
             ct);
@@ -173,7 +173,7 @@ public sealed class CompetitionManagementStore(
         DateTimeOffset deletedAt,
         CancellationToken ct)
     {
-        await using var transaction = await db.Database.BeginTransactionAsync(ct);
+        await using var transaction = await AggregateCompatibleTransaction.BeginAsync(db, ct);
         var competition = await db.Competitions
             .SingleOrDefaultAsync(x => x.Id == competitionId
                 && x.DeletedAt == null

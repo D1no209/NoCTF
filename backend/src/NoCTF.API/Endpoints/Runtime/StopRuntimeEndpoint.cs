@@ -8,13 +8,14 @@ namespace NoCTF.API.Endpoints.Runtime;
 
 public sealed class StopRuntimeEndpoint(
     MutatePlayerRuntime mutate,
+    GetPlayerRuntime get,
     IUserContext user,
     TimeProvider timeProvider)
-    : EndpointWithoutRequest<Results<Accepted<RuntimeAcceptedResponse>, NotFound, ProblemHttpResult>>
+    : EndpointWithoutRequest<Results<Accepted<RuntimeAcceptedResponse>, NotFound, Conflict<RuntimeConflictResponse>, ProblemHttpResult>>
 {
     public override void Configure()
     {
-        Post("/competitions/{competitionId}/challenges/{competitionChallengeId}/runtime/stop");
+        Delete("/competitions/{competitionId}/challenges/{competitionChallengeId}/runtimes/{runtimeInstanceId}");
         AuthSchemes("Bearer");
         Options(builder => builder.WithMetadata(new NoCTF.API.Security.ProtectedEntryMetadata(NoCTF.API.Security.ProtectedEntry.RuntimeCommand)));
         Options(builder => builder.WithMetadata(new HumanVerificationMetadata(HumanVerificationAction.Runtime)));
@@ -26,9 +27,16 @@ public sealed class StopRuntimeEndpoint(
         Summary(summary => summary.Summary = "Queues a team runtime stop.");
     }
 
-    public override Task<Results<Accepted<RuntimeAcceptedResponse>, NotFound, ProblemHttpResult>> ExecuteAsync(
-        CancellationToken ct) =>
-        RuntimeMutationEndpoint.ExecuteAsync(
-            mutate, user, Route<Guid>("competitionId"), Route<Guid>("competitionChallengeId"),
+    public override async Task<Results<Accepted<RuntimeAcceptedResponse>, NotFound, Conflict<RuntimeConflictResponse>, ProblemHttpResult>> ExecuteAsync(
+        CancellationToken ct)
+    {
+        var competitionId = Route<Guid>("competitionId");
+        var competitionChallengeId = Route<Guid>("competitionChallengeId");
+        var current = await get.ExecuteAsync(competitionId, competitionChallengeId, user.UserId, ct);
+        if (current?.Id != Route<Guid>("runtimeInstanceId"))
+            return TypedResults.NotFound();
+        return await PlayerRuntimeMutation.ExecuteAsync(
+            mutate, user, competitionId, competitionChallengeId,
             RuntimeAction.Stop, null, timeProvider, ct);
+    }
 }

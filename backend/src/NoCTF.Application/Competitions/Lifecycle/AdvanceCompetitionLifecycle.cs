@@ -119,6 +119,8 @@ public sealed class TransitionCompetitionLifecycle(
             return OperationResult<CompetitionTransitionFailureCode>.Failure(
                 CompetitionTransitionFailureCode.CompetitionNotFound,
                 "Competition was not found.");
+        if (current.Value == target)
+            return OperationResult<CompetitionTransitionFailureCode>.Success();
         if (target == CompetitionStatus.Running
             && current == CompetitionStatus.Published
             && startGate is not null)

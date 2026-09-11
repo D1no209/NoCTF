@@ -24,7 +24,18 @@ public sealed record GameplayFactAdmissionSnapshot(
     bool UserBelongsToTeam,
     bool HasCorrectBreak = false,
     bool HasCorrectFix = false,
-    bool HasCorrectFlag = false);
+    bool HasCorrectFlag = false,
+    DateTimeOffset? OfficialEndAt = null,
+    bool PracticeModeEnabled = false,
+    PracticeRuntimeAdmissionState PracticeRuntimeState = PracticeRuntimeAdmissionState.NotRequired);
+
+public enum PracticeRuntimeAdmissionState
+{
+    NotRequired,
+    Running,
+    NotRunning,
+    Unsupported
+}
 
 public sealed record GameplayFactAdmissionRules(
     bool AllowsFlag,

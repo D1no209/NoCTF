@@ -65,6 +65,9 @@ TLS、域名、WebSocket/SignalR 转发及镜像上传请求大小/超时，由�
 `None` 只关闭验证码，不关闭 Redis 限流、并发配额和幂等保护。选择 Cap 或 Turnstile 时，配置缺失会让
 NoCTF 启动失败，运行时验证服务不可用则敏感请求返回 503，不会自动放行。
 
+Provider 和密钥仍由部署配置管理；平台管理员可在“邮件与人机验证”中启用或停用验证。只有部署选择了
+Cap 或 Turnstile 且管理员开关已启用时，登录、注册和玩家敏感操作才要求验证。`None` 下不能从后台启用。
+
 Cap 使用独立部署的官方 Cap Standalone。填写 `CAP_SERVER_URL`、`CAP_SITE_KEY`、`CAP_SECRET`；生产 URL
 必须为 HTTPS。Cap 实例必须同时能被浏览器和 NoCTF 容器访问，并将 CORS 精确限制到 NoCTF 公开来源。
 若 Cap 位于反向代理后，只向代理公开其应用端口，并按实际代理设置来源 IP 头；Cap 会直接信任其配置的

@@ -1753,9 +1753,9 @@ export const adminPlatformExportLogs = <ThrowOnError extends boolean = false>(op
 });
 
 /**
- * Returns editable platform branding configuration.
+ * Returns editable platform configuration sections.
  *
- * Returns editable public branding fields.
+ * Returns branding, human verification, email delivery and public gateway configuration without deployment secrets.
  */
 export const adminPlatformGetConfiguration = <ThrowOnError extends boolean = false>(options?: Options<AdminPlatformGetConfigurationData, ThrowOnError>): RequestResult<AdminPlatformGetConfigurationResponses, AdminPlatformGetConfigurationErrors, ThrowOnError> => (options?.client ?? client).get<AdminPlatformGetConfigurationResponses, AdminPlatformGetConfigurationErrors, ThrowOnError>({
     security: [{

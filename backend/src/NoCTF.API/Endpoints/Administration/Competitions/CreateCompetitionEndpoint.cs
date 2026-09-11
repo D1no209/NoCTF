@@ -6,8 +6,32 @@ using NoCTF.API.Endpoints.Competitions;
 using NoCTF.API.Security;
 using NoCTF.Application.Competitions.Management;
 using NoCTF.Domain.Competitions;
+using System.Text.Json.Serialization;
 
 namespace NoCTF.API.Endpoints.Administration.Competitions;
+
+[JsonConverter(typeof(NoCTF.API.Serialization.StrictPascalCaseEnumConverter<CompetitionResourceManagerConflictCode>))]
+public enum CompetitionResourceManagerConflictCode
+{
+    RolesOverlap,
+    OwnerIncluded,
+    UserNotFound,
+    RoleNotEligible,
+    EmailNotVerified
+}
+
+public sealed record CompetitionResourceManagerConflictResponse(
+    CompetitionResourceManagerConflictCode Code,
+    string Detail,
+    IReadOnlyList<Guid> UserIds);
+
+internal static class CompetitionResourceManagerConflictMapper
+{
+    public static CompetitionResourceManagerConflictResponse ToResponse(
+        CompetitionResourceManagerConflictCode code,
+        IReadOnlyList<Guid>? userIds) =>
+        new(code, code.ToString(), userIds ?? []);
+}
 
 public sealed class CreateCompetitionRequest
 {

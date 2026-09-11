@@ -45,7 +45,7 @@ describe('human verification coordination', () => {
 
     expect(feature).toContain("import('@cap.js/widget')")
     expect(feature).toContain("'../assets/cap_wasm_bg.wasm'")
-    expect(feature).toContain("resolveComponent('NuxtTurnstile')")
+    expect(feature).toContain("from '@nuxtjs/turnstile/runtime/components/NuxtTurnstile.vue'")
     expect(view).toContain(':is="TurnstileWidget"')
     expect(feature).toContain("appearance: 'interaction-only'")
     expect(feature).toContain("'X-NoCTF-Human-Verification'")

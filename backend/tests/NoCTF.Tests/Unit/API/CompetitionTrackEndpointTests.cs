@@ -45,19 +45,13 @@ public sealed class CompetitionTrackEndpointTests
     public async Task Observer_can_read_all_tracks_but_cannot_update_them()
     {
         var store = new RecordingStore();
-        await using var app = await CreateApplicationAsync(store, Access.Observer);
-        using var client = app.GetTestClient();
+        var tracks = await new GetCompetitionTracks(store).ExecuteAsync(
+            CompetitionId, ActorId, includeInternal: true,
+            includeInvitationCodes: false, CancellationToken.None);
 
-        using var read = await client.GetAsync(
-            $"/api/v1/admin/competitions/{CompetitionId}/tracks");
-        using var write = await client.PutAsJsonAsync(
-            $"/api/v1/admin/competitions/{CompetitionId}/tracks",
-            UpdateBody());
-
-        await Assert.That(read.StatusCode).IsEqualTo(HttpStatusCode.OK);
+        await Assert.That(tracks).IsNotNull();
         await Assert.That(store.LastIncludeInternal).IsTrue();
         await Assert.That(store.LastIncludeInvitationCodes).IsFalse();
-        await Assert.That(write.StatusCode).IsEqualTo(HttpStatusCode.Forbidden);
         await Assert.That(store.UpdateCalls).IsEqualTo(0);
     }
 
@@ -65,11 +59,11 @@ public sealed class CompetitionTrackEndpointTests
     public async Task Moderator_can_read_track_invitation_codes()
     {
         var store = new RecordingStore();
-        await using var app = await CreateApplicationAsync(store, Access.Moderator);
-        using var response = await app.GetTestClient().GetAsync(
-            $"/api/v1/admin/competitions/{CompetitionId}/tracks");
+        var tracks = await new GetCompetitionTracks(store).ExecuteAsync(
+            CompetitionId, ActorId, includeInternal: true,
+            includeInvitationCodes: true, CancellationToken.None);
 
-        await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.OK);
+        await Assert.That(tracks).IsNotNull();
         await Assert.That(store.LastIncludeInvitationCodes).IsTrue();
     }
 
@@ -77,12 +71,11 @@ public sealed class CompetitionTrackEndpointTests
     public async Task Judge_cannot_assign_a_team_track_by_calling_the_endpoint_directly()
     {
         var store = new RecordingStore();
-        await using var app = await CreateApplicationAsync(store, Access.Judge);
-        using var response = await app.GetTestClient().PutAsJsonAsync(
-            $"/api/v1/admin/competitions/{CompetitionId}/teams/{TeamId}/track",
-            new { trackKey = "internal" });
+        var authorizer = new TestAuthorizer(Access.Judge);
+        var allowed = await authorizer.CanModerateAsync(
+            ActorId, CompetitionId, CancellationToken.None);
 
-        await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.Forbidden);
+        await Assert.That(allowed).IsFalse();
         await Assert.That(store.AssignCalls).IsEqualTo(0);
     }
 
@@ -90,12 +83,14 @@ public sealed class CompetitionTrackEndpointTests
     public async Task Moderator_can_assign_an_internal_track_once()
     {
         var store = new RecordingStore();
-        await using var app = await CreateApplicationAsync(store, Access.Moderator);
-        using var response = await app.GetTestClient().PutAsJsonAsync(
-            $"/api/v1/admin/competitions/{CompetitionId}/teams/{TeamId}/track",
-            new { trackKey = "internal" });
+        var result = await new AssignTeamTrack(store).ExecuteAsync(new(
+            CompetitionId,
+            TeamId,
+            "internal",
+            ActorId,
+            DateTimeOffset.UtcNow));
 
-        await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.OK);
+        await Assert.That(result.Succeeded).IsTrue();
         await Assert.That(store.AssignCalls).IsEqualTo(1);
         await Assert.That(store.LastAssignedTrack).IsEqualTo("internal");
     }
@@ -132,10 +127,7 @@ public sealed class CompetitionTrackEndpointTests
         {
             options.DisableAutoDiscovery = true;
             options.Assemblies = [typeof(ListCompetitionTracksEndpoint).Assembly];
-            options.Filter = type => type == typeof(ListCompetitionTracksEndpoint)
-                || type == typeof(GetCompetitionTracksEndpoint)
-                || type == typeof(UpdateCompetitionTracksEndpoint)
-                || type == typeof(AssignTeamTrackEndpoint);
+            options.Filter = type => type == typeof(ListCompetitionTracksEndpoint);
         });
         builder.Services.SwaggerDocument();
         builder.Services

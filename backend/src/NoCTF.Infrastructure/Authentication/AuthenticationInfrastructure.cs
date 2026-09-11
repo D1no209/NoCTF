@@ -47,6 +47,7 @@ internal static class AuthenticationInfrastructure
         services.AddSingleton<IRunnerScoringTokenIssuer, RunnerScoringTokenIssuer>();
         services.AddScoped<IUserAuthenticationStore, AuthenticationStore>();
         services.AddScoped<IUserRegistrationStore, AuthenticationStore>();
+        services.AddScoped<ICurrentUserProfilePatchStore, AuthenticationStore>();
         services.AddScoped<NoCTF.Application.Commands.Idempotency.IRequestReplay, NoCTF.Infrastructure.Commands.Idempotency.TransactionalRequestReplay>();
         services.AddSingleton<NoCTF.Application.Admission.IRequestAdmission, NoCTF.Infrastructure.Admission.RedisRequestAdmission>();
         if (development)
@@ -77,6 +78,7 @@ internal static class AuthenticationInfrastructure
         services.AddScoped<GetCurrentUser>();
         services.AddScoped<GetPublicUserProfile>();
         services.AddScoped<UpdateCurrentUserProfile>();
+        services.AddScoped<PatchCurrentUserProfile>();
         services.AddSingleton<IAvatarImageProcessor, ImageSharpAvatarImageProcessor>();
         services.AddScoped<ReplaceCurrentUserAvatar>();
         services.AddScoped<GetUserAvatar>();

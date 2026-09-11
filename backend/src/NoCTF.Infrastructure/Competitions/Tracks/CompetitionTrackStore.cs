@@ -79,7 +79,7 @@ public sealed class CompetitionTrackStore(
         UpdateCompetitionTracksCommand command,
         CancellationToken cancellationToken)
     {
-        await using var transaction = await db.Database.BeginTransactionAsync(
+        await using var transaction = await AggregateCompatibleTransaction.BeginAsync(db,
             System.Data.IsolationLevel.ReadCommitted,
             cancellationToken);
         var competition = await CompetitionTeamMutationCriticalSection.AcquireAsync(
@@ -154,7 +154,7 @@ public sealed class CompetitionTrackStore(
         AssignTeamTrackCommand command,
         CancellationToken cancellationToken)
     {
-        await using var transaction = await db.Database.BeginTransactionAsync(
+        await using var transaction = await AggregateCompatibleTransaction.BeginAsync(db,
             System.Data.IsolationLevel.ReadCommitted,
             cancellationToken);
         var competition = await CompetitionTeamMutationCriticalSection.AcquireAsync(

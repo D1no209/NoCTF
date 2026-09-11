@@ -56,6 +56,32 @@ public class GameplayFactAdmissionModePolicyTests
     }
 
     [Test]
+    public async Task Practice_attempt_state_is_independent_and_unlimited()
+    {
+        var competitionId = Guid.NewGuid();
+        var challengeId = Guid.NewGuid();
+        var userId = Guid.NewGuid();
+        var store = Substitute.For<IGameplayFactIntakeStore>();
+        var policy = Substitute.For<IGameplayFactAdmissionModePolicy>();
+        store.LoadAdmissionAsync(competitionId, challengeId, userId, Arg.Any<CancellationToken>())
+            .Returns(new GameplayFactAdmissionSnapshot(
+                competitionId, Guid.NewGuid(), challengeId, GameMode.Ctf,
+                "{}", "{}", 4, 0, CompetitionStatus.Finished,
+                DateTimeOffset.UtcNow.AddHours(-2), DateTimeOffset.UtcNow.AddHours(-1),
+                false, false, true, false, false, true, true,
+                HasCorrectFlag: true,
+                OfficialEndAt: DateTimeOffset.UtcNow.AddHours(-1),
+                PracticeModeEnabled: true));
+        policy.GetRules(GameMode.Ctf, "{}", "{}")
+            .Returns(new GameplayFactAdmissionRules(true, false, 1, null));
+
+        var state = await new GetFlagAttemptState(store, policy)
+            .ExecuteAsync(competitionId, challengeId, userId);
+
+        await Assert.That(state).IsEqualTo(new FlagAttemptState(null, 4, null, true));
+    }
+
+    [Test]
     public async Task Koh_DoesNotAcceptManualSubmissions()
     {
         var policy = new GameModeGameplayFactAdmissionPolicy();

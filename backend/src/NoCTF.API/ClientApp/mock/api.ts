@@ -217,6 +217,9 @@ export function createMockApi() {
       if (route === '/platform/configuration') value = state.platform
       else if (route === '/admin/platform/configuration') value = {
         branding: state.platform,
+        humanVerification: state.settings.get('platform/human-verification') ?? {
+          enabled: false, provider: 'Cap', available: true,
+        },
         emailVerification: state.settings.get('platform/email') ?? {
           enabled: false, publicBaseUrl: 'http://localhost:3000', tokenLifetimeMinutes: 30,
           resendCooldownSeconds: 60, passwordResetTokenLifetimeMinutes: 30,
@@ -339,6 +342,14 @@ export function createMockApi() {
       }
       else if (route === '/admin/platform/configuration' && request.method === 'PATCH') {
         if (body.branding) Object.assign(state.platform, body.branding, { updatedAt: now() })
+        if (body.humanVerification) {
+          state.settings.set('platform/human-verification', {
+            ...body.humanVerification, provider: 'Cap', available: true,
+          })
+          state.platform.humanVerification = body.humanVerification.enabled
+            ? { provider: 'Cap', siteKey: 'mock-site-key', apiEndpoint: 'https://captcha.mock.invalid/mock-site-key/' }
+            : { provider: 'None', siteKey: null, apiEndpoint: null }
+        }
         if (body.emailVerification) state.settings.set('platform/email', body.emailVerification)
         if (body.publicGateway) state.settings.set('platform/gateway', {
           policy: body.publicGateway,
@@ -346,6 +357,9 @@ export function createMockApi() {
         })
         value = {
           branding: state.platform,
+          humanVerification: state.settings.get('platform/human-verification') ?? {
+            enabled: false, provider: 'Cap', available: true,
+          },
           emailVerification: state.settings.get('platform/email'),
           publicGateway: state.settings.get('platform/gateway'),
           publicGatewayStatusUrl: '/api/v1/admin/platform/public-gateway/status',

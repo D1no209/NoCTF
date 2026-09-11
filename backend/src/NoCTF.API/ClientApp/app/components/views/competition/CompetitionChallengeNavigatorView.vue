@@ -23,8 +23,8 @@ const { ShieldCheck, Swords, Users, directionGlyph, isAwdp, loading, error, data
     <template #feedback>
       <Alert v-if="error" variant="destructive"><AlertDescription>{{ $message(error) }}</AlertDescription></Alert>
       <Alert v-else-if="board.error.value" variant="destructive"><AlertDescription>{{ $message(board.error.value) }}</AlertDescription></Alert>
-      <Alert v-else-if="board.processing.value"><AlertDescription><Spinner class="size-3" />{{ $t('ui.scoreboardDataIsBeingProjectedPleaseWait') }}</AlertDescription></Alert>
-      <Alert v-else-if="dataScope === 'Frozen'"><AlertDescription>{{ $t('ui.theRankingListHasBeenFrozenAndTheQuestionScores') }}</AlertDescription></Alert>
+      <p v-else-if="board.processing.value" class="flex items-center gap-2 text-xs text-muted-foreground" role="status"><Spinner class="size-3" />{{ $t('ui.scoreboardDataIsBeingProjectedPleaseWait') }}</p>
+      <p v-else-if="dataScope === 'Frozen'" class="text-xs text-muted-foreground" role="status">{{ $t('ui.theRankingListHasBeenFrozenAndTheQuestionScores') }}</p>
     </template>
     <template #group="{ group }">
       <span class="inline-flex items-center gap-2 font-semibold" :class="directionWatermarkClass(group.value)">

@@ -912,7 +912,7 @@ body:has([data-modal-scroll-lock]) {
 }
 [data-slot='default-layout']:has(> main [data-contained-workspace-page]) [data-scroll-surface] { overscroll-behavior: contain; }
 @media (min-width: 1440px) {
-  [data-slot='default-layout']:has(> main [data-contained-workspace-page]) .challenge-workspace { grid-template-rows: minmax(0, 1fr); }
+  [data-slot='default-layout']:has(> main [data-contained-workspace-page]) .competition-participant-workspace.challenge-workspace { grid-template-rows: minmax(0, 1fr); }
 }
 
 [data-slot='cover-image-scrim'] {

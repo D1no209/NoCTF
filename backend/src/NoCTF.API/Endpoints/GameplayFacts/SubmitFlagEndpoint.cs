@@ -137,6 +137,7 @@ public enum GameplayFactAdmissionFailureCodeProtocol
     CompetitionNotStarted,
     CompetitionFinished,
     CompetitionUnavailable,
+    RuntimeNotRunning,
     BreakRequired,
     AchievementAlreadySucceeded,
     AttemptsExhausted,
@@ -200,7 +201,8 @@ internal static class GameplayFactProblemDetails
             StatusCodes.Status403Forbidden,
         AdmissionFailureCode.CompetitionFinished or AdmissionFailureCode.CompetitionNotStarted
             or AdmissionFailureCode.BreakRequired
-            or AdmissionFailureCode.AchievementAlreadySucceeded =>
+            or AdmissionFailureCode.AchievementAlreadySucceeded
+            or AdmissionFailureCode.RuntimeNotRunning =>
             StatusCodes.Status409Conflict,
         _ => StatusCodes.Status400BadRequest
     };
@@ -277,7 +279,7 @@ public sealed class SubmitFlagEndpoint(SubmitFlag submitFlag, IUserContext userC
         {
             summary.Summary = "Submit one Flag or an ordered AWD Flag collection.";
             summary.Description =
-                "Creates independent immutable attempts. The accepted response is not an evaluation result.";
+                "Creates independent immutable attempts, including post-competition CTF practice attempts when enabled. The accepted response is not an evaluation result.";
         });
     }
 

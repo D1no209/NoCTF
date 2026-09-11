@@ -7,6 +7,7 @@ using NoCTF.Domain.Competitions.Events;
 using NoCTF.Domain.Gameplay;
 using NoCTF.Domain.Shared;
 using NoCTF.Infrastructure.Persistence;
+using NoCTF.Infrastructure.Competitions.Lifecycle;
 
 namespace NoCTF.Infrastructure.Scoring.Leaderboard;
 
@@ -19,6 +20,21 @@ public sealed class ScoreboardDetailReader(NoCtfDbContext db) : IScoreboardDetai
         await using var transaction = await db.Database.BeginTransactionAsync(
             IsolationLevel.RepeatableRead,
             cancellationToken);
+        CompetitionOfficialWindow? officialWindow = null;
+        if (query.Mode == GameMode.Ctf)
+        {
+            var competition = await db.Competitions.AsNoTracking()
+                .Where(candidate => candidate.Id == query.CompetitionId)
+                .Select(candidate => new { candidate.StartAt, candidate.EndAt })
+                .SingleAsync(cancellationToken);
+            officialWindow = await CompetitionOfficialWindowReader.ReadAsync(
+                db,
+                query.CompetitionId,
+                competition.StartAt,
+                competition.EndAt,
+                cancellationToken);
+        }
+        var ctfWindow = officialWindow.GetValueOrDefault();
         var facts = db.GameplayFacts.AsNoTracking()
             .Where(fact => fact.CompetitionId == query.CompetitionId
                 && fact.TeamId == query.TeamId
@@ -27,8 +43,10 @@ public sealed class ScoreboardDetailReader(NoCtfDbContext db) : IScoreboardDetai
 
         facts = query.Mode switch
         {
-            GameMode.Ctf => facts.Where(fact => fact.Kind == GameplayFactKind.FlagAttempt
-                || fact.Kind == GameplayFactKind.HintUnlock),
+            GameMode.Ctf => facts.Where(fact => (fact.Kind == GameplayFactKind.FlagAttempt
+                    || fact.Kind == GameplayFactKind.HintUnlock)
+                && fact.OccurredAt >= ctfWindow.StartAt
+                && fact.OccurredAt < ctfWindow.EndAt),
             GameMode.Awd => facts.Where(fact => fact.Kind == GameplayFactKind.FlagAttempt
                 && fact.ReferenceKind == GameplayFactReferenceKind.AwdRound
                 && fact.ReferenceId == query.RoundId),

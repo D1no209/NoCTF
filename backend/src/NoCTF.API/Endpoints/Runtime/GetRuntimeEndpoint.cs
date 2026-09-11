@@ -138,6 +138,8 @@ public sealed record RuntimeAcceptedResponse(
     Guid RuntimeInstanceId,
     string StatusUrl);
 
+public sealed record RuntimeConflictResponse(string Detail);
+
 internal static class RuntimeEndpointMapping
 {
     public static ProblemHttpResult UnknownOrigin() => TypedResults.Problem(statusCode: StatusCodes.Status403Forbidden,
@@ -165,7 +167,7 @@ internal static class RuntimeEndpointMapping
     public static RuntimeAcceptedResponse ToAccepted(RuntimeInstanceView view) =>
         new(
             view.Id,
-            $"/api/v1/competitions/{view.CompetitionId!.Value}/challenges/{view.CompetitionChallengeId!.Value}/runtime");
+            $"/api/v1/competitions/{view.CompetitionId!.Value}/challenges/{view.CompetitionChallengeId!.Value}/runtimes/current");
 }
 
 public sealed class GetRuntimeEndpoint(
@@ -176,7 +178,7 @@ public sealed class GetRuntimeEndpoint(
 {
     public override void Configure()
     {
-        Get("/competitions/{competitionId}/challenges/{competitionChallengeId}/runtime");
+        Get("/competitions/{competitionId}/challenges/{competitionChallengeId}/runtimes/current");
         AuthSchemes("Bearer");
         Summary(summary =>
         {

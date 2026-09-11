@@ -42,7 +42,7 @@ public sealed class UploadCompetitionPosterEndpoint(
     {
         Options(builder => builder.WithMetadata(new NoCTF.Hosting.Observability.ApiRequestMetricsMetadata(
             NoCTF.Application.Observability.ApiRequestKind.Upload)));
-        Post("/admin/competitions/{competitionId}/poster");
+        Put("/admin/competitions/{competitionId}/poster");
         AuthSchemes("Bearer");
         AllowFileUploads();
         MaxRequestBodySize(FileUploadLimits.MaximumRequestBytes(

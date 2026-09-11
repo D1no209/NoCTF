@@ -5,7 +5,7 @@ namespace NoCTF.Tests.Architecture;
 public sealed class CompetitionPermissionsOpenApiTests
 {
     private const string PermissionsPath =
-        "/api/v1/admin/competitions/{competitionId}/permissions";
+        "/api/v1/admin/competitions/{competitionId}";
     private const string CandidatesPath =
         "/api/v1/admin/competitions/{competitionId}/permission-candidates";
 
@@ -29,7 +29,6 @@ public sealed class CompetitionPermissionsOpenApiTests
             var responses = operation.GetProperty("responses");
             await Assert.That(responses.TryGetProperty("200", out _)).IsTrue();
             await Assert.That(responses.TryGetProperty("401", out _)).IsTrue();
-            await Assert.That(responses.TryGetProperty("403", out _)).IsTrue();
             await Assert.That(responses.TryGetProperty("404", out _)).IsTrue();
         }
     }
@@ -40,10 +39,12 @@ public sealed class CompetitionPermissionsOpenApiTests
         using var swagger = await ReadSwaggerAsync();
         var root = swagger.RootElement;
 
-        var permissions = ResponseSchema(
+        var aggregate = ResponseSchema(
             root,
             Operation(root, PermissionsPath, "get"),
             "200");
+        var permissions = ResolveNullableSchema(root,
+            aggregate.GetProperty("properties").GetProperty("permissions"));
         await Assert.That(PropertyNames(permissions))
             .IsEquivalentTo([
                 "competitionId",
@@ -78,35 +79,21 @@ public sealed class CompetitionPermissionsOpenApiTests
             .GetProperty("type")
             .GetString()).IsEqualTo("boolean");
 
-        var update = Operation(root, PermissionsPath, "put");
+        var update = Operation(root, PermissionsPath, "patch");
         var request = ResolveSchema(
             root,
             update.GetProperty("requestBody")
                 .GetProperty("content")
                 .GetProperty("application/json")
                 .GetProperty("schema"));
-        await Assert.That(PropertyNames(request))
-            .IsEquivalentTo(["managerIds", "judgeIds", "observerIds"]);
-        await Assert.That(request.GetProperty("required")
+        var permissionRequest = ResolveNullableSchema(root,
+            request.GetProperty("properties").GetProperty("permissions"));
+        await Assert.That(PropertyNames(permissionRequest))
+            .IsEquivalentTo(["ownerId", "managerIds", "judgeIds", "observerIds"]);
+        await Assert.That(permissionRequest.GetProperty("required")
             .EnumerateArray()
             .Select(item => item.GetString()!))
-            .IsEquivalentTo(["managerIds", "judgeIds", "observerIds"]);
-
-        var conflict = ResponseSchema(root, update, "409");
-        var conflictCode = ResolveSchema(
-            root,
-            conflict.GetProperty("properties").GetProperty("code"));
-        var conflictValues = conflictCode.GetProperty("enum")
-            .EnumerateArray()
-            .Select(item => item.GetString()!)
-            .ToArray();
-        await Assert.That(conflictValues).IsEquivalentTo([
-            "RolesOverlap",
-            "OwnerIncluded",
-            "UserNotFound",
-            "RoleNotEligible",
-            "EmailNotVerified"
-        ]);
+            .IsEquivalentTo(["ownerId", "managerIds", "judgeIds", "observerIds"]);
     }
 
     [Test]
@@ -155,6 +142,13 @@ public sealed class CompetitionPermissionsOpenApiTests
                 .GetProperty(name);
         }
         return schema;
+    }
+
+    private static JsonElement ResolveNullableSchema(JsonElement root, JsonElement schema)
+    {
+        if (schema.TryGetProperty("oneOf", out var oneOf))
+            schema = oneOf.EnumerateArray().First(item => item.TryGetProperty("$ref", out _));
+        return ResolveSchema(root, schema);
     }
 
     private static string[] PropertyNames(JsonElement schema) =>

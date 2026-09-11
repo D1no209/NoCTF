@@ -59,9 +59,9 @@ public sealed class AwdFullBoundaryTests
         }, JsonOptions);
         await SendJsonAsync(
             admin,
-            HttpMethod.Put,
-            $"/api/v1/admin/competitions/{competitionId}/configuration",
-            new { json = competitionConfigurationJson },
+            HttpMethod.Patch,
+            $"/api/v1/admin/competitions/{competitionId}",
+            new { modeConfiguration = new { json = competitionConfigurationJson } },
             HttpStatusCode.OK,
             cancellationToken);
 
@@ -97,25 +97,23 @@ public sealed class AwdFullBoundaryTests
         }, JsonOptions);
         await SendJsonAsync(
             admin,
-            HttpMethod.Put,
-            $"/api/v1/admin/competitions/{competitionId}/challenges/{competitionChallengeId}/configuration",
-            new { json = challengeConfigurationJson },
-            HttpStatusCode.OK,
-            cancellationToken);
-        await SendJsonAsync(
-            admin,
-            HttpMethod.Put,
+            HttpMethod.Patch,
             $"/api/v1/admin/competitions/{competitionId}/challenges/{competitionChallengeId}",
-            new { customTitle = (string?)null, order = 0, isPublished = true },
+            new
+            {
+                presentation = new
+                {
+                    customTitle = (string?)null,
+                    order = 0,
+                    isPublished = true
+                },
+                rules = new { json = challengeConfigurationJson }
+            },
             HttpStatusCode.OK,
             cancellationToken);
 
-        await SendWithoutBodyAsync(
-            admin,
-            HttpMethod.Post,
-            $"/api/v1/admin/competitions/{competitionId}/make-visible",
-            HttpStatusCode.NoContent,
-            cancellationToken);
+        await E2ELifecycle.SetStatusAsync(
+            admin, competitionId, "Visible", cancellationToken);
         var red = await RegisterTeamAsync(
             anonymous,
             baseUrl,
@@ -136,15 +134,11 @@ public sealed class AwdFullBoundaryTests
             cancellationToken);
 
         await E2ELifecycle.MakeScheduleDueAsync(admin, competitionId, cancellationToken);
-        await SendWithoutBodyAsync(
-            admin,
-            HttpMethod.Post,
-            $"/api/v1/admin/competitions/{competitionId}/publish",
-            HttpStatusCode.NoContent,
-            cancellationToken);
+        await E2ELifecycle.SetStatusAsync(
+            admin, competitionId, "Published", cancellationToken);
         await E2ELifecycle.StartOrObserveRunningAsync(admin, competitionId, cancellationToken);
 
-        var runtimePath = $"/api/v1/competitions/{competitionId}/challenges/{competitionChallengeId}/runtime";
+        var runtimePath = $"/api/v1/competitions/{competitionId}/challenges/{competitionChallengeId}/runtimes/current";
         var redRuntime = await PollOptionalJsonAsync(
             red.Client,
             runtimePath,
@@ -377,12 +371,8 @@ public sealed class AwdFullBoundaryTests
             .Sum(item => item.GetProperty("successfulCount").GetInt32());
         await Assert.That(successfulAttacks).IsEqualTo(1);
 
-        await SendWithoutBodyAsync(
-            admin,
-            HttpMethod.Post,
-            $"/api/v1/admin/competitions/{competitionId}/finish",
-            HttpStatusCode.NoContent,
-            cancellationToken);
+        await E2ELifecycle.SetStatusAsync(
+            admin, competitionId, "Finished", cancellationToken);
         await PollJsonAsync(
             admin,
             $"/api/v1/admin/competitions/{competitionId}/runtimes?competitionChallengeId={competitionChallengeId}",

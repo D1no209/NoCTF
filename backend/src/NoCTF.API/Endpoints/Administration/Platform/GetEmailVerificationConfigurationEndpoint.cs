@@ -45,27 +45,3 @@ internal static class EmailVerificationConfigurationMapping
             configuration.SmtpTimeoutSeconds,
             configuration.UpdatedAt);
 }
-
-public sealed class GetEmailVerificationConfigurationEndpoint(
-    ManageEmailVerificationConfiguration configuration)
-    : EndpointWithoutRequest<Ok<EmailVerificationConfigurationResponse>>
-{
-    public override void Configure()
-    {
-        Get("/admin/platform/email-verification/configuration");
-        AuthSchemes("Bearer");
-        Roles("Administrator");
-        Description(builder => builder.WithName("AdminPlatformGetEmailVerificationConfiguration"));
-        Summary(summary =>
-        {
-            summary.Summary = "Gets email verification and SMTP configuration.";
-            summary.Description =
-                "Returns non-secret platform settings and whether an SMTP password is configured.";
-        });
-    }
-
-    public override async Task<Ok<EmailVerificationConfigurationResponse>> ExecuteAsync(
-        CancellationToken ct) =>
-        TypedResults.Ok(EmailVerificationConfigurationMapping.ToResponse(
-            await configuration.GetAsync(ct)));
-}

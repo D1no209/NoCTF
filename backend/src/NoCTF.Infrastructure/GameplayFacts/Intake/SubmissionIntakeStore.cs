@@ -8,6 +8,8 @@ using NoCTF.Domain.Gameplay;
 using NoCTF.Application.Competitions.Events;
 using NoCTF.Domain.Competitions.Events;
 using NoCTF.Application.Commands.Idempotency;
+using NoCTF.Application.Runtime.Provisioning;
+using NoCTF.GameModes.Registration;
 
 namespace NoCTF.Infrastructure.GameplayFacts.Intake;
 
@@ -17,7 +19,9 @@ public sealed class GameplayFactIntakeStore(
     GameplayFactAttemptCriticalSection attemptCriticalSection,
     ICompetitionEventRecorder? eventRecorder = null,
     NoCTF.Application.Authentication.Privacy.IRequestSourceAddress? source = null,
-    IRequestReplay? replay = null) : IGameplayFactIntakeStore
+    IRequestReplay? replay = null,
+    IChallengeRuntimeTemplateCatalog? runtimeTemplates = null,
+    TimeProvider? clock = null) : IGameplayFactIntakeStore
 {
     public GameplayFactIntakeStore(
         NoCtfDbContext db,
@@ -33,6 +37,9 @@ public sealed class GameplayFactIntakeStore(
 
     private readonly ICompetitionEventRecorder events =
         eventRecorder ?? NullCompetitionEventRecorder.Instance;
+    private readonly IChallengeRuntimeTemplateCatalog templates =
+        runtimeTemplates ?? new ChallengeRuntimeTemplateCatalog();
+    private readonly TimeProvider timeProvider = clock ?? TimeProvider.System;
 
     public Task<GameplayFactAcceptanceResult[]?> FindFlagReplayAsync(Guid competitionId, Guid challengeId, Guid userId,
         IReadOnlyList<string> flags, CancellationToken ct) => replay is null
@@ -46,7 +53,13 @@ public sealed class GameplayFactIntakeStore(
         Guid userId,
         CancellationToken cancellationToken) =>
         GameplayFactAdmissionPersistence.LoadAsync(
-            db, competitionId, competitionChallengeId, userId, cancellationToken);
+            db,
+            competitionId,
+            competitionChallengeId,
+            userId,
+            timeProvider.GetUtcNow(),
+            templates,
+            cancellationToken);
 
     public async Task<GameplayFactAcceptanceResult> TryAcceptFlagAsync(
         FlagGameplayFactReceived received,
@@ -91,11 +104,16 @@ public sealed class GameplayFactIntakeStore(
             return received.Select(_ => new GameplayFactAcceptanceResult(
                 GameplayFactAcceptanceState.AchievementAlreadySucceeded)).ToArray();
         }
+        var practice = current is not null
+            && GameplayFactAdmissionPolicy.IsPracticeFlagAttempt(
+                current,
+                received[0].Kind,
+                received[0].OccurredAt);
         if (!GameplayFactAdmissionPersistence.Matches(snapshot, current)
-            || current!.CompetitionStatus != CompetitionStatus.Running)
+            || current!.CompetitionStatus != CompetitionStatus.Running && !practice)
             return received.Select(_ => new GameplayFactAcceptanceResult(
                 GameplayFactAcceptanceState.AdmissionRejected)).ToArray();
-        if (maxAttempts is > 0
+        if (!practice && maxAttempts is > 0
             && checked(current.AcceptedFlagAttempts + received.Count) > maxAttempts)
             return received.Select(_ => new GameplayFactAcceptanceResult(
                 GameplayFactAcceptanceState.AttemptsExhausted)).ToArray();

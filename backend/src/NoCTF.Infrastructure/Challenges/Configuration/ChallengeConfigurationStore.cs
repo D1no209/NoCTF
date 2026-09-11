@@ -48,7 +48,7 @@ public sealed class ChallengeConfigurationStore(
         DateTimeOffset updatedAt,
         CancellationToken ct)
     {
-        await using var transaction = await db.Database.BeginTransactionAsync(ct);
+        await using var transaction = await AggregateCompatibleTransaction.BeginAsync(db, ct);
         var status = await CompetitionStateReader.ReadAsync(db, competitionId, ct);
         if (status is null) return new(null, ChallengeConfigurationUpdateFailure.CompetitionNotFound);
         var competition = await db.Competitions.AsNoTracking()

@@ -41,6 +41,29 @@ public sealed class SubmitFlagOpenApiTests
             .IsEqualTo("string");
     }
 
+    [Test]
+    public async Task Practice_reuses_the_standard_contract_without_a_team_marker()
+    {
+        using var swagger = await ReadSwaggerAsync();
+        var root = swagger.RootElement;
+        await Assert.That(root.GetProperty("paths").TryGetProperty(
+                "/api/v1/competitions/{competitionId}/challenges/{competitionChallengeId}/practice-flag",
+                out _))
+            .IsFalse();
+        var schemas = root.GetProperty("components").GetProperty("schemas");
+        var admissionCodes = schemas
+            .GetProperty("NoCTFAPIEndpointsGameplayFactsGameplayFactAdmissionFailureCodeProtocol")
+            .GetProperty("enum")
+            .EnumerateArray()
+            .Select(item => item.GetString())
+            .ToArray();
+        await Assert.That(admissionCodes).Contains("RuntimeNotRunning");
+        var teamProperties = schemas
+            .GetProperty("NoCTFAPIEndpointsTeamsTeamResponse")
+            .GetProperty("properties");
+        await Assert.That(teamProperties.TryGetProperty("isPracticeTeam", out _)).IsFalse();
+    }
+
     private static string[] PropertyNames(JsonElement schema) =>
         schema.GetProperty("properties")
             .EnumerateObject()

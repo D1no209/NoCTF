@@ -19,12 +19,17 @@ namespace NoCTF.Tests.Unit.API;
 public sealed class PublicPlatformConfigurationEndpointTests
 {
     [Test]
-    public async Task Public_configuration_exposes_client_capabilities_without_provider_secrets()
+    [Arguments(true, HumanVerificationProviderProtocol.Cap)]
+    [Arguments(false, HumanVerificationProviderProtocol.None)]
+    public async Task Public_configuration_exposes_only_enabled_client_capabilities_without_provider_secrets(
+        bool humanVerificationEnabled,
+        HumanVerificationProviderProtocol expectedProvider)
     {
         var now = DateTimeOffset.UtcNow;
         var settings = Substitute.For<IPlatformConfigurationStore>();
         settings.GetAsync(Arg.Any<CancellationToken>())
-            .Returns(new PlatformConfigurationView("NoCTF", "Arena", null, now));
+            .Returns(new PlatformConfigurationView(
+                "NoCTF", "Arena", null, humanVerificationEnabled, now));
         var objects = Substitute.For<IStore>();
         var builder = WebApplication.CreateBuilder();
         builder.WebHost.UseTestServer();
@@ -64,10 +69,13 @@ public sealed class PublicPlatformConfigurationEndpointTests
         await Assert.That(payload).IsNotNull();
         await Assert.That(payload!.ImageUploadLimits.MaximumAvatarBytes).IsEqualTo(1_234_567);
         await Assert.That(payload.ImageUploadLimits.MaximumWallpaperBytes).IsEqualTo(7_654_321);
-        await Assert.That(payload.HumanVerification.Provider).IsEqualTo(HumanVerificationProviderProtocol.Cap);
-        await Assert.That(payload.HumanVerification.SiteKey).IsEqualTo("site-key");
+        await Assert.That(payload.HumanVerification.Provider).IsEqualTo(expectedProvider);
+        await Assert.That(payload.HumanVerification.SiteKey)
+            .IsEqualTo(humanVerificationEnabled ? "site-key" : null);
         await Assert.That(payload.HumanVerification.ApiEndpoint)
-            .IsEqualTo("https://cap.example.test/root/site-key/");
+            .IsEqualTo(humanVerificationEnabled
+                ? "https://cap.example.test/root/site-key/"
+                : null);
         await Assert.That(content).DoesNotContain("maximumLogoBytes");
         await Assert.That(content).DoesNotContain("maximumPosterBytes");
         await Assert.That(content).DoesNotContain("maximumAttachmentBytes");

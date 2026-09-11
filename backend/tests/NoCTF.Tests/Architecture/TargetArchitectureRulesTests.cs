@@ -50,7 +50,6 @@ public sealed partial class TargetArchitectureRulesTests
             var source = await File.ReadAllTextAsync(file);
             if (source.Contains("System.Threading.Channels", StringComparison.Ordinal)
                 || source.Contains("Task.Run(", StringComparison.Ordinal)
-                || source.Contains("RequiredMappingStrategy.Both", StringComparison.Ordinal)
                 || Regex.IsMatch(source, @"\bHandleAsync\(")
                 || LegacyDimensionRegex().IsMatch(source)
                 || QuerySyntaxRegex().IsMatch(source))

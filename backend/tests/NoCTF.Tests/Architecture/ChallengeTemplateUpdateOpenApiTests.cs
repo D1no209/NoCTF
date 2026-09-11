@@ -21,9 +21,7 @@ public sealed class ChallengeTemplateUpdateOpenApiTests
         await Assert.That(operation.GetProperty("responses").TryGetProperty(
             "404",
             out _)).IsTrue();
-        await Assert.That(ReferenceName(ResponseSchema(operation, "400")).EndsWith(
-            "ValidationProblemDetails",
-            StringComparison.Ordinal)).IsTrue();
+        await Assert.That(operation.GetProperty("responses").TryGetProperty("400", out _)).IsTrue();
         await Assert.That(ReferenceName(ResponseSchema(operation, "409")).EndsWith(
             "ChallengeTemplateConflictResponse",
             StringComparison.Ordinal)).IsTrue();
@@ -64,32 +62,27 @@ public sealed class ChallengeTemplateUpdateOpenApiTests
         await Assert.That(requestBody.GetProperty("required").GetBoolean()).IsTrue();
         await Assert.That(PropertyNames(request))
             .IsEquivalentTo([
-                "mode",
-                "visibility",
-                "title",
-                "description",
-                "direction",
-                "definitionJson"
+                "content",
+                "permissions"
             ]);
-        await Assert.That(RequiredPropertyNames(request))
-            .IsEquivalentTo([
-                "mode",
-                "visibility",
-                "title",
-                "direction"
-            ]);
+        var content = ResolveSchema(root,
+            request.GetProperty("properties").GetProperty("content")
+                .GetProperty("oneOf").EnumerateArray().First());
+        await Assert.That(PropertyNames(content)).IsEquivalentTo([
+            "mode", "visibility", "title", "description", "direction", "definitionJson"
+        ]);
         await AssertNamedStringEnumAsync(
             root,
-            request.GetProperty("properties").GetProperty("mode"),
+            content.GetProperty("properties").GetProperty("mode"),
             ["Ctf", "Awd", "Awdp", "Koh"]);
         await AssertNamedStringEnumAsync(
             root,
-            request.GetProperty("properties").GetProperty("visibility"),
+            content.GetProperty("properties").GetProperty("visibility"),
             ["Private", "Shared"]);
     }
 
     private static JsonElement Operation(JsonElement root) =>
-        root.GetProperty("paths").GetProperty(ItemPath).GetProperty("put");
+        root.GetProperty("paths").GetProperty(ItemPath).GetProperty("patch");
 
     private static JsonElement ResponseSchema(JsonElement operation, string statusCode)
     {

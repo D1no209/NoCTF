@@ -13,11 +13,11 @@ public sealed class StopTeamRuntimeEndpoint(
     IUserContext user,
     TimeProvider timeProvider)
     : EndpointWithoutRequest<
-        Results<Accepted<RuntimeAcceptedResponse>, NotFound, ProblemHttpResult, ForbidHttpResult>>
+        Results<Accepted<RuntimeAcceptedResponse>, NotFound, Conflict<RuntimeConflictResponse>, ProblemHttpResult, ForbidHttpResult>>
 {
     public override void Configure()
     {
-        Post("/admin/competitions/{competitionId}/teams/{teamId}/challenges/{competitionChallengeId}/runtime/stop");
+        Delete("/admin/competitions/{competitionId}/teams/{teamId}/challenges/{competitionChallengeId}/runtimes/{runtimeInstanceId}");
         AuthSchemes("Bearer");
         Options(builder => builder.WithMetadata(new NoCTF.API.Security.ProtectedEntryMetadata(NoCTF.API.Security.ProtectedEntry.RuntimeCommand)));
         Description(builder => builder.WithName("AdminStopTeamRuntime")
@@ -29,11 +29,28 @@ public sealed class StopTeamRuntimeEndpoint(
         });
     }
 
-    public override Task<
-        Results<Accepted<RuntimeAcceptedResponse>, NotFound, ProblemHttpResult, ForbidHttpResult>> ExecuteAsync(
-        CancellationToken ct) =>
-        AdminRuntimeMutation.ExecuteTeamAsync(
-            runtimes, authorizer, user, RuntimeAction.Stop,
-            Route<Guid>("competitionId"), Route<Guid>("competitionChallengeId"),
-            Route<Guid>("teamId"), null, timeProvider, ct);
+    public override async Task<
+        Results<Accepted<RuntimeAcceptedResponse>, NotFound, Conflict<RuntimeConflictResponse>, ProblemHttpResult, ForbidHttpResult>> ExecuteAsync(
+        CancellationToken ct)
+    {
+        var competitionId = Route<Guid>("competitionId");
+        if (!await authorizer.CanModerateAsync(user.UserId, competitionId, ct))
+            return TypedResults.Forbid();
+        var runtime = await runtimes.GetAsync(
+            competitionId,
+            Route<Guid>("runtimeInstanceId"),
+            ct);
+        if (runtime?.CompetitionChallengeId != Route<Guid>("competitionChallengeId")
+            || runtime.TeamId != Route<Guid>("teamId"))
+            return TypedResults.NotFound();
+        return await AdminRuntimeMutation.ExecuteTeamAsync(
+            runtimes,
+            RuntimeAction.Stop,
+            competitionId,
+            runtime.CompetitionChallengeId.Value,
+            runtime.TeamId,
+            null,
+            timeProvider,
+            ct);
+    }
 }

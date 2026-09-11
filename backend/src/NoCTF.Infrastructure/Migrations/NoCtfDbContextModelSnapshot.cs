@@ -1066,6 +1066,10 @@ namespace NoCTF.Infrastructure.Migrations
                         .HasColumnType("integer")
                         .HasColumnName("email_verification_token_lifetime_minutes");
 
+                    b.Property<bool>("HumanVerificationEnabled")
+                        .HasColumnType("boolean")
+                        .HasColumnName("human_verification_enabled");
+
                     b.Property<Guid?>("LogoFileId")
                         .HasColumnType("uuid")
                         .HasColumnName("logo_file_id");
@@ -1144,6 +1148,7 @@ namespace NoCTF.Infrastructure.Migrations
                             EmailVerificationEnabled = false,
                             EmailVerificationResendCooldownSeconds = 60,
                             EmailVerificationTokenLifetimeMinutes = 1440,
+                            HumanVerificationEnabled = true,
                             Name = "NoCTF",
                             PublicGatewayConnectorId = "",
                             PublicGatewayDirectOrigins = new string[0],
@@ -1383,10 +1388,6 @@ namespace NoCTF.Infrastructure.Migrations
                     b.Property<bool>("IsLocked")
                         .HasColumnType("boolean")
                         .HasColumnName("is_locked");
-
-                    b.Property<bool>("IsPracticeTeam")
-                        .HasColumnType("boolean")
-                        .HasColumnName("is_practice_team");
 
                     b.PrimitiveCollection<Guid[]>("MemberIds")
                         .IsRequired()

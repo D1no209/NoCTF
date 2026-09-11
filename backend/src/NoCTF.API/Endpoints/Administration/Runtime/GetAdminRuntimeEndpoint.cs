@@ -15,7 +15,7 @@ public sealed class GetAdminRuntimeEndpoint(
 {
     public override void Configure()
     {
-        Get("/admin/competitions/{competitionId}/runtimes/{runtimeInstanceId}");
+        Get("/admin/runtimes/{runtimeInstanceId}");
         AuthSchemes("Bearer");
         Description(builder => builder.WithName("AdminGetRuntime"));
         Summary(summary =>
@@ -28,11 +28,11 @@ public sealed class GetAdminRuntimeEndpoint(
     public override async Task<Results<Ok<AdminRuntimeResponse>, NotFound, ForbidHttpResult>> ExecuteAsync(
         CancellationToken ct)
     {
-        var competitionId = Route<Guid>("competitionId");
-        if (!await authorizer.CanObserveAsync(user.UserId, competitionId, ct))
+        var result = await runtimes.GetPlatformAsync(Route<Guid>("runtimeInstanceId"), ct);
+        if (result is not null && !user.IsAdministrator
+            && (result.CompetitionId is not Guid competitionId
+                || !await authorizer.CanObserveAsync(user.UserId, competitionId, ct)))
             return TypedResults.Forbid();
-        var result = await runtimes.GetAsync(
-            competitionId, Route<Guid>("runtimeInstanceId"), ct);
         return result is null
             ? TypedResults.NotFound()
             : TypedResults.Ok(AdminRuntimeMapping.ToResponse(

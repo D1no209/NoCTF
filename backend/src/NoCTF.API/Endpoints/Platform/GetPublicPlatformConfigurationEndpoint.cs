@@ -49,11 +49,14 @@ internal static class PublicPlatformConfigurationMapping
             new(
                 uploadLimits.MaximumAvatarBytes,
                 uploadLimits.MaximumWallpaperBytes),
-            MapHumanVerification(humanVerification));
+            MapHumanVerification(configuration.HumanVerificationEnabled, humanVerification));
 
     private static PublicHumanVerificationResponse MapHumanVerification(
+        bool enabled,
         HumanVerificationOptions options) =>
-        options.Provider switch
+        !enabled
+            ? new(HumanVerificationProviderProtocol.None, null, null)
+            : options.Provider switch
         {
             HumanVerificationProvider.None => new(
                 HumanVerificationProviderProtocol.None,
@@ -69,6 +72,16 @@ internal static class PublicPlatformConfigurationMapping
                 null),
             _ => throw new InvalidOperationException(
                 $"Unsupported human verification provider: {options.Provider}.")
+        };
+
+    public static HumanVerificationProviderProtocol ToProtocol(
+        HumanVerificationProvider provider) => provider switch
+        {
+            HumanVerificationProvider.None => HumanVerificationProviderProtocol.None,
+            HumanVerificationProvider.Cap => HumanVerificationProviderProtocol.Cap,
+            HumanVerificationProvider.Turnstile => HumanVerificationProviderProtocol.Turnstile,
+            _ => throw new InvalidOperationException(
+                $"Unsupported human verification provider: {provider}.")
         };
 
     public static string? LogoUrl(

@@ -24,7 +24,9 @@ public sealed record UserProfile(
     string? Description = null,
     Guid? AvatarFileId = null,
     Guid? WallpaperFileId = null,
-    bool WallpaperEnabled = false);
+    bool WallpaperEnabled = false,
+    string? SchoolFullName = null,
+    string? SchoolStudentNumber = null);
 public sealed record PublicUserProfile(
     Guid Id,
     string UserName,
