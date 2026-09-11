@@ -83,16 +83,19 @@ public sealed class AccountPrivacyHttpTests
             await using var app = await AppAsync(postgres.GetConnectionString(), fixture.OwnerId, ct);
             using var client = app.GetTestClient();
             Authenticate(existing);
-            using (var initial = await client.GetAsync("/api/v1/auth/me/school-identity", ct))
+            using (var initial = await client.GetAsync("/api/v1/auth/me/profile", ct))
             {
                 await Assert.That(initial.StatusCode).IsEqualTo(HttpStatusCode.OK);
-                await Assert.That((await initial.Content.ReadFromJsonAsync<SchoolIdentityResponse>(ct))!.StudentNumber).IsNull();
+                await Assert.That((await initial.Content.ReadFromJsonAsync<CurrentUserProfileResponse>(ct))!
+                    .SchoolIdentity.StudentNumber).IsNull();
                 await Assert.That(initial.Headers.CacheControl!.NoStore).IsTrue();
             }
             await SaveAsync("Test Name", "001Ab");
-            using (var read = await client.GetAsync("/api/v1/auth/me/school-identity", ct))
-                await Assert.That((await read.Content.ReadFromJsonAsync<SchoolIdentityResponse>(ct))!.StudentNumber).IsEqualTo("001Ab");
-            using (var invalid = await client.PutAsJsonAsync("/api/v1/auth/me/school-identity", new { fullName = new string('a', 101) }, ct))
+            using (var read = await client.GetAsync("/api/v1/auth/me/profile", ct))
+                await Assert.That((await read.Content.ReadFromJsonAsync<CurrentUserProfileResponse>(ct))!
+                    .SchoolIdentity.StudentNumber).IsEqualTo("001Ab");
+            using (var invalid = await client.PatchAsJsonAsync("/api/v1/auth/me/profile",
+                       new { schoolIdentity = new { fullName = new string('a', 101), studentNumber = (string?)null } }, ct))
                 await Assert.That(invalid.StatusCode).IsEqualTo(HttpStatusCode.BadRequest);
             var path = $"/api/v1/admin/competitions/{fixture.Id}/teams/{team.Id}/members/{existing}/private-profile";
             foreach (var (actor, allowed) in new[] { (fixture.OwnerId, true), (owner, true), (manager, true), (judge, true), (observer, false), (outsider, false), (existing, false) })
@@ -127,8 +130,8 @@ public sealed class AccountPrivacyHttpTests
             await store.SaveOwnAsync(existing, new("Test Name", "001Ab"), ct);
             await store.SaveOwnAsync(registrationId, new("Other", "001Ab"), ct);
             var profile = await auth.GetProfileAsync(existing, ct);
-            await Assert.That(JsonSerializer.Serialize(profile)).DoesNotContain("001Ab");
-            await Assert.That(JsonSerializer.Serialize(profile)).DoesNotContain("Test Name");
+            await Assert.That(JsonSerializer.Serialize(profile)).Contains("001Ab");
+            await Assert.That(JsonSerializer.Serialize(profile)).Contains("Test Name");
             var notifications = await new NotificationReader(db).ListAsync(fixture.OwnerId, null, null, 100, ct);
             await Assert.That(notifications.Any(x => x.Kind == NotificationKind.AuthenticationSecurityActivity)).IsFalse();
             var old = fixture.Now.AddDays(-31);
@@ -142,21 +145,28 @@ public sealed class AccountPrivacyHttpTests
             void Authenticate(Guid id) => client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", id.ToString());
             async Task SaveAsync(string? name, string? number)
             {
-                using var response = await client.PutAsJsonAsync("/api/v1/auth/me/school-identity", new { fullName = name, studentNumber = number }, ct);
-                await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.NoContent);
+                using var response = await client.PatchAsJsonAsync("/api/v1/auth/me/profile",
+                    new { schoolIdentity = new { fullName = name, studentNumber = number } }, ct);
+                await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.OK);
             }
         });
     }
     private static async Task<WebApplication> AppAsync(string connection, Guid admin, CancellationToken ct)
     {
         var builder = WebApplication.CreateBuilder(); builder.WebHost.UseTestServer();
-        Type[] endpoints = [typeof(GetMySchoolIdentityEndpoint), typeof(UpdateMySchoolIdentityEndpoint), typeof(GetPrivateTeamMemberEndpoint), typeof(GetPrivatePlatformUserEndpoint)];
-        builder.Services.AddFastEndpoints(o => { o.DisableAutoDiscovery = true; o.Assemblies = [typeof(GetMySchoolIdentityEndpoint).Assembly]; o.Filter = endpoints.Contains; });
+        Type[] endpoints = [typeof(GetMyProfileEndpoint), typeof(PatchMyProfileEndpoint), typeof(GetPrivateTeamMemberEndpoint), typeof(GetPrivatePlatformUserEndpoint)];
+        builder.Services.AddFastEndpoints(o => { o.DisableAutoDiscovery = true; o.Assemblies = [typeof(GetMyProfileEndpoint).Assembly]; o.Filter = endpoints.Contains; });
         builder.Services.AddAuthentication("Bearer").AddScheme<AuthenticationSchemeOptions, BearerHandler>("Bearer", _ => { });
         builder.Services.AddAuthorization(); builder.Services.AddHttpContextAccessor(); builder.Services.AddSingleton(new Administrator(admin));
         builder.Services.AddSingleton(TimeProvider.System); builder.Services.AddOptions<AccountPrivacyOptions>();
         builder.Services.AddScoped<IUserContext, Actor>(); builder.Services.AddScoped<IAccountPrivacyStore, AccountPrivacyStore>();
         builder.Services.AddScoped<ICompetitionModerationAuthorizer, CompetitionModerationAuthorizer>(); builder.Services.AddScoped<AccountPrivacy>();
+        builder.Services.AddScoped<IPasswordHasher<User>, PasswordHasher<User>>();
+        builder.Services.AddScoped<AuthenticationStore>();
+        builder.Services.AddScoped<IUserAuthenticationStore>(provider => provider.GetRequiredService<AuthenticationStore>());
+        builder.Services.AddScoped<ICurrentUserProfilePatchStore>(provider => provider.GetRequiredService<AuthenticationStore>());
+        builder.Services.AddScoped<GetCurrentUser>();
+        builder.Services.AddScoped<PatchCurrentUserProfile>();
         builder.Services.AddDbContext<NoCtfDbContext>(o => o.UseNpgsql(connection).UseSnakeCaseNamingConvention());
         var app = builder.Build(); app.UseAuthentication(); app.UseAuthorization(); app.UseNoCtfEndpoints(); await app.StartAsync(ct); return app;
     }

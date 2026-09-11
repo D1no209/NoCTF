@@ -35,41 +35,15 @@ public sealed class PlatformBotProtocolTests
     }
 
     [Test]
-    public async Task Role_conflict_code_serializes_as_a_named_enum()
+    public async Task Platform_user_patch_serializes_bounded_fields_as_named_enums()
     {
-        var json = JsonSerializer.Serialize(
-            UpdatePlatformUserRoleConflictCode.ActiveOwnerOrManagerAssignments);
+        var json = JsonSerializer.Serialize(new PatchPlatformUserRequest
+        {
+            Role = UserRoleProtocol.Organizer,
+            AccountStatus = PlatformManagedUserAccountStatusProtocol.Disabled
+        }, WebJson);
 
-        await Assert.That(json).IsEqualTo("\"ActiveOwnerOrManagerAssignments\"");
-    }
-
-    [Test]
-    public async Task Last_administrator_conflict_code_serializes_as_a_named_enum()
-    {
-        var json = JsonSerializer.Serialize(
-            UpdatePlatformUserRoleConflictCode.LastAdministratorProtected);
-
-        await Assert.That(json).IsEqualTo("\"LastAdministratorProtected\"");
-    }
-
-    [Test]
-    public async Task Managed_account_status_and_conflict_serialize_as_named_enums()
-    {
-        var status = JsonSerializer.Serialize(
-            PlatformManagedUserAccountStatusProtocol.Disabled);
-        var conflict = JsonSerializer.Serialize(
-            UpdatePlatformUserAccountStatusConflictCode.AnonymizedAccountImmutable);
-
-        await Assert.That(status).IsEqualTo("\"Disabled\"");
-        await Assert.That(conflict).IsEqualTo("\"AnonymizedAccountImmutable\"");
-    }
-
-    [Test]
-    public async Task Email_verification_conflict_serializes_as_a_named_enum()
-    {
-        var conflict = JsonSerializer.Serialize(
-            UpdatePlatformUserEmailVerificationConflictCode.AnonymizedAccountImmutable);
-
-        await Assert.That(conflict).IsEqualTo("\"AnonymizedAccountImmutable\"");
+        await Assert.That(json).Contains("\"role\":\"Organizer\"");
+        await Assert.That(json).Contains("\"accountStatus\":\"Disabled\"");
     }
 }

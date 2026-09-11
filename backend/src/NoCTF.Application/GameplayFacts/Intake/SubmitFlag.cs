@@ -25,7 +25,12 @@ public sealed class GetFlagAttemptState(
             snapshot.Mode,
             snapshot.CompetitionConfigurationJson,
             snapshot.ChallengeConfigurationJson);
-        var maximum = rules.MaxFlagAttempts is > 0 ? rules.MaxFlagAttempts : null;
+        var practice = snapshot.Mode == GameMode.Ctf
+            && snapshot.CompetitionStatus == CompetitionStatus.Finished
+            && snapshot.PracticeModeEnabled;
+        var maximum = !practice && rules.MaxFlagAttempts is > 0
+            ? rules.MaxFlagAttempts
+            : null;
         return new(
             maximum,
             snapshot.AcceptedFlagAttempts,

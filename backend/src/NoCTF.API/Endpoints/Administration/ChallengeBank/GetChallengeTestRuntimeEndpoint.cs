@@ -77,7 +77,7 @@ public sealed class GetChallengeTestRuntimeEndpoint(
 {
     public override void Configure()
     {
-        Get("/admin/challenges/{challengeId}/test-runtime");
+        Get("/admin/challenges/{challengeId}/test-runtimes/current");
         AuthSchemes("Bearer");
         Roles("Organizer", "Administrator");
         Description(builder => builder.WithName("AdminChallengeBankGetTestRuntime"));

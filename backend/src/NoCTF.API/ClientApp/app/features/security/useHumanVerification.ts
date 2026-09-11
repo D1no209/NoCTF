@@ -1,6 +1,7 @@
-import { markRaw, resolveComponent } from 'vue'
-import type { Component, Ref } from 'vue'
+import { markRaw } from 'vue'
+import type { Ref } from 'vue'
 import { ShieldCheck } from '@lucide/vue'
+import TurnstileWidgetComponent from '@nuxtjs/turnstile/runtime/components/NuxtTurnstile.vue'
 import { toast } from 'vue-sonner'
 import type { MessageKey } from '~/locales/zh-CN'
 import { createHumanVerificationCoordinator } from '~/lib/human-verification-coordinator'
@@ -223,7 +224,7 @@ export function useHumanVerificationGate() {
 
   return {
     ShieldCheck: markRaw(ShieldCheck),
-    TurnstileWidget: markRaw(resolveComponent('NuxtTurnstile') as Component),
+    TurnstileWidget: markRaw(TurnstileWidgetComponent),
     open: computed(() => challenge.value !== null),
     provider: computed(() => challenge.value?.provider ?? null),
     challengeId: computed(() => challenge.value?.id ?? 0),

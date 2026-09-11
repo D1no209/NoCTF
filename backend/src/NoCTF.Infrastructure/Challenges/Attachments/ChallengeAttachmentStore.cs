@@ -120,6 +120,53 @@ public sealed class ChallengeAttachmentStore(
         }
     }
 
+    public async Task<AddChallengeAttachmentState> AddBatchAsync(
+        Guid challengeId,
+        Guid actorId,
+        bool isAdministrator,
+        IReadOnlyList<ChallengeAttachmentBatchEntry> entries,
+        CancellationToken ct)
+    {
+        await using var transaction = await db.Database.BeginTransactionAsync(ct);
+        var challenge = await LockWritableChallengeAsync(
+            challengeId, actorId, isAdministrator, ct);
+        if (challenge is null)
+            return AddChallengeAttachmentState.ChallengeNotFound;
+        if (await HasRandomCandidatesAsync(challengeId, ct))
+            return AddChallengeAttachmentState.DeliveryModeConflict;
+        if (entries.Count == 0
+            || entries.Any(entry => entry.AttachmentId == Guid.Empty || entry.FileId == Guid.Empty)
+            || entries.Select(entry => entry.AttachmentId).Distinct().Count() != entries.Count
+            || entries.Select(entry => entry.FileId).Distinct().Count() != entries.Count
+            || await db.Set<ChallengeAttachment>().IgnoreQueryFilters().AsNoTracking()
+                .AnyAsync(attachment => entries.Select(entry => entry.AttachmentId)
+                    .Contains(attachment.Id), ct))
+            return AddChallengeAttachmentState.ResourceIdConflict;
+        foreach (var entry in entries)
+        {
+            if (!await fileLock.AcquireAsync(db, entry.FileId, ct))
+                return AddChallengeAttachmentState.ResourceIdConflict;
+        }
+        db.Set<ChallengeAttachment>().AddRange(entries.Select(entry => new ChallengeAttachment
+        {
+            Id = entry.AttachmentId,
+            ChallengeId = challengeId,
+            FileId = entry.FileId,
+            CreatedAt = entry.CreatedAt
+        }));
+        challenge.UpdatedAt = entries.Max(entry => entry.CreatedAt);
+        try
+        {
+            await db.SaveChangesAsync(ct);
+            await transaction.CommitAsync(ct);
+            return AddChallengeAttachmentState.Added;
+        }
+        catch (DbUpdateException)
+        {
+            return AddChallengeAttachmentState.ResourceIdConflict;
+        }
+    }
+
     public async Task<AddChallengeAttachmentState> AddRandomBatchAsync(
         Guid challengeId,
         Guid actorId,

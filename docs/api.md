@@ -2,13 +2,13 @@
 
 本文列出目标资源面。每个路由对应一个 StronglyTyped FastEndpoint 文件；请求/响应/Validator 放在该文件。业务码和精确 result union 依 [API 通用规范](api-conventions.md)。
 
+聚合 PATCH 使用可空 section：省略 section 不修改，出现的 section 必须提交完整字段，其中 nullable 字段可用显式 null 清空。服务端先验证所有请求 section 的权限，再以有界 flags 选择权限专属 Mapperly existing-target mapper；多 section 写入共享一个事务，任一规则失败会整体回滚并清理跟踪状态。
+
 ## Platform
 
 ### 可选公网访问（仅平台管理员）
 
 ```text
-GET /api/v1/admin/platform/public-gateway
-PUT /api/v1/admin/platform/public-gateway
 GET /api/v1/admin/platform/public-gateway/status
 ```
 
@@ -17,9 +17,9 @@ GET /api/v1/admin/platform/public-gateway/status
 ### 私密账户资料（不属于公开用户协议）
 
 ```text
-GET /api/v1/auth/me/school-identity
-PUT /api/v1/auth/me/school-identity
-GET /api/v1/admin/platform/users/{userId}/private-profile
+GET /api/v1/auth/me/profile
+PATCH /api/v1/auth/me/profile
+GET /api/v1/admin/platform/users/{userId}/activity
 GET /api/v1/admin/competitions/{competitionId}/teams/{teamId}/members/{userId}/private-profile
 ```
 
@@ -44,11 +44,11 @@ POST /api/v1/auth/email-verification/resend
 POST /api/v1/auth/password-reset/request
 POST /api/v1/auth/password-reset/complete
 GET  /api/v1/auth/me
-PUT  /api/v1/auth/me/profile
-POST /api/v1/auth/me/avatar
+GET  /api/v1/auth/me/profile
+PATCH /api/v1/auth/me/profile
+PUT  /api/v1/auth/me/avatar
 GET  /api/v1/auth/me/wallpaper
-POST /api/v1/auth/me/wallpaper
-PUT  /api/v1/auth/me/wallpaper-preference
+PUT  /api/v1/auth/me/wallpaper
 PUT  /api/v1/auth/password
 POST /api/v1/auth/logout-all
 GET  /api/v1/users/{userId}
@@ -77,20 +77,18 @@ POST /api/v1/competitions/{competitionId}/teams
 GET  /api/v1/competitions/{competitionId}/teams
 GET  /api/v1/competitions/{competitionId}/teams/me
 GET  /api/v1/competitions/{competitionId}/teams/{teamId}
-PUT  /api/v1/competitions/{competitionId}/teams/{teamId}
+PATCH /api/v1/competitions/{competitionId}/teams/{teamId}
 DELETE /api/v1/competitions/{competitionId}/teams/{teamId}
 GET  /api/v1/competitions/{competitionId}/teams/{teamId}/avatar
-POST /api/v1/competitions/{competitionId}/teams/{teamId}/avatar
+PUT  /api/v1/competitions/{competitionId}/teams/{teamId}/avatar
 DELETE /api/v1/competitions/{competitionId}/teams/{teamId}/avatar
 POST /api/v1/competitions/{competitionId}/teams/join
 POST /api/v1/competitions/{competitionId}/teams/{teamId}/invitation-token/rotate
-POST /api/v1/competitions/{competitionId}/teams/{teamId}/captain/transfer
-DELETE /api/v1/competitions/{competitionId}/teams/{teamId}/members/{userId}
 DELETE /api/v1/competitions/{competitionId}/teams/me/membership
-POST /api/v1/competitions/{competitionId}/teams/{teamId}/registration/resubmit
 ```
 
 Team response 使用 CaptainId 与 MemberIds 数组，不返回成员顺序。
+Team PATCH 使用 Profile、Membership、Registration、Administration、Ban section；队长的 Registration 只允许 Rejected → Pending，管理端 Administration 同时提交完整 TrackKey 与 RegistrationStatus，且只允许业务状态机接受的审核变化。
 Team Avatar 与 Competition Poster 都通过不可变 File 引用上传；上传/清除需要对应管理权限，读取路由不暴露通用 File 下载能力。
 邀请加入使用队伍当前的 32 位 InvitationToken；比赛运行中仅在 `AllowTeamRegistrationWhileRunning` 开启时允许加入。
 加入失败返回强类型 `TeamMembershipFailureCodeProtocol`，前端不得将阶段锁定、队伍已满或无效邀请码表现为无响应。
@@ -161,7 +159,6 @@ Target 是 CompetitionId，默认 TargetType=CompetitionCollaborators；面向�
 
 ```text
 POST /api/v1/competitions/{competitionId}/challenges/{competitionChallengeId}/flag-submissions
-POST /api/v1/competitions/{competitionId}/challenges/{competitionChallengeId}/practice-flag
 POST /api/v1/competitions/{competitionId}/challenges/{competitionChallengeId}/awdp-break-flag-judgement
 POST /api/v1/competitions/{competitionId}/challenges/{competitionChallengeId}/awdp-defense-targets
 POST /api/v1/competitions/{competitionId}/challenges/{competitionChallengeId}/awdp-defense-targets/{runtimeInstanceId}/fix
@@ -185,16 +182,20 @@ AWD 可二选一使用 flag 或 flags；CTF/AWDP Break 必须只用 flag。AWD f
 `FlagInvalid`/400 且零写入。每项创建独立 GameplayFact；数据库不保存 batch。单 flag 的 202 body 返回
 GameplayFactId/state/statusUrl；flags 保持输入顺序，不返回 BatchId。
 
+Finished 且已开启练习的 CTF 继续复用 `flag-submissions`。练习提交创建普通 FlagAttempt 并通过同一
+异步状态接口返回结果；正式赛与练习的尝试/已解进度按正式截止时间分隔，练习错误次数不限。
+有 Runtime 的练习题要求本队存在 Running 且未过期的 Practice Runtime，否则返回
+`RuntimeNotRunning`/409。练习 Fact 保留在提交与审计记录中，但不进入正式分数、血奖或排行榜。
+
 AWDP Break 首次正确后，普通 Flag 提交不再创建新 GameplayFact、计分、播报或改变 Runtime；只读 judgement 路由仅验证当前 Flag 正误，供赛后复现和 WP 使用。第一条 AWDP 防御路由申请一次性干净 Target，返回 RuntimeInstanceId 和状态地址。Target 为 Queued、Provisioning 或 Running 时，第二条 multipart 单文件路由即可在事务中唯一绑定 PatchUpload/Pending FixAttempt，并直接返回 PatchUploadId、GameplayFactId 与事实状态；没有独立的 Fix trigger。Target Running 后验证自动继续。归档校验失败不消费 Target，成功绑定后同一 Target 不再接受第二次上传。
 
 ## Runtime
 
 ```text
-GET  /api/v1/competitions/{competitionId}/challenges/{competitionChallengeId}/runtime
-POST /api/v1/competitions/{competitionId}/challenges/{competitionChallengeId}/runtime/start
-POST /api/v1/competitions/{competitionId}/challenges/{competitionChallengeId}/runtime/stop
-POST /api/v1/competitions/{competitionId}/challenges/{competitionChallengeId}/runtime/reset
-POST /api/v1/competitions/{competitionId}/challenges/{competitionChallengeId}/runtime/extend
+GET  /api/v1/competitions/{competitionId}/challenges/{competitionChallengeId}/runtimes/current
+POST /api/v1/competitions/{competitionId}/challenges/{competitionChallengeId}/runtimes
+PATCH /api/v1/competitions/{competitionId}/challenges/{competitionChallengeId}/runtimes/{runtimeInstanceId}
+DELETE /api/v1/competitions/{competitionId}/challenges/{competitionChallengeId}/runtimes/{runtimeInstanceId}
 GET  /api/v1/competitions/{competitionId}/challenges/{competitionChallengeId}/targets
 GET  /api/v1/competitions/{competitionId}/challenges/{competitionChallengeId}/awdp-state
 ```
@@ -215,29 +216,15 @@ CTF 开放四个动作；AWD 玩家 GET/Reset，Start/Stop 由平台生命周期
 GET  /api/v1/admin/competitions
 POST /api/v1/admin/competitions
 GET  /api/v1/admin/competitions/{competitionId}
-PUT  /api/v1/admin/competitions/{competitionId}
-GET  /api/v1/admin/competitions/{competitionId}/configuration
-PUT  /api/v1/admin/competitions/{competitionId}/configuration
-GET  /api/v1/admin/competitions/{competitionId}/leaderboard-visibility
-PUT  /api/v1/admin/competitions/{competitionId}/leaderboard-visibility
-GET  /api/v1/admin/competitions/{competitionId}/tracks
-PUT  /api/v1/admin/competitions/{competitionId}/tracks
+PATCH /api/v1/admin/competitions/{competitionId}
+PUT  /api/v1/admin/competitions/{competitionId}/status
 DELETE /api/v1/admin/competitions/{competitionId}
 POST /api/v1/admin/competitions/{competitionId}/restore
 GET  /api/v1/admin/competitions/{competitionId}/hard-delete-preview
 DELETE /api/v1/admin/competitions/{competitionId}/hard-delete
 POST /api/v1/admin/competitions/{competitionId}/force-delete
-POST /api/v1/admin/competitions/{competitionId}/publish
-POST /api/v1/admin/competitions/{competitionId}/make-visible
-POST /api/v1/admin/competitions/{competitionId}/start
-POST /api/v1/admin/competitions/{competitionId}/pause
-POST /api/v1/admin/competitions/{competitionId}/resume
-POST /api/v1/admin/competitions/{competitionId}/finish
-GET  /api/v1/admin/competitions/{competitionId}/permissions
-PUT  /api/v1/admin/competitions/{competitionId}/permissions
 GET  /api/v1/admin/competitions/{competitionId}/permission-candidates
-POST /api/v1/admin/competitions/{competitionId}/owner/transfer
-POST /api/v1/admin/competitions/{competitionId}/poster
+PUT  /api/v1/admin/competitions/{competitionId}/poster
 DELETE /api/v1/admin/competitions/{competitionId}/poster
 GET  /api/v1/admin/competitions/{competitionId}/start-validation
 POST /api/v1/admin/competitions/{competitionId}/flags/generate-missing
@@ -245,9 +232,7 @@ GET  /api/v1/admin/competitions/{competitionId}/events/export
 POST /api/v1/admin/competitions/{competitionId}/data-export
 GET  /api/v1/admin/competitions/{competitionId}/cheat-incidents
 GET  /api/v1/admin/competitions/{competitionId}/cheat-incidents/{gameplayFactId}
-POST /api/v1/admin/competitions/{competitionId}/cheat-incidents/{gameplayFactId}/dismiss
-POST /api/v1/admin/competitions/{competitionId}/cheat-incidents/{gameplayFactId}/confirm
-POST /api/v1/admin/competitions/{competitionId}/cheat-incidents/{gameplayFactId}/correct
+PUT  /api/v1/admin/competitions/{competitionId}/cheat-incidents/{gameplayFactId}/status
 ```
 
 Lifecycle Endpoint 复用同一 Application state machine，但每个动作仍是独立文件/路由/TypedResults。
@@ -293,15 +278,9 @@ Judge/Observer 必须完成邮箱验证；资格或角色冲突返回 typed 409�
 
 ```text
 GET  /api/v1/admin/competitions/{competitionId}/teams
-PUT  /api/v1/admin/competitions/{competitionId}/teams/{teamId}/track
-POST /api/v1/admin/competitions/{competitionId}/teams/{teamId}/approve
-POST /api/v1/admin/competitions/{competitionId}/teams/{teamId}/reject
-POST /api/v1/admin/competitions/{competitionId}/teams/{teamId}/ban
-POST /api/v1/admin/competitions/{competitionId}/teams/{teamId}/unban
 POST /api/v1/admin/competitions/{competitionId}/teams/{teamId}/correct-ban
 GET  /api/v1/admin/competitions/{competitionId}/team-ban-appeals
-POST /api/v1/admin/competitions/{competitionId}/team-ban-appeals/{appealId}/uphold
-POST /api/v1/admin/competitions/{competitionId}/team-ban-appeals/{appealId}/accept
+PUT  /api/v1/admin/competitions/{competitionId}/team-ban-appeals/{appealId}/resolution
 
 GET  /api/v1/competitions/{competitionId}/team-ban-case
 POST /api/v1/competitions/{competitionId}/team-ban-appeals
@@ -313,14 +292,11 @@ POST /api/v1/competitions/{competitionId}/team-ban-appeals
 GET  /api/v1/admin/challenges
 POST /api/v1/admin/challenges
 GET  /api/v1/admin/challenges/{challengeId}
-PUT  /api/v1/admin/challenges/{challengeId}
+PATCH /api/v1/admin/challenges/{challengeId}
 DELETE /api/v1/admin/challenges/{challengeId}
 POST /api/v1/admin/challenges/{challengeId}/restore
-PUT  /api/v1/admin/challenges/{challengeId}/permissions
-POST /api/v1/admin/challenges/{challengeId}/owner/transfer
 GET  /api/v1/admin/challenges/{challengeId}/attachments
 POST /api/v1/admin/challenges/{challengeId}/attachments
-POST /api/v1/admin/challenges/{challengeId}/attachments/random-batch
 DELETE /api/v1/admin/challenges/{challengeId}/attachments/{attachmentId}
 POST /api/v1/admin/challenges/{challengeId}/attachments/{attachmentId}/restore
 GET  /api/v1/admin/challenges/{challengeId}/flags
@@ -329,11 +305,10 @@ GET  /api/v1/admin/challenges/{challengeId}/flags/{flagId}
 PUT  /api/v1/admin/challenges/{challengeId}/flags/{flagId}
 DELETE /api/v1/admin/challenges/{challengeId}/flags/{flagId}
 POST /api/v1/admin/challenges/{challengeId}/flags/{flagId}/restore
-GET  /api/v1/admin/challenges/{challengeId}/test-runtime
-POST /api/v1/admin/challenges/{challengeId}/test-runtime/start
-POST /api/v1/admin/challenges/{challengeId}/test-runtime/stop
-POST /api/v1/admin/challenges/{challengeId}/test-runtime/reset
-POST /api/v1/admin/challenges/{challengeId}/test-runtime/extend
+GET  /api/v1/admin/challenges/{challengeId}/test-runtimes/current
+POST /api/v1/admin/challenges/{challengeId}/test-runtimes
+PATCH /api/v1/admin/challenges/{challengeId}/test-runtimes/{runtimeInstanceId}
+DELETE /api/v1/admin/challenges/{challengeId}/test-runtimes/{runtimeInstanceId}
 ```
 
 题库模板负责人、协作者和平台管理员可为包含 Container/Compose 定义的模板创建一个活动测试
@@ -349,16 +324,14 @@ Runtime。测试实例沿用正式 Runner 的镜像拉取、资源限制、安�
 
 ```text
 GET  /api/v1/admin/competitions/{competitionId}/runtimes
-GET  /api/v1/admin/competitions/{competitionId}/runtimes/{runtimeInstanceId}
-POST /api/v1/admin/competitions/{competitionId}/runtimes/{runtimeInstanceId}/terminate
-POST /api/v1/admin/competitions/{competitionId}/runtimes/{runtimeInstanceId}/force-terminate
-POST /api/v1/admin/competitions/{competitionId}/teams/{teamId}/challenges/{competitionChallengeId}/runtime/start
-POST /api/v1/admin/competitions/{competitionId}/teams/{teamId}/challenges/{competitionChallengeId}/runtime/stop
-POST /api/v1/admin/competitions/{competitionId}/teams/{teamId}/challenges/{competitionChallengeId}/runtime/reset
-POST /api/v1/admin/competitions/{competitionId}/teams/{teamId}/challenges/{competitionChallengeId}/runtime/extend
-POST /api/v1/admin/competitions/{competitionId}/challenges/{competitionChallengeId}/runtime/start
-POST /api/v1/admin/competitions/{competitionId}/challenges/{competitionChallengeId}/runtime/stop
-POST /api/v1/admin/competitions/{competitionId}/challenges/{competitionChallengeId}/runtime/reset
+GET  /api/v1/admin/runtimes/{runtimeInstanceId}
+DELETE /api/v1/admin/runtimes/{runtimeInstanceId}
+POST /api/v1/admin/runtimes/{runtimeInstanceId}/force-terminations
+POST /api/v1/admin/competitions/{competitionId}/teams/{teamId}/challenges/{competitionChallengeId}/runtimes
+PATCH /api/v1/admin/competitions/{competitionId}/teams/{teamId}/challenges/{competitionChallengeId}/runtimes/{runtimeInstanceId}
+DELETE /api/v1/admin/competitions/{competitionId}/teams/{teamId}/challenges/{competitionChallengeId}/runtimes/{runtimeInstanceId}
+POST /api/v1/admin/competitions/{competitionId}/challenges/{competitionChallengeId}/runtimes
+DELETE /api/v1/admin/competitions/{competitionId}/challenges/{competitionChallengeId}/runtimes/{runtimeInstanceId}
 ```
 
 列表按 CreatedAt desc/Id desc keyset，可筛选 CompetitionChallengeId、TeamId、RuntimeKind、Provider、RunnerId、State、ExpiresBefore。Manager 可执行常规动作；Judge/Observer 只读；ProviderReceipt/内部错误只在管理详情返回。精确终止仅使用 RuntimeInstanceId 定位实例，并通过持久化 `Stopping -> Stopped` Provider 清理状态机；同一终态操作依赖状态和幂等资源身份收敛。仅平台 Administrator 可对已停留至少五分钟的 `Provisioning`/`Stopping` 实例执行强制终结，必须提交原因；Runner 先按实例 UUID 标签清理并确认 Provider 资源已不存在，再释放容量、写回 `Stopped` 并派发等待实例，结果记录为工作人员可见的比赛事件。该流程幂等，禁止仅修改数据库状态。带 Team 的动作服务 CTF/AWD，复用玩家 Runtime 状态机，不提供绕过额度或状态的“强制成功”。不带 Team 的三个动作只服务 KoH shared Runtime，不伪造 TeamId；KoH 没有 Extend。
@@ -369,9 +342,7 @@ POST /api/v1/admin/competitions/{competitionId}/challenges/{competitionChallenge
 GET  /api/v1/admin/competitions/{competitionId}/challenges
 POST /api/v1/admin/competitions/{competitionId}/challenges
 GET  /api/v1/admin/competitions/{competitionId}/challenges/{competitionChallengeId}
-PUT  /api/v1/admin/competitions/{competitionId}/challenges/{competitionChallengeId}
-GET  /api/v1/admin/competitions/{competitionId}/challenges/{competitionChallengeId}/configuration
-PUT  /api/v1/admin/competitions/{competitionId}/challenges/{competitionChallengeId}/configuration
+PATCH /api/v1/admin/competitions/{competitionId}/challenges/{competitionChallengeId}
 DELETE /api/v1/admin/competitions/{competitionId}/challenges/{competitionChallengeId}
 POST /api/v1/admin/competitions/{competitionId}/challenges/{competitionChallengeId}/restore
 GET  /api/v1/admin/competitions/{competitionId}/challenges/{competitionChallengeId}/hints
@@ -403,8 +374,7 @@ GET  /api/v1/admin/competitions/{competitionId}/gameplay-facts/{gameplayFactId}
 GET  /api/v1/admin/competitions/{competitionId}/gameplay-facts/{gameplayFactId}/patch
 POST /api/v1/admin/competitions/{competitionId}/gameplay-facts/{gameplayFactId}/flag-access
 POST /api/v1/admin/competitions/{competitionId}/gameplay-facts/queue-evaluation
-POST /api/v1/admin/competitions/{competitionId}/gameplay-facts/rejudge
-POST /api/v1/admin/competitions/{competitionId}/gameplay-facts/{gameplayFactId}/rejudge
+POST /api/v1/admin/competitions/{competitionId}/gameplay-fact-rejudgements
 POST /api/v1/admin/competitions/{competitionId}/gameplay-facts/manual-adjustments
 ```
 
@@ -441,28 +411,23 @@ Feed 按动态受众读取：User、CompetitionCollaborators、CompetitionPartic
 ```text
 GET  /api/v1/admin/platform/users
 GET  /api/v1/admin/platform/users/{userId}
+PATCH /api/v1/admin/platform/users/{userId}
+GET  /api/v1/admin/platform/users/{userId}/activity
 GET  /api/v1/admin/platform/users/{userId}/deletion-preview
 DELETE /api/v1/admin/platform/users/{userId}
 GET  /api/v1/admin/platform/configuration
-PUT  /api/v1/admin/platform/configuration
-POST /api/v1/admin/platform/configuration/logo
+PATCH /api/v1/admin/platform/configuration
+PUT  /api/v1/admin/platform/configuration/logo
 GET  /api/v1/admin/platform/information
 GET  /api/v1/admin/platform/monitoring
 GET  /api/v1/admin/platform/runtimes
-POST /api/v1/admin/platform/runtimes/{runtimeInstanceId}/terminate
-POST /api/v1/admin/platform/runtimes/{runtimeInstanceId}/force-terminate
 GET  /api/v1/admin/platform/logs
 GET  /api/v1/admin/platform/logs/export
 GET  /api/v1/admin/platform/audit-logs
 POST /api/v1/admin/platform/audit-logs/data-export
 POST /api/v1/admin/platform/bots
 POST /api/v1/admin/platform/bots/{userId}/tokens
-PUT  /api/v1/admin/platform/users/{userId}/role
-PUT  /api/v1/admin/platform/users/{userId}/account-status
-PUT  /api/v1/admin/platform/users/{userId}/email-verification
 POST /api/v1/admin/platform/users/{userId}/tokens/invalidate
-GET  /api/v1/admin/platform/email-verification/configuration
-PUT  /api/v1/admin/platform/email-verification/configuration
 PUT  /api/v1/admin/platform/email-verification/password
 POST /api/v1/admin/platform/email-verification/test
 ```

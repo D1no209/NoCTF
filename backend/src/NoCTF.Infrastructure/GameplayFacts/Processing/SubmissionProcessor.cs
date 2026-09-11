@@ -17,6 +17,7 @@ using NoCTF.Domain.Shared;
 using NoCTF.Infrastructure.Challenges;
 using System.Globalization;
 using System.Text.Json;
+using NoCTF.Infrastructure.Competitions.Lifecycle;
 
 namespace NoCTF.Infrastructure.GameplayFacts.Processing;
 
@@ -144,6 +145,16 @@ public sealed class GameplayFactProcessor(
             configuration.Competition.Mode,
             configuration.Competition.ConfigurationJson,
             configuration.CompetitionChallenge.RulesJson);
+        var officialWindow = configuration.Competition.Mode == GameMode.Ctf
+            ? await CompetitionOfficialWindowReader.ReadAsync(
+                db,
+                configuration.Competition.Id,
+                configuration.Competition.StartAt,
+                configuration.Competition.EndAt,
+                cancellationToken)
+            : (CompetitionOfficialWindow?)null;
+        var practiceFact = officialWindow is { } ctfWindow
+            && submission.OccurredAt >= ctfWindow.EndAt;
         if (submission.Kind is GameplayFactKind.HintUnlock or GameplayFactKind.ManualAdjustment)
         {
             var special = await EvaluateSpecialAsync(
@@ -152,14 +163,16 @@ public sealed class GameplayFactProcessor(
                 configuration.CompetitionChallenge,
                 timeProvider.GetUtcNow(),
                 cancellationToken);
-            return new(special);
+            return new(special, officialWindow);
         }
-        var maxAttempts = submission.Kind is GameplayFactKind.FlagAttempt or GameplayFactKind.BreakAttempt
-            ? rules.MaxFlagAttempts
-            : rules.MaxFixAttempts;
+        var maxAttempts = practiceFact
+            ? null
+            : submission.Kind is GameplayFactKind.FlagAttempt or GameplayFactKind.BreakAttempt
+                ? rules.MaxFlagAttempts
+                : rules.MaxFixAttempts;
         if (maxAttempts is > 0)
         {
-            var acceptedPosition = await db.GameplayFacts.AsNoTracking()
+            var acceptedQuery = db.GameplayFacts.AsNoTracking()
                 .Where(candidate =>
                     candidate.CompetitionId == submission.CompetitionId
                     && candidate.TeamId == submission.TeamId
@@ -168,13 +181,22 @@ public sealed class GameplayFactProcessor(
                     && candidate.State != GameplayFactState.PlatformFailed
                     && (candidate.OccurredAt < submission.OccurredAt
                         || candidate.OccurredAt == submission.OccurredAt
-                        && candidate.Id.CompareTo(submission.Id) <= 0))
-                .CountAsync(cancellationToken);
+                        && candidate.Id.CompareTo(submission.Id) <= 0));
+            if (officialWindow is { } attemptWindow)
+            {
+                acceptedQuery = practiceFact
+                    ? acceptedQuery.Where(candidate => candidate.OccurredAt >= attemptWindow.EndAt)
+                    : acceptedQuery.Where(candidate => candidate.OccurredAt >= attemptWindow.StartAt
+                        && candidate.OccurredAt < attemptWindow.EndAt);
+            }
+            var acceptedPosition = await acceptedQuery.CountAsync(cancellationToken);
             if (acceptedPosition > maxAttempts)
-                return new(new(GameplayFactResult.AttemptsExhausted, null, submission.OccurredAt));
+                return new(
+                    new(GameplayFactResult.AttemptsExhausted, null, submission.OccurredAt),
+                    officialWindow);
         }
 
-        var priorSubmissions = await db.GameplayFacts.AsNoTracking()
+        var priorQuery = db.GameplayFacts.AsNoTracking()
             .Where(item =>
                 item.CompetitionId == submission.CompetitionId
                 && item.CompetitionChallengeId == submission.CompetitionChallengeId
@@ -183,8 +205,15 @@ public sealed class GameplayFactProcessor(
                     || item.FailureCode == GameplayFactFailureCode.ForeignTeamFlagDetected)
                 && (item.OccurredAt < submission.OccurredAt
                     || item.OccurredAt == submission.OccurredAt
-                    && item.Id.CompareTo(submission.Id) < 0))
-            .ToListAsync(cancellationToken);
+                    && item.Id.CompareTo(submission.Id) < 0));
+        if (officialWindow is { } priorWindow)
+        {
+            priorQuery = practiceFact
+                ? priorQuery.Where(item => item.OccurredAt >= priorWindow.EndAt)
+                : priorQuery.Where(item => item.OccurredAt >= priorWindow.StartAt
+                    && item.OccurredAt < priorWindow.EndAt);
+        }
+        var priorSubmissions = await priorQuery.ToListAsync(cancellationToken);
         var flags = await db.ChallengeFlags.AsNoTracking()
             .Where(flag =>
                 flag.CompetitionChallengeId == submission.CompetitionChallengeId
@@ -236,7 +265,7 @@ public sealed class GameplayFactProcessor(
             configuration.Competition.StartAt,
             effectiveRunningTime,
             configuration.Challenge.DefinitionJson));
-        return new(decision);
+        return new(decision, officialWindow);
     }
 
     private async Task<GameplayFactDecision> EvaluateSpecialAsync(
@@ -714,6 +743,9 @@ public sealed class GameplayFactProcessor(
         if (submission.Kind != GameplayFactKind.FlagAttempt
             || evaluation.Decision.Result != GameplayFactResult.Correct)
             return null;
+        if (evaluation.OfficialWindow is not { } officialWindow
+            || !officialWindow.Contains(submission.OccurredAt))
+            return null;
 
         var competition = await db.Competitions.AsNoTracking()
             .Where(competition => competition.Id == submission.CompetitionId)
@@ -745,9 +777,12 @@ public sealed class GameplayFactProcessor(
                 && candidate.CompetitionChallengeId == submission.CompetitionChallengeId
                 && candidate.Kind == GameplayFactKind.FlagAttempt
                 && candidate.Result == GameplayFactResult.Correct
+                && candidate.OccurredAt >= officialWindow.StartAt
+                && candidate.OccurredAt < officialWindow.EndAt
                 && candidate.Id != submission.Id)
             .Join(
-                db.Teams.AsNoTracking().Where(team => bloodTrackKeys.Contains(team.TrackKey)),
+                db.Teams.AsNoTracking().Where(team => bloodTrackKeys.Contains(team.TrackKey)
+                    && team.RegisteredAt < officialWindow.EndAt),
                 candidate => candidate.TeamId,
                 team => (Guid?)team.Id,
                 (candidate, _) => candidate.TeamId!.Value)
@@ -783,7 +818,9 @@ public sealed class GameplayFactProcessor(
             evaluation.Decision.OccurredAt);
     }
 
-    private sealed record Evaluation(GameplayFactDecision Decision);
+    private sealed record Evaluation(
+        GameplayFactDecision Decision,
+        CompetitionOfficialWindow? OfficialWindow = null);
 
     private sealed record GameplayFactProcessingScope(
         Guid CompetitionId,

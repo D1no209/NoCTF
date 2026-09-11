@@ -88,7 +88,7 @@ public sealed class AdminCompetitionStore(
         DateTimeOffset now,
         CancellationToken ct)
     {
-        await using var transaction = await db.Database.BeginTransactionAsync(ct);
+        await using var transaction = await AggregateCompatibleTransaction.BeginAsync(db, ct);
         var entity = await db.Competitions.IgnoreQueryFilters()
             .SingleOrDefaultAsync(competition =>
                 competition.Id == competitionId &&
@@ -166,7 +166,7 @@ public sealed class AdminCompetitionStore(
         bool isAdministrator,
         CancellationToken ct)
     {
-        await using var transaction = await db.Database.BeginTransactionAsync(ct);
+        await using var transaction = await AggregateCompatibleTransaction.BeginAsync(db, ct);
         var observed = await db.Competitions.IgnoreQueryFilters()
             .AsNoTracking()
             .Where(competition =>
@@ -224,7 +224,7 @@ public sealed class AdminCompetitionStore(
         if (!isAdministrator)
             return new(CompetitionForceDeleteState.NotFound);
 
-        await using var transaction = await db.Database.BeginTransactionAsync(ct);
+        await using var transaction = await AggregateCompatibleTransaction.BeginAsync(db, ct);
         await LockForHardDeleteAsync(
             command.CompetitionId,
             command.ActorId,
@@ -353,7 +353,7 @@ public sealed class AdminCompetitionStore(
         DateTimeOffset now,
         CancellationToken ct)
     {
-        await using var transaction = await db.Database.BeginTransactionAsync(ct);
+        await using var transaction = await AggregateCompatibleTransaction.BeginAsync(db, ct);
         var entity = await db.Competitions
             .FromSqlInterpolated($"SELECT * FROM competitions WHERE id = {competitionId} FOR UPDATE")
             .IgnoreQueryFilters()

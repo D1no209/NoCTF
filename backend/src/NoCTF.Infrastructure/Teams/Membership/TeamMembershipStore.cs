@@ -6,6 +6,7 @@ using NoCTF.Application.Competitions.Events;
 using NoCTF.Domain.Competitions;
 using NoCTF.Domain.Competitions.Events;
 using NoCTF.Infrastructure.Teams;
+using NoCTF.Infrastructure.Competitions.Lifecycle;
 
 namespace NoCTF.Infrastructure.Teams.Membership;
 
@@ -26,7 +27,7 @@ public sealed class TeamMembershipStore(
         DateTimeOffset now,
         CancellationToken ct)
     {
-        await using var transaction = await db.Database.BeginTransactionAsync(
+        await using var transaction = await AggregateCompatibleTransaction.BeginAsync(db,
             System.Data.IsolationLevel.ReadCommitted,
             ct);
         var competition = await CompetitionTeamMutationCriticalSection.AcquireAsync(
@@ -55,8 +56,19 @@ public sealed class TeamMembershipStore(
                 ct))
             return TeamMembershipFailure.UserAlreadyRegistered;
 
-        var practiceJoin = team.IsPracticeTeam && competition.Mode == GameMode.Ctf
-            && competition.Status == CompetitionStatus.Finished && competition.PracticeModeEnabled;
+        var practiceJoin = false;
+        if (competition.Mode == GameMode.Ctf
+            && competition.Status == CompetitionStatus.Finished
+            && competition.PracticeModeEnabled)
+        {
+            var officialWindow = await CompetitionOfficialWindowReader.ReadAsync(
+                db,
+                competition.Id,
+                competition.StartAt,
+                competition.EndAt,
+                ct);
+            practiceJoin = team.RegisteredAt >= officialWindow.EndAt;
+        }
         if (!practiceJoin && TeamMembershipPolicy.IsInvitationJoinLocked(
                 competition.Status,
                 competition.AllowTeamRegistrationWhileRunning))
@@ -87,7 +99,7 @@ public sealed class TeamMembershipStore(
         string token,
         CancellationToken ct)
     {
-        await using var transaction = await db.Database.BeginTransactionAsync(
+        await using var transaction = await AggregateCompatibleTransaction.BeginAsync(db,
             System.Data.IsolationLevel.ReadCommitted,
             ct);
         var competition = await CompetitionTeamMutationCriticalSection.AcquireAsync(
@@ -126,7 +138,7 @@ public sealed class TeamMembershipStore(
         Guid actorId,
         CancellationToken ct)
     {
-        await using var transaction = await db.Database.BeginTransactionAsync(
+        await using var transaction = await AggregateCompatibleTransaction.BeginAsync(db,
             System.Data.IsolationLevel.ReadCommitted,
             ct);
         var competition = await CompetitionTeamMutationCriticalSection.AcquireAsync(
@@ -168,7 +180,7 @@ public sealed class TeamMembershipStore(
         Guid userId,
         CancellationToken ct)
     {
-        await using var transaction = await db.Database.BeginTransactionAsync(
+        await using var transaction = await AggregateCompatibleTransaction.BeginAsync(db,
             System.Data.IsolationLevel.ReadCommitted,
             ct);
         var competition = await CompetitionTeamMutationCriticalSection.AcquireAsync(
@@ -212,7 +224,7 @@ public sealed class TeamMembershipStore(
         Guid newCaptainId,
         CancellationToken ct)
     {
-        await using var transaction = await db.Database.BeginTransactionAsync(
+        await using var transaction = await AggregateCompatibleTransaction.BeginAsync(db,
             System.Data.IsolationLevel.ReadCommitted,
             ct);
         var competition = await CompetitionTeamMutationCriticalSection.AcquireAsync(

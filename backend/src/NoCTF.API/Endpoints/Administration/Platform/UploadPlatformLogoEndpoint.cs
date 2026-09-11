@@ -39,13 +39,13 @@ public sealed class UploadPlatformLogoEndpoint(
     FileUploadLimits uploadLimits,
     TimeProvider timeProvider)
     : Endpoint<UploadPlatformLogoRequest,
-        Results<Ok<PlatformConfigurationResponse>, ProblemHttpResult>>
+        Results<Ok<PlatformBrandingResponse>, ProblemHttpResult>>
 {
     public override void Configure()
     {
         Options(builder => builder.WithMetadata(new NoCTF.Hosting.Observability.ApiRequestMetricsMetadata(
             NoCTF.Application.Observability.ApiRequestKind.Upload)));
-        Post("/admin/platform/configuration/logo");
+        Put("/admin/platform/configuration/logo");
         AuthSchemes("Bearer");
         Roles("Administrator");
         AllowFileUploads();
@@ -63,7 +63,7 @@ public sealed class UploadPlatformLogoEndpoint(
     }
 
     public override async Task<
-        Results<Ok<PlatformConfigurationResponse>, ProblemHttpResult>> ExecuteAsync(
+        Results<Ok<PlatformBrandingResponse>, ProblemHttpResult>> ExecuteAsync(
         UploadPlatformLogoRequest request,
         CancellationToken ct)
     {

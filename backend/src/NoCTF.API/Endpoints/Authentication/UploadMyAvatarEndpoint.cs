@@ -48,7 +48,7 @@ public sealed class UploadMyAvatarEndpoint(
     {
         Options(builder => builder.WithMetadata(new NoCTF.Hosting.Observability.ApiRequestMetricsMetadata(
             NoCTF.Application.Observability.ApiRequestKind.Upload)));
-        Post("/auth/me/avatar");
+        Put("/auth/me/avatar");
         AuthSchemes("Bearer");
         AllowFileUploads();
         MaxRequestBodySize(FileUploadLimits.MaximumRequestBytes(

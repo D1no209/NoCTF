@@ -17,7 +17,7 @@ export function useAdminPlatformPage() {
         { to: '/admin/platform', label: translate("ui.platformInformation"), icon: Info, exact: true },
         { to: '/admin/platform/users', label: translate("ui.user"), icon: Users },
         { to: '/admin/platform/bots', label: translate("ui.bot"), icon: Bot },
-        { to: '/admin/platform/email', label: translate("ui.emailVerification"), icon: MailCheck },
+        { to: '/admin/platform/email', label: translate("ui.emailAndHumanVerification"), icon: MailCheck },
       ],
     },
     {

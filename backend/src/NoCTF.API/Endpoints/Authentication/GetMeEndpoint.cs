@@ -57,7 +57,6 @@ public sealed record CurrentUserResponse(
     UserRoleProtocol Role,
     UserKindProtocol Kind,
     bool EmailVerified,
-    string? Description,
     string? AvatarUrl,
     Guid? WallpaperRevision,
     bool WallpaperEnabled);
@@ -78,7 +77,6 @@ internal static class CurrentUserMapping
             IdentityProtocolMapper.ToProtocol(profile.Role),
             IdentityProtocolMapper.ToProtocol(profile.Kind),
             profile.EmailVerified,
-            profile.Description,
             avatarUrl,
             profile.WallpaperFileId,
             profile.WallpaperEnabled);

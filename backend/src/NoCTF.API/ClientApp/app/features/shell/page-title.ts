@@ -35,7 +35,7 @@ const competitionAdministrationTitles = {
 const platformAdministrationTitles = {
   users: 'ui.user',
   bots: 'ui.bot',
-  email: 'ui.emailVerification',
+  email: 'ui.emailAndHumanVerification',
   monitoring: 'ui.monitoring',
   runtimes: 'ui.runtimeContainers',
   'public-gateway': 'ui.intranetTunneling',

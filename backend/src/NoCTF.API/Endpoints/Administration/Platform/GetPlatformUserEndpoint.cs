@@ -1,11 +1,21 @@
 using FastEndpoints;
 using Microsoft.AspNetCore.Http.HttpResults;
 using NoCTF.Application.Administration;
+using NoCTF.Application.Authentication.Privacy;
+using NoCTF.API.Endpoints.Authentication;
+using NoCTF.API.Security;
 
 namespace NoCTF.API.Endpoints.Administration.Platform;
 
-public sealed class GetPlatformUserEndpoint(ManagePlatform platform)
-    : EndpointWithoutRequest<Results<Ok<PlatformUserResponse>, NotFound>>
+public sealed record PlatformUserDetailResponse(
+    PlatformUserResponse User,
+    CurrentUserSchoolIdentityResponse SchoolIdentity);
+
+public sealed class GetPlatformUserEndpoint(
+    ManagePlatform platform,
+    AccountPrivacy privacy,
+    IUserContext actor)
+    : EndpointWithoutRequest<Results<Ok<PlatformUserDetailResponse>, NotFound>>
 {
     public override void Configure()
     {
@@ -20,12 +30,19 @@ public sealed class GetPlatformUserEndpoint(ManagePlatform platform)
         });
     }
 
-    public override async Task<Results<Ok<PlatformUserResponse>, NotFound>> ExecuteAsync(
+    public override async Task<Results<Ok<PlatformUserDetailResponse>, NotFound>> ExecuteAsync(
         CancellationToken ct)
     {
-        var user = await platform.GetUserAsync(Route<Guid>("userId"), ct);
-        return user is null
+        HttpContext.Response.Headers.CacheControl = "private, no-store";
+        var userId = Route<Guid>("userId");
+        var user = await platform.GetUserAsync(userId, ct);
+        var privateDetails = await privacy.ReadPlatformAsync(actor.UserId, userId, ct);
+        return user is null || privateDetails is null
             ? TypedResults.NotFound()
-            : TypedResults.Ok(PlatformUserMapping.ToResponse(user));
+            : TypedResults.Ok(new PlatformUserDetailResponse(
+                PlatformUserMapping.ToResponse(user),
+                new CurrentUserSchoolIdentityResponse(
+                    privateDetails.Identity.FullName,
+                    privateDetails.Identity.StudentNumber)));
     }
 }

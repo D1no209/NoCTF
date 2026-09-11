@@ -31,13 +31,11 @@ const { publicGatewayFailure, publicGatewayState, runtime, loading, loadError, e
         </Alert>
 
         <template v-if="!loadError && runtime">
-          <Alert v-if="isRunning && (runtime.access?.route === 'Gateway' || runtime.access?.failure)" aria-live="polite">
-            <AlertDescription>
+          <div v-if="isRunning && (runtime.access?.route === 'Gateway' || runtime.access?.failure)" class="text-sm text-muted-foreground" role="status" aria-live="polite">
               <span v-if="runtime.access?.route === 'Gateway'">{{ publicGatewayState(runtime.access.state) }}</span>
               <span v-if="runtime.access?.failure"> {{ publicGatewayFailure(runtime.access.failure) }}</span>
               <p v-if="runtime.access?.route === 'Gateway'" class="mt-1">{{ $t('ui.publicConnectionStatusDoesNotChangeTheRuntimeState') }}</p>
-            </AlertDescription>
-          </Alert>
+          </div>
           <div v-if="isRunning && runtime.urls?.length" class="flex flex-col gap-1">
             <span class="text-sm text-muted-foreground">{{ $t('ui.accessAddress') }}</span>
             <component :is="RuntimeAccessUrl"

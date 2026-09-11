@@ -27,6 +27,7 @@ internal static class LeaderboardFactProjectionReader
         CompetitionStatus competitionStatus,
         string? competitionConfigurationJson,
         DateTimeOffset? competitionStart,
+        DateTimeOffset? competitionEnd,
         IReadOnlyList<CompetitionLifecycleTransition> lifecycle,
         DateTimeOffset projectedAt,
         IReadOnlyDictionary<Guid, long> hintCosts,
@@ -87,7 +88,13 @@ internal static class LeaderboardFactProjectionReader
 
         var rows = mode switch
         {
-            GameMode.Ctf => await ReadCtfAsync(query, ct),
+            GameMode.Ctf => await ReadCtfAsync(
+                query,
+                CompetitionOfficialWindow.Resolve(
+                    competitionStart!.Value,
+                    competitionEnd!.Value,
+                    lifecycle),
+                ct),
             GameMode.Koh => await ReadKohAsync(query, teams, ct),
             _ => throw new ArgumentOutOfRangeException(nameof(mode), mode, null)
         };
@@ -123,10 +130,13 @@ internal static class LeaderboardFactProjectionReader
 
     private static Task<List<FactSummary>> ReadCtfAsync(
         IQueryable<GameplayFact> query,
+        CompetitionOfficialWindow officialWindow,
         CancellationToken ct) => query
-        .Where(fact => fact.Kind == GameplayFactKind.FlagAttempt
-            || fact.Kind == GameplayFactKind.HintUnlock
-            || fact.Kind == GameplayFactKind.ManualAdjustment)
+        .Where(fact => fact.Kind == GameplayFactKind.ManualAdjustment
+            || (fact.Kind == GameplayFactKind.FlagAttempt
+                || fact.Kind == GameplayFactKind.HintUnlock)
+            && fact.OccurredAt >= officialWindow.StartAt
+            && fact.OccurredAt < officialWindow.EndAt)
         .GroupBy(fact => new
         {
             fact.TeamId,

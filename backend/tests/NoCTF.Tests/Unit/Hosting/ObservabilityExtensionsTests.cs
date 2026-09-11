@@ -26,7 +26,6 @@ public sealed class ObservabilityExtensionsTests
 
     [Test]
     [Arguments("POST", "/competitions/{competitionId}/challenges/{competitionChallengeId}/flag-submissions", "flag")]
-    [Arguments("POST", "/competitions/{competitionId}/challenges/{competitionChallengeId}/practice-flag", "flag")]
     [Arguments("POST", "/competitions/{competitionId}/challenges/{competitionChallengeId}/awdp-break-flag-judgement", "flag")]
     [Arguments("POST", "/competitions/{competitionId}/challenges/{competitionChallengeId}/awdp-defense-targets", "fix_request")]
     [Arguments("POST", "/competitions/{competitionId}/challenges/{competitionChallengeId}/awdp-defense-targets/{runtimeInstanceId}/fix", "fix_upload")]

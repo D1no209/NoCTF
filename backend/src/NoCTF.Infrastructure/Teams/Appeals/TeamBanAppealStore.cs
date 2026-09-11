@@ -209,13 +209,26 @@ public sealed class TeamBanAppealStore(
             return new(Failure: TeamBanAppealFailure.AppealNotFound);
         }
 
-        var resolved = await db.CompetitionEvents.AsNoTracking().AnyAsync(
+        var eventKind = command.Resolution switch
+        {
+            TeamBanAppealResolution.Uphold =>
+                CompetitionEventKind.TeamBanAppealUpheld,
+            TeamBanAppealResolution.Accept =>
+                CompetitionEventKind.TeamBanAppealAccepted,
+            _ => throw new ArgumentOutOfRangeException(
+                nameof(command),
+                command.Resolution,
+                null)
+        };
+        var existingResolution = await db.CompetitionEvents.AsNoTracking().FirstOrDefaultAsync(
             @event =>
                 @event.CompetitionId == command.CompetitionId
                 && @event.ParentEventId == appeal.Id
                 && ResolutionKinds.Contains(@event.Kind),
             cancellationToken);
-        if (resolved)
+        if (existingResolution?.Kind == eventKind)
+            return new();
+        if (existingResolution is not null)
             return new(Failure: TeamBanAppealFailure.AppealAlreadyResolved);
 
         var ban = await db.CompetitionEvents.AsNoTracking().SingleOrDefaultAsync(
@@ -242,17 +255,6 @@ public sealed class TeamBanAppealStore(
         if (!await IsCurrentBanAsync(team, ban.Id, cancellationToken))
             return new(Failure: TeamBanAppealFailure.BanNoLongerCurrent);
 
-        var eventKind = command.Resolution switch
-        {
-            TeamBanAppealResolution.Uphold =>
-                CompetitionEventKind.TeamBanAppealUpheld,
-            TeamBanAppealResolution.Accept =>
-                CompetitionEventKind.TeamBanAppealAccepted,
-            _ => throw new ArgumentOutOfRangeException(
-                nameof(command),
-                command.Resolution,
-                null)
-        };
         await events.RecordAsync(new(
             command.CompetitionId,
             eventKind,

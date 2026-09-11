@@ -4,7 +4,7 @@ namespace NoCTF.Tests.Architecture;
 
 public sealed class ChallengeTestRuntimeOpenApiTests
 {
-    private const string Prefix = "/api/v1/admin/challenges/{challengeId}/test-runtime";
+    private const string Prefix = "/api/v1/admin/challenges/{challengeId}/test-runtimes";
 
     [Test]
     public async Task ChallengeTestRuntime_ExposesTypedLifecycleAndProtectedFlagStatus()
@@ -13,30 +13,23 @@ public sealed class ChallengeTestRuntimeOpenApiTests
         var root = swagger.RootElement;
         var paths = root.GetProperty("paths");
 
-        await Assert.That(paths.GetProperty(Prefix)
+        await Assert.That(paths.GetProperty($"{Prefix}/current")
                 .GetProperty("get")
                 .GetProperty("responses")
                 .EnumerateObject()
                 .Select(response => response.Name)
                 .ToArray())
             .IsEquivalentTo(["200", "401", "403", "404"]);
-        foreach (var action in new[] { "start", "reset", "stop" })
-        {
-            await Assert.That(paths.GetProperty($"{Prefix}/{action}")
-                    .GetProperty("post")
-                    .GetProperty("responses")
-                    .EnumerateObject()
-                    .Select(response => response.Name)
-                    .ToArray())
-                .IsEquivalentTo(["202", "401", "403", "404", "409", "503"]);
-        }
-        await Assert.That(paths.GetProperty($"{Prefix}/extend")
+        await Assert.That(paths.GetProperty(Prefix)
                 .GetProperty("post")
                 .GetProperty("responses")
                 .EnumerateObject()
                 .Select(response => response.Name)
                 .ToArray())
-            .IsEquivalentTo(["202", "400", "401", "403", "404", "409", "503"]);
+            .IsEquivalentTo(["202", "401", "403", "404", "409", "503"]);
+        var item = paths.GetProperty($"{Prefix}/{{runtimeInstanceId}}");
+        await Assert.That(item.TryGetProperty("delete", out _)).IsTrue();
+        await Assert.That(item.TryGetProperty("patch", out _)).IsTrue();
 
         var schema = root.GetProperty("components")
             .GetProperty("schemas")
@@ -54,11 +47,11 @@ public sealed class ChallengeTestRuntimeOpenApiTests
         var root = swagger.RootElement;
         var paths = root.GetProperty("paths");
         await Assert.That(paths.TryGetProperty(
-                "/api/v1/admin/platform/runtimes/{runtimeInstanceId}/terminate",
+                "/api/v1/admin/runtimes/{runtimeInstanceId}",
                 out _))
             .IsTrue();
         await Assert.That(paths.TryGetProperty(
-                "/api/v1/admin/platform/runtimes/{runtimeInstanceId}/force-terminate",
+                "/api/v1/admin/runtimes/{runtimeInstanceId}/force-terminations",
                 out _))
             .IsTrue();
         var scope = root.GetProperty("components")

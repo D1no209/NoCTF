@@ -4,6 +4,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using AsyncKeyedLock;
 using Wolverine.EntityFrameworkCore;
+using NoCTF.Application.Common;
 
 namespace NoCTF.Infrastructure.Persistence;
 
@@ -15,6 +16,7 @@ internal static class PersistenceInfrastructure
         bool exporting,
         bool development)
     {
+        services.AddScoped<IAtomicAggregatePatch, AggregatePatchTransaction>();
         services.AddSingleton(new AsyncKeyedLocker<string>(
             options => options.PoolSize = 20,
             StringComparer.Ordinal));

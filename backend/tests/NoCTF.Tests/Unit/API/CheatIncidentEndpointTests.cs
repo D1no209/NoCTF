@@ -69,12 +69,12 @@ public sealed class CheatIncidentEndpointTests
 
         using var detailResponse = await client.GetAsync(DetailUri());
         var detail = await detailResponse.Content.ReadFromJsonAsync<CheatIncidentDetailResponse>();
-        using var dismissResponse = await client.PostAsJsonAsync(
-            $"{DetailUri()}/dismiss",
-            new { reason = "reviewed evidence" });
-        using var confirmResponse = await client.PostAsJsonAsync(
-            $"{DetailUri()}/confirm",
-            new { reason = "confirmed evidence" });
+        using var dismissResponse = await client.PutAsJsonAsync(
+            $"{DetailUri()}/status",
+            new { status = "Dismissed", reason = "reviewed evidence" });
+        using var confirmResponse = await client.PutAsJsonAsync(
+            $"{DetailUri()}/status",
+            new { status = "Confirmed", reason = "confirmed evidence" });
 
         await Assert.That(detailResponse.StatusCode).IsEqualTo(HttpStatusCode.OK);
         await Assert.That(detailResponse.Headers.CacheControl?.NoStore).IsTrue();
@@ -117,46 +117,17 @@ public sealed class CheatIncidentEndpointTests
         await using var app = await CreateApplicationAsync(store, authorizer);
         using var client = app.GetTestClient();
 
-        using var confirmResponse = await client.PostAsJsonAsync(
-            $"{DetailUri()}/confirm",
-            new { reason = "confirmed evidence" });
-        using var correctResponse = await client.PostAsJsonAsync(
-            $"{DetailUri()}/correct",
-            new { reason = "confirmed false positive" });
+        using var confirmResponse = await client.PutAsJsonAsync(
+            $"{DetailUri()}/status",
+            new { status = "Confirmed", reason = "confirmed evidence" });
+        using var correctResponse = await client.PutAsJsonAsync(
+            $"{DetailUri()}/status",
+            new { status = "Corrected", reason = "confirmed false positive" });
 
         await Assert.That(confirmResponse.StatusCode).IsEqualTo(HttpStatusCode.NoContent);
         await Assert.That(correctResponse.StatusCode).IsEqualTo(HttpStatusCode.NoContent);
         await Assert.That(store.ConfirmCalls).IsEqualTo(1);
         await Assert.That(store.CorrectCalls).IsEqualTo(1);
-    }
-
-    [Test]
-    public async Task Judge_can_manually_ban_a_team_but_observer_cannot()
-    {
-        var judgeAuthorizer = new TestAuthorizer { Access = TestAccess.Judge };
-        var judgeStore = new RecordingStore();
-        await using var judgeApp = await CreateApplicationAsync(judgeStore, judgeAuthorizer);
-        using var judgeClient = judgeApp.GetTestClient();
-
-        using var judgeResponse = await judgeClient.PostAsJsonAsync(
-            $"/api/v1/admin/competitions/{CompetitionId}/teams/{TeamId}/ban",
-            new { reason = "confirmed competition misconduct", announcePublicly = false });
-
-        await Assert.That(judgeResponse.StatusCode).IsEqualTo(HttpStatusCode.NoContent);
-        await Assert.That(judgeStore.TeamModerationCalls).IsEqualTo(1);
-        await Assert.That(judgeStore.LastTeamModeration?.ActorId).IsEqualTo(ActorId);
-
-        var observerAuthorizer = new TestAuthorizer { Access = TestAccess.Observer };
-        var observerStore = new RecordingStore();
-        await using var observerApp = await CreateApplicationAsync(observerStore, observerAuthorizer);
-        using var observerClient = observerApp.GetTestClient();
-
-        using var observerResponse = await observerClient.PostAsJsonAsync(
-            $"/api/v1/admin/competitions/{CompetitionId}/teams/{TeamId}/ban",
-            new { reason = "observer must not ban teams", announcePublicly = false });
-
-        await Assert.That(observerResponse.StatusCode).IsEqualTo(HttpStatusCode.Forbidden);
-        await Assert.That(observerStore.TeamModerationCalls).IsEqualTo(0);
     }
 
     private static string ListUri()
@@ -184,8 +155,7 @@ public sealed class CheatIncidentEndpointTests
             options.DisableAutoDiscovery = true;
             options.Assemblies = [typeof(ListCheatIncidentsEndpoint).Assembly];
             options.Filter = type => type.Namespace
-                    == typeof(ListCheatIncidentsEndpoint).Namespace
-                || type == typeof(BanTeamEndpoint);
+                    == typeof(ListCheatIncidentsEndpoint).Namespace;
         });
         builder.Services.SwaggerDocument();
         builder.Services

@@ -8,6 +8,7 @@ using NoCTF.Domain.Competitions.Events;
 using NoCTF.Domain.Gameplay;
 using NoCTF.Domain.Shared;
 using NoCTF.Infrastructure.Persistence;
+using NoCTF.Infrastructure.Competitions.Lifecycle;
 
 namespace NoCTF.Infrastructure.GameplayFacts.AdjudicationPreview;
 
@@ -34,7 +35,12 @@ public sealed class HistoricalAdjudicationPreviewStore(NoCtfDbContext db)
             ct);
         var competition = await db.Competitions.IgnoreQueryFilters().AsNoTracking()
             .Where(competition => competition.Id == competitionId)
-            .Select(competition => new { competition.Mode })
+            .Select(competition => new
+            {
+                competition.Mode,
+                competition.StartAt,
+                competition.EndAt
+            })
             .SingleOrDefaultAsync(ct);
         if (competition is null)
         {
@@ -56,6 +62,18 @@ public sealed class HistoricalAdjudicationPreviewStore(NoCtfDbContext db)
         var query = db.GameplayFacts.AsNoTracking()
             .Where(fact => fact.CompetitionId == competitionId
                 && fact.Kind == gameplayFactKind.Value);
+        CompetitionOfficialWindow? officialWindow = null;
+        if (competition.Mode == GameMode.Ctf)
+        {
+            officialWindow = await CompetitionOfficialWindowReader.ReadAsync(
+                db,
+                competitionId,
+                competition.StartAt,
+                competition.EndAt,
+                ct);
+            query = query.Where(fact => fact.OccurredAt >= officialWindow.Value.StartAt
+                && fact.OccurredAt < officialWindow.Value.EndAt);
+        }
         if (competitionChallengeId is Guid challengeId)
             query = query.Where(fact => fact.CompetitionChallengeId == challengeId);
         if (beforeOccurredAt is DateTimeOffset occurredAt && beforeId is Guid id)
@@ -90,7 +108,9 @@ public sealed class HistoricalAdjudicationPreviewStore(NoCtfDbContext db)
                     && challengeIds.Contains(fact.CompetitionChallengeId)
                     && fact.TeamId != null
                     && fact.Kind == GameplayFactKind.FlagAttempt
-                    && fact.Result == GameplayFactResult.Correct)
+                    && fact.Result == GameplayFactResult.Correct
+                    && fact.OccurredAt >= officialWindow!.Value.StartAt
+                    && fact.OccurredAt < officialWindow.Value.EndAt)
                 .GroupBy(fact => new { fact.CompetitionChallengeId, fact.TeamId })
                 .Select(group => group
                     .OrderBy(fact => fact.OccurredAt)

@@ -37,6 +37,16 @@ public sealed record RandomAttachmentBatchEntry(
     string ExactFlag,
     DateTimeOffset CreatedAt);
 
+public sealed record ChallengeAttachmentBatchEntry(
+    Guid AttachmentId,
+    Guid FileId,
+    DateTimeOffset CreatedAt);
+
+public sealed record ChallengeAttachmentUploadItem(
+    string FileName,
+    string ContentType,
+    Stream Content);
+
 public sealed record ChallengeAttachmentContent(
     ChallengeAttachmentView Metadata,
     string ObjectKey);
@@ -84,6 +94,12 @@ public interface IChallengeAttachmentStore
         Guid attachmentId,
         Guid fileId,
         DateTimeOffset now,
+        CancellationToken cancellationToken);
+    Task<AddChallengeAttachmentState> AddBatchAsync(
+        Guid challengeId,
+        Guid actorId,
+        bool isAdministrator,
+        IReadOnlyList<ChallengeAttachmentBatchEntry> entries,
         CancellationToken cancellationToken);
     Task<AddChallengeAttachmentState> AddRandomBatchAsync(
         Guid challengeId,
@@ -206,6 +222,101 @@ public sealed class ManageChallengeAttachments(
             null,
             null,
             now));
+    }
+
+    public async Task<OperationResult<ChallengeAttachmentSet, ChallengeAttachmentFailureCode>>
+        UploadBatchAsync(
+            Guid challengeId,
+            Guid actorId,
+            bool isAdministrator,
+            IReadOnlyList<ChallengeAttachmentUploadItem> files,
+            DateTimeOffset now,
+            CancellationToken ct = default)
+    {
+        if (files.Count == 0)
+            return Failure(ChallengeAttachmentFailureCode.EmptyBatch,
+                "At least one attachment is required.");
+        if (files.Any(file => string.IsNullOrWhiteSpace(file.FileName)
+                || file.FileName.Length > 260))
+            return Failure(ChallengeAttachmentFailureCode.InvalidFileName,
+                "An attachment file name is invalid.");
+        if (!await store.CanWriteAsync(challengeId, actorId, isAdministrator, ct))
+            return Failure(ChallengeAttachmentFailureCode.ChallengeNotFound,
+                "Challenge was not found or access was denied.");
+
+        var uploadedFiles = new List<ManagedFileUpload>(files.Count);
+        var entries = new List<ChallengeAttachmentBatchEntry>(files.Count);
+        try
+        {
+            foreach (var file in files)
+            {
+                var attachmentId = Guid.CreateVersion7();
+                var fileId = Guid.CreateVersion7();
+                var uploaded = await uploads.CreateAsync(
+                    fileId,
+                    $"attachments/{attachmentId:N}",
+                    file.FileName.Trim(),
+                    string.IsNullOrWhiteSpace(file.ContentType)
+                        ? "application/octet-stream"
+                        : file.ContentType,
+                    file.Content,
+                    now,
+                    ct);
+                uploadedFiles.Add(uploaded);
+                entries.Add(new(attachmentId, uploaded.FileId, now));
+            }
+            var saved = await store.AddBatchAsync(
+                challengeId, actorId, isAdministrator, entries, ct);
+            if (saved != AddChallengeAttachmentState.Added)
+            {
+                await AbandonAllAsync();
+                return saved switch
+                {
+                    AddChallengeAttachmentState.ChallengeNotFound =>
+                        Failure(ChallengeAttachmentFailureCode.ChallengeNotFound,
+                            "Challenge was not found or access was denied."),
+                    AddChallengeAttachmentState.DeliveryModeConflict =>
+                        Failure(ChallengeAttachmentFailureCode.DeliveryModeConflict,
+                            "Ordinary attachments cannot be mixed with random variants."),
+                    _ => Failure(ChallengeAttachmentFailureCode.ResourceIdConflict,
+                        "An attachment resource identifier is already in use.")
+                };
+            }
+            return OperationResult<ChallengeAttachmentSet, ChallengeAttachmentFailureCode>.Success(new(
+                AttachmentDeliveryPolicy.All,
+                entries.Select((entry, index) => new ChallengeAttachmentView(
+                    entry.AttachmentId,
+                    challengeId,
+                    uploadedFiles[index].FileName,
+                    uploadedFiles[index].ContentType,
+                    uploadedFiles[index].ByteLength,
+                    uploadedFiles[index].Sha256,
+                    null,
+                    null,
+                    entry.CreatedAt)).ToArray()));
+        }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+        {
+            await AbandonAllAsync();
+            throw;
+        }
+        catch
+        {
+            await AbandonAllAsync();
+            return Failure(ChallengeAttachmentFailureCode.BatchPersistenceFailed,
+                "The attachment batch could not be persisted.");
+        }
+
+        async Task AbandonAllAsync()
+        {
+            foreach (var uploaded in uploadedFiles)
+                await uploads.AbandonAsync(uploaded.FileId);
+        }
+
+        static OperationResult<ChallengeAttachmentSet, ChallengeAttachmentFailureCode> Failure(
+            ChallengeAttachmentFailureCode code,
+            string message) =>
+            OperationResult<ChallengeAttachmentSet, ChallengeAttachmentFailureCode>.Failure(code, message);
     }
 
     public async Task<OperationResult<ChallengeAttachmentSet, ChallengeAttachmentFailureCode>>

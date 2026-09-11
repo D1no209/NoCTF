@@ -22,28 +22,32 @@ internal static class E2ELifecycle
         }
 
         using var current = JsonDocument.Parse(currentBody);
-        var root = current.RootElement;
+        var root = current.RootElement.GetProperty("competition");
         if (root.GetProperty("status").GetString() != "Visible")
         {
             throw new InvalidOperationException(
                 $"Competition must remain Visible while its E2E setup is staged. Current response: {currentBody}");
         }
 
-        using var updateResponse = await admin.PutAsJsonAsync(
+        using var updateResponse = await admin.PatchAsJsonAsync(
             $"/api/v1/admin/competitions/{competitionId}",
             new
             {
-                title = root.GetProperty("title").GetString(),
-                description = root.GetProperty("description").GetString(),
-                startTime = DateTimeOffset.UtcNow.AddMinutes(-1),
-                endTime = root.GetProperty("endTime").GetDateTimeOffset(),
-                teamRegistrationAutoApprove = root.GetProperty("teamRegistrationAutoApprove").GetBoolean(),
-                allowTeamRegistrationWhileRunning = root.GetProperty("allowTeamRegistrationWhileRunning").GetBoolean(),
-                maxTeamMembers = root.GetProperty("maxTeamMembers").GetInt32(),
-                maxConcurrentRuntimeInstancesPerTeam = root.GetProperty("maxConcurrentRuntimeInstancesPerTeam").GetInt32(),
-                maxActiveQuestionsPerTeam = root.GetProperty("maxActiveQuestionsPerTeam").GetInt32(),
-                maxParticipantMessagesBeforeHandlerReply = root.GetProperty("maxParticipantMessagesBeforeHandlerReply").GetInt32(),
-                allowChallengeOwnersToHandleQuestions = root.GetProperty("allowChallengeOwnersToHandleQuestions").GetBoolean()
+                metadata = new
+                {
+                    title = root.GetProperty("title").GetString(),
+                    description = root.GetProperty("description").GetString(),
+                    startTime = DateTimeOffset.UtcNow.AddMinutes(-1),
+                    endTime = root.GetProperty("endTime").GetDateTimeOffset(),
+                    teamRegistrationAutoApprove = root.GetProperty("teamRegistrationAutoApprove").GetBoolean(),
+                    allowTeamRegistrationWhileRunning = root.GetProperty("allowTeamRegistrationWhileRunning").GetBoolean(),
+                    maxTeamMembers = root.GetProperty("maxTeamMembers").GetInt32(),
+                    maxConcurrentRuntimeInstancesPerTeam = root.GetProperty("maxConcurrentRuntimeInstancesPerTeam").GetInt32(),
+                    maxActiveQuestionsPerTeam = root.GetProperty("maxActiveQuestionsPerTeam").GetInt32(),
+                    maxParticipantMessagesBeforeHandlerReply = root.GetProperty("maxParticipantMessagesBeforeHandlerReply").GetInt32(),
+                    allowChallengeOwnersToHandleQuestions = root.GetProperty("allowChallengeOwnersToHandleQuestions").GetBoolean(),
+                    practiceModeEnabled = root.GetProperty("practiceModeEnabled").GetBoolean()
+                }
             },
             cancellationToken);
         var updateBody = await updateResponse.Content.ReadAsStringAsync(cancellationToken);
@@ -54,7 +58,8 @@ internal static class E2ELifecycle
         }
 
         using var updated = JsonDocument.Parse(updateBody);
-        if (updated.RootElement.GetProperty("status").GetString() != "Visible")
+        if (updated.RootElement.GetProperty("competition").GetProperty("status").GetString()
+            != "Visible")
         {
             throw new InvalidOperationException(
                 $"Competition schedule update changed its lifecycle before publication. Update response: {updateBody}");
@@ -66,10 +71,10 @@ internal static class E2ELifecycle
         Guid competitionId,
         CancellationToken cancellationToken)
     {
-        using var request = new HttpRequestMessage(
-            HttpMethod.Post,
-            $"/api/v1/admin/competitions/{competitionId}/start");
-        using var response = await admin.SendAsync(request, cancellationToken);
+        using var response = await admin.PutAsJsonAsync(
+            $"/api/v1/admin/competitions/{competitionId}/status",
+            new { status = "Running" },
+            cancellationToken);
         if (response.StatusCode == HttpStatusCode.NoContent)
             return;
 
@@ -83,7 +88,8 @@ internal static class E2ELifecycle
             if (currentResponse.StatusCode == HttpStatusCode.OK)
             {
                 using var current = JsonDocument.Parse(currentBody);
-                if (current.RootElement.GetProperty("status").GetString() == "Running")
+                if (current.RootElement.GetProperty("competition")
+                        .GetProperty("status").GetString() == "Running")
                     return;
             }
 
@@ -93,5 +99,23 @@ internal static class E2ELifecycle
 
         throw new InvalidOperationException(
             $"Expected 204 or an already-Running 409 while starting competition, but received {(int)response.StatusCode}: {failure}");
+    }
+
+    public static async Task SetStatusAsync(
+        HttpClient admin,
+        Guid competitionId,
+        string status,
+        CancellationToken cancellationToken)
+    {
+        using var response = await admin.PutAsJsonAsync(
+            $"/api/v1/admin/competitions/{competitionId}/status",
+            new { status },
+            cancellationToken);
+        if (response.StatusCode == HttpStatusCode.NoContent)
+            return;
+
+        var body = await response.Content.ReadAsStringAsync(cancellationToken);
+        throw new InvalidOperationException(
+            $"Expected 204 while setting competition status to {status}, but received {(int)response.StatusCode}: {body}");
     }
 }

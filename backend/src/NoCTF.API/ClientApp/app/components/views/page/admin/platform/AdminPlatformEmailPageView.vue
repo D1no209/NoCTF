@@ -3,18 +3,84 @@ import { toRefs } from 'vue'
 import type { AdminPlatformEmailPageViewState } from '~/features/routes/admin/platform/useAdminPlatformEmailPage'
 
 const viewProps = defineProps<{ state: AdminPlatformEmailPageViewState }>()
-const { KeyRound, Send, configuration, loading, loadError, form, saving, passwordOpen, newPassword, passwordSaving, sendingTest, save, replacePassword, sendTest, AdminDateTime, onClickPasswordOpen, onClickPasswordOpen2 } = toRefs(viewProps.state)
+const { KeyRound, RefreshCw, Send, ShieldCheck, configuration, humanVerification, humanVerificationEnabled, humanVerificationSaving, humanVerificationDirty, humanVerificationProviderLabel, loading, loadError, form, saving, passwordOpen, newPassword, passwordSaving, sendingTest, load, saveHumanVerification, save, replacePassword, sendTest, AdminDateTime, onClickPasswordOpen, onClickPasswordOpen2 } = toRefs(viewProps.state)
 </script>
 
 <template>
-  <div class="flex flex-col gap-6">
+  <section class="flex min-w-0 flex-col gap-6">
     <Alert v-if="loadError" variant="destructive">
       <AlertDescription>{{ $message(loadError) }}</AlertDescription>
     </Alert>
 
-    <Skeleton v-if="loading" class="h-96 w-full" />
+    <template v-if="loading">
+      <Skeleton class="h-44 w-full" />
+      <Skeleton class="h-96 w-full" />
+    </template>
+
+    <Card v-else-if="!configuration">
+      <CardHeader>
+        <CardTitle>{{ $t('ui.emailAndHumanVerification') }}</CardTitle>
+        <CardDescription>{{ $t('ui.platformConfigurationCouldNotBeLoaded') }}</CardDescription>
+      </CardHeader>
+      <CardContent>
+        <Button variant="outline" @click="load">
+          <RefreshCw data-icon="inline-start" />
+          {{ $t('ui.retry') }}
+        </Button>
+      </CardContent>
+    </Card>
 
     <template v-else-if="configuration">
+      <Card v-if="humanVerification">
+        <CardHeader class="flex flex-row items-start justify-between gap-4">
+          <div class="flex min-w-0 flex-col gap-1">
+            <CardTitle class="flex items-center gap-2">
+              <ShieldCheck class="size-5" />
+              {{ $t('ui.humanVerificationConfiguration') }}
+            </CardTitle>
+            <CardDescription>{{ $t('ui.humanVerificationAdminDescription') }}</CardDescription>
+          </div>
+          <Badge :variant="humanVerification.available ? 'secondary' : 'destructive'">
+            {{ humanVerification.available ? $t('ui.providerReady') : $t('ui.providerNotConfigured') }}
+          </Badge>
+        </CardHeader>
+        <CardContent>
+          <UiForm class="flex flex-col gap-5" @submit.prevent="saveHumanVerification">
+            <FieldGroup>
+              <Field orientation="horizontal">
+                <Switch
+                  id="human-verification-enabled"
+                  v-model="humanVerificationEnabled"
+                  :disabled="humanVerificationSaving || (!humanVerification.available && !humanVerificationEnabled)"
+                />
+                <FieldContent>
+                  <FieldLabel for="human-verification-enabled">{{ $t('ui.enableHumanVerification') }}</FieldLabel>
+                  <FieldDescription>{{ $t('ui.humanVerificationProtectedOperations') }}</FieldDescription>
+                </FieldContent>
+              </Field>
+              <Field>
+                <FieldLabel>{{ $t('ui.provider') }}</FieldLabel>
+                <div class="flex flex-wrap items-center gap-2">
+                  <Badge variant="outline">{{ humanVerificationProviderLabel }}</Badge>
+                  <span v-if="!humanVerification.available" class="text-sm text-muted-foreground">
+                    {{ $t('ui.humanVerificationProviderDeploymentRequired') }}
+                  </span>
+                </div>
+              </Field>
+            </FieldGroup>
+            <div>
+              <Button
+                type="submit"
+                :disabled="humanVerificationSaving || !humanVerificationDirty || (!humanVerification.available && humanVerificationEnabled)"
+              >
+                <Spinner v-if="humanVerificationSaving" data-icon="inline-start" />
+                {{ $t('ui.saveChanges') }}
+              </Button>
+            </div>
+          </UiForm>
+        </CardContent>
+      </Card>
+
       <Card>
         <CardHeader class="flex flex-row items-center justify-between gap-4">
           <div>
@@ -147,5 +213,5 @@ const { KeyRound, Send, configuration, loading, loadError, form, saving, passwor
         </DialogFooter>
       </DialogContent>
     </Dialog>
-  </div>
+  </section>
 </template>

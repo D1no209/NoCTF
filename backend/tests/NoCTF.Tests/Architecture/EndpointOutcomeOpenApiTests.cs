@@ -16,6 +16,7 @@ public sealed class EndpointOutcomeOpenApiTests
         {
             new OutcomeContract(
                 $"{ChallengePrefix}/flag-submissions",
+                "post",
                 new Dictionary<string, ResponseBodyKind>
                 {
                     ["202"] = ResponseBodyKind.Json,
@@ -28,6 +29,7 @@ public sealed class EndpointOutcomeOpenApiTests
                 }),
             new OutcomeContract(
                 $"{ChallengePrefix}/awdp-defense-targets",
+                "post",
                 new Dictionary<string, ResponseBodyKind>
                 {
                     ["202"] = ResponseBodyKind.Json,
@@ -39,6 +41,7 @@ public sealed class EndpointOutcomeOpenApiTests
                 }),
             new OutcomeContract(
                 $"{ChallengePrefix}/awdp-defense-targets/{{runtimeInstanceId}}/fix",
+                "post",
                 new Dictionary<string, ResponseBodyKind>
                 {
                     ["202"] = ResponseBodyKind.Json,
@@ -51,17 +54,16 @@ public sealed class EndpointOutcomeOpenApiTests
                     ["422"] = ResponseBodyKind.Json,
                     ["503"] = ResponseBodyKind.Problem
                 }),
-            RuntimeContract("start", includesValidationProblem: false),
-            RuntimeContract("reset", includesValidationProblem: false),
-            RuntimeContract("stop", includesValidationProblem: false),
-            RuntimeContract("extend", includesValidationProblem: true)
+            RuntimeContract("post", includesValidationProblem: false),
+            RuntimeContract("delete", includesValidationProblem: false),
+            RuntimeContract("patch", includesValidationProblem: true)
         };
 
         foreach (var contract in contracts)
         {
             var responses = root.GetProperty("paths")
                 .GetProperty(contract.Path)
-                .GetProperty("post")
+                .GetProperty(contract.Method)
                 .GetProperty("responses");
             await Assert.That(responses.EnumerateObject()
                     .Select(response => response.Name)
@@ -76,7 +78,7 @@ public sealed class EndpointOutcomeOpenApiTests
     }
 
     private static OutcomeContract RuntimeContract(
-        string action,
+        string method,
         bool includesValidationProblem)
     {
         var responses = new Dictionary<string, ResponseBodyKind>
@@ -85,12 +87,14 @@ public sealed class EndpointOutcomeOpenApiTests
             ["401"] = ResponseBodyKind.Empty,
             ["403"] = ResponseBodyKind.Problem,
             ["404"] = ResponseBodyKind.Empty,
-            ["409"] = ResponseBodyKind.Problem,
+            ["409"] = method == "post" ? ResponseBodyKind.Json : ResponseBodyKind.Problem,
             ["503"] = ResponseBodyKind.Problem
         };
         if (includesValidationProblem)
             responses["400"] = ResponseBodyKind.Problem;
-        return new($"{ChallengePrefix}/runtime/{action}", responses);
+        return method == "post"
+            ? new($"{ChallengePrefix}/runtimes", method, responses)
+            : new($"{ChallengePrefix}/runtimes/{{runtimeInstanceId}}", method, responses);
     }
 
     private static async Task AssertResponseBodyAsync(
@@ -145,6 +149,7 @@ public sealed class EndpointOutcomeOpenApiTests
 
     private sealed record OutcomeContract(
         string Path,
+        string Method,
         IReadOnlyDictionary<string, ResponseBodyKind> Responses);
 
     private enum ResponseBodyKind

@@ -172,6 +172,15 @@ public sealed class CheatIncidentStore(
             .ThenByDescending(@event => @event.Id)
             .FirstOrDefaultAsync(cancellationToken);
         var currentStatus = StatusOf(resolution);
+        var targetStatus = operation switch
+        {
+            ResolutionOperation.Dismiss => CheatIncidentStatus.Dismissed,
+            ResolutionOperation.ConfirmAndBan => CheatIncidentStatus.Confirmed,
+            ResolutionOperation.CorrectAndUnban => CheatIncidentStatus.Corrected,
+            _ => throw new ArgumentOutOfRangeException(nameof(operation), operation, null)
+        };
+        if (currentStatus == targetStatus)
+            return new();
         if (operation is ResolutionOperation.Dismiss or ResolutionOperation.ConfirmAndBan
             && currentStatus != CheatIncidentStatus.Pending)
         {

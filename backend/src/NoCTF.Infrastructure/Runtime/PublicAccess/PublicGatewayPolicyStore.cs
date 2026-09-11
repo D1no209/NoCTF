@@ -26,7 +26,7 @@ public sealed class PublicGatewayPolicyStore(NoCtfDbContext db, IFusionCacheProv
 
     public async Task SaveAsync(PublicGatewayPolicy policy, DateTimeOffset now, CancellationToken ct)
     {
-        await using var transaction = await db.Database.BeginTransactionAsync(ct);
+        await using var transaction = await AggregateCompatibleTransaction.BeginAsync(db, ct);
         var settings = await db.PlatformSettings.SingleAsync(x => x.Id == 1, ct);
         settings.PublicGatewayEnabled = policy.Enabled;
         settings.PublicGatewayConnectorId = policy.ConnectorId;

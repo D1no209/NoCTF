@@ -101,7 +101,8 @@ internal sealed class SwaggerStatusReader : IGameplayFactStatusReader
         Task.FromResult<GameplayFactStatusView?>(null);
 }
 
-internal sealed class SwaggerAuthenticationStore : IUserAuthenticationStore
+internal sealed class SwaggerAuthenticationStore
+    : IUserAuthenticationStore, ICurrentUserProfilePatchStore
 {
     public Task<AuthenticatedUser?> FindByLoginAsync(string login, CancellationToken cancellationToken) => Task.FromResult<AuthenticatedUser?>(null);
     public Task<AuthenticatedUser?> FindByIdAsync(Guid userId, CancellationToken cancellationToken) => Task.FromResult<AuthenticatedUser?>(null);
@@ -145,6 +146,17 @@ internal sealed class SwaggerAuthenticationStore : IUserAuthenticationStore
         DateTimeOffset now,
         CancellationToken cancellationToken) =>
         Task.FromResult(false);
+
+    public Task<NoCTF.Domain.Identity.User?> FindForPatchAsync(
+        Guid userId,
+        CancellationToken cancellationToken) =>
+        Task.FromResult<NoCTF.Domain.Identity.User?>(null);
+
+    public Task SaveAsync(
+        NoCTF.Domain.Identity.User user,
+        CancellationToken cancellationToken) => Task.CompletedTask;
+
+    public void DiscardChanges() { }
 }
 
 internal sealed class SwaggerAccessTokenVersionReader : IAccessTokenVersionReader

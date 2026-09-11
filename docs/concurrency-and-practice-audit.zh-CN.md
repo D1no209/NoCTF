@@ -21,7 +21,7 @@
 
 ### 未能确认的事项
 
-- **未复现普通 CTF 练习判题在后端不执行**。当前 CtfPanel 已调用专用 practice-flag 接口，静态题不要求 Runtime，动态题要求本队有效 Practice Runtime。原有数据库测试及新增 HTTP 测试均可得到 Correct／Wrong。不能把 Outbox 缺陷当作同步练习判题的根因；生产反馈的具体请求、返回体和时间仍待提供。
+- **未复现普通 CTF 练习判题在后端不执行**。后续实现已移除专用 practice-flag 接口；CtfPanel 复用普通 Flag 提交与异步状态链路，静态题不要求 Runtime，有 Runtime 的题要求本队有效 Practice Runtime。练习提交创建普通 GameplayFact，但由正式时间窗口排除计分和血奖。
 - CTF 动态 Flag 现行设计是“比赛题目 + 队伍”派生，实例注入该值，不是每次重启换一个随机 Flag。本次保留此设计，验证没有运行中的本队练习实例时不可判定动态 Flag，不接受静态模板 Flag 冒充注入值。
 - 未进行生产攻击模拟、校园出口压测、真实代理拓扑验收或 Runner 上的真实 Patch 执行。真实依赖回归不能替代这些生产特定条件的核验。
 

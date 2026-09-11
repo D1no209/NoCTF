@@ -16,6 +16,8 @@ public sealed class PlatformSettings
     public Guid? LogoFileId { get; set; }
     public NoCTF.Domain.Storage.StoredFile? LogoFile { get; set; }
 
+    public bool HumanVerificationEnabled { get; set; } = true;
+
     public bool EmailVerificationEnabled { get; set; }
 
     [MaxLength(2048)]

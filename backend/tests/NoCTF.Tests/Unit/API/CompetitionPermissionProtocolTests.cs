@@ -72,13 +72,13 @@ public sealed class CompetitionPermissionProtocolTests
     [Test]
     public async Task Update_request_is_a_complete_last_write_wins_replacement()
     {
-        var properties = typeof(UpdateCompetitionPermissionsRequest)
+        var properties = typeof(CompetitionPermissionsPatchRequest)
             .GetProperties(BindingFlags.Public | BindingFlags.Instance)
             .Select(property => property.Name)
             .ToArray();
 
         await Assert.That(properties).IsEquivalentTo([
-            "CompetitionId",
+            "OwnerId",
             "ManagerIds",
             "JudgeIds",
             "ObserverIds"
@@ -98,7 +98,7 @@ public sealed class CompetitionPermissionProtocolTests
     }
 
     private static Type? ApiType(string name) =>
-        typeof(UpdateCompetitionPermissionsRequest).Assembly.GetType(
+        typeof(CompetitionPermissionsPatchRequest).Assembly.GetType(
             $"{ApiNamespace}.{name}",
             throwOnError: false,
             ignoreCase: false);

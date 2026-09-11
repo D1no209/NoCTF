@@ -1,5 +1,4 @@
 using FastEndpoints;
-using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.HttpResults;
 using NoCTF.API.Endpoints.Runtime;
 using NoCTF.API.Security;
@@ -13,50 +12,47 @@ public sealed class TerminateRuntimeEndpoint(
     ICompetitionModerationAuthorizer authorizer,
     IUserContext user,
     TimeProvider timeProvider)
-    : EndpointWithoutRequest<
-        Results<Accepted<RuntimeAcceptedResponse>, NotFound, ProblemHttpResult, ForbidHttpResult>>
+    : EndpointWithoutRequest<Results<Accepted<RuntimeAcceptedResponse>, NotFound,
+        ForbidHttpResult, Conflict<RuntimeConflictResponse>>>
 {
     public override void Configure()
     {
-        Post("/admin/competitions/{competitionId}/runtimes/{runtimeInstanceId}/terminate");
+        Delete("/admin/runtimes/{runtimeInstanceId}");
         AuthSchemes("Bearer");
-        Description(builder => builder.WithName("AdminTerminateRuntime")
-            .ProducesProblemFE(StatusCodes.Status409Conflict));
-        Summary(summary =>
-        {
-            summary.Summary = "Terminates an exact runtime instance.";
-            summary.Description =
-                "Queues durable provider cleanup for the selected instance.";
-        });
+        Description(builder => builder.WithName("AdminTerminateRuntime"));
+        Summary(summary => summary.Summary = "Terminates an authorized Runtime instance.");
     }
 
-    public override async Task<
-        Results<Accepted<RuntimeAcceptedResponse>, NotFound, ProblemHttpResult, ForbidHttpResult>> ExecuteAsync(
-        CancellationToken ct)
+    public override async Task<Results<Accepted<RuntimeAcceptedResponse>, NotFound,
+        ForbidHttpResult, Conflict<RuntimeConflictResponse>>> ExecuteAsync(CancellationToken ct)
     {
-        var competitionId = Route<Guid>("competitionId");
-        if (!await authorizer.CanModerateAsync(user.UserId, competitionId, ct))
-            return TypedResults.Forbid();
-
-        var result = await runtimes.TerminateAsync(
-            competitionId,
-            Route<Guid>("runtimeInstanceId"),
-            user.UserId,
-            timeProvider.GetUtcNow(),
-            ct);
+        var runtimeId = Route<Guid>("runtimeInstanceId");
+        var current = await runtimes.GetPlatformAsync(runtimeId, ct);
+        if (current is null)
+            return TypedResults.NotFound();
+        RuntimeMutationResult result;
+        if (user.IsAdministrator)
+        {
+            result = await runtimes.TerminatePlatformAsync(
+                runtimeId, user.UserId, timeProvider.GetUtcNow(), ct);
+        }
+        else
+        {
+            if (current.CompetitionId is not Guid competitionId
+                || !await authorizer.CanModerateAsync(user.UserId, competitionId, ct))
+                return TypedResults.Forbid();
+            result = await runtimes.TerminateAsync(
+                competitionId, runtimeId, user.UserId,
+                timeProvider.GetUtcNow(), ct);
+        }
         if (result.Failure == RuntimeMutationFailure.NotFound)
             return TypedResults.NotFound();
         if (result.Runtime is null)
-        {
-            return TypedResults.Problem(
-                statusCode: StatusCodes.Status409Conflict,
-                title: "Runtime termination was rejected.",
-                detail: "The runtime is already terminal or has no provider resource to clean up.");
-        }
-
-        var value = new RuntimeAcceptedResponse(
+            return TypedResults.Conflict(new RuntimeConflictResponse(
+                "The Runtime is already terminal or has no provider resource to clean up."));
+        var response = new RuntimeAcceptedResponse(
             result.Runtime.Id,
-            $"/api/v1/admin/competitions/{competitionId}/runtimes/{result.Runtime.Id}");
-        return TypedResults.Accepted(value.StatusUrl, value);
+            $"/api/v1/admin/runtimes/{result.Runtime.Id}");
+        return TypedResults.Accepted(response.StatusUrl, response);
     }
 }

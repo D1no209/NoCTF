@@ -10,24 +10,25 @@ namespace NoCTF.API.Endpoints.Runtime;
 
 public sealed class ExtendRuntimeRequest
 {
-    public int Seconds { get; set; }
+    public DateTimeOffset ExpiresAt { get; set; }
 }
 
 public sealed class ExtendRuntimeValidator : Validator<ExtendRuntimeRequest>
 {
     public ExtendRuntimeValidator() =>
-        RuleFor(request => request.Seconds).InclusiveBetween(1, 86_400);
+        RuleFor(request => request.ExpiresAt).NotEmpty();
 }
 
 public sealed class ExtendRuntimeEndpoint(
     MutatePlayerRuntime mutate,
+    GetPlayerRuntime get,
     IUserContext user,
     TimeProvider timeProvider)
     : Endpoint<ExtendRuntimeRequest, Results<Accepted<RuntimeAcceptedResponse>, NotFound, ProblemHttpResult>>
 {
     public override void Configure()
     {
-        Post("/competitions/{competitionId}/challenges/{competitionChallengeId}/runtime/extend");
+        Patch("/competitions/{competitionId}/challenges/{competitionChallengeId}/runtimes/{runtimeInstanceId}");
         AuthSchemes("Bearer");
         Options(builder => builder.WithMetadata(new NoCTF.API.Security.ProtectedEntryMetadata(NoCTF.API.Security.ProtectedEntry.RuntimeCommand)));
         Options(builder => builder.WithMetadata(new HumanVerificationMetadata(HumanVerificationAction.Runtime)));
@@ -43,12 +44,18 @@ public sealed class ExtendRuntimeEndpoint(
         ExtendRuntimeRequest request,
         CancellationToken ct)
     {
+        var competitionId = Route<Guid>("competitionId");
+        var competitionChallengeId = Route<Guid>("competitionChallengeId");
+        var current = await get.ExecuteAsync(competitionId, competitionChallengeId, user.UserId, ct);
+        if (current?.Id != Route<Guid>("runtimeInstanceId") || current.ExpiresAt is null)
+            return TypedResults.NotFound();
+        var extension = request.ExpiresAt - current.ExpiresAt.Value;
         var result = await mutate.ExecuteAsync(new RuntimeMutationCommand(
-            Route<Guid>("competitionId"),
-            Route<Guid>("competitionChallengeId"),
+            competitionId,
+            competitionChallengeId,
             user.UserId,
             RuntimeAction.Extend,
-            TimeSpan.FromSeconds(request.Seconds),
+            extension,
             timeProvider.GetUtcNow()), ct);
         if (result.FailureCode is RuntimeMutationFailureCode.RuntimeNotFound or RuntimeMutationFailureCode.RuntimeActionUnsupported)
             return TypedResults.NotFound();

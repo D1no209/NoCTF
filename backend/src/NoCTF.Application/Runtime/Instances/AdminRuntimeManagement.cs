@@ -70,6 +70,9 @@ public interface IAdminRuntimeStore
         string reason,
         DateTimeOffset now,
         CancellationToken cancellationToken);
+    Task<RuntimeInstanceView?> FindPlatformAsync(
+        Guid runtimeInstanceId,
+        CancellationToken cancellationToken);
     Task<RuntimeMutationResult> TerminatePlatformAsync(
         Guid runtimeInstanceId,
         Guid actorUserId,
@@ -106,6 +109,11 @@ public sealed class ManageAdminRuntimes(IAdminRuntimeStore store)
         Guid runtimeInstanceId,
         CancellationToken ct = default) =>
         store.FindAsync(competitionId, runtimeInstanceId, ct);
+
+    public Task<RuntimeInstanceView?> GetPlatformAsync(
+        Guid runtimeInstanceId,
+        CancellationToken ct = default) =>
+        store.FindPlatformAsync(runtimeInstanceId, ct);
 
     public Task<RuntimeMutationResult> MutateAsync(
         Guid competitionId,

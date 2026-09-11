@@ -1,17 +1,35 @@
 import { proxyRefs } from 'vue'
 import { markRaw } from 'vue'
 
-import { KeyRound, Send } from '@lucide/vue'
+import { KeyRound, RefreshCw, Send, ShieldCheck } from '@lucide/vue'
 import { toast } from 'vue-sonner'
 import { adminPlatformGetConfiguration, adminPlatformPatchConfiguration, adminPlatformReplaceEmailVerificationPassword, adminPlatformSendEmailVerificationTest } from '../../../../api'
-import type { NoCtfapiEndpointsAdministrationPlatformEmailVerificationConfigurationResponse, NoCtfapiEndpointsAdministrationPlatformSmtpSecurityModeProtocol } from '../../../../api'
+import type { NoCtfapiEndpointsAdministrationPlatformAdminHumanVerificationConfigurationResponse, NoCtfapiEndpointsAdministrationPlatformEmailVerificationConfigurationResponse, NoCtfapiEndpointsAdministrationPlatformSmtpSecurityModeProtocol } from '../../../../api'
 import AdminDateTimeComponent from '../../../admin/AdminDateTime.vue'
 
 type EmailConfiguration = NoCtfapiEndpointsAdministrationPlatformEmailVerificationConfigurationResponse
+type HumanVerificationConfiguration = NoCtfapiEndpointsAdministrationPlatformAdminHumanVerificationConfigurationResponse
 
 /** Owns state, effects and commands for AdminPlatformEmailPage. */
 export function useAdminPlatformEmailPage() {
+  const { refresh: refreshPlatform } = usePlatform()
+
   const configuration = ref<EmailConfiguration | null>(null)
+
+  const humanVerification = ref<HumanVerificationConfiguration | null>(null)
+
+  const humanVerificationEnabled = ref(false)
+
+  const humanVerificationSaving = ref(false)
+
+  const humanVerificationDirty = computed(() => humanVerification.value !== null
+    && humanVerificationEnabled.value !== (humanVerification.value.enabled ?? false))
+
+  const humanVerificationProviderLabel = computed(() => {
+    if (humanVerification.value?.provider === 'Cap') return 'CAP'
+    if (humanVerification.value?.provider === 'Turnstile') return 'Cloudflare Turnstile'
+    return translate('ui.notConfigured')
+  })
 
   const loading = ref(true)
 
@@ -70,8 +88,30 @@ export function useAdminPlatformEmailPage() {
       loadError.value = parseApiError(error).message
       return
     }
+    humanVerification.value = data.humanVerification ?? null
+    humanVerificationEnabled.value = data.humanVerification?.enabled ?? false
     configuration.value = data.emailVerification ?? null
     if (data.emailVerification) syncForm(data.emailVerification)
+  }
+
+  async function saveHumanVerification(): Promise<void> {
+    if (!humanVerification.value || humanVerificationSaving.value
+      || !humanVerificationDirty.value) return
+    humanVerificationSaving.value = true
+    const { data, error } = await adminPlatformPatchConfiguration({
+      body: { humanVerification: { enabled: humanVerificationEnabled.value } },
+    })
+    humanVerificationSaving.value = false
+    if (error) {
+      toast.error(parseApiError(error).message)
+      return
+    }
+    if (data?.humanVerification) {
+      humanVerification.value = data.humanVerification
+      humanVerificationEnabled.value = data.humanVerification.enabled ?? false
+    }
+    await refreshPlatform()
+    toast.success(translate('ui.humanVerificationConfigurationSaved'))
   }
 
   async function save(): Promise<void> {
@@ -125,8 +165,15 @@ export function useAdminPlatformEmailPage() {
 
   const viewBindings = {
       KeyRound,
+      RefreshCw,
       Send,
+      ShieldCheck,
       configuration,
+      humanVerification,
+      humanVerificationEnabled,
+      humanVerificationSaving,
+      humanVerificationDirty,
+      humanVerificationProviderLabel,
       loading,
       loadError,
       form,
@@ -135,6 +182,8 @@ export function useAdminPlatformEmailPage() {
       newPassword,
       passwordSaving,
       sendingTest,
+      load,
+      saveHumanVerification,
       save,
       replacePassword,
       sendTest,

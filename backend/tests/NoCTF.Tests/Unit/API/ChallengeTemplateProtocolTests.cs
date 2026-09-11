@@ -29,44 +29,57 @@ public sealed class ChallengeTemplateProtocolTests
     }
 
     [Test]
-    [Arguments("""{"mode":"Ctf","visibility":"Private"}""")]
+    [Arguments("""{"content":{"mode":"Ctf","visibility":"Private","title":"Template","description":null,"direction":"Web","definitionJson":"{}"}}""")]
     public async Task Update_request_accepts_pascal_case_string_enums(string json)
     {
-        var request = JsonSerializer.Deserialize<UpdateChallengeTemplateRequest>(
+        var request = JsonSerializer.Deserialize<PatchChallengeTemplateRequest>(
             json,
             JsonOptions);
 
         await Assert.That(request).IsNotNull();
-        await Assert.That(request!.Mode!.Value).IsEqualTo(GameModeProtocol.Ctf);
-        await Assert.That(request.Visibility!.Value).IsEqualTo(ChallengeVisibilityProtocol.Private);
+        await Assert.That(request!.Content!.Mode).IsEqualTo(GameModeProtocol.Ctf);
+        await Assert.That(request.Content.Visibility).IsEqualTo(ChallengeVisibilityProtocol.Private);
     }
 
     [Test]
     public async Task Update_request_requires_complete_last_write_wins_payload()
     {
-        var validator = new UpdateChallengeTemplateValidator();
-        var missing = validator.Validate(new UpdateChallengeTemplateRequest());
+        var validator = new PatchChallengeTemplateValidator();
+        var missing = validator.Validate(new PatchChallengeTemplateRequest
+        {
+            Content = new()
+            {
+                Mode = (GameModeProtocol)(-1),
+                Visibility = (ChallengeVisibilityProtocol)(-1),
+                Title = string.Empty,
+                Description = null,
+                Direction = string.Empty,
+                DefinitionJson = string.Empty
+            }
+        });
         var missingProperties = missing.Errors
             .Select(error => error.PropertyName)
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
 
         await Assert.That(missingProperties.Contains(
-            nameof(UpdateChallengeTemplateRequest.Mode))).IsTrue();
+            "Content.Mode")).IsTrue();
         await Assert.That(missingProperties.Contains(
-            nameof(UpdateChallengeTemplateRequest.Visibility))).IsTrue();
+            "Content.Visibility")).IsTrue();
         await Assert.That(missingProperties.Contains(
-            nameof(UpdateChallengeTemplateRequest.Title))).IsTrue();
+            "Content.Title")).IsTrue();
         await Assert.That(missingProperties.Contains(
-            nameof(UpdateChallengeTemplateRequest.Direction))).IsTrue();
-        await Assert.That(missingProperties.Contains(
-            nameof(UpdateChallengeTemplateRequest.DefinitionJson))).IsFalse();
-        await Assert.That(validator.Validate(new UpdateChallengeTemplateRequest
+            "Content.Direction")).IsTrue();
+        await Assert.That(validator.Validate(new PatchChallengeTemplateRequest
         {
-            Mode = GameModeProtocol.Ctf,
-            Visibility = ChallengeVisibilityProtocol.Private,
-            Title = "Template",
-            Direction = "Web",
-            DefinitionJson = """{"schemaVersion":1}"""
+            Content = new()
+            {
+                Mode = GameModeProtocol.Ctf,
+                Visibility = ChallengeVisibilityProtocol.Private,
+                Title = "Template",
+                Description = null,
+                Direction = "Web",
+                DefinitionJson = """{"schemaVersion":1}"""
+            }
         }).IsValid).IsTrue();
     }
 
@@ -83,38 +96,33 @@ public sealed class ChallengeTemplateProtocolTests
     }
 
     [Test]
-    public async Task Update_result_mapping_keeps_runtime_statuses_typed()
+    public async Task Permission_specific_mappers_only_update_their_allowed_fields()
     {
-        var notFound = ChallengeTemplateUpdateResponseMapper.ToResponse(
-            new(ChallengeTemplateWriteState.NotFoundOrForbidden));
-        var activeMode = ChallengeTemplateUpdateResponseMapper.ToResponse(
-            new(ChallengeTemplateWriteState.ActiveCompetitionModeConflict));
-        var activeRuntime = ChallengeTemplateUpdateResponseMapper.ToResponse(
-            new(ChallengeTemplateWriteState.ActiveRuntimeDefinitionConflict));
-        var invalidDefinition = ChallengeTemplateUpdateResponseMapper.ToResponse(
-            new(
-                ChallengeTemplateWriteState.InvalidDefinition,
-                Detail: "Definition is invalid."));
+        var challenge = new Challenge
+        {
+            Id = Guid.NewGuid(), OwnerId = Guid.NewGuid(), ManagerIds = [],
+            Mode = GameMode.Ctf, Visibility = ChallengeVisibility.Private,
+            Title = "Old", Direction = "Web", DefinitionJson = "{}"
+        };
+        ChallengeTemplatePatchMapper.ApplyContentAsTemplateManager(new()
+        {
+            Mode = GameModeProtocol.Awd,
+            Visibility = ChallengeVisibilityProtocol.Shared,
+            Title = "New",
+            Description = null,
+            Direction = "Pwn",
+            DefinitionJson = "{}"
+        }, challenge);
+        var ownerAfterContent = challenge.OwnerId;
+        var newOwner = Guid.NewGuid();
+        ChallengeTemplatePatchMapper.ApplyPermissionsAsTemplateOwner(new()
+        {
+            OwnerId = newOwner,
+            ManagerIds = [challenge.OwnerId]
+        }, challenge);
 
-        await Assert.That(notFound.Result).IsTypeOf<NotFound>();
-        await Assert.That(activeMode.Result)
-            .IsTypeOf<Conflict<ChallengeTemplateConflictResponse>>();
-        var activeModeConflict =
-            (Conflict<ChallengeTemplateConflictResponse>)activeMode.Result;
-        await Assert.That(activeModeConflict.Value!.Code)
-            .IsEqualTo(ChallengeTemplateConflictCode.ActiveCompetitionModeConflict);
-        await Assert.That(activeRuntime.Result)
-            .IsTypeOf<Conflict<ChallengeTemplateConflictResponse>>();
-        var activeRuntimeConflict =
-            (Conflict<ChallengeTemplateConflictResponse>)activeRuntime.Result;
-        await Assert.That(activeRuntimeConflict.Value!.Code)
-            .IsEqualTo(ChallengeTemplateConflictCode.ActiveRuntimeDefinitionConflict);
-        await Assert.That(invalidDefinition.Result)
-            .IsTypeOf<ProblemHttpResult>();
-        var response = (ProblemHttpResult)invalidDefinition.Result;
-        var value = (ValidationProblemDetails)response.ProblemDetails;
-        await Assert.That(value.Status).IsEqualTo(400);
-        await Assert.That(value.Errors.Keys)
-            .Contains(nameof(UpdateChallengeTemplateRequest.DefinitionJson));
+        await Assert.That(challenge.Title).IsEqualTo("New");
+        await Assert.That(challenge.OwnerId).IsEqualTo(newOwner);
+        await Assert.That(ownerAfterContent).IsNotEqualTo(newOwner);
     }
 }

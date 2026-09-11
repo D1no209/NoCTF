@@ -27,7 +27,7 @@ public sealed class TeamModerationStore(
         TeamModerationCommand command,
         CancellationToken cancellationToken)
     {
-        await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
+        await using var transaction = await AggregateCompatibleTransaction.BeginAsync(db, cancellationToken);
         var competition = await CompetitionTeamMutationCriticalSection.AcquireAsync(db, command.CompetitionId, cancellationToken);
         if (competition is null)
             return new(TeamModerationFailure.CompetitionNotFound);

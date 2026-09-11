@@ -37,7 +37,7 @@ public class AdminOpenApiRulesTests
                     operation.Value)))
             .ToArray();
 
-        await Assert.That(operations).Count().IsEqualTo(138);
+        await Assert.That(operations).Count().IsEqualTo(99);
         await Assert.That(operations
             .Where(operation => !operation.Value.TryGetProperty("operationId", out var id)
                 || id.GetString() is not { } value
@@ -95,7 +95,7 @@ public class AdminOpenApiRulesTests
         foreach (var schemaName in new[]
                  {
                      "NoCTFAPIEndpointsAdministrationCompetitionsCreateCompetitionRequest",
-                     "NoCTFAPIEndpointsAdministrationCompetitionsUpdateCompetitionRequest"
+                     "NoCTFAPIEndpointsAdministrationCompetitionsCompetitionMetadataPatchRequest"
                  })
         {
             var schema = schemas.GetProperty(schemaName);

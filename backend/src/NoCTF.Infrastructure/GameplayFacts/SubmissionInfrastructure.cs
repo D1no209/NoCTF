@@ -16,8 +16,6 @@ using NoCTF.Infrastructure.GameplayFacts.Status;
 using NoCTF.Infrastructure.GameplayFacts.CheatIncidents;
 using NoCTF.Application.GameplayFacts.AdjudicationPreview;
 using NoCTF.Infrastructure.GameplayFacts.AdjudicationPreview;
-using NoCTF.Application.GameplayFacts.Practice;
-using NoCTF.Infrastructure.GameplayFacts.Practice;
 using NoCTF.Application.GameplayFacts.Awdp;
 using NoCTF.Infrastructure.GameplayFacts.Awdp;
 
@@ -30,8 +28,6 @@ internal static class GameplayFactInfrastructure
         services.AddScoped<GameplayFactAttemptCriticalSection>();
         services.AddScoped<IGameplayFactIntakeStore, GameplayFactIntakeStore>();
         services.AddScoped<GetFlagAttemptState>();
-        services.AddScoped<IPracticeFlagJudge, PracticeFlagJudge>();
-        services.AddScoped<JudgePracticeFlag>();
         services.AddScoped<IAwdpParticipantStateReader, AwdpParticipantStateReader>();
         services.AddScoped<GetAwdpParticipantState>();
         services.AddScoped<IAwdpBreakFlagJudge, AwdpBreakFlagJudge>();

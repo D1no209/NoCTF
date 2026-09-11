@@ -87,7 +87,9 @@ public sealed class NoOpTransactionalMessageOutbox : ITransactionalMessageOutbox
     public Task FlushOutgoingMessagesAsync() => Task.CompletedTask;
 }
 
-public sealed class DevelopmentTransactionalMessageOutbox(IMessageBus bus)
+public sealed class DevelopmentTransactionalMessageOutbox(
+    IMessageBus bus,
+    NoCtfDbContext db)
     : ITransactionalMessageOutbox
 {
     private readonly List<Func<ValueTask>> pending = [];
@@ -112,6 +114,9 @@ public sealed class DevelopmentTransactionalMessageOutbox(IMessageBus bus)
 
     public async Task FlushOutgoingMessagesAsync()
     {
+        if (db.Database.CurrentTransaction is not null)
+            return;
+
         var batch = pending.ToArray();
         pending.Clear();
         foreach (var publish in batch)

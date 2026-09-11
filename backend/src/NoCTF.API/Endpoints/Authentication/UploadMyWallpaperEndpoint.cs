@@ -49,7 +49,7 @@ public sealed class UploadMyWallpaperEndpoint(
     {
         Options(builder => builder.WithMetadata(new NoCTF.Hosting.Observability.ApiRequestMetricsMetadata(
             NoCTF.Application.Observability.ApiRequestKind.Upload)));
-        Post("/auth/me/wallpaper");
+        Put("/auth/me/wallpaper");
         AuthSchemes("Bearer");
         AllowFileUploads();
         MaxRequestBodySize(FileUploadLimits.MaximumRequestBytes(

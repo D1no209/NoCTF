@@ -21,6 +21,7 @@ public sealed class PlatformConfigurationTests
                 "NoCTF Arena",
                 "Competition platform",
                 null,
+                true,
                 now));
         var objects = Substitute.For<IStore>();
         var configuration = new ManagePlatformConfiguration(
@@ -39,6 +40,23 @@ public sealed class PlatformConfigurationTests
             "Competition platform",
             now,
             Arg.Any<CancellationToken>());
+    }
+
+    [Test]
+    public async Task Human_verification_switch_is_persisted_with_the_update_time()
+    {
+        var now = DateTimeOffset.UtcNow;
+        var store = Substitute.For<IPlatformConfigurationStore>();
+        store.UpdateHumanVerificationAsync(false, now, Arg.Any<CancellationToken>())
+            .Returns(new PlatformConfigurationView("NoCTF", null, null, false, now));
+        var objects = Substitute.For<IStore>();
+        var configuration = new ManagePlatformConfiguration(store, objects, Uploads(objects));
+
+        var result = await configuration.UpdateHumanVerificationAsync(false, now);
+
+        await Assert.That(result.HumanVerificationEnabled).IsFalse();
+        await store.Received(1).UpdateHumanVerificationAsync(
+            false, now, Arg.Any<CancellationToken>());
     }
 
     [Test]
@@ -124,6 +142,7 @@ public sealed class PlatformConfigurationTests
                     "NoCTF",
                     null,
                     Guid.NewGuid(),
+                    true,
                     now),
                 Guid.NewGuid()));
         var configuration = new ManagePlatformConfiguration(

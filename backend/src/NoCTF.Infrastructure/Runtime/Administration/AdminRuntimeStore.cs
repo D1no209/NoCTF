@@ -265,10 +265,22 @@ public sealed class AdminRuntimeStore(
     public async Task<RuntimeInstanceView?> FindAsync(
         Guid competitionId,
         Guid runtimeInstanceId,
+        CancellationToken ct) =>
+        await FindCoreAsync(runtimeInstanceId, competitionId, ct);
+
+    public async Task<RuntimeInstanceView?> FindPlatformAsync(
+        Guid runtimeInstanceId,
+        CancellationToken ct) =>
+        await FindCoreAsync(runtimeInstanceId, competitionId: null, ct);
+
+    private async Task<RuntimeInstanceView?> FindCoreAsync(
+        Guid runtimeInstanceId,
+        Guid? competitionId,
         CancellationToken ct)
     {
         var item = await db.RuntimeInstances.AsNoTracking()
-            .Where(item => item.Id == runtimeInstanceId && item.CompetitionId == competitionId)
+            .Where(item => item.Id == runtimeInstanceId
+                && (competitionId == null || item.CompetitionId == competitionId))
             .Select(item => new RuntimeInstanceView(
                 item.Id, item.CompetitionId, item.CompetitionChallengeId, item.ChallengeId, item.TeamId,
                 item.Purpose, item.RuntimeKind, item.RuntimeProvider,

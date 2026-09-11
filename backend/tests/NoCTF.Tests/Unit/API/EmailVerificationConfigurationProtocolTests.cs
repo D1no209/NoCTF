@@ -9,7 +9,7 @@ public sealed class EmailVerificationConfigurationProtocolTests
     [Test]
     public async Task Smtp_security_mode_uses_named_values_and_rejects_integers()
     {
-        var request = new UpdateEmailVerificationConfigurationRequest
+        var request = new PlatformEmailVerificationPatchRequest
         {
             Enabled = true,
             PublicBaseUrl = "https://noctf.test",
@@ -29,7 +29,7 @@ public sealed class EmailVerificationConfigurationProtocolTests
 
         var serializerOptions = new JsonSerializerOptions(JsonSerializerDefaults.Web);
         var json = JsonSerializer.Serialize(request, serializerOptions);
-        var roundTrip = JsonSerializer.Deserialize<UpdateEmailVerificationConfigurationRequest>(
+        var roundTrip = JsonSerializer.Deserialize<PlatformEmailVerificationPatchRequest>(
             json,
             serializerOptions);
 
@@ -40,7 +40,7 @@ public sealed class EmailVerificationConfigurationProtocolTests
         var rejected = false;
         try
         {
-            _ = JsonSerializer.Deserialize<UpdateEmailVerificationConfigurationRequest>(
+            _ = JsonSerializer.Deserialize<PlatformEmailVerificationPatchRequest>(
                 json.Replace("\"StartTls\"", "2", StringComparison.Ordinal),
                 serializerOptions);
         }

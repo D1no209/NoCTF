@@ -46,16 +46,19 @@ public sealed class KohFullBoundaryTests
         var competitionId = competition.GetProperty("id").GetGuid();
         await SendJsonAsync(
             admin,
-            HttpMethod.Put,
-            $"/api/v1/admin/competitions/{competitionId}/configuration",
+            HttpMethod.Patch,
+            $"/api/v1/admin/competitions/{competitionId}",
             new
             {
-                json = JsonSerializer.Serialize(new
+                modeConfiguration = new
                 {
-                    schemaVersion = 1,
-                    pollIntervalSeconds = 2,
-                    controlPointsPerInterval = 10
-                }, JsonOptions)
+                    json = JsonSerializer.Serialize(new
+                    {
+                        schemaVersion = 1,
+                        pollIntervalSeconds = 2,
+                        controlPointsPerInterval = 10
+                    }, JsonOptions)
+                }
             },
             HttpStatusCode.OK,
             cancellationToken);
@@ -91,22 +94,23 @@ public sealed class KohFullBoundaryTests
         }, JsonOptions);
         await SendJsonAsync(
             admin,
-            HttpMethod.Put,
-            $"/api/v1/admin/competitions/{competitionId}/challenges/{competitionChallengeId}/configuration",
-            new { json = configuration },
-            HttpStatusCode.OK,
-            cancellationToken);
-        await SendJsonAsync(
-            admin,
-            HttpMethod.Put,
+            HttpMethod.Patch,
             $"/api/v1/admin/competitions/{competitionId}/challenges/{competitionChallengeId}",
-            new { customTitle = (string?)null, order = 0, isPublished = true },
+            new
+            {
+                presentation = new
+                {
+                    customTitle = (string?)null,
+                    order = 0,
+                    isPublished = true
+                },
+                rules = new { json = configuration }
+            },
             HttpStatusCode.OK,
             cancellationToken);
 
-        await SendWithoutBodyAsync(admin, HttpMethod.Post,
-            $"/api/v1/admin/competitions/{competitionId}/make-visible",
-            HttpStatusCode.NoContent, cancellationToken);
+        await E2ELifecycle.SetStatusAsync(
+            admin, competitionId, "Visible", cancellationToken);
         using var red = await RegisterTeamAsync(
             anonymous, baseUrl, competitionId,
             "koh-red", "red@koh-e2e.test", "koh-red-password", "Red Team", cancellationToken);
@@ -136,9 +140,8 @@ public sealed class KohFullBoundaryTests
         await Assert.That(redFlag).IsNotEqualTo(blueFlag);
 
         await E2ELifecycle.MakeScheduleDueAsync(admin, competitionId, cancellationToken);
-        await SendWithoutBodyAsync(admin, HttpMethod.Post,
-            $"/api/v1/admin/competitions/{competitionId}/publish",
-            HttpStatusCode.NoContent, cancellationToken);
+        await E2ELifecycle.SetStatusAsync(
+            admin, competitionId, "Published", cancellationToken);
         await E2ELifecycle.StartOrObserveRunningAsync(admin, competitionId, cancellationToken);
         var runtimePath =
             $"/api/v1/admin/competitions/{competitionId}/runtimes?competitionChallengeId={competitionChallengeId}";
@@ -204,9 +207,8 @@ public sealed class KohFullBoundaryTests
             anonymous, competitionId, TimeSpan.FromSeconds(5), cancellationToken);
         await SetFixtureAsync(fixtureUrl, "wrong", null, cancellationToken);
 
-        await SendWithoutBodyAsync(admin, HttpMethod.Post,
-            $"/api/v1/admin/competitions/{competitionId}/pause",
-            HttpStatusCode.NoContent, cancellationToken);
+        await E2ELifecycle.SetStatusAsync(
+            admin, competitionId, "Paused", cancellationToken);
         await Task.Delay(TimeSpan.FromSeconds(3), cancellationToken);
         await SetFixtureAsync(fixtureUrl, "flag", blueFlag, cancellationToken);
         await AssertScoresStableAsync(
@@ -221,17 +223,15 @@ public sealed class KohFullBoundaryTests
             .IsEqualTo(JsonValueKind.Null);
 
         var beforeBlue = await ReadScoresAsync(anonymous, competitionId, cancellationToken);
-        await SendWithoutBodyAsync(admin, HttpMethod.Post,
-            $"/api/v1/admin/competitions/{competitionId}/resume",
-            HttpStatusCode.NoContent, cancellationToken);
+        await E2ELifecycle.SetStatusAsync(
+            admin, competitionId, "Running", cancellationToken);
         await PollScoreAsync(
             anonymous, competitionId, blue.TeamId,
             beforeBlue.GetValueOrDefault(blue.TeamId) + 10,
             LeaderboardProjectionTimeout, cancellationToken);
 
-        await SendWithoutBodyAsync(admin, HttpMethod.Post,
-            $"/api/v1/admin/competitions/{competitionId}/finish",
-            HttpStatusCode.NoContent, cancellationToken);
+        await E2ELifecycle.SetStatusAsync(
+            admin, competitionId, "Finished", cancellationToken);
         var leaderboard = await PollJsonAsync(
             anonymous,
             $"/api/v1/competitions/{competitionId}/leaderboard",

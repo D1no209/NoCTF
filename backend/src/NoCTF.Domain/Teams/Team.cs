@@ -19,8 +19,6 @@ public sealed class Team
     public string InvitationToken { get; set; } = string.Empty;
     public bool IsLocked { get; set; }
     public TeamRegistrationStatus RegistrationStatus { get; set; }
-    /// <summary>Created for post-competition practice; never part of official scoring or rankings.</summary>
-    public bool IsPracticeTeam { get; set; }
     public DateTimeOffset RegisteredAt { get; set; }
     public bool IsBanned { get; set; }
     public DateTimeOffset? BannedAt { get; set; }

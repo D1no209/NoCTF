@@ -1422,6 +1422,7 @@ export type NoCtfapiEndpointsAdministrationPlatformPlatformLogServiceProtocol = 
 
 export type NoCtfapiEndpointsAdministrationPlatformAdminPlatformConfigurationResponse = {
     branding?: NoCtfapiEndpointsAdministrationPlatformPlatformBrandingResponse;
+    humanVerification?: NoCtfapiEndpointsAdministrationPlatformAdminHumanVerificationConfigurationResponse;
     emailVerification?: NoCtfapiEndpointsAdministrationPlatformEmailVerificationConfigurationResponse;
     publicGateway?: NoCtfapiEndpointsAdministrationPlatformPublicGatewayConfigurationResponse;
     publicGatewayStatusUrl?: string;
@@ -1432,6 +1433,12 @@ export type NoCtfapiEndpointsAdministrationPlatformPlatformBrandingResponse = {
     description?: string | null;
     logoUrl?: string | null;
     updatedAt?: string;
+};
+
+export type NoCtfapiEndpointsAdministrationPlatformAdminHumanVerificationConfigurationResponse = {
+    enabled?: boolean;
+    provider?: NoCtfapiEndpointsPlatformHumanVerificationProviderProtocol;
+    available?: boolean;
 };
 
 export type NoCtfapiEndpointsAdministrationPlatformEmailVerificationConfigurationResponse = {
@@ -1674,6 +1681,7 @@ export type NoCtfapiEndpointsAdministrationPlatformPlatformUserListResponse = {
 
 export type NoCtfapiEndpointsAdministrationPlatformPatchPlatformConfigurationRequest = {
     branding?: NoCtfapiEndpointsAdministrationPlatformPlatformBrandingPatchRequest | null;
+    humanVerification?: NoCtfapiEndpointsAdministrationPlatformPlatformHumanVerificationPatchRequest | null;
     emailVerification?: NoCtfapiEndpointsAdministrationPlatformPlatformEmailVerificationPatchRequest | null;
     publicGateway?: NoCtfapiEndpointsAdministrationPlatformPlatformGatewayPatchRequest | null;
 };
@@ -1681,6 +1689,10 @@ export type NoCtfapiEndpointsAdministrationPlatformPatchPlatformConfigurationReq
 export type NoCtfapiEndpointsAdministrationPlatformPlatformBrandingPatchRequest = {
     name: string;
     description: string | null;
+};
+
+export type NoCtfapiEndpointsAdministrationPlatformPlatformHumanVerificationPatchRequest = {
+    enabled: boolean;
 };
 
 export type NoCtfapiEndpointsAdministrationPlatformPlatformEmailVerificationPatchRequest = {

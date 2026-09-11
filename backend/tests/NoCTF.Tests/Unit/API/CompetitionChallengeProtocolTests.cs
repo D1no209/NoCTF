@@ -7,21 +7,23 @@ public sealed class CompetitionChallengeProtocolTests
     [Test]
     public async Task Update_request_requires_the_complete_last_write_wins_shape()
     {
-        var validator = new UpdateChallengeValidator();
+        var validator = new PatchCompetitionChallengeValidator();
 
-        await Assert.That(validator.Validate(new UpdateChallengeRequest { CustomTitle = null }).IsValid)
+        await Assert.That(validator.Validate(new PatchCompetitionChallengeRequest()).IsValid)
             .IsFalse();
-        await Assert.That(validator.Validate(new UpdateChallengeRequest
+        await Assert.That(validator.Validate(new PatchCompetitionChallengeRequest
         {
-            CustomTitle = "Finals Web",
-            Order = 1,
-            IsPublished = false
+            Presentation = new()
+            {
+                CustomTitle = "Finals Web", Order = 1, IsPublished = false
+            }
         }).IsValid).IsTrue();
-        await Assert.That(validator.Validate(new UpdateChallengeRequest
+        await Assert.That(validator.Validate(new PatchCompetitionChallengeRequest
         {
-            CustomTitle = new string('x', 161),
-            Order = 1,
-            IsPublished = false
+            Presentation = new()
+            {
+                CustomTitle = new string('x', 161), Order = 1, IsPublished = false
+            }
         }).IsValid).IsFalse();
     }
 

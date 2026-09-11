@@ -11,14 +11,14 @@ const { file, pendingAction, targetCreating, canUpload, validating, recycling, p
     <h3 id="fix-submit-title" class="text-sm font-semibold">{{ $t('ui.defenseVerification') }}</h3>
     <div class="flex flex-col gap-4">
       <UiForm v-if="canUpload" class="flex flex-col gap-4" @submit.prevent="uploadFix">
-        <Alert>
+        <p class="flex items-start gap-2 text-sm text-muted-foreground" role="status" aria-live="polite">
           <Spinner v-if="targetCreating" class="mr-2 inline size-3" />
-          <AlertDescription>
+          <span>
             {{ targetCreating
               ? $t('ui.theDefenseEnvironmentIsStartingYouCanUploadTheFix')
               : $t('ui.theVerificationEnvironmentIsReadyUploadThisFixPackage') }}
-          </AlertDescription>
-        </Alert>
+          </span>
+        </p>
         <FieldGroup>
           <Field>
             <FieldLabel :for="`patch-file-${competitionChallengeId}`">{{ $t('ui.fixArchiveForThisAttemptTarGz') }}</FieldLabel>
@@ -43,27 +43,16 @@ const { file, pendingAction, targetCreating, canUpload, validating, recycling, p
         </FieldGroup>
       </UiForm>
 
-      <Alert v-else-if="validating">
-        <Spinner class="mr-2 inline size-3" />
-        <AlertDescription class="inline">
+      <p v-else-if="validating || recycling || completedAndRecycled" class="flex items-center gap-2 text-sm text-muted-foreground" role="status" aria-live="polite">
+        <Spinner v-if="validating || recycling" class="size-3" />
+        <span v-if="validating">
           {{ patchWaitingForTarget
             ? $t('ui.theFixHasBeenUploadedVerificationWillStartAutomaticallyWhen')
             : $t('ui.verifyingThisFix') }}
-        </AlertDescription>
-      </Alert>
-
-      <Alert v-else-if="recycling">
-        <Spinner class="mr-2 inline size-3" />
-        <AlertDescription class="inline">
-          {{ $t('ui.thisVerificationHasEndedFinalizing') }}
-        </AlertDescription>
-      </Alert>
-
-      <Alert v-else-if="completedAndRecycled">
-        <AlertDescription>
-          {{ $t('ui.thisFixVerificationIsComplete') }}
-        </AlertDescription>
-      </Alert>
+        </span>
+        <span v-else-if="recycling">{{ $t('ui.thisVerificationHasEndedFinalizing') }}</span>
+        <span v-else>{{ $t('ui.thisFixVerificationIsComplete') }}</span>
+      </p>
 
       <Alert v-else-if="targetFailed" variant="destructive">
         <AlertDescription>

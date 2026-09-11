@@ -88,10 +88,10 @@ const { ShieldCheck, emit, state, loading, stateError, defenseOutcome, statePoll
             </div>
         </section>
 
-        <Alert v-if="state?.fixActivation" class="border-sky-500/40 bg-sky-500/5">
-          <ShieldCheck class="text-sky-600 dark:text-sky-400" />
-          <AlertTitle>{{ $t('ui.defenseLockedNoFurtherVerificationIsRequired') }}</AlertTitle>
-        </Alert>
+        <p v-if="state?.fixActivation" class="flex items-center gap-2 text-sm font-medium text-primary" role="status">
+          <ShieldCheck class="size-4" />
+          <span>{{ $t('ui.defenseLockedNoFurtherVerificationIsRequired') }}</span>
+        </p>
 
         <component :is="FixSubmit"
           v-else

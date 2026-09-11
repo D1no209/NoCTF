@@ -178,7 +178,6 @@ public static class ObservabilityExtensions
         }
 
         if (route.EndsWith("/flag-submissions", StringComparison.OrdinalIgnoreCase)
-            || route.EndsWith("/practice-flag", StringComparison.OrdinalIgnoreCase)
             || route.EndsWith("/awdp-break-flag-judgement", StringComparison.OrdinalIgnoreCase))
         {
             operation = "flag";

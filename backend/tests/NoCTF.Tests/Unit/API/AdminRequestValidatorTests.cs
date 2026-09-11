@@ -1,5 +1,6 @@
 using NoCTF.API.Endpoints.Administration.Competitions;
 using NoCTF.API.Endpoints.Administration.Teams;
+using NoCTF.API.Endpoints.Teams;
 using NoCTF.API.Endpoints.Competitions;
 
 namespace NoCTF.Tests.Unit.Api;
@@ -18,27 +19,38 @@ public sealed class AdminRequestValidatorTests
             EndTime = now.AddHours(1),
             MaxTeamMembers = 5
         };
-        var update = new UpdateCompetitionRequest
+        var update = new PatchCompetitionRequest
         {
-            Title = "CTF",
-            StartTime = now,
-            EndTime = now.AddHours(1),
-            MaxTeamMembers = 5
+            Metadata = new()
+            {
+                Title = "CTF",
+                Description = null,
+                StartTime = now,
+                EndTime = now.AddHours(1),
+                TeamRegistrationAutoApprove = false,
+                AllowTeamRegistrationWhileRunning = false,
+                MaxTeamMembers = 5,
+                MaxConcurrentRuntimeInstancesPerTeam = -1,
+                MaxActiveQuestionsPerTeam = 5,
+                MaxParticipantMessagesBeforeHandlerReply = 3,
+                AllowChallengeOwnersToHandleQuestions = true,
+                PracticeModeEnabled = false
+            }
         };
 
         await Assert.That((await new CreateCompetitionValidator()
                 .ValidateAsync(create)).IsValid)
             .IsFalse();
-        await Assert.That((await new UpdateCompetitionValidator()
+        await Assert.That((await new PatchCompetitionValidator()
                 .ValidateAsync(update)).IsValid)
             .IsFalse();
 
         create.MaxConcurrentRuntimeInstancesPerTeam = 0;
-        update.MaxConcurrentRuntimeInstancesPerTeam = 0;
+        update.Metadata!.MaxConcurrentRuntimeInstancesPerTeam = 0;
         await Assert.That((await new CreateCompetitionValidator()
                 .ValidateAsync(create)).IsValid)
             .IsTrue();
-        await Assert.That((await new UpdateCompetitionValidator()
+        await Assert.That((await new PatchCompetitionValidator()
                 .ValidateAsync(update)).IsValid)
             .IsTrue();
     }
@@ -46,15 +58,21 @@ public sealed class AdminRequestValidatorTests
     [Test]
     public async Task BanTeam_RequiresAReason()
     {
-        var validator = new BanTeamValidator();
+        var validator = new PatchTeamValidator();
 
-        var missing = await validator.ValidateAsync(new BanTeamRequest { Reason = " " });
-        var supplied = await validator.ValidateAsync(new BanTeamRequest { Reason = "Rule violation" });
+        var missing = await validator.ValidateAsync(new PatchTeamRequest
+        {
+            Ban = new() { IsBanned = true, Reason = " " }
+        });
+        var supplied = await validator.ValidateAsync(new PatchTeamRequest
+        {
+            Ban = new() { IsBanned = true, Reason = "Rule violation" }
+        });
 
         await Assert.That(missing.IsValid).IsFalse();
         await Assert.That(missing.Errors.Any(error => string.Equals(
             error.PropertyName,
-            nameof(BanTeamRequest.Reason),
+            "Ban.Reason",
             StringComparison.OrdinalIgnoreCase))).IsTrue();
         await Assert.That(supplied.IsValid).IsTrue();
     }

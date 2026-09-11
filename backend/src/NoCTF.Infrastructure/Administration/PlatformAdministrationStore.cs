@@ -81,7 +81,7 @@ public sealed class PlatformAdministrationStore(
         DateTimeOffset now,
         CancellationToken ct)
     {
-        await using var transaction = await db.Database.BeginTransactionAsync(ct);
+        await using var transaction = await AggregateCompatibleTransaction.BeginAsync(db, ct);
         await ActiveHumanAdministratorMutationGuard.AcquireAsync(db, ct);
         await ResourceManagerRoleGuard.AcquireAsync(db, [userId], ct);
         var user = await db.Users.SingleOrDefaultAsync(item => item.Id == userId, ct);
@@ -133,7 +133,7 @@ public sealed class PlatformAdministrationStore(
         DateTimeOffset now,
         CancellationToken ct)
     {
-        await using var transaction = await db.Database.BeginTransactionAsync(ct);
+        await using var transaction = await AggregateCompatibleTransaction.BeginAsync(db, ct);
         await ActiveHumanAdministratorMutationGuard.AcquireAsync(db, ct);
         var user = await db.Users.SingleOrDefaultAsync(item => item.Id == userId, ct);
         if (user is null)
@@ -168,7 +168,7 @@ public sealed class PlatformAdministrationStore(
         DateTimeOffset now,
         CancellationToken ct)
     {
-        await using var transaction = await db.Database.BeginTransactionAsync(ct);
+        await using var transaction = await AggregateCompatibleTransaction.BeginAsync(db, ct);
         var user = await db.Users.SingleOrDefaultAsync(item => item.Id == userId, ct);
         if (user is null)
             return new(UpdatePlatformUserEmailVerificationState.UserNotFound);
@@ -191,6 +191,99 @@ public sealed class PlatformAdministrationStore(
         await db.SaveChangesAsync(ct);
         await transaction.CommitAsync(ct);
         return new(UpdatePlatformUserEmailVerificationState.Updated, Map(user));
+    }
+
+    public async Task<PatchPlatformUserResult> PatchUserAsync(
+        Guid userId,
+        Guid actorUserId,
+        Action<User> apply,
+        bool? emailVerified,
+        DateTimeOffset now,
+        CancellationToken ct)
+    {
+        await using var transaction = await AggregateCompatibleTransaction.BeginAsync(db, ct);
+        await ActiveHumanAdministratorMutationGuard.AcquireAsync(db, ct);
+        await ResourceManagerRoleGuard.AcquireAsync(db, [userId], ct);
+        var user = await db.Users.SingleOrDefaultAsync(item => item.Id == userId, ct);
+        if (user is null)
+            return new(PatchPlatformUserState.UserNotFound);
+        if (user.AccountStatus == UserAccountStatus.Anonymized)
+            return new(PatchPlatformUserState.AnonymizedAccountImmutable);
+
+        var originalRole = user.Role;
+        var originalStatus = user.AccountStatus;
+        var originallyVerified = user.EmailVerifiedAt is not null;
+        apply(user);
+        if (user.AccountStatus == UserAccountStatus.Anonymized)
+        {
+            db.ChangeTracker.Clear();
+            return new(PatchPlatformUserState.AnonymizedAccountImmutable);
+        }
+        if (user.Kind == UserKind.Bot && user.Role == UserRole.Administrator)
+        {
+            db.ChangeTracker.Clear();
+            return new(PatchPlatformUserState.InvalidBotRole);
+        }
+
+        var removesActiveAdministrator = user.Kind == UserKind.Human
+            && originalRole == UserRole.Administrator
+            && originalStatus == UserAccountStatus.Active
+            && (user.Role != UserRole.Administrator
+                || user.AccountStatus != UserAccountStatus.Active);
+        if (removesActiveAdministrator
+            && await ActiveHumanAdministratorMutationGuard.CountAsync(db, ct) <= 1)
+        {
+            db.ChangeTracker.Clear();
+            return new(PatchPlatformUserState.LastAdministratorProtected);
+        }
+
+        if (user.Role == UserRole.User && originalRole.CanManageResources())
+        {
+            var competitionIds = await db.Competitions.AsNoTracking()
+                .Where(competition => competition.OwnerId == userId
+                    || competition.ManagerIds.Contains(userId))
+                .OrderBy(competition => competition.Id)
+                .Select(competition => competition.Id)
+                .ToArrayAsync(ct);
+            var challengeIds = await db.Challenges.AsNoTracking()
+                .Where(challenge => challenge.OwnerId == userId
+                    || challenge.ManagerIds.Contains(userId))
+                .OrderBy(challenge => challenge.Id)
+                .Select(challenge => challenge.Id)
+                .ToArrayAsync(ct);
+            if (competitionIds.Length > 0 || challengeIds.Length > 0)
+            {
+                db.ChangeTracker.Clear();
+                return new(
+                    PatchPlatformUserState.ActiveOwnerOrManagerAssignments,
+                    Blockers: new(competitionIds, challengeIds));
+            }
+        }
+
+        if (emailVerified is not null)
+            user.EmailVerifiedAt = emailVerified.Value ? now : null;
+        var roleChanged = user.Role != originalRole;
+        var statusChanged = user.AccountStatus != originalStatus;
+        var verificationChanged = (user.EmailVerifiedAt is not null) != originallyVerified;
+        if (!roleChanged && !statusChanged && !verificationChanged)
+        {
+            await transaction.CommitAsync(ct);
+            return new(PatchPlatformUserState.Updated, Map(user));
+        }
+
+        user.TokenVersion = checked(user.TokenVersion + 1);
+        user.UpdatedAt = now;
+        if (statusChanged)
+            RecordAccountStatusChange(user, actorUserId, user.AccountStatus, now);
+        if (verificationChanged)
+            RecordEmailVerificationChange(
+                user,
+                actorUserId,
+                user.EmailVerifiedAt is not null,
+                now);
+        await db.SaveChangesAsync(ct);
+        await transaction.CommitAsync(ct);
+        return new(PatchPlatformUserState.Updated, Map(user));
     }
 
     public async Task<PlatformUserView?> InvalidateTokensAsync(

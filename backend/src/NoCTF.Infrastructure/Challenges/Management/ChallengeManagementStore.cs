@@ -31,7 +31,7 @@ public sealed class ChallengeManagementStore(
         string configurationJson,
         CancellationToken ct)
     {
-        await using var transaction = await db.Database.BeginTransactionAsync(ct);
+        await using var transaction = await AggregateCompatibleTransaction.BeginAsync(db, ct);
         if (await CompetitionStateReader.ReadAsync(db, command.CompetitionId, ct) is null)
             return new(null, ChallengeMutationFailure.CompetitionNotFound);
         var competitionMode = await db.Competitions.AsNoTracking()
@@ -123,7 +123,7 @@ public sealed class ChallengeManagementStore(
         UpdateCompetitionChallengeCommand command,
         CancellationToken ct)
     {
-        await using var transaction = await db.Database.BeginTransactionAsync(ct);
+        await using var transaction = await AggregateCompatibleTransaction.BeginAsync(db, ct);
         if (await CompetitionStateReader.ReadAsync(db, command.CompetitionId, ct) is null)
             return new(null, ChallengeMutationFailure.CompetitionNotFound);
 
@@ -222,7 +222,7 @@ public sealed class ChallengeManagementStore(
         bool restore,
         CancellationToken ct)
     {
-        await using var transaction = await db.Database.BeginTransactionAsync(ct);
+        await using var transaction = await AggregateCompatibleTransaction.BeginAsync(db, ct);
         if (await CompetitionStateReader.ReadAsync(db, competitionId, ct) is null)
             return ChallengeMutationFailure.CompetitionNotFound;
 

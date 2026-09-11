@@ -153,6 +153,7 @@ public static class ServiceRegistration
             services.AddScoped<IFixArchiveReader, SwaggerFixArchiveReader>();
             services.AddScoped<IGameplayFactStatusReader, SwaggerStatusReader>();
             services.AddScoped<IUserAuthenticationStore, SwaggerAuthenticationStore>();
+            services.AddScoped<ICurrentUserProfilePatchStore, SwaggerAuthenticationStore>();
             services.AddScoped<IAccessTokenVersionReader, SwaggerAccessTokenVersionReader>();
             services.AddSingleton<IAccessTokenIssuer, SwaggerTokenIssuer>();
             services.AddScoped<SubmitFlag>();
@@ -161,7 +162,7 @@ public static class ServiceRegistration
             services.AddScoped<RefreshAccessToken>();
             services.AddScoped<GetCurrentUser>();
             services.AddScoped<GetPublicUserProfile>();
-            services.AddScoped<UpdateCurrentUserProfile>();
+            services.AddScoped<PatchCurrentUserProfile>();
             services.AddScoped<ReplaceCurrentUserAvatar>();
             services.AddScoped<GetUserAvatar>();
             services.AddScoped<ReplaceCurrentUserWallpaper>();

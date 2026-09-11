@@ -78,9 +78,11 @@ Visible | Published | Running | Paused -> Finished
 - Owner/Manager 可提前 Start、Pause、Resume、Finish；Finished 不可恢复。
 - Paused 冻结 `EffectiveRunningTime`，因此 AWD 加固期、AWD/AWDP 轮次延后；CTF Runtime TTL 使用真实 UTC，不冻结。
 - Start Gate 返回结构化失败列表：稳定错误码、CompetitionChallengeId、TeamId、配置路径与说明。自动启动失败保持原状态并通知管理者。
-- CTF 可显式开启赛后练习模式。仅原比赛中已审核且未封禁的队伍能够为已发布的 Container/Compose
-  题目启动独立 `Practice` Runtime；练习实例沿用正式 Runtime 的容量、TTL、随机端口和回收规则，但
-  不复用正式实例。练习 Flag 只返回正误，不创建 GameplayFact、分数、血榜或排行榜变化。
+- CTF 可显式开启赛后练习模式。已审核且未封禁的原参赛队与赛后自动审核的新队均可为已发布的
+  Container/Compose 题目启动独立 `Practice` Runtime；练习实例沿用正式 Runtime 的容量、TTL、随机端口
+  和回收规则，但不复用正式实例。练习 Flag 复用正式提交接口并创建普通 GameplayFact；其时间位于
+  正式窗口外，因此不产生正式分数、血奖或排行榜变化。赛后新队由 RegisteredAt 推导，不存队伍类型标记，
+  且不能进入正式榜；只有这些赛后新队可以继续通过邀请增加成员。
 - 平台 Administrator 可在比赛非 Running/Paused 且不存在活动或待处理 Runtime 资源时执行强制级联删除。
   操作必须输入完整比赛标题、至少 8 个字符的原因并二次确认；比赛作用域的历史与资源会被永久删除，
   但平台级审计事实保留操作者、比赛标识、标题、原因和时间。

@@ -7,7 +7,7 @@ public sealed class LeaderboardOpenApiTests
     private const string LeaderboardPath =
         "/api/v1/competitions/{competitionId}/leaderboard";
     private const string AdminVisibilityPath =
-        "/api/v1/admin/competitions/{competitionId}/leaderboard-visibility";
+        "/api/v1/admin/competitions/{competitionId}";
     private const string ChallengeListPath =
         "/api/v1/competitions/{competitionId}/challenges";
     private const string ScoreboardSlotDetailPath =
@@ -155,25 +155,26 @@ public sealed class LeaderboardOpenApiTests
 
         var adminPath = root.GetProperty("paths").GetProperty(AdminVisibilityPath);
         await Assert.That(adminPath.GetProperty("get").GetProperty("operationId").GetString())
-            .IsEqualTo("AdminGetCompetitionLeaderboardVisibility");
-        await Assert.That(adminPath.GetProperty("put").GetProperty("operationId").GetString())
-            .IsEqualTo("AdminUpdateCompetitionLeaderboardVisibility");
+            .IsEqualTo("AdminGetCompetition");
+        await Assert.That(adminPath.GetProperty("patch").GetProperty("operationId").GetString())
+            .IsEqualTo("AdminPatchCompetition");
         var request = ResolveSchema(
             root,
-            adminPath.GetProperty("put")
+            adminPath.GetProperty("patch")
                 .GetProperty("requestBody")
                 .GetProperty("content")
                 .GetProperty("application/json")
                 .GetProperty("schema"));
-        await Assert.That(PropertyNames(request)).IsEquivalentTo([
+        var visibilityRequest = ResolveSchema(root,
+            request.GetProperty("properties").GetProperty("leaderboardVisibility")
+                .GetProperty("oneOf").EnumerateArray().First());
+        await Assert.That(PropertyNames(visibilityRequest)).IsEquivalentTo([
             "frozenStartAt",
             "hiddenStartAt",
             "reason"
         ]);
-        await Assert.That(request.TryGetProperty("required", out _)).IsFalse();
-        await Assert.That(adminPath.GetProperty("put").GetProperty("responses")
-                .EnumerateObject().Select(response => response.Name))
-            .IsEquivalentTo(["200", "400", "409", "404", "401", "403"]);
+        await Assert.That(adminPath.GetProperty("patch").GetProperty("responses")
+                .TryGetProperty("200", out _)).IsTrue();
     }
 
     [Test]

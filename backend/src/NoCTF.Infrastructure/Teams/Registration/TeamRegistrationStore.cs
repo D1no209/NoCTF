@@ -36,7 +36,7 @@ public sealed class TeamRegistrationStore(
     public async Task<TeamCreateStoreResult> TryCreateAsync(CreateTeamCommand command, TeamRegistrationStatus status, CancellationToken ct)
     {
         var name = command.Name.Trim();
-        await using var transaction = await db.Database.BeginTransactionAsync(
+        await using var transaction = await AggregateCompatibleTransaction.BeginAsync(db,
             System.Data.IsolationLevel.ReadCommitted,
             ct);
         var competition = await CompetitionTeamMutationCriticalSection.AcquireAsync(
@@ -89,7 +89,6 @@ public sealed class TeamRegistrationStore(
             MemberIds = [command.UserId],
             InvitationToken = CreateInvitationToken(),
             RegistrationStatus = practice ? TeamRegistrationStatus.Approved : status,
-            IsPracticeTeam = practice,
             RegisteredAt = command.RegisteredAt
         };
         db.Teams.Add(team);
@@ -161,7 +160,7 @@ public sealed class TeamRegistrationStore(
 
     public async Task<TeamReviewStoreResult> SetStatusAsync(Guid competitionId, Guid teamId, TeamRegistrationStatus status, CancellationToken ct)
     {
-        await using var transaction = await db.Database.BeginTransactionAsync(ct);
+        await using var transaction = await AggregateCompatibleTransaction.BeginAsync(db, ct);
         var competition = await db.Competitions.AsNoTracking()
             .Where(item => item.Id == competitionId && item.DeletedAt == null)
             .Select(item => new { item.Status, item.Mode, item.TrackConfigurationJson })
@@ -207,7 +206,7 @@ public sealed class TeamRegistrationStore(
         Guid userId,
         CancellationToken ct)
     {
-        await using var transaction = await db.Database.BeginTransactionAsync(ct);
+        await using var transaction = await AggregateCompatibleTransaction.BeginAsync(db, ct);
         var competition = await db.Competitions.AsNoTracking()
             .Where(item => item.Id == competitionId && item.DeletedAt == null)
             .Select(item => new
@@ -330,7 +329,7 @@ public sealed class TeamRegistrationStore(
     public async Task<TeamUpdateStoreResult> UpdateAsync(UpdateTeamCommand command, CancellationToken ct)
     {
         var name = command.Name.Trim();
-        await using var transaction = await db.Database.BeginTransactionAsync(ct);
+        await using var transaction = await AggregateCompatibleTransaction.BeginAsync(db, ct);
         var status = await CompetitionStateReader.ReadAsync(db, command.CompetitionId, ct);
         if (status is null) return new(null, TeamRegistrationFailure.CompetitionNotFound);
         if (status == CompetitionStatus.Finished) return new(null, TeamRegistrationFailure.CompetitionFinished);
@@ -360,7 +359,7 @@ public sealed class TeamRegistrationStore(
 
     public async Task<TeamRegistrationFailure?> SoftDeleteAsync(Guid competitionId, Guid teamId, Guid actorId, DateTimeOffset deletedAt, CancellationToken ct)
     {
-        await using var transaction = await db.Database.BeginTransactionAsync(ct);
+        await using var transaction = await AggregateCompatibleTransaction.BeginAsync(db, ct);
         var status = await CompetitionStateReader.ReadAsync(db, competitionId, ct);
         if (status is null) return TeamRegistrationFailure.CompetitionNotFound;
         if (status is CompetitionStatus.Running or CompetitionStatus.Paused) return TeamRegistrationFailure.CompetitionActive;
@@ -387,7 +386,7 @@ public sealed class TeamRegistrationStore(
 
     private static TeamView Map(Team x) => new(
         x.Id, x.CompetitionId, x.Name, x.AvatarFileId, x.CaptainId, x.MemberIds,
-        x.RegistrationStatus, x.IsLocked, x.IsBanned, x.RegisteredAt, x.TrackKey, x.TrackKey, x.IsPracticeTeam);
+        x.RegistrationStatus, x.IsLocked, x.IsBanned, x.RegisteredAt, x.TrackKey, x.TrackKey);
 
     private static TeamView Map(Team team, CompetitionTrackConfiguration configuration) => new(
         team.Id,
@@ -401,8 +400,7 @@ public sealed class TeamRegistrationStore(
         team.IsBanned,
         team.RegisteredAt,
         team.TrackKey,
-        configuration.Find(team.TrackKey)?.Name ?? team.TrackKey,
-        team.IsPracticeTeam);
+        configuration.Find(team.TrackKey)?.Name ?? team.TrackKey);
 
     private static string CreateInvitationToken()
     {
