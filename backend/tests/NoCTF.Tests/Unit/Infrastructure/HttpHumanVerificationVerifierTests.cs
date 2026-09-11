@@ -2,8 +2,8 @@ using System.Net;
 using System.Text;
 using System.Text.Json;
 using Microsoft.Extensions.Logging.Abstractions;
-using Microsoft.Extensions.Options;
 using NoCTF.Application.Admission;
+using NoCTF.Domain.Platform;
 using NoCTF.Infrastructure.Admission;
 
 namespace NoCTF.Tests.Unit.Infrastructure;
@@ -15,9 +15,10 @@ public sealed class HttpHumanVerificationVerifierTests
     {
         var handler = new RecordingHandler(_ => Json(HttpStatusCode.OK, """{"success":true}"""));
         using var client = new HttpClient(handler);
-        var verifier = CreateVerifier(CapOptions(), client);
+        var verifier = CreateVerifier(client);
 
         var result = await verifier.VerifyAsync(
+            Runtime(CapOptions()),
             new("cap-token", HumanVerificationAction.Login, "192.0.2.10"),
             default);
 
@@ -35,13 +36,15 @@ public sealed class HttpHumanVerificationVerifierTests
     {
         var rejectedHandler = new RecordingHandler(_ => Json(HttpStatusCode.Forbidden, """{"success":false}"""));
         using var rejectedClient = new HttpClient(rejectedHandler);
-        var rejected = await CreateVerifier(CapOptions(), rejectedClient).VerifyAsync(
+        var rejected = await CreateVerifier(rejectedClient).VerifyAsync(
+            Runtime(CapOptions()),
             new("bad", HumanVerificationAction.Login, null),
             default);
 
         var failedHandler = new RecordingHandler(_ => Json(HttpStatusCode.BadGateway, """{"success":false}"""));
         using var failedClient = new HttpClient(failedHandler);
-        var unavailable = await CreateVerifier(CapOptions(), failedClient).VerifyAsync(
+        var unavailable = await CreateVerifier(failedClient).VerifyAsync(
+            Runtime(CapOptions()),
             new("bad", HumanVerificationAction.Login, null),
             default);
 
@@ -57,9 +60,10 @@ public sealed class HttpHumanVerificationVerifierTests
             HttpStatusCode.OK,
             """{"success":true,"hostname":"ctf.example.test","action":"evaluation"}"""));
         using var client = new HttpClient(handler);
-        var verifier = CreateVerifier(TurnstileOptions(), client);
+        var verifier = CreateVerifier(client);
 
         var verified = await verifier.VerifyAsync(
+            Runtime(TurnstileOptions()),
             new("turnstile-token", HumanVerificationAction.Evaluation, "198.51.100.3"),
             default);
 
@@ -75,6 +79,7 @@ public sealed class HttpHumanVerificationVerifierTests
             HttpStatusCode.OK,
             """{"success":true,"hostname":"other.example.test","action":"evaluation"}""");
         var wrongHost = await verifier.VerifyAsync(
+            Runtime(TurnstileOptions()),
             new("new-token", HumanVerificationAction.Evaluation, null),
             default);
         await Assert.That(wrongHost).IsEqualTo(HumanVerificationResult.Rejected);
@@ -83,6 +88,7 @@ public sealed class HttpHumanVerificationVerifierTests
             HttpStatusCode.OK,
             """{"success":true,"hostname":"ctf.example.test","action":"runtime"}""");
         var wrongAction = await verifier.VerifyAsync(
+            Runtime(TurnstileOptions()),
             new("another-token", HumanVerificationAction.Evaluation, null),
             default);
         await Assert.That(wrongAction).IsEqualTo(HumanVerificationResult.Rejected);
@@ -93,12 +99,14 @@ public sealed class HttpHumanVerificationVerifierTests
     {
         var handler = new RecordingHandler(_ => Json(HttpStatusCode.OK, "not-json"));
         using var client = new HttpClient(handler);
-        var invalid = await CreateVerifier(TurnstileOptions(), client).VerifyAsync(
+        var invalid = await CreateVerifier(client).VerifyAsync(
+            Runtime(TurnstileOptions()),
             new("token", HumanVerificationAction.Runtime, null),
             default);
 
         var noneOptions = new HumanVerificationOptions();
-        var none = await CreateVerifier(noneOptions, client).VerifyAsync(
+        var none = await CreateVerifier(client).VerifyAsync(
+            Runtime(noneOptions),
             new("", HumanVerificationAction.Runtime, null),
             default);
 
@@ -108,11 +116,12 @@ public sealed class HttpHumanVerificationVerifierTests
     }
 
     private static HttpHumanVerificationVerifier CreateVerifier(
-        HumanVerificationOptions options,
         HttpClient client) => new(
         new ClientFactory(client),
-        Options.Create(options),
         NullLogger<HttpHumanVerificationVerifier>.Instance);
+
+    private static HumanVerificationRuntimeConfiguration Runtime(
+        HumanVerificationOptions options) => new(true, options);
 
     private static HumanVerificationOptions CapOptions() => new()
     {

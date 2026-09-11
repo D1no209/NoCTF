@@ -80,14 +80,16 @@ dotnet ef database update
 
 ## 人机验证
 
-`HumanVerification:Provider` 支持 `None`、`Cap`、`Turnstile`，默认 `None`。Cap 使用独立的官方
-Standalone 服务和站点密钥；Turnstile 仅在后端调用固定 Siteverify 地址。Provider token 通过
+人机验证 Provider 由平台管理员在“邮件与人机验证”中选择，支持 `None`、`Cap`、`Turnstile`。
+Cap 使用独立的官方 Standalone 服务和站点密钥；Turnstile 仅在后端调用固定 Siteverify 地址。Provider token 通过
 `X-NoCTF-Human-Verification` 交给登录、注册和玩家 Runtime／评测端点，不写日志或持久化，且每次
 请求后立即丢弃。管理员操作与内部 Checker 回调不要求验证码。
 
-部署配置只选择 Provider 并保存其密钥；平台管理员在“邮件与人机验证”中独立启用或停用验证。
-只有部署已配置非 `None` Provider 且管理员开关已启用时，公开配置才会暴露 Provider，验证中间件
-才会要求 token。迁移会保留已有已配置 Provider 的启用行为；`Provider=None` 始终视为不可用。
+平台设置保存 Provider、公开参数和加密后的 Provider secret；管理 API 只返回 secret 是否已配置。
+`HumanVerification:*` 部署配置仅作为数据库尚未保存 Provider 时的首次启动回退，管理员首次保存后由
+数据库配置作为事实源。`EmailVerification:EncryptionKey` 同时保护 SMTP 密码和人机验证 secret，
+不同用途使用独立的认证附加数据。启用且配置就绪时，公开配置才会暴露 Provider，验证中间件才会要求
+token；`Provider=None` 始终停用验证。
 
 本地测试 Turnstile 时使用 Cloudflare 官方测试 site key/secret，并将 `localhost` 放入开发环境的
 `AllowedHostnames`；生产配置会拒绝 loopback hostname。Cap 本地实例可以使用 HTTP，生产启动校验只

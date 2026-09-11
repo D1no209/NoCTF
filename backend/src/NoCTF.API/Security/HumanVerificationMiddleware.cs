@@ -1,9 +1,8 @@
-using Microsoft.Extensions.Options;
 using NoCTF.API.Serialization;
-using NoCTF.Application.Administration.PlatformConfiguration;
 using NoCTF.Application.Admission;
 using NoCTF.Application.Authentication.Privacy;
 using NoCTF.Application.Observability;
+using NoCTF.Domain.Platform;
 using System.Text.Json.Serialization;
 
 namespace NoCTF.API.Security;
@@ -30,20 +29,19 @@ public sealed class HumanVerificationMiddleware(RequestDelegate next)
         HttpContext context,
         IHumanVerificationVerifier verifier,
         IRequestSourceAddress sourceAddress,
-        ManagePlatformConfiguration platformConfiguration,
-        IOptions<HumanVerificationOptions> configuredOptions)
+        IHumanVerificationConfigurationReader configurationReader)
     {
         var metadata = context.GetEndpoint()?.Metadata.GetMetadata<HumanVerificationMetadata>();
-        var provider = configuredOptions.Value.Provider;
         if (metadata is null)
         {
             await next(context);
             return;
         }
 
-        var configuration = await platformConfiguration.GetAsync(context.RequestAborted);
-        if (!configuration.HumanVerificationEnabled
-            || provider == HumanVerificationProvider.None)
+        var configuration = await configurationReader.GetRuntimeConfigurationAsync(
+            context.RequestAborted);
+        var provider = configuration.Options.Provider;
+        if (!configuration.Enabled || provider == HumanVerificationProvider.None)
         {
             await next(context);
             return;
@@ -80,6 +78,7 @@ public sealed class HumanVerificationMiddleware(RequestDelegate next)
         }
 
         var result = await verifier.VerifyAsync(
+            configuration,
             new HumanVerificationAttempt(tokens[0]!, metadata.Action, sourceAddress.Address),
             context.RequestAborted);
         NoCtfTelemetry.RecordHumanVerification(

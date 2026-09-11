@@ -429,6 +429,7 @@ POST /api/v1/admin/platform/bots
 POST /api/v1/admin/platform/bots/{userId}/tokens
 POST /api/v1/admin/platform/users/{userId}/tokens/invalidate
 PUT  /api/v1/admin/platform/email-verification/password
+PUT  /api/v1/admin/platform/human-verification/secret
 POST /api/v1/admin/platform/email-verification/test
 ```
 

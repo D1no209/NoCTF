@@ -6,7 +6,6 @@ using NoCTF.Application.Administration.PlatformConfiguration;
 using NoCTF.Application.Admission;
 using NoCTF.Application.Authentication.EmailVerification;
 using NoCTF.Application.Runtime.PublicAccess;
-using Microsoft.Extensions.Options;
 
 namespace NoCTF.API.Endpoints.Administration.Platform;
 
@@ -32,17 +31,30 @@ internal static class PlatformConfigurationMapping
 public sealed record AdminHumanVerificationConfigurationResponse(
     bool Enabled,
     HumanVerificationProviderProtocol Provider,
-    bool Available);
+    bool Ready,
+    string CapServerUrl,
+    string CapSiteKey,
+    bool CapSecretConfigured,
+    string TurnstileSiteKey,
+    bool TurnstileSecretConfigured,
+    IReadOnlyList<string> TurnstileAllowedHostnames,
+    DateTimeOffset UpdatedAt);
 
 internal static class AdminHumanVerificationConfigurationMapping
 {
     public static AdminHumanVerificationConfigurationResponse ToResponse(
-        PlatformConfigurationView configuration,
-        HumanVerificationOptions options) =>
+        HumanVerificationConfigurationView configuration) =>
         new(
-            configuration.HumanVerificationEnabled,
-            PublicPlatformConfigurationMapping.ToProtocol(options.Provider),
-            options.Provider != HumanVerificationProvider.None);
+            configuration.Enabled,
+            PublicPlatformConfigurationMapping.ToProtocol(configuration.Provider),
+            configuration.Ready,
+            configuration.CapServerUrl,
+            configuration.CapSiteKey,
+            configuration.CapSecretConfigured,
+            configuration.TurnstileSiteKey,
+            configuration.TurnstileSecretConfigured,
+            configuration.TurnstileAllowedHostnames,
+            configuration.UpdatedAt);
 }
 
 public sealed record AdminPlatformConfigurationResponse(
@@ -54,10 +66,10 @@ public sealed record AdminPlatformConfigurationResponse(
 
 public sealed class GetPlatformConfigurationEndpoint(
     ManagePlatformConfiguration configuration,
+    ManageHumanVerificationConfiguration humanVerification,
     ManageEmailVerificationConfiguration emailVerification,
     ManagePublicGateway publicGateway,
-    LinkGenerator links,
-    IOptions<HumanVerificationOptions> humanVerification)
+    LinkGenerator links)
     : EndpointWithoutRequest<Ok<AdminPlatformConfigurationResponse>>
 {
     public override void Configure()
@@ -69,7 +81,7 @@ public sealed class GetPlatformConfigurationEndpoint(
         Summary(summary =>
         {
             summary.Summary = "Returns editable platform configuration sections.";
-            summary.Description = "Returns branding, human verification, email delivery and public gateway configuration without deployment secrets.";
+            summary.Description = "Returns branding, human verification, email delivery and public gateway configuration without provider or delivery secrets.";
         });
     }
 
@@ -77,12 +89,12 @@ public sealed class GetPlatformConfigurationEndpoint(
         CancellationToken ct)
     {
         var current = await configuration.GetAsync(ct);
+        var verification = await humanVerification.GetAsync(ct);
         var email = await emailVerification.GetAsync(ct);
         var gateway = await publicGateway.GetAsync(ct);
         return TypedResults.Ok(new AdminPlatformConfigurationResponse(
             PlatformConfigurationMapping.ToResponse(current, links, HttpContext),
-            AdminHumanVerificationConfigurationMapping.ToResponse(
-                current, humanVerification.Value),
+            AdminHumanVerificationConfigurationMapping.ToResponse(verification),
             EmailVerificationConfigurationMapping.ToResponse(email),
             PublicGatewayConfigurationMapping.ToResponse(gateway),
             "/api/v1/admin/platform/public-gateway/status"));

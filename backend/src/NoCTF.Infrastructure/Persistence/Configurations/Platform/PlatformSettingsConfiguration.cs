@@ -19,6 +19,13 @@ internal sealed class PlatformSettingsConfiguration
             Description = null,
             LogoFileId = null,
             HumanVerificationEnabled = true,
+            HumanVerificationProvider = null,
+            HumanVerificationCapServerUrl = string.Empty,
+            HumanVerificationCapSiteKey = string.Empty,
+            HumanVerificationCapSecretCiphertext = null,
+            HumanVerificationTurnstileSiteKey = string.Empty,
+            HumanVerificationTurnstileSecretCiphertext = null,
+            HumanVerificationTurnstileAllowedHostnames = [],
             EmailVerificationEnabled = false,
             EmailPublicBaseUrl = "http://localhost:5000",
             EmailVerificationTokenLifetimeMinutes = 1440,
@@ -36,6 +43,8 @@ internal sealed class PlatformSettingsConfiguration
             EmailSmtpTimeoutSeconds = 30,
             UpdatedAt = DateTimeOffset.UnixEpoch
         });
+        builder.Property(settings => settings.HumanVerificationProvider)
+            .HasConversion<short>();
         builder.Property(settings => settings.EmailSmtpSecurityMode).HasConversion<short>();
         builder.HasOne(settings => settings.LogoFile).WithMany()
             .HasForeignKey(settings => settings.LogoFileId).OnDelete(DeleteBehavior.Restrict);

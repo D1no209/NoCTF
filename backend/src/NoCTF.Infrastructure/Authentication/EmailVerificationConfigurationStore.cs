@@ -8,7 +8,7 @@ namespace NoCTF.Infrastructure.Authentication;
 
 public sealed class EmailVerificationConfigurationStore(
     NoCtfDbContext db,
-    EmailVerificationSecretProtector secrets)
+    PlatformSecretProtector secrets)
     : IEmailVerificationConfigurationStore,
         IEmailVerificationDeliveryConfigurationReader
 {
@@ -55,7 +55,9 @@ public sealed class EmailVerificationConfigurationStore(
         DateTimeOffset now,
         CancellationToken ct)
     {
-        var ciphertext = secrets.Protect(password);
+        var ciphertext = secrets.Protect(
+            password,
+            PlatformSecretPurpose.EmailSmtpPassword);
         await db.PlatformSettings
             .Where(settings => settings.Id == SettingsId)
             .ExecuteUpdateAsync(setters => setters
@@ -88,7 +90,9 @@ public sealed class EmailVerificationConfigurationStore(
             ResolveSecurityMode(settings),
             settings.EmailSmtpUserName,
             usesAuthentication
-                ? secrets.Unprotect(settings.EmailSmtpPasswordCiphertext!)
+                ? secrets.Unprotect(
+                    settings.EmailSmtpPasswordCiphertext!,
+                    PlatformSecretPurpose.EmailSmtpPassword)
                 : null,
             settings.EmailSmtpFromAddress,
             settings.EmailSmtpFromName,

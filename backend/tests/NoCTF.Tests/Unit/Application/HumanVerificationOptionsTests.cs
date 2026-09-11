@@ -1,4 +1,5 @@
 using NoCTF.Application.Admission;
+using NoCTF.Domain.Platform;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;

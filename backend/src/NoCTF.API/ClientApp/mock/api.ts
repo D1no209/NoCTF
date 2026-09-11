@@ -105,6 +105,31 @@ export function createMockApi() {
   const changes = new Set<(competitionId: string) => void>()
   const json = (value: any, status = 200, headers: HeadersInit = {}) => Response.json(value, { status, headers: { 'X-NoCTF-Mock': 'true', 'Cache-Control': 'no-store', ...headers } })
   const problem = (status: number, detail: string) => json({ status, title: 'Mock API', detail }, status)
+  const defaultHumanVerification = () => ({
+    enabled: false, provider: 'None', ready: false,
+    capServerUrl: '', capSiteKey: '', capSecretConfigured: false,
+    turnstileSiteKey: '', turnstileSecretConfigured: false,
+    turnstileAllowedHostnames: [], updatedAt: now(),
+  })
+  const currentHumanVerification = () =>
+    state.settings.get('platform/human-verification') ?? defaultHumanVerification()
+  function humanVerificationReady(configuration: Data) {
+    return configuration.provider === 'Cap'
+      ? Boolean(configuration.capServerUrl && configuration.capSiteKey && configuration.capSecretConfigured)
+      : configuration.provider === 'Turnstile'
+        ? Boolean(configuration.turnstileSiteKey && configuration.turnstileSecretConfigured
+          && configuration.turnstileAllowedHostnames?.length)
+        : false
+  }
+  function syncPublicHumanVerification(configuration: Data) {
+    const ready = humanVerificationReady(configuration)
+    configuration.ready = ready
+    state.platform.humanVerification = !configuration.enabled || !ready
+      ? { provider: 'None', siteKey: null, apiEndpoint: null }
+      : configuration.provider === 'Cap'
+        ? { provider: 'Cap', siteKey: configuration.capSiteKey, apiEndpoint: `${configuration.capServerUrl.replace(/\/$/, '')}/${encodeURIComponent(configuration.capSiteKey)}/` }
+        : { provider: 'Turnstile', siteKey: configuration.turnstileSiteKey, apiEndpoint: null }
+  }
   const userFor = (request: Request) => {
     const bearer = request.headers.get('Authorization')?.replace(/^Bearer /, '')
     return state.users.find(user => user.userId === tokens.get(bearer ?? ''))
@@ -218,9 +243,7 @@ export function createMockApi() {
       if (route === '/platform/configuration') value = state.platform
       else if (route === '/admin/platform/configuration') value = {
         branding: state.platform,
-        humanVerification: state.settings.get('platform/human-verification') ?? {
-          enabled: false, provider: 'Cap', available: true,
-        },
+        humanVerification: currentHumanVerification(),
         emailVerification: state.settings.get('platform/email') ?? {
           enabled: false, publicBaseUrl: 'http://localhost:3000', tokenLifetimeMinutes: 30,
           resendCooldownSeconds: 60, passwordResetTokenLifetimeMinutes: 30,
@@ -348,12 +371,12 @@ export function createMockApi() {
       else if (route === '/admin/platform/configuration' && request.method === 'PATCH') {
         if (body.branding) Object.assign(state.platform, body.branding, { updatedAt: now() })
         if (body.humanVerification) {
-          state.settings.set('platform/human-verification', {
-            ...body.humanVerification, provider: 'Cap', available: true,
-          })
-          state.platform.humanVerification = body.humanVerification.enabled
-            ? { provider: 'Cap', siteKey: 'mock-site-key', apiEndpoint: 'https://captcha.mock.invalid/mock-site-key/' }
-            : { provider: 'None', siteKey: null, apiEndpoint: null }
+          const current = currentHumanVerification()
+          const updated = { ...current, ...body.humanVerification, updatedAt: now() }
+          if (updated.enabled && !humanVerificationReady(updated))
+            return problem(400, '请先完成所选 Provider 的配置 / Complete the selected provider configuration')
+          syncPublicHumanVerification(updated)
+          state.settings.set('platform/human-verification', updated)
         }
         if (body.emailVerification) state.settings.set('platform/email', body.emailVerification)
         if (body.publicGateway) state.settings.set('platform/gateway', {
@@ -362,13 +385,21 @@ export function createMockApi() {
         })
         value = {
           branding: state.platform,
-          humanVerification: state.settings.get('platform/human-verification') ?? {
-            enabled: false, provider: 'Cap', available: true,
-          },
+          humanVerification: currentHumanVerification(),
           emailVerification: state.settings.get('platform/email'),
           publicGateway: state.settings.get('platform/gateway'),
           publicGatewayStatusUrl: '/api/v1/admin/platform/public-gateway/status',
         }
+      }
+      else if (route === '/admin/platform/human-verification/secret' && request.method === 'PUT') {
+        if (!['Cap', 'Turnstile'].includes(body.provider) || !body.secret)
+          return problem(400, 'Provider 与密钥必填 / Provider and secret are required')
+        const updated = { ...currentHumanVerification(), updatedAt: now() }
+        if (body.provider === 'Cap') updated.capSecretConfigured = true
+        else updated.turnstileSecretConfigured = true
+        syncPublicHumanVerification(updated)
+        state.settings.set('platform/human-verification', updated)
+        value = updated
       }
       else if (route === '/admin/competitions' && request.method === 'POST') {
         value = { ...state.competitions[0], ...body, id: body.id ?? crypto.randomUUID(), ownerId: user!.userId, status: 'Draft' }; state.competitions.push(value)

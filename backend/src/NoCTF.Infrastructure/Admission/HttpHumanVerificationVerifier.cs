@@ -2,8 +2,8 @@ using System.Net.Http.Json;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
 using NoCTF.Application.Admission;
+using NoCTF.Domain.Platform;
 using Polly.CircuitBreaker;
 using Polly.Timeout;
 
@@ -11,7 +11,6 @@ namespace NoCTF.Infrastructure.Admission;
 
 public sealed class HttpHumanVerificationVerifier(
     IHttpClientFactory clients,
-    IOptions<HumanVerificationOptions> configuredOptions,
     ILogger<HttpHumanVerificationVerifier> logger)
     : IHumanVerificationVerifier
 {
@@ -20,11 +19,13 @@ public sealed class HttpHumanVerificationVerifier(
         "https://challenges.cloudflare.com/turnstile/v0/siteverify");
 
     public async ValueTask<HumanVerificationResult> VerifyAsync(
+        HumanVerificationRuntimeConfiguration configuration,
         HumanVerificationAttempt attempt,
         CancellationToken cancellationToken)
     {
-        var options = configuredOptions.Value;
-        if (options.Provider == HumanVerificationProvider.None)
+        var options = configuration.Options;
+        if (!configuration.Enabled
+            || options.Provider == HumanVerificationProvider.None)
             return HumanVerificationResult.Verified;
 
         try

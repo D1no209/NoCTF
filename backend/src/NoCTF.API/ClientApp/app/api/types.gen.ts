@@ -1438,7 +1438,14 @@ export type NoCtfapiEndpointsAdministrationPlatformPlatformBrandingResponse = {
 export type NoCtfapiEndpointsAdministrationPlatformAdminHumanVerificationConfigurationResponse = {
     enabled?: boolean;
     provider?: NoCtfapiEndpointsPlatformHumanVerificationProviderProtocol;
-    available?: boolean;
+    ready?: boolean;
+    capServerUrl?: string;
+    capSiteKey?: string;
+    capSecretConfigured?: boolean;
+    turnstileSiteKey?: string;
+    turnstileSecretConfigured?: boolean;
+    turnstileAllowedHostnames?: Array<string>;
+    updatedAt?: string;
 };
 
 export type NoCtfapiEndpointsAdministrationPlatformEmailVerificationConfigurationResponse = {
@@ -1693,6 +1700,11 @@ export type NoCtfapiEndpointsAdministrationPlatformPlatformBrandingPatchRequest 
 
 export type NoCtfapiEndpointsAdministrationPlatformPlatformHumanVerificationPatchRequest = {
     enabled: boolean;
+    provider: NoCtfapiEndpointsPlatformHumanVerificationProviderProtocol;
+    capServerUrl: string;
+    capSiteKey: string;
+    turnstileSiteKey: string;
+    turnstileAllowedHostnames: Array<string>;
 };
 
 export type NoCtfapiEndpointsAdministrationPlatformPlatformEmailVerificationPatchRequest = {
@@ -1732,6 +1744,11 @@ export type NoCtfapiEndpointsAdministrationPlatformPlatformManagedUserAccountSta
 
 export type NoCtfapiEndpointsAdministrationPlatformReplaceEmailVerificationPasswordRequest = {
     password: string;
+};
+
+export type NoCtfapiEndpointsAdministrationPlatformReplaceHumanVerificationSecretRequest = {
+    provider: NoCtfapiEndpointsPlatformHumanVerificationProviderProtocol;
+    secret: string;
 };
 
 export type NoCtfapiEndpointsAdministrationPlatformUploadPlatformLogoRequest = {
@@ -6194,6 +6211,39 @@ export type AdminPlatformReplaceEmailVerificationPasswordResponses = {
 };
 
 export type AdminPlatformReplaceEmailVerificationPasswordResponse = AdminPlatformReplaceEmailVerificationPasswordResponses[keyof AdminPlatformReplaceEmailVerificationPasswordResponses];
+
+export type AdminPlatformReplaceHumanVerificationSecretData = {
+    body: NoCtfapiEndpointsAdministrationPlatformReplaceHumanVerificationSecretRequest;
+    path?: never;
+    query?: never;
+    url: '/api/v1/admin/platform/human-verification/secret';
+};
+
+export type AdminPlatformReplaceHumanVerificationSecretErrors = {
+    /**
+     * Bad Request
+     */
+    400: MicrosoftAspNetCoreMvcValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+};
+
+export type AdminPlatformReplaceHumanVerificationSecretError = AdminPlatformReplaceHumanVerificationSecretErrors[keyof AdminPlatformReplaceHumanVerificationSecretErrors];
+
+export type AdminPlatformReplaceHumanVerificationSecretResponses = {
+    /**
+     * Success
+     */
+    200: NoCtfapiEndpointsAdministrationPlatformAdminHumanVerificationConfigurationResponse;
+};
+
+export type AdminPlatformReplaceHumanVerificationSecretResponse = AdminPlatformReplaceHumanVerificationSecretResponses[keyof AdminPlatformReplaceHumanVerificationSecretResponses];
 
 export type AdminPlatformSendEmailVerificationTestData = {
     body?: never;
