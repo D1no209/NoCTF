@@ -75,6 +75,22 @@ public sealed class UserAccountAdministrationStore(
 
         if (mode == UserDeletionMode.HardDelete)
         {
+            await RemoveResourcePermissionsAsync(userId, ct);
+            await RemoveTeamMembershipsAsync(userId, ct);
+            await db.Notifications
+                .Where(notification =>
+                    (notification.Kind == NotificationKind.AuthenticationSecurityActivity
+                        || notification.TargetType
+                            == NotificationTargetType.PlatformAdministrators
+                        && notification.RelatedType == EntityReferenceKind.User
+                        && notification.RelatedId == userId)
+                    && (notification.SourceType == NotificationSourceType.User
+                        && notification.SourceId == userId
+                    || notification.TargetType == NotificationTargetType.User
+                        && notification.TargetId == userId
+                    || notification.RelatedType == EntityReferenceKind.User
+                        && notification.RelatedId == userId))
+                .ExecuteDeleteAsync(ct);
             RecordLifecycleFact(
                 user,
                 actorUserId,
@@ -214,12 +230,16 @@ public sealed class UserAccountAdministrationStore(
         await AddReferenceAsync(
             UserDeletionReferenceKind.Notification,
             db.Notifications.CountAsync(notification =>
-                notification.SourceType == NotificationSourceType.User
+                notification.Kind != NotificationKind.AuthenticationSecurityActivity
+                && !(notification.TargetType == NotificationTargetType.PlatformAdministrators
+                    && notification.RelatedType == EntityReferenceKind.User
+                    && notification.RelatedId == user.Id)
+                && (notification.SourceType == NotificationSourceType.User
                     && notification.SourceId == user.Id
                 || (notification.TargetType == NotificationTargetType.User
                     && notification.TargetId == user.Id)
                 || (notification.RelatedType == EntityReferenceKind.User
-                    && notification.RelatedId == user.Id), ct));
+                    && notification.RelatedId == user.Id)), ct));
         await AddReferenceAsync(
             UserDeletionReferenceKind.CompetitionEvent,
             db.CompetitionEvents.CountAsync(entry =>
@@ -230,12 +250,21 @@ public sealed class UserAccountAdministrationStore(
         var selfDeletionForbidden = user.Id == actorUserId;
         var lastAdministratorProtected = ActiveHumanAdministratorMutationGuard.Contains(user)
             && await ActiveHumanAdministratorMutationGuard.CountAsync(db, ct) <= 1;
-        var hasReferences = references.Count > 0;
+        var hasBlockingReferences = references.Any(reference =>
+            reference.Kind is UserDeletionReferenceKind.CompetitionOwner
+                or UserDeletionReferenceKind.ChallengeOwner
+                or UserDeletionReferenceKind.TeamCaptain
+                or UserDeletionReferenceKind.GameplayFact
+                or UserDeletionReferenceKind.PatchUpload
+                or UserDeletionReferenceKind.Notification
+                or UserDeletionReferenceKind.CompetitionEvent);
         return new(
             user.Id,
             user.UserName,
             user.AccountStatus,
-            CanHardDelete: !selfDeletionForbidden && !lastAdministratorProtected && !hasReferences,
+            CanHardDelete: !selfDeletionForbidden
+                && !lastAdministratorProtected
+                && !hasBlockingReferences,
             CanAnonymize: !selfDeletionForbidden
                 && !lastAdministratorProtected
                 && user.AccountStatus != UserAccountStatus.Anonymized,
@@ -272,6 +301,15 @@ public sealed class UserAccountAdministrationStore(
             .ToListAsync(ct);
         foreach (var challenge in challenges)
             challenge.ManagerIds = challenge.ManagerIds.Where(id => id != userId).ToArray();
+    }
+
+    private async Task RemoveTeamMembershipsAsync(Guid userId, CancellationToken ct)
+    {
+        var teams = await db.Teams.IgnoreQueryFilters()
+            .Where(team => team.CaptainId != userId && team.MemberIds.Contains(userId))
+            .ToListAsync(ct);
+        foreach (var team in teams)
+            team.MemberIds = team.MemberIds.Where(id => id != userId).ToArray();
     }
 
     private async Task AnonymizeLeaderboardProjectionsAsync(
