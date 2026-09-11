@@ -64,7 +64,7 @@ public sealed class CreateTeamRequest
     private string name = string.Empty;
 
     public Guid CompetitionId { get; set; }
-    public required string TrackKey { get; set; }
+    public string? TrackKey { get; set; }
     public string? TrackInvitationCode { get; set; }
     public string Name
     {

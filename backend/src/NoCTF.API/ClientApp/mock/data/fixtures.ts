@@ -14,6 +14,7 @@ export function createFixtures() {
     description: 'Local Mock account / 本地演示账号', wallpaperRevision: null, wallpaperEnabled: false,
   }))
   const competitions = ['Ctf', 'Awd', 'Awdp', 'Koh'].map((mode, index) => model('CompetitionsCompetitionResponse', {
+    tracksEnabled: true,
     id: id(2, index + 1), title: ['NoCTF 春季挑战赛 · MOCK', '攻防训练场 · MOCK', 'AWDP 修复演练 · MOCK', 'KoH 占领演练 · MOCK'][index],
     posterUrl: `/api/v1/competitions/${id(2, index + 1)}/poster?revision=${id(12, index + 1).replaceAll('-', '')}`,
     description: '## 本地演示环境 / Local demo\n\n所有数据均为虚构，操作只影响内存。\n\n- 演示 Flag：`flag{mock_success}`\n- 支持浏览题目、队伍、排行榜与管理页面\n- 重启 Mock 服务即可重置数据',

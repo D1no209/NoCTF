@@ -30,6 +30,7 @@ public sealed class TeamRegistrationStore(
                 x.AllowTeamRegistrationWhileRunning,
                 x.Mode,
                 x.TrackConfigurationJson,
+                x.TracksEnabled,
                 x.PracticeModeEnabled))
             .SingleOrDefaultAsync(ct);
 
@@ -52,25 +53,29 @@ public sealed class TeamRegistrationStore(
         var tracks = CompetitionTrackConfiguration.ParseOrDefault(
             competition.Mode,
             competition.TrackConfigurationJson);
-        var requestedTrackKey = CompetitionTrackConfiguration.NormalizeKey(command.TrackKey);
-        if (requestedTrackKey is null)
-            return new(null, TeamRegistrationFailure.TrackNotFound);
-        var track = tracks.Find(requestedTrackKey);
-        if (track is null)
-            return new(null, TeamRegistrationFailure.TrackNotFound);
-        if (track.IsInternal || !track.IsPublicSelectable)
-            return new(null, TeamRegistrationFailure.TrackNotPublicSelectable);
-        if (track.RequiresInvitationCode
-            && string.IsNullOrWhiteSpace(command.TrackInvitationCode))
+        var track = tracks.DefaultTrack;
+        if (competition.TracksEnabled)
         {
-            return new(null, TeamRegistrationFailure.TrackInvitationRequired);
-        }
-        if (track.RequiresInvitationCode
-            && !CompetitionTrackInvitationCode.Verify(
-                track.InvitationCode,
-                command.TrackInvitationCode))
-        {
-            return new(null, TeamRegistrationFailure.TrackInvitationInvalid);
+            var requestedTrackKey = CompetitionTrackConfiguration.NormalizeKey(command.TrackKey);
+            if (requestedTrackKey is null)
+                return new(null, TeamRegistrationFailure.TrackNotFound);
+            track = tracks.Find(requestedTrackKey);
+            if (track is null)
+                return new(null, TeamRegistrationFailure.TrackNotFound);
+            if (track.IsInternal || !track.IsPublicSelectable)
+                return new(null, TeamRegistrationFailure.TrackNotPublicSelectable);
+            if (track.RequiresInvitationCode
+                && string.IsNullOrWhiteSpace(command.TrackInvitationCode))
+            {
+                return new(null, TeamRegistrationFailure.TrackInvitationRequired);
+            }
+            if (track.RequiresInvitationCode
+                && !CompetitionTrackInvitationCode.Verify(
+                    track.InvitationCode,
+                    command.TrackInvitationCode))
+            {
+                return new(null, TeamRegistrationFailure.TrackInvitationInvalid);
+            }
         }
         if (!await db.Users.AsNoTracking().AnyAsync(user => user.Id == command.UserId, ct))
             return new(null, TeamRegistrationFailure.TeamNameOrMembershipConflict);
@@ -139,12 +144,18 @@ public sealed class TeamRegistrationStore(
     {
         var competition = await db.Competitions.AsNoTracking()
             .Where(item => item.Id == competitionId && item.DeletedAt == null)
-            .Select(item => new { item.Mode, item.TrackConfigurationJson })
+            .Select(item => new
+            {
+                item.Mode,
+                item.TracksEnabled,
+                item.TrackConfigurationJson
+            })
             .SingleOrDefaultAsync(ct);
         if (competition is null)
             return [];
-        var configuration = CompetitionTrackConfiguration.ParseOrDefault(
+        var configuration = CompetitionTrackConfiguration.EffectiveFor(
             competition.Mode,
+            competition.TracksEnabled,
             competition.TrackConfigurationJson);
         var internalKeys = configuration.Tracks.Where(track => track.IsInternal)
             .Select(track => track.Key)
@@ -163,7 +174,13 @@ public sealed class TeamRegistrationStore(
         await using var transaction = await AggregateCompatibleTransaction.BeginAsync(db, ct);
         var competition = await db.Competitions.AsNoTracking()
             .Where(item => item.Id == competitionId && item.DeletedAt == null)
-            .Select(item => new { item.Status, item.Mode, item.TrackConfigurationJson })
+            .Select(item => new
+            {
+                item.Status,
+                item.Mode,
+                item.TracksEnabled,
+                item.TrackConfigurationJson
+            })
             .SingleOrDefaultAsync(ct);
         if (competition is null) return new(false, TeamRegistrationFailure.CompetitionNotFound);
         if (competition.Status == CompetitionStatus.Finished) return new(false, TeamRegistrationFailure.CompetitionFinished);
@@ -172,8 +189,9 @@ public sealed class TeamRegistrationStore(
             .Select(item => new { item.TrackKey })
             .SingleOrDefaultAsync(ct);
         if (team is null) return new(false, TeamRegistrationFailure.TeamNotFound);
-        var track = CompetitionTrackConfiguration.ParseOrDefault(
+        var track = CompetitionTrackConfiguration.EffectiveFor(
             competition.Mode,
+            competition.TracksEnabled,
             competition.TrackConfigurationJson).Find(team.TrackKey);
         var changed = await db.Teams.Where(x => x.Id == teamId && x.CompetitionId == competitionId
                 && x.RegistrationStatus == TeamRegistrationStatus.Pending)
@@ -276,12 +294,18 @@ public sealed class TeamRegistrationStore(
     {
         var competition = await db.Competitions.AsNoTracking()
             .Where(item => item.Id == competitionId && item.DeletedAt == null)
-            .Select(item => new { item.Mode, item.TrackConfigurationJson })
+            .Select(item => new
+            {
+                item.Mode,
+                item.TracksEnabled,
+                item.TrackConfigurationJson
+            })
             .SingleOrDefaultAsync(ct);
         if (competition is null)
             return null;
-        var configuration = CompetitionTrackConfiguration.ParseOrDefault(
+        var configuration = CompetitionTrackConfiguration.EffectiveFor(
             competition.Mode,
+            competition.TracksEnabled,
             competition.TrackConfigurationJson);
         var team = await db.Teams.AsNoTracking().SingleOrDefaultAsync(item =>
             item.Id == teamId
@@ -301,7 +325,12 @@ public sealed class TeamRegistrationStore(
     {
         var competition = await db.Competitions.AsNoTracking()
             .Where(item => item.Id == competitionId && item.DeletedAt == null)
-            .Select(item => new { item.Mode, item.TrackConfigurationJson })
+            .Select(item => new
+            {
+                item.Mode,
+                item.TracksEnabled,
+                item.TrackConfigurationJson
+            })
             .SingleOrDefaultAsync(ct);
         if (competition is null)
             return null;
@@ -312,8 +341,9 @@ public sealed class TeamRegistrationStore(
             .SingleOrDefaultAsync(ct);
         return team is null
             ? null
-            : Map(team, CompetitionTrackConfiguration.ParseOrDefault(
+            : Map(team, CompetitionTrackConfiguration.EffectiveFor(
                 competition.Mode,
+                competition.TracksEnabled,
                 competition.TrackConfigurationJson));
     }
 

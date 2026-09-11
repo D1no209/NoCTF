@@ -1106,6 +1106,27 @@ public sealed class LeaderboardProjectionPersistenceTests
             var fixtures = Enum.GetValues<GameMode>()
                 .Select((mode, index) => CreateFixture(mode, index, owner.Id, projectedAt))
                 .ToArray();
+            foreach (var fixture in fixtures)
+            {
+                fixture.Competition.TracksEnabled = false;
+                fixture.Competition.TrackConfigurationJson = CompetitionTrackConfiguration.Serialize(new(
+                    CompetitionTrackConfiguration.CurrentSchemaVersion,
+                    [
+                        CompetitionTrackConfiguration.DefaultFor(fixture.Competition.Mode).DefaultTrack,
+                        new CompetitionTrackDefinition(
+                            "internal",
+                            "Internal",
+                            IsDefault: false,
+                            IsPublicSelectable: false,
+                            IsInternal: true,
+                            EarnsScore: false,
+                            EarnsBlood: false,
+                            AffectsDynamicChallengeScore: false,
+                            VisibleOnLeaderboard: false,
+                            AffectsCompetitiveResults: false)
+                    ]));
+                fixture.Team.TrackKey = "internal";
+            }
             db.Competitions.AddRange(fixtures.Select(fixture => fixture.Competition));
             db.Challenges.AddRange(fixtures.Select(fixture => fixture.Challenge));
             db.CompetitionChallenges.AddRange(fixtures.Select(fixture => fixture.CompetitionChallenge));
@@ -1145,6 +1166,12 @@ public sealed class LeaderboardProjectionPersistenceTests
                 await Assert.That(bundle).IsNotNull();
                 await Assert.That(bundle!.Scoreboard.Snapshot.Teams).HasSingleItem();
                 await Assert.That(bundle.Scoreboard.Snapshot.Teams[0].Slots).IsNotEmpty();
+                await Assert.That(bundle.Scoreboard.Snapshot.TracksEnabled).IsFalse();
+                await Assert.That(bundle.Scoreboard.Snapshot.Tracks).HasSingleItem();
+                await Assert.That(bundle.Scoreboard.Snapshot.Tracks[0].Key)
+                    .IsEqualTo(CompetitionTrackConfiguration.DefaultTrackKey);
+                await Assert.That(bundle.Scoreboard.Snapshot.Teams[0].TrackKey)
+                    .IsEqualTo(CompetitionTrackConfiguration.DefaultTrackKey);
                 var expected = CreateExpectedScoreboard(fixture, projectedAt);
                 var actualRow = bundle.Scoreboard.Snapshot.Teams[0];
                 var expectedRow = expected.Snapshot.Teams.Single();

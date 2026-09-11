@@ -70,6 +70,7 @@ const EVENT_ACTION_LABELS: Partial<Record<NoCtfapiEndpointsCompetitionsEventsCom
   AnnouncementPublished: "ui.publishCompetitionAnnouncement",
   ChallengeDescriptionUpdated: "ui.updateChallengeDescription",
   TrackConfigurationUpdated: "ui.updateTrackConfiguration",
+  TrackRegistrationPolicyUpdated: "ui.updateTrackRegistrationPolicy",
   TeamTrackChanged: "ui.changeTeamTrack",
 }
 

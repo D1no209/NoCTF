@@ -39,7 +39,8 @@ public enum CompetitionEventKindProtocol
     RuntimeForceTerminationRequested, RuntimeForceTerminationCompleted,
     RuntimeForceTerminationFailed, AnnouncementPublished, QuestionOpened,
     QuestionReplied, QuestionStatusChanged, ChallengeDescriptionUpdated,
-    TrackConfigurationUpdated, TeamTrackChanged, AwdpBreakAttempted, AwdpFixAttempted,
+    TrackConfigurationUpdated, TeamTrackChanged, TrackRegistrationPolicyUpdated,
+    AwdpBreakAttempted, AwdpFixAttempted,
     AwdpBreakResolved, AwdpFixResolved, GameplayFactPatchDownloaded
 }
 

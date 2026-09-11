@@ -25,6 +25,8 @@ export function useCompetitionsByIdLeaderboardPage() {
 
   const selectedTrackKey = ref(allTracksKey)
 
+  const tracksEnabled = computed(() => board.snapshot.value?.tracksEnabled ?? true)
+
   const visibleTeamCount = ref(50)
 
   const canViewInternalTracks = computed(() => {
@@ -32,9 +34,10 @@ export function useCompetitionsByIdLeaderboardPage() {
     return isAdministrator.value || role === 'Owner' || role === 'Manager' || role === 'Judge'
   })
 
-  const availableTracks = computed(() => (board.snapshot.value?.tracks ?? [])
-    .filter(track => canViewInternalTracks.value
-      || !track.isInternal && (track.isViewerTrack || track.visibleOnLeaderboard)))
+  const availableTracks = computed(() => tracksEnabled.value
+    ? (board.snapshot.value?.tracks ?? []).filter(track => canViewInternalTracks.value
+        || !track.isInternal && (track.isViewerTrack || track.visibleOnLeaderboard))
+    : [])
 
   const selectedAllTracks = computed(() => selectedTrackKey.value === allTracksKey)
 
@@ -54,7 +57,7 @@ export function useCompetitionsByIdLeaderboardPage() {
 
   const teams = computed(() => {
     const all = board.snapshot.value?.teams ?? []
-    if (!selectedAllTracks.value)
+    if (tracksEnabled.value && !selectedAllTracks.value)
       return all.filter(team => team.trackKey === selectedTrackKey.value)
     return [...all].sort((left, right) => {
       const leftEligible = left.rankingState === 'Eligible' ? 0 : 1
@@ -231,7 +234,7 @@ export function useCompetitionsByIdLeaderboardPage() {
     const header = [
       translate("ui.ranking"),
       translate("ui.team"),
-      ...(selectedAllTracks.value ? [translate("ui.tracks")] : []),
+      ...(tracksEnabled.value && selectedAllTracks.value ? [translate("ui.tracks")] : []),
       translate("ui.totalScore"),
       ...flatColumns.value.map((column) => {
         const challenge = board.challengesById.value.get(column.competitionChallengeId ?? '')
@@ -241,7 +244,7 @@ export function useCompetitionsByIdLeaderboardPage() {
     const rows = teams.value.map(team => [
       displayRank(team) ?? '',
       displayTeamName(team),
-      ...(selectedAllTracks.value ? [trackName(team.trackKey)] : []),
+      ...(tracksEnabled.value && selectedAllTracks.value ? [trackName(team.trackKey)] : []),
       team.totalScore ?? 0,
       ...flatColumns.value.map((column) => {
         if (column.index === undefined) return ''
@@ -495,6 +498,7 @@ export function useCompetitionsByIdLeaderboardPage() {
       board,
       allTracksKey,
       selectedTrackKey,
+      tracksEnabled,
       visibleTeamCount,
       availableTracks,
       selectedAllTracks,

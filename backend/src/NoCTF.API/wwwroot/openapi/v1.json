@@ -8491,6 +8491,16 @@
           "404": {
             "description": "Not Found"
           },
+          "409": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationCompetitionsCompetitionTrackFailureResponse"
+                }
+              }
+            }
+          },
           "401": {
             "description": "Unauthorized"
           },
@@ -11651,12 +11661,10 @@
       "NoCTFAPIEndpointsTeamsCreateTeamRequest": {
         "type": "object",
         "additionalProperties": false,
-        "required": [
-          "trackKey"
-        ],
         "properties": {
           "trackKey": {
-            "type": "string"
+            "type": "string",
+            "nullable": true
           },
           "trackInvitationCode": {
             "type": "string",
@@ -13742,6 +13750,9 @@
           },
           "practiceModeEnabled": {
             "type": "boolean"
+          },
+          "tracksEnabled": {
+            "type": "boolean"
           }
         }
       },
@@ -13855,6 +13866,9 @@
             "items": {
               "$ref": "#/components/schemas/NoCTFAPIEndpointsCompetitionsScoreboardTrackResponse"
             }
+          },
+          "tracksEnabled": {
+            "type": "boolean"
           },
           "currentChallengeScores": {
             "type": "array",
@@ -14791,7 +14805,10 @@
           "mode": {
             "$ref": "#/components/schemas/NoCTFAPIEndpointsCompetitionsGameModeProtocol"
           },
-          "isFrozen": {
+          "enabled": {
+            "type": "boolean"
+          },
+          "canUpdate": {
             "type": "boolean"
           },
           "items": {
@@ -14929,6 +14946,7 @@
           "ChallengeDescriptionUpdated",
           "TrackConfigurationUpdated",
           "TeamTrackChanged",
+          "TrackRegistrationPolicyUpdated",
           "AwdpBreakAttempted",
           "AwdpFixAttempted",
           "AwdpBreakResolved",
@@ -14989,6 +15007,7 @@
           "ChallengeDescriptionUpdated",
           "TrackConfigurationUpdated",
           "TeamTrackChanged",
+          "TrackRegistrationPolicyUpdated",
           "AwdpBreakAttempted",
           "AwdpFixAttempted",
           "AwdpBreakResolved",
@@ -19259,6 +19278,9 @@
           },
           "practiceModeEnabled": {
             "type": "boolean"
+          },
+          "tracksEnabled": {
+            "type": "boolean"
           }
         }
       },
@@ -19621,6 +19643,48 @@
           }
         }
       },
+      "NoCTFAPIEndpointsAdministrationCompetitionsCompetitionTrackFailureResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "code": {
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationCompetitionsCompetitionTrackFailureCodeProtocol"
+          },
+          "message": {
+            "type": "string"
+          },
+          "affectedTeamCount": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
+      "NoCTFAPIEndpointsAdministrationCompetitionsCompetitionTrackFailureCodeProtocol": {
+        "type": "string",
+        "description": "",
+        "x-enumNames": [
+          "CompetitionNotFound",
+          "InvalidConfiguration",
+          "CompetitionFinished",
+          "TracksDisabled",
+          "TrackReassignmentRequired",
+          "InvalidTrackReassignment",
+          "TeamNotFound",
+          "TrackNotFound",
+          "TrackNotPublicSelectable"
+        ],
+        "enum": [
+          "CompetitionNotFound",
+          "InvalidConfiguration",
+          "CompetitionFinished",
+          "TracksDisabled",
+          "TrackReassignmentRequired",
+          "InvalidTrackReassignment",
+          "TeamNotFound",
+          "TrackNotFound",
+          "TrackNotPublicSelectable"
+        ]
+      },
       "NoCTFAPIEndpointsAdministrationCompetitionsPatchCompetitionRequest": {
         "type": "object",
         "additionalProperties": false,
@@ -19755,13 +19819,23 @@
         "type": "object",
         "additionalProperties": false,
         "required": [
+          "enabled",
           "tracks"
         ],
         "properties": {
+          "enabled": {
+            "type": "boolean"
+          },
           "tracks": {
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationCompetitionsUpdateCompetitionTrackRequest"
+            }
+          },
+          "removedTrackReassignments": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationCompetitionsRemovedTrackReassignmentRequest"
             }
           }
         }
@@ -19820,6 +19894,22 @@
           },
           "clearInvitationCode": {
             "type": "boolean"
+          }
+        }
+      },
+      "NoCTFAPIEndpointsAdministrationCompetitionsRemovedTrackReassignmentRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "fromTrackKey",
+          "toTrackKey"
+        ],
+        "properties": {
+          "fromTrackKey": {
+            "type": "string"
+          },
+          "toTrackKey": {
+            "type": "string"
           }
         }
       },

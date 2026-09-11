@@ -386,6 +386,7 @@ public sealed class AggregatePatchMapperTests
             new() { Json = "{\"schemaVersion\":2}" }, competition);
         CompetitionPatchMapper.ApplyTracksAsModerator(new()
         {
+            Enabled = true,
             Tracks = [],
             TrackConfigurationJson = "{\"schemaVersion\":1}"
         }, competition);

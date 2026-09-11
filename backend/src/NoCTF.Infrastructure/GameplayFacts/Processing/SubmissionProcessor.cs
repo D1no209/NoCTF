@@ -752,20 +752,24 @@ public sealed class GameplayFactProcessor(
             .Select(competition => new
             {
                 competition.Mode,
+                competition.TracksEnabled,
                 competition.TrackConfigurationJson
             })
             .SingleAsync(ct);
         if (competition.Mode != GameMode.Ctf)
             return null;
 
-        var tracks = CompetitionTrackConfiguration.ParseOrDefault(
+        var tracks = CompetitionTrackConfiguration.EffectiveFor(
             competition.Mode,
+            competition.TracksEnabled,
             competition.TrackConfigurationJson);
         var currentTrackKey = await db.Teams.AsNoTracking()
             .Where(team => team.Id == submission.TeamId)
             .Select(team => team.TrackKey)
             .SingleAsync(ct);
-        if (tracks.Find(currentTrackKey)?.EarnsBlood != true)
+        var currentTrack = tracks.Find(currentTrackKey)
+            ?? (!competition.TracksEnabled ? tracks.DefaultTrack : null);
+        if (currentTrack?.EarnsBlood != true)
             return null;
         var bloodTrackKeys = tracks.Tracks.Where(track => track.EarnsBlood)
             .Select(track => track.Key)
@@ -781,7 +785,8 @@ public sealed class GameplayFactProcessor(
                 && candidate.OccurredAt < officialWindow.EndAt
                 && candidate.Id != submission.Id)
             .Join(
-                db.Teams.AsNoTracking().Where(team => bloodTrackKeys.Contains(team.TrackKey)
+                db.Teams.AsNoTracking().Where(team => (!competition.TracksEnabled
+                        || bloodTrackKeys.Contains(team.TrackKey))
                     && team.RegisteredAt < officialWindow.EndAt),
                 candidate => candidate.TeamId,
                 team => (Guid?)team.Id,

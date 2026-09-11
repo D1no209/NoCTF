@@ -46,7 +46,11 @@ public sealed class LeaderboardProjectionMergeQueueTests
     }
 
     [Test]
-    public async Task Relevant_event_invalidates_immediately_and_enters_merge_window()
+    [Arguments(CompetitionEventKind.ScoringRecorded)]
+    [Arguments(CompetitionEventKind.TrackConfigurationUpdated)]
+    [Arguments(CompetitionEventKind.TeamTrackChanged)]
+    public async Task Relevant_event_invalidates_immediately_and_enters_merge_window(
+        CompetitionEventKind kind)
     {
         var leaderboard = Substitute.For<ILeaderboardCache>();
         var queue = new LeaderboardProjectionMergeQueue();
@@ -58,7 +62,7 @@ public sealed class LeaderboardProjectionMergeQueueTests
         var competitionId = Guid.CreateVersion7();
 
         await handler.Handle(
-            CreateEvent(competitionId, CompetitionEventKind.ScoringRecorded),
+            CreateEvent(competitionId, kind),
             CancellationToken.None);
 
         await leaderboard.Received(1).InvalidateAsync(competitionId, CancellationToken.None);
@@ -68,7 +72,10 @@ public sealed class LeaderboardProjectionMergeQueueTests
     }
 
     [Test]
-    public async Task Irrelevant_event_neither_invalidates_nor_enters_merge_window()
+    [Arguments(CompetitionEventKind.QuestionReplied)]
+    [Arguments(CompetitionEventKind.TrackRegistrationPolicyUpdated)]
+    public async Task Irrelevant_event_neither_invalidates_nor_enters_merge_window(
+        CompetitionEventKind kind)
     {
         var leaderboard = Substitute.For<ILeaderboardCache>();
         var queue = new LeaderboardProjectionMergeQueue();
@@ -78,7 +85,7 @@ public sealed class LeaderboardProjectionMergeQueueTests
             new FixedTimeProvider(DateTimeOffset.Parse("2026-08-24T00:00:00Z")));
 
         await handler.Handle(
-            CreateEvent(Guid.CreateVersion7(), CompetitionEventKind.QuestionReplied),
+            CreateEvent(Guid.CreateVersion7(), kind),
             CancellationToken.None);
 
         await leaderboard.DidNotReceiveWithAnyArgs().InvalidateAsync(default, default);

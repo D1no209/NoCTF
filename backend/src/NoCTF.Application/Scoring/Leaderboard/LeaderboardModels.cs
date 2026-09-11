@@ -314,6 +314,7 @@ public sealed record ScoreboardSnapshot(
     IReadOnlyList<ScoreboardTeam> Teams)
 {
     public IReadOnlyList<ScoreboardTrack> Tracks { get; init; } = [];
+    public bool TracksEnabled { get; init; } = true;
     public IReadOnlyList<ScoreboardCurrentChallengeScore> CurrentChallengeScores { get; init; } = [];
     public CompetitionLeaderboardVisibility Visibility { get; init; }
     public LeaderboardDataScope DataScope { get; init; }

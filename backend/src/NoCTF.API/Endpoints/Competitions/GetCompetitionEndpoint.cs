@@ -88,7 +88,8 @@ public sealed record CompetitionResponse(
     int MaxActiveQuestionsPerTeam = 5,
     int MaxParticipantMessagesBeforeHandlerReply = 3,
     bool AllowChallengeOwnersToHandleQuestions = true,
-    bool PracticeModeEnabled = false);
+    bool PracticeModeEnabled = false,
+    bool TracksEnabled = false);
 
 internal static class CompetitionMapper
 {
@@ -121,7 +122,8 @@ internal static class CompetitionMapper
             view.MaxActiveQuestionsPerTeam,
             view.MaxParticipantMessagesBeforeHandlerReply,
             view.AllowChallengeOwnersToHandleQuestions,
-            view.PracticeModeEnabled);
+            view.PracticeModeEnabled,
+            view.TracksEnabled);
 
     internal static string PosterUrl(Guid competitionId, Guid posterFileId) =>
         $"/api/v1/competitions/{competitionId}/poster?revision={posterFileId:N}";

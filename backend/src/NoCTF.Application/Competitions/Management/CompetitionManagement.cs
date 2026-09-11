@@ -19,7 +19,8 @@ public sealed record CreateCompetitionCommand(
     int MaxActiveQuestionsPerTeam = 5,
     int MaxParticipantMessagesBeforeHandlerReply = 3,
     bool AllowChallengeOwnersToHandleQuestions = true,
-    bool PracticeModeEnabled = false);
+    bool PracticeModeEnabled = false,
+    bool TracksEnabled = false);
 
 public sealed record CompetitionView(
     Guid Id,
@@ -41,7 +42,8 @@ public sealed record CompetitionView(
     int MaxParticipantMessagesBeforeHandlerReply = 3,
     bool AllowChallengeOwnersToHandleQuestions = true,
     bool PracticeModeEnabled = false,
-    Guid? PosterFileId = null);
+    Guid? PosterFileId = null,
+    bool TracksEnabled = false);
 
 public enum CompetitionCreationState
 {

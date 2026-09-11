@@ -64,7 +64,8 @@ public enum CompetitionEventKind : short
     AwdpFixAttempted,
     AwdpBreakResolved,
     AwdpFixResolved,
-    GameplayFactPatchDownloaded
+    GameplayFactPatchDownloaded,
+    TrackRegistrationPolicyUpdated
 }
 
 public enum CompetitionEventLevel : short

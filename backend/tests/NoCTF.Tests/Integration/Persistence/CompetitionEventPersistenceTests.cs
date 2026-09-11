@@ -246,9 +246,11 @@ public sealed class CompetitionEventPersistenceTests
                         AffectsCompetitiveResults: false)
                 ]);
             await db.Competitions.Where(item => item.Id == ids.CompetitionId)
-                .ExecuteUpdateAsync(setters => setters.SetProperty(
-                    item => item.TrackConfigurationJson,
-                    CompetitionTrackConfiguration.Serialize(internalTracks)), ct);
+                .ExecuteUpdateAsync(setters => setters
+                    .SetProperty(item => item.TracksEnabled, true)
+                    .SetProperty(
+                        item => item.TrackConfigurationJson,
+                        CompetitionTrackConfiguration.Serialize(internalTracks)), ct);
             await db.Teams.Where(team => team.Id == ids.TeamBId)
                 .ExecuteUpdateAsync(setters => setters.SetProperty(
                     team => team.TrackKey,

@@ -1,4 +1,6 @@
 import type {
+  NoCtfapiEndpointsAdministrationCompetitionsCompetitionTrackFailureCodeProtocol,
+  NoCtfapiEndpointsAdministrationCompetitionsCompetitionTrackFailureResponse,
   NoCtfapiEndpointsTeamsTeamRegistrationFailureCodeProtocol,
   NoCtfapiEndpointsTeamsTeamRegistrationFailureResponse,
   NoCtfapiEndpointsTeamsTeamMembershipFailureCodeProtocol,
@@ -10,15 +12,14 @@ import { translate } from '../utils/i18n'
 const trackMessages = {
   CompetitionNotFound: "ui.competitionNotFound",
   InvalidConfiguration: "ui.theTrackConfigurationIsInvalidCheckTheDefaultTrackTrack",
-  ConfigurationLocked: "ui.theCompetitionHasStartedAndItsTrackConfigurationIsFrozen",
-  ConfigurationConflict: "ui.anotherStaffMemberUpdatedTheTrackConfigurationRefreshAndTry",
-  TrackInUse: "ui.thisTrackIsStillAssignedToATeamAndCannot",
+  CompetitionFinished: "ui.finishedCompetitionTracksReadOnly",
+  TracksDisabled: "ui.teamTrackAssignmentRequiresEnabledTracks",
+  TrackReassignmentRequired: "ui.trackReassignmentRequired",
+  InvalidTrackReassignment: "ui.invalidTrackReassignment",
   TeamNotFound: "ui.teamNotFound",
   TrackNotFound: "ui.theSelectedTrackDoesNotExist",
   TrackNotPublicSelectable: "ui.participantsCannotSelectThisTrack",
-  AssignmentLocked: "ui.theCompetitionHasStartedAndTeamTrackAssignmentsAreFrozen",
-  AssignmentConflict: "ui.theTeamWasUpdatedRefreshAndTryAgain",
-} as const
+} satisfies Record<NoCtfapiEndpointsAdministrationCompetitionsCompetitionTrackFailureCodeProtocol, string>
 
 const registrationMessages = {
   InvalidTeamName: "ui.theTeamNameIsInvalid",
@@ -56,8 +57,10 @@ const membershipMessages = {
 } satisfies Record<NoCtfapiEndpointsTeamsTeamMembershipFailureCodeProtocol, string>
 
 export function competitionTrackErrorMessage(error: unknown, fallback: string): string {
-  const payload = error as { code?: keyof typeof trackMessages } | null
-  return payload?.code && payload.code in trackMessages
+  const payload = error as Partial<NoCtfapiEndpointsAdministrationCompetitionsCompetitionTrackFailureResponse> | null
+  if (payload?.code === 'TrackReassignmentRequired' && payload.affectedTeamCount)
+    return translate('ui.trackReassignmentRequiredWithCount', { count: payload.affectedTeamCount })
+  return payload?.code
     ? translate(trackMessages[payload.code])
     : parseApiError(error, fallback).message
 }

@@ -23,7 +23,8 @@ public sealed record CompetitionStartGateSnapshot(
     int ApprovedTeamCount,
     int MaxConcurrentRuntimeInstancesPerTeam,
     string? TrackConfigurationJson = null,
-    IReadOnlyList<string>? ApprovedTeamTrackKeys = null);
+    IReadOnlyList<string>? ApprovedTeamTrackKeys = null,
+    bool TracksEnabled = false);
 
 public enum StartGateFailureCode
 {
@@ -96,7 +97,9 @@ public sealed class CompetitionStartGate(
         {
             foreach (var message in CompetitionTrackPolicy.Validate(snapshot.Mode, trackConfiguration))
                 errors.Add(new(StartGateFailureCode.TrackConfigurationInvalid, null, message));
-            foreach (var trackKey in snapshot.ApprovedTeamTrackKeys ?? [])
+            foreach (var trackKey in snapshot.TracksEnabled
+                         ? snapshot.ApprovedTeamTrackKeys ?? []
+                         : [])
             {
                 if (trackConfiguration.Find(trackKey) is null)
                 {

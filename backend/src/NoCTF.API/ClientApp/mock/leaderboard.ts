@@ -72,7 +72,7 @@ export function leaderboard(state: MockState, competitionId: string) {
   rows.sort((a, b) => b.totalScore - a.totalScore).forEach((row, index) => { row.rank = index + 1 })
   return model('CompetitionsScoreboardSnapshotResponse', {
     competitionId, version: String(state.facts.length + 1), schemaRevision: 'mock-1', generatedAt: now(),
-    visibility: 'Normal', dataScope: 'Live', tracks: [{ key: 'open', name: '公开赛道 / Open', isInternal: false, visibleOnLeaderboard: true, isViewerTrack: true }],
+    visibility: 'Normal', dataScope: 'Live', tracksEnabled: competition.tracksEnabled ?? true, tracks: [{ key: 'open', name: '公开赛道 / Open', isInternal: false, visibleOnLeaderboard: true, isViewerTrack: true }],
     actors: state.users.map((user, index) => ({ index, userId: user.userId, displayName: user.userName })), teams: rows,
     currentChallengeScores: challenges.map(c => ({ competitionChallengeId: c.id, score: 100, breakScore: 100, fixScore: 100 })),
   })

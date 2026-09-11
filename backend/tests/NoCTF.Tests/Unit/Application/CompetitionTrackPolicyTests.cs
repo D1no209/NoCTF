@@ -95,16 +95,57 @@ public sealed class CompetitionTrackPolicyTests
     }
 
     [Test]
+    [Arguments(GameMode.Ctf)]
+    [Arguments(GameMode.Awd)]
+    [Arguments(GameMode.Awdp)]
+    [Arguments(GameMode.Koh)]
+    public async Task Disabled_tracks_use_one_public_comprehensive_default_for_every_mode(GameMode mode)
+    {
+        var saved = new CompetitionTrackConfiguration(1,
+        [
+            Track("formal", isDefault: true) with
+            {
+                IsPublicSelectable = false,
+                IsInternal = true,
+                EarnsScore = false,
+                EarnsBlood = false,
+                AffectsDynamicChallengeScore = false,
+                VisibleOnLeaderboard = false,
+                AffectsCompetitiveResults = false,
+                InvitationCode = "secret-value"
+            },
+            Track("student")
+        ]);
+
+        var effective = CompetitionTrackConfiguration.EffectiveFor(
+            mode,
+            tracksEnabled: false,
+            CompetitionTrackConfiguration.Serialize(saved));
+
+        await Assert.That(effective.Tracks).HasSingleItem();
+        await Assert.That(effective.DefaultTrack.Key).IsEqualTo("formal");
+        await Assert.That(effective.DefaultTrack.IsInternal).IsFalse();
+        await Assert.That(effective.DefaultTrack.IsPublicSelectable).IsTrue();
+        await Assert.That(effective.DefaultTrack.EarnsScore).IsTrue();
+        await Assert.That(effective.DefaultTrack.VisibleOnLeaderboard).IsTrue();
+        await Assert.That(effective.DefaultTrack.AffectsCompetitiveResults).IsTrue();
+        await Assert.That(effective.DefaultTrack.EarnsBlood).IsEqualTo(mode == GameMode.Ctf);
+        await Assert.That(effective.DefaultTrack.AffectsDynamicChallengeScore)
+            .IsEqualTo(mode == GameMode.Ctf);
+        await Assert.That(effective.DefaultTrack.InvitationCode).IsNull();
+    }
+
+    [Test]
     [Arguments(CompetitionStatus.Running, true)]
     [Arguments(CompetitionStatus.Paused, true)]
-    [Arguments(CompetitionStatus.Finished, true)]
-    [Arguments(CompetitionStatus.Draft, false)]
-    [Arguments(CompetitionStatus.Visible, false)]
-    [Arguments(CompetitionStatus.Published, false)]
-    public async Task Freeze_state_matches_first_running_boundary(
+    [Arguments(CompetitionStatus.Finished, false)]
+    [Arguments(CompetitionStatus.Draft, true)]
+    [Arguments(CompetitionStatus.Visible, true)]
+    [Arguments(CompetitionStatus.Published, true)]
+    public async Task Update_capability_only_rejects_finished_competitions(
         CompetitionStatus status,
         bool expected) =>
-        await Assert.That(CompetitionTrackPolicy.IsFrozen(status)).IsEqualTo(expected);
+        await Assert.That(CompetitionTrackPolicy.CanUpdate(status)).IsEqualTo(expected);
 
     [Test]
     public async Task Start_gate_rejects_invalid_configuration_and_missing_team_track()
@@ -123,7 +164,8 @@ public sealed class CompetitionTrackPolicyTests
                 TrackConfigurationJson: CompetitionTrackConfiguration.Serialize(new(
                     SchemaVersion: 99,
                     [Track("formal", isDefault: true)])),
-                ApprovedTeamTrackKeys: ["missing"])),
+                ApprovedTeamTrackKeys: ["missing"],
+                TracksEnabled: true)),
             new GameModeCompetitionConfigurationValidator(),
             configurations);
 

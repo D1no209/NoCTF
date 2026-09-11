@@ -19,6 +19,11 @@ internal sealed class CompetitionEntityConfiguration : IEntityTypeConfiguration<
         builder.Property(competition => competition.ObserverIds).HasColumnType("uuid[]");
         builder.Property(competition => competition.Mode).HasConversion<short>();
         builder.Property(competition => competition.Status).HasConversion<short>();
+        // Existing competitions used tracks implicitly, so the schema default backfills true.
+        // ValueGeneratedNever makes application inserts persist the explicit new default false.
+        builder.Property(competition => competition.TracksEnabled)
+            .HasDefaultValue(true)
+            .ValueGeneratedNever();
         // Schema defaults preserve the documented cross-mode question policy when an existing
         // competition row is upgraded; Data Annotations cannot express database defaults.
         builder.Property(competition => competition.MaxActiveQuestionsPerTeam).HasDefaultValue(5);

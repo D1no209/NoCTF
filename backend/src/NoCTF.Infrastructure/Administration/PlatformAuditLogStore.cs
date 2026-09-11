@@ -48,7 +48,8 @@ public sealed class PlatformAuditLogStore(NoCtfDbContext db) : IPlatformAuditLog
         CompetitionEventKind.AnnouncementPublished,
         CompetitionEventKind.ChallengeDescriptionUpdated,
         CompetitionEventKind.TrackConfigurationUpdated,
-        CompetitionEventKind.TeamTrackChanged
+        CompetitionEventKind.TeamTrackChanged,
+        CompetitionEventKind.TrackRegistrationPolicyUpdated
     ];
 
     private static readonly JsonSerializerOptions JsonOptions =

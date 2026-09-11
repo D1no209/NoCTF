@@ -81,6 +81,31 @@ public sealed record CompetitionTrackConfiguration(
             : DefaultFor(mode);
     }
 
+    public static CompetitionTrackConfiguration EffectiveFor(
+        GameMode mode,
+        bool tracksEnabled,
+        string? json)
+    {
+        var saved = ParseOrDefault(mode, json);
+        if (tracksEnabled)
+            return saved;
+        var defaultTrack = saved.DefaultTrack;
+        return new(
+            CurrentSchemaVersion,
+            [defaultTrack with
+            {
+                IsDefault = true,
+                IsPublicSelectable = true,
+                IsInternal = false,
+                EarnsScore = true,
+                EarnsBlood = mode == GameMode.Ctf,
+                AffectsDynamicChallengeScore = mode == GameMode.Ctf,
+                VisibleOnLeaderboard = true,
+                AffectsCompetitiveResults = true,
+                InvitationCode = null
+            }]);
+    }
+
     public static bool TryParse(
         string json,
         out CompetitionTrackConfiguration configuration)

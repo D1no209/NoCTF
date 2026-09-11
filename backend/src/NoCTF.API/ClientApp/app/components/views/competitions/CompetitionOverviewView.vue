@@ -3,7 +3,7 @@ import { toRefs } from 'vue'
 import type { CompetitionOverviewViewState } from '~/features/competitions/useCompetitionOverview'
 
 const viewProps = defineProps<{ state: CompetitionOverviewViewState }>()
-const { ArrowRight, Box, CalendarRange, Clock, FileText, KeyRound, LogIn, Settings, ShieldCheck, Trophy, UserPlus, Users, posterUrl, detailError, refreshCompetition, competitionId, isLoggedIn, isAdministrator, managementOnly, competition, myTeam, teamLoaded, teamLoadError, loadMyTeam, approvedTeamCount, selectableTracks, tracksLoaded, trackLoadError, loadRegistrationOptions, countdown, practiceOpen, canParticipate, teamRegistrationOpen, createOpen, createName, createTrackKey, createTrackInvitationCode, createPending, createValidationError, selectedCreateTrack, submitCreate, joinOpen, joinToken, joinPending, joinValidationError, submitJoin, isCaptain, LifecycleBadge } = toRefs(viewProps.state)
+const { ArrowRight, Box, CalendarRange, Clock, FileText, KeyRound, LogIn, Settings, ShieldCheck, Trophy, UserPlus, Users, posterUrl, detailError, refreshCompetition, competitionId, isLoggedIn, isAdministrator, managementOnly, competition, myTeam, teamLoaded, teamLoadError, loadMyTeam, approvedTeamCount, selectableTracks, tracksLoaded, trackLoadError, loadRegistrationOptions, countdown, practiceOpen, canParticipate, teamRegistrationOpen, tracksEnabled, createOpen, createName, createTrackKey, createTrackInvitationCode, createPending, createValidationError, selectedCreateTrack, submitCreate, joinOpen, joinToken, joinPending, joinValidationError, submitJoin, isCaptain, LifecycleBadge } = toRefs(viewProps.state)
 </script>
 
 <template>
@@ -81,11 +81,11 @@ const { ArrowRight, Box, CalendarRange, Clock, FileText, KeyRound, LogIn, Settin
                         <FieldLabel for="team-name">{{ $t('ui.teamName2') }}</FieldLabel>
                         <Input id="team-name" v-model="createName" required maxlength="64" />
                       </Field>
-                      <Field v-if="!tracksLoaded">
+                      <Field v-if="tracksEnabled && !tracksLoaded">
                         <Skeleton class="h-10 w-full" />
                         <FieldDescription>{{ $t('ui.loadingAvailableCompetitionTracks') }}</FieldDescription>
                       </Field>
-                      <Field v-else-if="trackLoadError">
+                      <Field v-else-if="tracksEnabled && trackLoadError">
                         <Alert variant="destructive">
                           <AlertDescription class="flex items-center justify-between gap-3">
                             <span>{{ $message(trackLoadError) }}</span>
@@ -95,7 +95,7 @@ const { ArrowRight, Box, CalendarRange, Clock, FileText, KeyRound, LogIn, Settin
                           </AlertDescription>
                         </Alert>
                       </Field>
-                      <Field v-else-if="selectableTracks.length > 0">
+                      <Field v-else-if="tracksEnabled && selectableTracks.length > 0">
                         <FieldLabel for="team-track">{{ $t('ui.competitionTrack') }}</FieldLabel>
                         <Select v-model="createTrackKey" required>
                           <SelectTrigger id="team-track"><SelectValue :placeholder="$t('ui.selectATrack')" /></SelectTrigger>
@@ -107,12 +107,12 @@ const { ArrowRight, Box, CalendarRange, Clock, FileText, KeyRound, LogIn, Settin
                         </Select>
                         <FieldDescription>{{ $t('ui.selectTheTrackThisTeamWillEnterCompetitionAdministratorsCan') }}</FieldDescription>
                       </Field>
-                      <Field v-else>
+                      <Field v-else-if="tracksEnabled">
                         <Alert variant="destructive">
                           <AlertDescription>{{ $t('ui.noCompetitionTracksAreCurrentlyOpenForRegistration') }}</AlertDescription>
                         </Alert>
                       </Field>
-                      <Field v-if="selectedCreateTrack?.requiresInvitationCode">
+                      <Field v-if="tracksEnabled && selectedCreateTrack?.requiresInvitationCode">
                         <FieldLabel for="track-invitation-code">{{ $t('ui.trackInvitationCode') }}</FieldLabel>
                         <Input
                           id="track-invitation-code"
@@ -130,7 +130,7 @@ const { ArrowRight, Box, CalendarRange, Clock, FileText, KeyRound, LogIn, Settin
                         <Button
                           type="submit"
                           class="w-full"
-                          :disabled="createPending || !tracksLoaded || Boolean(trackLoadError) || selectableTracks.length === 0"
+                          :disabled="createPending || (tracksEnabled && (!tracksLoaded || Boolean(trackLoadError) || selectableTracks.length === 0))"
                         >
                           <Spinner v-if="createPending" data-icon="inline-start" /> {{ $t('ui.create') }} </Button>
                       </Field>
@@ -184,7 +184,7 @@ const { ArrowRight, Box, CalendarRange, Clock, FileText, KeyRound, LogIn, Settin
               <NuxtLink :to="`/admin/competitions/${competitionId}`"><Settings data-icon="inline-start" />{{ $t('ui.manageCompetition') }}</NuxtLink>
             </Button>
           </div>
-          <FieldDescription v-if="myTeam">{{ $t('ui.currentTrack', { track: myTeam.trackName ?? myTeam.trackKey ?? '-' }) }}</FieldDescription>
+          <FieldDescription v-if="myTeam && tracksEnabled">{{ $t('ui.currentTrack', { track: myTeam.trackName ?? myTeam.trackKey ?? '-' }) }}</FieldDescription>
         </div>
         </CoverImage>
 

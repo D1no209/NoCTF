@@ -1,6 +1,7 @@
 import { sourceFile } from './support/feature-source'
 import { describe, expect, test } from 'bun:test'
 import type {
+  NoCtfapiEndpointsAdministrationCompetitionsCompetitionTrackFailureCodeProtocol,
   NoCtfapiEndpointsTeamsTeamMembershipFailureCodeProtocol,
   NoCtfapiEndpointsTeamsTeamRegistrationFailureCodeProtocol,
 } from '../app/api'
@@ -14,15 +15,14 @@ describe('competition track error presentation', () => {
   const trackCodes = [
     'CompetitionNotFound',
     'InvalidConfiguration',
-    'ConfigurationLocked',
-    'ConfigurationConflict',
-    'TrackInUse',
+    'CompetitionFinished',
+    'TracksDisabled',
+    'TrackReassignmentRequired',
+    'InvalidTrackReassignment',
     'TeamNotFound',
     'TrackNotFound',
     'TrackNotPublicSelectable',
-    'AssignmentLocked',
-    'AssignmentConflict',
-  ]
+  ] satisfies NoCtfapiEndpointsAdministrationCompetitionsCompetitionTrackFailureCodeProtocol[]
 
   const registrationCodes = [
     'InvalidTeamName',
@@ -80,8 +80,17 @@ describe('competition track pages', () => {
     const teams = await sourceFile(new URL('../app/pages/admin/competitions/[id]/teams.vue', import.meta.url)).text()
 
     expect(admin).toContain('adminGetCompetition')
+    expect(admin).toContain('adminListTeams')
     expect(admin).toContain('adminPatchCompetition')
-    expect(admin).toContain('if (saving.value || frozen.value || !canWrite.value) return')
+    expect(admin).toContain('if (saving.value || !canUpdate.value || !canWrite.value) return')
+    expect(admin).toContain('enabled: enabled.value')
+    expect(admin).toContain('removedTrackReassignments: enabled.value ? removedTrackReassignments.value : []')
+    expect(admin).toContain('affectedTeamCount')
+    expect(admin).toContain('requestRemoveTrack')
+    expect(admin).toContain('confirmRemoveTrack')
+    expect(admin).toContain('confirmDisable')
+    expect(admin).toContain('track.existingKey !== null')
+    expect(admin).not.toContain('frozen')
     expect(admin).toContain('setInvitationRequired')
     expect(admin).toContain('clearInvitationRequirement')
     expect(admin).toContain('clientId: crypto.randomUUID()')
@@ -90,6 +99,7 @@ describe('competition track pages', () => {
     expect(admin).toContain("ui.trackRequiresAnInvitationCode")
     expect(admin).toContain('error.value = competitionTrackErrorMessage')
     expect(teams).toContain('patchCompetitionTeam')
+    expect(teams).toContain('tracksEnabled')
     expect(teams).toContain('body: { administration: { trackKey, registrationStatus: team.registrationStatus } }')
     expect(teams).not.toContain('tracksFrozen.value || team.trackKey === trackKey')
   })
@@ -99,12 +109,15 @@ describe('competition track pages', () => {
     const leaderboard = await sourceFile(new URL('../app/pages/competitions/[id]/leaderboard.vue', import.meta.url)).text()
 
     expect(overview).toContain('listCompetitionTracks')
+    expect(overview).toContain('tracksEnabled.value && !createTrackKey.value')
+    expect(overview).toContain('...(tracksEnabled.value')
+    expect(overview).toContain('v-if="tracksEnabled && !tracksLoaded"')
     expect(overview).toContain('trackKey: createTrackKey.value')
     expect(overview).toContain('trackInvitationCode: selectedCreateTrack.value?.requiresInvitationCode')
     expect(overview).toContain('createTrackInvitationCode')
     expect(overview).toContain('track.isPublicSelectable')
     expect(overview).toContain('selectedCreateTrack?.requiresInvitationCode')
-    expect(overview).toContain('v-else-if="selectableTracks.length > 0"')
+    expect(overview).toContain('v-else-if="tracksEnabled && selectableTracks.length > 0"')
     expect(overview).not.toContain('createTrackKey.value = selectableTracks.value.find')
     expect(overview).toContain('response?.status === 404')
     expect(overview).toContain('teamLoadError')
@@ -119,7 +132,9 @@ describe('competition track pages', () => {
     expect(overview).toContain('minlength="32" maxlength="32"')
     expect(overview).not.toContain(':disabled="createPending || !createName.trim() || !createTrackKey')
     expect(leaderboard).toContain("all.filter(team => team.trackKey === selectedTrackKey.value)")
-    expect(leaderboard).toContain('availableTracks.length > 1')
+    expect(leaderboard).toContain('tracksEnabled && availableTracks.length > 1')
+    expect(leaderboard).toContain('board.snapshot.value?.tracksEnabled ?? true')
+    expect(leaderboard).toContain('tracksEnabled.value && selectedAllTracks.value')
     expect(leaderboard).toContain('canViewInternalTracks.value')
     expect(leaderboard).toContain("role === 'Owner' || role === 'Manager' || role === 'Judge'")
     expect(leaderboard).toContain('isAdministrator.value')

@@ -7,7 +7,8 @@ public sealed record CompetitionVisibilityAccessDecision(
     GameMode GameMode,
     CompetitionStatus CompetitionStatus,
     CompetitionLeaderboardVisibility Visibility,
-    LeaderboardDataScope DataScope);
+    LeaderboardDataScope DataScope,
+    bool TracksEnabled = true);
 
 public interface ICompetitionVisibilityAccess
 {

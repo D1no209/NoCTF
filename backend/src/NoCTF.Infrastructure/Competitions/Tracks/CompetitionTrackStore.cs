@@ -1,3 +1,4 @@
+using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using NoCTF.Application.Common;
 using NoCTF.Application.Competitions.Events;
@@ -5,6 +6,7 @@ using NoCTF.Application.Competitions.Tracks;
 using NoCTF.Application.Messaging;
 using NoCTF.Domain.Competitions;
 using NoCTF.Domain.Competitions.Events;
+using NoCTF.Domain.Teams;
 using NoCTF.Infrastructure.Persistence;
 using NoCTF.Infrastructure.Teams;
 
@@ -15,6 +17,16 @@ public sealed class CompetitionTrackStore(
     ITransactionalMessageOutbox outbox,
     ICompetitionEventRecorder events) : ICompetitionTrackStore
 {
+    private sealed record TrackConfigurationEventPayload(
+        int SchemaVersion,
+        bool Enabled,
+        string DefaultTrackKey,
+        IReadOnlyList<string> TrackKeys,
+        int ReassignedTeamCount);
+
+    private static readonly JsonSerializerOptions JsonOptions =
+        new(JsonSerializerDefaults.Web);
+
     public async Task<CompetitionTracksView?> GetAsync(
         Guid competitionId,
         Guid? viewerUserId,
@@ -29,6 +41,7 @@ public sealed class CompetitionTrackStore(
                 item.Id,
                 item.Mode,
                 item.Status,
+                item.TracksEnabled,
                 item.TrackConfigurationJson
             })
             .SingleOrDefaultAsync(cancellationToken);
@@ -70,12 +83,13 @@ public sealed class CompetitionTrackStore(
             competition.Id,
             competition.Mode,
             competition.Status,
-            CompetitionTrackPolicy.IsFrozen(competition.Status),
+            competition.TracksEnabled,
+            CompetitionTrackPolicy.CanUpdate(competition.Status),
             tracks,
             viewerTeamId);
     }
 
-    public async Task<OperationResult<CompetitionTracksView, CompetitionTrackFailureCode>> UpdateAsync(
+    public async Task<UpdateCompetitionTracksResult> UpdateAsync(
         UpdateCompetitionTracksCommand command,
         CancellationToken cancellationToken)
     {
@@ -88,9 +102,9 @@ public sealed class CompetitionTrackStore(
             cancellationToken);
         if (competition is null)
             return Failure(CompetitionTrackFailureCode.CompetitionNotFound, "Competition was not found.");
-        if (CompetitionTrackPolicy.IsFrozen(competition.Status))
-            return Failure(CompetitionTrackFailureCode.ConfigurationLocked,
-                "Track definitions are frozen after the competition first starts.");
+        if (!CompetitionTrackPolicy.CanUpdate(competition.Status))
+            return Failure(CompetitionTrackFailureCode.CompetitionFinished,
+                "Finished competitions are read-only.");
         var validationErrors = CompetitionTrackPolicy.Validate(competition.Mode, command.Tracks);
         if (validationErrors.Count > 0)
             return Failure(CompetitionTrackFailureCode.InvalidConfiguration,
@@ -115,38 +129,129 @@ public sealed class CompetitionTrackStore(
         }).ToArray());
         var nextKeys = normalized.Tracks.Select(track => track.Key)
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
-        var usedKeys = await db.Teams.AsNoTracking()
+        var teams = await db.Teams
             .Where(team => team.CompetitionId == command.CompetitionId && team.DeletedAt == null)
-            .Select(team => team.TrackKey)
-            .Distinct()
             .ToListAsync(cancellationToken);
-        var missingUsedKey = usedKeys.FirstOrDefault(key => !nextKeys.Contains(key));
-        if (missingUsedKey is not null)
-            return Failure(CompetitionTrackFailureCode.TrackInUse,
-                $"Track '{missingUsedKey}' is still assigned to one or more teams.");
+        var reassignmentSources = currentConfiguration.Tracks
+            .Select(track => track.Key)
+            .Where(key => !nextKeys.Contains(key))
+            .Concat(teams.Select(team => team.TrackKey).Where(key => !nextKeys.Contains(key)))
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var reassignments = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var reassignment in command.RemovedTrackReassignments)
+        {
+            if (string.IsNullOrWhiteSpace(reassignment.FromTrackKey)
+                || string.IsNullOrWhiteSpace(reassignment.ToTrackKey)
+                || !reassignmentSources.Contains(reassignment.FromTrackKey)
+                || !nextKeys.Contains(reassignment.ToTrackKey)
+                || string.Equals(
+                    reassignment.FromTrackKey,
+                    reassignment.ToTrackKey,
+                    StringComparison.OrdinalIgnoreCase)
+                || !reassignments.TryAdd(
+                    reassignment.FromTrackKey,
+                    reassignment.ToTrackKey))
+            {
+                return Failure(
+                    CompetitionTrackFailureCode.InvalidTrackReassignment,
+                    "Removed track reassignments must uniquely map removed source tracks "
+                    + "to tracks that remain in the new configuration.");
+            }
+        }
+
+        if (command.Enabled)
+        {
+            var missingSources = reassignmentSources
+                .Where(source => teams.Any(team => string.Equals(
+                        team.TrackKey,
+                        source,
+                        StringComparison.OrdinalIgnoreCase))
+                    && !reassignments.ContainsKey(source))
+                .ToArray();
+            if (missingSources.Length > 0)
+            {
+                var affectedTeamCount = teams.Count(team => missingSources.Contains(
+                    team.TrackKey,
+                    StringComparer.OrdinalIgnoreCase));
+                return Failure(
+                    CompetitionTrackFailureCode.TrackReassignmentRequired,
+                    "Every removed track assigned to a team requires a reassignment target.",
+                    affectedTeamCount);
+            }
+        }
+
+        var defaultTrackKey = normalized.DefaultTrack.Key;
+        var changedTeams = new List<(Team Team, string PreviousTrackKey)>();
+        foreach (var team in teams)
+        {
+            var nextTrackKey = command.Enabled
+                ? reassignments.GetValueOrDefault(team.TrackKey) ?? team.TrackKey
+                : defaultTrackKey;
+            if (!nextKeys.Contains(nextTrackKey))
+            {
+                return Failure(
+                    CompetitionTrackFailureCode.InvalidTrackReassignment,
+                    $"Team '{team.Id}' would retain missing track '{nextTrackKey}'.");
+            }
+            if (string.Equals(team.TrackKey, nextTrackKey, StringComparison.OrdinalIgnoreCase))
+                continue;
+            changedTeams.Add((team, team.TrackKey));
+            team.TrackKey = nextTrackKey;
+        }
 
         var nextJson = CompetitionTrackConfiguration.Serialize(normalized);
         var currentJson = CompetitionTrackConfiguration.Serialize(currentConfiguration);
-        if (string.Equals(nextJson, currentJson, StringComparison.Ordinal))
+        var configurationChanged = !string.Equals(nextJson, currentJson, StringComparison.Ordinal);
+        var enabledChanged = competition.TracksEnabled != command.Enabled;
+        if (!configurationChanged && !enabledChanged && changedTeams.Count == 0)
         {
             await transaction.CommitAsync(cancellationToken);
-            return OperationResult<CompetitionTracksView, CompetitionTrackFailureCode>.Success(
+            return UpdateCompetitionTracksResult.Success(
                 Map(competition, normalized, includeInvitationCodes: true));
         }
 
+        var affectsLeaderboard = enabledChanged
+            || !HasSameLeaderboardShape(currentConfiguration, normalized);
+        competition.TracksEnabled = command.Enabled;
         competition.TrackConfigurationJson = nextJson;
         competition.UpdatedAt = command.UpdatedAt;
-        await events.RecordAsync(new CompetitionEventDraft(
-            competition.Id,
-            CompetitionEventKind.TrackConfigurationUpdated,
-            CompetitionEventLevel.Information,
-            CompetitionEventVisibility.Staff,
-            command.UpdatedAt,
-            ActorUserId: command.ActorUserId), cancellationToken);
+        foreach (var (team, previousTrackKey) in changedTeams)
+        {
+            await events.RecordAsync(new CompetitionEventDraft(
+                competition.Id,
+                CompetitionEventKind.TeamTrackChanged,
+                CompetitionEventLevel.Information,
+                CompetitionEventVisibility.Staff,
+                command.UpdatedAt,
+                ActorUserId: command.ActorUserId,
+                TeamId: team.Id,
+                TrackKey: team.TrackKey,
+                PreviousTrackKey: previousTrackKey), cancellationToken);
+        }
+        if (configurationChanged || enabledChanged)
+        {
+            await events.RecordAsync(new CompetitionEventDraft(
+                competition.Id,
+                affectsLeaderboard
+                    ? CompetitionEventKind.TrackConfigurationUpdated
+                    : CompetitionEventKind.TrackRegistrationPolicyUpdated,
+                CompetitionEventLevel.Information,
+                CompetitionEventVisibility.Staff,
+                command.UpdatedAt,
+                ActorUserId: command.ActorUserId,
+                PayloadJson: JsonSerializer.Serialize(
+                    new TrackConfigurationEventPayload(
+                        1,
+                        command.Enabled,
+                        defaultTrackKey,
+                        normalized.Tracks.Select(track => track.Key).ToArray(),
+                        changedTeams.Count),
+                    JsonOptions)), cancellationToken);
+        }
         await db.SaveChangesAsync(cancellationToken);
         await transaction.CommitAsync(cancellationToken);
         await outbox.FlushOutgoingMessagesAsync();
-        return OperationResult<CompetitionTracksView, CompetitionTrackFailureCode>.Success(
+        return UpdateCompetitionTracksResult.Success(
             Map(competition, normalized, includeInvitationCodes: true));
     }
 
@@ -164,6 +269,14 @@ public sealed class CompetitionTrackStore(
         if (competition is null)
             return AssignmentFailure(CompetitionTrackFailureCode.CompetitionNotFound,
                 "Competition was not found.");
+        if (!CompetitionTrackPolicy.CanUpdate(competition.Status))
+            return AssignmentFailure(
+                CompetitionTrackFailureCode.CompetitionFinished,
+                "Finished competitions are read-only.");
+        if (!competition.TracksEnabled)
+            return AssignmentFailure(
+                CompetitionTrackFailureCode.TracksDisabled,
+                "Team track assignment is unavailable while tracks are disabled.");
         var configuration = CompetitionTrackConfiguration.ParseOrDefault(
             competition.Mode,
             competition.TrackConfigurationJson);
@@ -212,8 +325,28 @@ public sealed class CompetitionTrackStore(
         competition.Id,
         competition.Mode,
         competition.Status,
-        CompetitionTrackPolicy.IsFrozen(competition.Status),
+        competition.TracksEnabled,
+        CompetitionTrackPolicy.CanUpdate(competition.Status),
         configuration.Tracks.Select(track => Map(track, includeInvitationCodes)).ToArray());
+
+    private static bool HasSameLeaderboardShape(
+        CompetitionTrackConfiguration current,
+        CompetitionTrackConfiguration next) =>
+        current.Tracks.Select(ToLeaderboardShape)
+            .SequenceEqual(next.Tracks.Select(ToLeaderboardShape));
+
+    private static object ToLeaderboardShape(CompetitionTrackDefinition track) => new
+    {
+        track.Key,
+        track.Name,
+        track.IsDefault,
+        track.IsInternal,
+        track.EarnsScore,
+        track.EarnsBlood,
+        track.AffectsDynamicChallengeScore,
+        track.VisibleOnLeaderboard,
+        track.AffectsCompetitiveResults
+    };
 
     private static CompetitionTrackView Map(
         CompetitionTrackDefinition track,
@@ -232,10 +365,11 @@ public sealed class CompetitionTrackStore(
         track.RequiresInvitationCode,
         includeInvitationCode ? track.InvitationCode : null);
 
-    private static OperationResult<CompetitionTracksView, CompetitionTrackFailureCode> Failure(
+    private static UpdateCompetitionTracksResult Failure(
         CompetitionTrackFailureCode code,
-        string message) =>
-        OperationResult<CompetitionTracksView, CompetitionTrackFailureCode>.Failure(code, message);
+        string message,
+        int affectedTeamCount = 0) =>
+        UpdateCompetitionTracksResult.Failure(code, message, affectedTeamCount);
 
     private static OperationResult<TeamTrackAssignmentView, CompetitionTrackFailureCode> AssignmentFailure(
         CompetitionTrackFailureCode code,

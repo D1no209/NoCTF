@@ -57,8 +57,44 @@ public sealed class CompetitionConfigurationPatchRequest
 
 public sealed class CompetitionTracksPatchRequest
 {
+    public required bool Enabled { get; set; }
     public required IReadOnlyList<UpdateCompetitionTrackRequest> Tracks { get; set; }
+    public IReadOnlyList<RemovedTrackReassignmentRequest> RemovedTrackReassignments { get; set; } = [];
     [JsonIgnore] public string? TrackConfigurationJson { get; set; }
+}
+
+public sealed class RemovedTrackReassignmentRequest
+{
+    public required string FromTrackKey { get; set; }
+    public required string ToTrackKey { get; set; }
+}
+
+[JsonConverter(typeof(NoCTF.API.Serialization.StrictPascalCaseEnumConverter<
+    CompetitionTrackFailureCodeProtocol>))]
+public enum CompetitionTrackFailureCodeProtocol
+{
+    CompetitionNotFound,
+    InvalidConfiguration,
+    CompetitionFinished,
+    TracksDisabled,
+    TrackReassignmentRequired,
+    InvalidTrackReassignment,
+    TeamNotFound,
+    TrackNotFound,
+    TrackNotPublicSelectable
+}
+
+public sealed record CompetitionTrackFailureResponse(
+    CompetitionTrackFailureCodeProtocol Code,
+    string Message,
+    int AffectedTeamCount);
+
+[Mapper]
+internal static partial class CompetitionTrackFailureProtocolMapper
+{
+    [MapEnum(EnumMappingStrategy.ByName)]
+    public static partial CompetitionTrackFailureCodeProtocol ToProtocol(
+        CompetitionTrackFailureCode value);
 }
 
 public sealed class CompetitionPermissionsPatchRequest
@@ -122,6 +158,13 @@ public sealed class PatchCompetitionValidator : Validator<PatchCompetitionReques
         RuleFor(request => request.Tracks!.Tracks).NotNull()
             .Must(tracks => tracks.Count is >= 1 and <= 32)
             .When(request => request.Tracks is not null);
+        RuleForEach(request => request.Tracks!.RemovedTrackReassignments)
+            .ChildRules(reassignment =>
+            {
+                reassignment.RuleFor(value => value.FromTrackKey).NotEmpty().MaximumLength(64);
+                reassignment.RuleFor(value => value.ToTrackKey).NotEmpty().MaximumLength(64);
+            })
+            .When(request => request.Tracks is not null);
         RuleFor(request => request.Permissions!.OwnerId).NotEmpty()
             .When(request => request.Permissions is not null);
         RuleFor(request => request.Permissions!.ManagerIds).NotNull()
@@ -156,6 +199,7 @@ public static partial class CompetitionPatchMapper
     [MapperIgnoreTarget(nameof(Competition.JudgeIds))]
     [MapperIgnoreTarget(nameof(Competition.ObserverIds))]
     [MapperIgnoreTarget(nameof(Competition.ConfigurationJson))]
+    [MapperIgnoreTarget(nameof(Competition.TracksEnabled))]
     [MapperIgnoreTarget(nameof(Competition.TrackConfigurationJson))]
     [MapperIgnoreTarget(nameof(Competition.FrozenStartAt))]
     [MapperIgnoreTarget(nameof(Competition.HiddenStartAt))]
@@ -179,6 +223,7 @@ public static partial class CompetitionPatchMapper
     [MapperIgnoreTarget(nameof(Competition.ManagerIds))]
     [MapperIgnoreTarget(nameof(Competition.JudgeIds))]
     [MapperIgnoreTarget(nameof(Competition.ObserverIds))]
+    [MapperIgnoreTarget(nameof(Competition.TracksEnabled))]
     [MapperIgnoreTarget(nameof(Competition.TrackConfigurationJson))]
     [MapperIgnoreTarget(nameof(Competition.FrozenStartAt))]
     [MapperIgnoreTarget(nameof(Competition.HiddenStartAt))]
@@ -206,6 +251,8 @@ public static partial class CompetitionPatchMapper
         [MappingTarget] Competition target);
 
     [MapperIgnoreSource(nameof(CompetitionTracksPatchRequest.Tracks))]
+    [MapperIgnoreSource(nameof(CompetitionTracksPatchRequest.RemovedTrackReassignments))]
+    [MapProperty(nameof(CompetitionTracksPatchRequest.Enabled), nameof(Competition.TracksEnabled))]
     [MapProperty(nameof(CompetitionTracksPatchRequest.TrackConfigurationJson), nameof(Competition.TrackConfigurationJson))]
     [MapperIgnoreTarget(nameof(Competition.Title))]
     [MapperIgnoreTarget(nameof(Competition.Description))]
@@ -242,6 +289,7 @@ public static partial class CompetitionPatchMapper
     [MapperIgnoreTarget(nameof(Competition.Title))]
     [MapperIgnoreTarget(nameof(Competition.Description))]
     [MapperIgnoreTarget(nameof(Competition.ConfigurationJson))]
+    [MapperIgnoreTarget(nameof(Competition.TracksEnabled))]
     [MapperIgnoreTarget(nameof(Competition.TrackConfigurationJson))]
     [MapperIgnoreTarget(nameof(Competition.FrozenStartAt))]
     [MapperIgnoreTarget(nameof(Competition.HiddenStartAt))]
@@ -276,6 +324,7 @@ public static partial class CompetitionPatchMapper
     [MapperIgnoreTarget(nameof(Competition.JudgeIds))]
     [MapperIgnoreTarget(nameof(Competition.ObserverIds))]
     [MapperIgnoreTarget(nameof(Competition.ConfigurationJson))]
+    [MapperIgnoreTarget(nameof(Competition.TracksEnabled))]
     [MapperIgnoreTarget(nameof(Competition.TrackConfigurationJson))]
     [MapperIgnoreTarget(nameof(Competition.StartAt))]
     [MapperIgnoreTarget(nameof(Competition.EndAt))]
@@ -319,7 +368,7 @@ public sealed class PatchCompetitionEndpoint(
     TimeProvider timeProvider)
     : Endpoint<PatchCompetitionRequest,
         Results<Ok<AdminCompetitionResponse>, NotFound, ForbidHttpResult,
-            ProblemHttpResult>>
+            Conflict<CompetitionTrackFailureResponse>, ProblemHttpResult>>
 {
     public override void Configure()
     {
@@ -330,7 +379,7 @@ public sealed class PatchCompetitionEndpoint(
     }
 
     public override async Task<Results<Ok<AdminCompetitionResponse>, NotFound,
-        ForbidHttpResult, ProblemHttpResult>> ExecuteAsync(
+        ForbidHttpResult, Conflict<CompetitionTrackFailureResponse>, ProblemHttpResult>> ExecuteAsync(
         PatchCompetitionRequest request,
         CancellationToken ct)
     {
@@ -370,6 +419,7 @@ public sealed class PatchCompetitionEndpoint(
             ObserverIds = permissions.Snapshot?.ObserverIds.ToArray() ?? [],
             Mode = current.Mode,
             ConfigurationJson = configuration.Json,
+            TracksEnabled = current.TracksEnabled,
             FrozenStartAt = current.FrozenStartAt,
             HiddenStartAt = current.HiddenStartAt,
             StartAt = current.StartTime,
@@ -405,7 +455,8 @@ public sealed class PatchCompetitionEndpoint(
         return await atomicPatch.ExecuteAsync(ApplyAsync, ct);
 
         async Task<AtomicAggregatePatchDecision<Results<Ok<AdminCompetitionResponse>,
-            NotFound, ForbidHttpResult, ProblemHttpResult>>> ApplyAsync(
+            NotFound, ForbidHttpResult, Conflict<CompetitionTrackFailureResponse>,
+            ProblemHttpResult>>> ApplyAsync(
             CancellationToken transactionCt)
         {
             if ((sections & CompetitionPatchSection.Metadata) != 0)
@@ -453,7 +504,12 @@ public sealed class PatchCompetitionEndpoint(
                     return Missing();
                 var result = await updateTracks.ExecuteAsync(new UpdateCompetitionTracksCommand(
                     competitionId,
+                    request.Tracks!.Enabled,
                     request.Tracks!.Tracks.Select(ToDefinition).ToArray(),
+                    request.Tracks.RemovedTrackReassignments.Select(reassignment =>
+                        new RemovedTrackReassignment(
+                            reassignment.FromTrackKey,
+                            reassignment.ToTrackKey)).ToArray(),
                     user.UserId,
                     timeProvider.GetUtcNow(),
                     request.Tracks.Tracks.Select(track =>
@@ -464,8 +520,7 @@ public sealed class PatchCompetitionEndpoint(
                     tracks.Mode,
                     transactionCt);
                 if (!result.Succeeded)
-                    return Reject(Failure(
-                        result.ErrorMessage ?? "Competition tracks are invalid."));
+                    return RejectTrack(TrackFailure(result));
             }
             if ((sections & CompetitionPatchSection.Permissions) != 0)
             {
@@ -509,23 +564,36 @@ public sealed class PatchCompetitionEndpoint(
 
             var response = await LoadResponseAsync(competitionId, transactionCt);
             Results<Ok<AdminCompetitionResponse>, NotFound, ForbidHttpResult,
-                ProblemHttpResult> outcome = response is null
+                Conflict<CompetitionTrackFailureResponse>, ProblemHttpResult> outcome = response is null
                     ? TypedResults.NotFound()
                     : TypedResults.Ok(response);
             return AtomicAggregatePatchDecision<Results<Ok<AdminCompetitionResponse>,
-                NotFound, ForbidHttpResult, ProblemHttpResult>>.Commit(outcome);
+                NotFound, ForbidHttpResult, Conflict<CompetitionTrackFailureResponse>,
+                ProblemHttpResult>>.Commit(outcome);
         }
 
         static AtomicAggregatePatchDecision<Results<Ok<AdminCompetitionResponse>,
-            NotFound, ForbidHttpResult, ProblemHttpResult>> Reject(
+            NotFound, ForbidHttpResult, Conflict<CompetitionTrackFailureResponse>,
+            ProblemHttpResult>> Reject(
             ProblemHttpResult failure) =>
             AtomicAggregatePatchDecision<Results<Ok<AdminCompetitionResponse>,
-                NotFound, ForbidHttpResult, ProblemHttpResult>>.Rollback(failure);
+                NotFound, ForbidHttpResult, Conflict<CompetitionTrackFailureResponse>,
+                ProblemHttpResult>>.Rollback(failure);
 
         static AtomicAggregatePatchDecision<Results<Ok<AdminCompetitionResponse>,
-            NotFound, ForbidHttpResult, ProblemHttpResult>> Missing() =>
+            NotFound, ForbidHttpResult, Conflict<CompetitionTrackFailureResponse>,
+            ProblemHttpResult>> RejectTrack(
+            Conflict<CompetitionTrackFailureResponse> failure) =>
             AtomicAggregatePatchDecision<Results<Ok<AdminCompetitionResponse>,
-                NotFound, ForbidHttpResult, ProblemHttpResult>>.Rollback(
+                NotFound, ForbidHttpResult, Conflict<CompetitionTrackFailureResponse>,
+                ProblemHttpResult>>.Rollback(failure);
+
+        static AtomicAggregatePatchDecision<Results<Ok<AdminCompetitionResponse>,
+            NotFound, ForbidHttpResult, Conflict<CompetitionTrackFailureResponse>,
+            ProblemHttpResult>> Missing() =>
+            AtomicAggregatePatchDecision<Results<Ok<AdminCompetitionResponse>,
+                NotFound, ForbidHttpResult, Conflict<CompetitionTrackFailureResponse>,
+                ProblemHttpResult>>.Rollback(
                     TypedResults.NotFound());
     }
 
@@ -594,4 +662,11 @@ public sealed class PatchCompetitionEndpoint(
         statusCode: StatusCodes.Status409Conflict,
         title: "Competition was not updated.",
         detail: detail);
+
+    private static Conflict<CompetitionTrackFailureResponse> TrackFailure(
+        UpdateCompetitionTracksResult result) =>
+        TypedResults.Conflict(new CompetitionTrackFailureResponse(
+            CompetitionTrackFailureProtocolMapper.ToProtocol(result.FailureCode!.Value),
+            result.ErrorMessage ?? "Competition tracks were not updated.",
+            result.AffectedTeamCount));
 }
