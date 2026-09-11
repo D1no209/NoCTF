@@ -12,6 +12,7 @@ import {
 } from '../../api'
 import AvatarCropDialogComponent from './AvatarCropDialog.vue'
 import { exceedsUploadLimit } from './upload-limits'
+import { runDownRevealTransition } from '../../motion/reveal-transition'
 
 export type AccountPanelSection = 'profile' | 'identity' | 'wallpaper' | 'security'
 
@@ -188,7 +189,11 @@ export function useAccountPanel() {
         body: { appearance: { wallpaperEnabled: enabled } },
       })
       if (error || !data) throw error
-      await fetchMe()
+      const nextEnabled = data.appearance?.wallpaperEnabled ?? enabled
+      await runDownRevealTransition('wallpaper', () => {
+        if (user.value)
+          user.value = { ...user.value, wallpaperEnabled: nextEnabled }
+      })
       toast.success(translate(enabled
         ? 'accountPanel.wallpaperEnabled'
         : 'accountPanel.wallpaperDisabled'))

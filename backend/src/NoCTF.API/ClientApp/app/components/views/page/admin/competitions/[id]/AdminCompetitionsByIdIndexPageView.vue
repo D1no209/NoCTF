@@ -3,11 +3,61 @@ import { toRefs } from 'vue'
 import type { AdminCompetitionsByIdIndexPageViewState } from '~/features/routes/admin/competitions/[id]/useAdminCompetitionsByIdIndexPage'
 
 const viewProps = defineProps<{ state: AdminCompetitionsByIdIndexPageViewState }>()
-const { startGateErrorMessage, competitionId, competition, canWrite, canManagePermissions, isAdministrator, pendingAction, actionError, status, isDeleted, steps, actions, confirmTarget, execute, trigger, validating, validationErrors, validateStart, generating, generateFailures, generateMissingFlags, deleting, restoring, hardDeleting, forceDeleting, deleteConfirm, forceDeleteOpen, forceDeleteTitle, forceDeleteReason, forceDeleteError, forceDeleteConflictingIds, hardDeletePreview, hardDeletePreviewLoading, hardDeletePreviewError, hardDeleteReferenceLabel, restore, forceDeleteValid, beginForceDelete, forceDelete, submitDelete, onClickDeleteConfirm, onClickDeleteConfirm2, onUpdateOpenConfirmTarget, onClickForceDeleteOpen, onUpdateOpenDeleteConfirm } = toRefs(viewProps.state)
+const { startGateErrorMessage, competitionId, competition, canWrite, canManagePermissions, isAdministrator, pendingAction, actionError, status, isDeleted, posterUrl, posterLoading, posterError, posterPending, posterInputKey, posterSelectionError, posterRemoveOpen, refreshPoster, selectPoster, removePoster, setPosterRemoveOpen, steps, actions, confirmTarget, execute, trigger, validating, validationErrors, validateStart, generating, generateFailures, generateMissingFlags, deleting, restoring, hardDeleting, forceDeleting, deleteConfirm, forceDeleteOpen, forceDeleteTitle, forceDeleteReason, forceDeleteError, forceDeleteConflictingIds, hardDeletePreview, hardDeletePreviewLoading, hardDeletePreviewError, hardDeleteReferenceLabel, restore, forceDeleteValid, beginForceDelete, forceDelete, submitDelete, onClickDeleteConfirm, onClickDeleteConfirm2, onUpdateOpenConfirmTarget, onClickForceDeleteOpen, onUpdateOpenDeleteConfirm } = toRefs(viewProps.state)
 </script>
 
 <template>
   <div v-if="competition" class="flex flex-col gap-6">
+    <Card v-if="!isDeleted">
+      <CardHeader>
+        <CardTitle>{{ $t('ui.competitionPoster') }}</CardTitle>
+        <CardDescription>{{ $t('ui.competitionPosterManagementDescription') }}</CardDescription>
+      </CardHeader>
+      <CardContent class="grid min-w-0 gap-5 lg:grid-cols-[minmax(16rem,24rem)_minmax(0,1fr)] lg:items-start">
+        <CoverImage
+          :src="posterUrl"
+          :pending="posterLoading"
+          :alt="$t('ui.competitionPoster')"
+          :fallback="$t('competitionBrowser.noPoster')"
+          :aspect-ratio="16 / 9"
+          class="min-w-0 rounded-xl"
+        />
+        <div class="flex min-w-0 flex-col gap-4">
+          <Alert v-if="posterError" variant="destructive">
+            <AlertDescription class="flex flex-wrap items-center justify-between gap-3">
+              <span>{{ $message(posterError) }}</span>
+              <Button type="button" size="sm" variant="outline" :disabled="posterLoading" @click="refreshPoster">
+                {{ $t('ui.retry') }}
+              </Button>
+            </AlertDescription>
+          </Alert>
+          <template v-if="canWrite">
+            <Field>
+              <FieldLabel for="competition-poster-upload">
+                {{ posterUrl ? $t('ui.replaceCompetitionPoster') : $t('ui.uploadCompetitionPoster') }}
+              </FieldLabel>
+              <FileUpload
+                :key="posterInputKey"
+                id="competition-poster-upload"
+                accept="image/jpeg,image/png,image/webp"
+                :disabled="posterPending"
+                :pending="posterPending"
+                :error="posterSelectionError"
+                @change="selectPoster"
+              />
+              <FieldDescription>{{ $t('ui.competitionPosterUploadDescription') }}</FieldDescription>
+            </Field>
+            <div v-if="posterUrl">
+              <Button type="button" variant="outline" size="sm" :disabled="posterPending" @click="setPosterRemoveOpen(true)">
+                {{ $t('ui.removeCompetitionPoster') }}
+              </Button>
+            </div>
+          </template>
+          <p v-else class="text-sm text-muted-foreground">{{ $t('ui.theCurrentRoleIsReadOnlyAndCannotModifyThePoster') }}</p>
+        </div>
+      </CardContent>
+    </Card>
+
     <Card>
       <CardHeader>
         <CardTitle>{{ $t('ui.lifeCycle') }}</CardTitle>
@@ -144,6 +194,22 @@ const { startGateErrorMessage, competitionId, competition, canWrite, canManagePe
         </Alert>
       </CardContent>
     </Card>
+
+    <AlertDialog :open="posterRemoveOpen" @update:open="setPosterRemoveOpen">
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>{{ $t('ui.removeCompetitionPoster') }}</AlertDialogTitle>
+          <AlertDialogDescription>{{ $t('ui.removeCompetitionPosterDescription') }}</AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel :disabled="posterPending">{{ $t('ui.cancel') }}</AlertDialogCancel>
+          <Button type="button" variant="destructive" :disabled="posterPending" @click="removePoster">
+            <Spinner v-if="posterPending" data-icon="inline-start" />
+            {{ $t('ui.remove') }}
+          </Button>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
 
     <AlertDialog :open="confirmTarget !== null" @update:open="onUpdateOpenConfirmTarget">
       <AlertDialogContent>

@@ -41,12 +41,28 @@
 }
 .noctf-motion-home-signal-flow { animation: noctf-home-signal-flow 12s linear infinite; }
 ::view-transition-old(root),
-::view-transition-new(root) {
+::view-transition-new(root),
+::view-transition-old(noctf-page-wallpaper),
+::view-transition-new(noctf-page-wallpaper),
+::view-transition-old(noctf-page-foreground),
+::view-transition-new(noctf-page-foreground) {
   animation: none;
   mix-blend-mode: normal;
 }
-html[data-theme-transition='down']::view-transition-old(root) { z-index: 1; }
-html[data-theme-transition='down']::view-transition-new(root) {
+html[data-theme-transition='down']::view-transition-group(root),
+html[data-wallpaper-transition='down']::view-transition-group(root) { z-index: 0; }
+html[data-theme-transition='down']::view-transition-group(noctf-page-wallpaper),
+html[data-wallpaper-transition='down']::view-transition-group(noctf-page-wallpaper) { z-index: 1; }
+html[data-theme-transition='down']::view-transition-group(noctf-page-foreground),
+html[data-wallpaper-transition='down']::view-transition-group(noctf-page-foreground) { z-index: 2; }
+html[data-theme-transition='down']::view-transition-old(root),
+html[data-theme-transition='down']::view-transition-old(noctf-page-wallpaper),
+html[data-theme-transition='down']::view-transition-old(noctf-page-foreground),
+html[data-wallpaper-transition='down']::view-transition-old(noctf-page-wallpaper) { z-index: 1; }
+html[data-theme-transition='down']::view-transition-new(root),
+html[data-theme-transition='down']::view-transition-new(noctf-page-wallpaper),
+html[data-theme-transition='down']::view-transition-new(noctf-page-foreground),
+html[data-wallpaper-transition='down']::view-transition-new(noctf-page-wallpaper) {
   z-index: 2;
   -webkit-mask-image: linear-gradient(
     to bottom,
@@ -96,7 +112,13 @@ html[data-theme-transition='down']::view-transition-new(root) {
   .noctf-wave-item { transition: none; }
   .noctf-motion-terminal-caret, .noctf-motion-status-mark, .noctf-motion-home-signal-flow { animation: none; }
   html[data-theme-transition]::view-transition-old(root),
-  html[data-theme-transition]::view-transition-new(root) {
+  html[data-theme-transition]::view-transition-new(root),
+  html[data-theme-transition]::view-transition-old(noctf-page-wallpaper),
+  html[data-theme-transition]::view-transition-new(noctf-page-wallpaper),
+  html[data-theme-transition]::view-transition-old(noctf-page-foreground),
+  html[data-theme-transition]::view-transition-new(noctf-page-foreground),
+  html[data-wallpaper-transition]::view-transition-old(noctf-page-wallpaper),
+  html[data-wallpaper-transition]::view-transition-new(noctf-page-wallpaper) {
     animation: none;
     -webkit-mask-image: none;
     mask-image: none;

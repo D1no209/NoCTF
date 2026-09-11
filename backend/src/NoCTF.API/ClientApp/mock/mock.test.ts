@@ -255,6 +255,8 @@ describe('isolated Mock API', () => {
     expect(poster.status).toBe(200)
     expect(poster.headers.get('content-type')).toContain('image/webp')
     expect(await poster.text()).toBe('new poster')
+    expect((await send(`/api/v1/admin/competitions/${id(2)}/poster`, 'DELETE')).status).toBe(204)
+    expect((await send(`/api/v1/competitions/${id(2)}/poster`)).status).toBe(404)
   })
 
   test('unimplemented writes and unknown routes fail explicitly; roles are enforced', async () => {

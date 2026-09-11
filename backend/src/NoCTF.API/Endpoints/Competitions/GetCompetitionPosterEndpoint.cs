@@ -21,6 +21,7 @@ public sealed class GetCompetitionPosterEndpoint(ManageBusinessImages images)
         CancellationToken ct)
     {
         var file = await images.GetCompetitionPosterAsync(Route<Guid>("competitionId"), ct);
+        HttpContext.Response.Headers.CacheControl = "no-store";
         return file is null
             ? TypedResults.NotFound()
             : TypedResults.Stream(file.Content, file.ContentType, file.FileName);

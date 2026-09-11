@@ -7,12 +7,16 @@ const { Bell, isHome, wallpaperActive, wallpaperStyle, isLoggedIn, isAdministrat
 </script>
 
 <template>
-  <div data-slot="default-layout"
-    class="flex min-h-screen flex-col"
-    :data-page-wallpaper="!isHome || undefined"
-    :data-personal-wallpaper="!isHome && wallpaperActive || undefined"
-    :style="!isHome ? wallpaperStyle : undefined"
-  >
+  <div data-slot="default-layout" class="relative isolate flex min-h-screen flex-col">
+    <div
+      v-if="!isHome"
+      data-slot="page-wallpaper"
+      data-page-wallpaper="true"
+      :data-personal-wallpaper="wallpaperActive || undefined"
+      :style="wallpaperStyle"
+      aria-hidden="true"
+    />
+    <div data-slot="default-layout-foreground" class="flex min-h-screen flex-col">
     <header class="pointer-events-none sticky top-0 z-40">
       <div data-slot="topbar-frame" class="mx-auto grid h-20 w-full max-w-[96rem] grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 px-4 md:px-6">
         <div data-slot="topbar-capsule" data-position="left">
@@ -97,5 +101,6 @@ const { Bell, isHome, wallpaperActive, wallpaperStyle, isLoggedIn, isAdministrat
     <main data-slot="page-transition-viewport" class="flex-1">
       <slot />
     </main>
+    </div>
   </div>
 </template>
