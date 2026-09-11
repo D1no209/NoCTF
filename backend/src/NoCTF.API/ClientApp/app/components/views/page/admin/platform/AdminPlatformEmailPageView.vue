@@ -3,7 +3,7 @@ import { toRefs } from 'vue'
 import type { AdminPlatformEmailPageViewState } from '~/features/routes/admin/platform/useAdminPlatformEmailPage'
 
 const viewProps = defineProps<{ state: AdminPlatformEmailPageViewState }>()
-const { KeyRound, RefreshCw, Send, ShieldCheck, configuration, humanVerification, humanVerificationEnabled, humanVerificationSaving, humanVerificationDirty, humanVerificationProviderLabel, loading, loadError, form, saving, passwordOpen, newPassword, passwordSaving, sendingTest, load, saveHumanVerification, save, replacePassword, sendTest, AdminDateTime, onClickPasswordOpen, onClickPasswordOpen2 } = toRefs(viewProps.state)
+const { KeyRound, RefreshCw, Send, ShieldCheck, configuration, humanVerification, humanForm, humanVerificationSaving, humanVerificationDirty, humanVerificationReady, humanVerificationProviderLabel, selectedSecretConfigured, humanSecretOpen, humanSecret, humanSecretSaving, loading, loadError, form, saving, passwordOpen, newPassword, passwordSaving, sendingTest, load, saveHumanVerification, replaceHumanVerificationSecret, save, replacePassword, sendTest, AdminDateTime, onClickPasswordOpen, onClickPasswordOpen2, setHumanSecretOpen } = toRefs(viewProps.state)
 </script>
 
 <template>
@@ -40,42 +40,88 @@ const { KeyRound, RefreshCw, Send, ShieldCheck, configuration, humanVerification
             </CardTitle>
             <CardDescription>{{ $t('ui.humanVerificationAdminDescription') }}</CardDescription>
           </div>
-          <Badge :variant="humanVerification.available ? 'secondary' : 'destructive'">
-            {{ humanVerification.available ? $t('ui.providerReady') : $t('ui.providerNotConfigured') }}
+          <Badge :variant="humanVerificationReady ? 'secondary' : 'outline'">
+            {{ humanVerificationReady ? $t('ui.configurationComplete') : $t('ui.configurationIncomplete') }}
           </Badge>
         </CardHeader>
         <CardContent>
           <UiForm class="flex flex-col gap-5" @submit.prevent="saveHumanVerification">
             <FieldGroup>
+              <Field>
+                <FieldLabel for="human-verification-provider">{{ $t('ui.provider') }}</FieldLabel>
+                <Select v-model="humanForm.provider" :disabled="humanVerificationSaving">
+                  <SelectTrigger id="human-verification-provider" class="w-full">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectGroup>
+                      <SelectItem value="None">{{ $t('ui.disabled') }}</SelectItem>
+                      <SelectItem value="Cap">{{ $t('ui.capProvider') }}</SelectItem>
+                      <SelectItem value="Turnstile">{{ $t('ui.turnstileProvider') }}</SelectItem>
+                    </SelectGroup>
+                  </SelectContent>
+                </Select>
+                <FieldDescription>{{ $t('ui.humanVerificationProviderDescription') }}</FieldDescription>
+              </Field>
               <Field orientation="horizontal">
                 <Switch
                   id="human-verification-enabled"
-                  v-model="humanVerificationEnabled"
-                  :disabled="humanVerificationSaving || (!humanVerification.available && !humanVerificationEnabled)"
+                  v-model="humanForm.enabled"
+                  :disabled="humanVerificationSaving || humanForm.provider === 'None' || (!humanVerificationReady && !humanForm.enabled)"
                 />
                 <FieldContent>
                   <FieldLabel for="human-verification-enabled">{{ $t('ui.enableHumanVerification') }}</FieldLabel>
                   <FieldDescription>{{ $t('ui.humanVerificationProtectedOperations') }}</FieldDescription>
                 </FieldContent>
               </Field>
-              <Field>
-                <FieldLabel>{{ $t('ui.provider') }}</FieldLabel>
+
+              <template v-if="humanForm.provider === 'Cap'">
+                <Field>
+                  <FieldLabel for="human-verification-cap-url">{{ $t('ui.capServerUrl') }}</FieldLabel>
+                  <Input id="human-verification-cap-url" v-model="humanForm.capServerUrl" :disabled="humanVerificationSaving" :placeholder="$t('ui.capServerUrlPlaceholder')" maxlength="2048" />
+                  <FieldDescription>{{ $t('ui.capServerUrlDescription') }}</FieldDescription>
+                </Field>
+                <Field>
+                  <FieldLabel for="human-verification-cap-site-key">{{ $t('ui.siteKey') }}</FieldLabel>
+                  <Input id="human-verification-cap-site-key" v-model="humanForm.capSiteKey" :disabled="humanVerificationSaving" maxlength="256" autocomplete="off" />
+                </Field>
+              </template>
+
+              <template v-else-if="humanForm.provider === 'Turnstile'">
+                <Field>
+                  <FieldLabel for="human-verification-turnstile-site-key">{{ $t('ui.siteKey') }}</FieldLabel>
+                  <Input id="human-verification-turnstile-site-key" v-model="humanForm.turnstileSiteKey" :disabled="humanVerificationSaving" maxlength="256" autocomplete="off" />
+                </Field>
+                <Field>
+                  <FieldLabel for="human-verification-hostnames">{{ $t('ui.allowedHostnames') }}</FieldLabel>
+                  <Textarea id="human-verification-hostnames" v-model="humanForm.turnstileAllowedHostnames" :disabled="humanVerificationSaving" rows="3" :placeholder="$t('ui.allowedHostnamePlaceholder')" />
+                  <FieldDescription>{{ $t('ui.allowedHostnamesDescription') }}</FieldDescription>
+                </Field>
+              </template>
+
+              <Field v-if="humanForm.provider !== 'None'">
+                <FieldLabel>{{ $t('ui.providerSecret') }}</FieldLabel>
                 <div class="flex flex-wrap items-center gap-2">
-                  <Badge variant="outline">{{ humanVerificationProviderLabel }}</Badge>
-                  <span v-if="!humanVerification.available" class="text-sm text-muted-foreground">
-                    {{ $t('ui.humanVerificationProviderDeploymentRequired') }}
-                  </span>
+                  <Button type="button" variant="outline" :disabled="humanVerificationSaving" @click="setHumanSecretOpen(true)">
+                    <KeyRound data-icon="inline-start" />
+                    {{ selectedSecretConfigured ? $t('ui.replaceProviderSecret') : $t('ui.configureProviderSecret') }}
+                  </Button>
+                  <Badge :variant="selectedSecretConfigured ? 'secondary' : 'destructive'">
+                    {{ selectedSecretConfigured ? $t('ui.configured') : $t('ui.notConfigured') }}
+                  </Badge>
                 </div>
+                <FieldDescription>{{ $t('ui.providerSecretDescription') }}</FieldDescription>
               </Field>
             </FieldGroup>
-            <div>
+            <div class="flex flex-wrap items-center gap-3">
               <Button
                 type="submit"
-                :disabled="humanVerificationSaving || !humanVerificationDirty || (!humanVerification.available && humanVerificationEnabled)"
+                :disabled="humanVerificationSaving || !humanVerificationDirty || (humanForm.enabled && !humanVerificationReady)"
               >
                 <Spinner v-if="humanVerificationSaving" data-icon="inline-start" />
                 {{ $t('ui.saveChanges') }}
               </Button>
+              <span class="text-sm text-muted-foreground">{{ $t('ui.currentProvider') }}: {{ humanVerificationProviderLabel }}</span>
             </div>
           </UiForm>
         </CardContent>
@@ -193,6 +239,28 @@ const { KeyRound, RefreshCw, Send, ShieldCheck, configuration, humanVerification
         </CardContent>
       </Card>
     </template>
+
+    <Dialog :open="humanSecretOpen" @update:open="setHumanSecretOpen">
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>{{ $t('ui.configureProviderSecret') }}</DialogTitle>
+          <DialogDescription>{{ $t('ui.providerSecretDialogDescription', { provider: humanVerificationProviderLabel }) }}</DialogDescription>
+        </DialogHeader>
+        <FieldGroup>
+          <Field>
+            <FieldLabel for="human-verification-secret">{{ $t('ui.providerSecret') }}</FieldLabel>
+            <PasswordInput id="human-verification-secret" v-model="humanSecret" required maxlength="4096" autocomplete="new-password" />
+          </Field>
+        </FieldGroup>
+        <DialogFooter>
+          <Button variant="outline" :disabled="humanSecretSaving" @click="setHumanSecretOpen(false)">{{ $t('ui.cancel') }}</Button>
+          <Button :disabled="humanSecretSaving || !humanSecret" @click="replaceHumanVerificationSecret">
+            <Spinner v-if="humanSecretSaving" data-icon="inline-start" />
+            {{ $t('ui.saveSecret') }}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
 
     <Dialog v-model:open="passwordOpen">
       <DialogContent>

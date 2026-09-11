@@ -8,6 +8,7 @@ using NoCTF.Application.Administration.Monitoring;
 using NoCTF.Application.Administration.PlatformConfiguration;
 using NoCTF.Application.Administration.UserAccounts;
 using NoCTF.Application.Administration.PlatformLogs;
+using NoCTF.Application.Admission;
 using NoCTF.Infrastructure.Administration.Monitoring;
 using NoCTF.Infrastructure.Observability;
 
@@ -36,6 +37,11 @@ internal static class AdministrationInfrastructure
             services.AddScoped<IPlatformAuditLogStore, NoOpPlatformAuditLogStore>();
             services.AddSingleton<IPlatformMonitoringReader,
                 NoOpPlatformMonitoringReader>();
+            services.AddScoped<NoOpHumanVerificationConfigurationStore>();
+            services.AddScoped<IHumanVerificationConfigurationStore>(provider =>
+                provider.GetRequiredService<NoOpHumanVerificationConfigurationStore>());
+            services.AddScoped<IHumanVerificationConfigurationReader>(provider =>
+                provider.GetRequiredService<NoOpHumanVerificationConfigurationStore>());
         }
         else if (development)
         {
@@ -46,6 +52,7 @@ internal static class AdministrationInfrastructure
             services.AddScoped<IPlatformAuditLogStore, PlatformAuditLogStore>();
             services.AddSingleton<IPlatformMonitoringReader,
                 UnavailablePlatformMonitoringReader>();
+            AddHumanVerificationConfigurationStore(services);
         }
         else
         {
@@ -91,15 +98,29 @@ internal static class AdministrationInfrastructure
                 services.AddSingleton<IPlatformMonitoringReader,
                     PrometheusPlatformMonitoringReader>();
             }
+            AddHumanVerificationConfigurationStore(services);
         }
 
+        services.AddSingleton(new HumanVerificationValidationPolicy(
+            development || exporting));
         services.AddScoped<ManagePlatform>();
         services.AddScoped<ManageUserAccounts>();
         services.AddScoped<ManagePlatformConfiguration>();
+        services.AddScoped<ManageHumanVerificationConfiguration>();
         services.AddScoped<ObservePlatform>();
         services.AddScoped<ExportPlatformLogs>();
         services.AddScoped<ObservePlatformMonitoring>();
         return services;
+    }
+
+    private static void AddHumanVerificationConfigurationStore(
+        IServiceCollection services)
+    {
+        services.AddScoped<HumanVerificationConfigurationStore>();
+        services.AddScoped<IHumanVerificationConfigurationStore>(provider =>
+            provider.GetRequiredService<HumanVerificationConfigurationStore>());
+        services.AddScoped<IHumanVerificationConfigurationReader>(provider =>
+            provider.GetRequiredService<HumanVerificationConfigurationStore>());
     }
 
     private static Uri? OptionalHttpUri(string? value, string settingName)

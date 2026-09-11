@@ -6248,7 +6248,7 @@
           "Admin"
         ],
         "summary": "Returns editable platform configuration sections.",
-        "description": "Returns branding, human verification, email delivery and public gateway configuration without deployment secrets.",
+        "description": "Returns branding, human verification, email delivery and public gateway configuration without provider or delivery secrets.",
         "operationId": "AdminPlatformGetConfiguration",
         "responses": {
           "200": {
@@ -7132,6 +7132,64 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationPlatformEmailVerificationConfigurationResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcValidationProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "Bearer": [
+              "Administrator"
+            ]
+          }
+        ]
+      }
+    },
+    "/api/v1/admin/platform/human-verification/secret": {
+      "put": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "Replaces a human verification provider secret.",
+        "description": "Encrypts the selected provider secret without returning it.",
+        "operationId": "AdminPlatformReplaceHumanVerificationSecret",
+        "requestBody": {
+          "x-name": "ReplaceHumanVerificationSecretRequest",
+          "description": "",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationPlatformReplaceHumanVerificationSecretRequest"
+              }
+            }
+          },
+          "required": true,
+          "x-position": 1
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationPlatformAdminHumanVerificationConfigurationResponse"
                 }
               }
             }
@@ -17123,8 +17181,33 @@
           "provider": {
             "$ref": "#/components/schemas/NoCTFAPIEndpointsPlatformHumanVerificationProviderProtocol"
           },
-          "available": {
+          "ready": {
             "type": "boolean"
+          },
+          "capServerUrl": {
+            "type": "string"
+          },
+          "capSiteKey": {
+            "type": "string"
+          },
+          "capSecretConfigured": {
+            "type": "boolean"
+          },
+          "turnstileSiteKey": {
+            "type": "string"
+          },
+          "turnstileSecretConfigured": {
+            "type": "boolean"
+          },
+          "turnstileAllowedHostnames": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
           }
         }
       },
@@ -18171,11 +18254,42 @@
         "type": "object",
         "additionalProperties": false,
         "required": [
-          "enabled"
+          "enabled",
+          "provider",
+          "capServerUrl",
+          "capSiteKey",
+          "turnstileSiteKey",
+          "turnstileAllowedHostnames"
         ],
         "properties": {
           "enabled": {
             "type": "boolean"
+          },
+          "provider": {
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsPlatformHumanVerificationProviderProtocol"
+          },
+          "capServerUrl": {
+            "type": "string",
+            "maxLength": 2048,
+            "minLength": 0
+          },
+          "capSiteKey": {
+            "type": "string",
+            "maxLength": 256,
+            "minLength": 0
+          },
+          "turnstileSiteKey": {
+            "type": "string",
+            "maxLength": 256,
+            "minLength": 0
+          },
+          "turnstileAllowedHostnames": {
+            "type": "array",
+            "maxLength": 253,
+            "minLength": 0,
+            "items": {
+              "type": "string"
+            }
           }
         }
       },
@@ -18349,6 +18463,25 @@
           "password": {
             "type": "string",
             "maxLength": 1024,
+            "minLength": 0,
+            "nullable": false
+          }
+        }
+      },
+      "NoCTFAPIEndpointsAdministrationPlatformReplaceHumanVerificationSecretRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "provider",
+          "secret"
+        ],
+        "properties": {
+          "provider": {
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsPlatformHumanVerificationProviderProtocol"
+          },
+          "secret": {
+            "type": "string",
+            "maxLength": 4096,
             "minLength": 0,
             "nullable": false
           }

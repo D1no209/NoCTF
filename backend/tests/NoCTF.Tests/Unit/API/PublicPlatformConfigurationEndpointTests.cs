@@ -6,12 +6,12 @@ using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Options;
 using NoCTF.API.Composition;
 using NoCTF.API.Endpoints.Platform;
 using NoCTF.Application.Administration.PlatformConfiguration;
 using NoCTF.Application.Admission;
 using NoCTF.Application.Storage;
+using NoCTF.Domain.Platform;
 using NSubstitute;
 
 namespace NoCTF.Tests.Unit.API;
@@ -29,7 +29,20 @@ public sealed class PublicPlatformConfigurationEndpointTests
         var settings = Substitute.For<IPlatformConfigurationStore>();
         settings.GetAsync(Arg.Any<CancellationToken>())
             .Returns(new PlatformConfigurationView(
-                "NoCTF", "Arena", null, humanVerificationEnabled, now));
+                "NoCTF", "Arena", null, now));
+        var humanVerification = Substitute.For<IHumanVerificationConfigurationStore>();
+        humanVerification.GetAsync(Arg.Any<CancellationToken>()).Returns(
+            new HumanVerificationConfigurationView(
+                humanVerificationEnabled,
+                HumanVerificationProvider.Cap,
+                true,
+                "https://cap.example.test/root",
+                "site-key",
+                true,
+                string.Empty,
+                false,
+                [],
+                now));
         var objects = Substitute.For<IStore>();
         var builder = WebApplication.CreateBuilder();
         builder.WebHost.UseTestServer();
@@ -40,22 +53,15 @@ public sealed class PublicPlatformConfigurationEndpointTests
             options.Filter = type => type == typeof(GetPublicPlatformConfigurationEndpoint);
         });
         builder.Services.AddSingleton(settings);
+        builder.Services.AddSingleton(humanVerification);
         builder.Services.AddSingleton(objects);
         builder.Services.AddSingleton(new FileUploadLimits(1_234_567, 7_654_321, 11, 12, 13));
-        builder.Services.AddSingleton<IOptions<HumanVerificationOptions>>(Options.Create(new HumanVerificationOptions
-        {
-            Provider = HumanVerificationProvider.Cap,
-            Cap = new CapHumanVerificationOptions
-            {
-                ServerUrl = "https://cap.example.test/root",
-                SiteKey = "site-key",
-                Secret = "provider-secret"
-            }
-        }));
+        builder.Services.AddSingleton(new HumanVerificationValidationPolicy(true));
         builder.Services.AddSingleton(new ManagedFileUploads(
             Substitute.For<IManagedFileUploadRegistry>(),
             objects));
         builder.Services.AddScoped<ManagePlatformConfiguration>();
+        builder.Services.AddScoped<ManageHumanVerificationConfiguration>();
         await using var app = builder.Build();
         app.UseNoCtfEndpoints();
         await app.StartAsync();

@@ -1,11 +1,6 @@
-namespace NoCTF.Application.Admission;
+using NoCTF.Domain.Platform;
 
-public enum HumanVerificationProvider
-{
-    None,
-    Cap,
-    Turnstile
-}
+namespace NoCTF.Application.Admission;
 
 public enum HumanVerificationAction
 {
@@ -30,6 +25,7 @@ public sealed record HumanVerificationAttempt(
 public interface IHumanVerificationVerifier
 {
     ValueTask<HumanVerificationResult> VerifyAsync(
+        HumanVerificationRuntimeConfiguration configuration,
         HumanVerificationAttempt attempt,
         CancellationToken cancellationToken);
 }

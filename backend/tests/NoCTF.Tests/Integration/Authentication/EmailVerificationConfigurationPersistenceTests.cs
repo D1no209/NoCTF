@@ -42,7 +42,7 @@ public sealed class EmailVerificationConfigurationPersistenceTests
             await db.Database.EnsureCreatedAsync(cancellationToken);
             var store = new EmailVerificationConfigurationStore(
                 db,
-                new EmailVerificationSecretProtector(Options.Create(
+                new PlatformSecretProtector(Options.Create(
                     configuration.GetSection(EmailVerificationProtectionOptions.SectionName)
                         .Get<EmailVerificationProtectionOptions>()!)));
             var initial = await store.GetAsync(cancellationToken);

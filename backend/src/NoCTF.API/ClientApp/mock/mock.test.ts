@@ -189,8 +189,13 @@ describe('isolated Mock API', () => {
     expect(publicConfiguration.name).toBe('Mock edited')
     expect(publicConfiguration.imageUploadLimits).toEqual({ maximumAvatarBytes: 12 * 1024 * 1024, maximumWallpaperBytes: 16 * 1024 * 1024 })
     expect(publicConfiguration.humanVerification).toEqual({ provider: 'None', siteKey: null, apiEndpoint: null })
-    const enabled = await send('/api/v1/admin/platform/configuration', 'PATCH', { humanVerification: { enabled: true } })
-    expect((await enabled.json()).humanVerification).toEqual({ enabled: true, provider: 'Cap', available: true })
+    const secret = await send('/api/v1/admin/platform/human-verification/secret', 'PUT', { provider: 'Cap', secret: 'mock-secret' })
+    expect(secret.status).toBe(200)
+    const enabled = await send('/api/v1/admin/platform/configuration', 'PATCH', { humanVerification: {
+      enabled: true, provider: 'Cap', capServerUrl: 'https://captcha.mock.invalid', capSiteKey: 'mock-site-key',
+      turnstileSiteKey: '', turnstileAllowedHostnames: [],
+    } })
+    expect((await enabled.json()).humanVerification).toMatchObject({ enabled: true, provider: 'Cap', ready: true, capSecretConfigured: true })
     expect((await (await send('/api/v1/platform/configuration')).json()).humanVerification)
       .toEqual({ provider: 'Cap', siteKey: 'mock-site-key', apiEndpoint: 'https://captcha.mock.invalid/mock-site-key/' })
     const fresh = await setup()

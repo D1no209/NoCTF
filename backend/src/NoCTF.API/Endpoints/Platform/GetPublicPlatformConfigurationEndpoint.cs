@@ -5,7 +5,7 @@ using NoCTF.Application.Administration.PlatformConfiguration;
 using NoCTF.Application.Storage;
 using NoCTF.Application.Admission;
 using NoCTF.API.Serialization;
-using Microsoft.Extensions.Options;
+using NoCTF.Domain.Platform;
 using System.Text.Json.Serialization;
 
 namespace NoCTF.API.Endpoints.Platform;
@@ -41,7 +41,7 @@ internal static class PublicPlatformConfigurationMapping
         LinkGenerator links,
         HttpContext httpContext,
         FileUploadLimits uploadLimits,
-        HumanVerificationOptions humanVerification) =>
+        HumanVerificationConfigurationView humanVerification) =>
         new(
             configuration.Name,
             configuration.Description,
@@ -49,14 +49,13 @@ internal static class PublicPlatformConfigurationMapping
             new(
                 uploadLimits.MaximumAvatarBytes,
                 uploadLimits.MaximumWallpaperBytes),
-            MapHumanVerification(configuration.HumanVerificationEnabled, humanVerification));
+            MapHumanVerification(humanVerification));
 
     private static PublicHumanVerificationResponse MapHumanVerification(
-        bool enabled,
-        HumanVerificationOptions options) =>
-        !enabled
+        HumanVerificationConfigurationView configuration) =>
+        !configuration.Enabled || !configuration.Ready
             ? new(HumanVerificationProviderProtocol.None, null, null)
-            : options.Provider switch
+            : configuration.Provider switch
         {
             HumanVerificationProvider.None => new(
                 HumanVerificationProviderProtocol.None,
@@ -64,15 +63,21 @@ internal static class PublicPlatformConfigurationMapping
                 null),
             HumanVerificationProvider.Cap => new(
                 HumanVerificationProviderProtocol.Cap,
-                options.Cap.SiteKey,
-                options.CapApiEndpoint().AbsoluteUri),
+                configuration.CapSiteKey,
+                CapApiEndpoint(configuration)),
             HumanVerificationProvider.Turnstile => new(
                 HumanVerificationProviderProtocol.Turnstile,
-                options.Turnstile.SiteKey,
+                configuration.TurnstileSiteKey,
                 null),
             _ => throw new InvalidOperationException(
-                $"Unsupported human verification provider: {options.Provider}.")
+                $"Unsupported human verification provider: {configuration.Provider}.")
         };
+
+    private static string CapApiEndpoint(
+        HumanVerificationConfigurationView configuration) =>
+        new Uri(
+            new Uri(configuration.CapServerUrl.TrimEnd('/') + "/", UriKind.Absolute),
+            $"{Uri.EscapeDataString(configuration.CapSiteKey)}/").AbsoluteUri;
 
     public static HumanVerificationProviderProtocol ToProtocol(
         HumanVerificationProvider provider) => provider switch
@@ -80,6 +85,16 @@ internal static class PublicPlatformConfigurationMapping
             HumanVerificationProvider.None => HumanVerificationProviderProtocol.None,
             HumanVerificationProvider.Cap => HumanVerificationProviderProtocol.Cap,
             HumanVerificationProvider.Turnstile => HumanVerificationProviderProtocol.Turnstile,
+            _ => throw new InvalidOperationException(
+                $"Unsupported human verification provider: {provider}.")
+        };
+
+    public static HumanVerificationProvider ToDomain(
+        HumanVerificationProviderProtocol provider) => provider switch
+        {
+            HumanVerificationProviderProtocol.None => HumanVerificationProvider.None,
+            HumanVerificationProviderProtocol.Cap => HumanVerificationProvider.Cap,
+            HumanVerificationProviderProtocol.Turnstile => HumanVerificationProvider.Turnstile,
             _ => throw new InvalidOperationException(
                 $"Unsupported human verification provider: {provider}.")
         };
@@ -99,9 +114,9 @@ internal static class PublicPlatformConfigurationMapping
 
 public sealed class GetPublicPlatformConfigurationEndpoint(
     ManagePlatformConfiguration configuration,
+    ManageHumanVerificationConfiguration humanVerification,
     LinkGenerator links,
-    FileUploadLimits uploadLimits,
-    IOptions<HumanVerificationOptions> humanVerification)
+    FileUploadLimits uploadLimits)
     : EndpointWithoutRequest<Ok<PublicPlatformConfigurationResponse>>
 {
     public override void Configure()
@@ -120,11 +135,12 @@ public sealed class GetPublicPlatformConfigurationEndpoint(
         CancellationToken ct)
     {
         var current = await configuration.GetAsync(ct);
+        var verification = await humanVerification.GetAsync(ct);
         return TypedResults.Ok(PublicPlatformConfigurationMapping.ToResponse(
             current,
             links,
             HttpContext,
             uploadLimits,
-            humanVerification.Value));
+            verification));
     }
 }

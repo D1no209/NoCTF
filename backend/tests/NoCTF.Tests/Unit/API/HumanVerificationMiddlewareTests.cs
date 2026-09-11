@@ -1,13 +1,10 @@
 using System.Text.Json;
 using Microsoft.AspNetCore.Http;
-using Microsoft.Extensions.Options;
 using Microsoft.Extensions.DependencyInjection;
-using FluentStorage.Storage;
 using NoCTF.API.Security;
-using NoCTF.Application.Administration.PlatformConfiguration;
 using NoCTF.Application.Admission;
 using NoCTF.Application.Authentication.Privacy;
-using NoCTF.Application.Storage;
+using NoCTF.Domain.Platform;
 using NSubstitute;
 
 namespace NoCTF.Tests.Unit.API;
@@ -36,27 +33,24 @@ public sealed class HumanVerificationMiddlewareTests
             disabled,
             verifier,
             source,
-            PlatformConfiguration(enabled: true),
-            Options.Create(new HumanVerificationOptions()));
+            Configuration(enabled: true, new HumanVerificationOptions()));
 
         var administrativelyDisabled = Context(HumanVerificationAction.Login);
         await middleware.InvokeAsync(
             administrativelyDisabled,
             verifier,
             source,
-            PlatformConfiguration(enabled: false),
-            Options.Create(TurnstileOptions()));
+            Configuration(enabled: false, TurnstileOptions()));
 
         var unmarked = Context(action: null);
         await middleware.InvokeAsync(
             unmarked,
             verifier,
             source,
-            PlatformConfiguration(enabled: true),
-            Options.Create(TurnstileOptions()));
+            Configuration(enabled: true, TurnstileOptions()));
 
         await Assert.That(calls).IsEqualTo(3);
-        await verifier.DidNotReceiveWithAnyArgs().VerifyAsync(default!, default);
+        await verifier.DidNotReceiveWithAnyArgs().VerifyAsync(default!, default!, default);
     }
 
     [Test]
@@ -71,8 +65,7 @@ public sealed class HumanVerificationMiddlewareTests
             missing,
             verifier,
             source,
-            PlatformConfiguration(enabled: true),
-            Options.Create(TurnstileOptions()));
+            Configuration(enabled: true, TurnstileOptions()));
 
         var oversized = Context(HumanVerificationAction.Login);
         oversized.Request.Headers[HumanVerificationDefaults.HeaderName] =
@@ -81,21 +74,23 @@ public sealed class HumanVerificationMiddlewareTests
             oversized,
             verifier,
             source,
-            PlatformConfiguration(enabled: true),
-            Options.Create(TurnstileOptions()));
+            Configuration(enabled: true, TurnstileOptions()));
 
         await Assert.That(missing.Response.StatusCode).IsEqualTo(StatusCodes.Status403Forbidden);
         await Assert.That(await ProblemCodeAsync(missing)).IsEqualTo("HumanVerificationRequired");
         await Assert.That(oversized.Response.StatusCode).IsEqualTo(StatusCodes.Status403Forbidden);
         await Assert.That(await ProblemCodeAsync(oversized)).IsEqualTo("HumanVerificationFailed");
-        await verifier.DidNotReceiveWithAnyArgs().VerifyAsync(default!, default);
+        await verifier.DidNotReceiveWithAnyArgs().VerifyAsync(default!, default!, default);
     }
 
     [Test]
     public async Task Verified_token_carries_action_and_normalized_source_to_provider()
     {
         var verifier = Substitute.For<IHumanVerificationVerifier>();
-        verifier.VerifyAsync(Arg.Any<HumanVerificationAttempt>(), Arg.Any<CancellationToken>())
+        verifier.VerifyAsync(
+                Arg.Any<HumanVerificationRuntimeConfiguration>(),
+                Arg.Any<HumanVerificationAttempt>(),
+                Arg.Any<CancellationToken>())
             .Returns(HumanVerificationResult.Verified);
         var source = Substitute.For<IRequestSourceAddress>();
         source.Address.Returns("192.0.2.20");
@@ -112,11 +107,14 @@ public sealed class HumanVerificationMiddlewareTests
             context,
             verifier,
             source,
-            PlatformConfiguration(enabled: true),
-            Options.Create(TurnstileOptions()));
+            Configuration(enabled: true, TurnstileOptions()));
 
         await Assert.That(reachedEndpoint).IsTrue();
         await verifier.Received(1).VerifyAsync(
+            Arg.Is<HumanVerificationRuntimeConfiguration>(configuration =>
+                configuration != null
+                && configuration.Enabled
+                && configuration.Options.Provider == HumanVerificationProvider.Turnstile),
             Arg.Is<HumanVerificationAttempt>(attempt =>
                 attempt != null
                 && attempt.Token == "proof"
@@ -134,7 +132,10 @@ public sealed class HumanVerificationMiddlewareTests
         string expectedCode)
     {
         var verifier = Substitute.For<IHumanVerificationVerifier>();
-        verifier.VerifyAsync(Arg.Any<HumanVerificationAttempt>(), Arg.Any<CancellationToken>())
+        verifier.VerifyAsync(
+                Arg.Any<HumanVerificationRuntimeConfiguration>(),
+                Arg.Any<HumanVerificationAttempt>(),
+                Arg.Any<CancellationToken>())
             .Returns(result);
         var context = Context(HumanVerificationAction.Evaluation);
         context.Request.Headers[HumanVerificationDefaults.HeaderName] = "proof";
@@ -143,8 +144,7 @@ public sealed class HumanVerificationMiddlewareTests
             context,
             verifier,
             Substitute.For<IRequestSourceAddress>(),
-            PlatformConfiguration(enabled: true),
-            Options.Create(TurnstileOptions()));
+            Configuration(enabled: true, TurnstileOptions()));
 
         await Assert.That(context.Response.StatusCode).IsEqualTo(expectedStatus);
         await Assert.That(await ProblemCodeAsync(context)).IsEqualTo(expectedCode);
@@ -178,18 +178,14 @@ public sealed class HumanVerificationMiddlewareTests
         }
     };
 
-    private static ManagePlatformConfiguration PlatformConfiguration(bool enabled)
+    private static IHumanVerificationConfigurationReader Configuration(
+        bool enabled,
+        HumanVerificationOptions options)
     {
-        var store = Substitute.For<IPlatformConfigurationStore>();
-        store.GetAsync(Arg.Any<CancellationToken>()).Returns(new PlatformConfigurationView(
-            "NoCTF", null, null, enabled, DateTimeOffset.UnixEpoch));
-        var objects = Substitute.For<IStore>();
-        return new ManagePlatformConfiguration(
-            store,
-            objects,
-            new ManagedFileUploads(
-                Substitute.For<IManagedFileUploadRegistry>(),
-                objects));
+        var reader = Substitute.For<IHumanVerificationConfigurationReader>();
+        reader.GetRuntimeConfigurationAsync(Arg.Any<CancellationToken>())
+            .Returns(new HumanVerificationRuntimeConfiguration(enabled, options));
+        return reader;
     }
 
     private static async Task<string?> ProblemCodeAsync(DefaultHttpContext context)

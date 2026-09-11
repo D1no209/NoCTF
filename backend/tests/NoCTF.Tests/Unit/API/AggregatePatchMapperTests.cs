@@ -178,11 +178,20 @@ public sealed class AggregatePatchMapperTests
     public async Task Platform_branding_mapper_cannot_modify_credentials_or_gateway()
     {
         var password = new byte[] { 7, 8, 9 };
+        var capSecret = new byte[] { 10, 11, 12 };
+        var turnstileSecret = new byte[] { 13, 14, 15 };
         var settings = new PlatformSettings
         {
             Id = 1,
             Name = "old",
             HumanVerificationEnabled = true,
+            HumanVerificationProvider = HumanVerificationProvider.Cap,
+            HumanVerificationCapServerUrl = "https://cap.example.test",
+            HumanVerificationCapSiteKey = "cap-site-key",
+            HumanVerificationCapSecretCiphertext = capSecret,
+            HumanVerificationTurnstileSiteKey = "turnstile-site-key",
+            HumanVerificationTurnstileSecretCiphertext = turnstileSecret,
+            HumanVerificationTurnstileAllowedHostnames = ["example.test"],
             EmailSmtpPasswordCiphertext = password,
             PublicGatewayConnectorId = "protected"
         };
@@ -195,6 +204,20 @@ public sealed class AggregatePatchMapperTests
 
         await Assert.That(settings.Name).IsEqualTo("new");
         await Assert.That(settings.HumanVerificationEnabled).IsTrue();
+        await Assert.That(settings.HumanVerificationProvider)
+            .IsEqualTo(HumanVerificationProvider.Cap);
+        await Assert.That(settings.HumanVerificationCapServerUrl)
+            .IsEqualTo("https://cap.example.test");
+        await Assert.That(settings.HumanVerificationCapSiteKey)
+            .IsEqualTo("cap-site-key");
+        await Assert.That(settings.HumanVerificationCapSecretCiphertext)
+            .IsSameReferenceAs(capSecret);
+        await Assert.That(settings.HumanVerificationTurnstileSiteKey)
+            .IsEqualTo("turnstile-site-key");
+        await Assert.That(settings.HumanVerificationTurnstileSecretCiphertext)
+            .IsSameReferenceAs(turnstileSecret);
+        await Assert.That(settings.HumanVerificationTurnstileAllowedHostnames)
+            .IsEquivalentTo(["example.test"]);
         await Assert.That(settings.EmailSmtpPasswordCiphertext).IsSameReferenceAs(password);
         await Assert.That(settings.PublicGatewayConnectorId).IsEqualTo("protected");
     }
@@ -273,11 +296,20 @@ public sealed class AggregatePatchMapperTests
     public async Task Platform_email_and_gateway_mappers_preserve_credentials_and_other_sections()
     {
         var password = new byte[] { 1, 2, 3 };
+        var capSecret = new byte[] { 4, 5, 6 };
+        var turnstileSecret = new byte[] { 7, 8, 9 };
         var settings = new PlatformSettings
         {
             Id = 1,
             Name = "Brand",
             HumanVerificationEnabled = true,
+            HumanVerificationProvider = HumanVerificationProvider.Turnstile,
+            HumanVerificationCapServerUrl = "https://cap.example.test",
+            HumanVerificationCapSiteKey = "cap-site-key",
+            HumanVerificationCapSecretCiphertext = capSecret,
+            HumanVerificationTurnstileSiteKey = "turnstile-site-key",
+            HumanVerificationTurnstileSecretCiphertext = turnstileSecret,
+            HumanVerificationTurnstileAllowedHostnames = ["example.test"],
             EmailSmtpPasswordCiphertext = password,
             EmailVerificationEnabled = false,
             PublicGatewayConnectorId = "old-gateway"
@@ -314,6 +346,20 @@ public sealed class AggregatePatchMapperTests
 
         await Assert.That(settings.Name).IsEqualTo("Brand");
         await Assert.That(settings.HumanVerificationEnabled).IsTrue();
+        await Assert.That(settings.HumanVerificationProvider)
+            .IsEqualTo(HumanVerificationProvider.Turnstile);
+        await Assert.That(settings.HumanVerificationCapServerUrl)
+            .IsEqualTo("https://cap.example.test");
+        await Assert.That(settings.HumanVerificationCapSiteKey)
+            .IsEqualTo("cap-site-key");
+        await Assert.That(settings.HumanVerificationCapSecretCiphertext)
+            .IsSameReferenceAs(capSecret);
+        await Assert.That(settings.HumanVerificationTurnstileSiteKey)
+            .IsEqualTo("turnstile-site-key");
+        await Assert.That(settings.HumanVerificationTurnstileSecretCiphertext)
+            .IsSameReferenceAs(turnstileSecret);
+        await Assert.That(settings.HumanVerificationTurnstileAllowedHostnames)
+            .IsEquivalentTo(["example.test"]);
         await Assert.That(settings.EmailVerificationEnabled).IsTrue();
         await Assert.That(settings.PublicGatewayConnectorId).IsEqualTo("new-gateway");
         await Assert.That(settings.PublicGatewayDirectOrigins[0])

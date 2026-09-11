@@ -98,5 +98,9 @@ describe('api error localization', () => {
       status: 503,
       code: 'HumanVerificationUnavailable',
     }).message).toBe('人机验证服务暂不可用，请稍后重新验证。')
+    expect(parseApiError({
+      status: 400,
+      code: 'HumanVerificationSecretInvalid',
+    }).message).toBe('请输入有效的 Provider 密钥。')
   })
 })

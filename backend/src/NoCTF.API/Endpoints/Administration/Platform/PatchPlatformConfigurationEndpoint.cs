@@ -14,7 +14,6 @@ using NoCTF.Domain.Identity;
 using NoCTF.Domain.Platform;
 using Riok.Mapperly.Abstractions;
 using System.Text.Json.Serialization;
-using Microsoft.Extensions.Options;
 
 namespace NoCTF.API.Endpoints.Administration.Platform;
 
@@ -29,6 +28,7 @@ public enum SmtpSecurityModeProtocol
 [JsonConverter(typeof(StrictPascalCaseEnumConverter<PlatformProblemCode>))]
 public enum PlatformProblemCode
 {
+    HumanVerificationSecretInvalid,
     SmtpPasswordInvalid,
     EmailDeliveryNotConfigured,
     SmtpDeliveryFailed
@@ -71,6 +71,11 @@ public sealed class PlatformEmailVerificationPatchRequest
 public sealed class PlatformHumanVerificationPatchRequest
 {
     public required bool Enabled { get; set; }
+    public required HumanVerificationProviderProtocol Provider { get; set; }
+    public required string CapServerUrl { get; set; }
+    public required string CapSiteKey { get; set; }
+    public required string TurnstileSiteKey { get; set; }
+    public required string[] TurnstileAllowedHostnames { get; set; }
 }
 
 public sealed class PlatformGatewayPatchRequest
@@ -118,6 +123,28 @@ public sealed class PatchPlatformConfigurationValidator
         RuleFor(request => request.Branding!.Description)
             .MaximumLength(PlatformConfigurationRules.MaximumDescriptionLength)
             .When(request => request.Branding is not null);
+        RuleFor(request => request.HumanVerification!.Provider).IsInEnum()
+            .When(request => request.HumanVerification is not null);
+        RuleFor(request => request.HumanVerification!.CapServerUrl)
+            .NotNull()
+            .MaximumLength(HumanVerificationConfigurationRules.MaximumUrlLength)
+            .When(request => request.HumanVerification is not null);
+        RuleFor(request => request.HumanVerification!.CapSiteKey)
+            .NotNull()
+            .MaximumLength(HumanVerificationConfigurationRules.MaximumSiteKeyLength)
+            .When(request => request.HumanVerification is not null);
+        RuleFor(request => request.HumanVerification!.TurnstileSiteKey)
+            .NotNull()
+            .MaximumLength(HumanVerificationConfigurationRules.MaximumSiteKeyLength)
+            .When(request => request.HumanVerification is not null);
+        RuleFor(request => request.HumanVerification!.TurnstileAllowedHostnames)
+            .NotNull()
+            .Must(hostnames => hostnames is
+                { Length: <= HumanVerificationConfigurationRules.MaximumAllowedHostnames })
+            .When(request => request.HumanVerification is not null);
+        RuleForEach(request => request.HumanVerification!.TurnstileAllowedHostnames)
+            .NotEmpty().MaximumLength(253)
+            .When(request => request.HumanVerification is not null);
         RuleFor(request => request.EmailVerification!.PublicBaseUrl).NotEmpty().MaximumLength(2048)
             .When(request => request.EmailVerification is not null);
         RuleFor(request => request.EmailVerification!.SmtpPort).InclusiveBetween(1, 65_535)
@@ -141,6 +168,13 @@ public sealed class PatchPlatformConfigurationValidator
 public static partial class PlatformSettingsPatchMapper
 {
     [MapperIgnoreTarget(nameof(PlatformSettings.HumanVerificationEnabled))]
+    [MapperIgnoreTarget(nameof(PlatformSettings.HumanVerificationProvider))]
+    [MapperIgnoreTarget(nameof(PlatformSettings.HumanVerificationCapServerUrl))]
+    [MapperIgnoreTarget(nameof(PlatformSettings.HumanVerificationCapSiteKey))]
+    [MapperIgnoreTarget(nameof(PlatformSettings.HumanVerificationCapSecretCiphertext))]
+    [MapperIgnoreTarget(nameof(PlatformSettings.HumanVerificationTurnstileSiteKey))]
+    [MapperIgnoreTarget(nameof(PlatformSettings.HumanVerificationTurnstileSecretCiphertext))]
+    [MapperIgnoreTarget(nameof(PlatformSettings.HumanVerificationTurnstileAllowedHostnames))]
     [MapperIgnoreTarget(nameof(PlatformSettings.EmailVerificationEnabled))]
     [MapperIgnoreTarget(nameof(PlatformSettings.EmailPublicBaseUrl))]
     [MapperIgnoreTarget(nameof(PlatformSettings.EmailVerificationTokenLifetimeMinutes))]
@@ -188,6 +222,13 @@ public static partial class PlatformSettingsPatchMapper
     [MapperIgnoreTarget(nameof(PlatformSettings.Name))]
     [MapperIgnoreTarget(nameof(PlatformSettings.Description))]
     [MapperIgnoreTarget(nameof(PlatformSettings.HumanVerificationEnabled))]
+    [MapperIgnoreTarget(nameof(PlatformSettings.HumanVerificationProvider))]
+    [MapperIgnoreTarget(nameof(PlatformSettings.HumanVerificationCapServerUrl))]
+    [MapperIgnoreTarget(nameof(PlatformSettings.HumanVerificationCapSiteKey))]
+    [MapperIgnoreTarget(nameof(PlatformSettings.HumanVerificationCapSecretCiphertext))]
+    [MapperIgnoreTarget(nameof(PlatformSettings.HumanVerificationTurnstileSiteKey))]
+    [MapperIgnoreTarget(nameof(PlatformSettings.HumanVerificationTurnstileSecretCiphertext))]
+    [MapperIgnoreTarget(nameof(PlatformSettings.HumanVerificationTurnstileAllowedHostnames))]
     [MapperIgnoreTarget(nameof(PlatformSettings.PublicGatewayEnabled))]
     [MapperIgnoreTarget(nameof(PlatformSettings.PublicGatewayConnectorId))]
     [MapperIgnoreTarget(nameof(PlatformSettings.PublicGatewayOrigin))]
@@ -214,6 +255,13 @@ public static partial class PlatformSettingsPatchMapper
     [MapperIgnoreTarget(nameof(PlatformSettings.Name))]
     [MapperIgnoreTarget(nameof(PlatformSettings.Description))]
     [MapperIgnoreTarget(nameof(PlatformSettings.HumanVerificationEnabled))]
+    [MapperIgnoreTarget(nameof(PlatformSettings.HumanVerificationProvider))]
+    [MapperIgnoreTarget(nameof(PlatformSettings.HumanVerificationCapServerUrl))]
+    [MapperIgnoreTarget(nameof(PlatformSettings.HumanVerificationCapSiteKey))]
+    [MapperIgnoreTarget(nameof(PlatformSettings.HumanVerificationCapSecretCiphertext))]
+    [MapperIgnoreTarget(nameof(PlatformSettings.HumanVerificationTurnstileSiteKey))]
+    [MapperIgnoreTarget(nameof(PlatformSettings.HumanVerificationTurnstileSecretCiphertext))]
+    [MapperIgnoreTarget(nameof(PlatformSettings.HumanVerificationTurnstileAllowedHostnames))]
     [MapperIgnoreTarget(nameof(PlatformSettings.EmailVerificationEnabled))]
     [MapperIgnoreTarget(nameof(PlatformSettings.EmailPublicBaseUrl))]
     [MapperIgnoreTarget(nameof(PlatformSettings.EmailVerificationTokenLifetimeMinutes))]
@@ -243,12 +291,12 @@ public static partial class PlatformSettingsPatchMapper
 
 public sealed class PatchPlatformConfigurationEndpoint(
     ManagePlatformConfiguration configuration,
+    ManageHumanVerificationConfiguration humanVerification,
     ManageEmailVerificationConfiguration emailVerification,
     ManagePublicGateway publicGateway,
     IAtomicAggregatePatch atomicPatch,
     LinkGenerator links,
-    TimeProvider timeProvider,
-    IOptions<HumanVerificationOptions> humanVerification)
+    TimeProvider timeProvider)
     : Endpoint<PatchPlatformConfigurationRequest,
         Results<Ok<AdminPlatformConfigurationResponse>,
             Accepted<AdminPlatformConfigurationResponse>, ProblemHttpResult>>
@@ -267,10 +315,6 @@ public sealed class PatchPlatformConfigurationEndpoint(
         PatchPlatformConfigurationRequest request,
         CancellationToken ct)
     {
-        if (request.HumanVerification is { Enabled: true }
-            && humanVerification.Value.Provider == HumanVerificationProvider.None)
-            return Invalid("No human verification provider is configured for this deployment.");
-
         var branding = await configuration.GetAsync(ct);
         var email = await emailVerification.GetAsync(ct);
         var gateway = await publicGateway.GetAsync(ct);
@@ -281,7 +325,6 @@ public sealed class PatchPlatformConfigurationEndpoint(
             Name = branding.Name,
             Description = branding.Description,
             LogoFileId = branding.LogoFileId,
-            HumanVerificationEnabled = branding.HumanVerificationEnabled,
             EmailVerificationEnabled = email.Enabled,
             EmailPublicBaseUrl = email.PublicBaseUrl,
             EmailVerificationTokenLifetimeMinutes = email.TokenLifetimeMinutes,
@@ -307,8 +350,6 @@ public sealed class PatchPlatformConfigurationEndpoint(
         };
         if ((sections & PlatformConfigurationPatchSection.Branding) != 0)
             PlatformSettingsPatchMapper.ApplyBrandingAsAdministrator(request.Branding!, target);
-        if ((sections & PlatformConfigurationPatchSection.HumanVerification) != 0)
-            target.HumanVerificationEnabled = request.HumanVerification!.Enabled;
         if ((sections & PlatformConfigurationPatchSection.EmailVerification) != 0)
             PlatformSettingsPatchMapper.ApplyEmailAsAdministrator(
                 request.EmailVerification!, target);
@@ -338,10 +379,23 @@ public sealed class PatchPlatformConfigurationEndpoint(
             }
             if ((sections & PlatformConfigurationPatchSection.HumanVerification) != 0)
             {
-                await configuration.UpdateHumanVerificationAsync(
-                    target.HumanVerificationEnabled,
-                    timeProvider.GetUtcNow(),
+                var humanRequest = request.HumanVerification!;
+                var result = await humanVerification.UpdateAsync(new(
+                    humanRequest.Enabled,
+                    PublicPlatformConfigurationMapping.ToDomain(humanRequest.Provider),
+                    humanRequest.CapServerUrl,
+                    humanRequest.CapSiteKey,
+                    humanRequest.TurnstileSiteKey,
+                    humanRequest.TurnstileAllowedHostnames,
+                    timeProvider.GetUtcNow()),
                     transactionCt);
+                if (result.State != HumanVerificationConfigurationUpdateState.Updated)
+                {
+                    return AtomicAggregatePatchDecision<Results<
+                        Ok<AdminPlatformConfigurationResponse>,
+                        Accepted<AdminPlatformConfigurationResponse>, ProblemHttpResult>>
+                        .Rollback(Invalid(string.Join(" ", result.Errors)));
+                }
             }
             if ((sections & PlatformConfigurationPatchSection.EmailVerification) != 0)
             {
@@ -402,10 +456,10 @@ public sealed class PatchPlatformConfigurationEndpoint(
     private async Task<AdminPlatformConfigurationResponse> LoadResponseAsync(CancellationToken ct)
     {
         var current = await configuration.GetAsync(ct);
+        var verification = await humanVerification.GetAsync(ct);
         return new(
             PlatformConfigurationMapping.ToResponse(current, links, HttpContext),
-            AdminHumanVerificationConfigurationMapping.ToResponse(
-                current, humanVerification.Value),
+            AdminHumanVerificationConfigurationMapping.ToResponse(verification),
             EmailVerificationConfigurationMapping.ToResponse(
                 await emailVerification.GetAsync(ct)),
             PublicGatewayConfigurationMapping.ToResponse(

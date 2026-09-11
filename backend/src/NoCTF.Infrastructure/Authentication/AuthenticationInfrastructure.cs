@@ -89,7 +89,7 @@ internal static class AuthenticationInfrastructure
         services.AddScoped<ChangePassword>();
         services.AddScoped<LogoutAll>();
         services.AddScoped<IEmailVerificationStore, EmailVerificationStore>();
-        services.AddSingleton<EmailVerificationSecretProtector>();
+        services.AddSingleton<PlatformSecretProtector>();
         services.AddScoped<
             IEmailVerificationConfigurationStore,
             EmailVerificationConfigurationStore>();

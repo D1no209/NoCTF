@@ -18,6 +18,25 @@ public sealed class PlatformSettings
 
     public bool HumanVerificationEnabled { get; set; } = true;
 
+    public HumanVerificationProvider? HumanVerificationProvider { get; set; }
+
+    [MaxLength(2048)]
+    public string HumanVerificationCapServerUrl { get; set; } = string.Empty;
+
+    [MaxLength(256)]
+    public string HumanVerificationCapSiteKey { get; set; } = string.Empty;
+
+    [MaxLength(4096)]
+    public byte[]? HumanVerificationCapSecretCiphertext { get; set; }
+
+    [MaxLength(256)]
+    public string HumanVerificationTurnstileSiteKey { get; set; } = string.Empty;
+
+    [MaxLength(4096)]
+    public byte[]? HumanVerificationTurnstileSecretCiphertext { get; set; }
+
+    public string[] HumanVerificationTurnstileAllowedHostnames { get; set; } = [];
+
     public bool EmailVerificationEnabled { get; set; }
 
     [MaxLength(2048)]

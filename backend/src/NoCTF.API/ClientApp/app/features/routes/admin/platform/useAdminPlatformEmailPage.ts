@@ -3,8 +3,8 @@ import { markRaw } from 'vue'
 
 import { KeyRound, RefreshCw, Send, ShieldCheck } from '@lucide/vue'
 import { toast } from 'vue-sonner'
-import { adminPlatformGetConfiguration, adminPlatformPatchConfiguration, adminPlatformReplaceEmailVerificationPassword, adminPlatformSendEmailVerificationTest } from '../../../../api'
-import type { NoCtfapiEndpointsAdministrationPlatformAdminHumanVerificationConfigurationResponse, NoCtfapiEndpointsAdministrationPlatformEmailVerificationConfigurationResponse, NoCtfapiEndpointsAdministrationPlatformSmtpSecurityModeProtocol } from '../../../../api'
+import { adminPlatformGetConfiguration, adminPlatformPatchConfiguration, adminPlatformReplaceEmailVerificationPassword, adminPlatformReplaceHumanVerificationSecret, adminPlatformSendEmailVerificationTest } from '../../../../api'
+import type { NoCtfapiEndpointsAdministrationPlatformAdminHumanVerificationConfigurationResponse, NoCtfapiEndpointsAdministrationPlatformEmailVerificationConfigurationResponse, NoCtfapiEndpointsAdministrationPlatformSmtpSecurityModeProtocol, NoCtfapiEndpointsPlatformHumanVerificationProviderProtocol } from '../../../../api'
 import AdminDateTimeComponent from '../../../admin/AdminDateTime.vue'
 
 type EmailConfiguration = NoCtfapiEndpointsAdministrationPlatformEmailVerificationConfigurationResponse
@@ -18,17 +18,80 @@ export function useAdminPlatformEmailPage() {
 
   const humanVerification = ref<HumanVerificationConfiguration | null>(null)
 
-  const humanVerificationEnabled = ref(false)
+  const humanForm = reactive({
+    enabled: false,
+    provider: 'None' as NoCtfapiEndpointsPlatformHumanVerificationProviderProtocol,
+    capServerUrl: '',
+    capSiteKey: '',
+    turnstileSiteKey: '',
+    turnstileAllowedHostnames: '',
+  })
 
   const humanVerificationSaving = ref(false)
 
+  const humanVerificationSaved = ref('')
+
+  const humanSecretOpen = ref(false)
+
+  const humanSecret = ref('')
+
+  const humanSecretSaving = ref(false)
+
+  function humanVerificationRequest() {
+    return {
+      enabled: humanForm.enabled && humanForm.provider !== 'None',
+      provider: humanForm.provider,
+      capServerUrl: humanForm.capServerUrl.trim(),
+      capSiteKey: humanForm.capSiteKey.trim(),
+      turnstileSiteKey: humanForm.turnstileSiteKey.trim(),
+      turnstileAllowedHostnames: humanForm.turnstileAllowedHostnames
+        .split(/\r?\n/)
+        .map(hostname => hostname.trim())
+        .filter(Boolean),
+    }
+  }
+
+  function syncHumanVerification(value: HumanVerificationConfiguration): void {
+    humanForm.enabled = value.enabled ?? false
+    humanForm.provider = value.provider ?? 'None'
+    humanForm.capServerUrl = value.capServerUrl ?? ''
+    humanForm.capSiteKey = value.capSiteKey ?? ''
+    humanForm.turnstileSiteKey = value.turnstileSiteKey ?? ''
+    humanForm.turnstileAllowedHostnames = (value.turnstileAllowedHostnames ?? []).join('\n')
+    humanVerificationSaved.value = JSON.stringify(humanVerificationRequest())
+  }
+
   const humanVerificationDirty = computed(() => humanVerification.value !== null
-    && humanVerificationEnabled.value !== (humanVerification.value.enabled ?? false))
+    && JSON.stringify(humanVerificationRequest()) !== humanVerificationSaved.value)
+
+  const selectedSecretConfigured = computed(() => humanForm.provider === 'Cap'
+    ? humanVerification.value?.capSecretConfigured === true
+    : humanForm.provider === 'Turnstile'
+      ? humanVerification.value?.turnstileSecretConfigured === true
+      : false)
+
+  const humanVerificationReady = computed(() => {
+    if (!humanVerificationDirty.value)
+      return humanVerification.value?.ready === true
+    return humanForm.provider === 'Cap'
+      ? Boolean(humanForm.capServerUrl.trim()
+        && humanForm.capSiteKey.trim()
+        && selectedSecretConfigured.value)
+      : humanForm.provider === 'Turnstile'
+        ? Boolean(humanForm.turnstileSiteKey.trim()
+          && humanVerificationRequest().turnstileAllowedHostnames.length
+          && selectedSecretConfigured.value)
+        : false
+  })
 
   const humanVerificationProviderLabel = computed(() => {
-    if (humanVerification.value?.provider === 'Cap') return 'CAP'
-    if (humanVerification.value?.provider === 'Turnstile') return 'Cloudflare Turnstile'
-    return translate('ui.notConfigured')
+    if (humanForm.provider === 'Cap') return 'CAP'
+    if (humanForm.provider === 'Turnstile') return 'Cloudflare Turnstile'
+    return translate('ui.disabled')
+  })
+
+  watch(() => humanForm.provider, provider => {
+    if (provider === 'None') humanForm.enabled = false
   })
 
   const loading = ref(true)
@@ -89,7 +152,7 @@ export function useAdminPlatformEmailPage() {
       return
     }
     humanVerification.value = data.humanVerification ?? null
-    humanVerificationEnabled.value = data.humanVerification?.enabled ?? false
+    if (data.humanVerification) syncHumanVerification(data.humanVerification)
     configuration.value = data.emailVerification ?? null
     if (data.emailVerification) syncForm(data.emailVerification)
   }
@@ -99,7 +162,7 @@ export function useAdminPlatformEmailPage() {
       || !humanVerificationDirty.value) return
     humanVerificationSaving.value = true
     const { data, error } = await adminPlatformPatchConfiguration({
-      body: { humanVerification: { enabled: humanVerificationEnabled.value } },
+      body: { humanVerification: humanVerificationRequest() },
     })
     humanVerificationSaving.value = false
     if (error) {
@@ -108,10 +171,31 @@ export function useAdminPlatformEmailPage() {
     }
     if (data?.humanVerification) {
       humanVerification.value = data.humanVerification
-      humanVerificationEnabled.value = data.humanVerification.enabled ?? false
+      syncHumanVerification(data.humanVerification)
     }
     await refreshPlatform()
     toast.success(translate('ui.humanVerificationConfigurationSaved'))
+  }
+
+  async function replaceHumanVerificationSecret(): Promise<void> {
+    if (humanForm.provider === 'None' || !humanSecret.value
+      || humanSecretSaving.value) return
+    humanSecretSaving.value = true
+    const { data, error } = await adminPlatformReplaceHumanVerificationSecret({
+      body: {
+        provider: humanForm.provider,
+        secret: humanSecret.value,
+      },
+    })
+    humanSecretSaving.value = false
+    if (error) {
+      toast.error(parseApiError(error).message)
+      return
+    }
+    if (data) humanVerification.value = data
+    humanSecret.value = ''
+    humanSecretOpen.value = false
+    toast.success(translate('ui.humanVerificationSecretUpdated'))
   }
 
   async function save(): Promise<void> {
@@ -170,10 +254,15 @@ export function useAdminPlatformEmailPage() {
       ShieldCheck,
       configuration,
       humanVerification,
-      humanVerificationEnabled,
+      humanForm,
       humanVerificationSaving,
       humanVerificationDirty,
+      humanVerificationReady,
       humanVerificationProviderLabel,
+      selectedSecretConfigured,
+      humanSecretOpen,
+      humanSecret,
+      humanSecretSaving,
       loading,
       loadError,
       form,
@@ -184,6 +273,7 @@ export function useAdminPlatformEmailPage() {
       sendingTest,
       load,
       saveHumanVerification,
+      replaceHumanVerificationSecret,
       save,
       replacePassword,
       sendTest,
@@ -199,7 +289,13 @@ export function useAdminPlatformEmailPage() {
     viewState.passwordOpen = value
   }
 
-  return { ...viewBindings, onClickPasswordOpen, onClickPasswordOpen2 }
+  function setHumanSecretOpen(value: boolean): void {
+    if (viewState.humanSecretSaving) return
+    viewState.humanSecretOpen = value
+    if (!value) viewState.humanSecret = ''
+  }
+
+  return { ...viewBindings, onClickPasswordOpen, onClickPasswordOpen2, setHumanSecretOpen }
 }
 
 export type AdminPlatformEmailPageViewState = import('vue').ShallowUnwrapRef<Awaited<ReturnType<typeof useAdminPlatformEmailPage>>>

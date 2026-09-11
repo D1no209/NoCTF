@@ -37,8 +37,10 @@ public sealed class PublicGatewayHttpTests
         builder.Services.AddAuthentication("Bearer").AddScheme<AuthenticationSchemeOptions, TestAuthentication>("Bearer", _ => { });
         builder.Services.AddAuthorization();
         builder.Services.AddSingleton(TimeProvider.System);
-        builder.Services.AddSingleton<IOptions<HumanVerificationOptions>>(
-            Options.Create(new HumanVerificationOptions()));
+        builder.Services.AddSingleton<IHumanVerificationConfigurationStore>(
+            new NoOpHumanVerificationConfigurationStore());
+        builder.Services.AddSingleton(new HumanVerificationValidationPolicy(true));
+        builder.Services.AddScoped<ManageHumanVerificationConfiguration>();
         builder.Services.AddFastEndpoints(options =>
         {
             options.DisableAutoDiscovery = true;
@@ -94,7 +96,18 @@ public sealed class PublicGatewayHttpTests
             "Bearer", "Administrator");
         using var unavailableVerification = await client.PatchAsJsonAsync(
             "/api/v1/admin/platform/configuration",
-            new { humanVerification = new { enabled = true } });
+            new
+            {
+                humanVerification = new
+                {
+                    enabled = true,
+                    provider = "Cap",
+                    capServerUrl = "https://cap.example.test",
+                    capSiteKey = "site-key",
+                    turnstileSiteKey = string.Empty,
+                    turnstileAllowedHostnames = Array.Empty<string>()
+                }
+            });
         await Assert.That(unavailableVerification.StatusCode)
             .IsEqualTo(HttpStatusCode.BadRequest);
         await store.Received(1).SaveAsync(Arg.Any<PublicGatewayPolicy>(), Arg.Any<DateTimeOffset>(), Arg.Any<CancellationToken>());

@@ -67,6 +67,7 @@ function stableCodeMessage(code: string | undefined): string | null {
     case 'HumanVerificationRequired': return translate('ui.completeHumanVerificationBeforeRetrying')
     case 'HumanVerificationFailed': return translate('ui.humanVerificationFailedPleaseRetry')
     case 'HumanVerificationUnavailable': return translate('ui.humanVerificationProviderUnavailablePleaseRetry')
+    case 'HumanVerificationSecretInvalid': return translate('ui.humanVerificationSecretInvalid')
     default: return null
   }
 }

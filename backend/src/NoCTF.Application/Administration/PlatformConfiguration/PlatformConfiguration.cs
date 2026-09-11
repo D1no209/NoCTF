@@ -13,7 +13,6 @@ public sealed record PlatformConfigurationView(
     string Name,
     string? Description,
     Guid? LogoFileId,
-    bool HumanVerificationEnabled,
     DateTimeOffset UpdatedAt);
 
 public sealed record PlatformLogoReplacement(
@@ -27,11 +26,6 @@ public interface IPlatformConfigurationStore
     Task<PlatformConfigurationView> UpdateAsync(
         string name,
         string? description,
-        DateTimeOffset now,
-        CancellationToken cancellationToken);
-
-    Task<PlatformConfigurationView> UpdateHumanVerificationAsync(
-        bool enabled,
         DateTimeOffset now,
         CancellationToken cancellationToken);
 
@@ -73,12 +67,6 @@ public sealed class ManagePlatformConfiguration(
 {
     public Task<PlatformConfigurationView> GetAsync(CancellationToken ct = default) =>
         settings.GetAsync(ct);
-
-    public Task<PlatformConfigurationView> UpdateHumanVerificationAsync(
-        bool enabled,
-        DateTimeOffset now,
-        CancellationToken ct = default) =>
-        settings.UpdateHumanVerificationAsync(enabled, now, ct);
 
     public async Task<PlatformConfigurationUpdateResult> UpdateAsync(
         string name,

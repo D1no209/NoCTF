@@ -164,16 +164,27 @@ second exact `matchName` or port entry only when the configured mail service
 actually requires it; do not use a wildcard FQDN, `0.0.0.0/0`, or commit the
 production endpoint or credentials.
 
-Human verification is also optional and fail-closed. Keep
-`HumanVerification__Provider` as `None`, or set it to `Cap` or `Turnstile` and
-add the selected provider's public settings to `configmap.yaml`:
+Human verification is also optional and fail-closed. Platform administrators
+select `None`, `Cap`, or `Turnstile`, enter the provider's public settings and
+secret, and enable verification in Platform Settings. The secret is encrypted
+with `EmailVerification__EncryptionKey`; retain that key across upgrades.
+
+The `HumanVerification__*` values are only a bootstrap fallback while the
+database Provider is unset. To preserve an existing deployment, set
+`HumanVerification__Provider` to `Cap` or `Turnstile` and add its public settings
+to `configmap.yaml`:
 
 - Cap: `HumanVerification__Cap__ServerUrl` and `HumanVerification__Cap__SiteKey`.
 - Turnstile: `HumanVerification__Turnstile__SiteKey` and
   `HumanVerification__Turnstile__AllowedHostnames__0`.
 
 Add only the corresponding `cap-secret` or `turnstile-secret` key to
-`noctf-secrets`. Copy `human-verification-egress.example.yaml` outside the
+`noctf-secrets`. After an administrator first saves human verification settings,
+the database configuration becomes authoritative and changes take effect without
+a rollout. New installations may keep the bootstrap Provider as `None` and omit
+both provider secret keys.
+
+Copy `human-verification-egress.example.yaml` outside the
 repository, remove the unused provider policy, replace the Cap example FQDN
 and port when applicable, then apply it before enabling the provider. The
 Turnstile policy admits only `challenges.cloudflare.com:443`. Cap Standalone is
