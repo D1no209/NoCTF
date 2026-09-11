@@ -1,6 +1,6 @@
 import { platformConfigurationGet } from '../api'
 
-/** Platform branding (name/description/logo), loaded once for the whole app. */
+/** Public branding and deployment capabilities, loaded once for the whole app. */
 export function usePlatform() {
   const configuration = useState<Awaited<ReturnType<typeof load>> | null>('platform:configuration', () => null)
   const error = useState<string | null>('platform:configuration-error', () => null)

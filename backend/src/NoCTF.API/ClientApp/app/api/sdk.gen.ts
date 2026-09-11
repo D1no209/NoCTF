@@ -443,9 +443,9 @@ export const platformLogoGet = <ThrowOnError extends boolean = false>(options?: 
 });
 
 /**
- * Returns public platform branding.
+ * Returns public platform branding and client capabilities.
  *
- * Exposes the configured name, description, and cache-busted logo URL.
+ * Exposes branding and deployment-selected image upload limits without storage metadata.
  */
 export const platformConfigurationGet = <ThrowOnError extends boolean = false>(options?: Options<PlatformConfigurationGetData, ThrowOnError>): RequestResult<PlatformConfigurationGetResponses, unknown, ThrowOnError> => (options?.client ?? client).get<PlatformConfigurationGetResponses, unknown, ThrowOnError>({
     security: [{

@@ -1398,8 +1398,8 @@
         "tags": [
           "Platform"
         ],
-        "summary": "Returns public platform branding.",
-        "description": "Exposes the configured name, description, and cache-busted logo URL.",
+        "summary": "Returns public platform branding and client capabilities.",
+        "description": "Exposes branding and deployment-selected image upload limits without storage metadata.",
         "operationId": "PlatformConfiguration_Get",
         "responses": {
           "200": {
@@ -14839,6 +14839,23 @@
           "logoUrl": {
             "type": "string",
             "nullable": true
+          },
+          "imageUploadLimits": {
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsPlatformPublicImageUploadLimitsResponse"
+          }
+        }
+      },
+      "NoCTFAPIEndpointsPlatformPublicImageUploadLimitsResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "maximumAvatarBytes": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "maximumWallpaperBytes": {
+            "type": "integer",
+            "format": "int64"
           }
         }
       },
