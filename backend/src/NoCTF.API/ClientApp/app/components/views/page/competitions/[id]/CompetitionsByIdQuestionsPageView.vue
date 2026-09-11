@@ -7,7 +7,7 @@ const { maximumQuestionBodyLength, maximumQuestionTitleLength, minimumQuestionBo
 </script>
 
 <template>
-  <component :is="CompetitionParticipantWorkspace" :competition-id="competitionId" class="question-participant-workspace">
+  <component :is="CompetitionParticipantWorkspace" :competition-id="competitionId" :content-scroll="false" class="question-participant-workspace">
     <div class="questions-chat-layout">
     <div class="flex min-h-0 min-w-0 flex-col gap-4">
       <div class="flex items-center justify-between">

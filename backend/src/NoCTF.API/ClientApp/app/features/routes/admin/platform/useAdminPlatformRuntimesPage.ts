@@ -2,7 +2,7 @@ import { proxyRefs } from 'vue'
 
 import { ExternalLink, RefreshCw } from '@lucide/vue'
 import { toast } from 'vue-sonner'
-import { adminPlatformForceTerminateRuntime, adminPlatformListActiveRuntimes, adminPlatformTerminateRuntime } from '../../../../api'
+import { adminCreateRuntimeForceTermination, adminPlatformListActiveRuntimes, adminTerminateRuntime } from '../../../../api'
 import type { NoCtfapiEndpointsAdministrationPlatformPlatformRuntimeResponse, NoCtfapiEndpointsAdministrationRuntimeAdminRuntimeResponse } from '../../../../api'
 import { createLatestPageRefresh } from '../../../../lib/latest-page-refresh'
 import { adminRuntimeTeamLabel } from '../../../../utils/admin-runtime'
@@ -112,7 +112,7 @@ export function useAdminPlatformRuntimesPage() {
     terminatePending.value = true
     terminationError.value = null
     try {
-      const { error: requestError } = await adminPlatformTerminateRuntime({
+      const { error: requestError } = await adminTerminateRuntime({
         path: { runtimeInstanceId: runtime.id },
       })
       if (requestError) throw requestError
@@ -141,7 +141,7 @@ export function useAdminPlatformRuntimesPage() {
     forceTerminatePending.value = true
     forceTerminationError.value = null
     try {
-      const { error: requestError } = await adminPlatformForceTerminateRuntime({
+      const { error: requestError } = await adminCreateRuntimeForceTermination({
         path: { runtimeInstanceId: runtime.id },
         body: { reason },
       })

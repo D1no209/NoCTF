@@ -61,7 +61,7 @@ export function useAdminCompetitionsByIdPage() {
       error.value = parseApiError(e, translate("ui.loadingCompetitionFailed")).message
       return
     }
-    competition.value = data
+    competition.value = data.competition ?? null
     error.value = null
   }
 

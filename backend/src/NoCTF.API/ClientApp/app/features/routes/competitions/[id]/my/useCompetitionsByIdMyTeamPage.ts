@@ -3,7 +3,7 @@ import { markRaw } from 'vue'
 
 import { toast } from 'vue-sonner'
 import { Copy, RefreshCw } from '@lucide/vue'
-import { deleteTeamEndpoint, getMyTeamBanCase, getMyTeamEndpoint, leaveTeamEndpoint, resubmitTeamRegistrationEndpoint, rotateTeamInvitationEndpoint, submitTeamBanAppeal, transferTeamCaptainEndpoint, updateTeamEndpoint } from '../../../../../api'
+import { deleteTeamEndpoint, getMyTeamBanCase, getMyTeamEndpoint, leaveTeamEndpoint, patchCompetitionTeam, rotateTeamInvitationEndpoint, submitTeamBanAppeal } from '../../../../../api'
 import type { NoCtfapiEndpointsTeamsMyTeamBanCaseResponse, NoCtfapiEndpointsTeamsTeamResponse } from '../../../../../api'
 import { maximumAppealStatementLength, minimumAppealStatementLength, validateAppealStatement } from '../../../../../lib/participant-form-validation'
 import CompetitionParticipantWorkspaceComponent from '../../../../competition/CompetitionParticipantWorkspace.vue'
@@ -83,9 +83,9 @@ export function useCompetitionsByIdMyTeamPage() {
   async function submitRename() {
     if (!team.value || !renameValue.value.trim()) return
     renamePending.value = true
-    const { data, error } = await updateTeamEndpoint({
+    const { data, error } = await patchCompetitionTeam({
       path: { competitionId, teamId: team.value.id! },
-      body: { name: renameValue.value.trim() },
+      body: { profile: { name: renameValue.value.trim() } },
     })
     renamePending.value = false
     if (error || !data) {
@@ -110,9 +110,14 @@ export function useCompetitionsByIdMyTeamPage() {
   async function submitTransfer() {
     if (!team.value || !transferTarget.value) return
     transferPending.value = true
-    const { error } = await transferTeamCaptainEndpoint({
+    const { error } = await patchCompetitionTeam({
       path: { competitionId, teamId: team.value.id! },
-      body: { newCaptainId: transferTarget.value },
+      body: {
+        membership: {
+          captainId: transferTarget.value,
+          memberIds: team.value.memberIds ?? [],
+        },
+      },
     })
     transferPending.value = false
     if (error) {
@@ -156,8 +161,9 @@ export function useCompetitionsByIdMyTeamPage() {
   async function resubmit() {
     if (!team.value) return
     acting.value = true
-    const { error } = await resubmitTeamRegistrationEndpoint({
+    const { error } = await patchCompetitionTeam({
       path: { competitionId, teamId: team.value.id! },
+      body: { registration: { status: 'Pending' } },
     })
     acting.value = false
     if (error) {

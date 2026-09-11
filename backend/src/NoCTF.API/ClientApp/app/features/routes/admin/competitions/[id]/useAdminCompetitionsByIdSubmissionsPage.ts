@@ -3,7 +3,7 @@ import { proxyRefs } from 'vue'
 import { toast } from 'vue-sonner'
 import { Download } from '@lucide/vue'
 import { downloadSdkFile } from '../../../../../utils/download'
-import { adminAccessCompetitionGameplayFactValue, adminGetGameplayFact, adminDownloadGameplayFactPatch, adminListCompetitionChallenges, adminListGameplayFacts, adminPreviewHistoricalAdjudicationDifferences, adminListTeams, adminQueueGameplayFactEvaluation, adminRejudgeGameplayFact, adminRejudgeGameplayFacts } from '../../../../../api'
+import { adminAccessCompetitionGameplayFactValue, adminCreateGameplayFactRejudgement, adminGetGameplayFact, adminDownloadGameplayFactPatch, adminListCompetitionChallenges, adminListGameplayFacts, adminPreviewHistoricalAdjudicationDifferences, adminListTeams, adminQueueGameplayFactEvaluation } from '../../../../../api'
 import type { NoCtfapiEndpointsGameplayFactsAdminGameplayFactStatusResponse, NoCtfapiEndpointsGameplayFactsGameplayFactListItemResponse, NoCtfapiEndpointsGameplayFactsGameplayFactResultProtocol, NoCtfapiEndpointsGameplayFactsGameplayFactStateProtocol, NoCtfapiEndpointsGameplayFactsGameplayFactKindProtocol, NoCtfapiEndpointsAdministrationGameplayFactsHistoricalAdjudicationDifferenceItemResponse, NoCtfapiEndpointsAdministrationGameplayFactsAdjudicationDifferenceKindProtocol } from '../../../../../api'
 import { useCompetitionAdmin } from '../../../../../lib/admin-competition'
 
@@ -229,7 +229,10 @@ export function useAdminCompetitionsByIdSubmissionsPage() {
     if (!gameplayFactId) return
     actionPending.value = gameplayFactId
     try {
-      const { error } = await adminRejudgeGameplayFact({ path: { competitionId, gameplayFactId } })
+      const { error } = await adminCreateGameplayFactRejudgement({
+        path: { competitionId },
+        body: { targetKind: 'GameplayFact', targetId: gameplayFactId },
+      })
       if (error) throw error
       toast.success(translate("ui.alreadyJoinedTheReSentencingQueue"))
       applyFilters()
@@ -248,9 +251,9 @@ export function useAdminCompetitionsByIdSubmissionsPage() {
     if (!batchTarget.value) return
     actionPending.value = 'batch'
     try {
-      const { error } = await adminRejudgeGameplayFacts({
+      const { error } = await adminCreateGameplayFactRejudgement({
         path: { competitionId },
-        body: { competitionChallengeId: batchTarget.value },
+        body: { targetKind: 'CompetitionChallenge', targetId: batchTarget.value },
       })
       if (error) throw error
       toast.success(translate("ui.allQuestionsHaveBeenSubmittedAndAddedToTheRe"))

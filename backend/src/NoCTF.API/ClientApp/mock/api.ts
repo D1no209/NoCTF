@@ -101,6 +101,7 @@ export function createMockApi() {
   const sessions = new Map<string, string>()
   const tokens = new Map<string, string>()
   const wallpapers = new Map<string, Blob>()
+  const competitionPosters = new Map<string, Blob>()
   const changes = new Set<(competitionId: string) => void>()
   const json = (value: any, status = 200, headers: HeadersInit = {}) => Response.json(value, { status, headers: { 'X-NoCTF-Mock': 'true', 'Cache-Control': 'no-store', ...headers } })
   const problem = (status: number, detail: string) => json({ status, title: 'Mock API', detail }, status)
@@ -196,9 +197,13 @@ export function createMockApi() {
           headers: { 'Content-Type': wallpaper.type || 'image/png', 'Cache-Control': 'no-store', 'X-NoCTF-Mock': 'true' },
         })
       }
-      if (route === '/competitions/{competitionId}/poster') return new Response(Bun.file(new URL('./data/competition-poster.png', import.meta.url)), {
-        headers: { 'Content-Type': 'image/png', 'Cache-Control': 'no-store', 'X-NoCTF-Mock': 'true' },
-      })
+      if (route === '/competitions/{competitionId}/poster') {
+        const poster = competitionPosters.get(p.competitionId!)
+          ?? Bun.file(new URL('./data/competition-poster.png', import.meta.url))
+        return new Response(poster, {
+          headers: { 'Content-Type': poster.type || 'image/png', 'Cache-Control': 'no-store', 'X-NoCTF-Mock': 'true' },
+        })
+      }
       if (route === '/competitions/{competitionId}/challenges/{competitionChallengeId}/attachments/{attachmentId}') {
         if (!user) return problem(401, '请先登录演示账号 / Sign in to download attachments')
         return mockAttachmentResponse(attachment!)
@@ -209,13 +214,46 @@ export function createMockApi() {
         if (!assigned) return problem(404, '演示附件不存在 / Attachment not found')
         return mockAttachmentResponse(assigned)
       }
-      if (route === '/platform/configuration' || route === '/admin/platform/configuration') value = state.platform
+      if (route === '/platform/configuration') value = state.platform
+      else if (route === '/admin/platform/configuration') value = {
+        branding: state.platform,
+        emailVerification: state.settings.get('platform/email') ?? {
+          enabled: false, publicBaseUrl: 'http://localhost:3000', tokenLifetimeMinutes: 30,
+          resendCooldownSeconds: 60, passwordResetTokenLifetimeMinutes: 30,
+          passwordResetCooldownSeconds: 60, passwordResetMaxRequestsPerHour: 5,
+          smtpHost: '', smtpPort: 587, smtpSecurityMode: 'StartTls', smtpUserName: '',
+          smtpPasswordConfigured: false, smtpFromAddress: '', smtpFromName: '', smtpTimeoutSeconds: 15,
+        },
+        publicGateway: state.settings.get('platform/gateway') ?? {
+          policy: { enabled: false, connectorId: 'gateway', publicOrigin: '', directOrigins: [], publicRuntimeHost: '', directRuntimeHostOverride: null, maxPublishedPorts: 8 },
+          capability: { connectorId: 'gateway', runnerId: 'mock-runner', approvedOrigins: ['https://public.example.test'], firstPort: 32768, lastPort: 60999, reservedPorts: [], maximumPorts: 8, namespaceIsolationAvailable: true },
+        },
+        publicGatewayStatusUrl: '/api/v1/admin/platform/public-gateway/status',
+      }
       else if (route === '/auth/me') value = user
-      else if (route === '/auth/me/school-identity') value = state.settings.get(`${user!.userId}/school-identity`) ?? { fullName: '演示用户', studentNumber: 'MOCK-2026', ipRetentionDays: 7 }
-      else if (route === '/users/{userId}' || route === '/admin/platform/users/{userId}') value = state.users.find(u => u.userId === p.userId)
+      else if (route === '/auth/me/profile') {
+        const identity = state.settings.get(`${user!.userId}/school-identity`) ?? { fullName: '演示用户', studentNumber: 'MOCK-2026' }
+        value = { description: user!.description ?? null, schoolIdentity: identity, appearance: { wallpaperEnabled: Boolean(user!.wallpaperEnabled) }, privacy: { ipRetentionDays: 7 } }
+      }
+      else if (route === '/users/{userId}') value = state.users.find(u => u.userId === p.userId)
+      else if (route === '/admin/platform/users/{userId}') value = { user: state.users.find(u => u.userId === p.userId), schoolIdentity: state.settings.get(`${p.userId}/school-identity`) ?? { fullName: null, studentNumber: null } }
       else if (route === '/admin/platform/users') value = list(state.users.map(u => ({ ...u, id: u.userId, accountStatus: 'Active', createdAt: date(-720) })), url)
       else if (route === '/admin/platform/information') value = { version: 'MOCK / local-memory', contributors: [] }
       else if (route === '/admin/platform/monitoring') value = mockMonitoringSnapshot()
+      else if (route === '/admin/competitions/{competitionId}') value = {
+        competition: { ...competition, administrationRole: user?.role === 'Administrator' ? 'Owner' : user?.role === 'Organizer' ? 'Manager' : null },
+        modeConfiguration: { competitionId: competition!.id, mode: competition!.mode, competitionStatus: competition!.status, json: '{}', updatedAt: now() },
+        tracks: state.settings.get(`/competitions/{competitionId}/tracks${p.competitionId}`) ?? { mode: competition!.mode, isFrozen: false, items: [] },
+        permissions: { competitionId: competition!.id, ownerId: competition!.ownerId, managerIds: [], judgeIds: [], observerIds: [] },
+        leaderboardVisibility: { competitionId: competition!.id, effectiveVisibility: 'Normal', frozenStartAt: null, hiddenStartAt: null },
+        capabilities: { canObserve: true, canModerate: true, canManagePermissions: true },
+      }
+      else if (route === '/admin/competitions/{competitionId}/challenges/{competitionChallengeId}') value = {
+        challenge,
+        mode: competition!.mode,
+        competitionStatus: competition!.status,
+        rulesJson: '{}',
+      }
       else if (cleanRoute === '/competitions') value = list(state.competitions.map(c => ({ ...c, administrationRole: user?.role === 'Administrator' ? 'Owner' : user?.role === 'Organizer' ? 'Manager' : null })), url)
       else if (cleanRoute === '/competitions/{competitionId}') value = { ...competition, administrationRole: user?.role === 'Administrator' ? 'Owner' : user?.role === 'Organizer' ? 'Manager' : null }
       else if (cleanRoute === '/competitions/{competitionId}/challenges') value = { ...list(state.challenges.filter(c => c.competitionId === p.competitionId), url), leaderboardVisibility: 'Normal', dataScope: 'Live' }
@@ -255,11 +293,11 @@ export function createMockApi() {
       else if (cleanRoute.endsWith('/gameplay-facts')) value = list(state.facts.filter(f => f.competitionId === p.competitionId), url)
       else if (cleanRoute.endsWith('/gameplay-facts/{gameplayFactId}')) value = state.facts.find(f => f.id === p.gameplayFactId)
       else if (cleanRoute.endsWith('/gameplay-facts/{gameplayFactId}/value')) value = { gameplayFactId: p.gameplayFactId, value: state.facts.find(f => f.id === p.gameplayFactId)?.value ?? '' }
-      else if (cleanRoute.endsWith('/runtime') || route.endsWith('/test-runtime')) {
+      else if (cleanRoute.endsWith('/runtimes/current') || route.endsWith('/test-runtimes/current')) {
         value = [...state.runtimes].reverse().find(r => r.competitionChallengeId === challenge?.id && r.challengeId === template?.id)
         if (!value) return problem(404, '演示实例未启动 / No active Mock runtime')
       }
-      else if (route.endsWith('/runtimes/{runtimeInstanceId}')) value = state.runtimes.find(r => r.id === p.runtimeInstanceId)
+      else if (route === '/admin/runtimes/{runtimeInstanceId}' || route.endsWith('/runtimes/{runtimeInstanceId}')) value = state.runtimes.find(r => r.id === p.runtimeInstanceId)
       else if (route.endsWith('/runtimes')) value = list(state.runtimes.filter(r => !p.competitionId || r.competitionId === p.competitionId).map(r => route.startsWith('/admin/platform') ? { runtime: r, scope: 'Competition', competitionTitle: competition?.title ?? state.competitions[0]!.title, challengeTitle: 'Mock runtime' } : r), url)
       else if (route.endsWith('/permissions') && competition) value = { competitionId: competition.id, ownerId: competition.ownerId, managerIds: [id(1, 2)], judgeIds: [], observerIds: [] }
       else if (route.endsWith('/permission-candidates')) value = { items: state.users }
@@ -271,9 +309,18 @@ export function createMockApi() {
       value ??= sample(responseSchema(operation))
     }
     else {
-      if (route === '/auth/me/profile') { Object.assign(user!, body); value = user }
-      else if (route === '/auth/me/school-identity') { state.settings.set(`${user!.userId}/school-identity`, body); value = body }
-      else if (route === '/auth/me/wallpaper' && request.method === 'POST') {
+      if (route === '/auth/me/profile' && request.method === 'PATCH') {
+        if (body.profile) user!.description = body.profile.description ?? null
+        if (body.schoolIdentity) state.settings.set(`${user!.userId}/school-identity`, body.schoolIdentity)
+        if (body.appearance) {
+          if (body.appearance.wallpaperEnabled && !user!.wallpaperRevision)
+            return json({ code: 'WallpaperNotUploaded' }, 400)
+          user!.wallpaperEnabled = Boolean(body.appearance.wallpaperEnabled)
+        }
+        const identity = state.settings.get(`${user!.userId}/school-identity`) ?? { fullName: null, studentNumber: null }
+        value = { description: user!.description ?? null, schoolIdentity: identity, appearance: { wallpaperEnabled: Boolean(user!.wallpaperEnabled) }, privacy: { ipRetentionDays: 7 } }
+      }
+      else if (route === '/auth/me/wallpaper' && request.method === 'PUT') {
         const form = await request.formData()
         const file = form.get('file')
         if (!(file instanceof Blob) || !file.type.startsWith('image/'))
@@ -282,32 +329,60 @@ export function createMockApi() {
         Object.assign(user!, { wallpaperRevision: crypto.randomUUID(), wallpaperEnabled: true })
         value = user
       }
-      else if (route === '/auth/me/wallpaper-preference' && request.method === 'PUT') {
-        if (body.enabled && !user!.wallpaperRevision)
-          return json({ code: 'WallpaperNotUploaded' }, 400)
-        user!.wallpaperEnabled = Boolean(body.enabled)
-        value = user
+      else if (route === '/admin/competitions/{competitionId}/poster' && request.method === 'PUT') {
+        const form = await request.formData()
+        const file = form.get('file')
+        if (!(file instanceof Blob) || !['image/jpeg', 'image/png', 'image/webp'].includes(file.type))
+          return json({ code: 'UnsupportedFormat' }, 400)
+        competitionPosters.set(p.competitionId!, file)
+        value = { fileId: crypto.randomUUID(), contentType: file.type }
       }
-      else if (route === '/admin/platform/configuration') { Object.assign(state.platform, body, { updatedAt: now() }); value = state.platform }
+      else if (route === '/admin/platform/configuration' && request.method === 'PATCH') {
+        if (body.branding) Object.assign(state.platform, body.branding, { updatedAt: now() })
+        if (body.emailVerification) state.settings.set('platform/email', body.emailVerification)
+        if (body.publicGateway) state.settings.set('platform/gateway', {
+          policy: body.publicGateway,
+          capability: { connectorId: body.publicGateway.connectorId, runnerId: 'mock-runner', approvedOrigins: [body.publicGateway.publicOrigin], firstPort: 32768, lastPort: 60999, reservedPorts: [], maximumPorts: 8, namespaceIsolationAvailable: true },
+        })
+        value = {
+          branding: state.platform,
+          emailVerification: state.settings.get('platform/email'),
+          publicGateway: state.settings.get('platform/gateway'),
+          publicGatewayStatusUrl: '/api/v1/admin/platform/public-gateway/status',
+        }
+      }
       else if (route === '/admin/competitions' && request.method === 'POST') {
         value = { ...state.competitions[0], ...body, id: body.id ?? crypto.randomUUID(), ownerId: user!.userId, status: 'Draft' }; state.competitions.push(value)
       }
-      else if (route === '/admin/competitions/{competitionId}' && request.method === 'PUT') { Object.assign(competition!, body); value = competition }
+      else if (route === '/admin/competitions/{competitionId}' && request.method === 'PATCH') {
+        if (body.metadata) Object.assign(competition!, body.metadata)
+        if (body.modeConfiguration) state.settings.set(`${route}/configuration`, body.modeConfiguration)
+        value = { competition, modeConfiguration: body.modeConfiguration ?? { json: '{}' }, tracks: { items: [] }, permissions: body.permissions ?? null, leaderboardVisibility: body.leaderboardVisibility ?? { effectiveVisibility: 'Normal' }, capabilities: { canObserve: true, canModerate: true, canManagePermissions: true } }
+      }
+      else if (route === '/admin/competitions/{competitionId}/status' && request.method === 'PUT') { competition!.status = body.status; value = {} }
       else if (route === '/admin/challenges' && request.method === 'POST') { value = { ...state.templates[0], ...body, id: body.id ?? crypto.randomUUID(), ownerId: user!.userId, createdAt: now(), updatedAt: now() }; state.templates.push(value) }
-      else if (route === '/admin/challenges/{challengeId}' && request.method === 'PUT') { Object.assign(template!, body, { updatedAt: now() }); value = template; state.challenges.filter(c => c.challengeId === template!.id).forEach(c => Object.assign(c, { title: template!.title, description: template!.description, direction: template!.direction })) }
+      else if (route === '/admin/challenges/{challengeId}' && request.method === 'PATCH') { if (body.content) Object.assign(template!, body.content, { updatedAt: now() }); if (body.permissions) Object.assign(template!, body.permissions); value = template; state.challenges.filter(c => c.challengeId === template!.id).forEach(c => Object.assign(c, { title: template!.title, description: template!.description, direction: template!.direction })) }
       else if (route === '/admin/competitions/{competitionId}/challenges' && request.method === 'POST') {
         const source = state.templates.find(t => t.id === body.challengeId && t.mode === competition!.mode)
         if (!source) return problem(400, '选择同赛制的演示模板 / Select a template in the same mode')
         value = { ...state.challenges[0], ...body, id: body.id ?? crypto.randomUUID(), competitionId: competition!.id, title: body.customTitle ?? source.title, description: source.description, direction: source.direction, challengeId: source.id }; state.challenges.push(value)
       }
-      else if (route === '/admin/competitions/{competitionId}/challenges/{competitionChallengeId}' && request.method === 'PUT') { Object.assign(challenge!, body, { title: body.customTitle ?? challenge!.title }); value = challenge }
+      else if (route === '/admin/competitions/{competitionId}/challenges/{competitionChallengeId}' && request.method === 'PATCH') { if (body.presentation) Object.assign(challenge!, body.presentation, { title: body.presentation.customTitle ?? challenge!.title }); value = { challenge, mode: competition!.mode, competitionStatus: competition!.status, rulesJson: body.rules?.json ?? '{}' } }
       else if (cleanRoute === '/competitions/{competitionId}/teams' && request.method === 'POST') {
         if (myTeam) return problem(409, '已加入队伍，请先退出 / Already in a team')
         value = { ...state.teams[0], ...body, id: body.id ?? crypto.randomUUID(), competitionId: p.competitionId, captainId: user!.userId, memberIds: [user!.userId], registeredAt: now() }; state.teams.push(value)
       }
-      else if (cleanRoute === '/competitions/{competitionId}/teams/{teamId}' && request.method === 'PUT') {
+      else if (cleanRoute === '/competitions/{competitionId}/teams/{teamId}' && request.method === 'PATCH') {
         if (!team || (team.captainId !== user!.userId && user!.role !== 'Administrator')) return problem(403, '仅队长可以编辑 / Captain required')
-        Object.assign(team, body); value = team
+        if (body.profile) Object.assign(team, body.profile)
+        if (body.membership) Object.assign(team, body.membership)
+        if (body.registration) team.registrationStatus = body.registration.status
+        if (body.administration) {
+          team.trackKey = body.administration.trackKey
+          team.registrationStatus = body.administration.registrationStatus
+        }
+        if (body.ban) team.isBanned = body.ban.isBanned
+        value = team
       }
       else if (cleanRoute.endsWith('/teams/me/membership') && request.method === 'DELETE') { if (myTeam) myTeam.memberIds = myTeam.memberIds.filter((member: string) => member !== user!.userId); value = {} }
       else if (cleanRoute.endsWith('/invitation-token/rotate')) value = { invitationToken: 'mock00000000000000000000000000001' }
@@ -316,7 +391,7 @@ export function createMockApi() {
         if (myTeam) return problem(409, '已加入队伍 / Already in a team')
         value = state.teams.find(t => t.competitionId === p.competitionId)!; value.memberIds.push(user!.userId)
       }
-      else if (route.endsWith('/flag-submissions') || route.endsWith('/practice-flag')) {
+      else if (route.endsWith('/flag-submissions')) {
         if (!myTeam) return problem(409, '先加入演示队伍 / Join a team first')
         const correct = (body.flag ?? body.flags?.[0]) === 'flag{mock_success}'
         const duplicate = correct && state.facts.some(f => f.teamId === myTeam.id && f.competitionChallengeId === challenge!.id && f.result === 'Correct')
@@ -329,8 +404,9 @@ export function createMockApi() {
         const accepted = { gameplayFactId: fact.id, state: 'Completed', statusUrl: `/api/v1/competitions/${p.competitionId}/gameplay-facts/${fact.id}` }
         value = { ...accepted, items: [accepted], gameplayFacts: [accepted] }
       }
-      else if (/\/(runtime|test-runtime)\/(start|reset|stop|extend)$/.test(route)) {
-        const action = route.split('/').at(-1)
+      else if ((route.endsWith('/runtimes') && request.method === 'POST')
+        || (route.endsWith('/runtimes/{runtimeInstanceId}') && (request.method === 'DELETE' || request.method === 'PATCH'))) {
+        const action = request.method === 'POST' ? (body.replacesRuntimeId ? 'reset' : 'start') : request.method === 'DELETE' ? 'stop' : 'extend'
         let runtime = state.runtimes.find(r => r.competitionChallengeId === challenge?.id && r.challengeId === template?.id && r.state !== 'Stopped')
         if (action === 'start' || action === 'reset') {
           if (runtime) runtime.state = 'Stopped'
@@ -342,7 +418,7 @@ export function createMockApi() {
         if (!runtime) return problem(404, '演示实例未启动 / No runtime')
         if (action === 'stop') Object.assign(runtime, { state: 'Stopped', stoppedAt: now() })
         if (action === 'extend') runtime.expiresAt = date(2)
-        value = { ...runtime, runtimeInstanceId: runtime.id, statusUrl: path.replace(/\/(start|reset|stop|extend)$/, '') }
+        value = { ...runtime, runtimeInstanceId: runtime.id, statusUrl: path.replace(/\/{runtimeInstanceId}$/, '/current') }
       }
       else if (route === '/competitions/{competitionId}/questions') {
         const rootId = crypto.randomUUID()
@@ -373,14 +449,6 @@ export function createMockApi() {
       }
       else if (route === '/admin/competitions/{competitionId}/announcements') {
         value = model('NotificationsNotificationResponse', { id: crypto.randomUUID(), sourceType: 2, sourceId: p.competitionId, targetType: 2, targetId: p.competitionId, kind: 'CompetitionAnnouncement', content: body, sentAt: now(), sourceDisplayName: user!.userName }); state.notifications.unshift(value)
-      }
-      else if (route.startsWith('/admin/') && /\/(configuration|permissions|tracks|leaderboard-visibility|public-gateway)$/.test(route) && request.method === 'PUT') {
-        value = { ...sample(responseSchema(operation)), ...body, competitionId: p.competitionId, updatedAt: now() }
-        state.settings.set(path, value)
-      }
-      else if (route.startsWith('/admin/competitions/') && /\/(publish|make-visible|start|pause|resume|finish)$/.test(route)) {
-        const statuses: Data = { publish: 'Published', 'make-visible': 'Visible', start: 'Running', pause: 'Paused', resume: 'Running', finish: 'Finished' }
-        competition!.status = statuses[route.split('/').at(-1)!]; value = competition
       }
       else return problem(501, `尚未模拟此操作，未调用真实服务 / Mock operation not implemented: ${request.method} ${route}`)
       changed = true

@@ -3,8 +3,8 @@ import { markRaw } from 'vue'
 
 import { Plus } from '@lucide/vue'
 import { toast } from 'vue-sonner'
-import { adminChallengeConfigurationGet, adminChallengeConfigurationUpdate, adminCompetitionConfigurationGet, adminCreateManualAdjustment, adminCreateCompetitionChallengeHint, adminDeleteCompetitionChallengeHint, adminGetCompetitionChallenge, adminListGameplayFacts, adminListCompetitionChallengeHints, adminListTeams, adminRestoreCompetitionChallengeHint, adminUpdateCompetitionChallenge, adminUpdateCompetitionChallengeHint, getLeaderboardEndpoint, getScoreboardSchemaEndpoint } from '../../../../../../api'
-import type { NoCtfapiEndpointsAdministrationChallengesChallengeConfigurationResponse, NoCtfapiEndpointsAdministrationChallengesChallengeHintResponse, NoCtfapiEndpointsChallengesChallengeResponse, NoCtfapiEndpointsCompetitionsScoreboardSchemaResponse, NoCtfapiEndpointsCompetitionsScoreboardSnapshotResponse, NoCtfapiEndpointsGameplayFactsGameplayFactListResponse, NoCtfapiEndpointsGameplayFactsGameplayFactListItemResponse, NoCtfapiEndpointsTeamsTeamResponse } from '../../../../../../api'
+import { adminCreateManualAdjustment, adminCreateCompetitionChallengeHint, adminDeleteCompetitionChallengeHint, adminGetCompetition, adminGetCompetitionChallenge, adminListGameplayFacts, adminListCompetitionChallengeHints, adminListTeams, adminPatchCompetitionChallenge, adminRestoreCompetitionChallengeHint, adminUpdateCompetitionChallengeHint, getLeaderboardEndpoint, getScoreboardSchemaEndpoint } from '../../../../../../api'
+import type { NoCtfapiEndpointsAdministrationChallengesChallengeHintResponse, NoCtfapiEndpointsChallengesChallengeResponse, NoCtfapiEndpointsCompetitionsGameModeProtocol, NoCtfapiEndpointsCompetitionsScoreboardSchemaResponse, NoCtfapiEndpointsCompetitionsScoreboardSnapshotResponse, NoCtfapiEndpointsGameplayFactsGameplayFactListResponse, NoCtfapiEndpointsGameplayFactsGameplayFactListItemResponse, NoCtfapiEndpointsTeamsTeamResponse } from '../../../../../../api'
 import { useCompetitionAdmin } from '../../../../../../lib/admin-competition'
 
 import ChallengeRulesEditorComponent from '../../../../../admin/ChallengeRulesEditor.vue'
@@ -15,6 +15,11 @@ interface ChallengeTeamScoringRow {
   adjustment: number
   progressLabel: string
   progressVariant: 'default' | 'secondary' | 'outline'
+}
+
+interface ChallengeConfiguration {
+  mode?: NoCtfapiEndpointsCompetitionsGameModeProtocol
+  json?: string
 }
 
 /** Owns state, effects and commands for AdminCompetitionsByIdChallengesByCcIdPage. */
@@ -40,7 +45,7 @@ export function useAdminCompetitionsByIdChallengesByCcIdPage() {
       query: { includeDeleted: false },
     })
     if (error) loadError.value = parseApiError(error).message
-    else challenge.value = data ?? null
+    else challenge.value = data?.challenge ?? null
     loading.value = false
   }
 
@@ -63,16 +68,16 @@ export function useAdminCompetitionsByIdChallengesByCcIdPage() {
     if (!challenge.value) return
     savingEdit.value = true
     try {
-      const { data, error } = await adminUpdateCompetitionChallenge({
+      const { data, error } = await adminPatchCompetitionChallenge({
         path: { competitionId, competitionChallengeId: ccId },
-        body: {
+        body: { presentation: {
           customTitle: editCustomTitle.value.trim() || null,
           order: editOrder.value,
           isPublished: editPublished.value,
-        },
+        } },
       })
       if (error) throw error
-      challenge.value = data ?? challenge.value
+      challenge.value = data?.challenge ?? challenge.value
       toast.success(translate("ui.questionSettingsSaved"))
     }
     catch (e) {
@@ -83,7 +88,7 @@ export function useAdminCompetitionsByIdChallengesByCcIdPage() {
     }
   }
 
-  const config = ref<NoCtfapiEndpointsAdministrationChallengesChallengeConfigurationResponse | null>(null)
+  const config = ref<ChallengeConfiguration | null>(null)
 
   const configLoading = ref(true)
 
@@ -94,14 +99,20 @@ export function useAdminCompetitionsByIdChallengesByCcIdPage() {
   async function loadConfig() {
     configLoading.value = true
     const [challengeResult, competitionResult] = await Promise.all([
-      adminChallengeConfigurationGet({
+      adminGetCompetitionChallenge({
         path: { competitionId, competitionChallengeId: ccId },
+        query: { includeDeleted: false },
       }),
-      adminCompetitionConfigurationGet({ path: { competitionId } }),
+      adminGetCompetition({ path: { competitionId } }),
     ])
-    if (!challengeResult.error && challengeResult.data) config.value = challengeResult.data
+    if (!challengeResult.error && challengeResult.data) {
+      config.value = {
+        mode: challengeResult.data.mode,
+        json: challengeResult.data.rulesJson,
+      }
+    }
     if (!competitionResult.error && competitionResult.data) {
-      inheritedConfigJson.value = competitionResult.data.json ?? null
+      inheritedConfigJson.value = competitionResult.data.modeConfiguration?.json ?? null
     }
     configLoading.value = false
   }
@@ -110,12 +121,14 @@ export function useAdminCompetitionsByIdChallengesByCcIdPage() {
     if (!config.value) return
     savingConfig.value = true
     try {
-      const { data, error } = await adminChallengeConfigurationUpdate({
+      const { data, error } = await adminPatchCompetitionChallenge({
         path: { competitionId, competitionChallengeId: ccId },
-        body: { json },
+        body: { rules: { json } },
       })
       if (error) throw error
-      config.value = data ?? config.value
+      config.value = data
+        ? { mode: data.mode, json: data.rulesJson }
+        : config.value
       toast.success(translate("ui.questionConfigurationHasBeenSaved"))
     }
     catch (e) {

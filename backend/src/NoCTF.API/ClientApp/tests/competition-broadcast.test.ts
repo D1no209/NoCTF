@@ -140,14 +140,25 @@ describe('competition broadcast projection', () => {
     const shell = await sourceFile(
       new URL('../app/pages/competitions/[id].vue', import.meta.url),
     ).text()
-    const panel = await sourceFile(
-      new URL('../app/features/competition/CompetitionBroadcastPanel.vue', import.meta.url),
-    ).text()
+    const [panel, workspaceNavigation, theme] = await Promise.all([
+      sourceFile(new URL('../app/features/competition/CompetitionBroadcastPanel.vue', import.meta.url)).text(),
+      sourceFile(new URL('../app/features/competition/CompetitionWorkspaceNavigation.vue', import.meta.url)).text(),
+      Bun.file(new URL('../app/assets/css/main.css', import.meta.url)).text(),
+    ])
 
     expect(challengePage).toContain("<component :is=\"CompetitionParticipantWorkspace\"")
     expect(participantWorkspace).toContain("<component :is=\"CompetitionBroadcastPanel\"")
     expect(participantWorkspace).toContain('challenge-workspace')
     expect(participantWorkspace).toContain("<component :is=\"CompetitionWorkspaceNavigation\"")
+    expect(participantWorkspace).not.toContain('<ScrollSurface axis="y" class="col-span-full h-full"')
+    expect(participantWorkspace).toContain('min-[1440px]:grid-cols-1')
+    expect(workspaceNavigation).toContain('<Card as="nav"')
+    expect(workspaceNavigation).toContain('<ScrollSurface axis="y"')
+    expect(panel).toContain('<Card')
+    expect(panel).toContain('as="aside"')
+    expect(theme).toContain(":has(> main [data-contained-workspace-page])")
+    expect(theme).toContain("> [data-slot='competition-page-route'] { height: 100%;")
+    expect(theme).not.toContain(":has(> main > [data-contained-workspace-page])")
     expect(challengePage).toContain("<component :is=\"CompetitionChallengeDetail\"")
     expect(challengeNavigator).toContain("@update:model-value=\"selectChallenge\"")
     expect(shell).not.toContain("<component :is=\"AppWorkspaceNav\"")
@@ -199,7 +210,12 @@ describe('competition administration entry', () => {
 
     expect(dialog).toContain('<Dialog :open="open" @update:open="setOpen">')
     expect(dialog).toContain('sm:max-w-3xl')
-    expect(dialog).toContain("emit('created', data)")
+    expect(dialog).toContain('<FileUpload')
+    expect(dialog).toContain('accept="image/jpeg,image/png,image/webp"')
+    expect(dialog).toContain('adminCompetitionPosterReplace({')
+    expect(dialog).toContain('createdCompetition.value = data')
+    expect(dialog).toContain('completeCreation()')
+    expect(dialog).toContain('<ScrollSurface axis="y"')
     expect(dialog).not.toContain('navigateTo(`/admin/competitions/')
     expect(legacyRoute).toContain("redirect: '/competitions?create=1'")
   })

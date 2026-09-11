@@ -2,7 +2,7 @@ import { proxyRefs } from 'vue'
 import { markRaw } from 'vue'
 
 import { toast } from 'vue-sonner'
-import { adminAcceptTeamBanAppeal, adminApproveTeam, adminBanTeam, adminCreateManualAdjustment, adminCorrectTeamBan, adminCompetitionTracksGet, adminListCompetitionChallenges, adminListTeamBanAppeals, adminListTeams, adminRejectTeam, adminUpholdTeamBanAppeal, adminTeamTrackAssign, userProfileGet } from '../../../../../api'
+import { adminCreateManualAdjustment, adminCorrectTeamBan, adminGetCompetition, adminListCompetitionChallenges, adminListTeamBanAppeals, adminListTeams, adminResolveTeamBanAppeal, patchCompetitionTeam, userProfileGet } from '../../../../../api'
 import type { NoCtfapiEndpointsAdministrationTeamsAdminTeamBanCaseResponse, NoCtfapiEndpointsAuthenticationPublicUserProfileResponse, NoCtfapiEndpointsChallengesChallengeResponse, NoCtfapiEndpointsCompetitionsTracksCompetitionTrackResponse, NoCtfapiEndpointsTeamsTeamResponse } from '../../../../../api'
 import { useCompetitionAdmin } from '../../../../../lib/admin-competition'
 import { competitionTrackErrorMessage } from '../../../../../lib/competition-track'
@@ -131,23 +131,23 @@ export function useAdminCompetitionsByIdTeamsPage() {
     error.value = null
     const [teamResult, trackResult] = await Promise.all([
       adminListTeams({ path: { competitionId } }),
-      adminCompetitionTracksGet({ path: { competitionId } }),
+      adminGetCompetition({ path: { competitionId } }),
     ])
     if (teamResult.error || !teamResult.data) error.value = parseApiError(teamResult.error).message
     else teams.value = teamResult.data.items ?? []
     if (!trackResult.error && trackResult.data) {
-      tracks.value = trackResult.data.items ?? []
+      tracks.value = trackResult.data.tracks?.items ?? []
     }
     loading.value = false
   }
 
   async function assignTrack(team: NoCtfapiEndpointsTeamsTeamResponse, trackKey: string) {
-    if (!team.id || !canWrite.value || team.trackKey === trackKey) return
+    if (!team.id || !team.registrationStatus || !canWrite.value || team.trackKey === trackKey) return
     pendingId.value = team.id
     try {
-      const { error: requestError } = await adminTeamTrackAssign({
+      const { error: requestError } = await patchCompetitionTeam({
         path: { competitionId, teamId: team.id },
-        body: { trackKey },
+        body: { administration: { trackKey, registrationStatus: team.registrationStatus } },
       })
       if (requestError) throw requestError
       toast.success(translate("ui.teamTrackUpdated"))
@@ -166,13 +166,19 @@ export function useAdminCompetitionsByIdTeamsPage() {
   }
 
   async function simpleAction(team: NoCtfapiEndpointsTeamsTeamResponse, action: 'approve' | 'reject') {
-    if (!team.id) return
+    if (!team.id || !team.trackKey) return
     pendingId.value = team.id
     try {
       const path = { competitionId, teamId: team.id }
-      const { error } = action === 'approve'
-        ? await adminApproveTeam({ path })
-        : await adminRejectTeam({ path })
+      const { error } = await patchCompetitionTeam({
+        path,
+        body: {
+          administration: {
+            trackKey: team.trackKey,
+            registrationStatus: action === 'approve' ? 'Approved' : 'Rejected',
+          },
+        },
+      })
       if (error) throw error
       toast.success(translate("ui.operationCompleted"))
       await load()
@@ -211,11 +217,14 @@ export function useAdminCompetitionsByIdTeamsPage() {
     try {
       const path = { competitionId, teamId: ctx.team.id }
       const { error } = ctx.mode === 'ban'
-        ? await adminBanTeam({
+        ? await patchCompetitionTeam({
             path,
             body: {
-              reason: banReason.value.trim(),
-              announcePublicly: banAnnouncePublicly.value,
+              ban: {
+                isBanned: true,
+                reason: banReason.value.trim(),
+                announcePublicly: banAnnouncePublicly.value,
+              },
             },
           })
         : await adminCorrectTeamBan({ path, body: { reason: banReason.value.trim() } })
@@ -273,9 +282,13 @@ export function useAdminCompetitionsByIdTeamsPage() {
     appealPending.value = true
     try {
       const path = { competitionId, appealId }
-      const { error } = ctx.mode === 'accept'
-        ? await adminAcceptTeamBanAppeal({ path, body: { reason: appealReason.value.trim() } })
-        : await adminUpholdTeamBanAppeal({ path, body: { reason: appealReason.value.trim() } })
+      const { error } = await adminResolveTeamBanAppeal({
+        path,
+        body: {
+          resolution: ctx.mode === 'accept' ? 'Accepted' : 'Upheld',
+          reason: appealReason.value.trim(),
+        },
+      })
       if (error) throw error
       toast.success(ctx.mode === 'accept' ? translate("ui.appealAcceptedTeamUnblocked") : translate("ui.theAppealHasBeenDismissedAndTheBanIsMaintained"))
       appealDialog.value = null

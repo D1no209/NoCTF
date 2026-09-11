@@ -1,7 +1,7 @@
 import { proxyRefs } from 'vue'
 
 import { toast } from 'vue-sonner'
-import { adminDeleteCompetition, adminFinishCompetition, adminForceDeleteCompetition, adminGenerateMissingFlags, adminHardDeleteCompetition, adminMakeCompetitionVisible, adminPauseCompetition, adminPreviewCompetitionHardDelete, adminPublishCompetition, adminRestoreCompetition, adminResumeCompetition, adminStartCompetition, adminValidateCompetitionStart } from '../../../../../api'
+import { adminDeleteCompetition, adminForceDeleteCompetition, adminGenerateMissingFlags, adminHardDeleteCompetition, adminPreviewCompetitionHardDelete, adminRestoreCompetition, adminUpdateCompetitionStatus, adminValidateCompetitionStart } from '../../../../../api'
 import type { NoCtfapiEndpointsAdministrationCompetitionsCompetitionHardDeletePreviewResponse, NoCtfapiEndpointsAdministrationCompetitionsCompetitionHardDeleteReferenceCode, NoCtfapiEndpointsAdministrationCompetitionsStartGateErrorResponse } from '../../../../../api'
 import { useCompetitionAdmin } from '../../../../../lib/admin-competition'
 import { startGateErrorMessage } from '../../../../../lib/start-gate-error'
@@ -37,37 +37,40 @@ export function useAdminCompetitionsByIdIndexPage() {
     { value: 'Finished', label: "ui.finished" },
   ]
 
+  const updateStatus = (target: 'Visible' | 'Published' | 'Running' | 'Paused' | 'Finished') =>
+    adminUpdateCompetitionStatus({ path: { competitionId }, body: { status: target } })
+
   const actions = computed<LifecycleAction[]>(() => [
     {
       key: 'make-visible',
       label: translate("ui.visibleToTheOutsideWorld"),
       visible: status.value === 'Draft',
-      run: () => adminMakeCompetitionVisible({ path: { competitionId } }),
+      run: () => updateStatus('Visible'),
     },
     {
       key: 'publish',
       label: translate("ui.postAContest"),
       visible: status.value === 'Visible',
-      run: () => adminPublishCompetition({ path: { competitionId } }),
+      run: () => updateStatus('Published'),
     },
     {
       key: 'start',
       label: translate("ui.startTheGame"),
       visible: status.value === 'Published',
       confirm: { title: translate("ui.startTheGame"), description: translate("ui.theMatchWillStartImmediatelyAndARuntimeInstanceWill") },
-      run: () => adminStartCompetition({ path: { competitionId } }),
+      run: () => updateStatus('Running'),
     },
     {
       key: 'pause',
       label: translate("ui.pauseTheGame"),
       visible: status.value === 'Running',
-      run: () => adminPauseCompetition({ path: { competitionId } }),
+      run: () => updateStatus('Paused'),
     },
     {
       key: 'resume',
       label: translate("ui.resumePlay"),
       visible: status.value === 'Paused',
-      run: () => adminResumeCompetition({ path: { competitionId } }),
+      run: () => updateStatus('Running'),
     },
     {
       key: 'finish',
@@ -75,7 +78,7 @@ export function useAdminCompetitionsByIdIndexPage() {
       visible: status.value === 'Published' || status.value === 'Running' || status.value === 'Paused',
       destructive: true,
       confirm: { title: translate("ui.endGame"), description: translate("ui.endingTheMatchIsIrreversibleAndWillCleanUpAll") },
-      run: () => adminFinishCompetition({ path: { competitionId } }),
+      run: () => updateStatus('Finished'),
     },
   ])
 

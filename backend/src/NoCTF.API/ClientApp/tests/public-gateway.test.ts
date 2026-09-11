@@ -23,7 +23,7 @@ test('independent gateway failures have specific user-facing explanations', () =
 test('gateway page uses generated contracts and preserves async application and field errors', async () => {
   const page = await sourceFile(new URL('../app/pages/admin/platform/public-gateway.vue', import.meta.url)).text()
   expect(page).toContain('adminPlatformGetPublicGatewayStatus')
-  expect(page).toContain('adminPlatformUpdatePublicGateway')
+  expect(page).toContain('adminPlatformPatchConfiguration')
   expect(page).toContain('usePolling(readStatus')
   expect(page).toContain('finally { saving.value = false }')
   expect(page).toContain('FieldError')

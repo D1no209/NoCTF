@@ -61,7 +61,7 @@ export function useCompetitionsByIdEventsPage() {
       const { data, error: requestError, response } = await adminGetCompetition({
         path: { competitionId },
       })
-      hasStaffHistory.value = data?.administrationRole != null
+      hasStaffHistory.value = data?.competition?.administrationRole != null
       if (requestError && response?.status !== 403 && response?.status !== 404) {
         historyScopeError.value = parseApiError(
           requestError,

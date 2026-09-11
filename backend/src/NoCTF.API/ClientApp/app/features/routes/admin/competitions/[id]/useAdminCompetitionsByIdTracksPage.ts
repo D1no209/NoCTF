@@ -2,7 +2,7 @@
 
 import { Plus, Save, Trash2 } from '@lucide/vue'
 import { toast } from 'vue-sonner'
-import { adminCompetitionTracksGet, adminCompetitionTracksUpdate } from '../../../../../api'
+import { adminGetCompetition, adminPatchCompetition } from '../../../../../api'
 import type { NoCtfapiEndpointsAdministrationCompetitionsUpdateCompetitionTrackRequest } from '../../../../../api'
 import { useCompetitionAdmin } from '../../../../../lib/admin-competition'
 import { competitionTrackErrorMessage } from '../../../../../lib/competition-track'
@@ -32,15 +32,15 @@ export function useAdminCompetitionsByIdTracksPage() {
 
   async function load() {
     loading.value = true
-    const { data, error: requestError } = await adminCompetitionTracksGet({ path: { competitionId } })
+    const { data, error: requestError } = await adminGetCompetition({ path: { competitionId } })
     loading.value = false
     if (requestError || !data) {
       error.value = competitionTrackErrorMessage(requestError, translate("ui.failedToLoadTrackConfiguration"))
       return
     }
-    mode.value = data.mode ?? 'Ctf'
-    frozen.value = data.isFrozen ?? false
-    tracks.value = (data.items ?? []).map(item => ({
+    mode.value = data.competition?.mode ?? 'Ctf'
+    frozen.value = data.tracks?.isFrozen ?? false
+    tracks.value = (data.tracks?.items ?? []).map(item => ({
       clientId: crypto.randomUUID(),
       key: item.key ?? '',
       name: item.name ?? '',
@@ -153,23 +153,25 @@ export function useAdminCompetitionsByIdTracksPage() {
       return
     }
     saving.value = true
-    const { data, error: requestError } = await adminCompetitionTracksUpdate({
+    const { data, error: requestError } = await adminPatchCompetition({
       path: { competitionId },
       body: {
-        tracks: tracks.value.map(track => ({
-          key: track.key,
-          name: track.name,
-          isDefault: track.isDefault,
-          isPublicSelectable: track.isPublicSelectable,
-          isInternal: track.isInternal,
-          earnsScore: track.earnsScore,
-          earnsBlood: track.earnsBlood,
-          affectsDynamicChallengeScore: track.affectsDynamicChallengeScore,
-          visibleOnLeaderboard: track.visibleOnLeaderboard,
-          affectsCompetitiveResults: track.affectsCompetitiveResults,
-          invitationCode: track.requiresInvitationCode ? track.invitationCode.trim() : null,
-          clearInvitationCode: track.clearInvitationCode,
-        })),
+        tracks: {
+          tracks: tracks.value.map(track => ({
+            key: track.key,
+            name: track.name,
+            isDefault: track.isDefault,
+            isPublicSelectable: track.isPublicSelectable,
+            isInternal: track.isInternal,
+            earnsScore: track.earnsScore,
+            earnsBlood: track.earnsBlood,
+            affectsDynamicChallengeScore: track.affectsDynamicChallengeScore,
+            visibleOnLeaderboard: track.visibleOnLeaderboard,
+            affectsCompetitiveResults: track.affectsCompetitiveResults,
+            invitationCode: track.requiresInvitationCode ? track.invitationCode.trim() : null,
+            clearInvitationCode: track.clearInvitationCode,
+          })),
+        },
       },
     })
     saving.value = false

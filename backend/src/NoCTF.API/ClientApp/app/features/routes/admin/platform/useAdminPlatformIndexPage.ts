@@ -2,8 +2,8 @@
 import type { ComponentPublicInstance } from 'vue'
 import { Upload } from '@lucide/vue'
 import { toast } from 'vue-sonner'
-import { adminPlatformGetConfiguration, adminPlatformGetInformation, adminPlatformUpdateConfiguration, adminPlatformUploadLogo } from '../../../../api'
-import type { NoCtfapiEndpointsAdministrationPlatformPlatformConfigurationResponse, NoCtfapiEndpointsAdministrationPlatformPlatformInformationResponse } from '../../../../api'
+import { adminPlatformGetConfiguration, adminPlatformGetInformation, adminPlatformPatchConfiguration, adminPlatformUploadLogo } from '../../../../api'
+import type { NoCtfapiEndpointsAdministrationPlatformPlatformBrandingResponse, NoCtfapiEndpointsAdministrationPlatformPlatformInformationResponse } from '../../../../api'
 
 /** Owns state, effects and commands for AdminPlatformIndexPage. */
 export function useAdminPlatformIndexPage() {
@@ -11,7 +11,7 @@ export function useAdminPlatformIndexPage() {
 
   const information = ref<NoCtfapiEndpointsAdministrationPlatformPlatformInformationResponse | null>(null)
 
-  const configuration = ref<NoCtfapiEndpointsAdministrationPlatformPlatformConfigurationResponse | null>(null)
+  const configuration = ref<NoCtfapiEndpointsAdministrationPlatformPlatformBrandingResponse | null>(null)
 
   const loading = ref(true)
 
@@ -42,18 +42,20 @@ export function useAdminPlatformIndexPage() {
       return
     }
     information.value = infoResult.data ?? null
-    configuration.value = configResult.data ?? null
-    name.value = configResult.data?.name ?? ''
-    description.value = configResult.data?.description ?? ''
+    configuration.value = configResult.data?.branding ?? null
+    name.value = configResult.data?.branding?.name ?? ''
+    description.value = configResult.data?.branding?.description ?? ''
   }
 
   async function save(): Promise<void> {
     if (!configuration.value || !name.value.trim()) return
     saving.value = true
-    const { data, error } = await adminPlatformUpdateConfiguration({
+    const { data, error } = await adminPlatformPatchConfiguration({
       body: {
-        name: name.value.trim(),
-        description: description.value.trim() || null,
+        branding: {
+          name: name.value.trim(),
+          description: description.value.trim() || null,
+        },
       },
     })
     saving.value = false
@@ -61,8 +63,15 @@ export function useAdminPlatformIndexPage() {
       toast.error(parseApiError(error).message)
       return
     }
-    configuration.value = data ?? configuration.value
-    if (data) globalConfiguration.value = data
+    configuration.value = data?.branding ?? configuration.value
+    if (data?.branding && globalConfiguration.value) {
+      globalConfiguration.value = {
+        ...globalConfiguration.value,
+        name: data.branding.name,
+        description: data.branding.description,
+        logoUrl: data.branding.logoUrl,
+      }
+    }
     toast.success(translate("ui.platformConfigurationSaved"))
   }
 
@@ -82,7 +91,9 @@ export function useAdminPlatformIndexPage() {
     }
     if (data) {
       configuration.value = data
-      globalConfiguration.value = data
+      if (globalConfiguration.value) {
+        globalConfiguration.value = { ...globalConfiguration.value, logoUrl: data.logoUrl }
+      }
     }
     toast.success(translate("ui.logoHasBeenUpdated"))
   }

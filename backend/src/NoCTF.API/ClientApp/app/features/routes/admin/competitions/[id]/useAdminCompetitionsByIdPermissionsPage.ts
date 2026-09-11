@@ -2,7 +2,7 @@ import { proxyRefs } from 'vue'
 
 import { X } from '@lucide/vue'
 import { toast } from 'vue-sonner'
-import { adminGetCompetitionPermissions, adminListCompetitionPermissionCandidates, adminTransferCompetitionOwner, adminUpdateCompetitionPermissions } from '../../../../../api'
+import { adminGetCompetition, adminListCompetitionPermissionCandidates, adminPatchCompetition } from '../../../../../api'
 import type { NoCtfapiEndpointsAdministrationCompetitionsCompetitionPermissionCandidateResponse, NoCtfapiEndpointsAdministrationCompetitionsCompetitionPermissionsResponse } from '../../../../../api'
 import { useCompetitionAdmin } from '../../../../../lib/admin-competition'
 
@@ -35,7 +35,7 @@ export function useAdminCompetitionsByIdPermissionsPage() {
     loading.value = true
     error.value = null
     const [perm, cand] = await Promise.all([
-      adminGetCompetitionPermissions({ path: { competitionId } }),
+      adminGetCompetition({ path: { competitionId } }),
       adminListCompetitionPermissionCandidates({ path: { competitionId } }),
     ])
     if (perm.error) {
@@ -43,11 +43,11 @@ export function useAdminCompetitionsByIdPermissionsPage() {
       loading.value = false
       return
     }
-    permissions.value = perm.data ?? null
+    permissions.value = perm.data?.permissions ?? null
     candidates.value = cand.data?.items ?? []
-    managerIds.value = [...(perm.data?.managerIds ?? [])]
-    judgeIds.value = [...(perm.data?.judgeIds ?? [])]
-    observerIds.value = [...(perm.data?.observerIds ?? [])]
+    managerIds.value = [...(perm.data?.permissions?.managerIds ?? [])]
+    judgeIds.value = [...(perm.data?.permissions?.judgeIds ?? [])]
+    observerIds.value = [...(perm.data?.permissions?.observerIds ?? [])]
     loading.value = false
   }
 
@@ -83,16 +83,19 @@ export function useAdminCompetitionsByIdPermissionsPage() {
     if (!permissions.value) return
     saving.value = true
     try {
-      const { data, error } = await adminUpdateCompetitionPermissions({
+      const { data, error } = await adminPatchCompetition({
         path: { competitionId },
         body: {
-          managerIds: managerIds.value,
-          judgeIds: judgeIds.value,
-          observerIds: observerIds.value,
+          permissions: {
+            ownerId: permissions.value.ownerId!,
+            managerIds: managerIds.value,
+            judgeIds: judgeIds.value,
+            observerIds: observerIds.value,
+          },
         },
       })
       if (error) throw error
-      permissions.value = data ?? permissions.value
+      permissions.value = data?.permissions ?? permissions.value
       toast.success(translate("ui.permissionsSaved"))
     }
     catch (e) {
@@ -113,9 +116,18 @@ export function useAdminCompetitionsByIdPermissionsPage() {
     if (!transferTarget.value) return
     transferring.value = true
     try {
-      const { error } = await adminTransferCompetitionOwner({
+      const nextManagers = new Set(managerIds.value)
+      nextManagers.add(permissions.value!.ownerId!)
+      const { error } = await adminPatchCompetition({
         path: { competitionId },
-        body: { ownerId: transferTarget.value },
+        body: {
+          permissions: {
+            ownerId: transferTarget.value,
+            managerIds: [...nextManagers],
+            judgeIds: judgeIds.value,
+            observerIds: observerIds.value,
+          },
+        },
       })
       if (error) throw error
       toast.success(translate("ui.ownershipHasBeenTransferred"))

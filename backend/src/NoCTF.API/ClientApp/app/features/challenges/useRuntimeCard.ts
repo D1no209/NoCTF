@@ -1,7 +1,7 @@
 import { markRaw, toRefs } from 'vue'
 
 import { toast } from 'vue-sonner'
-import { extendRuntimeEndpoint, getRuntimeEndpoint, resetRuntimeEndpoint, startRuntimeEndpoint, stopRuntimeEndpoint } from '../../api'
+import { createRuntime, extendRuntimeEndpoint, getRuntimeEndpoint, stopRuntimeEndpoint } from '../../api'
 import type { NoCtfapiEndpointsRuntimeRuntimeResponse } from '../../api'
 import { publicGatewayFailure, publicGatewayState } from '../../utils/public-gateway'
 import { classifyPlayerRuntimeLookup, normalizePlayerRuntime, shouldPollPlayerRuntime, type PlayerRuntimeLookupOutcome } from '../../utils/player-runtime'
@@ -134,19 +134,35 @@ export function useRuntimeCard(props: Readonly<Omit<{
     competitionChallengeId: props.competitionChallengeId,
   }))
 
-  const start = () => act(verificationHeaders => startRuntimeEndpoint({ path: path.value, headers: { ...commandAttempt.headers({ ...path.value, action: 'start' }), ...verificationHeaders } }), translate("ui.failedToStartEnvironment"))
+  const start = () => act(verificationHeaders => createRuntime({
+    path: path.value,
+    body: { replacesRuntimeId: null },
+    headers: { ...commandAttempt.headers({ ...path.value, action: 'start' }), ...verificationHeaders },
+  }), translate("ui.failedToStartEnvironment"))
 
-  const stop = () => act(verificationHeaders => stopRuntimeEndpoint({ path: path.value, headers: { ...commandAttempt.headers({ ...path.value, action: 'stop' }), ...verificationHeaders } }), translate("ui.stopEnvironmentFailed"))
+  const stop = () => runtime.value && act(verificationHeaders => stopRuntimeEndpoint({
+    path: { ...path.value, runtimeInstanceId: runtime.value!.id! },
+    headers: { ...commandAttempt.headers({ ...path.value, action: 'stop' }), ...verificationHeaders },
+  }), translate("ui.stopEnvironmentFailed"))
 
-  const reset = () => act(verificationHeaders => resetRuntimeEndpoint({ path: path.value, headers: { ...commandAttempt.headers({ ...path.value, action: 'reset' }), ...verificationHeaders } }), translate("ui.failedToResetEnvironment"))
+  const reset = () => runtime.value && act(verificationHeaders => createRuntime({
+    path: path.value,
+    body: { replacesRuntimeId: runtime.value!.id! },
+    headers: { ...commandAttempt.headers({ ...path.value, action: 'reset' }), ...verificationHeaders },
+  }), translate("ui.failedToResetEnvironment"))
 
   const extend = () =>
     act(
       verificationHeaders =>
         extendRuntimeEndpoint({
           headers: { ...commandAttempt.headers({ ...path.value, action: 'extend', minutes: extendMinutes.value }), ...verificationHeaders },
-          path: path.value,
-          body: { seconds: Math.max(60, Math.round(extendMinutes.value * 60)) },
+          path: { ...path.value, runtimeInstanceId: runtime.value!.id! },
+          body: {
+            expiresAt: new Date(
+              new Date(runtime.value!.expiresAt!).getTime()
+              + Math.max(60, Math.round(extendMinutes.value * 60)) * 1000,
+            ).toISOString(),
+          },
         }),
       translate("ui.renewalFailed"),
     )

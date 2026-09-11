@@ -83,8 +83,8 @@ describe('attachment delivery editor', () => {
       page.indexOf('function randomAttachmentErrorMessage'),
     )
 
-    expect(page).toContain('adminChallengeBankUploadRandomAttachmentBatch')
-    expect(page).toContain('NoCtfapiEndpointsAdministrationChallengeBankRandomAttachmentBatchFailureResponse')
+    expect(page).toContain('adminChallengeBankUploadAttachments')
+    expect(page).toContain('NoCtfapiEndpointsAdministrationChallengeBankAttachmentBatchFailureResponse')
     expect(page).toContain('multiple class="hidden" @change="selectRandomFiles"')
     expect(page).toContain('file.name')
     expect(page).toContain('attachment.exactFlag')

@@ -7,30 +7,32 @@ const { Megaphone, items, loading, error, refreshLatest, fill } = toRefs(viewPro
 </script>
 
 <template>
-  <aside
-    class="rounded-xl border bg-card"
+  <Card
+    as="aside"
+    size="sm"
+    class="gap-0 py-0"
     :class="fill ? 'flex min-h-0 flex-col' : 'xl:sticky xl:top-24'"
     aria-labelledby="competition-broadcast-title"
   >
-    <header class="flex items-center justify-between gap-3 border-b px-4 py-3">
+    <CardHeader class="flex flex-row items-center justify-between gap-3 px-4 py-3">
       <div class="flex items-center gap-2">
         <Megaphone class="size-4 text-primary" aria-hidden="true" />
-        <h2 id="competition-broadcast-title" class="text-sm font-semibold">{{ $t('ui.competitionFeed') }}</h2>
+        <CardTitle id="competition-broadcast-title">{{ $t('ui.competitionFeed') }}</CardTitle>
       </div>
       <span class="text-[0.6875rem] font-medium tracking-wide text-muted-foreground">{{ $t('ui.live') }}</span>
-    </header>
+    </CardHeader>
 
-    <div v-if="loading" class="flex flex-col gap-3 p-4">
+    <CardContent v-if="loading" class="flex flex-col gap-3 px-4 pb-4">
       <Skeleton v-for="index in 4" :key="index" class="h-12 w-full" />
-    </div>
-    <div v-else-if="error" class="p-4">
+    </CardContent>
+    <CardContent v-else-if="error" class="px-4 pb-4">
       <p class="text-xs leading-5 text-destructive">{{ $message(error) }}</p>
       <Button variant="ghost" size="sm" class="mt-2 px-0" @click="refreshLatest">{{ $t('ui.reload') }}</Button>
-    </div>
-    <div v-else-if="!items.length" class="px-4 py-8 text-center">
+    </CardContent>
+    <CardContent v-else-if="!items.length" class="px-4 pb-8 pt-5 text-center">
       <p class="text-sm text-muted-foreground">{{ $t('ui.thereIsNoMatchReportYet') }}</p>
       <p class="mt-1 text-xs text-muted-foreground/80">{{ $t('ui.bloodListQuestionsAndDisciplineInformationWillBeUpdatedHere') }}</p>
-    </div>
+    </CardContent>
     <TransitionGroup data-scroll-surface
       v-else
       tag="ol"
@@ -59,7 +61,7 @@ const { Megaphone, items, loading, error, refreshLatest, fill } = toRefs(viewPro
         </div>
       </li>
     </TransitionGroup>
-  </aside>
+  </Card>
 </template>
 
 <style scoped>
