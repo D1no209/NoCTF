@@ -194,7 +194,8 @@ public sealed class DeploymentTopologyTests
         await Assert.That(compose).Contains("aliases: [noctf-web]");
         await Assert.That(compose).DoesNotContain("ports:");
         await Assert.That(compose).DoesNotContain("expose:");
-        await Assert.That(runtimeEnv).Contains("ASPNETCORE_URLS=http://+:8080");
+        await Assert.That(runtimeEnv).Contains("ASPNETCORE_HTTP_PORTS=8080");
+        await Assert.That(runtimeEnv).DoesNotContain("ASPNETCORE_URLS=");
         await Assert.That(runtimeEnv).Contains("ForwardedHeaders__KnownNetworks__0=");
         await Assert.That(runtimeEnv).Contains("ForwardedHeaders__AllowedHosts__0=");
         await Assert.That(nginx).Contains("return 308 https://$host$request_uri;");
@@ -206,7 +207,8 @@ public sealed class DeploymentTopologyTests
         await Assert.That(nginx).Contains("proxy_set_header Upgrade $http_upgrade;");
         await Assert.That(nginx).Contains("proxy_set_header Connection $connection_upgrade;");
 
-        await Assert.That(kubernetesConfig).Contains("ASPNETCORE_URLS: \"http://+:8080\"");
+        await Assert.That(kubernetesConfig).Contains("ASPNETCORE_HTTP_PORTS: \"8080\"");
+        await Assert.That(kubernetesConfig).DoesNotContain("ASPNETCORE_URLS:");
         await Assert.That(kubernetesConfig).Contains("ForwardedHeaders__KnownNetworks__0:");
         await Assert.That(kubernetesConfig).DoesNotContain("ForwardedHeaders__TrustAll");
         await Assert.That(kubernetesIngress).Contains("ssl-redirect: \"true\"");
@@ -540,8 +542,13 @@ public sealed class DeploymentTopologyTests
             .OrderBy(path => path, StringComparer.Ordinal)
             .ToArray();
         await Assert.That(e2eComposeFiles).Count().IsEqualTo(4);
-        var e2eServiceImages = (await Task.WhenAll(
-                e2eComposeFiles.Select(path => File.ReadAllTextAsync(path))))
+        var e2eComposeContents = await Task.WhenAll(
+            e2eComposeFiles.Select(path => File.ReadAllTextAsync(path)));
+        await Assert.That(e2eComposeContents.All(content =>
+                content.Contains("ASPNETCORE_HTTP_PORTS: \"8080\"", StringComparison.Ordinal)
+                && !content.Contains("ASPNETCORE_URLS:", StringComparison.Ordinal)))
+            .IsTrue();
+        var e2eServiceImages = e2eComposeContents
             .SelectMany(content => content.Split('\n'))
             .Select(line => line.Trim())
             .Where(line => line.StartsWith("image: postgres:", StringComparison.Ordinal)

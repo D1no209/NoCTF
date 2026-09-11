@@ -6,6 +6,7 @@ using System.Text.Json;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
+using Microsoft.Extensions.Logging;
 using Npgsql;
 using StackExchange.Redis;
 using Wolverine.Configuration;
@@ -23,8 +24,28 @@ public interface IReadinessDependency
         new Dictionary<string, object>();
 }
 
-public sealed class RoleReadinessHealthCheck(
-    IEnumerable<IReadinessDependency> dependencies) : IHealthCheck
+public sealed class RoleReadinessLogState
+{
+    private readonly object gate = new();
+    private string? fingerprint;
+
+    public bool TryTransition(HealthStatus status, IReadOnlyList<string> failures)
+    {
+        var next = $"{status}:{string.Join(',', failures)}";
+        lock (gate)
+        {
+            if (string.Equals(fingerprint, next, StringComparison.Ordinal))
+                return false;
+            fingerprint = next;
+            return true;
+        }
+    }
+}
+
+public sealed partial class RoleReadinessHealthCheck(
+    IEnumerable<IReadinessDependency> dependencies,
+    RoleReadinessLogState? logState = null,
+    ILogger<RoleReadinessHealthCheck>? logger = null) : IHealthCheck
 {
     public async Task<HealthCheckResult> CheckHealthAsync(
         HealthCheckContext context,
@@ -38,25 +59,78 @@ public sealed class RoleReadinessHealthCheck(
             .Order(StringComparer.Ordinal)
             .ToArray();
         var data = results
+            .Select(result => new KeyValuePair<string, object>(
+                $"{result.Name}.status",
+                result.Succeeded
+                    ? HealthStatus.Healthy.ToString()
+                    : result.FailureIsCritical
+                        ? HealthStatus.Unhealthy.ToString()
+                        : HealthStatus.Degraded.ToString()))
+            .Concat(results
             .SelectMany(result => result.Data.Select(item =>
-                new KeyValuePair<string, object>($"{result.Name}.{item.Key}", item.Value)))
+                new KeyValuePair<string, object>($"{result.Name}.{item.Key}", item.Value))))
             .ToDictionary(item => item.Key, item => item.Value, StringComparer.Ordinal);
         if (critical.Length > 0)
+        {
+            ReportTransition(HealthStatus.Unhealthy, critical);
             return HealthCheckResult.Unhealthy(
                 $"Required dependencies unavailable: {string.Join(", ", critical)}.",
                 data: data);
+        }
 
         var degraded = results
             .Where(result => !result.Succeeded)
             .Select(result => result.Name)
             .Order(StringComparer.Ordinal)
             .ToArray();
-        return degraded.Length > 0
-            ? HealthCheckResult.Degraded(
+        if (degraded.Length > 0)
+        {
+            ReportTransition(HealthStatus.Degraded, degraded);
+            return HealthCheckResult.Degraded(
                 $"Optional dependencies unavailable: {string.Join(", ", degraded)}.",
-                data: data)
-            : HealthCheckResult.Healthy(data: data);
+                data: data);
+        }
+
+        ReportTransition(HealthStatus.Healthy, []);
+        return HealthCheckResult.Healthy(data: data);
     }
+
+    private void ReportTransition(HealthStatus status, IReadOnlyList<string> failures)
+    {
+        if (logger is null || logState?.TryTransition(status, failures) != true)
+            return;
+        var names = string.Join(", ", failures);
+        switch (status)
+        {
+            case HealthStatus.Unhealthy:
+                LogUnhealthy(logger, names);
+                break;
+            case HealthStatus.Degraded:
+                LogDegraded(logger, names);
+                break;
+            default:
+                LogHealthy(logger);
+                break;
+        }
+    }
+
+    [LoggerMessage(
+        EventId = 4100,
+        Level = LogLevel.Error,
+        Message = "Role readiness changed to Unhealthy. Failed dependencies: {Dependencies}.")]
+    private static partial void LogUnhealthy(ILogger logger, string dependencies);
+
+    [LoggerMessage(
+        EventId = 4101,
+        Level = LogLevel.Warning,
+        Message = "Role readiness changed to Degraded. Failed optional dependencies: {Dependencies}.")]
+    private static partial void LogDegraded(ILogger logger, string dependencies);
+
+    [LoggerMessage(
+        EventId = 4102,
+        Level = LogLevel.Information,
+        Message = "Role readiness recovered; all dependencies are available.")]
+    private static partial void LogHealthy(ILogger logger);
 
     private static async Task<DependencyResult> CheckAsync(
         IReadinessDependency dependency,
@@ -157,6 +231,10 @@ public static class RoleHealthCheckRegistration
         HostRoles roles,
         bool development = false)
     {
+        services.AddLogging(logging => logging.AddFilter(
+            "Microsoft.Extensions.Diagnostics.HealthChecks.DefaultHealthCheckService",
+            LogLevel.Critical));
+        services.AddSingleton<RoleReadinessLogState>();
         if (!development)
         {
             var postgres = configuration.GetConnectionString("PostgreSql")
