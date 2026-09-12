@@ -838,6 +838,11 @@ body:has([data-modal-scroll-lock]) {
 .blood-mark[data-rank='First'] { --blood-mark: url('../svg/status/first-blood.svg'); color: var(--destructive); }
 .blood-mark[data-rank='Second'] { --blood-mark: url('../svg/status/second-blood.svg'); color: var(--warning); }
 .blood-mark[data-rank='Third'] { --blood-mark: url('../svg/status/third-blood.svg'); color: var(--primary); }
+.blood-mark[data-highlighted='true'] {
+  background: color-mix(in oklch, currentColor 18%, transparent);
+  box-shadow: 0 0 8px color-mix(in oklch, currentColor 48%, transparent), 0 0 18px color-mix(in oklch, currentColor 24%, transparent);
+}
+.blood-mark[data-highlighted='true'] [data-slot='blood-mark-glyph'] { filter: drop-shadow(0 0 4px currentColor); }
 [data-slot='default-layout-foreground']:has(> main [data-contained-workspace-page]) { height: 100dvh; min-height: 0; overflow: hidden; }
 [data-slot='default-layout-foreground'] > header { flex-shrink: 0; }
 [data-slot='default-layout-foreground'] > main { min-height: 0; }

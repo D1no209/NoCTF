@@ -21,10 +21,15 @@ test('challenge progress marks use standalone SVG assets', async () => {
 test('blood ranks use three distinct standalone SVG marks', async () => {
   const marks = await Promise.all(['first', 'second', 'third'].map(rank =>
     Bun.file(new URL(`../app/assets/svg/status/${rank}-blood.svg`, import.meta.url)).text()))
-  const component = await Bun.file(new URL('../app/components/ui/icons/BloodMark.vue', import.meta.url)).text()
+  const [component, theme] = await Promise.all([
+    Bun.file(new URL('../app/components/ui/icons/BloodMark.vue', import.meta.url)).text(),
+    Bun.file(new URL('../app/assets/css/main.css', import.meta.url)).text(),
+  ])
 
   expect(new Set(marks).size).toBe(3)
   expect(marks.every(mark => mark.includes('<svg'))).toBe(true)
   expect(component).toContain("rank: 'First' | 'Second' | 'Third'")
   expect(component).toContain('tabindex="0"')
+  expect(component).toContain(':data-highlighted="highlighted || undefined"')
+  expect(theme).toContain(".blood-mark[data-highlighted='true']")
 })
