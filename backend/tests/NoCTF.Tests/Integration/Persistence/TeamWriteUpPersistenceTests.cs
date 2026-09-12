@@ -106,6 +106,12 @@ public sealed class TeamWriteUpPersistenceTests
                     storage,
                     Substitute.For<ILeaderboardCache>());
 
+                var emptyReview = await manager.ReviewAsync(
+                    competitionId,
+                    cancellationToken);
+                await Assert.That(emptyReview.ScoreboardAvailable).IsFalse();
+                await Assert.That(emptyReview.Items).IsEmpty();
+
                 await using var outsiderPdf = Pdf("outsider");
                 var rejected = await manager.ReplaceMineAsync(
                     competitionId,
