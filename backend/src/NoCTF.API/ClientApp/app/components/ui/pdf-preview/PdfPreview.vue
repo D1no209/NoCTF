@@ -14,7 +14,7 @@ defineProps<{
     <Alert v-else-if="error" variant="destructive" class="m-4">
       <AlertDescription>{{ $message(error) }}</AlertDescription>
     </Alert>
-    <!-- Edge disables its built-in PDF viewer in sandboxed frames. This source is an
+    <!-- Edge disables its built-in PDF viewer in restricted frames. This source is an
          authenticated application/pdf Blob URL whose lifetime is owned by the caller. -->
     <iframe
       v-else-if="source"
