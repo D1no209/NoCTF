@@ -12,15 +12,12 @@ public sealed class DefaultEfGameplayFactEvaluator : IGameplayFactEvaluator
         var submission = context.GameplayFact;
         if (submission.Kind == GameplayFactKind.FixAttempt)
             return new(null, GameplayFactFailureCode.CheckerPlatformError, submission.OccurredAt);
-        var duplicate = context.PriorFacts.Any(x => x.TeamId == submission.TeamId
-            && x.CompetitionChallengeId == submission.CompetitionChallengeId
-            && x.Result == GameplayFactResult.Correct);
         var correct = context.ApplicableFlags.Any(x =>
             Matches(submission, x)
             && (x.TeamId is null || x.TeamId == submission.TeamId)
             && (x.ValidStart is null || x.ValidStart <= submission.OccurredAt)
             && (x.ValidUntil is null || submission.OccurredAt < x.ValidUntil));
-        return new(duplicate ? GameplayFactResult.Duplicate : correct ? GameplayFactResult.Correct : GameplayFactResult.Wrong,
+        return new(correct ? GameplayFactResult.Correct : GameplayFactResult.Wrong,
             null, submission.OccurredAt);
     }
 

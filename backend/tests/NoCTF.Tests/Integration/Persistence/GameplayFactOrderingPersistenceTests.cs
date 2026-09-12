@@ -257,7 +257,7 @@ public sealed class GameplayFactOrderingPersistenceTests
 
     [Test]
     [Timeout(300_000)]
-    public async Task Later_delivery_processes_earlier_fact_before_same_team_duplicate(
+    public async Task Later_delivery_processes_earlier_fact_before_same_team_resubmission(
         CancellationToken cancellationToken)
     {
         await DockerIntegrationTest.RunAsync(async () =>
@@ -297,7 +297,7 @@ public sealed class GameplayFactOrderingPersistenceTests
                 .ToArrayAsync(cancellationToken);
             await Assert.That(results.Length).IsEqualTo(2);
             await Assert.That(results[0]).IsEqualTo(GameplayFactResult.Correct);
-            await Assert.That(results[1]).IsEqualTo(GameplayFactResult.Duplicate);
+            await Assert.That(results[1]).IsEqualTo(GameplayFactResult.Correct);
             var awards = outbox.Messages.OfType<BloodAwarded>().ToArray();
             await Assert.That(awards.Length).IsEqualTo(1);
             await Assert.That(awards[0].BloodRank).IsEqualTo(LeaderboardBloodRank.First);
@@ -334,7 +334,7 @@ public sealed class GameplayFactOrderingPersistenceTests
             await Assert.That(facts[0].Id).IsEqualTo(lowerId);
             await Assert.That(facts[0].Result).IsEqualTo(GameplayFactResult.Correct);
             await Assert.That(facts[1].Id).IsEqualTo(higherId);
-            await Assert.That(facts[1].Result).IsEqualTo(GameplayFactResult.Duplicate);
+            await Assert.That(facts[1].Result).IsEqualTo(GameplayFactResult.Correct);
         });
     }
 

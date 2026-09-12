@@ -156,7 +156,7 @@ describe('isolated Mock API', () => {
     expect(checked).toBeGreaterThan(70)
   })
 
-  test('correct / wrong / duplicate flags update records and scores without double scoring', async () => {
+  test('CTF resubmissions are judged normally without double scoring', async () => {
     const { send } = await setup('player')
     const seeded = await (await send(`${competition}/challenges/${id(4)}`)).json()
     const unsolved = await (await send(`${competition}/challenges/${id(4, 2)}`)).json()
@@ -173,11 +173,11 @@ describe('isolated Mock API', () => {
     expect(await submit('flag{wrong}')).toBe('Wrong')
     expect(await submit('flag{mock_success}')).toBe('Correct')
     expect((await (await send(`${competition}/challenges/${id(4, 2)}`)).json()).solvedByMyTeam).toBe(true)
-    expect(await submit('flag{mock_success}')).toBe('Duplicate')
+    expect(await submit('flag{mock_success}')).toBe('Correct')
     const board = await (await send(`${competition}/leaderboard`)).json()
     expect(board.teams.find((team: Data) => team.teamId === id(5)).totalScore).toBe(200)
     const facts = await (await send(`${competition}/gameplay-facts`)).json()
-    expect(facts.items[0].result).toBe('Duplicate')
+    expect(facts.items[0].result).toBe('Correct')
   })
 
   test('profile and platform edits persist in memory and reset with a fresh Mock instance', async () => {
