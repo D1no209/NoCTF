@@ -56,6 +56,7 @@ Nuxt 4 SPA(`ssr: false`),Bun 管理依赖,TypeScript strict,Vue 用 `<script set
 - 顶部栏使用 80px 透明承载层及三个按内容宽度自适应的腰圆。左侧为平台 Logo 锁定；中间依次容纳竞赛、题库管理、平台设置、消息中心和中英切换；右侧容纳主题调色板、明暗切换和头像。腰圆使用主题 Card 表面、12px 模糊和统一投影。导航入口保留固定宽度槽位和展开动效。32px 无框头像触发 AccountPanel Popover，不使用 DropdownMenu；面板主 Card 以三个圆角方形按钮切换公开资料、账户信息和账户安全，并在下方展开独立详情 Card。
 - 登录与注册使用 `/auth/login`、`/auth/register` 独立页面，顶部栏、首页与鉴权拦截直接指向对应路由。认证表单 Card 使用 `max-w-xl` 预留横向扩展空间；鉴权中间件携带安全的站内 `redirect`，登录成功后返回原目标。
 - 除首页 `/` 外，浅色与深色模式页面分别使用本地 `assets/images/backgrounds/light-pages-wallpaper.jpg` 和 `dark-pages-wallpaper.jpg` 固定壁纸；两者均以 35% 图像强度叠在各自 background token 上，只影响布局背景。页面内容与卡片不继承壁纸透明度。
+- Nuxt 保持 `ssr: false`；搜索与分享平台所需的全局平台名称、描述、Logo、Open Graph 与 JSON-LD 由 API 的 SPA HTML fallback 从平台配置动态注入，不能只依赖客户端 `useHead`。元数据必须安全转义并生成绝对 URL，API/Hub/健康检查/静态资源不得被 fallback 接管。
 - Flag 输入统一使用 TerminalCommand 伪终端原语，空输入提示为主题色微软雅黑斜体 `Type Your Flag ~~`；回车提交、IME 组合确认不提交，批量模式 Shift+Enter 换行。普通 CTF Flag 正确后由 `Challenge is Solved ！` 直接替换原占位文字，不另显示成功结果 Alert；题目详情接口通过 `SolvedByMyTeam` 恢复本队已解状态，但已解状态不得禁用输入，后续 Flag 仍须正常判定为 Correct 或 Wrong。提交记录在 Dialog 中按需挂载，不在详情页内常驻表格；业务提交和历史读取仍由功能层管理。
 - 题目列表的一血、二血、三血标记保持横向图标排列，悬停提示显示排行榜快照中的队伍名；队伍名缺失时才回退到带标签的 Team ID，常驻界面不显示队名或 UUID。
 - 全局组件与原语不显示边框、outline 或 ring 框线；使用背景、投影和光晕表达层次、焦点及错误。统一规则由 main.css 覆盖，保留 SVG 图标笔画。竞赛侧栏状态选择器、下拉面板与列表选中/悬停底色完全透明，文字和图标保持可见。
