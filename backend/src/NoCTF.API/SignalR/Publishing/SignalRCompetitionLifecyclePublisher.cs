@@ -7,21 +7,25 @@ using NoCTF.Domain.Competitions;
 namespace NoCTF.API.SignalR.Publishing;
 
 public sealed class SignalRCompetitionLifecyclePublisher(
-    IHubContext<CompetitionHub, ICompetitionHubClient> hub)
+    ICompetitionHubAudienceRouter audiences)
     : ICompetitionLifecycleNotificationPublisher
 {
-    public Task PublishAsync(
+    public async Task PublishAsync(
         Guid competitionId,
         CompetitionStatus from,
         CompetitionStatus to,
         DateTimeOffset occurredAt,
-        CancellationToken cancellationToken) =>
-        hub.Clients.Group($"competition:{competitionId:N}")
-            .CompetitionLifecycleChanged(
-                new CompetitionLifecycleChangedNotification(
-                    competitionId,
-                    CompetitionProtocolMapper.ToProtocol(from),
-                    CompetitionProtocolMapper.ToProtocol(to),
-                    occurredAt),
-                cancellationToken);
+        CancellationToken cancellationToken)
+    {
+        var clients = await audiences.CurrentAsync(competitionId, cancellationToken);
+        if (clients is null)
+            return;
+        await clients.CompetitionLifecycleChanged(
+            new CompetitionLifecycleChangedNotification(
+                competitionId,
+                CompetitionProtocolMapper.ToProtocol(from),
+                CompetitionProtocolMapper.ToProtocol(to),
+                occurredAt),
+            cancellationToken);
+    }
 }

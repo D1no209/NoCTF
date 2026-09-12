@@ -49,6 +49,8 @@ public sealed class CreateCompetitionRequest
     public bool AllowChallengeOwnersToHandleQuestions { get; set; } = true;
     public bool PracticeModeEnabled { get; set; }
     public bool TracksEnabled { get; set; }
+    public CompetitionAccessModeProtocol AccessMode { get; set; } =
+        CompetitionAccessModeProtocol.Public;
 }
 
 public sealed class CreateCompetitionValidator : Validator<CreateCompetitionRequest>
@@ -57,6 +59,7 @@ public sealed class CreateCompetitionValidator : Validator<CreateCompetitionRequ
     {
         RuleFor(request => request.Title).NotEmpty().MaximumLength(160);
         RuleFor(request => request.Mode).IsInEnum();
+        RuleFor(request => request.AccessMode).IsInEnum();
         RuleFor(request => request.EndTime).GreaterThan(request => request.StartTime);
         RuleFor(request => request.MaxTeamMembers).GreaterThan(0);
         RuleFor(request => request.MaxConcurrentRuntimeInstancesPerTeam).NotNull();
@@ -110,7 +113,8 @@ public sealed class CreateCompetitionEndpoint(CreateCompetition create, IUserCon
             request.MaxParticipantMessagesBeforeHandlerReply,
             request.AllowChallengeOwnersToHandleQuestions,
             request.PracticeModeEnabled,
-            request.TracksEnabled), ct);
+            request.TracksEnabled,
+            CompetitionProtocolMapper.ToDomain(request.AccessMode)), ct);
         return result.State switch
         {
             CompetitionCreationState.Created =>

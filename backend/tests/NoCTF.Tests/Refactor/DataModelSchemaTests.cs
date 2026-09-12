@@ -84,9 +84,24 @@ public sealed class DataModelSchemaTests
                 "20260911144210_AddHumanVerificationToggle",
                 "20260911164825_AddManagedHumanVerificationProviders",
                 "20260911213004_AddCompetitionTracksEnabled",
-                "20260912074543_AddRuntimeHumanVerificationToggle"
+                "20260912074543_AddRuntimeHumanVerificationToggle",
+                "20260912130511_AddCompetitionAccessMode"
             ]);
             await Assert.That(migrations[0]).EndsWith("_InitialBaseline");
+
+            await using var accessModeColumnCommand = new NpgsqlCommand(
+                """
+                SELECT count(*)::int
+                FROM information_schema.columns
+                WHERE table_schema = 'public'
+                  AND table_name = 'competitions'
+                  AND column_name = 'access_mode'
+                  AND is_nullable = 'NO'
+                  AND data_type = 'smallint'
+                """,
+                connection);
+            await Assert.That((int)(await accessModeColumnCommand.ExecuteScalarAsync(ct))!)
+                .IsEqualTo(1);
 
             await using var primaryKeyCommand = new NpgsqlCommand(
                 """

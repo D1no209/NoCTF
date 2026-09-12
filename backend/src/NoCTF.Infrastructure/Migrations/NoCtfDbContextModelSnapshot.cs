@@ -285,6 +285,10 @@ namespace NoCTF.Infrastructure.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("id");
 
+                    b.Property<short>("AccessMode")
+                        .HasColumnType("smallint")
+                        .HasColumnName("access_mode");
+
                     b.Property<bool>("AllowChallengeOwnersToHandleQuestions")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("boolean")

@@ -11,7 +11,8 @@ public class CompetitionManagementTests
         var store = new Store();
         var now = DateTimeOffset.UtcNow;
         var command = new CreateCompetitionCommand("Spring CTF", "desc", GameMode.Ctf,
-            now.AddMinutes(1), now.AddHours(2), true, 5, 2, Guid.NewGuid(), now);
+            now.AddMinutes(1), now.AddHours(2), true, 5, 2, Guid.NewGuid(), now,
+            AccessMode: CompetitionAccessMode.StaffOnly);
 
         var result = await new CreateCompetition(store).ExecuteAsync(command);
 
@@ -19,6 +20,7 @@ public class CompetitionManagementTests
         await Assert.That(store.Last!.Status).IsEqualTo(CompetitionStatus.Draft);
         await Assert.That(store.Last.Mode).IsEqualTo(GameMode.Ctf);
         await Assert.That(store.Last.MaxConcurrentRuntimeInstancesPerTeam).IsEqualTo(2);
+        await Assert.That(store.Last.AccessMode).IsEqualTo(CompetitionAccessMode.StaffOnly);
     }
 
     [Test]
@@ -152,7 +154,8 @@ public class CompetitionManagementTests
             Last = new(Guid.NewGuid(), command.Title, command.Description, command.Mode, command.StartTime, command.EndTime,
                 CompetitionStatus.Draft, command.TeamRegistrationAutoApprove, command.MaxTeamMembers,
                 command.MaxConcurrentRuntimeInstancesPerTeam, command.OwnerId,
-                PracticeModeEnabled: command.PracticeModeEnabled);
+                PracticeModeEnabled: command.PracticeModeEnabled,
+                AccessMode: command.AccessMode);
             return Task.FromResult(new CompetitionCreationResult(
                 CompetitionCreationState.Created,
                 Last));

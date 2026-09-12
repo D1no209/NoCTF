@@ -34,7 +34,8 @@ public sealed class AdminRequestValidatorTests
                 MaxActiveQuestionsPerTeam = 5,
                 MaxParticipantMessagesBeforeHandlerReply = 3,
                 AllowChallengeOwnersToHandleQuestions = true,
-                PracticeModeEnabled = false
+                PracticeModeEnabled = false,
+                AccessMode = CompetitionAccessModeProtocol.Public
             }
         };
 

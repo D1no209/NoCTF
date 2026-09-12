@@ -1,5 +1,6 @@
 using System.Text.Json;
 using NoCTF.Application.Competitions.Events;
+using NoCTF.Domain.Competitions;
 using NoCTF.Domain.Competitions.Events;
 using NoCTF.Domain.Gameplay;
 using NoCTF.Domain.Shared;
@@ -70,6 +71,32 @@ public sealed class CompetitionEventStorePayloadTests
         await Assert.That(payload.GameplayFactKind).IsEqualTo(GameplayFactKind.FixAttempt);
         await Assert.That(payload.GameplayFactState).IsEqualTo(GameplayFactState.PlatformFailed);
         await Assert.That(payload.GameplayFactResult).IsNull();
+    }
+
+    [Test]
+    public async Task Audience_change_payload_preserves_typed_modes_and_reason()
+    {
+        var ids = new EventIds();
+        var json = CompetitionEventStore.SerializePayload(new(
+            ids.CompetitionId,
+            CompetitionEventKind.CompetitionAudienceChanged,
+            CompetitionEventLevel.Information,
+            CompetitionEventVisibility.Staff,
+            ids.OccurredAt,
+            CompetitionAccessMode: CompetitionAccessMode.StaffOnly,
+            PreviousCompetitionAccessMode: CompetitionAccessMode.Public,
+            CompetitionAudienceChangeKind: CompetitionAudienceChangeKind.AccessMode));
+
+        using var document = JsonDocument.Parse(json);
+        await Assert.That(document.RootElement
+                .GetProperty("competitionAccessMode").GetString())
+            .IsEqualTo("StaffOnly");
+        await Assert.That(document.RootElement
+                .GetProperty("previousCompetitionAccessMode").GetString())
+            .IsEqualTo("Public");
+        await Assert.That(document.RootElement
+                .GetProperty("competitionAudienceChangeKind").GetString())
+            .IsEqualTo("AccessMode");
     }
 
     private static CompetitionEvent StoredEvent(EventIds ids, AwdpFixOutcome outcome) => new()

@@ -32,6 +32,9 @@ public sealed record CompetitionEventDraft(
     Guid? ParentEventId = null,
     CompetitionStatus? CompetitionStatus = null,
     CompetitionLeaderboardVisibility? LeaderboardVisibility = null,
+    CompetitionAccessMode? CompetitionAccessMode = null,
+    CompetitionAccessMode? PreviousCompetitionAccessMode = null,
+    CompetitionAudienceChangeKind? CompetitionAudienceChangeKind = null,
     TeamRegistrationStatus? TeamRegistrationStatus = null,
     GameplayFactKind? GameplayFactKind = null,
     GameplayFactState? GameplayFactState = null,
@@ -54,7 +57,9 @@ public sealed record CompetitionEventCommitted(
     Guid EventId,
     CompetitionEventKind Kind,
     CompetitionEventLevel Level,
-    DateTimeOffset OccurredAt);
+    DateTimeOffset OccurredAt,
+    CompetitionAudienceChangeKind? AudienceChangeKind = null,
+    CompetitionAccessMode? AccessMode = null);
 
 public interface ICompetitionEventRecorder
 {
@@ -114,6 +119,9 @@ public sealed record CompetitionEventView(
     Guid? ParentEventId,
     CompetitionStatus? CompetitionStatus,
     CompetitionLeaderboardVisibility? LeaderboardVisibility,
+    CompetitionAccessMode? CompetitionAccessMode,
+    CompetitionAccessMode? PreviousCompetitionAccessMode,
+    CompetitionAudienceChangeKind? CompetitionAudienceChangeKind,
     TeamRegistrationStatus? TeamRegistrationStatus,
     GameplayFactKind? GameplayFactKind,
     GameplayFactState? GameplayFactState,

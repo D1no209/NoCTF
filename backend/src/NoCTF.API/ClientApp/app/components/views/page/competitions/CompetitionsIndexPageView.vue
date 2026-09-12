@@ -23,7 +23,7 @@ const { Plus, isAdministrator, loading, error, load, counts, group, selected, se
         <Skeleton v-if="loading" class="h-96 w-full" />
         <Card v-else-if="selected" class="competition-overview-card h-full min-h-0 overflow-hidden gap-0 py-0">
           <MotionSwap :identity="selectedId || ''" preset="film-up">
-            <component :is="CompetitionOverview" :key="selected.id" :competition="selected" />
+            <component :is="CompetitionOverview" :key="selected.id" :competition="selected" @audience-changed="load" />
           </MotionSwap>
         </Card>
         <Empty v-else class="min-h-72 border"><EmptyHeader><EmptyTitle>{{ missing ? $t('competitionBrowser.notFound') : $t('competitionBrowser.choose') }}</EmptyTitle><EmptyDescription>{{ $t('competitionBrowser.selectionHint') }}</EmptyDescription></EmptyHeader></Empty>

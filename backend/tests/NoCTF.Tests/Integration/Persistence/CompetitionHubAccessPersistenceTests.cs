@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using NoCTF.Domain.Competitions;
 using NoCTF.Domain.Identity;
+using NoCTF.Domain.Teams;
 using NoCTF.Infrastructure.Competitions.Permissions;
 using NoCTF.Infrastructure.Persistence;
 using Testcontainers.PostgreSql;
@@ -33,30 +34,46 @@ public sealed class CompetitionHubAccessPersistenceTests
             await using var db = new NoCtfDbContext(options);
             var access = new CompetitionHubAccess(db);
 
-            await Assert.That(await access.CanJoinAsync(ids.OwnerId, ids.DraftId, ct))
+            await Assert.That((await access.ResolveAsync(ids.OwnerId, ids.DraftId, ct))?.IsStaff)
                 .IsTrue();
-            await Assert.That(await access.CanJoinAsync(ids.ManagerId, ids.DraftId, ct))
+            await Assert.That((await access.ResolveAsync(ids.ManagerId, ids.DraftId, ct))?.IsStaff)
                 .IsTrue();
-            await Assert.That(await access.CanJoinAsync(ids.JudgeId, ids.DraftId, ct))
+            await Assert.That((await access.ResolveAsync(ids.JudgeId, ids.DraftId, ct))?.IsStaff)
                 .IsTrue();
-            await Assert.That(await access.CanJoinAsync(ids.ObserverId, ids.DraftId, ct))
+            await Assert.That((await access.ResolveAsync(ids.ObserverId, ids.DraftId, ct))?.IsStaff)
                 .IsTrue();
-            await Assert.That(await access.CanJoinAsync(ids.AdministratorId, ids.DraftId, ct))
+            await Assert.That((await access.ResolveAsync(ids.AdministratorId, ids.DraftId, ct))?.IsStaff)
                 .IsTrue();
 
-            await Assert.That(await access.CanJoinAsync(ids.UserId, ids.DraftId, ct))
-                .IsFalse();
-            await Assert.That(await access.CanJoinAsync(ids.InactiveAdministratorId, ids.DraftId, ct))
-                .IsFalse();
-            await Assert.That(await access.CanJoinAsync(Guid.NewGuid(), ids.DraftId, ct))
-                .IsFalse();
+            await Assert.That(await access.ResolveAsync(ids.UserId, ids.DraftId, ct))
+                .IsNull();
+            await Assert.That(await access.ResolveAsync(ids.InactiveAdministratorId, ids.DraftId, ct))
+                .IsNull();
+            await Assert.That(await access.ResolveAsync(Guid.NewGuid(), ids.DraftId, ct))
+                .IsNull();
 
-            await Assert.That(await access.CanJoinAsync(ids.UserId, ids.VisibleId, ct))
+            await Assert.That((await access.ResolveAsync(ids.UserId, ids.VisibleId, ct))?.IsStaff)
+                .IsFalse();
+            await Assert.That(await access.ResolveAsync(ids.UserId, ids.HiddenId, ct))
+                .IsNull();
+            await Assert.That(await access.ResolveAsync(ids.TeamMemberId, ids.HiddenId, ct))
+                .IsNull();
+            await Assert.That(await access.ResolveAsync(Guid.Empty, ids.HiddenId, ct))
+                .IsNull();
+            await Assert.That((await access.ResolveAsync(ids.OwnerId, ids.HiddenId, ct))?.IsStaff)
                 .IsTrue();
-            await Assert.That(await access.CanJoinAsync(ids.UserId, ids.DeletedId, ct))
-                .IsFalse();
-            await Assert.That(await access.CanJoinAsync(ids.UserId, Guid.NewGuid(), ct))
-                .IsFalse();
+            await Assert.That((await access.ResolveAsync(ids.ManagerId, ids.HiddenId, ct))?.IsStaff)
+                .IsTrue();
+            await Assert.That((await access.ResolveAsync(ids.JudgeId, ids.HiddenId, ct))?.IsStaff)
+                .IsTrue();
+            await Assert.That((await access.ResolveAsync(ids.ObserverId, ids.HiddenId, ct))?.IsStaff)
+                .IsTrue();
+            await Assert.That((await access.ResolveAsync(ids.AdministratorId, ids.HiddenId, ct))?.IsStaff)
+                .IsTrue();
+            await Assert.That(await access.ResolveAsync(ids.UserId, ids.DeletedId, ct))
+                .IsNull();
+            await Assert.That(await access.ResolveAsync(ids.UserId, Guid.NewGuid(), ct))
+                .IsNull();
         });
     }
 
@@ -68,6 +85,8 @@ public sealed class CompetitionHubAccessPersistenceTests
         await db.Database.EnsureCreatedAsync(ct);
         var now = DateTimeOffset.UtcNow;
         var ids = new Ids(
+            Guid.CreateVersion7(),
+            Guid.CreateVersion7(),
             Guid.CreateVersion7(),
             Guid.CreateVersion7(),
             Guid.CreateVersion7(),
@@ -90,7 +109,8 @@ public sealed class CompetitionHubAccessPersistenceTests
                 now,
                 UserRole.Administrator,
                 UserAccountStatus.Disabled),
-            User(ids.UserId, "hub-user", now));
+            User(ids.UserId, "hub-user", now),
+            User(ids.TeamMemberId, "hub-team-member", now));
         db.Competitions.AddRange(
             Competition(
                 ids.DraftId,
@@ -101,7 +121,27 @@ public sealed class CompetitionHubAccessPersistenceTests
                 judgeIds: [ids.JudgeId],
                 observerIds: [ids.ObserverId]),
             Competition(ids.VisibleId, ids.OwnerId, CompetitionStatus.Visible, now),
+            Competition(
+                ids.HiddenId,
+                ids.OwnerId,
+                CompetitionStatus.Visible,
+                now,
+                managerIds: [ids.ManagerId],
+                judgeIds: [ids.JudgeId],
+                observerIds: [ids.ObserverId],
+                accessMode: CompetitionAccessMode.StaffOnly),
             Competition(ids.DeletedId, ids.OwnerId, CompetitionStatus.Visible, now, now));
+        db.Teams.Add(new Team
+        {
+            Id = Guid.CreateVersion7(),
+            CompetitionId = ids.HiddenId,
+            Name = "Existing hidden team",
+            CaptainId = ids.TeamMemberId,
+            MemberIds = [ids.TeamMemberId],
+            RegistrationStatus = TeamRegistrationStatus.Approved,
+            InvitationToken = "0123456789abcdefghijklmnopqrstuv",
+            RegisteredAt = now
+        });
         await db.SaveChangesAsync(ct);
         return ids;
     }
@@ -133,7 +173,8 @@ public sealed class CompetitionHubAccessPersistenceTests
         DateTimeOffset? deletedAt = null,
         Guid[]? managerIds = null,
         Guid[]? judgeIds = null,
-        Guid[]? observerIds = null) => new()
+        Guid[]? observerIds = null,
+        CompetitionAccessMode accessMode = CompetitionAccessMode.Public) => new()
         {
             Id = id,
             Title = $"Hub access {status}",
@@ -141,6 +182,7 @@ public sealed class CompetitionHubAccessPersistenceTests
             ManagerIds = managerIds ?? [],
             JudgeIds = judgeIds ?? [],
             ObserverIds = observerIds ?? [],
+            AccessMode = accessMode,
             Mode = GameMode.Ctf,
             Status = status,
             ConfigurationJson = "{}",
@@ -155,6 +197,7 @@ public sealed class CompetitionHubAccessPersistenceTests
     private sealed record Ids(
         Guid DraftId,
         Guid VisibleId,
+        Guid HiddenId,
         Guid DeletedId,
         Guid OwnerId,
         Guid ManagerId,
@@ -162,5 +205,6 @@ public sealed class CompetitionHubAccessPersistenceTests
         Guid ObserverId,
         Guid AdministratorId,
         Guid InactiveAdministratorId,
-        Guid UserId);
+        Guid UserId,
+        Guid TeamMemberId);
 }

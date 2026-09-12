@@ -35,6 +35,8 @@ export function useAdminCompetitionsByIdConfigurationPage() {
 
   const practiceModeEnabled = ref(false)
 
+  const staffOnly = ref(false)
+
   const savingMeta = ref(false)
 
   const metaError = ref<string | null>(null)
@@ -53,6 +55,7 @@ export function useAdminCompetitionsByIdConfigurationPage() {
     maxParticipantMessagesBeforeHandlerReply.value = c.maxParticipantMessagesBeforeHandlerReply ?? 3
     allowChallengeOwnersToHandleQuestions.value = c.allowChallengeOwnersToHandleQuestions ?? true
     practiceModeEnabled.value = c.practiceModeEnabled ?? false
+    staffOnly.value = c.accessMode === 'StaffOnly'
   }, { immediate: true })
 
   async function saveMeta() {
@@ -81,6 +84,7 @@ export function useAdminCompetitionsByIdConfigurationPage() {
             maxParticipantMessagesBeforeHandlerReply: maxParticipantMessagesBeforeHandlerReply.value,
             allowChallengeOwnersToHandleQuestions: allowChallengeOwnersToHandleQuestions.value,
             practiceModeEnabled: practiceModeEnabled.value,
+            accessMode: staffOnly.value ? 'StaffOnly' : 'Public',
           },
         },
       })
@@ -148,6 +152,7 @@ export function useAdminCompetitionsByIdConfigurationPage() {
       maxParticipantMessagesBeforeHandlerReply,
       allowChallengeOwnersToHandleQuestions,
       practiceModeEnabled,
+      staffOnly,
       savingMeta,
       metaError,
       saveMeta,

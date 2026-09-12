@@ -8,6 +8,12 @@ public static class PipelineConfiguration
         app.UseStaticFiles();
         app.UseExceptionHandler();
         app.UseAuthentication();
+        if (app.Services.GetService<IServiceProviderIsService>() is { } serviceCatalog
+            && serviceCatalog.IsService(typeof(NoCTF.Application.Competitions.Access.ICompetitionAudienceReader))
+            && serviceCatalog.IsService(typeof(NoCTF.Application.Teams.Moderation.ICompetitionModerationAuthorizer)))
+        {
+            app.UseMiddleware<Security.CompetitionAudienceGateMiddleware>();
+        }
         app.UseRateLimiter();
         app.UseAuthorization();
         // Isolated transport tests intentionally omit Infrastructure; production/combined hosts register admission.

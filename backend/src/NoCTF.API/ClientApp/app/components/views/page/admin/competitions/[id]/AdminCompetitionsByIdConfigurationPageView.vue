@@ -3,7 +3,7 @@ import { toRefs } from 'vue'
 import type { AdminCompetitionsByIdConfigurationPageViewState } from '~/features/routes/admin/competitions/[id]/useAdminCompetitionsByIdConfigurationPage'
 
 const viewProps = defineProps<{ state: AdminCompetitionsByIdConfigurationPageViewState }>()
-const { competition, canWrite, title, description, startTime, endTime, teamRegistrationAutoApprove, allowTeamRegistrationWhileRunning, maxTeamMembers, maxConcurrentRuntimeInstancesPerTeam, maxActiveQuestionsPerTeam, maxParticipantMessagesBeforeHandlerReply, allowChallengeOwnersToHandleQuestions, practiceModeEnabled, savingMeta, metaError, saveMeta, config, configLoading, savingConfig, saveConfig, CompetitionModeConfigEditor } = toRefs(viewProps.state)
+const { competition, canWrite, title, description, startTime, endTime, teamRegistrationAutoApprove, allowTeamRegistrationWhileRunning, maxTeamMembers, maxConcurrentRuntimeInstancesPerTeam, maxActiveQuestionsPerTeam, maxParticipantMessagesBeforeHandlerReply, allowChallengeOwnersToHandleQuestions, practiceModeEnabled, staffOnly, savingMeta, metaError, saveMeta, config, configLoading, savingConfig, saveConfig, CompetitionModeConfigEditor } = toRefs(viewProps.state)
 </script>
 
 <template>
@@ -56,6 +56,13 @@ const { competition, canWrite, title, description, startTime, endTime, teamRegis
               <div class="grid gap-1.5 leading-none">
                 <FieldLabel for="c-practice-mode" class="font-normal">{{ $t('ui.postCompetitionPracticeMode') }}</FieldLabel>
                 <FieldDescription>{{ $t('ui.afterTheCompetitionFinishesApprovedAndNonBannedTeamsCan') }}</FieldDescription>
+              </div>
+            </Field>
+            <Field orientation="horizontal">
+              <Checkbox id="c-staff-only" v-model="staffOnly" :disabled="!canWrite" />
+              <div class="grid gap-1.5 leading-none">
+                <FieldLabel for="c-staff-only" class="font-normal">{{ $t('competitionAccess.hidden') }}</FieldLabel>
+                <FieldDescription>{{ $t('competitionAccess.description') }}</FieldDescription>
               </div>
             </Field>
             <Field orientation="horizontal">

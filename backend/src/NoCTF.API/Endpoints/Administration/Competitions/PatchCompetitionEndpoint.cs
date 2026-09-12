@@ -48,6 +48,7 @@ public sealed class CompetitionMetadataPatchRequest
     public required int MaxParticipantMessagesBeforeHandlerReply { get; set; }
     public required bool AllowChallengeOwnersToHandleQuestions { get; set; }
     public required bool PracticeModeEnabled { get; set; }
+    public required CompetitionAccessModeProtocol AccessMode { get; set; }
 }
 
 public sealed class CompetitionConfigurationPatchRequest
@@ -153,6 +154,8 @@ public sealed class PatchCompetitionValidator : Validator<PatchCompetitionReques
             .When(request => request.Metadata is not null);
         RuleFor(request => request.Metadata!.MaxParticipantMessagesBeforeHandlerReply).GreaterThan(0)
             .When(request => request.Metadata is not null);
+        RuleFor(request => request.Metadata!.AccessMode).IsInEnum()
+            .When(request => request.Metadata is not null);
         RuleFor(request => request.ModeConfiguration!.Json).NotEmpty()
             .When(request => request.ModeConfiguration is not null);
         RuleFor(request => request.Tracks!.Tracks).NotNull()
@@ -194,6 +197,8 @@ public static partial class CompetitionPatchMapper
 {
     [MapProperty(nameof(CompetitionMetadataPatchRequest.StartTime), nameof(Competition.StartAt))]
     [MapProperty(nameof(CompetitionMetadataPatchRequest.EndTime), nameof(Competition.EndAt))]
+    [MapperIgnoreSource(nameof(CompetitionMetadataPatchRequest.AccessMode))]
+    [MapperIgnoreTarget(nameof(Competition.AccessMode))]
     [MapperIgnoreTarget(nameof(Competition.OwnerId))]
     [MapperIgnoreTarget(nameof(Competition.ManagerIds))]
     [MapperIgnoreTarget(nameof(Competition.JudgeIds))]
@@ -219,6 +224,7 @@ public static partial class CompetitionPatchMapper
     [MapProperty(nameof(CompetitionConfigurationPatchRequest.Json), nameof(Competition.ConfigurationJson))]
     [MapperIgnoreTarget(nameof(Competition.Title))]
     [MapperIgnoreTarget(nameof(Competition.Description))]
+    [MapperIgnoreTarget(nameof(Competition.AccessMode))]
     [MapperIgnoreTarget(nameof(Competition.OwnerId))]
     [MapperIgnoreTarget(nameof(Competition.ManagerIds))]
     [MapperIgnoreTarget(nameof(Competition.JudgeIds))]
@@ -256,6 +262,7 @@ public static partial class CompetitionPatchMapper
     [MapProperty(nameof(CompetitionTracksPatchRequest.TrackConfigurationJson), nameof(Competition.TrackConfigurationJson))]
     [MapperIgnoreTarget(nameof(Competition.Title))]
     [MapperIgnoreTarget(nameof(Competition.Description))]
+    [MapperIgnoreTarget(nameof(Competition.AccessMode))]
     [MapperIgnoreTarget(nameof(Competition.OwnerId))]
     [MapperIgnoreTarget(nameof(Competition.ManagerIds))]
     [MapperIgnoreTarget(nameof(Competition.JudgeIds))]
@@ -288,6 +295,7 @@ public static partial class CompetitionPatchMapper
 
     [MapperIgnoreTarget(nameof(Competition.Title))]
     [MapperIgnoreTarget(nameof(Competition.Description))]
+    [MapperIgnoreTarget(nameof(Competition.AccessMode))]
     [MapperIgnoreTarget(nameof(Competition.ConfigurationJson))]
     [MapperIgnoreTarget(nameof(Competition.TracksEnabled))]
     [MapperIgnoreTarget(nameof(Competition.TrackConfigurationJson))]
@@ -319,6 +327,7 @@ public static partial class CompetitionPatchMapper
     [MapperIgnoreSource(nameof(CompetitionLeaderboardPatchRequest.Reason))]
     [MapperIgnoreTarget(nameof(Competition.Title))]
     [MapperIgnoreTarget(nameof(Competition.Description))]
+    [MapperIgnoreTarget(nameof(Competition.AccessMode))]
     [MapperIgnoreTarget(nameof(Competition.OwnerId))]
     [MapperIgnoreTarget(nameof(Competition.ManagerIds))]
     [MapperIgnoreTarget(nameof(Competition.JudgeIds))]
@@ -414,6 +423,7 @@ public sealed class PatchCompetitionEndpoint(
             Title = current.Title,
             Description = current.Description,
             OwnerId = current.OwnerId,
+            AccessMode = current.AccessMode,
             ManagerIds = permissions.Snapshot?.ManagerIds.ToArray() ?? [],
             JudgeIds = permissions.Snapshot?.JudgeIds.ToArray() ?? [],
             ObserverIds = permissions.Snapshot?.ObserverIds.ToArray() ?? [],
@@ -436,7 +446,10 @@ public sealed class PatchCompetitionEndpoint(
             DeletedAt = current.DeletedAt
         };
         if ((sections & CompetitionPatchSection.Metadata) != 0)
+        {
             CompetitionPatchMapper.ApplyMetadataAsModerator(request.Metadata!, target);
+            target.AccessMode = CompetitionProtocolMapper.ToDomain(request.Metadata!.AccessMode);
+        }
         if ((sections & CompetitionPatchSection.ModeConfiguration) != 0)
             CompetitionPatchMapper.ApplyConfigurationAsModerator(request.ModeConfiguration!, target);
         if ((sections & CompetitionPatchSection.Tracks) != 0)
@@ -476,7 +489,8 @@ public sealed class PatchCompetitionEndpoint(
                     target.MaxActiveQuestionsPerTeam,
                     target.MaxParticipantMessagesBeforeHandlerReply,
                     target.AllowChallengeOwnersToHandleQuestions,
-                    target.PracticeModeEnabled), transactionCt);
+                    target.PracticeModeEnabled,
+                    target.AccessMode), transactionCt);
                 if (!result.Succeeded)
                     return Reject(Failure(
                         result.ErrorMessage ?? "Competition metadata is invalid."));

@@ -8,7 +8,8 @@ namespace NoCTF.Infrastructure.Persistence;
 
 internal sealed class AggregatePatchTransaction(
     NoCtfDbContext db,
-    ITransactionalMessageOutbox outbox) : IAtomicAggregatePatch
+    ITransactionalMessageOutbox outbox,
+    AggregatePatchPostCommitActions? postCommitActions = null) : IAtomicAggregatePatch
 {
     public async Task<TResult> ExecuteAsync<TResult>(
         Func<CancellationToken, Task<AtomicAggregatePatchDecision<TResult>>> operation,
@@ -25,23 +26,31 @@ internal sealed class AggregatePatchTransaction(
         await using var transaction = await db.Database.BeginTransactionAsync(
             IsolationLevel.Serializable,
             cancellationToken);
+        postCommitActions?.Begin();
+        var committed = false;
         try
         {
             var decision = await operation(cancellationToken);
             if (!decision.ShouldCommit)
             {
                 await transaction.RollbackAsync(cancellationToken);
+                postCommitActions?.Discard();
                 db.ChangeTracker.Clear();
                 return decision.Result;
             }
 
             await transaction.CommitAsync(cancellationToken);
+            committed = true;
+            if (postCommitActions is not null)
+                await postCommitActions.CompleteAsync(CancellationToken.None);
             await outbox.FlushCommittedMessagesAsync();
             return decision.Result;
         }
         catch
         {
-            await transaction.RollbackAsync(cancellationToken);
+            postCommitActions?.Discard();
+            if (!committed)
+                await transaction.RollbackAsync(cancellationToken);
             db.ChangeTracker.Clear();
             throw;
         }

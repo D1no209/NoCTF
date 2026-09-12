@@ -18,25 +18,15 @@ public sealed class NotificationReaderDevelopmentTests
             .Options;
         var now = DateTimeOffset.Parse("2026-08-10T01:00:00Z");
         var ownerId = Guid.CreateVersion7(now);
-        var competitionId = Guid.CreateVersion7(now.AddMilliseconds(1));
-        var rootId = Guid.CreateVersion7(now.AddMilliseconds(2));
-        var replyId = Guid.CreateVersion7(now.AddMilliseconds(3));
+        var askerId = Guid.CreateVersion7(now.AddMilliseconds(1));
+        var competitionId = Guid.CreateVersion7(now.AddMilliseconds(2));
+        var rootId = Guid.CreateVersion7(now.AddMilliseconds(3));
+        var replyId = Guid.CreateVersion7(now.AddMilliseconds(4));
 
         await using var db = new NoCtfDbContext(options);
-        db.Users.Add(new User
-        {
-            Id = ownerId,
-            UserName = "development-owner",
-            NormalizedUserName = "DEVELOPMENT-OWNER",
-            Email = "development-owner@example.test",
-            PasswordHash = "test",
-            Kind = UserKind.Human,
-            Role = UserRole.Organizer,
-            AccountStatus = UserAccountStatus.Active,
-            EmailVerifiedAt = now,
-            CreatedAt = now,
-            UpdatedAt = now
-        });
+        db.Users.AddRange(
+            User(ownerId, "development-owner", UserRole.Organizer, now),
+            User(askerId, "development-asker", UserRole.User, now));
         db.Competitions.Add(new Competition
         {
             Id = competitionId,
@@ -56,7 +46,7 @@ public sealed class NotificationReaderDevelopmentTests
             {
                 Id = rootId,
                 SourceType = NotificationSourceType.User,
-                SourceId = ownerId,
+                SourceId = askerId,
                 TargetType = NotificationTargetType.CompetitionCollaborators,
                 TargetId = competitionId,
                 Kind = NotificationKind.CompetitionAnnouncement,
@@ -91,16 +81,51 @@ public sealed class NotificationReaderDevelopmentTests
             CancellationToken.None);
         var thread = await reader.ReadThreadAsync(ownerId, rootId, CancellationToken.None);
         var threadFromReply = await reader.ReadThreadAsync(ownerId, replyId, CancellationToken.None);
+        var askerThread = await reader.ReadThreadAsync(askerId, rootId, CancellationToken.None);
 
         await Assert.That(list.Select(item => item.Id))
             .IsEquivalentTo([rootId, replyId]);
         await Assert.That(list.Single(item => item.Id == rootId).SourceDisplayName)
-            .IsEqualTo("development-owner");
+            .IsEqualTo("development-asker");
         await Assert.That(thread).IsNotNull();
         await Assert.That(thread!.Select(item => item.Id))
             .IsEquivalentTo([rootId, replyId]);
         await Assert.That(threadFromReply).IsNotNull();
         await Assert.That(threadFromReply!.Select(item => item.Id))
             .IsEquivalentTo([rootId, replyId]);
+        await Assert.That(askerThread).IsNotNull();
+
+        var competition = await db.Competitions.SingleAsync(
+            candidate => candidate.Id == competitionId);
+        competition.AccessMode = CompetitionAccessMode.StaffOnly;
+        await db.SaveChangesAsync();
+
+        await Assert.That(await reader.ReadThreadAsync(
+            askerId,
+            rootId,
+            CancellationToken.None)).IsNull();
+        await Assert.That(await reader.ReadThreadAsync(
+            ownerId,
+            rootId,
+            CancellationToken.None)).IsNotNull();
     }
+
+    private static User User(
+        Guid id,
+        string name,
+        UserRole role,
+        DateTimeOffset now) => new()
+        {
+            Id = id,
+            UserName = name,
+            NormalizedUserName = name.ToUpperInvariant(),
+            Email = $"{name}@example.test",
+            PasswordHash = "test",
+            Kind = UserKind.Human,
+            Role = role,
+            AccountStatus = UserAccountStatus.Active,
+            EmailVerifiedAt = now,
+            CreatedAt = now,
+            UpdatedAt = now
+        };
 }

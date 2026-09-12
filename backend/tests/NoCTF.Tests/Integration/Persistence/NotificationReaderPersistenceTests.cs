@@ -85,6 +85,47 @@ public sealed class NotificationReaderPersistenceTests
                     cancellationToken)).IsEmpty();
             }
 
+            await using (var hide = new NoCtfDbContext(options))
+            {
+                await hide.Competitions
+                    .Where(candidate => candidate.Id == ids.CompetitionId)
+                    .ExecuteUpdateAsync(
+                        setters => setters.SetProperty(
+                            candidate => candidate.AccessMode,
+                            CompetitionAccessMode.StaffOnly),
+                        cancellationToken);
+            }
+
+            await using (var hidden = new NoCtfDbContext(options))
+            {
+                var reader = new NotificationReader(hidden);
+                await Assert.That(await reader.ListAsync(
+                    ids.FormerParticipantId,
+                    null,
+                    null,
+                    10,
+                    cancellationToken)).IsEmpty();
+                await Assert.That(await reader.ReadThreadAsync(
+                    ids.AskerId,
+                    ids.RootId,
+                    cancellationToken)).IsNull();
+                await Assert.That(await reader.ReadThreadAsync(
+                    ids.FormerManagerId,
+                    ids.RootId,
+                    cancellationToken)).Count().IsEqualTo(3);
+            }
+
+            await using (var reveal = new NoCtfDbContext(options))
+            {
+                await reveal.Competitions
+                    .Where(candidate => candidate.Id == ids.CompetitionId)
+                    .ExecuteUpdateAsync(
+                        setters => setters.SetProperty(
+                            candidate => candidate.AccessMode,
+                            CompetitionAccessMode.Public),
+                        cancellationToken);
+            }
+
             await using (var mutate = new NoCtfDbContext(options))
             {
                 var competition = await mutate.Competitions.SingleAsync(

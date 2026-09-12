@@ -1,16 +1,27 @@
 using NoCTF.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using NoCTF.Application.Competitions.Permissions;
+using NoCTF.Domain.Competitions;
 using NoCTF.Domain.Identity;
 using NoCTF.Infrastructure.Administration;
+using NoCTF.Application.Competitions.Events;
+using NoCTF.Application.Messaging;
+using NoCTF.Domain.Competitions.Events;
+using NoCTF.Infrastructure.Messaging;
 
 namespace NoCTF.Infrastructure.Competitions.Permissions;
 
 public sealed class CompetitionPermissionStore(
     NoCtfDbContext db,
-    TimeProvider? clock = null) : ICompetitionPermissionStore
+    TimeProvider? clock = null,
+    ITransactionalMessageOutbox? messageOutbox = null,
+    ICompetitionEventRecorder? eventRecorder = null) : ICompetitionPermissionStore
 {
     private readonly TimeProvider timeProvider = clock ?? TimeProvider.System;
+    private readonly ITransactionalMessageOutbox outbox =
+        messageOutbox ?? new NoOpTransactionalMessageOutbox();
+    private readonly ICompetitionEventRecorder events =
+        eventRecorder ?? NullCompetitionEventRecorder.Instance;
     public async Task<CompetitionPermissionSnapshotResult> GetSnapshotAsync(
         Guid competitionId,
         Guid actorId,
@@ -171,12 +182,34 @@ public sealed class CompetitionPermissionStore(
                 unverifiedUserIds);
         }
 
-        competition.ManagerIds = command.ManagerIds.Distinct().Order().ToArray();
-        competition.JudgeIds = command.JudgeIds.Distinct().Order().ToArray();
-        competition.ObserverIds = command.ObserverIds.Distinct().Order().ToArray();
+        var managerIds = command.ManagerIds.Distinct().Order().ToArray();
+        var judgeIds = command.JudgeIds.Distinct().Order().ToArray();
+        var observerIds = command.ObserverIds.Distinct().Order().ToArray();
+        var audienceChanged = !competition.ManagerIds.SequenceEqual(managerIds)
+            || !competition.JudgeIds.SequenceEqual(judgeIds)
+            || !competition.ObserverIds.SequenceEqual(observerIds);
+        competition.ManagerIds = managerIds;
+        competition.JudgeIds = judgeIds;
+        competition.ObserverIds = observerIds;
         competition.UpdatedAt = timeProvider.GetUtcNow();
+        if (audienceChanged)
+        {
+            await events.RecordAsync(new(
+                competition.Id,
+                CompetitionEventKind.CompetitionAudienceChanged,
+                CompetitionEventLevel.Information,
+                CompetitionEventVisibility.Staff,
+                competition.UpdatedAt,
+                ActorUserId: command.ActorId,
+                CompetitionStatus: competition.Status,
+                CompetitionAccessMode: competition.AccessMode,
+                PreviousCompetitionAccessMode: competition.AccessMode,
+                CompetitionAudienceChangeKind: CompetitionAudienceChangeKind.Collaborators), ct);
+        }
         await db.SaveChangesAsync(ct);
         await transaction.CommitAsync(ct);
+        if (audienceChanged)
+            await outbox.FlushOutgoingMessagesAsync();
         return new(CompetitionPermissionUpdateState.Updated);
     }
 }

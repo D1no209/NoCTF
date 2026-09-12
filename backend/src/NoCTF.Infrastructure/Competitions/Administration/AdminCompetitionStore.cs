@@ -11,6 +11,8 @@ using NoCTF.Domain.Runtime;
 using System.Text.Json;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
+using NoCTF.Application.Competitions.Events;
+using NoCTF.Domain.Competitions.Events;
 
 namespace NoCTF.Infrastructure.Competitions.Administration;
 
@@ -18,13 +20,17 @@ public sealed class AdminCompetitionStore(
     NoCtfDbContext db,
     NoCTF.Infrastructure.Competitions.Management.CompetitionReadModelCache? readModels = null,
     ITransactionalMessageOutbox? messageOutbox = null,
-    ILogger<AdminCompetitionStore>? logger = null)
+    ILogger<AdminCompetitionStore>? logger = null,
+    ICompetitionEventRecorder? eventRecorder = null,
+    AggregatePatchPostCommitActions? postCommitActions = null)
     : IAdminCompetitionStore
 {
     private static readonly JsonSerializerOptions JsonOptions =
         new(JsonSerializerDefaults.Web);
     private readonly ITransactionalMessageOutbox outbox =
         messageOutbox ?? new NoOpTransactionalMessageOutbox();
+    private readonly ICompetitionEventRecorder events =
+        eventRecorder ?? NullCompetitionEventRecorder.Instance;
     public async Task<IReadOnlyList<CompetitionView>> ListAsync(
         Guid actorId,
         bool isAdministrator,
@@ -51,7 +57,8 @@ public sealed class AdminCompetitionStore(
                 competition.AllowChallengeOwnersToHandleQuestions,
                 competition.PracticeModeEnabled,
                 competition.PosterFileId,
-                competition.TracksEnabled))
+                competition.TracksEnabled,
+                competition.AccessMode))
             .ToListAsync(ct);
     }
 
@@ -81,7 +88,8 @@ public sealed class AdminCompetitionStore(
                 competition.AllowChallengeOwnersToHandleQuestions,
                 competition.PracticeModeEnabled,
                 competition.PosterFileId,
-                competition.TracksEnabled))
+                competition.TracksEnabled,
+                competition.AccessMode))
             .SingleOrDefaultAsync(ct);
     }
 
@@ -128,7 +136,7 @@ public sealed class AdminCompetitionStore(
         }
         await transaction.CommitAsync(ct);
         if (readModels is not null)
-            await readModels.InvalidateAsync(entity.Id, ct);
+            await readModels.InvalidateAsync(entity.Id, CancellationToken.None);
         return new(CompetitionRestoreState.Restored);
     }
 
@@ -216,7 +224,7 @@ public sealed class AdminCompetitionStore(
             return new(CompetitionHardDeleteState.NotFound);
         await transaction.CommitAsync(ct);
         if (readModels is not null)
-            await readModels.InvalidateAsync(competitionId, ct);
+            await readModels.InvalidateAsync(competitionId, CancellationToken.None);
         return new(CompetitionHardDeleteState.Deleted);
     }
 
@@ -402,10 +410,26 @@ public sealed class AdminCompetitionStore(
             .Order()
             .ToArray();
         entity.UpdatedAt = now;
+        if (previousOwnerId != ownerId)
+        {
+            await events.RecordAsync(new(
+                entity.Id,
+                CompetitionEventKind.CompetitionAudienceChanged,
+                CompetitionEventLevel.Information,
+                CompetitionEventVisibility.Staff,
+                now,
+                ActorUserId: actorId,
+                RelatedUserId: ownerId,
+                CompetitionStatus: entity.Status,
+                CompetitionAccessMode: entity.AccessMode,
+                PreviousCompetitionAccessMode: entity.AccessMode,
+                CompetitionAudienceChangeKind: CompetitionAudienceChangeKind.Owner), ct);
+        }
         await db.SaveChangesAsync(ct);
         await transaction.CommitAsync(ct);
-        if (readModels is not null)
-            await readModels.InvalidateAsync(entity.Id, ct);
+        await InvalidateReadModelsAsync(entity.Id, CancellationToken.None);
+        if (previousOwnerId != ownerId)
+            await outbox.FlushOutgoingMessagesAsync();
         return new(CompetitionOwnerTransferState.Transferred, Map(entity));
     }
 
@@ -431,7 +455,20 @@ public sealed class AdminCompetitionStore(
             competition.FrozenStartAt, competition.HiddenStartAt,
             competition.AllowTeamRegistrationWhileRunning,
             competition.DeletedAt,
-            PracticeModeEnabled: competition.PracticeModeEnabled);
+            PracticeModeEnabled: competition.PracticeModeEnabled,
+            AccessMode: competition.AccessMode);
+
+    private Task InvalidateReadModelsAsync(
+        Guid competitionId,
+        CancellationToken cancellationToken)
+    {
+        if (readModels is null)
+            return Task.CompletedTask;
+        return postCommitActions?.RunOrDeferAsync(
+                token => readModels.InvalidateAsync(competitionId, token),
+                cancellationToken)
+            ?? readModels.InvalidateAsync(competitionId, cancellationToken);
+    }
 
     private async Task<CompetitionHardDeletePreview> BuildHardDeletePreviewAsync(
         Guid competitionId,

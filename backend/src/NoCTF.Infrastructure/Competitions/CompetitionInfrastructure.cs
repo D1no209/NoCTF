@@ -24,6 +24,8 @@ using NoCTF.Infrastructure.Competitions.Events;
 using NoCTF.Infrastructure.Caching;
 using NoCTF.Application.Competitions.Tracks;
 using NoCTF.Infrastructure.Competitions.Tracks;
+using NoCTF.Application.Competitions.Access;
+using NoCTF.Infrastructure.Competitions.Access;
 
 namespace NoCTF.Infrastructure.Competitions;
 
@@ -68,6 +70,7 @@ internal static class CompetitionInfrastructure
         services.AddScoped<CompetitionStartGate>();
         services.AddScoped<ICompetitionManagementStore, CompetitionManagementStore>();
         services.AddSingleton<CompetitionReadModelCache>();
+        services.AddScoped<ICompetitionAudienceReader, CompetitionAudienceReader>();
         services.AddScoped<CreateCompetition>();
         services.AddScoped<GetCompetition>();
         services.AddScoped<ListCompetitions>();

@@ -216,6 +216,7 @@ public sealed class PostgresSynchronousArchiveGenerator(
                 competition.ManagerIds,
                 competition.JudgeIds,
                 competition.ObserverIds,
+                competition.AccessMode,
                 competition.Mode,
                 competition.ConfigurationJson,
                 competition.TracksEnabled,

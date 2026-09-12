@@ -12,6 +12,7 @@ import LifecycleBadgeComponent from '../../competitions/LifecycleBadge.vue'
 /** Owns state, effects and commands for CompetitionsByIdPage. */
 export function useCompetitionsByIdPage() {
   const route = useRoute()
+  const router = useRouter()
 
   const competitionId = computed(() => route.params.id as string)
 
@@ -99,17 +100,28 @@ export function useCompetitionsByIdPage() {
 
   const refreshStandingLatest = createTrailingRefresh(refreshMyStanding)
 
-  async function refresh() {
-    const { data, error: err } = await getCompetitionEndpoint({
+  async function refresh(): Promise<'loaded' | 'not-found' | 'failed'> {
+    const { data, error: err, response } = await getCompetitionEndpoint({
       path: { competitionId: competitionId.value },
     })
     loading.value = false
     if (err || !data) {
       error.value = parseApiError(err, translate("ui.loadingCompetitionFailed")).message
-      return
+      return response?.status === 404 ? 'not-found' : 'failed'
     }
     error.value = null
     competition.value = data
+    return 'loaded'
+  }
+
+  async function handleAudienceChanged() {
+    const result = await refresh()
+    if (result === 'not-found') {
+      await router.replace('/competitions')
+      return
+    }
+    if (result === 'loaded')
+      await refreshMyTeam()
   }
 
   watch(
@@ -125,6 +137,10 @@ export function useCompetitionsByIdPage() {
         void refresh()
         void refreshStandingLatest()
       },
+      competitionEventChanged: event => {
+        if (event.kind === 'CompetitionAudienceChanged')
+          void handleAudienceChanged()
+      },
       scoreboardUpdated: () => void refreshStandingLatest(),
       onReconnected: () => void refreshStandingLatest(),
     })
@@ -132,7 +148,12 @@ export function useCompetitionsByIdPage() {
 
   onUnmounted(() => unwatch?.())
 
-  provide(competitionContextKey, { competition, loading, error, refresh })
+  provide(competitionContextKey, {
+    competition,
+    loading,
+    error,
+    refresh: async () => { await refresh() },
+  })
 
   const navGroups = computed<WorkspaceNavGroup[]>(() => {
     const base = `/competitions/${competitionId.value}`

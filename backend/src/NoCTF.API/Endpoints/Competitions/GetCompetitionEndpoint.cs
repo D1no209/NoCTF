@@ -30,6 +30,13 @@ public enum CompetitionStatusProtocol
     Finished
 }
 
+[JsonConverter(typeof(StrictPascalCaseEnumConverter<CompetitionAccessModeProtocol>))]
+public enum CompetitionAccessModeProtocol
+{
+    Public,
+    StaffOnly
+}
+
 [JsonConverter(typeof(StrictPascalCaseEnumConverter<LeaderboardVisibilityProtocol>))]
 public enum LeaderboardVisibilityProtocol
 {
@@ -58,6 +65,12 @@ public static partial class CompetitionProtocolMapper
 
     [MapEnum(EnumMappingStrategy.ByName)]
     public static partial CompetitionStatusProtocol ToProtocol(CompetitionStatus value);
+
+    [MapEnum(EnumMappingStrategy.ByName)]
+    public static partial CompetitionAccessModeProtocol ToProtocol(CompetitionAccessMode value);
+
+    [MapEnum(EnumMappingStrategy.ByName)]
+    public static partial CompetitionAccessMode ToDomain(CompetitionAccessModeProtocol value);
 
     [MapEnum(EnumMappingStrategy.ByName)]
     public static partial LeaderboardVisibilityProtocol ToProtocol(
@@ -89,7 +102,8 @@ public sealed record CompetitionResponse(
     int MaxParticipantMessagesBeforeHandlerReply = 3,
     bool AllowChallengeOwnersToHandleQuestions = true,
     bool PracticeModeEnabled = false,
-    bool TracksEnabled = false);
+    bool TracksEnabled = false,
+    CompetitionAccessModeProtocol AccessMode = CompetitionAccessModeProtocol.Public);
 
 internal static class CompetitionMapper
 {
@@ -123,7 +137,8 @@ internal static class CompetitionMapper
             view.MaxParticipantMessagesBeforeHandlerReply,
             view.AllowChallengeOwnersToHandleQuestions,
             view.PracticeModeEnabled,
-            view.TracksEnabled);
+            view.TracksEnabled,
+            CompetitionProtocolMapper.ToProtocol(view.AccessMode));
 
     internal static string PosterUrl(Guid competitionId, Guid posterFileId) =>
         $"/api/v1/competitions/{competitionId}/poster?revision={posterFileId:N}";

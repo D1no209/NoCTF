@@ -16,6 +16,7 @@ internal static class PersistenceInfrastructure
         bool exporting,
         bool development)
     {
+        services.AddScoped<AggregatePatchPostCommitActions>();
         services.AddScoped<IAtomicAggregatePatch, AggregatePatchTransaction>();
         services.AddSingleton(new AsyncKeyedLocker<string>(
             options => options.PoolSize = 20,

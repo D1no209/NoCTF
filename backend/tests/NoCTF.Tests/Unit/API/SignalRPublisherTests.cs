@@ -52,14 +52,16 @@ public sealed class SignalRPublisherTests
         var harness = CreateHarness();
         var competitionId = Guid.CreateVersion7();
 
-        await new SignalRCompetitionLifecyclePublisher(harness.Context).PublishAsync(
+        await new SignalRCompetitionLifecyclePublisher(harness.Audiences).PublishAsync(
             competitionId,
             CompetitionStatus.Running,
             CompetitionStatus.Finished,
             DateTimeOffset.UnixEpoch,
             CancellationToken.None);
 
-        _ = harness.Clients.Received(1).Group($"competition:{competitionId:N}");
+        await harness.Audiences.Received(1).CurrentAsync(
+            competitionId,
+            CancellationToken.None);
         await harness.Client.Received(1).CompetitionLifecycleChanged(
             Arg.Is<CompetitionLifecycleChangedNotification>(notification =>
                 notification != null
@@ -81,10 +83,14 @@ public sealed class SignalRPublisherTests
             CompetitionEventLevel.Information,
             DateTimeOffset.UnixEpoch);
 
-        await new LocalCompetitionEventMessageHandler(harness.Context)
+        await new LocalCompetitionEventMessageHandler(
+                harness.Audiences,
+                harness.Coordinator)
             .Handle(message, CancellationToken.None);
 
-        _ = harness.Clients.Received(1).Group($"competition:{competitionId:N}");
+        await harness.Audiences.Received(1).CurrentAsync(
+            competitionId,
+            CancellationToken.None);
         await harness.Client.Received(1).CompetitionEventChanged(
             Arg.Is<CompetitionEventChangedNotification>(notification =>
                 notification != null
@@ -94,19 +100,49 @@ public sealed class SignalRPublisherTests
             CancellationToken.None);
     }
 
+    [Test]
+    public async Task Audience_change_events_notify_all_known_groups_and_trigger_reauthorization()
+    {
+        var harness = CreateHarness();
+        var competitionId = Guid.CreateVersion7();
+        var message = new CompetitionEventCommitted(
+            competitionId,
+            Guid.CreateVersion7(),
+            CompetitionEventKind.CompetitionAudienceChanged,
+            CompetitionEventLevel.Information,
+            DateTimeOffset.UnixEpoch,
+            CompetitionAudienceChangeKind.AccessMode,
+            CompetitionAccessMode.StaffOnly);
+
+        await new LocalCompetitionEventMessageHandler(
+                harness.Audiences,
+                harness.Coordinator)
+            .Handle(message, CancellationToken.None);
+
+        _ = harness.Audiences.Received(1).AllKnown(competitionId);
+        await harness.Coordinator.Received(1).ApplyAsync(message, CancellationToken.None);
+    }
+
     private static PublisherHarness CreateHarness()
     {
         var context = Substitute.For<IHubContext<CompetitionHub, ICompetitionHubClient>>();
         var clients = Substitute.For<IHubClients<ICompetitionHubClient>>();
         var client = Substitute.For<ICompetitionHubClient>();
+        var audiences = Substitute.For<ICompetitionHubAudienceRouter>();
+        var coordinator = Substitute.For<ICompetitionHubAudienceCoordinator>();
         context.Clients.Returns(clients);
         clients.User(Arg.Any<string>()).Returns(client);
         clients.Group(Arg.Any<string>()).Returns(client);
-        return new(context, clients, client);
+        audiences.CurrentAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>())
+            .Returns(client);
+        audiences.AllKnown(Arg.Any<Guid>()).Returns(client);
+        return new(context, clients, client, audiences, coordinator);
     }
 
     private sealed record PublisherHarness(
         IHubContext<CompetitionHub, ICompetitionHubClient> Context,
         IHubClients<ICompetitionHubClient> Clients,
-        ICompetitionHubClient Client);
+        ICompetitionHubClient Client,
+        ICompetitionHubAudienceRouter Audiences,
+        ICompetitionHubAudienceCoordinator Coordinator);
 }
