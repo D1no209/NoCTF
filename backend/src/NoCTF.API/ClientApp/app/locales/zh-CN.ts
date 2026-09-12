@@ -2998,6 +2998,8 @@ export const chineseMessages = {
   ,"writeUp.invalidAdjustment": "调整值必须是有效的非零 32 位整数。"
   ,"writeUp.applyAdjustment": "应用人工调分"
   ,"writeUp.adjustmentAccepted": "人工调分已受理，权威分数将自动刷新"
+  ,"writeUp.adjustmentApplied": "人工调分已生效"
+  ,"writeUp.adjustmentRefreshTimedOut": "人工调分已受理，但权威分数刷新超时；请手动刷新确认。"
   ,"writeUp.adjustmentFailed": "人工调分失败"
   ,"writeUp.quickConsultation": "快速咨询"
   ,"writeUp.observerReadOnly": "你可以查看题解与得分，但当前角色不能调分或发起咨询。"

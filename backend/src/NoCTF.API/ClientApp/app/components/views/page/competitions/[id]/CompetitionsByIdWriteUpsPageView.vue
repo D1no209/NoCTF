@@ -190,11 +190,15 @@ const { ArrowLeft, Download, FileSearch, MessageCircleQuestion, MinusCircle, Ref
             {{ $t('writeUp.confirmDeductionDescription', { challenge: deduction?.title ?? '', score: deduction?.netPoints ?? 0 }) }}
           </AlertDialogDescription>
         </AlertDialogHeader>
+        <Alert v-if="adjustmentError" variant="destructive">
+          <AlertDescription>{{ $message(adjustmentError) }}</AlertDescription>
+        </Alert>
         <AlertDialogFooter>
-          <AlertDialogCancel>{{ $t('ui.cancel') }}</AlertDialogCancel>
-          <AlertDialogAction :disabled="adjustmentPending" @click="confirmDeduction">
+          <AlertDialogCancel :disabled="adjustmentPending">{{ $t('ui.cancel') }}</AlertDialogCancel>
+          <Button :disabled="adjustmentPending" @click="confirmDeduction">
+            <Spinner v-if="adjustmentPending" data-icon="inline-start" />
             {{ $t('writeUp.deductToZero') }}
-          </AlertDialogAction>
+          </Button>
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>
