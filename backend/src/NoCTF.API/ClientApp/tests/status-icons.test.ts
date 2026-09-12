@@ -32,4 +32,6 @@ test('blood ranks use three distinct standalone SVG marks', async () => {
   expect(component).toContain('tabindex="0"')
   expect(component).toContain(':data-highlighted="highlighted || undefined"')
   expect(theme).toContain(".blood-mark[data-highlighted='true']")
+  expect(theme).toContain('transform: scale(1.18)')
+  expect(theme).toContain('currentColor 72%')
 })
