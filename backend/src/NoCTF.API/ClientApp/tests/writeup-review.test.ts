@@ -39,8 +39,14 @@ test('staff review combines Edge-compatible PDF preview with authoritative chall
   expect(view).toContain('openDeduction(score)')
   expect(view).toContain('v-if="loadError && !review"')
   expect(view).toContain('v-else-if="review"')
+  expect(view).toContain('data-writeup-review-workspace')
+  expect(view).toContain('<PdfPreview\n              fill')
+  expect(view).not.toContain('h-[calc(100svh-9rem)]')
+  expect(view).not.toContain('min-h-[42rem]')
+  expect(controller).not.toContain('CompetitionParticipantWorkspace')
   expect(preview).not.toContain('sandbox')
   expect(preview).toContain('referrerpolicy="no-referrer"')
+  expect(preview).toContain("fill ? 'min-h-0' : 'min-h-[32rem]'")
 })
 
 test('WriteUp reviewers can start a team consultation and continue in the existing workspace', async () => {

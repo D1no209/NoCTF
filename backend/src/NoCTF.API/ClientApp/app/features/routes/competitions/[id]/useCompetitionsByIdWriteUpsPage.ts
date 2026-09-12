@@ -1,12 +1,10 @@
-import { markRaw } from 'vue'
-import { Download, FileSearch, MessageCircleQuestion, MinusCircle, RefreshCw, Scale } from '@lucide/vue'
+import { ArrowLeft, Download, FileSearch, MessageCircleQuestion, MinusCircle, RefreshCw, Scale } from '@lucide/vue'
 import { toast } from 'vue-sonner'
 
 import { adminCreateManualAdjustment, createTeamWriteUpConsultation, downloadTeamWriteUp, listTeamWriteUps } from '../../../../api'
 import type { NoCtfapiEndpointsTeamsWriteUpsTeamWriteUpChallengeScoreResponse, NoCtfapiEndpointsTeamsWriteUpsTeamWriteUpReviewItemResponse, NoCtfapiEndpointsTeamsWriteUpsTeamWriteUpReviewResponse } from '../../../../api'
 import { createTrailingRefresh } from '../../../../lib/latest-page-refresh'
 import { downloadSdkFile, readProtectedDownload } from '../../../../utils/download'
-import CompetitionParticipantWorkspaceComponent from '../../../competition/CompetitionParticipantWorkspace.vue'
 
 type ReviewItem = NoCtfapiEndpointsTeamsWriteUpsTeamWriteUpReviewItemResponse
 type ChallengeScore = NoCtfapiEndpointsTeamsWriteUpsTeamWriteUpChallengeScoreResponse
@@ -273,8 +271,8 @@ export function useCompetitionsByIdWriteUpsPage() {
     releasePreview()
   })
 
-  const CompetitionParticipantWorkspace = markRaw(CompetitionParticipantWorkspaceComponent)
   const viewBindings = {
+    ArrowLeft,
     Download,
     FileSearch,
     MessageCircleQuestion,
@@ -316,7 +314,6 @@ export function useCompetitionsByIdWriteUpsPage() {
     submitConsultation,
     setConsultationOpen,
     clearConsultationError,
-    CompetitionParticipantWorkspace,
   }
   return viewBindings
 }

@@ -5,12 +5,13 @@ defineProps<{
   emptyLabel: string
   loading?: boolean
   error?: string | null
+  fill?: boolean
 }>()
 </script>
 
 <template>
-  <div class="flex h-full min-h-[32rem] min-w-0 flex-col overflow-hidden rounded-xl bg-muted/45 shadow-inner">
-    <Skeleton v-if="loading" class="h-full min-h-[32rem] w-full" />
+  <div class="flex h-full min-w-0 flex-col overflow-hidden rounded-xl bg-muted/45 shadow-inner" :class="fill ? 'min-h-0' : 'min-h-[32rem]'">
+    <Skeleton v-if="loading" class="h-full w-full" :class="fill ? 'min-h-0' : 'min-h-[32rem]'" />
     <Alert v-else-if="error" variant="destructive" class="m-4">
       <AlertDescription>{{ $message(error) }}</AlertDescription>
     </Alert>
@@ -21,9 +22,10 @@ defineProps<{
       :src="source"
       :title="accessibleLabel"
       referrerpolicy="no-referrer"
-      class="h-full min-h-[32rem] w-full"
+      class="h-full w-full"
+      :class="fill ? 'min-h-0' : 'min-h-[32rem]'"
     />
-    <Empty v-else class="h-full min-h-[32rem]">
+    <Empty v-else class="h-full" :class="fill ? 'min-h-0' : 'min-h-[32rem]'">
       <EmptyHeader>
         <EmptyTitle>{{ emptyLabel }}</EmptyTitle>
       </EmptyHeader>
