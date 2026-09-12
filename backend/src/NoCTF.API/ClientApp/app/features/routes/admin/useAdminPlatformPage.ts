@@ -1,6 +1,6 @@
 import { markRaw } from 'vue'
 
-import { Activity, Bot, Container, Globe, History, Info, MailCheck, ScrollText, Users } from '@lucide/vue'
+import { Activity, Container, Globe, History, Info, MailCheck, ScrollText, Users } from '@lucide/vue'
 import type { WorkspaceNavGroup } from '../../app/workspace-nav'
 import AppWorkspaceNavComponent from '../../app/AppWorkspaceNav.vue'
 
@@ -16,7 +16,6 @@ export function useAdminPlatformPage() {
       items: [
         { to: '/admin/platform', label: translate("ui.platformInformation"), icon: Info, exact: true },
         { to: '/admin/platform/users', label: translate("ui.user"), icon: Users },
-        { to: '/admin/platform/bots', label: translate("ui.bot"), icon: Bot },
         { to: '/admin/platform/email', label: translate("ui.emailAndHumanVerification"), icon: MailCheck },
       ],
     },
