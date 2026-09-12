@@ -10,17 +10,19 @@ namespace NoCTF.Tests.Unit.Application;
 public sealed class TeamWriteUpTests
 {
     [Test]
-    public async Task Zero_deadline_hours_closes_at_the_competition_end_instant()
+    public async Task Submission_is_open_during_the_competition_and_closes_at_the_deadline()
     {
         var endAt = DateTimeOffset.Parse("2026-09-13T02:00:00Z");
 
         await Assert.That(CompetitionWriteUpPolicy.CanSubmit(
-            true,
+            endAt,
+            0,
+            endAt.AddHours(-1))).IsTrue();
+        await Assert.That(CompetitionWriteUpPolicy.CanSubmit(
             endAt,
             0,
             endAt)).IsTrue();
         await Assert.That(CompetitionWriteUpPolicy.CanSubmit(
-            true,
             endAt,
             0,
             endAt.AddTicks(1))).IsFalse();
@@ -61,12 +63,7 @@ public sealed class TeamWriteUpTests
     }
 
     [Test]
-    [Arguments(false, 1, TeamWriteUpSubmissionState.SubmissionNotRequired)]
-    [Arguments(true, -1, TeamWriteUpSubmissionState.SubmissionDeadlinePassed)]
-    public async Task ReplaceMineAsync_enforces_the_competition_submission_window_before_upload(
-        bool submissionRequired,
-        int competitionEndOffsetHours,
-        TeamWriteUpSubmissionState expected)
+    public async Task ReplaceMineAsync_rejects_an_expired_submission_before_upload()
     {
         var now = DateTimeOffset.Parse("2026-09-13T02:00:00Z");
         var competitionId = Guid.CreateVersion7(now);
@@ -78,8 +75,7 @@ public sealed class TeamWriteUpTests
                 Arg.Any<CancellationToken>())
             .Returns(new TeamWriteUpSubmissionContext(
                 Guid.CreateVersion7(now.AddTicks(2)),
-                submissionRequired,
-                now.AddHours(competitionEndOffsetHours),
+                now.AddHours(-1),
                 0));
         var registry = Substitute.For<IManagedFileUploadRegistry>();
         var objects = Substitute.For<IStore>();
@@ -100,7 +96,8 @@ public sealed class TeamWriteUpTests
             now,
             CancellationToken.None);
 
-        await Assert.That(result.State).IsEqualTo(expected);
+        await Assert.That(result.State)
+            .IsEqualTo(TeamWriteUpSubmissionState.SubmissionDeadlinePassed);
         await registry.DidNotReceive().RegisterAsync(
             Arg.Any<ManagedFileUpload>(),
             Arg.Any<DateTimeOffset>(),

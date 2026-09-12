@@ -144,11 +144,9 @@ internal static class CompetitionMapper
             CompetitionProtocolMapper.ToProtocol(view.AccessMode),
             view.WriteUpSubmissionRequired,
             view.WriteUpSubmissionDeadlineHours,
-            view.WriteUpSubmissionRequired
-                ? CompetitionWriteUpPolicy.DeadlineAt(
-                    view.EndTime,
-                    view.WriteUpSubmissionDeadlineHours)
-                : null);
+            CompetitionWriteUpPolicy.DeadlineAt(
+                view.EndTime,
+                view.WriteUpSubmissionDeadlineHours));
 
     internal static string PosterUrl(Guid competitionId, Guid posterFileId) =>
         $"/api/v1/competitions/{competitionId}/poster?revision={posterFileId:N}";

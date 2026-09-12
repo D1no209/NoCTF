@@ -38,7 +38,6 @@ public enum TeamWriteUpFailureCode
 {
     InvalidPdf,
     UploadTooLarge,
-    WriteUpSubmissionNotRequired,
     WriteUpSubmissionDeadlinePassed
 }
 
@@ -71,7 +70,7 @@ public sealed class UploadMyTeamWriteUpEndpoint(
         Summary(summary =>
         {
             summary.Summary = "Submits or replaces the current team's PDF WriteUp.";
-            summary.Description = "When the competition requires WriteUps, any active member of an approved, non-banned team may submit or replace its PDF through the configured deadline. The previous immutable File is cleaned up asynchronously.";
+            summary.Description = "Any active member of an approved, non-banned team may submit or replace its required or optional PDF through the configured deadline. The previous immutable File is cleaned up asynchronously.";
         });
     }
 
@@ -110,10 +109,6 @@ public sealed class UploadMyTeamWriteUpEndpoint(
                 TeamWriteUpProtocol.ToResponse(result.WriteUp!)),
             TeamWriteUpSubmissionState.NotFound => TypedResults.NotFound(),
             TeamWriteUpSubmissionState.Forbidden => TypedResults.Forbid(),
-            TeamWriteUpSubmissionState.SubmissionNotRequired => TypedResults.Conflict(
-                new TeamWriteUpFailureResponse(
-                    TeamWriteUpFailureCode.WriteUpSubmissionNotRequired,
-                    "This competition does not require WriteUp submission.")),
             TeamWriteUpSubmissionState.SubmissionDeadlinePassed => TypedResults.Conflict(
                 new TeamWriteUpFailureResponse(
                     TeamWriteUpFailureCode.WriteUpSubmissionDeadlinePassed,

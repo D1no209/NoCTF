@@ -33,7 +33,6 @@ public sealed class TeamWriteUpStore(
                 competition => competition.Id,
                 (team, competition) => new TeamWriteUpSubmissionContext(
                     team.Id,
-                    competition.WriteUpSubmissionRequired,
                     competition.EndAt,
                     competition.WriteUpSubmissionDeadlineHours))
             .SingleOrDefaultAsync(cancellationToken);
@@ -64,17 +63,13 @@ public sealed class TeamWriteUpStore(
             .Where(candidate => candidate.Id == competitionId)
             .Select(candidate => new
             {
-                candidate.WriteUpSubmissionRequired,
                 candidate.EndAt,
                 candidate.WriteUpSubmissionDeadlineHours
             })
             .SingleOrDefaultAsync(cancellationToken);
         if (competition is null)
             return new(TeamWriteUpSubmissionState.NotFound);
-        if (!competition.WriteUpSubmissionRequired)
-            return new(TeamWriteUpSubmissionState.SubmissionNotRequired);
         if (!CompetitionWriteUpPolicy.CanSubmit(
-                competition.WriteUpSubmissionRequired,
                 competition.EndAt,
                 competition.WriteUpSubmissionDeadlineHours,
                 submittedAt))

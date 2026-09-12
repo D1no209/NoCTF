@@ -514,9 +514,7 @@ export function createMockApi() {
       else if (route === '/competitions/{competitionId}/teams/me/writeup' && request.method === 'PUT') {
         if (!myTeam || myTeam.registrationStatus !== 'Approved' || myTeam.isBanned)
           return problem(403, '需要已审核且未封禁的队伍 / An approved, active team is required')
-        if (competition?.writeUpSubmissionRequired !== true)
-          return json({ code: 'WriteUpSubmissionNotRequired', detail: '本竞赛未要求提交题解 / WriteUp submission is not required' }, 409)
-        if (competition.writeUpSubmissionDeadlineAt
+        if (competition?.writeUpSubmissionDeadlineAt
           && Date.now() > Date.parse(competition.writeUpSubmissionDeadlineAt))
           return json({ code: 'WriteUpSubmissionDeadlinePassed', detail: '题解提交期限已结束 / WriteUp submission has closed' }, 409)
         const form = await request.formData()

@@ -29,7 +29,7 @@ public sealed class TeamWriteUpPersistenceTests
 {
     [Test]
     [Timeout(300_000)]
-    public async Task Team_members_replace_audited_pdf_while_other_users_are_rejected(
+    public async Task Teams_submit_optional_WriteUps_during_competition_for_staff_review(
         CancellationToken cancellationToken)
     {
         await DockerIntegrationTest.RunAsync(async () =>
@@ -71,12 +71,12 @@ public sealed class TeamWriteUpPersistenceTests
                     OwnerId = ownerId,
                     Title = "WriteUp competition",
                     Mode = GameMode.Ctf,
-                    Status = CompetitionStatus.Finished,
+                    Status = CompetitionStatus.Running,
                     ConfigurationJson = "{}",
                     FlagDerivationSecret = new byte[32],
                     StartAt = now.AddHours(-2),
-                    EndAt = now.AddHours(-1),
-                    WriteUpSubmissionRequired = true,
+                    EndAt = now.AddHours(1),
+                    WriteUpSubmissionRequired = false,
                     WriteUpSubmissionDeadlineHours = 24,
                     CreatedAt = now.AddHours(-3),
                     UpdatedAt = now
@@ -203,6 +203,8 @@ public sealed class TeamWriteUpPersistenceTests
                 var policy = await db.Competitions.SingleAsync(
                     candidate => candidate.Id == competitionId,
                     cancellationToken);
+                policy.Status = CompetitionStatus.Finished;
+                policy.EndAt = now.AddMinutes(2);
                 policy.WriteUpSubmissionDeadlineHours = 0;
                 await db.SaveChangesAsync(cancellationToken);
                 await using var overduePdf = Pdf("overdue");

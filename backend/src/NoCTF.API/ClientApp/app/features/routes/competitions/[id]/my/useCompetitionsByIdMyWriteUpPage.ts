@@ -24,7 +24,7 @@ export function useCompetitionsByIdMyWriteUpPage() {
     ctx.competition.value?.writeUpSubmissionDeadlineAt ?? null,
   )
   const submissionClosed = computed(() => {
-    if (!submissionRequired.value || !submissionDeadlineAt.value) return false
+    if (!submissionDeadlineAt.value) return false
     const deadline = Date.parse(submissionDeadlineAt.value)
     return Number.isFinite(deadline) && now.value.getTime() > deadline
   })
@@ -91,8 +91,7 @@ export function useCompetitionsByIdMyWriteUpPage() {
   }
 
   async function submit() {
-    if (!submissionRequired.value || submissionClosed.value
-      || !selectedFile.value || uploadPending.value) return
+    if (submissionClosed.value || !selectedFile.value || uploadPending.value) return
     uploadPending.value = true
     uploadError.value = null
     try {

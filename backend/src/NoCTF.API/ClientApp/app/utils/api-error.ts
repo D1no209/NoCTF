@@ -69,7 +69,6 @@ function stableCodeMessage(code: string | undefined): string | null {
     case 'HumanVerificationUnavailable': return translate('ui.humanVerificationProviderUnavailablePleaseRetry')
     case 'HumanVerificationSecretInvalid': return translate('ui.humanVerificationSecretInvalid')
     case 'EmailVerificationDisabled': return translate('ui.theTestEmailWillBeSentToTheEmailAddress')
-    case 'WriteUpSubmissionNotRequired': return translate('writeUp.notRequiredForCompetition')
     case 'WriteUpSubmissionDeadlinePassed': return translate('writeUp.deadlinePassedShort')
     default: return null
   }

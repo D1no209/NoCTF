@@ -1082,7 +1082,7 @@
           "Competitions"
         ],
         "summary": "Submits or replaces the current team's PDF WriteUp.",
-        "description": "When the competition requires WriteUps, any active member of an approved, non-banned team may submit or replace its PDF through the configured deadline. The previous immutable File is cleaned up asynchronously.",
+        "description": "Any active member of an approved, non-banned team may submit or replace its required or optional PDF through the configured deadline. The previous immutable File is cleaned up asynchronously.",
         "operationId": "ReplaceMyTeamWriteUp",
         "parameters": [
           {
@@ -13024,13 +13024,11 @@
         "x-enumNames": [
           "InvalidPdf",
           "UploadTooLarge",
-          "WriteUpSubmissionNotRequired",
           "WriteUpSubmissionDeadlinePassed"
         ],
         "enum": [
           "InvalidPdf",
           "UploadTooLarge",
-          "WriteUpSubmissionNotRequired",
           "WriteUpSubmissionDeadlinePassed"
         ]
       },
