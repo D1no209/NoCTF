@@ -21,7 +21,7 @@ test('participant WriteUp flow uses generated PDF upload preview and download op
   expect(navigation).toContain('/my/writeup')
 })
 
-test('staff review combines sandboxed PDF preview with authoritative challenge score actions', async () => {
+test('staff review combines Edge-compatible PDF preview with authoritative challenge score actions', async () => {
   const controller = await sourceFile(
     '../app/features/routes/competitions/[id]/useCompetitionsByIdWriteUpsPage.ts',
   ).text()
@@ -39,7 +39,8 @@ test('staff review combines sandboxed PDF preview with authoritative challenge s
   expect(view).toContain('openDeduction(score)')
   expect(view).toContain('v-if="loadError && !review"')
   expect(view).toContain('v-else-if="review"')
-  expect(preview).toContain(":sandbox=\"''\"")
+  expect(preview).not.toContain('sandbox')
+  expect(preview).toContain('referrerpolicy="no-referrer"')
 })
 
 test('WriteUp reviewers can start a team consultation and continue in the existing workspace', async () => {
