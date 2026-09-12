@@ -18,6 +18,7 @@ public enum CompetitionHardDeleteReferenceCode
     PatchUpload,
     Notification,
     PosterFile,
+    TeamWriteUp,
     ActiveRuntimeResource,
     NotificationScopeConflict
 }

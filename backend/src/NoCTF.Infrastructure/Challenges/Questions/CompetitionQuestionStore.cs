@@ -190,6 +190,146 @@ public sealed class CompetitionQuestionStore(
             ct));
     }
 
+    public async Task<CompetitionQuestionMutationResult> CreateWriteUpConsultationAsync(
+        CreateTeamWriteUpConsultationCommand command,
+        CancellationToken ct)
+    {
+        await using var transaction = await db.Database.BeginTransactionAsync(
+            IsolationLevel.ReadCommitted,
+            ct);
+        var actor = await accessResolver.ResolveActorAsync(
+            command.CompetitionId,
+            command.ActorUserId,
+            ct);
+        var actorRole = actor switch
+        {
+            { IsPlatformAdministrator: true } =>
+                CompetitionQuestionParticipantRole.PlatformAdministrator,
+            { IsCompetitionManager: true } =>
+                CompetitionQuestionParticipantRole.CompetitionManager,
+            { IsJudge: true } => CompetitionQuestionParticipantRole.Judge,
+            _ => (CompetitionQuestionParticipantRole?)null
+        };
+        if (actorRole is null)
+        {
+            return Failure(
+                CompetitionQuestionFailure.Forbidden,
+                command.CompetitionId,
+                null,
+                command.TeamId,
+                command.ActorUserId);
+        }
+
+        var teamExists = await db.Teams.AsNoTracking().AnyAsync(team =>
+            team.Id == command.TeamId
+            && team.CompetitionId == command.CompetitionId
+            && team.WriteUpFileId != null,
+            ct);
+        if (!teamExists)
+        {
+            return Failure(
+                CompetitionQuestionFailure.SubmissionNotFound,
+                command.CompetitionId,
+                null,
+                command.TeamId,
+                command.ActorUserId);
+        }
+        if (command.CompetitionChallengeId is { } challengeId
+            && !await db.CompetitionChallenges.AsNoTracking().AnyAsync(challenge =>
+                challenge.Id == challengeId
+                && challenge.CompetitionId == command.CompetitionId,
+                ct))
+        {
+            return Failure(
+                CompetitionQuestionFailure.InvalidChallengeReference,
+                command.CompetitionId,
+                null,
+                command.TeamId,
+                command.ActorUserId);
+        }
+
+        var duplicateCutoff = command.Now.AddMinutes(-1);
+        var recent = await db.Notifications.AsNoTracking()
+            .Where(notification => notification.Kind == NotificationKind.QuestionOpened
+                && notification.SourceType == NotificationSourceType.User
+                && notification.SourceId == command.ActorUserId
+                && notification.RelatedType == EntityReferenceKind.Competition
+                && notification.RelatedId == command.CompetitionId
+                && notification.SentAt >= duplicateCutoff)
+            .Select(notification => notification.ContentJson)
+            .ToArrayAsync(ct);
+        if (recent.Select(ParseRoot).Any(root =>
+                root is not null
+                && root.TeamId == command.TeamId
+                && root.Title == command.Title
+                && root.Body == command.Body))
+        {
+            return Failure(
+                CompetitionQuestionFailure.SpamRejected,
+                command.CompetitionId,
+                null,
+                command.TeamId,
+                command.ActorUserId);
+        }
+
+        var root = new QuestionRootPayload(
+            2,
+            command.CompetitionChallengeId is null
+                ? CompetitionQuestionSubject.Platform
+                : CompetitionQuestionSubject.Challenge,
+            command.Title,
+            command.Body,
+            command.TeamId,
+            command.CompetitionChallengeId,
+            null,
+            CompetitionQuestionStatus.Replied,
+            actorRole.Value);
+        var notification = new Notification
+        {
+            Id = Guid.CreateVersion7(command.Now),
+            SourceType = NotificationSourceType.User,
+            SourceId = command.ActorUserId,
+            TargetType = NotificationTargetType.CompetitionCollaborators,
+            TargetId = command.CompetitionId,
+            Kind = NotificationKind.QuestionOpened,
+            ContentJson = JsonSerializer.Serialize(
+                root,
+                CompetitionQuestionSerialization.Options),
+            SentAt = command.Now,
+            RelatedType = EntityReferenceKind.Competition,
+            RelatedId = command.CompetitionId
+        };
+        db.Notifications.Add(notification);
+        await events.RecordAsync(new(
+            command.CompetitionId,
+            CompetitionEventKind.QuestionOpened,
+            CompetitionEventLevel.Information,
+            CompetitionEventVisibility.Staff,
+            command.Now,
+            ActorUserId: command.ActorUserId,
+            TeamId: command.TeamId,
+            CompetitionChallengeId: command.CompetitionChallengeId,
+            QuestionId: notification.Id,
+            QuestionStatus: CompetitionQuestionStatus.Replied), ct);
+        await outbox.PublishAsync(new DeliverCompetitionQuestionNotification(
+            command.CompetitionId,
+            notification.Id,
+            null,
+            await ResolveTeamRecipientIdsAsync(command.TeamId, ct),
+            NotificationKind.QuestionOpened,
+            CompetitionQuestionNotificationEvent.Opened,
+            root.Title,
+            command.Now));
+        await db.SaveChangesAsync(ct);
+        await transaction.CommitAsync(ct);
+        await outbox.FlushOutgoingMessagesAsync();
+        return new(await BuildViewAsync(
+            new QuestionAggregate(notification, root, []),
+            CompetitionQuestionAccess.Handler,
+            true,
+            ct));
+    }
+
     public async Task<CompetitionQuestionPage> ListAsync(
         CompetitionQuestionQuery query,
         CancellationToken ct)
@@ -896,7 +1036,8 @@ public sealed class CompetitionQuestionStore(
         Guid TeamId,
         Guid? CompetitionChallengeId,
         Guid? GameplayFactId,
-        CompetitionQuestionStatus Status);
+        CompetitionQuestionStatus Status,
+        CompetitionQuestionParticipantRole? ActorRole = null);
 
     internal sealed record QuestionMessagePayload(
         int SchemaVersion,

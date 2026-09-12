@@ -1472,6 +1472,18 @@ namespace NoCTF.Infrastructure.Migrations
                         .HasDefaultValue("default")
                         .HasColumnName("track_key");
 
+                    b.Property<Guid?>("WriteUpFileId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("write_up_file_id");
+
+                    b.Property<DateTimeOffset?>("WriteUpSubmittedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("write_up_submitted_at");
+
+                    b.Property<Guid?>("WriteUpSubmittedByUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("write_up_submitted_by_user_id");
+
                     b.HasKey("Id")
                         .HasName("pk_teams");
 
@@ -1490,6 +1502,9 @@ namespace NoCTF.Infrastructure.Migrations
 
                     NpgsqlIndexBuilderExtensions.HasMethod(b.HasIndex("MemberIds"), "gin");
 
+                    b.HasIndex("WriteUpFileId")
+                        .HasDatabaseName("ix_teams_write_up_file_id");
+
                     b.HasIndex("CompetitionId", "RegistrationStatus")
                         .HasDatabaseName("ix_teams_competition_id_registration_status");
 
@@ -1503,6 +1518,8 @@ namespace NoCTF.Infrastructure.Migrations
                             t.HasCheckConstraint("ck_teams_invitation_token_length", "char_length(invitation_token) = 32");
 
                             t.HasCheckConstraint("ck_teams_members_not_empty", "cardinality(member_ids) > 0");
+
+                            t.HasCheckConstraint("ck_teams_write_up_metadata_complete", "(write_up_file_id IS NULL AND write_up_submitted_by_user_id IS NULL AND write_up_submitted_at IS NULL) OR (write_up_file_id IS NOT NULL AND write_up_submitted_by_user_id IS NOT NULL AND write_up_submitted_at IS NOT NULL)");
                         });
                 });
 
@@ -1868,7 +1885,15 @@ namespace NoCTF.Infrastructure.Migrations
                         .IsRequired()
                         .HasConstraintName("fk_teams_competitions_competition_id");
 
+                    b.HasOne("NoCTF.Domain.Storage.StoredFile", "WriteUpFile")
+                        .WithMany()
+                        .HasForeignKey("WriteUpFileId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_teams_files_write_up_file_id");
+
                     b.Navigation("AvatarFile");
+
+                    b.Navigation("WriteUpFile");
                 });
 
             modelBuilder.Entity("NoCTF.Domain.Challenges.Challenge", b =>

@@ -1,6 +1,6 @@
 import { markRaw } from 'vue'
 
-import { LayoutDashboard, MessageCircleQuestion, Puzzle, Trophy, UserRound } from '@lucide/vue'
+import { ClipboardCheck, FileText, LayoutDashboard, MessageCircleQuestion, Puzzle, Trophy, UserRound } from '@lucide/vue'
 import { getCompetitionEndpoint, getLeaderboardEndpoint, getMyTeamEndpoint } from '../../../api'
 import type { NoCtfapiEndpointsCompetitionsCompetitionResponse, NoCtfapiEndpointsCompetitionsScoreboardTeamResponse, NoCtfapiEndpointsTeamsTeamResponse } from '../../../api'
 import { competitionWorkspaceNavigationKey } from '../../app/workspace-nav'
@@ -180,8 +180,19 @@ export function useCompetitionsByIdPage() {
         label: translate("ui.mine"),
         items: [
           { to: `${base}/my/team`, label: translate("ui.myTeam"), icon: UserRound },
+          ...(hasParticipantChallengeAccess.value
+            ? [{ to: `${base}/my/writeup`, label: translate("writeUp.myWriteUp"), icon: FileText }]
+            : []),
         ],
       },
+      ...(hasCompetitionStaffAccess.value
+        ? [{
+            label: translate("ui.management"),
+            items: [
+              { to: `${base}/writeups`, label: translate("writeUp.review"), icon: ClipboardCheck },
+            ],
+          }]
+        : []),
     ]
   })
 

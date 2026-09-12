@@ -13,6 +13,10 @@ public sealed class Team
     public string Name { get; set; } = string.Empty;
     public Guid? AvatarFileId { get; set; }
     public NoCTF.Domain.Storage.StoredFile? AvatarFile { get; set; }
+    public Guid? WriteUpFileId { get; set; }
+    public NoCTF.Domain.Storage.StoredFile? WriteUpFile { get; set; }
+    public Guid? WriteUpSubmittedByUserId { get; set; }
+    public DateTimeOffset? WriteUpSubmittedAt { get; set; }
     public Guid CaptainId { get; set; }
     public Guid[] MemberIds { get; set; } = [];
     [StringLength(32, MinimumLength = 32)]

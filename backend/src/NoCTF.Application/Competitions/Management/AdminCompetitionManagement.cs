@@ -31,6 +31,7 @@ public enum CompetitionHardDeleteReferenceKind
     PatchUpload,
     Notification,
     PosterFile,
+    TeamWriteUp,
     ActiveRuntimeResource,
     NotificationScopeConflict
 }

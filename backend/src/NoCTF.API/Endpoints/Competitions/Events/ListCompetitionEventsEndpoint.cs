@@ -42,7 +42,7 @@ public enum CompetitionEventKindProtocol
     TrackConfigurationUpdated, TeamTrackChanged, TrackRegistrationPolicyUpdated,
     AwdpBreakAttempted, AwdpFixAttempted,
     AwdpBreakResolved, AwdpFixResolved, GameplayFactPatchDownloaded,
-    CompetitionAudienceChanged
+    CompetitionAudienceChanged, TeamWriteUpSubmitted
 }
 
 [JsonConverter(typeof(StrictPascalCaseEnumConverter<CompetitionEventLevelProtocol>))]

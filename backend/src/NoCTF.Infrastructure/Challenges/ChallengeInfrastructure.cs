@@ -72,6 +72,7 @@ internal static class ChallengeInfrastructure
         services.AddScoped<ICompetitionQuestionReader, CompetitionQuestionQueryReader>();
         services.AddScoped<ICompetitionQuestionWriter, CompetitionQuestionTransactionWriter>();
         services.AddScoped<CreateCompetitionQuestion>();
+        services.AddScoped<CreateTeamWriteUpConsultation>();
         services.AddScoped<ListCompetitionQuestions>();
         services.AddScoped<GetCompetitionQuestion>();
         services.AddScoped<AddCompetitionQuestionMessage>();

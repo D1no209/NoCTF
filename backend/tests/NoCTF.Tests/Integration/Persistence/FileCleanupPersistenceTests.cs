@@ -188,7 +188,8 @@ public sealed class FileCleanupPersistenceTests
                         Id = teamId, CompetitionId = competitionId, Name = "Soft-deleted team", CaptainId = userId,
                         MemberIds = [userId], InvitationToken = Guid.NewGuid().ToString("N"),
                         RegisteredAt = now, RegistrationStatus = TeamRegistrationStatus.Approved,
-                        DeletedAt = now, AvatarFileId = fileId
+                        DeletedAt = now, AvatarFileId = fileId, WriteUpFileId = fileId,
+                        WriteUpSubmittedByUserId = userId, WriteUpSubmittedAt = now
                     });
                     await db.SaveChangesAsync(cancellationToken);
                 }
@@ -202,6 +203,14 @@ public sealed class FileCleanupPersistenceTests
                 await using (var db = new NoCtfDbContext(options))
                     await db.Teams.IgnoreQueryFilters().Where(x => x.Id == teamId)
                         .ExecuteUpdateAsync(s => s.SetProperty(x => x.AvatarFileId, (Guid?)null), cancellationToken);
+                await HandleCleanupAsync(options, storage, fileId, cancellationToken);
+                await AssertFileExistsAsync(options, storage, fileId, objectKey, cancellationToken);
+                await using (var db = new NoCtfDbContext(options))
+                    await db.Teams.IgnoreQueryFilters().Where(x => x.Id == teamId)
+                        .ExecuteUpdateAsync(s => s
+                            .SetProperty(x => x.WriteUpFileId, (Guid?)null)
+                            .SetProperty(x => x.WriteUpSubmittedByUserId, (Guid?)null)
+                            .SetProperty(x => x.WriteUpSubmittedAt, (DateTimeOffset?)null), cancellationToken);
                 Func<Task> failedCleanup = () =>
                     HandleCleanupAsync(options, failOnce, fileId, cancellationToken);
                 await Assert.That(failedCleanup).Throws<IOException>();

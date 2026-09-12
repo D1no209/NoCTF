@@ -128,6 +128,49 @@ describe('isolated Mock API', () => {
     expect((await send(`${path}/messages`, 'POST', { body: 'closed' })).status).toBe(403)
   })
 
+  test('WriteUp review previews PDFs adjusts challenge scores and opens consultations', async () => {
+    const admin = await setup()
+    const reviewPath = `${competition}/writeups`
+    const initial = await (await admin.send(reviewPath)).json()
+    expect(initial.items.length).toBeGreaterThan(0)
+    const selected = initial.items[0]
+    const content = await admin.send(
+      `${competition}/teams/${selected.writeUp.teamId}/writeup/content`,
+    )
+    expect(content.status).toBe(200)
+    expect(content.headers.get('content-type')).toContain('application/pdf')
+    expect(new TextDecoder('ascii').decode(
+      new Uint8Array(await content.arrayBuffer()).slice(0, 5),
+    )).toBe('%PDF-')
+
+    const score = selected.challengeScores.find((item: Data) => item.netPoints > 0)
+      ?? selected.challengeScores[0]
+    const adjusted = await admin.send(
+      `/api/v1/admin/competitions/${id(2)}/gameplay-facts/manual-adjustments`,
+      'POST',
+      {
+        teamId: selected.writeUp.teamId,
+        competitionChallengeId: score.competitionChallengeId,
+        delta: -Math.max(1, score.netPoints),
+      },
+    )
+    expect(adjusted.status).toBe(202)
+
+    const consulted = await admin.send(
+      `${competition}/teams/${selected.writeUp.teamId}/writeup/consultations`,
+      'POST',
+      {
+        competitionChallengeId: score.competitionChallengeId,
+        title: 'WriteUp review',
+        body: 'Please clarify the evidence for this challenge.',
+      },
+    )
+    expect(consulted.status).toBe(201)
+    const thread = await consulted.json()
+    expect(thread.teamId).toBe(selected.writeUp.teamId)
+    expect(thread.status).toBe('Replied')
+  })
+
   test('question Mock respects participant limits and denies closing', async () => {
     const { send } = await setup('player')
     const path = `${competition}/questions/${id(9)}`

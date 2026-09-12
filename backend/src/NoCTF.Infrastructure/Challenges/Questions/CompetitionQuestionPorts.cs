@@ -26,6 +26,11 @@ internal sealed class CompetitionQuestionTransactionWriter(CompetitionQuestionSt
         CancellationToken cancellationToken) =>
         store.CreateAsync(command, cancellationToken);
 
+    public Task<CompetitionQuestionMutationResult> CreateWriteUpConsultationAsync(
+        CreateTeamWriteUpConsultationCommand command,
+        CancellationToken cancellationToken) =>
+        store.CreateWriteUpConsultationAsync(command, cancellationToken);
+
     public Task<CompetitionQuestionMutationResult> AddMessageAsync(
         AddCompetitionQuestionMessageCommand command,
         CancellationToken cancellationToken) =>

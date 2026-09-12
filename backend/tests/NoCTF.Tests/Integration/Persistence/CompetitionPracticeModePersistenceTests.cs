@@ -68,6 +68,9 @@ public sealed class CompetitionPracticeModePersistenceTests
             await db.Database.ExecuteSqlRawAsync(
                 "ALTER TABLE competitions ADD COLUMN access_mode smallint NOT NULL DEFAULT 0",
                 cancellationToken);
+            await db.Database.ExecuteSqlRawAsync(
+                "ALTER TABLE teams ADD COLUMN write_up_file_id uuid NULL, ADD COLUMN write_up_submitted_at timestamp with time zone NULL, ADD COLUMN write_up_submitted_by_user_id uuid NULL",
+                cancellationToken);
             var now = DateTimeOffset.UtcNow;
             var user = User(Guid.CreateVersion7(now), "migration-team-owner", now);
             var competition = Competition(
@@ -89,6 +92,9 @@ public sealed class CompetitionPracticeModePersistenceTests
                 cancellationToken);
             await db.Database.ExecuteSqlRawAsync(
                 "ALTER TABLE competitions DROP COLUMN access_mode",
+                cancellationToken);
+            await db.Database.ExecuteSqlRawAsync(
+                "ALTER TABLE teams DROP COLUMN write_up_file_id, DROP COLUMN write_up_submitted_at, DROP COLUMN write_up_submitted_by_user_id",
                 cancellationToken);
             db.ChangeTracker.Clear();
 
