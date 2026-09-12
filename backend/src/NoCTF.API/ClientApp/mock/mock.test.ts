@@ -128,6 +128,42 @@ describe('isolated Mock API', () => {
     expect((await send(`${path}/messages`, 'POST', { body: 'closed' })).status).toBe(403)
   })
 
+  test('optional WriteUps remain open to teams and staff during the competition', async () => {
+    const { api, accessToken } = await setup('player')
+    const currentCompetition = api.state.competitions.find(item => item.id === id(2))!
+    currentCompetition.writeUpSubmissionRequired = false
+    const form = new FormData()
+    form.set('file', new File(
+      ['%PDF-1.7\noptional submission\n%%EOF'],
+      'optional-writeup.pdf',
+      { type: 'application/pdf' },
+    ))
+
+    const submitted = await api.handle(new Request(
+      base + `${competition}/teams/me/writeup`,
+      {
+        method: 'PUT',
+        headers: { Authorization: `Bearer ${accessToken}` },
+        body: form,
+      },
+    ))
+    expect(submitted.status).toBe(200)
+
+    const login = await api.handle(new Request(base + '/api/v1/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ login: 'admin', password: 'Mock123!' }),
+    }))
+    const { accessToken: staffToken } = await login.json()
+    const review = await api.handle(new Request(base + `${competition}/writeups`, {
+      headers: { Authorization: `Bearer ${staffToken}` },
+    }))
+    const payload = await review.json()
+    expect(review.status).toBe(200)
+    expect(payload.items.some((item: Data) =>
+      item.writeUp.fileName === 'optional-writeup.pdf')).toBe(true)
+  })
+
   test('WriteUp review previews PDFs adjusts challenge scores and opens consultations', async () => {
     const admin = await setup()
     const reviewPath = `${competition}/writeups`

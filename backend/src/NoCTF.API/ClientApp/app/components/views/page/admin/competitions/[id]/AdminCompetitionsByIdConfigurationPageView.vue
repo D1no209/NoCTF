@@ -44,7 +44,7 @@ const { competition, canWrite, title, description, startTime, endTime, teamRegis
                 <FieldDescription>{{ $t('writeUp.requireSubmissionDescription') }}</FieldDescription>
               </div>
             </Field>
-            <Field v-if="writeUpSubmissionRequired">
+            <Field>
               <FieldLabel for="c-writeup-deadline-hours">{{ $t('writeUp.deadlineHours') }}</FieldLabel>
               <NumberInput
                 id="c-writeup-deadline-hours"

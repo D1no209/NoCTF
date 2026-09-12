@@ -113,13 +113,9 @@ describe('api error localization', () => {
     }).message).toBe('测试邮件将发送到当前登录管理员的邮箱地址;未启用邮件发送时不可用。')
   })
 
-  test('localizes WriteUp submission policy conflicts', () => {
+  test('localizes the WriteUp submission deadline conflict', () => {
     setLocale('zh-CN')
 
-    expect(parseApiError({
-      status: 409,
-      code: 'WriteUpSubmissionNotRequired',
-    }).message).toBe('本竞赛未要求提交题解。')
     expect(parseApiError({
       status: 409,
       code: 'WriteUpSubmissionDeadlinePassed',

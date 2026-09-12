@@ -33,7 +33,7 @@ const { Download, Eye, FileText, maximumWriteUpBytes, competitionId, submissionR
           <Alert v-if="!submissionRequired">
             <AlertDescription>{{ $t('writeUp.notRequiredForCompetition') }}</AlertDescription>
           </Alert>
-          <Alert v-else-if="submissionClosed" variant="destructive">
+          <Alert v-if="submissionClosed" variant="destructive">
             <AlertDescription>
               {{ $t('writeUp.deadlinePassed', { deadline: formatDateTime(submissionDeadlineAt) }) }}
             </AlertDescription>
@@ -43,7 +43,7 @@ const { Download, Eye, FileText, maximumWriteUpBytes, competitionId, submissionR
               {{ $t('writeUp.deadlineOpen', { deadline: formatDateTime(submissionDeadlineAt) }) }}
             </AlertDescription>
           </Alert>
-          <UiForm v-if="submissionRequired && !submissionClosed" validation="feature" class="flex flex-col gap-3" @submit.prevent="submit">
+          <UiForm v-if="!submissionClosed" validation="feature" class="flex flex-col gap-3" @submit.prevent="submit">
             <Field>
               <FieldLabel for="team-writeup-file">{{ writeUp ? $t('writeUp.replacePdf') : $t('writeUp.selectPdf') }}</FieldLabel>
               <FileUpload

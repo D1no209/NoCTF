@@ -38,13 +38,11 @@ public enum TeamWriteUpSubmissionState : short
     NotFound,
     Forbidden,
     InvalidPdf,
-    SubmissionNotRequired,
     SubmissionDeadlinePassed
 }
 
 public sealed record TeamWriteUpSubmissionContext(
     Guid TeamId,
-    bool SubmissionRequired,
     DateTimeOffset CompetitionEndAt,
     int DeadlineHours);
 
@@ -144,10 +142,7 @@ public sealed class ManageTeamWriteUps(
             cancellationToken);
         if (submission is null)
             return new(TeamWriteUpSubmissionState.Forbidden);
-        if (!submission.SubmissionRequired)
-            return new(TeamWriteUpSubmissionState.SubmissionNotRequired);
         if (!CompetitionWriteUpPolicy.CanSubmit(
-                submission.SubmissionRequired,
                 submission.CompetitionEndAt,
                 submission.DeadlineHours,
                 submittedAt))

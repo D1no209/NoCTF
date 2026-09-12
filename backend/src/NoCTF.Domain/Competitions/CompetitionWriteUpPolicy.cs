@@ -19,11 +19,9 @@ public static class CompetitionWriteUpPolicy
     }
 
     public static bool CanSubmit(
-        bool submissionRequired,
         DateTimeOffset competitionEndAt,
         int deadlineHours,
         DateTimeOffset now) =>
-        submissionRequired
-        && IsDeadlineHoursValid(deadlineHours)
+        IsDeadlineHoursValid(deadlineHours)
         && now <= DeadlineAt(competitionEndAt, deadlineHours);
 }

@@ -290,7 +290,7 @@ export type NoCtfapiEndpointsTeamsWriteUpsTeamWriteUpFailureResponse = {
     detail?: string;
 };
 
-export type NoCtfapiEndpointsTeamsWriteUpsTeamWriteUpFailureCode = 'InvalidPdf' | 'UploadTooLarge' | 'WriteUpSubmissionNotRequired' | 'WriteUpSubmissionDeadlinePassed';
+export type NoCtfapiEndpointsTeamsWriteUpsTeamWriteUpFailureCode = 'InvalidPdf' | 'UploadTooLarge' | 'WriteUpSubmissionDeadlinePassed';
 
 export type NoCtfapiEndpointsTeamsWriteUpsUploadMyTeamWriteUpRequest = {
     file: Blob | File;

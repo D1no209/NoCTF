@@ -104,20 +104,14 @@ public sealed class TeamWriteUpEndpointTests
     }
 
     [Test]
-    [Arguments(false, 1, TeamWriteUpFailureCode.WriteUpSubmissionNotRequired)]
-    [Arguments(true, -1, TeamWriteUpFailureCode.WriteUpSubmissionDeadlinePassed)]
-    public async Task Team_member_upload_rejects_disabled_or_expired_submission_windows(
-        bool submissionRequired,
-        int competitionEndOffsetHours,
-        TeamWriteUpFailureCode expectedCode)
+    public async Task Team_member_upload_rejects_an_expired_submission_window()
     {
         await using var app = await CreateApplicationAsync(
             canObserve: true,
             canJudge: true,
             submissionContext: new TeamWriteUpSubmissionContext(
                 TeamId,
-                submissionRequired,
-                DateTimeOffset.UtcNow.AddHours(competitionEndOffsetHours),
+                DateTimeOffset.UtcNow.AddHours(-1),
                 0));
         using var client = app.GetTestClient();
         using var content = new MultipartFormDataContent();
@@ -131,7 +125,8 @@ public sealed class TeamWriteUpEndpointTests
         var failure = await response.Content.ReadFromJsonAsync<TeamWriteUpFailureResponse>();
 
         await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.Conflict);
-        await Assert.That(failure!.Code).IsEqualTo(expectedCode);
+        await Assert.That(failure!.Code)
+            .IsEqualTo(TeamWriteUpFailureCode.WriteUpSubmissionDeadlinePassed);
     }
 
     private static async Task<WebApplication> CreateApplicationAsync(
@@ -159,7 +154,6 @@ public sealed class TeamWriteUpEndpointTests
         store.FindSubmissionContextAsync(CompetitionId, ActorId, Arg.Any<CancellationToken>())
             .Returns(submissionContext ?? new TeamWriteUpSubmissionContext(
                 TeamId,
-                true,
                 DateTimeOffset.UtcNow.AddDays(1),
                 24));
         store.ReplaceAsync(

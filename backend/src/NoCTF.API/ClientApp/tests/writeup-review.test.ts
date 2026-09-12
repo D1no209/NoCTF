@@ -53,7 +53,7 @@ test('WriteUp reviewers can start a team consultation and continue in the existi
   expect(controller).toContain('query: { question: data.threadRootId }')
 })
 
-test('competition configuration controls the WriteUp deadline and overdue submissions', async () => {
+test('competition configuration separates required WriteUps from submission availability', async () => {
   const configuration = await sourceFile(
     '../app/features/routes/admin/competitions/[id]/useAdminCompetitionsByIdConfigurationPage.ts',
   ).text()
@@ -73,7 +73,10 @@ test('competition configuration controls the WriteUp deadline and overdue submis
   expect(configuration).toContain('writeUpSubmissionDeadlineHours: writeUpSubmissionDeadlineHours.value')
   expect(configurationView).toContain('id="c-writeup-required"')
   expect(configurationView).toContain('id="c-writeup-deadline-hours"')
+  expect(configurationView).not.toContain('<Field v-if="writeUpSubmissionRequired">')
   expect(participant).toContain('submissionClosed')
-  expect(participantView).toContain('v-if="submissionRequired && !submissionClosed"')
-  expect(navigation).toContain("competition.value?.writeUpSubmissionRequired === true")
+  expect(participant).not.toContain('!submissionRequired.value || submissionClosed.value')
+  expect(participantView).toContain('v-if="!submissionClosed"')
+  expect(participantView).toContain("$t('writeUp.notRequiredForCompetition')")
+  expect(navigation).not.toContain('writeUpSubmissionRequired')
 })
