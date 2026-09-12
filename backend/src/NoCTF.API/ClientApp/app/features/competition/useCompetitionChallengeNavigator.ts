@@ -16,6 +16,7 @@ interface ChallengeBloodMark {
   rank: BloodRank
   teamId: string
   teamName: string | null
+  earnedByMyTeam: boolean
 }
 
 interface ChallengeProgress {
@@ -125,6 +126,7 @@ emit: { (event: "ready", ...args: [challengeId: string | null]): void; (event: "
               rank: bloodRank,
               teamId: team.teamId,
               teamName: team.teamName?.trim() || null,
+              earnedByMyTeam: team.teamId === myTeamId.value,
             })
           }
           if (team.teamId === myTeamId.value && !current.bloodRank) {

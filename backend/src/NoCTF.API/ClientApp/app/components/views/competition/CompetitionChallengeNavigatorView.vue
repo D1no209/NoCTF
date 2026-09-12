@@ -52,7 +52,7 @@ const { ShieldCheck, Swords, Users, directionGlyph, isAwdp, loading, error, data
               <span v-if="bloodsFor(item.challenge.id).length || currentScore(item.challenge.id) !== null" class="relative z-10 mt-auto flex items-end justify-between gap-3 pt-3">
                 <span class="flex min-w-0 flex-wrap items-center gap-1.5">
                   <Hint v-for="blood in bloodsFor(item.challenge.id)" :key="blood.rank" :content="bloodTooltip(blood)">
-                    <BloodMark :rank="blood.rank" :label="bloodTooltip(blood)" />
+                    <BloodMark :rank="blood.rank" :label="bloodTooltip(blood)" :highlighted="blood.earnedByMyTeam" />
                   </Hint>
                 </span>
                 <span v-if="currentScore(item.challenge.id) !== null" class="shrink-0 text-right font-sans text-xl leading-none font-bold italic tabular-nums text-primary whitespace-nowrap">
