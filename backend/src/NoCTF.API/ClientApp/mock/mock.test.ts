@@ -216,6 +216,15 @@ describe('isolated Mock API', () => {
       },
     )
     expect(adjusted.status).toBe(202)
+    const refreshed = await (await admin.send(reviewPath)).json()
+    const adjustedTeam = refreshed.items.find((item: Data) =>
+      item.writeUp.teamId === selected.writeUp.teamId)
+    const adjustedChallenge = adjustedTeam.challengeScores.find((item: Data) =>
+      item.competitionChallengeId === score.competitionChallengeId)
+    expect(adjustedChallenge.netPoints).toBe(0)
+    expect(adjustedTeam.adjustedTotalScore)
+      .toBe(selected.adjustedTotalScore - score.netPoints)
+    expect(adjustedTeam.originalTotalScore).toBe(selected.originalTotalScore)
 
     const consulted = await admin.send(
       `${competition}/teams/${selected.writeUp.teamId}/writeup/consultations`,

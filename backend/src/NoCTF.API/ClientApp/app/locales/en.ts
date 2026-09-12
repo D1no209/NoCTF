@@ -2998,6 +2998,8 @@ export const englishMessages = {
   ,"writeUp.invalidAdjustment": "The adjustment must be a valid non-zero 32-bit integer."
   ,"writeUp.applyAdjustment": "Apply adjustment"
   ,"writeUp.adjustmentAccepted": "Adjustment accepted; authoritative scores will refresh automatically"
+  ,"writeUp.adjustmentApplied": "Adjustment applied"
+  ,"writeUp.adjustmentRefreshTimedOut": "The adjustment was accepted, but the authoritative score refresh timed out. Refresh manually to confirm it."
   ,"writeUp.adjustmentFailed": "Failed to adjust the score"
   ,"writeUp.quickConsultation": "Quick consultation"
   ,"writeUp.observerReadOnly": "You can review WriteUps and scores, but this role cannot adjust scores or start consultations."

@@ -105,10 +105,50 @@ export function useCompetitionsByIdWriteUpsPage() {
     }
   }
 
+  const refreshLatest = createTrailingRefresh(load)
   const selectedChallengeId = ref('')
   const adjustmentDelta = ref(0)
-  const adjustmentPending = ref(false)
+  const adjustmentRequestPending = ref(false)
   const adjustmentError = ref<string | null>(null)
+  const pendingAdjustment = ref<{
+    teamId: string
+    competitionChallengeId: string
+    expectedNetPoints: number
+  } | null>(null)
+
+  async function observeAdjustment(): Promise<boolean> {
+    const expectation = pendingAdjustment.value
+    if (!expectation) return true
+    await refreshLatest()
+    const item = review.value?.items?.find(candidate =>
+      candidate.writeUp?.teamId === expectation.teamId)
+    const score = item?.challengeScores?.find(candidate =>
+      candidate.competitionChallengeId === expectation.competitionChallengeId)
+    if (score?.netPoints !== expectation.expectedNetPoints) return false
+    pendingAdjustment.value = null
+    toast.success(translate('writeUp.adjustmentApplied'))
+    return true
+  }
+
+  const {
+    polling: adjustmentProjectionPending,
+    timedOut: adjustmentRefreshTimedOut,
+    start: startAdjustmentRefresh,
+  } = usePolling(observeAdjustment, {
+    interval: 500,
+    maxInterval: 2_000,
+    timeout: 30_000,
+  })
+  const adjustmentPending = computed(() =>
+    adjustmentRequestPending.value || adjustmentProjectionPending.value,
+  )
+
+  watch(adjustmentRefreshTimedOut, timedOut => {
+    if (!timedOut) return
+    pendingAdjustment.value = null
+    adjustmentError.value = translate('writeUp.adjustmentRefreshTimedOut')
+    toast.error(adjustmentError.value)
+  })
 
   watch(selected, item => {
     const available = item?.challengeScores?.some(score =>
@@ -119,18 +159,25 @@ export function useCompetitionsByIdWriteUpsPage() {
     adjustmentError.value = null
   }, { immediate: true })
 
-  async function adjustScore(delta: number) {
+  async function adjustScore(delta: number): Promise<boolean> {
     const writeUp = selected.value?.writeUp
-    if (!canJudge.value || !writeUp?.teamId || !selectedChallengeId.value || delta === 0)
-      return
+    if (!canJudge.value || !writeUp?.teamId || !selectedChallengeId.value
+      || delta === 0 || adjustmentPending.value)
+      return false
     if (!Number.isInteger(delta) || delta < -2147483648 || delta > 2147483647) {
       adjustmentError.value = translate('writeUp.invalidAdjustment')
-      return
+      return false
     }
-    adjustmentPending.value = true
+    const score = selected.value?.challengeScores?.find(candidate =>
+      candidate.competitionChallengeId === selectedChallengeId.value)
+    if (score?.netPoints === null || score?.netPoints === undefined) {
+      adjustmentError.value = translate('writeUp.invalidAdjustment')
+      return false
+    }
+    adjustmentRequestPending.value = true
     adjustmentError.value = null
     try {
-      const { error } = await adminCreateManualAdjustment({
+      const { data, error } = await adminCreateManualAdjustment({
         path: { competitionId },
         body: {
           teamId: writeUp.teamId,
@@ -138,16 +185,24 @@ export function useCompetitionsByIdWriteUpsPage() {
           delta,
         },
       })
-      if (error) throw error
+      if (error || !data?.gameplayFactId) throw error
       adjustmentDelta.value = 0
+      pendingAdjustment.value = {
+        teamId: writeUp.teamId,
+        competitionChallengeId: selectedChallengeId.value,
+        expectedNetPoints: score.netPoints + delta,
+      }
+      startAdjustmentRefresh()
       toast.success(translate('writeUp.adjustmentAccepted'))
+      return true
     }
     catch (error) {
       adjustmentError.value = parseApiError(error, translate('writeUp.adjustmentFailed')).message
       toast.error(adjustmentError.value)
+      return false
     }
     finally {
-      adjustmentPending.value = false
+      adjustmentRequestPending.value = false
     }
   }
 
@@ -168,6 +223,7 @@ export function useCompetitionsByIdWriteUpsPage() {
   function openDeduction(score: ChallengeScore) {
     if (!canJudge.value || !score.competitionChallengeId || (score.netPoints ?? 0) <= 0)
       return
+    adjustmentError.value = null
     selectedChallengeId.value = score.competitionChallengeId
     deduction.value = score
   }
@@ -179,8 +235,7 @@ export function useCompetitionsByIdWriteUpsPage() {
   async function confirmDeduction() {
     const points = deduction.value?.netPoints ?? 0
     if (points <= 0 || points > 2147483647) return
-    deduction.value = null
-    await adjustScore(-points)
+    if (await adjustScore(-points)) deduction.value = null
   }
 
   const consultationOpen = ref(false)
@@ -249,7 +304,6 @@ export function useCompetitionsByIdWriteUpsPage() {
     consultationError.value = null
   }
 
-  const refreshLatest = createTrailingRefresh(load)
   let unwatch: (() => void) | undefined
   onMounted(() => {
     void load()
