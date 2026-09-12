@@ -37,7 +37,9 @@ public sealed class UploadMyTeamWriteUpValidator : Validator<UploadMyTeamWriteUp
 public enum TeamWriteUpFailureCode
 {
     InvalidPdf,
-    UploadTooLarge
+    UploadTooLarge,
+    WriteUpSubmissionNotRequired,
+    WriteUpSubmissionDeadlinePassed
 }
 
 public sealed record TeamWriteUpFailureResponse(
@@ -50,6 +52,7 @@ public sealed class UploadMyTeamWriteUpEndpoint(
     TimeProvider timeProvider)
     : Endpoint<UploadMyTeamWriteUpRequest,
         Results<Ok<TeamWriteUpResponse>, NotFound, ForbidHttpResult,
+            Conflict<TeamWriteUpFailureResponse>,
             UnprocessableEntity<TeamWriteUpFailureResponse>, ProblemHttpResult>>
 {
     public override void Configure()
@@ -68,12 +71,13 @@ public sealed class UploadMyTeamWriteUpEndpoint(
         Summary(summary =>
         {
             summary.Summary = "Submits or replaces the current team's PDF WriteUp.";
-            summary.Description = "Any active member of an approved, non-banned team may replace its current WriteUp. The previous immutable File is cleaned up asynchronously.";
+            summary.Description = "When the competition requires WriteUps, any active member of an approved, non-banned team may submit or replace its PDF through the configured deadline. The previous immutable File is cleaned up asynchronously.";
         });
     }
 
     public override async Task<Results<Ok<TeamWriteUpResponse>, NotFound,
-        ForbidHttpResult, UnprocessableEntity<TeamWriteUpFailureResponse>,
+        ForbidHttpResult, Conflict<TeamWriteUpFailureResponse>,
+        UnprocessableEntity<TeamWriteUpFailureResponse>,
         ProblemHttpResult>> ExecuteAsync(
         UploadMyTeamWriteUpRequest request,
         CancellationToken cancellationToken)
@@ -106,6 +110,14 @@ public sealed class UploadMyTeamWriteUpEndpoint(
                 TeamWriteUpProtocol.ToResponse(result.WriteUp!)),
             TeamWriteUpSubmissionState.NotFound => TypedResults.NotFound(),
             TeamWriteUpSubmissionState.Forbidden => TypedResults.Forbid(),
+            TeamWriteUpSubmissionState.SubmissionNotRequired => TypedResults.Conflict(
+                new TeamWriteUpFailureResponse(
+                    TeamWriteUpFailureCode.WriteUpSubmissionNotRequired,
+                    "This competition does not require WriteUp submission.")),
+            TeamWriteUpSubmissionState.SubmissionDeadlinePassed => TypedResults.Conflict(
+                new TeamWriteUpFailureResponse(
+                    TeamWriteUpFailureCode.WriteUpSubmissionDeadlinePassed,
+                    "The WriteUp submission deadline has passed.")),
             TeamWriteUpSubmissionState.InvalidPdf => TypedResults.UnprocessableEntity(
                 new TeamWriteUpFailureResponse(
                     TeamWriteUpFailureCode.InvalidPdf,

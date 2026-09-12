@@ -103,7 +103,10 @@ Team Avatar 与 Competition Poster 都通过不可变 File 引用上传；上传
 邀请加入使用队伍当前的 32 位 InvitationToken；队长、Owner 与 Manager 可读取当前值并轮换，普通成员与外部用户不可读取。比赛运行中仅在 `AllowTeamRegistrationWhileRunning` 开启时允许加入。
 加入失败返回强类型 `TeamMembershipFailureCodeProtocol`，前端不得将阶段锁定、队伍已满或无效邀请码表现为无响应。
 
-WriteUp 是队伍当前的一份 PDF；任一已审核且未封禁队伍成员可提交或替换，服务端同时校验扩展名、MIME、
+WriteUp 是队伍当前的一份 PDF。比赛配置以 `WriteUpSubmissionRequired` 开启提交要求，并用
+`WriteUpSubmissionDeadlineHours` 设置从比赛结束时间起计算的截止延后小时数（0 表示比赛结束时立即截止，
+范围 0–8760）。任一已审核且未封禁队伍成员可在截止时间前提交或替换；关闭提交要求或超过截止时间后，
+新提交与替换均返回 typed 409，已经提交的 PDF 仍可查看和下载。服务端同时校验扩展名、MIME、
 PDF 文件头和 64 MiB 上限。替换使用新的不可变 File 并异步清理旧对象。Owner、Manager、Judge、Observer
 及平台 Administrator 可在线预览和下载；审核列表同时返回权威排行榜中按题目聚合的当前净得分。
 具备 Judge 权限的调用者可复用 ManualAdjustment 对单题补分或扣分，并可从题解审核创建面向该队伍的私密咨询；

@@ -3,7 +3,7 @@ import { toRefs } from 'vue'
 import type { AdminCompetitionsByIdConfigurationPageViewState } from '~/features/routes/admin/competitions/[id]/useAdminCompetitionsByIdConfigurationPage'
 
 const viewProps = defineProps<{ state: AdminCompetitionsByIdConfigurationPageViewState }>()
-const { competition, canWrite, title, description, startTime, endTime, teamRegistrationAutoApprove, allowTeamRegistrationWhileRunning, maxTeamMembers, maxConcurrentRuntimeInstancesPerTeam, maxActiveQuestionsPerTeam, maxParticipantMessagesBeforeHandlerReply, allowChallengeOwnersToHandleQuestions, practiceModeEnabled, staffOnly, savingMeta, metaError, saveMeta, config, configLoading, savingConfig, saveConfig, CompetitionModeConfigEditor } = toRefs(viewProps.state)
+const { competition, canWrite, title, description, startTime, endTime, teamRegistrationAutoApprove, allowTeamRegistrationWhileRunning, maxTeamMembers, maxConcurrentRuntimeInstancesPerTeam, maxActiveQuestionsPerTeam, maxParticipantMessagesBeforeHandlerReply, allowChallengeOwnersToHandleQuestions, practiceModeEnabled, writeUpSubmissionRequired, writeUpSubmissionDeadlineHours, maximumWriteUpDeadlineHours, staffOnly, savingMeta, metaError, saveMeta, config, configLoading, savingConfig, saveConfig, CompetitionModeConfigEditor } = toRefs(viewProps.state)
 </script>
 
 <template>
@@ -37,6 +37,25 @@ const { competition, canWrite, title, description, startTime, endTime, teamRegis
                 <DateTimePicker id="c-end" v-model="endTime"  :readonly="!canWrite" required />
               </Field>
             </div>
+            <Field orientation="horizontal">
+              <Checkbox id="c-writeup-required" v-model="writeUpSubmissionRequired" :disabled="!canWrite" />
+              <div class="grid gap-1.5 leading-none">
+                <FieldLabel for="c-writeup-required" class="font-normal">{{ $t('writeUp.requireSubmission') }}</FieldLabel>
+                <FieldDescription>{{ $t('writeUp.requireSubmissionDescription') }}</FieldDescription>
+              </div>
+            </Field>
+            <Field v-if="writeUpSubmissionRequired">
+              <FieldLabel for="c-writeup-deadline-hours">{{ $t('writeUp.deadlineHours') }}</FieldLabel>
+              <NumberInput
+                id="c-writeup-deadline-hours"
+                v-model.number="writeUpSubmissionDeadlineHours"
+                min="0"
+                :max="maximumWriteUpDeadlineHours"
+                :readonly="!canWrite"
+                required
+              />
+              <FieldDescription>{{ $t('writeUp.deadlineHoursDescription') }}</FieldDescription>
+            </Field>
             <div class="grid gap-4 sm:grid-cols-2">
               <Field>
                 <FieldLabel for="c-max-members">{{ $t('ui.maximumNumberOfPeoplePerTeam') }}</FieldLabel>

@@ -134,6 +134,35 @@ public class CompetitionManagementTests
     }
 
     [Test]
+    public async Task UpdateCompetition_rejects_WriteUp_deadlines_outside_the_supported_range()
+    {
+        var now = DateTimeOffset.UtcNow;
+        var store = new Store
+        {
+            Last = new(Guid.NewGuid(), "CTF", null, GameMode.Ctf, now,
+                now.AddHours(2), CompetitionStatus.Draft, true, 5, 0, Guid.NewGuid())
+        };
+
+        var result = await new UpdateCompetition(store).ExecuteAsync(new(
+            store.Last.Id,
+            store.Last.Title,
+            store.Last.Description,
+            store.Last.StartTime,
+            store.Last.EndTime,
+            store.Last.TeamRegistrationAutoApprove,
+            store.Last.MaxTeamMembers,
+            store.Last.MaxConcurrentRuntimeInstancesPerTeam,
+            Guid.NewGuid(),
+            now,
+            WriteUpSubmissionRequired: true,
+            WriteUpSubmissionDeadlineHours:
+                CompetitionWriteUpPolicy.MaximumDeadlineHours + 1));
+
+        await Assert.That(result.FailureCode)
+            .IsEqualTo(CompetitionManagementFailureCode.CompetitionConflict);
+    }
+
+    [Test]
     public async Task DeleteCompetition_RejectsActiveCompetition()
     {
         var now = DateTimeOffset.UtcNow;

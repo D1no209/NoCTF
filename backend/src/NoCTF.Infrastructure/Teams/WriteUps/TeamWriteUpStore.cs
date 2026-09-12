@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using NoCTF.Application.Competitions.Events;
 using NoCTF.Application.Messaging;
 using NoCTF.Application.Teams.WriteUps;
+using NoCTF.Domain.Competitions;
 using NoCTF.Domain.Competitions.Events;
 using NoCTF.Domain.Shared;
 using NoCTF.Domain.Teams;
@@ -16,17 +17,27 @@ public sealed class TeamWriteUpStore(
     ICompetitionEventRecorder events,
     FileReferenceLock fileLock) : ITeamWriteUpStore
 {
-    public Task<Guid?> FindEligibleTeamIdAsync(
+    public Task<TeamWriteUpSubmissionContext?> FindSubmissionContextAsync(
         Guid competitionId,
         Guid actorUserId,
-        CancellationToken cancellationToken) =>
-        db.Teams.AsNoTracking()
+        CancellationToken cancellationToken)
+    {
+        return db.Teams.AsNoTracking()
             .Where(team => team.CompetitionId == competitionId
                 && team.MemberIds.Contains(actorUserId)
                 && team.RegistrationStatus == TeamRegistrationStatus.Approved
                 && !team.IsBanned)
-            .Select(team => (Guid?)team.Id)
+            .Join(
+                db.Competitions.AsNoTracking(),
+                team => team.CompetitionId,
+                competition => competition.Id,
+                (team, competition) => new TeamWriteUpSubmissionContext(
+                    team.Id,
+                    competition.WriteUpSubmissionRequired,
+                    competition.EndAt,
+                    competition.WriteUpSubmissionDeadlineHours))
             .SingleOrDefaultAsync(cancellationToken);
+    }
 
     public async Task<TeamWriteUpSubmissionResult> ReplaceAsync(
         Guid competitionId,
@@ -48,6 +59,27 @@ public sealed class TeamWriteUpStore(
             || team.IsBanned)
         {
             return new(TeamWriteUpSubmissionState.Forbidden);
+        }
+        var competition = await db.Competitions.AsNoTracking()
+            .Where(candidate => candidate.Id == competitionId)
+            .Select(candidate => new
+            {
+                candidate.WriteUpSubmissionRequired,
+                candidate.EndAt,
+                candidate.WriteUpSubmissionDeadlineHours
+            })
+            .SingleOrDefaultAsync(cancellationToken);
+        if (competition is null)
+            return new(TeamWriteUpSubmissionState.NotFound);
+        if (!competition.WriteUpSubmissionRequired)
+            return new(TeamWriteUpSubmissionState.SubmissionNotRequired);
+        if (!CompetitionWriteUpPolicy.CanSubmit(
+                competition.WriteUpSubmissionRequired,
+                competition.EndAt,
+                competition.WriteUpSubmissionDeadlineHours,
+                submittedAt))
+        {
+            return new(TeamWriteUpSubmissionState.SubmissionDeadlinePassed);
         }
         if (!await fileLock.AcquireAsync(db, fileId, cancellationToken))
             return new(TeamWriteUpSubmissionState.NotFound);

@@ -51,3 +51,28 @@ test('WriteUp reviewers can start a team consultation and continue in the existi
   expect(controller).toContain("path: `/competitions/${competitionId}/questions`")
   expect(controller).toContain('query: { question: data.threadRootId }')
 })
+
+test('competition configuration controls the WriteUp deadline and overdue submissions', async () => {
+  const configuration = await sourceFile(
+    '../app/features/routes/admin/competitions/[id]/useAdminCompetitionsByIdConfigurationPage.ts',
+  ).text()
+  const configurationView = await sourceFile(
+    '../app/components/views/page/admin/competitions/[id]/AdminCompetitionsByIdConfigurationPageView.vue',
+  ).text()
+  const participant = await sourceFile(
+    '../app/features/routes/competitions/[id]/my/useCompetitionsByIdMyWriteUpPage.ts',
+  ).text()
+  const participantView = await sourceFile(
+    '../app/components/views/page/competitions/[id]/my/CompetitionsByIdMyWriteUpPageView.vue',
+  ).text()
+  const navigation = await sourceFile(
+    '../app/features/routes/competitions/useCompetitionsByIdPage.ts',
+  ).text()
+
+  expect(configuration).toContain('writeUpSubmissionDeadlineHours: writeUpSubmissionDeadlineHours.value')
+  expect(configurationView).toContain('id="c-writeup-required"')
+  expect(configurationView).toContain('id="c-writeup-deadline-hours"')
+  expect(participant).toContain('submissionClosed')
+  expect(participantView).toContain('v-if="submissionRequired && !submissionClosed"')
+  expect(navigation).toContain("competition.value?.writeUpSubmissionRequired === true")
+})

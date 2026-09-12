@@ -45,7 +45,9 @@ public sealed record CompetitionView(
     bool PracticeModeEnabled = false,
     Guid? PosterFileId = null,
     bool TracksEnabled = false,
-    CompetitionAccessMode AccessMode = CompetitionAccessMode.Public);
+    CompetitionAccessMode AccessMode = CompetitionAccessMode.Public,
+    bool WriteUpSubmissionRequired = false,
+    int WriteUpSubmissionDeadlineHours = 0);
 
 public enum CompetitionCreationState
 {
@@ -91,7 +93,9 @@ public sealed record UpdateCompetitionCommand(
     int MaxParticipantMessagesBeforeHandlerReply = 3,
     bool AllowChallengeOwnersToHandleQuestions = true,
     bool PracticeModeEnabled = false,
-    CompetitionAccessMode AccessMode = CompetitionAccessMode.Public);
+    CompetitionAccessMode AccessMode = CompetitionAccessMode.Public,
+    bool WriteUpSubmissionRequired = false,
+    int WriteUpSubmissionDeadlineHours = 0);
 
 public interface ICompetitionManagementStore
 {
@@ -213,6 +217,13 @@ public sealed class UpdateCompetition(ICompetitionManagementStore store)
             return OperationResult<CompetitionView, CompetitionManagementFailureCode>.Failure(
                 CompetitionManagementFailureCode.InvalidTeamSize,
                 "Competition question limits must be greater than zero.");
+        if (!CompetitionWriteUpPolicy.IsDeadlineHoursValid(
+                command.WriteUpSubmissionDeadlineHours))
+        {
+            return OperationResult<CompetitionView, CompetitionManagementFailureCode>.Failure(
+                CompetitionManagementFailureCode.CompetitionConflict,
+                $"WriteUp submission deadline hours must be between 0 and {CompetitionWriteUpPolicy.MaximumDeadlineHours}.");
+        }
         if (command.PracticeModeEnabled && current.Mode != GameMode.Ctf)
             return OperationResult<CompetitionView, CompetitionManagementFailureCode>.Failure(
                 CompetitionManagementFailureCode.CompetitionConflict,

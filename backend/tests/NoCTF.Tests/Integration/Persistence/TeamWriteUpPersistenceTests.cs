@@ -76,6 +76,8 @@ public sealed class TeamWriteUpPersistenceTests
                     FlagDerivationSecret = new byte[32],
                     StartAt = now.AddHours(-2),
                     EndAt = now.AddHours(-1),
+                    WriteUpSubmissionRequired = true,
+                    WriteUpSubmissionDeadlineHours = 24,
                     CreatedAt = now.AddHours(-3),
                     UpdatedAt = now
                 });
@@ -197,6 +199,25 @@ public sealed class TeamWriteUpPersistenceTests
                 await using var staffContent = staffOpened!.Content;
                 await Assert.That(staffOpened.Metadata.FileId)
                     .IsEqualTo(second.WriteUp.FileId);
+
+                var policy = await db.Competitions.SingleAsync(
+                    candidate => candidate.Id == competitionId,
+                    cancellationToken);
+                policy.WriteUpSubmissionDeadlineHours = 0;
+                await db.SaveChangesAsync(cancellationToken);
+                await using var overduePdf = Pdf("overdue");
+                var overdue = await manager.ReplaceMineAsync(
+                    competitionId,
+                    memberId,
+                    "overdue.pdf",
+                    TeamWriteUpRules.ContentType,
+                    overduePdf.Length,
+                    overduePdf,
+                    now.AddMinutes(3),
+                    cancellationToken);
+                await Assert.That(overdue.State)
+                    .IsEqualTo(TeamWriteUpSubmissionState.SubmissionDeadlinePassed);
+                await Assert.That(await db.Files.CountAsync(cancellationToken)).IsEqualTo(1);
 
                 var questions = new CompetitionQuestionStore(
                     db,

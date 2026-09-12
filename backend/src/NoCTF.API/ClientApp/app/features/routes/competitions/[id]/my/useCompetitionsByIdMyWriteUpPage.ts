@@ -1,4 +1,5 @@
 import { markRaw } from 'vue'
+import { useNow } from '@vueuse/core'
 import { Download, Eye, FileText } from '@lucide/vue'
 import { toast } from 'vue-sonner'
 
@@ -13,6 +14,20 @@ const maximumWriteUpBytes = 64 * 1024 * 1024
 export function useCompetitionsByIdMyWriteUpPage() {
   const route = useRoute()
   const competitionId = route.params.id as string
+  const ctx = inject(competitionContextKey)!
+  const now = useNow({ interval: 1000 })
+
+  const submissionRequired = computed(() =>
+    ctx.competition.value?.writeUpSubmissionRequired === true,
+  )
+  const submissionDeadlineAt = computed(() =>
+    ctx.competition.value?.writeUpSubmissionDeadlineAt ?? null,
+  )
+  const submissionClosed = computed(() => {
+    if (!submissionRequired.value || !submissionDeadlineAt.value) return false
+    const deadline = Date.parse(submissionDeadlineAt.value)
+    return Number.isFinite(deadline) && now.value.getTime() > deadline
+  })
 
   const writeUp = ref<NoCtfapiEndpointsTeamsWriteUpsTeamWriteUpResponse | null>(null)
   const selectedFile = ref<File | null>(null)
@@ -76,7 +91,8 @@ export function useCompetitionsByIdMyWriteUpPage() {
   }
 
   async function submit() {
-    if (!selectedFile.value || uploadPending.value) return
+    if (!submissionRequired.value || submissionClosed.value
+      || !selectedFile.value || uploadPending.value) return
     uploadPending.value = true
     uploadError.value = null
     try {
@@ -161,6 +177,9 @@ export function useCompetitionsByIdMyWriteUpPage() {
     FileText,
     maximumWriteUpBytes,
     competitionId,
+    submissionRequired,
+    submissionDeadlineAt,
+    submissionClosed,
     writeUp,
     selectedFile,
     uploadInputKey,

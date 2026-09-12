@@ -3016,5 +3016,15 @@ export const chineseMessages = {
   ,"writeUp.sha256": "SHA-256 校验值"
   ,"writeUp.points": "{score} pts"
   ,"writeUp.reviewMetadata": "由 {user} 提交于 {time}"
+  ,"writeUp.requireSubmission": "要求队伍提交题解"
+  ,"writeUp.requireSubmissionDescription": "开启后显示选手提交与工作人员审核入口；关闭后不接受新提交。"
+  ,"writeUp.deadlineHours": "题解截止延后（小时）"
+  ,"writeUp.deadlineHoursDescription": "从比赛结束时间起计算，0 表示比赛结束时立即截止；逾期后不能提交或替换。"
+  ,"writeUp.invalidDeadlineHours": "请输入 0 到 {maximum} 之间的整数小时数。"
+  ,"writeUp.submissionClosed": "已截止"
+  ,"writeUp.notRequiredForCompetition": "本竞赛未要求提交题解。"
+  ,"writeUp.deadlinePassed": "题解提交已于 {deadline} 截止，未提交的队伍无法补交；已有题解仍可查看和下载。"
+  ,"writeUp.deadlineOpen": "题解提交截止时间：{deadline}。截止前可提交或替换。"
+  ,"writeUp.deadlinePassedShort": "题解提交期限已结束，无法提交或替换。"
 } as const
 export type MessageKey = keyof typeof chineseMessages

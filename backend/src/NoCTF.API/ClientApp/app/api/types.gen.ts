@@ -290,7 +290,7 @@ export type NoCtfapiEndpointsTeamsWriteUpsTeamWriteUpFailureResponse = {
     detail?: string;
 };
 
-export type NoCtfapiEndpointsTeamsWriteUpsTeamWriteUpFailureCode = 'InvalidPdf' | 'UploadTooLarge';
+export type NoCtfapiEndpointsTeamsWriteUpsTeamWriteUpFailureCode = 'InvalidPdf' | 'UploadTooLarge' | 'WriteUpSubmissionNotRequired' | 'WriteUpSubmissionDeadlinePassed';
 
 export type NoCtfapiEndpointsTeamsWriteUpsUploadMyTeamWriteUpRequest = {
     file: Blob | File;
@@ -644,6 +644,9 @@ export type NoCtfapiEndpointsCompetitionsCompetitionResponse = {
     practiceModeEnabled?: boolean;
     tracksEnabled?: boolean;
     accessMode?: NoCtfapiEndpointsCompetitionsCompetitionAccessModeProtocol;
+    writeUpSubmissionRequired?: boolean;
+    writeUpSubmissionDeadlineHours?: number;
+    writeUpSubmissionDeadlineAt?: string | null;
 };
 
 export type NoCtfapiEndpointsCompetitionsGameModeProtocol = 'Ctf' | 'Awd' | 'Awdp' | 'Koh';
@@ -2122,6 +2125,8 @@ export type NoCtfapiEndpointsAdministrationCompetitionsCompetitionMetadataPatchR
     maxParticipantMessagesBeforeHandlerReply: number;
     allowChallengeOwnersToHandleQuestions: boolean;
     practiceModeEnabled: boolean;
+    writeUpSubmissionRequired: boolean;
+    writeUpSubmissionDeadlineHours: number;
     accessMode: NoCtfapiEndpointsCompetitionsCompetitionAccessModeProtocol;
 };
 
@@ -3207,6 +3212,7 @@ export type ReplaceMyTeamWriteUpErrors = {
      * Not Found
      */
     404: unknown;
+    409: NoCtfapiEndpointsTeamsWriteUpsTeamWriteUpFailureResponse;
     413: MicrosoftAspNetCoreMvcProblemDetails;
     422: NoCtfapiEndpointsTeamsWriteUpsTeamWriteUpFailureResponse;
 };

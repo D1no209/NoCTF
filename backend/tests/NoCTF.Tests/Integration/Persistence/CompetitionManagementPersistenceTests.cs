@@ -165,7 +165,9 @@ public sealed class CompetitionManagementPersistenceTests
                     result.MaxConcurrentRuntimeInstancesPerTeam,
                     ownerId,
                     now.AddMinutes(1),
-                    AccessMode: CompetitionAccessMode.StaffOnly),
+                    AccessMode: CompetitionAccessMode.StaffOnly,
+                    WriteUpSubmissionRequired: true,
+                    WriteUpSubmissionDeadlineHours: 72),
                 cancellationToken);
             var refreshed = await store
                 .FindAsync(competitionId, includeDraft: false, cancellationToken);
@@ -183,9 +185,13 @@ public sealed class CompetitionManagementPersistenceTests
             await Assert.That(updated).IsNotNull();
             await Assert.That(updated!.AccessMode)
                 .IsEqualTo(CompetitionAccessMode.StaffOnly);
+            await Assert.That(updated.WriteUpSubmissionRequired).IsTrue();
+            await Assert.That(updated.WriteUpSubmissionDeadlineHours).IsEqualTo(72);
             await Assert.That(refreshed!.Title).IsEqualTo("Renamed competition");
             await Assert.That(refreshed.AccessMode)
                 .IsEqualTo(CompetitionAccessMode.StaffOnly);
+            await Assert.That(refreshed.WriteUpSubmissionRequired).IsTrue();
+            await Assert.That(refreshed.WriteUpSubmissionDeadlineHours).IsEqualTo(72);
             await Assert.That(refreshedList.Single(item => item.Id == competitionId).Title)
                 .IsEqualTo("Renamed competition");
             var updateEvent = await db.CompetitionEvents.AsNoTracking()

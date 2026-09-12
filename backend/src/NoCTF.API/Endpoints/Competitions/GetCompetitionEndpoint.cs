@@ -103,7 +103,10 @@ public sealed record CompetitionResponse(
     bool AllowChallengeOwnersToHandleQuestions = true,
     bool PracticeModeEnabled = false,
     bool TracksEnabled = false,
-    CompetitionAccessModeProtocol AccessMode = CompetitionAccessModeProtocol.Public);
+    CompetitionAccessModeProtocol AccessMode = CompetitionAccessModeProtocol.Public,
+    bool WriteUpSubmissionRequired = false,
+    int WriteUpSubmissionDeadlineHours = 0,
+    DateTimeOffset? WriteUpSubmissionDeadlineAt = null);
 
 internal static class CompetitionMapper
 {
@@ -138,7 +141,14 @@ internal static class CompetitionMapper
             view.AllowChallengeOwnersToHandleQuestions,
             view.PracticeModeEnabled,
             view.TracksEnabled,
-            CompetitionProtocolMapper.ToProtocol(view.AccessMode));
+            CompetitionProtocolMapper.ToProtocol(view.AccessMode),
+            view.WriteUpSubmissionRequired,
+            view.WriteUpSubmissionDeadlineHours,
+            view.WriteUpSubmissionRequired
+                ? CompetitionWriteUpPolicy.DeadlineAt(
+                    view.EndTime,
+                    view.WriteUpSubmissionDeadlineHours)
+                : null);
 
     internal static string PosterUrl(Guid competitionId, Guid posterFileId) =>
         $"/api/v1/competitions/{competitionId}/poster?revision={posterFileId:N}";

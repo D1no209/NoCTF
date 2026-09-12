@@ -181,11 +181,13 @@ export function useCompetitionsByIdPage() {
         items: [
           { to: `${base}/my/team`, label: translate("ui.myTeam"), icon: UserRound },
           ...(hasParticipantChallengeAccess.value
+            && competition.value?.writeUpSubmissionRequired === true
             ? [{ to: `${base}/my/writeup`, label: translate("writeUp.myWriteUp"), icon: FileText }]
             : []),
         ],
       },
       ...(hasCompetitionStaffAccess.value
+        && competition.value?.writeUpSubmissionRequired === true
         ? [{
             label: translate("ui.management"),
             items: [

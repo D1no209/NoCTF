@@ -35,6 +35,8 @@ public sealed class AdminRequestValidatorTests
                 MaxParticipantMessagesBeforeHandlerReply = 3,
                 AllowChallengeOwnersToHandleQuestions = true,
                 PracticeModeEnabled = false,
+                WriteUpSubmissionRequired = false,
+                WriteUpSubmissionDeadlineHours = 0,
                 AccessMode = CompetitionAccessModeProtocol.Public
             }
         };
@@ -54,6 +56,12 @@ public sealed class AdminRequestValidatorTests
         await Assert.That((await new PatchCompetitionValidator()
                 .ValidateAsync(update)).IsValid)
             .IsTrue();
+
+        update.Metadata.WriteUpSubmissionDeadlineHours =
+            NoCTF.Domain.Competitions.CompetitionWriteUpPolicy.MaximumDeadlineHours + 1;
+        await Assert.That((await new PatchCompetitionValidator()
+                .ValidateAsync(update)).IsValid)
+            .IsFalse();
     }
 
     [Test]

@@ -30,6 +30,8 @@ public sealed class Competition
     public bool TeamRegistrationAutoApprove { get; set; } = true;
     public bool AllowTeamRegistrationWhileRunning { get; set; }
     public bool PracticeModeEnabled { get; set; }
+    public bool WriteUpSubmissionRequired { get; set; }
+    public int WriteUpSubmissionDeadlineHours { get; set; }
     public int MaxTeamMembers { get; set; } = 5;
     public int MaxConcurrentRuntimeInstancesPerTeam { get; set; }
     public int MaxActiveQuestionsPerTeam { get; set; } = 5;
