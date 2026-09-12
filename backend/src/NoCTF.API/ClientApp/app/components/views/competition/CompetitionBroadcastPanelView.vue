@@ -38,7 +38,7 @@ const { Megaphone, items, loading, error, refreshLatest, fill } = toRefs(viewPro
       tag="ol"
       name="broadcast"
       class="divide-y overflow-y-auto"
-      :class="fill ? 'min-h-0 flex-1' : 'max-h-[32rem]'"
+      :class="fill ? 'min-h-0 flex-1' : 'max-h-[50dvh]'"
     >
       <li v-for="event in items" :key="competitionBroadcastIdentity(event)">
         <NuxtLink

@@ -8,10 +8,10 @@ const { workspaceNavGroups, selectChallenge, handleReady, CompetitionBroadcastPa
 
 <template>
   <div
-    class="competition-participant-workspace grid min-h-[calc(100svh-12rem)] items-stretch gap-4"
+    class="competition-participant-workspace grid min-h-0 items-stretch gap-4"
     :class="showChallengeNavigator
       ? 'challenge-workspace'
-      : 'xl:grid-cols-[minmax(0,1fr)_19rem]'"
+      : 'xl:grid-cols-[minmax(0,1fr)_clamp(16rem,20vw,21rem)]'"
   >
     <div v-if="showChallengeNavigator" class="min-w-0">
       <component :is="CompetitionChallengeNavigator"
@@ -32,10 +32,10 @@ const { workspaceNavGroups, selectChallenge, handleReady, CompetitionBroadcastPa
     </main>
 
     <aside
-      class="grid h-full min-h-0 grid-cols-2 content-start gap-4"
+      class="grid h-full min-h-0 grid-cols-2 grid-rows-[minmax(0,1fr)] gap-4"
       :class="showChallengeNavigator
-        ? 'min-[1440px]:sticky min-[1440px]:top-20 min-[1440px]:max-h-[calc(100svh-6rem)] min-[1440px]:grid-cols-1 min-[1440px]:grid-rows-[auto_18rem]'
-        : 'xl:sticky xl:top-20 xl:max-h-[calc(100svh-6rem)] xl:grid-cols-1 xl:grid-rows-[auto_18rem]'"
+        ? 'min-[1440px]:grid-cols-1 min-[1440px]:grid-rows-[fit-content(50%)_minmax(0,1fr)]'
+        : 'xl:grid-cols-1 xl:grid-rows-[fit-content(50%)_minmax(0,1fr)]'"
     >
       <component :is="CompetitionWorkspaceNavigation"
         class="h-full min-h-0"

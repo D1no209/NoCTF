@@ -36,11 +36,12 @@ describe('participant competition workspace layout', () => {
 
     expect(shell).toContain('challenge-workspace')
     expect(shell).toContain('v-if="showChallengeNavigator"')
-    expect(shell).toContain("'xl:grid-cols-[minmax(0,1fr)_19rem]'")
+    expect(shell).toContain("'xl:grid-cols-[minmax(0,1fr)_clamp(16rem,20vw,21rem)]'")
     expect(shell).toContain('<slot />')
     expect(shell).toContain("<component :is=\"CompetitionWorkspaceNavigation\"")
     expect(shell).toContain("<component :is=\"CompetitionBroadcastPanel\"")
-    expect(shell).toContain('grid-rows-[auto_18rem]')
+    expect(shell).toContain('grid-rows-[fit-content(50%)_minmax(0,1fr)]')
+    expect(shell).not.toContain('18rem]')
     expect(challenges).toContain('show-challenge-navigator')
     expect(theme).toContain("[data-slot='default-layout-foreground']:has(> main [data-contained-workspace-page])")
     expect(theme).not.toContain("[data-slot='default-layout']:has(> main [data-contained-workspace-page])")
@@ -68,6 +69,13 @@ describe('participant competition workspace layout', () => {
     expect(parent).not.toContain('`${base}/my/submissions`')
     expect(parent).not.toContain("label: translate(\"ui.mySubmissions\")")
     expect(parent).not.toContain('FileCheck')
+  })
+
+  test('keeps consultation inside the competition navigation group', async () => {
+    const parent = await page('../app/pages/competitions/[id].vue')
+
+    expect(parent).not.toContain('label: translate("ui.interaction")')
+    expect(parent).toMatch(/label: translate\("ui\.competitions"\)[\s\S]*ui\.leaderboard[\s\S]*ui\.questions[\s\S]*label: translate\("ui\.mine"\)/)
   })
 
   test('shows the approved participant team rank and points from the live scoreboard snapshot', async () => {

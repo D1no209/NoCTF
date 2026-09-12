@@ -772,7 +772,7 @@ body:has([data-modal-scroll-lock]) {
 }
 .challenge-workspace > aside { grid-column: 2; }
 @media (min-width: 1440px) {
-  .challenge-workspace { grid-template-columns: var(--floating-sidebar-width) minmax(0, 1fr) 17rem; }
+  .challenge-workspace { grid-template-columns: var(--floating-sidebar-width) minmax(0, 1fr) clamp(16rem, 18vw, 21rem); }
   .challenge-workspace > aside { grid-column: auto; }
 }
 [data-slot='type-watermark'] {
@@ -858,10 +858,10 @@ body:has([data-modal-scroll-lock]) {
 .question-participant-workspace > main { min-height: 0; padding: 4px 20px 24px 4px; }
 .question-participant-workspace > aside { min-height: 0; overflow: hidden; }
 @media (max-width: 1279px) {
-  [data-slot='default-layout-foreground']:has(> main [data-contained-workspace-page]) .question-participant-workspace { grid-template-rows: minmax(0, 1fr) 10rem; }
+  [data-slot='default-layout-foreground']:has(> main [data-contained-workspace-page]) .question-participant-workspace { grid-template-rows: minmax(0, 3fr) minmax(0, 1fr); }
 }
 [data-slot='default-layout-foreground']:has(> main [data-contained-workspace-page]) .competition-participant-workspace { flex: 1; min-height: 0; }
-[data-slot='default-layout-foreground']:has(> main [data-contained-workspace-page]) .competition-participant-workspace:not(.question-participant-workspace) { grid-template-rows: minmax(0, 1fr) 12rem; }
+[data-slot='default-layout-foreground']:has(> main [data-contained-workspace-page]) .competition-participant-workspace:not(.question-participant-workspace) { grid-template-rows: minmax(0, 2fr) minmax(0, 1fr); }
 [data-slot='default-layout-foreground']:has(> main [data-contained-workspace-page]) .competition-participant-workspace > main { min-height: 0; overflow: hidden; }
 [data-slot='default-layout-foreground']:has(> main [data-contained-workspace-page]) .competition-participant-workspace > aside { min-height: 0; overflow: hidden; }
 @media (min-width: 1280px) {
@@ -875,7 +875,7 @@ body:has([data-modal-scroll-lock]) {
 [data-slot='message-bubble'][data-own='true'] [data-slot='message-body'] { background: color-mix(in oklch, var(--primary) 14%, var(--card)); }
 [data-slot='default-layout-foreground']:has(> main [data-contained-workspace-page]) .challenge-workspace {
   --floating-sidebar-bottom: 16px;
-  flex: 1; min-height: 0; grid-template-rows: minmax(0, 1fr) 12rem;
+  flex: 1; min-height: 0; grid-template-rows: minmax(0, 2fr) minmax(0, 1fr);
 }
 /* Reserve paint space for the card's shadow; clipping belongs to its inner viewport. */
 [data-slot='default-layout-foreground']:has(> main [data-contained-workspace-page]) .challenge-workspace > main { min-height: 0; overflow: visible; padding: 4px 24px 28px 4px; }
