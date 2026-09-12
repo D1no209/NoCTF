@@ -66,7 +66,8 @@ public enum CompetitionEventKind : short
     AwdpFixResolved,
     GameplayFactPatchDownloaded,
     TrackRegistrationPolicyUpdated,
-    CompetitionAudienceChanged
+    CompetitionAudienceChanged,
+    TeamWriteUpSubmitted
 }
 
 public enum CompetitionEventLevel : short

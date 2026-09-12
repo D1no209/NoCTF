@@ -27,10 +27,12 @@ internal static class CompetitionQuestionViewProjection
         int maximumParticipantMessages)
     {
         var askerId = question.RootNotification.SourceId!.Value;
+        var rootActorRole = question.Root.ActorRole
+            ?? CompetitionQuestionParticipantRole.Participant;
         var lastNode = question.Nodes.LastOrDefault();
         var lastActorId = lastNode?.SourceId ?? askerId;
         var lastActorRole = lastNode is null
-            ? CompetitionQuestionParticipantRole.Participant
+            ? rootActorRole
             : ReadActorRole(lastNode);
         var remainingParticipantMessages = Math.Max(
             0,
@@ -41,7 +43,7 @@ internal static class CompetitionQuestionViewProjection
                 .Prepend(new CompetitionQuestionEntryView(
                     question.RootNotification.Id,
                     CompetitionQuestionEntryKind.Message,
-                    CompetitionQuestionParticipantRole.Participant,
+                    rootActorRole,
                     askerId,
                     names.GetValueOrDefault(askerId, "已删除用户"),
                     question.Root.Body,
@@ -92,8 +94,11 @@ internal static class CompetitionQuestionViewProjection
             .Skip(lastHandlerIndex + 1)
             .Count(message => CompetitionQuestionRules.IsParticipant(message.ActorRole));
 
-        // The root notification is the participant's first message.
-        return lastHandlerIndex < 0 ? participantMessages + 1 : participantMessages;
+        var rootIsParticipant = CompetitionQuestionRules.IsParticipant(
+            question.Root.ActorRole ?? CompetitionQuestionParticipantRole.Participant);
+        return lastHandlerIndex < 0 && rootIsParticipant
+            ? participantMessages + 1
+            : participantMessages;
     }
 
     private static CompetitionQuestionEntryView MapEntry(

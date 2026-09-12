@@ -111,6 +111,29 @@ function mockMonitoringSnapshot(): Data {
   }
 }
 
+function mockWriteUpPdf(teamName: string): Blob {
+  const safeName = teamName.replace(/[()\\]/g, '')
+  const stream = `BT /F1 20 Tf 72 740 Td (NoCTF Mock WriteUp) Tj 0 -32 Td /F1 12 Tf (Team: ${safeName}) Tj 0 -24 Td (Challenge evidence and adjudication notes.) Tj ET`
+  const objects = [
+    '<< /Type /Catalog /Pages 2 0 R >>',
+    '<< /Type /Pages /Kids [3 0 R] /Count 1 >>',
+    '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >>',
+    '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>',
+    `<< /Length ${stream.length} >>\nstream\n${stream}\nendstream`,
+  ]
+  let pdf = '%PDF-1.4\n'
+  const offsets: number[] = [0]
+  for (let index = 0; index < objects.length; index++) {
+    offsets.push(new TextEncoder().encode(pdf).length)
+    pdf += `${index + 1} 0 obj\n${objects[index]}\nendobj\n`
+  }
+  const xrefOffset = new TextEncoder().encode(pdf).length
+  pdf += `xref\n0 ${objects.length + 1}\n0000000000 65535 f \n`
+  pdf += offsets.slice(1).map(offset => `${String(offset).padStart(10, '0')} 00000 n \n`).join('')
+  pdf += `trailer\n<< /Size ${objects.length + 1} /Root 1 0 R >>\nstartxref\n${xrefOffset}\n%%EOF\n`
+  return new Blob([pdf], { type: 'application/pdf' })
+}
+
 export function createMockApi() {
   const state = createFixtures()
   const invitationTokens = new Map(state.teams.map((team, index) => [
@@ -122,6 +145,26 @@ export function createMockApi() {
   const administratorIssuedTokens = new Map<string, Data>()
   const wallpapers = new Map<string, Blob>()
   const competitionPosters = new Map<string, Blob | null>()
+  const teamWriteUps = new Map<string, { metadata: Data; content: Blob }>()
+  const writeUpAdjustments = new Map<string, number>()
+  for (const team of state.teams.filter(team => team.competitionId === state.competitions[0]?.id).slice(0, 3)) {
+    const content = mockWriteUpPdf(team.name)
+    teamWriteUps.set(team.id, {
+      content,
+      metadata: {
+        teamId: team.id,
+        teamName: team.name,
+        fileId: crypto.randomUUID(),
+        fileName: `${team.name}-writeup.pdf`,
+        contentType: 'application/pdf',
+        byteLength: content.size,
+        sha256: team.id.replaceAll('-', '').padEnd(64, '0').slice(0, 64),
+        submittedByUserId: team.captainId,
+        submittedByDisplayName: state.users.find(user => user.userId === team.captainId)?.userName ?? 'Mock Player',
+        submittedAt: date(-0.5),
+      },
+    })
+  }
   const changes = new Set<(competitionId: string) => void>()
   const json = (value: any, status = 200, headers: HeadersInit = {}) => Response.json(value, { status, headers: { 'X-NoCTF-Mock': 'true', 'Cache-Control': 'no-store', ...headers } })
   const problem = (status: number, detail: string) => json({ status, title: 'Mock API', detail }, status)
@@ -242,7 +285,50 @@ export function createMockApi() {
     let changed = false
 
     if (request.method === 'GET') {
-      if (route === '/auth/me/wallpaper') {
+      if (route === '/competitions/{competitionId}/teams/me/writeup') {
+        if (!user) return problem(401, '请先登录演示账号 / Sign in to the Mock site')
+        const writeUp = myTeam ? teamWriteUps.get(myTeam.id) : null
+        return writeUp ? json(writeUp.metadata) : problem(404, '尚未提交题解 / No WriteUp submitted')
+      }
+      if (route === '/competitions/{competitionId}/teams/me/writeup/content') {
+        if (!user) return problem(401, '请先登录演示账号 / Sign in to the Mock site')
+        const writeUp = myTeam ? teamWriteUps.get(myTeam.id) : null
+        return writeUp
+          ? new Response(writeUp.content, { headers: { 'Content-Type': 'application/pdf', 'Content-Disposition': `attachment; filename="${writeUp.metadata.fileName}"`, 'Cache-Control': 'private,no-store', 'Content-Security-Policy': "sandbox; default-src 'none'", 'Cross-Origin-Resource-Policy': 'same-origin', 'X-Content-Type-Options': 'nosniff', 'X-NoCTF-Mock': 'true' } })
+          : problem(404, '尚未提交题解 / No WriteUp submitted')
+      }
+      if (route === '/competitions/{competitionId}/teams/{teamId}/writeup/content') {
+        if (!competitionStaff) return problem(403, '需要竞赛工作人员权限 / Staff access required')
+        const writeUp = teamWriteUps.get(p.teamId!)
+        return writeUp
+          ? new Response(writeUp.content, { headers: { 'Content-Type': 'application/pdf', 'Content-Disposition': `attachment; filename="${writeUp.metadata.fileName}"`, 'Cache-Control': 'private,no-store', 'Content-Security-Policy': "sandbox; default-src 'none'", 'Cross-Origin-Resource-Policy': 'same-origin', 'X-Content-Type-Options': 'nosniff', 'X-NoCTF-Mock': 'true' } })
+          : problem(404, '尚未提交题解 / No WriteUp submitted')
+      }
+      if (route === '/competitions/{competitionId}/writeups') {
+        if (!competitionStaff) return problem(403, '需要竞赛工作人员权限 / Staff access required')
+        const writeUps = state.teams
+          .filter(team => team.competitionId === p.competitionId)
+          .map(team => ({ team, writeUp: teamWriteUps.get(team.id) }))
+          .filter(item => item.writeUp)
+          .map(({ team, writeUp }) => ({
+            writeUp: writeUp!.metadata,
+            totalScore: state.challenges
+              .filter(challenge => challenge.competitionId === p.competitionId)
+              .reduce((total, challenge) => total + (state.facts.some(fact => fact.teamId === team.id && fact.competitionChallengeId === challenge.id && fact.result === 'Correct') ? 500 : 0)
+                + (writeUpAdjustments.get(`${team.id}:${challenge.id}`) ?? 0), 0),
+            challengeScores: state.challenges
+              .filter(challenge => challenge.competitionId === p.competitionId)
+              .map(challenge => ({
+                competitionChallengeId: challenge.id,
+                title: challenge.title,
+                direction: challenge.direction,
+                netPoints: (state.facts.some(fact => fact.teamId === team.id && fact.competitionChallengeId === challenge.id && fact.result === 'Correct') ? 500 : 0)
+                  + (writeUpAdjustments.get(`${team.id}:${challenge.id}`) ?? 0),
+              })),
+          }))
+        value = { scoreboardAvailable: true, canJudge: user?.role !== 'User', items: writeUps }
+      }
+      else if (route === '/auth/me/wallpaper') {
         if (!user?.wallpaperRevision) return problem(404, '尚未上传壁纸 / No wallpaper uploaded')
         const wallpaper = wallpapers.get(user.userId)
           ?? Bun.file(new URL('./data/competition-poster.png', import.meta.url))
@@ -425,6 +511,31 @@ export function createMockApi() {
         competition!.posterUrl = posterUrl
         value = { fileId, contentType: file.type, url: posterUrl }
       }
+      else if (route === '/competitions/{competitionId}/teams/me/writeup' && request.method === 'PUT') {
+        if (!myTeam || myTeam.registrationStatus !== 'Approved' || myTeam.isBanned)
+          return problem(403, '需要已审核且未封禁的队伍 / An approved, active team is required')
+        const form = await request.formData()
+        const file = form.get('file')
+        if (!(file instanceof File)
+          || file.type !== 'application/pdf'
+          || !file.name.toLowerCase().endsWith('.pdf')
+          || new TextDecoder('ascii').decode(new Uint8Array(await file.slice(0, 5).arrayBuffer())) !== '%PDF-')
+          return problem(422, '请选择有效 PDF / Choose a valid PDF')
+        const metadata = {
+          teamId: myTeam.id,
+          teamName: myTeam.name,
+          fileId: crypto.randomUUID(),
+          fileName: file.name,
+          contentType: 'application/pdf',
+          byteLength: file.size,
+          sha256: crypto.randomUUID().replaceAll('-', '').padEnd(64, '0').slice(0, 64),
+          submittedByUserId: user!.userId,
+          submittedByDisplayName: user!.userName,
+          submittedAt: now(),
+        }
+        teamWriteUps.set(myTeam.id, { metadata, content: file })
+        value = metadata
+      }
       else if (route === '/admin/competitions/{competitionId}/poster' && request.method === 'DELETE') {
         competitionPosters.set(p.competitionId!, null)
         competition!.posterUrl = null
@@ -531,6 +642,19 @@ export function createMockApi() {
         value = { competition, modeConfiguration: body.modeConfiguration ?? { json: '{}' }, tracks: state.settings.get(`/competitions/{competitionId}/tracks${p.competitionId}`) ?? { enabled: competition!.tracksEnabled ?? false, canUpdate: competition!.status !== 'Finished', items: [] }, permissions: body.permissions ?? null, leaderboardVisibility: body.leaderboardVisibility ?? { effectiveVisibility: 'Normal' }, capabilities: { canObserve: true, canModerate: true, canManagePermissions: true } }
       }
       else if (route === '/admin/competitions/{competitionId}/status' && request.method === 'PUT') { competition!.status = body.status; value = {} }
+      else if (route === '/admin/competitions/{competitionId}/gameplay-facts/manual-adjustments') {
+        const adjustmentKey = `${body.teamId}:${body.competitionChallengeId}`
+        writeUpAdjustments.set(
+          adjustmentKey,
+          (writeUpAdjustments.get(adjustmentKey) ?? 0) + Number(body.delta ?? 0),
+        )
+        const gameplayFactId = crypto.randomUUID()
+        value = {
+          gameplayFactId,
+          state: 'Completed',
+          statusUrl: `/api/v1/competitions/${p.competitionId}/gameplay-facts/${gameplayFactId}`,
+        }
+      }
       else if (route === '/admin/challenges' && request.method === 'POST') { value = { ...state.templates[0], ...body, id: body.id ?? crypto.randomUUID(), ownerId: user!.userId, createdAt: now(), updatedAt: now() }; state.templates.push(value) }
       else if (route === '/admin/challenges/{challengeId}' && request.method === 'PATCH') { if (body.content) Object.assign(template!, body.content, { updatedAt: now() }); if (body.permissions) Object.assign(template!, body.permissions); value = template; state.challenges.filter(c => c.challengeId === template!.id).forEach(c => Object.assign(c, { title: template!.title, description: template!.description, direction: template!.direction })) }
       else if (route === '/admin/competitions/{competitionId}/challenges' && request.method === 'POST') {
@@ -598,6 +722,39 @@ export function createMockApi() {
         if (action === 'stop') Object.assign(runtime, { state: 'Stopped', stoppedAt: now() })
         if (action === 'extend') runtime.expiresAt = date(2)
         value = { ...runtime, runtimeInstanceId: runtime.id, statusUrl: path.replace(/\/{runtimeInstanceId}$/, '/current') }
+      }
+      else if (route === '/competitions/{competitionId}/teams/{teamId}/writeup/consultations') {
+        if (!competitionStaff || !team || !teamWriteUps.has(team.id))
+          return problem(404, '题解不存在或不可访问 / WriteUp unavailable')
+        const rootId = crypto.randomUUID()
+        const actorRole = user!.role === 'Administrator' ? 'PlatformAdministrator' : 'CompetitionManager'
+        const question = model('QuestionsCompetitionQuestionResponse', {
+          ...body,
+          threadRootId: rootId,
+          competitionId: p.competitionId,
+          teamId: team.id,
+          askedByUserId: user!.userId,
+          askerDisplayName: user!.userName,
+          teamDisplayName: team.name,
+          createdAt: now(),
+          updatedAt: now(),
+          status: 'Replied',
+          maxParticipantMessagesBeforeHandlerReply: 5,
+          challengeTitle: state.challenges.find(candidate => candidate.id === body.competitionChallengeId)?.title ?? null,
+          lastActorDisplayName: user!.userName,
+          lastActorRole: actorRole,
+          entries: [model('QuestionsCompetitionQuestionEntryResponse', {
+            id: rootId,
+            kind: 'Message',
+            actorRole,
+            actorUserId: user!.userId,
+            actorDisplayName: user!.userName,
+            body: body.body,
+            createdAt: now(),
+          })],
+        })
+        state.questions.unshift(question)
+        value = questionView(question, user, myTeam)
       }
       else if (route === '/competitions/{competitionId}/questions') {
         const rootId = crypto.randomUUID()

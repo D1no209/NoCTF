@@ -188,6 +188,114 @@ export type NoCtfapiEndpointsTeamsUploadTeamAvatarRequest = {
     file: Blob | File;
 };
 
+export type NoCtfapiEndpointsChallengesQuestionsCompetitionQuestionResponse = {
+    threadRootId?: string;
+    competitionId?: string;
+    competitionChallengeId?: string | null;
+    teamId?: string | null;
+    askedByUserId?: string | null;
+    askerDisplayName?: string;
+    teamDisplayName?: string | null;
+    gameplayFactId?: string | null;
+    subject?: NoCtfapiEndpointsChallengesQuestionsCompetitionQuestionSubjectCode;
+    challengeTitle?: string | null;
+    title?: string;
+    body?: string;
+    status?: NoCtfapiEndpointsChallengesQuestionsCompetitionQuestionStatusCode;
+    access?: NoCtfapiEndpointsChallengesQuestionsCompetitionQuestionAccessCode;
+    lastActorDisplayName?: string;
+    lastActorRole?: NoCtfapiEndpointsChallengesQuestionsCompetitionQuestionParticipantRoleCode;
+    participantMessagesRemaining?: number;
+    maxParticipantMessagesBeforeHandlerReply?: number;
+    createdAt?: string;
+    updatedAt?: string;
+    canReply?: boolean;
+    canResolve?: boolean;
+    canClose?: boolean;
+    entries?: Array<NoCtfapiEndpointsChallengesQuestionsCompetitionQuestionEntryResponse>;
+};
+
+export type NoCtfapiEndpointsChallengesQuestionsCompetitionQuestionSubjectCode = 'Challenge' | 'Platform';
+
+export type NoCtfapiEndpointsChallengesQuestionsCompetitionQuestionStatusCode = 'Pending' | 'Replied' | 'Resolved' | 'Closed';
+
+export type NoCtfapiEndpointsChallengesQuestionsCompetitionQuestionAccessCode = 'Asker' | 'Observer' | 'Handler';
+
+export type NoCtfapiEndpointsChallengesQuestionsCompetitionQuestionParticipantRoleCode = 'Asker' | 'Handler' | 'Participant' | 'Judge' | 'ChallengeOwner' | 'CompetitionManager' | 'PlatformAdministrator';
+
+export type NoCtfapiEndpointsChallengesQuestionsCompetitionQuestionEntryResponse = {
+    id?: string;
+    kind?: NoCtfapiEndpointsChallengesQuestionsCompetitionQuestionEntryKindCode;
+    actorRole?: NoCtfapiEndpointsChallengesQuestionsCompetitionQuestionParticipantRoleCode;
+    actorUserId?: string | null;
+    actorDisplayName?: string;
+    body?: string | null;
+    fromStatus?: NoCtfapiEndpointsChallengesQuestionsCompetitionQuestionStatusCode | null;
+    toStatus?: NoCtfapiEndpointsChallengesQuestionsCompetitionQuestionStatusCode | null;
+    targetEntryId?: string | null;
+    createdAt?: string;
+};
+
+export type NoCtfapiEndpointsChallengesQuestionsCompetitionQuestionEntryKindCode = 'Message' | 'StatusTransition';
+
+export type NoCtfapiEndpointsChallengesQuestionsCompetitionQuestionFailureResponse = {
+    code?: NoCtfapiEndpointsChallengesQuestionsCompetitionQuestionFailureCode;
+    detail?: string;
+    current?: NoCtfapiEndpointsChallengesQuestionsCompetitionQuestionResponse | null;
+    limit?: number | null;
+};
+
+export type NoCtfapiEndpointsChallengesQuestionsCompetitionQuestionFailureCode = 'InvalidRequest' | 'SpamRejected' | 'CompetitionNotAcceptingQuestions' | 'TeamNotEligible' | 'InvalidChallengeReference' | 'TeamActiveQuestionLimitReached' | 'ParticipantMessageLimitReached' | 'InvalidTransition' | 'QuestionClosed';
+
+export type NoCtfapiEndpointsTeamsWriteUpsCreateTeamWriteUpConsultationRequest = {
+    competitionChallengeId?: string | null;
+    title: string;
+    body: string;
+};
+
+export type NoCtfapiEndpointsTeamsWriteUpsTeamWriteUpResponse = {
+    teamId?: string;
+    teamName?: string;
+    fileId?: string;
+    fileName?: string;
+    contentType?: string;
+    byteLength?: number;
+    sha256?: string;
+    submittedByUserId?: string;
+    submittedByDisplayName?: string | null;
+    submittedAt?: string;
+};
+
+export type NoCtfapiEndpointsTeamsWriteUpsTeamWriteUpReviewResponse = {
+    scoreboardAvailable?: boolean;
+    canJudge?: boolean;
+    items?: Array<NoCtfapiEndpointsTeamsWriteUpsTeamWriteUpReviewItemResponse>;
+};
+
+export type NoCtfapiEndpointsTeamsWriteUpsTeamWriteUpReviewItemResponse = {
+    writeUp?: NoCtfapiEndpointsTeamsWriteUpsTeamWriteUpResponse;
+    totalScore?: number | null;
+    challengeScores?: Array<NoCtfapiEndpointsTeamsWriteUpsTeamWriteUpChallengeScoreResponse>;
+};
+
+export type NoCtfapiEndpointsTeamsWriteUpsTeamWriteUpChallengeScoreResponse = {
+    competitionChallengeId?: string;
+    title?: string;
+    direction?: string;
+    netPoints?: number;
+};
+
+export type NoCtfapiEndpointsTeamsWriteUpsTeamWriteUpFailureResponse = {
+    code?: NoCtfapiEndpointsTeamsWriteUpsTeamWriteUpFailureCode;
+    detail?: string;
+};
+
+export type NoCtfapiEndpointsTeamsWriteUpsTeamWriteUpFailureCode = 'InvalidPdf' | 'UploadTooLarge';
+
+export type NoCtfapiEndpointsTeamsWriteUpsUploadMyTeamWriteUpRequest = {
+    file: Blob | File;
+};
+
 export type NoCtfapiEndpointsRuntimeRuntimeAcceptedResponse = {
     runtimeInstanceId?: string;
     statusUrl?: string;
@@ -851,7 +959,7 @@ export type NoCtfapiEndpointsCompetitionsEventsExportCompetitionEventsRequest = 
     [key: string]: never;
 };
 
-export type NoCtfapiEndpointsCompetitionsEventsCompetitionEventKindProtocol = 'CompetitionCreated' | 'CompetitionUpdated' | 'CompetitionDeleted' | 'CompetitionLifecycleChanged' | 'LeaderboardVisibilityChanged' | 'ChallengeCreated' | 'ChallengeUpdated' | 'ChallengePublished' | 'ChallengeUnpublished' | 'ChallengeDeleted' | 'HintPublished' | 'HintUnlocked' | 'TeamRegistered' | 'TeamRegistrationChanged' | 'TeamUpdated' | 'TeamDeleted' | 'TeamMemberJoined' | 'TeamMemberRemoved' | 'TeamCaptainTransferred' | 'TeamBanned' | 'TeamUnbanned' | 'GameplayFactReceived' | 'GameplayFactAdjudicated' | 'ScoringRecorded' | 'FirstBloodAwarded' | 'SecondBloodAwarded' | 'ThirdBloodAwarded' | 'RuntimeCreated' | 'RuntimeStateChanged' | 'RuntimeExtended' | 'RuntimeReset' | 'RuntimePortAllocated' | 'ProtectedGameplayFactValueAccessed' | 'CheatIncidentDetected' | 'CheatIncidentConfirmed' | 'CheatIncidentDismissed' | 'CheatIncidentSuperseded' | 'CheatIncidentCorrected' | 'CompetitionArchiveExported' | 'TeamBanAppealSubmitted' | 'TeamBanAppealUpheld' | 'TeamBanAppealAccepted' | 'TeamBanCorrectionPublished' | 'RuntimeForceTerminationRequested' | 'RuntimeForceTerminationCompleted' | 'RuntimeForceTerminationFailed' | 'AnnouncementPublished' | 'QuestionOpened' | 'QuestionReplied' | 'QuestionStatusChanged' | 'ChallengeDescriptionUpdated' | 'TrackConfigurationUpdated' | 'TeamTrackChanged' | 'TrackRegistrationPolicyUpdated' | 'AwdpBreakAttempted' | 'AwdpFixAttempted' | 'AwdpBreakResolved' | 'AwdpFixResolved' | 'GameplayFactPatchDownloaded' | 'CompetitionAudienceChanged';
+export type NoCtfapiEndpointsCompetitionsEventsCompetitionEventKindProtocol = 'CompetitionCreated' | 'CompetitionUpdated' | 'CompetitionDeleted' | 'CompetitionLifecycleChanged' | 'LeaderboardVisibilityChanged' | 'ChallengeCreated' | 'ChallengeUpdated' | 'ChallengePublished' | 'ChallengeUnpublished' | 'ChallengeDeleted' | 'HintPublished' | 'HintUnlocked' | 'TeamRegistered' | 'TeamRegistrationChanged' | 'TeamUpdated' | 'TeamDeleted' | 'TeamMemberJoined' | 'TeamMemberRemoved' | 'TeamCaptainTransferred' | 'TeamBanned' | 'TeamUnbanned' | 'GameplayFactReceived' | 'GameplayFactAdjudicated' | 'ScoringRecorded' | 'FirstBloodAwarded' | 'SecondBloodAwarded' | 'ThirdBloodAwarded' | 'RuntimeCreated' | 'RuntimeStateChanged' | 'RuntimeExtended' | 'RuntimeReset' | 'RuntimePortAllocated' | 'ProtectedGameplayFactValueAccessed' | 'CheatIncidentDetected' | 'CheatIncidentConfirmed' | 'CheatIncidentDismissed' | 'CheatIncidentSuperseded' | 'CheatIncidentCorrected' | 'CompetitionArchiveExported' | 'TeamBanAppealSubmitted' | 'TeamBanAppealUpheld' | 'TeamBanAppealAccepted' | 'TeamBanCorrectionPublished' | 'RuntimeForceTerminationRequested' | 'RuntimeForceTerminationCompleted' | 'RuntimeForceTerminationFailed' | 'AnnouncementPublished' | 'QuestionOpened' | 'QuestionReplied' | 'QuestionStatusChanged' | 'ChallengeDescriptionUpdated' | 'TrackConfigurationUpdated' | 'TeamTrackChanged' | 'TrackRegistrationPolicyUpdated' | 'AwdpBreakAttempted' | 'AwdpFixAttempted' | 'AwdpBreakResolved' | 'AwdpFixResolved' | 'GameplayFactPatchDownloaded' | 'CompetitionAudienceChanged' | 'TeamWriteUpSubmitted';
 
 export type NoCtfapiEndpointsCompetitionsEventsCompetitionEventLevelProtocol = 'Information' | 'Warning' | 'Error';
 
@@ -997,65 +1105,6 @@ export type NoCtfapiEndpointsChallengesChallengeHintUnlockConflictResponse = {
 };
 
 export type NoCtfapiEndpointsChallengesChallengeHintUnlockFailureCodeProtocol = 'InsufficientScore';
-
-export type NoCtfapiEndpointsChallengesQuestionsCompetitionQuestionResponse = {
-    threadRootId?: string;
-    competitionId?: string;
-    competitionChallengeId?: string | null;
-    teamId?: string | null;
-    askedByUserId?: string | null;
-    askerDisplayName?: string;
-    teamDisplayName?: string | null;
-    gameplayFactId?: string | null;
-    subject?: NoCtfapiEndpointsChallengesQuestionsCompetitionQuestionSubjectCode;
-    challengeTitle?: string | null;
-    title?: string;
-    body?: string;
-    status?: NoCtfapiEndpointsChallengesQuestionsCompetitionQuestionStatusCode;
-    access?: NoCtfapiEndpointsChallengesQuestionsCompetitionQuestionAccessCode;
-    lastActorDisplayName?: string;
-    lastActorRole?: NoCtfapiEndpointsChallengesQuestionsCompetitionQuestionParticipantRoleCode;
-    participantMessagesRemaining?: number;
-    maxParticipantMessagesBeforeHandlerReply?: number;
-    createdAt?: string;
-    updatedAt?: string;
-    canReply?: boolean;
-    canResolve?: boolean;
-    canClose?: boolean;
-    entries?: Array<NoCtfapiEndpointsChallengesQuestionsCompetitionQuestionEntryResponse>;
-};
-
-export type NoCtfapiEndpointsChallengesQuestionsCompetitionQuestionSubjectCode = 'Challenge' | 'Platform';
-
-export type NoCtfapiEndpointsChallengesQuestionsCompetitionQuestionStatusCode = 'Pending' | 'Replied' | 'Resolved' | 'Closed';
-
-export type NoCtfapiEndpointsChallengesQuestionsCompetitionQuestionAccessCode = 'Asker' | 'Observer' | 'Handler';
-
-export type NoCtfapiEndpointsChallengesQuestionsCompetitionQuestionParticipantRoleCode = 'Asker' | 'Handler' | 'Participant' | 'Judge' | 'ChallengeOwner' | 'CompetitionManager' | 'PlatformAdministrator';
-
-export type NoCtfapiEndpointsChallengesQuestionsCompetitionQuestionEntryResponse = {
-    id?: string;
-    kind?: NoCtfapiEndpointsChallengesQuestionsCompetitionQuestionEntryKindCode;
-    actorRole?: NoCtfapiEndpointsChallengesQuestionsCompetitionQuestionParticipantRoleCode;
-    actorUserId?: string | null;
-    actorDisplayName?: string;
-    body?: string | null;
-    fromStatus?: NoCtfapiEndpointsChallengesQuestionsCompetitionQuestionStatusCode | null;
-    toStatus?: NoCtfapiEndpointsChallengesQuestionsCompetitionQuestionStatusCode | null;
-    targetEntryId?: string | null;
-    createdAt?: string;
-};
-
-export type NoCtfapiEndpointsChallengesQuestionsCompetitionQuestionEntryKindCode = 'Message' | 'StatusTransition';
-
-export type NoCtfapiEndpointsChallengesQuestionsCompetitionQuestionFailureResponse = {
-    code?: NoCtfapiEndpointsChallengesQuestionsCompetitionQuestionFailureCode;
-    detail?: string;
-    current?: NoCtfapiEndpointsChallengesQuestionsCompetitionQuestionResponse | null;
-    limit?: number | null;
-};
-
-export type NoCtfapiEndpointsChallengesQuestionsCompetitionQuestionFailureCode = 'InvalidRequest' | 'SpamRejected' | 'CompetitionNotAcceptingQuestions' | 'TeamNotEligible' | 'InvalidChallengeReference' | 'TeamActiveQuestionLimitReached' | 'ParticipantMessageLimitReached' | 'InvalidTransition' | 'QuestionClosed';
 
 export type NoCtfapiEndpointsChallengesQuestionsAddCompetitionQuestionMessageRequest = {
     body: string;
@@ -1966,7 +2015,7 @@ export type NoCtfapiEndpointsAdministrationCompetitionsCompetitionHardDeleteRefe
     count?: number;
 };
 
-export type NoCtfapiEndpointsAdministrationCompetitionsCompetitionHardDeleteReferenceCode = 'HistoricalEvent' | 'Team' | 'CompetitionChallenge' | 'GameplayFact' | 'RuntimeInstance' | 'PatchUpload' | 'Notification' | 'PosterFile' | 'ActiveRuntimeResource' | 'NotificationScopeConflict';
+export type NoCtfapiEndpointsAdministrationCompetitionsCompetitionHardDeleteReferenceCode = 'HistoricalEvent' | 'Team' | 'CompetitionChallenge' | 'GameplayFact' | 'RuntimeInstance' | 'PatchUpload' | 'Notification' | 'PosterFile' | 'TeamWriteUp' | 'ActiveRuntimeResource' | 'NotificationScopeConflict';
 
 export type NoCtfapiEndpointsAdministrationCompetitionsForceDeleteCompetitionRequest = {
     confirmationTitle: string;
@@ -2990,6 +3039,217 @@ export type SubmitTeamBanAppealResponses = {
 };
 
 export type SubmitTeamBanAppealResponse = SubmitTeamBanAppealResponses[keyof SubmitTeamBanAppealResponses];
+
+export type CreateTeamWriteUpConsultationData = {
+    body: NoCtfapiEndpointsTeamsWriteUpsCreateTeamWriteUpConsultationRequest;
+    path: {
+        competitionId: string;
+        teamId: string;
+    };
+    query?: never;
+    url: '/api/v1/competitions/{competitionId}/teams/{teamId}/writeup/consultations';
+};
+
+export type CreateTeamWriteUpConsultationErrors = {
+    /**
+     * Bad Request
+     */
+    400: MicrosoftAspNetCoreMvcValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+    /**
+     * Not Found
+     */
+    404: unknown;
+    422: NoCtfapiEndpointsChallengesQuestionsCompetitionQuestionFailureResponse;
+};
+
+export type CreateTeamWriteUpConsultationError = CreateTeamWriteUpConsultationErrors[keyof CreateTeamWriteUpConsultationErrors];
+
+export type CreateTeamWriteUpConsultationResponses = {
+    /**
+     * Created
+     */
+    201: NoCtfapiEndpointsChallengesQuestionsCompetitionQuestionResponse;
+};
+
+export type CreateTeamWriteUpConsultationResponse = CreateTeamWriteUpConsultationResponses[keyof CreateTeamWriteUpConsultationResponses];
+
+export type DownloadMyTeamWriteUpData = {
+    body?: never;
+    path: {
+        competitionId: string;
+    };
+    query?: never;
+    url: '/api/v1/competitions/{competitionId}/teams/me/writeup/content';
+};
+
+export type DownloadMyTeamWriteUpErrors = {
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+    /**
+     * Not Found
+     */
+    404: unknown;
+};
+
+export type DownloadMyTeamWriteUpResponses = {
+    /**
+     * Success
+     */
+    200: Blob | File;
+};
+
+export type DownloadMyTeamWriteUpResponse = DownloadMyTeamWriteUpResponses[keyof DownloadMyTeamWriteUpResponses];
+
+export type DownloadTeamWriteUpData = {
+    body?: never;
+    path: {
+        competitionId: string;
+        teamId: string;
+    };
+    query?: never;
+    url: '/api/v1/competitions/{competitionId}/teams/{teamId}/writeup/content';
+};
+
+export type DownloadTeamWriteUpErrors = {
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+    /**
+     * Not Found
+     */
+    404: unknown;
+};
+
+export type DownloadTeamWriteUpResponses = {
+    /**
+     * Success
+     */
+    200: Blob | File;
+};
+
+export type DownloadTeamWriteUpResponse = DownloadTeamWriteUpResponses[keyof DownloadTeamWriteUpResponses];
+
+export type GetMyTeamWriteUpData = {
+    body?: never;
+    path: {
+        competitionId: string;
+    };
+    query?: never;
+    url: '/api/v1/competitions/{competitionId}/teams/me/writeup';
+};
+
+export type GetMyTeamWriteUpErrors = {
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+    /**
+     * Not Found
+     */
+    404: unknown;
+};
+
+export type GetMyTeamWriteUpResponses = {
+    /**
+     * Success
+     */
+    200: NoCtfapiEndpointsTeamsWriteUpsTeamWriteUpResponse;
+};
+
+export type GetMyTeamWriteUpResponse = GetMyTeamWriteUpResponses[keyof GetMyTeamWriteUpResponses];
+
+export type ReplaceMyTeamWriteUpData = {
+    body: NoCtfapiEndpointsTeamsWriteUpsUploadMyTeamWriteUpRequest;
+    path: {
+        competitionId: string;
+    };
+    query?: never;
+    url: '/api/v1/competitions/{competitionId}/teams/me/writeup';
+};
+
+export type ReplaceMyTeamWriteUpErrors = {
+    /**
+     * Bad Request
+     */
+    400: MicrosoftAspNetCoreMvcValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+    /**
+     * Not Found
+     */
+    404: unknown;
+    413: MicrosoftAspNetCoreMvcProblemDetails;
+    422: NoCtfapiEndpointsTeamsWriteUpsTeamWriteUpFailureResponse;
+};
+
+export type ReplaceMyTeamWriteUpError = ReplaceMyTeamWriteUpErrors[keyof ReplaceMyTeamWriteUpErrors];
+
+export type ReplaceMyTeamWriteUpResponses = {
+    /**
+     * Success
+     */
+    200: NoCtfapiEndpointsTeamsWriteUpsTeamWriteUpResponse;
+};
+
+export type ReplaceMyTeamWriteUpResponse = ReplaceMyTeamWriteUpResponses[keyof ReplaceMyTeamWriteUpResponses];
+
+export type ListTeamWriteUpsData = {
+    body?: never;
+    path: {
+        competitionId: string;
+    };
+    query?: never;
+    url: '/api/v1/competitions/{competitionId}/writeups';
+};
+
+export type ListTeamWriteUpsErrors = {
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+};
+
+export type ListTeamWriteUpsResponses = {
+    /**
+     * Success
+     */
+    200: NoCtfapiEndpointsTeamsWriteUpsTeamWriteUpReviewResponse;
+};
+
+export type ListTeamWriteUpsResponse = ListTeamWriteUpsResponses[keyof ListTeamWriteUpsResponses];
 
 export type CreateRuntimeData = {
     body: NoCtfapiEndpointsRuntimeCreateRuntimeRequest;

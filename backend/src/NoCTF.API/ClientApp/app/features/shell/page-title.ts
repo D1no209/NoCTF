@@ -25,6 +25,8 @@ const competitionAdministrationTitles = {
   challenges: 'ui.challenge',
   teams: 'ui.teamManagement',
   submissions: 'ui.submissions',
+  writeup: 'writeUp.myWriteUp',
+  writeups: 'writeUp.review',
   runtimes: 'ui.runtime',
   cheats: 'ui.cheating',
   leaderboard: 'ui.leaderboard',

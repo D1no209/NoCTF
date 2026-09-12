@@ -95,6 +95,15 @@ public sealed record CreateCompetitionQuestionCommand(
     string Body,
     DateTimeOffset Now);
 
+public sealed record CreateTeamWriteUpConsultationCommand(
+    Guid CompetitionId,
+    Guid TeamId,
+    Guid? CompetitionChallengeId,
+    Guid ActorUserId,
+    string Title,
+    string Body,
+    DateTimeOffset Now);
+
 public sealed record AddCompetitionQuestionMessageCommand(
     Guid CompetitionId,
     Guid QuestionId,
@@ -143,6 +152,10 @@ public interface ICompetitionQuestionWriter
 {
     Task<CompetitionQuestionMutationResult> CreateAsync(
         CreateCompetitionQuestionCommand command,
+        CancellationToken cancellationToken);
+
+    Task<CompetitionQuestionMutationResult> CreateWriteUpConsultationAsync(
+        CreateTeamWriteUpConsultationCommand command,
         CancellationToken cancellationToken);
 
     Task<CompetitionQuestionMutationResult> AddMessageAsync(
@@ -331,6 +344,41 @@ public sealed class CreateCompetitionQuestion(
             null,
             null,
             command.ActorUserId);
+}
+
+public sealed class CreateTeamWriteUpConsultation(
+    ICompetitionQuestionWriter store,
+    ILogger<CreateTeamWriteUpConsultation> logger)
+{
+    public Task<CompetitionQuestionMutationResult> ExecuteAsync(
+        CreateTeamWriteUpConsultationCommand command,
+        CancellationToken cancellationToken = default)
+    {
+        if (command.CompetitionId == Guid.Empty
+            || command.TeamId == Guid.Empty
+            || command.ActorUserId == Guid.Empty)
+        {
+            return Task.FromResult(new CompetitionQuestionMutationResult(
+                null,
+                CompetitionQuestionFailure.InvalidRequest));
+        }
+        var failure = CompetitionQuestionRules.ValidateText(command.Title, command.Body);
+        if (failure is not null)
+        {
+            logger.LogWarning(
+                "WriteUp consultation rejected. failureCode={FailureCode} competitionId={CompetitionId} teamId={TeamId} userId={UserId}",
+                failure,
+                command.CompetitionId,
+                command.TeamId,
+                command.ActorUserId);
+            return Task.FromResult(new CompetitionQuestionMutationResult(null, failure));
+        }
+        return store.CreateWriteUpConsultationAsync(command with
+        {
+            Title = command.Title.Trim(),
+            Body = command.Body.Trim()
+        }, cancellationToken);
+    }
 }
 
 public sealed class ListCompetitionQuestions(ICompetitionQuestionReader store)

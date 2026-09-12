@@ -272,6 +272,7 @@ export function useAdminCompetitionsByIdIndexPage() {
     PatchUpload: "ui.patchUpload2",
     Notification: "ui.notificationsAndQuestions",
     PosterFile: "ui.competitionPoster",
+    TeamWriteUp: "writeUp.teamWriteUpFiles",
     ActiveRuntimeResource: "ui.message9",
     NotificationScopeConflict: "ui.crossScopeOrUnprovenNotificationReferences",
   }

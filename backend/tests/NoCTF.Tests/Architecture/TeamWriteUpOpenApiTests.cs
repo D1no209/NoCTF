@@ -1,0 +1,105 @@
+using System.Text.Json;
+
+namespace NoCTF.Tests.Architecture;
+
+public sealed class TeamWriteUpOpenApiTests
+{
+    [Test]
+    public async Task WriteUp_upload_and_download_contracts_are_pdf_specific_and_bearer_protected()
+    {
+        using var swagger = await ReadSwaggerAsync();
+        var root = swagger.RootElement;
+        var upload = Operation(
+            root,
+            "/api/v1/competitions/{competitionId}/teams/me/writeup",
+            "put");
+        await Assert.That(upload.GetProperty("requestBody")
+                .GetProperty("content")
+                .TryGetProperty("multipart/form-data", out _))
+            .IsTrue();
+        await Assert.That(upload.GetProperty("responses").TryGetProperty("413", out _))
+            .IsTrue();
+        await Assert.That(upload.GetProperty("responses").TryGetProperty("422", out _))
+            .IsTrue();
+
+        foreach (var path in new[]
+        {
+            "/api/v1/competitions/{competitionId}/teams/me/writeup/content",
+            "/api/v1/competitions/{competitionId}/teams/{teamId}/writeup/content"
+        })
+        {
+            var download = Operation(root, path, "get");
+            await Assert.That(download.GetProperty("responses")
+                    .GetProperty("200")
+                    .GetProperty("content")
+                    .TryGetProperty("application/pdf", out _))
+                .IsTrue();
+            await Assert.That(HasBearer(download)).IsTrue();
+        }
+    }
+
+    [Test]
+    public async Task Staff_review_exposes_scores_and_a_typed_consultation_contract()
+    {
+        using var swagger = await ReadSwaggerAsync();
+        var root = swagger.RootElement;
+        var review = Operation(
+            root,
+            "/api/v1/competitions/{competitionId}/writeups",
+            "get");
+        var reviewSchema = ResolveSchema(
+            root,
+            review.GetProperty("responses")
+                .GetProperty("200")
+                .GetProperty("content")
+                .GetProperty("application/json")
+                .GetProperty("schema"));
+        await Assert.That(reviewSchema.GetProperty("properties")
+                .EnumerateObject()
+                .Select(property => property.Name))
+            .IsEquivalentTo(["scoreboardAvailable", "canJudge", "items"]);
+
+        var consultation = Operation(
+            root,
+            "/api/v1/competitions/{competitionId}/teams/{teamId}/writeup/consultations",
+            "post");
+        await Assert.That(consultation.GetProperty("responses").TryGetProperty("201", out _))
+            .IsTrue();
+        await Assert.That(consultation.GetProperty("responses").TryGetProperty("403", out _))
+            .IsTrue();
+        await Assert.That(HasBearer(consultation)).IsTrue();
+    }
+
+    private static JsonElement Operation(JsonElement root, string path, string method) =>
+        root.GetProperty("paths").GetProperty(path).GetProperty(method);
+
+    private static bool HasBearer(JsonElement operation) =>
+        operation.GetProperty("security")
+            .EnumerateArray()
+            .Any(requirement => requirement.TryGetProperty("Bearer", out _));
+
+    private static JsonElement ResolveSchema(JsonElement root, JsonElement schema)
+    {
+        while (schema.TryGetProperty("$ref", out var reference))
+        {
+            schema = root.GetProperty("components")
+                .GetProperty("schemas")
+                .GetProperty(reference.GetString()!.Split('/')[^1]);
+        }
+        return schema;
+    }
+
+    private static async Task<JsonDocument> ReadSwaggerAsync()
+    {
+        var directory = new DirectoryInfo(AppContext.BaseDirectory);
+        while (directory is not null
+            && !File.Exists(Path.Combine(directory.FullName, "NoCTF.slnx")))
+        {
+            directory = directory.Parent;
+        }
+        if (directory is null)
+            throw new DirectoryNotFoundException("Backend root was not found.");
+        return JsonDocument.Parse(await File.ReadAllTextAsync(
+            Path.Combine(directory.FullName, "artifacts", "openapi", "swagger.json")));
+    }
+}

@@ -75,7 +75,8 @@ public sealed class CompetitionDeletionOutboxTests
                     // Independent connection, so this observes committed PostgreSQL rows, not a recording fake.
                     var count = await verification.Database.SqlQueryRaw<int>(
                         "SELECT count(*)::integer AS \"Value\" FROM wolverine_deletion.wolverine_outgoing_envelopes").SingleAsync(ct);
-                    await Assert.That(count).IsEqualTo(failBeforeCommit ? 0 : 5);
+                await Assert.That(count).IsEqualTo(
+                    failBeforeCommit ? 0 : fixture.CleanupFileIds.Length + 1);
                 }
                 await Assert.That(probe.Messages.Count).IsEqualTo(0);
                 await producer.StopAsync(ct);
@@ -136,7 +137,7 @@ public sealed class CompetitionDeletionOutboxTests
         public void Record(object message)
         {
             Messages.Add(message);
-            if (Messages.OfType<CleanupFile>().Select(x => x.FileId).Distinct().Count() == 4
+            if (Messages.OfType<CleanupFile>().Select(x => x.FileId).Distinct().Count() == 5
                 && Messages.OfType<InvalidateDeletedCompetitionReadModels>().Any()) Delivered.TrySetResult();
         }
     }

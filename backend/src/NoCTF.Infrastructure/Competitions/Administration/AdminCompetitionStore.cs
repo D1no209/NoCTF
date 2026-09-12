@@ -526,6 +526,13 @@ public sealed class AdminCompetitionStore(
             posterFileId.HasValue ? 1 : 0);
         AddReference(
             references,
+            CompetitionHardDeleteReferenceKind.TeamWriteUp,
+            await db.Teams.IgnoreQueryFilters().CountAsync(
+                item => item.CompetitionId == competitionId
+                    && item.WriteUpFileId != null,
+                ct));
+        AddReference(
+            references,
             CompetitionHardDeleteReferenceKind.ActiveRuntimeResource,
             await db.RuntimeInstances.CountAsync(item =>
                 item.CompetitionId == competitionId
@@ -560,6 +567,10 @@ public sealed class AdminCompetitionStore(
         ids.AddRange(await db.Teams.IgnoreQueryFilters()
             .Where(item => item.CompetitionId == competitionId && item.AvatarFileId != null)
             .Select(item => item.AvatarFileId!.Value)
+            .ToArrayAsync(ct));
+        ids.AddRange(await db.Teams.IgnoreQueryFilters()
+            .Where(item => item.CompetitionId == competitionId && item.WriteUpFileId != null)
+            .Select(item => item.WriteUpFileId!.Value)
             .ToArrayAsync(ct));
         ids.AddRange(await db.PatchUploads
             .Where(item => item.CompetitionId == competitionId)

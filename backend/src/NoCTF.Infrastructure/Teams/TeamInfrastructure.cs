@@ -7,6 +7,8 @@ using NoCTF.Infrastructure.Teams.Appeals;
 using NoCTF.Infrastructure.Teams.Membership;
 using NoCTF.Infrastructure.Teams.Moderation;
 using NoCTF.Infrastructure.Teams.Registration;
+using NoCTF.Application.Teams.WriteUps;
+using NoCTF.Infrastructure.Teams.WriteUps;
 
 namespace NoCTF.Infrastructure.Teams;
 
@@ -29,6 +31,8 @@ internal static class TeamInfrastructure
         services.AddScoped<ResubmitTeamRegistration>();
         services.AddScoped<GetTeam>();
         services.AddScoped<GetMyTeam>();
+        services.AddScoped<ITeamWriteUpStore, TeamWriteUpStore>();
+        services.AddScoped<ManageTeamWriteUps>();
         services.AddScoped<UpdateTeam>();
         services.AddScoped<DeleteTeam>();
         services.AddScoped<ITeamMembershipStore, TeamMembershipStore>();

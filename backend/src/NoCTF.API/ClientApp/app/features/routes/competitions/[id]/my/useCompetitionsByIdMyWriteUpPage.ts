@@ -1,0 +1,187 @@
+import { markRaw } from 'vue'
+import { Download, Eye, FileText } from '@lucide/vue'
+import { toast } from 'vue-sonner'
+
+import { downloadMyTeamWriteUp, getMyTeamWriteUp, replaceMyTeamWriteUp } from '../../../../../api'
+import type { NoCtfapiEndpointsTeamsWriteUpsTeamWriteUpResponse } from '../../../../../api'
+import { downloadSdkFile, readProtectedDownload } from '../../../../../utils/download'
+import CompetitionParticipantWorkspaceComponent from '../../../../competition/CompetitionParticipantWorkspace.vue'
+
+const maximumWriteUpBytes = 64 * 1024 * 1024
+
+/** Owns state, validation and authenticated PDF object URLs for the team WriteUp page. */
+export function useCompetitionsByIdMyWriteUpPage() {
+  const route = useRoute()
+  const competitionId = route.params.id as string
+
+  const writeUp = ref<NoCtfapiEndpointsTeamsWriteUpsTeamWriteUpResponse | null>(null)
+  const selectedFile = ref<File | null>(null)
+  const uploadInputKey = ref(0)
+  const loading = ref(true)
+  const loadError = ref<string | null>(null)
+  const uploadError = ref<string | null>(null)
+  const uploadPending = ref(false)
+  const previewUrl = ref<string | null>(null)
+  const previewLoading = ref(false)
+  const previewError = ref<string | null>(null)
+  const downloadPending = ref(false)
+  let selectionRequest = 0
+  let previewRequest = 0
+
+  function releasePreview() {
+    if (previewUrl.value) URL.revokeObjectURL(previewUrl.value)
+    previewUrl.value = null
+  }
+
+  async function load() {
+    loading.value = true
+    loadError.value = null
+    const { data, error, response } = await getMyTeamWriteUp({
+      path: { competitionId },
+    })
+    loading.value = false
+    if (response?.status === 404) {
+      writeUp.value = null
+      return
+    }
+    if (error || !data) {
+      loadError.value = parseApiError(error, translate('writeUp.loadFailed')).message
+      return
+    }
+    writeUp.value = data
+  }
+
+  async function selectFile(event: Event) {
+    const request = ++selectionRequest
+    const file = (event.target as HTMLInputElement).files?.[0] ?? null
+    selectedFile.value = file
+    uploadError.value = null
+    if (!file) return
+    if (!file.name.toLowerCase().endsWith('.pdf') || file.type !== 'application/pdf') {
+      uploadError.value = translate('writeUp.pdfOnly')
+      selectedFile.value = null
+      return
+    }
+    if (file.size > maximumWriteUpBytes) {
+      uploadError.value = translate('writeUp.tooLarge', { size: formatBytes(maximumWriteUpBytes) })
+      selectedFile.value = null
+      return
+    }
+    const header = new Uint8Array(await file.slice(0, 5).arrayBuffer())
+    if (request !== selectionRequest) return
+    if (new TextDecoder('ascii').decode(header) !== '%PDF-') {
+      uploadError.value = translate('writeUp.invalidPdf')
+      selectedFile.value = null
+    }
+  }
+
+  async function submit() {
+    if (!selectedFile.value || uploadPending.value) return
+    uploadPending.value = true
+    uploadError.value = null
+    try {
+      const { data, error } = await replaceMyTeamWriteUp({
+        path: { competitionId },
+        body: { file: selectedFile.value },
+      })
+      if (error || !data) throw error
+      writeUp.value = data
+      selectedFile.value = null
+      selectionRequest++
+      uploadInputKey.value++
+      previewRequest++
+      releasePreview()
+      toast.success(translate('writeUp.uploaded'))
+    }
+    catch (error) {
+      uploadError.value = parseApiError(error, translate('writeUp.uploadFailed')).message
+      toast.error(uploadError.value)
+    }
+    finally {
+      uploadPending.value = false
+    }
+  }
+
+  async function preview() {
+    if (!writeUp.value || previewLoading.value) return
+    const request = ++previewRequest
+    previewLoading.value = true
+    previewError.value = null
+    try {
+      const result = await readProtectedDownload(
+        () => downloadMyTeamWriteUp({
+          path: { competitionId },
+          parseAs: 'blob',
+        }),
+        writeUp.value.fileName ?? 'writeup.pdf',
+      )
+      if (request !== previewRequest) return
+      releasePreview()
+      previewUrl.value = URL.createObjectURL(result.blob)
+    }
+    catch (error) {
+      if (request === previewRequest)
+        previewError.value = parseApiError(error, translate('writeUp.previewFailed')).message
+    }
+    finally {
+      if (request === previewRequest) previewLoading.value = false
+    }
+  }
+
+  async function download() {
+    if (!writeUp.value || downloadPending.value) return
+    downloadPending.value = true
+    try {
+      await downloadSdkFile(
+        downloadMyTeamWriteUp({
+          path: { competitionId },
+          parseAs: 'blob',
+        }),
+        writeUp.value.fileName ?? 'writeup.pdf',
+      )
+    }
+    catch (error) {
+      toast.error(parseApiError(error, translate('writeUp.downloadFailed')).message)
+    }
+    finally {
+      downloadPending.value = false
+    }
+  }
+
+  onMounted(() => void load())
+  onUnmounted(() => {
+    previewRequest++
+    releasePreview()
+  })
+
+  const CompetitionParticipantWorkspace = markRaw(CompetitionParticipantWorkspaceComponent)
+  const viewBindings = {
+    Download,
+    Eye,
+    FileText,
+    maximumWriteUpBytes,
+    competitionId,
+    writeUp,
+    selectedFile,
+    uploadInputKey,
+    loading,
+    loadError,
+    uploadError,
+    uploadPending,
+    previewUrl,
+    previewLoading,
+    previewError,
+    downloadPending,
+    load,
+    selectFile,
+    submit,
+    preview,
+    download,
+    CompetitionParticipantWorkspace,
+  }
+  return viewBindings
+}
+
+export type CompetitionsByIdMyWriteUpPageViewState = import('vue').ShallowUnwrapRef<
+  ReturnType<typeof useCompetitionsByIdMyWriteUpPage>
+>

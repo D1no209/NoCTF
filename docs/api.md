@@ -89,6 +89,12 @@ POST /api/v1/competitions/{competitionId}/teams/join
 GET  /api/v1/competitions/{competitionId}/teams/{teamId}/invitation-token
 POST /api/v1/competitions/{competitionId}/teams/{teamId}/invitation-token/rotate
 DELETE /api/v1/competitions/{competitionId}/teams/me/membership
+GET  /api/v1/competitions/{competitionId}/teams/me/writeup
+PUT  /api/v1/competitions/{competitionId}/teams/me/writeup
+GET  /api/v1/competitions/{competitionId}/teams/me/writeup/content
+GET  /api/v1/competitions/{competitionId}/writeups
+GET  /api/v1/competitions/{competitionId}/teams/{teamId}/writeup/content
+POST /api/v1/competitions/{competitionId}/teams/{teamId}/writeup/consultations
 ```
 
 Team response 使用 CaptainId 与 MemberIds 数组，不返回成员顺序。
@@ -96,6 +102,12 @@ Team PATCH 使用 Profile、Membership、Registration、Administration、Ban sec
 Team Avatar 与 Competition Poster 都通过不可变 File 引用上传；上传/清除需要对应管理权限，读取路由不暴露通用 File 下载能力。
 邀请加入使用队伍当前的 32 位 InvitationToken；队长、Owner 与 Manager 可读取当前值并轮换，普通成员与外部用户不可读取。比赛运行中仅在 `AllowTeamRegistrationWhileRunning` 开启时允许加入。
 加入失败返回强类型 `TeamMembershipFailureCodeProtocol`，前端不得将阶段锁定、队伍已满或无效邀请码表现为无响应。
+
+WriteUp 是队伍当前的一份 PDF；任一已审核且未封禁队伍成员可提交或替换，服务端同时校验扩展名、MIME、
+PDF 文件头和 64 MiB 上限。替换使用新的不可变 File 并异步清理旧对象。Owner、Manager、Judge、Observer
+及平台 Administrator 可在线预览和下载；审核列表同时返回权威排行榜中按题目聚合的当前净得分。
+具备 Judge 权限的调用者可复用 ManualAdjustment 对单题补分或扣分，并可从题解审核创建面向该队伍的私密咨询；
+Observer 保持只读。
 
 Competition 列表只返回调用者可见状态：匿名可见 Visible/Published/Running/Paused/Finished，Draft 仅管理者。Team 私有字段（InvitationToken、Ban 原因）只按权限返回；公开 Team DTO 永不包含 InvitationToken。
 
@@ -152,6 +164,8 @@ GET  /api/v1/competitions/{competitionId}/events
 Administrator/Owner/Manager/Judge 与关联模板 Owner/Manager 处理；Platform 咨询由比赛处理者处理。
 Observer 只读。只有 Running/Paused 且已批准队伍内的 Human 用户可以发起咨询，Bot 不允许使用。
 Finished 后对话只读。Resolved 可由提问者通过追问重新打开，Closed 为终态。
+WriteUp 审核中的快捷咨询由平台 Administrator 或比赛 Owner、Manager、Judge 发起，不受比赛生命周期限制；
+初始状态为 Replied，队员收到通知后回复会转为 Pending，并继续使用同一咨询工作区。
 
 Question 根就是 `notifications.id`；回复和状态事件使用 `ThreadRootId` 指向根，`ReplyToId` 只是
 可空、非唯一回复上下文。线程按 `(sent_at,id)` 排序；读取权限在根发送者离队后仍保留。

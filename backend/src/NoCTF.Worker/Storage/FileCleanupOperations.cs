@@ -52,7 +52,9 @@ internal static partial class BackendMessageOperations
         var referenced = await db.Users.AnyAsync(item =>
                 item.AvatarFileId == file.Id || item.WallpaperFileId == file.Id,
                 cancellationToken)
-            || await db.Teams.IgnoreQueryFilters().AnyAsync(item => item.AvatarFileId == file.Id, cancellationToken)
+            || await db.Teams.IgnoreQueryFilters().AnyAsync(item =>
+                item.AvatarFileId == file.Id || item.WriteUpFileId == file.Id,
+                cancellationToken)
             || await db.Competitions.IgnoreQueryFilters().AnyAsync(item => item.PosterFileId == file.Id, cancellationToken)
             || await db.PlatformSettings.AnyAsync(item => item.LogoFileId == file.Id, cancellationToken)
             || await db.Set<ChallengeAttachment>().AnyAsync(item => item.FileId == file.Id, cancellationToken)

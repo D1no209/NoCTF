@@ -31,6 +31,9 @@ internal sealed class TeamConfiguration : IEntityTypeConfiguration<Team>
         builder.HasOne(team => team.AvatarFile).WithMany()
             .HasForeignKey(team => team.AvatarFileId)
             .OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne(team => team.WriteUpFile).WithMany()
+            .HasForeignKey(team => team.WriteUpFileId)
+            .OnDelete(DeleteBehavior.Restrict);
         builder.ToTable(table =>
         {
             table.HasCheckConstraint(
@@ -42,6 +45,9 @@ internal sealed class TeamConfiguration : IEntityTypeConfiguration<Team>
             table.HasCheckConstraint(
                 "ck_teams_invitation_token_length",
                 "char_length(invitation_token) = 32");
+            table.HasCheckConstraint(
+                "ck_teams_write_up_metadata_complete",
+                "(write_up_file_id IS NULL AND write_up_submitted_by_user_id IS NULL AND write_up_submitted_at IS NULL) OR (write_up_file_id IS NOT NULL AND write_up_submitted_by_user_id IS NOT NULL AND write_up_submitted_at IS NOT NULL)");
         });
     }
 }

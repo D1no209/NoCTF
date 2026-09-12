@@ -20,9 +20,10 @@ internal sealed class CompetitionForceDeleteFixture
     public Guid OwnerId { get; } = Guid.NewGuid();
     public Guid TemplateId { get; } = Guid.NewGuid();
     public Guid FileId { get; } = Guid.NewGuid();
+    public Guid WriteUpFileId { get; } = Guid.NewGuid();
     public Guid SharedFileId { get; } = Guid.NewGuid();
     public Guid[] AdditionalPatchFileIds { get; } = [Guid.NewGuid(), Guid.NewGuid()];
-    public Guid[] CleanupFileIds => [FileId, SharedFileId, .. AdditionalPatchFileIds];
+    public Guid[] CleanupFileIds => [FileId, WriteUpFileId, SharedFileId, .. AdditionalPatchFileIds];
     public Guid RootId { get; } = Guid.NewGuid();
     public Guid MemberId { get; } = Guid.NewGuid();
     public Guid[] RuntimeIds { get; } = [Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid()];
@@ -37,7 +38,7 @@ internal sealed class CompetitionForceDeleteFixture
             Email = $"{OwnerId:N}@example.test", PasswordHash = "unused", Kind = UserKind.Human,
             Role = UserRole.Administrator, AccountStatus = UserAccountStatus.Active, CreatedAt = Now, UpdatedAt = Now
         });
-        db.Files.AddRange(File(FileId), File(SharedFileId));
+        db.Files.AddRange(File(FileId), File(WriteUpFileId), File(SharedFileId));
         db.Files.AddRange(AdditionalPatchFileIds.Select(File));
         db.Competitions.AddRange(Competition(Id, "Delete fixture", FileId), Competition(OtherId, "Keep fixture", SharedFileId));
         db.Challenges.Add(new Challenge
@@ -66,7 +67,9 @@ internal sealed class CompetitionForceDeleteFixture
         db.Teams.Add(new Team
         {
             Id = team, CompetitionId = Id, Name = "Team", CaptainId = OwnerId, MemberIds = [OwnerId],
-            InvitationToken = Guid.NewGuid().ToString("N"), RegistrationStatus = TeamRegistrationStatus.Approved, RegisteredAt = Now
+            InvitationToken = Guid.NewGuid().ToString("N"), RegistrationStatus = TeamRegistrationStatus.Approved,
+            RegisteredAt = Now, WriteUpFileId = WriteUpFileId,
+            WriteUpSubmittedByUserId = OwnerId, WriteUpSubmittedAt = Now
         });
         foreach (var (runtimeId, index) in RuntimeIds.Select((id, index) => (id, index)))
         {
