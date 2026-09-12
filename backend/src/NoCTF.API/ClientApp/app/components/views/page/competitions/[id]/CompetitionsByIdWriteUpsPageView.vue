@@ -3,15 +3,20 @@ import { toRefs } from 'vue'
 import type { CompetitionsByIdWriteUpsPageViewState } from '~/features/routes/competitions/[id]/useCompetitionsByIdWriteUpsPage'
 
 const viewProps = defineProps<{ state: CompetitionsByIdWriteUpsPageViewState }>()
-const { Download, FileSearch, MessageCircleQuestion, MinusCircle, RefreshCw, Scale, competitionId, review, loading, loadError, selectedTeamId, selected, canJudge, previewUrl, previewLoading, previewError, downloadPending, load, selectTeam, download, selectedChallengeId, adjustmentDelta, adjustmentPending, adjustmentError, submitAdjustment, clearAdjustmentError, selectChallenge, deduction, openDeduction, setDeductionOpen, confirmDeduction, consultationOpen, consultationChallengeId, consultationTitle, consultationBody, consultationPending, consultationError, openConsultation, submitConsultation, setConsultationOpen, clearConsultationError, CompetitionParticipantWorkspace } = toRefs(viewProps.state)
+const { ArrowLeft, Download, FileSearch, MessageCircleQuestion, MinusCircle, RefreshCw, Scale, competitionId, review, loading, loadError, selectedTeamId, selected, canJudge, previewUrl, previewLoading, previewError, downloadPending, load, selectTeam, download, selectedChallengeId, adjustmentDelta, adjustmentPending, adjustmentError, submitAdjustment, clearAdjustmentError, selectChallenge, deduction, openDeduction, setDeductionOpen, confirmDeduction, consultationOpen, consultationChallengeId, consultationTitle, consultationBody, consultationPending, consultationError, openConsultation, submitConsultation, setConsultationOpen, clearConsultationError } = toRefs(viewProps.state)
 </script>
 
 <template>
-  <component :is="CompetitionParticipantWorkspace" :competition-id="competitionId" :content-scroll="false">
-    <Card class="flex h-[calc(100svh-9rem)] min-h-[42rem] flex-col overflow-hidden py-0">
+  <div data-writeup-review-workspace class="flex min-h-0 flex-1 flex-col">
+    <Card class="flex min-h-0 flex-1 flex-col overflow-hidden py-0">
       <CardHeader class="shrink-0 py-5">
         <div class="flex flex-wrap items-center justify-between gap-3">
           <div class="flex items-center gap-3">
+            <Button variant="ghost" size="icon-sm" as-child>
+              <NuxtLink :to="`/competitions?competition=${competitionId}`" :aria-label="$t('ui.backToCompetition')">
+                <ArrowLeft />
+              </NuxtLink>
+            </Button>
             <FileSearch class="size-6 text-primary" />
             <CardTitle>{{ $t('writeUp.review') }}</CardTitle>
             <Badge v-if="review" variant="secondary">{{ $t('writeUp.submissionCount', { count: review.items?.length ?? 0 }) }}</Badge>
@@ -30,14 +35,14 @@ const { Download, FileSearch, MessageCircleQuestion, MinusCircle, RefreshCw, Sca
             <Button variant="outline" size="sm" @click="load">{{ $t('ui.retry') }}</Button>
           </AlertDescription>
         </Alert>
-        <Skeleton v-else-if="loading && !review" class="h-full min-h-[32rem] w-full" />
-        <Empty v-else-if="review?.items?.length === 0" class="h-full min-h-[32rem]">
+        <Skeleton v-else-if="loading && !review" class="h-full min-h-0 w-full" />
+        <Empty v-else-if="review?.items?.length === 0" class="h-full min-h-0">
           <EmptyHeader>
             <EmptyTitle>{{ $t('writeUp.noSubmissions') }}</EmptyTitle>
             <EmptyDescription>{{ $t('writeUp.noSubmissionsDescription') }}</EmptyDescription>
           </EmptyHeader>
         </Empty>
-        <div v-else-if="review" class="grid h-full min-h-0 gap-4 lg:grid-cols-[15rem_minmax(0,1fr)] 2xl:grid-cols-[15rem_minmax(0,1fr)_20rem]">
+        <div v-else-if="review" data-scroll-surface data-scroll-axis="y" class="grid h-full min-h-0 gap-4 overflow-y-auto xl:grid-cols-[minmax(13rem,15rem)_minmax(0,1fr)_minmax(18rem,22rem)] xl:grid-rows-[minmax(0,1fr)] xl:overflow-hidden">
           <section class="flex min-h-0 flex-col rounded-xl bg-muted/35 p-3 shadow-inner">
             <h2 class="mb-3 text-sm font-semibold">{{ $t('writeUp.teams') }}</h2>
             <ScrollSurface axis="y" class="min-h-0 flex-1" :aria-label="$t('writeUp.teams')">
@@ -76,6 +81,7 @@ const { Download, FileSearch, MessageCircleQuestion, MinusCircle, RefreshCw, Sca
               </Button>
             </div>
             <PdfPreview
+              fill
               class="min-h-0 flex-1"
               :source="previewUrl"
               :loading="previewLoading"
@@ -85,7 +91,7 @@ const { Download, FileSearch, MessageCircleQuestion, MinusCircle, RefreshCw, Sca
             />
           </section>
 
-          <section class="flex min-h-0 flex-col rounded-xl bg-muted/35 p-4 shadow-inner lg:col-span-2 2xl:col-span-1">
+          <section class="flex min-h-0 flex-col rounded-xl bg-muted/35 p-4 shadow-inner">
             <div class="mb-3 flex items-center justify-between gap-3">
               <h2 class="flex items-center gap-2 text-sm font-semibold">
                 <Scale class="size-4 text-primary" />{{ $t('writeUp.scoring') }}
@@ -225,5 +231,5 @@ const { Download, FileSearch, MessageCircleQuestion, MinusCircle, RefreshCw, Sca
         </DialogFooter>
       </DialogContent>
     </Dialog>
-  </component>
+  </div>
 </template>

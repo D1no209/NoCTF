@@ -54,6 +54,7 @@ describe('participant competition workspace layout', () => {
       page('../app/pages/competitions/[id]/my/submissions.vue'),
     ])
     const leaderboard = await page('../app/pages/competitions/[id]/leaderboard.vue')
+    const writeUpReview = await page('../app/pages/competitions/[id]/writeups.vue')
 
     for (const source of sources)
       expect(source).toContain("<component :is=\"CompetitionParticipantWorkspace\"")
@@ -61,6 +62,9 @@ describe('participant competition workspace layout', () => {
     expect(leaderboard).toContain("$t('ui.backToCompetition')")
     expect(leaderboard).toContain('data-scoreboard-page-scroll')
     expect(leaderboard).not.toContain('<ScrollSurface axis="y"')
+    expect(writeUpReview).not.toContain('CompetitionParticipantWorkspace')
+    expect(writeUpReview).toContain('data-writeup-review-workspace')
+    expect(writeUpReview).toContain("$t('ui.backToCompetition')")
   })
 
   test('removes the standalone submissions navigation item', async () => {
