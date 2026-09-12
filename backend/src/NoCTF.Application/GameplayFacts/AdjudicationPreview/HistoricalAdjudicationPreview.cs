@@ -150,13 +150,7 @@ public sealed class PreviewHistoricalAdjudicationDifferences(
         HistoricalAdjudicationEvidence evidence)
     {
         var issues = new List<AdjudicationDifference>();
-        if (ShouldBeDuplicate(evidence))
-        {
-            issues.Add(new(
-                AdjudicationDifferenceKind.CurrentCorrectShouldBeDuplicate,
-                AdjudicationDifferenceCertainty.Deterministic));
-        }
-        else if (ShouldBeCorrect(evidence))
+        if (ShouldBeCorrect(evidence))
         {
             issues.Add(new(
                 AdjudicationDifferenceKind.CurrentDuplicateShouldBeCorrect,
@@ -225,12 +219,6 @@ public sealed class PreviewHistoricalAdjudicationDifferences(
         return issues;
     }
 
-    private static bool ShouldBeDuplicate(HistoricalAdjudicationEvidence evidence) =>
-        evidence.GameMode == GameMode.Ctf
-        && evidence.CurrentResult == GameplayFactResult.Correct
-        && evidence.HasEarlierCorrect
-        && evidence.GameplayFactKind == GameplayFactKind.FlagAttempt;
-
     private static bool ShouldBeCorrect(HistoricalAdjudicationEvidence evidence) =>
         evidence.GameMode == GameMode.Awdp
         && evidence.GameplayFactKind == GameplayFactKind.BreakAttempt
@@ -239,8 +227,6 @@ public sealed class PreviewHistoricalAdjudicationDifferences(
 
     private static GameplayFactResult? ExpectedResult(HistoricalAdjudicationEvidence evidence)
     {
-        if (ShouldBeDuplicate(evidence))
-            return GameplayFactResult.Duplicate;
         return ShouldBeCorrect(evidence) ? GameplayFactResult.Correct : null;
     }
 

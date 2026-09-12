@@ -398,46 +398,46 @@ public sealed class CtfFullBoundaryTests
             await Assert.That(sharedCorrectSubmission.GetProperty("actorUserId").GetGuid())
                 .IsEqualTo(captainId);
 
-            var duplicateGameplayFactAccepted = await SendJsonAsync(
+            var resubmittedGameplayFactAccepted = await SendJsonAsync(
                 teammate,
                 HttpMethod.Post,
                 $"/api/v1/competitions/{competitionId}/challenges/{competitionChallengeId}/flag-submissions",
                 new { flag },
                 HttpStatusCode.Accepted,
                 cancellationToken);
-            var duplicateGameplayFactId = duplicateGameplayFactAccepted
+            var resubmittedGameplayFactId = resubmittedGameplayFactAccepted
                 .GetProperty("gameplayFactId")
                 .GetGuid();
-            var duplicateSubmission = await PollJsonAsync(
+            var resubmittedSubmission = await PollJsonAsync(
                 teammate,
-                $"/api/v1/competitions/{competitionId}/gameplay-facts/{duplicateGameplayFactId}",
+                $"/api/v1/competitions/{competitionId}/gameplay-facts/{resubmittedGameplayFactId}",
                 value => value.GetProperty("state").GetString() == "Completed",
                 TimeSpan.FromSeconds(60),
                 cancellationToken);
-            await Assert.That(duplicateSubmission.GetProperty("result").GetString()).IsEqualTo("Duplicate");
-            var submissionsAfterDuplicate = await PollTeamSubmissionsAsync(
+            await Assert.That(resubmittedSubmission.GetProperty("result").GetString()).IsEqualTo("Correct");
+            var submissionsAfterResubmission = await PollTeamSubmissionsAsync(
                 teammate,
                 competitionId,
                 items => items.Any(item =>
                         item.GetProperty("id").GetGuid() == gameplayFactId
                         && item.GetProperty("result").GetString() == "Correct")
                     && items.Any(item =>
-                        item.GetProperty("id").GetGuid() == duplicateGameplayFactId
-                        && item.GetProperty("result").GetString() == "Duplicate"),
+                        item.GetProperty("id").GetGuid() == resubmittedGameplayFactId
+                        && item.GetProperty("result").GetString() == "Correct"),
                 TimeSpan.FromSeconds(60),
                 cancellationToken);
-            var sharedDuplicateSubmission = submissionsAfterDuplicate.Single(item =>
-                item.GetProperty("id").GetGuid() == duplicateGameplayFactId);
-            await Assert.That(sharedDuplicateSubmission.GetProperty("actorUserId").GetGuid())
+            var sharedResubmittedSubmission = submissionsAfterResubmission.Single(item =>
+                item.GetProperty("id").GetGuid() == resubmittedGameplayFactId);
+            await Assert.That(sharedResubmittedSubmission.GetProperty("actorUserId").GetGuid())
                 .IsEqualTo(teammateId);
-            var leaderboardAfterDuplicate = await PollLeaderboardAsync(
+            var leaderboardAfterResubmission = await PollLeaderboardAsync(
                 anonymous,
                 competitionId,
                 teamId,
                 expectedScore: 525,
                 cancellationToken);
             await AssertCtfLeaderboardStateAsync(
-                leaderboardAfterDuplicate,
+                leaderboardAfterResubmission,
                 teamId,
                 competitionChallengeId,
                 expectedSolveCount: 1,

@@ -546,7 +546,9 @@ export function createMockApi() {
       else if (route.endsWith('/flag-submissions')) {
         if (!myTeam) return problem(409, '先加入演示队伍 / Join a team first')
         const correct = (body.flag ?? body.flags?.[0]) === 'flag{mock_success}'
-        const duplicate = correct && state.facts.some(f => f.teamId === myTeam.id && f.competitionChallengeId === challenge!.id && f.result === 'Correct')
+        const duplicate = competition!.mode !== 'Ctf'
+          && correct
+          && state.facts.some(f => f.teamId === myTeam.id && f.competitionChallengeId === challenge!.id && f.result === 'Correct')
         const fact = model('GameplayFactsGameplayFactListItemResponse', {
           id: crypto.randomUUID(), competitionId: p.competitionId, competitionChallengeId: challenge!.id, teamId: myTeam.id,
           actorUserId: user!.userId, kind: competition!.mode === 'Awdp' ? 'BreakAttempt' : 'FlagAttempt', state: 'Completed', result: duplicate ? 'Duplicate' : correct ? 'Correct' : 'Wrong', occurredAt: now(), updatedAt: now(), value: body.flag ?? body.flags?.[0],

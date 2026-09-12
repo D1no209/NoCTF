@@ -97,7 +97,7 @@ emit: { (event: "evaluated", ...args: [result: TrackedSubmission['result']]): vo
   const attemptsExhausted = computed(() =>
     !props.practice && !props.readOnlyJudgement && remainingAttempts.value === 0)
 
-  const inputDisabled = computed(() => attemptsExhausted.value || solved.value)
+  const inputDisabled = computed(() => attemptsExhausted.value)
 
   function showResult(correct: boolean, message: string): void {
     persistentResult.value = { correct, message }

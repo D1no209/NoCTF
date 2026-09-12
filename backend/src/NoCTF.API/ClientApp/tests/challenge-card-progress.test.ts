@@ -68,7 +68,7 @@ describe('participant challenge progress', () => {
     expect(shell).toContain("...(challengesVisible && canReadChallenges ? [{ to: `${base}/challenges`, label: translate(\"ui.challenge\"), icon: Puzzle }] : [])")
   })
 
-  test('celebrates a correct flag once and respects reduced motion', async () => {
+  test('celebrates a correct flag and keeps CTF judging available after a solve', async () => {
     const submit = await sourceFile(
       new URL('../app/features/challenges/FlagSubmit.vue', import.meta.url),
     ).text()
@@ -95,7 +95,8 @@ describe('participant challenge progress', () => {
     expect(submit).toContain('props.initiallySolved || solvedChallengeKeys.has(challengeKey())')
     expect(submit).toContain('watch(() => props.initiallySolved')
     expect(panel).toContain(':initially-solved="challenge.solvedByMyTeam"')
-    expect(submit).toContain('const inputDisabled = computed(() => attemptsExhausted.value || solved.value)')
+    expect(submit).toContain('const inputDisabled = computed(() => attemptsExhausted.value)')
+    expect(submit).not.toContain('attemptsExhausted.value || solved.value')
     expect(submit).not.toContain('v-for="item in tracked"')
   })
 

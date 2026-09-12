@@ -77,7 +77,8 @@ public sealed class HistoricalAdjudicationPreviewPersistenceTests
                 fixture.EarlierFactId.ToString("N"),
                 fixture.LaterFactId.ToString("N"))).IsLessThan(0);
             await Assert.That(later.Differences.Select(item => item.Kind))
-                .Contains(AdjudicationDifferenceKind.CurrentCorrectShouldBeDuplicate);
+                .DoesNotContain(AdjudicationDifferenceKind.CurrentCorrectShouldBeDuplicate);
+            await Assert.That(later.DeterministicExpectedResult).IsNull();
             await Assert.That(later.Differences.Select(item => item.Kind))
                 .Contains(AdjudicationDifferenceKind.DuplicateBloodAward);
             await Assert.That(later.Differences.Select(item => item.Kind))

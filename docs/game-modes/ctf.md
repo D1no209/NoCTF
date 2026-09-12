@@ -44,7 +44,7 @@ Attachment 策略：
 
 只接受单个 `flag`，不接受 `flags`。题目可配置可空的 `MaxFlagAttempts`；null 表示无限，正整数表示接入上限。API 预检并由 Worker 二次验证。
 
-同队同题按 OccurredAt、GameplayFactId 的第一条当前 Correct FlagAttempt 是 solve；后来匹配正确答案的事实为 Duplicate。没有当前有效匹配为 Wrong，只命中过期窗口记录稳定 FailureCode；Wrong/Duplicate 都消耗已接收尝试，平台失败不消耗。重判可改变 solve 与血位。
+同队同题按 OccurredAt、GameplayFactId 的第一条当前 Correct FlagAttempt 是唯一计分 solve；后续 FlagAttempt 仍按当前有效 Flag 正常判定，匹配为 Correct，不匹配为 Wrong，但不会重复计分或授予血位。每条已接收的 Correct/Wrong 都消耗尝试，平台失败不消耗。重判可改变 solve 与血位。
 
 ## 动态题值
 

@@ -265,6 +265,40 @@ public sealed class CtfGameplayFactEvaluatorTests
     }
 
     [Test]
+    public async Task Correct_flag_is_still_correct_after_the_team_has_solved()
+    {
+        var fixture = CreateFixture("flag{resubmitted-correct}");
+        var result = new CtfGameplayFactEvaluator(new DefaultEfGameplayFactEvaluator())
+            .Evaluate(fixture.Context([fixture.Flag(null)]) with
+            {
+                PriorFacts = [fixture.PriorCorrect()]
+            });
+
+        await Assert.That(result.Result).IsEqualTo(GameplayFactResult.Correct);
+        await Assert.That(result.FailureCode).IsNull();
+    }
+
+    [Test]
+    public async Task Wrong_flag_is_still_wrong_after_the_team_has_solved()
+    {
+        var fixture = CreateFixture("flag{correct}");
+        var correctFlag = fixture.Flag(null);
+        var priorCorrect = fixture.PriorCorrect();
+        fixture.GameplayFact.Value = "flag{wrong-after-solve}";
+        fixture.GameplayFact.ValueSha256 = SHA256.HashData(
+            Encoding.UTF8.GetBytes(fixture.GameplayFact.Value));
+
+        var result = new CtfGameplayFactEvaluator(new DefaultEfGameplayFactEvaluator())
+            .Evaluate(fixture.Context([correctFlag]) with
+            {
+                PriorFacts = [priorCorrect]
+            });
+
+        await Assert.That(result.Result).IsEqualTo(GameplayFactResult.Wrong);
+        await Assert.That(result.FailureCode).IsNull();
+    }
+
+    [Test]
     public async Task Hint_unlock_does_not_turn_a_correct_rejudge_into_a_duplicate()
     {
         const string flag = "flag{rejudge}";
@@ -349,6 +383,21 @@ public sealed class CtfGameplayFactEvaluatorTests
             Flag = GameplayFact.Value!,
             FlagSha256 = GameplayFact.ValueSha256!,
             CreatedAt = OccurredAt
+        };
+
+        public GameplayFact PriorCorrect() => new()
+        {
+            Id = Guid.NewGuid(),
+            CompetitionId = GameplayFact.CompetitionId,
+            CompetitionChallengeId = GameplayFact.CompetitionChallengeId,
+            TeamId = GameplayFact.TeamId,
+            Kind = GameplayFactKind.FlagAttempt,
+            Value = GameplayFact.Value,
+            ValueSha256 = GameplayFact.ValueSha256,
+            OccurredAt = OccurredAt.AddSeconds(-1),
+            State = GameplayFactState.Completed,
+            Result = GameplayFactResult.Correct,
+            UpdatedAt = OccurredAt.AddSeconds(-1)
         };
     }
 }
