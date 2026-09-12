@@ -91,6 +91,32 @@ public sealed class TeamWriteUpTests
         await Assert.That(result.Items[0].ChallengeScores[1].NetPoints).IsEqualTo(7);
     }
 
+    [Test]
+    public async Task ReviewAsync_with_no_submissions_skips_the_scoreboard_dependency()
+    {
+        var competitionId = Guid.CreateVersion7();
+        var store = Substitute.For<ITeamWriteUpStore>();
+        store.ListAsync(competitionId, Arg.Any<CancellationToken>())
+            .Returns([]);
+        var leaderboard = Substitute.For<ILeaderboardCache>();
+        var objects = Substitute.For<IStore>();
+        var writeUps = new ManageTeamWriteUps(
+            store,
+            new ManagedFileUploads(
+                Substitute.For<IManagedFileUploadRegistry>(),
+                objects),
+            objects,
+            leaderboard);
+
+        var result = await writeUps.ReviewAsync(competitionId, CancellationToken.None);
+
+        await Assert.That(result.ScoreboardAvailable).IsFalse();
+        await Assert.That(result.Items).IsEmpty();
+        await leaderboard.DidNotReceive().GetScoreboardAsync(
+            Arg.Any<Guid>(),
+            Arg.Any<CancellationToken>());
+    }
+
     private static ScoreboardProjection Projection(
         Guid competitionId,
         Guid teamId,

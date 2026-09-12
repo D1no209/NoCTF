@@ -14,7 +14,7 @@ const { Download, FileSearch, MessageCircleQuestion, MinusCircle, RefreshCw, Sca
           <div class="flex items-center gap-3">
             <FileSearch class="size-6 text-primary" />
             <CardTitle>{{ $t('writeUp.review') }}</CardTitle>
-            <Badge variant="secondary">{{ $t('writeUp.submissionCount', { count: review?.items?.length ?? 0 }) }}</Badge>
+            <Badge v-if="review" variant="secondary">{{ $t('writeUp.submissionCount', { count: review.items?.length ?? 0 }) }}</Badge>
           </div>
           <Button variant="outline" size="sm" :disabled="loading" @click="load">
             <Spinner v-if="loading" data-icon="inline-start" />
@@ -24,17 +24,20 @@ const { Download, FileSearch, MessageCircleQuestion, MinusCircle, RefreshCw, Sca
       </CardHeader>
 
       <CardContent class="min-h-0 flex-1 pb-5">
-        <Alert v-if="loadError" variant="destructive" class="mb-4">
-          <AlertDescription>{{ $message(loadError) }}</AlertDescription>
+        <Alert v-if="loadError && !review" variant="destructive">
+          <AlertDescription class="flex flex-wrap items-center justify-between gap-3">
+            <span>{{ $message(loadError) }}</span>
+            <Button variant="outline" size="sm" @click="load">{{ $t('ui.retry') }}</Button>
+          </AlertDescription>
         </Alert>
-        <Skeleton v-if="loading && !review" class="h-full min-h-[32rem] w-full" />
+        <Skeleton v-else-if="loading && !review" class="h-full min-h-[32rem] w-full" />
         <Empty v-else-if="review?.items?.length === 0" class="h-full min-h-[32rem]">
           <EmptyHeader>
             <EmptyTitle>{{ $t('writeUp.noSubmissions') }}</EmptyTitle>
             <EmptyDescription>{{ $t('writeUp.noSubmissionsDescription') }}</EmptyDescription>
           </EmptyHeader>
         </Empty>
-        <div v-else class="grid h-full min-h-0 gap-4 lg:grid-cols-[15rem_minmax(0,1fr)] 2xl:grid-cols-[15rem_minmax(0,1fr)_20rem]">
+        <div v-else-if="review" class="grid h-full min-h-0 gap-4 lg:grid-cols-[15rem_minmax(0,1fr)] 2xl:grid-cols-[15rem_minmax(0,1fr)_20rem]">
           <section class="flex min-h-0 flex-col rounded-xl bg-muted/35 p-3 shadow-inner">
             <h2 class="mb-3 text-sm font-semibold">{{ $t('writeUp.teams') }}</h2>
             <ScrollSurface axis="y" class="min-h-0 flex-1" :aria-label="$t('writeUp.teams')">

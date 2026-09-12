@@ -200,6 +200,9 @@ public sealed class ManageTeamWriteUps(
         CancellationToken cancellationToken = default)
     {
         var writeUps = await store.ListAsync(competitionId, cancellationToken);
+        if (writeUps.Count == 0)
+            return new(false, []);
+
         var projection = await leaderboards.GetScoreboardAsync(
             competitionId,
             cancellationToken);

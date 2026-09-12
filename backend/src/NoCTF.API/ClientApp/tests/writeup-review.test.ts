@@ -37,6 +37,8 @@ test('staff review combines sandboxed PDF preview with authoritative challenge s
   expect(controller).toContain('await adjustScore(-points)')
   expect(view).toContain('selected.challengeScores')
   expect(view).toContain('openDeduction(score)')
+  expect(view).toContain('v-if="loadError && !review"')
+  expect(view).toContain('v-else-if="review"')
   expect(preview).toContain(":sandbox=\"''\"")
 })
 

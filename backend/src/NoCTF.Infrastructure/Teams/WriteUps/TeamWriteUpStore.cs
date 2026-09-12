@@ -108,10 +108,14 @@ public sealed class TeamWriteUpStore(
         Guid competitionId,
         CancellationToken cancellationToken)
     {
-        var rows = await References(competitionId)
+        var rows = (await References(competitionId)
+                .ToArrayAsync(cancellationToken))
             .OrderByDescending(item => item.SubmittedAt)
             .ThenBy(item => item.TeamId)
-            .ToArrayAsync(cancellationToken);
+            .ToArray();
+        if (rows.Length == 0)
+            return [];
+
         var userIds = rows.Select(item => item.SubmittedByUserId).Distinct().ToArray();
         var userNames = await db.Users.IgnoreQueryFilters().AsNoTracking()
             .Where(user => userIds.Contains(user.Id))
