@@ -29,6 +29,8 @@ internal sealed class CompetitionEntityConfiguration : IEntityTypeConfiguration<
         builder.Property(competition => competition.MaxActiveQuestionsPerTeam).HasDefaultValue(5);
         builder.Property(competition => competition.MaxParticipantMessagesBeforeHandlerReply).HasDefaultValue(3);
         builder.Property(competition => competition.AllowChallengeOwnersToHandleQuestions).HasDefaultValue(true);
+        builder.Property(competition => competition.WriteUpSubmissionRequired).HasDefaultValue(false);
+        builder.Property(competition => competition.WriteUpSubmissionDeadlineHours).HasDefaultValue(0);
         builder.HasQueryFilter(competition => competition.DeletedAt == null);
         builder.HasIndex(competition => new { competition.Status, competition.StartAt });
         builder.HasIndex(competition => new { competition.FrozenStartAt, competition.HiddenStartAt });
@@ -58,6 +60,9 @@ internal sealed class CompetitionEntityConfiguration : IEntityTypeConfiguration<
             table.HasCheckConstraint(
                 "ck_competitions_question_limits",
                 "max_active_questions_per_team > 0 AND max_participant_messages_before_handler_reply > 0");
+            table.HasCheckConstraint(
+                "ck_competitions_write_up_submission_deadline_hours",
+                $"write_up_submission_deadline_hours BETWEEN 0 AND {CompetitionWriteUpPolicy.MaximumDeadlineHours}");
         });
     }
 }

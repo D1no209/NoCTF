@@ -48,6 +48,8 @@ public sealed class CompetitionMetadataPatchRequest
     public required int MaxParticipantMessagesBeforeHandlerReply { get; set; }
     public required bool AllowChallengeOwnersToHandleQuestions { get; set; }
     public required bool PracticeModeEnabled { get; set; }
+    public required bool WriteUpSubmissionRequired { get; set; }
+    public required int WriteUpSubmissionDeadlineHours { get; set; }
     public required CompetitionAccessModeProtocol AccessMode { get; set; }
 }
 
@@ -154,6 +156,9 @@ public sealed class PatchCompetitionValidator : Validator<PatchCompetitionReques
             .When(request => request.Metadata is not null);
         RuleFor(request => request.Metadata!.MaxParticipantMessagesBeforeHandlerReply).GreaterThan(0)
             .When(request => request.Metadata is not null);
+        RuleFor(request => request.Metadata!.WriteUpSubmissionDeadlineHours)
+            .InclusiveBetween(0, CompetitionWriteUpPolicy.MaximumDeadlineHours)
+            .When(request => request.Metadata is not null);
         RuleFor(request => request.Metadata!.AccessMode).IsInEnum()
             .When(request => request.Metadata is not null);
         RuleFor(request => request.ModeConfiguration!.Json).NotEmpty()
@@ -238,6 +243,8 @@ public static partial class CompetitionPatchMapper
     [MapperIgnoreTarget(nameof(Competition.TeamRegistrationAutoApprove))]
     [MapperIgnoreTarget(nameof(Competition.AllowTeamRegistrationWhileRunning))]
     [MapperIgnoreTarget(nameof(Competition.PracticeModeEnabled))]
+    [MapperIgnoreTarget(nameof(Competition.WriteUpSubmissionRequired))]
+    [MapperIgnoreTarget(nameof(Competition.WriteUpSubmissionDeadlineHours))]
     [MapperIgnoreTarget(nameof(Competition.MaxTeamMembers))]
     [MapperIgnoreTarget(nameof(Competition.MaxConcurrentRuntimeInstancesPerTeam))]
     [MapperIgnoreTarget(nameof(Competition.MaxActiveQuestionsPerTeam))]
@@ -275,6 +282,8 @@ public static partial class CompetitionPatchMapper
     [MapperIgnoreTarget(nameof(Competition.TeamRegistrationAutoApprove))]
     [MapperIgnoreTarget(nameof(Competition.AllowTeamRegistrationWhileRunning))]
     [MapperIgnoreTarget(nameof(Competition.PracticeModeEnabled))]
+    [MapperIgnoreTarget(nameof(Competition.WriteUpSubmissionRequired))]
+    [MapperIgnoreTarget(nameof(Competition.WriteUpSubmissionDeadlineHours))]
     [MapperIgnoreTarget(nameof(Competition.MaxTeamMembers))]
     [MapperIgnoreTarget(nameof(Competition.MaxConcurrentRuntimeInstancesPerTeam))]
     [MapperIgnoreTarget(nameof(Competition.MaxActiveQuestionsPerTeam))]
@@ -306,6 +315,8 @@ public static partial class CompetitionPatchMapper
     [MapperIgnoreTarget(nameof(Competition.TeamRegistrationAutoApprove))]
     [MapperIgnoreTarget(nameof(Competition.AllowTeamRegistrationWhileRunning))]
     [MapperIgnoreTarget(nameof(Competition.PracticeModeEnabled))]
+    [MapperIgnoreTarget(nameof(Competition.WriteUpSubmissionRequired))]
+    [MapperIgnoreTarget(nameof(Competition.WriteUpSubmissionDeadlineHours))]
     [MapperIgnoreTarget(nameof(Competition.MaxTeamMembers))]
     [MapperIgnoreTarget(nameof(Competition.MaxConcurrentRuntimeInstancesPerTeam))]
     [MapperIgnoreTarget(nameof(Competition.MaxActiveQuestionsPerTeam))]
@@ -340,6 +351,8 @@ public static partial class CompetitionPatchMapper
     [MapperIgnoreTarget(nameof(Competition.TeamRegistrationAutoApprove))]
     [MapperIgnoreTarget(nameof(Competition.AllowTeamRegistrationWhileRunning))]
     [MapperIgnoreTarget(nameof(Competition.PracticeModeEnabled))]
+    [MapperIgnoreTarget(nameof(Competition.WriteUpSubmissionRequired))]
+    [MapperIgnoreTarget(nameof(Competition.WriteUpSubmissionDeadlineHours))]
     [MapperIgnoreTarget(nameof(Competition.MaxTeamMembers))]
     [MapperIgnoreTarget(nameof(Competition.MaxConcurrentRuntimeInstancesPerTeam))]
     [MapperIgnoreTarget(nameof(Competition.MaxActiveQuestionsPerTeam))]
@@ -438,6 +451,8 @@ public sealed class PatchCompetitionEndpoint(
             TeamRegistrationAutoApprove = current.TeamRegistrationAutoApprove,
             AllowTeamRegistrationWhileRunning = current.AllowTeamRegistrationWhileRunning,
             PracticeModeEnabled = current.PracticeModeEnabled,
+            WriteUpSubmissionRequired = current.WriteUpSubmissionRequired,
+            WriteUpSubmissionDeadlineHours = current.WriteUpSubmissionDeadlineHours,
             MaxTeamMembers = current.MaxTeamMembers,
             MaxConcurrentRuntimeInstancesPerTeam = current.MaxConcurrentRuntimeInstancesPerTeam,
             MaxActiveQuestionsPerTeam = current.MaxActiveQuestionsPerTeam,
@@ -490,7 +505,9 @@ public sealed class PatchCompetitionEndpoint(
                     target.MaxParticipantMessagesBeforeHandlerReply,
                     target.AllowChallengeOwnersToHandleQuestions,
                     target.PracticeModeEnabled,
-                    target.AccessMode), transactionCt);
+                    target.AccessMode,
+                    target.WriteUpSubmissionRequired,
+                    target.WriteUpSubmissionDeadlineHours), transactionCt);
                 if (!result.Succeeded)
                     return Reject(Failure(
                         result.ErrorMessage ?? "Competition metadata is invalid."));

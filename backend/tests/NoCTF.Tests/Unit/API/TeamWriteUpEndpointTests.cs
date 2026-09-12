@@ -103,9 +103,41 @@ public sealed class TeamWriteUpEndpointTests
             .IsEqualTo(HttpStatusCode.UnprocessableEntity);
     }
 
+    [Test]
+    [Arguments(false, 1, TeamWriteUpFailureCode.WriteUpSubmissionNotRequired)]
+    [Arguments(true, -1, TeamWriteUpFailureCode.WriteUpSubmissionDeadlinePassed)]
+    public async Task Team_member_upload_rejects_disabled_or_expired_submission_windows(
+        bool submissionRequired,
+        int competitionEndOffsetHours,
+        TeamWriteUpFailureCode expectedCode)
+    {
+        await using var app = await CreateApplicationAsync(
+            canObserve: true,
+            canJudge: true,
+            submissionContext: new TeamWriteUpSubmissionContext(
+                TeamId,
+                submissionRequired,
+                DateTimeOffset.UtcNow.AddHours(competitionEndOffsetHours),
+                0));
+        using var client = app.GetTestClient();
+        using var content = new MultipartFormDataContent();
+        var file = new ByteArrayContent("%PDF-1.7\nvalid\n%%EOF"u8.ToArray());
+        file.Headers.ContentType = new MediaTypeHeaderValue("application/pdf");
+        content.Add(file, "file", "team-writeup.pdf");
+
+        using var response = await client.PutAsync(
+            $"/api/v1/competitions/{CompetitionId}/teams/me/writeup",
+            content);
+        var failure = await response.Content.ReadFromJsonAsync<TeamWriteUpFailureResponse>();
+
+        await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.Conflict);
+        await Assert.That(failure!.Code).IsEqualTo(expectedCode);
+    }
+
     private static async Task<WebApplication> CreateApplicationAsync(
         bool canObserve,
-        bool canJudge)
+        bool canJudge,
+        TeamWriteUpSubmissionContext? submissionContext = null)
     {
         var reference = new TeamWriteUpReference(
             TeamId,
@@ -124,8 +156,12 @@ public sealed class TeamWriteUpEndpointTests
             .Returns([reference]);
         store.FindAsync(CompetitionId, TeamId, Arg.Any<CancellationToken>())
             .Returns(reference);
-        store.FindEligibleTeamIdAsync(CompetitionId, ActorId, Arg.Any<CancellationToken>())
-            .Returns(TeamId);
+        store.FindSubmissionContextAsync(CompetitionId, ActorId, Arg.Any<CancellationToken>())
+            .Returns(submissionContext ?? new TeamWriteUpSubmissionContext(
+                TeamId,
+                true,
+                DateTimeOffset.UtcNow.AddDays(1),
+                24));
         store.ReplaceAsync(
                 CompetitionId,
                 TeamId,

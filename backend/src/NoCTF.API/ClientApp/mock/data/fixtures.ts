@@ -22,14 +22,18 @@ export function createFixtures() {
     ownerId: id(1), administrationRole: 'Owner', leaderboardVisibility: 'Normal', maxTeamMembers: 5,
     maxConcurrentRuntimeInstancesPerTeam: 3, maxActiveQuestionsPerTeam: 5, maxParticipantMessagesBeforeHandlerReply: 5,
     teamRegistrationAutoApprove: true, allowTeamRegistrationWhileRunning: true, practiceModeEnabled: true,
+    writeUpSubmissionRequired: true, writeUpSubmissionDeadlineHours: 24,
+    writeUpSubmissionDeadlineAt: date(index === 2 ? 96 : 72),
     accessMode: 'Public',
   }))
   competitions.push(model('CompetitionsCompetitionResponse', {
     ...competitions[0], id: id(2, 5), title: '秋季公开赛 · MOCK', status: 'Visible', startTime: date(120), endTime: date(144),
+    writeUpSubmissionDeadlineAt: date(168),
     posterUrl: `/api/v1/competitions/${id(2, 5)}/poster?revision=${id(12, 5).replaceAll('-', '')}`,
   }))
   competitions.push(model('CompetitionsCompetitionResponse', {
     ...competitions[0], id: id(2, 6), title: '夏季邀请赛 · MOCK', status: 'Finished', startTime: date(-120), endTime: date(-72),
+    writeUpSubmissionDeadlineAt: date(-48),
     posterUrl: `/api/v1/competitions/${id(2, 6)}/poster?revision=${id(12, 6).replaceAll('-', '')}`,
   }))
   competitions.push(model('CompetitionsCompetitionResponse', {

@@ -58,7 +58,9 @@ public sealed class AdminCompetitionStore(
                 competition.PracticeModeEnabled,
                 competition.PosterFileId,
                 competition.TracksEnabled,
-                competition.AccessMode))
+                competition.AccessMode,
+                competition.WriteUpSubmissionRequired,
+                competition.WriteUpSubmissionDeadlineHours))
             .ToListAsync(ct);
     }
 
@@ -89,7 +91,9 @@ public sealed class AdminCompetitionStore(
                 competition.PracticeModeEnabled,
                 competition.PosterFileId,
                 competition.TracksEnabled,
-                competition.AccessMode))
+                competition.AccessMode,
+                competition.WriteUpSubmissionRequired,
+                competition.WriteUpSubmissionDeadlineHours))
             .SingleOrDefaultAsync(ct);
     }
 
@@ -456,7 +460,9 @@ public sealed class AdminCompetitionStore(
             competition.AllowTeamRegistrationWhileRunning,
             competition.DeletedAt,
             PracticeModeEnabled: competition.PracticeModeEnabled,
-            AccessMode: competition.AccessMode);
+            AccessMode: competition.AccessMode,
+            WriteUpSubmissionRequired: competition.WriteUpSubmissionRequired,
+            WriteUpSubmissionDeadlineHours: competition.WriteUpSubmissionDeadlineHours);
 
     private Task InvalidateReadModelsAsync(
         Guid competitionId,

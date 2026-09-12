@@ -3,7 +3,7 @@ import { toRefs } from 'vue'
 import type { CompetitionsByIdMyWriteUpPageViewState } from '~/features/routes/competitions/[id]/my/useCompetitionsByIdMyWriteUpPage'
 
 const viewProps = defineProps<{ state: CompetitionsByIdMyWriteUpPageViewState }>()
-const { Download, Eye, FileText, maximumWriteUpBytes, competitionId, writeUp, selectedFile, uploadInputKey, loading, loadError, uploadError, uploadPending, previewUrl, previewLoading, previewError, downloadPending, load, selectFile, submit, preview, download, CompetitionParticipantWorkspace } = toRefs(viewProps.state)
+const { Download, Eye, FileText, maximumWriteUpBytes, competitionId, submissionRequired, submissionDeadlineAt, submissionClosed, writeUp, selectedFile, uploadInputKey, loading, loadError, uploadError, uploadPending, previewUrl, previewLoading, previewError, downloadPending, load, selectFile, submit, preview, download, CompetitionParticipantWorkspace } = toRefs(viewProps.state)
 </script>
 
 <template>
@@ -16,6 +16,7 @@ const { Download, Eye, FileText, maximumWriteUpBytes, competitionId, writeUp, se
             <CardTitle>{{ $t('writeUp.myWriteUp') }}</CardTitle>
           </div>
           <Badge v-if="writeUp" variant="default">{{ $t('writeUp.submitted') }}</Badge>
+          <Badge v-else-if="submissionClosed" variant="destructive">{{ $t('writeUp.submissionClosed') }}</Badge>
           <Badge v-else variant="secondary">{{ $t('writeUp.notSubmitted') }}</Badge>
         </div>
         <CardDescription>{{ $t('writeUp.participantDescription', { size: formatBytes(maximumWriteUpBytes) }) }}</CardDescription>
@@ -29,7 +30,20 @@ const { Download, Eye, FileText, maximumWriteUpBytes, competitionId, writeUp, se
         </Alert>
         <Skeleton v-else-if="loading" class="h-56 w-full" />
         <template v-else>
-          <UiForm validation="feature" class="flex flex-col gap-3" @submit.prevent="submit">
+          <Alert v-if="!submissionRequired">
+            <AlertDescription>{{ $t('writeUp.notRequiredForCompetition') }}</AlertDescription>
+          </Alert>
+          <Alert v-else-if="submissionClosed" variant="destructive">
+            <AlertDescription>
+              {{ $t('writeUp.deadlinePassed', { deadline: formatDateTime(submissionDeadlineAt) }) }}
+            </AlertDescription>
+          </Alert>
+          <Alert v-else>
+            <AlertDescription>
+              {{ $t('writeUp.deadlineOpen', { deadline: formatDateTime(submissionDeadlineAt) }) }}
+            </AlertDescription>
+          </Alert>
+          <UiForm v-if="submissionRequired && !submissionClosed" validation="feature" class="flex flex-col gap-3" @submit.prevent="submit">
             <Field>
               <FieldLabel for="team-writeup-file">{{ writeUp ? $t('writeUp.replacePdf') : $t('writeUp.selectPdf') }}</FieldLabel>
               <FileUpload

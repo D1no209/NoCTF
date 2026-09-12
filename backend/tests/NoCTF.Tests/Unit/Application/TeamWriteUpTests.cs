@@ -10,6 +10,23 @@ namespace NoCTF.Tests.Unit.Application;
 public sealed class TeamWriteUpTests
 {
     [Test]
+    public async Task Zero_deadline_hours_closes_at_the_competition_end_instant()
+    {
+        var endAt = DateTimeOffset.Parse("2026-09-13T02:00:00Z");
+
+        await Assert.That(CompetitionWriteUpPolicy.CanSubmit(
+            true,
+            endAt,
+            0,
+            endAt)).IsTrue();
+        await Assert.That(CompetitionWriteUpPolicy.CanSubmit(
+            true,
+            endAt,
+            0,
+            endAt.AddTicks(1))).IsFalse();
+    }
+
+    [Test]
     public async Task ReplaceMineAsync_rejects_non_pdf_content_before_creating_a_file()
     {
         var store = Substitute.For<ITeamWriteUpStore>();
@@ -33,10 +50,57 @@ public sealed class TeamWriteUpTests
             CancellationToken.None);
 
         await Assert.That(result.State).IsEqualTo(TeamWriteUpSubmissionState.InvalidPdf);
-        await store.DidNotReceive().FindEligibleTeamIdAsync(
+        await store.DidNotReceive().FindSubmissionContextAsync(
             Arg.Any<Guid>(),
             Arg.Any<Guid>(),
             Arg.Any<CancellationToken>());
+        await registry.DidNotReceive().RegisterAsync(
+            Arg.Any<ManagedFileUpload>(),
+            Arg.Any<DateTimeOffset>(),
+            Arg.Any<CancellationToken>());
+    }
+
+    [Test]
+    [Arguments(false, 1, TeamWriteUpSubmissionState.SubmissionNotRequired)]
+    [Arguments(true, -1, TeamWriteUpSubmissionState.SubmissionDeadlinePassed)]
+    public async Task ReplaceMineAsync_enforces_the_competition_submission_window_before_upload(
+        bool submissionRequired,
+        int competitionEndOffsetHours,
+        TeamWriteUpSubmissionState expected)
+    {
+        var now = DateTimeOffset.Parse("2026-09-13T02:00:00Z");
+        var competitionId = Guid.CreateVersion7(now);
+        var actorId = Guid.CreateVersion7(now.AddTicks(1));
+        var store = Substitute.For<ITeamWriteUpStore>();
+        store.FindSubmissionContextAsync(
+                competitionId,
+                actorId,
+                Arg.Any<CancellationToken>())
+            .Returns(new TeamWriteUpSubmissionContext(
+                Guid.CreateVersion7(now.AddTicks(2)),
+                submissionRequired,
+                now.AddHours(competitionEndOffsetHours),
+                0));
+        var registry = Substitute.For<IManagedFileUploadRegistry>();
+        var objects = Substitute.For<IStore>();
+        var writeUps = new ManageTeamWriteUps(
+            store,
+            new ManagedFileUploads(registry, objects),
+            objects,
+            Substitute.For<ILeaderboardCache>());
+        await using var content = new MemoryStream("%PDF-1.7\n%%EOF"u8.ToArray());
+
+        var result = await writeUps.ReplaceMineAsync(
+            competitionId,
+            actorId,
+            "writeup.pdf",
+            TeamWriteUpRules.ContentType,
+            content.Length,
+            content,
+            now,
+            CancellationToken.None);
+
+        await Assert.That(result.State).IsEqualTo(expected);
         await registry.DidNotReceive().RegisterAsync(
             Arg.Any<ManagedFileUpload>(),
             Arg.Any<DateTimeOffset>(),

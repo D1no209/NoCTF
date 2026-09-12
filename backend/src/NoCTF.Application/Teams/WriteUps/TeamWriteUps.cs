@@ -1,6 +1,7 @@
 using FluentStorage.Storage;
 using NoCTF.Application.Scoring.Leaderboard;
 using NoCTF.Application.Storage;
+using NoCTF.Domain.Competitions;
 
 namespace NoCTF.Application.Teams.WriteUps;
 
@@ -36,8 +37,16 @@ public enum TeamWriteUpSubmissionState : short
     Updated,
     NotFound,
     Forbidden,
-    InvalidPdf
+    InvalidPdf,
+    SubmissionNotRequired,
+    SubmissionDeadlinePassed
 }
+
+public sealed record TeamWriteUpSubmissionContext(
+    Guid TeamId,
+    bool SubmissionRequired,
+    DateTimeOffset CompetitionEndAt,
+    int DeadlineHours);
 
 public sealed record TeamWriteUpReference(
     Guid TeamId,
@@ -77,7 +86,7 @@ public sealed record TeamWriteUpContent(
 
 public interface ITeamWriteUpStore
 {
-    Task<Guid?> FindEligibleTeamIdAsync(
+    Task<TeamWriteUpSubmissionContext?> FindSubmissionContextAsync(
         Guid competitionId,
         Guid actorUserId,
         CancellationToken cancellationToken);
@@ -129,17 +138,27 @@ public sealed class ManageTeamWriteUps(
             return new(TeamWriteUpSubmissionState.InvalidPdf);
         }
 
-        var teamId = await store.FindEligibleTeamIdAsync(
+        var submission = await store.FindSubmissionContextAsync(
             competitionId,
             actorUserId,
             cancellationToken);
-        if (teamId is null)
+        if (submission is null)
             return new(TeamWriteUpSubmissionState.Forbidden);
+        if (!submission.SubmissionRequired)
+            return new(TeamWriteUpSubmissionState.SubmissionNotRequired);
+        if (!CompetitionWriteUpPolicy.CanSubmit(
+                submission.SubmissionRequired,
+                submission.CompetitionEndAt,
+                submission.DeadlineHours,
+                submittedAt))
+        {
+            return new(TeamWriteUpSubmissionState.SubmissionDeadlinePassed);
+        }
 
         var fileId = Guid.CreateVersion7(submittedAt);
         var uploaded = await uploads.CreateAsync(
             fileId,
-            $"competitions/{competitionId:N}/writeups/{teamId:N}/{fileId:N}.pdf",
+            $"competitions/{competitionId:N}/writeups/{submission.TeamId:N}/{fileId:N}.pdf",
             NormalizeFileName(fileName),
             TeamWriteUpRules.ContentType,
             content,
@@ -150,7 +169,7 @@ public sealed class ManageTeamWriteUps(
         {
             var result = await store.ReplaceAsync(
                 competitionId,
-                teamId.Value,
+                submission.TeamId,
                 actorUserId,
                 uploaded.FileId,
                 submittedAt,

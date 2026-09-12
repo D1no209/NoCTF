@@ -362,7 +362,7 @@ export const getMyTeamWriteUp = <ThrowOnError extends boolean = false>(options: 
 /**
  * Submits or replaces the current team's PDF WriteUp.
  *
- * Any active member of an approved, non-banned team may replace its current WriteUp. The previous immutable File is cleaned up asynchronously.
+ * When the competition requires WriteUps, any active member of an approved, non-banned team may submit or replace its PDF through the configured deadline. The previous immutable File is cleaned up asynchronously.
  */
 export const replaceMyTeamWriteUp = <ThrowOnError extends boolean = false>(options: Options<ReplaceMyTeamWriteUpData, ThrowOnError>): RequestResult<ReplaceMyTeamWriteUpResponses, ReplaceMyTeamWriteUpErrors, ThrowOnError> => (options.client ?? client).put<ReplaceMyTeamWriteUpResponses, ReplaceMyTeamWriteUpErrors, ThrowOnError>({
     ...formDataBodySerializer,

@@ -19,6 +19,8 @@ public sealed class TeamWriteUpOpenApiTests
             .IsTrue();
         await Assert.That(upload.GetProperty("responses").TryGetProperty("413", out _))
             .IsTrue();
+        await Assert.That(upload.GetProperty("responses").TryGetProperty("409", out _))
+            .IsTrue();
         await Assert.That(upload.GetProperty("responses").TryGetProperty("422", out _))
             .IsTrue();
 
@@ -36,6 +38,35 @@ public sealed class TeamWriteUpOpenApiTests
                 .IsTrue();
             await Assert.That(HasBearer(download)).IsTrue();
         }
+    }
+
+    [Test]
+    public async Task Competition_contract_exposes_the_required_WriteUp_submission_window()
+    {
+        using var swagger = await ReadSwaggerAsync();
+        var schemas = swagger.RootElement.GetProperty("components").GetProperty("schemas");
+        var competition = schemas.GetProperty(
+            "NoCTFAPIEndpointsCompetitionsCompetitionResponse");
+        foreach (var property in new[]
+                 {
+                     "writeUpSubmissionRequired",
+                     "writeUpSubmissionDeadlineHours",
+                     "writeUpSubmissionDeadlineAt"
+                 })
+        {
+            await Assert.That(competition.GetProperty("properties")
+                    .TryGetProperty(property, out _))
+                .IsTrue();
+        }
+
+        var metadata = schemas.GetProperty(
+            "NoCTFAPIEndpointsAdministrationCompetitionsCompetitionMetadataPatchRequest");
+        var required = metadata.GetProperty("required")
+            .EnumerateArray()
+            .Select(property => property.GetString())
+            .ToArray();
+        await Assert.That(required).Contains("writeUpSubmissionRequired");
+        await Assert.That(required).Contains("writeUpSubmissionDeadlineHours");
     }
 
     [Test]

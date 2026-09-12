@@ -1082,7 +1082,7 @@
           "Competitions"
         ],
         "summary": "Submits or replaces the current team's PDF WriteUp.",
-        "description": "Any active member of an approved, non-banned team may replace its current WriteUp. The previous immutable File is cleaned up asynchronously.",
+        "description": "When the competition requires WriteUps, any active member of an approved, non-banned team may submit or replace its PDF through the configured deadline. The previous immutable File is cleaned up asynchronously.",
         "operationId": "ReplaceMyTeamWriteUp",
         "parameters": [
           {
@@ -1120,6 +1120,16 @@
           },
           "404": {
             "description": "Not Found"
+          },
+          "409": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsTeamsWriteUpsTeamWriteUpFailureResponse"
+                }
+              }
+            }
           },
           "422": {
             "description": "",
@@ -13013,11 +13023,15 @@
         "description": "",
         "x-enumNames": [
           "InvalidPdf",
-          "UploadTooLarge"
+          "UploadTooLarge",
+          "WriteUpSubmissionNotRequired",
+          "WriteUpSubmissionDeadlinePassed"
         ],
         "enum": [
           "InvalidPdf",
-          "UploadTooLarge"
+          "UploadTooLarge",
+          "WriteUpSubmissionNotRequired",
+          "WriteUpSubmissionDeadlinePassed"
         ]
       },
       "NoCTFAPIEndpointsTeamsWriteUpsUploadMyTeamWriteUpRequest": {
@@ -14635,6 +14649,18 @@
           },
           "accessMode": {
             "$ref": "#/components/schemas/NoCTFAPIEndpointsCompetitionsCompetitionAccessModeProtocol"
+          },
+          "writeUpSubmissionRequired": {
+            "type": "boolean"
+          },
+          "writeUpSubmissionDeadlineHours": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "writeUpSubmissionDeadlineAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
           }
         }
       },
@@ -20424,6 +20450,8 @@
           "maxParticipantMessagesBeforeHandlerReply",
           "allowChallengeOwnersToHandleQuestions",
           "practiceModeEnabled",
+          "writeUpSubmissionRequired",
+          "writeUpSubmissionDeadlineHours",
           "accessMode"
         ],
         "properties": {
@@ -20478,6 +20506,15 @@
           },
           "practiceModeEnabled": {
             "type": "boolean"
+          },
+          "writeUpSubmissionRequired": {
+            "type": "boolean"
+          },
+          "writeUpSubmissionDeadlineHours": {
+            "type": "integer",
+            "format": "int32",
+            "maximum": 8760.0,
+            "minimum": 0.0
           },
           "accessMode": {
             "$ref": "#/components/schemas/NoCTFAPIEndpointsCompetitionsCompetitionAccessModeProtocol"

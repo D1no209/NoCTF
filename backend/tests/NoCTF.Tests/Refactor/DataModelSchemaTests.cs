@@ -86,7 +86,8 @@ public sealed class DataModelSchemaTests
                 "20260911213004_AddCompetitionTracksEnabled",
                 "20260912074543_AddRuntimeHumanVerificationToggle",
                 "20260912130511_AddCompetitionAccessMode",
-                "20260912150416_AddTeamWriteUps"
+                "20260912150416_AddTeamWriteUps",
+                "20260912182604_ConfigureTeamWriteUpSubmission"
             ]);
             await Assert.That(migrations[0]).EndsWith("_InitialBaseline");
 
@@ -103,6 +104,19 @@ public sealed class DataModelSchemaTests
                 connection);
             await Assert.That((int)(await accessModeColumnCommand.ExecuteScalarAsync(ct))!)
                 .IsEqualTo(1);
+
+            await using var writeUpPolicyColumnCommand = new NpgsqlCommand(
+                """
+                SELECT count(*)::int
+                FROM information_schema.columns
+                WHERE table_schema = 'public'
+                  AND table_name = 'competitions'
+                  AND column_name IN ('write_up_submission_required', 'write_up_submission_deadline_hours')
+                  AND is_nullable = 'NO'
+                """,
+                connection);
+            await Assert.That((int)(await writeUpPolicyColumnCommand.ExecuteScalarAsync(ct))!)
+                .IsEqualTo(2);
 
             await using var primaryKeyCommand = new NpgsqlCommand(
                 """

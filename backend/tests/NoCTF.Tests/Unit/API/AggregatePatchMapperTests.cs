@@ -247,6 +247,8 @@ public sealed class AggregatePatchMapperTests
             MaxParticipantMessagesBeforeHandlerReply = 3,
             AllowChallengeOwnersToHandleQuestions = true,
             PracticeModeEnabled = false,
+            WriteUpSubmissionRequired = true,
+            WriteUpSubmissionDeadlineHours = 48,
             AccessMode = CompetitionAccessModeProtocol.Public
         }, competition);
 
@@ -261,6 +263,8 @@ public sealed class AggregatePatchMapperTests
         managerIds[0] = Guid.NewGuid();
 
         await Assert.That(competition.Description).IsNull();
+        await Assert.That(competition.WriteUpSubmissionRequired).IsTrue();
+        await Assert.That(competition.WriteUpSubmissionDeadlineHours).IsEqualTo(48);
         await Assert.That(competition.ManagerIds[0]).IsNotEqualTo(managerIds[0]);
     }
 

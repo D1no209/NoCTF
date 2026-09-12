@@ -7,6 +7,8 @@ import type { NoCtfapiEndpointsAdministrationCompetitionsCompetitionConfiguratio
 import { useCompetitionAdmin } from '../../../../../lib/admin-competition'
 import CompetitionModeConfigEditorComponent from '../../../../admin/CompetitionModeConfigEditor.vue'
 
+const maximumWriteUpDeadlineHours = 24 * 365
+
 /** Owns state, effects and commands for AdminCompetitionsByIdConfigurationPage. */
 export function useAdminCompetitionsByIdConfigurationPage() {
   const { competitionId, competition, canWrite, refresh } = useCompetitionAdmin()
@@ -35,6 +37,10 @@ export function useAdminCompetitionsByIdConfigurationPage() {
 
   const practiceModeEnabled = ref(false)
 
+  const writeUpSubmissionRequired = ref(false)
+
+  const writeUpSubmissionDeadlineHours = ref(0)
+
   const staffOnly = ref(false)
 
   const savingMeta = ref(false)
@@ -55,6 +61,8 @@ export function useAdminCompetitionsByIdConfigurationPage() {
     maxParticipantMessagesBeforeHandlerReply.value = c.maxParticipantMessagesBeforeHandlerReply ?? 3
     allowChallengeOwnersToHandleQuestions.value = c.allowChallengeOwnersToHandleQuestions ?? true
     practiceModeEnabled.value = c.practiceModeEnabled ?? false
+    writeUpSubmissionRequired.value = c.writeUpSubmissionRequired ?? false
+    writeUpSubmissionDeadlineHours.value = c.writeUpSubmissionDeadlineHours ?? 0
     staffOnly.value = c.accessMode === 'StaffOnly'
   }, { immediate: true })
 
@@ -64,6 +72,14 @@ export function useAdminCompetitionsByIdConfigurationPage() {
     const end = localInputToIso(endTime.value)
     if (!title.value.trim() || !start || !end) {
       metaError.value = translate("ui.pleaseFillInTheTitleAndTimeCompletely")
+      return
+    }
+    if (!Number.isInteger(writeUpSubmissionDeadlineHours.value)
+      || writeUpSubmissionDeadlineHours.value < 0
+      || writeUpSubmissionDeadlineHours.value > maximumWriteUpDeadlineHours) {
+      metaError.value = translate('writeUp.invalidDeadlineHours', {
+        maximum: maximumWriteUpDeadlineHours,
+      })
       return
     }
     savingMeta.value = true
@@ -84,6 +100,8 @@ export function useAdminCompetitionsByIdConfigurationPage() {
             maxParticipantMessagesBeforeHandlerReply: maxParticipantMessagesBeforeHandlerReply.value,
             allowChallengeOwnersToHandleQuestions: allowChallengeOwnersToHandleQuestions.value,
             practiceModeEnabled: practiceModeEnabled.value,
+            writeUpSubmissionRequired: writeUpSubmissionRequired.value,
+            writeUpSubmissionDeadlineHours: writeUpSubmissionDeadlineHours.value,
             accessMode: staffOnly.value ? 'StaffOnly' : 'Public',
           },
         },
@@ -152,6 +170,9 @@ export function useAdminCompetitionsByIdConfigurationPage() {
       maxParticipantMessagesBeforeHandlerReply,
       allowChallengeOwnersToHandleQuestions,
       practiceModeEnabled,
+      writeUpSubmissionRequired,
+      writeUpSubmissionDeadlineHours,
+      maximumWriteUpDeadlineHours,
       staffOnly,
       savingMeta,
       metaError,

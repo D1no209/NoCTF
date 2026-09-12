@@ -69,6 +69,9 @@ public sealed class CompetitionPracticeModePersistenceTests
                 "ALTER TABLE competitions ADD COLUMN access_mode smallint NOT NULL DEFAULT 0",
                 cancellationToken);
             await db.Database.ExecuteSqlRawAsync(
+                "ALTER TABLE competitions ADD COLUMN write_up_submission_required boolean NOT NULL DEFAULT FALSE, ADD COLUMN write_up_submission_deadline_hours integer NOT NULL DEFAULT 0",
+                cancellationToken);
+            await db.Database.ExecuteSqlRawAsync(
                 "ALTER TABLE teams ADD COLUMN write_up_file_id uuid NULL, ADD COLUMN write_up_submitted_at timestamp with time zone NULL, ADD COLUMN write_up_submitted_by_user_id uuid NULL",
                 cancellationToken);
             var now = DateTimeOffset.UtcNow;
@@ -92,6 +95,9 @@ public sealed class CompetitionPracticeModePersistenceTests
                 cancellationToken);
             await db.Database.ExecuteSqlRawAsync(
                 "ALTER TABLE competitions DROP COLUMN access_mode",
+                cancellationToken);
+            await db.Database.ExecuteSqlRawAsync(
+                "ALTER TABLE competitions DROP COLUMN write_up_submission_required, DROP COLUMN write_up_submission_deadline_hours",
                 cancellationToken);
             await db.Database.ExecuteSqlRawAsync(
                 "ALTER TABLE teams DROP COLUMN write_up_file_id, DROP COLUMN write_up_submitted_at, DROP COLUMN write_up_submitted_by_user_id",

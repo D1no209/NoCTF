@@ -153,6 +153,8 @@ public sealed class CompetitionManagementStore(
         competition.AllowChallengeOwnersToHandleQuestions =
             command.AllowChallengeOwnersToHandleQuestions;
         competition.PracticeModeEnabled = command.PracticeModeEnabled;
+        competition.WriteUpSubmissionRequired = command.WriteUpSubmissionRequired;
+        competition.WriteUpSubmissionDeadlineHours = command.WriteUpSubmissionDeadlineHours;
         competition.AccessMode = command.AccessMode;
         competition.UpdatedAt = command.UpdatedAt;
         await events.RecordAsync(new(
@@ -246,7 +248,9 @@ public sealed class CompetitionManagementStore(
             x.PracticeModeEnabled,
             x.PosterFileId,
             x.TracksEnabled,
-            x.AccessMode));
+            x.AccessMode,
+            x.WriteUpSubmissionRequired,
+            x.WriteUpSubmissionDeadlineHours));
 
     private static CompetitionView Map(Competition x) =>
         new(x.Id, x.Title, x.Description, x.Mode, x.StartAt, x.EndAt, x.Status,
@@ -261,7 +265,9 @@ public sealed class CompetitionManagementStore(
             x.PracticeModeEnabled,
             x.PosterFileId,
             x.TracksEnabled,
-            x.AccessMode);
+            x.AccessMode,
+            x.WriteUpSubmissionRequired,
+            x.WriteUpSubmissionDeadlineHours);
 
     private Task InvalidateReadModelsAsync(
         Guid competitionId,
