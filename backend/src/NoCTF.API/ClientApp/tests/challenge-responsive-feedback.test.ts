@@ -8,8 +8,12 @@ describe('challenge workspace responsive feedback', () => {
       '.competition-participant-workspace.challenge-workspace { grid-template-rows: minmax(0, 1fr); }',
     )
     expect(theme).toContain(
-      '.competition-participant-workspace:not(.question-participant-workspace) { grid-template-rows: minmax(0, 1fr) 12rem; }',
+      '.competition-participant-workspace:not(.question-participant-workspace) { grid-template-rows: minmax(0, 2fr) minmax(0, 1fr); }',
     )
+    expect(theme).toContain(
+      '.question-participant-workspace { grid-template-rows: minmax(0, 3fr) minmax(0, 1fr); }',
+    )
+    expect(theme).not.toContain('grid-template-rows: minmax(0, 1fr) 12rem;')
   })
 
   test('keeps automatic challenge state in its component instead of reopening corner notices', async () => {

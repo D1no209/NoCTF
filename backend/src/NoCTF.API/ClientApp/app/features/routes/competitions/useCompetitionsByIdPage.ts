@@ -168,11 +168,6 @@ export function useCompetitionsByIdPage() {
           { to: `/competitions?competition=${competitionId.value}`, label: translate("ui.overview"), icon: LayoutDashboard, exact: true },
           ...(challengesVisible && canReadChallenges ? [{ to: `${base}/challenges`, label: translate("ui.challenge"), icon: Puzzle }] : []),
           { to: `${base}/leaderboard`, label: translate("ui.leaderboard"), icon: Trophy },
-        ],
-      },
-      {
-        label: translate("ui.interaction"),
-        items: [
           { to: `${base}/questions`, label: translate("ui.questions"), icon: MessageCircleQuestion },
         ],
       },
