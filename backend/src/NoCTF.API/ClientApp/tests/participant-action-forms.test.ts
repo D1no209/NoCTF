@@ -79,7 +79,7 @@ describe('participant action page wiring', () => {
     expect(register).not.toContain("ui.theVerificationEmailHasBeenSentPleaseCheckYourEmail")
   })
 
-  test('offers an accessible password visibility toggle on every password form', async () => {
+  test('keeps password visibility toggles out of the sequential form focus order', async () => {
     const component = await sourceFile(
       new URL('../app/components/ui/password-input/PasswordInput.vue', import.meta.url),
     ).text()
@@ -93,6 +93,7 @@ describe('participant action page wiring', () => {
     expect(component).toContain(":type=\"visible ? 'text' : 'password'\"")
     expect(component).toContain(":aria-label=\"$t(visible ? 'ui.hidePassword' : 'ui.showPassword')\"")
     expect(component).toContain(':aria-pressed="visible"')
+    expect(component).toContain('tabindex="-1"')
     expect(pages.every(page => page.includes('<PasswordInput'))).toBe(true)
     expect(pages.some(page => page.includes('type="password"'))).toBe(false)
   })
