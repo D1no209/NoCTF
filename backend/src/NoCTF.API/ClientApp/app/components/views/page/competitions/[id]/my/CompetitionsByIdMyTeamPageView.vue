@@ -3,7 +3,7 @@ import { toRefs } from 'vue'
 import type { CompetitionsByIdMyTeamPageViewState } from '~/features/routes/competitions/[id]/my/useCompetitionsByIdMyTeamPage'
 
 const viewProps = defineProps<{ state: CompetitionsByIdMyTeamPageViewState }>()
-const { Copy, RefreshCw, maximumAppealStatementLength, minimumAppealStatementLength, competitionId, team, loading, loadError, load, isCaptain, invitationToken, rotating, rotate, copyToken, renameOpen, renameValue, renamePending, openRename, submitRename, transferOpen, transferTarget, transferPending, transferableMembers, submitTransfer, acting, disband, leave, resubmit, banCase, appealOpen, appealStatement, appealPending, appealError, banCaseError, loadBanCase, appealStatusLabel, submitAppeal, setAppealOpen, CompetitionParticipantWorkspace, TeamMembers, onInputAppealError } = toRefs(viewProps.state)
+const { Copy, RefreshCw, maximumAppealStatementLength, minimumAppealStatementLength, competitionId, team, loading, loadError, load, isCaptain, invitationToken, invitationLoading, invitationError, loadInvitationToken, rotating, rotate, copyToken, renameOpen, renameValue, renamePending, openRename, submitRename, transferOpen, transferTarget, transferPending, transferableMembers, submitTransfer, acting, disband, leave, resubmit, banCase, appealOpen, appealStatement, appealPending, appealError, banCaseError, loadBanCase, appealStatusLabel, submitAppeal, setAppealOpen, CompetitionParticipantWorkspace, TeamMembers, onInputAppealError } = toRefs(viewProps.state)
 </script>
 
 <template>
@@ -150,7 +150,16 @@ const { Copy, RefreshCw, maximumAppealStatementLength, minimumAppealStatementLen
           <CardTitle class="text-base">{{ $t('ui.inviteMembers') }}</CardTitle>
         </CardHeader>
         <CardContent class="flex flex-col gap-3">
-          <div v-if="invitationToken" class="flex flex-wrap items-center gap-2">
+          <Skeleton v-if="invitationLoading" class="h-9 w-80 max-w-full" />
+          <Alert v-else-if="invitationError" variant="destructive">
+            <AlertDescription class="flex flex-wrap items-center justify-between gap-3">
+              <span>{{ $message(invitationError) }}</span>
+              <Button type="button" size="sm" variant="outline" @click="loadInvitationToken">
+                {{ $t('ui.retry') }}
+              </Button>
+            </AlertDescription>
+          </Alert>
+          <div v-else-if="invitationToken" class="flex flex-wrap items-center gap-2">
             <code class="rounded bg-muted px-2 py-1 font-mono text-sm">{{ invitationToken }}</code>
             <Button variant="outline" size="sm" @click="copyToken">
               <Copy data-icon="inline-start" /> {{ $t('ui.copy') }} </Button>

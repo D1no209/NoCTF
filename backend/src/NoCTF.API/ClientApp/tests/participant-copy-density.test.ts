@@ -25,6 +25,9 @@ describe('participant copy density', () => {
     ).text()
 
     expect(teamPage).not.toContain("ui.theInvitationCodeIsGeneratedWhenCreatingATeamFor")
+    expect(teamPage).toContain('getTeamInvitationEndpoint({')
+    expect(teamPage).toContain('invitationToken.value = data.invitationToken')
+    expect(teamPage).toContain('v-else-if="invitationToken"')
     expect(teamPage).toContain("$t('ui.rotateInvitationCode')")
     expect(teamPage).toContain('v-if="isCaptain && !team.isBanned"')
     expect(teamPage).toContain(':can-manage="isCaptain && !team.isBanned"')

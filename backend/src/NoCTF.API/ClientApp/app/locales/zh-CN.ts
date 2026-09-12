@@ -854,6 +854,7 @@ export const chineseMessages = {
   "ui.roundDurationSeconds": "轮次时长(秒)",
   "ui.rotateInvitationCode": "轮换邀请码",
   "ui.failedToRotateInvitationCode": "轮换邀请码失败",
+  "ui.failedToLoadInvitationCode": "加载邀请码失败",
   "ui.noMatchingSubmissions": "没有符合条件的提交",
   "ui.thereAreNoRuntimeInstancesThatMatchTheCriteria": "没有符合条件的运行时实例",
   "ui.noMatchingCandidateUsers": "没有匹配的候选用户",

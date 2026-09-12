@@ -131,6 +131,34 @@ public sealed class TeamMembershipStore(
         return (token, null);
     }
 
+    public async Task<(string? Token, TeamMembershipFailure? Failure)> GetInvitationAsync(
+        Guid competitionId,
+        Guid teamId,
+        Guid actorId,
+        CancellationToken ct)
+    {
+        var competition = await db.Competitions.AsNoTracking()
+            .SingleOrDefaultAsync(item => item.Id == competitionId, ct);
+        if (competition is null)
+            return (null, TeamMembershipFailure.CompetitionNotFound);
+        var team = await db.Teams.AsNoTracking()
+            .Where(item => item.Id == teamId && item.CompetitionId == competitionId)
+            .Select(item => new
+            {
+                item.CaptainId,
+                item.InvitationToken,
+                item.IsBanned
+            })
+            .SingleOrDefaultAsync(ct);
+        if (team is null)
+            return (null, TeamMembershipFailure.TeamNotFound);
+        if (team.IsBanned)
+            return (null, TeamMembershipFailure.TeamBanned);
+        if (team.CaptainId != actorId && !IsManager(competition, actorId))
+            return (null, TeamMembershipFailure.TeamForbidden);
+        return (team.InvitationToken, null);
+    }
+
     public async Task<TeamMembershipFailure?> RemoveMemberAsync(
         Guid competitionId,
         Guid teamId,

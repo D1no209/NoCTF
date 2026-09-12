@@ -220,6 +220,14 @@ public sealed class CtfFullBoundaryTests
             "ctf-teammate",
             "ctf-teammate-password",
             cancellationToken));
+        var originalInvitation = await GetJsonAsync(
+            player,
+            $"/api/v1/competitions/{competitionId}/teams/{teamId}/invitation-token",
+            cancellationToken);
+        var originalInvitationToken = originalInvitation
+            .GetProperty("invitationToken")
+            .GetString()
+            ?? throw new InvalidOperationException("Invitation read did not return a token.");
         var invitation = await SendWithoutBodyForJsonAsync(
             player,
             HttpMethod.Post,
@@ -229,6 +237,13 @@ public sealed class CtfFullBoundaryTests
         var invitationToken = invitation.GetProperty("invitationToken").GetString()
             ?? throw new InvalidOperationException("Invitation rotation did not return a token.");
         await Assert.That(invitationToken.Length).IsEqualTo(32);
+        await Assert.That(invitationToken).IsNotEqualTo(originalInvitationToken);
+        var currentInvitation = await GetJsonAsync(
+            player,
+            $"/api/v1/competitions/{competitionId}/teams/{teamId}/invitation-token",
+            cancellationToken);
+        await Assert.That(currentInvitation.GetProperty("invitationToken").GetString())
+            .IsEqualTo(invitationToken);
         await SendJsonWithoutResponseAsync(
             teammate,
             HttpMethod.Post,

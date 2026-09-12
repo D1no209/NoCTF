@@ -23,10 +23,32 @@ public enum TeamMembershipFailure
 public interface ITeamMembershipStore
 {
     Task<TeamMembershipFailure?> JoinByInvitationAsync(Guid competitionId, string invitationToken, Guid userId, DateTimeOffset now, CancellationToken cancellationToken);
+    Task<(string? Token, TeamMembershipFailure? Failure)> GetInvitationAsync(Guid competitionId, Guid teamId, Guid actorId, CancellationToken cancellationToken);
     Task<(string? Token, TeamMembershipFailure? Failure)> RotateInvitationAsync(Guid competitionId, Guid teamId, Guid actorId, string token, CancellationToken cancellationToken);
     Task<TeamMembershipFailure?> RemoveMemberAsync(Guid competitionId, Guid teamId, Guid targetUserId, Guid actorId, CancellationToken cancellationToken);
     Task<TeamMembershipFailure?> LeaveAsync(Guid competitionId, Guid userId, CancellationToken cancellationToken);
     Task<TeamMembershipFailure?> TransferCaptainAsync(Guid competitionId, Guid teamId, Guid actorId, Guid newCaptainId, CancellationToken cancellationToken);
+}
+
+public sealed class GetTeamInvitation(ITeamMembershipStore store)
+{
+    public async Task<OperationResult<string, TeamMembershipFailure>> ExecuteAsync(
+        Guid competitionId,
+        Guid teamId,
+        Guid actorId,
+        CancellationToken cancellationToken = default)
+    {
+        var result = await store.GetInvitationAsync(
+            competitionId,
+            teamId,
+            actorId,
+            cancellationToken);
+        return result.Token is not null
+            ? OperationResult<string, TeamMembershipFailure>.Success(result.Token)
+            : OperationResult<string, TeamMembershipFailure>.Failure(
+                result.Failure!.Value,
+                "Invitation could not be read.");
+    }
 }
 
 public sealed class JoinTeamByInvitation(ITeamMembershipStore store)

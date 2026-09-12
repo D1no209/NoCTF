@@ -81,6 +81,14 @@ export type NoCtfapiEndpointsTeamsGetTeamRequest = {
     [key: string]: never;
 };
 
+export type NoCtfapiEndpointsTeamsGetTeamInvitationResponse = {
+    invitationToken?: string;
+};
+
+export type NoCtfapiEndpointsTeamsGetTeamInvitationRequest = {
+    [key: string]: never;
+};
+
 export type NoCtfapiEndpointsTeamsTeamMembershipFailureResponse = {
     code?: NoCtfapiEndpointsTeamsTeamMembershipFailureCodeProtocol;
     message?: string;
@@ -2795,6 +2803,40 @@ export type GetMyTeamEndpointResponses = {
 };
 
 export type GetMyTeamEndpointResponse = GetMyTeamEndpointResponses[keyof GetMyTeamEndpointResponses];
+
+export type GetTeamInvitationEndpointData = {
+    body?: never;
+    path: {
+        competitionId: string;
+        teamId: string;
+    };
+    query?: never;
+    url: '/api/v1/competitions/{competitionId}/teams/{teamId}/invitation-token';
+};
+
+export type GetTeamInvitationEndpointErrors = {
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+    /**
+     * Not Found
+     */
+    404: unknown;
+};
+
+export type GetTeamInvitationEndpointResponses = {
+    /**
+     * Success
+     */
+    200: NoCtfapiEndpointsTeamsGetTeamInvitationResponse;
+};
+
+export type GetTeamInvitationEndpointResponse = GetTeamInvitationEndpointResponses[keyof GetTeamInvitationEndpointResponses];
 
 export type JoinTeamByInvitationEndpointData = {
     body: NoCtfapiEndpointsTeamsJoinTeamByInvitationRequest;

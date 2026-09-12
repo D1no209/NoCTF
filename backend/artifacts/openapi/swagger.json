@@ -551,6 +551,62 @@
         ]
       }
     },
+    "/api/v1/competitions/{competitionId}/teams/{teamId}/invitation-token": {
+      "get": {
+        "tags": [
+          "Competitions"
+        ],
+        "summary": "Get Team Invitation Endpoint",
+        "description": "Executes GET /api/v1/competitions/{competitionId}/teams/{teamId}/invitation-token.",
+        "operationId": "GetTeamInvitationEndpoint",
+        "parameters": [
+          {
+            "name": "competitionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          },
+          {
+            "name": "teamId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsTeamsGetTeamInvitationResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ]
+      }
+    },
     "/api/v1/competitions/{competitionId}/teams/join": {
       "post": {
         "tags": [
@@ -11797,6 +11853,19 @@
         "additionalProperties": false
       },
       "NoCTFAPIEndpointsTeamsGetTeamRequest": {
+        "type": "object",
+        "additionalProperties": false
+      },
+      "NoCTFAPIEndpointsTeamsGetTeamInvitationResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "invitationToken": {
+            "type": "string"
+          }
+        }
+      },
+      "NoCTFAPIEndpointsTeamsGetTeamInvitationRequest": {
         "type": "object",
         "additionalProperties": false
       },

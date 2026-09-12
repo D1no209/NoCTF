@@ -69,6 +69,37 @@ public sealed class JoinTeamByInvitationEndpointTests
         await Assert.That(store.InvitationToken).IsNull();
     }
 
+    [Test]
+    public async Task Captain_can_read_the_current_invitation_without_rotating_it()
+    {
+        var store = new RecordingMembershipStore(currentToken: Token);
+        await using var app = await CreateApplicationAsync(store);
+
+        using var response = await app.GetTestClient().GetAsync(
+            $"/api/v1/competitions/{CompetitionId}/teams/{UserId}/invitation-token");
+        var invitation = await response.Content
+            .ReadFromJsonAsync<GetTeamInvitationResponse>();
+
+        await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.OK);
+        await Assert.That(response.Headers.CacheControl!.Private).IsTrue();
+        await Assert.That(response.Headers.CacheControl.NoStore).IsTrue();
+        await Assert.That(invitation!.InvitationToken).IsEqualTo(Token);
+    }
+
+    [Test]
+    public async Task Invitation_read_does_not_disclose_the_token_when_forbidden()
+    {
+        var store = new RecordingMembershipStore(
+            currentToken: Token,
+            readFailure: TeamMembershipFailure.TeamForbidden);
+        await using var app = await CreateApplicationAsync(store);
+
+        using var response = await app.GetTestClient().GetAsync(
+            $"/api/v1/competitions/{CompetitionId}/teams/{UserId}/invitation-token");
+
+        await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.Forbidden);
+    }
+
     private static async Task<WebApplication> CreateApplicationAsync(
         RecordingMembershipStore store)
     {
@@ -81,6 +112,7 @@ public sealed class JoinTeamByInvitationEndpointTests
             options.DisableAutoDiscovery = true;
             options.Assemblies = [typeof(JoinTeamByInvitationEndpoint).Assembly];
             options.Filter = type => type == typeof(JoinTeamByInvitationEndpoint)
+                || type == typeof(GetTeamInvitationEndpoint)
                 || type == typeof(JoinTeamByInvitationValidator);
         });
         builder.Services.SwaggerDocument();
@@ -93,6 +125,7 @@ public sealed class JoinTeamByInvitationEndpointTests
         builder.Services.AddAuthorization();
         builder.Services.AddSingleton<ITeamMembershipStore>(store);
         builder.Services.AddScoped<JoinTeamByInvitation>();
+        builder.Services.AddScoped<GetTeamInvitation>();
         builder.Services.AddSingleton<IUserContext>(new TestUserContext());
 
         var app = builder.Build();
@@ -104,7 +137,9 @@ public sealed class JoinTeamByInvitationEndpointTests
     }
 
     private sealed class RecordingMembershipStore(
-        TeamMembershipFailure? failure = null) : ITeamMembershipStore
+        TeamMembershipFailure? failure = null,
+        string? currentToken = null,
+        TeamMembershipFailure? readFailure = null) : ITeamMembershipStore
     {
         public string? InvitationToken { get; private set; }
         public Guid? UserId { get; private set; }
@@ -127,6 +162,15 @@ public sealed class JoinTeamByInvitationEndpointTests
             Guid actorId,
             string token,
             CancellationToken cancellationToken) => throw new NotSupportedException();
+
+        public Task<(string? Token, TeamMembershipFailure? Failure)> GetInvitationAsync(
+            Guid competitionId,
+            Guid teamId,
+            Guid actorId,
+            CancellationToken cancellationToken) => Task.FromResult(
+                readFailure is null
+                    ? (currentToken, (TeamMembershipFailure?)null)
+                    : ((string?)null, readFailure));
 
         public Task<TeamMembershipFailure?> RemoveMemberAsync(
             Guid competitionId,
