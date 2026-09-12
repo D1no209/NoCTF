@@ -103,4 +103,13 @@ describe('api error localization', () => {
       code: 'HumanVerificationSecretInvalid',
     }).message).toBe('请输入有效的 Provider 密钥。')
   })
+
+  test('explains that SMTP testing requires the saved registration switch', () => {
+    setLocale('zh-CN')
+
+    expect(parseApiError({
+      status: 409,
+      code: 'EmailVerificationDisabled',
+    }).message).toBe('测试邮件将发送到当前登录管理员的邮箱地址;未启用邮件发送时不可用。')
+  })
 })

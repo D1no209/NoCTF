@@ -31,3 +31,13 @@ test('email administration keeps a retryable page body when configuration loadin
   expect(view).toContain('@click="load"')
   expect(view).toContain("$t('ui.retry')")
 })
+
+test('SMTP test uses only an enabled and fully saved configuration', async () => {
+  const controller = await sourceFile('app/features/routes/admin/platform/useAdminPlatformEmailPage.ts').text()
+  const view = await sourceFile('app/components/views/page/admin/platform/AdminPlatformEmailPageView.vue').text()
+
+  expect(controller).toContain('const emailDirty = computed(')
+  expect(controller).toContain('syncForm(data.emailVerification)')
+  expect(view).toContain('!configuration.enabled || emailDirty')
+  expect(view).not.toContain('sendingTest || !form.enabled')
+})
