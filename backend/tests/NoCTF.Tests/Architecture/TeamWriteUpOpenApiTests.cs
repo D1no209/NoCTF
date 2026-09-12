@@ -101,11 +101,39 @@ public sealed class TeamWriteUpOpenApiTests
         await Assert.That(HasBearer(consultation)).IsTrue();
     }
 
+    [Test]
+    public async Task Staff_preview_issues_a_protected_grant_for_an_inline_pdf_stream()
+    {
+        using var swagger = await ReadSwaggerAsync();
+        var root = swagger.RootElement;
+        var issue = Operation(
+            root,
+            "/api/v1/competitions/{competitionId}/teams/{teamId}/writeup/preview",
+            "post");
+        var preview = Operation(
+            root,
+            "/api/v1/writeup-previews/{competitionId}/{teamId}",
+            "get");
+
+        await Assert.That(HasBearer(issue)).IsTrue();
+        await Assert.That(issue.GetProperty("responses").TryGetProperty("200", out _))
+            .IsTrue();
+        await Assert.That(preview.GetProperty("responses")
+                .GetProperty("200")
+                .GetProperty("content")
+                .TryGetProperty("application/pdf", out _))
+            .IsTrue();
+        await Assert.That(preview.GetProperty("responses").TryGetProperty("401", out _))
+            .IsTrue();
+        await Assert.That(HasBearer(preview)).IsFalse();
+    }
+
     private static JsonElement Operation(JsonElement root, string path, string method) =>
         root.GetProperty("paths").GetProperty(path).GetProperty(method);
 
     private static bool HasBearer(JsonElement operation) =>
-        operation.GetProperty("security")
+        operation.TryGetProperty("security", out var security)
+        && security
             .EnumerateArray()
             .Any(requirement => requirement.TryGetProperty("Bearer", out _));
 

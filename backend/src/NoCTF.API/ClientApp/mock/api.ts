@@ -146,6 +146,7 @@ export function createMockApi() {
   const wallpapers = new Map<string, Blob>()
   const competitionPosters = new Map<string, Blob | null>()
   const teamWriteUps = new Map<string, { metadata: Data; content: Blob }>()
+  const writeUpPreviewTickets = new Map<string, string>()
   const writeUpAdjustments = new Map<string, number>()
   for (const team of state.teams.filter(team => team.competitionId === state.competitions[0]?.id).slice(0, 3)) {
     const content = mockWriteUpPdf(team.name)
@@ -267,7 +268,9 @@ export function createMockApi() {
     const competition = state.competitions.find(c => c.id === p.competitionId)
     if (p.competitionId && !competition) return problem(404, '演示比赛不存在 / Competition not found')
     const competitionStaff = user?.role === 'Administrator' || user?.role === 'Organizer'
-    if (competition?.accessMode === 'StaffOnly' && !competitionStaff)
+    if (competition?.accessMode === 'StaffOnly'
+      && !competitionStaff
+      && route !== '/writeup-previews/{competitionId}/{teamId}')
       return problem(404, '演示比赛不存在 / Competition not found')
     const challenge = state.challenges.find(c => c.id === p.competitionChallengeId && c.competitionId === p.competitionId)
     if (p.competitionChallengeId && !challenge) return problem(404, '演示题目不存在 / Challenge not found')
@@ -303,6 +306,14 @@ export function createMockApi() {
         return writeUp
           ? new Response(writeUp.content, { headers: { 'Content-Type': 'application/pdf', 'Content-Disposition': `attachment; filename="${writeUp.metadata.fileName}"`, 'Cache-Control': 'private,no-store', 'Content-Security-Policy': "sandbox; default-src 'none'", 'Cross-Origin-Resource-Policy': 'same-origin', 'X-Content-Type-Options': 'nosniff', 'X-NoCTF-Mock': 'true' } })
           : problem(404, '尚未提交题解 / No WriteUp submitted')
+      }
+      if (route === '/writeup-previews/{competitionId}/{teamId}') {
+        const writeUp = teamWriteUps.get(p.teamId!)
+        const ticket = request.headers.get('cookie')
+          ?.match(/(?:^|;\s*)noctf_writeup_preview=([^;]+)/)?.[1]
+        return writeUp && ticket === writeUpPreviewTickets.get(p.teamId!)
+          ? new Response(writeUp.content, { headers: { 'Content-Type': 'application/pdf', 'Cache-Control': 'private,no-store', 'Accept-Ranges': 'bytes', 'Cross-Origin-Resource-Policy': 'same-origin', 'X-Content-Type-Options': 'nosniff', 'X-NoCTF-Mock': 'true' } })
+          : problem(401, '预览授权已失效 / Preview grant expired')
       }
       if (route === '/competitions/{competitionId}/writeups') {
         if (!competitionStaff) return problem(403, '需要竞赛工作人员权限 / Staff access required')
@@ -537,7 +548,21 @@ export function createMockApi() {
           submittedAt: now(),
         }
         teamWriteUps.set(myTeam.id, { metadata, content: file })
+        writeUpPreviewTickets.delete(myTeam.id)
         value = metadata
+      }
+      else if (route === '/competitions/{competitionId}/teams/{teamId}/writeup/preview' && request.method === 'POST') {
+        if (!competitionStaff) return problem(403, '需要竞赛工作人员权限 / Staff access required')
+        const writeUp = teamWriteUps.get(p.teamId!)
+        if (!writeUp) return problem(404, '尚未提交题解 / No WriteUp submitted')
+        const previewUrl = `/api/v1/writeup-previews/${p.competitionId}/${p.teamId}`
+        const ticket = crypto.randomUUID()
+        writeUpPreviewTickets.set(p.teamId!, ticket)
+        return json(
+          { previewUrl, expiresAt: date(10 / 60) },
+          200,
+          { 'Set-Cookie': `noctf_writeup_preview=${ticket}; Path=${previewUrl}; Max-Age=600; HttpOnly; SameSite=Strict` },
+        )
       }
       else if (route === '/admin/competitions/{competitionId}/poster' && request.method === 'DELETE') {
         competitionPosters.set(p.competitionId!, null)

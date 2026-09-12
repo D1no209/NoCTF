@@ -209,6 +209,12 @@ public sealed class ManageTeamWriteUps(
         return await OpenAsync(reference, cancellationToken);
     }
 
+    public Task<TeamWriteUpReference?> FindAsync(
+        Guid competitionId,
+        Guid teamId,
+        CancellationToken cancellationToken = default) =>
+        store.FindAsync(competitionId, teamId, cancellationToken);
+
     public async Task<TeamWriteUpReview> ReviewAsync(
         Guid competitionId,
         CancellationToken cancellationToken = default)

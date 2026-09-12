@@ -33,6 +33,11 @@ test('staff review combines Edge-compatible PDF preview with authoritative chall
   ).text()
 
   expect(controller).toContain('listTeamWriteUps')
+  expect(controller).toContain('issueTeamWriteUpPreview')
+  expect(controller).toContain('previewUrl.value = data.previewUrl')
+  expect(controller).not.toContain('readProtectedDownload')
+  expect(controller).not.toContain('URL.createObjectURL')
+  expect(controller).not.toContain('URL.revokeObjectURL')
   expect(controller).toContain('adminCreateManualAdjustment')
   expect(controller).toContain('await adjustScore(-points)')
   expect(view).toContain('selected.challengeScores')

@@ -1175,6 +1175,60 @@
         ]
       }
     },
+    "/api/v1/competitions/{competitionId}/teams/{teamId}/writeup/preview": {
+      "post": {
+        "tags": [
+          "Competitions"
+        ],
+        "summary": "Issues a short-lived inline preview grant for a team WriteUp.",
+        "description": "Authorized competition staff receive an HttpOnly, same-site grant scoped to the selected immutable PDF.",
+        "operationId": "IssueTeamWriteUpPreview",
+        "parameters": [
+          {
+            "name": "competitionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "teamId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsTeamsWriteUpsTeamWriteUpPreviewResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ]
+      }
+    },
     "/api/v1/competitions/{competitionId}/writeups": {
       "get": {
         "tags": [
@@ -1216,6 +1270,53 @@
             "Bearer": []
           }
         ]
+      }
+    },
+    "/api/v1/writeup-previews/{competitionId}/{teamId}": {
+      "get": {
+        "tags": [
+          "Writeup-Previews"
+        ],
+        "summary": "Streams a team WriteUp through a short-lived preview grant.",
+        "description": "The same-site HttpOnly grant is scoped to one immutable PDF. Byte ranges are enabled for progressive browser rendering.",
+        "operationId": "PreviewTeamWriteUp",
+        "parameters": [
+          {
+            "name": "competitionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "teamId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "404": {
+            "description": "Not Found"
+          },
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/pdf": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        }
       }
     },
     "/api/v1/competitions/{competitionId}/challenges/{competitionChallengeId}/runtimes": {
@@ -12943,6 +13044,19 @@
             "nullable": true
           },
           "submittedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "NoCTFAPIEndpointsTeamsWriteUpsTeamWriteUpPreviewResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "previewUrl": {
+            "type": "string"
+          },
+          "expiresAt": {
             "type": "string",
             "format": "date-time"
           }

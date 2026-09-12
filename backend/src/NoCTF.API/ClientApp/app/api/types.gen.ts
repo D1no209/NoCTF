@@ -266,6 +266,11 @@ export type NoCtfapiEndpointsTeamsWriteUpsTeamWriteUpResponse = {
     submittedAt?: string;
 };
 
+export type NoCtfapiEndpointsTeamsWriteUpsTeamWriteUpPreviewResponse = {
+    previewUrl?: string;
+    expiresAt?: string;
+};
+
 export type NoCtfapiEndpointsTeamsWriteUpsTeamWriteUpReviewResponse = {
     scoreboardAvailable?: boolean;
     canJudge?: boolean;
@@ -3228,6 +3233,40 @@ export type ReplaceMyTeamWriteUpResponses = {
 
 export type ReplaceMyTeamWriteUpResponse = ReplaceMyTeamWriteUpResponses[keyof ReplaceMyTeamWriteUpResponses];
 
+export type IssueTeamWriteUpPreviewData = {
+    body?: never;
+    path: {
+        competitionId: string;
+        teamId: string;
+    };
+    query?: never;
+    url: '/api/v1/competitions/{competitionId}/teams/{teamId}/writeup/preview';
+};
+
+export type IssueTeamWriteUpPreviewErrors = {
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+    /**
+     * Not Found
+     */
+    404: unknown;
+};
+
+export type IssueTeamWriteUpPreviewResponses = {
+    /**
+     * Success
+     */
+    200: NoCtfapiEndpointsTeamsWriteUpsTeamWriteUpPreviewResponse;
+};
+
+export type IssueTeamWriteUpPreviewResponse = IssueTeamWriteUpPreviewResponses[keyof IssueTeamWriteUpPreviewResponses];
+
 export type ListTeamWriteUpsData = {
     body?: never;
     path: {
@@ -3256,6 +3295,36 @@ export type ListTeamWriteUpsResponses = {
 };
 
 export type ListTeamWriteUpsResponse = ListTeamWriteUpsResponses[keyof ListTeamWriteUpsResponses];
+
+export type PreviewTeamWriteUpData = {
+    body?: never;
+    path: {
+        competitionId: string;
+        teamId: string;
+    };
+    query?: never;
+    url: '/api/v1/writeup-previews/{competitionId}/{teamId}';
+};
+
+export type PreviewTeamWriteUpErrors = {
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Not Found
+     */
+    404: unknown;
+};
+
+export type PreviewTeamWriteUpResponses = {
+    /**
+     * Success
+     */
+    200: Blob | File;
+};
+
+export type PreviewTeamWriteUpResponse = PreviewTeamWriteUpResponses[keyof PreviewTeamWriteUpResponses];
 
 export type CreateRuntimeData = {
     body: NoCtfapiEndpointsRuntimeCreateRuntimeRequest;

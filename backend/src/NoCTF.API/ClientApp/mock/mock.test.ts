@@ -162,6 +162,27 @@ describe('isolated Mock API', () => {
     expect(review.status).toBe(200)
     expect(payload.items.some((item: Data) =>
       item.writeUp.fileName === 'optional-writeup.pdf')).toBe(true)
+
+    const selected = payload.items.find((item: Data) =>
+      item.writeUp.fileName === 'optional-writeup.pdf')
+    const issued = await api.handle(new Request(
+      base + `${competition}/teams/${selected.writeUp.teamId}/writeup/preview`,
+      {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${staffToken}` },
+      },
+    ))
+    const grant = await issued.json()
+    const cookie = issued.headers.get('set-cookie')!.split(';', 1)[0]
+    const preview = await api.handle(new Request(base + grant.previewUrl, {
+      headers: { Cookie: cookie },
+    }))
+    expect(preview.status).toBe(200)
+    expect(preview.headers.get('accept-ranges')).toBe('bytes')
+    expect(preview.headers.has('content-security-policy')).toBe(false)
+    expect(new TextDecoder('ascii').decode(
+      new Uint8Array(await preview.arrayBuffer()).slice(0, 5),
+    )).toBe('%PDF-')
   })
 
   test('WriteUp review previews PDFs adjusts challenge scores and opens consultations', async () => {
