@@ -854,6 +854,7 @@ export const englishMessages = {
   "ui.roundDurationSeconds": "Round duration (seconds)",
   "ui.rotateInvitationCode": "Rotate invitation code",
   "ui.failedToRotateInvitationCode": "Failed to rotate invitation code",
+  "ui.failedToLoadInvitationCode": "Failed to load invitation code",
   "ui.noMatchingSubmissions": "No matching submissions",
   "ui.thereAreNoRuntimeInstancesThatMatchTheCriteria": "There are no runtime instances that match the criteria",
   "ui.noMatchingCandidateUsers": "No matching candidate users",

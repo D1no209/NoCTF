@@ -86,6 +86,7 @@ GET  /api/v1/competitions/{competitionId}/teams/{teamId}/avatar
 PUT  /api/v1/competitions/{competitionId}/teams/{teamId}/avatar
 DELETE /api/v1/competitions/{competitionId}/teams/{teamId}/avatar
 POST /api/v1/competitions/{competitionId}/teams/join
+GET  /api/v1/competitions/{competitionId}/teams/{teamId}/invitation-token
 POST /api/v1/competitions/{competitionId}/teams/{teamId}/invitation-token/rotate
 DELETE /api/v1/competitions/{competitionId}/teams/me/membership
 ```
@@ -93,7 +94,7 @@ DELETE /api/v1/competitions/{competitionId}/teams/me/membership
 Team response 使用 CaptainId 与 MemberIds 数组，不返回成员顺序。
 Team PATCH 使用 Profile、Membership、Registration、Administration、Ban section；队长的 Registration 只允许 Rejected → Pending，管理端 Administration 同时提交完整 TrackKey 与 RegistrationStatus，且只允许业务状态机接受的审核变化。
 Team Avatar 与 Competition Poster 都通过不可变 File 引用上传；上传/清除需要对应管理权限，读取路由不暴露通用 File 下载能力。
-邀请加入使用队伍当前的 32 位 InvitationToken；比赛运行中仅在 `AllowTeamRegistrationWhileRunning` 开启时允许加入。
+邀请加入使用队伍当前的 32 位 InvitationToken；队长、Owner 与 Manager 可读取当前值并轮换，普通成员与外部用户不可读取。比赛运行中仅在 `AllowTeamRegistrationWhileRunning` 开启时允许加入。
 加入失败返回强类型 `TeamMembershipFailureCodeProtocol`，前端不得将阶段锁定、队伍已满或无效邀请码表现为无响应。
 
 Competition 列表只返回调用者可见状态：匿名可见 Visible/Published/Running/Paused/Finished，Draft 仅管理者。Team 私有字段（InvitationToken、Ban 原因）只按权限返回；公开 Team DTO 永不包含 InvitationToken。

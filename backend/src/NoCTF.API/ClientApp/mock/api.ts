@@ -113,6 +113,10 @@ function mockMonitoringSnapshot(): Data {
 
 export function createMockApi() {
   const state = createFixtures()
+  const invitationTokens = new Map(state.teams.map((team, index) => [
+    team.id,
+    `mock${String(index + 1).padStart(28, '0')}`,
+  ]))
   const sessions = new Map<string, string>()
   const tokens = new Map<string, string>()
   const administratorIssuedTokens = new Map<string, Data>()
@@ -338,6 +342,11 @@ export function createMockApi() {
       else if (route === '/admin/challenges') value = list(state.templates, url)
       else if (route === '/admin/challenges/{challengeId}') value = template
       else if (route === '/admin/challenges/{challengeId}/attachments') value = { deliveryPolicy: 'All', items: state.attachments.filter(item => item.challengeId === template!.id && (!item.deletedAt || url.searchParams.get('includeDeleted') === 'true')) }
+      else if (cleanRoute.endsWith('/invitation-token')) {
+        if (!user) return problem(401, '请先登录演示账号 / Sign in to view the invitation token')
+        if (!team || (team.captainId !== user.userId && !['Administrator', 'Organizer'].includes(user.role))) return problem(403, '仅队长或竞赛管理者可查看 / Captain or competition manager required')
+        value = { invitationToken: invitationTokens.get(team.id) }
+      }
       else if (cleanRoute.endsWith('/teams/me')) {
         if (!myTeam) return problem(404, '尚未加入演示队伍 / No team')
         value = myTeam
@@ -522,7 +531,7 @@ export function createMockApi() {
       else if (route === '/admin/competitions/{competitionId}/challenges/{competitionChallengeId}' && request.method === 'PATCH') { if (body.presentation) Object.assign(challenge!, body.presentation, { title: body.presentation.customTitle ?? challenge!.title }); value = { challenge, mode: competition!.mode, competitionStatus: competition!.status, rulesJson: body.rules?.json ?? '{}' } }
       else if (cleanRoute === '/competitions/{competitionId}/teams' && request.method === 'POST') {
         if (myTeam) return problem(409, '已加入队伍，请先退出 / Already in a team')
-        value = { ...state.teams[0], ...body, id: body.id ?? crypto.randomUUID(), competitionId: p.competitionId, captainId: user!.userId, memberIds: [user!.userId], registeredAt: now() }; state.teams.push(value)
+        value = { ...state.teams[0], ...body, id: body.id ?? crypto.randomUUID(), competitionId: p.competitionId, captainId: user!.userId, memberIds: [user!.userId], registeredAt: now() }; state.teams.push(value); invitationTokens.set(value.id, crypto.randomUUID().replaceAll('-', ''))
       }
       else if (cleanRoute === '/competitions/{competitionId}/teams/{teamId}' && request.method === 'PATCH') {
         if (!team || (team.captainId !== user!.userId && user!.role !== 'Administrator')) return problem(403, '仅队长可以编辑 / Captain required')
@@ -537,11 +546,17 @@ export function createMockApi() {
         value = team
       }
       else if (cleanRoute.endsWith('/teams/me/membership') && request.method === 'DELETE') { if (myTeam) myTeam.memberIds = myTeam.memberIds.filter((member: string) => member !== user!.userId); value = {} }
-      else if (cleanRoute.endsWith('/invitation-token/rotate')) value = { invitationToken: 'mock00000000000000000000000000001' }
+      else if (cleanRoute.endsWith('/invitation-token/rotate')) {
+        if (!team || (team.captainId !== user!.userId && !['Administrator', 'Organizer'].includes(user!.role))) return problem(403, '仅队长或竞赛管理者可轮换 / Captain or competition manager required')
+        const invitationToken = crypto.randomUUID().replaceAll('-', '')
+        invitationTokens.set(team.id, invitationToken)
+        value = { invitationToken }
+      }
       else if (cleanRoute.endsWith('/teams/join')) {
-        if (body.invitationToken !== 'mock00000000000000000000000000001') return problem(400, '无效的演示邀请码 / Invalid demo invitation')
+        const invitedTeam = state.teams.find(candidate => candidate.competitionId === p.competitionId && invitationTokens.get(candidate.id) === body.invitationToken)
+        if (!invitedTeam) return problem(400, '无效的演示邀请码 / Invalid demo invitation')
         if (myTeam) return problem(409, '已加入队伍 / Already in a team')
-        value = state.teams.find(t => t.competitionId === p.competitionId)!; value.memberIds.push(user!.userId)
+        value = invitedTeam; value.memberIds.push(user!.userId)
       }
       else if (route.endsWith('/flag-submissions')) {
         if (!myTeam) return problem(409, '先加入演示队伍 / Join a team first')

@@ -156,6 +156,24 @@ describe('isolated Mock API', () => {
     expect(checked).toBeGreaterThan(70)
   })
 
+  test('invitation tokens can be read and rotated by the team captain', async () => {
+    const { send } = await setup('player')
+    const path = `${competition}/teams/${id(5)}/invitation-token`
+
+    const initialResponse = await send(path)
+    const initial = await initialResponse.json()
+    const rotatedResponse = await send(`${path}/rotate`, 'POST')
+    const rotated = await rotatedResponse.json()
+    const current = await (await send(path)).json()
+
+    expect(initialResponse.status).toBe(200)
+    expect(initial.invitationToken).toHaveLength(32)
+    expect(rotatedResponse.status).toBe(200)
+    expect(rotated.invitationToken).toHaveLength(32)
+    expect(rotated.invitationToken).not.toBe(initial.invitationToken)
+    expect(current.invitationToken).toBe(rotated.invitationToken)
+  })
+
   test('CTF resubmissions are judged normally without double scoring', async () => {
     const { send } = await setup('player')
     const seeded = await (await send(`${competition}/challenges/${id(4)}`)).json()

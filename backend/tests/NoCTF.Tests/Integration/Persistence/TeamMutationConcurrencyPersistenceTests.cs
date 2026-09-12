@@ -45,6 +45,7 @@ public sealed class TeamMutationConcurrencyPersistenceTests
             await CreateWhileJoiningAsync(options, cancellationToken);
             await DifferentUsersJoinAsync(options, cancellationToken);
             await JoinWhileRunningFollowsRegistrationSettingAsync(options, cancellationToken);
+            await InvitationReadAuthorizationAsync(options, cancellationToken);
             await BannedTeamRejectsOrganizationMutationsAsync(options, cancellationToken);
         });
     }
@@ -210,6 +211,44 @@ public sealed class TeamMutationConcurrencyPersistenceTests
         await Assert.That(memberIds.Length).IsEqualTo(3);
     }
 
+    private static async Task InvitationReadAuthorizationAsync(
+        DbContextOptions<NoCtfDbContext> options,
+        CancellationToken ct)
+    {
+        var now = DateTimeOffset.UtcNow.AddMinutes(35);
+        var owner = User(Guid.CreateVersion7(now), "invitation-owner", now);
+        var captain = User(Guid.CreateVersion7(now.AddTicks(1)), "invitation-captain", now);
+        var outsider = User(Guid.CreateVersion7(now.AddTicks(2)), "invitation-outsider", now);
+        var competition = Competition(
+            Guid.CreateVersion7(now.AddTicks(3)), owner.Id, "Invitation read", now);
+        const string invitationToken = "READREADREADREADREADREADREADREAD";
+        var team = Team(
+            Guid.CreateVersion7(now.AddTicks(4)),
+            competition.Id,
+            captain.Id,
+            "Readable",
+            invitationToken,
+            now);
+        await SeedAsync(options, [owner, captain, outsider], [competition], [team], ct);
+
+        await using var db = new NoCtfDbContext(options);
+        var membership = new TeamMembershipStore(db, new NoopOutbox());
+        var captainRead = await membership.GetInvitationAsync(
+            competition.Id, team.Id, captain.Id, ct);
+        var ownerRead = await membership.GetInvitationAsync(
+            competition.Id, team.Id, owner.Id, ct);
+        var outsiderRead = await membership.GetInvitationAsync(
+            competition.Id, team.Id, outsider.Id, ct);
+
+        await Assert.That(captainRead.Token).IsEqualTo(invitationToken);
+        await Assert.That(captainRead.Failure).IsNull();
+        await Assert.That(ownerRead.Token).IsEqualTo(invitationToken);
+        await Assert.That(ownerRead.Failure).IsNull();
+        await Assert.That(outsiderRead.Token).IsNull();
+        await Assert.That(outsiderRead.Failure)
+            .IsEqualTo(TeamMembershipFailure.TeamForbidden);
+    }
+
     private static async Task JoinWhileRunningFollowsRegistrationSettingAsync(
         DbContextOptions<NoCtfDbContext> options,
         CancellationToken ct)
@@ -307,6 +346,9 @@ public sealed class TeamMutationConcurrencyPersistenceTests
         await Assert.That((await membership.RotateInvitationAsync(
             competition.Id, team.Id, captain.Id,
             "FROZFROZFROZFROZFROZFROZFROZFROZ", ct)).Failure)
+            .IsEqualTo(TeamMembershipFailure.TeamBanned);
+        await Assert.That((await membership.GetInvitationAsync(
+            competition.Id, team.Id, captain.Id, ct)).Failure)
             .IsEqualTo(TeamMembershipFailure.TeamBanned);
         await Assert.That(await membership.RemoveMemberAsync(
             competition.Id, team.Id, member.Id, captain.Id, ct))

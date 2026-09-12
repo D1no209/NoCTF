@@ -3,7 +3,7 @@ import { markRaw } from 'vue'
 
 import { toast } from 'vue-sonner'
 import { Copy, RefreshCw } from '@lucide/vue'
-import { deleteTeamEndpoint, getMyTeamBanCase, getMyTeamEndpoint, leaveTeamEndpoint, patchCompetitionTeam, rotateTeamInvitationEndpoint, submitTeamBanAppeal } from '../../../../../api'
+import { deleteTeamEndpoint, getMyTeamBanCase, getMyTeamEndpoint, getTeamInvitationEndpoint, leaveTeamEndpoint, patchCompetitionTeam, rotateTeamInvitationEndpoint, submitTeamBanAppeal } from '../../../../../api'
 import type { NoCtfapiEndpointsTeamsMyTeamBanCaseResponse, NoCtfapiEndpointsTeamsTeamResponse } from '../../../../../api'
 import { maximumAppealStatementLength, minimumAppealStatementLength, validateAppealStatement } from '../../../../../lib/participant-form-validation'
 import CompetitionParticipantWorkspaceComponent from '../../../../competition/CompetitionParticipantWorkspace.vue'
@@ -23,6 +23,31 @@ export function useCompetitionsByIdMyTeamPage() {
 
   const loadError = ref<string | null>(null)
 
+  const invitationToken = ref<string | null>(null)
+
+  const invitationLoading = ref(false)
+
+  const invitationError = ref<string | null>(null)
+
+  async function loadInvitationToken() {
+    if (!team.value || team.value.captainId !== user.value?.userId || team.value.isBanned) {
+      invitationToken.value = null
+      invitationError.value = null
+      return
+    }
+    invitationLoading.value = true
+    invitationError.value = null
+    const { data, error } = await getTeamInvitationEndpoint({
+      path: { competitionId, teamId: team.value.id! },
+    })
+    invitationLoading.value = false
+    if (error || !data?.invitationToken) {
+      invitationError.value = parseApiError(error, translate("ui.failedToLoadInvitationCode")).message
+      return
+    }
+    invitationToken.value = data.invitationToken
+  }
+
   async function load() {
     const { data, error } = await getMyTeamEndpoint({ path: { competitionId } })
     loading.value = false
@@ -31,6 +56,7 @@ export function useCompetitionsByIdMyTeamPage() {
       return
     }
     team.value = data
+    await loadInvitationToken()
   }
 
   onMounted(load)
@@ -39,13 +65,12 @@ export function useCompetitionsByIdMyTeamPage() {
     () => !!team.value && !!user.value && team.value.captainId === user.value.userId,
   )
 
-  const invitationToken = ref<string | null>(null)
-
   const rotating = ref(false)
 
   async function rotate() {
     if (!team.value) return
     rotating.value = true
+    invitationError.value = null
     const { data, error } = await rotateTeamInvitationEndpoint({
       path: { competitionId, teamId: team.value.id! },
     })
@@ -259,6 +284,9 @@ export function useCompetitionsByIdMyTeamPage() {
       load,
       isCaptain,
       invitationToken,
+      invitationLoading,
+      invitationError,
+      loadInvitationToken,
       rotating,
       rotate,
       copyToken,
