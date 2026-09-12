@@ -89,6 +89,22 @@ public sealed class TeamWriteUpOpenApiTests
                 .EnumerateObject()
                 .Select(property => property.Name))
             .IsEquivalentTo(["scoreboardAvailable", "canJudge", "items"]);
+        var reviewItem = ResolveSchema(
+            root,
+            reviewSchema.GetProperty("properties")
+                .GetProperty("items")
+                .GetProperty("items"));
+        await Assert.That(reviewItem.GetProperty("properties")
+                .EnumerateObject()
+                .Select(property => property.Name))
+            .IsEquivalentTo([
+                "writeUp",
+                "originalTotalScore",
+                "originalRank",
+                "adjustedTotalScore",
+                "adjustedRank",
+                "challengeScores"
+            ]);
 
         var consultation = Operation(
             root,

@@ -22,6 +22,10 @@ export function useCompetitionsByIdPage() {
     `/competitions/${competitionId.value}/awdp-live`,
   ].includes(route.path))
 
+  const isWriteUpReview = computed(() =>
+    route.path === `/competitions/${competitionId.value}/writeups`,
+  )
+
   const competition = ref<NoCtfapiEndpointsCompetitionsCompetitionResponse | null>(null)
 
   const myTeam = ref<NoCtfapiEndpointsTeamsTeamResponse | null>(null)
@@ -120,13 +124,15 @@ export function useCompetitionsByIdPage() {
       await router.replace('/competitions')
       return
     }
-    if (result === 'loaded')
+    if (result === 'loaded' && !isWriteUpReview.value)
       await refreshMyTeam()
   }
 
   watch(
     () => user.value?.userId,
-    () => void refreshMyTeam(),
+    () => {
+      if (!isWriteUpReview.value) void refreshMyTeam()
+    },
   )
 
   let unwatch: (() => void) | undefined
@@ -135,14 +141,18 @@ export function useCompetitionsByIdPage() {
     unwatch = watchCompetition(competitionId.value, {
       competitionLifecycleChanged: () => {
         void refresh()
-        void refreshStandingLatest()
+        if (!isWriteUpReview.value) void refreshStandingLatest()
       },
       competitionEventChanged: event => {
         if (event.kind === 'CompetitionAudienceChanged')
           void handleAudienceChanged()
       },
-      scoreboardUpdated: () => void refreshStandingLatest(),
-      onReconnected: () => void refreshStandingLatest(),
+      scoreboardUpdated: () => {
+        if (!isWriteUpReview.value) void refreshStandingLatest()
+      },
+      onReconnected: () => {
+        if (!isWriteUpReview.value) void refreshStandingLatest()
+      },
     })
   })
 
@@ -200,12 +210,13 @@ export function useCompetitionsByIdPage() {
 
   async function initialize() {
     await refresh()
-    await refreshMyTeam()
+    if (!isWriteUpReview.value) await refreshMyTeam()
   }
 
   return {
       initialize,
       isControlScreen,
+      isWriteUpReview,
       competition,
       myStanding,
       standingLoading,

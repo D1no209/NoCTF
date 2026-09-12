@@ -8,27 +8,8 @@ const { ArrowLeft, Download, FileSearch, MessageCircleQuestion, MinusCircle, Ref
 
 <template>
   <div data-writeup-review-workspace class="flex min-h-0 flex-1 flex-col">
-    <Card class="flex min-h-0 flex-1 flex-col overflow-hidden py-0">
-      <CardHeader class="shrink-0 py-5">
-        <div class="flex flex-wrap items-center justify-between gap-3">
-          <div class="flex items-center gap-3">
-            <Button variant="ghost" size="icon-sm" as-child>
-              <NuxtLink :to="`/competitions?competition=${competitionId}`" :aria-label="$t('ui.backToCompetition')">
-                <ArrowLeft />
-              </NuxtLink>
-            </Button>
-            <FileSearch class="size-6 text-primary" />
-            <CardTitle>{{ $t('writeUp.review') }}</CardTitle>
-            <Badge v-if="review" variant="secondary">{{ $t('writeUp.submissionCount', { count: review.items?.length ?? 0 }) }}</Badge>
-          </div>
-          <Button variant="outline" size="sm" :disabled="loading" @click="load">
-            <Spinner v-if="loading" data-icon="inline-start" />
-            <RefreshCw v-else data-icon="inline-start" />{{ $t('ui.refresh') }}
-          </Button>
-        </div>
-      </CardHeader>
-
-      <CardContent class="min-h-0 flex-1 pb-5">
+    <Card slot-name="writeup-review-card" class="flex min-h-0 flex-1 flex-col overflow-hidden py-0">
+      <CardContent class="min-h-0 flex-1 px-3 pb-3">
         <Alert v-if="loadError && !review" variant="destructive">
           <AlertDescription class="flex flex-wrap items-center justify-between gap-3">
             <span>{{ $message(loadError) }}</span>
@@ -44,7 +25,20 @@ const { ArrowLeft, Download, FileSearch, MessageCircleQuestion, MinusCircle, Ref
         </Empty>
         <div v-else-if="review" data-scroll-surface data-scroll-axis="y" class="grid h-full min-h-0 gap-4 overflow-y-auto xl:grid-cols-[minmax(13rem,15rem)_minmax(0,1fr)_minmax(18rem,22rem)] xl:grid-rows-[minmax(0,1fr)] xl:overflow-hidden">
           <section class="flex min-h-0 flex-col rounded-xl bg-muted/35 p-3 shadow-inner">
-            <h2 class="mb-3 text-sm font-semibold">{{ $t('writeUp.teams') }}</h2>
+            <header class="mb-3 flex items-center gap-2">
+              <Button variant="ghost" size="icon-sm" as-child>
+                <NuxtLink :to="`/competitions?competition=${competitionId}`" :aria-label="$t('ui.backToCompetition')">
+                  <ArrowLeft />
+                </NuxtLink>
+              </Button>
+              <FileSearch class="size-5 shrink-0 text-primary" />
+              <h2 class="min-w-0 flex-1 truncate text-sm font-semibold">{{ $t('writeUp.review') }}</h2>
+              <Badge variant="secondary">{{ $t('writeUp.submissionCount', { count: review.items?.length ?? 0 }) }}</Badge>
+              <Button variant="ghost" size="icon-sm" :disabled="loading" :aria-label="$t('ui.refresh')" @click="load">
+                <Spinner v-if="loading" />
+                <RefreshCw v-else />
+              </Button>
+            </header>
             <ScrollSurface axis="y" class="min-h-0 flex-1" :aria-label="$t('writeUp.teams')">
               <div class="flex flex-col gap-1 pr-2">
                 <ActionButton
@@ -56,7 +50,7 @@ const { ArrowLeft, Download, FileSearch, MessageCircleQuestion, MinusCircle, Ref
                 >
                   <span class="w-full truncate font-semibold">{{ item.writeUp?.teamName }}</span>
                   <span class="font-mono text-xs tabular-nums text-muted-foreground">
-                    {{ $t('writeUp.totalScore', { score: item.totalScore ?? 0 }) }}
+                    {{ $t('writeUp.totalScore', { score: item.adjustedTotalScore ?? 0 }) }}
                   </span>
                   <span class="text-xs text-muted-foreground">{{ formatDateTime(item.writeUp?.submittedAt) }}</span>
                 </ActionButton>
@@ -65,8 +59,8 @@ const { ArrowLeft, Download, FileSearch, MessageCircleQuestion, MinusCircle, Ref
           </section>
 
           <section class="flex min-h-0 min-w-0 flex-col gap-3">
-            <div v-if="selected?.writeUp" class="flex flex-wrap items-start justify-between gap-3">
-              <div class="min-w-0">
+            <div v-if="selected?.writeUp" class="flex flex-wrap items-start gap-4">
+              <div class="min-w-0 flex-1">
                 <h2 class="truncate text-base font-semibold">{{ selected.writeUp.teamName }}</h2>
                 <p class="truncate text-sm text-muted-foreground">
                   {{ selected.writeUp.fileName }} · {{ formatBytes(selected.writeUp.byteLength ?? 0) }}
@@ -75,6 +69,16 @@ const { ArrowLeft, Download, FileSearch, MessageCircleQuestion, MinusCircle, Ref
                   {{ $t('writeUp.reviewMetadata', { user: selected.writeUp.submittedByDisplayName ?? selected.writeUp.submittedByUserId ?? '-', time: formatDateTime(selected.writeUp.submittedAt) }) }}
                 </p>
               </div>
+              <dl class="grid shrink-0 grid-cols-2 gap-x-5 text-right">
+                <div>
+                  <dt class="text-[0.6875rem] text-muted-foreground">{{ $t('writeUp.originalRank') }}</dt>
+                  <dd class="font-mono text-lg font-semibold tabular-nums">{{ selected.originalRank ? `#${selected.originalRank}` : '-' }}</dd>
+                </div>
+                <div>
+                  <dt class="text-[0.6875rem] text-muted-foreground">{{ $t('writeUp.originalScore') }}</dt>
+                  <dd class="font-mono text-lg font-semibold tabular-nums">{{ selected.originalTotalScore ?? '-' }} <span class="text-xs">{{ $t('ui.pts2') }}</span></dd>
+                </div>
+              </dl>
               <Button variant="outline" size="sm" :disabled="downloadPending" @click="download">
                 <Spinner v-if="downloadPending" data-icon="inline-start" />
                 <Download v-else data-icon="inline-start" />{{ $t('ui.download') }}
@@ -92,13 +96,20 @@ const { ArrowLeft, Download, FileSearch, MessageCircleQuestion, MinusCircle, Ref
           </section>
 
           <section class="flex min-h-0 flex-col rounded-xl bg-muted/35 p-4 shadow-inner">
-            <div class="mb-3 flex items-center justify-between gap-3">
+            <div class="mb-3 flex items-start justify-between gap-3">
               <h2 class="flex items-center gap-2 text-sm font-semibold">
                 <Scale class="size-4 text-primary" />{{ $t('writeUp.scoring') }}
               </h2>
-              <Badge v-if="selected" variant="secondary" class="font-mono tabular-nums">
-                {{ $t('writeUp.points', { score: selected.totalScore ?? 0 }) }}
-              </Badge>
+              <dl v-if="selected" class="grid grid-cols-2 gap-x-4 text-right">
+                <div>
+                  <dt class="text-[0.6875rem] text-muted-foreground">{{ $t('writeUp.adjustedRank') }}</dt>
+                  <dd class="font-mono text-xl font-bold tabular-nums text-primary">{{ selected.adjustedRank ? `#${selected.adjustedRank}` : '-' }}</dd>
+                </div>
+                <div>
+                  <dt class="text-[0.6875rem] text-muted-foreground">{{ $t('writeUp.adjustedScore') }}</dt>
+                  <dd class="font-mono text-xl font-bold tabular-nums text-primary">{{ selected.adjustedTotalScore ?? '-' }} <span class="text-xs">{{ $t('ui.pts2') }}</span></dd>
+                </div>
+              </dl>
             </div>
             <Alert v-if="review?.scoreboardAvailable === false" class="mb-3">
               <AlertDescription>{{ $t('writeUp.scoreboardUnavailable') }}</AlertDescription>

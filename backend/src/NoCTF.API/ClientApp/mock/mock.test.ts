@@ -191,6 +191,10 @@ describe('isolated Mock API', () => {
     const initial = await (await admin.send(reviewPath)).json()
     expect(initial.items.length).toBeGreaterThan(0)
     const selected = initial.items[0]
+    expect(selected.originalTotalScore).toBeNumber()
+    expect(selected.originalRank).toBeNumber()
+    expect(selected.adjustedTotalScore).toBeNumber()
+    expect(selected.adjustedRank).toBeNumber()
     const content = await admin.send(
       `${competition}/teams/${selected.writeUp.teamId}/writeup/content`,
     )

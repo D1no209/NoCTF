@@ -126,6 +126,10 @@ public sealed class TeamWriteUpTests
         var store = Substitute.For<ITeamWriteUpStore>();
         store.ListAsync(competitionId, Arg.Any<CancellationToken>())
             .Returns([writeUp]);
+        store.ReadManualAdjustmentTotalsAsync(
+                competitionId,
+                Arg.Any<CancellationToken>())
+            .Returns(new Dictionary<Guid, long> { [teamId] = 10 });
         var leaderboard = Substitute.For<ILeaderboardCache>();
         leaderboard.GetScoreboardAsync(competitionId, Arg.Any<CancellationToken>())
             .Returns(Projection(
@@ -146,7 +150,10 @@ public sealed class TeamWriteUpTests
 
         await Assert.That(result.ScoreboardAvailable).IsTrue();
         await Assert.That(result.Items).Count().IsEqualTo(1);
-        await Assert.That(result.Items[0].TotalScore).IsEqualTo(22);
+        await Assert.That(result.Items[0].OriginalTotalScore).IsEqualTo(12);
+        await Assert.That(result.Items[0].OriginalRank).IsEqualTo(2);
+        await Assert.That(result.Items[0].AdjustedTotalScore).IsEqualTo(22);
+        await Assert.That(result.Items[0].AdjustedRank).IsEqualTo(1);
         await Assert.That(result.Items[0].ChallengeScores).Count().IsEqualTo(2);
         await Assert.That(result.Items[0].ChallengeScores[0].NetPoints).IsEqualTo(15);
         await Assert.That(result.Items[0].ChallengeScores[1].NetPoints).IsEqualTo(7);
@@ -174,6 +181,9 @@ public sealed class TeamWriteUpTests
         await Assert.That(result.ScoreboardAvailable).IsFalse();
         await Assert.That(result.Items).IsEmpty();
         await leaderboard.DidNotReceive().GetScoreboardAsync(
+            Arg.Any<Guid>(),
+            Arg.Any<CancellationToken>());
+        await store.DidNotReceive().ReadManualAdjustmentTotalsAsync(
             Arg.Any<Guid>(),
             Arg.Any<CancellationToken>());
     }
@@ -212,6 +222,16 @@ public sealed class TeamWriteUpTests
             0,
             [],
             [Slot(0, 10), Slot(1, 5), Slot(2, 7)]);
+        var secondTeam = new ScoreboardTeam(
+            Guid.CreateVersion7(),
+            "Second team",
+            "default",
+            2,
+            ScoreboardRankingState.Eligible,
+            20,
+            0,
+            [],
+            []);
         var snapshot = new ScoreboardSnapshot(
             competitionId,
             1,
@@ -219,7 +239,7 @@ public sealed class TeamWriteUpTests
             DateTimeOffset.UtcNow,
             null,
             [],
-            [team]);
+            [team, secondTeam]);
         return new(catalog, schema, snapshot);
     }
 

@@ -3,7 +3,7 @@ import { toRefs } from 'vue'
 import type { CompetitionsByIdPageViewState } from '~/features/routes/competitions/useCompetitionsByIdPage'
 
 const viewProps = defineProps<{ state: CompetitionsByIdPageViewState }>()
-const { isControlScreen, competition, myStanding, standingLoading, teamLoadError, standingError, error, refreshMyTeam, refreshMyStanding, CompetitionCountdown, LifecycleBadge } = toRefs(viewProps.state)
+const { isControlScreen, isWriteUpReview, competition, myStanding, standingLoading, teamLoadError, standingError, error, refreshMyTeam, refreshMyStanding, CompetitionCountdown, LifecycleBadge } = toRefs(viewProps.state)
 </script>
 
 <template>
@@ -12,9 +12,10 @@ const { isControlScreen, competition, myStanding, standingLoading, teamLoadError
   <div
     v-else-if="competition"
     data-contained-workspace-page
-    class="mx-auto flex w-full max-w-[120rem] flex-col gap-4 px-3 py-4 md:px-5"
+    class="mx-auto flex w-full max-w-[120rem] flex-col"
+    :class="isWriteUpReview ? 'p-0' : 'gap-4 px-3 py-4 md:px-5'"
   >
-    <div class="flex flex-col justify-between gap-3 border-b pb-4 sm:flex-row sm:items-start">
+    <div v-if="!isWriteUpReview" class="flex flex-col justify-between gap-3 border-b pb-4 sm:flex-row sm:items-start">
       <div class="relative isolate flex min-w-0 flex-1 flex-col gap-1">
         <TypeWatermark :text="gameModeLabel(competition.mode)" class="text-primary" />
         <span class="sr-only">{{ gameModeLabel(competition.mode) }}</span>
@@ -50,13 +51,13 @@ const { isControlScreen, competition, myStanding, standingLoading, teamLoadError
         </div>
       </dl>
     </div>
-    <Alert v-if="teamLoadError" variant="destructive">
+    <Alert v-if="!isWriteUpReview && teamLoadError" variant="destructive">
       <AlertDescription class="flex flex-wrap items-center justify-between gap-3">
         <span>{{ $message(teamLoadError) }}</span>
         <Button type="button" size="sm" variant="outline" @click="refreshMyTeam">{{ $t('ui.reload') }}</Button>
       </AlertDescription>
     </Alert>
-    <Alert v-else-if="standingError" variant="destructive">
+    <Alert v-else-if="!isWriteUpReview && standingError" variant="destructive">
       <AlertDescription class="flex flex-wrap items-center justify-between gap-3">
         <span>{{ $message(standingError) }}</span>
         <Button type="button" size="sm" variant="outline" @click="refreshMyStanding">{{ $t('ui.reload') }}</Button>
