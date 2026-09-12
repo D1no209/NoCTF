@@ -2,14 +2,17 @@ import { markRaw } from 'vue'
 
 import { canEnterCompetition, canRegisterForCompetition, isCtfPracticeOpen } from '../../lib/competition-participation'
 import { toast } from 'vue-sonner'
-import { ArrowRight, Box, CalendarRange, Clock, FileText, KeyRound, LogIn, Settings, ShieldCheck, Trophy, UserPlus, Users } from '@lucide/vue'
+import { ArrowRight, Box, CalendarRange, Clock, EyeOff, FileText, KeyRound, LogIn, Settings, ShieldCheck, Trophy, UserPlus, Users } from '@lucide/vue'
 import { adminGetCompetition, getCompetitionEndpoint, createTeamEndpoint, getMyTeamEndpoint, joinTeamByInvitationEndpoint, listCompetitionTeamsEndpoint, listCompetitionTracks } from '../../api'
 import type { NoCtfapiEndpointsAdministrationCompetitionsAdminCompetitionResponse, NoCtfapiEndpointsCompetitionsCompetitionResponse, NoCtfapiEndpointsCompetitionsTracksCompetitionTrackResponse, NoCtfapiEndpointsTeamsTeamResponse } from '../../api'
 import { teamMembershipErrorMessage, teamRegistrationErrorMessage } from '../../lib/competition-track'
 import LifecycleBadgeComponent from './LifecycleBadge.vue'
 
 /** Owns state, effects and commands for CompetitionOverview. */
-export function useCompetitionOverview(props: Readonly<{ competition: NoCtfapiEndpointsCompetitionsCompetitionResponse }>) {
+export function useCompetitionOverview(
+  props: Readonly<{ competition: NoCtfapiEndpointsCompetitionsCompetitionResponse }>,
+  emit: (event: 'audienceChanged') => void,
+) {
   const competitionId = props.competition.id!
   const { user, isLoggedIn, isAdministrator } = useAuth()
   const competition = ref(props.competition)
@@ -41,6 +44,10 @@ export function useCompetitionOverview(props: Readonly<{ competition: NoCtfapiEn
     unwatch = watchCompetition(competitionId, {
       competitionLifecycleChanged: () => void refreshCompetition(),
       competitionEventChanged: (event) => {
+        if (event.kind === 'CompetitionAudienceChanged') {
+          emit('audienceChanged')
+          return
+        }
         if (event.kind === 'TrackConfigurationUpdated'
           || event.kind === 'TrackRegistrationPolicyUpdated') {
           void refreshCompetition().then(loadRegistrationOptions)
@@ -317,6 +324,7 @@ export function useCompetitionOverview(props: Readonly<{ competition: NoCtfapiEn
       Box,
       CalendarRange,
       Clock,
+      EyeOff,
       FileText,
       KeyRound,
       LogIn,

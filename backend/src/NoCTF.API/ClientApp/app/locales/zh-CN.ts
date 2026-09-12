@@ -2952,6 +2952,10 @@ export const chineseMessages = {
   "ui.issueUserAccessToken": "签发用户访问 JWT",
   "ui.revokeUserAccessToken": "吊销用户访问 JWT",
   "ui.invalidateAllUserTokens": "撤销用户全部 JWT",
-  "ui.jwtId": "JWT ID"
+  "ui.jwtId": "JWT ID",
+  "competitionAccess.hidden": "隐藏比赛",
+  "competitionAccess.description": "仅平台管理员和赛事所有者、经理、裁判、观察员可见。切换不会删除队伍、成绩或停止 Runtime。",
+  "competitionAccess.badge": "隐藏",
+  "competitionAccess.changed": "比赛访问范围已变更"
 } as const
 export type MessageKey = keyof typeof chineseMessages

@@ -1,6 +1,11 @@
 namespace NoCTF.Application.Notifications;
 
+public sealed record CompetitionHubAccessDecision(bool IsStaff);
+
 public interface ICompetitionHubAccess
 {
-    Task<bool> CanJoinAsync(Guid userId, Guid competitionId, CancellationToken cancellationToken);
+    Task<CompetitionHubAccessDecision?> ResolveAsync(
+        Guid userId,
+        Guid competitionId,
+        CancellationToken cancellationToken);
 }

@@ -173,10 +173,54 @@ public sealed class NotificationReader(NoCtfDbContext db) : INotificationReader
         if (!db.Database.IsRelational())
             return await VisibleToInMemoryAsync(userId, ct);
         return db.Notifications.FromSqlInterpolated($$"""
-            WITH directly_visible AS (
+            WITH notification_scope AS (
+                SELECT n.id,
+                       COALESCE(
+                           CASE
+                               WHEN n.related_type = {{(short)EntityReferenceKind.Competition}}
+                                   THEN n.related_id
+                               WHEN n.target_type IN (
+                                   {{(short)NotificationTargetType.CompetitionCollaborators}},
+                                   {{(short)NotificationTargetType.CompetitionParticipants}})
+                                   THEN n.target_id
+                               WHEN n.target_type = {{(short)NotificationTargetType.TeamMembers}}
+                                   THEN (
+                                       SELECT t.competition_id
+                                       FROM teams AS t
+                                       WHERE t.id = n.target_id)
+                           END,
+                           CASE
+                               WHEN n.thread_root_id IS NOT NULL THEN (
+                                   SELECT root.related_id
+                                   FROM notifications AS root
+                                   WHERE root.id = n.thread_root_id
+                                     AND root.related_type = {{(short)EntityReferenceKind.Competition}})
+                           END) AS competition_id
+                FROM notifications AS n
+            ), audience_visible AS (
+                SELECT n.*
+                FROM notifications AS n
+                JOIN notification_scope AS scope ON scope.id = n.id
+                WHERE scope.competition_id IS NULL
+                   OR NOT EXISTS (
+                       SELECT 1
+                       FROM competitions AS c
+                       WHERE c.id = scope.competition_id
+                         AND c.access_mode = {{(short)NoCTF.Domain.Competitions.CompetitionAccessMode.StaffOnly}}
+                         AND NOT EXISTS (
+                             SELECT 1
+                             FROM users AS u
+                             WHERE u.id = {{userId}}
+                               AND u.account_status = {{(short)UserAccountStatus.Active}}
+                               AND (u.role = {{(short)UserRole.Administrator}}
+                                 OR c.owner_id = {{userId}}
+                                 OR {{userId}} = ANY(c.manager_ids)
+                                 OR {{userId}} = ANY(c.judge_ids)
+                                 OR {{userId}} = ANY(c.observer_ids))))
+            ), directly_visible AS (
                 SELECT n.id,
                        COALESCE(n.thread_root_id, n.id) AS root_id
-                FROM notifications AS n
+                FROM audience_visible AS n
                 WHERE (n.target_type = 0 AND n.target_id = {{userId}})
                    OR (n.target_type = 1 AND EXISTS (
                        SELECT 1 FROM competitions AS c
@@ -202,7 +246,7 @@ public sealed class NotificationReader(NoCtfDbContext db) : INotificationReader
                          AND u.account_status = {{(short)UserAccountStatus.Active}}))
             ), participated_roots AS (
                 SELECT DISTINCT COALESCE(n.thread_root_id, n.id) AS root_id
-                FROM notifications AS n
+                FROM audience_visible AS n
                 WHERE n.source_type = {{(short)NotificationSourceType.User}}
                   AND n.source_id = {{userId}}
             ), visible_roots AS (
@@ -211,7 +255,7 @@ public sealed class NotificationReader(NoCtfDbContext db) : INotificationReader
                 SELECT root_id FROM participated_roots
             )
             SELECT n.*
-            FROM notifications AS n
+            FROM audience_visible AS n
             JOIN visible_roots AS visible
               ON n.id = visible.root_id OR n.thread_root_id = visible.root_id
             """).AsNoTracking().Where(item =>
@@ -227,11 +271,53 @@ public sealed class NotificationReader(NoCtfDbContext db) : INotificationReader
         CancellationToken ct)
     {
         var notifications = await db.Notifications.AsNoTracking().ToListAsync(ct);
-        var competitions = (await db.Competitions.AsNoTracking().ToListAsync(ct))
+        var competitions = (await db.Competitions.IgnoreQueryFilters().AsNoTracking()
+                .ToListAsync(ct))
             .ToDictionary(competition => competition.Id);
-        var teams = await db.Teams.AsNoTracking().ToListAsync(ct);
+        var teams = await db.Teams.IgnoreQueryFilters().AsNoTracking().ToListAsync(ct);
+        var teamsById = teams.ToDictionary(team => team.Id);
         var user = await db.Users.IgnoreQueryFilters().AsNoTracking()
             .FirstOrDefaultAsync(candidate => candidate.Id == userId, ct);
+
+        Guid? AudienceCompetitionId(Notification notification)
+        {
+            if (notification.RelatedType == EntityReferenceKind.Competition)
+                return notification.RelatedId;
+            if (notification.TargetType is NotificationTargetType.CompetitionCollaborators
+                or NotificationTargetType.CompetitionParticipants)
+                return notification.TargetId;
+            if (notification.TargetType == NotificationTargetType.TeamMembers
+                && teamsById.TryGetValue(notification.TargetId, out var team))
+                return team.CompetitionId;
+            if (notification.ThreadRootId is { } rootId)
+            {
+                var root = notifications.FirstOrDefault(candidate => candidate.Id == rootId);
+                if (root?.RelatedType == EntityReferenceKind.Competition)
+                    return root.RelatedId;
+            }
+            return null;
+        }
+
+        bool IsAudienceVisible(Notification notification)
+        {
+            var competitionId = AudienceCompetitionId(notification);
+            if (competitionId is null
+                || !competitions.TryGetValue(competitionId.Value, out var competition)
+                || competition.AccessMode !=
+                    NoCTF.Domain.Competitions.CompetitionAccessMode.StaffOnly)
+                return true;
+            return user is { AccountStatus: UserAccountStatus.Active }
+                && (user.Role == UserRole.Administrator
+                    || competition.OwnerId == userId
+                    || competition.ManagerIds.Contains(userId)
+                    || competition.JudgeIds.Contains(userId)
+                    || competition.ObserverIds.Contains(userId));
+        }
+
+        var audienceVisible = notifications.Where(IsAudienceVisible).ToArray();
+        var audienceVisibleIds = audienceVisible
+            .Select(notification => notification.Id)
+            .ToHashSet();
 
         bool IsDirectlyVisible(Notification notification) => notification.TargetType switch
         {
@@ -262,11 +348,11 @@ public sealed class NotificationReader(NoCtfDbContext db) : INotificationReader
             _ => false
         };
 
-        var visibleRootIds = notifications
+        var visibleRootIds = audienceVisible
             .Where(notification => IsDirectlyVisible(notification))
             .Select(notification => notification.ThreadRootId ?? notification.Id)
             .ToHashSet();
-        visibleRootIds.UnionWith(notifications
+        visibleRootIds.UnionWith(audienceVisible
             .Where(notification => notification.SourceType == NotificationSourceType.User
                 && notification.SourceId == userId)
             .Select(notification => notification.ThreadRootId ?? notification.Id));
@@ -279,6 +365,7 @@ public sealed class NotificationReader(NoCtfDbContext db) : INotificationReader
                 && notification.Kind != NotificationKind.PlatformUserAccessTokenRevoked
                 && notification.Kind != NotificationKind.PlatformUserTokensInvalidated)
             .Where(notification => visibleRootIds.Contains(
-                notification.ThreadRootId ?? notification.Id));
+                notification.ThreadRootId ?? notification.Id))
+            .Where(notification => audienceVisibleIds.Contains(notification.Id));
     }
 }

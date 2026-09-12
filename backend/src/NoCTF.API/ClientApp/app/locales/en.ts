@@ -2952,5 +2952,9 @@ export const englishMessages = {
   "ui.issueUserAccessToken": "Issue user access JWT",
   "ui.revokeUserAccessToken": "Revoke user access JWT",
   "ui.invalidateAllUserTokens": "Invalidate all user JWTs",
-  "ui.jwtId": "JWT ID"
+  "ui.jwtId": "JWT ID",
+  "competitionAccess.hidden": "Hidden competition",
+  "competitionAccess.description": "Only platform administrators, owners, managers, judges, and observers can see it. Switching does not delete teams or scores, or stop runtimes.",
+  "competitionAccess.badge": "Hidden",
+  "competitionAccess.changed": "Competition access changed"
 } satisfies Record<MessageKey, string>

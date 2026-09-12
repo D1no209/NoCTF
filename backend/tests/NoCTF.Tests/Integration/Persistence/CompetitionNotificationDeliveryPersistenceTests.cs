@@ -308,6 +308,37 @@ public sealed class CompetitionNotificationDeliveryPersistenceTests
                 now,
                 ct)).IsNotNull();
 
+            await db.Competitions
+                .Where(competition => competition.Id == competitionId)
+                .ExecuteUpdateAsync(
+                    setters => setters.SetProperty(
+                        competition => competition.AccessMode,
+                        CompetitionAccessMode.StaffOnly),
+                    ct);
+            var hiddenAudience = await resolver.ResolveAsync(
+                competitionId,
+                bannedTeamId,
+                ct);
+            await Assert.That(hiddenAudience).IsEquivalentTo(
+                [ownerId, managerAndMemberId, observerBotId]);
+            await Assert.That(await leaderboardAccess.ResolveAsync(
+                approvedMemberId,
+                competitionId,
+                now,
+                ct)).IsNull();
+            await Assert.That((await leaderboardAccess.ResolveAsync(
+                observerBotId,
+                competitionId,
+                now,
+                ct))?.DataScope).IsEqualTo(LeaderboardDataScope.Live);
+            await db.Competitions
+                .Where(competition => competition.Id == competitionId)
+                .ExecuteUpdateAsync(
+                    setters => setters.SetProperty(
+                        competition => competition.AccessMode,
+                        CompetitionAccessMode.Public),
+                    ct);
+
             var delivery = new CompetitionNotificationDelivery(db);
             var payload = new TeamBannedPayload(
                 competitionId,

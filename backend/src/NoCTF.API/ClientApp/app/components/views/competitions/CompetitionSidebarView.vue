@@ -3,7 +3,7 @@ import { toRefs } from 'vue'
 import type { CompetitionSidebarViewState } from '~/features/competitions/useCompetitionSidebar'
 
 const props = defineProps<{ state: CompetitionSidebarViewState }>()
-const { loading, options, selectedId, group, counts, showDeleted, setGroup, select, LifecycleBadge } = toRefs(props.state)
+const { EyeOff, loading, options, selectedId, group, counts, showDeleted, setGroup, select, LifecycleBadge } = toRefs(props.state)
 </script>
 
 <template>
@@ -26,6 +26,9 @@ const { loading, options, selectedId, group, counts, showDeleted, setGroup, sele
           <span class="relative z-10 flex flex-wrap items-center gap-2">
             <Badge v-if="item.competition.deletedAt" variant="destructive">{{ $t('ui.deleted') }}</Badge>
             <component :is="LifecycleBadge" v-else :status="item.competition.status" />
+            <Badge v-if="item.competition.accessMode === 'StaffOnly'" variant="secondary">
+              <EyeOff class="size-3" />{{ $t('competitionAccess.badge') }}
+            </Badge>
           </span>
           <span class="relative z-10 break-words text-sm font-semibold">{{ item.label }}</span>
           <span class="relative z-10 text-xs font-normal text-muted-foreground">{{ formatDateTime(item.competition.startTime) }}</span>

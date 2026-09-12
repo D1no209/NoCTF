@@ -65,7 +65,8 @@ public enum CompetitionEventKind : short
     AwdpBreakResolved,
     AwdpFixResolved,
     GameplayFactPatchDownloaded,
-    TrackRegistrationPolicyUpdated
+    TrackRegistrationPolicyUpdated,
+    CompetitionAudienceChanged
 }
 
 public enum CompetitionEventLevel : short
@@ -110,6 +111,12 @@ public sealed class CompetitionEvent
     [NotMapped] public CompetitionLeaderboardVisibility? LeaderboardVisibility => PayloadValue<CompetitionLeaderboardVisibility>("leaderboardVisibility");
     [NotMapped] public CompetitionLeaderboardVisibility? PreviousLeaderboardVisibility =>
         PayloadValue<CompetitionLeaderboardVisibility>("from");
+    [NotMapped] public CompetitionAccessMode? CompetitionAccessMode =>
+        PayloadValue<CompetitionAccessMode>("competitionAccessMode");
+    [NotMapped] public CompetitionAccessMode? PreviousCompetitionAccessMode =>
+        PayloadValue<CompetitionAccessMode>("previousCompetitionAccessMode");
+    [NotMapped] public CompetitionAudienceChangeKind? CompetitionAudienceChangeKind =>
+        PayloadValue<CompetitionAudienceChangeKind>("competitionAudienceChangeKind");
     [NotMapped] public NoCTF.Domain.Teams.TeamRegistrationStatus? TeamRegistrationStatus => PayloadValue<NoCTF.Domain.Teams.TeamRegistrationStatus>("teamRegistrationStatus");
     [NotMapped] public NoCTF.Domain.Gameplay.GameplayFactKind? GameplayFactKind => PayloadValue<NoCTF.Domain.Gameplay.GameplayFactKind>("gameplayFactKind");
     [NotMapped] public NoCTF.Domain.Gameplay.GameplayFactState? GameplayFactState => PayloadValue<NoCTF.Domain.Gameplay.GameplayFactState>("gameplayFactState");

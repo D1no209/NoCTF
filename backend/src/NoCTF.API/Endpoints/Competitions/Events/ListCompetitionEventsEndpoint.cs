@@ -41,7 +41,8 @@ public enum CompetitionEventKindProtocol
     QuestionReplied, QuestionStatusChanged, ChallengeDescriptionUpdated,
     TrackConfigurationUpdated, TeamTrackChanged, TrackRegistrationPolicyUpdated,
     AwdpBreakAttempted, AwdpFixAttempted,
-    AwdpBreakResolved, AwdpFixResolved, GameplayFactPatchDownloaded
+    AwdpBreakResolved, AwdpFixResolved, GameplayFactPatchDownloaded,
+    CompetitionAudienceChanged
 }
 
 [JsonConverter(typeof(StrictPascalCaseEnumConverter<CompetitionEventLevelProtocol>))]
@@ -52,6 +53,9 @@ public enum CompetitionEventVisibilityProtocol { Public, Team, Staff }
 
 [JsonConverter(typeof(StrictPascalCaseEnumConverter<CompetitionEventAccessLevelProtocol>))]
 public enum CompetitionEventAccessLevelProtocol { Participant, Team, Staff }
+
+[JsonConverter(typeof(StrictPascalCaseEnumConverter<CompetitionAudienceChangeKindProtocol>))]
+public enum CompetitionAudienceChangeKindProtocol { AccessMode, Collaborators, Owner }
 
 
 [JsonConverter(typeof(StrictPascalCaseEnumConverter<CompetitionQuestionStatusProtocol>))]
@@ -76,6 +80,7 @@ internal static partial class CompetitionEventProtocolMapper
     [MapEnum(EnumMappingStrategy.ByName)] public static partial CompetitionEventAccessLevelProtocol ToProtocol(CompetitionEventAccessLevel value);
     [MapEnum(EnumMappingStrategy.ByName)] public static partial CompetitionQuestionStatusProtocol ToProtocol(CompetitionQuestionStatus value);
     [MapEnum(EnumMappingStrategy.ByName)] public static partial RuntimeCleanupResultProtocol ToProtocol(RuntimeCleanupResult value);
+    [MapEnum(EnumMappingStrategy.ByName)] public static partial CompetitionAudienceChangeKindProtocol ToProtocol(CompetitionAudienceChangeKind value);
     [MapEnum(EnumMappingStrategy.ByName)] public static partial CompetitionEventKind ToDomain(CompetitionEventKindProtocol value);
     [MapEnum(EnumMappingStrategy.ByName)] public static partial CompetitionEventLevel ToDomain(CompetitionEventLevelProtocol value);
 }
@@ -135,6 +140,9 @@ public sealed record CompetitionEventResponse(
     Guid? ParentEventId,
     CompetitionStatusProtocol? CompetitionStatus,
     LeaderboardVisibilityProtocol? LeaderboardVisibility,
+    CompetitionAccessModeProtocol? CompetitionAccessMode,
+    CompetitionAccessModeProtocol? PreviousCompetitionAccessMode,
+    CompetitionAudienceChangeKindProtocol? CompetitionAudienceChangeKind,
     TeamRegistrationStatusProtocol? TeamRegistrationStatus,
     GameplayFactKindProtocol? GameplayFactKind,
     GameplayFactStateProtocol? GameplayFactState,
@@ -282,6 +290,9 @@ public sealed class ListCompetitionEventsEndpoint(
             item.ParentEventId,
             item.CompetitionStatus is null ? null : CompetitionProtocolMapper.ToProtocol(item.CompetitionStatus.Value),
             item.LeaderboardVisibility is null ? null : CompetitionProtocolMapper.ToProtocol(item.LeaderboardVisibility.Value),
+            item.CompetitionAccessMode is null ? null : CompetitionProtocolMapper.ToProtocol(item.CompetitionAccessMode.Value),
+            item.PreviousCompetitionAccessMode is null ? null : CompetitionProtocolMapper.ToProtocol(item.PreviousCompetitionAccessMode.Value),
+            item.CompetitionAudienceChangeKind is null ? null : CompetitionEventProtocolMapper.ToProtocol(item.CompetitionAudienceChangeKind.Value),
             item.TeamRegistrationStatus is null ? null : TeamMapper.ToProtocol(item.TeamRegistrationStatus.Value),
             item.GameplayFactKind is null ? null : GameplayFactMapper.ToProtocol(item.GameplayFactKind.Value),
             item.GameplayFactState is null ? null : GameplayFactMapper.ToProtocol(item.GameplayFactState.Value),

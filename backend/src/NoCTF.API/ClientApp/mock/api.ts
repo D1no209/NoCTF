@@ -223,6 +223,9 @@ export function createMockApi() {
 
     const competition = state.competitions.find(c => c.id === p.competitionId)
     if (p.competitionId && !competition) return problem(404, '演示比赛不存在 / Competition not found')
+    const competitionStaff = user?.role === 'Administrator' || user?.role === 'Organizer'
+    if (competition?.accessMode === 'StaffOnly' && !competitionStaff)
+      return problem(404, '演示比赛不存在 / Competition not found')
     const challenge = state.challenges.find(c => c.id === p.competitionChallengeId && c.competitionId === p.competitionId)
     if (p.competitionChallengeId && !challenge) return problem(404, '演示题目不存在 / Challenge not found')
     const template = state.templates.find(c => c.id === p.challengeId)
@@ -257,7 +260,9 @@ export function createMockApi() {
         return new Response(poster, {
           headers: {
             'Content-Type': poster.type || 'image/png',
-            'Cache-Control': currentRevision && url.searchParams.get('revision') === currentRevision
+            'Cache-Control': competition?.accessMode === 'StaffOnly'
+              ? 'private,no-store'
+              : currentRevision && url.searchParams.get('revision') === currentRevision
               ? 'public,max-age=31536000,immutable'
               : 'no-store',
             'X-NoCTF-Mock': 'true',
@@ -324,7 +329,12 @@ export function createMockApi() {
         competitionStatus: competition!.status,
         rulesJson: '{}',
       }
-      else if (cleanRoute === '/competitions') value = list(state.competitions.map(c => ({ ...c, administrationRole: user?.role === 'Administrator' ? 'Owner' : user?.role === 'Organizer' ? 'Manager' : null })), url)
+      else if (cleanRoute === '/competitions') {
+        const visibleCompetitions = route.startsWith('/admin') || competitionStaff
+          ? state.competitions
+          : state.competitions.filter(candidate => candidate.accessMode !== 'StaffOnly')
+        value = list(visibleCompetitions.map(c => ({ ...c, administrationRole: user?.role === 'Administrator' ? 'Owner' : user?.role === 'Organizer' ? 'Manager' : null })), url)
+      }
       else if (cleanRoute === '/competitions/{competitionId}') value = { ...competition, administrationRole: user?.role === 'Administrator' ? 'Owner' : user?.role === 'Organizer' ? 'Manager' : null }
       else if (cleanRoute === '/competitions/{competitionId}/challenges') value = { ...list(state.challenges.filter(c => c.competitionId === p.competitionId), url), leaderboardVisibility: 'Normal', dataScope: 'Live' }
       else if (cleanRoute === '/competitions/{competitionId}/challenges/{competitionChallengeId}') value = {

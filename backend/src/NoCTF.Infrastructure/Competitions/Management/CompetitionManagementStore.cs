@@ -15,7 +15,8 @@ public sealed class CompetitionManagementStore(
     NoCtfDbContext db,
     ITransactionalMessageOutbox? messageOutbox = null,
     ICompetitionEventRecorder? eventRecorder = null,
-    CompetitionReadModelCache? readModels = null) : ICompetitionManagementStore
+    CompetitionReadModelCache? readModels = null,
+    AggregatePatchPostCommitActions? postCommitActions = null) : ICompetitionManagementStore
 {
     private readonly ICompetitionEventRecorder events =
         eventRecorder ?? NullCompetitionEventRecorder.Instance;
@@ -51,6 +52,7 @@ public sealed class CompetitionManagementStore(
             Title = command.Title.Trim(),
             Description = command.Description?.Trim(),
             OwnerId = command.OwnerId,
+            AccessMode = command.AccessMode,
             Mode = command.Mode,
             StartAt = command.StartTime,
             EndAt = command.EndTime,
@@ -81,12 +83,12 @@ public sealed class CompetitionManagementStore(
             CompetitionEventVisibility.Staff,
             command.CreatedAt,
             ActorUserId: command.OwnerId,
-            CompetitionStatus: CompetitionStatus.Draft), ct);
+            CompetitionStatus: CompetitionStatus.Draft,
+            CompetitionAccessMode: command.AccessMode), ct);
         await db.SaveChangesAsync(ct);
         await transaction.CommitAsync(ct);
+        await InvalidateReadModelsAsync(competition.Id, CancellationToken.None);
         await outbox.FlushOutgoingMessagesAsync();
-        if (readModels is not null)
-            await readModels.InvalidateAsync(competition.Id, ct);
         return new(CompetitionCreationState.Created, Map(competition));
     }
 
@@ -123,6 +125,7 @@ public sealed class CompetitionManagementStore(
                 && x.DeletedAt == null, ct);
         if (competition is null)
             return null;
+        var previousAccessMode = competition.AccessMode;
         if (competition.PracticeModeEnabled
             && !command.PracticeModeEnabled
             && await db.RuntimeInstances.AnyAsync(runtime =>
@@ -150,6 +153,7 @@ public sealed class CompetitionManagementStore(
         competition.AllowChallengeOwnersToHandleQuestions =
             command.AllowChallengeOwnersToHandleQuestions;
         competition.PracticeModeEnabled = command.PracticeModeEnabled;
+        competition.AccessMode = command.AccessMode;
         competition.UpdatedAt = command.UpdatedAt;
         await events.RecordAsync(new(
             competition.Id,
@@ -159,11 +163,24 @@ public sealed class CompetitionManagementStore(
             command.UpdatedAt,
             ActorUserId: command.ActorId,
             CompetitionStatus: competition.Status), ct);
+        if (competition.AccessMode != previousAccessMode)
+        {
+            await events.RecordAsync(new(
+                competition.Id,
+                CompetitionEventKind.CompetitionAudienceChanged,
+                CompetitionEventLevel.Information,
+                CompetitionEventVisibility.Staff,
+                command.UpdatedAt,
+                ActorUserId: command.ActorId,
+                CompetitionStatus: competition.Status,
+                CompetitionAccessMode: competition.AccessMode,
+                PreviousCompetitionAccessMode: previousAccessMode,
+                CompetitionAudienceChangeKind: CompetitionAudienceChangeKind.AccessMode), ct);
+        }
         await db.SaveChangesAsync(ct);
         await transaction.CommitAsync(ct);
+        await InvalidateReadModelsAsync(competition.Id, CancellationToken.None);
         await outbox.FlushOutgoingMessagesAsync();
-        if (readModels is not null)
-            await readModels.InvalidateAsync(competition.Id, ct);
         return Map(competition);
     }
 
@@ -196,9 +213,8 @@ public sealed class CompetitionManagementStore(
             CompetitionStatus: competition.Status), ct);
         await db.SaveChangesAsync(ct);
         await transaction.CommitAsync(ct);
+        await InvalidateReadModelsAsync(competition.Id, CancellationToken.None);
         await outbox.FlushOutgoingMessagesAsync();
-        if (readModels is not null)
-            await readModels.InvalidateAsync(competition.Id, ct);
         return true;
     }
 
@@ -229,7 +245,8 @@ public sealed class CompetitionManagementStore(
             x.AllowChallengeOwnersToHandleQuestions,
             x.PracticeModeEnabled,
             x.PosterFileId,
-            x.TracksEnabled));
+            x.TracksEnabled,
+            x.AccessMode));
 
     private static CompetitionView Map(Competition x) =>
         new(x.Id, x.Title, x.Description, x.Mode, x.StartAt, x.EndAt, x.Status,
@@ -243,5 +260,18 @@ public sealed class CompetitionManagementStore(
             x.AllowChallengeOwnersToHandleQuestions,
             x.PracticeModeEnabled,
             x.PosterFileId,
-            x.TracksEnabled);
+            x.TracksEnabled,
+            x.AccessMode);
+
+    private Task InvalidateReadModelsAsync(
+        Guid competitionId,
+        CancellationToken cancellationToken)
+    {
+        if (readModels is null)
+            return Task.CompletedTask;
+        return postCommitActions?.RunOrDeferAsync(
+                token => readModels.InvalidateAsync(competitionId, token),
+                cancellationToken)
+            ?? readModels.InvalidateAsync(competitionId, cancellationToken);
+    }
 }

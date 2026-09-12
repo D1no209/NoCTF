@@ -8,11 +8,12 @@ using NoCTF.Application.Scoring.Leaderboard;
 using NoCTF.Infrastructure.Notifications;
 using NoCTF.API.Endpoints.Competitions.Events;
 using NoCTF.API.Endpoints.GameplayFacts;
+using NoCTF.Domain.Competitions.Events;
 
 namespace NoCTF.API.SignalR.Publishing;
 
 public sealed class LocalLeaderboardRefreshPublisher(
-    IHubContext<CompetitionHub, ICompetitionHubClient> hub) : ILeaderboardRefreshPublisher
+    ICompetitionHubAudienceRouter audiences) : ILeaderboardRefreshPublisher
 {
     public async Task PublishAsync(
         ScoreboardProjection projection,
@@ -22,7 +23,12 @@ public sealed class LocalLeaderboardRefreshPublisher(
         var outcome = "success";
         try
         {
-            await hub.Clients.Group($"competition:{projection.Snapshot.CompetitionId:N}").ScoreboardUpdated(
+            var clients = await audiences.CurrentAsync(
+                projection.Snapshot.CompetitionId,
+                cancellationToken);
+            if (clients is null)
+                return;
+            await clients.ScoreboardUpdated(
                 ScoreboardUpdated.From(projection),
                 cancellationToken);
         }
@@ -53,12 +59,19 @@ public sealed class LocalGameplayFactStatePublisher(
 }
 
 public sealed class LocalCompetitionEventMessageHandler(
-    IHubContext<CompetitionHub, ICompetitionHubClient> hub)
+    ICompetitionHubAudienceRouter audiences,
+    ICompetitionHubAudienceCoordinator coordinator)
 {
-    public Task Handle(
+    public async Task Handle(
         CompetitionEventCommitted message,
-        CancellationToken cancellationToken) =>
-        hub.Clients.Group($"competition:{message.CompetitionId:N}").CompetitionEventChanged(
+        CancellationToken cancellationToken)
+    {
+        var clients = message.Kind == CompetitionEventKind.CompetitionAudienceChanged
+            ? audiences.AllKnown(message.CompetitionId)
+            : await audiences.CurrentAsync(message.CompetitionId, cancellationToken);
+        if (clients is null)
+            return;
+        await clients.CompetitionEventChanged(
             new CompetitionEventChangedNotification(
                 message.CompetitionId,
                 message.EventId,
@@ -66,4 +79,7 @@ public sealed class LocalCompetitionEventMessageHandler(
                 CompetitionEventProtocolMapper.ToProtocol(message.Level),
                 message.OccurredAt),
             cancellationToken);
+        if (message.Kind == CompetitionEventKind.CompetitionAudienceChanged)
+            await coordinator.ApplyAsync(message, cancellationToken);
+    }
 }

@@ -65,6 +65,9 @@ public sealed class CompetitionPracticeModePersistenceTests
             await db.Database.ExecuteSqlRawAsync(
                 "ALTER TABLE competitions ADD COLUMN tracks_enabled boolean NOT NULL DEFAULT TRUE",
                 cancellationToken);
+            await db.Database.ExecuteSqlRawAsync(
+                "ALTER TABLE competitions ADD COLUMN access_mode smallint NOT NULL DEFAULT 0",
+                cancellationToken);
             var now = DateTimeOffset.UtcNow;
             var user = User(Guid.CreateVersion7(now), "migration-team-owner", now);
             var competition = Competition(
@@ -83,6 +86,9 @@ public sealed class CompetitionPracticeModePersistenceTests
             await db.SaveChangesAsync(cancellationToken);
             await db.Database.ExecuteSqlRawAsync(
                 "ALTER TABLE competitions DROP COLUMN tracks_enabled",
+                cancellationToken);
+            await db.Database.ExecuteSqlRawAsync(
+                "ALTER TABLE competitions DROP COLUMN access_mode",
                 cancellationToken);
             db.ChangeTracker.Clear();
 

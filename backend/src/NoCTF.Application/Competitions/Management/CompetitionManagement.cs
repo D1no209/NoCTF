@@ -20,7 +20,8 @@ public sealed record CreateCompetitionCommand(
     int MaxParticipantMessagesBeforeHandlerReply = 3,
     bool AllowChallengeOwnersToHandleQuestions = true,
     bool PracticeModeEnabled = false,
-    bool TracksEnabled = false);
+    bool TracksEnabled = false,
+    CompetitionAccessMode AccessMode = CompetitionAccessMode.Public);
 
 public sealed record CompetitionView(
     Guid Id,
@@ -43,7 +44,8 @@ public sealed record CompetitionView(
     bool AllowChallengeOwnersToHandleQuestions = true,
     bool PracticeModeEnabled = false,
     Guid? PosterFileId = null,
-    bool TracksEnabled = false);
+    bool TracksEnabled = false,
+    CompetitionAccessMode AccessMode = CompetitionAccessMode.Public);
 
 public enum CompetitionCreationState
 {
@@ -88,7 +90,8 @@ public sealed record UpdateCompetitionCommand(
     int MaxActiveQuestionsPerTeam = 5,
     int MaxParticipantMessagesBeforeHandlerReply = 3,
     bool AllowChallengeOwnersToHandleQuestions = true,
-    bool PracticeModeEnabled = false);
+    bool PracticeModeEnabled = false,
+    CompetitionAccessMode AccessMode = CompetitionAccessMode.Public);
 
 public interface ICompetitionManagementStore
 {
@@ -155,6 +158,12 @@ public sealed class CreateCompetition(ICompetitionManagementStore store)
                 CompetitionCreationState.InvalidRequest,
                 Detail: "Practice mode is supported only for CTF competitions."));
         }
+        if (!Enum.IsDefined(command.AccessMode))
+        {
+            return Task.FromResult(new CompetitionCreationResult(
+                CompetitionCreationState.InvalidRequest,
+                Detail: "Competition access mode is invalid."));
+        }
         var schedule = CompetitionLifecyclePolicy.ValidateSchedule(command.StartTime, command.EndTime);
         if (!schedule.Succeeded)
         {
@@ -208,6 +217,10 @@ public sealed class UpdateCompetition(ICompetitionManagementStore store)
             return OperationResult<CompetitionView, CompetitionManagementFailureCode>.Failure(
                 CompetitionManagementFailureCode.CompetitionConflict,
                 "Practice mode is supported only for CTF competitions.");
+        if (!Enum.IsDefined(command.AccessMode))
+            return OperationResult<CompetitionView, CompetitionManagementFailureCode>.Failure(
+                CompetitionManagementFailureCode.CompetitionConflict,
+                "Competition access mode is invalid.");
         var schedule = CompetitionLifecyclePolicy.ValidateSchedule(command.StartTime, command.EndTime);
         if (!schedule.Succeeded)
             return OperationResult<CompetitionView, CompetitionManagementFailureCode>.Failure(

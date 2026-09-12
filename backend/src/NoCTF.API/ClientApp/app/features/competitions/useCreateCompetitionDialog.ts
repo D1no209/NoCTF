@@ -27,6 +27,7 @@ export function useCreateCompetitionDialog(
   const maxParticipantMessagesBeforeHandlerReply = ref(3)
   const allowChallengeOwnersToHandleQuestions = ref(true)
   const practiceModeEnabled = ref(false)
+  const staffOnly = ref(false)
   const posterFile = ref<File | null>(null)
   const posterError = ref<string | null>(null)
   const posterInputKey = ref(0)
@@ -56,6 +57,7 @@ export function useCreateCompetitionDialog(
     maxParticipantMessagesBeforeHandlerReply.value = 3
     allowChallengeOwnersToHandleQuestions.value = true
     practiceModeEnabled.value = false
+    staffOnly.value = false
     posterFile.value = null
     posterError.value = null
     posterInputKey.value += 1
@@ -142,6 +144,7 @@ export function useCreateCompetitionDialog(
             maxParticipantMessagesBeforeHandlerReply: maxParticipantMessagesBeforeHandlerReply.value,
             allowChallengeOwnersToHandleQuestions: allowChallengeOwnersToHandleQuestions.value,
             practiceModeEnabled: mode.value === 'Ctf' && practiceModeEnabled.value,
+            accessMode: staffOnly.value ? 'StaffOnly' : 'Public',
           },
         })
         if (requestError || !data) throw requestError
@@ -191,6 +194,7 @@ export function useCreateCompetitionDialog(
     maxParticipantMessagesBeforeHandlerReply,
     allowChallengeOwnersToHandleQuestions,
     practiceModeEnabled,
+    staffOnly,
     posterFile,
     posterError,
     posterInputKey,

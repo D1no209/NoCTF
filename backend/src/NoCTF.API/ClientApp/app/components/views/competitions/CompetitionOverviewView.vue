@@ -3,7 +3,7 @@ import { toRefs } from 'vue'
 import type { CompetitionOverviewViewState } from '~/features/competitions/useCompetitionOverview'
 
 const viewProps = defineProps<{ state: CompetitionOverviewViewState }>()
-const { ArrowRight, Box, CalendarRange, Clock, FileText, KeyRound, LogIn, Settings, ShieldCheck, Trophy, UserPlus, Users, posterUrl, detailError, refreshCompetition, competitionId, isLoggedIn, isAdministrator, managementOnly, competition, myTeam, teamLoaded, teamLoadError, loadMyTeam, approvedTeamCount, selectableTracks, tracksLoaded, trackLoadError, loadRegistrationOptions, countdown, practiceOpen, canParticipate, teamRegistrationOpen, tracksEnabled, createOpen, createName, createTrackKey, createTrackInvitationCode, createPending, createValidationError, selectedCreateTrack, submitCreate, joinOpen, joinToken, joinPending, joinValidationError, submitJoin, isCaptain, LifecycleBadge } = toRefs(viewProps.state)
+const { ArrowRight, Box, CalendarRange, Clock, EyeOff, FileText, KeyRound, LogIn, Settings, ShieldCheck, Trophy, UserPlus, Users, posterUrl, detailError, refreshCompetition, competitionId, isLoggedIn, isAdministrator, managementOnly, competition, myTeam, teamLoaded, teamLoadError, loadMyTeam, approvedTeamCount, selectableTracks, tracksLoaded, trackLoadError, loadRegistrationOptions, countdown, practiceOpen, canParticipate, teamRegistrationOpen, tracksEnabled, createOpen, createName, createTrackKey, createTrackInvitationCode, createPending, createValidationError, selectedCreateTrack, submitCreate, joinOpen, joinToken, joinPending, joinValidationError, submitJoin, isCaptain, LifecycleBadge } = toRefs(viewProps.state)
 </script>
 
 <template>
@@ -17,6 +17,9 @@ const { ArrowRight, Box, CalendarRange, Clock, FileText, KeyRound, LogIn, Settin
           <span class="sr-only">{{ gameModeLabel(competition.mode) }}</span>
           <div class="flex flex-wrap items-center gap-2">
             <component :is="LifecycleBadge" :status="competition.status" />
+            <Badge v-if="competition.accessMode === 'StaffOnly'" variant="secondary">
+              <EyeOff class="size-3" />{{ $t('competitionAccess.badge') }}
+            </Badge>
           </div>
 
           <h2 class="text-display text-2xl sm:text-3xl">{{ competition.title }}</h2>

@@ -22,6 +22,7 @@ public sealed class CompetitionVisibilityAccess(NoCtfDbContext db)
             {
                 candidate.Mode,
                 candidate.Status,
+                candidate.AccessMode,
                 candidate.TracksEnabled,
                 candidate.OwnerId,
                 candidate.ManagerIds,
@@ -46,7 +47,9 @@ public sealed class CompetitionVisibilityAccess(NoCtfDbContext db)
                 || competition.ManagerIds.Contains(userId)
                 || competition.JudgeIds.Contains(userId)
                 || competition.ObserverIds.Contains(userId));
-        if (competition.Status == CompetitionStatus.Draft && !isCollaborator)
+        if ((competition.Status == CompetitionStatus.Draft
+                || competition.AccessMode == CompetitionAccessMode.StaffOnly)
+            && !isCollaborator)
             return null;
 
         var visibility = CompetitionLeaderboardVisibilityPolicy.EffectiveAt(

@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using NoCTF.Domain.Competitions;
 using NoCTF.Domain.Teams;
 using NoCTF.Infrastructure.Persistence;
 
@@ -20,7 +21,8 @@ public sealed class CompetitionNotificationAudienceResolver(NoCtfDbContext db)
                 candidate.OwnerId,
                 candidate.ManagerIds,
                 candidate.JudgeIds,
-                candidate.ObserverIds
+                candidate.ObserverIds,
+                candidate.AccessMode
             })
             .SingleOrDefaultAsync(ct);
         if (competition is null)
@@ -35,11 +37,15 @@ public sealed class CompetitionNotificationAudienceResolver(NoCtfDbContext db)
                     || requiredTeamId != null && team.Id == requiredTeamId))
             .Select(team => new { team.CaptainId, team.MemberIds })
             .ToArrayAsync(ct);
-        var candidateIds = competition.ManagerIds
+        var collaborators = competition.ManagerIds
             .Concat(competition.JudgeIds)
             .Concat(competition.ObserverIds)
             .Append(competition.OwnerId)
-            .Concat(teamMembers.SelectMany(team => team.MemberIds.Append(team.CaptainId)))
+            .Distinct();
+        var candidateIds = (competition.AccessMode == CompetitionAccessMode.StaffOnly
+                ? collaborators
+                : collaborators.Concat(
+                    teamMembers.SelectMany(team => team.MemberIds.Append(team.CaptainId))))
             .Distinct()
             .ToArray();
         return await db.Users.AsNoTracking()

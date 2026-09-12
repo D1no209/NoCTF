@@ -25,6 +25,7 @@ using NoCTF.Application.Messaging;
 using NoCTF.Application.Scoring.Leaderboard;
 using NoCTF.Application.Admission;
 using NoCTF.API.SignalR.Publishing;
+using NoCTF.API.SignalR.Hubs;
 using NoCTF.API.Endpoints.Authentication;
 using NoCTF.API.Pagination;
 using NSwag;
@@ -194,6 +195,10 @@ public static class ServiceRegistration
             .Get<RequestAdmissionOptions>() ?? new RequestAdmissionOptions();
         var redis = configuration.GetConnectionString("Redis");
         var signalR = services.AddSignalR();
+        services.AddSingleton<CompetitionHubSubscriptionRegistry>();
+        services.AddSingleton<ICompetitionHubAudienceAccess, CompetitionHubAudienceAccess>();
+        services.AddSingleton<ICompetitionHubAudienceRouter, CompetitionHubAudienceRouter>();
+        services.AddSingleton<ICompetitionHubAudienceCoordinator, CompetitionHubAudienceCoordinator>();
         services.AddScoped<IGameplayFactStatePublisher, SignalRGameplayFactStatePublisher>();
         if (includeInfrastructure && development)
         {

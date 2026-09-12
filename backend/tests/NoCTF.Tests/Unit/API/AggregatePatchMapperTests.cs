@@ -246,7 +246,8 @@ public sealed class AggregatePatchMapperTests
             MaxActiveQuestionsPerTeam = 5,
             MaxParticipantMessagesBeforeHandlerReply = 3,
             AllowChallengeOwnersToHandleQuestions = true,
-            PracticeModeEnabled = false
+            PracticeModeEnabled = false,
+            AccessMode = CompetitionAccessModeProtocol.Public
         }, competition);
 
         var managerIds = new[] { Guid.NewGuid() };

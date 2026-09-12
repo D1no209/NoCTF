@@ -55,7 +55,9 @@ public sealed class CompetitionEventStore(
             id,
             draft.Kind,
             draft.Level,
-            draft.OccurredAt));
+            draft.OccurredAt,
+            draft.CompetitionAudienceChangeKind,
+            draft.CompetitionAccessMode));
         return id;
     }
 
@@ -409,6 +411,9 @@ public sealed class CompetitionEventStore(
             item.ParentEventId,
             payload.CompetitionStatus,
             payload.LeaderboardVisibility,
+            payload.CompetitionAccessMode,
+            payload.PreviousCompetitionAccessMode,
+            payload.CompetitionAudienceChangeKind,
             payload.TeamRegistrationStatus,
             payload.GameplayFactKind,
             payload.GameplayFactState,
@@ -446,6 +451,9 @@ public sealed class CompetitionEventStore(
             schemaVersion = 1,
             competitionStatus = draft.CompetitionStatus,
             leaderboardVisibility = draft.LeaderboardVisibility,
+            competitionAccessMode = draft.CompetitionAccessMode,
+            previousCompetitionAccessMode = draft.PreviousCompetitionAccessMode,
+            competitionAudienceChangeKind = draft.CompetitionAudienceChangeKind,
             teamRegistrationStatus = draft.TeamRegistrationStatus,
             gameplayFactKind = draft.GameplayFactKind,
             gameplayFactState = draft.GameplayFactState,
@@ -591,6 +599,9 @@ public sealed class CompetitionEventStore(
     internal sealed record CompetitionEventPayload(
         CompetitionStatus? CompetitionStatus = null,
         CompetitionLeaderboardVisibility? LeaderboardVisibility = null,
+        CompetitionAccessMode? CompetitionAccessMode = null,
+        CompetitionAccessMode? PreviousCompetitionAccessMode = null,
+        CompetitionAudienceChangeKind? CompetitionAudienceChangeKind = null,
         TeamRegistrationStatus? TeamRegistrationStatus = null,
         NoCTF.Domain.Gameplay.GameplayFactKind? GameplayFactKind = null,
         NoCTF.Domain.Gameplay.GameplayFactState? GameplayFactState = null,

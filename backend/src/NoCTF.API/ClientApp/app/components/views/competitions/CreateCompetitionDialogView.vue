@@ -3,7 +3,7 @@ import { toRefs } from 'vue'
 import type { CreateCompetitionDialogViewState } from '~/features/competitions/useCreateCompetitionDialog'
 
 const viewProps = defineProps<{ state: CreateCompetitionDialogViewState }>()
-const { open, canOrganize, title, description, mode, startTime, endTime, teamRegistrationAutoApprove, allowTeamRegistrationWhileRunning, maxTeamMembers, maxConcurrentRuntimeInstancesPerTeam, maxActiveQuestionsPerTeam, maxParticipantMessagesBeforeHandlerReply, allowChallengeOwnersToHandleQuestions, practiceModeEnabled, posterError, posterInputKey, submitLabel, error, pending, selectPoster, setOpen, submit } = toRefs(viewProps.state)
+const { open, canOrganize, title, description, mode, startTime, endTime, teamRegistrationAutoApprove, allowTeamRegistrationWhileRunning, maxTeamMembers, maxConcurrentRuntimeInstancesPerTeam, maxActiveQuestionsPerTeam, maxParticipantMessagesBeforeHandlerReply, allowChallengeOwnersToHandleQuestions, practiceModeEnabled, staffOnly, posterError, posterInputKey, submitLabel, error, pending, selectPoster, setOpen, submit } = toRefs(viewProps.state)
 </script>
 
 <template>
@@ -48,6 +48,13 @@ const { open, canOrganize, title, description, mode, startTime, endTime, teamReg
               </SelectContent>
             </Select>
             <FieldDescription>{{ $t('ui.cannotBeModifiedAfterCreation') }}</FieldDescription>
+          </Field>
+          <Field orientation="horizontal">
+            <Checkbox id="create-competition-staff-only" v-model="staffOnly" />
+            <div class="grid gap-1.5 leading-none">
+              <FieldLabel for="create-competition-staff-only" class="font-normal">{{ $t('competitionAccess.hidden') }}</FieldLabel>
+              <FieldDescription>{{ $t('competitionAccess.description') }}</FieldDescription>
+            </div>
           </Field>
           <div class="grid gap-4 sm:grid-cols-2">
             <Field>

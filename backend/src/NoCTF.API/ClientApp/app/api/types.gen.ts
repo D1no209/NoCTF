@@ -535,6 +535,7 @@ export type NoCtfapiEndpointsCompetitionsCompetitionResponse = {
     allowChallengeOwnersToHandleQuestions?: boolean;
     practiceModeEnabled?: boolean;
     tracksEnabled?: boolean;
+    accessMode?: NoCtfapiEndpointsCompetitionsCompetitionAccessModeProtocol;
 };
 
 export type NoCtfapiEndpointsCompetitionsGameModeProtocol = 'Ctf' | 'Awd' | 'Awdp' | 'Koh';
@@ -544,6 +545,8 @@ export type NoCtfapiEndpointsCompetitionsCompetitionStatusProtocol = 'Draft' | '
 export type NoCtfapiEndpointsCompetitionsLeaderboardVisibilityProtocol = 'Normal' | 'Frozen' | 'Blackout';
 
 export type NoCtfapiEndpointsCompetitionsCompetitionAdministrationRoleProtocol = 'Owner' | 'Manager' | 'Judge' | 'Observer';
+
+export type NoCtfapiEndpointsCompetitionsCompetitionAccessModeProtocol = 'Public' | 'StaffOnly';
 
 export type NoCtfapiEndpointsCompetitionsGetCompetitionRequest = {
     [key: string]: never;
@@ -848,7 +851,7 @@ export type NoCtfapiEndpointsCompetitionsEventsExportCompetitionEventsRequest = 
     [key: string]: never;
 };
 
-export type NoCtfapiEndpointsCompetitionsEventsCompetitionEventKindProtocol = 'CompetitionCreated' | 'CompetitionUpdated' | 'CompetitionDeleted' | 'CompetitionLifecycleChanged' | 'LeaderboardVisibilityChanged' | 'ChallengeCreated' | 'ChallengeUpdated' | 'ChallengePublished' | 'ChallengeUnpublished' | 'ChallengeDeleted' | 'HintPublished' | 'HintUnlocked' | 'TeamRegistered' | 'TeamRegistrationChanged' | 'TeamUpdated' | 'TeamDeleted' | 'TeamMemberJoined' | 'TeamMemberRemoved' | 'TeamCaptainTransferred' | 'TeamBanned' | 'TeamUnbanned' | 'GameplayFactReceived' | 'GameplayFactAdjudicated' | 'ScoringRecorded' | 'FirstBloodAwarded' | 'SecondBloodAwarded' | 'ThirdBloodAwarded' | 'RuntimeCreated' | 'RuntimeStateChanged' | 'RuntimeExtended' | 'RuntimeReset' | 'RuntimePortAllocated' | 'ProtectedGameplayFactValueAccessed' | 'CheatIncidentDetected' | 'CheatIncidentConfirmed' | 'CheatIncidentDismissed' | 'CheatIncidentSuperseded' | 'CheatIncidentCorrected' | 'CompetitionArchiveExported' | 'TeamBanAppealSubmitted' | 'TeamBanAppealUpheld' | 'TeamBanAppealAccepted' | 'TeamBanCorrectionPublished' | 'RuntimeForceTerminationRequested' | 'RuntimeForceTerminationCompleted' | 'RuntimeForceTerminationFailed' | 'AnnouncementPublished' | 'QuestionOpened' | 'QuestionReplied' | 'QuestionStatusChanged' | 'ChallengeDescriptionUpdated' | 'TrackConfigurationUpdated' | 'TeamTrackChanged' | 'TrackRegistrationPolicyUpdated' | 'AwdpBreakAttempted' | 'AwdpFixAttempted' | 'AwdpBreakResolved' | 'AwdpFixResolved' | 'GameplayFactPatchDownloaded';
+export type NoCtfapiEndpointsCompetitionsEventsCompetitionEventKindProtocol = 'CompetitionCreated' | 'CompetitionUpdated' | 'CompetitionDeleted' | 'CompetitionLifecycleChanged' | 'LeaderboardVisibilityChanged' | 'ChallengeCreated' | 'ChallengeUpdated' | 'ChallengePublished' | 'ChallengeUnpublished' | 'ChallengeDeleted' | 'HintPublished' | 'HintUnlocked' | 'TeamRegistered' | 'TeamRegistrationChanged' | 'TeamUpdated' | 'TeamDeleted' | 'TeamMemberJoined' | 'TeamMemberRemoved' | 'TeamCaptainTransferred' | 'TeamBanned' | 'TeamUnbanned' | 'GameplayFactReceived' | 'GameplayFactAdjudicated' | 'ScoringRecorded' | 'FirstBloodAwarded' | 'SecondBloodAwarded' | 'ThirdBloodAwarded' | 'RuntimeCreated' | 'RuntimeStateChanged' | 'RuntimeExtended' | 'RuntimeReset' | 'RuntimePortAllocated' | 'ProtectedGameplayFactValueAccessed' | 'CheatIncidentDetected' | 'CheatIncidentConfirmed' | 'CheatIncidentDismissed' | 'CheatIncidentSuperseded' | 'CheatIncidentCorrected' | 'CompetitionArchiveExported' | 'TeamBanAppealSubmitted' | 'TeamBanAppealUpheld' | 'TeamBanAppealAccepted' | 'TeamBanCorrectionPublished' | 'RuntimeForceTerminationRequested' | 'RuntimeForceTerminationCompleted' | 'RuntimeForceTerminationFailed' | 'AnnouncementPublished' | 'QuestionOpened' | 'QuestionReplied' | 'QuestionStatusChanged' | 'ChallengeDescriptionUpdated' | 'TrackConfigurationUpdated' | 'TeamTrackChanged' | 'TrackRegistrationPolicyUpdated' | 'AwdpBreakAttempted' | 'AwdpFixAttempted' | 'AwdpBreakResolved' | 'AwdpFixResolved' | 'GameplayFactPatchDownloaded' | 'CompetitionAudienceChanged';
 
 export type NoCtfapiEndpointsCompetitionsEventsCompetitionEventLevelProtocol = 'Information' | 'Warning' | 'Error';
 
@@ -884,6 +887,9 @@ export type NoCtfapiEndpointsCompetitionsEventsCompetitionEventResponse = {
     parentEventId?: string | null;
     competitionStatus?: NoCtfapiEndpointsCompetitionsCompetitionStatusProtocol | null;
     leaderboardVisibility?: NoCtfapiEndpointsCompetitionsLeaderboardVisibilityProtocol | null;
+    competitionAccessMode?: NoCtfapiEndpointsCompetitionsCompetitionAccessModeProtocol | null;
+    previousCompetitionAccessMode?: NoCtfapiEndpointsCompetitionsCompetitionAccessModeProtocol | null;
+    competitionAudienceChangeKind?: NoCtfapiEndpointsCompetitionsEventsCompetitionAudienceChangeKindProtocol | null;
     teamRegistrationStatus?: NoCtfapiEndpointsTeamsTeamRegistrationStatusProtocol | null;
     gameplayFactKind?: NoCtfapiEndpointsGameplayFactsGameplayFactKindProtocol | null;
     gameplayFactState?: NoCtfapiEndpointsGameplayFactsGameplayFactStateProtocol | null;
@@ -899,6 +905,8 @@ export type NoCtfapiEndpointsCompetitionsEventsCompetitionEventResponse = {
 };
 
 export type NoCtfapiEndpointsCompetitionsEventsCompetitionEventVisibilityProtocol = 'Public' | 'Team' | 'Staff';
+
+export type NoCtfapiEndpointsCompetitionsEventsCompetitionAudienceChangeKindProtocol = 'AccessMode' | 'Collaborators' | 'Owner';
 
 export type NoCtfapiEndpointsCompetitionsEventsRuntimeCleanupResultProtocol = 'Pending' | 'ResourcesAbsent' | 'ResourcesRemain' | 'CleanupFailed' | 'CapacityOwnershipConflict';
 
@@ -1931,6 +1939,7 @@ export type NoCtfapiEndpointsAdministrationCompetitionsCreateCompetitionRequest 
     allowChallengeOwnersToHandleQuestions?: boolean;
     practiceModeEnabled?: boolean;
     tracksEnabled?: boolean;
+    accessMode?: NoCtfapiEndpointsCompetitionsCompetitionAccessModeProtocol;
 };
 
 export type NoCtfapiEndpointsAdministrationCompetitionsCompetitionForceDeleteConflictResponse = {
@@ -2064,6 +2073,7 @@ export type NoCtfapiEndpointsAdministrationCompetitionsCompetitionMetadataPatchR
     maxParticipantMessagesBeforeHandlerReply: number;
     allowChallengeOwnersToHandleQuestions: boolean;
     practiceModeEnabled: boolean;
+    accessMode: NoCtfapiEndpointsCompetitionsCompetitionAccessModeProtocol;
 };
 
 export type NoCtfapiEndpointsAdministrationCompetitionsCompetitionConfigurationPatchRequest = {

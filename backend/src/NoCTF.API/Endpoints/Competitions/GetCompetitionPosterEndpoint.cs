@@ -1,6 +1,7 @@
 using FastEndpoints;
 using Microsoft.AspNetCore.Http.HttpResults;
 using NoCTF.Application.Storage;
+using NoCTF.API.Security;
 
 namespace NoCTF.API.Endpoints.Competitions;
 
@@ -22,7 +23,10 @@ public sealed class GetCompetitionPosterEndpoint(ManageBusinessImages images)
     {
         var file = await images.GetCompetitionPosterAsync(Route<Guid>("competitionId"), ct);
         var revision = HttpContext.Request.Query["revision"].ToString();
-        HttpContext.Response.Headers.CacheControl = file is not null
+        HttpContext.Response.Headers.CacheControl =
+            CompetitionAudienceGateMiddleware.IsStaffOnly(HttpContext)
+                ? "private,no-store"
+                : file is not null
             && Guid.TryParseExact(revision, "N", out var requestedFileId)
             && requestedFileId == file.FileId
                 ? "public,max-age=31536000,immutable"

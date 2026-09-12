@@ -1,4 +1,5 @@
 using NoCTF.Application.Competitions.Management;
+using NoCTF.Domain.Competitions;
 using NoCTF.Infrastructure.Caching;
 using ZiggyCreatures.Caching.Fusion;
 
@@ -26,14 +27,27 @@ public sealed class CompetitionReadModelCache(IFusionCacheProvider caches)
             (_, token) => factory(token),
             token: cancellationToken);
 
+    public Task<CompetitionAccessMode?> GetAccessModeAsync(
+        Guid competitionId,
+        Func<CancellationToken, Task<CompetitionAccessMode?>> factory,
+        CancellationToken cancellationToken) =>
+        cache.GetOrSetAsync<CompetitionAccessMode?>(
+            AccessModeKey(competitionId),
+            (_, token) => factory(token),
+            token: cancellationToken).AsTask();
+
     public async Task InvalidateAsync(
         Guid competitionId,
         CancellationToken cancellationToken)
     {
         await cache.RemoveAsync(DetailKey(competitionId), token: cancellationToken);
         await cache.RemoveAsync(ListKey, token: cancellationToken);
+        await cache.RemoveAsync(AccessModeKey(competitionId), token: cancellationToken);
     }
 
     private static string DetailKey(Guid competitionId) =>
         $"competition:{competitionId:N}:public";
+
+    private static string AccessModeKey(Guid competitionId) =>
+        $"competition:{competitionId:N}:access-mode";
 }

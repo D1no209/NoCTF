@@ -13825,6 +13825,9 @@
           },
           "tracksEnabled": {
             "type": "boolean"
+          },
+          "accessMode": {
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsCompetitionsCompetitionAccessModeProtocol"
           }
         }
       },
@@ -13892,6 +13895,18 @@
           "Manager",
           "Judge",
           "Observer"
+        ]
+      },
+      "NoCTFAPIEndpointsCompetitionsCompetitionAccessModeProtocol": {
+        "type": "string",
+        "description": "",
+        "x-enumNames": [
+          "Public",
+          "StaffOnly"
+        ],
+        "enum": [
+          "Public",
+          "StaffOnly"
         ]
       },
       "NoCTFAPIEndpointsCompetitionsGetCompetitionRequest": {
@@ -15023,7 +15038,8 @@
           "AwdpFixAttempted",
           "AwdpBreakResolved",
           "AwdpFixResolved",
-          "GameplayFactPatchDownloaded"
+          "GameplayFactPatchDownloaded",
+          "CompetitionAudienceChanged"
         ],
         "enum": [
           "CompetitionCreated",
@@ -15084,7 +15100,8 @@
           "AwdpFixAttempted",
           "AwdpBreakResolved",
           "AwdpFixResolved",
-          "GameplayFactPatchDownloaded"
+          "GameplayFactPatchDownloaded",
+          "CompetitionAudienceChanged"
         ]
       },
       "NoCTFAPIEndpointsCompetitionsEventsCompetitionEventLevelProtocol": {
@@ -15243,6 +15260,30 @@
               }
             ]
           },
+          "competitionAccessMode": {
+            "nullable": true,
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsCompetitionsCompetitionAccessModeProtocol"
+              }
+            ]
+          },
+          "previousCompetitionAccessMode": {
+            "nullable": true,
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsCompetitionsCompetitionAccessModeProtocol"
+              }
+            ]
+          },
+          "competitionAudienceChangeKind": {
+            "nullable": true,
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsCompetitionsEventsCompetitionAudienceChangeKindProtocol"
+              }
+            ]
+          },
           "teamRegistrationStatus": {
             "nullable": true,
             "oneOf": [
@@ -15334,6 +15375,20 @@
           "Public",
           "Team",
           "Staff"
+        ]
+      },
+      "NoCTFAPIEndpointsCompetitionsEventsCompetitionAudienceChangeKindProtocol": {
+        "type": "string",
+        "description": "",
+        "x-enumNames": [
+          "AccessMode",
+          "Collaborators",
+          "Owner"
+        ],
+        "enum": [
+          "AccessMode",
+          "Collaborators",
+          "Owner"
         ]
       },
       "NoCTFAPIEndpointsCompetitionsEventsRuntimeCleanupResultProtocol": {
@@ -19366,6 +19421,9 @@
           },
           "tracksEnabled": {
             "type": "boolean"
+          },
+          "accessMode": {
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsCompetitionsCompetitionAccessModeProtocol"
           }
         }
       },
@@ -19831,7 +19889,8 @@
           "maxActiveQuestionsPerTeam",
           "maxParticipantMessagesBeforeHandlerReply",
           "allowChallengeOwnersToHandleQuestions",
-          "practiceModeEnabled"
+          "practiceModeEnabled",
+          "accessMode"
         ],
         "properties": {
           "title": {
@@ -19885,6 +19944,9 @@
           },
           "practiceModeEnabled": {
             "type": "boolean"
+          },
+          "accessMode": {
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsCompetitionsCompetitionAccessModeProtocol"
           }
         }
       },

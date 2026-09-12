@@ -15,6 +15,7 @@ public sealed class Competition
     public Guid[] ManagerIds { get; set; } = [];
     public Guid[] JudgeIds { get; set; } = [];
     public Guid[] ObserverIds { get; set; } = [];
+    public CompetitionAccessMode AccessMode { get; set; }
     public GameMode Mode { get; set; }
     public string ConfigurationJson { get; set; } = string.Empty;
     public bool TracksEnabled { get; set; }

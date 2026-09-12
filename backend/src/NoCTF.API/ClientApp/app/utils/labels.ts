@@ -164,6 +164,7 @@ export function competitionEventText(
   }
   const templates: Partial<Record<NoCtfapiEndpointsCompetitionsEventsCompetitionEventKindProtocol, string>> = {
     GameplayFactPatchDownloaded: translate("ui.downloadedThePatchArchiveForTeam", { actor, team }),
+    CompetitionAudienceChanged: translate("competitionAccess.changed"),
     CompetitionCreated: translate("ui.contestCreated"), CompetitionUpdated: translate("ui.competitionInformationHasBeenUpdated"), CompetitionLifecycleChanged: translate("ui.competitionLifeCycleChanges"),
     LeaderboardVisibilityChanged: translate("ui.leaderboardVisibilityChanged"), ChallengeCreated: translate("ui.challengeWasAddedToTheCompetition", { challenge }), ChallengeUpdated: translate("ui.challengeWasUpdated", { challenge }),
     ChallengePublished: translate("ui.challengeWasPublished", { challenge }), ChallengeDescriptionUpdated: translate("ui.challengeHasAnUpdatedDescription", { challenge }), ChallengeUnpublished: translate("ui.challengeWasUnpublished", { challenge }), HintPublished: translate("ui.challengeHasANewHint2", { challenge }),

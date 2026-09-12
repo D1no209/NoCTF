@@ -8,6 +8,7 @@ using NoCTF.Infrastructure.Caching;
 using NoCTF.Infrastructure.Competitions.Events;
 using NoCTF.Infrastructure.Persistence;
 using NoCTF.Infrastructure.Competitions.Management;
+using NoCTF.Infrastructure.Competitions.Access;
 using NoCTF.Application.Teams.Registration;
 using NoCTF.Domain.Teams;
 using NoCTF.GameModes.Registration;
@@ -146,6 +147,11 @@ public sealed class CompetitionManagementPersistenceTests
             var result = await store
                 .FindAsync(competitionId, includeDraft: false, cancellationToken);
             var listed = await store.ListAsync(includeDraft: false, cancellationToken);
+            var audience = new CompetitionAudienceReader(db, readModels);
+            await Assert.That(await audience.GetAccessModeAsync(
+                    competitionId,
+                    cancellationToken))
+                .IsEqualTo(CompetitionAccessMode.Public);
 
             var updated = await store.UpdateAsync(
                 new UpdateCompetitionCommand(
@@ -158,11 +164,16 @@ public sealed class CompetitionManagementPersistenceTests
                     result.MaxTeamMembers,
                     result.MaxConcurrentRuntimeInstancesPerTeam,
                     ownerId,
-                    now.AddMinutes(1)),
+                    now.AddMinutes(1),
+                    AccessMode: CompetitionAccessMode.StaffOnly),
                 cancellationToken);
             var refreshed = await store
                 .FindAsync(competitionId, includeDraft: false, cancellationToken);
             var refreshedList = await store.ListAsync(includeDraft: false, cancellationToken);
+            await Assert.That(await audience.GetAccessModeAsync(
+                    competitionId,
+                    cancellationToken))
+                .IsEqualTo(CompetitionAccessMode.StaffOnly);
 
             await Assert.That(result).IsNotNull();
             await Assert.That(result!.Id).IsEqualTo(competitionId);
@@ -170,7 +181,11 @@ public sealed class CompetitionManagementPersistenceTests
             await Assert.That(listed[0].Id).IsEqualTo(laterCompetitionId);
             await Assert.That(listed[1].Id).IsEqualTo(competitionId);
             await Assert.That(updated).IsNotNull();
+            await Assert.That(updated!.AccessMode)
+                .IsEqualTo(CompetitionAccessMode.StaffOnly);
             await Assert.That(refreshed!.Title).IsEqualTo("Renamed competition");
+            await Assert.That(refreshed.AccessMode)
+                .IsEqualTo(CompetitionAccessMode.StaffOnly);
             await Assert.That(refreshedList.Single(item => item.Id == competitionId).Title)
                 .IsEqualTo("Renamed competition");
             var updateEvent = await db.CompetitionEvents.AsNoTracking()
@@ -178,6 +193,16 @@ public sealed class CompetitionManagementPersistenceTests
                     && item.Kind == CompetitionEventKind.CompetitionUpdated,
                     cancellationToken);
             await Assert.That(updateEvent.ActorUserId).IsEqualTo(ownerId);
+            var audienceEvent = await db.CompetitionEvents.AsNoTracking()
+                .SingleAsync(item => item.CompetitionId == competitionId
+                    && item.Kind == CompetitionEventKind.CompetitionAudienceChanged,
+                    cancellationToken);
+            await Assert.That(audienceEvent.CompetitionAccessMode)
+                .IsEqualTo(CompetitionAccessMode.StaffOnly);
+            await Assert.That(audienceEvent.PreviousCompetitionAccessMode)
+                .IsEqualTo(CompetitionAccessMode.Public);
+            await Assert.That(audienceEvent.CompetitionAudienceChangeKind)
+                .IsEqualTo(CompetitionAudienceChangeKind.AccessMode);
 
             var runningCompetition = await db.Competitions.SingleAsync(
                 item => item.Id == competitionId,
