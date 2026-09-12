@@ -27,6 +27,7 @@ using NoCTF.Application.Admission;
 using NoCTF.API.SignalR.Publishing;
 using NoCTF.API.SignalR.Hubs;
 using NoCTF.API.Endpoints.Authentication;
+using NoCTF.API.Endpoints.Teams.WriteUps;
 using NoCTF.API.Pagination;
 using NSwag;
 
@@ -208,6 +209,7 @@ public static class ServiceRegistration
                 LocalGameplayFactStatePublisher>();
         }
         services.AddSingleton<NoCTF.API.Pagination.SignedKeysetCursor>();
+        services.AddSingleton<TeamWriteUpPreviewTicketCodec>();
         services.AddScoped<ICompetitionLifecycleNotificationPublisher, SignalRCompetitionLifecyclePublisher>();
         if (includeInfrastructure
             && !development

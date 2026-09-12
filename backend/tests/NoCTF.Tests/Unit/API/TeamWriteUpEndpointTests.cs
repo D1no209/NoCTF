@@ -12,8 +12,11 @@ using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using Microsoft.Extensions.Time.Testing;
 using NoCTF.API.Composition;
 using NoCTF.API.Endpoints.Teams.WriteUps;
+using NoCTF.API.Endpoints.Authentication;
+using NoCTF.API.Pagination;
 using NoCTF.API.Security;
 using NoCTF.Application.Scoring.Leaderboard;
 using NoCTF.Application.Storage;
@@ -28,6 +31,32 @@ public sealed class TeamWriteUpEndpointTests
     private static readonly Guid CompetitionId = Guid.CreateVersion7();
     private static readonly Guid TeamId = Guid.CreateVersion7();
     private static readonly Guid ActorId = Guid.CreateVersion7();
+
+    [Test]
+    public async Task Preview_ticket_expires_after_ten_minutes()
+    {
+        var clock = new FakeTimeProvider(
+            DateTimeOffset.Parse("2026-09-13T03:00:00Z"));
+        var codec = new TeamWriteUpPreviewTicketCodec(
+            Options.Create(new PaginationOptions { SigningKey = new string('P', 32) }),
+            Options.Create(new RefreshHttpOptions { RefreshCookieSecure = true }),
+            clock);
+        var grant = codec.Issue(CompetitionId, TeamId, Guid.CreateVersion7());
+
+        await Assert.That(codec.TryValidate(
+            grant.Token,
+            CompetitionId,
+            TeamId,
+            out _)).IsTrue();
+        clock.Advance(TimeSpan.FromMinutes(10));
+        await Assert.That(codec.TryValidate(
+            grant.Token,
+            CompetitionId,
+            TeamId,
+            out _)).IsFalse();
+        await Assert.That(codec.CookieName)
+            .IsEqualTo("__Secure-noctf_writeup_preview");
+    }
 
     [Test]
     public async Task Observer_can_review_and_download_but_receives_no_judging_capability()
@@ -74,6 +103,56 @@ public sealed class TeamWriteUpEndpointTests
 
         await Assert.That(list.StatusCode).IsEqualTo(HttpStatusCode.Forbidden);
         await Assert.That(download.StatusCode).IsEqualTo(HttpStatusCode.Forbidden);
+    }
+
+    [Test]
+    public async Task Staff_preview_uses_a_scoped_cookie_and_supports_byte_ranges()
+    {
+        await using var app = await CreateApplicationAsync(
+            canObserve: true,
+            canJudge: false);
+        using var client = app.GetTestClient();
+
+        using var issued = await client.PostAsync(
+            $"/api/v1/competitions/{CompetitionId}/teams/{TeamId}/writeup/preview",
+            null);
+        var grant = await issued.Content.ReadFromJsonAsync<TeamWriteUpPreviewResponse>();
+        var setCookie = issued.Headers.GetValues("Set-Cookie").Single();
+        var normalizedSetCookie = setCookie.ToLowerInvariant();
+        var cookie = setCookie.Split(';', 2)[0];
+        using var request = new HttpRequestMessage(HttpMethod.Get, grant!.PreviewUrl);
+        request.Headers.Add("Cookie", cookie);
+        request.Headers.Range = new RangeHeaderValue(0, 4);
+        using var preview = await client.SendAsync(request);
+        var bytes = await preview.Content.ReadAsByteArrayAsync();
+
+        await Assert.That(issued.StatusCode).IsEqualTo(HttpStatusCode.OK);
+        await Assert.That(grant.PreviewUrl).DoesNotContain("?");
+        await Assert.That(normalizedSetCookie).Contains("httponly");
+        await Assert.That(normalizedSetCookie).Contains("samesite=strict");
+        await Assert.That(preview.StatusCode).IsEqualTo(HttpStatusCode.PartialContent);
+        await Assert.That(preview.Content.Headers.ContentRange?.From).IsEqualTo(0);
+        await Assert.That(preview.Content.Headers.ContentRange?.To).IsEqualTo(4);
+        await Assert.That(preview.Content.Headers.ContentDisposition).IsNull();
+        await Assert.That(bytes).IsEquivalentTo("%PDF-"u8.ToArray());
+        await Assert.That(preview.Headers.CacheControl?.NoStore).IsTrue();
+        await Assert.That(preview.Headers.Contains("Content-Security-Policy")).IsFalse();
+
+        var tamperedCookie = cookie[..^1] + (cookie[^1] == 'A' ? 'B' : 'A');
+        using var tamperedRequest = new HttpRequestMessage(HttpMethod.Get, grant.PreviewUrl);
+        tamperedRequest.Headers.Add("Cookie", tamperedCookie);
+        using var tampered = await client.SendAsync(tamperedRequest);
+        await Assert.That(tampered.StatusCode).IsEqualTo(HttpStatusCode.Unauthorized);
+
+        using var crossTeamRequest = new HttpRequestMessage(
+            HttpMethod.Get,
+            grant.PreviewUrl.Replace(
+                TeamId.ToString("N"),
+                Guid.CreateVersion7().ToString("N"),
+                StringComparison.Ordinal));
+        crossTeamRequest.Headers.Add("Cookie", cookie);
+        using var crossTeam = await client.SendAsync(crossTeamRequest);
+        await Assert.That(crossTeam.StatusCode).IsEqualTo(HttpStatusCode.Unauthorized);
     }
 
     [Test]
@@ -189,7 +268,9 @@ public sealed class TeamWriteUpEndpointTests
             options.Assemblies = [typeof(ListTeamWriteUpsEndpoint).Assembly];
             options.Filter = type => type == typeof(ListTeamWriteUpsEndpoint)
                 || type == typeof(DownloadTeamWriteUpEndpoint)
-                || type == typeof(UploadMyTeamWriteUpEndpoint);
+                || type == typeof(UploadMyTeamWriteUpEndpoint)
+                || type == typeof(IssueTeamWriteUpPreviewEndpoint)
+                || type == typeof(PreviewTeamWriteUpEndpoint);
         });
         builder.Services
             .AddAuthentication(options =>
@@ -199,8 +280,13 @@ public sealed class TeamWriteUpEndpointTests
             })
             .AddScheme<AuthenticationSchemeOptions, TestBearerHandler>("Bearer", _ => { });
         builder.Services.AddAuthorization();
+        builder.Services.Configure<PaginationOptions>(options =>
+            options.SigningKey = new string('P', 32));
+        builder.Services.AddSingleton<IOptions<RefreshHttpOptions>>(
+            Options.Create(new RefreshHttpOptions { RefreshCookieSecure = false }));
         builder.Services.AddSingleton(manager);
         builder.Services.AddSingleton(TimeProvider.System);
+        builder.Services.AddSingleton<TeamWriteUpPreviewTicketCodec>();
         builder.Services.AddSingleton<ICompetitionModerationAuthorizer>(
             new TestAuthorizer(canObserve, canJudge));
         builder.Services.AddSingleton<IUserContext>(new ActorUserContext());

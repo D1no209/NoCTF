@@ -48,6 +48,14 @@ internal static class TeamWriteUpProtocol
         context.Response.Headers["Content-Security-Policy"] = "sandbox; default-src 'none'";
         context.Response.Headers["Cross-Origin-Resource-Policy"] = "same-origin";
     }
+
+    internal static void SetPrivateInlinePdfHeaders(HttpContext context)
+    {
+        context.Response.Headers.CacheControl = "private, no-store";
+        context.Response.Headers.XContentTypeOptions = "nosniff";
+        context.Response.Headers["Cross-Origin-Resource-Policy"] = "same-origin";
+        context.Response.Headers["Referrer-Policy"] = "no-referrer";
+    }
 }
 
 public sealed class GetMyTeamWriteUpEndpoint(

@@ -1,10 +1,10 @@
 import { ArrowLeft, Download, FileSearch, MessageCircleQuestion, MinusCircle, RefreshCw, Scale } from '@lucide/vue'
 import { toast } from 'vue-sonner'
 
-import { adminCreateManualAdjustment, createTeamWriteUpConsultation, downloadTeamWriteUp, listTeamWriteUps } from '../../../../api'
+import { adminCreateManualAdjustment, createTeamWriteUpConsultation, downloadTeamWriteUp, issueTeamWriteUpPreview, listTeamWriteUps } from '../../../../api'
 import type { NoCtfapiEndpointsTeamsWriteUpsTeamWriteUpChallengeScoreResponse, NoCtfapiEndpointsTeamsWriteUpsTeamWriteUpReviewItemResponse, NoCtfapiEndpointsTeamsWriteUpsTeamWriteUpReviewResponse } from '../../../../api'
 import { createTrailingRefresh } from '../../../../lib/latest-page-refresh'
-import { downloadSdkFile, readProtectedDownload } from '../../../../utils/download'
+import { downloadSdkFile } from '../../../../utils/download'
 
 type ReviewItem = NoCtfapiEndpointsTeamsWriteUpsTeamWriteUpReviewItemResponse
 type ChallengeScore = NoCtfapiEndpointsTeamsWriteUpsTeamWriteUpChallengeScoreResponse
@@ -32,7 +32,6 @@ export function useCompetitionsByIdWriteUpsPage() {
   let previewRequest = 0
 
   function releasePreview() {
-    if (previewUrl.value) URL.revokeObjectURL(previewUrl.value)
     previewUrl.value = null
     previewFileId.value = null
   }
@@ -58,7 +57,7 @@ export function useCompetitionsByIdWriteUpsPage() {
   async function selectTeam(teamId?: string) {
     if (!teamId) return
     selectedTeamId.value = teamId
-    await router.replace({
+    void router.replace({
       query: { ...route.query, team: teamId },
     })
     const item = review.value?.items?.find(candidate => candidate.writeUp?.teamId === teamId)
@@ -68,15 +67,12 @@ export function useCompetitionsByIdWriteUpsPage() {
     previewLoading.value = true
     previewError.value = null
     try {
-      const result = await readProtectedDownload(
-        () => downloadTeamWriteUp({
-          path: { competitionId, teamId },
-          parseAs: 'blob',
-        }),
-        item.writeUp.fileName ?? `writeup-${teamId}.pdf`,
-      )
+      const { data, error } = await issueTeamWriteUpPreview({
+        path: { competitionId, teamId },
+      })
+      if (error || !data?.previewUrl) throw error
       if (request !== previewRequest) return
-      previewUrl.value = URL.createObjectURL(result.blob)
+      previewUrl.value = data.previewUrl
       previewFileId.value = item.writeUp.fileId
     }
     catch (error) {
