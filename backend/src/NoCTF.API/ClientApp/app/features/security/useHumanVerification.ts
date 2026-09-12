@@ -115,18 +115,18 @@ export function useHumanVerification() {
   const { configuration, ensureLoaded } = usePlatform()
 
   async function request(action: HumanVerificationAction): Promise<HumanVerificationHeaders | null> {
-    if (requestCoordinator.active || challenge.value) {
-      toast.info(translate('ui.anotherHumanVerificationIsInProgress'))
-      return null
-    }
-
     await ensureLoaded()
     const provider = providerConfiguration(configuration.value)
     if (!provider?.provider) {
       toast.error(translate('ui.humanVerificationConfigurationUnavailable'))
       return null
     }
+    if (action === 'runtime' && provider.runtimeRequired === false) return {}
     if (provider.provider === 'None') return {}
+    if (requestCoordinator.active || challenge.value) {
+      toast.info(translate('ui.anotherHumanVerificationIsInProgress'))
+      return null
+    }
 
     const siteKey = provider.siteKey?.trim()
     const apiEndpoint = provider.apiEndpoint?.trim() ?? ''

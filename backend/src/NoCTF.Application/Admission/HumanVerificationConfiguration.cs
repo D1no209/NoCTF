@@ -20,7 +20,8 @@ public sealed record HumanVerificationConfigurationView(
     string TurnstileSiteKey,
     bool TurnstileSecretConfigured,
     IReadOnlyList<string> TurnstileAllowedHostnames,
-    DateTimeOffset UpdatedAt);
+    DateTimeOffset UpdatedAt,
+    bool RuntimeEnabled = true);
 
 public sealed record UpdateHumanVerificationConfigurationCommand(
     bool Enabled,
@@ -29,11 +30,17 @@ public sealed record UpdateHumanVerificationConfigurationCommand(
     string CapSiteKey,
     string TurnstileSiteKey,
     IReadOnlyList<string> TurnstileAllowedHostnames,
-    DateTimeOffset Now);
+    DateTimeOffset Now,
+    bool RuntimeEnabled = true);
 
 public sealed record HumanVerificationRuntimeConfiguration(
     bool Enabled,
-    HumanVerificationOptions Options);
+    HumanVerificationOptions Options,
+    bool RuntimeEnabled = true)
+{
+    public bool IsRequired(HumanVerificationAction action) =>
+        Enabled && (action != HumanVerificationAction.Runtime || RuntimeEnabled);
+}
 
 public enum HumanVerificationConfigurationError
 {
@@ -118,7 +125,8 @@ public sealed class ManageHumanVerificationConfiguration(
             normalized.TurnstileSiteKey,
             current.TurnstileSecretConfigured,
             normalized.TurnstileAllowedHostnames,
-            normalized.Now);
+            normalized.Now,
+            normalized.RuntimeEnabled);
         var errors = Validate(candidate);
         if (errors.Count > 0)
         {
@@ -283,7 +291,8 @@ public sealed class NoOpHumanVerificationConfigurationStore
         string.Empty,
         false,
         [],
-        DateTimeOffset.UnixEpoch);
+        DateTimeOffset.UnixEpoch,
+        RuntimeEnabled: true);
 
     public Task<HumanVerificationConfigurationView> GetAsync(
         CancellationToken cancellationToken) => Task.FromResult(Default);
@@ -298,7 +307,8 @@ public sealed class NoOpHumanVerificationConfigurationStore
             CapSiteKey = command.CapSiteKey,
             TurnstileSiteKey = command.TurnstileSiteKey,
             TurnstileAllowedHostnames = command.TurnstileAllowedHostnames,
-            UpdatedAt = command.Now
+            UpdatedAt = command.Now,
+            RuntimeEnabled = command.RuntimeEnabled
         });
 
     public Task<HumanVerificationConfigurationView> ReplaceSecretAsync(
@@ -316,5 +326,6 @@ public sealed class NoOpHumanVerificationConfigurationStore
         CancellationToken cancellationToken) => Task.FromResult(
         new HumanVerificationRuntimeConfiguration(
             false,
-            new HumanVerificationOptions()));
+            new HumanVerificationOptions(),
+            Default.RuntimeEnabled));
 }

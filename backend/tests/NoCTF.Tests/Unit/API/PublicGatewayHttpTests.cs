@@ -101,6 +101,7 @@ public sealed class PublicGatewayHttpTests
                 humanVerification = new
                 {
                     enabled = true,
+                    runtimeEnabled = true,
                     provider = "Cap",
                     capServerUrl = "https://cap.example.test",
                     capSiteKey = "site-key",

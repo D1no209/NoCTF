@@ -41,7 +41,8 @@ public sealed class HumanVerificationMiddleware(RequestDelegate next)
         var configuration = await configurationReader.GetRuntimeConfigurationAsync(
             context.RequestAborted);
         var provider = configuration.Options.Provider;
-        if (!configuration.Enabled || provider == HumanVerificationProvider.None)
+        if (!configuration.IsRequired(metadata.Action)
+            || provider == HumanVerificationProvider.None)
         {
             await next(context);
             return;

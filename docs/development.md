@@ -85,6 +85,11 @@ Cap 使用独立的官方 Standalone 服务和站点密钥；Turnstile 仅在后
 `X-NoCTF-Human-Verification` 交给登录、注册和玩家 Runtime／评测端点，不写日志或持久化，且每次
 请求后立即丢弃。管理员操作与内部 Checker 回调不要求验证码。
 
+全局启用验证后，平台管理员仍可独立关闭“容器操作需要人机验证”。关闭只影响玩家 Runtime 的启动、
+重置、停止和续期；登录、注册与评测继续要求当前 Provider 的验证。公开平台配置通过
+`humanVerification.runtimeRequired` 告知客户端是否应在 Runtime 请求前展示验证，服务端中间件始终
+执行同一策略并作为权威边界。既有数据库迁移后默认保持 Runtime 验证开启。
+
 平台设置保存 Provider、公开参数和加密后的 Provider secret；管理 API 只返回 secret 是否已配置。
 `HumanVerification:*` 部署配置仅作为数据库尚未保存 Provider 时的首次启动回退，管理员首次保存后由
 数据库配置作为事实源。`EmailVerification:EncryptionKey` 同时保护 SMTP 密码和人机验证 secret，

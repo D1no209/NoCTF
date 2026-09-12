@@ -271,6 +271,7 @@ export type NoCtfapiEndpointsPlatformPublicHumanVerificationResponse = {
     provider?: NoCtfapiEndpointsPlatformHumanVerificationProviderProtocol;
     siteKey?: string | null;
     apiEndpoint?: string | null;
+    runtimeRequired?: boolean;
 };
 
 export type NoCtfapiEndpointsPlatformHumanVerificationProviderProtocol = 'None' | 'Cap' | 'Turnstile';
@@ -1441,6 +1442,7 @@ export type NoCtfapiEndpointsAdministrationPlatformPlatformBrandingResponse = {
 
 export type NoCtfapiEndpointsAdministrationPlatformAdminHumanVerificationConfigurationResponse = {
     enabled?: boolean;
+    runtimeEnabled?: boolean;
     provider?: NoCtfapiEndpointsPlatformHumanVerificationProviderProtocol;
     ready?: boolean;
     capServerUrl?: string;
@@ -1731,6 +1733,7 @@ export type NoCtfapiEndpointsAdministrationPlatformPlatformBrandingPatchRequest 
 
 export type NoCtfapiEndpointsAdministrationPlatformPlatformHumanVerificationPatchRequest = {
     enabled: boolean;
+    runtimeEnabled: boolean;
     provider: NoCtfapiEndpointsPlatformHumanVerificationProviderProtocol;
     capServerUrl: string;
     capSiteKey: string;

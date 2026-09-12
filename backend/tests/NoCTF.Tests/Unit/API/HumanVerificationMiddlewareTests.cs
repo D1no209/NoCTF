@@ -84,6 +84,39 @@ public sealed class HumanVerificationMiddlewareTests
     }
 
     [Test]
+    public async Task Disabled_runtime_switch_bypasses_only_runtime_operations()
+    {
+        var verifier = Substitute.For<IHumanVerificationVerifier>();
+        var source = Substitute.For<IRequestSourceAddress>();
+        var calls = 0;
+        var middleware = new HumanVerificationMiddleware(_ =>
+        {
+            calls++;
+            return Task.CompletedTask;
+        });
+
+        var runtime = Context(HumanVerificationAction.Runtime);
+        await middleware.InvokeAsync(
+            runtime,
+            verifier,
+            source,
+            Configuration(enabled: true, TurnstileOptions(), runtimeEnabled: false));
+
+        var login = Context(HumanVerificationAction.Login);
+        await middleware.InvokeAsync(
+            login,
+            verifier,
+            source,
+            Configuration(enabled: true, TurnstileOptions(), runtimeEnabled: false));
+
+        await Assert.That(calls).IsEqualTo(1);
+        await Assert.That(runtime.Response.StatusCode).IsEqualTo(StatusCodes.Status200OK);
+        await Assert.That(login.Response.StatusCode).IsEqualTo(StatusCodes.Status403Forbidden);
+        await Assert.That(await ProblemCodeAsync(login)).IsEqualTo("HumanVerificationRequired");
+        await verifier.DidNotReceiveWithAnyArgs().VerifyAsync(default!, default!, default);
+    }
+
+    [Test]
     public async Task Verified_token_carries_action_and_normalized_source_to_provider()
     {
         var verifier = Substitute.For<IHumanVerificationVerifier>();
@@ -180,11 +213,15 @@ public sealed class HumanVerificationMiddlewareTests
 
     private static IHumanVerificationConfigurationReader Configuration(
         bool enabled,
-        HumanVerificationOptions options)
+        HumanVerificationOptions options,
+        bool runtimeEnabled = true)
     {
         var reader = Substitute.For<IHumanVerificationConfigurationReader>();
         reader.GetRuntimeConfigurationAsync(Arg.Any<CancellationToken>())
-            .Returns(new HumanVerificationRuntimeConfiguration(enabled, options));
+            .Returns(new HumanVerificationRuntimeConfiguration(
+                enabled,
+                options,
+                runtimeEnabled));
         return reader;
     }
 

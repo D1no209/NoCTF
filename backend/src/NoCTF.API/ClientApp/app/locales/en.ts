@@ -1496,6 +1496,8 @@ export const englishMessages = {
   "ui.humanVerificationAdminDescription": "Select and configure CAP or Cloudflare Turnstile here, then control whether sign-in, registration, runtime, and judging operations require human verification.",
   "ui.enableHumanVerification": "Enable human verification",
   "ui.humanVerificationProtectedOperations": "When enabled, protected operations must pass the selected verification provider.",
+  "ui.requireHumanVerificationForContainerOperations": "Require verification for container operations",
+  "ui.containerHumanVerificationDescription": "When disabled, starting, resetting, stopping, and extending participant containers skips human verification. Other protected operations remain unchanged.",
   "ui.providerReady": "Provider ready",
   "ui.providerNotConfigured": "Provider not configured",
   "ui.humanVerificationProviderDeploymentRequired": "Configure a verification provider for this deployment before enabling it here.",

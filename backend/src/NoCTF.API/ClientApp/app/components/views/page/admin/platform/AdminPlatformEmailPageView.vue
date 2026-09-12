@@ -74,6 +74,17 @@ const { KeyRound, RefreshCw, Send, ShieldCheck, configuration, humanVerification
                   <FieldDescription>{{ $t('ui.humanVerificationProtectedOperations') }}</FieldDescription>
                 </FieldContent>
               </Field>
+              <Field orientation="horizontal">
+                <Switch
+                  id="human-verification-runtime-enabled"
+                  v-model="humanForm.runtimeEnabled"
+                  :disabled="humanVerificationSaving || !humanForm.enabled || humanForm.provider === 'None'"
+                />
+                <FieldContent>
+                  <FieldLabel for="human-verification-runtime-enabled">{{ $t('ui.requireHumanVerificationForContainerOperations') }}</FieldLabel>
+                  <FieldDescription>{{ $t('ui.containerHumanVerificationDescription') }}</FieldDescription>
+                </FieldContent>
+              </Field>
 
               <template v-if="humanForm.provider === 'Cap'">
                 <Field>

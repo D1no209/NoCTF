@@ -49,6 +49,7 @@ describe('human verification coordination', () => {
     expect(view).toContain(':is="TurnstileWidget"')
     expect(feature).toContain("appearance: 'interaction-only'")
     expect(feature).toContain("'X-NoCTF-Human-Verification'")
+    expect(feature).toContain("action === 'runtime' && provider.runtimeRequired === false")
     expect(feature).toContain('watch(() => route.fullPath')
     expect(platform).not.toContain('secret')
   })
