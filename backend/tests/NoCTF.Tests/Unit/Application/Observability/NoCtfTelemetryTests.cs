@@ -43,6 +43,71 @@ public sealed class NoCtfTelemetryTests
     }
 
     [Test]
+    public async Task Gameplay_processing_records_bounded_terminal_outcomes_and_duration()
+    {
+        var outcomes = new ConcurrentBag<string>();
+        var durations = new ConcurrentBag<(string Outcome, double Value)>();
+        using var listener = new MeterListener();
+        listener.InstrumentPublished = (instrument, meterListener) =>
+        {
+            if (instrument.Meter.Name == NoCtfTelemetry.MeterName
+                && instrument.Name.StartsWith(
+                    "noctf.gameplay_fact.processing",
+                    StringComparison.Ordinal))
+            {
+                meterListener.EnableMeasurementEvents(instrument);
+            }
+        };
+        listener.SetMeasurementEventCallback<long>((instrument, _, tags, _) =>
+        {
+            if (instrument.Name != "noctf.gameplay_fact.processing")
+                return;
+            outcomes.Add(tags.ToArray().Single(tag => tag.Key == "outcome")
+                .Value?.ToString() ?? string.Empty);
+        });
+        listener.SetMeasurementEventCallback<double>((instrument, value, tags, _) =>
+        {
+            if (instrument.Name != "noctf.gameplay_fact.processing.duration")
+                return;
+            durations.Add((
+                tags.ToArray().Single(tag => tag.Key == "outcome")
+                    .Value?.ToString() ?? string.Empty,
+                value));
+        });
+        listener.Start();
+
+        NoCtfTelemetry.RecordGameplayFactProcessing(
+            GameplayFactKind.FlagAttempt,
+            GameplayFactState.Completed,
+            GameplayFactResult.Correct,
+            0.25);
+        NoCtfTelemetry.RecordGameplayFactProcessing(
+            GameplayFactKind.BreakAttempt,
+            GameplayFactState.Completed,
+            GameplayFactResult.Wrong,
+            0.5);
+        NoCtfTelemetry.RecordGameplayFactProcessing(
+            GameplayFactKind.FlagAttempt,
+            GameplayFactState.PlatformFailed,
+            null,
+            1.25);
+        NoCtfTelemetry.RecordGameplayFactProcessing(
+            GameplayFactKind.FixAttempt,
+            GameplayFactState.Completed,
+            GameplayFactResult.Correct,
+            2);
+
+        await Assert.That(outcomes).IsEquivalentTo(
+            ["correct", "incorrect", "platform_error"]);
+        await Assert.That(durations).IsEquivalentTo(
+        [
+            ("correct", 0.25),
+            ("incorrect", 0.5),
+            ("platform_error", 1.25)
+        ]);
+    }
+
+    [Test]
     public async Task Pools_remain_separate_and_offline_nodes_change_quota_and_online_count_independently()
     {
         var pool = $"pool-{Guid.NewGuid():N}";

@@ -63,7 +63,8 @@ public static class ObservabilityExtensions
             "noctf.api.request.duration", "noctf.redis.operation.duration",
             "noctf.signalr.publish.duration", "noctf.runner.claim.duration",
             "noctf.leaderboard.projection.duration", "noctf.scheduler.rebuild.duration",
-            "noctf.scheduler.dispatch.lateness"
+            "noctf.scheduler.dispatch.lateness",
+            "noctf.gameplay_fact.processing.duration"
         })
         {
             var view = new ExplicitBucketHistogramConfiguration

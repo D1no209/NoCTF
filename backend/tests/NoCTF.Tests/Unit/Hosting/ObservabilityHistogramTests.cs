@@ -36,6 +36,21 @@ public sealed class ObservabilityHistogramTests
         NoCtfTelemetry.RecordGameplayFactSubmissions(GameplayFactKind.FlagAttempt, 4);
         NoCtfTelemetry.RecordGameplayFactSubmissions(GameplayFactKind.BreakAttempt, 2);
         NoCtfTelemetry.RecordGameplayFactSubmissions(GameplayFactKind.FixAttempt);
+        NoCtfTelemetry.RecordGameplayFactProcessing(
+            GameplayFactKind.FlagAttempt,
+            GameplayFactState.Completed,
+            GameplayFactResult.Correct,
+            0.012);
+        NoCtfTelemetry.RecordGameplayFactProcessing(
+            GameplayFactKind.BreakAttempt,
+            GameplayFactState.Completed,
+            GameplayFactResult.Wrong,
+            0.04);
+        NoCtfTelemetry.RecordGameplayFactProcessing(
+            GameplayFactKind.FlagAttempt,
+            GameplayFactState.PlatformFailed,
+            null,
+            0.8);
         app.Services.GetRequiredService<MeterProvider>().ForceFlush();
         using var client = app.GetTestClient();
         var exported = await client.GetStringAsync("/metrics");
@@ -75,6 +90,20 @@ public sealed class ObservabilityHistogramTests
         await Assert.That(submissionLines.Any(line => line.Contains(
             "kind=\"fix\"",
             StringComparison.Ordinal))).IsTrue();
+        var processingLines = exported.Split('\n').Where(line => line.StartsWith(
+            "noctf_gameplay_fact_processing_total{",
+            StringComparison.Ordinal)).ToArray();
+        await Assert.That(processingLines.Any(line => line.Contains(
+            "outcome=\"correct\"",
+            StringComparison.Ordinal))).IsTrue();
+        await Assert.That(processingLines.Any(line => line.Contains(
+            "outcome=\"incorrect\"",
+            StringComparison.Ordinal))).IsTrue();
+        await Assert.That(processingLines.Any(line => line.Contains(
+            "outcome=\"platform_error\"",
+            StringComparison.Ordinal))).IsTrue();
+        await Assert.That(exported).Contains(
+            "noctf_gameplay_fact_processing_duration_seconds_bucket");
     }
 
     private static SortedDictionary<double, double> Buckets(string text, string metric)

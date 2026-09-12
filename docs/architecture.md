@@ -65,7 +65,7 @@ Domain <- Application <- API / Worker / Runner / Host
 
 分数投影不写回 GameplayFact。影响排行榜的业务提交发布 NATS 失效消息；Worker 按比赛合并 500ms 内的失效并从 PostgreSQL 全量投影到命名 FusionCache。缓存丢失时由 PostgreSQL 重建，不扫描 Dirty 业务列。
 
-Flag、AWDP Break 与 Fix 只有在 GameplayFact 事务提交成功后才增加低基数 Prometheus counter；幂等重放与拒绝请求不重复计数。平台监控将 Flag 与 Break 合并展示为 Flag 流量，并分别提供 Flag/Fix 的五分钟平均速率与近五分钟提交量。
+Flag、AWDP Break 与 Fix 只有在 GameplayFact 事务提交成功后才增加低基数 Prometheus counter；幂等重放与拒绝请求不重复计数。Flag/Break 首次判定终态另记录 `correct | incorrect | platform_error` 低基数结果和从接收到最终判定的完整处理耗时，重判不重复计数。平台监控将 Flag 与 Break 合并展示，提供五分钟正确率、处理 P95、平台错误率、Flag/Fix 平均速率与提交量；正确率排除平台失败，平台错误率以全部终态处理为分母。
 
 ## Runner Pool
 

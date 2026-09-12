@@ -6,7 +6,7 @@
 
 在 `ObservabilityExtensions` 中按原始 Instrument 名显式配置桶，而不是匹配 Prometheus 改写后的名字。没有全局 `AddView("*")`。
 
-覆盖全部 7 个自定义秒级 Histogram：
+覆盖全部 8 个自定义秒级 Histogram：
 
 - `noctf.api.request.duration`
 - `noctf.redis.operation.duration`
@@ -15,6 +15,7 @@
 - `noctf.leaderboard.projection.duration`
 - `noctf.scheduler.rebuild.duration`
 - `noctf.scheduler.dispatch.lateness`
+- `noctf.gameplay_fact.processing.duration`
 
 共同边界，单位为秒：
 
@@ -66,6 +67,16 @@ Observability__Monitoring__LatencySustainedWindowMinutes=3
 
 样本门槛必须为正数，持续时间为 1–60 分钟。持续判定使用 15 秒子查询步长检查同一五分钟分布，要求完整观察点及足够样本；不是扩大分布窗口。普通 API / Redis 有延迟阈值，文件传输与连接生命周期明细不套用普通 REST 阈值。
 
+### 赛事提交质量
+
+Flag 与 AWDP Break 首次进入终态时记录低基数 `correct`、`incorrect`、`platform_error` 结果；重判和幂等重放不重复记录。处理耗时从 GameplayFact 的 `OccurredAt` 计算到首次终态提交，包含排队、读取配置、判定和持久化时间。平台监控统一使用最近五分钟窗口：
+
+- Flag 正确率：`correct / (correct + incorrect)`，排除平台故障，避免把系统异常误算为选手答错。
+- 平台处理 P95：全部 Flag/Break 首次终态处理的端到端 P95。
+- 平台错误率：`platform_error / 全部首次终态处理`，普通 Wrong、Duplicate、AttemptsExhausted 不属于平台错误。
+
+三项指标至少需要 20 个样本才参与健康告警；低正确率只描述比赛行为，不降低平台健康状态。处理 P95 超过 2 秒告警、超过 10 秒严重；平台错误率超过 0.5% 告警、超过 2% 严重。
+
 ### 资源池配额
 
 “Runner 最低可用容量”改为“资源池最低剩余配额”。公式仍先按 `(pool, resource)` 汇总在线 Runner，再取可用量／总配额的最低比例，不改成节点级最小值。
@@ -77,7 +88,7 @@ Observability__Monitoring__LatencySustainedWindowMinutes=3
 ## 验证
 
 - 后端构建：0 警告、0 错误；1084 项非 Integration 测试通过。
-- 真实 MeterProvider + `/metrics`：7 个秒级 Histogram 的桶和计数、数量类桶不受影响、已知毫秒样本的合理分位数区间。
+- 真实 MeterProvider + `/metrics`：8 个秒级 Histogram 的桶和计数、数量类桶不受影响、已知毫秒样本的合理分位数区间。
 - 真实 ASP.NET 请求管线：REST、SignalR、失败上传、失败下载、抛出异常，以及静态资源和健康检查排除；计数与耗时标签一致。
 - 监控查询：无样本、低样本、正常、超阈值、持续判定、同时间点/窗口/过滤、多个 Redis endpoint、多个资源池。
 - 本地临时 Prometheus：所有实际监控查询能够执行，空分布不产生伪零延迟。

@@ -39,7 +39,10 @@ public enum PlatformMonitoringMetricKind : short
     FlagSubmissionsPerSecond,
     FlagSubmissionsLastFiveMinutes,
     FixSubmissionsPerSecond,
-    FixSubmissionsLastFiveMinutes
+    FixSubmissionsLastFiveMinutes,
+    FlagCorrectPercent,
+    FlagProcessingP95Milliseconds,
+    FlagPlatformErrorPercent
 }
 
 public enum PlatformMonitoringUnit : short
@@ -93,7 +96,8 @@ public sealed record PlatformMonitoringThresholds(
     double JetStreamStorageWarningPercent,
     double JetStreamStorageCriticalPercent,
     int LatencyMinimumSamples = 100,
-    int LatencySustainedWindowMinutes = 3)
+    int LatencySustainedWindowMinutes = 3,
+    int GameplayMinimumSamples = 20)
 {
     public static PlatformMonitoringThresholds Default { get; } = new(
         SustainedWindowMinutes: 3,
@@ -142,6 +146,9 @@ public sealed record PlatformMonitoringMeasurements(
     PlatformMonitoringSample FlagSubmissionsLastFiveMinutes,
     PlatformMonitoringSample FixSubmissionsPerSecond,
     PlatformMonitoringSample FixSubmissionsLastFiveMinutes,
+    PlatformMonitoringSample FlagCorrectRatio,
+    PlatformMonitoringSample FlagProcessingP95Seconds,
+    PlatformMonitoringSample FlagPlatformErrorRatio,
     IReadOnlyList<PlatformMonitoringLatencyMeasurement>? LatencyDetails = null,
     IReadOnlyList<PlatformMonitoringPoolResource>? PoolResources = null);
 
@@ -213,6 +220,22 @@ public sealed class ObservePlatformMonitoring(
             Metric(PlatformMonitoringMetricKind.FlagSubmissionsLastFiveMinutes,
                 PlatformMonitoringUnit.Count,
                 measurements.FlagSubmissionsLastFiveMinutes),
+            Metric(PlatformMonitoringMetricKind.FlagCorrectPercent,
+                PlatformMonitoringUnit.Percent,
+                Percent(measurements.FlagCorrectRatio),
+                noSamplesStatus: PlatformMonitoringStatus.NoSamples),
+            Metric(PlatformMonitoringMetricKind.FlagProcessingP95Milliseconds,
+                PlatformMonitoringUnit.Milliseconds,
+                Milliseconds(measurements.FlagProcessingP95Seconds),
+                warningAbove: 2_000,
+                criticalAbove: 10_000,
+                noSamplesStatus: PlatformMonitoringStatus.NoSamples),
+            Metric(PlatformMonitoringMetricKind.FlagPlatformErrorPercent,
+                PlatformMonitoringUnit.Percent,
+                Percent(measurements.FlagPlatformErrorRatio),
+                warningAbove: 0.5,
+                criticalAbove: 2,
+                noSamplesStatus: PlatformMonitoringStatus.NoSamples),
             Metric(PlatformMonitoringMetricKind.FixSubmissionsPerSecond,
                 PlatformMonitoringUnit.PerSecond,
                 measurements.FixSubmissionsPerSecond),

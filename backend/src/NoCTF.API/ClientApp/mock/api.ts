@@ -16,13 +16,21 @@ function shape(schema: Data | undefined, value: any): any {
 }
 
 function mockMonitoringSnapshot(): Data {
-  const metric = (kind: number, unit: number, value: number, status = 0, sampleCount: number | null = null, windowSeconds: number | null = sampleCount === null ? null : 300) => ({
+  const metric = (
+    kind: number,
+    unit: number,
+    value: number,
+    status = 0,
+    sampleCount: number | null = null,
+    windowSeconds: number | null = sampleCount === null ? null : 300,
+    minimumSamples: number | null = sampleCount === null ? null : 50,
+  ) => ({
     kind,
     unit,
     value,
     status,
     sampleCount,
-    minimumSamples: sampleCount === null ? null : 50,
+    minimumSamples,
     windowSeconds,
   })
   const latency = (kind: number, endpoint: string, p95: number, p99: number, mean: number, rate: number, errors: number, samples: number, status = 0) => ({
@@ -81,6 +89,9 @@ function mockMonitoringSnapshot(): Data {
       metric(24, 0, 11_520, 0, null, 300),
       metric(25, 1, 0.18, 0, null, 300),
       metric(26, 0, 54, 0, null, 300),
+      metric(27, 4, 73.8, 0, 10_944, 300, 20),
+      metric(28, 2, 342, 0, 11_520, 300, 20),
+      metric(29, 4, 0.4, 0, 11_520, 300, 20),
     ],
     latencyDetails: [
       latency(0, '/api/v1/competitions', 186, 342, 104, 88.4, 0.18, 26_520),

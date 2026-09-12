@@ -52,6 +52,9 @@ export function useAdminPlatformMonitoringPage() {
     flagSubmissionsLastFiveMinutes: 24,
     fixSubmissionsPerSecond: 25,
     fixSubmissionsLastFiveMinutes: 26,
+    flagCorrectPercent: 27,
+    flagProcessingP95Milliseconds: 28,
+    flagPlatformErrorPercent: 29,
   } as const
 
   const UNIT = {
@@ -78,15 +81,6 @@ export function useAdminPlatformMonitoringPage() {
       ],
     },
     {
-      title: "ui.gameplaySubmissions",
-      kinds: [
-        METRIC.flagSubmissionsPerSecond,
-        METRIC.flagSubmissionsLastFiveMinutes,
-        METRIC.fixSubmissionsPerSecond,
-        METRIC.fixSubmissionsLastFiveMinutes,
-      ],
-    },
-    {
       title: "ui.transactionalMessaging",
       kinds: [METRIC.wolverineOutboxCount, METRIC.wolverineInboxCount],
     },
@@ -110,13 +104,35 @@ export function useAdminPlatformMonitoringPage() {
     },
   ]
 
+  const GAMEPLAY = {
+    title: "ui.gameplaySubmissions",
+    qualityKind: METRIC.flagCorrectPercent,
+    healthKinds: [
+      METRIC.flagProcessingP95Milliseconds,
+      METRIC.flagPlatformErrorPercent,
+    ],
+    primaryKinds: [
+      METRIC.flagCorrectPercent,
+      METRIC.flagProcessingP95Milliseconds,
+      METRIC.flagPlatformErrorPercent,
+    ],
+    volumeKinds: [
+      METRIC.flagSubmissionsPerSecond,
+      METRIC.flagSubmissionsLastFiveMinutes,
+      METRIC.fixSubmissionsPerSecond,
+      METRIC.fixSubmissionsLastFiveMinutes,
+    ],
+    kinds: [
+      METRIC.flagCorrectPercent,
+      METRIC.flagProcessingP95Milliseconds,
+      METRIC.flagPlatformErrorPercent,
+    ],
+  }
+
   const HERO_KINDS = [
     METRIC.apiRequestsPerSecond,
     METRIC.apiP95Milliseconds,
     METRIC.apiServerErrorPercent,
-    METRIC.runnerOnlineCount,
-    METRIC.runnerMinimumAvailablePercent,
-    METRIC.postgreSqlConnectionUsagePercent,
   ]
 
   const METRIC_LABELS: Record<number, string> = {
@@ -147,6 +163,9 @@ export function useAdminPlatformMonitoringPage() {
     [METRIC.flagSubmissionsLastFiveMinutes]: "ui.flagSubmissionsLastFiveMinutes",
     [METRIC.fixSubmissionsPerSecond]: "ui.fixSubmissionRateFiveMinutes",
     [METRIC.fixSubmissionsLastFiveMinutes]: "ui.fixSubmissionsLastFiveMinutes",
+    [METRIC.flagCorrectPercent]: "ui.flagCorrectRateFiveMinutes",
+    [METRIC.flagProcessingP95Milliseconds]: "ui.flagProcessingP95FiveMinutes",
+    [METRIC.flagPlatformErrorPercent]: "ui.flagPlatformErrorRateFiveMinutes",
   }
 
   const snapshot = ref<MonitoringSnapshot | null>(null)
@@ -225,6 +244,7 @@ export function useAdminPlatformMonitoringPage() {
       [METRIC.flagSubmissionsLastFiveMinutes]: 30_000,
       [METRIC.fixSubmissionsPerSecond]: 5,
       [METRIC.fixSubmissionsLastFiveMinutes]: 1_500,
+      [METRIC.flagProcessingP95Milliseconds]: 10_000,
     }
     const maximum = maximumByKind[metric.kind ?? -1]
       ?? (metric.unit === UNIT.perSecond ? 5 : 100)
@@ -267,7 +287,10 @@ export function useAdminPlatformMonitoringPage() {
     if (statuses.includes(STATUS.critical)) return STATUS.critical
     if (statuses.includes(STATUS.warning)) return STATUS.warning
     if (statuses.includes(STATUS.observing)) return STATUS.observing
+    if (statuses.includes(STATUS.unavailable)) return STATUS.unavailable
     if (statuses.includes(STATUS.healthy)) return STATUS.healthy
+    if (statuses.includes(STATUS.insufficientSamples)) return STATUS.insufficientSamples
+    if (statuses.includes(STATUS.noSamples)) return STATUS.noSamples
     return STATUS.unavailable
   }
 
@@ -312,6 +335,7 @@ export function useAdminPlatformMonitoringPage() {
       ExternalLinkIcon,
       RefreshCw,
       GROUPS,
+      GAMEPLAY,
       HERO_KINDS,
       snapshot,
       loading,

@@ -58,6 +58,25 @@ public sealed class PrometheusPlatformMonitoringReaderTests
             item.Query.Contains("kind=~\"flag|break\"", StringComparison.Ordinal))).IsTrue();
         await Assert.That(submissionQueries.Any(item =>
             item.Query.Contains("kind=\"fix\"", StringComparison.Ordinal))).IsTrue();
+        await Assert.That(result.Metrics.Single(metric =>
+                metric.Kind == PlatformMonitoringMetricKind.FlagCorrectPercent).Value)
+            .IsEqualTo(samples == 0 ? null : 75);
+        await Assert.That(result.Metrics.Single(metric =>
+                metric.Kind == PlatformMonitoringMetricKind.FlagProcessingP95Milliseconds).Value)
+            .IsEqualTo(samples == 0 ? null : 100);
+        await Assert.That(result.Metrics.Single(metric =>
+                metric.Kind == PlatformMonitoringMetricKind.FlagPlatformErrorPercent).Value)
+            .IsEqualTo(samples == 0 ? null : 2);
+        var processingQueries = handler.Queries.Where(item =>
+            item.Query.Contains("noctf_gameplay_fact_processing", StringComparison.Ordinal))
+            .ToArray();
+        await Assert.That(processingQueries).Count().IsEqualTo(5);
+        await Assert.That(processingQueries.All(item =>
+            item.Query.Contains("[5m]", StringComparison.Ordinal))).IsTrue();
+        await Assert.That(processingQueries.All(item =>
+            item.Query.Contains("kind=~\"flag|break\"", StringComparison.Ordinal))).IsTrue();
+        await Assert.That(processingQueries.Any(item =>
+            item.Query.Contains("outcome=\"platform_error\"", StringComparison.Ordinal))).IsTrue();
     }
 
     private sealed class ClientFactory(HttpClient client) : IHttpClientFactory
@@ -82,7 +101,13 @@ public sealed class PrometheusPlatformMonitoringReaderTests
                     ? new[] { "memory", "cpu", "pids" }.Select(resource => new Dictionary<string, string> { ["pool"] = pool, ["resource"] = resource })
                     : [new Dictionary<string, string> { ["pool"] = pool }]).ToArray()
                 : [new Dictionary<string, string>()];
-            double value = query.Contains("histogram_quantile", StringComparison.Ordinal) ? 0.1
+            double value = query.Contains("noctf_gameplay_fact_processing", StringComparison.Ordinal)
+                    && query.Contains("outcome=\"correct\"", StringComparison.Ordinal)
+                    && query.Contains(" / ", StringComparison.Ordinal) ? 0.75
+                : query.Contains("noctf_gameplay_fact_processing", StringComparison.Ordinal)
+                    && query.Contains("outcome=\"platform_error\"", StringComparison.Ordinal)
+                    && query.Contains(" / ", StringComparison.Ordinal) ? 0.02
+                : query.Contains("histogram_quantile", StringComparison.Ordinal) ? 0.1
                 : query.Contains("increase(", StringComparison.Ordinal) ? samples
                 : query.Contains("capacity_total", StringComparison.Ordinal) ? 1000
                 : query.Contains("capacity_available", StringComparison.Ordinal) ? 500

@@ -47,6 +47,15 @@ public sealed class PlatformMonitoringTests
                 PlatformMonitoringMetricKind.FlagSubmissionsLastFiveMinutes).Value)
             .IsEqualTo(2400);
         await Assert.That(Metric(result,
+                PlatformMonitoringMetricKind.FlagCorrectPercent).Value)
+            .IsEqualTo(72);
+        await Assert.That(Metric(result,
+                PlatformMonitoringMetricKind.FlagProcessingP95Milliseconds).Value)
+            .IsEqualTo(420);
+        await Assert.That(Metric(result,
+                PlatformMonitoringMetricKind.FlagPlatformErrorPercent).Value)
+            .IsEqualTo(0.1);
+        await Assert.That(Metric(result,
                 PlatformMonitoringMetricKind.FixSubmissionsPerSecond).Value)
             .IsEqualTo(0.2);
         await Assert.That(Metric(result,
@@ -69,6 +78,41 @@ public sealed class PlatformMonitoringTests
             .IsEqualTo(PlatformMonitoringStatus.Warning);
         await Assert.That(Metric(result,
                 PlatformMonitoringMetricKind.RuntimeOldestWaitingSeconds).Status)
+            .IsEqualTo(PlatformMonitoringStatus.Critical);
+    }
+
+    [Test]
+    public async Task Incorrect_flags_do_not_degrade_platform_health_but_platform_failures_do()
+    {
+        var lowCorrectRate = Measurements() with
+        {
+            FlagCorrectRatio = PlatformMonitoringSample.From(0.01) with
+            {
+                SampleCount = 200,
+                MinimumSamples = 20,
+                WindowSeconds = 300
+            }
+        };
+        var platformFailures = lowCorrectRate with
+        {
+            FlagPlatformErrorRatio = PlatformMonitoringSample.From(0.03) with
+            {
+                SampleCount = 200,
+                MinimumSamples = 20,
+                WindowSeconds = 300
+            }
+        };
+
+        var playerResult = await UseCase(lowCorrectRate).ExecuteAsync();
+        var platformResult = await UseCase(platformFailures).ExecuteAsync();
+
+        await Assert.That(playerResult.Status).IsEqualTo(PlatformMonitoringStatus.Healthy);
+        await Assert.That(Metric(playerResult,
+                PlatformMonitoringMetricKind.FlagCorrectPercent).Value)
+            .IsEqualTo(1);
+        await Assert.That(platformResult.Status).IsEqualTo(PlatformMonitoringStatus.Critical);
+        await Assert.That(Metric(platformResult,
+                PlatformMonitoringMetricKind.FlagPlatformErrorPercent).Status)
             .IsEqualTo(PlatformMonitoringStatus.Critical);
     }
 
@@ -215,7 +259,25 @@ public sealed class PlatformMonitoringTests
             Value(8) with { WindowSeconds = 300 },
             Value(2400) with { WindowSeconds = 300 },
             Value(0.2) with { WindowSeconds = 300 },
-            Value(60) with { WindowSeconds = 300 });
+            Value(60) with { WindowSeconds = 300 },
+            Value(0.72) with
+            {
+                SampleCount = 200,
+                MinimumSamples = 20,
+                WindowSeconds = 300
+            },
+            Value(0.42) with
+            {
+                SampleCount = 200,
+                MinimumSamples = 20,
+                WindowSeconds = 300
+            },
+            Value(0.001) with
+            {
+                SampleCount = 200,
+                MinimumSamples = 20,
+                WindowSeconds = 300
+            });
     }
 
     private sealed class StubReader(PlatformMonitoringMeasurements measurements)

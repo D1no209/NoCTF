@@ -39,6 +39,12 @@ public static class NoCtfTelemetry
         "noctf.runtime.operations", unit: "{operation}");
     private static readonly Counter<long> GameplayFactSubmissions = Meter.CreateCounter<long>(
         "noctf.gameplay_fact.submissions", unit: "{submission}");
+    private static readonly Counter<long> GameplayFactProcessing = Meter.CreateCounter<long>(
+        "noctf.gameplay_fact.processing", unit: "{submission}");
+    private static readonly Histogram<double> GameplayFactProcessingDuration =
+        Meter.CreateHistogram<double>(
+            "noctf.gameplay_fact.processing.duration",
+            unit: "s");
     private static readonly Histogram<double> LeaderboardProjectionDuration = Meter.CreateHistogram<double>(
         "noctf.leaderboard.projection.duration", unit: "s");
     private static readonly Histogram<long> LeaderboardProjectionFacts = Meter.CreateHistogram<long>(
@@ -153,13 +159,7 @@ public static class NoCtfTelemetry
     {
         if (count <= 0)
             return;
-        var submissionKind = kind switch
-        {
-            GameplayFactKind.FlagAttempt => "flag",
-            GameplayFactKind.BreakAttempt => "break",
-            GameplayFactKind.FixAttempt => "fix",
-            _ => null
-        };
+        var submissionKind = SubmissionKind(kind);
         if (submissionKind is not null)
         {
             GameplayFactSubmissions.Add(
@@ -167,6 +167,43 @@ public static class NoCtfTelemetry
                 new TagList { { "kind", submissionKind } });
         }
     }
+
+    public static void RecordGameplayFactProcessing(
+        GameplayFactKind kind,
+        GameplayFactState state,
+        GameplayFactResult? result,
+        double elapsedSeconds)
+    {
+        var submissionKind = kind is GameplayFactKind.FlagAttempt
+            or GameplayFactKind.BreakAttempt
+            ? SubmissionKind(kind)
+            : null;
+        var outcome = state switch
+        {
+            GameplayFactState.PlatformFailed => "platform_error",
+            GameplayFactState.Completed when result == GameplayFactResult.Correct => "correct",
+            GameplayFactState.Completed => "incorrect",
+            _ => null
+        };
+        if (submissionKind is null || outcome is null)
+            return;
+
+        var tags = new TagList
+        {
+            { "kind", submissionKind },
+            { "outcome", outcome }
+        };
+        GameplayFactProcessing.Add(1, tags);
+        GameplayFactProcessingDuration.Record(Math.Max(0, elapsedSeconds), tags);
+    }
+
+    private static string? SubmissionKind(GameplayFactKind kind) => kind switch
+    {
+        GameplayFactKind.FlagAttempt => "flag",
+        GameplayFactKind.BreakAttempt => "break",
+        GameplayFactKind.FixAttempt => "fix",
+        _ => null
+    };
 
     public static void RecordLeaderboardProjection(
         string mode,
