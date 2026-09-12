@@ -14,11 +14,13 @@ defineProps<{
     <Alert v-else-if="error" variant="destructive" class="m-4">
       <AlertDescription>{{ $message(error) }}</AlertDescription>
     </Alert>
+    <!-- Edge disables its built-in PDF viewer in sandboxed frames. This source is an
+         authenticated application/pdf Blob URL whose lifetime is owned by the caller. -->
     <iframe
       v-else-if="source"
       :src="source"
       :title="accessibleLabel"
-      :sandbox="''"
+      referrerpolicy="no-referrer"
       class="h-full min-h-[32rem] w-full"
     />
     <Empty v-else class="h-full min-h-[32rem]">
