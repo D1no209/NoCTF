@@ -46,6 +46,14 @@ Worker、Runner 与 API 均可多副本。每个进程中的每种角色至多�
 - Object Storage：Challenge Attachment 与 AWDP Patch archive；支持 S3Compatible 和开发用 LocalFileSystem。
 - Runtime Provider：Docker、Kubernetes、Libvirt/QEMU/KVM。Provider 隐藏资源创建、查询、销毁与 receipt 细节。
 
+## SPA 分享元数据
+
+Nuxt 保持 `ssr: false`。API 返回 SPA 文档时从平台配置读取名称、描述和 Logo，在静态
+`index.html` 的 `<head>` 中注入 `description`、Open Graph、Twitter Card 与 `WebSite`
+JSON-LD。分享爬虫无需执行客户端 JavaScript 即可取得平台描述；配置更新不要求重新构建
+前端。注入值必须进行 HTML/JSON 安全转义，图片与页面地址使用代理转发头还原后的绝对 URL，
+HTML 响应使用 `no-cache`。API、Hub、健康检查、OpenAPI 与带扩展名的静态资源不进入 SPA fallback。
+
 ## 依赖方向
 
 ```text
