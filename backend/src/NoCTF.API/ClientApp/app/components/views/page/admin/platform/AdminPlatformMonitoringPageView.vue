@@ -8,6 +8,7 @@ const {
   ExternalLinkIcon,
   RefreshCw,
   GROUPS,
+  GAMEPLAY,
   HERO_KINDS,
   snapshot,
   loading,
@@ -150,8 +151,89 @@ const {
             </div>
           </div>
 
+        </CardContent>
+      </Card>
+
+      <Card data-slot="gameplay-monitoring" class="overflow-hidden">
+        <CardHeader class="pb-3">
+          <div class="flex flex-wrap items-start justify-between gap-3">
+            <div class="max-w-3xl">
+              <CardTitle class="text-base">{{ $t(GAMEPLAY.title) }}</CardTitle>
+              <CardDescription class="mt-1">{{ $t('ui.gameplaySubmissionHealthDescription') }}</CardDescription>
+            </div>
+            <Badge :variant="statusVariant(groupStatus(GAMEPLAY))">{{ statusLabel(groupStatus(GAMEPLAY)) }}</Badge>
+          </div>
+        </CardHeader>
+        <CardContent class="p-0">
+          <div class="grid lg:grid-cols-[minmax(0,1.35fr)_minmax(18rem,1fr)]">
+            <section class="flex min-h-44 flex-col justify-between bg-primary/[0.035] p-5 sm:p-6">
+              <div class="flex items-start justify-between gap-3">
+                <div>
+                  <p class="text-sm font-semibold">{{ $t(metricLabel(GAMEPLAY.qualityKind)) }}</p>
+                  <p v-if="metricByKind(GAMEPLAY.qualityKind)?.minimumSamples" class="mt-1 text-xs text-muted-foreground">
+                    {{ $t('ui.samplesInTheLastFiveMinutes') }} {{ monitoringNumber(metricByKind(GAMEPLAY.qualityKind)?.sampleCount, 0) }}
+                  </p>
+                </div>
+                <span data-slot="monitoring-status-dot" :data-monitoring-status="statusKey(metricByKind(GAMEPLAY.qualityKind)?.status)" />
+              </div>
+              <p class="my-5 font-mono text-3xl font-semibold tabular-nums">{{ formatMetric(metricByKind(GAMEPLAY.qualityKind)) }}</p>
+              <div
+                data-slot="monitoring-meter"
+                role="progressbar"
+                :aria-label="$t(metricLabel(GAMEPLAY.qualityKind))"
+                :aria-valuenow="metricVisualPercent(metricByKind(GAMEPLAY.qualityKind))"
+                aria-valuemin="0"
+                aria-valuemax="100"
+              >
+                <span :style="{ width: `${metricVisualPercent(metricByKind(GAMEPLAY.qualityKind))}%` }" />
+              </div>
+            </section>
+
+            <div class="grid divide-y divide-border/40">
+              <section
+                v-for="kind in GAMEPLAY.healthKinds"
+                :key="kind"
+                class="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 gap-y-3 p-5"
+                :data-monitoring-status="statusKey(metricByKind(kind)?.status)"
+              >
+                <div class="min-w-0">
+                  <p class="text-sm font-semibold">{{ $t(metricLabel(kind)) }}</p>
+                  <p v-if="metricByKind(kind)?.minimumSamples" class="mt-1 text-xs text-muted-foreground">
+                    {{ monitoringNumber(metricByKind(kind)?.sampleCount, 0) }} / {{ $t('ui.minimumSamples') }} {{ metricByKind(kind)?.minimumSamples }}
+                  </p>
+                </div>
+                <div class="flex items-center gap-2">
+                  <span data-slot="monitoring-status-dot" :data-monitoring-status="statusKey(metricByKind(kind)?.status)" />
+                  <span class="font-mono text-xl font-semibold tabular-nums">{{ formatMetric(metricByKind(kind)) }}</span>
+                </div>
+                <div
+                  class="col-span-2"
+                  data-slot="monitoring-meter"
+                  role="progressbar"
+                  :aria-label="$t(metricLabel(kind))"
+                  :aria-valuenow="metricVisualPercent(metricByKind(kind))"
+                  aria-valuemin="0"
+                  aria-valuemax="100"
+                >
+                  <span :style="{ width: `${metricVisualPercent(metricByKind(kind))}%` }" />
+                </div>
+              </section>
+            </div>
+          </div>
+
           <Separator />
 
+          <div class="grid bg-muted/20 sm:grid-cols-2 xl:grid-cols-4">
+            <div v-for="kind in GAMEPLAY.volumeKinds" :key="kind" class="flex items-center justify-between gap-4 px-5 py-4">
+              <span class="text-xs text-muted-foreground">{{ $t(metricLabel(kind)) }}</span>
+              <span class="whitespace-nowrap font-mono text-sm font-semibold tabular-nums">{{ formatMetric(metricByKind(kind)) }}</span>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card class="overflow-hidden">
+        <CardContent class="p-0">
           <div class="grid gap-px bg-muted/30 lg:grid-cols-2">
             <section
               v-for="group in GROUPS"

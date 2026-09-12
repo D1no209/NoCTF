@@ -89,6 +89,19 @@ internal sealed class PrometheusPlatformMonitoringReader(
             WindowSample(values, PrometheusMeasurementKind.FlagSubmissionsLastFiveMinutes),
             WindowSample(values, PrometheusMeasurementKind.FixSubmissionsPerSecond),
             WindowSample(values, PrometheusMeasurementKind.FixSubmissionsLastFiveMinutes),
+            RatioSample(
+                values,
+                PrometheusMeasurementKind.FlagCorrectRatio,
+                PrometheusMeasurementKind.FlagCompletedSamples),
+            LatencySample(
+                values,
+                PrometheusMeasurementKind.FlagProcessingP95Seconds,
+                PrometheusMeasurementKind.FlagProcessingSamples,
+                minimumSamples: thresholds.GameplayMinimumSamples),
+            RatioSample(
+                values,
+                PrometheusMeasurementKind.FlagPlatformErrorRatio,
+                PrometheusMeasurementKind.FlagProcessingSamples),
             BuildLatencyDetails(values), BuildPoolResources(values));
     }
 
@@ -173,7 +186,8 @@ internal sealed class PrometheusPlatformMonitoringReader(
     private PlatformMonitoringSample LatencySample(
         IReadOnlyDictionary<PrometheusMeasurementKind, PrometheusQueryResult> values,
         PrometheusMeasurementKind kind, PrometheusMeasurementKind countKind,
-        PrometheusMeasurementKind? sustainedKind = null, string? label = null, string? key = null)
+        PrometheusMeasurementKind? sustainedKind = null, string? label = null,
+        string? key = null, int? minimumSamples = null)
     {
         var count = Read(values, countKind, label, key);
         var sample = Read(values, kind, label, key);
@@ -185,9 +199,32 @@ internal sealed class PrometheusPlatformMonitoringReader(
         return sample with
         {
             SampleCount = count.State == PlatformMonitoringSampleState.Unavailable ? null : count.Value ?? 0,
-            MinimumSamples = thresholds.LatencyMinimumSamples, WindowSeconds = 300,
+            MinimumSamples = minimumSamples ?? thresholds.LatencyMinimumSamples,
+            WindowSeconds = 300,
             // Missing sustained evidence means not yet eligible, never fall back to the current spike.
             ThresholdValue = sustainedKind.HasValue ? sustained.Value ?? 0 : null
+        };
+    }
+
+    private PlatformMonitoringSample RatioSample(
+        IReadOnlyDictionary<PrometheusMeasurementKind, PrometheusQueryResult> values,
+        PrometheusMeasurementKind ratioKind,
+        PrometheusMeasurementKind countKind)
+    {
+        var count = Sample(values, countKind);
+        var ratio = Sample(values, ratioKind);
+        if (count.State == PlatformMonitoringSampleState.Unavailable
+            || ratio.State == PlatformMonitoringSampleState.Unavailable)
+            ratio = ratio with { State = PlatformMonitoringSampleState.Unavailable };
+        else if ((count.Value ?? 0) <= 0)
+            ratio = PlatformMonitoringSample.NoSamples();
+        return ratio with
+        {
+            SampleCount = count.State == PlatformMonitoringSampleState.Unavailable
+                ? null
+                : count.Value ?? 0,
+            MinimumSamples = thresholds.GameplayMinimumSamples,
+            WindowSeconds = 300
         };
     }
 
@@ -316,7 +353,10 @@ internal sealed class PrometheusPlatformMonitoringReader(
         RedisDetailSamples, RedisDetailP95, RedisDetailP99, RedisDetailMean, RedisDetailRate, RedisDetailErrors, RedisDetailSustained,
         PoolAvailable, PoolTotal, PoolOnline,
         FlagSubmissionsPerSecond, FlagSubmissionsLastFiveMinutes,
-        FixSubmissionsPerSecond, FixSubmissionsLastFiveMinutes
+        FixSubmissionsPerSecond, FixSubmissionsLastFiveMinutes,
+        FlagCorrectRatio, FlagCompletedSamples,
+        FlagProcessingP95Seconds, FlagProcessingSamples,
+        FlagPlatformErrorRatio
     }
 
     private sealed record PrometheusQueryDefinition(
@@ -340,6 +380,18 @@ internal sealed class PrometheusPlatformMonitoringReader(
             "noctf_gameplay_fact_submissions_total{role=\"api\",kind=~\"flag|break\"}";
         private const string FixSubmissions =
             "noctf_gameplay_fact_submissions_total{role=\"api\",kind=\"fix\"}";
+        private const string FlagProcessingSelector =
+            "{role=\"worker\",kind=~\"flag|break\"}";
+        private const string FlagCompletedSelector =
+            "{role=\"worker\",kind=~\"flag|break\",outcome=~\"correct|incorrect\"}";
+        private const string FlagCorrectSelector =
+            "{role=\"worker\",kind=~\"flag|break\",outcome=\"correct\"}";
+        private const string FlagPlatformErrorSelector =
+            "{role=\"worker\",kind=~\"flag|break\",outcome=\"platform_error\"}";
+        private const string FlagProcessingCounter =
+            "noctf_gameplay_fact_processing_total";
+        private const string FlagProcessingHistogram =
+            "noctf_gameplay_fact_processing_duration_seconds";
 
         public static IReadOnlyList<PrometheusQueryDefinition> Create(
             PlatformMonitoringThresholds thresholds)
@@ -413,6 +465,16 @@ internal sealed class PrometheusPlatformMonitoringReader(
                     $"sum(rate({FixSubmissions}[5m])) or vector(0)"),
                 new(PrometheusMeasurementKind.FixSubmissionsLastFiveMinutes,
                     $"sum(increase({FixSubmissions}[5m])) or vector(0)"),
+                new(PrometheusMeasurementKind.FlagCorrectRatio,
+                    Ratio(FlagProcessingCounter, FlagCorrectSelector, FlagCompletedSelector)),
+                new(PrometheusMeasurementKind.FlagCompletedSamples,
+                    $"sum(increase({FlagProcessingCounter}{FlagCompletedSelector}[5m])) or vector(0)"),
+                new(PrometheusMeasurementKind.FlagProcessingP95Seconds,
+                    Quantile(FlagProcessingHistogram, FlagProcessingSelector, "", "0.95")),
+                new(PrometheusMeasurementKind.FlagProcessingSamples,
+                    Count(FlagProcessingHistogram, FlagProcessingSelector, "")),
+                new(PrometheusMeasurementKind.FlagPlatformErrorRatio,
+                    Ratio(FlagProcessingCounter, FlagPlatformErrorSelector, FlagProcessingSelector)),
                 new(PrometheusMeasurementKind.ApiSamples, Count(ApiHistogram, Rest, "")),
                 new(PrometheusMeasurementKind.ApiSustainedSeconds,
                     SustainedLatency(Quantile(ApiHistogram, Rest, "", "0.95"), Count(ApiHistogram, Rest, ""), thresholds)),
@@ -452,6 +514,8 @@ internal sealed class PrometheusPlatformMonitoringReader(
         private static string Count(string histogram, string selector, string group) => Sum(group, $"increase({histogram}_count{selector}[5m])");
         private static string Quantile(string histogram, string selector, string group, string quantile) =>
             $"histogram_quantile({quantile}, sum by (le{(group.Length == 0 ? "" : "," + group)}) (rate({histogram}_bucket{selector}[5m])))";
+        private static string Ratio(string counter, string numeratorSelector, string denominatorSelector) =>
+            $"sum(increase({counter}{numeratorSelector}[5m])) / (sum(increase({counter}{denominatorSelector}[5m])) > 0)";
         private static string SustainedLatency(string quantile, string samples, PlatformMonitoringThresholds thresholds)
         {
             var window = $"{thresholds.LatencySustainedWindowMinutes}m";
@@ -480,6 +544,9 @@ file static class EmptyPlatformMonitoringMeasurements
             false,
             capturedAt,
             dashboardUri,
+            unavailable,
+            unavailable,
+            unavailable,
             unavailable,
             unavailable,
             unavailable,

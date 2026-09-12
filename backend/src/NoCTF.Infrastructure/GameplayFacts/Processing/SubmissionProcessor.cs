@@ -18,6 +18,7 @@ using NoCTF.Infrastructure.Challenges;
 using System.Globalization;
 using System.Text.Json;
 using NoCTF.Infrastructure.Competitions.Lifecycle;
+using NoCTF.Application.Observability;
 
 namespace NoCTF.Infrastructure.GameplayFacts.Processing;
 
@@ -378,6 +379,8 @@ public sealed class GameplayFactProcessor(
             processingScope, cancellationToken);
 
         var now = timeProvider.GetUtcNow();
+        var firstAdjudication = submission.Result is null
+            && submission.FailureCode is null;
         if (submission.Kind is GameplayFactKind.HintUnlock or GameplayFactKind.ManualAdjustment)
         {
             await AcquireTeamScoringLockAsync(
@@ -428,6 +431,8 @@ public sealed class GameplayFactProcessor(
             await QueueNextGameplayFactAsync(processingScope, cancellationToken);
             await db.SaveChangesAsync(cancellationToken);
             await transaction.CommitAsync(cancellationToken);
+            if (firstAdjudication)
+                RecordProcessingTelemetry(submission, now);
             await outbox.FlushOutgoingMessagesAsync();
             return;
         }
@@ -562,8 +567,19 @@ public sealed class GameplayFactProcessor(
         await QueueNextGameplayFactAsync(processingScope, cancellationToken);
         await db.SaveChangesAsync(cancellationToken);
         await transaction.CommitAsync(cancellationToken);
+        if (firstAdjudication)
+            RecordProcessingTelemetry(submission, now);
         await outbox.FlushOutgoingMessagesAsync();
     }
+
+    private static void RecordProcessingTelemetry(
+        GameplayFact submission,
+        DateTimeOffset completedAt) =>
+        NoCtfTelemetry.RecordGameplayFactProcessing(
+            submission.Kind,
+            submission.State,
+            submission.Result,
+            (completedAt - submission.OccurredAt).TotalSeconds);
 
     private async Task RecordAwdpBreakResolutionAsync(
         GameplayFact submission,

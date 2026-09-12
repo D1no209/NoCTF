@@ -17671,7 +17671,10 @@
           "FlagSubmissionsPerSecond",
           "FlagSubmissionsLastFiveMinutes",
           "FixSubmissionsPerSecond",
-          "FixSubmissionsLastFiveMinutes"
+          "FixSubmissionsLastFiveMinutes",
+          "FlagCorrectPercent",
+          "FlagProcessingP95Milliseconds",
+          "FlagPlatformErrorPercent"
         ],
         "enum": [
           0,
@@ -17700,7 +17703,10 @@
           23,
           24,
           25,
-          26
+          26,
+          27,
+          28,
+          29
         ]
       },
       "NoCTFApplicationAdministrationMonitoringPlatformMonitoringUnit": {
