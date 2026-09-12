@@ -19,11 +19,14 @@ namespace NoCTF.Tests.Unit.API;
 public sealed class PublicPlatformConfigurationEndpointTests
 {
     [Test]
-    [Arguments(true, HumanVerificationProviderProtocol.Cap)]
-    [Arguments(false, HumanVerificationProviderProtocol.None)]
+    [Arguments(true, true, HumanVerificationProviderProtocol.Cap, true)]
+    [Arguments(true, false, HumanVerificationProviderProtocol.Cap, false)]
+    [Arguments(false, true, HumanVerificationProviderProtocol.None, false)]
     public async Task Public_configuration_exposes_only_enabled_client_capabilities_without_provider_secrets(
         bool humanVerificationEnabled,
-        HumanVerificationProviderProtocol expectedProvider)
+        bool runtimeEnabled,
+        HumanVerificationProviderProtocol expectedProvider,
+        bool expectedRuntimeRequired)
     {
         var now = DateTimeOffset.UtcNow;
         var settings = Substitute.For<IPlatformConfigurationStore>();
@@ -42,7 +45,8 @@ public sealed class PublicPlatformConfigurationEndpointTests
                 string.Empty,
                 false,
                 [],
-                now));
+                now,
+                runtimeEnabled));
         var objects = Substitute.For<IStore>();
         var builder = WebApplication.CreateBuilder();
         builder.WebHost.UseTestServer();
@@ -82,6 +86,8 @@ public sealed class PublicPlatformConfigurationEndpointTests
             .IsEqualTo(humanVerificationEnabled
                 ? "https://cap.example.test/root/site-key/"
                 : null);
+        await Assert.That(payload.HumanVerification.RuntimeRequired)
+            .IsEqualTo(expectedRuntimeRequired);
         await Assert.That(content).DoesNotContain("maximumLogoBytes");
         await Assert.That(content).DoesNotContain("maximumPosterBytes");
         await Assert.That(content).DoesNotContain("maximumAttachmentBytes");

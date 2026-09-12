@@ -56,6 +56,7 @@ public sealed class HumanVerificationConfigurationPersistenceTests
 
             var fallback = await store.GetRuntimeConfigurationAsync(cancellationToken);
             await Assert.That(fallback.Enabled).IsTrue();
+            await Assert.That(fallback.RuntimeEnabled).IsTrue();
             await Assert.That(fallback.Options.Cap.Secret)
                 .IsEqualTo("deployment-secret");
 
@@ -76,9 +77,11 @@ public sealed class HumanVerificationConfigurationPersistenceTests
                 "site-key",
                 string.Empty,
                 [],
-                DateTimeOffset.UtcNow), cancellationToken);
+                DateTimeOffset.UtcNow,
+                RuntimeEnabled: false), cancellationToken);
 
             await Assert.That(view.Enabled).IsTrue();
+            await Assert.That(view.RuntimeEnabled).IsFalse();
             await Assert.That(view.CapSecretConfigured).IsTrue();
             await Assert.That(view.TurnstileSecretConfigured).IsTrue();
             await Assert.That(typeof(HumanVerificationConfigurationView)
@@ -87,6 +90,7 @@ public sealed class HumanVerificationConfigurationPersistenceTests
                 .GetProperty("TurnstileSecret")).IsNull();
             var persisted = await db.PlatformSettings.AsNoTracking()
                 .SingleAsync(cancellationToken);
+            await Assert.That(persisted.HumanVerificationRuntimeEnabled).IsFalse();
             await Assert.That(persisted.HumanVerificationCapSecretCiphertext)
                 .IsNotNull();
             await Assert.That(persisted.HumanVerificationCapSecretCiphertext!)
@@ -98,6 +102,9 @@ public sealed class HumanVerificationConfigurationPersistenceTests
 
             var runtime = await store.GetRuntimeConfigurationAsync(cancellationToken);
             await Assert.That(runtime.Enabled).IsTrue();
+            await Assert.That(runtime.RuntimeEnabled).IsFalse();
+            await Assert.That(runtime.IsRequired(HumanVerificationAction.Runtime)).IsFalse();
+            await Assert.That(runtime.IsRequired(HumanVerificationAction.Login)).IsTrue();
             await Assert.That(runtime.Options.Provider)
                 .IsEqualTo(HumanVerificationProvider.Cap);
             await Assert.That(runtime.Options.Cap.Secret).IsEqualTo("cap-secret");

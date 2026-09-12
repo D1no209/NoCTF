@@ -20,6 +20,7 @@ export function useAdminPlatformEmailPage() {
 
   const humanForm = reactive({
     enabled: false,
+    runtimeEnabled: true,
     provider: 'None' as NoCtfapiEndpointsPlatformHumanVerificationProviderProtocol,
     capServerUrl: '',
     capSiteKey: '',
@@ -40,6 +41,7 @@ export function useAdminPlatformEmailPage() {
   function humanVerificationRequest() {
     return {
       enabled: humanForm.enabled && humanForm.provider !== 'None',
+      runtimeEnabled: humanForm.runtimeEnabled,
       provider: humanForm.provider,
       capServerUrl: humanForm.capServerUrl.trim(),
       capSiteKey: humanForm.capSiteKey.trim(),
@@ -53,6 +55,7 @@ export function useAdminPlatformEmailPage() {
 
   function syncHumanVerification(value: HumanVerificationConfiguration): void {
     humanForm.enabled = value.enabled ?? false
+    humanForm.runtimeEnabled = value.runtimeEnabled ?? true
     humanForm.provider = value.provider ?? 'None'
     humanForm.capServerUrl = value.capServerUrl ?? ''
     humanForm.capSiteKey = value.capSiteKey ?? ''

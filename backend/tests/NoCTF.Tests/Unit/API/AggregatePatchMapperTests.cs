@@ -185,6 +185,7 @@ public sealed class AggregatePatchMapperTests
             Id = 1,
             Name = "old",
             HumanVerificationEnabled = true,
+            HumanVerificationRuntimeEnabled = false,
             HumanVerificationProvider = HumanVerificationProvider.Cap,
             HumanVerificationCapServerUrl = "https://cap.example.test",
             HumanVerificationCapSiteKey = "cap-site-key",
@@ -204,6 +205,7 @@ public sealed class AggregatePatchMapperTests
 
         await Assert.That(settings.Name).IsEqualTo("new");
         await Assert.That(settings.HumanVerificationEnabled).IsTrue();
+        await Assert.That(settings.HumanVerificationRuntimeEnabled).IsFalse();
         await Assert.That(settings.HumanVerificationProvider)
             .IsEqualTo(HumanVerificationProvider.Cap);
         await Assert.That(settings.HumanVerificationCapServerUrl)
@@ -303,6 +305,7 @@ public sealed class AggregatePatchMapperTests
             Id = 1,
             Name = "Brand",
             HumanVerificationEnabled = true,
+            HumanVerificationRuntimeEnabled = false,
             HumanVerificationProvider = HumanVerificationProvider.Turnstile,
             HumanVerificationCapServerUrl = "https://cap.example.test",
             HumanVerificationCapSiteKey = "cap-site-key",
@@ -346,6 +349,7 @@ public sealed class AggregatePatchMapperTests
 
         await Assert.That(settings.Name).IsEqualTo("Brand");
         await Assert.That(settings.HumanVerificationEnabled).IsTrue();
+        await Assert.That(settings.HumanVerificationRuntimeEnabled).IsFalse();
         await Assert.That(settings.HumanVerificationProvider)
             .IsEqualTo(HumanVerificationProvider.Turnstile);
         await Assert.That(settings.HumanVerificationCapServerUrl)

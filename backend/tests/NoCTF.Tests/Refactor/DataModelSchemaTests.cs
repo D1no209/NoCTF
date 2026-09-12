@@ -83,7 +83,8 @@ public sealed class DataModelSchemaTests
                 "20260911081054_RemovePracticeTeamMarker",
                 "20260911144210_AddHumanVerificationToggle",
                 "20260911164825_AddManagedHumanVerificationProviders",
-                "20260911213004_AddCompetitionTracksEnabled"
+                "20260911213004_AddCompetitionTracksEnabled",
+                "20260912074543_AddRuntimeHumanVerificationToggle"
             ]);
             await Assert.That(migrations[0]).EndsWith("_InitialBaseline");
 

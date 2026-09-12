@@ -19,6 +19,7 @@ internal sealed class PlatformSettingsConfiguration
             Description = null,
             LogoFileId = null,
             HumanVerificationEnabled = true,
+            HumanVerificationRuntimeEnabled = true,
             HumanVerificationProvider = null,
             HumanVerificationCapServerUrl = string.Empty,
             HumanVerificationCapSiteKey = string.Empty,
@@ -43,6 +44,11 @@ internal sealed class PlatformSettingsConfiguration
             EmailSmtpTimeoutSeconds = 30,
             UpdatedAt = DateTimeOffset.UnixEpoch
         });
+        // Existing deployments required verification for Runtime operations.
+        // Keep that behavior when adding the administrator-controlled switch.
+        builder.Property(settings => settings.HumanVerificationRuntimeEnabled)
+            .HasDefaultValue(true)
+            .ValueGeneratedNever();
         builder.Property(settings => settings.HumanVerificationProvider)
             .HasConversion<short>();
         builder.Property(settings => settings.EmailSmtpSecurityMode).HasConversion<short>();

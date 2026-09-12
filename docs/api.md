@@ -28,6 +28,9 @@ GET  /api/v1/platform/configuration
 GET  /api/v1/platform/logo
 ```
 
+公开平台配置的 `humanVerification.runtimeRequired` 表示玩家 Runtime 操作是否需要人机验证。管理员
+聚合配置的 `humanVerification.runtimeEnabled` 可独立控制该行为，不改变登录、注册和评测保护。
+
 公开平台配置返回名称、简介与通过 LinkGenerator 生成的 revisioned Logo 路径；未配置自定义
 Logo 时 Logo 路由返回 404，前端使用随包默认品牌资源。
 

@@ -1496,6 +1496,8 @@ export const chineseMessages = {
   "ui.humanVerificationAdminDescription": "在此选择并配置 CAP 或 Cloudflare Turnstile，控制登录、注册、运行环境和判题操作是否需要人机验证。",
   "ui.enableHumanVerification": "启用人机验证",
   "ui.humanVerificationProtectedOperations": "启用后，受保护操作必须先通过当前选择的验证服务。",
+  "ui.requireHumanVerificationForContainerOperations": "容器操作需要人机验证",
+  "ui.containerHumanVerificationDescription": "关闭后，参赛者启动、重置、停止和续期容器时不再触发人机验证；其他受保护操作不受影响。",
   "ui.providerReady": "服务可用",
   "ui.providerNotConfigured": "未配置服务",
   "ui.humanVerificationProviderDeploymentRequired": "请先在部署配置中选择并配置验证服务，随后即可在此启用。",
