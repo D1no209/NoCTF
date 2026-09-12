@@ -4,6 +4,25 @@ import { describe, expect, test } from 'bun:test'
 const pageUrl = new URL('../app/pages/admin/platform/users.vue', import.meta.url)
 
 describe('platform user account status management', () => {
+  test('merges Bot filtering and creation into the user management page', async () => {
+    const source = await sourceFile(pageUrl).text()
+    const platform = await sourceFile(
+      new URL('../app/pages/admin/platform.vue', import.meta.url),
+    ).text()
+    const oldBotRoute = await sourceFile(
+      new URL('../app/pages/admin/platform/bots.vue', import.meta.url),
+    ).text()
+
+    expect(source).toContain("roleFilter.value === 'Bot' && user.kind !== 'Bot'")
+    expect(source).toContain('<SelectItem value="Bot">')
+    expect(source).toContain('adminPlatformCreateBot({')
+    expect(source).toContain('roleFilter.value = \'Bot\'')
+    expect(source).toContain("$t('ui.createBot')")
+    expect(source).toContain('validation="feature"')
+    expect(platform).not.toContain("to: '/admin/platform/bots'")
+    expect(oldBotRoute).toContain("redirect: '/admin/platform/users?filter=Bot'")
+  })
+
   test('uses the generated status endpoint and keeps the sheet open on failure', async () => {
     const source = await sourceFile(pageUrl).text()
 

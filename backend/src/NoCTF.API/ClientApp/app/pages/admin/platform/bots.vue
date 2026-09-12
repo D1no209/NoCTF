@@ -1,8 +1,6 @@
 <script setup lang="ts">
-import Feature from '~/features/routes/admin/platform/AdminPlatformBotsPage.vue'
-definePageMeta({ middleware: 'platform-admin' })
+definePageMeta({
+  middleware: 'platform-admin',
+  redirect: '/admin/platform/users?filter=Bot',
+})
 </script>
-
-<template>
-  <Feature><slot /></Feature>
-</template>

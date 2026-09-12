@@ -1,9 +1,9 @@
 import { markRaw } from 'vue'
 
-import { Copy, KeyRound, LogIn, ShieldOff, Trash2 } from '@lucide/vue'
+import { Copy, KeyRound, LogIn, Plus, ShieldOff, Trash2 } from '@lucide/vue'
 import { toast } from 'vue-sonner'
-import { adminPlatformDeleteUser, adminPlatformDeleteUserTokens, adminPlatformGetUser, adminPlatformIssueUserToken, adminPlatformListUsers, adminPlatformListUserTokens, adminPlatformPatchUser, adminPlatformPreviewUserDeletion, adminPlatformRevokeUserToken } from '../../../../api'
-import type { NoCtfapiEndpointsAdministrationPlatformAdminIssuedAccessTokenResponse, NoCtfapiEndpointsAdministrationPlatformIssuePlatformUserTokenResponse, NoCtfapiEndpointsAdministrationPlatformPlatformUserDeletionMode, NoCtfapiEndpointsAdministrationPlatformPlatformUserDeletionPreviewResponse, NoCtfapiEndpointsAdministrationPlatformPlatformUserResponse, NoCtfapiEndpointsAdministrationPlatformPlatformManagedUserAccountStatusProtocol } from '../../../../api'
+import { adminPlatformCreateBot, adminPlatformDeleteUser, adminPlatformDeleteUserTokens, adminPlatformGetUser, adminPlatformIssueUserToken, adminPlatformListUsers, adminPlatformListUserTokens, adminPlatformPatchUser, adminPlatformPreviewUserDeletion, adminPlatformRevokeUserToken } from '../../../../api'
+import type { NoCtfapiEndpointsAdministrationPlatformAdminIssuedAccessTokenResponse, NoCtfapiEndpointsAdministrationPlatformIssuePlatformUserTokenResponse, NoCtfapiEndpointsAdministrationPlatformPlatformUserDeletionMode, NoCtfapiEndpointsAdministrationPlatformPlatformUserDeletionPreviewResponse, NoCtfapiEndpointsAdministrationPlatformPlatformUserResponse, NoCtfapiEndpointsAdministrationPlatformPlatformManagedUserAccountStatusProtocol, NoCtfapiEndpointsAuthenticationUserRoleProtocol } from '../../../../api'
 import { createLatestRequestGuard } from '../../../../lib/latest-request'
 import PrivateAccountPanelComponent from '../../../account/PrivateAccountPanel.vue'
 import AdminDateTimeComponent from '../../../admin/AdminDateTime.vue'
@@ -35,7 +35,7 @@ export function useAdminPlatformUsersPage() {
 
   const search = ref('')
 
-  const roleFilter = ref('all')
+  const roleFilter = ref(route.query.filter === 'Bot' ? 'Bot' : 'all')
 
   const ROLE_LABELS: Record<string, string> = { User: "ui.user", Organizer: "ui.organizer", Administrator: "ui.administrator" }
 
@@ -68,7 +68,9 @@ export function useAdminPlatformUsersPage() {
   const filteredUsers = computed(() => {
     const keyword = search.value.trim().toLowerCase()
     return users.value.filter((user) => {
-      if (roleFilter.value !== 'all' && user.role !== roleFilter.value) return false
+      if (roleFilter.value === 'Bot' && user.kind !== 'Bot') return false
+      if (roleFilter.value !== 'all' && roleFilter.value !== 'Bot'
+        && user.role !== roleFilter.value) return false
       if (!keyword) return true
       return (user.userName ?? '').toLowerCase().includes(keyword)
         || (user.email ?? '').toLowerCase().includes(keyword)
@@ -85,6 +87,42 @@ export function useAdminPlatformUsersPage() {
       return
     }
     users.value = data?.items ?? []
+  }
+
+  const createBotOpen = ref(false)
+
+  const creatingBot = ref(false)
+
+  const botName = ref('')
+
+  const botRole = ref<NoCtfapiEndpointsAuthenticationUserRoleProtocol>('User')
+
+  function openCreateBot(): void {
+    botName.value = ''
+    botRole.value = 'User'
+    createBotOpen.value = true
+  }
+
+  function setCreateBotOpen(open: boolean): void {
+    if (creatingBot.value) return
+    createBotOpen.value = open
+  }
+
+  async function createBot(): Promise<void> {
+    if (creatingBot.value || !botName.value.trim()) return
+    creatingBot.value = true
+    const { error } = await adminPlatformCreateBot({
+      body: { userName: botName.value.trim(), role: botRole.value },
+    })
+    creatingBot.value = false
+    if (error) {
+      toast.error(parseApiError(error).message)
+      return
+    }
+    createBotOpen.value = false
+    roleFilter.value = 'Bot'
+    toast.success(translate("ui.botCreated"))
+    await load()
   }
 
   const detailOpen = ref(false)
@@ -450,6 +488,7 @@ export function useAdminPlatformUsersPage() {
       KeyRound,
       Copy,
       LogIn,
+      Plus,
       ShieldOff,
       Trash2,
       currentUser,
@@ -462,6 +501,13 @@ export function useAdminPlatformUsersPage() {
       MANAGED_ACCOUNT_STATUS_OPTIONS,
       REFERENCE_LABELS,
       filteredUsers,
+      createBotOpen,
+      creatingBot,
+      botName,
+      botRole,
+      openCreateBot,
+      setCreateBotOpen,
+      createBot,
       detailOpen,
       detailLoading,
       detail,

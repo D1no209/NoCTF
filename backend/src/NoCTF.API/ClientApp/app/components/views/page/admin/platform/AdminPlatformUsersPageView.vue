@@ -3,7 +3,7 @@ import { toRefs } from 'vue'
 import type { AdminPlatformUsersPageViewState } from '~/features/routes/admin/platform/useAdminPlatformUsersPage'
 
 const viewProps = defineProps<{ state: AdminPlatformUsersPageViewState }>()
-const { Copy, KeyRound, LogIn, ShieldOff, Trash2, currentUser, loading, loadError, search, roleFilter, ROLE_LABELS, STATUS_LABELS, MANAGED_ACCOUNT_STATUS_OPTIONS, REFERENCE_LABELS, filteredUsers, detailOpen, detailLoading, detail, pendingRole, pendingAccountStatus, pendingEmailVerification, roleSaving, accountStatusSaving, emailVerificationSaving, invalidating, activeTokens, activeTokensLoading, revokingTokenId, tokenOpen, tokenIntent, tokenIssuing, tokenExpiresInSeconds, tokenReason, issuedToken, openToken, setTokenOpen, issueToken, copyIssuedToken, revokeIssuedToken, openDetail, saveRole, saveAccountStatus, saveEmailVerification, invalidateTokens, deleteOpen, previewLoading, preview, deletionMode, deletionReason, deleting, startDelete, confirmDelete, PrivateAccountPanel, AdminDateTime } = toRefs(viewProps.state)
+const { Copy, KeyRound, LogIn, Plus, ShieldOff, Trash2, currentUser, loading, loadError, search, roleFilter, ROLE_LABELS, STATUS_LABELS, MANAGED_ACCOUNT_STATUS_OPTIONS, REFERENCE_LABELS, filteredUsers, createBotOpen, creatingBot, botName, botRole, openCreateBot, setCreateBotOpen, createBot, detailOpen, detailLoading, detail, pendingRole, pendingAccountStatus, pendingEmailVerification, roleSaving, accountStatusSaving, emailVerificationSaving, invalidating, activeTokens, activeTokensLoading, revokingTokenId, tokenOpen, tokenIntent, tokenIssuing, tokenExpiresInSeconds, tokenReason, issuedToken, openToken, setTokenOpen, issueToken, copyIssuedToken, revokeIssuedToken, openDetail, saveRole, saveAccountStatus, saveEmailVerification, invalidateTokens, deleteOpen, previewLoading, preview, deletionMode, deletionReason, deleting, startDelete, confirmDelete, PrivateAccountPanel, AdminDateTime } = toRefs(viewProps.state)
 </script>
 
 <template>
@@ -20,9 +20,13 @@ const { Copy, KeyRound, LogIn, ShieldOff, Trash2, currentUser, loading, loadErro
             <SelectItem value="User">{{ $t('ui.user') }}</SelectItem>
             <SelectItem value="Organizer">{{ $t('ui.organizer') }}</SelectItem>
             <SelectItem value="Administrator">{{ $t('ui.administrator') }}</SelectItem>
+            <SelectItem value="Bot">{{ $t('ui.bot') }}</SelectItem>
           </SelectGroup>
         </SelectContent>
       </Select>
+      <Button type="button" @click="openCreateBot">
+        <Plus data-icon="inline-start" /> {{ $t('ui.createBot') }}
+      </Button>
       <p class="text-sm text-muted-foreground sm:ml-auto">{{ $t('ui.showingUsers', { count: filteredUsers.length }) }}</p>
     </div>
 
@@ -90,6 +94,46 @@ const { Copy, KeyRound, LogIn, ShieldOff, Trash2, currentUser, loading, loadErro
         </TableRow>
       </TableBody>
     </Table>
+
+    <Dialog :open="createBotOpen" @update:open="setCreateBotOpen">
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>{{ $t('ui.createBot') }}</DialogTitle>
+          <DialogDescription>{{ $t('ui.botIsASpecialServiceAccountForWhichAccessTokens') }}</DialogDescription>
+        </DialogHeader>
+        <UiForm validation="feature" class="flex flex-col gap-4" @submit.prevent="createBot">
+          <FieldGroup>
+            <Field>
+              <FieldLabel for="bot-name">{{ $t('ui.name') }}</FieldLabel>
+              <Input id="bot-name" v-model="botName" required maxlength="50" :placeholder="$t('ui.forExampleScoreboardSync')" />
+            </Field>
+            <Field>
+              <FieldLabel for="bot-role">{{ $t('ui.role') }}</FieldLabel>
+              <Select v-model="botRole">
+                <SelectTrigger id="bot-role" class="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectGroup>
+                    <SelectItem value="User">{{ $t('ui.user') }}</SelectItem>
+                    <SelectItem value="Organizer">{{ $t('ui.organizer') }}</SelectItem>
+                    <SelectItem value="Administrator">{{ $t('ui.administrator') }}</SelectItem>
+                  </SelectGroup>
+                </SelectContent>
+              </Select>
+            </Field>
+          </FieldGroup>
+          <DialogFooter>
+            <Button type="button" variant="outline" :disabled="creatingBot" @click="setCreateBotOpen(false)">
+              {{ $t('ui.cancel') }}
+            </Button>
+            <Button type="submit" :disabled="creatingBot || !botName.trim()">
+              <Spinner v-if="creatingBot" data-icon="inline-start" /> {{ $t('ui.create') }}
+            </Button>
+          </DialogFooter>
+        </UiForm>
+      </DialogContent>
+    </Dialog>
 
     <Sheet v-model:open="detailOpen">
       <SheetContent class="gap-0 overflow-hidden data-[side=right]:w-full data-[side=right]:sm:max-w-2xl">

@@ -141,7 +141,6 @@ describe('administrator impersonation session', () => {
 
   test('user management exposes one-time issue, impersonation, and individual revocation', async () => {
     const controller = await sourceFile(new URL('../app/features/routes/admin/platform/useAdminPlatformUsersPage.ts', import.meta.url)).text()
-    const botController = await sourceFile(new URL('../app/features/routes/admin/platform/useAdminPlatformBotsPage.ts', import.meta.url)).text()
     const view = await sourceFile(new URL('../app/components/views/page/admin/platform/AdminPlatformUsersPageView.vue', import.meta.url)).text()
     const layout = await sourceFile(new URL('../app/components/views/layout/DefaultLayoutView.vue', import.meta.url)).text()
 
@@ -152,7 +151,6 @@ describe('administrator impersonation session', () => {
     expect(controller).toContain('!tokenIssueRequests.isCurrent(request) || !tokenOpen.value')
     expect(controller).toContain('!tokenListRequests.isCurrent(request) || detail.value?.id !== targetUserId')
     expect(controller).toContain('function clearIssuedTokens(): void')
-    expect(botController).toContain('!tokenIssueRequests.isCurrent(request) || !issueOpen.value')
     expect(controller).toContain('await startImpersonation({')
     expect(view).toContain("openToken(detail, 'impersonate')")
     expect(view).toContain('revokeIssuedToken(token)')
