@@ -128,6 +128,15 @@ export function useAdminPlatformEmailPage() {
 
   const sendingTest = ref(false)
 
+  const savedEmailForm = ref('')
+
+  function emailVerificationRequest() {
+    return { ...form }
+  }
+
+  const emailDirty = computed(() => configuration.value !== null
+    && JSON.stringify(emailVerificationRequest()) !== savedEmailForm.value)
+
   function syncForm(value: EmailConfiguration): void {
     form.enabled = value.enabled ?? false
     form.publicBaseUrl = value.publicBaseUrl ?? ''
@@ -143,6 +152,7 @@ export function useAdminPlatformEmailPage() {
     form.smtpFromAddress = value.smtpFromAddress ?? ''
     form.smtpFromName = value.smtpFromName ?? ''
     form.smtpTimeoutSeconds = value.smtpTimeoutSeconds ?? 15
+    savedEmailForm.value = JSON.stringify(emailVerificationRequest())
   }
 
   async function load(): Promise<void> {
@@ -205,14 +215,17 @@ export function useAdminPlatformEmailPage() {
     if (!configuration.value) return
     saving.value = true
     const { data, error } = await adminPlatformPatchConfiguration({
-      body: { emailVerification: { ...form } },
+      body: { emailVerification: emailVerificationRequest() },
     })
     saving.value = false
     if (error) {
       toast.error(parseApiError(error).message)
       return
     }
-    if (data?.emailVerification) configuration.value = data.emailVerification
+    if (data?.emailVerification) {
+      configuration.value = data.emailVerification
+      syncForm(data.emailVerification)
+    }
     toast.success(translate("ui.emailVerificationConfigurationSaved"))
   }
 
@@ -269,6 +282,7 @@ export function useAdminPlatformEmailPage() {
       loading,
       loadError,
       form,
+      emailDirty,
       saving,
       passwordOpen,
       newPassword,

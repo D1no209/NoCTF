@@ -81,8 +81,12 @@ public sealed class SmtpEmailVerificationDelivery(
         Guid userId,
         CancellationToken ct)
     {
+        var publicConfiguration = await configurationStore.GetAsync(ct);
+        if (!publicConfiguration.Enabled)
+            return EmailVerificationDeliveryState.Disabled;
+
         var configuration = await deliveryConfiguration.GetDeliveryConfigurationAsync(
-            requireEnabled: false,
+            requireEnabled: true,
             ct);
         if (configuration is null)
             return EmailVerificationDeliveryState.NotConfigured;

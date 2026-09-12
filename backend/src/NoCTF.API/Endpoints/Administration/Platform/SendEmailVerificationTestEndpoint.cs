@@ -36,6 +36,14 @@ public sealed class SendEmailVerificationTestEndpoint(
                 EmailVerificationDeliveryState.RecipientNotFound => TypedResults.Problem(
                     statusCode: StatusCodes.Status404NotFound,
                     title: "Administrator account was not found."),
+                EmailVerificationDeliveryState.Disabled => TypedResults.Problem(
+                    statusCode: StatusCodes.Status409Conflict,
+                    title: "Email verification is disabled.",
+                    detail: "Enable and save email verification before sending a test message.",
+                    extensions: new Dictionary<string, object?>
+                    {
+                        ["code"] = PlatformProblemCode.EmailVerificationDisabled
+                    }),
                 _ => TypedResults.Problem(
                     statusCode: StatusCodes.Status409Conflict,
                     title: "SMTP delivery is not configured.",

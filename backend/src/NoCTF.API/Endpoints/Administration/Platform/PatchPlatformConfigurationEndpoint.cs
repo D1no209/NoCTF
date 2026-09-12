@@ -30,6 +30,7 @@ public enum PlatformProblemCode
 {
     HumanVerificationSecretInvalid,
     SmtpPasswordInvalid,
+    EmailVerificationDisabled,
     EmailDeliveryNotConfigured,
     SmtpDeliveryFailed
 }

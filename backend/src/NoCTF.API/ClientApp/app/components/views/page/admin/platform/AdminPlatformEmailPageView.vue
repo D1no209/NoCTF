@@ -3,7 +3,7 @@ import { toRefs } from 'vue'
 import type { AdminPlatformEmailPageViewState } from '~/features/routes/admin/platform/useAdminPlatformEmailPage'
 
 const viewProps = defineProps<{ state: AdminPlatformEmailPageViewState }>()
-const { KeyRound, RefreshCw, Send, ShieldCheck, configuration, humanVerification, humanForm, humanVerificationSaving, humanVerificationDirty, humanVerificationReady, humanVerificationProviderLabel, selectedSecretConfigured, humanSecretOpen, humanSecret, humanSecretSaving, loading, loadError, form, saving, passwordOpen, newPassword, passwordSaving, sendingTest, load, saveHumanVerification, replaceHumanVerificationSecret, save, replacePassword, sendTest, AdminDateTime, onClickPasswordOpen, onClickPasswordOpen2, setHumanSecretOpen } = toRefs(viewProps.state)
+const { KeyRound, RefreshCw, Send, ShieldCheck, configuration, humanVerification, humanForm, humanVerificationSaving, humanVerificationDirty, humanVerificationReady, humanVerificationProviderLabel, selectedSecretConfigured, humanSecretOpen, humanSecret, humanSecretSaving, loading, loadError, form, emailDirty, saving, passwordOpen, newPassword, passwordSaving, sendingTest, load, saveHumanVerification, replaceHumanVerificationSecret, save, replacePassword, sendTest, AdminDateTime, onClickPasswordOpen, onClickPasswordOpen2, setHumanSecretOpen } = toRefs(viewProps.state)
 </script>
 
 <template>
@@ -240,7 +240,7 @@ const { KeyRound, RefreshCw, Send, ShieldCheck, configuration, humanVerification
                     {{ configuration.smtpPasswordConfigured ? $t('ui.configured') : $t('ui.notConfigured') }}
                   </Badge>
                 </Button>
-                <Button type="button" variant="outline" :disabled="sendingTest || !form.enabled" @click="sendTest">
+                <Button type="button" variant="outline" :disabled="sendingTest || !configuration.enabled || emailDirty" @click="sendTest">
                   <Spinner v-if="sendingTest" data-icon="inline-start" />
                   <Send v-else data-icon="inline-start" /> {{ $t('ui.sendTestEmail') }} </Button>
               </Field>
