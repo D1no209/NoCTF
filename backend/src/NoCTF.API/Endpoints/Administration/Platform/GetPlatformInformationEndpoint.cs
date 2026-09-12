@@ -17,7 +17,8 @@ public sealed class GetPlatformInformationEndpoint
     [
         new("Fa1lSnow", "https://avatars.githubusercontent.com/u/76813774?v=4"),
         new("kengwang", "https://avatars.githubusercontent.com/u/30862240?v=4"),
-        new("lQ-A-Ql", "https://avatars.githubusercontent.com/u/83216887?v=4")
+        new("lQ-A-Ql", "https://avatars.githubusercontent.com/u/83216887?v=4"),
+        new("evnrowa", "https://avatars.githubusercontent.com/u/123802298?v=4")
     ];
 
     public override void Configure()
