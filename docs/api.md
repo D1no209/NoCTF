@@ -112,6 +112,8 @@ WriteUp 是队伍当前的一份 PDF。比赛配置以 `WriteUpSubmissionRequire
 新提交与替换返回 typed 409，已经提交的 PDF 仍可查看和下载。服务端同时校验扩展名、MIME、
 PDF 文件头和 64 MiB 上限。替换使用新的不可变 File 并异步清理旧对象。Owner、Manager、Judge、Observer
 及平台 Administrator 可在线预览和下载；审核列表同时返回权威排行榜中按题目聚合的当前净得分。
+每份审核项同时返回剔除全部已应用人工调分后的原始总分/同赛道排名，以及当前调整后总分/权威排名，
+供工作人员直接比较裁定前后结果。
 在线预览先通过 Bearer 保护接口签发 10 分钟、绑定比赛/队伍/不可变 File 的同站 HttpOnly Cookie，随后由
 独立预览端点启用 HTTP Range 流式读取；短期凭据不进入 URL，浏览器无需等待完整 PDF 下载后再开始渲染。
 具备 Judge 权限的调用者可复用 ManualAdjustment 对单题补分或扣分，并可从题解审核创建面向该队伍的私密咨询；

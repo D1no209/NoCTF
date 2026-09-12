@@ -13087,9 +13087,24 @@
           "writeUp": {
             "$ref": "#/components/schemas/NoCTFAPIEndpointsTeamsWriteUpsTeamWriteUpResponse"
           },
-          "totalScore": {
+          "originalTotalScore": {
             "type": "integer",
             "format": "int64",
+            "nullable": true
+          },
+          "originalRank": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "adjustedTotalScore": {
+            "type": "integer",
+            "format": "int64",
+            "nullable": true
+          },
+          "adjustedRank": {
+            "type": "integer",
+            "format": "int32",
             "nullable": true
           },
           "challengeScores": {

@@ -1,9 +1,11 @@
+using System.Globalization;
 using Microsoft.EntityFrameworkCore;
 using NoCTF.Application.Competitions.Events;
 using NoCTF.Application.Messaging;
 using NoCTF.Application.Teams.WriteUps;
 using NoCTF.Domain.Competitions;
 using NoCTF.Domain.Competitions.Events;
+using NoCTF.Domain.Gameplay;
 using NoCTF.Domain.Shared;
 using NoCTF.Domain.Teams;
 using NoCTF.Infrastructure.Persistence;
@@ -149,6 +151,32 @@ public sealed class TeamWriteUpStore(
             .ToDictionaryAsync(user => user.Id, user => user.UserName, cancellationToken);
         return rows.Select(row => Map(row, userNames.GetValueOrDefault(row.SubmittedByUserId)))
             .ToArray();
+    }
+
+    public async Task<IReadOnlyDictionary<Guid, long>> ReadManualAdjustmentTotalsAsync(
+        Guid competitionId,
+        CancellationToken cancellationToken)
+    {
+        var rows = await db.GameplayFacts.AsNoTracking()
+            .Where(fact => fact.CompetitionId == competitionId
+                && fact.TeamId != null
+                && fact.Kind == GameplayFactKind.ManualAdjustment
+                && fact.Result == GameplayFactResult.Applied)
+            .Select(fact => new
+            {
+                TeamId = fact.TeamId!.Value,
+                fact.Value
+            })
+            .ToArrayAsync(cancellationToken);
+        return rows.GroupBy(row => row.TeamId)
+            .ToDictionary(
+                group => group.Key,
+                group => group.Aggregate(
+                    0L,
+                    (total, row) => checked(total + int.Parse(
+                        row.Value!,
+                        NumberStyles.AllowLeadingSign,
+                        CultureInfo.InvariantCulture))));
     }
 
     private IQueryable<ReferenceRow> References(

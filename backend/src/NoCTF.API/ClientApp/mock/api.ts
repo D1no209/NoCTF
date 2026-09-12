@@ -321,13 +321,14 @@ export function createMockApi() {
           .filter(team => team.competitionId === p.competitionId)
           .map(team => ({ team, writeUp: teamWriteUps.get(team.id) }))
           .filter(item => item.writeUp)
-          .map(({ team, writeUp }) => ({
-            writeUp: writeUp!.metadata,
-            totalScore: state.challenges
+          .map(({ team, writeUp }, index) => {
+            const originalTotalScore = state.challenges
               .filter(challenge => challenge.competitionId === p.competitionId)
-              .reduce((total, challenge) => total + (state.facts.some(fact => fact.teamId === team.id && fact.competitionChallengeId === challenge.id && fact.result === 'Correct') ? 500 : 0)
-                + (writeUpAdjustments.get(`${team.id}:${challenge.id}`) ?? 0), 0),
-            challengeScores: state.challenges
+              .reduce((total, challenge) => total
+                + (state.facts.some(fact => fact.teamId === team.id
+                  && fact.competitionChallengeId === challenge.id
+                  && fact.result === 'Correct') ? 500 : 0), 0)
+            const challengeScores = state.challenges
               .filter(challenge => challenge.competitionId === p.competitionId)
               .map(challenge => ({
                 competitionChallengeId: challenge.id,
@@ -335,8 +336,20 @@ export function createMockApi() {
                 direction: challenge.direction,
                 netPoints: (state.facts.some(fact => fact.teamId === team.id && fact.competitionChallengeId === challenge.id && fact.result === 'Correct') ? 500 : 0)
                   + (writeUpAdjustments.get(`${team.id}:${challenge.id}`) ?? 0),
-              })),
-          }))
+              }))
+            const adjustedTotalScore = challengeScores.reduce(
+              (total, challenge) => total + challenge.netPoints,
+              0,
+            )
+            return {
+              writeUp: writeUp!.metadata,
+              originalTotalScore,
+              originalRank: index + 1,
+              adjustedTotalScore,
+              adjustedRank: index + 1,
+              challengeScores,
+            }
+          })
         value = { scoreboardAvailable: true, canJudge: user?.role !== 'User', items: writeUps }
       }
       else if (route === '/auth/me/wallpaper') {

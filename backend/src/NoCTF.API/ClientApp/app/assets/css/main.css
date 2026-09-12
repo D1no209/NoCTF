@@ -856,6 +856,7 @@ body:has([data-modal-scroll-lock]) {
 [data-slot='default-layout-foreground'] > main:has([data-contained-workspace-page]) > [data-slot='competition-page-route'] { height: 100%; min-height: 0; overflow: hidden; }
 [data-slot='default-layout-foreground'] > main [data-contained-workspace-page] { height: 100%; min-height: 0; overflow: hidden; }
 [data-slot='default-layout-foreground'] > main [data-contained-workspace-page] > div:first-child { flex-shrink: 0; }
+[data-slot='writeup-review-card'].card-surface { border-radius: 0; box-shadow: none; }
 [data-slot='default-layout-foreground']:has(> main [data-contained-workspace-page] > [data-scoreboard-page-scroll]) {
   height: auto; min-height: 100dvh; overflow: visible;
 }

@@ -14,7 +14,10 @@ public sealed record TeamWriteUpChallengeScoreResponse(
 
 public sealed record TeamWriteUpReviewItemResponse(
     TeamWriteUpResponse WriteUp,
-    long? TotalScore,
+    long? OriginalTotalScore,
+    int? OriginalRank,
+    long? AdjustedTotalScore,
+    int? AdjustedRank,
     IReadOnlyList<TeamWriteUpChallengeScoreResponse> ChallengeScores);
 
 public sealed record TeamWriteUpReviewResponse(
@@ -63,7 +66,10 @@ public sealed class ListTeamWriteUpsEndpoint(
             canJudge,
             review.Items.Select(item => new TeamWriteUpReviewItemResponse(
                 TeamWriteUpProtocol.ToResponse(item.WriteUp),
-                item.TotalScore,
+                item.OriginalTotalScore,
+                item.OriginalRank,
+                item.AdjustedTotalScore,
+                item.AdjustedRank,
                 item.ChallengeScores.Select(score => new TeamWriteUpChallengeScoreResponse(
                     score.CompetitionChallengeId,
                     score.Title,

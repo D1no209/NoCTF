@@ -279,7 +279,10 @@ export type NoCtfapiEndpointsTeamsWriteUpsTeamWriteUpReviewResponse = {
 
 export type NoCtfapiEndpointsTeamsWriteUpsTeamWriteUpReviewItemResponse = {
     writeUp?: NoCtfapiEndpointsTeamsWriteUpsTeamWriteUpResponse;
-    totalScore?: number | null;
+    originalTotalScore?: number | null;
+    originalRank?: number | null;
+    adjustedTotalScore?: number | null;
+    adjustedRank?: number | null;
     challengeScores?: Array<NoCtfapiEndpointsTeamsWriteUpsTeamWriteUpChallengeScoreResponse>;
 };
 

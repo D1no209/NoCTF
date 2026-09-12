@@ -71,7 +71,10 @@ public sealed record TeamWriteUpChallengeScore(
 
 public sealed record TeamWriteUpReviewItem(
     TeamWriteUpReference WriteUp,
-    long? TotalScore,
+    long? OriginalTotalScore,
+    int? OriginalRank,
+    long? AdjustedTotalScore,
+    int? AdjustedRank,
     IReadOnlyList<TeamWriteUpChallengeScore> ChallengeScores);
 
 public sealed record TeamWriteUpReview(
@@ -108,6 +111,10 @@ public interface ITeamWriteUpStore
         CancellationToken cancellationToken);
 
     Task<IReadOnlyList<TeamWriteUpReference>> ListAsync(
+        Guid competitionId,
+        CancellationToken cancellationToken);
+
+    Task<IReadOnlyDictionary<Guid, long>> ReadManualAdjustmentTotalsAsync(
         Guid competitionId,
         CancellationToken cancellationToken);
 }
@@ -229,14 +236,52 @@ public sealed class ManageTeamWriteUps(
         if (projection is null)
         {
             return new(false, writeUps.Select(writeUp =>
-                new TeamWriteUpReviewItem(writeUp, null, [])).ToArray());
+                new TeamWriteUpReviewItem(
+                    writeUp,
+                    null,
+                    null,
+                    null,
+                    null,
+                    [])).ToArray());
         }
 
+        var manualAdjustments = await store.ReadManualAdjustmentTotalsAsync(
+            competitionId,
+            cancellationToken);
         var columns = projection.Schema.Columns.ToDictionary(column => column.Index);
         var teams = projection.Snapshot.Teams.ToDictionary(team => team.TeamId);
+        var comparisons = projection.Snapshot.Teams.Select(team => new ScoreComparison(
+            team.TeamId,
+            team.TrackKey,
+            team.RankingState,
+            team.Rank,
+            team.TotalScore,
+            checked(team.TotalScore - manualAdjustments.GetValueOrDefault(team.TeamId))))
+            .ToArray();
+        var originalRanks = comparisons
+            .Where(team => team.RankingState == ScoreboardRankingState.Eligible
+                && team.AdjustedRank is not null)
+            .GroupBy(team => team.TrackKey, StringComparer.OrdinalIgnoreCase)
+            .SelectMany(track => track
+                .OrderByDescending(team => team.OriginalTotalScore)
+                .ThenBy(team => team.AdjustedRank)
+                .ThenBy(team => team.TeamId)
+                .Select((team, index) => new
+                {
+                    team.TeamId,
+                    Rank = index + 1
+                }))
+            .ToDictionary(team => team.TeamId, team => team.Rank);
+        var comparisonsByTeam = comparisons.ToDictionary(team => team.TeamId);
         var items = writeUps.Select(writeUp =>
         {
             teams.TryGetValue(writeUp.TeamId, out var team);
+            comparisonsByTeam.TryGetValue(writeUp.TeamId, out var comparison);
+            var originalRank = originalRanks.TryGetValue(
+                writeUp.TeamId,
+                out var ranked)
+                    ? ranked
+                    : (int?)null;
             var scores = projection.ChallengeCatalog.Challenges
                 .OrderBy(challenge => challenge.Order)
                 .ThenBy(challenge => challenge.CompetitionChallengeId)
@@ -249,7 +294,13 @@ public sealed class ManageTeamWriteUps(
                             && column.CompetitionChallengeId == challenge.CompetitionChallengeId)
                         .Sum(slot => slot.NetPoints ?? 0)))
                 .ToArray();
-            return new TeamWriteUpReviewItem(writeUp, team?.TotalScore ?? 0, scores);
+            return new TeamWriteUpReviewItem(
+                writeUp,
+                comparison?.OriginalTotalScore,
+                originalRank,
+                comparison?.AdjustedTotalScore,
+                comparison?.AdjustedRank,
+                scores);
         }).ToArray();
         return new(true, items);
     }
@@ -275,4 +326,12 @@ public sealed class ManageTeamWriteUps(
             return "writeup.pdf";
         return $"{stem[..Math.Min(stem.Length, 256)]}.pdf";
     }
+
+    private sealed record ScoreComparison(
+        Guid TeamId,
+        string TrackKey,
+        ScoreboardRankingState RankingState,
+        int? AdjustedRank,
+        long AdjustedTotalScore,
+        long OriginalTotalScore);
 }

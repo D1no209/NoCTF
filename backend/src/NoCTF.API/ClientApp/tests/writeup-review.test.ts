@@ -31,6 +31,9 @@ test('staff review combines Edge-compatible PDF preview with authoritative chall
   const preview = await sourceFile(
     '../app/components/ui/pdf-preview/PdfPreview.vue',
   ).text()
+  const competitionShell = await sourceFile(
+    '../app/components/views/page/competitions/CompetitionsByIdPageView.vue',
+  ).text()
 
   expect(controller).toContain('listTeamWriteUps')
   expect(controller).toContain('issueTeamWriteUpPreview')
@@ -45,7 +48,16 @@ test('staff review combines Edge-compatible PDF preview with authoritative chall
   expect(view).toContain('v-if="loadError && !review"')
   expect(view).toContain('v-else-if="review"')
   expect(view).toContain('data-writeup-review-workspace')
+  expect(view).toContain('slot-name="writeup-review-card"')
   expect(view).toContain('<PdfPreview\n              fill')
+  expect(view).not.toContain('<CardHeader')
+  expect(view).toContain('item.adjustedTotalScore')
+  expect(view).toContain('selected.originalRank')
+  expect(view).toContain('selected.originalTotalScore')
+  expect(view).toContain('selected.adjustedRank')
+  expect(view).toContain('selected.adjustedTotalScore')
+  expect(competitionShell).toContain('v-if="!isWriteUpReview"')
+  expect(competitionShell).toContain("isWriteUpReview ? 'p-0'")
   expect(view).not.toContain('h-[calc(100svh-9rem)]')
   expect(view).not.toContain('min-h-[42rem]')
   expect(controller).not.toContain('CompetitionParticipantWorkspace')
