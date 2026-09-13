@@ -126,10 +126,10 @@ public sealed class TeamWriteUpTests
         var store = Substitute.For<ITeamWriteUpStore>();
         store.ListAsync(competitionId, Arg.Any<CancellationToken>())
             .Returns([writeUp]);
-        store.ReadManualAdjustmentTotalsAsync(
+        store.ReadManualAdjustmentsAsync(
                 competitionId,
                 Arg.Any<CancellationToken>())
-            .Returns(new Dictionary<Guid, long> { [teamId] = 10 });
+            .Returns([new TeamWriteUpManualAdjustment(teamId, firstChallengeId, 10)]);
         var leaderboard = Substitute.For<ILeaderboardCache>();
         leaderboard.GetScoreboardAsync(competitionId, Arg.Any<CancellationToken>())
             .Returns(Projection(
@@ -183,7 +183,7 @@ public sealed class TeamWriteUpTests
         await leaderboard.DidNotReceive().GetScoreboardAsync(
             Arg.Any<Guid>(),
             Arg.Any<CancellationToken>());
-        await store.DidNotReceive().ReadManualAdjustmentTotalsAsync(
+        await store.DidNotReceive().ReadManualAdjustmentsAsync(
             Arg.Any<Guid>(),
             Arg.Any<CancellationToken>());
     }
@@ -221,7 +221,7 @@ public sealed class TeamWriteUpTests
             22,
             0,
             [],
-            [Slot(0, 10), Slot(1, 5), Slot(2, 7)]);
+            [Slot(0, 5), Slot(1, 0), Slot(2, 7)]);
         var secondTeam = new ScoreboardTeam(
             Guid.CreateVersion7(),
             "Second team",

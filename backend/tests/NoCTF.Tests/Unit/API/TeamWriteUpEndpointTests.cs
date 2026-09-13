@@ -228,10 +228,10 @@ public sealed class TeamWriteUpEndpointTests
         var store = Substitute.For<ITeamWriteUpStore>();
         store.ListAsync(CompetitionId, Arg.Any<CancellationToken>())
             .Returns([reference]);
-        store.ReadManualAdjustmentTotalsAsync(
+        store.ReadManualAdjustmentsAsync(
                 CompetitionId,
                 Arg.Any<CancellationToken>())
-            .Returns(new Dictionary<Guid, long>());
+            .Returns([]);
         store.FindAsync(CompetitionId, TeamId, Arg.Any<CancellationToken>())
             .Returns(reference);
         store.FindSubmissionContextAsync(CompetitionId, ActorId, Arg.Any<CancellationToken>())

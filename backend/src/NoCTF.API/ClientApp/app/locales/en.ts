@@ -2999,6 +2999,7 @@ export const englishMessages = {
   ,"writeUp.applyAdjustment": "Apply adjustment"
   ,"writeUp.adjustmentAccepted": "Adjustment accepted; authoritative scores will refresh automatically"
   ,"writeUp.adjustmentApplied": "Adjustment applied"
+  ,"writeUp.adjustmentRefreshing": "Syncing score"
   ,"writeUp.adjustmentRefreshTimedOut": "The adjustment was accepted, but the authoritative score refresh timed out. Refresh manually to confirm it."
   ,"writeUp.adjustmentFailed": "Failed to adjust the score"
   ,"writeUp.quickConsultation": "Quick consultation"

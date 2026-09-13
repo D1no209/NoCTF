@@ -2999,6 +2999,7 @@ export const chineseMessages = {
   ,"writeUp.applyAdjustment": "应用人工调分"
   ,"writeUp.adjustmentAccepted": "人工调分已受理，权威分数将自动刷新"
   ,"writeUp.adjustmentApplied": "人工调分已生效"
+  ,"writeUp.adjustmentRefreshing": "同步分数"
   ,"writeUp.adjustmentRefreshTimedOut": "人工调分已受理，但权威分数刷新超时；请手动刷新确认。"
   ,"writeUp.adjustmentFailed": "人工调分失败"
   ,"writeUp.quickConsultation": "快速咨询"

@@ -153,7 +153,7 @@ public sealed class TeamWriteUpStore(
             .ToArray();
     }
 
-    public async Task<IReadOnlyDictionary<Guid, long>> ReadManualAdjustmentTotalsAsync(
+    public async Task<IReadOnlyList<TeamWriteUpManualAdjustment>> ReadManualAdjustmentsAsync(
         Guid competitionId,
         CancellationToken cancellationToken)
     {
@@ -165,18 +165,25 @@ public sealed class TeamWriteUpStore(
             .Select(fact => new
             {
                 TeamId = fact.TeamId!.Value,
+                fact.CompetitionChallengeId,
                 fact.Value
             })
             .ToArrayAsync(cancellationToken);
-        return rows.GroupBy(row => row.TeamId)
-            .ToDictionary(
-                group => group.Key,
-                group => group.Aggregate(
+        return rows.GroupBy(row => new
+            {
+                row.TeamId,
+                row.CompetitionChallengeId
+            })
+            .Select(group => new TeamWriteUpManualAdjustment(
+                group.Key.TeamId,
+                group.Key.CompetitionChallengeId,
+                group.Aggregate(
                     0L,
                     (total, row) => checked(total + int.Parse(
                         row.Value!,
                         NumberStyles.AllowLeadingSign,
-                        CultureInfo.InvariantCulture))));
+                        CultureInfo.InvariantCulture)))))
+            .ToArray();
     }
 
     private IQueryable<ReferenceRow> References(

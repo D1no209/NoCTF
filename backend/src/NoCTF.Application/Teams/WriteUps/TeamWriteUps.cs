@@ -69,6 +69,11 @@ public sealed record TeamWriteUpChallengeScore(
     string Direction,
     long NetPoints);
 
+public sealed record TeamWriteUpManualAdjustment(
+    Guid TeamId,
+    Guid CompetitionChallengeId,
+    long NetPoints);
+
 public sealed record TeamWriteUpReviewItem(
     TeamWriteUpReference WriteUp,
     long? OriginalTotalScore,
@@ -114,7 +119,7 @@ public interface ITeamWriteUpStore
         Guid competitionId,
         CancellationToken cancellationToken);
 
-    Task<IReadOnlyDictionary<Guid, long>> ReadManualAdjustmentTotalsAsync(
+    Task<IReadOnlyList<TeamWriteUpManualAdjustment>> ReadManualAdjustmentsAsync(
         Guid competitionId,
         CancellationToken cancellationToken);
 }
@@ -245,9 +250,19 @@ public sealed class ManageTeamWriteUps(
                     [])).ToArray());
         }
 
-        var manualAdjustments = await store.ReadManualAdjustmentTotalsAsync(
+        var manualAdjustments = await store.ReadManualAdjustmentsAsync(
             competitionId,
             cancellationToken);
+        var manualAdjustmentTotals = manualAdjustments
+            .GroupBy(adjustment => adjustment.TeamId)
+            .ToDictionary(
+                group => group.Key,
+                group => group.Aggregate(
+                    0L,
+                    (total, adjustment) => checked(total + adjustment.NetPoints)));
+        var manualAdjustmentsByChallenge = manualAdjustments.ToDictionary(
+            adjustment => (adjustment.TeamId, adjustment.CompetitionChallengeId),
+            adjustment => adjustment.NetPoints);
         var columns = projection.Schema.Columns.ToDictionary(column => column.Index);
         var teams = projection.Snapshot.Teams.ToDictionary(team => team.TeamId);
         var comparisons = projection.Snapshot.Teams.Select(team => new ScoreComparison(
@@ -256,7 +271,7 @@ public sealed class ManageTeamWriteUps(
             team.RankingState,
             team.Rank,
             team.TotalScore,
-            checked(team.TotalScore - manualAdjustments.GetValueOrDefault(team.TeamId))))
+            checked(team.TotalScore - manualAdjustmentTotals.GetValueOrDefault(team.TeamId))))
             .ToArray();
         var originalRanks = comparisons
             .Where(team => team.RankingState == ScoreboardRankingState.Eligible
@@ -289,10 +304,13 @@ public sealed class ManageTeamWriteUps(
                     challenge.CompetitionChallengeId,
                     challenge.Title,
                     challenge.Direction,
-                    (team?.Slots ?? [])
+                    checked((team?.Slots ?? [])
                         .Where(slot => columns.TryGetValue(slot.ColumnIndex, out var column)
                             && column.CompetitionChallengeId == challenge.CompetitionChallengeId)
-                        .Sum(slot => slot.NetPoints ?? 0)))
+                        .Sum(slot => slot.NetPoints ?? 0)
+                        + manualAdjustmentsByChallenge.GetValueOrDefault((
+                            writeUp.TeamId,
+                            challenge.CompetitionChallengeId)))))
                 .ToArray();
             return new TeamWriteUpReviewItem(
                 writeUp,
