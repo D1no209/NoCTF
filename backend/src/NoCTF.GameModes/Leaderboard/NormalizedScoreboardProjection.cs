@@ -15,6 +15,7 @@ internal static class NormalizedScoreboardProjection
 {
     private const int CompactEntryLimit = 5;
     private const int CompactAdjustmentLimit = 5;
+    private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
 
     private static Dictionary<Guid, ScoreboardChallengeAchievement[]> BuildAchievements(
         LeaderboardProjectionInput input, IReadOnlyDictionary<Guid, LeaderboardChallengeFact> challenges)
@@ -28,18 +29,38 @@ internal static class NormalizedScoreboardProjection
                 && (input.Mode == GameMode.Ctf ? fact.Kind == GameplayFactKind.FlagAttempt
                     : fact.Kind is GameplayFactKind.BreakAttempt or GameplayFactKind.FixAttempt))
             .OrderBy(fact => fact.OccurredAt).ThenBy(fact => fact.GameplayFactId).ToArray();
-        var configuration = input.Mode == GameMode.Awdp ? ParseAwdpCompetition(input.CompetitionConfigurationJson) : null;
-        return facts.Where(fact => fact.Kind != GameplayFactKind.FixAttempt
-                || !EffectiveAwdp(configuration!, challenges[fact.CompetitionChallengeId!.Value].ConfigurationJson).RequireBreakBeforeFix
-                || facts.Any(candidate => candidate.Kind == GameplayFactKind.BreakAttempt
-                    && candidate.TeamId == fact.TeamId && candidate.CompetitionChallengeId == fact.CompetitionChallengeId
-                    && IsBefore(candidate, fact)))
+        IReadOnlyList<LeaderboardGameplayFact> eligibleFacts = facts;
+        if (input.Mode == GameMode.Awdp)
+        {
+            var configuration = ParseAwdpCompetition(input.CompetitionConfigurationJson);
+            var settingsByChallenge = challenges.ToDictionary(
+                pair => pair.Key,
+                pair => EffectiveAwdp(configuration, pair.Value.ConfigurationJson));
+            var priorBreaks = new HashSet<(Guid TeamId, Guid ChallengeId)>();
+            var filtered = new List<LeaderboardGameplayFact>(facts.Length);
+            foreach (var fact in facts)
+            {
+                var key = (fact.TeamId!.Value, fact.CompetitionChallengeId!.Value);
+                if (fact.Kind != GameplayFactKind.FixAttempt
+                    || !settingsByChallenge[key.Item2].RequireBreakBeforeFix
+                    || priorBreaks.Contains(key))
+                    filtered.Add(fact);
+                if (fact.Kind == GameplayFactKind.BreakAttempt)
+                    priorBreaks.Add(key);
+            }
+            eligibleFacts = filtered;
+        }
+        return eligibleFacts
             .GroupBy(fact => (fact.TeamId, fact.CompetitionChallengeId, fact.Kind))
             .Select(group => group.First()).GroupBy(fact => fact.TeamId!.Value)
             .ToDictionary(group => group.Key, group => group.Select(fact => new ScoreboardChallengeAchievement(
                 fact.CompetitionChallengeId!.Value,
-                fact.Kind switch { GameplayFactKind.FlagAttempt => ScoreboardEntryKind.Solve,
-                    GameplayFactKind.BreakAttempt => ScoreboardEntryKind.Attack, _ => ScoreboardEntryKind.Defense },
+                fact.Kind switch
+                {
+                    GameplayFactKind.FlagAttempt => ScoreboardEntryKind.Solve,
+                    GameplayFactKind.BreakAttempt => ScoreboardEntryKind.Attack,
+                    _ => ScoreboardEntryKind.Defense
+                },
                 fact.ActorUserId, fact.SubmitterName, fact.OccurredAt)).ToArray());
     }
 
@@ -106,6 +127,7 @@ internal static class NormalizedScoreboardProjection
             .ToArray();
         var actorIndexes = actors.ToDictionary(actor => actor.UserId, actor => actor.Index);
         var actorsByIndex = actors.ToDictionary(actor => actor.Index);
+        var globalAdjustmentsByTeam = BuildGlobalAdjustments(scoreboardInput, actorIndexes);
         var achievementsByTeam = BuildAchievements(input, challengeById);
         var columnsByKey = columns.ToDictionary(
             column => (column.CompetitionChallengeId, column.RoundId),
@@ -167,7 +189,9 @@ internal static class NormalizedScoreboardProjection
             var slotNet = compactSlots.Aggregate(0L, (total, slot) =>
                 checked(total + slot.NetPoints.GetValueOrDefault()));
             legacyByTeam.TryGetValue(team.Id, out var legacyRow);
-            var allGlobalAdjustments = BuildGlobalAdjustments(scoreboardInput, team.Id, actorIndexes);
+            var globalAdjustmentSummary = globalAdjustmentsByTeam.GetValueOrDefault(team.Id)
+                ?? GlobalAdjustmentSummary.Empty;
+            var allGlobalAdjustments = globalAdjustmentSummary.Adjustments;
             var globalAdjustmentNet = allGlobalAdjustments.Aggregate(0L, (total, adjustment) =>
                 checked(total + adjustment.NetPoints));
             var usesRoundWindow = scoreboardInput.Mode is GameMode.Awd or GameMode.Awdp;
@@ -210,11 +234,7 @@ internal static class NormalizedScoreboardProjection
                 .ThenBy(contribution => contribution.DisplayName, StringComparer.Ordinal)
                 .ThenBy(contribution => contribution.UserId)
                 .ToArray();
-            var globalAdjustmentCount = scoreboardInput.GameplayFacts
-                .Where(fact => fact.TeamId == team.Id
-                    && fact.Kind == GameplayFactKind.ManualAdjustment
-                    && fact.Result == GameplayFactResult.Applied)
-                .Aggregate(0, (total, fact) => checked(total + fact.Multiplicity));
+            var globalAdjustmentCount = globalAdjustmentSummary.Count;
             rows.Add(new ScoreboardTeam(
                 team.Id,
                 team.Name,
@@ -422,6 +442,7 @@ internal static class NormalizedScoreboardProjection
         }
 
         var duration = legacy.RoundDurationSeconds.GetValueOrDefault(300);
+        var runningTimeline = AwdEffectiveRunningClock.CreateTimeline(input.LifecycleAudits ?? []);
         var currentRound = Math.Max(1, legacy.CurrentRound.GetValueOrDefault(1));
         var settledThrough = Math.Max(0, legacy.SettledThroughRound.GetValueOrDefault());
         var lastRound = Math.Max(currentRound, settledThrough);
@@ -430,10 +451,16 @@ internal static class NormalizedScoreboardProjection
         var roundsResult = new List<ScoreboardRound>(windowEnd - windowStart + 1);
         for (var number = windowStart; number <= windowEnd; number++)
         {
-            var start = EffectiveClockToWallTime(input, TimeSpan.FromSeconds((long)(number - 1) * duration));
+            var start = EffectiveClockToWallTime(
+                input,
+                runningTimeline,
+                TimeSpan.FromSeconds((long)(number - 1) * duration));
             var end = number == currentRound && input.CompetitionStatus == CompetitionStatus.Paused
                 ? projectedAt.AddSeconds(Math.Max(0, legacy.CurrentRoundRemainingSeconds.GetValueOrDefault()))
-                : EffectiveClockToWallTime(input, TimeSpan.FromSeconds((long)number * duration));
+                : EffectiveClockToWallTime(
+                    input,
+                    runningTimeline,
+                    TimeSpan.FromSeconds((long)number * duration));
             var settled = number <= settledThrough;
             roundsResult.Add(new(
                 StableGuid(input.CompetitionId, $"round:{number}"),
@@ -472,14 +499,19 @@ internal static class NormalizedScoreboardProjection
                 && challenges.ContainsKey(challengeId))
             .GroupBy(fact => (fact.TeamId!.Value, fact.CompetitionChallengeId!.Value));
         var defaultWrongPenalty = ParseCtfCompetition(input.CompetitionConfigurationJson).WrongSubmissionPenalty;
+        var challengeConfigurations = challenges.ToDictionary(
+            pair => pair.Key,
+            pair => ParseCtfChallenge(pair.Value.ConfigurationJson));
+        var currentScores = legacy.Challenges.ToDictionary(
+            challenge => challenge.CompetitionChallengeId,
+            challenge => challenge.CurrentScore);
 
         foreach (var group in factsByCell)
         {
             var column = columns[(group.Key.Item2, null)];
             var slot = GetSlot(slots, group.Key.Item1, column, null);
             legacyCells.TryGetValue(group.Key, out var legacyCell);
-            var challenge = challenges[group.Key.Item2];
-            var challengeConfiguration = ParseCtfChallenge(challenge.ConfigurationJson);
+            var challengeConfiguration = challengeConfigurations[group.Key.Item2];
             var wrongPenalty = challengeConfiguration.WrongSubmissionPenalty ?? defaultWrongPenalty;
             var manualTotal = group
                 .Where(fact => fact.Kind == GameplayFactKind.ManualAdjustment
@@ -506,9 +538,7 @@ internal static class NormalizedScoreboardProjection
                                 : 0L;
                             var earned = isAwardedSolve ? Math.Max(0, solvePoints) : 0L;
                             var award = isAwardedSolve ? AwardFrom(legacyCell?.BloodRank) : null;
-                            var basePoints = legacy.Challenges
-                                .FirstOrDefault(item => item.CompetitionChallengeId == group.Key.Item2)
-                                ?.CurrentScore ?? earned;
+                            var basePoints = currentScores.GetValueOrDefault(group.Key.Item2) ?? earned;
                             var awardPoints = award is null ? 0L : Math.Max(0, earned - basePoints);
                             slot.AddFact(
                                 fact,
@@ -555,6 +585,9 @@ internal static class NormalizedScoreboardProjection
         IDictionary<(Guid TeamId, int ColumnIndex), SlotAccumulator> slots)
     {
         var competition = ParseAwdCompetition(input.CompetitionConfigurationJson);
+        var settingsByChallenge = challenges.ToDictionary(
+            pair => pair.Key,
+            pair => EffectiveAwd(competition, pair.Value.ConfigurationJson));
         var validTeams = input.Teams
             .Where(team => !team.IsBanned && !team.IsDeleted && team.EarnsScore)
             .Select(team => team.Id)
@@ -587,6 +620,9 @@ internal static class NormalizedScoreboardProjection
             })
             .Select(group => group.First())
             .ToArray();
+        var awardedAttackIds = attackFacts
+            .Select(fact => fact.GameplayFactId)
+            .ToHashSet();
 
         foreach (var victimPool in attackFacts.GroupBy(fact => new
         {
@@ -595,9 +631,7 @@ internal static class NormalizedScoreboardProjection
             VictimId = fact.VictimTeamId!.Value
         }))
         {
-            var settings = EffectiveAwd(
-                competition,
-                challenges[victimPool.Key.ChallengeId].ConfigurationJson);
+            var settings = settingsByChallenge[victimPool.Key.ChallengeId];
             var attackers = victimPool.Select(fact => fact.TeamId!.Value).Distinct().ToArray();
             var reward = settings.AttackRewardMode == AttackRewardMode.FixedPerAttack
                 ? settings.AttackPoints
@@ -637,7 +671,8 @@ internal static class NormalizedScoreboardProjection
                 && fact.Result is GameplayFactResult.ServiceUp or GameplayFactResult.ServiceDown)
             .OrderBy(fact => fact.OccurredAt)
             .ThenBy(fact => fact.GameplayFactId)
-            .ToArray();
+            .GroupBy(fact => (fact.TeamId!.Value, fact.CompetitionChallengeId!.Value))
+            .ToDictionary(group => group.Key, group => group.ToArray());
         foreach (var roundFact in (input.AwdRounds ?? [])
                      .Where(item => validTeams.Contains(item.TeamId)
                          && challenges.ContainsKey(item.CompetitionChallengeId))
@@ -647,12 +682,12 @@ internal static class NormalizedScoreboardProjection
             if (!rounds.TryGetValue(roundFact.RoundId, out var round)
                 || round.State != ScoreboardRoundState.Settled)
                 continue;
-            var settings = EffectiveAwd(
-                competition,
-                challenges[roundFact.CompetitionChallengeId].ConfigurationJson);
-            var latest = serviceStates.LastOrDefault(fact => fact.TeamId == roundFact.TeamId
-                && fact.CompetitionChallengeId == roundFact.CompetitionChallengeId
-                && fact.OccurredAt < roundFact.EndsAt);
+            var settings = settingsByChallenge[roundFact.CompetitionChallengeId];
+            var latest = serviceStates.TryGetValue(
+                (roundFact.TeamId, roundFact.CompetitionChallengeId),
+                out var transitions)
+                ? LatestBefore(transitions, roundFact.EndsAt)
+                : null;
             var up = latest?.Result != GameplayFactResult.ServiceDown;
             var slot = GetSlot(
                 slots,
@@ -685,7 +720,7 @@ internal static class NormalizedScoreboardProjection
             var column = columns[(fact.CompetitionChallengeId!.Value, roundId)];
             var slot = GetSlot(slots, fact.TeamId!.Value, column, round);
             if (fact.Kind == GameplayFactKind.FlagAttempt
-                && attackFacts.All(candidate => candidate.GameplayFactId != fact.GameplayFactId))
+                && !awardedAttackIds.Contains(fact.GameplayFactId))
             {
                 slot.AddFact(
                     fact,
@@ -707,6 +742,10 @@ internal static class NormalizedScoreboardProjection
         IDictionary<(Guid TeamId, int ColumnIndex), SlotAccumulator> slots)
     {
         var competition = ParseAwdpCompetition(input.CompetitionConfigurationJson);
+        var settingsByChallenge = challenges.ToDictionary(
+            pair => pair.Key,
+            pair => EffectiveAwdp(competition, pair.Value.ConfigurationJson));
+        var runningTimeline = AwdEffectiveRunningClock.CreateTimeline(input.LifecycleAudits ?? []);
         var activeTeams = input.Teams
             .Where(team => !team.IsBanned && !team.IsDeleted)
             .ToDictionary(team => team.Id);
@@ -728,26 +767,35 @@ internal static class NormalizedScoreboardProjection
             .OrderBy(fact => fact.OccurredAt)
             .ThenBy(fact => fact.GameplayFactId)
             .ToArray();
-        var activations = correctFacts
-            .Where(fact =>
-            {
-                if (fact.Kind != GameplayFactKind.FixAttempt)
-                    return true;
-                var effective = EffectiveAwdp(
-                    competition,
-                    challenges[fact.CompetitionChallengeId!.Value].ConfigurationJson);
-                return !effective.RequireBreakBeforeFix || correctFacts.Any(candidate =>
-                    candidate.Kind == GameplayFactKind.BreakAttempt
-                    && candidate.TeamId == fact.TeamId
-                    && candidate.CompetitionChallengeId == fact.CompetitionChallengeId
-                    && IsBefore(candidate, fact));
-            })
-            .GroupBy(fact => (fact.TeamId!.Value, fact.CompetitionChallengeId!.Value, fact.Kind))
-            .Select(group => group.First())
-            .Select(fact => new AwdpActivation(
-                fact,
-                FactRound(input, fact, competition.RoundDurationSeconds)))
-            .ToArray();
+        var priorBreaks = new HashSet<(Guid TeamId, Guid ChallengeId)>();
+        var activationKeys = new HashSet<(Guid TeamId, Guid ChallengeId, GameplayFactKind Kind)>();
+        var activationList = new List<AwdpActivation>();
+        foreach (var fact in correctFacts)
+        {
+            var teamId = fact.TeamId!.Value;
+            var challengeId = fact.CompetitionChallengeId!.Value;
+            var achievementKey = (teamId, challengeId);
+            if (fact.Kind == GameplayFactKind.FixAttempt
+                && settingsByChallenge[challengeId].RequireBreakBeforeFix
+                && !priorBreaks.Contains(achievementKey))
+                continue;
+            if (activationKeys.Add((teamId, challengeId, fact.Kind)))
+                activationList.Add(new(
+                    fact,
+                    FactRound(input, runningTimeline, fact, competition.RoundDurationSeconds)));
+            if (fact.Kind == GameplayFactKind.BreakAttempt)
+                priorBreaks.Add(achievementKey);
+        }
+        var activations = activationList.ToArray();
+        var activationsByTrack = activations
+            .GroupBy(item => (
+                ChallengeId: item.Fact.CompetitionChallengeId!.Value,
+                item.Fact.Kind))
+            .ToDictionary(group => group.Key, group => group
+                .OrderBy(item => item.Round)
+                .ThenBy(item => item.Fact.OccurredAt)
+                .ThenBy(item => item.Fact.GameplayFactId)
+                .ToArray());
         var curveEvaluator = new Scoring.ScoreCurveEvaluator();
 
         foreach (var activation in activations)
@@ -766,30 +814,43 @@ internal static class NormalizedScoreboardProjection
             }
         }
 
+        var settledRounds = roundProjection.Rounds
+            .Where(round => round.State == ScoreboardRoundState.Settled)
+            .OrderBy(round => round.Number)
+            .ThenBy(round => round.Id)
+            .ToArray();
         foreach (var challenge in challenges.Values)
         {
-            var effective = EffectiveAwdp(competition, challenge.ConfigurationJson);
+            var effective = settingsByChallenge[challenge.Id];
             foreach (var kind in new[] { GameplayFactKind.BreakAttempt, GameplayFactKind.FixAttempt })
             {
-                var trackActivations = activations
-                    .Where(item => item.Fact.CompetitionChallengeId == challenge.Id && item.Fact.Kind == kind)
-                    .ToArray();
+                var trackActivations = activationsByTrack.GetValueOrDefault((challenge.Id, kind)) ?? [];
                 var breakdownKind = kind == GameplayFactKind.BreakAttempt
                     ? ScoreboardBreakdownKind.Attack
                     : ScoreboardBreakdownKind.Defense;
                 var curve = kind == GameplayFactKind.BreakAttempt ? effective.Break : effective.Fix;
-                foreach (var round in roundProjection.Rounds.Where(round => round.State == ScoreboardRoundState.Settled))
+                var nextActivation = 0;
+                var successfulTeamCount = 0;
+                var activeScoring = new List<AwdpActivation>(trackActivations.Length);
+                foreach (var round in settledRounds)
                 {
-                    var successfulTeamCount = trackActivations.Count(item => item.Round <= round.Number
-                        && competitiveTeams.Contains(item.Fact.TeamId!.Value));
+                    while (nextActivation < trackActivations.Length
+                           && trackActivations[nextActivation].Round <= round.Number)
+                    {
+                        var activation = trackActivations[nextActivation++];
+                        var teamId = activation.Fact.TeamId!.Value;
+                        if (competitiveTeams.Contains(teamId))
+                            successfulTeamCount++;
+                        if (scoringTeams.Contains(teamId))
+                            activeScoring.Add(activation);
+                    }
                     if (successfulTeamCount == 0)
                         continue;
                     var points = curveEvaluator.Evaluate(
                         curve,
                         successfulTeamCount,
                         competitiveTeams.Count);
-                    foreach (var activation in trackActivations.Where(item => item.Round <= round.Number
-                                 && scoringTeams.Contains(item.Fact.TeamId!.Value)))
+                    foreach (var activation in activeScoring)
                     {
                         var slot = GetSlot(
                             slots,
@@ -813,6 +874,7 @@ internal static class NormalizedScoreboardProjection
             }
         }
 
+        var roundsByNumber = roundProjection.Rounds.ToDictionary(round => round.Number);
         foreach (var fact in input.GameplayFacts
                      .Where(fact => fact.TeamId is Guid teamId
                          && scoringTeams.Contains(teamId)
@@ -822,9 +884,8 @@ internal static class NormalizedScoreboardProjection
                      .OrderBy(fact => fact.OccurredAt)
                      .ThenBy(fact => fact.GameplayFactId))
         {
-            var roundNumber = FactRound(input, fact, competition.RoundDurationSeconds);
-            var round = roundProjection.Rounds.FirstOrDefault(candidate => candidate.Number == roundNumber);
-            if (round is null)
+            var roundNumber = FactRound(input, runningTimeline, fact, competition.RoundDurationSeconds);
+            if (!roundsByNumber.TryGetValue(roundNumber, out var round))
                 continue;
             var kind = fact.Kind == GameplayFactKind.BreakAttempt
                 ? ScoreboardEntryKind.Attack
@@ -834,7 +895,7 @@ internal static class NormalizedScoreboardProjection
                 : ScoreboardBreakdownKind.Defense;
             var penalty = AwdpPenalty(
                 fact,
-                EffectiveAwdp(competition, challenges[fact.CompetitionChallengeId!.Value].ConfigurationJson));
+                settingsByChallenge[fact.CompetitionChallengeId!.Value]);
             GetSlot(
                     slots,
                     fact.TeamId!.Value,
@@ -925,19 +986,22 @@ internal static class NormalizedScoreboardProjection
         return slot;
     }
 
-    private static IReadOnlyList<ScoreboardAdjustment> BuildGlobalAdjustments(
+    private static IReadOnlyDictionary<Guid, GlobalAdjustmentSummary> BuildGlobalAdjustments(
         LeaderboardProjectionInput input,
-        Guid teamId,
         IReadOnlyDictionary<Guid, int> actorIndexes)
     {
-        var adjustments = input.GameplayFacts
-            .Where(fact => fact.TeamId == teamId
-                && fact.Kind == GameplayFactKind.ManualAdjustment
-                && fact.Result == GameplayFactResult.Applied)
-            .Select(fact =>
-            {
-                var net = checked(ProjectionPenalties.ParseDelta(fact.Value) * fact.Multiplicity);
-                return new ScoreboardAdjustment(
+        var adjustments = new Dictionary<Guid, List<ScoreboardAdjustment>>();
+        var counts = new Dictionary<Guid, int>();
+        foreach (var fact in input.GameplayFacts)
+        {
+            if (fact.TeamId is not Guid teamId
+                || fact.Kind != GameplayFactKind.ManualAdjustment
+                || fact.Result != GameplayFactResult.Applied)
+                continue;
+            if (!adjustments.TryGetValue(teamId, out var teamAdjustments))
+                adjustments.Add(teamId, teamAdjustments = []);
+            var net = checked(ProjectionPenalties.ParseDelta(fact.Value) * fact.Multiplicity);
+            teamAdjustments.Add(new(
                     fact.GameplayFactId,
                     ScoreboardAdjustmentKind.ManualAdjustment,
                     fact.OccurredAt,
@@ -946,31 +1010,48 @@ internal static class NormalizedScoreboardProjection
                         : null,
                     Math.Max(0, net),
                     Math.Max(0, -net),
-                    net);
-            })
-            .ToList();
-        return adjustments;
+                    net));
+            counts[teamId] = checked(counts.GetValueOrDefault(teamId) + fact.Multiplicity);
+        }
+        return adjustments.ToDictionary(
+            pair => pair.Key,
+            pair => new GlobalAdjustmentSummary(pair.Value, counts[pair.Key]));
     }
 
     private static DateTimeOffset EffectiveClockToWallTime(
         LeaderboardProjectionInput input,
-        TimeSpan target) => AwdEffectiveRunningClock.ToWallTime(
-            input.LifecycleAudits ?? [], input.CompetitionStartTime.GetValueOrDefault(), target);
+        AwdEffectiveRunningTimeline runningTimeline,
+        TimeSpan target) => runningTimeline.ToWallTime(
+            input.CompetitionStartTime.GetValueOrDefault(), target);
 
     private static int FactRound(
         LeaderboardProjectionInput input,
+        AwdEffectiveRunningTimeline runningTimeline,
         LeaderboardGameplayFact fact,
         int duration)
     {
-        var elapsed = input.LifecycleAudits is { Count: > 0 }
-            ? AwdEffectiveRunningClock.Calculate(input.LifecycleAudits, fact.OccurredAt)
+        var elapsed = runningTimeline.HasTransitions
+            ? runningTimeline.Calculate(fact.OccurredAt)
             : fact.OccurredAt - input.CompetitionStartTime.GetValueOrDefault();
         return checked((int)(Math.Max(0, elapsed.TotalSeconds) / Math.Max(1, duration)) + 1);
     }
 
-    private static bool IsBefore(LeaderboardGameplayFact left, LeaderboardGameplayFact right) =>
-        left.OccurredAt < right.OccurredAt
-        || left.OccurredAt == right.OccurredAt && left.GameplayFactId.CompareTo(right.GameplayFactId) < 0;
+    private static LeaderboardGameplayFact? LatestBefore(
+        IReadOnlyList<LeaderboardGameplayFact> transitions,
+        DateTimeOffset cutoff)
+    {
+        var low = 0;
+        var high = transitions.Count;
+        while (low < high)
+        {
+            var middle = low + (high - low) / 2;
+            if (transitions[middle].OccurredAt < cutoff)
+                low = middle + 1;
+            else
+                high = middle;
+        }
+        return low == 0 ? null : transitions[low - 1];
+    }
 
     private static ScoreboardAward? AwardFrom(LeaderboardBloodRank? rank) => rank switch
     {
@@ -1067,7 +1148,7 @@ internal static class NormalizedScoreboardProjection
             return null;
         try
         {
-            return JsonSerializer.Deserialize<T>(json, new JsonSerializerOptions(JsonSerializerDefaults.Web));
+            return JsonSerializer.Deserialize<T>(json, JsonOptions);
         }
         catch (JsonException)
         {
@@ -1343,6 +1424,13 @@ internal static class NormalizedScoreboardProjection
         public int AttemptCount { get; set; }
         public long Earned { get; set; }
         public long Deducted { get; set; }
+    }
+
+    private sealed record GlobalAdjustmentSummary(
+        IReadOnlyList<ScoreboardAdjustment> Adjustments,
+        int Count)
+    {
+        public static GlobalAdjustmentSummary Empty { get; } = new([], 0);
     }
 
     private sealed record RoundProjection(

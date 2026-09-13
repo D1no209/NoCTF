@@ -28,11 +28,18 @@ internal static class AwdpDynamicLeaderboardProjection
         var challenges = (input.Challenges ?? [])
             .Where(challenge => !challenge.IsDeleted)
             .ToDictionary(challenge => challenge.Id);
+        var settingsByChallenge = challenges.ToDictionary(
+            pair => pair.Key,
+            pair => Effective(competition, pair.Value.ConfigurationJson));
+        var defaultSettings = Effective(competition, null);
+        AwdpEffectiveConfiguration SettingsFor(Guid challengeId) =>
+            settingsByChallenge.GetValueOrDefault(challengeId) ?? defaultSettings;
         var projectedAt = input.ProjectedAt
             ?? throw new InvalidOperationException("Leaderboard projection time is required.");
+        var runningTimeline = AwdEffectiveRunningClock.CreateTimeline(input.LifecycleAudits ?? []);
         var elapsed = EffectiveElapsed(
             projectedAt,
-            input.LifecycleAudits,
+            runningTimeline,
             input.CompetitionStartTime);
         var settledThroughRound = SettledThroughRound(
             elapsed,
@@ -61,55 +68,54 @@ internal static class AwdpDynamicLeaderboardProjection
             .OrderBy(fact => fact.OccurredAt)
             .ThenBy(fact => fact.GameplayFactId)
             .ToList();
-        var activations = correctFacts
-            .Where(fact =>
-            {
-                if (fact.Kind != GameplayFactKind.FixAttempt)
-                    return true;
-                var settings = Effective(
-                    competition,
-                    challenges.GetValueOrDefault(fact.CompetitionChallengeId!.Value)?.ConfigurationJson);
-                return !settings.RequireBreakBeforeFix
-                    || correctFacts.Any(candidate =>
-                        candidate.Kind == GameplayFactKind.BreakAttempt
-                        && candidate.TeamId == fact.TeamId
-                        && candidate.CompetitionChallengeId == fact.CompetitionChallengeId
-                        && (candidate.OccurredAt < fact.OccurredAt
-                            || candidate.OccurredAt == fact.OccurredAt
-                            && candidate.GameplayFactId.CompareTo(fact.GameplayFactId) < 0));
-            })
-            .GroupBy(fact => new
-            {
-                TeamId = fact.TeamId!.Value,
-                ChallengeId = fact.CompetitionChallengeId!.Value,
-                fact.Kind
-            })
-            .Select(group => group.First())
-            .Select(fact => new Activation(
-                fact,
-                Round(
-                    fact.OccurredAt,
-                    input.LifecycleAudits,
-                    input.CompetitionStartTime,
-                    competition.RoundDurationSeconds)))
-            .ToList();
+        var priorBreaks = new HashSet<(Guid TeamId, Guid ChallengeId)>();
+        var activationKeys = new HashSet<(Guid TeamId, Guid ChallengeId, GameplayFactKind Kind)>();
+        var activations = new List<Activation>();
+        foreach (var fact in correctFacts)
+        {
+            var teamId = fact.TeamId!.Value;
+            var challengeId = fact.CompetitionChallengeId!.Value;
+            var achievementKey = (teamId, challengeId);
+            if (fact.Kind == GameplayFactKind.FixAttempt
+                && SettingsFor(challengeId).RequireBreakBeforeFix
+                && !priorBreaks.Contains(achievementKey))
+                continue;
+            if (activationKeys.Add((teamId, challengeId, fact.Kind)))
+                activations.Add(new(
+                    fact,
+                    Round(
+                        fact.OccurredAt,
+                        runningTimeline,
+                        input.CompetitionStartTime,
+                        competition.RoundDurationSeconds)));
+            if (fact.Kind == GameplayFactKind.BreakAttempt)
+                priorBreaks.Add(achievementKey);
+        }
 
         var awards = new List<Award>();
         var breakScores = new Dictionary<Guid, long>();
         var fixScores = new Dictionary<Guid, long>();
+        var scoringTeamIds = scoringTeams.Keys.ToHashSet();
+        var activationsByTrack = activations
+            .GroupBy(item => (
+                ChallengeId: item.Fact.CompetitionChallengeId!.Value,
+                item.Fact.Kind))
+            .ToDictionary(group => group.Key, group => group
+                .OrderBy(item => item.Round)
+                .ThenBy(item => item.Fact.OccurredAt)
+                .ThenBy(item => item.Fact.GameplayFactId)
+                .ToArray());
         foreach (var challengeId in challenges.Count == 0
                      ? activations.Select(item => item.Fact.CompetitionChallengeId!.Value).Distinct()
                      : challenges.Keys)
         {
-            var settings = Effective(
-                competition,
-                challenges.GetValueOrDefault(challengeId)?.ConfigurationJson);
+            var settings = SettingsFor(challengeId);
             ProjectTrack(
                 challengeId,
-                GameplayFactKind.BreakAttempt,
                 settings.Break,
-                activations,
-                scoringTeams.Keys,
+                activationsByTrack.GetValueOrDefault(
+                    (challengeId, GameplayFactKind.BreakAttempt), []),
+                scoringTeamIds,
                 competitiveTeams,
                 currentRound,
                 settledThroughRound,
@@ -117,10 +123,10 @@ internal static class AwdpDynamicLeaderboardProjection
                 breakScores);
             ProjectTrack(
                 challengeId,
-                GameplayFactKind.FixAttempt,
                 settings.Fix,
-                activations,
-                scoringTeams.Keys,
+                activationsByTrack.GetValueOrDefault(
+                    (challengeId, GameplayFactKind.FixAttempt), []),
+                scoringTeamIds,
                 competitiveTeams,
                 currentRound,
                 settledThroughRound,
@@ -139,7 +145,7 @@ internal static class AwdpDynamicLeaderboardProjection
                 && fact.CompetitionChallengeId is Guid challengeId
                 && Round(
                     fact.OccurredAt,
-                    input.LifecycleAudits,
+                    runningTimeline,
                     input.CompetitionStartTime,
                     competition.RoundDurationSeconds) <= settledThroughRound
                 && (challenges.Count == 0 || challenges.ContainsKey(challengeId)))
@@ -148,9 +154,7 @@ internal static class AwdpDynamicLeaderboardProjection
                 group => group.Key,
                 group => group.Aggregate(0L, (total, fact) => checked(total + PenaltyFor(
                     fact,
-                    Effective(
-                        competition,
-                        challenges.GetValueOrDefault(fact.CompetitionChallengeId!.Value)?.ConfigurationJson))
+                    SettingsFor(fact.CompetitionChallengeId!.Value))
                     * fact.Multiplicity)));
         var hintCosts = ProjectionPenalties.HintCosts(input, scoringTeams.Keys);
         var manualAdjustments = ProjectionPenalties.ManualAdjustments(input, scoringTeams.Keys);
@@ -250,38 +254,30 @@ internal static class AwdpDynamicLeaderboardProjection
 
     private static void ProjectTrack(
         Guid challengeId,
-        GameplayFactKind kind,
         ScoreCurveConfiguration curve,
-        IReadOnlyList<Activation> allActivations,
-        IEnumerable<Guid> scoringTeamIds,
+        IReadOnlyList<Activation> activations,
+        IReadOnlySet<Guid> scoringTeamIds,
         IReadOnlySet<Guid> competitiveTeamIds,
         int currentRound,
         int settledThroughRound,
         ICollection<Award> awards,
         IDictionary<Guid, long> currentScores)
     {
-        var scoringTeams = scoringTeamIds.ToHashSet();
-        var activations = allActivations
-            .Where(item => item.Fact.CompetitionChallengeId == challengeId && item.Fact.Kind == kind)
-            .OrderBy(item => item.Round)
-            .ThenBy(item => item.Fact.OccurredAt)
-            .ThenBy(item => item.Fact.GameplayFactId)
-            .ToList();
         var scoringActivations = activations
-            .Where(item => scoringTeams.Contains(item.Fact.TeamId!.Value)
+            .Where(item => scoringTeamIds.Contains(item.Fact.TeamId!.Value)
                 && item.Round <= settledThroughRound)
-            .ToList();
-        var cumulativePoints = scoringActivations.ToDictionary(
-            item => item.Fact.GameplayFactId,
-            _ => 0L);
+            .ToArray();
         var changeRounds = activations
             .Where(item => item.Round <= settledThroughRound
                 && (competitiveTeamIds.Contains(item.Fact.TeamId!.Value)
-                    || scoringTeams.Contains(item.Fact.TeamId!.Value)))
+                    || scoringTeamIds.Contains(item.Fact.TeamId!.Value)))
             .Select(item => item.Round)
             .Distinct()
             .Order()
             .ToArray();
+        var segments = new (int FirstRound, long Points)[changeRounds.Length];
+        var activationIndex = 0;
+        var successfulTeamCount = 0;
         for (var index = 0; index < changeRounds.Length; index++)
         {
             var firstRound = changeRounds[index];
@@ -289,22 +285,31 @@ internal static class AwdpDynamicLeaderboardProjection
                 ? changeRounds[index + 1] - 1
                 : settledThroughRound;
             var roundCount = checked(lastRound - firstRound + 1);
-            var successfulTeamCount = activations.Count(item =>
-                item.Round <= firstRound
-                && competitiveTeamIds.Contains(item.Fact.TeamId!.Value));
+            while (activationIndex < activations.Count
+                   && activations[activationIndex].Round <= firstRound)
+            {
+                if (competitiveTeamIds.Contains(
+                        activations[activationIndex].Fact.TeamId!.Value))
+                    successfulTeamCount++;
+                activationIndex++;
+            }
             var points = ScoreCurve.Evaluate(
                 curve,
                 successfulTeamCount,
                 competitiveTeamIds.Count);
-            var segmentPoints = checked(points * roundCount);
-            foreach (var activation in scoringActivations.Where(item => item.Round <= firstRound))
-                cumulativePoints[activation.Fact.GameplayFactId] = checked(
-                    cumulativePoints[activation.Fact.GameplayFactId] + segmentPoints);
+            segments[index] = (firstRound, checked(points * roundCount));
+        }
+        var pointsFromRound = new Dictionary<int, long>(segments.Length);
+        var cumulativePoints = 0L;
+        for (var index = segments.Length - 1; index >= 0; index--)
+        {
+            cumulativePoints = checked(cumulativePoints + segments[index].Points);
+            pointsFromRound[segments[index].FirstRound] = cumulativePoints;
         }
         foreach (var activation in scoringActivations)
             awards.Add(new(
                 activation.Fact,
-                cumulativePoints[activation.Fact.GameplayFactId],
+                pointsFromRound[activation.Round],
                 activation.Round));
         var currentSuccessfulTeamCount = activations.Count(item =>
             item.Round <= currentRound && competitiveTeamIds.Contains(item.Fact.TeamId!.Value));
@@ -316,21 +321,21 @@ internal static class AwdpDynamicLeaderboardProjection
 
     private static int Round(
         DateTimeOffset occurredAt,
-        IReadOnlyList<NoCTF.Domain.Competitions.CompetitionLifecycleTransition>? lifecycleAudits,
+        AwdEffectiveRunningTimeline runningTimeline,
         DateTimeOffset? start,
         int durationSeconds)
     {
         if (durationSeconds <= 0)
             return 1;
-        var elapsed = EffectiveElapsed(occurredAt, lifecycleAudits, start);
+        var elapsed = EffectiveElapsed(occurredAt, runningTimeline, start);
         return Round(elapsed, durationSeconds);
     }
 
     private static TimeSpan EffectiveElapsed(
         DateTimeOffset occurredAt,
-        IReadOnlyList<NoCTF.Domain.Competitions.CompetitionLifecycleTransition>? lifecycleAudits,
-        DateTimeOffset? start) => lifecycleAudits is { Count: > 0 }
-        ? AwdEffectiveRunningClock.Calculate(lifecycleAudits, occurredAt)
+        AwdEffectiveRunningTimeline runningTimeline,
+        DateTimeOffset? start) => runningTimeline.HasTransitions
+        ? runningTimeline.Calculate(occurredAt)
         : start is { } startedAt
             ? occurredAt - startedAt
             : TimeSpan.Zero;

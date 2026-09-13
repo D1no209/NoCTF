@@ -329,20 +329,35 @@ public sealed class FusionLeaderboardCache(
         bool IsParticipantVisible(LeaderboardGameplayFact fact) =>
             fact.CompetitionChallengeId is not Guid challengeId
             || publishedChallengeIds.Contains(challengeId);
-        var participantInput = projectionInput with
+        ScoreboardProjection participantScoreboard;
+        var participantProjectionMatchesFull = publishedChallengeIds.Count == challenges.Count
+            && legacyFacts.All(IsParticipantVisible)
+            && scoreboardFacts.All(IsParticipantVisible)
+            && awdWindow.Rounds.All(round =>
+                publishedChallengeIds.Contains(round.CompetitionChallengeId))
+            && (factRows.AwdAggregates is null || factRows.AwdAggregates.All(fact =>
+                publishedChallengeIds.Contains(fact.CompetitionChallengeId)));
+        if (participantProjectionMatchesFull)
         {
-            Challenges = challenges.Where(challenge => challenge.IsPublished).ToArray(),
-            GameplayFacts = legacyFacts.Where(IsParticipantVisible).ToArray(),
-            ScoreboardGameplayFacts = scoreboardFacts.Where(IsParticipantVisible).ToArray(),
-            AwdRounds = awdWindow.Rounds
-                .Where(round => publishedChallengeIds.Contains(round.CompetitionChallengeId))
-                .ToArray(),
-            AwdAggregates = factRows.AwdAggregates?
-                .Where(fact => publishedChallengeIds.Contains(fact.CompetitionChallengeId))
-                .ToArray()
-        };
-        var participantScoreboard = AddResponseMetadata(
-            projectionEngine.ProjectOutputs(participantInput).Scoreboard);
+            participantScoreboard = scoreboard;
+        }
+        else
+        {
+            var participantInput = projectionInput with
+            {
+                Challenges = challenges.Where(challenge => challenge.IsPublished).ToArray(),
+                GameplayFacts = legacyFacts.Where(IsParticipantVisible).ToArray(),
+                ScoreboardGameplayFacts = scoreboardFacts.Where(IsParticipantVisible).ToArray(),
+                AwdRounds = awdWindow.Rounds
+                    .Where(round => publishedChallengeIds.Contains(round.CompetitionChallengeId))
+                    .ToArray(),
+                AwdAggregates = factRows.AwdAggregates?
+                    .Where(fact => publishedChallengeIds.Contains(fact.CompetitionChallengeId))
+                    .ToArray()
+            };
+            participantScoreboard = AddResponseMetadata(
+                projectionEngine.ProjectOutputs(participantInput).Scoreboard);
+        }
         scoreboard = scoreboard with
         {
             ParticipantView = ScoreboardAudienceView.From(participantScoreboard)
