@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test'
 import { fileURLToPath } from 'node:url'
-import { auditArchitecture, auditVueSource } from '../scripts/check-architecture'
+import { auditArchitecture, auditAssetPath, auditCssSource, auditVueSource } from '../scripts/check-architecture'
 
 describe('frontend architecture', () => {
   test('rejects default pickers, browser tooltips, private scrollbars and literal view colors', () => {
@@ -42,5 +42,14 @@ describe('frontend architecture', () => {
   test('rejects compound assignments and inline event functions in views', () => {
     const issues = auditVueSource('components/views/Example.vue', `<template><Button @click="count += 1" @focus="value ??= 1" @update:model-value="next => save(next)" /></template>`)
     expect(issues.filter(issue => issue.rule === 'render-only')).toHaveLength(3)
+  })
+
+  test('keeps feature composition, motion ownership and static SVG assets physically separated', () => {
+    const featureIssues = auditVueSource('features/Example.vue', '<template><Card /></template><style scoped>.card { opacity: 1; }</style>')
+    expect(featureIssues.filter(issue => issue.rule === 'logic-ui-boundary')).toHaveLength(2)
+    expect(auditCssSource('assets/css/main.css', '.page { view-transition-name: page; }')[0]?.rule).toBe('motion-boundary')
+    expect(auditCssSource('motion/motion.css', '.page { view-transition-name: page; }')).toEqual([])
+    expect(auditAssetPath('components/ui/icon.svg')[0]?.rule).toBe('svg-boundary')
+    expect(auditAssetPath('assets/svg/status/icon.svg')).toEqual([])
   })
 })

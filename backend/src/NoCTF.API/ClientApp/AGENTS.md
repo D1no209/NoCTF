@@ -34,7 +34,7 @@ Nuxt 4 SPA(`ssr: false`),Bun 管理依赖,TypeScript strict,Vue 用 `<script set
 - 错误提醒、校验摘要和操作通知统一使用右下角小型弹窗，从右向左滑入，字体为 14px 微软雅黑、700 字重，并复用 SVG 状态装饰。`Alert` 是受所属组件生命周期控制的浮动通知；`toast.*` 使用同一 Sonner 队列。辅助说明用 FieldDescription，确认流程继续用 Dialog/AlertDialog。
 - Dialog、DialogScrollContent 与 AlertDialog 的可见表面必须由共享 Card 原语渲染，统一继承卡片透明度、模糊、圆角、阴影和装饰；业务弹窗不得再自行实现一层原生卡片，也不得在 Card 弹窗内嵌套另一张 Card。
 - 开发环境的 `/__ui-check` 用于交互预览，不调用业务写接口；生产构建必须通过 `pages:extend` 排除此路由。不得将验证用临时文件作为应用依赖。
-- 新增动效放在独立的 `app/motion/` 库中，由 UI 原语调用预设；组件不内置动画定义，不引入业务状态，必须支持减少动态效果模式。列表键盘交互留在通用原语，竞赛选择与 URL 同步留在功能层。
+- 新增动效、View Transition 选择器和命名合成层声明放在独立的 `app/motion/` 库中，由 UI 原语调用预设；组件不内置动画定义，不引入业务状态，必须支持减少动态效果模式。`view-transition-name` 只能在实际过渡 dataset 存在时临时生效，禁止永久施加到 DefaultLayout 前景或壁纸，避免切断 Card 对背景的 `backdrop-filter` 采样。列表键盘交互留在通用原语，竞赛选择与 URL 同步留在功能层。
 - 普通路由使用 Nuxt 全局 `noctf-page-slide`，只横向移动 DefaultLayout 的 main 页面内容；顶部栏和布局壁纸不得进入页面过渡。主内容通过 `data-slot="page-transition-viewport"` 裁切横向溢出。竞赛页和消息中心的 ChoiceSidebar 必须在页面网格内稳定占位并与右侧 Card 同步横移，不得在带 transform 的页面根节点下使用 fixed 定位。减少动态效果模式取消位移。
 - 竞赛计分板在固定高度竞赛工作区内必须由纵向 ScrollSurface 承载整页内容，表格继续使用自身横向滚动面；不得让 `data-contained-workspace-page` 的 overflow 裁掉趋势图或队伍表格。
 - CTF 3D 大屏固定使用自身 `.dark` 容器的大屏专用语义颜色生成 WebGL 材质，不能从 document 根主题或站点品牌主色取色。舞台使用近黑紫背景、紫蓝网格、冷蓝未攻克建筑和高饱和红色已攻克建筑，绿色只用于成功分值与实时状态；`/competitions/:id/live-` 作为 `/live` 的兼容别名，必须加载同一完整大屏。
@@ -55,7 +55,7 @@ Nuxt 4 SPA(`ssr: false`),Bun 管理依赖,TypeScript strict,Vue 用 `<script set
 - 顶部主题调色板由 features/theme 控制浏览器本地偏好，亮暗主题分别保存；共享 ColorPicker / ColorSwatch 原语负责颜色编辑交互，不使用原生 color/range 控件。主题插件校验 HEX 后设置 user-primary token，语义 token 派生强调色与按钮前景，恢复默认时移除覆盖。新增用色继续使用主题 token。
 - 顶部栏使用 80px 透明承载层及三个按内容宽度自适应的腰圆。左侧为平台 Logo 锁定；中间依次容纳竞赛、题库管理、平台设置、消息中心和中英切换；右侧容纳主题调色板、明暗切换和头像。腰圆使用主题 Card 表面、12px 模糊和统一投影。导航入口保留固定宽度槽位和展开动效。32px 无框头像触发 AccountPanel Popover，不使用 DropdownMenu；面板主 Card 以三个圆角方形按钮切换公开资料、账户信息和账户安全，并在下方展开独立详情 Card。
 - 登录与注册使用 `/auth/login`、`/auth/register` 独立页面，顶部栏、首页与鉴权拦截直接指向对应路由。认证表单 Card 使用 `max-w-xl` 预留横向扩展空间；鉴权中间件携带安全的站内 `redirect`，登录成功后返回原目标。
-- 除首页 `/` 外，浅色与深色模式页面分别使用本地 `assets/images/backgrounds/light-pages-wallpaper.jpg` 和 `dark-pages-wallpaper.jpg` 固定壁纸；两者均以 35% 图像强度叠在各自 background token 上，只影响布局背景。页面内容与卡片不继承壁纸透明度。
+- 除首页 `/` 外，浅色与深色模式页面分别使用本地 `assets/images/backgrounds/light-pages-wallpaper.jpg` 和 `dark-pages-wallpaper.jpg` 固定壁纸；两者均以 35% 图像强度叠在各自 background token 上，只影响布局背景。页面内容与卡片不继承壁纸透明度，壁纸必须与普通页面 Card 保持在同一可采样合成上下文中。
 - Nuxt 保持 `ssr: false`；搜索与分享平台所需的全局平台名称、描述、Logo、Open Graph 与 JSON-LD 由 API 的 SPA HTML fallback 从平台配置动态注入，不能只依赖客户端 `useHead`。元数据必须安全转义并生成绝对 URL，API/Hub/健康检查/静态资源不得被 fallback 接管。
 - Flag 输入统一使用 TerminalCommand 伪终端原语，空输入提示为主题色微软雅黑斜体 `Type Your Flag ~~`；回车提交、IME 组合确认不提交，批量模式 Shift+Enter 换行。普通 CTF Flag 正确后由 `Challenge is Solved ！` 直接替换原占位文字，不另显示成功结果 Alert；题目详情接口通过 `SolvedByMyTeam` 恢复本队已解状态，但已解状态不得禁用输入，后续 Flag 仍须正常判定为 Correct 或 Wrong。提交记录在 Dialog 中按需挂载，不在详情页内常驻表格；业务提交和历史读取仍由功能层管理。
 - 题目列表的一血、二血、三血标记保持横向图标排列，悬停提示显示排行榜快照中的队伍名；队伍名缺失时才回退到带标签的 Team ID，常驻界面不显示队名或 UUID。

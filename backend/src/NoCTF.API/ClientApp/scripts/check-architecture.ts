@@ -10,7 +10,20 @@ export interface ArchitectureIssue { file: string; rule: string; detail: string 
 const visibleAttributes = new Set(['title', 'aria-label', 'aria-description', 'alt', 'placeholder', 'label', 'description'])
 const nativeControls = new Set(['form', 'button', 'input', 'textarea', 'select', 'option', 'label', 'a', 'table', 'hr', 'progress', 'dialog', 'details', 'summary', 'datalist', 'meter', 'fieldset', 'legend'])
 const nativePickerTypes = new Set(['number', 'date', 'datetime-local', 'time', 'month', 'week', 'file', 'color', 'range'])
+const featureCompositionTags = new Set(['component', 'slot', 'template', 'ClientOnly', 'KeepAlive', 'Suspense', 'Teleport', 'Transition', 'TransitionGroup'])
 const messages = chineseMessages as Record<string, string>
+
+export function auditCssSource(file: string, source: string): ArchitectureIssue[] {
+  if (!file.startsWith('motion/') && /\bview-transition-name\s*:/.test(source))
+    return [{ file, rule: 'motion-boundary', detail: 'View Transition layer ownership belongs in app/motion' }]
+  return []
+}
+
+export function auditAssetPath(file: string): ArchitectureIssue[] {
+  if (file.endsWith('.svg') && !file.startsWith('assets/svg/'))
+    return [{ file, rule: 'svg-boundary', detail: 'Static SVG assets belong in app/assets/svg' }]
+  return []
+}
 
 /** No allowlist of existing violations: new and existing files obey the same rules. */
 export function auditVueSource(file: string, source: string): ArchitectureIssue[] {
@@ -20,6 +33,7 @@ export function auditVueSource(file: string, source: string): ArchitectureIssue[
   for (const error of errors) report('syntax', String(error))
   const isView = file.startsWith('components/views/')
   const isPrimitive = file.startsWith('components/ui/')
+  const isFeature = file.startsWith('features/')
   const isShell = /^(pages|layouts)\//.test(file) || file === 'app.vue'
   const setup = descriptor.scriptSetup?.content ?? ''
   const ast = ts.createSourceFile(file + '.ts', setup, ts.ScriptTarget.Latest, true)
@@ -51,6 +65,8 @@ export function auditVueSource(file: string, source: string): ArchitectureIssue[
       function visit(node: any) {
         if (node.type === 2 && /[\p{L}\p{N}]/u.test(node.content)) report('i18n', `Literal template text: ${node.content.trim()}`)
         if (node.type === 1) {
+          if (isFeature && !featureCompositionTags.has(node.tag) && !node.tag.endsWith('View'))
+            report('logic-ui-boundary', `Feature composition rendered UI element: <${node.tag}>`)
           if (!isPrimitive && nativeControls.has(node.tag)) report('primitive-boundary', `Use a shared primitive instead of <${node.tag}>`)
           if (/^NativeSelect/.test(node.tag)) report('native-defaults', 'Native Select is not part of the design system')
           if (isView) {
@@ -125,6 +141,8 @@ export function auditVueSource(file: string, source: string): ArchitectureIssue[
     for (const shadow of style.content.matchAll(/(?:box-shadow|text-shadow)\s*:\s*([^;}]+)/g))
       if (!/^(?:var\(|none\b)/.test(shadow[1]!.trim())) report('theme-boundary', 'Use the shared shadow tokens')
   }
+  if (isFeature && descriptor.styles.some(style => style.content.trim()))
+    report('logic-ui-boundary', 'Feature composition cannot own presentation styles')
   return issues
 }
 
@@ -135,6 +153,12 @@ export function auditArchitecture(appRoot = resolve('app')): ArchitectureIssue[]
   })
   const vueFiles = walk(appRoot).filter(file => file.endsWith('.vue'))
   const issues = vueFiles.flatMap(file => auditVueSource(relative(appRoot, file).replaceAll('\\', '/'), readFileSync(file, 'utf8')))
+  for (const file of walk(appRoot).filter(file => file.endsWith('.css'))) {
+    const relativeFile = relative(appRoot, file).replaceAll('\\', '/')
+    issues.push(...auditCssSource(relativeFile, readFileSync(file, 'utf8')))
+  }
+  for (const file of walk(appRoot).filter(file => file.endsWith('.svg')))
+    issues.push(...auditAssetPath(relative(appRoot, file).replaceAll('\\', '/')))
   for (const file of walk(appRoot).filter(file => file.endsWith('.ts') && !relative(appRoot, file).replaceAll('\\', '/').startsWith('api/'))) {
     const source = readFileSync(file, 'utf8')
     if (/\bwindow\.(?:alert|confirm|prompt)\s*\(/.test(source))
