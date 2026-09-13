@@ -52,4 +52,9 @@ describe('frontend architecture', () => {
     expect(auditAssetPath('components/ui/icon.svg')[0]?.rule).toBe('svg-boundary')
     expect(auditAssetPath('assets/svg/status/icon.svg')).toEqual([])
   })
+
+  test('keeps PDF parsing inside the shared Canvas renderer', () => {
+    const issues = auditVueSource('components/views/Example.vue', `<script setup lang="ts">import { getDocument } from 'pdfjs-dist'</script><template><iframe /></template>`)
+    expect(issues.filter(issue => issue.rule === 'pdf-boundary')).toHaveLength(2)
+  })
 })

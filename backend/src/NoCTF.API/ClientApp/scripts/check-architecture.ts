@@ -9,6 +9,7 @@ import { englishMessages } from '../app/locales/en'
 export interface ArchitectureIssue { file: string; rule: string; detail: string }
 const visibleAttributes = new Set(['title', 'aria-label', 'aria-description', 'alt', 'placeholder', 'label', 'description'])
 const nativeControls = new Set(['form', 'button', 'input', 'textarea', 'select', 'option', 'label', 'a', 'table', 'hr', 'progress', 'dialog', 'details', 'summary', 'datalist', 'meter', 'fieldset', 'legend'])
+const nativePdfViewers = new Set(['embed', 'iframe', 'object'])
 const nativePickerTypes = new Set(['number', 'date', 'datetime-local', 'time', 'month', 'week', 'file', 'color', 'range'])
 const featureCompositionTags = new Set(['component', 'slot', 'template', 'ClientOnly', 'KeepAlive', 'Suspense', 'Teleport', 'Transition', 'TransitionGroup'])
 const messages = chineseMessages as Record<string, string>
@@ -47,6 +48,10 @@ export function auditVueSource(file: string, source: string): ArchitectureIssue[
       const path = (node.moduleSpecifier as ts.StringLiteral).text
       if (path !== 'vue') report('render-only', `View runtime import: ${path}`)
     }
+    if (ts.isImportDeclaration(node)
+      && (node.moduleSpecifier as ts.StringLiteral).text.startsWith('pdfjs-dist')
+      && file !== 'components/ui/pdf-preview/PdfPreview.vue')
+      report('pdf-boundary', 'PDF.js belongs exclusively to the shared PdfPreview primitive')
     if (isView && (ts.isFunctionDeclaration(node) || ts.isArrowFunction(node) || ts.isFunctionExpression(node)))
       report('render-only', 'Declare processing and event handlers in the feature controller')
     if (isView && ts.isCallExpression(node) && !['defineProps', 'defineOptions', 'toRefs'].includes(node.expression.getText(ast)))
@@ -65,6 +70,8 @@ export function auditVueSource(file: string, source: string): ArchitectureIssue[
       function visit(node: any) {
         if (node.type === 2 && /[\p{L}\p{N}]/u.test(node.content)) report('i18n', `Literal template text: ${node.content.trim()}`)
         if (node.type === 1) {
+          if (nativePdfViewers.has(node.tag))
+            report('pdf-boundary', `Use the shared Canvas PDF renderer instead of <${node.tag}>`)
           if (isFeature && !featureCompositionTags.has(node.tag) && !node.tag.endsWith('View'))
             report('logic-ui-boundary', `Feature composition rendered UI element: <${node.tag}>`)
           if (!isPrimitive && nativeControls.has(node.tag)) report('primitive-boundary', `Use a shared primitive instead of <${node.tag}>`)
