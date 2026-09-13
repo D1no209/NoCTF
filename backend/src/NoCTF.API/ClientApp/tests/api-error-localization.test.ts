@@ -2,6 +2,8 @@ import { afterEach, describe, expect, test } from 'bun:test'
 import { parseApiError } from '../app/utils/api-error'
 import { setLocale } from '../app/utils/i18n'
 
+const apiPlugin = await Bun.file(new URL('../app/plugins/api.client.ts', import.meta.url)).text()
+
 describe('api error localization', () => {
   afterEach(() => setLocale('zh-CN'))
 
@@ -30,6 +32,29 @@ describe('api error localization', () => {
       status: 400,
       title: 'Invalid cursor.',
     }).message).toBe('游标无效,请刷新后重试')
+  })
+
+  test('prefers concrete validation and operation context over a generic bad-request detail', () => {
+    setLocale('zh-CN')
+
+    expect(parseApiError({
+      status: 400,
+      detail: 'Unexpected legacy payload value.',
+      errors: {
+        To: ['The incident query range must be between zero and 31 days.'],
+        General: ['结束时间必须晚于开始时间。'],
+      },
+    }).message).toBe('作弊事件查询时间范围必须在 0 到 31 天内；结束时间必须晚于开始时间。')
+
+    expect(parseApiError({
+      status: 400,
+      code: 'InvalidTitle',
+      message: 'Title must not be empty.',
+    }).message).toBe('Title must not be empty.')
+
+    expect(parseApiError({ status: 400 }, '保存题目失败').message).toBe('保存题目失败')
+    expect(apiPlugin).toContain("status === 400 || status === 422")
+    expect(apiPlugin).toContain('? { status }')
   })
 
   test('keeps the same backend details in the English locale', () => {

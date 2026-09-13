@@ -26,7 +26,8 @@ public sealed record PublicHumanVerificationResponse(
     HumanVerificationProviderProtocol Provider,
     string? SiteKey,
     string? ApiEndpoint,
-    bool RuntimeRequired);
+    bool RuntimeRequired,
+    bool EvaluationRequired);
 
 public sealed record PublicPlatformConfigurationResponse(
     string Name,
@@ -55,24 +56,27 @@ internal static class PublicPlatformConfigurationMapping
     private static PublicHumanVerificationResponse MapHumanVerification(
         HumanVerificationConfigurationView configuration) =>
         !configuration.Enabled || !configuration.Ready
-            ? new(HumanVerificationProviderProtocol.None, null, null, false)
+            ? new(HumanVerificationProviderProtocol.None, null, null, false, false)
             : configuration.Provider switch
         {
             HumanVerificationProvider.None => new(
                 HumanVerificationProviderProtocol.None,
                 null,
                 null,
+                false,
                 false),
             HumanVerificationProvider.Cap => new(
                 HumanVerificationProviderProtocol.Cap,
                 configuration.CapSiteKey,
                 CapApiEndpoint(configuration),
-                configuration.RuntimeEnabled),
+                configuration.RuntimeEnabled,
+                configuration.EvaluationEnabled),
             HumanVerificationProvider.Turnstile => new(
                 HumanVerificationProviderProtocol.Turnstile,
                 configuration.TurnstileSiteKey,
                 null,
-                configuration.RuntimeEnabled),
+                configuration.RuntimeEnabled,
+                configuration.EvaluationEnabled),
             _ => throw new InvalidOperationException(
                 $"Unsupported human verification provider: {configuration.Provider}.")
         };

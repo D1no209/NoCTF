@@ -20,6 +20,8 @@ public sealed class PlatformSettings
 
     public bool HumanVerificationRuntimeEnabled { get; set; } = true;
 
+    public bool HumanVerificationEvaluationEnabled { get; set; } = true;
+
     public HumanVerificationProvider? HumanVerificationProvider { get; set; }
 
     [MaxLength(2048)]

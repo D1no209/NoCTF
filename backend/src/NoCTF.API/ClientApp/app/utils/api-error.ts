@@ -62,6 +62,21 @@ function normalizeFieldErrors(
   ]))
 }
 
+function validationErrorMessage(fieldErrors: Record<string, string[]> | undefined): string | undefined {
+  if (!fieldErrors) return undefined
+  const messages = [...new Set(Object.values(fieldErrors)
+    .flat()
+    .map(message => message.trim())
+    .filter(Boolean))]
+  if (!messages.length) return undefined
+  const localized = messages.map(message => userFacingErrorMessage(message, message, true))
+  return localized
+    .map((message, index) => index === localized.length - 1
+      ? message
+      : message.replace(/[。.!?；;]+$/u, ''))
+    .join(translate('ui.validationErrorSeparator'))
+}
+
 function stableCodeMessage(code: string | undefined): string | null {
   switch (code) {
     case 'HumanVerificationRequired': return translate('ui.completeHumanVerificationBeforeRetrying')
@@ -81,15 +96,18 @@ export function parseApiError(error: unknown, fallback = translate("ui.requestFa
     const problem = error as ProblemDetailsLike
     const status = problem.status ?? problem.statusCode
     const fieldErrors = normalizeFieldErrors(problem.errors)
-    const firstFieldError = fieldErrors ? Object.values(fieldErrors).flat()[0] : undefined
-    // 字段级校验错误(FluentValidation)优先于泛泛的 title("One or more validation errors occurred")。
+    const validationMessage = validationErrorMessage(fieldErrors)
+    const defaultFallback = translate('ui.requestFailedPleaseTryAgainLater')
+    // 字段级校验错误(FluentValidation)优先于泛泛的 detail/title。
     const statusFallback = status === undefined
       ? fallback
-      : statusErrorMessage(status)
+      : (status === 400 || status === 422) && fallback !== defaultFallback
+          ? fallback
+          : statusErrorMessage(status)
     const message = stableCodeMessage(problem.code) ?? userFacingErrorMessage(
-        problem.detail ?? firstFieldError ?? problem.message ?? problem.title,
+        validationMessage ?? problem.detail ?? problem.message ?? problem.title,
         statusFallback,
-        status === 409 || status === 422,
+        status === 409 || status === 422 || Boolean(validationMessage) || (status === 400 && Boolean(problem.code)),
       )
     return new ApiError(message, {
       status,

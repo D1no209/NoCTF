@@ -73,6 +73,7 @@ public sealed class PlatformHumanVerificationPatchRequest
 {
     public required bool Enabled { get; set; }
     public required bool RuntimeEnabled { get; set; }
+    public required bool EvaluationEnabled { get; set; }
     public required HumanVerificationProviderProtocol Provider { get; set; }
     public required string CapServerUrl { get; set; }
     public required string CapSiteKey { get; set; }
@@ -171,6 +172,7 @@ public static partial class PlatformSettingsPatchMapper
 {
     [MapperIgnoreTarget(nameof(PlatformSettings.HumanVerificationEnabled))]
     [MapperIgnoreTarget(nameof(PlatformSettings.HumanVerificationRuntimeEnabled))]
+    [MapperIgnoreTarget(nameof(PlatformSettings.HumanVerificationEvaluationEnabled))]
     [MapperIgnoreTarget(nameof(PlatformSettings.HumanVerificationProvider))]
     [MapperIgnoreTarget(nameof(PlatformSettings.HumanVerificationCapServerUrl))]
     [MapperIgnoreTarget(nameof(PlatformSettings.HumanVerificationCapSiteKey))]
@@ -226,6 +228,7 @@ public static partial class PlatformSettingsPatchMapper
     [MapperIgnoreTarget(nameof(PlatformSettings.Description))]
     [MapperIgnoreTarget(nameof(PlatformSettings.HumanVerificationEnabled))]
     [MapperIgnoreTarget(nameof(PlatformSettings.HumanVerificationRuntimeEnabled))]
+    [MapperIgnoreTarget(nameof(PlatformSettings.HumanVerificationEvaluationEnabled))]
     [MapperIgnoreTarget(nameof(PlatformSettings.HumanVerificationProvider))]
     [MapperIgnoreTarget(nameof(PlatformSettings.HumanVerificationCapServerUrl))]
     [MapperIgnoreTarget(nameof(PlatformSettings.HumanVerificationCapSiteKey))]
@@ -260,6 +263,7 @@ public static partial class PlatformSettingsPatchMapper
     [MapperIgnoreTarget(nameof(PlatformSettings.Description))]
     [MapperIgnoreTarget(nameof(PlatformSettings.HumanVerificationEnabled))]
     [MapperIgnoreTarget(nameof(PlatformSettings.HumanVerificationRuntimeEnabled))]
+    [MapperIgnoreTarget(nameof(PlatformSettings.HumanVerificationEvaluationEnabled))]
     [MapperIgnoreTarget(nameof(PlatformSettings.HumanVerificationProvider))]
     [MapperIgnoreTarget(nameof(PlatformSettings.HumanVerificationCapServerUrl))]
     [MapperIgnoreTarget(nameof(PlatformSettings.HumanVerificationCapSiteKey))]
@@ -393,7 +397,8 @@ public sealed class PatchPlatformConfigurationEndpoint(
                     humanRequest.TurnstileSiteKey,
                     humanRequest.TurnstileAllowedHostnames,
                     timeProvider.GetUtcNow(),
-                    humanRequest.RuntimeEnabled),
+                    humanRequest.RuntimeEnabled,
+                    humanRequest.EvaluationEnabled),
                     transactionCt);
                 if (result.State != HumanVerificationConfigurationUpdateState.Updated)
                 {

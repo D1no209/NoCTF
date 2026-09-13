@@ -78,10 +78,12 @@ public sealed class HumanVerificationConfigurationPersistenceTests
                 string.Empty,
                 [],
                 DateTimeOffset.UtcNow,
-                RuntimeEnabled: false), cancellationToken);
+                RuntimeEnabled: false,
+                EvaluationEnabled: false), cancellationToken);
 
             await Assert.That(view.Enabled).IsTrue();
             await Assert.That(view.RuntimeEnabled).IsFalse();
+            await Assert.That(view.EvaluationEnabled).IsFalse();
             await Assert.That(view.CapSecretConfigured).IsTrue();
             await Assert.That(view.TurnstileSecretConfigured).IsTrue();
             await Assert.That(typeof(HumanVerificationConfigurationView)
@@ -91,6 +93,7 @@ public sealed class HumanVerificationConfigurationPersistenceTests
             var persisted = await db.PlatformSettings.AsNoTracking()
                 .SingleAsync(cancellationToken);
             await Assert.That(persisted.HumanVerificationRuntimeEnabled).IsFalse();
+            await Assert.That(persisted.HumanVerificationEvaluationEnabled).IsFalse();
             await Assert.That(persisted.HumanVerificationCapSecretCiphertext)
                 .IsNotNull();
             await Assert.That(persisted.HumanVerificationCapSecretCiphertext!)
@@ -103,7 +106,9 @@ public sealed class HumanVerificationConfigurationPersistenceTests
             var runtime = await store.GetRuntimeConfigurationAsync(cancellationToken);
             await Assert.That(runtime.Enabled).IsTrue();
             await Assert.That(runtime.RuntimeEnabled).IsFalse();
+            await Assert.That(runtime.EvaluationEnabled).IsFalse();
             await Assert.That(runtime.IsRequired(HumanVerificationAction.Runtime)).IsFalse();
+            await Assert.That(runtime.IsRequired(HumanVerificationAction.Evaluation)).IsFalse();
             await Assert.That(runtime.IsRequired(HumanVerificationAction.Login)).IsTrue();
             await Assert.That(runtime.Options.Provider)
                 .IsEqualTo(HumanVerificationProvider.Cap);

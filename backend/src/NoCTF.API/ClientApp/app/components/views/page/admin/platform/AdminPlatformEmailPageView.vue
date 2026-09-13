@@ -85,6 +85,17 @@ const { KeyRound, RefreshCw, Send, ShieldCheck, configuration, humanVerification
                   <FieldDescription>{{ $t('ui.containerHumanVerificationDescription') }}</FieldDescription>
                 </FieldContent>
               </Field>
+              <Field orientation="horizontal">
+                <Switch
+                  id="human-verification-evaluation-enabled"
+                  v-model="humanForm.evaluationEnabled"
+                  :disabled="humanVerificationSaving || !humanForm.enabled || humanForm.provider === 'None'"
+                />
+                <FieldContent>
+                  <FieldLabel for="human-verification-evaluation-enabled">{{ $t('ui.requireHumanVerificationForFlagSubmissions') }}</FieldLabel>
+                  <FieldDescription>{{ $t('ui.flagSubmissionHumanVerificationDescription') }}</FieldDescription>
+                </FieldContent>
+              </Field>
 
               <template v-if="humanForm.provider === 'Cap'">
                 <Field>

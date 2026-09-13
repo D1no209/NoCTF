@@ -117,6 +117,45 @@ public sealed class HumanVerificationMiddlewareTests
     }
 
     [Test]
+    public async Task Disabled_evaluation_switch_bypasses_only_flag_evaluation()
+    {
+        var verifier = Substitute.For<IHumanVerificationVerifier>();
+        var source = Substitute.For<IRequestSourceAddress>();
+        var calls = 0;
+        var middleware = new HumanVerificationMiddleware(_ =>
+        {
+            calls++;
+            return Task.CompletedTask;
+        });
+
+        var evaluation = Context(HumanVerificationAction.Evaluation);
+        await middleware.InvokeAsync(
+            evaluation,
+            verifier,
+            source,
+            Configuration(
+                enabled: true,
+                TurnstileOptions(),
+                evaluationEnabled: false));
+
+        var runtime = Context(HumanVerificationAction.Runtime);
+        await middleware.InvokeAsync(
+            runtime,
+            verifier,
+            source,
+            Configuration(
+                enabled: true,
+                TurnstileOptions(),
+                evaluationEnabled: false));
+
+        await Assert.That(calls).IsEqualTo(1);
+        await Assert.That(evaluation.Response.StatusCode).IsEqualTo(StatusCodes.Status200OK);
+        await Assert.That(runtime.Response.StatusCode).IsEqualTo(StatusCodes.Status403Forbidden);
+        await Assert.That(await ProblemCodeAsync(runtime)).IsEqualTo("HumanVerificationRequired");
+        await verifier.DidNotReceiveWithAnyArgs().VerifyAsync(default!, default!, default);
+    }
+
+    [Test]
     public async Task Verified_token_carries_action_and_normalized_source_to_provider()
     {
         var verifier = Substitute.For<IHumanVerificationVerifier>();
@@ -214,14 +253,16 @@ public sealed class HumanVerificationMiddlewareTests
     private static IHumanVerificationConfigurationReader Configuration(
         bool enabled,
         HumanVerificationOptions options,
-        bool runtimeEnabled = true)
+        bool runtimeEnabled = true,
+        bool evaluationEnabled = true)
     {
         var reader = Substitute.For<IHumanVerificationConfigurationReader>();
         reader.GetRuntimeConfigurationAsync(Arg.Any<CancellationToken>())
             .Returns(new HumanVerificationRuntimeConfiguration(
                 enabled,
                 options,
-                runtimeEnabled));
+                runtimeEnabled,
+                evaluationEnabled));
         return reader;
     }
 

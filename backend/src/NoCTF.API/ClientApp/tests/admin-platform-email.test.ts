@@ -14,6 +14,8 @@ test('email administration exposes persisted human-verification providers and se
   expect(view).toContain('v-model="humanForm.enabled"')
   expect(view).toContain('v-model="humanForm.runtimeEnabled"')
   expect(controller).toContain('runtimeEnabled: humanForm.runtimeEnabled')
+  expect(view).toContain('v-model="humanForm.evaluationEnabled"')
+  expect(controller).toContain('evaluationEnabled: humanForm.evaluationEnabled')
   expect(view).toContain("humanForm.provider === 'Cap'")
   expect(view).toContain("humanForm.provider === 'Turnstile'")
   expect(view).toContain("$t('ui.configureProviderSecret')")

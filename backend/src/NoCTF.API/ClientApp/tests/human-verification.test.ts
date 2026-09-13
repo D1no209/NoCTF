@@ -50,6 +50,7 @@ describe('human verification coordination', () => {
     expect(feature).toContain("appearance: 'interaction-only'")
     expect(feature).toContain("'X-NoCTF-Human-Verification'")
     expect(feature).toContain("action === 'runtime' && provider.runtimeRequired === false")
+    expect(feature).toContain("action === 'evaluation' && provider.evaluationRequired === false")
     expect(feature).toContain('watch(() => route.fullPath')
     expect(platform).not.toContain('secret')
   })

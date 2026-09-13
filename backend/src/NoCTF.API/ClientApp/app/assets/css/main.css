@@ -1029,7 +1029,10 @@ body:has([data-modal-scroll-lock]) {
   gap: 12px;
   touch-action: pan-y;
   translate: calc(100% + 32px) 0;
-  transition: translate 240ms var(--ui-ease), transform 240ms var(--ui-ease), opacity 180ms ease;
+  transition: translate 240ms var(--ui-ease), transform 240ms var(--ui-ease), opacity 180ms ease, height 180ms var(--ui-ease);
+}
+[data-sonner-toaster] [data-sonner-toast]:has(.notice-frame):is([data-front='true'], [data-expanded='true']) {
+  height: var(--notice-height, auto) !important;
 }
 [data-sonner-toaster] [data-sonner-toast][data-mounted='false'] { --y: translateY(0); }
 [data-sonner-toaster] [data-sonner-toast][data-mounted='true'] { translate: 0 0; }
@@ -1054,7 +1057,7 @@ body:has([data-modal-scroll-lock]) {
   color: var(--muted-foreground); background: transparent;
 }
 .notice-frame { display: flex; align-items: flex-start; gap: 10px; width: 100%; }
-.notice-message { flex: 1; min-width: 0; max-height: min(200px, calc((100dvh - 180px) / 3)); }
+.notice-message { flex: 1; min-width: 0; max-height: min(24rem, calc((100dvh - 8rem) / 2)); }
 .notice-message [data-slot='alert-title'] { color: var(--notice-accent); margin-bottom: 4px; }
 .notice-message [data-slot='alert-description'] { color: var(--popover-foreground); }
 .notice-message [data-slot='alert-action'] { position: static; margin-top: 8px; }

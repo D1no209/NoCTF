@@ -73,9 +73,11 @@ export default defineNuxtPlugin(() => {
           : { ...problem, status }
       }
     }
-    // 空响应体(如登录 401)或网络错误:合成带状态码的 problem 形状,
-    // parseApiError 会读出其中的 detail 与 status。
+    // 空 400/422 保留为纯状态，让调用处的操作级 fallback 保持具体。
+    // 其他空响应体仍合成状态说明；401 需要区分登录失败与会话过期。
     const authenticatedRequest = request?.headers.has('Authorization') ?? false
-    return { status, detail: statusErrorMessage(status, authenticatedRequest) }
+    return status === 400 || status === 422
+      ? { status }
+      : { status, detail: statusErrorMessage(status, authenticatedRequest) }
   })
 })

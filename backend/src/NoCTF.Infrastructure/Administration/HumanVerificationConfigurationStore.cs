@@ -30,6 +30,7 @@ public sealed class HumanVerificationConfigurationStore(
         SeedDeploymentSecrets(settings);
         settings.HumanVerificationEnabled = command.Enabled;
         settings.HumanVerificationRuntimeEnabled = command.RuntimeEnabled;
+        settings.HumanVerificationEvaluationEnabled = command.EvaluationEnabled;
         settings.HumanVerificationProvider = command.Provider;
         settings.HumanVerificationCapServerUrl = command.CapServerUrl;
         settings.HumanVerificationCapSiteKey = command.CapSiteKey;
@@ -71,7 +72,8 @@ public sealed class HumanVerificationConfigurationStore(
                 settings.HumanVerificationEnabled
                     && fallback.Provider != HumanVerificationProvider.None,
                 fallback,
-                settings.HumanVerificationRuntimeEnabled);
+                settings.HumanVerificationRuntimeEnabled,
+                settings.HumanVerificationEvaluationEnabled);
         }
 
         var options = new HumanVerificationOptions
@@ -103,7 +105,8 @@ public sealed class HumanVerificationConfigurationStore(
             settings.HumanVerificationEnabled
                 && options.Provider != HumanVerificationProvider.None,
             options,
-            settings.HumanVerificationRuntimeEnabled);
+            settings.HumanVerificationRuntimeEnabled,
+            settings.HumanVerificationEvaluationEnabled);
     }
 
     private Task<PlatformSettings> LoadAsync(CancellationToken ct) =>
@@ -140,7 +143,8 @@ public sealed class HumanVerificationConfigurationStore(
                 ? fallback.Turnstile.AllowedHostnames.ToArray()
                 : settings.HumanVerificationTurnstileAllowedHostnames.ToArray(),
             settings.UpdatedAt,
-            settings.HumanVerificationRuntimeEnabled);
+            settings.HumanVerificationRuntimeEnabled,
+            settings.HumanVerificationEvaluationEnabled);
     }
 
     private void SeedDeploymentSecrets(PlatformSettings settings)

@@ -62,7 +62,8 @@ public sealed class HumanVerificationConfigurationTests
             " site-key ",
             ["CTF.Example.Test.", "ctf.example.test"],
             DateTimeOffset.UtcNow,
-            RuntimeEnabled: false));
+            RuntimeEnabled: false,
+            EvaluationEnabled: false));
 
         await Assert.That(result.State)
             .IsEqualTo(HumanVerificationConfigurationUpdateState.Updated);
@@ -71,6 +72,7 @@ public sealed class HumanVerificationConfigurationTests
         await Assert.That(saved.TurnstileAllowedHostnames)
             .IsEquivalentTo(["ctf.example.test"]);
         await Assert.That(saved.RuntimeEnabled).IsFalse();
+        await Assert.That(saved.EvaluationEnabled).IsFalse();
     }
 
     [Test]

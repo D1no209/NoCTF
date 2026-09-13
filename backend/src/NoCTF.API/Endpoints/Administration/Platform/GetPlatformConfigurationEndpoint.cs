@@ -31,6 +31,7 @@ internal static class PlatformConfigurationMapping
 public sealed record AdminHumanVerificationConfigurationResponse(
     bool Enabled,
     bool RuntimeEnabled,
+    bool EvaluationEnabled,
     HumanVerificationProviderProtocol Provider,
     bool Ready,
     string CapServerUrl,
@@ -48,6 +49,7 @@ internal static class AdminHumanVerificationConfigurationMapping
         new(
             configuration.Enabled,
             configuration.RuntimeEnabled,
+            configuration.EvaluationEnabled,
             PublicPlatformConfigurationMapping.ToProtocol(configuration.Provider),
             configuration.Ready,
             configuration.CapServerUrl,

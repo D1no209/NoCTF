@@ -2957,6 +2957,9 @@ export const chineseMessages = {
   "competitionAccess.description": "仅平台管理员和赛事所有者、经理、裁判、观察员可见。切换不会删除队伍、成绩或停止 Runtime。",
   "competitionAccess.badge": "隐藏",
   "competitionAccess.changed": "比赛访问范围已变更"
+  ,"ui.validationErrorSeparator": "；"
+  ,"ui.requireHumanVerificationForFlagSubmissions": "提交 Flag 时要求人机验证"
+  ,"ui.flagSubmissionHumanVerificationDescription": "关闭后，Flag 提交与只读 Break 判定不再弹出人机验证；登录、注册和 Runtime 策略不受影响。"
   ,"pdfPreview.loadFailed": "PDF 渲染失败"
   ,"pdfPreview.loadFailedDescription": "无法在内置预览器中解析此文件，请下载后检查原文件。"
   ,"pdfPreview.pageNavigation": "PDF 页面导航"

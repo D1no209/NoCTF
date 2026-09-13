@@ -170,7 +170,7 @@ export function createMockApi() {
   const json = (value: any, status = 200, headers: HeadersInit = {}) => Response.json(value, { status, headers: { 'X-NoCTF-Mock': 'true', 'Cache-Control': 'no-store', ...headers } })
   const problem = (status: number, detail: string) => json({ status, title: 'Mock API', detail }, status)
   const defaultHumanVerification = () => ({
-    enabled: false, runtimeEnabled: true, provider: 'None', ready: false,
+    enabled: false, runtimeEnabled: true, evaluationEnabled: true, provider: 'None', ready: false,
     capServerUrl: '', capSiteKey: '', capSecretConfigured: false,
     turnstileSiteKey: '', turnstileSecretConfigured: false,
     turnstileAllowedHostnames: [], updatedAt: now(),
@@ -189,10 +189,10 @@ export function createMockApi() {
     const ready = humanVerificationReady(configuration)
     configuration.ready = ready
     state.platform.humanVerification = !configuration.enabled || !ready
-      ? { provider: 'None', siteKey: null, apiEndpoint: null, runtimeRequired: false }
+      ? { provider: 'None', siteKey: null, apiEndpoint: null, runtimeRequired: false, evaluationRequired: false }
       : configuration.provider === 'Cap'
-        ? { provider: 'Cap', siteKey: configuration.capSiteKey, apiEndpoint: `${configuration.capServerUrl.replace(/\/$/, '')}/${encodeURIComponent(configuration.capSiteKey)}/`, runtimeRequired: configuration.runtimeEnabled !== false }
-        : { provider: 'Turnstile', siteKey: configuration.turnstileSiteKey, apiEndpoint: null, runtimeRequired: configuration.runtimeEnabled !== false }
+        ? { provider: 'Cap', siteKey: configuration.capSiteKey, apiEndpoint: `${configuration.capServerUrl.replace(/\/$/, '')}/${encodeURIComponent(configuration.capSiteKey)}/`, runtimeRequired: configuration.runtimeEnabled !== false, evaluationRequired: configuration.evaluationEnabled !== false }
+        : { provider: 'Turnstile', siteKey: configuration.turnstileSiteKey, apiEndpoint: null, runtimeRequired: configuration.runtimeEnabled !== false, evaluationRequired: configuration.evaluationEnabled !== false }
   }
   const userFor = (request: Request) => {
     const bearer = request.headers.get('Authorization')?.replace(/^Bearer /, '')
