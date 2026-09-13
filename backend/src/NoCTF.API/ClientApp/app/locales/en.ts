@@ -2957,6 +2957,9 @@ export const englishMessages = {
   "competitionAccess.description": "Only platform administrators, owners, managers, judges, and observers can see it. Switching does not delete teams or scores, or stop runtimes.",
   "competitionAccess.badge": "Hidden",
   "competitionAccess.changed": "Competition access changed"
+  ,"ui.validationErrorSeparator": "; "
+  ,"ui.requireHumanVerificationForFlagSubmissions": "Require human verification for Flag submissions"
+  ,"ui.flagSubmissionHumanVerificationDescription": "When disabled, Flag submissions and read-only Break checks no longer open human verification. Login, registration, and Runtime policies are unchanged."
   ,"pdfPreview.loadFailed": "PDF rendering failed"
   ,"pdfPreview.loadFailedDescription": "The built-in viewer could not parse this file. Download it to inspect the original."
   ,"pdfPreview.pageNavigation": "PDF page navigation"

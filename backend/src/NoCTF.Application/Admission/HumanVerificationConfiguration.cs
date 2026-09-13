@@ -21,7 +21,8 @@ public sealed record HumanVerificationConfigurationView(
     bool TurnstileSecretConfigured,
     IReadOnlyList<string> TurnstileAllowedHostnames,
     DateTimeOffset UpdatedAt,
-    bool RuntimeEnabled = true);
+    bool RuntimeEnabled = true,
+    bool EvaluationEnabled = true);
 
 public sealed record UpdateHumanVerificationConfigurationCommand(
     bool Enabled,
@@ -31,15 +32,21 @@ public sealed record UpdateHumanVerificationConfigurationCommand(
     string TurnstileSiteKey,
     IReadOnlyList<string> TurnstileAllowedHostnames,
     DateTimeOffset Now,
-    bool RuntimeEnabled = true);
+    bool RuntimeEnabled = true,
+    bool EvaluationEnabled = true);
 
 public sealed record HumanVerificationRuntimeConfiguration(
     bool Enabled,
     HumanVerificationOptions Options,
-    bool RuntimeEnabled = true)
+    bool RuntimeEnabled = true,
+    bool EvaluationEnabled = true)
 {
-    public bool IsRequired(HumanVerificationAction action) =>
-        Enabled && (action != HumanVerificationAction.Runtime || RuntimeEnabled);
+    public bool IsRequired(HumanVerificationAction action) => Enabled && action switch
+    {
+        HumanVerificationAction.Runtime => RuntimeEnabled,
+        HumanVerificationAction.Evaluation => EvaluationEnabled,
+        _ => true
+    };
 }
 
 public enum HumanVerificationConfigurationError
@@ -126,7 +133,8 @@ public sealed class ManageHumanVerificationConfiguration(
             current.TurnstileSecretConfigured,
             normalized.TurnstileAllowedHostnames,
             normalized.Now,
-            normalized.RuntimeEnabled);
+            normalized.RuntimeEnabled,
+            normalized.EvaluationEnabled);
         var errors = Validate(candidate);
         if (errors.Count > 0)
         {
@@ -292,7 +300,8 @@ public sealed class NoOpHumanVerificationConfigurationStore
         false,
         [],
         DateTimeOffset.UnixEpoch,
-        RuntimeEnabled: true);
+        RuntimeEnabled: true,
+        EvaluationEnabled: true);
 
     public Task<HumanVerificationConfigurationView> GetAsync(
         CancellationToken cancellationToken) => Task.FromResult(Default);
@@ -308,7 +317,8 @@ public sealed class NoOpHumanVerificationConfigurationStore
             TurnstileSiteKey = command.TurnstileSiteKey,
             TurnstileAllowedHostnames = command.TurnstileAllowedHostnames,
             UpdatedAt = command.Now,
-            RuntimeEnabled = command.RuntimeEnabled
+            RuntimeEnabled = command.RuntimeEnabled,
+            EvaluationEnabled = command.EvaluationEnabled
         });
 
     public Task<HumanVerificationConfigurationView> ReplaceSecretAsync(
@@ -327,5 +337,6 @@ public sealed class NoOpHumanVerificationConfigurationStore
         new HumanVerificationRuntimeConfiguration(
             false,
             new HumanVerificationOptions(),
-            Default.RuntimeEnabled));
+            Default.RuntimeEnabled,
+            Default.EvaluationEnabled));
 }

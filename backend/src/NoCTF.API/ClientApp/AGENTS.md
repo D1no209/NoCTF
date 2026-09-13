@@ -32,6 +32,7 @@ Nuxt 4 SPA(`ssr: false`),Bun 管理依赖,TypeScript strict,Vue 用 `<script set
 - 滚动需求通过 `ScrollSurface` 或共享组件的 `data-scroll-surface` 标记声明；禁止在业务视图私建滚动条。滑块默认隐藏，悬停/滚动/键盘操作时显示，800ms 后隐藏，颜色随主题。
 - 普通文本、密码、数值、多行与组合输入框使用 80% 背景不透明度，通过 field-surface token 在亮暗主题下与卡片区分，Flag 伪终端保持透明。选择与上传控件同主卡片使用 45% 背景不透明度；文字和图标不降低透明度。菜单和弹层保持不透明，按钮样式按 variant 全站统一，卡片不覆盖按钮颜色和透明度；主按钮使用主题色与柔光，禁用时关闭光晕。颜色、阴影、滚动条皮肤集中在 `main.css`；Canvas/WebGL 色值通过 `themeColor` 获取。禁止业务组件重新定义原始颜色或私有阴影。
 - 错误提醒、校验摘要和操作通知统一使用右下角小型弹窗，从右向左滑入，字体为 14px 微软雅黑、700 字重，并复用 SVG 状态装饰。`Alert` 是受所属组件生命周期控制的浮动通知；`toast.*` 使用同一 Sonner 队列。辅助说明用 FieldDescription，确认流程继续用 Dialog/AlertDialog。
+- 右下角通知必须在插槽内容变化时重新测量高度并更新 Sonner 堆叠偏移，达到视口上限后才使用内部 ScrollSurface。`parseApiError` 优先采用字段级 validation errors，带稳定 code 的 400 保留具体业务原因，空 400 使用调用处的操作级 fallback；不得用统一“参数有误”覆盖已有具体上下文。
 - Dialog、DialogScrollContent 与 AlertDialog 的可见表面必须由共享 Card 原语渲染，统一继承卡片透明度、模糊、圆角、阴影和装饰；业务弹窗不得再自行实现一层原生卡片，也不得在 Card 弹窗内嵌套另一张 Card。
 - WriteUp 审核页的队伍导航使用 ChoiceSidebar / WaveSelectionList，选择和路由同步留在 feature。PDF 在线预览统一使用 PdfPreview 内的 PDF.js Worker + Canvas，以及共享 Button、ScrollSurface、Skeleton、Spinner、Empty；禁止业务 View 或 PdfPreview 使用 iframe、object、embed 及浏览器原生 PDF 查看器。
 - 开发环境的 `/__ui-check` 用于交互预览，不调用业务写接口；生产构建必须通过 `pages:extend` 排除此路由。不得将验证用临时文件作为应用依赖。
@@ -54,6 +55,7 @@ Nuxt 4 SPA(`ssr: false`),Bun 管理依赖,TypeScript strict,Vue 用 `<script set
 - 首页 View 直接组合信号装饰层以连接品牌区与终端；四条线路与节点来自 `assets/svg/decorations/home-signal-paths.svg`，主题着色和遮罩集中在 main.css，移动高光放在 motion.css，装饰不接收指针事件并支持减少动态效果。不要为这一处静态标签组合创建单独共享原语。
 - 咨询页使用 ConversationPanel / MessageBubble 共享原语，消息与输入区按 3:1 分配并独立滚动，自己的消息按当前用户 ID 判定后靠右。发送位于输入区右下，解决和关闭操作位于左侧当前咨询条目下方；权限、消息与状态请求由功能层处理。
 - 顶部主题调色板由 features/theme 控制浏览器本地偏好，亮暗主题分别保存；共享 ColorPicker / ColorSwatch 原语负责颜色编辑交互，不使用原生 color/range 控件。主题插件校验 HEX 后设置 user-primary token，语义 token 派生强调色与按钮前景，恢复默认时移除覆盖。新增用色继续使用主题 token。
+- 人机验证总开关下的 Runtime 与 Evaluation 策略相互独立；Evaluation 控制 Flag 提交及只读 Break 判定。客户端只根据公共 `evaluationRequired` capability 决定是否弹出 HumanVerificationGate，服务端中间件继续执行最终策略，管理端保存 `evaluationEnabled`。
 - 顶部栏使用 80px 透明承载层及三个按内容宽度自适应的腰圆。左侧为平台 Logo 锁定；中间依次容纳竞赛、题库管理、平台设置、消息中心和中英切换；右侧容纳主题调色板、明暗切换和头像。腰圆使用主题 Card 表面、12px 模糊和统一投影。导航入口保留固定宽度槽位和展开动效。32px 无框头像触发 AccountPanel Popover，不使用 DropdownMenu；面板主 Card 以三个圆角方形按钮切换公开资料、账户信息和账户安全，并在下方展开独立详情 Card。
 - 登录与注册使用 `/auth/login`、`/auth/register` 独立页面，顶部栏、首页与鉴权拦截直接指向对应路由。认证表单 Card 使用 `max-w-xl` 预留横向扩展空间；鉴权中间件携带安全的站内 `redirect`，登录成功后返回原目标。
 - 除首页 `/` 外，浅色与深色模式页面分别使用本地 `assets/images/backgrounds/light-pages-wallpaper.jpg` 和 `dark-pages-wallpaper.jpg` 固定壁纸；两者均以 35% 图像强度叠在各自 background token 上，只影响布局背景。页面内容与卡片不继承壁纸透明度，壁纸必须与普通页面 Card 保持在同一可采样合成上下文中。

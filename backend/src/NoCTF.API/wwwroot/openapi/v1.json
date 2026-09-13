@@ -13575,6 +13575,9 @@
           },
           "runtimeRequired": {
             "type": "boolean"
+          },
+          "evaluationRequired": {
+            "type": "boolean"
           }
         }
       },
@@ -18119,6 +18122,9 @@
           "runtimeEnabled": {
             "type": "boolean"
           },
+          "evaluationEnabled": {
+            "type": "boolean"
+          },
           "provider": {
             "$ref": "#/components/schemas/NoCTFAPIEndpointsPlatformHumanVerificationProviderProtocol"
           },
@@ -19314,6 +19320,7 @@
         "required": [
           "enabled",
           "runtimeEnabled",
+          "evaluationEnabled",
           "provider",
           "capServerUrl",
           "capSiteKey",
@@ -19325,6 +19332,9 @@
             "type": "boolean"
           },
           "runtimeEnabled": {
+            "type": "boolean"
+          },
+          "evaluationEnabled": {
             "type": "boolean"
           },
           "provider": {

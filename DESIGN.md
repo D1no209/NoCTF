@@ -71,6 +71,8 @@ Dialog、可滚动 Dialog 和 AlertDialog 都以 Card 原语作为实际 Reka �
 - Alert 跟随所属界面的显示和生命周期。表单错误保留到修正或关闭；重新提交会重新提示。字段保留错误标记、辅助技术错误文本和定位入口。
 - 点击通知中的操作不会意外关闭原有对话框；全屏页面内的通知跟随全屏容器。
 - 提示窗保持不透明，确认型对话框保留独立确认流程。
+- 提示窗高度随当前内容重新测量并平滑调整，只有达到视口安全上限后才由内部 ScrollSurface 滚动；同一 Alert 的标题、说明或操作变化不得沿用旧高度。
+- API 校验错误优先展示字段级原因并合并去重；带稳定业务 code 的 400 响应保留具体原因，空 400 响应使用当前操作的上下文提示，不再统一退化为“请求参数有误”。
 
 ## 滚动
 
@@ -94,6 +96,8 @@ Dialog、可滚动 Dialog 和 AlertDialog 都以 Card 原语作为实际 Reka �
 `audit:architecture` 对原生表单/选择类型、title 提示、原生对话框、私有滚动区域与原始颜色进行检查，且已接入构建。交互通过行为测试、类型检查和浏览器验证补充，静态扫描不能代替实际使用验证。
 
 题解审核工作区左侧使用共享 ChoiceSidebar / WaveSelectionList 展示队伍，右侧使用并列的 PDF 预览 Card 与裁定 Card。PdfPreview 原语使用按需加载的 PDF.js Worker 将受保护 PDF 渲染到 Canvas，并通过共享 Button、ScrollSurface、Skeleton、Spinner 与 Empty 提供分页、缩放、适应宽度及反馈；不得回退到浏览器 iframe / object / embed PDF 查看器。业务 feature 只负责取得一次性预览 URL 和当前队伍，解析与渲染生命周期留在原语内部。
+
+平台人机验证总开关下分别维护 Runtime 操作和 Flag Evaluation 两个独立策略。Evaluation 开关关闭时，普通 Flag 提交与 AWDP 只读 Break 判定都不弹出验证；客户端按公共 capability 跳过弹层，服务端中间件以同一持久化配置作为最终判定。新增开关默认开启以延续已有部署行为。
 
 开发环境的 `/__ui-check` 提供交互预览；发布构建通过 pages hook 排除此路由，不包含预览逻辑。
 

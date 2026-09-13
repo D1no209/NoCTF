@@ -122,6 +122,7 @@ export function useHumanVerification() {
       return null
     }
     if (action === 'runtime' && provider.runtimeRequired === false) return {}
+    if (action === 'evaluation' && provider.evaluationRequired === false) return {}
     if (provider.provider === 'None') return {}
     if (requestCoordinator.active || challenge.value) {
       toast.info(translate('ui.anotherHumanVerificationIsInProgress'))

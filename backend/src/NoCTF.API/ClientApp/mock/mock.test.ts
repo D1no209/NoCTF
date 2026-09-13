@@ -319,16 +319,16 @@ describe('isolated Mock API', () => {
     const publicConfiguration = await (await send('/api/v1/platform/configuration')).json()
     expect(publicConfiguration.name).toBe('Mock edited')
     expect(publicConfiguration.imageUploadLimits).toEqual({ maximumAvatarBytes: 12 * 1024 * 1024, maximumWallpaperBytes: 16 * 1024 * 1024 })
-    expect(publicConfiguration.humanVerification).toEqual({ provider: 'None', siteKey: null, apiEndpoint: null, runtimeRequired: false })
+    expect(publicConfiguration.humanVerification).toEqual({ provider: 'None', siteKey: null, apiEndpoint: null, runtimeRequired: false, evaluationRequired: false })
     const secret = await send('/api/v1/admin/platform/human-verification/secret', 'PUT', { provider: 'Cap', secret: 'mock-secret' })
     expect(secret.status).toBe(200)
     const enabled = await send('/api/v1/admin/platform/configuration', 'PATCH', { humanVerification: {
-      enabled: true, runtimeEnabled: false, provider: 'Cap', capServerUrl: 'https://captcha.mock.invalid', capSiteKey: 'mock-site-key',
+      enabled: true, runtimeEnabled: false, evaluationEnabled: false, provider: 'Cap', capServerUrl: 'https://captcha.mock.invalid', capSiteKey: 'mock-site-key',
       turnstileSiteKey: '', turnstileAllowedHostnames: [],
     } })
-    expect((await enabled.json()).humanVerification).toMatchObject({ enabled: true, runtimeEnabled: false, provider: 'Cap', ready: true, capSecretConfigured: true })
+    expect((await enabled.json()).humanVerification).toMatchObject({ enabled: true, runtimeEnabled: false, evaluationEnabled: false, provider: 'Cap', ready: true, capSecretConfigured: true })
     expect((await (await send('/api/v1/platform/configuration')).json()).humanVerification)
-      .toEqual({ provider: 'Cap', siteKey: 'mock-site-key', apiEndpoint: 'https://captcha.mock.invalid/mock-site-key/', runtimeRequired: false })
+      .toEqual({ provider: 'Cap', siteKey: 'mock-site-key', apiEndpoint: 'https://captcha.mock.invalid/mock-site-key/', runtimeRequired: false, evaluationRequired: false })
     const fresh = await setup()
     expect((await (await fresh.send('/api/v1/platform/configuration')).json()).name).toBe('NoCTF · MOCK')
   })

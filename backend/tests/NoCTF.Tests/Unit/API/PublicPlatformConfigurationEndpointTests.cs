@@ -19,14 +19,17 @@ namespace NoCTF.Tests.Unit.API;
 public sealed class PublicPlatformConfigurationEndpointTests
 {
     [Test]
-    [Arguments(true, true, HumanVerificationProviderProtocol.Cap, true)]
-    [Arguments(true, false, HumanVerificationProviderProtocol.Cap, false)]
-    [Arguments(false, true, HumanVerificationProviderProtocol.None, false)]
+    [Arguments(true, true, true, HumanVerificationProviderProtocol.Cap, true, true)]
+    [Arguments(true, false, true, HumanVerificationProviderProtocol.Cap, false, true)]
+    [Arguments(true, true, false, HumanVerificationProviderProtocol.Cap, true, false)]
+    [Arguments(false, true, true, HumanVerificationProviderProtocol.None, false, false)]
     public async Task Public_configuration_exposes_only_enabled_client_capabilities_without_provider_secrets(
         bool humanVerificationEnabled,
         bool runtimeEnabled,
+        bool evaluationEnabled,
         HumanVerificationProviderProtocol expectedProvider,
-        bool expectedRuntimeRequired)
+        bool expectedRuntimeRequired,
+        bool expectedEvaluationRequired)
     {
         var now = DateTimeOffset.UtcNow;
         var settings = Substitute.For<IPlatformConfigurationStore>();
@@ -46,7 +49,8 @@ public sealed class PublicPlatformConfigurationEndpointTests
                 false,
                 [],
                 now,
-                runtimeEnabled));
+                runtimeEnabled,
+                evaluationEnabled));
         var objects = Substitute.For<IStore>();
         var builder = WebApplication.CreateBuilder();
         builder.WebHost.UseTestServer();
@@ -88,6 +92,8 @@ public sealed class PublicPlatformConfigurationEndpointTests
                 : null);
         await Assert.That(payload.HumanVerification.RuntimeRequired)
             .IsEqualTo(expectedRuntimeRequired);
+        await Assert.That(payload.HumanVerification.EvaluationRequired)
+            .IsEqualTo(expectedEvaluationRequired);
         await Assert.That(content).DoesNotContain("maximumLogoBytes");
         await Assert.That(content).DoesNotContain("maximumPosterBytes");
         await Assert.That(content).DoesNotContain("maximumAttachmentBytes");

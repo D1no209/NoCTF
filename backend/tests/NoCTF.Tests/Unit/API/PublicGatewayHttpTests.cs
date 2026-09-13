@@ -102,6 +102,7 @@ public sealed class PublicGatewayHttpTests
                 {
                     enabled = true,
                     runtimeEnabled = true,
+                    evaluationEnabled = true,
                     provider = "Cap",
                     capServerUrl = "https://cap.example.test",
                     capSiteKey = "site-key",
