@@ -48,6 +48,10 @@ internal static class CtfLeaderboardProjection
             .ToHashSet();
         var challenges = (input.Challenges ?? []).Where(challenge => !challenge.IsDeleted).ToDictionary(challenge => challenge.Id);
         var defaults = ParseCompetition(input.CompetitionConfigurationJson);
+        var challengeConfigurations = challenges.ToDictionary(
+            pair => pair.Key,
+            pair => ParseChallenge(pair.Value.ConfigurationJson));
+        var defaultChallengeConfiguration = ParseChallenge(null);
         var solves = input.GameplayFacts
             .Where(fact => fact.TeamId is Guid teamId && activeTeams.ContainsKey(teamId)
                           && fact.Kind == GameplayFactKind.FlagAttempt
@@ -69,7 +73,7 @@ internal static class CtfLeaderboardProjection
             pair => pair.Key,
             pair =>
             {
-                var configuration = ParseChallenge(pair.Value.ConfigurationJson);
+                var configuration = challengeConfigurations[pair.Key];
                 var curve = configuration.ScoreCurve ?? defaults.DefaultScoreCurve;
                 var solveCount = Math.Max(1, currentSolveCounts.GetValueOrDefault(pair.Key));
                 return ScoreCurve.Evaluate(curve, solveCount, dynamicTeams.Count);
@@ -80,9 +84,8 @@ internal static class CtfLeaderboardProjection
         foreach (var solve in solves)
         {
             var challengeId = solve.CompetitionChallengeId!.Value;
-            var configuration = ParseChallenge(challenges.TryGetValue(challengeId, out var challenge)
-                ? challenge.ConfigurationJson
-                : null);
+            var configuration = challengeConfigurations.GetValueOrDefault(challengeId)
+                ?? defaultChallengeConfiguration;
             var curve = configuration.ScoreCurve ?? defaults.DefaultScoreCurve;
             if (!validTeams.TryGetValue(solve.TeamId!.Value, out var team))
                 continue;
@@ -120,7 +123,7 @@ internal static class CtfLeaderboardProjection
                 fact.GameplayFactId,
                 fact.Multiplicity,
                 Penalty: (fact.CompetitionChallengeId is Guid challengeId
-                        ? ParseChallenge(challenges.GetValueOrDefault(challengeId)?.ConfigurationJson)
+                        ? challengeConfigurations.GetValueOrDefault(challengeId)
                         : null)
                     ?.WrongSubmissionPenalty ?? defaults.WrongSubmissionPenalty))
             .ToList();
@@ -250,6 +253,9 @@ internal static class AwdLeaderboardProjection
             .ToDictionary(team => team.Id);
         if (input.AwdAggregates is not null)
             return ProjectAggregates(input, challenges, teams);
+        var settingsByChallenge = challenges.ToDictionary(
+            pair => pair.Key,
+            pair => Effective(configuration, pair.Value.ConfigurationJson));
         var values = teams.Keys.ToDictionary(team => team, _ => 0L);
         var cellScores = new Dictionary<(Guid TeamId, Guid ChallengeId), long>();
         var cellSolves = new Dictionary<(Guid TeamId, Guid ChallengeId), (DateTimeOffset At, string? SolverName)>();
@@ -302,7 +308,7 @@ internal static class AwdLeaderboardProjection
             VictimId = fact.VictimTeamId!.Value
         }))
         {
-            var settings = Effective(configuration, challenges.GetValueOrDefault(pool.Key.ChallengeId)?.ConfigurationJson);
+            var settings = settingsByChallenge[pool.Key.ChallengeId];
             var attackers = pool.Select(fact => fact.TeamId!.Value).Distinct().ToList();
             var reward = settings.AttackRewardMode == AttackRewardMode.FixedPerAttack
                 ? settings.AttackPoints
@@ -333,7 +339,8 @@ internal static class AwdLeaderboardProjection
             })
             .OrderBy(fact => fact.OccurredAt)
             .ThenBy(fact => fact.GameplayFactId)
-            .ToList();
+            .GroupBy(fact => (fact.TeamId!.Value, fact.CompetitionChallengeId!.Value))
+            .ToDictionary(group => group.Key, group => group.ToArray());
         var projectedAt = input.ProjectedAt
             ?? throw new InvalidOperationException("Leaderboard projection time is required.");
         foreach (var round in (input.AwdRounds ?? [])
@@ -349,14 +356,12 @@ internal static class AwdLeaderboardProjection
                      })
                      .Select(group => group.First()))
         {
-            var latestState = serviceStates
-                .Where(fact => fact.TeamId == round.TeamId
-                    && fact.CompetitionChallengeId == round.CompetitionChallengeId
-                    && fact.OccurredAt < round.EndsAt)
-                .LastOrDefault();
-            var settings = Effective(
-                configuration,
-                challenges[round.CompetitionChallengeId].ConfigurationJson);
+            var latestState = serviceStates.TryGetValue(
+                (round.TeamId, round.CompetitionChallengeId),
+                out var transitions)
+                ? LatestBefore(transitions, round.EndsAt)
+                : null;
+            var settings = settingsByChallenge[round.CompetitionChallengeId];
             if (latestState?.Result == GameplayFactResult.ServiceDown)
             {
                 values[round.TeamId] = checked(
@@ -375,10 +380,16 @@ internal static class AwdLeaderboardProjection
             values[hint.Key] = checked(values[hint.Key] - hint.Value);
         foreach (var adjustment in ProjectionPenalties.ManualAdjustments(input, teams.Keys))
             values[adjustment.Key] = checked(values[adjustment.Key] + adjustment.Value);
+        var attackStatistics = attacks
+            .GroupBy(attack => attack.TeamId!.Value)
+            .ToDictionary(
+                group => group.Key,
+                group => (Count: group.Count(), LastAt: group.Max(attack => attack.OccurredAt)));
         var rows = teams.Values.Select(team =>
         {
-            var attackCount = attacks.Count(attack => attack.TeamId == team.Id);
-            var lastAttackAt = LastAttackAt(attacks, team.Id);
+            var statistics = attackStatistics.GetValueOrDefault(team.Id);
+            var attackCount = statistics.Count;
+            DateTimeOffset? lastAttackAt = statistics.LastAt == default ? null : statistics.LastAt;
             return new AwdRankedEntry(
                 new LeaderboardEntry(
                     0,
@@ -516,15 +527,21 @@ internal static class AwdLeaderboardProjection
         return (entries, cells);
     }
 
-    private static DateTimeOffset? LastAttackAt(
-        IReadOnlyList<LeaderboardGameplayFact> attacks,
-        Guid teamId)
+    private static LeaderboardGameplayFact? LatestBefore(
+        IReadOnlyList<LeaderboardGameplayFact> transitions,
+        DateTimeOffset cutoff)
     {
-        var last = attacks.Where(attack => attack.TeamId == teamId)
-            .Select(attack => attack.OccurredAt)
-            .OrderByDescending(value => value)
-            .FirstOrDefault();
-        return last == default ? null : last;
+        var low = 0;
+        var high = transitions.Count;
+        while (low < high)
+        {
+            var middle = low + (high - low) / 2;
+            if (transitions[middle].OccurredAt < cutoff)
+                low = middle + 1;
+            else
+                high = middle;
+        }
+        return low == 0 ? null : transitions[low - 1];
     }
 
     private static AwdConfiguration? TryParse(string? json)
@@ -644,9 +661,12 @@ internal static class KohLeaderboardProjection
         }
         var hintCosts = ProjectionPenalties.HintCosts(input, teams.Keys);
         var manualAdjustments = ProjectionPenalties.ManualAdjustments(input, teams.Keys);
+        var observationsByTeam = observations
+            .GroupBy(fact => fact.TeamId!.Value)
+            .ToDictionary(group => group.Key, group => group.ToList());
         var rows = teams.Values.Select(team =>
         {
-            var own = observations.Where(fact => fact.TeamId == team.Id).ToList();
+            var own = observationsByTeam.GetValueOrDefault(team.Id) ?? [];
             var first = own.Select(fact => fact.OccurredAt).FirstOrDefault();
             var last = own.Select(fact => fact.OccurredAt).LastOrDefault();
             var observationPoints = own.Aggregate(

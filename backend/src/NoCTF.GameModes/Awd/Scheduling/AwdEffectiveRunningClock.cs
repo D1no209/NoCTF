@@ -5,13 +5,33 @@ namespace NoCTF.GameModes.Awd.Scheduling;
 /// <summary>Reconstructs the pause-aware competition clock from immutable lifecycle facts.</summary>
 public static class AwdEffectiveRunningClock
 {
+    internal static AwdEffectiveRunningTimeline CreateTimeline(
+        IEnumerable<CompetitionLifecycleTransition> audits) => new(audits);
+
     /// <summary>Maps an effective boundary to wall time, clamping at a closed final segment.</summary>
     public static DateTimeOffset ToWallTime(
         IEnumerable<CompetitionLifecycleTransition> audits,
         DateTimeOffset start,
-        TimeSpan target)
+        TimeSpan target) => CreateTimeline(audits).ToWallTime(start, target);
+
+    public static TimeSpan Calculate(
+        IEnumerable<CompetitionLifecycleTransition> audits,
+        DateTimeOffset at) => CreateTimeline(audits).Calculate(at);
+}
+
+internal sealed class AwdEffectiveRunningTimeline
+{
+    private readonly CompetitionLifecycleTransition[] transitions;
+
+    public AwdEffectiveRunningTimeline(IEnumerable<CompetitionLifecycleTransition> audits)
     {
-        var transitions = audits.OrderBy(item => item.OccurredAt).ThenBy(item => item.Id).ToArray();
+        transitions = audits.OrderBy(item => item.OccurredAt).ThenBy(item => item.Id).ToArray();
+    }
+
+    public bool HasTransitions => transitions.Length > 0;
+
+    public DateTimeOffset ToWallTime(DateTimeOffset start, TimeSpan target)
+    {
         if (transitions.Length == 0)
             return start + target;
         var accumulated = TimeSpan.Zero;
@@ -37,17 +57,14 @@ public static class AwdEffectiveRunningClock
             : transitions[^1].OccurredAt;
     }
 
-    public static TimeSpan Calculate(
-        IEnumerable<CompetitionLifecycleTransition> audits,
-        DateTimeOffset at)
+    public TimeSpan Calculate(DateTimeOffset at)
     {
         var total = TimeSpan.Zero;
         DateTimeOffset? runningSince = null;
-        foreach (var audit in audits
-                     .Where(audit => audit.OccurredAt <= at)
-                     .OrderBy(audit => audit.OccurredAt)
-                     .ThenBy(audit => audit.Id))
+        foreach (var audit in transitions)
         {
+            if (audit.OccurredAt > at)
+                break;
             if (audit.To == CompetitionStatus.Running && runningSince is null)
             {
                 runningSince = audit.OccurredAt;
