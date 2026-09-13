@@ -58,6 +58,8 @@ export function auditVueSource(file: string, source: string): ArchitectureIssue[
             const classes = node.props.find((prop: any) => prop.type === 6 && prop.name === 'class')?.value?.content ?? ''
             if (/overflow-(?:x-|y-)?(?:auto|scroll)/.test(classes) && node.tag !== 'ScrollSurface' && !marker)
               report('scroll-boundary', 'Declare a shared scroll surface for constrained overflow')
+            if (['article', 'aside', 'div', 'section'].includes(node.tag) && /\bshadow-inner\b/.test(classes) && /\bbg-/.test(classes))
+              report('surface-boundary', 'Compose panel surfaces with the shared Card primitive')
           }
           for (const prop of node.props) {
             if (isView && prop.type === 7 && prop.name === 'html')

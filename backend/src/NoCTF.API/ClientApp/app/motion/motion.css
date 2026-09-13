@@ -61,7 +61,6 @@ html[data-theme-transition='down']::view-transition-old(noctf-page-foreground),
 html[data-wallpaper-transition='down']::view-transition-old(noctf-page-wallpaper) { z-index: 1; }
 html[data-theme-transition='down']::view-transition-new(root),
 html[data-theme-transition='down']::view-transition-new(noctf-page-wallpaper),
-html[data-theme-transition='down']::view-transition-new(noctf-page-foreground),
 html[data-wallpaper-transition='down']::view-transition-new(noctf-page-wallpaper) {
   z-index: 2;
   -webkit-mask-image: linear-gradient(
@@ -87,9 +86,25 @@ html[data-wallpaper-transition='down']::view-transition-new(noctf-page-wallpaper
   will-change: -webkit-mask-size, mask-size;
   animation: noctf-theme-cover-down 520ms cubic-bezier(0.4, 0, 0.2, 1) both;
 }
+html[data-theme-transition='down'],
+html[data-theme-transition='down'] *,
+html[data-theme-transition='down'] *::before,
+html[data-theme-transition='down'] *::after {
+  transition: none !important;
+}
+html[data-theme-transition='down']::view-transition-new(noctf-page-foreground) {
+  z-index: 2;
+  clip-path: inset(0 0 100% 0);
+  will-change: clip-path;
+  animation: noctf-theme-foreground-cover-down 520ms cubic-bezier(0.4, 0, 0.2, 1) both;
+}
 @keyframes noctf-theme-cover-down {
   from { -webkit-mask-size: 100% 0%; mask-size: 100% 0%; }
   to { -webkit-mask-size: 100% calc(100% + 5rem); mask-size: 100% calc(100% + 5rem); }
+}
+@keyframes noctf-theme-foreground-cover-down {
+  from { clip-path: inset(0 0 100% 0); }
+  to { clip-path: inset(0); }
 }
 @keyframes noctf-status-mark-enter {
   from { opacity: 0; transform: scale(0.62) rotate(-18deg); }
