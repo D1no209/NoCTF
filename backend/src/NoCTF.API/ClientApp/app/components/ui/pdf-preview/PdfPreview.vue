@@ -10,7 +10,12 @@ defineProps<{
 </script>
 
 <template>
-  <div class="flex h-full min-w-0 flex-col overflow-hidden rounded-xl bg-muted/45 shadow-inner" :class="fill ? 'min-h-0' : 'min-h-[32rem]'">
+  <div
+    data-slot="pdf-preview"
+    :aria-busy="loading || undefined"
+    class="flex h-full min-w-0 flex-col overflow-hidden rounded-xl bg-muted/45 shadow-inner"
+    :class="fill ? 'min-h-0' : 'min-h-[32rem]'"
+  >
     <Skeleton v-if="loading" class="h-full w-full" :class="fill ? 'min-h-0' : 'min-h-[32rem]'" />
     <Alert v-else-if="error" variant="destructive" class="m-4">
       <AlertDescription>{{ $message(error) }}</AlertDescription>

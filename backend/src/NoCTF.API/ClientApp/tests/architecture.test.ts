@@ -20,6 +20,9 @@ describe('frontend architecture', () => {
 
     expect(card).not.toContain('ring-1')
     expect(cardSurface).toContain('border: 0')
+    expect(cardSurface).toContain('background: color-mix(in oklch, var(--card) var(--card-opacity), transparent)')
+    expect(cardSurface).toContain('backdrop-filter: blur(var(--card-blur))')
+    expect(css).toContain('--card-blur: 12px')
     expect(css).toContain("outline: none; box-shadow: 0 0 14px color-mix(in oklch, var(--ring) 28%, transparent)")
   })
 
@@ -30,9 +33,10 @@ describe('frontend architecture', () => {
   })
 
   test('rejects feature hooks, API imports, private controls and template processing in views', () => {
-    const issues = auditVueSource('components/views/Example.vue', `<script setup lang="ts">import { fetchData } from '~/api'; const load = () => fetchData()</script><template><button @click="open = true" /></template>`)
+    const issues = auditVueSource('components/views/Example.vue', `<script setup lang="ts">import { fetchData } from '~/api'; const load = () => fetchData()</script><template><button @click="open = true" /><section class="rounded-xl bg-muted/35 shadow-inner" /></template>`)
     expect(issues.some(issue => issue.rule === 'render-only')).toBe(true)
     expect(issues.some(issue => issue.rule === 'primitive-boundary')).toBe(true)
+    expect(issues.some(issue => issue.rule === 'surface-boundary')).toBe(true)
   })
 
   test('rejects compound assignments and inline event functions in views', () => {

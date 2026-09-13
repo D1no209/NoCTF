@@ -5,7 +5,7 @@ const reveal = await Bun.file(new URL('../app/motion/reveal-transition.ts', impo
 const toggle = await Bun.file(new URL('../app/components/views/ThemeToggleView.vue', import.meta.url)).text()
 const motion = await Bun.file(new URL('../app/motion/motion.css', import.meta.url)).text()
 
-test('theme changes reveal from top to bottom through a feathered boundary', () => {
+test('theme changes reveal from top to bottom without blending component colors', () => {
   expect(theme).toContain("runDownRevealTransition('theme'")
   expect(reveal).toContain('startViewTransition')
   expect(reveal).toContain("layer === 'theme' ? 'themeTransition' : 'wallpaperTransition'")
@@ -15,6 +15,13 @@ test('theme changes reveal from top to bottom through a feathered boundary', () 
   expect(motion).toContain("html[data-theme-transition='down']::view-transition-new(root)")
   expect(motion).toContain("html[data-wallpaper-transition='down']::view-transition-new(noctf-page-wallpaper)")
   expect(motion).toContain('animation: noctf-theme-cover-down 520ms')
+  expect(motion).toContain("html[data-theme-transition='down'] *")
+  expect(motion).toContain("html[data-theme-transition='down'] *::before")
+  expect(motion).toContain('transition: none !important')
+  expect(motion).toContain("html[data-theme-transition='down']::view-transition-new(noctf-page-foreground)")
+  expect(motion).toContain('animation: noctf-theme-foreground-cover-down 520ms')
+  expect(motion).toContain('clip-path: inset(0 0 100% 0)')
+  expect(motion).toContain('to { clip-path: inset(0); }')
   expect(motion).toContain('#000 calc(100% - 5rem)')
   expect(motion).toContain('rgb(0 0 0 / 0.72) calc(100% - 3rem)')
   expect(motion).toContain('mask-size: 100% 0%')
