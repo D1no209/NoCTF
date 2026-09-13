@@ -3,7 +3,7 @@ import { toRefs } from 'vue'
 import type { CompetitionsByIdWriteUpsPageViewState } from '~/features/routes/competitions/[id]/useCompetitionsByIdWriteUpsPage'
 
 const viewProps = defineProps<{ state: CompetitionsByIdWriteUpsPageViewState }>()
-const { ArrowLeft, Download, FileSearch, MessageCircleQuestion, MinusCircle, RefreshCw, Scale, competitionId, review, loading, loadError, selectedTeamId, selected, canJudge, previewUrl, previewLoading, previewError, downloadPending, load, selectTeam, download, selectedChallengeId, adjustmentDelta, adjustmentPending, adjustmentError, submitAdjustment, clearAdjustmentError, selectChallenge, deduction, openDeduction, setDeductionOpen, confirmDeduction, consultationOpen, consultationChallengeId, consultationTitle, consultationBody, consultationPending, consultationError, openConsultation, submitConsultation, setConsultationOpen, clearConsultationError } = toRefs(viewProps.state)
+const { ArrowLeft, Download, FileSearch, MessageCircleQuestion, MinusCircle, RefreshCw, Scale, competitionId, review, loading, loadError, selectedTeamId, selected, canJudge, previewUrl, previewLoading, previewError, downloadPending, load, selectTeam, download, selectedChallengeId, adjustmentDelta, adjustmentPending, adjustmentRefreshing, adjustmentBusy, adjustmentError, submitAdjustment, clearAdjustmentError, selectChallenge, deduction, openDeduction, setDeductionOpen, confirmDeduction, consultationOpen, consultationChallengeId, consultationTitle, consultationBody, consultationPending, consultationError, openConsultation, submitConsultation, setConsultationOpen, clearConsultationError } = toRefs(viewProps.state)
 </script>
 
 <template>
@@ -99,6 +99,9 @@ const { ArrowLeft, Download, FileSearch, MessageCircleQuestion, MinusCircle, Ref
             <div class="mb-3 flex items-start justify-between gap-3">
               <h2 class="flex items-center gap-2 text-sm font-semibold">
                 <Scale class="size-4 text-primary" />{{ $t('writeUp.scoring') }}
+                <Badge v-if="adjustmentRefreshing" variant="secondary" class="gap-1.5">
+                  <Spinner class="size-3" />{{ $t('writeUp.adjustmentRefreshing') }}
+                </Badge>
               </h2>
               <dl v-if="selected" class="grid grid-cols-2 gap-x-4 text-right">
                 <div>
@@ -132,7 +135,7 @@ const { ArrowLeft, Download, FileSearch, MessageCircleQuestion, MinusCircle, Ref
                     v-if="canJudge"
                     variant="ghost"
                     size="icon-sm"
-                    :disabled="(score.netPoints ?? 0) <= 0 || adjustmentPending"
+                    :disabled="(score.netPoints ?? 0) <= 0 || adjustmentBusy"
                     :aria-label="$t('writeUp.deductChallengeScore', { challenge: score.title ?? '' })"
                     @click="openDeduction(score)"
                   >
@@ -167,7 +170,7 @@ const { ArrowLeft, Download, FileSearch, MessageCircleQuestion, MinusCircle, Ref
                   <FieldError v-if="adjustmentError">{{ $message(adjustmentError) }}</FieldError>
                 </Field>
                 <div class="flex flex-wrap gap-2">
-                  <Button type="submit" :disabled="!selectedChallengeId || adjustmentDelta === 0 || adjustmentPending">
+                  <Button type="submit" :disabled="!selectedChallengeId || adjustmentDelta === 0 || adjustmentBusy">
                     <Spinner v-if="adjustmentPending" data-icon="inline-start" />{{ $t('writeUp.applyAdjustment') }}
                   </Button>
                   <Button type="button" variant="outline" @click="openConsultation">

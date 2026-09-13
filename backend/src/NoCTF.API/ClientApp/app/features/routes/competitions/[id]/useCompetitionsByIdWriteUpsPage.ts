@@ -131,7 +131,7 @@ export function useCompetitionsByIdWriteUpsPage() {
   }
 
   const {
-    polling: adjustmentProjectionPending,
+    polling: adjustmentRefreshing,
     timedOut: adjustmentRefreshTimedOut,
     start: startAdjustmentRefresh,
   } = usePolling(observeAdjustment, {
@@ -139,8 +139,9 @@ export function useCompetitionsByIdWriteUpsPage() {
     maxInterval: 2_000,
     timeout: 30_000,
   })
-  const adjustmentPending = computed(() =>
-    adjustmentRequestPending.value || adjustmentProjectionPending.value,
+  const adjustmentPending = adjustmentRequestPending
+  const adjustmentBusy = computed(() =>
+    adjustmentPending.value || adjustmentRefreshing.value,
   )
 
   watch(adjustmentRefreshTimedOut, timedOut => {
@@ -162,7 +163,7 @@ export function useCompetitionsByIdWriteUpsPage() {
   async function adjustScore(delta: number): Promise<boolean> {
     const writeUp = selected.value?.writeUp
     if (!canJudge.value || !writeUp?.teamId || !selectedChallengeId.value
-      || delta === 0 || adjustmentPending.value)
+      || delta === 0 || adjustmentBusy.value)
       return false
     if (!Number.isInteger(delta) || delta < -2147483648 || delta > 2147483647) {
       adjustmentError.value = translate('writeUp.invalidAdjustment')
@@ -346,6 +347,8 @@ export function useCompetitionsByIdWriteUpsPage() {
     selectedChallengeId,
     adjustmentDelta,
     adjustmentPending,
+    adjustmentRefreshing,
+    adjustmentBusy,
     adjustmentError,
     submitAdjustment,
     clearAdjustmentError,
