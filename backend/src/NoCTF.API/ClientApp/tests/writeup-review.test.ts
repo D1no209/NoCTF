@@ -21,7 +21,7 @@ test('participant WriteUp flow uses generated PDF upload preview and download op
   expect(navigation).toContain('/my/writeup')
 })
 
-test('staff review combines Edge-compatible PDF preview with authoritative challenge score actions', async () => {
+test('staff review combines the shared sidebar and built-in PDF renderer with authoritative score actions', async () => {
   const controller = await sourceFile(
     '../app/features/routes/competitions/[id]/useCompetitionsByIdWriteUpsPage.ts',
   ).text()
@@ -48,6 +48,7 @@ test('staff review combines Edge-compatible PDF preview with authoritative chall
   expect(controller).toContain('const adjustmentPending = adjustmentRequestPending')
   expect(controller).toContain('await refreshLatest()')
   expect(controller).toContain('expectedNetPoints: score.netPoints + delta')
+  expect(controller).toContain('const teamOptions = computed')
   expect(view).toContain('selected.challengeScores')
   expect(view).toContain('openDeduction(score)')
   expect(view).not.toMatch(/<AlertDialogAction[\s\S]*?confirmDeduction/)
@@ -57,7 +58,9 @@ test('staff review combines Edge-compatible PDF preview with authoritative chall
   expect(view).toContain('v-if="loadError && !review"')
   expect(view).toContain('v-else-if="review"')
   expect(view).toContain('data-writeup-review-workspace')
-  expect(view).toContain('slot-name="writeup-team-list-card"')
+  expect(view).toContain('<ChoiceSidebar')
+  expect(view).toContain(':items="teamOptions"')
+  expect(view).toContain('@update:model-value="selectTeam"')
   expect(view).toContain('slot-name="writeup-pdf-preview-card"')
   expect(view).toContain('slot-name="writeup-scoring-card"')
   expect(view).toMatch(/<PdfPreview\s+fill/)
@@ -73,12 +76,19 @@ test('staff review combines Edge-compatible PDF preview with authoritative chall
   expect(view).not.toContain('h-[calc(100svh-9rem)]')
   expect(view).not.toContain('min-h-[42rem]')
   expect(controller).not.toContain('CompetitionParticipantWorkspace')
-  expect(preview).not.toContain('sandbox')
-  expect(preview).toContain('referrerpolicy="no-referrer"')
-  expect(preview).toContain(':title="accessibleLabel"')
+  expect(preview).not.toContain('<iframe')
+  expect(preview).toContain("import('pdfjs-dist')")
+  expect(preview).toContain("pdf.worker.min.mjs?url")
+  expect(preview).toContain('GlobalWorkerOptions.workerSrc')
+  expect(preview).toContain('library.getDocument')
+  expect(preview).toContain('page.render')
+  expect(preview).toContain('<canvas ref="canvas"')
+  expect(preview).toContain('<ScrollSurface axis="both"')
+  expect(preview).toContain('renderTask?.cancel()')
+  expect(preview).toContain('await task.destroy()')
   expect(preview).toContain("fill ? 'min-h-0' : 'min-h-[32rem]'")
   expect(preview).toContain('data-slot="pdf-preview"')
-  expect(preview).toContain(':aria-busy="loading || undefined"')
+  expect(preview).toContain(':aria-busy="busy || undefined"')
 })
 
 test('WriteUp reviewers can start a team consultation and continue in the existing workspace', async () => {

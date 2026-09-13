@@ -33,6 +33,7 @@ Nuxt 4 SPA(`ssr: false`),Bun 管理依赖,TypeScript strict,Vue 用 `<script set
 - 普通文本、密码、数值、多行与组合输入框使用 80% 背景不透明度，通过 field-surface token 在亮暗主题下与卡片区分，Flag 伪终端保持透明。选择与上传控件同主卡片使用 45% 背景不透明度；文字和图标不降低透明度。菜单和弹层保持不透明，按钮样式按 variant 全站统一，卡片不覆盖按钮颜色和透明度；主按钮使用主题色与柔光，禁用时关闭光晕。颜色、阴影、滚动条皮肤集中在 `main.css`；Canvas/WebGL 色值通过 `themeColor` 获取。禁止业务组件重新定义原始颜色或私有阴影。
 - 错误提醒、校验摘要和操作通知统一使用右下角小型弹窗，从右向左滑入，字体为 14px 微软雅黑、700 字重，并复用 SVG 状态装饰。`Alert` 是受所属组件生命周期控制的浮动通知；`toast.*` 使用同一 Sonner 队列。辅助说明用 FieldDescription，确认流程继续用 Dialog/AlertDialog。
 - Dialog、DialogScrollContent 与 AlertDialog 的可见表面必须由共享 Card 原语渲染，统一继承卡片透明度、模糊、圆角、阴影和装饰；业务弹窗不得再自行实现一层原生卡片，也不得在 Card 弹窗内嵌套另一张 Card。
+- WriteUp 审核页的队伍导航使用 ChoiceSidebar / WaveSelectionList，选择和路由同步留在 feature。PDF 在线预览统一使用 PdfPreview 内的 PDF.js Worker + Canvas，以及共享 Button、ScrollSurface、Skeleton、Spinner、Empty；禁止业务 View 或 PdfPreview 使用 iframe、object、embed 及浏览器原生 PDF 查看器。
 - 开发环境的 `/__ui-check` 用于交互预览，不调用业务写接口；生产构建必须通过 `pages:extend` 排除此路由。不得将验证用临时文件作为应用依赖。
 - 新增动效、View Transition 选择器和命名合成层声明放在独立的 `app/motion/` 库中，由 UI 原语调用预设；组件不内置动画定义，不引入业务状态，必须支持减少动态效果模式。`view-transition-name` 只能在实际过渡 dataset 存在时临时生效，禁止永久施加到 DefaultLayout 前景或壁纸，避免切断 Card 对背景的 `backdrop-filter` 采样。列表键盘交互留在通用原语，竞赛选择与 URL 同步留在功能层。
 - 普通路由使用 Nuxt 全局 `noctf-page-slide`，只横向移动 DefaultLayout 的 main 页面内容；顶部栏和布局壁纸不得进入页面过渡。主内容通过 `data-slot="page-transition-viewport"` 裁切横向溢出。竞赛页和消息中心的 ChoiceSidebar 必须在页面网格内稳定占位并与右侧 Card 同步横移，不得在带 transform 的页面根节点下使用 fixed 定位。减少动态效果模式取消位移。

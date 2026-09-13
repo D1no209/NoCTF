@@ -2957,6 +2957,16 @@ export const chineseMessages = {
   "competitionAccess.description": "仅平台管理员和赛事所有者、经理、裁判、观察员可见。切换不会删除队伍、成绩或停止 Runtime。",
   "competitionAccess.badge": "隐藏",
   "competitionAccess.changed": "比赛访问范围已变更"
+  ,"pdfPreview.loadFailed": "PDF 渲染失败"
+  ,"pdfPreview.loadFailedDescription": "无法在内置预览器中解析此文件，请下载后检查原文件。"
+  ,"pdfPreview.pageNavigation": "PDF 页面导航"
+  ,"pdfPreview.pageStatus": "第 {page} / {total} 页"
+  ,"pdfPreview.zoomControls": "PDF 缩放控制"
+  ,"pdfPreview.zoomOut": "缩小 PDF"
+  ,"pdfPreview.zoomIn": "放大 PDF"
+  ,"pdfPreview.fitWidth": "适应预览宽度"
+  ,"pdfPreview.rendering": "正在渲染"
+  ,"pdfPreview.accessiblePage": "第 {page} / {total} 页。{text}"
   ,"writeUp.submittedEvent": "队伍题解已提交"
   ,"writeUp.myWriteUp": "我的题解"
   ,"writeUp.review": "题解审核"

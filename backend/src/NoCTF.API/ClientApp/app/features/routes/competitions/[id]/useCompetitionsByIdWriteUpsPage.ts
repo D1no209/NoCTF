@@ -22,6 +22,11 @@ export function useCompetitionsByIdWriteUpsPage() {
   const selected = computed<ReviewItem | null>(() =>
     review.value?.items?.find(item => item.writeUp?.teamId === selectedTeamId.value) ?? null,
   )
+  const teamOptions = computed(() => review.value?.items?.flatMap(item => {
+    const teamId = item.writeUp?.teamId
+    if (!teamId) return []
+    return [{ value: teamId, label: item.writeUp?.teamName ?? teamId, item }]
+  }) ?? [])
   const canJudge = computed(() => review.value?.canJudge === true)
 
   const previewUrl = ref<string | null>(null)
@@ -334,6 +339,7 @@ export function useCompetitionsByIdWriteUpsPage() {
     review,
     loading,
     loadError,
+    teamOptions,
     selectedTeamId,
     selected,
     canJudge,

@@ -93,7 +93,7 @@ Dialog、可滚动 Dialog 和 AlertDialog 都以 Card 原语作为实际 Reka �
 
 `audit:architecture` 对原生表单/选择类型、title 提示、原生对话框、私有滚动区域与原始颜色进行检查，且已接入构建。交互通过行为测试、类型检查和浏览器验证补充，静态扫描不能代替实际使用验证。
 
-题解审核工作区的队伍列表、PDF 预览与裁定区域使用三张并列的共享 Card，由 CardHeader / CardContent 组合内容。PdfPreview 原语只负责受保护 PDF 的嵌入边界及 Skeleton、Alert、Empty 状态，不在业务 View 中复制卡片表面。
+题解审核工作区左侧使用共享 ChoiceSidebar / WaveSelectionList 展示队伍，右侧使用并列的 PDF 预览 Card 与裁定 Card。PdfPreview 原语使用按需加载的 PDF.js Worker 将受保护 PDF 渲染到 Canvas，并通过共享 Button、ScrollSurface、Skeleton、Spinner 与 Empty 提供分页、缩放、适应宽度及反馈；不得回退到浏览器 iframe / object / embed PDF 查看器。业务 feature 只负责取得一次性预览 URL 和当前队伍，解析与渲染生命周期留在原语内部。
 
 开发环境的 `/__ui-check` 提供交互预览；发布构建通过 pages hook 排除此路由，不包含预览逻辑。
 

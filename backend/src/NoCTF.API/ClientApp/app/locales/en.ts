@@ -2957,6 +2957,16 @@ export const englishMessages = {
   "competitionAccess.description": "Only platform administrators, owners, managers, judges, and observers can see it. Switching does not delete teams or scores, or stop runtimes.",
   "competitionAccess.badge": "Hidden",
   "competitionAccess.changed": "Competition access changed"
+  ,"pdfPreview.loadFailed": "PDF rendering failed"
+  ,"pdfPreview.loadFailedDescription": "The built-in viewer could not parse this file. Download it to inspect the original."
+  ,"pdfPreview.pageNavigation": "PDF page navigation"
+  ,"pdfPreview.pageStatus": "Page {page} of {total}"
+  ,"pdfPreview.zoomControls": "PDF zoom controls"
+  ,"pdfPreview.zoomOut": "Zoom out PDF"
+  ,"pdfPreview.zoomIn": "Zoom in PDF"
+  ,"pdfPreview.fitWidth": "Fit preview width"
+  ,"pdfPreview.rendering": "Rendering"
+  ,"pdfPreview.accessiblePage": "Page {page} of {total}. {text}"
   ,"writeUp.submittedEvent": "Team WriteUp submitted"
   ,"writeUp.myWriteUp": "My WriteUp"
   ,"writeUp.review": "WriteUp review"
