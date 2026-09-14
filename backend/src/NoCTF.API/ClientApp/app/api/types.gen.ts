@@ -384,6 +384,7 @@ export type NoCtfapiEndpointsPlatformPublicPlatformConfigurationResponse = {
     logoUrl?: string | null;
     imageUploadLimits?: NoCtfapiEndpointsPlatformPublicImageUploadLimitsResponse;
     humanVerification?: NoCtfapiEndpointsPlatformPublicHumanVerificationResponse;
+    experimentalFeatures?: NoCtfapiEndpointsPlatformPublicExperimentalFeaturesResponse;
 };
 
 export type NoCtfapiEndpointsPlatformPublicImageUploadLimitsResponse = {
@@ -400,6 +401,10 @@ export type NoCtfapiEndpointsPlatformPublicHumanVerificationResponse = {
 };
 
 export type NoCtfapiEndpointsPlatformHumanVerificationProviderProtocol = 'None' | 'Cap' | 'Turnstile';
+
+export type NoCtfapiEndpointsPlatformPublicExperimentalFeaturesResponse = {
+    ctfPatchVerificationEnabled?: boolean;
+};
 
 export type NoCtfapiEndpointsNotificationsNotificationListResponse = {
     items?: Array<NoCtfapiEndpointsNotificationsNotificationResponse>;
@@ -464,6 +469,12 @@ export type NoCtfapiEndpointsInternalRecordAwdpCheckResultRequest = {
 
 export type NoCtfapiEndpointsInternalAwdpFixResultOutcome = 'ExploitSucceeded' | 'DefenseSucceeded' | 'ServiceAbnormal';
 
+export type NoCtfapiEndpointsInternalRecordPatchVerificationResultRequest = {
+    outcome?: NoCtfapiEndpointsInternalPatchVerificationResultOutcome;
+};
+
+export type NoCtfapiEndpointsInternalPatchVerificationResultOutcome = 'StillExploitable' | 'Verified' | 'ServiceAbnormal';
+
 export type NoCtfapiEndpointsGameplayFactsAwdpParticipantStateResponse = {
     currentRound?: number | null;
     attackRuntime?: NoCtfapiEndpointsRuntimeRuntimeResponse | null;
@@ -495,7 +506,7 @@ export type NoCtfapiEndpointsGameplayFactsGameplayFactStateProtocol = 'Pending' 
 
 export type NoCtfapiEndpointsGameplayFactsGameplayFactResultProtocol = 'Correct' | 'Wrong' | 'Duplicate' | 'AttemptsExhausted' | 'Rejected' | 'Unlocked' | 'Applied' | 'ServiceUp' | 'ServiceDown' | 'Controlled' | 'Uncontrolled';
 
-export type NoCtfapiEndpointsGameplayFactsGameplayFactFailureCodeProtocol = 'FlagNotSupported' | 'FixNotSupported' | 'BreakAttemptsExhausted' | 'FixAttemptsExhausted' | 'BreakRequired' | 'ArchiveValidationUnavailable' | 'FixArchiveMissing' | 'FixArchiveLengthMismatch' | 'FixArchiveContentTypeMismatch' | 'FixArchiveHashMismatch' | 'StorageTimeout' | 'StorageUnavailable' | 'CheckerPlatformError' | 'SelfAttackRejected' | 'DuplicateAttack' | 'DuplicateAchievement' | 'UnknownTeamIdentifier' | 'InvalidObservation' | 'ProducerTimeout' | 'ProducerUnavailable' | 'AmbiguousFlagMatch' | 'FlagExpired' | 'RoundOutOfRange' | 'HardeningActive' | 'AwdpExploitSucceeded' | 'AwdpPatchFailed' | 'AwdpPatchTimeout' | 'AwdpServiceAbnormal' | 'AwdpPlatformFailed' | 'AwdpViolation' | 'ForeignTeamFlagDetected' | 'InsufficientScore' | 'HintUnavailable';
+export type NoCtfapiEndpointsGameplayFactsGameplayFactFailureCodeProtocol = 'FlagNotSupported' | 'FixNotSupported' | 'BreakAttemptsExhausted' | 'FixAttemptsExhausted' | 'BreakRequired' | 'ArchiveValidationUnavailable' | 'FixArchiveMissing' | 'FixArchiveLengthMismatch' | 'FixArchiveContentTypeMismatch' | 'FixArchiveHashMismatch' | 'StorageTimeout' | 'StorageUnavailable' | 'CheckerPlatformError' | 'SelfAttackRejected' | 'DuplicateAttack' | 'DuplicateAchievement' | 'UnknownTeamIdentifier' | 'InvalidObservation' | 'ProducerTimeout' | 'ProducerUnavailable' | 'AmbiguousFlagMatch' | 'FlagExpired' | 'RoundOutOfRange' | 'HardeningActive' | 'AwdpExploitSucceeded' | 'AwdpPatchFailed' | 'AwdpPatchTimeout' | 'AwdpServiceAbnormal' | 'AwdpPlatformFailed' | 'AwdpViolation' | 'ForeignTeamFlagDetected' | 'InsufficientScore' | 'HintUnavailable' | 'PatchStillExploitable' | 'PatchExecutionFailed' | 'PatchServiceAbnormal' | 'PatchVerificationPlatformFailed';
 
 export type NoCtfapiEndpointsGameplayFactsAwdpAchievementActivationResponse = {
     gameplayFactId?: string;
@@ -522,6 +533,25 @@ export type NoCtfapiEndpointsGameplayFactsGetGameplayFactValueResponse = {
     gameplayFactId?: string;
     kind?: NoCtfapiEndpointsGameplayFactsGameplayFactKindProtocol;
     value?: string;
+};
+
+export type NoCtfapiEndpointsGameplayFactsPatchVerificationStateResponse = {
+    patchVerificationAvailable?: boolean;
+    maximumAttempts?: number;
+    acceptedAttempts?: number;
+    remainingAttempts?: number;
+    verificationState?: NoCtfapiEndpointsGameplayFactsGameplayFactStateProtocol | null;
+    verificationResult?: NoCtfapiEndpointsGameplayFactsGameplayFactResultProtocol | null;
+    verificationFailureCode?: NoCtfapiEndpointsGameplayFactsGameplayFactFailureCodeProtocol | null;
+    runtimeInstanceId?: string | null;
+    runtimeState?: NoCtfapiEndpointsRuntimeRuntimeStateProtocol | null;
+    unavailableCode?: NoCtfapiEndpointsGameplayFactsPatchVerificationTargetFailureCodeProtocol | null;
+};
+
+export type NoCtfapiEndpointsGameplayFactsPatchVerificationTargetFailureCodeProtocol = 'PatchVerificationNotAvailable' | 'ExperimentalFeatureDisabled' | 'ActiveTargetExists' | 'PatchAlreadyVerified' | 'PatchAttemptsExhausted' | 'RuntimeQuotaExceeded' | 'InvalidRuntimeConfiguration' | 'TargetConcurrency';
+
+export type NoCtfapiEndpointsGameplayFactsGetPatchVerificationRequest = {
+    [key: string]: never;
 };
 
 export type NoCtfapiEndpointsGameplayFactsGetGameplayFactStatusRequest = {
@@ -587,6 +617,21 @@ export type NoCtfapiEndpointsGameplayFactsAwdpDefenseTargetConflictResponse = {
 
 export type NoCtfapiEndpointsGameplayFactsAwdpDefenseTargetRequestFailureCodeProtocol = 'DefenseNotAvailable' | 'ActiveDefenseTargetExists' | 'DefenseAlreadySucceeded' | 'BreakRequired' | 'FixAttemptsExhausted' | 'InvalidRuntimeConfiguration' | 'DefenseTargetConcurrency';
 
+export type NoCtfapiEndpointsGameplayFactsRequestPatchVerificationTargetResponse = {
+    runtimeInstanceId?: string;
+    state?: NoCtfapiEndpointsRuntimeRuntimeStateProtocol;
+    statusUrl?: string;
+};
+
+export type NoCtfapiEndpointsGameplayFactsPatchVerificationTargetFailureResponse = {
+    code?: NoCtfapiEndpointsGameplayFactsPatchVerificationTargetFailureCodeProtocol;
+    detail?: string;
+};
+
+export type NoCtfapiEndpointsGameplayFactsRequestPatchVerificationTargetRequest = {
+    [key: string]: never;
+};
+
 export type NoCtfapiEndpointsGameplayFactsFlagGameplayFactAcceptedResponse = {
     gameplayFactId?: string | null;
     state?: NoCtfapiEndpointsGameplayFactsGameplayFactStateProtocol | null;
@@ -627,6 +672,17 @@ export type NoCtfapiEndpointsGameplayFactsUploadPatchFailureResponse = {
 export type NoCtfapiEndpointsGameplayFactsUploadPatchFailureCodeProtocol = 'ArchiveStreamNotSeekable' | 'ArchiveInvalid' | 'DefenseTargetNotReady' | 'DefenseAlreadySucceeded' | 'FixAttemptsExhausted' | 'DefenseTargetConsumed';
 
 export type NoCtfapiEndpointsGameplayFactsUploadPatchRequest = {
+    file: Blob | File;
+};
+
+export type NoCtfapiEndpointsGameplayFactsPatchVerificationUploadFailureResponse = {
+    code?: NoCtfapiEndpointsGameplayFactsPatchVerificationUploadFailureCode;
+    detail?: string;
+};
+
+export type NoCtfapiEndpointsGameplayFactsPatchVerificationUploadFailureCode = 'ArchiveStreamNotSeekable' | 'ArchiveTooLarge' | 'ArchiveInvalid' | 'TargetNotReady' | 'PatchAlreadyVerified' | 'AttemptsExhausted' | 'TargetConsumed' | 'UploadConflict';
+
+export type NoCtfapiEndpointsGameplayFactsUploadPatchVerificationRequest = {
     file: Blob | File;
 };
 
@@ -1060,6 +1116,16 @@ export type NoCtfapiEndpointsChallengesChallengeResponse = {
     solvedByMyTeam?: boolean;
     usesDynamicFlag?: boolean;
     hints?: Array<NoCtfapiEndpointsChallengesParticipantChallengeHintResponse> | null;
+    interactionKind?: NoCtfapiEndpointsChallengesCtfInteractionKindProtocol;
+    patchVerificationAvailable?: boolean;
+    maximumPatchAttempts?: number | null;
+    acceptedPatchAttempts?: number | null;
+    remainingPatchAttempts?: number | null;
+    patchVerificationState?: NoCtfapiEndpointsGameplayFactsGameplayFactStateProtocol | null;
+    patchVerificationResult?: NoCtfapiEndpointsGameplayFactsGameplayFactResultProtocol | null;
+    patchVerificationFailureCode?: NoCtfapiEndpointsGameplayFactsGameplayFactFailureCodeProtocol | null;
+    patchVerificationRuntimeInstanceId?: string | null;
+    patchVerificationRuntimeState?: NoCtfapiEndpointsRuntimeRuntimeStateProtocol | null;
     publicAccessFailure?: NoCtfapiEndpointsRuntimePublicAccessFailureProtocol | null;
 };
 
@@ -1071,6 +1137,8 @@ export type NoCtfapiEndpointsChallengesParticipantChallengeHintResponse = {
     isUnlocked?: boolean;
     canUnlock?: boolean;
 };
+
+export type NoCtfapiEndpointsChallengesCtfInteractionKindProtocol = 'FlagSubmission' | 'PatchVerification';
 
 export type NoCtfapiEndpointsChallengesGetChallengeRequest = {
     [key: string]: never;
@@ -1416,7 +1484,7 @@ export type NoCtfapiEndpointsAdministrationRuntimeAdminRuntimeResponse = {
     canForceTerminate?: boolean;
 };
 
-export type NoCtfapiEndpointsRuntimeRuntimePurposeProtocol = 'Player' | 'AwdpTarget' | 'Practice' | 'AwdpAttack' | 'TemplateTest';
+export type NoCtfapiEndpointsRuntimeRuntimePurposeProtocol = 'Player' | 'AwdpTarget' | 'Practice' | 'AwdpAttack' | 'TemplateTest' | 'PatchVerificationTarget';
 
 export type NoCtfApplicationRuntimeInstancesRuntimePublishedPortView = {
     serviceName?: string | null;
@@ -1507,6 +1575,7 @@ export type NoCtfapiEndpointsAdministrationPlatformAdminPlatformConfigurationRes
     humanVerification?: NoCtfapiEndpointsAdministrationPlatformAdminHumanVerificationConfigurationResponse;
     emailVerification?: NoCtfapiEndpointsAdministrationPlatformEmailVerificationConfigurationResponse;
     publicGateway?: NoCtfapiEndpointsAdministrationPlatformPublicGatewayConfigurationResponse;
+    experimentalFeatures?: NoCtfapiEndpointsAdministrationPlatformPlatformExperimentalFeaturesResponse;
     publicGatewayStatusUrl?: string;
 };
 
@@ -1578,6 +1647,10 @@ export type NoCtfapiEndpointsAdministrationPlatformPublicGatewayCapabilityRespon
     maximumPorts?: number;
     namespaceIsolationAvailable?: boolean;
     configurationError?: string | null;
+};
+
+export type NoCtfapiEndpointsAdministrationPlatformPlatformExperimentalFeaturesResponse = {
+    ctfPatchVerificationEnabled?: boolean;
 };
 
 export type NoCtfapiEndpointsAdministrationPlatformPlatformInformationResponse = {
@@ -1802,6 +1875,7 @@ export type NoCtfapiEndpointsAdministrationPlatformPatchPlatformConfigurationReq
     humanVerification?: NoCtfapiEndpointsAdministrationPlatformPlatformHumanVerificationPatchRequest | null;
     emailVerification?: NoCtfapiEndpointsAdministrationPlatformPlatformEmailVerificationPatchRequest | null;
     publicGateway?: NoCtfapiEndpointsAdministrationPlatformPlatformGatewayPatchRequest | null;
+    experimentalFeatures?: NoCtfapiEndpointsAdministrationPlatformPlatformExperimentalFeaturesPatchRequest | null;
 };
 
 export type NoCtfapiEndpointsAdministrationPlatformPlatformBrandingPatchRequest = {
@@ -1845,6 +1919,10 @@ export type NoCtfapiEndpointsAdministrationPlatformPlatformGatewayPatchRequest =
     publicRuntimeHost: string;
     directRuntimeHostOverride: string | null;
     maxPublishedPorts: number;
+};
+
+export type NoCtfapiEndpointsAdministrationPlatformPlatformExperimentalFeaturesPatchRequest = {
+    ctfPatchVerificationEnabled: boolean;
 };
 
 export type NoCtfapiEndpointsAdministrationPlatformPatchPlatformUserRequest = {
@@ -2208,7 +2286,7 @@ export type NoCtfapiEndpointsAdministrationCompetitionsStartGateErrorResponse = 
     message?: string;
 };
 
-export type NoCtfapiEndpointsAdministrationCompetitionsStartGateFailureCodeProtocol = 'CompetitionNotPublished' | 'CompetitionConfigurationInvalid' | 'PublishedChallengeRequired' | 'ApprovedTeamRequired' | 'RuntimeQuotaInsufficient' | 'ChallengeModeMismatch' | 'ChallengeRulesInvalid' | 'RuntimeDefinitionInvalid' | 'TrackConfigurationInvalid' | 'TeamTrackInvalid';
+export type NoCtfapiEndpointsAdministrationCompetitionsStartGateFailureCodeProtocol = 'CompetitionNotPublished' | 'CompetitionConfigurationInvalid' | 'PublishedChallengeRequired' | 'ApprovedTeamRequired' | 'RuntimeQuotaInsufficient' | 'ChallengeModeMismatch' | 'ChallengeRulesInvalid' | 'RuntimeDefinitionInvalid' | 'TrackConfigurationInvalid' | 'TeamTrackInvalid' | 'ExperimentalFeatureDisabled';
 
 export type NoCtfapiEndpointsAdministrationCheatIncidentsCheatIncidentDetailResponse = {
     gameplayFactId?: string;
@@ -2291,7 +2369,7 @@ export type NoCtfapiEndpointsAdministrationChallengesCompetitionChallengeConflic
     detail: string;
 };
 
-export type NoCtfapiEndpointsAdministrationChallengesCompetitionChallengeConflictCode = 'ResourceIdConflict' | 'ChallengeOrderConflict' | 'ChallengeTemplateConflict' | 'LifecycleStateConflict' | 'ChallengeTemplateNotFound' | 'ChallengeTemplateModeMismatch';
+export type NoCtfapiEndpointsAdministrationChallengesCompetitionChallengeConflictCode = 'ResourceIdConflict' | 'ChallengeOrderConflict' | 'ChallengeTemplateConflict' | 'LifecycleStateConflict' | 'ChallengeTemplateNotFound' | 'ChallengeTemplateModeMismatch' | 'ExperimentalFeatureDisabled';
 
 export type NoCtfapiEndpointsAdministrationChallengesCreateChallengeRequest = {
     id?: string | null;
@@ -2428,6 +2506,7 @@ export type NoCtfapiEndpointsAdministrationChallengeBankChallengeTemplateRespons
     activeCompetitionReferenceCount?: number;
     createdAt?: string;
     updatedAt?: string;
+    interactionKind?: NoCtfapiEndpointsChallengesCtfInteractionKindProtocol;
 };
 
 export type NoCtfapiEndpointsAdministrationChallengeBankChallengeVisibilityProtocol = 'Private' | 'Shared';
@@ -2438,7 +2517,7 @@ export type NoCtfapiEndpointsAdministrationChallengeBankChallengeTemplateConflic
     userIds: Array<string>;
 };
 
-export type NoCtfapiEndpointsAdministrationChallengeBankChallengeTemplateConflictCode = 'ResourceIdConflict' | 'ActiveCompetitionModeConflict' | 'ActiveRuntimeDefinitionConflict' | 'OwnerIncludedInManagerSet' | 'UserNotFound' | 'RoleNotEligible';
+export type NoCtfapiEndpointsAdministrationChallengeBankChallengeTemplateConflictCode = 'ResourceIdConflict' | 'ActiveCompetitionModeConflict' | 'ActiveRuntimeDefinitionConflict' | 'OwnerIncludedInManagerSet' | 'UserNotFound' | 'RoleNotEligible' | 'ExperimentalFeatureDisabled' | 'InteractionKindConflict';
 
 export type NoCtfapiEndpointsAdministrationChallengeBankCreateChallengeTemplateRequest = {
     id?: string | null;
@@ -3783,6 +3862,48 @@ export type RecordAwdpCheckResultEndpointResponses = {
 
 export type RecordAwdpCheckResultEndpointResponse = RecordAwdpCheckResultEndpointResponses[keyof RecordAwdpCheckResultEndpointResponses];
 
+export type RecordPatchVerificationResultEndpointData = {
+    body: NoCtfapiEndpointsInternalRecordPatchVerificationResultRequest;
+    path?: never;
+    query?: never;
+    url: '/api/internal/v1/patch-verification/results';
+};
+
+export type RecordPatchVerificationResultEndpointErrors = {
+    /**
+     * Bad Request
+     */
+    400: MicrosoftAspNetCoreMvcValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+    /**
+     * Not Found
+     */
+    404: unknown;
+    409: NoCtfapiEndpointsInternalInternalResultResponse;
+};
+
+export type RecordPatchVerificationResultEndpointError = RecordPatchVerificationResultEndpointErrors[keyof RecordPatchVerificationResultEndpointErrors];
+
+export type RecordPatchVerificationResultEndpointResponses = {
+    /**
+     * Success
+     */
+    200: NoCtfapiEndpointsInternalInternalResultResponse;
+    /**
+     * Accepted
+     */
+    202: NoCtfapiEndpointsInternalInternalResultResponse;
+};
+
+export type RecordPatchVerificationResultEndpointResponse = RecordPatchVerificationResultEndpointResponses[keyof RecordPatchVerificationResultEndpointResponses];
+
 export type GetAwdpParticipantStateEndpointData = {
     body?: never;
     path: {
@@ -3850,6 +3971,40 @@ export type GetGameplayFactValueEndpointResponses = {
 };
 
 export type GetGameplayFactValueEndpointResponse = GetGameplayFactValueEndpointResponses[keyof GetGameplayFactValueEndpointResponses];
+
+export type GetPatchVerificationEndpointData = {
+    body?: never;
+    path: {
+        competitionId: string;
+        competitionChallengeId: string;
+    };
+    query?: never;
+    url: '/api/v1/competitions/{competitionId}/challenges/{competitionChallengeId}/patch-verification';
+};
+
+export type GetPatchVerificationEndpointErrors = {
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+    /**
+     * Not Found
+     */
+    404: unknown;
+};
+
+export type GetPatchVerificationEndpointResponses = {
+    /**
+     * Success
+     */
+    200: NoCtfapiEndpointsGameplayFactsPatchVerificationStateResponse;
+};
+
+export type GetPatchVerificationEndpointResponse = GetPatchVerificationEndpointResponses[keyof GetPatchVerificationEndpointResponses];
 
 export type GetGameplayFactStatusEndpointData = {
     body?: never;
@@ -4023,6 +4178,53 @@ export type RequestAwdpDefenseTargetEndpointResponses = {
 
 export type RequestAwdpDefenseTargetEndpointResponse = RequestAwdpDefenseTargetEndpointResponses[keyof RequestAwdpDefenseTargetEndpointResponses];
 
+export type RequestPatchVerificationTargetEndpointData = {
+    body?: never;
+    headers?: {
+        /**
+         * One-time token from the provider selected by public platform configuration. Omit only when that provider is None.
+         */
+        'X-NoCTF-Human-Verification'?: string;
+    };
+    path: {
+        competitionId: string;
+        competitionChallengeId: string;
+    };
+    query?: never;
+    url: '/api/v1/competitions/{competitionId}/challenges/{competitionChallengeId}/patch-verification-targets';
+};
+
+export type RequestPatchVerificationTargetEndpointErrors = {
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Human verification is required or was rejected.
+     */
+    403: MicrosoftAspNetCoreMvcProblemDetails;
+    /**
+     * Not Found
+     */
+    404: unknown;
+    409: NoCtfapiEndpointsGameplayFactsPatchVerificationTargetFailureResponse;
+    /**
+     * The selected human verification provider is unavailable.
+     */
+    503: MicrosoftAspNetCoreMvcProblemDetails;
+};
+
+export type RequestPatchVerificationTargetEndpointError = RequestPatchVerificationTargetEndpointErrors[keyof RequestPatchVerificationTargetEndpointErrors];
+
+export type RequestPatchVerificationTargetEndpointResponses = {
+    /**
+     * Accepted
+     */
+    202: NoCtfapiEndpointsGameplayFactsRequestPatchVerificationTargetResponse;
+};
+
+export type RequestPatchVerificationTargetEndpointResponse = RequestPatchVerificationTargetEndpointResponses[keyof RequestPatchVerificationTargetEndpointResponses];
+
 export type SubmitFlagEndpointData = {
     body: NoCtfapiEndpointsGameplayFactsSubmitFlagRequest;
     headers?: {
@@ -4127,6 +4329,60 @@ export type UploadPatchEndpointResponses = {
 };
 
 export type UploadPatchEndpointResponse = UploadPatchEndpointResponses[keyof UploadPatchEndpointResponses];
+
+export type UploadPatchVerificationEndpointData = {
+    body: NoCtfapiEndpointsGameplayFactsUploadPatchVerificationRequest;
+    headers?: {
+        /**
+         * One-time token from the provider selected by public platform configuration. Omit only when that provider is None.
+         */
+        'X-NoCTF-Human-Verification'?: string;
+    };
+    path: {
+        competitionId: string;
+        competitionChallengeId: string;
+        runtimeInstanceId: string;
+    };
+    query?: never;
+    url: '/api/v1/competitions/{competitionId}/challenges/{competitionChallengeId}/patch-verification-targets/{runtimeInstanceId}/patch';
+};
+
+export type UploadPatchVerificationEndpointErrors = {
+    /**
+     * Bad Request
+     */
+    400: MicrosoftAspNetCoreMvcValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Human verification is required or was rejected.
+     */
+    403: MicrosoftAspNetCoreMvcProblemDetails;
+    /**
+     * Not Found
+     */
+    404: unknown;
+    409: NoCtfapiEndpointsGameplayFactsPatchVerificationUploadFailureResponse;
+    413: MicrosoftAspNetCoreMvcProblemDetails;
+    422: NoCtfapiEndpointsGameplayFactsPatchVerificationUploadFailureResponse;
+    /**
+     * The selected human verification provider is unavailable.
+     */
+    503: MicrosoftAspNetCoreMvcProblemDetails;
+};
+
+export type UploadPatchVerificationEndpointError = UploadPatchVerificationEndpointErrors[keyof UploadPatchVerificationEndpointErrors];
+
+export type UploadPatchVerificationEndpointResponses = {
+    /**
+     * Accepted
+     */
+    202: NoCtfapiEndpointsGameplayFactsUploadPatchResponse;
+};
+
+export type UploadPatchVerificationEndpointResponse = UploadPatchVerificationEndpointResponses[keyof UploadPatchVerificationEndpointResponses];
 
 export type GetCompetitionEndpointData = {
     body?: never;

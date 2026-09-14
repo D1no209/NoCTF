@@ -135,7 +135,8 @@ export function createFixtures() {
     settings: new Map<string, Data>(),
     platform: { name: 'NoCTF · MOCK', description: '本地演示站 · Fictional data · No production backend', logoUrl: null,
       imageUploadLimits: { maximumAvatarBytes: 12 * 1024 * 1024, maximumWallpaperBytes: 16 * 1024 * 1024 },
-      humanVerification: { provider: 'None', siteKey: null, apiEndpoint: null, runtimeRequired: false, evaluationRequired: false }, updatedAt: now() },
+      humanVerification: { provider: 'None', siteKey: null, apiEndpoint: null, runtimeRequired: false, evaluationRequired: false },
+      experimentalFeatures: { ctfPatchVerificationEnabled: false }, updatedAt: now() },
   }
 }
 

@@ -38,6 +38,9 @@ const { ShieldCheck, Swords, Users, directionGlyph, isAwdp, loading, error, data
               <span class="sr-only">{{ directionLabel(item.challenge.direction) }}</span>
               <span class="relative z-10 flex min-w-0 items-baseline gap-2 font-sans text-sm font-bold italic text-primary">
                 <span class="min-w-0 flex-1 truncate">{{ item.challenge.title }}</span>
+                <Badge v-if="item.challenge.interactionKind === 'PatchVerification'" variant="secondary" class="shrink-0 text-[0.625rem] not-italic">
+                  {{ $t('ui.patchVerification') }}
+                </Badge>
                 <StatusIcon :name="progressIcon(item.challenge.id)" :label="progressIconLabel(item.challenge.id)" />
               </span>
               <span v-if="isAwdp && progressFor(item.challenge.id)" class="relative z-10 mt-1 flex items-center gap-2 text-[0.6875rem]">

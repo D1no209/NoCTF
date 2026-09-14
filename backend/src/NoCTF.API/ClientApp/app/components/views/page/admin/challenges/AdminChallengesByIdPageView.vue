@@ -3,7 +3,7 @@ import { toRefs } from 'vue'
 import type { AdminChallengesByIdPageViewState } from '~/features/routes/admin/challenges/useAdminChallengesByIdPage'
 
 const viewProps = defineProps<{ state: AdminChallengesByIdPageViewState }>()
-const { Paperclip, RotateCcw, Trash2, Upload, challengeId, canOrganize, template, loading, loadError, form, saving, saveErrors, deleting, restoring, isDeleted, titleInvalid, directionInvalid, definitionModel, definitionParseFailed, hasModeDefinition, usesRuntimeFlagInjection, runtimeDisabled, runtimeDefinitionDirty, changeMode, resetDefinitionToCurrentMode, save, removeTemplate, restoreTemplate, attachments, attachmentsLoading, attachmentsIncludeDeleted, attachmentDeliveryPolicy, uploading, uploadInput, randomBatchOpen, randomUploading, randomDownloadFileName, randomFiles, randomUploadInput, deletingAttachment, attachmentActionPending, requestAttachmentDeliveryPolicy, uploadAttachment, selectRandomFiles, uploadRandomBatch, confirmDeleteAttachment, restoreAttachment, formatBytes, flags, supportsRegularExpression, flagsLoading, flagsIncludeDeleted, flagCreateOpen, flagCreating, flagForm, deletingFlag, flagActionPending, staticFlags, systemFlags, openFlagCreate, createFlag, confirmDeleteFlag, restoreFlag, managersText, permissionsSaving, newOwnerId, transferOpen, transferring, savePermissions, transferOwner, AdminDateTime, AdminGameModeBadge, ChallengeTestRuntimePanel, DefinitionCheckerSection, DefinitionFlagInjectionSection, DefinitionFlagTemplateSection, DefinitionPatchSection, DefinitionRuntimeSection, setUploadInputRef, setRandomUploadInputRef, onBlurFormDirection, onClickRandomBatchOpen, onClickDeletingAttachment, onClickDeletingFlag, onClickTransferOpen, onUpdateOpenDeletingAttachment, onClickRandomBatchOpen2, onClickFlagCreateOpen, onUpdateOpenDeletingFlag } = toRefs(viewProps.state)
+const { Paperclip, RotateCcw, Trash2, Upload, challengeId, canOrganize, template, loading, loadError, form, saving, saveErrors, deleting, restoring, isDeleted, titleInvalid, directionInvalid, definitionModel, definitionParseFailed, hasModeDefinition, usesRuntimeFlagInjection, runtimeDisabled, runtimeDefinitionDirty, CtfInteraction, showInteractionKind, setInteractionKind, changeMode, resetDefinitionToCurrentMode, save, removeTemplate, restoreTemplate, attachments, attachmentsLoading, attachmentsIncludeDeleted, attachmentDeliveryPolicy, uploading, uploadInput, randomBatchOpen, randomUploading, randomDownloadFileName, randomFiles, randomUploadInput, deletingAttachment, attachmentActionPending, requestAttachmentDeliveryPolicy, uploadAttachment, selectRandomFiles, uploadRandomBatch, confirmDeleteAttachment, restoreAttachment, formatBytes, flags, supportsRegularExpression, flagsLoading, flagsIncludeDeleted, flagCreateOpen, flagCreating, flagForm, deletingFlag, flagActionPending, staticFlags, systemFlags, openFlagCreate, createFlag, confirmDeleteFlag, restoreFlag, managersText, permissionsSaving, newOwnerId, transferOpen, transferring, savePermissions, transferOwner, AdminDateTime, AdminGameModeBadge, ChallengeTestRuntimePanel, DefinitionCheckerSection, DefinitionFlagInjectionSection, DefinitionFlagTemplateSection, DefinitionPatchSection, DefinitionRuntimeSection, setUploadInputRef, setRandomUploadInputRef, onBlurFormDirection, onClickRandomBatchOpen, onClickDeletingAttachment, onClickDeletingFlag, onClickTransferOpen, onUpdateOpenDeletingAttachment, onClickRandomBatchOpen2, onClickFlagCreateOpen, onUpdateOpenDeletingFlag } = toRefs(viewProps.state)
 </script>
 
 <template>
@@ -229,6 +229,23 @@ const { Paperclip, RotateCcw, Trash2, Upload, challengeId, canOrganize, template
                   <Alert v-if="hasModeDefinition && runtimeDisabled">
                     <AlertDescription>{{ $t('ui.theFollowingConfigurationsWillNotTakeEffectWhileTheRuntime') }}</AlertDescription>
                   </Alert>
+                  <Field v-if="showInteractionKind">
+                    <FieldLabel for="challenge-ctf-interaction-kind">{{ $t('ui.completionMethod') }}</FieldLabel>
+                    <Select
+                      :model-value="definitionModel.interactionKind === CtfInteraction.PatchVerification ? 'PatchVerification' : 'FlagSubmission'"
+                      :disabled="isDeleted"
+                      @update:model-value="setInteractionKind"
+                    >
+                      <SelectTrigger id="challenge-ctf-interaction-kind" class="w-full"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectGroup>
+                          <SelectItem value="FlagSubmission">{{ $t('ui.flagSubmission') }}</SelectItem>
+                          <SelectItem value="PatchVerification">{{ $t('ui.patchVerification') }}</SelectItem>
+                        </SelectGroup>
+                      </SelectContent>
+                    </Select>
+                    <FieldDescription>{{ $t('ui.ctfCompletionMethodDescription') }}</FieldDescription>
+                  </Field>
                   <template v-if="form.mode === 'Awd'">
                     <component :is="DefinitionFlagInjectionSection" :model="definitionModel" :disabled="isDeleted" />
                     <component :is="DefinitionCheckerSection" :model="definitionModel" :mode="form.mode" :disabled="isDeleted" />
@@ -238,12 +255,17 @@ const { Paperclip, RotateCcw, Trash2, Upload, challengeId, canOrganize, template
                     <component :is="DefinitionPatchSection" :model="definitionModel" :disabled="isDeleted" />
                     <component :is="DefinitionCheckerSection" :model="definitionModel" :mode="form.mode" :disabled="isDeleted" />
                   </template>
-                  <component :is="DefinitionFlagTemplateSection"
-                    v-else-if="form.mode === 'Ctf'"
-                    :model="definitionModel"
-                    :mode="form.mode"
-                    :disabled="isDeleted"
-                  />
+                  <template v-else-if="form.mode === 'Ctf'">
+                    <template v-if="definitionModel.interactionKind === CtfInteraction.PatchVerification">
+                      <component :is="DefinitionPatchSection" :model="definitionModel" :disabled="isDeleted" />
+                      <component :is="DefinitionCheckerSection" :model="definitionModel" :mode="form.mode" :disabled="isDeleted" />
+                    </template>
+                    <component v-else :is="DefinitionFlagTemplateSection"
+                      :model="definitionModel"
+                      :mode="form.mode"
+                      :disabled="isDeleted"
+                    />
+                  </template>
                   <Empty v-if="!hasModeDefinition">
                     <EmptyHeader>
                       <EmptyTitle>{{ $t('ui.thisModeHasNoAdditionalModeDefinition') }}</EmptyTitle>
