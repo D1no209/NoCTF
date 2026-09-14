@@ -268,7 +268,7 @@ public sealed class HistoricalAdjudicationPreviewHttpTests
         GameplayFactResult.Correct,
         null,
         occurredAt,
-        true,
+        false,
         0,
         false,
         [GameplayFactResult.Correct],
