@@ -61,7 +61,8 @@ public sealed class CompetitionChallengeLifecycleOpenApiTests
                 "ChallengeTemplateConflict",
                 "LifecycleStateConflict",
                 "ChallengeTemplateNotFound",
-                "ChallengeTemplateModeMismatch"
+                "ChallengeTemplateModeMismatch",
+                "ExperimentalFeatureDisabled"
             ]);
     }
 

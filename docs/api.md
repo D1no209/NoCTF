@@ -519,6 +519,10 @@ ID 与头像，不把 GitHub 可用性变成管理后台的运行时依赖。
 POST /api/internal/v1/awd/check-results
 POST /api/internal/v1/awdp/fix-results
 GET  /api/internal/v1/awdp/fix-archives/{gameplayFactId}
+POST /api/internal/v1/patch-verification/results
+GET  /api/v1/competitions/{competitionId}/challenges/{competitionChallengeId}/patch-verification
+POST /api/v1/competitions/{competitionId}/challenges/{competitionChallengeId}/patch-verification-targets
+POST /api/v1/competitions/{competitionId}/challenges/{competitionChallengeId}/patch-verification-targets/{runtimeInstanceId}/patch
 ```
 
 全部使用独立 JWT Scheme、精确 audience/permission 与资源 Claims。Request body 不能包含可覆盖 Claims 的 Competition/Team/GameplayFact Id。JWT 由调度该 durable Job 的可信进程签发，不提供公开“任意换 Token”接口。
