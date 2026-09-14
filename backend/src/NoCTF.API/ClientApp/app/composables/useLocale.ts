@@ -1,9 +1,11 @@
+import { animateLocaleLayout } from '~/motion/locale-layout'
+
 export function useLocale() {
   const locale = computed(() => currentLocale())
   const isEnglish = computed(() => locale.value === 'en')
 
-  function switchLocale() {
-    setLocale(isEnglish.value ? 'zh-CN' : 'en')
+  async function switchLocale() {
+    await animateLocaleLayout(() => setLocale(isEnglish.value ? 'zh-CN' : 'en'))
   }
 
   return {

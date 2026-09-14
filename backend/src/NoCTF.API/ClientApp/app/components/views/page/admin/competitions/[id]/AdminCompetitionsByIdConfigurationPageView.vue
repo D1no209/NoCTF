@@ -8,7 +8,8 @@ const { competition, canWrite, title, description, startTime, endTime, teamRegis
 
 <template>
   <div class="flex flex-col gap-6">
-    <Card>
+    <Card class="gap-0">
+      <section id="competition-basic-configuration" class="flex flex-col gap-4 py-4 first:pt-0 last:pb-0">
       <CardHeader>
         <CardTitle>{{ $t('ui.basicInformation2') }}</CardTitle>
         <CardDescription>{{ $t('ui.titleTimeAndTeamRestrictionsGameModeCannotBeModified') }}</CardDescription>
@@ -117,9 +118,10 @@ const { competition, canWrite, title, description, startTime, endTime, teamRegis
           </FieldGroup>
         </UiForm>
       </CardContent>
-    </Card>
+      </section>
 
-    <Card>
+      <Separator />
+      <section id="competition-mode-configuration" class="flex flex-col gap-4 py-4 first:pt-0 last:pb-0">
       <CardHeader>
         <CardTitle>{{ $t('ui.modeConfiguration') }}</CardTitle>
         <CardDescription>
@@ -136,6 +138,7 @@ const { competition, canWrite, title, description, startTime, endTime, teamRegis
           @save="saveConfig"
         />
       </CardContent>
+      </section>
     </Card>
   </div>
 </template>

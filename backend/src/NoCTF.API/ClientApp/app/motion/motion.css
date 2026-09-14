@@ -9,6 +9,7 @@
 .noctf-motion-list-enter { animation: noctf-list-enter 180ms var(--ui-ease) var(--motion-stagger, 0ms) both; }
 .noctf-motion-detail-enter { animation: noctf-detail-enter 160ms var(--ui-ease) both; }
 .noctf-motion-interactive { transition: background-color 160ms ease-out, border-color 160ms ease-out, box-shadow 160ms ease-out; }
+[data-locale-resizing='true'] { overflow: clip; will-change: inline-size; }
 [data-top-nav-item].noctf-motion-top-nav { transition: width 760ms var(--ui-ease), color 440ms ease-out, background-color 440ms ease-out, box-shadow 440ms ease-out, transform 440ms ease-out; }
 .noctf-motion-top-nav [data-top-nav-label] { transition: opacity 520ms ease-out, transform 760ms var(--ui-ease); }
 .noctf-page-slide-enter-active {
@@ -121,6 +122,7 @@ html[data-theme-transition='down']::view-transition-new(root) {
 @media (prefers-reduced-motion: reduce) {
   .noctf-motion-list-enter, .noctf-motion-detail-enter { animation: none; }
   .noctf-motion-interactive { transition: none; }
+  [data-locale-resizing='true'] { overflow: visible; will-change: auto; }
   [data-top-nav-item].noctf-motion-top-nav, .noctf-motion-top-nav [data-top-nav-label] { transition: none; }
   .noctf-page-slide-enter-active, .noctf-page-slide-leave-active { transition: none; }
   .noctf-page-slide-enter-from, .noctf-page-slide-leave-to { transform: none; }
