@@ -13,7 +13,8 @@ const { canWrite, current, loading, error, frozenStartAt, hiddenStartAt, reason,
     </Alert>
     <Skeleton v-if="loading" class="h-48 w-full" />
     <template v-else-if="current">
-      <Card>
+      <Card class="gap-0">
+        <section id="competition-leaderboard-status" class="flex flex-col gap-4 py-4 first:pt-0 last:pb-0">
         <CardHeader>
           <CardTitle>{{ $t('ui.currentStatus') }}</CardTitle>
         </CardHeader>
@@ -31,9 +32,10 @@ const { canWrite, current, loading, error, frozenStartAt, hiddenStartAt, reason,
             <span class="font-mono tabular-nums">{{ current.hiddenStartAt ? adminFormatDateTime(current.hiddenStartAt) : $t('ui.notSet') }}</span>
           </div>
         </CardContent>
-      </Card>
+        </section>
 
-      <Card>
+        <Separator />
+        <section id="competition-leaderboard-visibility" class="flex flex-col gap-4 py-4 first:pt-0 last:pb-0">
         <CardHeader>
           <CardTitle>{{ $t('ui.modifyVisibility') }}</CardTitle>
           <CardDescription>{{ $t('ui.freezeRetainsASnapshotOfTheLastStandingsMaskCompletely') }}</CardDescription>
@@ -60,6 +62,7 @@ const { canWrite, current, loading, error, frozenStartAt, hiddenStartAt, reason,
             </FieldGroup>
           </UiForm>
         </CardContent>
+        </section>
       </Card>
     </template>
   </div>

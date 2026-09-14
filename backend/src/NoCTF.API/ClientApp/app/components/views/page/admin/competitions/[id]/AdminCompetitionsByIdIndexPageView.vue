@@ -8,7 +8,8 @@ const { startGateErrorMessage, competitionId, competition, canWrite, canManagePe
 
 <template>
   <div v-if="competition" class="flex flex-col gap-6">
-    <Card v-if="!isDeleted">
+    <Card class="gap-0">
+      <section v-if="!isDeleted" id="competition-poster-management" class="flex flex-col gap-4 py-4 first:pt-0 last:pb-0">
       <CardHeader>
         <CardTitle>{{ $t('ui.competitionPoster') }}</CardTitle>
         <CardDescription>{{ $t('ui.competitionPosterManagementDescription') }}</CardDescription>
@@ -56,9 +57,10 @@ const { startGateErrorMessage, competitionId, competition, canWrite, canManagePe
           <p v-else class="text-sm text-muted-foreground">{{ $t('ui.theCurrentRoleIsReadOnlyAndCannotModifyThePoster') }}</p>
         </div>
       </CardContent>
-    </Card>
+      </section>
 
-    <Card>
+      <Separator v-if="!isDeleted" />
+      <section id="competition-lifecycle-management" class="flex flex-col gap-4 py-4 first:pt-0 last:pb-0">
       <CardHeader>
         <CardTitle>{{ $t('ui.lifeCycle') }}</CardTitle>
         <CardDescription class="font-mono tabular-nums">
@@ -109,9 +111,11 @@ const { startGateErrorMessage, competitionId, competition, canWrite, canManagePe
           </Alert>
         </div>
       </CardContent>
-    </Card>
+      </section>
 
-    <Card v-if="canWrite && !isDeleted">
+      <template v-if="canWrite && !isDeleted">
+      <Separator />
+      <section id="competition-flag-management" class="flex flex-col gap-4 py-4 first:pt-0 last:pb-0">
       <CardHeader>
         <CardTitle>{{ $t('ui.flagGeneration') }}</CardTitle>
         <CardDescription>{{ $t('ui.generateMissingTeamFlagsInBatchesForDynamicFlagQuestions') }}</CardDescription>
@@ -129,9 +133,12 @@ const { startGateErrorMessage, competitionId, competition, canWrite, canManagePe
           </Alert>
         </div>
       </CardContent>
-    </Card>
+      </section>
+      </template>
 
-    <Card v-if="canWrite">
+      <template v-if="canWrite">
+      <Separator />
+      <section id="competition-danger-management" class="flex flex-col gap-4 py-4 first:pt-0 last:pb-0">
       <CardHeader>
         <CardTitle class="text-destructive">{{ $t('ui.dangerZone') }}</CardTitle>
         <CardDescription v-if="isDeleted">
@@ -193,6 +200,8 @@ const { startGateErrorMessage, competitionId, competition, canWrite, canManagePe
           <AlertDescription>{{ $t('ui.impactCheckPassedThisCompetitionHasNoPermanentHistoryOr') }}</AlertDescription>
         </Alert>
       </CardContent>
+      </section>
+      </template>
     </Card>
 
     <AlertDialog :open="posterRemoveOpen" @update:open="setPosterRemoveOpen">

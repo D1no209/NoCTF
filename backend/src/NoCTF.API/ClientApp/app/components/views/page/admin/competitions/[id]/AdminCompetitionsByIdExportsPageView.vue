@@ -8,7 +8,8 @@ const { canWrite, eventsFrom, eventsTo, exportingEvents, exportEvents, includePr
 
 <template>
   <div class="flex flex-col gap-6">
-    <Card>
+    <Card class="gap-0">
+      <section id="competition-event-export" class="flex flex-col gap-4 py-4 first:pt-0 last:pb-0">
       <CardHeader>
         <CardTitle>{{ $t('ui.eventExportJsonl') }}</CardTitle>
         <CardDescription>{{ $t('ui.exportTheCompetitionEventStreamByTimeRangeOneJson') }}</CardDescription>
@@ -25,9 +26,10 @@ const { canWrite, eventsFrom, eventsTo, exportingEvents, exportEvents, includePr
         <Button :disabled="exportingEvents" @click="exportEvents">
           <Spinner v-if="exportingEvents" data-icon="inline-start" /> {{ $t('ui.exportEvents') }} </Button>
       </CardContent>
-    </Card>
+      </section>
 
-    <Card>
+      <Separator />
+      <section id="competition-archive-export" class="flex flex-col gap-4 py-4 first:pt-0 last:pb-0">
       <CardHeader>
         <CardTitle>{{ $t('ui.competitionArchive') }}</CardTitle>
         <CardDescription>{{ $t('ui.generateThisCompetitionSDataArchiveSynchronouslyAndDownloadIt') }}</CardDescription>
@@ -47,6 +49,7 @@ const { canWrite, eventsFrom, eventsTo, exportingEvents, exportEvents, includePr
             <Spinner v-if="exportingArchive" data-icon="inline-start" /> {{ $t('ui.downloadCompetitionArchive') }} </Button>
         </div>
       </CardContent>
+      </section>
     </Card>
   </div>
 </template>

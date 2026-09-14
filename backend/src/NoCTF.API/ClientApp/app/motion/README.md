@@ -5,6 +5,7 @@
 - `list-enter`: subtle horizontal entrance with bounded item staggering (maximum 150ms).
 - `detail-enter`: brief vertical entrance for a newly selected detail surface.
 - `noctf-motion-interactive`: shared transitions for hover/focus colors and borders.
+- `animateLocaleLayout`: measures intrinsic shared-control widths before and after a locale update, then expands or contracts them over 500ms with the Web Animations API. Reduced motion applies the locale immediately.
 - `film-up` content swap: `useContentSwap` sequences a 260ms upward exit and a 380ms entrance from below. `MotionSwap` keeps the outer card separate and reserves outgoing height while the content changes. Completion/cancellation releases the reservation.
 - `useWaveMotion`: pointer/focus position produces a smooth distance-based displacement across neighboring items. The peak moves outward 30px; the selected item keeps a 14px resting offset. The library never changes selection. Geometry is cached, updates are coalesced into a requested animation frame, unchanged styles are skipped, and no idle animation loop runs. Observers and frames are disposed with the consumer.
 - `noctf-disclosure-content` / `noctf-disclosure-chevron`: shared group opening, closing and arrow rotation for collapsible lists. One wave surface spans all expanded groups. Reduced motion disables the disclosure animations and transitions.

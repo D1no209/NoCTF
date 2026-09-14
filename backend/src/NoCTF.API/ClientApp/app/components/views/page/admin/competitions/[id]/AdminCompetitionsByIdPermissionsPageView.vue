@@ -17,7 +17,8 @@ const { X, canManagePermissions, permissions, candidates, loading, error, candid
     <Skeleton v-if="loading" class="h-64 w-full" />
 
     <template v-else-if="permissions">
-      <Card>
+      <Card class="gap-0">
+        <section id="competition-collaboration-permissions" class="flex flex-col gap-4 py-4 first:pt-0 last:pb-0">
         <CardHeader>
           <CardTitle>{{ $t('ui.collaborationPermissions') }}</CardTitle>
           <CardDescription>
@@ -77,9 +78,11 @@ const { X, canManagePermissions, permissions, candidates, loading, error, candid
             </div>
           </template>
         </CardContent>
-      </Card>
+        </section>
 
-      <Card v-if="canManagePermissions">
+        <template v-if="canManagePermissions">
+        <Separator />
+        <section id="competition-ownership-transfer" class="flex flex-col gap-4 py-4 first:pt-0 last:pb-0">
         <CardHeader>
           <CardTitle class="text-destructive">{{ $t('ui.transferOwnership') }}</CardTitle>
           <CardDescription>{{ $t('ui.transferTheIdentityOfTheCompetitionLeaderToAnotherUser') }}</CardDescription>
@@ -99,6 +102,8 @@ const { X, canManagePermissions, permissions, candidates, loading, error, candid
           </Select>
           <Button variant="destructive" :disabled="!transferTarget" @click="onClickTransferConfirm(true)"> {{ $t('ui.transferOwnership') }} </Button>
         </CardContent>
+        </section>
+        </template>
       </Card>
     </template>
 

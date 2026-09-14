@@ -16,6 +16,8 @@ import AppWorkspaceNavComponent from '../../../app/AppWorkspaceNav.vue'
 export function useAdminCompetitionsByIdPage() {
   const route = useRoute()
 
+  const activePath = computed(() => route.path)
+
   const competitionId = route.params.id as string
 
   const { user, isAdministrator } = useAuth()
@@ -190,6 +192,7 @@ export function useAdminCompetitionsByIdPage() {
       publishAnnouncement,
       setAnnouncementOpen,
       navGroups,
+      activePath,
       CompetitionStatusBadge,
       GameModeBadge,
       AppWorkspaceNav

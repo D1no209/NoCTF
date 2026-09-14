@@ -37,6 +37,7 @@ Nuxt 4 SPA(`ssr: false`),Bun 管理依赖,TypeScript strict,Vue 用 `<script set
 - WriteUp 审核页的队伍导航使用 ChoiceSidebar / WaveSelectionList，选择和路由同步留在 feature。PDF 在线预览统一使用 PdfPreview 内的 PDF.js Worker + Canvas，以及共享 Button、ScrollSurface、Skeleton、Spinner、Empty；禁止业务 View 或 PdfPreview 使用 iframe、object、embed 及浏览器原生 PDF 查看器。
 - 开发环境的 `/__ui-check` 用于交互预览，不调用业务写接口；生产构建必须通过 `pages:extend` 排除此路由。不得将验证用临时文件作为应用依赖。
 - 新增动效、View Transition 选择器和命名合成层声明放在独立的 `app/motion/` 库中，由 UI 原语调用预设；组件不内置动画定义，不引入业务状态，必须支持减少动态效果模式。`view-transition-name` 只能在实际过渡 dataset 存在时临时生效，禁止永久施加到 DefaultLayout 前景或壁纸，避免切断 Card 对背景的 `backdrop-filter` 采样。列表键盘交互留在通用原语，竞赛选择与 URL 同步留在功能层。
+- 中英文切换通过 `motion/locale-layout.ts` 测量共享按钮、Badge、Tabs 与选择控件的固有宽度，并在 500ms 内完成横向延展或收缩；动效不得写入业务 View，减少动态效果模式立即完成切换。
 - 普通路由使用 Nuxt 全局 `noctf-page-slide`，只横向移动 DefaultLayout 的 main 页面内容；顶部栏和布局壁纸不得进入页面过渡。主内容通过 `data-slot="page-transition-viewport"` 裁切横向溢出。竞赛页和消息中心的 ChoiceSidebar 必须在页面网格内稳定占位并与右侧 Card 同步横移，不得在带 transform 的页面根节点下使用 fixed 定位。减少动态效果模式取消位移。
 - 竞赛计分板在固定高度竞赛工作区内必须由纵向 ScrollSurface 承载整页内容，表格继续使用自身横向滚动面；不得让 `data-contained-workspace-page` 的 overflow 裁掉趋势图或队伍表格。
 - CTF 3D 大屏固定使用自身 `.dark` 容器的大屏专用语义颜色生成 WebGL 材质，不能从 document 根主题或站点品牌主色取色。舞台使用近黑紫背景、紫蓝网格、冷蓝未攻克建筑和高饱和红色已攻克建筑，绿色只用于成功分值与实时状态；`/competitions/:id/live-` 作为 `/live` 的兼容别名，必须加载同一完整大屏。
@@ -67,6 +68,8 @@ Nuxt 4 SPA(`ssr: false`),Bun 管理依赖,TypeScript strict,Vue 用 `<script set
 - API 调用一律走 `app/api` SDK:`const { data, error } = await xxxEndpoint({ path, query, body })`;错误统一 `parseApiError(error)` 取 message,toast 用 vue-sonner 的 `toast()`。空响应体的错误(如登录 401)由 `plugins/api.client.ts` 的 error 拦截器按状态码合成文案,登录页 401 显示「用户名或密码错误」。
 - 模式专属配置 JSON(题目模板 definitionJson、竞赛模式配置、题目规则 rulesJson)一律用结构化编辑器组件,禁止暴露原始 JSON textarea:`DefinitionEditor`(题目定义薄组合,按模式渲染切片;切片组件 `DefinitionRuntimeSection`/`DefinitionFlagInjectionSection`/`DefinitionCheckerSection`/`DefinitionFlagTemplateSection`/`DefinitionPatchSection` 共享 `useDefinitionModel` 的 model,题库编辑页按「基本信息/运行环境/模式定义」Tab 分别引用切片)、`CompetitionModeConfigEditor`(竞赛配置)、`ChallengeRulesEditor`(题目规则,字段可「覆盖/继承竞赛默认」)。解析/序列化与 schemaVersion、枚举整数编码全部走 `utils/game-config.ts`;字段或结构变化时先改该文件。长表单内部分组用 `DefinitionSection`(标题+可选 Accordion 折叠):常用组 `:collapsible="false"` 固定展开,高级组默认折叠且数据非空时自动展开(`:default-open`),不要平铺十几个无层级的全宽 Field。
 - 竞赛管理与平台管理的路由级多分区导航使用 AppWorkspaceNav 组合 ChoiceSidebar / WaveSelectionList，不使用旧 SidebarProvider / SidebarInset；桌面端为网格内 sticky 侧栏，移动端位于内容上方。Tabs 仅用于单页内内容切换。
+- 竞赛管理与平台管理共用固定视口的 `data-workspace-scroll-content` 内容区：页面本身不滚动，标题保持固定，子页面由纵向 ScrollSurface 独立滚动，并用 MotionSwap 执行路由内容切换。竞赛概览、配置、排行榜、导出与权限页把同一任务域的分区合并到一张连续 Card，以 Separator 划分。
+- 公开个人资料页在桌面端将资料 Card 对齐到内容区右侧，头像居中悬浮在 Card 顶部；窄屏保持居中布局。
 - 分页一律签名 keyset cursor +「加载更多」(useCursorPagination),不要页码;改筛选必须 `reset()`。
 - 异步操作(提交/runtime/重判等)返回 202 时用 usePolling 轮询 statusUrl;SignalR 推送只做失效重取,REST 为事实源。开发环境下两个 Hub 强制走 SSE/长轮询(`import.meta.dev` 分支):Vite ws 代理转发 SignalR WebSocket 会被重置并引发 Nuxt 崩溃重启循环,生产直连后端不受影响。
 - 管理端写操作不携带持久化修订并发字段；可变记录采用 last-write-wins。409 只按生成 SDK 的强类型业务失败码展示，不得统一翻译为修订冲突。

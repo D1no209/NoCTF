@@ -33,7 +33,7 @@ test('route transitions slide only the page content inside the persistent layout
   expect(main).toContain('position: relative; inset: auto; z-index: 20;')
   expect(main).toContain("[data-slot='default-layout-foreground']:has(> main [data-contained-workspace-page])")
   expect(main).toContain("[data-slot='default-layout-foreground'] > main:has([data-contained-workspace-page])")
-  expect(main).toContain("[data-slot='default-layout-foreground']:has(> main [data-slot='app-workspace-nav'] [data-platform-workspace-content])")
+  expect(main).toContain("[data-slot='default-layout-foreground']:has(> main [data-slot='app-workspace-nav'] [data-workspace-scroll-content])")
   expect(main).toContain("> [data-slot='competition-page-route'] { height: 100%;")
   expect(main).not.toContain('.contained-workspace-shell')
   expect(motion).toContain('.noctf-page-slide-enter-active, .noctf-page-slide-leave-active { transition: none; }')
