@@ -25,21 +25,19 @@ export function useCompetitionBroadcastPanel(props: Readonly<Omit<{
 
   const initialized = ref(false)
 
-  let loadedStatus: string | null = null
+  let latestNotifiedAt = 0
 
   async function load(): Promise<void> {
     const competition = ctx.competition.value
     if (!competition) return
     const status = competition.status ?? null
-    const startAt = competition.startTime ? new Date(competition.startTime).getTime() : null
+    const startAt = competition.startTime ? Date.parse(competition.startTime) : Number.NaN
     const now = Date.now()
-    if (status === 'Finished' && initialized.value && loadedStatus === status) return
-    if (startAt === null || now < startAt || status === 'Draft' || status === 'Visible' || status === 'Published') {
+    if (!Number.isFinite(startAt) || now < startAt || status === 'Draft' || status === 'Visible' || status === 'Published') {
       items.value = []
       error.value = null
       loading.value = false
       initialized.value = true
-      loadedStatus = status
       return
     }
     const initialLoad = !initialized.value
@@ -47,15 +45,16 @@ export function useCompetitionBroadcastPanel(props: Readonly<Omit<{
       loading.value = true
       error.value = null
     }
-    const queryEnd = status === 'Finished' && competition.endTime
-      ? Math.min(now, new Date(competition.endTime).getTime())
-      : now
-    const from = new Date(Math.max(startAt, queryEnd - 30 * 24 * 60 * 60 * 1000)).toISOString()
+    const queryWindow = competitionBroadcastQueryWindow(
+      startAt,
+      now,
+      latestNotifiedAt,
+    )!
     const { data, error: requestError } = await listCompetitionEvents({
       path: { competitionId: props.competitionId },
       query: {
-        from,
-        to: new Date(queryEnd).toISOString(),
+        from: queryWindow.from,
+        to: queryWindow.to,
         kinds: competitionBroadcastKinds,
         limit: 10,
       },
@@ -68,7 +67,6 @@ export function useCompetitionBroadcastPanel(props: Readonly<Omit<{
     }
     items.value = mergeCompetitionBroadcasts(items.value, data.items ?? [])
     initialized.value = true
-    loadedStatus = status
     loading.value = false
     error.value = null
   }
@@ -89,6 +87,8 @@ export function useCompetitionBroadcastPanel(props: Readonly<Omit<{
     unwatch = watchCompetition(props.competitionId, {
       competitionEventChanged: notification => {
         if (!isCompetitionBroadcastKind(notification.kind)) return
+        const notifiedAt = Date.parse(notification.occurredAt)
+        if (Number.isFinite(notifiedAt)) latestNotifiedAt = Math.max(latestNotifiedAt, notifiedAt)
         void refreshLatest()
       },
       onReconnected: () => void refreshLatest(),

@@ -3,6 +3,7 @@ import { describe, expect, test } from 'bun:test'
 import type { NoCtfapiEndpointsCompetitionsEventsCompetitionEventResponse } from '../app/api'
 import {
   competitionBroadcastKinds,
+  competitionBroadcastQueryWindow,
   competitionBroadcastIdentity,
   deduplicateCompetitionBroadcasts,
   isCompetitionBroadcastKind,
@@ -127,6 +128,27 @@ describe('competition broadcast projection', () => {
       .toBe(competitionBroadcastIdentity(existing))
   })
 
+  test('keeps a server-timestamped invalidation inside the latest REST window', () => {
+    const startAt = Date.parse('2026-09-01T00:00:00Z')
+    const clientNow = Date.parse('2026-09-14T10:00:00Z')
+    const serverEventAt = Date.parse('2026-09-14T10:00:08Z')
+
+    expect(competitionBroadcastQueryWindow(startAt, clientNow, serverEventAt)).toEqual({
+      from: '2026-09-01T00:00:00.000Z',
+      to: '2026-09-14T10:00:08.000Z',
+    })
+  })
+
+  test('continues querying current announcements after a competition has finished', () => {
+    const startAt = Date.parse('2026-08-01T00:00:00Z')
+    const clientNow = Date.parse('2026-09-14T10:00:00Z')
+
+    expect(competitionBroadcastQueryWindow(startAt, clientNow)).toEqual({
+      from: '2026-08-15T10:00:00.000Z',
+      to: '2026-09-14T10:00:00.000Z',
+    })
+  })
+
   test('mounts the compact panel beside challenges and removes the overlapping tab', async () => {
     const challengePage = await sourceFile(
       new URL('../app/pages/competitions/[id]/challenges/index.vue', import.meta.url),
@@ -182,8 +204,10 @@ describe('competition broadcast projection', () => {
     expect(panel).toContain('@media (prefers-reduced-motion: reduce)')
     expect(panel).toContain('const initialLoad = !initialized.value')
     expect(panel).toContain("now < startAt || status === 'Draft' || status === 'Visible' || status === 'Published'")
-    expect(panel).toContain("status === 'Finished' && initialized.value && loadedStatus === status")
-    expect(panel).toContain('const queryEnd = status === \'Finished\' && competition.endTime')
+    expect(panel).not.toContain("status === 'Finished' && initialized.value")
+    expect(panel).not.toContain('competition.endTime')
+    expect(panel).toContain('latestNotifiedAt = Math.max(latestNotifiedAt, notifiedAt)')
+    expect(panel).toContain('competitionBroadcastQueryWindow(')
   })
 })
 

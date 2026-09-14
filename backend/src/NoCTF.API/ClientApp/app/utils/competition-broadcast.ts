@@ -18,6 +18,27 @@ export const competitionBroadcastKinds = [
   'AnnouncementPublished',
 ] satisfies NoCtfapiEndpointsCompetitionsEventsCompetitionEventKindProtocol[]
 
+const competitionBroadcastLookbackMs = 30 * 24 * 60 * 60 * 1000
+
+export interface CompetitionBroadcastQueryWindow {
+  from: string
+  to: string
+}
+
+/** Keep realtime invalidations inside the REST window even when browser and server clocks differ. */
+export function competitionBroadcastQueryWindow(
+  startAt: number,
+  clientNow: number,
+  latestNotifiedAt = 0,
+): CompetitionBroadcastQueryWindow | null {
+  if (!Number.isFinite(startAt) || !Number.isFinite(clientNow)) return null
+  const queryEnd = Math.max(clientNow, Number.isFinite(latestNotifiedAt) ? latestNotifiedAt : 0)
+  return {
+    from: new Date(Math.max(startAt, queryEnd - competitionBroadcastLookbackMs)).toISOString(),
+    to: new Date(queryEnd).toISOString(),
+  }
+}
+
 const competitionBroadcastKindSet: ReadonlySet<NoCtfapiEndpointsCompetitionsEventsCompetitionEventKindProtocol>
   = new Set(competitionBroadcastKinds)
 
