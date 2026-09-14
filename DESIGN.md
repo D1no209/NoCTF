@@ -109,6 +109,8 @@ Dialog、可滚动 Dialog 和 AlertDialog 都以 Card 原语作为实际 Reka �
 
 消息中心复用同一 `ChoiceSidebar` / `WaveSelectionList` 侧边栏组合与 `Card` 详情容器；列表分页入口使用侧边栏 footer 插槽，详情标题固定在卡片顶部，消息正文与后续记录通过共享 `ScrollSurface` 独立滚动。切换通知复用竞赛详情的 `MotionSwap` / `film-up` 上卷动效，外层 Card 保持固定，只按通知 ID 替换内部内容。选中项与 URL 同步、消息线程加载和操作目标解析继续由通知功能层负责。
 
+赛事播报以 PostgreSQL 事件为事实源，`CompetitionEventCommitted` 经事务 Outbox、Worker Redis 发布与 API SignalR Relay 只发送失效通知，前端收到后重取最近 30 天。重取窗口持续覆盖已结束赛事，并以浏览器当前时间和 SignalR 携带的服务端事件时间两者较晚者为上限，避免结束状态或时钟差导致新播报只能在整页刷新后出现。
+
 右侧详情统一为一张卡片：海报直接作为标题、时间、倒计时、操作和赛道信息区域的背景，不新增顶部横幅；旁边/下方保留报名摘要，底部为 Markdown 介绍。背景遮罩使用主题卡片色，保证文字可读。海报通过 SDK 获取，由共享 CoverImage 原语默认等比 cover 填充（裁切而不拉伸），加载和缺失状态均有占位。测试海报只存在 Mock 数据目录。
 
 切换竞赛使用影片式上卷：外层卡片不参与位移动画，旧内容向上退出后，新内容从下方进入。动效顺序、缓动和高度占位由 `app/motion/useContentSwap.ts` 与 `motion.css` 统一管理；业务详情按竞赛 ID 重建，快速切换以最终选择为准。当前优先验证桌面端，移动端专项适配暂缓。

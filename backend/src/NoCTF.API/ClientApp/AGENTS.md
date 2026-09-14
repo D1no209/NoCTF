@@ -52,6 +52,7 @@ Nuxt 4 SPA(`ssr: false`),Bun 管理依赖,TypeScript strict,Vue 用 `<script set
 - 竞赛列表通过 CompetitionSidebar 功能组件组合 FloatingSidebar / WaveSelectionList 原语，直接固定在背景上，不使用卡片外框。波浪形悬停与选中外凸由 `app/motion/useWaveMotion.ts` 管理，悬停不更改竞赛选择；当前以桌面端为准。
 - 竞赛与题目列表共用 ChoiceSidebar 组合原语；题目页按视口限制高度，采用组件内部 ScrollSurface，不做页面级滚动。题目侧栏提供按名称搜索并与隐藏已解出组合过滤；条目左下角使用 BloodMark 展示一二三血，Hint 暴露对应 teamId。类型水印使用 directionWatermarkClass 保留原方向配色。默认布局不显示站点页脚。
 - 消息中心复用 ChoiceSidebar / WaveSelectionList 列表侧边栏与 Card 详情容器；分页操作放在 ChoiceSidebar footer，详情正文和后续记录使用 Card 内部 ScrollSurface。通知切换复用竞赛详情的 MotionSwap / film-up 动效，外层 Card 不参与动画。通知选择、URL 同步、线程读取与操作目标解析留在 features/notifications。
+- 赛事播报由 `CompetitionEventCommitted` 经事务 Outbox、Worker Redis 发布、API SignalR Relay 后触发客户端 REST 重取。播报查询窗口不得在赛事结束后冻结，也不得只以浏览器时钟作为上限；必须至少覆盖 `competitionEventChanged.occurredAt`，以容忍客户端与服务端时钟差。
 - 首页主视觉填满导航栏下方视口，不再展示近期竞赛列表；状态区使用透明 PseudoTerminal 原语，英文字体为本地 JetBrains Mono，中文回退微软雅黑，输入提示符为 `noctf $`，空输入持续显示共享 motion 闪烁光标。支持 `help`、`ls`、`status`、`whoami`，回车后输入清空且当前输出替换旧输出，不保存或导航终端历史；当前输出使用共享 useTypewriterMotion 逐字呈现并支持减少动态效果，业务数据请求与命令解析留在功能层。
 - 首页 View 直接组合信号装饰层以连接品牌区与终端；四条线路与节点来自 `assets/svg/decorations/home-signal-paths.svg`，主题着色和遮罩集中在 main.css，移动高光放在 motion.css，装饰不接收指针事件并支持减少动态效果。不要为这一处静态标签组合创建单独共享原语。
 - 咨询页使用 ConversationPanel / MessageBubble 共享原语，消息与输入区按 3:1 分配并独立滚动，自己的消息按当前用户 ID 判定后靠右。发送位于输入区右下，解决和关闭操作位于左侧当前咨询条目下方；权限、消息与状态请求由功能层处理。
