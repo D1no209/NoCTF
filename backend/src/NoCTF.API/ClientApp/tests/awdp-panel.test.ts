@@ -37,7 +37,7 @@ describe('AWDP participant panel', () => {
     expect(source).toContain("props.defense?.runtimeState === 'Queued'")
     expect(source).toContain("props.defense?.runtimeState === 'Provisioning'")
     expect(source).toContain("props.defense?.runtimeState === 'Running'")
-    expect(source).toContain('!props.defense.gameplayFactId')
+    expect(source).toContain('!hasGameplayFact.value')
     expect(source).toContain("ui.requestDefenseEnvironment")
     expect(source).toContain("ui.uploadThisFixPackage")
     expect(source).toContain("ui.theDefenseEnvironmentIsStartingYouCanUploadTheFix")
@@ -143,7 +143,7 @@ describe('AWDP participant panel', () => {
     const source = await sourceFile(
       new URL('../app/features/admin/DefinitionCheckerSection.vue', import.meta.url),
     ).text()
-    const awdpBranch = source.slice(source.indexOf("v-else-if=\"mode === 'Awdp'\""))
+    const awdpBranch = source.slice(source.indexOf("mode === 'Awdp' || mode === 'Ctf'"))
 
     expect(awdpBranch).toContain("ui.oneShotFixVerificationChecker")
     expect(awdpBranch).toContain("ui.enableTheOneShotFixVerificationChecker")

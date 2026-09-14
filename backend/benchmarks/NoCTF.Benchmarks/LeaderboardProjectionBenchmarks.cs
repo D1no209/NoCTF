@@ -2,6 +2,7 @@ using BenchmarkDotNet.Attributes;
 using NoCTF.Application.Scoring.Leaderboard;
 using NoCTF.Domain.Competitions;
 using NoCTF.Domain.Gameplay;
+using NoCTF.Domain.Challenges;
 using NoCTF.GameModes.Awd.Configuration;
 using NoCTF.GameModes.Awdp.Configuration;
 using NoCTF.GameModes.Ctf.Configuration;
@@ -49,6 +50,9 @@ public class LeaderboardProjectionBenchmarks
         System.Text.Json.JsonSerializer.Serialize(left)
         == System.Text.Json.JsonSerializer.Serialize(right);
 
+    internal static LeaderboardProjectionInput CreateMixedCtfInput(int teamCount) =>
+        Corpus.Create(GameMode.Ctf, teamCount, mixedCtf: true);
+
     private static class Corpus
     {
         private const int ChallengeCount = 12;
@@ -58,7 +62,10 @@ public class LeaderboardProjectionBenchmarks
         private static readonly DateTimeOffset Start =
             DateTimeOffset.Parse("2026-08-28T00:00:00Z");
 
-        public static LeaderboardProjectionInput Create(GameMode mode, int teamCount)
+        public static LeaderboardProjectionInput Create(
+            GameMode mode,
+            int teamCount,
+            bool mixedCtf = false)
         {
             var competitionId = StableGuid(1);
             var challenges = Enumerable.Range(1, ChallengeCount)
@@ -68,7 +75,10 @@ public class LeaderboardProjectionBenchmarks
                     $"Challenge {index}",
                     false,
                     ChallengeConfiguration(mode, index),
-                    Order: index))
+                    Order: index,
+                    InteractionKind: mode == GameMode.Ctf && mixedCtf && index % 2 == 0
+                        ? CtfInteractionKind.PatchVerification
+                        : CtfInteractionKind.FlagSubmission))
                 .ToArray();
             var teams = Enumerable.Range(1, teamCount)
                 .Select(index => new LeaderboardTeamFact(
@@ -122,9 +132,12 @@ public class LeaderboardProjectionBenchmarks
                 {
                     var actorId = StableGuid(500_000 + teamIndex * 10 + challengeIndex % 4);
                     var occurredAt = Start.AddMinutes(5 + teamIndex).AddSeconds(challengeIndex);
-                    facts.Add(Fact(sequence++, team.Id, challenge.Id, GameplayFactKind.FlagAttempt,
+                    var interactionKind = challenge.InteractionKind == CtfInteractionKind.PatchVerification
+                        ? GameplayFactKind.FixAttempt
+                        : GameplayFactKind.FlagAttempt;
+                    facts.Add(Fact(sequence++, team.Id, challenge.Id, interactionKind,
                         occurredAt, GameplayFactResult.Correct, actorId: actorId));
-                    facts.Add(Fact(sequence++, team.Id, challenge.Id, GameplayFactKind.FlagAttempt,
+                    facts.Add(Fact(sequence++, team.Id, challenge.Id, interactionKind,
                         occurredAt.AddSeconds(-1), GameplayFactResult.Wrong, actorId: actorId, multiplicity: 3));
                     if (challengeIndex % 3 == 0)
                         facts.Add(Fact(sequence++, team.Id, challenge.Id, GameplayFactKind.HintUnlock,
@@ -347,4 +360,26 @@ public class LeaderboardProjectionBenchmarks
             IReadOnlyList<LeaderboardAwdRoundFact>? AwdRounds,
             IReadOnlyList<LeaderboardAwdAggregateFact>? AwdAggregates);
     }
+}
+
+[MemoryDiagnoser]
+public class CtfMixedLeaderboardProjectionBenchmarks
+{
+    private readonly LeaderboardProjectionEngine engine = new(new LeaderboardProjectorCatalog());
+    private LeaderboardProjectionInput input = null!;
+
+    [Params(16, 64)]
+    public int TeamCount { get; set; }
+
+    [GlobalSetup]
+    public void Setup()
+    {
+        input = LeaderboardProjectionBenchmarks.CreateMixedCtfInput(TeamCount);
+        var output = engine.ProjectOutputs(input);
+        if (output.Legacy.Entries.Count == 0 || output.Scoreboard.EntryAllocations.Count == 0)
+            throw new InvalidOperationException("The mixed CTF corpus did not exercise the leaderboard hot path.");
+    }
+
+    [Benchmark]
+    public LeaderboardProjectionOutputs Combined() => engine.ProjectOutputs(input);
 }

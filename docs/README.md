@@ -29,7 +29,7 @@
 10. [Flag](flags.md)
 11. [Runtime](runtime.md)
 12. [附件与对象存储](storage-attachments.md)
-13. 模式规范：[CTF](game-modes/ctf.md)、[AWD](game-modes/awd.md)、[AWDP](game-modes/awdp.md)、[KoH](game-modes/koh.md)
+13. 模式规范：[CTF](game-modes/ctf.md)、[CTF PatchVerification 实验功能](ctf-patch-verification-experiment.md)、[AWD](game-modes/awd.md)、[AWDP](game-modes/awdp.md)、[KoH](game-modes/koh.md)
 14. [实时与站内通知](realtime-notifications.md)
 15. [QQBOT JWT 接入](qqbot-jwt.md)
 16. [开发规范](development.md)、[测试规范](testing.md)、[部署边界](deployment.md)

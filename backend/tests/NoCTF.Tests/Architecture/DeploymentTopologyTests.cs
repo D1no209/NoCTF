@@ -79,6 +79,8 @@ public sealed class DeploymentTopologyTests
             .Contains("Route<CompleteAwdpFixRecovery>(options, WorkerQueue.Control)");
         await Assert.That(routing)
             .Contains("Route<StartAwdpFixVerification>(options, WorkerQueue.Gameplay)");
+        await Assert.That(routing)
+            .Contains("Route<StartPatchVerification>(options, WorkerQueue.Gameplay)");
         await Assert.That(runnerTopology).Contains(".MaximumAckExtension(");
         await Assert.That(runnerTopology).DoesNotContain(".AckWait(");
         foreach (var workerQueue in new[]

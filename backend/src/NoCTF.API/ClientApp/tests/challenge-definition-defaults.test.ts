@@ -22,7 +22,7 @@ import {
 
 describe('challenge definition defaults', () => {
   test.each([
-    ['Ctf', 2],
+    ['Ctf', 3],
     ['Awd', 4],
     ['Awdp', 4],
     ['Koh', 1],
@@ -78,7 +78,7 @@ describe('challenge definition defaults', () => {
   })
 
   test('normalizes submission JSON with the active schema version', () => {
-    expect(JSON.parse(normalizeDefinitionJson('Ctf', '{}')!).schemaVersion).toBe(2)
+    expect(JSON.parse(normalizeDefinitionJson('Ctf', '{}')!).schemaVersion).toBe(3)
     expect(normalizeDefinitionJson('Ctf', '{')).toBeNull()
   })
 
@@ -364,7 +364,9 @@ describe('CTF score decay preview', () => {
     expect(editor).toContain(':model-value="displayedValue(field)"')
     expect(page).toContain(':inherited-json="inheritedConfigJson"')
     expect(editor).toContain(".filter(field => !props.hiddenKeys.includes(field.key))")
-    expect(page).toContain(":hidden-keys=\"challenge.usesDynamicFlag ? [] : ['flagTemplate']\"")
+    expect(page).toContain(':hidden-keys="hiddenRuleKeys"')
+    expect(page).toContain("return ['maxFlagAttempts', 'flagTemplate']")
+    expect(page).toContain("const hidden = ['maxPatchAttempts']")
     expect(page).toContain('lg:grid-cols-[minmax(0,1fr)_14rem]')
   })
 })

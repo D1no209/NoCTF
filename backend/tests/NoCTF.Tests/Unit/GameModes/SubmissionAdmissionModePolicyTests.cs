@@ -93,6 +93,22 @@ public class GameplayFactAdmissionModePolicyTests
     }
 
     [Test]
+    public async Task Ctf_patch_definition_rejects_flag_and_admits_fix_with_patch_limit()
+    {
+        var policy = new GameModeGameplayFactAdmissionPolicy();
+
+        var rules = policy.GetRules(
+            GameMode.Ctf,
+            GameModeDefaultConfiguration.GetCompetitionJson(GameMode.Ctf),
+            """{"schemaVersion":2,"maxPatchAttempts":4}""",
+            """{"schemaVersion":3,"interactionKind":1}""");
+
+        await Assert.That(rules.AllowsFlag).IsFalse();
+        await Assert.That(rules.AllowsFix).IsTrue();
+        await Assert.That(rules.MaxFixAttempts).IsEqualTo(4);
+    }
+
+    [Test]
     public async Task Awdp_UsesConfiguredBreakAndFixAttemptLimits()
     {
         const string json = """{"schemaVersion":4,"break":{"initialPoints":10,"minimumPoints":10,"decayTeamCount":10,"decayMode":0},"fix":{"initialPoints":20,"minimumPoints":20,"decayTeamCount":10,"decayMode":0},"requireBreakBeforeFix":true,"maxBreakSubmissions":3,"maxFixSubmissions":2,"runtime":{"allocation":1,"definition":{"kind":"container","image":"target:v1","internalPorts":[8080]},"limits":{"memoryBytes":268435456,"nanoCpus":500000000,"pidsLimit":128}},"patchEntrypoint":"fix.sh","patchCommand":["/bin/sh","{entrypoint}"],"patchTimeoutSeconds":60,"checker":{"image":"checker:v1","timeoutSeconds":60},"readyTimeoutSeconds":30}""";
