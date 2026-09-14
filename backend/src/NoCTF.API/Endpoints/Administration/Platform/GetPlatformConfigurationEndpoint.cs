@@ -66,7 +66,11 @@ public sealed record AdminPlatformConfigurationResponse(
     AdminHumanVerificationConfigurationResponse HumanVerification,
     EmailVerificationConfigurationResponse EmailVerification,
     PublicGatewayConfigurationResponse PublicGateway,
+    PlatformExperimentalFeaturesResponse ExperimentalFeatures,
     string PublicGatewayStatusUrl);
+
+public sealed record PlatformExperimentalFeaturesResponse(
+    bool CtfPatchVerificationEnabled);
 
 public sealed class GetPlatformConfigurationEndpoint(
     ManagePlatformConfiguration configuration,
@@ -101,6 +105,7 @@ public sealed class GetPlatformConfigurationEndpoint(
             AdminHumanVerificationConfigurationMapping.ToResponse(verification),
             EmailVerificationConfigurationMapping.ToResponse(email),
             PublicGatewayConfigurationMapping.ToResponse(gateway),
+            new(current.CtfPatchVerificationEnabled),
             "/api/v1/admin/platform/public-gateway/status"));
     }
 }

@@ -13,6 +13,7 @@ using NoCTF.Application.Runtime.Provisioning;
 using NoCTF.GameModes.Registration;
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using NoCTF.GameModes.Ctf.Configuration;
 
 namespace NoCTF.Infrastructure.Challenges.Bank;
 
@@ -146,6 +147,40 @@ public sealed class ChallengeBankStore(
                     ct))
         {
             return new(ChallengeTemplateWriteState.ActiveCompetitionModeConflict);
+        }
+        var currentInteraction = entity.Mode == GameMode.Ctf
+            ? GetInteractionKind(entity.DefinitionJson)
+            : CtfInteractionKind.FlagSubmission;
+        var requestedInteraction = command.Mode == GameMode.Ctf
+            ? GetInteractionKind(command.DefinitionJson)
+            : CtfInteractionKind.FlagSubmission;
+        if (requestedInteraction == CtfInteractionKind.PatchVerification
+            && await db.ChallengeFlags.IgnoreQueryFilters().AsNoTracking()
+                .AnyAsync(flag => flag.ChallengeId == command.ChallengeId, ct))
+        {
+            return new(
+                ChallengeTemplateWriteState.InvalidDefinition,
+                Detail: "PatchVerification challenges cannot contain static or generated flags.");
+        }
+        if (currentInteraction != requestedInteraction)
+        {
+            var referenced = await db.CompetitionChallenges.IgnoreQueryFilters().AsNoTracking()
+                .AnyAsync(item => item.ChallengeId == command.ChallengeId, ct);
+            var hasTemplateRuntime = await db.RuntimeInstances.AsNoTracking()
+                .AnyAsync(runtime => runtime.ChallengeId == command.ChallengeId, ct);
+            var hasGameplayFact = await db.GameplayFacts.AsNoTracking()
+                .Join(
+                    db.CompetitionChallenges.IgnoreQueryFilters().AsNoTracking(),
+                    fact => fact.CompetitionChallengeId,
+                    competitionChallenge => competitionChallenge.Id,
+                    (fact, competitionChallenge) => competitionChallenge.ChallengeId)
+                .AnyAsync(challengeId => challengeId == command.ChallengeId, ct);
+            if (referenced || hasTemplateRuntime || hasGameplayFact)
+            {
+                return new(
+                    ChallengeTemplateWriteState.InteractionKindConflict,
+                    Detail: "The CTF interaction kind can change only before the template is referenced or used.");
+            }
         }
         var definitionChanged = !JsonEquals(
             entity.DefinitionJson,
@@ -424,6 +459,18 @@ public sealed class ChallengeBankStore(
         catch (JsonException)
         {
             return false;
+        }
+    }
+
+    private static CtfInteractionKind GetInteractionKind(string definitionJson)
+    {
+        try
+        {
+            return CtfConfigurationUpgrader.ParseChallenge(definitionJson).InteractionKind;
+        }
+        catch (GameModeConfigurationException)
+        {
+            return CtfInteractionKind.FlagSubmission;
         }
     }
 

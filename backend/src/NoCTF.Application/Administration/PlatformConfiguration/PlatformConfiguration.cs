@@ -13,7 +13,8 @@ public sealed record PlatformConfigurationView(
     string Name,
     string? Description,
     Guid? LogoFileId,
-    DateTimeOffset UpdatedAt);
+    DateTimeOffset UpdatedAt,
+    bool CtfPatchVerificationEnabled = false);
 
 public sealed record PlatformLogoReplacement(
     PlatformConfigurationView Configuration,
@@ -26,6 +27,11 @@ public interface IPlatformConfigurationStore
     Task<PlatformConfigurationView> UpdateAsync(
         string name,
         string? description,
+        DateTimeOffset now,
+        CancellationToken cancellationToken);
+
+    Task<PlatformConfigurationView> UpdateExperimentalFeaturesAsync(
+        bool ctfPatchVerificationEnabled,
         DateTimeOffset now,
         CancellationToken cancellationToken);
 
@@ -89,6 +95,12 @@ public sealed class ManagePlatformConfiguration(
             ct);
         return new(PlatformConfigurationUpdateState.Updated, updated);
     }
+
+    public Task<PlatformConfigurationView> UpdateExperimentalFeaturesAsync(
+        bool ctfPatchVerificationEnabled,
+        DateTimeOffset now,
+        CancellationToken ct = default) =>
+        settings.UpdateExperimentalFeaturesAsync(ctfPatchVerificationEnabled, now, ct);
 
     public async Task<PlatformLogoUpdateResult> ReplaceLogoAsync(
         string fileName,

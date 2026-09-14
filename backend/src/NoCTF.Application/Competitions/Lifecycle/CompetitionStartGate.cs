@@ -3,6 +3,8 @@ using NoCTF.Application.Competitions.Configuration;
 using NoCTF.Application.Competitions.Tracks;
 using NoCTF.Application.Scoring;
 using NoCTF.Domain.Competitions;
+using NoCTF.Domain.Challenges;
+using NoCTF.Application.Challenges.Bank;
 
 namespace NoCTF.Application.Competitions.Lifecycle;
 
@@ -37,7 +39,8 @@ public enum StartGateFailureCode
     ChallengeRulesInvalid,
     RuntimeDefinitionInvalid,
     TrackConfigurationInvalid,
-    TeamTrackInvalid
+    TeamTrackInvalid,
+    ExperimentalFeatureDisabled
 }
 
 public sealed record StartGateError(
@@ -55,7 +58,8 @@ public interface ICompetitionStartGateStore
 public sealed class CompetitionStartGate(
     ICompetitionStartGateStore store,
     ICompetitionConfigurationValidator competitionConfigurations,
-    IChallengeConfigurationCatalog challengeConfigurations)
+    IChallengeConfigurationCatalog challengeConfigurations,
+    IExperimentalFeatureReader? experimentalFeatures = null)
 {
     public async Task<IReadOnlyList<StartGateError>?> ValidateAsync(
         Guid competitionId,
@@ -70,6 +74,18 @@ public sealed class CompetitionStartGate(
                 StartGateFailureCode.CompetitionNotPublished,
                 null,
                 "The competition must be Published before it can start."));
+        var hasPatchVerification = snapshot.Mode == GameMode.Ctf
+            && snapshot.Challenges.Any(challenge => challenge.Published
+                && CtfInteractionDefinition.Parse(challenge.DefinitionJson)
+                    == CtfInteractionKind.PatchVerification);
+        if (hasPatchVerification
+            && !(await IsPatchVerificationEnabledAsync(ct)))
+        {
+            errors.Add(new(
+                StartGateFailureCode.ExperimentalFeatureDisabled,
+                null,
+                "CTF PatchVerification is disabled in platform settings."));
+        }
         var publishedChallengeConfigurations = snapshot.Challenges
             .Where(challenge => challenge.Published)
             .Select(challenge => new ChallengeConfigurationSections(
@@ -175,4 +191,8 @@ public sealed class CompetitionStartGate(
             .ThenBy(error => error.Message, StringComparer.Ordinal)
             .ToArray();
     }
+
+    private Task<bool> IsPatchVerificationEnabledAsync(CancellationToken ct) =>
+        experimentalFeatures?.IsCtfPatchVerificationEnabledAsync(ct)
+        ?? Task.FromResult(false);
 }

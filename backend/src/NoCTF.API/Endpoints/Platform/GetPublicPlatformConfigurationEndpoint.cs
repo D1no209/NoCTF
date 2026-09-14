@@ -34,7 +34,11 @@ public sealed record PublicPlatformConfigurationResponse(
     string? Description,
     string? LogoUrl,
     PublicImageUploadLimitsResponse ImageUploadLimits,
-    PublicHumanVerificationResponse HumanVerification);
+    PublicHumanVerificationResponse HumanVerification,
+    PublicExperimentalFeaturesResponse ExperimentalFeatures);
+
+public sealed record PublicExperimentalFeaturesResponse(
+    bool CtfPatchVerificationEnabled);
 
 internal static class PublicPlatformConfigurationMapping
 {
@@ -51,7 +55,8 @@ internal static class PublicPlatformConfigurationMapping
             new(
                 uploadLimits.MaximumAvatarBytes,
                 uploadLimits.MaximumWallpaperBytes),
-            MapHumanVerification(humanVerification));
+            MapHumanVerification(humanVerification),
+            new(configuration.CtfPatchVerificationEnabled));
 
     private static PublicHumanVerificationResponse MapHumanVerification(
         HumanVerificationConfigurationView configuration) =>

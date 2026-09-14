@@ -11,6 +11,8 @@ using NoCTF.Infrastructure.GameplayFacts.Administration;
 using NoCTF.Infrastructure.GameplayFacts.Intake;
 using NoCTF.Infrastructure.GameplayFacts.Management;
 using NoCTF.Infrastructure.GameplayFacts.PatchUploads;
+using NoCTF.Application.GameplayFacts.PatchVerification;
+using NoCTF.Infrastructure.GameplayFacts.PatchVerification;
 using NoCTF.Infrastructure.GameplayFacts.Processing;
 using NoCTF.Infrastructure.GameplayFacts.Status;
 using NoCTF.Infrastructure.GameplayFacts.CheatIncidents;
@@ -37,6 +39,9 @@ internal static class GameplayFactInfrastructure
         services.AddScoped<CreateManualAdjustment>();
         services.AddScoped<IPatchUploadStore, PatchUploadStore>();
         services.AddScoped<CreatePatchUpload>();
+        services.AddScoped<IPatchVerificationTargetStore, PatchVerificationTargetStore>();
+        services.AddScoped<RequestPatchVerificationTarget>();
+        services.AddScoped<GetPatchVerificationState>();
         services.AddScoped<IFixArchiveReader, FixArchiveReader>();
         services.AddScoped<IAdminPatchDownloadStore, AdminPatchDownloadStore>();
         services.AddScoped<AccessAdminPatch>();

@@ -6,7 +6,19 @@ public sealed record StartAwdpFixVerification(
     Guid GameplayFactId,
     Guid RuntimeInstanceId);
 
+public sealed record StartPatchVerification(
+    Guid GameplayFactId,
+    Guid RuntimeInstanceId);
+
 public sealed record RunAwdpFixVerification(
+    Guid GameplayFactId,
+    Guid CompetitionChallengeId,
+    Guid PatchUploadId,
+    Guid RuntimeInstanceId,
+    DateTimeOffset Deadline,
+    string RunnerId) : IRunnerNodeMessage;
+
+public sealed record RunPatchVerification(
     Guid GameplayFactId,
     Guid CompetitionChallengeId,
     Guid PatchUploadId,

@@ -193,7 +193,13 @@ public sealed class FusionLeaderboardCache(
                 false,
                 instance.RulesJson,
                 instance.Order,
-                instance.IsPublished))
+                instance.IsPublished,
+                templates[instance.ChallengeId].DefinitionJson,
+                templates[instance.ChallengeId].Mode == GameMode.Ctf
+                    ? NoCTF.GameModes.Ctf.Configuration.CtfConfigurationUpgrader
+                        .ParseChallenge(templates[instance.ChallengeId].DefinitionJson)
+                        .InteractionKind
+                    : CtfInteractionKind.FlagSubmission))
             .ToList();
 
         var hintCosts = challengeEntities

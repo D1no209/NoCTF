@@ -147,7 +147,8 @@ internal static class GameplayFactAdmissionPersistence
             flagAttempts?.HasCorrect == true,
             officialWindow.EndAt,
             scope.Competition.PracticeModeEnabled,
-            practiceRuntimeState);
+            practiceRuntimeState,
+            scope.Challenge.DefinitionJson);
     }
 
     public static bool Matches(
@@ -161,6 +162,10 @@ internal static class GameplayFactAdmissionPersistence
         && current.OfficialEndAt == expected.OfficialEndAt
         && current.PracticeModeEnabled == expected.PracticeModeEnabled
         && current.PracticeRuntimeState == expected.PracticeRuntimeState
+        && string.Equals(
+            current.ChallengeDefinitionJson,
+            expected.ChallengeDefinitionJson,
+            StringComparison.Ordinal)
         && current.CompetitionDeleted == expected.CompetitionDeleted
         && current.ChallengeDeleted == expected.ChallengeDeleted
         && current.ChallengePublished == expected.ChallengePublished

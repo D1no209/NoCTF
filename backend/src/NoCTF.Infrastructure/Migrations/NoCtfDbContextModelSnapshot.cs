@@ -1013,6 +1013,11 @@ namespace NoCTF.Infrastructure.Migrations
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<short>("Id"));
 
+                    b.Property<bool>("CtfPatchVerificationEnabled")
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false)
+                        .HasColumnName("ctf_patch_verification_enabled");
+
                     b.Property<string>("Description")
                         .HasMaxLength(500)
                         .HasColumnType("character varying(500)")
@@ -1205,6 +1210,7 @@ namespace NoCTF.Infrastructure.Migrations
                         new
                         {
                             Id = (short)1,
+                            CtfPatchVerificationEnabled = false,
                             EmailPasswordResetCooldownSeconds = 60,
                             EmailPasswordResetMaxRequestsPerHour = 5,
                             EmailPasswordResetTokenLifetimeMinutes = 30,

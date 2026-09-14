@@ -103,6 +103,28 @@ public sealed class GameModeCompetitionConfigurationValidator : ICompetitionConf
                             challenge.DefinitionJson)));
                 }
             }
+            else if (mode == GameMode.Ctf)
+            {
+                foreach (var challenge in challenges)
+                {
+                    var definition = Ctf.Configuration.CtfConfigurationUpgrader.ParseChallenge(
+                        challenge.DefinitionJson);
+                    var rules = Ctf.Configuration.CtfConfigurationUpgrader.ParseChallenge(
+                        challenge.RulesJson);
+                    if (definition.InteractionKind
+                            == NoCTF.Domain.Challenges.CtfInteractionKind.PatchVerification)
+                    {
+                        if (rules.MaxFlagAttempts is not null)
+                            errors.Add("PatchVerification rules cannot configure MaxFlagAttempts.");
+                        if (rules.FlagTemplate is not null)
+                            errors.Add("PatchVerification rules cannot configure FlagTemplate.");
+                    }
+                    else if (rules.MaxPatchAttempts is not null)
+                    {
+                        errors.Add("FlagSubmission rules cannot configure MaxPatchAttempts.");
+                    }
+                }
+            }
             else if (mode == GameMode.Koh)
             {
                 foreach (var challenge in challenges)

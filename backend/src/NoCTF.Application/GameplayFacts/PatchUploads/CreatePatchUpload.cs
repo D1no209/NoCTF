@@ -3,6 +3,7 @@ using System.IO.Compression;
 using NoCTF.Application.Common;
 using NoCTF.Application.Storage;
 using NoCTF.Application.Commands.Idempotency;
+using NoCTF.Domain.Runtime;
 
 namespace NoCTF.Application.GameplayFacts.PatchUploads;
 
@@ -12,7 +13,8 @@ public sealed record PatchUploadScope(
     Guid TeamId,
     Guid UserId,
     Guid RuntimeInstanceId,
-    long MaximumArchiveBytes = PatchUploadRules.DefaultMaximumArchiveBytes);
+    long MaximumArchiveBytes = PatchUploadRules.DefaultMaximumArchiveBytes,
+    RuntimePurpose Purpose = RuntimePurpose.AwdpTarget);
 
 public static class PatchUploadRules
 {
@@ -90,7 +92,8 @@ public sealed class CreatePatchUpload(
         string contentType,
         Stream content,
         DateTimeOffset now,
-        CancellationToken ct = default)
+        CancellationToken ct = default,
+        RuntimePurpose? expectedPurpose = null)
     {
         if (content.CanSeek && content.Length <= PatchUploadRules.HardMaximumArchiveBytes && replay is not null)
         {
@@ -107,6 +110,12 @@ public sealed class CreatePatchUpload(
             return OperationResult<AcceptedAwdpFix, PatchUploadFailureCode>.Failure(
                 PatchUploadFailureCode.PatchUploadNotAvailable,
                 "No active one-shot defense target is available for this team and challenge.");
+        if (expectedPurpose is { } purpose && scope.Purpose != purpose)
+        {
+            return OperationResult<AcceptedAwdpFix, PatchUploadFailureCode>.Failure(
+                PatchUploadFailureCode.PatchUploadNotAvailable,
+                "The Patch target does not belong to this verification workflow.");
+        }
         if (!content.CanSeek)
             return OperationResult<AcceptedAwdpFix, PatchUploadFailureCode>.Failure(
                 PatchUploadFailureCode.ArchiveStreamNotSeekable,

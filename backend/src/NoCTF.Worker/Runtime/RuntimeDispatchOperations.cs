@@ -26,6 +26,8 @@ using System.Security.Cryptography;
 using NoCTF.GameModes.Awd.Configuration;
 using NoCTF.GameModes.Awdp.Configuration;
 using NoCTF.GameModes.Awdp.Runtime;
+using NoCTF.GameModes.PatchVerification.Configuration;
+using NoCTF.GameModes.PatchVerification.Runtime;
 using NoCTF.GameModes.Registration;
 using NoCTF.Worker.Runtime;
 using CompetitionLifecycleAdvancer = NoCTF.Application.Competitions.Lifecycle.AdvanceCompetitionLifecycleUseCase;
@@ -85,13 +87,14 @@ internal static partial class BackendMessageOperations
         ChallengeRuntimeTemplate? template;
         try
         {
-            var awdpConfiguration = instance.Purpose == RuntimePurpose.AwdpTarget
-                ? AwdpConfigurationResolver.Resolve(
+            var patchVerificationConfiguration = IsPatchVerificationTarget(instance.Purpose)
+                ? PatchVerificationConfigurationResolver.Resolve(
+                    target.Mode,
                     target.CompetitionConfigurationJson!,
                     target.RulesJson!,
                     target.DefinitionJson)
                 : null;
-            template = awdpConfiguration?.Runtime
+            template = patchVerificationConfiguration?.Runtime
                 ?? templates.Get(target.Mode, target.DefinitionJson);
         }
         catch (Exception exception) when (exception is InvalidOperationException
@@ -122,7 +125,7 @@ internal static partial class BackendMessageOperations
                 .SingleOrDefaultAsync(cancellationToken);
         }
         else if (target.Mode is GameMode.Ctf or GameMode.Awdp
-            && instance.Purpose != RuntimePurpose.AwdpTarget
+            && !IsPatchVerificationTarget(instance.Purpose)
             && template.FlagSource == RuntimeFlagSource.PerTeam)
         {
             if (instance.TeamId is Guid teamId
@@ -148,7 +151,7 @@ internal static partial class BackendMessageOperations
         }
         if ((instance.TestFlagDelivery == RuntimeTestFlagDelivery.Environment
                 || target.Mode is GameMode.Ctf or GameMode.Awdp
-                    && instance.Purpose != RuntimePurpose.AwdpTarget
+                    && !IsPatchVerificationTarget(instance.Purpose)
                     && template.FlagSource == RuntimeFlagSource.PerTeam)
             && perTeamFlag is null)
         {
@@ -186,13 +189,13 @@ internal static partial class BackendMessageOperations
         IRuntimeProvisionMessage provision;
         try
         {
-            if (instance.Purpose == RuntimePurpose.AwdpTarget)
+            if (IsPatchVerificationTarget(instance.Purpose))
             {
-                var definition = AwdpTargetDefinitionFactory.Create(
+                var definition = PatchVerificationTargetDefinitionFactory.Create(
                     instance.Id,
                     template,
                     instance.RuntimeProvider,
-                    timeProvider.GetUtcNow());
+                    instance.Purpose);
                 if (instance.RuntimeProvider == RuntimeProvider.Docker)
                 {
                     definition = definition with
@@ -359,5 +362,8 @@ internal static partial class BackendMessageOperations
         string DefinitionJson,
         string? CompetitionConfigurationJson,
         string? RulesJson);
+
+    private static bool IsPatchVerificationTarget(RuntimePurpose purpose) =>
+        purpose is RuntimePurpose.AwdpTarget or RuntimePurpose.PatchVerificationTarget;
 
 }

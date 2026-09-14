@@ -1,5 +1,6 @@
 using NoCTF.Domain.Competitions;
 using NoCTF.Domain.Gameplay;
+using NoCTF.Domain.Challenges;
 
 namespace NoCTF.Application.Scoring.Leaderboard;
 
@@ -39,7 +40,9 @@ public sealed record LeaderboardChallengeFact(
     bool IsDeleted,
     string? ConfigurationJson = null,
     int Order = 0,
-    bool IsPublished = true);
+    bool IsPublished = true,
+    string? DefinitionJson = null,
+    CtfInteractionKind InteractionKind = CtfInteractionKind.FlagSubmission);
 
 public sealed record LeaderboardGameplayFact(
     Guid GameplayFactId,

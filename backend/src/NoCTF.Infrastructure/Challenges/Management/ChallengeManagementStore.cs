@@ -8,6 +8,9 @@ using NoCTF.Application.Messaging;
 using NoCTF.Application.Competitions.Events;
 using NoCTF.Application.Runtime.Provisioning;
 using NoCTF.Domain.Competitions.Events;
+using NoCTF.GameModes.Ctf.Configuration;
+using NoCTF.GameModes.Registration;
+using NoCTF.Application.Challenges.Bank;
 
 namespace NoCTF.Infrastructure.Challenges.Management;
 
@@ -15,7 +18,8 @@ public sealed class ChallengeManagementStore(
     NoCtfDbContext db,
     ITransactionalMessageOutbox outbox,
     IChallengeRuntimeTemplateCatalog runtimeTemplates,
-    ICompetitionEventRecorder? eventRecorder = null) : IChallengeManagementStore
+    ICompetitionEventRecorder? eventRecorder = null,
+    IExperimentalFeatureReader? experimentalFeatures = null) : IChallengeManagementStore
 {
     private readonly ICompetitionEventRecorder events =
         eventRecorder ?? NullCompetitionEventRecorder.Instance;
@@ -51,6 +55,12 @@ public sealed class ChallengeManagementStore(
             return new(null, ChallengeMutationFailure.TemplateNotFound);
         if (template.Mode != competitionMode)
             return new(null, ChallengeMutationFailure.TemplateModeMismatch);
+        if (GetInteractionKind(template.Mode, template.DefinitionJson)
+                == CtfInteractionKind.PatchVerification
+            && !(await IsPatchVerificationEnabledAsync(ct)))
+        {
+            return new(null, ChallengeMutationFailure.ExperimentalFeatureDisabled);
+        }
         var entity = new CompetitionChallenge
         {
             Id = command.CompetitionChallengeId ?? Guid.CreateVersion7(command.CreatedAt),
@@ -135,6 +145,19 @@ public sealed class ChallengeManagementStore(
             return new(null, ChallengeMutationFailure.ChallengeNotFound);
         var wasPublished = entity.IsPublished;
         var becamePublished = !wasPublished && command.IsPublished;
+        if (becamePublished)
+        {
+            var definition = await db.Challenges.AsNoTracking()
+                .Where(challenge => challenge.Id == entity.ChallengeId)
+                .Select(challenge => new { challenge.Mode, challenge.DefinitionJson })
+                .SingleAsync(ct);
+            if (GetInteractionKind(definition.Mode, definition.DefinitionJson)
+                    == CtfInteractionKind.PatchVerification
+                && !(await IsPatchVerificationEnabledAsync(ct)))
+            {
+                return new(null, ChallengeMutationFailure.ExperimentalFeatureDisabled);
+            }
+        }
         entity.CustomTitle = command.CustomTitle;
         entity.Order = command.Order;
         entity.IsPublished = command.IsPublished;
@@ -347,7 +370,8 @@ public sealed class ChallengeManagementStore(
             template.CreatedAt,
             instance.UpdatedAt)
         {
-            UsesDynamicFlag = runtime is { FlagSource: not RuntimeFlagSource.Static }
+            UsesDynamicFlag = runtime is { FlagSource: not RuntimeFlagSource.Static },
+            InteractionKind = GetInteractionKind(template.Mode, template.DefinitionJson)
         };
     }
 
@@ -369,9 +393,31 @@ public sealed class ChallengeManagementStore(
             projection.CreatedAt,
             projection.UpdatedAt)
         {
-            UsesDynamicFlag = runtime is { FlagSource: not RuntimeFlagSource.Static }
+            UsesDynamicFlag = runtime is { FlagSource: not RuntimeFlagSource.Static },
+            InteractionKind = GetInteractionKind(projection.Mode, projection.DefinitionJson)
         };
     }
+
+    private static CtfInteractionKind GetInteractionKind(GameMode mode, string definitionJson) =>
+        mode == GameMode.Ctf
+            ? TryGetCtfInteractionKind(definitionJson)
+            : CtfInteractionKind.FlagSubmission;
+
+    private static CtfInteractionKind TryGetCtfInteractionKind(string definitionJson)
+    {
+        try
+        {
+            return CtfConfigurationUpgrader.ParseChallenge(definitionJson).InteractionKind;
+        }
+        catch (GameModeConfigurationException)
+        {
+            return CtfInteractionKind.FlagSubmission;
+        }
+    }
+
+    private Task<bool> IsPatchVerificationEnabledAsync(CancellationToken ct) =>
+        experimentalFeatures?.IsCtfPatchVerificationEnabledAsync(ct)
+        ?? Task.FromResult(false);
 
     private sealed record ChallengeProjection(
         Guid Id,

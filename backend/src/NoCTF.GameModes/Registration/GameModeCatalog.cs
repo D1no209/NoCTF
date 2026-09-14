@@ -9,7 +9,7 @@ public static class GameModeCatalog
 {
     public static IReadOnlyList<GameModeDescriptor> All { get; } =
     [
-        new(GameMode.Ctf, Ctf.Configuration.CtfConfiguration.CurrentSchemaVersion, false),
+        new(GameMode.Ctf, Ctf.Configuration.CtfConfiguration.CurrentSchemaVersion, true),
         new(GameMode.Awd, Awd.Configuration.AwdConfiguration.CurrentSchemaVersion, false),
         new(GameMode.Awdp, Awdp.Configuration.AwdpConfiguration.CurrentSchemaVersion, true),
         new(GameMode.Koh, Koh.Configuration.KohConfiguration.CurrentSchemaVersion, false)

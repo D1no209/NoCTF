@@ -1,6 +1,6 @@
 namespace NoCTF.Application.Commands.Idempotency;
 
-public enum ReplayOperation { FlagSubmission, ManualAdjustment, PatchUpload, RuntimeMutation, AdminRuntimeMutation, TemplateTestRuntimeMutation, AwdpDefenseTarget }
+public enum ReplayOperation { FlagSubmission, ManualAdjustment, PatchUpload, RuntimeMutation, AdminRuntimeMutation, TemplateTestRuntimeMutation, AwdpDefenseTarget, PatchVerificationTarget }
 public sealed record ReplayScope(Guid UserId, ReplayOperation Operation, Guid CompetitionId, Guid ResourceId);
 public sealed record RuntimeCommandReceipt(Guid RuntimeInstanceId);
 public interface IRequestCommandKey { Guid? Key { get; } Guid? ActorId => null; }

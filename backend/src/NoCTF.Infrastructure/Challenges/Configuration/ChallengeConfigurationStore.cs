@@ -38,7 +38,8 @@ public sealed class ChallengeConfigurationStore(
                     && team.RegistrationStatus == TeamRegistrationStatus.Approved
                     && !team.IsBanned
                     && team.DeletedAt == null),
-                item.Configuration.UpdatedAt))
+                item.Configuration.UpdatedAt,
+                item.Challenge.DefinitionJson))
             .SingleOrDefaultAsync(ct);
 
     public async Task<ChallengeConfigurationUpdateResult> TryUpdateAsync(

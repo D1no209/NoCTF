@@ -39,9 +39,17 @@ public sealed class RunnerScoringTokenIssuer(IOptions<RunnerScoringOptions> conf
         ]);
 
     public string IssueAwdpFixResult(AwdpFixResultTokenRequest request) =>
+        IssuePatchResult(request, "awdp:fix-result:write");
+
+    public string IssuePatchVerificationResult(AwdpFixResultTokenRequest request) =>
+        IssuePatchResult(request, "patch-verification:result:write");
+
+    private string IssuePatchResult(
+        AwdpFixResultTokenRequest request,
+        string permission) =>
         Write(request.RunnerId, request.IssuedAt, request.Deadline,
         [
-            new("permission", "awdp:fix-result:write"),
+            new("permission", permission),
             new("resource", $"gameplay-fact:{request.GameplayFactId:D}:runtime:{request.RuntimeInstanceId:D}"),
             new("gameplay_fact_id", request.GameplayFactId.ToString("D")),
             new("runtime_instance_id", request.RuntimeInstanceId.ToString("D")),

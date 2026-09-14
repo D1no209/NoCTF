@@ -96,6 +96,15 @@ public static class AuthenticationRegistration
                 .RequireClaim("gameplay_fact_id")
                 .RequireClaim("runtime_instance_id")
                 .RequireClaim("deadline"));
+            options.AddPolicy("PatchVerificationResult", policy => policy
+                .AddAuthenticationSchemes(InternalScheme)
+                .RequireAuthenticatedUser()
+                .RequireClaim("token_type", "internal")
+                .RequireClaim("permission", "patch-verification:result:write")
+                .RequireClaim("resource")
+                .RequireClaim("gameplay_fact_id")
+                .RequireClaim("runtime_instance_id")
+                .RequireClaim("deadline"));
             options.AddPolicy("FixArchiveRead", policy => policy
                 .AddAuthenticationSchemes(InternalScheme)
                 .RequireAuthenticatedUser()

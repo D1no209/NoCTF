@@ -25,7 +25,8 @@ public enum RuntimePurpose : short
     AwdpTarget,
     Practice,
     AwdpAttack,
-    TemplateTest
+    TemplateTest,
+    PatchVerificationTarget
 }
 
 public enum RuntimeTestFlagDelivery : short

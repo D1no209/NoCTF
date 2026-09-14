@@ -269,7 +269,9 @@ public sealed class PatchChallengeTemplateEndpoint(
                 or ChallengeTemplateWriteState.ActiveRuntimeDefinitionConflict
                 or ChallengeTemplateWriteState.OwnerIncludedInManagerSet
                 or ChallengeTemplateWriteState.UserNotFound
-                or ChallengeTemplateWriteState.RoleNotEligible =>
+                or ChallengeTemplateWriteState.RoleNotEligible
+                or ChallengeTemplateWriteState.ExperimentalFeatureDisabled
+                or ChallengeTemplateWriteState.InteractionKindConflict =>
                 TypedResults.Conflict(ChallengeTemplateWriteResponseMapper.ToConflict(result)),
             ChallengeTemplateWriteState.InvalidRequest
                 or ChallengeTemplateWriteState.InvalidDefinition =>

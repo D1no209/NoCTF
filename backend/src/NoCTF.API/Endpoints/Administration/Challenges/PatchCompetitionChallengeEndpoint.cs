@@ -24,7 +24,8 @@ public enum CompetitionChallengeConflictCode
     ChallengeTemplateConflict,
     LifecycleStateConflict,
     ChallengeTemplateNotFound,
-    ChallengeTemplateModeMismatch
+    ChallengeTemplateModeMismatch,
+    ExperimentalFeatureDisabled
 }
 
 public sealed record CompetitionChallengeConflictResponse(
@@ -44,6 +45,7 @@ internal static class CompetitionChallengeConflictMapper
                 ChallengeMutationFailure.LifecycleStateConflict => CompetitionChallengeConflictCode.LifecycleStateConflict,
                 ChallengeMutationFailure.TemplateNotFound => CompetitionChallengeConflictCode.ChallengeTemplateNotFound,
                 ChallengeMutationFailure.TemplateModeMismatch => CompetitionChallengeConflictCode.ChallengeTemplateModeMismatch,
+                ChallengeMutationFailure.ExperimentalFeatureDisabled => CompetitionChallengeConflictCode.ExperimentalFeatureDisabled,
                 _ => throw new InvalidOperationException($"Unsupported competition challenge conflict: {failure}.")
             },
             failure.ToString());

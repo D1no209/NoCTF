@@ -3,6 +3,9 @@ using Microsoft.AspNetCore.Http.HttpResults;
 using NoCTF.Application.Challenges.Management;
 using NoCTF.API.Security;
 using NoCTF.Application.Competitions.Visibility;
+using NoCTF.Application.Challenges.Bank;
+using NoCTF.Domain.Challenges;
+using NoCTF.Domain.Competitions;
 
 namespace NoCTF.API.Endpoints.Challenges;
 
@@ -16,7 +19,8 @@ public sealed class ListChallengesEndpoint(
     ICompetitionChallengeAudienceAccess audienceAccess,
     ICompetitionVisibilityAccess visibilityAccess,
     IUserContext user,
-    TimeProvider timeProvider) : Endpoint<ListChallengesRequest, Results<Ok<ChallengeListResponse>, NotFound>>
+    TimeProvider timeProvider,
+    IExperimentalFeatureReader? experimentalFeatures = null) : Endpoint<ListChallengesRequest, Results<Ok<ChallengeListResponse>, NotFound>>
 {
     public override void Configure()
     {
@@ -46,9 +50,19 @@ public sealed class ListChallengesEndpoint(
             includeUnpublished: false,
             includeDeleted: false,
             ct);
+        if (visibility.CompetitionStatus is not (CompetitionStatus.Running or CompetitionStatus.Paused)
+            && !(await IsPatchVerificationEnabledAsync(ct)))
+        {
+            items = items.Where(item =>
+                item.InteractionKind != CtfInteractionKind.PatchVerification).ToArray();
+        }
         return TypedResults.Ok(ChallengeMapper.ToListResponse(
             items,
             visibility.Visibility,
             visibility.DataScope));
     }
+
+    private Task<bool> IsPatchVerificationEnabledAsync(CancellationToken ct) =>
+        experimentalFeatures?.IsCtfPatchVerificationEnabledAsync(ct)
+        ?? Task.FromResult(false);
 }
