@@ -32,6 +32,14 @@ export function useAdminCompetitionsByIdChallengesByCcIdPage() {
 
   const challenge = ref<NoCtfapiEndpointsChallengesChallengeResponse | null>(null)
 
+  const hiddenRuleKeys = computed(() => {
+    if (challenge.value?.interactionKind === 'PatchVerification')
+      return ['maxFlagAttempts', 'flagTemplate']
+    const hidden = ['maxPatchAttempts']
+    if (challenge.value?.usesDynamicFlag !== true) hidden.push('flagTemplate')
+    return hidden
+  })
+
   const loading = ref(true)
 
   const loadError = ref<string | null>(null)
@@ -500,7 +508,8 @@ export function useAdminCompetitionsByIdChallengesByCcIdPage() {
       openAdjustment,
       closeAdjustment,
       submitAdjustment,
-      ChallengeRulesEditor
+      ChallengeRulesEditor,
+      hiddenRuleKeys
     }
   const viewState = proxyRefs(viewBindings)
 

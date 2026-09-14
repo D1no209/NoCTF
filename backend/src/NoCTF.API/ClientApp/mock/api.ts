@@ -404,6 +404,7 @@ export function createMockApi() {
           policy: { enabled: false, connectorId: 'gateway', publicOrigin: '', directOrigins: [], publicRuntimeHost: '', directRuntimeHostOverride: null, maxPublishedPorts: 8 },
           capability: { connectorId: 'gateway', runnerId: 'mock-runner', approvedOrigins: ['https://public.example.test'], firstPort: 32768, lastPort: 60999, reservedPorts: [], maximumPorts: 8, namespaceIsolationAvailable: true },
         },
+        experimentalFeatures: state.platform.experimentalFeatures,
         publicGatewayStatusUrl: '/api/v1/admin/platform/public-gateway/status',
       }
       else if (route === '/auth/me') value = user
@@ -597,11 +598,18 @@ export function createMockApi() {
           policy: body.publicGateway,
           capability: { connectorId: body.publicGateway.connectorId, runnerId: 'mock-runner', approvedOrigins: [body.publicGateway.publicOrigin], firstPort: 32768, lastPort: 60999, reservedPorts: [], maximumPorts: 8, namespaceIsolationAvailable: true },
         })
+        if (body.experimentalFeatures) {
+          state.platform.experimentalFeatures = {
+            ctfPatchVerificationEnabled:
+              body.experimentalFeatures.ctfPatchVerificationEnabled === true,
+          }
+        }
         value = {
           branding: state.platform,
           humanVerification: currentHumanVerification(),
           emailVerification: state.settings.get('platform/email'),
           publicGateway: state.settings.get('platform/gateway'),
+          experimentalFeatures: state.platform.experimentalFeatures,
           publicGatewayStatusUrl: '/api/v1/admin/platform/public-gateway/status',
         }
       }

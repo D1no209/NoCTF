@@ -3,7 +3,7 @@ import { toRefs } from 'vue'
 import type { CtfPanelViewState } from '~/features/challenges/panels/useCtfPanel'
 
 const viewProps = defineProps<{ state: CtfPanelViewState }>()
-const { practiceOpen, actionsAvailable, emit, handleEvaluation, FlagSubmit, RuntimeCard, setRuntimeCardRef, competition, challenge, flagDockTarget, runtimeDockTarget } = toRefs(viewProps.state)
+const { practiceOpen, isPatchVerification, actionsAvailable, patchVerification, patchOutcome, emit, handleEvaluation, handlePatchChanged, FlagSubmit, FixSubmit, RuntimeCard, setRuntimeCardRef, competition, challenge, flagDockTarget, runtimeDockTarget } = toRefs(viewProps.state)
 </script>
 
 <template>
@@ -18,7 +18,7 @@ const { practiceOpen, actionsAvailable, emit, handleEvaluation, FlagSubmit, Runt
       :dock-target="runtimeDockTarget"
     />
     <component :is="FlagSubmit"
-      v-if="actionsAvailable"
+      v-if="actionsAvailable && !isPatchVerification"
       :dock-target="flagDockTarget"
       :competition-id="competition.id!"
       :competition-challenge-id="challenge.id!"
@@ -30,5 +30,20 @@ const { practiceOpen, actionsAvailable, emit, handleEvaluation, FlagSubmit, Runt
       @submitted="emit('submitted')"
       @remaining-changed="emit('remainingChanged', $event)"
     />
+    <Teleport v-if="actionsAvailable && isPatchVerification" :to="flagDockTarget ?? 'body'" :disabled="!flagDockTarget">
+      <component
+        :is="FixSubmit"
+        class="pt-5"
+        :competition-id="competition.id!"
+        :competition-challenge-id="challenge.id!"
+        :defense="patchVerification"
+        ctf-patch-verification
+        @changed="handlePatchChanged"
+        @accepted="emit('submitted')"
+      />
+    </Teleport>
+    <Alert v-if="isPatchVerification && patchOutcome" :variant="patchOutcome.variant" class="mt-4">
+      <AlertDescription>{{ $message(patchOutcome.message) }}</AlertDescription>
+    </Alert>
   </div>
 </template>

@@ -33,7 +33,7 @@ const { isCompose, toggleChecker, toggleCheckerJob, RunnerJobEditor, model, mode
     </template>
   </FieldSet>
 
-  <FieldSet v-else-if="mode === 'Awdp'" class="rounded-md border p-4">
+  <FieldSet v-else-if="mode === 'Awdp' || mode === 'Ctf'" class="rounded-md border p-4">
     <FieldLegend class="px-1 text-sm font-medium">{{ $t('ui.oneShotFixVerificationChecker') }}</FieldLegend>
     <Field orientation="horizontal">
       <Switch
@@ -65,7 +65,7 @@ const { isCompose, toggleChecker, toggleCheckerJob, RunnerJobEditor, model, mode
     </FieldDescription>
   </FieldSet>
 
-  <FieldGroup v-if="(mode === 'Awd' && model.checker) || (mode === 'Awdp' && model.checkerJob)">
+  <FieldGroup v-if="(mode === 'Awd' && model.checker) || ((mode === 'Awdp' || mode === 'Ctf') && model.checkerJob)">
     <Field orientation="horizontal" :data-disabled="disabled">
       <Switch id="def-checker-allow-root" v-model="model.checkerAllowRoot" :disabled="disabled" />
       <FieldContent>

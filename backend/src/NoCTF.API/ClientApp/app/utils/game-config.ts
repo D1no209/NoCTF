@@ -12,7 +12,7 @@ import { translate } from './i18n'
 export type GameModeValue = NoCtfapiEndpointsCompetitionsGameModeProtocol
 
 /** 各 JSON 区域当前的 schemaVersion(更高的版本或无 upgrader 的旧版本会被后端拒绝)。 */
-export const DEFINITION_SCHEMA_VERSION = { Ctf: 2, Awd: 4, Awdp: 4, Koh: 1 } as const
+export const DEFINITION_SCHEMA_VERSION = { Ctf: 3, Awd: 4, Awdp: 4, Koh: 1 } as const
 export const COMPETITION_CONFIG_SCHEMA_VERSION: Record<GameModeValue, number> = { Ctf: 2, Awd: 2, Awdp: 4, Koh: 1 }
 export const CHALLENGE_RULES_SCHEMA_VERSION: Record<GameModeValue, number> = { Ctf: 2, Awd: 4, Awdp: 4, Koh: 1 }
 
@@ -37,6 +37,7 @@ export const ScoreDecayMode = {
   Custom: 5,
 } as const
 export const EvaluationDispatch = { Automatic: 0, ManualBatch: 1 } as const
+export const CtfInteraction = { FlagSubmission: 0, PatchVerification: 1 } as const
 
 export const ATTACK_REWARD_MODES = [
   { value: 'FixedPerAttack', label: "ui.fixedScoreForEachAttack" },
@@ -150,6 +151,7 @@ export interface FlagInjectionModel {
 }
 
 export interface DefinitionModel {
+  interactionKind: number
   runtime: RuntimeTemplateModel | null
   /** AWD:checker(包装 job + targetServiceName)。 */
   checker: { job: RunnerJobModel; targetServiceName: string } | null
@@ -167,6 +169,7 @@ export interface DefinitionModel {
 }
 
 export const DEFAULT_MAXIMUM_PATCH_UPLOAD_BYTES = 256 * 1024 * 1024
+export const DEFAULT_CTF_PATCH_UPLOAD_BYTES = 64 * 1024 * 1024
 export const HARD_MAXIMUM_PATCH_UPLOAD_BYTES = 1024 * 1024 * 1024
 export const DEFAULT_RUNTIME_MEMORY_BYTES = 256 * 1024 * 1024
 export const DEFAULT_RUNTIME_NANO_CPUS = 500_000_000
@@ -251,6 +254,7 @@ export function emptyFlagTemplate(): FlagTemplateModel {
 
 export function emptyDefinition(mode: GameModeValue): DefinitionModel {
   return {
+    interactionKind: CtfInteraction.FlagSubmission,
     runtime: null,
     checker: null,
     checkerJob: null,
@@ -426,7 +430,11 @@ export function parseDefinition(
   const obj = parseJsonObject(json)
   if (!obj) return null
   const model = emptyDefinition(mode)
-  if (mode === 'Awd' || mode === 'Awdp')
+  model.interactionKind = mode === 'Ctf'
+    ? asNumber(obj.interactionKind) ?? CtfInteraction.FlagSubmission
+    : CtfInteraction.FlagSubmission
+  if (mode === 'Awd' || mode === 'Awdp'
+    || mode === 'Ctf' && model.interactionKind === CtfInteraction.PatchVerification)
     model.checkerAllowRoot = obj.checkerAllowRoot === true
   model.runtime = obj.runtime ? parseRuntimeTemplate(obj.runtime) : null
   if (mode === 'Awd' && obj.checker) {
@@ -438,7 +446,9 @@ export function parseDefinition(
       }
     }
   }
-  if (mode === 'Awdp' && obj.checker) {
+  if ((mode === 'Awdp'
+      || mode === 'Ctf' && model.interactionKind === CtfInteraction.PatchVerification)
+    && obj.checker) {
     const checker = asObject(obj.checker) ?? {}
     if (!('job' in checker)) model.checkerJob = parseRunnerJob(checker)
   }
@@ -454,13 +464,14 @@ export function parseDefinition(
   }
   if (mode === 'Ctf' || mode === 'Awd')
     model.flagTemplate = obj.flagTemplate ? parseFlagTemplate(obj.flagTemplate) : null
-  if (mode === 'Awdp') {
+  if (mode === 'Awdp'
+    || mode === 'Ctf' && model.interactionKind === CtfInteraction.PatchVerification) {
     model.patchEntrypoint = asString(obj.patchEntrypoint)
     model.patchCommand = asStringArray(obj.patchCommand)
     model.patchTimeoutSeconds = asNumber(obj.patchTimeoutSeconds)
     model.readyTimeoutSeconds = asNumber(obj.readyTimeoutSeconds)
     model.maximumPatchUploadBytes = asNumber(obj.maximumPatchUploadBytes)
-      ?? DEFAULT_MAXIMUM_PATCH_UPLOAD_BYTES
+      ?? (mode === 'Ctf' ? DEFAULT_CTF_PATCH_UPLOAD_BYTES : DEFAULT_MAXIMUM_PATCH_UPLOAD_BYTES)
     model.checkerFixInput = obj.checkerFixInput === true
   }
   return model
@@ -520,6 +531,38 @@ function serializeSecurity(security: SecurityModel): JsonObject | null {
   putStringArray(obj, 'capDrop', capDrop)
   putStringArray(obj, 'capAdd', capAdd)
   return obj
+}
+
+export function applyCtfInteraction(
+  model: DefinitionModel,
+  interactionKind: number,
+): void {
+  model.interactionKind = interactionKind
+  if (interactionKind === CtfInteraction.PatchVerification) {
+    model.runtime ??= emptyRuntimeTemplate('Ctf')
+    model.runtime.flagSource = FlagSource.Static
+    if (model.runtime.definition.kind === 'container')
+      model.runtime.definition.flagEnvironmentVariableName = ''
+    else
+      model.runtime.definition.flagEnvironmentVariables = {}
+    model.checkerJob ??= emptyRunnerJob()
+    model.maximumPatchUploadBytes ??= DEFAULT_CTF_PATCH_UPLOAD_BYTES
+    model.flagTemplate = null
+    return
+  }
+  model.patchEntrypoint = ''
+  model.patchCommand = []
+  model.patchTimeoutSeconds = null
+  model.readyTimeoutSeconds = null
+  model.maximumPatchUploadBytes = null
+  model.checkerJob = null
+  model.checkerFixInput = false
+  model.checkerAllowRoot = false
+  if (model.runtime) {
+    model.runtime.flagSource = FlagSource.PerTeam
+    if (model.runtime.definition.kind === 'container')
+      model.runtime.definition.flagEnvironmentVariableName = 'FLAG'
+  }
 }
 
 function serializeRuntimeDefinition(definition: RuntimeDefinitionModel): JsonObject {
@@ -600,7 +643,9 @@ function serializeRunnerJob(job: RunnerJobModel): JsonObject {
 /** 按模式白名单序列化编辑模型为 definitionJson。 */
 export function serializeDefinition(mode: GameModeValue, model: DefinitionModel): string {
   const obj: JsonObject = { schemaVersion: DEFINITION_SCHEMA_VERSION[mode] }
-  if (mode === 'Awd' || mode === 'Awdp')
+  if (mode === 'Ctf') obj.interactionKind = model.interactionKind
+  if (mode === 'Awd' || mode === 'Awdp'
+    || mode === 'Ctf' && model.interactionKind === CtfInteraction.PatchVerification)
     obj.checkerAllowRoot = model.checkerAllowRoot
   if (model.runtime) obj.runtime = serializeRuntimeTemplate(model.runtime)
   if (mode === 'Awd') {
@@ -616,7 +661,8 @@ export function serializeDefinition(mode: GameModeValue, model: DefinitionModel)
       obj.flagInjection = injection
     }
   }
-  if (mode === 'Awdp') {
+  if (mode === 'Awdp'
+    || mode === 'Ctf' && model.interactionKind === CtfInteraction.PatchVerification) {
     putString(obj, 'patchEntrypoint', model.patchEntrypoint)
     putStringArray(obj, 'patchCommand', model.patchCommand)
     putNumber(obj, 'patchTimeoutSeconds', model.patchTimeoutSeconds)
@@ -779,6 +825,7 @@ export function challengeRuleFields(mode: GameModeValue): ConfigFieldDef[] {
         { key: 'scoreCurve', label: translate("ui.scoreCurve"), type: 'pointsCurve' },
         { key: 'bloodRewards', label: translate("ui.bloodListReward"), type: 'bloodRewards', description: translate("ui.upTo3Items") },
         { key: 'maxFlagAttempts', label: translate("ui.flagMaximumNumberOfSubmissions"), type: 'int', min: 1 },
+        { key: 'maxPatchAttempts', label: translate("ui.patchMaximumNumberOfSubmissions"), type: 'int', min: 1, defaultValue: 10 },
         { key: 'wrongSubmissionPenalty', label: translate("ui.pointsDeductedForIncorrectSubmission"), type: 'int', min: 0 },
         { key: 'flagTemplate', label: translate("ui.dynamicFlagTemplate"), type: 'flagTemplate', description: translate("ui.usedOnlyForFuturePerTeamRuntimeFlagsGeneratedFor") },
       ]

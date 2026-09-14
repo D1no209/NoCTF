@@ -64,6 +64,9 @@ const { Plus, canOrganize, templates, loading, loadError, includeDeleted, create
               </TableCell>
               <TableCell>
                 <component :is="AdminGameModeBadge" :mode="template.mode" />
+                <Badge v-if="template.interactionKind === 'PatchVerification'" variant="secondary" class="ml-2">
+                  {{ $t('ui.patchVerification') }}
+                </Badge>
               </TableCell>
               <TableCell>{{ directionLabel(template.direction) }}</TableCell>
               <TableCell>

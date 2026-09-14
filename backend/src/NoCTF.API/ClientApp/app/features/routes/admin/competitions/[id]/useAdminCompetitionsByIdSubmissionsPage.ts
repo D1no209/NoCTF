@@ -46,7 +46,7 @@ export function useAdminCompetitionsByIdSubmissionsPage() {
   const gameplayFactKindOptions = [
     { value: 'FlagAttempt', label: 'Flag' },
     { value: 'BreakAttempt', label: 'Break' },
-    { value: 'FixAttempt', label: 'Fix' },
+    { value: 'FixAttempt', label: translate('ui.patchVerification') },
   ] satisfies FilterOption<NoCtfapiEndpointsGameplayFactsGameplayFactKindProtocol>[]
 
   const gameplayFactStateOptions = [

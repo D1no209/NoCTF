@@ -1,6 +1,7 @@
 import { markRaw, toRefs } from 'vue'
 
 import type { GameModeValue } from '../../utils/game-config'
+import { applyCtfInteraction, CtfInteraction } from '../../utils/game-config'
 import DefinitionCheckerSectionComponent from './DefinitionCheckerSection.vue'
 import DefinitionFlagInjectionSectionComponent from './DefinitionFlagInjectionSection.vue'
 import DefinitionPatchSectionComponent from './DefinitionPatchSection.vue'
@@ -33,6 +34,27 @@ emit: { (event: "update:modelValue", ...args: [json: string]): void }) {
 
   const DefinitionRuntimeSection = markRaw(DefinitionRuntimeSectionComponent)
 
+  const { configuration } = usePlatform()
+
+  const patchVerificationEnabled = computed(() =>
+    configuration.value?.experimentalFeatures?.ctfPatchVerificationEnabled === true,
+  )
+
+  const showInteractionKind = computed(() => props.mode === 'Ctf'
+    && (patchVerificationEnabled.value
+      || model.value?.interactionKind === CtfInteraction.PatchVerification),
+  )
+
+  function setInteractionKind(value: unknown): void {
+    if (!model.value || props.disabled || typeof value !== 'string') return
+    const interactionKind = value === 'PatchVerification'
+      ? CtfInteraction.PatchVerification
+      : CtfInteraction.FlagSubmission
+    if (interactionKind === CtfInteraction.PatchVerification
+      && !patchVerificationEnabled.value) return
+    applyCtfInteraction(model.value, interactionKind)
+  }
+
   return {
       ...toRefs(props),
       model,
@@ -40,7 +62,11 @@ emit: { (event: "update:modelValue", ...args: [json: string]): void }) {
       DefinitionCheckerSection,
       DefinitionFlagInjectionSection,
       DefinitionPatchSection,
-      DefinitionRuntimeSection
+      DefinitionRuntimeSection,
+      CtfInteraction,
+      patchVerificationEnabled,
+      showInteractionKind,
+      setInteractionKind
     }
 }
 

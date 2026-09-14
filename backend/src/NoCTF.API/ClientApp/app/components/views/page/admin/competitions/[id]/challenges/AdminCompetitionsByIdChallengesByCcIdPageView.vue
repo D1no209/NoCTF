@@ -3,7 +3,7 @@ import { toRefs } from 'vue'
 import type { AdminCompetitionsByIdChallengesByCcIdPageViewState } from '~/features/routes/admin/competitions/[id]/challenges/useAdminCompetitionsByIdChallengesByCcIdPage'
 
 const viewProps = defineProps<{ state: AdminCompetitionsByIdChallengesByCcIdPageViewState }>()
-const { Plus, competitionId, competition, canWrite, canJudge, challenge, loading, loadError, activeSection, editCustomTitle, editOrder, editPublished, savingEdit, saveEdit, config, configLoading, savingConfig, inheritedConfigJson, saveConfig, hints, hintsLoading, hintsLoadError, includeDeletedHints, hintDialogOpen, editingHint, hintForm, hintError, savingHint, pendingHintId, openHintDialog, saveHint, deleteHint, restoreHint, scoringLoading, scoringError, loadChallengeTeamScoring, scoringDisplayNames, scoringRows, adjustmentTarget, adjustmentDelta, adjustmentPending, adjustmentError, adjustmentValid, openAdjustment, closeAdjustment, submitAdjustment, ChallengeRulesEditor, onClickAdjustmentTarget, onClickHintDialogOpen } = toRefs(viewProps.state)
+const { Plus, competitionId, competition, canWrite, canJudge, challenge, loading, loadError, activeSection, editCustomTitle, editOrder, editPublished, savingEdit, saveEdit, config, configLoading, savingConfig, inheritedConfigJson, saveConfig, hints, hintsLoading, hintsLoadError, includeDeletedHints, hintDialogOpen, editingHint, hintForm, hintError, savingHint, pendingHintId, openHintDialog, saveHint, deleteHint, restoreHint, scoringLoading, scoringError, loadChallengeTeamScoring, scoringDisplayNames, scoringRows, adjustmentTarget, adjustmentDelta, adjustmentPending, adjustmentError, adjustmentValid, openAdjustment, closeAdjustment, submitAdjustment, ChallengeRulesEditor, hiddenRuleKeys, onClickAdjustmentTarget, onClickHintDialogOpen } = toRefs(viewProps.state)
 </script>
 
 <template>
@@ -85,7 +85,7 @@ const { Plus, competitionId, competition, canWrite, canJudge, challenge, loading
                 :readonly="!canWrite"
                 :loading="configLoading"
                 :saving="savingConfig"
-                :hidden-keys="challenge.usesDynamicFlag ? [] : ['flagTemplate']"
+                :hidden-keys="hiddenRuleKeys"
                 @save="saveConfig"
               />
             </CardContent>

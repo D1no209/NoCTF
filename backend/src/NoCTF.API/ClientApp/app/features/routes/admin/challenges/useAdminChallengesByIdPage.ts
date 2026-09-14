@@ -7,7 +7,7 @@ import { adminChallengeBankCreateFlag, adminChallengeBankDeleteAttachment, admin
 import type { NoCtfapiEndpointsAdministrationChallengeBankChallengeAttachmentResponse, NoCtfapiEndpointsAdministrationChallengeBankChallengeFlagResponse, NoCtfapiEndpointsAdministrationChallengeBankChallengeFlagMatchKindProtocol, NoCtfapiEndpointsAdministrationChallengeBankChallengeTemplateResponse, NoCtfapiEndpointsAdministrationChallengeBankChallengeVisibilityProtocol, NoCtfapiEndpointsCompetitionsGameModeProtocol, NoCtfapiEndpointsAdministrationChallengeBankAttachmentDeliveryPolicyProtocol, NoCtfapiEndpointsAdministrationChallengeBankChallengeFlagFailureResponse, NoCtfapiEndpointsAdministrationChallengeBankAttachmentBatchFailureResponse } from '../../../../api'
 import { challengeTemplateWriteErrorMessages } from '../../../../lib/challenge-template-error'
 import { validateChallengeTemplateDraft } from '../../../../lib/challenge-template-validation'
-import { defaultDefinitionJson, FlagSource, normalizeDefinitionJson, serializeDefinition } from '../../../../utils/game-config'
+import { applyCtfInteraction, CtfInteraction, defaultDefinitionJson, FlagSource, normalizeDefinitionJson, serializeDefinition } from '../../../../utils/game-config'
 import AdminDateTimeComponent from '../../../admin/AdminDateTime.vue'
 import AdminGameModeBadgeComponent from '../../../admin/AdminGameModeBadge.vue'
 import ChallengeTestRuntimePanelComponent from '../../../admin/ChallengeTestRuntimePanel.vue'
@@ -30,6 +30,7 @@ export function useAdminChallengesByIdPage() {
   const challengeId = route.params.id as string
 
   const { canOrganize } = useAuth()
+  const { configuration: platformConfiguration } = usePlatform()
 
   const template = ref<Template | null>(null)
 
@@ -72,7 +73,8 @@ export function useAdminChallengesByIdPage() {
 
   const hasModeDefinition = computed(() => {
     if (form.mode === 'Awd' || form.mode === 'Awdp') return true
-    if (form.mode === 'Ctf') return definitionModel.value?.runtime?.flagSource === FlagSource.PerTeam
+    if (form.mode === 'Ctf') return definitionModel.value?.interactionKind === CtfInteraction.PatchVerification
+      || definitionModel.value?.runtime?.flagSource === FlagSource.PerTeam
     return false
   })
 
@@ -91,6 +93,25 @@ export function useAdminChallengesByIdPage() {
     const persisted = normalizeDefinitionJson(template.value.mode ?? form.mode, template.value.definitionJson ?? '{}')
     return current === null || persisted === null || current !== persisted
   })
+
+  const patchVerificationEnabled = computed(() =>
+    platformConfiguration.value?.experimentalFeatures?.ctfPatchVerificationEnabled === true,
+  )
+
+  const showInteractionKind = computed(() => form.mode === 'Ctf'
+    && (patchVerificationEnabled.value
+      || definitionModel.value?.interactionKind === CtfInteraction.PatchVerification),
+  )
+
+  function setInteractionKind(value: unknown): void {
+    if (!definitionModel.value || isDeleted.value || typeof value !== 'string') return
+    const interactionKind = value === 'PatchVerification'
+      ? CtfInteraction.PatchVerification
+      : CtfInteraction.FlagSubmission
+    if (interactionKind === CtfInteraction.PatchVerification
+      && !patchVerificationEnabled.value) return
+    applyCtfInteraction(definitionModel.value, interactionKind)
+  }
 
   function changeMode(value: unknown): void {
     if (value !== 'Ctf' && value !== 'Awd' && value !== 'Awdp' && value !== 'Koh') return
@@ -630,6 +651,10 @@ export function useAdminChallengesByIdPage() {
       usesRuntimeFlagInjection,
       runtimeDisabled,
       runtimeDefinitionDirty,
+      CtfInteraction,
+      patchVerificationEnabled,
+      showInteractionKind,
+      setInteractionKind,
       changeMode,
       resetDefinitionToCurrentMode,
       save,

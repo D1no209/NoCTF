@@ -52,7 +52,7 @@ export function runtimeStateLabel(state?: NoCtfapiEndpointsRuntimeRuntimeStatePr
 
 export function gameplayFactKindLabel(kind?: NoCtfapiEndpointsGameplayFactsGameplayFactKindProtocol): string {
   if (!kind) return translate("ui.gameplayFacts")
-  const labels = { FlagAttempt: 'Flag', BreakAttempt: 'Break', FixAttempt: 'Fix', HintUnlock: translate("ui.promptToUnlock"), ManualAdjustment: translate("ui.manualAdjustment"), AwdServiceTransition: translate("ui.awdServiceStatus"), KohControlObservation: translate("ui.kohControlObservation") } satisfies Record<NoCtfapiEndpointsGameplayFactsGameplayFactKindProtocol, string>
+  const labels = { FlagAttempt: 'Flag', BreakAttempt: 'Break', FixAttempt: translate('ui.patchVerification'), HintUnlock: translate("ui.promptToUnlock"), ManualAdjustment: translate("ui.manualAdjustment"), AwdServiceTransition: translate("ui.awdServiceStatus"), KohControlObservation: translate("ui.kohControlObservation") } satisfies Record<NoCtfapiEndpointsGameplayFactsGameplayFactKindProtocol, string>
   return labels[kind]
 }
 
@@ -104,6 +104,10 @@ export function gameplayFactFailureCodeLabel(code?: NoCtfapiEndpointsGameplayFac
     ForeignTeamFlagDetected: translate("ui.submittedAFlagAssignedToAnotherTeam"),
     InsufficientScore: translate("ui.insufficientScore"),
     HintUnavailable: translate("ui.hintIsUnavailable"),
+    PatchStillExploitable: translate("ui.expStillSucceeds"),
+    PatchExecutionFailed: translate("ui.patchExecutionFailed"),
+    PatchServiceAbnormal: translate("ui.serviceException"),
+    PatchVerificationPlatformFailed: translate("ui.patchVerificationPlatformError"),
   } satisfies Record<NoCtfapiEndpointsGameplayFactsGameplayFactFailureCodeProtocol, string>
   return labels[code]
 }
@@ -161,6 +165,12 @@ export function competitionEventText(
     return resolvedSuccessfully
       ? translate("ui.teamPassedDefenseVerificationOn", { team, challenge })
       : translate("ui.teamFailedDefenseVerificationOn", { team, challenge })
+  }
+  if (event.kind === 'GameplayFactAdjudicated'
+    && event.gameplayFactKind === 'FixAttempt') {
+    return resolvedSuccessfully
+      ? translate('ui.teamPassedPatchVerificationOn', { team, challenge })
+      : translate('ui.teamFailedPatchVerificationOn', { team, challenge })
   }
   const templates: Partial<Record<NoCtfapiEndpointsCompetitionsEventsCompetitionEventKindProtocol, string>> = {
     GameplayFactPatchDownloaded: translate("ui.downloadedThePatchArchiveForTeam", { actor, team }),
