@@ -18,7 +18,12 @@ public sealed record ChallengeTemplateView(
     DateTimeOffset? DeletedAt,
     int ActiveCompetitionReferenceCount,
     DateTimeOffset CreatedAt,
-    DateTimeOffset UpdatedAt);
+    DateTimeOffset UpdatedAt)
+{
+    public CtfInteractionKind InteractionKind => Mode == GameMode.Ctf
+        ? CtfInteractionDefinition.Parse(DefinitionJson)
+        : CtfInteractionKind.FlagSubmission;
+}
 
 public enum ChallengeTemplateWriteState
 {
@@ -31,7 +36,9 @@ public enum ChallengeTemplateWriteState
     ActiveRuntimeDefinitionConflict,
     OwnerIncludedInManagerSet,
     UserNotFound,
-    RoleNotEligible
+    RoleNotEligible,
+    ExperimentalFeatureDisabled,
+    InteractionKindConflict
 }
 
 public sealed record ChallengeTemplateWriteResult(
@@ -157,7 +164,8 @@ public static class ChallengeTemplateValidation
 
 public sealed class CreateChallengeTemplate(
     IChallengeBankStore store,
-    IChallengeConfigurationCatalog configurations)
+    IChallengeConfigurationCatalog configurations,
+    IExperimentalFeatureReader? experimentalFeatures = null)
 {
     public async Task<ChallengeTemplateWriteResult> ExecuteAsync(
         CreateChallengeTemplateCommand command,
@@ -186,6 +194,13 @@ public sealed class CreateChallengeTemplate(
                 ChallengeTemplateWriteState.InvalidDefinition,
                 Detail: string.Join(" ", definitionErrors));
         }
+        if (IsPatchVerification(command.Mode, definitionJson)
+            && !(await IsPatchVerificationEnabledAsync(ct)))
+        {
+            return new(
+                ChallengeTemplateWriteState.ExperimentalFeatureDisabled,
+                Detail: "CTF PatchVerification is disabled in platform settings.");
+        }
         return await store.CreateAsync(command with
         {
             Title = command.Title.Trim(),
@@ -194,27 +209,60 @@ public sealed class CreateChallengeTemplate(
             DefinitionJson = definitionJson
         }, ct);
     }
+
+    private Task<bool> IsPatchVerificationEnabledAsync(CancellationToken ct) =>
+        experimentalFeatures?.IsCtfPatchVerificationEnabledAsync(ct)
+        ?? Task.FromResult(false);
+
+    private static bool IsPatchVerification(GameMode mode, string definitionJson) =>
+        mode == GameMode.Ctf
+        && CtfInteractionDefinition.Parse(definitionJson) == CtfInteractionKind.PatchVerification;
 }
 
-public sealed class ListChallengeTemplates(IChallengeBankStore store)
+public sealed class ListChallengeTemplates(
+    IChallengeBankStore store,
+    IExperimentalFeatureReader? experimentalFeatures = null)
 {
-    public Task<IReadOnlyList<ChallengeTemplateView>> ExecuteAsync(
+    public async Task<IReadOnlyList<ChallengeTemplateView>> ExecuteAsync(
         Guid actorId,
         bool isAdministrator,
         bool includeDeleted = false,
-        CancellationToken ct = default) =>
-        store.ListAsync(actorId, isAdministrator, includeDeleted, ct);
+        CancellationToken ct = default)
+    {
+        var items = await store.ListAsync(actorId, isAdministrator, includeDeleted, ct);
+        if (isAdministrator || await IsEnabledAsync(ct))
+            return items;
+        return items.Where(item => item.InteractionKind != CtfInteractionKind.PatchVerification)
+            .ToArray();
+    }
+
+    private Task<bool> IsEnabledAsync(CancellationToken ct) =>
+        experimentalFeatures?.IsCtfPatchVerificationEnabledAsync(ct)
+        ?? Task.FromResult(false);
 }
 
-public sealed class GetChallengeTemplate(IChallengeBankStore store)
+public sealed class GetChallengeTemplate(
+    IChallengeBankStore store,
+    IExperimentalFeatureReader? experimentalFeatures = null)
 {
-    public Task<ChallengeTemplateView?> ExecuteAsync(
+    public async Task<ChallengeTemplateView?> ExecuteAsync(
         Guid challengeId,
         Guid actorId,
         bool isAdministrator,
         bool includeDeleted = false,
-        CancellationToken ct = default) =>
-        store.FindAsync(challengeId, actorId, isAdministrator, includeDeleted, ct);
+        CancellationToken ct = default)
+    {
+        var item = await store.FindAsync(challengeId, actorId, isAdministrator, includeDeleted, ct);
+        if (item is null || isAdministrator
+            || item.InteractionKind != CtfInteractionKind.PatchVerification
+            || await IsEnabledAsync(ct))
+            return item;
+        return null;
+    }
+
+    private Task<bool> IsEnabledAsync(CancellationToken ct) =>
+        experimentalFeatures?.IsCtfPatchVerificationEnabledAsync(ct)
+        ?? Task.FromResult(false);
 }
 
 public sealed class UpdateChallengeTemplate(
@@ -256,6 +304,7 @@ public sealed class UpdateChallengeTemplate(
             DefinitionJson = definitionJson
         }, ct);
     }
+
 }
 
 public sealed class DeleteChallengeTemplate(IChallengeBankStore store)

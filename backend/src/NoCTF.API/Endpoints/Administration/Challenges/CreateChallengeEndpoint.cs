@@ -91,7 +91,8 @@ public sealed class CreateChallengeEndpoint(
                 TypedResults.NotFound(),
             ChallengeMutationFailure.ResourceIdConflict
                 or ChallengeMutationFailure.ChallengeOrderConflict
-                or ChallengeMutationFailure.ChallengeTemplateConflict =>
+                or ChallengeMutationFailure.ChallengeTemplateConflict
+                or ChallengeMutationFailure.ExperimentalFeatureDisabled =>
                 TypedResults.Conflict(
                     CompetitionChallengeConflictMapper.ToResponse(result.Failure.Value)),
             ChallengeMutationFailure.InvalidChallengeId

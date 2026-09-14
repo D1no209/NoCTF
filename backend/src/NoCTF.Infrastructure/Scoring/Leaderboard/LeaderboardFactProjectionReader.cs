@@ -134,6 +134,7 @@ internal static class LeaderboardFactProjectionReader
         CancellationToken ct) => query
         .Where(fact => fact.Kind == GameplayFactKind.ManualAdjustment
             || (fact.Kind == GameplayFactKind.FlagAttempt
+                || fact.Kind == GameplayFactKind.FixAttempt
                 || fact.Kind == GameplayFactKind.HintUnlock)
             && fact.OccurredAt >= officialWindow.StartAt
             && fact.OccurredAt < officialWindow.EndAt)

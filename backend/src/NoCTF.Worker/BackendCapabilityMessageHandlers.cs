@@ -79,6 +79,17 @@ public sealed class AwdpMessageHandler(
             cancellationToken,
             events);
 
+    public Task Handle(
+        StartPatchVerification message,
+        CancellationToken cancellationToken) =>
+        BackendMessageOperations.StartPatchVerificationAsync(
+            message,
+            db,
+            outbox,
+            timeProvider,
+            cancellationToken,
+            events);
+
     public Task Handle(AwdpFixResult message, CancellationToken cancellationToken) =>
         BackendMessageOperations.RecordAwdpFixResultAsync(message, results, cancellationToken);
 

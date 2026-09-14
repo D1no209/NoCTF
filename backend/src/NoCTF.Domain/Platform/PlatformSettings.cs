@@ -22,6 +22,8 @@ public sealed class PlatformSettings
 
     public bool HumanVerificationEvaluationEnabled { get; set; } = true;
 
+    public bool CtfPatchVerificationEnabled { get; set; }
+
     public HumanVerificationProvider? HumanVerificationProvider { get; set; }
 
     [MaxLength(2048)]

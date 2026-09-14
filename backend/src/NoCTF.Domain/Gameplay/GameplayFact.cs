@@ -108,5 +108,9 @@ public enum GameplayFactFailureCode : short
     ForeignTeamFlagDetected,
     InsufficientScore,
     HintUnavailable,
-    AwdpPlatformFailed
+    AwdpPlatformFailed,
+    PatchStillExploitable,
+    PatchExecutionFailed,
+    PatchServiceAbnormal,
+    PatchVerificationPlatformFailed
 }

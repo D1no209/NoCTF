@@ -45,7 +45,8 @@ public enum RuntimePurposeProtocol
     AwdpTarget,
     Practice,
     AwdpAttack,
-    TemplateTest
+    TemplateTest,
+    PatchVerificationTarget
 }
 
 [JsonConverter(typeof(StrictPascalCaseEnumConverter<RuntimeFailureCodeProtocol>))]

@@ -1,56 +1,46 @@
 namespace NoCTF.Application.GameplayFacts.Awdp;
 
+using NoCTF.Application.GameplayFacts.PatchVerification;
+
 public static class AwdpFixExecutionBudget
 {
-    public const int DefaultPatchTimeoutSeconds = 60;
-    public const int DefaultReadyTimeoutSeconds = 30;
-    public const int MaximumPatchTimeoutSeconds = 300;
-    public const int MaximumCheckerTimeoutSeconds = 1800;
-    public const int ArchiveDownloadBudgetSeconds = 60;
-    public const int CleanupBudgetSeconds = 60;
-    public const int ResultPublicationBudgetSeconds = 30;
+    public const int DefaultPatchTimeoutSeconds = PatchVerificationExecutionBudget.DefaultPatchTimeoutSeconds;
+    public const int DefaultReadyTimeoutSeconds = PatchVerificationExecutionBudget.DefaultReadyTimeoutSeconds;
+    public const int MaximumPatchTimeoutSeconds = PatchVerificationExecutionBudget.MaximumPatchTimeoutSeconds;
+    public const int MaximumCheckerTimeoutSeconds = PatchVerificationExecutionBudget.MaximumCheckerTimeoutSeconds;
+    public const int ArchiveDownloadBudgetSeconds = PatchVerificationExecutionBudget.ArchiveDownloadBudgetSeconds;
+    public const int CleanupBudgetSeconds = PatchVerificationExecutionBudget.CleanupBudgetSeconds;
+    public const int ResultPublicationBudgetSeconds = PatchVerificationExecutionBudget.ResultPublicationBudgetSeconds;
 
     // This remains message-specific. It is deliberately longer than the maximum
     // accepted download + Patch + Checker + cleanup execution budget.
-    public const int HandlerExecutionTimeoutSeconds = 2400;
+    public const int HandlerExecutionTimeoutSeconds = PatchVerificationExecutionBudget.HandlerExecutionTimeoutSeconds;
     public const int JetStreamMaximumAckExtensionSeconds =
-        HandlerExecutionTimeoutSeconds + 300;
+        PatchVerificationExecutionBudget.JetStreamMaximumAckExtensionSeconds;
 
     public static TimeSpan Calculate(int patchTimeoutSeconds, int checkerTimeoutSeconds)
-    {
-        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(patchTimeoutSeconds);
-        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(checkerTimeoutSeconds);
-        return TimeSpan.FromSeconds(
-            ArchiveDownloadBudgetSeconds
-            + patchTimeoutSeconds
-            + checkerTimeoutSeconds
-            + CleanupBudgetSeconds);
-    }
+        => PatchVerificationExecutionBudget.Calculate(patchTimeoutSeconds, checkerTimeoutSeconds);
 
     public static bool FitsHandlerTimeout(
         int patchTimeoutSeconds,
         int checkerTimeoutSeconds) =>
-        Calculate(patchTimeoutSeconds, checkerTimeoutSeconds)
-        < TimeSpan.FromSeconds(HandlerExecutionTimeoutSeconds);
+        PatchVerificationExecutionBudget.FitsHandlerTimeout(patchTimeoutSeconds, checkerTimeoutSeconds);
 
     public static DateTimeOffset CalculateDeadline(
         DateTimeOffset uploadedAt,
         DateTimeOffset? runtimeExpiresAt,
         int patchTimeoutSeconds,
         int checkerTimeoutSeconds)
-    {
-        var executionDeadline = uploadedAt.Add(Calculate(
+        => PatchVerificationExecutionBudget.CalculateDeadline(
+            uploadedAt,
+            runtimeExpiresAt,
             patchTimeoutSeconds,
-            checkerTimeoutSeconds));
-        return runtimeExpiresAt is { } expiresAt && expiresAt < executionDeadline
-            ? expiresAt
-            : executionDeadline;
-    }
+            checkerTimeoutSeconds);
 }
 
 public static class AwdpPatchCommandRules
 {
-    public const string EntrypointPlaceholder = "{entrypoint}";
-    public const int MaximumArguments = 64;
-    public const int MaximumArgumentLength = 4096;
+    public const string EntrypointPlaceholder = PatchVerificationCommandRules.EntrypointPlaceholder;
+    public const int MaximumArguments = PatchVerificationCommandRules.MaximumArguments;
+    public const int MaximumArgumentLength = PatchVerificationCommandRules.MaximumArgumentLength;
 }

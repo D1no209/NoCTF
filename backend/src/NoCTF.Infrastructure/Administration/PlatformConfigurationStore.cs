@@ -9,6 +9,7 @@ using NoCTF.Domain.Storage;
 using NoCTF.Application.Messaging;
 using NoCTF.Infrastructure.Messaging;
 using NoCTF.Infrastructure.Storage;
+using NoCTF.Application.Challenges.Bank;
 
 namespace NoCTF.Infrastructure.Administration;
 
@@ -17,7 +18,7 @@ public sealed class PlatformConfigurationStore(
     IFusionCacheProvider? cacheProvider = null,
     ITransactionalMessageOutbox? messageOutbox = null,
     FileReferenceLock? fileReferenceLock = null)
-    : IPlatformConfigurationStore
+    : IPlatformConfigurationStore, IExperimentalFeatureReader
 {
     private const short SettingsId = 1;
     private const string CacheKey = "platform-configuration";
@@ -34,6 +35,9 @@ public sealed class PlatformConfigurationStore(
                 (_, token) => LoadAsync(token),
                 token: ct).AsTask();
 
+    public async Task<bool> IsCtfPatchVerificationEnabledAsync(CancellationToken ct) =>
+        (await GetAsync(ct)).CtfPatchVerificationEnabled;
+
     public async Task<PlatformConfigurationView> UpdateAsync(
         string name,
         string? description,
@@ -45,6 +49,19 @@ public sealed class PlatformConfigurationStore(
             ct);
         settings.Name = name;
         settings.Description = description;
+        settings.UpdatedAt = now;
+        return await SaveAsync(settings, ct);
+    }
+
+    public async Task<PlatformConfigurationView> UpdateExperimentalFeaturesAsync(
+        bool ctfPatchVerificationEnabled,
+        DateTimeOffset now,
+        CancellationToken ct)
+    {
+        var settings = await db.PlatformSettings.SingleAsync(
+            candidate => candidate.Id == SettingsId,
+            ct);
+        settings.CtfPatchVerificationEnabled = ctfPatchVerificationEnabled;
         settings.UpdatedAt = now;
         return await SaveAsync(settings, ct);
     }
@@ -103,16 +120,21 @@ public sealed class PlatformConfigurationStore(
             settings.Name,
             settings.Description,
             settings.LogoFileId,
-            settings.UpdatedAt);
+            settings.UpdatedAt,
+            settings.CtfPatchVerificationEnabled);
 }
 
-public sealed class NoOpPlatformConfigurationStore : IPlatformConfigurationStore
+public sealed class NoOpPlatformConfigurationStore
+    : IPlatformConfigurationStore, IExperimentalFeatureReader
 {
     private static readonly PlatformConfigurationView Default =
         new("NoCTF", null, null, DateTimeOffset.UnixEpoch);
 
     public Task<PlatformConfigurationView> GetAsync(CancellationToken cancellationToken) =>
         Task.FromResult(Default);
+
+    public Task<bool> IsCtfPatchVerificationEnabledAsync(CancellationToken cancellationToken) =>
+        Task.FromResult(false);
 
     public Task<PlatformConfigurationView> UpdateAsync(
         string name,
@@ -123,6 +145,16 @@ public sealed class NoOpPlatformConfigurationStore : IPlatformConfigurationStore
         {
             Name = name,
             Description = description,
+            UpdatedAt = now
+        });
+
+    public Task<PlatformConfigurationView> UpdateExperimentalFeaturesAsync(
+        bool ctfPatchVerificationEnabled,
+        DateTimeOffset now,
+        CancellationToken cancellationToken) =>
+        Task.FromResult(Default with
+        {
+            CtfPatchVerificationEnabled = ctfPatchVerificationEnabled,
             UpdatedAt = now
         });
 

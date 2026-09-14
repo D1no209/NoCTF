@@ -92,12 +92,18 @@ public sealed class PlatformGatewayPatchRequest
     public required int MaxPublishedPorts { get; set; }
 }
 
+public sealed class PlatformExperimentalFeaturesPatchRequest
+{
+    public required bool CtfPatchVerificationEnabled { get; set; }
+}
+
 public sealed class PatchPlatformConfigurationRequest
 {
     public PlatformBrandingPatchRequest? Branding { get; set; }
     public PlatformHumanVerificationPatchRequest? HumanVerification { get; set; }
     public PlatformEmailVerificationPatchRequest? EmailVerification { get; set; }
     public PlatformGatewayPatchRequest? PublicGateway { get; set; }
+    public PlatformExperimentalFeaturesPatchRequest? ExperimentalFeatures { get; set; }
 }
 
 [Flags]
@@ -107,7 +113,8 @@ internal enum PlatformConfigurationPatchSection
     Branding = 1 << 0,
     HumanVerification = 1 << 1,
     EmailVerification = 1 << 2,
-    PublicGateway = 1 << 3
+    PublicGateway = 1 << 3,
+    ExperimentalFeatures = 1 << 4
 }
 
 public sealed class PatchPlatformConfigurationValidator
@@ -118,7 +125,8 @@ public sealed class PatchPlatformConfigurationValidator
         RuleFor(request => request).Must(request => request.Branding is not null
             || request.HumanVerification is not null
             || request.EmailVerification is not null
-            || request.PublicGateway is not null)
+            || request.PublicGateway is not null
+            || request.ExperimentalFeatures is not null)
             .WithMessage("At least one platform configuration section is required.");
         RuleFor(request => request.Branding!.Name).NotEmpty()
             .MaximumLength(PlatformConfigurationRules.MaximumNameLength)
@@ -171,6 +179,7 @@ public sealed class PatchPlatformConfigurationValidator
 public static partial class PlatformSettingsPatchMapper
 {
     [MapperIgnoreTarget(nameof(PlatformSettings.HumanVerificationEnabled))]
+    [MapperIgnoreTarget(nameof(PlatformSettings.CtfPatchVerificationEnabled))]
     [MapperIgnoreTarget(nameof(PlatformSettings.HumanVerificationRuntimeEnabled))]
     [MapperIgnoreTarget(nameof(PlatformSettings.HumanVerificationEvaluationEnabled))]
     [MapperIgnoreTarget(nameof(PlatformSettings.HumanVerificationProvider))]
@@ -227,6 +236,7 @@ public static partial class PlatformSettingsPatchMapper
     [MapperIgnoreTarget(nameof(PlatformSettings.Name))]
     [MapperIgnoreTarget(nameof(PlatformSettings.Description))]
     [MapperIgnoreTarget(nameof(PlatformSettings.HumanVerificationEnabled))]
+    [MapperIgnoreTarget(nameof(PlatformSettings.CtfPatchVerificationEnabled))]
     [MapperIgnoreTarget(nameof(PlatformSettings.HumanVerificationRuntimeEnabled))]
     [MapperIgnoreTarget(nameof(PlatformSettings.HumanVerificationEvaluationEnabled))]
     [MapperIgnoreTarget(nameof(PlatformSettings.HumanVerificationProvider))]
@@ -262,6 +272,7 @@ public static partial class PlatformSettingsPatchMapper
     [MapperIgnoreTarget(nameof(PlatformSettings.Name))]
     [MapperIgnoreTarget(nameof(PlatformSettings.Description))]
     [MapperIgnoreTarget(nameof(PlatformSettings.HumanVerificationEnabled))]
+    [MapperIgnoreTarget(nameof(PlatformSettings.CtfPatchVerificationEnabled))]
     [MapperIgnoreTarget(nameof(PlatformSettings.HumanVerificationRuntimeEnabled))]
     [MapperIgnoreTarget(nameof(PlatformSettings.HumanVerificationEvaluationEnabled))]
     [MapperIgnoreTarget(nameof(PlatformSettings.HumanVerificationProvider))]
@@ -355,6 +366,7 @@ public sealed class PatchPlatformConfigurationEndpoint(
             PublicGatewayRuntimeHost = gateway.Policy.PublicRuntimeHost,
             PublicGatewayDirectHostOverride = gateway.Policy.DirectRuntimeHostOverride,
             PublicGatewayMaxPorts = gateway.Policy.MaxPublishedPorts,
+            CtfPatchVerificationEnabled = branding.CtfPatchVerificationEnabled,
             UpdatedAt = branding.UpdatedAt
         };
         if ((sections & PlatformConfigurationPatchSection.Branding) != 0)
@@ -452,6 +464,13 @@ public sealed class PatchPlatformConfigurationEndpoint(
                         .Rollback(Invalid(string.Join(" ", result.Errors)));
                 }
             }
+            if ((sections & PlatformConfigurationPatchSection.ExperimentalFeatures) != 0)
+            {
+                await configuration.UpdateExperimentalFeaturesAsync(
+                    request.ExperimentalFeatures!.CtfPatchVerificationEnabled,
+                    timeProvider.GetUtcNow(),
+                    transactionCt);
+            }
 
             var response = await LoadResponseAsync(transactionCt);
             Results<Ok<AdminPlatformConfigurationResponse>,
@@ -475,6 +494,7 @@ public sealed class PatchPlatformConfigurationEndpoint(
                 await emailVerification.GetAsync(ct)),
             PublicGatewayConfigurationMapping.ToResponse(
                 await publicGateway.GetAsync(ct)),
+            new(current.CtfPatchVerificationEnabled),
             "/api/v1/admin/platform/public-gateway/status");
     }
 
@@ -487,7 +507,9 @@ public sealed class PatchPlatformConfigurationEndpoint(
         | (request.EmailVerification is null ? PlatformConfigurationPatchSection.None
             : PlatformConfigurationPatchSection.EmailVerification)
         | (request.PublicGateway is null ? PlatformConfigurationPatchSection.None
-            : PlatformConfigurationPatchSection.PublicGateway);
+            : PlatformConfigurationPatchSection.PublicGateway)
+        | (request.ExperimentalFeatures is null ? PlatformConfigurationPatchSection.None
+            : PlatformConfigurationPatchSection.ExperimentalFeatures);
 
     private static ProblemHttpResult Invalid(string detail) => TypedResults.Problem(
         statusCode: StatusCodes.Status400BadRequest,

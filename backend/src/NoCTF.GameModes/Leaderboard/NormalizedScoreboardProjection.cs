@@ -4,6 +4,7 @@ using System.Text.Json;
 using NoCTF.Application.Scoring.Leaderboard;
 using NoCTF.Domain.Competitions;
 using NoCTF.Domain.Gameplay;
+using NoCTF.Domain.Challenges;
 using NoCTF.GameModes.Awd.Configuration;
 using NoCTF.GameModes.Awd.Scheduling;
 using NoCTF.GameModes.Awdp.Configuration;
@@ -26,7 +27,8 @@ internal static class NormalizedScoreboardProjection
                 && fact.CompetitionChallengeId is Guid challengeId && challenges.ContainsKey(challengeId)
                 && fact.State == GameplayFactState.Completed && fact.Result == GameplayFactResult.Correct
                 && fact.OccurredAt <= input.ProjectedAt
-                && (input.Mode == GameMode.Ctf ? fact.Kind == GameplayFactKind.FlagAttempt
+                && (input.Mode == GameMode.Ctf
+                    ? IsCtfInteractionFact(fact, challenges[challengeId])
                     : fact.Kind is GameplayFactKind.BreakAttempt or GameplayFactKind.FixAttempt))
             .OrderBy(fact => fact.OccurredAt).ThenBy(fact => fact.GameplayFactId).ToArray();
         IReadOnlyList<LeaderboardGameplayFact> eligibleFacts = facts;
@@ -58,6 +60,8 @@ internal static class NormalizedScoreboardProjection
                 fact.Kind switch
                 {
                     GameplayFactKind.FlagAttempt => ScoreboardEntryKind.Solve,
+                    GameplayFactKind.FixAttempt when input.Mode == GameMode.Ctf =>
+                        ScoreboardEntryKind.Solve,
                     GameplayFactKind.BreakAttempt => ScoreboardEntryKind.Attack,
                     _ => ScoreboardEntryKind.Defense
                 },
@@ -512,6 +516,10 @@ internal static class NormalizedScoreboardProjection
             var slot = GetSlot(slots, group.Key.Item1, column, null);
             legacyCells.TryGetValue(group.Key, out var legacyCell);
             var challengeConfiguration = challengeConfigurations[group.Key.Item2];
+            var interactionKind = challenges[group.Key.Item2].InteractionKind;
+            var expectedKind = interactionKind == CtfInteractionKind.PatchVerification
+                ? GameplayFactKind.FixAttempt
+                : GameplayFactKind.FlagAttempt;
             var wrongPenalty = challengeConfiguration.WrongSubmissionPenalty ?? defaultWrongPenalty;
             var manualTotal = group
                 .Where(fact => fact.Kind == GameplayFactKind.ManualAdjustment
@@ -520,7 +528,7 @@ internal static class NormalizedScoreboardProjection
                     + ProjectionPenalties.ParseDelta(fact.Value) * fact.Multiplicity));
             var solvePoints = checked((legacyCell?.Score ?? 0) - manualTotal);
             var firstCorrect = group
-                .Where(fact => fact.Kind == GameplayFactKind.FlagAttempt
+                .Where(fact => fact.Kind == expectedKind
                     && fact.Result == GameplayFactResult.Correct)
                 .OrderBy(fact => fact.OccurredAt)
                 .ThenBy(fact => fact.GameplayFactId)
@@ -530,7 +538,8 @@ internal static class NormalizedScoreboardProjection
             {
                 switch (fact.Kind)
                 {
-                    case GameplayFactKind.FlagAttempt:
+                    case GameplayFactKind.FlagAttempt when expectedKind == GameplayFactKind.FlagAttempt:
+                    case GameplayFactKind.FixAttempt when expectedKind == GameplayFactKind.FixAttempt:
                         {
                             var isAwardedSolve = firstCorrect?.GameplayFactId == fact.GameplayFactId;
                             var deduction = fact.Result == GameplayFactResult.Wrong
@@ -1017,6 +1026,13 @@ internal static class NormalizedScoreboardProjection
             pair => pair.Key,
             pair => new GlobalAdjustmentSummary(pair.Value, counts[pair.Key]));
     }
+
+    private static bool IsCtfInteractionFact(
+        LeaderboardGameplayFact fact,
+        LeaderboardChallengeFact challenge) =>
+        challenge.InteractionKind == CtfInteractionKind.PatchVerification
+            ? fact.Kind == GameplayFactKind.FixAttempt
+            : fact.Kind == GameplayFactKind.FlagAttempt;
 
     private static DateTimeOffset EffectiveClockToWallTime(
         LeaderboardProjectionInput input,

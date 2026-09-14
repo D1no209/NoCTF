@@ -12,6 +12,8 @@ using NoCTF.Application.GameplayFacts.Awdp;
 using NoCTF.Domain.Runtime;
 using NoCTF.Domain.Gameplay;
 using NoCTF.GameModes.Awdp.Configuration;
+using NoCTF.GameModes.PatchVerification.Configuration;
+using NoCTF.Domain.Competitions;
 using NoCTF.Infrastructure.Persistence;
 using NoCTF.Infrastructure.Authentication;
 using NoCTF.Runner.Composition;
@@ -223,7 +225,8 @@ public sealed class AwdpFixWorkReader(
             .Join(
                 db.RuntimeInstances.AsNoTracking()
                     .Where(runtime => runtime.Id == message.RuntimeInstanceId
-                        && runtime.Purpose == RuntimePurpose.AwdpTarget
+                        && (runtime.Purpose == RuntimePurpose.AwdpTarget
+                            || runtime.Purpose == RuntimePurpose.PatchVerificationTarget)
                         && runtime.GameplayFactId == message.GameplayFactId
                         && runtime.State == RuntimeState.Running
                         && runtime.RunnerId == message.RunnerId),
@@ -273,7 +276,8 @@ public sealed class AwdpFixWorkReader(
                     item.Runtime,
                     item.ChallengeRulesJson,
                     item.ChallengeDefinitionJson,
-                    CompetitionConfigurationJson = competition.ConfigurationJson
+                    CompetitionConfigurationJson = competition.ConfigurationJson,
+                    competition.Mode
                 })
             .SingleOrDefaultAsync(cancellationToken);
         if (target is null
@@ -281,12 +285,14 @@ public sealed class AwdpFixWorkReader(
             || string.IsNullOrWhiteSpace(target.Runtime.ProviderReceiptJson))
             return new(AwdpFixExecutionFenceDisposition.Superseded);
 
-        var settings = AwdpConfigurationResolver.Resolve(
+        var settings = PatchVerificationConfigurationResolver.Resolve(
+            target.Mode,
             target.CompetitionConfigurationJson,
             target.ChallengeRulesJson,
             target.ChallengeDefinitionJson);
-        if (settings.Checker is not { } checker)
+        if (settings is null)
             return new(AwdpFixExecutionFenceDisposition.Superseded);
+        var checker = settings.Checker;
         var receipt = JsonSerializer.Deserialize<ContainerReceipt>(
             target.Runtime.ProviderReceiptJson);
         if (receipt?.NetworkId is not { Length: > 0 } networkId
@@ -302,12 +308,15 @@ public sealed class AwdpFixWorkReader(
             return new(AwdpFixExecutionFenceDisposition.Superseded);
         var checkerTimeout = TimeSpan.FromSeconds(checker.TimeoutSeconds);
         var timeout = checkerTimeout < remaining ? checkerTimeout : remaining;
-        var callbackToken = tokens.IssueAwdpFixResult(new(
+        var callbackTokenRequest = new AwdpFixResultTokenRequest(
             message.RunnerId,
             message.GameplayFactId,
             message.RuntimeInstanceId,
             message.Deadline,
-            now));
+            now);
+        var callbackToken = target.Mode == GameMode.Ctf
+            ? tokens.IssuePatchVerificationResult(callbackTokenRequest)
+            : tokens.IssueAwdpFixResult(callbackTokenRequest);
         var archiveToken = tokens.IssueFixArchiveRead(
             message.RunnerId,
             message.PatchUploadId,
@@ -340,7 +349,9 @@ public sealed class AwdpFixWorkReader(
                     networkId,
                     targetHost,
                     settings.ReadyTimeoutSeconds,
-                    new Uri(baseUri, "/api/internal/v1/awdp/fix-results"),
+                    new Uri(baseUri, target.Mode == GameMode.Ctf
+                        ? "/api/internal/v1/patch-verification/results"
+                        : "/api/internal/v1/awdp/fix-results"),
                     callbackToken,
                     timeout,
                     settings.CheckerFixInput,
@@ -472,6 +483,17 @@ public sealed class AwdpFixVerificationHandler(
     TimeProvider timeProvider,
     ILogger<AwdpFixVerificationHandler> logger)
 {
+    public Task Handle(
+        RunPatchVerification message,
+        CancellationToken cancellationToken) =>
+        Handle(new RunAwdpFixVerification(
+            message.GameplayFactId,
+            message.CompetitionChallengeId,
+            message.PatchUploadId,
+            message.RuntimeInstanceId,
+            message.Deadline,
+            message.RunnerId), cancellationToken);
+
     public async Task Handle(
         RunAwdpFixVerification message,
         CancellationToken cancellationToken)

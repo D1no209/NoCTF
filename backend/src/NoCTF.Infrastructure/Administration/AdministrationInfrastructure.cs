@@ -1,6 +1,7 @@
 using System.Globalization;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using NoCTF.Application.Challenges.Bank;
 using Microsoft.Extensions.Http.Resilience;
 using Polly;
 using NoCTF.Application.Administration;
@@ -106,6 +107,8 @@ internal static class AdministrationInfrastructure
         services.AddScoped<ManagePlatform>();
         services.AddScoped<ManageUserAccounts>();
         services.AddScoped<ManagePlatformConfiguration>();
+        services.AddScoped<IExperimentalFeatureReader>(provider =>
+            (IExperimentalFeatureReader)provider.GetRequiredService<IPlatformConfigurationStore>());
         services.AddScoped<ManageHumanVerificationConfiguration>();
         services.AddScoped<ObservePlatform>();
         services.AddScoped<ExportPlatformLogs>();

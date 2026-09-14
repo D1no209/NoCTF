@@ -15,7 +15,8 @@ internal sealed class AwdpFixVerificationExecutionTimeoutPolicy : IHandlerPolicy
         IServiceContainer container)
     {
         foreach (var chain in chains.Where(chain =>
-                     chain.MessageType == typeof(RunAwdpFixVerification)))
+                     chain.MessageType == typeof(RunAwdpFixVerification)
+                     || chain.MessageType == typeof(RunPatchVerification)))
         {
             chain.ExecutionTimeoutInSeconds =
                 AwdpFixExecutionBudget.HandlerExecutionTimeoutSeconds;
@@ -24,6 +25,7 @@ internal sealed class AwdpFixVerificationExecutionTimeoutPolicy : IHandlerPolicy
 
     internal static int? TimeoutFor(Type messageType) =>
         messageType == typeof(RunAwdpFixVerification)
+            || messageType == typeof(RunPatchVerification)
             ? AwdpFixExecutionBudget.HandlerExecutionTimeoutSeconds
             : null;
 }

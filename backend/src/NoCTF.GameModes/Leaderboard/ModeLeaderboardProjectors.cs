@@ -8,6 +8,7 @@ using NoCTF.GameModes.Awd.Scheduling;
 using NoCTF.GameModes.Koh.Configuration;
 using NoCTF.GameModes.Scoring;
 using System.Globalization;
+using NoCTF.Domain.Challenges;
 
 namespace NoCTF.GameModes.Leaderboard;
 
@@ -54,9 +55,11 @@ internal static class CtfLeaderboardProjection
         var defaultChallengeConfiguration = ParseChallenge(null);
         var solves = input.GameplayFacts
             .Where(fact => fact.TeamId is Guid teamId && activeTeams.ContainsKey(teamId)
-                          && fact.Kind == GameplayFactKind.FlagAttempt
                           && fact.Result == GameplayFactResult.Correct
                           && fact.CompetitionChallengeId is not null
+                          && (challenges.Count == 0
+                              ? fact.Kind == GameplayFactKind.FlagAttempt
+                              : IsInteractionFact(fact, challenges))
                           && (challenges.Count == 0 || challenges.ContainsKey(fact.CompetitionChallengeId.Value)))
             .OrderBy(fact => fact.OccurredAt)
             .ThenBy(fact => fact.GameplayFactId)
@@ -115,7 +118,9 @@ internal static class CtfLeaderboardProjection
 
         var wrongFacts = input.GameplayFacts
             .Where(fact => fact.TeamId is Guid teamId && validTeams.ContainsKey(teamId)
-                && fact.Kind == GameplayFactKind.FlagAttempt
+                && (challenges.Count == 0
+                    ? fact.Kind == GameplayFactKind.FlagAttempt
+                    : IsInteractionFact(fact, challenges))
                 && fact.Result == GameplayFactResult.Wrong)
             .Select(fact =>
                 (TeamId: fact.TeamId!.Value,
@@ -205,6 +210,19 @@ internal static class CtfLeaderboardProjection
             CtfConfiguration.CurrentSchemaVersion,
             ScoreCurveConfiguration.Default,
             []);
+
+    private static bool IsInteractionFact(
+        LeaderboardGameplayFact fact,
+        IReadOnlyDictionary<Guid, LeaderboardChallengeFact> challenges)
+    {
+        if (fact.CompetitionChallengeId is not Guid challengeId)
+            return false;
+        var interaction = challenges.GetValueOrDefault(challengeId)?.InteractionKind
+            ?? CtfInteractionKind.FlagSubmission;
+        return interaction == CtfInteractionKind.PatchVerification
+            ? fact.Kind == GameplayFactKind.FixAttempt
+            : fact.Kind == GameplayFactKind.FlagAttempt;
+    }
 
     private static CtfChallengeConfiguration ParseChallenge(string? json) =>
         TryParse<CtfChallengeConfiguration>(json)

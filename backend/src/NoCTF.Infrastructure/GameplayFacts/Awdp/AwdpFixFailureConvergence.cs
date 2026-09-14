@@ -30,7 +30,8 @@ public static class AwdpFixFailureConvergence
         AwdpFixRuntimeCleanupMode cleanupMode,
         CancellationToken cancellationToken)
     {
-        if (runtime.Purpose != RuntimePurpose.AwdpTarget
+        if (runtime.Purpose is not (RuntimePurpose.AwdpTarget
+                or RuntimePurpose.PatchVerificationTarget)
             || runtime.GameplayFactId is not Guid gameplayFactId)
             return new(false, false, false);
 
@@ -51,7 +52,9 @@ public static class AwdpFixFailureConvergence
         {
             fact.State = GameplayFactState.PlatformFailed;
             fact.Result = null;
-            fact.FailureCode = GameplayFactFailureCode.AwdpPlatformFailed;
+            fact.FailureCode = runtime.Purpose == RuntimePurpose.AwdpTarget
+                ? GameplayFactFailureCode.AwdpPlatformFailed
+                : GameplayFactFailureCode.PatchVerificationPlatformFailed;
             fact.UpdatedAt = failedAt;
             await outbox.PublishAsync(new GameplayFactStateChanged(fact.Id, fact.State));
             await RecordFactEventsAsync(
@@ -113,6 +116,9 @@ public static class AwdpFixFailureConvergence
             GameplayFactKind: fact.Kind,
             GameplayFactState: fact.State,
             RuntimeState: runtime.State), cancellationToken);
+
+        if (runtime.Purpose != RuntimePurpose.AwdpTarget)
+            return;
 
         if (fact.ReferenceId is not Guid patchUploadId
             || fact.TeamId is not Guid teamId)

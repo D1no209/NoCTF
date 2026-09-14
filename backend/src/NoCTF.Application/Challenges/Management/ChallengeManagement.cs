@@ -1,5 +1,6 @@
 using NoCTF.Application.Challenges.Configuration;
 using NoCTF.Domain.Competitions;
+using NoCTF.Domain.Challenges;
 
 namespace NoCTF.Application.Challenges.Management;
 
@@ -35,6 +36,7 @@ public sealed record ChallengeView(
     DateTimeOffset UpdatedAt)
 {
     public bool UsesDynamicFlag { get; init; }
+    public CtfInteractionKind InteractionKind { get; init; }
 }
 
 public enum ChallengeMutationFailure
@@ -49,7 +51,8 @@ public enum ChallengeMutationFailure
     ResourceIdConflict,
     ChallengeOrderConflict,
     ChallengeTemplateConflict,
-    LifecycleStateConflict
+    LifecycleStateConflict,
+    ExperimentalFeatureDisabled
 }
 
 public sealed record ChallengeMutationResult(

@@ -101,7 +101,8 @@ public sealed class UploadPatchEndpoint(
             request.File.ContentType,
             stream,
             timeProvider.GetUtcNow(),
-            ct);
+            ct,
+            NoCTF.Domain.Runtime.RuntimePurpose.AwdpTarget);
         if (result.FailureCode == PatchUploadFailureCode.PatchUploadNotAvailable)
             return TypedResults.NotFound();
         if (!result.Succeeded)

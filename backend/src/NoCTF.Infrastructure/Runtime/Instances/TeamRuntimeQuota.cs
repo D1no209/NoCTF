@@ -55,7 +55,8 @@ public sealed class TeamRuntimeQuota(
                 runtime.TeamId == teamId &&
                 (runtime.Purpose == RuntimePurpose.Player
                     || runtime.Purpose == RuntimePurpose.Practice
-                    || runtime.Purpose == RuntimePurpose.AwdpAttack) &&
+                    || runtime.Purpose == RuntimePurpose.AwdpAttack
+                    || runtime.Purpose == RuntimePurpose.PatchVerificationTarget) &&
                 (runtime.State == RuntimeState.Queued ||
                  runtime.State == RuntimeState.Provisioning ||
                  runtime.State == RuntimeState.Running ||

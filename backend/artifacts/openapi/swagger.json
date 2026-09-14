@@ -2154,6 +2154,80 @@
         }
       }
     },
+    "/api/internal/v1/patch-verification/results": {
+      "post": {
+        "tags": [
+          "Api"
+        ],
+        "summary": "Records a claim-bound PatchVerification result.",
+        "description": "GameplayFactId comes exclusively from the internal JWT.",
+        "operationId": "RecordPatchVerificationResultEndpoint",
+        "requestBody": {
+          "x-name": "RecordPatchVerificationResultRequest",
+          "description": "",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsInternalRecordPatchVerificationResultRequest"
+              }
+            }
+          },
+          "required": true,
+          "x-position": 1
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsInternalInternalResultResponse"
+                }
+              }
+            }
+          },
+          "202": {
+            "description": "Accepted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsInternalInternalResultResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "409": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsInternalInternalResultResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcValidationProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/competitions/{competitionId}/challenges/{competitionChallengeId}/awdp-state": {
       "get": {
         "tags": [
@@ -2241,6 +2315,62 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/NoCTFAPIEndpointsGameplayFactsGetGameplayFactValueResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/competitions/{competitionId}/challenges/{competitionChallengeId}/patch-verification": {
+      "get": {
+        "tags": [
+          "Competitions"
+        ],
+        "summary": "Gets the participant PatchVerification state.",
+        "description": "Executes GET /api/v1/competitions/{competitionId}/challenges/{competitionChallengeId}/patch-verification.",
+        "operationId": "GetPatchVerificationEndpoint",
+        "parameters": [
+          {
+            "name": "competitionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          },
+          {
+            "name": "competitionChallengeId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsGameplayFactsPatchVerificationStateResponse"
                 }
               }
             }
@@ -2612,6 +2742,98 @@
         ]
       }
     },
+    "/api/v1/competitions/{competitionId}/challenges/{competitionChallengeId}/patch-verification-targets": {
+      "post": {
+        "tags": [
+          "Competitions"
+        ],
+        "summary": "Requests a clean one-shot CTF PatchVerification target.",
+        "description": "Creates one isolated target for one team and challenge.",
+        "operationId": "RequestPatchVerificationTargetEndpoint",
+        "parameters": [
+          {
+            "name": "competitionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          },
+          {
+            "name": "competitionChallengeId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          },
+          {
+            "name": "X-NoCTF-Human-Verification",
+            "in": "header",
+            "description": "One-time token from the provider selected by public platform configuration. Omit only when that provider is None.",
+            "schema": {
+              "type": "string",
+              "maxLength": 4096
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Accepted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsGameplayFactsRequestPatchVerificationTargetResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "409": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsGameplayFactsPatchVerificationTargetFailureResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Human verification is required or was rejected.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcProblemDetails"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "The selected human verification provider is unavailable.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ]
+      }
+    },
     "/api/v1/competitions/{competitionId}/challenges/{competitionChallengeId}/flag-submissions": {
       "post": {
         "tags": [
@@ -2816,6 +3038,150 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/NoCTFAPIEndpointsGameplayFactsUploadPatchFailureResponse"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Human verification is required or was rejected.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcProblemDetails"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "The selected human verification provider is unavailable.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/competitions/{competitionId}/challenges/{competitionChallengeId}/patch-verification-targets/{runtimeInstanceId}/patch": {
+      "post": {
+        "tags": [
+          "Competitions"
+        ],
+        "summary": "Uploads one Patch archive to a CTF PatchVerification target.",
+        "description": "The archive is validated before a FixAttempt fact is created.",
+        "operationId": "UploadPatchVerificationEndpoint",
+        "parameters": [
+          {
+            "name": "competitionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          },
+          {
+            "name": "competitionChallengeId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          },
+          {
+            "name": "runtimeInstanceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          },
+          {
+            "name": "X-NoCTF-Human-Verification",
+            "in": "header",
+            "description": "One-time token from the provider selected by public platform configuration. Omit only when that provider is None.",
+            "schema": {
+              "type": "string",
+              "maxLength": 4096
+            }
+          }
+        ],
+        "requestBody": {
+          "x-name": "UploadPatchVerificationRequest",
+          "description": "",
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsGameplayFactsUploadPatchVerificationRequest"
+              }
+            }
+          },
+          "required": true,
+          "x-position": 1
+        },
+        "responses": {
+          "202": {
+            "description": "Accepted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsGameplayFactsUploadPatchResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "409": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsGameplayFactsPatchVerificationUploadFailureResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsGameplayFactsPatchVerificationUploadFailureResponse"
                 }
               }
             }
@@ -13541,6 +13907,9 @@
           },
           "humanVerification": {
             "$ref": "#/components/schemas/NoCTFAPIEndpointsPlatformPublicHumanVerificationResponse"
+          },
+          "experimentalFeatures": {
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsPlatformPublicExperimentalFeaturesResponse"
           }
         }
       },
@@ -13594,6 +13963,15 @@
           "Cap",
           "Turnstile"
         ]
+      },
+      "NoCTFAPIEndpointsPlatformPublicExperimentalFeaturesResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "ctfPatchVerificationEnabled": {
+            "type": "boolean"
+          }
+        }
       },
       "NoCTFAPIEndpointsNotificationsNotificationListResponse": {
         "type": "object",
@@ -13901,6 +14279,29 @@
           "ServiceAbnormal"
         ]
       },
+      "NoCTFAPIEndpointsInternalRecordPatchVerificationResultRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "outcome": {
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsInternalPatchVerificationResultOutcome"
+          }
+        }
+      },
+      "NoCTFAPIEndpointsInternalPatchVerificationResultOutcome": {
+        "type": "string",
+        "description": "",
+        "x-enumNames": [
+          "StillExploitable",
+          "Verified",
+          "ServiceAbnormal"
+        ],
+        "enum": [
+          "StillExploitable",
+          "Verified",
+          "ServiceAbnormal"
+        ]
+      },
       "NoCTFAPIEndpointsGameplayFactsAwdpParticipantStateResponse": {
         "type": "object",
         "additionalProperties": false,
@@ -14120,7 +14521,11 @@
           "AwdpViolation",
           "ForeignTeamFlagDetected",
           "InsufficientScore",
-          "HintUnavailable"
+          "HintUnavailable",
+          "PatchStillExploitable",
+          "PatchExecutionFailed",
+          "PatchServiceAbnormal",
+          "PatchVerificationPlatformFailed"
         ],
         "enum": [
           "FlagNotSupported",
@@ -14155,7 +14560,11 @@
           "AwdpViolation",
           "ForeignTeamFlagDetected",
           "InsufficientScore",
-          "HintUnavailable"
+          "HintUnavailable",
+          "PatchStillExploitable",
+          "PatchExecutionFailed",
+          "PatchServiceAbnormal",
+          "PatchVerificationPlatformFailed"
         ]
       },
       "NoCTFAPIEndpointsGameplayFactsAwdpAchievementActivationResponse": {
@@ -14272,6 +14681,100 @@
             "type": "string"
           }
         }
+      },
+      "NoCTFAPIEndpointsGameplayFactsPatchVerificationStateResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "patchVerificationAvailable": {
+            "type": "boolean"
+          },
+          "maximumAttempts": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "acceptedAttempts": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "remainingAttempts": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "verificationState": {
+            "nullable": true,
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsGameplayFactsGameplayFactStateProtocol"
+              }
+            ]
+          },
+          "verificationResult": {
+            "nullable": true,
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsGameplayFactsGameplayFactResultProtocol"
+              }
+            ]
+          },
+          "verificationFailureCode": {
+            "nullable": true,
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsGameplayFactsGameplayFactFailureCodeProtocol"
+              }
+            ]
+          },
+          "runtimeInstanceId": {
+            "type": "string",
+            "format": "guid",
+            "nullable": true
+          },
+          "runtimeState": {
+            "nullable": true,
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsRuntimeRuntimeStateProtocol"
+              }
+            ]
+          },
+          "unavailableCode": {
+            "nullable": true,
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsGameplayFactsPatchVerificationTargetFailureCodeProtocol"
+              }
+            ]
+          }
+        }
+      },
+      "NoCTFAPIEndpointsGameplayFactsPatchVerificationTargetFailureCodeProtocol": {
+        "type": "string",
+        "description": "",
+        "x-enumNames": [
+          "PatchVerificationNotAvailable",
+          "ExperimentalFeatureDisabled",
+          "ActiveTargetExists",
+          "PatchAlreadyVerified",
+          "PatchAttemptsExhausted",
+          "RuntimeQuotaExceeded",
+          "InvalidRuntimeConfiguration",
+          "TargetConcurrency"
+        ],
+        "enum": [
+          "PatchVerificationNotAvailable",
+          "ExperimentalFeatureDisabled",
+          "ActiveTargetExists",
+          "PatchAlreadyVerified",
+          "PatchAttemptsExhausted",
+          "RuntimeQuotaExceeded",
+          "InvalidRuntimeConfiguration",
+          "TargetConcurrency"
+        ]
+      },
+      "NoCTFAPIEndpointsGameplayFactsGetPatchVerificationRequest": {
+        "type": "object",
+        "additionalProperties": false
       },
       "NoCTFAPIEndpointsGameplayFactsGetGameplayFactStatusRequest": {
         "type": "object",
@@ -14505,6 +15008,38 @@
           "DefenseTargetConcurrency"
         ]
       },
+      "NoCTFAPIEndpointsGameplayFactsRequestPatchVerificationTargetResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "runtimeInstanceId": {
+            "type": "string",
+            "format": "guid"
+          },
+          "state": {
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsRuntimeRuntimeStateProtocol"
+          },
+          "statusUrl": {
+            "type": "string"
+          }
+        }
+      },
+      "NoCTFAPIEndpointsGameplayFactsPatchVerificationTargetFailureResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "code": {
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsGameplayFactsPatchVerificationTargetFailureCodeProtocol"
+          },
+          "detail": {
+            "type": "string"
+          }
+        }
+      },
+      "NoCTFAPIEndpointsGameplayFactsRequestPatchVerificationTargetRequest": {
+        "type": "object",
+        "additionalProperties": false
+      },
       "NoCTFAPIEndpointsGameplayFactsFlagGameplayFactAcceptedResponse": {
         "type": "object",
         "additionalProperties": false,
@@ -14680,6 +15215,56 @@
         ]
       },
       "NoCTFAPIEndpointsGameplayFactsUploadPatchRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "file"
+        ],
+        "properties": {
+          "file": {
+            "type": "string",
+            "format": "binary",
+            "nullable": false
+          }
+        }
+      },
+      "NoCTFAPIEndpointsGameplayFactsPatchVerificationUploadFailureResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "code": {
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsGameplayFactsPatchVerificationUploadFailureCode"
+          },
+          "detail": {
+            "type": "string"
+          }
+        }
+      },
+      "NoCTFAPIEndpointsGameplayFactsPatchVerificationUploadFailureCode": {
+        "type": "string",
+        "description": "",
+        "x-enumNames": [
+          "ArchiveStreamNotSeekable",
+          "ArchiveTooLarge",
+          "ArchiveInvalid",
+          "TargetNotReady",
+          "PatchAlreadyVerified",
+          "AttemptsExhausted",
+          "TargetConsumed",
+          "UploadConflict"
+        ],
+        "enum": [
+          "ArchiveStreamNotSeekable",
+          "ArchiveTooLarge",
+          "ArchiveInvalid",
+          "TargetNotReady",
+          "PatchAlreadyVerified",
+          "AttemptsExhausted",
+          "TargetConsumed",
+          "UploadConflict"
+        ]
+      },
+      "NoCTFAPIEndpointsGameplayFactsUploadPatchVerificationRequest": {
         "type": "object",
         "additionalProperties": false,
         "required": [
@@ -16492,6 +17077,64 @@
               "$ref": "#/components/schemas/NoCTFAPIEndpointsChallengesParticipantChallengeHintResponse"
             }
           },
+          "interactionKind": {
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsChallengesCtfInteractionKindProtocol"
+          },
+          "patchVerificationAvailable": {
+            "type": "boolean"
+          },
+          "maximumPatchAttempts": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "acceptedPatchAttempts": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "remainingPatchAttempts": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "patchVerificationState": {
+            "nullable": true,
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsGameplayFactsGameplayFactStateProtocol"
+              }
+            ]
+          },
+          "patchVerificationResult": {
+            "nullable": true,
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsGameplayFactsGameplayFactResultProtocol"
+              }
+            ]
+          },
+          "patchVerificationFailureCode": {
+            "nullable": true,
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsGameplayFactsGameplayFactFailureCodeProtocol"
+              }
+            ]
+          },
+          "patchVerificationRuntimeInstanceId": {
+            "type": "string",
+            "format": "guid",
+            "nullable": true
+          },
+          "patchVerificationRuntimeState": {
+            "nullable": true,
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsRuntimeRuntimeStateProtocol"
+              }
+            ]
+          },
           "publicAccessFailure": {
             "nullable": true,
             "oneOf": [
@@ -16529,6 +17172,18 @@
             "type": "boolean"
           }
         }
+      },
+      "NoCTFAPIEndpointsChallengesCtfInteractionKindProtocol": {
+        "type": "string",
+        "description": "",
+        "x-enumNames": [
+          "FlagSubmission",
+          "PatchVerification"
+        ],
+        "enum": [
+          "FlagSubmission",
+          "PatchVerification"
+        ]
       },
       "NoCTFAPIEndpointsChallengesGetChallengeRequest": {
         "type": "object",
@@ -17723,14 +18378,16 @@
           "AwdpTarget",
           "Practice",
           "AwdpAttack",
-          "TemplateTest"
+          "TemplateTest",
+          "PatchVerificationTarget"
         ],
         "enum": [
           "Player",
           "AwdpTarget",
           "Practice",
           "AwdpAttack",
-          "TemplateTest"
+          "TemplateTest",
+          "PatchVerificationTarget"
         ]
       },
       "NoCTFApplicationRuntimeInstancesRuntimePublishedPortView": {
@@ -18086,6 +18743,9 @@
           "publicGateway": {
             "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationPlatformPublicGatewayConfigurationResponse"
           },
+          "experimentalFeatures": {
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationPlatformPlatformExperimentalFeaturesResponse"
+          },
           "publicGatewayStatusUrl": {
             "type": "string"
           }
@@ -18324,6 +18984,15 @@
           "configurationError": {
             "type": "string",
             "nullable": true
+          }
+        }
+      },
+      "NoCTFAPIEndpointsAdministrationPlatformPlatformExperimentalFeaturesResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "ctfPatchVerificationEnabled": {
+            "type": "boolean"
           }
         }
       },
@@ -19290,6 +19959,14 @@
                 "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationPlatformPlatformGatewayPatchRequest"
               }
             ]
+          },
+          "experimentalFeatures": {
+            "nullable": true,
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationPlatformPlatformExperimentalFeaturesPatchRequest"
+              }
+            ]
           }
         }
       },
@@ -19482,6 +20159,18 @@
             "format": "int32",
             "maximum": 64.0,
             "minimum": 0.0
+          }
+        }
+      },
+      "NoCTFAPIEndpointsAdministrationPlatformPlatformExperimentalFeaturesPatchRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "ctfPatchVerificationEnabled"
+        ],
+        "properties": {
+          "ctfPatchVerificationEnabled": {
+            "type": "boolean"
           }
         }
       },
@@ -20920,7 +21609,8 @@
           "ChallengeRulesInvalid",
           "RuntimeDefinitionInvalid",
           "TrackConfigurationInvalid",
-          "TeamTrackInvalid"
+          "TeamTrackInvalid",
+          "ExperimentalFeatureDisabled"
         ],
         "enum": [
           "CompetitionNotPublished",
@@ -20932,7 +21622,8 @@
           "ChallengeRulesInvalid",
           "RuntimeDefinitionInvalid",
           "TrackConfigurationInvalid",
-          "TeamTrackInvalid"
+          "TeamTrackInvalid",
+          "ExperimentalFeatureDisabled"
         ]
       },
       "NoCTFAPIEndpointsAdministrationCheatIncidentsCheatIncidentDetailResponse": {
@@ -21225,7 +21916,8 @@
           "ChallengeTemplateConflict",
           "LifecycleStateConflict",
           "ChallengeTemplateNotFound",
-          "ChallengeTemplateModeMismatch"
+          "ChallengeTemplateModeMismatch",
+          "ExperimentalFeatureDisabled"
         ],
         "enum": [
           "ResourceIdConflict",
@@ -21233,7 +21925,8 @@
           "ChallengeTemplateConflict",
           "LifecycleStateConflict",
           "ChallengeTemplateNotFound",
-          "ChallengeTemplateModeMismatch"
+          "ChallengeTemplateModeMismatch",
+          "ExperimentalFeatureDisabled"
         ]
       },
       "NoCTFAPIEndpointsAdministrationChallengesCreateChallengeRequest": {
@@ -21684,6 +22377,9 @@
           "updatedAt": {
             "type": "string",
             "format": "date-time"
+          },
+          "interactionKind": {
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsChallengesCtfInteractionKindProtocol"
           }
         }
       },
@@ -21733,7 +22429,9 @@
           "ActiveRuntimeDefinitionConflict",
           "OwnerIncludedInManagerSet",
           "UserNotFound",
-          "RoleNotEligible"
+          "RoleNotEligible",
+          "ExperimentalFeatureDisabled",
+          "InteractionKindConflict"
         ],
         "enum": [
           "ResourceIdConflict",
@@ -21741,7 +22439,9 @@
           "ActiveRuntimeDefinitionConflict",
           "OwnerIncludedInManagerSet",
           "UserNotFound",
-          "RoleNotEligible"
+          "RoleNotEligible",
+          "ExperimentalFeatureDisabled",
+          "InteractionKindConflict"
         ]
       },
       "NoCTFAPIEndpointsAdministrationChallengeBankCreateChallengeTemplateRequest": {

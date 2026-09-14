@@ -52,6 +52,7 @@ public static class MessageRouting
         Route<ReconcileRunnerAssignments>(options, WorkerQueue.Control);
         Route<BloodAwarded>(options, WorkerQueue.Background);
         Route<StartAwdpFixVerification>(options, WorkerQueue.Gameplay);
+        Route<StartPatchVerification>(options, WorkerQueue.Gameplay);
         Route<AwdpFixResult>(options, WorkerQueue.Gameplay);
         Route<CompleteAwdpFixRecovery>(options, WorkerQueue.Control);
         Route<ExpireAwdpFixVerification>(options, WorkerQueue.Control);

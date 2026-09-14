@@ -1,6 +1,7 @@
 using System.Text.Json;
 using NoCTF.Application.Challenges.Configuration;
 using NoCTF.Domain.Competitions;
+using NoCTF.Domain.Challenges;
 using NoCTF.GameModes.Awd.Configuration;
 using NoCTF.GameModes.Awdp.Configuration;
 using NoCTF.GameModes.Ctf.Configuration;
@@ -14,10 +15,13 @@ public sealed class GameModeChallengeConfigurationCatalog : IChallengeConfigurat
 
     public string GetDefaultJson(GameMode mode) =>
         JsonSerializer.Serialize(
-            new { schemaVersion = CurrentSchemaVersion(mode) },
+            new { schemaVersion = CurrentRulesSchemaVersion(mode) },
             JsonOptions);
 
-    public string GetDefaultDefinitionJson(GameMode mode) => GetDefaultJson(mode);
+    public string GetDefaultDefinitionJson(GameMode mode) =>
+        JsonSerializer.Serialize(
+            new { schemaVersion = CurrentDefinitionSchemaVersion(mode) },
+            JsonOptions);
 
     public IReadOnlyList<string> ValidateRules(
         GameMode mode,
@@ -39,20 +43,79 @@ public sealed class GameModeChallengeConfigurationCatalog : IChallengeConfigurat
                 1)
         ];
 
-    public IReadOnlyList<string> ValidateDefinitionForStart(GameMode mode, string json)
+    public IReadOnlyList<string> ValidateRulesForDefinition(
+        GameMode mode,
+        string rulesJson,
+        string definitionJson,
+        string competitionConfigurationJson,
+        int eligibleTeamCount)
     {
-        var errors = ValidateDefinition(mode, json).ToList();
-        if (errors.Count > 0 || mode != GameMode.Awd)
+        var errors = ValidateRules(
+            mode,
+            rulesJson,
+            competitionConfigurationJson,
+            eligibleTeamCount).ToList();
+        if (errors.Count > 0 || mode != GameMode.Ctf)
             return errors;
 
-        if (AwdConfigurationUpgrader.ParseChallenge(json).Runtime is null)
-            errors.Add("Runtime is required before an AWD competition can start.");
+        try
+        {
+            var definition = CtfConfigurationUpgrader.ParseChallenge(definitionJson);
+            var rules = CtfConfigurationUpgrader.ParseChallenge(rulesJson);
+            if (definition.InteractionKind == CtfInteractionKind.PatchVerification)
+            {
+                if (rules.MaxFlagAttempts is not null)
+                    errors.Add("PatchVerification rules cannot configure MaxFlagAttempts.");
+                if (rules.FlagTemplate is not null)
+                    errors.Add("PatchVerification rules cannot configure FlagTemplate.");
+            }
+            else if (rules.MaxPatchAttempts is not null)
+            {
+                errors.Add("FlagSubmission rules cannot configure MaxPatchAttempts.");
+            }
+        }
+        catch (Exception exception) when (exception is GameModeConfigurationException or JsonException)
+        {
+            errors.Add(exception.Message);
+        }
         return errors;
     }
 
-    private static int CurrentSchemaVersion(GameMode mode) => mode switch
+    public IReadOnlyList<string> ValidateDefinitionForStart(GameMode mode, string json)
+    {
+        var errors = ValidateDefinition(mode, json).ToList();
+        if (errors.Count > 0)
+            return errors;
+
+        if (mode == GameMode.Awd
+            && AwdConfigurationUpgrader.ParseChallenge(json).Runtime is null)
+            errors.Add("Runtime is required before an AWD competition can start.");
+        if (mode == GameMode.Ctf)
+        {
+            var configuration = CtfConfigurationUpgrader.ParseChallenge(json);
+            if (configuration.InteractionKind == CtfInteractionKind.PatchVerification)
+            {
+                if (configuration.Runtime is null)
+                    errors.Add("Runtime is required before a CTF PatchVerification challenge can start.");
+                if (configuration.Checker is null)
+                    errors.Add("Checker is required before a CTF PatchVerification challenge can start.");
+            }
+        }
+        return errors;
+    }
+
+    private static int CurrentDefinitionSchemaVersion(GameMode mode) => mode switch
     {
         GameMode.Ctf => CtfChallengeConfiguration.CurrentSchemaVersion,
+        GameMode.Awd => AwdChallengeConfiguration.CurrentSchemaVersion,
+        GameMode.Awdp => AwdpChallengeConfiguration.CurrentSchemaVersion,
+        GameMode.Koh => KohChallengeConfiguration.CurrentSchemaVersion,
+        _ => throw new ArgumentOutOfRangeException(nameof(mode), mode, "Unsupported game mode.")
+    };
+
+    private static int CurrentRulesSchemaVersion(GameMode mode) => mode switch
+    {
+        GameMode.Ctf => CtfConfiguration.CurrentSchemaVersion,
         GameMode.Awd => AwdChallengeConfiguration.CurrentSchemaVersion,
         GameMode.Awdp => AwdpChallengeConfiguration.CurrentSchemaVersion,
         GameMode.Koh => KohChallengeConfiguration.CurrentSchemaVersion,
@@ -140,7 +203,19 @@ public sealed class GameModeChallengeConfigurationCatalog : IChallengeConfigurat
         new HashSet<string>(
             mode switch
             {
-                GameMode.Ctf => ["runtime"],
+                GameMode.Ctf =>
+                [
+                    "interactionKind",
+                    "runtime",
+                    "patchEntrypoint",
+                    "patchCommand",
+                    "patchTimeoutSeconds",
+                    "checker",
+                    "readyTimeoutSeconds",
+                    "maximumPatchUploadBytes",
+                    "checkerFixInput",
+                    "checkerAllowRoot"
+                ],
                 GameMode.Awd => ["runtime", "checker", "checkerAllowRoot", "flagInjection"],
                 GameMode.Awdp =>
                 [
@@ -168,6 +243,7 @@ public sealed class GameModeChallengeConfigurationCatalog : IChallengeConfigurat
                     "scoreCurve",
                     "bloodRewards",
                     "maxFlagAttempts",
+                    "maxPatchAttempts",
                     "wrongSubmissionPenalty",
                     "flagTemplate"
                 ],

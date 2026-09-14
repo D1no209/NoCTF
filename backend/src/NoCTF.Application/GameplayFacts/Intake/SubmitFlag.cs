@@ -62,7 +62,8 @@ public sealed class SubmitFlag(IGameplayFactIntakeStore store, IGameplayFactAdmi
 
         var kind = snapshot.Mode == GameMode.Awdp ? GameplayFactKind.BreakAttempt : GameplayFactKind.FlagAttempt;
         var rules = modePolicy.GetRules(
-            snapshot.Mode, snapshot.CompetitionConfigurationJson, snapshot.ChallengeConfigurationJson);
+            snapshot.Mode, snapshot.CompetitionConfigurationJson, snapshot.ChallengeConfigurationJson,
+            snapshot.ChallengeDefinitionJson);
         var admission = GameplayFactAdmissionPolicy.Check(snapshot, kind, rules, command.OccurredAt);
         if (!admission.Succeeded)
             return OperationResult<GameplayFactAccepted, GameplayFactAdmissionFailureCode>.Failure(
@@ -120,7 +121,8 @@ public sealed class SubmitFlag(IGameplayFactIntakeStore store, IGameplayFactAdmi
 
         var kind = snapshot.Mode == GameMode.Awdp ? GameplayFactKind.BreakAttempt : GameplayFactKind.FlagAttempt;
         var rules = modePolicy.GetRules(
-            snapshot.Mode, snapshot.CompetitionConfigurationJson, snapshot.ChallengeConfigurationJson);
+            snapshot.Mode, snapshot.CompetitionConfigurationJson, snapshot.ChallengeConfigurationJson,
+            snapshot.ChallengeDefinitionJson);
         var admission = GameplayFactAdmissionPolicy.Check(snapshot, kind, rules, receivedAt);
         if (!admission.Succeeded)
             return OperationResult<IReadOnlyList<GameplayFactAccepted>, GameplayFactAdmissionFailureCode>.Failure(

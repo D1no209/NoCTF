@@ -100,7 +100,8 @@ internal static partial class BackendMessageOperations
                 && (instance.State == RuntimeState.Queued
                     || instance.State == RuntimeState.Provisioning
                     || instance.State == RuntimeState.Running
-                    || (instance.Purpose == RuntimePurpose.AwdpTarget
+                    || ((instance.Purpose == RuntimePurpose.AwdpTarget
+                            || instance.Purpose == RuntimePurpose.PatchVerificationTarget)
                         && instance.GameplayFactId != null)))
             .OrderBy(instance => instance.CreatedAt)
             .ToListAsync(cancellationToken);

@@ -99,6 +99,13 @@ public sealed class CtfGameplayFactEvaluator(IGameplayFactEvaluator inner) : IGa
 {
     public GameplayFactDecision Evaluate(GameplayFactProcessingContext context)
     {
+        var interactionKind = CtfInteractionKind(context.ChallengeDefinitionJson);
+        if (interactionKind == NoCTF.Domain.Challenges.CtfInteractionKind.PatchVerification)
+        {
+            return ModeGameplayFactEvaluatorRules.Reject(
+                context.GameplayFact,
+                GameplayFactFailureCode.FlagNotSupported);
+        }
         if (context.GameplayFact.Kind != GameplayFactKind.FlagAttempt)
             return ModeGameplayFactEvaluatorRules.Reject(
                 context.GameplayFact,
@@ -118,6 +125,21 @@ public sealed class CtfGameplayFactEvaluator(IGameplayFactEvaluator inner) : IGa
         return ModeGameplayFactEvaluatorRules.DetectForeignTeamFlag(
             effectiveContext,
             inner.Evaluate(effectiveContext));
+    }
+
+    private static NoCTF.Domain.Challenges.CtfInteractionKind CtfInteractionKind(
+        string? definitionJson)
+    {
+        if (string.IsNullOrWhiteSpace(definitionJson))
+            return NoCTF.Domain.Challenges.CtfInteractionKind.FlagSubmission;
+        try
+        {
+            return CtfConfigurationUpgrader.ParseChallenge(definitionJson).InteractionKind;
+        }
+        catch (GameModeConfigurationException)
+        {
+            return NoCTF.Domain.Challenges.CtfInteractionKind.FlagSubmission;
+        }
     }
 
     private static bool UsesRuntimeInjection(string? definitionJson)

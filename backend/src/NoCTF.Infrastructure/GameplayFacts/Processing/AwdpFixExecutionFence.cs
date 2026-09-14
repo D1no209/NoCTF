@@ -52,12 +52,9 @@ public sealed class PostgresAwdpFixExecutionFence(
         RuntimeInstance? runtime,
         GameplayFact? fact,
         AwdpFixExecutionFenceRequest request) =>
-        runtime is
-        {
-            Purpose: RuntimePurpose.AwdpTarget,
-            GameplayFactId: not null,
-            RunnerId: not null
-        }
+        runtime is { GameplayFactId: not null, RunnerId: not null }
+        && (runtime.Purpose is RuntimePurpose.AwdpTarget
+            or RuntimePurpose.PatchVerificationTarget)
         && runtime.GameplayFactId == request.GameplayFactId
         && runtime.CompetitionChallengeId == request.CompetitionChallengeId
         && string.Equals(runtime.RunnerId, request.RunnerId, StringComparison.Ordinal)

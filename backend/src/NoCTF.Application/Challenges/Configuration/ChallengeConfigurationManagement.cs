@@ -11,7 +11,8 @@ public sealed record ChallengeConfigurationView(
     string CompetitionConfigurationJson,
     CompetitionStatus CompetitionStatus,
     int EligibleTeamCount,
-    DateTimeOffset UpdatedAt);
+    DateTimeOffset UpdatedAt,
+    string DefinitionJson = "{}");
 
 public interface IChallengeConfigurationCatalog
 {
@@ -40,6 +41,14 @@ public interface IChallengeConfigurationCatalog
         GameMode mode,
         string json) =>
         ValidateDefinition(mode, json);
+
+    IReadOnlyList<string> ValidateRulesForDefinition(
+        GameMode mode,
+        string rulesJson,
+        string definitionJson,
+        string competitionConfigurationJson,
+        int eligibleTeamCount) =>
+        ValidateRules(mode, rulesJson, competitionConfigurationJson, eligibleTeamCount);
 }
 
 public interface IChallengeConfigurationStore
@@ -105,9 +114,10 @@ public sealed class UpdateChallengeConfiguration(
             return OperationResult<ChallengeConfigurationView, ChallengeConfigurationFailureCode>.Failure(
                 ChallengeConfigurationFailureCode.ChallengeNotFound,
                 "Challenge was not found.");
-        var errors = catalog.ValidateRules(
+        var errors = catalog.ValidateRulesForDefinition(
             current.Mode,
             json,
+            current.DefinitionJson,
             current.CompetitionConfigurationJson,
             current.EligibleTeamCount);
         if (errors.Count > 0)

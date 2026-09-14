@@ -27,7 +27,8 @@ public sealed record GameplayFactAdmissionSnapshot(
     bool HasCorrectFlag = false,
     DateTimeOffset? OfficialEndAt = null,
     bool PracticeModeEnabled = false,
-    PracticeRuntimeAdmissionState PracticeRuntimeState = PracticeRuntimeAdmissionState.NotRequired);
+    PracticeRuntimeAdmissionState PracticeRuntimeState = PracticeRuntimeAdmissionState.NotRequired,
+    string? ChallengeDefinitionJson = null);
 
 public enum PracticeRuntimeAdmissionState
 {
@@ -50,6 +51,13 @@ public interface IGameplayFactAdmissionModePolicy
         GameMode mode,
         string competitionConfigurationJson,
         string challengeConfigurationJson);
+
+    GameplayFactAdmissionRules GetRules(
+        GameMode mode,
+        string competitionConfigurationJson,
+        string challengeConfigurationJson,
+        string? challengeDefinitionJson) =>
+        GetRules(mode, competitionConfigurationJson, challengeConfigurationJson);
 }
 
 public enum GameplayFactAcceptanceState

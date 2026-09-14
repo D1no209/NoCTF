@@ -68,6 +68,10 @@ public interface IInternalResultStore
     Task<InternalResultDisposition> RecordAwdpAsync(
         AwdpFixResult result,
         CancellationToken cancellationToken);
+    Task<InternalResultDisposition> RecordPatchVerificationAsync(
+        AwdpFixResult result,
+        CancellationToken cancellationToken) =>
+        RecordAwdpAsync(result, cancellationToken);
 }
 
 public sealed class RecordInternalResult(IInternalResultStore store)
@@ -81,4 +85,9 @@ public sealed class RecordInternalResult(IInternalResultStore store)
         AwdpFixResult result,
         CancellationToken ct = default) =>
         store.RecordAwdpAsync(result, ct);
+
+    public Task<InternalResultDisposition> PatchVerificationAsync(
+        AwdpFixResult result,
+        CancellationToken ct = default) =>
+        store.RecordPatchVerificationAsync(result, ct);
 }

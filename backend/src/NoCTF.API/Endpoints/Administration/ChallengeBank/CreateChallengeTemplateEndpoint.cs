@@ -55,7 +55,8 @@ public sealed record ChallengeTemplateResponse(
     DateTimeOffset? DeletedAt,
     int ActiveCompetitionReferenceCount,
     DateTimeOffset CreatedAt,
-    DateTimeOffset UpdatedAt);
+    DateTimeOffset UpdatedAt,
+    NoCTF.API.Endpoints.Challenges.CtfInteractionKindProtocol InteractionKind);
 
 [JsonConverter(typeof(NoCTF.API.Serialization.StrictPascalCaseEnumConverter<ChallengeTemplateConflictCode>))]
 public enum ChallengeTemplateConflictCode
@@ -65,7 +66,9 @@ public enum ChallengeTemplateConflictCode
     ActiveRuntimeDefinitionConflict,
     OwnerIncludedInManagerSet,
     UserNotFound,
-    RoleNotEligible
+    RoleNotEligible,
+    ExperimentalFeatureDisabled,
+    InteractionKindConflict
 }
 
 public sealed record ChallengeTemplateConflictResponse(
@@ -92,6 +95,10 @@ internal static class ChallengeTemplateWriteResponseMapper
                     ChallengeTemplateConflictCode.UserNotFound,
                 ChallengeTemplateWriteState.RoleNotEligible =>
                     ChallengeTemplateConflictCode.RoleNotEligible,
+                ChallengeTemplateWriteState.ExperimentalFeatureDisabled =>
+                    ChallengeTemplateConflictCode.ExperimentalFeatureDisabled,
+                ChallengeTemplateWriteState.InteractionKindConflict =>
+                    ChallengeTemplateConflictCode.InteractionKindConflict,
                 _ => throw new InvalidOperationException(
                     $"Unsupported challenge template conflict state: {result.State}.")
             },
@@ -109,6 +116,10 @@ internal static class ChallengeTemplateWriteResponseMapper
                     "One or more selected template managers no longer exist.",
                 ChallengeTemplateWriteState.RoleNotEligible =>
                     "One or more selected accounts do not have a platform role eligible to manage challenge templates.",
+                ChallengeTemplateWriteState.ExperimentalFeatureDisabled =>
+                    "CTF PatchVerification is disabled in platform settings.",
+                ChallengeTemplateWriteState.InteractionKindConflict =>
+                    "The CTF interaction kind can change only before the template is referenced or used.",
                 _ => "The challenge template conflicts with its current state."
             }),
             result.UserIds ?? []);
@@ -165,6 +176,10 @@ internal static partial class ChallengeTemplateMapper
 
     [MapEnum(EnumMappingStrategy.ByName)]
     private static partial GameModeProtocol ToProtocol(GameMode value);
+
+    [MapEnum(EnumMappingStrategy.ByName)]
+    private static partial NoCTF.API.Endpoints.Challenges.CtfInteractionKindProtocol ToProtocol(
+        CtfInteractionKind value);
 }
 
 public sealed class CreateChallengeTemplateEndpoint(
@@ -226,7 +241,8 @@ public sealed class CreateChallengeTemplateEndpoint(
                 detail: result.Detail),
             ChallengeTemplateWriteState.ResourceIdConflict
                 or ChallengeTemplateWriteState.UserNotFound
-                or ChallengeTemplateWriteState.RoleNotEligible =>
+                or ChallengeTemplateWriteState.RoleNotEligible
+                or ChallengeTemplateWriteState.ExperimentalFeatureDisabled =>
                 TypedResults.Conflict(
                     ChallengeTemplateWriteResponseMapper.ToConflict(result)),
             _ => throw new InvalidOperationException(

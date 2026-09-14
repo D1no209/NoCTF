@@ -4,6 +4,8 @@ using NoCTF.Application.Challenges.Flags;
 using NoCTF.Application.Runtime.Provisioning;
 using NoCTF.Domain.Challenges;
 using NoCTF.Domain.Competitions;
+using NoCTF.GameModes.Ctf.Configuration;
+using NoCTF.GameModes.Registration;
 
 namespace NoCTF.Infrastructure.Challenges.Flags;
 
@@ -26,6 +28,7 @@ public sealed class ChallengeFlagManagementStore(
         if (challenge.Mode == GameMode.Awdp)
             return true;
         return challenge.Mode == GameMode.Ctf
+            && InteractionKind(challenge.DefinitionJson) == CtfInteractionKind.FlagSubmission
             && runtimeTemplates.Get(challenge.Mode, challenge.DefinitionJson)?.FlagSource
                 is null or RuntimeFlagSource.Static;
     }
@@ -40,6 +43,7 @@ public sealed class ChallengeFlagManagementStore(
         if (challenge is null)
             return null;
         return challenge.Mode == GameMode.Ctf
+            && InteractionKind(challenge.DefinitionJson) == CtfInteractionKind.FlagSubmission
             && runtimeTemplates.Get(challenge.Mode, challenge.DefinitionJson)?.FlagSource
                 is null or RuntimeFlagSource.Static;
     }
@@ -254,6 +258,18 @@ public sealed class ChallengeFlagManagementStore(
         || flag.SpecificationId is not null
         || flag.ValidStart is not null
         || flag.ValidUntil is not null;
+
+    private static CtfInteractionKind InteractionKind(string definitionJson)
+    {
+        try
+        {
+            return CtfConfigurationUpgrader.ParseChallenge(definitionJson).InteractionKind;
+        }
+        catch (GameModeConfigurationException)
+        {
+            return CtfInteractionKind.FlagSubmission;
+        }
+    }
 
     private sealed record ChallengeFlagSupport(GameMode Mode, string DefinitionJson);
 

@@ -20,7 +20,8 @@ public enum StartGateFailureCodeProtocol
     ChallengeRulesInvalid,
     RuntimeDefinitionInvalid,
     TrackConfigurationInvalid,
-    TeamTrackInvalid
+    TeamTrackInvalid,
+    ExperimentalFeatureDisabled
 }
 
 public sealed record StartGateErrorResponse(
