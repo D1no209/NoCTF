@@ -88,12 +88,14 @@ describe('challenge definition defaults', () => {
     expect(editPage).toContain('form.definitionJson = value.definitionJson ??')
     expect(editPage).toContain("form.mode = value.mode ?? 'Ctf'")
     expect(createPage).toContain('normalizeDefinitionJson(mode.value, definitionJson.value)')
-    expect(editPage).toContain('normalizeDefinitionJson(form.mode, currentDefinition)')
+    expect(editPage).toContain('normalizeDefinitionJson(mode, definitionJson)')
     expect(createPage).toContain('<UiForm validation="feature"')
     expect(createPage).toContain('@submit.prevent="submit"')
-    expect(editPage).toContain('<UiForm validation="feature" @submit.prevent="save">')
+    expect(editPage).toContain('<UiForm validation="feature" @submit.prevent="saveBasic">')
     expect(createPage).toContain('v-if="saveErrors.length"')
-    expect(editPage).toContain('v-if="saveErrors.length"')
+    expect(editPage).toContain('v-if="basicSaveErrors.length"')
+    expect(editPage).toContain('v-if="runtimeSaveErrors.length"')
+    expect(editPage).toContain('v-if="definitionSaveErrors.length"')
   })
 
   test('normalizes submission JSON with the active schema version', () => {
@@ -155,13 +157,29 @@ describe('challenge definition defaults', () => {
     expect(competitionEditor).toContain('function resetToCurrentDefaults()')
     expect(competitionEditor).toContain("$t('ui.resetToCurrentModeDefaults')")
     expect(competitionEditor).toContain("$t('ui.saveTheConfigurationAfterResettingToApplyIt')")
-    expect(templatePage).toContain('function resetDefinitionToCurrentMode(): void')
+    expect(templatePage).toContain('function resetRuntimeDefinition(): void')
+    expect(templatePage).toContain('function resetModeDefinition(): void')
     expect(templatePage).toContain('form.definitionJson = defaultDefinitionJson(form.mode)')
     expect(templatePage).toContain("$t('ui.resetToCurrentModeDefinition')")
     expect(templatePage).toContain('data-testid="runtime-definition-save"')
     expect(templatePage).toContain('data-testid="mode-definition-save"')
-    expect(templatePage).toContain('serializeDefinition(form.mode, definitionModel.value)')
+    expect(templatePage).toContain('mergeChallengeModeDefinition(')
     expect(templatePage).not.toContain("$t('ui.afterResettingReturnToBasicInformationAndSaveYourChanges')")
+  })
+
+  test('saves basic, runtime, and mode definition drafts independently', async () => {
+    const templatePage = await sourceFile(
+      new URL('../app/pages/admin/challenges/[id].vue', import.meta.url),
+    ).text()
+
+    expect(templatePage).toContain("type SaveSection = 'basic' | 'runtime' | 'definition'")
+    expect(templatePage).toContain("updateContent('basic', contentFromTemplate(value, {")
+    expect(templatePage).toContain('mergeChallengeRuntimeDefinition(')
+    expect(templatePage).toContain("updateContent('runtime', contentFromTemplate(value, {")
+    expect(templatePage).toContain("updateContent('definition', contentFromTemplate(value, {")
+    expect(templatePage).toContain('mergeChallengeModeDefinition(')
+    expect(templatePage).toContain('@click="saveRuntimeDefinition"')
+    expect(templatePage).toContain('@click="saveModeDefinition"')
   })
 
   test('lists every blocking AWDP runtime field before sending the save request', () => {
