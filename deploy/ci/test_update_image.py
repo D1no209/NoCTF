@@ -112,6 +112,18 @@ class DeploymentSafetyTests(unittest.TestCase):
         exporter["Config"]["Labels"]["com.docker.compose.service"] = "prometheus"
         self.assertEqual(application_containers([app, foreign, exporter], Path("/root/NoCTF")), [app])
 
+    def test_selects_compose_project_with_implicit_dotenv_by_exact_working_directory(self):
+        app, _ = fixture()
+        labels = app["Config"]["Labels"]
+        labels.pop("com.docker.compose.project.environment_file")
+        labels["com.docker.compose.project.working_dir"] = "/opt/noctf"
+
+        self.assertEqual(
+            application_containers([app], Path("/opt/noctf")),
+            [app])
+        with self.assertRaises(RuntimeError):
+            application_containers([app], Path("/opt/another"))
+
     def test_rejects_multiple_projects_or_replicas(self):
         app, _ = fixture()
         with self.assertRaises(RuntimeError):

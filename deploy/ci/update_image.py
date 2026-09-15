@@ -126,8 +126,12 @@ def application_containers(containers, root):
     result = []
     for container in containers:
         meta = labels(container)
-        env_files = meta.get("com.docker.compose.project.environment_file", "").split(",")
-        if str(root / ".env") not in env_files:
+        env_files = [path for path in
+                     meta.get("com.docker.compose.project.environment_file", "").split(",")
+                     if path]
+        working_dir = meta.get("com.docker.compose.project.working_dir")
+        same_working_dir = working_dir and Path(working_dir).resolve() == root
+        if str(root / ".env") not in env_files and not same_working_dir:
             continue
         if meta.get("com.docker.compose.service") not in APPLICATIONS:
             continue
@@ -217,8 +221,13 @@ def _deploy_locked(args, root):
         raise RuntimeError("The installed API service is missing.")
     meta = labels(primary)
     project = meta["com.docker.compose.project"]
-    files = meta["com.docker.compose.project.config_files"].split(",")
-    env_files = meta["com.docker.compose.project.environment_file"].split(",")
+    files = [path for path in
+             meta["com.docker.compose.project.config_files"].split(",") if path]
+    env_files = [path for path in
+                 meta.get("com.docker.compose.project.environment_file", "").split(",")
+                 if path]
+    if not env_files:
+        env_files = [str(root / ".env")]
     if not all(Path(path).is_file() for path in files + env_files):
         raise RuntimeError("Installed Compose files are missing; refusing a new empty deployment.")
     compose = ["docker", "compose", "--project-name", project,
