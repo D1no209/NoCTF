@@ -1,3 +1,4 @@
+using JasperFx.CodeGeneration.Model;
 using Microsoft.Extensions.Configuration;
 using NoCTF.Application.Messaging;
 using NoCTF.Hosting.Messaging;
@@ -15,6 +16,11 @@ public static class WolverineHosting
         IConfiguration configuration,
         HostRoles roles)
     {
+        // Wolverine 6 defaults this to NotAllowed. NoCTF still has handler graphs
+        // that require service-location fallback; keep those paths observable while
+        // generated static handlers are introduced incrementally.
+        options.ServiceLocationPolicy = ServiceLocationPolicy.AllowedButWarn;
+
         var postgres = configuration.GetConnectionString("PostgreSql")
             ?? throw new InvalidOperationException(
                 "ConnectionStrings:PostgreSql is required.");
