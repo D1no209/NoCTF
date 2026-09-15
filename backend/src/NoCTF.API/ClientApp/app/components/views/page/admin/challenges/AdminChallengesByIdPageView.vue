@@ -3,7 +3,7 @@ import { toRefs } from 'vue'
 import type { AdminChallengesByIdPageViewState } from '~/features/routes/admin/challenges/useAdminChallengesByIdPage'
 
 const viewProps = defineProps<{ state: AdminChallengesByIdPageViewState }>()
-const { Paperclip, RotateCcw, Trash2, Upload, challengeId, canOrganize, template, loading, loadError, form, saving, saveErrors, deleting, restoring, isDeleted, titleInvalid, directionInvalid, definitionModel, definitionParseFailed, hasModeDefinition, usesRuntimeFlagInjection, runtimeDisabled, runtimeDefinitionDirty, CtfInteraction, showInteractionKind, setInteractionKind, changeMode, resetDefinitionToCurrentMode, save, removeTemplate, restoreTemplate, attachments, attachmentsLoading, attachmentsIncludeDeleted, attachmentDeliveryPolicy, uploading, uploadInput, randomBatchOpen, randomUploading, randomDownloadFileName, randomFiles, randomUploadInput, deletingAttachment, attachmentActionPending, requestAttachmentDeliveryPolicy, uploadAttachment, selectRandomFiles, uploadRandomBatch, confirmDeleteAttachment, restoreAttachment, formatBytes, flags, supportsRegularExpression, flagsLoading, flagsIncludeDeleted, flagCreateOpen, flagCreating, flagForm, deletingFlag, flagActionPending, staticFlags, systemFlags, openFlagCreate, createFlag, confirmDeleteFlag, restoreFlag, managersText, permissionsSaving, newOwnerId, transferOpen, transferring, savePermissions, transferOwner, AdminDateTime, AdminGameModeBadge, ChallengeTestRuntimePanel, DefinitionCheckerSection, DefinitionFlagInjectionSection, DefinitionFlagTemplateSection, DefinitionPatchSection, DefinitionRuntimeSection, setUploadInputRef, setRandomUploadInputRef, onBlurFormDirection, onClickRandomBatchOpen, onClickDeletingAttachment, onClickDeletingFlag, onClickTransferOpen, onUpdateOpenDeletingAttachment, onClickRandomBatchOpen2, onClickFlagCreateOpen, onUpdateOpenDeletingFlag } = toRefs(viewProps.state)
+const { Paperclip, RotateCcw, Trash2, Upload, challengeId, canOrganize, template, loading, loadError, form, saving, basicSaveErrors, runtimeSaveErrors, definitionSaveErrors, deleting, restoring, isDeleted, titleInvalid, directionInvalid, definitionModel, definitionParseFailed, runtimeDefinitionModel, runtimeDefinitionParseFailed, hasModeDefinition, usesRuntimeFlagInjection, runtimeDisabled, runtimeDefinitionDirty, CtfInteraction, showInteractionKind, setInteractionKind, changeMode, resetRuntimeDefinition, resetModeDefinition, saveBasic, saveRuntimeDefinition, saveModeDefinition, removeTemplate, restoreTemplate, attachments, attachmentsLoading, attachmentsIncludeDeleted, attachmentDeliveryPolicy, uploading, uploadInput, randomBatchOpen, randomUploading, randomDownloadFileName, randomFiles, randomUploadInput, deletingAttachment, attachmentActionPending, requestAttachmentDeliveryPolicy, uploadAttachment, selectRandomFiles, uploadRandomBatch, confirmDeleteAttachment, restoreAttachment, formatBytes, flags, supportsRegularExpression, flagsLoading, flagsIncludeDeleted, flagCreateOpen, flagCreating, flagForm, deletingFlag, flagActionPending, staticFlags, systemFlags, openFlagCreate, createFlag, confirmDeleteFlag, restoreFlag, managersText, permissionsSaving, newOwnerId, transferOpen, transferring, savePermissions, transferOwner, AdminDateTime, AdminGameModeBadge, ChallengeTestRuntimePanel, DefinitionCheckerSection, DefinitionFlagInjectionSection, DefinitionFlagTemplateSection, DefinitionPatchSection, DefinitionRuntimeSection, setUploadInputRef, setRandomUploadInputRef, onBlurFormDirection, onClickRandomBatchOpen, onClickDeletingAttachment, onClickDeletingFlag, onClickTransferOpen, onUpdateOpenDeletingAttachment, onClickRandomBatchOpen2, onClickFlagCreateOpen, onUpdateOpenDeletingFlag } = toRefs(viewProps.state)
 </script>
 
 <template>
@@ -61,16 +61,6 @@ const { Paperclip, RotateCcw, Trash2, Upload, challengeId, canOrganize, template
           </div>
         </div>
 
-        <Alert v-if="saveErrors.length" variant="destructive">
-          <AlertTitle>{{ $t('ui.unableToSaveTheChallengeTemplate') }}</AlertTitle>
-          <AlertDescription class="flex flex-col gap-2">
-            <span>{{ $t('ui.correctTheFollowingIssuesAndTryAgain') }}</span>
-            <ul class="list-disc pl-5">
-              <li v-for="message in saveErrors" :key="message">{{ message }}</li>
-            </ul>
-          </AlertDescription>
-        </Alert>
-
         <Tabs
           default-value="basic"
           orientation="vertical"
@@ -97,7 +87,15 @@ const { Paperclip, RotateCcw, Trash2, Upload, challengeId, canOrganize, template
           <TabsContent value="basic" class="mt-0">
             <Card>
               <CardContent class="pt-6">
-                <UiForm validation="feature" @submit.prevent="save">
+                <Alert v-if="basicSaveErrors.length" variant="destructive" class="mb-4">
+                  <AlertTitle>{{ $t('ui.unableToSaveTheChallengeTemplate') }}</AlertTitle>
+                  <AlertDescription>
+                    <ul class="list-disc pl-5">
+                      <li v-for="message in basicSaveErrors" :key="message">{{ message }}</li>
+                    </ul>
+                  </AlertDescription>
+                </Alert>
+                <UiForm validation="feature" @submit.prevent="saveBasic">
                   <FieldGroup>
                     <Field :data-invalid="titleInvalid || undefined">
                       <FieldLabel for="edit-title">{{ $t('ui.title') }}</FieldLabel>
@@ -110,39 +108,20 @@ const { Paperclip, RotateCcw, Trash2, Upload, challengeId, canOrganize, template
                         :disabled="isDeleted"
                       />
                     </Field>
-                    <div class="grid gap-4 sm:grid-cols-2">
-                      <Field>
-                        <FieldLabel for="edit-mode">{{ $t('ui.gameMode') }}</FieldLabel>
-                        <Select :model-value="form.mode" :disabled="isDeleted" @update:model-value="changeMode">
-                          <SelectTrigger id="edit-mode" class="w-full">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectGroup>
-                              <SelectItem value="Ctf">{{ $t('ui.ctf') }}</SelectItem>
-                              <SelectItem value="Awd">{{ $t('ui.awd') }}</SelectItem>
-                              <SelectItem value="Awdp">{{ $t('ui.awdp') }}</SelectItem>
-                              <SelectItem value="Koh">{{ $t('ui.koh') }}</SelectItem>
-                            </SelectGroup>
-                          </SelectContent>
-                        </Select>
-                        <FieldDescription>{{ $t('ui.theModeCannotBeModifiedWhileThereIsAnOngoing') }}</FieldDescription>
-                      </Field>
-                      <Field>
-                        <FieldLabel for="edit-visibility">{{ $t('ui.visibility') }}</FieldLabel>
-                        <Select v-model="form.visibility" :disabled="isDeleted">
-                          <SelectTrigger id="edit-visibility" class="w-full">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectGroup>
-                              <SelectItem value="Private">{{ $t('ui.private') }}</SelectItem>
-                              <SelectItem value="Shared">{{ $t('ui.share') }}</SelectItem>
-                            </SelectGroup>
-                          </SelectContent>
-                        </Select>
-                      </Field>
-                    </div>
+                    <Field>
+                      <FieldLabel for="edit-visibility">{{ $t('ui.visibility') }}</FieldLabel>
+                      <Select v-model="form.visibility" :disabled="isDeleted">
+                        <SelectTrigger id="edit-visibility" class="w-full">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectGroup>
+                            <SelectItem value="Private">{{ $t('ui.private') }}</SelectItem>
+                            <SelectItem value="Shared">{{ $t('ui.share') }}</SelectItem>
+                          </SelectGroup>
+                        </SelectContent>
+                      </Select>
+                    </Field>
                     <Field :data-invalid="directionInvalid || undefined">
                       <FieldLabel for="edit-direction">{{ $t('ui.category') }}</FieldLabel>
                       <Input
@@ -177,27 +156,35 @@ const { Paperclip, RotateCcw, Trash2, Upload, challengeId, canOrganize, template
           <TabsContent value="runtime" class="mt-0">
             <Card>
               <CardContent class="pt-6">
-                <Alert v-if="definitionParseFailed" variant="destructive">
+                <Alert v-if="runtimeSaveErrors.length" variant="destructive" class="mb-4">
+                  <AlertTitle>{{ $t('ui.unableToSaveTheChallengeTemplate') }}</AlertTitle>
+                  <AlertDescription>
+                    <ul class="list-disc pl-5">
+                      <li v-for="message in runtimeSaveErrors" :key="message">{{ message }}</li>
+                    </ul>
+                  </AlertDescription>
+                </Alert>
+                <Alert v-if="runtimeDefinitionParseFailed" variant="destructive">
                   <AlertDescription class="flex flex-col items-start gap-3">
                     <span>{{ $t('ui.theExistingDefinitionJsonCannotBeParsedAndMayBe2') }}</span>
-                    <Button v-if="!isDeleted" type="button" variant="outline" size="sm" @click="resetDefinitionToCurrentMode">
+                    <Button v-if="!isDeleted" type="button" variant="outline" size="sm" @click="resetRuntimeDefinition">
                       <RotateCcw data-icon="inline-start" /> {{ $t('ui.resetToCurrentModeDefinition') }}
                     </Button>
                   </AlertDescription>
                 </Alert>
-                <FieldGroup v-else-if="definitionModel">
+                <FieldGroup v-else-if="runtimeDefinitionModel">
                   <div v-if="!isDeleted" class="flex flex-wrap items-center justify-between gap-2">
-                    <Button type="button" variant="outline" size="sm" @click="resetDefinitionToCurrentMode">
+                    <Button type="button" variant="outline" size="sm" @click="resetRuntimeDefinition">
                       <RotateCcw data-icon="inline-start" /> {{ $t('ui.resetToCurrentModeDefinition') }}
                     </Button>
-                    <Button data-testid="runtime-definition-save" type="button" size="sm" :disabled="saving" @click="save">
+                    <Button data-testid="runtime-definition-save" type="button" size="sm" :disabled="saving" @click="saveRuntimeDefinition">
                       <Spinner v-if="saving" data-icon="inline-start" /> {{ $t('ui.saveChanges') }}
                     </Button>
                   </div>
-                  <component :is="DefinitionRuntimeSection" :model="definitionModel" :mode="form.mode" :disabled="isDeleted" />
+                  <component :is="DefinitionRuntimeSection" :model="runtimeDefinitionModel" :mode="template.mode ?? 'Ctf'" :disabled="isDeleted" />
                   <FieldDescription>{{ $t('ui.runtimeDefinitionChangesTakeEffectForInstancesStartedInThe') }}</FieldDescription>
                   <component :is="ChallengeTestRuntimePanel"
-                    v-if="definitionModel.runtime && !isDeleted"
+                    v-if="runtimeDefinitionModel.runtime && !isDeleted"
                     :challenge-id="challengeId"
                     :definition-dirty="runtimeDefinitionDirty"
                   />
@@ -209,26 +196,51 @@ const { Paperclip, RotateCcw, Trash2, Upload, challengeId, canOrganize, template
           <TabsContent value="definition" class="mt-0">
             <Card>
               <CardContent class="pt-6">
+                <Alert v-if="definitionSaveErrors.length" variant="destructive" class="mb-4">
+                  <AlertTitle>{{ $t('ui.unableToSaveTheChallengeTemplate') }}</AlertTitle>
+                  <AlertDescription>
+                    <ul class="list-disc pl-5">
+                      <li v-for="message in definitionSaveErrors" :key="message">{{ message }}</li>
+                    </ul>
+                  </AlertDescription>
+                </Alert>
                 <Alert v-if="definitionParseFailed" variant="destructive">
                   <AlertDescription class="flex flex-col items-start gap-3">
                     <span>{{ $t('ui.theExistingDefinitionJsonCannotBeParsedAndMayBe3') }}</span>
-                    <Button v-if="!isDeleted" type="button" variant="outline" size="sm" @click="resetDefinitionToCurrentMode">
+                    <Button v-if="!isDeleted" type="button" variant="outline" size="sm" @click="resetModeDefinition">
                       <RotateCcw data-icon="inline-start" /> {{ $t('ui.resetToCurrentModeDefinition') }}
                     </Button>
                   </AlertDescription>
                 </Alert>
                 <FieldGroup v-else-if="definitionModel">
                   <div v-if="!isDeleted" class="flex flex-wrap items-center justify-between gap-2">
-                    <Button type="button" variant="outline" size="sm" @click="resetDefinitionToCurrentMode">
+                    <Button type="button" variant="outline" size="sm" @click="resetModeDefinition">
                       <RotateCcw data-icon="inline-start" /> {{ $t('ui.resetToCurrentModeDefinition') }}
                     </Button>
-                    <Button data-testid="mode-definition-save" type="button" size="sm" :disabled="saving" @click="save">
+                    <Button data-testid="mode-definition-save" type="button" size="sm" :disabled="saving" @click="saveModeDefinition">
                       <Spinner v-if="saving" data-icon="inline-start" /> {{ $t('ui.saveChanges') }}
                     </Button>
                   </div>
                   <Alert v-if="hasModeDefinition && runtimeDisabled">
                     <AlertDescription>{{ $t('ui.theFollowingConfigurationsWillNotTakeEffectWhileTheRuntime') }}</AlertDescription>
                   </Alert>
+                  <Field>
+                    <FieldLabel for="edit-mode">{{ $t('ui.gameMode') }}</FieldLabel>
+                    <Select :model-value="form.mode" :disabled="isDeleted" @update:model-value="changeMode">
+                      <SelectTrigger id="edit-mode" class="w-full">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectGroup>
+                          <SelectItem value="Ctf">{{ $t('ui.ctf') }}</SelectItem>
+                          <SelectItem value="Awd">{{ $t('ui.awd') }}</SelectItem>
+                          <SelectItem value="Awdp">{{ $t('ui.awdp') }}</SelectItem>
+                          <SelectItem value="Koh">{{ $t('ui.koh') }}</SelectItem>
+                        </SelectGroup>
+                      </SelectContent>
+                    </Select>
+                    <FieldDescription>{{ $t('ui.theModeCannotBeModifiedWhileThereIsAnOngoing') }}</FieldDescription>
+                  </Field>
                   <Field v-if="showInteractionKind">
                     <FieldLabel for="challenge-ctf-interaction-kind">{{ $t('ui.completionMethod') }}</FieldLabel>
                     <Select
