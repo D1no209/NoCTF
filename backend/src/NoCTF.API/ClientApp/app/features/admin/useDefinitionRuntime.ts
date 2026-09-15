@@ -2,7 +2,7 @@ import { proxyRefs } from 'vue'
 import { markRaw, toRefs } from 'vue'
 
 import type { GameModeValue, RuntimeTemplateModel } from '../../utils/game-config'
-import { bytesToMib, coresToNanoCpus, emptyContainerDefinition, emptyComposeDefinition, FlagSource, mibToBytes, nanoCpusToCores, RuntimeAllocation, UrlExposure } from '../../utils/game-config'
+import { bytesToMib, coresToNanoCpus, CtfInteraction, emptyContainerDefinition, emptyComposeDefinition, FlagSource, mibToBytes, nanoCpusToCores, RuntimeAllocation, UrlExposure } from '../../utils/game-config'
 import DefinitionComposeComponent from './DefinitionCompose.vue'
 import DefinitionContainerComponent from './DefinitionContainer.vue'
 import UrlBindingListComponent from './UrlBindingList.vue'
@@ -11,16 +11,22 @@ import UrlBindingListComponent from './UrlBindingList.vue'
 export function useDefinitionRuntime(props: Readonly<Omit<{
   runtime: RuntimeTemplateModel
   mode: GameModeValue
+  interactionKind: number
   disabled?: boolean
 }, "disabled"> & Required<Pick<{
   runtime: RuntimeTemplateModel
   mode: GameModeValue
+  interactionKind: number
   disabled?: boolean
 }, "disabled">>>) {
   const isCompose = computed(() => props.runtime.definition.kind === 'compose')
+  const isPatchVerification = computed(() =>
+    props.mode === 'Ctf'
+    && props.interactionKind === CtfInteraction.PatchVerification,
+  )
 
   const kindOptions = computed(() =>
-    props.mode === 'Awdp'
+    props.mode === 'Awdp' || isPatchVerification.value
       ? [{ value: 'container', label: translate("ui.singleContainer") }]
       : [
           { value: 'container', label: translate("ui.singleContainer") },
@@ -32,7 +38,10 @@ export function useDefinitionRuntime(props: Readonly<Omit<{
     if (kind === props.runtime.definition.kind) return
     props.runtime.definition = kind === 'compose'
       ? emptyComposeDefinition()
-      : emptyContainerDefinition(props.mode === 'Ctf' || props.mode === 'Awdp')
+      : emptyContainerDefinition(
+          props.mode === 'Awdp'
+          || props.mode === 'Ctf' && !isPatchVerification.value,
+        )
   }
 
   const flagSourceOptions = computed(() => {
@@ -62,18 +71,30 @@ export function useDefinitionRuntime(props: Readonly<Omit<{
   })
 
   watch(
-    () => props.mode,
-    (mode) => {
+    [() => props.mode, () => props.interactionKind],
+    ([mode, interactionKind]) => {
       const runtime = props.runtime
       runtime.allocation = mode === 'Koh' ? RuntimeAllocation.Shared : RuntimeAllocation.PerTeam
       if (mode !== 'Koh') runtime.controlCheckUrlBinding = null
-      if (mode === 'Ctf' || mode === 'Awdp') {
-        runtime.flagSource = FlagSource.PerTeam
-        if (runtime.definition.kind === 'container' && !runtime.definition.flagEnvironmentVariableName.trim())
-          runtime.definition.flagEnvironmentVariableName = 'FLAG'
+      if (mode === 'Ctf') {
+        const patchVerification = interactionKind === CtfInteraction.PatchVerification
+        if (patchVerification && runtime.definition.kind === 'compose')
+          runtime.definition = emptyContainerDefinition(false)
+        runtime.flagSource = patchVerification ? FlagSource.Static : FlagSource.PerTeam
+        if (runtime.definition.kind === 'container') {
+          runtime.definition.flagEnvironmentVariableName = patchVerification
+            ? ''
+            : runtime.definition.flagEnvironmentVariableName.trim() || 'FLAG'
+        }
         for (const binding of runtime.urlBindings) binding.exposure = UrlExposure.OwnerOnly
       }
       if (mode === 'Awdp') {
+        runtime.flagSource = FlagSource.PerTeam
+        if (runtime.definition.kind === 'container'
+          && !runtime.definition.flagEnvironmentVariableName.trim()) {
+          runtime.definition.flagEnvironmentVariableName = 'FLAG'
+        }
+        for (const binding of runtime.urlBindings) binding.exposure = UrlExposure.OwnerOnly
         if (runtime.definition.kind === 'compose') {
           runtime.definition = emptyContainerDefinition(true)
         }
@@ -97,6 +118,7 @@ export function useDefinitionRuntime(props: Readonly<Omit<{
       RuntimeAllocation,
       UrlExposure,
       isCompose,
+      isPatchVerification,
       kindOptions,
       switchKind,
       flagSourceOptions,

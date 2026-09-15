@@ -7,7 +7,9 @@ import {
 import { validateChallengeTemplateDraft } from '../app/lib/challenge-template-validation'
 import { startGateErrorMessage } from '../app/lib/start-gate-error'
 import {
+  applyCtfInteraction,
   competitionConfigFields,
+  CtfInteraction,
   ctfPointsAtSolveCount,
   defaultDefinitionJson,
   emptyDefinition,
@@ -53,6 +55,23 @@ describe('challenge definition defaults', () => {
     expect(validateChallengeTemplateDraft({
       mode: 'Ctf',
       title: 'Custom connection command',
+      direction: 'Pwn',
+      definitionJson: serializeDefinition('Ctf', model),
+    })).toEqual([])
+  })
+
+  test('accepts a complete CTF PatchVerification definition without Flag injection', () => {
+    const model = emptyDefinition('Ctf')
+    applyCtfInteraction(model, CtfInteraction.PatchVerification)
+    if (model.runtime?.definition.kind !== 'container') throw new Error('Expected container definition')
+    model.runtime.definition.image = 'registry.example.com/challenge:latest'
+    model.runtime.definition.internalPorts = [8080]
+    if (!model.checkerJob) throw new Error('Expected patch checker')
+    model.checkerJob.image = 'registry.example.com/checker:latest'
+
+    expect(validateChallengeTemplateDraft({
+      mode: 'Ctf',
+      title: 'Patch verification',
       direction: 'Pwn',
       definitionJson: serializeDefinition('Ctf', model),
     })).toEqual([])

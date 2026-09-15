@@ -2,6 +2,7 @@ import { describe, expect, test } from 'bun:test'
 import {
   BLOOD_REWARD_POLICIES,
   BloodRewardPolicy,
+  CtfInteraction,
   ScoreDecayMode,
   FlagSource,
   DEFAULT_RUNTIME_MEMORY_BYTES,
@@ -12,6 +13,7 @@ import {
   challengeRuleFields,
   competitionConfigFields,
   ctfPointsAtSolveCount,
+  applyCtfInteraction,
   emptyFlagTemplate,
   emptyDefinition,
   emptyRuntimeTemplate,
@@ -100,6 +102,19 @@ describe('dynamic flag templates', () => {
     expect(runtime.definition.kind).toBe('container')
     if (runtime.definition.kind !== 'container') throw new Error('Expected container definition')
     expect(runtime.definition.flagEnvironmentVariableName).toBe('FLAG')
+  })
+
+  test('canonicalizes PatchVerification runtimes without Flag injection', () => {
+    const model = emptyDefinition('Ctf')
+    applyCtfInteraction(model, CtfInteraction.PatchVerification)
+    if (model.runtime?.definition.kind !== 'container') throw new Error('Expected container definition')
+
+    model.runtime.flagSource = FlagSource.PerTeam
+    model.runtime.definition.flagEnvironmentVariableName = 'FLAG'
+    const serialized = JSON.parse(serializeDefinition('Ctf', model))
+
+    expect(serialized.runtime.flagSource).toBe(FlagSource.Static)
+    expect(serialized.runtime.definition.flagEnvironmentVariableName).toBeUndefined()
   })
 })
 

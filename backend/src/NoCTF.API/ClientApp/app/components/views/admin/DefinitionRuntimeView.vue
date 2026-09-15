@@ -3,7 +3,7 @@ import { toRefs } from 'vue'
 import type { DefinitionRuntimeViewState } from '~/features/admin/useDefinitionRuntime'
 
 const viewProps = defineProps<{ state: DefinitionRuntimeViewState }>()
-const { bytesToMib, coresToNanoCpus, mibToBytes, nanoCpusToCores, RuntimeAllocation, UrlExposure, isCompose, kindOptions, switchKind, flagSourceOptions, exposureOptions, controlBindingList, DefinitionCompose, DefinitionContainer, UrlBindingList, runtime, mode, disabled, onUpdateModelValueRuntimeLimitsMemoryBytes, onUpdateModelValueRuntimeLimitsNanoCpus, onUpdateModelValueRuntimeLimitsPidsLimit, onUpdateModelValueRuntimeTtlSeconds, onUpdateModelValueRuntimeOperationTimeoutSeconds, onUpdateModelValueRuntimeFlagSource, onUpdateModelValueRuntimeUrlBindings } = toRefs(viewProps.state)
+const { bytesToMib, coresToNanoCpus, mibToBytes, nanoCpusToCores, RuntimeAllocation, UrlExposure, isCompose, isPatchVerification, kindOptions, switchKind, flagSourceOptions, exposureOptions, controlBindingList, DefinitionCompose, DefinitionContainer, UrlBindingList, runtime, mode, disabled, onUpdateModelValueRuntimeLimitsMemoryBytes, onUpdateModelValueRuntimeLimitsNanoCpus, onUpdateModelValueRuntimeLimitsPidsLimit, onUpdateModelValueRuntimeTtlSeconds, onUpdateModelValueRuntimeOperationTimeoutSeconds, onUpdateModelValueRuntimeFlagSource, onUpdateModelValueRuntimeUrlBindings } = toRefs(viewProps.state)
 </script>
 
 <template>
@@ -136,9 +136,15 @@ const { bytesToMib, coresToNanoCpus, mibToBytes, nanoCpusToCores, RuntimeAllocat
       <Field v-else>
         <FieldLabel>{{ $t('ui.flagSource') }}</FieldLabel>
         <div class="flex h-9 items-center gap-2">
-          <Badge variant="secondary">{{ $t('ui.perTeamFlagEnvironmentInjection') }}</Badge>
+          <Badge variant="secondary">
+            {{ isPatchVerification ? $t('ui.notRequired') : $t('ui.perTeamFlagEnvironmentInjection') }}
+          </Badge>
         </div>
-        <FieldDescription>{{ $t('ui.forRuntimeChallengesThePlatformGeneratesATeamSpecificFlag') }}</FieldDescription>
+        <FieldDescription>
+          {{ isPatchVerification
+            ? $t('ui.patchVerificationTargetsDoNotReceiveFlags')
+            : $t('ui.forRuntimeChallengesThePlatformGeneratesATeamSpecificFlag') }}
+        </FieldDescription>
       </Field>
 
       <Field>
