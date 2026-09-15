@@ -22,6 +22,7 @@ const { toggleRuntime, DefinitionRuntime, model, mode, disabled } = toRefs(viewP
       v-if="model.runtime"
       :runtime="model.runtime"
       :mode="mode"
+      :interaction-kind="model.interactionKind"
       :disabled="disabled"
     />
     <FieldDescription v-else> {{ $t('ui.purelyStaticQuestionsSuchAsDownloadAttachmentAnalysisDoNot') }} </FieldDescription>

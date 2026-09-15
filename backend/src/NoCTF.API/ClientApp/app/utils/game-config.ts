@@ -540,11 +540,10 @@ export function applyCtfInteraction(
   model.interactionKind = interactionKind
   if (interactionKind === CtfInteraction.PatchVerification) {
     model.runtime ??= emptyRuntimeTemplate('Ctf')
+    if (model.runtime.definition.kind === 'compose')
+      model.runtime.definition = emptyContainerDefinition(false)
     model.runtime.flagSource = FlagSource.Static
-    if (model.runtime.definition.kind === 'container')
-      model.runtime.definition.flagEnvironmentVariableName = ''
-    else
-      model.runtime.definition.flagEnvironmentVariables = {}
+    model.runtime.definition.flagEnvironmentVariableName = ''
     model.checkerJob ??= emptyRunnerJob()
     model.maximumPatchUploadBytes ??= DEFAULT_CTF_PATCH_UPLOAD_BYTES
     model.flagTemplate = null
@@ -602,10 +601,13 @@ function serializeRuntimeDefinition(definition: RuntimeDefinitionModel): JsonObj
   return obj
 }
 
-function serializeRuntimeTemplate(runtime: RuntimeTemplateModel): JsonObject {
+function serializeRuntimeTemplate(
+  runtime: RuntimeTemplateModel,
+  flagSource: number = runtime.flagSource,
+): JsonObject {
   const definition = serializeRuntimeDefinition(runtime.definition)
   // 后端仅允许 PerTeam/AwdRotation 配置 Flag 注入环境变量。
-  if (runtime.flagSource === FlagSource.Static) {
+  if (flagSource === FlagSource.Static) {
     delete definition.flagEnvironmentVariableName
     delete definition.flagEnvironmentVariables
   }
@@ -625,7 +627,7 @@ function serializeRuntimeTemplate(runtime: RuntimeTemplateModel): JsonObject {
     .filter(b => b.urlTemplate.trim())
     .map(serializeUrlBinding)
   if (bindings.length > 0) obj.urlBindings = bindings
-  obj.flagSource = runtime.flagSource
+  obj.flagSource = flagSource
   if (runtime.controlCheckUrlBinding && runtime.controlCheckUrlBinding.urlTemplate.trim()) {
     obj.controlCheckUrlBinding = serializeUrlBinding(runtime.controlCheckUrlBinding)
   }
@@ -647,7 +649,16 @@ export function serializeDefinition(mode: GameModeValue, model: DefinitionModel)
   if (mode === 'Awd' || mode === 'Awdp'
     || mode === 'Ctf' && model.interactionKind === CtfInteraction.PatchVerification)
     obj.checkerAllowRoot = model.checkerAllowRoot
-  if (model.runtime) obj.runtime = serializeRuntimeTemplate(model.runtime)
+  if (model.runtime) {
+    const flagSource = mode === 'Ctf'
+      ? model.interactionKind === CtfInteraction.PatchVerification
+        ? FlagSource.Static
+        : FlagSource.PerTeam
+      : mode === 'Awdp'
+        ? FlagSource.PerTeam
+        : model.runtime.flagSource
+    obj.runtime = serializeRuntimeTemplate(model.runtime, flagSource)
+  }
   if (mode === 'Awd') {
     if (model.checker) {
       const checker: JsonObject = { job: serializeRunnerJob(model.checker.job) }
