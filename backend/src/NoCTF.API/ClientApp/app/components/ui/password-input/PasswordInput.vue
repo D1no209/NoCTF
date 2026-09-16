@@ -22,6 +22,7 @@ function updateValue(value: string | number) {
   <InputGroup>
     <InputGroupInput
       v-bind="$attrs"
+      data-password-input
       :model-value="props.modelValue"
       :type="visible ? 'text' : 'password'"
       @update:model-value="updateValue"
