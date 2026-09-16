@@ -562,6 +562,8 @@
 }
 [data-slot='dialog-content'], [data-slot='alert-dialog-content'] { max-height: calc(100dvh - 32px); }
 [data-slot='input'], [data-slot='input-group-control'], [data-slot='textarea'] { appearance: none; }
+[data-password-input]::-ms-reveal,
+[data-password-input]::-ms-clear { display: none; }
 input::-webkit-search-cancel-button, input::-webkit-search-decoration { appearance: none; }
 input:-webkit-autofill { -webkit-box-shadow: 0 0 0 1000px var(--control) inset; -webkit-text-fill-color: var(--foreground); caret-color: var(--foreground); }
 :is([data-slot='input'], [data-slot='textarea'], [data-slot='select-trigger'])[aria-invalid='true'],
