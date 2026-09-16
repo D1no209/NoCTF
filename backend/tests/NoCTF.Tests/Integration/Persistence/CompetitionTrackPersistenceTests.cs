@@ -426,13 +426,40 @@ public sealed class CompetitionTrackPersistenceTests
                     continue;
                 }
 
+                var addedTrackKey = $"live-{frozenStatus.ToString().ToLowerInvariant()}";
+                var expandedTracks = tracks.Append(Track(
+                    addedTrackKey,
+                    $"Added while {frozenStatus}"))
+                    .ToArray();
+                var addWhileActive = await store.UpdateAsync(new(
+                    competitionId,
+                    true,
+                    expandedTracks,
+                    [],
+                    ownerId,
+                    now.AddSeconds(5)), cancellationToken);
+                await Assert.That(addWhileActive.Succeeded).IsTrue();
+                await Assert.That(addWhileActive.Value!.Tracks.Any(track =>
+                    track.Key == addedTrackKey)).IsTrue();
+
+                var deleteWhileActive = await store.UpdateAsync(new(
+                    competitionId,
+                    true,
+                    tracks,
+                    [new(addedTrackKey, "default")],
+                    ownerId,
+                    now.AddSeconds(6)), cancellationToken);
+                await Assert.That(deleteWhileActive.Succeeded).IsTrue();
+                await Assert.That(deleteWhileActive.Value!.Tracks.Any(track =>
+                    track.Key == addedTrackKey)).IsFalse();
+
                 await using var restoreDb = new NoCtfDbContext(options);
                 var restored = await CreateStore(restoreDb).AssignAsync(new(
                     competitionId,
                     teamId,
                     "internal",
                     ownerId,
-                    now.AddSeconds(5)), cancellationToken);
+                    now.AddSeconds(7)), cancellationToken);
                 await Assert.That(restored.Succeeded).IsTrue();
             }
 

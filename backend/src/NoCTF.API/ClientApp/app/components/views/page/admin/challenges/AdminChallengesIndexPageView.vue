@@ -3,7 +3,7 @@ import { toRefs } from 'vue'
 import type { AdminChallengesIndexPageViewState } from '~/features/routes/admin/challenges/useAdminChallengesIndexPage'
 
 const viewProps = defineProps<{ state: AdminChallengesIndexPageViewState }>()
-const { Plus, canOrganize, templates, loading, loadError, includeDeleted, createOpen, setCreateOpen, templateCreated, visibilityLabel, AdminDateTime, AdminGameModeBadge, ChallengeTemplateCreateDialog } = toRefs(viewProps.state)
+const { Plus, canOrganize, templates, filteredTemplates, directionFilter, directionOptions, loading, loadError, includeDeleted, createOpen, setCreateOpen, templateCreated, visibilityLabel, AdminDateTime, AdminGameModeBadge, ChallengeTemplateCreateDialog } = toRefs(viewProps.state)
 </script>
 
 <template>
@@ -20,9 +20,25 @@ const { Plus, canOrganize, templates, loading, loadError, includeDeleted, create
     </Alert>
 
     <template v-else>
-      <div class="flex items-center gap-2">
-        <Switch id="include-deleted" v-model="includeDeleted" />
-        <Label for="include-deleted">{{ $t('ui.showDeletedTemplates') }}</Label>
+      <div class="flex flex-wrap items-end gap-4">
+        <Field class="w-full sm:w-56">
+          <FieldLabel>{{ $t('ui.category') }}</FieldLabel>
+          <Select v-model="directionFilter">
+            <SelectTrigger class="w-full"><SelectValue /></SelectTrigger>
+            <SelectContent position="popper">
+              <SelectGroup>
+                <SelectItem value="all">{{ $t('ui.allDirections') }}</SelectItem>
+                <SelectItem v-for="option in directionOptions" :key="option.value" :value="option.value">
+                  {{ option.label }}
+                </SelectItem>
+              </SelectGroup>
+            </SelectContent>
+          </Select>
+        </Field>
+        <div class="flex h-10 items-center gap-2">
+          <Switch id="include-deleted" v-model="includeDeleted" />
+          <Label for="include-deleted">{{ $t('ui.showDeletedTemplates') }}</Label>
+        </div>
       </div>
 
       <Alert v-if="loadError" variant="destructive">
@@ -35,7 +51,7 @@ const { Plus, canOrganize, templates, loading, loadError, includeDeleted, create
         </CardContent>
       </Card>
 
-      <Empty v-else-if="templates.length === 0 && !loadError">
+      <Empty v-else-if="filteredTemplates.length === 0 && !loadError">
         <EmptyHeader>
           <EmptyTitle>{{ $t('ui.noQuestionTemplateYet') }}</EmptyTitle>
           <EmptyDescription>{{ $t('ui.clickNewTemplateInTheUpperRightCornerToCreate') }}</EmptyDescription>
@@ -56,7 +72,7 @@ const { Plus, canOrganize, templates, loading, loadError, includeDeleted, create
             </TableRow>
           </TableHeader>
           <TableBody>
-            <TableRow v-for="template in templates" :key="template.id">
+            <TableRow v-for="template in filteredTemplates" :key="template.id">
               <TableCell>
                 <NuxtLink :to="`/admin/challenges/${template.id}`" class="font-medium hover:underline">
                   {{ template.title }}

@@ -13,7 +13,10 @@ describe('challenge flag match kind editor', () => {
     expect(templatePage).toContain('NoCtfapiEndpointsAdministrationChallengeBankChallengeFlagMatchKindProtocol')
     expect(templatePage).toContain('matchKind: flagForm')
     expect(templatePage).toContain('supportsRegularExpression')
+    expect(templatePage).toContain("template.value?.mode === 'Ctf'")
+    expect(templatePage).toContain('!usesRuntimeFlagInjection.value')
     expect(templatePage).toContain('value="RegularExpression"')
+    expect(templatePage).not.toContain("ui.theRegularExpressionMatchesTheEntireFlagAndIsCase")
     expect(templatePage).toContain('usesRuntimeFlagInjection')
     expect(templatePage).toContain("ui.thisChallengeUsesRuntimeManagedDynamicFlagsThePlatformGenerates")
     expect(templatePage).not.toContain('flagForm.teamId')
@@ -27,7 +30,7 @@ describe('challenge flag match kind editor', () => {
     expect(competitionPage).not.toContain('TabsTrigger value="flags"')
   })
 
-  test('uses generated typed flag failures and preserves the open form on failure', async () => {
+  test('uses generated typed flag failures and keeps creation inline', async () => {
     const templatePage = await sourceFile(
       new URL('../app/pages/admin/challenges/[id].vue', import.meta.url),
     ).text()
@@ -43,7 +46,9 @@ describe('challenge flag match kind editor', () => {
       templatePage.indexOf('async function createFlag'),
       templatePage.indexOf('async function confirmDeleteFlag'),
     )
-    expect(create.indexOf('flagCreateOpen.value = false')).toBeGreaterThan(create.indexOf('if (error)'))
+    expect(templatePage).toContain('<UiForm validation="feature" @submit.prevent="createFlag">')
+    expect(templatePage).not.toContain('<Dialog v-model:open="flagCreateOpen">')
+    expect(create.indexOf("flagForm.flag = ''")).toBeGreaterThan(create.indexOf('if (error)'))
     const confirmation = templatePage.slice(
       templatePage.indexOf('<AlertDialog :open="!!deletingFlag"'),
       templatePage.indexOf('<AlertDialog v-model:open="transferOpen">'),

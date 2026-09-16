@@ -56,9 +56,9 @@ const { Copy, RefreshCw, maximumAppealStatementLength, minimumAppealStatementLen
             </AlertDescription>
           </Alert>
         </CardContent>
-      </Card>
+      <Separator />
 
-      <Card v-if="team.isBanned" id="ban-appeal" class="scroll-mt-24">
+      <section v-if="team.isBanned" id="ban-appeal" class="scroll-mt-24">
         <CardHeader>
           <CardTitle class="text-base">{{ $t('ui.banProcessing') }}</CardTitle>
           <CardDescription>{{ $t('ui.yourTeamIsCurrentlyBannedYouCanSubmitAnAppeal') }}</CardDescription>
@@ -124,13 +124,13 @@ const { Copy, RefreshCw, maximumAppealStatementLength, minimumAppealStatementLen
             </Dialog>
           </div>
         </CardContent>
-      </Card>
+      </section>
 
       <Alert v-if="team.isBanned" variant="destructive">
         <AlertDescription>{{ $t('ui.aBannedTeamCannotChangeItsNameMembershipCaptainInvitation') }}</AlertDescription>
       </Alert>
 
-      <Card>
+      <section>
         <CardHeader>
           <CardTitle class="text-base">{{ $t('ui.members3', { count: team.memberIds?.length ?? 0 }) }}</CardTitle>
           <CardDescription v-if="!isCaptain">{{ $t('ui.onlyTheLeaderCanRemoveMembers') }}</CardDescription>
@@ -143,9 +143,11 @@ const { Copy, RefreshCw, maximumAppealStatementLength, minimumAppealStatementLen
             @changed="load"
           />
         </CardContent>
-      </Card>
+      </section>
 
-      <Card v-if="isCaptain && !team.isBanned">
+      <template v-if="isCaptain && !team.isBanned">
+      <Separator />
+      <section>
         <CardHeader>
           <CardTitle class="text-base">{{ $t('ui.inviteMembers') }}</CardTitle>
         </CardHeader>
@@ -170,9 +172,12 @@ const { Copy, RefreshCw, maximumAppealStatementLength, minimumAppealStatementLen
               <RefreshCw v-else data-icon="inline-start" /> {{ $t('ui.rotateInvitationCode') }} </Button>
           </div>
         </CardContent>
-      </Card>
+      </section>
+      </template>
 
-      <Card v-if="!team.isBanned">
+      <template v-if="!team.isBanned">
+      <Separator />
+      <section>
         <CardHeader>
           <CardTitle class="text-base">{{ $t('ui.teamManagement') }}</CardTitle>
         </CardHeader>
@@ -270,6 +275,8 @@ const { Copy, RefreshCw, maximumAppealStatementLength, minimumAppealStatementLen
             </AlertDialogContent>
           </AlertDialog>
         </CardContent>
+      </section>
+      </template>
       </Card>
     </template>
     </div>

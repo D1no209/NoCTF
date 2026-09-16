@@ -2,7 +2,7 @@ import { proxyRefs } from 'vue'
 import { markRaw, toRefs } from 'vue'
 
 import type { GameModeValue, RuntimeTemplateModel } from '../../utils/game-config'
-import { bytesToMib, coresToNanoCpus, CtfInteraction, emptyContainerDefinition, emptyComposeDefinition, FlagSource, mibToBytes, nanoCpusToCores, RuntimeAllocation, UrlExposure } from '../../utils/game-config'
+import { bytesToMib, coresToNanoCpus, CtfInteraction, DEFAULT_RUNTIME_MEMORY_BYTES, DEFAULT_RUNTIME_NANO_CPUS, DEFAULT_RUNTIME_OPERATION_TIMEOUT_SECONDS, DEFAULT_RUNTIME_PIDS_LIMIT, DEFAULT_RUNTIME_TTL_SECONDS, emptyContainerDefinition, emptyComposeDefinition, FlagSource, mibToBytes, nanoCpusToCores, RuntimeAllocation, UrlExposure } from '../../utils/game-config'
 import DefinitionComposeComponent from './DefinitionCompose.vue'
 import DefinitionContainerComponent from './DefinitionContainer.vue'
 import UrlBindingListComponent from './UrlBindingList.vue'
@@ -70,6 +70,14 @@ export function useDefinitionRuntime(props: Readonly<Omit<{
     },
   })
 
+  const hasCustomRuntimePolicy = computed(() =>
+    props.runtime.limits.memoryBytes !== DEFAULT_RUNTIME_MEMORY_BYTES
+    || props.runtime.limits.nanoCpus !== DEFAULT_RUNTIME_NANO_CPUS
+    || props.runtime.limits.pidsLimit !== DEFAULT_RUNTIME_PIDS_LIMIT
+    || props.runtime.ttlSeconds !== DEFAULT_RUNTIME_TTL_SECONDS
+    || props.runtime.operationTimeoutSeconds !== DEFAULT_RUNTIME_OPERATION_TIMEOUT_SECONDS,
+  )
+
   watch(
     [() => props.mode, () => props.interactionKind],
     ([mode, interactionKind]) => {
@@ -124,6 +132,7 @@ export function useDefinitionRuntime(props: Readonly<Omit<{
       flagSourceOptions,
       exposureOptions,
       controlBindingList,
+      hasCustomRuntimePolicy,
       DefinitionCompose,
       DefinitionContainer,
       UrlBindingList

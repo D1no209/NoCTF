@@ -34,16 +34,16 @@ const { workspaceNavGroups, selectChallenge, handleReady, CompetitionBroadcastPa
     <aside
       class="grid h-full min-h-0 grid-cols-2 grid-rows-[minmax(0,1fr)] gap-4"
       :class="showChallengeNavigator
-        ? 'min-[1440px]:grid-cols-1 min-[1440px]:grid-rows-[fit-content(50%)_minmax(0,1fr)]'
+        ? 'min-[900px]:grid-cols-1 min-[900px]:grid-rows-[fit-content(50%)_minmax(0,1fr)]'
         : 'xl:grid-cols-1 xl:grid-rows-[fit-content(50%)_minmax(0,1fr)]'"
     >
       <component :is="CompetitionWorkspaceNavigation"
         class="h-full min-h-0"
-        :class="showChallengeNavigator ? 'min-[1440px]:h-auto' : 'xl:h-auto'"
+        :class="showChallengeNavigator ? 'min-[900px]:h-auto' : 'xl:h-auto'"
         :groups="workspaceNavGroups"
       />
       <component :is="CompetitionBroadcastPanel"
-        class="h-full min-h-0 min-[1440px]:static min-[1440px]:flex min-[1440px]:flex-col"
+        class="h-full min-h-0 min-[900px]:static min-[900px]:flex min-[900px]:flex-col"
         :competition-id="competitionId"
         fill
       />

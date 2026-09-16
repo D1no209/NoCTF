@@ -1,6 +1,7 @@
 import { sourceFile } from './support/feature-source'
 import { describe, expect, test } from 'bun:test'
 import { challengeProgressIcon } from '../app/features/competition/challenge-progress-icon'
+import { affectsCompetitionChallengeList } from '../app/features/competition/useCompetitionChallengeNavigator'
 
 describe('participant challenge progress', () => {
   test('shows solve counts and a color-independent solved marker', async () => {
@@ -56,6 +57,19 @@ describe('participant challenge progress', () => {
     expect(navigator).toContain(':content="bloodTooltip(blood)"')
     expect(navigator).toContain('return `${bloodRankLabel(blood.rank)} · ${bloodTeamName(blood)}`')
     expect(navigator).not.toContain('{{ bloodTeamName(blood) }}')
+    expect(navigator).toContain('competitionEventChanged: notification => {')
+    expect(navigator).toContain('onReconnected: () => void refreshChallenges()')
+    expect(navigator).toContain('const refreshChallenges = createTrailingRefresh(loadChallenges)')
+  })
+
+  test('refreshes the challenge list for every event that can change participant visibility', () => {
+    expect(affectsCompetitionChallengeList('ChallengeCreated')).toBeTrue()
+    expect(affectsCompetitionChallengeList('ChallengeUpdated')).toBeTrue()
+    expect(affectsCompetitionChallengeList('ChallengePublished')).toBeTrue()
+    expect(affectsCompetitionChallengeList('ChallengeUnpublished')).toBeTrue()
+    expect(affectsCompetitionChallengeList('ChallengeDeleted')).toBeTrue()
+    expect(affectsCompetitionChallengeList('ChallengeDescriptionUpdated')).toBeTrue()
+    expect(affectsCompetitionChallengeList('HintPublished')).toBeFalse()
   })
 
   test('hides the challenge tab before start and from ineligible participants', async () => {
@@ -70,9 +84,12 @@ describe('participant challenge progress', () => {
     expect(shell).toContain("...(challengesVisible && canReadChallenges ? [{ to: `${base}/challenges`, label: translate(\"ui.challenge\"), icon: Puzzle }] : [])")
   })
 
-  test('celebrates a correct flag and keeps CTF judging available after a solve', async () => {
+  test('celebrates a correct flag prominently and locks judging after a solve', async () => {
     const submit = await sourceFile(
       new URL('../app/features/challenges/FlagSubmit.vue', import.meta.url),
+    ).text()
+    const celebrationMotion = await Bun.file(
+      new URL('../app/motion/flag-celebration.css', import.meta.url),
     ).text()
     const panel = await sourceFile(
       new URL('../app/features/challenges/panels/CtfPanel.vue', import.meta.url),
@@ -84,7 +101,8 @@ describe('participant challenge progress', () => {
     expect(submit).toContain('flag-celebration-particle')
     expect(submit).not.toContain('resultTimer')
     expect(submit).not.toContain('<Dialog :open="resultDialog')
-    expect(submit).toContain('@media (prefers-reduced-motion: reduce)')
+    expect(celebrationMotion).toContain('@media (prefers-reduced-motion: reduce)')
+    expect(celebrationMotion).toContain('.flag-celebration-layer')
     expect(submit).toContain("if (wasPending && !isGameplayFactPending(data.state) && !toasted.has(id))")
     expect(submit).not.toContain('resultDialog')
     expect(submit).not.toContain("$t('ui.submissionsRemaining'")
@@ -97,8 +115,8 @@ describe('participant challenge progress', () => {
     expect(submit).toContain('props.initiallySolved || solvedChallengeKeys.has(challengeKey())')
     expect(submit).toContain('watch(() => props.initiallySolved')
     expect(panel).toContain(':initially-solved="challenge.solvedByMyTeam"')
-    expect(submit).toContain('const inputDisabled = computed(() => attemptsExhausted.value)')
-    expect(submit).not.toContain('attemptsExhausted.value || solved.value')
+    expect(submit).toContain('const inputDisabled = computed(() => solved.value || attemptsExhausted.value)')
+    expect(submit).toContain('<Alert v-if="solved"')
     expect(submit).not.toContain('v-for="item in tracked"')
   })
 

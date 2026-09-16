@@ -117,4 +117,16 @@ describe('safe challenge Markdown', () => {
     expect(hints).toContain('<Button v-else-if="!hint.isUnlocked"')
     expect(hints).toContain("$t('ui.unlockHintPoints'")
   })
+
+  test('competition and challenge editors share a live sanitized preview', async () => {
+    const challenge = await sourceFile(new URL('../app/pages/admin/challenges/[id].vue', import.meta.url)).text()
+    const competition = await sourceFile(new URL('../app/pages/admin/competitions/[id]/configuration.vue', import.meta.url)).text()
+    const preview = await Bun.file(new URL('../app/components/ui/markdown/MarkdownPreview.vue', import.meta.url)).text()
+
+    expect(challenge).toContain('<MarkdownPreview :source="form.description"')
+    expect(competition).toContain('<MarkdownPreview :source="description"')
+    expect(preview).toContain('<MarkdownContent v-if="previewSource.trim()"')
+    expect(preview).toContain('requestAnimationFrame')
+    expect(preview).toContain('<ScrollSurface axis="both"')
+  })
 })

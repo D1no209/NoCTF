@@ -4,9 +4,13 @@ describe('challenge workspace responsive feedback', () => {
   test('uses the full available row for the wide challenge workspace', async () => {
     const theme = await Bun.file(new URL('../app/assets/css/main.css', import.meta.url)).text()
 
-    expect(theme).toContain(
-      '.competition-participant-workspace.challenge-workspace { grid-template-rows: minmax(0, 1fr); }',
-    )
+    expect(theme).toContain('grid-template-columns: var(--floating-sidebar-width) minmax(0, 1fr) clamp(13rem, 18vw, 21rem);')
+    expect(theme).toContain('.competition-participant-workspace.challenge-workspace {')
+    expect(theme).toContain("[data-challenge-navigator] [data-slot='wave-selection-item']")
+    expect(theme).toContain('min-height: clamp(76px, 12dvh, 112px);')
+    expect(theme).toContain('padding: 4px 24px 4px 4px;')
+    expect(theme).toContain('@media (max-width: 899px)')
+    expect(theme).toContain('grid-template-columns: minmax(0, 1fr); grid-template-rows: auto; flex: none;')
     expect(theme).toContain(
       '.competition-participant-workspace:not(.question-participant-workspace) { grid-template-rows: minmax(0, 2fr) minmax(0, 1fr); }',
     )

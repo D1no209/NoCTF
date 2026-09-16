@@ -3,7 +3,7 @@ import { toRefs } from 'vue'
 import type { UrlBindingListViewState } from '~/features/admin/useUrlBindingList'
 
 const viewProps = defineProps<{ state: UrlBindingListViewState }>()
-const { Plus, X, update, remove, add, modelValue, exposureOptions, showServiceName, addLabel, allowCustomDisplay, disabled } = toRefs(viewProps.state)
+const { Plus, X, displayTemplateOptions, update, remove, add, modelValue, exposureOptions, showServiceName, addLabel, allowCustomDisplay, disabled } = toRefs(viewProps.state)
 </script>
 
 <template>
@@ -17,9 +17,34 @@ const { Plus, X, update, remove, add, modelValue, exposureOptions, showServiceNa
         <div class="grid flex-1 gap-2 sm:grid-cols-2">
           <Field>
             <FieldLabel>{{ allowCustomDisplay ? $t('ui.displayTemplate') : $t('ui.urlTemplate') }}</FieldLabel>
-            <Input
+            <Select
+              v-if="allowCustomDisplay"
               :model-value="binding.urlTemplate"
-              :placeholder="allowCustomDisplay ? $t('ui.forExampleNc') : $t('ui.httpHOSTPORT')"
+              :disabled="disabled"
+              @update:model-value="update(index, { urlTemplate: String($event ?? '') })"
+            >
+              <SelectTrigger class="w-full font-mono text-sm">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent position="popper">
+                <SelectGroup>
+                  <SelectItem v-for="template in displayTemplateOptions" :key="template" :value="template" class="font-mono">
+                    {{ template }}
+                  </SelectItem>
+                  <SelectItem
+                    v-if="binding.urlTemplate && !displayTemplateOptions.includes(binding.urlTemplate)"
+                    :value="binding.urlTemplate"
+                    class="font-mono"
+                  >
+                    {{ binding.urlTemplate }}
+                  </SelectItem>
+                </SelectGroup>
+              </SelectContent>
+            </Select>
+            <Input
+              v-else
+              :model-value="binding.urlTemplate"
+              :placeholder="$t('ui.httpHOSTPORT')"
               class="font-mono text-sm"
               :disabled="disabled"
               @update:model-value="update(index, { urlTemplate: String($event ?? '') })"
@@ -90,10 +115,7 @@ const { Plus, X, update, remove, add, modelValue, exposureOptions, showServiceNa
       <Plus data-icon="inline-start" />
       {{ $t(addLabel) }}
     </Button>
-    <p v-if="allowCustomDisplay" class="text-xs text-muted-foreground">
-      {{ $t('ui.customizeTheTextShownToParticipantsOnlyTheAndPlaceholders') }}
-    </p>
-    <p v-else class="text-xs text-muted-foreground">
+    <p v-if="!allowCustomDisplay" class="text-xs text-muted-foreground">
       {{ $t('ui.urlTemplatesOnlyAllowAndPlaceholdersIsARandomHost') }}
     </p>
   </div>

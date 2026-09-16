@@ -6,6 +6,7 @@ import type { NoCtfapiEndpointsAdministrationChallengeBankChallengeTemplateRespo
 import AdminDateTimeComponent from '../../../admin/AdminDateTime.vue'
 import AdminGameModeBadgeComponent from '../../../admin/AdminGameModeBadge.vue'
 import ChallengeTemplateCreateDialogComponent from '../../../admin/ChallengeTemplateCreateDialog.vue'
+import { directionKey, directionLabel } from '../../../../utils/directions'
 
 type ChallengeTemplate = NoCtfapiEndpointsAdministrationChallengeBankChallengeTemplateResponse
 
@@ -27,6 +28,18 @@ export function useAdminChallengesIndexPage() {
   const loading = ref(false)
 
   const loadError = ref<string | null>(null)
+
+  const directionFilter = ref('all')
+
+  const directionOptions = computed(() => [...new Map(templates.value
+    .map(template => [directionKey(template.direction), directionLabel(template.direction)] as const)
+    .filter(([value]) => value))]
+    .map(([value, label]) => ({ value, label }))
+    .sort((left, right) => left.label.localeCompare(right.label)))
+
+  const filteredTemplates = computed(() => directionFilter.value === 'all'
+    ? templates.value
+    : templates.value.filter(template => directionKey(template.direction) === directionFilter.value))
 
   let loadGeneration = 0
 
@@ -101,6 +114,9 @@ export function useAdminChallengesIndexPage() {
       Plus,
       canOrganize,
       templates,
+      filteredTemplates,
+      directionFilter,
+      directionOptions,
       loading,
       loadError,
       includeDeleted,

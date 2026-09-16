@@ -179,16 +179,6 @@ export const DEFAULT_RUNTIME_OPERATION_TIMEOUT_SECONDS = 60
 
 export function defaultContainerSecurity(): SecurityModel {
   return {
-    noNewPrivileges: true,
-    readonlyRootfs: false,
-    runAsNonRoot: false,
-    capDrop: ['ALL'],
-    capAdd: [],
-  }
-}
-
-function compatibilityContainerSecurity(): SecurityModel {
-  return {
     noNewPrivileges: false,
     readonlyRootfs: false,
     runAsNonRoot: false,
@@ -212,7 +202,7 @@ export function emptyContainerDefinition(withFlagInjection = false): ContainerDe
     command: [],
     environment: {},
     labels: {},
-    containerPorts: [],
+    containerPorts: [null],
     security: defaultContainerSecurity(),
     flagEnvironmentVariableName: withFlagInjection ? 'FLAG' : '',
     internalPorts: [],
@@ -228,13 +218,17 @@ export function emptyUrlBinding(): UrlBindingModel {
 }
 
 export function emptyRuntimeTemplate(mode: GameModeValue): RuntimeTemplateModel {
+  const accessBinding = emptyUrlBinding()
+  accessBinding.exposure = mode === 'Ctf' || mode === 'Awdp'
+    ? UrlExposure.OwnerOnly
+    : UrlExposure.Participants
   return {
     allocation: mode === 'Koh' ? RuntimeAllocation.Shared : RuntimeAllocation.PerTeam,
     definition: emptyContainerDefinition(mode === 'Ctf' || mode === 'Awdp'),
     limits: defaultRuntimeLimits(),
     ttlSeconds: DEFAULT_RUNTIME_TTL_SECONDS,
     operationTimeoutSeconds: DEFAULT_RUNTIME_OPERATION_TIMEOUT_SECONDS,
-    urlBindings: [],
+    urlBindings: [accessBinding],
     flagSource: mode === 'Ctf' || mode === 'Awdp'
       ? FlagSource.PerTeam
       : mode === 'Awd'
@@ -323,8 +317,8 @@ export function parseJsonObject(json: string | null | undefined): JsonObject | n
 function parseSecurity(raw: unknown): SecurityModel {
   const obj = asObject(raw)
   // Omitted security on a legacy template remains omitted after a read/write
-  // cycle. Secure defaults are applied only when creating a new container draft.
-  const defaults = compatibilityContainerSecurity()
+  // cycle. New container drafts use the same opt-in security defaults.
+  const defaults = defaultContainerSecurity()
   return {
     noNewPrivileges: typeof obj?.noNewPrivileges === 'boolean' ? obj.noNewPrivileges : defaults.noNewPrivileges,
     readonlyRootfs: typeof obj?.readonlyRootfs === 'boolean' ? obj.readonlyRootfs : defaults.readonlyRootfs,

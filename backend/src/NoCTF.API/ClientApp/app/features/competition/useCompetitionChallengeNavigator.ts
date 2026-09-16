@@ -7,10 +7,20 @@ import { bloodRankLabel } from '../leaderboard/types'
 import { directionGlyph } from '../../utils/directions'
 import { challengeProgressIcon } from './challenge-progress-icon'
 import { scoreboardBreakdown, scoreboardColumnsForChallenge, scoreboardCurrentChallengeScore, scoreboardSlot } from '../../utils/scoreboard'
+import { createTrailingRefresh } from '../../lib/latest-page-refresh'
 
 type Challenge = NoCtfapiEndpointsChallengesChallengeResponse
 type BloodRank = 'First' | 'Second' | 'Third'
 const bloodOrder: Record<BloodRank, number> = { First: 0, Second: 1, Third: 2 }
+
+export function affectsCompetitionChallengeList(kind: string): boolean {
+  return kind === 'ChallengeCreated'
+    || kind === 'ChallengeUpdated'
+    || kind === 'ChallengePublished'
+    || kind === 'ChallengeUnpublished'
+    || kind === 'ChallengeDeleted'
+    || kind === 'ChallengeDescriptionUpdated'
+}
 
 interface ChallengeBloodMark {
   rank: BloodRank
@@ -56,7 +66,8 @@ emit: { (event: "ready", ...args: [challengeId: string | null]): void; (event: "
 
   const search = ref('')
 
-
+  let initialized = false
+  let unwatch: (() => void) | undefined
 
   const board = useScoreboardMatrix(props.competitionId)
 
@@ -71,20 +82,35 @@ emit: { (event: "ready", ...args: [challengeId: string | null]): void; (event: "
     myTeamId.value = requestError ? null : data?.id ?? null
   }
 
-  onMounted(async () => {
-    const [{ data, error: requestError }] = await Promise.all([
-      listChallengesEndpoint({ path: { competitionId: props.competitionId } }),
-      loadMyTeam(),
-    ])
+  async function loadChallenges(): Promise<void> {
+    const { data, error: requestError } = await listChallengesEndpoint({
+      path: { competitionId: props.competitionId },
+    })
     loading.value = false
     if (requestError || !data) {
       error.value = parseApiError(requestError, translate("ui.failedToLoadQuestion")).message
-      emit('ready', null)
+      if (!initialized) emit('ready', null)
       return
     }
     items.value = (data.items ?? []).filter(challenge => challenge.isPublished)
     dataScope.value = data.dataScope ?? 'Live'
+    error.value = null
+    initialized = true
+  }
+
+  const refreshChallenges = createTrailingRefresh(loadChallenges)
+
+  onMounted(() => {
+    unwatch = watchCompetition(props.competitionId, {
+      competitionEventChanged: notification => {
+        if (affectsCompetitionChallengeList(notification.kind)) void refreshChallenges()
+      },
+      onReconnected: () => void refreshChallenges(),
+    })
+    void Promise.all([refreshChallenges(), loadMyTeam()])
   })
+
+  onUnmounted(() => unwatch?.())
 
   watch(isLoggedIn, () => void loadMyTeam())
 
