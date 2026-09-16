@@ -52,11 +52,18 @@ public sealed class IdentityNormalizationPersistenceTests
                 var second = await new RegisterUser(store).ExecuteAsync(
                     new("Player_Two", "player-two@example.test", "eight888", now.AddTicks(1)),
                     cancellationToken);
+                var chinese = await new RegisterUser(store).ExecuteAsync(
+                    new("  中文选手  ", "chinese-player@example.test", "eight888", now.AddTicks(2)),
+                    cancellationToken);
 
                 await Assert.That(first.Succeeded).IsTrue();
                 await Assert.That(first.Value!.Profile.UserName).IsEqualTo("Player_One");
                 await Assert.That(first.Value.Profile.Email).IsEqualTo("player-one@example.test");
                 await Assert.That(second.Succeeded).IsTrue();
+                await Assert.That(chinese.Succeeded).IsTrue();
+                await Assert.That(chinese.Value!.Profile.UserName).IsEqualTo("中文选手");
+                await Assert.That((await store.FindByLoginAsync("  中文选手  ", cancellationToken))!.Id)
+                    .IsEqualTo(chinese.Value.Profile.Id);
                 firstUserId = first.Value.Profile.Id;
                 secondUserId = second.Value!.Profile.Id;
 
