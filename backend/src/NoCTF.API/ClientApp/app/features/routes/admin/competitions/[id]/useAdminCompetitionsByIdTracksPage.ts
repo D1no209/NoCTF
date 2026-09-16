@@ -139,10 +139,6 @@ export function useAdminCompetitionsByIdTracksPage() {
       return
     }
     const affectedTeamCount = teams.value.filter(team => team.trackKey === track.existingKey).length
-    if (affectedTeamCount === 0) {
-      removeTrackAt(index)
-      return
-    }
     pendingRemoval.value = {
       index,
       key: track.existingKey,

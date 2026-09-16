@@ -6,9 +6,9 @@ const { ShieldCheck, Swords, Users, directionGlyph, isAwdp, loading, error, data
 </script>
 
 <template>
-  <ChoiceSidebar :groups="groupOptions" :items="listOptions" :model-value="selectedChallengeId || null" :loading="loading" :label="$t('ui.challengeList')" :loading-label="$t('ui.challengeList')" :empty-label="emptyLabel" controls="challenge-workspace-detail" @update:model-value="selectChallenge">
+  <ChoiceSidebar data-challenge-navigator :groups="groupOptions" :items="listOptions" :model-value="selectedChallengeId || null" :loading="loading" :label="$t('ui.challengeList')" :loading-label="$t('ui.challengeList')" :empty-label="emptyLabel" controls="challenge-workspace-detail" @update:model-value="selectChallenge">
     <template #header>
-      <header class="flex flex-col gap-3 pr-10">
+      <header data-challenge-navigator-header class="flex flex-col gap-3 pr-10">
         <div class="flex min-w-0 items-center gap-3">
           <h2 class="shrink-0 text-base font-semibold">{{ $t('ui.challengeList') }}</h2>
           <Input :id="`challenge-search-${competitionId}`" v-model="search" class="min-w-0 flex-1" :placeholder="$t('challengeNavigator.searchPlaceholder')" :aria-label="$t('challengeNavigator.searchPlaceholder')" />
@@ -58,7 +58,7 @@ const { ShieldCheck, Swords, Users, directionGlyph, isAwdp, loading, error, data
                     <BloodMark :rank="blood.rank" :label="bloodTooltip(blood)" :highlighted="blood.earnedByMyTeam" />
                   </Hint>
                 </span>
-                <span v-if="currentScore(item.challenge.id) !== null" class="shrink-0 text-right font-sans text-xl leading-none font-bold italic tabular-nums text-primary whitespace-nowrap">
+                <span v-if="currentScore(item.challenge.id) !== null" data-challenge-score class="shrink-0 text-right font-sans text-xl leading-none font-bold italic tabular-nums text-primary whitespace-nowrap">
                   {{ currentScore(item.challenge.id) }} <span class="text-xs">{{ $t('ui.pts2') }}</span>
                 </span>
               </span>

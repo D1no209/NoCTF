@@ -131,6 +131,11 @@ describe('normalized scoreboard matrix', () => {
     expect(leaderboardPage).toContain("isCtf ? 'min-w-56' : 'min-w-28'")
     expect(leaderboardPage).toContain('w-full whitespace-normal break-words')
     expect(leaderboardPage).toContain('whitespace-nowrap')
+    expect(leaderboardPage).toContain('data-scoreboard-frozen-corner="top-start"')
+    expect(leaderboardPage).toContain('data-scoreboard-frozen-corner="top-end"')
+    expect(leaderboardPage).toContain("'bottom-start'")
+    expect(leaderboardPage).toContain("'bottom-end'")
+    expect(leaderboardPage).toContain('data-score-detail-dialog')
   })
 
   test('keeps schema columns when challenge metadata is unpublished or temporarily missing', () => {

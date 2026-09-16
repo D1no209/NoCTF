@@ -69,9 +69,9 @@ const { ArrowLeft, ChevronLeft, ChevronRight, Download, History, Medal, Trophy, 
             <Table class="min-w-max table-auto">
               <TableHeader>
                 <TableRow>
-                  <TableHead :rowspan="isCtf ? 1 : 2" class="sticky left-0 z-30 w-20 min-w-20 max-w-20 bg-card text-center">{{ $t('ui.ranking') }}</TableHead>
+                  <TableHead :rowspan="isCtf ? 1 : 2" data-scoreboard-frozen-corner="top-start" class="sticky left-0 z-30 w-20 min-w-20 max-w-20 bg-card text-center">{{ $t('ui.ranking') }}</TableHead>
                   <TableHead :rowspan="isCtf ? 1 : 2" class="sticky left-20 z-30 w-56 min-w-56 max-w-56 bg-card">{{ $t('ui.teams') }}</TableHead>
-                  <TableHead :rowspan="isCtf ? 1 : 2" class="sticky left-76 z-30 w-28 min-w-28 max-w-28 border-r bg-card text-right">{{ $t('ui.totalScore') }}</TableHead>
+                  <TableHead :rowspan="isCtf ? 1 : 2" data-scoreboard-frozen-corner="top-end" class="sticky left-76 z-30 w-28 min-w-28 max-w-28 border-r bg-card text-right">{{ $t('ui.totalScore') }}</TableHead>
                   <TableHead v-for="group in columnGroups" :key="group.competitionChallengeId" :colspan="group.columns.length" class="border-l px-4 text-center">
                     <span class="inline-flex items-center gap-1.5 whitespace-nowrap"><component :is="directionIcon(group.challenge?.direction)" class="size-4" :class="directionTextClass(group.challenge?.direction)" />{{ group.challenge?.title ?? $t('ui.unknownQuestion') }}</span>
                   </TableHead>
@@ -79,10 +79,10 @@ const { ArrowLeft, ChevronLeft, ChevronRight, Download, History, Medal, Trophy, 
                 <TableRow v-if="!isCtf"><template v-for="group in columnGroups" :key="`${group.competitionChallengeId}-rounds`"><TableHead v-for="column in group.columns" :key="column.index" class="min-w-28 border-l px-3 text-center">{{ roundLabel(column) }}</TableHead></template></TableRow>
               </TableHeader>
               <TableBody>
-                <TableRow v-for="team in visibleTeams" :key="team.teamId" :class="(displayRank(team) ?? 99) <= 3 ? 'bg-primary/5' : ''">
-                  <TableCell class="sticky left-0 z-20 w-20 min-w-20 max-w-20 bg-card text-center"><Medal v-if="(displayRank(team) ?? 99) <= 3" class="size-5" :class="medalRankClass[displayRank(team) ?? 0]" /><span v-else class="font-mono tabular-nums">{{ displayRank(team) ?? $t('ui.symbol') }}</span></TableCell>
+                <TableRow v-for="(team, teamIndex) in visibleTeams" :key="team.teamId" :class="(displayRank(team) ?? 99) <= 3 ? 'bg-primary/5' : ''">
+                  <TableCell :data-scoreboard-frozen-corner="teamIndex === visibleTeams.length - 1 ? 'bottom-start' : undefined" class="sticky left-0 z-20 w-20 min-w-20 max-w-20 bg-card text-center"><Medal v-if="(displayRank(team) ?? 99) <= 3" class="size-5" :class="medalRankClass[displayRank(team) ?? 0]" /><span v-else class="font-mono tabular-nums">{{ displayRank(team) ?? $t('ui.symbol') }}</span></TableCell>
                   <TableCell class="sticky left-20 z-20 w-56 min-w-56 max-w-56 bg-card"><div class="flex min-w-0 flex-col items-start gap-1"><Hint :content="displayTeamName(team)" ><ActionButton type="button" class="w-full whitespace-normal break-words rounded-sm text-left font-medium underline-offset-4 hover:text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"  :aria-label="$t('ui.viewDetailsForTeam', { team: displayTeamName(team) })" @click="openTeamDetail(team)">{{ displayTeamName(team) }}</ActionButton></Hint><div v-if="(tracksEnabled && selectedAllTracks && availableTracks.length > 1) || team.rankingState !== 'Eligible'" class="flex flex-wrap items-center gap-1"><Hint v-if="tracksEnabled && selectedAllTracks && availableTracks.length > 1" :content="trackName(team.trackKey)"><Badge variant="outline" class="whitespace-normal break-words text-left">{{ trackName(team.trackKey) }}</Badge></Hint><Badge v-if="team.rankingState !== 'Eligible'" variant="destructive">{{ scoreboardRankingStateLabel(team.rankingState) }}</Badge></div></div></TableCell>
-                  <TableCell class="sticky left-76 z-20 w-28 min-w-28 max-w-28 border-r bg-card text-right">
+                  <TableCell :data-scoreboard-frozen-corner="teamIndex === visibleTeams.length - 1 ? 'bottom-end' : undefined" class="sticky left-76 z-20 w-28 min-w-28 max-w-28 border-r bg-card text-right">
                     <ActionButton v-if="(team.globalAdjustmentCount ?? 0) > 0" type="button" class="w-full rounded-md px-2 py-1 text-right transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" @click="openAdjustments(team)">
                       <span class="block font-mono font-semibold tabular-nums">{{ team.totalScore ?? 0 }} {{ $t('ui.pts2') }}</span>
                       <span class="mt-1 block text-[0.7rem] text-muted-foreground">{{ $t('ui.globalAdjustments2', { count: team.globalAdjustmentCount ?? 0 }) }}</span>
@@ -141,7 +141,7 @@ const { ArrowLeft, ChevronLeft, ChevronRight, Download, History, Medal, Trophy, 
     />
 
     <Dialog v-model:open="detailOpen">
-      <DialogScrollContent class="max-h-[85vh] sm:max-w-2xl">
+      <DialogScrollContent data-score-detail-dialog class="max-h-[85vh] sm:max-w-2xl">
         <DialogHeader><DialogTitle>{{ detailTeam ? displayTeamName(detailTeam) : '' }} · {{ board.challengesById.value.get(detailColumn?.competitionChallengeId ?? '')?.title ?? $t('ui.unknownQuestion') }} · {{ detailColumn ? roundLabel(detailColumn) : '' }}</DialogTitle><DialogDescription>{{ isCtf ? $t('ui.scoresComeFromTheAuthoritativeServerSideScoringResult') : $t('ui.scoresAndStatesComeFromAuthoritativeServerSettlement') }}</DialogDescription></DialogHeader>
         <Alert v-if="detailError" variant="destructive"><AlertDescription>{{ $message(detailError) }}</AlertDescription></Alert>
         <div v-if="detailLoading" class="flex items-center justify-center py-10"><Spinner /></div>

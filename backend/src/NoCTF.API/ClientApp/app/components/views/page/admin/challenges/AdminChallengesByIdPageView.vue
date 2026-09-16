@@ -3,7 +3,7 @@ import { toRefs } from 'vue'
 import type { AdminChallengesByIdPageViewState } from '~/features/routes/admin/challenges/useAdminChallengesByIdPage'
 
 const viewProps = defineProps<{ state: AdminChallengesByIdPageViewState }>()
-const { Paperclip, RotateCcw, Trash2, Upload, challengeId, canOrganize, template, loading, loadError, form, saving, basicSaveErrors, runtimeSaveErrors, definitionSaveErrors, deleting, restoring, isDeleted, titleInvalid, directionInvalid, definitionModel, definitionParseFailed, runtimeDefinitionModel, runtimeDefinitionParseFailed, hasModeDefinition, usesRuntimeFlagInjection, runtimeDisabled, runtimeDefinitionDirty, CtfInteraction, showInteractionKind, setInteractionKind, changeMode, resetRuntimeDefinition, resetModeDefinition, saveBasic, saveRuntimeDefinition, saveModeDefinition, removeTemplate, restoreTemplate, attachments, attachmentsLoading, attachmentsIncludeDeleted, attachmentDeliveryPolicy, uploading, uploadInput, randomBatchOpen, randomUploading, randomDownloadFileName, randomFiles, randomUploadInput, deletingAttachment, attachmentActionPending, requestAttachmentDeliveryPolicy, uploadAttachment, selectRandomFiles, uploadRandomBatch, confirmDeleteAttachment, restoreAttachment, formatBytes, flags, supportsRegularExpression, flagsLoading, flagsIncludeDeleted, flagCreateOpen, flagCreating, flagForm, deletingFlag, flagActionPending, staticFlags, systemFlags, openFlagCreate, createFlag, confirmDeleteFlag, restoreFlag, managersText, permissionsSaving, newOwnerId, transferOpen, transferring, savePermissions, transferOwner, AdminDateTime, AdminGameModeBadge, ChallengeTestRuntimePanel, DefinitionCheckerSection, DefinitionFlagInjectionSection, DefinitionFlagTemplateSection, DefinitionPatchSection, DefinitionRuntimeSection, setUploadInputRef, setRandomUploadInputRef, onBlurFormDirection, onClickRandomBatchOpen, onClickDeletingAttachment, onClickDeletingFlag, onClickTransferOpen, onUpdateOpenDeletingAttachment, onClickRandomBatchOpen2, onClickFlagCreateOpen, onUpdateOpenDeletingFlag } = toRefs(viewProps.state)
+const { Paperclip, RotateCcw, Trash2, Upload, challengeId, canOrganize, template, loading, loadError, form, saving, basicSaveErrors, runtimeSaveErrors, definitionSaveErrors, deleting, restoring, isDeleted, titleInvalid, directionInvalid, definitionModel, definitionParseFailed, runtimeDefinitionModel, runtimeDefinitionParseFailed, hasModeDefinition, usesRuntimeFlagInjection, runtimeDisabled, runtimeDefinitionDirty, CtfInteraction, showInteractionKind, setInteractionKind, changeMode, resetRuntimeDefinition, resetModeDefinition, saveBasic, saveRuntimeDefinition, saveModeDefinition, removeTemplate, restoreTemplate, attachments, attachmentsLoading, attachmentsIncludeDeleted, attachmentDeliveryPolicy, uploading, uploadInput, randomBatchOpen, randomUploading, randomDownloadFileName, randomFiles, randomUploadInput, deletingAttachment, attachmentActionPending, requestAttachmentDeliveryPolicy, uploadAttachment, selectRandomFiles, uploadRandomBatch, confirmDeleteAttachment, restoreAttachment, formatBytes, flags, supportsRegularExpression, flagsLoading, flagsIncludeDeleted, flagCreating, flagForm, deletingFlag, flagActionPending, staticFlags, systemFlags, createFlag, confirmDeleteFlag, restoreFlag, managersText, permissionsSaving, newOwnerId, transferOpen, transferring, savePermissions, transferOwner, AdminDateTime, AdminGameModeBadge, ChallengeTestRuntimePanel, DefinitionCheckerSection, DefinitionFlagInjectionSection, DefinitionFlagTemplateSection, DefinitionPatchSection, DefinitionRuntimeSection, setUploadInputRef, setRandomUploadInputRef, onBlurFormDirection, onClickRandomBatchOpen, onClickDeletingAttachment, onClickDeletingFlag, onClickTransferOpen, onUpdateOpenDeletingAttachment, onClickRandomBatchOpen2, onUpdateOpenDeletingFlag } = toRefs(viewProps.state)
 </script>
 
 <template>
@@ -134,10 +134,13 @@ const { Paperclip, RotateCcw, Trash2, Upload, challengeId, canOrganize, template
                         :disabled="isDeleted"
                       />
                     </Field>
-                    <Field>
-                      <FieldLabel for="edit-description">{{ $t('ui.question') }}</FieldLabel>
-                      <Textarea id="edit-description" v-model="form.description" rows="8" :disabled="isDeleted" />
-                    </Field>
+                    <div class="grid min-w-0 gap-4 xl:grid-cols-2">
+                      <Field>
+                        <FieldLabel for="edit-description">{{ $t('ui.question') }}</FieldLabel>
+                        <Textarea id="edit-description" v-model="form.description" rows="8" :disabled="isDeleted" />
+                      </Field>
+                      <MarkdownPreview :source="form.description" :label="$t('ui.markdownPreview')" :empty-label="$t('ui.noContent')" />
+                    </div>
                     <div class="flex flex-wrap items-center gap-4 text-sm text-muted-foreground">
                       <span>{{ $t('ui.create') }} <component :is="AdminDateTime" :value="template.createdAt" /></span>
                       <span>{{ $t('ui.update') }} <component :is="AdminDateTime" :value="template.updatedAt" /></span>
@@ -182,7 +185,6 @@ const { Paperclip, RotateCcw, Trash2, Upload, challengeId, canOrganize, template
                     </Button>
                   </div>
                   <component :is="DefinitionRuntimeSection" :model="runtimeDefinitionModel" :mode="template.mode ?? 'Ctf'" :disabled="isDeleted" />
-                  <FieldDescription>{{ $t('ui.runtimeDefinitionChangesTakeEffectForInstancesStartedInThe') }}</FieldDescription>
                   <component :is="ChallengeTestRuntimePanel"
                     v-if="runtimeDefinitionModel.runtime && !isDeleted"
                     :challenge-id="challengeId"
@@ -425,11 +427,36 @@ const { Paperclip, RotateCcw, Trash2, Upload, challengeId, canOrganize, template
                   <Switch id="flags-include-deleted" v-model="flagsIncludeDeleted" />
                   <Label for="flags-include-deleted">{{ $t('ui.showDeleted') }}</Label>
                 </div>
-                <Button v-if="!usesRuntimeFlagInjection" :disabled="isDeleted" @click="openFlagCreate">
-                  {{ $t('ui.addFlag2') }}
-                </Button>
               </CardHeader>
               <CardContent>
+                <section v-if="!usesRuntimeFlagInjection" class="mb-6 flex flex-col gap-4" aria-labelledby="add-static-flag-title">
+                  <div>
+                    <h3 id="add-static-flag-title" class="text-sm font-semibold">{{ $t('ui.addFlag2') }}</h3>
+                    <p class="text-sm text-muted-foreground">{{ $t('ui.templateLevelStaticFlagWhichCanBeReferencedWhenInstantiated') }}</p>
+                  </div>
+                  <UiForm validation="feature" @submit.prevent="createFlag">
+                    <div class="grid gap-4 lg:grid-cols-[minmax(12rem,16rem)_minmax(0,1fr)_auto] lg:items-end">
+                      <Field>
+                        <FieldLabel for="flag-match-kind">{{ $t('ui.matchType') }}</FieldLabel>
+                        <Select v-model="flagForm.matchKind" :disabled="isDeleted || flagCreating">
+                          <SelectTrigger id="flag-match-kind" class="w-full"><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="Exact">{{ $t('ui.exactMatch') }}</SelectItem>
+                            <SelectItem v-if="supportsRegularExpression" value="RegularExpression">{{ $t('ui.regularExpression') }}</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </Field>
+                      <Field>
+                        <FieldLabel for="flag-value">{{ flagForm.matchKind === 'RegularExpression' ? $t('ui.regularExpression2') : $t('ui.flagContent') }}</FieldLabel>
+                        <Input id="flag-value" v-model="flagForm.flag" required class="font-mono text-sm" :disabled="isDeleted || flagCreating" :placeholder="flagForm.matchKind === 'RegularExpression' ? $t('ui.flag09aF36') : $t('ui.flag3')" />
+                      </Field>
+                      <Button type="submit" :disabled="isDeleted || flagCreating || !flagForm.flag.trim()">
+                        <Spinner v-if="flagCreating" data-icon="inline-start" />{{ $t('ui.add') }}
+                      </Button>
+                    </div>
+                  </UiForm>
+                </section>
+                <Separator v-if="!usesRuntimeFlagInjection" class="mb-6" />
                 <Alert v-if="usesRuntimeFlagInjection" class="mb-4">
                   <AlertDescription>
                     {{ $t('ui.thisChallengeUsesRuntimeManagedDynamicFlagsThePlatformGenerates') }}
@@ -635,51 +662,6 @@ const { Paperclip, RotateCcw, Trash2, Upload, challengeId, canOrganize, template
           <Button :disabled="randomUploading || !randomDownloadFileName.trim() || randomFiles.length === 0" @click="uploadRandomBatch">
             <Spinner v-if="randomUploading" data-icon="inline-start" /> {{ $t('ui.uploadEntireBatch') }}
           </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-
-    <Dialog v-model:open="flagCreateOpen">
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>{{ $t('ui.addFlag2') }}</DialogTitle>
-          <DialogDescription>{{ $t('ui.templateLevelStaticFlagWhichCanBeReferencedWhenInstantiated') }}</DialogDescription>
-        </DialogHeader>
-        <FieldGroup>
-          <Field>
-            <FieldLabel for="flag-match-kind">{{ $t('ui.matchType') }}</FieldLabel>
-            <Select v-model="flagForm.matchKind">
-              <SelectTrigger id="flag-match-kind" class="w-full">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="Exact">{{ $t('ui.exactMatch') }}</SelectItem>
-                <SelectItem v-if="supportsRegularExpression" value="RegularExpression">
-                  {{ $t('ui.regularExpression') }}
-                </SelectItem>
-              </SelectContent>
-            </Select>
-            <FieldDescription>
-              {{ $t('ui.theRegularExpressionMatchesTheEntireFlagAndIsCase') }}
-            </FieldDescription>
-          </Field>
-          <Field>
-            <FieldLabel for="flag-value">
-              {{ flagForm.matchKind === 'RegularExpression' ? $t('ui.regularExpression2') : $t('ui.flagContent') }}
-            </FieldLabel>
-            <Input
-              id="flag-value"
-              v-model="flagForm.flag"
-              required
-              class="font-mono text-sm"
-              :placeholder="flagForm.matchKind === 'RegularExpression' ? $t('ui.flag09aF36') : $t('ui.flag3')"
-            />
-          </Field>
-        </FieldGroup>
-        <DialogFooter>
-          <Button variant="outline" @click="onClickFlagCreateOpen(false)">{{ $t('ui.cancel') }}</Button>
-          <Button :disabled="flagCreating || !flagForm.flag.trim()" @click="createFlag">
-            <Spinner v-if="flagCreating" data-icon="inline-start" /> {{ $t('ui.add') }} </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

@@ -24,10 +24,13 @@ const { competition, canWrite, title, description, startTime, endTime, teamRegis
               <FieldLabel for="c-title">{{ $t('ui.title') }}</FieldLabel>
               <Input id="c-title" v-model="title" :readonly="!canWrite" required />
             </Field>
-            <Field>
-              <FieldLabel for="c-desc">{{ $t('ui.description') }}</FieldLabel>
-              <Textarea id="c-desc" v-model="description" :readonly="!canWrite" />
-            </Field>
+            <div class="grid min-w-0 gap-4 xl:grid-cols-2">
+              <Field>
+                <FieldLabel for="c-desc">{{ $t('ui.description') }}</FieldLabel>
+                <Textarea id="c-desc" v-model="description" rows="8" :readonly="!canWrite" />
+              </Field>
+              <MarkdownPreview :source="description" :label="$t('ui.markdownPreview')" :empty-label="$t('ui.noContent')" />
+            </div>
             <div class="grid gap-4 sm:grid-cols-2">
               <Field>
                 <FieldLabel for="c-start">{{ $t('ui.startTime') }}</FieldLabel>

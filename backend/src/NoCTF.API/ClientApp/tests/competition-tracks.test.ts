@@ -88,6 +88,8 @@ describe('competition track pages', () => {
     expect(admin).toContain('affectedTeamCount')
     expect(admin).toContain('requestRemoveTrack')
     expect(admin).toContain('confirmRemoveTrack')
+    expect(admin).not.toContain('if (affectedTeamCount === 0)')
+    expect(admin).toContain('{ fromTrackKey: removal.key, toTrackKey: removal.toTrackKey }')
     expect(admin).toContain('confirmDisable')
     expect(admin).toContain('track.existingKey !== null')
     expect(admin).not.toContain('frozen')

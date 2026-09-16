@@ -4,6 +4,9 @@ import { Plus, X } from '@lucide/vue'
 import type { UrlBindingModel } from '../../utils/game-config'
 import { UrlExposure } from '../../utils/game-config'
 
+const HTTP_DISPLAY_TEMPLATE = 'http://{HOST}:{PORT}'
+const NETCAT_DISPLAY_TEMPLATE = 'nc {HOST} {PORT}'
+
 /** Owns state, effects and commands for UrlBindingList. */
 export function useUrlBindingList(props: Readonly<Omit<{
   modelValue: UrlBindingModel[]
@@ -12,7 +15,7 @@ export function useUrlBindingList(props: Readonly<Omit<{
   /** Compose 运行时需要选择服务名。 */
   showServiceName?: boolean
   addLabel?: string
-  /** 访问入口允许输出命令等自定义显示文本；控制检查入口仍要求 URL。 */
+  /** 访问入口使用连接格式预设；控制检查入口仍要求 URL。 */
   allowCustomDisplay?: boolean
   disabled?: boolean
 }, "exposureOptions" | "showServiceName" | "addLabel" | "allowCustomDisplay" | "disabled"> & Required<Pick<{
@@ -22,7 +25,7 @@ export function useUrlBindingList(props: Readonly<Omit<{
   /** Compose 运行时需要选择服务名。 */
   showServiceName?: boolean
   addLabel?: string
-  /** 访问入口允许输出命令等自定义显示文本；控制检查入口仍要求 URL。 */
+  /** 访问入口使用连接格式预设；控制检查入口仍要求 URL。 */
   allowCustomDisplay?: boolean
   disabled?: boolean
 }, "exposureOptions" | "showServiceName" | "addLabel" | "allowCustomDisplay" | "disabled">>>,
@@ -40,7 +43,7 @@ emit: { (event: "update:modelValue", ...args: [value: UrlBindingModel[]]): void 
     emit('update:modelValue', [
       ...props.modelValue,
       {
-        urlTemplate: 'http://{HOST}:{PORT}',
+        urlTemplate: HTTP_DISPLAY_TEMPLATE,
         exposure: props.exposureOptions[0]?.value ?? UrlExposure.Participants,
         containerPort: null,
         serviceName: '',
@@ -52,6 +55,7 @@ emit: { (event: "update:modelValue", ...args: [value: UrlBindingModel[]]): void 
       ...toRefs(props),
       Plus,
       X,
+      displayTemplateOptions: [HTTP_DISPLAY_TEMPLATE, NETCAT_DISPLAY_TEMPLATE],
       update,
       remove,
       add

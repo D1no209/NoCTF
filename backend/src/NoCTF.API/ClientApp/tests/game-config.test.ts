@@ -19,6 +19,7 @@ import {
   emptyRuntimeTemplate,
   parseDefinition,
   serializeDefinition,
+  UrlExposure,
 } from '../app/utils/game-config'
 
 describe('CTF blood reward policies', () => {
@@ -141,16 +142,36 @@ describe('container security drafts', () => {
     expect(JSON.parse(serializeDefinition('Ctf', parsed)).runtime.definition.security).toBeUndefined()
   })
 
-  test('applies the safe capability baseline to new container drafts', () => {
+  test('keeps every security option disabled for new container drafts', () => {
     const model = emptyDefinition('Ctf')
     model.runtime = emptyRuntimeTemplate('Ctf')
 
+    if (model.runtime.definition.kind !== 'container') throw new Error('Expected container definition')
+    expect(model.runtime.definition.security).toEqual({
+      noNewPrivileges: false,
+      readonlyRootfs: false,
+      runAsNonRoot: false,
+      capDrop: [],
+      capAdd: [],
+    })
+
     const json = JSON.parse(serializeDefinition('Ctf', model))
 
-    expect(json.runtime.definition.security).toEqual({
-      noNewPrivileges: true,
-      capDrop: ['ALL'],
-    })
+    expect(json.runtime.definition.security).toBeUndefined()
+  })
+
+  test('starts a runtime draft with one public port row and one access entry', () => {
+    const runtime = emptyRuntimeTemplate('Ctf')
+
+    expect(runtime.definition.kind).toBe('container')
+    if (runtime.definition.kind !== 'container') throw new Error('Expected container definition')
+    expect(runtime.definition.containerPorts).toEqual([null])
+    expect(runtime.urlBindings).toEqual([{
+      urlTemplate: 'http://{HOST}:{PORT}',
+      exposure: UrlExposure.OwnerOnly,
+      containerPort: null,
+      serviceName: '',
+    }])
   })
 
   test('serializes and parses explicit hardening values', () => {

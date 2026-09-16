@@ -46,6 +46,13 @@ export function useAdminCompetitionsByIdChallengesByCcIdPage() {
 
   const activeSection = ref('general')
 
+  const sectionOptions = computed(() => [
+    { value: 'general', label: translate('ui.basicSettings') },
+    { value: 'config', label: translate('ui.questionConfiguration') },
+    { value: 'hints', label: translate('ui.hint') },
+    { value: 'scoring', label: translate('ui.teamScoring') },
+  ])
+
   async function loadChallenge() {
     loading.value = true
     const { data, error } = await adminGetCompetitionChallenge({
@@ -471,6 +478,7 @@ export function useAdminCompetitionsByIdChallengesByCcIdPage() {
       loading,
       loadError,
       activeSection,
+      sectionOptions,
       editCustomTitle,
       editOrder,
       editPublished,

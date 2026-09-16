@@ -7,10 +7,13 @@ const props = withDefaults(defineProps<{
   collapsible?: boolean
   /** 初始是否展开;编辑存量内容时可由父组件按数据非空传入 true。 */
   defaultOpen?: boolean
+  /** 使用主题色强调标题。 */
+  accentTitle?: boolean
 }>(), {
   hint: undefined,
   collapsible: true,
   defaultOpen: false,
+  accentTitle: false,
 })
 
 const openValue = ref(props.defaultOpen ? 'content' : '')
@@ -19,7 +22,7 @@ const openValue = ref(props.defaultOpen ? 'content' : '')
 <template>
   <section v-if="!collapsible" class="rounded-md border">
     <header class="px-4 pt-3">
-      <h3 class="text-sm font-medium">{{ title }}</h3>
+      <h3 :class="accentTitle ? 'text-base font-semibold text-primary' : 'text-sm font-medium'">{{ title }}</h3>
       <p v-if="hint" class="text-muted-foreground mt-0.5 text-xs">{{ hint }}</p>
     </header>
     <div class="px-4 pb-4 pt-3">
@@ -32,7 +35,7 @@ const openValue = ref(props.defaultOpen ? 'content' : '')
     <AccordionItem value="content" class="border-b-0">
       <AccordionTrigger class="px-4 py-3 hover:no-underline">
         <span class="flex flex-col gap-0.5">
-          <span>{{ title }}</span>
+          <span :class="accentTitle ? 'text-base font-semibold text-primary' : ''">{{ title }}</span>
           <span v-if="hint" class="text-muted-foreground text-xs font-normal">{{ hint }}</span>
         </span>
       </AccordionTrigger>

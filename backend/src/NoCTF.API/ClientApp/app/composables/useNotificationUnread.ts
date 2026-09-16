@@ -1,4 +1,5 @@
 import { listNotificationsEndpoint } from '../api'
+import type { NoCtfapiEndpointsNotificationsNotificationResponse } from '../api'
 import { safeLocalStorage } from '../lib/safe-storage'
 import { ref } from 'vue'
 
@@ -19,22 +20,24 @@ export function useNotificationUnread() {
     return user.value?.userId ? `noctf:notifications:last-read:${user.value.userId}` : null
   }
 
-  async function refreshUnread(): Promise<void> {
+  async function refreshUnread(): Promise<NoCtfapiEndpointsNotificationsNotificationResponse | null | undefined> {
     const key = storageKey()
     if (!key) {
       latestNotificationId.value = null
       hasUnread.value = false
-      return
+      return null
     }
 
     const { data, error } = await listNotificationsEndpoint({
       query: { scope: 'Inbox', limit: 1 },
     })
-    if (error) return
+    if (error) return undefined
 
-    latestNotificationId.value = data?.items?.[0]?.id ?? null
+    const latest = data?.items?.[0] ?? null
+    latestNotificationId.value = latest?.id ?? null
     const lastReadId = safeLocalStorage.getItem(key)
     hasUnread.value = isNotificationUnread(latestNotificationId.value, lastReadId)
+    return latest
   }
 
   function markAllRead(notificationId?: string | null): void {

@@ -560,13 +560,16 @@ export function useAdminChallengesByIdPage() {
 
   const flags = ref<Flag[]>([])
 
-  const supportsRegularExpression = ref(false)
+  const regularExpressionCapability = ref(false)
+
+  const supportsRegularExpression = computed(() => regularExpressionCapability.value
+    || template.value?.mode === 'Ctf'
+      && persistedDefinitionModel.value?.interactionKind === CtfInteraction.FlagSubmission
+      && !usesRuntimeFlagInjection.value)
 
   const flagsLoading = ref(false)
 
   const flagsIncludeDeleted = ref(false)
-
-  const flagCreateOpen = ref(false)
 
   const flagCreating = ref(false)
 
@@ -595,7 +598,7 @@ export function useAdminChallengesByIdPage() {
       return
     }
     flags.value = data?.items ?? []
-    supportsRegularExpression.value = data?.supportsRegularExpression ?? false
+    regularExpressionCapability.value = data?.supportsRegularExpression ?? false
     if (!supportsRegularExpression.value && flagForm.matchKind === 'RegularExpression')
       flagForm.matchKind = 'Exact'
   }
@@ -603,12 +606,6 @@ export function useAdminChallengesByIdPage() {
   watch(flagsIncludeDeleted, () => {
     void loadFlags()
   })
-
-  function openFlagCreate(): void {
-    flagForm.flag = ''
-    flagForm.matchKind = 'Exact'
-    flagCreateOpen.value = true
-  }
 
   async function createFlag(): Promise<void> {
     if (!flagForm.flag.trim()) {
@@ -628,7 +625,8 @@ export function useAdminChallengesByIdPage() {
       toast.error(challengeFlagErrorMessage(error))
       return
     }
-    flagCreateOpen.value = false
+    flagForm.flag = ''
+    flagForm.matchKind = 'Exact'
     toast.success(translate("ui.flagAdded"))
     await loadFlags()
   }
@@ -840,14 +838,12 @@ export function useAdminChallengesByIdPage() {
       supportsRegularExpression,
       flagsLoading,
       flagsIncludeDeleted,
-      flagCreateOpen,
       flagCreating,
       flagForm,
       deletingFlag,
       flagActionPending,
       staticFlags,
       systemFlags,
-      openFlagCreate,
       createFlag,
       confirmDeleteFlag,
       restoreFlag,
@@ -899,15 +895,11 @@ export function useAdminChallengesByIdPage() {
     viewState.randomBatchOpen = value
   }
 
-  function onClickFlagCreateOpen(value: typeof viewState.flagCreateOpen) {
-    viewState.flagCreateOpen = value
-  }
-
   function onUpdateOpenDeletingFlag(open: boolean) {
      if (!open) viewState.deletingFlag = null
   }
 
-  return { ...viewBindings, onBlurFormDirection, onClickRandomBatchOpen, onClickDeletingAttachment, onClickDeletingFlag, onClickTransferOpen, onUpdateOpenDeletingAttachment, onClickRandomBatchOpen2, onClickFlagCreateOpen, onUpdateOpenDeletingFlag }
+  return { ...viewBindings, onBlurFormDirection, onClickRandomBatchOpen, onClickDeletingAttachment, onClickDeletingFlag, onClickTransferOpen, onUpdateOpenDeletingAttachment, onClickRandomBatchOpen2, onUpdateOpenDeletingFlag }
 }
 
 export type AdminChallengesByIdPageViewState = import('vue').ShallowUnwrapRef<Awaited<ReturnType<typeof useAdminChallengesByIdPage>>>

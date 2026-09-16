@@ -4,15 +4,19 @@ import { describe, expect, test } from 'bun:test'
 const page = () => sourceFile(new URL('../app/pages/admin/competitions/[id]/challenges/[ccId].vue', import.meta.url)).text()
 
 describe('admin competition challenge navigation', () => {
-  test('places the challenge sections in a sticky right rail on desktop', async () => {
+  test('places the challenge sections in the shared right sidebar', async () => {
     const source = await page()
+    const css = await sourceFile(new URL('../app/assets/css/main.css', import.meta.url)).text()
 
-    expect(source).toContain('lg:grid-cols-[minmax(0,1fr)_14rem]')
-    expect(source).toContain('lg:sticky lg:top-24 lg:col-start-2 lg:row-start-1 lg:flex-col')
-    expect(source).toContain('value="general" class="mt-0 lg:col-start-1 lg:row-start-1"')
-    expect(source).toContain('value="config" class="mt-0 lg:col-start-1 lg:row-start-1"')
-    expect(source).toContain('value="hints" class="mt-0 lg:col-start-1 lg:row-start-1"')
-    expect(source).toContain('value="scoring" class="mt-0 lg:col-start-1 lg:row-start-1"')
+    expect(source).toContain('<ChoiceSidebar')
+    expect(source).toContain('v-model="activeSection"')
+    expect(source).toContain('data-side="right"')
+    expect(source).toContain(':items="sectionOptions"')
+    expect(source).toContain('controls="competition-challenge-editor-content"')
+    expect(source).not.toContain('<TabsList')
+    expect(source).not.toContain('<TabsTrigger')
+    expect(css).toContain('[data-challenge-editor-workspace] > [data-side=\'right\'] { grid-column: 2; grid-row: 1; }')
+    expect(css).toContain('transform-origin: right center;')
   })
 
   test('lists every team and all paged challenge facts before allowing a judge to correct scoring', async () => {
@@ -75,5 +79,17 @@ describe('challenge template list navigation', () => {
     expect(dialog).not.toMatch(/<Input[\s\S]{0,160}v-model="direction"/)
     expect(dialog).toContain('class="px-1"')
     expect(dialog).toContain('overscroll-contain')
+  })
+
+  test('filters the challenge library by direction', async () => {
+    const index = await sourceFile(
+      new URL('../app/pages/admin/challenges/index.vue', import.meta.url),
+    ).text()
+
+    expect(index).toContain("const directionFilter = ref('all')")
+    expect(index).toContain('const filteredTemplates = computed(')
+    expect(index).toContain('v-model="directionFilter"')
+    expect(index).toContain("$t('ui.allDirections')")
+    expect(index).toContain('v-for="template in filteredTemplates"')
   })
 })

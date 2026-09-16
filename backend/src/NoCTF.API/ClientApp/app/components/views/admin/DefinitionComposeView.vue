@@ -86,7 +86,7 @@ const { Plus, X, bytesToMib, nanoCpusToCores, addService, hasMetadata, definitio
     </Field>
 
     <DefinitionSection :title="$t('ui.environmentMetadata')"
-
+      accent-title
       :hint="$t('ui.environmentVariablesLabelsAndFlagInjectionTargetsMostChallengesDo')"
       :default-open="hasMetadata"
     >

@@ -7,7 +7,7 @@ const { Bell, ShieldAlert, isHome, wallpaperActive, wallpaperStyle, isLoggedIn, 
 </script>
 
 <template>
-  <div data-slot="default-layout" class="relative isolate flex min-h-screen flex-col">
+  <div data-slot="default-layout" class="relative isolate flex h-dvh min-h-0 flex-col overflow-hidden">
     <div
       v-if="!isHome"
       data-slot="page-wallpaper"
@@ -16,7 +16,7 @@ const { Bell, ShieldAlert, isHome, wallpaperActive, wallpaperStyle, isLoggedIn, 
       :style="wallpaperStyle"
       aria-hidden="true"
     />
-    <div data-slot="default-layout-foreground" class="flex min-h-screen flex-col">
+    <div data-slot="default-layout-foreground" class="flex h-full min-h-0 flex-col overflow-hidden">
     <header class="pointer-events-none sticky top-0 z-40">
       <div data-slot="topbar-frame" class="mx-auto grid h-20 w-full max-w-[96rem] grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 px-4 md:px-6">
         <div data-slot="topbar-capsule" data-position="left">
@@ -124,9 +124,9 @@ const { Bell, ShieldAlert, isHome, wallpaperActive, wallpaperStyle, isLoggedIn, 
         </Button>
       </AlertDescription>
     </Alert>
-    <main data-slot="page-transition-viewport" class="flex-1">
+    <ScrollSurface as="main" axis="y" data-slot="page-transition-viewport" class="min-h-0 flex-1 overflow-y-auto overscroll-contain">
       <slot />
-    </main>
+    </ScrollSurface>
     </div>
   </div>
 </template>

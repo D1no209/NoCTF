@@ -75,7 +75,7 @@ emit: { (event: "evaluated", ...args: [result: TrackedSubmission['result']]): vo
   const celebrationParticles = Array.from({ length: 20 }, (_, index) => ({
     id: index,
     angle: `${index * 18}deg`,
-    distance: `-${3.5 + (index % 4) * 0.45}rem`,
+    distance: `-${5 + (index % 4) * 0.65}rem`,
     delay: `${(index % 5) * 18}ms`,
     tone: index % 3 === 0
       ? 'text-destructive'
@@ -97,7 +97,7 @@ emit: { (event: "evaluated", ...args: [result: TrackedSubmission['result']]): vo
   const attemptsExhausted = computed(() =>
     !props.practice && !props.readOnlyJudgement && remainingAttempts.value === 0)
 
-  const inputDisabled = computed(() => attemptsExhausted.value)
+  const inputDisabled = computed(() => solved.value || attemptsExhausted.value)
 
   function showResult(correct: boolean, message: string): void {
     persistentResult.value = { correct, message }

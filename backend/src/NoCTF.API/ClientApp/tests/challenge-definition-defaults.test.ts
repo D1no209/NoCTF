@@ -66,6 +66,8 @@ describe('challenge definition defaults', () => {
     if (model.runtime?.definition.kind !== 'container') throw new Error('Expected container definition')
     model.runtime.definition.image = 'registry.example.com/challenge:latest'
     model.runtime.definition.internalPorts = [8080]
+    model.runtime.definition.containerPorts = [8080]
+    model.runtime.urlBindings[0]!.containerPort = 8080
     if (!model.checkerJob) throw new Error('Expected patch checker')
     model.checkerJob.image = 'registry.example.com/checker:latest'
 
@@ -196,7 +198,7 @@ describe('challenge definition defaults', () => {
     expect(issues).toContain("容器镜像不能为空")
     expect(issues).toContain("AWDP 必须且只能填写 1 个内部端口")
     expect(issues).toContain("AWDP 必须且只能填写 1 个对外端口")
-    expect(issues).toContain("AWDP 必须添加至少 1 个访问入口")
+    expect(issues).toContain("每个访问入口都必须填写有效的容器端口")
   })
 
   test('reports every unsafe AWDP Fix execution setting before save', async () => {
@@ -404,6 +406,35 @@ describe('CTF score decay preview', () => {
     expect(page).toContain(':hidden-keys="hiddenRuleKeys"')
     expect(page).toContain("return ['maxFlagAttempts', 'flagTemplate']")
     expect(page).toContain("const hidden = ['maxPatchAttempts']")
-    expect(page).toContain('lg:grid-cols-[minmax(0,1fr)_14rem]')
+    expect(page).toContain('<ChoiceSidebar')
+    expect(page).toContain(':items="sectionOptions"')
+  })
+
+  test('keeps runtime essentials visible and moves defaulted controls into advanced sections', async () => {
+    const runtime = await sourceFile(new URL('../app/features/admin/DefinitionRuntime.vue', import.meta.url)).text()
+    const container = await sourceFile(new URL('../app/features/admin/DefinitionContainer.vue', import.meta.url)).text()
+    const containerController = await sourceFile(new URL('../app/features/admin/useDefinitionContainer.ts', import.meta.url)).text()
+    const section = await sourceFile(new URL('../app/features/admin/DefinitionRuntimeSection.vue', import.meta.url)).text()
+
+    expect(section).toContain("$t('ui.enableRuntimeEnvironment')")
+    expect(container).toContain(":title=\"$t('ui.advancedSettings')\"")
+    expect(container).toContain(':default-open="hasAdvanced"')
+    expect(container).toContain(':default-open="hasMetadata"')
+    expect(container).toContain(':default-open="hasSecurity"')
+    expect(containerController).toContain('return security.noNewPrivileges || security.readonlyRootfs || security.runAsNonRoot')
+    expect(containerController).toContain('|| security.capDrop.length > 0')
+    expect(runtime).toContain(':default-open="hasCustomRuntimePolicy"')
+    expect(runtime).toContain(":title=\"$t('ui.accessEntrance')\"")
+    expect(runtime).toContain('accent-title')
+    expect(container).toContain("containerPorts")
+    expect(runtime).not.toContain('blankValuesUseThePlatformDefaultResourceLimitsAndLifecycle')
+  })
+
+  test('offers HTTP and netcat access display presets', async () => {
+    const bindingList = await sourceFile(new URL('../app/features/admin/UrlBindingList.vue', import.meta.url)).text()
+
+    expect(bindingList).toContain("'http://{HOST}:{PORT}'")
+    expect(bindingList).toContain("'nc {HOST} {PORT}'")
+    expect(bindingList).toContain('v-for="template in displayTemplateOptions"')
   })
 })
