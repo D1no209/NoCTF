@@ -88,8 +88,7 @@ describe('participant error feedback', () => {
     expect(miniChart).toContain('width === observedWidth && height === observedHeight')
     expect(miniChart).toContain('resizeFrame = requestAnimationFrame')
     expect(trendChart).toContain('trendChartPalette(el.value)')
-    for (const component of [miniChart, trendChart]) {
-      expect(component).toContain('watch(isDark, () => void nextTick(render))')
-    }
+    expect(miniChart).toContain('watch(isDark, () => void nextTick(render))')
+    expect(trendChart).toContain('watch(isDark, () => void nextTick(scheduleRender))')
   })
 })

@@ -18,6 +18,7 @@ const props = defineProps<{
   trendError?: string | null
   trendRangeStart?: string | null
   trendRangeEnd?: string | null
+  trendRevision?: string | number | null
 }>()
 const emit = defineEmits<{ retryTrends: [] }>()
 const open = defineModel<boolean>('open', { default: false })

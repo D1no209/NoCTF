@@ -19,6 +19,7 @@ export function useScoreboardTeamDetailDialog(props: Readonly<{
   trendError?: string | null
   trendRangeStart?: string | null
   trendRangeEnd?: string | null
+  trendRevision?: string | number | null
 }>,
 emit: { (event: "retryTrends", ...args: []): void },
 open: Ref<boolean>) {

@@ -3,7 +3,7 @@ import { toRefs } from 'vue'
 import type { ScoreboardTeamDetailDialogViewState } from '~/features/leaderboard/useScoreboardTeamDetailDialog'
 
 const viewProps = defineProps<{ state: ScoreboardTeamDetailDialogViewState }>()
-const { ChartSpline, Flag, ShieldCheck, Target, Trophy, scoreboardRankingStateLabel, emit, open, isAwdp, scoreLabel, memberContributionSlices, memberContributionPercent, memberContributionPieOption, rows, directionGroups, radarOption, flagLabel, mode, team, trendSeries, trendLoading, trendError, trendRangeStart, trendRangeEnd, LazyScoreTrendChart } = toRefs(viewProps.state)
+const { ChartSpline, Flag, ShieldCheck, Target, Trophy, scoreboardRankingStateLabel, emit, open, isAwdp, scoreLabel, memberContributionSlices, memberContributionPercent, memberContributionPieOption, rows, directionGroups, radarOption, flagLabel, mode, team, trendSeries, trendLoading, trendError, trendRangeStart, trendRangeEnd, trendRevision, LazyScoreTrendChart } = toRefs(viewProps.state)
 </script>
 
 <template>
@@ -39,6 +39,7 @@ const { ChartSpline, Flag, ShieldCheck, Target, Trophy, scoreboardRankingStateLa
           <component :is="LazyScoreTrendChart"
             v-else-if="trendSeries?.length"
             :series="trendSeries"
+            :revision="`${trendRevision ?? 'none'}:${team.teamId}`"
             :range-start="trendRangeStart"
             :range-end="trendRangeEnd"
             height="280px"

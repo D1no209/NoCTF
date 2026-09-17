@@ -16,6 +16,9 @@ const teamDetail = await sourceFile(
 const trendChart = await sourceFile(
   new URL('../app/features/leaderboard/ScoreTrendChart.vue', import.meta.url),
 ).text()
+const trendChartView = await sourceFile(
+  new URL('../app/components/views/leaderboard/ScoreTrendChartView.vue', import.meta.url),
+).text()
 const theme = await sourceFile(
   new URL('../app/assets/css/main.css', import.meta.url),
 ).text()
@@ -109,6 +112,12 @@ describe('leaderboard progressive display', () => {
     expect(trendChart).toContain('width === observedWidth && height === observedHeight')
     expect(trendChart).toContain('resizeFrame = requestAnimationFrame')
     expect(trendChart).toContain('new Map((team.points ?? [])')
+    expect(trendChart).toContain('props.revision')
+    expect(trendChart).not.toContain('{ deep: true }')
+    expect(trendChart).toContain('scheduleRender')
+    expect(trendChart).toContain('renderFrame = requestAnimationFrame')
+    expect(trendChart).toContain('notMerge: false')
+    expect(trendChart).toContain("replaceMerge: ['series']")
     expect(trendChart).toContain('min: timeRange.axisMin')
     expect(trendChart).toContain('max: timeRange.axisMax')
     expect(trendChart).toContain("type: 'slider'")
@@ -119,5 +128,11 @@ describe('leaderboard progressive display', () => {
     expect(trendChart).toContain('selectedScoreRange')
     expect(theme.match(/--chart-(?:[1-9]|10): oklch\([^)]+\);/g)).toHaveLength(20)
     expect(theme.match(/--trend-chart-(?:[1-9]|10): oklch\([^)]+\);/g)).toHaveLength(20)
+  })
+
+  test('lets ordinary wheel input reach the leaderboard scroll surface while retaining ctrl zoom', () => {
+    expect(trendChartView).toContain('@wheel.capture="releaseWheelToScrollSurface"')
+    expect(trendChart).toContain('if (!event.ctrlKey) event.stopImmediatePropagation()')
+    expect(trendChart).toContain("zoomOnMouseWheel: 'ctrl'")
   })
 })

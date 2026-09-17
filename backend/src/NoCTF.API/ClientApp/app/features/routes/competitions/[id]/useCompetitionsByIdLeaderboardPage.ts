@@ -133,6 +133,12 @@ export function useCompetitionsByIdLeaderboardPage() {
 
   const trendRangeEnd = computed(() => trends.value?.dataAsOf ?? trends.value?.generatedAt ?? null)
 
+  const trendRevision = computed(() => [
+    trends.value?.version ?? 'none',
+    trends.value?.dataAsOf ?? trends.value?.generatedAt ?? 'none',
+    selectedTrackKey.value,
+  ].join(':'))
+
   async function loadTrends(): Promise<void> {
     if (trendsRetryTimer) clearTimeout(trendsRetryTimer)
     trendsRetryTimer = null
@@ -516,6 +522,7 @@ export function useCompetitionsByIdLeaderboardPage() {
       visibleTrendSeries,
       trendRangeStart,
       trendRangeEnd,
+      trendRevision,
       loadTrends,
       roundWindowLabel,
       roundLabel,
