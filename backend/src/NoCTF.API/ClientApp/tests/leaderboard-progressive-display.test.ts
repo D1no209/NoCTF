@@ -84,12 +84,13 @@ describe('leaderboard progressive display', () => {
       .toBeLessThan(teamDetail.indexOf('scoreboard-team-radar-title'))
   })
 
-  test('uses page scrolling while the overall trend remains in normal document flow', () => {
+  test('uses an internal scroll surface while the overall trend remains in normal flow', () => {
     expect(page).toContain('data-scoreboard-page-scroll')
-    expect(page).not.toContain('<ScrollSurface axis="y"')
+    expect(page).toContain('<ScrollSurface as="div" axis="y" data-scoreboard-page-scroll')
+    expect(page).toContain('min-h-0 flex-1 overflow-y-auto overscroll-contain')
     expect(page).toContain('data-slot="leaderboard-trend-panel"')
     expect(page).not.toContain('md:sticky md:top-24 md:z-20')
-    expect(theme).toContain(':has(> main [data-contained-workspace-page] > [data-scoreboard-page-scroll])')
+    expect(theme).not.toContain(':has(> main [data-contained-workspace-page] > [data-scoreboard-page-scroll])')
   })
 
   test('keeps every team visible on hover and assigns series colors from a diverse theme palette', () => {
@@ -105,6 +106,8 @@ describe('leaderboard progressive display', () => {
     expect(trendChart).toContain('shadowBlur: 18')
     expect(trendChart).toContain("appendTo: 'body'")
     expect(trendChart).toContain("className: 'noctf-chart-tooltip'")
+    expect(trendChart).toContain('width === observedWidth && height === observedHeight')
+    expect(trendChart).toContain('resizeFrame = requestAnimationFrame')
     expect(trendChart).toContain('new Map((team.points ?? [])')
     expect(trendChart).toContain('min: timeRange.axisMin')
     expect(trendChart).toContain('max: timeRange.axisMax')

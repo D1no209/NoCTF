@@ -14,6 +14,21 @@ describe('competition challenge deletion', () => {
     expect(page).toContain("published ? 'ui.challengeWasPublished' : 'ui.challengeWasUnpublished'")
   })
 
+  test('can search templates and hide templates already added to the competition', async () => {
+    const page = await sourceFile(
+      new URL('../app/pages/admin/competitions/[id]/challenges/index.vue', import.meta.url),
+    ).text()
+
+    expect(page).toContain("const templateSearch = ref('')")
+    expect(page).toContain('const hideAddedTemplates = ref(false)')
+    expect(page).toContain('const addedTemplateIds = computed(() => new Set(')
+    expect(page).toContain('const visibleModeTemplates = computed(() => {')
+    expect(page).toContain('addedTemplateIds.value.has(template.id)')
+    expect(page).toContain('v-model="templateSearch"')
+    expect(page).toContain('v-model="hideAddedTemplates"')
+    expect(page).toContain('v-for="t in visibleModeTemplates"')
+  })
+
   test('keeps the selected challenge while deletion is pending or fails', async () => {
     const page = await sourceFile(
       new URL('../app/pages/admin/competitions/[id]/challenges/index.vue', import.meta.url),

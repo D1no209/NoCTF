@@ -1,6 +1,8 @@
 import { nextTick } from 'vue'
 
 export const localeLayoutMotionDuration = 500
+export const maximumLocaleLayoutControls = 96
+export const maximumLocaleLayoutCandidates = 256
 
 const localeResizeSelector = [
   "[data-slot='button']",
@@ -13,6 +15,30 @@ const localeResizeSelector = [
 
 const activeAnimations = new WeakMap<HTMLElement, Animation>()
 
+function isVisibleInViewport(rect: DOMRect): boolean {
+  const viewportWidth = document.documentElement.clientWidth
+  const viewportHeight = document.documentElement.clientHeight
+  return rect.width > 0
+    && rect.height > 0
+    && rect.right >= 0
+    && rect.bottom >= 0
+    && rect.left <= viewportWidth
+    && rect.top <= viewportHeight
+}
+
+function visibleControls(): Map<HTMLElement, number> {
+  const widths = new Map<HTMLElement, number>()
+  let inspected = 0
+  for (const control of document.querySelectorAll<HTMLElement>(localeResizeSelector)) {
+    inspected += 1
+    if (inspected > maximumLocaleLayoutCandidates || widths.size >= maximumLocaleLayoutControls) break
+    const rect = control.getBoundingClientRect()
+    if (!isVisibleInViewport(rect)) continue
+    widths.set(control, rect.width)
+  }
+  return widths
+}
+
 /** Smooth intrinsic-width changes caused by replacing localized control labels. */
 export async function animateLocaleLayout(update: () => void): Promise<void> {
   if (!import.meta.client || matchMedia('(prefers-reduced-motion: reduce)').matches) {
@@ -20,12 +46,7 @@ export async function animateLocaleLayout(update: () => void): Promise<void> {
     return
   }
 
-  const controls = [...document.querySelectorAll<HTMLElement>(localeResizeSelector)]
-  const widths = new Map<HTMLElement, number>()
-  for (const control of controls) {
-    const width = control.getBoundingClientRect().width
-    if (width > 0) widths.set(control, width)
-  }
+  const widths = visibleControls()
 
   update()
   await nextTick()

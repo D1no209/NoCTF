@@ -7,7 +7,8 @@ const { ArrowLeft, ChevronLeft, ChevronRight, Download, History, Medal, Trophy, 
 </script>
 
 <template>
-  <div data-scoreboard-page-scroll class="flex flex-col gap-6 pb-4">
+  <ScrollSurface as="div" axis="y" data-scoreboard-page-scroll class="min-h-0 flex-1 overflow-y-auto overscroll-contain pr-3">
+    <div class="flex flex-col gap-6 pb-4">
     <div>
       <Button variant="ghost" size="sm" as-child>
         <NuxtLink :to="`/competitions/${competitionId}`">
@@ -169,5 +170,6 @@ const { ArrowLeft, ChevronLeft, ChevronRight, Download, History, Medal, Trophy, 
         </template>
       </DialogScrollContent>
     </Dialog>
-  </div>
+    </div>
+  </ScrollSurface>
 </template>

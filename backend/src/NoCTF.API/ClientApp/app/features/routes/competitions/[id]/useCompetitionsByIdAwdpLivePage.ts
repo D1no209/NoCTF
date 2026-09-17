@@ -185,7 +185,8 @@ export function useCompetitionsByIdAwdpLivePage() {
   }
 
   function progressPlayback(now: number): void {
-    playbackProgress.value = Math.min(100, Math.max(0, (now - playbackStartedAt) / PLAYBACK_DURATION_MS * 100))
+    const nextProgress = Math.floor(Math.min(100, Math.max(0, (now - playbackStartedAt) / PLAYBACK_DURATION_MS * 100)))
+    if (playbackProgress.value !== nextProgress) playbackProgress.value = nextProgress
     if (activeEvent.value) playbackFrame = requestAnimationFrame(progressPlayback)
   }
 

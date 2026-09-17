@@ -290,17 +290,35 @@ export function useScoreTrendChart(props: Readonly<Omit<{
 
   watch(isDark, () => void nextTick(render))
 
-  const onResize = () => chart?.resize()
-
   let observer: ResizeObserver | null = null
 
+  let resizeFrame = 0
+
+  let observedWidth = -1
+
+  let observedHeight = -1
+
   onMounted(() => {
-    observer = new ResizeObserver(onResize)
+    observer = new ResizeObserver((entries) => {
+      const size = entries[0]?.contentRect
+      if (!size) return
+      const width = Math.ceil(size.width)
+      const height = Math.ceil(size.height)
+      if (width === observedWidth && height === observedHeight) return
+      observedWidth = width
+      observedHeight = height
+      if (resizeFrame) cancelAnimationFrame(resizeFrame)
+      resizeFrame = requestAnimationFrame(() => {
+        resizeFrame = 0
+        chart?.resize()
+      })
+    })
     if (el.value) observer.observe(el.value)
   })
 
   onUnmounted(() => {
     observer?.disconnect()
+    if (resizeFrame) cancelAnimationFrame(resizeFrame)
     chart?.off('datazoom', rememberZoom)
     chart?.off('restore', restoreChartView)
     chart?.off('legendselectchanged', toggleTeamFocus)

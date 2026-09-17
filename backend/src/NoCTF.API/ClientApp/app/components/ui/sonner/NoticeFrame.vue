@@ -10,6 +10,12 @@ const emit = defineEmits<{ dismiss: [] }>()
 const frame = ref<HTMLElement | null>(null)
 let observer: ResizeObserver | undefined
 let measureFrame = 0
+let observedWidth = -1
+let observedHeight = -1
+
+function setPropertyIfChanged(element: HTMLElement, name: string, value: string) {
+  if (element.style.getPropertyValue(name) !== value) element.style.setProperty(name, value)
+}
 
 function measureNoticeStack() {
   const current = frame.value
@@ -35,15 +41,15 @@ function measureNoticeStack() {
       ? notice.getBoundingClientRect().height + verticalPadding
       : item.scrollHeight)
     if (notice) {
-      item.style.setProperty('--notice-height', `${height}px`)
-      item.style.setProperty('--initial-height', `${height}px`)
+      setPropertyIfChanged(item, '--notice-height', `${height}px`)
+      setPropertyIfChanged(item, '--initial-height', `${height}px`)
     }
-    item.style.setProperty('--offset', `${offset}px`)
+    setPropertyIfChanged(item, '--offset', `${offset}px`)
     if (item.dataset.front === 'true') frontHeight = height
     offset += height + gap
   }
 
-  if (frontHeight) toaster.style.setProperty('--front-toast-height', `${frontHeight}px`)
+  if (frontHeight) setPropertyIfChanged(toaster, '--front-toast-height', `${frontHeight}px`)
 }
 
 function scheduleMeasurement() {
@@ -57,7 +63,16 @@ function scheduleMeasurement() {
 onMounted(async () => {
   await nextTick()
   if (!frame.value) return
-  observer = new ResizeObserver(scheduleMeasurement)
+  observer = new ResizeObserver((entries) => {
+    const size = entries[0]?.contentRect
+    if (!size) return
+    const width = Math.ceil(size.width)
+    const height = Math.ceil(size.height)
+    if (width === observedWidth && height === observedHeight) return
+    observedWidth = width
+    observedHeight = height
+    scheduleMeasurement()
+  })
   observer.observe(frame.value)
   scheduleMeasurement()
 })
