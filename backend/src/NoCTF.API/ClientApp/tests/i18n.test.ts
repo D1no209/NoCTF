@@ -115,7 +115,9 @@ describe('locale switch placement', () => {
       new URL('../app/app.vue', import.meta.url),
     ).text()
 
-    expect(composable).toContain("setLocale(isEnglish.value ? 'zh-CN' : 'en')")
+    expect(composable).toContain("const nextLocale = isEnglish.value ? 'zh-CN' : 'en'")
+    expect(composable).toContain('await prepareLocale(nextLocale)')
+    expect(composable).toContain('setLocale(nextLocale)')
     expect(composable).not.toContain('window.location.reload()')
     expect(app).toContain('<NuxtPage :transition="pageTransition" />')
     expect(app).not.toContain('const { locale } = useLocale()')
