@@ -33,6 +33,7 @@ const { Bell, ShieldAlert, isHome, wallpaperActive, wallpaperStyle, isLoggedIn, 
             <span
               v-for="item in navItems.filter((i) => i.show)"
               :key="item.to"
+              v-top-nav-motion
               data-top-nav-slot
             >
               <span data-top-nav-sizer aria-hidden="true">
@@ -48,8 +49,10 @@ const { Bell, ShieldAlert, isHome, wallpaperActive, wallpaperStyle, isLoggedIn, 
                 :class="isActive(item.to) ? 'text-foreground font-medium after:absolute after:inset-x-2.5 after:bottom-1 after:h-0.5 after:rounded-full after:bg-primary' : 'text-muted-foreground'"
               >
                 <NuxtLink :to="item.to" :aria-current="isActive(item.to) ? 'page' : undefined">
-                  <span data-top-nav-icon><component :is="item.icon" /></span>
-                  <span data-top-nav-label>{{ item.label }}</span>
+                  <span data-top-nav-content>
+                    <span data-top-nav-icon><component :is="item.icon" /></span>
+                    <span data-top-nav-label>{{ item.label }}</span>
+                  </span>
                 </NuxtLink>
               </Button>
             </span>

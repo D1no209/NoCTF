@@ -10,7 +10,7 @@
 .noctf-motion-detail-enter { animation: noctf-detail-enter 160ms var(--ui-ease) both; }
 .noctf-motion-interactive { transition: background-color 160ms ease-out, border-color 160ms ease-out, box-shadow 160ms ease-out; }
 [data-locale-resizing='true'] { overflow: clip; will-change: inline-size; }
-[data-top-nav-item].noctf-motion-top-nav { transition: width 760ms var(--ui-ease), color 440ms ease-out, background-color 440ms ease-out, box-shadow 440ms ease-out, transform 440ms ease-out; }
+[data-top-nav-item].noctf-motion-top-nav { transform-origin: left center; transition: color 440ms ease-out, background-color 440ms ease-out, box-shadow 440ms ease-out; }
 .noctf-motion-top-nav [data-top-nav-label] { transition: opacity 520ms ease-out, transform 760ms var(--ui-ease); }
 .noctf-page-slide-enter-active {
   transition: transform 240ms var(--ui-ease);

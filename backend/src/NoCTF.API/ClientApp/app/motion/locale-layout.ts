@@ -5,7 +5,7 @@ export const maximumLocaleLayoutControls = 96
 export const maximumLocaleLayoutCandidates = 256
 
 const localeResizeSelector = [
-  "[data-slot='button']",
+  "[data-slot='button']:not([data-top-nav-item])",
   "[data-slot='action-button']",
   "[data-slot='badge']",
   "[data-slot='tabs-trigger']",
