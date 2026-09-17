@@ -8,7 +8,7 @@ const props = defineProps<{
 </script>
 
 <template>
-  <div data-slot="table-container" data-scroll-surface data-scroll-axis="x" class="relative w-full overflow-x-auto">
+  <div data-slot="table-container" v-scroll-surface data-scroll-surface data-scroll-axis="x" class="relative w-full overflow-x-auto">
     <table data-slot="table" :class="cn('w-full caption-bottom text-sm', props.class)">
       <slot />
     </table>
