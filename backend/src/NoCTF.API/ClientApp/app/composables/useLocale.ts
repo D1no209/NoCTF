@@ -5,7 +5,9 @@ export function useLocale() {
   const isEnglish = computed(() => locale.value === 'en')
 
   async function switchLocale() {
-    await animateLocaleLayout(() => setLocale(isEnglish.value ? 'zh-CN' : 'en'))
+    const nextLocale = isEnglish.value ? 'zh-CN' : 'en'
+    await prepareLocale(nextLocale)
+    await animateLocaleLayout(() => setLocale(nextLocale))
   }
 
   return {

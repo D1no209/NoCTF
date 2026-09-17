@@ -1,5 +1,6 @@
 import { sourceFile } from './support/feature-source'
 import { describe, expect, test } from 'bun:test'
+import { englishMessages } from '../app/locales/en'
 import {
   emptyDefinition,
   normalizeDefinitionJson,
@@ -60,13 +61,9 @@ describe('AWDP Checker Fix input', () => {
     const component = await sourceFile(
       new URL('../app/features/admin/DefinitionCheckerSection.vue', import.meta.url),
     ).text()
-    const translations = await sourceFile(
-      new URL('../app/locales/en.ts', import.meta.url),
-    ).text()
-
     expect(issues).toContain("向 Checker 提供 Fix 包前必须启用 Checker")
     expect(component).toContain('v-model="model.checkerFixInput"')
     expect(component).toContain('ui.beforeItStartsTheCheckerReceivesThePlatformValidatedFix')
-    expect(translations).toContain('Provide the Fix package to the Checker')
+    expect(englishMessages['ui.provideTheFixPackageToTheChecker']).toBe('Provide the Fix package to the Checker')
   })
 })
