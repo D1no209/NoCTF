@@ -923,15 +923,6 @@ body:has([data-modal-scroll-lock]) {
 @media (max-width: 1279px) {
   [data-writeup-review-workspace] [data-slot='floating-sidebar'] { height: min(20rem, 42dvh); }
 }
-[data-slot='default-layout-foreground']:has(> main [data-contained-workspace-page] > [data-scoreboard-page-scroll]) {
-  height: auto; min-height: 100dvh; overflow: visible;
-}
-[data-slot='default-layout-foreground'] > main:has([data-contained-workspace-page] > [data-scoreboard-page-scroll]) {
-  overflow: visible;
-}
-[data-slot='default-layout-foreground'] > main [data-contained-workspace-page]:has(> [data-scoreboard-page-scroll]) {
-  height: auto; min-height: calc(100dvh - 5rem); overflow: visible;
-}
 [data-slot='default-layout-foreground']:has(> main [data-contained-workspace-page]) .question-participant-workspace { flex: 1; min-height: 0; grid-template-rows: minmax(0, 1fr); }
 .question-participant-workspace > main { min-height: 0; padding: 4px 20px 24px 4px; }
 .question-participant-workspace > aside { min-height: 0; overflow: hidden; }

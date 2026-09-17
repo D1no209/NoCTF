@@ -61,7 +61,7 @@ describe('participant competition workspace layout', () => {
     expect(leaderboard).not.toContain("<component :is=\"CompetitionParticipantWorkspace\"")
     expect(leaderboard).toContain("$t('ui.backToCompetition')")
     expect(leaderboard).toContain('data-scoreboard-page-scroll')
-    expect(leaderboard).not.toContain('<ScrollSurface axis="y"')
+    expect(leaderboard).toContain('<ScrollSurface as="div" axis="y" data-scoreboard-page-scroll')
     expect(writeUpReview).not.toContain('CompetitionParticipantWorkspace')
     expect(writeUpReview).toContain('data-writeup-review-workspace')
     expect(writeUpReview).toContain("$t('ui.backToCompetition')")

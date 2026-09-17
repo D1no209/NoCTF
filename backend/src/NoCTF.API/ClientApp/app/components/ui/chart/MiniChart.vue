@@ -12,6 +12,9 @@ const props = withDefaults(
 const el = ref<HTMLElement | null>(null)
 const { isDark } = useTheme()
 let chart: echarts.ECharts | null = null
+let resizeFrame = 0
+let observedWidth = -1
+let observedHeight = -1
 
 function render() {
   if (!chart || !el.value) return
@@ -40,11 +43,25 @@ watch(isDark, () => void nextTick(render))
 
 let observer: ResizeObserver | null = null
 onMounted(() => {
-  observer = new ResizeObserver(() => chart?.resize())
+  observer = new ResizeObserver((entries) => {
+    const size = entries[0]?.contentRect
+    if (!size) return
+    const width = Math.ceil(size.width)
+    const height = Math.ceil(size.height)
+    if (width === observedWidth && height === observedHeight) return
+    observedWidth = width
+    observedHeight = height
+    if (resizeFrame) cancelAnimationFrame(resizeFrame)
+    resizeFrame = requestAnimationFrame(() => {
+      resizeFrame = 0
+      chart?.resize()
+    })
+  })
   if (el.value) observer.observe(el.value)
 })
 onUnmounted(() => {
   observer?.disconnect()
+  if (resizeFrame) cancelAnimationFrame(resizeFrame)
   chart?.dispose()
   chart = null
 })

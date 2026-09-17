@@ -45,6 +45,10 @@ export function useAdminCompetitionsByIdChallengesIndexPage() {
 
   const selectedTemplateId = ref<string>('')
 
+  const templateSearch = ref('')
+
+  const hideAddedTemplates = ref(false)
+
   const newCustomTitle = ref('')
 
   const newOrder = ref(0)
@@ -57,10 +61,32 @@ export function useAdminCompetitionsByIdChallengesIndexPage() {
     templates.value.filter(t => t.mode === competition.value?.mode && !t.deletedAt),
   )
 
+  const addedTemplateIds = computed(() => new Set(
+    items.value
+      .filter(item => !item.deletedAt && item.challengeId)
+      .map(item => item.challengeId!),
+  ))
+
+  const visibleModeTemplates = computed(() => {
+    const search = templateSearch.value.trim().toLocaleLowerCase()
+    return modeTemplates.value.filter((template) => {
+      if (hideAddedTemplates.value && template.id && addedTemplateIds.value.has(template.id)) return false
+      if (!search) return true
+      return [template.title, template.direction]
+        .some(value => value?.toLocaleLowerCase().includes(search))
+    })
+  })
+
+  watch(hideAddedTemplates, (hidden) => {
+    if (hidden && addedTemplateIds.value.has(selectedTemplateId.value)) selectedTemplateId.value = ''
+  })
+
   async function openAdd() {
     addOpen.value = true
     addError.value = null
     selectedTemplateId.value = ''
+    templateSearch.value = ''
+    hideAddedTemplates.value = false
     newCustomTitle.value = ''
     newOrder.value = (items.value.filter(i => !i.deletedAt).map(i => i.order ?? 0).reduce((m, o) => Math.max(m, o), 0) || 0) + 1
     templatesLoading.value = true
@@ -216,11 +242,14 @@ export function useAdminCompetitionsByIdChallengesIndexPage() {
       addOpen,
       templatesLoading,
       selectedTemplateId,
+      templateSearch,
+      hideAddedTemplates,
       newCustomTitle,
       newOrder,
       adding,
       addError,
       modeTemplates,
+      visibleModeTemplates,
       openAdd,
       addChallenge,
       deleteTarget,

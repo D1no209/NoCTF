@@ -3,7 +3,7 @@ import { toRefs } from 'vue'
 import type { AwdpEventTickerViewState } from '~/features/awdp-control/useAwdpEventTicker'
 
 const viewProps = defineProps<{ state: AwdpEventTickerViewState }>()
-const { Activity, offset, eventText, eventTime, setViewportRef, setGroupRef, events, onMouseenterPaused, onMouseleavePaused } = toRefs(viewProps.state)
+const { Activity, eventText, eventTime, setViewportRef, setGroupRef, setTrackRef, events, onMouseenterPaused, onMouseleavePaused } = toRefs(viewProps.state)
 </script>
 
 <template>
@@ -17,7 +17,7 @@ const { Activity, offset, eventText, eventTime, setViewportRef, setGroupRef, eve
       @focusin="onMouseenterPaused(true)"
       @focusout="onMouseleavePaused(false)"
     >
-      <div v-if="events.length" class="ticker-track" :style="{ transform: `translate3d(-${offset}px,0,0)` }">
+      <div v-if="events.length" :ref="setTrackRef" class="ticker-track">
         <div :ref="setGroupRef" class="ticker-group">
           <article v-for="event in events" :key="event.id" :class="['ticker-card', event.action, event.outcome]">
             <time>{{ eventTime(event.occurredAt) }}</time><span>{{ eventText(event) }}</span>

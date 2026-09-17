@@ -3,7 +3,7 @@ import { toRefs } from 'vue'
 import type { AdminCompetitionsByIdChallengesIndexPageViewState } from '~/features/routes/admin/competitions/[id]/challenges/useAdminCompetitionsByIdChallengesIndexPage'
 
 const viewProps = defineProps<{ state: AdminCompetitionsByIdChallengesIndexPageViewState }>()
-const { Plus, competitionId, competition, canWrite, items, loading, error, includeDeleted, pendingId, addOpen, templatesLoading, selectedTemplateId, newCustomTitle, newOrder, adding, addError, modeTemplates, openAdd, addChallenge, deleteTarget, deletePending, deleteError, closeDeleteDialog, beginDeleteChallenge, removeChallenge, restoreChallenge, setChallengePublished, onClickAddOpen } = toRefs(viewProps.state)
+const { Plus, competitionId, competition, canWrite, items, loading, error, includeDeleted, pendingId, addOpen, templatesLoading, selectedTemplateId, templateSearch, hideAddedTemplates, newCustomTitle, newOrder, adding, addError, modeTemplates, visibleModeTemplates, openAdd, addChallenge, deleteTarget, deletePending, deleteError, closeDeleteDialog, beginDeleteChallenge, removeChallenge, restoreChallenge, setChallengePublished, onClickAddOpen } = toRefs(viewProps.state)
 </script>
 
 <template>
@@ -114,20 +114,40 @@ const { Plus, competitionId, competition, canWrite, items, loading, error, inclu
           <Field>
             <FieldLabel for="tpl">{{ $t('ui.questionBankTemplate') }}</FieldLabel>
             <Skeleton v-if="templatesLoading" class="h-9 w-full" />
-            <Select v-else id="tpl" v-model="selectedTemplateId">
-              <SelectTrigger class="w-full">
-                <SelectValue :placeholder="$t('ui.selectTemplate')" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectGroup>
-                  <SelectItem v-for="t in modeTemplates" :key="t.id" :value="t.id!">
-                    {{ t.title }}({{ directionLabel(t.direction) }})
-                  </SelectItem>
-                </SelectGroup>
-              </SelectContent>
-            </Select>
+            <template v-else>
+              <div class="flex flex-col gap-3 sm:flex-row sm:items-center">
+                <Input
+                  id="template-search"
+                  v-model="templateSearch"
+                  class="flex-1"
+                  :placeholder="$t('ui.searchQuestionBankTemplates')"
+                  :aria-label="$t('ui.searchQuestionBankTemplates')"
+                />
+                <div class="flex shrink-0 items-center gap-2">
+                  <Switch id="hide-added-templates" v-model="hideAddedTemplates" />
+                  <FieldLabel for="hide-added-templates" class="cursor-pointer whitespace-nowrap text-xs">
+                    {{ $t('ui.hideAddedQuestions') }}
+                  </FieldLabel>
+                </div>
+              </div>
+              <Select id="tpl" v-model="selectedTemplateId">
+                <SelectTrigger class="w-full">
+                  <SelectValue :placeholder="$t('ui.selectTemplate')" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectGroup>
+                    <SelectItem v-for="t in visibleModeTemplates" :key="t.id" :value="t.id!">
+                      {{ t.title }}({{ directionLabel(t.direction) }})
+                    </SelectItem>
+                  </SelectGroup>
+                </SelectContent>
+              </Select>
+            </template>
             <FieldDescription v-if="!templatesLoading && modeTemplates.length === 0">
               {{ $t('ui.noAvailableTemplatesInTheChallengeLibrary', { mode: enumLabel(GameModeLabel, competition?.mode) }) }}
+            </FieldDescription>
+            <FieldDescription v-else-if="!templatesLoading && visibleModeTemplates.length === 0">
+              {{ $t('ui.noMatchingQuestionBankTemplates') }}
             </FieldDescription>
           </Field>
           <Field>

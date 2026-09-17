@@ -7,6 +7,9 @@ test('locale changes animate intrinsic control widths within half a second', asy
 
   expect(locale).toContain('await animateLocaleLayout')
   expect(layout).toContain('localeLayoutMotionDuration = 500')
+  expect(layout).toContain('maximumLocaleLayoutControls = 96')
+  expect(layout).toContain('maximumLocaleLayoutCandidates = 256')
+  expect(layout).toContain('isVisibleInViewport')
   expect(layout).toContain("[data-slot='button']")
   expect(layout).toContain("[data-slot='badge']")
   expect(layout).toContain("[data-slot='tabs-trigger']")

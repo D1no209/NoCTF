@@ -9,6 +9,8 @@ const css = await Bun.file(new URL('../app/assets/css/main.css', import.meta.url
 test('theme changes reveal from top to bottom without blending component colors', () => {
   expect(theme).toContain("runDownRevealTransition('theme'")
   expect(reveal).toContain('startViewTransition')
+  expect(reveal).toContain('revealTransitionDeadlineMs = 1_500')
+  expect(reveal).toContain('transition.skipTransition?.()')
   expect(reveal).toContain("layer === 'theme' ? 'themeTransition' : 'wallpaperTransition'")
   expect(reveal).toContain("matchMedia('(prefers-reduced-motion: reduce)')")
   expect(reveal).toContain('await nextTick()')
@@ -22,6 +24,7 @@ test('theme changes reveal from top to bottom without blending component colors'
   expect(motion).toContain("html[data-theme-transition='down'] *")
   expect(motion).toContain("html[data-theme-transition='down'] *::before")
   expect(motion).toContain('transition: none !important')
+  expect(motion).toContain('pointer-events: none')
   expect(motion).toContain('clip-path: inset(0 0 100% 0)')
   expect(motion).toContain('to { clip-path: inset(0); }')
   expect(motion).toContain('#000 calc(100% - 5rem)')

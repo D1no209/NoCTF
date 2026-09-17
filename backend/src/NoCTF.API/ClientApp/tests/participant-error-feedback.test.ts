@@ -85,6 +85,8 @@ describe('participant error feedback', () => {
     expect(chart).toContain('themeColor(property, element ?? undefined)')
     expect(chart).toContain('chartTooltipTheme')
     expect(miniChart).toContain('chartPalette(el.value)')
+    expect(miniChart).toContain('width === observedWidth && height === observedHeight')
+    expect(miniChart).toContain('resizeFrame = requestAnimationFrame')
     expect(trendChart).toContain('trendChartPalette(el.value)')
     for (const component of [miniChart, trendChart]) {
       expect(component).toContain('watch(isDark, () => void nextTick(render))')

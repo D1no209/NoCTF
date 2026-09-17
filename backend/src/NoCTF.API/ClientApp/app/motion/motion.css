@@ -44,6 +44,7 @@
   to { background-position: -140% 0; }
 }
 .noctf-motion-home-signal-flow { animation: noctf-home-signal-flow 12s linear infinite; }
+::view-transition { pointer-events: none; }
 ::view-transition-old(root),
 ::view-transition-new(root),
 ::view-transition-old(noctf-page-wallpaper),
@@ -52,6 +53,7 @@
 ::view-transition-new(noctf-page-foreground) {
   animation: none;
   mix-blend-mode: normal;
+  pointer-events: none;
 }
 html[data-wallpaper-transition='down'] [data-page-wallpaper='true'] {
   view-transition-name: noctf-page-wallpaper;
