@@ -3,7 +3,7 @@ import { toRefs } from 'vue'
 import type { AuthLoginPageViewState } from '~/features/routes/auth/useAuthLoginPage'
 
 const viewProps = defineProps<{ state: AuthLoginPageViewState }>()
-const { loginCharacter, registerCharacter, configuration, loginName, password, error, pending, submit } = toRefs(viewProps.state)
+const { authArtwork, configuration, loginName, password, error, pending, submit } = toRefs(viewProps.state)
 </script>
 
 <template>
@@ -17,8 +17,7 @@ const { loginCharacter, registerCharacter, configuration, loginName, password, e
       <p v-if="configuration?.description" class="text-sm text-muted-foreground">{{ configuration.description }}</p>
     </div>
     <Card class="auth-card">
-      <img data-slot="auth-character-cutout" data-theme-character="dark" data-corner="left-bottom" :src="loginCharacter" alt="" aria-hidden="true">
-      <img data-slot="auth-character-cutout" data-theme-character="light" data-corner="right-top" :src="registerCharacter" alt="" aria-hidden="true">
+      <img v-if="authArtwork" data-slot="auth-character-cutout" :data-corner="authArtwork.corner" :src="authArtwork.src" :width="authArtwork.width" :height="authArtwork.height" decoding="async" alt="" aria-hidden="true">
       <CardHeader class="relative z-10 pt-3">
         <CardTitle class="text-xl font-semibold">{{ $t('ui.signIn') }}</CardTitle>
       </CardHeader>

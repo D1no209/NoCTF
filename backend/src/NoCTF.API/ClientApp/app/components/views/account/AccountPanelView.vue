@@ -152,6 +152,8 @@ const { UserRound, LockKeyhole, ShieldCheck, ImageIcon, LogOut, user, isImperson
                   v-if="wallpaperUrl"
                   :src="wallpaperUrl"
                   :alt="$t('accountPanel.wallpaperPreview')"
+                  loading="lazy"
+                  decoding="async"
                   class="size-full object-cover"
                 >
                 <div v-else class="flex size-full items-center justify-center px-8 text-center text-sm text-muted-foreground">

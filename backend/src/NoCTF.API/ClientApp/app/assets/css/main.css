@@ -1172,9 +1172,6 @@ body:has([data-modal-scroll-lock]) {
   user-select: none;
   object-fit: contain;
 }
-[data-slot='auth-character-cutout'][data-theme-character='dark'] { display: none; }
-.dark [data-slot='auth-character-cutout'][data-theme-character='dark'] { display: block; }
-.dark [data-slot='auth-character-cutout'][data-theme-character='light'] { display: none; }
 [data-slot='auth-character-cutout'][data-corner='left-bottom'] {
   left: -3.4rem;
   bottom: -4.2rem;

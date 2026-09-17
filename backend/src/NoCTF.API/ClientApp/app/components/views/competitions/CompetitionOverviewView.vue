@@ -11,7 +11,7 @@ const { ArrowRight, Box, CalendarRange, Clock, EyeOff, FileText, KeyRound, LogIn
     <!-- Hero -->
     <div data-slot="competition-overview-hero" class="@container/overview shrink-0 overflow-hidden">
       <div class="grid @3xl/overview:grid-cols-[minmax(0,1fr)_15rem]">
-        <CoverImage :src="posterUrl" :alt="$t('ui.competitionPoster')" class="min-w-0 self-start">
+        <CoverImage :src="posterUrl" :alt="$t('ui.competitionPoster')" loading="eager" fetchpriority="high" class="min-w-0 self-start">
         <div class="relative isolate flex min-w-0 flex-col gap-5 p-6 sm:p-8">
           <TypeWatermark :text="gameModeLabel(competition.mode)" placement="top" class="text-primary" />
           <span class="sr-only">{{ gameModeLabel(competition.mode) }}</span>
