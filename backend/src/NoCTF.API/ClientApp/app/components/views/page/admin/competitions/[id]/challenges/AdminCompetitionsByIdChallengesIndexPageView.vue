@@ -48,6 +48,7 @@ const { Plus, competitionId, competition, canWrite, items, loading, error, inclu
               v-if="!c.deletedAt"
               class="font-medium underline-offset-4 hover:underline"
               :to="`/admin/competitions/${competitionId}/challenges/${c.id}`"
+              prefetch-on="interaction"
             >
               {{ c.title }}
             </NuxtLink>

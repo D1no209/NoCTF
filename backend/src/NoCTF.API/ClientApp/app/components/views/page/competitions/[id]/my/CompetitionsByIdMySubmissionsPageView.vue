@@ -55,6 +55,7 @@ const { competitionId, challengeTitles, challengeTitlesError, items, loading, er
           <TableCell>
             <NuxtLink
               :to="`/competitions/${competitionId}/challenges?challenge=${submission.competitionChallengeId}`"
+              prefetch-on="interaction"
               class="font-medium hover:underline"
             >
               {{ challengeTitles[submission.competitionChallengeId!] ?? $t('ui.unknownQuestion') }}

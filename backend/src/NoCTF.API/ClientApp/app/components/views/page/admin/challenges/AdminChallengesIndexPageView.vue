@@ -74,7 +74,7 @@ const { Plus, canOrganize, templates, filteredTemplates, directionFilter, direct
           <TableBody>
             <TableRow v-for="template in filteredTemplates" :key="template.id">
               <TableCell>
-                <NuxtLink :to="`/admin/challenges/${template.id}`" class="font-medium hover:underline">
+                <NuxtLink :to="`/admin/challenges/${template.id}`" prefetch-on="interaction" class="font-medium hover:underline">
                   {{ template.title }}
                 </NuxtLink>
               </TableCell>

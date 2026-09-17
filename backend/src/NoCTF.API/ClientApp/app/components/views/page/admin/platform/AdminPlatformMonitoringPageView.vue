@@ -372,3 +372,5 @@ const {
     </template>
   </div>
 </template>
+
+<style src="./platform-monitoring.css"></style>

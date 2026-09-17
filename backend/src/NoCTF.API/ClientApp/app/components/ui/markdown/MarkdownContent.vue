@@ -19,3 +19,5 @@ onBeforeUnmount(() => { renderSequence++ })
 <template>
   <div class="markdown-content min-w-0 text-sm leading-7"><MarkdownDocument :html="html" /></div>
 </template>
+
+<style src="./markdown.css"></style>

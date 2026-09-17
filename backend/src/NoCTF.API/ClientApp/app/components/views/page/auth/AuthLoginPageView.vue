@@ -54,3 +54,5 @@ const { authArtwork, configuration, loginName, password, error, pending, submit 
     </Card>
   </div>
 </template>
+
+<style src="./auth-artwork.css"></style>

@@ -5,7 +5,9 @@ test('competition management keeps navigation fixed and scrolls animated content
   const shell = await sourceFile(
     new URL('../app/pages/admin/competitions/[id].vue', import.meta.url),
   ).text()
-  const main = await Bun.file(new URL('../app/assets/css/main.css', import.meta.url)).text()
+  const workspace = await Bun.file(
+    new URL('../app/components/views/app/settings-workspace.css', import.meta.url),
+  ).text()
 
   expect(shell).toContain('const activePath = computed(() => route.path)')
   expect(shell).toContain('data-workspace-scroll-content')
@@ -13,8 +15,8 @@ test('competition management keeps navigation fixed and scrolls animated content
   expect(shell).toContain('<ScrollSurface axis="y"')
   expect(shell).toContain('min-h-0 flex-1 overscroll-contain')
   expect(shell).toContain('<MotionSwap :identity="activePath" preset="film-up">')
-  expect(main).toContain("[data-slot='app-workspace-nav']:has([data-workspace-scroll-content])")
-  expect(main).toContain('grid-template-rows: minmax(10rem, 32dvh) minmax(0, 1fr)')
+  expect(workspace).toContain("[data-slot='app-workspace-nav']:has([data-workspace-scroll-content])")
+  expect(workspace).toContain('grid-template-rows: minmax(10rem, 32dvh) minmax(0, 1fr)')
 })
 
 test('related competition settings share continuous cards', async () => {

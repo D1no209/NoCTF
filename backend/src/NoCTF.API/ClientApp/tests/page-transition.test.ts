@@ -12,6 +12,9 @@ test('route transitions slide only the page content inside the persistent layout
   const notifications = await Bun.file(new URL('../app/components/views/notifications/NotificationCenterView.vue', import.meta.url)).text()
   const motion = await Bun.file(new URL('../app/motion/motion.css', import.meta.url)).text()
   const main = await Bun.file(new URL('../app/assets/css/main.css', import.meta.url)).text()
+  const workspace = await Bun.file(
+    new URL('../app/components/views/app/settings-workspace.css', import.meta.url),
+  ).text()
 
   expect(root).toContain("name: 'noctf-page-slide'")
   expect(root).toContain("mode: 'out-in' as const")
@@ -36,7 +39,7 @@ test('route transitions slide only the page content inside the persistent layout
   expect(main).toContain('position: relative; inset: auto; z-index: 20;')
   expect(main).toContain("[data-slot='default-layout-foreground']:has(> main [data-contained-workspace-page])")
   expect(main).toContain("[data-slot='default-layout-foreground'] > main:has([data-contained-workspace-page])")
-  expect(main).toContain("[data-slot='default-layout-foreground']:has(> main [data-slot='app-workspace-nav'] [data-workspace-scroll-content])")
+  expect(workspace).toContain("[data-slot='default-layout-foreground']:has(> main [data-slot='app-workspace-nav'] [data-workspace-scroll-content])")
   expect(main).toContain("> [data-slot='competition-page-route'] { height: 100%;")
   expect(main).not.toContain('.contained-workspace-shell')
   expect(motion).toContain('.noctf-page-slide-enter-active, .noctf-page-slide-leave-active { transition: none; }')
