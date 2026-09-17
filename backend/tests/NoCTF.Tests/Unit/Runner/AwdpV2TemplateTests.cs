@@ -210,8 +210,12 @@ public sealed class AwdpV2TemplateTests
             ["components/views/admin/ChallengeTemplateCreateDialogView.vue"] = ["标题", "游戏模式", "可见性", "方向", "题面"],
             ["components/views/page/admin/competitions/[id]/challenges/AdminCompetitionsByIdChallengesByCcIdPageView.vue"] = ["提示内容", "扣分", "发布时间(可选)"]
         };
-        var localizedLabels = await File.ReadAllTextAsync(
-            Path.Combine(client, "locales", "zh-CN.ts"));
+        var localizedLabels = string.Join('\n', await Task.WhenAll(
+            Directory.EnumerateFiles(
+                    Path.Combine(client, "locales", "catalogs", "zh-CN"),
+                    "*.ts",
+                    SearchOption.TopDirectoryOnly)
+                .Select(path => File.ReadAllTextAsync(path))));
         foreach (var component in components)
         {
             var source = string.Join('\n',

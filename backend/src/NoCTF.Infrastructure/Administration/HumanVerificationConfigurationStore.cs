@@ -3,22 +3,27 @@ using Microsoft.Extensions.Options;
 using NoCTF.Application.Admission;
 using NoCTF.Domain.Platform;
 using NoCTF.Infrastructure.Authentication;
+using NoCTF.Infrastructure.Caching;
 using NoCTF.Infrastructure.Persistence;
+using ZiggyCreatures.Caching.Fusion;
 
 namespace NoCTF.Infrastructure.Administration;
 
 public sealed class HumanVerificationConfigurationStore(
     NoCtfDbContext db,
     PlatformSecretProtector secrets,
-    IOptions<HumanVerificationOptions> deploymentOptions)
+    IOptions<HumanVerificationOptions> deploymentOptions,
+    IFusionCacheProvider? cacheProvider = null)
     : IHumanVerificationConfigurationStore,
         IHumanVerificationConfigurationReader
 {
     private const short SettingsId = 1;
+    private const string CacheKey = "human-verification-configuration";
+    private readonly IFusionCache? cache = cacheProvider?.GetCache(NoCtfCacheNames.ReadModels);
 
     public async Task<HumanVerificationConfigurationView> GetAsync(
         CancellationToken ct) =>
-        ToView(await LoadAsync(ct));
+        ToView(await GetSnapshotAsync(ct));
 
     public async Task<HumanVerificationConfigurationView> UpdateAsync(
         UpdateHumanVerificationConfigurationCommand command,
@@ -39,7 +44,10 @@ public sealed class HumanVerificationConfigurationStore(
             command.TurnstileAllowedHostnames.ToArray();
         settings.UpdatedAt = command.Now;
         await db.SaveChangesAsync(ct);
-        return ToView(settings);
+        var snapshot = HumanVerificationConfigurationSnapshot.From(settings);
+        if (cache is not null)
+            await cache.SetAsync(CacheKey, snapshot, token: ct);
+        return ToView(snapshot);
     }
 
     public async Task<HumanVerificationConfigurationView> ReplaceSecretAsync(
@@ -58,93 +66,108 @@ public sealed class HumanVerificationConfigurationStore(
             settings.HumanVerificationTurnstileSecretCiphertext = ciphertext;
         settings.UpdatedAt = now;
         await db.SaveChangesAsync(ct);
-        return ToView(settings);
+        var snapshot = HumanVerificationConfigurationSnapshot.From(settings);
+        if (cache is not null)
+            await cache.SetAsync(CacheKey, snapshot, token: ct);
+        return ToView(snapshot);
     }
 
     public async Task<HumanVerificationRuntimeConfiguration> GetRuntimeConfigurationAsync(
         CancellationToken ct)
     {
-        var settings = await LoadAsync(ct);
-        if (settings.HumanVerificationProvider is null)
+        var settings = await GetSnapshotAsync(ct);
+        if (settings.Provider is null)
         {
             var fallback = deploymentOptions.Value;
             return new(
-                settings.HumanVerificationEnabled
+                settings.Enabled
                     && fallback.Provider != HumanVerificationProvider.None,
                 fallback,
-                settings.HumanVerificationRuntimeEnabled,
-                settings.HumanVerificationEvaluationEnabled);
+                settings.RuntimeEnabled,
+                settings.EvaluationEnabled);
         }
 
         var options = new HumanVerificationOptions
         {
-            Provider = settings.HumanVerificationProvider.Value,
+            Provider = settings.Provider.Value,
             Cap = new()
             {
-                ServerUrl = settings.HumanVerificationCapServerUrl,
-                SiteKey = settings.HumanVerificationCapSiteKey,
-                Secret = settings.HumanVerificationCapSecretCiphertext is { Length: > 0 }
+                ServerUrl = settings.CapServerUrl,
+                SiteKey = settings.CapSiteKey,
+                Secret = settings.CapSecretCiphertext is { Length: > 0 }
                     ? secrets.Unprotect(
-                        settings.HumanVerificationCapSecretCiphertext,
+                        settings.CapSecretCiphertext,
                         PlatformSecretPurpose.HumanVerificationCapSecret)
                     : string.Empty
             },
             Turnstile = new()
             {
-                SiteKey = settings.HumanVerificationTurnstileSiteKey,
-                Secret = settings.HumanVerificationTurnstileSecretCiphertext is { Length: > 0 }
+                SiteKey = settings.TurnstileSiteKey,
+                Secret = settings.TurnstileSecretCiphertext is { Length: > 0 }
                     ? secrets.Unprotect(
-                        settings.HumanVerificationTurnstileSecretCiphertext,
+                        settings.TurnstileSecretCiphertext,
                         PlatformSecretPurpose.HumanVerificationTurnstileSecret)
                     : string.Empty,
                 AllowedHostnames =
-                    settings.HumanVerificationTurnstileAllowedHostnames.ToArray()
+                    settings.TurnstileAllowedHostnames.ToArray()
             }
         };
         return new(
-            settings.HumanVerificationEnabled
+            settings.Enabled
                 && options.Provider != HumanVerificationProvider.None,
             options,
-            settings.HumanVerificationRuntimeEnabled,
-            settings.HumanVerificationEvaluationEnabled);
+            settings.RuntimeEnabled,
+            settings.EvaluationEnabled);
     }
 
-    private Task<PlatformSettings> LoadAsync(CancellationToken ct) =>
-        db.PlatformSettings.AsNoTracking().SingleAsync(
-            candidate => candidate.Id == SettingsId,
-            ct);
+    private Task<HumanVerificationConfigurationSnapshot> GetSnapshotAsync(
+        CancellationToken ct) =>
+        cache is null
+            ? LoadAsync(ct)
+            : cache.GetOrSetAsync<HumanVerificationConfigurationSnapshot>(
+                CacheKey,
+                (_, token) => LoadAsync(token),
+                token: ct).AsTask();
 
-    private HumanVerificationConfigurationView ToView(PlatformSettings settings)
+    private async Task<HumanVerificationConfigurationSnapshot> LoadAsync(
+        CancellationToken ct) =>
+        HumanVerificationConfigurationSnapshot.From(
+            await db.PlatformSettings.AsNoTracking().SingleAsync(
+                candidate => candidate.Id == SettingsId,
+                ct));
+
+    private HumanVerificationConfigurationView ToView(
+        HumanVerificationConfigurationSnapshot settings)
     {
         var fallback = deploymentOptions.Value;
-        var useDeployment = settings.HumanVerificationProvider is null;
-        var provider = settings.HumanVerificationProvider ?? fallback.Provider;
+        var useDeployment = settings.Provider is null;
+        var provider = settings.Provider ?? fallback.Provider;
         return new(
-            settings.HumanVerificationEnabled
+            settings.Enabled
                 && provider != HumanVerificationProvider.None,
             provider,
             false,
             useDeployment
                 ? fallback.Cap.ServerUrl
-                : settings.HumanVerificationCapServerUrl,
+                : settings.CapServerUrl,
             useDeployment
                 ? fallback.Cap.SiteKey
-                : settings.HumanVerificationCapSiteKey,
+                : settings.CapSiteKey,
             useDeployment
                 ? !string.IsNullOrWhiteSpace(fallback.Cap.Secret)
-                : settings.HumanVerificationCapSecretCiphertext is { Length: > 0 },
+                : settings.CapSecretCiphertext is { Length: > 0 },
             useDeployment
                 ? fallback.Turnstile.SiteKey
-                : settings.HumanVerificationTurnstileSiteKey,
+                : settings.TurnstileSiteKey,
             useDeployment
                 ? !string.IsNullOrWhiteSpace(fallback.Turnstile.Secret)
-                : settings.HumanVerificationTurnstileSecretCiphertext is { Length: > 0 },
+                : settings.TurnstileSecretCiphertext is { Length: > 0 },
             useDeployment
                 ? fallback.Turnstile.AllowedHostnames.ToArray()
-                : settings.HumanVerificationTurnstileAllowedHostnames.ToArray(),
+                : settings.TurnstileAllowedHostnames.ToArray(),
             settings.UpdatedAt,
-            settings.HumanVerificationRuntimeEnabled,
-            settings.HumanVerificationEvaluationEnabled);
+            settings.RuntimeEnabled,
+            settings.EvaluationEnabled);
     }
 
     private void SeedDeploymentSecrets(PlatformSettings settings)
@@ -177,4 +200,32 @@ public sealed class HumanVerificationConfigurationStore(
                 PlatformSecretPurpose.HumanVerificationTurnstileSecret,
             _ => throw new ArgumentOutOfRangeException(nameof(provider), provider, null)
         };
+}
+
+internal sealed record HumanVerificationConfigurationSnapshot(
+    bool Enabled,
+    bool RuntimeEnabled,
+    bool EvaluationEnabled,
+    HumanVerificationProvider? Provider,
+    string CapServerUrl,
+    string CapSiteKey,
+    byte[]? CapSecretCiphertext,
+    string TurnstileSiteKey,
+    byte[]? TurnstileSecretCiphertext,
+    string[] TurnstileAllowedHostnames,
+    DateTimeOffset UpdatedAt)
+{
+    public static HumanVerificationConfigurationSnapshot From(
+        PlatformSettings settings) => new(
+        settings.HumanVerificationEnabled,
+        settings.HumanVerificationRuntimeEnabled,
+        settings.HumanVerificationEvaluationEnabled,
+        settings.HumanVerificationProvider,
+        settings.HumanVerificationCapServerUrl,
+        settings.HumanVerificationCapSiteKey,
+        settings.HumanVerificationCapSecretCiphertext,
+        settings.HumanVerificationTurnstileSiteKey,
+        settings.HumanVerificationTurnstileSecretCiphertext,
+        settings.HumanVerificationTurnstileAllowedHostnames.ToArray(),
+        settings.UpdatedAt);
 }

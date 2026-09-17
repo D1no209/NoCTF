@@ -341,6 +341,12 @@ describe('isolated Mock API', () => {
     expect(snapshot.status).toBe(1)
     expect(snapshot.prometheusAvailable).toBe(true)
     expect(snapshot.natsAvailable).toBe(true)
+    expect(snapshot.humanVerification).toEqual(expect.objectContaining({
+      provider: 1,
+      enabled: true,
+      state: 2,
+      latencyMilliseconds: 42,
+    }))
     expect(snapshot.metrics).toHaveLength(30)
     expect(snapshot.metrics.find((metric: { kind: number }) => metric.kind === 27)?.value).toBe(73.8)
     expect(snapshot.metrics.find((metric: { kind: number }) => metric.kind === 28)?.value).toBe(342)

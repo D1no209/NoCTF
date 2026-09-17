@@ -28,6 +28,9 @@ const {
   healthyMetricCount,
   metricCount,
   formatCapturedAt,
+  verificationProviderLabel,
+  verificationStateLabel,
+  verificationStatusKey,
   refreshMonitoring,
   LATENCY_LABELS,
   RESOURCE_LABELS,
@@ -121,6 +124,28 @@ const {
                     <span data-slot="monitoring-status-dot" :data-monitoring-status="snapshot.natsAvailable ? 'healthy' : 'critical'" />
                     {{ $t(snapshot.natsAvailable ? 'ui.available' : 'ui.unavailable2') }}
                   </span>
+                </div>
+                <div
+                  v-if="snapshot.humanVerification"
+                  class="grid gap-1 rounded-xl bg-muted/35 px-3 py-2 text-sm"
+                  :data-monitoring-status="verificationStatusKey(snapshot.humanVerification.state, snapshot.humanVerification.enabled)"
+                >
+                  <div class="flex items-center justify-between gap-3">
+                    <span class="text-muted-foreground">{{ $t('ui.humanVerification') }} · {{ verificationProviderLabel(snapshot.humanVerification.provider) }}</span>
+                    <span class="flex items-center gap-2 font-medium">
+                      <span data-slot="monitoring-status-dot" :data-monitoring-status="verificationStatusKey(snapshot.humanVerification.state, snapshot.humanVerification.enabled)" />
+                      {{ verificationStateLabel(snapshot.humanVerification.state) }}
+                    </span>
+                  </div>
+                  <div class="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 text-[0.68rem] text-muted-foreground">
+                    <span>{{ $t(snapshot.humanVerification.enabled ? 'ui.enabled2' : 'ui.disabled') }}</span>
+                    <span v-if="snapshot.humanVerification.checkedAt" class="font-mono tabular-nums">
+                      {{ formatCapturedAt(snapshot.humanVerification.checkedAt) }}
+                      <template v-if="snapshot.humanVerification.latencyMilliseconds != null">
+                        · {{ snapshot.humanVerification.latencyMilliseconds }} {{ $t('ui.millisecondsShort') }}
+                      </template>
+                    </span>
+                  </div>
                 </div>
               </div>
             </div>

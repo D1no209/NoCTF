@@ -2,7 +2,7 @@
 
 import { Activity, ExternalLink as ExternalLinkIcon, RefreshCw } from '@lucide/vue'
 import { adminPlatformGetMonitoring } from '../../../../api'
-import type { NoCtfapiEndpointsAdministrationPlatformPlatformMonitoringMetricResponse, NoCtfapiEndpointsAdministrationPlatformPlatformMonitoringResponse, NoCtfApplicationAdministrationMonitoringPlatformMonitoringStatus, NoCtfApplicationAdministrationMonitoringPlatformMonitoringUnit } from '../../../../api'
+import type { NoCtfapiEndpointsAdministrationPlatformPlatformMonitoringMetricResponse, NoCtfapiEndpointsAdministrationPlatformPlatformMonitoringResponse, NoCtfApplicationAdministrationMonitoringPlatformMonitoringStatus, NoCtfApplicationAdministrationMonitoringPlatformMonitoringUnit, NoCtfApplicationAdmissionHumanVerificationMonitoringState, NoCtfDomainPlatformHumanVerificationProvider } from '../../../../api'
 
 type MonitoringSnapshot = NoCtfapiEndpointsAdministrationPlatformPlatformMonitoringResponse
 
@@ -11,6 +11,10 @@ type MonitoringMetric = NoCtfapiEndpointsAdministrationPlatformPlatformMonitorin
 type MonitoringStatus = NoCtfApplicationAdministrationMonitoringPlatformMonitoringStatus
 
 type MonitoringUnit = NoCtfApplicationAdministrationMonitoringPlatformMonitoringUnit
+
+type VerificationState = NoCtfApplicationAdmissionHumanVerificationMonitoringState
+
+type VerificationProvider = NoCtfDomainPlatformHumanVerificationProvider
 
 /** Owns state, effects and commands for AdminPlatformMonitoringPage. */
 export function useAdminPlatformMonitoringPage() {
@@ -23,6 +27,20 @@ export function useAdminPlatformMonitoringPage() {
     insufficientSamples: 5,
     observing: 6,
   } as const satisfies Record<string, MonitoringStatus>
+
+  const VERIFICATION_STATE = {
+    notApplicable: 0,
+    pending: 1,
+    healthy: 2,
+    misconfigured: 3,
+    unavailable: 4,
+  } as const satisfies Record<string, VerificationState>
+
+  const VERIFICATION_PROVIDER = {
+    none: 0,
+    cap: 1,
+    turnstile: 2,
+  } as const satisfies Record<string, VerificationProvider>
 
   const METRIC = {
     apiRequestsPerSecond: 0,
@@ -225,6 +243,27 @@ export function useAdminPlatformMonitoringPage() {
     return new Date(value).toLocaleString(localeTag(), { hour12: false })
   }
 
+  function verificationProviderLabel(provider: VerificationProvider | undefined): string {
+    if (provider === VERIFICATION_PROVIDER.cap) return translate('ui.capProvider')
+    if (provider === VERIFICATION_PROVIDER.turnstile) return translate('ui.turnstileProvider')
+    return translate('ui.none2')
+  }
+
+  function verificationStateLabel(state: VerificationState | undefined): string {
+    if (state === VERIFICATION_STATE.healthy) return translate('ui.healthy')
+    if (state === VERIFICATION_STATE.pending) return translate('ui.pending')
+    if (state === VERIFICATION_STATE.misconfigured) return translate('ui.misconfigured')
+    if (state === VERIFICATION_STATE.unavailable) return translate('ui.unavailable2')
+    return translate('ui.notApplicable')
+  }
+
+  function verificationStatusKey(state: VerificationState | undefined, enabled: boolean | undefined): string {
+    if (state === VERIFICATION_STATE.healthy) return 'healthy'
+    if (state === VERIFICATION_STATE.misconfigured || state === VERIFICATION_STATE.unavailable)
+      return enabled ? 'critical' : 'warning'
+    return 'neutral'
+  }
+
   function metricVisualPercent(metric: MonitoringMetric | undefined): number {
     if (metric?.value == null || !Number.isFinite(metric.value)) return 0
     if (metric.kind === METRIC.natsAvailability)
@@ -355,6 +394,9 @@ export function useAdminPlatformMonitoringPage() {
       healthyMetricCount,
       metricCount,
       formatCapturedAt,
+      verificationProviderLabel,
+      verificationStateLabel,
+      verificationStatusKey,
       refreshMonitoring,
       LATENCY_LABELS,
       RESOURCE_LABELS

@@ -21,6 +21,11 @@ public static class NoCtfTelemetry
         "noctf.api.rate_limit.rejections", unit: "{request}");
     private static readonly Counter<long> HumanVerifications = Meter.CreateCounter<long>(
         "noctf.api.human_verification", unit: "{verification}");
+    private static readonly Counter<long> HumanVerificationProbes = Meter.CreateCounter<long>(
+        "noctf.human_verification.probe", unit: "{probe}");
+    private static readonly Histogram<double> HumanVerificationProbeDuration =
+        Meter.CreateHistogram<double>(
+            "noctf.human_verification.probe.duration", unit: "s");
     private static readonly UpDownCounter<long> SignalRConnections = Meter.CreateUpDownCounter<long>(
         "noctf.signalr.connections", unit: "{connection}");
     private static readonly Histogram<double> SignalRPublishDuration = Meter.CreateHistogram<double>(
@@ -129,6 +134,20 @@ public static class NoCtfTelemetry
             { "action", action.ToLowerInvariant() },
             { "outcome", outcome.ToLowerInvariant() }
         });
+
+    public static void RecordHumanVerificationProbe(
+        string provider,
+        string outcome,
+        double elapsedSeconds)
+    {
+        var tags = new TagList
+        {
+            { "provider", provider.ToLowerInvariant() },
+            { "outcome", outcome.ToLowerInvariant() }
+        };
+        HumanVerificationProbes.Add(1, tags);
+        HumanVerificationProbeDuration.Record(Math.Max(0, elapsedSeconds), tags);
+    }
 
     public static void SignalRConnected(string endpoint) =>
         SignalRConnections.Add(1, new TagList { { "endpoint", endpoint } });

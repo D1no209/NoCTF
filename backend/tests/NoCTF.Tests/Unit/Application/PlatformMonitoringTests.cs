@@ -1,5 +1,7 @@
 using System.Text.Json;
 using NoCTF.Application.Administration.Monitoring;
+using NoCTF.Application.Admission;
+using NoCTF.Domain.Platform;
 
 namespace NoCTF.Tests.Unit.Application;
 
@@ -164,6 +166,44 @@ public sealed class PlatformMonitoringTests
     }
 
     [Test]
+    public async Task Enabled_unavailable_cap_is_critical_even_without_prometheus()
+    {
+        var measurements = Measurements() with { PrometheusAvailable = false };
+        var verification = new HumanVerificationMonitoringSnapshot(
+            HumanVerificationProvider.Cap,
+            true,
+            HumanVerificationMonitoringState.Unavailable,
+            DateTimeOffset.UtcNow,
+            3000);
+
+        var result = await new ObservePlatformMonitoring(
+            new StubReader(measurements),
+            PlatformMonitoringThresholds.Default,
+            new VerificationReader(verification)).ExecuteAsync();
+
+        await Assert.That(result.Status).IsEqualTo(PlatformMonitoringStatus.Critical);
+        await Assert.That(result.HumanVerification).IsEqualTo(verification);
+    }
+
+    [Test]
+    public async Task Disabled_unavailable_cap_does_not_change_overall_health()
+    {
+        var verification = new HumanVerificationMonitoringSnapshot(
+            HumanVerificationProvider.Cap,
+            false,
+            HumanVerificationMonitoringState.Unavailable,
+            DateTimeOffset.UtcNow,
+            3000);
+
+        var result = await new ObservePlatformMonitoring(
+            new StubReader(Measurements()),
+            PlatformMonitoringThresholds.Default,
+            new VerificationReader(verification)).ExecuteAsync();
+
+        await Assert.That(result.Status).IsEqualTo(PlatformMonitoringStatus.Healthy);
+    }
+
+    [Test]
     public async Task IdleLatency_IsNoSamplesWithoutDegradingOverallStatus()
     {
         var measurements = Measurements() with
@@ -285,5 +325,13 @@ public sealed class PlatformMonitoringTests
     {
         public Task<PlatformMonitoringMeasurements> ReadAsync(
             CancellationToken cancellationToken) => Task.FromResult(measurements);
+    }
+
+    private sealed class VerificationReader(
+        HumanVerificationMonitoringSnapshot snapshot)
+        : IHumanVerificationMonitoringReader
+    {
+        public Task<HumanVerificationMonitoringSnapshot> ReadAsync(
+            CancellationToken cancellationToken) => Task.FromResult(snapshot);
     }
 }

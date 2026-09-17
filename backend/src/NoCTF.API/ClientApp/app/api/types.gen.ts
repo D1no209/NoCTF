@@ -1673,6 +1673,7 @@ export type NoCtfapiEndpointsAdministrationPlatformPlatformMonitoringResponse = 
     latencyDetails?: Array<NoCtfApplicationAdministrationMonitoringPlatformMonitoringLatencyView>;
     poolResources?: Array<NoCtfApplicationAdministrationMonitoringPlatformMonitoringPoolResource>;
     latencySustainedWindowMinutes?: number;
+    humanVerification?: NoCtfapiEndpointsAdministrationPlatformHumanVerificationMonitoringResponse;
 };
 
 export type NoCtfApplicationAdministrationMonitoringPlatformMonitoringStatus = 0 | 1 | 2 | 3 | 4 | 5 | 6;
@@ -1716,6 +1717,18 @@ export type NoCtfApplicationAdministrationMonitoringPlatformMonitoringPoolResour
 };
 
 export type NoCtfApplicationAdministrationMonitoringPlatformMonitoringResource = 0 | 1 | 2;
+
+export type NoCtfapiEndpointsAdministrationPlatformHumanVerificationMonitoringResponse = {
+    provider?: NoCtfDomainPlatformHumanVerificationProvider;
+    enabled?: boolean;
+    state?: NoCtfApplicationAdmissionHumanVerificationMonitoringState;
+    checkedAt?: string | null;
+    latencyMilliseconds?: number | null;
+};
+
+export type NoCtfDomainPlatformHumanVerificationProvider = 0 | 1 | 2;
+
+export type NoCtfApplicationAdmissionHumanVerificationMonitoringState = 0 | 1 | 2 | 3 | 4;
 
 export type NoCtfapiEndpointsAdministrationPlatformPlatformUserDetailResponse = {
     user?: NoCtfapiEndpointsAdministrationPlatformPlatformUserResponse;

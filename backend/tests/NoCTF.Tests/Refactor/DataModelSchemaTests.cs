@@ -85,10 +85,12 @@ public sealed class DataModelSchemaTests
                 "20260911164825_AddManagedHumanVerificationProviders",
                 "20260911213004_AddCompetitionTracksEnabled",
                 "20260912074543_AddRuntimeHumanVerificationToggle",
-                "20260912130511_AddCompetitionAccessMode",
-                "20260912150416_AddTeamWriteUps",
-                "20260912182604_ConfigureTeamWriteUpSubmission"
-            ]);
+            "20260912130511_AddCompetitionAccessMode",
+            "20260912150416_AddTeamWriteUps",
+            "20260912182604_ConfigureTeamWriteUpSubmission",
+            "20260913172544_AddHumanVerificationEvaluationToggle",
+            "20260914154253_AddCtfPatchVerificationExperiment"
+        ]);
             await Assert.That(migrations[0]).EndsWith("_InitialBaseline");
 
             await using var accessModeColumnCommand = new NpgsqlCommand(

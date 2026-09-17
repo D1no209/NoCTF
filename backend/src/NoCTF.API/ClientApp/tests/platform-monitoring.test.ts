@@ -45,9 +45,12 @@ describe('platform monitoring', () => {
     expect(page).toContain('METRIC.flagPlatformErrorPercent')
     expect(page).toContain('snapshot.prometheusAvailable')
     expect(page).toContain('snapshot.natsAvailable')
+    expect(page).toContain('snapshot.humanVerification')
+    expect(page).toContain('verificationStatusKey')
     expect(page).toContain('STATUS.noSamples')
     expect(types).toContain('prometheusAvailable?: boolean')
     expect(types).toContain('natsAvailable?: boolean')
+    expect(types).toContain('humanVerification?: NoCtfapiEndpointsAdministrationPlatformHumanVerificationMonitoringResponse')
   })
 
   test('renders current snapshot data as dense status, latency, and quota visualizations', async () => {
