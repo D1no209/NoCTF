@@ -35,6 +35,8 @@ describe('competition deletion actions', () => {
     expect(detailPage).toContain("ui.theCompetitionAndItsScopedDataWerePermanentlyDeletedThe")
     expect(detailPage).toContain("reference.code === 'HistoricalEvent'")
     expect(detailPage).toContain("ui.impactCheckPassedThisCompetitionHasNoPermanentHistoryOr")
+    expect(detailPage).toContain('data-slot="hard-delete-impact"')
+    expect(detailPage).not.toContain('<Alert v-else-if="canManagePermissions && hardDeletePreview')
     expect(detailPage).toContain("await navigateTo('/competitions')")
     expect(listPage).toContain('adminListCompetitions({ query: { includeDeleted: true } })')
     expect(sidebar).toContain("<Badge v-if=\"item.competition.deletedAt\" variant=\"destructive\">{{ $t('ui.deleted') }}</Badge>")
