@@ -8,12 +8,12 @@ import { reactiveOmit } from '@vueuse/core'
 import {
   DialogClose,
   DialogContent as RekaDialogContent,
-  DialogOverlay,
   DialogPortal,
   useForwardPropsEmits,
 } from 'reka-ui'
 import { cn } from '~/lib/utils'
 import { Card } from '~/components/ui/card'
+import DialogOverlay from '~/components/ui/dialog/DialogOverlay.vue'
 
 defineOptions({
   inheritAttrs: false,
