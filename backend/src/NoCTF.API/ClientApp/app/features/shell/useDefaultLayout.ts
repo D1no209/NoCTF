@@ -1,14 +1,11 @@
-import { h, markRaw, shallowReactive } from 'vue'
-import { toast } from 'vue-sonner'
+import { markRaw } from 'vue'
 
 import { Bell, Database, Flag, ShieldAlert } from '@lucide/vue'
 import AccountPanelComponent from '../account/AccountPanel.vue'
 import LanguageToggleComponent from '../LanguageToggle.vue'
 import ThemeToggleComponent from '../ThemeToggle.vue'
 import ThemePalettePanelComponent from '../theme/ThemePalettePanel.vue'
-import NoticeToastComponent from '../../components/ui/sonner/NoticeToast.vue'
-import type { NoticePayload } from '../../components/ui/sonner/notice-state'
-import NotificationNoticeContentComponent from '../../components/views/layout/NotificationNoticeContent.vue'
+import { showNotificationNotice } from '../notifications/showNotificationNotice'
 
 /** Owns state, effects and commands for DefaultLayout. */
 export function useDefaultLayout() {
@@ -48,31 +45,6 @@ export function useDefaultLayout() {
   let notificationTimer: ReturnType<typeof setInterval> | undefined
   let notificationBaselineReady = false
   let lastNotificationId: string | null = null
-
-  function showNotificationNotice(notification: NonNullable<Awaited<ReturnType<typeof refreshUnread>>>): void {
-    if (!notification.id) return
-    const id = `notification-${notification.id}`
-    const payload = shallowReactive<NoticePayload>({
-      id,
-      destructive: false,
-      content: () => [h(NotificationNoticeContentComponent, {
-        title: notificationTitle(notification),
-        body: notificationBody(notification),
-        href: notificationTargetPath(notification),
-        actionLabel: notificationActionLabel(notification),
-      })],
-    })
-    const release = () => { payload.content = undefined }
-    toast.custom(markRaw(NoticeToastComponent), {
-      id,
-      duration: 8000,
-      position: 'top-right',
-      class: 'noctf-notice-info',
-      componentProps: { payload },
-      onDismiss: release,
-      onAutoClose: release,
-    })
-  }
 
   async function refreshNotifications(showNotice: boolean): Promise<void> {
     const latest = await refreshUnread()
