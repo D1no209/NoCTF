@@ -278,7 +278,9 @@ export function useAdminCompetitionsByIdTracksPage() {
             affectsDynamicChallengeScore: track.affectsDynamicChallengeScore,
             visibleOnLeaderboard: track.visibleOnLeaderboard,
             affectsCompetitiveResults: track.affectsCompetitiveResults,
-            invitationCode: track.requiresInvitationCode ? track.invitationCode.trim() : null,
+            invitationCode: track.requiresInvitationCode
+              ? track.invitationCode.trim() || null
+              : null,
             clearInvitationCode: track.clearInvitationCode,
           })),
           removedTrackReassignments: enabled.value ? removedTrackReassignments.value : [],

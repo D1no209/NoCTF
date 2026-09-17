@@ -115,6 +115,7 @@ describe('competition track pages', () => {
     expect(admin).toContain('<Switch')
     expect(admin).not.toContain(':key="`${track.key}-${index}`"')
     expect(admin).toContain("ui.trackRequiresAnInvitationCode")
+    expect(admin).toContain('track.invitationCode.trim() || null')
     expect(admin).toContain('error.value = competitionTrackErrorMessage')
     expect(teams).toContain('patchCompetitionTeam')
     expect(teams).toContain('tracksEnabled')
