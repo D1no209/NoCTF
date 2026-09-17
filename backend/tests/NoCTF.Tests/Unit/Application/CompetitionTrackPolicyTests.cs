@@ -2,6 +2,7 @@ using NoCTF.Application.Competitions.Tracks;
 using NoCTF.Application.Competitions.Lifecycle;
 using NoCTF.Domain.Competitions;
 using NoCTF.GameModes.Registration;
+using NSubstitute;
 
 namespace NoCTF.Tests.Unit.Application;
 
@@ -146,6 +147,58 @@ public sealed class CompetitionTrackPolicyTests
         CompetitionStatus status,
         bool expected) =>
         await Assert.That(CompetitionTrackPolicy.CanUpdate(status)).IsEqualTo(expected);
+
+    [Test]
+    public async Task Blank_invitation_code_preserves_the_existing_code()
+    {
+        var competitionId = Guid.CreateVersion7();
+        var track = Track("default", isDefault: true);
+        var store = Substitute.For<ICompetitionTrackStore>();
+        UpdateCompetitionTracksCommand? receivedCommand = null;
+        store.UpdateAsync(
+                Arg.Any<UpdateCompetitionTracksCommand>(),
+                Arg.Any<CancellationToken>())
+            .Returns(call =>
+            {
+                receivedCommand = call.ArgAt<UpdateCompetitionTracksCommand>(0);
+                return UpdateCompetitionTracksResult.Success(new(
+                    competitionId,
+                    GameMode.Ctf,
+                    CompetitionStatus.Running,
+                    true,
+                    true,
+                    [new(
+                        track.Key,
+                        track.Name,
+                        track.IsDefault,
+                        track.IsPublicSelectable,
+                        track.IsInternal,
+                        track.EarnsScore,
+                        track.EarnsBlood,
+                        track.AffectsDynamicChallengeScore,
+                        track.VisibleOnLeaderboard,
+                        track.AffectsCompetitiveResults,
+                        RequiresInvitationCode: true)]));
+            });
+        var update = new UpdateCompetitionTracks(store);
+
+        var result = await update.ExecuteAsync(new(
+            competitionId,
+            true,
+            [track],
+            [],
+            Guid.CreateVersion7(),
+            DateTimeOffset.UtcNow,
+            [new(track.Key, "  ", ClearInvitationCode: false)]), GameMode.Ctf);
+
+        await Assert.That(result.Succeeded).IsTrue();
+        await store.Received(1).UpdateAsync(
+            Arg.Any<UpdateCompetitionTracksCommand>(),
+            Arg.Any<CancellationToken>());
+        await Assert.That(receivedCommand).IsNotNull();
+        await Assert.That(receivedCommand!.InvitationCodeUpdates).IsNotNull();
+        await Assert.That(receivedCommand.InvitationCodeUpdates![0].InvitationCode).IsNull();
+    }
 
     [Test]
     public async Task Start_gate_rejects_invalid_configuration_and_missing_team_track()

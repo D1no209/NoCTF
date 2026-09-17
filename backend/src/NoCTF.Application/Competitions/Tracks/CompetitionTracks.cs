@@ -203,7 +203,7 @@ public sealed class UpdateCompetitionTracks(ICompetitionTrackStore store)
         var errors = CompetitionTrackPolicy.Validate(mode, command.Tracks);
         foreach (var update in command.InvitationCodeUpdates ?? [])
         {
-            if (update.InvitationCode is not null
+            if (!string.IsNullOrWhiteSpace(update.InvitationCode)
                 && update.InvitationCode.Trim().Length is < 8 or > 128)
             {
                 errors = errors.Append(
