@@ -3,7 +3,7 @@ import { toRefs } from 'vue'
 import type { CompetitionsByIdLeaderboardPageViewState } from '~/features/routes/competitions/[id]/useCompetitionsByIdLeaderboardPage'
 
 const viewProps = defineProps<{ state: CompetitionsByIdLeaderboardPageViewState }>()
-const { ArrowLeft, ChevronLeft, ChevronRight, Download, History, Medal, Trophy, medalBloodRankClass, medalRankClass, scoreboardBloodAward, scoreboardEntryKindLabel, scoreboardEntryOutcomeLabel, scoreboardRankingStateLabel, scoreboardSlot, competitionId, board, allTracksKey, selectedTrackKey, tracksEnabled, availableTracks, selectedAllTracks, trackName, teams, displayRank, visibleTeams, showMoreTeams, displayTeamName, columnGroups, isCtf, trends, trendsLoading, trendsError, visibleTrendSeries, trendRangeStart, trendRangeEnd, trendRevision, loadTrends, roundWindowLabel, roundLabel, slotTitle, ctfScore, exportCsv, detailOpen, teamDetailOpen, teamDetailTeam, teamDetailTrendSeries, detailLoading, detailLoadingMore, detailError, detail, detailEntries, detailTeam, detailColumn, loadDetailPage, openDetail, openTeamDetail, showOlderRoundWindow, showNewerRoundWindow, showLatestRoundWindow, entryActor, adjustmentOpen, adjustmentLoading, adjustmentLoadingMore, adjustmentError, adjustmentDetail, adjustmentEntries, adjustmentTeam, loadAdjustmentPage, openAdjustments, adjustmentActor, adjustmentKind, ScoreboardSlotStatus, LazyScoreTrendChart, LazyScoreboardTeamDetailDialog } = toRefs(viewProps.state)
+const { ArrowLeft, ChevronLeft, ChevronRight, Download, History, Medal, Trophy, medalBloodRankClass, medalRankClass, scoreboardBloodAward, scoreboardEntryKindLabel, scoreboardEntryOutcomeLabel, scoreboardRankingStateLabel, scoreboardSlot, competitionId, board, allTracksKey, selectedTrackKey, tracksEnabled, canViewInternalTracks, showLeaderboardHiddenTeams, availableTracks, selectedAllTracks, trackName, teams, displayRank, visibleTeams, showMoreTeams, displayTeamName, columnGroups, isCtf, trends, trendsLoading, trendsError, visibleTrendSeries, trendRangeStart, trendRangeEnd, trendRevision, loadTrends, roundWindowLabel, roundLabel, slotTitle, ctfScore, exportCsv, detailOpen, teamDetailOpen, teamDetailTeam, teamDetailTrendSeries, detailLoading, detailLoadingMore, detailError, detail, detailEntries, detailTeam, detailColumn, loadDetailPage, openDetail, openTeamDetail, showOlderRoundWindow, showNewerRoundWindow, showLatestRoundWindow, entryActor, adjustmentOpen, adjustmentLoading, adjustmentLoadingMore, adjustmentError, adjustmentDetail, adjustmentEntries, adjustmentTeam, loadAdjustmentPage, openAdjustments, adjustmentActor, adjustmentKind, ScoreboardSlotStatus, LazyScoreTrendChart, LazyScoreboardTeamDetailDialog } = toRefs(viewProps.state)
 </script>
 
 <template>
@@ -38,6 +38,10 @@ const { ArrowLeft, ChevronLeft, ChevronRight, Download, History, Medal, Trophy, 
             <Button v-if="!board.viewingLatestRounds.value" variant="outline" size="sm" :disabled="board.refreshing.value" @click="showLatestRoundWindow">
               <History data-icon="inline-start" />{{ $t('ui.backToLatestRounds') }}
             </Button>
+          </div>
+          <div v-if="canViewInternalTracks && tracksEnabled" class="flex items-center gap-2">
+            <Label :for="`leaderboard-hidden-teams-${competitionId}`" class="cursor-pointer text-sm font-medium">{{ $t('ui.showLeaderboardHiddenTeams') }}</Label>
+            <Switch :id="`leaderboard-hidden-teams-${competitionId}`" v-model="showLeaderboardHiddenTeams" />
           </div>
           <Select v-if="tracksEnabled && availableTracks.length > 1" v-model="selectedTrackKey">
             <SelectTrigger class="min-w-40" :aria-label="$t('ui.selectLeaderboardTrack')"><SelectValue /></SelectTrigger>
