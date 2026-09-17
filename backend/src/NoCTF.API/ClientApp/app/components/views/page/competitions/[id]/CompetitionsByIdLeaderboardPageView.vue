@@ -67,7 +67,7 @@ const { ArrowLeft, ChevronLeft, ChevronRight, Download, History, Medal, Trophy, 
         <CardContent class="pt-6">
           <Empty v-if="!teams.length" class="border py-8"><EmptyHeader><EmptyTitle>{{ $t('ui.noTeamHasScoredYet') }}</EmptyTitle></EmptyHeader></Empty>
           <div v-else class="min-w-0">
-            <Table class="min-w-max table-auto">
+            <Table pin-horizontal-scrollbar class="min-w-max table-auto">
               <TableHeader>
                 <TableRow>
                   <TableHead :rowspan="isCtf ? 1 : 2" data-scoreboard-frozen-corner="top-start" class="sticky left-0 z-30 w-20 min-w-20 max-w-20 bg-card text-center">{{ $t('ui.ranking') }}</TableHead>

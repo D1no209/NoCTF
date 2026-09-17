@@ -1,5 +1,6 @@
 import { sourceFile } from './support/feature-source'
 import { describe, expect, test } from 'bun:test'
+import { horizontalScrollbarPinPosition } from '../app/components/ui/scroll-area/scrollbars'
 
 const page = await sourceFile(
   new URL('../app/pages/competitions/[id]/leaderboard.vue', import.meta.url),
@@ -41,7 +42,7 @@ describe('leaderboard progressive display', () => {
   })
 
   test('keeps identity columns frozen while every matrix column remains readable', () => {
-    expect(page).toContain('<Table class="min-w-max table-auto">')
+    expect(page).toContain('<Table pin-horizontal-scrollbar class="min-w-max table-auto">')
     expect(page).toContain('sticky left-0 z-30 w-20 min-w-20 max-w-20')
     expect(page).toContain('sticky left-20 z-30 w-56 min-w-56 max-w-56')
     expect(page).toContain('sticky left-76 z-30 w-28 min-w-28 max-w-28')
@@ -94,6 +95,35 @@ describe('leaderboard progressive display', () => {
     expect(page).toContain('data-slot="leaderboard-trend-panel"')
     expect(page).not.toContain('md:sticky md:top-24 md:z-20')
     expect(theme).not.toContain(':has(> main [data-contained-workspace-page] > [data-scoreboard-page-scroll])')
+  })
+
+  test('lets vertical wheel input escape the horizontal score matrix', () => {
+    expect(theme).toContain("[data-scroll-surface][data-scroll-axis='x']")
+    expect(theme).toContain('overscroll-behavior-x: contain;')
+    expect(theme).toContain('overscroll-behavior-y: auto;')
+  })
+
+  test('pins the horizontal scrollbar to the visible bottom of a long score matrix', () => {
+    expect(page).toContain('<Table pin-horizontal-scrollbar')
+    expect(horizontalScrollbarPinPosition(
+      { top: 420, right: 1880, bottom: 1600, left: 60 },
+      { top: 290, right: 1900, bottom: 1010, left: 40 },
+      300,
+      0,
+      8,
+    )).toEqual({ top: 1012, left: 20, width: 1820 })
+    expect(horizontalScrollbarPinPosition(
+      { top: 1100, right: 1880, bottom: 1600, left: 60 },
+      { top: 290, right: 1900, bottom: 1010, left: 40 },
+      300,
+      0,
+      8,
+    )).toBeNull()
+  })
+
+  test('keeps score detail dialogs on the opaque theme surface', () => {
+    expect(theme).toContain(".card-surface.card-surface:is([data-slot='dialog-content'], [data-slot='alert-dialog-content'])")
+    expect(theme).toContain('background: var(--popover);')
   })
 
   test('keeps every team visible on hover and assigns series colors from a diverse theme palette', () => {
