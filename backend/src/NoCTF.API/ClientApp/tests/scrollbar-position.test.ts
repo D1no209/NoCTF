@@ -4,8 +4,7 @@ test('owned scrollbar enhancement preserves positioning and disposes its listene
   const source = await Bun.file(new URL('../app/components/ui/scroll-area/scrollbars.ts', import.meta.url)).text()
   const compiled = new Bun.Transpiler({ loader: 'ts' }).transformSync(source)
     .replace(/^import[^\n]*\n/gm, '')
-    .replace('export function createScrollbars', 'function createScrollbars')
-    .replace('export const scrollSurfaceDirective', 'const scrollSurfaceDirective')
+    .replace(/^export /gm, '')
   class Style {
     values = new Map<string, string>()
     priorities = new Map<string, string>()

@@ -340,6 +340,11 @@
 :is([data-slot='select-content'], [data-slot='popover-content'], [data-slot='dropdown-menu-content'], [data-slot='dropdown-menu-sub-content'], [data-slot='dialog-content'], [data-slot='alert-dialog-content'], [data-slot='sheet-content'], [data-sonner-toast]) {
   border: 0; border-radius: var(--control-radius); background: var(--popover); color: var(--popover-foreground); box-shadow: var(--panel-shadow); backdrop-filter: none;
 }
+.card-surface.card-surface:is([data-slot='dialog-content'], [data-slot='alert-dialog-content']) {
+  background: var(--popover);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
 [data-slot='select-item'][data-state='checked'] { background: var(--accent); color: var(--primary); font-weight: 600; }
 :is([data-slot='select-item'], [data-slot='dropdown-menu-item']):is(:focus, [data-highlighted]) { background: var(--control-hover); outline: none; box-shadow: 0 0 12px color-mix(in oklch, var(--ring) 22%, transparent); }
 [data-slot='select-item'] { min-height: 32px; border-radius: var(--control-radius); }
@@ -400,6 +405,7 @@
 }
 .os-theme-noctf .os-scrollbar-handle { min-height: 24px; }
 .os-theme-noctf.os-scrollbar-horizontal .os-scrollbar-handle { min-height: 0; min-width: 24px; }
+.os-theme-noctf.os-scrollbar-pinned-horizontal { z-index: 40; }
 @media (pointer: coarse) {
   :is([data-slot='button'], [data-slot='input'], [data-slot='select-trigger'], [data-slot='select-item']) { min-height: 44px; }
   .os-theme-noctf { --os-size: 12px; }
@@ -785,7 +791,17 @@ body:has([data-modal-scroll-lock]) {
   content: '>'; position: absolute; inset-inline-start: 0; top: 5px;
   color: var(--primary); font: 700 1.125rem/1.75rem var(--font-mono);
 }
-[data-slot='default-layout-foreground']:has(> main [data-contained-workspace-page]) [data-scroll-surface] { overscroll-behavior: contain; }
+[data-slot='default-layout-foreground']:has(> main [data-contained-workspace-page]) [data-scroll-surface][data-scroll-axis='y'] {
+  overscroll-behavior-x: auto;
+  overscroll-behavior-y: contain;
+}
+[data-slot='default-layout-foreground']:has(> main [data-contained-workspace-page]) [data-scroll-surface][data-scroll-axis='x'] {
+  overscroll-behavior-x: contain;
+  overscroll-behavior-y: auto;
+}
+[data-slot='default-layout-foreground']:has(> main [data-contained-workspace-page]) [data-scroll-surface][data-scroll-axis='both'] {
+  overscroll-behavior: contain;
+}
 @media (max-width: 1023px) {
   [data-slot='default-layout-foreground']:has(> main [data-contained-workspace-page] .challenge-workspace),
   [data-slot='default-layout-foreground'] > main:has([data-contained-workspace-page] .challenge-workspace),
