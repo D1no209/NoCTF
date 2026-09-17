@@ -11,6 +11,7 @@ test('locale changes animate intrinsic control widths within half a second', asy
   expect(layout).toContain('maximumLocaleLayoutCandidates = 256')
   expect(layout).toContain('isVisibleInViewport')
   expect(layout).toContain("[data-slot='button']")
+  expect(layout).toContain(':not([data-top-nav-item])')
   expect(layout).toContain("[data-slot='badge']")
   expect(layout).toContain("[data-slot='tabs-trigger']")
   expect(layout).toContain("matchMedia('(prefers-reduced-motion: reduce)')")
