@@ -4,18 +4,20 @@ import { sourceFile } from './support/feature-source'
 
 describe('locale feature catalogs', () => {
   test('loads only the feature domains required by public routes', () => {
-    expect(localeDomainsForPath('/')).toEqual([])
-    expect(localeDomainsForPath('/competitions')).toEqual(['competitions'])
+    expect(localeDomainsForPath('/')).toEqual(['account'])
+    expect(localeDomainsForPath('/competitions')).toEqual(['account', 'competitions'])
     expect(localeDomainsForPath('/competitions/c1/challenges/c2')).toEqual([
+      'account',
       'competitions',
       'challenges',
       'runtime',
     ])
     expect(localeDomainsForPath('/competitions/c1/leaderboard')).toEqual([
+      'account',
       'competitions',
       'leaderboard',
     ])
-    expect(localeDomainsForPath('/notifications')).toEqual(['notifications'])
+    expect(localeDomainsForPath('/notifications')).toEqual(['account', 'notifications'])
   })
 
   test('keeps complete catalogs out of the runtime i18n entry', async () => {
