@@ -37,7 +37,7 @@ const forwarded = useForwardPropsEmits(delegatedProps, emits)
       :as="RekaDialogContent"
       slot-name="dialog-content"
       data-modal-scroll-lock
-      data-scroll-surface data-scroll-axis="y"
+      v-scroll-surface data-scroll-surface data-scroll-axis="y"
       @interact-outside="keepNoticeInteractive"
       v-bind="{ ...$attrs, ...forwarded }"
       :class="cn('text-card-foreground data-open:animate-in data-closed:animate-out data-closed:fade-out-0 data-open:fade-in-0 data-closed:zoom-out-95 data-open:zoom-in-95 grid max-w-[calc(100%-2rem)] gap-4 p-4 duration-100 sm:max-w-sm fixed top-1/2 left-1/2 z-50 w-full -translate-x-1/2 -translate-y-1/2 outline-none', props.class)"

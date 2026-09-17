@@ -31,7 +31,7 @@ const forwarded = useForwardPropsEmits(delegatedProps, emits)
 <template>
   <PopoverPortal>
     <PopoverContent
-      data-scroll-surface data-scroll-axis="y"
+      v-scroll-surface data-scroll-surface data-scroll-axis="y"
       data-slot="popover-content"
       v-bind="{ ...$attrs, ...forwarded }"
       :class="
