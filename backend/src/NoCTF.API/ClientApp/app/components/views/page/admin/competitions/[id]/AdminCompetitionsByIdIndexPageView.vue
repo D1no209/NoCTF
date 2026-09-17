@@ -21,6 +21,8 @@ const { startGateErrorMessage, competitionId, competition, canWrite, canManagePe
           :alt="$t('ui.competitionPoster')"
           :fallback="$t('competitionBrowser.noPoster')"
           :aspect-ratio="16 / 9"
+          loading="eager"
+          fetchpriority="high"
           class="min-w-0 rounded-xl"
         />
         <div class="flex min-w-0 flex-col gap-4">

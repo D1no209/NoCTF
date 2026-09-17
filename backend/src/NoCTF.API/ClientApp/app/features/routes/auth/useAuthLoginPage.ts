@@ -1,13 +1,13 @@
 import { toast } from 'vue-sonner'
-import loginCharacter from '~/assets/images/auth/login-character.png'
-import registerCharacter from '~/assets/images/auth/register-character.png'
 import { useHumanVerification } from '~/features/security/useHumanVerification'
+import { useAuthThemeArtwork } from './useAuthThemeArtwork'
 
 /** Owns the standalone login page workflow. */
 export function useAuthLoginPage() {
   const route = useRoute()
   const { login } = useAuth()
   const { request: requestHumanVerification } = useHumanVerification()
+  const { authArtwork } = useAuthThemeArtwork()
   const { configuration } = usePlatform()
   const loginName = ref('')
   const password = ref('')
@@ -42,8 +42,7 @@ export function useAuthLoginPage() {
   }
 
   return {
-    loginCharacter,
-    registerCharacter,
+    authArtwork,
     configuration,
     loginName,
     password,

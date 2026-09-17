@@ -21,7 +21,7 @@ const { Bell, ShieldAlert, isHome, wallpaperActive, wallpaperStyle, isLoggedIn, 
       <div data-slot="topbar-frame" class="mx-auto grid h-20 w-full max-w-[96rem] grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 px-4 md:px-6">
         <div data-slot="topbar-capsule" data-position="left">
           <NuxtLink to="/" class="flex min-w-0 items-center gap-2.5 font-mono text-base font-semibold tracking-tight" :aria-label="configuration?.name ?? $t('ui.noctf')">
-            <img v-if="configuration?.logoUrl" :src="configuration.logoUrl" :alt="configuration.name ?? $t('ui.noctf')" class="size-8 shrink-0 rounded-full object-contain">
+            <img v-if="configuration?.logoUrl" :src="configuration.logoUrl" :alt="configuration.name ?? $t('ui.noctf')" loading="eager" fetchpriority="high" decoding="async" class="size-8 shrink-0 rounded-full object-contain">
             <span v-else class="text-primary">&gt;</span>
             <span data-slot="topbar-brand-name" class="hidden max-w-48 truncate sm:inline">{{ configuration?.name ?? $t('ui.noctf') }}</span>
             <span v-if="!configuration?.logoUrl" class="animate-blink text-primary">_</span>
