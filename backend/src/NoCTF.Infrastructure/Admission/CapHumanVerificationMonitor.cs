@@ -132,7 +132,8 @@ public sealed class CapHumanVerificationMonitor(
         }
 
         var client = clientFactory.CreateClient(ClientName);
-        var capApi = configuration.CapApiEndpoint();
+        var capApi = configuration.CapBackendApiEndpoint();
+        var capRoot = configuration.CapBackendServerRoot();
         var challengeUri = new Uri(capApi, "challenge");
         using (var request = new HttpRequestMessage(HttpMethod.Options, challengeUri))
         {
@@ -153,9 +154,6 @@ public sealed class CapHumanVerificationMonitor(
             }
         }
 
-        var capRoot = new Uri(
-            configuration.Cap.ServerUrl.TrimEnd('/') + "/",
-            UriKind.Absolute);
         using (var request = new HttpRequestMessage(
                    HttpMethod.Get,
                    new Uri(capRoot, "assets/cap_wasm_bg.wasm")))

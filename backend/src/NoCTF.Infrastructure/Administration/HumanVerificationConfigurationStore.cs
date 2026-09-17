@@ -93,6 +93,7 @@ public sealed class HumanVerificationConfigurationStore(
             Cap = new()
             {
                 ServerUrl = settings.CapServerUrl,
+                BackendServerUrl = deploymentOptions.Value.Cap.BackendServerUrl,
                 SiteKey = settings.CapSiteKey,
                 Secret = settings.CapSecretCiphertext is { Length: > 0 }
                     ? secrets.Unprotect(

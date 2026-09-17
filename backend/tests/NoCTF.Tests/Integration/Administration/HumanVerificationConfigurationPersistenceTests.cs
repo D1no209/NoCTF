@@ -59,6 +59,7 @@ public sealed class HumanVerificationConfigurationPersistenceTests
                     Cap = new()
                     {
                         ServerUrl = "https://deployment-cap.example.test",
+                        BackendServerUrl = "http://noctf-cap:3000",
                         SiteKey = "deployment-site-key",
                         Secret = "deployment-secret"
                     }
@@ -126,6 +127,8 @@ public sealed class HumanVerificationConfigurationPersistenceTests
             await Assert.That(runtime.Options.Cap.Secret).IsEqualTo("cap-secret");
             await Assert.That(runtime.Options.CapApiEndpoint().AbsoluteUri)
                 .IsEqualTo("https://cap.example.test/root/site-key/");
+            await Assert.That(runtime.Options.CapBackendApiEndpoint().AbsoluteUri)
+                .IsEqualTo("http://noctf-cap:3000/site-key/");
 
             var cached = await cacheProvider
                 .GetCache(NoCtfCacheNames.ReadModels)

@@ -137,11 +137,55 @@ public sealed class CapHumanVerificationMonitorTests
             .IsEqualTo(HumanVerificationMonitoringState.Unavailable);
     }
 
+    [Test]
+    public async Task Internal_probe_base_preserves_the_public_cors_origin()
+    {
+        var requestedHosts = new List<string>();
+        var handler = new StubHandler(request =>
+        {
+            requestedHosts.Add(request.RequestUri!.Authority);
+            if (request.Method == HttpMethod.Options)
+            {
+                var response = new HttpResponseMessage(HttpStatusCode.NoContent);
+                response.Headers.TryAddWithoutValidation(
+                    "Access-Control-Allow-Origin", "https://noctf.example.test");
+                return response;
+            }
+            if (request.RequestUri.AbsolutePath.EndsWith(
+                    "/assets/cap_wasm_bg.wasm", StringComparison.Ordinal))
+            {
+                return new HttpResponseMessage(HttpStatusCode.OK)
+                {
+                    Content = new ByteArrayContent([0, 97, 115, 109])
+                    {
+                        Headers = { ContentType = new("application/wasm") }
+                    }
+                };
+            }
+            return Json(
+                HttpStatusCode.NotFound,
+                "{\"success\":false,\"error\":\"Token not found\"}");
+        });
+        var monitor = CreateMonitor(
+            Cap(enabled: true),
+            handler,
+            backendServerUrl: "http://noctf-cap:3000");
+
+        var snapshot = await monitor.ProbeOnceAsync(CancellationToken.None);
+
+        await Assert.That(snapshot.State)
+            .IsEqualTo(HumanVerificationMonitoringState.Healthy);
+        await Assert.That(requestedHosts)
+            .IsEquivalentTo(["noctf-cap:3000", "noctf-cap:3000", "noctf-cap:3000"]);
+    }
+
     private static CapHumanVerificationMonitor CreateMonitor(
         HumanVerificationRuntimeConfiguration configuration,
         StubHandler handler,
-        TimeSpan? stageTimeout = null)
+        TimeSpan? stageTimeout = null,
+        string backendServerUrl = "")
     {
+        configuration.Options.Cap.BackendServerUrl = backendServerUrl;
         var services = new ServiceCollection();
         services.AddSingleton<IHumanVerificationConfigurationReader>(
             new StubConfigurationReader(configuration));
