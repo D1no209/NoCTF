@@ -60,7 +60,7 @@ const { Plus, Save, Trash2, canWrite, mode, enabled, canUpdate, tracks, pendingR
             <TableHead>{{ $t('ui.dynamicScoring') }}</TableHead>
             <TableHead>{{ $t('ui.leaderboardVisibility') }}</TableHead>
             <TableHead>{{ $t('ui.competitiveResults') }}</TableHead>
-            <TableHead class="min-w-56">{{ $t('ui.trackInvitationCode') }}</TableHead>
+            <TableHead class="min-w-64">{{ $t('ui.trackInvitationCode') }}</TableHead>
             <TableHead v-if="canWrite && canUpdate" class="w-14"><span class="sr-only">{{ $t('ui.actions') }}</span></TableHead>
           </TableRow>
         </TableHeader>
@@ -79,13 +79,19 @@ const { Plus, Save, Trash2, canWrite, mode, enabled, canUpdate, tracks, pendingR
             <TableCell><Checkbox v-model="track.visibleOnLeaderboard" :disabled="!canWrite || !canUpdate || track.isInternal" /></TableCell>
             <TableCell><Checkbox v-model="track.affectsCompetitiveResults" :disabled="!canWrite || !canUpdate || track.isInternal" /></TableCell>
             <TableCell>
-              <div class="flex items-center gap-2">
-                <Checkbox
-                  :model-value="track.requiresInvitationCode"
-                  :disabled="!canWrite || !canUpdate || track.isInternal || !track.isPublicSelectable"
-                  :aria-label="$t('ui.requireATrackInvitationCode')"
-                  @update:model-value="updateInvitationRequired(track, $event)"
-                />
+              <div class="flex min-w-64 flex-col gap-2">
+                <div class="flex items-center gap-2">
+                  <Switch
+                    :id="`track-invitation-${track.clientId}`"
+                    :model-value="track.requiresInvitationCode"
+                    :disabled="!canWrite || !canUpdate || track.isInternal || !track.isPublicSelectable"
+                    :aria-label="$t('ui.requireATrackInvitationCode')"
+                    @update:model-value="updateInvitationRequired(track, $event)"
+                  />
+                  <FieldLabel :for="`track-invitation-${track.clientId}`" class="whitespace-nowrap text-xs">
+                    {{ track.requiresInvitationCode ? $t('ui.requireATrackInvitationCode') : $t('ui.noRestriction') }}
+                  </FieldLabel>
+                </div>
                 <Input
                   v-if="track.requiresInvitationCode"
                   v-model="track.invitationCode"
@@ -95,7 +101,6 @@ const { Plus, Save, Trash2, canWrite, mode, enabled, canUpdate, tracks, pendingR
                   :disabled="!canWrite || !canUpdate"
                   :placeholder="track.invitationCodeConfigured ? $t('ui.leaveBlankToKeepTheCurrentInvitationCode') : $t('ui.enterAn8128CharacterInvitationCode')"
                 />
-                <span v-else class="text-xs text-muted-foreground">{{ $t('ui.noRestriction') }}</span>
               </div>
             </TableCell>
             <TableCell v-if="canWrite && canUpdate">

@@ -2084,6 +2084,7 @@ export const englishMessages = {
   "ui.leaveBlankToKeepTheCurrentInvitationCode": "Leave blank to keep the current invitation code",
   "ui.enterAn8128CharacterInvitationCode": "Enter an 8-128 character invitation code",
   "ui.noRestriction": "No restriction",
+  "ui.duplicateTrackKey": "Track key “{key}” is duplicated. Change it before saving.",
   "ui.unnamedTrack": "Unnamed track",
   "ui.deleteTrack": "Delete track",
   "ui.bloodAwardsRequireScoringInternalTracksAreAlwaysPrivateUnscored": "Blood awards require scoring. Internal tracks are always private, unscored, and non-competitive.",

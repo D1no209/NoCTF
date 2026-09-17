@@ -2,7 +2,7 @@ import { proxyRefs } from 'vue'
 
 import { Plus } from '@lucide/vue'
 import { toast } from 'vue-sonner'
-import { adminChallengeBankListTemplates, adminCreateCompetitionChallenge, adminDeleteCompetitionChallenge, adminListCompetitionChallenges, adminRestoreCompetitionChallenge } from '../../../../../../api'
+import { adminChallengeBankListTemplates, adminCreateCompetitionChallenge, adminDeleteCompetitionChallenge, adminListCompetitionChallenges, adminPatchCompetitionChallenge, adminRestoreCompetitionChallenge } from '../../../../../../api'
 import type { NoCtfapiEndpointsAdministrationChallengeBankChallengeTemplateResponse, NoCtfapiEndpointsChallengesChallengeResponse } from '../../../../../../api'
 import { useCompetitionAdmin } from '../../../../../../lib/admin-competition'
 import { competitionChallengeConflictMessage } from '../../../../../../lib/competition-challenge-conflict'
@@ -165,6 +165,44 @@ export function useAdminCompetitionsByIdChallengesIndexPage() {
     }
   }
 
+  async function setChallengePublished(
+    challenge: NoCtfapiEndpointsChallengesChallengeResponse,
+    published: boolean,
+  ) {
+    if (!challenge.id || challenge.deletedAt || pendingId.value !== null) return
+    pendingId.value = challenge.id
+    try {
+      const { data, error: requestError } = await adminPatchCompetitionChallenge({
+        path: { competitionId, competitionChallengeId: challenge.id },
+        body: {
+          presentation: {
+            customTitle: challenge.customTitle ?? null,
+            order: challenge.order ?? 0,
+            isPublished: published,
+          },
+        },
+      })
+      if (requestError) throw requestError
+      const updated = data?.challenge
+      if (updated) {
+        items.value = items.value.map(item => item.id === updated.id ? updated : item)
+      }
+      else {
+        await load()
+      }
+      toast.success(translate(
+        published ? 'ui.challengeWasPublished' : 'ui.challengeWasUnpublished',
+        { challenge: challenge.title ?? challenge.customTitle ?? '-' },
+      ))
+    }
+    catch (e) {
+      toast.error(competitionChallengeConflictMessage(e) ?? parseApiError(e).message)
+    }
+    finally {
+      pendingId.value = null
+    }
+  }
+
   const viewBindings = {
       Plus,
       competitionId,
@@ -191,7 +229,8 @@ export function useAdminCompetitionsByIdChallengesIndexPage() {
       closeDeleteDialog,
       beginDeleteChallenge,
       removeChallenge,
-      restoreChallenge
+      restoreChallenge,
+      setChallengePublished,
     }
   const viewState = proxyRefs(viewBindings)
 

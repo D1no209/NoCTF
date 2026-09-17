@@ -7,6 +7,8 @@ import type {
 } from '../app/api'
 import {
   competitionTrackErrorMessage,
+  duplicateCompetitionTrackKey,
+  nextCompetitionTrackOrdinal,
   teamMembershipErrorMessage,
   teamRegistrationErrorMessage,
 } from '../app/lib/competition-track'
@@ -75,6 +77,17 @@ describe('competition track error presentation', () => {
 })
 
 describe('competition track pages', () => {
+  test('allocates generated keys without reusing an existing ordinal', () => {
+    expect(nextCompetitionTrackOrdinal(['track-2', 'track-3', 'track-4'])).toBe(5)
+    expect(nextCompetitionTrackOrdinal(['default', 'track-2', 'track-4'])).toBe(5)
+    expect(nextCompetitionTrackOrdinal(['default'])).toBe(2)
+  })
+
+  test('detects duplicate keys with the same server normalization', () => {
+    expect(duplicateCompetitionTrackKey(['track-2', ' TRACK-2 '])).toBe('track-2')
+    expect(duplicateCompetitionTrackKey(['track-2', 'track-3'])).toBeNull()
+  })
+
   test('uses generated SDK operations and keeps pending/error state explicit', async () => {
     const admin = await sourceFile(new URL('../app/pages/admin/competitions/[id]/tracks.vue', import.meta.url)).text()
     const teams = await sourceFile(new URL('../app/pages/admin/competitions/[id]/teams.vue', import.meta.url)).text()
@@ -95,8 +108,11 @@ describe('competition track pages', () => {
     expect(admin).not.toContain('frozen')
     expect(admin).toContain('setInvitationRequired')
     expect(admin).toContain('clearInvitationRequirement')
+    expect(admin).toContain('nextCompetitionTrackOrdinal')
+    expect(admin).toContain('duplicateCompetitionTrackKey')
     expect(admin).toContain('clientId: crypto.randomUUID()')
     expect(admin).toContain(':key="track.clientId"')
+    expect(admin).toContain('<Switch')
     expect(admin).not.toContain(':key="`${track.key}-${index}`"')
     expect(admin).toContain("ui.trackRequiresAnInvitationCode")
     expect(admin).toContain('error.value = competitionTrackErrorMessage')

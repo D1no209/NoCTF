@@ -3,7 +3,7 @@ import { toRefs } from 'vue'
 import type { AdminCompetitionsByIdChallengesIndexPageViewState } from '~/features/routes/admin/competitions/[id]/challenges/useAdminCompetitionsByIdChallengesIndexPage'
 
 const viewProps = defineProps<{ state: AdminCompetitionsByIdChallengesIndexPageViewState }>()
-const { Plus, competitionId, competition, canWrite, items, loading, error, includeDeleted, pendingId, addOpen, templatesLoading, selectedTemplateId, newCustomTitle, newOrder, adding, addError, modeTemplates, openAdd, addChallenge, deleteTarget, deletePending, deleteError, closeDeleteDialog, beginDeleteChallenge, removeChallenge, restoreChallenge, onClickAddOpen } = toRefs(viewProps.state)
+const { Plus, competitionId, competition, canWrite, items, loading, error, includeDeleted, pendingId, addOpen, templatesLoading, selectedTemplateId, newCustomTitle, newOrder, adding, addError, modeTemplates, openAdd, addChallenge, deleteTarget, deletePending, deleteError, closeDeleteDialog, beginDeleteChallenge, removeChallenge, restoreChallenge, setChallengePublished, onClickAddOpen } = toRefs(viewProps.state)
 </script>
 
 <template>
@@ -60,6 +60,20 @@ const { Plus, competitionId, competition, canWrite, items, loading, error, inclu
           </TableCell>
           <TableCell>
             <Badge v-if="c.deletedAt" variant="destructive">{{ $t('ui.deleted') }}</Badge>
+            <div v-else-if="canWrite" class="flex items-center gap-2">
+              <Spinner v-if="pendingId === c.id" class="size-4" />
+              <Switch
+                v-else
+                :id="`challenge-published-${c.id}`"
+                :model-value="c.isPublished"
+                :disabled="pendingId !== null"
+                :aria-label="c.isPublished ? $t('ui.unpublishCompetitionChallenge') : $t('ui.publishCompetitionChallenge')"
+                @update:model-value="setChallengePublished(c, $event)"
+              />
+              <FieldLabel :for="`challenge-published-${c.id}`" class="whitespace-nowrap text-xs">
+                {{ c.isPublished ? $t('ui.published') : $t('ui.unpublished') }}
+              </FieldLabel>
+            </div>
             <Badge v-else :variant="c.isPublished ? 'default' : 'outline'">
               {{ c.isPublished ? $t('ui.published') : $t('ui.unpublished') }}
             </Badge>
@@ -70,7 +84,7 @@ const { Plus, competitionId, competition, canWrite, items, loading, error, inclu
                 v-if="c.deletedAt"
                 variant="outline"
                 size="sm"
-                :disabled="pendingId === c.id"
+                :disabled="pendingId !== null"
                 @click="restoreChallenge(c)"
               >
                 <Spinner v-if="pendingId === c.id" data-icon="inline-start" /> {{ $t('ui.restore2') }} </Button>
@@ -78,7 +92,7 @@ const { Plus, competitionId, competition, canWrite, items, loading, error, inclu
                 v-else
                 variant="ghost"
                 size="sm"
-                :disabled="pendingId === c.id"
+                :disabled="pendingId !== null"
                 @click="beginDeleteChallenge(c)"
               > {{ $t('ui.delete') }} </Button>
             </div>

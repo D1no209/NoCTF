@@ -7,7 +7,11 @@ import type {
   NoCtfapiEndpointsTeamsTeamResponse,
 } from '../../../../../api'
 import { useCompetitionAdmin } from '../../../../../lib/admin-competition'
-import { competitionTrackErrorMessage } from '../../../../../lib/competition-track'
+import {
+  competitionTrackErrorMessage,
+  duplicateCompetitionTrackKey,
+  nextCompetitionTrackOrdinal,
+} from '../../../../../lib/competition-track'
 
 type TrackForm = Omit<NoCtfapiEndpointsAdministrationCompetitionsUpdateCompetitionTrackRequest, 'invitationCode'> & {
   clientId: string
@@ -101,7 +105,7 @@ export function useAdminCompetitionsByIdTracksPage() {
   }
 
   function addTrack() {
-    const ordinal = tracks.value.length + 1
+    const ordinal = nextCompetitionTrackOrdinal(tracks.value.map(track => track.key))
     tracks.value.push({
       clientId: crypto.randomUUID(),
       existingKey: null,
@@ -238,6 +242,12 @@ export function useAdminCompetitionsByIdTracksPage() {
 
   async function save() {
     if (saving.value || !canUpdate.value || !canWrite.value) return
+    const duplicateTrackKey = duplicateCompetitionTrackKey(tracks.value.map(track => track.key))
+    if (duplicateTrackKey) {
+      error.value = translate('ui.duplicateTrackKey', { key: duplicateTrackKey })
+      toast.error(error.value)
+      return
+    }
     const invalidInvitationTrack = tracks.value.find(track =>
       track.requiresInvitationCode
       && !track.invitationCodeConfigured
