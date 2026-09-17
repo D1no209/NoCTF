@@ -77,6 +77,7 @@ Cap 使用独立部署的官方 Cap Standalone。在后台填写 Server URL、si
 IP 头，因此不能绕过代理直接暴露源站。启用 Standalone 的 asset server，并固定
 `WIDGET_VERSION=0.1.57` 与 `WASM_VERSION=0.0.7`；NoCTF 会从同一实例加载求解 WASM，避免运行时
 依赖公共 CDN。NoCTF 不把 Cap 或其 Valkey 生命周期并入本 Compose 栈。
+仓库中的 `deploy/cap/` 提供固定版本的独立 Compose、目录初始化、反向代理片段、备份与回滚说明。
 
 Turnstile 在后台填写 site key、secret 和不含 scheme/路径的允许 hostname；用于首次启动回退时可填写
 `TURNSTILE_SITE_KEY`、`TURNSTILE_SECRET` 和 `TURNSTILE_ALLOWED_HOSTNAME`。测试、预发布与生产使用不同 widget；生产 hostname 不得使用 localhost。
