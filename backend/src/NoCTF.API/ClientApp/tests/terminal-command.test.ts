@@ -30,3 +30,16 @@ test('terminal exposes the themed flag placeholder without covering it with the 
   expect(css).toContain("font-family: 'Microsoft YaHei'")
   expect(css).toContain('font-style: italic;')
 })
+
+test('all platform font roles resolve to Microsoft YaHei without loading a competing web font', async () => {
+  const css = await Bun.file(new URL('../app/assets/css/main.css', import.meta.url)).text()
+
+  expect(css).toContain("--font-sans: 'Microsoft YaHei', '微软雅黑', 'Microsoft YaHei UI', sans-serif")
+  expect(css).toContain("--font-heading: 'Microsoft YaHei', '微软雅黑', 'Microsoft YaHei UI', sans-serif")
+  expect(css).toContain("--font-mono: 'Microsoft YaHei', '微软雅黑', 'Microsoft YaHei UI', sans-serif")
+  expect(css).toContain("html {\n    font-family: var(--font-sans);")
+  expect(css).toContain('code, kbd, samp, pre {\n    font-family: var(--font-mono);')
+  expect(css).toContain("[data-slot='pseudo-terminal']")
+  expect(css).not.toContain('JetBrains Mono')
+  expect(css).not.toContain('@fontsource/jetbrains-mono')
+})

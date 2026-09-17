@@ -16,7 +16,6 @@
   },
   "dependencies": {
     "@cap.js/widget": "0.1.57",
-    "@fontsource/jetbrains-mono": "^5.3.0",
     "@hey-api/client-fetch": "^0.13.1",
     "@internationalized/date": "3.12.3",
     "@lucide/vue": "^1.43.0",
