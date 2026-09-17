@@ -2,6 +2,18 @@ import { sourceFile } from './support/feature-source'
 import { describe, expect, test } from 'bun:test'
 
 describe('competition challenge deletion', () => {
+  test('allows publication to be toggled directly from the challenge list', async () => {
+    const page = await sourceFile(
+      new URL('../app/pages/admin/competitions/[id]/challenges/index.vue', import.meta.url),
+    ).text()
+
+    expect(page).toContain('async function setChallengePublished(')
+    expect(page).toContain('adminPatchCompetitionChallenge({')
+    expect(page).toContain('isPublished: published')
+    expect(page).toContain('@update:model-value="setChallengePublished(c, $event)"')
+    expect(page).toContain("published ? 'ui.challengeWasPublished' : 'ui.challengeWasUnpublished'")
+  })
+
   test('keeps the selected challenge while deletion is pending or fails', async () => {
     const page = await sourceFile(
       new URL('../app/pages/admin/competitions/[id]/challenges/index.vue', import.meta.url),

@@ -2084,6 +2084,7 @@ export const chineseMessages = {
   "ui.leaveBlankToKeepTheCurrentInvitationCode": "留空以保留现有邀请码",
   "ui.enterAn8128CharacterInvitationCode": "输入 8-128 位邀请码",
   "ui.noRestriction": "不限制",
+  "ui.duplicateTrackKey": "赛道标识“{key}”重复，请修改后再保存。",
   "ui.unnamedTrack": "未命名赛道",
   "ui.deleteTrack": "删除赛道",
   "ui.bloodAwardsRequireScoringInternalTracksAreAlwaysPrivateUnscored": "血榜奖励要求启用计分；内部赛道固定不公开、不计分且不参与竞争。",
