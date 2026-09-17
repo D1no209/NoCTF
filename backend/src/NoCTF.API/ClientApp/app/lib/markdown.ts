@@ -1,18 +1,26 @@
 import MarkdownIt from 'markdown-it'
 import sanitizeHtml from 'sanitize-html'
-import { highlightMarkdownCode, normalizeMarkdownCodeLanguage } from './markdown-highlighter'
+import { hasMarkdownCodeFence, normalizeMarkdownCodeLanguage } from './markdown-language'
 
-// HTML must pass the allowlist below after Markdown parsing and before v-html.
-const markdown = new MarkdownIt({ html: true, linkify: true })
-markdown.renderer.rules.fence = (tokens, index) => {
-  const token = tokens[index]!
-  const language = normalizeMarkdownCodeLanguage(token.info)
-  const highlighted = highlightMarkdownCode(token.content, language)
-    ?? markdown.utils.escapeHtml(token.content)
-  const displayLanguage = language || 'text'
-  const languageClass = language ? ` language-${displayLanguage}` : ''
-  return `<pre tabindex="0" data-language="${displayLanguage}"><code class="hljs${languageClass}">${highlighted}</code></pre>\n`
+type CodeHighlighter = (code: string, language: string) => string | null
+
+function createMarkdown(highlighter?: CodeHighlighter) {
+  const markdown = new MarkdownIt({ html: true, linkify: true })
+  markdown.renderer.rules.fence = (tokens, index) => {
+    const token = tokens[index]!
+    const language = normalizeMarkdownCodeLanguage(token.info)
+    const highlighted = highlighter?.(token.content, language)
+      ?? markdown.utils.escapeHtml(token.content)
+    const displayLanguage = language || 'text'
+    const languageClass = language ? ` language-${displayLanguage}` : ''
+    return `<pre tabindex="0" data-language="${displayLanguage}"><code class="hljs${languageClass}">${highlighted}</code></pre>\n`
+  }
+  return markdown
 }
+
+// HTML must pass the allowlist below after Markdown parsing and before display.
+const plainMarkdown = createMarkdown()
+let highlightedMarkdown: ReturnType<typeof createMarkdown> | undefined
 
 const color = /^(?:#[\da-f]{3,8}|[a-z]+|(?:rgb|hsl)a?\([\d\s.,%/+-]+\))$/i
 const length = /^(?:0|auto|\d{1,4}(?:\.\d+)?(?:px|em|rem|%))$/i
@@ -88,6 +96,50 @@ const htmlOptions: sanitizeHtml.IOptions = {
 }
 
 /** Sanitize the complete result, including Markdown-generated links and author HTML. */
-export function renderMarkdown(source: string): string {
-  return sanitizeHtml(markdown.render(source), htmlOptions)
+export function renderMarkdown(source: string, highlighter?: CodeHighlighter): string {
+  if (highlighter && !highlightedMarkdown)
+    highlightedMarkdown = createMarkdown(highlighter)
+  return sanitizeHtml((highlighter ? highlightedMarkdown! : plainMarkdown).render(source), htmlOptions)
+}
+
+/** Loads Highlight.js only for documents that contain a code fence. */
+export async function renderMarkdownAsync(source: string): Promise<string> {
+  if (!hasMarkdownCodeFence(source))
+    return renderMarkdown(source)
+  const { highlightMarkdownCode } = await import('./markdown-highlighter')
+  return renderMarkdown(source, highlightMarkdownCode)
+}
+
+interface MarkdownCacheEntry {
+  source: string
+  html: Promise<string>
+}
+
+const publishedMarkdownCache = new Map<string, MarkdownCacheEntry>()
+const publishedMarkdownCacheLimit = 64
+
+function markdownSourceHash(source: string): string {
+  let hash = 2166136261
+  for (let index = 0; index < source.length; index++) {
+    hash ^= source.charCodeAt(index)
+    hash = Math.imul(hash, 16777619)
+  }
+  return `${source.length}:${(hash >>> 0).toString(36)}`
+}
+
+/** Reuses parsed and sanitized HTML for immutable published content. */
+export function renderPublishedMarkdown(source: string): Promise<string> {
+  const key = markdownSourceHash(source)
+  const cached = publishedMarkdownCache.get(key)
+  if (cached?.source === source) {
+    publishedMarkdownCache.delete(key)
+    publishedMarkdownCache.set(key, cached)
+    return cached.html
+  }
+
+  const entry = { source, html: renderMarkdownAsync(source) }
+  publishedMarkdownCache.set(key, entry)
+  if (publishedMarkdownCache.size > publishedMarkdownCacheLimit)
+    publishedMarkdownCache.delete(publishedMarkdownCache.keys().next().value!)
+  return entry.html
 }

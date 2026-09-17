@@ -20,6 +20,7 @@ import typescript from 'highlight.js/lib/languages/typescript'
 import xml from 'highlight.js/lib/languages/xml'
 import x86asm from 'highlight.js/lib/languages/x86asm'
 import yaml from 'highlight.js/lib/languages/yaml'
+export { normalizeMarkdownCodeLanguage } from './markdown-language'
 
 const languages = {
   bash,
@@ -59,13 +60,6 @@ hljs.registerAliases(['py'], { languageName: 'python' })
 hljs.registerAliases(['rs'], { languageName: 'rust' })
 hljs.registerAliases(['ts', 'tsx'], { languageName: 'typescript' })
 hljs.registerAliases(['yml'], { languageName: 'yaml' })
-
-const languageName = /^[a-z\d][a-z\d_+.#-]{0,31}$/i
-
-export function normalizeMarkdownCodeLanguage(info: string): string {
-  const candidate = info.trim().split(/\s+/, 1)[0]?.toLowerCase() ?? ''
-  return languageName.test(candidate) ? candidate : ''
-}
 
 export function highlightMarkdownCode(code: string, language: string): string | null {
   if (!language || !hljs.getLanguage(language)) return null

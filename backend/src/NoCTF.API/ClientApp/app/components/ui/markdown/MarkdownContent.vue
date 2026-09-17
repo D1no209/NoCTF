@@ -1,9 +1,19 @@
 <script setup lang="ts">
-import { renderMarkdown } from '~/lib/markdown'
+import { renderPublishedMarkdown } from '~/lib/markdown'
 import MarkdownDocument from './MarkdownDocument'
 
 const props = defineProps<{ source: string }>()
-const html = computed(() => renderMarkdown(props.source))
+const html = shallowRef('')
+let renderSequence = 0
+
+watch(() => props.source, async (source) => {
+  const sequence = ++renderSequence
+  const rendered = await renderPublishedMarkdown(source)
+  if (sequence === renderSequence)
+    html.value = rendered
+}, { immediate: true })
+
+onBeforeUnmount(() => { renderSequence++ })
 </script>
 
 <template>
