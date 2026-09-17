@@ -1,0 +1,98 @@
+services:
+  cap:
+    image: ${CAP_IMAGE:?CAP_IMAGE must be an immutable repository digest}
+    container_name: noctf-cap
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      REDIS_URL: redis://valkey:6379
+      ENABLE_ASSETS_SERVER: "true"
+      WIDGET_VERSION: "0.1.57"
+      WASM_VERSION: "0.0.7"
+      CORS_ORIGIN: ${CAP_PUBLIC_ORIGIN:?CAP_PUBLIC_ORIGIN is required}
+      RATELIMIT_IP_HEADER: X-Real-IP
+      SERVER_HOSTNAME: 0.0.0.0
+      SERVER_PORT: "3000"
+    depends_on:
+      valkey:
+        condition: service_healthy
+    networks:
+      cap-internal:
+      1panel-network:
+        aliases:
+          - noctf-cap
+    volumes:
+      - /opt/noctf-cap/data/cap:/usr/src/app/data
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,nodev,size=16m
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    pids_limit: 128
+    cpus: 0.50
+    mem_limit: 256m
+    healthcheck:
+      test:
+        - CMD
+        - bun
+        - -e
+        - fetch('http://127.0.0.1:3000/').then(r=>process.exit(r.status<500?0:1)).catch(()=>process.exit(1))
+      interval: 15s
+      timeout: 3s
+      retries: 5
+      start_period: 30s
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: "3"
+
+  valkey:
+    image: ${VALKEY_IMAGE:?VALKEY_IMAGE must be an immutable repository digest}
+    container_name: noctf-cap-valkey
+    restart: unless-stopped
+    user: "999:1000"
+    command:
+      - valkey-server
+      - --appendonly
+      - "yes"
+      - --appendfsync
+      - everysec
+      - --save
+      - "60"
+      - "1"
+      - --maxmemory-policy
+      - noeviction
+    networks:
+      - cap-internal
+    volumes:
+      - /opt/noctf-cap/data/valkey:/data
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    pids_limit: 96
+    cpus: 0.25
+    mem_limit: 192m
+    healthcheck:
+      test: ["CMD", "valkey-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 10s
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: "3"
+
+networks:
+  cap-internal:
+    name: noctf-cap-internal
+    internal: true
+  1panel-network:
+    external: true
+    name: 1panel-network
