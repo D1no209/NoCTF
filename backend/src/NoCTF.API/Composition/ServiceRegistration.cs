@@ -1,9 +1,11 @@
 using FastEndpoints;
 using FastEndpoints.Swagger;
+using System.IO.Compression;
 using System.Security.Claims;
 using System.Threading.RateLimiting;
 using NoCTF.Application.Observability;
 using Microsoft.AspNetCore.RateLimiting;
+using Microsoft.AspNetCore.ResponseCompression;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using NoCTF.Application.Authentication.Login;
@@ -90,6 +92,7 @@ public static class ServiceRegistration
         services.AddSingleton(uploadLimits);
         services.AddProblemDetails();
         services.AddExceptionHandler<NoCTF.API.Security.RequestSafetyExceptionHandler>();
+        services.AddNoCtfStaticAssetDelivery();
         services.AddHttpContextAccessor();
         services.AddScoped<NoCTF.Application.Commands.Idempotency.IRequestCommandKey, NoCTF.API.Security.RequestCommandKey>();
         services.AddScoped<NoCTF.Application.Authentication.Privacy.IRequestSourceAddress, NoCTF.API.Security.RequestSourceAddress>();
@@ -288,6 +291,24 @@ public static class ServiceRegistration
                         QueueLimit = 0
                     }));
         });
+        return services;
+    }
+
+    public static IServiceCollection AddNoCtfStaticAssetDelivery(this IServiceCollection services)
+    {
+        services.AddResponseCompression(options =>
+        {
+            options.EnableForHttps = true;
+            options.Providers.Add<BrotliCompressionProvider>();
+            options.Providers.Add<GzipCompressionProvider>();
+            options.MimeTypes = ResponseCompressionDefaults.MimeTypes
+                .Concat(["image/svg+xml"])
+                .Distinct(StringComparer.OrdinalIgnoreCase);
+        });
+        services.Configure<BrotliCompressionProviderOptions>(options =>
+            options.Level = CompressionLevel.Fastest);
+        services.Configure<GzipCompressionProviderOptions>(options =>
+            options.Level = CompressionLevel.Fastest);
         return services;
     }
 }

@@ -5,7 +5,7 @@ public static class PipelineConfiguration
     public static WebApplication UseNoCtfPipeline(this WebApplication app)
     {
         app.UseForwardedHeaders();
-        app.UseStaticFiles();
+        app.UseNoCtfStaticAssetDelivery();
         app.UseExceptionHandler();
         app.UseAuthentication();
         if (app.Services.GetService<IServiceProviderIsService>() is { } serviceCatalog
@@ -23,6 +23,31 @@ public static class PipelineConfiguration
         if (app.Services.GetService<IServiceProviderIsService>()?.IsService(typeof(NoCTF.Application.Admission.IHumanVerificationVerifier)) == true)
             app.UseMiddleware<Security.HumanVerificationMiddleware>();
         app.UseMiddleware<SpaDocumentMetadataMiddleware>();
+        return app;
+    }
+
+    public static WebApplication UseNoCtfStaticAssetDelivery(this WebApplication app)
+    {
+        app.UseResponseCompression();
+        app.UseStaticFiles(new StaticFileOptions
+        {
+            OnPrepareResponse = context =>
+            {
+                var path = context.Context.Request.Path;
+                if (path.StartsWithSegments("/_nuxt"))
+                {
+                    context.Context.Response.Headers.CacheControl =
+                        "public,max-age=31536000,immutable";
+                }
+                else if (string.Equals(
+                    context.File.Name,
+                    "index.html",
+                    StringComparison.OrdinalIgnoreCase))
+                {
+                    context.Context.Response.Headers.CacheControl = "no-cache";
+                }
+            }
+        });
         return app;
     }
 }
