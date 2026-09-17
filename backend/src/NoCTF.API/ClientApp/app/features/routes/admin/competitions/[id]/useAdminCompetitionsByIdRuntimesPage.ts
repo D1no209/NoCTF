@@ -8,6 +8,7 @@ import { useCompetitionAdmin } from '../../../../../lib/admin-competition'
 import { createLatestPageRefresh } from '../../../../../lib/latest-page-refresh'
 import { adminRuntimeTeamLabel } from '../../../../../utils/admin-runtime'
 import { createRuntimeOperationCoordinator, type RuntimeOperationKind, type RuntimeOperationToken } from '../../../../../lib/runtime-operation-coordinator'
+import { RUNTIME_STOP_POLL_DELAYS_MS, RUNTIME_STOP_POLL_MAX_INTERVAL_MS, RUNTIME_STOP_POLL_TIMEOUT_MS } from '../../../../../lib/runtime-stop-polling'
 import RuntimeAccessUrlComponent from '../../../../challenges/RuntimeAccessUrl.vue'
 
 /** Owns state, effects and commands for AdminCompetitionsByIdRuntimesPage. */
@@ -103,7 +104,12 @@ export function useAdminCompetitionsByIdRuntimesPage() {
     detailLoading.value = false
   }
 
-  const runtimeOperations = createRuntimeOperationCoordinator()
+  const runtimeOperations = createRuntimeOperationCoordinator({
+    maxAttempts: 50,
+    maxIntervalMs: RUNTIME_STOP_POLL_MAX_INTERVAL_MS,
+    delaysMs: RUNTIME_STOP_POLL_DELAYS_MS,
+    timeoutMs: RUNTIME_STOP_POLL_TIMEOUT_MS,
+  })
 
   const opMessage = ref<string | null>(null)
 
@@ -132,6 +138,14 @@ export function useAdminCompetitionsByIdRuntimesPage() {
     if (!key) return null
     opMessage.value = null
     return runtimeOperations.begin(key, operation)
+  }
+
+  function markRuntimeStopping(runtimeInstanceId: string): void {
+    items.value = items.value.map(item => item.id === runtimeInstanceId
+      ? { ...item, state: 'Stopping' }
+      : item)
+    if (detail.value?.id === runtimeInstanceId)
+      detail.value = { ...detail.value, state: 'Stopping' }
   }
 
   function refreshRuntimeInBackground(
@@ -209,6 +223,7 @@ export function useAdminCompetitionsByIdRuntimesPage() {
       })
       if (!runtimeOperations.isActive(token)) return
       if (error) throw error
+      markRuntimeStopping(rt.id)
       toast.success(translate("ui.instanceTerminationOperationHasBeenAccepted"))
       terminateDialog.value = null
       void refreshList()
@@ -250,6 +265,7 @@ export function useAdminCompetitionsByIdRuntimesPage() {
       })
       if (!runtimeOperations.isActive(token)) return
       if (error) throw error
+      markRuntimeStopping(rt.id)
       toast.success(translate("ui.forcedFinalizationHasBeenHandedOverToRunnerForCleanup"))
       forceTerminateDialog.value = null
       void refreshList()

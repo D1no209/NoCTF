@@ -40,6 +40,12 @@ public interface IComposeRuntime
 {
     Task<ComposeReceipt> UpAsync(ComposeRequest request, CancellationToken cancellationToken);
     Task DownAsync(ComposeReceipt receipt, CancellationToken cancellationToken);
+    Task DownAsync(
+        ComposeReceipt receipt,
+        RuntimeTerminationMode mode,
+        RuntimeTerminationPolicy policy,
+        CancellationToken cancellationToken) =>
+        DownAsync(receipt, cancellationToken);
     Task<ComposeStatus?> GetStatusAsync(ComposeReceipt receipt, CancellationToken cancellationToken);
     Task<ContainerExecResult> ExecAsync(
         ComposeReceipt receipt,

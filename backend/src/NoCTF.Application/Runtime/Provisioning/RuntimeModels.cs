@@ -224,6 +224,25 @@ public sealed class OneShotInputPreparationException(string message, Exception? 
 public sealed class OneShotCleanupException(string message, Exception? innerException = null)
     : Exception(message, innerException);
 
+public enum RuntimeTerminationMode
+{
+    GracefulThenForce,
+    Force
+}
+
+public sealed record RuntimeTerminationPolicy(
+    TimeSpan GracefulStopTimeout,
+    TimeSpan ForceDeleteTimeout,
+    TimeSpan NetworkCleanupTimeout,
+    TimeSpan VerificationTimeout)
+{
+    public static RuntimeTerminationPolicy Default { get; } = new(
+        TimeSpan.FromSeconds(2),
+        TimeSpan.FromSeconds(8),
+        TimeSpan.FromSeconds(5),
+        TimeSpan.FromSeconds(3));
+}
+
 public interface IContainerLifecycle
 {
     Task<ContainerReceipt> CreateAsync(ContainerRequest request, CancellationToken cancellationToken);
@@ -231,6 +250,12 @@ public interface IContainerLifecycle
         ContainerRequest request,
         CancellationToken cancellationToken);
     Task DestroyAsync(ContainerReceipt receipt, CancellationToken cancellationToken);
+    Task DestroyAsync(
+        ContainerReceipt receipt,
+        RuntimeTerminationMode mode,
+        RuntimeTerminationPolicy policy,
+        CancellationToken cancellationToken) =>
+        DestroyAsync(receipt, cancellationToken);
     Task<ContainerReceipt?> GetAsync(RuntimeProvider provider, string resourceId, CancellationToken cancellationToken);
 }
 
@@ -308,6 +333,13 @@ public interface IRuntimeManagedResourceReconciler
     Task DestroyByIdentityAsync(
         RuntimeResourceIdentity identity,
         CancellationToken cancellationToken);
+
+    Task DestroyByIdentityAsync(
+        RuntimeResourceIdentity identity,
+        RuntimeTerminationMode mode,
+        RuntimeTerminationPolicy policy,
+        CancellationToken cancellationToken) =>
+        DestroyByIdentityAsync(identity, cancellationToken);
 }
 
 public interface IRuntimeProviderAvailabilityProbe

@@ -50,6 +50,8 @@ describe('player runtime presentation', () => {
     expect(source).toContain('<div v-if="!loadError" class="flex flex-wrap items-center gap-2">')
     expect(source).toContain("defineExpose({ refreshUntilStopped: state.refreshUntilStopped })")
     expect(source).toContain('if (forceUntilStopped.value)')
+    expect(source).toContain("runtime.value = { ...runtime.value, state: 'Stopping' }")
+    expect(source).toContain('delays: RUNTIME_STOP_POLL_DELAYS_MS')
   })
 
   test('does not render or request a runtime for static CTF challenges', async () => {

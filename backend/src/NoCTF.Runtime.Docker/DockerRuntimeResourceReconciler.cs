@@ -1,7 +1,9 @@
 using System.Net;
+using System.Diagnostics;
 using Docker.DotNet;
 using Docker.DotNet.Models;
 using NoCTF.Application.Runtime.Provisioning;
+using NoCTF.Application.Observability;
 using NoCTF.Domain.Runtime;
 using NoCTF.Runtime.Docker.Compose;
 using NoCTF.Runtime.Docker.Containers;
@@ -53,12 +55,25 @@ public sealed class DockerRuntimeResourceReconciler(
         RuntimeResourceIdentity identity,
         CancellationToken cancellationToken)
     {
+        await DestroyByIdentityAsync(
+            identity,
+            RuntimeTerminationMode.GracefulThenForce,
+            RuntimeTerminationPolicy.Default,
+            cancellationToken);
+    }
+
+    public async Task DestroyByIdentityAsync(
+        RuntimeResourceIdentity identity,
+        RuntimeTerminationMode mode,
+        RuntimeTerminationPolicy policy,
+        CancellationToken cancellationToken)
+    {
         if (identity.RuntimeInstanceId == Guid.Empty)
             throw new ArgumentOutOfRangeException(nameof(identity));
-        Exception? failure = null;
+        var warnings = new List<Exception>();
         try
         {
-            await compose.DestroyByIdentityAsync(identity, cancellationToken);
+            await compose.DestroyByIdentityAsync(identity, mode, policy, cancellationToken);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
@@ -66,66 +81,144 @@ public sealed class DockerRuntimeResourceReconciler(
         }
         catch (Exception exception)
         {
-            failure = exception;
+            warnings.Add(exception);
         }
 
+        var forceStarted = Stopwatch.GetTimestamp();
+        using var force = CreateStageToken(cancellationToken, policy.ForceDeleteTimeout);
         var filters = IdentityFilters(identity);
-        var containers = await client.Containers.ListContainersAsync(
-            new ContainersListParameters { All = true, Filters = filters },
-            cancellationToken);
-        foreach (var container in containers.Where(container =>
-                     TryReadIdentity(container.Labels, out var actual)
-                     && actual == identity))
+        try
         {
-            try
+            var containers = await client.Containers.ListContainersAsync(
+                new ContainersListParameters { All = true, Filters = filters },
+                force.Token);
+            foreach (var container in containers.Where(container =>
+                         TryReadIdentity(container.Labels, out var actual)
+                         && actual == identity))
             {
-                await client.Containers.RemoveContainerAsync(
-                    container.ID,
-                    new ContainerRemoveParameters { Force = true },
-                    cancellationToken);
-            }
-            catch (DockerContainerNotFoundException)
-            {
-                // Exact cleanup is idempotent.
-            }
-            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
-            {
-                throw;
-            }
-            catch (Exception exception)
-            {
-                failure ??= exception;
+                try
+                {
+                    await client.Containers.RemoveContainerAsync(
+                        container.ID,
+                        new ContainerRemoveParameters { Force = true },
+                        force.Token);
+                }
+                catch (DockerContainerNotFoundException)
+                {
+                    // Exact cleanup is idempotent.
+                }
+                catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+                {
+                    throw;
+                }
+                catch (Exception exception)
+                {
+                    warnings.Add(exception);
+                }
             }
         }
-
-        var networks = await client.Networks.ListNetworksAsync(
-            new NetworksListParameters { Filters = filters },
-            cancellationToken);
-        foreach (var network in networks.Where(network =>
-                     TryReadIdentity(network.Labels, out var actual)
-                     && actual == identity))
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
-            try
+            throw;
+        }
+        catch (Exception exception)
+        {
+            warnings.Add(exception);
+        }
+        NoCtfTelemetry.RecordRuntimeStopDuration(
+            "docker", "managed", "force_delete",
+            warnings.Count == 0 ? "success" : "warning",
+            Stopwatch.GetElapsedTime(forceStarted).TotalSeconds);
+
+        var networkStarted = Stopwatch.GetTimestamp();
+        using var networkCleanup = CreateStageToken(
+            cancellationToken,
+            policy.NetworkCleanupTimeout);
+        try
+        {
+            var networks = await client.Networks.ListNetworksAsync(
+                new NetworksListParameters { Filters = filters },
+                networkCleanup.Token);
+            foreach (var network in networks.Where(network =>
+                         TryReadIdentity(network.Labels, out var actual)
+                         && actual == identity))
             {
-                await client.Networks.DeleteNetworkAsync(network.ID, cancellationToken);
-            }
-            catch (DockerApiException exception)
-                when (exception.StatusCode == HttpStatusCode.NotFound)
-            {
-                // Exact cleanup is idempotent.
-            }
-            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
-            {
-                throw;
-            }
-            catch (Exception exception)
-            {
-                failure ??= exception;
+                try
+                {
+                    await client.Networks.DeleteNetworkAsync(network.ID, networkCleanup.Token);
+                }
+                catch (DockerApiException exception)
+                    when (exception.StatusCode == HttpStatusCode.NotFound)
+                {
+                    // Exact cleanup is idempotent.
+                }
+                catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+                {
+                    throw;
+                }
+                catch (Exception exception)
+                {
+                    warnings.Add(exception);
+                }
             }
         }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception exception)
+        {
+            warnings.Add(exception);
+        }
+        NoCtfTelemetry.RecordRuntimeStopDuration(
+            "docker", "managed", "network_cleanup",
+            warnings.Count == 0 ? "success" : "warning",
+            Stopwatch.GetElapsedTime(networkStarted).TotalSeconds);
 
-        if (failure is not null)
-            System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(failure).Throw();
+        var verificationStarted = Stopwatch.GetTimestamp();
+        using var verification = CreateStageToken(
+            cancellationToken,
+            policy.VerificationTimeout);
+        try
+        {
+            await WaitUntilDeletedAsync(identity, verification.Token);
+            NoCtfTelemetry.RecordRuntimeStopDuration(
+                "docker", "managed", "verification", "success",
+                Stopwatch.GetElapsedTime(verificationStarted).TotalSeconds);
+        }
+        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+        {
+            NoCtfTelemetry.RecordRuntimeStopResourcesRemaining("docker", "managed");
+            NoCtfTelemetry.RecordRuntimeStopDuration(
+                "docker", "managed", "verification", "timeout",
+                Stopwatch.GetElapsedTime(verificationStarted).TotalSeconds);
+            throw new InvalidOperationException(
+                "Docker Runtime resources remain after identity-based cleanup.",
+                warnings.Count == 0 ? null : new AggregateException(warnings));
+        }
+    }
+
+    private async Task WaitUntilDeletedAsync(
+        RuntimeResourceIdentity identity,
+        CancellationToken cancellationToken)
+    {
+        var delays = new[] { 200, 400, 800, 1_000 };
+        var attempt = 0;
+        while ((await ListManagedAsync(cancellationToken)).Contains(identity))
+        {
+            await Task.Delay(
+                TimeSpan.FromMilliseconds(delays[Math.Min(attempt++, delays.Length - 1)]),
+                cancellationToken);
+        }
+    }
+
+    private static CancellationTokenSource CreateStageToken(
+        CancellationToken cancellationToken,
+        TimeSpan timeout)
+    {
+        var source = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        source.CancelAfter(timeout);
+        return source;
     }
 
     public void Dispose() => client.Dispose();

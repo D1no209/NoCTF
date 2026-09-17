@@ -889,6 +889,21 @@ public sealed class KubernetesContainerLifecycleTests
             {
                 Body = new V1Pod()
             }));
+        core.ReadNamespacedPodWithHttpMessagesAsync(
+                Arg.Any<string>(), Arg.Any<string>(), Arg.Any<bool?>(),
+                Arg.Any<IReadOnlyDictionary<string, IReadOnlyList<string>>?>(),
+                Arg.Any<CancellationToken>())
+            .Returns(Task.FromException<HttpOperationResponse<V1Pod>>(NotFound()));
+        core.ReadNamespacedServiceWithHttpMessagesAsync(
+                Arg.Any<string>(), Arg.Any<string>(), Arg.Any<bool?>(),
+                Arg.Any<IReadOnlyDictionary<string, IReadOnlyList<string>>?>(),
+                Arg.Any<CancellationToken>())
+            .Returns(Task.FromException<HttpOperationResponse<V1Service>>(NotFound()));
+        networking.ReadNamespacedNetworkPolicyWithHttpMessagesAsync(
+                Arg.Any<string>(), Arg.Any<string>(), Arg.Any<bool?>(),
+                Arg.Any<IReadOnlyDictionary<string, IReadOnlyList<string>>?>(),
+                Arg.Any<CancellationToken>())
+            .Returns(Task.FromException<HttpOperationResponse<V1NetworkPolicy>>(NotFound()));
         var lifecycle = new KubernetesContainerLifecycle(
             client,
             new KubernetesRuntimeOptions(ClusterDnsServiceAddress: "10.96.0.10"));
@@ -912,6 +927,106 @@ public sealed class KubernetesContainerLifecycleTests
             .ToArray();
         await Assert.That(deletedServices)
             .IsEquivalentTo([resourceId, $"{resourceId}-public"]);
+        var podDelete = core.ReceivedCalls().Single(call =>
+            call.GetMethodInfo().Name == "DeleteNamespacedPodWithHttpMessagesAsync");
+        await Assert.That(((V1DeleteOptions)podDelete.GetArguments()[2]!).GracePeriodSeconds)
+            .IsEqualTo(2);
+    }
+
+    [Test]
+    public async Task Destroy_waits_for_a_terminating_pod_to_disappear()
+    {
+        var (client, core, networking) = CreateClient();
+        core.DeleteNamespacedServiceWithHttpMessagesAsync(
+                Arg.Any<string>(), Arg.Any<string>(), Arg.Any<V1DeleteOptions>(),
+                Arg.Any<string?>(), Arg.Any<int?>(), Arg.Any<bool?>(), Arg.Any<bool?>(),
+                Arg.Any<string?>(), Arg.Any<bool?>(),
+                Arg.Any<IReadOnlyDictionary<string, IReadOnlyList<string>>?>(),
+                Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult(new HttpOperationResponse<V1Service>
+            {
+                Body = new V1Service()
+            }));
+        networking.DeleteNamespacedNetworkPolicyWithHttpMessagesAsync(
+                Arg.Any<string>(), Arg.Any<string>(), Arg.Any<V1DeleteOptions>(),
+                Arg.Any<string?>(), Arg.Any<int?>(), Arg.Any<bool?>(), Arg.Any<bool?>(),
+                Arg.Any<string?>(), Arg.Any<bool?>(),
+                Arg.Any<IReadOnlyDictionary<string, IReadOnlyList<string>>?>(),
+                Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult(new HttpOperationResponse<V1Status>
+            {
+                Body = new V1Status()
+            }));
+        core.DeleteNamespacedPodWithHttpMessagesAsync(
+                Arg.Any<string>(), Arg.Any<string>(), Arg.Any<V1DeleteOptions>(),
+                Arg.Any<string?>(), Arg.Any<int?>(), Arg.Any<bool?>(), Arg.Any<bool?>(),
+                Arg.Any<string?>(), Arg.Any<bool?>(),
+                Arg.Any<IReadOnlyDictionary<string, IReadOnlyList<string>>?>(),
+                Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult(new HttpOperationResponse<V1Pod>
+            {
+                Body = new V1Pod()
+            }));
+        var terminating = new HttpOperationResponse<V1Pod>
+        {
+            Body = new V1Pod
+            {
+                Metadata = new V1ObjectMeta
+                {
+                    DeletionTimestamp = DateTime.UtcNow
+                }
+            }
+        };
+        core.ReadNamespacedPodWithHttpMessagesAsync(
+                Arg.Any<string>(), Arg.Any<string>(), Arg.Any<bool?>(),
+                Arg.Any<IReadOnlyDictionary<string, IReadOnlyList<string>>?>(),
+                Arg.Any<CancellationToken>())
+            .Returns(
+                Task.FromResult(terminating),
+                Task.FromResult(terminating),
+                Task.FromException<HttpOperationResponse<V1Pod>>(NotFound()));
+        core.ReadNamespacedServiceWithHttpMessagesAsync(
+                Arg.Any<string>(), Arg.Any<string>(), Arg.Any<bool?>(),
+                Arg.Any<IReadOnlyDictionary<string, IReadOnlyList<string>>?>(),
+                Arg.Any<CancellationToken>())
+            .Returns(Task.FromException<HttpOperationResponse<V1Service>>(NotFound()));
+        networking.ReadNamespacedNetworkPolicyWithHttpMessagesAsync(
+                Arg.Any<string>(), Arg.Any<string>(), Arg.Any<bool?>(),
+                Arg.Any<IReadOnlyDictionary<string, IReadOnlyList<string>>?>(),
+                Arg.Any<CancellationToken>())
+            .Returns(Task.FromException<HttpOperationResponse<V1NetworkPolicy>>(NotFound()));
+        var lifecycle = new KubernetesContainerLifecycle(
+            client,
+            new KubernetesRuntimeOptions(ClusterDnsServiceAddress: "10.96.0.10"));
+        const string resourceId = "noctf-019be6f7882e7cae9389898a98fbfe22";
+
+        await lifecycle.DestroyAsync(
+            new ContainerReceipt(
+                Guid.Parse("019be6f7-882e-7cae-9389-898a98fbfe22"),
+                RuntimeProvider.Kubernetes,
+                resourceId,
+                RuntimeStatus.Running,
+                new Dictionary<int, int>(),
+                "node.example",
+                "10.96.0.42"),
+            RuntimeTerminationMode.GracefulThenForce,
+            new RuntimeTerminationPolicy(
+                TimeSpan.FromSeconds(2),
+                TimeSpan.FromSeconds(1),
+                TimeSpan.FromSeconds(1),
+                TimeSpan.FromSeconds(1)),
+            CancellationToken.None);
+
+        await Assert.That(core.ReceivedCalls().Count(call =>
+            call.GetMethodInfo().Name == "ReadNamespacedPodWithHttpMessagesAsync"))
+            .IsEqualTo(4);
+        var podDeletes = core.ReceivedCalls()
+            .Where(call => call.GetMethodInfo().Name
+                == "DeleteNamespacedPodWithHttpMessagesAsync")
+            .ToArray();
+        await Assert.That(podDeletes).HasSingleItem();
+        await Assert.That(((V1DeleteOptions)podDeletes[0].GetArguments()[2]!).GracePeriodSeconds)
+            .IsEqualTo(2);
     }
 
     [Test]

@@ -51,6 +51,7 @@ public sealed class ContainerRuntimeHandlerTests
         await Assert.That(lifecycle.EnsureRunningCalls).IsEqualTo(1);
         await Assert.That(reconciler.Destroyed)
             .IsEquivalentTo([new RuntimeResourceIdentity(runtimeInstanceId)]);
+        await Assert.That(reconciler.Modes).IsEquivalentTo([RuntimeTerminationMode.Force]);
         await Assert.That(capacity.ReleasedRuntimeIds).IsEquivalentTo([runtimeInstanceId]);
     }
 
@@ -90,6 +91,8 @@ public sealed class ContainerRuntimeHandlerTests
         var failure = (RuntimeStopFailed)result;
         await Assert.That(failure.RunnerId).IsEqualTo(message.RunnerId);
         await Assert.That(lifecycle.Destroyed).IsEquivalentTo([receipt]);
+        await Assert.That(lifecycle.DestroyModes)
+            .IsEquivalentTo([RuntimeTerminationMode.GracefulThenForce]);
         await Assert.That(sandbox.DeletedNetworks).IsEquivalentTo(["network-1"]);
         await Assert.That(lifecycle.ReadResourceIds).IsEquivalentTo(["container-1"]);
         await Assert.That(sandbox.CheckedNetworks).IsEquivalentTo(["network-1"]);
@@ -184,8 +187,9 @@ public sealed class ContainerRuntimeHandlerTests
         var runtimeInstanceId = Guid.Parse("11111111-1111-1111-1111-111111111111");
         var reconciler = new RecordingResourceReconciler();
         var capacity = new RecordingCapacity(RunnerCapacityReleaseOutcome.Released);
+        var lifecycle = new RecordingContainerLifecycle();
         var handler = CreateHandler(
-            new RecordingContainerLifecycle(),
+            lifecycle,
             new RecordingSandboxLifecycle(),
             capacity,
             new FixedWorkReader(new(
@@ -201,7 +205,37 @@ public sealed class ContainerRuntimeHandlerTests
         await Assert.That(acknowledgement.RunnerId).IsEqualTo(message.RunnerId);
         await Assert.That(reconciler.Destroyed)
             .IsEquivalentTo([new RuntimeResourceIdentity(runtimeInstanceId)]);
+        await Assert.That(reconciler.Modes)
+            .IsEquivalentTo([RuntimeTerminationMode.GracefulThenForce]);
         await Assert.That(capacity.ReleasedRuntimeIds).IsEquivalentTo([runtimeInstanceId]);
+    }
+
+    [Test]
+    public async Task Stop_does_not_release_capacity_while_provider_resources_remain()
+    {
+        var runtimeInstanceId = Guid.Parse("11111111-1111-1111-1111-111111111111");
+        var identity = new RuntimeResourceIdentity(runtimeInstanceId);
+        var reconciler = new RecordingResourceReconciler
+        {
+            Remaining = [identity]
+        };
+        var capacity = new RecordingCapacity(RunnerCapacityReleaseOutcome.Released);
+        var handler = CreateHandler(
+            new RecordingContainerLifecycle(),
+            new RecordingSandboxLifecycle(),
+            capacity,
+            new FixedWorkReader(new(
+                RuntimeProvider.Docker,
+                ProviderReceiptJson: null)),
+            reconciler);
+
+        var result = await handler.Handle(
+            new StopContainerRuntime(runtimeInstanceId, "runner-a"),
+            CancellationToken.None);
+
+        await Assert.That(result).IsTypeOf<RuntimeStopFailed>();
+        await Assert.That(reconciler.Destroyed).IsEquivalentTo([identity]);
+        await Assert.That(capacity.ReleasedRuntimeIds).IsEmpty();
     }
 
     [Test]
@@ -210,6 +244,7 @@ public sealed class ContainerRuntimeHandlerTests
         var runtimeInstanceId = Guid.Parse("11111111-1111-1111-1111-111111111111");
         var reconciler = new RecordingResourceReconciler();
         var capacity = new RecordingCapacity(RunnerCapacityReleaseOutcome.Released);
+        var lifecycle = new RecordingContainerLifecycle();
         var receipt = new ContainerReceipt(
             runtimeInstanceId,
             RuntimeProvider.Docker,
@@ -221,7 +256,7 @@ public sealed class ContainerRuntimeHandlerTests
             "network-1",
             runtimeInstanceId);
         var handler = CreateHandler(
-            new RecordingContainerLifecycle(),
+            lifecycle,
             new RecordingSandboxLifecycle(),
             capacity,
             new FixedWorkReader(new(
@@ -242,6 +277,7 @@ public sealed class ContainerRuntimeHandlerTests
         await Assert.That(result).IsTypeOf<RuntimeForceTerminated>();
         await Assert.That(((RuntimeForceTerminated)result).CleanupResult)
             .IsEqualTo(RuntimeCleanupResult.ResourcesAbsent);
+        await Assert.That(lifecycle.DestroyModes).IsEquivalentTo([RuntimeTerminationMode.Force]);
         await Assert.That(reconciler.Destroyed).IsEmpty();
         await Assert.That(capacity.ReleasedRuntimeIds).IsEquivalentTo([runtimeInstanceId]);
     }
@@ -271,6 +307,7 @@ public sealed class ContainerRuntimeHandlerTests
         await Assert.That(result).IsTypeOf<RuntimeForceTerminated>();
         await Assert.That(reconciler.Destroyed)
             .IsEquivalentTo([new RuntimeResourceIdentity(runtimeInstanceId)]);
+        await Assert.That(reconciler.Modes).IsEquivalentTo([RuntimeTerminationMode.Force]);
         await Assert.That(capacity.ReleasedRuntimeIds).IsEquivalentTo([runtimeInstanceId]);
     }
 
@@ -301,6 +338,7 @@ public sealed class ContainerRuntimeHandlerTests
     private sealed class RecordingContainerLifecycle : IContainerLifecycle
     {
         public List<ContainerReceipt> Destroyed { get; } = [];
+        public List<RuntimeTerminationMode> DestroyModes { get; } = [];
         public List<string> ReadResourceIds { get; } = [];
         public Exception? ProvisionFailure { get; init; }
         public int EnsureRunningCalls { get; private set; }
@@ -326,6 +364,16 @@ public sealed class ContainerRuntimeHandlerTests
         {
             Destroyed.Add(receipt);
             return Task.CompletedTask;
+        }
+
+        public Task DestroyAsync(
+            ContainerReceipt receipt,
+            RuntimeTerminationMode mode,
+            RuntimeTerminationPolicy policy,
+            CancellationToken cancellationToken)
+        {
+            DestroyModes.Add(mode);
+            return DestroyAsync(receipt, cancellationToken);
         }
 
         public Task<ContainerReceipt?> GetAsync(
@@ -454,11 +502,13 @@ public sealed class ContainerRuntimeHandlerTests
     private sealed class RecordingResourceReconciler : IRuntimeManagedResourceReconciler
     {
         public List<RuntimeResourceIdentity> Destroyed { get; } = [];
+        public List<RuntimeTerminationMode> Modes { get; } = [];
+        public IReadOnlyList<RuntimeResourceIdentity> Remaining { get; init; } = [];
         public RuntimeProvider Provider => RuntimeProvider.Docker;
 
         public Task<IReadOnlyList<RuntimeResourceIdentity>> ListManagedAsync(
             CancellationToken cancellationToken) =>
-            Task.FromResult<IReadOnlyList<RuntimeResourceIdentity>>([]);
+            Task.FromResult(Remaining);
 
         public Task DestroyByIdentityAsync(
             RuntimeResourceIdentity identity,
@@ -466,6 +516,16 @@ public sealed class ContainerRuntimeHandlerTests
         {
             Destroyed.Add(identity);
             return Task.CompletedTask;
+        }
+
+        public Task DestroyByIdentityAsync(
+            RuntimeResourceIdentity identity,
+            RuntimeTerminationMode mode,
+            RuntimeTerminationPolicy policy,
+            CancellationToken cancellationToken)
+        {
+            Modes.Add(mode);
+            return DestroyByIdentityAsync(identity, cancellationToken);
         }
     }
 }

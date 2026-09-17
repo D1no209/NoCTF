@@ -15,6 +15,108 @@ public sealed class DockerComposeRuntimeIntegrationTests
 {
     [Test]
     [Timeout(300_000)]
+    public async Task Force_down_removes_project_resources_when_the_work_directory_is_missing(
+        CancellationToken cancellationToken)
+    {
+        await DockerIntegrationTest.RunAsync(async () =>
+        {
+            await using var imageProbe = new ContainerBuilder("busybox:1.36.1")
+                .WithCommand("true")
+                .Build();
+            await imageProbe.StartAsync(cancellationToken);
+            var operationId = Guid.NewGuid();
+            var projectName = $"missing-{operationId:N}";
+            var networkName = $"{projectName}-default";
+            var labels = new Dictionary<string, string>
+            {
+                ["com.docker.compose.project"] = projectName
+            };
+            using var docker = new DockerClientBuilder()
+                .WithEndpoint(new Uri(DockerEndpoint()))
+                .Build();
+            var network = await docker.Networks.CreateNetworkAsync(
+                new NetworksCreateParameters
+                {
+                    Name = networkName,
+                    Labels = labels
+                },
+                cancellationToken);
+            var created = await docker.Containers.CreateContainerAsync(
+                new CreateContainerParameters
+                {
+                    Image = "busybox:1.36.1",
+                    Cmd = ["sleep", "300"],
+                    Labels = labels,
+                    HostConfig = new HostConfig { NetworkMode = networkName }
+                },
+                cancellationToken);
+            _ = await docker.Containers.StartContainerAsync(
+                created.ID,
+                new ContainerStartParameters(),
+                cancellationToken);
+            var workRoot = Path.Combine(
+                Path.GetTempPath(),
+                $"noctf-compose-missing-{operationId:N}");
+            var runtime = new DockerComposeRuntime(
+                new DockerRuntimeOptions(Endpoint: DockerEndpoint()),
+                workDirectory: workRoot);
+            try
+            {
+                await runtime.DownAsync(
+                    new ComposeReceipt(
+                        operationId,
+                        RuntimeProvider.Docker,
+                        projectName,
+                        Path.Combine(workRoot, operationId.ToString("N")),
+                        "127.0.0.1",
+                        DateTimeOffset.UtcNow),
+                    RuntimeTerminationMode.Force,
+                    RuntimeTerminationPolicy.Default,
+                    cancellationToken);
+
+                Func<Task> inspectContainer = async () =>
+                    _ = await docker.Containers.InspectContainerAsync(
+                        created.ID,
+                        cancellationToken);
+                Func<Task> inspectNetwork = async () =>
+                    _ = await docker.Networks.InspectNetworkAsync(
+                        network.ID,
+                        cancellationToken);
+                await Assert.That(inspectContainer).ThrowsException();
+                await Assert.That(inspectNetwork).ThrowsException();
+            }
+            finally
+            {
+                try
+                {
+                    await docker.Containers.RemoveContainerAsync(
+                        created.ID,
+                        new ContainerRemoveParameters { Force = true },
+                        CancellationToken.None);
+                }
+                catch (DockerContainerNotFoundException)
+                {
+                    // The termination contract removed the container.
+                }
+                try
+                {
+                    await docker.Networks.DeleteNetworkAsync(
+                        network.ID,
+                        CancellationToken.None);
+                }
+                catch (DockerApiException exception)
+                    when (exception.StatusCode == System.Net.HttpStatusCode.NotFound)
+                {
+                    // The termination contract removed the network.
+                }
+                if (Directory.Exists(workRoot))
+                    Directory.Delete(workRoot, recursive: true);
+            }
+        });
+    }
+
+    [Test]
+    [Timeout(300_000)]
     public async Task Real_Docker_Compose_provisions_resolves_ports_executes_and_cleans_up(
         CancellationToken cancellationToken)
     {

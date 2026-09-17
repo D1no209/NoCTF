@@ -1,6 +1,6 @@
+using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
-using System.Security.Cryptography;
 using Docker.DotNet;
 using Docker.DotNet.Models;
 using DotNet.Testcontainers.Builders;
@@ -18,6 +18,79 @@ namespace NoCTF.Tests.Integration.Runtime;
 [NotInParallel]
 public sealed class DockerContainerLifecycleTests
 {
+    [Test]
+    [Timeout(300_000)]
+    public async Task Container_that_ignores_sigterm_is_force_removed_within_the_cleanup_budget(
+        CancellationToken cancellationToken)
+    {
+        await DockerIntegrationTest.RunAsync(async () =>
+        {
+            await using var imageProbe = new ContainerBuilder("busybox:1.36.1")
+                .WithCommand("true")
+                .Build();
+            await imageProbe.StartAsync(cancellationToken);
+            using var lifecycle = CreateLifecycle();
+            var operationId = Guid.NewGuid();
+            var networkName = $"noctf-stop-it-{operationId:N}";
+            using var docker = new DockerClientBuilder()
+                .WithEndpoint(new Uri(DockerEndpoint()))
+                .Build();
+            var network = await docker.Networks.CreateNetworkAsync(
+                new NetworksCreateParameters { Name = networkName },
+                cancellationToken);
+            ContainerReceipt? receipt = null;
+            try
+            {
+                receipt = await lifecycle.CreateAsync(new ContainerRequest(
+                    operationId,
+                    RuntimeProvider.Docker,
+                    "busybox:1.36.1",
+                    ["/bin/sh", "-c", "trap '' TERM; while true; do sleep 1; done"],
+                    new Dictionary<string, string>(),
+                    new Dictionary<string, string>
+                    {
+                        ["noctf.io/managed"] = "true",
+                        ["noctf.io/runtime-instance-id"] = operationId.ToString("D")
+                    },
+                    new Dictionary<int, int>(),
+                    new RuntimeResourceLimits(128 * 1024 * 1024, 100_000_000, 64),
+                    new ContainerSecurityPolicy(true, false, false, ["ALL"], []),
+                    TimeSpan.FromMinutes(1),
+                    NetworkName: networkName,
+                    RuntimeInstanceId: operationId), cancellationToken);
+                var started = System.Diagnostics.Stopwatch.GetTimestamp();
+
+                await lifecycle.DestroyAsync(
+                    receipt,
+                    RuntimeTerminationMode.GracefulThenForce,
+                    new RuntimeTerminationPolicy(
+                        TimeSpan.FromSeconds(2),
+                        TimeSpan.FromSeconds(8),
+                        TimeSpan.FromSeconds(5),
+                        TimeSpan.FromSeconds(3)),
+                    cancellationToken);
+
+                await Assert.That(System.Diagnostics.Stopwatch.GetElapsedTime(started))
+                    .IsLessThan(TimeSpan.FromSeconds(8));
+                await Assert.That(await lifecycle.GetAsync(
+                    RuntimeProvider.Docker,
+                    receipt.ResourceId,
+                    cancellationToken)).IsNull();
+                receipt = null;
+            }
+            finally
+            {
+                if (receipt is not null)
+                    await lifecycle.DestroyAsync(
+                        receipt,
+                        RuntimeTerminationMode.Force,
+                        RuntimeTerminationPolicy.Default,
+                        CancellationToken.None);
+                await docker.Networks.DeleteNetworkAsync(network.ID, CancellationToken.None);
+            }
+        });
+    }
+
     [Test]
     [Timeout(300_000)]
     public async Task One_shot_output_is_bounded_per_stream(

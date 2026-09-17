@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Diagnostics;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using NoCTF.Domain.Runtime;
@@ -10,6 +11,7 @@ using NoCTF.Application.Runtime.Instances;
 using NoCTF.Application.Runtime.Provisioning;
 using NoCTF.Application.Runtime.Capacity;
 using NoCTF.Application.Messaging;
+using NoCTF.Application.Observability;
 using NoCTF.Application.Competitions.Events;
 using NoCTF.Application.Challenges.Testing;
 using NoCTF.Domain.Competitions;
@@ -132,11 +134,13 @@ public sealed class RuntimeProviderHandler(
     {
         ValidateAssignment(message);
         RuntimeStopWork? work = null;
+        var started = Stopwatch.GetTimestamp();
         try
         {
             work = await workReader.ReadStopAsync(message, cancellationToken);
             if (work is null)
                 return StopSucceeded(message, work);
+            RecordStopQueueDelay(message, work);
             if (work.ProviderReceiptJson is { } receiptJson)
             {
                 await RuntimeReceiptCleanup.CleanupContainerAsync(
@@ -144,6 +148,8 @@ public sealed class RuntimeProviderHandler(
                     new(message.RuntimeInstanceId),
                     work.Provider,
                     receiptJson,
+                    RuntimeTerminationMode.GracefulThenForce,
+                    runnerOptions.Value.Cleanup.ToPolicy(),
                     cancellationToken);
             }
             else
@@ -156,12 +162,14 @@ public sealed class RuntimeProviderHandler(
             await ReleaseStopCapacityOrThrowAsync(
                 message.RuntimeInstanceId,
                 cancellationToken);
+            RecordStopTotal(work, "success", started);
             return StopSucceeded(message, work);
         }
         catch (InvalidOperationException)
         {
             if (work is not null)
             {
+                RecordStopTotal(work, "failed", started);
                 providerHealth?.ReportFailure(
                     work.Provider,
                     RunnerProviderFailureKind.CleanupFailed,
@@ -176,9 +184,11 @@ public sealed class RuntimeProviderHandler(
         CancellationToken cancellationToken)
     {
         ValidateAssignment(message);
+        var started = Stopwatch.GetTimestamp();
+        RuntimeStopWork? work = null;
         try
         {
-            var work = await workReader.ReadStopAsync(message, cancellationToken);
+            work = await workReader.ReadStopAsync(message, cancellationToken);
             if (work is not null && work.Provider != message.Provider)
             {
                 return ForceTerminationFailed(
@@ -188,6 +198,8 @@ public sealed class RuntimeProviderHandler(
             }
 
             var identity = new RuntimeResourceIdentity(message.RuntimeInstanceId);
+            if (work is not null)
+                RecordStopQueueDelay(message, work);
             if (work?.ProviderReceiptJson is { } providerReceiptJson)
             {
                 await RuntimeReceiptCleanup.CleanupAsync(
@@ -196,12 +208,18 @@ public sealed class RuntimeProviderHandler(
                     identity,
                     message.Provider,
                     providerReceiptJson,
+                    RuntimeTerminationMode.Force,
+                    runnerOptions.Value.Cleanup.ToPolicy(),
                     cancellationToken);
             }
             else
             {
                 var reconciler = ReadResourceReconciler(message.Provider);
-                await reconciler.DestroyByIdentityAsync(identity, cancellationToken);
+                await reconciler.DestroyByIdentityAsync(
+                    identity,
+                    RuntimeTerminationMode.Force,
+                    runnerOptions.Value.Cleanup.ToPolicy(),
+                    cancellationToken);
                 var remaining = await reconciler.ListManagedAsync(cancellationToken);
                 if (remaining.Contains(identity))
                 {
@@ -228,6 +246,8 @@ public sealed class RuntimeProviderHandler(
                     RuntimeCleanupResult.CapacityOwnershipConflict);
             }
 
+            if (work is not null)
+                RecordStopTotal(work, "success", started);
             return ForceTerminationSucceeded(message, timeProvider.GetUtcNow());
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
@@ -236,6 +256,8 @@ public sealed class RuntimeProviderHandler(
         }
         catch
         {
+            if (work is not null)
+                RecordStopTotal(work, "failed", started);
             providerHealth?.ReportFailure(
                 message.Provider,
                 RunnerProviderFailureKind.CleanupFailed,
@@ -343,11 +365,13 @@ public sealed class RuntimeProviderHandler(
     {
         ValidateAssignment(message);
         RuntimeStopWork? work = null;
+        var started = Stopwatch.GetTimestamp();
         try
         {
             work = await workReader.ReadStopAsync(message, cancellationToken);
             if (work is null)
                 return StopSucceeded(message, work);
+            RecordStopQueueDelay(message, work);
             if (work.ProviderReceiptJson is { } receiptJson)
             {
                 await RuntimeReceiptCleanup.CleanupComposeAsync(
@@ -355,6 +379,8 @@ public sealed class RuntimeProviderHandler(
                     new(message.RuntimeInstanceId),
                     work.Provider,
                     receiptJson,
+                    RuntimeTerminationMode.GracefulThenForce,
+                    runnerOptions.Value.Cleanup.ToPolicy(),
                     cancellationToken);
             }
             else
@@ -367,12 +393,14 @@ public sealed class RuntimeProviderHandler(
             await ReleaseStopCapacityOrThrowAsync(
                 message.RuntimeInstanceId,
                 cancellationToken);
+            RecordStopTotal(work, "success", started);
             return StopSucceeded(message, work);
         }
         catch (InvalidOperationException)
         {
             if (work is not null)
             {
+                RecordStopTotal(work, "failed", started);
                 providerHealth?.ReportFailure(
                     work.Provider,
                     RunnerProviderFailureKind.CleanupFailed,
@@ -473,18 +501,24 @@ public sealed class RuntimeProviderHandler(
     {
         ValidateAssignment(message);
         RuntimeStopWork? work = null;
+        var started = Stopwatch.GetTimestamp();
         try
         {
             work = await workReader.ReadStopAsync(message, cancellationToken);
             if (work is null)
                 return StopSucceeded(message, work);
+            RecordStopQueueDelay(message, work);
             if (work.Provider != RuntimeProvider.Libvirt)
                 throw new InvalidOperationException("OVA Runtime receipt provider is invalid.");
             if (work.ProviderReceiptJson is { } receiptJson)
             {
                 var receipt = JsonSerializer.Deserialize<OvaRuntimeReceipt>(receiptJson)
                     ?? throw new InvalidOperationException("Provider receipt is invalid.");
-                await providers.Appliance(work.Provider).DestroyAsync(receipt, cancellationToken);
+                await providers.Appliance(work.Provider).DestroyAsync(
+                    receipt,
+                    RuntimeTerminationMode.GracefulThenForce,
+                    runnerOptions.Value.Cleanup.ToPolicy(),
+                    cancellationToken);
             }
             else
             {
@@ -496,12 +530,14 @@ public sealed class RuntimeProviderHandler(
             await ReleaseStopCapacityOrThrowAsync(
                 message.RuntimeInstanceId,
                 cancellationToken);
+            RecordStopTotal(work, "success", started);
             return StopSucceeded(message, work);
         }
         catch (InvalidOperationException)
         {
             if (work is not null)
             {
+                RecordStopTotal(work, "failed", started);
                 providerHealth?.ReportFailure(
                     work.Provider,
                     RunnerProviderFailureKind.CleanupFailed,
@@ -528,6 +564,8 @@ public sealed class RuntimeProviderHandler(
         var reconciler = ReadResourceReconciler(provider);
         await reconciler.DestroyByIdentityAsync(
             new RuntimeResourceIdentity(message.RuntimeInstanceId),
+            RuntimeTerminationMode.Force,
+            runnerOptions.Value.Cleanup.ToPolicy(),
             cancellationToken);
         await ReleaseCapacityOrThrowAsync(message, cancellationToken);
         return new RuntimeProvisionTerminated(
@@ -544,6 +582,8 @@ public sealed class RuntimeProviderHandler(
         var reconciler = ReadResourceReconciler(provider);
         await reconciler.DestroyByIdentityAsync(
             new RuntimeResourceIdentity(message.RuntimeInstanceId),
+            RuntimeTerminationMode.Force,
+            runnerOptions.Value.Cleanup.ToPolicy(),
             cancellationToken);
         await ReleaseCapacityOrThrowAsync(message, cancellationToken);
         return new RuntimeProvisionCanceled(
@@ -564,7 +604,11 @@ public sealed class RuntimeProviderHandler(
     {
         var reconciler = ReadResourceReconciler(work.Provider);
         var identity = new RuntimeResourceIdentity(runtimeInstanceId);
-        await reconciler.DestroyByIdentityAsync(identity, cancellationToken);
+        await reconciler.DestroyByIdentityAsync(
+            identity,
+            RuntimeTerminationMode.GracefulThenForce,
+            runnerOptions.Value.Cleanup.ToPolicy(),
+            cancellationToken);
         var remaining = await reconciler.ListManagedAsync(cancellationToken);
         if (remaining.Contains(identity))
         {
@@ -576,6 +620,29 @@ public sealed class RuntimeProviderHandler(
     private static RuntimeStopped StopSucceeded(
         IRuntimeStopMessage message,
         RuntimeStopWork? work) => new(message.RuntimeInstanceId, message.RunnerId);
+
+    private void RecordStopQueueDelay(
+        IRuntimeStopMessage message,
+        RuntimeStopWork work)
+    {
+        if (message.RequestedAt == default)
+            return;
+        NoCtfTelemetry.RecordRuntimeStopQueueDelay(
+            work.Provider.ToString(),
+            work.RuntimeKind.ToString(),
+            Math.Max(0, (timeProvider.GetUtcNow() - message.RequestedAt).TotalSeconds));
+    }
+
+    private static void RecordStopTotal(
+        RuntimeStopWork work,
+        string outcome,
+        long started) =>
+        NoCtfTelemetry.RecordRuntimeStopDuration(
+            work.Provider.ToString(),
+            work.RuntimeKind.ToString(),
+            "total",
+            outcome,
+            Stopwatch.GetElapsedTime(started).TotalSeconds);
 
     private static RuntimeStopFailed StopFailed(
         IRuntimeStopMessage message,
@@ -695,7 +762,11 @@ internal static class RuntimeWriteBackOperations
             await InvalidateAwdpAttackFlagAsync(db, instance, timeProvider.GetUtcNow(), cancellationToken);
             await EndChallengeTestFlagAsync(
                 db, instance, RuntimeTestFlagState.Canceled, timeProvider.GetUtcNow(), cancellationToken);
-            await PublishRuntimeStopAsync(outbox, instance, message.RunnerId);
+            await PublishRuntimeStopAsync(
+                outbox,
+                instance,
+                message.RunnerId,
+                timeProvider.GetUtcNow());
             await AwdpFixFailureConvergence.ConvergeAwdpFixFailureAsync(
                 instance,
                 db,
@@ -720,7 +791,11 @@ internal static class RuntimeWriteBackOperations
             await InvalidateAwdpAttackFlagAsync(db, instance, timeProvider.GetUtcNow(), cancellationToken);
             await EndChallengeTestFlagAsync(
                 db, instance, RuntimeTestFlagState.Failed, timeProvider.GetUtcNow(), cancellationToken);
-            await PublishRuntimeStopAsync(outbox, instance, message.RunnerId);
+            await PublishRuntimeStopAsync(
+                outbox,
+                instance,
+                message.RunnerId,
+                timeProvider.GetUtcNow());
             await AwdpFixFailureConvergence.ConvergeAwdpFixFailureAsync(
                 instance,
                 db,
@@ -1316,21 +1391,25 @@ internal static class RuntimeWriteBackOperations
     private static ValueTask PublishRuntimeStopAsync(
         ITransactionalMessageOutbox outbox,
         RuntimeInstance instance,
-        string runnerId) =>
+        string runnerId,
+        DateTimeOffset requestedAt) =>
         instance.RuntimeKind switch
         {
             RuntimeKind.Container => outbox.PublishToRunnerNodeAsync(
                 new StopContainerRuntime(
                     instance.Id,
-                    runnerId)),
+                    runnerId,
+                    requestedAt)),
             RuntimeKind.Compose => outbox.PublishToRunnerNodeAsync(
                 new StopComposeRuntime(
                     instance.Id,
-                    runnerId)),
+                    runnerId,
+                    requestedAt)),
             RuntimeKind.OvaVm => outbox.PublishToRunnerNodeAsync(
                 new StopOvaRuntime(
                     instance.Id,
-                    runnerId)),
+                    runnerId,
+                    requestedAt)),
             _ => throw new InvalidOperationException(
                 $"Unsupported runtime kind '{instance.RuntimeKind}'.")
         };

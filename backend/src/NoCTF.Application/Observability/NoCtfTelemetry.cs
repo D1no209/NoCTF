@@ -37,6 +37,14 @@ public static class NoCtfTelemetry
         "noctf.runner.claim.attempts", unit: "{attempt}");
     private static readonly Counter<long> RuntimeOperations = Meter.CreateCounter<long>(
         "noctf.runtime.operations", unit: "{operation}");
+    private static readonly Histogram<double> RuntimeStopDuration = Meter.CreateHistogram<double>(
+        "noctf.runtime.stop.duration", unit: "s");
+    private static readonly Histogram<double> RuntimeStopQueueDelay = Meter.CreateHistogram<double>(
+        "noctf.runtime.stop.queue_delay", unit: "s");
+    private static readonly Counter<long> RuntimeStopForces = Meter.CreateCounter<long>(
+        "noctf.runtime.stop.force_total", unit: "{operation}");
+    private static readonly Counter<long> RuntimeStopResourcesRemaining = Meter.CreateCounter<long>(
+        "noctf.runtime.stop.resources_remaining_total", unit: "{operation}");
     private static readonly Counter<long> GameplayFactSubmissions = Meter.CreateCounter<long>(
         "noctf.gameplay_fact.submissions", unit: "{submission}");
     private static readonly Counter<long> GameplayFactProcessing = Meter.CreateCounter<long>(
@@ -152,6 +160,44 @@ public static class NoCtfTelemetry
 
     public static void RecordRuntimeOperation(string endpoint, string outcome) =>
         RuntimeOperations.Add(1, new TagList { { "endpoint", endpoint }, { "outcome", outcome } });
+
+    public static void RecordRuntimeStopDuration(
+        string provider,
+        string kind,
+        string stage,
+        string outcome,
+        double elapsedSeconds) =>
+        RuntimeStopDuration.Record(Math.Max(0, elapsedSeconds), new TagList
+        {
+            { "provider", provider.ToLowerInvariant() },
+            { "kind", kind.ToLowerInvariant() },
+            { "stage", stage },
+            { "outcome", outcome }
+        });
+
+    public static void RecordRuntimeStopQueueDelay(
+        string provider,
+        string kind,
+        double elapsedSeconds) =>
+        RuntimeStopQueueDelay.Record(Math.Max(0, elapsedSeconds), new TagList
+        {
+            { "provider", provider.ToLowerInvariant() },
+            { "kind", kind.ToLowerInvariant() }
+        });
+
+    public static void RecordRuntimeStopForce(string provider, string reason) =>
+        RuntimeStopForces.Add(1, new TagList
+        {
+            { "provider", provider.ToLowerInvariant() },
+            { "reason", reason }
+        });
+
+    public static void RecordRuntimeStopResourcesRemaining(string provider, string kind) =>
+        RuntimeStopResourcesRemaining.Add(1, new TagList
+        {
+            { "provider", provider.ToLowerInvariant() },
+            { "kind", kind.ToLowerInvariant() }
+        });
 
     public static void RecordGameplayFactSubmissions(
         GameplayFactKind kind,
