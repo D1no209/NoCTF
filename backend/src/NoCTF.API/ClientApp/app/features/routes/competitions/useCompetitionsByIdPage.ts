@@ -8,6 +8,7 @@ import type { WorkspaceNavGroup } from '../../app/workspace-nav'
 import { createTrailingRefresh } from '../../../lib/latest-page-refresh'
 import CompetitionCountdownComponent from '../../competitions/CompetitionCountdown.vue'
 import LifecycleBadgeComponent from '../../competitions/LifecycleBadge.vue'
+import { useCompetitionAnnouncementCatchUp } from '../../competition/useCompetitionAnnouncementCatchUp'
 
 /** Owns state, effects and commands for CompetitionsByIdPage. */
 export function useCompetitionsByIdPage() {
@@ -43,6 +44,8 @@ export function useCompetitionsByIdPage() {
   const error = ref<string | null>(null)
 
   const { user } = useAuth()
+
+  const { refreshMissedAnnouncements } = useCompetitionAnnouncementCatchUp(competitionId)
 
   const hasCompetitionStaffAccess = computed(() => competition.value?.administrationRole != null)
 
@@ -132,6 +135,7 @@ export function useCompetitionsByIdPage() {
     () => user.value?.userId,
     () => {
       if (!isWriteUpReview.value) void refreshMyTeam()
+      void refreshMissedAnnouncements()
     },
   )
 
@@ -146,12 +150,15 @@ export function useCompetitionsByIdPage() {
       competitionEventChanged: event => {
         if (event.kind === 'CompetitionAudienceChanged')
           void handleAudienceChanged()
+        if (event.kind === 'AnnouncementPublished')
+          void refreshMissedAnnouncements()
       },
       scoreboardUpdated: () => {
         if (!isWriteUpReview.value) void refreshStandingLatest()
       },
       onReconnected: () => {
         if (!isWriteUpReview.value) void refreshStandingLatest()
+        void refreshMissedAnnouncements()
       },
     })
   })
@@ -211,6 +218,7 @@ export function useCompetitionsByIdPage() {
   async function initialize() {
     await refresh()
     if (!isWriteUpReview.value) await refreshMyTeam()
+    await refreshMissedAnnouncements()
   }
 
   return {
