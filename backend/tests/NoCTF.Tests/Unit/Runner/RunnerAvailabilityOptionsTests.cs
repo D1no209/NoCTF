@@ -62,6 +62,32 @@ public sealed class RunnerOptionsTests
         await Assert.That(options.Capacity.MemoryBytes).IsEqualTo(4_294_967_296);
         await Assert.That(options.Heartbeat.Interval).IsEqualTo(TimeSpan.FromSeconds(5));
         await Assert.That(options.Heartbeat.Ttl).IsEqualTo(TimeSpan.FromSeconds(15));
+        var cleanup = options.Cleanup.ToPolicy();
+        await Assert.That(cleanup.GracefulStopTimeout).IsEqualTo(TimeSpan.FromSeconds(2));
+        await Assert.That(cleanup.ForceDeleteTimeout).IsEqualTo(TimeSpan.FromSeconds(8));
+        await Assert.That(cleanup.NetworkCleanupTimeout).IsEqualTo(TimeSpan.FromSeconds(5));
+        await Assert.That(cleanup.VerificationTimeout).IsEqualTo(TimeSpan.FromSeconds(3));
+    }
+
+    [Test]
+    public async Task Runner_cleanup_configuration_requires_positive_stage_budgets()
+    {
+        using var services = BuildServices(new Dictionary<string, string?>
+        {
+            ["Runner:Provider"] = nameof(RuntimeProvider.Docker),
+            ["Runner:Pool"] = "docker",
+            ["Runner:Id"] = "docker-1",
+            ["Runner:Capacity:MemoryBytes"] = "1024",
+            ["Runner:Capacity:NanoCpus"] = "100",
+            ["Runner:Capacity:PidsLimit"] = "10",
+            ["Runner:Heartbeat:IntervalSeconds"] = "5",
+            ["Runner:Heartbeat:TtlSeconds"] = "15",
+            ["Runner:Cleanup:VerificationTimeoutSeconds"] = "0"
+        });
+        Func<RunnerOptions> read = () =>
+            services.GetRequiredService<IOptions<RunnerOptions>>().Value;
+
+        await Assert.That(read).Throws<OptionsValidationException>();
     }
 
     [Test]

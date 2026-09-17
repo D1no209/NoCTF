@@ -4,7 +4,7 @@ namespace NoCTF.Runner.Messages;
 
 public static class IsolatedContainerProvisioner
 {
-    private static readonly TimeSpan CleanupBudget = TimeSpan.FromSeconds(15);
+    private static readonly TimeSpan ProvisioningCleanupBudget = TimeSpan.FromSeconds(15);
 
     public static async Task<ContainerReceipt> ProvisionAsync(
         IContainerLifecycle lifecycle,
@@ -39,7 +39,7 @@ public static class IsolatedContainerProvisioner
         }
         catch
         {
-            using var cleanup = new CancellationTokenSource(CleanupBudget);
+            using var cleanup = new CancellationTokenSource(ProvisioningCleanupBudget);
             await sandbox.DeleteIsolatedNetworkAsync(networkId, cleanup.Token);
             throw;
         }
@@ -51,33 +51,101 @@ public static class IsolatedContainerProvisioner
         ContainerReceipt receipt,
         CancellationToken cancellationToken)
     {
-        _ = cancellationToken;
-        List<Exception>? failures = null;
-        using var cleanup = new CancellationTokenSource(CleanupBudget);
+        await DestroyAsync(
+            lifecycle,
+            sandbox,
+            receipt,
+            RuntimeTerminationMode.GracefulThenForce,
+            RuntimeTerminationPolicy.Default,
+            cancellationToken);
+    }
+
+    public static async Task DestroyAsync(
+        IContainerLifecycle lifecycle,
+        IContainerSandboxLifecycle sandbox,
+        ContainerReceipt receipt,
+        RuntimeTerminationMode mode,
+        RuntimeTerminationPolicy policy,
+        CancellationToken cancellationToken)
+    {
+        List<Exception>? warnings = null;
         try
         {
-            await lifecycle.DestroyAsync(receipt, cleanup.Token);
+            await lifecycle.DestroyAsync(receipt, mode, policy, cancellationToken);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
         }
         catch (Exception exception)
         {
-            (failures ??= []).Add(exception);
+            (warnings ??= []).Add(exception);
         }
 
         if (receipt.NetworkId is { Length: > 0 } networkId)
         {
+            using var network = CreateStageToken(
+                cancellationToken,
+                policy.NetworkCleanupTimeout);
             try
             {
-                await sandbox.DeleteIsolatedNetworkAsync(networkId, cleanup.Token);
+                await sandbox.DeleteIsolatedNetworkAsync(networkId, network.Token);
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
             }
             catch (Exception exception)
             {
-                (failures ??= []).Add(exception);
+                (warnings ??= []).Add(exception);
             }
         }
 
-        if (failures is [var failure])
-            System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(failure).Throw();
-        if (failures is { Count: > 1 })
-            throw new AggregateException("Runtime cleanup failed.", failures);
+        using var verification = CreateStageToken(
+            cancellationToken,
+            policy.VerificationTimeout);
+        try
+        {
+            await WaitUntilAbsentAsync(lifecycle, sandbox, receipt, verification.Token);
+        }
+        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+        {
+            throw new InvalidOperationException(
+                "Runtime container or isolated network remains after cleanup.",
+                warnings is null ? null : new AggregateException(warnings));
+        }
+    }
+
+    private static async Task WaitUntilAbsentAsync(
+        IContainerLifecycle lifecycle,
+        IContainerSandboxLifecycle sandbox,
+        ContainerReceipt receipt,
+        CancellationToken cancellationToken)
+    {
+        var delays = new[] { 200, 400, 800, 1_000 };
+        var attempt = 0;
+        while (true)
+        {
+            var container = await lifecycle.GetAsync(
+                receipt.Provider,
+                receipt.ResourceId,
+                cancellationToken);
+            var networkExists = receipt.NetworkId is { Length: > 0 } networkId
+                && await sandbox.IsolatedNetworkExistsAsync(networkId, cancellationToken);
+            if (container is null && !networkExists)
+                return;
+            await Task.Delay(
+                TimeSpan.FromMilliseconds(delays[Math.Min(attempt++, delays.Length - 1)]),
+                cancellationToken);
+        }
+    }
+
+    private static CancellationTokenSource CreateStageToken(
+        CancellationToken cancellationToken,
+        TimeSpan timeout)
+    {
+        var source = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        source.CancelAfter(timeout);
+        return source;
     }
 }

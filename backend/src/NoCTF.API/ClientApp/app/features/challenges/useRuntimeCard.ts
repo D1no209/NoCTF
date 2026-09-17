@@ -5,6 +5,7 @@ import { createRuntime, extendRuntimeEndpoint, getRuntimeEndpoint, stopRuntimeEn
 import type { NoCtfapiEndpointsRuntimeRuntimeResponse } from '../../api'
 import { publicGatewayFailure, publicGatewayState } from '../../utils/public-gateway'
 import { classifyPlayerRuntimeLookup, normalizePlayerRuntime, shouldPollPlayerRuntime, type PlayerRuntimeLookupOutcome } from '../../utils/player-runtime'
+import { RUNTIME_STOP_POLL_DELAYS_MS, RUNTIME_STOP_POLL_MAX_INTERVAL_MS, RUNTIME_STOP_POLL_TIMEOUT_MS } from '../../lib/runtime-stop-polling'
 import RuntimeAccessUrlComponent from './RuntimeAccessUrl.vue'
 import { useHumanVerification } from '~/features/security/useHumanVerification'
 
@@ -79,7 +80,12 @@ export function useRuntimeCard(props: Readonly<Omit<{
       }
       return outcome === 'failed' || !shouldPollPlayerRuntime(runtime.value, now.value)
     },
-    { interval: 2000, timeout: 120_000 },
+    {
+      interval: 2_000,
+      maxInterval: RUNTIME_STOP_POLL_MAX_INTERVAL_MS,
+      timeout: RUNTIME_STOP_POLL_TIMEOUT_MS,
+      delays: RUNTIME_STOP_POLL_DELAYS_MS,
+    },
   )
 
   async function refreshUntilStopped(): Promise<void> {
@@ -111,6 +117,7 @@ export function useRuntimeCard(props: Readonly<Omit<{
   async function act(
     action: (humanVerificationHeaders: Record<string, string>) => Promise<{ error?: unknown }>,
     failMessage: string,
+    onAccepted?: () => void,
   ) {
     if (acting.value) return
     acting.value = true
@@ -123,6 +130,7 @@ export function useRuntimeCard(props: Readonly<Omit<{
       return
     }
     commandAttempt.completed()
+    onAccepted?.()
     toast.success(translate("ui.theOperationHasBeenAcceptedAndTheEnvironmentStatusIs"))
     startPolling()
     } catch (e) { toast.error(parseApiError(e, failMessage).message) }
@@ -140,10 +148,17 @@ export function useRuntimeCard(props: Readonly<Omit<{
     headers: { ...commandAttempt.headers({ ...path.value, action: 'start' }), ...verificationHeaders },
   }), translate("ui.failedToStartEnvironment"))
 
-  const stop = () => runtime.value && act(verificationHeaders => stopRuntimeEndpoint({
-    path: { ...path.value, runtimeInstanceId: runtime.value!.id! },
-    headers: { ...commandAttempt.headers({ ...path.value, action: 'stop' }), ...verificationHeaders },
-  }), translate("ui.stopEnvironmentFailed"))
+  const stop = () => {
+    const current = runtime.value
+    if (!current?.id) return
+    return act(verificationHeaders => stopRuntimeEndpoint({
+      path: { ...path.value, runtimeInstanceId: current.id! },
+      headers: { ...commandAttempt.headers({ ...path.value, action: 'stop' }), ...verificationHeaders },
+    }), translate("ui.stopEnvironmentFailed"), () => {
+      if (runtime.value?.id === current.id)
+        runtime.value = { ...runtime.value, state: 'Stopping' }
+    })
+  }
 
   const reset = () => runtime.value && act(verificationHeaders => createRuntime({
     path: path.value,

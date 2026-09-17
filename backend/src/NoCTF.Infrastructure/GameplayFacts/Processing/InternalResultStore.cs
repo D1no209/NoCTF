@@ -304,7 +304,8 @@ public sealed class InternalResultStore(
         await outbox.PublishToRunnerNodeAsync(new StopContainerRuntime(
             runtime.Id,
             runtime.RunnerId
-                ?? throw new InvalidOperationException("AWDP target has no owning Runner.")));
+                ?? throw new InvalidOperationException("AWDP target has no owning Runner."),
+            resolvedAt));
         await QueueNextAwdpFixAttemptAsync(fact, ct);
         await db.SaveChangesAsync(ct);
         await transaction.CommitAsync(ct);

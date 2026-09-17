@@ -1,6 +1,7 @@
 import { sourceFile } from './support/feature-source'
 import { describe, expect, test } from 'bun:test'
 import { createRuntimeOperationCoordinator } from '../app/lib/runtime-operation-coordinator'
+import { RUNTIME_STOP_POLL_DELAYS_MS } from '../app/lib/runtime-stop-polling'
 
 describe('runtime operation coordinator', () => {
   test('allows different instances to run concurrently and rejects duplicates for one instance', () => {
@@ -51,6 +52,23 @@ describe('runtime operation coordinator', () => {
     operations.finish(token)
   })
 
+  test('uses the short stop schedule before returning to bounded backoff', async () => {
+    const delays: number[] = []
+    const operations = createRuntimeOperationCoordinator({
+      maxAttempts: 8,
+      intervalMs: 2_000,
+      maxIntervalMs: 30_000,
+      delaysMs: RUNTIME_STOP_POLL_DELAYS_MS,
+      timeoutMs: 10_000,
+      wait: async delay => { delays.push(delay) },
+    })
+    const token = operations.begin('runtime-a', 'terminate')!
+
+    expect(await operations.poll(token, async () => false)).toBe('exhausted')
+    expect(delays).toEqual([500, 1_000, 1_000, 2_000, 2_000, 3_000, 4_500])
+    operations.finish(token)
+  })
+
   test('cancels in-flight refreshes and clears pending state when the view leaves', async () => {
     const operations = createRuntimeOperationCoordinator({ timeoutMs: 10_000 })
     const token = operations.begin('runtime-a', 'force-terminate')!
@@ -91,7 +109,7 @@ describe('runtime administration operation wiring', () => {
     ).text()
 
     expect(source.match(/const shouldNotify = runtimeOperations\.isActive\(token\)\s+runtimeOperations\.finish\(token\)\s+if \(shouldNotify\) toast\.error\(parseApiError\(e\)\.message\)/g)?.length).toBe(4)
-    expect(source).not.toMatch(/rt\.state\s*=(?!=)/)
-    expect(source).not.toMatch(/items\.value\s*=(?!=)/)
+    expect(source).toContain("markRuntimeStopping(rt.id)")
+    expect(source).toContain("? { ...item, state: 'Stopping' }")
   })
 })

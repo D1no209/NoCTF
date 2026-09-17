@@ -38,10 +38,24 @@ public interface IOvaRuntime
         OvaRuntimeReceipt receipt,
         CancellationToken cancellationToken);
 
+    Task DestroyAsync(
+        OvaRuntimeReceipt receipt,
+        RuntimeTerminationMode mode,
+        RuntimeTerminationPolicy policy,
+        CancellationToken cancellationToken) =>
+        DestroyAsync(receipt, cancellationToken);
+
     Task<IReadOnlyList<OvaManagedRuntimeResource>> ListManagedAsync(
         CancellationToken cancellationToken);
 
     Task DestroyByIdentityAsync(
         OvaManagedRuntimeResource identity,
         CancellationToken cancellationToken);
+
+    Task DestroyByIdentityAsync(
+        OvaManagedRuntimeResource identity,
+        RuntimeTerminationMode mode,
+        RuntimeTerminationPolicy policy,
+        CancellationToken cancellationToken) =>
+        DestroyByIdentityAsync(identity, cancellationToken);
 }

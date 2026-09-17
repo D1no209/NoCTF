@@ -1,6 +1,7 @@
 using System.Buffers;
 using System.Globalization;
 using System.Net;
+using System.Diagnostics;
 using System.Text;
 using Docker.DotNet;
 using Docker.DotNet.Models;
@@ -285,48 +286,183 @@ public sealed class DockerContainerLifecycle : IContainerLifecycle, IOneShotJobR
 
     public async Task DestroyAsync(ContainerReceipt receipt, CancellationToken cancellationToken)
     {
-        Exception? failure = null;
-        try
+        await DestroyAsync(
+            receipt,
+            RuntimeTerminationMode.GracefulThenForce,
+            RuntimeTerminationPolicy.Default,
+            cancellationToken);
+    }
+
+    public async Task DestroyAsync(
+        ContainerReceipt receipt,
+        RuntimeTerminationMode mode,
+        RuntimeTerminationPolicy policy,
+        CancellationToken cancellationToken)
+    {
+        var warnings = new List<Exception>();
+        var gracefulSucceeded = false;
+        if (mode == RuntimeTerminationMode.GracefulThenForce)
         {
-            await client.Containers.StopContainerAsync(receipt.ResourceId, new ContainerStopParameters(), cancellationToken);
+            var started = Stopwatch.GetTimestamp();
+            using var graceful = CreateStageToken(cancellationToken, policy.GracefulStopTimeout);
+            try
+            {
+                await client.Containers.StopContainerAsync(
+                    receipt.ResourceId,
+                    new ContainerStopParameters
+                    {
+                        WaitBeforeKillSeconds = checked((uint)Math.Max(
+                            1,
+                            Math.Ceiling(policy.GracefulStopTimeout.TotalSeconds)))
+                    },
+                    graceful.Token);
+                gracefulSucceeded = true;
+                NoCtfTelemetry.RecordRuntimeStopDuration(
+                    "docker", "container", "graceful", "success",
+                    Stopwatch.GetElapsedTime(started).TotalSeconds);
+            }
+            catch (DockerContainerNotFoundException)
+            {
+                gracefulSucceeded = true;
+                NoCtfTelemetry.RecordRuntimeStopDuration(
+                    "docker", "container", "graceful", "absent",
+                    Stopwatch.GetElapsedTime(started).TotalSeconds);
+            }
+            catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+            {
+                NoCtfTelemetry.RecordRuntimeStopDuration(
+                    "docker", "container", "graceful", "timeout",
+                    Stopwatch.GetElapsedTime(started).TotalSeconds);
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
+            }
+            catch (Exception exception)
+            {
+                warnings.Add(exception);
+                NoCtfTelemetry.RecordRuntimeStopDuration(
+                    "docker", "container", "graceful", "warning",
+                    Stopwatch.GetElapsedTime(started).TotalSeconds);
+            }
         }
-        catch (DockerContainerNotFoundException)
-        {
-            // Destroy is idempotent: an externally removed runtime is already stopped.
-        }
-        catch (Exception exception)
-        {
-            failure = exception;
-        }
+
+        var forceStarted = Stopwatch.GetTimestamp();
+        if (mode == RuntimeTerminationMode.Force || !gracefulSucceeded)
+            NoCtfTelemetry.RecordRuntimeStopForce(
+                "docker",
+                mode == RuntimeTerminationMode.Force ? "requested" : "graceful_failed");
+        using var force = CreateStageToken(cancellationToken, policy.ForceDeleteTimeout);
         try
         {
             await client.Containers.RemoveContainerAsync(
                 receipt.ResourceId,
                 new ContainerRemoveParameters { Force = true },
-                cancellationToken);
+                force.Token);
+            NoCtfTelemetry.RecordRuntimeStopDuration(
+                "docker", "container", "force_delete", "success",
+                Stopwatch.GetElapsedTime(forceStarted).TotalSeconds);
         }
         catch (DockerContainerNotFoundException)
         {
-            // A failed or skipped stop may still race with external cleanup.
+            NoCtfTelemetry.RecordRuntimeStopDuration(
+                "docker", "container", "force_delete", "absent",
+                Stopwatch.GetElapsedTime(forceStarted).TotalSeconds);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
         }
         catch (Exception exception)
         {
-            failure ??= exception;
+            warnings.Add(exception);
+            NoCtfTelemetry.RecordRuntimeStopDuration(
+                "docker", "container", "force_delete", "warning",
+                Stopwatch.GetElapsedTime(forceStarted).TotalSeconds);
         }
+
+        var networkStarted = Stopwatch.GetTimestamp();
+        using var network = CreateStageToken(cancellationToken, policy.NetworkCleanupTimeout);
         try
         {
             await DeleteCallbackNetworkAsync(
                 receipt.OperationId,
                 new RuntimeResourceIdentity(
                     receipt.RuntimeInstanceId ?? receipt.OperationId),
-                cancellationToken);
+                network.Token);
+            NoCtfTelemetry.RecordRuntimeStopDuration(
+                "docker", "container", "network_cleanup", "success",
+                Stopwatch.GetElapsedTime(networkStarted).TotalSeconds);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
         }
         catch (Exception exception)
         {
-            failure ??= exception;
+            warnings.Add(exception);
+            NoCtfTelemetry.RecordRuntimeStopDuration(
+                "docker", "container", "network_cleanup", "warning",
+                Stopwatch.GetElapsedTime(networkStarted).TotalSeconds);
         }
-        if (failure is not null)
-            System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(failure).Throw();
+
+        var verificationStarted = Stopwatch.GetTimestamp();
+        using var verification = CreateStageToken(cancellationToken, policy.VerificationTimeout);
+        try
+        {
+            await WaitUntilDestroyedAsync(receipt, verification.Token);
+            NoCtfTelemetry.RecordRuntimeStopDuration(
+                "docker", "container", "verification", "success",
+                Stopwatch.GetElapsedTime(verificationStarted).TotalSeconds);
+        }
+        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+        {
+            NoCtfTelemetry.RecordRuntimeStopResourcesRemaining("docker", "container");
+            NoCtfTelemetry.RecordRuntimeStopDuration(
+                "docker", "container", "verification", "timeout",
+                Stopwatch.GetElapsedTime(verificationStarted).TotalSeconds);
+            throw new InvalidOperationException(
+                "Docker Runtime resources remain after the termination budget.",
+                warnings.Count == 0 ? null : new AggregateException(warnings));
+        }
+    }
+
+    private async Task WaitUntilDestroyedAsync(
+        ContainerReceipt receipt,
+        CancellationToken cancellationToken)
+    {
+        var delays = new[] { 200, 400, 800, 1_000 };
+        var attempt = 0;
+        while (true)
+        {
+            var container = await GetAsync(
+                RuntimeProvider.Docker,
+                receipt.ResourceId,
+                cancellationToken);
+            var callbackNetwork = await FindNetworkAsync(
+                CallbackNetworkName(receipt.OperationId),
+                cancellationToken);
+            var callbackNetworkRemains = callbackNetwork is not null
+                && HasResourceIdentity(
+                    callbackNetwork.Labels,
+                    new RuntimeResourceIdentity(
+                        receipt.RuntimeInstanceId ?? receipt.OperationId));
+            if (container is null && !callbackNetworkRemains)
+                return;
+            await Task.Delay(
+                TimeSpan.FromMilliseconds(delays[Math.Min(attempt++, delays.Length - 1)]),
+                timeProvider,
+                cancellationToken);
+        }
+    }
+
+    private static CancellationTokenSource CreateStageToken(
+        CancellationToken cancellationToken,
+        TimeSpan timeout)
+    {
+        var source = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        source.CancelAfter(timeout);
+        return source;
     }
 
     public async Task<ContainerReceipt?> GetAsync(RuntimeProvider provider, string resourceId, CancellationToken cancellationToken)

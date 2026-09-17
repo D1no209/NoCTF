@@ -13,12 +13,27 @@ public sealed class RunnerOptions
     public RuntimeProvider? Provider { get; set; }
     public RunnerCapacityOptions Capacity { get; set; } = new();
     public RunnerHeartbeatOptions Heartbeat { get; set; } = new();
+    public RunnerCleanupOptions Cleanup { get; set; } = new();
     public int ProviderFailureHoldSeconds { get; set; } = 120;
 
     public RuntimeResourceLimits ResourceCapacity => new(
         Capacity.MemoryBytes,
         Capacity.NanoCpus,
         Capacity.PidsLimit);
+}
+
+public sealed class RunnerCleanupOptions
+{
+    public int GracefulStopSeconds { get; set; } = 2;
+    public int ForceDeleteTimeoutSeconds { get; set; } = 8;
+    public int NetworkCleanupTimeoutSeconds { get; set; } = 5;
+    public int VerificationTimeoutSeconds { get; set; } = 3;
+
+    public RuntimeTerminationPolicy ToPolicy() => new(
+        TimeSpan.FromSeconds(GracefulStopSeconds),
+        TimeSpan.FromSeconds(ForceDeleteTimeoutSeconds),
+        TimeSpan.FromSeconds(NetworkCleanupTimeoutSeconds),
+        TimeSpan.FromSeconds(VerificationTimeoutSeconds));
 }
 
 public sealed class RunnerCapacityOptions
@@ -57,6 +72,13 @@ public sealed class RunnerOptionsValidator : IValidateOptions<RunnerOptions>
             failures.Add("Runner heartbeat TTL must be greater than its positive interval.");
         if (options.ProviderFailureHoldSeconds <= 0)
             failures.Add("Runner provider failure hold must be a positive number of seconds.");
+        if (options.Cleanup.GracefulStopSeconds <= 0
+            || options.Cleanup.ForceDeleteTimeoutSeconds <= 0
+            || options.Cleanup.NetworkCleanupTimeoutSeconds <= 0
+            || options.Cleanup.VerificationTimeoutSeconds <= 0)
+        {
+            failures.Add("Runner cleanup timeouts must be positive numbers of seconds.");
+        }
         return failures.Count == 0
             ? ValidateOptionsResult.Success
             : ValidateOptionsResult.Fail(failures);
