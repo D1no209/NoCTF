@@ -43,6 +43,7 @@ export const messages = {
   "ui.noDataYet": "暂无数据",
   "ui.theLeaderboardIsFrozenThisSnapshotIsCurrentAsOf": "排行榜已冻结，以下为截至 {time} 的快照。",
   "ui.selectLeaderboardTrack": "选择排行榜赛道",
+  "ui.showLeaderboardHiddenTeams": "显示排行榜不可见队伍",
   "ui.teamScoreTrend": "队伍得分趋势",
   "ui.viewTheCumulativeScoreChangesForOneTeam": "查看单支队伍的累计分值变化",
   "ui.noScoreTrendDataYet": "暂无得分趋势",

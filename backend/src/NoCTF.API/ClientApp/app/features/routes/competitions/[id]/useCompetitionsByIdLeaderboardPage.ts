@@ -29,14 +29,25 @@ export function useCompetitionsByIdLeaderboardPage() {
 
   const visibleTeamCount = ref(50)
 
+  const showLeaderboardHiddenTeams = ref(false)
+
   const canViewInternalTracks = computed(() => {
     const role = ctx.competition.value?.administrationRole
     return isAdministrator.value || role === 'Owner' || role === 'Manager' || role === 'Judge'
   })
 
+  const publiclyVisibleTrackKeys = computed(() => new Set(
+    (board.snapshot.value?.tracks ?? [])
+      .filter(track => !track.isInternal && track.visibleOnLeaderboard)
+      .map(track => track.key),
+  ))
+
   const availableTracks = computed(() => tracksEnabled.value
-    ? (board.snapshot.value?.tracks ?? []).filter(track => canViewInternalTracks.value
-        || !track.isInternal && (track.isViewerTrack || track.visibleOnLeaderboard))
+    ? (board.snapshot.value?.tracks ?? []).filter(track => (
+        canViewInternalTracks.value && showLeaderboardHiddenTeams.value
+      ) || (
+        !track.isInternal && (track.isViewerTrack || track.visibleOnLeaderboard)
+      ))
     : [])
 
   const selectedAllTracks = computed(() => selectedTrackKey.value === allTracksKey)
@@ -56,7 +67,9 @@ export function useCompetitionsByIdLeaderboardPage() {
   }, { immediate: true })
 
   const teams = computed(() => {
-    const all = board.snapshot.value?.teams ?? []
+    let all = board.snapshot.value?.teams ?? []
+    if (tracksEnabled.value && canViewInternalTracks.value && !showLeaderboardHiddenTeams.value)
+      all = all.filter(team => publiclyVisibleTrackKeys.value.has(team.trackKey))
     if (tracksEnabled.value && !selectedAllTracks.value)
       return all.filter(team => team.trackKey === selectedTrackKey.value)
     return [...all].sort((left, right) => {
@@ -506,6 +519,8 @@ export function useCompetitionsByIdLeaderboardPage() {
       selectedTrackKey,
       tracksEnabled,
       visibleTeamCount,
+      canViewInternalTracks,
+      showLeaderboardHiddenTeams,
       availableTracks,
       selectedAllTracks,
       trackName,

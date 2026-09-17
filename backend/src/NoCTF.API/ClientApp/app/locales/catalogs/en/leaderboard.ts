@@ -43,6 +43,7 @@ export const messages = {
   "ui.noDataYet": "No data yet",
   "ui.theLeaderboardIsFrozenThisSnapshotIsCurrentAsOf": "The leaderboard is frozen. This snapshot is current as of {time}.",
   "ui.selectLeaderboardTrack": "Select leaderboard track",
+  "ui.showLeaderboardHiddenTeams": "Show teams hidden from leaderboard",
   "ui.teamScoreTrend": "Team score trend",
   "ui.viewTheCumulativeScoreChangesForOneTeam": "View the cumulative score changes for one team.",
   "ui.noScoreTrendDataYet": "No score trend data yet",
