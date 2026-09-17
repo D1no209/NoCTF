@@ -32,6 +32,14 @@ public sealed class HumanVerificationOptionsTests
         await Assert.That(options.IsValid(development: false)).IsTrue();
         await Assert.That(options.CapApiEndpoint().AbsoluteUri)
             .IsEqualTo("https://cap.example.test/base/site-key/");
+
+        options.Cap.BackendServerUrl = "http://noctf-cap:3000";
+        await Assert.That(options.IsValid(development: false)).IsTrue();
+        await Assert.That(options.CapBackendApiEndpoint().AbsoluteUri)
+            .IsEqualTo("http://noctf-cap:3000/site-key/");
+
+        options.Cap.BackendServerUrl = "http://user@noctf-cap:3000";
+        await Assert.That(options.IsValid(development: false)).IsFalse();
     }
 
     [Test]

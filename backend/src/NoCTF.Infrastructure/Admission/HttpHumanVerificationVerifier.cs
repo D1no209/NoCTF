@@ -64,7 +64,7 @@ public sealed class HttpHumanVerificationVerifier(
         CancellationToken cancellationToken)
     {
         using var response = await clients.CreateClient(ClientName).PostAsJsonAsync(
-            new Uri(options.CapApiEndpoint(), "siteverify"),
+            new Uri(options.CapBackendApiEndpoint(), "siteverify"),
             new CapSiteverifyRequest(options.Cap.Secret, token),
             cancellationToken);
         if ((int)response.StatusCode >= 500 || response.StatusCode == System.Net.HttpStatusCode.TooManyRequests)
