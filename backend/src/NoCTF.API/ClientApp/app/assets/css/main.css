@@ -1,8 +1,6 @@
 
 @import 'vue-sonner/style.css';
 @import 'overlayscrollbars/styles/overlayscrollbars.css';
-@import '@fontsource/jetbrains-mono/latin-400.css';
-
 @import "tailwindcss";
 @import "tw-animate-css";
 @import "shadcn-vue/tailwind.css";
@@ -159,6 +157,9 @@
     height: 100%;
     overflow: hidden;
   }
+  html {
+    font-family: var(--font-sans);
+  }
   * {
     @apply border-border outline-ring/50;
     }
@@ -169,6 +170,9 @@
   h1, h2, h3 {
     @apply font-heading tracking-tight;
     }
+  code, kbd, samp, pre {
+    font-family: var(--font-mono);
+  }
   ::selection {
     @apply bg-primary text-primary-foreground;
     }
@@ -534,7 +538,7 @@ input:-webkit-autofill { -webkit-box-shadow: 0 0 0 1000px var(--control) inset; 
   display: flex; width: 100%; max-width: 32rem; height: clamp(18rem, 42dvh, 24rem); min-height: 0;
   flex-direction: column; justify-self: end;
   background: transparent; border: 0; box-shadow: none;
-  font-family: 'JetBrains Mono', 'Microsoft YaHei', '微软雅黑', monospace;
+  font-family: var(--font-mono);
   font-size: clamp(14px, 1.15vw, 18px); line-height: 1.8; font-weight: 400;
   cursor: text;
 }
