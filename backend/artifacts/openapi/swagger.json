@@ -17847,7 +17847,7 @@
             "type": "string",
             "maxLength": 64,
             "minLength": 3,
-            "pattern": "^[A-Za-z0-9_-]+$",
+            "pattern": "^[\\p{L}\\p{N}_-]+$",
             "nullable": false
           },
           "email": {
@@ -19065,6 +19065,9 @@
           "latencySustainedWindowMinutes": {
             "type": "integer",
             "format": "int32"
+          },
+          "humanVerification": {
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationPlatformHumanVerificationMonitoringResponse"
           }
         }
       },
@@ -19321,6 +19324,63 @@
           0,
           1,
           2
+        ]
+      },
+      "NoCTFAPIEndpointsAdministrationPlatformHumanVerificationMonitoringResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "provider": {
+            "$ref": "#/components/schemas/NoCTFDomainPlatformHumanVerificationProvider"
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "state": {
+            "$ref": "#/components/schemas/NoCTFApplicationAdmissionHumanVerificationMonitoringState"
+          },
+          "checkedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "latencyMilliseconds": {
+            "type": "integer",
+            "format": "int64",
+            "nullable": true
+          }
+        }
+      },
+      "NoCTFDomainPlatformHumanVerificationProvider": {
+        "type": "integer",
+        "description": "",
+        "x-enumNames": [
+          "None",
+          "Cap",
+          "Turnstile"
+        ],
+        "enum": [
+          0,
+          1,
+          2
+        ]
+      },
+      "NoCTFApplicationAdmissionHumanVerificationMonitoringState": {
+        "type": "integer",
+        "description": "",
+        "x-enumNames": [
+          "NotApplicable",
+          "Pending",
+          "Healthy",
+          "Misconfigured",
+          "Unavailable"
+        ],
+        "enum": [
+          0,
+          1,
+          2,
+          3,
+          4
         ]
       },
       "NoCTFAPIEndpointsAdministrationPlatformPlatformUserDetailResponse": {

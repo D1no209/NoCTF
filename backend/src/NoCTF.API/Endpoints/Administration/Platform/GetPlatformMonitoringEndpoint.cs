@@ -1,6 +1,8 @@
 using FastEndpoints;
 using Microsoft.AspNetCore.Http.HttpResults;
 using NoCTF.Application.Administration.Monitoring;
+using NoCTF.Application.Admission;
+using NoCTF.Domain.Platform;
 
 namespace NoCTF.API.Endpoints.Administration.Platform;
 
@@ -20,7 +22,15 @@ public sealed record PlatformMonitoringResponse(
     IReadOnlyList<PlatformMonitoringMetricResponse> Metrics,
     IReadOnlyList<PlatformMonitoringLatencyView> LatencyDetails,
     IReadOnlyList<PlatformMonitoringPoolResource> PoolResources,
-    int LatencySustainedWindowMinutes);
+    int LatencySustainedWindowMinutes,
+    HumanVerificationMonitoringResponse HumanVerification);
+
+public sealed record HumanVerificationMonitoringResponse(
+    HumanVerificationProvider Provider,
+    bool Enabled,
+    HumanVerificationMonitoringState State,
+    DateTimeOffset? CheckedAt,
+    long? LatencyMilliseconds);
 
 public sealed class GetPlatformMonitoringEndpoint(
     ObservePlatformMonitoring monitoring)
@@ -55,6 +65,15 @@ public sealed class GetPlatformMonitoringEndpoint(
                 metric.Unit,
                 metric.Value,
                 metric.Status, metric.SampleCount, metric.MinimumSamples, metric.WindowSeconds)).ToArray(),
-            view.LatencyDetails ?? [], view.PoolResources ?? [], view.LatencySustainedWindowMinutes));
+            view.LatencyDetails ?? [],
+            view.PoolResources ?? [],
+            view.LatencySustainedWindowMinutes,
+            new HumanVerificationMonitoringResponse(
+                view.HumanVerification?.Provider ?? HumanVerificationProvider.None,
+                view.HumanVerification?.Enabled ?? false,
+                view.HumanVerification?.State
+                    ?? HumanVerificationMonitoringState.NotApplicable,
+                view.HumanVerification?.CheckedAt,
+                view.HumanVerification?.LatencyMilliseconds)));
     }
 }

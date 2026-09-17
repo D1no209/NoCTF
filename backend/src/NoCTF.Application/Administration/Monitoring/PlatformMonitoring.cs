@@ -1,3 +1,6 @@
+using NoCTF.Application.Admission;
+using NoCTF.Domain.Platform;
+
 namespace NoCTF.Application.Administration.Monitoring;
 
 public enum PlatformMonitoringStatus : short
@@ -186,7 +189,8 @@ public sealed record PlatformMonitoringView(
     IReadOnlyList<PlatformMonitoringMetricView> Metrics,
     IReadOnlyList<PlatformMonitoringLatencyView>? LatencyDetails = null,
     IReadOnlyList<PlatformMonitoringPoolResource>? PoolResources = null,
-    int LatencySustainedWindowMinutes = 3);
+    int LatencySustainedWindowMinutes = 3,
+    HumanVerificationMonitoringSnapshot? HumanVerification = null);
 
 public interface IPlatformMonitoringReader
 {
@@ -196,12 +200,16 @@ public interface IPlatformMonitoringReader
 
 public sealed class ObservePlatformMonitoring(
     IPlatformMonitoringReader reader,
-    PlatformMonitoringThresholds thresholds)
+    PlatformMonitoringThresholds thresholds,
+    IHumanVerificationMonitoringReader? humanVerification = null)
 {
     public async Task<PlatformMonitoringView> ExecuteAsync(
         CancellationToken cancellationToken = default)
     {
         var measurements = await reader.ReadAsync(cancellationToken);
+        var verification = humanVerification is null
+            ? HumanVerificationMonitoringSnapshot.NotApplicable()
+            : await humanVerification.ReadAsync(cancellationToken);
         var metrics = new[]
         {
             Metric(PlatformMonitoringMetricKind.ApiRequestsPerSecond,
@@ -316,7 +324,10 @@ public sealed class ObservePlatformMonitoring(
                 Percent(measurements.DiskAvailableRatio), criticalBelow: 15)
         };
 
-        var status = ResolveOverallStatus(measurements.PrometheusAvailable, metrics);
+        var status = ResolveOverallStatus(
+            measurements.PrometheusAvailable,
+            metrics,
+            verification);
         var natsAvailable = Metric(metrics, PlatformMonitoringMetricKind.NatsAvailability)
             .Status == PlatformMonitoringStatus.Healthy;
         return new(
@@ -328,7 +339,8 @@ public sealed class ObservePlatformMonitoring(
             metrics,
             (measurements.LatencyDetails ?? []).Select(LatencyView).ToArray(),
             measurements.PoolResources ?? [],
-            thresholds.LatencySustainedWindowMinutes);
+            thresholds.LatencySustainedWindowMinutes,
+            verification);
     }
 
     private PlatformMonitoringLatencyView LatencyView(PlatformMonitoringLatencyMeasurement row)
@@ -385,8 +397,16 @@ public sealed class ObservePlatformMonitoring(
 
     private static PlatformMonitoringStatus ResolveOverallStatus(
         bool prometheusAvailable,
-        IReadOnlyList<PlatformMonitoringMetricView> metrics)
+        IReadOnlyList<PlatformMonitoringMetricView> metrics,
+        HumanVerificationMonitoringSnapshot verification)
     {
+        if (verification.Enabled
+            && verification.Provider == HumanVerificationProvider.Cap
+            && verification.State is HumanVerificationMonitoringState.Misconfigured
+                or HumanVerificationMonitoringState.Unavailable)
+        {
+            return PlatformMonitoringStatus.Critical;
+        }
         if (!prometheusAvailable)
             return PlatformMonitoringStatus.Unavailable;
         if (metrics.Any(metric => metric.Status == PlatformMonitoringStatus.Critical))

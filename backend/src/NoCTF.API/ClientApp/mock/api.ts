@@ -61,6 +61,13 @@ function mockMonitoringSnapshot(): Data {
     capturedAt: now(),
     dashboardUrl: null,
     latencySustainedWindowMinutes: 3,
+    humanVerification: {
+      provider: 1,
+      enabled: true,
+      state: 2,
+      checkedAt: now(),
+      latencyMilliseconds: 42,
+    },
     metrics: [
       metric(0, 1, 148.6, 0, 44_580),
       metric(1, 2, 186, 0, 44_580),

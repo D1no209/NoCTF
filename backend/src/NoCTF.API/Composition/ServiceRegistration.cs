@@ -131,7 +131,9 @@ public static class ServiceRegistration
         });
         if (includeInfrastructure)
         {
-            services.AddNoCtfHumanVerification();
+            services.AddNoCtfHumanVerification(
+                configuration,
+                enableMonitoring: !configuration.GetValue<bool>("OpenApi:Exporting"));
             services.AddNoCtfInfrastructure(configuration, development);
             services.AddScoped<SubmitFlag>();
             services.AddScoped<LoginUser>();

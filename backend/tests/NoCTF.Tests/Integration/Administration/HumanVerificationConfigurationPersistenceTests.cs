@@ -1,11 +1,15 @@
 using System.Text;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
+using Microsoft.Extensions.DependencyInjection;
 using NoCTF.Application.Admission;
 using NoCTF.Domain.Platform;
 using NoCTF.Infrastructure.Administration;
 using NoCTF.Infrastructure.Authentication;
 using NoCTF.Infrastructure.Persistence;
+using NoCTF.Infrastructure.Caching;
+using System.Text.Json;
+using ZiggyCreatures.Caching.Fusion;
 using Testcontainers.PostgreSql;
 
 namespace NoCTF.Tests.Integration.Administration;
@@ -40,6 +44,12 @@ public sealed class HumanVerificationConfigurationPersistenceTests
 
             await using var db = new NoCtfDbContext(options);
             await db.Database.EnsureCreatedAsync(cancellationToken);
+            var cacheServices = new ServiceCollection();
+            cacheServices.AddFusionCache(NoCtfCacheNames.ReadModels);
+            await using var cacheProviderServices =
+                cacheServices.BuildServiceProvider();
+            var cacheProvider = cacheProviderServices
+                .GetRequiredService<IFusionCacheProvider>();
             var store = new HumanVerificationConfigurationStore(
                 db,
                 protector,
@@ -52,7 +62,8 @@ public sealed class HumanVerificationConfigurationPersistenceTests
                         SiteKey = "deployment-site-key",
                         Secret = "deployment-secret"
                     }
-                }));
+                }),
+                cacheProvider);
 
             var fallback = await store.GetRuntimeConfigurationAsync(cancellationToken);
             await Assert.That(fallback.Enabled).IsTrue();
@@ -115,6 +126,16 @@ public sealed class HumanVerificationConfigurationPersistenceTests
             await Assert.That(runtime.Options.Cap.Secret).IsEqualTo("cap-secret");
             await Assert.That(runtime.Options.CapApiEndpoint().AbsoluteUri)
                 .IsEqualTo("https://cap.example.test/root/site-key/");
+
+            var cached = await cacheProvider
+                .GetCache(NoCtfCacheNames.ReadModels)
+                .GetOrDefaultAsync<HumanVerificationConfigurationSnapshot>(
+                    "human-verification-configuration",
+                    token: cancellationToken);
+            var cachedJson = JsonSerializer.Serialize(cached);
+            await Assert.That(cached).IsNotNull();
+            await Assert.That(cachedJson).DoesNotContain("cap-secret");
+            await Assert.That(cachedJson).DoesNotContain("turnstile-secret");
         });
     }
 }
