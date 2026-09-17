@@ -89,3 +89,5 @@ const { authArtwork, configuration, userName, email, password, confirmPassword, 
     </Card>
   </div>
 </template>
+
+<style src="./auth-artwork.css"></style>

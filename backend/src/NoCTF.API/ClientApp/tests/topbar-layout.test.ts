@@ -5,6 +5,7 @@ test('the top bar uses three content-sized capsules with the requested controls'
   const css = await Bun.file(new URL('../app/assets/css/main.css', import.meta.url)).text()
   const motion = await Bun.file(new URL('../app/motion/motion.css', import.meta.url)).text()
   const workspace = await Bun.file(new URL('../app/components/views/app/AppWorkspaceNavView.vue', import.meta.url)).text()
+  const workspaceCss = await Bun.file(new URL('../app/components/views/app/settings-workspace.css', import.meta.url)).text()
 
   expect(layout.match(/data-slot="topbar-capsule"/g)?.length).toBe(3)
   const left = layout.slice(layout.indexOf('data-position="left"'), layout.indexOf('data-position="center"'))
@@ -36,5 +37,6 @@ test('the top bar uses three content-sized capsules with the requested controls'
   expect(motion).toContain('opacity 520ms ease-out, transform 760ms var(--ui-ease)')
   expect(workspace).toContain('class="settings-workspace-page"')
   expect(workspace).toContain('<ChoiceSidebar')
-  expect(css).toContain('.settings-workspace-page { width: 100%; min-height: calc(100svh - 5rem);')
+  expect(workspace).toContain('<style src="./settings-workspace.css"></style>')
+  expect(workspaceCss).toContain('.settings-workspace-page { width: 100%; min-height: calc(100svh - 5rem);')
 })

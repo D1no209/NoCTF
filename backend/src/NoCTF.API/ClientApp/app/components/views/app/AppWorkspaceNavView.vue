@@ -30,3 +30,5 @@ const { title, groupOptions, options, selectedPath, selectPath } = toRefs(viewPr
     </div>
   </div>
 </template>
+
+<style src="./settings-workspace.css"></style>

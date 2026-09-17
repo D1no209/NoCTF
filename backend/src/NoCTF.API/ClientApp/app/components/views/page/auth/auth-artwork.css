@@ -1,0 +1,43 @@
+.auth-card { isolation: isolate; }
+.auth-card > .card-ornament { display: none; }
+[data-slot='auth-character-cutout'] {
+  position: absolute;
+  z-index: 0;
+  display: block;
+  max-width: none;
+  pointer-events: none;
+  user-select: none;
+  object-fit: contain;
+}
+[data-slot='auth-character-cutout'][data-corner='left-bottom'] {
+  left: -3.4rem;
+  bottom: -4.2rem;
+  width: 22rem;
+  opacity: 0.74;
+  filter: saturate(0.96) drop-shadow(0 14px 22px color-mix(in oklch, var(--shadow-ink) 22%, transparent));
+  -webkit-mask-image: linear-gradient(42deg, #000 0 58%, transparent 88%);
+  mask-image: linear-gradient(42deg, #000 0 58%, transparent 88%);
+}
+[data-slot='auth-character-cutout'][data-corner='right-top'] {
+  top: -3.4rem;
+  right: -4.6rem;
+  width: 20rem;
+  opacity: 0.72;
+  filter: saturate(1.04) drop-shadow(0 14px 22px color-mix(in oklch, var(--primary) 16%, transparent));
+  -webkit-mask-image: linear-gradient(222deg, #000 0 58%, transparent 90%);
+  mask-image: linear-gradient(222deg, #000 0 58%, transparent 90%);
+}
+@media (max-width: 479px) {
+  [data-slot='auth-character-cutout'][data-corner='left-bottom'] {
+    left: -3.7rem;
+    bottom: -3.4rem;
+    width: 17rem;
+    opacity: 0.52;
+  }
+  [data-slot='auth-character-cutout'][data-corner='right-top'] {
+    top: -2.7rem;
+    right: -4.7rem;
+    width: 15.5rem;
+    opacity: 0.5;
+  }
+}

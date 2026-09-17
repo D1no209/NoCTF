@@ -42,3 +42,5 @@ onBeforeUnmount(() => {
     </ScrollSurface>
   </section>
 </template>
+
+<style src="./markdown.css"></style>

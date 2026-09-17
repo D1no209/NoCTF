@@ -6,7 +6,7 @@ const page = () => sourceFile(new URL('../app/pages/admin/competitions/[id]/chal
 describe('admin competition challenge navigation', () => {
   test('places the challenge sections in the shared right sidebar', async () => {
     const source = await page()
-    const css = await sourceFile(new URL('../app/assets/css/main.css', import.meta.url)).text()
+    const css = await sourceFile(new URL('../app/components/views/app/settings-workspace.css', import.meta.url)).text()
 
     expect(source).toContain('<ChoiceSidebar')
     expect(source).toContain('v-model="activeSection"')
