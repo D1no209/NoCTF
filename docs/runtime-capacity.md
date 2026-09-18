@@ -49,6 +49,13 @@ the committed allocation and current admission gate again. Cleanup confirms actu
 resource absence before removing allocation metadata and publishing durable release.
 Repeated claim/release is idempotent. A missing ledger cannot be credited by cleanup.
 
+New typed claims are atomically indexed as unconfirmed in Redis. The ordinary
+resource audit confirms committed allocations or, after provider absence and a
+second PostgreSQL check under the allocation lock, releases rolled-back claims.
+Cancelled/unassigned Runtime rows are included through claim identity. The index
+has no TTL, processes bounded batches and rotates uncertain entries; unknown
+provider state never returns budget. This does not depend on Runner restart.
+
 Recovery pauses admission, drains coordinated resource mutations, reads provider
 inventory outside the database transaction, and rebuilds under a short allocation
 critical section. Legacy full-budget claims are persisted before their Redis keys

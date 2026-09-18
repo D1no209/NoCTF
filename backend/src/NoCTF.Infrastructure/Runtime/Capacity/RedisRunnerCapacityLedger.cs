@@ -7,6 +7,38 @@ namespace NoCTF.Infrastructure.Runtime.Capacity;
 
 public sealed class RedisRunnerCapacityLedger(IConnectionMultiplexer redis)
 {
+    public async Task<IReadOnlyList<RuntimeWorkloadIdentity>> ReadUnconfirmedAsync(string runnerId, CancellationToken ct)
+    {
+        ct.ThrowIfCancellationRequested();
+        var keys = await redis.GetDatabase().SortedSetRangeByRankAsync($"runner:{runnerId}:unconfirmed-claims", 0, 127);
+        var result = new List<RuntimeWorkloadIdentity>(keys.Length);
+        foreach (var key in keys)
+        {
+            var parts = key.ToString().Split(':');
+            if (parts.Length != 4 || parts[0] != "runner-claim" || !short.TryParse(parts[1], out var kind)
+                || !Guid.TryParseExact(parts[2], "N", out var runtimeId) || !Guid.TryParseExact(parts[3], "N", out var operationId))
+                throw new InvalidOperationException("Invalid unconfirmed capacity identity.");
+            var identity = new RuntimeWorkloadIdentity((RuntimeWorkloadKind)kind, runtimeId, operationId);
+            identity.Validate();
+            result.Add(identity);
+        }
+        return result;
+    }
+
+    public async Task ConfirmAsync(string runnerId, RuntimeWorkloadIdentity identity, CancellationToken ct)
+    {
+        ct.ThrowIfCancellationRequested();
+        await redis.GetDatabase().SortedSetRemoveAsync($"runner:{runnerId}:unconfirmed-claims", $"runner-claim:{identity.Key}");
+    }
+
+    public async Task DeferConfirmationAsync(string runnerId, RuntimeWorkloadIdentity identity, CancellationToken ct)
+    {
+        ct.ThrowIfCancellationRequested();
+        // Rotate uncertain entries so they cannot starve later unconfirmed claims.
+        await redis.GetDatabase().SortedSetAddAsync($"runner:{runnerId}:unconfirmed-claims", $"runner-claim:{identity.Key}",
+            DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(), When.Exists);
+    }
+
     public async Task<RuntimeCapacityAllocation?> ReadLegacyAsync(RuntimeInstance runtime, string runnerId, CancellationToken ct)
     {
         ct.ThrowIfCancellationRequested();
@@ -81,6 +113,7 @@ public sealed class RedisRunnerCapacityLedger(IConnectionMultiplexer redis)
                 'totalMemoryBytes', ARGV[3], 'totalNanoCpus', ARGV[4], 'totalPids', ARGV[5],
                 'availableMemoryBytes', memory, 'availableNanoCpus', cpu, 'availablePids', pids)
             redis.call('PERSIST', KEYS[1])
+            redis.call('DEL', 'runner:' .. ARGV[1] .. ':unconfirmed-claims')
             redis.call('ZREM', KEYS[2], ARGV[1])
             return 1
             """, [$"runner:{runnerId}:capacity", $"runner-pool:{pool}:candidates"],

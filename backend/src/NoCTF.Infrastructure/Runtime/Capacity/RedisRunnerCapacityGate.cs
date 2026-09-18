@@ -89,6 +89,7 @@ public sealed class RedisRunnerCapacityGate(IConnectionMultiplexer redis) : IRun
             'nanoCpus', ARGV[2],
             'pidsLimit', ARGV[3])
         start_slot(KEYS[2], KEYS[3], ARGV[7] == '1')
+        track_claim(KEYS[3], ARGV[4])
         redis.call('ZADD', KEYS[5], pressure(KEYS[2], tonumber(ARGV[6])), ARGV[4])
         return 1
         """;
@@ -155,6 +156,7 @@ public sealed class RedisRunnerCapacityGate(IConnectionMultiplexer redis) : IRun
             'nanoCpus', ARGV[2],
             'pidsLimit', ARGV[3])
         start_slot(bestCapacityKey, KEYS[3], ARGV[6] == '1')
+        track_claim(KEYS[3], bestRunner)
         redis.call('ZADD', KEYS[2], pressure(bestCapacityKey, 0), bestRunner)
         return { 1, bestRunner }
         """;
@@ -205,6 +207,7 @@ public sealed class RedisRunnerCapacityGate(IConnectionMultiplexer redis) : IRun
             redis.call('HSET', KEYS[1], field, math.max(0, value - 1))
         end
         redis.call('DEL', KEYS[2])
+        redis.call('ZREM', 'runner:' .. ARGV[1] .. ':unconfirmed-claims', KEYS[2])
         if redis.call('SISMEMBER', KEYS[4], ARGV[1]) == 1
             and redis.call('EXISTS', KEYS[3]) == 1
             and redis.call('EXISTS', KEYS[1]) == 1 then
