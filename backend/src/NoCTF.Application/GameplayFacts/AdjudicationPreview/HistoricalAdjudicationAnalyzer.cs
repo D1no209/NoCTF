@@ -66,13 +66,16 @@ public static class HistoricalAdjudicationAnalyzer
             var comparisonSeverity = historicalAdjustment ? AdjudicationFindingSeverity.Information : AdjudicationFindingSeverity.Warning;
             var comparisonClass = evidence.HasEligibilityChanges ? AdjudicationFindingClassification.EligibilityAdjustment
                 : changes > 0 ? AdjudicationFindingClassification.LegalHistoryChange : AdjudicationFindingClassification.InsufficientEvidence;
-            if (evidence.BloodEligibilityHistoryRequiresReview || !evidence.MatchesCurrentInteraction)
-                Add(AdjudicationDifferenceKind.TeamEligibilityHistoryRequiresReview, AdjudicationDifferenceCertainty.NeedsReview,
-                    comparisonSeverity, comparisonClass);
             if (evidence.CurrentBloodEligible && evidence.MatchesCurrentInteraction
                 && evidence.CurrentResult == GameplayFactResult.Correct && !evidence.HasEarlierCorrect
                 && evidence.EarlierCorrectTeamCount is >= 0 and < 3)
                 currentRank = (LeaderboardBloodRank)(evidence.EarlierCorrectTeamCount + 1);
+            // Unknown historical qualification matters only to an actual award comparison.
+            // An ordinary nonparticipant with no award and no adjustment is not an anomaly.
+            if ((evidence.BloodEligibilityHistoryRequiresReview || !evidence.MatchesCurrentInteraction)
+                && (currentRank is not null || evidence.RecordedBloodRanks.Count > 0 || evidence.HasEligibilityChanges))
+                Add(AdjudicationDifferenceKind.TeamEligibilityHistoryRequiresReview, AdjudicationDifferenceCertainty.NeedsReview,
+                    comparisonSeverity, comparisonClass);
 
             var bloods = events.Where(item => IsBlood(item.Kind)).ToArray();
             var linkedDuplicate = bloods.Where(item => item.ParentEventId is { } parent

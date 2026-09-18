@@ -1,5 +1,13 @@
 # Runtime capacity and adjudication implementation
 
+## Review follow-up J1
+
+Qualification uncertainty only creates a blood-review finding when there is an
+actual current/historical award comparison or a known adjustment. Normal
+nonparticipants with consistent Correct/Wrong decisions and no award/adjustment
+produce no finding. Missing adjudication and existing award conflicts still remain
+visible. Historical analyzer, HTTP and PostgreSQL tests passed 25/25.
+
 ## Review follow-up R3
 
 Auxiliary audits now select the allocation's owner rather than the parent's mutable
