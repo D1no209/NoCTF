@@ -5,8 +5,9 @@ using StackExchange.Redis;
 
 namespace NoCTF.Infrastructure.Runtime.Capacity;
 
-public sealed class RedisRunnerCapacityLedger(IConnectionMultiplexer redis)
+public sealed class RedisRunnerCapacityLedger(IConnectionMultiplexer redis, TimeProvider? clock = null)
 {
+    private readonly TimeProvider timeProvider = clock ?? TimeProvider.System;
     public async Task<IReadOnlyList<RuntimeWorkloadIdentity>> ReadUnconfirmedAsync(string runnerId, CancellationToken ct)
     {
         ct.ThrowIfCancellationRequested();
@@ -36,7 +37,7 @@ public sealed class RedisRunnerCapacityLedger(IConnectionMultiplexer redis)
         ct.ThrowIfCancellationRequested();
         // Rotate uncertain entries so they cannot starve later unconfirmed claims.
         await redis.GetDatabase().SortedSetAddAsync($"runner:{runnerId}:unconfirmed-claims", $"runner-claim:{identity.Key}",
-            DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(), When.Exists);
+            timeProvider.GetUtcNow().ToUnixTimeMilliseconds(), When.Exists);
     }
 
     public async Task<RuntimeCapacityAllocation?> ReadLegacyAsync(RuntimeInstance runtime, string runnerId, CancellationToken ct)

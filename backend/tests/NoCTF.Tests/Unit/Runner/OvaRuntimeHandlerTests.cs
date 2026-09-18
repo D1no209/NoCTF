@@ -24,7 +24,7 @@ public sealed class OvaRuntimeHandlerTests
         var result = await handler.Handle(message, CancellationToken.None);
 
         await Assert.That(result).IsTypeOf<RuntimeProvisioned>();
-        var provisioned = (RuntimeProvisioned)result;
+        var provisioned = (RuntimeProvisioned)result!;
         await Assert.That(provisioned.Provider).IsEqualTo(RuntimeProvider.Libvirt);
         await Assert.That(provisioned.Urls)
             .IsEquivalentTo(["http://10.90.0.2:8080/play"]);
@@ -63,7 +63,7 @@ public sealed class OvaRuntimeHandlerTests
         var result = await handler.Handle(message, CancellationToken.None);
 
         await Assert.That(result).IsTypeOf<RuntimeProvisionTerminated>();
-        await Assert.That(((RuntimeProvisionTerminated)result).FailureCode)
+        await Assert.That(((RuntimeProvisionTerminated)result!).FailureCode)
             .IsEqualTo(RuntimeFailureCode.UrlExpansionFailed);
         await Assert.That(reconciler.Destroyed)
             .IsEquivalentTo([new RuntimeResourceIdentity(message.RuntimeInstanceId)]);

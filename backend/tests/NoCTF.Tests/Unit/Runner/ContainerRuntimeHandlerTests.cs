@@ -46,7 +46,7 @@ public sealed class ContainerRuntimeHandlerTests
         var result = await handler.Handle(message, CancellationToken.None);
 
         await Assert.That(result).IsTypeOf<RuntimeProvisionTerminated>();
-        await Assert.That(((RuntimeProvisionTerminated)result).FailureCode)
+        await Assert.That(((RuntimeProvisionTerminated)result!).FailureCode)
             .IsEqualTo(RuntimeFailureCode.InvalidConfiguration);
         await Assert.That(lifecycle.EnsureRunningCalls).IsEqualTo(1);
         await Assert.That(reconciler.Destroyed)
@@ -141,7 +141,7 @@ public sealed class ContainerRuntimeHandlerTests
         var result = await handler.Handle(message, CancellationToken.None);
 
         await Assert.That(result).IsTypeOf<RuntimeProvisionTerminated>();
-        await Assert.That(((RuntimeProvisionTerminated)result).FailureCode)
+        await Assert.That(((RuntimeProvisionTerminated)result!).FailureCode)
             .IsEqualTo(RuntimeFailureCode.ProviderRejected);
         await Assert.That(health.IsReady(RuntimeProvider.Docker)).IsFalse();
     }

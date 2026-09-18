@@ -35,7 +35,7 @@ public sealed class RuntimeProviderHandler(
 {
     private readonly TimeProvider timeProvider = configuredTimeProvider ?? TimeProvider.System;
 
-    public async Task<object> ProvisionContainerAsync(
+    public async Task<object?> ProvisionContainerAsync(
         ProvisionContainerRuntime message,
         CancellationToken cancellationToken)
     {
@@ -44,6 +44,7 @@ public sealed class RuntimeProviderHandler(
         var workStatus = await workReader.ReadProvisionStatusAsync(message, cancellationToken);
         if (workStatus != RuntimeProvisionWorkStatus.Current)
         {
+            if (workStatus == RuntimeProvisionWorkStatus.AssignmentRetained) return null;
             if (workStatus == RuntimeProvisionWorkStatus.StopRequested)
                 return await CancelProvisionAsync(
                     message,
@@ -280,7 +281,7 @@ public sealed class RuntimeProviderHandler(
         }
     }
 
-    public async Task<object> ProvisionComposeAsync(
+    public async Task<object?> ProvisionComposeAsync(
         ProvisionComposeRuntime message,
         CancellationToken cancellationToken)
     {
@@ -289,6 +290,7 @@ public sealed class RuntimeProviderHandler(
         var workStatus = await workReader.ReadProvisionStatusAsync(message, cancellationToken);
         if (workStatus != RuntimeProvisionWorkStatus.Current)
         {
+            if (workStatus == RuntimeProvisionWorkStatus.AssignmentRetained) return null;
             if (workStatus == RuntimeProvisionWorkStatus.StopRequested)
                 return await CancelProvisionAsync(
                     message,
@@ -428,7 +430,7 @@ public sealed class RuntimeProviderHandler(
         }
     }
 
-    public async Task<object> ProvisionOvaAsync(
+    public async Task<object?> ProvisionOvaAsync(
         ProvisionOvaRuntime message,
         CancellationToken cancellationToken)
     {
@@ -437,6 +439,7 @@ public sealed class RuntimeProviderHandler(
         var workStatus = await workReader.ReadProvisionStatusAsync(message, cancellationToken);
         if (workStatus != RuntimeProvisionWorkStatus.Current)
         {
+            if (workStatus == RuntimeProvisionWorkStatus.AssignmentRetained) return null;
             if (workStatus == RuntimeProvisionWorkStatus.StopRequested)
                 return await CancelProvisionAsync(
                     message,
@@ -809,7 +812,7 @@ internal static class RuntimeWriteBackOperations
             await outbox.FlushOutgoingMessagesAsync();
             return;
         }
-        if (instance.State != RuntimeState.Provisioning
+        if (instance.State is not (RuntimeState.Provisioning or RuntimeState.Failed)
             || !string.Equals(instance.RunnerId, message.RunnerId, StringComparison.Ordinal)
             || instance.RuntimeProvider != message.Provider)
             return;
@@ -905,7 +908,7 @@ internal static class RuntimeWriteBackOperations
             candidate => candidate.Id == message.RuntimeInstanceId,
             cancellationToken);
         if (instance is null
-            || instance.State != RuntimeState.Provisioning
+            || instance.State is RuntimeState.Stopped or RuntimeState.Stopping or RuntimeState.Queued
             || !string.Equals(
                 instance.RunnerId,
                 message.RunnerId,

@@ -34,11 +34,13 @@ and precise fixture scope are in `docs/runtime-capacity-review-validation.md`.
 
 ## Process recovery follow-up: late writebacks
 
-The combined recovery run exposed a late failure response overwriting Running.
-Success/failure provision writebacks now serialize their state check on the Runtime
-row and only transition Provisioning (with the existing late-stop cleanup exception).
-Duplicate success preserves RunningAt and does not revive a stopped Runtime. Real
-PostgreSQL ordering tests 2/2, template lifecycle 1/1 and SQL architecture 1/1 passed.
+The combined recovery run exposed a synthetic failure from replaying an already
+retained assignment. Full-suite review confirmed that genuine results retain the
+repository's completion-order semantics. Retained provision commands now return no
+result; genuine failure/success may still complete in order, while cleanup transitions
+remain fenced under a short Runtime row lock. Replay and capacity reconciliation use
+the injected TimeProvider. Provider tests 21/21, cleanup ordering 2/2, existing AWDP
+completion-order persistence 6/6 and architecture 11/11 passed in the follow-up run.
 
 ## Process recovery follow-up: Docker purpose identity
 
