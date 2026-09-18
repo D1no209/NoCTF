@@ -39,7 +39,10 @@ public sealed class PersistedRunnerCapacityGate(
             throw new InvalidOperationException("The capacity identity belongs to another Runtime.");
         if (identity.IsAuxiliary && (request.GameplayFactId is not Guid factId
             || !await db.GameplayFacts.AnyAsync(fact => fact.Id == factId
-                && fact.State == GameplayFactState.Processing, ct)))
+                && fact.State == GameplayFactState.Processing
+                && fact.CompetitionChallengeId == runtime.CompetitionChallengeId && fact.TeamId == runtime.TeamId
+                && (identity.Kind == RuntimeWorkloadKind.AwdChecker && fact.Kind == GameplayFactKind.AwdServiceTransition
+                    || identity.Kind == RuntimeWorkloadKind.PatchChecker && runtime.GameplayFactId == fact.Id), ct)))
             return new(RunnerCapacityAvailability.Unavailable, Failure: RunnerAdmissionFailure.NoEligibleRunner);
         var existing = runtime.CapacityAllocations.Items.SingleOrDefault(item => item.Identity == identity);
         var limit = existing?.Limit ?? request.Limit ?? new(request.MemoryBytes, request.NanoCpus, request.PidsLimit);

@@ -98,9 +98,11 @@ public static class ServiceRegistration
             services.AddScoped<IRunnerCapacityGate, PersistedRunnerCapacityGate>();
             services.AddSingleton<RedisRunnerAvailabilityRegistry>();
             services.AddSingleton<RedisRunnerCapacityLedger>();
-            services.AddSingleton<RunnerResourceMutationCoordinator>();
             services.AddHostedService<RunnerAvailabilityPublisher>();
         }
+        services.AddSingleton<RunnerResourceMutationCoordinator>();
+        if (!development)
+            services.AddScoped<AuxiliaryRuntimeCapacity>();
         var isKubernetesPool = string.Equals(
             configuredProvider,
             nameof(NoCTF.Domain.Runtime.RuntimeProvider.Kubernetes),
@@ -132,16 +134,16 @@ public static class ServiceRegistration
         services.AddSingleton<IAwdFlagInjectionWorkReader, AwdFlagInjectionWorkReader>();
         services.AddSingleton<IChallengeTestFlagInjectionStore, ChallengeTestFlagInjectionStore>();
         services.AddSingleton<IAwdCheckerWorkReader, AwdCheckerWorkReader>();
-        services.AddSingleton<RuntimeProviderHandler>();
-        services.AddSingleton<ContainerRuntimeMessageHandler>();
-        services.AddSingleton<ComposeRuntimeMessageHandler>();
-        services.AddSingleton<OvaRuntimeMessageHandler>();
-        services.AddSingleton<RuntimeTerminationMessageHandler>();
+        services.AddScoped<RuntimeProviderHandler>();
+        services.AddScoped<ContainerRuntimeMessageHandler>();
+        services.AddScoped<ComposeRuntimeMessageHandler>();
+        services.AddScoped<OvaRuntimeMessageHandler>();
+        services.AddScoped<RuntimeTerminationMessageHandler>();
         services.AddScoped<RuntimeProvisionWriteBackMessageHandler>();
         services.AddScoped<RuntimeStopWriteBackMessageHandler>();
-        services.AddSingleton<IAwdCheckerExecutor, AwdCheckerExecutor>();
+        services.AddScoped<IAwdCheckerExecutor, AwdCheckerExecutor>();
         services.AddSingleton<IAwdpFixWorkReader, AwdpFixWorkReader>();
-        services.AddSingleton<IAwdpCheckerExecutor, AwdpCheckerExecutor>();
+        services.AddScoped<IAwdpCheckerExecutor, AwdpCheckerExecutor>();
         services.AddSingleton<IAwdpAttackProvisioningPlanReader,
             AwdpAttackProvisioningPlanReader>();
         services.AddSingleton<AwdpFixArchiveDownloader>();

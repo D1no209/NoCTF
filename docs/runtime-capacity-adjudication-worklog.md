@@ -101,6 +101,16 @@ missing evidence remains blocked. Cleanup recognizes RecoveryRequired instead of
 pretending release succeeded. Redis regression suite 13/13, explicit legacy/quota
 test 1/1, and PostgreSQL/Redis publisher-cleanup test 1/1 passed.
 
+A4 completed: AWD and Patch Checkers claim their own deterministic operation
+identity and retain capacity until exact provider inventory confirms cleanup.
+Auxiliary reconciliation preserves active executions and cleans terminal leftovers.
+Main provider handlers use scoped dependencies and explicitly nontransactional
+provider execution. Capacity-denied AWD checks become PlatformFailed, not Down;
+Patch checks use the existing platform-failure path. Nontransactional Patch result
+publication explicitly saves its outbox before dispatch. Checker regressions 44/44,
+real PostgreSQL/Redis parent/checker identity and release tests 2/2, real Docker
+parent-versus-checker inventory 1/1 and Runner registration 1/1 passed.
+
 Use `backend/scripts/Verify-CoreRecovery.ps1` for scoped checks. Integration tests
 must use real PostgreSQL/Redis/Wolverine/NATS and Docker. Source-only assertions or
 EF InMemory do not establish relational or recovery behavior. Compare performance

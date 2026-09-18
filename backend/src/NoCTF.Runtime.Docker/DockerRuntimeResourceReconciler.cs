@@ -21,6 +21,24 @@ public sealed class DockerRuntimeResourceReconciler(
 
     public RuntimeProvider Provider => RuntimeProvider.Docker;
 
+    public async Task<bool?> WorkloadExistsAsync(RuntimeWorkloadIdentity identity, CancellationToken cancellationToken)
+    {
+        identity.Validate();
+        var containers = await client.Containers.ListContainersAsync(new ContainersListParameters
+        {
+            All = true, Filters = IdentityFilters(new(identity.RuntimeInstanceId))
+        }, cancellationToken);
+        if (containers.Any(container => container.Names.Contains($"/noctf-{identity.OperationId:N}")
+            || container.Labels.TryGetValue("noctf.io/operation-id", out var operation)
+                && operation == identity.OperationId.ToString("N")))
+            return true;
+        var networks = await client.Networks.ListNetworksAsync(new NetworksListParameters
+        {
+            Filters = IdentityFilters(new(identity.RuntimeInstanceId))
+        }, cancellationToken);
+        return networks.Any(network => network.Name == $"noctf-callback-{identity.OperationId:N}");
+    }
+
     public async Task CheckAvailabilityAsync(CancellationToken cancellationToken) =>
         await client.System.PingAsync(cancellationToken);
 
