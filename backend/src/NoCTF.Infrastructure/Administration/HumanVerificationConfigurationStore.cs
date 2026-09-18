@@ -99,7 +99,8 @@ public sealed class HumanVerificationConfigurationStore(
                     ? secrets.Unprotect(
                         settings.CapSecretCiphertext,
                         PlatformSecretPurpose.HumanVerificationCapSecret)
-                    : string.Empty
+                    : string.Empty,
+                ManagementApiKey = deploymentOptions.Value.Cap.ManagementApiKey
             },
             Turnstile = new()
             {

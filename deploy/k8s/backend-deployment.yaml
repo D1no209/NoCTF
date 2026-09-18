@@ -83,6 +83,12 @@ spec:
                   name: noctf-secrets
                   key: cap-secret
                   optional: true
+            - name: HumanVerification__Cap__ManagementApiKey
+              valueFrom:
+                secretKeyRef:
+                  name: noctf-secrets
+                  key: cap-management-api-key
+                  optional: true
             - name: HumanVerification__Turnstile__Secret
               valueFrom:
                 secretKeyRef:

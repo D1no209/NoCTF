@@ -466,6 +466,8 @@ DELETE /api/v1/admin/platform/users/{userId}/tokens/{jwtId}
 DELETE /api/v1/admin/platform/users/{userId}/tokens
 PUT  /api/v1/admin/platform/email-verification/password
 PUT  /api/v1/admin/platform/human-verification/secret
+GET  /api/v1/admin/platform/human-verification/cap-workload
+PUT  /api/v1/admin/platform/human-verification/cap-workload
 POST /api/v1/admin/platform/email-verification/test
 ```
 

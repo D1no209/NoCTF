@@ -35,6 +35,29 @@ public static class HumanVerificationInfrastructure
                 pipeline.AddTimeout(TimeSpan.FromSeconds(5));
             });
         services.AddSingleton<IHumanVerificationVerifier, HttpHumanVerificationVerifier>();
+        services.AddHttpClient(CapWorkloadConfigurationClient.ClientName, client =>
+            {
+                client.Timeout = Timeout.InfiniteTimeSpan;
+                client.MaxResponseContentBufferSize = 64 * 1024;
+            })
+            .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler
+            {
+                AllowAutoRedirect = false
+            })
+            .AddResilienceHandler("cap-workload-configuration", pipeline =>
+            {
+                pipeline.AddCircuitBreaker(new HttpCircuitBreakerStrategyOptions
+                {
+                    FailureRatio = 0.5,
+                    MinimumThroughput = 4,
+                    SamplingDuration = TimeSpan.FromSeconds(20),
+                    BreakDuration = TimeSpan.FromSeconds(10)
+                });
+                pipeline.AddTimeout(TimeSpan.FromSeconds(5));
+            });
+        services.AddSingleton<ICapWorkloadConfigurationClient,
+            CapWorkloadConfigurationClient>();
+        services.AddScoped<ManageCapWorkloadConfiguration>();
         if (enableMonitoring)
         {
             services.AddHttpClient(CapHumanVerificationMonitor.ClientName, client =>

@@ -23,6 +23,22 @@ test('email administration exposes persisted human-verification providers and se
   expect(types).toContain('ReplaceHumanVerificationSecretRequest')
 })
 
+test('CAP workload is managed through the platform page without exposing credentials', async () => {
+  const controller = await sourceFile('app/features/routes/admin/platform/useAdminPlatformEmailPage.ts').text()
+  const view = await sourceFile('app/components/views/page/admin/platform/AdminPlatformEmailPageView.vue').text()
+  const types = await sourceFile('app/api/types.gen.ts').text()
+
+  expect(controller).toContain('adminPlatformGetCapWorkloadConfiguration')
+  expect(controller).toContain('adminPlatformUpdateCapWorkloadConfiguration')
+  expect(controller).toContain('* 16 ** capWorkloadForm.difficulty')
+  expect(view).toContain('v-model.number="capWorkloadForm.difficulty"')
+  expect(view).toContain('v-model.number="capWorkloadForm.challengeCount"')
+  expect(view).toContain('capExpectedHashAttemptsLabel')
+  expect(view).toContain('capWorkload.challengeSize ?? 32')
+  expect(types).toContain('CapWorkloadConfigurationResponse')
+  expect(types).not.toContain('managementApiKey?:')
+})
+
 test('email administration keeps a retryable page body when configuration loading fails', async () => {
   const controller = await sourceFile('app/features/routes/admin/platform/useAdminPlatformEmailPage.ts').text()
   const view = await sourceFile('app/components/views/page/admin/platform/AdminPlatformEmailPageView.vue').text()

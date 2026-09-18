@@ -1590,6 +1590,13 @@ export type NoCtfapiEndpointsAdministrationPlatformPlatformLogLevelProtocol = 'T
 
 export type NoCtfapiEndpointsAdministrationPlatformPlatformLogServiceProtocol = 'Api' | 'Worker' | 'Runner' | 'Host';
 
+export type NoCtfapiEndpointsAdministrationPlatformCapWorkloadConfigurationResponse = {
+    difficulty?: number;
+    challengeCount?: number;
+    challengeSize?: number;
+    expectedHashAttempts?: number;
+};
+
 export type NoCtfapiEndpointsAdministrationPlatformAdminPlatformConfigurationResponse = {
     branding?: NoCtfapiEndpointsAdministrationPlatformPlatformBrandingResponse;
     humanVerification?: NoCtfapiEndpointsAdministrationPlatformAdminHumanVerificationConfigurationResponse;
@@ -2005,6 +2012,11 @@ export type NoCtfapiEndpointsAdministrationPlatformReplaceEmailVerificationPassw
 export type NoCtfapiEndpointsAdministrationPlatformReplaceHumanVerificationSecretRequest = {
     provider: NoCtfapiEndpointsPlatformHumanVerificationProviderProtocol;
     secret: string;
+};
+
+export type NoCtfapiEndpointsAdministrationPlatformUpdateCapWorkloadConfigurationRequest = {
+    difficulty: number;
+    challengeCount: number;
 };
 
 export type NoCtfapiEndpointsAdministrationPlatformUploadPlatformLogoRequest = {
@@ -6609,6 +6621,66 @@ export type AdminPlatformExportLogsErrors = {
 };
 
 export type AdminPlatformExportLogsError = AdminPlatformExportLogsErrors[keyof AdminPlatformExportLogsErrors];
+
+export type AdminPlatformGetCapWorkloadConfigurationData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/v1/admin/platform/human-verification/cap-workload';
+};
+
+export type AdminPlatformGetCapWorkloadConfigurationErrors = {
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+};
+
+export type AdminPlatformGetCapWorkloadConfigurationResponses = {
+    /**
+     * Success
+     */
+    200: NoCtfapiEndpointsAdministrationPlatformCapWorkloadConfigurationResponse;
+};
+
+export type AdminPlatformGetCapWorkloadConfigurationResponse = AdminPlatformGetCapWorkloadConfigurationResponses[keyof AdminPlatformGetCapWorkloadConfigurationResponses];
+
+export type AdminPlatformUpdateCapWorkloadConfigurationData = {
+    body: NoCtfapiEndpointsAdministrationPlatformUpdateCapWorkloadConfigurationRequest;
+    path?: never;
+    query?: never;
+    url: '/api/v1/admin/platform/human-verification/cap-workload';
+};
+
+export type AdminPlatformUpdateCapWorkloadConfigurationErrors = {
+    /**
+     * Bad Request
+     */
+    400: MicrosoftAspNetCoreMvcValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+};
+
+export type AdminPlatformUpdateCapWorkloadConfigurationError = AdminPlatformUpdateCapWorkloadConfigurationErrors[keyof AdminPlatformUpdateCapWorkloadConfigurationErrors];
+
+export type AdminPlatformUpdateCapWorkloadConfigurationResponses = {
+    /**
+     * Success
+     */
+    200: NoCtfapiEndpointsAdministrationPlatformCapWorkloadConfigurationResponse;
+};
+
+export type AdminPlatformUpdateCapWorkloadConfigurationResponse = AdminPlatformUpdateCapWorkloadConfigurationResponses[keyof AdminPlatformUpdateCapWorkloadConfigurationResponses];
 
 export type AdminPlatformGetConfigurationData = {
     body?: never;

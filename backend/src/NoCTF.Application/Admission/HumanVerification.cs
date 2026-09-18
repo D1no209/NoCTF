@@ -122,6 +122,7 @@ public sealed class CapHumanVerificationOptions
     public string BackendServerUrl { get; set; } = string.Empty;
     public string SiteKey { get; set; } = string.Empty;
     public string Secret { get; set; } = string.Empty;
+    public string ManagementApiKey { get; set; } = string.Empty;
 }
 
 public sealed class TurnstileHumanVerificationOptions

@@ -3,7 +3,7 @@ import { toRefs } from 'vue'
 import type { AdminPlatformEmailPageViewState } from '~/features/routes/admin/platform/useAdminPlatformEmailPage'
 
 const viewProps = defineProps<{ state: AdminPlatformEmailPageViewState }>()
-const { KeyRound, RefreshCw, Send, ShieldCheck, configuration, humanVerification, humanForm, humanVerificationSaving, humanVerificationDirty, humanVerificationReady, humanVerificationProviderLabel, selectedSecretConfigured, humanSecretOpen, humanSecret, humanSecretSaving, loading, loadError, form, emailDirty, saving, passwordOpen, newPassword, passwordSaving, sendingTest, load, saveHumanVerification, replaceHumanVerificationSecret, save, replacePassword, sendTest, AdminDateTime, onClickPasswordOpen, onClickPasswordOpen2, setHumanSecretOpen } = toRefs(viewProps.state)
+const { KeyRound, RefreshCw, Send, ShieldCheck, configuration, humanVerification, humanForm, humanVerificationSaving, humanVerificationDirty, humanVerificationReady, humanVerificationProviderLabel, selectedSecretConfigured, humanSecretOpen, humanSecret, humanSecretSaving, capWorkload, capWorkloadForm, capWorkloadLoading, capWorkloadSaving, capWorkloadError, capWorkloadDirty, capWorkloadValid, capExpectedHashAttemptsLabel, capWorkloadRiskLabel, capWorkloadRiskVariant, loading, loadError, form, emailDirty, saving, passwordOpen, newPassword, passwordSaving, sendingTest, load, saveHumanVerification, replaceHumanVerificationSecret, loadCapWorkload, saveCapWorkload, save, replacePassword, sendTest, AdminDateTime, onClickPasswordOpen, onClickPasswordOpen2, setHumanSecretOpen } = toRefs(viewProps.state)
 </script>
 
 <template>
@@ -107,6 +107,80 @@ const { KeyRound, RefreshCw, Send, ShieldCheck, configuration, humanVerification
                   <FieldLabel for="human-verification-cap-site-key">{{ $t('ui.siteKey') }}</FieldLabel>
                   <Input id="human-verification-cap-site-key" v-model="humanForm.capSiteKey" :disabled="humanVerificationSaving" maxlength="256" autocomplete="off" />
                 </Field>
+
+                <FieldSeparator>{{ $t('ui.capProofOfWorkConfiguration') }}</FieldSeparator>
+
+                <div class="flex flex-col gap-1">
+                  <h3 class="text-base font-semibold text-primary">{{ $t('ui.capComputationalWorkload') }}</h3>
+                  <p class="text-sm text-muted-foreground">{{ $t('ui.capComputationalWorkloadDescription') }}</p>
+                </div>
+
+                <Skeleton v-if="capWorkloadLoading" class="h-28 w-full" />
+
+                <Alert v-else-if="capWorkloadError" variant="destructive">
+                  <AlertDescription class="flex flex-wrap items-center justify-between gap-3">
+                    <span>{{ $message(capWorkloadError) }}</span>
+                    <Button type="button" variant="outline" size="sm" @click="loadCapWorkload">
+                      <RefreshCw data-icon="inline-start" />
+                      {{ $t('ui.retry') }}
+                    </Button>
+                  </AlertDescription>
+                </Alert>
+
+                <template v-else-if="capWorkload">
+                  <div class="grid gap-4 sm:grid-cols-3">
+                    <Field>
+                      <FieldLabel for="human-verification-cap-difficulty">{{ $t('ui.capDifficulty') }}</FieldLabel>
+                      <NumberInput
+                        id="human-verification-cap-difficulty"
+                        v-model.number="capWorkloadForm.difficulty"
+                        :disabled="capWorkloadSaving"
+                        min="1"
+                        max="8"
+                        required
+                      />
+                      <FieldDescription>{{ $t('ui.capDifficultyDescription') }}</FieldDescription>
+                    </Field>
+                    <Field>
+                      <FieldLabel for="human-verification-cap-challenge-count">{{ $t('ui.capChallengeCount') }}</FieldLabel>
+                      <NumberInput
+                        id="human-verification-cap-challenge-count"
+                        v-model.number="capWorkloadForm.challengeCount"
+                        :disabled="capWorkloadSaving"
+                        min="1"
+                        max="500"
+                        required
+                      />
+                      <FieldDescription>{{ $t('ui.capChallengeCountDescription') }}</FieldDescription>
+                    </Field>
+                    <Field>
+                      <FieldLabel>{{ $t('ui.capChallengeSize') }}</FieldLabel>
+                      <div class="flex h-10 items-center">
+                        <Badge variant="outline">{{ capWorkload.challengeSize ?? 32 }}</Badge>
+                      </div>
+                      <FieldDescription>{{ $t('ui.capChallengeSizeDescription') }}</FieldDescription>
+                    </Field>
+                  </div>
+
+                  <div class="flex flex-wrap items-center gap-3 rounded-xl bg-muted/45 px-4 py-3">
+                    <span class="text-sm text-muted-foreground">{{ $t('ui.capExpectedHashAttempts') }}</span>
+                    <strong class="text-sm text-foreground">{{ capExpectedHashAttemptsLabel }}</strong>
+                    <Badge :variant="capWorkloadRiskVariant">{{ capWorkloadRiskLabel }}</Badge>
+                  </div>
+                  <FieldDescription v-if="humanVerificationDirty">
+                    {{ $t('ui.saveCapProviderBeforeWorkload') }}
+                  </FieldDescription>
+                  <div>
+                    <Button
+                      type="button"
+                      :disabled="capWorkloadSaving || !capWorkloadDirty || !capWorkloadValid || humanVerificationDirty"
+                      @click="saveCapWorkload"
+                    >
+                      <Spinner v-if="capWorkloadSaving" data-icon="inline-start" />
+                      {{ $t('ui.saveCapWorkload') }}
+                    </Button>
+                  </div>
+                </template>
               </template>
 
               <template v-else-if="humanForm.provider === 'Turnstile'">
