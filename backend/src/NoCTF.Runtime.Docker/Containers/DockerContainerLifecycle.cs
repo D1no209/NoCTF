@@ -1105,8 +1105,9 @@ public sealed class DockerContainerLifecycle : IContainerLifecycle, IOneShotJobR
     {
         var identity = new RuntimeResourceIdentity(
             request.RuntimeInstanceId ?? request.OperationId);
+        var expectedJobKind = BuildLabels(request).GetValueOrDefault("noctf.io/job-kind") ?? JobKind(request.NetworkPurpose);
         if (!HasResourceIdentity(container.Config?.Labels, identity)
-            || !HasJobKind(container.Config?.Labels, JobKind(request.NetworkPurpose))
+            || !HasJobKind(container.Config?.Labels, expectedJobKind)
             || !HasPublishedPortBindings(container.NetworkSettings?.Ports, request.PortMappings))
             throw new InvalidOperationException(
                 $"Docker Container '{resourceName}' has a different ownership identity, purpose, or published port contract.");
