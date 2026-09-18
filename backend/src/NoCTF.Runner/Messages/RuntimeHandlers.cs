@@ -764,7 +764,12 @@ public sealed class RuntimeProviderHandler(
 
 internal static class RuntimeWriteBackOperations
 {
-    public static async Task ProvisionedAsync(
+    public static Task ProvisionedAsync(RuntimeProvisioned message, NoCtfDbContext db, ITransactionalMessageOutbox outbox,
+        ICompetitionEventRecorder events, TimeProvider timeProvider, CancellationToken ct) =>
+        WithProvisionLockAsync(message.RuntimeInstanceId, db, outbox,
+            () => ProvisionedCoreAsync(message, db, outbox, events, timeProvider, ct), ct);
+
+    private static async Task ProvisionedCoreAsync(
         RuntimeProvisioned message,
         NoCtfDbContext db,
         ITransactionalMessageOutbox outbox,
@@ -804,7 +809,8 @@ internal static class RuntimeWriteBackOperations
             await outbox.FlushOutgoingMessagesAsync();
             return;
         }
-        if (!string.Equals(instance.RunnerId, message.RunnerId, StringComparison.Ordinal)
+        if (instance.State != RuntimeState.Provisioning
+            || !string.Equals(instance.RunnerId, message.RunnerId, StringComparison.Ordinal)
             || instance.RuntimeProvider != message.Provider)
             return;
 
@@ -882,7 +888,12 @@ internal static class RuntimeWriteBackOperations
         await outbox.FlushOutgoingMessagesAsync();
     }
 
-    public static async Task ProvisionFailedAsync(
+    public static Task ProvisionFailedAsync(RuntimeProvisionFailed message, NoCtfDbContext db, ITransactionalMessageOutbox? outbox,
+        ICompetitionEventRecorder events, TimeProvider timeProvider, CancellationToken ct) =>
+        WithProvisionLockAsync(message.RuntimeInstanceId, db, outbox,
+            () => ProvisionFailedCoreAsync(message, db, outbox, events, timeProvider, ct), ct);
+
+    private static async Task ProvisionFailedCoreAsync(
         RuntimeProvisionFailed message,
         NoCtfDbContext db,
         ITransactionalMessageOutbox? outbox,
@@ -894,6 +905,7 @@ internal static class RuntimeWriteBackOperations
             candidate => candidate.Id == message.RuntimeInstanceId,
             cancellationToken);
         if (instance is null
+            || instance.State != RuntimeState.Provisioning
             || !string.Equals(
                 instance.RunnerId,
                 message.RunnerId,
@@ -1236,6 +1248,26 @@ internal static class RuntimeWriteBackOperations
             GameplayFactId: instance.GameplayFactId,
             RuntimeState: instance.State),
             cancellationToken);
+    }
+
+    private static async Task WithProvisionLockAsync(Guid runtimeId, NoCtfDbContext db, ITransactionalMessageOutbox? outbox,
+        Func<Task> apply, CancellationToken ct)
+    {
+        await using var transaction = db.Database.IsRelational() && db.Database.CurrentTransaction is null
+            ? await db.Database.BeginTransactionAsync(ct) : null;
+        if (db.Database.IsRelational())
+        {
+            var tracked = db.ChangeTracker.Entries<RuntimeInstance>().SingleOrDefault(entry => entry.Entity.Id == runtimeId);
+            _ = await db.RuntimeInstances.FromSqlInterpolated($"SELECT * FROM runtime_instances WHERE id = {runtimeId} FOR UPDATE")
+                .SingleOrDefaultAsync(ct);
+            if (tracked is not null) await tracked.ReloadAsync(ct);
+        }
+        await apply();
+        if (transaction is not null)
+        {
+            await transaction.CommitAsync(ct);
+            if (outbox is not null) await outbox.FlushCommittedMessagesAsync();
+        }
     }
 
     private static async Task StartChallengeTestFlagDeliveryAsync(

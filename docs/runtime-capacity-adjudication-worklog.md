@@ -1,5 +1,13 @@
 # Runtime capacity and adjudication implementation
 
+## Process recovery follow-up: late writebacks
+
+The combined recovery run exposed a late failure response overwriting Running.
+Success/failure provision writebacks now serialize their state check on the Runtime
+row and only transition Provisioning (with the existing late-stop cleanup exception).
+Duplicate success preserves RunningAt and does not revive a stopped Runtime. Real
+PostgreSQL ordering tests 2/2, template lifecycle 1/1 and SQL architecture 1/1 passed.
+
 ## Process recovery follow-up: Docker purpose identity
 
 The real process-crash fixture exposed a template-test replay mismatch: creation

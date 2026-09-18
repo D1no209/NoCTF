@@ -36,6 +36,8 @@ public sealed class RawSqlPersistenceRulesTests
             ["backend/src/NoCTF.Runner/Messages/RuntimeResourceReconciliationHandler.cs"] = ["FromSqlInterpolated"],
             // Lock the owning Runtime while updating its active allocation document.
             ["backend/src/NoCTF.Runner/Messages/AuxiliaryRuntimeCapacity.cs"] = ["FromSqlInterpolated", "FOR UPDATE"],
+            // Serialize result state guards for one Runtime; no provider operation crosses this lock.
+            ["backend/src/NoCTF.Runner/Messages/RuntimeHandlers.cs"] = ["FromSqlInterpolated", "FOR UPDATE"],
             // Parameterized settings/runtime SHARE locks fence only the bounded local gateway lease write.
             ["backend/src/NoCTF.Infrastructure/Runtime/PublicAccess/PublicGatewayLeaseGuard.cs"] = ["ExecuteSqlInterpolated"],
             // Competition-scoped shared admission lock, with a bound UUID parameter.
