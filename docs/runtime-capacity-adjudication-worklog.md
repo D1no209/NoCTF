@@ -1,5 +1,15 @@
 # Runtime capacity and adjudication implementation
 
+## Review final gate, 2026-09-19
+
+Latest Release full suite: 1665 total, 1657 passed, zero failed, eight explicit
+conditional skips. Frontend 588/588, typecheck, architecture and production build
+passed; EF/OpenAPI/SDK drift checks and whitespace checks passed. Real isolated
+Libvirt/KVM import, guest HTTP, replacement and cleanup passed separately (1/1).
+The original 19-file patch remains identical. Precise skip coverage, remaining wider
+validation boundaries and the read-only public deployment configuration assessment
+are recorded in `docs/runtime-capacity-review-validation.md`.
+
 ## Kubernetes resource-domain validation
 
 A local isolated three-node kind/Kubernetes 1.35.8 cluster with real metrics-server

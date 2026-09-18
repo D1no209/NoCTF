@@ -1,0 +1,8 @@
+    - E:\SourceCode\NoCTF\backend\tests\NoCTF.Tests\bin\Release\net10.0\TestResults\NoCTF.Tests-windows-net10.0-report.html
+
+测试运行摘要: 已通过! - E:\SourceCode\NoCTF\backend\tests\NoCTF.Tests\bin\Release\net10.0\NoCTF.Tests.dll (net10.0|x64)
+  总计: 1665
+  失败: 0
+  成功: 1657
+  已跳过: 8
+  持续时间: 21m 48s 496ms
