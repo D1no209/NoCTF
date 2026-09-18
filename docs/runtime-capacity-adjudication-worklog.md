@@ -1,5 +1,14 @@
 # Runtime capacity and adjudication implementation
 
+## Review follow-up J2
+
+Blood parent validation now checks event kind, fact scope, readable completed state
+and Correct result. A parent outside a complete same-fact evidence set is an
+integrity gap; truncated ranges or missing fields remain inconclusive. Legacy null
+parent links are not retroactively required. Analyzer/HTTP/PostgreSQL tests passed
+29/29, including wrong-kind and foreign-scope persisted links and read-only counts.
+Fact scope is internal evidence metadata; HTTP response fields are unchanged.
+
 ## Review follow-up J1
 
 Qualification uncertainty only creates a blood-review finding when there is an

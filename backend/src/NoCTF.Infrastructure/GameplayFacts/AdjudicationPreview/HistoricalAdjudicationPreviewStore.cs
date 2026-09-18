@@ -170,9 +170,11 @@ public sealed class HistoricalAdjudicationPreviewStore(NoCtfDbContext db) : IHis
             using var document = JsonDocument.Parse(item.PayloadJson);
             return new(item.Id, item.OccurredAt, item.Kind,
                 ReadEnum<GameplayFactState>(document.RootElement, "gameplayFactState"),
-                ReadEnum<GameplayFactResult>(document.RootElement, "gameplayFactResult"), item.ActorUserId, item.ParentEventId);
+                ReadEnum<GameplayFactResult>(document.RootElement, "gameplayFactResult"), item.ActorUserId, item.ParentEventId,
+                GameplayFactId: item.SubjectType == EntityReferenceKind.GameplayFact ? item.SubjectId : null);
         }
-        catch (JsonException) { return new(item.Id, item.OccurredAt, item.Kind, null, null, item.ActorUserId, item.ParentEventId, false); }
+        catch (JsonException) { return new(item.Id, item.OccurredAt, item.Kind, null, null, item.ActorUserId, item.ParentEventId, false,
+            item.SubjectType == EntityReferenceKind.GameplayFact ? item.SubjectId : null); }
     }
 
     public async Task<HistoricalAdjudicationEventPage?> ReadEventsAsync(Guid competitionId, Guid gameplayFactId,

@@ -25,6 +25,33 @@ namespace NoCTF.Tests.Integration.Persistence;
 [Category("Integration")]
 public sealed class HistoricalAdjudicationPreviewPersistenceTests
 {
+    [Test, Arguments(false), Arguments(true), Timeout(300_000)]
+    public async Task Blood_parent_must_be_an_adjudication_in_the_same_fact_scope(bool wrongKind, CancellationToken ct)
+    {
+        await DockerIntegrationTest.RunAsync(async () =>
+        {
+            await using var postgres = await StartPostgresAsync(ct);
+            var options = Options(postgres);
+            var fixture = await SeedAsync(options, ct);
+            await using var db = new NoCtfDbContext(options);
+            var parent = Event(fixture, wrongKind ? fixture.LaterFactId : Guid.NewGuid(),
+                wrongKind ? CompetitionEventKind.GameplayFactReceived : CompetitionEventKind.GameplayFactAdjudicated,
+                fixture.Now.AddSeconds(-1), GameplayFactResult.Correct);
+            var blood = Event(fixture, fixture.LaterFactId, CompetitionEventKind.FirstBloodAwarded,
+                fixture.Now.AddSeconds(2), GameplayFactResult.Correct);
+            blood.ParentEventId = parent.Id;
+            db.CompetitionEvents.AddRange(parent, blood);
+            await db.SaveChangesAsync(ct);
+            var before = await CountsAsync(db, ct);
+            var evidence = (await new HistoricalAdjudicationPreviewStore(db).ReadAsync(fixture.CompetitionId, null, null, null, 50, ct)).Items.Single();
+            await Assert.That(evidence.Events.All(item => item.GameplayFactId == fixture.LaterFactId)).IsTrue();
+            await Assert.That(HistoricalAdjudicationAnalyzer.Analyze(evidence).Differences.Any(item =>
+                item.Kind == AdjudicationDifferenceKind.UnexpectedBloodAward && item.Severity == AdjudicationFindingSeverity.Error
+                && item.Classification == AdjudicationFindingClassification.IntegrityGap)).IsTrue();
+            await Assert.That(await CountsAsync(db, ct)).IsEqualTo(before);
+        });
+    }
+
     [Test, Timeout(300_000)]
     public async Task Truncated_eligibility_prefix_does_not_claim_a_complete_history(CancellationToken ct)
     {
