@@ -111,6 +111,8 @@ public sealed record HistoricalAdjudicationEvidencePage(
 
 public interface IHistoricalAdjudicationEvidenceStore
 {
+    Task<HistoricalAdjudicationEvidencePage> ReadRestrictedAsync(Guid competitionId, Guid? challengeId,
+        DateTimeOffset? beforeOccurredAt, Guid? beforeId, int scanLimit, CancellationToken ct);
     Task<HistoricalAdjudicationEvidencePage> ReadAsync(
         Guid competitionId,
         Guid? competitionChallengeId,
@@ -134,16 +136,22 @@ public sealed class PreviewHistoricalAdjudicationDifferences(
 
     public async Task<HistoricalAdjudicationPreviewPage> ExecuteAsync(
         Guid competitionId, Guid? competitionChallengeId, DateTimeOffset? beforeOccurredAt,
-        Guid? beforeId, int limit, bool includeInformational, CancellationToken cancellationToken = default)
+        Guid? beforeId, int limit, bool includeInformational, CancellationToken cancellationToken = default) =>
+        await ExecuteAsync(competitionId, competitionChallengeId, beforeOccurredAt, beforeId, limit,
+            includeInformational, false, cancellationToken);
+
+    public async Task<HistoricalAdjudicationPreviewPage> ExecuteAsync(
+        Guid competitionId, Guid? competitionChallengeId, DateTimeOffset? beforeOccurredAt,
+        Guid? beforeId, int limit, bool includeInformational, bool includeInternalTeams, CancellationToken cancellationToken = default)
     {
         var scanLimit = Math.Min(checked(limit * 10), 500);
-        var evidencePage = await store.ReadAsync(
+        var evidencePage = includeInternalTeams ? await store.ReadAsync(
             competitionId,
             competitionChallengeId,
             beforeOccurredAt,
             beforeId,
             scanLimit,
-            cancellationToken);
+            cancellationToken) : await store.ReadRestrictedAsync(competitionId, competitionChallengeId, beforeOccurredAt, beforeId, scanLimit, cancellationToken);
         if (evidencePage.State != HistoricalAdjudicationPreviewReadState.Available)
             return new(evidencePage.State, [], null, null);
         if (evidencePage.Items.Count == 0)

@@ -56,6 +56,8 @@ internal static class GameplayFactInfrastructure
         services.AddScoped<AccessCheatIncident>();
         services.AddScoped<ResolveCheatIncident>();
         services.AddScoped<IHistoricalAdjudicationEvidenceStore, HistoricalAdjudicationPreviewStore>();
+        services.AddScoped<IHistoricalAdjudicationEventStore, HistoricalAdjudicationPreviewStore>();
+        services.AddScoped<ReadHistoricalAdjudicationEvents>();
         services.AddScoped<PreviewHistoricalAdjudicationDifferences>();
         services.AddScoped<IGameplayFactProcessor, GameplayFactProcessor>();
         services.AddScoped<BloodRankCriticalSection>();

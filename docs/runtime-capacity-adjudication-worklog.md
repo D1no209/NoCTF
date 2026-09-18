@@ -161,6 +161,14 @@ historical correction. New blood events reference the adjudication event. Analyz
 HTTP and real PostgreSQL tests passed 21/21, including bounded queries, read-only
 snapshot behavior, event-prefix truncation and track/Patch handling.
 
+B3 completed: typed preview classifications and optional informational findings,
+signed single-fact evidence pages (50 default / 100 maximum), observer/internal-team
+scope isolation and on-demand bilingual UI. Historical analyzer/HTTP/real PostgreSQL
+tests passed 22/22; frontend 588/588, architecture audit and typecheck passed.
+OpenAPI export and two SDK generations produced identical SDK bytes. The concurrent
+CAP workload configuration was independently committed as `e4e6a2a44`; this step
+extends that contract without including the original question-editor changes.
+
 Use `backend/scripts/Verify-CoreRecovery.ps1` for scoped checks. Integration tests
 must use real PostgreSQL/Redis/Wolverine/NATS and Docker. Source-only assertions or
 EF InMemory do not establish relational or recovery behavior. Compare performance

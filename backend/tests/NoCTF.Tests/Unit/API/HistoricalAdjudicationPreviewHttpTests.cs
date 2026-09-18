@@ -31,6 +31,39 @@ public sealed class HistoricalAdjudicationPreviewHttpTests
     private const string BearerScheme = "Bearer";
 
     [Test]
+    public async Task Event_pages_are_read_only_authorized_and_cursor_bound_to_the_fact()
+    {
+        var competitionId = Guid.NewGuid();
+        var factId = Guid.NewGuid();
+        var actor = new MutableUserContext(Guid.NewGuid());
+        var authorizer = Substitute.For<ICompetitionModerationAuthorizer>();
+        authorizer.CanReadHistoricalAuditAsync(Arg.Any<Guid>(), competitionId, Arg.Any<CancellationToken>()).Returns(true);
+        var events = Substitute.For<IHistoricalAdjudicationEventStore>();
+        var at = DateTimeOffset.UtcNow;
+        var eventId = Guid.NewGuid();
+        events.ReadEventsAsync(competitionId, factId, Arg.Any<DateTimeOffset?>(), Arg.Any<Guid?>(), Arg.Any<int>(), false, Arg.Any<CancellationToken>())
+            .Returns(new HistoricalAdjudicationEventPage([new(eventId, at, NoCTF.Domain.Competitions.Events.CompetitionEventKind.GameplayFactAdjudicated,
+                GameplayFactState.Completed, GameplayFactResult.Correct)], at, eventId));
+        await using var app = await CreateApplicationAsync(authorizer, user: actor, eventStore: events);
+        using var client = app.GetTestClient();
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue(BearerScheme, actor.UserId.ToString());
+        var route = $"/api/v1/admin/competitions/{competitionId}/gameplay-facts/{factId}/adjudication-events";
+        var first = await client.GetFromJsonAsync<HistoricalAdjudicationEventsResponse>(route + "?limit=1");
+        await Assert.That(first!.Events.Single().EventId).IsEqualTo(eventId);
+        await Assert.That(first.NextCursor).IsNotNull();
+        var cursor = Uri.EscapeDataString(first.NextCursor!);
+        using var crossFact = await client.GetAsync(route.Replace(factId.ToString(), Guid.NewGuid().ToString()) + "?cursor=" + cursor);
+        await Assert.That(crossFact.StatusCode).IsEqualTo(HttpStatusCode.BadRequest);
+        actor.UserId = Guid.NewGuid();
+        using var crossUser = await client.GetAsync(route + "?cursor=" + cursor);
+        await Assert.That(crossUser.StatusCode).IsEqualTo(HttpStatusCode.BadRequest);
+        authorizer.CanReadHistoricalAuditAsync(Arg.Any<Guid>(), competitionId, Arg.Any<CancellationToken>()).Returns(false);
+        using var forbidden = await client.GetAsync(route);
+        await Assert.That(forbidden.StatusCode).IsEqualTo(HttpStatusCode.Forbidden);
+        await Assert.That(events.ReceivedCalls().Count()).IsEqualTo(1);
+    }
+
+    [Test]
     public async Task Observer_can_read_preview_but_participant_is_forbidden()
     {
         var competitionId = Guid.NewGuid();
@@ -199,7 +232,8 @@ public sealed class HistoricalAdjudicationPreviewHttpTests
     private static async Task<WebApplication> CreateApplicationAsync(
         ICompetitionModerationAuthorizer authorizer,
         IHistoricalAdjudicationEvidenceStore? store = null,
-        IUserContext? user = null)
+        IUserContext? user = null,
+        IHistoricalAdjudicationEventStore? eventStore = null)
     {
         var builder = WebApplication.CreateBuilder();
         builder.WebHost.UseTestServer();
@@ -211,7 +245,9 @@ public sealed class HistoricalAdjudicationPreviewHttpTests
             options.Assemblies = [typeof(PreviewHistoricalAdjudicationDifferencesEndpoint).Assembly];
             options.Filter = type =>
                 type == typeof(PreviewHistoricalAdjudicationDifferencesEndpoint)
-                || type == typeof(PreviewHistoricalAdjudicationDifferencesValidator);
+                || type == typeof(PreviewHistoricalAdjudicationDifferencesValidator)
+                || type == typeof(GetHistoricalAdjudicationEventsEndpoint)
+                || type == typeof(HistoricalAdjudicationEventsValidator);
         });
         builder.Services
             .AddAuthentication(options =>
@@ -222,6 +258,8 @@ public sealed class HistoricalAdjudicationPreviewHttpTests
             .AddScheme<AuthenticationSchemeOptions, TestBearerHandler>(BearerScheme, _ => { });
         builder.Services.AddAuthorization();
         builder.Services.AddSingleton(authorizer);
+        builder.Services.AddSingleton(eventStore ?? Substitute.For<IHistoricalAdjudicationEventStore>());
+        builder.Services.AddSingleton<ReadHistoricalAdjudicationEvents>();
         if (store is null)
         {
             store = Substitute.For<IHistoricalAdjudicationEvidenceStore>();
@@ -236,6 +274,9 @@ public sealed class HistoricalAdjudicationPreviewHttpTests
                     HistoricalAdjudicationPreviewReadState.Available,
                     []));
         }
+        store.ReadRestrictedAsync(Arg.Any<Guid>(), Arg.Any<Guid?>(), Arg.Any<DateTimeOffset?>(), Arg.Any<Guid?>(), Arg.Any<int>(), Arg.Any<CancellationToken>())
+            .Returns(call => store.ReadAsync(call.ArgAt<Guid>(0), call.ArgAt<Guid?>(1), call.ArgAt<DateTimeOffset?>(2),
+                call.ArgAt<Guid?>(3), call.ArgAt<int>(4), call.ArgAt<CancellationToken>(5)));
         builder.Services.AddSingleton(store);
         builder.Services.AddSingleton<PreviewHistoricalAdjudicationDifferences>();
         user ??= new MutableUserContext(Guid.NewGuid());
