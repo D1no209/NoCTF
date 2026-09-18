@@ -1,5 +1,12 @@
 # Runtime capacity and adjudication implementation
 
+## Recovery inventory contention validation
+
+Both real PostgreSQL/Redis 8192-claim inventory tests passed with 16/64 concurrent
+allocations/releases on another Runner. A MONITOR-observed scan was still active
+when an independent PostgreSQL session acquired the allocation lock (5.30/0.86 ms).
+This validates the already-moved scan rather than inferring lock behavior from code.
+
 ## Baseline test expectation correction
 
 The pre-existing force-delete failure expected four Files although its fixture owns

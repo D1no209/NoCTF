@@ -1,0 +1,1 @@
+{"concurrency":16,"inventoryClaims":8192,"recoveryAndConcurrentWorkMs":4803.9482,"globalLockWaitMs":5.2979,"allocationAndReleaseMs":[324.003,329.4304,336.2457,449.8479,334.4372,337.25,338.7305,337.2961,340.2655,338.9686,340.2019,341.8015,343.4887,345.1488,346.5437,347.9214],"databaseLockAcquiredDuringInventory":true}
