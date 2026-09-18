@@ -6,6 +6,7 @@
 @import "shadcn-vue/tailwind.css";
 @import '../../motion/motion.css';
 @import '../../motion/flag-celebration.css';
+@import '../../motion/cap-verification.css';
 
 @custom-variant dark (&:is(.dark *));
 
