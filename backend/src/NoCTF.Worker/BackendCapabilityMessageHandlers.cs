@@ -115,11 +115,12 @@ public sealed class RuntimeDispatchMessageHandler(
     ICompetitionEventRecorder events,
     IAwdRuntimeProvisioner awdRuntimes,
     IKohRuntimeProvisioner kohRuntimes,
-    TimeProvider timeProvider)
+    TimeProvider timeProvider,
+    NoCTF.Application.Runtime.Capacity.RuntimeResourceBudgetPolicy? budgets = null)
 {
     public Task Handle(DispatchRuntime message, CancellationToken cancellationToken) =>
         BackendMessageOperations.DispatchRuntimeAsync(
-            message, db, templates, placement, capacity, outbox, timeProvider, cancellationToken, events);
+            message, db, templates, placement, capacity, outbox, timeProvider, cancellationToken, events, budgets);
 
     public Task Handle(StopRuntime message, CancellationToken cancellationToken) =>
         BackendMessageOperations.StopRuntimeAsync(

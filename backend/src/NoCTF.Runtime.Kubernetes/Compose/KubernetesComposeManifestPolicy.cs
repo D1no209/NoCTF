@@ -130,7 +130,9 @@ public static class KubernetesComposeManifestPolicy
             var limits = request.ServiceResources[serviceName];
             container.Name = serviceName;
             container.ImagePullPolicy = options.ImagePullPolicy;
-            container.Resources = ResourceRequirements(limits);
+            container.Resources = KubernetesWorkloadResources.Create(limits,
+                request.ServiceBudgets is null ? null : request.ServiceBudgets.TryGetValue(serviceName, out var budget)
+                    ? budget : throw new InvalidOperationException("Every Compose service requires its committed budget."));
             container.SecurityContext = new V1SecurityContext
             {
                 AllowPrivilegeEscalation = false,
@@ -404,22 +406,6 @@ public static class KubernetesComposeManifestPolicy
         {
             ["noctf.io/compose-project"] = request.ProjectName
         };
-
-    private static V1ResourceRequirements ResourceRequirements(
-        RuntimeResourceLimits limits)
-    {
-        var cpuMillis = checked((limits.NanoCpus + 999_999) / 1_000_000);
-        var resources = new Dictionary<string, ResourceQuantity>
-        {
-            ["memory"] = new(limits.MemoryBytes.ToString(CultureInfo.InvariantCulture)),
-            ["cpu"] = new($"{cpuMillis}m")
-        };
-        return new V1ResourceRequirements
-        {
-            Limits = resources,
-            Requests = new Dictionary<string, ResourceQuantity>(resources)
-        };
-    }
 
     private static string ResourceName(
         string runtimeName,
