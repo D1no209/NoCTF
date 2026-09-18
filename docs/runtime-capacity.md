@@ -52,6 +52,9 @@ allocation/outbox commits have explicit recovery handling. Provider creation che
 the committed allocation and current admission gate again. Cleanup confirms actual
 resource absence before removing allocation metadata and publishing durable release.
 Repeated claim/release is idempotent. A missing ledger cannot be credited by cleanup.
+Auxiliary cleanup selects the owner from each active allocation document, even when
+the parent Runtime has already cleared RunnerId. Provider filtering occurs before
+the bounded query limit, and cleanup only touches allocations owned by this Runner.
 
 New typed claims are atomically indexed as unconfirmed in Redis. The ordinary
 resource audit confirms committed allocations or, after provider absence and a

@@ -9,6 +9,7 @@ using NoCTF.Runner.Composition;
 using Wolverine.Attributes;
 using NoCTF.Infrastructure.Runtime.Capacity;
 using NoCTF.Application.Messaging;
+using System.Text.Json;
 
 namespace NoCTF.Runner.Messages;
 
@@ -191,14 +192,17 @@ public sealed class RuntimeResourceReconciliationHandler(
     private async Task ReconcileAuxiliaryAsync(IRuntimeManagedResourceReconciler reconciler, string runnerId, CancellationToken ct)
     {
         if (providers is null || !db.Database.IsRelational()) return;
+        var awdOwner = JsonSerializer.Serialize(new { items = new[] { new { runnerId, identity = new { kind = RuntimeWorkloadKind.AwdChecker } } } });
+        var patchOwner = JsonSerializer.Serialize(new { items = new[] { new { runnerId, identity = new { kind = RuntimeWorkloadKind.PatchChecker } } } });
         var rows = await db.RuntimeInstances.FromSqlInterpolated($"""
             SELECT * FROM runtime_instances
-            WHERE runner_id = {runnerId}
-              AND jsonb_path_exists(capacity_allocations, '$.items[*].identity.kind ? (@ == 3 || @ == 4)')
+            WHERE runtime_provider = {(short)reconciler.Provider}
+              AND (capacity_allocations @> CAST({awdOwner} AS jsonb)
+                OR capacity_allocations @> CAST({patchOwner} AS jsonb))
             ORDER BY id LIMIT 500
             """).AsNoTracking().ToArrayAsync(ct);
         foreach (var runtime in rows.Where(row => row.RuntimeProvider == reconciler.Provider))
-        foreach (var allocation in runtime.CapacityAllocations.Items.Where(item => item.Identity.IsAuxiliary))
+        foreach (var allocation in runtime.CapacityAllocations.Items.Where(item => item.Identity.IsAuxiliary && item.RunnerId == runnerId))
         {
             if (mutations?.IsActive(allocation.Identity) == true) continue;
             var processing = await db.GameplayFacts.AnyAsync(fact => fact.Id == allocation.GameplayFactId

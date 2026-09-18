@@ -1,5 +1,13 @@
 # Runtime capacity and adjudication implementation
 
+## Review follow-up R3
+
+Auxiliary audits now select the allocation's owner rather than the parent's mutable
+RunnerId. A real PostgreSQL/Redis/Docker regression passed with a detached stopped
+parent, a surviving Checker and newly constructed audit state. It verifies physical
+cleanup, durable release handling and exact balance after duplicate release. This
+fixture restricts Docker inventory to its own UUID and never cleans unrelated containers.
+
 ## Review follow-up R2
 
 Worker re-dispatch rejects a resource definition that differs from the committed
