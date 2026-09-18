@@ -497,29 +497,41 @@ public sealed class HistoricalAdjudicationPreviewPersistenceTests
                 fixture.CompetitionId, null, null, null, 20, cancellationToken);
 
             await Assert.That(countedPage.Items).Count().IsEqualTo(20);
-            // Competition metadata, lifecycle-derived official window, candidates,
-            // first-correct facts, audit events, teams, and challenge titles.
+            // Competition, official window, candidates, challenge definitions,
+            // combined first-completion/team qualification, and audit evidence.
             // Eligibility adjustment evidence shares the bounded audit-event round trip.
-            await Assert.That(counter.ReaderCommandCount).IsLessThanOrEqualTo(7);
+            await Assert.That(counter.ReaderCommandCount).IsLessThanOrEqualTo(6);
             var measurements = Environment.GetEnvironmentVariable("NOCTF_CAPACITY_MEASUREMENTS");
             if (!string.IsNullOrWhiteSpace(measurements))
             {
                 var milliseconds = new List<double>();
                 var queries = new List<int>();
+                var queryMilliseconds = new List<double[]>();
+                var allocatedBytes = new List<long>();
                 for (var iteration = 0; iteration < 60; iteration++)
                 {
                     var initialCount = counter.ReaderCommandCount;
+                    var allocatedBefore = GC.GetTotalAllocatedBytes(precise: true);
                     var watch = System.Diagnostics.Stopwatch.StartNew();
                     var measured = await countedPreview.ExecuteAsync(fixture.CompetitionId, null, null, null, 500, cancellationToken);
                     await Assert.That(measured.Items.Count).IsEqualTo(500);
+                    var elapsedMs = watch.Elapsed.TotalMilliseconds;
+                    var allocated = GC.GetTotalAllocatedBytes(precise: true) - allocatedBefore;
                     if (iteration < 10) continue;
-                    milliseconds.Add(watch.Elapsed.TotalMilliseconds);
+                    milliseconds.Add(elapsedMs);
+                    allocatedBytes.Add(allocated);
                     queries.Add(counter.ReaderCommandCount - initialCount);
+                    queryMilliseconds.Add(counter.ReaderMilliseconds.Skip(initialCount).ToArray());
                 }
+                var evidence = await new HistoricalAdjudicationPreviewStore(countedDb).ReadAsync(fixture.CompetitionId, null, null, null, 500, cancellationToken);
+                var analyzeWatch = System.Diagnostics.Stopwatch.StartNew();
+                for (var repeat = 0; repeat < 100; repeat++)
+                    foreach (var item in evidence.Items) _ = HistoricalAdjudicationAnalyzer.Analyze(item);
+                var analyzePageMs = analyzeWatch.Elapsed.TotalMilliseconds / 100;
                 Directory.CreateDirectory(measurements);
                 await File.WriteAllTextAsync(Path.Combine(measurements, "preview-scan.json"), JsonSerializer.Serialize(new
                 {
-                    corpusFacts = 601, pageLimit = 500, warmup = 10, milliseconds, queries
+                    corpusFacts = 601, pageLimit = 500, warmup = 10, milliseconds, queries, queryMilliseconds, analyzePageMs, allocatedBytes
                 }, new JsonSerializerOptions { WriteIndented = true }), cancellationToken);
             }
         });
@@ -1000,6 +1012,13 @@ public sealed class HistoricalAdjudicationPreviewPersistenceTests
         private int readerCommandCount;
 
         public int ReaderCommandCount => Volatile.Read(ref readerCommandCount);
+        public List<double> ReaderMilliseconds { get; } = [];
+        public override ValueTask<DbDataReader> ReaderExecutedAsync(DbCommand command, CommandExecutedEventData eventData,
+            DbDataReader result, CancellationToken cancellationToken = default)
+        {
+            ReaderMilliseconds.Add(eventData.Duration.TotalMilliseconds);
+            return ValueTask.FromResult(result);
+        }
 
         public override ValueTask<InterceptionResult<DbDataReader>> ReaderExecutingAsync(
             DbCommand command,
