@@ -142,6 +142,15 @@ existing bundle/Nitro warnings. OpenAPI export and repeated SDK generation passe
 The optional shadcn CLI docs command could not resolve upstream packages; official
 component documentation and the installed primitives were used without dependency changes.
 
+B1 completed: shared current membership, track resolution, interaction and stable
+ordering policy. Flag and Patch blood generation excludes nonparticipants and uses
+earlier facts rather than completion order. Public Patch blood metadata follows the
+same completion kind as scoring; numerical score calculations are unchanged.
+Leaderboard regression baseline and after-change runs both passed 53/53; new shared
+eligibility/Flag/Patch tests passed 3/3, real PostgreSQL gameplay ordering 18/18 and
+Patch target persistence 1/1. Historical qualification remains a separate evidence
+question; B2 adds track context and ordered events to the preview reader.
+
 Use `backend/scripts/Verify-CoreRecovery.ps1` for scoped checks. Integration tests
 must use real PostgreSQL/Redis/Wolverine/NATS and Docker. Source-only assertions or
 EF InMemory do not establish relational or recovery behavior. Compare performance

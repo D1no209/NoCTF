@@ -80,19 +80,18 @@ public sealed class LeaderboardProjectionEngine(
         LeaderboardProjectionInput input)
     {
         var validTeams = input.Teams
-            .Where(team => !team.IsBanned && !team.IsDeleted && team.EarnsBlood)
+            .Where(CtfCompletionEligibility.EarnsBlood)
             .Select(team => team.Id)
             .ToHashSet();
         var validChallenges = (input.Challenges ?? [])
             .Where(challenge => !challenge.IsDeleted)
-            .Select(challenge => challenge.Id)
-            .ToHashSet();
+            .ToDictionary(challenge => challenge.Id);
         return input.GameplayFacts
             .Where(fact => fact.TeamId is Guid teamId && validTeams.Contains(teamId)
-                && fact.Kind == GameplayFactKind.FlagAttempt
                 && fact.CompetitionChallengeId is not null
-                && (validChallenges.Count == 0
-                    || validChallenges.Contains(fact.CompetitionChallengeId.Value))
+                && (validChallenges.Count == 0 ? fact.Kind == GameplayFactKind.FlagAttempt
+                    : validChallenges.TryGetValue(fact.CompetitionChallengeId.Value, out var challenge)
+                        && CtfCompletionEligibility.Matches(fact.Kind, challenge.InteractionKind))
                 && fact.Result == GameplayFactResult.Correct)
             .Select(fact => new CtfSolveObservation(
                 fact.TeamId!.Value,

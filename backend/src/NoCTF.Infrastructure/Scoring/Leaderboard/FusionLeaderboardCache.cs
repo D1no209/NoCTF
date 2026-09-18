@@ -139,10 +139,6 @@ public sealed class FusionLeaderboardCache(
             competition.Mode,
             competition.TracksEnabled,
             competition.TrackConfigurationJson);
-        var trackDefinitions = trackConfiguration.Tracks.ToDictionary(
-            track => track.Key,
-            StringComparer.OrdinalIgnoreCase);
-
         var teams = await db.Teams.AsNoTracking()
             .Where(team => team.CompetitionId == competitionId
                 && (competition.Mode != GameMode.Ctf
@@ -159,8 +155,7 @@ public sealed class FusionLeaderboardCache(
             .ToListAsync(ct);
         var teamFacts = teams.Select(team =>
         {
-            var track = trackDefinitions.GetValueOrDefault(team.TrackKey)
-                ?? trackConfiguration.DefaultTrack;
+            var track = CtfCompletionEligibility.Track(trackConfiguration, team.TrackKey);
             return new LeaderboardTeamFact(
                 team.Id,
                 team.Name,
