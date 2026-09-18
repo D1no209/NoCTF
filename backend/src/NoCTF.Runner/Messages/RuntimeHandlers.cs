@@ -6,6 +6,7 @@ using NoCTF.Domain.Runtime;
 using NoCTF.Infrastructure.Persistence;
 using NoCTF.Infrastructure.GameplayFacts.Awdp;
 using NoCTF.Infrastructure.Messaging;
+using NoCTF.Infrastructure.Runtime.Capacity;
 using NoCTF.Runner.Composition;
 using NoCTF.Application.Runtime.Instances;
 using NoCTF.Application.Runtime.Provisioning;
@@ -28,7 +29,8 @@ public sealed class RuntimeProviderHandler(
     IRuntimeNodeWorkReader workReader,
     TimeProvider? configuredTimeProvider = null,
     IAwdpAttackProvisioningPlanReader? awdpAttackPlans = null,
-    RunnerProviderHealthState? providerHealth = null)
+    RunnerProviderHealthState? providerHealth = null,
+    RunnerResourceMutationCoordinator? mutations = null)
 {
     private readonly TimeProvider timeProvider = configuredTimeProvider ?? TimeProvider.System;
 
@@ -36,6 +38,7 @@ public sealed class RuntimeProviderHandler(
         ProvisionContainerRuntime message,
         CancellationToken cancellationToken)
     {
+        using var mutation = mutations is null ? null : await mutations.EnterAsync(cancellationToken);
         ValidateAssignment(message);
         var workStatus = await workReader.ReadProvisionStatusAsync(message, cancellationToken);
         if (workStatus != RuntimeProvisionWorkStatus.Current)
@@ -132,6 +135,7 @@ public sealed class RuntimeProviderHandler(
         StopContainerRuntime message,
         CancellationToken cancellationToken)
     {
+        using var mutation = mutations is null ? null : await mutations.EnterAsync(cancellationToken);
         ValidateAssignment(message);
         RuntimeStopWork? work = null;
         var started = Stopwatch.GetTimestamp();
@@ -183,6 +187,7 @@ public sealed class RuntimeProviderHandler(
         ForceTerminateRuntime message,
         CancellationToken cancellationToken)
     {
+        using var mutation = mutations is null ? null : await mutations.EnterAsync(cancellationToken);
         ValidateAssignment(message);
         var started = Stopwatch.GetTimestamp();
         RuntimeStopWork? work = null;
@@ -273,6 +278,7 @@ public sealed class RuntimeProviderHandler(
         ProvisionComposeRuntime message,
         CancellationToken cancellationToken)
     {
+        using var mutation = mutations is null ? null : await mutations.EnterAsync(cancellationToken);
         ValidateAssignment(message);
         var workStatus = await workReader.ReadProvisionStatusAsync(message, cancellationToken);
         if (workStatus != RuntimeProvisionWorkStatus.Current)
@@ -363,6 +369,7 @@ public sealed class RuntimeProviderHandler(
         StopComposeRuntime message,
         CancellationToken cancellationToken)
     {
+        using var mutation = mutations is null ? null : await mutations.EnterAsync(cancellationToken);
         ValidateAssignment(message);
         RuntimeStopWork? work = null;
         var started = Stopwatch.GetTimestamp();
@@ -414,6 +421,7 @@ public sealed class RuntimeProviderHandler(
         ProvisionOvaRuntime message,
         CancellationToken cancellationToken)
     {
+        using var mutation = mutations is null ? null : await mutations.EnterAsync(cancellationToken);
         ValidateAssignment(message);
         var workStatus = await workReader.ReadProvisionStatusAsync(message, cancellationToken);
         if (workStatus != RuntimeProvisionWorkStatus.Current)
@@ -499,6 +507,7 @@ public sealed class RuntimeProviderHandler(
         StopOvaRuntime message,
         CancellationToken cancellationToken)
     {
+        using var mutation = mutations is null ? null : await mutations.EnterAsync(cancellationToken);
         ValidateAssignment(message);
         RuntimeStopWork? work = null;
         var started = Stopwatch.GetTimestamp();

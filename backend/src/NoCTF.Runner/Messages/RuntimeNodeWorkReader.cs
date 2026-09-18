@@ -19,13 +19,17 @@ public sealed class RuntimeNodeWorkReader(IServiceScopeFactory scopes) : IRuntim
             {
                 candidate.State,
                 candidate.RunnerId,
-                candidate.ProviderReceiptJson
+                candidate.ProviderReceiptJson,
+                candidate.CapacityAllocations
             })
             .SingleOrDefaultAsync(cancellationToken);
         if (assignment is null
             || !string.Equals(assignment.RunnerId, message.RunnerId, StringComparison.Ordinal))
             return RuntimeProvisionWorkStatus.AssignmentAbsent;
-        if (assignment.State == RuntimeState.Provisioning)
+        if (assignment.State == RuntimeState.Provisioning
+            && assignment.CapacityAllocations.Items.Any(item => !item.Identity.IsAuxiliary
+                && item.Identity.RuntimeInstanceId == message.RuntimeInstanceId
+                && item.RunnerId == message.RunnerId))
             return RuntimeProvisionWorkStatus.Current;
         if (assignment.State == RuntimeState.Stopping
             && assignment.ProviderReceiptJson == null)

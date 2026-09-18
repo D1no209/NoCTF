@@ -84,6 +84,15 @@ that a two-hour-old queued row is dispatched again after capacity returns withou
 any saved retry; stopped rows remain excluded (1/1 passed). This addresses the
 observed recovery symptom without claiming a proven historical message-loss cause.
 
+A2b completed for the new allocation protocol: allocation and provisioning are
+committed before provider work; release removes metadata and durably publishes a
+Redis release command. Recovery closes admission, excludes provider mutations and
+rebuilds claims from committed allocations. Unknown legacy/resource ownership
+remains blocked pending A3 reconciliation. Real PostgreSQL/Redis commit/rollback,
+Redis loss, frozen replay budgets and repeated release tests passed (2/2); provider
+handler regressions passed (25/25), mutation exclusion passed (1/1). No provider
+calls are made while holding the capacity database transaction.
+
 Use `backend/scripts/Verify-CoreRecovery.ps1` for scoped checks. Integration tests
 must use real PostgreSQL/Redis/Wolverine/NATS and Docker. Source-only assertions or
 EF InMemory do not establish relational or recovery behavior. Compare performance

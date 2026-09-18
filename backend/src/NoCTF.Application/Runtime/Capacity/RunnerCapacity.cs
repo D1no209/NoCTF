@@ -1,3 +1,5 @@
+using NoCTF.Domain.Runtime;
+
 namespace NoCTF.Application.Runtime.Capacity;
 
 public enum RunnerCapacityAvailability
@@ -24,7 +26,8 @@ public enum RunnerCapacityReleaseOutcome
 {
     Released,
     AlreadyReleased,
-    OwnerMismatch
+    OwnerMismatch,
+    RecoveryRequired
 }
 
 public enum RunnerPoolInventoryAvailability
@@ -42,12 +45,19 @@ public sealed record RunnerCapacityRequest(
     string Pool,
     long MemoryBytes,
     long NanoCpus,
-    long PidsLimit);
+    long PidsLimit,
+    RuntimeWorkloadIdentity? Workload = null,
+    Guid? GameplayFactId = null,
+    RuntimeResourceAmount? Limit = null)
+{
+    public string ClaimSuffix => Workload?.Key ?? RuntimeInstanceId.ToString("N");
+}
 
 public sealed record RunnerCapacityClaim(
     RunnerCapacityAvailability Availability,
     string? RunnerId = null,
-    RunnerCapacityClaimState? State = null);
+    RunnerCapacityClaimState? State = null,
+    RunnerAdmissionFailure? Failure = null);
 
 public interface IRunnerCapacityGate
 {
@@ -73,4 +83,10 @@ public interface IRunnerCapacityGate
         Guid runtimeInstanceId,
         string runnerId,
         CancellationToken cancellationToken);
+
+    Task<RunnerCapacityReleaseOutcome> ReleaseWorkloadAsync(
+        RuntimeWorkloadIdentity identity, string runnerId, CancellationToken cancellationToken) =>
+        identity.IsAuxiliary
+            ? throw new NotSupportedException("This capacity gate does not support auxiliary allocations.")
+            : ReleaseAsync(identity.RuntimeInstanceId, runnerId, cancellationToken);
 }

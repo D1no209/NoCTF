@@ -17,12 +17,14 @@ public sealed class RuntimeResourceReconciliationHandler(
     IEnumerable<IRuntimeManagedResourceReconciler> reconcilers,
     IOptions<RunnerOptions> runnerOptions,
     IRunnerCapacityGate capacity,
-    IRuntimeProviderCatalog? providers = null)
+    IRuntimeProviderCatalog? providers = null,
+    NoCTF.Infrastructure.Runtime.Capacity.RunnerResourceMutationCoordinator? mutations = null)
 {
     public async Task Handle(
         ReconcileRuntimeResources message,
         CancellationToken cancellationToken)
     {
+        using var mutation = mutations is null ? null : await mutations.EnterAsync(cancellationToken);
         var configuredPool = runnerOptions.Value.Pool;
         var configuredRunnerId = runnerOptions.Value.Id;
         RunnerNodeAssignmentGuard.Validate(

@@ -1,0 +1,79 @@
+using System.Text.Json;
+using NoCTF.Application.Runtime.Provisioning;
+using NoCTF.Domain.Runtime;
+using StackExchange.Redis;
+
+namespace NoCTF.Infrastructure.Runtime.Capacity;
+
+public sealed class RedisRunnerCapacityLedger(IConnectionMultiplexer redis)
+{
+    public async Task PauseAsync(string runnerId, string pool, CancellationToken ct)
+    {
+        ct.ThrowIfCancellationRequested();
+        await redis.GetDatabase().ScriptEvaluateAsync("""
+            redis.call('HSET', KEYS[1], 'admissionState', 'reconciling')
+            redis.call('ZREM', KEYS[2], ARGV[1])
+            return 1
+            """, [$"runner:{runnerId}:capacity", $"runner-pool:{pool}:candidates"], [runnerId]);
+    }
+
+    public async Task RestoreAsync(string runnerId, string pool, RuntimeResourceLimits total,
+        IReadOnlyList<RuntimeCapacityAllocation> allocations, CancellationToken ct)
+    {
+        foreach (var allocation in allocations)
+        {
+            allocation.Validate();
+            if (allocation.RunnerId != runnerId)
+                throw new InvalidOperationException("Cannot rebuild another Runner's allocation.");
+        }
+        var database = redis.GetDatabase();
+        var keys = new List<string>();
+        // Only used during recovery; admission is already closed. Include pre-index legacy claims.
+        foreach (var endpoint in redis.GetEndPoints())
+        {
+            var server = redis.GetServer(endpoint);
+            if (server.IsReplica) continue;
+            await foreach (var key in server.KeysAsync(database.Database, "runner-claim:*", pageSize: 256)
+                               .WithCancellation(ct))
+            {
+                if ((string?)await database.HashGetAsync(key, "runnerId") == runnerId)
+                    keys.Add(key.ToString());
+                if (keys.Count > 10000)
+                    throw new InvalidOperationException("Capacity recovery exceeds its bounded inventory.");
+            }
+        }
+        var rows = allocations.Select(item => new
+        {
+            key = $"runner-claim:{item.Identity.Key}", memory = item.Budget.MemoryBytes,
+            cpu = item.Budget.NanoCpus, pids = item.Budget.PidsLimit
+        }).ToArray();
+        var restored = (long)await database.ScriptEvaluateAsync("""
+            if redis.call('HGET', KEYS[1], 'admissionState') ~= 'reconciling' then return 0 end
+            local old = cjson.decode(ARGV[6])
+            for _, key in ipairs(old) do
+                if redis.call('HGET', key, 'runnerId') == ARGV[1] then redis.call('DEL', key) end
+            end
+            local memory = tonumber(ARGV[3])
+            local cpu = tonumber(ARGV[4])
+            local pids = tonumber(ARGV[5])
+            local rows = cjson.decode(ARGV[7])
+            for _, row in ipairs(rows) do
+                memory = memory - row.memory
+                cpu = cpu - row.cpu
+                pids = pids - row.pids
+                redis.call('HSET', row.key, 'runnerId', ARGV[1], 'pool', ARGV[2],
+                    'memoryBytes', row.memory, 'nanoCpus', row.cpu, 'pidsLimit', row.pids)
+            end
+            redis.call('HSET', KEYS[1], 'registrationSchema', '1', 'admissionState', 'ready',
+                'totalMemoryBytes', ARGV[3], 'totalNanoCpus', ARGV[4], 'totalPids', ARGV[5],
+                'availableMemoryBytes', memory, 'availableNanoCpus', cpu, 'availablePids', pids)
+            redis.call('PERSIST', KEYS[1])
+            redis.call('ZREM', KEYS[2], ARGV[1])
+            return 1
+            """, [$"runner:{runnerId}:capacity", $"runner-pool:{pool}:candidates"],
+            [runnerId, pool, total.MemoryBytes, total.NanoCpus, total.PidsLimit,
+                JsonSerializer.Serialize(keys), JsonSerializer.Serialize(rows)]);
+        if (restored != 1)
+            throw new InvalidOperationException("Capacity recovery lost its admission barrier.");
+    }
+}

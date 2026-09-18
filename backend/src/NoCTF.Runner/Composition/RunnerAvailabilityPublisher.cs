@@ -4,6 +4,8 @@ using Microsoft.Extensions.Options;
 using NoCTF.Domain.Runtime;
 using NoCTF.Infrastructure.Runtime.Capacity;
 using NoCTF.Infrastructure.Persistence;
+using NoCTF.Application.Runtime.Provisioning;
+using System.Text.Json;
 using Npgsql;
 using StackExchange.Redis;
 
@@ -15,7 +17,10 @@ public sealed class RunnerAvailabilityPublisher(
     IOptions<RunnerOptions> configuredOptions,
     ILogger<RunnerAvailabilityPublisher> logger,
     TimeProvider timeProvider,
-    RunnerProviderHealthState? providerHealth = null) : BackgroundService
+    RunnerProviderHealthState? providerHealth = null,
+    RedisRunnerCapacityLedger? ledger = null,
+    RunnerResourceMutationCoordinator? mutations = null,
+    IEnumerable<IRuntimeManagedResourceReconciler>? reconcilers = null) : BackgroundService
 {
     private static readonly string Version =
         typeof(RunnerProgramMarker).Assembly
@@ -97,8 +102,7 @@ public sealed class RunnerAvailabilityPublisher(
                             && instance.ProviderReceiptJson != null)),
                 cancellationToken);
 
-        return await registry.RegisterAsync(
-            new RunnerAvailabilityRegistration(
+        var registration = new RunnerAvailabilityRegistration(
                 options.Pool,
                 options.Id,
                 options.Provider!.Value,
@@ -106,7 +110,34 @@ public sealed class RunnerAvailabilityPublisher(
                 options.ResourceCapacity,
                 options.Heartbeat.Ttl,
                 hasActiveAssignments,
-                providerHealth?.IsReady(options.Provider.Value) ?? true),
-            cancellationToken);
+                providerHealth?.IsReady(options.Provider.Value) ?? true);
+        var result = await registry.RegisterAsync(registration, cancellationToken);
+        if (result == RunnerAvailabilityRegistrationOutcome.OfflineCapacityUntrusted
+            && ledger is not null && mutations is not null && reconcilers is not null)
+        {
+            await ledger.PauseAsync(options.Id, options.Pool, cancellationToken);
+            using var exclusive = await mutations.ReconcileAsync(cancellationToken);
+            var reconciler = reconcilers.Single(x => x.Provider == options.Provider);
+            // External inventory reads happen outside the database transaction.
+            var managed = await reconciler.ListManagedAsync(cancellationToken);
+            await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
+            await RuntimeCapacityCriticalSection.AcquireAsync(db, cancellationToken);
+            var ownerJson = JsonSerializer.Serialize(new { items = new[] { new { runnerId = options.Id } } });
+            var runtimes = await db.RuntimeInstances.FromSqlInterpolated(
+                    $"SELECT * FROM runtime_instances WHERE runner_id = {options.Id} OR capacity_allocations @> CAST({ownerJson} AS jsonb)")
+                .AsNoTracking().ToArrayAsync(cancellationToken);
+            var unresolvedLegacy = runtimes.Any(runtime => runtime.CapacityAllocations.Items.Count == 0
+                && runtime.State is RuntimeState.Provisioning or RuntimeState.Running or RuntimeState.Stopping);
+            var known = runtimes.Where(runtime => runtime.CapacityAllocations.Items.Count > 0)
+                .Select(runtime => runtime.Id).ToHashSet();
+            if (unresolvedLegacy || managed.Any(resource => !known.Contains(resource.RuntimeInstanceId)))
+                return RunnerAvailabilityRegistrationOutcome.OfflineCapacityUntrusted;
+            await ledger.RestoreAsync(options.Id, options.Pool, options.ResourceCapacity,
+                runtimes.SelectMany(runtime => runtime.CapacityAllocations.Items)
+                    .Where(item => item.RunnerId == options.Id).ToArray(), cancellationToken);
+            await transaction.CommitAsync(cancellationToken);
+            result = await registry.RegisterAsync(registration, cancellationToken);
+        }
+        return result;
     }
 }

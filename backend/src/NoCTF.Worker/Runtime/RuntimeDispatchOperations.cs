@@ -51,6 +51,25 @@ internal static partial class BackendMessageOperations
         CancellationToken cancellationToken,
         ICompetitionEventRecorder? events = null)
     {
+        await using var transaction = db.Database.IsRelational() && db.Database.CurrentTransaction is null
+            ? await db.Database.BeginTransactionAsync(cancellationToken) : null;
+        if (db.Database.IsRelational())
+            await NoCTF.Infrastructure.Runtime.Capacity.RuntimeCapacityCriticalSection.AcquireAsync(db, cancellationToken);
+        await DispatchRuntimeCoreAsync(message, db, templates, placementPolicy, capacity, outbox,
+            timeProvider, cancellationToken, events);
+        if (transaction is not null)
+        {
+            await transaction.CommitAsync(cancellationToken);
+            await outbox.FlushCommittedMessagesAsync();
+        }
+    }
+
+    private static async Task DispatchRuntimeCoreAsync(
+        DispatchRuntime message, NoCtfDbContext db, IChallengeRuntimeTemplateCatalog templates,
+        IRuntimePlacementPolicy placementPolicy, IRunnerCapacityGate capacity,
+        ITransactionalMessageOutbox outbox, TimeProvider timeProvider, CancellationToken cancellationToken,
+        ICompetitionEventRecorder? events)
+    {
         events ??= NullCompetitionEventRecorder.Instance;
         var runtimeScope = await db.RuntimeInstances.AsNoTracking()
             .Where(candidate => candidate.Id == message.RuntimeInstanceId)
@@ -237,6 +256,13 @@ internal static partial class BackendMessageOperations
         }
 
         instance.RunnerId = runnerId;
+        if (!db.Database.IsRelational())
+        {
+            var amount = new RuntimeResourceAmount(limits.MemoryBytes, limits.NanoCpus, limits.PidsLimit);
+            instance.CapacityAllocations = instance.CapacityAllocations.Add(new(
+                NoCTF.Infrastructure.Runtime.Capacity.PersistedRunnerCapacityGate.PrimaryIdentity(instance),
+                instance.GameplayFactId, runnerId, runnerId, amount, amount));
+        }
         instance.State = RuntimeState.Provisioning;
         instance.FailureCode = null;
         await PublishRuntimeProvisionAsync(outbox, provision);

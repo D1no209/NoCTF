@@ -47,6 +47,7 @@ public static class WorkerRole
         services.AddTransient<AwdpMessageHandler>();
         services.AddTransient<RuntimeDispatchMessageHandler>();
         services.AddTransient<QueuedRuntimeDispatchHandler>();
+        services.AddTransient<ReleaseRunnerCapacityHandler>();
         services.AddTransient<GameplayFactDrainMessageHandler>();
         services.AddSingleton<LeaderboardProjectionMergeQueue>();
         if (WorkerQueues.GetEnabled(configuration).Contains(WorkerQueue.Background))
@@ -89,6 +90,7 @@ public static class WorkerRole
         options.Discovery.IncludeType(typeof(AwdpMessageHandler));
         options.Discovery.IncludeType(typeof(RuntimeDispatchMessageHandler));
         options.Discovery.IncludeType(typeof(QueuedRuntimeDispatchHandler));
+        options.Discovery.IncludeType(typeof(ReleaseRunnerCapacityHandler));
         options.Discovery.IncludeType(typeof(GameplayFactDrainMessageHandler));
         options.Discovery.IncludeType(typeof(AccountNotificationMessageHandler));
         options.Discovery.IncludeType(typeof(GameplayFactMessageHandler));

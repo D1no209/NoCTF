@@ -45,6 +45,12 @@ public sealed class RedisRunnerAvailabilityRegistry(IConnectionMultiplexer redis
 
         redis.call('SADD', KEYS[1], ARGV[1])
 
+        if redis.call('HGET', KEYS[2], 'admissionState') == 'reconciling' then
+            redis.call('SET', KEYS[3], ARGV[7], 'PX', ARGV[6])
+            redis.call('ZREM', KEYS[4], ARGV[1])
+            return { 0, 0, 0, 0 }
+        end
+
         if ARGV[9] ~= '1' then
             redis.call('DEL', KEYS[3])
             redis.call('ZREM', KEYS[4], ARGV[1])
