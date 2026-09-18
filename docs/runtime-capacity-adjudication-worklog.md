@@ -1,5 +1,14 @@
 # Runtime capacity and adjudication implementation
 
+## Review follow-up V1 combined crash evidence
+
+Five real Linux worker/runner process scenarios passed with host observations,
+Singular Agent, PostgreSQL/EF Outbox, Redis and NATS: rollback/cancel without restart,
+SIGKILL before allocation write, after commit, after physical creation and after
+allocation removal before Redis release. Recovery used persisted facts/messages;
+no manual Redis deletion or in-memory reconstruction list. Raw checkpoint evidence
+and precise fixture scope are in `docs/runtime-capacity-review-validation.md`.
+
 ## Process recovery follow-up: late writebacks
 
 The combined recovery run exposed a late failure response overwriting Running.

@@ -38,5 +38,32 @@ R1 的普通审计回归使用真实 PostgreSQL/Redis 与受控 Provider 探针�
 [preview-summary.csv](validation/runtime-capacity-review/preview-summary.csv) 及该目录六份 JSON。
 这不是所有规模、所有 HTTP 业务或整个平台的端到端性能结论。
 
-V1/V3 的组合故障、完整全仓及 Kubernetes/Libvirt 环境结果将在完成后补充；容量配置
+## V1：真实进程故障窗口
+
+真实 Docker 宿主只读指标、生产 Runner 注册、Worker 派发/回写、Singular Agent、
+PostgreSQL EF Outbox、Redis 和 Wolverine/NATS 在 Linux 子进程中组合运行。测试替身仅用于
+本语料不调用的 AWD/KoH provisioner；Provider 清单限定为本测试 UUID，防止清理其他本地资源。
+故障屏障位于测试进程的 EF interceptor 或真实 Docker adapter 外层，生产代码没有测试开关。
+
+五个场景全部通过，合计 6 分 56 秒：
+
+| 窗口 | 动作 | 检查点至最终收敛秒数 |
+| --- | --- | ---: |
+| Redis 领取后、分配写入前 | 数据库回滚、通过正式测试 Runtime 用例取消，不重启 | 23.68 |
+| 分配写入前 | `SIGKILL`，取消后重启 | 12.83 |
+| 分配与 Outbox 提交后、刷新派发前 | `SIGKILL`，重启自动创建，再正常停止 | 69.30 |
+| 真实容器创建后、回写前 | `SIGKILL`，重启复用同一容器，再正常停止 | 68.99 |
+| 确认清理并移除分配后、Redis 释放前 | `SIGKILL`，重启完成释放与准入恢复 | 82.87 |
+
+以上是故障后的完整检查链耗时（包含重新启动、消息所有权恢复及必要停止），不是 P50/P95
+性能基准。每次最终 PostgreSQL 分配为空、Docker 资源不存在、Redis 预算恢复 512 MiB、
+启动名额归零且健康准入 Ready；创建恢复只发现一个容器。未手工删除 Redis Key，也未向
+恢复器传入内存分配列表。证据见 [crash-summary.csv](validation/runtime-capacity-review/crash-summary.csv)
+和同目录五份 `crash-*.jsonl`。副作用全部限定在本地隔离数据库和测试 UUID。
+
+运行：设置 `NOCTF_CAPACITY_FAULT_IMAGE` 为含 ASP.NET 10 的本地 Linux 镜像，
+`NOCTF_CAPACITY_MEASUREMENTS` 为报告目录，再执行 TUnit `CapacityCrashRecoveryTests`。
+镜像只提供运行时，实际生产程序集来自当前 Release 构建的挂载目录。
+
+V3 的完整全仓及 Kubernetes/Libvirt 环境结果将在完成后补充；容量配置
 仍按部署额度与真实边界取小值，默认 CPU 倍率仍为 1，不宣称原公测瓶颈已经消除。
