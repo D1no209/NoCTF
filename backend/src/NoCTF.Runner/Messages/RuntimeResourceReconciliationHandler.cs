@@ -77,7 +77,7 @@ public sealed class RuntimeResourceReconciliationHandler(
                 instance.Id,
                 message.RunnerId,
                 cancellationToken);
-            if (release == RunnerCapacityReleaseOutcome.OwnerMismatch)
+            if (release is RunnerCapacityReleaseOutcome.OwnerMismatch or RunnerCapacityReleaseOutcome.RecoveryRequired)
                 throw new InvalidOperationException(
                     "Failed Runtime capacity belongs to a different Runner assignment.");
 
@@ -131,7 +131,7 @@ public sealed class RuntimeResourceReconciliationHandler(
                         resource.RuntimeInstanceId,
                         message.RunnerId,
                         cancellationToken);
-                    if (release == RunnerCapacityReleaseOutcome.OwnerMismatch)
+                    if (release is RunnerCapacityReleaseOutcome.OwnerMismatch or RunnerCapacityReleaseOutcome.RecoveryRequired)
                         throw new InvalidOperationException(
                             "Orphaned Runtime capacity belongs to a different Runner assignment.");
                 }

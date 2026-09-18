@@ -1,5 +1,6 @@
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
+using NoCTF.Application.Runtime.Capacity;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -110,6 +111,16 @@ public sealed class RunnerAvailabilityPublisherTests
                 $"runner-claim:{fixture.RuntimeInstanceId:N}")).IsTrue();
 
             var reconciler = new RecordingResourceReconciler();
+            // A missing ledger cannot be credited by cleanup. First restore the
+            // independently known two legacy claims (128 bytes / 10 CPU / 1 PID each).
+            await Assert.That(await new RedisRunnerCapacityGate(redis).ReleaseAsync(
+                fixture.RuntimeInstanceId, "runner-a", cancellationToken))
+                .IsEqualTo(RunnerCapacityReleaseOutcome.RecoveryRequired);
+            await database.HashSetAsync("runner:runner-a:capacity", [
+                new HashEntry("totalMemoryBytes", 1024), new HashEntry("totalNanoCpus", 100),
+                new HashEntry("totalPids", 10), new HashEntry("availableMemoryBytes", 768),
+                new HashEntry("availableNanoCpus", 80), new HashEntry("availablePids", 8)
+            ]);
             var receiptResources = new RecordingReceiptResources();
             var configuration = new ConfigurationBuilder()
                 .AddInMemoryCollection(new Dictionary<string, string?>
@@ -194,7 +205,7 @@ public sealed class RunnerAvailabilityPublisherTests
 
             await Assert.That(providerUnavailable)
                 .IsEqualTo(RunnerAvailabilityRegistrationOutcome.OfflineProviderUnavailable);
-            await Assert.That(await database.KeyExistsAsync("runner:runner-a:heartbeat")).IsFalse();
+            await Assert.That(await database.KeyExistsAsync("runner:runner-a:heartbeat")).IsTrue();
             await Assert.That(await database.KeyExistsAsync("runner:runner-a:capacity")).IsTrue();
 
             providerHealth.ReportSuccess(RuntimeProvider.Docker);

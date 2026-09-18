@@ -243,7 +243,7 @@ public sealed class RuntimeProviderHandler(
                 message.RuntimeInstanceId,
                 message.RunnerId,
                 cancellationToken);
-            if (release == RunnerCapacityReleaseOutcome.OwnerMismatch)
+            if (release is RunnerCapacityReleaseOutcome.OwnerMismatch or RunnerCapacityReleaseOutcome.RecoveryRequired)
             {
                 return ForceTerminationFailed(
                     message,
@@ -693,7 +693,7 @@ public sealed class RuntimeProviderHandler(
             message.RuntimeInstanceId,
             message.RunnerId,
             cancellationToken);
-        if (release == RunnerCapacityReleaseOutcome.OwnerMismatch)
+        if (release is RunnerCapacityReleaseOutcome.OwnerMismatch or RunnerCapacityReleaseOutcome.RecoveryRequired)
             throw new InvalidOperationException(
                 "Runtime capacity belongs to a different Runner assignment.");
     }
@@ -706,7 +706,7 @@ public sealed class RuntimeProviderHandler(
             runtimeInstanceId,
             runnerOptions.Value.Id,
             cancellationToken);
-        if (release == RunnerCapacityReleaseOutcome.OwnerMismatch)
+        if (release is RunnerCapacityReleaseOutcome.OwnerMismatch or RunnerCapacityReleaseOutcome.RecoveryRequired)
             throw new InvalidOperationException(
                 "Runtime capacity belongs to a different Runner assignment.");
     }

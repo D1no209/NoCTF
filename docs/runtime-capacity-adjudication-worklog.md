@@ -93,6 +93,14 @@ Redis loss, frozen replay budgets and repeated release tests passed (2/2); provi
 handler regressions passed (25/25), mutation exclusion passed (1/1). No provider
 calls are made while holding the capacity database transaction.
 
+A3 completed: capacity hashes no longer expire with heartbeat. Quota changes apply
+the total delta to available capacity, preserving existing claims and allowing a
+negative balance. Provider failure closes admission but keeps liveness for cleanup.
+Legacy full-budget claims are copied into PostgreSQL before Redis key replacement;
+missing evidence remains blocked. Cleanup recognizes RecoveryRequired instead of
+pretending release succeeded. Redis regression suite 13/13, explicit legacy/quota
+test 1/1, and PostgreSQL/Redis publisher-cleanup test 1/1 passed.
+
 Use `backend/scripts/Verify-CoreRecovery.ps1` for scoped checks. Integration tests
 must use real PostgreSQL/Redis/Wolverine/NATS and Docker. Source-only assertions or
 EF InMemory do not establish relational or recovery behavior. Compare performance
