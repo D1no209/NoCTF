@@ -118,7 +118,7 @@ public sealed class ListPlatformRuntimesEndpoint(
         var now = timeProvider.GetUtcNow();
         return TypedResults.Ok(new PlatformRuntimeListResponse(
             items.Select(item => new PlatformRuntimeResponse(
-                    AdminRuntimeMapping.ToResponse(item.Runtime, now),
+                    AdminRuntimeMapping.ToResponse(item.Runtime, now, includeCapacity: true),
                     item.Scope == PlatformRuntimeScope.ChallengeTest
                         ? PlatformRuntimeScopeProtocol.ChallengeTest
                         : PlatformRuntimeScopeProtocol.Competition,

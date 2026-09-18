@@ -61,9 +61,24 @@ public enum RuntimeFailureCodeProtocol
     UrlExpansionFailed
 }
 
+[JsonConverter(typeof(StrictPascalCaseEnumConverter<RunnerAdmissionFailureProtocol>))]
+public enum RunnerAdmissionFailureProtocol
+{
+    NoEligibleRunner, CpuBudgetInsufficient, MemoryBudgetInsufficient, PidBudgetInsufficient,
+    NodePressureHigh, ObservationStale, LedgerRecovering, StartupConcurrencyLimited,
+    ProviderUnavailable, RequestExceedsNodeCapacity
+}
+
+[JsonConverter(typeof(StrictPascalCaseEnumConverter<RunnerAdmissionStateProtocol>))]
+public enum RunnerAdmissionStateProtocol { Starting, Reconciling, Ready, PressureBlocked, ProviderUnavailable, Draining }
+
 [Mapper]
 public static partial class RuntimeProtocolMapper
 {
+    [MapEnum(EnumMappingStrategy.ByName)]
+    public static partial RunnerAdmissionFailureProtocol ToProtocol(RunnerAdmissionFailure value);
+    [MapEnum(EnumMappingStrategy.ByName)]
+    public static partial RunnerAdmissionStateProtocol ToProtocol(RunnerAdmissionState value);
     [MapEnum(EnumMappingStrategy.ByName)]
     public static partial RuntimeKindProtocol ToProtocol(RuntimeKind value);
 
@@ -105,6 +120,7 @@ public sealed record RuntimeResponse(
     DateTimeOffset? StoppedAt)
 {
     public RuntimeAccessResponse? Access { get; init; }
+    public RunnerAdmissionFailureProtocol? WaitingReason { get; init; }
 }
 
 [JsonConverter(typeof(StrictPascalCaseEnumConverter<RuntimeAccessRouteProtocol>))]
@@ -163,7 +179,11 @@ internal static class RuntimeEndpointMapping
             view.CreatedAt,
             view.RunningAt,
             view.ExpiresAt,
-            view.StoppedAt) { Access = access is null ? null : RuntimeAccessMapping.ToResponse(access) };
+            view.StoppedAt)
+        {
+            Access = access is null ? null : RuntimeAccessMapping.ToResponse(access),
+            WaitingReason = view.WaitingReason is { } reason ? RuntimeProtocolMapper.ToProtocol(reason) : null
+        };
 
     public static RuntimeAcceptedResponse ToAccepted(RuntimeInstanceView view) =>
         new(

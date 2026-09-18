@@ -3,6 +3,9 @@ using Microsoft.AspNetCore.Http.HttpResults;
 using NoCTF.Application.Administration.Monitoring;
 using NoCTF.Application.Admission;
 using NoCTF.Domain.Platform;
+using NoCTF.Application.Runtime.Capacity;
+using NoCTF.Domain.Runtime;
+using NoCTF.API.Endpoints.Runtime;
 
 namespace NoCTF.API.Endpoints.Administration.Platform;
 
@@ -23,7 +26,18 @@ public sealed record PlatformMonitoringResponse(
     IReadOnlyList<PlatformMonitoringLatencyView> LatencyDetails,
     IReadOnlyList<PlatformMonitoringPoolResource> PoolResources,
     int LatencySustainedWindowMinutes,
-    HumanVerificationMonitoringResponse HumanVerification);
+    HumanVerificationMonitoringResponse HumanVerification,
+    RunnerCapacityReportResponse? Capacity = null);
+
+public sealed record RunnerResourceAmountResponse(long MemoryBytes, long NanoCpus, long PidsLimit);
+public sealed record RunnerObservationResponse(DateTimeOffset ObservedAt, double CpuUsageRatio,
+    long MemoryTotalBytes, long MemoryAvailableBytes, long? PidsUsed, long PidsCapacity);
+public sealed record RunnerCapacitySnapshotResponse(string RunnerId, bool Alive,
+    RunnerAdmissionStateProtocol State, RunnerAdmissionFailureProtocol? Failure,
+    RunnerResourceAmountResponse? Allocatable, RunnerResourceAmountResponse? Available,
+    RunnerResourceAmountResponse? Budget, RunnerResourceAmountResponse? Limits,
+    RunnerObservationResponse? Observation, int? StartingPrimary, int? ActiveAuxiliary);
+public sealed record RunnerCapacityReportResponse(bool Available, IReadOnlyList<RunnerCapacitySnapshotResponse> Runners, bool Truncated);
 
 public sealed record HumanVerificationMonitoringResponse(
     HumanVerificationProvider Provider,
@@ -33,7 +47,8 @@ public sealed record HumanVerificationMonitoringResponse(
     long? LatencyMilliseconds);
 
 public sealed class GetPlatformMonitoringEndpoint(
-    ObservePlatformMonitoring monitoring)
+    ObservePlatformMonitoring monitoring,
+    ObserveRunnerCapacity? capacity = null)
     : EndpointWithoutRequest<Ok<PlatformMonitoringResponse>>
 {
     public override void Configure()
@@ -54,6 +69,7 @@ public sealed class GetPlatformMonitoringEndpoint(
         CancellationToken ct)
     {
         var view = await monitoring.ExecuteAsync(ct);
+        var resources = capacity is null ? null : await capacity.ExecuteAsync(ct);
         return TypedResults.Ok(new PlatformMonitoringResponse(
             view.Status,
             view.PrometheusAvailable,
@@ -74,6 +90,17 @@ public sealed class GetPlatformMonitoringEndpoint(
                 view.HumanVerification?.State
                     ?? HumanVerificationMonitoringState.NotApplicable,
                 view.HumanVerification?.CheckedAt,
-                view.HumanVerification?.LatencyMilliseconds)));
+                view.HumanVerification?.LatencyMilliseconds), resources is null ? null : Map(resources)));
     }
+
+    private static RunnerResourceAmountResponse? Amount(RuntimeResourceAmount? value) =>
+        value is null ? null : new(value.MemoryBytes, value.NanoCpus, value.PidsLimit);
+
+    private static RunnerCapacityReportResponse Map(RunnerCapacityReport report) => new(report.Available,
+        report.Runners.Select(runner => new RunnerCapacitySnapshotResponse(runner.RunnerId, runner.Alive,
+            RuntimeProtocolMapper.ToProtocol(runner.State), runner.Failure is { } failure ? RuntimeProtocolMapper.ToProtocol(failure) : null,
+            Amount(runner.Allocatable), Amount(runner.Available), Amount(runner.Budget), Amount(runner.Limits),
+            runner.Observation is { } sample ? new RunnerObservationResponse(sample.ObservedAt, sample.CpuUsageRatio,
+                sample.MemoryTotalBytes, sample.MemoryAvailableBytes, sample.PidsUsed, sample.PidsCapacity) : null,
+            runner.StartingPrimary, runner.ActiveAuxiliary)).ToArray(), report.Truncated);
 }

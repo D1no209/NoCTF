@@ -4,6 +4,7 @@ import { toast } from 'vue-sonner'
 import { createRuntime, extendRuntimeEndpoint, getRuntimeEndpoint, stopRuntimeEndpoint } from '../../api'
 import type { NoCtfapiEndpointsRuntimeRuntimeResponse } from '../../api'
 import { publicGatewayFailure, publicGatewayState } from '../../utils/public-gateway'
+import { runnerFailureLabel } from '../shared/runner-capacity'
 import { classifyPlayerRuntimeLookup, normalizePlayerRuntime, shouldPollPlayerRuntime, type PlayerRuntimeLookupOutcome } from '../../utils/player-runtime'
 import { RUNTIME_STOP_POLL_DELAYS_MS, RUNTIME_STOP_POLL_MAX_INTERVAL_MS, RUNTIME_STOP_POLL_TIMEOUT_MS } from '../../lib/runtime-stop-polling'
 import RuntimeAccessUrlComponent from './RuntimeAccessUrl.vue'
@@ -218,6 +219,8 @@ export function useRuntimeCard(props: Readonly<Omit<{
   })
 
   const isRunning = computed(() => runtime.value?.state === 'Running')
+  const canStop = computed(() => runtime.value && ['Running', 'Queued', 'Provisioning'].includes(runtime.value.state ?? ''))
+  const stopDisabled = computed(() => acting.value || runtime.value?.state === 'Stopping')
 
   const busy = computed(() => acting.value || polling.value)
 
@@ -240,6 +243,9 @@ export function useRuntimeCard(props: Readonly<Omit<{
       ...toRefs(props),
       publicGatewayFailure,
       publicGatewayState,
+      runnerFailureLabel,
+      canStop,
+      stopDisabled,
       runtime,
       loading,
       loadError,

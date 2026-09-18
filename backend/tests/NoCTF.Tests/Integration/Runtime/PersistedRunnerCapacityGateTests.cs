@@ -56,6 +56,11 @@ public sealed class PersistedRunnerCapacityGateTests
             await db.RuntimeInstances.Where(x => x.Id == id).ExecuteUpdateAsync(update =>
                 update.SetProperty(x => x.State, RuntimeState.Provisioning).SetProperty(x => x.RunnerId, "runner"), ct);
             await Assert.That(await gate.CanCreateAsync(id, "runner", ct)).IsEqualTo(!rollback);
+            var report = await new RedisRunnerCapacityDiagnostics(db, redis, TimeProvider.System).ReadAsync(ct);
+            await Assert.That(report.Available).IsTrue();
+            await Assert.That(report.Runners.Single().Budget!.MemoryBytes).IsEqualTo(512);
+            if (rollback) await Assert.That(report.Runners.Single().Limits).IsNull();
+            else await Assert.That(report.Runners.Single().Limits!.MemoryBytes).IsEqualTo(512);
             // Redis failure occurs after allocation, before any provider command is consumed.
             await redis.GetDatabase().KeyDeleteAsync("runner:runner:capacity");
             await Assert.That(await gate.CanCreateAsync(id, "runner", ct)).IsFalse();

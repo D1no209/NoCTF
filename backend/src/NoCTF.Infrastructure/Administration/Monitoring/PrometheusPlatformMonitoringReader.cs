@@ -434,7 +434,8 @@ internal sealed class PrometheusPlatformMonitoringReader(
                 new(PrometheusMeasurementKind.WolverineInboxSustainedCount,
                     Sustained(inbox, window)),
                 new(PrometheusMeasurementKind.RuntimeWaitingCount,
-                    "sum(noctf_runtime_waiting{role=\"worker\"}) or vector(0)"),
+                    // Each Worker reports the same global PostgreSQL count.
+                    "max(noctf_runtime_waiting{role=\"worker\"}) or vector(0)"),
                 new(PrometheusMeasurementKind.RuntimeOldestWaitingSeconds,
                     "max(noctf_runtime_waiting_oldest_age_seconds{role=\"worker\"}) or vector(0)"),
                 new(PrometheusMeasurementKind.LeaderboardMergeDispatchFailuresPerSecond,

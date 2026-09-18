@@ -59,7 +59,16 @@ public sealed record AdminRuntimeResponse(
     DateTimeOffset? ExpiresAt,
     DateTimeOffset? StoppedAt,
     DateTimeOffset? ForceTerminationAvailableAt,
-    bool CanForceTerminate);
+    bool CanForceTerminate)
+{
+    public RunnerAdmissionFailureProtocol? WaitingReason { get; init; }
+    public IReadOnlyList<AdminRuntimeAllocationResponse>? Capacity { get; init; }
+}
+
+public sealed record AdminRuntimeAllocationResponse(Guid OperationId,
+    NoCTF.Domain.Runtime.RuntimeWorkloadKind Kind,
+    NoCTF.API.Endpoints.Administration.Platform.RunnerResourceAmountResponse Limit,
+    NoCTF.API.Endpoints.Administration.Platform.RunnerResourceAmountResponse Budget);
 
 public sealed record AdminRuntimeListResponse(
     IReadOnlyList<AdminRuntimeResponse> Items,
@@ -69,7 +78,8 @@ internal static class AdminRuntimeMapping
 {
     public static AdminRuntimeResponse ToResponse(
         RuntimeInstanceView view,
-        DateTimeOffset now)
+        DateTimeOffset now,
+        bool includeCapacity = false)
     {
         var availableAt = RuntimeForceTerminationPolicy.AvailableAt(view);
         return new(
@@ -84,7 +94,14 @@ internal static class AdminRuntimeMapping
             view.Urls, view.PublishedPorts ?? [], view.CreatedAt,
             view.RunningAt, view.ExpiresAt, view.StoppedAt,
             availableAt,
-            availableAt is { } value && value <= now);
+            availableAt is { } value && value <= now)
+        {
+            WaitingReason = view.WaitingReason is { } reason ? RuntimeProtocolMapper.ToProtocol(reason) : null,
+            Capacity = includeCapacity ? view.Capacity?.Items.Select(item => new AdminRuntimeAllocationResponse(
+                item.Identity.OperationId, item.Identity.Kind,
+                new(item.Limit.MemoryBytes, item.Limit.NanoCpus, item.Limit.PidsLimit),
+                new(item.Budget.MemoryBytes, item.Budget.NanoCpus, item.Budget.PidsLimit))).ToArray() : null
+        };
     }
 }
 

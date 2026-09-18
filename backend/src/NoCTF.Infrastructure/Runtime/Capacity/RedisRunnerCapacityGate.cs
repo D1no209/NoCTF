@@ -8,6 +8,32 @@ namespace NoCTF.Infrastructure.Runtime.Capacity;
 
 public sealed class RedisRunnerCapacityGate(IConnectionMultiplexer redis) : IRunnerCapacityGate
 {
+    public async Task RecordWaitingAsync(Guid runtimeInstanceId, RunnerAdmissionFailure? failure, CancellationToken ct)
+    {
+        ct.ThrowIfCancellationRequested();
+        var key = $"runtime-wait:{runtimeInstanceId:N}";
+        if (failure is null) await redis.GetDatabase().KeyDeleteAsync(key);
+        else await redis.GetDatabase().StringSetAsync(key, (int)failure.Value, TimeSpan.FromMinutes(1));
+    }
+
+    public async Task<IReadOnlyDictionary<Guid, RunnerAdmissionFailure>> ReadWaitingAsync(IReadOnlyList<Guid> runtimeIds, CancellationToken ct)
+    {
+        ct.ThrowIfCancellationRequested();
+        if (runtimeIds.Count == 0) return new Dictionary<Guid, RunnerAdmissionFailure>();
+        try
+        {
+            var values = await redis.GetDatabase().StringGetAsync(runtimeIds.Select(id => (RedisKey)$"runtime-wait:{id:N}").ToArray());
+            var result = new Dictionary<Guid, RunnerAdmissionFailure>();
+            for (var index = 0; index < runtimeIds.Count; index++)
+                if (int.TryParse(values[index].ToString(), out var value) && Enum.IsDefined((RunnerAdmissionFailure)value))
+                    result[runtimeIds[index]] = (RunnerAdmissionFailure)value;
+            return result;
+        }
+        catch (RedisException)
+        {
+            return runtimeIds.Distinct().ToDictionary(id => id, _ => RunnerAdmissionFailure.LedgerRecovering);
+        }
+    }
     private const int CandidateLimit = 8;
     private const double CandidateJitterMaximum = 0.000001d;
 

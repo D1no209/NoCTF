@@ -13659,6 +13659,14 @@
                 "$ref": "#/components/schemas/NoCTFAPIEndpointsRuntimeRuntimeAccessResponse"
               }
             ]
+          },
+          "waitingReason": {
+            "nullable": true,
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsRuntimeRunnerAdmissionFailureProtocol"
+              }
+            ]
           }
         }
       },
@@ -13847,6 +13855,34 @@
             "nullable": true
           }
         }
+      },
+      "NoCTFAPIEndpointsRuntimeRunnerAdmissionFailureProtocol": {
+        "type": "string",
+        "description": "",
+        "x-enumNames": [
+          "NoEligibleRunner",
+          "CpuBudgetInsufficient",
+          "MemoryBudgetInsufficient",
+          "PidBudgetInsufficient",
+          "NodePressureHigh",
+          "ObservationStale",
+          "LedgerRecovering",
+          "StartupConcurrencyLimited",
+          "ProviderUnavailable",
+          "RequestExceedsNodeCapacity"
+        ],
+        "enum": [
+          "NoEligibleRunner",
+          "CpuBudgetInsufficient",
+          "MemoryBudgetInsufficient",
+          "PidBudgetInsufficient",
+          "NodePressureHigh",
+          "ObservationStale",
+          "LedgerRecovering",
+          "StartupConcurrencyLimited",
+          "ProviderUnavailable",
+          "RequestExceedsNodeCapacity"
+        ]
       },
       "NoCTFAPIEndpointsRuntimeRuntimeTargetListResponse": {
         "type": "object",
@@ -18367,6 +18403,21 @@
           },
           "canForceTerminate": {
             "type": "boolean"
+          },
+          "waitingReason": {
+            "nullable": true,
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsRuntimeRunnerAdmissionFailureProtocol"
+              }
+            ]
+          },
+          "capacity": {
+            "type": "array",
+            "nullable": true,
+            "items": {
+              "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationRuntimeAdminRuntimeAllocationResponse"
+            }
           }
         }
       },
@@ -18405,6 +18456,61 @@
           "hostPort": {
             "type": "integer",
             "format": "int32"
+          }
+        }
+      },
+      "NoCTFAPIEndpointsAdministrationRuntimeAdminRuntimeAllocationResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "operationId": {
+            "type": "string",
+            "format": "guid"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/NoCTFDomainRuntimeRuntimeWorkloadKind"
+          },
+          "limit": {
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationPlatformRunnerResourceAmountResponse"
+          },
+          "budget": {
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationPlatformRunnerResourceAmountResponse"
+          }
+        }
+      },
+      "NoCTFDomainRuntimeRuntimeWorkloadKind": {
+        "type": "integer",
+        "description": "",
+        "x-enumNames": [
+          "Runtime",
+          "Compose",
+          "VerificationTarget",
+          "AwdChecker",
+          "PatchChecker"
+        ],
+        "enum": [
+          0,
+          1,
+          2,
+          3,
+          4
+        ]
+      },
+      "NoCTFAPIEndpointsAdministrationPlatformRunnerResourceAmountResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "memoryBytes": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "nanoCpus": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "pidsLimit": {
+            "type": "integer",
+            "format": "int64"
           }
         }
       },
@@ -19068,6 +19174,14 @@
           },
           "humanVerification": {
             "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationPlatformHumanVerificationMonitoringResponse"
+          },
+          "capacity": {
+            "nullable": true,
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationPlatformRunnerCapacityReportResponse"
+              }
+            ]
           }
         }
       },
@@ -19382,6 +19496,148 @@
           3,
           4
         ]
+      },
+      "NoCTFAPIEndpointsAdministrationPlatformRunnerCapacityReportResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "available": {
+            "type": "boolean"
+          },
+          "runners": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationPlatformRunnerCapacitySnapshotResponse"
+            }
+          },
+          "truncated": {
+            "type": "boolean"
+          }
+        }
+      },
+      "NoCTFAPIEndpointsAdministrationPlatformRunnerCapacitySnapshotResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "runnerId": {
+            "type": "string"
+          },
+          "alive": {
+            "type": "boolean"
+          },
+          "state": {
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsRuntimeRunnerAdmissionStateProtocol"
+          },
+          "failure": {
+            "nullable": true,
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsRuntimeRunnerAdmissionFailureProtocol"
+              }
+            ]
+          },
+          "allocatable": {
+            "nullable": true,
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationPlatformRunnerResourceAmountResponse"
+              }
+            ]
+          },
+          "available": {
+            "nullable": true,
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationPlatformRunnerResourceAmountResponse"
+              }
+            ]
+          },
+          "budget": {
+            "nullable": true,
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationPlatformRunnerResourceAmountResponse"
+              }
+            ]
+          },
+          "limits": {
+            "nullable": true,
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationPlatformRunnerResourceAmountResponse"
+              }
+            ]
+          },
+          "observation": {
+            "nullable": true,
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationPlatformRunnerObservationResponse"
+              }
+            ]
+          },
+          "startingPrimary": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "activeAuxiliary": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          }
+        }
+      },
+      "NoCTFAPIEndpointsRuntimeRunnerAdmissionStateProtocol": {
+        "type": "string",
+        "description": "",
+        "x-enumNames": [
+          "Starting",
+          "Reconciling",
+          "Ready",
+          "PressureBlocked",
+          "ProviderUnavailable",
+          "Draining"
+        ],
+        "enum": [
+          "Starting",
+          "Reconciling",
+          "Ready",
+          "PressureBlocked",
+          "ProviderUnavailable",
+          "Draining"
+        ]
+      },
+      "NoCTFAPIEndpointsAdministrationPlatformRunnerObservationResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "observedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "cpuUsageRatio": {
+            "type": "number",
+            "format": "double"
+          },
+          "memoryTotalBytes": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "memoryAvailableBytes": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "pidsUsed": {
+            "type": "integer",
+            "format": "int64",
+            "nullable": true
+          },
+          "pidsCapacity": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
       },
       "NoCTFAPIEndpointsAdministrationPlatformPlatformUserDetailResponse": {
         "type": "object",
