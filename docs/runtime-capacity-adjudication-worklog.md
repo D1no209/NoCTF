@@ -1,5 +1,14 @@
 # Runtime capacity and adjudication implementation
 
+## Review follow-up V2
+
+Profile-guided empty-evidence allocation reductions, shared qualification/adjustment
+decoding and one combined predecessor/team query retain audit semantics while
+reducing reads from seven to six. Three alternating 50-sample baseline/current pairs
+passed the 5% mean/P50/P95 and allocation comparison for the original 500-fact corpus;
+allocation decreased about 17%. Historical regressions 29/29 and SQL guard 1/1 passed.
+See `docs/runtime-capacity-review-validation.md` and its raw paired measurements.
+
 ## Review follow-up J2
 
 Blood parent validation now checks event kind, fact scope, readable completed state

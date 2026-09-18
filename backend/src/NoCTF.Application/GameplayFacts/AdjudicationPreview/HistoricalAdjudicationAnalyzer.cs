@@ -9,18 +9,19 @@ public static class HistoricalAdjudicationAnalyzer
 {
     public static HistoricalAdjudicationDifferenceItem Analyze(HistoricalAdjudicationEvidence evidence)
     {
-        var events = evidence.Events.OrderBy(item => item.OccurredAt).ThenBy(item => item.EventId).ToArray();
-        var adjudications = events.Where(item => item.Kind == CompetitionEventKind.GameplayFactAdjudicated).ToArray();
-        var decisions = adjudications.Where(item => item.Readable && item.State == GameplayFactState.Completed && item.Result is not null).ToArray();
+        var events = evidence.Events.Count == 0 ? [] : evidence.Events.OrderBy(item => item.OccurredAt).ThenBy(item => item.EventId).ToArray();
+        var adjudications = events.Length == 0 ? [] : events.Where(item => item.Kind == CompetitionEventKind.GameplayFactAdjudicated).ToArray();
+        var decisions = adjudications.Length == 0 ? [] : adjudications.Where(item => item.Readable && item.State == GameplayFactState.Completed && item.Result is not null).ToArray();
         var latest = decisions.LastOrDefault();
-        var unknown = adjudications.Where(item => !item.Readable || item.State is null
+        var unknown = adjudications.Length == 0 ? [] : adjudications.Where(item => !item.Readable || item.State is null
             || item.State == GameplayFactState.Completed && item.Result is null).ToArray();
-        var conflictingTimes = decisions.GroupBy(item => item.OccurredAt)
+        var conflictingTimes = decisions.Length < 2 ? null : decisions.GroupBy(item => item.OccurredAt)
             .Where(group => group.Select(item => item.Result).Distinct().Count() > 1)
             .Select(group => group.Key).ToHashSet();
-        var latestTrusted = latest is not null && !conflictingTimes.Contains(latest.OccurredAt)
+        var hasConflicts = conflictingTimes is { Count: > 0 };
+        var latestTrusted = latest is not null && conflictingTimes?.Contains(latest.OccurredAt) != true
             && !unknown.Any(item => item.OccurredAt >= latest.OccurredAt);
-        var changes = decisions.Zip(decisions.Skip(1)).Count(pair => pair.First.Result != pair.Second.Result);
+        var changes = decisions.Length < 2 ? 0 : decisions.Zip(decisions.Skip(1)).Count(pair => pair.First.Result != pair.Second.Result);
         var issues = new List<AdjudicationDifference>();
         var incompleteParent = false;
         GameplayFactResult? expectedResult = null;
@@ -42,11 +43,11 @@ public static class HistoricalAdjudicationAnalyzer
             Add(AdjudicationDifferenceKind.HistoricalResultChanged, AdjudicationDifferenceCertainty.Deterministic,
                 AdjudicationFindingSeverity.Error, AdjudicationFindingClassification.CurrentResultMismatch);
         }
-        else if (decisions.Length > 1 && conflictingTimes.Count == 0 && unknown.Length == 0)
+        else if (decisions.Length > 1 && !hasConflicts && unknown.Length == 0)
             Add(AdjudicationDifferenceKind.HistoricalResultChanged, AdjudicationDifferenceCertainty.Deterministic,
                 AdjudicationFindingSeverity.Information, AdjudicationFindingClassification.LegalHistoryChange);
 
-        if (conflictingTimes.Count > 0 || unknown.Length > 0 || evidence.Completeness == AdjudicationEvidenceCompleteness.Truncated)
+        if (hasConflicts || unknown.Length > 0 || evidence.Completeness == AdjudicationEvidenceCompleteness.Truncated)
             Add(AdjudicationDifferenceKind.HistoricalResultChanged, AdjudicationDifferenceCertainty.NeedsReview,
                 AdjudicationFindingSeverity.Warning, AdjudicationFindingClassification.InsufficientEvidence);
         if (evidence.CurrentResult is not null && decisions.Length == 0
@@ -78,12 +79,13 @@ public static class HistoricalAdjudicationAnalyzer
                 Add(AdjudicationDifferenceKind.TeamEligibilityHistoryRequiresReview, AdjudicationDifferenceCertainty.NeedsReview,
                     comparisonSeverity, comparisonClass);
 
-            var bloods = events.Where(item => IsBlood(item.Kind)).ToArray();
+            var bloods = events.Length == 0 ? [] : events.Where(item => IsBlood(item.Kind)).ToArray();
             bool ValidParent(AdjudicationEventEvidence parent) => parent.Kind == CompetitionEventKind.GameplayFactAdjudicated
                 && parent.GameplayFactId == evidence.GameplayFactId && parent.Readable
                 && parent.State == GameplayFactState.Completed && parent.Result == GameplayFactResult.Correct;
-            foreach (var blood in bloods.Where(item => item.ParentEventId is not null))
+            foreach (var blood in bloods)
             {
+                if (blood.ParentEventId is null) continue;
                 var parent = events.SingleOrDefault(item => item.EventId == blood.ParentEventId);
                 if (parent is not null && ValidParent(parent)) continue;
                 var fieldsMissing = parent is { Kind: CompetitionEventKind.GameplayFactAdjudicated }
@@ -97,14 +99,14 @@ public static class HistoricalAdjudicationAnalyzer
                     uncertain ? AdjudicationFindingSeverity.Warning : AdjudicationFindingSeverity.Error,
                     uncertain ? AdjudicationFindingClassification.InsufficientEvidence : AdjudicationFindingClassification.IntegrityGap);
             }
-            var linkedDuplicate = bloods.Where(item => item.ParentEventId is { } parent
+            var linkedDuplicate = bloods.Length > 1 && bloods.Where(item => item.ParentEventId is { } parent
                     && adjudications.Any(adjudication => adjudication.EventId == parent
                         && ValidParent(adjudication)))
                 .GroupBy(item => item.ParentEventId).Any(group => group.Count() > 1);
             if (linkedDuplicate)
                 Add(AdjudicationDifferenceKind.DuplicateBloodAward, AdjudicationDifferenceCertainty.Deterministic,
                     AdjudicationFindingSeverity.Error, AdjudicationFindingClassification.SuspectedDuplicate);
-            else if (evidence.RecordedBloodRanks.GroupBy(rank => rank).Any(group => group.Count() > 1)
+            else if (evidence.RecordedBloodRanks.Count > 1 && evidence.RecordedBloodRanks.GroupBy(rank => rank).Any(group => group.Count() > 1)
                 && (bloods.Length != evidence.RecordedBloodRanks.Count
                     || bloods.Any(blood => blood.ParentEventId is not Guid parent
                         || !adjudications.Any(item => item.EventId == parent))))
@@ -126,11 +128,11 @@ public static class HistoricalAdjudicationAnalyzer
             }
         }
         var completeness = evidence.Completeness == AdjudicationEvidenceCompleteness.Truncated ? evidence.Completeness
-            : conflictingTimes.Count > 0 ? AdjudicationEvidenceCompleteness.Ambiguous
+            : hasConflicts ? AdjudicationEvidenceCompleteness.Ambiguous
             : unknown.Length > 0 || incompleteParent ? AdjudicationEvidenceCompleteness.MissingFields : evidence.Completeness;
         return new(evidence.GameplayFactId, evidence.CompetitionChallengeId, evidence.ChallengeTitle,
             evidence.TeamId, evidence.TeamName, evidence.GameplayFactKind, evidence.CurrentResult, expectedResult,
-            null, evidence.RecordedBloodRanks, evidence.OccurredAt, issues.Distinct().ToArray())
+            null, evidence.RecordedBloodRanks, evidence.OccurredAt, issues.Count < 2 ? issues.ToArray() : issues.Distinct().ToArray())
         {
             CurrentState = evidence.CurrentState, CurrentProjectedBloodRank = currentRank,
             EvidenceCompleteness = completeness, LatestProcessingEvent = events.LastOrDefault(item => item.State is not null),
