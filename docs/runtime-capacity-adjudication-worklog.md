@@ -77,6 +77,13 @@ owner/budget invariants. EF generated `AddRuntimeCapacityAllocations`; empty-db
 migration plus real PostgreSQL JSON round-trip and three unit tests passed (4/4).
 Model drift check passed. The change does not enable CPU sharing.
 
+A2a completed: the Singular Agent dispatches bounded keyset batches of queued
+Runtime facts every five seconds. Capacity rejection no longer creates a per-row
+scheduled retry. A real PostgreSQL/NATS durable-inbox/outbox regression verifies
+that a two-hour-old queued row is dispatched again after capacity returns without
+any saved retry; stopped rows remain excluded (1/1 passed). This addresses the
+observed recovery symptom without claiming a proven historical message-loss cause.
+
 Use `backend/scripts/Verify-CoreRecovery.ps1` for scoped checks. Integration tests
 must use real PostgreSQL/Redis/Wolverine/NATS and Docker. Source-only assertions or
 EF InMemory do not establish relational or recovery behavior. Compare performance

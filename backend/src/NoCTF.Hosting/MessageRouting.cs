@@ -33,6 +33,7 @@ public static class MessageRouting
         Route<PollKohChallenge>(options, WorkerQueue.Control);
         Route<RecordKohObservation>(options, WorkerQueue.Gameplay);
         Route<DispatchRuntime>(options, WorkerQueue.Control);
+        Route<DispatchQueuedRuntimes>(options, WorkerQueue.Control);
         Route<StopRuntime>(options, WorkerQueue.Control);
         Route<DrainGameplayFactEvaluation>(options, WorkerQueue.Gameplay);
         Route<DrainGameplayFactRejudge>(options, WorkerQueue.Gameplay);

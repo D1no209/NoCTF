@@ -179,9 +179,8 @@ internal static partial class BackendMessageOperations
         if (capacityClaim.Availability != RunnerCapacityAvailability.Claimed
             || string.IsNullOrWhiteSpace(capacityClaim.RunnerId))
         {
-            var retryAt = timeProvider.GetUtcNow().Add(RunnerDependencyRetryDelay);
-            await outbox.ScheduleAsync(message, retryAt);
-            await outbox.FlushOutgoingMessagesAsync();
+            // The cluster Singular Agent rebuilds work from Queued facts. A missing
+            // or failed delayed delivery must never strand a capacity-blocked Runtime.
             return;
         }
 

@@ -298,6 +298,7 @@ public sealed class MaintenanceTickAgent(
             AdvanceCompetitionLifecycle value => bus.PublishAsync(value),
             ProjectLeaderboard value => bus.PublishAsync(value),
             ExpireAccountSourceAddresses value => bus.PublishAsync(value),
+            DispatchQueuedRuntimes value => bus.PublishAsync(value),
             _ => throw new ArgumentOutOfRangeException(
                 nameof(message),
                 message.GetType().FullName,
@@ -307,6 +308,8 @@ public sealed class MaintenanceTickAgent(
 
     private void AddFixedSchedules(DateTimeOffset now)
     {
+        AddFixed(new("runtime-dispatch", ClusterScheduleKind.RuntimeDispatch,
+            now, TimeSpan.FromSeconds(5), new DispatchQueuedRuntimes(now)));
         AddFixed(new("account-source-retention", ClusterScheduleKind.AccountPrivacyRetention,
             now, TimeSpan.FromHours(1), new ExpireAccountSourceAddresses(now)));
         AddFixed(new(
@@ -343,6 +346,7 @@ public sealed class MaintenanceTickAgent(
         ClusterScheduleKind.KohPoll => "koh_poll",
         ClusterScheduleKind.CompetitionLifecycle => "competition_lifecycle",
         ClusterScheduleKind.AccountPrivacyRetention => "account_privacy_retention",
+        ClusterScheduleKind.RuntimeDispatch => "runtime_dispatch",
         _ => throw new ArgumentOutOfRangeException(nameof(kind), kind, null)
     };
 }

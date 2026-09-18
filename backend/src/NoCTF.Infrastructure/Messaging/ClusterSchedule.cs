@@ -8,7 +8,8 @@ public enum ClusterScheduleKind
     AwdChecker,
     KohPoll,
     CompetitionLifecycle,
-    AccountPrivacyRetention
+    AccountPrivacyRetention,
+    RuntimeDispatch
 }
 
 public sealed record ClusterScheduleEntry(
@@ -179,6 +180,8 @@ internal static class ClusterScheduleMessageClock
             new NoCTF.Application.Messaging.AdvanceCompetitionLifecycle(dueAt),
         NoCTF.Application.Messaging.ExpireAccountSourceAddresses =>
             new NoCTF.Application.Messaging.ExpireAccountSourceAddresses(dueAt),
+        NoCTF.Application.Messaging.DispatchQueuedRuntimes =>
+            new NoCTF.Application.Messaging.DispatchQueuedRuntimes(dueAt),
         _ => throw new ArgumentOutOfRangeException(
             nameof(message),
             message.GetType().FullName,
