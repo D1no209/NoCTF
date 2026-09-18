@@ -33,6 +33,17 @@ internal sealed class RuntimeInstanceConfiguration : IEntityTypeConfiguration<Ru
         builder.Property(instance => instance.State).HasConversion<short>();
         builder.Property(instance => instance.FailureCode).HasConversion<short>();
         builder.Property(instance => instance.ProviderReceiptJson).HasColumnType("jsonb");
+        // PostgreSQL jsonb stores the bounded, typed active allocation document for Redis recovery.
+        builder.Property(instance => instance.CapacityAllocations)
+            .HasColumnType("jsonb")
+            .HasDefaultValue(RuntimeCapacityAllocations.Empty)
+            .HasConversion(
+                value => RuntimeCapacityAllocations.Serialize(value),
+                json => RuntimeCapacityAllocations.Deserialize(json))
+            .Metadata.SetValueComparer(new Microsoft.EntityFrameworkCore.ChangeTracking.ValueComparer<RuntimeCapacityAllocations>(
+                (left, right) => RuntimeCapacityAllocations.Serialize(left!) == RuntimeCapacityAllocations.Serialize(right!),
+                value => RuntimeCapacityAllocations.Serialize(value).GetHashCode(),
+                value => RuntimeCapacityAllocations.Deserialize(RuntimeCapacityAllocations.Serialize(value))));
         builder.Property(instance => instance.Urls).HasColumnType("text[]");
         builder.HasIndex(instance => new
         {
