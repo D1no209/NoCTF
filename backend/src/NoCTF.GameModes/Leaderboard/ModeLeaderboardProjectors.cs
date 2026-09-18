@@ -38,13 +38,13 @@ internal static class CtfLeaderboardProjection
         ProjectCore(LeaderboardProjectionInput input)
     {
         var activeTeams = input.Teams
-            .Where(team => !team.IsBanned && !team.IsDeleted)
+            .Where(CtfCompletionEligibility.IsActive)
             .ToDictionary(team => team.Id);
         var validTeams = activeTeams.Values
-            .Where(team => !team.IsBanned && !team.IsDeleted && team.EarnsScore)
+            .Where(CtfCompletionEligibility.EarnsScore)
             .ToDictionary(team => team.Id);
         var dynamicTeams = activeTeams.Values
-            .Where(team => team.AffectsDynamicChallengeScore)
+            .Where(CtfCompletionEligibility.AffectsDynamicScore)
             .Select(team => team.Id)
             .ToHashSet();
         var challenges = (input.Challenges ?? []).Where(challenge => !challenge.IsDeleted).ToDictionary(challenge => challenge.Id);
@@ -219,9 +219,7 @@ internal static class CtfLeaderboardProjection
             return false;
         var interaction = challenges.GetValueOrDefault(challengeId)?.InteractionKind
             ?? CtfInteractionKind.FlagSubmission;
-        return interaction == CtfInteractionKind.PatchVerification
-            ? fact.Kind == GameplayFactKind.FixAttempt
-            : fact.Kind == GameplayFactKind.FlagAttempt;
+        return CtfCompletionEligibility.Matches(fact.Kind, interaction);
     }
 
     private static CtfChallengeConfiguration ParseChallenge(string? json) =>

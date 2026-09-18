@@ -371,18 +371,19 @@ public sealed class InternalResultStore(
             competition.Mode,
             competition.TracksEnabled,
             competition.TrackConfigurationJson);
-        var currentTrackKey = await db.Teams.AsNoTracking()
+        var currentTrackKey = await db.Teams.AsNoTracking().Where(CtfCompletionEligibility.ParticipatingTeams)
             .Where(team => team.Id == fact.TeamId)
             .Select(team => team.TrackKey)
-            .SingleAsync(ct);
-        var currentTrack = tracks.Find(currentTrackKey)
-            ?? (!competition.TracksEnabled ? tracks.DefaultTrack : null);
+            .SingleOrDefaultAsync(ct);
+        if (currentTrackKey is null) return null;
+        var currentTrack = CtfCompletionEligibility.Track(tracks, currentTrackKey);
         if (currentTrack?.EarnsBlood != true)
             return null;
         var bloodTrackKeys = tracks.Tracks.Where(track => track.EarnsBlood)
-            .Select(track => track.Key)
+            .Select(track => track.Key.ToLowerInvariant())
             .ToArray();
         var solvedTeamIds = await db.GameplayFacts.AsNoTracking()
+            .Where(CtfCompletionEligibility.Before(fact.OccurredAt, fact.Id))
             .Where(candidate => candidate.CompetitionId == fact.CompetitionId
                 && candidate.CompetitionChallengeId == fact.CompetitionChallengeId
                 && candidate.Kind == GameplayFactKind.FixAttempt
@@ -391,8 +392,8 @@ public sealed class InternalResultStore(
                 && candidate.OccurredAt < officialWindow.EndAt
                 && candidate.Id != fact.Id)
             .Join(
-                db.Teams.AsNoTracking().Where(team => (!competition.TracksEnabled
-                        || bloodTrackKeys.Contains(team.TrackKey))
+                db.Teams.AsNoTracking().Where(CtfCompletionEligibility.ParticipatingTeams).Where(team => (!competition.TracksEnabled
+                        || bloodTrackKeys.Contains(team.TrackKey.ToLower()))
                     && team.RegisteredAt < officialWindow.EndAt),
                 candidate => candidate.TeamId,
                 team => (Guid?)team.Id,

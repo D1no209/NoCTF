@@ -231,17 +231,10 @@ public sealed class HistoricalAdjudicationPreviewStore(NoCtfDbContext db)
         Guid leftId,
         DateTimeOffset rightOccurredAt,
         Guid rightId) =>
-        leftOccurredAt < rightOccurredAt
-        || leftOccurredAt == rightOccurredAt
-        && string.CompareOrdinal(leftId.ToString("N"), rightId.ToString("N")) < 0;
+        CtfCompletionEligibility.IsBefore(leftOccurredAt, leftId, rightOccurredAt, rightId);
 
     private static bool IsEligible(TeamEvidence? team) =>
-        team is
-        {
-            RegistrationStatus: NoCTF.Domain.Teams.TeamRegistrationStatus.Approved,
-            IsBanned: false,
-            DeletedAt: null
-        };
+        team is not null && CtfCompletionEligibility.CanParticipate(team.RegistrationStatus, team.IsBanned, team.DeletedAt is not null);
 
     private static LeaderboardBloodRank ToBloodRank(CompetitionEventKind kind) => kind switch
     {
