@@ -64,7 +64,8 @@ internal static class RuntimeInfrastructure
                 redisOptions.AbortOnConnectFail = false;
                 return ConnectionMultiplexer.Connect(redisOptions);
             });
-            services.AddScoped<IRunnerCapacityGate, RedisRunnerCapacityGate>();
+            services.AddScoped<RedisRunnerCapacityGate>();
+            services.AddScoped<IRunnerCapacityGate, PersistedRunnerCapacityGate>();
         }
         services.AddSingleton<IRuntimePlacementPolicy, ConfiguredRuntimePlacementPolicy>();
         services.AddScoped<TeamRuntimeQuota>();

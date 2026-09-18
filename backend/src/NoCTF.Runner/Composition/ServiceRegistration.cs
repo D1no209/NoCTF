@@ -94,8 +94,11 @@ public static class ServiceRegistration
                 redisOptions.AbortOnConnectFail = false;
                 return ConnectionMultiplexer.Connect(redisOptions);
             });
-            services.AddScoped<IRunnerCapacityGate, RedisRunnerCapacityGate>();
+            services.AddScoped<RedisRunnerCapacityGate>();
+            services.AddScoped<IRunnerCapacityGate, PersistedRunnerCapacityGate>();
             services.AddSingleton<RedisRunnerAvailabilityRegistry>();
+            services.AddSingleton<RedisRunnerCapacityLedger>();
+            services.AddSingleton<RunnerResourceMutationCoordinator>();
             services.AddHostedService<RunnerAvailabilityPublisher>();
         }
         var isKubernetesPool = string.Equals(

@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using NoCTF.Application.Observability;
 using NoCTF.Application.Runtime.Capacity;
+using NoCTF.Domain.Runtime;
 using StackExchange.Redis;
 
 namespace NoCTF.Infrastructure.Runtime.Capacity;
@@ -31,6 +32,8 @@ public sealed class RedisRunnerCapacityGate(IConnectionMultiplexer redis) : IRun
                 1 - (availablePids / totalPids)) + jitter
         end
 
+        local admission = redis.call('HGET', KEYS[2], 'admissionState')
+        if admission and admission ~= 'ready' then return 0 end
         local existingRunner = redis.call('HGET', KEYS[3], 'runnerId')
         if existingRunner then
             if existingRunner == ARGV[4] then return 2 end
@@ -80,7 +83,11 @@ public sealed class RedisRunnerCapacityGate(IConnectionMultiplexer redis) : IRun
         end
 
         local existingRunner = redis.call('HGET', KEYS[3], 'runnerId')
-        if existingRunner then return { 2, existingRunner } end
+        if existingRunner then
+            local admission = redis.call('HGET', 'runner:' .. existingRunner .. ':capacity', 'admissionState')
+            if admission and admission ~= 'ready' then return { 0, '' } end
+            return { 2, existingRunner }
+        end
 
         redis.call('DEL', KEYS[2])
         local requestedMemory = tonumber(ARGV[1])
@@ -92,7 +99,9 @@ public sealed class RedisRunnerCapacityGate(IConnectionMultiplexer redis) : IRun
         for _, runnerId in ipairs(members) do
             local heartbeatKey = 'runner:' .. runnerId .. ':heartbeat'
             local capacityKey = 'runner:' .. runnerId .. ':capacity'
-            if redis.call('EXISTS', heartbeatKey) == 1 and redis.call('EXISTS', capacityKey) == 1 then
+            local admission = redis.call('HGET', capacityKey, 'admissionState')
+            if redis.call('EXISTS', heartbeatKey) == 1 and redis.call('EXISTS', capacityKey) == 1
+                and (not admission or admission == 'ready') then
                 local hash = redis.sha1hex(runnerId .. ARGV[5])
                 local jitter = (tonumber(string.sub(hash, 1, 8), 16) / 4294967295) * 0.000001
                 local score = pressure(capacityKey, jitter)
@@ -146,6 +155,7 @@ public sealed class RedisRunnerCapacityGate(IConnectionMultiplexer redis) : IRun
         local owner = redis.call('HGET', KEYS[2], 'runnerId')
         if not owner then return 0 end
         if owner ~= ARGV[1] then return -1 end
+        if redis.call('EXISTS', KEYS[1]) == 0 then return -2 end
         local memory = redis.call('HGET', KEYS[2], 'memoryBytes')
         local cpu = redis.call('HGET', KEYS[2], 'nanoCpus')
         local pids = redis.call('HGET', KEYS[2], 'pidsLimit')
@@ -247,7 +257,7 @@ public sealed class RedisRunnerCapacityGate(IConnectionMultiplexer redis) : IRun
         try
         {
             var database = redis.GetDatabase();
-            var claimKey = new RedisKey($"runner-claim:{request.RuntimeInstanceId:N}");
+            var claimKey = new RedisKey($"runner-claim:{request.ClaimSuffix}");
             var existingRunner = (string?)await database.HashGetAsync(claimKey, "runnerId");
             if (!string.IsNullOrWhiteSpace(existingRunner))
             {
@@ -324,17 +334,31 @@ public sealed class RedisRunnerCapacityGate(IConnectionMultiplexer redis) : IRun
         }
     }
 
-    public async Task<RunnerCapacityReleaseOutcome> ReleaseAsync(
+    public Task<RunnerCapacityReleaseOutcome> ReleaseAsync(
         Guid runtimeInstanceId,
         string runnerId,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken) => ReleaseCoreAsync(runtimeInstanceId.ToString("N"), runnerId, cancellationToken);
+
+    public Task<RunnerCapacityReleaseOutcome> ReleaseWorkloadAsync(
+        RuntimeWorkloadIdentity identity, string runnerId, CancellationToken cancellationToken) =>
+        ReleaseCoreAsync(identity.Key, runnerId, cancellationToken);
+
+    public async Task<string> GetResourceDomainAsync(string runnerId, CancellationToken ct)
+    {
+        ct.ThrowIfCancellationRequested();
+        var domain = (string?)await redis.GetDatabase().HashGetAsync($"runner:{runnerId}:capacity", "resourceDomain");
+        return string.IsNullOrWhiteSpace(domain) ? runnerId : domain;
+    }
+
+    private async Task<RunnerCapacityReleaseOutcome> ReleaseCoreAsync(
+        string claimSuffix, string runnerId, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
         var startedAt = Stopwatch.GetTimestamp();
         var database = redis.GetDatabase();
         try
         {
-            var claimKey = new RedisKey($"runner-claim:{runtimeInstanceId:N}");
+            var claimKey = new RedisKey($"runner-claim:{claimSuffix}");
             var pool = (string?)await database.HashGetAsync(claimKey, "pool");
             var poolKey = string.IsNullOrWhiteSpace(pool) ? "__legacy__" : pool;
             var released = (long)await database.ScriptEvaluateAsync(
@@ -352,6 +376,7 @@ public sealed class RedisRunnerCapacityGate(IConnectionMultiplexer redis) : IRun
                 1 => RunnerCapacityReleaseOutcome.Released,
                 0 => RunnerCapacityReleaseOutcome.AlreadyReleased,
                 -1 => RunnerCapacityReleaseOutcome.OwnerMismatch,
+                -2 => RunnerCapacityReleaseOutcome.RecoveryRequired,
                 _ => throw new InvalidOperationException("Redis returned an unknown capacity release result.")
             };
             RecordRedisOperation("runner_release", "success", startedAt);
@@ -376,7 +401,7 @@ public sealed class RedisRunnerCapacityGate(IConnectionMultiplexer redis) : IRun
             [
                 new RedisKey($"runner:{runnerId}:heartbeat"),
                 new RedisKey($"runner:{runnerId}:capacity"),
-                new RedisKey($"runner-claim:{request.RuntimeInstanceId:N}"),
+                new RedisKey($"runner-claim:{request.ClaimSuffix}"),
                 new RedisKey($"runner-pool:{request.Pool}:members"),
                 new RedisKey($"runner-pool:{request.Pool}:candidates")
             ],
@@ -409,7 +434,7 @@ public sealed class RedisRunnerCapacityGate(IConnectionMultiplexer redis) : IRun
             [
                 new RedisKey($"runner-pool:{request.Pool}:members"),
                 new RedisKey($"runner-pool:{request.Pool}:candidates"),
-                new RedisKey($"runner-claim:{request.RuntimeInstanceId:N}")
+                new RedisKey($"runner-claim:{request.ClaimSuffix}")
             ],
             [
                 request.MemoryBytes,
