@@ -1,5 +1,12 @@
 # Runtime capacity and adjudication implementation
 
+## Baseline test expectation correction
+
+The pre-existing force-delete failure expected four Files although its fixture owns
+five and deletion only enqueues asynchronous CleanupFile messages. The test now
+asserts the exact preserved fixture IDs rather than a stale numeric count. Production
+deletion behavior is unchanged; all nine boundary cases passed against PostgreSQL.
+
 ## Review follow-up V1 combined crash evidence
 
 Five real Linux worker/runner process scenarios passed with host observations,

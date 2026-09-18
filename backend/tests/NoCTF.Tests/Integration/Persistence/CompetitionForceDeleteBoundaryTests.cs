@@ -38,7 +38,8 @@ public sealed class CompetitionForceDeleteBoundaryTests
         await Assert.That(await db.ChallengeFlags.CountAsync(ct)).IsEqualTo(1);
         await Assert.That(await db.Set<NoCTF.Domain.Challenges.ChallengeAttachment>().CountAsync(ct)).IsEqualTo(1);
         await Assert.That(await db.Users.CountAsync(ct)).IsEqualTo(1);
-        await Assert.That(await db.Files.CountAsync(ct)).IsEqualTo(4);
+        // File cleanup is queued separately; this transaction preserves every immutable file record.
+        await Assert.That(await db.Files.Select(file => file.Id).ToArrayAsync(ct)).IsEquivalentTo(fixture.CleanupFileIds);
         await Assert.That(await db.Notifications.CountAsync(x => x.Kind == NotificationKind.CompetitionForceDeleted, ct)).IsEqualTo(1);
         await Assert.That(await db.Notifications.AnyAsync(x => x.Id == fixture.MemberId, ct)).IsFalse();
     }, ct);
