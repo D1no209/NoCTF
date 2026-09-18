@@ -2,6 +2,7 @@
 
 import { Activity, ExternalLink as ExternalLinkIcon, RefreshCw } from '@lucide/vue'
 import { adminPlatformGetMonitoring } from '../../../../api'
+import { runnerFailureLabel, runnerStateLabel, formatCapacityAmount, formatRunnerUsage } from '../../../shared/runner-capacity'
 import type { NoCtfapiEndpointsAdministrationPlatformPlatformMonitoringMetricResponse, NoCtfapiEndpointsAdministrationPlatformPlatformMonitoringResponse, NoCtfApplicationAdministrationMonitoringPlatformMonitoringStatus, NoCtfApplicationAdministrationMonitoringPlatformMonitoringUnit, NoCtfApplicationAdmissionHumanVerificationMonitoringState, NoCtfDomainPlatformHumanVerificationProvider } from '../../../../api'
 
 type MonitoringSnapshot = NoCtfapiEndpointsAdministrationPlatformPlatformMonitoringResponse
@@ -370,6 +371,7 @@ export function useAdminPlatformMonitoringPage() {
   })
 
   return {
+      runnerFailureLabel, runnerStateLabel, formatCapacityAmount, formatRunnerUsage,
       Activity,
       ExternalLinkIcon,
       RefreshCw,

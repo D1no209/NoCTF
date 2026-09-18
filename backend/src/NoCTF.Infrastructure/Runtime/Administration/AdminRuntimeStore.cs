@@ -105,7 +105,7 @@ public sealed class AdminRuntimeStore(
                     .OrderByDescending(eventItem => eventItem.OccurredAt)
                     .ThenByDescending(eventItem => eventItem.Id)
                     .Select(eventItem => (DateTimeOffset?)eventItem.OccurredAt)
-                    .FirstOrDefault()))
+                    .FirstOrDefault()) { Capacity = item.CapacityAllocations })
             .ToListAsync(ct);
         return await AddTeamAttributionAsync(items, ct);
     }
@@ -192,7 +192,7 @@ public sealed class AdminRuntimeStore(
                     .OrderByDescending(eventItem => eventItem.OccurredAt)
                     .ThenByDescending(eventItem => eventItem.Id)
                     .Select(eventItem => (DateTimeOffset?)eventItem.OccurredAt)
-                    .FirstOrDefault()))
+                    .FirstOrDefault()) { Capacity = item.CapacityAllocations })
             .ToListAsync(ct);
         if (runtimes.Count == 0)
             return [];
@@ -304,7 +304,7 @@ public sealed class AdminRuntimeStore(
                     .OrderByDescending(eventItem => eventItem.OccurredAt)
                     .ThenByDescending(eventItem => eventItem.Id)
                     .Select(eventItem => (DateTimeOffset?)eventItem.OccurredAt)
-                    .FirstOrDefault()))
+                    .FirstOrDefault()) { Capacity = item.CapacityAllocations })
             .SingleOrDefaultAsync(ct);
         if (item is null)
             return null;

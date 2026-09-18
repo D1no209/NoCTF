@@ -86,7 +86,7 @@ public interface IAdminRuntimeStore
         CancellationToken cancellationToken);
 }
 
-public sealed class ManageAdminRuntimes(IAdminRuntimeStore store)
+public sealed class ManageAdminRuntimes(IAdminRuntimeStore store, NoCTF.Application.Runtime.Capacity.IRunnerCapacityGate? capacity = null)
 {
     public Task<IReadOnlyList<RuntimeInstanceView>> ListAsync(
         AdminRuntimeFilter filter,
@@ -96,24 +96,41 @@ public sealed class ManageAdminRuntimes(IAdminRuntimeStore store)
         CancellationToken ct = default) =>
         store.ListAsync(filter, beforeCreatedAt, beforeId, limit, ct);
 
-    public Task<IReadOnlyList<PlatformRuntimeInstanceView>> ListActiveContainersAsync(
+    public async Task<IReadOnlyList<PlatformRuntimeInstanceView>> ListActiveContainersAsync(
         PlatformRuntimeFilter filter,
         DateTimeOffset? beforeCreatedAt,
         Guid? beforeId,
         int limit,
-        CancellationToken ct = default) =>
-        store.ListActiveContainersAsync(filter, beforeCreatedAt, beforeId, limit, ct);
+        CancellationToken ct = default)
+    {
+        var rows = await store.ListActiveContainersAsync(filter, beforeCreatedAt, beforeId, limit, ct);
+        if (capacity is null) return rows;
+        var waiting = await capacity.ReadWaitingAsync(rows.Where(row => row.Runtime.State is RuntimeState.Queued or RuntimeState.Provisioning)
+            .Select(row => row.Runtime.Id).ToArray(), ct);
+        return rows.Select(row => row with
+        {
+            Runtime = row.Runtime with { WaitingReason = waiting.TryGetValue(row.Runtime.Id, out var reason) ? reason : null }
+        }).ToArray();
+    }
 
     public Task<RuntimeInstanceView?> GetAsync(
         Guid competitionId,
         Guid runtimeInstanceId,
         CancellationToken ct = default) =>
-        store.FindAsync(competitionId, runtimeInstanceId, ct);
+        WithWaitingAsync(store.FindAsync(competitionId, runtimeInstanceId, ct), ct);
 
     public Task<RuntimeInstanceView?> GetPlatformAsync(
         Guid runtimeInstanceId,
         CancellationToken ct = default) =>
-        store.FindPlatformAsync(runtimeInstanceId, ct);
+        WithWaitingAsync(store.FindPlatformAsync(runtimeInstanceId, ct), ct);
+
+    private async Task<RuntimeInstanceView?> WithWaitingAsync(Task<RuntimeInstanceView?> pending, CancellationToken ct)
+    {
+        var view = await pending;
+        if (view is null || capacity is null || view.State is not (RuntimeState.Queued or RuntimeState.Provisioning)) return view;
+        var waiting = await capacity.ReadWaitingAsync([view.Id], ct);
+        return view with { WaitingReason = waiting.TryGetValue(view.Id, out var reason) ? reason : null };
+    }
 
     public Task<RuntimeMutationResult> MutateAsync(
         Guid competitionId,

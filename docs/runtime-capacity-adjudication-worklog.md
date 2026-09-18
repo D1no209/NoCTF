@@ -132,6 +132,16 @@ sets Requests and Limits; Docker still applies original hard limits. Budget poli
 tests 3/3, actual Docker hard-limit inspection at factors 1/2 (2/2), and Kubernetes
 Compose manifest regression (1/1) passed. No Kubernetes execution claim is made.
 
+A7 completed: player-safe waiting reasons, cancellable queued environments,
+administrator capacity/usage monitoring and per-workload Runtime detail. Capacity
+diagnostics distinguish unknown limits, zero usage and negative remaining budget;
+global waiting gauges are deduplicated across Workers. HTTP permission/disclosure
+tests 10/10, real PostgreSQL/Redis diagnostics 2/2, frontend tests 584/584,
+architecture audit and typecheck passed. Nuxt production generation passed with
+existing bundle/Nitro warnings. OpenAPI export and repeated SDK generation passed.
+The optional shadcn CLI docs command could not resolve upstream packages; official
+component documentation and the installed primitives were used without dependency changes.
+
 Use `backend/scripts/Verify-CoreRecovery.ps1` for scoped checks. Integration tests
 must use real PostgreSQL/Redis/Wolverine/NATS and Docker. Source-only assertions or
 EF InMemory do not establish relational or recovery behavior. Compare performance

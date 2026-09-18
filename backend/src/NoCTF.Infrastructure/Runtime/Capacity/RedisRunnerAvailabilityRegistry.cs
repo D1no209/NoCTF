@@ -49,6 +49,7 @@ public sealed class RedisRunnerAvailabilityRegistry(IConnectionMultiplexer redis
         end
 
         redis.call('SADD', KEYS[1], ARGV[1])
+        redis.call('SADD', 'runner-registry:nodes', ARGV[1])
         if ARGV[20] == '1' then
             redis.call('HSET', KEYS[2], 'observationRequired', '1', 'observationFreshUntil', ARGV[13],
                 'observation', ARGV[11], 'resourceDomain', ARGV[14], 'maxPrimary', ARGV[15],

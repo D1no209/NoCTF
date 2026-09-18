@@ -61,6 +61,9 @@ public sealed record RunnerCapacityClaim(
 
 public interface IRunnerCapacityGate
 {
+    Task RecordWaitingAsync(Guid runtimeInstanceId, RunnerAdmissionFailure? failure, CancellationToken cancellationToken) => Task.CompletedTask;
+    Task<IReadOnlyDictionary<Guid, RunnerAdmissionFailure>> ReadWaitingAsync(IReadOnlyList<Guid> runtimeIds, CancellationToken cancellationToken) =>
+        Task.FromResult<IReadOnlyDictionary<Guid, RunnerAdmissionFailure>>(new Dictionary<Guid, RunnerAdmissionFailure>());
     Task CompleteStartupAsync(Guid runtimeInstanceId, string runnerId, CancellationToken cancellationToken) => Task.CompletedTask;
     Task<bool> CanCreateAsync(Guid runtimeInstanceId, string runnerId, CancellationToken cancellationToken) => Task.FromResult(true);
     Task<RunnerHeartbeatStatus> GetHeartbeatAsync(

@@ -4,6 +4,7 @@ import type { AdminPlatformMonitoringPageViewState } from '~/features/routes/adm
 
 const viewProps = defineProps<{ state: AdminPlatformMonitoringPageViewState }>()
 const {
+  runnerFailureLabel, runnerStateLabel, formatCapacityAmount, formatRunnerUsage,
   Activity,
   ExternalLinkIcon,
   RefreshCw,
@@ -389,6 +390,39 @@ const {
           </CardContent>
         </Card>
       </div>
+
+      <Card>
+        <CardHeader><CardTitle>{{ $t('capacity.title') }}</CardTitle></CardHeader>
+        <CardContent>
+          <Empty v-if="!snapshot.capacity?.available">{{ $t('capacity.unavailable') }}</Empty>
+          <template v-else>
+            <FieldDescription>{{ $t('capacity.units') }}</FieldDescription>
+            <Table>
+              <TableHeader><TableRow>
+                <TableHead>{{ $t('capacity.runner') }}</TableHead>
+                <TableHead>{{ $t('capacity.state') }}</TableHead>
+                <TableHead>{{ $t('capacity.limit') }}</TableHead>
+                <TableHead>{{ $t('capacity.budget') }}</TableHead>
+                <TableHead>{{ $t('capacity.allocatable') }}</TableHead>
+                <TableHead>{{ $t('capacity.available') }}</TableHead>
+                <TableHead>{{ $t('capacity.usage') }}</TableHead>
+                <TableHead>{{ $t('capacity.observed') }}</TableHead>
+              </TableRow></TableHeader>
+              <TableBody><TableRow v-for="runner in snapshot.capacity.runners" :key="runner.runnerId">
+                <TableCell><span class="font-mono">{{ runner.runnerId }}</span><Badge variant="secondary">{{ $t(runner.alive ? 'capacity.alive' : 'capacity.offline') }}</Badge></TableCell>
+                <TableCell>{{ runnerStateLabel(runner.state) }}<FieldDescription v-if="runner.failure">{{ runnerFailureLabel(runner.failure) }}</FieldDescription></TableCell>
+                <TableCell class="font-mono tabular-nums">{{ formatCapacityAmount(runner.limits) }}</TableCell>
+                <TableCell class="font-mono tabular-nums">{{ formatCapacityAmount(runner.budget) }}</TableCell>
+                <TableCell class="font-mono tabular-nums">{{ formatCapacityAmount(runner.allocatable) }}</TableCell>
+                <TableCell class="font-mono tabular-nums">{{ formatCapacityAmount(runner.available) }}</TableCell>
+                <TableCell class="font-mono tabular-nums">{{ formatRunnerUsage(runner) }}</TableCell>
+                <TableCell>{{ formatCapturedAt(runner.observation?.observedAt) }}</TableCell>
+              </TableRow></TableBody>
+            </Table>
+            <FieldDescription v-if="snapshot.capacity.truncated">{{ $t('capacity.truncated') }}</FieldDescription>
+          </template>
+        </CardContent>
+      </Card>
 
       <div class="flex flex-wrap items-center justify-between gap-2 px-1 text-xs text-muted-foreground">
         <span>{{ $t('ui.dataRefreshesAutomaticallyEvery15Seconds') }}</span>

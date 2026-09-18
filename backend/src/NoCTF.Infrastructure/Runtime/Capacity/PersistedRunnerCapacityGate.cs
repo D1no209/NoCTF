@@ -13,6 +13,9 @@ public sealed class PersistedRunnerCapacityGate(
     RedisRunnerCapacityGate redis,
     ITransactionalMessageOutbox outbox) : IRunnerCapacityGate
 {
+    public Task RecordWaitingAsync(Guid runtimeId, RunnerAdmissionFailure? failure, CancellationToken ct) => redis.RecordWaitingAsync(runtimeId, failure, ct);
+    public Task<IReadOnlyDictionary<Guid, RunnerAdmissionFailure>> ReadWaitingAsync(IReadOnlyList<Guid> runtimeIds, CancellationToken ct) =>
+        redis.ReadWaitingAsync(runtimeIds, ct);
     public Task<RunnerHeartbeatStatus> GetHeartbeatAsync(string runnerPool, string runnerId, CancellationToken ct) =>
         redis.GetHeartbeatAsync(runnerPool, runnerId, ct);
 

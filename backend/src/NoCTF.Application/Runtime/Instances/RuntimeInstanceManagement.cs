@@ -34,7 +34,11 @@ public sealed record RuntimeInstanceView(
     Guid? SourceTeamId = null,
     string? SourceTeamName = null,
     GameMode? Mode = null,
-    IReadOnlyList<NoCTF.Application.Runtime.Provisioning.RuntimeUrlBinding>? AccessBindings = null);
+    IReadOnlyList<NoCTF.Application.Runtime.Provisioning.RuntimeUrlBinding>? AccessBindings = null,
+    RunnerAdmissionFailure? WaitingReason = null)
+{
+    public RuntimeCapacityAllocations? Capacity { get; init; }
+}
 
 public sealed record RuntimePublishedPortView(
     string? ServiceName,
@@ -111,14 +115,19 @@ public sealed class ListRuntimeTargets(IRuntimeTargetReader reader)
         reader.ListAsync(competitionId, competitionChallengeId, userId, now, ct);
 }
 
-public sealed class GetPlayerRuntime(IRuntimeInstanceStore store)
+public sealed class GetPlayerRuntime(IRuntimeInstanceStore store, NoCTF.Application.Runtime.Capacity.IRunnerCapacityGate? capacity = null)
 {
-    public Task<RuntimeInstanceView?> ExecuteAsync(
+    public async Task<RuntimeInstanceView?> ExecuteAsync(
         Guid competitionId,
         Guid competitionChallengeId,
         Guid userId,
-        CancellationToken ct = default) =>
-        store.FindPlayerRuntimeAsync(competitionId, competitionChallengeId, userId, ct);
+        CancellationToken ct = default)
+    {
+        var view = await store.FindPlayerRuntimeAsync(competitionId, competitionChallengeId, userId, ct);
+        if (view is null || capacity is null || view.State is not (RuntimeState.Queued or RuntimeState.Provisioning)) return view;
+        var waiting = await capacity.ReadWaitingAsync([view.Id], ct);
+        return view with { WaitingReason = waiting.TryGetValue(view.Id, out var reason) ? reason : null };
+    }
 }
 
 public sealed class MutatePlayerRuntime(IRuntimeInstanceStore store)

@@ -3,7 +3,7 @@ import { toRefs } from 'vue'
 import type { RuntimeCardViewState } from '~/features/challenges/useRuntimeCard'
 
 const viewProps = defineProps<{ state: RuntimeCardViewState }>()
-const { publicGatewayFailure, publicGatewayState, runtime, loading, loadError, extendMinutes, polling, timedOut, retryLoad, start, stop, reset, extend, ttl, isRunning, busy, stateVariant, RuntimeAccessUrl, controls, dockTarget } = toRefs(viewProps.state)
+const { runnerFailureLabel, canStop, stopDisabled, publicGatewayFailure, publicGatewayState, runtime, loading, loadError, extendMinutes, polling, timedOut, retryLoad, start, stop, reset, extend, ttl, isRunning, busy, stateVariant, RuntimeAccessUrl, controls, dockTarget } = toRefs(viewProps.state)
 </script>
 
 <template>
@@ -49,11 +49,13 @@ const { publicGatewayFailure, publicGatewayState, runtime, loading, loadError, e
           </div>
         </template>
 
+        <FieldDescription v-if="runtime?.waitingReason">{{ runnerFailureLabel(runtime.waitingReason) }}</FieldDescription>
+
         <div v-if="!loadError" class="flex flex-wrap items-center gap-2">
           <template v-if="controls === 'full'">
             <Button v-if="!runtime || runtime.state === 'Stopped' || runtime.state === 'Failed'" :disabled="busy" @click="start">
               <Spinner v-if="busy && polling" data-icon="inline-start" /> {{ $t('ui.startEnvironment') }} </Button>
-            <Button v-if="isRunning" variant="outline" :disabled="busy" @click="stop"> {{ $t('ui.stop') }} </Button>
+            <Button v-if="canStop" variant="outline" :disabled="stopDisabled" @click="stop"> {{ $t('ui.stop') }} </Button>
           </template>
           <Button v-if="runtime && controls !== 'readonly'" variant="outline" :disabled="busy" @click="reset">
             <Spinner v-if="polling" data-icon="inline-start" /> {{ $t('ui.resetEnvironment') }} </Button>

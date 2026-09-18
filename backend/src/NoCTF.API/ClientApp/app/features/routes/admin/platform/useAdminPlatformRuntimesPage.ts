@@ -7,6 +7,7 @@ import type { NoCtfapiEndpointsAdministrationPlatformPlatformRuntimeResponse, No
 import { createLatestPageRefresh } from '../../../../lib/latest-page-refresh'
 import { adminRuntimeTeamLabel } from '../../../../utils/admin-runtime'
 import { emptyPlatformRuntimeFilters, platformRuntimeQuery } from '../../../../utils/platform-runtime-filters'
+import { formatCapacityAmount, runnerFailureLabel } from '../../../shared/runner-capacity'
 
 type PlatformRuntime = NoCtfapiEndpointsAdministrationPlatformPlatformRuntimeResponse
 
@@ -169,7 +170,7 @@ export function useAdminPlatformRuntimesPage() {
   })
 
   const viewBindings = {
-      ExternalLink,
+      formatCapacityAmount, runnerFailureLabel, ExternalLink,
       RefreshCw,
       filters,
       detailTarget,

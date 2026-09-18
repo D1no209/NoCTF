@@ -336,6 +336,7 @@ export type NoCtfapiEndpointsRuntimeRuntimeResponse = {
     expiresAt?: string | null;
     stoppedAt?: string | null;
     access?: NoCtfapiEndpointsRuntimeRuntimeAccessResponse | null;
+    waitingReason?: NoCtfapiEndpointsRuntimeRunnerAdmissionFailureProtocol | null;
 };
 
 export type NoCtfapiEndpointsRuntimeRuntimeKindProtocol = 'Container' | 'Compose' | 'OvaVm';
@@ -366,6 +367,8 @@ export type NoCtfapiEndpointsRuntimePublicEndpointResponse = {
     failure?: NoCtfapiEndpointsRuntimePublicAccessFailureProtocol | null;
     publicPort?: number | null;
 };
+
+export type NoCtfapiEndpointsRuntimeRunnerAdmissionFailureProtocol = 'NoEligibleRunner' | 'CpuBudgetInsufficient' | 'MemoryBudgetInsufficient' | 'PidBudgetInsufficient' | 'NodePressureHigh' | 'ObservationStale' | 'LedgerRecovering' | 'StartupConcurrencyLimited' | 'ProviderUnavailable' | 'RequestExceedsNodeCapacity';
 
 export type NoCtfapiEndpointsRuntimeRuntimeTargetListResponse = {
     items?: Array<NoCtfapiEndpointsRuntimeRuntimeTargetResponse>;
@@ -1482,6 +1485,8 @@ export type NoCtfapiEndpointsAdministrationRuntimeAdminRuntimeResponse = {
     stoppedAt?: string | null;
     forceTerminationAvailableAt?: string | null;
     canForceTerminate?: boolean;
+    waitingReason?: NoCtfapiEndpointsRuntimeRunnerAdmissionFailureProtocol | null;
+    capacity?: Array<NoCtfapiEndpointsAdministrationRuntimeAdminRuntimeAllocationResponse> | null;
 };
 
 export type NoCtfapiEndpointsRuntimeRuntimePurposeProtocol = 'Player' | 'AwdpTarget' | 'Practice' | 'AwdpAttack' | 'TemplateTest' | 'PatchVerificationTarget';
@@ -1490,6 +1495,21 @@ export type NoCtfApplicationRuntimeInstancesRuntimePublishedPortView = {
     serviceName?: string | null;
     containerPort?: number;
     hostPort?: number;
+};
+
+export type NoCtfapiEndpointsAdministrationRuntimeAdminRuntimeAllocationResponse = {
+    operationId?: string;
+    kind?: NoCtfDomainRuntimeRuntimeWorkloadKind;
+    limit?: NoCtfapiEndpointsAdministrationPlatformRunnerResourceAmountResponse;
+    budget?: NoCtfapiEndpointsAdministrationPlatformRunnerResourceAmountResponse;
+};
+
+export type NoCtfDomainRuntimeRuntimeWorkloadKind = 0 | 1 | 2 | 3 | 4;
+
+export type NoCtfapiEndpointsAdministrationPlatformRunnerResourceAmountResponse = {
+    memoryBytes?: number;
+    nanoCpus?: number;
+    pidsLimit?: number;
 };
 
 export type NoCtfapiEndpointsAdministrationRuntimeAdminRuntimeListResponse = {
@@ -1674,6 +1694,7 @@ export type NoCtfapiEndpointsAdministrationPlatformPlatformMonitoringResponse = 
     poolResources?: Array<NoCtfApplicationAdministrationMonitoringPlatformMonitoringPoolResource>;
     latencySustainedWindowMinutes?: number;
     humanVerification?: NoCtfapiEndpointsAdministrationPlatformHumanVerificationMonitoringResponse;
+    capacity?: NoCtfapiEndpointsAdministrationPlatformRunnerCapacityReportResponse | null;
 };
 
 export type NoCtfApplicationAdministrationMonitoringPlatformMonitoringStatus = 0 | 1 | 2 | 3 | 4 | 5 | 6;
@@ -1729,6 +1750,37 @@ export type NoCtfapiEndpointsAdministrationPlatformHumanVerificationMonitoringRe
 export type NoCtfDomainPlatformHumanVerificationProvider = 0 | 1 | 2;
 
 export type NoCtfApplicationAdmissionHumanVerificationMonitoringState = 0 | 1 | 2 | 3 | 4;
+
+export type NoCtfapiEndpointsAdministrationPlatformRunnerCapacityReportResponse = {
+    available?: boolean;
+    runners?: Array<NoCtfapiEndpointsAdministrationPlatformRunnerCapacitySnapshotResponse>;
+    truncated?: boolean;
+};
+
+export type NoCtfapiEndpointsAdministrationPlatformRunnerCapacitySnapshotResponse = {
+    runnerId?: string;
+    alive?: boolean;
+    state?: NoCtfapiEndpointsRuntimeRunnerAdmissionStateProtocol;
+    failure?: NoCtfapiEndpointsRuntimeRunnerAdmissionFailureProtocol | null;
+    allocatable?: NoCtfapiEndpointsAdministrationPlatformRunnerResourceAmountResponse | null;
+    available?: NoCtfapiEndpointsAdministrationPlatformRunnerResourceAmountResponse | null;
+    budget?: NoCtfapiEndpointsAdministrationPlatformRunnerResourceAmountResponse | null;
+    limits?: NoCtfapiEndpointsAdministrationPlatformRunnerResourceAmountResponse | null;
+    observation?: NoCtfapiEndpointsAdministrationPlatformRunnerObservationResponse | null;
+    startingPrimary?: number | null;
+    activeAuxiliary?: number | null;
+};
+
+export type NoCtfapiEndpointsRuntimeRunnerAdmissionStateProtocol = 'Starting' | 'Reconciling' | 'Ready' | 'PressureBlocked' | 'ProviderUnavailable' | 'Draining';
+
+export type NoCtfapiEndpointsAdministrationPlatformRunnerObservationResponse = {
+    observedAt?: string;
+    cpuUsageRatio?: number;
+    memoryTotalBytes?: number;
+    memoryAvailableBytes?: number;
+    pidsUsed?: number | null;
+    pidsCapacity?: number;
+};
 
 export type NoCtfapiEndpointsAdministrationPlatformPlatformUserDetailResponse = {
     user?: NoCtfapiEndpointsAdministrationPlatformPlatformUserResponse;

@@ -19,6 +19,10 @@ HAProxy 或入口代理。
 
 ## 最小持久化模型
 
+容量恢复扩展见 [Runtime capacity contract](runtime-capacity.md)：允许保存有界的活动工作负载分配
+身份、所属资源域、Runner 及 Limit/Budget 数额，用于恢复 Redis 账本；清理后删除对应项。
+这不是题目定义快照、工作流阶段、调度游标或历史操作列表。
+
 `runtime_instances` 只保存恢复和清理外部资源所需事实：
 
 - 比赛/练习实例保存 Competition、CompetitionChallenge、Team 和可选 GameplayFact 关系；题目测试实例改用互斥的 Challenge 关系；

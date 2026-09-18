@@ -223,8 +223,10 @@ internal static partial class BackendMessageOperations
         {
             // The cluster Singular Agent rebuilds work from Queued facts. A missing
             // or failed delayed delivery must never strand a capacity-blocked Runtime.
+            await capacity.RecordWaitingAsync(instance.Id, capacityClaim.Failure ?? RunnerAdmissionFailure.NoEligibleRunner, cancellationToken);
             return;
         }
+        await capacity.RecordWaitingAsync(instance.Id, null, cancellationToken);
 
         var runnerId = capacityClaim.RunnerId;
         IRuntimeProvisionMessage provision;
