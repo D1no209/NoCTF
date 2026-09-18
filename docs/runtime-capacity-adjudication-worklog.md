@@ -72,6 +72,11 @@ their fixes; do not claim the existing passing suite proves those behaviors.
 
 ## Verification discipline
 
+A1 completed: bounded typed allocation JSONB, deterministic workload identity and
+owner/budget invariants. EF generated `AddRuntimeCapacityAllocations`; empty-db
+migration plus real PostgreSQL JSON round-trip and three unit tests passed (4/4).
+Model drift check passed. The change does not enable CPU sharing.
+
 Use `backend/scripts/Verify-CoreRecovery.ps1` for scoped checks. Integration tests
 must use real PostgreSQL/Redis/Wolverine/NATS and Docker. Source-only assertions or
 EF InMemory do not establish relational or recovery behavior. Compare performance
