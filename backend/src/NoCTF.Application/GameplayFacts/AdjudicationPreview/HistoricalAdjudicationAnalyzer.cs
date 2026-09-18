@@ -22,6 +22,7 @@ public static class HistoricalAdjudicationAnalyzer
             && !unknown.Any(item => item.OccurredAt >= latest.OccurredAt);
         var changes = decisions.Zip(decisions.Skip(1)).Count(pair => pair.First.Result != pair.Second.Result);
         var issues = new List<AdjudicationDifference>();
+        var incompleteParent = false;
         GameplayFactResult? expectedResult = null;
         void Add(AdjudicationDifferenceKind kind, AdjudicationDifferenceCertainty certainty,
             AdjudicationFindingSeverity severity, AdjudicationFindingClassification classification) =>
@@ -78,9 +79,27 @@ public static class HistoricalAdjudicationAnalyzer
                     comparisonSeverity, comparisonClass);
 
             var bloods = events.Where(item => IsBlood(item.Kind)).ToArray();
+            bool ValidParent(AdjudicationEventEvidence parent) => parent.Kind == CompetitionEventKind.GameplayFactAdjudicated
+                && parent.GameplayFactId == evidence.GameplayFactId && parent.Readable
+                && parent.State == GameplayFactState.Completed && parent.Result == GameplayFactResult.Correct;
+            foreach (var blood in bloods.Where(item => item.ParentEventId is not null))
+            {
+                var parent = events.SingleOrDefault(item => item.EventId == blood.ParentEventId);
+                if (parent is not null && ValidParent(parent)) continue;
+                var fieldsMissing = parent is { Kind: CompetitionEventKind.GameplayFactAdjudicated }
+                    && (!parent.Readable || parent.State is null || parent.Result is null || parent.GameplayFactId is null);
+                incompleteParent |= fieldsMissing;
+                var uncertain = evidence.Completeness == AdjudicationEvidenceCompleteness.Truncated || fieldsMissing;
+                // A complete evidence set contains every relevant event of this fact.
+                // An absent parent cannot be a valid adjudication belonging to this fact.
+                Add(AdjudicationDifferenceKind.UnexpectedBloodAward,
+                    uncertain ? AdjudicationDifferenceCertainty.NeedsReview : AdjudicationDifferenceCertainty.Deterministic,
+                    uncertain ? AdjudicationFindingSeverity.Warning : AdjudicationFindingSeverity.Error,
+                    uncertain ? AdjudicationFindingClassification.InsufficientEvidence : AdjudicationFindingClassification.IntegrityGap);
+            }
             var linkedDuplicate = bloods.Where(item => item.ParentEventId is { } parent
                     && adjudications.Any(adjudication => adjudication.EventId == parent
-                        && adjudication.State == GameplayFactState.Completed && adjudication.Result == GameplayFactResult.Correct))
+                        && ValidParent(adjudication)))
                 .GroupBy(item => item.ParentEventId).Any(group => group.Count() > 1);
             if (linkedDuplicate)
                 Add(AdjudicationDifferenceKind.DuplicateBloodAward, AdjudicationDifferenceCertainty.Deterministic,
@@ -91,12 +110,6 @@ public static class HistoricalAdjudicationAnalyzer
                         || !adjudications.Any(item => item.EventId == parent))))
                 Add(AdjudicationDifferenceKind.DuplicateBloodAward, AdjudicationDifferenceCertainty.NeedsReview,
                     AdjudicationFindingSeverity.Warning, AdjudicationFindingClassification.InsufficientEvidence);
-            if (bloods.Any(blood => blood.ParentEventId is Guid parent
-                && adjudications.Any(adjudication => adjudication.EventId == parent
-                    && adjudication.State == GameplayFactState.Completed && adjudication.Result is not GameplayFactResult.Correct)))
-                Add(AdjudicationDifferenceKind.UnexpectedBloodAward, AdjudicationDifferenceCertainty.Deterministic,
-                    AdjudicationFindingSeverity.Error, AdjudicationFindingClassification.IntegrityGap);
-
             // This compares a current projection with immutable history, not two versions of the same truth.
             if (!evidence.BloodEligibilityHistoryRequiresReview && evidence.MatchesCurrentInteraction
                 && evidence.Completeness != AdjudicationEvidenceCompleteness.Truncated)
@@ -114,7 +127,7 @@ public static class HistoricalAdjudicationAnalyzer
         }
         var completeness = evidence.Completeness == AdjudicationEvidenceCompleteness.Truncated ? evidence.Completeness
             : conflictingTimes.Count > 0 ? AdjudicationEvidenceCompleteness.Ambiguous
-            : unknown.Length > 0 ? AdjudicationEvidenceCompleteness.MissingFields : evidence.Completeness;
+            : unknown.Length > 0 || incompleteParent ? AdjudicationEvidenceCompleteness.MissingFields : evidence.Completeness;
         return new(evidence.GameplayFactId, evidence.CompetitionChallengeId, evidence.ChallengeTitle,
             evidence.TeamId, evidence.TeamName, evidence.GameplayFactKind, evidence.CurrentResult, expectedResult,
             null, evidence.RecordedBloodRanks, evidence.OccurredAt, issues.Distinct().ToArray())

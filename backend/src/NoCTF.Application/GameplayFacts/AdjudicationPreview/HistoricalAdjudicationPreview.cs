@@ -41,7 +41,8 @@ public enum AdjudicationEvidenceCompleteness : short { Complete, Truncated, Miss
 
 public sealed record AdjudicationEventEvidence(Guid EventId, DateTimeOffset OccurredAt,
     CompetitionEventKind Kind, GameplayFactState? State, GameplayFactResult? Result,
-    Guid? ActorUserId = null, Guid? ParentEventId = null, bool Readable = true);
+    Guid? ActorUserId = null, Guid? ParentEventId = null, bool Readable = true,
+    Guid? GameplayFactId = null);
 
 public sealed record HistoricalAdjudicationDifferenceItem(
     Guid GameplayFactId,

@@ -13,9 +13,13 @@ public sealed class HistoricalAdjudicationAnalyzerTests
         GameplayFactState? state = GameplayFactState.Completed) =>
         new(Guid.NewGuid(), At.AddSeconds(seconds), CompetitionEventKind.GameplayFactAdjudicated, state, result);
 
-    private static HistoricalAdjudicationEvidence Evidence(params AdjudicationEventEvidence[] events) =>
-        new(Guid.NewGuid(), Guid.NewGuid(), "challenge", Guid.NewGuid(), "team", GameMode.Ctf,
-            GameplayFactKind.FlagAttempt, GameplayFactResult.Correct, null, At, true, 0, false, events, []);
+    private static HistoricalAdjudicationEvidence Evidence(params AdjudicationEventEvidence[] events)
+    {
+        var factId = Guid.NewGuid();
+        return new(factId, Guid.NewGuid(), "challenge", Guid.NewGuid(), "team", GameMode.Ctf,
+            GameplayFactKind.FlagAttempt, GameplayFactResult.Correct, null, At, true, 0, false,
+            events.Select(item => item with { GameplayFactId = item.GameplayFactId ?? factId }).ToArray(), []);
+    }
 
     [Test]
     public async Task Correct_wrong_correct_is_an_ordered_legal_change_not_a_result_conflict()
@@ -133,5 +137,36 @@ public sealed class HistoricalAdjudicationAnalyzerTests
         await Assert.That(analyzed.CurrentProjectedBloodRank).IsNull();
         await Assert.That(analyzed.Differences).IsEmpty();
         await Assert.That(analyzed.EvidenceCompleteness).IsEqualTo(AdjudicationEvidenceCompleteness.Complete);
+    }
+
+    [Test, Arguments(false), Arguments(true)]
+    public async Task Blood_links_require_a_completed_correct_adjudication_of_this_fact(bool truncated)
+    {
+        var correct = Decision(3, GameplayFactResult.Correct);
+        var parents = new[]
+        {
+            Decision(1, GameplayFactResult.Correct) with { Kind = CompetitionEventKind.GameplayFactReceived },
+            Decision(1, GameplayFactResult.Correct) with { GameplayFactId = Guid.NewGuid() },
+            Decision(1, GameplayFactResult.Wrong),
+            Decision(1, GameplayFactResult.Correct, GameplayFactState.Processing)
+        };
+        foreach (var parent in parents)
+        {
+            var blood = new AdjudicationEventEvidence(Guid.NewGuid(), At.AddSeconds(2), CompetitionEventKind.FirstBloodAwarded,
+                null, GameplayFactResult.Correct, ParentEventId: parent.EventId);
+            var evidence = Evidence(parent, correct, blood) with
+            {
+                HasEarlierCorrect = false, RecordedBloodRanks = [LeaderboardBloodRank.First],
+                Completeness = truncated ? AdjudicationEvidenceCompleteness.Truncated : AdjudicationEvidenceCompleteness.Complete
+            };
+            var result = HistoricalAdjudicationAnalyzer.Analyze(evidence);
+            await Assert.That(result.Differences.Any(item => item.Kind == AdjudicationDifferenceKind.UnexpectedBloodAward
+                && item.Classification == (truncated ? AdjudicationFindingClassification.InsufficientEvidence : AdjudicationFindingClassification.IntegrityGap)
+                && item.Severity == (truncated ? AdjudicationFindingSeverity.Warning : AdjudicationFindingSeverity.Error))).IsTrue();
+            var missing = evidence with { Events = evidence.Events.Where(item => item.EventId != parent.EventId).ToArray() };
+            await Assert.That(HistoricalAdjudicationAnalyzer.Analyze(missing).Differences.Any(item =>
+                item.Kind == AdjudicationDifferenceKind.UnexpectedBloodAward
+                && item.Severity == (truncated ? AdjudicationFindingSeverity.Warning : AdjudicationFindingSeverity.Error))).IsTrue();
+        }
     }
 }
