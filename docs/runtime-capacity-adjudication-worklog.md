@@ -1,5 +1,13 @@
 # Runtime capacity and adjudication implementation
 
+## Process recovery follow-up: Docker purpose identity
+
+The real process-crash fixture exposed a template-test replay mismatch: creation
+preserved `challenge-test-runtime`, while replay required `persistent-runtime`.
+Replay now checks the purpose label actually derived from the request. Real Docker
+regressions passed 3/3, including unchanged container identity and rejection of a
+different purpose. The combined crash matrix is rerun after this correction.
+
 ## Review follow-up V2
 
 Profile-guided empty-evidence allocation reductions, shared qualification/adjustment
