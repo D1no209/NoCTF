@@ -26,6 +26,32 @@ namespace NoCTF.Tests.Integration.Persistence;
 public sealed class HistoricalAdjudicationPreviewPersistenceTests
 {
     [Test, Timeout(300_000)]
+    public async Task Truncated_eligibility_prefix_does_not_claim_a_complete_history(CancellationToken ct)
+    {
+        await DockerIntegrationTest.RunAsync(async () =>
+        {
+            await using var postgres = await StartPostgresAsync(ct);
+            var options = Options(postgres);
+            var fixture = await SeedAsync(options, ct);
+            await using var db = new NoCtfDbContext(options);
+            for (var index = 0; index < 65; index++)
+                db.CompetitionEvents.Add(new CompetitionEvent
+                {
+                    Id = Guid.NewGuid(), CompetitionId = fixture.CompetitionId,
+                    Kind = CompetitionEventKind.TrackConfigurationUpdated, Level = CompetitionEventLevel.Information,
+                    Visibility = CompetitionEventVisibility.Staff, SubjectType = EntityReferenceKind.Competition,
+                    SubjectId = fixture.CompetitionId, OccurredAt = fixture.Now.AddSeconds(index + 2), PayloadJson = "{\"schemaVersion\":1}"
+                });
+            await db.SaveChangesAsync(ct);
+            var item = (await new HistoricalAdjudicationPreviewStore(db).ReadAsync(fixture.CompetitionId, null, null, null, 50, ct)).Items.Single();
+            await Assert.That(item.Completeness).IsEqualTo(AdjudicationEvidenceCompleteness.Truncated);
+            await Assert.That(item.EligibilityEvents!.Count).IsEqualTo(64);
+            await Assert.That(HistoricalAdjudicationAnalyzer.Analyze(item).Differences
+                .Any(finding => finding.Classification == AdjudicationFindingClassification.InsufficientEvidence)).IsTrue();
+        });
+    }
+
+    [Test, Timeout(300_000)]
     public async Task Event_prefix_is_bounded_without_deduplicating_legitimate_rejudgements(CancellationToken ct)
     {
         await DockerIntegrationTest.RunAsync(async () =>
@@ -441,27 +467,27 @@ public sealed class HistoricalAdjudicationPreviewPersistenceTests
             await Assert.That(countedPage.Items).Count().IsEqualTo(20);
             // Competition metadata, lifecycle-derived official window, candidates,
             // first-correct facts, audit events, teams, and challenge titles.
-            // Eligibility adjustment evidence is one additional bounded query.
-            await Assert.That(counter.ReaderCommandCount).IsLessThanOrEqualTo(8);
+            // Eligibility adjustment evidence shares the bounded audit-event round trip.
+            await Assert.That(counter.ReaderCommandCount).IsLessThanOrEqualTo(7);
             var measurements = Environment.GetEnvironmentVariable("NOCTF_CAPACITY_MEASUREMENTS");
             if (!string.IsNullOrWhiteSpace(measurements))
             {
                 var milliseconds = new List<double>();
                 var queries = new List<int>();
-                for (var iteration = 0; iteration < 15; iteration++)
+                for (var iteration = 0; iteration < 60; iteration++)
                 {
                     var initialCount = counter.ReaderCommandCount;
                     var watch = System.Diagnostics.Stopwatch.StartNew();
                     var measured = await countedPreview.ExecuteAsync(fixture.CompetitionId, null, null, null, 500, cancellationToken);
                     await Assert.That(measured.Items.Count).IsEqualTo(500);
-                    if (iteration < 3) continue;
+                    if (iteration < 10) continue;
                     milliseconds.Add(watch.Elapsed.TotalMilliseconds);
                     queries.Add(counter.ReaderCommandCount - initialCount);
                 }
                 Directory.CreateDirectory(measurements);
                 await File.WriteAllTextAsync(Path.Combine(measurements, "preview-scan.json"), JsonSerializer.Serialize(new
                 {
-                    corpusFacts = 601, pageLimit = 500, warmup = 3, milliseconds, queries
+                    corpusFacts = 601, pageLimit = 500, warmup = 10, milliseconds, queries
                 }, new JsonSerializerOptions { WriteIndented = true }), cancellationToken);
             }
         });

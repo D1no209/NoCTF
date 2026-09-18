@@ -184,6 +184,13 @@ current leaderboard benchmarks are retained under `docs/validation/runtime-capac
 The measured CTF projection's latency and allocations remain within the 5% threshold;
 this does not establish a platform-wide HTTP or crash-recovery latency guarantee.
 
+Preview follow-up: independently bounded adjudication and eligibility prefixes now
+share one database read, restoring the seven-query bound. Eligibility-prefix
+truncation is explicitly reflected in completeness. Historical tests passed 23/23,
+including the new 65-adjustment boundary. Fifty-sample preview measurements are
+retained for both the original reader and the extended reader; the latter does more
+work and does not meet a 5% latency comparison against the older audit semantics.
+
 Recovery follow-up: Redis inventory is bounded across all scanned claims and runs
 outside the PostgreSQL critical section; Kubernetes observes the same attested
 node selector as workload scheduling. Auxiliary creation rechecks the committed
