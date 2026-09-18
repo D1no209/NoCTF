@@ -1,9 +1,11 @@
 using NoCTF.Application.Messaging;
 using NoCTF.Application.Runtime.Provisioning;
 using NoCTF.Application.Runtime.Instances;
+using Wolverine.Attributes;
 
 namespace NoCTF.Runner.Messages;
 
+[NonTransactional]
 public sealed class ContainerRuntimeMessageHandler(RuntimeProviderHandler runtime)
 {
     public Task<object> Handle(
@@ -17,6 +19,7 @@ public sealed class ContainerRuntimeMessageHandler(RuntimeProviderHandler runtim
         runtime.StopContainerAsync(message, cancellationToken);
 }
 
+[NonTransactional]
 public sealed class ComposeRuntimeMessageHandler(RuntimeProviderHandler runtime)
 {
     public Task<object> Handle(
@@ -30,6 +33,7 @@ public sealed class ComposeRuntimeMessageHandler(RuntimeProviderHandler runtime)
         runtime.StopComposeAsync(message, cancellationToken);
 }
 
+[NonTransactional]
 public sealed class OvaRuntimeMessageHandler(RuntimeProviderHandler runtime)
 {
     public Task<object> Handle(
@@ -43,6 +47,7 @@ public sealed class OvaRuntimeMessageHandler(RuntimeProviderHandler runtime)
         runtime.StopOvaAsync(message, cancellationToken);
 }
 
+[NonTransactional]
 public sealed class RuntimeTerminationMessageHandler(RuntimeProviderHandler runtime)
 {
     public Task<object> Handle(

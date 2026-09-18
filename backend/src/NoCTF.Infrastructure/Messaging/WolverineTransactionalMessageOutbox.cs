@@ -54,6 +54,12 @@ public sealed class WolverineTransactionalMessageOutbox : ITransactionalMessageO
             ? outbox.FlushOutgoingMessagesAsync()
             : Task.CompletedTask;
 
+    public async Task SaveChangesAndFlushAsync(CancellationToken cancellationToken)
+    {
+        await outbox.DbContext.SaveChangesAsync(cancellationToken);
+        await FlushCommittedMessagesAsync();
+    }
+
     public async Task FlushCommittedMessagesAsync()
     {
         try { await FlushOutgoingMessagesAsync(); }

@@ -74,12 +74,28 @@ public sealed class PersistedRunnerCapacityGateTests
                 // Replays retain the committed budget, even when a caller's current policy differs.
                 var replay = await gate.TryClaimAsync(new(id, "test", 1024, 100, 10), ct);
                 await Assert.That(replay.State).IsEqualTo(RunnerCapacityClaimState.AlreadyOwned);
+                var factId = await db.RuntimeInstances.Where(x => x.Id == id).Select(x => x.GameplayFactId).SingleAsync(ct);
+                await db.GameplayFacts.Where(fact => fact.Id == factId).ExecuteUpdateAsync(update =>
+                    update.SetProperty(fact => fact.State, NoCTF.Domain.Gameplay.GameplayFactState.Processing), ct);
+                var checker = new RuntimeWorkloadIdentity(RuntimeWorkloadKind.PatchChecker, id, Guid.NewGuid());
+                var checkerRequest = new RunnerCapacityRequest(id, "test", 128, 10, 1, checker, factId);
+                await Assert.That((await gate.TryClaimForRunnerAsync(checkerRequest, "runner", ct)).Availability)
+                    .IsEqualTo(RunnerCapacityAvailability.Claimed);
+                await Assert.That((await gate.TryClaimForRunnerAsync(checkerRequest, "runner", ct)).State)
+                    .IsEqualTo(RunnerCapacityClaimState.AlreadyOwned);
+                await Assert.That((long)await redis.GetDatabase().HashGetAsync("runner:runner:capacity", "availableMemoryBytes"))
+                    .IsEqualTo(384);
                 await Assert.That(await gate.ReleaseAsync(id, "wrong-owner", ct)).IsEqualTo(RunnerCapacityReleaseOutcome.OwnerMismatch);
                 await Assert.That(await gate.ReleaseAsync(id, "runner", ct)).IsEqualTo(RunnerCapacityReleaseOutcome.Released);
                 await Assert.That(await gate.ReleaseAsync(id, "runner", ct)).IsEqualTo(RunnerCapacityReleaseOutcome.AlreadyReleased);
-                var release = outbox.Messages.OfType<ReleaseRunnerCapacity>().Single();
-                await raw.ReleaseWorkloadAsync(release.Identity, release.RunnerId, ct);
-                await raw.ReleaseWorkloadAsync(release.Identity, release.RunnerId, ct);
+                var retained = await db.RuntimeInstances.Where(x => x.Id == id).Select(x => x.CapacityAllocations).SingleAsync(ct);
+                await Assert.That(retained.Items.Single().Identity).IsEqualTo(checker);
+                await gate.ReleaseWorkloadAsync(checker, "runner", ct);
+                foreach (var release in outbox.Messages.OfType<ReleaseRunnerCapacity>())
+                {
+                    await raw.ReleaseWorkloadAsync(release.Identity, release.RunnerId, ct);
+                    await raw.ReleaseWorkloadAsync(release.Identity, release.RunnerId, ct);
+                }
                 await Assert.That((long)await redis.GetDatabase().HashGetAsync("runner:runner:capacity", "availableMemoryBytes"))
                     .IsEqualTo(1024);
             }

@@ -17,6 +17,19 @@ public sealed class KubernetesRuntimeResourceReconciler(
 {
     public RuntimeProvider Provider => RuntimeProvider.Kubernetes;
 
+    public async Task<bool?> WorkloadExistsAsync(RuntimeWorkloadIdentity identity, CancellationToken cancellationToken)
+    {
+        identity.Validate();
+        var name = $"noctf-{identity.OperationId:N}";
+        var selector = $"noctf.io/managed=true,noctf.io/runtime-instance-id={identity.RuntimeInstanceId:D}";
+        var pods = await client.CoreV1.ListNamespacedPodAsync(options.Namespace, labelSelector: selector, cancellationToken: cancellationToken);
+        var services = await client.CoreV1.ListNamespacedServiceAsync(options.Namespace, labelSelector: selector, cancellationToken: cancellationToken);
+        var policies = await client.NetworkingV1.ListNamespacedNetworkPolicyAsync(options.Namespace, labelSelector: selector, cancellationToken: cancellationToken);
+        return pods.Items.Any(item => item.Metadata.Name == name)
+            || services.Items.Any(item => item.Metadata.Name == name || item.Metadata.Name == name + "-public")
+            || policies.Items.Any(item => item.Metadata.Name == name + "-callback");
+    }
+
     public async Task CheckAvailabilityAsync(CancellationToken cancellationToken)
     {
         using var response = await client.CoreV1.GetAPIResourcesWithHttpMessagesAsync(

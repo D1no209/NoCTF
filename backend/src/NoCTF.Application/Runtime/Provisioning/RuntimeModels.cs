@@ -327,6 +327,9 @@ public interface IRuntimeManagedResourceReconciler
 {
     RuntimeProvider Provider { get; }
 
+    Task<bool?> WorkloadExistsAsync(RuntimeWorkloadIdentity identity, CancellationToken cancellationToken) =>
+        Task.FromResult<bool?>(null);
+
     Task<IReadOnlyList<RuntimeResourceIdentity>> ListManagedAsync(
         CancellationToken cancellationToken);
 

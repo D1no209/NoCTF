@@ -208,7 +208,8 @@ public sealed class AwdCheckerWorkReader(
 
 public sealed class AwdCheckerExecutor(
     IOneShotRuntimeProviderCatalog providers,
-    IHttpClientFactory httpClients)
+    IHttpClientFactory httpClients,
+    AuxiliaryRuntimeCapacity? capacity = null)
     : IAwdCheckerExecutor
 {
     public async Task<AwdCheckerExecutionOutcome> ExecuteAsync(
@@ -243,10 +244,11 @@ public sealed class AwdCheckerExecutor(
         timeoutSource.CancelAfter(work.Timeout);
         try
         {
-            var result = await providers.Attached(work.Provider).RunAttachedAsync(
-                request,
-                target,
-                timeoutSource.Token);
+            var result = capacity is null
+                ? await providers.Attached(work.Provider).RunAttachedAsync(request, target, timeoutSource.Token)
+                : await capacity.RunAsync(request,
+                    new(RuntimeWorkloadKind.AwdChecker, work.RuntimeInstanceId, request.OperationId), work.GameplayFactId,
+                    (reserved, token) => providers.Attached(work.Provider).RunAttachedAsync(reserved, target, token), timeoutSource.Token);
             if (result.ExitCode == 0)
                 return AwdCheckerExecutionOutcome.Completed;
             await ReportPlatformStatusAsync(
@@ -254,6 +256,11 @@ public sealed class AwdCheckerExecutor(
                 AwdServiceState.CheckerAbnormalExit,
                 cancellationToken);
             return AwdCheckerExecutionOutcome.AbnormalExit;
+        }
+        catch (RunnerCapacityUnavailableException) when (capacity is not null)
+        {
+            await capacity.RecordAwdAdmissionFailureAsync(work.GameplayFactId, cancellationToken);
+            return AwdCheckerExecutionOutcome.Superseded;
         }
         catch (OperationCanceledException) when (
             !cancellationToken.IsCancellationRequested && timeoutSource.IsCancellationRequested)

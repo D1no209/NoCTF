@@ -38,6 +38,7 @@ public sealed class RuntimeResourceReconciliationHandler(
                 candidate.Provider == configuredProvider)
             ?? throw new InvalidOperationException(
                 $"Runtime resource reconciliation is unavailable for '{configuredProvider}'.");
+        await ReconcileAuxiliaryAsync(reconciler, configuredRunnerId, cancellationToken);
         var managed = await reconciler.ListManagedAsync(cancellationToken);
 
         var failedAssignments = await db.RuntimeInstances
@@ -149,6 +150,34 @@ public sealed class RuntimeResourceReconciliationHandler(
         if (failures > 0)
             throw new InvalidOperationException(
                 $"{failures} orphaned Runtime resource groups could not be removed.");
+    }
+
+    private async Task ReconcileAuxiliaryAsync(IRuntimeManagedResourceReconciler reconciler, string runnerId, CancellationToken ct)
+    {
+        if (providers is null || !db.Database.IsRelational()) return;
+        var rows = await db.RuntimeInstances.FromSqlInterpolated($"""
+            SELECT * FROM runtime_instances
+            WHERE runner_id = {runnerId}
+              AND jsonb_path_exists(capacity_allocations, '$.items[*].identity.kind ? (@ == 3 || @ == 4)')
+            ORDER BY id LIMIT 500
+            """).AsNoTracking().ToArrayAsync(ct);
+        foreach (var runtime in rows.Where(row => row.RuntimeProvider == reconciler.Provider))
+        foreach (var allocation in runtime.CapacityAllocations.Items.Where(item => item.Identity.IsAuxiliary))
+        {
+            if (mutations?.IsActive(allocation.Identity) == true) continue;
+            var processing = await db.GameplayFacts.AnyAsync(fact => fact.Id == allocation.GameplayFactId
+                && fact.State == NoCTF.Domain.Gameplay.GameplayFactState.Processing, ct);
+            if (processing && runtime.State is RuntimeState.Running or RuntimeState.Provisioning) continue;
+            if (await reconciler.WorkloadExistsAsync(allocation.Identity, ct) == true)
+            {
+                var receipt = new ContainerReceipt(allocation.Identity.OperationId, runtime.RuntimeProvider,
+                    $"noctf-{allocation.Identity.OperationId:N}", RuntimeStatus.Stopped,
+                    new Dictionary<int, int>(), null, null, RuntimeInstanceId: runtime.Id);
+                await providers.Containers(runtime.RuntimeProvider).DestroyAsync(receipt, ct);
+            }
+            if (await reconciler.WorkloadExistsAsync(allocation.Identity, ct) == false)
+                await capacity.ReleaseWorkloadAsync(allocation.Identity, runnerId, ct);
+        }
     }
 
     private static bool CanReleaseOrphanCapacity(

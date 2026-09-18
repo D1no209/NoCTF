@@ -34,7 +34,8 @@ public sealed record AwdpCheckerWork(
     string CallbackToken,
     TimeSpan Timeout,
     bool FixInputEnabled = false,
-    bool AllowRoot = false)
+    bool AllowRoot = false,
+    Guid? GameplayFactId = null)
 {
     public override string ToString() =>
         $"AwdpCheckerWork {{ RuntimeInstanceId = {RuntimeInstanceId}, Provider = {Provider}, "
@@ -355,11 +356,12 @@ public sealed class AwdpFixWorkReader(
                     callbackToken,
                     timeout,
                     settings.CheckerFixInput,
-                    settings.CheckerAllowRoot)));
+                    settings.CheckerAllowRoot,
+                    message.GameplayFactId)));
     }
 }
 
-public sealed class AwdpCheckerExecutor(IOneShotRuntimeProviderCatalog providers)
+public sealed class AwdpCheckerExecutor(IOneShotRuntimeProviderCatalog providers, AuxiliaryRuntimeCapacity? capacity = null)
     : IAwdpCheckerExecutor
 {
     public Task<AwdpCheckerExecutionOutcome> ExecuteAsync(
@@ -407,9 +409,12 @@ public sealed class AwdpCheckerExecutor(IOneShotRuntimeProviderCatalog providers
         try
         {
             var runner = providers.OneShot(work.Provider);
-            var result = input is null
-                ? await runner.RunAsync(request, timeout.Token)
-                : await runner.RunAsync(request, input, timeout.Token);
+            var result = capacity is null
+                ? input is null ? await runner.RunAsync(request, timeout.Token) : await runner.RunAsync(request, input, timeout.Token)
+                : await capacity.RunAsync(request,
+                    new(RuntimeWorkloadKind.PatchChecker, work.RuntimeInstanceId, request.OperationId),
+                    work.GameplayFactId ?? throw new InvalidOperationException("Checker capacity requires a gameplay fact."),
+                    (reserved, token) => input is null ? runner.RunAsync(reserved, token) : runner.RunAsync(reserved, input, token), timeout.Token);
             return result.ExitCode == 0
                 ? AwdpCheckerExecutionOutcome.Completed
                 : AwdpCheckerExecutionOutcome.AbnormalExit;
@@ -481,7 +486,8 @@ public sealed class AwdpFixVerificationHandler(
     IOptions<RunnerOptions> runnerOptions,
     IHostApplicationLifetime applicationLifetime,
     TimeProvider timeProvider,
-    ILogger<AwdpFixVerificationHandler> logger)
+    ILogger<AwdpFixVerificationHandler> logger,
+    NoCTF.Infrastructure.Runtime.Capacity.RunnerResourceMutationCoordinator? mutations = null)
 {
     public Task Handle(
         RunPatchVerification message,
@@ -781,13 +787,14 @@ public sealed class AwdpFixVerificationHandler(
             message.RuntimeInstanceId,
             outcome,
             timeProvider.GetUtcNow())).AsTask().WaitAsync(compensation.Token);
-        await outbox.FlushOutgoingMessagesAsync().WaitAsync(compensation.Token);
+        await outbox.SaveChangesAndFlushAsync(compensation.Token).WaitAsync(compensation.Token);
     }
 
     private async Task RecoverAsync(
         AwdpFixRecoveryWork recovery,
         CancellationToken cancellationToken)
     {
+        using var mutation = mutations is null ? null : await mutations.EnterAsync(cancellationToken);
         var identity = new RuntimeResourceIdentity(recovery.RuntimeInstanceId);
         if (!string.IsNullOrWhiteSpace(recovery.ProviderReceiptJson))
         {

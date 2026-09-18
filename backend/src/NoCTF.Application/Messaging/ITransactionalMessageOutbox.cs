@@ -10,6 +10,8 @@ public interface ITransactionalMessageOutbox
     ValueTask ScheduleToRunnerNodeAsync<T>(T message, DateTimeOffset scheduledAt)
         where T : IRunnerNodeMessage;
     Task FlushOutgoingMessagesAsync();
+    /// <summary>Persist messages from a nontransactional orchestration handler before dispatch.</summary>
+    Task SaveChangesAndFlushAsync(CancellationToken cancellationToken) => FlushOutgoingMessagesAsync();
     /// <summary>Call only after saving messages with business data and confirming the transaction commit.</summary>
     Task FlushCommittedMessagesAsync() => FlushOutgoingMessagesAsync();
 }
