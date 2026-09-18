@@ -212,3 +212,12 @@ Wolverine is pinned to 6.30.3. Consult the official EF transactional outbox,
 PostgreSQL persistence, NATS transport, handler discovery, Sticky handlers and
 Singular Agent documentation and verify APIs against the pinned package. Transport
 remains the current NATS + PostgreSQL durability composition.
+
+V1 execution record: Release build/analyzers, 1356 non-integration tests, 49 scoped
+core checks, the final 23 historical checks, frontend 588 tests/typecheck/architecture/
+production generation, EF drift and OpenAPI/SDK idempotence passed. Full-suite
+remaining failures and unverified environments are explicitly recorded in
+`docs/runtime-capacity-validation.md`. The extended preview's 500-fact latency
+comparison exceeds 5%; the full crash-injection and platform-wide performance
+matrix is not established. V1 is therefore not marked complete. All changes stay
+local; the original 19-file patch is byte-identical to its initial capture.
