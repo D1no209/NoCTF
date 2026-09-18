@@ -169,6 +169,17 @@ OpenAPI export and two SDK generations produced identical SDK bytes. The concurr
 CAP workload configuration was independently committed as `e4e6a2a44`; this step
 extends that contract without including the original question-editor changes.
 
+Recovery follow-up: Redis inventory is bounded across all scanned claims and runs
+outside the PostgreSQL critical section; Kubernetes observes the same attested
+node selector as workload scheduling. Auxiliary creation rechecks the committed
+allocation and processing fact, rejecting owner changes and completed facts.
+Admission checks now follow terminal-work detection so stale commands can clean up
+even without healthy observations. Development host registration, SQL guardrails
+and the migration expectation were updated. Scoped tests passed: persisted claims
+2, publisher 1, architecture 5, development hosting 1, observation scope 1,
+real PostgreSQL/NATS delivery 2, model schema 1. The force-delete file-count test
+also fails unchanged at baseline `957a05e6b` (expected 4, actual 5); it is outside scope.
+
 Use `backend/scripts/Verify-CoreRecovery.ps1` for scoped checks. Integration tests
 must use real PostgreSQL/Redis/Wolverine/NATS and Docker. Source-only assertions or
 EF InMemory do not establish relational or recovery behavior. Compare performance

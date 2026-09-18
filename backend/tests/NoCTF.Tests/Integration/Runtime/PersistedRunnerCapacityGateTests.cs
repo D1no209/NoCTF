@@ -69,10 +69,11 @@ public sealed class PersistedRunnerCapacityGateTests
                 .IsEqualTo(RunnerCapacityReleaseOutcome.RecoveryRequired);
             var ledger = new RedisRunnerCapacityLedger(redis);
             await ledger.PauseAsync("runner", "test", ct);
+            var claimKeys = await ledger.ReadClaimKeysAsync("runner", ct);
             await using (var transaction = await db.Database.BeginTransactionAsync(ct))
             {
                 await RuntimeCapacityCriticalSection.AcquireAsync(db, ct);
-                await ledger.RestoreAsync("runner", "test", registration.Capacity, document.Items, ct);
+                await ledger.RestoreAsync("runner", "test", registration.Capacity, document.Items, ct, claimKeys: claimKeys);
                 await transaction.CommitAsync(ct);
             }
             await registry.RegisterAsync(registration with { HasActiveAssignments = !rollback }, ct);
@@ -88,10 +89,18 @@ public sealed class PersistedRunnerCapacityGateTests
                     update.SetProperty(fact => fact.State, NoCTF.Domain.Gameplay.GameplayFactState.Processing), ct);
                 var checker = new RuntimeWorkloadIdentity(RuntimeWorkloadKind.PatchChecker, id, Guid.NewGuid());
                 var checkerRequest = new RunnerCapacityRequest(id, "test", 128, 10, 1, checker, factId);
+                await db.RuntimeInstances.Where(row => row.Id == id).ExecuteUpdateAsync(update =>
+                    update.SetProperty(row => row.State, RuntimeState.Running).SetProperty(row => row.RunnerId, "runner"), ct);
+                await Assert.That((await gate.TryClaimForRunnerAsync(checkerRequest, "wrong-owner", ct)).Availability)
+                    .IsEqualTo(RunnerCapacityAvailability.Unavailable);
                 await Assert.That((await gate.TryClaimForRunnerAsync(checkerRequest, "runner", ct)).Availability)
                     .IsEqualTo(RunnerCapacityAvailability.Claimed);
                 await Assert.That((await gate.TryClaimForRunnerAsync(checkerRequest, "runner", ct)).State)
                     .IsEqualTo(RunnerCapacityClaimState.AlreadyOwned);
+                await Assert.That(await gate.CanCreateWorkloadAsync(checker, factId!.Value, "runner", ct)).IsTrue();
+                await db.GameplayFacts.Where(fact => fact.Id == factId).ExecuteUpdateAsync(update =>
+                    update.SetProperty(fact => fact.State, NoCTF.Domain.Gameplay.GameplayFactState.Completed), ct);
+                await Assert.That(await gate.CanCreateWorkloadAsync(checker, factId.Value, "runner", ct)).IsFalse();
                 await Assert.That((long)await redis.GetDatabase().HashGetAsync("runner:runner:capacity", "availableMemoryBytes"))
                     .IsEqualTo(384);
                 await Assert.That(await gate.ReleaseAsync(id, "wrong-owner", ct)).IsEqualTo(RunnerCapacityReleaseOutcome.OwnerMismatch);

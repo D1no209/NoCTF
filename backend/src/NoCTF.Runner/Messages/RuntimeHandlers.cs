@@ -41,7 +41,6 @@ public sealed class RuntimeProviderHandler(
     {
         using var mutation = mutations is null ? null : await mutations.EnterWorkloadAsync(new(RuntimeWorkloadKind.Runtime, message.RuntimeInstanceId, message.RuntimeInstanceId), cancellationToken);
         ValidateAssignment(message);
-        observer?.EnsureFreshAdmission();
         var workStatus = await workReader.ReadProvisionStatusAsync(message, cancellationToken);
         if (workStatus != RuntimeProvisionWorkStatus.Current)
         {
@@ -60,6 +59,7 @@ public sealed class RuntimeProviderHandler(
                 RuntimeFailureCode.RunnerUnavailable,
                 message.RunnerId);
         }
+        observer?.EnsureFreshAdmission();
         if (!await capacity.CanCreateAsync(message.RuntimeInstanceId, message.RunnerId, cancellationToken))
             throw new TimeoutException("Runtime allocation is waiting for capacity recovery.");
         RuntimeFailureCode? failureCode = null;
@@ -286,7 +286,6 @@ public sealed class RuntimeProviderHandler(
     {
         using var mutation = mutations is null ? null : await mutations.EnterWorkloadAsync(new(RuntimeWorkloadKind.Runtime, message.RuntimeInstanceId, message.RuntimeInstanceId), cancellationToken);
         ValidateAssignment(message);
-        observer?.EnsureFreshAdmission();
         var workStatus = await workReader.ReadProvisionStatusAsync(message, cancellationToken);
         if (workStatus != RuntimeProvisionWorkStatus.Current)
         {
@@ -305,6 +304,7 @@ public sealed class RuntimeProviderHandler(
                 RuntimeFailureCode.RunnerUnavailable,
                 message.RunnerId);
         }
+        observer?.EnsureFreshAdmission();
         if (!await capacity.CanCreateAsync(message.RuntimeInstanceId, message.RunnerId, cancellationToken))
             throw new TimeoutException("Runtime allocation is waiting for capacity recovery.");
         RuntimeFailureCode? failureCode = null;
@@ -434,7 +434,6 @@ public sealed class RuntimeProviderHandler(
     {
         using var mutation = mutations is null ? null : await mutations.EnterWorkloadAsync(new(RuntimeWorkloadKind.Runtime, message.RuntimeInstanceId, message.RuntimeInstanceId), cancellationToken);
         ValidateAssignment(message);
-        observer?.EnsureFreshAdmission();
         var workStatus = await workReader.ReadProvisionStatusAsync(message, cancellationToken);
         if (workStatus != RuntimeProvisionWorkStatus.Current)
         {
@@ -454,6 +453,7 @@ public sealed class RuntimeProviderHandler(
                 message.RunnerId);
         }
 
+        observer?.EnsureFreshAdmission();
         if (!await capacity.CanCreateAsync(message.RuntimeInstanceId, message.RunnerId, cancellationToken))
             throw new TimeoutException("Runtime allocation is waiting for capacity recovery.");
         RuntimeFailureCode? failureCode = null;

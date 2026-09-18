@@ -195,7 +195,9 @@ public sealed class RunnerResourceObserver(
 
     private async Task<RunnerResourceObservation?> ReadKubernetesAsync(CancellationToken ct)
     {
-        var nodes = await kubernetes.CoreV1.ListNodeAsync(cancellationToken: ct);
+        var selector = NoCTF.Runtime.Kubernetes.Configuration.KubernetesRuntimeOptions.PodPidsLimitNodeLabel
+            + "=" + kubernetesOptions.PodPidsLimit.ToString(CultureInfo.InvariantCulture);
+        var nodes = await kubernetes.CoreV1.ListNodeAsync(labelSelector: selector, cancellationToken: ct);
         var identity = await kubernetes.CoreV1.ReadNamespaceAsync("kube-system", cancellationToken: ct);
         var metrics = JsonSerializer.SerializeToElement(await kubernetes.CustomObjects.ListClusterCustomObjectAsync(
             "metrics.k8s.io", "v1beta1", "nodes", cancellationToken: ct));

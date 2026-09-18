@@ -44,6 +44,8 @@ public sealed class AuxiliaryRuntimeCapacity(
         labels["noctf.io/workload-kind"] = ((short)identity.Kind).ToString(System.Globalization.CultureInfo.InvariantCulture);
         try
         {
+            if (!await capacity.CanCreateWorkloadAsync(identity, factId, runnerOptions.Value.Id, ct))
+                throw new RunnerCapacityUnavailableException(RunnerAdmissionFailure.NoEligibleRunner);
             return await execute(request with { Labels = labels }, ct);
         }
         finally

@@ -7,10 +7,19 @@ using NoCTF.Infrastructure.Runtime.Capacity;
 namespace NoCTF.Worker;
 
 public sealed class ReleaseRunnerCapacityHandler(
-    NoCtfDbContext db, RedisRunnerCapacityGate capacity, ITransactionalMessageOutbox outbox, TimeProvider clock)
+    NoCtfDbContext db, IRunnerCapacityGate developmentCapacity, ITransactionalMessageOutbox outbox, TimeProvider clock,
+    RedisRunnerCapacityGate? capacity = null)
 {
     public async Task Handle(ReleaseRunnerCapacity message, CancellationToken ct)
     {
+        if (!db.Database.IsRelational())
+        {
+            await developmentCapacity.ReleaseWorkloadAsync(message.Identity, message.RunnerId, ct);
+            await outbox.PublishAsync(new DispatchQueuedRuntimes(clock.GetUtcNow()));
+            return;
+        }
+        if (capacity is null)
+            throw new InvalidOperationException("A durable capacity release requires the Redis ledger.");
         await using var transaction = db.Database.CurrentTransaction is null
             ? await db.Database.BeginTransactionAsync(ct) : null;
         await RuntimeCapacityCriticalSection.AcquireAsync(db, ct);

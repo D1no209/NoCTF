@@ -7,12 +7,12 @@ public sealed class RawSqlPersistenceRulesTests
     [
         "ExecuteSqlRaw",
         "FromSqlRaw",
-        ".SqlQuery<",
         "PostgresException",
         "PostgresErrorCodes"
     ];
     private static readonly string[] ProviderSpecificTokens =
     [
+        ".SqlQuery<",
         "ExecuteSqlInterpolated",
         "FromSqlInterpolated",
         "pg_advisory_",
@@ -25,6 +25,17 @@ public sealed class RawSqlPersistenceRulesTests
     private static readonly IReadOnlyDictionary<string, HashSet<string>> ApprovedProviderSql =
         new Dictionary<string, HashSet<string>>(StringComparer.Ordinal)
         {
+            // Bounded lateral evidence prefixes cannot be expressed by the mapped JSON model.
+            ["backend/src/NoCTF.Infrastructure/GameplayFacts/AdjudicationPreview/HistoricalAdjudicationPreviewStore.cs"] = ["FromSqlInterpolated"],
+            // Parameterized JSONB aggregation returns at most one row per selected Runner.
+            ["backend/src/NoCTF.Infrastructure/Runtime/Capacity/RedisRunnerCapacityDiagnostics.cs"] = [".SqlQuery<"],
+            // Short allocation/recovery transactions share one advisory lock; no provider calls inside.
+            ["backend/src/NoCTF.Infrastructure/Runtime/Capacity/RuntimeCapacityCriticalSection.cs"] = ["ExecuteSqlInterpolated", "pg_advisory_"],
+            // JSONB ownership containment includes auxiliary allocations after the primary is released.
+            ["backend/src/NoCTF.Runner/Composition/RunnerAvailabilityPublisher.cs"] = ["FromSqlInterpolated"],
+            ["backend/src/NoCTF.Runner/Messages/RuntimeResourceReconciliationHandler.cs"] = ["FromSqlInterpolated"],
+            // Lock the owning Runtime while updating its active allocation document.
+            ["backend/src/NoCTF.Runner/Messages/AuxiliaryRuntimeCapacity.cs"] = ["FromSqlInterpolated", "FOR UPDATE"],
             // Parameterized settings/runtime SHARE locks fence only the bounded local gateway lease write.
             ["backend/src/NoCTF.Infrastructure/Runtime/PublicAccess/PublicGatewayLeaseGuard.cs"] = ["ExecuteSqlInterpolated"],
             // Competition-scoped shared admission lock, with a bound UUID parameter.
