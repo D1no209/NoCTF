@@ -99,7 +99,10 @@ public sealed class HistoricalAdjudicationPreviewStore(NoCtfDbContext db) : IHis
         var ids = facts.Select(fact => fact.Id).ToArray();
         var eventKinds = EvidenceKinds.Select(kind => (short)kind).ToArray();
         var subjectKind = (short)EntityReferenceKind.GameplayFact;
+        var earliest = facts.Min(fact => fact.OccurredAt);
+        var eligibilityKinds = competition.Mode == GameMode.Ctf ? EligibilityKinds.Select(kind => (short)kind).ToArray() : [];
         // LATERAL bounds each fact independently; a prolific fact cannot exhaust another fact's evidence budget.
+        // Include the independently bounded eligibility prefix in the same snapshot/read round trip.
         var events = await db.CompetitionEvents.FromSqlInterpolated($"""
             SELECT evidence.* FROM unnest({ids}) AS requested(id)
             CROSS JOIN LATERAL (
@@ -108,15 +111,17 @@ public sealed class HistoricalAdjudicationPreviewStore(NoCtfDbContext db) : IHis
                   AND event.subject_id = requested.id AND event.kind = ANY({eventKinds})
                 ORDER BY event.occurred_at DESC, event.id DESC LIMIT {MaximumEventsPerFact + 1}
             ) evidence
+            UNION ALL (
+                SELECT event.* FROM competition_events event
+                WHERE event.competition_id = {competitionId} AND event.kind = ANY({eligibilityKinds})
+                  AND event.occurred_at >= {earliest}
+                ORDER BY event.occurred_at DESC, event.id DESC LIMIT 65
+            )
             """).AsNoTracking().ToArrayAsync(ct);
-        var eventsByFact = events.GroupBy(item => item.SubjectId).ToDictionary(group => group.Key,
+        var eventsByFact = events.Where(item => EvidenceKinds.Contains(item.Kind)).GroupBy(item => item.SubjectId).ToDictionary(group => group.Key,
             group => group.OrderByDescending(item => item.OccurredAt).ThenByDescending(item => item.Id).ToArray());
-        var earliest = facts.Min(fact => fact.OccurredAt);
-        var eligibilityEvents = competition.Mode == GameMode.Ctf
-            ? await db.CompetitionEvents.AsNoTracking().Where(item => item.CompetitionId == competitionId
-                    && EligibilityKinds.Contains(item.Kind) && item.OccurredAt >= earliest)
-                .OrderByDescending(item => item.OccurredAt).ThenByDescending(item => item.Id).Take(65).ToArrayAsync(ct)
-            : [];
+        var eligibilityEvents = events.Where(item => EligibilityKinds.Contains(item.Kind))
+            .OrderByDescending(item => item.OccurredAt).ThenByDescending(item => item.Id).ToArray();
         var teamsIds = facts.Where(fact => fact.TeamId != null).Select(fact => fact.TeamId!.Value)
             .Concat(firstCorrects.Select(fact => fact.TeamId)).Distinct().ToArray();
         var teams = await db.Teams.IgnoreQueryFilters().AsNoTracking().Where(team => teamsIds.Contains(team.Id))
@@ -149,7 +154,8 @@ public sealed class HistoricalAdjudicationPreviewStore(NoCtfDbContext db) : IHis
                 earlier.Count(item => Eligible(item.TeamId)),
                 competition.Mode == GameMode.Ctf && (!currentEligible || earlier.Any(item => !Eligible(item.TeamId)) || eligibilityEvents.Length > 64),
                 timeline, timeline.Where(item => HistoricalAdjudicationAnalyzer.IsBlood(item.Kind)).Select(item => ToBloodRank(item.Kind)).ToArray(),
-                fact.State, ownEvents.Length > MaximumEventsPerFact ? AdjudicationEvidenceCompleteness.Truncated : AdjudicationEvidenceCompleteness.Complete,
+                fact.State, ownEvents.Length > MaximumEventsPerFact || eligibilityEvents.Length > 64
+                    ? AdjudicationEvidenceCompleteness.Truncated : AdjudicationEvidenceCompleteness.Complete,
                 adjustments.Length > 0, currentEligible,
                 competition.Mode != GameMode.Ctf || knownInteraction is { } interaction && CtfCompletionEligibility.Matches(fact.Kind, interaction), adjustments);
         }).ToArray();
