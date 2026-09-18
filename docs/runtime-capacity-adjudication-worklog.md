@@ -1,5 +1,15 @@
 # Runtime capacity and adjudication implementation
 
+## Review follow-up R2
+
+Worker re-dispatch rejects a resource definition that differs from the committed
+Limit, retains the allocation for confirmed cleanup and checks reconstructed Budget.
+Runner also checks the concrete container/Compose/OVA request before invoking a
+provider. Real PostgreSQL/Redis regressions passed 2/2 for single-container and
+Compose edits that double Limit while factor 2 would mask the Budget mismatch.
+Existing template lifecycle 1/1, CTF flag persistence 2/2, budget policy 3/3 and
+claim factory 13/13 passed. No definition snapshot or concurrent version was added.
+
 ## Review follow-up R1
 
 Atomic unconfirmed-claim indexing and normal Runner audit close the

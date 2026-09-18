@@ -13,6 +13,10 @@ challenge schemas or select a provider/pool from challenge data.
   retain their original amounts. Compose charges one aggregate of service budgets.
 - Kubernetes explicitly receives Requests and Limits, with CPU rounded upwards to
   millicores before accounting. Missing Budget in an old command means full limits.
+- Re-dispatch validates both committed Limit and Budget against the concrete provider
+  request. Resource edits after allocation invalidate the pending start and retain its
+  allocation/owner for confirmed cleanup; they never silently reprice a claim. Runner
+  performs the same request check before creation. A new start/reset uses the new definition.
 - `Runner:Admission` configures sampling (5 seconds), freshness (15 seconds), CPU
   pressure duration (20 seconds), high/recovery thresholds (90%/80%), available
   memory thresholds (10%/15%), PID thresholds (90%/80%) and recovery samples (3).

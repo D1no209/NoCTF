@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using NoCTF.Application.Runtime.Instances;
 using NoCTF.Domain.Runtime;
 using NoCTF.Infrastructure.Persistence;
+using NoCTF.Application.Runtime.Capacity;
 
 namespace NoCTF.Runner.Messages;
 
@@ -29,7 +30,7 @@ public sealed class RuntimeNodeWorkReader(IServiceScopeFactory scopes) : IRuntim
         if (assignment.State == RuntimeState.Provisioning
             && assignment.CapacityAllocations.Items.Any(item => !item.Identity.IsAuxiliary
                 && item.Identity.RuntimeInstanceId == message.RuntimeInstanceId
-                && item.RunnerId == message.RunnerId))
+                && item.RunnerId == message.RunnerId && RuntimeProvisionCapacity.Matches(item, message)))
             return RuntimeProvisionWorkStatus.Current;
         if (assignment.State == RuntimeState.Stopping
             && assignment.ProviderReceiptJson == null)

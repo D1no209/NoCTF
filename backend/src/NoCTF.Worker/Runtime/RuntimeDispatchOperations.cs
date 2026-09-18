@@ -211,6 +211,15 @@ internal static partial class BackendMessageOperations
             await RejectInvalidConfigurationAsync(instance, db, outbox, events, timeProvider, cancellationToken);
             return;
         }
+        var priorAllocation = instance.CapacityAllocations.Items.SingleOrDefault(item => !item.Identity.IsAuxiliary);
+        if (priorAllocation is not null && priorAllocation.Limit != RuntimeResourceBudgetPolicy.ToAmount(limits))
+        {
+            // A previous creation may have succeeded without writing its receipt. Keep the
+            // allocation until Runner cleanup proves absence; never reprice or release here.
+            instance.RunnerId = priorAllocation.RunnerId;
+            await RejectInvalidConfigurationAsync(instance, db, outbox, events, timeProvider, cancellationToken);
+            return;
+        }
         var capacityClaim = await capacity.TryClaimAsync(new RunnerCapacityRequest(
             instance.Id,
             placement.RunnerPool,
@@ -265,13 +274,19 @@ internal static partial class BackendMessageOperations
             }
             var stored = await db.RuntimeInstances.AsNoTracking().Where(runtime => runtime.Id == instance.Id)
                 .Select(runtime => runtime.CapacityAllocations).SingleAsync(cancellationToken);
-            var committed = stored.Items.SingleOrDefault(item => !item.Identity.IsAuxiliary)?.Budget
-                ?? RuntimeResourceBudgetPolicy.ToAmount(budget);
+            var allocation = stored.Items.SingleOrDefault(item => !item.Identity.IsAuxiliary) ?? new RuntimeCapacityAllocation(
+                NoCTF.Infrastructure.Runtime.Capacity.PersistedRunnerCapacityGate.PrimaryIdentity(instance), instance.GameplayFactId,
+                runnerId, runnerId, RuntimeResourceBudgetPolicy.ToAmount(budget), RuntimeResourceBudgetPolicy.ToAmount(limits));
+            var committed = allocation.Budget;
             provision = provision switch
             {
                 ProvisionContainerRuntime container => container with
                 {
-                    Definition = container.Definition with { Budget = RuntimeResourceBudgetPolicy.ToLimits(committed) }
+                    Definition = container.Definition with
+                    {
+                        Limits = budgets.EffectiveLimit(container.Definition.Limits, instance.RuntimeProvider),
+                        Budget = RuntimeResourceBudgetPolicy.ToLimits(committed)
+                    }
                 },
                 ProvisionComposeRuntime compose => compose with
                 {
@@ -283,18 +298,13 @@ internal static partial class BackendMessageOperations
                 },
                 _ => provision
             };
+            if (!RuntimeProvisionCapacity.Matches(allocation, provision))
+                throw new InvalidOperationException("Provider request resources differ from the committed allocation.");
         }
         catch (InvalidOperationException)
         {
-            var release = await capacity.ReleaseAsync(
-                instance.Id,
-                runnerId,
-                cancellationToken);
-            if (release is RunnerCapacityReleaseOutcome.OwnerMismatch or RunnerCapacityReleaseOutcome.RecoveryRequired)
-            {
-                throw new InvalidOperationException(
-                    "The selected Runner no longer owns the Runtime capacity claim.");
-            }
+            // Cleanup owns release, including when a previous provider call has no receipt yet.
+            instance.RunnerId = runnerId;
             await RejectInvalidConfigurationAsync(
                 instance, db, outbox, events, timeProvider, cancellationToken);
             return;
