@@ -1,5 +1,16 @@
 # Runtime capacity and adjudication implementation
 
+## Review follow-up R1
+
+Atomic unconfirmed-claim indexing and normal Runner audit close the
+claim/rollback/cancel leak. PostgreSQL is checked again after provider absence,
+under the short allocation lock; committed or physically uncertain claims stay
+charged. Regression tests use real PostgreSQL/Redis and exercise normal audit
+handling without restart/key deletion, including duplicate audits and unknown
+provider state. Persisted gate 4/4, Redis gate 13/13, real messaging 2/2 and SQL
+architecture guard 1/1 passed. Provider absence in the new rollback test is a
+controlled probe; full process-kill coverage is still a separate V1 requirement.
+
 ## Scope and delivery
 
 Implement the approved capacity recovery and read-only historical adjudication plan.

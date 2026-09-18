@@ -3,6 +3,13 @@ namespace NoCTF.Infrastructure.Runtime.Capacity;
 internal static class RunnerAdmissionLua
 {
     internal const string Functions = """
+        local function track_claim(claim, runner)
+            if string.match(claim, '^runner%-claim:%d+:') then
+                local time = redis.call('TIME')
+                redis.call('ZADD', 'runner:' .. runner .. ':unconfirmed-claims',
+                    tonumber(time[1]) * 1000 + math.floor(tonumber(time[2]) / 1000), claim)
+            end
+        end
         local function ready(heartbeat, capacity)
             if redis.call('EXISTS', heartbeat) == 0 or redis.call('EXISTS', capacity) == 0 then return false end
             local state = redis.call('HGET', capacity, 'admissionState')

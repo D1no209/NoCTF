@@ -10,12 +10,69 @@ using NoCTF.Tests.Integration.Persistence;
 using StackExchange.Redis;
 using Testcontainers.PostgreSql;
 using Testcontainers.Redis;
+using Microsoft.Extensions.Options;
+using NoCTF.Runner.Composition;
+using NoCTF.Runner.Messages;
+using NSubstitute;
 
 namespace NoCTF.Tests.Integration.Runtime;
 
 [Category("Integration")]
 public sealed class PersistedRunnerCapacityGateTests
 {
+    [Test, Arguments(false), Arguments(true), Timeout(300_000)]
+    public async Task Background_audit_recovers_rolled_back_then_cancelled_claim_without_restart(bool commit, CancellationToken ct)
+    {
+        await DockerIntegrationTest.RunAsync(async () =>
+        {
+            await using var postgres = new PostgreSqlBuilder("postgres:17.10-alpine3.24@sha256:742f40ea20b9ff2ff31db5458d127452988a2164df9e17441e191f3b72252193").Build();
+            await using var cache = new RedisBuilder("redis:7.4.10-alpine3.21@sha256:e7723ff73d963f5cc6d9c4643ea3d989527a402a319239054e9472a7fb9219a2").Build();
+            await Task.WhenAll(postgres.StartAsync(ct), cache.StartAsync(ct));
+            await using var redis = await ConnectionMultiplexer.ConnectAsync(cache.GetConnectionString());
+            await using var db = new NoCtfDbContext(new DbContextOptionsBuilder<NoCtfDbContext>()
+                .UseNpgsql(postgres.GetConnectionString()).UseSnakeCaseNamingConvention().Options);
+            await db.Database.EnsureCreatedAsync(ct);
+            var fixture = new CompetitionForceDeleteFixture();
+            await fixture.SeedAsync(db, ct);
+            var id = fixture.RuntimeIds[0];
+            await db.RuntimeInstances.Where(row => row.Id == id).ExecuteUpdateAsync(update => update
+                .SetProperty(row => row.State, RuntimeState.Queued).SetProperty(row => row.StoppedAt, (DateTimeOffset?)null), ct);
+            await new RedisRunnerAvailabilityRegistry(redis).RegisterAsync(new("test", "runner", RuntimeProvider.Docker,
+                "test", new(1024, 100, 10), TimeSpan.FromMinutes(1), false), ct);
+            var raw = new RedisRunnerCapacityGate(redis);
+            var outbox = new CapturedOutbox();
+            var gate = new PersistedRunnerCapacityGate(db, raw, outbox);
+            await using (var transaction = await db.Database.BeginTransactionAsync(ct))
+            {
+                await Assert.That((await gate.TryClaimAsync(new(id, "test", 512, 40, 2), ct)).Availability)
+                    .IsEqualTo(RunnerCapacityAvailability.Claimed);
+                if (commit) await transaction.CommitAsync(ct);
+                else await transaction.RollbackAsync(ct);
+            }
+            db.ChangeTracker.Clear();
+            await db.RuntimeInstances.Where(row => row.Id == id).ExecuteUpdateAsync(update => update
+                .SetProperty(row => row.State, RuntimeState.Stopped).SetProperty(row => row.RunnerId, (string?)null), ct);
+            var inventory = Substitute.For<IRuntimeManagedResourceReconciler>();
+            inventory.Provider.Returns(RuntimeProvider.Docker);
+            inventory.ListManagedAsync(ct).Returns(Task.FromResult<IReadOnlyList<RuntimeResourceIdentity>>([]));
+            inventory.WorkloadExistsAsync(Arg.Any<RuntimeWorkloadIdentity>(), ct).Returns(Task.FromResult<bool?>(null));
+            var ledger = new RedisRunnerCapacityLedger(redis);
+            var audit = new RuntimeResourceReconciliationHandler(db, [inventory], Options.Create(new RunnerOptions
+            {
+                Id = "runner", Pool = "test", Provider = RuntimeProvider.Docker
+            }), gate, ledger: ledger, rawCapacity: raw, outbox: outbox);
+            await audit.Handle(new("runner", DateTimeOffset.UtcNow), ct);
+            await Assert.That((long)await redis.GetDatabase().HashGetAsync("runner:runner:capacity", "availableMemoryBytes")).IsEqualTo(512);
+            inventory.WorkloadExistsAsync(Arg.Any<RuntimeWorkloadIdentity>(), ct).Returns(Task.FromResult<bool?>(false));
+            await audit.Handle(new("runner", DateTimeOffset.UtcNow), ct);
+            await audit.Handle(new("runner", DateTimeOffset.UtcNow), ct);
+            await Assert.That((long)await redis.GetDatabase().HashGetAsync("runner:runner:capacity", "availableMemoryBytes")).IsEqualTo(commit ? 512 : 1024);
+            await Assert.That((long)await redis.GetDatabase().HashGetAsync("runner:runner:capacity", "startingPrimary")).IsEqualTo(commit ? 1 : 0);
+            await Assert.That(await ledger.ReadUnconfirmedAsync("runner", ct)).IsEmpty();
+            await Assert.That(outbox.Messages.OfType<DispatchQueuedRuntimes>().Count()).IsEqualTo(commit ? 0 : 1);
+        });
+    }
+
     [Test, Arguments(false), Arguments(true), Timeout(300_000)]
     public async Task Database_commit_decides_which_claims_survive_Redis_reconstruction(bool rollback, CancellationToken ct)
     {
