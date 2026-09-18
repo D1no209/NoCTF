@@ -8,7 +8,7 @@ namespace NoCTF.Runner.Messages;
 [NonTransactional]
 public sealed class ContainerRuntimeMessageHandler(RuntimeProviderHandler runtime)
 {
-    public Task<object> Handle(
+    public Task<object?> Handle(
         ProvisionContainerRuntime message,
         CancellationToken cancellationToken) =>
         runtime.ProvisionContainerAsync(message, cancellationToken);
@@ -22,7 +22,7 @@ public sealed class ContainerRuntimeMessageHandler(RuntimeProviderHandler runtim
 [NonTransactional]
 public sealed class ComposeRuntimeMessageHandler(RuntimeProviderHandler runtime)
 {
-    public Task<object> Handle(
+    public Task<object?> Handle(
         ProvisionComposeRuntime message,
         CancellationToken cancellationToken) =>
         runtime.ProvisionComposeAsync(message, cancellationToken);
@@ -36,7 +36,7 @@ public sealed class ComposeRuntimeMessageHandler(RuntimeProviderHandler runtime)
 [NonTransactional]
 public sealed class OvaRuntimeMessageHandler(RuntimeProviderHandler runtime)
 {
-    public Task<object> Handle(
+    public Task<object?> Handle(
         ProvisionOvaRuntime message,
         CancellationToken cancellationToken) =>
         runtime.ProvisionOvaAsync(message, cancellationToken);
@@ -58,7 +58,7 @@ public sealed class RuntimeTerminationMessageHandler(RuntimeProviderHandler runt
 
 internal static class RuntimeProviderHandlerCompatibilityExtensions
 {
-    public static Task<object> Handle(
+    public static Task<object?> Handle(
         this RuntimeProviderHandler runtime,
         ProvisionContainerRuntime message,
         CancellationToken cancellationToken) =>
@@ -70,7 +70,7 @@ internal static class RuntimeProviderHandlerCompatibilityExtensions
         CancellationToken cancellationToken) =>
         runtime.StopContainerAsync(message, cancellationToken);
 
-    public static Task<object> Handle(
+    public static Task<object?> Handle(
         this RuntimeProviderHandler runtime,
         ProvisionComposeRuntime message,
         CancellationToken cancellationToken) =>
@@ -82,7 +82,7 @@ internal static class RuntimeProviderHandlerCompatibilityExtensions
         CancellationToken cancellationToken) =>
         runtime.StopComposeAsync(message, cancellationToken);
 
-    public static Task<object> Handle(
+    public static Task<object?> Handle(
         this RuntimeProviderHandler runtime,
         ProvisionOvaRuntime message,
         CancellationToken cancellationToken) =>

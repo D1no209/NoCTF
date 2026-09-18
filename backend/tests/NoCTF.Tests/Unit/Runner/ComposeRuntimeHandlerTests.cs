@@ -24,7 +24,7 @@ public sealed class ComposeRuntimeHandlerTests
         var result = await handler.Handle(message, CancellationToken.None);
 
         await Assert.That(result).IsTypeOf<RuntimeProvisioned>();
-        var provisioned = (RuntimeProvisioned)result;
+        var provisioned = (RuntimeProvisioned)result!;
         await Assert.That(provisioned.Provider).IsEqualTo(RuntimeProvider.Docker);
         await Assert.That(provisioned.Urls)
             .IsEquivalentTo(["http://runner.example:32000/play"]);
@@ -62,7 +62,7 @@ public sealed class ComposeRuntimeHandlerTests
         var result = await handler.Handle(message, CancellationToken.None);
 
         await Assert.That(result).IsTypeOf<RuntimeProvisionTerminated>();
-        await Assert.That(((RuntimeProvisionTerminated)result).FailureCode)
+        await Assert.That(((RuntimeProvisionTerminated)result!).FailureCode)
             .IsEqualTo(RuntimeFailureCode.UrlExpansionFailed);
         await Assert.That(reconciler.Destroyed)
             .IsEquivalentTo([new RuntimeResourceIdentity(message.RuntimeInstanceId)]);
@@ -128,7 +128,7 @@ public sealed class ComposeRuntimeHandlerTests
         var result = await handler.Handle(message, CancellationToken.None);
 
         await Assert.That(result).IsTypeOf<RuntimeProvisionCanceled>();
-        var canceled = (RuntimeProvisionCanceled)result;
+        var canceled = (RuntimeProvisionCanceled)result!;
         await Assert.That(canceled.RuntimeInstanceId).IsEqualTo(message.RuntimeInstanceId);
         await Assert.That(canceled.RunnerId).IsEqualTo(message.RunnerId);
         await Assert.That(runtime.UpCount).IsEqualTo(0);
@@ -201,7 +201,7 @@ public sealed class ComposeRuntimeHandlerTests
 
         var result = await handler.Handle(message, CancellationToken.None);
 
-        await Assert.That(result).IsTypeOf<RuntimeProvisionFailed>();
+        await Assert.That(result).IsNull();
         await Assert.That(runtime.UpCount).IsEqualTo(0);
         await Assert.That(capacity.ReleasedRuntimeIds).IsEmpty();
     }

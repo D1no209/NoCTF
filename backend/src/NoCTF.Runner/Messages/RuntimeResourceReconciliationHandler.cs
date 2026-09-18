@@ -24,8 +24,10 @@ public sealed class RuntimeResourceReconciliationHandler(
     NoCTF.Infrastructure.Runtime.Capacity.RunnerResourceMutationCoordinator? mutations = null,
     RedisRunnerCapacityLedger? ledger = null,
     RedisRunnerCapacityGate? rawCapacity = null,
-    ITransactionalMessageOutbox? outbox = null)
+    ITransactionalMessageOutbox? outbox = null,
+    TimeProvider? clock = null)
 {
+    private readonly TimeProvider timeProvider = clock ?? TimeProvider.System;
     public async Task Handle(
         ReconcileRuntimeResources message,
         CancellationToken cancellationToken)
@@ -182,7 +184,7 @@ public sealed class RuntimeResourceReconciliationHandler(
             var released = await rawCapacity.ReleaseWorkloadAsync(identity, runnerId, ct);
             if (released == RunnerCapacityReleaseOutcome.AlreadyReleased) await ledger.ConfirmAsync(runnerId, identity, ct);
             if (released == RunnerCapacityReleaseOutcome.Released && outbox is not null)
-                await outbox.PublishAsync(new DispatchQueuedRuntimes(DateTimeOffset.UtcNow));
+                await outbox.PublishAsync(new DispatchQueuedRuntimes(timeProvider.GetUtcNow()));
             await db.SaveChangesAsync(ct);
             await transaction.CommitAsync(ct);
             if (outbox is not null) await outbox.FlushCommittedMessagesAsync();

@@ -13,8 +13,8 @@ namespace NoCTF.Tests.Integration.Runtime;
 [Category("Integration")]
 public sealed class RuntimeWriteBackOrderingTests
 {
-    [Test, Arguments(RuntimeState.Running), Arguments(RuntimeState.Stopped), Timeout(300_000)]
-    public async Task Late_provision_results_do_not_revert_a_completed_transition(RuntimeState state, CancellationToken ct)
+    [Test, Arguments(RuntimeState.Stopping), Arguments(RuntimeState.Stopped), Timeout(300_000)]
+    public async Task Late_provision_results_do_not_revert_a_cleanup_transition(RuntimeState state, CancellationToken ct)
     {
         await DockerIntegrationTest.RunAsync(async () =>
         {
