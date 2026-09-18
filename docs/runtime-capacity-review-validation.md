@@ -73,5 +73,23 @@ PostgreSQL EF Outbox、Redis 和 Wolverine/NATS 在 Linux 子进程中组合运�
 精确回归。扫描与并发工作合计约 4.80/3.30 秒，两项测试通过；这不是恢复路径的通用性能 SLO。
 原始诊断在同目录 `inventory-concurrency-16.json` 与 `inventory-concurrency-64.json`。
 
-V3 的完整全仓及 Kubernetes/Libvirt 环境结果将在完成后补充；容量配置
+## Kubernetes 真实资源域验证
+
+使用隔离本地 kind 0.33.0 / Kubernetes 1.35.8 三节点集群，节点镜像固定为
+`kindest/node:v1.35.8@sha256:07b2536e30b803ed61d1677a79df6115f798ce64c80f9e22f6ed45afd09323c0`。
+配置见 `backend/tests/environments/capacity-kind.yaml`；kubelet 的 `podPidsLimit: 128`
+已从实际节点配置核对。只有一个工作节点有匹配标签，其余节点不计入观测资源域。
+
+真实 Pod 落在该节点，CPU Request=101m、Limit=202m，内存 Request=完整 Limit。
+Observer 实际 Node/metrics 读取进入 Ready，容量等于选中节点而非三节点总和，PID 数值
+仍为未知。无 metrics 权限但可读取 nodes/namespaces/pods 的 ServiceAccount 被实际 API
+拒绝后，Observer 关闭准入。结果见 [kubernetes-capacity.json](validation/runtime-capacity-review/kubernetes-capacity.json)。
+
+参考 [kind 官方配置](https://kind.sigs.k8s.io/docs/user/configuration/)；实验使用 metrics-server
+0.9.0，仅在此自签名本地集群添加 `--kubelet-insecure-tls`。没有修改全局 kubeconfig。
+运行时指定此独立 `KUBECONFIG`，启用 `NOCTF_KUBERNETES_CAPACITY_INTEGRATION=true`。
+本项没有验证 CNI 网络策略执行、真实 Node 高压阈值或所有 Compose/Checker 路径，不外推为
+整个 Kubernetes Provider 全验收通过。
+
+V3 的完整全仓及 Libvirt 环境结果将在完成后补充；容量配置
 仍按部署额度与真实边界取小值，默认 CPU 倍率仍为 1，不宣称原公测瓶颈已经消除。
