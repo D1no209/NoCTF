@@ -3,12 +3,13 @@ import { markRaw } from 'vue'
 
 import { KeyRound, RefreshCw, Send, ShieldCheck } from '@lucide/vue'
 import { toast } from 'vue-sonner'
-import { adminPlatformGetConfiguration, adminPlatformPatchConfiguration, adminPlatformReplaceEmailVerificationPassword, adminPlatformReplaceHumanVerificationSecret, adminPlatformSendEmailVerificationTest } from '../../../../api'
-import type { NoCtfapiEndpointsAdministrationPlatformAdminHumanVerificationConfigurationResponse, NoCtfapiEndpointsAdministrationPlatformEmailVerificationConfigurationResponse, NoCtfapiEndpointsAdministrationPlatformSmtpSecurityModeProtocol, NoCtfapiEndpointsPlatformHumanVerificationProviderProtocol } from '../../../../api'
+import { adminPlatformGetCapWorkloadConfiguration, adminPlatformGetConfiguration, adminPlatformPatchConfiguration, adminPlatformReplaceEmailVerificationPassword, adminPlatformReplaceHumanVerificationSecret, adminPlatformSendEmailVerificationTest, adminPlatformUpdateCapWorkloadConfiguration } from '../../../../api'
+import type { NoCtfapiEndpointsAdministrationPlatformAdminHumanVerificationConfigurationResponse, NoCtfapiEndpointsAdministrationPlatformCapWorkloadConfigurationResponse, NoCtfapiEndpointsAdministrationPlatformEmailVerificationConfigurationResponse, NoCtfapiEndpointsAdministrationPlatformSmtpSecurityModeProtocol, NoCtfapiEndpointsPlatformHumanVerificationProviderProtocol } from '../../../../api'
 import AdminDateTimeComponent from '../../../admin/AdminDateTime.vue'
 
 type EmailConfiguration = NoCtfapiEndpointsAdministrationPlatformEmailVerificationConfigurationResponse
 type HumanVerificationConfiguration = NoCtfapiEndpointsAdministrationPlatformAdminHumanVerificationConfigurationResponse
+type CapWorkloadConfiguration = NoCtfapiEndpointsAdministrationPlatformCapWorkloadConfigurationResponse
 
 /** Owns state, effects and commands for AdminPlatformEmailPage. */
 export function useAdminPlatformEmailPage() {
@@ -38,6 +39,89 @@ export function useAdminPlatformEmailPage() {
   const humanSecret = ref('')
 
   const humanSecretSaving = ref(false)
+
+  const capWorkload = ref<CapWorkloadConfiguration | null>(null)
+  const capWorkloadForm = reactive({
+    difficulty: 4,
+    challengeCount: 80,
+  })
+  const capWorkloadSaved = ref('')
+  const capWorkloadLoading = ref(false)
+  const capWorkloadSaving = ref(false)
+  const capWorkloadError = ref<string | null>(null)
+
+  function capWorkloadRequest() {
+    return {
+      difficulty: capWorkloadForm.difficulty,
+      challengeCount: capWorkloadForm.challengeCount,
+    }
+  }
+
+  function syncCapWorkload(value: CapWorkloadConfiguration): void {
+    capWorkload.value = value
+    capWorkloadForm.difficulty = value.difficulty ?? 4
+    capWorkloadForm.challengeCount = value.challengeCount ?? 80
+    capWorkloadSaved.value = JSON.stringify(capWorkloadRequest())
+  }
+
+  const capWorkloadDirty = computed(() => capWorkload.value !== null
+    && JSON.stringify(capWorkloadRequest()) !== capWorkloadSaved.value)
+  const capWorkloadValid = computed(() => capWorkloadForm.difficulty >= 1
+    && capWorkloadForm.difficulty <= 8
+    && capWorkloadForm.challengeCount >= 1
+    && capWorkloadForm.challengeCount <= 500)
+  const capExpectedHashAttempts = computed(() => capWorkloadForm.challengeCount
+    * 16 ** capWorkloadForm.difficulty)
+  const capExpectedHashAttemptsLabel = computed(() =>
+    new Intl.NumberFormat().format(capExpectedHashAttempts.value))
+  const capWorkloadRiskLabel = computed(() => {
+    if (capExpectedHashAttempts.value < 10_000_000)
+      return translate('ui.capWorkloadRiskNormal')
+    if (capExpectedHashAttempts.value < 100_000_000)
+      return translate('ui.capWorkloadRiskHigh')
+    return translate('ui.capWorkloadRiskExtreme')
+  })
+  const capWorkloadRiskVariant = computed(() => capExpectedHashAttempts.value >= 100_000_000
+    ? 'destructive' as const
+    : capExpectedHashAttempts.value >= 10_000_000
+      ? 'outline' as const
+      : 'secondary' as const)
+
+  async function loadCapWorkload(): Promise<void> {
+    if (humanForm.provider !== 'Cap') return
+    capWorkloadLoading.value = true
+    capWorkloadError.value = null
+    const { data, error } = await adminPlatformGetCapWorkloadConfiguration()
+    capWorkloadLoading.value = false
+    if (error || !data) {
+      capWorkload.value = null
+      capWorkloadError.value = parseApiError(
+        error,
+        translate('ui.capWorkloadConfigurationUnavailable'),
+      ).message
+      return
+    }
+    syncCapWorkload(data)
+  }
+
+  async function saveCapWorkload(): Promise<void> {
+    if (!capWorkloadDirty.value || !capWorkloadValid.value
+      || capWorkloadSaving.value || humanVerificationDirty.value) return
+    capWorkloadSaving.value = true
+    const { data, error } = await adminPlatformUpdateCapWorkloadConfiguration({
+      body: capWorkloadRequest(),
+    })
+    capWorkloadSaving.value = false
+    if (error || !data) {
+      toast.error(parseApiError(
+        error,
+        translate('ui.capWorkloadConfigurationUnavailable'),
+      ).message)
+      return
+    }
+    syncCapWorkload(data)
+    toast.success(translate('ui.capWorkloadConfigurationSaved'))
+  }
 
   function humanVerificationRequest() {
     return {
@@ -171,6 +255,7 @@ export function useAdminPlatformEmailPage() {
     if (data.humanVerification) syncHumanVerification(data.humanVerification)
     configuration.value = data.emailVerification ?? null
     if (data.emailVerification) syncForm(data.emailVerification)
+    if (humanForm.provider === 'Cap') await loadCapWorkload()
   }
 
   async function saveHumanVerification(): Promise<void> {
@@ -190,6 +275,7 @@ export function useAdminPlatformEmailPage() {
       syncHumanVerification(data.humanVerification)
     }
     await refreshPlatform()
+    if (humanForm.provider === 'Cap') await loadCapWorkload()
     toast.success(translate('ui.humanVerificationConfigurationSaved'))
   }
 
@@ -282,6 +368,16 @@ export function useAdminPlatformEmailPage() {
       humanSecretOpen,
       humanSecret,
       humanSecretSaving,
+      capWorkload,
+      capWorkloadForm,
+      capWorkloadLoading,
+      capWorkloadSaving,
+      capWorkloadError,
+      capWorkloadDirty,
+      capWorkloadValid,
+      capExpectedHashAttemptsLabel,
+      capWorkloadRiskLabel,
+      capWorkloadRiskVariant,
       loading,
       loadError,
       form,
@@ -294,6 +390,8 @@ export function useAdminPlatformEmailPage() {
       load,
       saveHumanVerification,
       replaceHumanVerificationSecret,
+      loadCapWorkload,
+      saveCapWorkload,
       save,
       replacePassword,
       sendTest,
