@@ -66,6 +66,8 @@ public interface IRunnerCapacityGate
         Task.FromResult<IReadOnlyDictionary<Guid, RunnerAdmissionFailure>>(new Dictionary<Guid, RunnerAdmissionFailure>());
     Task CompleteStartupAsync(Guid runtimeInstanceId, string runnerId, CancellationToken cancellationToken) => Task.CompletedTask;
     Task<bool> CanCreateAsync(Guid runtimeInstanceId, string runnerId, CancellationToken cancellationToken) => Task.FromResult(true);
+    Task<bool> CanCreateWorkloadAsync(RuntimeWorkloadIdentity identity, Guid factId, string runnerId,
+        CancellationToken cancellationToken) => Task.FromResult(false);
     Task<RunnerHeartbeatStatus> GetHeartbeatAsync(
         string runnerPool,
         string runnerId,

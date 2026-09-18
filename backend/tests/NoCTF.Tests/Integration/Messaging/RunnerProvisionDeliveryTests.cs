@@ -49,6 +49,7 @@ public sealed class RunnerProvisionDeliveryTests
             work.ReadProvisionStatusAsync(Arg.Any<IRuntimeProvisionMessage>(), Arg.Any<CancellationToken>())
                 .Returns(_ => { called.TrySetResult(); return Task.FromResult(RuntimeProvisionWorkStatus.AssignmentAbsent); });
             var capacity = Substitute.For<IRunnerCapacityGate>();
+            capacity.CanCreateAsync(Arg.Any<Guid>(), runnerId, Arg.Any<CancellationToken>()).Returns(true);
             var provider = new RuntimeProviderHandler(Substitute.For<IRuntimeProviderCatalog>(), [],
                 Options.Create(new RunnerOptions { Id = runnerId, Pool = "default", Provider = RuntimeProvider.Docker }), capacity, work);
             var probe = new ResultProbe();

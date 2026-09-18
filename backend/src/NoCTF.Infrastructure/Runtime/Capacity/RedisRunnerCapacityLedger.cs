@@ -35,7 +35,8 @@ public sealed class RedisRunnerCapacityLedger(IConnectionMultiplexer redis)
 
     public async Task RestoreAsync(string runnerId, string pool, RuntimeResourceLimits total,
         IReadOnlyList<RuntimeCapacityAllocation> allocations, CancellationToken ct,
-        IReadOnlySet<RuntimeWorkloadIdentity>? starting = null)
+        IReadOnlySet<RuntimeWorkloadIdentity>? starting = null,
+        IReadOnlyList<string>? claimKeys = null)
     {
         foreach (var allocation in allocations)
         {
@@ -44,21 +45,7 @@ public sealed class RedisRunnerCapacityLedger(IConnectionMultiplexer redis)
                 throw new InvalidOperationException("Cannot rebuild another Runner's allocation.");
         }
         var database = redis.GetDatabase();
-        var keys = new List<string>();
-        // Only used during recovery; admission is already closed. Include pre-index legacy claims.
-        foreach (var endpoint in redis.GetEndPoints())
-        {
-            var server = redis.GetServer(endpoint);
-            if (server.IsReplica) continue;
-            await foreach (var key in server.KeysAsync(database.Database, "runner-claim:*", pageSize: 256)
-                               .WithCancellation(ct))
-            {
-                if ((string?)await database.HashGetAsync(key, "runnerId") == runnerId)
-                    keys.Add(key.ToString());
-                if (keys.Count > 10000)
-                    throw new InvalidOperationException("Capacity recovery exceeds its bounded inventory.");
-            }
-        }
+        var keys = claimKeys ?? await ReadClaimKeysAsync(runnerId, ct);
         var rows = allocations.Select(item => new
         {
             key = $"runner-claim:{item.Identity.Key}", memory = item.Budget.MemoryBytes,
@@ -101,5 +88,28 @@ public sealed class RedisRunnerCapacityLedger(IConnectionMultiplexer redis)
                 JsonSerializer.Serialize(keys), JsonSerializer.Serialize(rows)]);
         if (restored != 1)
             throw new InvalidOperationException("Capacity recovery lost its admission barrier.");
+    }
+
+    // Admission must be closed before this inventory and remain closed through RestoreAsync.
+    // Scan outside the PostgreSQL transaction, including pre-index legacy claims.
+    public async Task<IReadOnlyList<string>> ReadClaimKeysAsync(string runnerId, CancellationToken ct)
+    {
+        var database = redis.GetDatabase();
+        var keys = new HashSet<string>(StringComparer.Ordinal);
+        var scanned = 0;
+        foreach (var endpoint in redis.GetEndPoints())
+        {
+            var server = redis.GetServer(endpoint);
+            if (server.IsReplica) continue;
+            await foreach (var key in server.KeysAsync(database.Database, "runner-claim:*", pageSize: 256)
+                               .WithCancellation(ct))
+            {
+                if (++scanned > 10000)
+                    throw new InvalidOperationException("Capacity recovery exceeds its bounded inventory.");
+                if ((string?)await database.HashGetAsync(key, "runnerId") == runnerId)
+                    keys.Add(key.ToString());
+            }
+        }
+        return keys.ToArray();
     }
 }

@@ -42,6 +42,17 @@ public sealed class PersistedRunnerCapacityGate(
     public Task<RunnerCapacityClaim> TryClaimAsync(RunnerCapacityRequest request, CancellationToken ct) =>
         ClaimAsync(request, null, ct);
 
+    public async Task<bool> CanCreateWorkloadAsync(RuntimeWorkloadIdentity identity, Guid factId, string runnerId, CancellationToken ct)
+    {
+        var runtime = await db.RuntimeInstances.AsNoTracking().SingleOrDefaultAsync(row => row.Id == identity.RuntimeInstanceId
+            && row.RunnerId == runnerId && row.State == RuntimeState.Running, ct);
+        var allocation = runtime?.CapacityAllocations.Items.SingleOrDefault(item => item.Identity == identity
+            && item.GameplayFactId == factId && item.RunnerId == runnerId);
+        return allocation is not null
+            && await db.GameplayFacts.AnyAsync(fact => fact.Id == factId && fact.State == GameplayFactState.Processing, ct)
+            && await redis.ValidateClaimAsync(allocation, ct);
+    }
+
     public Task<RunnerCapacityClaim> TryClaimForRunnerAsync(RunnerCapacityRequest request, string runnerId, CancellationToken ct) =>
         ClaimAsync(request, runnerId, ct);
 
@@ -57,6 +68,10 @@ public sealed class PersistedRunnerCapacityGate(
         identity.Validate();
         if (identity.RuntimeInstanceId != runtime.Id)
             throw new InvalidOperationException("The capacity identity belongs to another Runtime.");
+        if (!identity.IsAuxiliary && identity != PrimaryIdentity(runtime)
+            || runtime.RunnerId is { } owner && runnerId is not null && owner != runnerId)
+            return new(RunnerCapacityAvailability.Unavailable, Failure: RunnerAdmissionFailure.NoEligibleRunner);
+        runnerId ??= runtime.RunnerId;
         if (identity.IsAuxiliary && (request.GameplayFactId is not Guid factId
             || !await db.GameplayFacts.AnyAsync(fact => fact.Id == factId
                 && fact.State == GameplayFactState.Processing

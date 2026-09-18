@@ -139,6 +139,7 @@ public sealed class RunnerAvailabilityPublisher(
             var reconciler = reconcilers.Single(x => x.Provider == options.Provider);
             // External inventory reads happen outside the database transaction.
             var managed = await reconciler.ListManagedAsync(cancellationToken);
+            var claimKeys = await ledger.ReadClaimKeysAsync(options.Id, cancellationToken);
             await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
             await RuntimeCapacityCriticalSection.AcquireAsync(db, cancellationToken);
             var ownerJson = JsonSerializer.Serialize(new { items = new[] { new { runnerId = options.Id } } });
@@ -174,7 +175,7 @@ public sealed class RunnerAvailabilityPublisher(
                 documents.SelectMany(document => document.Items)
                     .Where(item => item.RunnerId == options.Id).ToArray(), cancellationToken,
                 runtimes.Where(runtime => runtime.State == RuntimeState.Provisioning)
-                    .SelectMany(runtime => runtime.CapacityAllocations.Items).Select(item => item.Identity).ToHashSet());
+                    .SelectMany(runtime => runtime.CapacityAllocations.Items).Select(item => item.Identity).ToHashSet(), claimKeys);
             await restoreTransaction.CommitAsync(cancellationToken);
             initialReconciliationComplete = true;
             result = await registry.RegisterAsync(registration, cancellationToken);

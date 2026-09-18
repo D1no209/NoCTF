@@ -89,7 +89,8 @@ public sealed class DataModelSchemaTests
             "20260912150416_AddTeamWriteUps",
             "20260912182604_ConfigureTeamWriteUpSubmission",
             "20260913172544_AddHumanVerificationEvaluationToggle",
-            "20260914154253_AddCtfPatchVerificationExperiment"
+            "20260914154253_AddCtfPatchVerificationExperiment",
+            "20260918101546_AddRuntimeCapacityAllocations"
         ]);
             await Assert.That(migrations[0]).EndsWith("_InitialBaseline");
 

@@ -2,7 +2,7 @@ using StackExchange.Redis;
 
 namespace NoCTF.Infrastructure.Runtime.Capacity;
 
-public sealed class RuntimeDispatchWakeupGate(IConnectionMultiplexer? redis)
+public sealed class RuntimeDispatchWakeupGate(IConnectionMultiplexer? redis = null)
 {
     public async Task<bool> TryBeginAsync(CancellationToken ct)
     {
