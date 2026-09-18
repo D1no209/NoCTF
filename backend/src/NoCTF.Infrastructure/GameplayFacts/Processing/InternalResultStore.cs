@@ -222,7 +222,7 @@ public sealed class InternalResultStore(
             GameplayFactKind: fact.Kind,
             GameplayFactState: fact.State,
             GameplayFactResult: fact.Result), ct);
-        await events.RecordAsync(new(
+        var adjudicationEventId = await events.RecordAsync(new(
             fact.CompetitionId,
             CompetitionEventKind.GameplayFactAdjudicated,
             result.Outcome == AwdpFixOutcome.PlatformFailed
@@ -260,7 +260,8 @@ public sealed class InternalResultStore(
                 CompetitionChallengeId: fact.CompetitionChallengeId,
                 GameplayFactId: fact.Id,
                 GameplayFactKind: fact.Kind,
-                GameplayFactResult: fact.Result), ct);
+                GameplayFactResult: fact.Result,
+                ParentEventId: adjudicationEventId == Guid.Empty ? null : adjudicationEventId), ct);
         }
         if (context.Competition.Mode == GameMode.Awdp)
         {

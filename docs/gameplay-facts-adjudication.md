@@ -37,23 +37,23 @@ ForeignTeamFlagDetected 作弊事件直接以 GameplayFactId 为身份；Confirm
 
 ## 历史差异预览
 
-比赛工作人员可读取有界、游标分页的历史裁决差异预览。该预览分析 CTF 的
-`FlagAttempt`，并额外识别 AWDP `BreakAttempt` 中当前结果恰为
-`Duplicate / DuplicateAchievement` 的旧版本异常；AWD、KoH 及其他事实类型返回空结果。
-AWDP Break 的 Milestone/PerRound 唯一性仍由排行榜投影负责，当前合法的 Correct
-Break 不会被预览标为 Duplicate；同轮、跨轮旧异常都只读报告
-`CurrentDuplicateShouldBeCorrect`，确定性预期结果为 Correct，且不分析 CTF 血榜。
-该预览不会排队评测、修改 `GameplayFact`、追加 `competition_event` 或发布消息。
+工作人员可按 signed keyset cursor 读取有界、只读的裁决预览。CTF 分析当前正式比赛窗口内的
+FlagAttempt 与 PatchVerification FixAttempt；AWDP 保留 BreakAttempt 的历史
+Duplicate / DuplicateAchievement 异常识别。其他赛制不在此预览范围内。
 
-预览把当前 `GameplayFact` 与不可变事件流作为证据，而不是擅自补全已经不存在的历史：
+事实、资格和事件在同一 RepeatableRead 快照读取。每次最多扫描 500 条事实，每条事实保留
+最新 128 条相关事件并探测截断；事件保留 Id、时间、处理状态、结果、操作者和 ParentEventId，
+按 `(OccurredAt, Id)` 稳定排列。稳定排序不代表同时间事件的业务因果顺序。
 
-- CTF 血榜名次按每队每题第一条当前 Correct 的权威 `(OccurredAt, Id)` 顺序比较；后续 Correct 仍是合法判题结果，但不重复计分或授予血位；
-- AWDP 仅按当前 `Result` 与稳定 `FailureCode` 识别上述旧异常，不尝试从当前配置重建历史 Milestone/PerRound 首次成就；
-- 缺失、名次错误、意外出现及重复的血榜事件只报告、不修改；
-- 当前结果存在但缺少对应 `GameplayFactAdjudicated` 事件，标记为 `NeedsReview`；该历史完整性检查同样适用于纳入预览的 AWDP Break；
-- 若当前队伍或会影响血榜名次的前序队伍已不是 Approved、已封禁或已删除，现有事件不足以无歧义重建发生时资格，因此不报告确定性血榜名次并标记为 `NeedsReview`；同一事实的重复血榜事件仍是确定性差异；
-- 不可变事件中存在互相冲突的裁决结果，或当前 `Duplicate` 的前序事实已不再为 `Correct`，标记为 `NeedsReview`，因为旧配置、旧 Flag 归属和完整旧结果均未保存；
-- 尤其不得静默推断或修复 `Correct → Wrong → Correct`。
+- 当前结果与可信的最新 Completed 业务裁决不一致，属于明确异常。
+- 完整扫描范围内缺少必要裁决事件，属于完整性异常；截断不能证明事件不存在。
+- `Correct → Wrong → Correct`、多次相同结果的合法重判、排队期间或平台失败后保留旧 Result，
+  都不因历史存在多个结果而被判为损坏；合法变化作为信息，默认不单独列出。
+- 同时间冲突、旧事件缺少状态、证据截断以及无法关联到具体裁决的重复播报，需要人工复核。
+- 当前血位按共享资格、赛道、交互方式与首次完成顺序计算，单独标明为“当前投影血位”；
+  它不能证明过去的资格或播报有误。已知赛道/资格调整作为调整说明，未知历史保持未知。
+- 新血榜事件用 ParentEventId 指向对应裁决。只有同一已确认裁决的重复血榜子事件才有确定的
+  重复证据；旧事件不回填关联，不重写历史。
 
-Observer、Judge、Manager、Owner 与平台管理员均可读取，比赛软删除归档后仍可继续只读审计；
-参赛者不可访问，不存在的比赛返回 404。此功能刻意不提供“应用纠正”操作。
+预览不读取 Flag 原文，不排队评测、不改分、不补发血榜、不删除或修改事实与事件。
+沿用工作人员授权和软删除比赛的归档只读权限；参赛者不可访问。

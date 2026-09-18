@@ -271,7 +271,8 @@ public sealed class HistoricalAdjudicationPreviewHttpTests
         false,
         0,
         false,
-        [GameplayFactResult.Correct],
+        [new(Guid.NewGuid(), occurredAt, NoCTF.Domain.Competitions.Events.CompetitionEventKind.GameplayFactAdjudicated,
+            GameplayFactState.Completed, GameplayFactResult.Correct)],
         []);
 
     private static HistoricalAdjudicationEvidence LegacyAwdpDuplicateEvidence(
@@ -289,7 +290,8 @@ public sealed class HistoricalAdjudicationPreviewHttpTests
         false,
         0,
         false,
-        [GameplayFactResult.Duplicate],
+        [new(Guid.NewGuid(), occurredAt, NoCTF.Domain.Competitions.Events.CompetitionEventKind.GameplayFactAdjudicated,
+            GameplayFactState.Completed, GameplayFactResult.Duplicate)],
         []);
 
     private sealed class MutableUserContext(Guid userId) : IUserContext

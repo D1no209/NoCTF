@@ -5,6 +5,7 @@ using System.Text;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 using NoCTF.Application.GameplayFacts.AdjudicationPreview;
+using NoCTF.Application.Scoring.Leaderboard;
 using NoCTF.Domain.Challenges;
 using NoCTF.Domain.Competitions;
 using NoCTF.Domain.Competitions.Events;
@@ -24,6 +25,79 @@ namespace NoCTF.Tests.Integration.Persistence;
 [Category("Integration")]
 public sealed class HistoricalAdjudicationPreviewPersistenceTests
 {
+    [Test, Timeout(300_000)]
+    public async Task Event_prefix_is_bounded_without_deduplicating_legitimate_rejudgements(CancellationToken ct)
+    {
+        await DockerIntegrationTest.RunAsync(async () =>
+        {
+            await using var postgres = await StartPostgresAsync(ct);
+            var options = Options(postgres);
+            var fixture = await SeedAsync(options, ct);
+            await using var db = new NoCtfDbContext(options);
+            for (var index = 0; index < 140; index++)
+                db.CompetitionEvents.Add(Event(fixture, fixture.LaterFactId, CompetitionEventKind.GameplayFactAdjudicated,
+                    fixture.Now.AddSeconds(index + 2), GameplayFactResult.Correct));
+            await db.SaveChangesAsync(ct);
+            var before = await CountsAsync(db, ct);
+            var evidence = await new HistoricalAdjudicationPreviewStore(db).ReadAsync(fixture.CompetitionId, null, null, null, 50, ct);
+            var item = evidence.Items.Single();
+            await Assert.That(item.Events.Count).IsEqualTo(128);
+            await Assert.That(item.Events.Select(row => row.EventId).Distinct().Count()).IsEqualTo(128);
+            await Assert.That(item.Completeness).IsEqualTo(AdjudicationEvidenceCompleteness.Truncated);
+            var analysis = HistoricalAdjudicationAnalyzer.Analyze(item);
+            await Assert.That(analysis.LatestEffectiveAdjudication!.Result).IsEqualTo(GameplayFactResult.Correct);
+            await Assert.That(analysis.Differences.Any(row => row.Kind == AdjudicationDifferenceKind.MissingBloodAward)).IsFalse();
+            await Assert.That(analysis.Differences.Any(row => row.Severity == AdjudicationFindingSeverity.Error)).IsFalse();
+            await Assert.That(await CountsAsync(db, ct)).IsEqualTo(before);
+        });
+    }
+
+    [Test, Timeout(300_000)]
+    public async Task Track_changes_are_information_and_patch_completion_uses_the_current_interaction(CancellationToken ct)
+    {
+        await DockerIntegrationTest.RunAsync(async () =>
+        {
+            await using var postgres = await StartPostgresAsync(ct);
+            var options = Options(postgres);
+            var fixture = await SeedAsync(options, ct);
+            await using var db = new NoCtfDbContext(options);
+            var tracks = CompetitionTrackConfiguration.DefaultFor(GameMode.Ctf);
+            var guest = tracks.DefaultTrack with { Key = "guest", Name = "Guest", IsDefault = false, EarnsBlood = false };
+            var configuration = JsonSerializer.Serialize(tracks with { Tracks = [tracks.DefaultTrack, guest] }, new JsonSerializerOptions(JsonSerializerDefaults.Web));
+            await db.Competitions.Where(row => row.Id == fixture.CompetitionId).ExecuteUpdateAsync(update =>
+                update.SetProperty(row => row.TracksEnabled, true).SetProperty(row => row.TrackConfigurationJson, configuration), ct);
+            await db.Teams.Where(row => row.Id == fixture.FirstTeamId).ExecuteUpdateAsync(update => update.SetProperty(row => row.TrackKey, "guest"), ct);
+            db.CompetitionEvents.Add(new CompetitionEvent
+            {
+                Id = Guid.NewGuid(), CompetitionId = fixture.CompetitionId, Kind = CompetitionEventKind.TeamTrackChanged,
+                Level = CompetitionEventLevel.Information, Visibility = CompetitionEventVisibility.Staff,
+                SubjectType = EntityReferenceKind.Team, SubjectId = fixture.FirstTeamId,
+                OccurredAt = fixture.Now.AddSeconds(5), PayloadJson = "{\"schemaVersion\":1,\"trackKey\":\"guest\",\"previousTrackKey\":\"default\"}"
+            });
+            await db.SaveChangesAsync(ct);
+            var preview = new PreviewHistoricalAdjudicationDifferences(new HistoricalAdjudicationPreviewStore(db));
+            await Assert.That((await preview.ExecuteAsync(fixture.CompetitionId, null, null, null, 20, ct)).Items).IsEmpty();
+            var information = await preview.ExecuteAsync(fixture.CompetitionId, null, null, null, 20, true, ct);
+            await Assert.That(information.Items.Single().Differences.All(row => row.Severity == AdjudicationFindingSeverity.Information)).IsTrue();
+            await Assert.That(information.Items.Single().EligibilityEvents.Count).IsEqualTo(1);
+
+            await db.Competitions.Where(row => row.Id == fixture.CompetitionId).ExecuteUpdateAsync(update => update.SetProperty(row => row.TracksEnabled, false), ct);
+            var templateId = await db.CompetitionChallenges.Where(row => row.Id == fixture.CompetitionChallengeId).Select(row => row.ChallengeId).SingleAsync(ct);
+            await db.Challenges.Where(row => row.Id == templateId).ExecuteUpdateAsync(update =>
+                update.SetProperty(row => row.DefinitionJson, "{\"schemaVersion\":3,\"interactionKind\":1}"), ct);
+            // Archive content is outside this read-only projection; only the typed reference identity is relevant.
+            await db.GameplayFacts.Where(row => row.Id == fixture.LaterFactId).ExecuteUpdateAsync(update =>
+                update.SetProperty(row => row.Kind, GameplayFactKind.FixAttempt).SetProperty(row => row.Value, (string?)null)
+                    .SetProperty(row => row.ValueSha256, (byte[]?)null)
+                    .SetProperty(row => row.ReferenceKind, (GameplayFactReferenceKind?)GameplayFactReferenceKind.PatchUpload)
+                    .SetProperty(row => row.ReferenceId, (Guid?)Guid.NewGuid()), ct);
+            var patch = (await new HistoricalAdjudicationPreviewStore(db).ReadAsync(fixture.CompetitionId, null, null, null, 20, ct)).Items.Single();
+            await Assert.That(patch.GameplayFactKind).IsEqualTo(GameplayFactKind.FixAttempt);
+            await Assert.That(patch.MatchesCurrentInteraction).IsTrue();
+            await Assert.That(HistoricalAdjudicationAnalyzer.Analyze(patch).CurrentProjectedBloodRank).IsEqualTo(LeaderboardBloodRank.First);
+        });
+    }
+
     [Test]
     [Timeout(300_000)]
     public async Task Preview_detects_out_of_order_and_duplicate_blood_without_writing(
@@ -78,14 +152,14 @@ public sealed class HistoricalAdjudicationPreviewPersistenceTests
                 fixture.LaterFactId.ToString("N"))).IsLessThan(0);
             await Assert.That(later.Differences.Select(item => item.Kind))
                 .DoesNotContain(AdjudicationDifferenceKind.CurrentCorrectShouldBeDuplicate);
-            await Assert.That(later.DeterministicExpectedResult).IsNull();
+            await Assert.That(later.DeterministicExpectedResult).IsEqualTo(GameplayFactResult.Wrong);
             await Assert.That(later.Differences.Select(item => item.Kind))
                 .Contains(AdjudicationDifferenceKind.DuplicateBloodAward);
             await Assert.That(later.Differences.Select(item => item.Kind))
                 .Contains(AdjudicationDifferenceKind.HistoricalResultChanged);
             await Assert.That(later.Differences
                 .Single(item => item.Kind == AdjudicationDifferenceKind.HistoricalResultChanged)
-                .Certainty).IsEqualTo(AdjudicationDifferenceCertainty.NeedsReview);
+                .Certainty).IsEqualTo(AdjudicationDifferenceCertainty.Deterministic);
             await Assert.That(page.Items.Single(item => item.GameplayFactId == fixture.EarlierFactId)
                 .Differences.Select(item => item.Kind))
                 .Contains(AdjudicationDifferenceKind.MissingBloodAward);
@@ -346,7 +420,8 @@ public sealed class HistoricalAdjudicationPreviewPersistenceTests
             await Assert.That(countedPage.Items).Count().IsEqualTo(20);
             // Competition metadata, lifecycle-derived official window, candidates,
             // first-correct facts, audit events, teams, and challenge titles.
-            await Assert.That(counter.ReaderCommandCount).IsLessThanOrEqualTo(7);
+            // Eligibility adjustment evidence is one additional bounded query.
+            await Assert.That(counter.ReaderCommandCount).IsLessThanOrEqualTo(8);
         });
     }
 
@@ -534,6 +609,7 @@ public sealed class HistoricalAdjudicationPreviewPersistenceTests
         PayloadJson = JsonSerializer.Serialize(new
         {
             schemaVersion = 1,
+            gameplayFactState = GameplayFactState.Completed.ToString(),
             gameplayFactResult = result.ToString(),
             competitionChallengeId
         }),
@@ -631,6 +707,7 @@ public sealed class HistoricalAdjudicationPreviewPersistenceTests
         PayloadJson = JsonSerializer.Serialize(new
         {
             schemaVersion = 1,
+            gameplayFactState = GameplayFactState.Completed.ToString(),
             gameplayFactResult = result.ToString(),
             competitionChallengeId = fixture.CompetitionChallengeId
         }),
@@ -709,7 +786,7 @@ public sealed class HistoricalAdjudicationPreviewPersistenceTests
             Mode = GameMode.Ctf,
             Title = "Preview challenge",
             Direction = "Web",
-            DefinitionJson = "{}",
+            DefinitionJson = "{\"schemaVersion\":3,\"interactionKind\":0}",
             CreatedAt = now,
             UpdatedAt = now
         });
