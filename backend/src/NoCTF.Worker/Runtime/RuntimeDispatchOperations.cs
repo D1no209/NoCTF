@@ -92,7 +92,7 @@ internal static partial class BackendMessageOperations
         var instance = await db.RuntimeInstances.SingleOrDefaultAsync(
             candidate => candidate.Id == message.RuntimeInstanceId,
             cancellationToken);
-        if (instance is null || instance.State != RuntimeState.Queued)
+        if (instance is null || instance.State is not (RuntimeState.Queued or RuntimeState.Provisioning))
             return;
 
         var target = await ResolveRuntimeDispatchTargetAsync(instance, db, cancellationToken);

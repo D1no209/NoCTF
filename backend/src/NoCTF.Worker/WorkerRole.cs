@@ -47,6 +47,8 @@ public static class WorkerRole
         services.AddTransient<AwdpMessageHandler>();
         services.AddTransient<RuntimeDispatchMessageHandler>();
         services.AddTransient<QueuedRuntimeDispatchHandler>();
+        services.AddSingleton(provider => new NoCTF.Infrastructure.Runtime.Capacity.RuntimeDispatchWakeupGate(
+            provider.GetService<StackExchange.Redis.IConnectionMultiplexer>()));
         services.AddTransient<ReleaseRunnerCapacityHandler>();
         services.AddTransient<GameplayFactDrainMessageHandler>();
         services.AddSingleton<LeaderboardProjectionMergeQueue>();

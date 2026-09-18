@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Options;
 using NoCTF.Application.Runtime.Provisioning;
 using NoCTF.Domain.Runtime;
+using NoCTF.Application.Runtime.Capacity;
 
 namespace NoCTF.Runner.Composition;
 
@@ -14,6 +15,7 @@ public sealed class RunnerOptions
     public RunnerCapacityOptions Capacity { get; set; } = new();
     public RunnerHeartbeatOptions Heartbeat { get; set; } = new();
     public RunnerCleanupOptions Cleanup { get; set; } = new();
+    public RunnerAdmissionOptions Admission { get; set; } = new();
     public int ProviderFailureHoldSeconds { get; set; } = 120;
 
     public RuntimeResourceLimits ResourceCapacity => new(
@@ -72,6 +74,8 @@ public sealed class RunnerOptionsValidator : IValidateOptions<RunnerOptions>
             failures.Add("Runner heartbeat TTL must be greater than its positive interval.");
         if (options.ProviderFailureHoldSeconds <= 0)
             failures.Add("Runner provider failure hold must be a positive number of seconds.");
+        if (!options.Admission.IsValid())
+            failures.Add("Runner admission thresholds, sampling and concurrency must be valid.");
         if (options.Cleanup.GracefulStopSeconds <= 0
             || options.Cleanup.ForceDeleteTimeoutSeconds <= 0
             || options.Cleanup.NetworkCleanupTimeoutSeconds <= 0

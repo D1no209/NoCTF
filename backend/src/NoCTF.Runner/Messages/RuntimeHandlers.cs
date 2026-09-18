@@ -30,7 +30,8 @@ public sealed class RuntimeProviderHandler(
     TimeProvider? configuredTimeProvider = null,
     IAwdpAttackProvisioningPlanReader? awdpAttackPlans = null,
     RunnerProviderHealthState? providerHealth = null,
-    RunnerResourceMutationCoordinator? mutations = null)
+    RunnerResourceMutationCoordinator? mutations = null,
+    RunnerResourceObserver? observer = null)
 {
     private readonly TimeProvider timeProvider = configuredTimeProvider ?? TimeProvider.System;
 
@@ -38,8 +39,9 @@ public sealed class RuntimeProviderHandler(
         ProvisionContainerRuntime message,
         CancellationToken cancellationToken)
     {
-        using var mutation = mutations is null ? null : await mutations.EnterAsync(cancellationToken);
+        using var mutation = mutations is null ? null : await mutations.EnterWorkloadAsync(new(RuntimeWorkloadKind.Runtime, message.RuntimeInstanceId, message.RuntimeInstanceId), cancellationToken);
         ValidateAssignment(message);
+        observer?.EnsureFreshAdmission();
         var workStatus = await workReader.ReadProvisionStatusAsync(message, cancellationToken);
         if (workStatus != RuntimeProvisionWorkStatus.Current)
         {
@@ -58,6 +60,8 @@ public sealed class RuntimeProviderHandler(
                 RuntimeFailureCode.RunnerUnavailable,
                 message.RunnerId);
         }
+        if (!await capacity.CanCreateAsync(message.RuntimeInstanceId, message.RunnerId, cancellationToken))
+            throw new TimeoutException("Runtime allocation is waiting for capacity recovery.");
         RuntimeFailureCode? failureCode = null;
         try
         {
@@ -86,6 +90,8 @@ public sealed class RuntimeProviderHandler(
             {
                 failureCode = RuntimeFailureCode.UrlExpansionFailed;
             }
+            if (expanded is not null)
+                await capacity.CompleteStartupAsync(message.RuntimeInstanceId, message.RunnerId, cancellationToken);
             if (expanded is not null)
                 return new RuntimeProvisioned(
                     message.RuntimeInstanceId,
@@ -135,7 +141,7 @@ public sealed class RuntimeProviderHandler(
         StopContainerRuntime message,
         CancellationToken cancellationToken)
     {
-        using var mutation = mutations is null ? null : await mutations.EnterAsync(cancellationToken);
+        using var mutation = mutations is null ? null : await mutations.EnterWorkloadAsync(new(RuntimeWorkloadKind.Runtime, message.RuntimeInstanceId, message.RuntimeInstanceId), cancellationToken);
         ValidateAssignment(message);
         RuntimeStopWork? work = null;
         var started = Stopwatch.GetTimestamp();
@@ -187,7 +193,7 @@ public sealed class RuntimeProviderHandler(
         ForceTerminateRuntime message,
         CancellationToken cancellationToken)
     {
-        using var mutation = mutations is null ? null : await mutations.EnterAsync(cancellationToken);
+        using var mutation = mutations is null ? null : await mutations.EnterWorkloadAsync(new(RuntimeWorkloadKind.Runtime, message.RuntimeInstanceId, message.RuntimeInstanceId), cancellationToken);
         ValidateAssignment(message);
         var started = Stopwatch.GetTimestamp();
         RuntimeStopWork? work = null;
@@ -278,8 +284,9 @@ public sealed class RuntimeProviderHandler(
         ProvisionComposeRuntime message,
         CancellationToken cancellationToken)
     {
-        using var mutation = mutations is null ? null : await mutations.EnterAsync(cancellationToken);
+        using var mutation = mutations is null ? null : await mutations.EnterWorkloadAsync(new(RuntimeWorkloadKind.Runtime, message.RuntimeInstanceId, message.RuntimeInstanceId), cancellationToken);
         ValidateAssignment(message);
+        observer?.EnsureFreshAdmission();
         var workStatus = await workReader.ReadProvisionStatusAsync(message, cancellationToken);
         if (workStatus != RuntimeProvisionWorkStatus.Current)
         {
@@ -298,6 +305,8 @@ public sealed class RuntimeProviderHandler(
                 RuntimeFailureCode.RunnerUnavailable,
                 message.RunnerId);
         }
+        if (!await capacity.CanCreateAsync(message.RuntimeInstanceId, message.RunnerId, cancellationToken))
+            throw new TimeoutException("Runtime allocation is waiting for capacity recovery.");
         RuntimeFailureCode? failureCode = null;
         try
         {
@@ -327,6 +336,8 @@ public sealed class RuntimeProviderHandler(
                 {
                     failureCode = RuntimeFailureCode.UrlExpansionFailed;
                 }
+                if (expanded is not null)
+                    await capacity.CompleteStartupAsync(message.RuntimeInstanceId, message.RunnerId, cancellationToken);
                 if (expanded is not null)
                     return new RuntimeProvisioned(
                         message.RuntimeInstanceId,
@@ -369,7 +380,7 @@ public sealed class RuntimeProviderHandler(
         StopComposeRuntime message,
         CancellationToken cancellationToken)
     {
-        using var mutation = mutations is null ? null : await mutations.EnterAsync(cancellationToken);
+        using var mutation = mutations is null ? null : await mutations.EnterWorkloadAsync(new(RuntimeWorkloadKind.Runtime, message.RuntimeInstanceId, message.RuntimeInstanceId), cancellationToken);
         ValidateAssignment(message);
         RuntimeStopWork? work = null;
         var started = Stopwatch.GetTimestamp();
@@ -421,8 +432,9 @@ public sealed class RuntimeProviderHandler(
         ProvisionOvaRuntime message,
         CancellationToken cancellationToken)
     {
-        using var mutation = mutations is null ? null : await mutations.EnterAsync(cancellationToken);
+        using var mutation = mutations is null ? null : await mutations.EnterWorkloadAsync(new(RuntimeWorkloadKind.Runtime, message.RuntimeInstanceId, message.RuntimeInstanceId), cancellationToken);
         ValidateAssignment(message);
+        observer?.EnsureFreshAdmission();
         var workStatus = await workReader.ReadProvisionStatusAsync(message, cancellationToken);
         if (workStatus != RuntimeProvisionWorkStatus.Current)
         {
@@ -442,6 +454,8 @@ public sealed class RuntimeProviderHandler(
                 message.RunnerId);
         }
 
+        if (!await capacity.CanCreateAsync(message.RuntimeInstanceId, message.RunnerId, cancellationToken))
+            throw new TimeoutException("Runtime allocation is waiting for capacity recovery.");
         RuntimeFailureCode? failureCode = null;
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         timeout.CancelAfter(message.Definition.OperationTimeout);
@@ -461,6 +475,8 @@ public sealed class RuntimeProviderHandler(
             {
                 failureCode = RuntimeFailureCode.UrlExpansionFailed;
             }
+            if (expanded is not null)
+                await capacity.CompleteStartupAsync(message.RuntimeInstanceId, message.RunnerId, cancellationToken);
             if (expanded is not null)
                 return new RuntimeProvisioned(
                     message.RuntimeInstanceId,
@@ -507,7 +523,7 @@ public sealed class RuntimeProviderHandler(
         StopOvaRuntime message,
         CancellationToken cancellationToken)
     {
-        using var mutation = mutations is null ? null : await mutations.EnterAsync(cancellationToken);
+        using var mutation = mutations is null ? null : await mutations.EnterWorkloadAsync(new(RuntimeWorkloadKind.Runtime, message.RuntimeInstanceId, message.RuntimeInstanceId), cancellationToken);
         ValidateAssignment(message);
         RuntimeStopWork? work = null;
         var started = Stopwatch.GetTimestamp();
