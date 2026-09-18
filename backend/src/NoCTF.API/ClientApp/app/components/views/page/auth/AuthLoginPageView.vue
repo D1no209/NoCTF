@@ -3,7 +3,7 @@ import { toRefs } from 'vue'
 import type { AuthLoginPageViewState } from '~/features/routes/auth/useAuthLoginPage'
 
 const viewProps = defineProps<{ state: AuthLoginPageViewState }>()
-const { authArtwork, configuration, loginName, password, error, pending, submit } = toRefs(viewProps.state)
+const { authArtwork, configuration, loginName, password, error, pending, capVerification, capCanRetry, submitDisabled, submit } = toRefs(viewProps.state)
 </script>
 
 <template>
@@ -39,9 +39,16 @@ const { authArtwork, configuration, loginName, password, error, pending, submit 
               </FieldDescription>
             </Field>
             <Field>
-              <Button type="submit" :disabled="pending" class="w-full sm:mx-auto sm:w-2/3">
-                <Spinner v-if="pending" data-icon="inline-start" />
-                {{ $t('ui.signIn') }}
+              <CapVerificationStatus
+                v-if="capVerification"
+                :key="capVerification.id"
+                :state="capVerification.state"
+                :progress="capVerification.progress"
+                :label="capVerification.label"
+              />
+              <Button type="submit" :disabled="submitDisabled" class="w-full sm:mx-auto sm:w-2/3">
+                <Spinner v-if="pending && !capCanRetry" data-icon="inline-start" />
+                {{ capCanRetry ? $t('ui.retry') : $t('ui.signIn') }}
               </Button>
             </Field>
           </FieldGroup>
