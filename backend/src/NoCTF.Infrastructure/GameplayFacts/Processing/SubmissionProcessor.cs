@@ -527,7 +527,7 @@ public sealed class GameplayFactProcessor(
             cancellationToken);
         if (bloodAward is not null)
             await outbox.PublishAsync(bloodAward);
-        await events.RecordAsync(new(
+        var adjudicationEventId = await events.RecordAsync(new(
             submission.CompetitionId,
             CompetitionEventKind.GameplayFactAdjudicated,
             evaluation.Decision.Result is null
@@ -562,7 +562,8 @@ public sealed class GameplayFactProcessor(
                 CompetitionChallengeId: submission.CompetitionChallengeId,
                 GameplayFactId: submission.Id,
                 GameplayFactKind: submission.Kind,
-                GameplayFactResult: submission.Result), cancellationToken);
+                GameplayFactResult: submission.Result,
+                ParentEventId: adjudicationEventId == Guid.Empty ? null : adjudicationEventId), cancellationToken);
         }
         await QueueNextGameplayFactAsync(processingScope, cancellationToken);
         await db.SaveChangesAsync(cancellationToken);

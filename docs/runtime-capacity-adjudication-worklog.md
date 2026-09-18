@@ -151,6 +151,16 @@ eligibility/Flag/Patch tests passed 3/3, real PostgreSQL gameplay ordering 18/18
 Patch target persistence 1/1. Historical qualification remains a separate evidence
 question; B2 adds track context and ordered events to the preview reader.
 
+B2 completed: repeatable-read evidence now preserves event identity, state, time and
+parent relationships. Each fact reads a latest prefix of 128 events with truncation
+detection; an independent bounded query reads eligibility adjustments. CTF Flag and
+Patch facts share current track/interaction rules. Legal rejudge changes and retained
+results are informational; ambiguous time ties, legacy missing fields and unlinked
+duplicates require review. Current projection blood rank never becomes an automatic
+historical correction. New blood events reference the adjudication event. Analyzer,
+HTTP and real PostgreSQL tests passed 21/21, including bounded queries, read-only
+snapshot behavior, event-prefix truncation and track/Patch handling.
+
 Use `backend/scripts/Verify-CoreRecovery.ps1` for scoped checks. Integration tests
 must use real PostgreSQL/Redis/Wolverine/NATS and Docker. Source-only assertions or
 EF InMemory do not establish relational or recovery behavior. Compare performance
