@@ -1,0 +1,31 @@
+{
+  "nodeCount": 3,
+  "eligibleNodes": [
+    "noctf-capacity-review-worker"
+  ],
+  "scheduledNode": "noctf-capacity-review-worker",
+  "cpuRequest": 0.101,
+  "cpuLimit": 0.202,
+  "snapshot": {
+    "State": 2,
+    "Failure": null,
+    "Observation": {
+      "ResourceDomain": "kubernetes:9806988f-108b-4690-921b-af2c6f0e9269",
+      "ObservedAt": "2026-09-18T16:43:37+00:00",
+      "MemoryTotalBytes": 33449242624,
+      "MemoryAvailableBytes": 33281409024,
+      "NanoCpus": 32000000000,
+      "CpuUsageRatio": 0.0007487225,
+      "PidsUsed": null,
+      "PidsCapacity": 4096,
+      "OomKills": 0,
+      "ProviderPressure": false,
+      "PidPressureConditionAvailable": true
+    }
+  },
+  "metricsPermissionDenied": {
+    "State": 0,
+    "Failure": 5,
+    "Observation": null
+  }
+}

@@ -1,5 +1,14 @@
 # Runtime capacity and adjudication implementation
 
+## Kubernetes resource-domain validation
+
+A local isolated three-node kind/Kubernetes 1.35.8 cluster with real metrics-server
+validated one attested scheduling node, actual 101m/202m requests/limits, host-domain
+observation and admission closure on metrics RBAC denial. The integration test passed.
+The kubeconfig stays in local Git metadata; the reproducible node configuration and
+sanitized observation artifact are committed. NetworkPolicy/high-pressure/remaining
+provider paths are explicitly separate, unproven claims.
+
 ## Recovery inventory contention validation
 
 Both real PostgreSQL/Redis 8192-claim inventory tests passed with 16/64 concurrent
