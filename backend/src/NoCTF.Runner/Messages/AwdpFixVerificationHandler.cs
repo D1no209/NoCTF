@@ -816,7 +816,7 @@ public sealed class AwdpFixVerificationHandler(
             recovery.RuntimeInstanceId,
             recovery.RunnerId,
             cancellationToken);
-        if (release == RunnerCapacityReleaseOutcome.OwnerMismatch)
+        if (release is RunnerCapacityReleaseOutcome.OwnerMismatch or RunnerCapacityReleaseOutcome.RecoveryRequired)
             throw new InvalidOperationException(
                 "AWDP target capacity belongs to a different Runner assignment.");
 

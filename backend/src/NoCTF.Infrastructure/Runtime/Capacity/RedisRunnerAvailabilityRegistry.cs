@@ -52,18 +52,19 @@ public sealed class RedisRunnerAvailabilityRegistry(IConnectionMultiplexer redis
         end
 
         if ARGV[9] ~= '1' then
-            redis.call('DEL', KEYS[3])
+            redis.call('SET', KEYS[3], ARGV[7], 'PX', ARGV[6])
             redis.call('ZREM', KEYS[4], ARGV[1])
             if redis.call('EXISTS', KEYS[2]) == 1 then
-                redis.call('PEXPIRE', KEYS[2], ARGV[6])
+                redis.call('HSET', KEYS[2], 'admissionState', 'providerUnavailable')
+                redis.call('PERSIST', KEYS[2])
             end
             return { 2, 0, 0, 0 }
         end
 
         local trusted = redis.call('HGET', KEYS[2], 'registrationSchema') == ARGV[2]
-            and redis.call('HGET', KEYS[2], 'totalMemoryBytes') == ARGV[3]
-            and redis.call('HGET', KEYS[2], 'totalNanoCpus') == ARGV[4]
-            and redis.call('HGET', KEYS[2], 'totalPids') == ARGV[5]
+            and redis.call('HEXISTS', KEYS[2], 'totalMemoryBytes') == 1
+            and redis.call('HEXISTS', KEYS[2], 'totalNanoCpus') == 1
+            and redis.call('HEXISTS', KEYS[2], 'totalPids') == 1
 
         if not trusted then
             local wasOnline = redis.call('EXISTS', KEYS[3])
@@ -78,9 +79,20 @@ public sealed class RedisRunnerAvailabilityRegistry(IConnectionMultiplexer redis
                 'totalMemoryBytes', ARGV[3],
                 'totalNanoCpus', ARGV[4],
                 'totalPids', ARGV[5])
+        else
+            local fields = { 'MemoryBytes', 'NanoCpus', 'Pids' }
+            for i, suffix in ipairs(fields) do
+                local total = tonumber(ARGV[i + 2])
+                local previous = tonumber(redis.call('HGET', KEYS[2], 'total' .. suffix))
+                local available = tonumber(redis.call('HGET', KEYS[2], 'available' .. suffix))
+                if not available then return { 0, 0, 0, 0 } end
+                redis.call('HSET', KEYS[2], 'total' .. suffix, total,
+                    'available' .. suffix, available + total - previous)
+            end
         end
 
-        redis.call('PEXPIRE', KEYS[2], ARGV[6])
+        redis.call('PERSIST', KEYS[2])
+        redis.call('HSET', KEYS[2], 'admissionState', 'ready')
         redis.call('SET', KEYS[3], ARGV[7], 'PX', ARGV[6])
         redis.call('ZADD', KEYS[4], pressure(KEYS[2], tonumber(ARGV[10])), ARGV[1])
         return {

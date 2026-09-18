@@ -245,7 +245,7 @@ internal static partial class BackendMessageOperations
                 instance.Id,
                 runnerId,
                 cancellationToken);
-            if (release == RunnerCapacityReleaseOutcome.OwnerMismatch)
+            if (release is RunnerCapacityReleaseOutcome.OwnerMismatch or RunnerCapacityReleaseOutcome.RecoveryRequired)
             {
                 throw new InvalidOperationException(
                     "The selected Runner no longer owns the Runtime capacity claim.");

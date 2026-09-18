@@ -7,6 +7,22 @@ namespace NoCTF.Infrastructure.Runtime.Capacity;
 
 public sealed class RedisRunnerCapacityLedger(IConnectionMultiplexer redis)
 {
+    public async Task<RuntimeCapacityAllocation?> ReadLegacyAsync(RuntimeInstance runtime, string runnerId, CancellationToken ct)
+    {
+        ct.ThrowIfCancellationRequested();
+        var entries = (await redis.GetDatabase().HashGetAllAsync($"runner-claim:{runtime.Id:N}"))
+            .ToDictionary(entry => entry.Name.ToString(), entry => entry.Value.ToString(), StringComparer.Ordinal);
+        if (entries.GetValueOrDefault("runnerId") != runnerId
+            || !long.TryParse(entries.GetValueOrDefault("memoryBytes"), out var memory)
+            || !long.TryParse(entries.GetValueOrDefault("nanoCpus"), out var cpu)
+            || !long.TryParse(entries.GetValueOrDefault("pidsLimit"), out var pids)
+            || memory <= 0 || cpu <= 0 || pids <= 0)
+            return null;
+        var amount = new RuntimeResourceAmount(memory, cpu, pids);
+        return new(PersistedRunnerCapacityGate.PrimaryIdentity(runtime), runtime.GameplayFactId,
+            runnerId, runnerId, amount, amount);
+    }
+
     public async Task PauseAsync(string runnerId, string pool, CancellationToken ct)
     {
         ct.ThrowIfCancellationRequested();

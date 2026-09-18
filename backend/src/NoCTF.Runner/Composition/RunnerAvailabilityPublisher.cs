@@ -125,17 +125,36 @@ public sealed class RunnerAvailabilityPublisher(
             var ownerJson = JsonSerializer.Serialize(new { items = new[] { new { runnerId = options.Id } } });
             var runtimes = await db.RuntimeInstances.FromSqlInterpolated(
                     $"SELECT * FROM runtime_instances WHERE runner_id = {options.Id} OR capacity_allocations @> CAST({ownerJson} AS jsonb)")
+                .Where(runtime => runtime.RuntimeProvider == options.Provider)
                 .AsNoTracking().ToArrayAsync(cancellationToken);
-            var unresolvedLegacy = runtimes.Any(runtime => runtime.CapacityAllocations.Items.Count == 0
-                && runtime.State is RuntimeState.Provisioning or RuntimeState.Running or RuntimeState.Stopping);
+            foreach (var runtime in runtimes.Where(runtime => runtime.CapacityAllocations.Items.Count == 0
+                         && (runtime.State is RuntimeState.Provisioning or RuntimeState.Running or RuntimeState.Stopping
+                             || runtime.State == RuntimeState.Failed && runtime.ProviderReceiptJson != null)))
+            {
+                var legacy = await ledger.ReadLegacyAsync(runtime, options.Id, cancellationToken);
+                if (legacy is null)
+                    return RunnerAvailabilityRegistrationOutcome.OfflineCapacityUntrusted;
+                runtime.CapacityAllocations = runtime.CapacityAllocations.Add(legacy);
+                var document = runtime.CapacityAllocations;
+                await db.RuntimeInstances.Where(row => row.Id == runtime.Id).ExecuteUpdateAsync(
+                    update => update.SetProperty(row => row.CapacityAllocations, document), cancellationToken);
+            }
             var known = runtimes.Where(runtime => runtime.CapacityAllocations.Items.Count > 0)
                 .Select(runtime => runtime.Id).ToHashSet();
-            if (unresolvedLegacy || managed.Any(resource => !known.Contains(resource.RuntimeInstanceId)))
+            if (managed.Any(resource => !known.Contains(resource.RuntimeInstanceId)))
                 return RunnerAvailabilityRegistrationOutcome.OfflineCapacityUntrusted;
-            await ledger.RestoreAsync(options.Id, options.Pool, options.ResourceCapacity,
-                runtimes.SelectMany(runtime => runtime.CapacityAllocations.Items)
-                    .Where(item => item.RunnerId == options.Id).ToArray(), cancellationToken);
+            // Persist legacy evidence before replacing its Redis keys. A failed commit
+            // must leave the old claim intact for the next recovery attempt.
             await transaction.CommitAsync(cancellationToken);
+            await using var restoreTransaction = await db.Database.BeginTransactionAsync(cancellationToken);
+            await RuntimeCapacityCriticalSection.AcquireAsync(db, cancellationToken);
+            var documents = await db.RuntimeInstances.AsNoTracking().Where(runtime =>
+                    runtimes.Select(item => item.Id).Contains(runtime.Id))
+                .Select(runtime => runtime.CapacityAllocations).ToArrayAsync(cancellationToken);
+            await ledger.RestoreAsync(options.Id, options.Pool, options.ResourceCapacity,
+                documents.SelectMany(document => document.Items)
+                    .Where(item => item.RunnerId == options.Id).ToArray(), cancellationToken);
+            await restoreTransaction.CommitAsync(cancellationToken);
             result = await registry.RegisterAsync(registration, cancellationToken);
         }
         return result;
