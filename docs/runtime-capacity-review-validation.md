@@ -9,6 +9,13 @@
 | R3 | `515087d1e` | 父 RunnerId 清空后，以新审计上下文回收真实 Docker Checker；分配回收 1、既有审计 3 项通过 |
 | J1 | `355122423` | 无奖励/无调整的正常非参与队伍不再误报；历史专项 25 项通过 |
 | J2 | `862e1911e` | 父事件类型、事实范围、Completed/Correct 与截断分类；历史专项 29 项通过，OpenAPI 不变 |
+| V2 | `386d8e6f1` | 预览三组性能复测达标，新增语义保留 |
+| Docker 恢复补充 | `753041844` | 模板测试容器重放保留用途身份 |
+| 回写补充 | `1ee390ae0`、`c379ad388` | 短行锁、终止状态保护、无效重放不制造失败；保留有效结果完成顺序 |
+| V1 组合故障 | `d8a1aaca2` | 五个真实进程故障窗口通过 |
+| 基线断言 | `b2446e4c0` | 不改生产代码，修正异步文件清理的既有测试预期 |
+| 大清单争用 | `655604f10` | 8192 Claim 与 16/64 并发验证 |
+| Kubernetes | `e26c971e9` | 实际节点、资源请求及指标权限验证 |
 
 R1 的普通审计回归使用真实 PostgreSQL/Redis 与受控 Provider 探针；R3 使用真实 Docker
 和新的服务实例。这些不冒充进程强杀验收；组合进程故障测试另行记录。
@@ -91,5 +98,54 @@ Observer 实际 Node/metrics 读取进入 Ready，容量等于选中节点而非
 本项没有验证 CNI 网络策略执行、真实 Node 高压阈值或所有 Compose/Checker 路径，不外推为
 整个 Kubernetes Provider 全验收通过。
 
-V3 的完整全仓及 Libvirt 环境结果将在完成后补充；容量配置
-仍按部署额度与真实边界取小值，默认 CPU 倍率仍为 1，不宣称原公测瓶颈已经消除。
+## 公测容量配置与 CPU 共享策略
+
+2026-09-19 只读复核服务器：宿主 4 CPU、7951 MiB 内存，采样时可用约 4440 MiB；
+Runner/Worker 配置均为 2 CPU、4 GiB、2048 PID，未设置 CPU 共享倍率。Docker 对这两个
+进程容器未设置 CPU/内存硬额度（inspect 值为 0），这不等于题目的可调度额度无限。
+没有修改服务、配置或部署。
+
+保留仓库默认倍率 1。建议后续灰度候选仍使用 **2 CPU / 4 GiB / 2048 PID** 配额，只对
+新分配启用 `Runtime__CpuOvercommitFactor=2`，先不同时提高总配额。以每题 0.5 CPU /
+256 MiB / 128 PID 为例，预留 Checker 后，空账本严格模式可准入 3 个，倍率 2 可准入 7 个；
+这是预算推算，不是吞吐承诺。内存/PID仍按完整上限扣减。
+
+启用前必须完成新账本恢复并处理旧的满额分配：旧 Claim 数额不会因倍率改变而减半，不能
+据此假定 Checker 预留立即产生。使用自然到期或明确维护窗口排空，核对余额，再分批创建
+新实例并观察压力/排队。回退时只把新任务倍率恢复为 1，保留已有数额。
+
+`min(配置配额, 观测边界)` 的政策仍不自动放宽偏低配额；需要更多规模时应另行压测并调整
+部署额度。这一配置候选没有被启用，也不构成“公测排队瓶颈已消除”的结论。
+
+## Libvirt 真实环境
+
+在独立本地 Linux 容器内通过宿主 KVM 运行 libvirt 10.0.0 / QEMU 8.2.2，执行既有
+`LibvirtOvaRuntimeIntegrationTests`，1/1 通过，耗时 2 分 15 秒。涵盖真实 OVA 导入、
+Guest Agent 启动 HTTP、访客地址访问、替换及按确切身份清理；结束时 `virsh list --all` 为空。
+证据见 [libvirt-result.txt](validation/runtime-capacity-review/libvirt-result.txt)。
+
+实验镜像准备依据 [virt-builder 官方说明](https://libguestfs.org/virt-builder.1.html)：
+Debian 12 模板、8 GiB qcow2、安装 `qemu-guest-agent,python3` 并启用 Guest Agent，
+测试导入资源为 1 vCPU / 512 MiB，网卡 `ens3` 使用 DHCP。签名校验保持开启。
+隔离宿主安装 libvirt/qemu/virt-install/libguestfs 与内核，必须使用容器 `--init` 回收
+虚拟机子进程；首次无 init 的夹具清理失败以及镜像网卡不匹配均已纠正后重跑。
+此结果证明物理 adapter 基本链路，不代表 Libvirt 已覆盖 Docker 的全部强杀矩阵。
+
+## V3：最终全仓及交付门禁
+
+最新 Release solution build 零警告、零错误。全仓 TUnit **1665 项：1657 通过、0 失败、
+8 条件跳过**，耗时 21 分 48 秒；包含真实进程故障、PostgreSQL/Redis/NATS/Docker 和
+Kubernetes 容量测试。原来失败的网关测试用校验 SHA-256 的官方 FRP 0.68.0 归档和本地
+构建的 Linux relay 补齐依赖后通过，没有通过禁用断言绕过失败。
+
+八个跳过项保留可见：GitOps 外部语料/API 测试、只由父测试启动的子进程入口、Linux 宿主
+压力入口、Linux 文件权限/agent 两项、Kubernetes 完整 Compose 网络策略及大归档 Checker
+两项、Libvirt 一项。宿主压力、子进程和 Libvirt 已在各自环境另行执行；未执行项不能算通过。
+
+前端 **588/588**，typecheck、架构审计 0 violation、生产生成通过。EF drift 为空，
+OpenAPI 重新导出和 SDK 生成无差异，`git diff --check` 通过。原有 19 文件 patch 的 SHA-256
+与开始前完全一致。所有修正分步本地提交，未推送、未远程部署。
+
+仍不外推的结论：所有 HTTP 业务的端到端 5% 性能门槛、所有 Provider/辅助 Checker 的
+完整故障组合、Kubernetes 实际高压与 CNI 网络策略全路径、公测部署效果。这里明确区分
+已通过的修正门禁和这些更广的验收范围，不能称全部环境、全部矩阵均已验证。
