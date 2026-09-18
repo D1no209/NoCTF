@@ -81,6 +81,24 @@ services:
         target: /var/run/docker.sock
         bind:
           create_host_path: false
+      - type: bind
+        source: /proc
+        target: /host/proc
+        read_only: true
+        bind:
+          create_host_path: false
+      - type: bind
+        source: /sys/fs/cgroup
+        target: /host/sys/fs/cgroup
+        read_only: true
+        bind:
+          create_host_path: false
+      - type: bind
+        source: /etc/machine-id
+        target: /host/etc/machine-id
+        read_only: true
+        bind:
+          create_host_path: false
     networks:
       default:
         aliases: [noctf]

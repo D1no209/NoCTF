@@ -196,7 +196,7 @@ public sealed class RedisRunnerCapacityGateTests
             await Assert.That(outcome)
                 .IsEqualTo(RunnerAvailabilityRegistrationOutcome.OfflineCapacityUntrusted);
             await Assert.That(await database.SetContainsAsync($"runner-pool:{pool}:members", runner)).IsTrue();
-            await Assert.That(await database.KeyExistsAsync($"runner:{runner}:heartbeat")).IsFalse();
+            await Assert.That(await database.KeyExistsAsync($"runner:{runner}:heartbeat")).IsTrue();
             await Assert.That(await database.KeyExistsAsync($"runner:{runner}:capacity")).IsFalse();
             await Assert.That(await database.SortedSetScoreAsync(
                 $"runner-pool:{pool}:candidates",
@@ -206,7 +206,7 @@ public sealed class RedisRunnerCapacityGateTests
 
     [Test]
     [Timeout(300_000)]
-    public async Task Runner_registration_clears_a_stale_heartbeat_before_rebuilding_untrusted_capacity(
+    public async Task Runner_registration_keeps_liveness_but_requires_reconciliation_of_untrusted_capacity(
         CancellationToken cancellationToken)
     {
         await DockerIntegrationTest.RunAsync(async () =>
@@ -230,6 +230,9 @@ public sealed class RedisRunnerCapacityGateTests
                 HasActiveAssignments: false);
 
             var first = await registry.RegisterAsync(registration, cancellationToken);
+            var ledger = new RedisRunnerCapacityLedger(redis);
+            await ledger.PauseAsync(runner, pool, cancellationToken);
+            await ledger.RestoreAsync(runner, pool, registration.Capacity, [], cancellationToken);
             var second = await registry.RegisterAsync(registration, cancellationToken);
 
             await Assert.That(first)
@@ -590,9 +593,8 @@ public sealed class RedisRunnerCapacityGateTests
                 cancellationToken);
             var released = await gate.ReleaseAsync(claimedRuntimeId, runner, cancellationToken);
 
-            await Assert.That(replay.Availability).IsEqualTo(RunnerCapacityAvailability.Claimed);
-            await Assert.That(replay.RunnerId).IsEqualTo(runner);
-            await Assert.That(replay.State).IsEqualTo(RunnerCapacityClaimState.AlreadyOwned);
+            await Assert.That(replay.Availability).IsEqualTo(RunnerCapacityAvailability.Insufficient);
+            await Assert.That(replay.Failure).IsEqualTo(RunnerAdmissionFailure.NoEligibleRunner);
             await Assert.That(rejected.Availability)
                 .IsEqualTo(RunnerCapacityAvailability.Insufficient);
             await Assert.That(released).IsEqualTo(RunnerCapacityReleaseOutcome.Released);

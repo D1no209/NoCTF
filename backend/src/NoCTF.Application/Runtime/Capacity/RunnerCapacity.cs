@@ -61,6 +61,8 @@ public sealed record RunnerCapacityClaim(
 
 public interface IRunnerCapacityGate
 {
+    Task CompleteStartupAsync(Guid runtimeInstanceId, string runnerId, CancellationToken cancellationToken) => Task.CompletedTask;
+    Task<bool> CanCreateAsync(Guid runtimeInstanceId, string runnerId, CancellationToken cancellationToken) => Task.FromResult(true);
     Task<RunnerHeartbeatStatus> GetHeartbeatAsync(
         string runnerPool,
         string runnerId,

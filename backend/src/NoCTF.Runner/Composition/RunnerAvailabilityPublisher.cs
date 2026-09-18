@@ -20,7 +20,8 @@ public sealed class RunnerAvailabilityPublisher(
     RunnerProviderHealthState? providerHealth = null,
     RedisRunnerCapacityLedger? ledger = null,
     RunnerResourceMutationCoordinator? mutations = null,
-    IEnumerable<IRuntimeManagedResourceReconciler>? reconcilers = null) : BackgroundService
+    IEnumerable<IRuntimeManagedResourceReconciler>? reconcilers = null,
+    RunnerResourceObserver? observer = null) : BackgroundService
 {
     private static readonly string Version =
         typeof(RunnerProgramMarker).Assembly
@@ -31,10 +32,12 @@ public sealed class RunnerAvailabilityPublisher(
 
     private readonly RunnerOptions options = configuredOptions.Value;
     private RunnerAvailabilityRegistrationOutcome? lastOutcome;
+    private bool initialReconciliationComplete;
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        using var timer = new PeriodicTimer(options.Heartbeat.Interval, timeProvider);
+        using var timer = new PeriodicTimer(TimeSpan.FromSeconds(Math.Min(options.Heartbeat.IntervalSeconds,
+            options.Admission.SampleIntervalSeconds)), timeProvider);
         while (!stoppingToken.IsCancellationRequested)
         {
             try
@@ -55,6 +58,10 @@ public sealed class RunnerAvailabilityPublisher(
                             "Runner {RunnerId} in pool {RunnerPool} remains offline because its Redis capacity is untrusted while assignments may still be active.",
                             options.Id,
                             options.Pool);
+                    }
+                    else if (outcome == RunnerAvailabilityRegistrationOutcome.OfflineAdmissionBlocked)
+                    {
+                        logger.LogWarning("Runner {RunnerId} is alive but admission is blocked by resource observation or pressure.", options.Id);
                     }
                     else
                     {
@@ -91,6 +98,15 @@ public sealed class RunnerAvailabilityPublisher(
     {
         await using var scope = scopeFactory.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<NoCtfDbContext>();
+        var admission = observer is null ? null : await observer.SampleAsync(cancellationToken);
+        var effectiveCapacity = options.ResourceCapacity;
+        if (admission?.Observation is { } observed)
+            effectiveCapacity = effectiveCapacity with
+            {
+                MemoryBytes = Math.Min(effectiveCapacity.MemoryBytes, observed.MemoryTotalBytes),
+                NanoCpus = Math.Min(effectiveCapacity.NanoCpus, observed.NanoCpus),
+                PidsLimit = Math.Min(effectiveCapacity.PidsLimit, observed.PidsCapacity)
+            };
         var hasActiveAssignments = await db.RuntimeInstances.AsNoTracking()
             .AnyAsync(
                 instance => instance.RunnerId == options.Id
@@ -107,10 +123,13 @@ public sealed class RunnerAvailabilityPublisher(
                 options.Id,
                 options.Provider!.Value,
                 Version,
-                options.ResourceCapacity,
+                effectiveCapacity,
                 options.Heartbeat.Ttl,
                 hasActiveAssignments,
-                providerHealth?.IsReady(options.Provider.Value) ?? true);
+                providerHealth?.IsReady(options.Provider.Value) ?? true,
+                admission, observer is null ? null : options.Admission);
+        if (!initialReconciliationComplete && ledger is not null)
+            await ledger.PauseAsync(options.Id, options.Pool, cancellationToken);
         var result = await registry.RegisterAsync(registration, cancellationToken);
         if (result == RunnerAvailabilityRegistrationOutcome.OfflineCapacityUntrusted
             && ledger is not null && mutations is not null && reconcilers is not null)
@@ -151,10 +170,13 @@ public sealed class RunnerAvailabilityPublisher(
             var documents = await db.RuntimeInstances.AsNoTracking().Where(runtime =>
                     runtimes.Select(item => item.Id).Contains(runtime.Id))
                 .Select(runtime => runtime.CapacityAllocations).ToArrayAsync(cancellationToken);
-            await ledger.RestoreAsync(options.Id, options.Pool, options.ResourceCapacity,
+            await ledger.RestoreAsync(options.Id, options.Pool, effectiveCapacity,
                 documents.SelectMany(document => document.Items)
-                    .Where(item => item.RunnerId == options.Id).ToArray(), cancellationToken);
+                    .Where(item => item.RunnerId == options.Id).ToArray(), cancellationToken,
+                runtimes.Where(runtime => runtime.State == RuntimeState.Provisioning)
+                    .SelectMany(runtime => runtime.CapacityAllocations.Items).Select(item => item.Identity).ToHashSet());
             await restoreTransaction.CommitAsync(cancellationToken);
+            initialReconciliationComplete = true;
             result = await registry.RegisterAsync(registration, cancellationToken);
         }
         return result;

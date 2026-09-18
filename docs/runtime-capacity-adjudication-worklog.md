@@ -111,6 +111,19 @@ publication explicitly saves its outbox before dispatch. Checker regressions 44/
 real PostgreSQL/Redis parent/checker identity and release tests 2/2, real Docker
 parent-versus-checker inventory 1/1 and Runner registration 1/1 passed.
 
+A5 completed: 5-second resource observations, 15-second freshness, pressure
+hysteresis/OOM gates, a PostgreSQL session lock for resource-domain ownership,
+independent liveness and atomic startup/auxiliary admission. Provider replay checks
+both the committed allocation and current Redis gate. Startup and release counters
+are reconstructed independently of resource balances. Queued and provisioning facts
+are redispatched with 500 ms coalescing. Docker/Libvirt read explicit host mounts;
+Kubernetes reads node metrics and pressure conditions (unknown PID usage remains
+null). Local Compose has read-only host mounts; Kubernetes RBAC adds metrics reads.
+Validation: pressure policy 3/3; 16/64 real Redis concurrency 2/2; Redis regressions
+13/13; real PostgreSQL ownership plus controlled host-file sampling 1/1; deployment
+contracts 15/15; PostgreSQL/NATS recovery 1/1; provider handlers 25/25. Real Linux
+host stress and Kubernetes execution remain separate A8/V1 verification items.
+
 Use `backend/scripts/Verify-CoreRecovery.ps1` for scoped checks. Integration tests
 must use real PostgreSQL/Redis/Wolverine/NATS and Docker. Source-only assertions or
 EF InMemory do not establish relational or recovery behavior. Compare performance

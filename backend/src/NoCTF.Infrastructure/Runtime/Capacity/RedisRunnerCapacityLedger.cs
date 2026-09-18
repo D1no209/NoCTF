@@ -34,7 +34,8 @@ public sealed class RedisRunnerCapacityLedger(IConnectionMultiplexer redis)
     }
 
     public async Task RestoreAsync(string runnerId, string pool, RuntimeResourceLimits total,
-        IReadOnlyList<RuntimeCapacityAllocation> allocations, CancellationToken ct)
+        IReadOnlyList<RuntimeCapacityAllocation> allocations, CancellationToken ct,
+        IReadOnlySet<RuntimeWorkloadIdentity>? starting = null)
     {
         foreach (var allocation in allocations)
         {
@@ -61,7 +62,9 @@ public sealed class RedisRunnerCapacityLedger(IConnectionMultiplexer redis)
         var rows = allocations.Select(item => new
         {
             key = $"runner-claim:{item.Identity.Key}", memory = item.Budget.MemoryBytes,
-            cpu = item.Budget.NanoCpus, pids = item.Budget.PidsLimit
+            cpu = item.Budget.NanoCpus, pids = item.Budget.PidsLimit,
+            auxiliary = item.Identity.IsAuxiliary,
+            starting = item.Identity.IsAuxiliary || starting?.Contains(item.Identity) == true
         }).ToArray();
         var restored = (long)await database.ScriptEvaluateAsync("""
             if redis.call('HGET', KEYS[1], 'admissionState') ~= 'reconciling' then return 0 end
@@ -73,14 +76,21 @@ public sealed class RedisRunnerCapacityLedger(IConnectionMultiplexer redis)
             local cpu = tonumber(ARGV[4])
             local pids = tonumber(ARGV[5])
             local rows = cjson.decode(ARGV[7])
+            local primary = 0
+            local auxiliary = 0
             for _, row in ipairs(rows) do
                 memory = memory - row.memory
                 cpu = cpu - row.cpu
                 pids = pids - row.pids
                 redis.call('HSET', row.key, 'runnerId', ARGV[1], 'pool', ARGV[2],
-                    'memoryBytes', row.memory, 'nanoCpus', row.cpu, 'pidsLimit', row.pids)
+                    'memoryBytes', row.memory, 'nanoCpus', row.cpu, 'pidsLimit', row.pids,
+                    'starting', row.starting and 1 or 0, 'auxiliary', row.auxiliary and 1 or 0)
+                if row.starting then
+                    if row.auxiliary then auxiliary = auxiliary + 1 else primary = primary + 1 end
+                end
             end
-            redis.call('HSET', KEYS[1], 'registrationSchema', '1', 'admissionState', 'ready',
+            redis.call('HSET', KEYS[1], 'registrationSchema', '2', 'admissionState', 'ready',
+                'startingPrimary', primary, 'activeAuxiliary', auxiliary,
                 'totalMemoryBytes', ARGV[3], 'totalNanoCpus', ARGV[4], 'totalPids', ARGV[5],
                 'availableMemoryBytes', memory, 'availableNanoCpus', cpu, 'availablePids', pids)
             redis.call('PERSIST', KEYS[1])

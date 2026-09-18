@@ -1,6 +1,8 @@
 using System.Diagnostics;
 using NoCTF.Application.Observability;
 using NoCTF.Application.Runtime.Provisioning;
+using NoCTF.Application.Runtime.Capacity;
+using System.Text.Json;
 using NoCTF.Domain.Runtime;
 using StackExchange.Redis;
 
@@ -10,7 +12,8 @@ public enum RunnerAvailabilityRegistrationOutcome
 {
     Online,
     OfflineCapacityUntrusted,
-    OfflineProviderUnavailable
+    OfflineProviderUnavailable,
+    OfflineAdmissionBlocked
 }
 
 public sealed record RunnerAvailabilityRegistration(
@@ -21,11 +24,13 @@ public sealed record RunnerAvailabilityRegistration(
     RuntimeResourceLimits Capacity,
     TimeSpan TimeToLive,
     bool HasActiveAssignments,
-    bool ProviderAvailable = true);
+    bool ProviderAvailable = true,
+    RunnerAdmissionSnapshot? Admission = null,
+    RunnerAdmissionOptions? AdmissionOptions = null);
 
 public sealed class RedisRunnerAvailabilityRegistry(IConnectionMultiplexer redis)
 {
-    private const string RegistrationSchema = "1";
+    private const string RegistrationSchema = "2";
     private const double CandidateJitterMaximum = 0.000001d;
 
     private const string RegisterScript = """
@@ -44,6 +49,11 @@ public sealed class RedisRunnerAvailabilityRegistry(IConnectionMultiplexer redis
         end
 
         redis.call('SADD', KEYS[1], ARGV[1])
+        if ARGV[20] == '1' then
+            redis.call('HSET', KEYS[2], 'observationRequired', '1', 'observationFreshUntil', ARGV[13],
+                'observation', ARGV[11], 'resourceDomain', ARGV[14], 'maxPrimary', ARGV[15],
+                'maxAuxiliary', ARGV[16], 'reservedMemory', ARGV[17], 'reservedCpu', ARGV[18], 'reservedPids', ARGV[19])
+        end
 
         if redis.call('HGET', KEYS[2], 'admissionState') == 'reconciling' then
             redis.call('SET', KEYS[3], ARGV[7], 'PX', ARGV[6])
@@ -68,7 +78,7 @@ public sealed class RedisRunnerAvailabilityRegistry(IConnectionMultiplexer redis
 
         if not trusted then
             local wasOnline = redis.call('EXISTS', KEYS[3])
-            redis.call('DEL', KEYS[3])
+            redis.call('SET', KEYS[3], ARGV[7], 'PX', ARGV[6])
             redis.call('ZREM', KEYS[4], ARGV[1])
             if ARGV[8] == '1' or wasOnline == 1 then return { 0, 0, 0, 0 } end
             redis.call('HSET', KEYS[2],
@@ -92,8 +102,12 @@ public sealed class RedisRunnerAvailabilityRegistry(IConnectionMultiplexer redis
         end
 
         redis.call('PERSIST', KEYS[2])
-        redis.call('HSET', KEYS[2], 'admissionState', 'ready')
+        redis.call('HSET', KEYS[2], 'admissionState', ARGV[12])
         redis.call('SET', KEYS[3], ARGV[7], 'PX', ARGV[6])
+        if ARGV[12] ~= 'ready' then
+            redis.call('ZREM', KEYS[4], ARGV[1])
+            return { 3, 0, 0, 0 }
+        end
         redis.call('ZADD', KEYS[4], pressure(KEYS[2], tonumber(ARGV[10])), ARGV[1])
         return {
             1,
@@ -141,7 +155,17 @@ public sealed class RedisRunnerAvailabilityRegistry(IConnectionMultiplexer redis
                     heartbeat,
                     registration.HasActiveAssignments ? 1 : 0,
                     registration.ProviderAvailable ? 1 : 0,
-                    Random.Shared.NextDouble() * CandidateJitterMaximum
+                    Random.Shared.NextDouble() * CandidateJitterMaximum,
+                    JsonSerializer.Serialize(registration.Admission),
+                    AdmissionState(registration.Admission?.State ?? RunnerAdmissionState.Ready),
+                    registration.Admission?.Observation?.ObservedAt.AddSeconds(registration.AdmissionOptions?.FreshnessSeconds ?? 15).ToUnixTimeMilliseconds() ?? 0,
+                    registration.Admission?.Observation?.ResourceDomain ?? registration.RunnerId,
+                    registration.AdmissionOptions?.MainStartupConcurrency ?? 0,
+                    registration.AdmissionOptions?.AuxiliaryConcurrency ?? 0,
+                    registration.AdmissionOptions?.AuxiliaryReservedMemoryBytes ?? 0,
+                    registration.AdmissionOptions?.AuxiliaryReservedNanoCpus ?? 0,
+                    registration.AdmissionOptions?.AuxiliaryReservedPids ?? 0,
+                    registration.Admission is null ? 0 : 1
                 ]);
 
             if (result is not { Length: 4 })
@@ -151,6 +175,7 @@ public sealed class RedisRunnerAvailabilityRegistry(IConnectionMultiplexer redis
             {
                 1 => RunnerAvailabilityRegistrationOutcome.Online,
                 2 => RunnerAvailabilityRegistrationOutcome.OfflineProviderUnavailable,
+                3 => RunnerAvailabilityRegistrationOutcome.OfflineAdmissionBlocked,
                 _ => RunnerAvailabilityRegistrationOutcome.OfflineCapacityUntrusted
             };
             var online = registrationOutcome == RunnerAvailabilityRegistrationOutcome.Online;
@@ -194,4 +219,14 @@ public sealed class RedisRunnerAvailabilityRegistry(IConnectionMultiplexer redis
         values.Count > index && long.TryParse(values[index].ToString(), out var value)
             ? Math.Max(0, value)
             : 0;
+
+    private static string AdmissionState(RunnerAdmissionState state) => state switch
+    {
+        RunnerAdmissionState.Ready => "ready",
+        RunnerAdmissionState.Reconciling => "reconciling",
+        RunnerAdmissionState.PressureBlocked => "pressureBlocked",
+        RunnerAdmissionState.ProviderUnavailable => "providerUnavailable",
+        RunnerAdmissionState.Draining => "draining",
+        _ => "starting"
+    };
 }

@@ -51,6 +51,7 @@ public sealed class QueuedRuntimeRecoveryTests
                 .ConfigureServices(services =>
                 {
                     services.AddSingleton(probe);
+                    services.AddSingleton(new NoCTF.Infrastructure.Runtime.Capacity.RuntimeDispatchWakeupGate(null));
                     services.AddDbContextWithWolverineIntegration<NoCtfDbContext>(builder =>
                         builder.UseNpgsql(connection).UseSnakeCaseNamingConvention());
                     services.AddScoped<ITransactionalMessageOutbox, WolverineTransactionalMessageOutbox>();

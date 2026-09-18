@@ -106,7 +106,7 @@ public sealed class RunnerAvailabilityPublisherTests
             await Assert.That(blocked)
                 .IsEqualTo(RunnerAvailabilityRegistrationOutcome.OfflineCapacityUntrusted);
             await Assert.That(await database.KeyExistsAsync("runner:runner-a:capacity")).IsFalse();
-            await Assert.That(await database.KeyExistsAsync("runner:runner-a:heartbeat")).IsFalse();
+            await Assert.That(await database.KeyExistsAsync("runner:runner-a:heartbeat")).IsTrue();
             await Assert.That(await database.KeyExistsAsync(
                 $"runner-claim:{fixture.RuntimeInstanceId:N}")).IsTrue();
 
@@ -189,6 +189,9 @@ public sealed class RunnerAvailabilityPublisherTests
                 await Assert.That(otherProvider.RunnerId).IsEqualTo("runner-a");
             }
 
+            var restoredLedger = new RedisRunnerCapacityLedger(redis);
+            await restoredLedger.PauseAsync("runner-a", "pool-a", cancellationToken);
+            await restoredLedger.RestoreAsync("runner-a", "pool-a", availabilityOptions.Value.ResourceCapacity, [], cancellationToken);
             var online = await publisher.PublishOnceAsync(cancellationToken);
 
             await Assert.That(online).IsEqualTo(RunnerAvailabilityRegistrationOutcome.Online);

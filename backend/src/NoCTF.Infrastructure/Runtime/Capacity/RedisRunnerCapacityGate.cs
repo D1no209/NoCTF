@@ -17,7 +17,7 @@ public sealed class RedisRunnerCapacityGate(IConnectionMultiplexer redis) : IRun
         return 1
         """;
 
-    private const string ClaimScript = """
+    private const string ClaimScript = RunnerAdmissionLua.Functions + "\n" + """
         local function pressure(capacityKey, jitter)
             local availableMemory = tonumber(redis.call('HGET', capacityKey, 'availableMemoryBytes') or '0')
             local availableCpu = tonumber(redis.call('HGET', capacityKey, 'availableNanoCpus') or '0')
@@ -32,8 +32,7 @@ public sealed class RedisRunnerCapacityGate(IConnectionMultiplexer redis) : IRun
                 1 - (availablePids / totalPids)) + jitter
         end
 
-        local admission = redis.call('HGET', KEYS[2], 'admissionState')
-        if admission and admission ~= 'ready' then return 0 end
+        if not ready(KEYS[1], KEYS[2]) then return 0 end
         local existingRunner = redis.call('HGET', KEYS[3], 'runnerId')
         if existingRunner then
             if existingRunner == ARGV[4] then return 2 end
@@ -50,7 +49,7 @@ public sealed class RedisRunnerCapacityGate(IConnectionMultiplexer redis) : IRun
         local memory = tonumber(redis.call('HGET', KEYS[2], 'availableMemoryBytes') or '-1')
         local cpu = tonumber(redis.call('HGET', KEYS[2], 'availableNanoCpus') or '-1')
         local pids = tonumber(redis.call('HGET', KEYS[2], 'availablePids') or '-1')
-        if memory < tonumber(ARGV[1]) or cpu < tonumber(ARGV[2]) or pids < tonumber(ARGV[3]) then
+        if not fits(KEYS[2], tonumber(ARGV[1]), tonumber(ARGV[2]), tonumber(ARGV[3]), ARGV[7] == '1') then
             redis.call('ZADD', KEYS[5], pressure(KEYS[2], tonumber(ARGV[6])), ARGV[4])
             return 0
         end
@@ -63,11 +62,12 @@ public sealed class RedisRunnerCapacityGate(IConnectionMultiplexer redis) : IRun
             'memoryBytes', ARGV[1],
             'nanoCpus', ARGV[2],
             'pidsLimit', ARGV[3])
+        start_slot(KEYS[2], KEYS[3], ARGV[7] == '1')
         redis.call('ZADD', KEYS[5], pressure(KEYS[2], tonumber(ARGV[6])), ARGV[4])
         return 1
         """;
 
-    private const string RebuildAndClaimScript = """
+    private const string RebuildAndClaimScript = RunnerAdmissionLua.Functions + "\n" + """
         local function pressure(capacityKey, jitter)
             local availableMemory = tonumber(redis.call('HGET', capacityKey, 'availableMemoryBytes') or '0')
             local availableCpu = tonumber(redis.call('HGET', capacityKey, 'availableNanoCpus') or '0')
@@ -84,8 +84,7 @@ public sealed class RedisRunnerCapacityGate(IConnectionMultiplexer redis) : IRun
 
         local existingRunner = redis.call('HGET', KEYS[3], 'runnerId')
         if existingRunner then
-            local admission = redis.call('HGET', 'runner:' .. existingRunner .. ':capacity', 'admissionState')
-            if admission and admission ~= 'ready' then return { 0, '' } end
+            if not ready('runner:' .. existingRunner .. ':heartbeat', 'runner:' .. existingRunner .. ':capacity') then return { 0, '' } end
             return { 2, existingRunner }
         end
 
@@ -99,9 +98,7 @@ public sealed class RedisRunnerCapacityGate(IConnectionMultiplexer redis) : IRun
         for _, runnerId in ipairs(members) do
             local heartbeatKey = 'runner:' .. runnerId .. ':heartbeat'
             local capacityKey = 'runner:' .. runnerId .. ':capacity'
-            local admission = redis.call('HGET', capacityKey, 'admissionState')
-            if redis.call('EXISTS', heartbeatKey) == 1 and redis.call('EXISTS', capacityKey) == 1
-                and (not admission or admission == 'ready') then
+            if ready(heartbeatKey, capacityKey) then
                 local hash = redis.sha1hex(runnerId .. ARGV[5])
                 local jitter = (tonumber(string.sub(hash, 1, 8), 16) / 4294967295) * 0.000001
                 local score = pressure(capacityKey, jitter)
@@ -109,9 +106,7 @@ public sealed class RedisRunnerCapacityGate(IConnectionMultiplexer redis) : IRun
                 local availableMemory = tonumber(redis.call('HGET', capacityKey, 'availableMemoryBytes') or '-1')
                 local availableCpu = tonumber(redis.call('HGET', capacityKey, 'availableNanoCpus') or '-1')
                 local availablePids = tonumber(redis.call('HGET', capacityKey, 'availablePids') or '-1')
-                if availableMemory >= requestedMemory
-                    and availableCpu >= requestedCpu
-                    and availablePids >= requestedPids
+                if fits(capacityKey, requestedMemory, requestedCpu, requestedPids, ARGV[6] == '1')
                     and (not bestScore or score < bestScore) then
                     bestRunner = runnerId
                     bestScore = score
@@ -133,6 +128,7 @@ public sealed class RedisRunnerCapacityGate(IConnectionMultiplexer redis) : IRun
             'memoryBytes', ARGV[1],
             'nanoCpus', ARGV[2],
             'pidsLimit', ARGV[3])
+        start_slot(bestCapacityKey, KEYS[3], ARGV[6] == '1')
         redis.call('ZADD', KEYS[2], pressure(bestCapacityKey, 0), bestRunner)
         return { 1, bestRunner }
         """;
@@ -156,6 +152,7 @@ public sealed class RedisRunnerCapacityGate(IConnectionMultiplexer redis) : IRun
         if not owner then return 0 end
         if owner ~= ARGV[1] then return -1 end
         if redis.call('EXISTS', KEYS[1]) == 0 then return -2 end
+        if redis.call('HGET', KEYS[1], 'admissionState') == 'reconciling' then return -2 end
         local memory = redis.call('HGET', KEYS[2], 'memoryBytes')
         local cpu = redis.call('HGET', KEYS[2], 'nanoCpus')
         local pids = redis.call('HGET', KEYS[2], 'pidsLimit')
@@ -176,6 +173,11 @@ public sealed class RedisRunnerCapacityGate(IConnectionMultiplexer redis) : IRun
             'availableMemoryBytes', restoredMemory,
             'availableNanoCpus', restoredCpu,
             'availablePids', restoredPids)
+        if redis.call('HGET', KEYS[2], 'starting') == '1' then
+            local field = redis.call('HGET', KEYS[2], 'auxiliary') == '1' and 'activeAuxiliary' or 'startingPrimary'
+            local value = tonumber(redis.call('HGET', KEYS[1], field) or '0')
+            redis.call('HSET', KEYS[1], field, math.max(0, value - 1))
+        end
         redis.call('DEL', KEYS[2])
         if redis.call('SISMEMBER', KEYS[4], ARGV[1]) == 1
             and redis.call('EXISTS', KEYS[3]) == 1
@@ -277,6 +279,7 @@ public sealed class RedisRunnerCapacityGate(IConnectionMultiplexer redis) : IRun
                 0,
                 CandidateLimit - 1,
                 Order.Ascending);
+            RunnerAdmissionFailure? failure = null;
             foreach (var candidate in candidates)
             {
                 cancellationToken.ThrowIfCancellationRequested();
@@ -288,13 +291,26 @@ public sealed class RedisRunnerCapacityGate(IConnectionMultiplexer redis) : IRun
                     request,
                     runnerId,
                     cancellationToken);
-                if (claim.Availability != RunnerCapacityAvailability.Claimed) continue;
+                if (claim.Availability != RunnerCapacityAvailability.Claimed)
+                {
+                    failure ??= claim.Failure;
+                    continue;
+                }
                 RecordClaim(request.Pool, claim.Availability, attempts, startedAt);
                 return claim;
             }
 
             attempts++;
             var rebuilt = await RebuildAndClaimAsync(database, request, cancellationToken);
+            if (rebuilt.Availability != RunnerCapacityAvailability.Claimed)
+            {
+                foreach (var member in (await database.SetMembersAsync($"runner-pool:{request.Pool}:members")).Take(CandidateLimit))
+                {
+                    var observed = await ReadFailureAsync(database, request, member.ToString(), cancellationToken);
+                    if (observed != RunnerAdmissionFailure.NoEligibleRunner) { failure = observed; break; }
+                }
+                rebuilt = rebuilt with { Failure = failure ?? RunnerAdmissionFailure.NoEligibleRunner };
+            }
             RecordClaim(request.Pool, rebuilt.Availability, attempts, startedAt);
             return rebuilt;
         }
@@ -342,6 +358,36 @@ public sealed class RedisRunnerCapacityGate(IConnectionMultiplexer redis) : IRun
     public Task<RunnerCapacityReleaseOutcome> ReleaseWorkloadAsync(
         RuntimeWorkloadIdentity identity, string runnerId, CancellationToken cancellationToken) =>
         ReleaseCoreAsync(identity.Key, runnerId, cancellationToken);
+
+    public async Task CompleteWorkloadStartupAsync(RuntimeWorkloadIdentity identity, string runnerId, CancellationToken ct)
+    {
+        ct.ThrowIfCancellationRequested();
+        await redis.GetDatabase().ScriptEvaluateAsync("""
+            if redis.call('HGET', KEYS[2], 'runnerId') ~= ARGV[1] then return 0 end
+            if redis.call('EXISTS', KEYS[1]) == 0 then return 0 end
+            if redis.call('HGET', KEYS[2], 'auxiliary') == '1' then return 0 end
+            if redis.call('HGET', KEYS[2], 'starting') == '1' then
+                local active = tonumber(redis.call('HGET', KEYS[1], 'startingPrimary') or '0')
+                redis.call('HSET', KEYS[1], 'startingPrimary', math.max(0, active - 1))
+                redis.call('HSET', KEYS[2], 'starting', 0)
+            end
+            return 1
+            """, [$"runner:{runnerId}:capacity", $"runner-claim:{identity.Key}"], [runnerId]);
+    }
+
+    public async Task<bool> ValidateClaimAsync(RuntimeCapacityAllocation allocation, CancellationToken ct)
+    {
+        ct.ThrowIfCancellationRequested();
+        return (long)await redis.GetDatabase().ScriptEvaluateAsync(RunnerAdmissionLua.Functions + "\n" + """
+            if not ready(KEYS[1], KEYS[2]) then return 0 end
+            if redis.call('HGET', KEYS[3], 'runnerId') ~= ARGV[1] then return 0 end
+            if tonumber(redis.call('HGET', KEYS[3], 'memoryBytes') or '-1') ~= tonumber(ARGV[2]) then return 0 end
+            if tonumber(redis.call('HGET', KEYS[3], 'nanoCpus') or '-1') ~= tonumber(ARGV[3]) then return 0 end
+            if tonumber(redis.call('HGET', KEYS[3], 'pidsLimit') or '-1') ~= tonumber(ARGV[4]) then return 0 end
+            return 1
+            """, [$"runner:{allocation.RunnerId}:heartbeat", $"runner:{allocation.RunnerId}:capacity", $"runner-claim:{allocation.Identity.Key}"],
+            [allocation.RunnerId, allocation.Budget.MemoryBytes, allocation.Budget.NanoCpus, allocation.Budget.PidsLimit]) == 1;
+    }
 
     public async Task<string> GetResourceDomainAsync(string runnerId, CancellationToken ct)
     {
@@ -411,7 +457,8 @@ public sealed class RedisRunnerCapacityGate(IConnectionMultiplexer redis) : IRun
                 request.PidsLimit,
                 runnerId,
                 request.Pool,
-                NextJitter()
+                NextJitter(),
+                request.Workload?.IsAuxiliary == true ? 1 : 0
             ]);
         return claimed == 1 || claimed == 2
             ? new(
@@ -420,7 +467,41 @@ public sealed class RedisRunnerCapacityGate(IConnectionMultiplexer redis) : IRun
                 claimed == 1
                     ? RunnerCapacityClaimState.Acquired
                     : RunnerCapacityClaimState.AlreadyOwned)
-            : new(RunnerCapacityAvailability.Insufficient);
+            : new(RunnerCapacityAvailability.Insufficient, Failure: await ReadFailureAsync(database, request, runnerId, cancellationToken));
+    }
+
+    private static async Task<RunnerAdmissionFailure> ReadFailureAsync(IDatabase database,
+        RunnerCapacityRequest request, string runnerId, CancellationToken ct)
+    {
+        ct.ThrowIfCancellationRequested();
+        var fields = (await database.HashGetAllAsync($"runner:{runnerId}:capacity"))
+            .ToDictionary(field => field.Name.ToString(), field => field.Value.ToString(), StringComparer.Ordinal);
+        long Read(string name) => long.TryParse(fields.GetValueOrDefault(name), out var value) ? value : 0;
+        if (fields.Count == 0) return RunnerAdmissionFailure.LedgerRecovering;
+        var state = fields.GetValueOrDefault("admissionState");
+        if (state == "reconciling") return RunnerAdmissionFailure.LedgerRecovering;
+        if (state == "providerUnavailable") return RunnerAdmissionFailure.ProviderUnavailable;
+        if (state == "pressureBlocked") return RunnerAdmissionFailure.NodePressureHigh;
+        if (state is "starting" or "draining") return RunnerAdmissionFailure.ObservationStale;
+        if (fields.GetValueOrDefault("observationRequired") == "1"
+            && Read("observationFreshUntil") < TimeProvider.System.GetUtcNow().ToUnixTimeMilliseconds())
+            return RunnerAdmissionFailure.ObservationStale;
+        if (!await database.KeyExistsAsync($"runner:{runnerId}:heartbeat")) return RunnerAdmissionFailure.NoEligibleRunner;
+        var auxiliary = request.Workload?.IsAuxiliary == true;
+        var memoryReserve = auxiliary ? 0 : Read("reservedMemory");
+        var cpuReserve = auxiliary ? 0 : Read("reservedCpu");
+        var pidReserve = auxiliary ? 0 : Read("reservedPids");
+        if (request.MemoryBytes > Read("totalMemoryBytes") - memoryReserve
+            || request.NanoCpus > Read("totalNanoCpus") - cpuReserve
+            || request.PidsLimit > Read("totalPids") - pidReserve)
+            return RunnerAdmissionFailure.RequestExceedsNodeCapacity;
+        var maximum = Read(auxiliary ? "maxAuxiliary" : "maxPrimary");
+        if (maximum > 0 && Read(auxiliary ? "activeAuxiliary" : "startingPrimary") >= maximum)
+            return RunnerAdmissionFailure.StartupConcurrencyLimited;
+        if (request.MemoryBytes > Read("availableMemoryBytes") - memoryReserve) return RunnerAdmissionFailure.MemoryBudgetInsufficient;
+        if (request.NanoCpus > Read("availableNanoCpus") - cpuReserve) return RunnerAdmissionFailure.CpuBudgetInsufficient;
+        if (request.PidsLimit > Read("availablePids") - pidReserve) return RunnerAdmissionFailure.PidBudgetInsufficient;
+        return RunnerAdmissionFailure.NoEligibleRunner;
     }
 
     private static async Task<RunnerCapacityClaim> RebuildAndClaimAsync(
@@ -441,7 +522,8 @@ public sealed class RedisRunnerCapacityGate(IConnectionMultiplexer redis) : IRun
                 request.NanoCpus,
                 request.PidsLimit,
                 request.Pool,
-                Random.Shared.NextInt64()
+                Random.Shared.NextInt64(),
+                request.Workload?.IsAuxiliary == true ? 1 : 0
             ]);
         if (result is not { Length: 2 })
             throw new InvalidOperationException("Redis returned an invalid runner index rebuild result.");

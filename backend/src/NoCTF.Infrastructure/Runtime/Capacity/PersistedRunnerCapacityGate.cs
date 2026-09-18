@@ -19,6 +19,23 @@ public sealed class PersistedRunnerCapacityGate(
     public Task<RunnerPoolInventory> GetPoolInventoryAsync(string runnerPool, CancellationToken ct) =>
         redis.GetPoolInventoryAsync(runnerPool, ct);
 
+    public async Task CompleteStartupAsync(Guid runtimeInstanceId, string runnerId, CancellationToken ct)
+    {
+        var document = await db.RuntimeInstances.AsNoTracking().Where(runtime => runtime.Id == runtimeInstanceId)
+            .Select(runtime => runtime.CapacityAllocations).SingleOrDefaultAsync(ct);
+        var primary = document?.Items.SingleOrDefault(item => !item.Identity.IsAuxiliary && item.RunnerId == runnerId);
+        if (primary is not null) await redis.CompleteWorkloadStartupAsync(primary.Identity, runnerId, ct);
+    }
+
+    public async Task<bool> CanCreateAsync(Guid runtimeInstanceId, string runnerId, CancellationToken ct)
+    {
+        var document = await db.RuntimeInstances.AsNoTracking().Where(runtime => runtime.Id == runtimeInstanceId
+                && runtime.State == RuntimeState.Provisioning && runtime.RunnerId == runnerId)
+            .Select(runtime => runtime.CapacityAllocations).SingleOrDefaultAsync(ct);
+        var primary = document?.Items.SingleOrDefault(item => !item.Identity.IsAuxiliary && item.RunnerId == runnerId);
+        return primary is not null && await redis.ValidateClaimAsync(primary, ct);
+    }
+
     public Task<RunnerCapacityClaim> TryClaimAsync(RunnerCapacityRequest request, CancellationToken ct) =>
         ClaimAsync(request, null, ct);
 

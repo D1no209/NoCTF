@@ -98,6 +98,9 @@ public static class ServiceRegistration
             services.AddScoped<IRunnerCapacityGate, PersistedRunnerCapacityGate>();
             services.AddSingleton<RedisRunnerAvailabilityRegistry>();
             services.AddSingleton<RedisRunnerCapacityLedger>();
+            services.AddSingleton<RunnerResourceObserver>();
+            services.AddSingleton<IReadinessDependency, RunnerAdmissionReadinessDependency>();
+            services.AddHostedService<RunnerLivenessPublisher>();
             services.AddHostedService<RunnerAvailabilityPublisher>();
         }
         services.AddSingleton<RunnerResourceMutationCoordinator>();
