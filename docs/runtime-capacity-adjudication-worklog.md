@@ -174,6 +174,16 @@ the "exceeds all nodes" reason. Only a complete bounded pool inventory where eve
 node is undersized supports that conclusion; a larger pressure-blocked node retains
 its pressure reason. Real Redis pool/admission tests passed 4/4.
 
+A8 completed locally: four strict/shared × 16/64 real Redis/Docker load cases passed,
+covering idle, startup burst, continuous load, checker reserve, 12 isolated Redis
+losses and 66 exact provider cleanup/release cycles. A separate Linux daemon-host
+experiment passed with the default 90%/20-second CPU threshold and three healthy
+recovery samples. Default configuration remains factor 1. Recovery/rollback guidance
+and repeatable measurement scripts are included. Raw samples and warmed baseline/
+current leaderboard benchmarks are retained under `docs/validation/runtime-capacity-20260918`.
+The measured CTF projection's latency and allocations remain within the 5% threshold;
+this does not establish a platform-wide HTTP or crash-recovery latency guarantee.
+
 Recovery follow-up: Redis inventory is bounded across all scanned claims and runs
 outside the PostgreSQL critical section; Kubernetes observes the same attested
 node selector as workload scheduling. Auxiliary creation rechecks the committed

@@ -1,0 +1,190 @@
+[
+  {
+    "sample": {
+      "State": 0,
+      "Failure": 5,
+      "Observation": null
+    },
+    "collectionMs": 18.8259
+  },
+  {
+    "sample": {
+      "State": 2,
+      "Failure": null,
+      "Observation": {
+        "ResourceDomain": "docker:f52bcbc8-eaa1-4575-815c-73ceb981d5cc",
+        "ObservedAt": "2026-09-18T13:37:23.2109224+00:00",
+        "MemoryTotalBytes": 33449242624,
+        "MemoryAvailableBytes": 30406467584,
+        "NanoCpus": 32000000000,
+        "CpuUsageRatio": 0.004649432769202155,
+        "PidsUsed": 1528,
+        "PidsCapacity": 4194304,
+        "OomKills": 0,
+        "ProviderPressure": false,
+        "PidPressureConditionAvailable": false
+      }
+    },
+    "collectionMs": 268.8508
+  },
+  {
+    "sample": {
+      "State": 2,
+      "Failure": null,
+      "Observation": {
+        "ResourceDomain": "docker:f52bcbc8-eaa1-4575-815c-73ceb981d5cc",
+        "ObservedAt": "2026-09-18T13:37:28.78277+00:00",
+        "MemoryTotalBytes": 33449242624,
+        "MemoryAvailableBytes": 30434271232,
+        "NanoCpus": 32000000000,
+        "CpuUsageRatio": 0.9109820723869658,
+        "PidsUsed": 1540,
+        "PidsCapacity": 4194304,
+        "OomKills": 0,
+        "ProviderPressure": false,
+        "PidPressureConditionAvailable": false
+      }
+    },
+    "collectionMs": 28.343
+  },
+  {
+    "sample": {
+      "State": 2,
+      "Failure": null,
+      "Observation": {
+        "ResourceDomain": "docker:f52bcbc8-eaa1-4575-815c-73ceb981d5cc",
+        "ObservedAt": "2026-09-18T13:37:33.806613+00:00",
+        "MemoryTotalBytes": 33449242624,
+        "MemoryAvailableBytes": 30394056704,
+        "NanoCpus": 32000000000,
+        "CpuUsageRatio": 0.998256320836966,
+        "PidsUsed": 1559,
+        "PidsCapacity": 4194304,
+        "OomKills": 0,
+        "ProviderPressure": false,
+        "PidPressureConditionAvailable": false
+      }
+    },
+    "collectionMs": 22.0357
+  },
+  {
+    "sample": {
+      "State": 2,
+      "Failure": null,
+      "Observation": {
+        "ResourceDomain": "docker:f52bcbc8-eaa1-4575-815c-73ceb981d5cc",
+        "ObservedAt": "2026-09-18T13:37:38.8384347+00:00",
+        "MemoryTotalBytes": 33449242624,
+        "MemoryAvailableBytes": 30390661120,
+        "NanoCpus": 32000000000,
+        "CpuUsageRatio": 0.9967697850664679,
+        "PidsUsed": 1549,
+        "PidsCapacity": 4194304,
+        "OomKills": 0,
+        "ProviderPressure": false,
+        "PidPressureConditionAvailable": false
+      }
+    },
+    "collectionMs": 33.9012
+  },
+  {
+    "sample": {
+      "State": 2,
+      "Failure": null,
+      "Observation": {
+        "ResourceDomain": "docker:f52bcbc8-eaa1-4575-815c-73ceb981d5cc",
+        "ObservedAt": "2026-09-18T13:37:43.8757948+00:00",
+        "MemoryTotalBytes": 33449242624,
+        "MemoryAvailableBytes": 30364700672,
+        "NanoCpus": 32000000000,
+        "CpuUsageRatio": 0.9991302727216251,
+        "PidsUsed": 1601,
+        "PidsCapacity": 4194304,
+        "OomKills": 0,
+        "ProviderPressure": false,
+        "PidPressureConditionAvailable": false
+      }
+    },
+    "collectionMs": 37.4404
+  },
+  {
+    "sample": {
+      "State": 3,
+      "Failure": 4,
+      "Observation": {
+        "ResourceDomain": "docker:f52bcbc8-eaa1-4575-815c-73ceb981d5cc",
+        "ObservedAt": "2026-09-18T13:37:51.243234+00:00",
+        "MemoryTotalBytes": 33449242624,
+        "MemoryAvailableBytes": 30436769792,
+        "NanoCpus": 32000000000,
+        "CpuUsageRatio": 0.9993077407174323,
+        "PidsUsed": 1536,
+        "PidsCapacity": 4194304,
+        "OomKills": 0,
+        "ProviderPressure": false,
+        "PidPressureConditionAvailable": false
+      }
+    },
+    "collectionMs": 28.6988
+  },
+  {
+    "sample": {
+      "State": 3,
+      "Failure": 4,
+      "Observation": {
+        "ResourceDomain": "docker:f52bcbc8-eaa1-4575-815c-73ceb981d5cc",
+        "ObservedAt": "2026-09-18T13:37:59.5110533+00:00",
+        "MemoryTotalBytes": 33449242624,
+        "MemoryAvailableBytes": 30398160896,
+        "NanoCpus": 32000000000,
+        "CpuUsageRatio": 0.3826017979904812,
+        "PidsUsed": 1470,
+        "PidsCapacity": 4194304,
+        "OomKills": 0,
+        "ProviderPressure": false,
+        "PidPressureConditionAvailable": false
+      }
+    },
+    "collectionMs": 9.8433
+  },
+  {
+    "sample": {
+      "State": 3,
+      "Failure": 4,
+      "Observation": {
+        "ResourceDomain": "docker:f52bcbc8-eaa1-4575-815c-73ceb981d5cc",
+        "ObservedAt": "2026-09-18T13:38:04.5237133+00:00",
+        "MemoryTotalBytes": 33449242624,
+        "MemoryAvailableBytes": 30393753600,
+        "NanoCpus": 32000000000,
+        "CpuUsageRatio": 0.0033019749548314214,
+        "PidsUsed": 1469,
+        "PidsCapacity": 4194304,
+        "OomKills": 0,
+        "ProviderPressure": false,
+        "PidPressureConditionAvailable": false
+      }
+    },
+    "collectionMs": 10.071
+  },
+  {
+    "sample": {
+      "State": 2,
+      "Failure": null,
+      "Observation": {
+        "ResourceDomain": "docker:f52bcbc8-eaa1-4575-815c-73ceb981d5cc",
+        "ObservedAt": "2026-09-18T13:38:09.531467+00:00",
+        "MemoryTotalBytes": 33449242624,
+        "MemoryAvailableBytes": 30388867072,
+        "NanoCpus": 32000000000,
+        "CpuUsageRatio": 0.003056005987277066,
+        "PidsUsed": 1469,
+        "PidsCapacity": 4194304,
+        "OomKills": 0,
+        "ProviderPressure": false,
+        "PidPressureConditionAvailable": false
+      }
+    },
+    "collectionMs": 9.9977
+  }
+]

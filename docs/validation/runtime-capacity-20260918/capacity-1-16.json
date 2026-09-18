@@ -1,0 +1,77 @@
+{
+  "factor": 1,
+  "concurrency": 16,
+  "observations": "controlled healthy snapshot; not host-pressure acceptance",
+  "createMs": [
+    252.7851,
+    234.3721,
+    230.879,
+    225.9674,
+    216.0648,
+    219.4035,
+    230.6594,
+    227.8459,
+    245.1352,
+    200.9822,
+    222.5386,
+    235.0744
+  ],
+  "stopMs": [
+    2159.3792,
+    2133.163,
+    2135.851,
+    2130.5692,
+    2122.2537,
+    2116.7977,
+    2147.587,
+    2123.7325,
+    2230.8366,
+    2142.1245,
+    2177.9419,
+    2134.0232
+  ],
+  "claimBatchMs": [
+    44.3287,
+    6.8837,
+    5.7931,
+    5.7635,
+    5.8446,
+    6.0972,
+    4.9356,
+    6.7342,
+    5.3433
+  ],
+  "recoveryMs": [
+    28.5464,
+    9.8769,
+    2.1842
+  ],
+  "queueMs": [
+    61.7501,
+    317.3501,
+    560.6325,
+    6.6733,
+    223.6175,
+    451.206,
+    5.5255,
+    251.7811,
+    461.4324
+  ],
+  "metrics": [
+    {
+      "phase": "idle",
+      "queuedNotAdmitted": 13
+    },
+    {
+      "phase": "burst",
+      "queuedNotAdmitted": 13
+    },
+    {
+      "phase": "full",
+      "queuedNotAdmitted": 13
+    }
+  ],
+  "redisCommands": 1251,
+  "providerLifecycleCalls": 24,
+  "databaseCalls": 0
+}

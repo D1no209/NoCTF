@@ -443,6 +443,27 @@ public sealed class HistoricalAdjudicationPreviewPersistenceTests
             // first-correct facts, audit events, teams, and challenge titles.
             // Eligibility adjustment evidence is one additional bounded query.
             await Assert.That(counter.ReaderCommandCount).IsLessThanOrEqualTo(8);
+            var measurements = Environment.GetEnvironmentVariable("NOCTF_CAPACITY_MEASUREMENTS");
+            if (!string.IsNullOrWhiteSpace(measurements))
+            {
+                var milliseconds = new List<double>();
+                var queries = new List<int>();
+                for (var iteration = 0; iteration < 15; iteration++)
+                {
+                    var initialCount = counter.ReaderCommandCount;
+                    var watch = System.Diagnostics.Stopwatch.StartNew();
+                    var measured = await countedPreview.ExecuteAsync(fixture.CompetitionId, null, null, null, 500, cancellationToken);
+                    await Assert.That(measured.Items.Count).IsEqualTo(500);
+                    if (iteration < 3) continue;
+                    milliseconds.Add(watch.Elapsed.TotalMilliseconds);
+                    queries.Add(counter.ReaderCommandCount - initialCount);
+                }
+                Directory.CreateDirectory(measurements);
+                await File.WriteAllTextAsync(Path.Combine(measurements, "preview-scan.json"), JsonSerializer.Serialize(new
+                {
+                    corpusFacts = 601, pageLimit = 500, warmup = 3, milliseconds, queries
+                }, new JsonSerializerOptions { WriteIndented = true }), cancellationToken);
+            }
         });
     }
 
@@ -702,8 +723,8 @@ public sealed class HistoricalAdjudicationPreviewPersistenceTests
                 ValueSha256 = SHA256.HashData(Encoding.UTF8.GetBytes(value)),
                 State = GameplayFactState.Completed,
                 Result = GameplayFactResult.Wrong,
-                OccurredAt = fixture.Now.AddMinutes(index + 1),
-                UpdatedAt = fixture.Now.AddMinutes(index + 1)
+                OccurredAt = fixture.Now.AddSeconds(index + 1),
+                UpdatedAt = fixture.Now.AddSeconds(index + 1)
             });
         }
         await db.SaveChangesAsync(ct);
