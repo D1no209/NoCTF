@@ -331,12 +331,21 @@ public sealed class RedisRunnerCapacityGate(IConnectionMultiplexer redis) : IRun
             var rebuilt = await RebuildAndClaimAsync(database, request, cancellationToken);
             if (rebuilt.Availability != RunnerCapacityAvailability.Claimed)
             {
-                foreach (var member in (await database.SetMembersAsync($"runner-pool:{request.Pool}:members")).Take(CandidateLimit))
+                var members = await database.SetMembersAsync($"runner-pool:{request.Pool}:members");
+                var allExceed = members.Length is > 0 and <= 128;
+                RunnerAdmissionFailure? poolFailure = null;
+                foreach (var member in members.Take(128))
                 {
                     var observed = await ReadFailureAsync(database, request, member.ToString(), cancellationToken);
-                    if (observed != RunnerAdmissionFailure.NoEligibleRunner) { failure = observed; break; }
+                    allExceed &= observed == RunnerAdmissionFailure.RequestExceedsNodeCapacity;
+                    if (observed is not (RunnerAdmissionFailure.NoEligibleRunner or RunnerAdmissionFailure.RequestExceedsNodeCapacity))
+                        poolFailure ??= observed;
                 }
-                rebuilt = rebuilt with { Failure = failure ?? RunnerAdmissionFailure.NoEligibleRunner };
+                // An oversized candidate is not proof that every configured node is too small.
+                // Incomplete/offline inventory keeps this conclusion unknown.
+                rebuilt = rebuilt with { Failure = allExceed ? RunnerAdmissionFailure.RequestExceedsNodeCapacity
+                    : poolFailure ?? (failure is not RunnerAdmissionFailure.RequestExceedsNodeCapacity
+                        ? failure : null) ?? RunnerAdmissionFailure.NoEligibleRunner };
             }
             RecordClaim(request.Pool, rebuilt.Availability, attempts, startedAt);
             return rebuilt;

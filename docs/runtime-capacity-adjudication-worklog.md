@@ -169,6 +169,11 @@ OpenAPI export and two SDK generations produced identical SDK bytes. The concurr
 CAP workload configuration was independently committed as `e4e6a2a44`; this step
 extends that contract without including the original question-editor changes.
 
+Pool diagnostic follow-up: an individual undersized candidate no longer produces
+the "exceeds all nodes" reason. Only a complete bounded pool inventory where every
+node is undersized supports that conclusion; a larger pressure-blocked node retains
+its pressure reason. Real Redis pool/admission tests passed 4/4.
+
 Recovery follow-up: Redis inventory is bounded across all scanned claims and runs
 outside the PostgreSQL critical section; Kubernetes observes the same attested
 node selector as workload scheduling. Auxiliary creation rechecks the committed
