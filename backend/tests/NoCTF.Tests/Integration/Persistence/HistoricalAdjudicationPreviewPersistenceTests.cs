@@ -240,7 +240,12 @@ public sealed class HistoricalAdjudicationPreviewPersistenceTests
                 .Single(item => item.GameplayFactId == fixture.EarlierFactId);
             await Assert.That(ineligibleEarlier.DeterministicExpectedBloodRank).IsNull();
             await Assert.That(ineligibleEarlier.Differences.Select(item => item.Kind))
-                .Contains(AdjudicationDifferenceKind.TeamEligibilityHistoryRequiresReview);
+                .DoesNotContain(AdjudicationDifferenceKind.TeamEligibilityHistoryRequiresReview);
+            // Missing adjudication is still an integrity issue; no award means no eligibility conflict.
+            await Assert.That(ineligibleEarlier.Differences.Select(item => item.Kind))
+                .Contains(AdjudicationDifferenceKind.MissingAdjudicationRecord);
+            await Assert.That(ineligiblePreview.Items.Single(item => item.GameplayFactId == fixture.LaterFactId)
+                .Differences.Select(item => item.Kind)).Contains(AdjudicationDifferenceKind.TeamEligibilityHistoryRequiresReview);
             await Assert.That(ineligibleEarlier.Differences.Select(item => item.Kind))
                 .DoesNotContain(AdjudicationDifferenceKind.MissingBloodAward);
             await db.Teams.Where(item => item.Id == fixture.FirstTeamId)

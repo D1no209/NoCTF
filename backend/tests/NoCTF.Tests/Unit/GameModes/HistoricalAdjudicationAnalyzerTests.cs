@@ -121,4 +121,17 @@ public sealed class HistoricalAdjudicationAnalyzerTests
         await Assert.That(result.EvidenceCompleteness).IsEqualTo(AdjudicationEvidenceCompleteness.MissingFields);
         await Assert.That(result.Differences.All(item => item.Certainty == AdjudicationDifferenceCertainty.NeedsReview)).IsTrue();
     }
+
+    [Test, Arguments(GameplayFactResult.Correct), Arguments(GameplayFactResult.Wrong)]
+    public async Task Ordinary_nonparticipants_without_awards_or_adjustments_do_not_need_review(GameplayFactResult result)
+    {
+        var analyzed = HistoricalAdjudicationAnalyzer.Analyze(Evidence(Decision(1, result)) with
+        {
+            CurrentResult = result, CurrentBloodEligible = false, HasEarlierCorrect = false,
+            BloodEligibilityHistoryRequiresReview = true, HasEligibilityChanges = false, RecordedBloodRanks = []
+        });
+        await Assert.That(analyzed.CurrentProjectedBloodRank).IsNull();
+        await Assert.That(analyzed.Differences).IsEmpty();
+        await Assert.That(analyzed.EvidenceCompleteness).IsEqualTo(AdjudicationEvidenceCompleteness.Complete);
+    }
 }
