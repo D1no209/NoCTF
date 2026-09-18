@@ -253,6 +253,7 @@ public sealed class RedisRunnerCapacityGate(IConnectionMultiplexer redis) : IRun
         RunnerCapacityRequest request,
         CancellationToken cancellationToken)
     {
+        ValidateRequest(request);
         cancellationToken.ThrowIfCancellationRequested();
         var startedAt = Stopwatch.GetTimestamp();
         var attempts = 0;
@@ -330,6 +331,7 @@ public sealed class RedisRunnerCapacityGate(IConnectionMultiplexer redis) : IRun
         string runnerId,
         CancellationToken cancellationToken)
     {
+        ValidateRequest(request);
         ArgumentException.ThrowIfNullOrWhiteSpace(runnerId);
         cancellationToken.ThrowIfCancellationRequested();
         var startedAt = Stopwatch.GetTimestamp();
@@ -546,6 +548,19 @@ public sealed class RedisRunnerCapacityGate(IConnectionMultiplexer redis) : IRun
     }
 
     private static double NextJitter() => Random.Shared.NextDouble() * CandidateJitterMaximum;
+
+    private static void ValidateRequest(RunnerCapacityRequest request)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(request.Pool);
+        if (request.RuntimeInstanceId == Guid.Empty || request.MemoryBytes <= 0 || request.NanoCpus <= 0 || request.PidsLimit <= 0)
+            throw new ArgumentOutOfRangeException(nameof(request), "Capacity requests require positive resource amounts and a Runtime identity.");
+        if (request.Workload is { } identity)
+        {
+            identity.Validate();
+            if (identity.RuntimeInstanceId != request.RuntimeInstanceId)
+                throw new ArgumentException("The workload identity belongs to another Runtime.", nameof(request));
+        }
+    }
 
     private static void RecordClaim(
         string pool,

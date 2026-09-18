@@ -159,7 +159,8 @@ public sealed record ContainerRequest(
     RuntimeUrlBinding? ControlCheckUrlBinding = null,
     RuntimeInternalEndpointBinding? AwdCheckerTargetBinding = null,
     RuntimeEgressPolicy EgressPolicy = RuntimeEgressPolicy.Isolated,
-    ContainerNetworkPurpose NetworkPurpose = ContainerNetworkPurpose.PersistentRuntime)
+    ContainerNetworkPurpose NetworkPurpose = ContainerNetworkPurpose.PersistentRuntime,
+    RuntimeResourceLimits? Budget = null)
 {
     public IReadOnlyList<int> ContainerPorts =>
         [.. PortMappings.Keys.Concat(InternalPorts ?? []).Distinct().Order()];

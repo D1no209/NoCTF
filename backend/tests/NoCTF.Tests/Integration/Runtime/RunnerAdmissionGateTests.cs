@@ -49,7 +49,9 @@ public sealed class RunnerAdmissionGateTests
                 HasActiveAssignments = true,
                 Admission = registration.Admission! with { Observation = registration.Admission.Observation! with { ObservedAt = now.AddMinutes(-1) } }
             }, ct);
-            var stale = await gate.TryClaimAsync(requests[0] with { RuntimeInstanceId = Guid.NewGuid() }, ct);
+            var staleId = Guid.NewGuid();
+            var stale = await gate.TryClaimAsync(new(staleId, "test", 64, 5, 1,
+                new(RuntimeWorkloadKind.Runtime, staleId, staleId)), ct);
             await Assert.That(stale.Failure).IsEqualTo(RunnerAdmissionFailure.ObservationStale);
             // Stale observations never prevent confirmed cleanup from returning a claim.
             await Assert.That(await gate.ReleaseWorkloadAsync(checker, "runner", ct)).IsEqualTo(RunnerCapacityReleaseOutcome.Released);

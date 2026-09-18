@@ -124,6 +124,14 @@ Validation: pressure policy 3/3; 16/64 real Redis concurrency 2/2; Redis regress
 contracts 15/15; PostgreSQL/NATS recovery 1/1; provider handlers 25/25. Real Linux
 host stress and Kubernetes execution remain separate A8/V1 verification items.
 
+A6 completed: `Runtime:CpuOvercommitFactor` accepts 1 (default) or 2 for new
+container allocations. Libvirt and auxiliary jobs remain strict. Compose budgets
+sum per-service resources and Kubernetes CPU rounding. Replays reconstruct requests
+from committed amounts, not a subsequently changed policy. Kubernetes explicitly
+sets Requests and Limits; Docker still applies original hard limits. Budget policy
+tests 3/3, actual Docker hard-limit inspection at factors 1/2 (2/2), and Kubernetes
+Compose manifest regression (1/1) passed. No Kubernetes execution claim is made.
+
 Use `backend/scripts/Verify-CoreRecovery.ps1` for scoped checks. Integration tests
 must use real PostgreSQL/Redis/Wolverine/NATS and Docker. Source-only assertions or
 EF InMemory do not establish relational or recovery behavior. Compare performance

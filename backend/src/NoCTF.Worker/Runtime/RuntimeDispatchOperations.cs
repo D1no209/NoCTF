@@ -49,14 +49,15 @@ internal static partial class BackendMessageOperations
         ITransactionalMessageOutbox outbox,
         TimeProvider timeProvider,
         CancellationToken cancellationToken,
-        ICompetitionEventRecorder? events = null)
+        ICompetitionEventRecorder? events = null,
+        RuntimeResourceBudgetPolicy? budgets = null)
     {
         await using var transaction = db.Database.IsRelational() && db.Database.CurrentTransaction is null
             ? await db.Database.BeginTransactionAsync(cancellationToken) : null;
         if (db.Database.IsRelational())
             await NoCTF.Infrastructure.Runtime.Capacity.RuntimeCapacityCriticalSection.AcquireAsync(db, cancellationToken);
         await DispatchRuntimeCoreAsync(message, db, templates, placementPolicy, capacity, outbox,
-            timeProvider, cancellationToken, events);
+            timeProvider, cancellationToken, events, budgets ?? new());
         if (transaction is not null)
         {
             await transaction.CommitAsync(cancellationToken);
@@ -68,7 +69,7 @@ internal static partial class BackendMessageOperations
         DispatchRuntime message, NoCtfDbContext db, IChallengeRuntimeTemplateCatalog templates,
         IRuntimePlacementPolicy placementPolicy, IRunnerCapacityGate capacity,
         ITransactionalMessageOutbox outbox, TimeProvider timeProvider, CancellationToken cancellationToken,
-        ICompetitionEventRecorder? events)
+        ICompetitionEventRecorder? events, RuntimeResourceBudgetPolicy budgets)
     {
         events ??= NullCompetitionEventRecorder.Instance;
         var runtimeScope = await db.RuntimeInstances.AsNoTracking()
@@ -189,12 +190,34 @@ internal static partial class BackendMessageOperations
 
         var limits = template.Limits
             ?? new RuntimeResourceLimits(512 * 1024 * 1024, 500_000_000, 256);
+        RuntimeResourceLimits budget;
+        try
+        {
+            if (template.Definition is ComposeRuntimeDefinition compose)
+            {
+                var pids = limits.PidsLimit;
+                limits = RuntimeResourceBudgetPolicy.Sum(compose.ServiceResources.Values
+                    .Select(value => budgets.EffectiveLimit(value, instance.RuntimeProvider)), pids);
+                budget = RuntimeResourceBudgetPolicy.Sum(budgets.ForCompose(compose.ServiceResources, instance.RuntimeProvider).Values, pids);
+            }
+            else
+            {
+                limits = budgets.EffectiveLimit(limits, instance.RuntimeProvider);
+                budget = budgets.Calculate(limits, instance.RuntimeProvider);
+            }
+        }
+        catch (Exception exception) when (exception is InvalidOperationException or OverflowException)
+        {
+            await RejectInvalidConfigurationAsync(instance, db, outbox, events, timeProvider, cancellationToken);
+            return;
+        }
         var capacityClaim = await capacity.TryClaimAsync(new RunnerCapacityRequest(
             instance.Id,
             placement.RunnerPool,
-            limits.MemoryBytes,
-            limits.NanoCpus,
-            limits.PidsLimit), cancellationToken);
+            budget.MemoryBytes,
+            budget.NanoCpus,
+            budget.PidsLimit,
+            Limit: RuntimeResourceBudgetPolicy.ToAmount(limits)), cancellationToken);
         if (capacityClaim.Availability != RunnerCapacityAvailability.Claimed
             || string.IsNullOrWhiteSpace(capacityClaim.RunnerId))
         {
@@ -238,6 +261,26 @@ internal static partial class BackendMessageOperations
                     target.DefinitionJson,
                     perTeamFlag);
             }
+            var stored = await db.RuntimeInstances.AsNoTracking().Where(runtime => runtime.Id == instance.Id)
+                .Select(runtime => runtime.CapacityAllocations).SingleAsync(cancellationToken);
+            var committed = stored.Items.SingleOrDefault(item => !item.Identity.IsAuxiliary)?.Budget
+                ?? RuntimeResourceBudgetPolicy.ToAmount(budget);
+            provision = provision switch
+            {
+                ProvisionContainerRuntime container => container with
+                {
+                    Definition = container.Definition with { Budget = RuntimeResourceBudgetPolicy.ToLimits(committed) }
+                },
+                ProvisionComposeRuntime compose => compose with
+                {
+                    Definition = compose.Definition with
+                    {
+                        ServiceBudgets = RuntimeResourceBudgetPolicy.RestoreComposeBudgets(
+                            compose.Definition.ServiceResources, instance.RuntimeProvider, committed)
+                    }
+                },
+                _ => provision
+            };
         }
         catch (InvalidOperationException)
         {
@@ -258,10 +301,10 @@ internal static partial class BackendMessageOperations
         instance.RunnerId = runnerId;
         if (!db.Database.IsRelational())
         {
-            var amount = new RuntimeResourceAmount(limits.MemoryBytes, limits.NanoCpus, limits.PidsLimit);
+            var amount = RuntimeResourceBudgetPolicy.ToAmount(limits);
             instance.CapacityAllocations = instance.CapacityAllocations.Add(new(
                 NoCTF.Infrastructure.Runtime.Capacity.PersistedRunnerCapacityGate.PrimaryIdentity(instance),
-                instance.GameplayFactId, runnerId, runnerId, amount, amount));
+                instance.GameplayFactId, runnerId, runnerId, RuntimeResourceBudgetPolicy.ToAmount(budget), amount));
         }
         instance.State = RuntimeState.Provisioning;
         instance.FailureCode = null;

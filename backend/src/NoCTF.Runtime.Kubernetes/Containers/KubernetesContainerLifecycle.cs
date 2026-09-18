@@ -130,15 +130,7 @@ public sealed class KubernetesContainerLifecycle(
                                 Add = request.Security.CapAdd?.ToList() ?? []
                             }
                         },
-                        Resources = new V1ResourceRequirements
-                        {
-                            Limits = new Dictionary<string, ResourceQuantity>
-                            {
-                                ["memory"] = new(request.Limits.MemoryBytes.ToString(
-                                    System.Globalization.CultureInfo.InvariantCulture)),
-                                ["cpu"] = new($"{request.Limits.NanoCpus / 1_000_000L}m")
-                            }
-                        }
+                        Resources = KubernetesWorkloadResources.Create(request.Limits, request.Budget)
                     }
                 ],
                 RestartPolicy = "Never"
