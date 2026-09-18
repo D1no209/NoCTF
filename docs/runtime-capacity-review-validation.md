@@ -65,5 +65,13 @@ PostgreSQL EF Outbox、Redis 和 Wolverine/NATS 在 Linux 子进程中组合运�
 `NOCTF_CAPACITY_MEASUREMENTS` 为报告目录，再执行 TUnit `CapacityCrashRecoveryTests`。
 镜像只提供运行时，实际生产程序集来自当前 Release 构建的挂载目录。
 
+## 已有锁范围调整的压力验证
+
+在真实 PostgreSQL/Redis 中放入 8192 条待恢复 Claim，通过 Redis MONITOR 确认清单扫描
+已经开始，再由另一个数据库会话获取全局容量锁：16/64 并发场景的等待分别为 5.30/0.86 ms，
+取锁时扫描仍未完成，直接验证没有跨扫描持锁。另一 Runner 同时进行持久领取/释放，最终余额
+精确回归。扫描与并发工作合计约 4.80/3.30 秒，两项测试通过；这不是恢复路径的通用性能 SLO。
+原始诊断在同目录 `inventory-concurrency-16.json` 与 `inventory-concurrency-64.json`。
+
 V3 的完整全仓及 Kubernetes/Libvirt 环境结果将在完成后补充；容量配置
 仍按部署额度与真实边界取小值，默认 CPU 倍率仍为 1，不宣称原公测瓶颈已经消除。
