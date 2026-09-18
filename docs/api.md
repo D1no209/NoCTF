@@ -405,6 +405,7 @@ CompetitionChallenge 管理写共享 Competition transaction lock，并通过 Ou
 GET  /api/v1/admin/competitions/{competitionId}/gameplay-facts
 GET  /api/v1/admin/competitions/{competitionId}/gameplay-facts/adjudication-differences
 GET  /api/v1/admin/competitions/{competitionId}/gameplay-facts/{gameplayFactId}
+GET  /api/v1/admin/competitions/{competitionId}/gameplay-facts/{gameplayFactId}/adjudication-events
 GET  /api/v1/admin/competitions/{competitionId}/gameplay-facts/{gameplayFactId}/patch
 POST /api/v1/admin/competitions/{competitionId}/gameplay-facts/{gameplayFactId}/flag-access
 POST /api/v1/admin/competitions/{competitionId}/gameplay-facts/queue-evaluation

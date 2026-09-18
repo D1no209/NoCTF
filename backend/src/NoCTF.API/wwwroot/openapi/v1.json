@@ -8700,6 +8700,87 @@
         ]
       }
     },
+    "/api/v1/admin/competitions/{competitionId}/gameplay-facts/{gameplayFactId}/adjudication-events": {
+      "get": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "Reads ordered adjudication evidence for one gameplay fact.",
+        "description": "Read-only signed-keyset pages of event identity, state, result and parent links; excludes Flag values and internal tracks from observers.",
+        "operationId": "AdminGetGameplayFactAdjudicationEvents",
+        "parameters": [
+          {
+            "name": "competitionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "gameplayFactId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "nullable": true
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationGameplayFactsHistoricalAdjudicationEventsResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcValidationProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ]
+      }
+    },
     "/api/v1/admin/competitions/{competitionId}/gameplay-facts": {
       "get": {
         "tags": [
@@ -8907,7 +8988,7 @@
           "Admin"
         ],
         "summary": "Previews historical gameplay adjudication differences.",
-        "description": "Returns a bounded, read-only analysis of CTF Flag results and recorded blood awards, plus legacy AWDP Break duplicates. It never applies corrections.",
+        "description": "Returns bounded read-only analysis of CTF Flag/Patch facts and legacy AWDP Break duplicates, distinguishing anomalies, legal changes and incomplete evidence. It never applies corrections.",
         "operationId": "AdminPreviewHistoricalAdjudicationDifferences",
         "parameters": [
           {
@@ -8942,6 +9023,14 @@
             "schema": {
               "type": "integer",
               "format": "int32"
+            }
+          },
+          {
+            "name": "includeInformational",
+            "in": "query",
+            "schema": {
+              "type": "boolean",
+              "nullable": true
             }
           }
         ],
@@ -20925,6 +21014,72 @@
         "type": "object",
         "additionalProperties": false
       },
+      "NoCTFAPIEndpointsAdministrationGameplayFactsHistoricalAdjudicationEventsResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "events": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationGameplayFactsAdjudicationEventResponse"
+            }
+          },
+          "nextCursor": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
+      "NoCTFAPIEndpointsAdministrationGameplayFactsAdjudicationEventResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "eventId": {
+            "type": "string",
+            "format": "guid"
+          },
+          "occurredAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsCompetitionsEventsCompetitionEventKindProtocol"
+          },
+          "state": {
+            "nullable": true,
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsGameplayFactsGameplayFactStateProtocol"
+              }
+            ]
+          },
+          "result": {
+            "nullable": true,
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsGameplayFactsGameplayFactResultProtocol"
+              }
+            ]
+          },
+          "actorUserId": {
+            "type": "string",
+            "format": "guid",
+            "nullable": true
+          },
+          "parentEventId": {
+            "type": "string",
+            "format": "guid",
+            "nullable": true
+          },
+          "readable": {
+            "type": "boolean"
+          }
+        }
+      },
+      "NoCTFAPIEndpointsAdministrationGameplayFactsHistoricalAdjudicationEventsRequest": {
+        "type": "object",
+        "additionalProperties": false
+      },
       "NoCTFAPIEndpointsAdministrationGameplayFactsListAdminGameplayFactsRequest": {
         "type": "object",
         "additionalProperties": false
@@ -20942,6 +21097,22 @@
           "nextCursor": {
             "type": "string",
             "nullable": true
+          },
+          "scannedFacts": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "anomalyCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "reviewCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "informationCount": {
+            "type": "integer",
+            "format": "int32"
           }
         }
       },
@@ -21011,6 +21182,50 @@
             "items": {
               "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationGameplayFactsHistoricalAdjudicationDifferenceResponse"
             }
+          },
+          "currentState": {
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsGameplayFactsGameplayFactStateProtocol"
+          },
+          "currentProjectedBloodRank": {
+            "nullable": true,
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationGameplayFactsLeaderboardBloodRankProtocol"
+              }
+            ]
+          },
+          "evidenceCompleteness": {
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationGameplayFactsAdjudicationEvidenceCompletenessProtocol"
+          },
+          "latestProcessingEvent": {
+            "nullable": true,
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationGameplayFactsAdjudicationEventResponse"
+              }
+            ]
+          },
+          "latestEffectiveAdjudication": {
+            "nullable": true,
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationGameplayFactsAdjudicationEventResponse"
+              }
+            ]
+          },
+          "resultChangeCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "evidenceCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "eligibilityEvents": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationGameplayFactsAdjudicationEventResponse"
+            }
           }
         }
       },
@@ -21037,6 +21252,12 @@
           },
           "certainty": {
             "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationGameplayFactsAdjudicationDifferenceCertaintyProtocol"
+          },
+          "severity": {
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationGameplayFactsAdjudicationFindingSeverityProtocol"
+          },
+          "classification": {
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationGameplayFactsAdjudicationFindingClassificationProtocol"
           }
         }
       },
@@ -21078,6 +21299,58 @@
         "enum": [
           "Deterministic",
           "NeedsReview"
+        ]
+      },
+      "NoCTFAPIEndpointsAdministrationGameplayFactsAdjudicationFindingSeverityProtocol": {
+        "type": "string",
+        "description": "",
+        "x-enumNames": [
+          "Information",
+          "Warning",
+          "Error"
+        ],
+        "enum": [
+          "Information",
+          "Warning",
+          "Error"
+        ]
+      },
+      "NoCTFAPIEndpointsAdministrationGameplayFactsAdjudicationFindingClassificationProtocol": {
+        "type": "string",
+        "description": "",
+        "x-enumNames": [
+          "CurrentResultMismatch",
+          "IntegrityGap",
+          "SuspectedDuplicate",
+          "LegalHistoryChange",
+          "EligibilityAdjustment",
+          "InsufficientEvidence",
+          "RetainedResult"
+        ],
+        "enum": [
+          "CurrentResultMismatch",
+          "IntegrityGap",
+          "SuspectedDuplicate",
+          "LegalHistoryChange",
+          "EligibilityAdjustment",
+          "InsufficientEvidence",
+          "RetainedResult"
+        ]
+      },
+      "NoCTFAPIEndpointsAdministrationGameplayFactsAdjudicationEvidenceCompletenessProtocol": {
+        "type": "string",
+        "description": "",
+        "x-enumNames": [
+          "Complete",
+          "Truncated",
+          "MissingFields",
+          "Ambiguous"
+        ],
+        "enum": [
+          "Complete",
+          "Truncated",
+          "MissingFields",
+          "Ambiguous"
         ]
       },
       "NoCTFAPIEndpointsAdministrationGameplayFactsPreviewHistoricalAdjudicationDifferencesRequest": {

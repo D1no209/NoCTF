@@ -81,6 +81,27 @@ public sealed class HistoricalAdjudicationPreviewPersistenceTests
             await Assert.That(information.Items.Single().Differences.All(row => row.Severity == AdjudicationFindingSeverity.Information)).IsTrue();
             await Assert.That(information.Items.Single().EligibilityEvents.Count).IsEqualTo(1);
 
+            var internalTrack = guest with
+            {
+                IsInternal = true, IsPublicSelectable = false, EarnsScore = false, EarnsBlood = false,
+                AffectsDynamicChallengeScore = false, VisibleOnLeaderboard = false, AffectsCompetitiveResults = false
+            };
+            var internalConfiguration = JsonSerializer.Serialize(tracks with { Tracks = [tracks.DefaultTrack, internalTrack] }, new JsonSerializerOptions(JsonSerializerDefaults.Web));
+            await db.Competitions.Where(row => row.Id == fixture.CompetitionId).ExecuteUpdateAsync(update =>
+                update.SetProperty(row => row.TrackConfigurationJson, internalConfiguration), ct);
+            var evidenceStore = new HistoricalAdjudicationPreviewStore(db);
+            await Assert.That((await evidenceStore.ReadRestrictedAsync(fixture.CompetitionId, null, null, null, 20, ct)).Items).IsEmpty();
+            await Assert.That((await evidenceStore.ReadAsync(fixture.CompetitionId, null, null, null, 20, ct)).Items.Count).IsEqualTo(1);
+            await Assert.That(await evidenceStore.ReadEventsAsync(fixture.CompetitionId, fixture.LaterFactId, null, null, 1, false, ct)).IsNull();
+            var firstPage = await evidenceStore.ReadEventsAsync(fixture.CompetitionId, fixture.LaterFactId, null, null, 1, true, ct);
+            await Assert.That(firstPage!.NextBeforeId).IsNotNull();
+            var secondPage = await evidenceStore.ReadEventsAsync(fixture.CompetitionId, fixture.LaterFactId,
+                firstPage.NextBeforeOccurredAt, firstPage.NextBeforeId, 1, true, ct);
+            await Assert.That(firstPage.Events[0].EventId).IsNotEqualTo(secondPage!.Events[0].EventId);
+            var access = new CompetitionModerationAuthorizer(db);
+            await Assert.That(await access.CanReadInternalHistoricalAuditAsync(fixture.ObserverId, fixture.CompetitionId, ct)).IsFalse();
+            await Assert.That(await access.CanReadInternalHistoricalAuditAsync(fixture.JudgeId, fixture.CompetitionId, ct)).IsTrue();
+
             await db.Competitions.Where(row => row.Id == fixture.CompetitionId).ExecuteUpdateAsync(update => update.SetProperty(row => row.TracksEnabled, false), ct);
             var templateId = await db.CompetitionChallenges.Where(row => row.Id == fixture.CompetitionChallengeId).Select(row => row.ChallengeId).SingleAsync(ct);
             await db.Challenges.Where(row => row.Id == templateId).ExecuteUpdateAsync(update =>

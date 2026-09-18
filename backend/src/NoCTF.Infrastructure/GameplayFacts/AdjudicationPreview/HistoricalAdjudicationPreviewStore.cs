@@ -16,7 +16,7 @@ using NoCTF.Infrastructure.Persistence;
 
 namespace NoCTF.Infrastructure.GameplayFacts.AdjudicationPreview;
 
-public sealed class HistoricalAdjudicationPreviewStore(NoCtfDbContext db) : IHistoricalAdjudicationEvidenceStore
+public sealed class HistoricalAdjudicationPreviewStore(NoCtfDbContext db) : IHistoricalAdjudicationEvidenceStore, IHistoricalAdjudicationEventStore
 {
     public const int MaximumEventsPerFact = 128;
     private static readonly CompetitionEventKind[] EvidenceKinds =
@@ -33,8 +33,16 @@ public sealed class HistoricalAdjudicationPreviewStore(NoCtfDbContext db) : IHis
         CompetitionEventKind.TeamBanCorrectionPublished
     ];
 
-    public async Task<HistoricalAdjudicationEvidencePage> ReadAsync(Guid competitionId, Guid? competitionChallengeId,
-        DateTimeOffset? beforeOccurredAt, Guid? beforeId, int scanLimit, CancellationToken ct)
+    public Task<HistoricalAdjudicationEvidencePage> ReadAsync(Guid competitionId, Guid? competitionChallengeId,
+        DateTimeOffset? beforeOccurredAt, Guid? beforeId, int scanLimit, CancellationToken ct) =>
+        ReadCoreAsync(competitionId, competitionChallengeId, beforeOccurredAt, beforeId, scanLimit, true, ct);
+
+    public Task<HistoricalAdjudicationEvidencePage> ReadRestrictedAsync(Guid competitionId, Guid? competitionChallengeId,
+        DateTimeOffset? beforeOccurredAt, Guid? beforeId, int scanLimit, CancellationToken ct) =>
+        ReadCoreAsync(competitionId, competitionChallengeId, beforeOccurredAt, beforeId, scanLimit, false, ct);
+
+    private async Task<HistoricalAdjudicationEvidencePage> ReadCoreAsync(Guid competitionId, Guid? competitionChallengeId,
+        DateTimeOffset? beforeOccurredAt, Guid? beforeId, int scanLimit, bool includeInternalTeams, CancellationToken ct)
     {
         scanLimit = Math.Clamp(scanLimit, 1, 500);
         await using var transaction = await db.Database.BeginTransactionAsync(IsolationLevel.RepeatableRead, ct);
@@ -42,9 +50,14 @@ public sealed class HistoricalAdjudicationPreviewStore(NoCtfDbContext db) : IHis
             .Select(row => new { row.Mode, row.StartAt, row.EndAt, row.TracksEnabled, row.TrackConfigurationJson }).SingleOrDefaultAsync(ct);
         if (competition is null) return new(HistoricalAdjudicationPreviewReadState.CompetitionNotFound, []);
         if (competition.Mode is not (GameMode.Ctf or GameMode.Awdp)) return new(HistoricalAdjudicationPreviewReadState.Available, []);
+        var tracks = CompetitionTrackConfiguration.EffectiveFor(competition.Mode, competition.TracksEnabled, competition.TrackConfigurationJson);
+        var internalKeys = tracks.Tracks.Where(track => track.IsInternal).Select(track => track.Key.ToLowerInvariant()).ToArray();
+        var hiddenTeams = db.Teams.IgnoreQueryFilters().Where(team => team.CompetitionId == competitionId
+            && internalKeys.Contains(team.TrackKey.ToLower())).Select(team => (Guid?)team.Id);
         var query = db.GameplayFacts.AsNoTracking().Where(fact => fact.CompetitionId == competitionId
             && (competition.Mode == GameMode.Ctf ? fact.Kind == GameplayFactKind.FlagAttempt || fact.Kind == GameplayFactKind.FixAttempt
                 : fact.Kind == GameplayFactKind.BreakAttempt));
+        if (!includeInternalTeams) query = query.Where(fact => !hiddenTeams.Contains(fact.TeamId));
         CompetitionOfficialWindow? window = null;
         if (competition.Mode == GameMode.Ctf)
         {
@@ -73,6 +86,7 @@ public sealed class HistoricalAdjudicationPreviewStore(NoCtfDbContext db) : IHis
         var patchIds = interactions.Where(pair => pair.Value == CtfInteractionKind.PatchVerification).Select(pair => pair.Key).ToArray();
         var firstCorrects = competition.Mode == GameMode.Ctf
             ? await db.GameplayFacts.AsNoTracking().Where(fact => fact.CompetitionId == competitionId && fact.TeamId != null
+                && (includeInternalTeams || !hiddenTeams.Contains(fact.TeamId))
                 && (fact.Kind == GameplayFactKind.FlagAttempt && flagIds.Contains(fact.CompetitionChallengeId)
                     || fact.Kind == GameplayFactKind.FixAttempt && patchIds.Contains(fact.CompetitionChallengeId))
                 && fact.Result == GameplayFactResult.Correct && fact.OccurredAt >= window!.Value.StartAt && fact.OccurredAt < window.Value.EndAt)
@@ -108,7 +122,6 @@ public sealed class HistoricalAdjudicationPreviewStore(NoCtfDbContext db) : IHis
         var teams = await db.Teams.IgnoreQueryFilters().AsNoTracking().Where(team => teamsIds.Contains(team.Id))
             .Select(team => new TeamEvidence(team.Id, team.Name, team.RegistrationStatus, team.IsBanned,
                 team.DeletedAt, team.TrackKey, team.RegisteredAt)).ToDictionaryAsync(team => team.Id, ct);
-        var tracks = CompetitionTrackConfiguration.EffectiveFor(competition.Mode, competition.TracksEnabled, competition.TrackConfigurationJson);
         bool Eligible(Guid teamId) => teams.TryGetValue(teamId, out var team)
             && CtfCompletionEligibility.CanParticipate(team.RegistrationStatus, team.IsBanned, team.DeletedAt != null)
             && (window is null || team.RegisteredAt < window.Value.EndAt)
@@ -154,6 +167,35 @@ public sealed class HistoricalAdjudicationPreviewStore(NoCtfDbContext db) : IHis
                 ReadEnum<GameplayFactResult>(document.RootElement, "gameplayFactResult"), item.ActorUserId, item.ParentEventId);
         }
         catch (JsonException) { return new(item.Id, item.OccurredAt, item.Kind, null, null, item.ActorUserId, item.ParentEventId, false); }
+    }
+
+    public async Task<HistoricalAdjudicationEventPage?> ReadEventsAsync(Guid competitionId, Guid gameplayFactId,
+        DateTimeOffset? beforeOccurredAt, Guid? beforeId, int limit, bool includeInternalTeams, CancellationToken ct)
+    {
+        await using var transaction = await db.Database.BeginTransactionAsync(IsolationLevel.RepeatableRead, ct);
+        var scope = await db.GameplayFacts.AsNoTracking().Where(fact => fact.Id == gameplayFactId && fact.CompetitionId == competitionId)
+            .Join(db.Competitions.IgnoreQueryFilters().AsNoTracking(), fact => fact.CompetitionId, competition => competition.Id,
+                (fact, competition) => new { fact.Kind, fact.TeamId, competition.Mode, competition.TracksEnabled, competition.TrackConfigurationJson })
+            .SingleOrDefaultAsync(ct);
+        if (scope is null || !(scope.Mode == GameMode.Ctf && scope.Kind is GameplayFactKind.FlagAttempt or GameplayFactKind.FixAttempt
+            || scope.Mode == GameMode.Awdp && scope.Kind == GameplayFactKind.BreakAttempt)) return null;
+        if (!includeInternalTeams && scope.TeamId is Guid teamId)
+        {
+            var trackKey = await db.Teams.IgnoreQueryFilters().AsNoTracking().Where(team => team.Id == teamId)
+                .Select(team => team.TrackKey).SingleOrDefaultAsync(ct);
+            var tracks = CompetitionTrackConfiguration.EffectiveFor(scope.Mode, scope.TracksEnabled, scope.TrackConfigurationJson);
+            if (trackKey is null || CtfCompletionEligibility.Track(tracks, trackKey).IsInternal) return null;
+        }
+        var query = db.CompetitionEvents.AsNoTracking().Where(item => item.CompetitionId == competitionId
+            && item.SubjectType == EntityReferenceKind.GameplayFact && item.SubjectId == gameplayFactId && EvidenceKinds.Contains(item.Kind));
+        if (beforeOccurredAt is { } at && beforeId is { } id)
+            query = query.Where(item => item.OccurredAt < at || item.OccurredAt == at && item.Id.CompareTo(id) < 0);
+        var rows = await query.OrderByDescending(item => item.OccurredAt).ThenByDescending(item => item.Id)
+            .Take(Math.Clamp(limit, 1, 100) + 1).ToArrayAsync(ct);
+        var page = rows.Take(Math.Clamp(limit, 1, 100)).ToArray();
+        var more = rows.Length > page.Length;
+        await transaction.CommitAsync(ct);
+        return new(page.Select(ReadEvent).ToArray(), more ? page[^1].OccurredAt : null, more ? page[^1].Id : null);
     }
 
     private static T? ReadEnum<T>(JsonElement root, string name) where T : struct, Enum =>
