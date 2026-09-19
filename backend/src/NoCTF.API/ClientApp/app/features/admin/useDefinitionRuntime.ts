@@ -24,6 +24,12 @@ export function useDefinitionRuntime(props: Readonly<Omit<{
     props.mode === 'Ctf'
     && props.interactionKind === CtfInteraction.PatchVerification,
   )
+  const showDynamicFlagInjection = computed(() =>
+    props.mode === 'Ctf' && !isPatchVerification.value,
+  )
+  const dynamicFlagInjection = computed(() =>
+    props.runtime.flagSource === FlagSource.PerTeam,
+  )
 
   const kindOptions = computed(() =>
     props.mode === 'Awdp' || isPatchVerification.value
@@ -42,6 +48,7 @@ export function useDefinitionRuntime(props: Readonly<Omit<{
           props.mode === 'Awdp'
           || props.mode === 'Ctf' && !isPatchVerification.value,
         )
+    synchronizeFlagInjection(props.runtime)
   }
 
   const flagSourceOptions = computed(() => {
@@ -88,12 +95,14 @@ export function useDefinitionRuntime(props: Readonly<Omit<{
         const patchVerification = interactionKind === CtfInteraction.PatchVerification
         if (patchVerification && runtime.definition.kind === 'compose')
           runtime.definition = emptyContainerDefinition(false)
-        runtime.flagSource = patchVerification ? FlagSource.Static : FlagSource.PerTeam
-        if (runtime.definition.kind === 'container') {
-          runtime.definition.flagEnvironmentVariableName = patchVerification
-            ? ''
-            : runtime.definition.flagEnvironmentVariableName.trim() || 'FLAG'
+        if (patchVerification) {
+          runtime.flagSource = FlagSource.Static
         }
+        else if (runtime.flagSource !== FlagSource.Static
+          && runtime.flagSource !== FlagSource.PerTeam) {
+          runtime.flagSource = FlagSource.PerTeam
+        }
+        synchronizeFlagInjection(runtime)
         for (const binding of runtime.urlBindings) binding.exposure = UrlExposure.OwnerOnly
       }
       if (mode === 'Awdp') {
@@ -127,6 +136,8 @@ export function useDefinitionRuntime(props: Readonly<Omit<{
       UrlExposure,
       isCompose,
       isPatchVerification,
+      showDynamicFlagInjection,
+      dynamicFlagInjection,
       kindOptions,
       switchKind,
       flagSourceOptions,
@@ -163,11 +174,27 @@ export function useDefinitionRuntime(props: Readonly<Omit<{
     viewState.runtime!.flagSource = Number(value)
   }
 
+  function setDynamicFlagInjection(enabled: boolean): void {
+    props.runtime.flagSource = enabled ? FlagSource.PerTeam : FlagSource.Static
+    synchronizeFlagInjection(props.runtime)
+  }
+
   function onUpdateModelValueRuntimeUrlBindings(value: NonNullable<typeof viewState.runtime>['urlBindings']) {
     viewState.runtime!.urlBindings = value
   }
 
-  return { ...viewBindings, onUpdateModelValueRuntimeLimitsMemoryBytes, onUpdateModelValueRuntimeLimitsNanoCpus, onUpdateModelValueRuntimeLimitsPidsLimit, onUpdateModelValueRuntimeTtlSeconds, onUpdateModelValueRuntimeOperationTimeoutSeconds, onUpdateModelValueRuntimeFlagSource, onUpdateModelValueRuntimeUrlBindings }
+  return { ...viewBindings, onUpdateModelValueRuntimeLimitsMemoryBytes, onUpdateModelValueRuntimeLimitsNanoCpus, onUpdateModelValueRuntimeLimitsPidsLimit, onUpdateModelValueRuntimeTtlSeconds, onUpdateModelValueRuntimeOperationTimeoutSeconds, onUpdateModelValueRuntimeFlagSource, setDynamicFlagInjection, onUpdateModelValueRuntimeUrlBindings }
+}
+
+function synchronizeFlagInjection(runtime: RuntimeTemplateModel): void {
+  const enabled = runtime.flagSource === FlagSource.PerTeam
+  if (runtime.definition.kind === 'container') {
+    runtime.definition.flagEnvironmentVariableName = enabled
+      ? runtime.definition.flagEnvironmentVariableName.trim() || 'FLAG'
+      : ''
+    return
+  }
+  if (!enabled) runtime.definition.flagEnvironmentVariables = {}
 }
 
 export type DefinitionRuntimeViewState = import('vue').ShallowUnwrapRef<Awaited<ReturnType<typeof useDefinitionRuntime>>>

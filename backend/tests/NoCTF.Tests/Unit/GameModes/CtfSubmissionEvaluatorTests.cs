@@ -41,6 +41,29 @@ public sealed class CtfGameplayFactEvaluatorTests
     }
 
     [Test]
+    public async Task Static_ctf_runtime_accepts_a_template_exact_flag()
+    {
+        var fixture = CreateFixture("flag{static}");
+        var definition = JsonSerializer.Serialize(new CtfChallengeConfiguration(
+            CtfChallengeConfiguration.CurrentSchemaVersion,
+            null,
+            null,
+            Runtime: new ChallengeRuntimeTemplate(
+                RuntimeAllocation.PerTeam,
+                new ContainerRuntimeDefinition("registry.example/challenge:v1"),
+                FlagSource: RuntimeFlagSource.Static)),
+            new JsonSerializerOptions(JsonSerializerDefaults.Web));
+
+        var result = new CtfGameplayFactEvaluator(new DefaultEfGameplayFactEvaluator())
+            .Evaluate(fixture.Context([fixture.Flag(null)]) with
+            {
+                ChallengeDefinitionJson = definition
+            });
+
+        await Assert.That(result.Result).IsEqualTo(GameplayFactResult.Correct);
+    }
+
+    [Test]
     public async Task Dynamic_ctf_runtime_ignores_regular_expression_flags()
     {
         var fixture = CreateFixture("flag{dynamic}");

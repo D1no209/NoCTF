@@ -2,14 +2,17 @@
 import { bindViewState } from '~/features/shared/view-state'
 
 import type { ComposeDefinitionModel } from '~/utils/game-config'
+import { FlagSource } from '~/utils/game-config'
 
 import { useDefinitionCompose } from './useDefinitionCompose'
 import View from '~/components/views/admin/DefinitionComposeView.vue'
 
 const props = withDefaults(defineProps<{
   definition: ComposeDefinitionModel
+  flagSource?: number
   disabled?: boolean
 }>(), {
+  flagSource: FlagSource.Static,
   disabled: false,
 })
 const state = bindViewState(useDefinitionCompose(props))

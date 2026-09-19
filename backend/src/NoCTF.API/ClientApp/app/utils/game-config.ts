@@ -647,7 +647,7 @@ export function serializeDefinition(mode: GameModeValue, model: DefinitionModel)
     const flagSource = mode === 'Ctf'
       ? model.interactionKind === CtfInteraction.PatchVerification
         ? FlagSource.Static
-        : FlagSource.PerTeam
+        : model.runtime.flagSource
       : mode === 'Awdp'
         ? FlagSource.PerTeam
         : model.runtime.flagSource

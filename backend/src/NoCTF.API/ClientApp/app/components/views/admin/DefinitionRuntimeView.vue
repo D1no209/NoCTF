@@ -3,7 +3,7 @@ import { toRefs } from 'vue'
 import type { DefinitionRuntimeViewState } from '~/features/admin/useDefinitionRuntime'
 
 const viewProps = defineProps<{ state: DefinitionRuntimeViewState }>()
-const { bytesToMib, nanoCpusToCores, RuntimeAllocation, UrlExposure, isCompose, kindOptions, switchKind, flagSourceOptions, exposureOptions, controlBindingList, hasCustomRuntimePolicy, DefinitionCompose, DefinitionContainer, UrlBindingList, runtime, mode, disabled, onUpdateModelValueRuntimeLimitsMemoryBytes, onUpdateModelValueRuntimeLimitsNanoCpus, onUpdateModelValueRuntimeLimitsPidsLimit, onUpdateModelValueRuntimeTtlSeconds, onUpdateModelValueRuntimeOperationTimeoutSeconds, onUpdateModelValueRuntimeFlagSource, onUpdateModelValueRuntimeUrlBindings } = toRefs(viewProps.state)
+const { bytesToMib, nanoCpusToCores, RuntimeAllocation, UrlExposure, isCompose, showDynamicFlagInjection, dynamicFlagInjection, kindOptions, switchKind, flagSourceOptions, exposureOptions, controlBindingList, hasCustomRuntimePolicy, DefinitionCompose, DefinitionContainer, UrlBindingList, runtime, mode, disabled, onUpdateModelValueRuntimeLimitsMemoryBytes, onUpdateModelValueRuntimeLimitsNanoCpus, onUpdateModelValueRuntimeLimitsPidsLimit, onUpdateModelValueRuntimeTtlSeconds, onUpdateModelValueRuntimeOperationTimeoutSeconds, onUpdateModelValueRuntimeFlagSource, setDynamicFlagInjection, onUpdateModelValueRuntimeUrlBindings } = toRefs(viewProps.state)
 </script>
 
 <template>
@@ -33,6 +33,25 @@ const { bytesToMib, nanoCpusToCores, RuntimeAllocation, UrlExposure, isCompose, 
       </Badge>
     </div>
 
+    <Field v-if="showDynamicFlagInjection" orientation="horizontal">
+      <Switch
+        id="ctf-dynamic-flag-injection"
+        :model-value="dynamicFlagInjection"
+        :disabled="disabled"
+        @update:model-value="setDynamicFlagInjection($event === true)"
+      />
+      <div class="space-y-1">
+        <FieldLabel for="ctf-dynamic-flag-injection" class="font-normal">
+          {{ $t('ui.dynamicFlagInjection') }}
+        </FieldLabel>
+        <FieldDescription>
+          {{ dynamicFlagInjection
+            ? $t('ui.dynamicFlagInjectionEnabledDescription')
+            : $t('ui.dynamicFlagInjectionDisabledDescription') }}
+        </FieldDescription>
+      </div>
+    </Field>
+
     <component :is="DefinitionContainer"
       v-if="runtime.definition.kind === 'container'"
       :definition="runtime.definition"
@@ -43,6 +62,7 @@ const { bytesToMib, nanoCpusToCores, RuntimeAllocation, UrlExposure, isCompose, 
     <component :is="DefinitionCompose"
       v-else
       :definition="runtime.definition"
+      :flag-source="runtime.flagSource"
       :disabled="disabled"
     />
 

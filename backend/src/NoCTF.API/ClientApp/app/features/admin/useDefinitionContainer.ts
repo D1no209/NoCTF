@@ -20,7 +20,7 @@ export function useDefinitionContainer(props: Readonly<Omit<{
 }, "flagSource" | "disabled">>>) {
   const isAwdp = computed(() => props.mode === 'Awdp')
 
-  const flagEnvDisabled = computed(() => props.disabled || props.flagSource === FlagSource.Static)
+  const showFlagEnvironmentVariable = computed(() => props.flagSource !== FlagSource.Static)
 
   const hasMetadata = computed(() =>
     Object.keys(props.definition.environment).length > 0 || Object.keys(props.definition.labels).length > 0,
@@ -44,7 +44,7 @@ export function useDefinitionContainer(props: Readonly<Omit<{
       ...toRefs(props),
       FlagSource,
       isAwdp,
-      flagEnvDisabled,
+      showFlagEnvironmentVariable,
       hasAdvanced,
       hasMetadata,
       hasSecurity

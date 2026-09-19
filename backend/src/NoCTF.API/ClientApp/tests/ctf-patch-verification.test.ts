@@ -12,7 +12,8 @@ describe('CTF Patch Verification experiment', () => {
     expect(source).toContain('model.runtime.flagSource = FlagSource.Static')
     expect(source).toContain('DEFAULT_CTF_PATCH_UPLOAD_BYTES = 64 * 1024 * 1024')
     expect(runtime).toContain('interactionKind === CtfInteraction.PatchVerification')
-    expect(runtime).toContain('runtime.flagSource = patchVerification ? FlagSource.Static : FlagSource.PerTeam')
+    expect(runtime).toContain('runtime.flagSource = FlagSource.Static')
+    expect(runtime).toContain('runtime.flagSource !== FlagSource.PerTeam')
   })
 
   test('uses generated endpoints with bounded polling and server-computed availability', async () => {

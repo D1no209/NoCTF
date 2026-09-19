@@ -219,7 +219,8 @@ export function validateChallengeTemplateDraft(draft: ChallengeTemplateDraft): s
         validateRunnerJob(issues, model.checkerJob, translate('Checker'))
         validatePatchSettings(issues, model)
       }
-      else if (runtime.flagSource !== FlagSource.PerTeam) {
+      else if (runtime.flagSource !== FlagSource.Static
+        && runtime.flagSource !== FlagSource.PerTeam) {
         addIssue(issues, translate("ui.ctfContainerChallengesMustUsePerTeamFlags"))
       }
       if (runtime.urlBindings.some(binding => binding.exposure !== UrlExposure.OwnerOnly))

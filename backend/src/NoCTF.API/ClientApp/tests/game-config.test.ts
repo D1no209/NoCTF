@@ -105,6 +105,19 @@ describe('dynamic flag templates', () => {
     expect(runtime.definition.flagEnvironmentVariableName).toBe('FLAG')
   })
 
+  test('serializes a static CTF runtime without a Flag injection variable', () => {
+    const model = emptyDefinition('Ctf')
+    model.runtime = emptyRuntimeTemplate('Ctf')
+    if (model.runtime.definition.kind !== 'container') throw new Error('Expected container definition')
+    model.runtime.flagSource = FlagSource.Static
+    model.runtime.definition.flagEnvironmentVariableName = 'FLAG'
+
+    const serialized = JSON.parse(serializeDefinition('Ctf', model))
+
+    expect(serialized.runtime.flagSource).toBe(FlagSource.Static)
+    expect(serialized.runtime.definition.flagEnvironmentVariableName).toBeUndefined()
+  })
+
   test('canonicalizes PatchVerification runtimes without Flag injection', () => {
     const model = emptyDefinition('Ctf')
     applyCtfInteraction(model, CtfInteraction.PatchVerification)
