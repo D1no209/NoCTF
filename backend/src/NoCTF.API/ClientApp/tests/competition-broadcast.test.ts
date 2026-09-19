@@ -135,7 +135,18 @@ describe('competition broadcast projection', () => {
 
     expect(competitionBroadcastQueryWindow(startAt, clientNow, serverEventAt)).toEqual({
       from: '2026-09-01T00:00:00.000Z',
-      to: '2026-09-14T10:00:08.000Z',
+      to: '2026-09-14T10:05:00.000Z',
+    })
+  })
+
+  test('uses a newer notification timestamp beyond the reconnect clock margin', () => {
+    const startAt = Date.parse('2026-09-01T00:00:00Z')
+    const clientNow = Date.parse('2026-09-14T10:00:00Z')
+    const serverEventAt = Date.parse('2026-09-14T10:08:00Z')
+
+    expect(competitionBroadcastQueryWindow(startAt, clientNow, serverEventAt)).toEqual({
+      from: '2026-09-01T00:00:00.000Z',
+      to: '2026-09-14T10:08:00.000Z',
     })
   })
 
@@ -144,8 +155,8 @@ describe('competition broadcast projection', () => {
     const clientNow = Date.parse('2026-09-14T10:00:00Z')
 
     expect(competitionBroadcastQueryWindow(startAt, clientNow)).toEqual({
-      from: '2026-08-15T10:00:00.000Z',
-      to: '2026-09-14T10:00:00.000Z',
+      from: '2026-08-15T10:05:00.000Z',
+      to: '2026-09-14T10:05:00.000Z',
     })
   })
 
@@ -199,9 +210,11 @@ describe('competition broadcast projection', () => {
     expect(panel).toContain('onReconnected: () => void refreshLatest()')
     expect(panel).toContain('const refreshLatest = createTrailingRefresh(load)')
     expect(panel).toContain('mergeCompetitionBroadcasts(items.value, data.items ?? [])')
-    expect(panel).toContain('name="broadcast"')
+    expect(panel).not.toContain('<TransitionGroup')
+    expect(panel).toContain('v-bind="broadcastMotionAttributes(event)"')
+    expect(panel).toContain("motionAttributes('list-enter')")
     expect(panel).toContain(':key="competitionBroadcastIdentity(event)"')
-    expect(panel).toContain('@media (prefers-reduced-motion: reduce)')
+    expect(panel).not.toContain('.broadcast-move')
     expect(panel).toContain('const initialLoad = !initialized.value')
     expect(panel).toContain("now < startAt || status === 'Draft' || status === 'Visible' || status === 'Published'")
     expect(panel).not.toContain("status === 'Finished' && initialized.value")
