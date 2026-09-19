@@ -9,6 +9,20 @@ export interface ProtectedDownloadResponse {
 
 export type ProtectedDownloadRequest = () => PromiseLike<ProtectedDownloadResponse>
 
+export type ProtectedDownloadParseMode = 'blob' | 'stream'
+
+export type ProtectedDownloadRequestFactory = (
+  parseAs: ProtectedDownloadParseMode,
+) => PromiseLike<ProtectedDownloadResponse>
+
+type SaveFileHandle = {
+  createWritable: () => Promise<WritableStream<Uint8Array>>
+}
+
+type SaveFilePicker = (options: { suggestedName: string }) => Promise<SaveFileHandle>
+
+export type ProtectedDownloadOutcome = 'downloaded' | 'canceled'
+
 export interface ProtectedDownload {
   blob: Blob
   fileName: string
@@ -83,6 +97,50 @@ export async function downloadSdkFile(
   anchor.click()
   anchor.remove()
   setTimeout(() => URL.revokeObjectURL(objectUrl), 1_000)
+}
+
+/** Stream an authenticated SDK response directly to disk when the browser supports it. */
+export async function downloadSdkFileToDisk(
+  request: ProtectedDownloadRequestFactory,
+  fallbackName = 'download',
+): Promise<ProtectedDownloadOutcome> {
+  const browser = globalThis as typeof globalThis & {
+    showSaveFilePicker?: SaveFilePicker
+  }
+  const picker = browser.showSaveFilePicker
+
+  if (!picker) {
+    await downloadSdkFile(request('blob'), fallbackName)
+    return 'downloaded'
+  }
+
+  let handle: SaveFileHandle
+  try {
+    handle = await picker.call(browser, {
+      suggestedName: sanitizeDownloadFileName(fallbackName),
+    })
+  }
+  catch (error) {
+    if (error instanceof DOMException && error.name === 'AbortError')
+      return 'canceled'
+    await downloadSdkFile(request('blob'), fallbackName)
+    return 'downloaded'
+  }
+
+  const { data, error, response } = await request('stream')
+  if (error || response?.ok === false) {
+    throw parseApiError(
+      error,
+      translate("ui.downloadFailedHttp", { status: response?.status ?? '-' }),
+    )
+  }
+  if (!(data instanceof ReadableStream)) {
+    throw new ApiError(translate("ui.theDownloadResponseFormatIsInvalid"))
+  }
+
+  const writable = await handle.createWritable()
+  await data.pipeTo(writable)
+  return 'downloaded'
 }
 
 /** @deprecated Prefer downloadSdkFile with the generated SDK promise directly. */

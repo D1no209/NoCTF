@@ -4,7 +4,7 @@ import { toast } from 'vue-sonner'
 import { Dice5, FileDown, History } from '@lucide/vue'
 import { downloadChallengeAttachmentEndpoint, downloadRandomChallengeAttachmentEndpoint, getChallengeEndpoint, listChallengeAttachmentsEndpoint } from '../../api'
 import type { NoCtfapiEndpointsAdministrationChallengeBankAttachmentDeliveryPolicyProtocol, NoCtfapiEndpointsAdministrationChallengeBankChallengeAttachmentResponse, NoCtfapiEndpointsChallengesChallengeResponse } from '../../api'
-import { downloadSdkFile } from '../../utils/download'
+import { downloadSdkFileToDisk } from '../../utils/download'
 import ChallengeHintsComponent from './ChallengeHints.vue'
 import ChallengeSubmissionHistoryComponent from './ChallengeSubmissionHistory.vue'
 import AwdPanelComponent from './panels/AwdPanel.vue'
@@ -127,16 +127,17 @@ export function useCompetitionChallengeDetail(props: Readonly<{
   })
 
   async function downloadAttachment(attachmentId: string, fileName: string): Promise<void> {
+    if (downloading.value) return
     downloading.value = true
     try {
-      await downloadSdkFile(
-        downloadChallengeAttachmentEndpoint({
+      await downloadSdkFileToDisk(
+        parseAs => downloadChallengeAttachmentEndpoint({
           path: {
             competitionId: props.competitionId,
             competitionChallengeId: props.competitionChallengeId,
             attachmentId,
           },
-          parseAs: 'blob',
+          parseAs,
         }),
         fileName,
       )
@@ -150,15 +151,16 @@ export function useCompetitionChallengeDetail(props: Readonly<{
   }
 
   async function downloadRandom(): Promise<void> {
+    if (downloading.value) return
     downloading.value = true
     try {
-      await downloadSdkFile(
-        downloadRandomChallengeAttachmentEndpoint({
+      await downloadSdkFileToDisk(
+        parseAs => downloadRandomChallengeAttachmentEndpoint({
           path: {
             competitionId: props.competitionId,
             competitionChallengeId: props.competitionChallengeId,
           },
-          parseAs: 'blob',
+          parseAs,
         }),
         'attachment',
       )
