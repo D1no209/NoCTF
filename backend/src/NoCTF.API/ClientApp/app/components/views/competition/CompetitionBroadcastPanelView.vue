@@ -3,7 +3,7 @@ import { toRefs } from 'vue'
 import type { CompetitionBroadcastPanelViewState } from '~/features/competition/useCompetitionBroadcastPanel'
 
 const viewProps = defineProps<{ state: CompetitionBroadcastPanelViewState }>()
-const { Megaphone, items, loading, error, refreshLatest, fill } = toRefs(viewProps.state)
+const { Megaphone, items, loading, error, broadcastMotionAttributes, refreshLatest, fill } = toRefs(viewProps.state)
 </script>
 
 <template>
@@ -33,14 +33,16 @@ const { Megaphone, items, loading, error, refreshLatest, fill } = toRefs(viewPro
       <p class="text-sm text-muted-foreground">{{ $t('ui.thereIsNoMatchReportYet') }}</p>
       <p class="mt-1 text-xs text-muted-foreground/80">{{ $t('ui.bloodListQuestionsAndDisciplineInformationWillBeUpdatedHere') }}</p>
     </CardContent>
-    <TransitionGroup v-scroll-surface data-scroll-surface
+    <ol v-scroll-surface data-scroll-surface
       v-else
-      tag="ol"
-      name="broadcast"
       class="divide-y overflow-y-auto"
       :class="fill ? 'min-h-0 flex-1' : 'max-h-[50dvh]'"
     >
-      <li v-for="event in items" :key="competitionBroadcastIdentity(event)">
+      <li
+        v-for="event in items"
+        :key="competitionBroadcastIdentity(event)"
+        v-bind="broadcastMotionAttributes(event)"
+      >
         <NuxtLink
           v-if="competitionBroadcastTargetPath(event)"
           :to="competitionBroadcastTargetPath(event)!"
@@ -60,32 +62,6 @@ const { Megaphone, items, loading, error, refreshLatest, fill } = toRefs(viewPro
           </time>
         </div>
       </li>
-    </TransitionGroup>
+    </ol>
   </Card>
 </template>
-
-<style scoped>
-.broadcast-enter-active {
-  transition:
-    opacity 220ms cubic-bezier(0.16, 1, 0.3, 1),
-    transform 220ms cubic-bezier(0.16, 1, 0.3, 1),
-    background-color 700ms cubic-bezier(0.16, 1, 0.3, 1);
-}
-
-.broadcast-enter-from {
-  opacity: 0;
-  transform: translateY(-0.4rem);
-  background-color: color-mix(in oklch, var(--primary) 10%, transparent);
-}
-
-.broadcast-move {
-  transition: transform 220ms cubic-bezier(0.16, 1, 0.3, 1);
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .broadcast-enter-active,
-  .broadcast-move {
-    transition: none;
-  }
-}
-</style>
