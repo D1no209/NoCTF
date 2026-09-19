@@ -72,9 +72,12 @@ public static class CtfConfigurationValidator
         if (!Enum.IsDefined(configuration.InteractionKind))
             errors.Add("InteractionKind is invalid.");
         if (configuration.InteractionKind == CtfInteractionKind.FlagSubmission
-            && configuration.Runtime is { FlagSource: not RuntimeFlagSource.PerTeam })
+            && configuration.Runtime is
+            {
+                FlagSource: not RuntimeFlagSource.Static and not RuntimeFlagSource.PerTeam
+            })
         {
-            errors.Add("CTF runtimes must use PerTeam flags injected into the runtime environment.");
+            errors.Add("CTF runtimes support only Static or PerTeam flags.");
         }
         if (configuration.InteractionKind == CtfInteractionKind.PatchVerification
             && configuration.Runtime is { FlagSource: not RuntimeFlagSource.Static })

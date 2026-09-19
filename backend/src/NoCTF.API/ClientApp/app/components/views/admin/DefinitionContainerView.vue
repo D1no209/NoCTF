@@ -3,7 +3,7 @@ import { toRefs } from 'vue'
 import type { DefinitionContainerViewState } from '~/features/admin/useDefinitionContainer'
 
 const viewProps = defineProps<{ state: DefinitionContainerViewState }>()
-const { isAwdp, flagEnvDisabled, hasAdvanced, hasMetadata, hasSecurity, definition, disabled, onUpdateModelValueDefinitionCommand, onUpdateModelValueDefinitionContainerPorts, onUpdateModelValueDefinitionInternalPorts, onUpdateModelValueDefinitionEnvironment, onUpdateModelValueDefinitionLabels, onUpdateModelValueDefinitionSecurityCapDrop, onUpdateModelValueDefinitionSecurityCapAdd } = toRefs(viewProps.state)
+const { isAwdp, showFlagEnvironmentVariable, hasAdvanced, hasMetadata, hasSecurity, definition, disabled, onUpdateModelValueDefinitionCommand, onUpdateModelValueDefinitionContainerPorts, onUpdateModelValueDefinitionInternalPorts, onUpdateModelValueDefinitionEnvironment, onUpdateModelValueDefinitionLabels, onUpdateModelValueDefinitionSecurityCapDrop, onUpdateModelValueDefinitionSecurityCapAdd } = toRefs(viewProps.state)
 </script>
 
 <template>
@@ -56,13 +56,13 @@ const { isAwdp, flagEnvDisabled, hasAdvanced, hasMetadata, hasSecurity, definiti
           @update:model-value="onUpdateModelValueDefinitionCommand"
         />
       </Field>
-      <Field>
+      <Field v-if="showFlagEnvironmentVariable">
         <FieldLabel>{{ $t('ui.flagEnvironmentVariableName') }}</FieldLabel>
         <Input
           v-model="definition.flagEnvironmentVariableName"
           :placeholder="$t('ui.flag')"
           class="font-mono text-sm sm:max-w-xs"
-          :disabled="flagEnvDisabled"
+          :disabled="disabled"
         />
       </Field>
       <Field v-if="!isAwdp">

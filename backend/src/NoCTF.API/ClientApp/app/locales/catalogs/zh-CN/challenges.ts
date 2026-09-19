@@ -36,7 +36,7 @@ export const messages = {
   "ui.theAccessUrlPortMustAlsoAppearInThePublished": "访问入口端口必须同时存在于对外端口列表",
   "ui.composeAccessUrlsRequireAServiceName": "Compose 访问入口必须填写服务名",
   "ui.ctfRuntimesMustUsePerTeamAllocation": "CTF 运行环境必须采用每队独立分配",
-  "ui.ctfContainerChallengesMustUsePerTeamFlags": "CTF 容器题必须使用每队独立 Flag",
+  "ui.ctfContainerChallengesMustUsePerTeamFlags": "CTF 容器题仅支持静态 Flag 或每队独立 Flag",
   "ui.ctfAccessUrlsMustBeVisibleOnlyToTheirOwning": "CTF 访问入口必须设为仅队伍自己可见",
   "ui.awdRuntimesMustUsePerTeamAllocation": "AWD 运行环境必须采用每队独立分配",
   "ui.awdRuntimesMustUseRotatingFlags": "AWD 运行环境必须使用轮换 Flag",

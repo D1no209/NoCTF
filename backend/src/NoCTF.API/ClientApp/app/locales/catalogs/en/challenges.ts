@@ -36,7 +36,7 @@ export const messages = {
   "ui.theAccessUrlPortMustAlsoAppearInThePublished": "The access URL port must also appear in the published port list",
   "ui.composeAccessUrlsRequireAServiceName": "Compose access URLs require a service name",
   "ui.ctfRuntimesMustUsePerTeamAllocation": "CTF runtimes must use per-team allocation",
-  "ui.ctfContainerChallengesMustUsePerTeamFlags": "CTF container challenges must use per-team flags",
+  "ui.ctfContainerChallengesMustUsePerTeamFlags": "CTF container challenges support only static or per-team Flags",
   "ui.ctfAccessUrlsMustBeVisibleOnlyToTheirOwning": "CTF access URLs must be visible only to their owning team",
   "ui.awdRuntimesMustUsePerTeamAllocation": "AWD runtimes must use per-team allocation",
   "ui.awdRuntimesMustUseRotatingFlags": "AWD runtimes must use rotating flags",

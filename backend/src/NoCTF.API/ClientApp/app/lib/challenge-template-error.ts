@@ -20,7 +20,7 @@ const definitionDiagnostics: Record<string, string> = {
   'PerTeam Container runtimes require FlagEnvironmentVariableName.': "ui.perTeamFlagsRequireAFlagEnvironmentVariableName",
   'Flag environment variables cannot use the NOCTF_ prefix.': "ui.theFlagEnvironmentVariableNameCannotUseTheNoctfPrefix",
   'CTF runtimes must use PerTeam allocation.': "ui.ctfRuntimesMustUsePerTeamAllocation",
-  'CTF runtimes must use PerTeam flags injected into the runtime environment.': "ui.ctfContainerChallengesMustUsePerTeamFlags",
+  'CTF runtimes support only Static or PerTeam flags.': "ui.ctfContainerChallengesMustUsePerTeamFlags",
   'CTF PatchVerification runtimes cannot inject flags.': "ui.ctfPatchVerificationRuntimesCannotInjectFlags",
   'CTF PatchVerification requires a Docker or Kubernetes Container runtime.': "ui.ctfPatchVerificationOnlySupportsSingleContainerRuntimes",
   'CTF PatchVerification Runtime must declare exactly one InternalPort.': "ui.ctfPatchVerificationRequiresExactlyOneInternalPort",

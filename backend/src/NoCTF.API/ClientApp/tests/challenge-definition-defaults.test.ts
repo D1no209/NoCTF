@@ -60,6 +60,25 @@ describe('challenge definition defaults', () => {
     })).toEqual([])
   })
 
+  test('accepts a CTF runtime that uses a static Flag', () => {
+    const model = emptyDefinition('Ctf')
+    const runtime = emptyRuntimeTemplate('Ctf')
+    model.runtime = runtime
+    if (runtime.definition.kind !== 'container') throw new Error('Expected container definition')
+    runtime.definition.image = 'registry.example.com/challenge:latest'
+    runtime.definition.containerPorts = [8080]
+    runtime.urlBindings[0]!.containerPort = 8080
+    runtime.flagSource = FlagSource.Static
+    runtime.definition.flagEnvironmentVariableName = ''
+
+    expect(validateChallengeTemplateDraft({
+      mode: 'Ctf',
+      title: 'Static Flag runtime',
+      direction: 'Web',
+      definitionJson: serializeDefinition('Ctf', model),
+    })).toEqual([])
+  })
+
   test('accepts a complete CTF PatchVerification definition without Flag injection', () => {
     const model = emptyDefinition('Ctf')
     applyCtfInteraction(model, CtfInteraction.PatchVerification)
@@ -140,6 +159,10 @@ describe('challenge definition defaults', () => {
       status: 409,
       code: 'ActiveRuntimeDefinitionConflict',
     })).toEqual(['该模板仍有活动运行环境，请停止相关实例后再修改技术定义'])
+    expect(challengeTemplateWriteErrorMessages({
+      status: 400,
+      detail: 'CTF runtimes support only Static or PerTeam flags.',
+    })).toEqual(['CTF 容器题仅支持静态 Flag 或每队独立 Flag'])
 
     const createPage = await sourceFile(new URL('../app/features/admin/ChallengeTemplateCreateDialog.vue', import.meta.url)).text()
     const submit = createPage.slice(createPage.indexOf('async function submit'), createPage.indexOf('export type', createPage.indexOf('async function submit')))
