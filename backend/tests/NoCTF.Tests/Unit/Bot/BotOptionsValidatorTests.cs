@@ -1,4 +1,5 @@
 using NoCTF.Bot.Configuration;
+using NoCTF.Bot.Providers.Milky;
 
 namespace NoCTF.Tests.Unit.Bot;
 
@@ -24,6 +25,25 @@ public sealed class BotOptionsValidatorTests
 
         await Assert.That(valid.Succeeded).IsTrue();
         await Assert.That(insecure.Failed).IsTrue();
+    }
+
+    [Test]
+    public async Task RelayOptions_RequireProviderAndMasterUserId()
+    {
+        var validator = new RelayOptionsValidator();
+        var valid = validator.Validate(null, new RelayOptions
+        {
+            Provider = "milky",
+            MasterUserId = "10001"
+        });
+        var missing = validator.Validate(null, new RelayOptions
+        {
+            Provider = "",
+            MasterUserId = ""
+        });
+
+        await Assert.That(valid.Succeeded).IsTrue();
+        await Assert.That(missing.Failed).IsTrue();
     }
 
     [Test]

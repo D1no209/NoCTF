@@ -1,4 +1,4 @@
-using NoCTF.Bot.Milky;
+using NoCTF.Bot.Providers.Milky;
 
 namespace NoCTF.Tests.Unit.Bot;
 
@@ -30,10 +30,10 @@ public sealed class MilkyEventParserTests
         var message = MilkyEventParser.ParseGroupMessage(json);
 
         await Assert.That(message).IsNotNull();
-        await Assert.That(message!.SelfId).IsEqualTo(10001);
-        await Assert.That(message.GroupId).IsEqualTo(20002);
-        await Assert.That(message.SenderId).IsEqualTo(30003);
-        await Assert.That(message.MessageSequence).IsEqualTo(42);
+        await Assert.That(message!.ProviderId).IsEqualTo("milky");
+        await Assert.That(message.GroupId).IsEqualTo("20002");
+        await Assert.That(message.SenderId).IsEqualTo("30003");
+        await Assert.That(message.MessageId).IsEqualTo("42");
         await Assert.That(message.Text).IsEqualTo("/ctf rank 20");
     }
 
@@ -50,6 +50,27 @@ public sealed class MilkyEventParserTests
                 "peer_id": 30003,
                 "sender_id": 30003,
                 "message_seq": 42,
+                "segments": [{ "type": "text", "data": { "text": "/ctf status" } }]
+              }
+            }
+            """;
+
+        await Assert.That(MilkyEventParser.ParseGroupMessage(json)).IsNull();
+    }
+
+    [Test]
+    public async Task ParseGroupMessage_MessageFromBotItself_IsIgnored()
+    {
+        const string json = """
+            {
+              "time": 1760000000,
+              "self_id": 10001,
+              "event_type": "message_receive",
+              "data": {
+                "message_scene": "group",
+                "peer_id": 20002,
+                "sender_id": 10001,
+                "message_seq": 43,
                 "segments": [{ "type": "text", "data": { "text": "/ctf status" } }]
               }
             }

@@ -991,6 +991,22 @@ export type NoCtfapiEndpointsCompetitionsGetScoreboardSlotDetailRequest = {
     [key: string]: never;
 };
 
+export type NoCtfapiEndpointsCompetitionsCompetitionAnnouncementListResponse = {
+    items?: Array<NoCtfapiEndpointsCompetitionsCompetitionAnnouncementResponse>;
+    nextCursor?: string | null;
+};
+
+export type NoCtfapiEndpointsCompetitionsCompetitionAnnouncementResponse = {
+    id?: string;
+    title?: string;
+    body?: string;
+    publishedAt?: string;
+};
+
+export type NoCtfapiEndpointsCompetitionsListCompetitionAnnouncementsRequest = {
+    [key: string]: never;
+};
+
 export type NoCtfapiEndpointsCompetitionsCompetitionListResponse = {
     items?: Array<NoCtfapiEndpointsCompetitionsCompetitionResponse>;
 };
@@ -4946,6 +4962,48 @@ export type GetScoreboardSlotDetailEndpointResponses = {
 };
 
 export type GetScoreboardSlotDetailEndpointResponse = GetScoreboardSlotDetailEndpointResponses[keyof GetScoreboardSlotDetailEndpointResponses];
+
+export type ListCompetitionAnnouncementsEndpointData = {
+    body?: never;
+    path: {
+        competitionId: string;
+    };
+    query: {
+        cursor?: string | null;
+        limit: number;
+    };
+    url: '/api/v1/competitions/{competitionId}/announcements';
+};
+
+export type ListCompetitionAnnouncementsEndpointErrors = {
+    /**
+     * Bad Request
+     */
+    400: MicrosoftAspNetCoreMvcValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+    /**
+     * Not Found
+     */
+    404: unknown;
+};
+
+export type ListCompetitionAnnouncementsEndpointError = ListCompetitionAnnouncementsEndpointErrors[keyof ListCompetitionAnnouncementsEndpointErrors];
+
+export type ListCompetitionAnnouncementsEndpointResponses = {
+    /**
+     * Success
+     */
+    200: NoCtfapiEndpointsCompetitionsCompetitionAnnouncementListResponse;
+};
+
+export type ListCompetitionAnnouncementsEndpointResponse = ListCompetitionAnnouncementsEndpointResponses[keyof ListCompetitionAnnouncementsEndpointResponses];
 
 export type ListCompetitionsEndpointData = {
     body?: never;

@@ -3,8 +3,8 @@ using System.Text;
 using System.Text.Json;
 using Microsoft.Extensions.Options;
 using NoCTF.Bot.Configuration;
-using NoCTF.Bot.Milky;
 using NoCTF.Bot.NoCtf;
+using NoCTF.Bot.Providers.Milky;
 
 namespace NoCTF.Tests.Unit.Bot;
 
@@ -84,6 +84,51 @@ public sealed class ProtocolClientTests
         await Assert.That(first.RetryAfter).IsEqualTo(TimeSpan.FromSeconds(7));
         await Assert.That(coalesced.State).IsEqualTo(NoCtfReadState.Processing);
         await Assert.That(calls).IsEqualTo(1);
+    }
+
+    [Test]
+    public async Task NoCtfClient_Announcements_UsesGenericCompetitionContract()
+    {
+        HttpRequestMessage? captured = null;
+        var handler = new StubHandler(request =>
+        {
+            captured = request;
+            return Task.FromResult(Json("""
+                {
+                  "items": [
+                    {
+                      "id": "019bf9b5-e4cc-711a-b231-562e32ad7286",
+                      "title": "Notice",
+                      "body": "Body",
+                      "publishedAt": "2026-09-20T00:00:00Z"
+                    }
+                  ],
+                  "nextCursor": null
+                }
+                """));
+        });
+        var client = new NoCtfClient(
+            new HttpClient(handler),
+            Options.Create(new NoCtfBotOptions
+            {
+                BaseUrl = new("https://noctf.test"),
+                PublicBaseUrl = new("https://noctf.test"),
+                AccessToken = "noctf-secret"
+            }),
+            TimeProvider.System);
+        var competitionId = Guid.NewGuid();
+
+        var result = await client.GetAnnouncementsAsync(
+            competitionId,
+            "signed cursor",
+            CancellationToken.None);
+
+        await Assert.That(result.State).IsEqualTo(NoCtfReadState.Available);
+        await Assert.That(result.Value!.Items).HasSingleItem();
+        await Assert.That(result.Value.Items[0].Body).IsEqualTo("Body");
+        await Assert.That(captured!.RequestUri!.PathAndQuery)
+            .IsEqualTo($"/api/v1/competitions/{competitionId:D}/announcements?limit=200&cursor=signed%20cursor");
+        await Assert.That(captured.Headers.Authorization!.Parameter).IsEqualTo("noctf-secret");
     }
 
     private static HttpResponseMessage Json(string value) => new(HttpStatusCode.OK)

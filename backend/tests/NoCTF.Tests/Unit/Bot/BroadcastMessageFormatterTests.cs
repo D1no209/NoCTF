@@ -50,9 +50,13 @@ public sealed class BroadcastMessageFormatterTests
             new Dictionary<Guid, TeamSnapshot>(),
             [],
             Scoreboard(LeaderboardVisibility.Blackout, LeaderboardDataScope.Hidden),
-            [new(Guid.NewGuid(), "FirstBloodAwarded", occurredAt)]);
+            [
+                new(Guid.NewGuid(), "FirstBloodAwarded", occurredAt),
+                new(Guid.NewGuid(), "AwdpBreakResolved", occurredAt)
+            ]);
 
         await Assert.That(messages.Any(message => message.Category == BroadcastCategory.Blood)).IsFalse();
+        await Assert.That(messages.Any(message => message.Category == BroadcastCategory.Scoreboard)).IsFalse();
         await Assert.That(messages.Any(message => message.Text.Contains("1000", StringComparison.Ordinal))).IsFalse();
     }
 
@@ -102,7 +106,8 @@ public sealed class BroadcastMessageFormatterTests
             occurredAt);
         var scoreboard = Scoreboard(
             LeaderboardVisibility.Normal,
-            LeaderboardDataScope.Live) with { Teams = [team] };
+            LeaderboardDataScope.Live) with
+        { Teams = [team] };
         var teamJson = System.Text.Json.JsonSerializer.Serialize(new[] { achievement });
         var teamSnapshot = new TeamSnapshot(
             competitionId,
@@ -128,6 +133,73 @@ public sealed class BroadcastMessageFormatterTests
             && message.Text.Contains("Blue Team", StringComparison.Ordinal)
             && message.Text.Contains("Web 100", StringComparison.Ordinal)
             && message.Text.Contains("一血", StringComparison.Ordinal))).IsTrue();
+    }
+
+    [Test]
+    [Arguments("ScoreboardUpdated", false)]
+    [Arguments("ScoringRecorded", false)]
+    [Arguments("AwdpBreakResolved", true)]
+    [Arguments("AwdpFixResolved", true)]
+    public async Task Create_ScoreboardBroadcastsOnlyForAwdpResolutions(
+        string signalKind,
+        bool expected)
+    {
+        var competitionId = Guid.NewGuid();
+        var teamId = Guid.NewGuid();
+        var occurredAt = DateTimeOffset.Parse("2026-09-20T00:00:00Z");
+        var competition = new Competition(
+            competitionId,
+            "AWDP",
+            null,
+            "Awdp",
+            occurredAt.AddHours(-1),
+            occurredAt.AddHours(1),
+            CompetitionStatus.Running,
+            LeaderboardVisibility.Normal,
+            CompetitionAccessMode.Public);
+        var previousCompetition = new CompetitionSnapshot(
+            competitionId,
+            CompetitionStatus.Running,
+            competition.StartTime,
+            competition.EndTime,
+            "hash",
+            occurredAt);
+        var previousTeam = new TeamSnapshot(
+            competitionId,
+            teamId,
+            "Red Team",
+            2,
+            100,
+            "old",
+            "[]");
+        var currentTeam = previousTeam with { Rank = 1, Score = 200, AchievementHash = "new" };
+        var scoreboard = Scoreboard(
+            LeaderboardVisibility.Normal,
+            LeaderboardDataScope.Live) with
+        {
+            CompetitionId = competitionId,
+            Teams = [new(
+                teamId,
+                "Red Team",
+                "default",
+                1,
+                ScoreboardRankingState.Eligible,
+                200,
+                [])]
+        };
+
+        var messages = BroadcastMessageFormatter.Create(
+            competition,
+            previousCompetition,
+            new Dictionary<Guid, ChallengeSnapshot>(),
+            [],
+            new Dictionary<Guid, TeamSnapshot> { [teamId] = previousTeam },
+            [currentTeam],
+            scoreboard,
+            [new(Guid.NewGuid(), signalKind, occurredAt)]);
+
+        await Assert.That(messages.Any(message =>
+            message.Category == BroadcastCategory.Scoreboard)).IsEqualTo(expected);
     }
 
     private static ScoreboardSnapshot Scoreboard(

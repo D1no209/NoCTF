@@ -13,7 +13,9 @@ internal static class NotificationInfrastructure
     {
         services.AddScoped<ICompetitionHubAccess, CompetitionHubAccess>();
         services.AddScoped<INotificationReader, NotificationReader>();
+        services.AddScoped<IPublicCompetitionAnnouncementReader, PublicCompetitionAnnouncementReader>();
         services.AddScoped<ListNotifications>();
+        services.AddScoped<ListPublicCompetitionAnnouncements>();
         services.AddScoped<ReadNotificationFeed>();
         services.AddScoped<CompetitionNotificationAudienceResolver>();
         services.AddScoped<CompetitionNotificationDelivery>();
