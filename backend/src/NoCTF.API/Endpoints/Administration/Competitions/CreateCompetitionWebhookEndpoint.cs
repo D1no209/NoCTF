@@ -32,7 +32,9 @@ public sealed record CompetitionWebhookCreatedResponse(
     CompetitionWebhookTargetResponse Target,
     string SigningSecret);
 
-public sealed record CompetitionWebhookFailureResponse(CompetitionWebhookProblemCode Code);
+public sealed record CompetitionWebhookFailureResponse(
+    CompetitionWebhookProblemCode Code,
+    string Message);
 
 public sealed class CreateCompetitionWebhookEndpoint(
     CreateCompetitionWebhookTarget create,
@@ -69,7 +71,8 @@ public sealed class CreateCompetitionWebhookEndpoint(
         if (result.Failure == CompetitionWebhookMutationFailure.DuplicateEndpoint)
         {
             return TypedResults.Conflict(new CompetitionWebhookFailureResponse(
-                CompetitionWebhookProblemCode.DuplicateEndpoint));
+                CompetitionWebhookProblemCode.DuplicateEndpoint,
+                "A webhook target with this endpoint URL already exists."));
         }
         if (!result.Succeeded || result.Target is null || result.SigningSecret is null)
             return CompetitionWebhookEndpointValidation.Failure(result.Failure);

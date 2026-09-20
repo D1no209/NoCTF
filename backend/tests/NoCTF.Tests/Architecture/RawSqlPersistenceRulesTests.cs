@@ -182,6 +182,16 @@ public sealed class RawSqlPersistenceRulesTests
                 "ExecuteSqlInterpolated",
                 "pg_advisory_"
             ],
+            ["backend/src/NoCTF.Infrastructure/Competitions/Webhooks/CompetitionWebhookStore.cs"] =
+            [
+                "FromSqlInterpolated",
+                "FOR UPDATE"
+            ],
+            ["backend/src/NoCTF.Infrastructure/Competitions/Webhooks/CompetitionWebhookDeliveryStore.cs"] =
+            [
+                "FromSqlInterpolated",
+                "FOR UPDATE"
+            ],
             ["backend/src/NoCTF.Worker/BackendMessageHandlers.cs"] =
             [
                 "ExecuteSqlInterpolated",

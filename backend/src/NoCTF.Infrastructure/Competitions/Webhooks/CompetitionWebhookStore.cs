@@ -14,7 +14,8 @@ public sealed class CompetitionWebhookStore(
     NoCtfDbContext db,
     PlatformSecretProtector secrets,
     ICompetitionEventRecorder events,
-    ITransactionalMessageOutbox outbox) : ICompetitionWebhookStore
+    ITransactionalMessageOutbox outbox,
+    TimeProvider timeProvider) : ICompetitionWebhookStore
 {
     private static readonly TimeSpan PreviousSecretLifetime = TimeSpan.FromHours(24);
 
@@ -185,7 +186,7 @@ public sealed class CompetitionWebhookStore(
         if (removed == 0)
             return CompetitionWebhookMutationFailure.TargetNotFound;
 
-        var now = DateTimeOffset.UtcNow;
+        var now = timeProvider.GetUtcNow();
         competition.UpdatedAt = now;
         await RecordChangeAsync(competition.Id, "WebhookTargetDeleted", now, cancellationToken);
         await db.SaveChangesAsync(cancellationToken);

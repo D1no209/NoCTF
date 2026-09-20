@@ -64,7 +64,8 @@ public sealed class UpdateCompetitionWebhookEndpoint(
         if (result.Failure == CompetitionWebhookMutationFailure.DuplicateEndpoint)
         {
             return TypedResults.Conflict(new CompetitionWebhookFailureResponse(
-                CompetitionWebhookProblemCode.DuplicateEndpoint));
+                CompetitionWebhookProblemCode.DuplicateEndpoint,
+                "A webhook target with this endpoint URL already exists."));
         }
         if (!result.Succeeded || result.Target is null)
             return CompetitionWebhookEndpointValidation.Failure(result.Failure);

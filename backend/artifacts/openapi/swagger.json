@@ -23558,6 +23558,9 @@
         "properties": {
           "code": {
             "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationCompetitionsCompetitionWebhookProblemCode"
+          },
+          "message": {
+            "type": "string"
           }
         }
       },
