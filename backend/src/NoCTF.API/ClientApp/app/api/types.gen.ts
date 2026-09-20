@@ -2406,6 +2406,55 @@ export type NoCtfapiEndpointsAdministrationCompetitionsCreateCompetitionRequest 
     accessMode?: NoCtfapiEndpointsCompetitionsCompetitionAccessModeProtocol;
 };
 
+export type NoCtfapiEndpointsAdministrationCompetitionsCompetitionWebhookCreatedResponse = {
+    target?: NoCtfapiEndpointsAdministrationCompetitionsCompetitionWebhookTargetResponse;
+    signingSecret?: string;
+};
+
+export type NoCtfapiEndpointsAdministrationCompetitionsCompetitionWebhookTargetResponse = {
+    id?: string;
+    name?: string;
+    endpointHost?: string;
+    endpointUrl?: string | null;
+    enabled?: boolean;
+    enabledAt?: string | null;
+    secretConfigured?: boolean;
+    previousSecretValidUntil?: string | null;
+    disabledReason?: NoCtfapiEndpointsAdministrationCompetitionsCompetitionWebhookDisabledReasonProtocol | null;
+    createdAt?: string;
+    updatedAt?: string;
+};
+
+export type NoCtfapiEndpointsAdministrationCompetitionsCompetitionWebhookDisabledReasonProtocol = 'ReceiverGone';
+
+export type NoCtfapiEndpointsAdministrationCompetitionsCompetitionWebhookFailureResponse = {
+    code?: NoCtfapiEndpointsAdministrationCompetitionsCompetitionWebhookProblemCode;
+};
+
+export type NoCtfapiEndpointsAdministrationCompetitionsCompetitionWebhookProblemCode = 'InvalidCursor' | 'DuplicateEndpoint' | 'InvalidEndpoint' | 'InvalidName';
+
+export type NoCtfapiEndpointsAdministrationCompetitionsCreateCompetitionWebhookRequest = {
+    name: string;
+    endpointUrl: string;
+    enabled?: boolean;
+};
+
+export type NoCtfapiEndpointsAdministrationCompetitionsCompetitionWebhookTestAcceptedResponse = {
+    deliveryId?: string;
+    statusUrl?: string;
+    state?: NoCtfapiEndpointsAdministrationCompetitionsCompetitionWebhookTestStateProtocol;
+};
+
+export type NoCtfapiEndpointsAdministrationCompetitionsCompetitionWebhookTestStateProtocol = 'Pending' | 'Succeeded' | 'Failed';
+
+export type NoCtfapiEndpointsAdministrationCompetitionsCreateCompetitionWebhookTestDeliveryRequest = {
+    [key: string]: never;
+};
+
+export type NoCtfapiEndpointsAdministrationCompetitionsDeleteCompetitionWebhookRequest = {
+    [key: string]: never;
+};
+
 export type NoCtfapiEndpointsAdministrationCompetitionsCompetitionForceDeleteConflictResponse = {
     code?: NoCtfapiEndpointsAdministrationCompetitionsCompetitionForceDeleteConflictCode;
     detail?: string;
@@ -2488,6 +2537,20 @@ export type NoCtfapiEndpointsAdministrationCompetitionsAdminCompetitionCapabilit
     canManagePermissions?: boolean;
 };
 
+export type NoCtfapiEndpointsAdministrationCompetitionsCompetitionWebhookTestStatusResponse = {
+    deliveryId?: string;
+    state?: NoCtfapiEndpointsAdministrationCompetitionsCompetitionWebhookTestStateProtocol;
+    requestedAt?: string;
+    completedAt?: string | null;
+    failureCode?: NoCtfapiEndpointsAdministrationCompetitionsCompetitionWebhookTestFailureCodeProtocol | null;
+};
+
+export type NoCtfapiEndpointsAdministrationCompetitionsCompetitionWebhookTestFailureCodeProtocol = 'TargetUnavailable' | 'ReceiverGone' | 'PermanentFailure';
+
+export type NoCtfapiEndpointsAdministrationCompetitionsGetCompetitionWebhookTestDeliveryRequest = {
+    [key: string]: never;
+};
+
 export type NoCtfapiEndpointsAdministrationCompetitionsAdminCompetitionListResponse = {
     items?: Array<NoCtfapiEndpointsCompetitionsCompetitionResponse>;
 };
@@ -2506,6 +2569,16 @@ export type NoCtfapiEndpointsAdministrationCompetitionsCompetitionPermissionCand
     kind?: NoCtfapiEndpointsAuthenticationUserKindProtocol;
     role?: NoCtfapiEndpointsAuthenticationUserRoleProtocol;
     emailVerified?: boolean;
+};
+
+export type NoCtfapiEndpointsAdministrationCompetitionsCompetitionWebhookTargetListResponse = {
+    items?: Array<NoCtfapiEndpointsAdministrationCompetitionsCompetitionWebhookTargetResponse>;
+    nextCursor?: string | null;
+    canManage?: boolean;
+};
+
+export type NoCtfapiEndpointsAdministrationCompetitionsListCompetitionWebhooksRequest = {
+    [key: string]: never;
 };
 
 export type NoCtfapiEndpointsAdministrationCompetitionsCompetitionTrackFailureResponse = {
@@ -2585,8 +2658,23 @@ export type NoCtfapiEndpointsAdministrationCompetitionsCompetitionLeaderboardPat
     reason?: string | null;
 };
 
+export type NoCtfapiEndpointsAdministrationCompetitionsRotateCompetitionWebhookSecretResponse = {
+    signingSecret?: string;
+    previousSecretValidUntil?: string;
+};
+
+export type NoCtfapiEndpointsAdministrationCompetitionsRotateCompetitionWebhookSecretRequest = {
+    [key: string]: never;
+};
+
 export type NoCtfapiEndpointsAdministrationCompetitionsUpdateCompetitionStatusRequest = {
     status: NoCtfapiEndpointsCompetitionsCompetitionStatusProtocol;
+};
+
+export type NoCtfapiEndpointsAdministrationCompetitionsUpdateCompetitionWebhookRequest = {
+    name: string;
+    endpointUrl: string;
+    enabled?: boolean;
 };
 
 export type NoCtfapiEndpointsAdministrationCompetitionsCompetitionPosterResponse = {
@@ -8419,6 +8507,118 @@ export type AdminCreateCompetitionResponses = {
 
 export type AdminCreateCompetitionResponse = AdminCreateCompetitionResponses[keyof AdminCreateCompetitionResponses];
 
+export type AdminListCompetitionWebhooksData = {
+    body?: never;
+    path: {
+        competitionId: string;
+    };
+    query: {
+        cursor?: string | null;
+        limit: number;
+    };
+    url: '/api/v1/admin/competitions/{competitionId}/webhooks';
+};
+
+export type AdminListCompetitionWebhooksErrors = {
+    /**
+     * Bad Request
+     */
+    400: MicrosoftAspNetCoreMvcValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+    /**
+     * Not Found
+     */
+    404: unknown;
+};
+
+export type AdminListCompetitionWebhooksError = AdminListCompetitionWebhooksErrors[keyof AdminListCompetitionWebhooksErrors];
+
+export type AdminListCompetitionWebhooksResponses = {
+    /**
+     * Success
+     */
+    200: NoCtfapiEndpointsAdministrationCompetitionsCompetitionWebhookTargetListResponse;
+};
+
+export type AdminListCompetitionWebhooksResponse = AdminListCompetitionWebhooksResponses[keyof AdminListCompetitionWebhooksResponses];
+
+export type AdminCreateCompetitionWebhookData = {
+    body: NoCtfapiEndpointsAdministrationCompetitionsCreateCompetitionWebhookRequest;
+    path: {
+        competitionId: string;
+    };
+    query?: never;
+    url: '/api/v1/admin/competitions/{competitionId}/webhooks';
+};
+
+export type AdminCreateCompetitionWebhookErrors = {
+    /**
+     * Bad Request
+     */
+    400: MicrosoftAspNetCoreMvcValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+    /**
+     * Not Found
+     */
+    404: unknown;
+    409: NoCtfapiEndpointsAdministrationCompetitionsCompetitionWebhookFailureResponse;
+};
+
+export type AdminCreateCompetitionWebhookError = AdminCreateCompetitionWebhookErrors[keyof AdminCreateCompetitionWebhookErrors];
+
+export type AdminCreateCompetitionWebhookResponses = {
+    /**
+     * Created
+     */
+    201: NoCtfapiEndpointsAdministrationCompetitionsCompetitionWebhookCreatedResponse;
+};
+
+export type AdminCreateCompetitionWebhookResponse = AdminCreateCompetitionWebhookResponses[keyof AdminCreateCompetitionWebhookResponses];
+
+export type AdminCreateCompetitionWebhookTestDeliveryData = {
+    body?: never;
+    path: {
+        competitionId: string;
+        targetId: string;
+    };
+    query?: never;
+    url: '/api/v1/admin/competitions/{competitionId}/webhooks/{targetId}/test-deliveries';
+};
+
+export type AdminCreateCompetitionWebhookTestDeliveryErrors = {
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+};
+
+export type AdminCreateCompetitionWebhookTestDeliveryResponses = {
+    /**
+     * Accepted
+     */
+    202: NoCtfapiEndpointsAdministrationCompetitionsCompetitionWebhookTestAcceptedResponse;
+};
+
+export type AdminCreateCompetitionWebhookTestDeliveryResponse = AdminCreateCompetitionWebhookTestDeliveryResponses[keyof AdminCreateCompetitionWebhookTestDeliveryResponses];
+
 export type AdminDeleteCompetitionData = {
     body?: never;
     path: {
@@ -8528,6 +8728,81 @@ export type AdminPatchCompetitionResponses = {
 
 export type AdminPatchCompetitionResponse = AdminPatchCompetitionResponses[keyof AdminPatchCompetitionResponses];
 
+export type AdminDeleteCompetitionWebhookData = {
+    body?: never;
+    path: {
+        competitionId: string;
+        targetId: string;
+    };
+    query?: never;
+    url: '/api/v1/admin/competitions/{competitionId}/webhooks/{targetId}';
+};
+
+export type AdminDeleteCompetitionWebhookErrors = {
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+    /**
+     * Not Found
+     */
+    404: unknown;
+};
+
+export type AdminDeleteCompetitionWebhookResponses = {
+    /**
+     * No Content
+     */
+    204: void;
+};
+
+export type AdminDeleteCompetitionWebhookResponse = AdminDeleteCompetitionWebhookResponses[keyof AdminDeleteCompetitionWebhookResponses];
+
+export type AdminUpdateCompetitionWebhookData = {
+    body: NoCtfapiEndpointsAdministrationCompetitionsUpdateCompetitionWebhookRequest;
+    path: {
+        competitionId: string;
+        targetId: string;
+    };
+    query?: never;
+    url: '/api/v1/admin/competitions/{competitionId}/webhooks/{targetId}';
+};
+
+export type AdminUpdateCompetitionWebhookErrors = {
+    /**
+     * Bad Request
+     */
+    400: MicrosoftAspNetCoreMvcValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+    /**
+     * Not Found
+     */
+    404: unknown;
+    409: NoCtfapiEndpointsAdministrationCompetitionsCompetitionWebhookFailureResponse;
+};
+
+export type AdminUpdateCompetitionWebhookError = AdminUpdateCompetitionWebhookErrors[keyof AdminUpdateCompetitionWebhookErrors];
+
+export type AdminUpdateCompetitionWebhookResponses = {
+    /**
+     * Success
+     */
+    200: NoCtfapiEndpointsAdministrationCompetitionsCompetitionWebhookTargetResponse;
+};
+
+export type AdminUpdateCompetitionWebhookResponse = AdminUpdateCompetitionWebhookResponses[keyof AdminUpdateCompetitionWebhookResponses];
+
 export type AdminForceDeleteCompetitionData = {
     body: NoCtfapiEndpointsAdministrationCompetitionsForceDeleteCompetitionRequest;
     path: {
@@ -8596,6 +8871,41 @@ export type AdminGenerateMissingFlagsResponses = {
 };
 
 export type AdminGenerateMissingFlagsResponse = AdminGenerateMissingFlagsResponses[keyof AdminGenerateMissingFlagsResponses];
+
+export type AdminGetCompetitionWebhookTestDeliveryData = {
+    body?: never;
+    path: {
+        competitionId: string;
+        targetId: string;
+        deliveryId: string;
+    };
+    query?: never;
+    url: '/api/v1/admin/competitions/{competitionId}/webhooks/{targetId}/test-deliveries/{deliveryId}';
+};
+
+export type AdminGetCompetitionWebhookTestDeliveryErrors = {
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+    /**
+     * Not Found
+     */
+    404: unknown;
+};
+
+export type AdminGetCompetitionWebhookTestDeliveryResponses = {
+    /**
+     * Success
+     */
+    200: NoCtfapiEndpointsAdministrationCompetitionsCompetitionWebhookTestStatusResponse;
+};
+
+export type AdminGetCompetitionWebhookTestDeliveryResponse = AdminGetCompetitionWebhookTestDeliveryResponses[keyof AdminGetCompetitionWebhookTestDeliveryResponses];
 
 export type AdminHardDeleteCompetitionData = {
     body?: never;
@@ -8734,6 +9044,40 @@ export type AdminRestoreCompetitionResponses = {
 };
 
 export type AdminRestoreCompetitionResponse = AdminRestoreCompetitionResponses[keyof AdminRestoreCompetitionResponses];
+
+export type AdminRotateCompetitionWebhookSecretData = {
+    body?: never;
+    path: {
+        competitionId: string;
+        targetId: string;
+    };
+    query?: never;
+    url: '/api/v1/admin/competitions/{competitionId}/webhooks/{targetId}/rotate-secret';
+};
+
+export type AdminRotateCompetitionWebhookSecretErrors = {
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+    /**
+     * Not Found
+     */
+    404: unknown;
+};
+
+export type AdminRotateCompetitionWebhookSecretResponses = {
+    /**
+     * Success
+     */
+    200: NoCtfapiEndpointsAdministrationCompetitionsRotateCompetitionWebhookSecretResponse;
+};
+
+export type AdminRotateCompetitionWebhookSecretResponse = AdminRotateCompetitionWebhookSecretResponses[keyof AdminRotateCompetitionWebhookSecretResponses];
 
 export type AdminUpdateCompetitionStatusData = {
     body: NoCtfapiEndpointsAdministrationCompetitionsUpdateCompetitionStatusRequest;

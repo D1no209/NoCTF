@@ -16,7 +16,7 @@ public sealed class CreateCompetitionWebhookTestDeliveryRequest
 public sealed record CompetitionWebhookTestAcceptedResponse(
     Guid DeliveryId,
     string StatusUrl,
-    CompetitionWebhookTestState State);
+    CompetitionWebhookTestStateProtocol State);
 
 public sealed class CreateCompetitionWebhookTestDeliveryEndpoint(
     ICompetitionWebhookTestStatusStore statuses,
@@ -58,6 +58,6 @@ public sealed class CreateCompetitionWebhookTestDeliveryEndpoint(
         return TypedResults.Accepted(statusUrl, new CompetitionWebhookTestAcceptedResponse(
             deliveryId,
             statusUrl,
-            CompetitionWebhookTestState.Pending));
+            CompetitionWebhookTestStateProtocol.Pending));
     }
 }
