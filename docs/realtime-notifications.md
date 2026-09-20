@@ -42,7 +42,6 @@ Payload 由 NotificationKind 对应强类型 DTO 序列化，只含安全展示�
 - `GET /notifications/feed` 和默认 `scope=All` 保持完整动态受众语义。公开比赛公告正文另由
   `GET /competitions/{competitionId}/announcements` 提供给所有普通 Bearer 客户端，不改变通知受众。
 
-旧的 QQBot 公钥 Agent、群组同步和专用投递协议不在目标架构中。QQBOT 作为普通
-User Bot 使用 Bearer JWT 加入公开比赛 SignalR group，并在失效提示后重读通用比赛、题目、
-排行榜与公告接口；平台不维护聊天 Provider、群、权限、投递状态或 BOT 专用通知表。Bot 不加入 Observer、
-参赛队伍或其他工作人员角色。详见 [QQBOT 公开只读接入](qqbot-jwt.md)。
+外部系统通过赛事级 Webhook 接收公开播报事件。Worker 使用独立 JetStream 队列异步发送
+CloudEvents 1.0 JSON，并按 Standard Webhooks 约定附加 HMAC-SHA256 签名。平台不维护聊天
+Provider、群组、消息模板或专用 Bot 投递状态；浏览器 SignalR 链路不受影响。

@@ -31,7 +31,7 @@
 12. [附件与对象存储](storage-attachments.md)
 13. 模式规范：[CTF](game-modes/ctf.md)、[CTF PatchVerification 实验功能](ctf-patch-verification-experiment.md)、[AWD](game-modes/awd.md)、[AWDP](game-modes/awdp.md)、[KoH](game-modes/koh.md)
 14. [实时与站内通知](realtime-notifications.md)
-15. [BOT 使用手册](bot-usage.md)、[BOT 回显文案清单](bot-message-catalog.md)、[BOT JWT 接入](qqbot-jwt.md)、[BOT Provider 开发](bot-provider-development.md)
+15. [赛事 Webhook](competition-webhooks.md)
 16. [开发规范](development.md)、[测试规范](testing.md)、[部署边界](deployment.md)
 17. [PostgreSQL、对象存储与 Wolverine 备份恢复](backup-recovery.md)
 18. [比赛题目仓库与 GitOps 管理设计](challenge-repository-gitops.md)
@@ -54,4 +54,4 @@
 
 ## 已废弃内容
 
-旧 Penetration、QQBot 专用 Agent/群组同步协议、插件式 GameMode、进程内队列、`runtime_operations`、`runtime_artifacts`、TeamMember 顺序队长模型和 CompetitionCollaborator 子表不属于目标架构。QQBOT 以最小权限 User Bot 和普通 JWT 消费公开 API 与 SignalR；平台的 Bot 权限模型本身仍与 Human 对等。仓库历史、旧提交或外部说明中出现这些旧设计时，不得据此恢复它们。
+旧 Penetration、聊天 Bot 专用 Agent/群组同步协议、插件式 GameMode、进程内队列、`runtime_operations`、`runtime_artifacts`、TeamMember 顺序队长模型和 CompetitionCollaborator 子表不属于目标架构。外部通知统一使用通用赛事 Webhook；通用非交互 User Bot 只作为普通 JWT API 身份，不承担通知投递。仓库历史、旧提交或外部说明中出现旧设计时，不得据此恢复它们。

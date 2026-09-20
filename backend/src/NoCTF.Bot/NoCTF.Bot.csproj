@@ -1,6 +1,0 @@
-<Project Sdk="Microsoft.NET.Sdk.Worker">
-  <ItemGroup>
-    <ProjectReference Include="../NoCTF.Bot.Core/NoCTF.Bot.Core.csproj" />
-    <ProjectReference Include="../NoCTF.Bot.Providers.Milky/NoCTF.Bot.Providers.Milky.csproj" />
-  </ItemGroup>
-</Project>
