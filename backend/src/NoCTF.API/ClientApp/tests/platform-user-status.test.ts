@@ -13,7 +13,8 @@ describe('platform user account status management', () => {
       new URL('../app/pages/admin/platform/bots.vue', import.meta.url),
     ).text()
 
-    expect(source).toContain("roleFilter.value === 'Bot' && user.kind !== 'Bot'")
+    expect(source).toContain("kind: roleFilter.value === 'Bot' ? 'Bot'")
+    expect(source).toContain('keyword: search.value.trim() || null')
     expect(source).toContain('<SelectItem value="Bot">')
     expect(source).toContain('adminPlatformCreateBot({')
     expect(source).toContain('roleFilter.value = \'Bot\'')

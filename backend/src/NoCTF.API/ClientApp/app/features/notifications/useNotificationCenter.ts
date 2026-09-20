@@ -32,12 +32,16 @@ export function useNotificationCenter() {
       const { data, error: requestError } = await listNotificationsEndpoint({
         query: {
           scope: 'Inbox',
-          cursor,
+          offset: cursor ? Number(cursor) || 0 : 0,
           limit: 50,
+          desc: true,
         },
       })
       if (requestError || !data) throw requestError ?? new Error(translate("ui.failedToLoadNotification"))
-      return { items: data.items, nextCursor: data.nextCursor }
+      const pageItems = data.items ?? []
+      const offset = cursor ? Number(cursor) || 0 : 0
+      const nextOffset = offset + pageItems.length
+      return { items: pageItems, nextCursor: nextOffset < (data.total ?? 0) ? String(nextOffset) : null }
     })
 
   const notificationOptions = computed(() => items.value.flatMap(notification => notification.id

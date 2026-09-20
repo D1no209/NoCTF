@@ -27,8 +27,8 @@ describe('admin competition challenge navigation', () => {
     expect(source).toContain('getLeaderboardEndpoint')
     expect(source).toContain('getScoreboardSchemaEndpoint')
     expect(source).toContain('do {')
-    expect(source).toContain('} while (cursor)')
-    expect(source).toContain('seenCursors.has(cursor)')
+    expect(source).toContain('} while (offset < total && offset > 0)')
+    expect(source).toContain('query: { competitionChallengeId: ccId, offset, limit: 200, desc: true }')
     expect(source).toContain('v-for="row in scoringRows"')
     expect(source).toContain('v-if="canJudge"')
     expect(source).toContain('adminCreateManualAdjustment')
@@ -44,16 +44,15 @@ describe('admin competition challenge navigation', () => {
 })
 
 describe('challenge template list navigation', () => {
-  test('restores the previous list before refreshing it in the background', async () => {
+  test('uses server-side offset pagination and debounced filters', async () => {
     const source = await sourceFile(
       new URL('../app/pages/admin/challenges/index.vue', import.meta.url),
     ).text()
 
-    expect(source).toContain('const templateListCache = new Map<boolean, ChallengeTemplate[]>()')
-    expect(source).toContain('const templates = ref<ChallengeTemplate[]>([...(templateListCache.get(includeDeleted.value) ?? [])])')
-    expect(source).toContain('templateListCache.set(requestedIncludeDeleted, [...nextTemplates])')
-    expect(source).toContain('templates.value = [...(templateListCache.get(value) ?? [])]')
-    expect(source).toContain('if (generation !== loadGeneration) return')
+    expect(source).toContain('useOffsetPagination<ChallengeTemplate>')
+    expect(source).toContain('offset,')
+    expect(source).toContain('keyword: search.value.trim() || null')
+    expect(source).toContain('setTimeout(() => { void load() }, 250)')
     expect(source).toContain('v-if="loading && templates.length === 0"')
   })
 

@@ -60,7 +60,9 @@ export function useCompetitionAnnouncementCatchUp(competitionId: Readonly<Ref<st
       query: {
         competitionId: requestedCompetitionId,
         scope: 'Inbox',
+        offset: 0,
         limit: 200,
+        desc: true,
       },
     })
     if (error || !data || user.value?.userId !== userId || competitionId.value !== requestedCompetitionId)

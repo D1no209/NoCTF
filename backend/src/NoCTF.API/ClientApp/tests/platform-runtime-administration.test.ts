@@ -26,12 +26,12 @@ describe('platform runtime administration', () => {
 
   test('snapshots applied server filters independently from form edits', () => {
     const filters = emptyPlatformRuntimeFilters()
-    expect(platformRuntimeQuery(filters)).toEqual({ search: undefined, scope: undefined, state: undefined, runtimeKind: undefined })
+    expect(platformRuntimeQuery(filters)).toEqual({ search: undefined, scope: undefined, state: undefined, runtimeKind: undefined, offset: 0, desc: true })
     Object.assign(filters, { search: '  soul  ', scope: 'Competition', state: 'Running', kind: 'Container' })
     const applied = platformRuntimeQuery(filters)
     filters.search = 'another team'
     filters.state = 'Stopping'
-    expect(applied).toEqual({ search: 'soul', scope: 'Competition', state: 'Running', runtimeKind: 'Container' })
+    expect(applied).toEqual({ search: 'soul', scope: 'Competition', state: 'Running', runtimeKind: 'Container', offset: 0, desc: true })
     expect(platformRuntimeQuery(filters).state).toBe('Stopping')
   })
 

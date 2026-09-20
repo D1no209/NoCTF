@@ -102,6 +102,45 @@ public sealed class ChallengeBankStore(
             .ToListAsync(ct);
     }
 
+    public async Task<ChallengeTemplateListPage> ListPageAsync(
+        ChallengeTemplateListQuery query,
+        CancellationToken ct)
+    {
+        var source = db.Challenges.IgnoreQueryFilters().AsNoTracking();
+        if (!query.IncludeDeleted)
+            source = source.Where(challenge => challenge.DeletedAt == null);
+
+        var authorized = Authorized(source, query.ActorId, query.IsAdministrator);
+        var keyword = string.IsNullOrWhiteSpace(query.Keyword) ? null : query.Keyword.Trim();
+        if (keyword is not null)
+        {
+            var pattern = $"%{keyword}%";
+            authorized = authorized.Where(challenge =>
+                EF.Functions.ILike(challenge.Title, pattern)
+                || EF.Functions.ILike(challenge.Direction, pattern));
+        }
+        if (!string.IsNullOrWhiteSpace(query.Direction))
+            authorized = authorized.Where(challenge => challenge.Direction == query.Direction);
+
+        var total = await authorized.CountAsync(ct);
+        var ordered = query.Desc
+            ? authorized.OrderByDescending(challenge => challenge.UpdatedAt)
+                .ThenByDescending(challenge => challenge.Id)
+            : authorized.OrderBy(challenge => challenge.UpdatedAt)
+                .ThenBy(challenge => challenge.Id);
+        var items = await Project(ordered)
+            .Skip(query.Offset)
+            .Take(query.Limit)
+            .ToListAsync(ct);
+
+        var directions = await Authorized(source, query.ActorId, query.IsAdministrator)
+            .Select(challenge => challenge.Direction)
+            .Distinct()
+            .OrderBy(direction => direction)
+            .ToArrayAsync(ct);
+        return new(items, total, directions);
+    }
+
     public Task<ChallengeTemplateView?> FindAsync(
         Guid challengeId,
         Guid actorId,

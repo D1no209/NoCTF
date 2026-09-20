@@ -1,6 +1,5 @@
 using FastEndpoints;
 using FluentValidation;
-using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.HttpResults;
 using NoCTF.API.Pagination;
 using NoCTF.API.Security;
@@ -9,22 +8,18 @@ using NoCTF.Domain.Gameplay;
 
 namespace NoCTF.API.Endpoints.GameplayFacts;
 
-public sealed class ListGameplayFactsRequest
+public sealed class ListGameplayFactsRequest : PaginationRequest
 {
     [QueryParam]
     public Guid? CompetitionChallengeId { get; set; }
     [QueryParam]
     public GameplayFactKindProtocol? Kind { get; set; }
-    [QueryParam]
-    public string? Cursor { get; set; }
-    [QueryParam]
-    public int Limit { get; set; } = 50;
 }
 
 public sealed class ListGameplayFactsValidator : Validator<ListGameplayFactsRequest>
 {
     public ListGameplayFactsValidator() =>
-        RuleFor(request => request.Limit).InclusiveBetween(1, 200);
+        PaginationRules.Add(this);
 }
 
 public sealed record GameplayFactListItemResponse(
@@ -44,9 +39,13 @@ public sealed record GameplayFactListItemResponse(
     DateTimeOffset OccurredAt,
     DateTimeOffset UpdatedAt);
 
-public sealed record GameplayFactListResponse(
-    IReadOnlyList<GameplayFactListItemResponse> Items,
-    string? NextCursor);
+public sealed class GameplayFactListResponse : ArrayResult<GameplayFactListItemResponse>
+{
+    public GameplayFactListResponse() { }
+
+    public GameplayFactListResponse(GameplayFactListItemResponse[] items, int total)
+        : base(items, total) { }
+}
 
 internal static class GameplayFactListMapping
 {
@@ -69,12 +68,9 @@ internal static class GameplayFactListMapping
 
 public sealed class ListGameplayFactsEndpoint(
     ListGameplayFacts list,
-    SignedKeysetCursor cursors,
     IUserContext user)
-    : Endpoint<ListGameplayFactsRequest, Results<Ok<GameplayFactListResponse>, NotFound, ProblemHttpResult>>
+    : Endpoint<ListGameplayFactsRequest, Results<Ok<GameplayFactListResponse>, NotFound>>
 {
-    private const string CursorEndpoint = "gameplay-facts.player.list";
-
     public override void Configure()
     {
         Get("/competitions/{competitionId}/gameplay-facts");
@@ -82,36 +78,24 @@ public sealed class ListGameplayFactsEndpoint(
         Summary(summary => summary.Summary = "Lists the current team's gameplay facts.");
     }
 
-    public override async Task<Results<Ok<GameplayFactListResponse>, NotFound, ProblemHttpResult>> ExecuteAsync(
+    public override async Task<Results<Ok<GameplayFactListResponse>, NotFound>> ExecuteAsync(
         ListGameplayFactsRequest request,
         CancellationToken ct)
     {
         var competitionId = Route<Guid>("competitionId");
-        var cursorScope = string.Join(':',
-            competitionId.ToString("N"),
-            user.UserId.ToString("N"),
-            request.CompetitionChallengeId?.ToString("N") ?? "all",
-            request.Kind?.ToString() ?? "all");
-        if (!cursors.TryDecode(request.Cursor, CursorEndpoint, cursorScope, out var position))
-            return TypedResults.Problem(
-                statusCode: StatusCodes.Status400BadRequest,
-                title: "Invalid cursor.");
-        var items = await list.PlayerAsync(
+        var page = await list.PlayerPageAsync(
             competitionId,
             user.UserId,
             request.CompetitionChallengeId,
             request.Kind is null ? null : GameplayFactMapper.ToDomain(request.Kind.Value),
-            position?.CreatedAt,
-            position?.Id,
+            request.Offset,
             request.Limit,
+            request.Desc,
             ct);
-        if (items is null)
+        if (page is null)
             return TypedResults.NotFound();
-        var next = items.Count == request.Limit
-            ? cursors.Encode(CursorEndpoint, cursorScope, new(items[^1].OccurredAt, items[^1].Id))
-            : null;
         return TypedResults.Ok(new GameplayFactListResponse(
-            items.Select(GameplayFactListMapping.ToPlayerResponse).ToArray(),
-            next));
+            page.Items.Select(GameplayFactListMapping.ToPlayerResponse).ToArray(),
+            page.Total));
     }
 }

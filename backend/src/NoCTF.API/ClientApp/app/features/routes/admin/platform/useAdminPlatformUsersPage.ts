@@ -3,10 +3,11 @@ import { markRaw } from 'vue'
 import { Copy, KeyRound, LogIn, Plus, ShieldOff, Trash2 } from '@lucide/vue'
 import { toast } from 'vue-sonner'
 import { adminPlatformCreateBot, adminPlatformDeleteUser, adminPlatformDeleteUserTokens, adminPlatformGetUser, adminPlatformIssueUserToken, adminPlatformListUsers, adminPlatformListUserTokens, adminPlatformPatchUser, adminPlatformPreviewUserDeletion, adminPlatformRevokeUserToken } from '../../../../api'
-import type { NoCtfapiEndpointsAdministrationPlatformAdminIssuedAccessTokenResponse, NoCtfapiEndpointsAdministrationPlatformIssuePlatformUserTokenResponse, NoCtfapiEndpointsAdministrationPlatformPlatformUserDeletionMode, NoCtfapiEndpointsAdministrationPlatformPlatformUserDeletionPreviewResponse, NoCtfapiEndpointsAdministrationPlatformPlatformUserResponse, NoCtfapiEndpointsAdministrationPlatformPlatformManagedUserAccountStatusProtocol, NoCtfapiEndpointsAuthenticationUserRoleProtocol } from '../../../../api'
+import type { NoCtfapiEndpointsAdministrationPlatformAdminIssuedAccessTokenResponse, NoCtfapiEndpointsAdministrationPlatformIssuePlatformUserTokenResponse, NoCtfapiEndpointsAdministrationPlatformPlatformUserDeletionMode, NoCtfapiEndpointsAdministrationPlatformPlatformUserDeletionPreviewResponse, NoCtfapiEndpointsAdministrationPlatformPlatformUserResponse, NoCtfapiEndpointsAdministrationPlatformPlatformManagedUserAccountStatusProtocol, NoCtfapiEndpointsAuthenticationUserKindProtocol, NoCtfapiEndpointsAuthenticationUserRoleProtocol } from '../../../../api'
 import { createLatestRequestGuard } from '../../../../lib/latest-request'
 import PrivateAccountPanelComponent from '../../../account/PrivateAccountPanel.vue'
 import AdminDateTimeComponent from '../../../admin/AdminDateTime.vue'
+import { useOffsetPagination } from '../../../../composables/useOffsetPagination'
 
 type PlatformUser = NoCtfapiEndpointsAdministrationPlatformPlatformUserResponse
 
@@ -35,7 +36,9 @@ export function useAdminPlatformUsersPage() {
 
   const search = ref('')
 
-  const roleFilter = ref(route.query.filter === 'Bot' ? 'Bot' : 'all')
+  const roleFilter = ref<'all' | 'Bot' | NoCtfapiEndpointsAuthenticationUserRoleProtocol>(
+    route.query.filter === 'Bot' ? 'Bot' : 'all',
+  )
 
   const ROLE_LABELS: Record<string, string> = { User: "ui.user", Organizer: "ui.organizer", Administrator: "ui.administrator" }
 
@@ -65,29 +68,33 @@ export function useAdminPlatformUsersPage() {
     UserAccountLifecycleAudit: "ui.accountLifeCycleAudit",
   }
 
-  const filteredUsers = computed(() => {
-    const keyword = search.value.trim().toLowerCase()
-    return users.value.filter((user) => {
-      if (roleFilter.value === 'Bot' && user.kind !== 'Bot') return false
-      if (roleFilter.value !== 'all' && roleFilter.value !== 'Bot'
-        && user.role !== roleFilter.value) return false
-      if (!keyword) return true
-      return (user.userName ?? '').toLowerCase().includes(keyword)
-        || (user.email ?? '').toLowerCase().includes(keyword)
-    })
-  })
+  const pagination = useOffsetPagination<PlatformUser>(async ({ offset, limit, desc }) => {
+    const query = {
+      keyword: search.value.trim() || null,
+      kind: roleFilter.value === 'Bot' ? 'Bot' as NoCtfapiEndpointsAuthenticationUserKindProtocol : null,
+      role: roleFilter.value !== 'all' && roleFilter.value !== 'Bot' ? roleFilter.value : null,
+      offset,
+      limit,
+      desc,
+    }
+    const { data, error } = await adminPlatformListUsers({ query })
+    if (error || !data) throw error ?? new Error('Failed to load platform users.')
+    users.value = data.items ?? []
+    return { items: users.value, total: data.total ?? 0 }
+  }, { initialDesc: false })
+
+  const filteredUsers = computed(() => users.value)
 
   async function load(): Promise<void> {
-    loading.value = true
     loadError.value = null
-    const { data, error } = await adminPlatformListUsers()
-    loading.value = false
-    if (error) {
-      loadError.value = parseApiError(error).message
-      return
-    }
-    users.value = data?.items ?? []
+    await pagination.loadPage(pagination.page.value)
+    loadError.value = pagination.error.value?.message ?? null
   }
+
+  watch([search, roleFilter], () => {
+    pagination.reset()
+    void load()
+  })
 
   const createBotOpen = ref(false)
 
@@ -501,6 +508,13 @@ export function useAdminPlatformUsersPage() {
       MANAGED_ACCOUNT_STATUS_OPTIONS,
       REFERENCE_LABELS,
       filteredUsers,
+      page: pagination.page,
+      pageCount: pagination.pageCount,
+      total: pagination.total,
+      pageLimit: pagination.limit,
+      pageLoading: pagination.loading,
+      loadPage: pagination.loadPage,
+      setPageSize: pagination.setPageSize,
       createBotOpen,
       creatingBot,
       botName,

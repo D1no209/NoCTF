@@ -40,7 +40,7 @@ export function useAdminCompetitionsByIdRuntimesPage() {
   async function loadRefs() {
     const [challenges, teams] = await Promise.all([
       adminListCompetitionChallenges({ path: { competitionId }, query: { includeDeleted: false } }),
-      adminListTeams({ path: { competitionId } }),
+      adminListTeams({ path: { competitionId }, query: { keyword: null, offset: 0, limit: 200, desc: false } }),
     ])
     challengeOptions.value = (challenges.data?.items ?? []).map(c => ({ id: c.id!, title: c.title ?? '' }))
     teamOptions.value = (teams.data?.items ?? []).map(t => ({ id: t.id!, name: t.name ?? '' }))
@@ -65,7 +65,9 @@ export function useAdminCompetitionsByIdRuntimesPage() {
         state: filterState.value === '' ? null : filterState.value as NoCtfapiEndpointsRuntimeRuntimeStateProtocol,
         runtimeKind: filterKind.value === '' ? null : filterKind.value as NoCtfapiEndpointsRuntimeRuntimeKindProtocol,
         cursor,
+        offset: 0,
         limit: 30,
+        desc: true,
       },
     })
     if (error || !data) throw parseApiError(error)

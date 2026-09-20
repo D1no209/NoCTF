@@ -49,7 +49,9 @@ export function useCompetitionsByIdEventsPage() {
           to: range.to,
           kind: kind.value === 'all' ? null : kind.value as NoCtfapiEndpointsCompetitionsEventsCompetitionEventKindProtocol,
           cursor,
+          offset: 0,
           limit: 50,
+          desc: true,
         },
       })
       if (err || !data) throw err ?? new Error(translate("ui.failedToLoad"))
