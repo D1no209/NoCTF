@@ -31,7 +31,7 @@
 12. [附件与对象存储](storage-attachments.md)
 13. 模式规范：[CTF](game-modes/ctf.md)、[CTF PatchVerification 实验功能](ctf-patch-verification-experiment.md)、[AWD](game-modes/awd.md)、[AWDP](game-modes/awdp.md)、[KoH](game-modes/koh.md)
 14. [实时与站内通知](realtime-notifications.md)
-15. [BOT 使用手册](bot-usage.md)、[BOT JWT 接入](qqbot-jwt.md)、[BOT Provider 开发](bot-provider-development.md)
+15. [BOT 使用手册](bot-usage.md)、[BOT 回显文案清单](bot-message-catalog.md)、[BOT JWT 接入](qqbot-jwt.md)、[BOT Provider 开发](bot-provider-development.md)
 16. [开发规范](development.md)、[测试规范](testing.md)、[部署边界](deployment.md)
 17. [PostgreSQL、对象存储与 Wolverine 备份恢复](backup-recovery.md)
 18. [比赛题目仓库与 GitOps 管理设计](challenge-repository-gitops.md)
