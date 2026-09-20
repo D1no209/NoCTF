@@ -19,19 +19,19 @@ describe('platform runtime administration', () => {
     expect(page).toContain("item.scope === 'ChallengeTest'")
     expect(page).toContain('v-else-if="detail.runtime?.challengeId"')
     expect(page).toContain('`/admin/challenges/${detail.runtime.challengeId}`')
-    expect(page).toContain('useCursorPagination<PlatformRuntime>')
+    expect(page).toContain('useOffsetPagination<PlatformRuntime>')
     expect(page).toContain('setInterval(() => void refresh(), 10_000)')
     expect(page).not.toContain("fetch('/api")
   })
 
   test('snapshots applied server filters independently from form edits', () => {
     const filters = emptyPlatformRuntimeFilters()
-    expect(platformRuntimeQuery(filters)).toEqual({ search: undefined, scope: undefined, state: undefined, runtimeKind: undefined })
+    expect(platformRuntimeQuery(filters)).toEqual({ search: undefined, scope: undefined, state: undefined, runtimeKind: undefined, offset: 0, desc: true })
     Object.assign(filters, { search: '  soul  ', scope: 'Competition', state: 'Running', kind: 'Container' })
     const applied = platformRuntimeQuery(filters)
     filters.search = 'another team'
     filters.state = 'Stopping'
-    expect(applied).toEqual({ search: 'soul', scope: 'Competition', state: 'Running', runtimeKind: 'Container' })
+    expect(applied).toEqual({ search: 'soul', scope: 'Competition', state: 'Running', runtimeKind: 'Container', offset: 0, desc: true })
     expect(platformRuntimeQuery(filters).state).toBe('Stopping')
   })
 
@@ -42,8 +42,9 @@ describe('platform runtime administration', () => {
     expect(workspace).toContain('class="settings-workspace-layout"')
     expect(workspace).not.toContain('<SidebarInset')
     expect(page).toContain('<UiForm @submit.prevent="applyFilters">')
-    expect(page).toContain('query: { ...appliedQuery.value, cursor, limit: 50 }')
-    expect(page).toContain('appliedQuery.value = platformRuntimeQuery(filters)\n    reset()')
+    expect(page).toContain('query: { ...appliedQuery.value, offset, limit, desc }')
+    expect(page).toContain('appliedQuery.value = platformRuntimeQuery(filters)\n    pagination.reset()')
+    expect(page).toContain('<OffsetPagination')
     expect(page).toContain('whitespace-normal break-words')
     expect(page).toContain('<SheetTitle>')
     expect(page).not.toContain('min-w-64')

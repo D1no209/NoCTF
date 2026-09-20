@@ -76,14 +76,15 @@ public sealed class CompetitionEventStore(
             && access.AccessLevel != CompetitionEventAccessLevel.Staff)
             return new(CompetitionEventReadState.Forbidden);
 
-        var items = await LoadAsync(query, access, cancellationToken);
+        var (items, total) = await LoadAsync(query, access, cancellationToken);
         return new(
             CompetitionEventReadState.Available,
             access.AccessLevel,
             access.TeamId,
             access.CanExport,
             access.CanAccessGameplayFactValues,
-            await EnrichAsync(items, cancellationToken));
+            await EnrichAsync(items, cancellationToken),
+            total);
     }
 
     public async Task<CompetitionEventExportResult> ExportAsync(
@@ -103,7 +104,7 @@ public sealed class CompetitionEventStore(
             return new(CompetitionEventReadState.InvalidQuery);
 
         var items = await EnrichAsync(
-            await LoadAsync(query, access, cancellationToken),
+            (await LoadAsync(query, access, cancellationToken)).Items,
             cancellationToken);
         var stream = new MemoryStream();
         foreach (var item in items)
@@ -257,7 +258,7 @@ public sealed class CompetitionEventStore(
                 false);
     }
 
-    private async Task<IReadOnlyList<CompetitionEvent>> LoadAsync(
+    private async Task<(IReadOnlyList<CompetitionEvent> Items, int Total)> LoadAsync(
         CompetitionEventQuery filter,
         AccessResolution access,
         CancellationToken cancellationToken)
@@ -324,6 +325,14 @@ public sealed class CompetitionEventStore(
                     && item.SubjectId == runtimeInstanceId
                 || item.RelatedType == EntityReferenceKind.RuntimeInstance
                     && item.RelatedId == runtimeInstanceId);
+        if (filter.OffsetMode)
+        {
+            var total = await query.CountAsync(cancellationToken);
+            var ordered = filter.Desc
+                ? query.OrderByDescending(item => item.OccurredAt).ThenByDescending(item => item.Id)
+                : query.OrderBy(item => item.OccurredAt).ThenBy(item => item.Id);
+            return (await ordered.Skip(filter.Offset).Take(filter.Limit).ToListAsync(cancellationToken), total);
+        }
         if (filter.BeforeOccurredAt is DateTimeOffset beforeOccurredAt
             && filter.BeforeId is Guid beforeId)
         {
@@ -332,11 +341,11 @@ public sealed class CompetitionEventStore(
                 || item.OccurredAt == beforeOccurredAt
                 && item.Id.CompareTo(beforeId) < 0);
         }
-        return await query
+        return (await query
             .OrderByDescending(item => item.OccurredAt)
             .ThenByDescending(item => item.Id)
             .Take(filter.Limit)
-            .ToListAsync(cancellationToken);
+            .ToListAsync(cancellationToken), 0);
     }
 
     private async Task<IReadOnlyList<CompetitionEventView>> EnrichAsync(

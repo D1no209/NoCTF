@@ -29,7 +29,7 @@ export function useNotificationUnread() {
     }
 
     const { data, error } = await listNotificationsEndpoint({
-      query: { scope: 'Inbox', limit: 1 },
+      query: { scope: 'Inbox', offset: 0, limit: 1, desc: true },
     })
     if (error) return undefined
 

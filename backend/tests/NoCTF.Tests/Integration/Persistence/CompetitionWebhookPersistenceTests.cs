@@ -219,12 +219,12 @@ public sealed class CompetitionWebhookPersistenceTests
                     TimeProvider.System);
                 var page = await store.ListAsync(
                     competitionId,
-                    null,
-                    null,
+                    0,
                     100,
+                    descending: true,
                     cancellationToken);
                 await Assert.That(page!.Items).Count().IsEqualTo(100);
-                await Assert.That(page.HasMore).IsTrue();
+                await Assert.That(page.Total).IsEqualTo(1_001);
 
                 var rotated = await store.RotateSecretAsync(
                     competitionId,

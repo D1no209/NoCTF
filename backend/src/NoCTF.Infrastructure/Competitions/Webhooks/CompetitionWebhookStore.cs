@@ -21,9 +21,9 @@ public sealed class CompetitionWebhookStore(
 
     public async Task<CompetitionWebhookTargetPage?> ListAsync(
         Guid competitionId,
-        DateTimeOffset? beforeUpdatedAt,
-        Guid? beforeId,
+        int offset,
         int limit,
+        bool descending,
         CancellationToken cancellationToken)
     {
         var configuration = await db.Competitions.AsNoTracking()
@@ -33,17 +33,17 @@ public sealed class CompetitionWebhookStore(
         if (configuration is null)
             return null;
 
-        var targets = configuration.Targets
-            .Where(item => beforeUpdatedAt is null
-                || item.UpdatedAt < beforeUpdatedAt
-                || item.UpdatedAt == beforeUpdatedAt && item.Id.CompareTo(beforeId!.Value) < 0)
-            .OrderByDescending(item => item.UpdatedAt)
-            .ThenByDescending(item => item.Id)
-            .Take(limit + 1)
-            .ToArray();
+        var ordered = descending
+            ? configuration.Targets
+                .OrderByDescending(item => item.UpdatedAt)
+                .ThenByDescending(item => item.Id)
+            : configuration.Targets
+                .OrderBy(item => item.UpdatedAt)
+                .ThenBy(item => item.Id);
+        var targets = ordered.Skip(offset).Take(limit).ToArray();
         return new(
-            targets.Take(limit).Select(ToView).ToArray(),
-            targets.Length > limit);
+            targets.Select(ToView).ToArray(),
+            configuration.Targets.Count);
     }
 
     public async Task<CompetitionWebhookMutationResult> CreateAsync(

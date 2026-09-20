@@ -1,7 +1,6 @@
 using System.Text.Json.Serialization;
 using FastEndpoints;
 using FluentValidation;
-using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.HttpResults;
 using NoCTF.API.Pagination;
 using NoCTF.API.Security;
@@ -21,7 +20,6 @@ public enum CompetitionWebhookDisabledReasonProtocol
 [JsonConverter(typeof(StrictPascalCaseEnumConverter<CompetitionWebhookProblemCode>))]
 public enum CompetitionWebhookProblemCode
 {
-    InvalidCursor,
     DuplicateEndpoint,
     InvalidEndpoint,
     InvalidName
@@ -40,77 +38,69 @@ public sealed record CompetitionWebhookTargetResponse(
     DateTimeOffset CreatedAt,
     DateTimeOffset UpdatedAt);
 
-public sealed record CompetitionWebhookTargetListResponse(
-    IReadOnlyList<CompetitionWebhookTargetResponse> Items,
-    string? NextCursor,
-    bool CanManage);
+public sealed class CompetitionWebhookTargetListResponse
+    : ArrayResult<CompetitionWebhookTargetResponse>
+{
+    public CompetitionWebhookTargetListResponse() { }
 
-public sealed class ListCompetitionWebhooksRequest
+    public CompetitionWebhookTargetListResponse(
+        CompetitionWebhookTargetResponse[] items,
+        int total,
+        bool canManage) : base(items, total) => CanManage = canManage;
+
+    public bool CanManage { get; set; }
+}
+
+public sealed class ListCompetitionWebhooksRequest : PaginationRequest
 {
     public Guid CompetitionId { get; set; }
-    [QueryParam] public string? Cursor { get; set; }
-    [QueryParam] public int Limit { get; set; } = 50;
 }
 
 public sealed class ListCompetitionWebhooksValidator
     : Validator<ListCompetitionWebhooksRequest>
 {
-    public ListCompetitionWebhooksValidator() =>
-        RuleFor(request => request.Limit).InclusiveBetween(1, 100);
+    public ListCompetitionWebhooksValidator() => PaginationRules.Add(this);
 }
 
 public sealed class ListCompetitionWebhooksEndpoint(
     ListCompetitionWebhookTargets list,
     ICompetitionModerationAuthorizer authorizer,
-    IUserContext user,
-    SignedKeysetCursor cursors)
+    IUserContext user)
     : Endpoint<ListCompetitionWebhooksRequest,
-        Results<Ok<CompetitionWebhookTargetListResponse>, NotFound, ForbidHttpResult, ProblemHttpResult>>
+        Results<Ok<CompetitionWebhookTargetListResponse>, NotFound, ForbidHttpResult>>
 {
-    private const string CursorEndpoint = "admin.competition.webhooks.list";
-
     public override void Configure()
     {
         Get("/admin/competitions/{competitionId}/webhooks");
         AuthSchemes("Bearer");
         Description(builder => builder.WithName("AdminListCompetitionWebhooks"));
-        Summary(summary => summary.Summary = "Lists outbound webhook targets for one competition.");
+        Summary(summary =>
+        {
+            summary.Summary = "Lists outbound webhook targets for one competition.";
+            summary.Description = "Returns an offset page of targets with endpoint details redacted for read-only staff.";
+        });
     }
 
-    public override async Task<Results<Ok<CompetitionWebhookTargetListResponse>, NotFound, ForbidHttpResult, ProblemHttpResult>> ExecuteAsync(
+    public override async Task<Results<Ok<CompetitionWebhookTargetListResponse>, NotFound, ForbidHttpResult>> ExecuteAsync(
         ListCompetitionWebhooksRequest request,
         CancellationToken ct)
     {
         if (!await authorizer.CanObserveAsync(user.UserId, request.CompetitionId, ct))
             return TypedResults.Forbid();
         var canManage = await authorizer.CanModerateAsync(user.UserId, request.CompetitionId, ct);
-        var scope = request.CompetitionId.ToString("N");
-        if (!cursors.TryDecode(request.Cursor, CursorEndpoint, scope, out var position))
-        {
-            return TypedResults.Problem(
-                statusCode: StatusCodes.Status400BadRequest,
-                title: "Invalid webhook cursor.",
-                extensions: new Dictionary<string, object?>
-                {
-                    ["code"] = CompetitionWebhookProblemCode.InvalidCursor
-                });
-        }
         var page = await list.ExecuteAsync(
             request.CompetitionId,
-            position?.CreatedAt,
-            position?.Id,
+            request.Offset,
             request.Limit,
+            request.Desc,
             ct);
         if (page is null)
             return TypedResults.NotFound();
         var items = page.Items.Select(item => CompetitionWebhookProtocol.ToResponse(item, canManage)).ToArray();
-        var next = page.HasMore && items.Length > 0
-            ? cursors.Encode(
-                CursorEndpoint,
-                scope,
-                new(items[^1].UpdatedAt, items[^1].Id))
-            : null;
-        return TypedResults.Ok(new CompetitionWebhookTargetListResponse(items, next, canManage));
+        return TypedResults.Ok(new CompetitionWebhookTargetListResponse(
+            items,
+            page.Total,
+            canManage));
     }
 }
 

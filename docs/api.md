@@ -297,7 +297,7 @@ CompetitionEvent；不在 Competition 保存 revision、scheduled next-run 或�
 
 比赛事件使用永久、不可变的单表事实流。活动比赛的公共参与者只能读取公开事件，已审批且
 未封禁队伍还能读取本队事件；其查询必须提供最长 31 天的时间窗。Administrator 与该比赛的
-Owner/Manager/Judge/Observer 可以省略时间窗，通过签名 keyset cursor 分页读取完整历史，比赛
+Owner/Manager/Judge/Observer 可以省略时间窗，通过 `offset/limit/total` 页码分页读取完整历史，比赛
 软删除归档后仍保留这一只读能力；参赛者不能借归档状态继续读取或扩大可见范围。JSONL 导出仍
 要求有界时间窗、最多 50,000 条，且仅 Administrator、Owner、Manager 可用。实时通知只携带事件
 Id、类型、级别与发生时间，客户端收到后通过本 GET 重新读取，不通过 SignalR 传输敏感正文。
@@ -383,7 +383,7 @@ POST /api/v1/admin/competitions/{competitionId}/challenges/{competitionChallenge
 DELETE /api/v1/admin/competitions/{competitionId}/challenges/{competitionChallengeId}/runtimes/{runtimeInstanceId}
 ```
 
-列表按 CreatedAt desc/Id desc keyset，可筛选 CompetitionChallengeId、TeamId、RuntimeKind、Provider、RunnerId、State、ExpiresBefore。Manager 可执行常规动作；Judge/Observer 只读；ProviderReceipt/内部错误只在管理详情返回。精确终止仅使用 RuntimeInstanceId 定位实例，并通过持久化 `Stopping -> Stopped` Provider 清理状态机；同一终态操作依赖状态和幂等资源身份收敛。仅平台 Administrator 可对已停留至少五分钟的 `Provisioning`/`Stopping` 实例执行强制终结，必须提交原因；Runner 先按实例 UUID 标签清理并确认 Provider 资源已不存在，再释放容量、写回 `Stopped` 并派发等待实例，结果记录为工作人员可见的比赛事件。该流程幂等，禁止仅修改数据库状态。带 Team 的动作服务 CTF/AWD，复用玩家 Runtime 状态机，不提供绕过额度或状态的“强制成功”。不带 Team 的三个动作只服务 KoH shared Runtime，不伪造 TeamId；KoH 没有 Extend。
+列表使用 `offset/limit/total` 页码分页，可筛选 CompetitionChallengeId、TeamId、RuntimeKind、Provider、RunnerId、State、ExpiresBefore。Manager 可执行常规动作；Judge/Observer 只读；ProviderReceipt/内部错误只在管理详情返回。精确终止仅使用 RuntimeInstanceId 定位实例，并通过持久化 `Stopping -> Stopped` Provider 清理状态机；同一终态操作依赖状态和幂等资源身份收敛。仅平台 Administrator 可对已停留至少五分钟的 `Provisioning`/`Stopping` 实例执行强制终结，必须提交原因；Runner 先按实例 UUID 标签清理并确认 Provider 资源已不存在，再释放容量、写回 `Stopped` 并派发等待实例，结果记录为工作人员可见的比赛事件。该流程幂等，禁止仅修改数据库状态。带 Team 的动作服务 CTF/AWD，复用玩家 Runtime 状态机，不提供绕过额度或状态的“强制成功”。不带 Team 的三个动作只服务 KoH shared Runtime，不伪造 TeamId；KoH 没有 Extend。
 
 ## CompetitionChallenge Management
 
@@ -493,7 +493,7 @@ POST /api/v1/admin/platform/sso/providers/{providerId}/authentication-tests
 ```
 
 平台 Runtime 清单只投影当前处于 Queued、Provisioning、Running 或 Stopping 状态的 Container 与
-Compose 实例，包含比赛 Runtime 与题库模板测试 Runtime，并按 CreatedAt/Id 使用签名 keyset cursor
+Compose 实例，包含比赛 Runtime 与题库模板测试 Runtime，并使用 `offset/limit/total` 页码
 分页。响应带作用域、赛事或模板题目、来源队伍、Provider、Runner、端口及生命周期时间；平台级停止
 与强制终结按 RuntimeInstanceId 操作两种作用域，复用同一 durable cleanup 链路。比赛 Runtime 继续写入
 比赛审计事件，题库测试 Runtime 不伪造 CompetitionEvent。
@@ -520,7 +520,7 @@ POST   /api/v1/admin/competitions/{competitionId}/webhooks/{targetId}/test-deliv
 GET    /api/v1/admin/competitions/{competitionId}/webhooks/{targetId}/test-deliveries/{deliveryId}
 ```
 
-目标列表使用签名 keyset cursor，不设置产品数量上限。Administrator、Owner、Manager 可写；Judge 与
+目标列表使用 `offset/limit/total` 页码分页，不设置产品数量上限。Administrator、Owner、Manager 可写；Judge 与
 Observer 只能读取名称、主机和启停状态。创建及轮换只显示一次 HMAC 密钥。正式事件经事务 Outbox、
 独立 NATS Webhook fan-out 和 Worker 工作队列异步发送；详细事件、签名、重试和网络限制见
 [赛事 Webhook](competition-webhooks.md)。

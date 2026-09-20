@@ -3,13 +3,14 @@ import { toRefs } from 'vue'
 import type { AdminCompetitionsByIdTeamsPageViewState } from '~/features/routes/admin/competitions/[id]/useAdminCompetitionsByIdTeamsPage'
 
 const viewProps = defineProps<{ state: AdminCompetitionsByIdTeamsPageViewState }>()
-const { competitionId, canJudge, canWrite, teams, loading, error, pendingId, tracks, tracksEnabled, selectedTeam, teamMembers, teamDetailLoading, teamDisplayNames, displayTeamName, scoreAdjustmentTeam, scoreAdjustmentChallenges, scoreAdjustmentChallengeId, scoreAdjustmentDelta, scoreAdjustmentLoading, scoreAdjustmentPending, scoreAdjustmentError, scoreAdjustmentValid, openScoreAdjustment, closeScoreAdjustment, submitScoreAdjustment, openTeamDetail, assignTrackValue, simpleAction, banDialog, banReason, banAnnouncePublicly, banPending, banReasonValid, openBan, submitBan, appeals, appealsLoading, appealsError, appealDialog, appealReason, appealPending, openAppeal, submitAppeal, PrivateAccountPanel, onUpdateOpenOpen, onClickScoreAdjustmentTeam, onUpdateOpenBanDialog, onClickBanDialog, onUpdateOpenAppealDialog, onClickAppealDialog } = toRefs(viewProps.state)
+const { competitionId, canJudge, canWrite, teams, search, loading, pageLoading, error, page, pageCount, total, pageLimit, loadPage, setPageSize, pendingId, tracks, tracksEnabled, selectedTeam, teamMembers, teamDetailLoading, teamDisplayNames, displayTeamName, scoreAdjustmentTeam, scoreAdjustmentChallenges, scoreAdjustmentChallengeId, scoreAdjustmentDelta, scoreAdjustmentLoading, scoreAdjustmentPending, scoreAdjustmentError, scoreAdjustmentValid, openScoreAdjustment, closeScoreAdjustment, submitScoreAdjustment, openTeamDetail, assignTrackValue, simpleAction, banDialog, banReason, banAnnouncePublicly, banPending, banReasonValid, openBan, submitBan, appeals, appealsLoading, appealsError, appealDialog, appealReason, appealPending, openAppeal, submitAppeal, PrivateAccountPanel, onUpdateOpenOpen, onClickScoreAdjustmentTeam, onUpdateOpenBanDialog, onClickBanDialog, onUpdateOpenAppealDialog, onClickAppealDialog } = toRefs(viewProps.state)
 </script>
 
 <template>
   <div class="flex flex-col gap-8">
     <div id="ban-appeals" class="flex scroll-mt-24 flex-col gap-4">
       <h2 class="text-lg font-semibold">{{ $t('ui.teamManagement2') }}</h2>
+      <Input v-model="search" :placeholder="$t('ui.searchTeam')" :aria-label="$t('ui.searchTeam')" />
       <Alert v-if="error" variant="destructive">
         <AlertDescription>{{ $message(error) }}</AlertDescription>
       </Alert>
@@ -89,6 +90,16 @@ const { competitionId, canJudge, canWrite, teams, loading, error, pendingId, tra
           </TableRow>
         </TableBody>
       </Table>
+      <OffsetPagination
+        v-if="teams.length > 0 || total > 0"
+        :page="page"
+        :page-count="pageCount"
+        :total="total"
+        :limit="pageLimit"
+        :loading="pageLoading"
+        @update:page="loadPage"
+        @update:limit="setPageSize"
+      />
     </div>
 
     <Sheet :open="selectedTeam !== null" @update:open="onUpdateOpenOpen">

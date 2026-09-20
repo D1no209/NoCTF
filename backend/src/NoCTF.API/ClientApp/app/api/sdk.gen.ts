@@ -2437,7 +2437,7 @@ export const adminPlatformListLogs = <ThrowOnError extends boolean = false>(opti
 /**
  * Lists active runtime containers across the platform.
  *
- * Returns keyset-paged Container and Compose runtimes in active lifecycle states to platform administrators. Supports scope, state, kind and case-insensitive title/team search, including Fix target team attribution.
+ * Returns offset-paged Container and Compose runtimes in active lifecycle states to platform administrators. Supports scope, state, kind and case-insensitive title/team search, including Fix target team attribution.
  */
 export const adminPlatformListActiveRuntimes = <ThrowOnError extends boolean = false>(options: Options<AdminPlatformListActiveRuntimesData, ThrowOnError>): RequestResult<AdminPlatformListActiveRuntimesResponses, AdminPlatformListActiveRuntimesErrors, ThrowOnError> => (options.client ?? client).get<AdminPlatformListActiveRuntimesResponses, AdminPlatformListActiveRuntimesErrors, ThrowOnError>({
     security: [{
@@ -2454,7 +2454,7 @@ export const adminPlatformListActiveRuntimes = <ThrowOnError extends boolean = f
  *
  * Returns platform role and token-version metadata to administrators only.
  */
-export const adminPlatformListUsers = <ThrowOnError extends boolean = false>(options?: Options<AdminPlatformListUsersData, ThrowOnError>): RequestResult<AdminPlatformListUsersResponses, AdminPlatformListUsersErrors, ThrowOnError> => (options?.client ?? client).get<AdminPlatformListUsersResponses, AdminPlatformListUsersErrors, ThrowOnError>({
+export const adminPlatformListUsers = <ThrowOnError extends boolean = false>(options: Options<AdminPlatformListUsersData, ThrowOnError>): RequestResult<AdminPlatformListUsersResponses, AdminPlatformListUsersErrors, ThrowOnError> => (options.client ?? client).get<AdminPlatformListUsersResponses, AdminPlatformListUsersErrors, ThrowOnError>({
     security: [{
             key: 'Bearer',
             scheme: 'bearer',
@@ -2691,7 +2691,7 @@ export const adminGetGameplayFactAdjudicationEvents = <ThrowOnError extends bool
 /**
  * Lists filtered competition gameplay facts.
  *
- * Returns keyset-paged protected gameplay facts to authorized competition observers.
+ * Returns offset-paged protected gameplay facts to authorized competition observers.
  */
 export const adminListGameplayFacts = <ThrowOnError extends boolean = false>(options: Options<AdminListGameplayFactsData, ThrowOnError>): RequestResult<AdminListGameplayFactsResponses, AdminListGameplayFactsErrors, ThrowOnError> => (options.client ?? client).get<AdminListGameplayFactsResponses, AdminListGameplayFactsErrors, ThrowOnError>({
     security: [{
@@ -2828,7 +2828,7 @@ export const adminCreateCompetition = <ThrowOnError extends boolean = false>(opt
 /**
  * Lists outbound webhook targets for one competition.
  *
- * Executes GET /api/v1/admin/competitions/{competitionId}/webhooks.
+ * Returns an offset page of targets with endpoint details redacted for read-only staff.
  */
 export const adminListCompetitionWebhooks = <ThrowOnError extends boolean = false>(options: Options<AdminListCompetitionWebhooksData, ThrowOnError>): RequestResult<AdminListCompetitionWebhooksResponses, AdminListCompetitionWebhooksErrors, ThrowOnError> => (options.client ?? client).get<AdminListCompetitionWebhooksResponses, AdminListCompetitionWebhooksErrors, ThrowOnError>({
     security: [{

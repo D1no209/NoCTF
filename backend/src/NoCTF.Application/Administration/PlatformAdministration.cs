@@ -15,6 +15,18 @@ public sealed record PlatformUserView(
     DateTimeOffset CreatedAt,
     DateTimeOffset UpdatedAt);
 
+public sealed record PlatformUserListQuery(
+    string? Keyword,
+    UserKind? Kind,
+    UserRole? Role,
+    int Offset,
+    int Limit,
+    bool Desc);
+
+public sealed record PlatformUserListPage(
+    IReadOnlyList<PlatformUserView> Items,
+    int Total);
+
 public enum UpdatePlatformRoleState
 {
     Updated,
@@ -119,6 +131,9 @@ public static class BotIdentity
 public interface IPlatformAdministrationStore
 {
     Task<IReadOnlyList<PlatformUserView>> ListUsersAsync(CancellationToken cancellationToken);
+    Task<PlatformUserListPage> ListUsersPageAsync(
+        PlatformUserListQuery query,
+        CancellationToken cancellationToken);
     Task<PlatformUserView?> FindUserAsync(Guid userId, CancellationToken cancellationToken);
     Task<CreateBotResult> CreateBotAsync(
         string userName,
@@ -165,6 +180,10 @@ public sealed class ManagePlatform(
 
     public Task<IReadOnlyList<PlatformUserView>> ListUsersAsync(CancellationToken ct = default) =>
         store.ListUsersAsync(ct);
+    public Task<PlatformUserListPage> ListUsersPageAsync(
+        PlatformUserListQuery query,
+        CancellationToken ct = default) =>
+        store.ListUsersPageAsync(query, ct);
     public Task<PlatformUserView?> GetUserAsync(Guid userId, CancellationToken ct = default) =>
         store.FindUserAsync(userId, ct);
     public Task<CreateBotResult> CreateBotAsync(

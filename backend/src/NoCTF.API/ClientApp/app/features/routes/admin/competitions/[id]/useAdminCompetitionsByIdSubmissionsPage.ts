@@ -79,7 +79,7 @@ export function useAdminCompetitionsByIdSubmissionsPage() {
   async function loadRefs() {
     const [challenges, teams] = await Promise.all([
       adminListCompetitionChallenges({ path: { competitionId }, query: { includeDeleted: false } }),
-      adminListTeams({ path: { competitionId } }),
+      adminListTeams({ path: { competitionId }, query: { keyword: null, offset: 0, limit: 200, desc: false } }),
     ])
     challengeOptions.value = (challenges.data?.items ?? [])
       .map(c => ({ id: c.id!, title: c.title ?? '' }))
@@ -228,12 +228,16 @@ export function useAdminCompetitionsByIdSubmissionsPage() {
         state: filterState.value || null,
         gameplayFactResult: filterResult.value || null,
         value: filterFlag.value || null,
-        cursor,
+        offset: cursor ? Number(cursor) || 0 : 0,
         limit: 30,
+        desc: true,
       },
     })
     if (error || !data) throw parseApiError(error)
-    return data
+    const pageItems = data.items ?? []
+    const offset = cursor ? Number(cursor) || 0 : 0
+    const nextOffset = offset + pageItems.length
+    return { items: pageItems, nextCursor: nextOffset < (data.total ?? 0) ? String(nextOffset) : null }
   })
 
   function applyFilters() {

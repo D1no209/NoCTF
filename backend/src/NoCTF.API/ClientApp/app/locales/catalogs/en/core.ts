@@ -875,6 +875,8 @@ export const messages = {
   "ui.retry": "Retry",
   "ui.previousPage": "Previous page",
   "ui.nextPage": "Next page",
+  "ui.itemsPerPage": "Items per page",
+  "ui.searchTeam": "Search teams",
   "ui.showPassword": "Show password",
   "ui.fullHistory": "Full history",
   "ui.last30Days": "Last 30 days",

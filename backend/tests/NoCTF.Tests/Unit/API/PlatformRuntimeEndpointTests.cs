@@ -65,31 +65,19 @@ public sealed class PlatformRuntimeEndpointTests
     }
 
     [Test]
-    public async Task Filters_reach_store_and_cursor_is_bound_to_every_filter()
+    public async Task Filters_and_offset_page_reach_the_store()
     {
         var store = CreateStore();
         await using var app = await CreateApp(store);
         using var client = app.GetTestClient();
         client.DefaultRequestHeaders.Add("X-Test-Role", "Administrator");
-        const string filters = "search=soul&scope=Competition&state=Running&runtimeKind=Container&limit=1";
-        var first = await client.GetFromJsonAsync<PlatformRuntimeListResponse>($"{Route}?{filters}");
-        await Assert.That(first!.NextCursor).IsNotNull();
-        await store.Received(1).ListActiveContainersAsync(
+        const string filters = "search=soul&scope=Competition&state=Running&runtimeKind=Container&offset=5&limit=1&desc=true";
+        var page = await client.GetFromJsonAsync<PlatformRuntimeListResponse>($"{Route}?{filters}");
+        await Assert.That(page!.Total).IsEqualTo(1);
+        await store.Received(1).ListActiveContainersPageAsync(
             new("soul", PlatformRuntimeScope.Competition, RuntimeState.Running, RuntimeKind.Container),
-            null, null, 1, Arg.Any<CancellationToken>());
-        var cursor = Uri.EscapeDataString(first.NextCursor!);
-        using var next = await client.GetAsync($"{Route}?{filters}&cursor={cursor}");
-        await Assert.That(next.StatusCode).IsEqualTo(HttpStatusCode.OK);
-        foreach (var changed in new[]
-        {
-            filters.Replace("soul", "different"), filters.Replace("Competition", "ChallengeTest"),
-            filters.Replace("Running", "Stopping"), filters.Replace("Container", "Compose")
-        })
-        {
-            using var response = await client.GetAsync($"{Route}?{changed}&cursor={cursor}");
-            await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.BadRequest);
-        }
-        await Assert.That(store.ReceivedCalls().Count()).IsEqualTo(2);
+            5, 1, true, Arg.Any<CancellationToken>());
+        await Assert.That(store.ReceivedCalls()).Count().IsEqualTo(1);
     }
 
     [Test]
@@ -118,6 +106,17 @@ public sealed class PlatformRuntimeEndpointTests
                     RuntimeKind.Container, RuntimeProvider.Docker, RuntimeState.Running, null, [],
                     DateTimeOffset.UtcNow, null, null, null), PlatformRuntimeScope.Competition, "Contest", "soul")
             ]));
+        store.ListActiveContainersPageAsync(
+                Arg.Any<PlatformRuntimeFilter>(),
+                Arg.Any<int>(),
+                Arg.Any<int>(),
+                Arg.Any<bool>(),
+                Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult(new PlatformRuntimeListPage(
+                [new(new(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), null, null, RuntimePurpose.Player,
+                    RuntimeKind.Container, RuntimeProvider.Docker, RuntimeState.Running, null, [],
+                    DateTimeOffset.UtcNow, null, null, null), PlatformRuntimeScope.Competition, "Contest", "soul")],
+                1)));
         return store;
     }
 
@@ -146,8 +145,6 @@ public sealed class PlatformRuntimeEndpointTests
         builder.Services.AddSingleton(store);
         builder.Services.AddScoped<ManageAdminRuntimes>();
         builder.Services.AddSingleton(TimeProvider.System);
-        builder.Services.Configure<PaginationOptions>(options => options.SigningKey = "test-only-cursor-signing-key");
-        builder.Services.AddSingleton<SignedKeysetCursor>();
         var app = builder.Build();
         app.UseAuthentication();
         app.UseAuthorization();

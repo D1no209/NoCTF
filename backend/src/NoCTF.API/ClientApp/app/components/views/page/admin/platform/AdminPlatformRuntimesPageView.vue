@@ -3,7 +3,7 @@ import { toRefs } from 'vue'
 import type { AdminPlatformRuntimesPageViewState } from '~/features/routes/admin/platform/useAdminPlatformRuntimesPage'
 
 const viewProps = defineProps<{ state: AdminPlatformRuntimesPageViewState }>()
-const { formatCapacityAmount, runnerFailureLabel, ExternalLink, RefreshCw, filters, detailTarget, items, loading, error, hasMore, initialized, loadMore, refresh, detail, applyFilters, clearFilters, terminateTarget, terminatePending, terminationError, forceTerminateTarget, forceTerminateReason, forceTerminateConfirmed, forceTerminatePending, forceTerminationError, teamLabel, stateBadgeVariant, canTerminate, openTermination, openForceTermination, submitTermination, submitForceTermination, onClickDetailTarget, onUpdateOpenDetailTarget, onUpdateOpenTerminateTarget, onUpdateOpenForceTerminateTarget } = toRefs(viewProps.state)
+const { formatCapacityAmount, runnerFailureLabel, ExternalLink, RefreshCw, filters, detailTarget, items, loading, error, initialized, refresh, page, pageCount, total, pageLimit, loadPage, setPageSize, detail, applyFilters, clearFilters, terminateTarget, terminatePending, terminationError, forceTerminateTarget, forceTerminateReason, forceTerminateConfirmed, forceTerminatePending, forceTerminationError, teamLabel, stateBadgeVariant, canTerminate, openTermination, openForceTermination, submitTermination, submitForceTermination, onClickDetailTarget, onUpdateOpenDetailTarget, onUpdateOpenTerminateTarget, onUpdateOpenForceTerminateTarget } = toRefs(viewProps.state)
 </script>
 
 <template>
@@ -148,11 +148,15 @@ const { formatCapacityAmount, runnerFailureLabel, ExternalLink, RefreshCw, filte
           </TableRow>
         </TableBody>
       </Table>
-      <div v-if="hasMore" class="flex justify-center border-t p-4">
-        <Button variant="outline" :disabled="loading" @click="loadMore">
-          <Spinner v-if="loading" data-icon="inline-start" /> {{ $t('ui.loadMore') }}
-        </Button>
-      </div>
+      <OffsetPagination
+        :page="page"
+        :page-count="pageCount"
+        :total="total"
+        :limit="pageLimit"
+        :loading="loading"
+        @update:page="loadPage"
+        @update:limit="setPageSize"
+      />
     </template>
 
     <Sheet :open="detailTarget !== null" @update:open="onUpdateOpenDetailTarget">

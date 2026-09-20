@@ -484,7 +484,7 @@ describe('isolated Mock API', () => {
   test('pagination is stable and runtime reset replaces the simulated runtime ID', async () => {
     const { send } = await setup()
     const first = await (await send(`${competition}/gameplay-facts?limit=1`)).json()
-    const next = await (await send(`${competition}/gameplay-facts?limit=1&cursor=${first.nextCursor}`)).json()
+    const next = await (await send(`${competition}/gameplay-facts?limit=1&offset=1`)).json()
     expect(first.items).toHaveLength(1)
     expect(next.items[0].id).not.toBe(first.items[0].id)
     const path = `${competition}/challenges/${id(4, 2)}/runtimes`

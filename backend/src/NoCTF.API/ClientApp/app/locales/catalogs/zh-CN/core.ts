@@ -875,6 +875,8 @@ export const messages = {
   "ui.retry": "重试",
   "ui.previousPage": "上一页",
   "ui.nextPage": "下一页",
+  "ui.itemsPerPage": "每页条数",
+  "ui.searchTeam": "搜索队伍",
   "ui.showPassword": "显示密码",
   "ui.fullHistory": "完整历史",
   "ui.last30Days": "最近 30 天",
