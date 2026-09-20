@@ -8,10 +8,12 @@ public static class NatsSubjects
     public const string GameplayStream = "NOCTF_GAMEPLAY";
     public const string ProjectionStream = "NOCTF_PROJECTION";
     public const string BackgroundStream = "NOCTF_BACKGROUND";
+    public const string WebhookStream = "NOCTF_WEBHOOK";
     public const string EventsStream = "NOCTF_EVENTS";
     public const string RunnerStream = "NOCTF_RUNNER";
     public const string RealtimeEvents = "noctf.events.realtime";
     public const string LeaderboardEvents = "noctf.events.leaderboard";
+    public const string WebhookEvents = "noctf.events.webhook";
 
     public static string Subject(WorkerQueue queue) => queue switch
     {
@@ -19,6 +21,7 @@ public static class NatsSubjects
         WorkerQueue.Gameplay => "noctf.gameplay",
         WorkerQueue.Projection => "noctf.projection",
         WorkerQueue.Background => "noctf.background",
+        WorkerQueue.Webhook => "noctf.webhook",
         _ => throw new ArgumentOutOfRangeException(nameof(queue), queue, null)
     };
 
@@ -28,6 +31,7 @@ public static class NatsSubjects
         WorkerQueue.Gameplay => GameplayStream,
         WorkerQueue.Projection => ProjectionStream,
         WorkerQueue.Background => BackgroundStream,
+        WorkerQueue.Webhook => WebhookStream,
         _ => throw new ArgumentOutOfRangeException(nameof(queue), queue, null)
     };
 

@@ -70,12 +70,18 @@ public static class WolverineHosting
                 stream => stream.WithSubjects(NatsSubjects.Subject(WorkerQueue.Background)),
                 NatsSubjects.Subject(WorkerQueue.Background))
             .DefineWorkQueueStream(
+                NatsSubjects.WebhookStream,
+                stream => stream.WithSubjects(NatsSubjects.Subject(WorkerQueue.Webhook)),
+                NatsSubjects.Subject(WorkerQueue.Webhook))
+            .DefineWorkQueueStream(
                 NatsSubjects.EventsStream,
                 stream => stream.WithSubjects(
                     NatsSubjects.RealtimeEvents,
-                    NatsSubjects.LeaderboardEvents),
+                    NatsSubjects.LeaderboardEvents,
+                    NatsSubjects.WebhookEvents),
                 NatsSubjects.RealtimeEvents,
-                NatsSubjects.LeaderboardEvents)
+                NatsSubjects.LeaderboardEvents,
+                NatsSubjects.WebhookEvents)
             .DefineWorkQueueStream(
                 NatsSubjects.RunnerStream,
                 stream => stream.WithSubject("noctf.runner.>"),

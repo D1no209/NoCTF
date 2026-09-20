@@ -4,6 +4,7 @@ using NoCTF.Application.Messaging;
 using NoCTF.Application.Runtime.Instances;
 using NoCTF.Application.GameplayFacts.Processing;
 using NoCTF.Hosting.Messaging;
+using NoCTF.Application.Competitions.Webhooks;
 using Wolverine;
 using Wolverine.Nats;
 
@@ -43,6 +44,9 @@ public static class MessageRouting
         Route<SendPasswordChangedNotification>(options, WorkerQueue.Background);
         Route<CleanupFile>(options, WorkerQueue.Background, durableOutbox: true);
         Route<ExpireAccountSourceAddresses>(options, WorkerQueue.Background, durableOutbox: true);
+        Route<DispatchCompetitionWebhooks>(options, WorkerQueue.Webhook);
+        Route<DeliverCompetitionWebhook>(options, WorkerQueue.Webhook);
+        Route<TestCompetitionWebhook>(options, WorkerQueue.Webhook);
         Route<InvalidateDeletedCompetitionReadModels>(options, WorkerQueue.Background, durableOutbox: true);
         Route<ChallengePublished>(options, WorkerQueue.Background);
         Route<PublishHintNotification>(options, WorkerQueue.Background);
@@ -75,11 +79,15 @@ public static class MessageRouting
         var route = options.PublishMessage<CompetitionEventCommitted>();
         route.ToNatsSubject(NatsSubjects.RealtimeEvents).UseJetStream(NatsSubjects.EventsStream).UseDurableOutbox();
         route.ToNatsSubject(NatsSubjects.LeaderboardEvents).UseJetStream(NatsSubjects.EventsStream).UseDurableOutbox();
+        route.ToNatsSubject(NatsSubjects.WebhookEvents).UseJetStream(NatsSubjects.EventsStream).UseDurableOutbox();
         options.ConfigureNoCtfInfrastructureRetriesFor<CompetitionEventCommitted>(
             WorkerQueue.Background,
             CompetitionEventFanoutQueueNames.Realtime);
         options.ConfigureNoCtfInfrastructureRetriesFor<CompetitionEventCommitted>(
             WorkerQueue.Projection,
             CompetitionEventFanoutQueueNames.Leaderboard);
+        options.ConfigureNoCtfInfrastructureRetriesFor<CompetitionEventCommitted>(
+            WorkerQueue.Webhook,
+            CompetitionEventFanoutQueueNames.Webhook);
     }
 }

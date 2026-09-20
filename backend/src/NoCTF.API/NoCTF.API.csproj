@@ -34,6 +34,12 @@
     <None Include="$(SpaRoot)**"
           Exclude="$(SpaRoot)node_modules\**;$(SpaRoot).nuxt\**;$(SpaRoot).output\**" />
   </ItemGroup>
+  <ItemGroup>
+    <Content Include="..\..\artifacts\webhooks\competition-events-v1.schema.json"
+             Link="wwwroot\schemas\webhooks\competition-events-v1.schema.json"
+             CopyToOutputDirectory="PreserveNewest"
+             CopyToPublishDirectory="PreserveNewest" />
+  </ItemGroup>
   <Target Name="DebugEnsureNodeEnv"
           BeforeTargets="Build"
           Condition="'$(Configuration)' == 'Debug' And !Exists('$(SpaRoot)node_modules')">

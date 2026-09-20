@@ -13,6 +13,7 @@ using Wolverine;
 using Wolverine.ErrorHandling;
 using Wolverine.Nats;
 using Wolverine.Runtime.Agents;
+using NoCTF.Application.Competitions.Webhooks;
 
 namespace NoCTF.Worker;
 
@@ -50,6 +51,7 @@ public static class WorkerRole
         services.AddSingleton<NoCTF.Infrastructure.Runtime.Capacity.RuntimeDispatchWakeupGate>();
         services.AddTransient<ReleaseRunnerCapacityHandler>();
         services.AddTransient<GameplayFactDrainMessageHandler>();
+        services.AddTransient<CompetitionWebhookMessageHandler>();
         services.AddSingleton<LeaderboardProjectionMergeQueue>();
         if (WorkerQueues.GetEnabled(configuration).Contains(WorkerQueue.Background))
         {
@@ -96,12 +98,15 @@ public static class WorkerRole
         options.Discovery.IncludeType(typeof(AccountNotificationMessageHandler));
         options.Discovery.IncludeType(typeof(GameplayFactMessageHandler));
         options.Discovery.IncludeType(typeof(LeaderboardMessageHandler));
+        options.Discovery.IncludeType(typeof(CompetitionWebhookMessageHandler));
         options.Discovery.IncludeType(typeof(CompetitionNotificationMessageHandlers));
         var enabledQueues = WorkerQueues.GetEnabled(configuration);
         if (enabledQueues.Contains(WorkerQueue.Background))
             options.Discovery.IncludeType(typeof(CompetitionEventRealtimeMessageHandler));
         if (enabledQueues.Contains(WorkerQueue.Projection))
             options.Discovery.IncludeType(typeof(CompetitionEventLeaderboardMessageHandler));
+        if (enabledQueues.Contains(WorkerQueue.Webhook))
+            options.Discovery.IncludeType(typeof(CompetitionEventWebhookMessageHandler));
         options.Durability.Mode = DurabilityMode.Balanced;
         options.Durability.MessageIdentity = MessageIdentity.IdAndDestination;
         options.Durability.CheckAssignmentPeriod = TimeSpan.FromSeconds(1);
@@ -126,6 +131,20 @@ public static class WorkerRole
                 exception => exception.Failure is
                     EmailVerificationDeliveryFailure.AuthenticationFailed
                     or EmailVerificationDeliveryFailure.MessageRejected)
+            .MoveToErrorQueue();
+        options.Policies.OnException<CompetitionWebhookTransientException>()
+            .ScheduleRetry([
+                TimeSpan.FromSeconds(5),
+                TimeSpan.FromSeconds(30),
+                TimeSpan.FromMinutes(2),
+                TimeSpan.FromMinutes(10),
+                TimeSpan.FromMinutes(30),
+                TimeSpan.FromHours(2),
+                TimeSpan.FromHours(8),
+                TimeSpan.FromHours(24)
+            ])
+            .WithFullJitter();
+        options.Policies.OnException<CompetitionWebhookPermanentException>()
             .MoveToErrorQueue();
         if (!durable)
             return;
@@ -159,6 +178,16 @@ public static class WorkerRole
                 .MaximumParallelMessages(WorkerQueues.GetConcurrency(
                     configuration,
                     WorkerQueue.Projection))
+                .UseDurableInbox();
+        }
+        if (enabledQueues.Contains(WorkerQueue.Webhook))
+        {
+            options.ListenToNatsSubject(NatsSubjects.WebhookEvents)
+                .UseJetStream(NatsSubjects.EventsStream, "noctf-webhook-events")
+                .Named(CompetitionEventFanoutQueueNames.Webhook)
+                .MaximumParallelMessages(WorkerQueues.GetConcurrency(
+                    configuration,
+                    WorkerQueue.Webhook))
                 .UseDurableInbox();
         }
     }

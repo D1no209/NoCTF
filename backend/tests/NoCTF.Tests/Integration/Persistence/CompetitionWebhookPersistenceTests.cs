@@ -2,10 +2,15 @@ using System.Text.Json;
 using System.Security.Cryptography;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
+using NSubstitute;
+using NoCTF.Application.Challenges.Management;
 using NoCTF.Application.Competitions.Events;
 using NoCTF.Application.Competitions.Webhooks;
+using NoCTF.Application.Scoring.Leaderboard;
 using NoCTF.Domain.Competitions;
 using NoCTF.Domain.Identity;
+using NoCTF.Domain.Competitions.Events;
+using NoCTF.Domain.Shared;
 using NoCTF.GameModes.Registration;
 using NoCTF.Infrastructure.Authentication;
 using NoCTF.Infrastructure.Competitions.Webhooks;
@@ -78,6 +83,7 @@ public sealed class CompetitionWebhookPersistenceTests
                         .Select(value => (byte)value).ToArray())
                 }));
             Guid targetId;
+            var eventId = Guid.CreateVersion7(now.AddTicks(2));
             string originalSecret;
             await using (var createDb = new NoCtfDbContext(options))
             {
@@ -98,6 +104,56 @@ public sealed class CompetitionWebhookPersistenceTests
                 originalSecret = result.SigningSecret!;
             }
 
+            await using (var eventDb = new NoCtfDbContext(options))
+            {
+                eventDb.CompetitionEvents.Add(new CompetitionEvent
+                {
+                    Id = eventId,
+                    CompetitionId = competitionId,
+                    Kind = CompetitionEventKind.CompetitionLifecycleChanged,
+                    Level = CompetitionEventLevel.Information,
+                    Visibility = CompetitionEventVisibility.Public,
+                    SubjectType = EntityReferenceKind.Competition,
+                    SubjectId = competitionId,
+                    PayloadJson = "{\"schemaVersion\":1,\"competitionStatus\":\"Running\",\"from\":\"Published\"}",
+                    OccurredAt = now.AddSeconds(1)
+                });
+                await eventDb.SaveChangesAsync(cancellationToken);
+            }
+
+            await using (var deliveryDb = new NoCtfDbContext(options))
+            {
+                var deliveryStore = new CompetitionWebhookDeliveryStore(
+                    deliveryDb,
+                    protector,
+                    new GetChallenge(Substitute.For<IChallengeManagementStore>()),
+                    Substitute.For<ILeaderboardCache>(),
+                    new CompetitionWebhookOptions(
+                        new Uri("https://noctf.example.test/"),
+                        10,
+                        new HashSet<string>(),
+                        new HashSet<string>()),
+                    TimeProvider.System);
+                var batch = await deliveryStore.PrepareBatchAsync(
+                    new(competitionId, eventId),
+                    100,
+                    cancellationToken);
+                await Assert.That(batch.Deliveries).HasSingleItem();
+                var delivery = await deliveryStore.PrepareDeliveryAsync(
+                    batch.Deliveries[0],
+                    cancellationToken);
+                await Assert.That(delivery.State)
+                    .IsEqualTo(CompetitionWebhookDeliveryReadState.Ready);
+                using var body = JsonDocument.Parse(delivery.Body!);
+                await Assert.That(body.RootElement.GetProperty("type").GetString())
+                    .IsEqualTo("com.noctf.competition.lifecycle.changed.v1");
+                await Assert.That(body.RootElement.GetProperty("data")
+                    .GetProperty("resources")
+                    .GetProperty("competition")
+                    .GetProperty("administrationRole").ValueKind)
+                    .IsEqualTo(JsonValueKind.Null);
+            }
+
             await using (var expandDb = new NoCtfDbContext(options))
             {
                 var competition = await expandDb.Competitions.SingleAsync(
@@ -110,12 +166,43 @@ public sealed class CompetitionWebhookPersistenceTests
                         Id = Guid.CreateVersion7(now.AddTicks(index + 10)),
                         Name = $"Target {index}",
                         EndpointUrl = $"https://hooks-{index}.example.test/noctf",
+                        Enabled = true,
+                        EnabledAt = now,
                         CurrentSecretCiphertext = [1, 2, 3],
                         CreatedAt = now,
                         UpdatedAt = now
                     });
                 }
                 await expandDb.SaveChangesAsync(cancellationToken);
+            }
+
+            await using (var batchingDb = new NoCtfDbContext(options))
+            {
+                var deliveryStore = new CompetitionWebhookDeliveryStore(
+                    batchingDb,
+                    protector,
+                    new GetChallenge(Substitute.For<IChallengeManagementStore>()),
+                    Substitute.For<ILeaderboardCache>(),
+                    new CompetitionWebhookOptions(
+                        new Uri("https://noctf.example.test/"),
+                        10,
+                        new HashSet<string>(),
+                        new HashSet<string>()),
+                    TimeProvider.System);
+                Guid? cursor = null;
+                var dispatched = 0;
+                do
+                {
+                    var batch = await deliveryStore.PrepareBatchAsync(
+                        new(competitionId, eventId, cursor),
+                        100,
+                        cancellationToken);
+                    await Assert.That(batch.Deliveries.Count).IsLessThanOrEqualTo(100);
+                    dispatched += batch.Deliveries.Count;
+                    cursor = batch.NextAfterTargetId;
+                }
+                while (cursor is not null);
+                await Assert.That(dispatched).IsEqualTo(1_001);
             }
 
             await using (var rotateDb = new NoCtfDbContext(options))

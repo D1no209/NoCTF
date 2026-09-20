@@ -41,6 +41,18 @@ public static class NoCtfMessagingRetryPolicies
         TimeSpan.FromMinutes(2)
     };
 
+    private static readonly TimeSpan[] WebhookRetryDelays =
+    {
+        TimeSpan.FromSeconds(5),
+        TimeSpan.FromSeconds(30),
+        TimeSpan.FromMinutes(2),
+        TimeSpan.FromMinutes(10),
+        TimeSpan.FromMinutes(30),
+        TimeSpan.FromHours(2),
+        TimeSpan.FromHours(8),
+        TimeSpan.FromHours(24)
+    };
+
     private static readonly TimeSpan[] RunnerRetryDelays =
     {
         TimeSpan.FromSeconds(1),
@@ -60,6 +72,7 @@ public static class NoCtfMessagingRetryPolicies
             WorkerQueue.Gameplay => GameplayRetryDelays,
             WorkerQueue.Projection => ProjectionRetryDelays,
             WorkerQueue.Background => BackgroundRetryDelays,
+            WorkerQueue.Webhook => WebhookRetryDelays,
             _ => throw new ArgumentOutOfRangeException(nameof(queue), queue, null)
         };
 
@@ -141,6 +154,8 @@ public static class NoCtfMessagingRetryPolicies
                     "nats://subject/noctf.events.realtime",
                 CompetitionEventFanoutQueueNames.Leaderboard =>
                     "nats://subject/noctf.events.leaderboard",
+                CompetitionEventFanoutQueueNames.Webhook =>
+                    "nats://subject/noctf.events.webhook",
                 _ => $"nats://subject/noctf.{endpointName.Replace("-", ".", StringComparison.Ordinal)}"
             };
     }
