@@ -1,5 +1,7 @@
 # NoCTF QQ BOT
 
+群聊命令和权限说明见 [`docs/bot-usage.md`](../../docs/bot-usage.md)。
+
 `NoCTF.Bot` is a standalone .NET 10 worker. Its provider-neutral Core consumes general public
 NoCTF HTTP APIs and the competition SignalR Hub; the separately compiled Milky provider owns QQ
 HTTP/WebSocket details. The platform has no BOT/provider configuration or delivery responsibility.
