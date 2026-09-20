@@ -3,7 +3,7 @@ import { toRefs } from 'vue'
 import type { AuthLoginPageViewState } from '~/features/routes/auth/useAuthLoginPage'
 
 const viewProps = defineProps<{ state: AuthLoginPageViewState }>()
-const { authArtwork, configuration, loginName, password, error, pending, capVerification, capCanRetry, submitDisabled, submit } = toRefs(viewProps.state)
+const { authArtwork, configuration, loginName, password, error, pending, capVerification, capCanRetry, submitDisabled, submit, ssoProviders, ssoLoading, ssoPendingId, beginSso } = toRefs(viewProps.state)
 </script>
 
 <template>
@@ -53,6 +53,30 @@ const { authArtwork, configuration, loginName, password, error, pending, capVeri
             </Field>
           </FieldGroup>
         </UiForm>
+        <template v-if="ssoLoading || ssoProviders.length">
+          <div class="my-5 flex items-center gap-3" aria-hidden="true">
+            <Separator class="flex-1" />
+            <span class="text-xs text-muted-foreground">{{ $t('sso.orUseSingleSignOn') }}</span>
+            <Separator class="flex-1" />
+          </div>
+          <div class="flex flex-col gap-2">
+            <Skeleton v-if="ssoLoading" class="h-10 w-full" />
+            <template v-else>
+              <Button
+                v-for="provider in ssoProviders"
+                :key="provider.id"
+                type="button"
+                variant="outline"
+                class="w-full"
+                :disabled="Boolean(ssoPendingId)"
+                @click="provider.id && beginSso(provider.id)"
+              >
+                <Spinner v-if="ssoPendingId === provider.id" data-icon="inline-start" />
+                {{ $t('sso.continueWith', { provider: provider.name ?? '' }) }}
+              </Button>
+            </template>
+          </div>
+        </template>
       </CardContent>
       <CardFooter class="relative z-10 justify-center text-sm text-muted-foreground">
         {{ $t('ui.donTHaveAnAccountYet') }}

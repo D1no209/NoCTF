@@ -3,7 +3,7 @@ import { toRefs } from 'vue'
 import type { AccountPanelViewState } from '~/features/account/useAccountPanel'
 
 const viewProps = defineProps<{ state: AccountPanelViewState }>()
-const { UserRound, LockKeyhole, ShieldCheck, ImageIcon, LogOut, user, isImpersonating, fetchMe, open, activeSection, setOpen, selectSection, signOut, description, profilePending, profileError, profileSuccess, profileDirty, saveProfile, avatarInput, avatarPending, avatarEditorOpen, avatarSourceFile, avatarRequirements, selectAvatar, setAvatarEditorOpen, uploadAvatar, reportAvatarError, setAvatarInputRef, wallpaperInput, wallpaperPending, wallpaperUrl, wallpaperRequirements, selectWallpaper, setWallpaperEnabled, setWallpaperInputRef, fullName, studentNumber, identityLoading, identityLoaded, identityPending, identityError, identitySuccess, identityDirty, identityFieldError, loadIdentity, saveIdentity, emailPending, emailMessage, emailError, resendEmail, currentPassword, newPassword, confirmNewPassword, passwordPending, passwordError, changePassword, logoutAll, AvatarCropDialog } = toRefs(viewProps.state)
+const { UserRound, LockKeyhole, ShieldCheck, ImageIcon, LogOut, user, isImpersonating, fetchMe, open, activeSection, setOpen, selectSection, signOut, description, profilePending, profileError, profileSuccess, profileDirty, saveProfile, avatarInput, avatarPending, avatarEditorOpen, avatarSourceFile, avatarRequirements, selectAvatar, setAvatarEditorOpen, uploadAvatar, reportAvatarError, setAvatarInputRef, wallpaperInput, wallpaperPending, wallpaperUrl, wallpaperRequirements, selectWallpaper, setWallpaperEnabled, setWallpaperInputRef, fullName, studentNumber, identityLoading, identityLoaded, identityPending, identityError, identitySuccess, identityDirty, identityFieldError, loadIdentity, saveIdentity, emailPending, emailMessage, emailError, resendEmail, ssoConfiguration, ssoLoading, ssoLoaded, ssoPending, ssoError, ssoProviderId, ssoPassword, loadSsoBinding, beginSsoBinding, unbindSsoIdentity, currentPassword, newPassword, confirmNewPassword, passwordPending, passwordError, changePassword, logoutAll, AvatarCropDialog } = toRefs(viewProps.state)
 </script>
 
 <template>
@@ -201,6 +201,46 @@ const { UserRound, LockKeyhole, ShieldCheck, ImageIcon, LogOut, user, isImperson
               </section>
 
               <Separator />
+              <section v-if="!isImpersonating" class="flex flex-col gap-4">
+                <h3 class="text-sm font-semibold">{{ $t('sso.externalIdentity') }}</h3>
+                <Skeleton v-if="ssoLoading" class="h-24 w-full" />
+                <Alert v-else-if="ssoError" variant="destructive"><AlertDescription>{{ $message(ssoError) }}</AlertDescription></Alert>
+                <template v-if="ssoLoaded && ssoConfiguration?.binding">
+                  <div class="rounded-xl border p-4">
+                    <p class="font-medium">{{ ssoConfiguration.binding.providerName }}</p>
+                    <p class="mt-1 break-all text-xs text-muted-foreground">{{ ssoConfiguration.binding.subject }}</p>
+                  </div>
+                  <Field>
+                    <FieldLabel for="account-panel-sso-unbind-password">{{ $t('ui.currentPassword') }}</FieldLabel>
+                    <PasswordInput id="account-panel-sso-unbind-password" v-model="ssoPassword" :disabled="ssoPending" autocomplete="current-password" />
+                  </Field>
+                  <Button type="button" variant="destructive" size="sm" class="self-start" :disabled="ssoPending || !ssoPassword" @click="unbindSsoIdentity">
+                    <Spinner v-if="ssoPending" data-icon="inline-start" />{{ $t('sso.unbind') }}
+                  </Button>
+                </template>
+                <template v-else-if="ssoLoaded && ssoConfiguration?.providers?.length">
+                  <Field>
+                    <FieldLabel for="account-panel-sso-provider">{{ $t('sso.identityProvider') }}</FieldLabel>
+                    <Select v-model="ssoProviderId" :disabled="ssoPending">
+                      <SelectTrigger id="account-panel-sso-provider"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem v-for="provider in ssoConfiguration.providers" :key="provider.id" :value="provider.id!">{{ provider.name }}</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </Field>
+                  <Field>
+                    <FieldLabel for="account-panel-sso-bind-password">{{ $t('ui.currentPassword') }}</FieldLabel>
+                    <PasswordInput id="account-panel-sso-bind-password" v-model="ssoPassword" :disabled="ssoPending" autocomplete="current-password" />
+                  </Field>
+                  <Button type="button" variant="outline" size="sm" class="self-start" :disabled="ssoPending || !ssoPassword || !ssoProviderId" @click="beginSsoBinding">
+                    <Spinner v-if="ssoPending" data-icon="inline-start" />{{ $t('sso.bind') }}
+                  </Button>
+                </template>
+                <p v-else-if="ssoLoaded" class="text-sm text-muted-foreground">{{ $t('sso.noBindableProviders') }}</p>
+                <Button v-if="!ssoLoaded && !ssoLoading" type="button" variant="outline" size="sm" class="self-start" @click="loadSsoBinding">{{ $t('ui.retry') }}</Button>
+              </section>
+
+              <Separator v-if="!isImpersonating" />
               <UiForm class="flex flex-col gap-4" @submit.prevent="changePassword">
                 <h3 class="text-sm font-semibold">{{ $t('ui.changePassword') }}</h3>
                 <FieldGroup>

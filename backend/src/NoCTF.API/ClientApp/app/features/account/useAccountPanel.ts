@@ -9,7 +9,11 @@ import {
   authenticationUploadMyWallpaper,
   changePasswordEndpoint,
   resendEmailVerificationEndpoint,
+  authenticationSsoBeginBinding,
+  authenticationSsoGetMyBinding,
+  authenticationSsoUnbindIdentity,
 } from '../../api'
+import type { NoCtfapiEndpointsAuthenticationMySsoBindingConfigurationResponse } from '../../api'
 import AvatarCropDialogComponent from './AvatarCropDialog.vue'
 import { exceedsUploadLimit } from './upload-limits'
 import { runDownRevealTransition } from '../../motion/reveal-transition'
@@ -18,7 +22,7 @@ export type AccountPanelSection = 'profile' | 'identity' | 'wallpaper' | 'securi
 
 /** Owns the compact account popover, drafts and account commands across route changes. */
 export function useAccountPanel() {
-  const { user, fetchMe, logout, logoutAll, impersonation } = useAuth()
+  const { user, fetchMe, logout, logoutAll, invalidate, impersonation } = useAuth()
   const isImpersonating = computed(() => impersonation.value !== null)
   const { configuration: platformConfiguration } = usePlatform()
   const maximumAvatarBytes = computed(() =>
@@ -66,6 +70,8 @@ export function useAccountPanel() {
     if ((section === 'profile' || section === 'identity' || section === 'wallpaper')
       && !identityLoaded.value && !identityLoading.value)
       void loadIdentity()
+    if (section === 'security' && !ssoLoaded.value && !ssoLoading.value)
+      void loadSsoBinding()
   }
 
   const description = ref('')
@@ -293,6 +299,65 @@ export function useAccountPanel() {
     }
   }
 
+  const ssoConfiguration = ref<NoCtfapiEndpointsAuthenticationMySsoBindingConfigurationResponse | null>(null)
+  const ssoLoading = ref(false)
+  const ssoLoaded = ref(false)
+  const ssoPending = ref(false)
+  const ssoError = ref<string | null>(null)
+  const ssoProviderId = ref('')
+  const ssoPassword = ref('')
+
+  async function loadSsoBinding() {
+    ssoLoading.value = true
+    ssoError.value = null
+    const { data, error } = await authenticationSsoGetMyBinding()
+    ssoLoading.value = false
+    if (error || !data) {
+      ssoError.value = parseApiError(error, translate('sso.bindingUnavailable')).message
+      return
+    }
+    ssoConfiguration.value = data
+    ssoProviderId.value ||= data.providers?.[0]?.id ?? ''
+    ssoLoaded.value = true
+  }
+
+  async function beginSsoBinding() {
+    if (!ssoProviderId.value || !ssoPassword.value || ssoPending.value) return
+    ssoPending.value = true
+    ssoError.value = null
+    try {
+      const { data, error } = await authenticationSsoBeginBinding({
+        body: { providerId: ssoProviderId.value, password: ssoPassword.value },
+      })
+      if (error || !data?.authorizationUrl) throw error
+      ssoPassword.value = ''
+      window.location.assign(data.authorizationUrl)
+    }
+    catch (error) {
+      ssoError.value = parseApiError(error, translate('sso.bindingStartFailed')).message
+      ssoPending.value = false
+    }
+  }
+
+  async function unbindSsoIdentity() {
+    if (!ssoPassword.value || ssoPending.value) return
+    ssoPending.value = true
+    ssoError.value = null
+    const { error } = await authenticationSsoUnbindIdentity({
+      body: { password: ssoPassword.value },
+    })
+    ssoPending.value = false
+    if (error) {
+      ssoError.value = parseApiError(error, translate('sso.unbindingFailed')).message
+      return
+    }
+    ssoPassword.value = ''
+    invalidate()
+    toast.success(translate('sso.unbindingSuccessful'))
+    open.value = false
+    await navigateTo('/auth/login')
+  }
+
   const currentPassword = ref('')
   const newPassword = ref('')
   const confirmNewPassword = ref('')
@@ -330,7 +395,8 @@ export function useAccountPanel() {
     await logout()
   }
 
-  const hasUnsaved = computed(() => profileDirty.value || identityDirty.value || Boolean(currentPassword.value || newPassword.value || confirmNewPassword.value))
+  const hasUnsaved = computed(() => profileDirty.value || identityDirty.value
+    || Boolean(ssoPassword.value || currentPassword.value || newPassword.value || confirmNewPassword.value))
 
   function beforeUnload(event: BeforeUnloadEvent) {
     if (!hasUnsaved.value) return
@@ -403,6 +469,16 @@ export function useAccountPanel() {
     emailMessage,
     emailError,
     resendEmail,
+    ssoConfiguration,
+    ssoLoading,
+    ssoLoaded,
+    ssoPending,
+    ssoError,
+    ssoProviderId,
+    ssoPassword,
+    loadSsoBinding,
+    beginSsoBinding,
+    unbindSsoIdentity,
     currentPassword,
     newPassword,
     confirmNewPassword,

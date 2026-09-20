@@ -1,6 +1,6 @@
 import { markRaw } from 'vue'
 
-import { Activity, Beaker, Container, Globe, History, Info, MailCheck, ScrollText, Users } from '@lucide/vue'
+import { Activity, Beaker, Container, Globe, History, Info, KeyRound, MailCheck, ScrollText, Users } from '@lucide/vue'
 import type { WorkspaceNavGroup } from '../../app/workspace-nav'
 import AppWorkspaceNavComponent from '../../app/AppWorkspaceNav.vue'
 
@@ -17,6 +17,7 @@ export function useAdminPlatformPage() {
         { to: '/admin/platform', label: translate("ui.platformInformation"), icon: Info, exact: true },
         { to: '/admin/platform/users', label: translate("ui.user"), icon: Users },
         { to: '/admin/platform/email', label: translate("ui.emailAndHumanVerification"), icon: MailCheck },
+        { to: '/admin/platform/authentication', label: translate('sso.authenticationSettings'), icon: KeyRound },
         { to: '/admin/platform/experiments', label: translate('ui.experimentalFeatures'), icon: Beaker },
       ],
     },
