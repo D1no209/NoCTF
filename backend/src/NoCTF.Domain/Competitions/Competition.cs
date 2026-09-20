@@ -18,6 +18,7 @@ public sealed class Competition
     public CompetitionAccessMode AccessMode { get; set; }
     public GameMode Mode { get; set; }
     public string ConfigurationJson { get; set; } = string.Empty;
+    public CompetitionWebhookConfiguration WebhookConfiguration { get; set; } = new();
     public bool TracksEnabled { get; set; }
     public string? TrackConfigurationJson { get; set; }
     public DateTimeOffset? FrozenStartAt { get; set; }
