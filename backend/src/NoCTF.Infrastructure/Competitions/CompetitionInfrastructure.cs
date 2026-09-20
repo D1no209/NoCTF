@@ -26,6 +26,8 @@ using NoCTF.Application.Competitions.Tracks;
 using NoCTF.Infrastructure.Competitions.Tracks;
 using NoCTF.Application.Competitions.Access;
 using NoCTF.Infrastructure.Competitions.Access;
+using NoCTF.Application.Competitions.Webhooks;
+using NoCTF.Infrastructure.Competitions.Webhooks;
 
 namespace NoCTF.Infrastructure.Competitions;
 
@@ -107,6 +109,12 @@ internal static class CompetitionInfrastructure
         services.AddScoped<ListCompetitionEvents>();
         services.AddScoped<ExportCompetitionEvents>();
         services.AddScoped<AccessGameplayFactValue>();
+        services.AddScoped<ICompetitionWebhookStore, CompetitionWebhookStore>();
+        services.AddScoped<ListCompetitionWebhookTargets>();
+        services.AddScoped<CreateCompetitionWebhookTarget>();
+        services.AddScoped<UpdateCompetitionWebhookTarget>();
+        services.AddScoped<RotateCompetitionWebhookSecret>();
+        services.AddScoped<DeleteCompetitionWebhookTarget>();
         if (!development)
             services.AddSingleton<RedisCompetitionEventRefreshPublisher>();
         return services;

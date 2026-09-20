@@ -10,7 +10,8 @@ public enum PlatformSecretPurpose
     HumanVerificationCapSecret,
     HumanVerificationTurnstileSecret,
     SsoOidcClientSecret,
-    SsoDataProtectionKey
+    SsoDataProtectionKey,
+    CompetitionWebhookSecret
 }
 
 public sealed class PlatformSecretProtector
@@ -81,6 +82,80 @@ public sealed class PlatformSecretProtector
         }
     }
 
+    public byte[] Protect(
+        string secret,
+        PlatformSecretPurpose purpose,
+        Guid primaryScopeId,
+        Guid secondaryScopeId) =>
+        ProtectCore(secret, purpose, primaryScopeId, secondaryScopeId);
+
+    public string Unprotect(
+        byte[] protectedSecret,
+        PlatformSecretPurpose purpose,
+        Guid primaryScopeId,
+        Guid secondaryScopeId) =>
+        UnprotectCore(protectedSecret, purpose, primaryScopeId, secondaryScopeId);
+
+    private byte[] ProtectCore(
+        string secret,
+        PlatformSecretPurpose purpose,
+        Guid? primaryScopeId,
+        Guid? secondaryScopeId)
+    {
+        var plaintext = Encoding.UTF8.GetBytes(secret);
+        var key = ReadKey();
+        try
+        {
+            var ciphertext = new byte[plaintext.Length];
+            var nonce = RandomNumberGenerator.GetBytes(NonceLength);
+            var tag = new byte[TagLength];
+            using var aes = new AesGcm(key, TagLength);
+            aes.Encrypt(nonce, plaintext, ciphertext, tag,
+                AssociatedData(purpose, primaryScopeId, secondaryScopeId));
+
+            var protectedSecret = new byte[1 + NonceLength + TagLength + ciphertext.Length];
+            protectedSecret[0] = 1;
+            nonce.CopyTo(protectedSecret.AsSpan(1, NonceLength));
+            tag.CopyTo(protectedSecret.AsSpan(1 + NonceLength, TagLength));
+            ciphertext.CopyTo(protectedSecret.AsSpan(1 + NonceLength + TagLength));
+            return protectedSecret;
+        }
+        finally
+        {
+            CryptographicOperations.ZeroMemory(plaintext);
+            CryptographicOperations.ZeroMemory(key);
+        }
+    }
+
+    private string UnprotectCore(
+        byte[] protectedSecret,
+        PlatformSecretPurpose purpose,
+        Guid? primaryScopeId,
+        Guid? secondaryScopeId)
+    {
+        if (protectedSecret.Length <= 1 + NonceLength + TagLength
+            || protectedSecret[0] != 1)
+            throw new CryptographicException("The protected platform secret is invalid.");
+
+        var nonce = protectedSecret.AsSpan(1, NonceLength);
+        var tag = protectedSecret.AsSpan(1 + NonceLength, TagLength);
+        var ciphertext = protectedSecret.AsSpan(1 + NonceLength + TagLength);
+        var plaintext = new byte[ciphertext.Length];
+        var key = ReadKey();
+        try
+        {
+            using var aes = new AesGcm(key, TagLength);
+            aes.Decrypt(nonce, ciphertext, tag, plaintext,
+                AssociatedData(purpose, primaryScopeId, secondaryScopeId));
+            return Encoding.UTF8.GetString(plaintext);
+        }
+        finally
+        {
+            CryptographicOperations.ZeroMemory(plaintext);
+            CryptographicOperations.ZeroMemory(key);
+        }
+    }
+
     private byte[] ReadKey()
     {
         try
@@ -102,7 +177,8 @@ public sealed class PlatformSecretProtector
 
     private static byte[] AssociatedData(
         PlatformSecretPurpose purpose,
-        Guid? scopeId)
+        Guid? scopeId,
+        Guid? secondaryScopeId = null)
     {
         var prefix = purpose switch
         {
@@ -116,10 +192,14 @@ public sealed class PlatformSecretProtector
                 "NoCTF.Sso.OidcClientSecret.v1",
             PlatformSecretPurpose.SsoDataProtectionKey =>
                 "NoCTF.Sso.DataProtectionKey.v1",
+            PlatformSecretPurpose.CompetitionWebhookSecret =>
+                "NoCTF.Competition.WebhookSecret.v1",
             _ => throw new ArgumentOutOfRangeException(nameof(purpose), purpose, null)
         };
         return Encoding.UTF8.GetBytes(scopeId is null
             ? prefix
-            : $"{prefix}:{scopeId.Value:N}");
+            : secondaryScopeId is null
+                ? $"{prefix}:{scopeId.Value:N}"
+                : $"{prefix}:{scopeId.Value:N}:{secondaryScopeId.Value:N}");
     }
 }

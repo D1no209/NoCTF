@@ -1,17 +1,35 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using NoCTF.Domain.Competitions;
+using Microsoft.EntityFrameworkCore.ChangeTracking;
+using System.Text.Json;
 
 namespace NoCTF.Infrastructure.Persistence.Configurations.Competitions;
 
 internal sealed class CompetitionEntityConfiguration : IEntityTypeConfiguration<Competition>
 {
+    private static readonly JsonSerializerOptions WebhookJsonOptions =
+        new(JsonSerializerDefaults.Web);
+
     public void Configure(EntityTypeBuilder<Competition> builder)
     {
         builder.ToTable("competitions");
         builder.HasKey(competition => competition.Id);
         builder.Property(competition => competition.Title).HasMaxLength(160);
         builder.Property(competition => competition.ConfigurationJson).HasColumnType("jsonb");
+        builder.Property(competition => competition.WebhookConfiguration)
+            .HasColumnType("jsonb")
+            .HasDefaultValueSql("'{\"schemaVersion\":1,\"targets\":[]}'::jsonb")
+            .HasConversion(
+                value => JsonSerializer.Serialize(value, WebhookJsonOptions),
+                value => JsonSerializer.Deserialize<CompetitionWebhookConfiguration>(
+                        value,
+                        WebhookJsonOptions)
+                    ?? new CompetitionWebhookConfiguration(),
+                new ValueComparer<CompetitionWebhookConfiguration>(
+                    (left, right) => SerializeWebhook(left) == SerializeWebhook(right),
+                    value => SerializeWebhook(value).GetHashCode(StringComparison.Ordinal),
+                    value => DeserializeWebhook(SerializeWebhook(value))));
         builder.Property(competition => competition.TrackConfigurationJson)
             .HasColumnType("jsonb");
         builder.Property(competition => competition.ManagerIds).HasColumnType("uuid[]");
@@ -63,6 +81,18 @@ internal sealed class CompetitionEntityConfiguration : IEntityTypeConfiguration<
             table.HasCheckConstraint(
                 "ck_competitions_write_up_submission_deadline_hours",
                 $"write_up_submission_deadline_hours BETWEEN 0 AND {CompetitionWriteUpPolicy.MaximumDeadlineHours}");
+            table.HasCheckConstraint(
+                "ck_competitions_webhook_configuration",
+                "jsonb_typeof(webhook_configuration) = 'object'"
+                + " AND (webhook_configuration ->> 'schemaVersion')::integer = 1"
+                + " AND jsonb_typeof(webhook_configuration -> 'targets') = 'array'");
         });
     }
+
+    private static string SerializeWebhook(CompetitionWebhookConfiguration? value) =>
+        JsonSerializer.Serialize(value ?? new CompetitionWebhookConfiguration(), WebhookJsonOptions);
+
+    private static CompetitionWebhookConfiguration DeserializeWebhook(string value) =>
+        JsonSerializer.Deserialize<CompetitionWebhookConfiguration>(value, WebhookJsonOptions)
+        ?? new CompetitionWebhookConfiguration();
 }

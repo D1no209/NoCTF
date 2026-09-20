@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using NoCTF.Infrastructure.Persistence;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace NoCTF.Infrastructure.Migrations
 {
     [DbContext(typeof(NoCtfDbContext))]
-    partial class NoCtfDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260920151129_AddCompetitionWebhooks")]
+    partial class AddCompetitionWebhooks
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -971,6 +974,8 @@ namespace NoCTF.Infrastructure.Migrations
 
                     b.ToTable("users", null, t =>
                         {
+                            t.HasCheckConstraint("ck_users_bot_role", "\"kind\" <> 1 OR \"role\" IN (0, 1)");
+
                             t.HasCheckConstraint("ck_users_external_identity_complete", "(\"external_identity_provider_id\" IS NULL AND \"external_identity_protocol\" IS NULL AND \"external_identity_namespace\" IS NULL AND \"external_identity_subject\" IS NULL AND \"external_identity_bound_at\" IS NULL) OR (\"external_identity_provider_id\" IS NOT NULL AND \"external_identity_protocol\" IS NOT NULL AND \"external_identity_namespace\" IS NOT NULL AND \"external_identity_subject\" IS NOT NULL AND \"external_identity_bound_at\" IS NOT NULL)");
 
                             t.HasCheckConstraint("ck_users_wallpaper_enabled", "NOT \"wallpaper_enabled\" OR \"wallpaper_file_id\" IS NOT NULL");
