@@ -215,6 +215,7 @@ public static partial class PlatformSettingsPatchMapper
     [MapperIgnoreTarget(nameof(PlatformSettings.LogoFile))]
     [MapperIgnoreTarget(nameof(PlatformSettings.EmailSmtpPasswordCiphertext))]
     [MapperIgnoreTarget(nameof(PlatformSettings.UpdatedAt))]
+    [MapperIgnoreTarget(nameof(PlatformSettings.SsoConfiguration))]
     public static partial void ApplyBrandingAsAdministrator(
         PlatformBrandingPatchRequest request,
         [MappingTarget] PlatformSettings target);
@@ -258,6 +259,7 @@ public static partial class PlatformSettingsPatchMapper
     [MapperIgnoreTarget(nameof(PlatformSettings.LogoFile))]
     [MapperIgnoreTarget(nameof(PlatformSettings.EmailSmtpPasswordCiphertext))]
     [MapperIgnoreTarget(nameof(PlatformSettings.UpdatedAt))]
+    [MapperIgnoreTarget(nameof(PlatformSettings.SsoConfiguration))]
     public static partial void ApplyEmailAsAdministrator(
         PlatformEmailVerificationPatchRequest request,
         [MappingTarget] PlatformSettings target);
@@ -301,6 +303,7 @@ public static partial class PlatformSettingsPatchMapper
     [MapperIgnoreTarget(nameof(PlatformSettings.LogoFile))]
     [MapperIgnoreTarget(nameof(PlatformSettings.EmailSmtpPasswordCiphertext))]
     [MapperIgnoreTarget(nameof(PlatformSettings.UpdatedAt))]
+    [MapperIgnoreTarget(nameof(PlatformSettings.SsoConfiguration))]
     public static partial void ApplyGatewayAsAdministrator(
         PlatformGatewayPatchRequest request,
         [MappingTarget] PlatformSettings target);

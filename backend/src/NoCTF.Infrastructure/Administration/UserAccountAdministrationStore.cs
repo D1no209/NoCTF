@@ -120,6 +120,11 @@ public sealed class UserAccountAdministrationStore(
         user.NormalizedUserName = user.UserName.ToUpperInvariant();
         user.Email = string.Empty;
         user.PasswordHash = string.Empty;
+        user.ExternalIdentityProviderId = null;
+        user.ExternalIdentityProtocol = null;
+        user.ExternalIdentityNamespace = null;
+        user.ExternalIdentitySubject = null;
+        user.ExternalIdentityBoundAt = null;
         user.Role = UserRole.User;
         user.AccountStatus = UserAccountStatus.Anonymized;
         await NoCTF.Infrastructure.Authentication.UserCredentialWrite.InvalidateTokensAsync(db, user, ct);

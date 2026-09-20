@@ -86,5 +86,7 @@ public sealed class PlatformSettings
     public string? PublicGatewayDirectHostOverride { get; set; }
     public int PublicGatewayMaxPorts { get; set; }
 
+    public SsoConfiguration SsoConfiguration { get; set; } = new();
+
     public DateTimeOffset UpdatedAt { get; set; }
 }

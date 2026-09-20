@@ -7,6 +7,10 @@ using NoCTF.Application.Authentication.EmailVerification;
 using NoCTF.Application.Authentication.PasswordReset;
 using NoCTF.Application.Authentication.RefreshSession;
 using NoCTF.Domain.Identity;
+using Microsoft.AspNetCore.DataProtection;
+using Microsoft.AspNetCore.DataProtection.KeyManagement;
+using Microsoft.AspNetCore.DataProtection.Repositories;
+using NoCTF.Infrastructure.Persistence;
 
 namespace NoCTF.Infrastructure.Authentication;
 
@@ -44,6 +48,12 @@ internal static class AuthenticationInfrastructure
                     || IsValidEncryptionKey(options.EncryptionKey),
                 "EmailVerification:EncryptionKey must be a Base64-encoded 32-byte key.")
             .ValidateOnStart();
+        services.AddSingleton<IXmlRepository, PostgresEncryptedDataProtectionKeyRepository>();
+        services.AddDataProtection()
+            .SetApplicationName("NoCTF");
+        services.AddOptions<KeyManagementOptions>()
+            .Configure<IXmlRepository>((options, repository) =>
+                options.XmlRepository = repository);
         services.AddSingleton<IRunnerScoringTokenIssuer, RunnerScoringTokenIssuer>();
         services.AddScoped<IUserAuthenticationStore, AuthenticationStore>();
         services.AddScoped<IUserRegistrationStore, AuthenticationStore>();
