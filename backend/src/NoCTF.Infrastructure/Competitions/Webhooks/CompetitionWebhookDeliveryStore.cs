@@ -4,6 +4,7 @@ using System.Text.Json.Serialization;
 using Microsoft.EntityFrameworkCore;
 using NoCTF.Application.Challenges.Management;
 using NoCTF.Application.Competitions.Webhooks;
+using NoCTF.Application.Competitions.Tracks;
 using NoCTF.Application.Scoring.Leaderboard;
 using NoCTF.Domain.Competitions;
 using NoCTF.Domain.Competitions.Events;
@@ -23,6 +24,7 @@ public sealed class CompetitionWebhookDeliveryStore(
     NoCtfDbContext db,
     PlatformSecretProtector secrets,
     GetChallenge getChallenge,
+    GetCompetitionTracks getTracks,
     ILeaderboardCache leaderboard,
     CompetitionWebhookOptions options,
     TimeProvider timeProvider) : ICompetitionWebhookDeliveryStore
@@ -446,19 +448,29 @@ public sealed class CompetitionWebhookDeliveryStore(
             var projection = dataScope == LeaderboardDataScope.Frozen
                 ? await leaderboard.GetFrozenScoreboardAsync(competition.Id, cancellationToken)
                 : await leaderboard.GetScoreboardAsync(competition.Id, cancellationToken);
+            if (projection is not null)
+            {
+                projection = ScoreboardAudienceProjection.Filter(
+                    projection,
+                    canObserve: false);
+                var tracks = await getTracks.ExecuteAsync(
+                    competition.Id,
+                    viewerUserId: null,
+                    includeInternal: false,
+                    includeInvitationCodes: false,
+                    cancellationToken);
+                if (tracks is not null)
+                {
+                    projection = ScoreboardAudienceProjection.FilterTracks(
+                        projection,
+                        tracks,
+                        canViewInternalTracks: false);
+                }
+            }
             snapshot = projection?.Snapshot
                 ?? new ScoreboardSnapshot(competition.Id, 0, 0, now, null, [], []);
-            var publicTracks = snapshot.Tracks
-                .Where(item => !item.IsInternal && item.VisibleOnLeaderboard)
-                .Select(item => item.Key)
-                .ToHashSet(StringComparer.OrdinalIgnoreCase);
             snapshot = snapshot with
             {
-                Actors = [],
-                Teams = snapshot.Teams.Where(item => publicTracks.Count == 0
-                    || publicTracks.Contains(item.TrackKey)).ToArray(),
-                Tracks = snapshot.Tracks.Where(item => !item.IsInternal
-                    && item.VisibleOnLeaderboard).ToArray(),
                 Visibility = visibility,
                 DataScope = dataScope,
                 DataAsOf = dataScope == LeaderboardDataScope.Frozen
