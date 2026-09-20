@@ -3,7 +3,7 @@ import { toRefs } from 'vue'
 import type { AdminPlatformUsersPageViewState } from '~/features/routes/admin/platform/useAdminPlatformUsersPage'
 
 const viewProps = defineProps<{ state: AdminPlatformUsersPageViewState }>()
-const { Copy, KeyRound, LogIn, Plus, Trash2, currentUser, loading, loadError, search, roleFilter, ROLE_LABELS, STATUS_LABELS, MANAGED_ACCOUNT_STATUS_OPTIONS, REFERENCE_LABELS, filteredUsers, createBotOpen, creatingBot, botName, botRole, openCreateBot, setCreateBotOpen, createBot, detailOpen, detailLoading, detail, pendingRole, pendingAccountStatus, pendingEmailVerification, roleSaving, accountStatusSaving, emailVerificationSaving, invalidating, tokenOpen, tokenIntent, identitySwitchActive, tokenIssuing, tokenExpiresInSeconds, issuedToken, openToken, setTokenOpen, issueToken, copyIssuedToken, openDetail, saveRole, saveAccountStatus, saveEmailVerification, invalidateTokens, deleteOpen, previewLoading, preview, deletionMode, deletionReason, deleting, startDelete, confirmDelete, PrivateAccountPanel, AdminDateTime } = toRefs(viewProps.state)
+const { Copy, KeyRound, LogIn, Plus, Trash2, currentUser, loading, pageLoading, loadError, search, roleFilter, ROLE_LABELS, STATUS_LABELS, MANAGED_ACCOUNT_STATUS_OPTIONS, REFERENCE_LABELS, filteredUsers, page, pageCount, total, pageLimit, loadPage, setPageSize, createBotOpen, creatingBot, botName, botRole, openCreateBot, setCreateBotOpen, createBot, detailOpen, detailLoading, detail, pendingRole, pendingAccountStatus, pendingEmailVerification, roleSaving, accountStatusSaving, emailVerificationSaving, invalidating, tokenOpen, tokenIntent, identitySwitchActive, tokenIssuing, tokenExpiresInSeconds, issuedToken, openToken, setTokenOpen, issueToken, copyIssuedToken, openDetail, saveRole, saveAccountStatus, saveEmailVerification, invalidateTokens, deleteOpen, previewLoading, preview, deletionMode, deletionReason, deleting, startDelete, confirmDelete, PrivateAccountPanel, AdminDateTime } = toRefs(viewProps.state)
 </script>
 
 <template>
@@ -94,6 +94,17 @@ const { Copy, KeyRound, LogIn, Plus, Trash2, currentUser, loading, loadError, se
         </TableRow>
       </TableBody>
     </Table>
+
+    <OffsetPagination
+      v-if="filteredUsers.length > 0 || total > 0"
+      :page="page"
+      :page-count="pageCount"
+      :total="total"
+      :limit="pageLimit"
+      :loading="pageLoading"
+      @update:page="loadPage"
+      @update:limit="setPageSize"
+    />
 
     <Dialog :open="createBotOpen" @update:open="setCreateBotOpen">
       <DialogContent>

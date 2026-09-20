@@ -5,10 +5,11 @@ import type { AdminCompetitionsByIdWebhooksPageViewState } from '~/features/rout
 const viewProps = defineProps<{ state: AdminCompetitionsByIdWebhooksPageViewState }>()
 const {
   Webhook, Plus, Copy, RotateCw, Send, Trash2,
-  targets, mayManage, nextCursor, loading, loadingMore, error,
+  targets, mayManage, loading, error, page, pageCount, total, pageLimit,
+  loadPage, setPageSize,
   formOpen, editingId, form, saving, pendingId, deletingTarget,
   signingSecret, secretOpen, testStates, createTarget, editTarget,
-  setFormOpen, save, setEnabled, requestDelete, setDeleteOpen, loadMore,
+  setFormOpen, save, setEnabled, requestDelete, setDeleteOpen,
   rotate, copySecret, remove, test,
 } = toRefs(viewProps.state)
 </script>
@@ -104,10 +105,15 @@ const {
               <Badge v-else-if="testStates[target.id!] === 'Failed'" variant="destructive">{{ $t('webhook.testFailed') }}</Badge>
             </CardContent>
           </Card>
-          <Button v-if="nextCursor" variant="secondary" :disabled="loadingMore" @click="loadMore">
-            <Spinner v-if="loadingMore" data-icon="inline-start" />
-            {{ $t('ui.loadMore') }}
-          </Button>
+          <OffsetPagination
+            :page="page"
+            :page-count="pageCount"
+            :total="total"
+            :limit="pageLimit"
+            :loading="loading"
+            @update:page="loadPage"
+            @update:limit="setPageSize"
+          />
         </div>
       </CardContent>
     </Card>

@@ -7,6 +7,7 @@ import type { NoCtfapiEndpointsAdministrationTeamsAdminTeamBanCaseResponse, NoCt
 import { useCompetitionAdmin } from '../../../../../lib/admin-competition'
 import { competitionTrackErrorMessage } from '../../../../../lib/competition-track'
 import PrivateAccountPanelComponent from '../../../../account/PrivateAccountPanel.vue'
+import { useOffsetPagination } from '../../../../../composables/useOffsetPagination'
 
 /** Owns state, effects and commands for AdminCompetitionsByIdTeamsPage. */
 export function useAdminCompetitionsByIdTeamsPage() {
@@ -15,6 +16,8 @@ export function useAdminCompetitionsByIdTeamsPage() {
   const route = useRoute()
 
   const teams = ref<NoCtfapiEndpointsTeamsTeamResponse[]>([])
+
+  const search = ref('')
 
   const loading = ref(true)
 
@@ -31,6 +34,16 @@ export function useAdminCompetitionsByIdTeamsPage() {
   const teamMembers = ref<NoCtfapiEndpointsAuthenticationPublicUserProfileResponse[]>([])
 
   const teamDetailLoading = ref(false)
+
+  const pagination = useOffsetPagination<NoCtfapiEndpointsTeamsTeamResponse>(async ({ offset, limit, desc }) => {
+    const { data, error: requestError } = await adminListTeams({
+      path: { competitionId },
+      query: { keyword: search.value.trim() || null, offset, limit, desc },
+    })
+    if (requestError || !data) throw requestError ?? new Error('Failed to load teams.')
+    teams.value = data.items ?? []
+    return { items: teams.value, total: data.total ?? 0 }
+  })
 
   const teamDisplayNames = computed(() => buildTeamDisplayNames(teams.value))
 
@@ -131,18 +144,20 @@ export function useAdminCompetitionsByIdTeamsPage() {
   async function load() {
     loading.value = true
     error.value = null
-    const [teamResult, trackResult] = await Promise.all([
-      adminListTeams({ path: { competitionId } }),
-      adminGetCompetition({ path: { competitionId } }),
-    ])
-    if (teamResult.error || !teamResult.data) error.value = parseApiError(teamResult.error).message
-    else teams.value = teamResult.data.items ?? []
+    const trackResult = await adminGetCompetition({ path: { competitionId } })
+    await pagination.loadPage(pagination.page.value)
+    if (pagination.error.value) error.value = pagination.error.value.message
     if (!trackResult.error && trackResult.data) {
       tracks.value = trackResult.data.tracks?.items ?? []
       tracksEnabled.value = trackResult.data.tracks?.enabled ?? false
     }
     loading.value = false
   }
+
+  watch(search, () => {
+    pagination.reset()
+    void load()
+  })
 
   async function assignTrack(team: NoCtfapiEndpointsTeamsTeamResponse, trackKey: string) {
     if (!team.id || !team.registrationStatus || !canWrite.value || !tracksEnabled.value || team.trackKey === trackKey) return
@@ -317,6 +332,14 @@ export function useAdminCompetitionsByIdTeamsPage() {
       canJudge,
       canWrite,
       teams,
+      search,
+      page: pagination.page,
+      pageCount: pagination.pageCount,
+      total: pagination.total,
+      pageLimit: pagination.limit,
+      pageLoading: pagination.loading,
+      loadPage: pagination.loadPage,
+      setPageSize: pagination.setPageSize,
       loading,
       error,
       pendingId,

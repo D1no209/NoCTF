@@ -19,7 +19,8 @@ describe('competition webhook administration', () => {
     expect(feature).toContain('adminRotateCompetitionWebhookSecret')
     expect(feature).toContain('adminCreateCompetitionWebhookTestDelivery')
     expect(feature).toContain('adminGetCompetitionWebhookTestDelivery')
-    expect(feature).toContain('nextCursor')
+    expect(feature).toContain('useOffsetPagination')
+    expect(view).toContain('<OffsetPagination')
   })
 
   test('shows the one-time secret and delivery semantics without provider-specific language', () => {

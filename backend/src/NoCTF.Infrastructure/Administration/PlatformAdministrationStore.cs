@@ -27,6 +27,39 @@ public sealed class PlatformAdministrationStore(
                 user.EmailVerifiedAt != null, user.CreatedAt, user.UpdatedAt))
             .ToListAsync(ct);
 
+    public async Task<PlatformUserListPage> ListUsersPageAsync(
+        PlatformUserListQuery query,
+        CancellationToken ct)
+    {
+        var source = db.Users.AsNoTracking();
+        var keyword = string.IsNullOrWhiteSpace(query.Keyword) ? null : query.Keyword.Trim();
+        if (keyword is not null)
+        {
+            var pattern = $"%{keyword}%";
+            source = source.Where(user =>
+                EF.Functions.ILike(user.UserName, pattern)
+                || EF.Functions.ILike(user.Email, pattern));
+        }
+        if (query.Kind is not null)
+            source = source.Where(user => user.Kind == query.Kind);
+        if (query.Role is not null)
+            source = source.Where(user => user.Role == query.Role);
+
+        var total = await source.CountAsync(ct);
+        var ordered = query.Desc
+            ? source.OrderByDescending(user => user.CreatedAt).ThenByDescending(user => user.Id)
+            : source.OrderBy(user => user.CreatedAt).ThenBy(user => user.Id);
+        var items = await ordered
+            .Skip(query.Offset)
+            .Take(query.Limit)
+            .Select(user => new PlatformUserView(
+                user.Id, user.UserName, user.Email, user.Kind, user.Role, user.AccountStatus,
+                user.TokenVersion,
+                user.EmailVerifiedAt != null, user.CreatedAt, user.UpdatedAt))
+            .ToListAsync(ct);
+        return new(items, total);
+    }
+
     public Task<PlatformUserView?> FindUserAsync(Guid userId, CancellationToken ct) =>
         db.Users.AsNoTracking()
             .Where(user => user.Id == userId)

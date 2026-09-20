@@ -4,7 +4,7 @@ import { ExternalLink, RefreshCw } from '@lucide/vue'
 import { toast } from 'vue-sonner'
 import { adminCreateRuntimeForceTermination, adminPlatformListActiveRuntimes, adminTerminateRuntime } from '../../../../api'
 import type { NoCtfapiEndpointsAdministrationPlatformPlatformRuntimeResponse, NoCtfapiEndpointsAdministrationRuntimeAdminRuntimeResponse } from '../../../../api'
-import { createLatestPageRefresh } from '../../../../lib/latest-page-refresh'
+import { useOffsetPagination } from '../../../../composables/useOffsetPagination'
 import { adminRuntimeTeamLabel } from '../../../../utils/admin-runtime'
 import { emptyPlatformRuntimeFilters, platformRuntimeQuery } from '../../../../utils/platform-runtime-filters'
 import { formatCapacityAmount, runnerFailureLabel } from '../../../shared/runner-capacity'
@@ -19,36 +19,26 @@ export function useAdminPlatformRuntimesPage() {
 
   const detailTarget = ref<PlatformRuntime | null>(null)
 
-  const {
-    items,
-    loading,
-    error,
-    hasMore,
-    initialized,
-    loadMore: loadRuntimePage,
-    reset,
-  } = useCursorPagination<PlatformRuntime>(async (cursor) => {
+  const pagination = useOffsetPagination<PlatformRuntime>(async ({ offset, limit, desc }) => {
     const { data, error: requestError } = await adminPlatformListActiveRuntimes({
-      query: { ...appliedQuery.value, cursor, limit: 50 },
+      query: { ...appliedQuery.value, offset, limit, desc },
     })
     if (requestError || !data) throw parseApiError(requestError)
-    return data
-  })
+    return { items: data.items ?? [], total: data.total ?? 0 }
+  }, { initialPageSize: 50, initialDesc: true })
 
-  const {
-    loadNextPage: loadMore,
-    refreshLatest: refresh,
-  } = createLatestPageRefresh({
-    loadMore: loadRuntimePage,
-    reset: () => reset({ preserveItems: true }),
-  })
+  const { items, loading, error, initialized } = pagination
+
+  async function refresh(): Promise<void> {
+    await pagination.loadPage(pagination.page.value)
+  }
 
   const detail = computed(() => items.value.find(item => item.runtime?.id === detailTarget.value?.runtime?.id) ?? detailTarget.value)
 
   async function applyFilters(): Promise<void> {
     appliedQuery.value = platformRuntimeQuery(filters)
-    reset()
-    await refresh()
+    pagination.reset()
+    await pagination.loadPage(1)
   }
 
   function clearFilters(): void {
@@ -161,7 +151,7 @@ export function useAdminPlatformRuntimesPage() {
   }
 
   onMounted(() => {
-    void loadMore()
+    void pagination.loadPage(1)
     refreshTimer = setInterval(() => void refresh(), 10_000)
   })
 
@@ -177,10 +167,14 @@ export function useAdminPlatformRuntimesPage() {
       items,
       loading,
       error,
-      hasMore,
       initialized,
-      loadMore,
       refresh,
+      page: pagination.page,
+      pageCount: pagination.pageCount,
+      total: pagination.total,
+      pageLimit: pagination.limit,
+      loadPage: pagination.loadPage,
+      setPageSize: pagination.setPageSize,
       detail,
       applyFilters,
       clearFilters,

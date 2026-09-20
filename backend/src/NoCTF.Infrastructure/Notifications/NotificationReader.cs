@@ -10,6 +10,32 @@ namespace NoCTF.Infrastructure.Notifications;
 
 public sealed class NotificationReader(NoCtfDbContext db) : INotificationReader
 {
+    public async Task<NotificationListPage> ListPageAsync(
+        Guid userId,
+        Guid? competitionId,
+        int offset,
+        int limit,
+        bool desc,
+        NotificationReadScope scope,
+        CancellationToken cancellationToken)
+    {
+        var query = ApplyScope(await VisibleToAsync(userId, cancellationToken), scope);
+        if (competitionId is { } id)
+            query = query.Where(notification =>
+                notification.RelatedType == EntityReferenceKind.Competition
+                && notification.RelatedId == id);
+
+        var total = await query.CountAsync(cancellationToken);
+        var ordered = desc
+            ? query.OrderByDescending(notification => notification.SentAt)
+                .ThenByDescending(notification => notification.Id)
+            : query.OrderBy(notification => notification.SentAt)
+                .ThenBy(notification => notification.Id);
+        var items = await Project(ordered.Skip(offset).Take(limit))
+            .ToListAsync(cancellationToken);
+        return new NotificationListPage(items, total);
+    }
+
     public Task<IReadOnlyList<NotificationView>> ListAsync(
         Guid userId,
         DateTimeOffset? beforeCreatedAt,

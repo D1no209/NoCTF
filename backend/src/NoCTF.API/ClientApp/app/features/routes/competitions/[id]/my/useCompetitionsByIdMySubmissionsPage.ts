@@ -21,14 +21,17 @@ export function useCompetitionsByIdMySubmissionsPage() {
     useCursorPagination<Submission>(async (cursor) => {
       const { data, error: err, response } = await listGameplayFactsEndpoint({
         path: { competitionId },
-        query: { cursor, limit: 50 },
+        query: { offset: cursor ? Number(cursor) || 0 : 0, limit: 50, desc: true },
       })
       // 未加入队伍时后端返回 404:视为没有提交记录,展示空态而不是报错。
       if (response?.status === 404) {
         return { items: [], nextCursor: null }
       }
       if (err || !data) throw err ?? new Error(translate("ui.failedToLoad"))
-      return { items: data.items, nextCursor: data.nextCursor }
+      const pageItems = data.items ?? []
+      const offset = cursor ? Number(cursor) || 0 : 0
+      const nextOffset = offset + pageItems.length
+      return { items: pageItems, nextCursor: nextOffset < (data.total ?? 0) ? String(nextOffset) : null }
     })
 
   async function loadChallengeTitles(): Promise<void> {

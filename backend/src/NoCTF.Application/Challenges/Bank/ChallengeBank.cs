@@ -25,6 +25,21 @@ public sealed record ChallengeTemplateView(
         : CtfInteractionKind.FlagSubmission;
 }
 
+public sealed record ChallengeTemplateListQuery(
+    Guid ActorId,
+    bool IsAdministrator,
+    bool IncludeDeleted,
+    string? Keyword,
+    string? Direction,
+    int Offset,
+    int Limit,
+    bool Desc);
+
+public sealed record ChallengeTemplateListPage(
+    IReadOnlyList<ChallengeTemplateView> Items,
+    int Total,
+    IReadOnlyList<string> Directions);
+
 public enum ChallengeTemplateWriteState
 {
     Succeeded,
@@ -82,6 +97,9 @@ public interface IChallengeBankStore
         Guid actorId,
         bool isAdministrator,
         bool includeDeleted,
+        CancellationToken cancellationToken);
+    Task<ChallengeTemplateListPage> ListPageAsync(
+        ChallengeTemplateListQuery query,
         CancellationToken cancellationToken);
     Task<ChallengeTemplateView?> FindAsync(Guid challengeId, Guid actorId, bool isAdministrator, bool includeDeleted, CancellationToken cancellationToken);
     Task<ChallengeTemplateWriteResult> UpdateAsync(
@@ -223,6 +241,20 @@ public sealed class ListChallengeTemplates(
     IChallengeBankStore store,
     IExperimentalFeatureReader? experimentalFeatures = null)
 {
+    public async Task<ChallengeTemplateListPage> ExecutePageAsync(
+        ChallengeTemplateListQuery query,
+        CancellationToken ct = default)
+    {
+        var page = await store.ListPageAsync(query, ct);
+        if (query.IsAdministrator || await IsEnabledAsync(ct))
+            return page;
+
+        var visible = page.Items
+            .Where(item => item.InteractionKind != CtfInteractionKind.PatchVerification)
+            .ToArray();
+        return page with { Items = visible };
+    }
+
     public async Task<IReadOnlyList<ChallengeTemplateView>> ExecuteAsync(
         Guid actorId,
         bool isAdministrator,

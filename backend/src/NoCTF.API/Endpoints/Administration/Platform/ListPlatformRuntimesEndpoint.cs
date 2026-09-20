@@ -1,6 +1,5 @@
 using FastEndpoints;
 using FluentValidation;
-using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.HttpResults;
 using NoCTF.API.Endpoints.Administration.Runtime;
 using NoCTF.API.Endpoints.Runtime;
@@ -11,21 +10,19 @@ using System.Text.Json.Serialization;
 
 namespace NoCTF.API.Endpoints.Administration.Platform;
 
-public sealed class ListPlatformRuntimesRequest
+public sealed class ListPlatformRuntimesRequest : PaginationRequest
 {
     [QueryParam] public string? Search { get; set; }
     [QueryParam] public PlatformRuntimeScopeProtocol? Scope { get; set; }
     [QueryParam] public RuntimeStateProtocol? State { get; set; }
     [QueryParam] public RuntimeKindProtocol? RuntimeKind { get; set; }
-    [QueryParam] public string? Cursor { get; set; }
-    [QueryParam] public int Limit { get; set; } = 50;
 }
 
 public sealed class ListPlatformRuntimesValidator : Validator<ListPlatformRuntimesRequest>
 {
     public ListPlatformRuntimesValidator()
     {
-        RuleFor(request => request.Limit).InclusiveBetween(1, 200);
+        PaginationRules.Add(this);
         RuleFor(request => request.Search).MaximumLength(200);
         RuleFor(request => request.Scope).IsInEnum();
         RuleFor(request => request.State).Must(value => value is null
@@ -51,19 +48,19 @@ public sealed record PlatformRuntimeResponse(
     string? CompetitionTitle,
     string ChallengeTitle);
 
-public sealed record PlatformRuntimeListResponse(
-    IReadOnlyList<PlatformRuntimeResponse> Items,
-    string? NextCursor);
+public sealed class PlatformRuntimeListResponse : ArrayResult<PlatformRuntimeResponse>
+{
+    public PlatformRuntimeListResponse() { }
+
+    public PlatformRuntimeListResponse(PlatformRuntimeResponse[] items, int total)
+        : base(items, total) { }
+}
 
 public sealed class ListPlatformRuntimesEndpoint(
     ManageAdminRuntimes runtimes,
-    SignedKeysetCursor cursors,
     TimeProvider timeProvider)
-    : Endpoint<ListPlatformRuntimesRequest,
-        Results<Ok<PlatformRuntimeListResponse>, ProblemHttpResult>>
+    : Endpoint<ListPlatformRuntimesRequest, Ok<PlatformRuntimeListResponse>>
 {
-    private const string CursorEndpoint = "runtimes.platform.active.list";
-
     public override void Configure()
     {
         Get("/admin/platform/runtimes");
@@ -74,57 +71,38 @@ public sealed class ListPlatformRuntimesEndpoint(
         {
             summary.Summary = "Lists active runtime containers across the platform.";
             summary.Description =
-                "Returns keyset-paged Container and Compose runtimes in active lifecycle states to platform administrators. "
+                "Returns offset-paged Container and Compose runtimes in active lifecycle states to platform administrators. "
                 + "Supports scope, state, kind and case-insensitive title/team search, including Fix target team attribution.";
         });
     }
 
-    public override async Task<Results<Ok<PlatformRuntimeListResponse>, ProblemHttpResult>> ExecuteAsync(
+    public override async Task<Ok<PlatformRuntimeListResponse>> ExecuteAsync(
         ListPlatformRuntimesRequest request,
         CancellationToken ct)
     {
         var search = request.Search?.Trim();
-        var filterKey = System.Text.Json.JsonSerializer.Serialize(new
-        {
-            Search = string.IsNullOrEmpty(search) ? null : search.ToLowerInvariant(),
-            request.Scope,
-            request.State,
-            request.RuntimeKind
-        });
-        if (!cursors.TryDecode(request.Cursor, CursorEndpoint, filterKey, out var position))
-        {
-            return TypedResults.Problem(
-                statusCode: StatusCodes.Status400BadRequest,
-                title: "Invalid cursor.");
-        }
-
-        var items = await runtimes.ListActiveContainersAsync(
-            new PlatformRuntimeFilter(
+        var runtimeFilter = new PlatformRuntimeFilter(
                 search,
                 request.Scope is null ? null : request.Scope == PlatformRuntimeScopeProtocol.ChallengeTest
                     ? PlatformRuntimeScope.ChallengeTest : PlatformRuntimeScope.Competition,
                 request.State is null ? null : RuntimeProtocolMapper.ToDomain(request.State.Value),
-                request.RuntimeKind is null ? null : RuntimeProtocolMapper.ToDomain(request.RuntimeKind.Value)),
-            position?.CreatedAt,
-            position?.Id,
+                request.RuntimeKind is null ? null : RuntimeProtocolMapper.ToDomain(request.RuntimeKind.Value));
+        var page = await runtimes.ListActiveContainersPageAsync(
+            runtimeFilter,
+            request.Offset,
             request.Limit,
+            request.Desc,
             ct);
-        var next = items.Count == request.Limit
-            ? cursors.Encode(
-                CursorEndpoint,
-                filterKey,
-                new(items[^1].Runtime.CreatedAt, items[^1].Runtime.Id))
-            : null;
-        var now = timeProvider.GetUtcNow();
+        var current = timeProvider.GetUtcNow();
         return TypedResults.Ok(new PlatformRuntimeListResponse(
-            items.Select(item => new PlatformRuntimeResponse(
-                    AdminRuntimeMapping.ToResponse(item.Runtime, now, includeCapacity: true),
+            page.Items.Select(item => new PlatformRuntimeResponse(
+                    AdminRuntimeMapping.ToResponse(item.Runtime, current, includeCapacity: true),
                     item.Scope == PlatformRuntimeScope.ChallengeTest
                         ? PlatformRuntimeScopeProtocol.ChallengeTest
                         : PlatformRuntimeScopeProtocol.Competition,
                     item.CompetitionTitle,
                     item.ChallengeTitle))
                 .ToArray(),
-            next));
+            page.Total));
     }
 }

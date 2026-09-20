@@ -10,6 +10,7 @@ import {
   adminUpdateCompetitionWebhook,
 } from '../../../../../api'
 import type { NoCtfapiEndpointsAdministrationCompetitionsCompetitionWebhookTargetResponse } from '../../../../../api'
+import { useOffsetPagination } from '../../../../../composables/useOffsetPagination'
 import { useCompetitionAdmin } from '../../../../../lib/admin-competition'
 
 interface WebhookForm {
@@ -21,12 +22,7 @@ interface WebhookForm {
 /** Owns state, effects and commands for the competition webhook administration page. */
 export function useAdminCompetitionsByIdWebhooksPage() {
   const { competitionId, canWrite } = useCompetitionAdmin()
-  const targets = ref<NoCtfapiEndpointsAdministrationCompetitionsCompetitionWebhookTargetResponse[]>([])
   const canManage = ref(false)
-  const nextCursor = ref<string | null>(null)
-  const loading = ref(true)
-  const loadingMore = ref(false)
-  const error = ref<string | null>(null)
   const formOpen = ref(false)
   const editingId = ref<string | null>(null)
   const form = reactive<WebhookForm>({ name: '', endpointUrl: '', enabled: false })
@@ -39,23 +35,28 @@ export function useAdminCompetitionsByIdWebhooksPage() {
 
   const mayManage = computed(() => canWrite.value && canManage.value)
 
-  async function load(reset = true) {
-    if (reset) loading.value = true
-    else loadingMore.value = true
+  const pagination = useOffsetPagination<NoCtfapiEndpointsAdministrationCompetitionsCompetitionWebhookTargetResponse>(async ({ offset, limit, desc }) => {
     const { data, error: requestError } = await adminListCompetitionWebhooks({
       path: { competitionId },
-      query: { limit: 50, cursor: reset ? undefined : nextCursor.value ?? undefined },
+      query: { offset, limit, desc },
     })
-    loading.value = false
-    loadingMore.value = false
-    if (requestError || !data) {
-      error.value = parseApiError(requestError, translate('webhook.loadFailed')).message
-      return
-    }
-    targets.value = reset ? data.items ?? [] : [...targets.value, ...(data.items ?? [])]
+    if (requestError || !data)
+      throw requestError ?? new Error(translate('webhook.loadFailed'))
     canManage.value = data.canManage ?? false
-    nextCursor.value = data.nextCursor ?? null
-    error.value = null
+    return { items: data.items ?? [], total: data.total ?? 0 }
+  }, { initialPageSize: 50, initialDesc: true })
+
+  const targets = pagination.items
+  const loading = pagination.loading
+  const error = computed(() => pagination.error.value?.message ?? null)
+
+  async function load() {
+    await pagination.loadPage(pagination.page.value)
+  }
+
+  async function reloadFirstPage() {
+    pagination.reset()
+    await pagination.loadPage(1)
   }
 
   function createTarget() {
@@ -108,7 +109,7 @@ export function useAdminCompetitionsByIdWebhooksPage() {
     }
     formOpen.value = false
     toast.success(translate('webhook.saved'))
-    await load()
+    await reloadFirstPage()
   }
 
   async function setEnabled(
@@ -127,7 +128,7 @@ export function useAdminCompetitionsByIdWebhooksPage() {
       return
     }
     toast.success(enabled ? translate('webhook.enabled') : translate('webhook.disabled'))
-    await load()
+    await reloadFirstPage()
   }
 
   function requestDelete(target: NoCtfapiEndpointsAdministrationCompetitionsCompetitionWebhookTargetResponse) {
@@ -136,10 +137,6 @@ export function useAdminCompetitionsByIdWebhooksPage() {
 
   function setDeleteOpen(open: boolean) {
     if (!open && !pendingId.value) deletingTarget.value = null
-  }
-
-  function loadMore() {
-    return load(false)
   }
 
   async function rotate(target: NoCtfapiEndpointsAdministrationCompetitionsCompetitionWebhookTargetResponse) {
@@ -156,7 +153,7 @@ export function useAdminCompetitionsByIdWebhooksPage() {
     signingSecret.value = data.signingSecret
     secretOpen.value = true
     toast.success(translate('webhook.rotated'))
-    await load()
+    await reloadFirstPage()
   }
 
   async function copySecret() {
@@ -179,7 +176,7 @@ export function useAdminCompetitionsByIdWebhooksPage() {
     }
     deletingTarget.value = null
     toast.success(translate('webhook.deleted'))
-    await load()
+    await reloadFirstPage()
   }
 
   async function test(target: NoCtfapiEndpointsAdministrationCompetitionsCompetitionWebhookTargetResponse) {
@@ -223,10 +220,14 @@ export function useAdminCompetitionsByIdWebhooksPage() {
     Trash2,
     targets,
     mayManage,
-    nextCursor,
     loading,
-    loadingMore,
     error,
+    page: pagination.page,
+    pageCount: pagination.pageCount,
+    total: pagination.total,
+    pageLimit: pagination.limit,
+    loadPage: pagination.loadPage,
+    setPageSize: pagination.setPageSize,
     formOpen,
     editingId,
     form,
@@ -244,7 +245,6 @@ export function useAdminCompetitionsByIdWebhooksPage() {
     setEnabled,
     requestDelete,
     setDeleteOpen,
-    loadMore,
     rotate,
     copySecret,
     remove,

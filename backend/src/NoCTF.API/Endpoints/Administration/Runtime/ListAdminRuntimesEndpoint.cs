@@ -13,7 +13,7 @@ using NoCTF.Domain.Runtime;
 
 namespace NoCTF.API.Endpoints.Administration.Runtime;
 
-public sealed class ListAdminRuntimesRequest
+public sealed class ListAdminRuntimesRequest : PaginationRequest
 {
     [QueryParam] public Guid? CompetitionChallengeId { get; set; }
     [QueryParam] public Guid? TeamId { get; set; }
@@ -24,7 +24,6 @@ public sealed class ListAdminRuntimesRequest
     [QueryParam] public DateTimeOffset? ExpiresBefore { get; set; }
     [QueryParam] public int? HostPort { get; set; }
     [QueryParam] public string? Cursor { get; set; }
-    [QueryParam] public int Limit { get; set; } = 50;
 }
 
 public sealed class ListAdminRuntimesValidator : Validator<ListAdminRuntimesRequest>
@@ -72,7 +71,8 @@ public sealed record AdminRuntimeAllocationResponse(Guid OperationId,
 
 public sealed record AdminRuntimeListResponse(
     IReadOnlyList<AdminRuntimeResponse> Items,
-    string? NextCursor);
+    string? NextCursor,
+    int Total = 0);
 
 internal static class AdminRuntimeMapping
 {
@@ -142,21 +142,27 @@ public sealed class ListAdminRuntimesEndpoint(
             request.HostPort);
         if (!cursors.TryDecode(request.Cursor, CursorEndpoint, filterKey, out var position))
             return TypedResults.Problem(statusCode: StatusCodes.Status400BadRequest, title: "Invalid cursor.");
-        var items = await runtimes.ListAsync(new(
+        var filter = new AdminRuntimeFilter(
                 competitionId, request.CompetitionChallengeId, request.TeamId,
                 request.RuntimeKind is null ? null : RuntimeProtocolMapper.ToDomain(request.RuntimeKind.Value),
                 request.Provider is null ? null : RuntimeProtocolMapper.ToDomain(request.Provider.Value),
                 request.RunnerId,
                 request.State is null ? null : RuntimeProtocolMapper.ToDomain(request.State.Value),
                 request.ExpiresBefore,
-                request.HostPort),
-            position?.CreatedAt, position?.Id, request.Limit, ct);
+                request.HostPort);
+        if (string.IsNullOrWhiteSpace(request.Cursor))
+        {
+            var page = await runtimes.ListPageAsync(filter, request.Offset, request.Limit, request.Desc, ct);
+            return TypedResults.Ok(new AdminRuntimeListResponse(
+                page.Items.Select(item => AdminRuntimeMapping.ToResponse(item, timeProvider.GetUtcNow())).ToArray(),
+                null,
+                page.Total));
+        }
+        var items = await runtimes.ListAsync(filter, position?.CreatedAt, position?.Id, request.Limit, ct);
         var next = items.Count == request.Limit
             ? cursors.Encode(CursorEndpoint, filterKey, new(items[^1].CreatedAt, items[^1].Id))
             : null;
         return TypedResults.Ok(new AdminRuntimeListResponse(
-            items.Select(item => AdminRuntimeMapping.ToResponse(
-                item,
-                timeProvider.GetUtcNow())).ToArray(), next));
+            items.Select(item => AdminRuntimeMapping.ToResponse(item, timeProvider.GetUtcNow())).ToArray(), next));
     }
 }

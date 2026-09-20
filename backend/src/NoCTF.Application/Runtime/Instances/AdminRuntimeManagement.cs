@@ -13,6 +13,9 @@ public sealed record AdminRuntimeFilter(
     DateTimeOffset? ExpiresBefore,
     int? HostPort);
 
+public sealed record RuntimeInstanceListPage(IReadOnlyList<RuntimeInstanceView> Items, int Total);
+public sealed record PlatformRuntimeListPage(IReadOnlyList<PlatformRuntimeInstanceView> Items, int Total);
+
 public enum PlatformRuntimeScope
 {
     Competition,
@@ -33,18 +36,34 @@ public sealed record PlatformRuntimeFilter(
 
 public interface IAdminRuntimeStore
 {
+    Task<RuntimeInstanceListPage> ListPageAsync(
+        AdminRuntimeFilter filter,
+        int offset,
+        int limit,
+        bool desc,
+        CancellationToken cancellationToken);
+    Task<PlatformRuntimeListPage> ListActiveContainersPageAsync(
+        PlatformRuntimeFilter filter,
+        int offset,
+        int limit,
+        bool desc,
+        CancellationToken cancellationToken);
     Task<IReadOnlyList<RuntimeInstanceView>> ListAsync(
         AdminRuntimeFilter filter,
         DateTimeOffset? beforeCreatedAt,
         Guid? beforeId,
         int limit,
-        CancellationToken cancellationToken);
+        CancellationToken cancellationToken,
+        int offset = 0,
+        bool desc = true);
     Task<IReadOnlyList<PlatformRuntimeInstanceView>> ListActiveContainersAsync(
         PlatformRuntimeFilter filter,
         DateTimeOffset? beforeCreatedAt,
         Guid? beforeId,
         int limit,
-        CancellationToken cancellationToken);
+        CancellationToken cancellationToken,
+        int offset = 0,
+        bool desc = true);
     Task<RuntimeInstanceView?> FindAsync(
         Guid competitionId,
         Guid runtimeInstanceId,
@@ -88,6 +107,35 @@ public interface IAdminRuntimeStore
 
 public sealed class ManageAdminRuntimes(IAdminRuntimeStore store, NoCTF.Application.Runtime.Capacity.IRunnerCapacityGate? capacity = null)
 {
+    public Task<RuntimeInstanceListPage> ListPageAsync(
+        AdminRuntimeFilter filter,
+        int offset,
+        int limit,
+        bool desc,
+        CancellationToken ct = default) =>
+        store.ListPageAsync(filter, offset, limit, desc, ct);
+
+    public async Task<PlatformRuntimeListPage> ListActiveContainersPageAsync(
+        PlatformRuntimeFilter filter,
+        int offset,
+        int limit,
+        bool desc,
+        CancellationToken ct = default)
+    {
+        var page = await store.ListActiveContainersPageAsync(filter, offset, limit, desc, ct);
+        if (capacity is null) return page;
+        var waiting = await capacity.ReadWaitingAsync(page.Items
+            .Where(row => row.Runtime.State is RuntimeState.Queued or RuntimeState.Provisioning)
+            .Select(row => row.Runtime.Id).ToArray(), ct);
+        return page with { Items = page.Items.Select(row => row with
+        {
+            Runtime = row.Runtime with
+            {
+                WaitingReason = waiting.TryGetValue(row.Runtime.Id, out var reason) ? reason : null
+            }
+        }).ToArray() };
+    }
+
     public Task<IReadOnlyList<RuntimeInstanceView>> ListAsync(
         AdminRuntimeFilter filter,
         DateTimeOffset? beforeCreatedAt,

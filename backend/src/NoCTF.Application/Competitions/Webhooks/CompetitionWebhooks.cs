@@ -16,7 +16,7 @@ public sealed record CompetitionWebhookTargetView(
 
 public sealed record CompetitionWebhookTargetPage(
     IReadOnlyList<CompetitionWebhookTargetView> Items,
-    bool HasMore);
+    int Total);
 
 public enum CompetitionWebhookMutationFailure : short
 {
@@ -170,9 +170,9 @@ public interface ICompetitionWebhookStore
 {
     Task<CompetitionWebhookTargetPage?> ListAsync(
         Guid competitionId,
-        DateTimeOffset? beforeUpdatedAt,
-        Guid? beforeId,
+        int offset,
         int limit,
+        bool descending,
         CancellationToken cancellationToken);
 
     Task<CompetitionWebhookMutationResult> CreateAsync(
@@ -199,11 +199,11 @@ public sealed class ListCompetitionWebhookTargets(ICompetitionWebhookStore store
 {
     public Task<CompetitionWebhookTargetPage?> ExecuteAsync(
         Guid competitionId,
-        DateTimeOffset? beforeUpdatedAt,
-        Guid? beforeId,
+        int offset,
         int limit,
+        bool descending,
         CancellationToken cancellationToken = default) =>
-        store.ListAsync(competitionId, beforeUpdatedAt, beforeId, limit, cancellationToken);
+        store.ListAsync(competitionId, offset, limit, descending, cancellationToken);
 }
 
 public sealed class CreateCompetitionWebhookTarget(ICompetitionWebhookStore store)
