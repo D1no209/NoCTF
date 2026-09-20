@@ -1,0 +1,79 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://noctf.example/schemas/webhooks/competition-events-v1.schema.json",
+  "title": "NoCTF competition webhook event",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "specversion",
+    "id",
+    "source",
+    "type",
+    "subject",
+    "time",
+    "datacontenttype",
+    "dataschema",
+    "data"
+  ],
+  "properties": {
+    "specversion": { "const": "1.0" },
+    "id": { "type": "string", "format": "uuid" },
+    "source": { "type": "string", "format": "uri" },
+    "type": {
+      "enum": [
+        "com.noctf.competition.lifecycle.changed.v1",
+        "com.noctf.competition.challenge.published.v1",
+        "com.noctf.competition.challenge.updated.v1",
+        "com.noctf.competition.hint.published.v1",
+        "com.noctf.competition.announcement.published.v1",
+        "com.noctf.competition.team.banned.v1",
+        "com.noctf.competition.team.ban.corrected.v1",
+        "com.noctf.competition.blood.awarded.v1",
+        "com.noctf.competition.awdp.break.resolved.v1",
+        "com.noctf.competition.awdp.fix.resolved.v1",
+        "com.noctf.webhook.test.v1"
+      ]
+    },
+    "subject": { "type": "string", "pattern": "^competitions/[0-9a-fA-F-]{36}$" },
+    "time": { "type": "string", "format": "date-time" },
+    "datacontenttype": { "const": "application/json" },
+    "dataschema": { "type": "string", "format": "uri" },
+    "data": { "$ref": "#/$defs/data" }
+  },
+  "$defs": {
+    "data": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["capturedAt", "event", "resources"],
+      "properties": {
+        "capturedAt": { "type": "string", "format": "date-time" },
+        "event": {
+          "type": "object",
+          "required": ["competitionId"],
+          "properties": {
+            "competitionId": { "type": "string", "format": "uuid" },
+            "competitionChallengeId": { "type": ["string", "null"], "format": "uuid" },
+            "hintId": { "type": ["string", "null"], "format": "uuid" },
+            "notificationId": { "type": ["string", "null"], "format": "uuid" },
+            "teamId": { "type": ["string", "null"], "format": "uuid" },
+            "gameplayFactId": { "type": ["string", "null"], "format": "uuid" },
+            "from": { "type": ["string", "null"] },
+            "to": { "type": ["string", "null"] },
+            "award": { "type": ["string", "null"] },
+            "outcome": { "type": ["string", "null"] }
+          }
+        },
+        "resources": {
+          "type": "object",
+          "required": ["competition"],
+          "properties": {
+            "competition": { "type": "object" },
+            "challenge": { "type": ["object", "null"] },
+            "announcement": { "type": ["object", "null"] },
+            "leaderboard": { "type": ["object", "null"] }
+          }
+        }
+      }
+    }
+  }
+}
