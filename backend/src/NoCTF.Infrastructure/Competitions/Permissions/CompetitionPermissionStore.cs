@@ -72,12 +72,7 @@ public sealed class CompetitionPermissionStore(
             return new(CompetitionPermissionCandidateListState.Forbidden);
 
         var candidates = await db.Users.AsNoTracking()
-            .Where(user =>
-                user.Id != ownerId.Value &&
-                (user.Kind == UserKind.Bot ||
-                 user.Role == UserRole.Organizer ||
-                 user.Role == UserRole.Administrator ||
-                 user.EmailVerifiedAt != null))
+            .Where(user => user.Id != ownerId.Value)
             .OrderBy(user => user.UserName)
             .ThenBy(user => user.Id)
             .Select(user => new CompetitionPermissionCandidate(
@@ -144,12 +139,12 @@ public sealed class CompetitionPermissionStore(
             .Distinct()
             .Order()
             .ToArray();
-        var judgeObserverUsers = await db.Users.AsNoTracking()
+        var judgeObserverUserIds = await db.Users.AsNoTracking()
             .Where(user => judgeObserverIds.Contains(user.Id))
-            .Select(user => new { user.Id, user.Kind, user.EmailVerifiedAt })
+            .Select(user => user.Id)
             .ToArrayAsync(ct);
         var missingUserIds = judgeObserverIds
-            .Except(judgeObserverUsers.Select(user => user.Id))
+            .Except(judgeObserverUserIds)
             .ToArray();
         if (missingUserIds.Length > 0)
         {
@@ -157,31 +152,6 @@ public sealed class CompetitionPermissionStore(
                 CompetitionPermissionUpdateState.UserNotFound,
                 missingUserIds);
         }
-        var ineligibleJudgeIds = judgeObserverUsers
-            .Where(user => user.Kind == UserKind.Bot && command.JudgeIds.Contains(user.Id))
-            .Select(user => user.Id)
-            .Order()
-            .ToArray();
-        if (ineligibleJudgeIds.Length > 0)
-        {
-            return new(
-                CompetitionPermissionUpdateState.RoleNotEligible,
-                ineligibleJudgeIds);
-        }
-        var unverifiedUserIds = judgeObserverUsers
-            .Where(user =>
-                user.Kind == UserKind.Human
-                && user.EmailVerifiedAt is null)
-            .Select(user => user.Id)
-            .Order()
-            .ToArray();
-        if (unverifiedUserIds.Length > 0)
-        {
-            return new(
-                CompetitionPermissionUpdateState.EmailNotVerified,
-                unverifiedUserIds);
-        }
-
         var managerIds = command.ManagerIds.Distinct().Order().ToArray();
         var judgeIds = command.JudgeIds.Distinct().Order().ToArray();
         var observerIds = command.ObserverIds.Distinct().Order().ToArray();

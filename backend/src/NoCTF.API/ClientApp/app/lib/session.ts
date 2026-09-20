@@ -3,9 +3,9 @@ import { createClient } from '../api/client'
 import { accessTokenNeedsRefresh } from './auth-refresh'
 
 /**
- * In-memory access token store and refresh single-flight.
+ * In-memory access token store, reversible identity switch and refresh single-flight.
  *
- * The access token is intentionally kept only in memory (never localStorage);
+ * Both the active and suspended administrator access tokens stay only in memory (never localStorage);
  * the refresh token lives in an HttpOnly cookie managed by the backend.
  * Module scope is safe because the app is a client-only SPA (ssr: false).
  */
@@ -13,6 +13,7 @@ let accessToken: string | null = null
 let sessionRevision = 0
 let sessionInvalidated: (() => void) | null = null
 let impersonationActive = false
+let administratorAccessToken: string | null = null
 let impersonationTimer: ReturnType<typeof setTimeout> | null = null
 let impersonationExpiresAt = 0
 let impersonationEnded: ((reason: ImpersonationEndReason) => void | Promise<void>) | null = null
@@ -32,12 +33,15 @@ export function isImpersonatingSession(): boolean {
   return impersonationActive
 }
 
-export function beginImpersonationAccessToken(token: string, expiresAt: string): void {
+export function beginImpersonationAccessToken(token: string, expiresAt: string): boolean {
+  if (impersonationActive || !accessToken) return false
   if (impersonationTimer) clearTimeout(impersonationTimer)
+  administratorAccessToken = accessToken
   impersonationActive = true
   setAccessToken(token)
   impersonationExpiresAt = Date.parse(expiresAt)
   scheduleImpersonationExpiry()
+  return true
 }
 
 function scheduleImpersonationExpiry(): void {
@@ -53,7 +57,19 @@ export function clearImpersonationAccessToken(): void {
   impersonationTimer = null
   impersonationExpiresAt = 0
   impersonationActive = false
+  administratorAccessToken = null
   setAccessToken(null)
+}
+
+export function restoreImpersonationAccessToken(): string | null {
+  if (impersonationTimer) clearTimeout(impersonationTimer)
+  const restored = administratorAccessToken
+  impersonationTimer = null
+  impersonationExpiresAt = 0
+  impersonationActive = false
+  administratorAccessToken = null
+  setAccessToken(restored)
+  return restored
 }
 
 export function setImpersonationEndHandler(
@@ -90,12 +106,6 @@ let refreshPromise: Promise<boolean> | null = null
  */
 export function refreshSession(): Promise<boolean> {
   if (impersonationActive) return Promise.resolve(false)
-  return refreshSessionCore()
-}
-
-export function refreshAdministratorSession(): Promise<boolean> {
-  setAccessToken(null)
-  refreshPromise = null
   return refreshSessionCore()
 }
 

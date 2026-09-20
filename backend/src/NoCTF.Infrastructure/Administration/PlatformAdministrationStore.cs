@@ -87,8 +87,6 @@ public sealed class PlatformAdministrationStore(
         var user = await db.Users.SingleOrDefaultAsync(item => item.Id == userId, ct);
         if (user is null)
             return new(UpdatePlatformRoleState.UserNotFound);
-        if (user.Kind == UserKind.Bot && role == UserRole.Administrator)
-            return new(UpdatePlatformRoleState.InvalidBotRole);
         if (ActiveHumanAdministratorMutationGuard.Contains(user)
             && role != UserRole.Administrator
             && await ActiveHumanAdministratorMutationGuard.CountAsync(db, ct) <= 1)
@@ -219,12 +217,6 @@ public sealed class PlatformAdministrationStore(
             db.ChangeTracker.Clear();
             return new(PatchPlatformUserState.AnonymizedAccountImmutable);
         }
-        if (user.Kind == UserKind.Bot && user.Role == UserRole.Administrator)
-        {
-            db.ChangeTracker.Clear();
-            return new(PatchPlatformUserState.InvalidBotRole);
-        }
-
         var removesActiveAdministrator = user.Kind == UserKind.Human
             && originalRole == UserRole.Administrator
             && originalStatus == UserAccountStatus.Active
@@ -284,144 +276,6 @@ public sealed class PlatformAdministrationStore(
         await db.SaveChangesAsync(ct);
         await transaction.CommitAsync(ct);
         return new(PatchPlatformUserState.Updated, Map(user));
-    }
-
-    public async Task RecordTokenIssuedAsync(
-        Guid actorUserId,
-        PlatformUserTokenAuditFact fact,
-        DateTimeOffset now,
-        CancellationToken ct)
-    {
-        RecordTokenAudit(
-            actorUserId,
-            fact,
-            fact.JwtId ?? Guid.CreateVersion7(now),
-            EntityReferenceKind.User,
-            fact.TargetUserId,
-            now);
-        await db.SaveChangesAsync(ct);
-    }
-
-    public async Task<IReadOnlyList<AdminIssuedAccessTokenView>> ListIssuedTokensAsync(
-        Guid actorUserId,
-        Guid targetUserId,
-        DateTimeOffset now,
-        CancellationToken ct)
-    {
-        var target = await db.Users.AsNoTracking()
-            .Where(user => user.Id == targetUserId)
-            .Select(user => new { user.AccountStatus, user.TokenVersion })
-            .SingleOrDefaultAsync(ct);
-        if (target is null || target.AccountStatus != UserAccountStatus.Active)
-            return [];
-
-        var earliestIssuedAt = now.AddSeconds(-ManagePlatform.MaximumIssuedTokenLifetimeSeconds);
-        var issuanceRecords = await db.Notifications.AsNoTracking()
-            .Where(notification =>
-                notification.Kind == NotificationKind.PlatformUserAccessTokenIssued
-                && notification.SourceType == NotificationSourceType.User
-                && notification.SourceId == actorUserId
-                && notification.RelatedType == EntityReferenceKind.User
-                && notification.RelatedId == targetUserId
-                && notification.SentAt >= earliestIssuedAt)
-            .OrderByDescending(notification => notification.SentAt)
-            .ThenByDescending(notification => notification.Id)
-            .ToArrayAsync(ct);
-        var issuances = issuanceRecords
-            .Select(notification => new
-            {
-                Notification = notification,
-                Fact = DeserializeTokenAudit(notification)
-            })
-            .Where(item =>
-                item.Fact.Action == PlatformUserTokenAdministrationAction.AccessTokenIssued
-                && item.Fact.JwtId == item.Notification.Id
-                && item.Fact.ExpiresAt > now
-                && item.Fact.TokenVersion == target.TokenVersion)
-            .ToArray();
-        if (issuances.Length == 0)
-            return [];
-
-        var jwtIds = issuances.Select(item => item.Notification.Id).ToArray();
-        var revokedIds = (await db.Notifications.AsNoTracking()
-                .Where(notification =>
-                    notification.Kind == NotificationKind.PlatformUserAccessTokenRevoked
-                    && notification.RelatedType == EntityReferenceKind.Notification
-                    && notification.RelatedId != null
-                    && jwtIds.Contains(notification.RelatedId.Value))
-                .Select(notification => notification.RelatedId!.Value)
-                .ToArrayAsync(ct))
-            .ToHashSet();
-        return issuances
-            .Where(item => !revokedIds.Contains(item.Notification.Id))
-            .Select(item => new AdminIssuedAccessTokenView(
-                item.Notification.Id,
-                item.Fact.TargetUserId,
-                item.Fact.TargetUserName,
-                item.Notification.SentAt,
-                item.Fact.ExpiresAt!.Value,
-                item.Fact.Reason!))
-            .ToArray();
-    }
-
-    public async Task<RevokeAdminIssuedAccessTokenState> RevokeIssuedTokenAsync(
-        Guid actorUserId,
-        Guid targetUserId,
-        Guid jwtId,
-        DateTimeOffset now,
-        CancellationToken ct)
-    {
-        await using var transaction = await AggregateCompatibleTransaction.BeginAsync(db, ct);
-        var issuance = await PlatformUserTokenCriticalSection.AcquireIssuanceAsync(
-            db,
-            jwtId,
-            ct);
-        if (issuance is null
-            || issuance.Kind != NotificationKind.PlatformUserAccessTokenIssued
-            || issuance.SourceType != NotificationSourceType.User
-            || issuance.SourceId != actorUserId
-            || issuance.RelatedType != EntityReferenceKind.User
-            || issuance.RelatedId != targetUserId)
-            return RevokeAdminIssuedAccessTokenState.NotFound;
-        var fact = DeserializeTokenAudit(issuance);
-        var target = await db.Users.AsNoTracking().SingleOrDefaultAsync(
-            user => user.Id == targetUserId,
-            ct);
-        if (fact.Action != PlatformUserTokenAdministrationAction.AccessTokenIssued
-            || fact.JwtId != jwtId
-            || fact.ExpiresAt <= now
-            || target is null
-            || target.AccountStatus != UserAccountStatus.Active
-            || target.TokenVersion != fact.TokenVersion)
-        {
-            return RevokeAdminIssuedAccessTokenState.NotFound;
-        }
-
-        var alreadyRevoked = await db.Notifications.AsNoTracking().AnyAsync(notification =>
-            notification.Kind == NotificationKind.PlatformUserAccessTokenRevoked
-            && notification.RelatedType == EntityReferenceKind.Notification
-            && notification.RelatedId == jwtId,
-            ct);
-        if (alreadyRevoked)
-        {
-            await transaction.CommitAsync(ct);
-            return RevokeAdminIssuedAccessTokenState.Revoked;
-        }
-
-        RecordTokenAudit(
-            actorUserId,
-            fact with
-            {
-                Action = PlatformUserTokenAdministrationAction.AccessTokenRevoked,
-                Reason = null
-            },
-            Guid.CreateVersion7(now),
-            EntityReferenceKind.Notification,
-            jwtId,
-            now);
-        await db.SaveChangesAsync(ct);
-        await transaction.CommitAsync(ct);
-        return RevokeAdminIssuedAccessTokenState.Revoked;
     }
 
     public async Task<PlatformUserView?> InvalidateTokensAsync(
@@ -566,12 +420,5 @@ public sealed class PlatformAdministrationStore(
             SentAt = occurredAt
         });
     }
-
-    private static PlatformUserTokenAuditFact DeserializeTokenAudit(
-        Notification notification) =>
-        JsonSerializer.Deserialize<PlatformUserTokenAuditFact>(
-            notification.ContentJson,
-            JsonOptions) ?? throw new InvalidOperationException(
-            $"Notification {notification.Id} has no platform token audit payload.");
 
 }

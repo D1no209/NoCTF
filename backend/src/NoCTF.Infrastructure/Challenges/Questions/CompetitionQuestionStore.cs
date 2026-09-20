@@ -36,7 +36,7 @@ public sealed class CompetitionQuestionStore(
             ct);
         var user = await db.Users.AsNoTracking()
             .Where(candidate => candidate.Id == command.ActorUserId)
-            .Select(candidate => new { candidate.Kind, candidate.AccountStatus })
+            .Select(candidate => new { candidate.AccountStatus })
             .SingleOrDefaultAsync(ct);
         var competition = await db.Competitions.AsNoTracking()
             .Where(candidate => candidate.Id == command.CompetitionId)
@@ -94,7 +94,6 @@ public sealed class CompetitionQuestionStore(
                 ct);
         }
         var context = new CompetitionQuestionCreationContext(
-            user is { Kind: UserKind.Human, AccountStatus: UserAccountStatus.Active },
             competition.Status,
             hasApprovedTeam,
             command.Subject,
@@ -644,7 +643,6 @@ public sealed class CompetitionQuestionStore(
 
         var administratorIds = await db.Users.AsNoTracking()
             .Where(user => user.Role == UserRole.Administrator
-                && user.Kind == UserKind.Human
                 && user.AccountStatus == UserAccountStatus.Active)
             .Select(user => user.Id)
             .ToArrayAsync(ct);
@@ -652,7 +650,6 @@ public sealed class CompetitionQuestionStore(
         var distinctIds = candidateIds.Distinct().ToArray();
         return await db.Users.AsNoTracking()
             .Where(user => distinctIds.Contains(user.Id)
-                && user.Kind == UserKind.Human
                 && user.AccountStatus == UserAccountStatus.Active)
             .OrderBy(user => user.Id)
             .Select(user => user.Id)
@@ -669,7 +666,6 @@ public sealed class CompetitionQuestionStore(
             .SingleOrDefaultAsync(ct) ?? [];
         return await db.Users.AsNoTracking()
             .Where(user => memberIds.Contains(user.Id)
-                && user.Kind == UserKind.Human
                 && user.AccountStatus == UserAccountStatus.Active)
             .OrderBy(user => user.Id)
             .Select(user => user.Id)

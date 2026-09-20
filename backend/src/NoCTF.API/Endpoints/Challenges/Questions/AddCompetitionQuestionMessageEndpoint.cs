@@ -58,8 +58,6 @@ public sealed class AddCompetitionQuestionMessageEndpoint(
         AddCompetitionQuestionMessageRequest request,
         CancellationToken ct)
     {
-        if (!user.IsHuman)
-            return TypedResults.Forbid();
         var result = await add.ExecuteAsync(new(
             Route<Guid>("competitionId"),
             Route<Guid>("threadRootId"),

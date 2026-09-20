@@ -2011,7 +2011,6 @@ export type NoCtfapiEndpointsAdministrationPlatformPublicGatewayRuntimeStatusRes
 export type NoCtfapiEndpointsAdministrationPlatformIssuePlatformUserTokenResponse = {
     accessToken?: string;
     expiresAt?: string;
-    jwtId?: string;
     targetUserId?: string;
     targetUserName?: string;
 };
@@ -2025,7 +2024,6 @@ export type NoCtfapiEndpointsAdministrationPlatformIssuePlatformUserTokenFailure
 
 export type NoCtfapiEndpointsAdministrationPlatformIssuePlatformUserTokenRequest = {
     expiresInSeconds: number;
-    reason: string;
 };
 
 export type NoCtfapiEndpointsAdministrationPlatformPlatformAuditLogListResponse = {
@@ -2125,19 +2123,6 @@ export type NoCtfapiEndpointsAdministrationPlatformListPlatformRuntimesRequest =
 
 export type NoCtfapiEndpointsAdministrationPlatformPlatformUserListResponse = {
     items?: Array<NoCtfapiEndpointsAdministrationPlatformPlatformUserResponse>;
-};
-
-export type NoCtfapiEndpointsAdministrationPlatformAdminIssuedAccessTokenListResponse = {
-    items?: Array<NoCtfapiEndpointsAdministrationPlatformAdminIssuedAccessTokenResponse>;
-};
-
-export type NoCtfapiEndpointsAdministrationPlatformAdminIssuedAccessTokenResponse = {
-    jwtId?: string;
-    targetUserId?: string;
-    targetUserName?: string;
-    issuedAt?: string;
-    expiresAt?: string;
-    reason?: string;
 };
 
 export type NoCtfapiEndpointsAdministrationPlatformPatchPlatformConfigurationRequest = {
@@ -7140,39 +7125,6 @@ export type AdminPlatformDeleteUserTokensResponses = {
 
 export type AdminPlatformDeleteUserTokensResponse = AdminPlatformDeleteUserTokensResponses[keyof AdminPlatformDeleteUserTokensResponses];
 
-export type AdminPlatformListUserTokensData = {
-    body?: never;
-    path: {
-        userId: string;
-    };
-    query?: never;
-    url: '/api/v1/admin/platform/users/{userId}/tokens';
-};
-
-export type AdminPlatformListUserTokensErrors = {
-    /**
-     * Unauthorized
-     */
-    401: unknown;
-    /**
-     * Forbidden
-     */
-    403: unknown;
-    /**
-     * Not Found
-     */
-    404: unknown;
-};
-
-export type AdminPlatformListUserTokensResponses = {
-    /**
-     * Success
-     */
-    200: NoCtfapiEndpointsAdministrationPlatformAdminIssuedAccessTokenListResponse;
-};
-
-export type AdminPlatformListUserTokensResponse = AdminPlatformListUserTokensResponses[keyof AdminPlatformListUserTokensResponses];
-
 export type AdminPlatformIssueUserTokenData = {
     body: NoCtfapiEndpointsAdministrationPlatformIssuePlatformUserTokenRequest;
     path: {
@@ -7839,40 +7791,6 @@ export type AdminPlatformSsoReplaceProviderSecretResponses = {
 };
 
 export type AdminPlatformSsoReplaceProviderSecretResponse = AdminPlatformSsoReplaceProviderSecretResponses[keyof AdminPlatformSsoReplaceProviderSecretResponses];
-
-export type AdminPlatformRevokeUserTokenData = {
-    body?: never;
-    path: {
-        userId: string;
-        jwtId: string;
-    };
-    query?: never;
-    url: '/api/v1/admin/platform/users/{userId}/tokens/{jwtId}';
-};
-
-export type AdminPlatformRevokeUserTokenErrors = {
-    /**
-     * Unauthorized
-     */
-    401: unknown;
-    /**
-     * Forbidden
-     */
-    403: unknown;
-    /**
-     * Not Found
-     */
-    404: unknown;
-};
-
-export type AdminPlatformRevokeUserTokenResponses = {
-    /**
-     * No Content
-     */
-    204: void;
-};
-
-export type AdminPlatformRevokeUserTokenResponse = AdminPlatformRevokeUserTokenResponses[keyof AdminPlatformRevokeUserTokenResponses];
 
 export type AdminPlatformSendEmailVerificationTestData = {
     body?: never;

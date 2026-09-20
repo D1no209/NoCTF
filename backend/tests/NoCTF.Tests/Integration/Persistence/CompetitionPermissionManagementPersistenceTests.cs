@@ -233,7 +233,13 @@ public sealed class CompetitionPermissionManagementPersistenceTests
                         "candidate-unrelated-verified",
                         UserKind.Human,
                         UserRole.User,
-                        true)
+                        true),
+                    new Candidate(
+                        unverifiedUserId,
+                        "candidate-unverified",
+                        UserKind.Human,
+                        UserRole.User,
+                        false)
                 };
                 await AssertCandidatesAsync(owner.Candidates!, expected);
                 await AssertCandidatesAsync(administrator.Candidates!, expected);
@@ -342,7 +348,7 @@ public sealed class CompetitionPermissionManagementPersistenceTests
 
     [Test]
     [Timeout(300_000)]
-    public async Task Unverified_judge_or_observer_is_rejected_atomically(
+    public async Task Judge_and_observer_assignment_is_independent_of_account_kind_and_credentials(
         CancellationToken cancellationToken)
     {
         await RunAsync(
@@ -398,9 +404,7 @@ public sealed class CompetitionPermissionManagementPersistenceTests
                             ObserverIds: []),
                         cancellationToken);
                     await Assert.That(judge.State)
-                        .IsEqualTo(CompetitionPermissionUpdateState.EmailNotVerified);
-                    await Assert.That(judge.UserIds)
-                        .IsEquivalentTo([unverifiedUserId]);
+                        .IsEqualTo(CompetitionPermissionUpdateState.Updated);
                 }
 
                 await using (var observerDb = new NoCtfDbContext(options))
@@ -414,9 +418,7 @@ public sealed class CompetitionPermissionManagementPersistenceTests
                             ObserverIds: [unverifiedUserId]),
                         cancellationToken);
                     await Assert.That(observer.State)
-                        .IsEqualTo(CompetitionPermissionUpdateState.EmailNotVerified);
-                    await Assert.That(observer.UserIds)
-                        .IsEquivalentTo([unverifiedUserId]);
+                        .IsEqualTo(CompetitionPermissionUpdateState.Updated);
                 }
 
                 await using (var botObserverDb = new NoCtfDbContext(options))
@@ -444,9 +446,7 @@ public sealed class CompetitionPermissionManagementPersistenceTests
                             ObserverIds: []),
                         cancellationToken);
                     await Assert.That(judge.State)
-                        .IsEqualTo(CompetitionPermissionUpdateState.RoleNotEligible);
-                    await Assert.That(judge.UserIds)
-                        .IsEquivalentTo([notificationBotId]);
+                        .IsEqualTo(CompetitionPermissionUpdateState.Updated);
                 }
 
                 await using var verifyDb = new NoCtfDbContext(options);
@@ -456,9 +456,9 @@ public sealed class CompetitionPermissionManagementPersistenceTests
                         cancellationToken);
                 await Assert.That(persisted.ManagerIds)
                     .IsEquivalentTo([existingManagerId]);
-                await Assert.That(persisted.JudgeIds).IsEmpty();
-                await Assert.That(persisted.ObserverIds)
+                await Assert.That(persisted.JudgeIds)
                     .IsEquivalentTo([notificationBotId]);
+                await Assert.That(persisted.ObserverIds).IsEmpty();
                 await Assert.That(persisted.UpdatedAt).IsNotEqualTo(originalUpdatedAt);
             },
             cancellationToken);

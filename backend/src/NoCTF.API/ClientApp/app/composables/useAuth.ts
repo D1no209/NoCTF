@@ -10,8 +10,8 @@ import {
   beginImpersonationAccessToken,
   clearImpersonationAccessToken,
   getAccessToken,
-  refreshAdministratorSession,
   refreshSession,
+  restoreImpersonationAccessToken,
   setAccessToken,
 } from '../lib/session'
 
@@ -128,6 +128,10 @@ export function useAuth() {
     const administrator = user.value
     if (!administrator?.userId || administrator.role !== 'Administrator')
       throw new Error(translate("ui.administratorSessionRequired"))
+    if (impersonation.value)
+      throw new Error(translate("ui.identitySwitchAlreadyActive"))
+    if (!beginImpersonationAccessToken(input.accessToken, input.expiresAt))
+      throw new Error(translate("ui.administratorSessionRequired"))
     impersonation.value = {
       administratorUserId: administrator.userId,
       administratorUserName: administrator.userName ?? administrator.userId,
@@ -136,7 +140,6 @@ export function useAuth() {
       expiresAt: input.expiresAt,
       returnPath: input.returnPath,
     }
-    beginImpersonationAccessToken(input.accessToken, input.expiresAt)
     await fetchMe()
     if (user.value?.userId !== input.targetUserId) {
       await endImpersonation()
@@ -150,11 +153,10 @@ export function useAuth() {
       const active = impersonation.value
       if (!active) return
       impersonationEnding.value = true
-      clearImpersonationAccessToken()
-      const restored = await refreshAdministratorSession()
-      if (restored) await fetchMe()
-      const administratorRestored = restored
-        && user.value?.userId === active.administratorUserId
+      const restoredToken = restoreImpersonationAccessToken()
+      if (restoredToken) await fetchMe()
+      else if (await refreshSession()) await fetchMe()
+      const administratorRestored = user.value?.userId === active.administratorUserId
         && user.value.role === 'Administrator'
       impersonation.value = null
       if (!administratorRestored) {

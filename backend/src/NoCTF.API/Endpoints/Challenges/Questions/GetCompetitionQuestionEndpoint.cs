@@ -175,8 +175,6 @@ public sealed class GetCompetitionQuestionEndpoint(
     public override async Task<Results<Ok<CompetitionQuestionResponse>, NotFound, ForbidHttpResult>>
         ExecuteAsync(CancellationToken ct)
     {
-        if (!user.IsHuman)
-            return TypedResults.Forbid();
         var question = await get.ExecuteAsync(
             Route<Guid>("competitionId"),
             Route<Guid>("threadRootId"),

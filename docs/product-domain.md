@@ -19,7 +19,8 @@ Penetration 是普通 CTF 内容，不是模式。平台不实现多阶段题、
 `UserRole.User | Organizer | Administrator`。Human 通过公开注册创建；Bot 只能由
 Administrator 创建，并由服务端填入 `.invalid` dummy Email 和随机 GUID 生成的非空
 PasswordHash。Bot 是否能密码登录由 UserKind 规则决定，而不是由 dummy 值保密决定；它也不能
-刷新 Token。两者使用相同的 Competition/Challenge 权限模型。用户名与邮箱都保存原文及
+刷新 Token。两者使用相同的角色、团队、Competition/Challenge 和平台管理权限模型；Bot 可直接
+拥有 Administrator，但至少一个 Active Human Administrator 的安全不变量始终保留。用户名与邮箱都保存原文及
 大小写不敏感 Normalized 值。`TokenVersion` 是全局 Token 失效来源。
 
 ### Competition

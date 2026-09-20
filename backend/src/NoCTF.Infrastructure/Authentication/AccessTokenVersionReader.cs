@@ -12,16 +12,16 @@ public sealed class AccessTokenVersionReader(NoCtfDbContext db) : IAccessTokenVe
         Guid userId,
         int tokenVersion,
         CancellationToken cancellationToken,
-        AdministratorIssuedAccessToken? administratorIssuedToken = null)
+        LegacyAdministratorIssuedAccessToken? legacyAdministratorIssuedToken = null)
     {
         var users = db.Users.AsNoTracking().Where(
             user => user.Id == userId
                 && user.AccountStatus == NoCTF.Domain.Identity.UserAccountStatus.Active
                 && user.TokenVersion == tokenVersion);
-        if (administratorIssuedToken is null)
+        if (legacyAdministratorIssuedToken is null)
             return users.AnyAsync(cancellationToken);
 
-        var issuedToken = administratorIssuedToken;
+        var issuedToken = legacyAdministratorIssuedToken;
         return users.AnyAsync(
             _ => db.Notifications.Any(notification =>
                     notification.Id == issuedToken.JwtId

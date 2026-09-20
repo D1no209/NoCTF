@@ -146,8 +146,6 @@ public sealed class CreateCompetitionQuestionEndpoint(
         CreateCompetitionQuestionRequest request,
         CancellationToken ct)
     {
-        if (!user.IsHuman)
-            return TypedResults.Forbid();
         var competitionId = Route<Guid>("competitionId");
         var result = await create.ExecuteAsync(new(
             competitionId,

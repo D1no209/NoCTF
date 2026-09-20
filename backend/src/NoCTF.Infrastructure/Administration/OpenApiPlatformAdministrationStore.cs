@@ -41,24 +41,6 @@ public sealed class NoOpPlatformAdministrationStore : IPlatformAdministrationSto
         DateTimeOffset now,
         CancellationToken cancellationToken) =>
         Task.FromResult(new PatchPlatformUserResult(PatchPlatformUserState.UserNotFound));
-    public Task RecordTokenIssuedAsync(
-        Guid actorUserId,
-        PlatformUserTokenAuditFact fact,
-        DateTimeOffset now,
-        CancellationToken cancellationToken) => Task.CompletedTask;
-    public Task<IReadOnlyList<AdminIssuedAccessTokenView>> ListIssuedTokensAsync(
-        Guid actorUserId,
-        Guid targetUserId,
-        DateTimeOffset now,
-        CancellationToken cancellationToken) =>
-        Task.FromResult<IReadOnlyList<AdminIssuedAccessTokenView>>([]);
-    public Task<RevokeAdminIssuedAccessTokenState> RevokeIssuedTokenAsync(
-        Guid actorUserId,
-        Guid targetUserId,
-        Guid jwtId,
-        DateTimeOffset now,
-        CancellationToken cancellationToken) =>
-        Task.FromResult(RevokeAdminIssuedAccessTokenState.NotFound);
     public Task<PlatformUserView?> InvalidateTokensAsync(
         Guid userId,
         Guid actorUserId,

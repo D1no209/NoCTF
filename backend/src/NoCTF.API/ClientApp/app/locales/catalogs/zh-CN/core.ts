@@ -1312,6 +1312,7 @@ export const messages = {
   "navigation.leave": "放弃修改并离开",
   "ui.impersonatingUserUntil": "正在以 {user} 的身份操作，有效至 {expiresAt}",
   "ui.exitImpersonation": "退出身份模拟",
+  "ui.identitySwitchAlreadyActive": "当前页面已经处于身份模拟状态，请先退出后再切换。",
   "ui.administratorSessionRequired": "需要有效的管理员会话。",
   "ui.impersonatedIdentityCouldNotBeVerified": "无法验证模拟登录后的账号身份。",
   "ui.issueUserAccessToken": "签发用户访问 JWT",

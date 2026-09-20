@@ -16,9 +16,9 @@ public sealed class CurrentAccessTokenValidator(IAccessTokenVersionReader versio
         var version = principal?.FindFirstValue("token_version");
         if (!Guid.TryParse(subject, out var userId) || !int.TryParse(version, out var tokenVersion))
             return Task.FromResult(false);
-        var impersonation = principal?.FindFirstValue(AccessTokenClaims.Impersonation);
-        var impersonator = principal?.FindFirstValue(AccessTokenClaims.ImpersonatorId);
-        AdministratorIssuedAccessToken? issuedToken = null;
+        var impersonation = principal?.FindFirstValue(LegacyAccessTokenClaims.Impersonation);
+        var impersonator = principal?.FindFirstValue(LegacyAccessTokenClaims.ImpersonatorId);
+        LegacyAdministratorIssuedAccessToken? issuedToken = null;
         if (impersonation is not null || impersonator is not null)
         {
             if (!string.Equals(impersonation, "true", StringComparison.OrdinalIgnoreCase)

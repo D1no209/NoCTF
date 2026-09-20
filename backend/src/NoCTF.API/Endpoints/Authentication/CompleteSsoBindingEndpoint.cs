@@ -31,7 +31,7 @@ public sealed class CompleteSsoBindingEndpoint(
         CompleteSsoBindingRequest request,
         CancellationToken ct)
     {
-        if (!user.IsHuman || user.IsImpersonating)
+        if (!user.IsHuman)
             return SsoEndpointProblems.Create(SsoFailureCode.AccountUnavailable);
         var browserId = correlation.Read(HttpContext);
         if (browserId is null)

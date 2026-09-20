@@ -17,8 +17,7 @@ public sealed class JwtIssuer(
     public IssuedAccessToken Issue(
         AuthenticatedUser user,
         DateTimeOffset now,
-        TimeSpan? requestedLifetime = null,
-        Guid? impersonatorUserId = null)
+        TimeSpan? requestedLifetime = null)
     {
         var expires = now.Add(requestedLifetime
             ?? TimeSpan.FromMinutes(options.AccessTokenMinutes));
@@ -36,16 +35,6 @@ public sealed class JwtIssuer(
             new(JwtRegisteredClaimNames.Iat, now.ToUnixTimeSeconds().ToString(), ClaimValueTypes.Integer64),
             new("token_type", "access")
         };
-        if (impersonatorUserId is Guid administratorId)
-        {
-            claims.Add(new(
-                AccessTokenClaims.Impersonation,
-                "true",
-                ClaimValueTypes.Boolean));
-            claims.Add(new(
-                AccessTokenClaims.ImpersonatorId,
-                administratorId.ToString()));
-        }
         var token = new JwtSecurityToken(
             issuer: options.Issuer,
             audience: options.Audience,

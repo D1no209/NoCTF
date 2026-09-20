@@ -28,8 +28,6 @@ public sealed class DeletePlatformUserTokensEndpoint(
     public override async Task<Results<Ok<PlatformUserResponse>, NotFound,
         ForbidHttpResult>> ExecuteAsync(CancellationToken ct)
     {
-        if (actor.IsImpersonating)
-            return TypedResults.Forbid();
         var user = await platform.InvalidateTokensAsync(
             Route<Guid>("userId"),
             actor.UserId,

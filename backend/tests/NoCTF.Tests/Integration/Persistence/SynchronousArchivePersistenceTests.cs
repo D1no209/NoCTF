@@ -49,7 +49,6 @@ public sealed class SynchronousArchivePersistenceTests
                     ids.CompetitionId,
                     ids.OwnerId,
                     RequesterIsAdministrator: false,
-                    RequesterIsHuman: true,
                     IncludeProtectedFlags: false,
                     Reason: null), cancellationToken);
 
@@ -78,7 +77,6 @@ public sealed class SynchronousArchivePersistenceTests
                     ids.CompetitionId,
                     ids.AdministratorId,
                     RequesterIsAdministrator: true,
-                    RequesterIsHuman: true,
                     IncludeProtectedFlags: true,
                     Reason: "Investigate the reported scoring incident."), cancellationToken);
                 await Assert.That(protectedArchive.Failure).IsNull();
@@ -144,21 +142,18 @@ public sealed class SynchronousArchivePersistenceTests
                     ids.CompetitionId,
                     ids.StrangerId,
                     RequesterIsAdministrator: false,
-                    RequesterIsHuman: true,
                     IncludeProtectedFlags: false,
                     Reason: null), cancellationToken);
                 var notFound = await generator.GenerateCompetitionAsync(new(
                     Guid.NewGuid(),
                     ids.OwnerId,
                     RequesterIsAdministrator: false,
-                    RequesterIsHuman: true,
                     IncludeProtectedFlags: false,
                     Reason: null), cancellationToken);
                 var limited = await generator.GenerateCompetitionAsync(new(
                     ids.CompetitionId,
                     ids.OwnerId,
                     RequesterIsAdministrator: false,
-                    RequesterIsHuman: true,
                     IncludeProtectedFlags: false,
                     Reason: null), cancellationToken);
 
@@ -175,7 +170,6 @@ public sealed class SynchronousArchivePersistenceTests
                     ids.CompetitionId,
                     ids.OwnerId,
                     RequesterIsAdministrator: false,
-                    RequesterIsHuman: true,
                     IncludeProtectedFlags: false,
                     Reason: null), cancellationToken);
 
@@ -192,7 +186,6 @@ public sealed class SynchronousArchivePersistenceTests
                     ids.CompetitionId,
                     ids.OwnerId,
                     RequesterIsAdministrator: false,
-                    RequesterIsHuman: true,
                     IncludeProtectedFlags: false,
                     Reason: null), cancellationToken);
 
@@ -209,7 +202,6 @@ public sealed class SynchronousArchivePersistenceTests
                 var deadlineTask = deadlineGenerator.GeneratePlatformAuditAsync(new(
                     ids.AdministratorId,
                     RequesterIsAdministrator: true,
-                    RequesterIsHuman: true,
                     Kind: null,
                     CompetitionId: null,
                     ActorId: null,
@@ -226,7 +218,6 @@ public sealed class SynchronousArchivePersistenceTests
                         ids.CompetitionId,
                         ids.OwnerId,
                         RequesterIsAdministrator: false,
-                        RequesterIsHuman: true,
                         IncludeProtectedFlags: false,
                         Reason: null), cancelled.Token);
                 };
@@ -283,7 +274,6 @@ public sealed class SynchronousArchivePersistenceTests
                 var result = await useCase.ExecuteAsync(new(
                     ids.AdministratorId,
                     RequesterIsAdministrator: true,
-                    RequesterIsHuman: true,
                     Kind: PlatformAuditKind.CompetitionEvent,
                     CompetitionId: ids.CompetitionId,
                     ActorId: ids.OwnerId,
