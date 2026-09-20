@@ -32,7 +32,7 @@ public sealed class BroadcastMessageFormatter(
             messages.Add(new(
                 $"lifecycle:{competition.Status}:{competition.StartTime.ToUnixTimeSeconds()}:{competition.EndTime.ToUnixTimeSeconds()}",
                 BroadcastCategory.General,
-                $"【NoCTF】{Plain(competition.Title, 120)}：{lifecycle}"));
+                $"▌NoCTF · {Plain(competition.Title, 120)}\n▷ {lifecycle}"));
         }
 
         var challengeById = challenges?.ToDictionary(item => item.ChallengeId) ?? [];
@@ -52,7 +52,7 @@ public sealed class BroadcastMessageFormatter(
                         var suffix = published.Length == 0
                             ? "平台开放了新题目，请前往比赛页面查看。"
                             : $"新题开放：{string.Join("、", published.Select(item => Plain(item, 100)))}";
-                        messages.Add(new(key, BroadcastCategory.General, $"【NoCTF】{suffix}"));
+                        messages.Add(new(key, BroadcastCategory.General, $"▌NoCTF\n▷ {suffix}"));
                         break;
                     }
                 case "ChallengeDescriptionUpdated":
@@ -65,35 +65,36 @@ public sealed class BroadcastMessageFormatter(
                         var subject = updated.Length == 0
                             ? "某道题"
                             : string.Join("、", updated.Select(item => Plain(item, 100)));
+                        var separator = updated.Length == 0 ? string.Empty : " ";
                         messages.Add(new(
                             key,
                             BroadcastCategory.General,
-                            $"【NoCTF】{subject}的题目内容已更新，请前往平台查看。"));
+                            $"▌NoCTF\n▷ {subject}{separator}的题目内容已更新，请前往平台查看。"));
                         break;
                     }
                 case "HintPublished":
                     messages.Add(new(
                         key,
                         BroadcastCategory.General,
-                        "【NoCTF】平台发布了新提示；BOT 不会自动解锁或转发提示正文，请前往比赛页面查看。"));
+                        "▌NoCTF\n▷ 平台发布了新提示；BOT 不会自动解锁或转发提示正文，请前往比赛页面查看。"));
                     break;
                 case "AnnouncementPublished":
                     messages.Add(new(
                         key,
                         BroadcastCategory.General,
-                        "【NoCTF】平台发布了新公告，请前往比赛页面查看。"));
+                        "▌NoCTF\n▷ 平台发布了新公告，请前往比赛页面查看。"));
                     break;
                 case "TeamBanned":
                     messages.Add(new(
                         key,
                         BroadcastCategory.General,
-                        "【NoCTF】平台公布了一项队伍封禁事件，请以比赛页面公开信息为准。"));
+                        "▌NoCTF\n▷ 平台公布了一项队伍封禁事件，请以比赛页面公开信息为准。"));
                     break;
                 case "TeamBanCorrectionPublished":
                     messages.Add(new(
                         key,
                         BroadcastCategory.General,
-                        "【NoCTF】平台公布了一项队伍封禁纠正事件，请以比赛页面公开信息为准。"));
+                        "▌NoCTF\n▷ 平台公布了一项队伍封禁纠正事件，请以比赛页面公开信息为准。"));
                     break;
             }
         }
@@ -124,29 +125,29 @@ public sealed class BroadcastMessageFormatter(
         var timing = competition.Status switch
         {
             CompetitionStatus.Draft or CompetitionStatus.Visible or CompetitionStatus.Published
-                when competition.StartTime > now => $"距开始：{Duration(competition.StartTime - now)}",
+                when competition.StartTime > now => $"▷ Remain：{Duration(competition.StartTime - now)}",
             CompetitionStatus.Running or CompetitionStatus.Paused when remaining > TimeSpan.Zero =>
-                $"距结束：{Duration(remaining)}",
+                $"▷ Remain：{Duration(remaining)}",
             _ => ""
         };
         return $"""
-            【NoCTF】{Plain(competition.Title, 120)}
-            状态：{StatusText(competition.Status)}
-            开始：{LocalTime(competition.StartTime)}
-            结束：{LocalTime(competition.EndTime)}
+            ▌NoCTF · {Plain(competition.Title, 120)}
+            ▷ 状态：{StatusText(competition.Status)}
+            ▷ Start：{LocalTime(competition.StartTime)}
+            ▷ End：{LocalTime(competition.EndTime)}
             {timing}
             """.TrimEnd();
     }
 
     public static string Challenges(ChallengeList challenges)
     {
-        if (challenges.Items.Count == 0) return "【NoCTF】当前没有可见题目。";
+        if (challenges.Items.Count == 0) return "▌NoCTF\n▷ 当前没有可见题目。";
         var lines = challenges.Items
             .OrderBy(item => item.Order)
             .ThenBy(item => item.DisplayTitle)
-            .Select(item => $"- [{Plain(item.Direction, 32)}] {Plain(item.DisplayTitle, 100)}")
+            .Select(item => $"▷ [{Plain(item.Direction, 32)}] {Plain(item.DisplayTitle, 100)}")
             .ToArray();
-        var message = new StringBuilder("【NoCTF】当前可见题目");
+        var message = new StringBuilder("▌NoCTF · 当前可见题目");
         var included = 0;
         foreach (var line in lines)
         {
@@ -159,25 +160,51 @@ public sealed class BroadcastMessageFormatter(
         return message.ToString();
     }
 
-    public static IReadOnlyList<string> Rank(ScoreboardSnapshot scoreboard, int limit)
+    public static IReadOnlyList<string> Rank(
+        ScoreboardSnapshot scoreboard,
+        int limit,
+        string? trackKey = null)
     {
         if (scoreboard.DataScope == LeaderboardDataScope.Hidden
             || scoreboard.Visibility == LeaderboardVisibility.Blackout)
         {
-            return ["【NoCTF】排行榜当前不可见。BOT 不会推测实时分数或名次。"];
+            return ["▌NoCTF\n▷ 排行榜当前不可见。BOT 不会推测实时分数或名次。"];
         }
-        var teams = scoreboard.Teams
+        var eligible = scoreboard.Teams
             .Where(team => team.RankingState == ScoreboardRankingState.Eligible)
-            .OrderBy(team => team.Rank ?? int.MaxValue)
-            .ThenByDescending(team => team.TotalScore)
+            .ToArray();
+        var rankedTeams = string.IsNullOrWhiteSpace(trackKey)
+            ? eligible
+                .OrderByDescending(team => team.TotalScore)
+                .ThenBy(team => team.Rank ?? int.MaxValue)
+                .ThenBy(team => team.TeamName, StringComparer.OrdinalIgnoreCase)
+                .ThenBy(team => team.TeamId)
+                .Select((team, index) => new RankedTeam(team, index + 1))
+            : eligible
+                .Where(team => string.Equals(
+                    team.TrackKey,
+                    trackKey,
+                    StringComparison.OrdinalIgnoreCase))
+                .OrderBy(team => team.Rank ?? int.MaxValue)
+                .ThenByDescending(team => team.TotalScore)
+                .ThenBy(team => team.TeamName, StringComparer.OrdinalIgnoreCase)
+                .Select(team => new RankedTeam(team, team.Rank));
+        var teams = rankedTeams
             .Take(limit)
             .ToArray();
-        if (teams.Length == 0) return ["【NoCTF】排行榜暂时没有可显示的队伍。"];
+        if (teams.Length == 0) return ["▌NoCTF\n▷ 排行榜暂时没有可显示的队伍。"];
+        var selectedTrack = string.IsNullOrWhiteSpace(trackKey)
+            ? null
+            : teams[0].Team.TrackKey;
         var header = scoreboard.DataScope == LeaderboardDataScope.Frozen
-            ? $"【NoCTF】冻结排行榜（截至 {scoreboard.DataAsOf:yyyy-MM-dd HH:mm:ss zzz}）"
-            : "【NoCTF】实时排行榜";
-        var rows = teams.Select(team =>
-            $"#{team.Rank?.ToString(CultureInfo.InvariantCulture) ?? "-"} {Plain(team.TeamName, 100)}  {team.TotalScore} pts");
+            ? selectedTrack is null
+                ? $"▌NoCTF · 冻结排行榜（截至 {scoreboard.DataAsOf:yyyy-MM-dd HH:mm:ss zzz}）"
+                : $"▌NoCTF · {Plain(selectedTrack, 32)} 赛道冻结排行榜（截至 {scoreboard.DataAsOf:yyyy-MM-dd HH:mm:ss zzz}）"
+            : selectedTrack is null
+                ? "▌NoCTF · 实时排行榜"
+                : $"▌NoCTF · {Plain(selectedTrack, 32)} 赛道实时排行榜";
+        var rows = teams.Select(item =>
+            $"▷ #{item.Rank?.ToString(CultureInfo.InvariantCulture) ?? "-"} {Plain(item.Team.TeamName, 100)}  {item.Team.TotalScore} pts");
         var all = new[] { header }.Concat(rows).ToArray();
         if (all.Length <= 12) return [string.Join('\n', all)];
         return [string.Join('\n', all[..12]), string.Join('\n', all[12..])];
@@ -188,7 +215,7 @@ public sealed class BroadcastMessageFormatter(
         if (scoreboard.DataScope == LeaderboardDataScope.Hidden
             || scoreboard.Visibility == LeaderboardVisibility.Blackout)
         {
-            return "【NoCTF】排行榜当前不可见。";
+            return "▌NoCTF\n▷ 排行榜当前不可见。";
         }
         var matches = scoreboard.Teams
             .Where(team => team.TeamName.Contains(teamName, StringComparison.OrdinalIgnoreCase))
@@ -197,10 +224,10 @@ public sealed class BroadcastMessageFormatter(
             .ToArray();
         return matches.Length switch
         {
-            0 => $"【NoCTF】公开排行榜中未找到队伍“{Plain(teamName, 100)}”。",
-            1 => $"【NoCTF】{Plain(matches[0].TeamName, 100)}\n排名：#{matches[0].Rank?.ToString(CultureInfo.InvariantCulture) ?? "-"}\n积分：{matches[0].TotalScore} pts",
-            _ => "【NoCTF】找到多个匹配队伍：\n" + string.Join('\n', matches.Select(item =>
-                $"#{item.Rank?.ToString(CultureInfo.InvariantCulture) ?? "-"} {Plain(item.TeamName, 100)}  {item.TotalScore} pts"))
+            0 => $"▌NoCTF\n▷ 公开排行榜中未找到队伍「{Plain(teamName, 100)}」。",
+            1 => $"▌NoCTF · {Plain(matches[0].TeamName, 100)}\n▷ Rank：#{matches[0].Rank?.ToString(CultureInfo.InvariantCulture) ?? "-"}\n▷ Score：{matches[0].TotalScore} pts",
+            _ => "▌NoCTF · 多支匹配队伍\n" + string.Join('\n', matches.Select(item =>
+                $"▷ #{item.Rank?.ToString(CultureInfo.InvariantCulture) ?? "-"} {Plain(item.TeamName, 100)}  {item.TotalScore} pts"))
         };
     }
 
@@ -243,7 +270,7 @@ public sealed class BroadcastMessageFormatter(
             var matchIndex = ClosestAchievementIndex(remaining, signal.OccurredAt);
             if (matchIndex < 0)
             {
-                messages.Add(new(key, BroadcastCategory.Blood, $"【NoCTF】产生{rank}，请前往排行榜查看。"));
+                messages.Add(new(key, BroadcastCategory.Blood, $"▌NoCTF\n▷ 产生{rank}，请前往排行榜查看。"));
                 continue;
             }
             var achievement = remaining[matchIndex];
@@ -256,7 +283,7 @@ public sealed class BroadcastMessageFormatter(
             messages.Add(new(
                 key,
                 BroadcastCategory.Blood,
-                $"【NoCTF】{Plain(achievement.Team.TeamName, 100)} 获得题目「{Plain(challenge, 100)}」{rank}！"));
+                $"▌NoCTF\n▷ {Plain(achievement.Team.TeamName, 100)} 获得题目「{Plain(challenge, 100)}」{rank}！"));
         }
         return messages;
     }
@@ -301,13 +328,13 @@ public sealed class BroadcastMessageFormatter(
             previousTeams.TryGetValue(team.TeamId, out var previous);
             var delta = previous is null ? team.Score : team.Score - previous.Score;
             var deltaText = delta == 0 ? string.Empty : $" ({delta:+#;-#;0})";
-            return $"#{team.Rank} {Plain(team.TeamName, 100)}  {team.Score} pts{deltaText}";
+            return $"▷ #{team.Rank} {Plain(team.TeamName, 100)}  {team.Score} pts{deltaText}";
         });
         var scope = leaderboard.DataScope == LeaderboardDataScope.Frozen ? "冻结榜" : "排行榜";
         return new(
             $"scoreboard:{leaderboard.Version}:{leaderboard.DataScope}",
             BroadcastCategory.Scoreboard,
-            $"【NoCTF】{scope}更新\n{string.Join('\n', lines)}");
+            $"▌NoCTF · {scope}更新\n{string.Join('\n', lines)}");
     }
 
     private string LocalTime(DateTimeOffset value) =>
@@ -317,10 +344,10 @@ public sealed class BroadcastMessageFormatter(
     {
         if (value < TimeSpan.Zero) value = TimeSpan.Zero;
         return value.TotalDays >= 1
-            ? $"{(int)value.TotalDays} 天 {value.Hours} 小时"
+            ? $"{(int)value.TotalDays}d {value.Hours}h"
             : value.TotalHours >= 1
-                ? $"{(int)value.TotalHours} 小时 {value.Minutes} 分"
-                : $"{Math.Max(0, value.Minutes)} 分";
+                ? $"{(int)value.TotalHours}h {value.Minutes}m"
+                : $"{Math.Max(0, value.Minutes)}m";
     }
 
     private static string StatusText(CompetitionStatus status) => status switch
@@ -359,4 +386,6 @@ public sealed class BroadcastMessageFormatter(
             ? normalized
             : normalized[..maximumLength];
     }
+
+    private sealed record RankedTeam(ScoreboardTeam Team, int? Rank);
 }

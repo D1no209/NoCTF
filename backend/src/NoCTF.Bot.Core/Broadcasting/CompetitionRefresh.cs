@@ -331,7 +331,7 @@ public sealed class CompetitionRefreshService(
                 $"subscription-suspended:{subscription.ProviderId}:{subscription.GroupId}:{competitionId:N}:{reason}",
                 subscription.ProviderId,
                 subscription.GroupId,
-                "【NoCTF】比赛已不可访问，该群订阅已暂停。请由群管理员重新订阅后恢复。");
+                "▌NoCTF\n▷ 比赛已不可访问，该群绑定已暂停。请由群管理员重新绑定后恢复。");
         }
     }
 
@@ -345,7 +345,7 @@ public sealed class CompetitionRefreshService(
                 $"token-invalid:{subscription.ProviderId}:{subscription.GroupId}",
                 subscription.ProviderId,
                 subscription.GroupId,
-                "【NoCTF】BOT 凭据已失效，自动播报和查询已暂停，请联系管理员轮换 Token。");
+                "▌NoCTF\n▷ BOT 凭据已失效，自动播报和查询已暂停，请联系管理员轮换 Token。");
         }
     }
 
@@ -446,7 +446,7 @@ public sealed class CompetitionRefreshService(
                     $"announcement:{subscription.ProviderId}:{subscription.GroupId}:{announcement.Id:N}",
                     subscription.ProviderId,
                     subscription.GroupId,
-                    $"【NoCTF】公告｜{announcement.Title}\n{announcement.Body}\n{new Uri(publicBaseUrl, $"competitions/{competitionId:D}")}");
+                    $"▌NoCTF · Announcement｜{announcement.Title}\n▷ {announcement.Body}\n▷ {new Uri(publicBaseUrl, $"competitions/{competitionId:D}")}");
             }
             if (newest is not null && IsAfter(newest, checkpoint))
             {

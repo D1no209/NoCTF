@@ -20,6 +20,53 @@ public sealed class BroadcastMessageFormatterTests
     }
 
     [Test]
+    public async Task Rank_WithoutTrack_CombinesTracksAndRecalculatesRanks()
+    {
+        var snapshot = Scoreboard(
+            LeaderboardVisibility.Normal,
+            LeaderboardDataScope.Live) with
+        {
+            Teams =
+            [
+                Team("Open First", "open", 1, 200),
+                Team("Invite First", "invite", 1, 300),
+                Team("Open Second", "open", 2, 100)
+            ]
+        };
+
+        var messages = BroadcastMessageFormatter.Rank(snapshot, 10);
+
+        await Assert.That(messages).HasSingleItem();
+        await Assert.That(messages[0]).Contains("▷ #1 Invite First  300 pts");
+        await Assert.That(messages[0]).Contains("▷ #2 Open First  200 pts");
+        await Assert.That(messages[0]).Contains("▷ #3 Open Second  100 pts");
+    }
+
+    [Test]
+    public async Task Rank_WithTrack_ReturnsOnlyThatTrackUsingTrackRanks()
+    {
+        var snapshot = Scoreboard(
+            LeaderboardVisibility.Normal,
+            LeaderboardDataScope.Live) with
+        {
+            Teams =
+            [
+                Team("Open First", "open", 1, 200),
+                Team("Invite First", "invite", 1, 300),
+                Team("Open Second", "open", 2, 100)
+            ]
+        };
+
+        var messages = BroadcastMessageFormatter.Rank(snapshot, 10, "OPEN");
+
+        await Assert.That(messages).HasSingleItem();
+        await Assert.That(messages[0]).Contains("▌NoCTF · open 赛道实时排行榜");
+        await Assert.That(messages[0]).Contains("▷ #1 Open First  200 pts");
+        await Assert.That(messages[0]).Contains("▷ #2 Open Second  100 pts");
+        await Assert.That(messages[0]).DoesNotContain("Invite First");
+    }
+
+    [Test]
     public async Task Create_HiddenScope_DoesNotEmitBloodDetails()
     {
         var competitionId = Guid.NewGuid();
@@ -221,4 +268,17 @@ public sealed class BroadcastMessageFormatterTests
             visibility,
             dataScope,
             null);
+
+    private static ScoreboardTeam Team(
+        string name,
+        string track,
+        int rank,
+        long score) => new(
+            Guid.NewGuid(),
+            name,
+            track,
+            rank,
+            ScoreboardRankingState.Eligible,
+            score,
+            []);
 }
