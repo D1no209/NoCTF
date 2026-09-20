@@ -100,9 +100,22 @@ internal static class BotCommandParser
     private static BotCommand ParseRank(string argument)
     {
         if (argument.Length == 0) return new(BotCommandKind.Rank);
-        return int.TryParse(argument, out var limit) && limit is >= 1 and <= 20
-            ? new(BotCommandKind.Rank, RankLimit: limit)
-            : new(BotCommandKind.Invalid);
+        var parts = argument.Split(
+            [' ', '\t', '\r', '\n'],
+            StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        if (parts.Length == 1)
+        {
+            if (!int.TryParse(parts[0], out var limit))
+                return new(BotCommandKind.Rank, parts[0]);
+            return limit is >= 1 and <= 20
+                ? new(BotCommandKind.Rank, RankLimit: limit)
+                : new(BotCommandKind.Invalid);
+        }
+        return parts.Length == 2
+            && int.TryParse(parts[1], out var trackLimit)
+            && trackLimit is >= 1 and <= 20
+                ? new(BotCommandKind.Rank, parts[0], trackLimit)
+                : new(BotCommandKind.Invalid);
     }
 
     private static BotCommand ParseToggle(BotCommandKind kind, string argument) =>

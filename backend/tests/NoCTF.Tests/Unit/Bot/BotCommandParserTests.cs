@@ -47,4 +47,33 @@ public sealed class BotCommandParserTests
         await Assert.That(command).IsNotNull();
         await Assert.That(command!.Kind).IsEqualTo(BotCommandKind.Invalid);
     }
+
+    [Test]
+    [Arguments("/ctf rank", null, 10)]
+    [Arguments("/ctf rank 20", null, 20)]
+    [Arguments("/ctf rank open", "open", 10)]
+    [Arguments("/ctf rank open 20", "open", 20)]
+    public async Task Parse_RankCommand_ReturnsTrackAndLimit(
+        string text,
+        string? expectedTrack,
+        int expectedLimit)
+    {
+        var command = BotCommandParser.Parse(text);
+
+        await Assert.That(command).IsNotNull();
+        await Assert.That(command!.Kind).IsEqualTo(BotCommandKind.Rank);
+        await Assert.That(command.Argument).IsEqualTo(expectedTrack);
+        await Assert.That(command.RankLimit).IsEqualTo(expectedLimit);
+    }
+
+    [Test]
+    [Arguments("/ctf rank open 21")]
+    [Arguments("/ctf rank open 10 extra")]
+    public async Task Parse_InvalidRankArguments_IsRejected(string text)
+    {
+        var command = BotCommandParser.Parse(text);
+
+        await Assert.That(command).IsNotNull();
+        await Assert.That(command!.Kind).IsEqualTo(BotCommandKind.Invalid);
+    }
 }
