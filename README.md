@@ -85,6 +85,7 @@ backend/
     NoCTF.Runner/          runtime-provider execution
     NoCTF.Hosting/         shared role and durable-messaging composition
     NoCTF.Host/            configurable unified process
+    NoCTF.Bot/             standalone public API/SignalR to Milky QQ relay
     NoCTF.Domain/          domain model and policies
     NoCTF.Application/     capability-oriented use cases
     NoCTF.Infrastructure/  persistence and infrastructure adapters
