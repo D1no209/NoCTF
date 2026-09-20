@@ -7,10 +7,10 @@ import AdminDateTimeComponent from '../../../admin/AdminDateTime.vue'
 import AdminGameModeBadgeComponent from '../../../admin/AdminGameModeBadge.vue'
 import ChallengeTemplateCreateDialogComponent from '../../../admin/ChallengeTemplateCreateDialog.vue'
 import { directionKey, directionLabel } from '../../../../utils/directions'
+import { useOffsetPagination } from '../../../../composables/useOffsetPagination'
 
 type ChallengeTemplate = NoCtfapiEndpointsAdministrationChallengeBankChallengeTemplateResponse
 
-const templateListCache = new Map<boolean, ChallengeTemplate[]>()
 let lastIncludeDeleted = false
 
 /** Owns state, effects and commands for AdminChallengesIndexPage. */
@@ -23,69 +23,65 @@ export function useAdminChallengesIndexPage() {
 
   const includeDeleted = ref(lastIncludeDeleted)
 
-  const templates = ref<ChallengeTemplate[]>([...(templateListCache.get(includeDeleted.value) ?? [])])
+  const templates = ref<ChallengeTemplate[]>([])
 
-  const loading = ref(false)
+  const directions = ref<string[]>([])
 
   const loadError = ref<string | null>(null)
 
+  const search = ref('')
+
   const directionFilter = ref('all')
 
-  const directionOptions = computed(() => [...new Map(templates.value
-    .map(template => [directionKey(template.direction), directionLabel(template.direction)] as const)
-    .filter(([value]) => value))]
-    .map(([value, label]) => ({ value, label }))
+  const directionOptions = computed(() => directions.value
+    .map(value => ({ value: directionKey(value), label: directionLabel(value) }))
+    .filter(option => option.value)
     .sort((left, right) => left.label.localeCompare(right.label)))
 
-  const filteredTemplates = computed(() => directionFilter.value === 'all'
-    ? templates.value
-    : templates.value.filter(template => directionKey(template.direction) === directionFilter.value))
+  const filteredTemplates = computed(() => templates.value)
 
-  let loadGeneration = 0
+  const pagination = useOffsetPagination<ChallengeTemplate>(async ({ offset, limit, desc }) => {
+    const { data, error } = await adminChallengeBankListTemplates({
+      query: {
+        includeDeleted: includeDeleted.value,
+        keyword: search.value.trim() || null,
+        direction: directionFilter.value === 'all' ? null : directionFilter.value,
+        offset,
+        limit,
+        desc,
+      },
+    })
+    if (error || !data) throw error ?? new Error('Failed to load challenge templates.')
+    templates.value = data.items ?? []
+    directions.value = data.directions ?? []
+    return { items: templates.value, total: data.total ?? 0 }
+  }, { initialDesc: true })
+
+  const loading = pagination.loading
 
   async function load(): Promise<void> {
-    const generation = ++loadGeneration
-    const requestedIncludeDeleted = includeDeleted.value
-    loading.value = true
     loadError.value = null
-    try {
-      const { data, error } = await adminChallengeBankListTemplates({
-        query: { includeDeleted: requestedIncludeDeleted },
-      })
-      if (generation !== loadGeneration) return
-      if (error || !data) {
-        loadError.value = parseApiError(error).message
-        return
-      }
-      const nextTemplates = data.items ?? []
-      templateListCache.set(requestedIncludeDeleted, [...nextTemplates])
-      templates.value = [...nextTemplates]
-    }
-    catch (error) {
-      if (generation === loadGeneration)
-        loadError.value = parseApiError(error).message
-    }
-    finally {
-      if (generation === loadGeneration)
-        loading.value = false
-    }
+    await pagination.loadPage(pagination.page.value)
+    loadError.value = pagination.error.value?.message ?? null
   }
 
-  watch(includeDeleted, value => {
-    lastIncludeDeleted = value
-    loadGeneration += 1
-    templates.value = [...(templateListCache.get(value) ?? [])]
-    loading.value = false
-    loadError.value = null
-    void load()
-  })
+  let searchTimer: ReturnType<typeof setTimeout> | null = null
+  function reloadFromFirstPage(): void {
+    lastIncludeDeleted = includeDeleted.value
+    pagination.reset()
+    if (searchTimer) clearTimeout(searchTimer)
+    searchTimer = setTimeout(() => { void load() }, 250)
+  }
+
+  watch([includeDeleted, directionFilter, search], reloadFromFirstPage)
 
   onMounted(() => {
     if (canOrganize.value) void load()
   })
 
   onBeforeUnmount(() => {
-    loadGeneration += 1
+    if (searchTimer) clearTimeout(searchTimer)
+    pagination.reset()
   })
 
   function visibilityLabel(visibility?: string): string {
@@ -115,6 +111,7 @@ export function useAdminChallengesIndexPage() {
       canOrganize,
       templates,
       filteredTemplates,
+      search,
       directionFilter,
       directionOptions,
       loading,
@@ -126,7 +123,14 @@ export function useAdminChallengesIndexPage() {
       visibilityLabel,
       AdminDateTime,
       AdminGameModeBadge,
-      ChallengeTemplateCreateDialog
+      ChallengeTemplateCreateDialog,
+      page: pagination.page,
+      pageCount: pagination.pageCount,
+      total: pagination.total,
+      pageLimit: pagination.limit,
+      pageLoading: pagination.loading,
+      loadPage: pagination.loadPage,
+      setPageSize: pagination.setPageSize,
     }
 }
 

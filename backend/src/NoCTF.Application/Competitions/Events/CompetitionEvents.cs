@@ -96,7 +96,10 @@ public sealed record CompetitionEventQuery(
     DateTimeOffset? BeforeOccurredAt,
     Guid? BeforeId,
     int Limit,
-    IReadOnlyList<CompetitionEventKind>? Kinds = null);
+    IReadOnlyList<CompetitionEventKind>? Kinds = null,
+    int Offset = 0,
+    bool Desc = true,
+    bool OffsetMode = false);
 
 public sealed record CompetitionEventView(
     Guid Id,
@@ -149,7 +152,8 @@ public sealed record CompetitionEventPage(
     Guid? ViewerTeamId = null,
     bool CanExport = false,
     bool CanAccessGameplayFactValues = false,
-    IReadOnlyList<CompetitionEventView>? Items = null);
+    IReadOnlyList<CompetitionEventView>? Items = null,
+    int Total = 0);
 
 public sealed record CompetitionEventExport(
     Stream Content,

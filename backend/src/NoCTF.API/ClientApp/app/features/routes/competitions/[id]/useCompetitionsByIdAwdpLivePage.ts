@@ -226,7 +226,7 @@ export function useCompetitionsByIdAwdpLivePage() {
     do {
       const result = await listCompetitionEvents({
         path: { competitionId },
-        query: { from, to, kinds: [...awdpControlEventKinds], cursor, limit: 200 },
+        query: { from, to, kinds: [...awdpControlEventKinds], cursor, offset: 0, limit: 200, desc: true },
       })
       if (result.error || !result.data) return { data: null, error: result.error }
       items.push(...(result.data.items ?? []))

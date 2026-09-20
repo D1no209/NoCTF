@@ -18,5 +18,7 @@ export function platformRuntimeQuery(filters: PlatformRuntimeFilters): Omit<Admi
     scope: filters.scope === 'all' ? undefined : filters.scope,
     state: filters.state === 'all' ? undefined : filters.state,
     runtimeKind: filters.kind === 'all' ? undefined : filters.kind,
+    offset: 0,
+    desc: true,
   }
 }

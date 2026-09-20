@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.Http.HttpResults;
 using System.ComponentModel.DataAnnotations;
 using System.Text.Json.Serialization;
 using NoCTF.API.Endpoints.Competitions;
+using NoCTF.API.Pagination;
 using NoCTF.API.Security;
 using NoCTF.API.Serialization;
 using NoCTF.Application.Challenges.Bank;
@@ -139,7 +140,7 @@ public sealed class CreateChallengeTemplateValidator : Validator<CreateChallenge
     }
 }
 
-[Mapper(RequiredMappingStrategy = RequiredMappingStrategy.Source)]
+[Mapper(RequiredMappingStrategy = RequiredMappingStrategy.Target)]
 internal static partial class ChallengeTemplateMapper
 {
     public static CreateChallengeTemplateCommand ToCommand(
@@ -159,8 +160,8 @@ internal static partial class ChallengeTemplateMapper
     public static partial ChallengeTemplateResponse ToResponse(ChallengeTemplateView source);
     private static partial IReadOnlyList<ChallengeTemplateResponse> ToResponses(
         IReadOnlyList<ChallengeTemplateView> source);
-    public static ChallengeTemplateListResponse ToListResponse(IReadOnlyList<ChallengeTemplateView> source) =>
-        new(ToResponses(source));
+    public static ChallengeTemplateListResponse ToListResponse(ChallengeTemplateListPage page) =>
+        new(ToResponses(page.Items).ToArray(), page.Total, page.Directions);
 
     [MapEnum(EnumMappingStrategy.ByName)]
     public static partial ChallengeVisibility ToDomain(ChallengeVisibilityProtocol value);

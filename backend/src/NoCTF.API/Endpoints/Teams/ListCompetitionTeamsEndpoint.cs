@@ -19,6 +19,6 @@ public sealed class ListCompetitionTeamsEndpoint(ListCompetitionTeams list, Link
             includeInternal: false,
             ct);
         return TypedResults.Ok(new TeamListResponse(
-            items.Select(item => TeamMapper.ToResponse(item, links, HttpContext)).ToList()));
+            items.Select(item => TeamMapper.ToResponse(item, links, HttpContext)).ToArray()));
     }
 }

@@ -86,7 +86,9 @@ export function useCompetitionBroadcastPanel(props: Readonly<Omit<{
         from: queryWindow.from,
         to: queryWindow.to,
         kinds: competitionBroadcastKinds,
+        offset: 0,
         limit: 10,
+        desc: true,
       },
     })
     if (requestError || !data) {
