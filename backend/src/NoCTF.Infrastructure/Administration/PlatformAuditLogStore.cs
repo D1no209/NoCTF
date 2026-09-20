@@ -10,6 +10,8 @@ using NoCTF.Infrastructure.Persistence;
 using NoCTF.Domain.Shared;
 using NoCTF.Application.Competitions.Management;
 using NoCTF.Application.Exports;
+using NoCTF.Application.Authentication.Sso;
+using NoCTF.Infrastructure.Authentication;
 
 namespace NoCTF.Infrastructure.Administration;
 
@@ -154,7 +156,9 @@ public sealed class PlatformAuditLogStore(NoCtfDbContext db) : IPlatformAuditLog
                     || notification.Kind == NotificationKind.PlatformAuditExported
                     || notification.Kind == NotificationKind.PlatformUserAccessTokenIssued
                     || notification.Kind == NotificationKind.PlatformUserAccessTokenRevoked
-                    || notification.Kind == NotificationKind.PlatformUserTokensInvalidated)
+                    || notification.Kind == NotificationKind.PlatformUserTokensInvalidated
+                    || notification.Kind == NotificationKind.SsoProviderConfigurationChanged
+                    || notification.Kind == NotificationKind.SsoExternalIdentityBindingChanged)
                 && notification.TargetType == NotificationTargetType.PlatformAdministrators);
             auditFacts = query.Kind switch
             {
@@ -164,7 +168,9 @@ public sealed class PlatformAuditLogStore(NoCtfDbContext db) : IPlatformAuditLog
                     notification.Kind == NotificationKind.PlatformAuditExported
                     || notification.Kind == NotificationKind.PlatformUserAccessTokenIssued
                     || notification.Kind == NotificationKind.PlatformUserAccessTokenRevoked
-                    || notification.Kind == NotificationKind.PlatformUserTokensInvalidated),
+                    || notification.Kind == NotificationKind.PlatformUserTokensInvalidated
+                    || notification.Kind == NotificationKind.SsoProviderConfigurationChanged
+                    || notification.Kind == NotificationKind.SsoExternalIdentityBindingChanged),
                 PlatformAuditKind.CompetitionAdministration => auditFacts.Where(notification =>
                     notification.Kind == NotificationKind.CompetitionForceDeleted),
                 _ => auditFacts
@@ -221,6 +227,96 @@ public sealed class PlatformAuditLogStore(NoCtfDbContext db) : IPlatformAuditLog
 
     private static PlatformAuditView ToAuditView(Notification notification)
     {
+        if (notification.Kind == NotificationKind.SsoExternalIdentityBindingChanged)
+        {
+            var bindingFact = JsonSerializer.Deserialize<SsoBindingAuditFact>(
+                notification.ContentJson,
+                JsonOptions) ?? throw new InvalidOperationException(
+                $"Notification {notification.Id} has no SSO binding audit payload.");
+            return new(
+                Id: notification.Id,
+                Kind: PlatformAuditKind.PlatformAdministration,
+                SubjectId: bindingFact.UserId,
+                CompetitionId: null,
+                ActorId: notification.SourceId,
+                FromCompetitionStatus: null,
+                ToCompetitionStatus: null,
+                FromLeaderboardVisibility: null,
+                ToLeaderboardVisibility: null,
+                UserAccountAction: null,
+                PlatformAdministrationAction: bindingFact.Action switch
+                {
+                    SsoBindingAuditAction.Bound =>
+                        PlatformAdministrationAction.SsoExternalIdentityBound,
+                    SsoBindingAuditAction.Unbound =>
+                        PlatformAdministrationAction.SsoExternalIdentityUnbound,
+                    _ => throw new InvalidOperationException(
+                        $"Unsupported SSO binding audit action {bindingFact.Action}.")
+                },
+                CompetitionEventKind: null,
+                CompetitionEventLevel: null,
+                CompetitionEventVisibility: null,
+                RelatedUserId: bindingFact.UserId,
+                TeamId: null,
+                CompetitionChallengeId: null,
+                RuntimeInstanceId: null,
+                GameplayFactId: null,
+                QuestionId: null,
+                GameplayFactKind: null,
+                GameplayFactState: null,
+                GameplayFactResult: null,
+                SubjectDisplayName: bindingFact.ProviderName,
+                Reason: null,
+                Automatic: false,
+                OccurredAt: notification.SentAt);
+        }
+        if (notification.Kind == NotificationKind.SsoProviderConfigurationChanged)
+        {
+            var ssoFact = JsonSerializer.Deserialize<SsoProviderAuditFact>(
+                notification.ContentJson,
+                JsonOptions) ?? throw new InvalidOperationException(
+                $"Notification {notification.Id} has no SSO provider audit payload.");
+            return new(
+                Id: notification.Id,
+                Kind: PlatformAuditKind.PlatformAdministration,
+                SubjectId: ssoFact.ProviderId ?? Notification.PlatformAdministratorsTargetId,
+                CompetitionId: null,
+                ActorId: notification.SourceId,
+                FromCompetitionStatus: null,
+                ToCompetitionStatus: null,
+                FromLeaderboardVisibility: null,
+                ToLeaderboardVisibility: null,
+                UserAccountAction: null,
+                PlatformAdministrationAction: ssoFact.Action switch
+                {
+                    SsoProviderAuditAction.GlobalConfigurationUpdated =>
+                        PlatformAdministrationAction.SsoGlobalConfigurationUpdated,
+                    SsoProviderAuditAction.ProviderCreated =>
+                        PlatformAdministrationAction.SsoProviderCreated,
+                    SsoProviderAuditAction.ProviderUpdated =>
+                        PlatformAdministrationAction.SsoProviderUpdated,
+                    SsoProviderAuditAction.ProviderSecretReplaced =>
+                        PlatformAdministrationAction.SsoProviderSecretReplaced,
+                    _ => throw new InvalidOperationException(
+                        $"Unsupported SSO audit action {ssoFact.Action}.")
+                },
+                CompetitionEventKind: null,
+                CompetitionEventLevel: null,
+                CompetitionEventVisibility: null,
+                RelatedUserId: null,
+                TeamId: null,
+                CompetitionChallengeId: null,
+                RuntimeInstanceId: null,
+                GameplayFactId: null,
+                QuestionId: null,
+                GameplayFactKind: null,
+                GameplayFactState: null,
+                GameplayFactResult: null,
+                SubjectDisplayName: ssoFact.ProviderName ?? "Single sign-on",
+                Reason: null,
+                Automatic: false,
+                OccurredAt: notification.SentAt);
+        }
         if (notification.Kind == NotificationKind.CompetitionForceDeleted)
         {
             var deletionFact = JsonSerializer.Deserialize<CompetitionForceDeletionFact>(
