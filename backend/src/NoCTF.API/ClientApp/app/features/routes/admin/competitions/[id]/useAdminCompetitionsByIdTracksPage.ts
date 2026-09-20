@@ -60,7 +60,7 @@ export function useAdminCompetitionsByIdTracksPage() {
     loading.value = true
     const [competitionResult, teamResult] = await Promise.all([
       adminGetCompetition({ path: { competitionId } }),
-      adminListTeams({ path: { competitionId } }),
+      adminListTeams({ path: { competitionId }, query: { keyword: null, offset: 0, limit: 200, desc: false } }),
     ])
     loading.value = false
     if (competitionResult.error || !competitionResult.data) {

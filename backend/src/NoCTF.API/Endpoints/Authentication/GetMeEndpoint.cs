@@ -48,6 +48,9 @@ public static partial class IdentityProtocolMapper
 
     [MapEnum(EnumMappingStrategy.ByName)]
     public static partial UserRole ToDomain(UserRoleProtocol value);
+
+    [MapEnum(EnumMappingStrategy.ByName)]
+    public static partial UserKind ToDomain(UserKindProtocol value);
 }
 
 public sealed record CurrentUserResponse(

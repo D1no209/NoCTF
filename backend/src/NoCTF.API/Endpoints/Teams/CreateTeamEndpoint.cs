@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Routing;
 using NoCTF.API.Security;
+using NoCTF.API.Pagination;
 using NoCTF.API.Serialization;
 using NoCTF.Application.Teams.Registration;
 using NoCTF.Domain.Teams;
@@ -87,7 +88,16 @@ public sealed record TeamResponse(
     bool IsBanned,
     DateTimeOffset RegisteredAt);
 
-public sealed record TeamListResponse(IReadOnlyList<TeamResponse> Items);
+public sealed class TeamListResponse : ArrayResult<TeamResponse>
+{
+    public TeamListResponse() { }
+
+    public TeamListResponse(TeamResponse[] items)
+        : base(items, items.Length) { }
+
+    public TeamListResponse(TeamResponse[] items, int total)
+        : base(items, total) { }
+}
 
 public sealed class UpdateTeamRequest
 {

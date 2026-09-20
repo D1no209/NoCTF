@@ -9,6 +9,10 @@ public sealed class NoOpPlatformAdministrationStore : IPlatformAdministrationSto
 {
     public Task<IReadOnlyList<PlatformUserView>> ListUsersAsync(CancellationToken cancellationToken) =>
         Task.FromResult<IReadOnlyList<PlatformUserView>>([]);
+    public Task<PlatformUserListPage> ListUsersPageAsync(
+        PlatformUserListQuery query,
+        CancellationToken cancellationToken) =>
+        Task.FromResult(new PlatformUserListPage([], 0));
     public Task<PlatformUserView?> FindUserAsync(Guid userId, CancellationToken cancellationToken) =>
         Task.FromResult<PlatformUserView?>(null);
     public Task<CreateBotResult> CreateBotAsync(

@@ -3,7 +3,7 @@ import { toRefs } from 'vue'
 import type { AdminChallengesIndexPageViewState } from '~/features/routes/admin/challenges/useAdminChallengesIndexPage'
 
 const viewProps = defineProps<{ state: AdminChallengesIndexPageViewState }>()
-const { Plus, canOrganize, templates, filteredTemplates, directionFilter, directionOptions, loading, loadError, includeDeleted, createOpen, setCreateOpen, templateCreated, visibilityLabel, AdminDateTime, AdminGameModeBadge, ChallengeTemplateCreateDialog } = toRefs(viewProps.state)
+const { Plus, canOrganize, templates, filteredTemplates, search, directionFilter, directionOptions, loading, loadError, includeDeleted, createOpen, setCreateOpen, templateCreated, visibilityLabel, AdminDateTime, AdminGameModeBadge, ChallengeTemplateCreateDialog, page, pageCount, total, pageLimit, pageLoading, loadPage, setPageSize } = toRefs(viewProps.state)
 </script>
 
 <template>
@@ -21,6 +21,10 @@ const { Plus, canOrganize, templates, filteredTemplates, directionFilter, direct
 
     <template v-else>
       <div class="flex flex-wrap items-end gap-4">
+        <Field class="w-full sm:w-72">
+          <FieldLabel>{{ $t('ui.searchQuestionBankTemplates') }}</FieldLabel>
+          <Input v-model="search" :placeholder="$t('ui.searchQuestionBankTemplates')" />
+        </Field>
         <Field class="w-full sm:w-56">
           <FieldLabel>{{ $t('ui.category') }}</FieldLabel>
           <Select v-model="directionFilter">
@@ -28,7 +32,7 @@ const { Plus, canOrganize, templates, filteredTemplates, directionFilter, direct
             <SelectContent position="popper">
               <SelectGroup>
                 <SelectItem value="all">{{ $t('ui.allDirections') }}</SelectItem>
-                <SelectItem v-for="option in directionOptions" :key="option.value" :value="option.value">
+                <SelectItem v-for="option in directionOptions" :key="option.value" :value="option.value!">
                   {{ option.label }}
                 </SelectItem>
               </SelectGroup>
@@ -100,6 +104,17 @@ const { Plus, canOrganize, templates, filteredTemplates, directionFilter, direct
           </TableBody>
         </Table>
       </Card>
+
+      <OffsetPagination
+        v-if="filteredTemplates.length > 0 || total > 0"
+        :page="page"
+        :page-count="pageCount"
+        :total="total"
+        :limit="pageLimit"
+        :loading="pageLoading"
+        @update:page="loadPage"
+        @update:limit="setPageSize"
+      />
     </template>
 
     <component
