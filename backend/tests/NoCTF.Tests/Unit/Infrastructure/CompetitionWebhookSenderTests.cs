@@ -1,6 +1,8 @@
 using System.Net;
+using System.Net.Sockets;
 using System.Security.Cryptography;
 using System.Text;
+using NoCTF.Application.Competitions.Webhooks;
 using NoCTF.Infrastructure.Competitions.Webhooks;
 
 namespace NoCTF.Tests.Unit.Infrastructure;
@@ -58,4 +60,148 @@ public sealed class CompetitionWebhookSenderTests
         await Assert.That(CompetitionWebhookSender.IsBlocked(IPAddress.Parse(value)))
             .IsFalse();
     }
+
+    [Test]
+    public async Task Successful_delivery_posts_signed_cloudevents_without_redirecting()
+    {
+        var receiver = StartReceiver(204);
+
+        var result = await receiver.Sender.SendAsync(
+            receiver.Delivery,
+            CancellationToken.None);
+        var request = await receiver.Request;
+
+        await Assert.That(result).IsEqualTo(CompetitionWebhookSendResult.Delivered);
+        await Assert.That(request).Contains("POST /hook HTTP/1.1");
+        await Assert.That(request).Contains("Content-Type: application/cloudevents+json; charset=utf-8");
+        await Assert.That(request).Contains($"webhook-id: {receiver.Delivery.EventId}");
+        await Assert.That(request).Contains("webhook-signature: v1,");
+        await Assert.That(request).Contains("{\"type\":\"com.noctf.webhook.test.v1\"}");
+    }
+
+    [Test]
+    public async Task Gone_requests_target_disable_without_retry()
+    {
+        var receiver = StartReceiver(410);
+
+        var result = await receiver.Sender.SendAsync(
+            receiver.Delivery,
+            CancellationToken.None);
+        _ = await receiver.Request;
+
+        await Assert.That(result).IsEqualTo(CompetitionWebhookSendResult.ReceiverGone);
+    }
+
+    [Test]
+    [Arguments(408)]
+    [Arguments(429)]
+    [Arguments(500)]
+    [Arguments(503)]
+    public async Task Retryable_statuses_raise_transient_failures(int status)
+    {
+        var receiver = StartReceiver(status);
+        Func<Task> action = async () => _ = await receiver.Sender.SendAsync(
+            receiver.Delivery,
+            CancellationToken.None);
+
+        await Assert.That(action).Throws<CompetitionWebhookTransientException>();
+        _ = await receiver.Request;
+    }
+
+    [Test]
+    [Arguments(300)]
+    [Arguments(302)]
+    [Arguments(400)]
+    [Arguments(401)]
+    [Arguments(404)]
+    public async Task Redirects_and_permanent_client_failures_enter_the_error_path(int status)
+    {
+        var receiver = StartReceiver(status);
+        Func<Task> action = async () => _ = await receiver.Sender.SendAsync(
+            receiver.Delivery,
+            CancellationToken.None);
+
+        await Assert.That(action).Throws<CompetitionWebhookPermanentException>();
+        _ = await receiver.Request;
+    }
+
+    private static ReceiverFixture StartReceiver(int status)
+    {
+        var listener = new TcpListener(IPAddress.Loopback, 0);
+        listener.Start();
+        var port = ((IPEndPoint)listener.LocalEndpoint).Port;
+        var request = ReceiveOnceAsync(listener, status);
+        var options = new CompetitionWebhookOptions(
+            new Uri("https://noctf.example.test/"),
+            3,
+            new HashSet<string>(["127.0.0.1"], StringComparer.OrdinalIgnoreCase),
+            new HashSet<string>(["127.0.0.1"], StringComparer.OrdinalIgnoreCase));
+        var body = Encoding.UTF8.GetBytes("{\"type\":\"com.noctf.webhook.test.v1\"}");
+        var delivery = new CompetitionWebhookDelivery(
+            CompetitionWebhookDeliveryReadState.Ready,
+            Guid.CreateVersion7(),
+            Guid.CreateVersion7(),
+            Guid.CreateVersion7(),
+            new Uri($"http://127.0.0.1:{port}/hook"),
+            body,
+            "whsec_" + Convert.ToBase64String(Enumerable.Range(1, 32)
+                .Select(value => (byte)value).ToArray()));
+        return new(new CompetitionWebhookSender(options, TimeProvider.System), delivery, request);
+    }
+
+    private static async Task<string> ReceiveOnceAsync(TcpListener listener, int status)
+    {
+        try
+        {
+            using var client = await listener.AcceptTcpClientAsync();
+            await using var stream = client.GetStream();
+            using var received = new MemoryStream();
+            var buffer = new byte[4096];
+            var headerEnd = -1;
+            var contentLength = 0;
+            while (true)
+            {
+                var read = await stream.ReadAsync(buffer);
+                if (read == 0)
+                    break;
+                received.Write(buffer, 0, read);
+                var bytes = received.ToArray();
+                if (headerEnd < 0)
+                {
+                    headerEnd = FindHeaderEnd(bytes);
+                    if (headerEnd >= 0)
+                    {
+                        var headers = Encoding.ASCII.GetString(bytes, 0, headerEnd);
+                        var contentLengthHeader = headers.Split("\r\n")
+                            .Single(line => line.StartsWith(
+                                "Content-Length:",
+                                StringComparison.OrdinalIgnoreCase));
+                        contentLength = int.Parse(contentLengthHeader.Split(':', 2)[1].Trim());
+                    }
+                }
+                if (headerEnd >= 0 && received.Length >= headerEnd + 4L + contentLength)
+                    break;
+            }
+            var response = Encoding.ASCII.GetBytes(
+                $"HTTP/1.1 {status} Test\r\nContent-Length: 0\r\nConnection: close\r\n\r\n");
+            await stream.WriteAsync(response);
+            await stream.FlushAsync();
+            return Encoding.UTF8.GetString(received.ToArray());
+        }
+        finally
+        {
+            listener.Stop();
+        }
+    }
+
+    private static int FindHeaderEnd(ReadOnlySpan<byte> value)
+    {
+        ReadOnlySpan<byte> marker = "\r\n\r\n"u8;
+        return value.IndexOf(marker);
+    }
+
+    private sealed record ReceiverFixture(
+        CompetitionWebhookSender Sender,
+        CompetitionWebhookDelivery Delivery,
+        Task<string> Request);
 }
