@@ -228,7 +228,7 @@ public sealed class RunnerResourceObserver(
         }
         return memory <= 0 || cpus <= 0 ? null : new("kubernetes:" + identity.Metadata.Uid, observedAt,
             memory, Math.Max(0, memory - usedMemory), cpus, (double)usedCpus / cpus,
-            null, options.Value.Capacity.PidsLimit, 0, nodePressure, PidPressureConditionAvailable: true);
+            null, null, 0, nodePressure, PidPressureConditionAvailable: true);
     }
 
     private static async Task<long?> ReadLimitAsync(string path, CancellationToken ct)

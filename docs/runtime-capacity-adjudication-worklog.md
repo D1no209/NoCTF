@@ -1,5 +1,8 @@
 # Runtime capacity and adjudication implementation
 
+> Historical schema 2 implementation log. Schema 3 uses actual resource-domain
+> observations and startup-only reservations; see `runtime-capacity.md`.
+
 ## Review final gate, 2026-09-19
 
 Latest Release full suite: 1665 total, 1657 passed, zero failed, eight explicit

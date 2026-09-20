@@ -99,14 +99,11 @@ public sealed class RunnerAvailabilityPublisher(
         await using var scope = scopeFactory.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<NoCtfDbContext>();
         var admission = observer is null ? null : await observer.SampleAsync(cancellationToken);
-        var effectiveCapacity = options.ResourceCapacity;
-        if (admission?.Observation is { } observed)
-            effectiveCapacity = effectiveCapacity with
-            {
-                MemoryBytes = Math.Min(effectiveCapacity.MemoryBytes, observed.MemoryTotalBytes),
-                NanoCpus = Math.Min(effectiveCapacity.NanoCpus, observed.NanoCpus),
-                PidsLimit = Math.Min(effectiveCapacity.PidsLimit, observed.PidsCapacity)
-            };
+        var observedCapacity = admission?.Capacity?.ObservedTotal;
+        var compatibilityCapacity = observer is null ? options.ResourceCapacity : new RuntimeResourceLimits(
+            observedCapacity?.MemoryBytes ?? 0,
+            observedCapacity?.NanoCpus ?? 0,
+            observedCapacity?.PidsLimit ?? 0);
         var hasActiveAssignments = await db.RuntimeInstances.AsNoTracking()
             .AnyAsync(
                 instance => instance.RunnerId == options.Id
@@ -123,15 +120,17 @@ public sealed class RunnerAvailabilityPublisher(
                 options.Id,
                 options.Provider!.Value,
                 Version,
-                effectiveCapacity,
+                compatibilityCapacity,
                 options.Heartbeat.Ttl,
                 hasActiveAssignments,
                 providerHealth?.IsReady(options.Provider.Value) ?? true,
-                admission, observer is null ? null : options.Admission);
+                admission, observer is null ? null : options.Admission,
+                ActualUsage: observer is not null);
         if (!initialReconciliationComplete && ledger is not null)
             await ledger.PauseAsync(options.Id, options.Pool, cancellationToken);
         var result = await registry.RegisterAsync(registration, cancellationToken);
         if (result == RunnerAvailabilityRegistrationOutcome.OfflineCapacityUntrusted
+            && (admission?.Capacity is not null || observer is null)
             && ledger is not null && mutations is not null && reconcilers is not null)
         {
             await ledger.PauseAsync(options.Id, options.Pool, cancellationToken);
@@ -139,6 +138,7 @@ public sealed class RunnerAvailabilityPublisher(
             var reconciler = reconcilers.Single(x => x.Provider == options.Provider);
             // External inventory reads happen outside the database transaction.
             var managed = await reconciler.ListManagedAsync(cancellationToken);
+            var managedRuntimeIds = managed.Select(resource => resource.RuntimeInstanceId).ToHashSet();
             var claimKeys = await ledger.ReadClaimKeysAsync(options.Id, cancellationToken);
             await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
             await RuntimeCapacityCriticalSection.AcquireAsync(db, cancellationToken);
@@ -166,16 +166,35 @@ public sealed class RunnerAvailabilityPublisher(
             // Persist legacy evidence before replacing its Redis keys. A failed commit
             // must leave the old claim intact for the next recovery attempt.
             await transaction.CommitAsync(cancellationToken);
+            var starting = runtimes.Where(runtime => runtime.State == RuntimeState.Provisioning)
+                .SelectMany(runtime => runtime.CapacityAllocations.Items)
+                .Select(item => item.Identity)
+                .ToHashSet();
+            foreach (var identity in runtimes.SelectMany(runtime => runtime.CapacityAllocations.Items)
+                         .Select(item => item.Identity).Where(identity => identity.IsAuxiliary))
+            {
+                if (await reconciler.WorkloadExistsAsync(identity, cancellationToken) != true)
+                    starting.Add(identity);
+            }
             await using var restoreTransaction = await db.Database.BeginTransactionAsync(cancellationToken);
             await RuntimeCapacityCriticalSection.AcquireAsync(db, cancellationToken);
-            var documents = await db.RuntimeInstances.AsNoTracking().Where(runtime =>
+            var recoveryRows = await db.RuntimeInstances.AsNoTracking().Where(runtime =>
                     runtimes.Select(item => item.Id).Contains(runtime.Id))
-                .Select(runtime => runtime.CapacityAllocations).ToArrayAsync(cancellationToken);
-            await ledger.RestoreAsync(options.Id, options.Pool, effectiveCapacity,
-                documents.SelectMany(document => document.Items)
-                    .Where(item => item.RunnerId == options.Id).ToArray(), cancellationToken,
-                runtimes.Where(runtime => runtime.State == RuntimeState.Provisioning)
-                    .SelectMany(runtime => runtime.CapacityAllocations.Items).Select(item => item.Identity).ToHashSet(), claimKeys);
+                .Select(runtime => new { runtime.Id, runtime.State, runtime.ProviderReceiptJson, runtime.CapacityAllocations })
+                .ToArrayAsync(cancellationToken);
+            var ownedRows = recoveryRows.Where(runtime => runtime.State == RuntimeState.Provisioning
+                    || managedRuntimeIds.Contains(runtime.Id)
+                        && (runtime.State is RuntimeState.Running or RuntimeState.Stopping
+                            || runtime.State == RuntimeState.Failed && runtime.ProviderReceiptJson != null))
+                .ToArray();
+            var allocations = ownedRows.SelectMany(runtime => runtime.CapacityAllocations.Items)
+                .Where(item => item.RunnerId == options.Id).ToArray();
+            if (admission?.Capacity is { } projection)
+                await ledger.RestoreAsync(options.Id, options.Pool, projection,
+                    admission.Observation!.ObservedAt, allocations, cancellationToken, starting, claimKeys);
+            else
+                await ledger.RestoreLegacyAsync(options.Id, options.Pool, options.ResourceCapacity,
+                    allocations, cancellationToken, starting, claimKeys);
             await restoreTransaction.CommitAsync(cancellationToken);
             initialReconciliationComplete = true;
             result = await registry.RegisterAsync(registration, cancellationToken);

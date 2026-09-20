@@ -45,5 +45,42 @@ public sealed class RunnerPressurePolicyTests
         await Assert.That(policy.Evaluate(sample, Start).Failure).IsEqualTo(RunnerAdmissionFailure.ObservationStale);
         await Assert.That(policy.Evaluate(sample with { PidPressureConditionAvailable = true }, Start).State)
             .IsEqualTo(RunnerAdmissionState.Ready);
+        await Assert.That(policy.Evaluate(sample with { PidsCapacity = null, PidPressureConditionAvailable = true }, Start)
+            .Capacity!.AdmissionAvailable.PidsLimit).IsNull();
+    }
+
+    [Test]
+    public async Task Admission_capacity_uses_actual_free_resources_and_threshold_headroom()
+    {
+        var sample = new RunnerResourceObservation("production-equivalent", Start,
+            8L * 1024 * 1024 * 1024, 7L * 1024 * 1024 * 1024,
+            4_000_000_000, .05, 384, 4096, 0);
+        var result = new RunnerPressurePolicy(new()).Evaluate(sample, Start);
+
+        await Assert.That(result.Capacity!.ObservedTotal)
+            .IsEqualTo(new RunnerObservedResourceAmount(8L * 1024 * 1024 * 1024, 4_000_000_000, 4096));
+        await Assert.That(result.Capacity.ObservedAvailable.NanoCpus).IsEqualTo(3_800_000_000);
+        await Assert.That(result.Capacity.SafetyHeadroom)
+            .IsEqualTo(new RunnerObservedResourceAmount(858_993_460, 400_000_000, 410));
+        await Assert.That(result.Capacity.AdmissionAvailable)
+            .IsEqualTo(new RunnerObservedResourceAmount(6_657_199_308, 3_400_000_000, 3302));
+    }
+
+    [Test]
+    public async Task Invalid_or_future_observations_are_never_projected()
+    {
+        var policy = new RunnerPressurePolicy(new());
+        foreach (var sample in new[]
+        {
+            Sample(0) with { CpuUsageRatio = double.NaN },
+            Sample(0) with { CpuUsageRatio = -0.1 },
+            Sample(0) with { MemoryAvailableBytes = -1 },
+            Sample(1)
+        })
+        {
+            var result = policy.Evaluate(sample, Start);
+            await Assert.That(result.Failure).IsEqualTo(RunnerAdmissionFailure.ObservationStale);
+            await Assert.That(result.Capacity).IsNull();
+        }
     }
 }

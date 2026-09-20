@@ -368,7 +368,7 @@ export type NoCtfapiEndpointsRuntimePublicEndpointResponse = {
     publicPort?: number | null;
 };
 
-export type NoCtfapiEndpointsRuntimeRunnerAdmissionFailureProtocol = 'NoEligibleRunner' | 'CpuBudgetInsufficient' | 'MemoryBudgetInsufficient' | 'PidBudgetInsufficient' | 'NodePressureHigh' | 'ObservationStale' | 'LedgerRecovering' | 'StartupConcurrencyLimited' | 'ProviderUnavailable' | 'RequestExceedsNodeCapacity';
+export type NoCtfapiEndpointsRuntimeRunnerAdmissionFailureProtocol = 'NoEligibleRunner' | 'CpuActualCapacityInsufficient' | 'MemoryActualCapacityInsufficient' | 'PidActualCapacityInsufficient' | 'NodePressureHigh' | 'ObservationStale' | 'LedgerRecovering' | 'StartupConcurrencyLimited' | 'ProviderUnavailable' | 'RequestExceedsNodeCapacity';
 
 export type NoCtfapiEndpointsRuntimeRuntimeTargetListResponse = {
     items?: Array<NoCtfapiEndpointsRuntimeRuntimeTargetResponse>;
@@ -1955,24 +1955,36 @@ export type NoCtfapiEndpointsAdministrationPlatformRunnerCapacitySnapshotRespons
     alive?: boolean;
     state?: NoCtfapiEndpointsRuntimeRunnerAdmissionStateProtocol;
     failure?: NoCtfapiEndpointsRuntimeRunnerAdmissionFailureProtocol | null;
-    allocatable?: NoCtfapiEndpointsAdministrationPlatformRunnerResourceAmountResponse | null;
-    available?: NoCtfapiEndpointsAdministrationPlatformRunnerResourceAmountResponse | null;
-    budget?: NoCtfapiEndpointsAdministrationPlatformRunnerResourceAmountResponse | null;
-    limits?: NoCtfapiEndpointsAdministrationPlatformRunnerResourceAmountResponse | null;
+    observedTotal?: NoCtfapiEndpointsAdministrationPlatformRunnerObservedResourceAmountResponse | null;
+    observedAvailable?: NoCtfapiEndpointsAdministrationPlatformRunnerObservedResourceAmountResponse | null;
+    safetyHeadroom?: NoCtfapiEndpointsAdministrationPlatformRunnerObservedResourceAmountResponse | null;
+    startupReserved?: NoCtfapiEndpointsAdministrationPlatformRunnerObservedResourceAmountResponse | null;
+    admissionAvailable?: NoCtfapiEndpointsAdministrationPlatformRunnerObservedResourceAmountResponse | null;
+    declaredLimits?: NoCtfapiEndpointsAdministrationPlatformRunnerResourceAmountResponse | null;
     observation?: NoCtfapiEndpointsAdministrationPlatformRunnerObservationResponse | null;
     startingPrimary?: number | null;
-    activeAuxiliary?: number | null;
+    startingAuxiliary?: number | null;
 };
 
 export type NoCtfapiEndpointsRuntimeRunnerAdmissionStateProtocol = 'Starting' | 'Reconciling' | 'Ready' | 'PressureBlocked' | 'ProviderUnavailable' | 'Draining';
+
+export type NoCtfapiEndpointsAdministrationPlatformRunnerObservedResourceAmountResponse = {
+    memoryBytes?: number;
+    nanoCpus?: number;
+    pidsLimit?: number | null;
+};
 
 export type NoCtfapiEndpointsAdministrationPlatformRunnerObservationResponse = {
     observedAt?: string;
     cpuUsageRatio?: number;
     memoryTotalBytes?: number;
     memoryAvailableBytes?: number;
+    nanoCpus?: number;
     pidsUsed?: number | null;
-    pidsCapacity?: number;
+    pidsCapacity?: number | null;
+    oomKills?: number;
+    providerPressure?: boolean;
+    pidPressureConditionAvailable?: boolean;
 };
 
 export type NoCtfapiEndpointsAdministrationPlatformPlatformUserDetailResponse = {

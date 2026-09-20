@@ -1,5 +1,9 @@
 # 审查后修正与验证
 
+> 本文是容量 schema 2 的历史证据。当前 schema 3 已改为按实际占用准入；以
+> `runtime-capacity.md` 与 `runtime-capacity-recovery-runbook.md` 为准，文中的 CPU
+> 超售建议不再生效。
+
 本记录接续 `7709b8e9e` 的审查，保留原有工作区修改；所有提交仅在本地。
 
 | 问题 | 提交 | 验证 |

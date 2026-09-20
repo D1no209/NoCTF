@@ -1,4 +1,5 @@
 using System.Text.Json;
+using NoCTF.Application.Runtime.Capacity;
 using NoCTF.Application.Runtime.Provisioning;
 using NoCTF.Domain.Runtime;
 using StackExchange.Redis;
@@ -66,7 +67,80 @@ public sealed class RedisRunnerCapacityLedger(IConnectionMultiplexer redis, Time
             """, [$"runner:{runnerId}:capacity", $"runner-pool:{pool}:candidates"], [runnerId]);
     }
 
-    public async Task RestoreAsync(string runnerId, string pool, RuntimeResourceLimits total,
+    public async Task RestoreAsync(string runnerId, string pool, RunnerCapacityProjection projection,
+        DateTimeOffset observedAt,
+        IReadOnlyList<RuntimeCapacityAllocation> allocations, CancellationToken ct,
+        IReadOnlySet<RuntimeWorkloadIdentity>? starting = null,
+        IReadOnlyList<string>? claimKeys = null)
+    {
+        foreach (var allocation in allocations)
+        {
+            allocation.Validate();
+            if (allocation.RunnerId != runnerId)
+                throw new InvalidOperationException("Cannot rebuild another Runner's allocation.");
+        }
+        var database = redis.GetDatabase();
+        var keys = claimKeys ?? await ReadClaimKeysAsync(runnerId, ct);
+        var rows = allocations.Select(item => new
+        {
+            key = $"runner-claim:{item.Identity.Key}", memory = item.Limit.MemoryBytes,
+            cpu = item.Limit.NanoCpus, pids = item.Limit.PidsLimit,
+            auxiliary = item.Identity.IsAuxiliary,
+            starting = starting?.Contains(item.Identity) == true
+        }).ToArray();
+        var restored = (long)await database.ScriptEvaluateAsync("""
+            if redis.call('HGET', KEYS[1], 'admissionState') ~= 'reconciling' then return 0 end
+            local old = cjson.decode(ARGV[6])
+            for _, key in ipairs(old) do
+                if redis.call('HGET', key, 'runnerId') == ARGV[1] then redis.call('DEL', key) end
+            end
+            local rows = cjson.decode(ARGV[7])
+            local primary = 0
+            local auxiliary = 0
+            local reservedMemory = 0
+            local reservedCpu = 0
+            local reservedPids = 0
+            for _, row in ipairs(rows) do
+                redis.call('HSET', row.key, 'runnerId', ARGV[1], 'pool', ARGV[2],
+                    'memoryBytes', row.memory, 'nanoCpus', row.cpu, 'pidsLimit', row.pids,
+                    'starting', row.starting and 1 or 0, 'auxiliary', row.auxiliary and 1 or 0,
+                    'acquiredObservedAt', ARGV[17])
+                if row.starting then
+                    reservedMemory = reservedMemory + row.memory
+                    reservedCpu = reservedCpu + row.cpu
+                    reservedPids = reservedPids + row.pids
+                    if row.auxiliary then auxiliary = auxiliary + 1 else primary = primary + 1 end
+                end
+            end
+            local admissionMemory = math.max(0, tonumber(ARGV[10]) - tonumber(ARGV[13]) - reservedMemory)
+            local admissionCpu = math.max(0, tonumber(ARGV[11]) - tonumber(ARGV[14]) - reservedCpu)
+            local admissionPids = math.max(0, tonumber(ARGV[12]) - tonumber(ARGV[15]) - reservedPids)
+            redis.call('HSET', KEYS[1], 'registrationSchema', '3', 'admissionState', 'starting',
+                'startingPrimary', primary, 'startingAuxiliary', auxiliary,
+                'startupReservedMemoryBytes', reservedMemory, 'startupReservedNanoCpus', reservedCpu,
+                'startupReservedPids', reservedPids,
+                'observedTotalMemoryBytes', ARGV[3], 'observedTotalNanoCpus', ARGV[4], 'observedTotalPids', ARGV[5],
+                'observedAvailableMemoryBytes', ARGV[10], 'observedAvailableNanoCpus', ARGV[11], 'observedAvailablePids', ARGV[12],
+                'safetyHeadroomMemoryBytes', ARGV[13], 'safetyHeadroomNanoCpus', ARGV[14], 'safetyHeadroomPids', ARGV[15],
+                'admissionAvailableMemoryBytes', admissionMemory, 'admissionAvailableNanoCpus', admissionCpu,
+                'admissionAvailablePids', admissionPids, 'pidsObserved', ARGV[16])
+            redis.call('PERSIST', KEYS[1])
+            redis.call('DEL', 'runner:' .. ARGV[1] .. ':unconfirmed-claims')
+            redis.call('DEL', 'runner:' .. ARGV[1] .. ':completed-startups')
+            redis.call('ZREM', KEYS[2], ARGV[1])
+            return 1
+            """, [$"runner:{runnerId}:capacity", $"runner-pool:{pool}:candidates"],
+            [runnerId, pool, projection.ObservedTotal.MemoryBytes, projection.ObservedTotal.NanoCpus,
+                projection.ObservedTotal.PidsLimit ?? 0, JsonSerializer.Serialize(keys), JsonSerializer.Serialize(rows),
+                0, 0, projection.ObservedAvailable.MemoryBytes, projection.ObservedAvailable.NanoCpus,
+                projection.ObservedAvailable.PidsLimit ?? 0, projection.SafetyHeadroom.MemoryBytes,
+                projection.SafetyHeadroom.NanoCpus, projection.SafetyHeadroom.PidsLimit ?? 0,
+                projection.ObservedTotal.PidsLimit is null ? 0 : 1, observedAt.ToUnixTimeMilliseconds()]);
+        if (restored != 1)
+            throw new InvalidOperationException("Capacity recovery lost its admission barrier.");
+    }
+
+    public async Task RestoreLegacyAsync(string runnerId, string pool, RuntimeResourceLimits total,
         IReadOnlyList<RuntimeCapacityAllocation> allocations, CancellationToken ct,
         IReadOnlySet<RuntimeWorkloadIdentity>? starting = null,
         IReadOnlyList<string>? claimKeys = null)
@@ -109,7 +183,7 @@ public sealed class RedisRunnerCapacityLedger(IConnectionMultiplexer redis, Time
                     if row.auxiliary then auxiliary = auxiliary + 1 else primary = primary + 1 end
                 end
             end
-            redis.call('HSET', KEYS[1], 'registrationSchema', '2', 'admissionState', 'ready',
+            redis.call('HSET', KEYS[1], 'registrationSchema', '2', 'admissionState', 'starting',
                 'startingPrimary', primary, 'activeAuxiliary', auxiliary,
                 'totalMemoryBytes', ARGV[3], 'totalNanoCpus', ARGV[4], 'totalPids', ARGV[5],
                 'availableMemoryBytes', memory, 'availableNanoCpus', cpu, 'availablePids', pids)
@@ -121,7 +195,7 @@ public sealed class RedisRunnerCapacityLedger(IConnectionMultiplexer redis, Time
             [runnerId, pool, total.MemoryBytes, total.NanoCpus, total.PidsLimit,
                 JsonSerializer.Serialize(keys), JsonSerializer.Serialize(rows)]);
         if (restored != 1)
-            throw new InvalidOperationException("Capacity recovery lost its admission barrier.");
+            throw new InvalidOperationException("Legacy capacity recovery lost its admission barrier.");
     }
 
     // Admission must be closed before this inventory and remain closed through RestoreAsync.

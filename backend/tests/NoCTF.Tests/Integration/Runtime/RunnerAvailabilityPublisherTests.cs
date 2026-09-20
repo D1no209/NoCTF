@@ -189,9 +189,7 @@ public sealed class RunnerAvailabilityPublisherTests
                 await Assert.That(otherProvider.RunnerId).IsEqualTo("runner-a");
             }
 
-            var restoredLedger = new RedisRunnerCapacityLedger(redis);
-            await restoredLedger.PauseAsync("runner-a", "pool-a", cancellationToken);
-            await restoredLedger.RestoreAsync("runner-a", "pool-a", availabilityOptions.Value.ResourceCapacity, [], cancellationToken);
+            await database.KeyDeleteAsync(["runner:runner-a:heartbeat", "runner:runner-a:capacity"]);
             var online = await publisher.PublishOnceAsync(cancellationToken);
 
             await Assert.That(online).IsEqualTo(RunnerAvailabilityRegistrationOutcome.Online);

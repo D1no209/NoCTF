@@ -1,7 +1,10 @@
 using NoCTF.Application.Competitions.Events;
 using NoCTF.Application.Messaging;
+using NoCTF.Application.Runtime.Capacity;
 using NoCTF.Application.Runtime.Instances;
+using NoCTF.Domain.Runtime;
 using NoCTF.Infrastructure.Persistence;
+using Microsoft.EntityFrameworkCore;
 
 namespace NoCTF.Runner.Messages;
 
@@ -9,11 +12,17 @@ public sealed class RuntimeProvisionWriteBackMessageHandler(
     NoCtfDbContext db,
     ITransactionalMessageOutbox outbox,
     ICompetitionEventRecorder events,
-    TimeProvider timeProvider)
+    TimeProvider timeProvider,
+    IRunnerCapacityGate capacity)
 {
-    public Task Handle(RuntimeProvisioned message, CancellationToken cancellationToken) =>
-        RuntimeWriteBackOperations.ProvisionedAsync(
+    public async Task Handle(RuntimeProvisioned message, CancellationToken cancellationToken)
+    {
+        await RuntimeWriteBackOperations.ProvisionedAsync(
             message, db, outbox, events, timeProvider, cancellationToken);
+        if (await db.RuntimeInstances.AsNoTracking().AnyAsync(runtime => runtime.Id == message.RuntimeInstanceId
+                && runtime.RunnerId == message.RunnerId && runtime.State == RuntimeState.Running, cancellationToken))
+            await capacity.CompleteStartupAsync(message.RuntimeInstanceId, message.RunnerId, cancellationToken);
+    }
 
     public Task Handle(RuntimeProvisionFailed message, CancellationToken cancellationToken) =>
         RuntimeWriteBackOperations.ProvisionFailedAsync(

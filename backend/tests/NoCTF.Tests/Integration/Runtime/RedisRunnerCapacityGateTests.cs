@@ -230,9 +230,7 @@ public sealed class RedisRunnerCapacityGateTests
                 HasActiveAssignments: false);
 
             var first = await registry.RegisterAsync(registration, cancellationToken);
-            var ledger = new RedisRunnerCapacityLedger(redis);
-            await ledger.PauseAsync(runner, pool, cancellationToken);
-            await ledger.RestoreAsync(runner, pool, registration.Capacity, [], cancellationToken);
+            await database.KeyDeleteAsync([$"runner:{runner}:heartbeat", $"runner:{runner}:capacity"]);
             var second = await registry.RegisterAsync(registration, cancellationToken);
 
             await Assert.That(first)

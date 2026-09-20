@@ -401,20 +401,24 @@ const {
               <TableHeader><TableRow>
                 <TableHead>{{ $t('capacity.runner') }}</TableHead>
                 <TableHead>{{ $t('capacity.state') }}</TableHead>
-                <TableHead>{{ $t('capacity.limit') }}</TableHead>
-                <TableHead>{{ $t('capacity.budget') }}</TableHead>
-                <TableHead>{{ $t('capacity.allocatable') }}</TableHead>
-                <TableHead>{{ $t('capacity.available') }}</TableHead>
+                <TableHead>{{ $t('capacity.observedTotal') }}</TableHead>
+                <TableHead>{{ $t('capacity.observedAvailable') }}</TableHead>
+                <TableHead>{{ $t('capacity.safetyHeadroom') }}</TableHead>
+                <TableHead>{{ $t('capacity.startupReserved') }}</TableHead>
+                <TableHead>{{ $t('capacity.admissionAvailable') }}</TableHead>
+                <TableHead>{{ $t('capacity.declaredLimits') }}</TableHead>
                 <TableHead>{{ $t('capacity.usage') }}</TableHead>
                 <TableHead>{{ $t('capacity.observed') }}</TableHead>
               </TableRow></TableHeader>
               <TableBody><TableRow v-for="runner in snapshot.capacity.runners" :key="runner.runnerId">
                 <TableCell><span class="font-mono">{{ runner.runnerId }}</span><Badge variant="secondary">{{ $t(runner.alive ? 'capacity.alive' : 'capacity.offline') }}</Badge></TableCell>
-                <TableCell>{{ runnerStateLabel(runner.state) }}<FieldDescription v-if="runner.failure">{{ runnerFailureLabel(runner.failure) }}</FieldDescription></TableCell>
-                <TableCell class="font-mono tabular-nums">{{ formatCapacityAmount(runner.limits) }}</TableCell>
-                <TableCell class="font-mono tabular-nums">{{ formatCapacityAmount(runner.budget) }}</TableCell>
-                <TableCell class="font-mono tabular-nums">{{ formatCapacityAmount(runner.allocatable) }}</TableCell>
-                <TableCell class="font-mono tabular-nums">{{ formatCapacityAmount(runner.available) }}</TableCell>
+                <TableCell>{{ runnerStateLabel(runner.state) }}<FieldDescription v-if="runner.failure">{{ runnerFailureLabel(runner.failure) }}</FieldDescription><FieldDescription v-if="runner.startingPrimary != null || runner.startingAuxiliary != null">{{ $t('capacity.startingCounts', { primary: runner.startingPrimary ?? 0, auxiliary: runner.startingAuxiliary ?? 0 }) }}</FieldDescription></TableCell>
+                <TableCell class="font-mono tabular-nums">{{ formatCapacityAmount(runner.observedTotal) }}</TableCell>
+                <TableCell class="font-mono tabular-nums">{{ formatCapacityAmount(runner.observedAvailable) }}</TableCell>
+                <TableCell class="font-mono tabular-nums">{{ formatCapacityAmount(runner.safetyHeadroom) }}</TableCell>
+                <TableCell class="font-mono tabular-nums">{{ formatCapacityAmount(runner.startupReserved) }}</TableCell>
+                <TableCell class="font-mono tabular-nums">{{ formatCapacityAmount(runner.admissionAvailable) }}</TableCell>
+                <TableCell class="font-mono tabular-nums">{{ formatCapacityAmount(runner.declaredLimits) }}</TableCell>
                 <TableCell class="font-mono tabular-nums">{{ formatRunnerUsage(runner) }}</TableCell>
                 <TableCell>{{ formatCapturedAt(runner.observation?.observedAt) }}</TableCell>
               </TableRow></TableBody>

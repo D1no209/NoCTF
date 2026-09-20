@@ -5,14 +5,6 @@ namespace NoCTF.Application.Runtime.Capacity;
 
 public sealed class RuntimeResourceBudgetPolicy
 {
-    public int CpuOvercommitFactor { get; }
-    public RuntimeResourceBudgetPolicy(int cpuOvercommitFactor = 1)
-    {
-        if (cpuOvercommitFactor is < 1 or > 2)
-            throw new ArgumentOutOfRangeException(nameof(cpuOvercommitFactor), "CPU sharing supports factors 1 and 2.");
-        CpuOvercommitFactor = cpuOvercommitFactor;
-    }
-
     public RuntimeResourceLimits EffectiveLimit(RuntimeResourceLimits limits, RuntimeProvider provider)
     {
         if (limits.MemoryBytes <= 0 || limits.NanoCpus <= 0 || limits.PidsLimit < 0)
@@ -23,12 +15,7 @@ public sealed class RuntimeResourceBudgetPolicy
     }
 
     public RuntimeResourceLimits Calculate(RuntimeResourceLimits limits, RuntimeProvider provider, bool auxiliary = false)
-    {
-        limits = EffectiveLimit(limits, provider);
-        var factor = provider == RuntimeProvider.Libvirt || auxiliary ? 1 : CpuOvercommitFactor;
-        var cpu = limits.NanoCpus / factor + (limits.NanoCpus % factor == 0 ? 0 : 1);
-        return limits with { NanoCpus = provider == RuntimeProvider.Kubernetes ? RoundUp(cpu, 1_000_000) : cpu };
-    }
+        => EffectiveLimit(limits, provider);
 
     public static RuntimeResourceLimits Sum(IEnumerable<RuntimeResourceLimits> resources, long inheritedPids = 0)
     {
@@ -40,14 +27,15 @@ public sealed class RuntimeResourceBudgetPolicy
 
     public IReadOnlyDictionary<string, RuntimeResourceLimits> ForCompose(
         IReadOnlyDictionary<string, RuntimeResourceLimits> services, RuntimeProvider provider) =>
-        services.ToDictionary(pair => pair.Key, pair => Calculate(pair.Value, provider), StringComparer.Ordinal);
+        services.ToDictionary(pair => pair.Key, pair => EffectiveLimit(pair.Value, provider), StringComparer.Ordinal);
 
     public static IReadOnlyDictionary<string, RuntimeResourceLimits> RestoreComposeBudgets(
         IReadOnlyDictionary<string, RuntimeResourceLimits> services, RuntimeProvider provider, RuntimeResourceAmount committed)
     {
         foreach (var factor in new[] { 1, 2 })
         {
-            var budgets = new RuntimeResourceBudgetPolicy(factor).ForCompose(services, provider);
+            var budgets = services.ToDictionary(pair => pair.Key, pair => LegacyBudget(pair.Value, provider, factor),
+                StringComparer.Ordinal);
             var sum = Sum(budgets.Values, committed.PidsLimit);
             if (sum.MemoryBytes == committed.MemoryBytes && sum.NanoCpus == committed.NanoCpus
                 && sum.PidsLimit == committed.PidsLimit)
@@ -64,5 +52,12 @@ public sealed class RuntimeResourceBudgetPolicy
 
     public static RuntimeResourceLimits ToLimits(RuntimeResourceAmount amount) => new(amount.MemoryBytes, amount.NanoCpus, amount.PidsLimit);
     public static RuntimeResourceAmount ToAmount(RuntimeResourceLimits limits) => new(limits.MemoryBytes, limits.NanoCpus, limits.PidsLimit);
+    private static RuntimeResourceLimits LegacyBudget(RuntimeResourceLimits limits, RuntimeProvider provider, int factor)
+    {
+        var effective = new RuntimeResourceBudgetPolicy().EffectiveLimit(limits, provider);
+        if (provider == RuntimeProvider.Libvirt || factor == 1) return effective;
+        var cpu = effective.NanoCpus / factor + (effective.NanoCpus % factor == 0 ? 0 : 1);
+        return effective with { NanoCpus = provider == RuntimeProvider.Kubernetes ? RoundUp(cpu, 1_000_000) : cpu };
+    }
     private static long RoundUp(long value, long unit) => checked((value / unit + (value % unit == 0 ? 0 : 1)) * unit);
 }

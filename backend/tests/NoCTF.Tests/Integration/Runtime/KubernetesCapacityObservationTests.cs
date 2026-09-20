@@ -41,7 +41,7 @@ public sealed class KubernetesCapacityObservationTests
             var options = new KubernetesRuntimeOptions(Namespace: ns, PodPidsLimit: 128);
             var lifecycle = new KubernetesContainerLifecycle(client, options);
             var id = Guid.NewGuid();
-            var policy = new RuntimeResourceBudgetPolicy(2);
+            var policy = new RuntimeResourceBudgetPolicy();
             var limits = policy.EffectiveLimit(new(64 * 1024 * 1024, 201_000_001, 128), RuntimeProvider.Kubernetes);
             var budget = policy.Calculate(limits, RuntimeProvider.Kubernetes);
             var receipt = await lifecycle.CreateAsync(new(id, RuntimeProvider.Kubernetes, "busybox:1.36.1", ["sleep", "180"],
@@ -51,15 +51,14 @@ public sealed class KubernetesCapacityObservationTests
             {
                 var pod = await client.CoreV1.ReadNamespacedPodAsync(receipt.ResourceId, ns, cancellationToken: ct);
                 await Assert.That(eligible.Items.Select(node => node.Metadata.Name)).Contains(pod.Spec.NodeName);
-                await Assert.That(pod.Spec.Containers[0].Resources.Requests["cpu"].ToDecimal()).IsEqualTo(.101m);
+                await Assert.That(pod.Spec.Containers[0].Resources.Requests["cpu"].ToDecimal()).IsEqualTo(.202m);
                 await Assert.That(pod.Spec.Containers[0].Resources.Limits["cpu"].ToDecimal()).IsEqualTo(.202m);
                 await Assert.That(pod.Spec.Containers[0].Resources.Requests["memory"].ToDecimal()).IsEqualTo(limits.MemoryBytes);
                 await using var postgres = new PostgreSqlBuilder("postgres:17.10-alpine3.24@sha256:742f40ea20b9ff2ff31db5458d127452988a2164df9e17441e191f3b72252193").Build();
                 await postgres.StartAsync(ct);
                 var config = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
                     { ["ConnectionStrings:PostgreSql"] = postgres.GetConnectionString() }).Build();
-                var runner = Options.Create(new RunnerOptions { Id = "kube-capacity-test", Provider = RuntimeProvider.Kubernetes,
-                    Capacity = new() { MemoryBytes = 1024L * 1024 * 1024, NanoCpus = 2_000_000_000, PidsLimit = 4096 } });
+                var runner = Options.Create(new RunnerOptions { Id = "kube-capacity-test", Provider = RuntimeProvider.Kubernetes });
                 await using var observer = new RunnerResourceObserver(runner, new DockerRuntimeOptions(), options, client, config,
                     Substitute.For<IHostApplicationLifetime>(), TimeProvider.System, NullLogger<RunnerResourceObserver>.Instance);
                 RunnerAdmissionSnapshot snapshot = await observer.SampleAsync(ct);
@@ -72,6 +71,8 @@ public sealed class KubernetesCapacityObservationTests
                 await Assert.That(snapshot.Observation!.NanoCpus).IsEqualTo(eligible.Items.Sum(node => (long)(node.Status.Allocatable["cpu"].ToDecimal() * 1_000_000_000m)));
                 await Assert.That(snapshot.Observation.MemoryTotalBytes).IsEqualTo(eligible.Items.Sum(node => (long)node.Status.Allocatable["memory"].ToDecimal()));
                 await Assert.That(snapshot.Observation.PidsUsed).IsNull();
+                await Assert.That(snapshot.Observation.PidsCapacity).IsNull();
+                await Assert.That(snapshot.Capacity!.ObservedTotal.PidsLimit).IsNull();
                 await client.CoreV1.CreateNamespacedServiceAccountAsync(new V1ServiceAccount { Metadata = new V1ObjectMeta { Name = "unprivileged" } }, ns, cancellationToken: ct);
                 await client.RbacAuthorizationV1.CreateClusterRoleAsync(new V1ClusterRole
                 {

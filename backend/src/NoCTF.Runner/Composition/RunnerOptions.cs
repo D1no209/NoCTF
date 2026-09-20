@@ -12,6 +12,7 @@ public sealed class RunnerOptions
     public string Id { get; set; } = string.Empty;
     public string Pool { get; set; } = string.Empty;
     public RuntimeProvider? Provider { get; set; }
+    // Rolling-compatibility only. Actual-usage runners ignore this configured ceiling.
     public RunnerCapacityOptions Capacity { get; set; } = new();
     public RunnerHeartbeatOptions Heartbeat { get; set; } = new();
     public RunnerCleanupOptions Cleanup { get; set; } = new();
@@ -22,6 +23,13 @@ public sealed class RunnerOptions
         Capacity.MemoryBytes,
         Capacity.NanoCpus,
         Capacity.PidsLimit);
+}
+
+public sealed class RunnerCapacityOptions
+{
+    public long MemoryBytes { get; set; }
+    public long NanoCpus { get; set; }
+    public long PidsLimit { get; set; }
 }
 
 public sealed class RunnerCleanupOptions
@@ -36,13 +44,6 @@ public sealed class RunnerCleanupOptions
         TimeSpan.FromSeconds(ForceDeleteTimeoutSeconds),
         TimeSpan.FromSeconds(NetworkCleanupTimeoutSeconds),
         TimeSpan.FromSeconds(VerificationTimeoutSeconds));
-}
-
-public sealed class RunnerCapacityOptions
-{
-    public long MemoryBytes { get; set; }
-    public long NanoCpus { get; set; }
-    public long PidsLimit { get; set; }
 }
 
 public sealed class RunnerHeartbeatOptions
@@ -65,10 +66,6 @@ public sealed class RunnerOptionsValidator : IValidateOptions<RunnerOptions>
             failures.Add("Runner:Pool must contain 1..256 characters.");
         if (options.Provider is null)
             failures.Add("Runner:Provider must be Docker, Kubernetes, or Libvirt.");
-        if (options.Capacity.MemoryBytes <= 0
-            || options.Capacity.NanoCpus <= 0
-            || options.Capacity.PidsLimit <= 0)
-            failures.Add("Runner capacity values must be positive integers.");
         if (options.Heartbeat.IntervalSeconds <= 0
             || options.Heartbeat.TtlSeconds <= options.Heartbeat.IntervalSeconds)
             failures.Add("Runner heartbeat TTL must be greater than its positive interval.");

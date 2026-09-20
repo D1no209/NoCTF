@@ -85,12 +85,12 @@ public sealed class RuntimeDispatchAllocationTests
                 _ => throw new InvalidOperationException()
             };
             await Assert.That(await reader.ReadProvisionStatusAsync(tampered, ct)).IsEqualTo(RuntimeProvisionWorkStatus.AssignmentRetained);
-            // Doubling Limit with factor 2 would reproduce the old Budget-only false match.
+            // Changing a hard limit must never match a previously committed allocation.
             await db.Challenges.Where(row => row.Id == challengeId).ExecuteUpdateAsync(update => update
                 .SetProperty(row => row.DefinitionJson, Definition(initial with { NanoCpus = 1_000_000_000 })), ct);
             db.ChangeTracker.Clear();
             await BackendMessageOperations.DispatchRuntimeAsync(new(id), db, templates, new FixedRuntimePlacementPolicy(),
-                capacity, outbox, TimeProvider.System, ct, budgets: new(2));
+                capacity, outbox, TimeProvider.System, ct, budgets: new());
             db.ChangeTracker.Clear();
             var rejected = await db.RuntimeInstances.SingleAsync(row => row.Id == id, ct);
             await Assert.That(rejected.State).IsEqualTo(RuntimeState.Failed);

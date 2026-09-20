@@ -18,7 +18,7 @@ try {
     dotnet build NoCTF.slnx -c Release --no-restore -m:1 -v:q
     if ($LASTEXITCODE -ne 0) { throw 'Release build failed.' }
     $env:NOCTF_CAPACITY_MEASUREMENTS = $destination
-    dotnet tests/NoCTF.Tests/bin/Release/net10.0/NoCTF.Tests.dll --treenode-filter '/*/*/RuntimeCapacityLoadTests/*' --minimum-expected-tests 4
+    dotnet tests/NoCTF.Tests/bin/Release/net10.0/NoCTF.Tests.dll --treenode-filter '/*/*/RuntimeCapacityLoadTests/*' --minimum-expected-tests 2
     if ($LASTEXITCODE -ne 0) { throw 'Capacity load verification failed.' }
     if ($HostPressure) {
         # Docker-host bind sources intentionally refer to the daemon's Linux filesystem.
@@ -38,19 +38,6 @@ try {
     }
     dotnet tests/NoCTF.Tests/bin/Release/net10.0/NoCTF.Tests.dll --treenode-filter '/*/*/HistoricalAdjudicationPreviewPersistenceTests/Preview_uses_one_repeatable_snapshot_and_a_bounded_query_count' --minimum-expected-tests 1
     if ($LASTEXITCODE -ne 0) { throw 'Preview scan measurement failed.' }
-    $rows = foreach ($file in Get-ChildItem -LiteralPath $destination -Filter 'capacity-*.json') {
-        $data = Get-Content -LiteralPath $file.FullName -Raw | ConvertFrom-Json
-        foreach ($metric in @('createMs', 'stopMs', 'claimBatchMs', 'recoveryMs', 'queueMs')) {
-            $samples = @($data.$metric | Sort-Object)
-            [pscustomobject]@{
-                Factor = $data.factor; Concurrency = $data.concurrency; Metric = $metric; Count = $samples.Count
-                P50ms = $samples[[Math]::Max(0, [Math]::Ceiling($samples.Count * .5) - 1)]
-                P95ms = $samples[[Math]::Max(0, [Math]::Ceiling($samples.Count * .95) - 1)]
-            }
-        }
-    }
-    $rows | Export-Csv -LiteralPath (Join-Path $destination 'summary.csv') -NoTypeInformation
-    $rows | Format-Table
 } finally {
     $env:NOCTF_CAPACITY_MEASUREMENTS = $previousMeasurements
     Pop-Location
