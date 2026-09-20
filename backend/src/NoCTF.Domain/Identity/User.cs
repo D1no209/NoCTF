@@ -14,6 +14,13 @@ public sealed class User
     public UserRole Role { get; set; }
     public UserAccountStatus AccountStatus { get; set; }
     public int TokenVersion { get; set; }
+    public Guid? ExternalIdentityProviderId { get; set; }
+    public SsoProtocol? ExternalIdentityProtocol { get; set; }
+    [MaxLength(512), System.Text.Json.Serialization.JsonIgnore]
+    public string? ExternalIdentityNamespace { get; set; }
+    [MaxLength(255), System.Text.Json.Serialization.JsonIgnore]
+    public string? ExternalIdentitySubject { get; set; }
+    public DateTimeOffset? ExternalIdentityBoundAt { get; set; }
     [MaxLength(500)]
     public string? Description { get; set; }
     [MaxLength(100), System.Text.Json.Serialization.JsonIgnore]

@@ -11,11 +11,13 @@ using NoCTF.Domain.Challenges.Questions;
 using NoCTF.Domain.Competitions.Events;
 using NoCTF.Domain.Storage;
 using NoCTF.Domain.Gameplay;
+using Microsoft.AspNetCore.DataProtection.EntityFrameworkCore;
 
 namespace NoCTF.Infrastructure.Persistence;
 
 /// <summary>Relational persistence for all NoCTF business facts and current state.</summary>
-public sealed class NoCtfDbContext(DbContextOptions<NoCtfDbContext> options) : DbContext(options)
+public sealed class NoCtfDbContext(DbContextOptions<NoCtfDbContext> options)
+    : DbContext(options), IDataProtectionKeyContext
 {
     public DbSet<User> Users => Set<User>();
     public DbSet<Competition> Competitions => Set<Competition>();
@@ -31,6 +33,7 @@ public sealed class NoCtfDbContext(DbContextOptions<NoCtfDbContext> options) : D
     public DbSet<Notification> Notifications => Set<Notification>();
     public DbSet<GameplayFact> GameplayFacts => Set<GameplayFact>();
     public DbSet<StoredFile> Files => Set<StoredFile>();
+    public DbSet<DataProtectionKey> DataProtectionKeys => Set<DataProtectionKey>();
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(NoCtfDbContext).Assembly);
