@@ -23,7 +23,7 @@ public sealed class AccountPrivacyStore(NoCtfDbContext db, IOptions<AccountPriva
                 .SetProperty(user => user.UpdatedAt, clock.GetUtcNow()), ct) == 1;
 
     public Task<bool> IsAdministratorAsync(Guid actorId, CancellationToken ct) => db.Users.AnyAsync(user =>
-        user.Id == actorId && user.Kind == UserKind.Human && user.Role == UserRole.Administrator
+        user.Id == actorId && user.Role == UserRole.Administrator
         && user.AccountStatus == UserAccountStatus.Active, ct);
 
     public Task<bool> IsTeamMemberAsync(Guid competitionId, Guid teamId, Guid memberId, CancellationToken ct) =>

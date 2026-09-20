@@ -3,7 +3,7 @@ import { toRefs } from 'vue'
 import type { AdminPlatformUsersPageViewState } from '~/features/routes/admin/platform/useAdminPlatformUsersPage'
 
 const viewProps = defineProps<{ state: AdminPlatformUsersPageViewState }>()
-const { Copy, KeyRound, LogIn, Plus, ShieldOff, Trash2, currentUser, loading, loadError, search, roleFilter, ROLE_LABELS, STATUS_LABELS, MANAGED_ACCOUNT_STATUS_OPTIONS, REFERENCE_LABELS, filteredUsers, createBotOpen, creatingBot, botName, botRole, openCreateBot, setCreateBotOpen, createBot, detailOpen, detailLoading, detail, pendingRole, pendingAccountStatus, pendingEmailVerification, roleSaving, accountStatusSaving, emailVerificationSaving, invalidating, activeTokens, activeTokensLoading, revokingTokenId, tokenOpen, tokenIntent, tokenIssuing, tokenExpiresInSeconds, tokenReason, issuedToken, openToken, setTokenOpen, issueToken, copyIssuedToken, revokeIssuedToken, openDetail, saveRole, saveAccountStatus, saveEmailVerification, invalidateTokens, deleteOpen, previewLoading, preview, deletionMode, deletionReason, deleting, startDelete, confirmDelete, PrivateAccountPanel, AdminDateTime } = toRefs(viewProps.state)
+const { Copy, KeyRound, LogIn, Plus, Trash2, currentUser, loading, loadError, search, roleFilter, ROLE_LABELS, STATUS_LABELS, MANAGED_ACCOUNT_STATUS_OPTIONS, REFERENCE_LABELS, filteredUsers, createBotOpen, creatingBot, botName, botRole, openCreateBot, setCreateBotOpen, createBot, detailOpen, detailLoading, detail, pendingRole, pendingAccountStatus, pendingEmailVerification, roleSaving, accountStatusSaving, emailVerificationSaving, invalidating, tokenOpen, tokenIntent, identitySwitchActive, tokenIssuing, tokenExpiresInSeconds, issuedToken, openToken, setTokenOpen, issueToken, copyIssuedToken, openDetail, saveRole, saveAccountStatus, saveEmailVerification, invalidateTokens, deleteOpen, previewLoading, preview, deletionMode, deletionReason, deleting, startDelete, confirmDelete, PrivateAccountPanel, AdminDateTime } = toRefs(viewProps.state)
 </script>
 
 <template>
@@ -299,7 +299,7 @@ const { Copy, KeyRound, LogIn, Plus, ShieldOff, Trash2, currentUser, loading, lo
                 <Button
                   type="button"
                   size="sm"
-                  :disabled="detail.accountStatus !== 'Active'"
+                  :disabled="detail.accountStatus !== 'Active' || identitySwitchActive"
                   @click="openToken(detail, 'impersonate')"
                 >
                   <LogIn data-icon="inline-start" />{{ $t('ui.signInAsThisUser') }}
@@ -309,41 +309,7 @@ const { Copy, KeyRound, LogIn, Plus, ShieldOff, Trash2, currentUser, loading, lo
             <p v-if="detail.accountStatus !== 'Active'" class="text-sm text-muted-foreground">
               {{ $t('ui.onlyActiveAccountsCanReceiveAdministratorIssuedTokens') }}
             </p>
-            <div v-if="activeTokensLoading" class="flex flex-col gap-2">
-              <Skeleton v-for="i in 2" :key="i" class="h-16 w-full" />
-            </div>
-            <p v-else-if="activeTokens.length === 0" class="text-sm text-muted-foreground">
-              {{ $t('ui.noActiveTokensIssuedByYou') }}
-            </p>
-            <div v-else class="flex flex-col gap-2">
-              <div
-                v-for="token in activeTokens"
-                :key="token.jwtId"
-                class="flex flex-wrap items-center justify-between gap-3 rounded-xl bg-muted/40 px-4 py-3"
-              >
-                <div class="min-w-0 flex-1 basis-64 text-sm">
-                  <p class="break-words font-medium">{{ token.reason }}</p>
-                  <p class="mt-1 text-xs text-muted-foreground">
-                    {{ $t('ui.creationTime') }}: <component :is="AdminDateTime" :value="token.issuedAt" />
-                  </p>
-                  <p class="mt-1 text-xs text-muted-foreground">
-                    {{ $t('ui.expiresAt') }} <component :is="AdminDateTime" :value="token.expiresAt" />
-                  </p>
-                  <p class="mt-1 select-all break-all font-mono text-xs text-muted-foreground">{{ token.jwtId }}</p>
-                </div>
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="outline"
-                  :disabled="revokingTokenId !== null"
-                  @click="revokeIssuedToken(token)"
-                >
-                  <Spinner v-if="revokingTokenId === token.jwtId" data-icon="inline-start" />
-                  <ShieldOff v-else data-icon="inline-start" />
-                  {{ $t('ui.revokeThisToken') }}
-                </Button>
-              </div>
-            </div>
+            <FieldDescription>{{ $t('ui.issuedTokensAreStatelessAndCanOnlyBeRevokedTogether') }}</FieldDescription>
           </section>
 
           <Separator />
@@ -398,15 +364,10 @@ const { Copy, KeyRound, LogIn, Plus, ShieldOff, Trash2, currentUser, loading, lo
                 <NumberInput id="user-token-ttl" v-model.number="tokenExpiresInSeconds" min="60" max="31536000" step="60" required />
                 <FieldDescription>{{ $t('ui.tokenLifetimeRange') }}</FieldDescription>
               </Field>
-              <Field>
-                <FieldLabel for="user-token-reason">{{ $t('ui.issuanceReason') }}</FieldLabel>
-                <Textarea id="user-token-reason" v-model="tokenReason" minlength="3" maxlength="500" rows="3" required />
-                <FieldDescription>{{ $t('ui.issuanceReasonAuditNotice') }}</FieldDescription>
-              </Field>
             </FieldGroup>
             <DialogFooter>
               <Button type="button" variant="outline" @click="setTokenOpen(false)">{{ $t('ui.cancel') }}</Button>
-              <Button type="submit" :disabled="tokenIssuing || tokenReason.trim().length < 3 || tokenExpiresInSeconds < 60 || tokenExpiresInSeconds > 31536000">
+              <Button type="submit" :disabled="tokenIssuing || tokenExpiresInSeconds < 60 || tokenExpiresInSeconds > 31536000">
                 <Spinner v-if="tokenIssuing" data-icon="inline-start" />
                 {{ tokenIntent === 'impersonate' ? $t('ui.issueAndSignIn') : $t('ui.issue') }}
               </Button>

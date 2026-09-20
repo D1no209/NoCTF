@@ -61,8 +61,6 @@ public sealed class ListCompetitionQuestionsEndpoint(
         ProblemHttpResult>>
         ExecuteAsync(ListCompetitionQuestionsRequest request, CancellationToken ct)
     {
-        if (!user.IsHuman)
-            return TypedResults.Forbid();
         var competitionId = Route<Guid>("competitionId");
         var filterKey = FilterKey(competitionId, user.UserId, request);
         if (!cursors.TryDecode(request.Cursor, CursorEndpoint, filterKey, out var position))

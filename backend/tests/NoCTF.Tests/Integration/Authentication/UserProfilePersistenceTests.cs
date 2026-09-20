@@ -191,8 +191,7 @@ public sealed class UserProfilePersistenceTests
         public IssuedAccessToken Issue(
             AuthenticatedUser user,
             DateTimeOffset now,
-            TimeSpan? lifetime = null,
-            Guid? impersonatorUserId = null) =>
+            TimeSpan? lifetime = null) =>
             new("unused-access", now.AddMinutes(15));
 
         public IssuedRefreshToken IssueRefresh(AuthenticatedUser user) =>

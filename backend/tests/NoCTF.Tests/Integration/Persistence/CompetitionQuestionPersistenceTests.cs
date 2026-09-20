@@ -254,9 +254,12 @@ public sealed class CompetitionQuestionPersistenceTests
                     RulesJson = """{"schemaVersion":1}""",
                     UpdatedAt = now
                 });
+                var otherTeam = ApprovedTeam(
+                    ids.OtherTeamId, ids.CompetitionId, "Other team", ids.OtherParticipantId, now);
+                otherTeam.MemberIds = [ids.OtherParticipantId, ids.BotId];
                 setup.Teams.AddRange(
                     ApprovedTeam(ids.AskerTeamId, ids.CompetitionId, "Asker team", ids.AskerId, now),
-                    ApprovedTeam(ids.OtherTeamId, ids.CompetitionId, "Other team", ids.OtherParticipantId, now));
+                    otherTeam);
                 await setup.SaveChangesAsync(ct);
             }
 
@@ -400,10 +403,11 @@ public sealed class CompetitionQuestionPersistenceTests
                 null,
                 ids.BotId,
                 "Bot question",
-                "Automation identities cannot open dialogue.",
+                "A Bot in an approved team follows the ordinary participant rules.",
                 now.AddSeconds(9)), ct);
-            await Assert.That(botQuestion.Failure)
-                .IsEqualTo(CompetitionQuestionFailure.Forbidden);
+            await Assert.That(botQuestion.Failure).IsNull();
+            await Assert.That(botQuestion.Question!.Access).IsEqualTo(CompetitionQuestionAccess.Asker);
+            await Assert.That(botQuestion.Question.TeamId).IsEqualTo(ids.OtherTeamId);
 
             var delivery = new CompetitionNotificationDelivery(db);
             await CompetitionNotificationMessageHandlers.Handle(opened, delivery, ct);

@@ -9,11 +9,10 @@ public sealed class CompetitionQuestionRulesTests
     [Test]
     [Arguments(CompetitionStatus.Running)]
     [Arguments(CompetitionStatus.Paused)]
-    public async Task Creation_AllowsApprovedHumanDuringActiveCompetition(
+    public async Task Creation_AllowsApprovedIdentityDuringActiveCompetition(
         CompetitionStatus status)
     {
         var result = CompetitionQuestionRules.ValidateCreation(new(
-            IsHuman: true,
             CompetitionStatus: status,
             HasApprovedTeam: true,
             Subject: CompetitionQuestionSubject.Challenge,
@@ -32,7 +31,6 @@ public sealed class CompetitionQuestionRulesTests
     public async Task Creation_RejectsNonActiveCompetition(CompetitionStatus status)
     {
         var result = CompetitionQuestionRules.ValidateCreation(new(
-            true,
             status,
             true,
             CompetitionQuestionSubject.Platform,
@@ -49,7 +47,6 @@ public sealed class CompetitionQuestionRulesTests
     public async Task Creation_RequiresChallengeOnlyForChallengeSubject()
     {
         var challengeFailure = CompetitionQuestionRules.ValidateCreation(new(
-            true,
             CompetitionStatus.Running,
             true,
             CompetitionQuestionSubject.Challenge,
@@ -58,7 +55,6 @@ public sealed class CompetitionQuestionRulesTests
             0,
             5));
         var platformFailure = CompetitionQuestionRules.ValidateCreation(new(
-            true,
             CompetitionStatus.Running,
             true,
             CompetitionQuestionSubject.Platform,
@@ -67,7 +63,6 @@ public sealed class CompetitionQuestionRulesTests
             0,
             5));
         var platformWithChallengeFailure = CompetitionQuestionRules.ValidateCreation(new(
-            true,
             CompetitionStatus.Running,
             true,
             CompetitionQuestionSubject.Platform,
@@ -87,7 +82,6 @@ public sealed class CompetitionQuestionRulesTests
     public async Task Creation_EnforcesTeamActiveQuestionLimit()
     {
         var result = CompetitionQuestionRules.ValidateCreation(new(
-            true,
             CompetitionStatus.Running,
             true,
             CompetitionQuestionSubject.Platform,

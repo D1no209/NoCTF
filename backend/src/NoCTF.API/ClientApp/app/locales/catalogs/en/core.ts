@@ -1312,6 +1312,7 @@ export const messages = {
   "navigation.leave": "Discard and leave",
   "ui.impersonatingUserUntil": "Acting as {user} until {expiresAt}",
   "ui.exitImpersonation": "Exit impersonation",
+  "ui.identitySwitchAlreadyActive": "This page is already using another identity. Exit it before switching again.",
   "ui.administratorSessionRequired": "An active administrator session is required.",
   "ui.impersonatedIdentityCouldNotBeVerified": "The impersonated account identity could not be verified.",
   "ui.issueUserAccessToken": "Issue user access JWT",

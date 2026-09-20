@@ -149,7 +149,6 @@ export function createMockApi() {
   ]))
   const sessions = new Map<string, string>()
   const tokens = new Map<string, string>()
-  const administratorIssuedTokens = new Map<string, Data>()
   const wallpapers = new Map<string, Blob>()
   const competitionPosters = new Map<string, Blob | null>()
   const teamWriteUps = new Map<string, { metadata: Data; content: Blob }>()
@@ -266,11 +265,6 @@ export function createMockApi() {
     if ((route.startsWith('/admin') || route.startsWith('/auth/me') || request.method !== 'GET') && !user) return problem(401, '请先登录演示账号 / Sign in to the Mock site')
     if (route.startsWith('/admin/platform') && user?.role !== 'Administrator') return problem(403, '需要 Mock 管理员账号 / Administrator required')
     if (route.startsWith('/admin/') && !['Administrator', 'Organizer'].includes(user?.role)) return problem(403, '需要 Mock 管理账号 / Staff account required')
-    const bearerToken = request.headers.get('Authorization')?.replace(/^Bearer /, '') ?? ''
-    const impersonatedRequest = [...administratorIssuedTokens.values()]
-      .some(item => item.accessToken === bearerToken)
-    if (impersonatedRequest && route.startsWith('/admin/platform/users/')
-      && route.includes('/tokens')) return problem(403, '模拟身份不能管理 JWT / Impersonated sessions cannot manage JWTs')
 
     const competition = state.competitions.find(c => c.id === p.competitionId)
     if (p.competitionId && !competition) return problem(404, '演示比赛不存在 / Competition not found')
@@ -422,15 +416,6 @@ export function createMockApi() {
       else if (route === '/users/{userId}') value = state.users.find(u => u.userId === p.userId)
       else if (route === '/admin/platform/users/{userId}') value = { user: state.users.find(u => u.userId === p.userId), schoolIdentity: state.settings.get(`${p.userId}/school-identity`) ?? { fullName: null, studentNumber: null } }
       else if (route === '/admin/platform/users') value = list(state.users.map(u => ({ ...u, id: u.userId, accountStatus: 'Active', createdAt: date(-720) })), url)
-      else if (route === '/admin/platform/users/{userId}/tokens') {
-        value = {
-          items: [...administratorIssuedTokens.values()].filter(item =>
-            item.issuedByUserId === user!.userId
-            && item.targetUserId === p.userId
-            && !item.revoked
-            && Date.parse(item.expiresAt) > Date.now()),
-        }
-      }
       else if (route === '/admin/platform/information') value = { version: 'MOCK / local-memory', contributors: [] }
       else if (route === '/admin/platform/monitoring') value = mockMonitoringSnapshot()
       else if (route === '/admin/competitions/{competitionId}') value = {
@@ -636,50 +621,25 @@ export function createMockApi() {
         if (target.accountStatus && target.accountStatus !== 'Active')
           return json({ code: 'AccountInactive', message: 'Only active accounts can receive tokens.' }, 409)
         const expiresInSeconds = Number(body.expiresInSeconds)
-        const reason = typeof body.reason === 'string' ? body.reason.trim() : ''
         if (!Number.isInteger(expiresInSeconds)
           || expiresInSeconds < 60
-          || expiresInSeconds > 31_536_000
-          || reason.length < 3
-          || reason.length > 500) return problem(400, 'JWT lifetime or reason is invalid.')
+          || expiresInSeconds > 31_536_000) return problem(400, 'JWT lifetime is invalid.')
         const jwtId = crypto.randomUUID()
         const expiresAt = new Date(Date.now() + expiresInSeconds * 1000).toISOString()
         const accessToken = `mock.${Buffer.from(JSON.stringify({
           sub: target.userId,
           exp: Math.floor(Date.parse(expiresAt) / 1000),
           jti: jwtId.replaceAll('-', ''),
-          impersonation: true,
-          impersonator_id: user!.userId,
+          role: target.role,
+          user_kind: target.kind,
+          token_type: 'access',
         })).toString('base64url')}.${crypto.randomUUID()}`
         tokens.set(accessToken, target.userId)
-        administratorIssuedTokens.set(jwtId, {
-          jwtId,
-          targetUserId: target.userId,
-          targetUserName: target.userName,
-          issuedByUserId: user!.userId,
-          issuedAt: now(),
-          expiresAt,
-          reason,
-          accessToken,
-          revoked: false,
-        })
-        value = { accessToken, expiresAt, jwtId, targetUserId: target.userId, targetUserName: target.userName }
-      }
-      else if (route === '/admin/platform/users/{userId}/tokens/{jwtId}' && request.method === 'DELETE') {
-        const issued = administratorIssuedTokens.get(p.jwtId!)
-        if (!issued || issued.issuedByUserId !== user!.userId || issued.targetUserId !== p.userId)
-          return problem(404, '签发记录不存在 / Issued token not found')
-        issued.revoked = true
-        tokens.delete(issued.accessToken)
-        return new Response(null, { status: 204, headers: { 'X-NoCTF-Mock': 'true' } })
+        value = { accessToken, expiresAt, targetUserId: target.userId, targetUserName: target.userName }
       }
       else if (route === '/admin/platform/users/{userId}/tokens' && request.method === 'DELETE') {
-        for (const [jwtId, issued] of administratorIssuedTokens) {
-          if (issued.targetUserId !== p.userId) continue
-          issued.revoked = true
-          tokens.delete(issued.accessToken)
-          administratorIssuedTokens.set(jwtId, issued)
-        }
+        for (const [token, tokenUserId] of tokens)
+          if (tokenUserId === p.userId) tokens.delete(token)
         const target = state.users.find(candidate => candidate.userId === p.userId)
         if (!target) return problem(404, '演示账号不存在 / Mock user not found')
         target.tokenVersion = Number(target.tokenVersion ?? 0) + 1

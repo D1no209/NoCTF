@@ -191,7 +191,6 @@ public sealed class CompetitionEventStore(
         var user = await db.Users.AsNoTracking()
             .Where(item =>
                 item.Id == userId
-                && item.Kind == UserKind.Human
                 && item.AccountStatus == UserAccountStatus.Active)
             .Select(item => new { item.Role })
             .SingleOrDefaultAsync(cancellationToken);

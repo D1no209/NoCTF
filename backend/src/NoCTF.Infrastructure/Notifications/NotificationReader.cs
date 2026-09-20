@@ -243,7 +243,6 @@ public sealed class NotificationReader(NoCtfDbContext db) : INotificationReader
                    OR (n.target_type = 4 AND EXISTS (
                        SELECT 1 FROM users AS u
                        WHERE u.id = {{userId}}
-                         AND u.kind = {{(short)UserKind.Human}}
                          AND u.role = {{(short)UserRole.Administrator}}
                          AND u.account_status = {{(short)UserAccountStatus.Active}}))
             ), participated_roots AS (
@@ -345,7 +344,6 @@ public sealed class NotificationReader(NoCtfDbContext db) : INotificationReader
                 && team.MemberIds.Contains(userId)),
             NotificationTargetType.PlatformAdministrators => user is
             {
-                Kind: UserKind.Human,
                 Role: UserRole.Administrator,
                 AccountStatus: UserAccountStatus.Active
             },

@@ -70,8 +70,7 @@ public enum CompetitionPermissionUpdateState
     RolesOverlap,
     OwnerIncluded,
     UserNotFound,
-    RoleNotEligible,
-    EmailNotVerified
+    RoleNotEligible
 }
 
 public sealed record CompetitionPermissionUpdateResult(

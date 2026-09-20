@@ -52,8 +52,6 @@ public sealed class ChangeCompetitionQuestionStatusEndpoint(
         ChangeCompetitionQuestionStatusRequest request,
         CancellationToken ct)
     {
-        if (!user.IsHuman)
-            return TypedResults.Forbid();
         var result = await change.ExecuteAsync(new(
             Route<Guid>("competitionId"),
             Route<Guid>("threadRootId"),

@@ -7272,7 +7272,7 @@
           "Admin"
         ],
         "summary": "Creates a non-interactive integration Bot.",
-        "description": "Creates a User Notification Relay Bot or Organizer GitOps Bot that cannot use password login or refresh tokens.",
+        "description": "Creates a role-bearing Bot that uses ordinary Access JWT authorization without password login or refresh tokens.",
         "operationId": "AdminPlatformCreateBot",
         "requestBody": {
           "x-name": "CreatePlatformBotRequest",
@@ -7635,7 +7635,7 @@
           "Admin"
         ],
         "summary": "Issues a bounded-lifetime Access JWT for an active user.",
-        "description": "The token uses the target identity and records the issuing administrator without creating a Refresh Token.",
+        "description": "The token is an ordinary target-identity Access JWT without a Refresh Token or server-side session record.",
         "operationId": "AdminPlatformIssueUserToken",
         "parameters": [
           {
@@ -7699,52 +7699,6 @@
                 }
               }
             }
-          }
-        },
-        "security": [
-          {
-            "Bearer": [
-              "Administrator"
-            ]
-          }
-        ]
-      },
-      "get": {
-        "tags": [
-          "Admin"
-        ],
-        "summary": "Lists the caller's active administrator-issued JWTs for one user.",
-        "description": "Executes GET /api/v1/admin/platform/users/{userId}/tokens.",
-        "operationId": "AdminPlatformListUserTokens",
-        "parameters": [
-          {
-            "name": "userId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Success",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationPlatformAdminIssuedAccessTokenListResponse"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Not Found"
-          },
-          "401": {
-            "description": "Unauthorized"
-          },
-          "403": {
-            "description": "Forbidden"
           }
         },
         "security": [
@@ -9014,55 +8968,6 @@
                 }
               }
             }
-          }
-        },
-        "security": [
-          {
-            "Bearer": [
-              "Administrator"
-            ]
-          }
-        ]
-      }
-    },
-    "/api/v1/admin/platform/users/{userId}/tokens/{jwtId}": {
-      "delete": {
-        "tags": [
-          "Admin"
-        ],
-        "summary": "Revokes one JWT previously issued by the calling administrator.",
-        "description": "Executes DELETE /api/v1/admin/platform/users/{userId}/tokens/{jwtId}.",
-        "operationId": "AdminPlatformRevokeUserToken",
-        "parameters": [
-          {
-            "name": "userId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "jwtId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "204": {
-            "description": "No Content"
-          },
-          "404": {
-            "description": "Not Found"
-          },
-          "401": {
-            "description": "Unauthorized"
-          },
-          "403": {
-            "description": "Forbidden"
           }
         },
         "security": [
@@ -13376,7 +13281,7 @@
           "Admin"
         ],
         "summary": "Streams a bounded competition archive.",
-        "description": "Administrator, competition owner, and manager only. Protected Flag values require a human administrator and an explicit reason.",
+        "description": "Administrator, competition owner, and manager only. Protected Flag values require an administrator and an explicit reason.",
         "operationId": "AdminExportCompetitionArchive",
         "parameters": [
           {
@@ -21462,10 +21367,6 @@
             "type": "string",
             "format": "date-time"
           },
-          "jwtId": {
-            "type": "string",
-            "format": "guid"
-          },
           "targetUserId": {
             "type": "string",
             "format": "guid"
@@ -21501,8 +21402,7 @@
         "type": "object",
         "additionalProperties": false,
         "required": [
-          "expiresInSeconds",
-          "reason"
+          "expiresInSeconds"
         ],
         "properties": {
           "expiresInSeconds": {
@@ -21510,11 +21410,6 @@
             "format": "int64",
             "maximum": 31536000.0,
             "minimum": 60.0
-          },
-          "reason": {
-            "type": "string",
-            "minLength": 1,
-            "nullable": false
           }
         }
       },
@@ -21947,46 +21842,6 @@
             "items": {
               "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationPlatformPlatformUserResponse"
             }
-          }
-        }
-      },
-      "NoCTFAPIEndpointsAdministrationPlatformAdminIssuedAccessTokenListResponse": {
-        "type": "object",
-        "additionalProperties": false,
-        "properties": {
-          "items": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationPlatformAdminIssuedAccessTokenResponse"
-            }
-          }
-        }
-      },
-      "NoCTFAPIEndpointsAdministrationPlatformAdminIssuedAccessTokenResponse": {
-        "type": "object",
-        "additionalProperties": false,
-        "properties": {
-          "jwtId": {
-            "type": "string",
-            "format": "guid"
-          },
-          "targetUserId": {
-            "type": "string",
-            "format": "guid"
-          },
-          "targetUserName": {
-            "type": "string"
-          },
-          "issuedAt": {
-            "type": "string",
-            "format": "date-time"
-          },
-          "expiresAt": {
-            "type": "string",
-            "format": "date-time"
-          },
-          "reason": {
-            "type": "string"
           }
         }
       },

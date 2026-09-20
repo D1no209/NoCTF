@@ -282,6 +282,13 @@ public sealed class LastAdministratorConcurrencyPersistenceTests
             ct,
             createDelayTrigger: false);
 
+        await using (var promoteDb = new NoCtfDbContext(options))
+        {
+            var promoted = await new PlatformAdministrationStore(promoteDb, new PasswordHasher<User>())
+                .UpdateRoleAsync(botId, UserRole.Administrator, now.AddSeconds(30), ct);
+            await Assert.That(promoted.State).IsEqualTo(UpdatePlatformRoleState.Updated);
+        }
+
         var downgrade = await UpdateRoleAsync(
             options,
             connectionString,

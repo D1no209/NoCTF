@@ -51,7 +51,7 @@ public class CurrentAccessTokenValidatorTests
     }
 
     [Test]
-    public async Task ImpersonationToken_RequiresProvenanceAndRegisteredJwtId()
+    public async Task LegacyAdministratorIssuedToken_RequiresProvenanceAndRegisteredJwtId()
     {
         var userId = Guid.NewGuid();
         var administratorId = Guid.NewGuid();
@@ -61,8 +61,8 @@ public class CurrentAccessTokenValidatorTests
         [
             new Claim(ClaimTypes.NameIdentifier, userId.ToString()),
             new Claim("token_version", "4"),
-            new Claim(AccessTokenClaims.Impersonation, "true"),
-            new Claim(AccessTokenClaims.ImpersonatorId, administratorId.ToString()),
+            new Claim(LegacyAccessTokenClaims.Impersonation, "true"),
+            new Claim(LegacyAccessTokenClaims.ImpersonatorId, administratorId.ToString()),
             new Claim(JwtRegisteredClaimNames.Jti, jwtId.ToString("N"))
         ], "Bearer"));
 
@@ -71,18 +71,18 @@ public class CurrentAccessTokenValidatorTests
 
         await Assert.That(isCurrent).IsTrue();
         await Assert.That(versions.ObservedToken)
-            .IsEqualTo(new AdministratorIssuedAccessToken(jwtId, administratorId));
+            .IsEqualTo(new LegacyAdministratorIssuedAccessToken(jwtId, administratorId));
     }
 
     [Test]
-    public async Task ImpersonationToken_WithMissingAdministratorClaim_IsRejected()
+    public async Task LegacyAdministratorIssuedToken_WithMissingAdministratorClaim_IsRejected()
     {
         var userId = Guid.NewGuid();
         var principal = new ClaimsPrincipal(new ClaimsIdentity(
         [
             new Claim(ClaimTypes.NameIdentifier, userId.ToString()),
             new Claim("token_version", "4"),
-            new Claim(AccessTokenClaims.Impersonation, "true"),
+            new Claim(LegacyAccessTokenClaims.Impersonation, "true"),
             new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString("N"))
         ], "Bearer"));
 
@@ -146,7 +146,7 @@ public class CurrentAccessTokenValidatorTests
             Guid requestedUserId,
             int tokenVersion,
             CancellationToken cancellationToken,
-            AdministratorIssuedAccessToken? administratorIssuedToken = null) =>
+            LegacyAdministratorIssuedAccessToken? legacyAdministratorIssuedToken = null) =>
             Task.FromResult(requestedUserId == userId && tokenVersion == currentVersion);
     }
 
@@ -155,19 +155,19 @@ public class CurrentAccessTokenValidatorTests
         int currentVersion,
         Guid expectedJwtId) : IAccessTokenVersionReader
     {
-        public AdministratorIssuedAccessToken? ObservedToken { get; private set; }
+        public LegacyAdministratorIssuedAccessToken? ObservedToken { get; private set; }
 
         public Task<bool> IsCurrentAsync(
             Guid requestedUserId,
             int tokenVersion,
             CancellationToken cancellationToken,
-            AdministratorIssuedAccessToken? administratorIssuedToken = null)
+            LegacyAdministratorIssuedAccessToken? legacyAdministratorIssuedToken = null)
         {
-            ObservedToken = administratorIssuedToken;
+            ObservedToken = legacyAdministratorIssuedToken;
             return Task.FromResult(
                 requestedUserId == userId
                 && tokenVersion == currentVersion
-                && administratorIssuedToken?.JwtId == expectedJwtId);
+                && legacyAdministratorIssuedToken?.JwtId == expectedJwtId);
         }
     }
 }

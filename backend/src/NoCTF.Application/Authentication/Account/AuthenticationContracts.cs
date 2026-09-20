@@ -18,7 +18,8 @@ public sealed record IssuedAccessToken(
 public sealed record IssuedRefreshToken(string Token, DateTimeOffset ExpiresAt);
 public sealed record RefreshTokenPrincipal(Guid UserId, int TokenVersion);
 
-public static class AccessTokenClaims
+/// <summary>Read-only compatibility for administrator-issued tokens created before ordinary JWT issuance.</summary>
+public static class LegacyAccessTokenClaims
 {
     public const string Impersonation = "impersonation";
     public const string ImpersonatorId = "impersonator_id";
@@ -127,8 +128,7 @@ public interface IAccessTokenIssuer
     IssuedAccessToken Issue(
         AuthenticatedUser user,
         DateTimeOffset now,
-        TimeSpan? lifetime = null,
-        Guid? impersonatorUserId = null);
+        TimeSpan? lifetime = null);
     IssuedRefreshToken IssueRefresh(AuthenticatedUser user);
     RefreshTokenPrincipal? ValidateRefresh(string token);
 }

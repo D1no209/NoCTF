@@ -60,7 +60,6 @@ public sealed class ExportPlatformAuditArchiveEndpoint(
         var result = await export.ExecuteAsync(new ExportPlatformAuditArchiveCommand(
             user.UserId,
             user.IsAdministrator,
-            user.IsHuman,
             request.Kind is null ? null : PlatformAuditProtocolMapper.ToDomain(request.Kind.Value),
             request.CompetitionId,
             request.ActorId,

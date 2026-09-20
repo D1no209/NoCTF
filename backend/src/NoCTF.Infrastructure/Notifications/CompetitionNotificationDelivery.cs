@@ -74,7 +74,6 @@ public sealed class CompetitionNotificationDelivery(
             return;
         var recipients = await db.Users.AsNoTracking()
             .Where(user => recipientUserIds.Contains(user.Id)
-                && user.Kind == NoCTF.Domain.Identity.UserKind.Human
                 && user.AccountStatus == NoCTF.Domain.Identity.UserAccountStatus.Active)
             .OrderBy(user => user.Id)
             .Select(user => user.Id)

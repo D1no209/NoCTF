@@ -7,6 +7,7 @@ import {
   isImpersonatingSession,
   refreshSession,
   requestImpersonationEnd,
+  restoreImpersonationAccessToken,
   setAccessToken,
   setImpersonationEndHandler,
 } from '../app/lib/session'
@@ -80,6 +81,8 @@ describe('administrator impersonation session', () => {
       throw new Error('refresh must not run')
     }) as typeof fetch
     setImpersonationEndHandler(() => { ended += 1 })
+    clearImpersonationAccessToken()
+    setAccessToken('administrator-token')
     beginImpersonationAccessToken(
       'impersonated-token',
       new Date(Date.now() + 60_000).toISOString(),
@@ -100,10 +103,12 @@ describe('administrator impersonation session', () => {
     expect(getAccessToken()).toBeNull()
   })
 
-  test('expiry clears the target token through the impersonation end handler', async () => {
+  test('expiry restores the saved administrator token through the identity-switch end handler', async () => {
+    clearImpersonationAccessToken()
+    setAccessToken('administrator-token')
     const ended = new Promise<string>((resolve) => {
       setImpersonationEndHandler((reason) => {
-        clearImpersonationAccessToken()
+        restoreImpersonationAccessToken()
         resolve(reason)
       })
     })
@@ -115,7 +120,7 @@ describe('administrator impersonation session', () => {
     try {
       expect(await ended).toBe('expired')
       expect(isImpersonatingSession()).toBeFalse()
-      expect(getAccessToken()).toBeNull()
+      expect(getAccessToken()).toBe('administrator-token')
     }
     finally {
       clearImpersonationAccessToken()
@@ -134,26 +139,26 @@ describe('administrator impersonation session', () => {
     expect(branch).toContain("requestImpersonationEnd('unauthorized')")
     expect(branch).toContain('return response')
     expect(branch).not.toContain('fetch(')
-    expect(auth).toContain('await refreshAdministratorSession()')
+    expect(auth).toContain('restoreImpersonationAccessToken()')
+    expect(auth).toContain('else if (await refreshSession())')
     expect(auth).toContain('user.value?.userId === active.administratorUserId')
     expect(auth).toContain('await navigateTo(active.returnPath)')
   })
 
-  test('user management exposes one-time issue, impersonation, and individual revocation', async () => {
+  test('user management exposes stateless one-time issuance and frontend identity switching', async () => {
     const controller = await sourceFile(new URL('../app/features/routes/admin/platform/useAdminPlatformUsersPage.ts', import.meta.url)).text()
     const view = await sourceFile(new URL('../app/components/views/page/admin/platform/AdminPlatformUsersPageView.vue', import.meta.url)).text()
     const layout = await sourceFile(new URL('../app/components/views/layout/DefaultLayoutView.vue', import.meta.url)).text()
 
     expect(controller).toContain('adminPlatformIssueUserToken')
-    expect(controller).toContain('adminPlatformListUserTokens')
-    expect(controller).toContain('adminPlatformRevokeUserToken')
+    expect(controller).not.toContain('adminPlatformListUserTokens')
+    expect(controller).not.toContain('adminPlatformRevokeUserToken')
     expect(controller).toContain('issuedToken.value = null')
     expect(controller).toContain('!tokenIssueRequests.isCurrent(request) || !tokenOpen.value')
-    expect(controller).toContain('!tokenListRequests.isCurrent(request) || detail.value?.id !== targetUserId')
-    expect(controller).toContain('function clearIssuedTokens(): void')
     expect(controller).toContain('await startImpersonation({')
     expect(view).toContain("openToken(detail, 'impersonate')")
-    expect(view).toContain('revokeIssuedToken(token)')
+    expect(view).not.toContain('revokeIssuedToken(token)')
+    expect(view).not.toContain('tokenReason')
     expect(layout).toContain('impersonation.targetUserName')
     expect(layout).toContain('endImpersonation')
     expect(layout).toContain('sticky top-20')
@@ -161,5 +166,25 @@ describe('administrator impersonation session', () => {
     expect(layout).toContain('slot-name="impersonation-banner"')
     expect(layout).toContain('aria-live="polite"')
     expect(layout).toContain('<CardContent class="flex flex-wrap items-center justify-between gap-3">')
+  })
+
+  test('identity switching restores the exact previous token and rejects nesting', () => {
+    clearImpersonationAccessToken()
+    setAccessToken('administrator-token')
+    beginImpersonationAccessToken('target-token', new Date(Date.now() + 60_000).toISOString())
+
+    expect(beginImpersonationAccessToken(
+      'nested-token',
+      new Date(Date.now() + 60_000).toISOString(),
+    )).toBeFalse()
+    expect(restoreImpersonationAccessToken()).toBe('administrator-token')
+    expect(getAccessToken()).toBe('administrator-token')
+    expect(isImpersonatingSession()).toBeFalse()
+  })
+
+  test('access tokens remain memory-only', async () => {
+    const session = await sourceFile(new URL('../app/lib/session.ts', import.meta.url)).text()
+    expect(session).not.toContain('.localStorage')
+    expect(session).not.toContain('.sessionStorage')
   })
 })

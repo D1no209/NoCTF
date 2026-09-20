@@ -14,8 +14,10 @@
 仍为非空：服务端生成 `bot-<user-id-N>@bot.invalid`，并用一次性随机 GUID 生成 dummy
 PasswordHash 后立即丢弃明文。Bot 不能调用 Login、ChangePassword、Refresh 或邮箱验证流程；
 即使 dummy password 泄露也必须按 UserKind 拒绝。Bot 登录尝试与普通错误凭据使用相同响应。
-Bot 与 Human 共用 UserRole、TokenVersion 和资源授权；比赛 GitOps Bot 通常使用 Organizer
-角色并被显式加入目标 Competition.ManagerIds。
+Bot 与 Human 共用 UserRole、TokenVersion 和全部业务授权，可直接被赋予 User、Organizer 或
+Administrator，并按相同规则成为 Owner、Manager、Judge、Observer 或队员。平台始终保留至少一个
+Active Human Administrator，以确保仍存在可交互登录的管理入口。比赛 GitOps Bot 通常只需
+Organizer，QQBOT 通常只需 User；这是最小权限部署选择，不是平台硬编码。
 
 ## Access JWT
 
@@ -23,11 +25,12 @@ Bot 与 Human 共用 UserRole、TokenVersion 和资源授权；比赛 GitOps Bot
 - Administrator 可以为任意 Active 账号签发 60 秒至 1 年的普通 Access JWT；它使用相同 access audience 和 `token_type=access`，不签发目标 Refresh JWT。
 - 客户端在内存持有，以 Bearer Header 使用。
 - Claims 至少含 sub、role、user_kind、token_version、CSPRNG jti、iat、exp、aud 与 `token_type=access`。
-- 管理员签发的 JWT 额外包含 `impersonation=true` 与 `impersonator_id`，并以 append-only 管理审计事实登记 jti、目标、签发者、原因和到期时间；完整 JWT 永不持久化。目标账号匿名化或物理删除后，这些审计事实及签发时的目标用户名仍永久保留。
-- 管理员只能逐枚吊销自己签发且仍有效的 JWT。吊销追加不可变事实；认证必须确认签发事实存在且不存在对应吊销事实，不能只依赖进程内存或 Redis。
+- 管理员签发的 JWT 与登录 Access JWT 使用相同 Claims，不包含 impersonation 或签发管理员来源。
+- 新签发 JWT 不建立服务端会话、不记录签发事实且不支持单枚吊销；`jti` 仅作为普通唯一标识。旧版带 impersonation Claims 的存量 JWT 在最长一年兼容期内继续按历史签发/吊销事实校验，避免已吊销令牌重新生效。
 - 每个认证请求比较当前 TokenVersion：Redis 命中直接比较，未命中查 PostgreSQL 回填；Redis 故障回退数据库，不能绕过。
 - 角色/密码/全局退出修改 TokenVersion，并通过 Outbox 失效缓存。
-- 管理员对账号执行全量 Token 撤销同样递增 TokenVersion；模拟身份不能嵌套签发或撤销 JWT。
+- 管理员对账号执行全量 Token 撤销同样递增 TokenVersion。
+- Web 身份模拟只在 SPA 内存中保存原管理员 Access JWT 并切换为目标普通 JWT；退出时原样恢复，后端没有模拟会话或模拟权限分支。当前页面禁止嵌套切换，页面刷新后通过原管理员 Refresh Cookie 恢复普通会话。
 
 Administrator 将 Organizer 降级为 User 前，必须确认其不是任何未删除 Competition/Challenge 的 Owner 或 Manager；否则返回 409 并列出阻塞资源 Id。角色更新和 TokenVersion++ 同事务，旧 Access/Refresh JWT 随后都失效。
 

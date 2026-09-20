@@ -54,4 +54,4 @@
 
 ## 已废弃内容
 
-旧 Penetration、QQBot 专用 Agent/群组同步协议、插件式 GameMode、进程内队列、`runtime_operations`、`runtime_artifacts`、TeamMember 顺序队长模型和 CompetitionCollaborator 子表不属于目标架构。QQBOT 只能作为普通 User Bot，以 JWT 消费公开 API 与 SignalR。仓库历史、旧提交或外部说明中出现这些旧设计时，不得据此恢复它们。
+旧 Penetration、QQBot 专用 Agent/群组同步协议、插件式 GameMode、进程内队列、`runtime_operations`、`runtime_artifacts`、TeamMember 顺序队长模型和 CompetitionCollaborator 子表不属于目标架构。QQBOT 以最小权限 User Bot 和普通 JWT 消费公开 API 与 SignalR；平台的 Bot 权限模型本身仍与 Human 对等。仓库历史、旧提交或外部说明中出现这些旧设计时，不得据此恢复它们。

@@ -38,8 +38,8 @@ Record, byte, time, and memory limits fail with stable protocol codes. Request c
 ## Authorization and audit
 
 - Competition exports require platform administrator, competition owner, or competition manager access.
-- Plaintext protected Flags additionally require a human platform administrator and an 8–512 character reason.
-- Platform audit exports require a human platform administrator.
+- Plaintext protected Flags additionally require a platform administrator and an 8–512 character reason.
+- Platform audit exports require a platform administrator; Human and Bot identities with that role are equivalent.
 - Successful competition archive creation records one staff-only competition event without exported contents.
 - Successful platform audit archive creation records one append-only administrator audit notification without exported contents.
 

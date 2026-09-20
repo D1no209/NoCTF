@@ -7,8 +7,9 @@
 
 ## 1. 身份与平台接口
 
-平台管理员创建 `User` 角色 Bot 身份并签发 Access JWT。该账号不设置密码、不获得 Refresh
-Token、不加入队伍，也不进入比赛 Owner、Manager、Judge 或 Observer。JWT 只写入 BOT Secret，
+平台管理员为 QQBOT 创建最小权限的 `User` 角色 Bot 身份并签发普通 Access JWT。平台本身允许 Bot
+按角色和资源关系参与业务；QQBOT 运维约定主动不加入队伍，也不担任 Owner、Manager、Judge 或
+Observer，以避免获得播报所不需要的权限。该账号不设置密码、不获得 Refresh Token。JWT 只写入 BOT Secret，
 不得进入源码、镜像、普通配置、日志或截图。BOT 启动时调用 `GET /api/v1/auth/me`，只有
 `kind=Bot` 且 `role=User` 才继续运行。
 

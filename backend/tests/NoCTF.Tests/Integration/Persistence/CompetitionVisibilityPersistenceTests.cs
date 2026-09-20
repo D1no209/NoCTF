@@ -69,7 +69,7 @@ public sealed class CompetitionVisibilityPersistenceTests
 
     [Test]
     [Timeout(300_000)]
-    public async Task Blackout_hides_public_and_bot_data_but_trusted_humans_remain_live(
+    public async Task Blackout_hides_public_data_but_all_trusted_collaborators_remain_live(
         CancellationToken ct)
     {
         await RunAsync("noctf_visibility_access", async fixture =>
@@ -94,7 +94,7 @@ public sealed class CompetitionVisibilityPersistenceTests
                 ct);
 
             await Assert.That(participant?.DataScope).IsEqualTo(LeaderboardDataScope.Hidden);
-            await Assert.That(observerBot?.DataScope).IsEqualTo(LeaderboardDataScope.Hidden);
+            await Assert.That(observerBot?.DataScope).IsEqualTo(LeaderboardDataScope.Live);
             await Assert.That(humanObserver?.DataScope).IsEqualTo(LeaderboardDataScope.Live);
             await Assert.That(humanObserver?.Visibility)
                 .IsEqualTo(CompetitionLeaderboardVisibility.Blackout);

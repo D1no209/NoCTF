@@ -1,6 +1,6 @@
 namespace NoCTF.Application.Authentication.RefreshSession;
 
-public sealed record AdministratorIssuedAccessToken(
+public sealed record LegacyAdministratorIssuedAccessToken(
     Guid JwtId,
     Guid AdministratorUserId);
 
@@ -10,5 +10,5 @@ public interface IAccessTokenVersionReader
         Guid userId,
         int tokenVersion,
         CancellationToken cancellationToken,
-        AdministratorIssuedAccessToken? administratorIssuedToken = null);
+        LegacyAdministratorIssuedAccessToken? legacyAdministratorIssuedToken = null);
 }

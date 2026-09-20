@@ -40,7 +40,7 @@ public sealed class UnbindSsoIdentityEndpoint(
         UnbindSsoIdentityRequest request,
         CancellationToken ct)
     {
-        if (!user.IsHuman || user.IsImpersonating)
+        if (!user.IsHuman)
             return SsoEndpointProblems.Create(SsoFailureCode.AccountUnavailable);
         var result = await unbind.ExecuteAsync(user.UserId, request.Password, ct);
         if (!result.Succeeded)

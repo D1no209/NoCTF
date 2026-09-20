@@ -18,7 +18,6 @@ public sealed class CompetitionQuestionAccessResolver(NoCtfDbContext db)
     {
         var user = await db.Users.AsNoTracking()
             .Where(candidate => candidate.Id == actorUserId
-                && candidate.Kind == UserKind.Human
                 && candidate.AccountStatus == UserAccountStatus.Active)
             .Select(candidate => new { candidate.Role })
             .SingleOrDefaultAsync(ct);

@@ -56,7 +56,7 @@ public sealed class CompetitionEventPersistenceTests
                     Id = ids.CompetitionId,
                     OwnerId = ids.OwnerId,
                     ManagerIds = [ids.ManagerId],
-                    JudgeIds = [ids.JudgeId],
+                    JudgeIds = [ids.JudgeId, ids.BotId],
                     ObserverIds = [ids.ObserverId],
                     Title = "Event feed competition",
                     Mode = GameMode.Ctf,
@@ -326,7 +326,8 @@ public sealed class CompetitionEventPersistenceTests
                 ids.AdministratorId,
                 ids.OwnerId,
                 ids.ManagerId,
-                ids.JudgeId
+                ids.JudgeId,
+                ids.BotId
             };
             foreach (var readerId in archivedValueReaders)
             {
@@ -361,12 +362,12 @@ public sealed class CompetitionEventPersistenceTests
                     && item.OccurredAt == archivedAccessedAt)
                 .ToListAsync(ct);
             await Assert.That(archivedValueAudits.Select(item => item.ActorUserId!.Value))
-                .IsEquivalentTo([ids.OwnerId, ids.ManagerId, ids.JudgeId]);
+                .IsEquivalentTo([ids.OwnerId, ids.ManagerId, ids.JudgeId, ids.BotId]);
 
             var bot = await store.QueryAsync(Query(ids, ids.BotId, now), ct);
-            await Assert.That(bot.State).IsEqualTo(CompetitionEventReadState.Forbidden);
+            await Assert.That(bot.State).IsEqualTo(CompetitionEventReadState.Available);
             await Assert.That(outbox.Messages.OfType<CompetitionEventCommitted>()).Count()
-                .IsEqualTo(10);
+                .IsEqualTo(11);
 
             var immutable = await db.CompetitionEvents.SingleAsync(
                 item => item.Id == eventIds[0], ct);

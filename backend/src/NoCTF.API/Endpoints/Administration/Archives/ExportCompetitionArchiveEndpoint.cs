@@ -39,7 +39,7 @@ public sealed class ExportCompetitionArchiveEndpoint(
         {
             summary.Summary = "Streams a bounded competition archive.";
             summary.Description =
-                "Administrator, competition owner, and manager only. Protected Flag values require a human administrator and an explicit reason.";
+                "Administrator, competition owner, and manager only. Protected Flag values require an administrator and an explicit reason.";
         });
     }
 
@@ -52,14 +52,12 @@ public sealed class ExportCompetitionArchiveEndpoint(
             Route<Guid>("competitionId"),
             user.UserId,
             user.IsAdministrator,
-            user.IsHuman,
             request.IncludeProtectedFlags,
             request.Reason), ct);
         if (result.Failure == SynchronousArchiveFailure.SubjectNotFound)
             return TypedResults.NotFound();
         if (result.Failure is SynchronousArchiveFailure.Forbidden
-            or SynchronousArchiveFailure.ProtectedFlagsRequireAdministrator
-            or SynchronousArchiveFailure.ProtectedFlagsRequireHuman)
+            or SynchronousArchiveFailure.ProtectedFlagsRequireAdministrator)
         {
             return TypedResults.Forbid();
         }
