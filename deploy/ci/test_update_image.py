@@ -95,9 +95,11 @@ class DeploymentSafetyTests(unittest.TestCase):
         self.assertFalse(managed_ssh_client(client, [runner]))
 
     def test_ci_rejects_the_production_host_before_any_deployment_io(self):
-        with patch("update_image.socket.gethostname", return_value="dino209"):
-            with self.assertRaisesRegex(RuntimeError, "CI must never deploy to production"):
-                deploy(SimpleNamespace(manual_production=False))
+        for hostname in ("dino209", "kmm4GtiU65FR1Y"):
+            with self.subTest(hostname=hostname), \
+                    patch("update_image.socket.gethostname", return_value=hostname):
+                with self.assertRaisesRegex(RuntimeError, "CI must never deploy to production"):
+                    deploy(SimpleNamespace(manual_production=False))
 
     def test_manual_production_flag_cannot_target_a_different_host(self):
         with patch("update_image.socket.gethostname", return_value="test-server"):
