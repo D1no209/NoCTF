@@ -6,6 +6,7 @@ using NSubstitute;
 using NoCTF.Application.Challenges.Management;
 using NoCTF.Application.Competitions.Events;
 using NoCTF.Application.Competitions.Webhooks;
+using NoCTF.Application.Competitions.Tracks;
 using NoCTF.Application.Scoring.Leaderboard;
 using NoCTF.Domain.Competitions;
 using NoCTF.Domain.Identity;
@@ -128,6 +129,7 @@ public sealed class CompetitionWebhookPersistenceTests
                     deliveryDb,
                     protector,
                     new GetChallenge(Substitute.For<IChallengeManagementStore>()),
+                    new GetCompetitionTracks(Substitute.For<ICompetitionTrackStore>()),
                     Substitute.For<ILeaderboardCache>(),
                     new CompetitionWebhookOptions(
                         new Uri("https://noctf.example.test/"),
@@ -183,6 +185,7 @@ public sealed class CompetitionWebhookPersistenceTests
                     batchingDb,
                     protector,
                     new GetChallenge(Substitute.For<IChallengeManagementStore>()),
+                    new GetCompetitionTracks(Substitute.For<ICompetitionTrackStore>()),
                     Substitute.For<ILeaderboardCache>(),
                     new CompetitionWebhookOptions(
                         new Uri("https://noctf.example.test/"),
