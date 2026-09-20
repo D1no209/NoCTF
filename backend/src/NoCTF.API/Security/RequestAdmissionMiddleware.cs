@@ -6,7 +6,17 @@ using NoCTF.Application.Authentication.Privacy;
 
 namespace NoCTF.API.Security;
 
-public enum ProtectedEntry { Authentication, Registration, PatchUpload, RuntimeCommand, ManualAdjustment, FlagSubmission }
+public enum ProtectedEntry
+{
+    Authentication,
+    Registration,
+    SsoAuthentication,
+    SsoCallback,
+    PatchUpload,
+    RuntimeCommand,
+    ManualAdjustment,
+    FlagSubmission
+}
 public sealed record ProtectedEntryMetadata(ProtectedEntry Entry);
 
 public sealed class RequestAdmissionMiddleware(RequestDelegate next)
@@ -37,7 +47,8 @@ public sealed class RequestAdmissionMiddleware(RequestDelegate next)
             return;
         }
         var rates = new List<RateQuota>(); var slots = new List<ConcurrentQuota>();
-        if (entry is ProtectedEntry.Authentication or ProtectedEntry.Registration)
+        if (entry is ProtectedEntry.Authentication or ProtectedEntry.Registration
+            or ProtectedEntry.SsoAuthentication or ProtectedEntry.SsoCallback)
             rates.Add(new($"authentication-ip:{ip}", options.Value.AuthenticationIpPerMinute, 60));
         else
         {
@@ -58,6 +69,17 @@ public sealed class RequestAdmissionMiddleware(RequestDelegate next)
             var targetKey = Guid.TryParse(context.Request.RouteValues["runtimeInstanceId"]?.ToString(), out var canonicalTargetId)
                 ? canonicalTargetId.ToString("N") : "invalid";
             slots.Add(new($"patch-target:{targetKey}", 1));
+        }
+        if (entry == ProtectedEntry.SsoCallback)
+        {
+            slots.Add(new("sso-protocol-global", options.Value.SsoProtocolConcurrency));
+            var providerKey = Guid.TryParse(
+                context.Request.RouteValues["providerId"]?.ToString(),
+                out var providerId)
+                ? providerId.ToString("N")
+                : "invalid";
+            slots.Add(new($"sso-protocol-provider:{providerKey}",
+                options.Value.SsoPerProviderConcurrency));
         }
         if (policy == "submission" || entry == ProtectedEntry.FlagSubmission)
         {
