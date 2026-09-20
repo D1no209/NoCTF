@@ -16,7 +16,8 @@
 - OpenAPI 与生成 SDK 连续执行哈希一致。
 
 本轮最终专项结果：Release 全解构建零警告；后端非集成测试 `1392/1392` 通过；Webhook 的真实
-PostgreSQL、Redis、NATS 集成测试 `3/3` 通过；Webhook 签名与网络单元测试 `11/11` 通过；前端
+PostgreSQL、Redis、NATS 集成测试 `3/3` 通过；Webhook 签名、环回 HTTP 状态码与网络单元测试
+`22/22` 通过；前端
 Webhook 专项 `2/2`、typecheck、架构审计和生产生成通过。
 
 前端全量测试为 `596` 通过、`2` 失败。失败分别是既有 Runtime 管理布局断言和全局字体断言；对应
