@@ -399,7 +399,9 @@ public sealed class CompetitionRefreshService(
             }
             if (result.State == NoCtfReadState.NotFound)
             {
-                SuspendCompetition(competitionId, subscriptions, "announcements_unavailable");
+                logger.LogDebug(
+                    "Public announcement feed is not available for competition {CompetitionId}; announcement forwarding is skipped.",
+                    competitionId);
                 return;
             }
             if (result.State != NoCtfReadState.Available || result.Value is null)
