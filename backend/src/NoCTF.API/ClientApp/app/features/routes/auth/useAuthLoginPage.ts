@@ -1,6 +1,8 @@
 import { toast } from 'vue-sonner'
 import { useHumanVerification } from '~/features/security/useHumanVerification'
 import { useAuthThemeArtwork } from './useAuthThemeArtwork'
+import { authenticationSsoBeginLogin, authenticationSsoListProviders } from '~/api'
+import type { NoCtfapiEndpointsAuthenticationPublicSsoProviderResponse } from '~/api'
 
 /** Owns the standalone login page workflow. */
 export function useAuthLoginPage() {
@@ -46,6 +48,39 @@ export function useAuthLoginPage() {
   })
   const capCanRetry = computed(() => capVerification.value?.state === 'error')
   const submitDisabled = computed(() => pending.value && !capCanRetry.value)
+  const ssoProviders = ref<NoCtfapiEndpointsAuthenticationPublicSsoProviderResponse[]>([])
+  const ssoLoading = ref(true)
+  const ssoPendingId = ref<string | null>(null)
+
+  async function loadSsoProviders() {
+    ssoLoading.value = true
+    const { data } = await authenticationSsoListProviders()
+    ssoProviders.value = data?.items ?? []
+    ssoLoading.value = false
+  }
+
+  async function beginSso(providerId: string) {
+    if (ssoPendingId.value) return
+    error.value = null
+    ssoPendingId.value = providerId
+    const candidate = route.query.redirect
+    const returnPath = typeof candidate === 'string' && candidate.startsWith('/') && !candidate.startsWith('//')
+      ? candidate
+      : '/'
+    try {
+      const { data, error: requestError } = await authenticationSsoBeginLogin({
+        body: { providerId, returnPath },
+      })
+      if (requestError || !data?.authorizationUrl) throw requestError
+      window.location.assign(data.authorizationUrl)
+    }
+    catch (requestError) {
+      error.value = parseApiError(requestError, translate('sso.loginStartFailed')).message
+      ssoPendingId.value = null
+    }
+  }
+
+  onMounted(() => void loadSsoProviders())
 
   async function submit() {
     if (pending.value) {
@@ -95,6 +130,10 @@ export function useAuthLoginPage() {
     capCanRetry,
     submitDisabled,
     submit,
+    ssoProviders,
+    ssoLoading,
+    ssoPendingId,
+    beginSso,
   }
 }
 

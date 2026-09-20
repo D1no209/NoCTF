@@ -1214,6 +1214,26 @@ export type NoCtfapiEndpointsChallengesQuestionsListCompetitionQuestionsRequest 
     [key: string]: never;
 };
 
+export type NoCtfapiEndpointsAuthenticationBeginSsoLoginResponse = {
+    flowId?: string;
+    authorizationUrl?: string;
+    expiresAt?: string;
+};
+
+export type NoCtfapiEndpointsAuthenticationBeginSsoBindingRequest = {
+    providerId: string;
+    password: string;
+};
+
+export type NoCtfapiEndpointsAuthenticationBeginSsoLoginRequest = {
+    providerId: string;
+    returnPath: string;
+};
+
+export type NoCtfapiEndpointsAuthenticationCasSsoCallbackRequest = {
+    [key: string]: never;
+};
+
 export type NoCtfapiEndpointsAuthenticationChangePasswordFailureResponse = {
     code?: NoCtfapiEndpointsAuthenticationChangePasswordFailureCode;
     detail?: string;
@@ -1237,6 +1257,37 @@ export type NoCtfapiEndpointsAuthenticationCompletePasswordResetRequest = {
     newPassword: string;
 };
 
+export type NoCtfapiEndpointsAuthenticationMySsoBindingResponse = {
+    providerId?: string;
+    providerName?: string;
+    protocol?: NoCtfapiEndpointsAuthenticationPublicSsoProtocol;
+    identityNamespace?: string;
+    subject?: string;
+    boundAt?: string;
+};
+
+export type NoCtfapiEndpointsAuthenticationPublicSsoProtocol = 'Oidc' | 'Cas';
+
+export type NoCtfapiEndpointsAuthenticationCompleteSsoBindingRequest = {
+    [key: string]: never;
+};
+
+export type NoCtfapiEndpointsAuthenticationCompleteSsoLoginResponse = {
+    userId?: string;
+    userName?: string;
+    role?: NoCtfapiEndpointsAuthenticationUserRoleProtocol;
+    emailVerified?: boolean;
+    accessToken?: string;
+    expiresAt?: string;
+    returnPath?: string;
+};
+
+export type NoCtfapiEndpointsAuthenticationUserRoleProtocol = 'User' | 'Organizer' | 'Administrator';
+
+export type NoCtfapiEndpointsAuthenticationCompleteSsoLoginRequest = {
+    [key: string]: never;
+};
+
 export type NoCtfapiEndpointsAuthenticationCurrentUserResponse = {
     userId?: string;
     userName?: string;
@@ -1248,8 +1299,6 @@ export type NoCtfapiEndpointsAuthenticationCurrentUserResponse = {
     wallpaperRevision?: string | null;
     wallpaperEnabled?: boolean;
 };
-
-export type NoCtfapiEndpointsAuthenticationUserRoleProtocol = 'User' | 'Organizer' | 'Administrator';
 
 export type NoCtfapiEndpointsAuthenticationUserKindProtocol = 'Human' | 'Bot';
 
@@ -1273,6 +1322,36 @@ export type NoCtfapiEndpointsAuthenticationCurrentUserPrivacyResponse = {
     ipRetentionDays?: number;
 };
 
+export type NoCtfapiEndpointsAuthenticationMySsoBindingConfigurationResponse = {
+    binding?: NoCtfapiEndpointsAuthenticationMySsoBindingResponse | null;
+    providers?: Array<NoCtfapiEndpointsAuthenticationBindableSsoProviderResponse>;
+};
+
+export type NoCtfapiEndpointsAuthenticationBindableSsoProviderResponse = {
+    id?: string;
+    name?: string;
+    protocol?: NoCtfapiEndpointsAuthenticationPublicSsoProtocol;
+};
+
+export type NoCtfapiEndpointsAuthenticationSsoFlowStatusResponse = {
+    flowId?: string;
+    state?: NoCtfapiEndpointsAuthenticationSsoFlowStateProtocol;
+    intent?: NoCtfapiEndpointsAuthenticationSsoFlowIntentProtocol;
+    providerName?: string | null;
+    displayName?: string | null;
+    subject?: string | null;
+    failureCode?: string | null;
+    expiresAt?: string;
+};
+
+export type NoCtfapiEndpointsAuthenticationSsoFlowStateProtocol = 'Pending' | 'Processing' | 'Authenticated' | 'Failed' | 'Consumed';
+
+export type NoCtfapiEndpointsAuthenticationSsoFlowIntentProtocol = 'Login' | 'Bind' | 'AdministratorTest';
+
+export type NoCtfapiEndpointsAuthenticationGetSsoFlowRequest = {
+    [key: string]: never;
+};
+
 export type NoCtfapiEndpointsAuthenticationPublicUserProfileResponse = {
     userId?: string;
     userName?: string;
@@ -1282,6 +1361,16 @@ export type NoCtfapiEndpointsAuthenticationPublicUserProfileResponse = {
 
 export type NoCtfapiEndpointsAuthenticationGetUserProfileRequest = {
     [key: string]: never;
+};
+
+export type NoCtfapiEndpointsAuthenticationPublicSsoProviderListResponse = {
+    items?: Array<NoCtfapiEndpointsAuthenticationPublicSsoProviderResponse>;
+};
+
+export type NoCtfapiEndpointsAuthenticationPublicSsoProviderResponse = {
+    id?: string;
+    name?: string;
+    protocol?: NoCtfapiEndpointsAuthenticationPublicSsoProtocol;
 };
 
 export type NoCtfapiEndpointsAuthenticationLoginResponse = {
@@ -1296,6 +1385,10 @@ export type NoCtfapiEndpointsAuthenticationLoginResponse = {
 export type NoCtfapiEndpointsAuthenticationLoginRequest = {
     login: string;
     password: string;
+};
+
+export type NoCtfapiEndpointsAuthenticationOidcSsoCallbackRequest = {
+    [key: string]: never;
 };
 
 export type NoCtfapiEndpointsAuthenticationCurrentUserProfilePatchFailureResponse = {
@@ -1362,6 +1455,10 @@ export type NoCtfapiEndpointsAuthenticationRequestPasswordResetAcceptedResponse 
 
 export type NoCtfapiEndpointsAuthenticationRequestPasswordResetRequest = {
     email: string;
+};
+
+export type NoCtfapiEndpointsAuthenticationUnbindSsoIdentityRequest = {
+    password: string;
 };
 
 export type NoCtfapiEndpointsAuthenticationAvatarUploadFailureResponse = {
@@ -1521,6 +1618,10 @@ export type NoCtfapiEndpointsAdministrationRuntimeListAdminRuntimesRequest = {
     [key: string]: never;
 };
 
+export type NoCtfapiEndpointsAdministrationPlatformBeginSsoAuthenticationTestRequest = {
+    [key: string]: never;
+};
+
 export type NoCtfapiEndpointsAdministrationPlatformPlatformUserResponse = {
     id?: string;
     userName?: string;
@@ -1539,6 +1640,75 @@ export type NoCtfapiEndpointsAuthenticationUserAccountStatusProtocol = 'Active' 
 export type NoCtfapiEndpointsAdministrationPlatformCreatePlatformBotRequest = {
     userName: string;
     role?: NoCtfapiEndpointsAuthenticationUserRoleProtocol;
+};
+
+export type NoCtfapiEndpointsAdministrationPlatformSsoConfigurationResponse = {
+    enabled?: boolean;
+    publicBaseUrl?: string;
+    providers?: Array<NoCtfapiEndpointsAdministrationPlatformSsoProviderResponse>;
+    updatedAt?: string;
+};
+
+export type NoCtfapiEndpointsAdministrationPlatformSsoProviderResponse = {
+    id?: string;
+    name?: string;
+    protocol?: NoCtfapiEndpointsAdministrationPlatformSsoProtocolProtocol;
+    enabled?: boolean;
+    allowLogin?: boolean;
+    allowBinding?: boolean;
+    timeoutSeconds?: number;
+    allowedHosts?: Array<string>;
+    oidc?: NoCtfapiEndpointsAdministrationPlatformOidcSsoProviderResponse | null;
+    cas?: NoCtfapiEndpointsAdministrationPlatformCasSsoProviderResponse | null;
+};
+
+export type NoCtfapiEndpointsAdministrationPlatformSsoProtocolProtocol = 'Oidc' | 'Cas';
+
+export type NoCtfapiEndpointsAdministrationPlatformOidcSsoProviderResponse = {
+    issuer?: string;
+    discoveryUrl?: string;
+    clientId?: string;
+    scopes?: Array<string>;
+    readUserInfo?: boolean;
+    displayNameClaim?: string;
+    secretConfigured?: boolean;
+};
+
+export type NoCtfapiEndpointsAdministrationPlatformCasSsoProviderResponse = {
+    identityNamespace?: string;
+    loginUrl?: string;
+    serviceValidateUrl?: string;
+    displayNameAttribute?: string;
+};
+
+export type NoCtfapiEndpointsAdministrationPlatformCreateSsoProviderRequest = NoCtfapiEndpointsAdministrationPlatformSsoProviderWriteRequest & {};
+
+export type NoCtfapiEndpointsAdministrationPlatformSsoProviderWriteRequest = {
+    name: string;
+    protocol: NoCtfapiEndpointsAdministrationPlatformSsoProtocolProtocol;
+    enabled: boolean;
+    allowLogin: boolean;
+    allowBinding: boolean;
+    timeoutSeconds: number;
+    allowedHosts: Array<string>;
+    oidc?: NoCtfapiEndpointsAdministrationPlatformOidcSsoProviderRequest | null;
+    cas?: NoCtfapiEndpointsAdministrationPlatformCasSsoProviderRequest | null;
+};
+
+export type NoCtfapiEndpointsAdministrationPlatformOidcSsoProviderRequest = {
+    issuer: string;
+    discoveryUrl: string;
+    clientId: string;
+    scopes: Array<string>;
+    readUserInfo: boolean;
+    displayNameClaim: string;
+};
+
+export type NoCtfapiEndpointsAdministrationPlatformCasSsoProviderRequest = {
+    identityNamespace: string;
+    loginUrl: string;
+    serviceValidateUrl: string;
+    displayNameAttribute: string;
 };
 
 export type NoCtfapiEndpointsAdministrationPlatformPlatformUserDeletionResponse = {
@@ -1873,7 +2043,7 @@ export type NoCtfapiEndpointsAdministrationPlatformPlatformAuditKindProtocol = '
 
 export type NoCtfapiEndpointsAdministrationPlatformUserAccountLifecycleActionProtocol = 'Activated' | 'Banned' | 'Disabled' | 'EmailVerified' | 'EmailUnverified' | 'Anonymized' | 'PhysicallyDeleted';
 
-export type NoCtfapiEndpointsAdministrationPlatformPlatformAdministrationActionProtocol = 'AuditArchiveExported' | 'UserAccessTokenIssued' | 'UserAccessTokenRevoked' | 'UserTokensInvalidated';
+export type NoCtfapiEndpointsAdministrationPlatformPlatformAdministrationActionProtocol = 'AuditArchiveExported' | 'UserAccessTokenIssued' | 'UserAccessTokenRevoked' | 'UserTokensInvalidated' | 'SsoGlobalConfigurationUpdated' | 'SsoProviderCreated' | 'SsoProviderUpdated' | 'SsoProviderSecretReplaced' | 'SsoExternalIdentityBound' | 'SsoExternalIdentityUnbound';
 
 export type NoCtfapiEndpointsAdministrationPlatformListPlatformAuditLogsRequest = {
     [key: string]: never;
@@ -2005,6 +2175,11 @@ export type NoCtfapiEndpointsAdministrationPlatformPatchPlatformUserRequest = {
 
 export type NoCtfapiEndpointsAdministrationPlatformPlatformManagedUserAccountStatusProtocol = 'Active' | 'Banned' | 'Disabled';
 
+export type NoCtfapiEndpointsAdministrationPlatformPatchSsoConfigurationRequest = {
+    enabled: boolean;
+    publicBaseUrl: string;
+};
+
 export type NoCtfapiEndpointsAdministrationPlatformReplaceEmailVerificationPasswordRequest = {
     password: string;
 };
@@ -2014,10 +2189,28 @@ export type NoCtfapiEndpointsAdministrationPlatformReplaceHumanVerificationSecre
     secret: string;
 };
 
+export type NoCtfapiEndpointsAdministrationPlatformReplaceSsoProviderSecretRequest = {
+    secret: string;
+};
+
+export type NoCtfapiEndpointsAdministrationPlatformSsoProviderConnectionTestResponse = {
+    succeeded?: boolean;
+    protocol?: NoCtfapiEndpointsAdministrationPlatformSsoProtocolProtocol | null;
+    issuer?: string | null;
+    failureStage?: string | null;
+    failureCode?: string | null;
+};
+
+export type NoCtfapiEndpointsAdministrationPlatformTestSsoProviderConnectionRequest = {
+    [key: string]: never;
+};
+
 export type NoCtfapiEndpointsAdministrationPlatformUpdateCapWorkloadConfigurationRequest = {
     difficulty: number;
     challengeCount: number;
 };
+
+export type NoCtfapiEndpointsAdministrationPlatformUpdateSsoProviderRequest = NoCtfapiEndpointsAdministrationPlatformSsoProviderWriteRequest & {};
 
 export type NoCtfapiEndpointsAdministrationPlatformUploadPlatformLogoRequest = {
     file: Blob | File;
@@ -5291,6 +5484,83 @@ export type GetCompetitionQuestionResponses = {
 
 export type GetCompetitionQuestionResponse = GetCompetitionQuestionResponses[keyof GetCompetitionQuestionResponses];
 
+export type AuthenticationSsoBeginBindingData = {
+    body: NoCtfapiEndpointsAuthenticationBeginSsoBindingRequest;
+    path?: never;
+    query?: never;
+    url: '/api/v1/auth/me/sso-binding/flows';
+};
+
+export type AuthenticationSsoBeginBindingErrors = {
+    /**
+     * Bad Request
+     */
+    400: MicrosoftAspNetCoreMvcValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+};
+
+export type AuthenticationSsoBeginBindingError = AuthenticationSsoBeginBindingErrors[keyof AuthenticationSsoBeginBindingErrors];
+
+export type AuthenticationSsoBeginBindingResponses = {
+    /**
+     * Success
+     */
+    200: NoCtfapiEndpointsAuthenticationBeginSsoLoginResponse;
+};
+
+export type AuthenticationSsoBeginBindingResponse = AuthenticationSsoBeginBindingResponses[keyof AuthenticationSsoBeginBindingResponses];
+
+export type AuthenticationSsoBeginLoginData = {
+    body: NoCtfapiEndpointsAuthenticationBeginSsoLoginRequest;
+    path?: never;
+    query?: never;
+    url: '/api/v1/auth/sso/login/flows';
+};
+
+export type AuthenticationSsoBeginLoginErrors = {
+    /**
+     * Bad Request
+     */
+    400: MicrosoftAspNetCoreMvcValidationProblemDetails;
+};
+
+export type AuthenticationSsoBeginLoginError = AuthenticationSsoBeginLoginErrors[keyof AuthenticationSsoBeginLoginErrors];
+
+export type AuthenticationSsoBeginLoginResponses = {
+    /**
+     * Success
+     */
+    200: NoCtfapiEndpointsAuthenticationBeginSsoLoginResponse;
+};
+
+export type AuthenticationSsoBeginLoginResponse = AuthenticationSsoBeginLoginResponses[keyof AuthenticationSsoBeginLoginResponses];
+
+export type AuthenticationSsoCasCallbackData = {
+    body?: never;
+    path: {
+        providerId: string;
+    };
+    query?: {
+        flow?: string | null;
+        ticket?: string | null;
+    };
+    url: '/api/v1/auth/sso/callback/cas/{providerId}';
+};
+
+export type AuthenticationSsoCasCallbackResponses = {
+    /**
+     * Success
+     */
+    200: unknown;
+};
+
 export type ChangePasswordEndpointData = {
     body: NoCtfapiEndpointsAuthenticationChangePasswordRequest;
     path?: never;
@@ -5349,6 +5619,64 @@ export type AuthenticationCompletePasswordResetResponses = {
 };
 
 export type AuthenticationCompletePasswordResetResponse = AuthenticationCompletePasswordResetResponses[keyof AuthenticationCompletePasswordResetResponses];
+
+export type AuthenticationSsoCompleteBindingData = {
+    body?: never;
+    path: {
+        flowId: string;
+    };
+    query?: never;
+    url: '/api/v1/auth/me/sso-binding/flows/{flowId}/complete';
+};
+
+export type AuthenticationSsoCompleteBindingErrors = {
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+};
+
+export type AuthenticationSsoCompleteBindingResponses = {
+    /**
+     * Success
+     */
+    200: NoCtfapiEndpointsAuthenticationMySsoBindingResponse;
+};
+
+export type AuthenticationSsoCompleteBindingResponse = AuthenticationSsoCompleteBindingResponses[keyof AuthenticationSsoCompleteBindingResponses];
+
+export type AuthenticationSsoCompleteLoginData = {
+    body?: never;
+    path: {
+        flowId: string;
+    };
+    query?: never;
+    url: '/api/v1/auth/sso/flows/{flowId}/complete-login';
+};
+
+export type AuthenticationSsoCompleteLoginErrors = {
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+};
+
+export type AuthenticationSsoCompleteLoginResponses = {
+    /**
+     * Success
+     */
+    200: NoCtfapiEndpointsAuthenticationCompleteSsoLoginResponse;
+};
+
+export type AuthenticationSsoCompleteLoginResponse = AuthenticationSsoCompleteLoginResponses[keyof AuthenticationSsoCompleteLoginResponses];
 
 export type GetMeEndpointData = {
     body?: never;
@@ -5449,6 +5777,66 @@ export type AuthenticationPatchMyProfileResponses = {
 
 export type AuthenticationPatchMyProfileResponse = AuthenticationPatchMyProfileResponses[keyof AuthenticationPatchMyProfileResponses];
 
+export type AuthenticationSsoUnbindIdentityData = {
+    body: NoCtfapiEndpointsAuthenticationUnbindSsoIdentityRequest;
+    path?: never;
+    query?: never;
+    url: '/api/v1/auth/me/sso-binding';
+};
+
+export type AuthenticationSsoUnbindIdentityErrors = {
+    /**
+     * Bad Request
+     */
+    400: MicrosoftAspNetCoreMvcValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+};
+
+export type AuthenticationSsoUnbindIdentityError = AuthenticationSsoUnbindIdentityErrors[keyof AuthenticationSsoUnbindIdentityErrors];
+
+export type AuthenticationSsoUnbindIdentityResponses = {
+    /**
+     * No Content
+     */
+    204: void;
+};
+
+export type AuthenticationSsoUnbindIdentityResponse = AuthenticationSsoUnbindIdentityResponses[keyof AuthenticationSsoUnbindIdentityResponses];
+
+export type AuthenticationSsoGetMyBindingData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/v1/auth/me/sso-binding';
+};
+
+export type AuthenticationSsoGetMyBindingErrors = {
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+};
+
+export type AuthenticationSsoGetMyBindingResponses = {
+    /**
+     * Success
+     */
+    200: NoCtfapiEndpointsAuthenticationMySsoBindingConfigurationResponse;
+};
+
+export type AuthenticationSsoGetMyBindingResponse = AuthenticationSsoGetMyBindingResponses[keyof AuthenticationSsoGetMyBindingResponses];
+
 export type AuthenticationGetMyWallpaperData = {
     body?: never;
     path?: never;
@@ -5509,6 +5897,39 @@ export type AuthenticationUploadMyWallpaperResponses = {
 
 export type AuthenticationUploadMyWallpaperResponse = AuthenticationUploadMyWallpaperResponses[keyof AuthenticationUploadMyWallpaperResponses];
 
+export type AuthenticationSsoGetFlowData = {
+    body?: never;
+    path: {
+        flowId: string;
+    };
+    query?: never;
+    url: '/api/v1/auth/sso/flows/{flowId}';
+};
+
+export type AuthenticationSsoGetFlowErrors = {
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+    /**
+     * Not Found
+     */
+    404: unknown;
+};
+
+export type AuthenticationSsoGetFlowResponses = {
+    /**
+     * Success
+     */
+    200: NoCtfapiEndpointsAuthenticationSsoFlowStatusResponse;
+};
+
+export type AuthenticationSsoGetFlowResponse = AuthenticationSsoGetFlowResponses[keyof AuthenticationSsoGetFlowResponses];
+
 export type UserAvatarGetData = {
     body?: never;
     path: {
@@ -5549,6 +5970,22 @@ export type UserProfileGetResponses = {
 };
 
 export type UserProfileGetResponse = UserProfileGetResponses[keyof UserProfileGetResponses];
+
+export type AuthenticationSsoListProvidersData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/v1/auth/sso/providers';
+};
+
+export type AuthenticationSsoListProvidersResponses = {
+    /**
+     * Success
+     */
+    200: NoCtfapiEndpointsAuthenticationPublicSsoProviderListResponse;
+};
+
+export type AuthenticationSsoListProvidersResponse = AuthenticationSsoListProvidersResponses[keyof AuthenticationSsoListProvidersResponses];
 
 export type LoginEndpointData = {
     body: NoCtfapiEndpointsAuthenticationLoginRequest;
@@ -5635,6 +6072,26 @@ export type LogoutEndpointResponses = {
 };
 
 export type LogoutEndpointResponse = LogoutEndpointResponses[keyof LogoutEndpointResponses];
+
+export type AuthenticationSsoOidcCallbackData = {
+    body?: never;
+    path: {
+        providerId: string;
+    };
+    query?: {
+        state?: string | null;
+        code?: string | null;
+        error?: string | null;
+    };
+    url: '/api/v1/auth/sso/callback/oidc/{providerId}';
+};
+
+export type AuthenticationSsoOidcCallbackResponses = {
+    /**
+     * Success
+     */
+    200: unknown;
+};
 
 export type RefreshTokenEndpointData = {
     body?: never;
@@ -6373,6 +6830,35 @@ export type AdminStopSharedRuntimeResponses = {
 
 export type AdminStopSharedRuntimeResponse = AdminStopSharedRuntimeResponses[keyof AdminStopSharedRuntimeResponses];
 
+export type AdminPlatformSsoBeginAuthenticationTestData = {
+    body?: never;
+    path: {
+        providerId: string;
+    };
+    query?: never;
+    url: '/api/v1/admin/platform/sso/providers/{providerId}/authentication-tests';
+};
+
+export type AdminPlatformSsoBeginAuthenticationTestErrors = {
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+};
+
+export type AdminPlatformSsoBeginAuthenticationTestResponses = {
+    /**
+     * Success
+     */
+    200: NoCtfapiEndpointsAuthenticationBeginSsoLoginResponse;
+};
+
+export type AdminPlatformSsoBeginAuthenticationTestResponse = AdminPlatformSsoBeginAuthenticationTestResponses[keyof AdminPlatformSsoBeginAuthenticationTestResponses];
+
 export type AdminPlatformCreateBotData = {
     body: NoCtfapiEndpointsAdministrationPlatformCreatePlatformBotRequest;
     path?: never;
@@ -6405,6 +6891,39 @@ export type AdminPlatformCreateBotResponses = {
 };
 
 export type AdminPlatformCreateBotResponse = AdminPlatformCreateBotResponses[keyof AdminPlatformCreateBotResponses];
+
+export type AdminPlatformSsoCreateProviderData = {
+    body: NoCtfapiEndpointsAdministrationPlatformCreateSsoProviderRequest;
+    path?: never;
+    query?: never;
+    url: '/api/v1/admin/platform/sso/providers';
+};
+
+export type AdminPlatformSsoCreateProviderErrors = {
+    /**
+     * Bad Request
+     */
+    400: MicrosoftAspNetCoreMvcValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+};
+
+export type AdminPlatformSsoCreateProviderError = AdminPlatformSsoCreateProviderErrors[keyof AdminPlatformSsoCreateProviderErrors];
+
+export type AdminPlatformSsoCreateProviderResponses = {
+    /**
+     * Success
+     */
+    200: NoCtfapiEndpointsAdministrationPlatformSsoConfigurationResponse;
+};
+
+export type AdminPlatformSsoCreateProviderResponse = AdminPlatformSsoCreateProviderResponses[keyof AdminPlatformSsoCreateProviderResponses];
 
 export type AdminPlatformDeleteUserData = {
     body: NoCtfapiEndpointsAdministrationPlatformDeletePlatformUserRequest;
@@ -6900,6 +7419,66 @@ export type AdminPlatformGetPublicGatewayStatusResponses = {
 
 export type AdminPlatformGetPublicGatewayStatusResponse = AdminPlatformGetPublicGatewayStatusResponses[keyof AdminPlatformGetPublicGatewayStatusResponses];
 
+export type AdminPlatformSsoGetConfigurationData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/v1/admin/platform/sso';
+};
+
+export type AdminPlatformSsoGetConfigurationErrors = {
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+};
+
+export type AdminPlatformSsoGetConfigurationResponses = {
+    /**
+     * Success
+     */
+    200: NoCtfapiEndpointsAdministrationPlatformSsoConfigurationResponse;
+};
+
+export type AdminPlatformSsoGetConfigurationResponse = AdminPlatformSsoGetConfigurationResponses[keyof AdminPlatformSsoGetConfigurationResponses];
+
+export type AdminPlatformSsoPatchConfigurationData = {
+    body: NoCtfapiEndpointsAdministrationPlatformPatchSsoConfigurationRequest;
+    path?: never;
+    query?: never;
+    url: '/api/v1/admin/platform/sso';
+};
+
+export type AdminPlatformSsoPatchConfigurationErrors = {
+    /**
+     * Bad Request
+     */
+    400: MicrosoftAspNetCoreMvcValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+};
+
+export type AdminPlatformSsoPatchConfigurationError = AdminPlatformSsoPatchConfigurationErrors[keyof AdminPlatformSsoPatchConfigurationErrors];
+
+export type AdminPlatformSsoPatchConfigurationResponses = {
+    /**
+     * Success
+     */
+    200: NoCtfapiEndpointsAdministrationPlatformSsoConfigurationResponse;
+};
+
+export type AdminPlatformSsoPatchConfigurationResponse = AdminPlatformSsoPatchConfigurationResponses[keyof AdminPlatformSsoPatchConfigurationResponses];
+
 export type AdminPlatformListAuditLogsData = {
     body?: never;
     path?: never;
@@ -7156,6 +7735,41 @@ export type AdminPlatformReplaceHumanVerificationSecretResponses = {
 
 export type AdminPlatformReplaceHumanVerificationSecretResponse = AdminPlatformReplaceHumanVerificationSecretResponses[keyof AdminPlatformReplaceHumanVerificationSecretResponses];
 
+export type AdminPlatformSsoReplaceProviderSecretData = {
+    body: NoCtfapiEndpointsAdministrationPlatformReplaceSsoProviderSecretRequest;
+    path: {
+        providerId: string;
+    };
+    query?: never;
+    url: '/api/v1/admin/platform/sso/providers/{providerId}/secret';
+};
+
+export type AdminPlatformSsoReplaceProviderSecretErrors = {
+    /**
+     * Bad Request
+     */
+    400: MicrosoftAspNetCoreMvcValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+};
+
+export type AdminPlatformSsoReplaceProviderSecretError = AdminPlatformSsoReplaceProviderSecretErrors[keyof AdminPlatformSsoReplaceProviderSecretErrors];
+
+export type AdminPlatformSsoReplaceProviderSecretResponses = {
+    /**
+     * Success
+     */
+    200: NoCtfapiEndpointsAdministrationPlatformSsoConfigurationResponse;
+};
+
+export type AdminPlatformSsoReplaceProviderSecretResponse = AdminPlatformSsoReplaceProviderSecretResponses[keyof AdminPlatformSsoReplaceProviderSecretResponses];
+
 export type AdminPlatformRevokeUserTokenData = {
     body?: never;
     path: {
@@ -7216,6 +7830,74 @@ export type AdminPlatformSendEmailVerificationTestResponses = {
 };
 
 export type AdminPlatformSendEmailVerificationTestResponse = AdminPlatformSendEmailVerificationTestResponses[keyof AdminPlatformSendEmailVerificationTestResponses];
+
+export type AdminPlatformSsoTestProviderConnectionData = {
+    body?: never;
+    path: {
+        providerId: string;
+    };
+    query?: never;
+    url: '/api/v1/admin/platform/sso/providers/{providerId}/connection-tests';
+};
+
+export type AdminPlatformSsoTestProviderConnectionErrors = {
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+    /**
+     * Not Found
+     */
+    404: unknown;
+};
+
+export type AdminPlatformSsoTestProviderConnectionResponses = {
+    /**
+     * Success
+     */
+    200: NoCtfapiEndpointsAdministrationPlatformSsoProviderConnectionTestResponse;
+};
+
+export type AdminPlatformSsoTestProviderConnectionResponse = AdminPlatformSsoTestProviderConnectionResponses[keyof AdminPlatformSsoTestProviderConnectionResponses];
+
+export type AdminPlatformSsoUpdateProviderData = {
+    body: NoCtfapiEndpointsAdministrationPlatformUpdateSsoProviderRequest;
+    path: {
+        providerId: string;
+    };
+    query?: never;
+    url: '/api/v1/admin/platform/sso/providers/{providerId}';
+};
+
+export type AdminPlatformSsoUpdateProviderErrors = {
+    /**
+     * Bad Request
+     */
+    400: MicrosoftAspNetCoreMvcValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+};
+
+export type AdminPlatformSsoUpdateProviderError = AdminPlatformSsoUpdateProviderErrors[keyof AdminPlatformSsoUpdateProviderErrors];
+
+export type AdminPlatformSsoUpdateProviderResponses = {
+    /**
+     * Success
+     */
+    200: NoCtfapiEndpointsAdministrationPlatformSsoConfigurationResponse;
+};
+
+export type AdminPlatformSsoUpdateProviderResponse = AdminPlatformSsoUpdateProviderResponses[keyof AdminPlatformSsoUpdateProviderResponses];
 
 export type AdminPlatformUploadLogoData = {
     body: NoCtfapiEndpointsAdministrationPlatformUploadPlatformLogoRequest;

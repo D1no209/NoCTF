@@ -3,6 +3,7 @@ import {
   loginEndpoint,
   logoutAllEndpoint,
   logoutEndpoint,
+  authenticationSsoCompleteLogin,
 } from '../api'
 import type { NoCtfapiEndpointsAuthenticationCurrentUserResponse } from '../api'
 import {
@@ -106,6 +107,17 @@ export function useAuth() {
     await navigateTo('/auth/login')
   }
 
+  async function completeSsoLogin(flowId: string): Promise<string> {
+    const { data, error } = await authenticationSsoCompleteLogin({
+      path: { flowId },
+    })
+    if (error || !data?.accessToken)
+      throw parseApiError(error)
+    setAccessToken(data.accessToken)
+    await fetchMe()
+    return data.returnPath ?? '/'
+  }
+
   async function startImpersonation(input: {
     accessToken: string
     expiresAt: string
@@ -169,6 +181,7 @@ export function useAuth() {
     invalidate,
     restore,
     login,
+    completeSsoLogin,
     logout,
     logoutAll,
     fetchMe,
