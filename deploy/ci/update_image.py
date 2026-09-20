@@ -18,6 +18,7 @@ import uuid
 APPLICATIONS = {"backend", "worker", "runner", "noctf"}
 ENTRYPOINTS = {"NoCTF.Host.dll", "NoCTF.API.dll", "NoCTF.Worker.dll", "NoCTF.Runner.dll"}
 LEGACY_SERVICE_ROLES = {"backend": "Api", "worker": "Worker", "runner": "Runner"}
+PRODUCTION_HOSTS = frozenset({"dino209", "kmm4gtiu65fr1y"})
 
 
 def run(args, **kwargs):
@@ -197,9 +198,9 @@ def write_private(path, value):
 
 def deploy(args):
     hostname = socket.gethostname().lower()
-    if hostname == "dino209" and not args.manual_production:
+    if hostname in PRODUCTION_HOSTS and not args.manual_production:
         raise RuntimeError("CI must never deploy to production.")
-    if args.manual_production and hostname != "dino209":
+    if args.manual_production and hostname not in PRODUCTION_HOSTS:
         raise RuntimeError("Manual production deployment requires the verified production host.")
     if not re.fullmatch(r"[0-9a-f]{40}", args.commit) or not re.fullmatch(
             r"[A-Za-z0-9.-]+(?::[0-9]+)?/[A-Za-z0-9._/-]+@sha256:[a-f0-9]{64}", args.image):
