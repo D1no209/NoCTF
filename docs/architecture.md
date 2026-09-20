@@ -24,31 +24,9 @@ NoCTF.API  ---- Redis (cache/rate limit/SignalR/heartbeat)
 - `NoCTF.Worker`：Submission 普通判定、生命周期、轮次、Flag、排行榜投影、通知与清理。
 - `NoCTF.Runner`：Wolverine durable consumer；执行 Docker、Compose/Kompose、Kubernetes、Libvirt/OVA、Checker 和 Patch。
 
-`NoCTF.Bot` 不是第四个平台角色。它是可选的独立边缘消费者，仅通过公开 HTTPS API 与比赛
-SignalR 工作，不引用 API/Domain/Application/Infrastructure，不接入 PostgreSQL、Redis、NATS、
-Wolverine 或 Runtime Provider。聊天框架通过独立 Provider 适配；群授权、绑定、快照与发送重试
-只保存在 BOT 自己的 SQLite。
-
-### BOT 开发期仓库边界
-
-当前开发阶段暂时将 `NoCTF.Bot`、`NoCTF.Bot.Core`、Provider 源码、测试及依赖版本放在单仓，并加入
-`backend/NoCTF.slnx`，用于同步验证公开 API/SignalR 契约、复用统一代码质量检查并降低联调成本。
-这只是源码协同与 CI 组织方式，不改变运行时所有权：平台发布物、平台配置、数据库、消息总线、
-部署清单和进程角色均不得包含 BOT、Milky、UniQsign、QQ群或其 Secret。
-
-单仓期间仍必须保持以下可分离边界：
-
-- BOT 项目不得引用 API、Domain、Application、Infrastructure、Hosting、Worker 或 Runner 项目；
-- 平台项目不得引用 BOT Core、宿主或 Provider 项目；
-- BOT 只能通过通用公开 HTTPS API 与 SignalR 契约访问平台；
-- 平台只能创建普通 User Bot 身份并签发、校验、轮换和撤销 JWT，不保存 BOT 运行配置；
-- BOT、Milky、UniQsign 与 SQLite 必须独立部署和运维，不能进入平台 Compose/Kubernetes 拓扑；
-- BOT 不得要求平台新增专用接口、通知、表、队列或权限；公开公告列表是面向全部普通 API
-  客户端的比赛契约，不包含 Bot/QQ/Provider 分支。
-
-待公开契约稳定、独立部署与至少 24 小时公测验收完成后，将 `NoCTF.Bot` 的源码、测试和依赖
-迁移到独立仓库，建立独立版本、CI、发布与安全扫描。拆分后平台仓库仅保留通用 Bot 身份/JWT
-能力、公开协议契约及必要的接入说明，不保留 QQ 协议端或签名服务的实现与配置。
+外部通知统一使用赛事级 Webhook。平台不包含聊天协议、群组、消息模板或外部 Provider；Worker
+只向赛事负责人配置的目标发送带 HMAC 签名的公开 CloudEvents。浏览器继续通过 SignalR 接收
+失效提示并重读 REST。通用非交互自动化账户只负责 API 身份，不承担通知投递模型。
 
 角色可由兼容入口 `NoCTF.API`、`NoCTF.Worker`、`NoCTF.Runner` 分别承载，也可由
 `NoCTF.Host` 承载任意非空组合。统一宿主读取 `Hosting:Roles` 枚举数组，缺省启用
@@ -86,8 +64,7 @@ HTML 响应使用 `no-cache`。API、Hub、健康检查、OpenAPI 与带扩展�
 Domain <- Application <- API / Worker / Runner / Host
                        <- Infrastructure
 
-NoCTF.Bot -> NoCTF.Bot.Core <- Chat Provider adapters
-NoCTF.Bot.Core -> public API / SignalR protocol only
+NoCTF.Worker -> signed competition Webhooks
 ```
 
 - Domain 不依赖 EF、HTTP、Redis、Wolverine 或 Provider SDK。

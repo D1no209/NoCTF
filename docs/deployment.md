@@ -192,6 +192,5 @@ Runner 容量事实均依赖 Redis。Runtime 题目本身不使用平台 Health 
 平台进程和管理后台不实现数据库/对象备份或恢复 API；由外部运维负责。仓库提供强制停写、age
 加密、完整保留 JetStream 持久卷与 stream/consumer 配置、对象元数据和恢复后校验的外部工具及隔离演练，见
 [备份恢复](backup-recovery.md)。当前工具生成离散恢复点，不是 PITR。Redis 可丢失并重建。
-核心 NoCTF Compose/Kubernetes 拓扑不部署 QQBOT。可选 `NoCTF.Bot` 必须按
-[QQBOT 公开只读接入](qqbot-jwt.md) 在独立主机或隔离网络部署，不得接入平台数据库、消息总线
-或内部服务网络，也不得把 UniQsign/Milky 端口暴露到公网。
+外部通知接收方不属于 NoCTF 部署拓扑。赛事 Webhook 默认只连接公开 HTTPS 地址；需要访问
+内网接收方时，运维必须通过 `Webhooks__PrivateNetworkAllowList` 精确放行主机、IP 或 CIDR。

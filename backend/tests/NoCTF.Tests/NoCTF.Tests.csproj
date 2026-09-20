@@ -27,8 +27,5 @@
     <ProjectReference Include="../../src/NoCTF.Runtime.Docker/NoCTF.Runtime.Docker.csproj" />
     <ProjectReference Include="../../src/NoCTF.Runtime.Kubernetes/NoCTF.Runtime.Kubernetes.csproj" />
     <ProjectReference Include="../../src/NoCTF.Runner/NoCTF.Runner.csproj" />
-    <ProjectReference Include="../../src/NoCTF.Bot.Core/NoCTF.Bot.Core.csproj" />
-    <ProjectReference Include="../../src/NoCTF.Bot.Providers.Milky/NoCTF.Bot.Providers.Milky.csproj" />
-    <ProjectReference Include="../../src/NoCTF.Bot/NoCTF.Bot.csproj" />
   </ItemGroup>
 </Project>
