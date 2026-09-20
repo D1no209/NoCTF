@@ -47,8 +47,9 @@ public sealed class RequestAdmissionMiddleware(RequestDelegate next)
             return;
         }
         var rates = new List<RateQuota>(); var slots = new List<ConcurrentQuota>();
-        if (entry is ProtectedEntry.Authentication or ProtectedEntry.Registration
-            or ProtectedEntry.SsoAuthentication or ProtectedEntry.SsoCallback)
+        if (entry is ProtectedEntry.SsoAuthentication or ProtectedEntry.SsoCallback)
+            rates.Add(new($"sso-ip:{ip}", options.Value.SsoIpPerMinute, 60));
+        else if (entry is ProtectedEntry.Authentication or ProtectedEntry.Registration)
             rates.Add(new($"authentication-ip:{ip}", options.Value.AuthenticationIpPerMinute, 60));
         else
         {
@@ -70,9 +71,10 @@ public sealed class RequestAdmissionMiddleware(RequestDelegate next)
                 ? canonicalTargetId.ToString("N") : "invalid";
             slots.Add(new($"patch-target:{targetKey}", 1));
         }
+        if (entry is ProtectedEntry.SsoAuthentication or ProtectedEntry.SsoCallback)
+            slots.Add(new("sso-protocol-global", options.Value.SsoProtocolConcurrency));
         if (entry == ProtectedEntry.SsoCallback)
         {
-            slots.Add(new("sso-protocol-global", options.Value.SsoProtocolConcurrency));
             var providerKey = Guid.TryParse(
                 context.Request.RouteValues["providerId"]?.ToString(),
                 out var providerId)

@@ -299,6 +299,7 @@ public static class SsoProviderValidation
     private static bool IsSafeEndpointUri(string value, bool allowHttp, out Uri? uri) =>
         Uri.TryCreate(value, UriKind.Absolute, out uri)
         && AllowedScheme(uri, allowHttp)
+        && string.IsNullOrEmpty(uri.Query)
         && string.IsNullOrEmpty(uri.Fragment)
         && uri.UserInfo.Length == 0;
 

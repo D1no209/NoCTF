@@ -32,11 +32,22 @@ public enum SsoUnbindState
     AccountUnavailable
 }
 
+public enum SsoExternalAccountLookupState
+{
+    Available,
+    NotLinked,
+    AccountUnavailable
+}
+
+public sealed record SsoExternalAccountLookup(
+    SsoExternalAccountLookupState State,
+    AuthenticatedUser? User = null);
+
 public interface ISsoAccountStore
 {
     Task<SsoBindingView?> GetBindingAsync(Guid userId, CancellationToken cancellationToken);
 
-    Task<AuthenticatedUser?> FindByExternalIdentityAsync(
+    Task<SsoExternalAccountLookup> FindByExternalIdentityAsync(
         SsoExternalIdentity identity,
         CancellationToken cancellationToken);
 
@@ -151,12 +162,15 @@ public sealed class CompleteSsoLogin(
             || !provider.AllowLogin
             || !string.Equals(provider.Fingerprint, flow.ProviderFingerprint, StringComparison.Ordinal))
             return Failure(SsoFailureCode.ProviderChanged);
-        var user = await accounts.FindByExternalIdentityAsync(flow.ExternalIdentity, ct);
-        if (user is null)
+        var account = await accounts.FindByExternalIdentityAsync(flow.ExternalIdentity, ct);
+        if (account.State != SsoExternalAccountLookupState.Available || account.User is null)
         {
             await activities.RecordSsoAsync(null, flow.ProviderId, false, clock.GetUtcNow(), ct);
-            return Failure(SsoFailureCode.IdentityNotLinked);
+            return Failure(account.State == SsoExternalAccountLookupState.NotLinked
+                ? SsoFailureCode.IdentityNotLinked
+                : SsoFailureCode.AccountUnavailable);
         }
+        var user = account.User;
         var now = clock.GetUtcNow();
         var access = issuer.Issue(user, now);
         var refresh = issuer.IssueRefresh(user);

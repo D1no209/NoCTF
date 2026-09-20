@@ -21,6 +21,9 @@ public sealed class BeginSsoAuthenticationTestEndpoint(
         Post("/admin/platform/sso/providers/{providerId:guid}/authentication-tests");
         AuthSchemes("Bearer");
         Roles("Administrator");
+        Options(options => options.WithMetadata(
+            new NoCTF.API.Security.ProtectedEntryMetadata(
+                NoCTF.API.Security.ProtectedEntry.SsoAuthentication)));
         Description(builder => builder.WithName("AdminPlatformSsoBeginAuthenticationTest"));
         Summary(summary => summary.Summary = "Starts a browser authentication test without creating a binding or platform session.");
     }

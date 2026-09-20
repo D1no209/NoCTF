@@ -33,6 +33,8 @@ public sealed class CompleteSsoLoginEndpoint(
     {
         Post("/auth/sso/flows/{flowId:guid}/complete-login");
         AuthSchemes(AuthenticationRegistration.SsoFlowScheme);
+        Options(options => options.WithMetadata(
+            new ProtectedEntryMetadata(ProtectedEntry.SsoAuthentication)));
         Description(builder => builder.WithName("Authentication_SsoCompleteLogin"));
         Summary(summary => summary.Summary = "Consumes an authenticated SSO flow and issues a NoCTF session.");
     }
