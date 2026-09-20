@@ -115,4 +115,20 @@ writeup、runtime 或 admin 等平台写操作。单用户限制为 10 秒 5 条
 - 可用 `Bot__AllowedGroupIds` 再加一层本地群白名单。
 - 日志只记录有界错误类型和公开 ID，不记录 JWT、Milky Token 或原始敏感 payload。
 
+## 8. 开发期单仓与后续拆分
+
+当前为了让公开 API/SignalR 契约变更、BOT 客户端实现和自动化测试在同一提交中协同验证，
+`NoCTF.Bot` 暂时与平台代码保存在同一仓库并参加解决方案构建。这不代表 BOT、Milky 或
+UniQsign 属于平台，也不授权平台读取或管理其配置。
+
+开发期单仓不得突破以下限制：
+
+- 平台运行配置和部署清单中不增加 BOT、Milky、UniQsign 或 QQ 群字段；
+- 平台只负责普通 User Bot 身份及 JWT 生命周期；
+- BOT 保持零平台项目引用，仅依赖公开网络协议；
+- BOT 生产部署、Secret、SQLite、日志和告警全部位于外部 BOT 运维边界。
+
+完成公开契约稳定和公测验收后，BOT 将迁移到独立仓库并使用独立版本、CI 与发布流程；迁移
+不得引入平台专用兼容接口，原有 JWT 与公开 API/SignalR 接入方式保持不变。
+
 部署与验收步骤见 [`integrations/qqbot/README.md`](../integrations/qqbot/README.md)。
