@@ -11,6 +11,7 @@ public sealed class DeploymentTopologyTests
         var compose = await ReadAsync("deploy", "docker-compose.yml");
         var runtimeEnv = await ReadAsync("deploy", "env", "noctf", ".env.example");
         var healthcheck = await ReadAsync("backend", "docker", "healthcheck.sh");
+        var apiProgram = await ReadAsync("backend", "src", "NoCTF.API", "Program.cs");
         var hostProgram = await ReadAsync("backend", "src", "NoCTF.Host", "Program.cs");
         var roleModel = await ReadAsync("backend", "src", "NoCTF.Hosting", "HostRoles.cs");
         var routing = await ReadAsync("backend", "src", "NoCTF.Hosting", "MessageRouting.cs");
@@ -47,6 +48,8 @@ public sealed class DeploymentTopologyTests
         await Assert.That(runtimeEnv).Contains("Hosting__Roles__1=Worker");
         await Assert.That(runtimeEnv).Contains("Hosting__Roles__2=Runner");
         await Assert.That(hostProgram).Contains("DatabaseStartup.InitializeAsync");
+        await Assert.That(apiProgram).Contains("DatabaseStartup.InitializeAsync");
+        await Assert.That(apiProgram).Contains("Database:AutoMigrate");
         await Assert.That(healthcheck).Contains("GET /health/ready HTTP/1.1");
         await Assert.That(dockerfile).Contains("HEALTHCHECK");
         await Assert.That(File.Exists(workerDeployment)).IsTrue();

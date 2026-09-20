@@ -10,6 +10,7 @@ using NoCTF.Hosting.Health;
 using NoCTF.Hosting.Observability;
 using NoCTF.Infrastructure;
 using NoCTF.Infrastructure.Observability;
+using NoCTF.Infrastructure.Persistence;
 using NoCTF.Runner;
 using NoCTF.Runner.Composition;
 using NoCTF.Worker;
@@ -72,8 +73,14 @@ if (args.Contains("--migrate-only", StringComparer.OrdinalIgnoreCase))
     await app.StopAsync();
     return;
 }
-if (development)
-    await app.Services.InitializeNoCtfAsync();
+if (!exportSwagger
+    && (development || app.Configuration.GetValue("Database:AutoMigrate", false)))
+{
+    await DatabaseStartup.InitializeAsync(
+        app.Services,
+        app.Configuration,
+        app.Lifetime.ApplicationStopping);
+}
 if (!exportSwagger)
     app.UseNoCtfObservability();
 app.UseNoCtfPipeline();
