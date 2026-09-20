@@ -287,23 +287,22 @@ export function useAdminCompetitionsByIdChallengesByCcIdPage() {
 
   async function loadAllChallengeFacts(): Promise<NoCtfapiEndpointsGameplayFactsGameplayFactListItemResponse[]> {
     const facts: NoCtfapiEndpointsGameplayFactsGameplayFactListItemResponse[] = []
-    const seenCursors = new Set<string>()
-    let cursor: string | null = null
+    let offset = 0
+    let total = 0
     do {
       const response: {
         data?: NoCtfapiEndpointsGameplayFactsGameplayFactListResponse
         error?: unknown
       } = await adminListGameplayFacts({
         path: { competitionId },
-        query: { competitionChallengeId: ccId, cursor, limit: 200 },
+        query: { competitionChallengeId: ccId, offset, limit: 200, desc: true },
       })
       if (response.error || !response.data)
         throw response.error ?? new Error(translate("ui.failedToLoadThisChallengeSAdjudicationRecords"))
       facts.push(...(response.data.items ?? []))
-      cursor = response.data.nextCursor ?? null
-      if (cursor && seenCursors.has(cursor)) throw new Error(translate("ui.theAdjudicationRecordCursorRepeatedUnexpectedly"))
-      if (cursor) seenCursors.add(cursor)
-    } while (cursor)
+      total = response.data.total ?? facts.length
+      offset += response.data.items?.length ?? 0
+    } while (offset < total && offset > 0)
     return facts
   }
 
@@ -313,7 +312,7 @@ export function useAdminCompetitionsByIdChallengesByCcIdPage() {
     scoringError.value = null
     try {
       const [teamsResult, facts, leaderboardResult, schemaResult] = await Promise.all([
-        adminListTeams({ path: { competitionId } }),
+      adminListTeams({ path: { competitionId }, query: { keyword: null, offset: 0, limit: 200, desc: false } }),
         loadAllChallengeFacts(),
         getLeaderboardEndpoint({ path: { competitionId } }),
         getScoreboardSchemaEndpoint({ path: { competitionId } }),

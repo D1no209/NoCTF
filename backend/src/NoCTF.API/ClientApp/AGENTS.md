@@ -71,7 +71,7 @@ Nuxt 4 SPA(`ssr: false`),Bun 管理依赖,TypeScript strict,Vue 用 `<script set
 - 竞赛管理与平台管理的路由级多分区导航使用 AppWorkspaceNav 组合 ChoiceSidebar / WaveSelectionList，不使用旧 SidebarProvider / SidebarInset；桌面端为网格内 sticky 侧栏，移动端位于内容上方。Tabs 仅用于单页内内容切换。
 - 竞赛管理与平台管理共用固定视口的 `data-workspace-scroll-content` 内容区：页面本身不滚动，标题保持固定，子页面由纵向 ScrollSurface 独立滚动，并用 MotionSwap 执行路由内容切换。竞赛概览、配置、排行榜、导出与权限页把同一任务域的分区合并到一张连续 Card，以 Separator 划分。
 - 公开个人资料页在桌面端将资料 Card 对齐到内容区右侧，头像居中悬浮在 Card 顶部；窄屏保持居中布局。
-- 分页一律签名 keyset cursor +「加载更多」(useCursorPagination),不要页码;改筛选必须 `reset()`。
+- 普通列表使用 offset/limit/total 页码分页（useOffsetPagination + OffsetPagination）；改筛选必须回到第一页。通知增量 feed 与 Redis 平台日志保留签名/opaque cursor +「加载更多」(useCursorPagination)。
 - 异步操作(提交/runtime/重判等)返回 202 时用 usePolling 轮询 statusUrl;SignalR 推送只做失效重取,REST 为事实源。开发环境下两个 Hub 强制走 SSE/长轮询(`import.meta.dev` 分支):Vite ws 代理转发 SignalR WebSocket 会被重置并引发 Nuxt 崩溃重启循环,生产直连后端不受影响。
 - 管理端写操作不携带持久化修订并发字段；可变记录采用 last-write-wins。409 只按生成 SDK 的强类型业务失败码展示，不得统一翻译为修订冲突。
 - shadcn 规则:表单 FieldGroup+Field;Dialog/Sheet 必带 Title;语义色类(禁原始色值);gap-* 不用 space-*;size-*;条件类 `cn()`;空态 Empty、提示 Alert、骨架 Skeleton、状态 Badge;按钮加载态 Spinner+data-icon+disabled;图标用 `@lucide/vue`。

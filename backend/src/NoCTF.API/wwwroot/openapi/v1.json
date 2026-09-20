@@ -1815,11 +1815,12 @@
             }
           },
           {
-            "name": "cursor",
+            "name": "offset",
             "in": "query",
+            "required": true,
             "schema": {
-              "type": "string",
-              "nullable": true
+              "type": "integer",
+              "format": "int32"
             }
           },
           {
@@ -1829,6 +1830,14 @@
             "schema": {
               "type": "integer",
               "format": "int32"
+            }
+          },
+          {
+            "name": "desc",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "boolean"
             }
           }
         ],
@@ -2597,11 +2606,12 @@
             }
           },
           {
-            "name": "cursor",
+            "name": "offset",
             "in": "query",
+            "required": true,
             "schema": {
-              "type": "string",
-              "nullable": true
+              "type": "integer",
+              "format": "int32"
             }
           },
           {
@@ -2611,6 +2621,14 @@
             "schema": {
               "type": "integer",
               "format": "int32"
+            }
+          },
+          {
+            "name": "desc",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "boolean"
             }
           }
         ],
@@ -4054,12 +4072,29 @@
             }
           },
           {
+            "name": "offset",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
             "name": "limit",
             "in": "query",
             "required": true,
             "schema": {
               "type": "integer",
               "format": "int32"
+            }
+          },
+          {
+            "name": "desc",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "boolean"
             }
           }
         ],
@@ -6247,6 +6282,40 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "name": "keyword",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "nullable": true
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "desc",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "boolean"
+            }
           }
         ],
         "responses": {
@@ -6265,6 +6334,16 @@
           },
           "403": {
             "description": "Forbidden"
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcValidationProblemDetails"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -7031,12 +7110,29 @@
             }
           },
           {
+            "name": "offset",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
             "name": "limit",
             "in": "query",
             "required": true,
             "schema": {
               "type": "integer",
               "format": "int32"
+            }
+          },
+          {
+            "name": "desc",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "boolean"
             }
           }
         ],
@@ -8638,12 +8734,29 @@
             }
           },
           {
+            "name": "offset",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
             "name": "limit",
             "in": "query",
             "required": true,
             "schema": {
               "type": "integer",
               "format": "int32"
+            }
+          },
+          {
+            "name": "desc",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "boolean"
             }
           }
         ],
@@ -8692,6 +8805,66 @@
         "summary": "Lists platform users.",
         "description": "Returns platform role and token-version metadata to administrators only.",
         "operationId": "AdminPlatformListUsers",
+        "parameters": [
+          {
+            "name": "kind",
+            "in": "query",
+            "schema": {
+              "nullable": true,
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsAuthenticationUserKindProtocol"
+                }
+              ]
+            }
+          },
+          {
+            "name": "role",
+            "in": "query",
+            "schema": {
+              "nullable": true,
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsAuthenticationUserRoleProtocol"
+                }
+              ]
+            }
+          },
+          {
+            "name": "keyword",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "nullable": true
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "desc",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "boolean"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "description": "Success",
@@ -8708,6 +8881,16 @@
           },
           "403": {
             "description": "Forbidden"
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcValidationProblemDetails"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -9594,7 +9777,7 @@
           "Admin"
         ],
         "summary": "Lists filtered competition gameplay facts.",
-        "description": "Returns keyset-paged protected gameplay facts to authorized competition observers.",
+        "description": "Returns offset-paged protected gameplay facts to authorized competition observers.",
         "operationId": "AdminListGameplayFacts",
         "parameters": [
           {
@@ -9737,11 +9920,12 @@
             }
           },
           {
-            "name": "cursor",
+            "name": "offset",
             "in": "query",
+            "required": true,
             "schema": {
-              "type": "string",
-              "nullable": true
+              "type": "integer",
+              "format": "int32"
             }
           },
           {
@@ -9751,6 +9935,14 @@
             "schema": {
               "type": "integer",
               "format": "int32"
+            }
+          },
+          {
+            "name": "desc",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "boolean"
             }
           }
         ],
@@ -12259,6 +12451,48 @@
             "schema": {
               "type": "boolean"
             }
+          },
+          {
+            "name": "direction",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "nullable": true
+            }
+          },
+          {
+            "name": "keyword",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "nullable": true
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "desc",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "boolean"
+            }
           }
         ],
         "responses": {
@@ -12277,6 +12511,16 @@
           },
           "403": {
             "description": "Forbidden"
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcValidationProblemDetails"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -13837,9 +14081,24 @@
         }
       },
       "NoCTFAPIEndpointsTeamsTeamListResponse": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/NoCTFAPIPaginationArrayResultOfTeamResponse"
+          },
+          {
+            "type": "object",
+            "additionalProperties": false
+          }
+        ]
+      },
+      "NoCTFAPIPaginationArrayResultOfTeamResponse": {
         "type": "object",
         "additionalProperties": false,
         "properties": {
+          "total": {
+            "type": "integer",
+            "format": "int32"
+          },
           "items": {
             "type": "array",
             "items": {
@@ -14997,18 +15256,29 @@
         }
       },
       "NoCTFAPIEndpointsNotificationsNotificationListResponse": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/NoCTFAPIPaginationArrayResultOfNotificationResponse"
+          },
+          {
+            "type": "object",
+            "additionalProperties": false
+          }
+        ]
+      },
+      "NoCTFAPIPaginationArrayResultOfNotificationResponse": {
         "type": "object",
         "additionalProperties": false,
         "properties": {
+          "total": {
+            "type": "integer",
+            "format": "int32"
+          },
           "items": {
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/NoCTFAPIEndpointsNotificationsNotificationResponse"
             }
-          },
-          "nextCursor": {
-            "type": "string",
-            "nullable": true
           }
         }
       },
@@ -15189,8 +15459,15 @@
         ]
       },
       "NoCTFAPIEndpointsNotificationsListNotificationsRequest": {
-        "type": "object",
-        "additionalProperties": false
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/NoCTFAPIPaginationPaginationRequest"
+          },
+          {
+            "type": "object",
+            "additionalProperties": false
+          }
+        ]
       },
       "NoCTFAPIEndpointsNotificationsNotificationListScopeProtocol": {
         "type": "string",
@@ -15203,6 +15480,10 @@
           "All",
           "Inbox"
         ]
+      },
+      "NoCTFAPIPaginationPaginationRequest": {
+        "type": "object",
+        "additionalProperties": false
       },
       "NoCTFAPIEndpointsNotificationsNotificationFeedResponse": {
         "type": "object",
@@ -15868,18 +16149,29 @@
         }
       },
       "NoCTFAPIEndpointsGameplayFactsGameplayFactListResponse": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/NoCTFAPIPaginationArrayResultOfGameplayFactListItemResponse"
+          },
+          {
+            "type": "object",
+            "additionalProperties": false
+          }
+        ]
+      },
+      "NoCTFAPIPaginationArrayResultOfGameplayFactListItemResponse": {
         "type": "object",
         "additionalProperties": false,
         "properties": {
+          "total": {
+            "type": "integer",
+            "format": "int32"
+          },
           "items": {
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/NoCTFAPIEndpointsGameplayFactsGameplayFactListItemResponse"
             }
-          },
-          "nextCursor": {
-            "type": "string",
-            "nullable": true
           }
         }
       },
@@ -15978,8 +16270,15 @@
         ]
       },
       "NoCTFAPIEndpointsGameplayFactsListGameplayFactsRequest": {
-        "type": "object",
-        "additionalProperties": false
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/NoCTFAPIPaginationPaginationRequest"
+          },
+          {
+            "type": "object",
+            "additionalProperties": false
+          }
+        ]
       },
       "NoCTFAPIEndpointsGameplayFactsRequestAwdpDefenseTargetResponse": {
         "type": "object",
@@ -17718,6 +18017,10 @@
           "nextCursor": {
             "type": "string",
             "nullable": true
+          },
+          "total": {
+            "type": "integer",
+            "format": "int32"
           }
         }
       },
@@ -17999,8 +18302,15 @@
         ]
       },
       "NoCTFAPIEndpointsCompetitionsEventsListCompetitionEventsRequest": {
-        "type": "object",
-        "additionalProperties": false
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/NoCTFAPIPaginationPaginationRequest"
+          },
+          {
+            "type": "object",
+            "additionalProperties": false
+          }
+        ]
       },
       "NoCTFAPIEndpointsChallengesChallengeResponse": {
         "type": "object",
@@ -19402,6 +19712,28 @@
           }
         }
       },
+      "NoCTFAPIEndpointsAdministrationTeamsListAdminTeamsRequest": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/NoCTFAPIPaginationSearchRequest"
+          },
+          {
+            "type": "object",
+            "additionalProperties": false
+          }
+        ]
+      },
+      "NoCTFAPIPaginationSearchRequest": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/NoCTFAPIPaginationPaginationRequest"
+          },
+          {
+            "type": "object",
+            "additionalProperties": false
+          }
+        ]
+      },
       "NoCTFAPIEndpointsAdministrationTeamsAdminTeamBanAppealListResponse": {
         "type": "object",
         "additionalProperties": false,
@@ -19809,12 +20141,23 @@
           "nextCursor": {
             "type": "string",
             "nullable": true
+          },
+          "total": {
+            "type": "integer",
+            "format": "int32"
           }
         }
       },
       "NoCTFAPIEndpointsAdministrationRuntimeListAdminRuntimesRequest": {
-        "type": "object",
-        "additionalProperties": false
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/NoCTFAPIPaginationPaginationRequest"
+          },
+          {
+            "type": "object",
+            "additionalProperties": false
+          }
+        ]
       },
       "NoCTFAPIEndpointsAdministrationPlatformBeginSsoAuthenticationTestRequest": {
         "type": "object",
@@ -21737,6 +22080,10 @@
           "nextCursor": {
             "type": "string",
             "nullable": true
+          },
+          "total": {
+            "type": "integer",
+            "format": "int32"
           }
         }
       },
@@ -21772,13 +22119,35 @@
         ]
       },
       "NoCTFAPIEndpointsAdministrationPlatformListPlatformRuntimesRequest": {
-        "type": "object",
-        "additionalProperties": false
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/NoCTFAPIPaginationPaginationRequest"
+          },
+          {
+            "type": "object",
+            "additionalProperties": false
+          }
+        ]
       },
       "NoCTFAPIEndpointsAdministrationPlatformPlatformUserListResponse": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/NoCTFAPIPaginationArrayResultOfPlatformUserResponse"
+          },
+          {
+            "type": "object",
+            "additionalProperties": false
+          }
+        ]
+      },
+      "NoCTFAPIPaginationArrayResultOfPlatformUserResponse": {
         "type": "object",
         "additionalProperties": false,
         "properties": {
+          "total": {
+            "type": "integer",
+            "format": "int32"
+          },
           "items": {
             "type": "array",
             "items": {
@@ -21786,6 +22155,17 @@
             }
           }
         }
+      },
+      "NoCTFAPIEndpointsAdministrationPlatformListPlatformUsersRequest": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/NoCTFAPIPaginationSearchRequest"
+          },
+          {
+            "type": "object",
+            "additionalProperties": false
+          }
+        ]
       },
       "NoCTFAPIEndpointsAdministrationPlatformAdminIssuedAccessTokenListResponse": {
         "type": "object",
@@ -22544,8 +22924,15 @@
         "additionalProperties": false
       },
       "NoCTFAPIEndpointsAdministrationGameplayFactsListAdminGameplayFactsRequest": {
-        "type": "object",
-        "additionalProperties": false
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/NoCTFAPIPaginationPaginationRequest"
+          },
+          {
+            "type": "object",
+            "additionalProperties": false
+          }
+        ]
       },
       "NoCTFAPIEndpointsAdministrationGameplayFactsHistoricalAdjudicationDifferencePageResponse": {
         "type": "object",
@@ -24816,9 +25203,32 @@
         "additionalProperties": false
       },
       "NoCTFAPIEndpointsAdministrationChallengeBankChallengeTemplateListResponse": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/NoCTFAPIPaginationArrayResultOfChallengeTemplateResponse"
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "directions": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        ]
+      },
+      "NoCTFAPIPaginationArrayResultOfChallengeTemplateResponse": {
         "type": "object",
         "additionalProperties": false,
         "properties": {
+          "total": {
+            "type": "integer",
+            "format": "int32"
+          },
           "items": {
             "type": "array",
             "items": {
@@ -24828,8 +25238,15 @@
         }
       },
       "NoCTFAPIEndpointsAdministrationChallengeBankListChallengeTemplatesRequest": {
-        "type": "object",
-        "additionalProperties": false
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/NoCTFAPIPaginationSearchRequest"
+          },
+          {
+            "type": "object",
+            "additionalProperties": false
+          }
+        ]
       },
       "NoCTFAPIEndpointsAdministrationChallengeBankPatchChallengeTemplateRequest": {
         "type": "object",

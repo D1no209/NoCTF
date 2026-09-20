@@ -2454,7 +2454,7 @@ export const adminPlatformListActiveRuntimes = <ThrowOnError extends boolean = f
  *
  * Returns platform role and token-version metadata to administrators only.
  */
-export const adminPlatformListUsers = <ThrowOnError extends boolean = false>(options?: Options<AdminPlatformListUsersData, ThrowOnError>): RequestResult<AdminPlatformListUsersResponses, AdminPlatformListUsersErrors, ThrowOnError> => (options?.client ?? client).get<AdminPlatformListUsersResponses, AdminPlatformListUsersErrors, ThrowOnError>({
+export const adminPlatformListUsers = <ThrowOnError extends boolean = false>(options: Options<AdminPlatformListUsersData, ThrowOnError>): RequestResult<AdminPlatformListUsersResponses, AdminPlatformListUsersErrors, ThrowOnError> => (options.client ?? client).get<AdminPlatformListUsersResponses, AdminPlatformListUsersErrors, ThrowOnError>({
     security: [{
             key: 'Bearer',
             scheme: 'bearer',
@@ -2706,7 +2706,7 @@ export const adminGetGameplayFactAdjudicationEvents = <ThrowOnError extends bool
 /**
  * Lists filtered competition gameplay facts.
  *
- * Returns keyset-paged protected gameplay facts to authorized competition observers.
+ * Returns offset-paged protected gameplay facts to authorized competition observers.
  */
 export const adminListGameplayFacts = <ThrowOnError extends boolean = false>(options: Options<AdminListGameplayFactsData, ThrowOnError>): RequestResult<AdminListGameplayFactsResponses, AdminListGameplayFactsErrors, ThrowOnError> => (options.client ?? client).get<AdminListGameplayFactsResponses, AdminListGameplayFactsErrors, ThrowOnError>({
     security: [{

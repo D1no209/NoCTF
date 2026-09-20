@@ -136,6 +136,52 @@ public sealed class TeamRegistrationStore(
         CancellationToken ct) =>
         ListCoreAsync(competitionId, includePending, includeInternal: false, ct);
 
+    public Task<TeamListPage> ListPageAsync(TeamListQuery query, CancellationToken ct) =>
+        ListPageCoreAsync(query, ct);
+
+    private async Task<TeamListPage> ListPageCoreAsync(
+        TeamListQuery query,
+        CancellationToken ct)
+    {
+        var competition = await db.Competitions.AsNoTracking()
+            .Where(item => item.Id == query.CompetitionId && item.DeletedAt == null)
+            .Select(item => new
+            {
+                item.Mode,
+                item.TracksEnabled,
+                item.TrackConfigurationJson
+            })
+            .SingleOrDefaultAsync(ct);
+        if (competition is null)
+            return new([], 0);
+
+        var configuration = CompetitionTrackConfiguration.EffectiveFor(
+            competition.Mode,
+            competition.TracksEnabled,
+            competition.TrackConfigurationJson);
+        var internalKeys = configuration.Tracks.Where(track => track.IsInternal)
+            .Select(track => track.Key)
+            .ToArray();
+        var source = db.Teams.AsNoTracking()
+            .Where(team => team.CompetitionId == query.CompetitionId
+                && team.DeletedAt == null
+                && (query.IncludePending || team.RegistrationStatus == TeamRegistrationStatus.Approved)
+                && (query.IncludeInternal || !internalKeys.Contains(team.TrackKey)));
+        var keyword = string.IsNullOrWhiteSpace(query.Keyword) ? null : query.Keyword.Trim();
+        if (keyword is not null)
+            source = source.Where(team => EF.Functions.ILike(team.Name, $"%{keyword}%"));
+
+        var total = await source.CountAsync(ct);
+        var ordered = query.Desc
+            ? source.OrderByDescending(team => team.Name).ThenByDescending(team => team.Id)
+            : source.OrderBy(team => team.Name).ThenBy(team => team.Id);
+        var teams = await ordered
+            .Skip(query.Offset)
+            .Take(query.Limit)
+            .ToListAsync(ct);
+        return new(teams.Select(team => Map(team, configuration)).ToArray(), total);
+    }
+
     private async Task<IReadOnlyList<TeamView>> ListCoreAsync(
         Guid competitionId,
         bool includePending,

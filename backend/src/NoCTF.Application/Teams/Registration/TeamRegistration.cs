@@ -24,6 +24,19 @@ public sealed record TeamView(
     DateTimeOffset RegisteredAt,
     string TrackKey = CompetitionTrackConfiguration.DefaultTrackKey,
     string TrackName = "Default");
+
+public sealed record TeamListQuery(
+    Guid CompetitionId,
+    bool IncludePending,
+    bool IncludeInternal,
+    string? Keyword,
+    int Offset,
+    int Limit,
+    bool Desc);
+
+public sealed record TeamListPage(
+    IReadOnlyList<TeamView> Items,
+    int Total);
 public sealed record TeamRegistrationPolicy(
     CompetitionStatus Status,
     bool AutoApprove,
@@ -65,6 +78,18 @@ public interface ITeamRegistrationStore
     Task<TeamRegistrationPolicy?> GetPolicyAsync(Guid competitionId, CancellationToken cancellationToken);
     Task<TeamCreateStoreResult> TryCreateAsync(CreateTeamCommand command, TeamRegistrationStatus status, CancellationToken cancellationToken);
     Task<IReadOnlyList<TeamView>> ListAsync(Guid competitionId, bool includePending, CancellationToken cancellationToken);
+    async Task<TeamListPage> ListPageAsync(TeamListQuery query, CancellationToken cancellationToken)
+    {
+        var items = await ListAsync(query.CompetitionId, query.IncludePending, cancellationToken);
+        if (!query.IncludeInternal)
+            items = await ListPublicAsync(query.CompetitionId, query.IncludePending, cancellationToken);
+        if (!string.IsNullOrWhiteSpace(query.Keyword))
+            items = items.Where(team => team.Name.Contains(query.Keyword, StringComparison.OrdinalIgnoreCase)).ToArray();
+        var ordered = query.Desc
+            ? items.OrderByDescending(team => team.Name).ThenByDescending(team => team.Id)
+            : items.OrderBy(team => team.Name).ThenBy(team => team.Id);
+        return new TeamListPage(ordered.Skip(query.Offset).Take(query.Limit).ToArray(), items.Count);
+    }
     Task<IReadOnlyList<TeamView>> ListPublicAsync(
         Guid competitionId,
         bool includePending,
@@ -160,6 +185,11 @@ public sealed class CreateTeam(ITeamRegistrationStore store)
 
 public sealed class ListCompetitionTeams(ITeamRegistrationStore store)
 {
+    public Task<TeamListPage> ExecutePageAsync(
+        TeamListQuery query,
+        CancellationToken ct = default) =>
+        store.ListPageAsync(query, ct);
+
     public Task<IReadOnlyList<TeamView>> ExecuteAsync(
         Guid competitionId,
         bool includePending,

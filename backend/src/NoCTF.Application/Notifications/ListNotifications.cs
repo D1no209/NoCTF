@@ -26,6 +26,22 @@ public enum NotificationReadScope : short
 
 public interface INotificationReader
 {
+    async Task<NotificationListPage> ListPageAsync(
+        Guid userId,
+        Guid? competitionId,
+        int offset,
+        int limit,
+        bool desc,
+        NotificationReadScope scope,
+        CancellationToken cancellationToken)
+    {
+        var items = await (competitionId is { } id
+            ? ListCompetitionAsync(userId, id, null, null, offset + limit, scope, cancellationToken)
+            : ListAsync(userId, null, null, offset + limit, scope, cancellationToken));
+        var ordered = desc ? items : items.Reverse().ToArray();
+        return new NotificationListPage(ordered.Skip(offset).Take(limit).ToArray(), items.Count);
+    }
+
     Task<IReadOnlyList<NotificationView>> ListAsync(
         Guid userId,
         DateTimeOffset? beforeCreatedAt,
@@ -90,10 +106,24 @@ public interface INotificationReader
         Task.FromResult<IReadOnlyList<NotificationView>?>(null);
 }
 
+public sealed record NotificationListPage(
+    IReadOnlyList<NotificationView> Items,
+    int Total);
+
 public sealed record KeysetNotificationPosition(DateTimeOffset CreatedAt, Guid Id);
 
 public sealed class ListNotifications(INotificationReader reader)
 {
+    public Task<NotificationListPage> ExecutePageAsync(
+        Guid userId,
+        Guid? competitionId,
+        int offset,
+        int limit,
+        bool desc,
+        NotificationReadScope scope,
+        CancellationToken ct = default) =>
+        reader.ListPageAsync(userId, competitionId, offset, limit, desc, scope, ct);
+
     public Task<IReadOnlyList<NotificationView>> ExecuteAsync(
         Guid userId,
         Guid? competitionId,

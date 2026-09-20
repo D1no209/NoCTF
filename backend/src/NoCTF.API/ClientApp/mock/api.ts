@@ -223,13 +223,19 @@ export function createMockApi() {
       if (selected) filtered = filtered.filter(item => String(item[key]) === selected)
     }
     const schema = resolve(responseSchema(matchOperation(url.pathname, 'GET')?.operation ?? {}))
-    const paginated = 'nextCursor' in (schema.properties ?? {})
-    const limit = paginated ? Math.max(1, Math.min(100, Number(url.searchParams.get('limit') ?? url.searchParams.get('pageSize') ?? 30) || 30)) : Math.max(1, filtered.length)
+    const schemaProperties = schema.properties ?? Object.assign({}, ...(schema.allOf ?? []).map((part: Data) => resolve(part).properties ?? {}))
+    const cursorPaginated = 'nextCursor' in schemaProperties
+    const offsetPaginated = 'total' in schemaProperties
+    const paginated = cursorPaginated || offsetPaginated
+    const limit = paginated ? Math.max(1, Math.min(200, Number(url.searchParams.get('limit') ?? url.searchParams.get('pageSize') ?? 30) || 30)) : Math.max(1, filtered.length)
     const cursor = url.searchParams.get('cursor')
-    const offset = paginated && cursor?.startsWith('mock:') ? Number(cursor.slice(5)) || 0 : 0
-    const nextCursor = offset + limit < filtered.length ? `mock:${offset + limit}` : null
+    const offset = cursor?.startsWith('mock:')
+      ? Number(cursor.slice(5)) || 0
+      : Math.max(0, Number(url.searchParams.get('offset') ?? 0) || 0)
+    const nextCursor = cursorPaginated && offset + limit < filtered.length ? `mock:${offset + limit}` : null
+    const total = filtered.length
     filtered = filtered.slice(offset, offset + limit)
-    return { items: filtered, nextCursor }
+    return offsetPaginated ? { items: filtered, total } : { items: filtered, nextCursor }
   }
 
   async function handle(request: Request): Promise<Response> {

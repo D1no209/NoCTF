@@ -1,6 +1,8 @@
 using FastEndpoints;
+using FluentValidation;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Routing;
+using NoCTF.API.Pagination;
 using NoCTF.API.Endpoints.Teams;
 using NoCTF.API.Security;
 using NoCTF.Application.Teams.Moderation;
@@ -8,12 +10,21 @@ using NoCTF.Application.Teams.Registration;
 
 namespace NoCTF.API.Endpoints.Administration.Teams;
 
+public sealed class ListAdminTeamsRequest : SearchRequest
+{
+}
+
+public sealed class ListAdminTeamsValidator : Validator<ListAdminTeamsRequest>
+{
+    public ListAdminTeamsValidator() => PaginationRules.AddSearch(this);
+}
+
 public sealed class ListAdminTeamsEndpoint(
     ListCompetitionTeams list,
     ICompetitionModerationAuthorizer authorizer,
     IUserContext user,
     LinkGenerator links)
-    : EndpointWithoutRequest<Results<Ok<TeamListResponse>, ForbidHttpResult>>
+    : Endpoint<ListAdminTeamsRequest, Results<Ok<TeamListResponse>, ForbidHttpResult>>
 {
     public override void Configure()
     {
@@ -28,17 +39,22 @@ public sealed class ListAdminTeamsEndpoint(
     }
 
     public override async Task<Results<Ok<TeamListResponse>, ForbidHttpResult>> ExecuteAsync(
+        ListAdminTeamsRequest request,
         CancellationToken ct)
     {
         var competitionId = Route<Guid>("competitionId");
         if (!await authorizer.CanObserveAsync(user.UserId, competitionId, ct))
             return TypedResults.Forbid();
-        var items = await list.ExecuteAsync(
+        var page = await list.ExecutePageAsync(new(
             competitionId,
-            includePending: true,
-            includeInternal: true,
-            ct);
+            IncludePending: true,
+            IncludeInternal: true,
+            PaginationRules.Normalize(request.Keyword),
+            request.Offset,
+            request.Limit,
+            request.Desc), ct);
         return TypedResults.Ok(new TeamListResponse(
-            items.Select(item => TeamMapper.ToResponse(item, links, HttpContext)).ToArray()));
+            page.Items.Select(item => TeamMapper.ToResponse(item, links, HttpContext)).ToArray(),
+            page.Total));
     }
 }
