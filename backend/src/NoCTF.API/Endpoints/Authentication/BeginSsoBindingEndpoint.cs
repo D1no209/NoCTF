@@ -34,7 +34,7 @@ public sealed class BeginSsoBindingEndpoint(
         Post("/auth/me/sso-binding/flows");
         AuthSchemes("Bearer");
         Options(options => options.WithMetadata(
-            new ProtectedEntryMetadata(ProtectedEntry.Authentication)));
+            new ProtectedEntryMetadata(ProtectedEntry.SsoAuthentication)));
         Description(builder => builder.WithName("Authentication_SsoBeginBinding"));
         Summary(summary => summary.Summary = "Reauthenticates the current user and starts an external identity binding flow.");
     }

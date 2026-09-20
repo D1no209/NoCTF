@@ -105,6 +105,7 @@ internal static class AuthenticationInfrastructure
             .Bind(configuration.GetSection("RequestAdmission"))
             .Validate(value => value.AuthenticationIpPerMinute > 0 && value.AuthenticationAccountPerMinute > 0
                 && value.PasswordConcurrency is >= 1 and <= 128
+                && value.SsoIpPerMinute > 0
                 && value.SsoProtocolConcurrency is >= 1 and <= 128
                 && value.SsoPerProviderConcurrency is >= 1 and <= 32
                 && value.SensitiveIpPerMinute > 0

@@ -55,7 +55,7 @@ public sealed class SsoAccountStore(NoCtfDbContext db) : ISsoAccountStore
             user.ExternalIdentityBoundAt.Value);
     }
 
-    public async Task<AuthenticatedUser?> FindByExternalIdentityAsync(
+    public async Task<SsoExternalAccountLookup> FindByExternalIdentityAsync(
         SsoExternalIdentity identity,
         CancellationToken ct)
     {
@@ -63,17 +63,19 @@ public sealed class SsoAccountStore(NoCtfDbContext db) : ISsoAccountStore
             item.ExternalIdentityProviderId == identity.ProviderId
             && item.ExternalIdentityProtocol == identity.Protocol
             && item.ExternalIdentityNamespace == identity.IdentityNamespace
-            && item.ExternalIdentitySubject == identity.Subject
-            && item.Kind == UserKind.Human
-            && item.AccountStatus == UserAccountStatus.Active,
+            && item.ExternalIdentitySubject == identity.Subject,
             ct);
-        return user is null ? null : new(
+        if (user is null)
+            return new(SsoExternalAccountLookupState.NotLinked);
+        if (user.Kind != UserKind.Human || user.AccountStatus != UserAccountStatus.Active)
+            return new(SsoExternalAccountLookupState.AccountUnavailable);
+        return new(SsoExternalAccountLookupState.Available, new(
             user.Id,
             user.UserName,
             user.Role,
             user.Kind,
             user.TokenVersion,
-            user.EmailVerifiedAt is not null);
+            user.EmailVerifiedAt is not null));
     }
 
     public async Task<SsoBindResult> BindAsync(

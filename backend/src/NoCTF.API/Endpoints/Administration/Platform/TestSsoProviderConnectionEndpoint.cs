@@ -25,6 +25,9 @@ public sealed class TestSsoProviderConnectionEndpoint(ManageSsoProviders managem
         Post("/admin/platform/sso/providers/{providerId:guid}/connection-tests");
         AuthSchemes("Bearer");
         Roles("Administrator");
+        Options(options => options.WithMetadata(
+            new NoCTF.API.Security.ProtectedEntryMetadata(
+                NoCTF.API.Security.ProtectedEntry.SsoAuthentication)));
         Description(builder => builder.WithName("AdminPlatformSsoTestProviderConnection"));
         Summary(summary => summary.Summary = "Tests provider network, TLS and protocol metadata without authenticating a user.");
     }

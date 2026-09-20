@@ -221,14 +221,26 @@ public sealed class SsoPersistenceTests
             var duplicate = await store.BindAsync(
                 second.Id, second.TokenVersion, identity, "Example CAS", now, cancellationToken);
             var authenticated = await store.FindByExternalIdentityAsync(identity, cancellationToken);
-            var tokenVersion = authenticated!.TokenVersion;
+            var tokenVersion = authenticated.User!.TokenVersion;
+            await db.Users.Where(user => user.Id == first.Id)
+                .ExecuteUpdateAsync(setters => setters
+                    .SetProperty(user => user.AccountStatus, UserAccountStatus.Banned),
+                    cancellationToken);
+            var unavailable = await store.FindByExternalIdentityAsync(identity, cancellationToken);
+            await db.Users.Where(user => user.Id == first.Id)
+                .ExecuteUpdateAsync(setters => setters
+                    .SetProperty(user => user.AccountStatus, UserAccountStatus.Active),
+                    cancellationToken);
             var unbound = await store.UnbindAsync(first.Id, now.AddMinutes(1), cancellationToken);
             var updated = await db.Users.AsNoTracking().SingleAsync(
                 user => user.Id == first.Id, cancellationToken);
 
             await Assert.That(bound.State).IsEqualTo(SsoBindState.Bound);
             await Assert.That(duplicate.State).IsEqualTo(SsoBindState.IdentityAlreadyLinked);
-            await Assert.That(authenticated.Id).IsEqualTo(first.Id);
+            await Assert.That(authenticated.State).IsEqualTo(SsoExternalAccountLookupState.Available);
+            await Assert.That(authenticated.User.Id).IsEqualTo(first.Id);
+            await Assert.That(unavailable.State)
+                .IsEqualTo(SsoExternalAccountLookupState.AccountUnavailable);
             await Assert.That(unbound).IsEqualTo(SsoUnbindState.Unbound);
             await Assert.That(updated.ExternalIdentityProviderId).IsNull();
             await Assert.That(updated.TokenVersion).IsEqualTo(tokenVersion + 1);
