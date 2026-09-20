@@ -2429,6 +2429,7 @@ export type NoCtfapiEndpointsAdministrationCompetitionsCompetitionWebhookDisable
 
 export type NoCtfapiEndpointsAdministrationCompetitionsCompetitionWebhookFailureResponse = {
     code?: NoCtfapiEndpointsAdministrationCompetitionsCompetitionWebhookProblemCode;
+    message?: string;
 };
 
 export type NoCtfapiEndpointsAdministrationCompetitionsCompetitionWebhookProblemCode = 'InvalidCursor' | 'DuplicateEndpoint' | 'InvalidEndpoint' | 'InvalidName';

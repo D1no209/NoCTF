@@ -91,7 +91,8 @@ public sealed class CompetitionWebhookPersistenceTests
                     createDb,
                     protector,
                     NullCompetitionEventRecorder.Instance,
-                    new NoOpTransactionalMessageOutbox());
+                    new NoOpTransactionalMessageOutbox(),
+                    TimeProvider.System);
                 var result = await store.CreateAsync(new(
                     competitionId,
                     "Primary",
@@ -211,7 +212,8 @@ public sealed class CompetitionWebhookPersistenceTests
                     rotateDb,
                     protector,
                     NullCompetitionEventRecorder.Instance,
-                    new NoOpTransactionalMessageOutbox());
+                    new NoOpTransactionalMessageOutbox(),
+                    TimeProvider.System);
                 var page = await store.ListAsync(
                     competitionId,
                     null,

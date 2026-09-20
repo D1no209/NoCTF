@@ -118,25 +118,40 @@ internal static class CompetitionInfrastructure
         services.AddScoped<RotateCompetitionWebhookSecret>();
         services.AddScoped<DeleteCompetitionWebhookTarget>();
         var publicBaseUrlValue = configuration["Webhooks:PublicBaseUrl"]
-            ?? "http://localhost:5000";
+            ?? (development ? "http://localhost:5000" : "https://localhost");
         if (!Uri.TryCreate(publicBaseUrlValue, UriKind.Absolute, out var webhookPublicBaseUrl)
             || webhookPublicBaseUrl.Scheme is not ("https" or "http")
+            || webhookPublicBaseUrl.UserInfo.Length > 0
+            || webhookPublicBaseUrl.AbsolutePath != "/"
+            || webhookPublicBaseUrl.Query.Length > 0
+            || webhookPublicBaseUrl.Fragment.Length > 0
             || !development && webhookPublicBaseUrl.Scheme != Uri.UriSchemeHttps)
         {
             throw new InvalidOperationException(
                 "Webhooks:PublicBaseUrl must be an absolute HTTPS origin in production.");
         }
+        var webhookTimeoutSeconds = configuration.GetValue("Webhooks:TimeoutSeconds", 10);
+        if (webhookTimeoutSeconds is < 1 or > 120)
+            throw new InvalidOperationException("Webhooks:TimeoutSeconds must be between 1 and 120.");
         services.AddSingleton(new CompetitionWebhookOptions(
             new Uri(webhookPublicBaseUrl.AbsoluteUri.TrimEnd('/') + "/"),
-            configuration.GetValue("Webhooks:TimeoutSeconds", 10),
+            webhookTimeoutSeconds,
             ReadAllowList(configuration.GetSection(
                 "Webhooks:PrivateNetworkAllowList").Get<string[]>()),
             ReadAllowList(configuration.GetSection(
-                "Webhooks:InsecureHttpHostAllowList").Get<string[]>()))) ;
+                "Webhooks:InsecureHttpHostAllowList").Get<string[]>())));
         services.AddScoped<ICompetitionWebhookDeliveryStore, CompetitionWebhookDeliveryStore>();
         services.AddSingleton<ICompetitionWebhookSender, CompetitionWebhookSender>();
-        services.AddSingleton<ICompetitionWebhookTestStatusStore,
-            RedisCompetitionWebhookTestStatusStore>();
+        if (development)
+        {
+            services.AddSingleton<ICompetitionWebhookTestStatusStore,
+                DevelopmentCompetitionWebhookTestStatusStore>();
+        }
+        else
+        {
+            services.AddSingleton<ICompetitionWebhookTestStatusStore,
+                RedisCompetitionWebhookTestStatusStore>();
+        }
         if (!development)
             services.AddSingleton<RedisCompetitionEventRefreshPublisher>();
         return services;
