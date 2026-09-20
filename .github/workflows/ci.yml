@@ -210,10 +210,12 @@ jobs:
         run: |
           set -Eeuo pipefail
           remote_hostname=$(ssh noctf-deploy hostname)
-          if [[ "${remote_hostname,,}" == dino209 ]]; then
-            echo 'Refusing to write to the production server.' >&2
-            exit 1
-          fi
+          case "${remote_hostname,,}" in
+            dino209|kmm4gtiu65fr1y)
+              echo 'Refusing to write to the production server.' >&2
+              exit 1
+              ;;
+          esac
 
       - name: Package exact commit
         shell: bash

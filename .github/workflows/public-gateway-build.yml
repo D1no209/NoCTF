@@ -1,8 +1,6 @@
 name: Build optional public gateway
 
 on:
-  push:
-    branches: [codex/optional-public-gateway]
   workflow_dispatch:
 
 permissions:

@@ -331,6 +331,14 @@ public sealed class DeploymentTopologyTests
     {
         var ci = (await ReadAsync(".github", "workflows", "ci.yml"))
             .ReplaceLineEndings("\n");
+        var publicGateway = (await ReadAsync(
+                ".github", "workflows", "public-gateway-build.yml"))
+            .ReplaceLineEndings("\n");
+        var publicGatewayTriggers = System.Text.RegularExpressions.Regex.Match(
+            publicGateway,
+            "(?ms)^on:\n(?<body>.*?)(?=^\npermissions:)")
+            .Groups["body"]
+            .Value;
         var publishJob = System.Text.RegularExpressions.Regex.Match(
             ci,
             "(?ms)^  publish-images:\n(?<body>.*?)(?=^  deploy-test:)")
@@ -359,6 +367,8 @@ public sealed class DeploymentTopologyTests
             "cache-to: type=gha,mode=max,scope=noctf-host,ignore-error=true");
         await Assert.That(ci).DoesNotContain("matrix.image");
         await Assert.That(ci).DoesNotContain("matrix.target");
+        await Assert.That(publicGatewayTriggers).Contains("  workflow_dispatch:\n");
+        await Assert.That(publicGatewayTriggers).DoesNotContain("  push:\n");
 
     }
 
@@ -391,7 +401,7 @@ public sealed class DeploymentTopologyTests
         await Assert.That(ci).Contains("noctf-ci-upload-$GITHUB_SHA");
         await Assert.That(ci).Contains("172.26.106.246|noctf.d1no.cn)");
         await Assert.That(ci).Contains("remote_hostname=$(ssh noctf-deploy hostname)");
-        await Assert.That(ci).Contains("\"${remote_hostname,,}\" == dino209");
+        await Assert.That(ci).Contains("dino209|kmm4gtiu65fr1y)");
         await Assert.That(ci).Contains("if: always() && steps.verify_test_target.outcome == 'success'");
         await Assert.That(ci).DoesNotContain("kompose_version=1.38.0");
         await Assert.That(ci).DoesNotContain("Reused the verified Kompose asset");
