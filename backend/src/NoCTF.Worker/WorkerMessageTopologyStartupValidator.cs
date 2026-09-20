@@ -218,7 +218,9 @@ public sealed class WorkerMessageTopologyStartupValidator(
     internal static string NatsEndpointAddress(string queueName) =>
         $"nats://subject/noctf.events.{(queueName.Contains("leaderboard", StringComparison.Ordinal)
             ? "leaderboard"
-            : "realtime")}";
+            : queueName.Contains("webhook", StringComparison.Ordinal)
+                ? "webhook"
+                : "realtime")}";
 
     public Task StoppingAsync(CancellationToken cancellationToken) => Task.CompletedTask;
 
@@ -229,11 +231,13 @@ public sealed class WorkerMessageTopologyStartupValidator(
     internal static IReadOnlyList<string> ExpectedFanoutQueues(
         IReadOnlyCollection<WorkerQueue> enabled)
     {
-        var queues = new List<string>(2);
+        var queues = new List<string>(3);
         if (enabled.Contains(WorkerQueue.Background))
             queues.Add(CompetitionEventFanoutQueueNames.Realtime);
         if (enabled.Contains(WorkerQueue.Projection))
             queues.Add(CompetitionEventFanoutQueueNames.Leaderboard);
+        if (enabled.Contains(WorkerQueue.Webhook))
+            queues.Add(CompetitionEventFanoutQueueNames.Webhook);
         return queues;
     }
 

@@ -41,6 +41,7 @@ public sealed class WorkerRoleTests
         await Assert.That(WorkerQueues.GetConcurrency(configuration, WorkerQueue.Gameplay)).IsEqualTo(8);
         await Assert.That(WorkerQueues.GetConcurrency(configuration, WorkerQueue.Projection)).IsEqualTo(2);
         await Assert.That(WorkerQueues.GetConcurrency(configuration, WorkerQueue.Background)).IsEqualTo(2);
+        await Assert.That(WorkerQueues.GetConcurrency(configuration, WorkerQueue.Webhook)).IsEqualTo(8);
     }
 
     [Test]
@@ -137,6 +138,7 @@ public sealed class WorkerRoleTests
     [Test]
     [Arguments(CompetitionEventFanoutQueueNames.Realtime, "nats://subject/noctf.events.realtime")]
     [Arguments(CompetitionEventFanoutQueueNames.Leaderboard, "nats://subject/noctf.events.leaderboard")]
+    [Arguments(CompetitionEventFanoutQueueNames.Webhook, "nats://subject/noctf.events.webhook")]
     public async Task Sticky_fanout_uses_the_canonical_NATS_subject_address(
         string queueName,
         string expected)

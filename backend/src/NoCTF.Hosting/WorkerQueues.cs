@@ -17,6 +17,7 @@ public static class WorkerQueues
     public const string Gameplay = WorkerQueueNames.Gameplay;
     public const string Projection = WorkerQueueNames.Projection;
     public const string Background = WorkerQueueNames.Background;
+    public const string Webhook = WorkerQueueNames.Webhook;
 
     public static IReadOnlyList<WorkerQueue> All => WorkerQueueNames.All;
 
@@ -46,7 +47,7 @@ public static class WorkerQueues
             if (!TryParse(value, out var queue))
             {
                 throw new InvalidOperationException(
-                    $"Unknown Worker queue '{value}'. Allowed values: control, gameplay, projection, background, all.");
+                    $"Unknown Worker queue '{value}'. Allowed values: control, gameplay, projection, background, webhook, all.");
             }
 
             if (!queues.Contains(queue))
@@ -66,6 +67,7 @@ public static class WorkerQueues
             WorkerQueue.Gameplay => 8,
             WorkerQueue.Projection => 2,
             WorkerQueue.Background => 2,
+            WorkerQueue.Webhook => 8,
             _ => throw new ArgumentOutOfRangeException(nameof(queue), queue, null)
         };
         var configured = configuration[$"Worker:Concurrency:{queue}"];
@@ -107,6 +109,13 @@ public static class WorkerQueues
             || value.Equals(Background, StringComparison.OrdinalIgnoreCase))
         {
             queue = WorkerQueue.Background;
+            return true;
+        }
+
+        if (value.Equals("webhook", StringComparison.OrdinalIgnoreCase)
+            || value.Equals(Webhook, StringComparison.OrdinalIgnoreCase))
+        {
+            queue = WorkerQueue.Webhook;
             return true;
         }
 

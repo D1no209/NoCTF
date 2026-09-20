@@ -1,4 +1,5 @@
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Http.Resilience;
 using Polly;
 using NoCTF.Application.Competitions.Awd;
@@ -35,6 +36,7 @@ internal static class CompetitionInfrastructure
 {
     internal static IServiceCollection AddNoCtfCompetitions(
         this IServiceCollection services,
+        IConfiguration configuration,
         bool development)
     {
         services.AddScoped<ICompetitionLifecycleStore, CompetitionLifecycleStore>();
@@ -115,8 +117,34 @@ internal static class CompetitionInfrastructure
         services.AddScoped<UpdateCompetitionWebhookTarget>();
         services.AddScoped<RotateCompetitionWebhookSecret>();
         services.AddScoped<DeleteCompetitionWebhookTarget>();
+        var publicBaseUrlValue = configuration["Webhooks:PublicBaseUrl"]
+            ?? "http://localhost:5000";
+        if (!Uri.TryCreate(publicBaseUrlValue, UriKind.Absolute, out var webhookPublicBaseUrl)
+            || webhookPublicBaseUrl.Scheme is not ("https" or "http")
+            || !development && webhookPublicBaseUrl.Scheme != Uri.UriSchemeHttps)
+        {
+            throw new InvalidOperationException(
+                "Webhooks:PublicBaseUrl must be an absolute HTTPS origin in production.");
+        }
+        services.AddSingleton(new CompetitionWebhookOptions(
+            new Uri(webhookPublicBaseUrl.AbsoluteUri.TrimEnd('/') + "/"),
+            configuration.GetValue("Webhooks:TimeoutSeconds", 10),
+            ReadAllowList(configuration.GetSection(
+                "Webhooks:PrivateNetworkAllowList").Get<string[]>()),
+            ReadAllowList(configuration.GetSection(
+                "Webhooks:InsecureHttpHostAllowList").Get<string[]>()))) ;
+        services.AddScoped<ICompetitionWebhookDeliveryStore, CompetitionWebhookDeliveryStore>();
+        services.AddSingleton<ICompetitionWebhookSender, CompetitionWebhookSender>();
+        services.AddSingleton<ICompetitionWebhookTestStatusStore,
+            RedisCompetitionWebhookTestStatusStore>();
         if (!development)
             services.AddSingleton<RedisCompetitionEventRefreshPublisher>();
         return services;
     }
+
+    private static IReadOnlySet<string> ReadAllowList(string[]? values) =>
+        new HashSet<string>(
+            (values ?? []).Select(value => value.Trim().TrimEnd('.'))
+                .Where(value => value.Length > 0),
+            StringComparer.OrdinalIgnoreCase);
 }

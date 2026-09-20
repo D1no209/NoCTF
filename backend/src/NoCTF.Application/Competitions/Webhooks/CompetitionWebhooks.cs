@@ -50,6 +50,122 @@ public sealed record UpdateCompetitionWebhookTargetCommand(
     bool Enabled,
     DateTimeOffset Now);
 
+public sealed record DispatchCompetitionWebhooks(
+    Guid CompetitionId,
+    Guid EventId,
+    Guid? AfterTargetId = null);
+
+public sealed record DeliverCompetitionWebhook(
+    Guid CompetitionId,
+    Guid EventId,
+    Guid TargetId,
+    DateTimeOffset OccurredAt);
+
+public sealed record TestCompetitionWebhook(
+    Guid CompetitionId,
+    Guid TargetId,
+    Guid DeliveryId,
+    DateTimeOffset RequestedAt);
+
+public sealed record CompetitionWebhookDispatchBatch(
+    IReadOnlyList<DeliverCompetitionWebhook> Deliveries,
+    Guid? NextAfterTargetId = null);
+
+public enum CompetitionWebhookDeliveryReadState : short
+{
+    Ready,
+    Suppressed,
+    Missing
+}
+
+public sealed record CompetitionWebhookDelivery(
+    CompetitionWebhookDeliveryReadState State,
+    Guid CompetitionId,
+    Guid EventId,
+    Guid TargetId,
+    Uri? Endpoint = null,
+    byte[]? Body = null,
+    string? CurrentSigningSecret = null,
+    string? PreviousSigningSecret = null);
+
+public interface ICompetitionWebhookDeliveryStore
+{
+    Task<CompetitionWebhookDispatchBatch> PrepareBatchAsync(
+        DispatchCompetitionWebhooks command,
+        int batchSize,
+        CancellationToken cancellationToken);
+
+    Task<CompetitionWebhookDelivery> PrepareDeliveryAsync(
+        DeliverCompetitionWebhook command,
+        CancellationToken cancellationToken);
+
+    Task<CompetitionWebhookDelivery> PrepareTestDeliveryAsync(
+        TestCompetitionWebhook command,
+        CancellationToken cancellationToken);
+
+    Task DisableGoneAsync(
+        Guid competitionId,
+        Guid targetId,
+        Uri expectedEndpoint,
+        DateTimeOffset disabledAt,
+        CancellationToken cancellationToken);
+}
+
+public enum CompetitionWebhookSendResult : short
+{
+    Delivered,
+    ReceiverGone
+}
+
+public interface ICompetitionWebhookSender
+{
+    Task<CompetitionWebhookSendResult> SendAsync(
+        CompetitionWebhookDelivery delivery,
+        CancellationToken cancellationToken);
+}
+
+public sealed class CompetitionWebhookTransientException(
+    string message,
+    Exception? innerException = null) : Exception(message, innerException);
+
+public sealed class CompetitionWebhookPermanentException(
+    string message) : Exception(message);
+
+public enum CompetitionWebhookTestState : short
+{
+    Pending,
+    Succeeded,
+    Failed
+}
+
+public enum CompetitionWebhookTestFailureCode : short
+{
+    TargetUnavailable,
+    ReceiverGone,
+    PermanentFailure
+}
+
+public sealed record CompetitionWebhookTestStatus(
+    Guid DeliveryId,
+    Guid CompetitionId,
+    Guid TargetId,
+    CompetitionWebhookTestState State,
+    DateTimeOffset RequestedAt,
+    DateTimeOffset? CompletedAt = null,
+    CompetitionWebhookTestFailureCode? FailureCode = null);
+
+public interface ICompetitionWebhookTestStatusStore
+{
+    Task CreateAsync(CompetitionWebhookTestStatus status, CancellationToken cancellationToken);
+    Task<CompetitionWebhookTestStatus?> GetAsync(Guid deliveryId, CancellationToken cancellationToken);
+    Task CompleteAsync(
+        Guid deliveryId,
+        CompetitionWebhookTestState state,
+        DateTimeOffset completedAt,
+        CompetitionWebhookTestFailureCode? failureCode,
+        CancellationToken cancellationToken);
+}
+
 public interface ICompetitionWebhookStore
 {
     Task<CompetitionWebhookTargetPage?> ListAsync(
