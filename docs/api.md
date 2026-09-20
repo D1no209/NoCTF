@@ -508,6 +508,23 @@ NATS JetStream 的 consumer、重投与 dead-letter 运维由受控基础设施�
 暴露消息正文、异常详情或任意重投能力。比赛管理者不能操作
 DLQ，只能从 Competition/GameplayFact/Runtime 领域 API 重新触发。
 
+## Competition Webhooks
+
+```text
+GET    /api/v1/admin/competitions/{competitionId}/webhooks
+POST   /api/v1/admin/competitions/{competitionId}/webhooks
+PUT    /api/v1/admin/competitions/{competitionId}/webhooks/{targetId}
+DELETE /api/v1/admin/competitions/{competitionId}/webhooks/{targetId}
+POST   /api/v1/admin/competitions/{competitionId}/webhooks/{targetId}/rotate-secret
+POST   /api/v1/admin/competitions/{competitionId}/webhooks/{targetId}/test-deliveries
+GET    /api/v1/admin/competitions/{competitionId}/webhooks/{targetId}/test-deliveries/{deliveryId}
+```
+
+目标列表使用签名 keyset cursor，不设置产品数量上限。Administrator、Owner、Manager 可写；Judge 与
+Observer 只能读取名称、主机和启停状态。创建及轮换只显示一次 HMAC 密钥。正式事件经事务 Outbox、
+独立 NATS Webhook fan-out 和 Worker 工作队列异步发送；详细事件、签名、重试和网络限制见
+[赛事 Webhook](competition-webhooks.md)。
+
 平台运行日志使用每日 Redis Stream 分片聚合 API、Worker、Runner、Host 的结构化诊断日志，并通过
 管理员专用 SignalR Hub `/hubs/v1/admin/platform-logs` 实时推送。每个 UTC 日分片精确保留最多
 50,000 条，保留 14 天后由 Redis TTL 删除，不自动归档。历史查询默认从 Warning 开始，使用
