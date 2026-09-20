@@ -66,5 +66,7 @@ public enum NotificationKind : short
     HttpCommandReceipt,
     PlatformUserAccessTokenIssued,
     PlatformUserAccessTokenRevoked,
-    PlatformUserTokensInvalidated
+    PlatformUserTokensInvalidated,
+    SsoProviderConfigurationChanged,
+    SsoExternalIdentityBindingChanged
 }

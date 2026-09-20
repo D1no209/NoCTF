@@ -11,6 +11,8 @@ using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.DataProtection.KeyManagement;
 using Microsoft.AspNetCore.DataProtection.Repositories;
 using NoCTF.Infrastructure.Persistence;
+using Microsoft.Extensions.DependencyInjection.Extensions;
+using NoCTF.Application.Authentication.Sso;
 
 namespace NoCTF.Infrastructure.Authentication;
 
@@ -21,6 +23,8 @@ internal static class AuthenticationInfrastructure
         IConfiguration configuration,
         bool development = false)
     {
+        var exporting = configuration.GetValue<bool>("OpenApi:Exporting");
+        var allowDevelopmentProtection = development || exporting;
         services.AddOptions<AuthenticationTokenOptions>()
             .Bind(configuration.GetSection(AuthenticationTokenOptions.SectionName))
             .Validate(options => System.Text.Encoding.UTF8.GetByteCount(options.SigningKey) >= 32,
@@ -44,8 +48,10 @@ internal static class AuthenticationInfrastructure
             .ValidateOnStart();
         services.AddOptions<EmailVerificationProtectionOptions>()
             .Bind(configuration.GetSection(EmailVerificationProtectionOptions.SectionName))
-            .Validate(options => string.IsNullOrWhiteSpace(options.EncryptionKey)
-                    || IsValidEncryptionKey(options.EncryptionKey),
+            .Validate(options => allowDevelopmentProtection
+                    && string.IsNullOrWhiteSpace(options.EncryptionKey)
+                    || !string.IsNullOrWhiteSpace(options.EncryptionKey)
+                    && IsValidEncryptionKey(options.EncryptionKey),
                 "EmailVerification:EncryptionKey must be a Base64-encoded 32-byte key.")
             .ValidateOnStart();
         services.AddSingleton<IXmlRepository, PostgresEncryptedDataProtectionKeyRepository>();

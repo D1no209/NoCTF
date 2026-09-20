@@ -145,7 +145,9 @@ public sealed class NotificationReader(NoCtfDbContext db) : INotificationReader
                 && notification.Kind != NotificationKind.HttpCommandReceipt
                 && notification.Kind != NotificationKind.PlatformUserAccessTokenIssued
                 && notification.Kind != NotificationKind.PlatformUserAccessTokenRevoked
-                && notification.Kind != NotificationKind.PlatformUserTokensInvalidated)
+                && notification.Kind != NotificationKind.PlatformUserTokensInvalidated
+                && notification.Kind != NotificationKind.SsoProviderConfigurationChanged
+                && notification.Kind != NotificationKind.SsoExternalIdentityBindingChanged)
             .Select(notification => new NotificationView(
                 notification.Id,
                 notification.SourceType,
@@ -263,7 +265,9 @@ public sealed class NotificationReader(NoCtfDbContext db) : INotificationReader
                 && item.Kind != NotificationKind.HttpCommandReceipt
                 && item.Kind != NotificationKind.PlatformUserAccessTokenIssued
                 && item.Kind != NotificationKind.PlatformUserAccessTokenRevoked
-                && item.Kind != NotificationKind.PlatformUserTokensInvalidated);
+                && item.Kind != NotificationKind.PlatformUserTokensInvalidated
+                && item.Kind != NotificationKind.SsoProviderConfigurationChanged
+                && item.Kind != NotificationKind.SsoExternalIdentityBindingChanged);
     }
 
     private async Task<IQueryable<Notification>> VisibleToInMemoryAsync(
@@ -363,7 +367,9 @@ public sealed class NotificationReader(NoCtfDbContext db) : INotificationReader
                 && notification.Kind != NotificationKind.HttpCommandReceipt
                 && notification.Kind != NotificationKind.PlatformUserAccessTokenIssued
                 && notification.Kind != NotificationKind.PlatformUserAccessTokenRevoked
-                && notification.Kind != NotificationKind.PlatformUserTokensInvalidated)
+                && notification.Kind != NotificationKind.PlatformUserTokensInvalidated
+                && notification.Kind != NotificationKind.SsoProviderConfigurationChanged
+                && notification.Kind != NotificationKind.SsoExternalIdentityBindingChanged)
             .Where(notification => visibleRootIds.Contains(
                 notification.ThreadRootId ?? notification.Id))
             .Where(notification => audienceVisibleIds.Contains(notification.Id));

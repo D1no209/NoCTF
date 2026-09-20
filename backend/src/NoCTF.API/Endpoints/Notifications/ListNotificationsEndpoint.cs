@@ -61,6 +61,8 @@ internal static partial class NotificationProtocolMapper
     [MapperIgnoreSourceValue(NotificationKind.PlatformUserAccessTokenIssued)]
     [MapperIgnoreSourceValue(NotificationKind.PlatformUserAccessTokenRevoked)]
     [MapperIgnoreSourceValue(NotificationKind.PlatformUserTokensInvalidated)]
+    [MapperIgnoreSourceValue(NotificationKind.SsoProviderConfigurationChanged)]
+    [MapperIgnoreSourceValue(NotificationKind.SsoExternalIdentityBindingChanged)]
     public static partial NotificationKindProtocol ToProtocol(NotificationKind value);
 
     [MapEnum(EnumMappingStrategy.ByName)]
