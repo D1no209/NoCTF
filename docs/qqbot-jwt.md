@@ -1,134 +1,111 @@
-# QQBOT 公开只读接入
+# BOT 公开只读接入
 
-`NoCTF.Bot` 是独立的普通 API 消费者，不属于 NoCTF 的 Api、Worker 或 Runner 角色。平台不为
-QQBOT 创建专用接口、通知类型、群组绑定或投递协议；BOT 只使用现有公开 HTTP API 与比赛
-SignalR Hub，并通过 Lagrange.Milky 收发 QQ 群消息。
+`NoCTF.Bot` 是独立产品和普通 API 消费者，不属于 NoCTF 的 Api、Worker 或 Runner 角色。
+平台不保存聊天 Provider、master、群、绑定、权限、投递或 Secret；BOT 不引用任何平台项目，
+只使用公开 HTTPS API 和比赛 SignalR。Milky、OneBot、UniQsign 及其他聊天框架均位于 BOT
+运维边界。
 
-## 1. 身份与权限
+## 1. 身份与平台接口
 
-管理员创建用途为通知转发的 Bot，平台角色必须为 `User`。该账号不设置密码，不获得 Refresh
-Token，不加入任何队伍，也不能加入比赛的 Owner、Manager、Judge 或 Observer 列表。
+平台管理员创建 `User` 角色 Bot 身份并签发 Access JWT。该账号不设置密码、不获得 Refresh
+Token、不加入队伍，也不进入比赛 Owner、Manager、Judge 或 Observer。JWT 只写入 BOT Secret，
+不得进入源码、镜像、普通配置、日志或截图。BOT 启动时调用 `GET /api/v1/auth/me`，只有
+`kind=Bot` 且 `role=User` 才继续运行。
 
-首次联调签发 24 小时 Access JWT；稳定公测可签发 7 至 30 天。不要签发一年期 Token。Token
-只写入部署 Secret；不得进入源码、镜像、普通配置文件、日志或截图。`NoCTF.Bot` 启动时调用
-现有 `GET /api/v1/auth/me`，只有 `kind=Bot` 且 `role=User` 才会继续运行。
-
-公开比赛允许普通已认证用户加入 `/hubs/v1/competitions` 的 public group。Draft 或 StaffOnly
-比赛不会向该身份开放，因此 BOT 无法通过订阅绕过公开可见性。
-
-## 2. 使用的现有接口
-
-BOT 只读取：
+BOT 使用的接口均为通用公开契约：
 
 ```text
 GET /api/v1/auth/me
 GET /api/v1/competitions/{competitionId}
 GET /api/v1/competitions/{competitionId}/challenges
 GET /api/v1/competitions/{competitionId}/leaderboard
+GET /api/v1/competitions/{competitionId}/announcements
 ```
 
-平台仍是可见性裁剪的唯一权威。BOT 不读取题解、咨询、队伍私有信息、Flag、Runtime、管理端点
-或工作人员事件，也不自行累计分数。
+公告接口不是 BOT 专用接口。任何有效 Bearer 身份遵循同一规则：只返回 Public、非 Draft
+比赛中面向参赛者且事件可见性为 Public 的公告；StaffOnly 比赛和协作者公告不可读取。
 
-SignalR 连接 `/hubs/v1/competitions`，连接后对本地订阅的比赛调用
-`JoinCompetition(competitionId)`，监听：
+SignalR `/hubs/v1/competitions` 只提供失效提示。BOT 在 750 ms 合并后重新读取 HTTP 事实，
+60 秒轮询恢复断线遗漏；平台不向 BOT 投递消息，也不知道群绑定关系。
 
-- `competitionLifecycleChanged`
-- `competitionEventChanged`
-- `scoreboardUpdated`
-- `gameplayFactStateChanged`（显式忽略，不转发选手提交状态）
+## 2. Core 与 Provider
 
-SignalR 只作为失效提示。BOT 在 750 ms 合并窗口后重新读取 HTTP 资源，与 SQLite 快照比较后
-才生成消息；重连后重新加入全部比赛并重读快照。另有默认 60 秒低频兜底读取，用于恢复断线
-期间遗漏的失效提示。
+- `NoCTF.Bot.Core`：命令、权限、比赛同步、播报、SQLite 与可靠队列，不认识聊天框架。
+- `NoCTF.Bot.Providers.Milky`：Milky HTTP/WebSocket、QQ 标识、群角色和发送协议。
+- `NoCTF.Bot`：独立 Worker 宿主，一个进程选择一个编译期注册 Provider。
 
-## 3. 排行榜协议
+Core 使用字符串 `ProviderId`、`GroupId`、`UserId`、`MessageId`。第三方适配器必须实现身份探测、
+群消息流、群角色解析、文本发送和能力声明。开发方式见
+[BOT Provider 开发指南](bot-provider-development.md)。
 
-- `200`：使用响应中的 `visibility`、`dataScope`、`dataAsOf` 和 `generatedAt`。
-- `202`：遵循 `Retry-After`，不得立即循环请求。
-- `401`：全局熔断 HTTP 与 SignalR 读取，向已订阅群提示 Token 失效。
-- `404`：比赛或排行榜不可见，暂停本地订阅，等待群管理员重新订阅。
-- `503`：保留现有快照并退避，不把投影失败解释为零分。
+## 3. master、群授权与命令
 
-`Frozen` 只展示冻结快照及时间；`Hidden`/`Blackout` 不显示分数、名次、血榜或解出数，也不
-推测实时数据。公告、题目更新等公开非战况通知仍可继续播报。
+启动必须配置 `Bot__Provider` 与 `Bot__MasterUserId`。每个群第一次使用前，master 必须在该群
+执行 `enable`。首次授权后，master、群主、群管理员和本群自定义 admin 均可 `enable/disable`。
+`disable` 保留配置；master 的 `/ctf revoke` 清除授权、绑定、自定义 admin 和待发送消息。
 
-## 4. QQ 命令
-
-普通成员：
+master 管理本群自定义 admin：
 
 ```text
-/ctf help
-/ctf status
-/ctf challenges
-/ctf rank
-/ctf rank 20
-/ctf team <队伍名>
-/ctf link
+/ctf admin add <userId>
+/ctf admin remove <userId>
+/ctf admins
 ```
 
-群主和群管理员：
+管理员命令：
 
 ```text
-/ctf subscribe <competitionId>
-/ctf unsubscribe
+enable
+disable
+bind <competitionId>
+unbind
 /ctf broadcasts on|off
 /ctf scoreboard on|off
 /ctf blood on|off
 /ctf config
 ```
 
-管理员权限来自 Milky `get_group_member_info` 的 `owner/admin` 角色。BOT 不实现 flag、answer、
-writeup、runtime 或 admin 等平台写操作。单用户限制为 10 秒 5 条命令，单群限制为每分钟 30
-条；`rank` 最多 20 队且最多拆为两条消息。
+`/ctf bind` 与 `/ctf unbind` 同样有效；`subscribe/unsubscribe` 仅为兼容别名。只能绑定 Public
+且非 Draft 的比赛。普通成员在群启用并绑定后可使用：
 
-## 5. 本地可靠性
+```text
+/ctf help
+/ctf status
+/ctf challenges
+/ctf rank [1-20]
+/ctf team <队伍名>
+/ctf link
+```
 
-单实例使用 SQLite WAL，保存：
+未授权或关闭群除合法 `enable` 和 master `revoke` 外静默忽略。单用户限制为 10 秒 5 条命令，
+单群限制为每分钟 30 条。
 
-- 群订阅及三个播报开关；
-- 比赛、题目、队伍及 Achievement 快照；
-- `(scene, peer_id, message_sequence)` 入站去重；
-- 带唯一 `dedupe_key` 的持久化出站队列。
+## 4. 播报与黑榜
 
-出站失败按 `2s → 5s → 15s → 30s → 1m → 5m` 重试，随后进入 DeadLetter。进程重启会
-恢复 Pending/Sending 记录；逻辑事件不会因 SignalR 重投或快照重复读取而重复入队。由于 QQ
-协议没有跨系统事务，进程恰好在 QQ 接受消息后、SQLite 完成确认前崩溃时仍存在极小的重复
-投递窗口；这是当前 Milky API 下无法伪造“恰好一次”承诺的边界。
+`broadcasts` 控制比赛开始/暂停/恢复/结束、新题、题面、提示、公告正文、封禁与纠正；`blood`
+控制一二三血；`scoreboard` 只控制 AWDP Break/Fix 引起的公开榜单差异。绑定时三类默认开启。
 
-## 6. Token 轮换
+绑定时建立公告检查点，不补发历史。正文按 Provider 最大长度分段，使用公告 ID 和分段序号去重。
+`Hidden`/`Blackout` 不展示分数、名次、血榜、解出数、AWDP 差异或推测数据；BOT 仍推进快照，
+解除黑榜后不会补发隐藏期间变化。公开的生命周期、题目、提示、公告和封禁信息继续播报。
 
-1. 管理员签发新 Access JWT。
-2. 原子替换 `NoCtf__AccessToken` Secret。
-3. 重启 `NoCTF.Bot`，确认 `/auth/me` 和 SignalR 正常。
-4. 撤销旧 Token。
-5. 确认旧 Token 返回 `401`。
+## 5. SQLite 与可靠性
 
-轮换不得清空 SQLite；订阅、快照、入站去重和待发送消息必须保留。
+SQLite WAL 保存 Provider+群授权、群 admin、比赛绑定、播报开关、公告检查点、比赛快照、入站去重
+和持久化出站队列。旧 Milky schema 自动升级，保留绑定和开关，但所有群升级后保持关闭，必须由
+master 首次启用。
 
-## 7. 安全边界
+出站失败按 `2s → 5s → 15s → 30s → 1m → 5m` 重试，随后进入 DeadLetter。进程重启恢复
+Pending/Sending；聊天协议没有跨系统事务，因此在 Provider 已接收、SQLite 尚未确认时崩溃仍存在
+极小重复投递窗口。
 
-- NoCTF 公网地址强制为无凭据、无路径的 HTTPS origin，HTTP 客户端禁止跨域重定向。
-- Milky HTTP/WebSocket 使用私有 Bearer Token，只在内部网络开放。
-- `NoCTF.Bot` 不监听管理端口。
-- 用户输入只作为命令、UUID 或队伍名称处理，不执行 shell、不读取文件、不发起任意 URL 请求。
-- 可用 `Bot__AllowedGroupIds` 再加一层本地群白名单。
-- 日志只记录有界错误类型和公开 ID，不记录 JWT、Milky Token 或原始敏感 payload。
+## 6. 安全、部署与拆仓
 
-## 8. 开发期单仓与后续拆分
+- NoCTF 地址必须是无凭据、无路径的 HTTPS origin，并禁止跨域重定向。
+- Provider API/WebSocket 和签名服务只能位于 BOT 私网。
+- BOT 不监听管理端口，不执行用户输入，不读取任意文件或 URL。
+- `Bot__AllowedGroupIds` 可作为额外本地白名单。
+- 平台 Compose/Kubernetes、环境变量和发布物不得包含 BOT 或 Provider 配置。
 
-当前为了让公开 API/SignalR 契约变更、BOT 客户端实现和自动化测试在同一提交中协同验证，
-`NoCTF.Bot` 暂时与平台代码保存在同一仓库并参加解决方案构建。这不代表 BOT、Milky 或
-UniQsign 属于平台，也不授权平台读取或管理其配置。
-
-开发期单仓不得突破以下限制：
-
-- 平台运行配置和部署清单中不增加 BOT、Milky、UniQsign 或 QQ 群字段；
-- 平台只负责普通 User Bot 身份及 JWT 生命周期；
-- BOT 保持零平台项目引用，仅依赖公开网络协议；
-- BOT 生产部署、Secret、SQLite、日志和告警全部位于外部 BOT 运维边界。
-
-完成公开契约稳定和公测验收后，BOT 将迁移到独立仓库并使用独立版本、CI 与发布流程；迁移
-不得引入平台专用兼容接口，原有 JWT 与公开 API/SignalR 接入方式保持不变。
-
-部署与验收步骤见 [`integrations/qqbot/README.md`](../integrations/qqbot/README.md)。
+开发期三个 BOT 项目暂存于同仓以同步验证公开协议；完成公测后整体迁移到独立仓库、版本和 CI。
+部署与验收见 [`integrations/qqbot/README.md`](../integrations/qqbot/README.md)。

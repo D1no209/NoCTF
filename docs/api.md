@@ -176,6 +176,7 @@ GET  /api/v1/competitions/{competitionId}/questions/{threadRootId}
 POST /api/v1/competitions/{competitionId}/questions/{threadRootId}/messages
 PUT  /api/v1/competitions/{competitionId}/questions/{threadRootId}/status
 POST /api/v1/admin/competitions/{competitionId}/announcements
+GET  /api/v1/competitions/{competitionId}/announcements
 GET  /api/v1/notifications/{notificationId}/thread
 GET  /api/v1/competitions/{competitionId}/events
 ```
@@ -192,6 +193,10 @@ Question 根就是 `notifications.id`；回复和状态事件使用 `ThreadRootI
 删除 Question publication；面向全体参赛者的通用说明创建 CompetitionAnnouncement。管理员公告 Source 是发送者 UserId，
 Target 是 CompetitionId，默认 TargetType=CompetitionCollaborators；面向选手必须显式选择 CompetitionParticipants。所有写操作采用 last-write-wins，发起与回复共享每用户/IP
 每分钟 8 次的限流策略。
+
+公开公告列表使用 Bearer 认证与签名 keyset cursor，只返回 Public、非 Draft 比赛中
+`CompetitionParticipants` 且对应 `AnnouncementPublished` 事件为 Public 的公告 ID、标题、正文和
+发布时间。它是通用只读比赛契约，不区分 Human/Bot，不返回协作者公告，也不承担外部投递。
 
 ## GameplayFact 动作
 

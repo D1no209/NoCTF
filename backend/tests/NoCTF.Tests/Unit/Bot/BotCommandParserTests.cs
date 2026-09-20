@@ -12,6 +12,10 @@ public sealed class BotCommandParserTests
     [Arguments("/ctf rank 20", BotCommandKind.Rank)]
     [Arguments("/ctf team Red Team", BotCommandKind.Team)]
     [Arguments("/ctf broadcasts off", BotCommandKind.Broadcasts)]
+    [Arguments("enable", BotCommandKind.Enable)]
+    [Arguments("bind 01a041a5-d3b7-754b-b399-8106afe5be14", BotCommandKind.Bind)]
+    [Arguments("/ctf admin add 30003", BotCommandKind.AdminAdd)]
+    [Arguments("/ctf admins", BotCommandKind.AdminList)]
     public async Task Parse_ValidCommand_ReturnsExpectedKind(
         string text,
         BotCommandKind expected)
@@ -35,6 +39,7 @@ public sealed class BotCommandParserTests
     [Arguments("/ctf subscribe nope")]
     [Arguments("/ctf broadcasts maybe")]
     [Arguments("/ctf flag test")]
+    [Arguments("bind nope")]
     public async Task Parse_UnsafeOrInvalidCommand_IsRejected(string text)
     {
         var command = BotCommandParser.Parse(text);
