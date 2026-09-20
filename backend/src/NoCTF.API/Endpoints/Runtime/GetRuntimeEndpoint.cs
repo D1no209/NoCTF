@@ -64,7 +64,7 @@ public enum RuntimeFailureCodeProtocol
 [JsonConverter(typeof(StrictPascalCaseEnumConverter<RunnerAdmissionFailureProtocol>))]
 public enum RunnerAdmissionFailureProtocol
 {
-    NoEligibleRunner, CpuBudgetInsufficient, MemoryBudgetInsufficient, PidBudgetInsufficient,
+    NoEligibleRunner, CpuActualCapacityInsufficient, MemoryActualCapacityInsufficient, PidActualCapacityInsufficient,
     NodePressureHigh, ObservationStale, LedgerRecovering, StartupConcurrencyLimited,
     ProviderUnavailable, RequestExceedsNodeCapacity
 }

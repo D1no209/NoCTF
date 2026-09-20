@@ -98,9 +98,6 @@ public sealed class DeploymentTopologyTests
         }
         foreach (var runnerAvailabilitySetting in new[]
                  {
-                     "Runner__Capacity__MemoryBytes",
-                     "Runner__Capacity__NanoCpus",
-                     "Runner__Capacity__PidsLimit",
                      "Runner__Heartbeat__IntervalSeconds",
                      "Runner__Heartbeat__TtlSeconds"
                  })
@@ -111,6 +108,10 @@ public sealed class DeploymentTopologyTests
 
         foreach (var legacySetting in new[]
                  {
+                     "Runner__Capacity__MemoryBytes",
+                     "Runner__Capacity__NanoCpus",
+                     "Runner__Capacity__PidsLimit",
+                     "Runtime__CpuOvercommitFactor",
                      "Runner__ApiKey",
                      "Runner__BaseUrl",
                      "QqBot__PublicBaseUrl",
@@ -119,6 +120,7 @@ public sealed class DeploymentTopologyTests
         {
             await Assert.That(compose).DoesNotContain(legacySetting);
             await Assert.That(kubernetesConfig).DoesNotContain(legacySetting);
+            await Assert.That(runtimeEnv).DoesNotContain(legacySetting);
         }
     }
 

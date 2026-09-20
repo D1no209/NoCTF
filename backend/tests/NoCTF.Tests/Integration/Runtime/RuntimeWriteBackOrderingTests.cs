@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using NoCTF.Application.Competitions.Events;
+using NoCTF.Application.Runtime.Capacity;
 using NoCTF.Application.Runtime.Instances;
 using NoCTF.Domain.Runtime;
 using NoCTF.Infrastructure.Messaging;
@@ -7,6 +8,7 @@ using NoCTF.Infrastructure.Persistence;
 using NoCTF.Runner.Messages;
 using NoCTF.Tests.Integration.Persistence;
 using Testcontainers.PostgreSql;
+using NSubstitute;
 
 namespace NoCTF.Tests.Integration.Runtime;
 
@@ -35,7 +37,7 @@ public sealed class RuntimeWriteBackOrderingTests
             var runningAt = runtime.RunningAt;
             var before = await db.CompetitionEvents.CountAsync(ct);
             var handler = new RuntimeProvisionWriteBackMessageHandler(db, new NoOpTransactionalMessageOutbox(),
-                NullCompetitionEventRecorder.Instance, TimeProvider.System);
+                NullCompetitionEventRecorder.Instance, TimeProvider.System, Substitute.For<IRunnerCapacityGate>());
             await handler.Handle(new RuntimeProvisionFailed(runtime.Id, RuntimeFailureCode.RunnerUnavailable, "runner"), ct);
             await handler.Handle(new RuntimeProvisioned(runtime.Id, "runner", RuntimeProvider.Docker, "{\"late\":true}", [], null), ct);
             await db.Entry(runtime).ReloadAsync(ct);

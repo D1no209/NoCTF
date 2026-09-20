@@ -42,11 +42,15 @@ public sealed class RedisRunnerCapacityDiagnostics(NoCtfDbContext db, IConnectio
                 var fields = (await cache.HashGetAllAsync($"runner:{runnerId}:capacity"))
                     .ToDictionary(field => field.Name.ToString(), field => field.Value.ToString(), StringComparer.Ordinal);
                 var alive = await cache.KeyExistsAsync($"runner:{runnerId}:heartbeat");
-                var total = Amount(fields, "total");
-                var available = Amount(fields, "available");
-                var budget = total is not null && available is not null
-                    ? new RuntimeResourceAmount(total.MemoryBytes - available.MemoryBytes, total.NanoCpus - available.NanoCpus,
-                        total.PidsLimit - available.PidsLimit) : null;
+                var modern = fields.GetValueOrDefault("registrationSchema") == "3";
+                var pidsObserved = fields.GetValueOrDefault("pidsObserved") != "0";
+                var observedTotal = modern ? ObservedAmount(fields, "observedTotal", pidsObserved) : null;
+                var observedAvailable = modern ? ObservedAmount(fields, "observedAvailable", pidsObserved) : null;
+                var safetyHeadroom = modern ? ObservedAmount(fields, "safetyHeadroom", pidsObserved) : null;
+                var startupReserved = modern ? ObservedAmount(fields, "startupReserved", pidsObserved: true) : null;
+                var admissionAvailable = modern
+                    ? ObservedAmount(fields, "admissionAvailable", pidsObserved)
+                    : LegacyAmount(fields, "available");
                 RunnerAdmissionSnapshot? admission = null;
                 if (fields.TryGetValue("observation", out var json))
                 {
@@ -77,8 +81,9 @@ public sealed class RedisRunnerCapacityDiagnostics(NoCtfDbContext db, IConnectio
                     : totals.TryGetValue(runnerId, out var row)
                         ? new RuntimeResourceAmount(row.MemoryBytes, row.NanoCpus, row.PidsLimit) : new(0, 0, 0);
                 snapshots.Add(new(runnerId, fields.GetValueOrDefault("resourceDomain"), alive, state, failure,
-                    total, available, budget, limit, admission?.Observation,
-                    ReadCount(fields, "startingPrimary"), ReadCount(fields, "activeAuxiliary")));
+                    observedTotal, observedAvailable, safetyHeadroom, startupReserved, admissionAvailable, limit,
+                    admission?.Observation, ReadCount(fields, "startingPrimary"),
+                    ReadCount(fields, modern ? "startingAuxiliary" : "activeAuxiliary")));
             }
             return new(true, snapshots, members.Length > ids.Length);
         }
@@ -91,10 +96,19 @@ public sealed class RedisRunnerCapacityDiagnostics(NoCtfDbContext db, IConnectio
     private static int? ReadCount(IReadOnlyDictionary<string, string> fields, string key) =>
         int.TryParse(fields.GetValueOrDefault(key), out var count) ? count : null;
 
-    private static RuntimeResourceAmount? Amount(IReadOnlyDictionary<string, string> fields, string prefix) =>
+    private static RunnerObservedResourceAmount? ObservedAmount(
+        IReadOnlyDictionary<string, string> fields, string prefix, bool pidsObserved) =>
         long.TryParse(fields.GetValueOrDefault(prefix + "MemoryBytes"), out var memory)
         && long.TryParse(fields.GetValueOrDefault(prefix + "NanoCpus"), out var cpu)
-        && long.TryParse(fields.GetValueOrDefault(prefix + "Pids"), out var pids) ? new(memory, cpu, pids) : null;
+        && long.TryParse(fields.GetValueOrDefault(prefix + "Pids"), out var pids)
+            ? new(memory, cpu, pidsObserved ? pids : null) : null;
+
+    private static RunnerObservedResourceAmount? LegacyAmount(
+        IReadOnlyDictionary<string, string> fields, string prefix) =>
+        long.TryParse(fields.GetValueOrDefault(prefix + "MemoryBytes"), out var memory)
+        && long.TryParse(fields.GetValueOrDefault(prefix + "NanoCpus"), out var cpu)
+        && long.TryParse(fields.GetValueOrDefault(prefix + "Pids"), out var pids)
+            ? new(memory, cpu, pids) : null;
 
     private sealed record AllocationTotal(string RunnerId, long MemoryBytes, long NanoCpus, long PidsLimit);
 }

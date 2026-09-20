@@ -107,9 +107,6 @@ public sealed class CapacityCrashRecoveryTests
                 .WithEnvironment("Runner__Provider", "Docker")
                 .WithEnvironment("Runner__Heartbeat__IntervalSeconds", "5")
                 .WithEnvironment("Runner__Heartbeat__TtlSeconds", "15")
-                .WithEnvironment("Runner__Capacity__MemoryBytes", "536870912")
-                .WithEnvironment("Runner__Capacity__NanoCpus", "1000000000")
-                .WithEnvironment("Runner__Capacity__PidsLimit", "512")
                 .WithEnvironment("Runtime__Docker__Endpoint", "unix:///var/run/docker.sock")
                 .WithEnvironment("RunnerScoring__CallbackBaseUrl", "http://127.0.0.1:8080")
                 .WithEnvironment("RunnerScoring__SigningKey", new string('x', 64))
@@ -180,8 +177,8 @@ public sealed class CapacityCrashRecoveryTests
                     await RequestStopAsync();
                 }
                 await WaitForAsync(async () => await StateAsync() == RuntimeState.Stopped
-                    && (long?)await redis.GetDatabase().HashGetAsync($"runner:{runner}:capacity", "availableMemoryBytes") == 536870912,
-                    "automatic cleanup and exact budget recovery");
+                    && (long?)await redis.GetDatabase().HashGetAsync($"runner:{runner}:capacity", "startupReservedMemoryBytes") == 0,
+                    "automatic cleanup and startup reservation recovery");
                 await WaitForAsync(async () => (string?)await redis.GetDatabase().HashGetAsync($"runner:{runner}:capacity", "admissionState") == "ready",
                     "healthy admission after recovery");
                 await Assert.That(await inventory.WorkloadExistsAsync(new(RuntimeWorkloadKind.Runtime, id, id), ct)).IsFalse();

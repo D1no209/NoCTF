@@ -9,6 +9,75 @@ namespace NoCTF.Tests.Integration.Runtime;
 [Category("Integration")]
 public sealed class RunnerAdmissionGateTests
 {
+    [Test, Timeout(300_000)]
+    public async Task Mixed_schema_pool_keeps_legacy_runner_compatible_and_selects_actual_headroom(CancellationToken ct)
+    {
+        await DockerIntegrationTest.RunAsync(async () =>
+        {
+            await using var container = new RedisBuilder("redis:7.4.10-alpine3.21@sha256:e7723ff73d963f5cc6d9c4643ea3d989527a402a319239054e9472a7fb9219a2").Build();
+            await container.StartAsync(ct);
+            await using var redis = await ConnectionMultiplexer.ConnectAsync(container.GetConnectionString());
+            var registry = new RedisRunnerAvailabilityRegistry(redis);
+            await registry.RegisterAsync(new("mixed", "legacy", RuntimeProvider.Docker, "old",
+                new(128, 100, 100), TimeSpan.FromMinutes(1), false), ct);
+            var now = DateTimeOffset.UtcNow;
+            var options = new RunnerAdmissionOptions();
+            var admission = new RunnerPressurePolicy(options).Evaluate(
+                new("actual-domain", now, 1024, 900, 100, .1, 1, 100, 0), now);
+            await registry.RegisterAsync(new("mixed", "actual", RuntimeProvider.Docker, "new",
+                new(0, 0, 0), TimeSpan.FromMinutes(1), false, true,
+                admission, options, ActualUsage: true), ct);
+
+            var id = Guid.NewGuid();
+            var identity = new RuntimeWorkloadIdentity(RuntimeWorkloadKind.Runtime, id, id);
+            var claim = await new RedisRunnerCapacityGate(redis).TryClaimAsync(
+                new(id, "mixed", 256, 5, 1, identity, Limit: new(256, 5, 1)), ct);
+
+            await Assert.That(claim.Availability).IsEqualTo(RunnerCapacityAvailability.Claimed);
+            await Assert.That(claim.RunnerId).IsEqualTo("actual");
+            await Assert.That((string?)await redis.GetDatabase().HashGetAsync(
+                "runner:legacy:capacity", "registrationSchema")).IsEqualTo("2");
+            await Assert.That((string?)await redis.GetDatabase().HashGetAsync(
+                "runner:actual:capacity", "registrationSchema")).IsEqualTo("3");
+        });
+    }
+
+    [Test, Timeout(300_000)]
+    public async Task Startup_reservation_releases_only_after_an_observation_at_or_after_completion(CancellationToken ct)
+    {
+        await DockerIntegrationTest.RunAsync(async () =>
+        {
+            await using var container = new RedisBuilder("redis:7.4.10-alpine3.21@sha256:e7723ff73d963f5cc6d9c4643ea3d989527a402a319239054e9472a7fb9219a2").Build();
+            await container.StartAsync(ct);
+            await using var redis = await ConnectionMultiplexer.ConnectAsync(container.GetConnectionString());
+            var options = new RunnerAdmissionOptions();
+            var observedAt = DateTimeOffset.UtcNow.AddSeconds(-1);
+            var sample = new RunnerResourceObservation("domain", observedAt, 1024, 1024, 100, 0, 0, 100, 0);
+            RunnerAvailabilityRegistration Registration(DateTimeOffset at) => new("test", "runner", RuntimeProvider.Docker,
+                "test", new(0, 0, 0), TimeSpan.FromMinutes(1), true, true,
+                new RunnerPressurePolicy(options).Evaluate(sample with { ObservedAt = at }, DateTimeOffset.UtcNow),
+                options, ActualUsage: true);
+            var registry = new RedisRunnerAvailabilityRegistry(redis);
+            await registry.RegisterAsync(Registration(observedAt) with { HasActiveAssignments = false }, ct);
+            var gate = new RedisRunnerCapacityGate(redis);
+            var id = Guid.NewGuid();
+            var identity = new RuntimeWorkloadIdentity(RuntimeWorkloadKind.Runtime, id, id);
+            await gate.TryClaimAsync(new(id, "test", 128, 10, 1, identity, Limit: new(128, 10, 1)), ct);
+            await gate.CompleteWorkloadStartupAsync(identity, "runner", ct);
+
+            await registry.RegisterAsync(Registration(observedAt), ct);
+            await Assert.That((long)await redis.GetDatabase().HashGetAsync(
+                "runner:runner:capacity", "startupReservedMemoryBytes")).IsEqualTo(128);
+
+            await Task.Delay(10, ct);
+            await registry.RegisterAsync(Registration(DateTimeOffset.UtcNow), ct);
+            await Assert.That((long)await redis.GetDatabase().HashGetAsync(
+                "runner:runner:capacity", "startupReservedMemoryBytes")).IsEqualTo(0);
+            await Assert.That((long)await redis.GetDatabase().HashGetAsync(
+                "runner:runner:capacity", "startingPrimary")).IsEqualTo(0);
+        });
+    }
+
     [Test, Arguments(false), Arguments(true), Timeout(300_000)]
     public async Task Oversized_reason_requires_evidence_for_every_pool_node(bool allTooSmall, CancellationToken ct)
     {
@@ -18,15 +87,18 @@ public sealed class RunnerAdmissionGateTests
             await container.StartAsync(ct);
             await using var redis = await ConnectionMultiplexer.ConnectAsync(container.GetConnectionString());
             var registry = new RedisRunnerAvailabilityRegistry(redis);
-            var policy = new RunnerAdmissionOptions { AuxiliaryReservedMemoryBytes = 128, AuxiliaryReservedNanoCpus = 10, AuxiliaryReservedPids = 1 };
+            var policy = new RunnerAdmissionOptions();
             foreach (var runner in new[] { "small", "other" })
             {
                 var blocked = runner == "other" && !allTooSmall;
+                var now = DateTimeOffset.UtcNow;
+                var sample = new RunnerResourceObservation(runner, now,
+                    blocked ? 1024 : 128, blocked ? 900 : 120, 100, blocked ? 1 : .1, 1, 100, 0,
+                    ProviderPressure: blocked);
+                var admission = new RunnerPressurePolicy(policy).Evaluate(sample, now);
                 await registry.RegisterAsync(new("test", runner, RuntimeProvider.Docker, "test",
-                    new(blocked ? 1024 : 128, 100, 100), TimeSpan.FromMinutes(1), false, true,
-                    new(blocked ? RunnerAdmissionState.PressureBlocked : RunnerAdmissionState.Ready,
-                        blocked ? RunnerAdmissionFailure.NodePressureHigh : null,
-                        new(runner, DateTimeOffset.UtcNow, 1024, 900, 100, blocked ? 1 : .1, 1, 100, 0)), policy), ct);
+                    new(0, 0, 0), TimeSpan.FromMinutes(1), false, true,
+                    admission, policy, ActualUsage: true), ct);
             }
             var id = Guid.NewGuid();
             var claim = await new RedisRunnerCapacityGate(redis).TryClaimAsync(new(id, "test", 256, 5, 1,
@@ -46,13 +118,11 @@ public sealed class RunnerAdmissionGateTests
             await using var redis = await ConnectionMultiplexer.ConnectAsync(container.GetConnectionString());
             var registry = new RedisRunnerAvailabilityRegistry(redis);
             var now = DateTimeOffset.UtcNow;
-            var policy = new RunnerAdmissionOptions
-            {
-                AuxiliaryReservedMemoryBytes = 128, AuxiliaryReservedNanoCpus = 10, AuxiliaryReservedPids = 1
-            };
+            var policy = new RunnerAdmissionOptions();
+            var sample = new RunnerResourceObservation("domain", now, 1024, 900, 100, .1, 1, 100, 0);
             var registration = new RunnerAvailabilityRegistration("test", "runner", RuntimeProvider.Docker,
-                "test", new(1024, 100, 100), TimeSpan.FromMinutes(1), false, true,
-                new(RunnerAdmissionState.Ready, null, new("domain", now, 1024, 900, 100, .1, 1, 100, 0)), policy);
+                "test", new(0, 0, 0), TimeSpan.FromMinutes(1), false, true,
+                new RunnerPressurePolicy(policy).Evaluate(sample, now), policy, ActualUsage: true);
             await registry.RegisterAsync(registration, ct);
             var gate = new RedisRunnerCapacityGate(redis);
             var requests = Enumerable.Range(0, parallelism).Select(_ =>
@@ -67,6 +137,14 @@ public sealed class RunnerAdmissionGateTests
             foreach (var (request, claim) in requests.Zip(claims))
                 if (claim.Availability == RunnerCapacityAvailability.Claimed)
                     await gate.CompleteWorkloadStartupAsync(request.Workload!.Value, "runner", ct);
+            await Task.Delay(10, ct);
+            var refreshedAt = DateTimeOffset.UtcNow;
+            var refreshed = sample with { ObservedAt = refreshedAt };
+            await registry.RegisterAsync(registration with
+            {
+                HasActiveAssignments = true,
+                Admission = new RunnerPressurePolicy(policy).Evaluate(refreshed, refreshedAt)
+            }, ct);
             var parent = Guid.NewGuid();
             var checker = new RuntimeWorkloadIdentity(RuntimeWorkloadKind.AwdChecker, parent, Guid.NewGuid());
             var checkerClaim = await gate.TryClaimForRunnerAsync(new(parent, "test", 128, 10, 1, checker), "runner", ct);
@@ -74,7 +152,9 @@ public sealed class RunnerAdmissionGateTests
             await registry.RegisterAsync(registration with
             {
                 HasActiveAssignments = true,
-                Admission = registration.Admission! with { Observation = registration.Admission.Observation! with { ObservedAt = now.AddMinutes(-1) } }
+                Admission = new RunnerAdmissionSnapshot(RunnerAdmissionState.Starting,
+                    RunnerAdmissionFailure.ObservationStale,
+                    sample with { ObservedAt = now.AddMinutes(-1) })
             }, ct);
             var staleId = Guid.NewGuid();
             var stale = await gate.TryClaimAsync(new(staleId, "test", 64, 5, 1,
@@ -85,8 +165,8 @@ public sealed class RunnerAdmissionGateTests
             foreach (var (request, claim) in requests.Zip(claims))
                 if (claim.Availability == RunnerCapacityAvailability.Claimed)
                     await gate.ReleaseWorkloadAsync(request.Workload!.Value, "runner", ct);
-            await Assert.That((long)await redis.GetDatabase().HashGetAsync("runner:runner:capacity", "availableMemoryBytes"))
-                .IsEqualTo(1024);
+            await Assert.That((long)await redis.GetDatabase().HashGetAsync("runner:runner:capacity", "startupReservedMemoryBytes"))
+                .IsEqualTo(0);
         });
     }
 }

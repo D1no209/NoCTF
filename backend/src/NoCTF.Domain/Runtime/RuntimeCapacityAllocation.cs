@@ -25,9 +25,9 @@ public enum RunnerAdmissionState : short
 public enum RunnerAdmissionFailure : short
 {
     NoEligibleRunner,
-    CpuBudgetInsufficient,
-    MemoryBudgetInsufficient,
-    PidBudgetInsufficient,
+    CpuActualCapacityInsufficient,
+    MemoryActualCapacityInsufficient,
+    PidActualCapacityInsufficient,
     NodePressureHigh,
     ObservationStale,
     LedgerRecovering,

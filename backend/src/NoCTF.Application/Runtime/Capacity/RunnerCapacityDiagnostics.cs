@@ -5,9 +5,15 @@ namespace NoCTF.Application.Runtime.Capacity;
 public sealed record RunnerCapacitySnapshot(
     string RunnerId, string? ResourceDomain, bool Alive,
     RunnerAdmissionState State, RunnerAdmissionFailure? Failure,
-    RuntimeResourceAmount? Allocatable, RuntimeResourceAmount? Available,
-    RuntimeResourceAmount? Budget, RuntimeResourceAmount? Limits,
-    RunnerResourceObservation? Observation, int? StartingPrimary, int? ActiveAuxiliary);
+    RunnerObservedResourceAmount? ObservedTotal,
+    RunnerObservedResourceAmount? ObservedAvailable,
+    RunnerObservedResourceAmount? SafetyHeadroom,
+    RunnerObservedResourceAmount? StartupReserved,
+    RunnerObservedResourceAmount? AdmissionAvailable,
+    RuntimeResourceAmount? DeclaredLimits,
+    RunnerResourceObservation? Observation,
+    int? StartingPrimary,
+    int? StartingAuxiliary);
 
 public sealed record RunnerCapacityReport(bool Available, IReadOnlyList<RunnerCapacitySnapshot> Runners, bool Truncated = false);
 

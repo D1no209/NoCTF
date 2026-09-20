@@ -21,7 +21,7 @@ internal static class RuntimeInfrastructure
         IConfiguration configuration,
         bool development)
     {
-        services.AddSingleton(new RuntimeResourceBudgetPolicy(configuration.GetValue("Runtime:CpuOvercommitFactor", 1)));
+        services.AddSingleton(new RuntimeResourceBudgetPolicy());
         services.AddOptions<RuntimePlacementOptions>()
             .Configure(options =>
             {

@@ -30,13 +30,20 @@ public sealed record PlatformMonitoringResponse(
     RunnerCapacityReportResponse? Capacity = null);
 
 public sealed record RunnerResourceAmountResponse(long MemoryBytes, long NanoCpus, long PidsLimit);
+public sealed record RunnerObservedResourceAmountResponse(long MemoryBytes, long NanoCpus, long? PidsLimit);
 public sealed record RunnerObservationResponse(DateTimeOffset ObservedAt, double CpuUsageRatio,
-    long MemoryTotalBytes, long MemoryAvailableBytes, long? PidsUsed, long PidsCapacity);
+    long MemoryTotalBytes, long MemoryAvailableBytes, long NanoCpus,
+    long? PidsUsed, long? PidsCapacity, long OomKills,
+    bool ProviderPressure, bool PidPressureConditionAvailable);
 public sealed record RunnerCapacitySnapshotResponse(string RunnerId, bool Alive,
     RunnerAdmissionStateProtocol State, RunnerAdmissionFailureProtocol? Failure,
-    RunnerResourceAmountResponse? Allocatable, RunnerResourceAmountResponse? Available,
-    RunnerResourceAmountResponse? Budget, RunnerResourceAmountResponse? Limits,
-    RunnerObservationResponse? Observation, int? StartingPrimary, int? ActiveAuxiliary);
+    RunnerObservedResourceAmountResponse? ObservedTotal,
+    RunnerObservedResourceAmountResponse? ObservedAvailable,
+    RunnerObservedResourceAmountResponse? SafetyHeadroom,
+    RunnerObservedResourceAmountResponse? StartupReserved,
+    RunnerObservedResourceAmountResponse? AdmissionAvailable,
+    RunnerResourceAmountResponse? DeclaredLimits,
+    RunnerObservationResponse? Observation, int? StartingPrimary, int? StartingAuxiliary);
 public sealed record RunnerCapacityReportResponse(bool Available, IReadOnlyList<RunnerCapacitySnapshotResponse> Runners, bool Truncated);
 
 public sealed record HumanVerificationMonitoringResponse(
@@ -96,11 +103,18 @@ public sealed class GetPlatformMonitoringEndpoint(
     private static RunnerResourceAmountResponse? Amount(RuntimeResourceAmount? value) =>
         value is null ? null : new(value.MemoryBytes, value.NanoCpus, value.PidsLimit);
 
+    private static RunnerObservedResourceAmountResponse? ObservedAmount(RunnerObservedResourceAmount? value) =>
+        value is null ? null : new(value.MemoryBytes, value.NanoCpus, value.PidsLimit);
+
     private static RunnerCapacityReportResponse Map(RunnerCapacityReport report) => new(report.Available,
         report.Runners.Select(runner => new RunnerCapacitySnapshotResponse(runner.RunnerId, runner.Alive,
             RuntimeProtocolMapper.ToProtocol(runner.State), runner.Failure is { } failure ? RuntimeProtocolMapper.ToProtocol(failure) : null,
-            Amount(runner.Allocatable), Amount(runner.Available), Amount(runner.Budget), Amount(runner.Limits),
+            ObservedAmount(runner.ObservedTotal), ObservedAmount(runner.ObservedAvailable),
+            ObservedAmount(runner.SafetyHeadroom), ObservedAmount(runner.StartupReserved),
+            ObservedAmount(runner.AdmissionAvailable), Amount(runner.DeclaredLimits),
             runner.Observation is { } sample ? new RunnerObservationResponse(sample.ObservedAt, sample.CpuUsageRatio,
-                sample.MemoryTotalBytes, sample.MemoryAvailableBytes, sample.PidsUsed, sample.PidsCapacity) : null,
-            runner.StartingPrimary, runner.ActiveAuxiliary)).ToArray(), report.Truncated);
+                sample.MemoryTotalBytes, sample.MemoryAvailableBytes, sample.NanoCpus,
+                sample.PidsUsed, sample.PidsCapacity, sample.OomKills,
+                sample.ProviderPressure, sample.PidPressureConditionAvailable) : null,
+            runner.StartingPrimary, runner.StartingAuxiliary)).ToArray(), report.Truncated);
 }

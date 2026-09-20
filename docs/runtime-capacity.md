@@ -1,92 +1,98 @@
 # Runtime capacity contract
 
-This document describes the approved capacity-model extension. It does not change
-challenge schemas or select a provider/pool from challenge data.
+Runner admission uses the latest observed free resources of the whole execution
+domain. A running Runtime's declared limit is not a lifetime capacity debt.
 
-## Limits, budgets and observation
+## Admission calculation
 
-- Limit is the workload's enforced resource ceiling; Budget is its allocation
-  charge. Actual Usage is independently sampled. Allocatable is the configured
-  deployment allowance bounded by the observed execution resource domain.
-- `Runtime:CpuOvercommitFactor` defaults to `1` and supports `2` for new container
-  allocations. Memory, PIDs, Libvirt and Checkers remain strict. Existing allocations
-  retain their original amounts. Compose charges one aggregate of service budgets.
-- Kubernetes explicitly receives Requests and Limits, with CPU rounded upwards to
-  millicores before accounting. Missing Budget in an old command means full limits.
-- Re-dispatch validates both committed Limit and Budget against the concrete provider
-  request. Resource edits after allocation invalidate the pending start and retain its
-  allocation/owner for confirmed cleanup; they never silently reprice a claim. Runner
-  performs the same request check before creation. A new start/reset uses the new definition.
-- `Runner:Admission` configures sampling (5 seconds), freshness (15 seconds), CPU
-  pressure duration (20 seconds), high/recovery thresholds (90%/80%), available
-  memory thresholds (10%/15%), PID thresholds (90%/80%) and recovery samples (3).
-- A recent OOM, stale observation or unavailable provider blocks new work. CPU
-  observations do not rewrite budget balances. Unknown measurements remain unknown.
-- Main startup concurrency defaults to 2. Auxiliary concurrency defaults to 1;
-  long-lived workloads leave 256 MiB, 0.25 CPU and 128 PIDs reserved for Checkers.
+For every fresh observation, Runner calculates:
 
-## Execution-domain observation
+```text
+CPU free       = total CPU × (1 - current usage ratio)
+CPU headroom   = total CPU × (1 - CpuHighRatio)
+memory free    = MemAvailable
+memory headroom= MemTotal × MemoryLowRatio
+PID free       = PID capacity - PID used
+PID headroom   = PID capacity × (1 - PidsHighRatio)
 
-Linux Docker Runner uses a local Unix socket and explicit read-only host mounts at
-`/host/proc`, `/host/sys/fs/cgroup` and `/host/etc/machine-id`. These must describe
-the actual daemon host. The Runner container's own limits are not host capacity.
-Remote Docker and Windows named-pipe hosts without trusted host observation cannot
-accept production work through this sampler. Development mode remains separate.
+admission available = max(0, free - headroom - startup reservations)
+```
 
-Kubernetes requires read access to node metrics, node conditions and the runtime
-namespace. PID pressure conditions gate admission; unavailable numeric PID usage
-is returned as null, not zero. A PostgreSQL session advisory lock prevents multiple
-active Runner owners of the same Docker engine, Kubernetes cluster or Libvirt host.
-Loss of that ownership stops the Runner. Liveness renewal is independent of a long
-inventory scan, so stopping and cleanup can still reach a reconciling node.
+The defaults retain 10% CPU, 10% memory and 10% PID headroom. Observations older
+than 15 seconds, recent OOM kills, provider pressure, sustained CPU pressure and
+memory/PID pressure block new starts. Recovery still requires the configured healthy
+sample window.
 
-## Recovery
+Docker and Libvirt use the observed host/cgroup execution domain. They do not use
+`Runner:Capacity` as a scheduling ceiling. Kubernetes uses Node Allocatable and the
+Metrics API. Kubernetes PID usage remains unknown when the platform cannot observe
+it; admission then relies on PIDPressure and each workload's enforced PID limit
+instead of inventing a numeric PID balance.
 
-`runtime_instances.capacity_allocations` is a versioned JSONB document containing
-only active workload identity, Runtime/GameplayFact association, Runner/resource
-domain and Limit/Budget amounts. It is not a definition snapshot, scheduling cursor
-or operation history. Only EF CLI generates migrations.
+## Startup reservations
 
-Heartbeat expires; the ledger and claims do not. Redis admission and PostgreSQL
-allocation/outbox commits have explicit recovery handling. Provider creation checks
-the committed allocation and current admission gate again. Cleanup confirms actual
-resource absence before removing allocation metadata and publishing durable release.
-Repeated claim/release is idempotent. A missing ledger cannot be credited by cleanup.
-Auxiliary cleanup selects the owner from each active allocation document, even when
-the parent Runtime has already cleared RunnerId. Provider filtering occurs before
-the bounded query limit, and cleanup only touches allocations owned by this Runner.
+Every new workload atomically reserves its complete declared hard limit while it is
+starting. A Runtime entering `Running` records `completedAt`, but its startup
+reservation remains until Runner publishes the first observation whose timestamp is
+at or after `completedAt`. This closes the sampling race between provider creation and
+host metrics.
 
-New typed claims are atomically indexed as unconfirmed in Redis. The ordinary
-resource audit confirms committed allocations or, after provider absence and a
-second PostgreSQL check under the allocation lock, releases rolled-back claims.
-Cancelled/unassigned Runtime rows are included through claim identity. The index
-has no TTL, processes bounded batches and rotates uncertain entries; unknown
-provider state never returns budget. This does not depend on Runner restart.
+Provisioning failure, cancellation and confirmed resource removal release the
+reservation idempotently. Primary and auxiliary work use the same resource formula.
+They retain separate startup concurrency limits (`MainStartupConcurrency=2` and
+`AuxiliaryConcurrency=1` by default); no fixed Checker/Patch resource reserve exists.
 
-Recovery pauses admission, drains coordinated resource mutations, reads provider
-inventory outside the database transaction, and rebuilds under a short allocation
-critical section. Legacy full-budget claims are persisted before their Redis keys
-are replaced. Missing evidence blocks admission instead of treating resources as
-absent. Quota reductions preserve allocations and can produce a negative balance.
+`RuntimeResourceLimits` remain provider hard limits. Kubernetes Requests equal Limits
+for new work. `capacity_allocations.budget` remains only as rolling-upgrade evidence
+for allocations written by older versions; schema 3 admission uses `limit` as the
+startup reservation.
 
-The Singular Agent rebuilds queued/provisioning dispatch from PostgreSQL every
-five seconds; scans use bounded keyset batches. Capacity-release wakeups coalesce
-for 500 ms. There is no per-Runtime periodic scheduled-message chain or persisted
-business next-run field.
+## Redis schema and recovery
 
-## HTTP and UI
+Capacity registration schema 3 stores observed total/free resources, safety
+headroom, startup reservations, final admission availability, observation state and
+primary/auxiliary startup counts. Claim hashes retain ownership and declared limits.
+Claims with `starting=0` do not reduce admission availability.
 
-Player Runtime responses include an optional stable `waitingReason`, scoped to the
-authorized player's own Runtime. They contain no host usage or allocation amounts.
-Queued environments can be stopped while waiting.
+The Worker accepts schema 2 and schema 3 during rolling upgrades. Schema 2 keeps its
+legacy budget behavior until that Runner upgrades. A schema 3 Runner pauses admission,
+owns the execution domain, compares PostgreSQL allocations with provider resources and
+rebuilds Redis before becoming Ready:
 
-Platform monitoring includes `capacity` with availability, a bounded Runner snapshot,
-separate liveness/admission, Limits, reserved Budget, Allocatable, remaining budget,
-Usage and observation time. Negative remaining values denote an over-budget node.
-Unknown legacy limits remain null. Platform Runtime details include per-workload
-amounts; ordinary competition staff do not receive these allocation details.
-Monitoring refresh uses the existing 15-second page timer; pages never start samplers.
-Global waiting counts use a maximum across duplicate Worker reporters, not a sum.
+- `Provisioning` restores a full startup reservation.
+- `Running` and `Stopping` restore ownership without a startup reservation.
+- `Failed` resources retain ownership until cleanup.
+- absent or stale Redis claims are removed during reconciliation.
 
-The frontend consumes generated OpenAPI types, keeps logic in features and uses
-shared UI primitives plus stable Chinese/English keys.
+Existing provider resources are never recreated or stopped by the capacity upgrade.
+Queued Runtime rows remain PostgreSQL facts and are retried by the Singular Agent.
+
+## Monitoring contract
+
+Platform monitoring exposes:
+
+- `observedTotal`
+- `observedAvailable`
+- `safetyHeadroom`
+- `startupReserved`
+- `admissionAvailable`
+- `declaredLimits` (observation only; not admission debt)
+- the raw observation, including OOM/provider pressure
+- `startingPrimary` and `startingAuxiliary`
+
+Waiting reasons distinguish actual CPU, memory and PID shortages, startup concurrency,
+stale observation, node pressure, provider unavailability and reconciliation.
+
+## Verification
+
+Run the Release verification and the isolated capacity suite:
+
+```powershell
+backend/scripts/Verify-Backend.ps1 -Configuration Release
+backend/scripts/Measure-CoreCapacity.ps1
+```
+
+The production-equivalent fixture models a 4 CPU / approximately 8 GiB node with
+three idle Runtime claims at 0.5 CPU / 256 MiB / 128 PID each. The fourth Runtime must
+be admitted, while 64 concurrent claims remain atomic and never produce negative
+availability.

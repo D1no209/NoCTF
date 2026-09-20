@@ -14921,9 +14921,9 @@
         "description": "",
         "x-enumNames": [
           "NoEligibleRunner",
-          "CpuBudgetInsufficient",
-          "MemoryBudgetInsufficient",
-          "PidBudgetInsufficient",
+          "CpuActualCapacityInsufficient",
+          "MemoryActualCapacityInsufficient",
+          "PidActualCapacityInsufficient",
           "NodePressureHigh",
           "ObservationStale",
           "LedgerRecovering",
@@ -14933,9 +14933,9 @@
         ],
         "enum": [
           "NoEligibleRunner",
-          "CpuBudgetInsufficient",
-          "MemoryBudgetInsufficient",
-          "PidBudgetInsufficient",
+          "CpuActualCapacityInsufficient",
+          "MemoryActualCapacityInsufficient",
+          "PidActualCapacityInsufficient",
           "NodePressureHigh",
           "ObservationStale",
           "LedgerRecovering",
@@ -21224,31 +21224,47 @@
               }
             ]
           },
-          "allocatable": {
+          "observedTotal": {
             "nullable": true,
             "oneOf": [
               {
-                "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationPlatformRunnerResourceAmountResponse"
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationPlatformRunnerObservedResourceAmountResponse"
               }
             ]
           },
-          "available": {
+          "observedAvailable": {
             "nullable": true,
             "oneOf": [
               {
-                "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationPlatformRunnerResourceAmountResponse"
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationPlatformRunnerObservedResourceAmountResponse"
               }
             ]
           },
-          "budget": {
+          "safetyHeadroom": {
             "nullable": true,
             "oneOf": [
               {
-                "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationPlatformRunnerResourceAmountResponse"
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationPlatformRunnerObservedResourceAmountResponse"
               }
             ]
           },
-          "limits": {
+          "startupReserved": {
+            "nullable": true,
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationPlatformRunnerObservedResourceAmountResponse"
+              }
+            ]
+          },
+          "admissionAvailable": {
+            "nullable": true,
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationPlatformRunnerObservedResourceAmountResponse"
+              }
+            ]
+          },
+          "declaredLimits": {
             "nullable": true,
             "oneOf": [
               {
@@ -21269,7 +21285,7 @@
             "format": "int32",
             "nullable": true
           },
-          "activeAuxiliary": {
+          "startingAuxiliary": {
             "type": "integer",
             "format": "int32",
             "nullable": true
@@ -21296,6 +21312,25 @@
           "Draining"
         ]
       },
+      "NoCTFAPIEndpointsAdministrationPlatformRunnerObservedResourceAmountResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "memoryBytes": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "nanoCpus": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "pidsLimit": {
+            "type": "integer",
+            "format": "int64",
+            "nullable": true
+          }
+        }
+      },
       "NoCTFAPIEndpointsAdministrationPlatformRunnerObservationResponse": {
         "type": "object",
         "additionalProperties": false,
@@ -21316,6 +21351,10 @@
             "type": "integer",
             "format": "int64"
           },
+          "nanoCpus": {
+            "type": "integer",
+            "format": "int64"
+          },
           "pidsUsed": {
             "type": "integer",
             "format": "int64",
@@ -21323,7 +21362,18 @@
           },
           "pidsCapacity": {
             "type": "integer",
+            "format": "int64",
+            "nullable": true
+          },
+          "oomKills": {
+            "type": "integer",
             "format": "int64"
+          },
+          "providerPressure": {
+            "type": "boolean"
+          },
+          "pidPressureConditionAvailable": {
+            "type": "boolean"
           }
         }
       },

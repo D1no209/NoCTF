@@ -93,8 +93,13 @@ public sealed class PersistedRunnerCapacityGateTests
             var id = fixture.RuntimeIds[0];
             await db.RuntimeInstances.Where(x => x.Id == id).ExecuteUpdateAsync(update =>
                 update.SetProperty(x => x.State, RuntimeState.Queued).SetProperty(x => x.StoppedAt, (DateTimeOffset?)null), ct);
+            var now = DateTimeOffset.UtcNow;
+            var admissionOptions = new RunnerAdmissionOptions();
+            var admission = new RunnerPressurePolicy(admissionOptions).Evaluate(
+                new("test-domain", now, 1024, 1024, 100, .1, 0, 10, 0), now);
             var registration = new RunnerAvailabilityRegistration("test", "runner", RuntimeProvider.Docker,
-                "test", new(1024, 100, 10), TimeSpan.FromMinutes(1), false);
+                "test", new(0, 0, 0), TimeSpan.FromMinutes(1), false, Admission: admission,
+                AdmissionOptions: admissionOptions, ActualUsage: true);
             var registry = new RedisRunnerAvailabilityRegistry(redis);
             await registry.RegisterAsync(registration, ct);
             var raw = new RedisRunnerCapacityGate(redis);
@@ -115,9 +120,9 @@ public sealed class PersistedRunnerCapacityGateTests
             await Assert.That(await gate.CanCreateAsync(id, "runner", ct)).IsEqualTo(!rollback);
             var report = await new RedisRunnerCapacityDiagnostics(db, redis, TimeProvider.System).ReadAsync(ct);
             await Assert.That(report.Available).IsTrue();
-            await Assert.That(report.Runners.Single().Budget!.MemoryBytes).IsEqualTo(512);
-            if (rollback) await Assert.That(report.Runners.Single().Limits).IsNull();
-            else await Assert.That(report.Runners.Single().Limits!.MemoryBytes).IsEqualTo(512);
+            await Assert.That(report.Runners.Single().StartupReserved!.MemoryBytes).IsEqualTo(512);
+            if (rollback) await Assert.That(report.Runners.Single().DeclaredLimits).IsNull();
+            else await Assert.That(report.Runners.Single().DeclaredLimits!.MemoryBytes).IsEqualTo(512);
             // Redis failure occurs after allocation, before any provider command is consumed.
             await redis.GetDatabase().KeyDeleteAsync("runner:runner:capacity");
             await Assert.That(await gate.CanCreateAsync(id, "runner", ct)).IsFalse();
@@ -130,12 +135,14 @@ public sealed class PersistedRunnerCapacityGateTests
             await using (var transaction = await db.Database.BeginTransactionAsync(ct))
             {
                 await RuntimeCapacityCriticalSection.AcquireAsync(db, ct);
-                await ledger.RestoreAsync("runner", "test", registration.Capacity, document.Items, ct, claimKeys: claimKeys);
+                await ledger.RestoreAsync("runner", "test", admission.Capacity!, admission.Observation!.ObservedAt,
+                    document.Items, ct,
+                    starting: document.Items.Select(item => item.Identity).ToHashSet(), claimKeys: claimKeys);
                 await transaction.CommitAsync(ct);
             }
             await registry.RegisterAsync(registration with { HasActiveAssignments = !rollback }, ct);
-            var available = (long)await redis.GetDatabase().HashGetAsync("runner:runner:capacity", "availableMemoryBytes");
-            await Assert.That(available).IsEqualTo(rollback ? 1024 : 512);
+            var available = (long)await redis.GetDatabase().HashGetAsync("runner:runner:capacity", "admissionAvailableMemoryBytes");
+            await Assert.That(available).IsEqualTo(rollback ? 921 : 409);
             if (!rollback)
             {
                 // Replays retain the committed budget, even when a caller's current policy differs.
@@ -158,8 +165,8 @@ public sealed class PersistedRunnerCapacityGateTests
                 await db.GameplayFacts.Where(fact => fact.Id == factId).ExecuteUpdateAsync(update =>
                     update.SetProperty(fact => fact.State, NoCTF.Domain.Gameplay.GameplayFactState.Completed), ct);
                 await Assert.That(await gate.CanCreateWorkloadAsync(checker, factId.Value, "runner", ct)).IsFalse();
-                await Assert.That((long)await redis.GetDatabase().HashGetAsync("runner:runner:capacity", "availableMemoryBytes"))
-                    .IsEqualTo(384);
+                await Assert.That((long)await redis.GetDatabase().HashGetAsync("runner:runner:capacity", "admissionAvailableMemoryBytes"))
+                    .IsEqualTo(281);
                 await Assert.That(await gate.ReleaseAsync(id, "wrong-owner", ct)).IsEqualTo(RunnerCapacityReleaseOutcome.OwnerMismatch);
                 await Assert.That(await gate.ReleaseAsync(id, "runner", ct)).IsEqualTo(RunnerCapacityReleaseOutcome.Released);
                 await Assert.That(await gate.ReleaseAsync(id, "runner", ct)).IsEqualTo(RunnerCapacityReleaseOutcome.AlreadyReleased);
@@ -171,8 +178,10 @@ public sealed class PersistedRunnerCapacityGateTests
                     await raw.ReleaseWorkloadAsync(release.Identity, release.RunnerId, ct);
                     await raw.ReleaseWorkloadAsync(release.Identity, release.RunnerId, ct);
                 }
-                await Assert.That((long)await redis.GetDatabase().HashGetAsync("runner:runner:capacity", "availableMemoryBytes"))
-                    .IsEqualTo(1024);
+                await Assert.That((long)await redis.GetDatabase().HashGetAsync("runner:runner:capacity", "admissionAvailableMemoryBytes"))
+                    .IsEqualTo(921);
+                await Assert.That((long)await redis.GetDatabase().HashGetAsync("runner:runner:capacity", "startupReservedMemoryBytes"))
+                    .IsEqualTo(0);
             }
         });
     }

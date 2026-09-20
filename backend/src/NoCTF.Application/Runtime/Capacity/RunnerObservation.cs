@@ -10,15 +10,24 @@ public sealed record RunnerResourceObservation(
     long NanoCpus,
     double CpuUsageRatio,
     long? PidsUsed,
-    long PidsCapacity,
+    long? PidsCapacity,
     long OomKills,
     bool ProviderPressure = false,
     bool PidPressureConditionAvailable = false);
 
+public sealed record RunnerObservedResourceAmount(long MemoryBytes, long NanoCpus, long? PidsLimit);
+
+public sealed record RunnerCapacityProjection(
+    RunnerObservedResourceAmount ObservedTotal,
+    RunnerObservedResourceAmount ObservedAvailable,
+    RunnerObservedResourceAmount SafetyHeadroom,
+    RunnerObservedResourceAmount AdmissionAvailable);
+
 public sealed record RunnerAdmissionSnapshot(
     RunnerAdmissionState State,
     RunnerAdmissionFailure? Failure,
-    RunnerResourceObservation? Observation);
+    RunnerResourceObservation? Observation,
+    RunnerCapacityProjection? Capacity = null);
 
 public sealed class RunnerAdmissionOptions
 {
@@ -34,9 +43,6 @@ public sealed class RunnerAdmissionOptions
     public int HealthySamplesToResume { get; set; } = 3;
     public int MainStartupConcurrency { get; set; } = 2;
     public int AuxiliaryConcurrency { get; set; } = 1;
-    public long AuxiliaryReservedMemoryBytes { get; set; } = 256 * 1024 * 1024;
-    public long AuxiliaryReservedNanoCpus { get; set; } = 250_000_000;
-    public long AuxiliaryReservedPids { get; set; } = 128;
     public string HostProcRoot { get; set; } = "/host/proc";
     public string HostCgroupRoot { get; set; } = "/host/sys/fs/cgroup";
     public string HostIdentityPath { get; set; } = "/host/etc/machine-id";
@@ -47,12 +53,11 @@ public sealed class RunnerAdmissionOptions
         && CpuHighRatio is > 0 and <= 1 && CpuRecoveryRatio > 0 && CpuRecoveryRatio < CpuHighRatio
         && MemoryLowRatio > 0 && MemoryRecoveryRatio > MemoryLowRatio && MemoryRecoveryRatio < 1
         && PidsHighRatio is > 0 and <= 1 && PidsRecoveryRatio > 0 && PidsRecoveryRatio < PidsHighRatio
-        && AuxiliaryReservedMemoryBytes > 0 && AuxiliaryReservedNanoCpus > 0 && AuxiliaryReservedPids > 0
         && !string.IsNullOrWhiteSpace(HostProcRoot) && !string.IsNullOrWhiteSpace(HostCgroupRoot)
         && !string.IsNullOrWhiteSpace(HostIdentityPath);
 }
 
-/// <summary>Pressure gates new admission; measured usage never rewrites allocation balances.</summary>
+/// <summary>Projects actual resource-domain headroom and gates new admission when observations are unsafe.</summary>
 public sealed class RunnerPressurePolicy(RunnerAdmissionOptions options)
 {
     private DateTimeOffset? cpuHighSince;
@@ -66,11 +71,14 @@ public sealed class RunnerPressurePolicy(RunnerAdmissionOptions options)
     {
         if (sample is null || now - sample.ObservedAt > TimeSpan.FromSeconds(options.FreshnessSeconds)
             || sample.ObservedAt > now || sample.MemoryTotalBytes <= 0 || sample.NanoCpus <= 0
-            || sample.PidsCapacity <= 0 || !double.IsFinite(sample.CpuUsageRatio))
+            || sample.MemoryAvailableBytes < 0 || !double.IsFinite(sample.CpuUsageRatio)
+            || sample.CpuUsageRatio is < 0 or > 1
+            || sample.PidsCapacity is <= 0 || sample.PidsUsed is < 0)
         {
             healthySamples = 0;
             return new(RunnerAdmissionState.Starting, RunnerAdmissionFailure.ObservationStale, sample);
         }
+        var capacity = Project(sample);
         if (previousOomKills is long previous && sample.OomKills > previous)
             oomUntil = now.AddMinutes(1);
         previousOomKills = sample.OomKills;
@@ -78,7 +86,8 @@ public sealed class RunnerPressurePolicy(RunnerAdmissionOptions options)
         var memoryRatio = (double)sample.MemoryAvailableBytes / sample.MemoryTotalBytes;
         if (sample.PidsUsed is null && !sample.PidPressureConditionAvailable)
             return new(RunnerAdmissionState.Starting, RunnerAdmissionFailure.ObservationStale, sample);
-        var pidsRatio = sample.PidsUsed is long pids ? (double)pids / sample.PidsCapacity : 0;
+        var pidsRatio = sample.PidsUsed is long pids && sample.PidsCapacity is long pidsCapacity
+            ? (double)pids / pidsCapacity : 0;
         var pressure = sample.ProviderPressure || oomUntil > now
             || cpuHighSince is { } since && now - since >= TimeSpan.FromSeconds(options.CpuPressureWindowSeconds)
             || memoryRatio < options.MemoryLowRatio || pidsRatio >= options.PidsHighRatio;
@@ -97,7 +106,36 @@ public sealed class RunnerPressurePolicy(RunnerAdmissionOptions options)
         }
         lastHealthyAt = sample.ObservedAt;
         return blocked
-            ? new(RunnerAdmissionState.PressureBlocked, RunnerAdmissionFailure.NodePressureHigh, sample)
-            : new(RunnerAdmissionState.Ready, null, sample);
+            ? new(RunnerAdmissionState.PressureBlocked, RunnerAdmissionFailure.NodePressureHigh, sample, capacity)
+            : new(RunnerAdmissionState.Ready, null, sample, capacity);
     }
+
+    private RunnerCapacityProjection Project(RunnerResourceObservation sample)
+    {
+        var memoryTotal = sample.MemoryTotalBytes;
+        var memoryAvailable = Math.Min(sample.MemoryAvailableBytes, memoryTotal);
+        var cpuAvailable = ScaleFloor(sample.NanoCpus, 1 - sample.CpuUsageRatio);
+        var cpuHeadroom = ScaleCeiling(sample.NanoCpus, 1 - options.CpuHighRatio);
+        var memoryHeadroom = ScaleCeiling(memoryTotal, options.MemoryLowRatio);
+        long? pidsTotal = sample.PidsUsed is not null ? sample.PidsCapacity : null;
+        long? pidsAvailable = pidsTotal is long total && sample.PidsUsed is long used
+            ? Math.Max(0, total - Math.Min(used, total)) : null;
+        long? pidsHeadroom = pidsTotal is long pidCapacity
+            ? ScaleCeiling(pidCapacity, 1 - options.PidsHighRatio) : null;
+        return new(
+            new(memoryTotal, sample.NanoCpus, pidsTotal),
+            new(memoryAvailable, cpuAvailable, pidsAvailable),
+            new(memoryHeadroom, cpuHeadroom, pidsHeadroom),
+            new(
+                Math.Max(0, memoryAvailable - memoryHeadroom),
+                Math.Max(0, cpuAvailable - cpuHeadroom),
+                pidsAvailable is long available && pidsHeadroom is long reserved
+                    ? Math.Max(0, available - reserved) : null));
+    }
+
+    private static long ScaleFloor(long value, double ratio) =>
+        checked((long)decimal.Floor(value * (decimal)ratio));
+
+    private static long ScaleCeiling(long value, double ratio) =>
+        checked((long)decimal.Ceiling(value * (decimal)ratio));
 }

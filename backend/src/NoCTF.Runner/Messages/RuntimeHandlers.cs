@@ -92,8 +92,6 @@ public sealed class RuntimeProviderHandler(
                 failureCode = RuntimeFailureCode.UrlExpansionFailed;
             }
             if (expanded is not null)
-                await capacity.CompleteStartupAsync(message.RuntimeInstanceId, message.RunnerId, cancellationToken);
-            if (expanded is not null)
                 return new RuntimeProvisioned(
                     message.RuntimeInstanceId,
                     message.RunnerId,
@@ -339,8 +337,6 @@ public sealed class RuntimeProviderHandler(
                     failureCode = RuntimeFailureCode.UrlExpansionFailed;
                 }
                 if (expanded is not null)
-                    await capacity.CompleteStartupAsync(message.RuntimeInstanceId, message.RunnerId, cancellationToken);
-                if (expanded is not null)
                     return new RuntimeProvisioned(
                         message.RuntimeInstanceId,
                         message.RunnerId,
@@ -478,8 +474,6 @@ public sealed class RuntimeProviderHandler(
             {
                 failureCode = RuntimeFailureCode.UrlExpansionFailed;
             }
-            if (expanded is not null)
-                await capacity.CompleteStartupAsync(message.RuntimeInstanceId, message.RunnerId, cancellationToken);
             if (expanded is not null)
                 return new RuntimeProvisioned(
                     message.RuntimeInstanceId,

@@ -104,16 +104,17 @@ membership；heartbeat 过期的节点不会收到新审计，节点以相同 Ru
 `Runner__Provider` 必须与该 Pool 的 Runtime 配置一致。不要通过复用 RunnerId 把同一
 Docker/Kubernetes 节点或 Libvirt node CIDR 同时交给两个宿主。
 
-每个 Runner 节点必须配置稳定唯一的 `Runner__Id`、`Runner__Capacity__MemoryBytes`、
-`Runner__Capacity__NanoCpus`、`Runner__Capacity__PidsLimit`、
+每个 Runner 节点必须配置稳定唯一的 `Runner__Id`、
 `Runner__Heartbeat__IntervalSeconds`、`Runner__Heartbeat__TtlSeconds` 和
-`Runner__ProviderFailureHoldSeconds`。所有容量值和周期必须为正，心跳 TTL 必须大于刷新周期。
+`Runner__ProviderFailureHoldSeconds`。周期必须为正，心跳 TTL 必须大于刷新周期。
+Docker/Libvirt 根据可信宿主/cgroup 实际观测自动使用整个执行资源域；不要配置
+`Runner__Capacity__*` 人工容量上限。Kubernetes 使用 Node Allocatable 与 Metrics API。
 Provider 创建资源被拒绝、超时或清理失败时，Runner 会在最后一次失败后的 hold 窗口内让
 readiness 失败、停止发布可接单 heartbeat，并记录不含题目配置或凭据的结构化 Warning；成功的
 Provider 创建会立即恢复，hold 到期后也会重新开放一次探测机会，默认窗口为 120 秒。Runner
-只刷新已初始化的可用容量，不会覆盖已扣减值；
-Redis 容量状态丢失且 PostgreSQL 仍有该节点活跃 assignment 时，节点保持离线，直到
-assignment 收敛后才从部署配置重建容量。
+每份新鲜观测都会重算实际空闲、安全余量和启动临时预留；Running Runtime 的声明上限
+不作为长期容量负债。Redis 容量状态丢失且 PostgreSQL 仍有该节点活跃 assignment 时，
+节点保持离线并对照 Provider 清单原地恢复所有权，完成对账和新鲜观测后再开放准入。
 
 Kubernetes 清单使用 StatefulSet Pod 名作为 RunnerId，使副本扩缩容和重启保持稳定身份。
 其他编排环境也必须为每个 Runner 副本提供唯一且可恢复的 RunnerId；不得让多个活动副本共享身份。

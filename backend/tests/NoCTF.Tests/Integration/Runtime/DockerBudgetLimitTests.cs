@@ -10,8 +10,8 @@ namespace NoCTF.Tests.Integration.Runtime;
 [Category("Integration")]
 public sealed class DockerBudgetLimitTests
 {
-    [Test, Arguments(1), Arguments(2), Timeout(300_000)]
-    public async Task Cpu_budget_does_not_replace_the_actual_Docker_hard_limit(int factor, CancellationToken ct)
+    [Test, Timeout(300_000)]
+    public async Task Startup_reservation_matches_the_actual_Docker_hard_limit(CancellationToken ct)
     {
         await DockerIntegrationTest.RunAsync(async () =>
         {
@@ -21,7 +21,7 @@ public sealed class DockerBudgetLimitTests
                 ?? (OperatingSystem.IsWindows() ? "npipe://./pipe/docker_engine" : "unix:///var/run/docker.sock");
             var id = Guid.NewGuid();
             var limits = new RuntimeResourceLimits(64 * 1024 * 1024, 200_000_000, 64);
-            var budget = new RuntimeResourceBudgetPolicy(factor).Calculate(limits, RuntimeProvider.Docker);
+            var budget = new RuntimeResourceBudgetPolicy().Calculate(limits, RuntimeProvider.Docker);
             using var runtime = new DockerContainerLifecycle(new(Endpoint: endpoint, NetworkName: "none"));
             var request = new ContainerRequest(id, RuntimeProvider.Docker, "busybox:1.36.1", ["sleep", "120"],
                 new Dictionary<string, string>(), new Dictionary<string, string>(), new Dictionary<int, int>(), limits,
@@ -35,7 +35,7 @@ public sealed class DockerBudgetLimitTests
                 await Assert.That(actualLimits.Memory).IsEqualTo(limits.MemoryBytes);
                 await Assert.That(actualLimits.NanoCPUs).IsEqualTo(limits.NanoCpus);
                 await Assert.That(actualLimits.PidsLimit).IsEqualTo(limits.PidsLimit);
-                await Assert.That(budget.NanoCpus).IsEqualTo(limits.NanoCpus / factor);
+                await Assert.That(budget).IsEqualTo(limits);
             }
             finally { await runtime.DestroyAsync(receipt, CancellationToken.None); }
         });

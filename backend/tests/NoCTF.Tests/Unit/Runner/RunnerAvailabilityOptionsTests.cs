@@ -22,9 +22,6 @@ public sealed class RunnerOptionsTests
             ["Runner:Provider"] = nameof(RuntimeProvider.Docker),
             ["Runner:Pool"] = "docker",
             ["Runner:Id"] = "docker-1",
-            ["Runner:Capacity:MemoryBytes"] = "4294967296",
-            ["Runner:Capacity:NanoCpus"] = "2000000000",
-            ["Runner:Capacity:PidsLimit"] = "2048",
             ["Runner:Heartbeat:IntervalSeconds"] = "5",
             ["Runner:Heartbeat:TtlSeconds"] = "15",
             ["Runtime:Docker:RuntimeLogMaxSizeBytes"] = "8388608",
@@ -59,7 +56,6 @@ public sealed class RunnerOptionsTests
         await Assert.That(options.Id).IsEqualTo("docker-1");
         await Assert.That(options.Pool).IsEqualTo("docker");
         await Assert.That(options.Provider).IsEqualTo(RuntimeProvider.Docker);
-        await Assert.That(options.Capacity.MemoryBytes).IsEqualTo(4_294_967_296);
         await Assert.That(options.Heartbeat.Interval).IsEqualTo(TimeSpan.FromSeconds(5));
         await Assert.That(options.Heartbeat.Ttl).IsEqualTo(TimeSpan.FromSeconds(15));
         var cleanup = options.Cleanup.ToPolicy();
@@ -91,7 +87,7 @@ public sealed class RunnerOptionsTests
     }
 
     [Test]
-    public async Task Runner_availability_configuration_rejects_missing_capacity()
+    public async Task Runner_availability_configuration_uses_observation_without_manual_capacity()
     {
         using var services = BuildServices(new Dictionary<string, string?>
         {
@@ -101,10 +97,10 @@ public sealed class RunnerOptionsTests
             ["Runner:Heartbeat:IntervalSeconds"] = "5",
             ["Runner:Heartbeat:TtlSeconds"] = "15"
         });
-        Func<RunnerOptions> read = () =>
-            services.GetRequiredService<IOptions<RunnerOptions>>().Value;
+        var options = services.GetRequiredService<IOptions<RunnerOptions>>().Value;
 
-        await Assert.That(read).Throws<OptionsValidationException>();
+        await Assert.That(options.Id).IsEqualTo("docker-1");
+        await Assert.That(options.Capacity.MemoryBytes).IsEqualTo(0);
     }
 
     [Test]
