@@ -67,6 +67,22 @@ public sealed class AccountPrivacyStore(NoCtfDbContext db, IOptions<AccountPriva
         await db.SaveChangesAsync(ct);
     }
 
+    public async Task RecordSsoAsync(
+        Guid? authenticatedUserId,
+        Guid providerId,
+        bool succeeded,
+        DateTimeOffset now,
+        CancellationToken ct)
+    {
+        db.Notifications.Add(AuthenticationActivity.CreateSso(
+            authenticatedUserId,
+            providerId,
+            succeeded,
+            source?.Address,
+            now));
+        await db.SaveChangesAsync(ct);
+    }
+
     public async Task RemoveExpiredAddressesAsync(CancellationToken ct)
     {
         var cutoff = clock.GetUtcNow().AddDays(-options.Value.IpRetentionDays);
@@ -90,6 +106,32 @@ internal static class AuthenticationActivity
             TargetId = Notification.PlatformAdministratorsTargetId,
             Kind = NotificationKind.AuthenticationSecurityActivity, SentAt = now,
             ContentJson = JsonSerializer.Serialize(new AccountActivity(id, kind, now, address))
+        };
+    }
+
+    internal static Notification CreateSso(
+        Guid? userId,
+        Guid providerId,
+        bool succeeded,
+        string? address,
+        DateTimeOffset now)
+    {
+        var id = Guid.CreateVersion7(now);
+        return new Notification
+        {
+            Id = id,
+            SourceType = userId is null ? NotificationSourceType.System : NotificationSourceType.User,
+            SourceId = userId,
+            TargetType = NotificationTargetType.PlatformAdministrators,
+            TargetId = Notification.PlatformAdministratorsTargetId,
+            Kind = NotificationKind.AuthenticationSecurityActivity,
+            SentAt = now,
+            ContentJson = JsonSerializer.Serialize(new AccountActivity(
+                id,
+                succeeded ? AccountActivityKind.SsoLoggedIn : AccountActivityKind.SsoLoginFailed,
+                now,
+                address,
+                SsoProviderId: providerId))
         };
     }
 }
