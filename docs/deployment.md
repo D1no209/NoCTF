@@ -191,4 +191,6 @@ Runner 容量事实均依赖 Redis。Runtime 题目本身不使用平台 Health 
 平台进程和管理后台不实现数据库/对象备份或恢复 API；由外部运维负责。仓库提供强制停写、age
 加密、完整保留 JetStream 持久卷与 stream/consumer 配置、对象元数据和恢复后校验的外部工具及隔离演练，见
 [备份恢复](backup-recovery.md)。当前工具生成离散恢复点，不是 PITR。Redis 可丢失并重建。
-QQBot 不部署。
+核心 NoCTF Compose/Kubernetes 拓扑不部署 QQBOT。可选 `NoCTF.Bot` 必须按
+[QQBOT 公开只读接入](qqbot-jwt.md) 在独立主机或隔离网络部署，不得接入平台数据库、消息总线
+或内部服务网络，也不得把 UniQsign/Milky 端口暴露到公网。

@@ -12,6 +12,7 @@
     <Project Path="src/NoCTF.Worker/NoCTF.Worker.csproj" />
     <Project Path="src/NoCTF.Runner/NoCTF.Runner.csproj" />
     <Project Path="src/NoCTF.Host/NoCTF.Host.csproj" />
+    <Project Path="src/NoCTF.Bot/NoCTF.Bot.csproj" />
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/NoCTF.Tests/NoCTF.Tests.csproj" />

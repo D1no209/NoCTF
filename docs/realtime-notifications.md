@@ -42,5 +42,6 @@ Payload 由 NotificationKind 对应强类型 DTO 序列化，只含安全展示�
 - `GET /notifications/feed` 和默认 `scope=All` 保持完整动态受众语义，BOT 与已有消费者不受个人收件箱投影影响。
 
 旧的 QQBot 公钥 Agent、群组同步和专用投递协议不在目标架构中。QQBOT 作为普通
-User Bot 使用 Bearer JWT 消费自身的 `/notifications/feed`，并复用现有排行榜接口；
-平台不维护 QQ 群、投递状态或 QQBOT 专用通知表。详见 [QQBOT JWT 接入](qqbot-jwt.md)。
+User Bot 使用 Bearer JWT 加入公开比赛 SignalR group，并在失效提示后重读既有公开比赛、
+题目与排行榜接口；平台不维护 QQ 群、投递状态或 QQBOT 专用通知表。Bot 不加入 Observer、
+参赛队伍或其他工作人员角色。详见 [QQBOT 公开只读接入](qqbot-jwt.md)。

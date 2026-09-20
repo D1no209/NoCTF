@@ -24,6 +24,10 @@ NoCTF.API  ---- Redis (cache/rate limit/SignalR/heartbeat)
 - `NoCTF.Worker`：Submission 普通判定、生命周期、轮次、Flag、排行榜投影、通知与清理。
 - `NoCTF.Runner`：Wolverine durable consumer；执行 Docker、Compose/Kompose、Kubernetes、Libvirt/OVA、Checker 和 Patch。
 
+`NoCTF.Bot` 不是第四个平台角色。它是可选的独立边缘消费者，仅通过公开 HTTPS API、比赛
+SignalR 与私网 Milky 工作，不引用 Domain/Application/Infrastructure，不接入 PostgreSQL、Redis、
+NATS、Wolverine 或 Runtime Provider。其 QQ 群订阅、快照与发送重试只保存在独立 SQLite。
+
 角色可由兼容入口 `NoCTF.API`、`NoCTF.Worker`、`NoCTF.Runner` 分别承载，也可由
 `NoCTF.Host` 承载任意非空组合。统一宿主读取 `Hosting:Roles` 枚举数组，缺省启用
 `Api`、`Worker`、`Runner`；配置只在启动时解析，切换通过重启或滚动发布完成。
@@ -59,6 +63,8 @@ HTML 响应使用 `no-cache`。API、Hub、健康检查、OpenAPI 与带扩展�
 ```text
 Domain <- Application <- API / Worker / Runner / Host
                        <- Infrastructure
+
+NoCTF.Bot -> public API / SignalR protocol only
 ```
 
 - Domain 不依赖 EF、HTTP、Redis、Wolverine 或 Provider SDK。
