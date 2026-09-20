@@ -9,9 +9,6 @@ namespace NoCTF.Tests.Integration.Authentication;
 [Category("Integration")]
 public sealed class SsoFlowStoreTests
 {
-    private const string Image =
-        "redis:7.4.10-alpine3.21@sha256:e7723ff73d963f5cc6d9c4643ea3d989527a402a319239054e9472a7fb9219a2";
-
     [Test]
     [Timeout(300_000)]
     public async Task Callback_claim_and_completion_are_single_consumer_and_browser_bound(
@@ -94,7 +91,8 @@ public sealed class SsoFlowStoreTests
         var external = Environment.GetEnvironmentVariable("NOCTF_TEST_REDIS");
         if (!string.IsNullOrWhiteSpace(external))
             return new(external, null);
-        var container = new RedisBuilder(Image).Build();
+        var container = new RedisBuilder(
+            "redis:7.4.10-alpine3.21@sha256:e7723ff73d963f5cc6d9c4643ea3d989527a402a319239054e9472a7fb9219a2").Build();
         await container.StartAsync(ct);
         return new(container.GetConnectionString(), container);
     }

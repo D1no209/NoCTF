@@ -28,8 +28,8 @@ PostgreSQL WAL/PITR 与对象版本的一致性协议，不能把本工具描述
 - manifest 只记录非秘密的 `secretSetId`。恢复者必须提供完全相同的外部 Secret 集标识。
 - JWT signing key、Runner scoring key、S3/数据库凭据、age identity、Minisign signing key 和
   `EmailVerification__EncryptionKey` 不在
-  备份中，必须在独立 Secret 管理系统中备份。尤其是邮箱 SMTP 密码在数据库中为密文；缺少原
-  `EmailVerification__EncryptionKey` 时无法解密。
+  备份中，必须在独立 Secret 管理系统中备份。邮箱 SMTP 密码、SSO Client Secret 与共享
+  Data Protection 密钥环在数据库中为密文；缺少原 `EmailVerification__EncryptionKey` 时无法解密。
 - 加密备份必须复制到与运行集群不同的故障域。至少保留一份不可由 NoCTF 运行身份删除的副本。
 - 恢复工具只接受空数据库和空 bucket，不支持覆盖、合并或原地恢复。
 

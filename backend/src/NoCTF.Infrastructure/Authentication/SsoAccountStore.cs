@@ -1,7 +1,6 @@
 using System.Data;
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
-using Npgsql;
 using NoCTF.Application.Authentication.Account;
 using NoCTF.Application.Authentication.Sso;
 using NoCTF.Domain.Identity;
@@ -131,12 +130,17 @@ public sealed class SsoAccountStore(NoCtfDbContext db) : ISsoAccountStore
             if (transaction is not null)
                 await transaction.CommitAsync(ct);
         }
-        catch (DbUpdateException exception) when (exception.InnerException is PostgresException
-            { SqlState: PostgresErrorCodes.UniqueViolation })
+        catch (DbUpdateException)
         {
             if (transaction is not null)
                 await transaction.RollbackAsync(ct);
-            return new(SsoBindState.IdentityAlreadyLinked);
+            db.ChangeTracker.Clear();
+            if (await db.Users.AsNoTracking().AnyAsync(item =>
+                    item.ExternalIdentityProviderId == identity.ProviderId
+                    && item.ExternalIdentitySubject == identity.Subject,
+                    ct))
+                return new(SsoBindState.IdentityAlreadyLinked);
+            throw;
         }
         return new(SsoBindState.Bound, new(
             identity.ProviderId,

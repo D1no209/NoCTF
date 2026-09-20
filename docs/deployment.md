@@ -166,7 +166,7 @@ NoCTF 继续让 Kestrel 的全局 `MaxRequestBodySize=null`、multipart `Multipa
 
 ## 配置/Secret
 
-JWT signing key 可供 Access/Refresh/Internal 使用，但 audience/Scheme 隔离。PostgreSQL、Redis、S3 credentials、SMTP、FlagDerivationSecret 不写日志。FlagDerivationSecret 是每 Competition 数据，不是部署 Secret。`EmailVerification:EncryptionKey` 必须是独立的 Base64 32-byte 部署 Secret，仅用于加密数据库中的 SMTP 密码；API 永不返回该密码。
+JWT signing key 可供 Access/Refresh/Internal 使用，但 audience/Scheme 隔离。PostgreSQL、Redis、S3 credentials、SMTP、SSO Client Secret、FlagDerivationSecret 不写日志。FlagDerivationSecret 是每 Competition 数据，不是部署 Secret。`EmailVerification:EncryptionKey` 必须是独立的 Base64 32-byte 部署 Secret，用途隔离地保护 SMTP 密码、人机验证 Secret、SSO Client Secret 与共享 Data Protection 密钥环；API 永不返回这些密钥。
 
 Runner Pool/Provider/resource max、Redis、NATS JetStream transport、S3、CORS/Origin、Cookie Secure 是强类型 IOptions 并在进程启动时 ValidateOnStart。邮箱验证开关、密码找回有效期/冷却/账号限额、公开 URL 与 SMTP 投递参数由管理员页面写入数据库，API/Worker 动态读取；SMTP 密码只能整体替换，前端不回填也不持久化。SMTP 测试只读取已保存且已启用的配置，表单存在未保存修改时前端不允许发送，避免把单次 SMTP 可达误认为注册验证已经启用。密码找回不依赖注册邮箱验证开关，但没有完整 SMTP 投递配置时不会签发重置令牌。
 

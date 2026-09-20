@@ -18,9 +18,6 @@ namespace NoCTF.Tests.Integration.Authentication;
 [Category("Integration")]
 public sealed class SsoPersistenceTests
 {
-    private const string Image =
-        "postgres:17.10-alpine3.24@sha256:742f40ea20b9ff2ff31db5458d127452988a2164df9e17441e191f3b72252193";
-
     [Test]
     [Timeout(300_000)]
     public async Task Migration_enforces_complete_and_unique_external_identity_bindings(
@@ -331,7 +328,8 @@ public sealed class SsoPersistenceTests
             return new(databaseBuilder.ConnectionString, null, adminBuilder.ConnectionString, database);
         }
 
-        var postgres = new PostgreSqlBuilder(Image)
+        var postgres = new PostgreSqlBuilder(
+                "postgres:17.10-alpine3.24@sha256:742f40ea20b9ff2ff31db5458d127452988a2164df9e17441e191f3b72252193")
             .WithDatabase(database)
             .WithUsername("postgres")
             .WithPassword("postgres")

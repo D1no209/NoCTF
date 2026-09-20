@@ -74,6 +74,9 @@ public sealed class CompetitionPracticeModePersistenceTests
             await db.Database.ExecuteSqlRawAsync(
                 "ALTER TABLE teams ADD COLUMN write_up_file_id uuid NULL, ADD COLUMN write_up_submitted_at timestamp with time zone NULL, ADD COLUMN write_up_submitted_by_user_id uuid NULL",
                 cancellationToken);
+            await db.Database.ExecuteSqlRawAsync(
+                "ALTER TABLE users ADD COLUMN external_identity_bound_at timestamp with time zone NULL, ADD COLUMN external_identity_namespace varchar(512) NULL, ADD COLUMN external_identity_protocol smallint NULL, ADD COLUMN external_identity_provider_id uuid NULL, ADD COLUMN external_identity_subject varchar(255) NULL",
+                cancellationToken);
             var now = DateTimeOffset.UtcNow;
             var user = User(Guid.CreateVersion7(now), "migration-team-owner", now);
             var competition = Competition(
@@ -101,6 +104,9 @@ public sealed class CompetitionPracticeModePersistenceTests
                 cancellationToken);
             await db.Database.ExecuteSqlRawAsync(
                 "ALTER TABLE teams DROP COLUMN write_up_file_id, DROP COLUMN write_up_submitted_at, DROP COLUMN write_up_submitted_by_user_id",
+                cancellationToken);
+            await db.Database.ExecuteSqlRawAsync(
+                "ALTER TABLE users DROP COLUMN external_identity_bound_at, DROP COLUMN external_identity_namespace, DROP COLUMN external_identity_protocol, DROP COLUMN external_identity_provider_id, DROP COLUMN external_identity_subject",
                 cancellationToken);
             db.ChangeTracker.Clear();
 

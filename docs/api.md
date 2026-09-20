@@ -54,6 +54,16 @@ GET  /api/v1/auth/me/wallpaper
 PUT  /api/v1/auth/me/wallpaper
 PUT  /api/v1/auth/password
 POST /api/v1/auth/logout-all
+GET  /api/v1/auth/sso/providers
+POST /api/v1/auth/sso/login/flows
+GET  /api/v1/auth/sso/callback/oidc/{providerId}
+GET  /api/v1/auth/sso/callback/cas/{providerId}
+GET  /api/v1/auth/sso/flows/{flowId}
+POST /api/v1/auth/sso/flows/{flowId}/complete-login
+GET  /api/v1/auth/me/sso-binding
+POST /api/v1/auth/me/sso-binding/flows
+POST /api/v1/auth/me/sso-binding/flows/{flowId}/complete
+DELETE /api/v1/auth/me/sso-binding
 GET  /api/v1/users/{userId}
 GET  /api/v1/users/{userId}/avatar
 ```
@@ -470,6 +480,13 @@ PUT  /api/v1/admin/platform/human-verification/secret
 GET  /api/v1/admin/platform/human-verification/cap-workload
 PUT  /api/v1/admin/platform/human-verification/cap-workload
 POST /api/v1/admin/platform/email-verification/test
+GET  /api/v1/admin/platform/sso
+PATCH /api/v1/admin/platform/sso
+POST /api/v1/admin/platform/sso/providers
+PUT  /api/v1/admin/platform/sso/providers/{providerId}
+PUT  /api/v1/admin/platform/sso/providers/{providerId}/secret
+POST /api/v1/admin/platform/sso/providers/{providerId}/connection-tests
+POST /api/v1/admin/platform/sso/providers/{providerId}/authentication-tests
 ```
 
 平台 Runtime 清单只投影当前处于 Queued、Provisioning、Running 或 Stopping 状态的 Container 与

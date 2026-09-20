@@ -20,6 +20,8 @@ data:
   Authentication__Issuer: "NoCTF"
   Authentication__Audience: "NoCTF.Api"
   Authentication__AccessTokenMinutes: "15"
+  Sso__AllowInsecurePublicBaseUrl: "false"
+  Sso__AllowInsecureProviderUrls: "false"
   HumanVerification__Provider: "None"
   RunnerScoring__Issuer: "NoCTF.Runner"
   RunnerScoring__Audience: "NoCTF.ScoringInput"

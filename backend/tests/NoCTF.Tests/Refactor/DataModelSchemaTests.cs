@@ -60,7 +60,9 @@ public sealed class DataModelSchemaTests
                     actual.Add(reader.GetString(0));
             }
 
-            await Assert.That(actual).IsEquivalentTo(ExpectedTables);
+            await Assert.That(actual.Where(table => table != "data_protection_keys"))
+                .IsEquivalentTo(ExpectedTables);
+            await Assert.That(actual).Contains("data_protection_keys");
 
             await using var migrationCommand = new NpgsqlCommand(
                 "SELECT migration_id FROM \"__EFMigrationsHistory\" ORDER BY migration_id",
@@ -90,7 +92,8 @@ public sealed class DataModelSchemaTests
             "20260912182604_ConfigureTeamWriteUpSubmission",
             "20260913172544_AddHumanVerificationEvaluationToggle",
             "20260914154253_AddCtfPatchVerificationExperiment",
-            "20260918101546_AddRuntimeCapacityAllocations"
+            "20260918101546_AddRuntimeCapacityAllocations",
+            "20260920033821_AddSsoFoundation"
         ]);
             await Assert.That(migrations[0]).EndsWith("_InitialBaseline");
 

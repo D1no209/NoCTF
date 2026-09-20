@@ -91,6 +91,20 @@ public sealed class RawSqlPersistenceRulesTests
                 "FromSqlInterpolated",
                 "FOR UPDATE"
             ],
+            // Serialize one SSO JSON document update without holding a lock during provider I/O.
+            ["backend/src/NoCTF.Infrastructure/Authentication/SsoConfigurationStore.cs"] =
+            [
+                "FromSqlInterpolated",
+                "FOR UPDATE"
+            ],
+            // Bind one account and one external identity under bounded transaction-scoped locks.
+            ["backend/src/NoCTF.Infrastructure/Authentication/SsoAccountStore.cs"] =
+            [
+                "ExecuteSqlInterpolated",
+                "FromSqlInterpolated",
+                "pg_advisory_",
+                "FOR UPDATE"
+            ],
             ["backend/src/NoCTF.Infrastructure/Competitions/Administration/AdminCompetitionStore.cs"] =
             [
                 "ExecuteSqlInterpolated",
