@@ -509,6 +509,7 @@ public sealed class TeamMutationConcurrencyPersistenceTests
 
         await using var db = new NoCtfDbContext(options);
         var membership = new TeamMembershipStore(db, new NoopOutbox());
+        var adminInvitation = new AdminTeamInvitationReader(db);
         var registration = new TeamRegistrationStore(db, new NoopOutbox());
         await Assert.That(await membership.JoinByInvitationAsync(
             competition.Id, invitationToken, outsider.Id, now, ct))
@@ -520,6 +521,8 @@ public sealed class TeamMutationConcurrencyPersistenceTests
         await Assert.That((await membership.GetInvitationAsync(
             competition.Id, team.Id, captain.Id, ct)).Failure)
             .IsEqualTo(TeamMembershipFailure.TeamBanned);
+        await Assert.That(await adminInvitation.ReadAsync(
+            competition.Id, team.Id, ct)).IsEqualTo(invitationToken);
         await Assert.That(await membership.RemoveMemberAsync(
             competition.Id, team.Id, member.Id, captain.Id, ct))
             .IsEqualTo(TeamMembershipFailure.TeamBanned);

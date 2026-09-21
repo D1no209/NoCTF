@@ -2,7 +2,7 @@ import { proxyRefs } from 'vue'
 import { markRaw } from 'vue'
 
 import { toast } from 'vue-sonner'
-import { adminCreateManualAdjustment, adminCorrectTeamBan, adminGetCompetition, adminListCompetitionChallenges, adminListTeamBanAppeals, adminListTeams, adminResolveTeamBanAppeal, patchCompetitionTeam, userProfileGet } from '../../../../../api'
+import { adminCreateManualAdjustment, adminCorrectTeamBan, adminGetCompetition, adminGetTeamInvitation, adminListCompetitionChallenges, adminListTeamBanAppeals, adminListTeams, adminResolveTeamBanAppeal, patchCompetitionTeam, userProfileGet } from '../../../../../api'
 import type { NoCtfapiEndpointsAdministrationTeamsAdminTeamBanCaseResponse, NoCtfapiEndpointsAuthenticationPublicUserProfileResponse, NoCtfapiEndpointsChallengesChallengeResponse, NoCtfapiEndpointsCompetitionsTracksCompetitionTrackResponse, NoCtfapiEndpointsTeamsTeamResponse } from '../../../../../api'
 import { useCompetitionAdmin } from '../../../../../lib/admin-competition'
 import { competitionTrackErrorMessage } from '../../../../../lib/competition-track'
@@ -42,10 +42,65 @@ export function useAdminCompetitionsByIdTeamsPage() {
 
   const teamDetailLoading = ref(false)
 
+  const teamInvitationToken = ref<string | null>(null)
+
+  const teamInvitationLoading = ref(false)
+
+  const teamInvitationError = ref<string | null>(null)
+
   const expandedMemberId = ref<string | null>(null)
 
   function setExpandedMember(value: unknown): void {
     expandedMemberId.value = typeof value === 'string' ? value : null
+  }
+
+  async function loadTeamInvitation(
+    team: NoCtfapiEndpointsTeamsTeamResponse | null = selectedTeam.value,
+  ): Promise<void> {
+    teamInvitationToken.value = null
+    teamInvitationError.value = null
+    if (!canWrite.value || !team?.id) return
+    teamInvitationLoading.value = true
+    try {
+      const { data, error: requestError } = await adminGetTeamInvitation({
+        path: { competitionId, teamId: team.id },
+      })
+      if (selectedTeam.value?.id !== team.id) return
+      if (requestError || !data?.invitationToken) {
+        teamInvitationError.value = parseApiError(
+          requestError,
+          translate('ui.failedToLoadInvitationCode'),
+        ).message
+        return
+      }
+      teamInvitationToken.value = data.invitationToken
+    }
+    catch (requestError) {
+      if (selectedTeam.value?.id === team.id) {
+        teamInvitationError.value = parseApiError(
+          requestError,
+          translate('ui.failedToLoadInvitationCode'),
+        ).message
+      }
+    }
+    finally {
+      if (selectedTeam.value?.id === team.id) teamInvitationLoading.value = false
+    }
+  }
+
+  async function copyTeamInvitation(): Promise<void> {
+    if (!teamInvitationToken.value) return
+    try {
+      await navigator.clipboard.writeText(teamInvitationToken.value)
+      toast.success(translate('ui.invitationCodeHasBeenCopied'))
+    }
+    catch {
+      toast.error(translate('ui.copyFailedPleaseManuallySelectCopy'))
+    }
+  }
+
+  function reloadTeamInvitation(): void {
+    void loadTeamInvitation()
   }
 
   const pagination = useOffsetPagination<NoCtfapiEndpointsTeamsTeamResponse>(async ({ offset, limit, desc }) => {
@@ -147,6 +202,7 @@ export function useAdminCompetitionsByIdTeamsPage() {
     expandedMemberId.value = null
     teamMembers.value = []
     teamDetailLoading.value = true
+    void loadTeamInvitation(team)
     const memberIds = team.memberIds ?? []
     const responses = await Promise.all(memberIds.map(userId => userProfileGet({ path: { userId } })))
     if (selectedTeam.value?.id === team.id) {
@@ -374,6 +430,12 @@ export function useAdminCompetitionsByIdTeamsPage() {
       selectedTeam,
       teamMembers,
       teamDetailLoading,
+      teamInvitationToken,
+      teamInvitationLoading,
+      teamInvitationError,
+      loadTeamInvitation,
+      reloadTeamInvitation,
+      copyTeamInvitation,
       expandedMemberId,
       setExpandedMember,
       teamDisplayNames,
@@ -415,6 +477,9 @@ export function useAdminCompetitionsByIdTeamsPage() {
   function onUpdateOpenOpen(open: boolean) {
      if (!open) {
        viewState.selectedTeam = null
+       viewState.teamInvitationToken = null
+       viewState.teamInvitationError = null
+       viewState.teamInvitationLoading = false
        viewState.expandedMemberId = null
      }
   }

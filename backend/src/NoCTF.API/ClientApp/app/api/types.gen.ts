@@ -1485,6 +1485,14 @@ export type NoCtfapiEndpointsAdministrationTeamsCorrectTeamBanRequest = {
     reason?: string;
 };
 
+export type NoCtfapiEndpointsAdministrationTeamsAdminTeamInvitationResponse = {
+    invitationToken?: string;
+};
+
+export type NoCtfapiEndpointsAdministrationTeamsGetAdminTeamInvitationRequest = {
+    [key: string]: never;
+};
+
 export type NoCtfapiEndpointsAdministrationPlatformPrivateAccountResponse = {
     identity?: NoCtfapiEndpointsAuthenticationCurrentUserSchoolIdentityResponse;
     activities?: Array<NoCtfapiEndpointsAdministrationPlatformPrivateActivityResponse>;
@@ -6445,6 +6453,40 @@ export type AdminCorrectTeamBanResponses = {
 };
 
 export type AdminCorrectTeamBanResponse = AdminCorrectTeamBanResponses[keyof AdminCorrectTeamBanResponses];
+
+export type AdminGetTeamInvitationData = {
+    body?: never;
+    path: {
+        competitionId: string;
+        teamId: string;
+    };
+    query?: never;
+    url: '/api/v1/admin/competitions/{competitionId}/teams/{teamId}/invitation-token';
+};
+
+export type AdminGetTeamInvitationErrors = {
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+    /**
+     * Not Found
+     */
+    404: unknown;
+};
+
+export type AdminGetTeamInvitationResponses = {
+    /**
+     * Success
+     */
+    200: NoCtfapiEndpointsAdministrationTeamsAdminTeamInvitationResponse;
+};
+
+export type AdminGetTeamInvitationResponse = AdminGetTeamInvitationResponses[keyof AdminGetTeamInvitationResponses];
 
 export type AdminGetPrivateTeamMemberData = {
     body?: never;
