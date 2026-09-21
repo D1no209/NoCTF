@@ -20652,10 +20652,6 @@
           }
         ]
       },
-      "NoCTFAPIEndpointsAdministrationPlatformBeginSsoAuthenticationTestRequest": {
-        "type": "object",
-        "additionalProperties": false
-      },
       "NoCTFAPIEndpointsAdministrationPlatformPlatformUserResponse": {
         "type": "object",
         "additionalProperties": false,
@@ -23103,10 +23099,6 @@
             "nullable": true
           }
         }
-      },
-      "NoCTFAPIEndpointsAdministrationPlatformTestSsoProviderConnectionRequest": {
-        "type": "object",
-        "additionalProperties": false
       },
       "NoCTFAPIEndpointsAdministrationPlatformUpdateCapWorkloadConfigurationRequest": {
         "type": "object",
