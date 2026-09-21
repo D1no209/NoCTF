@@ -67,7 +67,8 @@ test('light and dark non-home pages use local wallpapers at the same strength', 
 })
 
 test('private views are confined to staff pages and clear stale member responses', () => {
-  expect(read('pages/admin/competitions/[id]/teams.vue')).toContain('v-if="canJudge && member.userId && selectedTeam.id"')
+  expect(read('pages/admin/competitions/[id]/teams.vue')).toContain('<AccordionTrigger v-if="canJudge">')
+  expect(read('pages/admin/competitions/[id]/teams.vue')).toContain('v-if="expandedMemberId === member.userId && member.userId && selectedTeam.id"')
   expect(read('features/account/PrivateAccountPanel.vue')).toContain('if (ticket !== revision) return')
   expect(read('pages/users/[id].vue')).not.toContain('PrivateAccountPanel')
   expect(read('pages/competitions/[id]/teams/[teamId].vue')).not.toContain('PrivateAccountPanel')
