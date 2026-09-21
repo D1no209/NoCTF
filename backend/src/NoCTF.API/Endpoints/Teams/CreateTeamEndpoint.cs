@@ -100,19 +100,6 @@ public sealed class TeamListResponse : ArrayResult<TeamResponse>
         : base(items, total) { }
 }
 
-public sealed class UpdateTeamRequest
-{
-    private string name = string.Empty;
-
-    public Guid CompetitionId { get; set; }
-    public Guid TeamId { get; set; }
-    public string Name
-    {
-        get => name;
-        set => name = value?.Trim() ?? string.Empty;
-    }
-}
-
 [Mapper]
 internal static partial class TeamMapper
 {
@@ -120,8 +107,6 @@ internal static partial class TeamMapper
         CreateTeamRequest request,
         Guid userId,
         DateTimeOffset registeredAt);
-    public static partial UpdateTeamCommand ToCommand(UpdateTeamRequest request);
-
     public static TeamResponse ToResponse(
         TeamView view,
         LinkGenerator links,
