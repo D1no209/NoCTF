@@ -62,3 +62,5 @@ backend/src/NoCTF.API/ClientApp/test-results/
 backend/artifacts/*
 !backend/artifacts/openapi/
 !backend/artifacts/openapi/swagger.json
+!backend/artifacts/webhooks/
+!backend/artifacts/webhooks/competition-events-v1.schema.json
