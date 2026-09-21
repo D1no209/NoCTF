@@ -72,6 +72,15 @@ const { authArtwork, configuration, loginName, password, error, pending, capVeri
                 @click="provider.id && beginSso(provider.id)"
               >
                 <Spinner v-if="ssoPendingId === provider.id" data-icon="inline-start" />
+                <img
+                  v-else-if="provider.iconUrl"
+                  :src="provider.iconUrl"
+                  class="size-5 shrink-0 object-contain"
+                  alt=""
+                  aria-hidden="true"
+                  decoding="async"
+                  referrerpolicy="no-referrer"
+                >
                 {{ $t('sso.continueWith', { provider: provider.name ?? '' }) }}
               </Button>
             </template>

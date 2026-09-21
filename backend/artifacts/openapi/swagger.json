@@ -19384,6 +19384,10 @@
           "providerName": {
             "type": "string"
           },
+          "providerIconUrl": {
+            "type": "string",
+            "nullable": true
+          },
           "protocol": {
             "$ref": "#/components/schemas/NoCTFAPIEndpointsAuthenticationPublicSsoProtocol"
           },
@@ -19594,6 +19598,10 @@
           "name": {
             "type": "string"
           },
+          "iconUrl": {
+            "type": "string",
+            "nullable": true
+          },
           "protocol": {
             "$ref": "#/components/schemas/NoCTFAPIEndpointsAuthenticationPublicSsoProtocol"
           }
@@ -19718,6 +19726,10 @@
           },
           "name": {
             "type": "string"
+          },
+          "iconUrl": {
+            "type": "string",
+            "nullable": true
           },
           "protocol": {
             "$ref": "#/components/schemas/NoCTFAPIEndpointsAuthenticationPublicSsoProtocol"
@@ -20752,6 +20764,10 @@
           "name": {
             "type": "string"
           },
+          "iconUrl": {
+            "type": "string",
+            "nullable": true
+          },
           "protocol": {
             "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationPlatformSsoProtocolProtocol"
           },
@@ -20881,6 +20897,12 @@
             "maxLength": 100,
             "minLength": 0,
             "nullable": false
+          },
+          "iconUrl": {
+            "type": "string",
+            "maxLength": 2048,
+            "minLength": 0,
+            "nullable": true
           },
           "protocol": {
             "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationPlatformSsoProtocolProtocol"

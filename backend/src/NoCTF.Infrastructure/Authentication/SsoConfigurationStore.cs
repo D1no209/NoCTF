@@ -215,6 +215,7 @@ public sealed class SsoConfigurationStore(
     {
         Id = id,
         Name = provider.Name,
+        IconUrl = provider.IconUrl,
         Protocol = provider.Protocol,
         Enabled = provider.Enabled,
         AllowLogin = provider.AllowLogin,
@@ -265,6 +266,7 @@ public sealed class SsoConfigurationStore(
         configuration.Providers.Select(provider => new SsoProviderView(
             provider.Id,
             provider.Name,
+            provider.IconUrl,
             provider.Protocol,
             provider.Enabled,
             provider.AllowLogin,

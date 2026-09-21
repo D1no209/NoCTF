@@ -29,4 +29,18 @@ describe('single sign-on client integration', () => {
     expect(administration).toContain('adminPlatformSsoReplaceProviderSecret')
     expect(navigation).toContain("'/admin/platform/authentication'")
   })
+
+  test('renders configured provider icons without leaking the current page as referrer', async () => {
+    const login = await sourceFile(new URL('../app/components/views/page/auth/AuthLoginPageView.vue', import.meta.url)).text()
+    const account = await sourceFile(new URL('../app/components/views/account/AccountPanelView.vue', import.meta.url)).text()
+    const administration = await sourceFile(new URL('../app/components/views/page/admin/platform/AdminPlatformAuthenticationPageView.vue', import.meta.url)).text()
+    const controller = await sourceFile(new URL('../app/features/routes/admin/platform/useAdminPlatformAuthenticationPage.ts', import.meta.url)).text()
+
+    expect(login).toContain('provider.iconUrl')
+    expect(account).toContain('providerIconUrl')
+    expect(administration).toContain('sso-provider-icon-url')
+    expect(controller).toContain('iconUrl: providerForm.iconUrl.trim() || null')
+    expect(login).toContain('referrerpolicy="no-referrer"')
+    expect(account).toContain('referrerpolicy="no-referrer"')
+  })
 })

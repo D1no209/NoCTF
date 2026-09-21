@@ -47,6 +47,7 @@ public sealed class CompleteSsoBindingEndpoint(
         return TypedResults.Ok(new MySsoBindingResponse(
             binding.ProviderId,
             binding.ProviderName,
+            binding.ProviderIconUrl,
             binding.Protocol == NoCTF.Domain.Identity.SsoProtocol.Oidc
                 ? PublicSsoProtocol.Oidc
                 : PublicSsoProtocol.Cas,

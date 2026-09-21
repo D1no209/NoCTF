@@ -48,6 +48,25 @@ public sealed class SsoProviderValidationTests
     }
 
     [Test]
+    public async Task Provider_icon_requires_a_safe_absolute_url()
+    {
+        var valid = OidcDraft();
+
+        await Assert.That(SsoProviderValidation.IsValid(
+            valid with { IconUrl = "https://cdn.example.test/identity/cdut.png" },
+            allowHttp: false)).IsTrue();
+        await Assert.That(SsoProviderValidation.IsValid(
+            valid with { IconUrl = "http://cdn.example.test/identity/cdut.png" },
+            allowHttp: false)).IsFalse();
+        await Assert.That(SsoProviderValidation.IsValid(
+            valid with { IconUrl = "https://user@cdn.example.test/cdut.png" },
+            allowHttp: false)).IsFalse();
+        await Assert.That(SsoProviderValidation.IsValid(
+            valid with { IconUrl = "https://cdn.example.test/cdut.png?token=secret" },
+            allowHttp: false)).IsFalse();
+    }
+
+    [Test]
     [Arguments("127.0.0.1")]
     [Arguments("10.0.0.1")]
     [Arguments("172.20.0.1")]
@@ -85,6 +104,7 @@ public sealed class SsoProviderValidationTests
 
     private static SsoProviderDraft OidcDraft() => new(
         "Example OIDC",
+        null,
         SsoProtocol.Oidc,
         Enabled: false,
         AllowLogin: true,

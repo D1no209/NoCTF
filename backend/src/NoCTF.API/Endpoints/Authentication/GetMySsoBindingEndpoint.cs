@@ -8,6 +8,7 @@ namespace NoCTF.API.Endpoints.Authentication;
 public sealed record MySsoBindingResponse(
     Guid ProviderId,
     string ProviderName,
+    string? ProviderIconUrl,
     PublicSsoProtocol Protocol,
     string IdentityNamespace,
     string Subject,
@@ -16,6 +17,7 @@ public sealed record MySsoBindingResponse(
 public sealed record BindableSsoProviderResponse(
     Guid Id,
     string Name,
+    string? IconUrl,
     PublicSsoProtocol Protocol);
 
 public sealed record MySsoBindingConfigurationResponse(
@@ -39,6 +41,7 @@ public sealed class GetMySsoBindingEndpoint(GetSsoBinding getBinding, IUserConte
         var binding = result.Binding is null ? null : new MySsoBindingResponse(
             result.Binding.ProviderId,
             result.Binding.ProviderName,
+            result.Binding.ProviderIconUrl,
             ToProtocol(result.Binding.Protocol),
             result.Binding.IdentityNamespace,
             result.Binding.Subject,
@@ -46,6 +49,7 @@ public sealed class GetMySsoBindingEndpoint(GetSsoBinding getBinding, IUserConte
         var providers = result.Providers.Select(provider => new BindableSsoProviderResponse(
             provider.Id,
             provider.Name,
+            provider.IconUrl,
             ToProtocol(provider.Protocol))).ToArray();
         HttpContext.Response.Headers.CacheControl = "private, no-store";
         return TypedResults.Ok(new MySsoBindingConfigurationResponse(binding, providers));

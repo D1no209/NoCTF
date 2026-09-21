@@ -17,6 +17,7 @@ public enum PublicSsoProtocol
 public sealed record PublicSsoProviderResponse(
     Guid Id,
     string Name,
+    string? IconUrl,
     PublicSsoProtocol Protocol);
 
 public sealed record PublicSsoProviderListResponse(
@@ -43,6 +44,7 @@ public sealed class ListSsoProvidersEndpoint(ManageSsoProviders management)
                 .Select(provider => new PublicSsoProviderResponse(
                     provider.Id,
                     provider.Name,
+                    provider.IconUrl,
                     provider.Protocol switch
                     {
                         SsoProtocol.Oidc => PublicSsoProtocol.Oidc,

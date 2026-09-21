@@ -17,6 +17,10 @@ SSO 默认关闭。普通密码登录、NoCTF Access Token 与 Refresh Cookie �
 `/api/v1/admin/platform/sso`。错误通过 Problem Details 的 `code` 返回稳定的
 `SsoFailureCode` 名称。
 
+每个身份源可以配置一个可空的 `IconUrl`。该地址随管理、公开登录和账户绑定接口返回，
+客户端在身份源按钮和绑定信息中显示它。生产配置只接受不含用户信息、查询串和片段的公开
+HTTPS 绝对地址；图片请求使用 `no-referrer`。未配置图标时仍以身份源名称完成操作。
+
 ## 部署配置
 
 生产环境继续使用 `EmailVerification__EncryptionKey` 保护 Provider Client Secret
@@ -32,3 +36,6 @@ OIDC 回调为
 `{PublicBaseUrl}/api/v1/auth/sso/callback/oidc/{ProviderId}`。CAS 的基础回调为
 `{PublicBaseUrl}/api/v1/auth/sso/callback/cas/{ProviderId}`，实际 service 会附加一次性
 `flow` 参数。反向代理访问日志必须省略查询字符串，避免记录授权码或 CAS 票据。
+
+成都理工大学 CDUT Auth 的逐项配置与验收步骤见
+[CDUT Auth 接入 NoCTF](sso-cdut-auth-integration.md)。

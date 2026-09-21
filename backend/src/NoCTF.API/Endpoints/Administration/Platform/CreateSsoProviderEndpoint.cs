@@ -27,6 +27,7 @@ public sealed class CasSsoProviderRequest
 public class SsoProviderWriteRequest
 {
     public required string Name { get; set; }
+    public string? IconUrl { get; set; }
     public required SsoProtocolProtocol Protocol { get; set; }
     public required bool Enabled { get; set; }
     public required bool AllowLogin { get; set; }
@@ -45,6 +46,7 @@ public class SsoProviderWriteValidator<TRequest> : Validator<TRequest>
     public SsoProviderWriteValidator()
     {
         RuleFor(request => request.Name).NotEmpty().MaximumLength(SsoRules.MaximumProviderNameLength);
+        RuleFor(request => request.IconUrl).MaximumLength(SsoRules.MaximumUrlLength);
         RuleFor(request => request.Protocol).IsInEnum();
         RuleFor(request => request.TimeoutSeconds)
             .InclusiveBetween(SsoRules.MinimumTimeoutSeconds, SsoRules.MaximumTimeoutSeconds);
@@ -66,6 +68,7 @@ internal static class SsoProviderRequestMapping
 {
     internal static SsoProviderDraft ToDraft(SsoProviderWriteRequest request) => new(
         request.Name,
+        request.IconUrl,
         SsoAdministrationMapping.ToDomain(request.Protocol),
         request.Enabled,
         request.AllowLogin,

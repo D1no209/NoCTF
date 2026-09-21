@@ -19,6 +19,7 @@ public sealed record CasSsoProviderDraft(
 
 public sealed record SsoProviderDraft(
     string Name,
+    string? IconUrl,
     SsoProtocol Protocol,
     bool Enabled,
     bool AllowLogin,
@@ -46,6 +47,7 @@ public sealed record CasSsoProviderView(
 public sealed record SsoProviderView(
     Guid Id,
     string Name,
+    string? IconUrl,
     SsoProtocol Protocol,
     bool Enabled,
     bool AllowLogin,
@@ -202,6 +204,7 @@ public sealed class ManageSsoProviders(
     private static SsoProviderDraft Normalize(SsoProviderDraft provider) => provider with
     {
         Name = provider.Name.Trim(),
+        IconUrl = string.IsNullOrWhiteSpace(provider.IconUrl) ? null : provider.IconUrl.Trim(),
         AllowedHosts = provider.AllowedHosts
             .Select(host => host.Trim().TrimEnd('.').ToLowerInvariant())
             .Where(host => host.Length > 0)
@@ -236,6 +239,7 @@ public static class SsoProviderValidation
     public static bool IsValid(SsoProviderDraft provider, bool allowHttp)
     {
         if (provider.Name.Length is < 1 or > SsoRules.MaximumProviderNameLength
+            || (provider.IconUrl is not null && !IsSafeIconUri(provider.IconUrl, allowHttp))
             || provider.TimeoutSeconds is < SsoRules.MinimumTimeoutSeconds
                 or > SsoRules.MaximumTimeoutSeconds
             || provider.AllowedHosts.Count is 0 or > SsoRules.MaximumAllowedHosts
@@ -298,6 +302,14 @@ public static class SsoProviderValidation
 
     private static bool IsSafeEndpointUri(string value, bool allowHttp, out Uri? uri) =>
         Uri.TryCreate(value, UriKind.Absolute, out uri)
+        && AllowedScheme(uri, allowHttp)
+        && string.IsNullOrEmpty(uri.Query)
+        && string.IsNullOrEmpty(uri.Fragment)
+        && uri.UserInfo.Length == 0;
+
+    private static bool IsSafeIconUri(string value, bool allowHttp) =>
+        value.Length <= SsoRules.MaximumUrlLength
+        && Uri.TryCreate(value, UriKind.Absolute, out var uri)
         && AllowedScheme(uri, allowHttp)
         && string.IsNullOrEmpty(uri.Query)
         && string.IsNullOrEmpty(uri.Fragment)

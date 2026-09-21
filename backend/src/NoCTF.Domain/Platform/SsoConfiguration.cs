@@ -16,6 +16,7 @@ public sealed class SsoProviderConfiguration
 {
     public Guid Id { get; set; }
     public string Name { get; set; } = string.Empty;
+    public string? IconUrl { get; set; }
     public SsoProtocol Protocol { get; set; }
     public bool Enabled { get; set; }
     public bool AllowLogin { get; set; }

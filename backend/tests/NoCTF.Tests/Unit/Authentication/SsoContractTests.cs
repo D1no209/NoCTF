@@ -31,6 +31,7 @@ public sealed class SsoContractTests
                 {
                     Id = providerId,
                     Name = "Example OIDC",
+                    IconUrl = "https://cdn.example.test/identity/example.png",
                     Protocol = SsoProtocol.Oidc,
                     Enabled = true,
                     AllowLogin = true,
@@ -55,6 +56,8 @@ public sealed class SsoContractTests
         await Assert.That(restored).IsNotNull();
         await Assert.That(restored!.Providers).Count().IsEqualTo(1);
         await Assert.That(restored.Providers[0].Id).IsEqualTo(providerId);
+        await Assert.That(restored.Providers[0].IconUrl)
+            .IsEqualTo("https://cdn.example.test/identity/example.png");
         await Assert.That(restored.Providers[0].Protocol).IsEqualTo(SsoProtocol.Oidc);
         await Assert.That(restored.Providers[0].Oidc!.ClientSecretCiphertext)
             .IsEquivalentTo(new byte[] { 1, 2, 3 });

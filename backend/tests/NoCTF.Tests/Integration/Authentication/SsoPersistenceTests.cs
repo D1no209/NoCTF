@@ -164,6 +164,9 @@ public sealed class SsoPersistenceTests
             var persisted = await verify.PlatformSettings.AsNoTracking().SingleAsync(cancellationToken);
             await Assert.That(persisted.SsoConfiguration.Providers.Select(provider => provider.Id))
                 .IsEquivalentTo(new[] { firstId, secondId });
+            await Assert.That(persisted.SsoConfiguration.Providers
+                .Single(provider => provider.Id == firstId).IconUrl)
+                .IsEqualTo("https://cas-one.example.test/icon.png");
             await Assert.That(await verify.Notifications.CountAsync(notification =>
                 notification.Kind == NotificationKind.SsoProviderConfigurationChanged,
                 cancellationToken)).IsEqualTo(2);
@@ -304,6 +307,7 @@ public sealed class SsoPersistenceTests
 
     private static SsoProviderDraft CasDraft(string name, string identityNamespace, string host) => new(
         name,
+        $"https://{host}/icon.png",
         SsoProtocol.Cas,
         Enabled: false,
         AllowLogin: true,
