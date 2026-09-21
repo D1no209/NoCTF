@@ -23,8 +23,7 @@ public sealed class RuntimeInstanceStore(
     ITransactionalMessageOutbox outbox,
     TeamRuntimeQuota runtimeQuota,
     ICompetitionEventRecorder? eventRecorder = null,
-    IRequestReplay? replay = null,
-    NoCTF.Application.Runtime.PublicAccess.PublicGatewayCapability? gatewayCapability = null) : IRuntimeInstanceStore
+    IRequestReplay? replay = null) : IRuntimeInstanceStore
 {
     public RuntimeInstanceStore(
         NoCtfDbContext db,
@@ -74,18 +73,7 @@ public sealed class RuntimeInstanceStore(
                 instance.RunnerId, instance.PublishedPorts.Select(port => new RuntimePublishedPortView(
                     port.ServiceName, port.ContainerPort, port.HostPort)).ToArray()))
             .FirstOrDefaultAsync(ct);
-        return runtime is null ? null : runtime with
-        {
-            Mode = scope.Mode,
-            AccessBindings = gatewayCapability is null ? [] : ReadAccessBindings(scope)
-        };
-    }
-
-    private IReadOnlyList<RuntimeUrlBinding> ReadAccessBindings(RuntimeScope scope)
-    {
-        try { return templates.Get(scope.Mode, scope.DefinitionJson)?.UrlBindings ?? []; }
-        catch (GameModeConfigurationException) { return []; }
-        catch (System.Text.Json.JsonException) { return []; }
+        return runtime;
     }
 
     public async Task<RuntimeMutationResult> MutatePlayerRuntimeAsync(

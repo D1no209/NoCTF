@@ -407,12 +407,7 @@ export function createMockApi() {
           smtpHost: '', smtpPort: 587, smtpSecurityMode: 'StartTls', smtpUserName: '',
           smtpPasswordConfigured: false, smtpFromAddress: '', smtpFromName: '', smtpTimeoutSeconds: 15,
         },
-        publicGateway: state.settings.get('platform/gateway') ?? {
-          policy: { enabled: false, connectorId: 'gateway', publicOrigin: '', directOrigins: [], publicRuntimeHost: '', directRuntimeHostOverride: null, maxPublishedPorts: 8 },
-          capability: { connectorId: 'gateway', runnerId: 'mock-runner', approvedOrigins: ['https://public.example.test'], firstPort: 32768, lastPort: 60999, reservedPorts: [], maximumPorts: 8, namespaceIsolationAvailable: true },
-        },
         experimentalFeatures: state.platform.experimentalFeatures,
-        publicGatewayStatusUrl: '/api/v1/admin/platform/public-gateway/status',
       }
       else if (route === '/auth/me') value = user
       else if (route === '/auth/me/profile') {
@@ -592,10 +587,6 @@ export function createMockApi() {
           state.settings.set('platform/human-verification', updated)
         }
         if (body.emailVerification) state.settings.set('platform/email', body.emailVerification)
-        if (body.publicGateway) state.settings.set('platform/gateway', {
-          policy: body.publicGateway,
-          capability: { connectorId: body.publicGateway.connectorId, runnerId: 'mock-runner', approvedOrigins: [body.publicGateway.publicOrigin], firstPort: 32768, lastPort: 60999, reservedPorts: [], maximumPorts: 8, namespaceIsolationAvailable: true },
-        })
         if (body.experimentalFeatures) {
           state.platform.experimentalFeatures = {
             ctfPatchVerificationEnabled:
@@ -606,9 +597,7 @@ export function createMockApi() {
           branding: state.platform,
           humanVerification: currentHumanVerification(),
           emailVerification: state.settings.get('platform/email'),
-          publicGateway: state.settings.get('platform/gateway'),
           experimentalFeatures: state.platform.experimentalFeatures,
-          publicGatewayStatusUrl: '/api/v1/admin/platform/public-gateway/status',
         }
       }
       else if (route === '/admin/platform/human-verification/secret' && request.method === 'PUT') {

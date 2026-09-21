@@ -5,7 +5,6 @@ using NoCTF.API.Endpoints.Platform;
 using NoCTF.Application.Administration.PlatformConfiguration;
 using NoCTF.Application.Admission;
 using NoCTF.Application.Authentication.EmailVerification;
-using NoCTF.Application.Runtime.PublicAccess;
 
 namespace NoCTF.API.Endpoints.Administration.Platform;
 
@@ -65,9 +64,7 @@ public sealed record AdminPlatformConfigurationResponse(
     PlatformBrandingResponse Branding,
     AdminHumanVerificationConfigurationResponse HumanVerification,
     EmailVerificationConfigurationResponse EmailVerification,
-    PublicGatewayConfigurationResponse PublicGateway,
-    PlatformExperimentalFeaturesResponse ExperimentalFeatures,
-    string PublicGatewayStatusUrl);
+    PlatformExperimentalFeaturesResponse ExperimentalFeatures);
 
 public sealed record PlatformExperimentalFeaturesResponse(
     bool CtfPatchVerificationEnabled);
@@ -76,7 +73,6 @@ public sealed class GetPlatformConfigurationEndpoint(
     ManagePlatformConfiguration configuration,
     ManageHumanVerificationConfiguration humanVerification,
     ManageEmailVerificationConfiguration emailVerification,
-    ManagePublicGateway publicGateway,
     LinkGenerator links)
     : EndpointWithoutRequest<Ok<AdminPlatformConfigurationResponse>>
 {
@@ -89,7 +85,7 @@ public sealed class GetPlatformConfigurationEndpoint(
         Summary(summary =>
         {
             summary.Summary = "Returns editable platform configuration sections.";
-            summary.Description = "Returns branding, human verification, email delivery and public gateway configuration without provider or delivery secrets.";
+            summary.Description = "Returns branding, human verification, email delivery and experimental feature configuration without provider or delivery secrets.";
         });
     }
 
@@ -99,13 +95,10 @@ public sealed class GetPlatformConfigurationEndpoint(
         var current = await configuration.GetAsync(ct);
         var verification = await humanVerification.GetAsync(ct);
         var email = await emailVerification.GetAsync(ct);
-        var gateway = await publicGateway.GetAsync(ct);
         return TypedResults.Ok(new AdminPlatformConfigurationResponse(
             PlatformConfigurationMapping.ToResponse(current, links, HttpContext),
             AdminHumanVerificationConfigurationMapping.ToResponse(verification),
             EmailVerificationConfigurationMapping.ToResponse(email),
-            PublicGatewayConfigurationMapping.ToResponse(gateway),
-            new(current.CtfPatchVerificationEnabled),
-            "/api/v1/admin/platform/public-gateway/status"));
+            new(current.CtfPatchVerificationEnabled)));
     }
 }

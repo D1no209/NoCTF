@@ -33,8 +33,6 @@ public sealed record RuntimeInstanceView(
     DateTimeOffset? StateChangedAt = null,
     Guid? SourceTeamId = null,
     string? SourceTeamName = null,
-    GameMode? Mode = null,
-    IReadOnlyList<NoCTF.Application.Runtime.Provisioning.RuntimeUrlBinding>? AccessBindings = null,
     RunnerAdmissionFailure? WaitingReason = null)
 {
     public RuntimeCapacityAllocations? Capacity { get; init; }

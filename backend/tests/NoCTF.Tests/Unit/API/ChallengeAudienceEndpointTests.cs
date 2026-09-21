@@ -72,9 +72,6 @@ public sealed class ChallengeAudienceEndpointTests
         builder.WebHost.UseTestServer();
         builder.Services.AddProblemDetails();
         builder.Services.AddSingleton(TimeProvider.System);
-        builder.Services.AddSingleton(new NoCTF.Application.Runtime.PublicAccess.ReadRuntimePublicAccess(
-            Substitute.For<NoCTF.Application.Runtime.PublicAccess.IPublicGatewayPolicyStore>(),
-            Substitute.For<NoCTF.Application.Runtime.PublicAccess.IPublicGatewayStatusStore>(), TimeProvider.System));
         builder.Services.AddFastEndpoints(options =>
         {
             options.DisableAutoDiscovery = true;

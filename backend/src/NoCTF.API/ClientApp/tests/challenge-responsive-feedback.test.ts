@@ -32,7 +32,7 @@ describe('challenge workspace responsive feedback', () => {
     expect(fix).toContain('v-else-if="validating || recycling || completedAndRecycled"')
     expect(fix).toContain('role="status" aria-live="polite"')
     expect(fix.match(/<Alert\b/g)).toHaveLength(1)
-    expect(runtime).not.toContain("<Alert v-if=\"isRunning && (runtime.access?.route === 'Gateway'")
+    expect(runtime).not.toContain('runtime.access')
     expect(awdp).not.toContain('<Alert v-if="state?.fixActivation"')
     expect(navigator).not.toContain('<Alert v-else-if="board.processing.value"')
     expect(root).toContain(':visible-toasts="2"')

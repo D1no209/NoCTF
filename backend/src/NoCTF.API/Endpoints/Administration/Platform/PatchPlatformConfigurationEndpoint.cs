@@ -9,7 +9,6 @@ using NoCTF.Application.Administration.PlatformConfiguration;
 using NoCTF.Application.Admission;
 using NoCTF.Application.Common;
 using NoCTF.Application.Authentication.EmailVerification;
-using NoCTF.Application.Runtime.PublicAccess;
 using NoCTF.Domain.Identity;
 using NoCTF.Domain.Platform;
 using Riok.Mapperly.Abstractions;
@@ -81,17 +80,6 @@ public sealed class PlatformHumanVerificationPatchRequest
     public required string[] TurnstileAllowedHostnames { get; set; }
 }
 
-public sealed class PlatformGatewayPatchRequest
-{
-    public required bool Enabled { get; set; }
-    public required string ConnectorId { get; set; }
-    public required string PublicOrigin { get; set; }
-    public required string[] DirectOrigins { get; set; }
-    public required string PublicRuntimeHost { get; set; }
-    public required string? DirectRuntimeHostOverride { get; set; }
-    public required int MaxPublishedPorts { get; set; }
-}
-
 public sealed class PlatformExperimentalFeaturesPatchRequest
 {
     public required bool CtfPatchVerificationEnabled { get; set; }
@@ -102,7 +90,6 @@ public sealed class PatchPlatformConfigurationRequest
     public PlatformBrandingPatchRequest? Branding { get; set; }
     public PlatformHumanVerificationPatchRequest? HumanVerification { get; set; }
     public PlatformEmailVerificationPatchRequest? EmailVerification { get; set; }
-    public PlatformGatewayPatchRequest? PublicGateway { get; set; }
     public PlatformExperimentalFeaturesPatchRequest? ExperimentalFeatures { get; set; }
 }
 
@@ -113,8 +100,7 @@ internal enum PlatformConfigurationPatchSection
     Branding = 1 << 0,
     HumanVerification = 1 << 1,
     EmailVerification = 1 << 2,
-    PublicGateway = 1 << 3,
-    ExperimentalFeatures = 1 << 4
+    ExperimentalFeatures = 1 << 3
 }
 
 public sealed class PatchPlatformConfigurationValidator
@@ -125,7 +111,6 @@ public sealed class PatchPlatformConfigurationValidator
         RuleFor(request => request).Must(request => request.Branding is not null
             || request.HumanVerification is not null
             || request.EmailVerification is not null
-            || request.PublicGateway is not null
             || request.ExperimentalFeatures is not null)
             .WithMessage("At least one platform configuration section is required.");
         RuleFor(request => request.Branding!.Name).NotEmpty()
@@ -162,13 +147,6 @@ public sealed class PatchPlatformConfigurationValidator
             .When(request => request.EmailVerification is not null);
         RuleFor(request => request.EmailVerification!.SmtpSecurityMode).IsInEnum()
             .When(request => request.EmailVerification is not null);
-        RuleFor(request => request.PublicGateway!.DirectOrigins).NotNull()
-            .Must(origins => origins.Length <= 16)
-            .When(request => request.PublicGateway is not null);
-        RuleForEach(request => request.PublicGateway!.DirectOrigins).NotEmpty().MaximumLength(2048)
-            .When(request => request.PublicGateway is not null);
-        RuleFor(request => request.PublicGateway!.MaxPublishedPorts).InclusiveBetween(0, 64)
-            .When(request => request.PublicGateway is not null);
     }
 }
 
@@ -203,13 +181,6 @@ public static partial class PlatformSettingsPatchMapper
     [MapperIgnoreTarget(nameof(PlatformSettings.EmailSmtpFromAddress))]
     [MapperIgnoreTarget(nameof(PlatformSettings.EmailSmtpFromName))]
     [MapperIgnoreTarget(nameof(PlatformSettings.EmailSmtpTimeoutSeconds))]
-    [MapperIgnoreTarget(nameof(PlatformSettings.PublicGatewayEnabled))]
-    [MapperIgnoreTarget(nameof(PlatformSettings.PublicGatewayConnectorId))]
-    [MapperIgnoreTarget(nameof(PlatformSettings.PublicGatewayOrigin))]
-    [MapperIgnoreTarget(nameof(PlatformSettings.PublicGatewayDirectOrigins))]
-    [MapperIgnoreTarget(nameof(PlatformSettings.PublicGatewayRuntimeHost))]
-    [MapperIgnoreTarget(nameof(PlatformSettings.PublicGatewayDirectHostOverride))]
-    [MapperIgnoreTarget(nameof(PlatformSettings.PublicGatewayMaxPorts))]
     [MapperIgnoreTarget(nameof(PlatformSettings.Id))]
     [MapperIgnoreTarget(nameof(PlatformSettings.LogoFileId))]
     [MapperIgnoreTarget(nameof(PlatformSettings.LogoFile))]
@@ -247,13 +218,6 @@ public static partial class PlatformSettingsPatchMapper
     [MapperIgnoreTarget(nameof(PlatformSettings.HumanVerificationTurnstileSiteKey))]
     [MapperIgnoreTarget(nameof(PlatformSettings.HumanVerificationTurnstileSecretCiphertext))]
     [MapperIgnoreTarget(nameof(PlatformSettings.HumanVerificationTurnstileAllowedHostnames))]
-    [MapperIgnoreTarget(nameof(PlatformSettings.PublicGatewayEnabled))]
-    [MapperIgnoreTarget(nameof(PlatformSettings.PublicGatewayConnectorId))]
-    [MapperIgnoreTarget(nameof(PlatformSettings.PublicGatewayOrigin))]
-    [MapperIgnoreTarget(nameof(PlatformSettings.PublicGatewayDirectOrigins))]
-    [MapperIgnoreTarget(nameof(PlatformSettings.PublicGatewayRuntimeHost))]
-    [MapperIgnoreTarget(nameof(PlatformSettings.PublicGatewayDirectHostOverride))]
-    [MapperIgnoreTarget(nameof(PlatformSettings.PublicGatewayMaxPorts))]
     [MapperIgnoreTarget(nameof(PlatformSettings.Id))]
     [MapperIgnoreTarget(nameof(PlatformSettings.LogoFileId))]
     [MapperIgnoreTarget(nameof(PlatformSettings.LogoFile))]
@@ -264,50 +228,6 @@ public static partial class PlatformSettingsPatchMapper
         PlatformEmailVerificationPatchRequest request,
         [MappingTarget] PlatformSettings target);
 
-    [MapProperty(nameof(PlatformGatewayPatchRequest.Enabled), nameof(PlatformSettings.PublicGatewayEnabled))]
-    [MapProperty(nameof(PlatformGatewayPatchRequest.ConnectorId), nameof(PlatformSettings.PublicGatewayConnectorId))]
-    [MapProperty(nameof(PlatformGatewayPatchRequest.PublicOrigin), nameof(PlatformSettings.PublicGatewayOrigin))]
-    [MapProperty(nameof(PlatformGatewayPatchRequest.DirectOrigins), nameof(PlatformSettings.PublicGatewayDirectOrigins))]
-    [MapProperty(nameof(PlatformGatewayPatchRequest.PublicRuntimeHost), nameof(PlatformSettings.PublicGatewayRuntimeHost))]
-    [MapProperty(nameof(PlatformGatewayPatchRequest.DirectRuntimeHostOverride), nameof(PlatformSettings.PublicGatewayDirectHostOverride))]
-    [MapProperty(nameof(PlatformGatewayPatchRequest.MaxPublishedPorts), nameof(PlatformSettings.PublicGatewayMaxPorts))]
-    [MapperIgnoreTarget(nameof(PlatformSettings.Name))]
-    [MapperIgnoreTarget(nameof(PlatformSettings.Description))]
-    [MapperIgnoreTarget(nameof(PlatformSettings.HumanVerificationEnabled))]
-    [MapperIgnoreTarget(nameof(PlatformSettings.CtfPatchVerificationEnabled))]
-    [MapperIgnoreTarget(nameof(PlatformSettings.HumanVerificationRuntimeEnabled))]
-    [MapperIgnoreTarget(nameof(PlatformSettings.HumanVerificationEvaluationEnabled))]
-    [MapperIgnoreTarget(nameof(PlatformSettings.HumanVerificationProvider))]
-    [MapperIgnoreTarget(nameof(PlatformSettings.HumanVerificationCapServerUrl))]
-    [MapperIgnoreTarget(nameof(PlatformSettings.HumanVerificationCapSiteKey))]
-    [MapperIgnoreTarget(nameof(PlatformSettings.HumanVerificationCapSecretCiphertext))]
-    [MapperIgnoreTarget(nameof(PlatformSettings.HumanVerificationTurnstileSiteKey))]
-    [MapperIgnoreTarget(nameof(PlatformSettings.HumanVerificationTurnstileSecretCiphertext))]
-    [MapperIgnoreTarget(nameof(PlatformSettings.HumanVerificationTurnstileAllowedHostnames))]
-    [MapperIgnoreTarget(nameof(PlatformSettings.EmailVerificationEnabled))]
-    [MapperIgnoreTarget(nameof(PlatformSettings.EmailPublicBaseUrl))]
-    [MapperIgnoreTarget(nameof(PlatformSettings.EmailVerificationTokenLifetimeMinutes))]
-    [MapperIgnoreTarget(nameof(PlatformSettings.EmailVerificationResendCooldownSeconds))]
-    [MapperIgnoreTarget(nameof(PlatformSettings.EmailPasswordResetTokenLifetimeMinutes))]
-    [MapperIgnoreTarget(nameof(PlatformSettings.EmailPasswordResetCooldownSeconds))]
-    [MapperIgnoreTarget(nameof(PlatformSettings.EmailPasswordResetMaxRequestsPerHour))]
-    [MapperIgnoreTarget(nameof(PlatformSettings.EmailSmtpHost))]
-    [MapperIgnoreTarget(nameof(PlatformSettings.EmailSmtpPort))]
-    [MapperIgnoreTarget(nameof(PlatformSettings.EmailSmtpSecurityMode))]
-    [MapperIgnoreTarget(nameof(PlatformSettings.EmailSmtpUserName))]
-    [MapperIgnoreTarget(nameof(PlatformSettings.EmailSmtpFromAddress))]
-    [MapperIgnoreTarget(nameof(PlatformSettings.EmailSmtpFromName))]
-    [MapperIgnoreTarget(nameof(PlatformSettings.EmailSmtpTimeoutSeconds))]
-    [MapperIgnoreTarget(nameof(PlatformSettings.Id))]
-    [MapperIgnoreTarget(nameof(PlatformSettings.LogoFileId))]
-    [MapperIgnoreTarget(nameof(PlatformSettings.LogoFile))]
-    [MapperIgnoreTarget(nameof(PlatformSettings.EmailSmtpPasswordCiphertext))]
-    [MapperIgnoreTarget(nameof(PlatformSettings.UpdatedAt))]
-    [MapperIgnoreTarget(nameof(PlatformSettings.SsoConfiguration))]
-    public static partial void ApplyGatewayAsAdministrator(
-        PlatformGatewayPatchRequest request,
-        [MappingTarget] PlatformSettings target);
-
     [MapEnum(EnumMappingStrategy.ByName)]
     private static partial SmtpSecurityMode ToDomain(SmtpSecurityModeProtocol value);
 }
@@ -316,13 +236,11 @@ public sealed class PatchPlatformConfigurationEndpoint(
     ManagePlatformConfiguration configuration,
     ManageHumanVerificationConfiguration humanVerification,
     ManageEmailVerificationConfiguration emailVerification,
-    ManagePublicGateway publicGateway,
     IAtomicAggregatePatch atomicPatch,
     LinkGenerator links,
     TimeProvider timeProvider)
     : Endpoint<PatchPlatformConfigurationRequest,
-        Results<Ok<AdminPlatformConfigurationResponse>,
-            Accepted<AdminPlatformConfigurationResponse>, ProblemHttpResult>>
+        Results<Ok<AdminPlatformConfigurationResponse>, ProblemHttpResult>>
 {
     public override void Configure()
     {
@@ -333,14 +251,12 @@ public sealed class PatchPlatformConfigurationEndpoint(
         Summary(summary => summary.Summary = "Updates selected platform configuration sections.");
     }
 
-    public override async Task<Results<Ok<AdminPlatformConfigurationResponse>,
-        Accepted<AdminPlatformConfigurationResponse>, ProblemHttpResult>> ExecuteAsync(
+    public override async Task<Results<Ok<AdminPlatformConfigurationResponse>, ProblemHttpResult>> ExecuteAsync(
         PatchPlatformConfigurationRequest request,
         CancellationToken ct)
     {
         var branding = await configuration.GetAsync(ct);
         var email = await emailVerification.GetAsync(ct);
-        var gateway = await publicGateway.GetAsync(ct);
         var sections = ResolveSections(request);
         var target = new PlatformSettings
         {
@@ -362,13 +278,6 @@ public sealed class PatchPlatformConfigurationEndpoint(
             EmailSmtpFromAddress = email.SmtpFromAddress,
             EmailSmtpFromName = email.SmtpFromName,
             EmailSmtpTimeoutSeconds = email.SmtpTimeoutSeconds,
-            PublicGatewayEnabled = gateway.Policy.Enabled,
-            PublicGatewayConnectorId = gateway.Policy.ConnectorId,
-            PublicGatewayOrigin = gateway.Policy.PublicOrigin,
-            PublicGatewayDirectOrigins = gateway.Policy.DirectOrigins.ToArray(),
-            PublicGatewayRuntimeHost = gateway.Policy.PublicRuntimeHost,
-            PublicGatewayDirectHostOverride = gateway.Policy.DirectRuntimeHostOverride,
-            PublicGatewayMaxPorts = gateway.Policy.MaxPublishedPorts,
             CtfPatchVerificationEnabled = branding.CtfPatchVerificationEnabled,
             UpdatedAt = branding.UpdatedAt
         };
@@ -377,13 +286,9 @@ public sealed class PatchPlatformConfigurationEndpoint(
         if ((sections & PlatformConfigurationPatchSection.EmailVerification) != 0)
             PlatformSettingsPatchMapper.ApplyEmailAsAdministrator(
                 request.EmailVerification!, target);
-        if ((sections & PlatformConfigurationPatchSection.PublicGateway) != 0)
-            PlatformSettingsPatchMapper.ApplyGatewayAsAdministrator(request.PublicGateway!, target);
-
         return await atomicPatch.ExecuteAsync(ApplyAsync, ct);
 
-        async Task<AtomicAggregatePatchDecision<Results<Ok<AdminPlatformConfigurationResponse>,
-            Accepted<AdminPlatformConfigurationResponse>, ProblemHttpResult>>> ApplyAsync(
+        async Task<AtomicAggregatePatchDecision<Results<Ok<AdminPlatformConfigurationResponse>, ProblemHttpResult>>> ApplyAsync(
             CancellationToken transactionCt)
         {
             if ((sections & PlatformConfigurationPatchSection.Branding) != 0)
@@ -397,7 +302,7 @@ public sealed class PatchPlatformConfigurationEndpoint(
                 {
                     return AtomicAggregatePatchDecision<Results<
                         Ok<AdminPlatformConfigurationResponse>,
-                        Accepted<AdminPlatformConfigurationResponse>, ProblemHttpResult>>
+                        ProblemHttpResult>>
                         .Rollback(Invalid("Platform branding is invalid."));
                 }
             }
@@ -419,7 +324,7 @@ public sealed class PatchPlatformConfigurationEndpoint(
                 {
                     return AtomicAggregatePatchDecision<Results<
                         Ok<AdminPlatformConfigurationResponse>,
-                        Accepted<AdminPlatformConfigurationResponse>, ProblemHttpResult>>
+                        ProblemHttpResult>>
                         .Rollback(Invalid(string.Join(" ", result.Errors)));
                 }
             }
@@ -445,25 +350,7 @@ public sealed class PatchPlatformConfigurationEndpoint(
                 {
                     return AtomicAggregatePatchDecision<Results<
                         Ok<AdminPlatformConfigurationResponse>,
-                        Accepted<AdminPlatformConfigurationResponse>, ProblemHttpResult>>
-                        .Rollback(Invalid(string.Join(" ", result.Errors)));
-                }
-            }
-            if ((sections & PlatformConfigurationPatchSection.PublicGateway) != 0)
-            {
-                var result = await publicGateway.SaveAsync(new(
-                    target.PublicGatewayEnabled,
-                    target.PublicGatewayConnectorId,
-                    target.PublicGatewayOrigin,
-                    target.PublicGatewayDirectOrigins,
-                    target.PublicGatewayRuntimeHost,
-                    target.PublicGatewayDirectHostOverride,
-                    target.PublicGatewayMaxPorts), timeProvider.GetUtcNow(), transactionCt);
-                if (result.Errors.Count > 0)
-                {
-                    return AtomicAggregatePatchDecision<Results<
-                        Ok<AdminPlatformConfigurationResponse>,
-                        Accepted<AdminPlatformConfigurationResponse>, ProblemHttpResult>>
+                        ProblemHttpResult>>
                         .Rollback(Invalid(string.Join(" ", result.Errors)));
                 }
             }
@@ -476,13 +363,10 @@ public sealed class PatchPlatformConfigurationEndpoint(
             }
 
             var response = await LoadResponseAsync(transactionCt);
-            Results<Ok<AdminPlatformConfigurationResponse>,
-                Accepted<AdminPlatformConfigurationResponse>, ProblemHttpResult> outcome =
-                (sections & PlatformConfigurationPatchSection.PublicGateway) == 0
-                    ? TypedResults.Ok(response)
-                    : TypedResults.Accepted(response.PublicGatewayStatusUrl, response);
+            Results<Ok<AdminPlatformConfigurationResponse>, ProblemHttpResult> outcome =
+                TypedResults.Ok(response);
             return AtomicAggregatePatchDecision<Results<Ok<AdminPlatformConfigurationResponse>,
-                Accepted<AdminPlatformConfigurationResponse>, ProblemHttpResult>>.Commit(outcome);
+                ProblemHttpResult>>.Commit(outcome);
         }
     }
 
@@ -495,10 +379,7 @@ public sealed class PatchPlatformConfigurationEndpoint(
             AdminHumanVerificationConfigurationMapping.ToResponse(verification),
             EmailVerificationConfigurationMapping.ToResponse(
                 await emailVerification.GetAsync(ct)),
-            PublicGatewayConfigurationMapping.ToResponse(
-                await publicGateway.GetAsync(ct)),
-            new(current.CtfPatchVerificationEnabled),
-            "/api/v1/admin/platform/public-gateway/status");
+            new(current.CtfPatchVerificationEnabled));
     }
 
     private static PlatformConfigurationPatchSection ResolveSections(
@@ -509,8 +390,6 @@ public sealed class PatchPlatformConfigurationEndpoint(
             : PlatformConfigurationPatchSection.HumanVerification)
         | (request.EmailVerification is null ? PlatformConfigurationPatchSection.None
             : PlatformConfigurationPatchSection.EmailVerification)
-        | (request.PublicGateway is null ? PlatformConfigurationPatchSection.None
-            : PlatformConfigurationPatchSection.PublicGateway)
         | (request.ExperimentalFeatures is null ? PlatformConfigurationPatchSection.None
             : PlatformConfigurationPatchSection.ExperimentalFeatures);
 

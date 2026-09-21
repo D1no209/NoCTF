@@ -175,7 +175,7 @@ public sealed class AggregatePatchMapperTests
     }
 
     [Test]
-    public async Task Platform_branding_mapper_cannot_modify_credentials_or_gateway()
+    public async Task Platform_branding_mapper_cannot_modify_credentials_or_verification_configuration()
     {
         var password = new byte[] { 7, 8, 9 };
         var capSecret = new byte[] { 10, 11, 12 };
@@ -194,8 +194,7 @@ public sealed class AggregatePatchMapperTests
             HumanVerificationTurnstileSiteKey = "turnstile-site-key",
             HumanVerificationTurnstileSecretCiphertext = turnstileSecret,
             HumanVerificationTurnstileAllowedHostnames = ["example.test"],
-            EmailSmtpPasswordCiphertext = password,
-            PublicGatewayConnectorId = "protected"
+            EmailSmtpPasswordCiphertext = password
         };
 
         PlatformSettingsPatchMapper.ApplyBrandingAsAdministrator(new()
@@ -223,7 +222,6 @@ public sealed class AggregatePatchMapperTests
         await Assert.That(settings.HumanVerificationTurnstileAllowedHostnames)
             .IsEquivalentTo(["example.test"]);
         await Assert.That(settings.EmailSmtpPasswordCiphertext).IsSameReferenceAs(password);
-        await Assert.That(settings.PublicGatewayConnectorId).IsEqualTo("protected");
     }
 
     [Test]
@@ -302,7 +300,7 @@ public sealed class AggregatePatchMapperTests
     }
 
     [Test]
-    public async Task Platform_email_and_gateway_mappers_preserve_credentials_and_other_sections()
+    public async Task Platform_email_mapper_preserves_credentials_and_other_sections()
     {
         var password = new byte[] { 1, 2, 3 };
         var capSecret = new byte[] { 4, 5, 6 };
@@ -322,8 +320,7 @@ public sealed class AggregatePatchMapperTests
             HumanVerificationTurnstileSecretCiphertext = turnstileSecret,
             HumanVerificationTurnstileAllowedHostnames = ["example.test"],
             EmailSmtpPasswordCiphertext = password,
-            EmailVerificationEnabled = false,
-            PublicGatewayConnectorId = "old-gateway"
+            EmailVerificationEnabled = false
         };
         PlatformSettingsPatchMapper.ApplyEmailAsAdministrator(new()
         {
@@ -342,19 +339,6 @@ public sealed class AggregatePatchMapperTests
             SmtpFromName = "Sender",
             SmtpTimeoutSeconds = 10
         }, settings);
-        var origins = new[] { "https://direct.example.test" };
-        PlatformSettingsPatchMapper.ApplyGatewayAsAdministrator(new()
-        {
-            Enabled = true,
-            ConnectorId = "new-gateway",
-            PublicOrigin = "https://public.example.test",
-            DirectOrigins = origins,
-            PublicRuntimeHost = "runtime.example.test",
-            DirectRuntimeHostOverride = null,
-            MaxPublishedPorts = 8
-        }, settings);
-        origins[0] = "https://mutated.example.test";
-
         await Assert.That(settings.Name).IsEqualTo("Brand");
         await Assert.That(settings.HumanVerificationEnabled).IsTrue();
         await Assert.That(settings.HumanVerificationRuntimeEnabled).IsFalse();
@@ -374,9 +358,6 @@ public sealed class AggregatePatchMapperTests
         await Assert.That(settings.HumanVerificationTurnstileAllowedHostnames)
             .IsEquivalentTo(["example.test"]);
         await Assert.That(settings.EmailVerificationEnabled).IsTrue();
-        await Assert.That(settings.PublicGatewayConnectorId).IsEqualTo("new-gateway");
-        await Assert.That(settings.PublicGatewayDirectOrigins[0])
-            .IsEqualTo("https://direct.example.test");
         await Assert.That(settings.EmailSmtpPasswordCiphertext).IsSameReferenceAs(password);
     }
 

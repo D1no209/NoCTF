@@ -8104,7 +8104,7 @@
           "Admin"
         ],
         "summary": "Returns editable platform configuration sections.",
-        "description": "Returns branding, human verification, email delivery and public gateway configuration without provider or delivery secrets.",
+        "description": "Returns branding, human verification, email delivery and experimental feature configuration without provider or delivery secrets.",
         "operationId": "AdminPlatformGetConfiguration",
         "responses": {
           "200": {
@@ -8155,16 +8155,6 @@
         "responses": {
           "200": {
             "description": "Success",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationPlatformAdminPlatformConfigurationResponse"
-                }
-              }
-            }
-          },
-          "202": {
-            "description": "Accepted",
             "content": {
               "application/json": {
                 "schema": {
@@ -8300,41 +8290,6 @@
           },
           "404": {
             "description": "Not Found"
-          },
-          "401": {
-            "description": "Unauthorized"
-          },
-          "403": {
-            "description": "Forbidden"
-          }
-        },
-        "security": [
-          {
-            "Bearer": [
-              "Administrator"
-            ]
-          }
-        ]
-      }
-    },
-    "/api/v1/admin/platform/public-gateway/status": {
-      "get": {
-        "tags": [
-          "Admin"
-        ],
-        "summary": "Reads current public gateway application status.",
-        "description": "Reads bounded connector status from cache without contacting Docker, FRP or external hosts.",
-        "operationId": "AdminPlatformGetPublicGatewayStatus",
-        "responses": {
-          "200": {
-            "description": "Success",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationPlatformPublicGatewayStatusResponse"
-                }
-              }
-            }
           },
           "401": {
             "description": "Unauthorized"
@@ -15394,14 +15349,6 @@
             "format": "date-time",
             "nullable": true
           },
-          "access": {
-            "nullable": true,
-            "oneOf": [
-              {
-                "$ref": "#/components/schemas/NoCTFAPIEndpointsRuntimeRuntimeAccessResponse"
-              }
-            ]
-          },
           "waitingReason": {
             "nullable": true,
             "oneOf": [
@@ -15482,122 +15429,6 @@
           "UrlExpansionFailed"
         ]
       },
-      "NoCTFAPIEndpointsRuntimeRuntimeAccessResponse": {
-        "type": "object",
-        "additionalProperties": false,
-        "properties": {
-          "route": {
-            "$ref": "#/components/schemas/NoCTFAPIEndpointsRuntimeRuntimeAccessRouteProtocol"
-          },
-          "state": {
-            "$ref": "#/components/schemas/NoCTFAPIEndpointsRuntimePublicAccessStateProtocol"
-          },
-          "failure": {
-            "nullable": true,
-            "oneOf": [
-              {
-                "$ref": "#/components/schemas/NoCTFAPIEndpointsRuntimePublicAccessFailureProtocol"
-              }
-            ]
-          },
-          "endpoints": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/NoCTFAPIEndpointsRuntimePublicEndpointResponse"
-            }
-          }
-        }
-      },
-      "NoCTFAPIEndpointsRuntimeRuntimeAccessRouteProtocol": {
-        "type": "string",
-        "description": "",
-        "x-enumNames": [
-          "Direct",
-          "Gateway"
-        ],
-        "enum": [
-          "Direct",
-          "Gateway"
-        ]
-      },
-      "NoCTFAPIEndpointsRuntimePublicAccessStateProtocol": {
-        "type": "string",
-        "description": "",
-        "x-enumNames": [
-          "Disabled",
-          "Pending",
-          "Ready",
-          "Unavailable",
-          "Revoking",
-          "Unsupported"
-        ],
-        "enum": [
-          "Disabled",
-          "Pending",
-          "Ready",
-          "Unavailable",
-          "Revoking",
-          "Unsupported"
-        ]
-      },
-      "NoCTFAPIEndpointsRuntimePublicAccessFailureProtocol": {
-        "type": "string",
-        "description": "",
-        "x-enumNames": [
-          "GatewayDisabled",
-          "ConnectorOffline",
-          "PublicPortUnavailable",
-          "RuntimeBindingUnavailable",
-          "UnsupportedRuntimeKind",
-          "AccessDisplayUnsupported",
-          "GatewayCapacityExceeded",
-          "GatewayIdentityRejected",
-          "GatewaySafetyCheckFailed",
-          "GatewayReconciliationPending"
-        ],
-        "enum": [
-          "GatewayDisabled",
-          "ConnectorOffline",
-          "PublicPortUnavailable",
-          "RuntimeBindingUnavailable",
-          "UnsupportedRuntimeKind",
-          "AccessDisplayUnsupported",
-          "GatewayCapacityExceeded",
-          "GatewayIdentityRejected",
-          "GatewaySafetyCheckFailed",
-          "GatewayReconciliationPending"
-        ]
-      },
-      "NoCTFAPIEndpointsRuntimePublicEndpointResponse": {
-        "type": "object",
-        "additionalProperties": false,
-        "properties": {
-          "containerPort": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "hostPort": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "state": {
-            "$ref": "#/components/schemas/NoCTFAPIEndpointsRuntimePublicAccessStateProtocol"
-          },
-          "failure": {
-            "nullable": true,
-            "oneOf": [
-              {
-                "$ref": "#/components/schemas/NoCTFAPIEndpointsRuntimePublicAccessFailureProtocol"
-              }
-            ]
-          },
-          "publicPort": {
-            "type": "integer",
-            "format": "int32",
-            "nullable": true
-          }
-        }
-      },
       "NoCTFAPIEndpointsRuntimeRunnerAdmissionFailureProtocol": {
         "type": "string",
         "description": "",
@@ -15635,14 +15466,6 @@
             "items": {
               "$ref": "#/components/schemas/NoCTFAPIEndpointsRuntimeRuntimeTargetResponse"
             }
-          },
-          "publicAccessFailure": {
-            "nullable": true,
-            "oneOf": [
-              {
-                "$ref": "#/components/schemas/NoCTFAPIEndpointsRuntimePublicAccessFailureProtocol"
-              }
-            ]
           }
         }
       },
@@ -19019,14 +18842,6 @@
                 "$ref": "#/components/schemas/NoCTFAPIEndpointsRuntimeRuntimeStateProtocol"
               }
             ]
-          },
-          "publicAccessFailure": {
-            "nullable": true,
-            "oneOf": [
-              {
-                "$ref": "#/components/schemas/NoCTFAPIEndpointsRuntimePublicAccessFailureProtocol"
-              }
-            ]
           }
         }
       },
@@ -21362,14 +21177,8 @@
           "emailVerification": {
             "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationPlatformEmailVerificationConfigurationResponse"
           },
-          "publicGateway": {
-            "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationPlatformPublicGatewayConfigurationResponse"
-          },
           "experimentalFeatures": {
             "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationPlatformPlatformExperimentalFeaturesResponse"
-          },
-          "publicGatewayStatusUrl": {
-            "type": "string"
           }
         }
       },
@@ -21515,99 +21324,6 @@
           "SslOnConnect",
           "StartTls"
         ]
-      },
-      "NoCTFAPIEndpointsAdministrationPlatformPublicGatewayConfigurationResponse": {
-        "type": "object",
-        "additionalProperties": false,
-        "properties": {
-          "policy": {
-            "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationPlatformPublicGatewayPolicyResponse"
-          },
-          "capability": {
-            "nullable": true,
-            "oneOf": [
-              {
-                "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationPlatformPublicGatewayCapabilityResponse"
-              }
-            ]
-          }
-        }
-      },
-      "NoCTFAPIEndpointsAdministrationPlatformPublicGatewayPolicyResponse": {
-        "type": "object",
-        "additionalProperties": false,
-        "properties": {
-          "enabled": {
-            "type": "boolean"
-          },
-          "connectorId": {
-            "type": "string"
-          },
-          "publicOrigin": {
-            "type": "string"
-          },
-          "directOrigins": {
-            "type": "array",
-            "items": {
-              "type": "string"
-            }
-          },
-          "publicRuntimeHost": {
-            "type": "string"
-          },
-          "directRuntimeHostOverride": {
-            "type": "string",
-            "nullable": true
-          },
-          "maxPublishedPorts": {
-            "type": "integer",
-            "format": "int32"
-          }
-        }
-      },
-      "NoCTFAPIEndpointsAdministrationPlatformPublicGatewayCapabilityResponse": {
-        "type": "object",
-        "additionalProperties": false,
-        "properties": {
-          "connectorId": {
-            "type": "string"
-          },
-          "runnerId": {
-            "type": "string"
-          },
-          "approvedOrigins": {
-            "type": "array",
-            "items": {
-              "type": "string"
-            }
-          },
-          "firstPort": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "lastPort": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "reservedPorts": {
-            "type": "array",
-            "items": {
-              "type": "integer",
-              "format": "int32"
-            }
-          },
-          "maximumPorts": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "namespaceIsolationAvailable": {
-            "type": "boolean"
-          },
-          "configurationError": {
-            "type": "string",
-            "nullable": true
-          }
-        }
       },
       "NoCTFAPIEndpointsAdministrationPlatformPlatformExperimentalFeaturesResponse": {
         "type": "object",
@@ -22217,68 +21933,6 @@
           }
         }
       },
-      "NoCTFAPIEndpointsAdministrationPlatformPublicGatewayStatusResponse": {
-        "type": "object",
-        "additionalProperties": false,
-        "properties": {
-          "configured": {
-            "type": "boolean"
-          },
-          "enabled": {
-            "type": "boolean"
-          },
-          "applied": {
-            "type": "boolean"
-          },
-          "validUntil": {
-            "type": "string",
-            "format": "date-time",
-            "nullable": true
-          },
-          "failure": {
-            "nullable": true,
-            "oneOf": [
-              {
-                "$ref": "#/components/schemas/NoCTFAPIEndpointsRuntimePublicAccessFailureProtocol"
-              }
-            ]
-          },
-          "runtimes": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationPlatformPublicGatewayRuntimeStatusResponse"
-            }
-          }
-        }
-      },
-      "NoCTFAPIEndpointsAdministrationPlatformPublicGatewayRuntimeStatusResponse": {
-        "type": "object",
-        "additionalProperties": false,
-        "properties": {
-          "runtimeId": {
-            "type": "string",
-            "format": "guid"
-          },
-          "validUntil": {
-            "type": "string",
-            "format": "date-time"
-          },
-          "endpoints": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/NoCTFAPIEndpointsRuntimePublicEndpointResponse"
-            }
-          },
-          "failure": {
-            "nullable": true,
-            "oneOf": [
-              {
-                "$ref": "#/components/schemas/NoCTFAPIEndpointsRuntimePublicAccessFailureProtocol"
-              }
-            ]
-          }
-        }
-      },
       "NoCTFAPIEndpointsAdministrationPlatformIssuePlatformUserTokenResponse": {
         "type": "object",
         "additionalProperties": false,
@@ -22840,14 +22494,6 @@
               }
             ]
           },
-          "publicGateway": {
-            "nullable": true,
-            "oneOf": [
-              {
-                "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationPlatformPlatformGatewayPatchRequest"
-              }
-            ]
-          },
           "experimentalFeatures": {
             "nullable": true,
             "oneOf": [
@@ -23002,51 +22648,6 @@
           "smtpTimeoutSeconds": {
             "type": "integer",
             "format": "int32"
-          }
-        }
-      },
-      "NoCTFAPIEndpointsAdministrationPlatformPlatformGatewayPatchRequest": {
-        "type": "object",
-        "additionalProperties": false,
-        "required": [
-          "enabled",
-          "connectorId",
-          "publicOrigin",
-          "directOrigins",
-          "publicRuntimeHost",
-          "directRuntimeHostOverride",
-          "maxPublishedPorts"
-        ],
-        "properties": {
-          "enabled": {
-            "type": "boolean"
-          },
-          "connectorId": {
-            "type": "string"
-          },
-          "publicOrigin": {
-            "type": "string"
-          },
-          "directOrigins": {
-            "type": "array",
-            "maxLength": 2048,
-            "minLength": 0,
-            "items": {
-              "type": "string"
-            }
-          },
-          "publicRuntimeHost": {
-            "type": "string"
-          },
-          "directRuntimeHostOverride": {
-            "type": "string",
-            "nullable": true
-          },
-          "maxPublishedPorts": {
-            "type": "integer",
-            "format": "int32",
-            "maximum": 64.0,
-            "minimum": 0.0
           }
         }
       },
@@ -26104,14 +25705,6 @@
             "type": "string",
             "format": "date-time",
             "nullable": true
-          },
-          "publicAccessFailure": {
-            "nullable": true,
-            "oneOf": [
-              {
-                "$ref": "#/components/schemas/NoCTFAPIEndpointsRuntimePublicAccessFailureProtocol"
-              }
-            ]
           }
         }
       },

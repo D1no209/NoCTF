@@ -7,8 +7,6 @@ using NoCTF.API.Serialization;
 using NoCTF.Application.Challenges.Testing;
 using NoCTF.Domain.Runtime;
 using System.Text.Json.Serialization;
-using NoCTF.Application.Runtime.PublicAccess;
-using NoCTF.Domain.Platform;
 
 namespace NoCTF.API.Endpoints.Administration.ChallengeBank;
 
@@ -35,10 +33,7 @@ public sealed record ChallengeTestRuntimeResponse(
     DateTimeOffset CreatedAt,
     DateTimeOffset? RunningAt,
     DateTimeOffset? ExpiresAt,
-    DateTimeOffset? StoppedAt)
-{
-    public PublicAccessFailureProtocol? PublicAccessFailure { get; init; }
-}
+    DateTimeOffset? StoppedAt);
 
 internal static class ChallengeTestRuntimeMapping
 {
@@ -71,9 +66,8 @@ internal static class ChallengeTestRuntimeMapping
 
 public sealed class GetChallengeTestRuntimeEndpoint(
     GetChallengeTestRuntime get,
-    IUserContext user,
-    ReadRuntimePublicAccess access)
-    : EndpointWithoutRequest<Results<Ok<ChallengeTestRuntimeResponse>, NotFound, ProblemHttpResult>>
+    IUserContext user)
+    : EndpointWithoutRequest<Results<Ok<ChallengeTestRuntimeResponse>, NotFound>>
 {
     public override void Configure()
     {
@@ -89,7 +83,7 @@ public sealed class GetChallengeTestRuntimeEndpoint(
         });
     }
 
-    public override async Task<Results<Ok<ChallengeTestRuntimeResponse>, NotFound, ProblemHttpResult>> ExecuteAsync(
+    public override async Task<Results<Ok<ChallengeTestRuntimeResponse>, NotFound>> ExecuteAsync(
         CancellationToken cancellationToken)
     {
         HttpContext.Response.GetTypedHeaders().CacheControl = new CacheControlHeaderValue
@@ -103,10 +97,6 @@ public sealed class GetChallengeTestRuntimeEndpoint(
             user.IsAdministrator,
             cancellationToken);
         if (runtime is null) return TypedResults.NotFound();
-        var route = await access.RouteAsync($"{HttpContext.Request.Scheme}://{HttpContext.Request.Host}", cancellationToken);
-        if (route is null) return RuntimeEndpointMapping.UnknownOrigin();
-        var response = ChallengeTestRuntimeMapping.ToResponse(runtime);
-        return TypedResults.Ok(route == RuntimeAccessRoute.Direct ? response : response with
-        { Urls = [], PublicAccessFailure = PublicAccessFailureProtocol.UnsupportedRuntimeKind });
+        return TypedResults.Ok(ChallengeTestRuntimeMapping.ToResponse(runtime));
     }
 }

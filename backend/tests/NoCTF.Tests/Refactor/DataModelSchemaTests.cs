@@ -95,9 +95,16 @@ public sealed class DataModelSchemaTests
             "20260918101546_AddRuntimeCapacityAllocations",
             "20260920033821_AddSsoFoundation",
             "20260920150729_AllowBotAdministratorRole",
-            "20260920151129_AddCompetitionWebhooks"
+            "20260920151129_AddCompetitionWebhooks",
+            "20260921080056_RemovePublicGateway"
         ]);
             await Assert.That(migrations[0]).EndsWith("_InitialBaseline");
+
+            await using var removedGatewayColumnsCommand = new NpgsqlCommand(
+                "SELECT count(*) FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'platform_settings' AND column_name LIKE 'public_gateway_%'",
+                connection);
+            var removedGatewayColumns = (long)(await removedGatewayColumnsCommand.ExecuteScalarAsync(ct))!;
+            await Assert.That(removedGatewayColumns).IsEqualTo(0);
 
             await using var accessModeColumnCommand = new NpgsqlCommand(
                 """

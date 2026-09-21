@@ -3,7 +3,6 @@ import { markRaw, toRefs } from 'vue'
 import { toast } from 'vue-sonner'
 import { createRuntime, extendRuntimeEndpoint, getRuntimeEndpoint, stopRuntimeEndpoint } from '../../api'
 import type { NoCtfapiEndpointsRuntimeRuntimeResponse } from '../../api'
-import { publicGatewayFailure, publicGatewayState } from '../../utils/public-gateway'
 import { runnerFailureLabel } from '../shared/runner-capacity'
 import { classifyPlayerRuntimeLookup, normalizePlayerRuntime, shouldPollPlayerRuntime, type PlayerRuntimeLookupOutcome } from '../../utils/player-runtime'
 import { RUNTIME_STOP_POLL_DELAYS_MS, RUNTIME_STOP_POLL_MAX_INTERVAL_MS, RUNTIME_STOP_POLL_TIMEOUT_MS } from '../../lib/runtime-stop-polling'
@@ -185,31 +184,14 @@ export function useRuntimeCard(props: Readonly<Omit<{
 
   let timer: ReturnType<typeof setInterval> | undefined
 
-  let publicTimer: ReturnType<typeof setInterval> | undefined
-
-  let publicRefreshing = false
-
   onMounted(() => {
     timer = setInterval(() => {
       now.value = Date.now()
     }, 1000)
   })
 
-  watch(() => runtime.value?.access?.route === 'Gateway' && runtime.value.state === 'Running', (needsPublicRefresh) => {
-    if (publicTimer) clearInterval(publicTimer)
-    publicTimer = undefined
-    if (!needsPublicRefresh) return
-    publicTimer = setInterval(async () => {
-      if (publicRefreshing || acting.value || polling.value || runtime.value?.access?.route !== 'Gateway' || runtime.value.state !== 'Running') return
-      publicRefreshing = true
-      try { await load() }
-      finally { publicRefreshing = false }
-    }, 5000)
-  })
-
   onUnmounted(() => {
     if (timer) clearInterval(timer)
-    if (publicTimer) clearInterval(publicTimer)
   })
 
   const ttl = computed(() => {
@@ -241,8 +223,6 @@ export function useRuntimeCard(props: Readonly<Omit<{
 
   return {
       ...toRefs(props),
-      publicGatewayFailure,
-      publicGatewayState,
       runnerFailureLabel,
       canStop,
       stopDisabled,

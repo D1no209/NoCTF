@@ -9,8 +9,6 @@ using NoCTF.Domain.Competitions;
 using NoCTF.API.Endpoints.Competitions;
 using NoCTF.Application.GameplayFacts.Intake;
 using NoCTF.Application.Challenges.Hints;
-using NoCTF.Application.Runtime.PublicAccess;
-using NoCTF.Domain.Platform;
 using NoCTF.API.Endpoints.Runtime;
 using NoCTF.Domain.Challenges;
 using NoCTF.Application.Challenges.Bank;
@@ -61,10 +59,7 @@ public sealed record ChallengeResponse(
     GameplayFactResultProtocol? PatchVerificationResult = null,
     GameplayFactFailureCodeProtocol? PatchVerificationFailureCode = null,
     Guid? PatchVerificationRuntimeInstanceId = null,
-    RuntimeStateProtocol? PatchVerificationRuntimeState = null)
-{
-    public PublicAccessFailureProtocol? PublicAccessFailure { get; init; }
-}
+    RuntimeStateProtocol? PatchVerificationRuntimeState = null);
 
 public sealed record ParticipantChallengeHintResponse(
     Guid Id,
@@ -169,9 +164,8 @@ public sealed class GetChallengeEndpoint(
     ReadParticipantChallengeHints getHints,
     IUserContext user,
     TimeProvider timeProvider,
-    ReadRuntimePublicAccess runtimeAccess,
     IExperimentalFeatureReader? experimentalFeatures = null,
-    GetPatchVerificationState? getPatchVerificationState = null) : Endpoint<GetChallengeRequest, Results<Ok<ChallengeResponse>, NotFound, ProblemHttpResult>>
+    GetPatchVerificationState? getPatchVerificationState = null) : Endpoint<GetChallengeRequest, Results<Ok<ChallengeResponse>, NotFound>>
 {
     public override void Configure()
     {
@@ -180,7 +174,7 @@ public sealed class GetChallengeEndpoint(
         Summary(summary => summary.Summary = "Gets a published challenge.");
     }
 
-    public override async Task<Results<Ok<ChallengeResponse>, NotFound, ProblemHttpResult>> ExecuteAsync(
+    public override async Task<Results<Ok<ChallengeResponse>, NotFound>> ExecuteAsync(
         GetChallengeRequest request,
         CancellationToken ct)
     {
@@ -244,11 +238,7 @@ public sealed class GetChallengeEndpoint(
             attemptState,
             await getHints.ExecuteAsync(item.CompetitionId, item.Id, user.UserId, timeProvider.GetUtcNow(), ct),
             patchVerification);
-        if (access is null) return TypedResults.Ok(response);
-        var route = await runtimeAccess.RouteAsync($"{HttpContext.Request.Scheme}://{HttpContext.Request.Host}", ct);
-        if (route is null) return RuntimeEndpointMapping.UnknownOrigin();
-        return TypedResults.Ok(route == RuntimeAccessRoute.Direct ? response : response with
-        { Urls = [], PublicAccessFailure = PublicAccessFailureProtocol.UnsupportedRuntimeKind });
+        return TypedResults.Ok(response);
     }
 
     private Task<bool> IsPatchVerificationEnabledAsync(CancellationToken ct) =>

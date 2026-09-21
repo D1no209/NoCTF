@@ -1,6 +1,5 @@
 /** Runtime locale chunk. Keep keys stable across languages. */
 export const messages = {
-  "ui.publicConnectionStatusDoesNotChangeTheRuntimeState": "公网连接状态不会改变题目运行状态。",
   "ui.searchCompetitionChallengeOrTeam": "搜索赛事、题目或队伍",
   "ui.allSources": "来源(全部)",
   "ui.competitionContainers": "赛事容器",

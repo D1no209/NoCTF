@@ -338,7 +338,6 @@ export type NoCtfapiEndpointsRuntimeRuntimeResponse = {
     runningAt?: string | null;
     expiresAt?: string | null;
     stoppedAt?: string | null;
-    access?: NoCtfapiEndpointsRuntimeRuntimeAccessResponse | null;
     waitingReason?: NoCtfapiEndpointsRuntimeRunnerAdmissionFailureProtocol | null;
 };
 
@@ -350,32 +349,10 @@ export type NoCtfapiEndpointsRuntimeRuntimeStateProtocol = 'Queued' | 'Provision
 
 export type NoCtfapiEndpointsRuntimeRuntimeFailureCodeProtocol = 'InvalidConfiguration' | 'RunnerUnavailable' | 'ProviderUnavailable' | 'ProvisionTimeout' | 'ProviderRejected' | 'CleanupFailed' | 'UrlExpansionFailed';
 
-export type NoCtfapiEndpointsRuntimeRuntimeAccessResponse = {
-    route?: NoCtfapiEndpointsRuntimeRuntimeAccessRouteProtocol;
-    state?: NoCtfapiEndpointsRuntimePublicAccessStateProtocol;
-    failure?: NoCtfapiEndpointsRuntimePublicAccessFailureProtocol | null;
-    endpoints?: Array<NoCtfapiEndpointsRuntimePublicEndpointResponse>;
-};
-
-export type NoCtfapiEndpointsRuntimeRuntimeAccessRouteProtocol = 'Direct' | 'Gateway';
-
-export type NoCtfapiEndpointsRuntimePublicAccessStateProtocol = 'Disabled' | 'Pending' | 'Ready' | 'Unavailable' | 'Revoking' | 'Unsupported';
-
-export type NoCtfapiEndpointsRuntimePublicAccessFailureProtocol = 'GatewayDisabled' | 'ConnectorOffline' | 'PublicPortUnavailable' | 'RuntimeBindingUnavailable' | 'UnsupportedRuntimeKind' | 'AccessDisplayUnsupported' | 'GatewayCapacityExceeded' | 'GatewayIdentityRejected' | 'GatewaySafetyCheckFailed' | 'GatewayReconciliationPending';
-
-export type NoCtfapiEndpointsRuntimePublicEndpointResponse = {
-    containerPort?: number;
-    hostPort?: number;
-    state?: NoCtfapiEndpointsRuntimePublicAccessStateProtocol;
-    failure?: NoCtfapiEndpointsRuntimePublicAccessFailureProtocol | null;
-    publicPort?: number | null;
-};
-
 export type NoCtfapiEndpointsRuntimeRunnerAdmissionFailureProtocol = 'NoEligibleRunner' | 'CpuActualCapacityInsufficient' | 'MemoryActualCapacityInsufficient' | 'PidActualCapacityInsufficient' | 'NodePressureHigh' | 'ObservationStale' | 'LedgerRecovering' | 'StartupConcurrencyLimited' | 'ProviderUnavailable' | 'RequestExceedsNodeCapacity';
 
 export type NoCtfapiEndpointsRuntimeRuntimeTargetListResponse = {
     items?: Array<NoCtfapiEndpointsRuntimeRuntimeTargetResponse>;
-    publicAccessFailure?: NoCtfapiEndpointsRuntimePublicAccessFailureProtocol | null;
 };
 
 export type NoCtfapiEndpointsRuntimeRuntimeTargetResponse = {
@@ -1155,7 +1132,6 @@ export type NoCtfapiEndpointsChallengesChallengeResponse = {
     patchVerificationFailureCode?: NoCtfapiEndpointsGameplayFactsGameplayFactFailureCodeProtocol | null;
     patchVerificationRuntimeInstanceId?: string | null;
     patchVerificationRuntimeState?: NoCtfapiEndpointsRuntimeRuntimeStateProtocol | null;
-    publicAccessFailure?: NoCtfapiEndpointsRuntimePublicAccessFailureProtocol | null;
 };
 
 export type NoCtfapiEndpointsChallengesParticipantChallengeHintResponse = {
@@ -1803,9 +1779,7 @@ export type NoCtfapiEndpointsAdministrationPlatformAdminPlatformConfigurationRes
     branding?: NoCtfapiEndpointsAdministrationPlatformPlatformBrandingResponse;
     humanVerification?: NoCtfapiEndpointsAdministrationPlatformAdminHumanVerificationConfigurationResponse;
     emailVerification?: NoCtfapiEndpointsAdministrationPlatformEmailVerificationConfigurationResponse;
-    publicGateway?: NoCtfapiEndpointsAdministrationPlatformPublicGatewayConfigurationResponse;
     experimentalFeatures?: NoCtfapiEndpointsAdministrationPlatformPlatformExperimentalFeaturesResponse;
-    publicGatewayStatusUrl?: string;
 };
 
 export type NoCtfapiEndpointsAdministrationPlatformPlatformBrandingResponse = {
@@ -1850,33 +1824,6 @@ export type NoCtfapiEndpointsAdministrationPlatformEmailVerificationConfiguratio
 };
 
 export type NoCtfapiEndpointsAdministrationPlatformSmtpSecurityModeProtocol = 'None' | 'SslOnConnect' | 'StartTls';
-
-export type NoCtfapiEndpointsAdministrationPlatformPublicGatewayConfigurationResponse = {
-    policy?: NoCtfapiEndpointsAdministrationPlatformPublicGatewayPolicyResponse;
-    capability?: NoCtfapiEndpointsAdministrationPlatformPublicGatewayCapabilityResponse | null;
-};
-
-export type NoCtfapiEndpointsAdministrationPlatformPublicGatewayPolicyResponse = {
-    enabled?: boolean;
-    connectorId?: string;
-    publicOrigin?: string;
-    directOrigins?: Array<string>;
-    publicRuntimeHost?: string;
-    directRuntimeHostOverride?: string | null;
-    maxPublishedPorts?: number;
-};
-
-export type NoCtfapiEndpointsAdministrationPlatformPublicGatewayCapabilityResponse = {
-    connectorId?: string;
-    runnerId?: string;
-    approvedOrigins?: Array<string>;
-    firstPort?: number;
-    lastPort?: number;
-    reservedPorts?: Array<number>;
-    maximumPorts?: number;
-    namespaceIsolationAvailable?: boolean;
-    configurationError?: string | null;
-};
 
 export type NoCtfapiEndpointsAdministrationPlatformPlatformExperimentalFeaturesResponse = {
     ctfPatchVerificationEnabled?: boolean;
@@ -2008,22 +1955,6 @@ export type NoCtfapiEndpointsAdministrationPlatformPlatformUserDetailResponse = 
     schoolIdentity?: NoCtfapiEndpointsAuthenticationCurrentUserSchoolIdentityResponse;
 };
 
-export type NoCtfapiEndpointsAdministrationPlatformPublicGatewayStatusResponse = {
-    configured?: boolean;
-    enabled?: boolean;
-    applied?: boolean;
-    validUntil?: string | null;
-    failure?: NoCtfapiEndpointsRuntimePublicAccessFailureProtocol | null;
-    runtimes?: Array<NoCtfapiEndpointsAdministrationPlatformPublicGatewayRuntimeStatusResponse>;
-};
-
-export type NoCtfapiEndpointsAdministrationPlatformPublicGatewayRuntimeStatusResponse = {
-    runtimeId?: string;
-    validUntil?: string;
-    endpoints?: Array<NoCtfapiEndpointsRuntimePublicEndpointResponse>;
-    failure?: NoCtfapiEndpointsRuntimePublicAccessFailureProtocol | null;
-};
-
 export type NoCtfapiEndpointsAdministrationPlatformIssuePlatformUserTokenResponse = {
     accessToken?: string;
     expiresAt?: string;
@@ -2150,7 +2081,6 @@ export type NoCtfapiEndpointsAdministrationPlatformPatchPlatformConfigurationReq
     branding?: NoCtfapiEndpointsAdministrationPlatformPlatformBrandingPatchRequest | null;
     humanVerification?: NoCtfapiEndpointsAdministrationPlatformPlatformHumanVerificationPatchRequest | null;
     emailVerification?: NoCtfapiEndpointsAdministrationPlatformPlatformEmailVerificationPatchRequest | null;
-    publicGateway?: NoCtfapiEndpointsAdministrationPlatformPlatformGatewayPatchRequest | null;
     experimentalFeatures?: NoCtfapiEndpointsAdministrationPlatformPlatformExperimentalFeaturesPatchRequest | null;
 };
 
@@ -2185,16 +2115,6 @@ export type NoCtfapiEndpointsAdministrationPlatformPlatformEmailVerificationPatc
     smtpFromAddress: string;
     smtpFromName: string;
     smtpTimeoutSeconds: number;
-};
-
-export type NoCtfapiEndpointsAdministrationPlatformPlatformGatewayPatchRequest = {
-    enabled: boolean;
-    connectorId: string;
-    publicOrigin: string;
-    directOrigins: Array<string>;
-    publicRuntimeHost: string;
-    directRuntimeHostOverride: string | null;
-    maxPublishedPorts: number;
 };
 
 export type NoCtfapiEndpointsAdministrationPlatformPlatformExperimentalFeaturesPatchRequest = {
@@ -3003,7 +2923,6 @@ export type NoCtfapiEndpointsAdministrationChallengeBankChallengeTestRuntimeResp
     runningAt?: string | null;
     expiresAt?: string | null;
     stoppedAt?: string | null;
-    publicAccessFailure?: NoCtfapiEndpointsRuntimePublicAccessFailureProtocol | null;
 };
 
 export type NoCtfapiEndpointsAdministrationChallengeBankRuntimeTestFlagStateProtocol = 'NotRequired' | 'Pending' | 'Succeeded' | 'Failed' | 'Canceled';
@@ -7488,10 +7407,6 @@ export type AdminPlatformPatchConfigurationResponses = {
      * Success
      */
     200: NoCtfapiEndpointsAdministrationPlatformAdminPlatformConfigurationResponse;
-    /**
-     * Accepted
-     */
-    202: NoCtfapiEndpointsAdministrationPlatformAdminPlatformConfigurationResponse;
 };
 
 export type AdminPlatformPatchConfigurationResponse = AdminPlatformPatchConfigurationResponses[keyof AdminPlatformPatchConfigurationResponses];
@@ -7582,33 +7497,6 @@ export type AdminGetPrivatePlatformUserResponses = {
 };
 
 export type AdminGetPrivatePlatformUserResponse = AdminGetPrivatePlatformUserResponses[keyof AdminGetPrivatePlatformUserResponses];
-
-export type AdminPlatformGetPublicGatewayStatusData = {
-    body?: never;
-    path?: never;
-    query?: never;
-    url: '/api/v1/admin/platform/public-gateway/status';
-};
-
-export type AdminPlatformGetPublicGatewayStatusErrors = {
-    /**
-     * Unauthorized
-     */
-    401: unknown;
-    /**
-     * Forbidden
-     */
-    403: unknown;
-};
-
-export type AdminPlatformGetPublicGatewayStatusResponses = {
-    /**
-     * Success
-     */
-    200: NoCtfapiEndpointsAdministrationPlatformPublicGatewayStatusResponse;
-};
-
-export type AdminPlatformGetPublicGatewayStatusResponse = AdminPlatformGetPublicGatewayStatusResponses[keyof AdminPlatformGetPublicGatewayStatusResponses];
 
 export type AdminPlatformSsoGetConfigurationData = {
     body?: never;
