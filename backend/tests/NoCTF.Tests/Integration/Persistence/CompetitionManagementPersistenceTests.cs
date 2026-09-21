@@ -14,6 +14,8 @@ using NoCTF.Domain.Teams;
 using NoCTF.GameModes.Registration;
 using NoCTF.Infrastructure.Messaging;
 using NoCTF.Infrastructure.Teams.Registration;
+using NoCTF.Domain.Challenges;
+using NoCTF.Domain.Runtime;
 using Testcontainers.PostgreSql;
 using ZiggyCreatures.Caching.Fusion;
 
@@ -215,7 +217,80 @@ public sealed class CompetitionManagementPersistenceTests
                 cancellationToken);
             runningCompetition.Status = CompetitionStatus.Running;
             runningCompetition.AllowTeamRegistrationWhileRunning = true;
+            var challengeId = Guid.CreateVersion7();
+            var competitionChallengeId = Guid.CreateVersion7();
+            var runtimeId = Guid.CreateVersion7();
+            db.Challenges.Add(new Challenge
+            {
+                Id = challengeId,
+                OwnerId = ownerId,
+                Mode = GameMode.Ctf,
+                Title = "Runtime access test",
+                DefinitionJson = "{}",
+                CreatedAt = now,
+                UpdatedAt = now
+            });
+            db.CompetitionChallenges.Add(new CompetitionChallenge
+            {
+                Id = competitionChallengeId,
+                CompetitionId = competitionId,
+                ChallengeId = challengeId,
+                Order = 1,
+                IsPublished = true,
+                RulesJson = "{}",
+                UpdatedAt = now
+            });
+            db.RuntimeInstances.Add(new RuntimeInstance
+            {
+                Id = runtimeId,
+                CompetitionId = competitionId,
+                CompetitionChallengeId = competitionChallengeId,
+                Purpose = RuntimePurpose.Player,
+                AccessMode = RuntimeAccessMode.Direct,
+                RuntimeKind = RuntimeKind.Container,
+                RuntimeProvider = RuntimeProvider.Docker,
+                State = RuntimeState.Running,
+                CreatedAt = now,
+                RunningAt = now,
+                ExpiresAt = now.AddHours(1)
+            });
             await db.SaveChangesAsync(cancellationToken);
+
+            var accessUpdated = await store.UpdateAsync(new(
+                competitionId,
+                refreshed.Title,
+                refreshed.Description,
+                refreshed.StartTime,
+                refreshed.EndTime,
+                refreshed.TeamRegistrationAutoApprove,
+                refreshed.MaxTeamMembers,
+                refreshed.MaxConcurrentRuntimeInstancesPerTeam,
+                ownerId,
+                now.AddMinutes(2),
+                true,
+                refreshed.MaxActiveQuestionsPerTeam,
+                refreshed.MaxParticipantMessagesBeforeHandlerReply,
+                refreshed.AllowChallengeOwnersToHandleQuestions,
+                refreshed.PracticeModeEnabled,
+                refreshed.AccessMode,
+                refreshed.WriteUpSubmissionRequired,
+                refreshed.WriteUpSubmissionDeadlineHours,
+                RuntimeAccessMode.WsrxOnly,
+                TrafficCaptureEnabled: true,
+                TrafficCaptureLimitBytes: 16 * 1_048_576),
+                cancellationToken);
+
+            await Assert.That(accessUpdated).IsNotNull();
+            await Assert.That(accessUpdated!.RuntimeAccessMode)
+                .IsEqualTo(RuntimeAccessMode.WsrxOnly);
+            await Assert.That(accessUpdated.TrafficCaptureEnabled).IsTrue();
+            await Assert.That(accessUpdated.TrafficCaptureLimitBytes)
+                .IsEqualTo(16 * 1_048_576);
+            var existingRuntime = await db.RuntimeInstances.AsNoTracking()
+                .SingleAsync(runtime => runtime.Id == runtimeId, cancellationToken);
+            await Assert.That(existingRuntime.AccessMode)
+                .IsEqualTo(RuntimeAccessMode.Direct);
+            await Assert.That(existingRuntime.TrafficCaptureEnabled).IsFalse();
 
             var registrations = new TeamRegistrationStore(
                 db,
