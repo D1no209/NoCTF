@@ -79,7 +79,7 @@ public sealed class CommandReceiptOutboxTests
                     && (x.Kind == NoCTF.Domain.Competitions.Events.CompetitionEventKind.CompetitionUpdated
                         || x.Kind == NoCTF.Domain.Competitions.Events.CompetitionEventKind.ChallengeUpdated), ct)).IsEqualTo(2);
                 // Observe real database rows inside each transaction, before dispatch can remove them.
-                await Assert.That(commits.EnvelopeCounts).IsEquivalentTo([2, 2]);
+                await Assert.That(commits.EnvelopeCounts).IsEquivalentTo([3, 3]);
                 using var gatewayCaches = new ServiceCollection().AddFusionCache(NoCTF.Infrastructure.Caching.NoCtfCacheNames.ReadModels).Services.BuildServiceProvider();
                 var gatewayPolicy = new NoCTF.Application.Runtime.PublicAccess.PublicGatewayPolicy(true, "test-gateway", "https://public.example.test",
                     ["https://direct.example.test"], "203.0.113.1", null, 8);
@@ -87,7 +87,7 @@ public sealed class CommandReceiptOutboxTests
                     gatewayCaches.GetRequiredService<ZiggyCreatures.Caching.Fusion.IFusionCacheProvider>(), outbox,
                     new("test-gateway", "receipt-runner", [gatewayPolicy.PublicOrigin], 32768, 60999, [], 8, true));
                 await gateway.SaveAsync(gatewayPolicy, fixture.Now, ct);
-                await Assert.That(commits.EnvelopeCounts).IsEquivalentTo([2, 2, 1]);
+                await Assert.That(commits.EnvelopeCounts).IsEquivalentTo([3, 3, 1]);
                 commits.FailCommit = true;
                 await Assert.That(async () => await store.TryUpdateAsync(fixture.Id,
                     """{"schemaVersion":4,"roundDurationSeconds":99}""", true, fixture.Now.AddSeconds(1), ct))
@@ -255,7 +255,8 @@ public sealed class CommandReceiptOutboxTests
                 .DefineWorkQueueStream(NatsSubjects.BackgroundStream, stream => stream.WithSubjects(NatsSubjects.Subject(WorkerQueue.Background)), NatsSubjects.Subject(WorkerQueue.Background))
                 .DefineWorkQueueStream(NatsSubjects.ControlStream, stream => stream.WithSubjects(NatsSubjects.Subject(WorkerQueue.Control)), NatsSubjects.Subject(WorkerQueue.Control))
                 .DefineWorkQueueStream(NatsSubjects.ProjectionStream, stream => stream.WithSubjects(NatsSubjects.Subject(WorkerQueue.Projection)), NatsSubjects.Subject(WorkerQueue.Projection))
-                .DefineWorkQueueStream(NatsSubjects.EventsStream, stream => stream.WithSubjects(NatsSubjects.RealtimeEvents, NatsSubjects.LeaderboardEvents), NatsSubjects.RealtimeEvents, NatsSubjects.LeaderboardEvents)
+                .DefineWorkQueueStream(NatsSubjects.WebhookStream, stream => stream.WithSubjects(NatsSubjects.Subject(WorkerQueue.Webhook)), NatsSubjects.Subject(WorkerQueue.Webhook))
+                .DefineWorkQueueStream(NatsSubjects.EventsStream, stream => stream.WithSubjects(NatsSubjects.RealtimeEvents, NatsSubjects.LeaderboardEvents, NatsSubjects.WebhookEvents), NatsSubjects.RealtimeEvents, NatsSubjects.LeaderboardEvents, NatsSubjects.WebhookEvents)
                 .DefineWorkQueueStream(NatsSubjects.RunnerStream, stream => stream.WithSubject("noctf.runner.>"), "noctf.runner.>");
             if (recover) options.ListenToNatsSubject(NatsSubjects.Subject(WorkerQueue.Gameplay)).UseJetStream(NatsSubjects.GameplayStream, "receipt-worker").UseDurableInbox();
             if (recover) options.ListenToNatsSubject(NatsSubjects.Runner(RunnerNodeQueueName.FromRunnerId("receipt-runner").Value)).UseJetStream(NatsSubjects.RunnerStream, "receipt-runner").UseDurableInbox();
