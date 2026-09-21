@@ -13,7 +13,11 @@ public sealed record PlatformUserView(
     int TokenVersion,
     bool EmailVerified,
     DateTimeOffset CreatedAt,
-    DateTimeOffset UpdatedAt);
+    DateTimeOffset UpdatedAt,
+    Guid? SsoProviderId = null,
+    SsoProtocol? SsoProtocol = null,
+    string? SsoSubject = null,
+    DateTimeOffset? SsoBoundAt = null);
 
 public sealed record PlatformUserListQuery(
     string? Keyword,
@@ -21,7 +25,8 @@ public sealed record PlatformUserListQuery(
     UserRole? Role,
     int Offset,
     int Limit,
-    bool Desc);
+    bool Desc,
+    Guid? SsoProviderId = null);
 
 public sealed record PlatformUserListPage(
     IReadOnlyList<PlatformUserView> Items,

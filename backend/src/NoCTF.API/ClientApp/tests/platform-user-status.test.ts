@@ -80,4 +80,16 @@ describe('platform user account status management', () => {
     )
     expect(handler).not.toContain('detailOpen.value = false')
   })
+
+  test('lists searches filters and removes administrator-visible SSO bindings', async () => {
+    const source = await sourceFile(pageUrl).text()
+
+    expect(source).toContain('ssoProviderId: ssoProviderFilter.value')
+    expect(source).toContain('adminPlatformSsoGetConfiguration')
+    expect(source).toContain('adminPlatformUnbindSsoIdentity')
+    expect(source).toContain('user.ssoBinding.subject')
+    expect(source).toContain('detail.ssoBinding.boundAt')
+    expect(source).toContain("translate('sso.adminUnbindSuccessful')")
+    expect(source).toContain("await navigateTo('/auth/login')")
+  })
 })

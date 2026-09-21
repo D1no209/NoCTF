@@ -13,7 +13,8 @@ namespace NoCTF.Infrastructure.Authentication;
 public enum SsoBindingAuditAction
 {
     Bound,
-    Unbound
+    Unbound,
+    AdministrativelyUnbound
 }
 
 public sealed record SsoBindingAuditFact(
@@ -122,6 +123,7 @@ public sealed class SsoAccountStore(NoCtfDbContext db) : ISsoAccountStore
         user.UpdatedAt = now;
         db.Notifications.Add(Audit(
             user.Id,
+            user.Id,
             identity.ProviderId,
             providerName,
             identity.Protocol,
@@ -187,6 +189,7 @@ public sealed class SsoAccountStore(NoCtfDbContext db) : ISsoAccountStore
         user.UpdatedAt = now;
         db.Notifications.Add(Audit(
             user.Id,
+            user.Id,
             providerId,
             providerName,
             protocol,
@@ -198,7 +201,52 @@ public sealed class SsoAccountStore(NoCtfDbContext db) : ISsoAccountStore
         return SsoUnbindState.Unbound;
     }
 
+    public async Task<AdminSsoUnbindState> UnbindAsAdministratorAsync(
+        Guid userId,
+        Guid actorUserId,
+        DateTimeOffset now,
+        CancellationToken ct)
+    {
+        await using var transaction = db.Database.IsRelational()
+            ? await db.Database.BeginTransactionAsync(IsolationLevel.ReadCommitted, ct)
+            : null;
+        var user = db.Database.IsRelational()
+            ? await db.Users.FromSqlInterpolated(
+                    $"SELECT * FROM users WHERE id = {userId} FOR UPDATE")
+                .SingleOrDefaultAsync(ct)
+            : await db.Users.SingleOrDefaultAsync(item => item.Id == userId, ct);
+        if (user is null || user.Kind != UserKind.Human)
+            return AdminSsoUnbindState.UserNotFound;
+        if (user.ExternalIdentityProviderId is not Guid providerId
+            || user.ExternalIdentityProtocol is not SsoProtocol protocol)
+            return AdminSsoUnbindState.NotLinked;
+        var settings = await db.PlatformSettings.AsNoTracking().SingleAsync(ct);
+        var providerName = settings.SsoConfiguration.Providers
+            .SingleOrDefault(provider => provider.Id == providerId)?.Name
+            ?? "Unavailable provider";
+        user.ExternalIdentityProviderId = null;
+        user.ExternalIdentityProtocol = null;
+        user.ExternalIdentityNamespace = null;
+        user.ExternalIdentitySubject = null;
+        user.ExternalIdentityBoundAt = null;
+        user.TokenVersion = checked(user.TokenVersion + 1);
+        user.UpdatedAt = now;
+        db.Notifications.Add(Audit(
+            actorUserId,
+            user.Id,
+            providerId,
+            providerName,
+            protocol,
+            SsoBindingAuditAction.AdministrativelyUnbound,
+            now));
+        await db.SaveChangesAsync(ct);
+        if (transaction is not null)
+            await transaction.CommitAsync(ct);
+        return AdminSsoUnbindState.Unbound;
+    }
+
     private static Notification Audit(
+        Guid actorUserId,
         Guid userId,
         Guid providerId,
         string providerName,
@@ -208,7 +256,7 @@ public sealed class SsoAccountStore(NoCtfDbContext db) : ISsoAccountStore
     {
         Id = Guid.CreateVersion7(now),
         SourceType = NotificationSourceType.User,
-        SourceId = userId,
+        SourceId = actorUserId,
         TargetType = NotificationTargetType.PlatformAdministrators,
         TargetId = Notification.PlatformAdministratorsTargetId,
         Kind = NotificationKind.SsoExternalIdentityBindingChanged,

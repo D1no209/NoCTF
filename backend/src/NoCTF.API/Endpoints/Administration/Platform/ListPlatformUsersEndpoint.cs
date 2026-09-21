@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Http.HttpResults;
 using NoCTF.API.Endpoints.Authentication;
 using NoCTF.API.Pagination;
 using NoCTF.Application.Administration;
+using NoCTF.Application.Authentication.Sso;
 using NoCTF.Domain.Identity;
 using Riok.Mapperly.Abstractions;
 
@@ -19,7 +20,15 @@ public sealed record PlatformUserResponse(
     int TokenVersion,
     bool EmailVerified,
     DateTimeOffset CreatedAt,
-    DateTimeOffset UpdatedAt);
+    DateTimeOffset UpdatedAt,
+    PlatformUserSsoBindingResponse? SsoBinding = null);
+
+public sealed record PlatformUserSsoBindingResponse(
+    Guid ProviderId,
+    string? ProviderName,
+    PublicSsoProtocol Protocol,
+    string Subject,
+    DateTimeOffset BoundAt);
 
 public sealed class PlatformUserListResponse : ArrayResult<PlatformUserResponse>
 {
@@ -36,6 +45,9 @@ public sealed class ListPlatformUsersRequest : SearchRequest
 
     [QueryParam]
     public UserRoleProtocol? Role { get; set; }
+
+    [QueryParam]
+    public Guid? SsoProviderId { get; set; }
 }
 
 public sealed class ListPlatformUsersValidator : Validator<ListPlatformUsersRequest>
@@ -60,10 +72,38 @@ internal static partial class PlatformUserMapping
     [MapEnum(EnumMappingStrategy.ByName)]
     private static partial UserAccountStatusProtocol ToProtocol(UserAccountStatus value);
 
-    public static partial PlatformUserResponse ToResponse(PlatformUserView view);
+    [MapperIgnoreTarget(nameof(PlatformUserResponse.SsoBinding))]
+    private static partial PlatformUserResponse ToBaseResponse(PlatformUserView view);
+
+    public static PlatformUserResponse ToResponse(
+        PlatformUserView view,
+        IReadOnlyDictionary<Guid, string>? providerNames = null)
+    {
+        var response = ToBaseResponse(view);
+        if (view.SsoProviderId is not Guid providerId
+            || view.SsoProtocol is not SsoProtocol protocol
+            || view.SsoSubject is null
+            || view.SsoBoundAt is not DateTimeOffset boundAt)
+            return response;
+        string? providerName = null;
+        providerNames?.TryGetValue(providerId, out providerName);
+        return response with
+        {
+            SsoBinding = new(
+                providerId,
+                providerName,
+                protocol == SsoProtocol.Oidc
+                    ? PublicSsoProtocol.Oidc
+                    : PublicSsoProtocol.Cas,
+                view.SsoSubject,
+                boundAt)
+        };
+    }
 }
 
-public sealed class ListPlatformUsersEndpoint(ManagePlatform platform)
+public sealed class ListPlatformUsersEndpoint(
+    ManagePlatform platform,
+    ManageSsoProviders ssoProviders)
     : Endpoint<ListPlatformUsersRequest, Ok<PlatformUserListResponse>>
 {
     public override void Configure()
@@ -89,9 +129,16 @@ public sealed class ListPlatformUsersEndpoint(ManagePlatform platform)
             request.Role is null ? null : IdentityProtocolMapper.ToDomain(request.Role.Value),
             request.Offset,
             request.Limit,
-            request.Desc), ct);
+            request.Desc,
+            request.SsoProviderId), ct);
+        var sso = await ssoProviders.GetAsync(ct);
+        var providerNames = sso.Providers.ToDictionary(
+            provider => provider.Id,
+            provider => provider.Name);
         return TypedResults.Ok(new PlatformUserListResponse(
-            page.Items.Select(PlatformUserMapping.ToResponse).ToArray(),
+            page.Items.Select(user => PlatformUserMapping.ToResponse(
+                user,
+                providerNames)).ToArray(),
             page.Total));
     }
 }

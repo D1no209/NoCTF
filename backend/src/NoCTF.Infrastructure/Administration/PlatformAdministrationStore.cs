@@ -24,7 +24,11 @@ public sealed class PlatformAdministrationStore(
             .Select(user => new PlatformUserView(
                 user.Id, user.UserName, user.Email, user.Kind, user.Role, user.AccountStatus,
                 user.TokenVersion,
-                user.EmailVerifiedAt != null, user.CreatedAt, user.UpdatedAt))
+                user.EmailVerifiedAt != null, user.CreatedAt, user.UpdatedAt,
+                user.ExternalIdentityProviderId,
+                user.ExternalIdentityProtocol,
+                user.ExternalIdentitySubject,
+                user.ExternalIdentityBoundAt))
             .ToListAsync(ct);
 
     public async Task<PlatformUserListPage> ListUsersPageAsync(
@@ -38,12 +42,17 @@ public sealed class PlatformAdministrationStore(
             var pattern = $"%{keyword}%";
             source = source.Where(user =>
                 EF.Functions.ILike(user.UserName, pattern)
-                || EF.Functions.ILike(user.Email, pattern));
+                || EF.Functions.ILike(user.Email, pattern)
+                || user.ExternalIdentitySubject != null
+                    && EF.Functions.ILike(user.ExternalIdentitySubject, pattern));
         }
         if (query.Kind is not null)
             source = source.Where(user => user.Kind == query.Kind);
         if (query.Role is not null)
             source = source.Where(user => user.Role == query.Role);
+        if (query.SsoProviderId is not null)
+            source = source.Where(user =>
+                user.ExternalIdentityProviderId == query.SsoProviderId);
 
         var total = await source.CountAsync(ct);
         var ordered = query.Desc
@@ -55,7 +64,11 @@ public sealed class PlatformAdministrationStore(
             .Select(user => new PlatformUserView(
                 user.Id, user.UserName, user.Email, user.Kind, user.Role, user.AccountStatus,
                 user.TokenVersion,
-                user.EmailVerifiedAt != null, user.CreatedAt, user.UpdatedAt))
+                user.EmailVerifiedAt != null, user.CreatedAt, user.UpdatedAt,
+                user.ExternalIdentityProviderId,
+                user.ExternalIdentityProtocol,
+                user.ExternalIdentitySubject,
+                user.ExternalIdentityBoundAt))
             .ToListAsync(ct);
         return new(items, total);
     }
@@ -66,7 +79,11 @@ public sealed class PlatformAdministrationStore(
             .Select(user => new PlatformUserView(
                 user.Id, user.UserName, user.Email, user.Kind, user.Role, user.AccountStatus,
                 user.TokenVersion,
-                user.EmailVerifiedAt != null, user.CreatedAt, user.UpdatedAt))
+                user.EmailVerifiedAt != null, user.CreatedAt, user.UpdatedAt,
+                user.ExternalIdentityProviderId,
+                user.ExternalIdentityProtocol,
+                user.ExternalIdentitySubject,
+                user.ExternalIdentityBoundAt))
             .SingleOrDefaultAsync(ct);
 
     public async Task<CreateBotResult> CreateBotAsync(
@@ -348,7 +365,11 @@ public sealed class PlatformAdministrationStore(
         new(
             user.Id, user.UserName, user.Email, user.Kind, user.Role, user.AccountStatus,
             user.TokenVersion,
-            user.EmailVerifiedAt != null, user.CreatedAt, user.UpdatedAt);
+            user.EmailVerifiedAt != null, user.CreatedAt, user.UpdatedAt,
+            user.ExternalIdentityProviderId,
+            user.ExternalIdentityProtocol,
+            user.ExternalIdentitySubject,
+            user.ExternalIdentityBoundAt);
 
     private void RecordAccountStatusChange(
         User user,

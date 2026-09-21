@@ -1650,9 +1650,18 @@ export type NoCtfapiEndpointsAdministrationPlatformPlatformUserResponse = {
     emailVerified?: boolean;
     createdAt?: string;
     updatedAt?: string;
+    ssoBinding?: NoCtfapiEndpointsAdministrationPlatformPlatformUserSsoBindingResponse | null;
 };
 
 export type NoCtfapiEndpointsAuthenticationUserAccountStatusProtocol = 'Active' | 'Banned' | 'Disabled' | 'Anonymized';
+
+export type NoCtfapiEndpointsAdministrationPlatformPlatformUserSsoBindingResponse = {
+    providerId?: string;
+    providerName?: string | null;
+    protocol?: NoCtfapiEndpointsAuthenticationPublicSsoProtocol;
+    subject?: string;
+    boundAt?: string;
+};
 
 export type NoCtfapiEndpointsAdministrationPlatformCreatePlatformBotRequest = {
     userName: string;
@@ -6997,6 +7006,39 @@ export type AdminStopSharedRuntimeResponses = {
 
 export type AdminStopSharedRuntimeResponse = AdminStopSharedRuntimeResponses[keyof AdminStopSharedRuntimeResponses];
 
+export type AdminPlatformUnbindSsoIdentityData = {
+    body?: never;
+    path: {
+        userId: string;
+    };
+    query?: never;
+    url: '/api/v1/admin/platform/users/{userId}/sso-binding';
+};
+
+export type AdminPlatformUnbindSsoIdentityErrors = {
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+    /**
+     * Not Found
+     */
+    404: unknown;
+};
+
+export type AdminPlatformUnbindSsoIdentityResponses = {
+    /**
+     * No Content
+     */
+    204: void;
+};
+
+export type AdminPlatformUnbindSsoIdentityResponse = AdminPlatformUnbindSsoIdentityResponses[keyof AdminPlatformUnbindSsoIdentityResponses];
+
 export type AdminPlatformSsoBeginAuthenticationTestData = {
     body?: never;
     path: {
@@ -7750,6 +7792,7 @@ export type AdminPlatformListUsersData = {
     query: {
         kind?: NoCtfapiEndpointsAuthenticationUserKindProtocol | null;
         role?: NoCtfapiEndpointsAuthenticationUserRoleProtocol | null;
+        ssoProviderId?: string | null;
         keyword?: string | null;
         offset: number;
         limit: number;

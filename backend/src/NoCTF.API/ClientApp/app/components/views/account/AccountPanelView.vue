@@ -3,7 +3,7 @@ import { toRefs } from 'vue'
 import type { AccountPanelViewState } from '~/features/account/useAccountPanel'
 
 const viewProps = defineProps<{ state: AccountPanelViewState }>()
-const { UserRound, LockKeyhole, ShieldCheck, ImageIcon, LogOut, user, isImpersonating, fetchMe, open, activeSection, setOpen, selectSection, signOut, description, profilePending, profileError, profileSuccess, profileDirty, saveProfile, avatarInput, avatarPending, avatarEditorOpen, avatarSourceFile, avatarRequirements, selectAvatar, setAvatarEditorOpen, uploadAvatar, reportAvatarError, setAvatarInputRef, wallpaperInput, wallpaperPending, wallpaperUrl, wallpaperRequirements, selectWallpaper, setWallpaperEnabled, setWallpaperInputRef, fullName, studentNumber, identityLoading, identityLoaded, identityPending, identityError, identitySuccess, identityDirty, identityFieldError, loadIdentity, saveIdentity, emailPending, emailMessage, emailError, resendEmail, ssoConfiguration, ssoLoading, ssoLoaded, ssoPending, ssoError, ssoProviderId, ssoPassword, loadSsoBinding, beginSsoBinding, unbindSsoIdentity, currentPassword, newPassword, confirmNewPassword, passwordPending, passwordError, changePassword, logoutAll, AvatarCropDialog } = toRefs(viewProps.state)
+const { UserRound, LockKeyhole, ShieldCheck, ImageIcon, LogOut, user, isImpersonating, fetchMe, open, activeSection, setOpen, selectSection, signOut, description, profilePending, profileError, profileSuccess, profileDirty, saveProfile, avatarInput, avatarPending, avatarEditorOpen, avatarSourceFile, avatarRequirements, selectAvatar, setAvatarEditorOpen, uploadAvatar, reportAvatarError, setAvatarInputRef, wallpaperInput, wallpaperPending, wallpaperUrl, wallpaperRequirements, selectWallpaper, setWallpaperEnabled, setWallpaperInputRef, fullName, studentNumber, identityLoading, identityLoaded, identityPending, identityError, identitySuccess, identityDirty, identityFieldError, loadIdentity, saveIdentity, emailPending, emailMessage, emailError, resendEmail, ssoConfiguration, ssoLoading, ssoLoaded, ssoPending, ssoError, ssoProviderId, ssoPassword, loadSsoBinding, beginSsoBinding, unbindSsoIdentity, currentPassword, newPassword, confirmNewPassword, passwordPending, passwordError, changePassword, logoutAll, AvatarCropDialog, AdminDateTime } = toRefs(viewProps.state)
 </script>
 
 <template>
@@ -219,6 +219,11 @@ const { UserRound, LockKeyhole, ShieldCheck, ImageIcon, LogOut, user, isImperson
                     <div class="min-w-0">
                       <p class="font-medium">{{ ssoConfiguration.binding.providerName }}</p>
                       <p class="mt-1 break-all text-xs text-muted-foreground">{{ ssoConfiguration.binding.subject }}</p>
+                      <div class="mt-2 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                        <Badge variant="outline">{{ ssoConfiguration.binding.protocol }}</Badge>
+                        <span>{{ $t('sso.boundAt') }}</span>
+                        <component :is="AdminDateTime" :value="ssoConfiguration.binding.boundAt" />
+                      </div>
                     </div>
                   </div>
                   <Field>

@@ -1,9 +1,9 @@
 import { markRaw } from 'vue'
 
-import { Copy, KeyRound, LogIn, Plus, Trash2 } from '@lucide/vue'
+import { Copy, KeyRound, LogIn, Plus, Trash2, Unlink } from '@lucide/vue'
 import { toast } from 'vue-sonner'
-import { adminPlatformCreateBot, adminPlatformDeleteUser, adminPlatformDeleteUserTokens, adminPlatformGetUser, adminPlatformIssueUserToken, adminPlatformListUsers, adminPlatformPatchUser, adminPlatformPreviewUserDeletion } from '../../../../api'
-import type { NoCtfapiEndpointsAdministrationPlatformIssuePlatformUserTokenResponse, NoCtfapiEndpointsAdministrationPlatformPlatformUserDeletionMode, NoCtfapiEndpointsAdministrationPlatformPlatformUserDeletionPreviewResponse, NoCtfapiEndpointsAdministrationPlatformPlatformUserResponse, NoCtfapiEndpointsAdministrationPlatformPlatformManagedUserAccountStatusProtocol, NoCtfapiEndpointsAuthenticationUserKindProtocol, NoCtfapiEndpointsAuthenticationUserRoleProtocol } from '../../../../api'
+import { adminPlatformCreateBot, adminPlatformDeleteUser, adminPlatformDeleteUserTokens, adminPlatformGetUser, adminPlatformIssueUserToken, adminPlatformListUsers, adminPlatformPatchUser, adminPlatformPreviewUserDeletion, adminPlatformSsoGetConfiguration, adminPlatformUnbindSsoIdentity } from '../../../../api'
+import type { NoCtfapiEndpointsAdministrationPlatformIssuePlatformUserTokenResponse, NoCtfapiEndpointsAdministrationPlatformPlatformUserDeletionMode, NoCtfapiEndpointsAdministrationPlatformPlatformUserDeletionPreviewResponse, NoCtfapiEndpointsAdministrationPlatformPlatformUserResponse, NoCtfapiEndpointsAdministrationPlatformPlatformManagedUserAccountStatusProtocol, NoCtfapiEndpointsAdministrationPlatformSsoProviderResponse, NoCtfapiEndpointsAuthenticationUserKindProtocol, NoCtfapiEndpointsAuthenticationUserRoleProtocol } from '../../../../api'
 import { createLatestRequestGuard } from '../../../../lib/latest-request'
 import PrivateAccountPanelComponent from '../../../account/PrivateAccountPanel.vue'
 import AdminDateTimeComponent from '../../../admin/AdminDateTime.vue'
@@ -23,7 +23,7 @@ type IssuedToken = NoCtfapiEndpointsAdministrationPlatformIssuePlatformUserToken
 
 /** Owns state, effects and commands for AdminPlatformUsersPage. */
 export function useAdminPlatformUsersPage() {
-  const { user: currentUser, impersonation, startImpersonation } = useAuth()
+  const { user: currentUser, impersonation, startImpersonation, invalidate } = useAuth()
   const route = useRoute()
 
   const users = ref<PlatformUser[]>([])
@@ -35,6 +35,10 @@ export function useAdminPlatformUsersPage() {
   const roleFilter = ref<'all' | 'Bot' | NoCtfapiEndpointsAuthenticationUserRoleProtocol>(
     route.query.filter === 'Bot' ? 'Bot' : 'all',
   )
+
+  const ssoProviders = ref<NoCtfapiEndpointsAdministrationPlatformSsoProviderResponse[]>([])
+
+  const ssoProviderFilter = ref('all')
 
   const ROLE_LABELS: Record<string, string> = { User: "ui.user", Organizer: "ui.organizer", Administrator: "ui.administrator" }
 
@@ -69,6 +73,7 @@ export function useAdminPlatformUsersPage() {
       keyword: search.value.trim() || null,
       kind: roleFilter.value === 'Bot' ? 'Bot' as NoCtfapiEndpointsAuthenticationUserKindProtocol : null,
       role: roleFilter.value !== 'all' && roleFilter.value !== 'Bot' ? roleFilter.value : null,
+      ssoProviderId: ssoProviderFilter.value === 'all' ? null : ssoProviderFilter.value,
       offset,
       limit,
       desc,
@@ -89,10 +94,15 @@ export function useAdminPlatformUsersPage() {
     loadError.value = pagination.error.value?.message ?? null
   }
 
-  watch([search, roleFilter], () => {
+  watch([search, roleFilter, ssoProviderFilter], () => {
     pagination.reset()
     void load()
   })
+
+  async function loadSsoProviders(): Promise<void> {
+    const { data } = await adminPlatformSsoGetConfiguration()
+    ssoProviders.value = data?.providers ?? []
+  }
 
   const createBotOpen = ref(false)
 
@@ -149,6 +159,8 @@ export function useAdminPlatformUsersPage() {
   const emailVerificationSaving = ref(false)
 
   const invalidating = ref(false)
+
+  const ssoUnbinding = ref(false)
 
   const tokenOpen = ref(false)
 
@@ -260,6 +272,29 @@ export function useAdminPlatformUsersPage() {
     catch {
       toast.error(translate("ui.copyFailedPleaseManuallySelectCopy"))
     }
+  }
+
+  async function unbindManagedSsoIdentity(): Promise<void> {
+    const target = detail.value
+    if (!target?.id || !target.ssoBinding || ssoUnbinding.value) return
+    ssoUnbinding.value = true
+    const { error } = await adminPlatformUnbindSsoIdentity({
+      path: { userId: target.id },
+    })
+    ssoUnbinding.value = false
+    if (error) {
+      toast.error(parseApiError(error, translate('sso.adminUnbindFailed')).message)
+      return
+    }
+    toast.success(translate('sso.adminUnbindSuccessful'))
+    if (target.id === currentUser.value?.userId) {
+      invalidate()
+      detailOpen.value = false
+      await navigateTo('/auth/login')
+      return
+    }
+    detail.value = { ...target, ssoBinding: null }
+    await load()
   }
 
   async function saveRole(): Promise<void> {
@@ -422,6 +457,7 @@ export function useAdminPlatformUsersPage() {
 
   onMounted(() => {
     void load()
+    void loadSsoProviders()
   })
 
   const PrivateAccountPanel = markRaw(PrivateAccountPanelComponent)
@@ -434,11 +470,14 @@ export function useAdminPlatformUsersPage() {
       LogIn,
       Plus,
       Trash2,
+      Unlink,
       currentUser,
       loading,
       loadError,
       search,
       roleFilter,
+      ssoProviders,
+      ssoProviderFilter,
       ROLE_LABELS,
       STATUS_LABELS,
       MANAGED_ACCOUNT_STATUS_OPTIONS,
@@ -468,6 +507,7 @@ export function useAdminPlatformUsersPage() {
       accountStatusSaving,
       emailVerificationSaving,
       invalidating,
+      ssoUnbinding,
       tokenOpen,
       tokenIntent,
       identitySwitchActive,
@@ -483,6 +523,7 @@ export function useAdminPlatformUsersPage() {
       saveAccountStatus,
       saveEmailVerification,
       invalidateTokens,
+      unbindManagedSsoIdentity,
       deleteOpen,
       previewLoading,
       preview,

@@ -82,6 +82,7 @@ internal static class AuthenticationInfrastructure
         services.AddScoped<CompleteSsoLogin>();
         services.AddScoped<CompleteSsoBinding>();
         services.AddScoped<UnbindSsoIdentity>();
+        services.AddScoped<AdministrativelyUnbindSsoIdentity>();
         services.AddDataProtection()
             .SetApplicationName("NoCTF");
         if (!string.IsNullOrWhiteSpace(
