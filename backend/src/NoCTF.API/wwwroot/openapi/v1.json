@@ -433,6 +433,16 @@
           "404": {
             "description": "Not Found"
           },
+          "409": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsTeamsTeamRegistrationFailureResponse"
+                }
+              }
+            }
+          },
           "401": {
             "description": "Unauthorized"
           },
@@ -14619,6 +14629,18 @@
             "type": "string",
             "maxLength": 128,
             "minLength": 0
+          },
+          "trackKey": {
+            "type": "string",
+            "maxLength": 64,
+            "minLength": 0,
+            "nullable": true
+          },
+          "trackInvitationCode": {
+            "type": "string",
+            "maxLength": 128,
+            "minLength": 0,
+            "nullable": true
           }
         }
       },

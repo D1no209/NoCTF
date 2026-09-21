@@ -63,26 +63,44 @@ public sealed class CompetitionTrackStore(
                 provider => (provider.Name, provider.IconUrl));
         }
         Guid? viewerSsoProviderId = null;
-        if (hasActiveSsoGates && viewerUserId.HasValue)
-        {
-            viewerSsoProviderId = await db.Users.AsNoTracking()
-                .Where(user => user.Id == viewerUserId.Value)
-                .Select(user => user.ExternalIdentityProviderId)
-                .SingleOrDefaultAsync(cancellationToken);
-        }
-
         Guid? viewerTeamId = null;
         string? viewerTrackKey = null;
+        Guid[] viewerTeamMemberIds = [];
         if (!includeInternal && viewerUserId.HasValue)
         {
             var viewerTeam = await db.Teams.AsNoTracking()
                 .Where(team => team.CompetitionId == competitionId
                     && team.DeletedAt == null
                     && team.MemberIds.Contains(viewerUserId.Value))
-                .Select(team => new { team.Id, team.TrackKey })
+                .Select(team => new { team.Id, team.TrackKey, team.MemberIds })
                 .SingleOrDefaultAsync(cancellationToken);
             viewerTeamId = viewerTeam?.Id;
             viewerTrackKey = viewerTeam?.TrackKey;
+            viewerTeamMemberIds = viewerTeam?.MemberIds ?? [];
+        }
+
+        HashSet<Guid>? teamSatisfiedSsoProviders = null;
+        if (hasActiveSsoGates && viewerTeamMemberIds.Length > 0)
+        {
+            var memberProviderIds = await db.Users.AsNoTracking()
+                .Where(user => viewerTeamMemberIds.Contains(user.Id))
+                .Select(user => user.ExternalIdentityProviderId)
+                .ToArrayAsync(cancellationToken);
+            teamSatisfiedSsoProviders = configuration.Tracks
+                .Select(track => track.RequiredSsoProviderId)
+                .Where(providerId => providerId.HasValue)
+                .Select(providerId => providerId!.Value)
+                .Distinct()
+                .Where(providerId => memberProviderIds.Length == viewerTeamMemberIds.Length
+                    && memberProviderIds.All(memberProviderId => memberProviderId == providerId))
+                .ToHashSet();
+        }
+        else if (hasActiveSsoGates && viewerUserId.HasValue)
+        {
+            viewerSsoProviderId = await db.Users.AsNoTracking()
+                .Where(user => user.Id == viewerUserId.Value)
+                .Select(user => user.ExternalIdentityProviderId)
+                .SingleOrDefaultAsync(cancellationToken);
         }
 
         var tracks = configuration.Tracks
@@ -96,6 +114,7 @@ public sealed class CompetitionTrackStore(
                 includeInvitationCodes,
                 providers,
                 viewerSsoProviderId,
+                teamSatisfiedSsoProviders,
                 competition.TracksEnabled) with
             {
                 IsViewerTrack = string.Equals(
@@ -381,6 +400,7 @@ public sealed class CompetitionTrackStore(
             includeInvitationCodes,
             providers,
             viewerSsoProviderId: null,
+            teamSatisfiedSsoProviders: null,
             competition.TracksEnabled)).ToArray());
 
     private static bool HasSameLeaderboardShape(
@@ -407,6 +427,7 @@ public sealed class CompetitionTrackStore(
         bool includeInvitationCode,
         IReadOnlyDictionary<Guid, (string Name, string? IconUrl)> providers,
         Guid? viewerSsoProviderId,
+        IReadOnlySet<Guid>? teamSatisfiedSsoProviders,
         bool ssoGatesEnabled)
     {
         (string Name, string? IconUrl)? provider = null;
@@ -432,7 +453,9 @@ public sealed class CompetitionTrackStore(
         provider?.IconUrl,
         !ssoGatesEnabled
             || track.RequiredSsoProviderId is null
-            || track.RequiredSsoProviderId == viewerSsoProviderId);
+            || teamSatisfiedSsoProviders?.Contains(track.RequiredSsoProviderId.Value) == true
+            || teamSatisfiedSsoProviders is null
+                && track.RequiredSsoProviderId == viewerSsoProviderId);
     }
 
     private static UpdateCompetitionTracksResult Failure(

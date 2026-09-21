@@ -161,10 +161,45 @@ public class TeamRegistrationTests
     {
         var store = new Store(new(CompetitionStatus.Finished, true, false));
 
-        var result = await new ReviewTeamRegistration(store).ExecuteAsync(Guid.NewGuid(), Guid.NewGuid(), true);
+        var result = await new ReviewTeamRegistration(store).ExecuteAsync(
+            Guid.NewGuid(),
+            Guid.NewGuid(),
+            TeamRegistrationStatus.Approved);
 
         await Assert.That(result.FailureCode).IsEqualTo(TeamRegistrationFailure.CompetitionFinished);
         await Assert.That(store.ReviewWriteCount).IsEqualTo(0);
+    }
+
+    [Test]
+    public async Task ReviewTeamRegistration_Allows_moderator_to_return_team_to_pending()
+    {
+        var store = new Store(new(CompetitionStatus.Published, true, false));
+
+        var result = await new ReviewTeamRegistration(store).ExecuteAsync(
+            Guid.NewGuid(),
+            Guid.NewGuid(),
+            TeamRegistrationStatus.Pending);
+
+        await Assert.That(result.Succeeded).IsTrue();
+        await Assert.That(store.Status).IsEqualTo(TeamRegistrationStatus.Pending);
+    }
+
+    [Test]
+    [Arguments(CompetitionStatus.Draft, false, false)]
+    [Arguments(CompetitionStatus.Visible, false, true)]
+    [Arguments(CompetitionStatus.Published, false, true)]
+    [Arguments(CompetitionStatus.Running, false, false)]
+    [Arguments(CompetitionStatus.Running, true, true)]
+    [Arguments(CompetitionStatus.Paused, true, false)]
+    [Arguments(CompetitionStatus.Finished, true, false)]
+    public async Task Participant_organization_changes_follow_the_registration_window(
+        CompetitionStatus status,
+        bool allowWhileRunning,
+        bool expected)
+    {
+        await Assert.That(ParticipantTeamMutationPolicy.CanChangeOrganization(
+            status,
+            allowWhileRunning)).IsEqualTo(expected);
     }
 
     [Test]
@@ -207,6 +242,7 @@ public class TeamRegistrationTests
         public Task<TeamReviewStoreResult> SetStatusAsync(Guid competitionId, Guid teamId, TeamRegistrationStatus status, CancellationToken cancellationToken)
         {
             ReviewWriteCount++;
+            Status = status;
             return Task.FromResult(new TeamReviewStoreResult(true));
         }
         public Task<TeamView?> FindAsync(Guid competitionId, Guid teamId, bool includePending, CancellationToken cancellationToken) => Task.FromResult<TeamView?>(null);

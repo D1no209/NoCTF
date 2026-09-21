@@ -72,7 +72,14 @@ public enum TeamRegistrationFailure
 public sealed record TeamCreateStoreResult(TeamView? Team, TeamRegistrationFailure? Failure = null);
 public sealed record TeamReviewStoreResult(bool Changed, TeamRegistrationFailure? Failure = null);
 public sealed record TeamUpdateStoreResult(TeamView? Team, TeamRegistrationFailure? Failure = null);
-public sealed record UpdateTeamCommand(Guid CompetitionId, Guid TeamId, string Name);
+public sealed record UpdateTeamCommand(
+    Guid CompetitionId,
+    Guid TeamId,
+    string Name,
+    string? TrackKey = null,
+    string? TrackInvitationCode = null,
+    Guid? ActorUserId = null,
+    DateTimeOffset? UpdatedAt = null);
 
 public interface ITeamRegistrationStore
 {
@@ -234,6 +241,18 @@ public sealed class UpdateTeam(ITeamRegistrationStore store)
     }
 }
 
+public static class ParticipantTeamMutationPolicy
+{
+    public static bool CanChangeOrganization(
+        CompetitionStatus status,
+        bool allowTeamRegistrationWhileRunning) =>
+        status is CompetitionStatus.Visible or CompetitionStatus.Published
+        || status == CompetitionStatus.Running && allowTeamRegistrationWhileRunning;
+
+    public static TeamRegistrationStatus RegistrationStatusAfterChange(bool autoApprove) =>
+        autoApprove ? TeamRegistrationStatus.Approved : TeamRegistrationStatus.Pending;
+}
+
 public sealed class DeleteTeam(ITeamRegistrationStore store)
 {
     public async Task<OperationResult<TeamRegistrationFailure>> ExecuteAsync(Guid competitionId, Guid teamId, Guid actorId, DateTimeOffset now, CancellationToken ct = default)
@@ -246,15 +265,18 @@ public sealed class DeleteTeam(ITeamRegistrationStore store)
 
 public sealed class ReviewTeamRegistration(ITeamRegistrationStore store)
 {
-    public async Task<OperationResult<TeamRegistrationFailure>> ExecuteAsync(Guid competitionId, Guid teamId, bool approve, CancellationToken ct = default)
+    public async Task<OperationResult<TeamRegistrationFailure>> ExecuteAsync(
+        Guid competitionId,
+        Guid teamId,
+        TeamRegistrationStatus status,
+        CancellationToken ct = default)
     {
         var policy = await store.GetPolicyAsync(competitionId, ct);
         if (policy is null || policy.CompetitionDeleted)
             return OperationResult<TeamRegistrationFailure>.Failure(TeamRegistrationFailure.CompetitionNotFound, "Competition was not found.");
         if (policy.Status == CompetitionStatus.Finished)
             return OperationResult<TeamRegistrationFailure>.Failure(TeamRegistrationFailure.CompetitionFinished, "Finished competitions are read-only.");
-        var result = await store.SetStatusAsync(competitionId, teamId,
-            approve ? TeamRegistrationStatus.Approved : TeamRegistrationStatus.Rejected, ct);
+        var result = await store.SetStatusAsync(competitionId, teamId, status, ct);
         return result.Changed
             ? OperationResult<TeamRegistrationFailure>.Success()
             : OperationResult<TeamRegistrationFailure>.Failure(result.Failure ?? TeamRegistrationFailure.TeamReviewConflict, "Team registration was not reviewed.");

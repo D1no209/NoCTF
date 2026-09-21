@@ -3,6 +3,7 @@ using NoCTF.Application.Competitions.Tracks;
 using NoCTF.Application.Teams.Membership;
 using NoCTF.Application.Teams.Registration;
 using NoCTF.Domain.Competitions;
+using NoCTF.Domain.Competitions.Events;
 using NoCTF.Domain.Identity;
 using NoCTF.Domain.Platform;
 using NoCTF.Domain.Teams;
@@ -19,6 +20,159 @@ namespace NoCTF.Tests.Integration.Persistence;
 [Category("Integration")]
 public sealed class CompetitionTrackSsoGatePersistenceTests
 {
+    [Test]
+    [Timeout(300_000)]
+    public async Task Participant_profile_update_validates_track_gates_and_recalculates_registration(
+        CancellationToken cancellationToken)
+    {
+        await DockerIntegrationTest.RunAsync(async () =>
+        {
+            await using var postgres = new PostgreSqlBuilder(
+                    "postgres:17.10-alpine3.24@sha256:742f40ea20b9ff2ff31db5458d127452988a2164df9e17441e191f3b72252193")
+                .WithDatabase("noctf_participant_track_update")
+                .WithUsername("postgres")
+                .WithPassword("postgres")
+                .Build();
+            await postgres.StartAsync(cancellationToken);
+            var options = new DbContextOptionsBuilder<NoCtfDbContext>()
+                .UseNpgsql(postgres.GetConnectionString())
+                .UseSnakeCaseNamingConvention()
+                .Options;
+            await using var db = new NoCtfDbContext(options);
+            await db.Database.EnsureCreatedAsync(cancellationToken);
+
+            var now = DateTimeOffset.UtcNow;
+            var competitionId = Guid.CreateVersion7(now);
+            var providerId = Guid.CreateVersion7(now.AddMilliseconds(1));
+            var captainId = Guid.CreateVersion7(now.AddMilliseconds(2));
+            var memberId = Guid.CreateVersion7(now.AddMilliseconds(3));
+            var settings = await db.PlatformSettings.SingleAsync(cancellationToken);
+            settings.SsoConfiguration.Providers.Add(new SsoProviderConfiguration
+            {
+                Id = providerId,
+                Name = "School identity",
+                Protocol = SsoProtocol.Cas,
+                Enabled = true,
+                AllowBinding = true,
+                AllowedHosts = ["cas.example.test"],
+                Cas = new CasSsoProviderConfiguration
+                {
+                    IdentityNamespace = "school",
+                    LoginUrl = "https://cas.example.test/login",
+                    ServiceValidateUrl = "https://cas.example.test/serviceValidate"
+                }
+            });
+            db.Users.AddRange(
+                BoundUser(captainId, "captain", providerId, now),
+                User(memberId, "member", now));
+            var defaultTrack = Track("default", null, isDefault: true);
+            var gatedTrack = Track("school", providerId, invitationCode: "let-me-in");
+            db.Competitions.Add(new Competition
+            {
+                Id = competitionId,
+                OwnerId = captainId,
+                Title = "Participant track update",
+                Mode = GameMode.Ctf,
+                Status = CompetitionStatus.Published,
+                StartAt = now.AddHours(1),
+                EndAt = now.AddHours(2),
+                MaxTeamMembers = 5,
+                ConfigurationJson = "{}",
+                FlagDerivationSecret = new byte[32],
+                TracksEnabled = true,
+                TrackConfigurationJson = CompetitionTrackConfiguration.Serialize(new(
+                    1,
+                    [defaultTrack, gatedTrack])),
+                TeamRegistrationAutoApprove = false,
+                CreatedAt = now,
+                UpdatedAt = now
+            });
+            await db.SaveChangesAsync(cancellationToken);
+
+            var outbox = new NoOpTransactionalMessageOutbox();
+            var events = new CompetitionEventStore(db, outbox);
+            var registrations = new TeamRegistrationStore(db, outbox, eventRecorder: events);
+            var created = await registrations.TryCreateAsync(new(
+                competitionId,
+                captainId,
+                "Original",
+                now,
+                defaultTrack.Key), TeamRegistrationStatus.Approved, cancellationToken);
+            var teamId = created.Team!.Id;
+            await db.Teams.Where(team => team.Id == teamId)
+                .ExecuteUpdateAsync(setters => setters.SetProperty(
+                    team => team.MemberIds,
+                    new[] { captainId, memberId }), cancellationToken);
+            db.ChangeTracker.Clear();
+            var update = new UpdateTeam(registrations);
+
+            var missingCode = await update.ExecuteAsync(new(
+                competitionId, teamId, "Renamed", gatedTrack.Key,
+                ActorUserId: captainId, UpdatedAt: now.AddMinutes(1)), cancellationToken);
+            var invalidCode = await update.ExecuteAsync(new(
+                competitionId, teamId, "Renamed", gatedTrack.Key, "wrong-code",
+                captainId, now.AddMinutes(2)), cancellationToken);
+            var missingMemberIdentity = await update.ExecuteAsync(new(
+                competitionId, teamId, "Renamed", gatedTrack.Key, "let-me-in",
+                captainId, now.AddMinutes(3)), cancellationToken);
+
+            await db.Users.Where(user => user.Id == memberId).ExecuteUpdateAsync(setters => setters
+                .SetProperty(user => user.ExternalIdentityProviderId, providerId)
+                .SetProperty(user => user.ExternalIdentityProtocol, SsoProtocol.Cas)
+                .SetProperty(user => user.ExternalIdentityNamespace, "school")
+                .SetProperty(user => user.ExternalIdentitySubject, "member")
+                .SetProperty(user => user.ExternalIdentityBoundAt, now), cancellationToken);
+            db.ChangeTracker.Clear();
+            var changed = await update.ExecuteAsync(new(
+                competitionId, teamId, "Renamed", gatedTrack.Key, "let-me-in",
+                captainId, now.AddMinutes(4)), cancellationToken);
+
+            await Assert.That(missingCode.FailureCode)
+                .IsEqualTo(TeamRegistrationFailure.TrackInvitationRequired);
+            await Assert.That(invalidCode.FailureCode)
+                .IsEqualTo(TeamRegistrationFailure.TrackInvitationInvalid);
+            await Assert.That(missingMemberIdentity.FailureCode)
+                .IsEqualTo(TeamRegistrationFailure.TrackSsoIdentityRequired);
+            await Assert.That(changed.Succeeded).IsTrue();
+            await Assert.That(changed.Value!.Name).IsEqualTo("Renamed");
+            await Assert.That(changed.Value.TrackKey).IsEqualTo(gatedTrack.Key);
+            await Assert.That(changed.Value.RegistrationStatus)
+                .IsEqualTo(TeamRegistrationStatus.Pending);
+
+            await db.Teams.Where(team => team.Id == teamId).ExecuteUpdateAsync(setters => setters
+                .SetProperty(team => team.RegistrationStatus, TeamRegistrationStatus.Approved),
+                cancellationToken);
+            db.ChangeTracker.Clear();
+            var noOp = await update.ExecuteAsync(new(
+                competitionId, teamId, "Renamed", gatedTrack.Key,
+                ActorUserId: captainId, UpdatedAt: now.AddMinutes(5)), cancellationToken);
+            await Assert.That(noOp.Succeeded).IsTrue();
+            await Assert.That(noOp.Value!.RegistrationStatus)
+                .IsEqualTo(TeamRegistrationStatus.Approved);
+
+            await db.Competitions.Where(competition => competition.Id == competitionId)
+                .ExecuteUpdateAsync(setters => setters.SetProperty(
+                    competition => competition.TeamRegistrationAutoApprove,
+                    true), cancellationToken);
+            db.ChangeTracker.Clear();
+            var autoApproved = await update.ExecuteAsync(new(
+                competitionId, teamId, "Automatically approved",
+                ActorUserId: captainId, UpdatedAt: now.AddMinutes(6)), cancellationToken);
+            await Assert.That(autoApproved.Succeeded).IsTrue();
+            await Assert.That(autoApproved.Value!.RegistrationStatus)
+                .IsEqualTo(TeamRegistrationStatus.Approved);
+
+            var recordedKinds = await db.CompetitionEvents.AsNoTracking()
+                .Where(item => item.SubjectType == NoCTF.Domain.Shared.EntityReferenceKind.Team
+                    && item.SubjectId == teamId)
+                .Select(item => item.Kind)
+                .ToListAsync(cancellationToken);
+            await Assert.That(recordedKinds).Contains(CompetitionEventKind.TeamUpdated);
+            await Assert.That(recordedKinds).Contains(CompetitionEventKind.TeamTrackChanged);
+            await Assert.That(recordedKinds).Contains(CompetitionEventKind.TeamRegistrationChanged);
+        });
+    }
+
     [Test]
     [Timeout(300_000)]
     public async Task Gate_checks_team_entry_but_does_not_retroactively_reject_existing_teams(
@@ -134,6 +288,27 @@ public sealed class CompetitionTrackSsoGatePersistenceTests
                 db,
                 outbox,
                 new CompetitionEventStore(db, outbox));
+            var eligibleView = await tracks.GetAsync(
+                competitionId,
+                eligibleCaptainId,
+                includeInternal: false,
+                includeInvitationCodes: false,
+                cancellationToken);
+            await db.Users.Where(user => user.Id == eligibleMemberId)
+                .ExecuteUpdateAsync(setters => setters
+                    .SetProperty(user => user.ExternalIdentityProviderId, (Guid?)null)
+                    .SetProperty(user => user.ExternalIdentityProtocol, (SsoProtocol?)null)
+                    .SetProperty(user => user.ExternalIdentityNamespace, (string?)null)
+                    .SetProperty(user => user.ExternalIdentitySubject, (string?)null)
+                    .SetProperty(user => user.ExternalIdentityBoundAt, (DateTimeOffset?)null),
+                    cancellationToken);
+            db.ChangeTracker.Clear();
+            var teamNoLongerMeetsGate = await tracks.GetAsync(
+                competitionId,
+                eligibleCaptainId,
+                includeInternal: false,
+                includeInvitationCodes: false,
+                cancellationToken);
             var unboundView = await tracks.GetAsync(
                 competitionId,
                 unboundUserId,
@@ -186,6 +361,10 @@ public sealed class CompetitionTrackSsoGatePersistenceTests
             await Assert.That(blockedJoin)
                 .IsEqualTo(TeamMembershipFailure.TrackSsoIdentityRequired);
             await Assert.That(allowedJoin).IsNull();
+            await Assert.That(eligibleView!.Tracks.Single(track => track.Key == gatedTrack.Key)
+                .MeetsSsoRequirement).IsTrue();
+            await Assert.That(teamNoLongerMeetsGate!.Tracks.Single(
+                track => track.Key == gatedTrack.Key).MeetsSsoRequirement).IsFalse();
             await Assert.That(unboundView!.Tracks.Single(track => track.Key == gatedTrack.Key)
                 .MeetsSsoRequirement).IsFalse();
             await Assert.That(unboundView.Tracks.Single(track => track.Key == gatedTrack.Key)
@@ -205,7 +384,8 @@ public sealed class CompetitionTrackSsoGatePersistenceTests
     private static CompetitionTrackDefinition Track(
         string key,
         Guid? providerId,
-        bool isDefault = false) => new(
+        bool isDefault = false,
+        string? invitationCode = null) => new(
         key,
         key,
         isDefault,
@@ -216,6 +396,7 @@ public sealed class CompetitionTrackSsoGatePersistenceTests
         AffectsDynamicChallengeScore: true,
         VisibleOnLeaderboard: true,
         AffectsCompetitiveResults: true,
+        InvitationCode: invitationCode,
         RequiredSsoProviderId: providerId);
 
     private static User BoundUser(

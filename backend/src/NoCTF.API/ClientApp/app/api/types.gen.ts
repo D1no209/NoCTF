@@ -144,6 +144,8 @@ export type NoCtfapiEndpointsTeamsPatchTeamRequest = {
 
 export type NoCtfapiEndpointsTeamsTeamProfilePatchRequest = {
     name: string;
+    trackKey?: string | null;
+    trackInvitationCode?: string | null;
 };
 
 export type NoCtfapiEndpointsTeamsTeamMembershipPatchRequest = {
@@ -3240,6 +3242,7 @@ export type PatchCompetitionTeamErrors = {
      * Not Found
      */
     404: unknown;
+    409: NoCtfapiEndpointsTeamsTeamRegistrationFailureResponse;
 };
 
 export type PatchCompetitionTeamError = PatchCompetitionTeamErrors[keyof PatchCompetitionTeamErrors];
