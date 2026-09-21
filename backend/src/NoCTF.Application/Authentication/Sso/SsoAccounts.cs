@@ -33,6 +33,13 @@ public enum SsoUnbindState
     AccountUnavailable
 }
 
+public enum AdminSsoUnbindState
+{
+    Unbound,
+    UserNotFound,
+    NotLinked
+}
+
 public enum SsoExternalAccountLookupState
 {
     Available,
@@ -62,6 +69,12 @@ public interface ISsoAccountStore
 
     Task<SsoUnbindState> UnbindAsync(
         Guid userId,
+        DateTimeOffset now,
+        CancellationToken cancellationToken);
+
+    Task<AdminSsoUnbindState> UnbindAsAdministratorAsync(
+        Guid userId,
+        Guid actorUserId,
         DateTimeOffset now,
         CancellationToken cancellationToken);
 }
@@ -277,4 +290,19 @@ public sealed class UnbindSsoIdentity(
                 "The account is unavailable.")
         };
     }
+}
+
+public sealed class AdministrativelyUnbindSsoIdentity(
+    ISsoAccountStore accounts,
+    TimeProvider clock)
+{
+    public Task<AdminSsoUnbindState> ExecuteAsync(
+        Guid userId,
+        Guid actorUserId,
+        CancellationToken ct = default) =>
+        accounts.UnbindAsAdministratorAsync(
+            userId,
+            actorUserId,
+            clock.GetUtcNow(),
+            ct);
 }

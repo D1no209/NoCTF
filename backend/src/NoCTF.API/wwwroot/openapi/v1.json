@@ -7316,6 +7316,48 @@
         ]
       }
     },
+    "/api/v1/admin/platform/users/{userId}/sso-binding": {
+      "delete": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "Removes a user's external identity binding and revokes their sessions.",
+        "description": "Executes DELETE /api/v1/admin/platform/users/{userId}/sso-binding.",
+        "operationId": "AdminPlatformUnbindSsoIdentity",
+        "parameters": [
+          {
+            "name": "userId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "Bearer": [
+              "Administrator"
+            ]
+          }
+        ]
+      }
+    },
     "/api/v1/admin/platform/sso/providers/{providerId}/authentication-tests": {
       "post": {
         "tags": [
@@ -8847,6 +8889,15 @@
                   "$ref": "#/components/schemas/NoCTFAPIEndpointsAuthenticationUserRoleProtocol"
                 }
               ]
+            }
+          },
+          {
+            "name": "ssoProviderId",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "guid",
+              "nullable": true
             }
           },
           {
@@ -20685,6 +20736,14 @@
           "updatedAt": {
             "type": "string",
             "format": "date-time"
+          },
+          "ssoBinding": {
+            "nullable": true,
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationPlatformPlatformUserSsoBindingResponse"
+              }
+            ]
           }
         }
       },
@@ -20703,6 +20762,30 @@
           "Disabled",
           "Anonymized"
         ]
+      },
+      "NoCTFAPIEndpointsAdministrationPlatformPlatformUserSsoBindingResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "providerId": {
+            "type": "string",
+            "format": "guid"
+          },
+          "providerName": {
+            "type": "string",
+            "nullable": true
+          },
+          "protocol": {
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsAuthenticationPublicSsoProtocol"
+          },
+          "subject": {
+            "type": "string"
+          },
+          "boundAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
       },
       "NoCTFAPIEndpointsAdministrationPlatformCreatePlatformBotRequest": {
         "type": "object",

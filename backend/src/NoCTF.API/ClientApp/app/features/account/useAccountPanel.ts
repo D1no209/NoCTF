@@ -15,6 +15,7 @@ import {
 } from '../../api'
 import type { NoCtfapiEndpointsAuthenticationMySsoBindingConfigurationResponse } from '../../api'
 import AvatarCropDialogComponent from './AvatarCropDialog.vue'
+import AdminDateTimeComponent from '../admin/AdminDateTime.vue'
 import { exceedsUploadLimit } from './upload-limits'
 import { runDownRevealTransition } from '../../motion/reveal-transition'
 
@@ -428,6 +429,7 @@ export function useAccountPanel() {
   onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
 
   const AvatarCropDialog = markRaw(AvatarCropDialogComponent)
+  const AdminDateTime = markRaw(AdminDateTimeComponent)
 
   function setAvatarInputRef(element: Element | ComponentPublicInstance | null) {
     avatarInput.value = (element instanceof Element ? element : element?.$el ?? null) as typeof avatarInput.value
@@ -507,6 +509,7 @@ export function useAccountPanel() {
     changePassword,
     logoutAll,
     AvatarCropDialog,
+    AdminDateTime,
   }
 }
 

@@ -2,6 +2,7 @@ using FastEndpoints;
 using Microsoft.AspNetCore.Http.HttpResults;
 using NoCTF.Application.Administration;
 using NoCTF.Application.Authentication.Privacy;
+using NoCTF.Application.Authentication.Sso;
 using NoCTF.API.Endpoints.Authentication;
 using NoCTF.API.Security;
 
@@ -13,6 +14,7 @@ public sealed record PlatformUserDetailResponse(
 
 public sealed class GetPlatformUserEndpoint(
     ManagePlatform platform,
+    ManageSsoProviders ssoProviders,
     AccountPrivacy privacy,
     IUserContext actor)
     : EndpointWithoutRequest<Results<Ok<PlatformUserDetailResponse>, NotFound>>
@@ -37,10 +39,14 @@ public sealed class GetPlatformUserEndpoint(
         var userId = Route<Guid>("userId");
         var user = await platform.GetUserAsync(userId, ct);
         var privateDetails = await privacy.ReadPlatformAsync(actor.UserId, userId, ct);
+        var sso = await ssoProviders.GetAsync(ct);
+        var providerNames = sso.Providers.ToDictionary(
+            provider => provider.Id,
+            provider => provider.Name);
         return user is null || privateDetails is null
             ? TypedResults.NotFound()
             : TypedResults.Ok(new PlatformUserDetailResponse(
-                PlatformUserMapping.ToResponse(user),
+                PlatformUserMapping.ToResponse(user, providerNames),
                 new CurrentUserSchoolIdentityResponse(
                     privateDetails.Identity.FullName,
                     privateDetails.Identity.StudentNumber)));

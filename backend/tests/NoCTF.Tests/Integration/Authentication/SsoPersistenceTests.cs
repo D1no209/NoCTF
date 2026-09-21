@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.DataProtection.Repositories;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
+using Microsoft.AspNetCore.Identity;
 using NoCTF.Domain.Identity;
 using NoCTF.Infrastructure.Authentication;
 using NoCTF.Infrastructure.Administration;
@@ -12,6 +13,7 @@ using Npgsql;
 using Testcontainers.PostgreSql;
 using NoCTF.Application.Authentication.Sso;
 using NoCTF.Domain.Notifications;
+using System.Text.Json;
 
 namespace NoCTF.Tests.Integration.Authentication;
 
@@ -237,6 +239,52 @@ public sealed class SsoPersistenceTests
             var unbound = await store.UnbindAsync(first.Id, now.AddMinutes(1), cancellationToken);
             var updated = await db.Users.AsNoTracking().SingleAsync(
                 user => user.Id == first.Id, cancellationToken);
+            var secondIdentity = identity with
+            {
+                Subject = "student-2",
+                DisplayName = "Student Two"
+            };
+            var secondBound = await store.BindAsync(
+                second.Id,
+                second.TokenVersion,
+                secondIdentity,
+                "Example CAS",
+                now.AddMinutes(2),
+                cancellationToken);
+            var administration = new PlatformAdministrationStore(
+                db,
+                new PasswordHasher<User>());
+            var bySubject = await administration.ListUsersPageAsync(new(
+                "student-2",
+                Kind: null,
+                Role: null,
+                Offset: 0,
+                Limit: 10,
+                Desc: false), cancellationToken);
+            var byProvider = await administration.ListUsersPageAsync(new(
+                Keyword: null,
+                Kind: null,
+                Role: null,
+                Offset: 0,
+                Limit: 10,
+                Desc: false,
+                SsoProviderId: providerId), cancellationToken);
+            var secondTokenVersion = second.TokenVersion;
+            var administratorId = Guid.CreateVersion7(now.AddMinutes(3));
+            var administrativelyUnbound = await store.UnbindAsAdministratorAsync(
+                second.Id,
+                administratorId,
+                now.AddMinutes(3),
+                cancellationToken);
+            var adminUpdated = await db.Users.AsNoTracking().SingleAsync(
+                user => user.Id == second.Id,
+                cancellationToken);
+            var administrativeAudit = (await db.Notifications.AsNoTracking()
+                    .Where(notification =>
+                        notification.Kind == NotificationKind.SsoExternalIdentityBindingChanged
+                        && notification.SourceId == administratorId)
+                    .SingleAsync(cancellationToken))
+                .ContentJson;
 
             await Assert.That(bound.State).IsEqualTo(SsoBindState.Bound);
             await Assert.That(duplicate.State).IsEqualTo(SsoBindState.IdentityAlreadyLinked);
@@ -247,9 +295,23 @@ public sealed class SsoPersistenceTests
             await Assert.That(unbound).IsEqualTo(SsoUnbindState.Unbound);
             await Assert.That(updated.ExternalIdentityProviderId).IsNull();
             await Assert.That(updated.TokenVersion).IsEqualTo(tokenVersion + 1);
+            await Assert.That(secondBound.State).IsEqualTo(SsoBindState.Bound);
+            await Assert.That(bySubject.Items).HasSingleItem();
+            await Assert.That(bySubject.Items[0].Id).IsEqualTo(second.Id);
+            await Assert.That(byProvider.Items.Select(user => user.Id))
+                .Contains(second.Id);
+            await Assert.That(bySubject.Items[0].SsoProviderId).IsEqualTo(providerId);
+            await Assert.That(bySubject.Items[0].SsoSubject).IsEqualTo("student-2");
+            await Assert.That(administrativelyUnbound).IsEqualTo(AdminSsoUnbindState.Unbound);
+            await Assert.That(adminUpdated.ExternalIdentityProviderId).IsNull();
+            await Assert.That(adminUpdated.TokenVersion).IsEqualTo(secondTokenVersion + 1);
+            await Assert.That(JsonSerializer.Deserialize<SsoBindingAuditFact>(
+                    administrativeAudit,
+                    new JsonSerializerOptions(JsonSerializerDefaults.Web))!.Action)
+                .IsEqualTo(SsoBindingAuditAction.AdministrativelyUnbound);
             await Assert.That(await db.Notifications.CountAsync(notification =>
                 notification.Kind == NotificationKind.SsoExternalIdentityBindingChanged,
-                cancellationToken)).IsEqualTo(2);
+                cancellationToken)).IsEqualTo(4);
         });
     }
 
