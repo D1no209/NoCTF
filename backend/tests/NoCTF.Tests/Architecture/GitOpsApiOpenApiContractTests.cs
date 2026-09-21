@@ -83,8 +83,11 @@ public sealed class GitOpsApiOpenApiContractTests
         await Assert.That(PropertyNames(request)).IsEquivalentTo([
             "deliveryPolicy", "downloadFileName", "attachmentIds", "files"
         ]);
+        await Assert.That(RequiredPropertyNames(request))
+            .IsEquivalentTo(["deliveryPolicy", "files"]);
         var attachmentIds = request.GetProperty("properties").GetProperty("attachmentIds");
         await Assert.That(attachmentIds.GetProperty("type").GetString()).IsEqualTo("array");
+        await Assert.That(attachmentIds.GetProperty("nullable").GetBoolean()).IsTrue();
         await Assert.That(attachmentIds.GetProperty("items").GetProperty("format").GetString())
             .IsEqualTo("guid");
     }
@@ -116,6 +119,12 @@ public sealed class GitOpsApiOpenApiContractTests
         schema.GetProperty("properties")
             .EnumerateObject()
             .Select(property => property.Name)
+            .ToArray();
+
+    private static string[] RequiredPropertyNames(JsonElement schema) =>
+        schema.GetProperty("required")
+            .EnumerateArray()
+            .Select(property => property.GetString()!)
             .ToArray();
 
     private static async Task<JsonDocument> ReadSwaggerAsync()
