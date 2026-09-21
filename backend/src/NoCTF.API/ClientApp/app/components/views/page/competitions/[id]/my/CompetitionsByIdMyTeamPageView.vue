@@ -3,7 +3,7 @@ import { toRefs } from 'vue'
 import type { CompetitionsByIdMyTeamPageViewState } from '~/features/routes/competitions/[id]/my/useCompetitionsByIdMyTeamPage'
 
 const viewProps = defineProps<{ state: CompetitionsByIdMyTeamPageViewState }>()
-const { Copy, RefreshCw, maximumAppealStatementLength, minimumAppealStatementLength, competitionId, competition, tracksEnabled, canEditOrganization, requiresManualReview, selectableTracks, tracksLoading, tracksError, loadTracks, team, loading, loadError, load, isCaptain, invitationToken, invitationLoading, invitationError, loadInvitationToken, rotating, rotate, copyToken, renameOpen, renameValue, renameTrackKey, renameTrackInvitationCode, selectedRenameTrack, renameTrackChanged, renameValid, renamePending, openRename, submitRename, maximumAvatarBytes, avatarInputKey, avatarPending, replaceTeamAvatar, clearTeamAvatar, transferOpen, transferTarget, transferPending, transferableMembers, submitTransfer, acting, disband, leave, resubmit, banCase, appealOpen, appealStatement, appealPending, appealError, banCaseError, loadBanCase, appealStatusLabel, submitAppeal, setAppealOpen, CompetitionParticipantWorkspace, TeamMembers, onInputAppealError } = toRefs(viewProps.state)
+const { Copy, RefreshCw, maximumAppealStatementLength, minimumAppealStatementLength, competitionId, competition, tracksEnabled, canEditOrganization, requiresManualReview, selectableTracks, tracksLoading, tracksError, loadTracks, team, loading, loadError, load, isCaptain, invitationToken, invitationLoading, invitationError, loadInvitationToken, rotating, rotate, copyToken, renameOpen, renameValue, renameTrackKey, selectedRenameTrack, renameValid, renamePending, openRename, submitRename, maximumAvatarBytes, avatarInputKey, avatarPending, replaceTeamAvatar, clearTeamAvatar, transferOpen, transferTarget, transferPending, transferableMembers, submitTransfer, acting, disband, leave, registrationOpen, registrationInvitationCode, registrationPending, registrationError, registrationTrack, registrationValid, openRegistration, setRegistrationOpen, submitRegistration, banCase, appealOpen, appealStatement, appealPending, appealError, banCaseError, loadBanCase, appealStatusLabel, submitAppeal, setAppealOpen, CompetitionParticipantWorkspace, TeamMembers, onInputAppealError } = toRefs(viewProps.state)
 </script>
 
 <template>
@@ -51,12 +51,20 @@ const { Copy, RefreshCw, maximumAppealStatementLength, minimumAppealStatementLen
           <Alert v-if="team.registrationStatus === 'Rejected'">
             <AlertDescription class="flex flex-wrap items-center gap-2">
               {{ $t('ui.message13') }}{{ isCaptain ? $t('ui.youCanResubmitAfterModifyingTheInformation') : $t('ui.pleaseContactTheTeamLeaderToResubmitYourRegistration') }}
-              <Button v-if="isCaptain" size="sm" :disabled="acting" @click="resubmit">
-                <Spinner v-if="acting" data-icon="inline-start" /> {{ $t('ui.resubmitRegistration') }} </Button>
+              <Button v-if="isCaptain" size="sm" :disabled="!canEditOrganization" @click="openRegistration">
+                {{ $t('ui.submitRegistration') }} </Button>
             </AlertDescription>
           </Alert>
           <Alert v-else-if="team.registrationStatus === 'Pending'">
             <AlertDescription>{{ $t('ui.pendingTeamCannotAccessCompetition') }}</AlertDescription>
+          </Alert>
+          <Alert v-else-if="team.registrationStatus === 'Unregistered'">
+            <AlertDescription class="flex flex-wrap items-center gap-2">
+              {{ $t('ui.unregisteredTeamCanEditBeforeSubmitting') }}
+              <Button v-if="isCaptain" size="sm" :disabled="!canEditOrganization" @click="openRegistration">
+                {{ $t('ui.submitRegistration') }}
+              </Button>
+            </AlertDescription>
           </Alert>
         </CardContent>
       <Separator />
@@ -194,7 +202,7 @@ const { Copy, RefreshCw, maximumAppealStatementLength, minimumAppealStatementLen
                 <DialogHeader>
                   <DialogTitle>{{ $t('ui.editTeamInformation') }}</DialogTitle>
                   <DialogDescription>
-                    {{ requiresManualReview ? $t('ui.teamChangesRequireReview') : $t('ui.teamChangesAreAutomaticallyApproved') }}
+                    {{ $t('ui.teamChangesCreateRegistrationDraft') }}
                   </DialogDescription>
                 </DialogHeader>
                 <UiForm validation="feature" @submit.prevent="submitRename">
@@ -223,7 +231,6 @@ const { Copy, RefreshCw, maximumAppealStatementLength, minimumAppealStatementLen
                             v-for="track in selectableTracks"
                             :key="track.key"
                             :value="track.key!"
-                            :disabled="track.meetsSsoRequirement === false"
                           >
                             <span class="flex items-center gap-2">
                               <Avatar v-if="track.requiredSsoProviderIconUrl" class="size-5">
@@ -242,23 +249,12 @@ const { Copy, RefreshCw, maximumAppealStatementLength, minimumAppealStatementLen
                     </Field>
                     <Alert v-if="tracksEnabled && selectedRenameTrack?.meetsSsoRequirement === false">
                       <AlertDescription class="flex flex-wrap items-center justify-between gap-3">
-                        <span>{{ $t('sso.trackIdentityRequired') }}</span>
+                        <span>{{ $t('ui.trackRequirementsCheckedOnRegistration') }}</span>
                         <Button as-child type="button" size="sm" variant="outline">
                           <NuxtLink :to="{ path: '/', query: { account: 'security' } }">{{ $t('sso.openAccountSecurity') }}</NuxtLink>
                         </Button>
                       </AlertDescription>
                     </Alert>
-                    <Field v-if="tracksEnabled && renameTrackChanged && selectedRenameTrack?.requiresInvitationCode">
-                      <FieldLabel for="team-edit-track-code">{{ $t('ui.trackInvitationCode') }}</FieldLabel>
-                      <Input
-                        id="team-edit-track-code"
-                        v-model="renameTrackInvitationCode"
-                        type="password"
-                        required
-                        autocomplete="off"
-                        maxlength="128"
-                      />
-                    </Field>
                     <Separator />
                     <Field>
                       <FieldLabel for="team-avatar-file">{{ $t('ui.teamAvatar') }}</FieldLabel>
@@ -283,6 +279,53 @@ const { Copy, RefreshCw, maximumAppealStatementLength, minimumAppealStatementLen
                   </FieldGroup>
                 </UiForm>
               </DialogScrollContent>
+            </Dialog>
+
+            <Dialog :open="registrationOpen" @update:open="setRegistrationOpen">
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>{{ $t('ui.submitRegistration') }}</DialogTitle>
+                  <DialogDescription>
+                    {{ requiresManualReview ? $t('ui.registrationWillEnterPendingReview') : $t('ui.registrationWillBeAutomaticallyApproved') }}
+                  </DialogDescription>
+                </DialogHeader>
+                <UiForm validation="feature" @submit.prevent="submitRegistration">
+                  <FieldGroup>
+                    <Alert v-if="registrationError" variant="destructive">
+                      <AlertDescription>{{ $message(registrationError) }}</AlertDescription>
+                    </Alert>
+                    <Field v-if="tracksEnabled">
+                      <FieldLabel>{{ $t('ui.competitionTrack') }}</FieldLabel>
+                      <div class="flex items-center gap-2">
+                        <span class="font-medium">{{ registrationTrack?.name ?? team.trackName ?? team.trackKey }}</span>
+                        <Badge v-if="registrationTrack?.requiredSsoProviderId" variant="outline">{{ registrationTrack.requiredSsoProviderName }}</Badge>
+                      </div>
+                    </Field>
+                    <Alert v-if="registrationTrack?.meetsSsoRequirement === false">
+                      <AlertDescription class="flex flex-wrap items-center justify-between gap-3">
+                        <span>{{ $t('sso.trackIdentityRequired') }}</span>
+                        <Button as-child type="button" size="sm" variant="outline">
+                          <NuxtLink :to="{ path: '/', query: { account: 'security' } }">{{ $t('sso.openAccountSecurity') }}</NuxtLink>
+                        </Button>
+                      </AlertDescription>
+                    </Alert>
+                    <Field v-if="registrationTrack?.requiresInvitationCode">
+                      <FieldLabel for="team-registration-track-code">{{ $t('ui.trackInvitationCode') }}</FieldLabel>
+                      <Input
+                        id="team-registration-track-code"
+                        v-model="registrationInvitationCode"
+                        type="password"
+                        required
+                        autocomplete="off"
+                        maxlength="128"
+                      />
+                    </Field>
+                    <Button type="submit" :disabled="registrationPending || !registrationValid">
+                      <Spinner v-if="registrationPending" data-icon="inline-start" />{{ $t('ui.submitRegistration') }}
+                    </Button>
+                  </FieldGroup>
+                </UiForm>
+              </DialogContent>
             </Dialog>
 
             <FieldDescription v-if="!canEditOrganization">{{ $t('ui.teamChangesClosedForCurrentStage', { status: competition?.status ?? '-' }) }}</FieldDescription>

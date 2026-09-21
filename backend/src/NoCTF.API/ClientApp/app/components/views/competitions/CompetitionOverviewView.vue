@@ -3,7 +3,7 @@ import { toRefs } from 'vue'
 import type { CompetitionOverviewViewState } from '~/features/competitions/useCompetitionOverview'
 
 const viewProps = defineProps<{ state: CompetitionOverviewViewState }>()
-const { ArrowRight, Box, CalendarRange, Clock, EyeOff, FileText, KeyRound, LogIn, Settings, ShieldCheck, Trophy, UserPlus, Users, posterUrl, detailError, refreshCompetition, competitionId, isLoggedIn, isAdministrator, managementOnly, competition, myTeam, teamLoaded, teamLoadError, loadMyTeam, approvedTeamCount, selectableTracks, tracksLoaded, trackLoadError, loadRegistrationOptions, countdown, practiceOpen, canParticipate, teamRegistrationOpen, tracksEnabled, createOpen, createName, createTrackKey, createTrackInvitationCode, createPending, createValidationError, selectedCreateTrack, hasUnavailableSsoTracks, ssoSettingsTarget, submitCreate, joinOpen, joinToken, joinPending, joinValidationError, submitJoin, isCaptain, LifecycleBadge } = toRefs(viewProps.state)
+const { ArrowRight, Box, CalendarRange, Clock, EyeOff, FileText, KeyRound, LogIn, Settings, ShieldCheck, Trophy, UserPlus, Users, posterUrl, detailError, refreshCompetition, competitionId, isLoggedIn, isAdministrator, managementOnly, competition, myTeam, teamLoaded, teamLoadError, loadMyTeam, approvedTeamCount, selectableTracks, tracksLoaded, trackLoadError, loadRegistrationOptions, countdown, practiceOpen, canParticipate, teamRegistrationOpen, tracksEnabled, createOpen, createName, createTrackKey, createPending, createValidationError, selectedCreateTrack, submitCreate, joinOpen, joinToken, joinPending, joinValidationError, submitJoin, isCaptain, LifecycleBadge } = toRefs(viewProps.state)
 </script>
 
 <template>
@@ -103,7 +103,7 @@ const { ArrowRight, Box, CalendarRange, Clock, EyeOff, FileText, KeyRound, LogIn
                         <Select v-model="createTrackKey" required>
                           <SelectTrigger id="team-track"><SelectValue :placeholder="$t('ui.selectATrack')" /></SelectTrigger>
                           <SelectContent>
-                            <SelectItem v-for="track in selectableTracks" :key="track.key" :value="track.key!" :disabled="track.meetsSsoRequirement === false">
+                            <SelectItem v-for="track in selectableTracks" :key="track.key" :value="track.key!">
                               <span class="flex items-center gap-2">
                                 <span>{{ track.name }}</span>
                                 <Badge v-if="track.requiredSsoProviderId" variant="outline">{{ track.requiredSsoProviderName }}</Badge>
@@ -118,25 +118,9 @@ const { ArrowRight, Box, CalendarRange, Clock, EyeOff, FileText, KeyRound, LogIn
                           <AlertDescription>{{ $t('ui.noCompetitionTracksAreCurrentlyOpenForRegistration') }}</AlertDescription>
                         </Alert>
                       </Field>
-                      <Alert v-if="tracksEnabled && hasUnavailableSsoTracks">
-                        <AlertDescription class="flex flex-wrap items-center justify-between gap-3">
-                          <span>{{ $t('sso.trackIdentityRequired') }}</span>
-                          <Button as-child size="sm" variant="outline">
-                            <NuxtLink :to="ssoSettingsTarget">{{ $t('sso.openAccountSecurity') }}</NuxtLink>
-                          </Button>
-                        </AlertDescription>
-                      </Alert>
-                      <Field v-if="tracksEnabled && selectedCreateTrack?.requiresInvitationCode">
-                        <FieldLabel for="track-invitation-code">{{ $t('ui.trackInvitationCode') }}</FieldLabel>
-                        <Input
-                          id="track-invitation-code"
-                          v-model="createTrackInvitationCode"
-                          type="password"
-                          required
-                          autocomplete="off"
-                          maxlength="128"
-                        />
-                      </Field>
+                      <FieldDescription v-if="tracksEnabled && (selectedCreateTrack?.requiredSsoProviderId || selectedCreateTrack?.requiresInvitationCode)">
+                        {{ $t('ui.trackRequirementsCheckedOnRegistration') }}
+                      </FieldDescription>
                       <p v-if="createValidationError" role="alert" class="text-sm text-destructive">
                         {{ $message(createValidationError) }}
                       </p>
@@ -253,6 +237,9 @@ const { ArrowRight, Box, CalendarRange, Clock, EyeOff, FileText, KeyRound, LogIn
           <AlertDescription>
             {{ $t('ui.teamSRegistrationWasSubmittedYouCanCompeteAfterOrganizer', { team: myTeam.name ?? '-' }) }}
           </AlertDescription>
+        </Alert>
+        <Alert v-else-if="myTeam && myTeam.registrationStatus === 'Unregistered'">
+          <AlertDescription>{{ $t('ui.teamIsNotRegisteredEditAndSubmitFromMyTeam', { team: myTeam.name ?? '-' }) }}</AlertDescription>
         </Alert>
         <Alert v-else-if="myTeam && myTeam.registrationStatus === 'Rejected'" variant="destructive">
           <AlertDescription>

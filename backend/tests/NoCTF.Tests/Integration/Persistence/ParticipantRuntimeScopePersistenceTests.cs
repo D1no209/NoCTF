@@ -197,6 +197,14 @@ public sealed class ParticipantRuntimeScopePersistenceTests
                 registrationStatus: TeamRegistrationStatus.Pending),
             AddScope(
                 db,
+                "unregistered-team",
+                challengeDefinition,
+                challengeRules,
+                competitionConfiguration,
+                now,
+                registrationStatus: TeamRegistrationStatus.Unregistered),
+            AddScope(
+                db,
                 "banned-team",
                 challengeDefinition,
                 challengeRules,

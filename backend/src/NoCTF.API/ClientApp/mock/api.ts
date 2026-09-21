@@ -676,13 +676,13 @@ export function createMockApi() {
       else if (route === '/admin/competitions/{competitionId}/challenges/{competitionChallengeId}' && request.method === 'PATCH') { if (body.presentation) Object.assign(challenge!, body.presentation, { title: body.presentation.customTitle ?? challenge!.title }); value = { challenge, mode: competition!.mode, competitionStatus: competition!.status, rulesJson: body.rules?.json ?? '{}' } }
       else if (cleanRoute === '/competitions/{competitionId}/teams' && request.method === 'POST') {
         if (myTeam) return problem(409, '已加入队伍，请先退出 / Already in a team')
-        value = { ...state.teams[0], ...body, id: body.id ?? crypto.randomUUID(), competitionId: p.competitionId, captainId: user!.userId, memberIds: [user!.userId], registeredAt: now() }; state.teams.push(value); invitationTokens.set(value.id, crypto.randomUUID().replaceAll('-', ''))
+        value = { ...state.teams[0], ...body, id: body.id ?? crypto.randomUUID(), competitionId: p.competitionId, captainId: user!.userId, memberIds: [user!.userId], registrationStatus: 'Unregistered', registeredAt: now() }; state.teams.push(value); invitationTokens.set(value.id, crypto.randomUUID().replaceAll('-', ''))
       }
       else if (cleanRoute === '/competitions/{competitionId}/teams/{teamId}' && request.method === 'PATCH') {
         if (!team || (team.captainId !== user!.userId && user!.role !== 'Administrator')) return problem(403, '仅队长可以编辑 / Captain required')
-        if (body.profile) Object.assign(team, body.profile)
-        if (body.membership) Object.assign(team, body.membership)
-        if (body.registration) team.registrationStatus = body.registration.status
+        if (body.profile) { Object.assign(team, body.profile); team.registrationStatus = 'Unregistered' }
+        if (body.membership) { Object.assign(team, body.membership); team.registrationStatus = 'Unregistered' }
+        if (body.registration) team.registrationStatus = competition?.teamRegistrationAutoApprove ? 'Approved' : 'Pending'
         if (body.administration) {
           team.trackKey = body.administration.trackKey
           team.registrationStatus = body.administration.registrationStatus
@@ -701,7 +701,7 @@ export function createMockApi() {
         const invitedTeam = state.teams.find(candidate => candidate.competitionId === p.competitionId && invitationTokens.get(candidate.id) === body.invitationToken)
         if (!invitedTeam) return problem(400, '无效的演示邀请码 / Invalid demo invitation')
         if (myTeam) return problem(409, '已加入队伍 / Already in a team')
-        value = invitedTeam; value.memberIds.push(user!.userId)
+        value = invitedTeam; value.memberIds.push(user!.userId); value.registrationStatus = 'Unregistered'
       }
       else if (route.endsWith('/flag-submissions')) {
         if (!myTeam) return problem(409, '先加入演示队伍 / Join a team first')

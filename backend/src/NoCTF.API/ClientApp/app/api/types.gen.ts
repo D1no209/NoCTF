@@ -32,7 +32,7 @@ export type NoCtfapiEndpointsTeamsTeamResponse = {
     registeredAt?: string;
 };
 
-export type NoCtfapiEndpointsTeamsTeamRegistrationStatusProtocol = 'Pending' | 'Approved' | 'Rejected';
+export type NoCtfapiEndpointsTeamsTeamRegistrationStatusProtocol = 'Pending' | 'Approved' | 'Rejected' | 'Unregistered';
 
 export type NoCtfapiEndpointsTeamsCreateTeamRequest = {
     trackKey?: string | null;
@@ -155,6 +155,7 @@ export type NoCtfapiEndpointsTeamsTeamMembershipPatchRequest = {
 
 export type NoCtfapiEndpointsTeamsTeamRegistrationPatchRequest = {
     status: NoCtfapiEndpointsTeamsTeamRegistrationStatusProtocol;
+    trackInvitationCode?: string | null;
 };
 
 export type NoCtfapiEndpointsTeamsTeamAdministrationPatchRequest = {
@@ -1226,7 +1227,6 @@ export type NoCtfapiEndpointsAuthenticationBeginSsoLoginResponse = {
 
 export type NoCtfapiEndpointsAuthenticationBeginSsoBindingRequest = {
     providerId: string;
-    password: string;
 };
 
 export type NoCtfapiEndpointsAuthenticationBeginSsoLoginRequest = {
@@ -1457,10 +1457,6 @@ export type NoCtfapiEndpointsAuthenticationRequestPasswordResetRequest = {
     email: string;
 };
 
-export type NoCtfapiEndpointsAuthenticationUnbindSsoIdentityRequest = {
-    password: string;
-};
-
 export type NoCtfapiEndpointsAuthenticationAvatarUploadFailureResponse = {
     code?: NoCtfapiEndpointsAuthenticationAvatarUploadFailureCode;
 };
@@ -1493,6 +1489,7 @@ export type NoCtfapiEndpointsAdministrationPlatformPrivateAccountResponse = {
     identity?: NoCtfapiEndpointsAuthenticationCurrentUserSchoolIdentityResponse;
     activities?: Array<NoCtfapiEndpointsAdministrationPlatformPrivateActivityResponse>;
     retentionDays?: number;
+    ssoBinding?: NoCtfapiEndpointsAdministrationPlatformPrivateSsoBindingResponse | null;
 };
 
 export type NoCtfapiEndpointsAdministrationPlatformPrivateActivityResponse = {
@@ -1502,6 +1499,15 @@ export type NoCtfapiEndpointsAdministrationPlatformPrivateActivityResponse = {
     ipAddress?: string | null;
     competitionId?: string | null;
     gameplayFactId?: string | null;
+};
+
+export type NoCtfapiEndpointsAdministrationPlatformPrivateSsoBindingResponse = {
+    providerId?: string;
+    providerName?: string | null;
+    providerIconUrl?: string | null;
+    protocol?: NoCtfapiEndpointsAuthenticationPublicSsoProtocol;
+    subject?: string;
+    boundAt?: string;
 };
 
 export type NoCtfapiEndpointsAdministrationTeamsListAdminTeamsRequest = NoCtfapiPaginationSearchRequest & {};
@@ -5882,17 +5888,13 @@ export type AuthenticationPatchMyProfileResponses = {
 export type AuthenticationPatchMyProfileResponse = AuthenticationPatchMyProfileResponses[keyof AuthenticationPatchMyProfileResponses];
 
 export type AuthenticationSsoUnbindIdentityData = {
-    body: NoCtfapiEndpointsAuthenticationUnbindSsoIdentityRequest;
+    body?: never;
     path?: never;
     query?: never;
     url: '/api/v1/auth/me/sso-binding';
 };
 
 export type AuthenticationSsoUnbindIdentityErrors = {
-    /**
-     * Bad Request
-     */
-    400: MicrosoftAspNetCoreMvcValidationProblemDetails;
     /**
      * Unauthorized
      */
@@ -5902,8 +5904,6 @@ export type AuthenticationSsoUnbindIdentityErrors = {
      */
     403: unknown;
 };
-
-export type AuthenticationSsoUnbindIdentityError = AuthenticationSsoUnbindIdentityErrors[keyof AuthenticationSsoUnbindIdentityErrors];
 
 export type AuthenticationSsoUnbindIdentityResponses = {
     /**

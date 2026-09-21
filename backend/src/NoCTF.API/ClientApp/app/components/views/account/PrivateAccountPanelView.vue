@@ -11,6 +11,23 @@ const { LockKeyhole, data, loading, error, commonSources, kinds, load, AdminDate
     <Skeleton v-if="loading" class="h-24 w-full" />
     <Alert v-else-if="error" variant="destructive"><AlertDescription>{{ $message(error) }}<Button variant="outline" size="sm" @click="load">{{ $t('ui.retry') }}</Button></AlertDescription></Alert>
     <template v-else-if="data">
+      <section class="flex min-w-0 flex-col gap-2">
+        <h3 class="flex items-center gap-2 font-semibold"><LockKeyhole class="size-4" />{{ $t('sso.externalIdentity') }}</h3>
+        <div v-if="data.ssoBinding" class="flex items-center gap-3 rounded-xl bg-muted/45 p-3">
+          <Avatar class="size-9">
+            <AvatarImage v-if="data.ssoBinding.providerIconUrl" :src="data.ssoBinding.providerIconUrl" :alt="data.ssoBinding.providerName ?? ''" />
+            <AvatarFallback>{{ data.ssoBinding.providerName?.slice(0, 1) ?? 'S' }}</AvatarFallback>
+          </Avatar>
+          <dl class="grid min-w-0 flex-1 grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-sm">
+            <dt class="text-muted-foreground">{{ $t('sso.identityProvider') }}</dt><dd class="break-all">{{ data.ssoBinding.providerName || data.ssoBinding.providerId }}</dd>
+            <dt class="text-muted-foreground">{{ $t('sso.protocol') }}</dt><dd>{{ data.ssoBinding.protocol }}</dd>
+            <dt class="text-muted-foreground">{{ $t('sso.subject') }}</dt><dd class="break-all font-mono text-xs">{{ data.ssoBinding.subject }}</dd>
+            <dt class="text-muted-foreground">{{ $t('sso.boundAt') }}</dt><dd><component :is="AdminDateTime" :value="data.ssoBinding.boundAt" /></dd>
+          </dl>
+        </div>
+        <p v-else class="text-sm text-muted-foreground">{{ $t('sso.notBound') }}</p>
+      </section>
+      <Separator />
       <section v-if="!showActivities" class="flex min-w-0 flex-col gap-2" aria-labelledby="account-common-ips">
         <h3 id="account-common-ips" class="font-semibold">{{ $t('ui.commonIpAddresses') }}</h3>
         <p class="text-xs text-muted-foreground">{{ $t('ui.top3KnownIpsFromUpTo50RecentRetained', { days: data.retentionDays ?? 30 }) }}</p>

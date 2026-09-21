@@ -16,8 +16,7 @@ internal static class ParticipantTeamRegistrationTransition
         ICompetitionEventRecorder events,
         CancellationToken cancellationToken)
     {
-        var nextStatus = ParticipantTeamMutationPolicy.RegistrationStatusAfterChange(
-            competition.TeamRegistrationAutoApprove);
+        var nextStatus = ParticipantTeamMutationPolicy.RegistrationStatusAfterChange();
         if (team.RegistrationStatus == nextStatus)
             return;
 

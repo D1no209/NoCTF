@@ -171,8 +171,6 @@ export function useCompetitionsByIdMyTeamPage() {
 
   const renameTrackKey = ref('')
 
-  const renameTrackInvitationCode = ref('')
-
   const selectedRenameTrack = computed(() => selectableTracks.value.find(
     track => track.key === renameTrackKey.value,
   ))
@@ -187,10 +185,7 @@ export function useCompetitionsByIdMyTeamPage() {
     team.value
     && canEditOrganization.value
     && renameValue.value.trim()
-    && (!tracksEnabled.value || renameTrackKey.value)
-    && (!renameTrackChanged.value
-      || !selectedRenameTrack.value?.requiresInvitationCode
-      || renameTrackInvitationCode.value.trim()),
+    && (!tracksEnabled.value || renameTrackKey.value),
   ))
 
   const renamePending = ref(false)
@@ -198,36 +193,24 @@ export function useCompetitionsByIdMyTeamPage() {
   function openRename() {
     renameValue.value = team.value?.name ?? ''
     renameTrackKey.value = team.value?.trackKey ?? ''
-    renameTrackInvitationCode.value = ''
     renameOpen.value = true
   }
 
-  watch(renameTrackKey, () => {
-    renameTrackInvitationCode.value = ''
-  })
-
   function showOrganizationChangeSuccess(updatedTeam: NoCtfapiEndpointsTeamsTeamResponse): void {
-    toast.success(updatedTeam.registrationStatus === 'Pending'
-      ? translate('ui.teamChangesSavedAwaitingReview')
+    toast.success(updatedTeam.registrationStatus === 'Unregistered'
+      ? translate('ui.teamDraftSavedSubmitRegistration')
       : translate('ui.teamChangesSavedAndApproved'))
   }
 
   async function submitRename() {
     if (!team.value || !renameValid.value) return
-    if (renameTrackChanged.value && selectedRenameTrack.value?.meetsSsoRequirement === false) {
-      toast.error(translate('sso.trackIdentityRequired'))
-      return
-    }
     renamePending.value = true
     const { data, error } = await patchCompetitionTeam({
       path: { competitionId, teamId: team.value.id! },
       body: { profile: {
         name: renameValue.value.trim(),
         trackKey: tracksEnabled.value ? renameTrackKey.value : null,
-        trackInvitationCode: renameTrackChanged.value
-          && selectedRenameTrack.value?.requiresInvitationCode
-          ? renameTrackInvitationCode.value.trim()
-          : null,
+        trackInvitationCode: null,
       } },
     })
     renamePending.value = false
@@ -327,8 +310,8 @@ export function useCompetitionsByIdMyTeamPage() {
     }
     transferOpen.value = false
     if (data) team.value = data
-    toast.success(data?.registrationStatus === 'Pending'
-      ? translate('ui.captainTransferredAwaitingReview')
+    toast.success(data?.registrationStatus === 'Unregistered'
+      ? translate('ui.captainTransferredRegistrationRequired')
       : translate("ui.captainHasBeenTransferred"))
     if (!data) await load()
   }
@@ -362,20 +345,66 @@ export function useCompetitionsByIdMyTeamPage() {
     team.value = null
   }
 
-  async function resubmit() {
-    if (!team.value) return
-    acting.value = true
-    const { error } = await patchCompetitionTeam({
+  const registrationOpen = ref(false)
+
+  const registrationInvitationCode = ref('')
+
+  const registrationPending = ref(false)
+
+  const registrationError = ref<string | null>(null)
+
+  const registrationTrack = computed(() => selectableTracks.value.find(
+    track => track.key === team.value?.trackKey,
+  ))
+
+  const registrationValid = computed(() => Boolean(
+    team.value
+    && (team.value.registrationStatus === 'Unregistered'
+      || team.value.registrationStatus === 'Rejected')
+    && canEditOrganization.value
+    && registrationTrack.value?.meetsSsoRequirement !== false
+    && (!registrationTrack.value?.requiresInvitationCode
+      || registrationInvitationCode.value.trim()),
+  ))
+
+  function openRegistration(): void {
+    registrationInvitationCode.value = ''
+    registrationError.value = null
+    registrationOpen.value = true
+  }
+
+  function setRegistrationOpen(open: boolean): void {
+    if (registrationPending.value) return
+    registrationOpen.value = open
+    if (!open) registrationError.value = null
+  }
+
+  async function submitRegistration() {
+    if (!team.value || !registrationValid.value) return
+    registrationPending.value = true
+    registrationError.value = null
+    const { data, error } = await patchCompetitionTeam({
       path: { competitionId, teamId: team.value.id! },
-      body: { registration: { status: 'Pending' } },
+      body: { registration: {
+        status: 'Pending',
+        trackInvitationCode: registrationTrack.value?.requiresInvitationCode
+          ? registrationInvitationCode.value.trim()
+          : null,
+      } },
     })
-    acting.value = false
-    if (error) {
-      toast.error(parseApiError(error, translate("ui.failedToResubmitRegistration")).message)
+    registrationPending.value = false
+    if (error || !data) {
+      registrationError.value = teamRegistrationErrorMessage(
+        error,
+        translate("ui.failedToResubmitRegistration"),
+      )
       return
     }
-    toast.success(translate("ui.registrationHasBeenResubmittedAndIsAwaitingReview"))
-    await load()
+    team.value = data
+    registrationOpen.value = false
+    toast.success(data.registrationStatus === 'Approved'
+      ? translate('ui.registrationSubmittedAndApproved')
+      : translate("ui.registrationHasBeenResubmittedAndIsAwaitingReview"))
   }
 
   const banCase = ref<NoCtfapiEndpointsTeamsMyTeamBanCaseResponse | null>(null)
@@ -480,7 +509,6 @@ export function useCompetitionsByIdMyTeamPage() {
       renameOpen,
       renameValue,
       renameTrackKey,
-      renameTrackInvitationCode,
       selectedRenameTrack,
       renameTrackChanged,
       renameValid,
@@ -500,7 +528,15 @@ export function useCompetitionsByIdMyTeamPage() {
       acting,
       disband,
       leave,
-      resubmit,
+      registrationOpen,
+      registrationInvitationCode,
+      registrationPending,
+      registrationError,
+      registrationTrack,
+      registrationValid,
+      openRegistration,
+      setRegistrationOpen,
+      submitRegistration,
       banCase,
       appealOpen,
       appealStatement,

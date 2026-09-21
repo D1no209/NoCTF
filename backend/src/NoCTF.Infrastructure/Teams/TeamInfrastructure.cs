@@ -28,7 +28,7 @@ internal static class TeamInfrastructure
         services.AddScoped<CreateTeam>();
         services.AddScoped<ListCompetitionTeams>();
         services.AddScoped<ReviewTeamRegistration>();
-        services.AddScoped<ResubmitTeamRegistration>();
+        services.AddScoped<SubmitTeamRegistration>();
         services.AddScoped<GetTeam>();
         services.AddScoped<GetMyTeam>();
         services.AddScoped<ITeamWriteUpStore, TeamWriteUpStore>();

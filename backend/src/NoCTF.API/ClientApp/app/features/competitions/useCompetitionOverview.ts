@@ -197,8 +197,6 @@ export function useCompetitionOverview(
 
   const createTrackKey = ref('')
 
-  const createTrackInvitationCode = ref('')
-
   const createPending = ref(false)
 
   const createValidationError = ref<string | null>(null)
@@ -206,16 +204,7 @@ export function useCompetitionOverview(
   const selectedCreateTrack = computed(() => selectableTracks.value.find(
     track => track.key === createTrackKey.value,
   ))
-  const hasUnavailableSsoTracks = computed(() => selectableTracks.value.some(track =>
-    track.requiredSsoProviderId && track.meetsSsoRequirement === false,
-  ))
-  const ssoSettingsTarget = {
-    path: '/',
-    query: { account: 'security' },
-  }
-
   watch(createTrackKey, () => {
-    createTrackInvitationCode.value = ''
     createValidationError.value = null
   })
 
@@ -233,15 +222,6 @@ export function useCompetitionOverview(
       createValidationError.value = translate("ui.selectACompetitionTrack")
       return
     }
-    if (tracksEnabled.value && selectedCreateTrack.value?.requiresInvitationCode
-      && !createTrackInvitationCode.value.trim()) {
-      createValidationError.value = translate("ui.enterTheTrackInvitationCode")
-      return
-    }
-    if (tracksEnabled.value && selectedCreateTrack.value?.meetsSsoRequirement === false) {
-      createValidationError.value = translate('sso.trackIdentityRequired')
-      return
-    }
     createPending.value = true
     try {
       const { data, error } = await createTeamEndpoint({
@@ -251,9 +231,7 @@ export function useCompetitionOverview(
           ...(tracksEnabled.value
             ? {
                 trackKey: createTrackKey.value,
-                trackInvitationCode: selectedCreateTrack.value?.requiresInvitationCode
-                  ? createTrackInvitationCode.value.trim()
-                  : null,
+                trackInvitationCode: null,
               }
             : {}),
         },
@@ -265,11 +243,10 @@ export function useCompetitionOverview(
         )
         return
       }
-      toast.success(translate("ui.teamCreatedSuccessfully"))
+      toast.success(translate("ui.teamCreatedAsUnregistered"))
       createOpen.value = false
       createName.value = ''
       createTrackKey.value = ''
-      createTrackInvitationCode.value = ''
       await loadMyTeam()
     } catch (error: unknown) {
       createValidationError.value = teamRegistrationErrorMessage(
@@ -374,12 +351,9 @@ export function useCompetitionOverview(
       createOpen,
       createName,
       createTrackKey,
-      createTrackInvitationCode,
       createPending,
       createValidationError,
       selectedCreateTrack,
-      hasUnavailableSsoTracks,
-      ssoSettingsTarget,
       submitCreate,
       joinOpen,
       joinToken,

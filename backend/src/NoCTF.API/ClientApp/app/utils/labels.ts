@@ -40,7 +40,7 @@ export function competitionStatusLabel(status?: NoCtfapiEndpointsCompetitionsCom
 
 export function teamRegistrationStatusLabel(status?: NoCtfapiEndpointsTeamsTeamRegistrationStatusProtocol): string {
   if (!status) return translate("ui.unknown")
-  const labels = { Pending: translate("ui.pendingReview"), Approved: translate("ui.passed"), Rejected: translate("ui.rejected") } satisfies Record<NoCtfapiEndpointsTeamsTeamRegistrationStatusProtocol, string>
+  const labels = { Pending: translate("ui.pendingReview"), Approved: translate("ui.passed"), Rejected: translate("ui.rejected"), Unregistered: translate("ui.notRegistered") } satisfies Record<NoCtfapiEndpointsTeamsTeamRegistrationStatusProtocol, string>
   return labels[status]
 }
 

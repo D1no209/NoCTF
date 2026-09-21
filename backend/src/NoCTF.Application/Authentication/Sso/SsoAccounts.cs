@@ -123,7 +123,6 @@ public sealed class BeginSsoBinding(
     public async Task<OperationResult<BeginSsoFlowResult, SsoFailureCode>> ExecuteAsync(
         Guid userId,
         Guid providerId,
-        string password,
         string browserIdHash,
         CancellationToken ct = default)
     {
@@ -132,18 +131,13 @@ public sealed class BeginSsoBinding(
         var user = await users.FindByIdAsync(userId, ct);
         if (user is null || user.Kind != UserKind.Human)
             return Failure(SsoFailureCode.AccountUnavailable);
-        if (!await users.VerifyPasswordAsync(userId, password, ct))
-            return Failure(SsoFailureCode.ReauthenticationRequired);
-        user = await users.FindByIdAsync(userId, ct);
-        return user is null
-            ? Failure(SsoFailureCode.AccountUnavailable)
-            : await begin.ExecuteAsync(new(
-                providerId,
-                SsoFlowIntent.Bind,
-                browserIdHash,
-                "/",
-                userId,
-                user.TokenVersion), ct);
+        return await begin.ExecuteAsync(new(
+            providerId,
+            SsoFlowIntent.Bind,
+            browserIdHash,
+            "/",
+            userId,
+            user.TokenVersion), ct);
     }
 
     private static OperationResult<BeginSsoFlowResult, SsoFailureCode> Failure(
@@ -263,22 +257,16 @@ public sealed class CompleteSsoBinding(
 }
 
 public sealed class UnbindSsoIdentity(
-    IUserAuthenticationStore users,
     ICredentialWorkAdmission admission,
     ISsoAccountStore accounts,
     TimeProvider clock)
 {
     public async Task<OperationResult<SsoFailureCode>> ExecuteAsync(
         Guid userId,
-        string password,
         CancellationToken ct = default)
     {
         await using var lease = await admission.AcquireAsync(userId.ToString("N"), ct);
         ct = lease.Token;
-        if (!await users.VerifyPasswordAsync(userId, password, ct))
-            return OperationResult<SsoFailureCode>.Failure(
-                SsoFailureCode.ReauthenticationRequired,
-                "The current password is incorrect.");
         return await accounts.UnbindAsync(userId, clock.GetUtcNow(), ct) switch
         {
             SsoUnbindState.Unbound => OperationResult<SsoFailureCode>.Success(),

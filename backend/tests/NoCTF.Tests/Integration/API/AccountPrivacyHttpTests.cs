@@ -27,6 +27,7 @@ using NoCTF.Application.Authentication.Privacy;
 using NoCTF.Application.Teams.Moderation;
 using NoCTF.Domain.Identity;
 using NoCTF.Domain.Notifications;
+using NoCTF.Domain.Platform;
 using NoCTF.Infrastructure.Authentication;
 using NoCTF.Infrastructure.Authentication.Privacy;
 using NoCTF.Infrastructure.Notifications;
@@ -53,7 +54,31 @@ public sealed class AccountPrivacyHttpTests
             var existing = Guid.NewGuid();
             await db.Database.ExecuteSqlInterpolatedAsync($"INSERT INTO users (id,user_name,normalized_user_name,email,password_hash,kind,role,account_status,token_version,created_at,updated_at) VALUES ({existing},'existing','EXISTING','existing@example.test','unused',0,0,0,0,now(),now())", ct);
             await db.Database.MigrateAsync(ct);
-            await Assert.That((await db.Users.SingleAsync(x => x.Id == existing, ct)).SchoolFullName).IsNull();
+            var existingUser = await db.Users.SingleAsync(x => x.Id == existing, ct);
+            await Assert.That(existingUser.SchoolFullName).IsNull();
+            var providerId = Guid.NewGuid();
+            existingUser.ExternalIdentityProviderId = providerId;
+            existingUser.ExternalIdentityProtocol = SsoProtocol.Cas;
+            existingUser.ExternalIdentityNamespace = "school";
+            existingUser.ExternalIdentitySubject = "student-001";
+            existingUser.ExternalIdentityBoundAt = DateTimeOffset.UtcNow;
+            var platformSettings = await db.PlatformSettings.SingleAsync(ct);
+            platformSettings.SsoConfiguration.Providers.Add(new SsoProviderConfiguration
+            {
+                Id = providerId,
+                Name = "School SSO",
+                IconUrl = "https://sso.example.test/icon.png",
+                Protocol = SsoProtocol.Cas,
+                Enabled = true,
+                AllowBinding = true,
+                AllowedHosts = ["sso.example.test"],
+                Cas = new CasSsoProviderConfiguration
+                {
+                    IdentityNamespace = "school",
+                    LoginUrl = "https://sso.example.test/login",
+                    ServiceValidateUrl = "https://sso.example.test/serviceValidate"
+                }
+            });
             var fixture = new CompetitionForceDeleteFixture();
             await fixture.SeedAsync(db, ct);
             var owner = Guid.NewGuid(); var manager = Guid.NewGuid(); var judge = Guid.NewGuid(); var observer = Guid.NewGuid(); var outsider = Guid.NewGuid();
@@ -106,6 +131,8 @@ public sealed class AccountPrivacyHttpTests
                 if (!allowed) continue;
                 var detail = (await response.Content.ReadFromJsonAsync<PrivateAccountResponse>(ct))!;
                 await Assert.That(detail.Identity.StudentNumber).IsEqualTo("001Ab");
+                await Assert.That(detail.SsoBinding!.ProviderName).IsEqualTo("School SSO");
+                await Assert.That(detail.SsoBinding.Subject).IsEqualTo("student-001");
                 await Assert.That(detail.Activities.All(x => x.CompetitionId == fixture.Id && x.Kind == "PatchUploaded")).IsTrue();
                 await Assert.That(detail.Activities.Single(x => x.Id == fact.Id).IpAddress).IsEqualTo("192.0.2.9");
             }
@@ -115,7 +142,7 @@ public sealed class AccountPrivacyHttpTests
                 await Assert.That(pending.StatusCode).IsEqualTo(HttpStatusCode.OK);
             await db.Teams.Where(x => x.Id == team.Id).ExecuteUpdateAsync(s => s.SetProperty(x => x.RegistrationStatus, NoCTF.Domain.Teams.TeamRegistrationStatus.Rejected), ct);
             using (var rejected = await client.GetAsync(path, ct))
-                await Assert.That(rejected.StatusCode).IsEqualTo(HttpStatusCode.NotFound);
+                await Assert.That(rejected.StatusCode).IsEqualTo(HttpStatusCode.OK);
             await db.Teams.Where(x => x.Id == team.Id).ExecuteUpdateAsync(s => s.SetProperty(x => x.RegistrationStatus, NoCTF.Domain.Teams.TeamRegistrationStatus.Approved), ct);
             using (var cross = await client.GetAsync(path.Replace(fixture.Id.ToString(), fixture.OtherId.ToString()), ct))
                 await Assert.That(cross.StatusCode).IsEqualTo(HttpStatusCode.NotFound);

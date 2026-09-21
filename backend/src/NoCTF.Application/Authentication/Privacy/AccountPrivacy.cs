@@ -1,5 +1,7 @@
 namespace NoCTF.Application.Authentication.Privacy;
 
+using NoCTF.Domain.Identity;
+
 public interface IRequestSourceAddress
 {
     string? Address { get; }
@@ -25,7 +27,18 @@ public sealed record AccountActivity(Guid Id, AccountActivityKind Kind, DateTime
     public override string ToString() => $"AccountActivity {{ Id = {Id}, Kind = {Kind}, IpAddress = [REDACTED] }}";
 }
 public sealed record SchoolIdentity(string? FullName, string? StudentNumber);
-public sealed record PrivateAccountDetails(SchoolIdentity Identity, IReadOnlyList<AccountActivity> Activities, int RetentionDays);
+public sealed record PrivateSsoBinding(
+    Guid ProviderId,
+    string? ProviderName,
+    string? ProviderIconUrl,
+    SsoProtocol Protocol,
+    string Subject,
+    DateTimeOffset BoundAt);
+public sealed record PrivateAccountDetails(
+    SchoolIdentity Identity,
+    IReadOnlyList<AccountActivity> Activities,
+    int RetentionDays,
+    PrivateSsoBinding? SsoBinding = null);
 
 public interface IAccountActivityRecorder
 {
