@@ -36,8 +36,10 @@ internal static class TeamInfrastructure
         services.AddScoped<UpdateTeam>();
         services.AddScoped<DeleteTeam>();
         services.AddScoped<ITeamMembershipStore, TeamMembershipStore>();
+        services.AddScoped<IAdminTeamInvitationReader, AdminTeamInvitationReader>();
         services.AddScoped<JoinTeamByInvitation>();
         services.AddScoped<GetTeamInvitation>();
+        services.AddScoped<GetAdminTeamInvitation>();
         services.AddScoped<RotateTeamInvitation>();
         services.AddScoped<RemoveTeamMember>();
         services.AddScoped<LeaveTeam>();
