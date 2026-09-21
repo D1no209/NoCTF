@@ -1,3 +1,6 @@
+using NSubstitute;
+using NoCTF.Application.Authentication.Account;
+using NoCTF.Application.Authentication.Privacy;
 using NoCTF.Application.Authentication.Sso;
 using NoCTF.Domain.Identity;
 using NoCTF.Infrastructure.Authentication;
@@ -69,13 +72,38 @@ public sealed class SsoFlowStoreTests
             await Assert.That(readable.Flow!.State).IsEqualTo(SsoFlowState.Authenticated);
             await Assert.That(readable.Flow.ExternalIdentity!.Subject).IsEqualTo("subject-1");
 
-            var consumed = await store.ConsumeAuthenticatedAsync(
+            var accounts = Substitute.For<ISsoAccountStore>();
+            accounts.FindByExternalIdentityAsync(
+                    Arg.Any<SsoExternalIdentity>(),
+                    Arg.Any<CancellationToken>())
+                .Returns(new SsoExternalAccountLookup(SsoExternalAccountLookupState.NotLinked));
+            var providers = Substitute.For<ISsoProviderRuntimeReader>();
+            providers.FindAsync(providerId, Arg.Any<CancellationToken>())
+                .Returns(Provider(providerId));
+            var activities = Substitute.For<IAccountActivityRecorder>();
+            var complete = new CompleteSsoLogin(
+                store,
+                accounts,
+                providers,
+                Substitute.For<IAccessTokenIssuer>(),
+                activities,
+                TimeProvider.System);
+
+            var unlinked = await complete.ExecuteAsync(
                 flow.Id, flow.BrowserIdHash, cancellationToken);
-            await Assert.That(consumed.State).IsEqualTo(SsoFlowReadState.Available);
-            await Assert.That(consumed.Flow!.State).IsEqualTo(SsoFlowState.Consumed);
+            await Assert.That(unlinked.FailureCode).IsEqualTo(SsoFailureCode.IdentityNotLinked);
             await Assert.That((await store.ReadAsync(
                 flow.Id, flow.BrowserIdHash, cancellationToken)).State)
                 .IsEqualTo(SsoFlowReadState.NotFound);
+            var replay = await complete.ExecuteAsync(
+                flow.Id, flow.BrowserIdHash, cancellationToken);
+            await Assert.That(replay.FailureCode).IsEqualTo(SsoFailureCode.FlowExpired);
+            await activities.Received(1).RecordSsoAsync(
+                null,
+                providerId,
+                false,
+                Arg.Any<DateTimeOffset>(),
+                Arg.Any<CancellationToken>());
         });
     }
 
@@ -85,6 +113,28 @@ public sealed class SsoFlowStoreTests
         "https://issuer.example.test",
         "subject-1",
         "Test User");
+
+    private static SsoProviderRuntimeConfiguration Provider(Guid providerId) => new(
+        true,
+        "https://ctf.example.test",
+        providerId,
+        "Example OIDC",
+        SsoProtocol.Oidc,
+        true,
+        true,
+        true,
+        10,
+        ["id.example.test"],
+        "provider-fingerprint",
+        new OidcSsoRuntimeConfiguration(
+            "https://issuer.example.test",
+            "https://id.example.test/.well-known/openid-configuration",
+            "noctf",
+            "secret",
+            ["openid"],
+            false,
+            "name"),
+        null);
 
     private static async Task<RedisLease> StartRedisAsync(CancellationToken ct)
     {
