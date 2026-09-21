@@ -22,7 +22,7 @@
 3. [系统架构](architecture.md)
 4. [进程、消息与并发](processes-messaging.md)
 5. [数据库](database.md)
-6. [认证与授权](authentication-authorization.md)
+6. [认证与授权](authentication-authorization.md)、[通用 SSO](sso-authentication.md) 与 [CDUT Auth 接入](sso-cdut-auth-integration.md)
 7. [API 通用规范](api-conventions.md) 与 [API 清单](api.md)
 8. [GameplayFact 与判定/重判](gameplay-facts-adjudication.md)
 9. [计分与排行榜投影](scoring-projection.md)
