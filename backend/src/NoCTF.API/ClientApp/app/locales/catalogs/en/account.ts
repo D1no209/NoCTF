@@ -85,6 +85,8 @@ export const messages = {
   "sso.loginSuccessful": "Single sign-on successful",
   "sso.loginFailed": "Single sign-on failed",
   "sso.identityNotLinked": "This external identity is not linked to a NoCTF account. Sign in or register locally, then start binding from Account Security.",
+  "sso.signInToBind": "Sign in to link",
+  "sso.registerToBind": "Register to link",
   "sso.confirmBinding": "Confirm binding",
   "sso.bindingSuccessful": "External identity linked",
   "sso.bindingFailed": "External identity binding failed",

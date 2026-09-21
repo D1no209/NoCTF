@@ -8,11 +8,6 @@ using NoCTF.Application.Authentication.Sso;
 
 namespace NoCTF.API.Endpoints.Authentication;
 
-public sealed class CompleteSsoLoginRequest
-{
-    public Guid FlowId { get; set; }
-}
-
 public sealed record CompleteSsoLoginResponse(
     Guid UserId,
     string UserName,
@@ -26,7 +21,7 @@ public sealed class CompleteSsoLoginEndpoint(
     CompleteSsoLogin complete,
     SsoBrowserCorrelation correlation,
     IOptions<RefreshHttpOptions> refreshOptions)
-    : Endpoint<CompleteSsoLoginRequest,
+    : EndpointWithoutRequest<
         Results<Ok<CompleteSsoLoginResponse>, ProblemHttpResult>>
 {
     public override void Configure()
@@ -40,14 +35,13 @@ public sealed class CompleteSsoLoginEndpoint(
     }
 
     public override async Task<Results<Ok<CompleteSsoLoginResponse>, ProblemHttpResult>> ExecuteAsync(
-        CompleteSsoLoginRequest request,
         CancellationToken ct)
     {
         var browserId = User.FindFirstValue(SsoFlowAuthenticationHandler.BrowserClaim);
         if (browserId is null)
             return SsoEndpointProblems.Create(SsoFailureCode.InvalidCorrelation);
         var result = await complete.ExecuteAsync(
-            request.FlowId, correlation.Hash(browserId), ct);
+            Route<Guid>("flowId"), correlation.Hash(browserId), ct);
         if (!result.Succeeded)
             return SsoEndpointProblems.Create(result.FailureCode!.Value);
         HttpContext.Response.Cookies.Append(

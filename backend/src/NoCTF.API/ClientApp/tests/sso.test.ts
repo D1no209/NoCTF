@@ -43,4 +43,21 @@ describe('single sign-on client integration', () => {
     expect(login).toContain('referrerpolicy="no-referrer"')
     expect(account).toContain('referrerpolicy="no-referrer"')
   })
+
+  test('discards an unlinked login flow and guides local authentication into a fresh binding', async () => {
+    const completion = await sourceFile(new URL('../app/pages/auth/sso/complete.vue', import.meta.url)).text()
+    const registration = await sourceFile(new URL('../app/pages/auth/register.vue', import.meta.url)).text()
+    const account = await sourceFile(new URL('../app/features/account/AccountPanel.vue', import.meta.url)).text()
+
+    expect(completion).toContain("parsed.code === 'IdentityNotLinked'")
+    expect(completion).toContain("new URLSearchParams({ account: 'security' })")
+    expect(completion).toContain("query.set('ssoProvider', providerId)")
+    expect(completion).toContain('sso.signInToBind')
+    expect(completion).toContain('sso.registerToBind')
+    expect(registration).toContain('loginTarget')
+    expect(account).toContain("account !== 'security'")
+    expect(account).toContain('await loadSsoBinding()')
+    expect(account).toContain('ssoProviderId.value = requestedProvider')
+    expect(completion).not.toContain('LinkRequired')
+  })
 })

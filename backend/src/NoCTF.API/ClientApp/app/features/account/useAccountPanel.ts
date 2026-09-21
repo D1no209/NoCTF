@@ -22,6 +22,7 @@ export type AccountPanelSection = 'profile' | 'identity' | 'wallpaper' | 'securi
 
 /** Owns the compact account popover, drafts and account commands across route changes. */
 export function useAccountPanel() {
+  const route = useRoute()
   const { user, fetchMe, logout, logoutAll, invalidate, impersonation } = useAuth()
   const isImpersonating = computed(() => impersonation.value !== null)
   const { configuration: platformConfiguration } = usePlatform()
@@ -357,6 +358,25 @@ export function useAccountPanel() {
     open.value = false
     await navigateTo('/auth/login')
   }
+
+  watch(
+    () => [route.query.account, route.query.ssoProvider] as const,
+    async ([account, requestedProvider]) => {
+      if (account !== 'security' || !user.value || isImpersonating.value) return
+      open.value = true
+      activeSection.value = 'security'
+      if (!ssoLoaded.value && !ssoLoading.value) await loadSsoBinding()
+      if (typeof requestedProvider === 'string'
+        && ssoConfiguration.value?.providers?.some(provider => provider.id === requestedProvider)) {
+        ssoProviderId.value = requestedProvider
+      }
+      const query = { ...route.query }
+      delete query.account
+      delete query.ssoProvider
+      await navigateTo({ path: route.path, query, hash: route.hash }, { replace: true })
+    },
+    { immediate: true },
+  )
 
   const currentPassword = ref('')
   const newPassword = ref('')

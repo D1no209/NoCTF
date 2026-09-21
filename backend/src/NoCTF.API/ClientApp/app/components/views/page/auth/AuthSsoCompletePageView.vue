@@ -3,7 +3,7 @@ import { toRefs } from 'vue'
 import type { AuthSsoCompletePageViewState } from '~/features/routes/auth/useAuthSsoCompletePage'
 
 const viewProps = defineProps<{ state: AuthSsoCompletePageViewState }>()
-const { flow, loading, pending, error, completeLogin, completeBinding } = toRefs(viewProps.state)
+const { flow, loading, pending, error, identityNotLinked, bindingLoginTarget, bindingRegisterTarget, completeLogin, completeBinding } = toRefs(viewProps.state)
 </script>
 
 <template>
@@ -21,6 +21,19 @@ const { flow, loading, pending, error, completeLogin, completeBinding } = toRefs
         <Alert v-else-if="error" variant="destructive">
           <AlertDescription>{{ $message(error) }}</AlertDescription>
         </Alert>
+        <template v-else-if="identityNotLinked">
+          <Alert>
+            <AlertDescription>{{ $t('sso.identityNotLinked') }}</AlertDescription>
+          </Alert>
+          <div class="flex flex-col gap-3 sm:flex-row">
+            <Button as-child class="flex-1">
+              <NuxtLink :to="bindingLoginTarget">{{ $t('sso.signInToBind') }}</NuxtLink>
+            </Button>
+            <Button as-child variant="outline" class="flex-1">
+              <NuxtLink :to="bindingRegisterTarget">{{ $t('sso.registerToBind') }}</NuxtLink>
+            </Button>
+          </div>
+        </template>
         <template v-else-if="flow?.state === 'Authenticated' && flow.intent === 'Bind'">
           <div class="rounded-xl border p-4">
             <p class="font-medium">{{ flow.displayName || flow.subject }}</p>
@@ -44,7 +57,7 @@ const { flow, loading, pending, error, completeLogin, completeBinding } = toRefs
           <Button as-child variant="outline"><NuxtLink to="/auth/login">{{ $t('ui.backToLogin') }}</NuxtLink></Button>
         </div>
       </CardContent>
-      <CardFooter v-if="error" class="justify-center gap-3 text-sm">
+      <CardFooter v-if="error && !identityNotLinked" class="justify-center gap-3 text-sm">
         <NuxtLink to="/auth/login" class="underline">{{ $t('ui.signIn') }}</NuxtLink>
         <NuxtLink to="/auth/register" class="underline">{{ $t('ui.registerNow') }}</NuxtLink>
       </CardFooter>

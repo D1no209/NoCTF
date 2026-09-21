@@ -34,6 +34,7 @@ public sealed class GetSsoFlowRequest
 
 public sealed record SsoFlowStatusResponse(
     Guid FlowId,
+    Guid ProviderId,
     SsoFlowStateProtocol State,
     SsoFlowIntentProtocol Intent,
     string? ProviderName,
@@ -77,6 +78,7 @@ public sealed class GetSsoFlowEndpoint(
             .SingleOrDefault(provider => provider.Id == flow.ProviderId)?.Name;
         return TypedResults.Ok(new SsoFlowStatusResponse(
             flow.Id,
+            flow.ProviderId,
             (SsoFlowStateProtocol)flow.State,
             (SsoFlowIntentProtocol)flow.Intent,
             providerName,
