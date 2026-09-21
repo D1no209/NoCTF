@@ -206,9 +206,20 @@ const { UserRound, LockKeyhole, ShieldCheck, ImageIcon, LogOut, user, isImperson
                 <Skeleton v-if="ssoLoading" class="h-24 w-full" />
                 <Alert v-else-if="ssoError" variant="destructive"><AlertDescription>{{ $message(ssoError) }}</AlertDescription></Alert>
                 <template v-if="ssoLoaded && ssoConfiguration?.binding">
-                  <div class="rounded-xl border p-4">
-                    <p class="font-medium">{{ ssoConfiguration.binding.providerName }}</p>
-                    <p class="mt-1 break-all text-xs text-muted-foreground">{{ ssoConfiguration.binding.subject }}</p>
+                  <div class="flex items-center gap-3 rounded-xl border p-4">
+                    <img
+                      v-if="ssoConfiguration.binding.providerIconUrl"
+                      :src="ssoConfiguration.binding.providerIconUrl"
+                      class="size-9 shrink-0 rounded-lg object-contain"
+                      alt=""
+                      aria-hidden="true"
+                      decoding="async"
+                      referrerpolicy="no-referrer"
+                    >
+                    <div class="min-w-0">
+                      <p class="font-medium">{{ ssoConfiguration.binding.providerName }}</p>
+                      <p class="mt-1 break-all text-xs text-muted-foreground">{{ ssoConfiguration.binding.subject }}</p>
+                    </div>
                   </div>
                   <Field>
                     <FieldLabel for="account-panel-sso-unbind-password">{{ $t('ui.currentPassword') }}</FieldLabel>
@@ -224,7 +235,12 @@ const { UserRound, LockKeyhole, ShieldCheck, ImageIcon, LogOut, user, isImperson
                     <Select v-model="ssoProviderId" :disabled="ssoPending">
                       <SelectTrigger id="account-panel-sso-provider"><SelectValue /></SelectTrigger>
                       <SelectContent>
-                        <SelectItem v-for="provider in ssoConfiguration.providers" :key="provider.id" :value="provider.id!">{{ provider.name }}</SelectItem>
+                        <SelectItem v-for="provider in ssoConfiguration.providers" :key="provider.id" :value="provider.id!">
+                          <span class="flex items-center gap-2">
+                            <img v-if="provider.iconUrl" :src="provider.iconUrl" class="size-4 object-contain" alt="" aria-hidden="true" decoding="async" referrerpolicy="no-referrer">
+                            <span>{{ provider.name }}</span>
+                          </span>
+                        </SelectItem>
                       </SelectContent>
                     </Select>
                   </Field>

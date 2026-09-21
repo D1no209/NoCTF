@@ -56,6 +56,7 @@ public enum SsoFailureCode
 public sealed record SsoPublicProvider(
     Guid Id,
     string Name,
+    string? IconUrl,
     SsoProtocol Protocol,
     bool CanLogin,
     bool CanBind);

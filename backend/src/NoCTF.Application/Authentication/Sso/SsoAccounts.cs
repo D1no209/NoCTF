@@ -9,6 +9,7 @@ namespace NoCTF.Application.Authentication.Sso;
 public sealed record SsoBindingView(
     Guid ProviderId,
     string ProviderName,
+    string? ProviderIconUrl,
     SsoProtocol Protocol,
     string IdentityNamespace,
     string Subject,
@@ -92,6 +93,7 @@ public sealed class GetSsoBinding(
                 .Select(provider => new SsoPublicProvider(
                     provider.Id,
                     provider.Name,
+                    provider.IconUrl,
                     provider.Protocol,
                     provider.AllowLogin,
                     provider.AllowBinding))

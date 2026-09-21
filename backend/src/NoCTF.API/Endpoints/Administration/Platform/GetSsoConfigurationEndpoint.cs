@@ -32,6 +32,7 @@ public sealed record CasSsoProviderResponse(
 public sealed record SsoProviderResponse(
     Guid Id,
     string Name,
+    string? IconUrl,
     SsoProtocolProtocol Protocol,
     bool Enabled,
     bool AllowLogin,
@@ -55,6 +56,7 @@ internal static class SsoAdministrationMapping
         view.Providers.Select(provider => new SsoProviderResponse(
             provider.Id,
             provider.Name,
+            provider.IconUrl,
             ToProtocol(provider.Protocol),
             provider.Enabled,
             provider.AllowLogin,

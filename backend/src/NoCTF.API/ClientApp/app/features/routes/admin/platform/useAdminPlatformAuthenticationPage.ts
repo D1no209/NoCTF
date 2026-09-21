@@ -31,6 +31,7 @@ export function useAdminPlatformAuthenticationPage() {
   const providerForm = reactive({
     id: '',
     name: '',
+    iconUrl: '',
     protocol: 'Oidc' as NoCtfapiEndpointsAdministrationPlatformSsoProtocolProtocol,
     enabled: false,
     allowLogin: true,
@@ -92,7 +93,7 @@ export function useAdminPlatformAuthenticationPage() {
 
   function resetProviderForm() {
     Object.assign(providerForm, {
-      id: '', name: '', protocol: 'Oidc', enabled: false,
+      id: '', name: '', iconUrl: '', protocol: 'Oidc', enabled: false,
       allowLogin: true, allowBinding: true, timeoutSeconds: 10,
       allowedHosts: '', issuer: '', discoveryUrl: '', clientId: '',
       scopes: 'openid\nprofile', readUserInfo: false, displayNameClaim: 'name',
@@ -112,6 +113,7 @@ export function useAdminPlatformAuthenticationPage() {
     Object.assign(providerForm, {
       id: provider.id ?? '',
       name: provider.name ?? '',
+      iconUrl: provider.iconUrl ?? '',
       protocol: provider.protocol ?? 'Oidc',
       enabled: provider.enabled ?? false,
       allowLogin: provider.allowLogin ?? false,
@@ -135,6 +137,7 @@ export function useAdminPlatformAuthenticationPage() {
   function providerRequest(): NoCtfapiEndpointsAdministrationPlatformSsoProviderWriteRequest {
     const common = {
       name: providerForm.name.trim(),
+      iconUrl: providerForm.iconUrl.trim() || null,
       protocol: providerForm.protocol,
       enabled: providerForm.enabled,
       allowLogin: providerForm.allowLogin,

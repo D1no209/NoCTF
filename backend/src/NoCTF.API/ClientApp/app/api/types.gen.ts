@@ -1282,6 +1282,7 @@ export type NoCtfapiEndpointsAuthenticationCompletePasswordResetRequest = {
 export type NoCtfapiEndpointsAuthenticationMySsoBindingResponse = {
     providerId?: string;
     providerName?: string;
+    providerIconUrl?: string | null;
     protocol?: NoCtfapiEndpointsAuthenticationPublicSsoProtocol;
     identityNamespace?: string;
     subject?: string;
@@ -1352,6 +1353,7 @@ export type NoCtfapiEndpointsAuthenticationMySsoBindingConfigurationResponse = {
 export type NoCtfapiEndpointsAuthenticationBindableSsoProviderResponse = {
     id?: string;
     name?: string;
+    iconUrl?: string | null;
     protocol?: NoCtfapiEndpointsAuthenticationPublicSsoProtocol;
 };
 
@@ -1392,6 +1394,7 @@ export type NoCtfapiEndpointsAuthenticationPublicSsoProviderListResponse = {
 export type NoCtfapiEndpointsAuthenticationPublicSsoProviderResponse = {
     id?: string;
     name?: string;
+    iconUrl?: string | null;
     protocol?: NoCtfapiEndpointsAuthenticationPublicSsoProtocol;
 };
 
@@ -1677,6 +1680,7 @@ export type NoCtfapiEndpointsAdministrationPlatformSsoConfigurationResponse = {
 export type NoCtfapiEndpointsAdministrationPlatformSsoProviderResponse = {
     id?: string;
     name?: string;
+    iconUrl?: string | null;
     protocol?: NoCtfapiEndpointsAdministrationPlatformSsoProtocolProtocol;
     enabled?: boolean;
     allowLogin?: boolean;
@@ -1710,6 +1714,7 @@ export type NoCtfapiEndpointsAdministrationPlatformCreateSsoProviderRequest = No
 
 export type NoCtfapiEndpointsAdministrationPlatformSsoProviderWriteRequest = {
     name: string;
+    iconUrl?: string | null;
     protocol: NoCtfapiEndpointsAdministrationPlatformSsoProtocolProtocol;
     enabled: boolean;
     allowLogin: boolean;

@@ -55,6 +55,16 @@ const { Plus, RotateCw, FlaskConical, configuration, loading, loadError, globalF
             <EmptyHeader><EmptyTitle>{{ $t('sso.noProviders') }}</EmptyTitle></EmptyHeader>
           </Empty>
           <div v-for="provider in configuration.providers" v-else :key="provider.id" class="flex flex-col gap-4 rounded-xl border p-4 sm:flex-row sm:items-center">
+            <img
+              v-if="provider.iconUrl"
+              :src="provider.iconUrl"
+              class="size-10 shrink-0 rounded-lg object-contain"
+              alt=""
+              aria-hidden="true"
+              loading="lazy"
+              decoding="async"
+              referrerpolicy="no-referrer"
+            >
             <div class="min-w-0 flex-1">
               <div class="flex flex-wrap items-center gap-2">
                 <p class="font-semibold">{{ provider.name }}</p>
@@ -62,6 +72,7 @@ const { Plus, RotateCw, FlaskConical, configuration, loading, loadError, globalF
                 <Badge :variant="provider.enabled ? 'secondary' : 'outline'">{{ provider.enabled ? $t('sso.enabled') : $t('ui.disabled') }}</Badge>
               </div>
               <p class="mt-1 truncate text-xs text-muted-foreground">{{ provider.oidc?.issuer || provider.cas?.identityNamespace }}</p>
+              <p class="mt-1 break-all font-mono text-xs text-muted-foreground">{{ $t('sso.providerId') }}: {{ provider.id }}</p>
             </div>
             <div class="flex flex-wrap gap-2">
               <Button variant="outline" size="sm" :disabled="Boolean(testingId)" @click="testConnection(provider)">
@@ -87,6 +98,11 @@ const { Plus, RotateCw, FlaskConical, configuration, loading, loadError, globalF
         <UiForm class="flex flex-col gap-5" @submit.prevent="saveProvider">
           <FieldGroup>
             <Field><FieldLabel for="sso-provider-name">{{ $t('ui.name') }}</FieldLabel><Input id="sso-provider-name" v-model="providerForm.name" required maxlength="100" /></Field>
+            <Field>
+              <FieldLabel for="sso-provider-icon-url">{{ $t('sso.iconUrl') }}</FieldLabel>
+              <Input id="sso-provider-icon-url" v-model="providerForm.iconUrl" type="url" maxlength="2048" :placeholder="$t('sso.iconUrlPlaceholder')" />
+              <FieldDescription>{{ $t('sso.iconUrlDescription') }}</FieldDescription>
+            </Field>
             <Field>
               <FieldLabel for="sso-provider-protocol">{{ $t('sso.protocol') }}</FieldLabel>
               <Select v-model="providerForm.protocol" :disabled="providerSaving || Boolean(providerForm.id)">

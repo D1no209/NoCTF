@@ -43,12 +43,13 @@ public sealed class SsoAccountStore(NoCtfDbContext db) : ISsoAccountStore
             || user.ExternalIdentityBoundAt is null)
             return null;
         var settings = await db.PlatformSettings.AsNoTracking().SingleAsync(ct);
-        var providerName = settings.SsoConfiguration.Providers
-            .SingleOrDefault(provider => provider.Id == providerId)?.Name
-            ?? "Unavailable provider";
+        var provider = settings.SsoConfiguration.Providers
+            .SingleOrDefault(item => item.Id == providerId);
+        var providerName = provider?.Name ?? "Unavailable provider";
         return new(
             providerId,
             providerName,
+            provider?.IconUrl,
             protocol,
             user.ExternalIdentityNamespace,
             user.ExternalIdentitySubject,
@@ -147,6 +148,7 @@ public sealed class SsoAccountStore(NoCtfDbContext db) : ISsoAccountStore
         return new(SsoBindState.Bound, new(
             identity.ProviderId,
             providerName,
+            null,
             identity.Protocol,
             identity.IdentityNamespace,
             identity.Subject,
