@@ -53,7 +53,8 @@ public enum TeamRegistrationFailureCodeProtocol
     TrackNotFound,
     TrackNotPublicSelectable,
     TrackInvitationRequired,
-    TrackInvitationInvalid
+    TrackInvitationInvalid,
+    TrackSsoIdentityRequired
 }
 
 public sealed record TeamRegistrationFailureResponse(

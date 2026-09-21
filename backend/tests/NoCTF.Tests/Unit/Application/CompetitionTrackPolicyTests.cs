@@ -96,6 +96,35 @@ public sealed class CompetitionTrackPolicyTests
     }
 
     [Test]
+    public async Task Sso_gate_round_trips_and_is_ignored_when_tracks_are_disabled()
+    {
+        var providerId = Guid.CreateVersion7();
+        var configuration = new CompetitionTrackConfiguration(1,
+        [
+            Track("default", isDefault: true) with
+            {
+                RequiredSsoProviderId = providerId
+            }
+        ]);
+
+        var restored = CompetitionTrackConfiguration.ParseOrDefault(
+            GameMode.Ctf,
+            CompetitionTrackConfiguration.Serialize(configuration));
+        var disabled = CompetitionTrackConfiguration.EffectiveFor(
+            GameMode.Ctf,
+            tracksEnabled: false,
+            CompetitionTrackConfiguration.Serialize(configuration));
+
+        await Assert.That(restored.DefaultTrack.RequiredSsoProviderId).IsEqualTo(providerId);
+        await Assert.That(disabled.DefaultTrack.RequiredSsoProviderId).IsNull();
+        await Assert.That(CompetitionTrackPolicy.Validate(GameMode.Ctf,
+            [Track("default", isDefault: true) with
+            {
+                RequiredSsoProviderId = Guid.Empty
+            }])).IsNotEmpty();
+    }
+
+    [Test]
     [Arguments(GameMode.Ctf)]
     [Arguments(GameMode.Awd)]
     [Arguments(GameMode.Awdp)]

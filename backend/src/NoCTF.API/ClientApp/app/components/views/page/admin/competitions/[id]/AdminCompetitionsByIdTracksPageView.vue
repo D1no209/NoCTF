@@ -3,7 +3,7 @@ import { toRefs } from 'vue'
 import type { AdminCompetitionsByIdTracksPageViewState } from '~/features/routes/admin/competitions/[id]/useAdminCompetitionsByIdTracksPage'
 
 const viewProps = defineProps<{ state: AdminCompetitionsByIdTracksPageViewState }>()
-const { Plus, Save, Trash2, canWrite, mode, enabled, canUpdate, tracks, pendingRemoval, removalTargets, disableConfirmationOpen, disableAffectedTeamCount, loading, saving, error, load, addTrack, requestRemoveTrack, closeRemoval, confirmRemoveTrack, requestEnabled, confirmDisable, setDisableConfirmationOpen, updateDefault, updatePublicSelectable, updateInternal, updateInvitationRequired, save } = toRefs(viewProps.state)
+const { Plus, Save, Trash2, canWrite, mode, enabled, canUpdate, tracks, ssoProviders, pendingRemoval, removalTargets, disableConfirmationOpen, disableAffectedTeamCount, loading, saving, error, load, addTrack, requestRemoveTrack, closeRemoval, confirmRemoveTrack, requestEnabled, confirmDisable, setDisableConfirmationOpen, updateDefault, updatePublicSelectable, updateInternal, updateInvitationRequired, updateRequiredSsoProvider, save } = toRefs(viewProps.state)
 </script>
 
 <template>
@@ -61,6 +61,7 @@ const { Plus, Save, Trash2, canWrite, mode, enabled, canUpdate, tracks, pendingR
             <TableHead>{{ $t('ui.leaderboardVisibility') }}</TableHead>
             <TableHead>{{ $t('ui.competitiveResults') }}</TableHead>
             <TableHead class="min-w-64">{{ $t('ui.trackInvitationCode') }}</TableHead>
+            <TableHead class="min-w-56">{{ $t('sso.trackGate') }}</TableHead>
             <TableHead v-if="canWrite && canUpdate" class="w-14"><span class="sr-only">{{ $t('ui.actions') }}</span></TableHead>
           </TableRow>
         </TableHeader>
@@ -68,6 +69,25 @@ const { Plus, Save, Trash2, canWrite, mode, enabled, canUpdate, tracks, pendingR
           <TableRow v-for="(track, index) in tracks" :key="track.clientId">
             <TableCell>
               <Input v-model="track.key" :disabled="!canWrite || !canUpdate || track.existingKey !== null" maxlength="64" class="font-mono" />
+            </TableCell>
+            <TableCell>
+              <Select
+                :model-value="track.requiredSsoProviderId ?? 'none'"
+                :disabled="!canWrite || !canUpdate"
+                @update:model-value="updateRequiredSsoProvider(track, String($event))"
+              >
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">{{ $t('ui.noRestriction') }}</SelectItem>
+                  <SelectItem v-for="provider in ssoProviders" :key="provider.id" :value="provider.id!">
+                    <span class="flex items-center gap-2">
+                      <img v-if="provider.iconUrl" :src="provider.iconUrl" class="size-4 object-contain" alt="" aria-hidden="true" referrerpolicy="no-referrer">
+                      <span>{{ provider.name }}</span>
+                      <Badge v-if="!provider.enabled || !provider.allowBinding" variant="outline">{{ $t('ui.disabled') }}</Badge>
+                    </span>
+                  </SelectItem>
+                </SelectContent>
+              </Select>
             </TableCell>
             <TableCell><Input v-model="track.name" :disabled="!canWrite || !canUpdate" maxlength="80" /></TableCell>
             <TableCell><Checkbox :model-value="track.isDefault" :disabled="!canWrite || !canUpdate" @update:model-value="updateDefault(index, $event)" /></TableCell>
@@ -115,6 +135,7 @@ const { Plus, Save, Trash2, canWrite, mode, enabled, canUpdate, tracks, pendingR
     <p v-if="!loading" class="text-xs text-muted-foreground">
       {{ $t('ui.bloodAwardsRequireScoringInternalTracksAreAlwaysPrivateUnscored') }}
     </p>
+    <p v-if="!loading" class="text-xs text-muted-foreground">{{ $t('sso.trackGateDescription') }}</p>
 
     <Dialog :open="pendingRemoval !== null" @update:open="closeRemoval">
       <DialogContent v-if="pendingRemoval">

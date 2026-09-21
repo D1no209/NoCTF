@@ -77,8 +77,18 @@ public sealed class TeamRegistrationStore(
                 return new(null, TeamRegistrationFailure.TrackInvitationInvalid);
             }
         }
-        if (!await db.Users.AsNoTracking().AnyAsync(user => user.Id == command.UserId, ct))
+        var userIdentity = await db.Users.AsNoTracking()
+            .Where(user => user.Id == command.UserId)
+            .Select(user => new { user.Id, user.ExternalIdentityProviderId })
+            .SingleOrDefaultAsync(ct);
+        if (userIdentity is null)
             return new(null, TeamRegistrationFailure.TeamNameOrMembershipConflict);
+        if (competition.TracksEnabled
+            && track.RequiredSsoProviderId is Guid requiredProviderId
+            && userIdentity.ExternalIdentityProviderId != requiredProviderId)
+        {
+            return new(null, TeamRegistrationFailure.TrackSsoIdentityRequired);
+        }
         if (await db.Teams.AnyAsync(x => x.CompetitionId == command.CompetitionId
             && x.DeletedAt == null
             && x.MemberIds.Contains(command.UserId), ct))

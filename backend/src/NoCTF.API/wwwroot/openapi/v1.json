@@ -14258,7 +14258,8 @@
           "TrackNotFound",
           "TrackNotPublicSelectable",
           "TrackInvitationRequired",
-          "TrackInvitationInvalid"
+          "TrackInvitationInvalid",
+          "TrackSsoIdentityRequired"
         ],
         "enum": [
           "InvalidTeamName",
@@ -14276,7 +14277,8 @@
           "TrackNotFound",
           "TrackNotPublicSelectable",
           "TrackInvitationRequired",
-          "TrackInvitationInvalid"
+          "TrackInvitationInvalid",
+          "TrackSsoIdentityRequired"
         ]
       },
       "NoCTFAPIEndpointsTeamsCreateTeamRequest": {
@@ -14462,7 +14464,8 @@
           "MemberNotFound",
           "MembershipNotFound",
           "CaptainMustTransfer",
-          "CaptainOnly"
+          "CaptainOnly",
+          "TrackSsoIdentityRequired"
         ],
         "enum": [
           "CompetitionNotFound",
@@ -14477,7 +14480,8 @@
           "MemberNotFound",
           "MembershipNotFound",
           "CaptainMustTransfer",
-          "CaptainOnly"
+          "CaptainOnly",
+          "TrackSsoIdentityRequired"
         ]
       },
       "MicrosoftAspNetCoreMvcValidationProblemDetails": {
@@ -18351,6 +18355,22 @@
           "invitationCode": {
             "type": "string",
             "nullable": true
+          },
+          "requiredSsoProviderId": {
+            "type": "string",
+            "format": "guid",
+            "nullable": true
+          },
+          "requiredSsoProviderName": {
+            "type": "string",
+            "nullable": true
+          },
+          "requiredSsoProviderIconUrl": {
+            "type": "string",
+            "nullable": true
+          },
+          "meetsSsoRequirement": {
+            "type": "boolean"
           }
         }
       },
@@ -24339,6 +24359,12 @@
           "leaderboardVisibility": {
             "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationCompetitionsCompetitionLeaderboardVisibilityResponse"
           },
+          "ssoProviders": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationCompetitionsCompetitionSsoProviderResponse"
+            }
+          },
           "capabilities": {
             "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationCompetitionsAdminCompetitionCapabilitiesResponse"
           }
@@ -24422,6 +24448,32 @@
             "type": "string",
             "format": "date-time",
             "nullable": true
+          }
+        }
+      },
+      "NoCTFAPIEndpointsAdministrationCompetitionsCompetitionSsoProviderResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "guid"
+          },
+          "name": {
+            "type": "string"
+          },
+          "iconUrl": {
+            "type": "string",
+            "nullable": true
+          },
+          "protocol": {
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsAuthenticationPublicSsoProtocol"
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "allowBinding": {
+            "type": "boolean"
           }
         }
       },
@@ -24609,7 +24661,9 @@
           "InvalidTrackReassignment",
           "TeamNotFound",
           "TrackNotFound",
-          "TrackNotPublicSelectable"
+          "TrackNotPublicSelectable",
+          "TrackSsoIdentityRequired",
+          "SsoProviderNotFound"
         ],
         "enum": [
           "CompetitionNotFound",
@@ -24620,7 +24674,9 @@
           "InvalidTrackReassignment",
           "TeamNotFound",
           "TrackNotFound",
-          "TrackNotPublicSelectable"
+          "TrackNotPublicSelectable",
+          "TrackSsoIdentityRequired",
+          "SsoProviderNotFound"
         ]
       },
       "NoCTFAPIEndpointsAdministrationCompetitionsPatchCompetitionRequest": {
@@ -24807,6 +24863,7 @@
           "affectsDynamicChallengeScore",
           "visibleOnLeaderboard",
           "affectsCompetitiveResults",
+          "requiredSsoProviderId",
           "invitationCode",
           "clearInvitationCode"
         ],
@@ -24840,6 +24897,11 @@
           },
           "affectsCompetitiveResults": {
             "type": "boolean"
+          },
+          "requiredSsoProviderId": {
+            "type": "string",
+            "format": "guid",
+            "nullable": true
           },
           "invitationCode": {
             "type": "string",

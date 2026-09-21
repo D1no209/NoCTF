@@ -45,8 +45,23 @@ public sealed class TeamMembershipStore(
             return TeamMembershipFailure.TeamNotFound;
         if (team.IsBanned)
             return TeamMembershipFailure.TeamBanned;
-        if (!await db.Users.AsNoTracking().AnyAsync(user => user.Id == userId, ct))
+        var userIdentity = await db.Users.AsNoTracking()
+            .Where(user => user.Id == userId)
+            .Select(user => new { user.Id, user.ExternalIdentityProviderId })
+            .SingleOrDefaultAsync(ct);
+        if (userIdentity is null)
             return TeamMembershipFailure.MemberNotFound;
+        if (competition.TracksEnabled)
+        {
+            var track = CompetitionTrackConfiguration.ParseOrDefault(
+                competition.Mode,
+                competition.TrackConfigurationJson).Find(team.TrackKey);
+            if (track?.RequiredSsoProviderId is Guid requiredProviderId
+                && userIdentity.ExternalIdentityProviderId != requiredProviderId)
+            {
+                return TeamMembershipFailure.TrackSsoIdentityRequired;
+            }
+        }
         if (team.MemberIds.Contains(userId))
             return TeamMembershipFailure.UserAlreadyRegistered;
         if (await db.Teams.AnyAsync(

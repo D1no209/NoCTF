@@ -9,6 +9,8 @@ using NoCTF.Application.Competitions.Tracks;
 using NoCTF.Application.Competitions.Visibility;
 using NoCTF.API.Endpoints.Competitions.Tracks;
 using NoCTF.Application.Teams.Moderation;
+using NoCTF.Application.Authentication.Sso;
+using NoCTF.API.Endpoints.Authentication;
 
 namespace NoCTF.API.Endpoints.Administration.Competitions;
 
@@ -69,12 +71,21 @@ public sealed record AdminCompetitionCapabilitiesResponse(
     bool CanModerate,
     bool CanManagePermissions);
 
+public sealed record CompetitionSsoProviderResponse(
+    Guid Id,
+    string Name,
+    string? IconUrl,
+    PublicSsoProtocol Protocol,
+    bool Enabled,
+    bool AllowBinding);
+
 public sealed record AdminCompetitionResponse(
     CompetitionResponse Competition,
     CompetitionConfigurationResponse ModeConfiguration,
     CompetitionTrackListResponse Tracks,
     CompetitionPermissionsResponse? Permissions,
     CompetitionLeaderboardVisibilityResponse LeaderboardVisibility,
+    IReadOnlyList<CompetitionSsoProviderResponse> SsoProviders,
     AdminCompetitionCapabilitiesResponse Capabilities);
 
 public sealed class GetAdminCompetitionEndpoint(
@@ -83,6 +94,7 @@ public sealed class GetAdminCompetitionEndpoint(
     GetCompetitionTracks getTracks,
     GetCompetitionPermissions getPermissions,
     GetCompetitionVisibility getVisibility,
+    ManageSsoProviders ssoProviders,
     ICompetitionModerationAuthorizer authorizer,
     IUserContext user,
     TimeProvider timeProvider)
@@ -134,6 +146,7 @@ public sealed class GetAdminCompetitionEndpoint(
             view.Id,
             timeProvider.GetUtcNow(),
             ct);
+        var sso = await ssoProviders.GetAsync(ct);
         if (configuration is null || tracks is null || visibility is null)
             return TypedResults.NotFound();
         var competition = CompetitionMapper.ToResponse(
@@ -150,6 +163,15 @@ public sealed class GetAdminCompetitionEndpoint(
                 ? CompetitionPermissionsMapper.ToResponse(permissions.Snapshot!)
                 : null,
             CompetitionLeaderboardVisibilityMapper.ToResponse(visibility),
+            sso.Providers.Select(provider => new CompetitionSsoProviderResponse(
+                provider.Id,
+                provider.Name,
+                provider.IconUrl,
+                provider.Protocol == NoCTF.Domain.Identity.SsoProtocol.Oidc
+                    ? PublicSsoProtocol.Oidc
+                    : PublicSsoProtocol.Cas,
+                provider.Enabled,
+                provider.AllowBinding)).ToArray(),
             new(true, canModerate,
                 permissions.State == CompetitionPermissionSnapshotState.Found)));
     }

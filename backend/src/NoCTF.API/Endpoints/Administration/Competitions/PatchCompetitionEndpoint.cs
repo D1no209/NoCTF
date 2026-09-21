@@ -12,6 +12,8 @@ using NoCTF.Application.Competitions.Tracks;
 using NoCTF.Application.Competitions.Visibility;
 using NoCTF.Application.Common;
 using NoCTF.Application.Teams.Moderation;
+using NoCTF.Application.Authentication.Sso;
+using NoCTF.API.Endpoints.Authentication;
 using NoCTF.Domain.Competitions;
 using Riok.Mapperly.Abstractions;
 using System.Text.Json.Serialization;
@@ -30,6 +32,7 @@ public sealed class UpdateCompetitionTrackRequest
     public required bool AffectsDynamicChallengeScore { get; set; }
     public required bool VisibleOnLeaderboard { get; set; }
     public required bool AffectsCompetitiveResults { get; set; }
+    public required Guid? RequiredSsoProviderId { get; set; }
     public required string? InvitationCode { get; set; }
     public required bool ClearInvitationCode { get; set; }
 }
@@ -84,7 +87,9 @@ public enum CompetitionTrackFailureCodeProtocol
     InvalidTrackReassignment,
     TeamNotFound,
     TrackNotFound,
-    TrackNotPublicSelectable
+    TrackNotPublicSelectable,
+    TrackSsoIdentityRequired,
+    SsoProviderNotFound
 }
 
 public sealed record CompetitionTrackFailureResponse(
@@ -391,6 +396,7 @@ public sealed class PatchCompetitionEndpoint(
     UpdateCompetitionVisibility updateVisibility,
     IAtomicAggregatePatch atomicPatch,
     ICompetitionModerationAuthorizer authorizer,
+    ManageSsoProviders ssoProviders,
     IUserContext user,
     TimeProvider timeProvider)
     : Endpoint<PatchCompetitionRequest,
@@ -649,6 +655,7 @@ public sealed class PatchCompetitionEndpoint(
             competitionId, user.UserId, user.IsAdministrator, ct);
         var visibility = await getVisibility.ExecuteAsync(
             competitionId, timeProvider.GetUtcNow(), ct);
+        var sso = await ssoProviders.GetAsync(ct);
         if (configuration is null || tracks is null || visibility is null)
             return null;
         var role = await CompetitionAdministrationRoleResolver.ResolveAsync(
@@ -664,6 +671,15 @@ public sealed class PatchCompetitionEndpoint(
                 ? CompetitionPermissionsMapper.ToResponse(permissions.Snapshot!)
                 : null,
             CompetitionLeaderboardVisibilityMapper.ToResponse(visibility),
+            sso.Providers.Select(provider => new CompetitionSsoProviderResponse(
+                provider.Id,
+                provider.Name,
+                provider.IconUrl,
+                provider.Protocol == NoCTF.Domain.Identity.SsoProtocol.Oidc
+                    ? PublicSsoProtocol.Oidc
+                    : PublicSsoProtocol.Cas,
+                provider.Enabled,
+                provider.AllowBinding)).ToArray(),
             new(true, canModerate,
                 permissions.State == CompetitionPermissionSnapshotState.Found));
     }
@@ -680,7 +696,8 @@ public sealed class PatchCompetitionEndpoint(
             track.AffectsDynamicChallengeScore,
             track.VisibleOnLeaderboard,
             track.AffectsCompetitiveResults,
-            track.InvitationCode);
+            track.InvitationCode,
+            track.RequiredSsoProviderId);
 
     private static CompetitionPatchSection ResolveSections(PatchCompetitionRequest request) =>
         (request.Metadata is null ? CompetitionPatchSection.None

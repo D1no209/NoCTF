@@ -413,7 +413,8 @@ public sealed class PatchTeamEndpoint(
                     if (!result.Succeeded)
                     {
                         return Reject(Conflict(
-                            result.ErrorMessage ?? "Team track was not updated."));
+                            result.ErrorMessage ?? "Team track was not updated.",
+                            result.FailureCode?.ToString()));
                     }
                 }
                 if (target.RegistrationStatus != current.RegistrationStatus)
@@ -471,10 +472,13 @@ public sealed class PatchTeamEndpoint(
                 ForbidHttpResult, ProblemHttpResult>>.Rollback(failure);
     }
 
-    private static ProblemHttpResult Conflict(string detail) => TypedResults.Problem(
+    private static ProblemHttpResult Conflict(string detail, string? code = null) => TypedResults.Problem(
         statusCode: StatusCodes.Status409Conflict,
         title: "Team was not updated.",
-        detail: detail);
+        detail: detail,
+        extensions: code is null
+            ? null
+            : new Dictionary<string, object?> { ["code"] = code });
 
     private static TeamPatchSection ResolveSections(PatchTeamRequest request) =>
         (request.Profile is null ? TeamPatchSection.None : TeamPatchSection.Profile)

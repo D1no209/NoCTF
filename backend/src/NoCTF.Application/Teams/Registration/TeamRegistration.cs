@@ -66,7 +66,8 @@ public enum TeamRegistrationFailure
     TrackNotFound,
     TrackNotPublicSelectable,
     TrackInvitationRequired,
-    TrackInvitationInvalid
+    TrackInvitationInvalid,
+    TrackSsoIdentityRequired
 }
 public sealed record TeamCreateStoreResult(TeamView? Team, TeamRegistrationFailure? Failure = null);
 public sealed record TeamReviewStoreResult(bool Changed, TeamRegistrationFailure? Failure = null);

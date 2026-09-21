@@ -24,6 +24,8 @@ describe('competition track error presentation', () => {
     'TeamNotFound',
     'TrackNotFound',
     'TrackNotPublicSelectable',
+    'TrackSsoIdentityRequired',
+    'SsoProviderNotFound',
   ] satisfies NoCtfapiEndpointsAdministrationCompetitionsCompetitionTrackFailureCodeProtocol[]
 
   const registrationCodes = [
@@ -42,6 +44,7 @@ describe('competition track error presentation', () => {
     'TrackNotPublicSelectable',
     'TrackInvitationRequired',
     'TrackInvitationInvalid',
+    'TrackSsoIdentityRequired',
   ] satisfies NoCtfapiEndpointsTeamsTeamRegistrationFailureCodeProtocol[]
 
   const membershipCodes = [
@@ -58,6 +61,7 @@ describe('competition track error presentation', () => {
     'MembershipNotFound',
     'CaptainMustTransfer',
     'CaptainOnly',
+    'TrackSsoIdentityRequired',
   ] satisfies NoCtfapiEndpointsTeamsTeamMembershipFailureCodeProtocol[]
 
   test('maps every generated track failure code', () => {
@@ -116,6 +120,9 @@ describe('competition track pages', () => {
     expect(admin).not.toContain(':key="`${track.key}-${index}`"')
     expect(admin).toContain("ui.trackRequiresAnInvitationCode")
     expect(admin).toContain('track.invitationCode.trim() || null')
+    expect(admin).toContain('requiredSsoProviderId: track.requiredSsoProviderId ?? null')
+    expect(admin).toContain('updateRequiredSsoProvider')
+    expect(admin).toContain('data.ssoProviders ?? []')
     expect(admin).toContain('error.value = competitionTrackErrorMessage')
     expect(teams).toContain('patchCompetitionTeam')
     expect(teams).toContain('tracksEnabled')
@@ -135,6 +142,9 @@ describe('competition track pages', () => {
     expect(overview).toContain('trackInvitationCode: selectedCreateTrack.value?.requiresInvitationCode')
     expect(overview).toContain('createTrackInvitationCode')
     expect(overview).toContain('track.isPublicSelectable')
+    expect(overview).toContain('track.meetsSsoRequirement === false')
+    expect(overview).toContain('track.requiredSsoProviderId')
+    expect(overview).toContain('ssoSettingsTarget')
     expect(overview).toContain('selectedCreateTrack?.requiresInvitationCode')
     expect(overview).toContain('v-else-if="tracksEnabled && selectableTracks.length > 0"')
     expect(overview).not.toContain('createTrackKey.value = selectableTracks.value.find')
