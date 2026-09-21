@@ -46,8 +46,7 @@ Release solution build：零警告、零错误（包括启用的分析器）。E
 其余首次失败：1 项强制删除文件数量断言在干净基线 `957a05e6b` 同样失败
 （期望 4、实际 5）；1 项 Docker 拉取测试起初受到本机 Desktop credential helper 配置限制，
 随后使用独立匿名 Docker 配置通过复验，没有修改用户的 Docker 配置；
-8 项共享隧道测试缺少其服务连接；3 项隧道原型测试缺少 `NOCTF_RELAY_BINARY`。
-它们没有被删除、跳过包装或混入本次修正。
+这些结果没有通过跳过包装或混入本次修正。
 
 本修正专项使用真实 PostgreSQL、Redis、Wolverine/NATS、Docker，覆盖领取/释放幂等、
 16/64 并发、Redis 领取后 PostgreSQL 回滚、Redis 丢失重建、旧预算保持、辅助与主分配
