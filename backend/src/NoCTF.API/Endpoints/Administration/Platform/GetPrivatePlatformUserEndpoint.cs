@@ -8,12 +8,35 @@ namespace NoCTF.API.Endpoints.Administration.Platform;
 
 public sealed record PrivateActivityResponse(Guid Id, string Kind, DateTimeOffset OccurredAt, string? IpAddress,
     Guid? CompetitionId, Guid? GameplayFactId);
-public sealed record PrivateAccountResponse(CurrentUserSchoolIdentityResponse Identity, IReadOnlyList<PrivateActivityResponse> Activities, int RetentionDays)
+public sealed record PrivateSsoBindingResponse(
+    Guid ProviderId,
+    string? ProviderName,
+    string? ProviderIconUrl,
+    PublicSsoProtocol Protocol,
+    string Subject,
+    DateTimeOffset BoundAt);
+public sealed record PrivateAccountResponse(
+    CurrentUserSchoolIdentityResponse Identity,
+    IReadOnlyList<PrivateActivityResponse> Activities,
+    int RetentionDays,
+    PrivateSsoBindingResponse? SsoBinding)
 {
     internal static PrivateAccountResponse From(PrivateAccountDetails value) => new(
         new(value.Identity.FullName, value.Identity.StudentNumber),
         value.Activities.Select(item => new PrivateActivityResponse(item.Id, item.Kind.ToString(), item.OccurredAt,
-            item.IpAddress, item.CompetitionId, item.GameplayFactId)).ToArray(), value.RetentionDays);
+            item.IpAddress, item.CompetitionId, item.GameplayFactId)).ToArray(),
+        value.RetentionDays,
+        value.SsoBinding is null
+            ? null
+            : new(
+                value.SsoBinding.ProviderId,
+                value.SsoBinding.ProviderName,
+                value.SsoBinding.ProviderIconUrl,
+                value.SsoBinding.Protocol == NoCTF.Domain.Identity.SsoProtocol.Oidc
+                    ? PublicSsoProtocol.Oidc
+                    : PublicSsoProtocol.Cas,
+                value.SsoBinding.Subject,
+                value.SsoBinding.BoundAt));
 }
 
 public sealed class GetPrivatePlatformUserEndpoint(AccountPrivacy privacy, IUserContext user)

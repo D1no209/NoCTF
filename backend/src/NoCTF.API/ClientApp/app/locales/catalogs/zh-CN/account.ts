@@ -108,7 +108,7 @@ export const messages = {
   "sso.trackGateDescription": "团队进入受限赛道时，全体成员必须已绑定所选身份源；进入后的解绑不追溯既有赛道资格。",
   "sso.trackGateConfigurationHint": "先在平台管理的“身份认证”中创建身份源并允许绑定，再在每条赛道的“SSO 身份门禁”列选择它。",
   "sso.trackGateNoProviders": "尚未配置 SSO 身份源，当前只能选择“无限制”。",
-  "sso.trackGateProvider": "切换到此赛道前，全体当前成员都必须绑定 {provider}。",
+  "sso.trackGateProvider": "以此赛道提交报名之前，全体当前成员都必须绑定 {provider}。",
   "sso.manageIdentityProviders": "前往身份认证",
   "sso.trackIdentityRequired": "该赛道要求团队全体成员绑定指定的 SSO 身份源。请先在账户安全中完成绑定。",
   "sso.trackProviderNotFound": "赛道引用的 SSO 身份源不存在。",

@@ -38,7 +38,7 @@ describe('competition practice entry', () => {
   test('does not bypass registration, team membership or bans', () => {
     expect(canEnterCompetition(practice, null)).toBeFalse()
     expect(canEnterCompetition(practice, { ...eligible, isBanned: true })).toBeFalse()
-    for (const registrationStatus of ['Pending', 'Rejected'] as const)
+    for (const registrationStatus of ['Pending', 'Rejected', 'Unregistered'] as const)
       expect(canEnterCompetition(practice, { ...eligible, registrationStatus })).toBeFalse()
   })
 

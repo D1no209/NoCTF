@@ -17,7 +17,8 @@ public enum TeamRegistrationStatusProtocol
 {
     Pending,
     Approved,
-    Rejected
+    Rejected,
+    Unregistered
 }
 
 [JsonConverter(typeof(StrictPascalCaseEnumConverter<TeamBanAppealStatusProtocol>))]

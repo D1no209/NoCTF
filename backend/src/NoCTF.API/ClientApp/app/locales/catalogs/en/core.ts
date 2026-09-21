@@ -179,6 +179,7 @@ export const messages = {
   "ui.awaitingEvaluation": "Awaiting evaluation",
   "ui.pendingReview": "Pending review",
   "ui.pendingApproval": "Pending approval",
+  "ui.notRegistered": "Not registered",
   "ui.questionsCannotBeOpenedInTheCurrentCompetitionState": "Questions cannot be opened in the current competition state.",
   "ui.fixesCannotBeSubmittedAtThisTime": "Fixes cannot be submitted at this time.",
   "ui.currentDynamicScore": "Current dynamic score",

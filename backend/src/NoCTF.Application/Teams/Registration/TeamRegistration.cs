@@ -104,10 +104,11 @@ public interface ITeamRegistrationStore
         CancellationToken cancellationToken) =>
         ListAsync(competitionId, includePending, cancellationToken);
     Task<TeamReviewStoreResult> SetStatusAsync(Guid competitionId, Guid teamId, TeamRegistrationStatus status, CancellationToken cancellationToken);
-    Task<TeamReviewStoreResult> ResubmitAsync(
+    Task<TeamReviewStoreResult> SubmitAsync(
         Guid competitionId,
         Guid teamId,
         Guid userId,
+        string? trackInvitationCode,
         CancellationToken cancellationToken) =>
         Task.FromResult(new TeamReviewStoreResult(
             false,
@@ -158,29 +159,13 @@ public sealed class CreateTeam(ITeamRegistrationStore store)
                 return OperationResult<TeamView, TeamRegistrationFailure>.Failure(
                     TeamRegistrationFailure.TrackNotPublicSelectable,
                     "The selected competition track cannot be selected by participants.");
-            if (requestedTrack.RequiresInvitationCode
-                && string.IsNullOrWhiteSpace(command.TrackInvitationCode))
-            {
-                return OperationResult<TeamView, TeamRegistrationFailure>.Failure(
-                    TeamRegistrationFailure.TrackInvitationRequired,
-                    "The selected competition track requires an invitation code.");
-            }
-            if (requestedTrack.RequiresInvitationCode
-                && !CompetitionTrackInvitationCode.Verify(
-                    requestedTrack.InvitationCode,
-                    command.TrackInvitationCode))
-            {
-                return OperationResult<TeamView, TeamRegistrationFailure>.Failure(
-                    TeamRegistrationFailure.TrackInvitationInvalid,
-                    "The competition track invitation code is invalid.");
-            }
         }
         var created = await store.TryCreateAsync(command with
         {
             Name = name,
             TrackKey = policy.TracksEnabled ? requestedTrack.Key : command.TrackKey
         },
-            policy.PracticeOpen || policy.AutoApprove ? TeamRegistrationStatus.Approved : TeamRegistrationStatus.Pending, ct);
+            policy.PracticeOpen ? TeamRegistrationStatus.Approved : TeamRegistrationStatus.Unregistered, ct);
         return created.Team is not null
             ? OperationResult<TeamView, TeamRegistrationFailure>.Success(created.Team)
             : OperationResult<TeamView, TeamRegistrationFailure>.Failure(created.Failure ?? TeamRegistrationFailure.TeamConflict, "The team could not be created.");
@@ -249,8 +234,8 @@ public static class ParticipantTeamMutationPolicy
         status is CompetitionStatus.Visible or CompetitionStatus.Published
         || status == CompetitionStatus.Running && allowTeamRegistrationWhileRunning;
 
-    public static TeamRegistrationStatus RegistrationStatusAfterChange(bool autoApprove) =>
-        autoApprove ? TeamRegistrationStatus.Approved : TeamRegistrationStatus.Pending;
+    public static TeamRegistrationStatus RegistrationStatusAfterChange() =>
+        TeamRegistrationStatus.Unregistered;
 }
 
 public sealed class DeleteTeam(ITeamRegistrationStore store)
@@ -283,12 +268,13 @@ public sealed class ReviewTeamRegistration(ITeamRegistrationStore store)
     }
 }
 
-public sealed class ResubmitTeamRegistration(ITeamRegistrationStore store)
+public sealed class SubmitTeamRegistration(ITeamRegistrationStore store)
 {
     public async Task<OperationResult<TeamRegistrationFailure>> ExecuteAsync(
         Guid competitionId,
         Guid teamId,
         Guid userId,
+        string? trackInvitationCode,
         CancellationToken ct = default)
     {
         var policy = await store.GetPolicyAsync(competitionId, ct);
@@ -297,11 +283,16 @@ public sealed class ResubmitTeamRegistration(ITeamRegistrationStore store)
         if (policy.Status is CompetitionStatus.Paused or CompetitionStatus.Finished
             || policy.Status == CompetitionStatus.Running && !policy.AllowWhileRunning)
             return OperationResult<TeamRegistrationFailure>.Failure(TeamRegistrationFailure.RegistrationClosed, "Team registration is closed.");
-        var result = await store.ResubmitAsync(competitionId, teamId, userId, ct);
+        var result = await store.SubmitAsync(
+            competitionId,
+            teamId,
+            userId,
+            trackInvitationCode,
+            ct);
         return result.Changed
             ? OperationResult<TeamRegistrationFailure>.Success()
             : OperationResult<TeamRegistrationFailure>.Failure(
                 result.Failure ?? TeamRegistrationFailure.TeamReviewConflict,
-                "Rejected registration was not resubmitted.");
+                "Team registration was not submitted.");
     }
 }

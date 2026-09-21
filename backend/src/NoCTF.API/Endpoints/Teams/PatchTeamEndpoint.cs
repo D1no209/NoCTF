@@ -30,6 +30,7 @@ public sealed class TeamMembershipPatchRequest
 public sealed class TeamRegistrationPatchRequest
 {
     public required TeamRegistrationStatusProtocol Status { get; set; }
+    public string? TrackInvitationCode { get; set; }
 }
 
 public sealed class TeamAdministrationPatchRequest
@@ -97,7 +98,9 @@ public sealed class PatchTeamValidator : Validator<PatchTeamRequest>
         RuleFor(request => request.Registration!.Status)
             .Equal(TeamRegistrationStatusProtocol.Pending)
             .When(request => request.Registration is not null)
-            .WithMessage("Captain registration updates can only resubmit a rejected team as Pending.");
+            .WithMessage("Captain registration updates use Pending to submit the current team draft.");
+        RuleFor(request => request.Registration!.TrackInvitationCode).MaximumLength(128)
+            .When(request => request.Registration?.TrackInvitationCode is not null);
         RuleFor(request => request.Ban!.Reason).NotEmpty().MaximumLength(512)
             .When(request => request.Ban?.IsBanned == true);
     }
@@ -179,6 +182,7 @@ public static partial class TeamPatchMapper
     [MapperIgnoreTarget(nameof(Team.BannedById))]
     [MapperIgnoreTarget(nameof(Team.BanReason))]
     [MapperIgnoreTarget(nameof(Team.DeletedAt))]
+    [MapperIgnoreSource(nameof(TeamRegistrationPatchRequest.TrackInvitationCode))]
     public static partial void ApplyRegistrationAsCaptain(
         TeamRegistrationPatchRequest request,
         [MappingTarget] Team target);
@@ -268,7 +272,7 @@ public sealed class PatchTeamEndpoint(
     TransferTeamCaptain transferCaptain,
     RemoveTeamMember removeMember,
     ReviewTeamRegistration reviewRegistration,
-    ResubmitTeamRegistration resubmitRegistration,
+    SubmitTeamRegistration submitRegistration,
     AssignTeamTrack assignTrack,
     ModerateTeam moderate,
     IAtomicAggregatePatch atomicPatch,
@@ -411,10 +415,11 @@ public sealed class PatchTeamEndpoint(
             }
             if ((sections & TeamPatchSection.Registration) != 0)
             {
-                var result = await resubmitRegistration.ExecuteAsync(
+                var result = await submitRegistration.ExecuteAsync(
                     competitionId,
                     teamId,
                     user.UserId,
+                    request.Registration!.TrackInvitationCode,
                     transactionCt);
                 if (!result.Succeeded)
                     return Reject(MapFailure(result.FailureCode, result.ErrorMessage));

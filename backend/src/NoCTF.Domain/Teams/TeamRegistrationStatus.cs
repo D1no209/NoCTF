@@ -4,5 +4,6 @@ public enum TeamRegistrationStatus
 {
     Pending,
     Approved,
-    Rejected
+    Rejected,
+    Unregistered
 }

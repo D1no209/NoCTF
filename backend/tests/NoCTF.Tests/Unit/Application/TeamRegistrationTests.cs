@@ -20,7 +20,7 @@ public class TeamRegistrationTests
     }
 
     [Test]
-    public async Task CreateTeam_AutoApproveCreatesCaptainTeam()
+    public async Task CreateTeam_Creates_an_unregistered_editable_team()
     {
         var store = new Store(new(CompetitionStatus.Published, true, false));
         var command = new CreateTeamCommand(Guid.NewGuid(), Guid.NewGuid(), "alpha", DateTimeOffset.UtcNow, "default");
@@ -28,7 +28,7 @@ public class TeamRegistrationTests
         var result = await new CreateTeam(store).ExecuteAsync(command);
 
         await Assert.That(result.Succeeded).IsTrue();
-        await Assert.That(store.Status).IsEqualTo(TeamRegistrationStatus.Approved);
+        await Assert.That(store.Status).IsEqualTo(TeamRegistrationStatus.Unregistered);
         await Assert.That(result.Value!.CaptainId).IsEqualTo(command.UserId);
     }
 
@@ -57,7 +57,7 @@ public class TeamRegistrationTests
             "default"));
 
         await Assert.That(result.Succeeded).IsTrue();
-        await Assert.That(store.Status).IsEqualTo(TeamRegistrationStatus.Pending);
+        await Assert.That(store.Status).IsEqualTo(TeamRegistrationStatus.Unregistered);
     }
 
     [Test]
@@ -97,7 +97,7 @@ public class TeamRegistrationTests
     }
 
     [Test]
-    public async Task CreateTeam_Requires_valid_invitation_code_for_protected_track()
+    public async Task CreateTeam_Defers_protected_track_requirements_until_submission()
     {
         var configuration = new CompetitionTrackConfiguration(1,
         [
@@ -121,8 +121,8 @@ public class TeamRegistrationTests
         var valid = await create.ExecuteAsync(new(
             Guid.NewGuid(), Guid.NewGuid(), "valid", DateTimeOffset.UtcNow, "invite", " let-me-in "));
 
-        await Assert.That(missing.FailureCode).IsEqualTo(TeamRegistrationFailure.TrackInvitationRequired);
-        await Assert.That(invalid.FailureCode).IsEqualTo(TeamRegistrationFailure.TrackInvitationInvalid);
+        await Assert.That(missing.Succeeded).IsTrue();
+        await Assert.That(invalid.Succeeded).IsTrue();
         await Assert.That(valid.Succeeded).IsTrue();
         await Assert.That(valid.Value!.TrackKey).IsEqualTo("invite");
     }

@@ -22,7 +22,7 @@ public sealed class CompetitionTrackSsoGatePersistenceTests
 {
     [Test]
     [Timeout(300_000)]
-    public async Task Concurrent_track_change_and_member_join_preserve_the_team_SSO_gate(
+    public async Task Concurrent_track_change_and_member_join_create_one_unregistered_draft(
         CancellationToken cancellationToken)
     {
         await DockerIntegrationTest.RunAsync(async () =>
@@ -137,15 +137,28 @@ public sealed class CompetitionTrackSsoGatePersistenceTests
             await using var verification = new NoCtfDbContext(options);
             var finalTeam = await verification.Teams.AsNoTracking()
                 .SingleAsync(team => team.Id == teamId, cancellationToken);
-            await Assert.That(joinTask.Result is null ^ trackTask.Result.Succeeded).IsTrue();
-            await Assert.That(finalTeam.TrackKey != "school"
-                || !finalTeam.MemberIds.Contains(joiningUserId)).IsTrue();
+            await Assert.That(joinTask.Result).IsNull();
+            await Assert.That(trackTask.Result.Succeeded).IsTrue();
+            await Assert.That(finalTeam.TrackKey).IsEqualTo("school");
+            await Assert.That(finalTeam.MemberIds).Contains(joiningUserId);
+            await Assert.That(finalTeam.RegistrationStatus)
+                .IsEqualTo(TeamRegistrationStatus.Unregistered);
+            var submission = await new SubmitTeamRegistration(new TeamRegistrationStore(
+                verification,
+                new NoOpTransactionalMessageOutbox())).ExecuteAsync(
+                    competitionId,
+                    teamId,
+                    captainId,
+                    null,
+                    cancellationToken);
+            await Assert.That(submission.FailureCode)
+                .IsEqualTo(TeamRegistrationFailure.TrackSsoIdentityRequired);
         });
     }
 
     [Test]
     [Timeout(300_000)]
-    public async Task Participant_profile_update_validates_track_gates_and_recalculates_registration(
+    public async Task Participant_profile_builds_a_draft_and_submission_validates_track_gates(
         CancellationToken cancellationToken)
     {
         await DockerIntegrationTest.RunAsync(async () =>
@@ -229,15 +242,16 @@ public sealed class CompetitionTrackSsoGatePersistenceTests
             db.ChangeTracker.Clear();
             var update = new UpdateTeam(registrations);
 
-            var missingCode = await update.ExecuteAsync(new(
+            var changed = await update.ExecuteAsync(new(
                 competitionId, teamId, "Renamed", gatedTrack.Key,
                 ActorUserId: captainId, UpdatedAt: now.AddMinutes(1)), cancellationToken);
-            var invalidCode = await update.ExecuteAsync(new(
-                competitionId, teamId, "Renamed", gatedTrack.Key, "wrong-code",
-                captainId, now.AddMinutes(2)), cancellationToken);
-            var missingMemberIdentity = await update.ExecuteAsync(new(
-                competitionId, teamId, "Renamed", gatedTrack.Key, "let-me-in",
-                captainId, now.AddMinutes(3)), cancellationToken);
+            var submit = new SubmitTeamRegistration(registrations);
+            var missingCode = await submit.ExecuteAsync(
+                competitionId, teamId, captainId, null, cancellationToken);
+            var invalidCode = await submit.ExecuteAsync(
+                competitionId, teamId, captainId, "wrong-code", cancellationToken);
+            var missingMemberIdentity = await submit.ExecuteAsync(
+                competitionId, teamId, captainId, "let-me-in", cancellationToken);
 
             await db.Users.Where(user => user.Id == memberId).ExecuteUpdateAsync(setters => setters
                 .SetProperty(user => user.ExternalIdentityProviderId, providerId)
@@ -246,9 +260,8 @@ public sealed class CompetitionTrackSsoGatePersistenceTests
                 .SetProperty(user => user.ExternalIdentitySubject, "member")
                 .SetProperty(user => user.ExternalIdentityBoundAt, now), cancellationToken);
             db.ChangeTracker.Clear();
-            var changed = await update.ExecuteAsync(new(
-                competitionId, teamId, "Renamed", gatedTrack.Key, "let-me-in",
-                captainId, now.AddMinutes(4)), cancellationToken);
+            var submitted = await submit.ExecuteAsync(
+                competitionId, teamId, captainId, "let-me-in", cancellationToken);
 
             await Assert.That(missingCode.FailureCode)
                 .IsEqualTo(TeamRegistrationFailure.TrackInvitationRequired);
@@ -260,7 +273,11 @@ public sealed class CompetitionTrackSsoGatePersistenceTests
             await Assert.That(changed.Value!.Name).IsEqualTo("Renamed");
             await Assert.That(changed.Value.TrackKey).IsEqualTo(gatedTrack.Key);
             await Assert.That(changed.Value.RegistrationStatus)
-                .IsEqualTo(TeamRegistrationStatus.Pending);
+                .IsEqualTo(TeamRegistrationStatus.Unregistered);
+            await Assert.That(submitted.Succeeded).IsTrue();
+            await Assert.That((await registrations.FindAsync(
+                competitionId, teamId, includePending: true, cancellationToken))!
+                .RegistrationStatus).IsEqualTo(TeamRegistrationStatus.Pending);
 
             await db.Teams.Where(team => team.Id == teamId).ExecuteUpdateAsync(setters => setters
                 .SetProperty(team => team.RegistrationStatus, TeamRegistrationStatus.Approved),
@@ -283,7 +300,13 @@ public sealed class CompetitionTrackSsoGatePersistenceTests
                 ActorUserId: captainId, UpdatedAt: now.AddMinutes(6)), cancellationToken);
             await Assert.That(autoApproved.Succeeded).IsTrue();
             await Assert.That(autoApproved.Value!.RegistrationStatus)
-                .IsEqualTo(TeamRegistrationStatus.Approved);
+                .IsEqualTo(TeamRegistrationStatus.Unregistered);
+            var autoApprovedSubmission = await submit.ExecuteAsync(
+                competitionId, teamId, captainId, "let-me-in", cancellationToken);
+            await Assert.That(autoApprovedSubmission.Succeeded).IsTrue();
+            await Assert.That((await registrations.FindAsync(
+                competitionId, teamId, includePending: true, cancellationToken))!
+                .RegistrationStatus).IsEqualTo(TeamRegistrationStatus.Approved);
 
             var recordedKinds = await db.CompetitionEvents.AsNoTracking()
                 .Where(item => item.SubjectType == NoCTF.Domain.Shared.EntityReferenceKind.Team
@@ -324,6 +347,7 @@ public sealed class CompetitionTrackSsoGatePersistenceTests
             var eligibleMemberId = Guid.CreateVersion7(now.AddMilliseconds(3));
             var unboundUserId = Guid.CreateVersion7(now.AddMilliseconds(4));
             var secondUnboundUserId = Guid.CreateVersion7(now.AddMilliseconds(5));
+            var thirdUnboundUserId = Guid.CreateVersion7(now.AddMilliseconds(6));
             var settings = await db.PlatformSettings.SingleAsync(cancellationToken);
             settings.SsoConfiguration.Providers.Add(new SsoProviderConfiguration
             {
@@ -344,7 +368,8 @@ public sealed class CompetitionTrackSsoGatePersistenceTests
                 BoundUser(eligibleCaptainId, "eligible-captain", providerId, now),
                 BoundUser(eligibleMemberId, "eligible-member", providerId, now),
                 User(unboundUserId, "unbound", now),
-                User(secondUnboundUserId, "second-unbound", now));
+                User(secondUnboundUserId, "second-unbound", now),
+                User(thirdUnboundUserId, "third-unbound", now));
             var gatedTrack = Track("school", providerId);
             var defaultTrack = Track("default", null, isDefault: true);
             db.Competitions.Add(new Competition
@@ -376,13 +401,6 @@ public sealed class CompetitionTrackSsoGatePersistenceTests
                 "Eligible team",
                 now,
                 gatedTrack.Key), TeamRegistrationStatus.Approved, cancellationToken);
-            var blockedCreate = await registrations.TryCreateAsync(new(
-                competitionId,
-                unboundUserId,
-                "Blocked team",
-                now,
-                gatedTrack.Key), TeamRegistrationStatus.Approved, cancellationToken);
-
             var invitation = await db.Teams.AsNoTracking()
                 .Where(team => team.Id == eligibleTeam.Team!.Id)
                 .Select(team => team.InvitationToken)
@@ -403,7 +421,7 @@ public sealed class CompetitionTrackSsoGatePersistenceTests
 
             var defaultTeam = await registrations.TryCreateAsync(new(
                 competitionId,
-                unboundUserId,
+                secondUnboundUserId,
                 "Default team",
                 now,
                 defaultTrack.Key), TeamRegistrationStatus.Approved, cancellationToken);
@@ -473,19 +491,16 @@ public sealed class CompetitionTrackSsoGatePersistenceTests
             db.ChangeTracker.Clear();
             var disabledGateCreate = await registrations.TryCreateAsync(new(
                 competitionId,
-                secondUnboundUserId,
+                thirdUnboundUserId,
                 "Disabled gate team",
                 now.AddMinutes(2),
                 TrackKey: null), TeamRegistrationStatus.Approved, cancellationToken);
 
             await Assert.That(eligibleTeam.Team).IsNotNull();
-            await Assert.That(blockedCreate.Failure)
-                .IsEqualTo(TeamRegistrationFailure.TrackSsoIdentityRequired);
-            await Assert.That(blockedJoin)
-                .IsEqualTo(TeamMembershipFailure.TrackSsoIdentityRequired);
+            await Assert.That(blockedJoin).IsNull();
             await Assert.That(allowedJoin).IsNull();
             await Assert.That(eligibleView!.Tracks.Single(track => track.Key == gatedTrack.Key)
-                .MeetsSsoRequirement).IsTrue();
+                .MeetsSsoRequirement).IsFalse();
             await Assert.That(teamNoLongerMeetsGate!.Tracks.Single(
                 track => track.Key == gatedTrack.Key).MeetsSsoRequirement).IsFalse();
             await Assert.That(unboundView!.Tracks.Single(track => track.Key == gatedTrack.Key)

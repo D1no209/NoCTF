@@ -140,10 +140,15 @@ const { competitionId, canJudge, canWrite, teams, search, loading, pageLoading, 
                   </NuxtLink>
                 </div>
                 <Badge v-if="member.userId === selectedTeam.captainId" variant="secondary">{{ $t('ui.captain') }}</Badge>
-                <Collapsible v-if="canJudge && member.userId && selectedTeam.id" class="w-full">
-                  <CollapsibleTrigger as-child><Button variant="outline" size="sm">{{ $t('ui.privateMemberDetails') }}</Button></CollapsibleTrigger>
-                  <CollapsibleContent class="pt-4"><component :is="PrivateAccountPanel" :user-id="member.userId" :competition-id="competitionId" :team-id="selectedTeam.id" /></CollapsibleContent>
-                </Collapsible>
+                <component
+                  :is="PrivateAccountPanel"
+                  v-if="canJudge && member.userId && selectedTeam.id"
+                  class="w-full pt-3"
+                  :user-id="member.userId"
+                  :competition-id="competitionId"
+                  :team-id="selectedTeam.id"
+                  :show-activities="false"
+                />
               </div>
               <p v-if="!teamMembers.length" class="p-3 text-sm text-muted-foreground">{{ $t('ui.noMembers') }}</p>
             </div>

@@ -178,6 +178,7 @@ export const messages = {
   "ui.pendingAndRespondedInquiriesCountTowardsTheCap": "待处理与已回复的咨询计入上限。",
   "ui.awaitingEvaluation": "待评测",
   "ui.pendingReview": "待审核",
+  "ui.notRegistered": "未报名",
   "ui.pendingApproval": "待审批",
   "ui.questionsCannotBeOpenedInTheCurrentCompetitionState": "当前比赛状态不允许创建咨询。",
   "ui.fixesCannotBeSubmittedAtThisTime": "当前不可提交 Fix。",

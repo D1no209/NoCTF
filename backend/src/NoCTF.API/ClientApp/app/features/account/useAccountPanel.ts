@@ -307,7 +307,6 @@ export function useAccountPanel() {
   const ssoPending = ref(false)
   const ssoError = ref<string | null>(null)
   const ssoProviderId = ref('')
-  const ssoPassword = ref('')
 
   async function loadSsoBinding() {
     ssoLoading.value = true
@@ -324,15 +323,14 @@ export function useAccountPanel() {
   }
 
   async function beginSsoBinding() {
-    if (!ssoProviderId.value || !ssoPassword.value || ssoPending.value) return
+    if (!ssoProviderId.value || ssoPending.value) return
     ssoPending.value = true
     ssoError.value = null
     try {
       const { data, error } = await authenticationSsoBeginBinding({
-        body: { providerId: ssoProviderId.value, password: ssoPassword.value },
+        body: { providerId: ssoProviderId.value },
       })
       if (error || !data?.authorizationUrl) throw error
-      ssoPassword.value = ''
       window.location.assign(data.authorizationUrl)
     }
     catch (error) {
@@ -342,18 +340,15 @@ export function useAccountPanel() {
   }
 
   async function unbindSsoIdentity() {
-    if (!ssoPassword.value || ssoPending.value) return
+    if (ssoPending.value) return
     ssoPending.value = true
     ssoError.value = null
-    const { error } = await authenticationSsoUnbindIdentity({
-      body: { password: ssoPassword.value },
-    })
+    const { error } = await authenticationSsoUnbindIdentity()
     ssoPending.value = false
     if (error) {
       ssoError.value = parseApiError(error, translate('sso.unbindingFailed')).message
       return
     }
-    ssoPassword.value = ''
     invalidate()
     toast.success(translate('sso.unbindingSuccessful'))
     open.value = false
@@ -417,7 +412,7 @@ export function useAccountPanel() {
   }
 
   const hasUnsaved = computed(() => profileDirty.value || identityDirty.value
-    || Boolean(ssoPassword.value || currentPassword.value || newPassword.value || confirmNewPassword.value))
+    || Boolean(currentPassword.value || newPassword.value || confirmNewPassword.value))
 
   function beforeUnload(event: BeforeUnloadEvent) {
     if (!hasUnsaved.value) return
@@ -497,7 +492,6 @@ export function useAccountPanel() {
     ssoPending,
     ssoError,
     ssoProviderId,
-    ssoPassword,
     loadSsoBinding,
     beginSsoBinding,
     unbindSsoIdentity,

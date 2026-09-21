@@ -28,14 +28,40 @@ public sealed class AccountPrivacyStore(NoCtfDbContext db, IOptions<AccountPriva
 
     public Task<bool> IsTeamMemberAsync(Guid competitionId, Guid teamId, Guid memberId, CancellationToken ct) =>
         db.Teams.AnyAsync(team => team.Id == teamId && team.CompetitionId == competitionId
-            && team.DeletedAt == null && team.RegistrationStatus != NoCTF.Domain.Teams.TeamRegistrationStatus.Rejected
+            && team.DeletedAt == null
             && team.MemberIds.Contains(memberId), ct);
 
     public async Task<PrivateAccountDetails?> ReadAsync(Guid userId, Guid? competitionId, CancellationToken ct)
     {
-        var identity = await db.Users.AsNoTracking().Where(user => user.Id == userId)
-            .Select(user => new SchoolIdentity(user.SchoolFullName, user.SchoolStudentNumber)).SingleOrDefaultAsync(ct);
-        if (identity is null) return null;
+        var user = await db.Users.AsNoTracking().Where(item => item.Id == userId)
+            .Select(item => new
+            {
+                item.SchoolFullName,
+                item.SchoolStudentNumber,
+                item.ExternalIdentityProviderId,
+                item.ExternalIdentityProtocol,
+                item.ExternalIdentitySubject,
+                item.ExternalIdentityBoundAt
+            }).SingleOrDefaultAsync(ct);
+        if (user is null) return null;
+        var identity = new SchoolIdentity(user.SchoolFullName, user.SchoolStudentNumber);
+        PrivateSsoBinding? ssoBinding = null;
+        if (user.ExternalIdentityProviderId is Guid providerId
+            && user.ExternalIdentityProtocol is { } protocol
+            && user.ExternalIdentitySubject is { } subject
+            && user.ExternalIdentityBoundAt is { } boundAt)
+        {
+            var settings = await db.PlatformSettings.AsNoTracking().SingleAsync(ct);
+            var provider = settings.SsoConfiguration.Providers.FirstOrDefault(
+                candidate => candidate.Id == providerId);
+            ssoBinding = new(
+                providerId,
+                provider?.Name,
+                provider?.IconUrl,
+                protocol,
+                subject,
+                boundAt);
+        }
         var cutoff = clock.GetUtcNow().AddDays(-options.Value.IpRetentionDays);
         var facts = await db.GameplayFacts.AsNoTracking().Where(fact => fact.ActorUserId == userId
                 && (competitionId == null || fact.CompetitionId == competitionId)
@@ -57,7 +83,7 @@ public sealed class AccountPrivacyStore(NoCtfDbContext db, IOptions<AccountPriva
                 .Where(item => item is not null));
         }
         return new(identity, facts.OrderByDescending(item => item.OccurredAt).ThenByDescending(item => item.Id).Take(50).ToArray(),
-            options.Value.IpRetentionDays);
+            options.Value.IpRetentionDays, ssoBinding);
     }
 
     public async Task RecordLoginAsync(Guid? authenticatedUserId, DateTimeOffset now, CancellationToken ct)

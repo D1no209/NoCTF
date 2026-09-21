@@ -48,8 +48,8 @@ public sealed class TeamMutationConcurrencyPersistenceTests
             await CreateWhileJoiningAsync(options, cancellationToken);
             await DifferentUsersJoinAsync(options, cancellationToken);
             await JoinWhileRunningFollowsRegistrationSettingAsync(options, cancellationToken);
-            await OrganizationChangesRecalculateRegistrationAsync(options, cancellationToken);
-            await AvatarChangesRecalculateRegistrationAsync(options, cancellationToken);
+            await OrganizationChangesReturnTeamToUnregisteredAsync(options, cancellationToken);
+            await AvatarChangesReturnTeamToUnregisteredAsync(options, cancellationToken);
             await InvitationReadAuthorizationAsync(options, cancellationToken);
             await BannedTeamRejectsOrganizationMutationsAsync(options, cancellationToken);
         });
@@ -216,7 +216,7 @@ public sealed class TeamMutationConcurrencyPersistenceTests
         await Assert.That(memberIds.Length).IsEqualTo(3);
     }
 
-    private static async Task OrganizationChangesRecalculateRegistrationAsync(
+    private static async Task OrganizationChangesReturnTeamToUnregisteredAsync(
         DbContextOptions<NoCtfDbContext> options,
         CancellationToken ct)
     {
@@ -247,7 +247,7 @@ public sealed class TeamMutationConcurrencyPersistenceTests
         await Assert.That(await membership.JoinByInvitationAsync(
             competition.Id, invitationToken, joining.Id, now.AddMinutes(1), ct)).IsNull();
         await Assert.That(await TeamStatusAsync(db, team.Id, ct))
-            .IsEqualTo(TeamRegistrationStatus.Pending);
+            .IsEqualTo(TeamRegistrationStatus.Unregistered);
 
         await db.Competitions.Where(item => item.Id == competition.Id)
             .ExecuteUpdateAsync(setters => setters.SetProperty(
@@ -257,7 +257,7 @@ public sealed class TeamMutationConcurrencyPersistenceTests
         await Assert.That(await membership.RemoveMemberAsync(
             competition.Id, team.Id, joining.Id, captain.Id, ct)).IsNull();
         await Assert.That(await TeamStatusAsync(db, team.Id, ct))
-            .IsEqualTo(TeamRegistrationStatus.Approved);
+            .IsEqualTo(TeamRegistrationStatus.Unregistered);
 
         await db.Competitions.Where(item => item.Id == competition.Id)
             .ExecuteUpdateAsync(setters => setters.SetProperty(
@@ -267,14 +267,14 @@ public sealed class TeamMutationConcurrencyPersistenceTests
         await Assert.That(await membership.TransferCaptainAsync(
             competition.Id, team.Id, captain.Id, member.Id, ct)).IsNull();
         await Assert.That(await TeamStatusAsync(db, team.Id, ct))
-            .IsEqualTo(TeamRegistrationStatus.Pending);
+            .IsEqualTo(TeamRegistrationStatus.Unregistered);
 
         await db.Teams.Where(item => item.Id == team.Id).ExecuteUpdateAsync(setters => setters
             .SetProperty(item => item.RegistrationStatus, TeamRegistrationStatus.Approved), ct);
         db.ChangeTracker.Clear();
         await Assert.That(await membership.LeaveAsync(competition.Id, captain.Id, ct)).IsNull();
         await Assert.That(await TeamStatusAsync(db, team.Id, ct))
-            .IsEqualTo(TeamRegistrationStatus.Pending);
+            .IsEqualTo(TeamRegistrationStatus.Unregistered);
 
         await db.Competitions.Where(item => item.Id == competition.Id)
             .ExecuteUpdateAsync(setters => setters.SetProperty(
@@ -286,7 +286,7 @@ public sealed class TeamMutationConcurrencyPersistenceTests
             .IsEqualTo(TeamMembershipFailure.MembershipLocked);
     }
 
-    private static async Task AvatarChangesRecalculateRegistrationAsync(
+    private static async Task AvatarChangesReturnTeamToUnregisteredAsync(
         DbContextOptions<NoCtfDbContext> options,
         CancellationToken ct)
     {
@@ -331,7 +331,7 @@ public sealed class TeamMutationConcurrencyPersistenceTests
             captain.Id, false, competition.Id, team.Id, fileId, now.AddMinutes(1), ct);
         await Assert.That(replaced.State).IsEqualTo(BusinessFileReferenceState.Updated);
         await Assert.That(await TeamStatusAsync(db, team.Id, ct))
-            .IsEqualTo(TeamRegistrationStatus.Pending);
+            .IsEqualTo(TeamRegistrationStatus.Unregistered);
 
         await db.Competitions.Where(item => item.Id == competition.Id)
             .ExecuteUpdateAsync(setters => setters.SetProperty(
@@ -342,7 +342,7 @@ public sealed class TeamMutationConcurrencyPersistenceTests
             captain.Id, false, competition.Id, team.Id, ct);
         await Assert.That(cleared.State).IsEqualTo(BusinessFileReferenceState.Cleared);
         await Assert.That(await TeamStatusAsync(db, team.Id, ct))
-            .IsEqualTo(TeamRegistrationStatus.Approved);
+            .IsEqualTo(TeamRegistrationStatus.Unregistered);
 
         await db.Teams.Where(item => item.Id == team.Id).ExecuteUpdateAsync(setters => setters
             .SetProperty(item => item.RegistrationStatus, TeamRegistrationStatus.Pending), ct);

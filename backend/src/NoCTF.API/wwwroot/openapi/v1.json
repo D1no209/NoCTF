@@ -4965,7 +4965,7 @@
         "tags": [
           "Auth"
         ],
-        "summary": "Reauthenticates the current user and starts an external identity binding flow.",
+        "summary": "Starts an external identity binding flow for the authenticated user.",
         "description": "Executes POST /api/v1/auth/me/sso-binding/flows.",
         "operationId": "Authentication_SsoBeginBinding",
         "requestBody": {
@@ -5448,27 +5448,9 @@
         "tags": [
           "Auth"
         ],
-        "summary": "Removes the external identity binding after password reauthentication and revokes current sessions.",
+        "summary": "Removes the authenticated user's external identity binding and revokes current sessions.",
         "description": "Executes DELETE /api/v1/auth/me/sso-binding.",
         "operationId": "Authentication_SsoUnbindIdentity",
-        "requestBody": {
-          "x-name": "UnbindSsoIdentityRequest",
-          "description": "",
-          "content": {
-            "*/*": {
-              "schema": {
-                "$ref": "#/components/schemas/NoCTFAPIEndpointsAuthenticationUnbindSsoIdentityRequest"
-              }
-            },
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/NoCTFAPIEndpointsAuthenticationUnbindSsoIdentityRequest"
-              }
-            }
-          },
-          "required": true,
-          "x-position": 1
-        },
         "responses": {
           "204": {
             "description": "No Content"
@@ -5478,16 +5460,6 @@
           },
           "403": {
             "description": "Forbidden"
-          },
-          "400": {
-            "description": "Bad Request",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcValidationProblemDetails"
-                }
-              }
-            }
           }
         },
         "security": [
@@ -14258,12 +14230,14 @@
         "x-enumNames": [
           "Pending",
           "Approved",
-          "Rejected"
+          "Rejected",
+          "Unregistered"
         ],
         "enum": [
           "Pending",
           "Approved",
-          "Rejected"
+          "Rejected",
+          "Unregistered"
         ]
       },
       "NoCTFAPIEndpointsTeamsCreateTeamRequest": {
@@ -14694,6 +14668,12 @@
         "properties": {
           "status": {
             "$ref": "#/components/schemas/NoCTFAPIEndpointsTeamsTeamRegistrationStatusProtocol"
+          },
+          "trackInvitationCode": {
+            "type": "string",
+            "maxLength": 128,
+            "minLength": 0,
+            "nullable": true
           }
         }
       },
@@ -19172,7 +19152,6 @@
         "type": "object",
         "additionalProperties": false,
         "required": [
-          "password",
           "providerId"
         ],
         "properties": {
@@ -19180,12 +19159,6 @@
             "type": "string",
             "format": "guid",
             "minLength": 1,
-            "nullable": false
-          },
-          "password": {
-            "type": "string",
-            "maxLength": 1024,
-            "minLength": 0,
             "nullable": false
           }
         }
@@ -19948,21 +19921,6 @@
           }
         }
       },
-      "NoCTFAPIEndpointsAuthenticationUnbindSsoIdentityRequest": {
-        "type": "object",
-        "additionalProperties": false,
-        "required": [
-          "password"
-        ],
-        "properties": {
-          "password": {
-            "type": "string",
-            "maxLength": 1024,
-            "minLength": 0,
-            "nullable": false
-          }
-        }
-      },
       "NoCTFAPIEndpointsAuthenticationAvatarUploadFailureResponse": {
         "type": "object",
         "additionalProperties": false,
@@ -20095,6 +20053,14 @@
           "retentionDays": {
             "type": "integer",
             "format": "int32"
+          },
+          "ssoBinding": {
+            "nullable": true,
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationPlatformPrivateSsoBindingResponse"
+              }
+            ]
           }
         }
       },
@@ -20126,6 +20092,34 @@
             "type": "string",
             "format": "guid",
             "nullable": true
+          }
+        }
+      },
+      "NoCTFAPIEndpointsAdministrationPlatformPrivateSsoBindingResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "providerId": {
+            "type": "string",
+            "format": "guid"
+          },
+          "providerName": {
+            "type": "string",
+            "nullable": true
+          },
+          "providerIconUrl": {
+            "type": "string",
+            "nullable": true
+          },
+          "protocol": {
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsAuthenticationPublicSsoProtocol"
+          },
+          "subject": {
+            "type": "string"
+          },
+          "boundAt": {
+            "type": "string",
+            "format": "date-time"
           }
         }
       },

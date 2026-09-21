@@ -107,12 +107,12 @@ Owner/Manager 手动 Start 与 StartAt 调度共用一个 Application 用例，�
 ## 报名与团队
 
 - Visible、Published 允许创建团队和凭 Token 加入；Running 仅在显式开启赛中报名时允许。
-- AutoApprove 为 true 时新团队是 Approved，否则 Pending。
-- Pending 可被批准或拒绝；Rejected 可重新提交为 Pending。
-- 队长可修改队名、头像和公开可报名赛道。切换赛道时重新校验邀请码，并要求全体成员满足该赛道的 SSO 门禁；只修改当前受限赛道上的其他资料时不重复要求邀请码或 SSO。
-- 队名、头像、赛道、成员加入/退出/移除和队长转让均重算审核状态：AutoApprove 为 true 时成为 Approved，否则成为 Pending；无实际变化与邀请 Token 轮换不触发复审。Administrator、Owner、Manager 可把队伍显式退回 Pending。
+- 新团队先保存为 Unregistered，不因邀请码或 SSO 尚未满足而阻止创建和编辑。队长提交报名时才校验当前赛道的邀请码和全体成员 SSO；通过后，AutoApprove 为 true 时成为 Approved，否则成为 Pending。
+- Pending 可被批准或拒绝；Rejected 与 Unregistered 可重新提交当前报名草稿。Administrator、Owner、Manager 可把队伍显式设为 Pending。
+- 队长可在 Unregistered 状态修改队名、头像和公开可报名赛道。选择赛道与成员加入只构建草稿，不提前校验邀请码或 SSO。
+- 队名、头像、赛道、成员加入/退出/移除和队长转让有实际变化时一律退回 Unregistered；无实际变化与邀请 Token 轮换不改变状态。
 - 组织变更窗口与报名窗口相同；Paused、Finished 禁止，Running 受 AllowTeamRegistrationWhileRunning 控制。
-- Pending/Rejected 可管理报名与允许的队伍资料，但不能获得题目、附件、提示、咨询、Flag、Runtime 或新 GameplayFact 权限。转为 Pending 时已有 Runtime 保留至正常生命周期结束，但所有选手读取与操作 API 都拒绝访问。
+- Unregistered/Pending/Rejected 不能获得题目、附件、提示、咨询、Flag、Runtime 或新 GameplayFact 权限。退出 Approved 后已有 Runtime 保留至正常生命周期结束，但所有选手读取与操作 API 都拒绝访问。
 - CaptainId 是唯一队长来源。转让队长原子更新 CaptainId；成员数组无顺序。
 - Ban 立即拒绝私有数据、Runtime 与 GameplayFact，回收该队 CTF/AWD Runtime，并把该队及与其相关的攻防事实从投影排除。Unban 恢复当前事实；CTF Runtime 由选手重新启动，AWD 由系统重新配置。
 - 每次 Ban 对应一个不可变事件。队长可提交一次私密申诉，全队可读；Judge/Observer 只读，Administrator、Owner、Manager 裁决。接受申诉或主动纠错允许赛后恢复历史投影，但 Finished 比赛不重新配置 Runtime。申诉、裁决和公开纠错都保留原始事件关联，不公开工作人员原因或证据。

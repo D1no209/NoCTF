@@ -64,18 +64,6 @@ public sealed class TeamRegistrationStore(
                 return new(null, TeamRegistrationFailure.TrackNotFound);
             if (track.IsInternal || !track.IsPublicSelectable)
                 return new(null, TeamRegistrationFailure.TrackNotPublicSelectable);
-            if (track.RequiresInvitationCode
-                && string.IsNullOrWhiteSpace(command.TrackInvitationCode))
-            {
-                return new(null, TeamRegistrationFailure.TrackInvitationRequired);
-            }
-            if (track.RequiresInvitationCode
-                && !CompetitionTrackInvitationCode.Verify(
-                    track.InvitationCode,
-                    command.TrackInvitationCode))
-            {
-                return new(null, TeamRegistrationFailure.TrackInvitationInvalid);
-            }
         }
         var userIdentity = await db.Users.AsNoTracking()
             .Where(user => user.Id == command.UserId)
@@ -83,12 +71,6 @@ public sealed class TeamRegistrationStore(
             .SingleOrDefaultAsync(ct);
         if (userIdentity is null)
             return new(null, TeamRegistrationFailure.TeamNameOrMembershipConflict);
-        if (competition.TracksEnabled
-            && track.RequiredSsoProviderId is Guid requiredProviderId
-            && userIdentity.ExternalIdentityProviderId != requiredProviderId)
-        {
-            return new(null, TeamRegistrationFailure.TrackSsoIdentityRequired);
-        }
         if (await db.Teams.AnyAsync(x => x.CompetitionId == command.CompetitionId
             && x.DeletedAt == null
             && x.MemberIds.Contains(command.UserId), ct))
@@ -250,7 +232,9 @@ public sealed class TeamRegistrationStore(
             competition.TracksEnabled,
             competition.TrackConfigurationJson).Find(team.TrackKey);
         var changed = await db.Teams.Where(x => x.Id == teamId && x.CompetitionId == competitionId
-                && x.RegistrationStatus != status)
+                && (status == TeamRegistrationStatus.Pending
+                    ? x.RegistrationStatus != TeamRegistrationStatus.Pending
+                    : x.RegistrationStatus == TeamRegistrationStatus.Pending))
             .ExecuteUpdateAsync(setters => setters.SetProperty(x => x.RegistrationStatus, status), ct);
         if (changed == 1)
         {
@@ -274,57 +258,83 @@ public sealed class TeamRegistrationStore(
         return changed == 1 ? new(true) : new(false, TeamRegistrationFailure.TeamReviewConflict);
     }
 
-    public async Task<TeamReviewStoreResult> ResubmitAsync(
+    public async Task<TeamReviewStoreResult> SubmitAsync(
         Guid competitionId,
         Guid teamId,
         Guid userId,
+        string? trackInvitationCode,
         CancellationToken ct)
     {
-        await using var transaction = await AggregateCompatibleTransaction.BeginAsync(db, ct);
-        var competition = await db.Competitions.AsNoTracking()
-            .Where(item => item.Id == competitionId && item.DeletedAt == null)
-            .Select(item => new
-            {
-                item.Status,
-                item.AllowTeamRegistrationWhileRunning
-            })
-            .SingleOrDefaultAsync(ct);
+        await using var transaction = await AggregateCompatibleTransaction.BeginAsync(
+            db,
+            System.Data.IsolationLevel.ReadCommitted,
+            ct);
+        var competition = await CompetitionTeamMutationCriticalSection.AcquireAsync(
+            db,
+            competitionId,
+            ct);
         if (competition is null)
             return new(false, TeamRegistrationFailure.CompetitionNotFound);
-        if (competition.Status is CompetitionStatus.Paused or CompetitionStatus.Finished
-            || competition.Status == CompetitionStatus.Running
-                && !competition.AllowTeamRegistrationWhileRunning)
+        if (!ParticipantTeamMutationPolicy.CanChangeOrganization(
+                competition.Status,
+                competition.AllowTeamRegistrationWhileRunning))
             return new(false, TeamRegistrationFailure.RegistrationClosed);
-        var changed = await db.Teams
-            .Where(team =>
-                team.Id == teamId &&
-                team.CompetitionId == competitionId &&
-                team.CaptainId == userId &&
-                team.RegistrationStatus == TeamRegistrationStatus.Rejected)
-            .ExecuteUpdateAsync(
-                setters => setters.SetProperty(
-                    team => team.RegistrationStatus,
-                    TeamRegistrationStatus.Pending),
-                ct);
-        if (changed == 1)
-        {
-            await events.RecordAsync(new(
-                competitionId,
-                CompetitionEventKind.TeamRegistrationChanged,
-                CompetitionEventLevel.Information,
-                CompetitionEventVisibility.Staff,
-                timeProvider.GetUtcNow(),
-                ActorUserId: userId,
-                RelatedUserId: userId,
-                TeamId: teamId,
-                TeamRegistrationStatus: TeamRegistrationStatus.Pending), ct);
-            await db.SaveChangesAsync(ct);
-        }
+        var team = await db.Teams.SingleOrDefaultAsync(item =>
+            item.Id == teamId
+            && item.CompetitionId == competitionId
+            && item.CaptainId == userId
+            && item.DeletedAt == null
+            && (item.RegistrationStatus == TeamRegistrationStatus.Unregistered
+                || item.RegistrationStatus == TeamRegistrationStatus.Rejected), ct);
+        if (team is null)
+            return new(false, TeamRegistrationFailure.TeamReviewConflict);
+        if (team.IsBanned)
+            return new(false, TeamRegistrationFailure.TeamBanned);
+        if (team.IsLocked)
+            return new(false, TeamRegistrationFailure.TeamLocked);
+        var configuration = CompetitionTrackConfiguration.ParseOrDefault(
+            competition.Mode,
+            competition.TrackConfigurationJson);
+        var track = configuration.Find(team.TrackKey);
+        if (track is null)
+            return new(false, TeamRegistrationFailure.TrackNotFound);
+        if (competition.TracksEnabled && (track.IsInternal || !track.IsPublicSelectable))
+            return new(false, TeamRegistrationFailure.TrackNotPublicSelectable);
+        if (competition.TracksEnabled && track.RequiresInvitationCode
+            && string.IsNullOrWhiteSpace(trackInvitationCode))
+            return new(false, TeamRegistrationFailure.TrackInvitationRequired);
+        if (competition.TracksEnabled && track.RequiresInvitationCode
+            && !CompetitionTrackInvitationCode.Verify(track.InvitationCode, trackInvitationCode))
+            return new(false, TeamRegistrationFailure.TrackInvitationInvalid);
+        if (competition.TracksEnabled
+            && track.RequiredSsoProviderId is Guid requiredProviderId
+            && await db.Users.AsNoTracking().CountAsync(user =>
+                team.MemberIds.Contains(user.Id)
+                && user.ExternalIdentityProviderId == requiredProviderId,
+                ct) != team.MemberIds.Length)
+            return new(false, TeamRegistrationFailure.TrackSsoIdentityRequired);
+
+        var nextStatus = competition.TeamRegistrationAutoApprove
+            ? TeamRegistrationStatus.Approved
+            : TeamRegistrationStatus.Pending;
+        team.RegistrationStatus = nextStatus;
+        await events.RecordAsync(new(
+            competitionId,
+            CompetitionEventKind.TeamRegistrationChanged,
+            CompetitionEventLevel.Information,
+            nextStatus == TeamRegistrationStatus.Approved && !track.IsInternal
+                ? CompetitionEventVisibility.Public
+                : CompetitionEventVisibility.Staff,
+            timeProvider.GetUtcNow(),
+            ActorUserId: userId,
+            RelatedUserId: userId,
+            TeamId: teamId,
+            TeamRegistrationStatus: nextStatus,
+            TrackKey: team.TrackKey), ct);
+        await db.SaveChangesAsync(ct);
         await transaction.CommitAsync(ct);
         await outbox.FlushOutgoingMessagesAsync();
-        return changed == 1
-            ? new(true)
-            : new(false, TeamRegistrationFailure.TeamReviewConflict);
+        return new(true);
     }
 
     public Task<TeamView?> FindAsync(
@@ -453,21 +463,6 @@ public sealed class TeamRegistrationStore(
                 StringComparison.OrdinalIgnoreCase);
             if (trackChanged && (nextTrack.IsInternal || !nextTrack.IsPublicSelectable))
                 return new(null, TeamRegistrationFailure.TrackNotPublicSelectable);
-            if (trackChanged && nextTrack.RequiresInvitationCode
-                && string.IsNullOrWhiteSpace(command.TrackInvitationCode))
-                return new(null, TeamRegistrationFailure.TrackInvitationRequired);
-            if (trackChanged && nextTrack.RequiresInvitationCode
-                && !CompetitionTrackInvitationCode.Verify(
-                    nextTrack.InvitationCode,
-                    command.TrackInvitationCode))
-                return new(null, TeamRegistrationFailure.TrackInvitationInvalid);
-            if (trackChanged
-                && nextTrack.RequiredSsoProviderId is Guid requiredProviderId
-                && await db.Users.AsNoTracking().CountAsync(user =>
-                    entity.MemberIds.Contains(user.Id)
-                    && user.ExternalIdentityProviderId == requiredProviderId,
-                    ct) != entity.MemberIds.Length)
-                return new(null, TeamRegistrationFailure.TrackSsoIdentityRequired);
         }
 
         var nameChanged = !string.Equals(entity.Name, name, StringComparison.Ordinal);

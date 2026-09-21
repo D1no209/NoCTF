@@ -3,7 +3,7 @@ import { toRefs } from 'vue'
 import type { AccountPanelViewState } from '~/features/account/useAccountPanel'
 
 const viewProps = defineProps<{ state: AccountPanelViewState }>()
-const { UserRound, LockKeyhole, ShieldCheck, ImageIcon, LogOut, user, isImpersonating, fetchMe, open, activeSection, setOpen, selectSection, signOut, description, profilePending, profileError, profileSuccess, profileDirty, saveProfile, avatarInput, avatarPending, avatarEditorOpen, avatarSourceFile, avatarRequirements, selectAvatar, setAvatarEditorOpen, uploadAvatar, reportAvatarError, setAvatarInputRef, wallpaperInput, wallpaperPending, wallpaperUrl, wallpaperRequirements, selectWallpaper, setWallpaperEnabled, setWallpaperInputRef, fullName, studentNumber, identityLoading, identityLoaded, identityPending, identityError, identitySuccess, identityDirty, identityFieldError, loadIdentity, saveIdentity, emailPending, emailMessage, emailError, resendEmail, ssoConfiguration, ssoLoading, ssoLoaded, ssoPending, ssoError, ssoProviderId, ssoPassword, loadSsoBinding, beginSsoBinding, unbindSsoIdentity, currentPassword, newPassword, confirmNewPassword, passwordPending, passwordError, changePassword, logoutAll, AvatarCropDialog, AdminDateTime } = toRefs(viewProps.state)
+const { UserRound, LockKeyhole, ShieldCheck, ImageIcon, LogOut, user, isImpersonating, fetchMe, open, activeSection, setOpen, selectSection, signOut, description, profilePending, profileError, profileSuccess, profileDirty, saveProfile, avatarInput, avatarPending, avatarEditorOpen, avatarSourceFile, avatarRequirements, selectAvatar, setAvatarEditorOpen, uploadAvatar, reportAvatarError, setAvatarInputRef, wallpaperInput, wallpaperPending, wallpaperUrl, wallpaperRequirements, selectWallpaper, setWallpaperEnabled, setWallpaperInputRef, fullName, studentNumber, identityLoading, identityLoaded, identityPending, identityError, identitySuccess, identityDirty, identityFieldError, loadIdentity, saveIdentity, emailPending, emailMessage, emailError, resendEmail, ssoConfiguration, ssoLoading, ssoLoaded, ssoPending, ssoError, ssoProviderId, loadSsoBinding, beginSsoBinding, unbindSsoIdentity, currentPassword, newPassword, confirmNewPassword, passwordPending, passwordError, changePassword, logoutAll, AvatarCropDialog, AdminDateTime } = toRefs(viewProps.state)
 </script>
 
 <template>
@@ -226,11 +226,7 @@ const { UserRound, LockKeyhole, ShieldCheck, ImageIcon, LogOut, user, isImperson
                       </div>
                     </div>
                   </div>
-                  <Field>
-                    <FieldLabel for="account-panel-sso-unbind-password">{{ $t('ui.currentPassword') }}</FieldLabel>
-                    <PasswordInput id="account-panel-sso-unbind-password" v-model="ssoPassword" :disabled="ssoPending" autocomplete="current-password" />
-                  </Field>
-                  <Button type="button" variant="destructive" size="sm" class="self-start" :disabled="ssoPending || !ssoPassword" @click="unbindSsoIdentity">
+                  <Button type="button" variant="destructive" size="sm" class="self-start" :disabled="ssoPending" @click="unbindSsoIdentity">
                     <Spinner v-if="ssoPending" data-icon="inline-start" />{{ $t('sso.unbind') }}
                   </Button>
                 </template>
@@ -249,11 +245,7 @@ const { UserRound, LockKeyhole, ShieldCheck, ImageIcon, LogOut, user, isImperson
                       </SelectContent>
                     </Select>
                   </Field>
-                  <Field>
-                    <FieldLabel for="account-panel-sso-bind-password">{{ $t('ui.currentPassword') }}</FieldLabel>
-                    <PasswordInput id="account-panel-sso-bind-password" v-model="ssoPassword" :disabled="ssoPending" autocomplete="current-password" />
-                  </Field>
-                  <Button type="button" variant="outline" size="sm" class="self-start" :disabled="ssoPending || !ssoPassword || !ssoProviderId" @click="beginSsoBinding">
+                  <Button type="button" variant="outline" size="sm" class="self-start" :disabled="ssoPending || !ssoProviderId" @click="beginSsoBinding">
                     <Spinner v-if="ssoPending" data-icon="inline-start" />{{ $t('sso.bind') }}
                   </Button>
                 </template>

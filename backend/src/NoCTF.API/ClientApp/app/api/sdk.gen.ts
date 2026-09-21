@@ -1301,7 +1301,7 @@ export const getCompetitionQuestion = <ThrowOnError extends boolean = false>(opt
 });
 
 /**
- * Reauthenticates the current user and starts an external identity binding flow.
+ * Starts an external identity binding flow for the authenticated user.
  *
  * Executes POST /api/v1/auth/me/sso-binding/flows.
  */
@@ -1487,22 +1487,18 @@ export const authenticationPatchMyProfile = <ThrowOnError extends boolean = fals
 });
 
 /**
- * Removes the external identity binding after password reauthentication and revokes current sessions.
+ * Removes the authenticated user's external identity binding and revokes current sessions.
  *
  * Executes DELETE /api/v1/auth/me/sso-binding.
  */
-export const authenticationSsoUnbindIdentity = <ThrowOnError extends boolean = false>(options: Options<AuthenticationSsoUnbindIdentityData, ThrowOnError>): RequestResult<AuthenticationSsoUnbindIdentityResponses, AuthenticationSsoUnbindIdentityErrors, ThrowOnError> => (options.client ?? client).delete<AuthenticationSsoUnbindIdentityResponses, AuthenticationSsoUnbindIdentityErrors, ThrowOnError>({
+export const authenticationSsoUnbindIdentity = <ThrowOnError extends boolean = false>(options?: Options<AuthenticationSsoUnbindIdentityData, ThrowOnError>): RequestResult<AuthenticationSsoUnbindIdentityResponses, AuthenticationSsoUnbindIdentityErrors, ThrowOnError> => (options?.client ?? client).delete<AuthenticationSsoUnbindIdentityResponses, AuthenticationSsoUnbindIdentityErrors, ThrowOnError>({
     security: [{
             key: 'Bearer',
             scheme: 'bearer',
             type: 'http'
         }],
     url: '/api/v1/auth/me/sso-binding',
-    ...options,
-    headers: {
-        'Content-Type': 'application/json',
-        ...options.headers
-    }
+    ...options
 });
 
 /**
