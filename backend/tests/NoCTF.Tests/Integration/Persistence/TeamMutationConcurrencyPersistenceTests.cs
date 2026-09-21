@@ -249,6 +249,24 @@ public sealed class TeamMutationConcurrencyPersistenceTests
         await Assert.That(await TeamStatusAsync(db, team.Id, ct))
             .IsEqualTo(TeamRegistrationStatus.Unregistered);
 
+        var registrations = new TeamRegistrationStore(db, outbox, eventRecorder: events);
+        foreach (var status in new[]
+                 {
+                     TeamRegistrationStatus.Approved,
+                     TeamRegistrationStatus.Rejected,
+                     TeamRegistrationStatus.Pending,
+                     TeamRegistrationStatus.Unregistered
+                 })
+        {
+            var changed = await registrations.SetStatusAsync(
+                competition.Id,
+                team.Id,
+                status,
+                ct);
+            await Assert.That(changed.Changed).IsTrue();
+            await Assert.That(await TeamStatusAsync(db, team.Id, ct)).IsEqualTo(status);
+        }
+
         await db.Competitions.Where(item => item.Id == competition.Id)
             .ExecuteUpdateAsync(setters => setters.SetProperty(
                 item => item.TeamRegistrationAutoApprove,

@@ -141,6 +141,7 @@ export const messages = {
   "ui.size": "大小",
   "ui.pending": "待处理",
   "ui.returnToPendingReview": "退回待审核",
+  "ui.changeTeamRegistrationStatus": "调整队伍“{team}”的报名状态",
   "ui.theCurrentRoleIsReadOnlyAndCannotPerformLife": "当前角色为只读,无法执行生命周期操作",
   "ui.export": "导出",
   "ui.exportFailed": "导出失败",

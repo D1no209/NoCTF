@@ -3,7 +3,7 @@ import { toRefs } from 'vue'
 import type { AdminCompetitionsByIdTeamsPageViewState } from '~/features/routes/admin/competitions/[id]/useAdminCompetitionsByIdTeamsPage'
 
 const viewProps = defineProps<{ state: AdminCompetitionsByIdTeamsPageViewState }>()
-const { competitionId, canJudge, canWrite, teams, search, loading, pageLoading, error, page, pageCount, total, pageLimit, loadPage, setPageSize, pendingId, tracks, tracksEnabled, selectedTeam, teamMembers, teamDetailLoading, teamDisplayNames, displayTeamName, scoreAdjustmentTeam, scoreAdjustmentChallenges, scoreAdjustmentChallengeId, scoreAdjustmentDelta, scoreAdjustmentLoading, scoreAdjustmentPending, scoreAdjustmentError, scoreAdjustmentValid, openScoreAdjustment, closeScoreAdjustment, submitScoreAdjustment, openTeamDetail, assignTrackValue, simpleAction, banDialog, banReason, banAnnouncePublicly, banPending, banReasonValid, openBan, submitBan, appeals, appealsLoading, appealsError, appealDialog, appealReason, appealPending, openAppeal, submitAppeal, PrivateAccountPanel, onUpdateOpenOpen, onClickScoreAdjustmentTeam, onUpdateOpenBanDialog, onClickBanDialog, onUpdateOpenAppealDialog, onClickAppealDialog } = toRefs(viewProps.state)
+const { competitionId, canJudge, canWrite, teams, search, loading, pageLoading, error, page, pageCount, total, pageLimit, loadPage, setPageSize, pendingId, tracks, tracksEnabled, registrationStatusOptions, selectedTeam, teamMembers, teamDetailLoading, teamDisplayNames, displayTeamName, scoreAdjustmentTeam, scoreAdjustmentChallenges, scoreAdjustmentChallengeId, scoreAdjustmentDelta, scoreAdjustmentLoading, scoreAdjustmentPending, scoreAdjustmentError, scoreAdjustmentValid, openScoreAdjustment, closeScoreAdjustment, submitScoreAdjustment, openTeamDetail, assignTrackValue, setRegistrationStatusValue, banDialog, banReason, banAnnouncePublicly, banPending, banReasonValid, openBan, submitBan, appeals, appealsLoading, appealsError, appealDialog, appealReason, appealPending, openAppeal, submitAppeal, PrivateAccountPanel, onUpdateOpenOpen, onClickScoreAdjustmentTeam, onUpdateOpenBanDialog, onClickBanDialog, onUpdateOpenAppealDialog, onClickAppealDialog } = toRefs(viewProps.state)
 </script>
 
 <template>
@@ -61,7 +61,26 @@ const { competitionId, canJudge, canWrite, teams, search, loading, pageLoading, 
             </TableCell>
             <TableCell class="font-mono tabular-nums">{{ t.memberIds?.length ?? 0 }}</TableCell>
             <TableCell>
-              <Badge :variant="t.registrationStatus === 'Approved' ? 'default' : t.registrationStatus === 'Rejected' ? 'destructive' : 'secondary'">
+              <DropdownMenu v-if="canWrite">
+                <DropdownMenuTrigger as-child>
+                  <ActionButton type="button" :disabled="pendingId === t.id" :aria-label="$t('ui.changeTeamRegistrationStatus', { team: displayTeamName(t) })">
+                    <Badge :variant="t.registrationStatus === 'Approved' ? 'default' : t.registrationStatus === 'Rejected' ? 'destructive' : 'secondary'">
+                      {{ enumLabel(TeamRegistrationStatusLabel, t.registrationStatus) }}
+                    </Badge>
+                  </ActionButton>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="start">
+                  <DropdownMenuItem
+                    v-for="option in registrationStatusOptions"
+                    :key="option.value"
+                    :disabled="pendingId === t.id || option.value === t.registrationStatus"
+                    @select="setRegistrationStatusValue(t, option.value)"
+                  >
+                    {{ $t(option.label) }}
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+              <Badge v-else :variant="t.registrationStatus === 'Approved' ? 'default' : t.registrationStatus === 'Rejected' ? 'destructive' : 'secondary'">
                 {{ enumLabel(TeamRegistrationStatusLabel, t.registrationStatus) }}
               </Badge>
             </TableCell>
@@ -72,13 +91,6 @@ const { competitionId, canJudge, canWrite, teams, search, loading, pageLoading, 
             <TableCell class="font-mono tabular-nums">{{ adminFormatDateTime(t.registeredAt) }}</TableCell>
             <TableCell v-if="canWrite || canJudge" class="text-right">
               <div class="flex flex-wrap justify-end gap-1">
-                <template v-if="canWrite && t.registrationStatus === 'Pending'">
-                  <Button size="sm" :disabled="pendingId === t.id" @click="simpleAction(t, 'approve')">{{ $t('ui.pass') }}</Button>
-                  <Button variant="outline" size="sm" :disabled="pendingId === t.id" @click="simpleAction(t, 'reject')">{{ $t('ui.reject') }}</Button>
-                </template>
-                <Button v-else-if="canWrite" variant="outline" size="sm" :disabled="pendingId === t.id" @click="simpleAction(t, 'pending')">
-                  {{ $t('ui.returnToPendingReview') }}
-                </Button>
                 <Button v-if="canJudge" variant="outline" size="sm" :disabled="pendingId === t.id" @click="openScoreAdjustment(t)">
                   {{ $t('ui.adjustScore') }}
                 </Button>

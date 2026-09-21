@@ -29,6 +29,13 @@ export function useAdminCompetitionsByIdTeamsPage() {
 
   const tracksEnabled = ref(false)
 
+  const registrationStatusOptions = [
+    { value: 'Unregistered', label: "ui.notRegistered" },
+    { value: 'Pending', label: "ui.pendingApproval" },
+    { value: 'Approved', label: "ui.passed" },
+    { value: 'Rejected', label: "ui.rejected" },
+  ] as const
+
   const selectedTeam = ref<NoCtfapiEndpointsTeamsTeamResponse | null>(null)
 
   const teamMembers = ref<NoCtfapiEndpointsAuthenticationPublicUserProfileResponse[]>([])
@@ -183,8 +190,11 @@ export function useAdminCompetitionsByIdTeamsPage() {
     if (typeof value === 'string') void assignTrack(team, value)
   }
 
-  async function simpleAction(team: NoCtfapiEndpointsTeamsTeamResponse, action: 'pending' | 'approve' | 'reject') {
-    if (!team.id || !team.trackKey) return
+  async function setRegistrationStatus(
+    team: NoCtfapiEndpointsTeamsTeamResponse,
+    registrationStatus: NonNullable<NoCtfapiEndpointsTeamsTeamResponse['registrationStatus']>,
+  ) {
+    if (!team.id || !team.trackKey || team.registrationStatus === registrationStatus) return
     pendingId.value = team.id
     try {
       const path = { competitionId, teamId: team.id }
@@ -193,9 +203,7 @@ export function useAdminCompetitionsByIdTeamsPage() {
         body: {
           administration: {
             trackKey: team.trackKey,
-            registrationStatus: action === 'approve'
-              ? 'Approved'
-              : action === 'reject' ? 'Rejected' : 'Pending',
+            registrationStatus,
           },
         },
       })
@@ -209,6 +217,14 @@ export function useAdminCompetitionsByIdTeamsPage() {
     finally {
       pendingId.value = null
     }
+  }
+
+  function setRegistrationStatusValue(
+    team: NoCtfapiEndpointsTeamsTeamResponse,
+    value: unknown,
+  ): void {
+    if (registrationStatusOptions.some(option => option.value === value))
+      void setRegistrationStatus(team, value as NonNullable<NoCtfapiEndpointsTeamsTeamResponse['registrationStatus']>)
   }
 
   const banDialog = ref<{ team: NoCtfapiEndpointsTeamsTeamResponse; mode: 'ban' | 'correct' } | null>(null)
@@ -347,6 +363,7 @@ export function useAdminCompetitionsByIdTeamsPage() {
       pendingId,
       tracks,
       tracksEnabled,
+      registrationStatusOptions,
       selectedTeam,
       teamMembers,
       teamDetailLoading,
@@ -366,7 +383,7 @@ export function useAdminCompetitionsByIdTeamsPage() {
       openTeamDetail,
       assignTrack,
       assignTrackValue,
-      simpleAction,
+      setRegistrationStatusValue,
       banDialog,
       banReason,
       banAnnouncePublicly,

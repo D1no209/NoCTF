@@ -232,9 +232,7 @@ public sealed class TeamRegistrationStore(
             competition.TracksEnabled,
             competition.TrackConfigurationJson).Find(team.TrackKey);
         var changed = await db.Teams.Where(x => x.Id == teamId && x.CompetitionId == competitionId
-                && (status == TeamRegistrationStatus.Pending
-                    ? x.RegistrationStatus != TeamRegistrationStatus.Pending
-                    : x.RegistrationStatus == TeamRegistrationStatus.Pending))
+                && x.RegistrationStatus != status)
             .ExecuteUpdateAsync(setters => setters.SetProperty(x => x.RegistrationStatus, status), ct);
         if (changed == 1)
         {
