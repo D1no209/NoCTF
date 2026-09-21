@@ -5,14 +5,17 @@ using NoCTF.Application.Runtime.Instances;
 using NoCTF.Application.Scoring.Leaderboard;
 using NoCTF.Application.Teams.Membership;
 using NoCTF.Application.Teams.Registration;
+using NoCTF.Application.Storage;
 using NoCTF.Domain.Competitions;
 using NoCTF.Domain.Competitions.Events;
 using NoCTF.Domain.Identity;
 using NoCTF.Domain.Teams;
+using NoCTF.Domain.Storage;
 using NoCTF.Infrastructure.Competitions.Events;
 using NoCTF.Infrastructure.Persistence;
 using NoCTF.Infrastructure.Teams.Membership;
 using NoCTF.Infrastructure.Teams.Registration;
+using NoCTF.Infrastructure.Storage;
 using NoCTF.Worker;
 using Testcontainers.PostgreSql;
 
@@ -45,6 +48,8 @@ public sealed class TeamMutationConcurrencyPersistenceTests
             await CreateWhileJoiningAsync(options, cancellationToken);
             await DifferentUsersJoinAsync(options, cancellationToken);
             await JoinWhileRunningFollowsRegistrationSettingAsync(options, cancellationToken);
+            await OrganizationChangesRecalculateRegistrationAsync(options, cancellationToken);
+            await AvatarChangesRecalculateRegistrationAsync(options, cancellationToken);
             await InvitationReadAuthorizationAsync(options, cancellationToken);
             await BannedTeamRejectsOrganizationMutationsAsync(options, cancellationToken);
         });
@@ -210,6 +215,153 @@ public sealed class TeamMutationConcurrencyPersistenceTests
         await Assert.That(memberIds).Contains(secondParticipant.Id);
         await Assert.That(memberIds.Length).IsEqualTo(3);
     }
+
+    private static async Task OrganizationChangesRecalculateRegistrationAsync(
+        DbContextOptions<NoCtfDbContext> options,
+        CancellationToken ct)
+    {
+        var now = DateTimeOffset.UtcNow.AddMinutes(37);
+        var owner = User(Guid.CreateVersion7(now), "review-owner", now);
+        var captain = User(Guid.CreateVersion7(now.AddTicks(1)), "review-captain", now);
+        var member = User(Guid.CreateVersion7(now.AddTicks(2)), "review-member", now);
+        var joining = User(Guid.CreateVersion7(now.AddTicks(3)), "review-joining", now);
+        var competition = Competition(
+            Guid.CreateVersion7(now.AddTicks(4)), owner.Id, "Organization review", now);
+        competition.TeamRegistrationAutoApprove = false;
+        const string invitationToken = "REVIEWREVIEWREVIEWREVIEWREVIEW12";
+        var team = Team(
+            Guid.CreateVersion7(now.AddTicks(5)),
+            competition.Id,
+            captain.Id,
+            "Review Team",
+            invitationToken,
+            now);
+        team.MemberIds = [captain.Id, member.Id];
+        await SeedAsync(options, [owner, captain, member, joining], [competition], [team], ct);
+
+        await using var db = new NoCtfDbContext(options);
+        var outbox = new NoopOutbox();
+        var events = new CompetitionEventStore(db, outbox);
+        var membership = new TeamMembershipStore(db, outbox, eventRecorder: events);
+
+        await Assert.That(await membership.JoinByInvitationAsync(
+            competition.Id, invitationToken, joining.Id, now.AddMinutes(1), ct)).IsNull();
+        await Assert.That(await TeamStatusAsync(db, team.Id, ct))
+            .IsEqualTo(TeamRegistrationStatus.Pending);
+
+        await db.Competitions.Where(item => item.Id == competition.Id)
+            .ExecuteUpdateAsync(setters => setters.SetProperty(
+                item => item.TeamRegistrationAutoApprove,
+                true), ct);
+        db.ChangeTracker.Clear();
+        await Assert.That(await membership.RemoveMemberAsync(
+            competition.Id, team.Id, joining.Id, captain.Id, ct)).IsNull();
+        await Assert.That(await TeamStatusAsync(db, team.Id, ct))
+            .IsEqualTo(TeamRegistrationStatus.Approved);
+
+        await db.Competitions.Where(item => item.Id == competition.Id)
+            .ExecuteUpdateAsync(setters => setters.SetProperty(
+                item => item.TeamRegistrationAutoApprove,
+                false), ct);
+        db.ChangeTracker.Clear();
+        await Assert.That(await membership.TransferCaptainAsync(
+            competition.Id, team.Id, captain.Id, member.Id, ct)).IsNull();
+        await Assert.That(await TeamStatusAsync(db, team.Id, ct))
+            .IsEqualTo(TeamRegistrationStatus.Pending);
+
+        await db.Teams.Where(item => item.Id == team.Id).ExecuteUpdateAsync(setters => setters
+            .SetProperty(item => item.RegistrationStatus, TeamRegistrationStatus.Approved), ct);
+        db.ChangeTracker.Clear();
+        await Assert.That(await membership.LeaveAsync(competition.Id, captain.Id, ct)).IsNull();
+        await Assert.That(await TeamStatusAsync(db, team.Id, ct))
+            .IsEqualTo(TeamRegistrationStatus.Pending);
+
+        await db.Competitions.Where(item => item.Id == competition.Id)
+            .ExecuteUpdateAsync(setters => setters.SetProperty(
+                item => item.Status,
+                CompetitionStatus.Paused), ct);
+        db.ChangeTracker.Clear();
+        await Assert.That(await membership.RemoveMemberAsync(
+            competition.Id, team.Id, captain.Id, member.Id, ct))
+            .IsEqualTo(TeamMembershipFailure.MembershipLocked);
+    }
+
+    private static async Task AvatarChangesRecalculateRegistrationAsync(
+        DbContextOptions<NoCtfDbContext> options,
+        CancellationToken ct)
+    {
+        var now = DateTimeOffset.UtcNow.AddMinutes(38);
+        var owner = User(Guid.CreateVersion7(now), "avatar-owner", now);
+        var captain = User(Guid.CreateVersion7(now.AddTicks(1)), "avatar-captain", now);
+        var competition = Competition(
+            Guid.CreateVersion7(now.AddTicks(2)), owner.Id, "Avatar review", now);
+        competition.TeamRegistrationAutoApprove = false;
+        var team = Team(
+            Guid.CreateVersion7(now.AddTicks(3)),
+            competition.Id,
+            captain.Id,
+            "Avatar Team",
+            "AVATARAVATARAVATARAVATARAVATAR12",
+            now);
+        var fileId = Guid.CreateVersion7(now.AddTicks(4));
+        await SeedAsync(options, [owner, captain], [competition], [team], ct);
+        await using var db = new NoCtfDbContext(options);
+        db.Files.Add(new StoredFile
+        {
+            Id = fileId,
+            ObjectKey = $"teams/{team.Id:N}/avatars/{fileId:N}",
+            FileName = "avatar.png",
+            ContentType = "image/png",
+            ByteLength = 4,
+            Sha256 = new byte[32],
+            CreatedAt = now
+        });
+        await db.SaveChangesAsync(ct);
+        var outbox = new NoopOutbox();
+        var events = new CompetitionEventStore(db, outbox);
+        var store = new BusinessFileReferenceStore(
+            db,
+            outbox,
+            new FileReferenceLock(),
+            null!,
+            TimeProvider.System,
+            events);
+
+        var replaced = await store.ReplaceTeamAvatarAsync(
+            captain.Id, false, competition.Id, team.Id, fileId, now.AddMinutes(1), ct);
+        await Assert.That(replaced.State).IsEqualTo(BusinessFileReferenceState.Updated);
+        await Assert.That(await TeamStatusAsync(db, team.Id, ct))
+            .IsEqualTo(TeamRegistrationStatus.Pending);
+
+        await db.Competitions.Where(item => item.Id == competition.Id)
+            .ExecuteUpdateAsync(setters => setters.SetProperty(
+                item => item.TeamRegistrationAutoApprove,
+                true), ct);
+        db.ChangeTracker.Clear();
+        var cleared = await store.ClearTeamAvatarAsync(
+            captain.Id, false, competition.Id, team.Id, ct);
+        await Assert.That(cleared.State).IsEqualTo(BusinessFileReferenceState.Cleared);
+        await Assert.That(await TeamStatusAsync(db, team.Id, ct))
+            .IsEqualTo(TeamRegistrationStatus.Approved);
+
+        await db.Teams.Where(item => item.Id == team.Id).ExecuteUpdateAsync(setters => setters
+            .SetProperty(item => item.RegistrationStatus, TeamRegistrationStatus.Pending), ct);
+        db.ChangeTracker.Clear();
+        var noOp = await store.ClearTeamAvatarAsync(
+            captain.Id, false, competition.Id, team.Id, ct);
+        await Assert.That(noOp.State).IsEqualTo(BusinessFileReferenceState.Cleared);
+        await Assert.That(await TeamStatusAsync(db, team.Id, ct))
+            .IsEqualTo(TeamRegistrationStatus.Pending);
+    }
+
+    private static Task<TeamRegistrationStatus> TeamStatusAsync(
+        NoCtfDbContext db,
+        Guid teamId,
+        CancellationToken ct) =>
+        db.Teams.AsNoTracking()
+            .Where(team => team.Id == teamId)
+            .Select(team => team.RegistrationStatus)
+            .SingleAsync(ct);
 
     private static async Task InvitationReadAuthorizationAsync(
         DbContextOptions<NoCtfDbContext> options,

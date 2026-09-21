@@ -2,11 +2,12 @@ using NoCTF.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using NoCTF.Application.Messaging;
 using NoCTF.Application.Teams.Membership;
+using NoCTF.Application.Teams.Registration;
 using NoCTF.Application.Competitions.Events;
 using NoCTF.Domain.Competitions;
 using NoCTF.Domain.Competitions.Events;
 using NoCTF.Infrastructure.Teams;
-using NoCTF.Infrastructure.Competitions.Lifecycle;
+using NoCTF.Infrastructure.Teams.Registration;
 
 namespace NoCTF.Infrastructure.Teams.Membership;
 
@@ -71,20 +72,7 @@ public sealed class TeamMembershipStore(
                 ct))
             return TeamMembershipFailure.UserAlreadyRegistered;
 
-        var practiceJoin = false;
-        if (competition.Mode == GameMode.Ctf
-            && competition.Status == CompetitionStatus.Finished
-            && competition.PracticeModeEnabled)
-        {
-            var officialWindow = await CompetitionOfficialWindowReader.ReadAsync(
-                db,
-                competition.Id,
-                competition.StartAt,
-                competition.EndAt,
-                ct);
-            practiceJoin = team.RegisteredAt >= officialWindow.EndAt;
-        }
-        if (!practiceJoin && TeamMembershipPolicy.IsInvitationJoinLocked(
+        if (!ParticipantTeamMutationPolicy.CanChangeOrganization(
                 competition.Status,
                 competition.AllowTeamRegistrationWhileRunning))
             return TeamMembershipFailure.MembershipLocked;
@@ -101,6 +89,13 @@ public sealed class TeamMembershipStore(
             ActorUserId: userId,
             RelatedUserId: userId,
             TeamId: team.Id), ct);
+        await ParticipantTeamRegistrationTransition.ApplyAsync(
+            competition,
+            team,
+            userId,
+            now,
+            events,
+            ct);
         await db.SaveChangesAsync(ct);
         await transaction.CommitAsync(ct);
         await outbox.FlushOutgoingMessagesAsync();
@@ -190,6 +185,10 @@ public sealed class TeamMembershipStore(
             ct);
         if (competition is null)
             return TeamMembershipFailure.CompetitionNotFound;
+        if (!ParticipantTeamMutationPolicy.CanChangeOrganization(
+                competition.Status,
+                competition.AllowTeamRegistrationWhileRunning))
+            return TeamMembershipFailure.MembershipLocked;
         var team = await LoadAsync(competitionId, teamId, ct);
         if (team is null)
             return TeamMembershipFailure.TeamNotFound;
@@ -212,6 +211,13 @@ public sealed class TeamMembershipStore(
             ActorUserId: actorId,
             RelatedUserId: targetUserId,
             TeamId: teamId), ct);
+        await ParticipantTeamRegistrationTransition.ApplyAsync(
+            competition,
+            team,
+            actorId,
+            timeProvider.GetUtcNow(),
+            events,
+            ct);
         await db.SaveChangesAsync(ct);
         await transaction.CommitAsync(ct);
         await outbox.FlushOutgoingMessagesAsync();
@@ -232,6 +238,10 @@ public sealed class TeamMembershipStore(
             ct);
         if (competition is null)
             return TeamMembershipFailure.CompetitionNotFound;
+        if (!ParticipantTeamMutationPolicy.CanChangeOrganization(
+                competition.Status,
+                competition.AllowTeamRegistrationWhileRunning))
+            return TeamMembershipFailure.MembershipLocked;
         var team = await db.Teams.SingleOrDefaultAsync(
             item => item.CompetitionId == competitionId
                 && item.DeletedAt == null
@@ -254,6 +264,13 @@ public sealed class TeamMembershipStore(
             ActorUserId: userId,
             RelatedUserId: userId,
             TeamId: team.Id), ct);
+        await ParticipantTeamRegistrationTransition.ApplyAsync(
+            competition,
+            team,
+            userId,
+            timeProvider.GetUtcNow(),
+            events,
+            ct);
         await db.SaveChangesAsync(ct);
         await transaction.CommitAsync(ct);
         await outbox.FlushOutgoingMessagesAsync();
@@ -276,6 +293,10 @@ public sealed class TeamMembershipStore(
             ct);
         if (competition is null)
             return TeamMembershipFailure.CompetitionNotFound;
+        if (!ParticipantTeamMutationPolicy.CanChangeOrganization(
+                competition.Status,
+                competition.AllowTeamRegistrationWhileRunning))
+            return TeamMembershipFailure.MembershipLocked;
         var team = await LoadAsync(competitionId, teamId, ct);
         if (team is null)
             return TeamMembershipFailure.TeamNotFound;
@@ -296,6 +317,13 @@ public sealed class TeamMembershipStore(
             ActorUserId: actorId,
             RelatedUserId: newCaptainId,
             TeamId: teamId), ct);
+        await ParticipantTeamRegistrationTransition.ApplyAsync(
+            competition,
+            team,
+            actorId,
+            timeProvider.GetUtcNow(),
+            events,
+            ct);
         await db.SaveChangesAsync(ct);
         await transaction.CommitAsync(ct);
         await outbox.FlushOutgoingMessagesAsync();
