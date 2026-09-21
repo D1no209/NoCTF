@@ -30,7 +30,7 @@ describe('participant copy density', () => {
     expect(teamPage).toContain('v-else-if="invitationToken"')
     expect(teamPage).toContain("$t('ui.rotateInvitationCode')")
     expect(teamPage).toContain('v-if="isCaptain && !team.isBanned"')
-    expect(teamPage).toContain(':can-manage="isCaptain && !team.isBanned"')
+    expect(teamPage).toContain(':can-manage="isCaptain && !team.isBanned && canEditOrganization"')
     expect(teamPage).toContain('v-if="!team.isBanned"')
     expect(teamPage.match(/<Card>/g)).toHaveLength(1)
   })

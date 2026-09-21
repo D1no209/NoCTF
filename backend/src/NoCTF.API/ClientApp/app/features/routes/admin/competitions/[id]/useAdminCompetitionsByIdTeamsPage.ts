@@ -183,7 +183,7 @@ export function useAdminCompetitionsByIdTeamsPage() {
     if (typeof value === 'string') void assignTrack(team, value)
   }
 
-  async function simpleAction(team: NoCtfapiEndpointsTeamsTeamResponse, action: 'approve' | 'reject') {
+  async function simpleAction(team: NoCtfapiEndpointsTeamsTeamResponse, action: 'pending' | 'approve' | 'reject') {
     if (!team.id || !team.trackKey) return
     pendingId.value = team.id
     try {
@@ -193,7 +193,9 @@ export function useAdminCompetitionsByIdTeamsPage() {
         body: {
           administration: {
             trackKey: team.trackKey,
-            registrationStatus: action === 'approve' ? 'Approved' : 'Rejected',
+            registrationStatus: action === 'approve'
+              ? 'Approved'
+              : action === 'reject' ? 'Rejected' : 'Pending',
           },
         },
       })

@@ -140,6 +140,7 @@ export const messages = {
   "ui.thereIsAnOngoingCompetitionReferenceAndTheModeCannot": "There is an ongoing competition reference and the mode cannot be modified.",
   "ui.size": "size",
   "ui.pending": "Pending",
+  "ui.returnToPendingReview": "Return to pending",
   "ui.theCurrentRoleIsReadOnlyAndCannotPerformLife": "The current role is read-only and cannot perform life cycle operations.",
   "ui.export": "Export",
   "ui.exportFailed": "Export failed",

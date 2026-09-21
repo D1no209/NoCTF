@@ -20,6 +20,11 @@ export function affectsCompetitionChallengeList(kind: string): boolean {
     || kind === 'ChallengeUnpublished'
     || kind === 'ChallengeDeleted'
     || kind === 'ChallengeDescriptionUpdated'
+    || kind === 'TeamRegistrationChanged'
+    || kind === 'TeamTrackChanged'
+    || kind === 'TeamBanned'
+    || kind === 'TeamUnbanned'
+    || kind === 'TeamBanCorrectionPublished'
 }
 
 interface ChallengeBloodMark {
@@ -83,11 +88,12 @@ emit: { (event: "ready", ...args: [challengeId: string | null]): void; (event: "
   }
 
   async function loadChallenges(): Promise<void> {
-    const { data, error: requestError } = await listChallengesEndpoint({
+    const { data, error: requestError, response } = await listChallengesEndpoint({
       path: { competitionId: props.competitionId },
     })
     loading.value = false
     if (requestError || !data) {
+      if (response?.status === 404) items.value = []
       error.value = parseApiError(requestError, translate("ui.failedToLoadQuestion")).message
       if (!initialized) emit('ready', null)
       return
@@ -103,7 +109,9 @@ emit: { (event: "ready", ...args: [challengeId: string | null]): void; (event: "
   onMounted(() => {
     unwatch = watchCompetition(props.competitionId, {
       competitionEventChanged: notification => {
-        if (affectsCompetitionChallengeList(notification.kind)) void refreshChallenges()
+        if (affectsCompetitionChallengeList(notification.kind)) {
+          void Promise.all([refreshChallenges(), loadMyTeam()])
+        }
       },
       onReconnected: () => void refreshChallenges(),
     })

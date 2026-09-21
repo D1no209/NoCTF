@@ -3,7 +3,7 @@ import { toRefs } from 'vue'
 import type { CompetitionsByIdMyTeamPageViewState } from '~/features/routes/competitions/[id]/my/useCompetitionsByIdMyTeamPage'
 
 const viewProps = defineProps<{ state: CompetitionsByIdMyTeamPageViewState }>()
-const { Copy, RefreshCw, maximumAppealStatementLength, minimumAppealStatementLength, competitionId, team, loading, loadError, load, isCaptain, invitationToken, invitationLoading, invitationError, loadInvitationToken, rotating, rotate, copyToken, renameOpen, renameValue, renamePending, openRename, submitRename, transferOpen, transferTarget, transferPending, transferableMembers, submitTransfer, acting, disband, leave, resubmit, banCase, appealOpen, appealStatement, appealPending, appealError, banCaseError, loadBanCase, appealStatusLabel, submitAppeal, setAppealOpen, CompetitionParticipantWorkspace, TeamMembers, onInputAppealError } = toRefs(viewProps.state)
+const { Copy, RefreshCw, maximumAppealStatementLength, minimumAppealStatementLength, competitionId, competition, tracksEnabled, canEditOrganization, requiresManualReview, selectableTracks, tracksLoading, tracksError, loadTracks, team, loading, loadError, load, isCaptain, invitationToken, invitationLoading, invitationError, loadInvitationToken, rotating, rotate, copyToken, renameOpen, renameValue, renameTrackKey, renameTrackInvitationCode, selectedRenameTrack, renameTrackChanged, renameValid, renamePending, openRename, submitRename, maximumAvatarBytes, avatarInputKey, avatarPending, replaceTeamAvatar, clearTeamAvatar, transferOpen, transferTarget, transferPending, transferableMembers, submitTransfer, acting, disband, leave, resubmit, banCase, appealOpen, appealStatement, appealPending, appealError, banCaseError, loadBanCase, appealStatusLabel, submitAppeal, setAppealOpen, CompetitionParticipantWorkspace, TeamMembers, onInputAppealError } = toRefs(viewProps.state)
 </script>
 
 <template>
@@ -54,6 +54,9 @@ const { Copy, RefreshCw, maximumAppealStatementLength, minimumAppealStatementLen
               <Button v-if="isCaptain" size="sm" :disabled="acting" @click="resubmit">
                 <Spinner v-if="acting" data-icon="inline-start" /> {{ $t('ui.resubmitRegistration') }} </Button>
             </AlertDescription>
+          </Alert>
+          <Alert v-else-if="team.registrationStatus === 'Pending'">
+            <AlertDescription>{{ $t('ui.pendingTeamCannotAccessCompetition') }}</AlertDescription>
           </Alert>
         </CardContent>
       <Separator />
@@ -139,7 +142,7 @@ const { Copy, RefreshCw, maximumAppealStatementLength, minimumAppealStatementLen
           <component :is="TeamMembers"
             :competition-id="competitionId"
             :team="team"
-            :can-manage="isCaptain && !team.isBanned"
+            :can-manage="isCaptain && !team.isBanned && canEditOrganization"
             @changed="load"
           />
         </CardContent>
@@ -185,30 +188,108 @@ const { Copy, RefreshCw, maximumAppealStatementLength, minimumAppealStatementLen
           <template v-if="isCaptain">
             <Dialog v-model:open="renameOpen">
               <DialogTrigger as-child>
-                <Button variant="outline" @click="openRename">{{ $t('ui.modifyTeamName') }}</Button>
+                <Button variant="outline" :disabled="!canEditOrganization" @click="openRename">{{ $t('ui.editTeamInformation') }}</Button>
               </DialogTrigger>
-              <DialogContent>
+              <DialogScrollContent class="max-h-[85vh] sm:max-w-xl">
                 <DialogHeader>
-                  <DialogTitle>{{ $t('ui.modifyTeamName') }}</DialogTitle>
+                  <DialogTitle>{{ $t('ui.editTeamInformation') }}</DialogTitle>
+                  <DialogDescription>
+                    {{ requiresManualReview ? $t('ui.teamChangesRequireReview') : $t('ui.teamChangesAreAutomaticallyApproved') }}
+                  </DialogDescription>
                 </DialogHeader>
-                <UiForm @submit.prevent="submitRename">
+                <UiForm validation="feature" @submit.prevent="submitRename">
                   <FieldGroup>
                     <Field>
                       <FieldLabel for="rename-input">{{ $t('ui.newTeamName') }}</FieldLabel>
-                      <Input id="rename-input" v-model="renameValue" required maxlength="64" />
+                      <Input id="rename-input" v-model="renameValue" required maxlength="128" />
+                    </Field>
+                    <Field v-if="tracksEnabled && tracksLoading">
+                      <Skeleton class="h-10 w-full" />
+                    </Field>
+                    <Field v-else-if="tracksEnabled && tracksError">
+                      <Alert variant="destructive">
+                        <AlertDescription class="flex flex-wrap items-center justify-between gap-3">
+                          <span>{{ $message(tracksError) }}</span>
+                          <Button type="button" size="sm" variant="outline" @click="loadTracks">{{ $t('ui.retry') }}</Button>
+                        </AlertDescription>
+                      </Alert>
+                    </Field>
+                    <Field v-else-if="tracksEnabled">
+                      <FieldLabel for="team-edit-track">{{ $t('ui.competitionTrack') }}</FieldLabel>
+                      <Select v-model="renameTrackKey" required>
+                        <SelectTrigger id="team-edit-track"><SelectValue :placeholder="$t('ui.selectATrack')" /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem
+                            v-for="track in selectableTracks"
+                            :key="track.key"
+                            :value="track.key!"
+                            :disabled="track.meetsSsoRequirement === false"
+                          >
+                            <span class="flex items-center gap-2">
+                              <Avatar v-if="track.requiredSsoProviderIconUrl" class="size-5">
+                                <AvatarImage :src="track.requiredSsoProviderIconUrl" :alt="track.requiredSsoProviderName ?? ''" />
+                                <AvatarFallback>{{ track.requiredSsoProviderName?.slice(0, 1) }}</AvatarFallback>
+                              </Avatar>
+                              <span>{{ track.name }}</span>
+                              <Badge v-if="track.requiredSsoProviderId" variant="outline">{{ track.requiredSsoProviderName }}</Badge>
+                            </span>
+                          </SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <FieldDescription v-if="selectedRenameTrack?.requiredSsoProviderId">
+                        {{ $t('sso.trackGateProvider', { provider: selectedRenameTrack.requiredSsoProviderName ?? '-' }) }}
+                      </FieldDescription>
+                    </Field>
+                    <Alert v-if="tracksEnabled && selectedRenameTrack?.meetsSsoRequirement === false">
+                      <AlertDescription class="flex flex-wrap items-center justify-between gap-3">
+                        <span>{{ $t('sso.trackIdentityRequired') }}</span>
+                        <Button as-child type="button" size="sm" variant="outline">
+                          <NuxtLink :to="{ path: '/', query: { account: 'security' } }">{{ $t('sso.openAccountSecurity') }}</NuxtLink>
+                        </Button>
+                      </AlertDescription>
+                    </Alert>
+                    <Field v-if="tracksEnabled && renameTrackChanged && selectedRenameTrack?.requiresInvitationCode">
+                      <FieldLabel for="team-edit-track-code">{{ $t('ui.trackInvitationCode') }}</FieldLabel>
+                      <Input
+                        id="team-edit-track-code"
+                        v-model="renameTrackInvitationCode"
+                        type="password"
+                        required
+                        autocomplete="off"
+                        maxlength="128"
+                      />
+                    </Field>
+                    <Separator />
+                    <Field>
+                      <FieldLabel for="team-avatar-file">{{ $t('ui.teamAvatar') }}</FieldLabel>
+                      <FileUpload
+                        :key="avatarInputKey"
+                        id="team-avatar-file"
+                        accept="image/jpeg,image/png,image/webp,.jpg,.jpeg,.png,.webp"
+                        :pending="avatarPending"
+                        @change="replaceTeamAvatar"
+                      />
+                      <FieldDescription>
+                        {{ maximumAvatarBytes ? $t('accountPanel.avatarRequirements', { limit: formatBytes(maximumAvatarBytes) }) : $t('ui.avatarMustBeAJpegPngOrWebpImage') }}
+                      </FieldDescription>
+                      <Button v-if="team.avatarUrl" type="button" variant="outline" :disabled="avatarPending" @click="clearTeamAvatar">
+                        <Spinner v-if="avatarPending" data-icon="inline-start" />{{ $t('ui.clearTeamAvatar') }}
+                      </Button>
                     </Field>
                     <Field>
-                      <Button type="submit" class="w-full" :disabled="renamePending">
+                      <Button type="submit" class="w-full" :disabled="renamePending || !renameValid || Boolean(tracksError)">
                         <Spinner v-if="renamePending" data-icon="inline-start" /> {{ $t('ui.save') }} </Button>
                     </Field>
                   </FieldGroup>
                 </UiForm>
-              </DialogContent>
+              </DialogScrollContent>
             </Dialog>
+
+            <FieldDescription v-if="!canEditOrganization">{{ $t('ui.teamChangesClosedForCurrentStage', { status: competition?.status ?? '-' }) }}</FieldDescription>
 
             <Dialog v-model:open="transferOpen">
               <DialogTrigger as-child>
-                <Button variant="outline" :disabled="!transferableMembers.length">{{ $t('ui.transferCaptain') }}</Button>
+                <Button variant="outline" :disabled="!canEditOrganization || !transferableMembers.length">{{ $t('ui.transferCaptain') }}</Button>
               </DialogTrigger>
               <DialogContent>
                 <DialogHeader>
@@ -261,7 +342,7 @@ const { Copy, RefreshCw, maximumAppealStatementLength, minimumAppealStatementLen
 
           <AlertDialog v-else>
             <AlertDialogTrigger as-child>
-              <Button variant="destructive">{{ $t('ui.exitTheTeam') }}</Button>
+              <Button variant="destructive" :disabled="!canEditOrganization">{{ $t('ui.exitTheTeam') }}</Button>
             </AlertDialogTrigger>
             <AlertDialogContent>
               <AlertDialogHeader>

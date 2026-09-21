@@ -73,7 +73,7 @@ Visible | Published -> Running <-> Paused
 Visible | Published | Running | Paused -> Finished
 ```
 
-- Draft 不公开；Visible 公开但不能报名；Published 公开且允许报名。
+- Draft 不公开；Visible 与 Published 公开且允许报名。
 - StartAt 到达时，Visible/Published 执行 Start Gate；Draft 不自动开始。
 - EndAt 是绝对 UTC 终点，即使 Paused 也进入 Finished。
 - Owner/Manager 可提前 Start、Pause、Resume、Finish；Finished 不可恢复。
@@ -83,7 +83,7 @@ Visible | Published | Running | Paused -> Finished
   Container/Compose 题目启动独立 `Practice` Runtime；练习实例沿用正式 Runtime 的容量、TTL、随机端口
   和回收规则，但不复用正式实例。练习 Flag 复用正式提交接口并创建普通 GameplayFact；其时间位于
   正式窗口外，因此不产生正式分数、血奖或排行榜变化。赛后新队由 RegisteredAt 推导，不存队伍类型标记，
-  且不能进入正式榜；只有这些赛后新队可以继续通过邀请增加成员。
+  且不能进入正式榜。Finished 阶段不再允许修改队伍组织资料或追加成员。
 - 平台 Administrator 可在比赛非 Running/Paused 且不存在活动或待处理 Runtime 资源时执行强制级联删除。
   操作必须输入完整比赛标题、至少 8 个字符的原因并二次确认；比赛作用域的历史与资源会被永久删除，
   但平台级审计事实保留操作者、比赛标识、标题、原因和时间。
@@ -106,11 +106,13 @@ Owner/Manager 手动 Start 与 StartAt 调度共用一个 Application 用例，�
 
 ## 报名与团队
 
-- 只有 Published 允许创建团队和凭 Token 加入。
+- Visible、Published 允许创建团队和凭 Token 加入；Running 仅在显式开启赛中报名时允许。
 - AutoApprove 为 true 时新团队是 Approved，否则 Pending。
 - Pending 可被批准或拒绝；Rejected 可重新提交为 Pending。
-- Pending/Rejected 可管理成员与资料，但不能获得题目私有数据、Flag、Runtime 或 GameplayFact 权限。
-- Running/Paused/Finished 冻结成员与审核状态；违规处置使用 Ban。
+- 队长可修改队名、头像和公开可报名赛道。切换赛道时重新校验邀请码，并要求全体成员满足该赛道的 SSO 门禁；只修改当前受限赛道上的其他资料时不重复要求邀请码或 SSO。
+- 队名、头像、赛道、成员加入/退出/移除和队长转让均重算审核状态：AutoApprove 为 true 时成为 Approved，否则成为 Pending；无实际变化与邀请 Token 轮换不触发复审。Administrator、Owner、Manager 可把队伍显式退回 Pending。
+- 组织变更窗口与报名窗口相同；Paused、Finished 禁止，Running 受 AllowTeamRegistrationWhileRunning 控制。
+- Pending/Rejected 可管理报名与允许的队伍资料，但不能获得题目、附件、提示、咨询、Flag、Runtime 或新 GameplayFact 权限。转为 Pending 时已有 Runtime 保留至正常生命周期结束，但所有选手读取与操作 API 都拒绝访问。
 - CaptainId 是唯一队长来源。转让队长原子更新 CaptainId；成员数组无顺序。
 - Ban 立即拒绝私有数据、Runtime 与 GameplayFact，回收该队 CTF/AWD Runtime，并把该队及与其相关的攻防事实从投影排除。Unban 恢复当前事实；CTF Runtime 由选手重新启动，AWD 由系统重新配置。
 - 每次 Ban 对应一个不可变事件。队长可提交一次私密申诉，全队可读；Judge/Observer 只读，Administrator、Owner、Manager 裁决。接受申诉或主动纠错允许赛后恢复历史投影，但 Finished 比赛不重新配置 Runtime。申诉、裁决和公开纠错都保留原始事件关联，不公开工作人员原因或证据。

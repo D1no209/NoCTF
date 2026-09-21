@@ -22,6 +22,129 @@ public sealed class CompetitionTrackSsoGatePersistenceTests
 {
     [Test]
     [Timeout(300_000)]
+    public async Task Concurrent_track_change_and_member_join_preserve_the_team_SSO_gate(
+        CancellationToken cancellationToken)
+    {
+        await DockerIntegrationTest.RunAsync(async () =>
+        {
+            await using var postgres = new PostgreSqlBuilder(
+                    "postgres:17.10-alpine3.24@sha256:742f40ea20b9ff2ff31db5458d127452988a2164df9e17441e191f3b72252193")
+                .WithDatabase("noctf_track_join_race")
+                .WithUsername("postgres")
+                .WithPassword("postgres")
+                .Build();
+            await postgres.StartAsync(cancellationToken);
+            var options = new DbContextOptionsBuilder<NoCtfDbContext>()
+                .UseNpgsql(postgres.GetConnectionString())
+                .UseSnakeCaseNamingConvention()
+                .Options;
+            var now = DateTimeOffset.UtcNow;
+            var competitionId = Guid.CreateVersion7(now);
+            var providerId = Guid.CreateVersion7(now.AddTicks(1));
+            var captainId = Guid.CreateVersion7(now.AddTicks(2));
+            var joiningUserId = Guid.CreateVersion7(now.AddTicks(3));
+            Guid teamId;
+            string invitationToken;
+            await using (var seed = new NoCtfDbContext(options))
+            {
+                await seed.Database.EnsureCreatedAsync(cancellationToken);
+                var settings = await seed.PlatformSettings.SingleAsync(cancellationToken);
+                settings.SsoConfiguration.Providers.Add(new SsoProviderConfiguration
+                {
+                    Id = providerId,
+                    Name = "School identity",
+                    Protocol = SsoProtocol.Cas,
+                    Enabled = true,
+                    AllowBinding = true,
+                    AllowedHosts = ["cas.example.test"],
+                    Cas = new CasSsoProviderConfiguration
+                    {
+                        IdentityNamespace = "school",
+                        LoginUrl = "https://cas.example.test/login",
+                        ServiceValidateUrl = "https://cas.example.test/serviceValidate"
+                    }
+                });
+                seed.Users.AddRange(
+                    BoundUser(captainId, "race-captain", providerId, now),
+                    User(joiningUserId, "race-joining", now));
+                seed.Competitions.Add(new Competition
+                {
+                    Id = competitionId,
+                    OwnerId = captainId,
+                    Title = "Track join race",
+                    Mode = GameMode.Ctf,
+                    Status = CompetitionStatus.Published,
+                    StartAt = now.AddHours(1),
+                    EndAt = now.AddHours(2),
+                    MaxTeamMembers = 5,
+                    ConfigurationJson = "{}",
+                    FlagDerivationSecret = new byte[32],
+                    TracksEnabled = true,
+                    TrackConfigurationJson = CompetitionTrackConfiguration.Serialize(new(
+                        1,
+                        [Track("default", null, isDefault: true), Track("school", providerId)])),
+                    TeamRegistrationAutoApprove = true,
+                    CreatedAt = now,
+                    UpdatedAt = now
+                });
+                await seed.SaveChangesAsync(cancellationToken);
+                var created = await new TeamRegistrationStore(
+                    seed,
+                    new NoOpTransactionalMessageOutbox()).TryCreateAsync(new(
+                        competitionId,
+                        captainId,
+                        "Race team",
+                        now,
+                        "default"), TeamRegistrationStatus.Approved, cancellationToken);
+                teamId = created.Team!.Id;
+                invitationToken = await seed.Teams.AsNoTracking()
+                    .Where(team => team.Id == teamId)
+                    .Select(team => team.InvitationToken)
+                    .SingleAsync(cancellationToken);
+            }
+
+            var start = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            var joinTask = Task.Run(async () =>
+            {
+                await start.Task.WaitAsync(cancellationToken);
+                await using var db = new NoCtfDbContext(options);
+                return await new TeamMembershipStore(
+                    db,
+                    new NoOpTransactionalMessageOutbox()).JoinByInvitationAsync(
+                        competitionId,
+                        invitationToken,
+                        joiningUserId,
+                        now.AddMinutes(1),
+                        cancellationToken);
+            }, cancellationToken);
+            var trackTask = Task.Run(async () =>
+            {
+                await start.Task.WaitAsync(cancellationToken);
+                await using var db = new NoCtfDbContext(options);
+                return await new UpdateTeam(new TeamRegistrationStore(
+                    db,
+                    new NoOpTransactionalMessageOutbox())).ExecuteAsync(new(
+                        competitionId,
+                        teamId,
+                        "Race team",
+                        "school",
+                        ActorUserId: captainId,
+                        UpdatedAt: now.AddMinutes(1)), cancellationToken);
+            }, cancellationToken);
+            start.SetResult();
+            await Task.WhenAll(joinTask, trackTask);
+
+            await using var verification = new NoCtfDbContext(options);
+            var finalTeam = await verification.Teams.AsNoTracking()
+                .SingleAsync(team => team.Id == teamId, cancellationToken);
+            await Assert.That(joinTask.Result is null ^ trackTask.Result.Succeeded).IsTrue();
+            await Assert.That(finalTeam.TrackKey != "school"
+                || !finalTeam.MemberIds.Contains(joiningUserId)).IsTrue();
+        });
+    }
+
+    [Test]
+    [Timeout(300_000)]
     public async Task Participant_profile_update_validates_track_gates_and_recalculates_registration(
         CancellationToken cancellationToken)
     {

@@ -76,6 +76,9 @@ const { competitionId, canJudge, canWrite, teams, search, loading, pageLoading, 
                   <Button size="sm" :disabled="pendingId === t.id" @click="simpleAction(t, 'approve')">{{ $t('ui.pass') }}</Button>
                   <Button variant="outline" size="sm" :disabled="pendingId === t.id" @click="simpleAction(t, 'reject')">{{ $t('ui.reject') }}</Button>
                 </template>
+                <Button v-else-if="canWrite" variant="outline" size="sm" :disabled="pendingId === t.id" @click="simpleAction(t, 'pending')">
+                  {{ $t('ui.returnToPendingReview') }}
+                </Button>
                 <Button v-if="canJudge" variant="outline" size="sm" :disabled="pendingId === t.id" @click="openScoreAdjustment(t)">
                   {{ $t('ui.adjustScore') }}
                 </Button>
