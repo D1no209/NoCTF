@@ -249,6 +249,10 @@ export function useAdminCompetitionsByIdTracksPage() {
     track.requiredSsoProviderId = providerId === 'none' ? null : providerId
   }
 
+  function configureSsoProviders(): void {
+    void navigateTo('/admin/platform/authentication')
+  }
+
   async function save() {
     if (saving.value || !canUpdate.value || !canWrite.value) return
     const duplicateTrackKey = duplicateCompetitionTrackKey(tracks.value.map(track => track.key))
@@ -339,6 +343,7 @@ export function useAdminCompetitionsByIdTracksPage() {
     updateInternal,
     updateInvitationRequired,
     updateRequiredSsoProvider,
+    configureSsoProviders,
     save,
   }
 }

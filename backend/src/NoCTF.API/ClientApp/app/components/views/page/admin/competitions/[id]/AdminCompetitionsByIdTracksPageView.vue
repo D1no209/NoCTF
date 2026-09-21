@@ -3,7 +3,7 @@ import { toRefs } from 'vue'
 import type { AdminCompetitionsByIdTracksPageViewState } from '~/features/routes/admin/competitions/[id]/useAdminCompetitionsByIdTracksPage'
 
 const viewProps = defineProps<{ state: AdminCompetitionsByIdTracksPageViewState }>()
-const { Plus, Save, Trash2, canWrite, mode, enabled, canUpdate, tracks, ssoProviders, pendingRemoval, removalTargets, disableConfirmationOpen, disableAffectedTeamCount, loading, saving, error, load, addTrack, requestRemoveTrack, closeRemoval, confirmRemoveTrack, requestEnabled, confirmDisable, setDisableConfirmationOpen, updateDefault, updatePublicSelectable, updateInternal, updateInvitationRequired, updateRequiredSsoProvider, save } = toRefs(viewProps.state)
+const { Plus, Save, Trash2, canWrite, mode, enabled, canUpdate, tracks, ssoProviders, pendingRemoval, removalTargets, disableConfirmationOpen, disableAffectedTeamCount, loading, saving, error, load, addTrack, requestRemoveTrack, closeRemoval, confirmRemoveTrack, requestEnabled, confirmDisable, setDisableConfirmationOpen, updateDefault, updatePublicSelectable, updateInternal, updateInvitationRequired, updateRequiredSsoProvider, configureSsoProviders, save } = toRefs(viewProps.state)
 </script>
 
 <template>
@@ -44,6 +44,14 @@ const { Plus, Save, Trash2, canWrite, mode, enabled, canUpdate, tracks, ssoProvi
         <Button size="sm" variant="outline" @click="load">{{ $t('ui.retry') }}</Button>
       </AlertDescription>
     </Alert>
+    <Alert v-if="!loading && ssoProviders.length === 0">
+      <AlertDescription class="flex flex-wrap items-center justify-between gap-3">
+        <span>{{ $t('sso.trackGateNoProviders') }}</span>
+        <Button size="sm" variant="outline" @click="configureSsoProviders">
+          {{ $t('sso.manageIdentityProviders') }}
+        </Button>
+      </AlertDescription>
+    </Alert>
     <Skeleton v-if="loading" class="h-64 w-full" />
 
     <ScrollSurface as="div" axis="x" v-else class="overflow-x-auto border">
@@ -71,25 +79,8 @@ const { Plus, Save, Trash2, canWrite, mode, enabled, canUpdate, tracks, ssoProvi
               <Input v-model="track.key" :disabled="!canWrite || !canUpdate || track.existingKey !== null" maxlength="64" class="font-mono" />
             </TableCell>
             <TableCell>
-              <Select
-                :model-value="track.requiredSsoProviderId ?? 'none'"
-                :disabled="!canWrite || !canUpdate"
-                @update:model-value="updateRequiredSsoProvider(track, String($event))"
-              >
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">{{ $t('ui.noRestriction') }}</SelectItem>
-                  <SelectItem v-for="provider in ssoProviders" :key="provider.id" :value="provider.id!">
-                    <span class="flex items-center gap-2">
-                      <img v-if="provider.iconUrl" :src="provider.iconUrl" class="size-4 object-contain" alt="" aria-hidden="true" referrerpolicy="no-referrer">
-                      <span>{{ provider.name }}</span>
-                      <Badge v-if="!provider.enabled || !provider.allowBinding" variant="outline">{{ $t('ui.disabled') }}</Badge>
-                    </span>
-                  </SelectItem>
-                </SelectContent>
-              </Select>
+              <Input v-model="track.name" :disabled="!canWrite || !canUpdate" maxlength="80" />
             </TableCell>
-            <TableCell><Input v-model="track.name" :disabled="!canWrite || !canUpdate" maxlength="80" /></TableCell>
             <TableCell><Checkbox :model-value="track.isDefault" :disabled="!canWrite || !canUpdate" @update:model-value="updateDefault(index, $event)" /></TableCell>
             <TableCell><Checkbox :model-value="track.isPublicSelectable" :disabled="!canWrite || !canUpdate || track.isInternal" @update:model-value="updatePublicSelectable(track, $event)" /></TableCell>
             <TableCell><Checkbox :model-value="track.isInternal" :disabled="!canWrite || !canUpdate" @update:model-value="updateInternal(track, $event)" /></TableCell>
@@ -123,6 +114,25 @@ const { Plus, Save, Trash2, canWrite, mode, enabled, canUpdate, tracks, ssoProvi
                 />
               </div>
             </TableCell>
+            <TableCell>
+              <Select
+                :model-value="track.requiredSsoProviderId ?? 'none'"
+                :disabled="!canWrite || !canUpdate"
+                @update:model-value="updateRequiredSsoProvider(track, String($event))"
+              >
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">{{ $t('ui.noRestriction') }}</SelectItem>
+                  <SelectItem v-for="provider in ssoProviders" :key="provider.id" :value="provider.id!">
+                    <span class="flex items-center gap-2">
+                      <img v-if="provider.iconUrl" :src="provider.iconUrl" class="size-4 object-contain" alt="" aria-hidden="true" referrerpolicy="no-referrer">
+                      <span>{{ provider.name }}</span>
+                      <Badge v-if="!provider.enabled || !provider.allowBinding" variant="outline">{{ $t('ui.disabled') }}</Badge>
+                    </span>
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+            </TableCell>
             <TableCell v-if="canWrite && canUpdate">
               <Button variant="ghost" size="icon" :disabled="track.isDefault" :aria-label="$t('ui.deleteTrack')" @click="requestRemoveTrack(index)">
                 <Trash2 class="size-4" />
@@ -136,6 +146,7 @@ const { Plus, Save, Trash2, canWrite, mode, enabled, canUpdate, tracks, ssoProvi
       {{ $t('ui.bloodAwardsRequireScoringInternalTracksAreAlwaysPrivateUnscored') }}
     </p>
     <p v-if="!loading" class="text-xs text-muted-foreground">{{ $t('sso.trackGateDescription') }}</p>
+    <p v-if="!loading" class="text-xs text-muted-foreground">{{ $t('sso.trackGateConfigurationHint') }}</p>
 
     <Dialog :open="pendingRemoval !== null" @update:open="closeRemoval">
       <DialogContent v-if="pendingRemoval">
