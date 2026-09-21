@@ -38,6 +38,17 @@ public class GameplayFactAdmissionPolicyTests
     }
 
     [Test]
+    public async Task Pending_team_is_rejected_even_when_competition_is_running()
+    {
+        var snapshot = Snapshot(CompetitionStatus.Running) with { TeamApproved = false };
+
+        var result = Check(snapshot, DateTimeOffset.UtcNow);
+
+        await Assert.That(result.FailureCode)
+            .IsEqualTo(GameplayFactAdmissionFailureCode.TeamForbidden);
+    }
+
+    [Test]
     public async Task NonRunning_competitions_are_rejected()
     {
         foreach (var status in new[] { CompetitionStatus.Draft, CompetitionStatus.Published, CompetitionStatus.Paused, CompetitionStatus.Finished })
