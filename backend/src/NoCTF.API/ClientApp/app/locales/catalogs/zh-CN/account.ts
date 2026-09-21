@@ -85,6 +85,8 @@ export const messages = {
   "sso.loginSuccessful": "单点登录成功",
   "sso.loginFailed": "单点登录失败",
   "sso.identityNotLinked": "此外部身份尚未绑定 NoCTF 账户，请先使用本地账户登录或注册，再在账户安全设置中发起绑定。",
+  "sso.signInToBind": "登录后绑定",
+  "sso.registerToBind": "注册后绑定",
   "sso.confirmBinding": "确认绑定",
   "sso.bindingSuccessful": "外部身份绑定成功",
   "sso.bindingFailed": "外部身份绑定失败",

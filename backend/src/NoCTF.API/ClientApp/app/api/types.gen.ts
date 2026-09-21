@@ -1291,10 +1291,6 @@ export type NoCtfapiEndpointsAuthenticationMySsoBindingResponse = {
 
 export type NoCtfapiEndpointsAuthenticationPublicSsoProtocol = 'Oidc' | 'Cas';
 
-export type NoCtfapiEndpointsAuthenticationCompleteSsoBindingRequest = {
-    [key: string]: never;
-};
-
 export type NoCtfapiEndpointsAuthenticationCompleteSsoLoginResponse = {
     userId?: string;
     userName?: string;
@@ -1306,10 +1302,6 @@ export type NoCtfapiEndpointsAuthenticationCompleteSsoLoginResponse = {
 };
 
 export type NoCtfapiEndpointsAuthenticationUserRoleProtocol = 'User' | 'Organizer' | 'Administrator';
-
-export type NoCtfapiEndpointsAuthenticationCompleteSsoLoginRequest = {
-    [key: string]: never;
-};
 
 export type NoCtfapiEndpointsAuthenticationCurrentUserResponse = {
     userId?: string;
@@ -1359,6 +1351,7 @@ export type NoCtfapiEndpointsAuthenticationBindableSsoProviderResponse = {
 
 export type NoCtfapiEndpointsAuthenticationSsoFlowStatusResponse = {
     flowId?: string;
+    providerId?: string;
     state?: NoCtfapiEndpointsAuthenticationSsoFlowStateProtocol;
     intent?: NoCtfapiEndpointsAuthenticationSsoFlowIntentProtocol;
     providerName?: string | null;

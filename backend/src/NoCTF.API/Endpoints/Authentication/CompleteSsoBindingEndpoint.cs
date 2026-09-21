@@ -5,16 +5,11 @@ using NoCTF.Application.Authentication.Sso;
 
 namespace NoCTF.API.Endpoints.Authentication;
 
-public sealed class CompleteSsoBindingRequest
-{
-    public Guid FlowId { get; set; }
-}
-
 public sealed class CompleteSsoBindingEndpoint(
     CompleteSsoBinding complete,
     SsoBrowserCorrelation correlation,
     IUserContext user)
-    : Endpoint<CompleteSsoBindingRequest,
+    : EndpointWithoutRequest<
         Results<Ok<MySsoBindingResponse>, ProblemHttpResult>>
 {
     public override void Configure()
@@ -28,7 +23,6 @@ public sealed class CompleteSsoBindingEndpoint(
     }
 
     public override async Task<Results<Ok<MySsoBindingResponse>, ProblemHttpResult>> ExecuteAsync(
-        CompleteSsoBindingRequest request,
         CancellationToken ct)
     {
         if (!user.IsHuman)
@@ -37,7 +31,7 @@ public sealed class CompleteSsoBindingEndpoint(
         if (browserId is null)
             return SsoEndpointProblems.Create(SsoFailureCode.InvalidCorrelation);
         var result = await complete.ExecuteAsync(
-            request.FlowId,
+            Route<Guid>("flowId"),
             user.UserId,
             correlation.Hash(browserId),
             ct);

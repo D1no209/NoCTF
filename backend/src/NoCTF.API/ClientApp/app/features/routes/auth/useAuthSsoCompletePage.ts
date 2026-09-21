@@ -12,12 +12,27 @@ export function useAuthSsoCompletePage() {
   const loading = ref(true)
   const pending = ref(false)
   const error = ref<string | null>(null)
+  const identityNotLinked = ref(false)
   const flowId = computed(() => {
     const value = route.query.flow
     return typeof value === 'string' && /^[0-9a-f]{32}$/i.test(value)
       ? `${value.slice(0, 8)}-${value.slice(8, 12)}-${value.slice(12, 16)}-${value.slice(16, 20)}-${value.slice(20)}`
       : null
   })
+  const bindingReturnPath = computed(() => {
+    const providerId = flow.value?.providerId
+    const query = new URLSearchParams({ account: 'security' })
+    if (providerId) query.set('ssoProvider', providerId)
+    return `/?${query.toString()}`
+  })
+  const bindingLoginTarget = computed(() => ({
+    path: '/auth/login',
+    query: { redirect: bindingReturnPath.value },
+  }))
+  const bindingRegisterTarget = computed(() => ({
+    path: '/auth/register',
+    query: { redirect: bindingReturnPath.value },
+  }))
 
   async function load(attempt = 0): Promise<void> {
     if (!flowId.value) {
@@ -58,9 +73,13 @@ export function useAuthSsoCompletePage() {
     }
     catch (requestError) {
       const parsed = parseApiError(requestError, translate('sso.loginFailed'))
-      error.value = parsed.code === 'IdentityNotLinked'
-        ? translate('sso.identityNotLinked')
-        : parsed.message
+      if (parsed.code === 'IdentityNotLinked') {
+        identityNotLinked.value = true
+        error.value = null
+      }
+      else {
+        error.value = parsed.message
+      }
     }
     finally {
       pending.value = false
@@ -90,6 +109,9 @@ export function useAuthSsoCompletePage() {
     loading,
     pending,
     error,
+    identityNotLinked,
+    bindingLoginTarget,
+    bindingRegisterTarget,
     completeLogin,
     completeBinding,
   }

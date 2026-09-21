@@ -3,7 +3,7 @@ import { toRefs } from 'vue'
 import type { AuthRegisterPageViewState } from '~/features/routes/auth/useAuthRegisterPage'
 
 const viewProps = defineProps<{ state: AuthRegisterPageViewState }>()
-const { authArtwork, configuration, userName, email, password, confirmPassword, error, pending, registered, resendPending, resendDone, resendError, submit, resendVerification } = toRefs(viewProps.state)
+const { authArtwork, configuration, userName, email, password, confirmPassword, error, pending, registered, resendPending, resendDone, resendError, loginTarget, submit, resendVerification } = toRefs(viewProps.state)
 </script>
 
 <template>
@@ -42,7 +42,7 @@ const { authArtwork, configuration, userName, email, password, confirmPassword, 
       </CardContent>
       <CardFooter class="relative z-10">
         <Button as-child class="w-full">
-          <NuxtLink to="/auth/login">{{ $t('ui.goToLogin') }}</NuxtLink>
+          <NuxtLink :to="loginTarget">{{ $t('ui.goToLogin') }}</NuxtLink>
         </Button>
       </CardFooter>
     </Card>
@@ -84,7 +84,7 @@ const { authArtwork, configuration, userName, email, password, confirmPassword, 
       </CardContent>
       <CardFooter class="relative z-10 justify-center text-sm text-muted-foreground">
         {{ $t('ui.alreadyHaveAnAccount') }}
-        <NuxtLink to="/auth/login" class="ml-1 underline">{{ $t('ui.logInDirectly') }}</NuxtLink>
+        <NuxtLink :to="loginTarget" class="ml-1 underline">{{ $t('ui.logInDirectly') }}</NuxtLink>
       </CardFooter>
     </Card>
   </div>

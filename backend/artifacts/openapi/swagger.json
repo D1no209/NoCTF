@@ -19415,10 +19415,6 @@
           "Cas"
         ]
       },
-      "NoCTFAPIEndpointsAuthenticationCompleteSsoBindingRequest": {
-        "type": "object",
-        "additionalProperties": false
-      },
       "NoCTFAPIEndpointsAuthenticationCompleteSsoLoginResponse": {
         "type": "object",
         "additionalProperties": false,
@@ -19461,10 +19457,6 @@
           "Organizer",
           "Administrator"
         ]
-      },
-      "NoCTFAPIEndpointsAuthenticationCompleteSsoLoginRequest": {
-        "type": "object",
-        "additionalProperties": false
       },
       "NoCTFAPIEndpointsAuthenticationCurrentUserResponse": {
         "type": "object",
@@ -19612,6 +19604,10 @@
         "additionalProperties": false,
         "properties": {
           "flowId": {
+            "type": "string",
+            "format": "guid"
+          },
+          "providerId": {
             "type": "string",
             "format": "guid"
           },
