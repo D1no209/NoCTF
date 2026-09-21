@@ -4,11 +4,6 @@ using NoCTF.Application.Authentication.Sso;
 
 namespace NoCTF.API.Endpoints.Administration.Platform;
 
-public sealed class TestSsoProviderConnectionRequest
-{
-    public Guid ProviderId { get; set; }
-}
-
 public sealed record SsoProviderConnectionTestResponse(
     bool Succeeded,
     SsoProtocolProtocol? Protocol,
@@ -17,7 +12,7 @@ public sealed record SsoProviderConnectionTestResponse(
     string? FailureCode);
 
 public sealed class TestSsoProviderConnectionEndpoint(ManageSsoProviders management)
-    : Endpoint<TestSsoProviderConnectionRequest,
+    : EndpointWithoutRequest<
         Results<Ok<SsoProviderConnectionTestResponse>, NotFound>>
 {
     public override void Configure()
@@ -33,10 +28,9 @@ public sealed class TestSsoProviderConnectionEndpoint(ManageSsoProviders managem
     }
 
     public override async Task<Results<Ok<SsoProviderConnectionTestResponse>, NotFound>> ExecuteAsync(
-        TestSsoProviderConnectionRequest request,
         CancellationToken ct)
     {
-        var result = await management.TestConnectionAsync(request.ProviderId, ct);
+        var result = await management.TestConnectionAsync(Route<Guid>("providerId"), ct);
         if (result.FailureCode == "ProviderNotFound")
             return TypedResults.NotFound();
         return TypedResults.Ok(new SsoProviderConnectionTestResponse(

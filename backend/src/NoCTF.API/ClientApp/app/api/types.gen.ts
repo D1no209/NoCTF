@@ -1646,10 +1646,6 @@ export type NoCtfapiEndpointsAdministrationRuntimeAdminRuntimeListResponse = {
 
 export type NoCtfapiEndpointsAdministrationRuntimeListAdminRuntimesRequest = NoCtfapiPaginationPaginationRequest & {};
 
-export type NoCtfapiEndpointsAdministrationPlatformBeginSsoAuthenticationTestRequest = {
-    [key: string]: never;
-};
-
 export type NoCtfapiEndpointsAdministrationPlatformPlatformUserResponse = {
     id?: string;
     userName?: string;
@@ -2231,10 +2227,6 @@ export type NoCtfapiEndpointsAdministrationPlatformSsoProviderConnectionTestResp
     issuer?: string | null;
     failureStage?: string | null;
     failureCode?: string | null;
-};
-
-export type NoCtfapiEndpointsAdministrationPlatformTestSsoProviderConnectionRequest = {
-    [key: string]: never;
 };
 
 export type NoCtfapiEndpointsAdministrationPlatformUpdateCapWorkloadConfigurationRequest = {

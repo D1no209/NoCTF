@@ -5,15 +5,10 @@ using NoCTF.Application.Authentication.Sso;
 
 namespace NoCTF.API.Endpoints.Administration.Platform;
 
-public sealed class BeginSsoAuthenticationTestRequest
-{
-    public Guid ProviderId { get; set; }
-}
-
 public sealed class BeginSsoAuthenticationTestEndpoint(
     BeginSsoFlow begin,
     SsoBrowserCorrelation correlation)
-    : Endpoint<BeginSsoAuthenticationTestRequest,
+    : EndpointWithoutRequest<
         Results<Ok<NoCTF.API.Endpoints.Authentication.BeginSsoLoginResponse>, ProblemHttpResult>>
 {
     public override void Configure()
@@ -30,12 +25,11 @@ public sealed class BeginSsoAuthenticationTestEndpoint(
 
     public override async Task<Results<Ok<NoCTF.API.Endpoints.Authentication.BeginSsoLoginResponse>,
         ProblemHttpResult>> ExecuteAsync(
-        BeginSsoAuthenticationTestRequest request,
         CancellationToken ct)
     {
         var browserId = correlation.GetOrCreate(HttpContext);
         var result = await begin.ExecuteAsync(new(
-            request.ProviderId,
+            Route<Guid>("providerId"),
             SsoFlowIntent.AdministratorTest,
             correlation.Hash(browserId),
             "/admin/platform/authentication"), ct);
