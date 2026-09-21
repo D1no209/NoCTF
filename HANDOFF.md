@@ -3939,3 +3939,24 @@ dotnet run --project backend/src/NoCTF.API/NoCTF.API.csproj --no-build -- --expo
   均来自工作区既有 Runtime Proxy/Traffic Capture WIP（OpenAPI 数量、DI、架构门禁等），不是本阶段回归。
 - 已运行 OpenAPI 导出和 `bun run api:gen`。生成差异同时包含用户现有 Runtime WIP，保留在工作区，
   本阶段提交只纳入附件 API、对应测试、GitOps 契约测试和本交接记录，不提交其他已有改动。
+
+## 2026-09-21 GitOps API 契约对齐：模板与端到端阶段
+
+- 外部 `NoCTF-Challenge-Template-reference` 在现有未提交安全重跑改造上完成当前 API 对齐：比赛详情
+  解包 `competition/capabilities`，比赛题目详情解包 `challenge/rulesJson`；Challenge 使用 `content`
+  PATCH，CompetitionChallenge 使用 `presentation/rules` PATCH，彻底移除独立 `/configuration`。
+- 比赛题目收敛继续先以原发布状态原子更新展示与规则，再写 Hint，最后切换目标发布状态；Hint 失败
+  不会提前发布或取消发布。顺序避让、软删除恢复和丢失响应后的稳定 ID 重读均改为处理聚合响应。
+- GitOps 附件上传发送 `DeliveryPolicy=All`、`AttachmentIds`、`Files`，读取时拒绝接管
+  RandomOnePerTeam 集合；静态 Flag 请求只发送当前 API 的 `id/flag/matchKind`。CTF Definition 升至
+  schemaVersion 3，Rules 保持 2；其他模式版本不变。Bot Token 文档改为 platform users 路由。
+- 模板不再实现虚构 cursor 分页；实际使用的完整 `items` 集合只读取一次。`dotnet build`、`self-test`、
+  manifest validate 与 diff check 均通过，self-test 覆盖聚合响应、PATCH 正文、附件 multipart、发布安全、
+  稳定 ID、权限、schema 版本与禁止旧路由。
+- 平台 opt-in 跨仓测试同步改用 PATCH，并把 PATCH 纳入写请求/故障注入统计。使用当前两个工作区、真实
+  JWT、真实 HTTP 与 Testcontainers PostgreSQL 运行通过 1/1（40 秒），覆盖 dry-run、首次 Apply、
+  幂等重跑、Hint 失败保护、附件/Flag/Hint 恢复、顺序交换、软删除及中断后恢复。
+- OpenAPI 再次导出，生成客户端显示 `attachmentIds?: string[] | null`，旧调用方仍可省略；前端
+  `typecheck` 与 architecture audit 通过；`bun test` 为 598/599，唯一失败是现有 Runtime Access WIP
+  已出现 `runtime.access`、旧测试仍要求其不存在。生成文件同时携带 Runtime WIP 的合法当前契约，
+  继续保留在工作区，未把其他任务源码纳入本轮提交。

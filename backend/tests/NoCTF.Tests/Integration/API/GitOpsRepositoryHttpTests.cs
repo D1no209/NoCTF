@@ -176,8 +176,18 @@ public sealed class GitOpsRepositoryHttpTests
                 using (var client = new HttpClient { BaseAddress = new Uri(apiUrl) })
                 {
                     client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
-                    using var change = await client.PutAsJsonAsync($"/api/v1/admin/competitions/{competitionId}/challenges/{firstInstance}",
-                        new { customTitle = (string?)null, order = 10, isPublished = false }, ct);
+                    using var change = await client.PatchAsJsonAsync(
+                        $"/api/v1/admin/competitions/{competitionId}/challenges/{firstInstance}",
+                        new
+                        {
+                            presentation = new
+                            {
+                                customTitle = (string?)null,
+                                order = 10,
+                                isPublished = false
+                            }
+                        },
+                        ct);
                     change.EnsureSuccessStatusCode();
                 }
                 WriteCompetition(temporary, competitionId, firstInstance, secondInstance, false, true, firstOrder: 10, secondOrder: 30);
@@ -240,13 +250,18 @@ public sealed class GitOpsRepositoryHttpTests
         app.Use(async (context, next) =>
         {
             var faults = context.RequestServices.GetRequiredService<TestFaults>();
-            var writing = HttpMethods.IsPost(context.Request.Method) || HttpMethods.IsPut(context.Request.Method)
-                || HttpMethods.IsDelete(context.Request.Method);
+            var writing = HttpMethods.IsPost(context.Request.Method)
+                          || HttpMethods.IsPut(context.Request.Method)
+                          || HttpMethods.IsPatch(context.Request.Method)
+                          || HttpMethods.IsDelete(context.Request.Method);
             if (writing) Interlocked.Increment(ref faults.MutationRequests);
-            if (writing && faults.RejectHintWrites && context.Request.Path.Value!.Contains("/hints", StringComparison.Ordinal)
-                || HttpMethods.IsPut(context.Request.Method) && context.Request.Path.Value == faults.FailNextPutPath)
+            if ((writing
+                 && faults.RejectHintWrites
+                 && context.Request.Path.Value!.Contains("/hints", StringComparison.Ordinal))
+                || (HttpMethods.IsPatch(context.Request.Method)
+                    && context.Request.Path.Value == faults.FailNextPatchPath))
             {
-                faults.FailNextPutPath = null;
+                faults.FailNextPatchPath = null;
                 context.Response.StatusCode = StatusCodes.Status500InternalServerError;
                 return;
             }
@@ -254,7 +269,7 @@ public sealed class GitOpsRepositoryHttpTests
             if (HttpMethods.IsPost(context.Request.Method) && context.Request.Path.Value == faults.FailAfterRestorePath
                 && context.Response.StatusCode is >= 200 and < 300)
             {
-                faults.FailNextPutPath = faults.FailAfterRestorePath![..^"/restore".Length];
+                faults.FailNextPatchPath = faults.FailAfterRestorePath![..^"/restore".Length];
                 faults.FailAfterRestorePath = null;
             }
         });
@@ -282,7 +297,7 @@ public sealed class GitOpsRepositoryHttpTests
         public int MutationRequests;
         public bool RejectHintWrites { get; set; }
         public string? FailAfterRestorePath { get; set; }
-        public string? FailNextPutPath { get; set; }
+        public string? FailNextPatchPath { get; set; }
     }
 
     private static async Task<DateTimeOffset[]> TimestampsAsync(WebApplication app, CancellationToken ct)

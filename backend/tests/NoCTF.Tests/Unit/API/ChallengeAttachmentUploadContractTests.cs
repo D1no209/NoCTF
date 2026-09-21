@@ -70,7 +70,7 @@ public sealed class ChallengeAttachmentUploadContractTests
         new()
         {
             DeliveryPolicy = AttachmentDeliveryPolicyProtocol.All,
-            AttachmentIds = attachmentIds ?? [],
+            AttachmentIds = attachmentIds,
             Files = files
         };
 

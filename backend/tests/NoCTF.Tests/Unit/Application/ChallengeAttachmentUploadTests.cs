@@ -316,6 +316,37 @@ public sealed class ChallengeAttachmentUploadTests
     }
 
     [Test]
+    public async Task Requested_id_conflict_compensates_every_staged_file()
+    {
+        var harness = CreateHarness();
+        harness.Store.AddBatchAsync(
+                ChallengeId,
+                ActorId,
+                false,
+                Arg.Any<IReadOnlyList<ChallengeAttachmentBatchEntry>>(),
+                Arg.Any<CancellationToken>())
+            .Returns(AddChallengeAttachmentState.ResourceIdConflict);
+        using var first = new MemoryStream([1]);
+        using var second = new MemoryStream([2]);
+
+        var result = await harness.UseCase.UploadBatchAsync(
+            ChallengeId,
+            ActorId,
+            false,
+            [
+                new("first.txt", "text/plain", first, Guid.NewGuid()),
+                new("second.txt", "text/plain", second, Guid.NewGuid())
+            ],
+            DateTimeOffset.Parse("2026-09-21T00:00:00Z"));
+
+        await Assert.That(result.FailureCode)
+            .IsEqualTo(ChallengeAttachmentFailureCode.ResourceIdConflict);
+        await harness.Registry.Received(2).AbandonAsync(
+            Arg.Any<Guid>(),
+            Arg.Any<CancellationToken>());
+    }
+
+    [Test]
     public async Task Duplicate_random_batch_flag_is_rejected_before_storage()
     {
         var harness = CreateHarness();
