@@ -45,7 +45,7 @@ Team 只属于一个 Competition。字段包含当前、大小写不敏感的 `T
 
 Competition 以普通列 `TracksEnabled` 显式启停赛道，并以 `TrackConfigurationJson` 保存 1–32 条跨模式赛道；赛道不是业务表，GameplayFact 也不复制赛道。每场比赛始终恰有一个公开、非内部的默认赛道，旧比赛的空配置按唯一 `default` 赛道解释。新比赛默认关闭赛道，旧数据由迁移保持开启。Running 与 Paused 允许启停、修改定义和调整归属；Finished 只读。删除使用中赛道必须在同一事务指定目标赛道并迁移全部受影响队伍；关闭赛道会把所有队伍原子归并到当前默认赛道，再次开启不会恢复旧归属。
 
-每条赛道独立声明是否允许公开选择、计分、参与 CTF 血榜、影响 CTF 动态分值、出现在公开排行榜以及影响 AWD/AWDP/KoH 的竞争性结果。内部赛道必须关闭所有公开与竞争开关，但仍可正常查看题目、运行 Runtime/Checker 并产生永久 GameplayFact 和工作人员事件。Administrator、Owner、Manager 可配置赛道；Judge、Observer 只读。内部赛道及队伍只对平台 Administrator 与比赛 Owner、Manager、Judge 可见，Observer 与普通用户均不得通过排行榜或详情协议读取。赛道开启时，普通参赛者必须显式选择公开可报名赛道并满足邀请码规则；赛道关闭时，协议允许省略 TrackKey，服务端忽略多传的赛道信息并在比赛行锁内写入默认赛道。
+每条赛道独立声明是否允许公开选择、计分、参与 CTF 血榜、影响 CTF 动态分值、出现在公开排行榜以及影响 AWD/AWDP/KoH 的竞争性结果，并可选用一个 SSO Provider UUID 作为身份门禁。内部赛道必须关闭所有公开与竞争开关，但仍可正常查看题目、运行 Runtime/Checker 并产生永久 GameplayFact 和工作人员事件。Administrator、Owner、Manager 可配置赛道；Judge、Observer 只读。内部赛道及队伍只对平台 Administrator 与比赛 Owner、Manager、Judge 可见，Observer 与普通用户均不得通过排行榜或详情协议读取。赛道开启时，普通参赛者必须显式选择公开可报名赛道并同时满足邀请码与 SSO 门禁；建队检查创建者，邀请加入检查新成员，管理员改道检查全体成员。门禁只在入场时校验，新增门禁与成员后续解绑均不追溯既有队伍。赛道关闭时门禁被忽略，协议允许省略 TrackKey，服务端忽略多传的赛道信息并在比赛行锁内写入默认赛道。
 
 团队拥有一个全局唯一、明文的 32 字符 Base62 InvitationToken。字母表固定为 `0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz`，使用 CSPRNG rejection sampling 逐字符无偏生成；若撞全局唯一索引就整体重生。持有 Token 的已登录用户在 Published 状态直接加入；轮换立即使旧值失效。
 

@@ -72,6 +72,12 @@ Login/Refresh 返回 AccessToken 与 ExpiresAt；Refresh Cookie 不出现在 bod
 公开用户资料默认隐藏邮箱；本人和 Administrator 始终可见，其他访问者仅在用户主动公开后可见。
 密码重置请求对所有合法邮箱格式统一返回 202；完成接口成功返回 204，无效、过期或已消费 Token 返回 typed 400 `InvalidOrExpired`。完成后不会签发新 Token，并清除当前 Refresh Cookie。
 
+`GET /auth/sso/flows/{flowId}` 的安全状态摘要包含 `providerId`，供完成页在消费前记住后续绑定引导；
+不返回 Subject、授权码、票据或外部令牌。`complete-login` 会先原子消费认证结果，未找到绑定时返回
+`IdentityNotLinked`，此后读取或重放同一 Flow 均失败。用户需注册或本地登录，再从账户安全输入密码并
+发起新的绑定 Flow。两个 `.../{flowId}/complete*` 接口均为无正文 POST，不要求 JSON
+`Content-Type`。
+
 ## Competition 与 Team
 
 ```text
@@ -284,6 +290,13 @@ PUT  /api/v1/admin/competitions/{competitionId}/cheat-incidents/{gameplayFactId}
 失败码与 `affectedTeamCount` 的强类型 409。Running/Paused 允许更新，Finished 返回
 `CompetitionFinished`。关闭赛道时服务端在同一事务将所有队伍归并到新配置的默认赛道。
 
+每条赛道的 `requiredSsoProviderId` 可为空，或引用一个已配置的 SSO Provider UUID。管理比赛响应的
+`ssoProviders` 只包含无密钥目录；公开赛道响应返回门禁 Provider 的 ID、名称、图标，以及当前查看者的
+`meetsSsoRequirement`，不返回任何 Subject。赛道开启时，建队校验创建者，邀请加入校验新成员，
+管理员改道校验队伍全体成员；邀请码与 SSO 门禁同时配置时必须同时满足。资格不足返回
+`TrackSsoIdentityRequired`，保存不存在的 Provider 返回 `SsoProviderNotFound`。已有队伍不因新增
+门禁或成员后续解绑被追溯处理；赛道关闭时忽略门禁。
+
 Lifecycle 状态资源复用同一 Application state machine，并通过强类型 `PUT .../status` 表达目标状态。
 
 普通删除是可恢复的软删除，恢复不会清理任何历史。物理删除是独立操作，不要求先软删除；调用方应先读取
@@ -465,6 +478,7 @@ PATCH /api/v1/admin/platform/users/{userId}
 GET  /api/v1/admin/platform/users/{userId}/activity
 GET  /api/v1/admin/platform/users/{userId}/deletion-preview
 DELETE /api/v1/admin/platform/users/{userId}
+DELETE /api/v1/admin/platform/users/{userId}/sso-binding
 GET  /api/v1/admin/platform/configuration
 PATCH /api/v1/admin/platform/configuration
 PUT  /api/v1/admin/platform/configuration/logo
@@ -491,6 +505,11 @@ PUT  /api/v1/admin/platform/sso/providers/{providerId}/secret
 POST /api/v1/admin/platform/sso/providers/{providerId}/connection-tests
 POST /api/v1/admin/platform/sso/providers/{providerId}/authentication-tests
 ```
+
+用户列表和详情的可空 `ssoBinding` 包含 Provider UUID/名称、协议、Subject 和绑定时间。列表的
+`search` 同时匹配用户名、邮箱和 SSO Subject，`ssoProviderId` 可按 Provider 筛选。管理员解除绑定
+支持正常、封禁和停用的人类账户，清空全部绑定字段并递增目标用户 `TokenVersion`；审计不记录
+Subject。管理员解除自己的绑定后，管理前端会清除当前会话并返回登录页。
 
 平台 Runtime 清单只投影当前处于 Queued、Provisioning、Running 或 Stopping 状态的 Container 与
 Compose 实例，包含比赛 Runtime 与题库模板测试 Runtime，并使用 `offset/limit/total` 页码

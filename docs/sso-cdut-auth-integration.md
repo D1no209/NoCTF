@@ -111,7 +111,9 @@ https://noctf.example.com/api/v1/auth/sso/callback/oidc/00000000-0000-0000-0000-
 5. 退出后，登录页会显示带自定义图标的身份源按钮；之后可直接使用该按钮登录。
 
 一个 NoCTF 账户最多绑定一个外部身份，一个 CDUT Auth 身份也只能绑定一个 NoCTF 账户。
-直接用尚未绑定的学校身份登录会得到 `IdentityNotLinked`，这是预期行为；用户应先完成上述绑定。
+直接用尚未绑定的学校身份登录会得到 `IdentityNotLinked`。NoCTF 会立即消费并销毁本次认证结果，
+完成页会引导用户注册或登录本地账户，并自动打开“账户安全”。用户必须再次输入本地密码，并重新
+完成一条新的 CDUT Auth 流程才能绑定；刷新或返回旧完成页不会恢复先前身份结果。
 
 解除绑定需要再次输入 NoCTF 当前密码。成功后 NoCTF 会递增 `TokenVersion`，旧会话失效，
 用户仍可使用本地密码登录。
@@ -135,7 +137,7 @@ https://noctf.example.com/api/v1/auth/sso/callback/oidc/00000000-0000-0000-0000-
 | 返回 `invalid_scope` | Scopes 只配置 `openid` 和 `profile`。 |
 | NoCTF 显示 `ProviderUnavailable` | 检查 Discovery URL、证书、DNS、Allowed Host 和服务器到 CDUT Auth 的网络。 |
 | NoCTF 显示 `ProviderChanged` | 流程中修改了公开地址或身份信任边界；重新从登录/绑定按钮发起。 |
-| 登录成功后显示 `IdentityNotLinked` | 先用本地账号登录，再从账户安全发起绑定。 |
+| 登录成功后显示 `IdentityNotLinked` | 按完成页引导注册或登录；进入账户安全后输入本地密码并重新发起绑定。旧流程不能重用。 |
 | 图标不显示 | 使用无需鉴权、无需 Cookie、证书有效且不含查询串的公开 HTTPS 图片地址。 |
 | Discovery/JWKS 的浏览器 CORS 报错 | NoCTF 正常流程由服务端访问这些端点，不依赖浏览器 CORS；不要把换码逻辑移到 SPA。 |
 

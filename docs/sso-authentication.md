@@ -21,6 +21,39 @@ SSO 默认关闭。普通密码登录、NoCTF Access Token 与 Refresh Cookie �
 客户端在身份源按钮和绑定信息中显示它。生产配置只接受不含用户信息、查询串和片段的公开
 HTTPS 绝对地址；图片请求使用 `no-referrer`。未配置图标时仍以身份源名称完成操作。
 
+## 登录、绑定与解绑
+
+SSO 登录只接受已经绑定到 NoCTF 人类账户的外部身份。登录完成页读取流程状态时会得到安全的
+`ProviderId`，但不会得到 Subject、外部令牌或身份属性。调用 `complete-login` 后，流程结果先被
+原子消费；若身份尚未绑定，接口返回 `IdentityNotLinked`，身份结果随即销毁，刷新页面或重放请求
+只会得到流程已失效。
+
+完成页会引导用户注册或使用本地账户登录，并通过受限的站内重定向打开“账户安全”。用户仍需输入
+当前 NoCTF 密码，再从预选的身份源发起一条全新的 SSO 绑定流程。平台不会把前一次未绑定登录的
+身份结果续接到账号，也不会据此自动注册或匹配账号。
+
+本人可以在“账户安全”查看 Provider、协议、Subject 和绑定时间，并在密码复核后绑定或解绑。
+解绑会递增 `TokenVersion`，使既有 Access/Refresh 会话失效。平台管理员可以在用户管理中按
+SSO Subject 搜索、按 Provider 筛选、查看绑定摘要，并解除正常、封禁或停用人类账户的绑定；
+管理员解除绑定同样递增目标用户的 `TokenVersion`，审计记录操作者、目标用户和 Provider，
+不记录 Subject。
+
+`POST /api/v1/auth/sso/flows/{flowId}/complete-login` 与
+`POST /api/v1/auth/me/sso-binding/flows/{flowId}/complete` 都是无请求正文的 POST。调用方不需要发送
+JSON 或 `Content-Type`；浏览器关联 Cookie 和路由中的 Flow ID 是完成操作所需的协议输入。
+
+## 赛道身份门禁
+
+赛道配置可用 `RequiredSsoProviderId` 选择一个身份源作为入场门禁。赛道功能开启时，创建队伍的
+用户、通过邀请加入的新成员，以及管理员把队伍改入该赛道时的全体成员，都必须绑定同一个 Provider
+UUID。邀请码与 SSO 门禁同时配置时，两项都必须满足。Provider 名称和图标可在公开赛道响应中展示，
+Subject 不会公开。
+
+门禁只在入场或改道时校验。新增门禁不会追溯既有队伍，成员入场后解绑也不会移出队伍或改变已有
+赛道资格；关闭赛道功能时门禁被忽略。平台管理员、比赛 Owner 和 Manager 可以配置门禁，保存时
+引用不存在的 Provider 会返回 `SsoProviderNotFound`，入场资格不足则返回
+`TrackSsoIdentityRequired`。
+
 ## 部署配置
 
 生产环境继续使用 `EmailVerification__EncryptionKey` 保护 Provider Client Secret
