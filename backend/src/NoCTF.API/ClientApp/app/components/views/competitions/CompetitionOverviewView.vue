@@ -3,7 +3,7 @@ import { toRefs } from 'vue'
 import type { CompetitionOverviewViewState } from '~/features/competitions/useCompetitionOverview'
 
 const viewProps = defineProps<{ state: CompetitionOverviewViewState }>()
-const { ArrowRight, Box, CalendarRange, Clock, EyeOff, FileText, KeyRound, LogIn, Settings, ShieldCheck, Trophy, UserPlus, Users, posterUrl, detailError, refreshCompetition, competitionId, isLoggedIn, isAdministrator, managementOnly, competition, myTeam, teamLoaded, teamLoadError, loadMyTeam, approvedTeamCount, selectableTracks, tracksLoaded, trackLoadError, loadRegistrationOptions, countdown, practiceOpen, canParticipate, teamRegistrationOpen, tracksEnabled, createOpen, createName, createTrackKey, createPending, createValidationError, selectedCreateTrack, submitCreate, joinOpen, joinToken, joinPending, joinValidationError, submitJoin, isCaptain, LifecycleBadge } = toRefs(viewProps.state)
+const { ArrowRight, Box, CalendarRange, Clock, EyeOff, FileText, KeyRound, LogIn, Settings, ShieldCheck, Trophy, UserPlus, Users, posterUrl, detailError, refreshCompetition, competitionId, isLoggedIn, isAdministrator, managementOnly, competition, myTeam, teamLoaded, teamLoadError, loadMyTeam, approvedTeamCount, selectableTracks, tracksLoaded, trackLoadError, loadRegistrationOptions, countdown, practiceOpen, canParticipate, teamRegistrationOpen, tracksEnabled, createOpen, createName, createTrackKey, createPending, createValidationError, selectedCreateTrack, submitCreate, joinOpen, joinToken, joinPending, joinValidationError, submitJoin, isCaptain, requiresManualReview, registrationOpen, registrationInvitationCode, registrationPending, registrationError, registrationTrack, canSubmitRegistration, registrationValid, openRegistration, setRegistrationOpen, submitRegistration, LifecycleBadge } = toRefs(viewProps.state)
 </script>
 
 <template>
@@ -173,6 +173,72 @@ const { ArrowRight, Box, CalendarRange, Clock, EyeOff, FileText, KeyRound, LogIn
                 <NuxtLink :to="`/competitions/${competitionId}/challenges`"> {{ practiceOpen ? $t('ui.enterPractice') : $t('ui.enterTheCompetition') }} <ArrowRight data-icon="inline-end" />
                 </NuxtLink>
               </Button>
+              <Dialog v-if="canSubmitRegistration" :open="registrationOpen" @update:open="setRegistrationOpen">
+                <DialogTrigger as-child>
+                  <Button @click="openRegistration">
+                    <ShieldCheck data-icon="inline-start" />{{ $t('ui.submitRegistration') }}
+                  </Button>
+                </DialogTrigger>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>{{ $t('ui.submitRegistration') }}</DialogTitle>
+                    <DialogDescription>
+                      {{ requiresManualReview ? $t('ui.registrationWillEnterPendingReview') : $t('ui.registrationWillBeAutomaticallyApproved') }}
+                    </DialogDescription>
+                  </DialogHeader>
+                  <UiForm validation="feature" @submit.prevent="submitRegistration">
+                    <FieldGroup>
+                      <Alert v-if="registrationError" variant="destructive">
+                        <AlertDescription>{{ $message(registrationError) }}</AlertDescription>
+                      </Alert>
+                      <Field v-if="tracksEnabled && !tracksLoaded">
+                        <Skeleton class="h-10 w-full" />
+                        <FieldDescription>{{ $t('ui.loadingAvailableCompetitionTracks') }}</FieldDescription>
+                      </Field>
+                      <Alert v-else-if="tracksEnabled && trackLoadError" variant="destructive">
+                        <AlertDescription class="flex items-center justify-between gap-3">
+                          <span>{{ $message(trackLoadError) }}</span>
+                          <Button type="button" size="sm" variant="outline" @click="loadRegistrationOptions">
+                            {{ $t('ui.retry') }}
+                          </Button>
+                        </AlertDescription>
+                      </Alert>
+                      <Field v-else-if="tracksEnabled && registrationTrack">
+                        <FieldLabel>{{ $t('ui.competitionTrack') }}</FieldLabel>
+                        <div class="flex items-center gap-2">
+                          <span class="font-medium">{{ registrationTrack.name ?? myTeam?.trackName ?? myTeam?.trackKey }}</span>
+                          <Badge v-if="registrationTrack.requiredSsoProviderId" variant="outline">{{ registrationTrack.requiredSsoProviderName }}</Badge>
+                        </div>
+                      </Field>
+                      <Alert v-else-if="tracksEnabled" variant="destructive">
+                        <AlertDescription>{{ $t('ui.noCompetitionTracksAreCurrentlyOpenForRegistration') }}</AlertDescription>
+                      </Alert>
+                      <Alert v-if="registrationTrack?.meetsSsoRequirement === false">
+                        <AlertDescription class="flex flex-wrap items-center justify-between gap-3">
+                          <span>{{ $t('sso.trackIdentityRequired') }}</span>
+                          <Button as-child type="button" size="sm" variant="outline">
+                            <NuxtLink :to="{ path: '/', query: { account: 'security' } }">{{ $t('sso.openAccountSecurity') }}</NuxtLink>
+                          </Button>
+                        </AlertDescription>
+                      </Alert>
+                      <Field v-if="registrationTrack?.requiresInvitationCode">
+                        <FieldLabel for="competition-registration-track-code">{{ $t('ui.trackInvitationCode') }}</FieldLabel>
+                        <Input
+                          id="competition-registration-track-code"
+                          v-model="registrationInvitationCode"
+                          type="password"
+                          required
+                          autocomplete="off"
+                          maxlength="128"
+                        />
+                      </Field>
+                      <Button type="submit" :disabled="registrationPending || !registrationValid">
+                        <Spinner v-if="registrationPending" data-icon="inline-start" />{{ $t('ui.submitRegistration') }}
+                      </Button>
+                    </FieldGroup>
+                  </UiForm>
+                </DialogContent>
+              </Dialog>
               <Button as-child variant="outline">
                 <NuxtLink :to="`/competitions/${competitionId}/my/team`">{{ $t('ui.myTeam') }}</NuxtLink>
               </Button>
@@ -237,9 +303,6 @@ const { ArrowRight, Box, CalendarRange, Clock, EyeOff, FileText, KeyRound, LogIn
           <AlertDescription>
             {{ $t('ui.teamSRegistrationWasSubmittedYouCanCompeteAfterOrganizer', { team: myTeam.name ?? '-' }) }}
           </AlertDescription>
-        </Alert>
-        <Alert v-else-if="myTeam && myTeam.registrationStatus === 'Unregistered'">
-          <AlertDescription>{{ $t('ui.teamIsNotRegisteredEditAndSubmitFromMyTeam', { team: myTeam.name ?? '-' }) }}</AlertDescription>
         </Alert>
         <Alert v-else-if="myTeam && myTeam.registrationStatus === 'Rejected'" variant="destructive">
           <AlertDescription>
