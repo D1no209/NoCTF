@@ -3,18 +3,59 @@ import { toRefs } from 'vue'
 import type { AdminCompetitionsByIdChallengesIndexPageViewState } from '~/features/routes/admin/competitions/[id]/challenges/useAdminCompetitionsByIdChallengesIndexPage'
 
 const viewProps = defineProps<{ state: AdminCompetitionsByIdChallengesIndexPageViewState }>()
-const { Plus, competitionId, competition, canWrite, items, loading, error, includeDeleted, pendingId, addOpen, templatesLoading, selectedTemplateId, templateSearch, hideAddedTemplates, newCustomTitle, newOrder, adding, addError, modeTemplates, visibleModeTemplates, openAdd, addChallenge, deleteTarget, deletePending, deleteError, closeDeleteDialog, beginDeleteChallenge, removeChallenge, restoreChallenge, setChallengePublished, onClickAddOpen } = toRefs(viewProps.state)
+const { Plus, competitionId, competition, canWrite, items, loading, error, includeDeleted, search, directionFilter, directionOptions, statusFilter, filteredItems, pendingId, addOpen, templatesLoading, selectedTemplateId, templateSearch, hideAddedTemplates, newCustomTitle, newOrder, adding, addError, modeTemplates, visibleModeTemplates, openAdd, addChallenge, deleteTarget, deletePending, deleteError, closeDeleteDialog, beginDeleteChallenge, removeChallenge, restoreChallenge, setChallengePublished, onClickAddOpen } = toRefs(viewProps.state)
 </script>
 
 <template>
   <div class="flex flex-col gap-4">
-    <div class="flex items-center justify-between">
-      <div class="flex items-center gap-2">
-        <Checkbox id="show-deleted" v-model="includeDeleted" />
-        <Label for="show-deleted" class="text-sm text-muted-foreground">{{ $t('ui.showDeleted') }}</Label>
+    <div class="flex flex-col gap-3 xl:flex-row xl:items-end xl:justify-between">
+      <div class="grid min-w-0 flex-1 gap-3 sm:grid-cols-2 lg:grid-cols-[minmax(16rem,1fr)_12rem_12rem]">
+        <Field>
+          <FieldLabel for="competition-challenge-search">{{ $t('ui.search') }}</FieldLabel>
+          <Input
+            id="competition-challenge-search"
+            v-model="search"
+            :placeholder="$t('ui.searchCompetitionChallenges')"
+          />
+        </Field>
+        <Field>
+          <FieldLabel for="competition-challenge-direction">{{ $t('ui.category') }}</FieldLabel>
+          <Select id="competition-challenge-direction" v-model="directionFilter">
+            <SelectTrigger class="w-full"><SelectValue /></SelectTrigger>
+            <SelectContent position="popper">
+              <SelectGroup>
+                <SelectItem value="all">{{ $t('ui.allDirections') }}</SelectItem>
+                <SelectItem v-for="option in directionOptions" :key="option.value" :value="option.value">
+                  {{ option.label }}
+                </SelectItem>
+              </SelectGroup>
+            </SelectContent>
+          </Select>
+        </Field>
+        <Field>
+          <FieldLabel for="competition-challenge-status">{{ $t('ui.status') }}</FieldLabel>
+          <Select id="competition-challenge-status" v-model="statusFilter">
+            <SelectTrigger class="w-full"><SelectValue /></SelectTrigger>
+            <SelectContent position="popper">
+              <SelectGroup>
+                <SelectItem value="all">{{ $t('ui.statusAll') }}</SelectItem>
+                <SelectItem value="published">{{ $t('ui.published') }}</SelectItem>
+                <SelectItem value="unpublished">{{ $t('ui.unpublished') }}</SelectItem>
+                <SelectItem value="deleted" :disabled="!includeDeleted">{{ $t('ui.deleted') }}</SelectItem>
+              </SelectGroup>
+            </SelectContent>
+          </Select>
+        </Field>
       </div>
-      <Button v-if="canWrite" size="sm" @click="openAdd">
-        <Plus data-icon="inline-start" /> {{ $t('ui.addFromQuestionBank') }} </Button>
+      <div class="flex flex-wrap items-center justify-between gap-3 xl:justify-end">
+        <div class="flex h-10 items-center gap-2">
+          <Checkbox id="show-deleted" v-model="includeDeleted" />
+          <Label for="show-deleted" class="text-sm text-muted-foreground">{{ $t('ui.showDeleted') }}</Label>
+        </div>
+        <Button v-if="canWrite" size="sm" @click="openAdd">
+          <Plus data-icon="inline-start" /> {{ $t('ui.addFromQuestionBank') }}
+        </Button>
+      </div>
     </div>
 
     <Alert v-if="error" variant="destructive">
@@ -30,6 +71,13 @@ const { Plus, competitionId, competition, canWrite, items, loading, error, inclu
       </EmptyHeader>
     </Empty>
 
+    <Empty v-else-if="filteredItems.length === 0" class="py-12">
+      <EmptyHeader>
+        <EmptyTitle>{{ $t('ui.noMatchingCompetitionChallenges') }}</EmptyTitle>
+        <EmptyDescription>{{ $t('ui.adjustYourSearchOrFilters') }}</EmptyDescription>
+      </EmptyHeader>
+    </Empty>
+
     <Table v-else>
       <TableHeader>
         <TableRow>
@@ -41,7 +89,7 @@ const { Plus, competitionId, competition, canWrite, items, loading, error, inclu
         </TableRow>
       </TableHeader>
       <TableBody>
-        <TableRow v-for="c in items" :key="c.id" :class="{ 'opacity-60': c.deletedAt }">
+        <TableRow v-for="c in filteredItems" :key="c.id" :class="{ 'opacity-60': c.deletedAt }">
           <TableCell class="font-mono tabular-nums">{{ c.order }}</TableCell>
           <TableCell>
             <NuxtLink

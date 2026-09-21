@@ -29,7 +29,7 @@ describe('route loading boundaries', () => {
     const submissions = await sourceFile('app/components/views/page/competitions/[id]/my/CompetitionsByIdMySubmissionsPageView.vue').text()
 
     expect(challengeLibrary).toMatch(/v-for="template in filteredTemplates"[\s\S]+prefetch-on="interaction"/)
-    expect(competitionChallenges).toMatch(/v-for="c in items"[\s\S]+prefetch-on="interaction"/)
+    expect(competitionChallenges).toMatch(/v-for="c in filteredItems"[\s\S]+prefetch-on="interaction"/)
     expect(teams).toMatch(/v-for="team in teams"[\s\S]+prefetch-on="interaction"/)
     expect(submissions).toMatch(/v-for="submission in items"[\s\S]+prefetch-on="interaction"/)
   })

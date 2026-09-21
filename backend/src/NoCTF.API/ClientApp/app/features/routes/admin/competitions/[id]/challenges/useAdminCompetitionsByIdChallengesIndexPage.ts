@@ -7,6 +7,8 @@ import type { NoCtfapiEndpointsAdministrationChallengeBankChallengeTemplateRespo
 import { useCompetitionAdmin } from '../../../../../../lib/admin-competition'
 import { competitionChallengeConflictMessage } from '../../../../../../lib/competition-challenge-conflict'
 
+type ChallengeStatusFilter = 'all' | 'published' | 'unpublished' | 'deleted'
+
 /** Owns state, effects and commands for AdminCompetitionsByIdChallengesIndexPage. */
 export function useAdminCompetitionsByIdChallengesIndexPage() {
   const { competitionId, competition, canWrite } = useCompetitionAdmin()
@@ -18,6 +20,31 @@ export function useAdminCompetitionsByIdChallengesIndexPage() {
   const error = ref<string | null>(null)
 
   const includeDeleted = ref(false)
+
+  const search = ref('')
+
+  const directionFilter = ref('all')
+
+  const statusFilter = ref<ChallengeStatusFilter>('all')
+
+  const directionOptions = computed(() => [...new Set(items.value
+    .map(item => item.direction)
+    .filter((direction): direction is string => Boolean(direction)))]
+    .map(value => ({ value, label: directionLabel(value) }))
+    .sort((left, right) => left.label.localeCompare(right.label)))
+
+  const filteredItems = computed(() => {
+    const keyword = search.value.trim().toLocaleLowerCase()
+    return items.value.filter((item) => {
+      if (directionFilter.value !== 'all' && item.direction !== directionFilter.value) return false
+      if (statusFilter.value === 'published' && (item.deletedAt || !item.isPublished)) return false
+      if (statusFilter.value === 'unpublished' && (item.deletedAt || item.isPublished)) return false
+      if (statusFilter.value === 'deleted' && !item.deletedAt) return false
+      if (!keyword) return true
+      return [item.title, item.customTitle, item.direction, directionLabel(item.direction)]
+        .some(value => value?.toLocaleLowerCase().includes(keyword))
+    })
+  })
 
   const pendingId = ref<string | null>(null)
 
@@ -33,7 +60,17 @@ export function useAdminCompetitionsByIdChallengesIndexPage() {
     loading.value = false
   }
 
-  watch(includeDeleted, load)
+  watch(includeDeleted, (value) => {
+    if (!value && statusFilter.value === 'deleted') statusFilter.value = 'all'
+    void load()
+  })
+
+  watch(directionOptions, (options) => {
+    if (directionFilter.value !== 'all'
+      && !options.some(option => option.value === directionFilter.value)) {
+      directionFilter.value = 'all'
+    }
+  })
 
   onMounted(load)
 
@@ -238,6 +275,11 @@ export function useAdminCompetitionsByIdChallengesIndexPage() {
       loading,
       error,
       includeDeleted,
+      search,
+      directionFilter,
+      directionOptions,
+      statusFilter,
+      filteredItems,
       pendingId,
       addOpen,
       templatesLoading,
