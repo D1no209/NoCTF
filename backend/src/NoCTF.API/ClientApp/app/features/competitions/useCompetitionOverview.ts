@@ -3,7 +3,7 @@ import { markRaw } from 'vue'
 import { canEnterCompetition, canRegisterForCompetition, isCtfPracticeOpen } from '../../lib/competition-participation'
 import { toast } from 'vue-sonner'
 import { ArrowRight, Box, CalendarRange, Clock, EyeOff, FileText, KeyRound, LogIn, Settings, ShieldCheck, Trophy, UserPlus, Users } from '@lucide/vue'
-import { adminGetCompetition, getCompetitionEndpoint, createTeamEndpoint, getMyTeamEndpoint, joinTeamByInvitationEndpoint, listCompetitionTeamsEndpoint, listCompetitionTracks } from '../../api'
+import { adminGetCompetition, getCompetitionEndpoint, createTeamEndpoint, getMyTeamEndpoint, joinTeamByInvitationEndpoint, listCompetitionTeamsEndpoint, listCompetitionTracks, patchCompetitionTeam } from '../../api'
 import type { NoCtfapiEndpointsAdministrationCompetitionsAdminCompetitionResponse, NoCtfapiEndpointsCompetitionsCompetitionResponse, NoCtfapiEndpointsCompetitionsTracksCompetitionTrackResponse, NoCtfapiEndpointsTeamsTeamResponse } from '../../api'
 import { teamMembershipErrorMessage, teamRegistrationErrorMessage } from '../../lib/competition-track'
 import LifecycleBadgeComponent from './LifecycleBadge.vue'
@@ -309,6 +309,94 @@ export function useCompetitionOverview(
     () => myTeam.value && user.value && myTeam.value.captainId === user.value.userId,
   )
 
+  const registrationSubmissionOpen = computed(() => competition.value.status === 'Visible'
+    || competition.value.status === 'Published'
+    || competition.value.status === 'Running'
+      && competition.value.allowTeamRegistrationWhileRunning === true)
+
+  const requiresManualReview = computed(() =>
+    competition.value.teamRegistrationAutoApprove !== true)
+
+  const registrationOpen = ref(false)
+
+  const registrationInvitationCode = ref('')
+
+  const registrationPending = ref(false)
+
+  const registrationError = ref<string | null>(null)
+
+  const registrationTrack = computed(() => selectableTracks.value.find(
+    track => track.key === myTeam.value?.trackKey,
+  ))
+
+  const canSubmitRegistration = computed(() => Boolean(
+    isCaptain.value
+    && myTeam.value
+    && (myTeam.value.registrationStatus === 'Unregistered'
+      || myTeam.value.registrationStatus === 'Rejected')
+    && registrationSubmissionOpen.value,
+  ))
+
+  const registrationValid = computed(() => Boolean(
+    canSubmitRegistration.value
+    && (!tracksEnabled.value || tracksLoaded.value
+      && !trackLoadError.value
+      && registrationTrack.value)
+    && registrationTrack.value?.meetsSsoRequirement !== false
+    && (!registrationTrack.value?.requiresInvitationCode
+      || registrationInvitationCode.value.trim()),
+  ))
+
+  function openRegistration(): void {
+    registrationInvitationCode.value = ''
+    registrationError.value = null
+    registrationOpen.value = true
+  }
+
+  function setRegistrationOpen(open: boolean): void {
+    if (registrationPending.value) return
+    registrationOpen.value = open
+    if (!open) registrationError.value = null
+  }
+
+  async function submitRegistration(): Promise<void> {
+    if (!myTeam.value || !registrationValid.value) return
+    registrationPending.value = true
+    registrationError.value = null
+    try {
+      const { data, error } = await patchCompetitionTeam({
+        path: { competitionId, teamId: myTeam.value.id! },
+        body: { registration: {
+          status: 'Pending',
+          trackInvitationCode: registrationTrack.value?.requiresInvitationCode
+            ? registrationInvitationCode.value.trim()
+            : null,
+        } },
+      })
+      if (error || !data) {
+        registrationError.value = teamRegistrationErrorMessage(
+          error,
+          translate('ui.failedToResubmitRegistration'),
+        )
+        return
+      }
+      myTeam.value = data
+      registrationOpen.value = false
+      toast.success(data.registrationStatus === 'Approved'
+        ? translate('ui.registrationSubmittedAndApproved')
+        : translate('ui.registrationHasBeenResubmittedAndIsAwaitingReview'))
+    }
+    catch (error: unknown) {
+      registrationError.value = teamRegistrationErrorMessage(
+        error,
+        translate('ui.failedToResubmitRegistration'),
+      )
+    }
+    finally {
+      registrationPending.value = false
+    }
+  }
+
   const LifecycleBadge = markRaw(LifecycleBadgeComponent)
 
 
@@ -361,6 +449,17 @@ export function useCompetitionOverview(
       joinValidationError,
       submitJoin,
       isCaptain,
+      requiresManualReview,
+      registrationOpen,
+      registrationInvitationCode,
+      registrationPending,
+      registrationError,
+      registrationTrack,
+      canSubmitRegistration,
+      registrationValid,
+      openRegistration,
+      setRegistrationOpen,
+      submitRegistration,
       LifecycleBadge,
     }
 }

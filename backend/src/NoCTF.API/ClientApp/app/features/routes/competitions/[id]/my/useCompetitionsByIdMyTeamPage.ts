@@ -30,9 +30,6 @@ export function useCompetitionsByIdMyTeamPage() {
     || competition.value?.status === 'Running'
       && competition.value.allowTeamRegistrationWhileRunning === true)
 
-  const requiresManualReview = computed(() =>
-    competition.value?.teamRegistrationAutoApprove !== true)
-
   const selectableTracks = ref<NoCtfapiEndpointsCompetitionsTracksCompetitionTrackResponse[]>([])
 
   const tracksLoading = ref(false)
@@ -345,68 +342,6 @@ export function useCompetitionsByIdMyTeamPage() {
     team.value = null
   }
 
-  const registrationOpen = ref(false)
-
-  const registrationInvitationCode = ref('')
-
-  const registrationPending = ref(false)
-
-  const registrationError = ref<string | null>(null)
-
-  const registrationTrack = computed(() => selectableTracks.value.find(
-    track => track.key === team.value?.trackKey,
-  ))
-
-  const registrationValid = computed(() => Boolean(
-    team.value
-    && (team.value.registrationStatus === 'Unregistered'
-      || team.value.registrationStatus === 'Rejected')
-    && canEditOrganization.value
-    && registrationTrack.value?.meetsSsoRequirement !== false
-    && (!registrationTrack.value?.requiresInvitationCode
-      || registrationInvitationCode.value.trim()),
-  ))
-
-  function openRegistration(): void {
-    registrationInvitationCode.value = ''
-    registrationError.value = null
-    registrationOpen.value = true
-  }
-
-  function setRegistrationOpen(open: boolean): void {
-    if (registrationPending.value) return
-    registrationOpen.value = open
-    if (!open) registrationError.value = null
-  }
-
-  async function submitRegistration() {
-    if (!team.value || !registrationValid.value) return
-    registrationPending.value = true
-    registrationError.value = null
-    const { data, error } = await patchCompetitionTeam({
-      path: { competitionId, teamId: team.value.id! },
-      body: { registration: {
-        status: 'Pending',
-        trackInvitationCode: registrationTrack.value?.requiresInvitationCode
-          ? registrationInvitationCode.value.trim()
-          : null,
-      } },
-    })
-    registrationPending.value = false
-    if (error || !data) {
-      registrationError.value = teamRegistrationErrorMessage(
-        error,
-        translate("ui.failedToResubmitRegistration"),
-      )
-      return
-    }
-    team.value = data
-    registrationOpen.value = false
-    toast.success(data.registrationStatus === 'Approved'
-      ? translate('ui.registrationSubmittedAndApproved')
-      : translate("ui.registrationHasBeenResubmittedAndIsAwaitingReview"))
-  }
-
   const banCase = ref<NoCtfapiEndpointsTeamsMyTeamBanCaseResponse | null>(null)
 
   const appealOpen = ref(false)
@@ -489,7 +424,6 @@ export function useCompetitionsByIdMyTeamPage() {
       competition,
       tracksEnabled,
       canEditOrganization,
-      requiresManualReview,
       selectableTracks,
       tracksLoading,
       tracksError,
@@ -528,15 +462,6 @@ export function useCompetitionsByIdMyTeamPage() {
       acting,
       disband,
       leave,
-      registrationOpen,
-      registrationInvitationCode,
-      registrationPending,
-      registrationError,
-      registrationTrack,
-      registrationValid,
-      openRegistration,
-      setRegistrationOpen,
-      submitRegistration,
       banCase,
       appealOpen,
       appealStatement,
