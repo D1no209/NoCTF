@@ -71,3 +71,6 @@ webhook-id + "." + webhook-timestamp + "." + rawBody
 4. 解析 CloudEvent `type` 与 `data`；
 5. 完成本地事务后返回 `2xx`；
 6. 无法暂时处理时返回 `429` 或 `5xx`，永久拒绝时返回普通 `4xx`，停止订阅时返回 `410`。
+
+面向聊天平台 BOT 的模块划分、完整事件目录、.NET 验签代码、幂等 Inbox、消息映射和联调步骤见
+[Webhook 与 BOT 对接手册](webhook-bot-integration.md)。
