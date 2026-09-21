@@ -5,6 +5,7 @@ import { Plus } from '@lucide/vue'
 import { toast } from 'vue-sonner'
 import { adminCreateManualAdjustment, adminCreateCompetitionChallengeHint, adminDeleteCompetitionChallengeHint, adminGetCompetition, adminGetCompetitionChallenge, adminListGameplayFacts, adminListCompetitionChallengeHints, adminListTeams, adminPatchCompetitionChallenge, adminRestoreCompetitionChallengeHint, adminUpdateCompetitionChallengeHint, getLeaderboardEndpoint, getScoreboardSchemaEndpoint } from '../../../../../../api'
 import type { NoCtfapiEndpointsAdministrationChallengesChallengeHintResponse, NoCtfapiEndpointsChallengesChallengeResponse, NoCtfapiEndpointsCompetitionsGameModeProtocol, NoCtfapiEndpointsCompetitionsScoreboardSchemaResponse, NoCtfapiEndpointsCompetitionsScoreboardSnapshotResponse, NoCtfapiEndpointsGameplayFactsGameplayFactListResponse, NoCtfapiEndpointsGameplayFactsGameplayFactListItemResponse, NoCtfapiEndpointsTeamsTeamResponse } from '../../../../../../api'
+import { useOffsetPagination } from '../../../../../../composables/useOffsetPagination'
 import { useCompetitionAdmin } from '../../../../../../lib/admin-competition'
 
 import ChallengeRulesEditorComponent from '../../../../../admin/ChallengeRulesEditor.vue'
@@ -271,7 +272,18 @@ export function useAdminCompetitionsByIdChallengesByCcIdPage() {
     }
   }
 
-  const scoringTeams = ref<NoCtfapiEndpointsTeamsTeamResponse[]>([])
+  const scoringSearch = ref('')
+
+  const scoringPagination = useOffsetPagination<NoCtfapiEndpointsTeamsTeamResponse>(async ({ offset, limit, desc }) => {
+    const { data, error } = await adminListTeams({
+      path: { competitionId },
+      query: { keyword: scoringSearch.value.trim() || null, offset, limit, desc },
+    })
+    if (error || !data) throw error ?? new Error(translate("ui.failedToLoadTeams"))
+    return { items: data.items ?? [], total: data.total ?? 0 }
+  })
+
+  const scoringTeams = scoringPagination.items
 
   const scoringFacts = ref<NoCtfapiEndpointsGameplayFactsGameplayFactListItemResponse[]>([])
 
@@ -279,9 +291,16 @@ export function useAdminCompetitionsByIdChallengesByCcIdPage() {
 
   const scoringSchema = ref<NoCtfapiEndpointsCompetitionsScoreboardSchemaResponse | null>(null)
 
-  const scoringLoading = ref(true)
+  const scoringContextLoading = ref(true)
 
-  const scoringError = ref<string | null>(null)
+  const scoringContextError = ref<string | null>(null)
+
+  const scoringLoading = computed(() => scoringContextLoading.value
+    || (scoringPagination.loading.value && !scoringPagination.initialized.value))
+
+  const scoringError = computed(() => scoringContextError.value
+    ?? scoringPagination.error.value?.message
+    ?? null)
 
   let scoringLoadGeneration = 0
 
@@ -308,18 +327,16 @@ export function useAdminCompetitionsByIdChallengesByCcIdPage() {
 
   async function loadChallengeTeamScoring(): Promise<void> {
     const generation = ++scoringLoadGeneration
-    scoringLoading.value = true
-    scoringError.value = null
+    scoringContextLoading.value = true
+    scoringContextError.value = null
     try {
-      const [teamsResult, facts, leaderboardResult, schemaResult] = await Promise.all([
-      adminListTeams({ path: { competitionId }, query: { keyword: null, offset: 0, limit: 200, desc: false } }),
+      const [, facts, leaderboardResult, schemaResult] = await Promise.all([
+        scoringPagination.loadPage(scoringPagination.page.value),
         loadAllChallengeFacts(),
         getLeaderboardEndpoint({ path: { competitionId } }),
         getScoreboardSchemaEndpoint({ path: { competitionId } }),
       ])
       if (generation !== scoringLoadGeneration) return
-      if (teamsResult.error || !teamsResult.data) throw teamsResult.error ?? new Error(translate("ui.failedToLoadTeams"))
-      scoringTeams.value = teamsResult.data.items ?? []
       scoringFacts.value = facts
       scoringSnapshot.value = leaderboardResult.data && 'teams' in leaderboardResult.data
         ? leaderboardResult.data
@@ -330,12 +347,21 @@ export function useAdminCompetitionsByIdChallengesByCcIdPage() {
     }
     catch (requestError) {
       if (generation === scoringLoadGeneration)
-        scoringError.value = parseApiError(requestError, translate("ui.failedToLoadTeamScoringForThisChallenge")).message
+        scoringContextError.value = parseApiError(requestError, translate("ui.failedToLoadTeamScoringForThisChallenge")).message
     }
     finally {
-      if (generation === scoringLoadGeneration) scoringLoading.value = false
+      if (generation === scoringLoadGeneration) scoringContextLoading.value = false
     }
   }
+
+  let scoringSearchTimer: ReturnType<typeof setTimeout> | null = null
+  function reloadScoringTeamsFromFirstPage(): void {
+    scoringPagination.reset()
+    if (scoringSearchTimer) clearTimeout(scoringSearchTimer)
+    scoringSearchTimer = setTimeout(() => { void scoringPagination.loadPage(1) }, 250)
+  }
+
+  watch(scoringSearch, reloadScoringTeamsFromFirstPage)
 
   function teamFacts(teamId?: string): NoCtfapiEndpointsGameplayFactsGameplayFactListItemResponse[] {
     return teamId ? scoringFacts.value.filter(fact => fact.teamId === teamId) : []
@@ -465,6 +491,11 @@ export function useAdminCompetitionsByIdChallengesByCcIdPage() {
     void loadChallengeTeamScoring()
   })
 
+  onBeforeUnmount(() => {
+    if (scoringSearchTimer) clearTimeout(scoringSearchTimer)
+    scoringPagination.reset()
+  })
+
   const ChallengeRulesEditor = markRaw(ChallengeRulesEditorComponent)
 
   const viewBindings = {
@@ -504,7 +535,15 @@ export function useAdminCompetitionsByIdChallengesByCcIdPage() {
       restoreHint,
       scoringLoading,
       scoringError,
+      scoringSearch,
       loadChallengeTeamScoring,
+      scoringPage: scoringPagination.page,
+      scoringPageCount: scoringPagination.pageCount,
+      scoringTotal: scoringPagination.total,
+      scoringPageLimit: scoringPagination.limit,
+      scoringPageLoading: scoringPagination.loading,
+      loadScoringPage: scoringPagination.loadPage,
+      setScoringPageSize: scoringPagination.setPageSize,
       scoringDisplayNames,
       scoringRows,
       adjustmentTarget,

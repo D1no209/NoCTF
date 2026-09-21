@@ -3,7 +3,7 @@ import { toRefs } from 'vue'
 import type { AdminCompetitionsByIdChallengesByCcIdPageViewState } from '~/features/routes/admin/competitions/[id]/challenges/useAdminCompetitionsByIdChallengesByCcIdPage'
 
 const viewProps = defineProps<{ state: AdminCompetitionsByIdChallengesByCcIdPageViewState }>()
-const { Plus, competitionId, competition, canWrite, canJudge, challenge, loading, loadError, activeSection, sectionOptions, editCustomTitle, editOrder, editPublished, savingEdit, saveEdit, config, configLoading, savingConfig, inheritedConfigJson, saveConfig, hints, hintsLoading, hintsLoadError, includeDeletedHints, hintDialogOpen, editingHint, hintForm, hintError, savingHint, pendingHintId, openHintDialog, saveHint, deleteHint, restoreHint, scoringLoading, scoringError, loadChallengeTeamScoring, scoringDisplayNames, scoringRows, adjustmentTarget, adjustmentDelta, adjustmentPending, adjustmentError, adjustmentValid, openAdjustment, closeAdjustment, submitAdjustment, ChallengeRulesEditor, hiddenRuleKeys, onClickAdjustmentTarget, onClickHintDialogOpen } = toRefs(viewProps.state)
+const { Plus, competitionId, competition, canWrite, canJudge, challenge, loading, loadError, activeSection, sectionOptions, editCustomTitle, editOrder, editPublished, savingEdit, saveEdit, config, configLoading, savingConfig, inheritedConfigJson, saveConfig, hints, hintsLoading, hintsLoadError, includeDeletedHints, hintDialogOpen, editingHint, hintForm, hintError, savingHint, pendingHintId, openHintDialog, saveHint, deleteHint, restoreHint, scoringLoading, scoringError, scoringSearch, loadChallengeTeamScoring, scoringPage, scoringPageCount, scoringTotal, scoringPageLimit, scoringPageLoading, loadScoringPage, setScoringPageSize, scoringDisplayNames, scoringRows, adjustmentTarget, adjustmentDelta, adjustmentPending, adjustmentError, adjustmentValid, openAdjustment, closeAdjustment, submitAdjustment, ChallengeRulesEditor, hiddenRuleKeys, onClickAdjustmentTarget, onClickHintDialogOpen } = toRefs(viewProps.state)
 </script>
 
 <template>
@@ -160,12 +160,19 @@ const { Plus, competitionId, competition, canWrite, canJudge, challenge, loading
               </Button>
             </div>
 
+            <Input
+              v-model="scoringSearch"
+              class="sm:max-w-sm"
+              :placeholder="$t('ui.searchTeam')"
+              :aria-label="$t('ui.searchTeam')"
+            />
+
             <Alert v-if="scoringError" variant="destructive">
               <AlertDescription>{{ $message(scoringError) }}</AlertDescription>
             </Alert>
             <Skeleton v-if="scoringLoading" class="h-48 w-full" />
             <Empty v-else-if="!scoringError && scoringRows.length === 0" class="border border-dashed py-12">
-              <EmptyHeader><EmptyTitle>{{ $t('ui.thereIsNoRegisteredTeamYet') }}</EmptyTitle></EmptyHeader>
+              <EmptyHeader><EmptyTitle>{{ scoringSearch.trim() ? $t('ui.noMatchingTeams') : $t('ui.thereIsNoRegisteredTeamYet') }}</EmptyTitle></EmptyHeader>
             </Empty>
             <Table v-else-if="scoringRows.length > 0">
               <TableHeader>
@@ -202,6 +209,16 @@ const { Plus, competitionId, competition, canWrite, canJudge, challenge, loading
                 </TableRow>
               </TableBody>
             </Table>
+            <OffsetPagination
+              v-if="scoringRows.length > 0 || scoringTotal > 0"
+              :page="scoringPage"
+              :page-count="scoringPageCount"
+              :total="scoringTotal"
+              :limit="scoringPageLimit"
+              :loading="scoringPageLoading"
+              @update:page="loadScoringPage"
+              @update:limit="setScoringPageSize"
+            />
           </div>
         </section>
         </div>

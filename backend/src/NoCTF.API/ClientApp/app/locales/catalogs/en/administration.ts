@@ -575,6 +575,7 @@ export const messages = {
   "ui.noTitleYet": "No title yet",
   "ui.noQuestionTemplateYet": "No question template yet",
   "ui.thereIsNoRegisteredTeamYet": "There is no registered team yet",
+  "ui.noMatchingTeams": "No teams match this search",
   "ui.noCheatingIncidentsYet": "No cheating incidents yet",
   "ui.addedCapabilitiesCapAdd": "Added capabilities (cap-add)",
   "ui.effectiveForALongTime": "Effective for a long time",
