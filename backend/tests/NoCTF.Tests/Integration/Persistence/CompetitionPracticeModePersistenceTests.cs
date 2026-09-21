@@ -243,7 +243,7 @@ public sealed class CompetitionPracticeModePersistenceTests
     }
 
     [Test, Timeout(300_000)]
-    public async Task Only_teams_registered_after_the_official_cutoff_accept_practice_membership(
+    public async Task Finished_competition_blocks_practice_membership_changes(
         CancellationToken cancellationToken)
     {
         await DockerIntegrationTest.RunAsync(async () =>
@@ -289,7 +289,7 @@ public sealed class CompetitionPracticeModePersistenceTests
                     joinerId,
                     fixture.Now,
                     cancellationToken))
-                .IsNull();
+                .IsEqualTo(TeamMembershipFailure.MembershipLocked);
 
             using var cacheServices = new ServiceCollection()
                 .AddFusionCache(NoCtfCacheNames.Leaderboards)
