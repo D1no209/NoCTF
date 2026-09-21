@@ -6,14 +6,6 @@
 
 ## Platform
 
-### 可选公网访问（仅平台管理员）
-
-```text
-GET /api/v1/admin/platform/public-gateway/status
-```
-
-配置只允许选择部署批准的连接器、HTTPS 入口、主机显示与端口配额，不返回配对密钥或允许任意网络探测。保存返回 202 和状态地址；状态读取使用有界缓存，不同步请求 Docker/FRP。Runtime 响应的 `access` 与 Runtime 自身状态独立，公网不可用时不回落为内网地址。默认未安装时仍使用原有直连行为。
-
 ### 私密账户资料（不属于公开用户协议）
 
 ```text

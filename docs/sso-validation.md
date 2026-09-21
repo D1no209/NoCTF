@@ -16,7 +16,7 @@
 - EF `has-pending-model-changes`：无 drift。
 - `git diff --check`：通过。
 
-首次全并行运行出现 Docker 启动超时和本机 Desktop 凭据助手不可用于 Host 镜像；预算用例串行通过，拉取用例使用无凭据助手的隔离 Docker 配置后通过。固定 SHA-256 的 FRP 0.68.0 归档、Linux relay 与 SSH 原型均按仓库复现文档构建，原型测试 3/3 通过。最终全量运行使用同一组显式依赖，不以禁用断言消除失败。
+首次全并行运行出现 Docker 启动超时和本机 Desktop 凭据助手不可用于 Host 镜像；预算用例串行通过，拉取用例使用无凭据助手的隔离 Docker 配置后通过。最终全量运行使用同一组显式依赖，不以禁用断言消除失败。
 
 ## 性能边界
 

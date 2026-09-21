@@ -139,8 +139,7 @@ Debian 12 模板、8 GiB qcow2、安装 `qemu-guest-agent,python3` 并启用 Gue
 
 最新 Release solution build 零警告、零错误。全仓 TUnit **1665 项：1657 通过、0 失败、
 8 条件跳过**，耗时 21 分 48 秒；包含真实进程故障、PostgreSQL/Redis/NATS/Docker 和
-Kubernetes 容量测试。原来失败的网关测试用校验 SHA-256 的官方 FRP 0.68.0 归档和本地
-构建的 Linux relay 补齐依赖后通过，没有通过禁用断言绕过失败。
+Kubernetes 容量测试。
 
 八个跳过项保留可见：GitOps 外部语料/API 测试、只由父测试启动的子进程入口、Linux 宿主
 压力入口、Linux 文件权限/agent 两项、Kubernetes 完整 Compose 网络策略及大归档 Checker
