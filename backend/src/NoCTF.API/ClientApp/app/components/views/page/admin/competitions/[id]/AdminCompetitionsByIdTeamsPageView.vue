@@ -3,7 +3,7 @@ import { toRefs } from 'vue'
 import type { AdminCompetitionsByIdTeamsPageViewState } from '~/features/routes/admin/competitions/[id]/useAdminCompetitionsByIdTeamsPage'
 
 const viewProps = defineProps<{ state: AdminCompetitionsByIdTeamsPageViewState }>()
-const { competitionId, canJudge, canWrite, teams, search, loading, pageLoading, error, page, pageCount, total, pageLimit, loadPage, setPageSize, pendingId, tracks, tracksEnabled, registrationStatusOptions, selectedTeam, teamMembers, teamDetailLoading, teamDisplayNames, displayTeamName, scoreAdjustmentTeam, scoreAdjustmentChallenges, scoreAdjustmentChallengeId, scoreAdjustmentDelta, scoreAdjustmentLoading, scoreAdjustmentPending, scoreAdjustmentError, scoreAdjustmentValid, openScoreAdjustment, closeScoreAdjustment, submitScoreAdjustment, openTeamDetail, assignTrackValue, setRegistrationStatusValue, banDialog, banReason, banAnnouncePublicly, banPending, banReasonValid, openBan, submitBan, appeals, appealsLoading, appealsError, appealDialog, appealReason, appealPending, openAppeal, submitAppeal, PrivateAccountPanel, onUpdateOpenOpen, onClickScoreAdjustmentTeam, onUpdateOpenBanDialog, onClickBanDialog, onUpdateOpenAppealDialog, onClickAppealDialog } = toRefs(viewProps.state)
+const { competitionId, canJudge, canWrite, teams, search, loading, pageLoading, error, page, pageCount, total, pageLimit, loadPage, setPageSize, pendingId, tracks, tracksEnabled, registrationStatusOptions, selectedTeam, teamMembers, teamDetailLoading, expandedMemberId, setExpandedMember, teamDisplayNames, displayTeamName, scoreAdjustmentTeam, scoreAdjustmentChallenges, scoreAdjustmentChallengeId, scoreAdjustmentDelta, scoreAdjustmentLoading, scoreAdjustmentPending, scoreAdjustmentError, scoreAdjustmentValid, openScoreAdjustment, closeScoreAdjustment, submitScoreAdjustment, openTeamDetail, assignTrackValue, setRegistrationStatusValue, banDialog, banReason, banAnnouncePublicly, banPending, banReasonValid, openBan, submitBan, appeals, appealsLoading, appealsError, appealDialog, appealReason, appealPending, openAppeal, submitAppeal, PrivateAccountPanel, onUpdateOpenOpen, onClickScoreAdjustmentTeam, onUpdateOpenBanDialog, onClickBanDialog, onUpdateOpenAppealDialog, onClickAppealDialog } = toRefs(viewProps.state)
 </script>
 
 <template>
@@ -140,30 +140,41 @@ const { competitionId, canJudge, canWrite, teams, search, loading, pageLoading, 
             <div v-if="teamDetailLoading" class="flex items-center gap-2 text-sm text-muted-foreground">
               <Spinner class="size-4" />{{ $t('ui.loading2') }}
             </div>
-            <div v-else class="flex flex-col divide-y rounded-md border">
-              <div v-for="member in teamMembers" :key="member.userId" class="flex flex-wrap items-center gap-3 p-3">
-                <Avatar class="size-9">
-                  <AvatarImage v-if="member.avatarUrl" :src="member.avatarUrl" :alt="member.userName ?? ''" />
-                  <AvatarFallback>{{ member.userName?.slice(0, 2) }}</AvatarFallback>
-                </Avatar>
-                <div class="min-w-0 flex-1">
-                  <NuxtLink :to="`/users/${member.userId}`" class="font-medium hover:underline">
-                    {{ member.userName }}
-                  </NuxtLink>
+            <Accordion
+              v-else
+              type="single"
+              collapsible
+              :model-value="expandedMemberId ?? undefined"
+              class="rounded-md bg-muted/20"
+              @update:model-value="setExpandedMember"
+            >
+              <AccordionItem v-for="member in teamMembers" :key="member.userId" :value="member.userId!" class="px-3">
+                <div class="flex flex-wrap items-center gap-3 py-3">
+                  <Avatar class="size-9">
+                    <AvatarImage v-if="member.avatarUrl" :src="member.avatarUrl" :alt="member.userName ?? ''" />
+                    <AvatarFallback>{{ member.userName?.slice(0, 2) }}</AvatarFallback>
+                  </Avatar>
+                  <div class="min-w-0 flex-1">
+                    <NuxtLink :to="`/users/${member.userId}`" class="font-medium hover:underline">
+                      {{ member.userName }}
+                    </NuxtLink>
+                  </div>
+                  <Badge v-if="member.userId === selectedTeam.captainId" variant="secondary">{{ $t('ui.captain') }}</Badge>
                 </div>
-                <Badge v-if="member.userId === selectedTeam.captainId" variant="secondary">{{ $t('ui.captain') }}</Badge>
-                <component
-                  :is="PrivateAccountPanel"
-                  v-if="canJudge && member.userId && selectedTeam.id"
-                  class="w-full pt-3"
-                  :user-id="member.userId"
-                  :competition-id="competitionId"
-                  :team-id="selectedTeam.id"
-                  :show-activities="false"
-                />
-              </div>
+                <AccordionTrigger v-if="canJudge">{{ $t('ui.privateMemberDetails') }}</AccordionTrigger>
+                <AccordionContent v-if="canJudge" class="pb-3">
+                  <component
+                    :is="PrivateAccountPanel"
+                    v-if="expandedMemberId === member.userId && member.userId && selectedTeam.id"
+                    :user-id="member.userId"
+                    :competition-id="competitionId"
+                    :team-id="selectedTeam.id"
+                    :show-activities="false"
+                  />
+                </AccordionContent>
+              </AccordionItem>
               <p v-if="!teamMembers.length" class="p-3 text-sm text-muted-foreground">{{ $t('ui.noMembers') }}</p>
-            </div>
+            </Accordion>
           </section>
         </div>
       </SheetContent>

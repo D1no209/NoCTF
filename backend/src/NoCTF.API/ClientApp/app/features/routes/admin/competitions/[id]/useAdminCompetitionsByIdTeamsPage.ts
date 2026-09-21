@@ -42,6 +42,12 @@ export function useAdminCompetitionsByIdTeamsPage() {
 
   const teamDetailLoading = ref(false)
 
+  const expandedMemberId = ref<string | null>(null)
+
+  function setExpandedMember(value: unknown): void {
+    expandedMemberId.value = typeof value === 'string' ? value : null
+  }
+
   const pagination = useOffsetPagination<NoCtfapiEndpointsTeamsTeamResponse>(async ({ offset, limit, desc }) => {
     const { data, error: requestError } = await adminListTeams({
       path: { competitionId },
@@ -138,6 +144,7 @@ export function useAdminCompetitionsByIdTeamsPage() {
 
   async function openTeamDetail(team: NoCtfapiEndpointsTeamsTeamResponse): Promise<void> {
     selectedTeam.value = team
+    expandedMemberId.value = null
     teamMembers.value = []
     teamDetailLoading.value = true
     const memberIds = team.memberIds ?? []
@@ -367,6 +374,8 @@ export function useAdminCompetitionsByIdTeamsPage() {
       selectedTeam,
       teamMembers,
       teamDetailLoading,
+      expandedMemberId,
+      setExpandedMember,
       teamDisplayNames,
       displayTeamName,
       scoreAdjustmentTeam,
@@ -404,7 +413,10 @@ export function useAdminCompetitionsByIdTeamsPage() {
   const viewState = proxyRefs(viewBindings)
 
   function onUpdateOpenOpen(open: boolean) {
-     if (!open) viewState.selectedTeam = null
+     if (!open) {
+       viewState.selectedTeam = null
+       viewState.expandedMemberId = null
+     }
   }
 
   function onClickScoreAdjustmentTeam(value: typeof viewState.scoreAdjustmentTeam) {
