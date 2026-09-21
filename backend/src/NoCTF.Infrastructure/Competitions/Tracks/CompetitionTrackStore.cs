@@ -48,6 +48,29 @@ public sealed class CompetitionTrackStore(
         if (competition is null)
             return null;
 
+        var configuration = CompetitionTrackConfiguration.ParseOrDefault(
+            competition.Mode,
+            competition.TrackConfigurationJson);
+        var hasActiveSsoGates = competition.TracksEnabled
+            && configuration.Tracks.Any(track => track.RequiredSsoProviderId is not null);
+        IReadOnlyDictionary<Guid, (string Name, string? IconUrl)> providers =
+            new Dictionary<Guid, (string Name, string? IconUrl)>();
+        if (hasActiveSsoGates)
+        {
+            var settings = await db.PlatformSettings.AsNoTracking().SingleAsync(cancellationToken);
+            providers = settings.SsoConfiguration.Providers.ToDictionary(
+                provider => provider.Id,
+                provider => (provider.Name, provider.IconUrl));
+        }
+        Guid? viewerSsoProviderId = null;
+        if (hasActiveSsoGates && viewerUserId.HasValue)
+        {
+            viewerSsoProviderId = await db.Users.AsNoTracking()
+                .Where(user => user.Id == viewerUserId.Value)
+                .Select(user => user.ExternalIdentityProviderId)
+                .SingleOrDefaultAsync(cancellationToken);
+        }
+
         Guid? viewerTeamId = null;
         string? viewerTrackKey = null;
         if (!includeInternal && viewerUserId.HasValue)
@@ -62,16 +85,18 @@ public sealed class CompetitionTrackStore(
             viewerTrackKey = viewerTeam?.TrackKey;
         }
 
-        var configuration = CompetitionTrackConfiguration.ParseOrDefault(
-            competition.Mode,
-            competition.TrackConfigurationJson);
         var tracks = configuration.Tracks
             .Where(track => includeInternal
                 || !track.IsInternal
                 && (track.IsPublicSelectable
                     || track.VisibleOnLeaderboard
                     || string.Equals(track.Key, viewerTrackKey, StringComparison.OrdinalIgnoreCase)))
-            .Select(track => Map(track, includeInvitationCodes) with
+            .Select(track => Map(
+                track,
+                includeInvitationCodes,
+                providers,
+                viewerSsoProviderId,
+                competition.TracksEnabled) with
             {
                 IsViewerTrack = string.Equals(
                     track.Key,
@@ -109,6 +134,19 @@ public sealed class CompetitionTrackStore(
         if (validationErrors.Count > 0)
             return Failure(CompetitionTrackFailureCode.InvalidConfiguration,
                 string.Join(" ", validationErrors));
+
+        var settings = await db.PlatformSettings.AsNoTracking().SingleAsync(cancellationToken);
+        var providers = settings.SsoConfiguration.Providers.ToDictionary(
+            provider => provider.Id,
+            provider => (provider.Name, provider.IconUrl));
+        if (command.Tracks.Any(track =>
+                track.RequiredSsoProviderId is Guid providerId
+                && !providers.ContainsKey(providerId)))
+        {
+            return Failure(
+                CompetitionTrackFailureCode.SsoProviderNotFound,
+                "A track references an SSO provider that does not exist.");
+        }
 
         var currentConfiguration = CompetitionTrackConfiguration.ParseOrDefault(
             competition.Mode,
@@ -207,7 +245,7 @@ public sealed class CompetitionTrackStore(
         {
             await transaction.CommitAsync(cancellationToken);
             return UpdateCompetitionTracksResult.Success(
-                Map(competition, normalized, includeInvitationCodes: true));
+                Map(competition, normalized, includeInvitationCodes: true, providers));
         }
 
         var affectsLeaderboard = enabledChanged
@@ -252,7 +290,7 @@ public sealed class CompetitionTrackStore(
         await transaction.CommitAsync(cancellationToken);
         await outbox.FlushOutgoingMessagesAsync();
         return UpdateCompetitionTracksResult.Success(
-            Map(competition, normalized, includeInvitationCodes: true));
+            Map(competition, normalized, includeInvitationCodes: true, providers));
     }
 
     public async Task<OperationResult<TeamTrackAssignmentView, CompetitionTrackFailureCode>> AssignAsync(
@@ -292,6 +330,16 @@ public sealed class CompetitionTrackStore(
             cancellationToken);
         if (team is null)
             return AssignmentFailure(CompetitionTrackFailureCode.TeamNotFound, "Team was not found.");
+        if (track.RequiredSsoProviderId is Guid requiredProviderId
+            && await db.Users.AsNoTracking().CountAsync(user =>
+                team.MemberIds.Contains(user.Id)
+                && user.ExternalIdentityProviderId == requiredProviderId,
+                cancellationToken) != team.MemberIds.Length)
+        {
+            return AssignmentFailure(
+                CompetitionTrackFailureCode.TrackSsoIdentityRequired,
+                "Every team member must bind the SSO provider required by this track.");
+        }
         if (string.Equals(team.TrackKey, track.Key, StringComparison.OrdinalIgnoreCase))
         {
             await transaction.CommitAsync(cancellationToken);
@@ -321,13 +369,19 @@ public sealed class CompetitionTrackStore(
     private static CompetitionTracksView Map(
         Competition competition,
         CompetitionTrackConfiguration configuration,
-        bool includeInvitationCodes) => new(
+        bool includeInvitationCodes,
+        IReadOnlyDictionary<Guid, (string Name, string? IconUrl)> providers) => new(
         competition.Id,
         competition.Mode,
         competition.Status,
         competition.TracksEnabled,
         CompetitionTrackPolicy.CanUpdate(competition.Status),
-        configuration.Tracks.Select(track => Map(track, includeInvitationCodes)).ToArray());
+        configuration.Tracks.Select(track => Map(
+            track,
+            includeInvitationCodes,
+            providers,
+            viewerSsoProviderId: null,
+            competition.TracksEnabled)).ToArray());
 
     private static bool HasSameLeaderboardShape(
         CompetitionTrackConfiguration current,
@@ -350,7 +404,16 @@ public sealed class CompetitionTrackStore(
 
     private static CompetitionTrackView Map(
         CompetitionTrackDefinition track,
-        bool includeInvitationCode) => new(
+        bool includeInvitationCode,
+        IReadOnlyDictionary<Guid, (string Name, string? IconUrl)> providers,
+        Guid? viewerSsoProviderId,
+        bool ssoGatesEnabled)
+    {
+        (string Name, string? IconUrl)? provider = null;
+        if (track.RequiredSsoProviderId is Guid providerId
+            && providers.TryGetValue(providerId, out var configuredProvider))
+            provider = configuredProvider;
+        return new(
         track.Key,
         track.Name,
         track.IsDefault,
@@ -363,7 +426,14 @@ public sealed class CompetitionTrackStore(
         track.AffectsCompetitiveResults,
         IsViewerTrack: false,
         track.RequiresInvitationCode,
-        includeInvitationCode ? track.InvitationCode : null);
+        includeInvitationCode ? track.InvitationCode : null,
+        track.RequiredSsoProviderId,
+        provider?.Name,
+        provider?.IconUrl,
+        !ssoGatesEnabled
+            || track.RequiredSsoProviderId is null
+            || track.RequiredSsoProviderId == viewerSsoProviderId);
+    }
 
     private static UpdateCompetitionTracksResult Failure(
         CompetitionTrackFailureCode code,

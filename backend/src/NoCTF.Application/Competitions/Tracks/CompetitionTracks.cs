@@ -17,7 +17,11 @@ public sealed record CompetitionTrackView(
     bool AffectsCompetitiveResults,
     bool IsViewerTrack = false,
     bool RequiresInvitationCode = false,
-    string? InvitationCode = null);
+    string? InvitationCode = null,
+    Guid? RequiredSsoProviderId = null,
+    string? RequiredSsoProviderName = null,
+    string? RequiredSsoProviderIconUrl = null,
+    bool MeetsSsoRequirement = true);
 
 public sealed record CompetitionTracksView(
     Guid CompetitionId,
@@ -38,7 +42,9 @@ public enum CompetitionTrackFailureCode
     InvalidTrackReassignment,
     TeamNotFound,
     TrackNotFound,
-    TrackNotPublicSelectable
+    TrackNotPublicSelectable,
+    TrackSsoIdentityRequired,
+    SsoProviderNotFound
 }
 
 public sealed record CompetitionTrackInvitationCodeUpdate(
@@ -149,6 +155,8 @@ public static partial class CompetitionTrackPolicy
                 errors.Add($"Track '{key ?? track.Key}' can earn blood only in CTF while earning score.");
             if (mode != GameMode.Ctf && track.AffectsDynamicChallengeScore)
                 errors.Add($"Track '{key ?? track.Key}' can affect dynamic challenge scores only in CTF.");
+            if (track.RequiredSsoProviderId == Guid.Empty)
+                errors.Add($"Track '{key ?? track.Key}' has an invalid SSO provider identifier.");
         }
         return errors.Distinct().ToArray();
     }

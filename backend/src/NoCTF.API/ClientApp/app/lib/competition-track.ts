@@ -19,6 +19,8 @@ const trackMessages = {
   TeamNotFound: "ui.teamNotFound",
   TrackNotFound: "ui.theSelectedTrackDoesNotExist",
   TrackNotPublicSelectable: "ui.participantsCannotSelectThisTrack",
+  TrackSsoIdentityRequired: "sso.trackIdentityRequired",
+  SsoProviderNotFound: "sso.trackProviderNotFound",
 } satisfies Record<NoCtfapiEndpointsAdministrationCompetitionsCompetitionTrackFailureCodeProtocol, string>
 
 const registrationMessages = {
@@ -38,6 +40,7 @@ const registrationMessages = {
   TrackNotPublicSelectable: "ui.participantsCannotSelectThisTrack",
   TrackInvitationRequired: "ui.message7",
   TrackInvitationInvalid: "ui.message8",
+  TrackSsoIdentityRequired: "sso.trackIdentityRequired",
 } satisfies Record<NoCtfapiEndpointsTeamsTeamRegistrationFailureCodeProtocol, string>
 
 const membershipMessages = {
@@ -54,6 +57,7 @@ const membershipMessages = {
   MembershipNotFound: "ui.theTeamMembershipWasNotFound",
   CaptainMustTransfer: "ui.theCaptainMustTransferCaptaincyFirst",
   CaptainOnly: "ui.onlyTheCaptainCanPerformThisOperation",
+  TrackSsoIdentityRequired: "sso.trackIdentityRequired",
 } satisfies Record<NoCtfapiEndpointsTeamsTeamMembershipFailureCodeProtocol, string>
 
 export function nextCompetitionTrackOrdinal(trackKeys: readonly string[]): number {

@@ -17,7 +17,8 @@ public enum TeamMembershipFailure
     MemberNotFound,
     MembershipNotFound,
     CaptainMustTransfer,
-    CaptainOnly
+    CaptainOnly,
+    TrackSsoIdentityRequired
 }
 
 public interface ITeamMembershipStore

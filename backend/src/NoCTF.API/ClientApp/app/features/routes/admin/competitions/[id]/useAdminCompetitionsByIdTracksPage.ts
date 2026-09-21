@@ -3,6 +3,7 @@ import { toast } from 'vue-sonner'
 import { adminGetCompetition, adminListTeams, adminPatchCompetition } from '../../../../../api'
 import type {
   NoCtfapiEndpointsAdministrationCompetitionsRemovedTrackReassignmentRequest,
+  NoCtfapiEndpointsAdministrationCompetitionsCompetitionSsoProviderResponse,
   NoCtfapiEndpointsAdministrationCompetitionsUpdateCompetitionTrackRequest,
   NoCtfapiEndpointsTeamsTeamResponse,
 } from '../../../../../api'
@@ -37,6 +38,7 @@ export function useAdminCompetitionsByIdTracksPage() {
   const enabled = ref(false)
   const canUpdate = ref(false)
   const tracks = ref<TrackForm[]>([])
+  const ssoProviders = ref<NoCtfapiEndpointsAdministrationCompetitionsCompetitionSsoProviderResponse[]>([])
   const teams = ref<NoCtfapiEndpointsTeamsTeamResponse[]>([])
   const removedTrackReassignments = ref<NoCtfapiEndpointsAdministrationCompetitionsRemovedTrackReassignmentRequest[]>([])
   const pendingRemoval = ref<PendingTrackRemoval | null>(null)
@@ -80,6 +82,7 @@ export function useAdminCompetitionsByIdTracksPage() {
     enabled.value = data.tracks?.enabled ?? data.competition?.tracksEnabled ?? false
     canUpdate.value = data.tracks?.canUpdate ?? false
     teams.value = teamResult.data.items ?? []
+    ssoProviders.value = data.ssoProviders ?? []
     removedTrackReassignments.value = []
     pendingRemoval.value = null
     disableConfirmationOpen.value = false
@@ -100,6 +103,7 @@ export function useAdminCompetitionsByIdTracksPage() {
       invitationCodeConfigured: item.requiresInvitationCode ?? false,
       invitationCode: '',
       clearInvitationCode: false,
+      requiredSsoProviderId: item.requiredSsoProviderId ?? null,
     }))
     error.value = null
   }
@@ -123,6 +127,7 @@ export function useAdminCompetitionsByIdTracksPage() {
       invitationCodeConfigured: false,
       invitationCode: '',
       clearInvitationCode: false,
+      requiredSsoProviderId: null,
     })
   }
 
@@ -240,6 +245,10 @@ export function useAdminCompetitionsByIdTracksPage() {
     setInvitationRequired(track, value === true)
   }
 
+  function updateRequiredSsoProvider(track: TrackForm, providerId: string): void {
+    track.requiredSsoProviderId = providerId === 'none' ? null : providerId
+  }
+
   async function save() {
     if (saving.value || !canUpdate.value || !canWrite.value) return
     const duplicateTrackKey = duplicateCompetitionTrackKey(tracks.value.map(track => track.key))
@@ -282,6 +291,7 @@ export function useAdminCompetitionsByIdTracksPage() {
               ? track.invitationCode.trim() || null
               : null,
             clearInvitationCode: track.clearInvitationCode,
+            requiredSsoProviderId: track.requiredSsoProviderId ?? null,
           })),
           removedTrackReassignments: enabled.value ? removedTrackReassignments.value : [],
         },
@@ -308,6 +318,7 @@ export function useAdminCompetitionsByIdTracksPage() {
     enabled,
     canUpdate,
     tracks,
+    ssoProviders,
     pendingRemoval,
     removalTargets,
     disableConfirmationOpen,
@@ -327,6 +338,7 @@ export function useAdminCompetitionsByIdTracksPage() {
     updatePublicSelectable,
     updateInternal,
     updateInvitationRequired,
+    updateRequiredSsoProvider,
     save,
   }
 }

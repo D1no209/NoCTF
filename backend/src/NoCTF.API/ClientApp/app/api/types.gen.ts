@@ -32,7 +32,7 @@ export type NoCtfapiEndpointsTeamsTeamRegistrationFailureResponse = {
     message?: string;
 };
 
-export type NoCtfapiEndpointsTeamsTeamRegistrationFailureCodeProtocol = 'InvalidTeamName' | 'CompetitionNotFound' | 'RegistrationClosed' | 'UserAlreadyRegistered' | 'TeamNameOrMembershipConflict' | 'TeamNotFound' | 'CompetitionFinished' | 'TeamLocked' | 'TeamBanned' | 'TeamConflict' | 'TeamReviewConflict' | 'CompetitionActive' | 'TrackNotFound' | 'TrackNotPublicSelectable' | 'TrackInvitationRequired' | 'TrackInvitationInvalid';
+export type NoCtfapiEndpointsTeamsTeamRegistrationFailureCodeProtocol = 'InvalidTeamName' | 'CompetitionNotFound' | 'RegistrationClosed' | 'UserAlreadyRegistered' | 'TeamNameOrMembershipConflict' | 'TeamNotFound' | 'CompetitionFinished' | 'TeamLocked' | 'TeamBanned' | 'TeamConflict' | 'TeamReviewConflict' | 'CompetitionActive' | 'TrackNotFound' | 'TrackNotPublicSelectable' | 'TrackInvitationRequired' | 'TrackInvitationInvalid' | 'TrackSsoIdentityRequired';
 
 export type NoCtfapiEndpointsTeamsCreateTeamRequest = {
     trackKey?: string | null;
@@ -94,7 +94,7 @@ export type NoCtfapiEndpointsTeamsTeamMembershipFailureResponse = {
     message?: string;
 };
 
-export type NoCtfapiEndpointsTeamsTeamMembershipFailureCodeProtocol = 'CompetitionNotFound' | 'TeamNotFound' | 'TeamForbidden' | 'TeamBanned' | 'MembershipLocked' | 'UserAlreadyRegistered' | 'TeamFull' | 'MembershipConflict' | 'CaptainCannotBeRemoved' | 'MemberNotFound' | 'MembershipNotFound' | 'CaptainMustTransfer' | 'CaptainOnly';
+export type NoCtfapiEndpointsTeamsTeamMembershipFailureCodeProtocol = 'CompetitionNotFound' | 'TeamNotFound' | 'TeamForbidden' | 'TeamBanned' | 'MembershipLocked' | 'UserAlreadyRegistered' | 'TeamFull' | 'MembershipConflict' | 'CaptainCannotBeRemoved' | 'MemberNotFound' | 'MembershipNotFound' | 'CaptainMustTransfer' | 'CaptainOnly' | 'TrackSsoIdentityRequired';
 
 export type MicrosoftAspNetCoreMvcValidationProblemDetails = MicrosoftAspNetCoreHttpHttpValidationProblemDetails & {
     errors?: {
@@ -1040,6 +1040,10 @@ export type NoCtfapiEndpointsCompetitionsTracksCompetitionTrackResponse = {
     requiresInvitationCode?: boolean;
     isViewerTrack?: boolean;
     invitationCode?: string | null;
+    requiredSsoProviderId?: string | null;
+    requiredSsoProviderName?: string | null;
+    requiredSsoProviderIconUrl?: string | null;
+    meetsSsoRequirement?: boolean;
 };
 
 export type NoCtfapiEndpointsCompetitionsEventsAccessCompetitionGameplayFactValueResponse = {
@@ -2517,6 +2521,7 @@ export type NoCtfapiEndpointsAdministrationCompetitionsAdminCompetitionResponse 
     tracks?: NoCtfapiEndpointsCompetitionsTracksCompetitionTrackListResponse;
     permissions?: NoCtfapiEndpointsAdministrationCompetitionsCompetitionPermissionsResponse | null;
     leaderboardVisibility?: NoCtfapiEndpointsAdministrationCompetitionsCompetitionLeaderboardVisibilityResponse;
+    ssoProviders?: Array<NoCtfapiEndpointsAdministrationCompetitionsCompetitionSsoProviderResponse>;
     capabilities?: NoCtfapiEndpointsAdministrationCompetitionsAdminCompetitionCapabilitiesResponse;
 };
 
@@ -2541,6 +2546,15 @@ export type NoCtfapiEndpointsAdministrationCompetitionsCompetitionLeaderboardVis
     effectiveVisibility?: NoCtfapiEndpointsCompetitionsLeaderboardVisibilityProtocol;
     frozenStartAt?: string | null;
     hiddenStartAt?: string | null;
+};
+
+export type NoCtfapiEndpointsAdministrationCompetitionsCompetitionSsoProviderResponse = {
+    id?: string;
+    name?: string;
+    iconUrl?: string | null;
+    protocol?: NoCtfapiEndpointsAuthenticationPublicSsoProtocol;
+    enabled?: boolean;
+    allowBinding?: boolean;
 };
 
 export type NoCtfapiEndpointsAdministrationCompetitionsAdminCompetitionCapabilitiesResponse = {
@@ -2600,7 +2614,7 @@ export type NoCtfapiEndpointsAdministrationCompetitionsCompetitionTrackFailureRe
     affectedTeamCount?: number;
 };
 
-export type NoCtfapiEndpointsAdministrationCompetitionsCompetitionTrackFailureCodeProtocol = 'CompetitionNotFound' | 'InvalidConfiguration' | 'CompetitionFinished' | 'TracksDisabled' | 'TrackReassignmentRequired' | 'InvalidTrackReassignment' | 'TeamNotFound' | 'TrackNotFound' | 'TrackNotPublicSelectable';
+export type NoCtfapiEndpointsAdministrationCompetitionsCompetitionTrackFailureCodeProtocol = 'CompetitionNotFound' | 'InvalidConfiguration' | 'CompetitionFinished' | 'TracksDisabled' | 'TrackReassignmentRequired' | 'InvalidTrackReassignment' | 'TeamNotFound' | 'TrackNotFound' | 'TrackNotPublicSelectable' | 'TrackSsoIdentityRequired' | 'SsoProviderNotFound';
 
 export type NoCtfapiEndpointsAdministrationCompetitionsPatchCompetitionRequest = {
     metadata?: NoCtfapiEndpointsAdministrationCompetitionsCompetitionMetadataPatchRequest | null;
@@ -2649,6 +2663,7 @@ export type NoCtfapiEndpointsAdministrationCompetitionsUpdateCompetitionTrackReq
     affectsDynamicChallengeScore: boolean;
     visibleOnLeaderboard: boolean;
     affectsCompetitiveResults: boolean;
+    requiredSsoProviderId: string | null;
     invitationCode: string | null;
     clearInvitationCode: boolean;
 };

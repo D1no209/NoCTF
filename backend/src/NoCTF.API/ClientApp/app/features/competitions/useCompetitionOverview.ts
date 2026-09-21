@@ -139,6 +139,11 @@ export function useCompetitionOverview(
         ).message
       } else {
         selectableTracks.value = (trackResult.data.items ?? []).filter(track => track.isPublicSelectable)
+        if (selectableTracks.value.some(track =>
+            track.key === createTrackKey.value
+            && track.meetsSsoRequirement === false)) {
+          createTrackKey.value = ''
+        }
       }
     } catch (error: unknown) {
       selectableTracks.value = []
@@ -201,6 +206,13 @@ export function useCompetitionOverview(
   const selectedCreateTrack = computed(() => selectableTracks.value.find(
     track => track.key === createTrackKey.value,
   ))
+  const hasUnavailableSsoTracks = computed(() => selectableTracks.value.some(track =>
+    track.requiredSsoProviderId && track.meetsSsoRequirement === false,
+  ))
+  const ssoSettingsTarget = {
+    path: '/',
+    query: { account: 'security' },
+  }
 
   watch(createTrackKey, () => {
     createTrackInvitationCode.value = ''
@@ -224,6 +236,10 @@ export function useCompetitionOverview(
     if (tracksEnabled.value && selectedCreateTrack.value?.requiresInvitationCode
       && !createTrackInvitationCode.value.trim()) {
       createValidationError.value = translate("ui.enterTheTrackInvitationCode")
+      return
+    }
+    if (tracksEnabled.value && selectedCreateTrack.value?.meetsSsoRequirement === false) {
+      createValidationError.value = translate('sso.trackIdentityRequired')
       return
     }
     createPending.value = true
@@ -362,6 +378,8 @@ export function useCompetitionOverview(
       createPending,
       createValidationError,
       selectedCreateTrack,
+      hasUnavailableSsoTracks,
+      ssoSettingsTarget,
       submitCreate,
       joinOpen,
       joinToken,

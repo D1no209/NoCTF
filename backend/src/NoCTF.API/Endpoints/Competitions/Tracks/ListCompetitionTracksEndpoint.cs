@@ -21,7 +21,11 @@ public sealed record CompetitionTrackResponse(
     bool RequiresInvitationCode,
     bool IsViewerTrack,
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    string? InvitationCode = null);
+    string? InvitationCode = null,
+    Guid? RequiredSsoProviderId = null,
+    string? RequiredSsoProviderName = null,
+    string? RequiredSsoProviderIconUrl = null,
+    bool MeetsSsoRequirement = true);
 
 public sealed record CompetitionTrackListResponse(
     Guid CompetitionId,
@@ -45,7 +49,11 @@ internal static class CompetitionTrackProtocolMapping
         view.AffectsCompetitiveResults,
         view.RequiresInvitationCode,
         view.IsViewerTrack,
-        view.InvitationCode);
+        view.InvitationCode,
+        view.RequiredSsoProviderId,
+        view.RequiredSsoProviderName,
+        view.RequiredSsoProviderIconUrl,
+        view.MeetsSsoRequirement);
 
     public static CompetitionTrackListResponse ToResponse(CompetitionTracksView view) => new(
         view.CompetitionId,

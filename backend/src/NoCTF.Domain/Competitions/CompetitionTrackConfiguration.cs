@@ -16,7 +16,8 @@ public sealed record CompetitionTrackDefinition(
     bool AffectsDynamicChallengeScore,
     bool VisibleOnLeaderboard,
     bool AffectsCompetitiveResults,
-    string? InvitationCode = null)
+    string? InvitationCode = null,
+    Guid? RequiredSsoProviderId = null)
 {
     [JsonIgnore]
     public bool RequiresInvitationCode => !string.IsNullOrWhiteSpace(InvitationCode);
@@ -102,7 +103,8 @@ public sealed record CompetitionTrackConfiguration(
                 AffectsDynamicChallengeScore = mode == GameMode.Ctf,
                 VisibleOnLeaderboard = true,
                 AffectsCompetitiveResults = true,
-                InvitationCode = null
+                InvitationCode = null,
+                RequiredSsoProviderId = null
             }]);
     }
 
