@@ -29,6 +29,25 @@ describe('competition challenge deletion', () => {
     expect(page).toContain('v-for="t in visibleModeTemplates"')
   })
 
+  test('filters competition challenge rows by keyword direction and status', async () => {
+    const page = await sourceFile(
+      new URL('../app/pages/admin/competitions/[id]/challenges/index.vue', import.meta.url),
+    ).text()
+
+    expect(page).toContain("const search = ref('')")
+    expect(page).toContain("const directionFilter = ref('all')")
+    expect(page).toContain("const statusFilter = ref<ChallengeStatusFilter>('all')")
+    expect(page).toContain('const filteredItems = computed(() => {')
+    expect(page).toContain("statusFilter.value === 'published'")
+    expect(page).toContain("statusFilter.value === 'unpublished'")
+    expect(page).toContain("statusFilter.value === 'deleted'")
+    expect(page).toContain('v-model="search"')
+    expect(page).toContain('v-model="directionFilter"')
+    expect(page).toContain('v-model="statusFilter"')
+    expect(page).toContain('v-for="c in filteredItems"')
+    expect(page).toContain("$t('ui.noMatchingCompetitionChallenges')")
+  })
+
   test('keeps the selected challenge while deletion is pending or fails', async () => {
     const page = await sourceFile(
       new URL('../app/pages/admin/competitions/[id]/challenges/index.vue', import.meta.url),
