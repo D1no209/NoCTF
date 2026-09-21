@@ -575,6 +575,7 @@ export const messages = {
   "ui.noTitleYet": "暂无题目",
   "ui.noQuestionTemplateYet": "暂无题目模板",
   "ui.thereIsNoRegisteredTeamYet": "暂无注册队伍",
+  "ui.noMatchingTeams": "没有匹配的队伍",
   "ui.noCheatingIncidentsYet": "暂无作弊事件",
   "ui.addedCapabilitiesCapAdd": "增加的能力(cap-add)",
   "ui.effectiveForALongTime": "长期有效",

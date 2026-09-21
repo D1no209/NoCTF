@@ -19,10 +19,18 @@ describe('admin competition challenge navigation', () => {
     expect(css).toContain('transform-origin: right center;')
   })
 
-  test('lists every team and all paged challenge facts before allowing a judge to correct scoring', async () => {
+  test('paginates and searches challenge team scoring before allowing a judge to correct scoring', async () => {
     const source = await page()
 
     expect(source).toContain('adminListTeams')
+    expect(source).toContain('useOffsetPagination<NoCtfapiEndpointsTeamsTeamResponse>')
+    expect(source).toContain('keyword: scoringSearch.value.trim() || null, offset, limit, desc')
+    expect(source).toContain('watch(scoringSearch, reloadScoringTeamsFromFirstPage)')
+    expect(source).toContain('setTimeout(() => { void scoringPagination.loadPage(1) }, 250)')
+    expect(source).toContain('v-model="scoringSearch"')
+    expect(source).toContain('<OffsetPagination')
+    expect(source).toContain('@update:page="loadScoringPage"')
+    expect(source).not.toContain('query: { keyword: null, offset: 0, limit: 200, desc: false }')
     expect(source).toContain('adminListGameplayFacts')
     expect(source).toContain('getLeaderboardEndpoint')
     expect(source).toContain('getScoreboardSchemaEndpoint')
