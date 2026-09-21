@@ -3925,3 +3925,17 @@ dotnet run --project backend/src/NoCTF.API/NoCTF.API.csproj --no-build -- --expo
   迁移数据或清除旧服务。部署架构回归 15/15 通过，原 1048 后端和 353 前端测试及构建结果仍有效。
 - 发布范围为当前已完成的平台功能、部署定义和出题文档；未纳入临时审计文件、真实 .env、外部题目
   Checker 源码或未跟踪的 challenge-authoring-templates.zip 打包产物。
+
+## 2026-09-21 GitOps API 契约对齐：平台附件阶段
+
+- 当前批量附件上传请求新增可选 `AttachmentIds`，与 `Files` 按索引对应；省略时继续由服务端生成
+  UUID。普通附件和 RandomOnePerTeam 批次都保留显式 UUID，并在文件暂存前拒绝空 UUID 或批内重复。
+- FastEndpoints Validator 要求显式 ID 数量与文件数量一致且无空值/重复；现有批量原子写入、对象清理、
+  DeliveryPolicy、响应结构和 ResourceIdConflict 行为保持不变。
+- 新增 GitOps OpenAPI 契约测试，冻结实际使用的认证、比赛、题库、附件、Flag、Hint 与 Bot Token
+  路由，确认聚合响应、PATCH 入口、已删除 configuration 路由及 multipart AttachmentIds 形状。
+- `dotnet build backend/tests/NoCTF.Tests/NoCTF.Tests.csproj --no-restore -m:1` 通过；附件应用层、请求
+  Validator 与 GitOps OpenAPI 聚焦测试共 31/31 通过。非 Integration 全量为 1360/1381，21 个失败
+  均来自工作区既有 Runtime Proxy/Traffic Capture WIP（OpenAPI 数量、DI、架构门禁等），不是本阶段回归。
+- 已运行 OpenAPI 导出和 `bun run api:gen`。生成差异同时包含用户现有 Runtime WIP，保留在工作区，
+  本阶段提交只纳入附件 API、对应测试、GitOps 契约测试和本交接记录，不提交其他已有改动。

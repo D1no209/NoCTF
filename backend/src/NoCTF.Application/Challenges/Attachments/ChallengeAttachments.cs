@@ -29,7 +29,8 @@ public sealed record ChallengeAttachmentSet(
 public sealed record RandomAttachmentUploadItem(
     string OriginalFileName,
     string ContentType,
-    Stream Content);
+    Stream Content,
+    Guid? RequestedAttachmentId = null);
 
 public sealed record RandomAttachmentBatchEntry(
     Guid AttachmentId,
@@ -45,7 +46,8 @@ public sealed record ChallengeAttachmentBatchEntry(
 public sealed record ChallengeAttachmentUploadItem(
     string FileName,
     string ContentType,
-    Stream Content);
+    Stream Content,
+    Guid? RequestedAttachmentId = null);
 
 public sealed record ChallengeAttachmentContent(
     ChallengeAttachmentView Metadata,
@@ -240,6 +242,9 @@ public sealed class ManageChallengeAttachments(
                 || file.FileName.Length > 260))
             return Failure(ChallengeAttachmentFailureCode.InvalidFileName,
                 "An attachment file name is invalid.");
+        if (!RequestedAttachmentIdsAreValid(files.Select(file => file.RequestedAttachmentId)))
+            return Failure(ChallengeAttachmentFailureCode.ResourceIdConflict,
+                "Attachment resource identifiers must be non-empty and unique.");
         if (!await store.CanWriteAsync(challengeId, actorId, isAdministrator, ct))
             return Failure(ChallengeAttachmentFailureCode.ChallengeNotFound,
                 "Challenge was not found or access was denied.");
@@ -250,7 +255,7 @@ public sealed class ManageChallengeAttachments(
         {
             foreach (var file in files)
             {
-                var attachmentId = Guid.CreateVersion7();
+                var attachmentId = file.RequestedAttachmentId ?? Guid.CreateVersion7();
                 var fileId = Guid.CreateVersion7();
                 var uploaded = await uploads.CreateAsync(
                     fileId,
@@ -336,6 +341,9 @@ public sealed class ManageChallengeAttachments(
         if (files.Count == 0)
             return Failure(ChallengeAttachmentFailureCode.EmptyBatch,
                 "At least one attachment variant is required.");
+        if (!RequestedAttachmentIdsAreValid(files.Select(file => file.RequestedAttachmentId)))
+            return Failure(ChallengeAttachmentFailureCode.ResourceIdConflict,
+                "Attachment resource identifiers must be non-empty and unique.");
 
         var flags = new HashSet<string>(StringComparer.Ordinal);
         foreach (var file in files)
@@ -357,7 +365,7 @@ public sealed class ManageChallengeAttachments(
         {
             foreach (var file in files)
             {
-                var attachmentId = Guid.CreateVersion7();
+                var attachmentId = file.RequestedAttachmentId ?? Guid.CreateVersion7();
                 var fileId = Guid.CreateVersion7();
                 var uploaded = await uploads.CreateAsync(
                     fileId,
@@ -451,6 +459,16 @@ public sealed class ManageChallengeAttachments(
             ChallengeAttachmentFailureCode code,
             string message) =>
             OperationResult<ChallengeAttachmentSet, ChallengeAttachmentFailureCode>.Failure(code, message);
+    }
+
+    private static bool RequestedAttachmentIdsAreValid(IEnumerable<Guid?> requestedIds)
+    {
+        var ids = requestedIds
+            .Where(id => id.HasValue)
+            .Select(id => id.GetValueOrDefault())
+            .ToArray();
+        return ids.All(id => id != Guid.Empty)
+               && ids.Distinct().Count() == ids.Length;
     }
 
     public async Task<OperationResult<ChallengeAttachmentFailureCode>> DeleteAsync(
