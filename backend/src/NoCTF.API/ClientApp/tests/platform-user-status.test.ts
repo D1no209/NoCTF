@@ -24,6 +24,15 @@ describe('platform user account status management', () => {
     expect(oldBotRoute).toContain("redirect: '/admin/platform/users?filter=Bot'")
   })
 
+  test('leaves the initial skeleton after the first paged response', async () => {
+    const source = await sourceFile(pageUrl).text()
+
+    expect(source).toContain('const loading = computed(() => pagination.loading.value && !pagination.initialized.value)')
+    expect(source).not.toContain('const loading = ref(true)')
+    expect(source).toContain('<div v-if="loading"')
+    expect(source).toContain(':loading="pageLoading"')
+  })
+
   test('uses the generated status endpoint and keeps the sheet open on failure', async () => {
     const source = await sourceFile(pageUrl).text()
 
