@@ -61,6 +61,16 @@
           "404": {
             "description": "Not Found"
           },
+          "409": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsTeamsTeamRegistrationFailureResponse"
+                }
+              }
+            }
+          },
           "401": {
             "description": "Unauthorized"
           },
@@ -156,6 +166,16 @@
           },
           "404": {
             "description": "Not Found"
+          },
+          "409": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsTeamsTeamRegistrationFailureResponse"
+                }
+              }
+            }
           },
           "413": {
             "description": "",
@@ -14127,6 +14147,60 @@
           "Ok"
         ]
       },
+      "NoCTFAPIEndpointsTeamsTeamRegistrationFailureResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "code": {
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsTeamsTeamRegistrationFailureCodeProtocol"
+          },
+          "message": {
+            "type": "string"
+          }
+        }
+      },
+      "NoCTFAPIEndpointsTeamsTeamRegistrationFailureCodeProtocol": {
+        "type": "string",
+        "description": "",
+        "x-enumNames": [
+          "InvalidTeamName",
+          "CompetitionNotFound",
+          "RegistrationClosed",
+          "UserAlreadyRegistered",
+          "TeamNameOrMembershipConflict",
+          "TeamNotFound",
+          "CompetitionFinished",
+          "TeamLocked",
+          "TeamBanned",
+          "TeamConflict",
+          "TeamReviewConflict",
+          "CompetitionActive",
+          "TrackNotFound",
+          "TrackNotPublicSelectable",
+          "TrackInvitationRequired",
+          "TrackInvitationInvalid",
+          "TrackSsoIdentityRequired"
+        ],
+        "enum": [
+          "InvalidTeamName",
+          "CompetitionNotFound",
+          "RegistrationClosed",
+          "UserAlreadyRegistered",
+          "TeamNameOrMembershipConflict",
+          "TeamNotFound",
+          "CompetitionFinished",
+          "TeamLocked",
+          "TeamBanned",
+          "TeamConflict",
+          "TeamReviewConflict",
+          "CompetitionActive",
+          "TrackNotFound",
+          "TrackNotPublicSelectable",
+          "TrackInvitationRequired",
+          "TrackInvitationInvalid",
+          "TrackSsoIdentityRequired"
+        ]
+      },
       "NoCTFAPIEndpointsTeamsTeamResponse": {
         "type": "object",
         "additionalProperties": false,
@@ -14190,60 +14264,6 @@
           "Pending",
           "Approved",
           "Rejected"
-        ]
-      },
-      "NoCTFAPIEndpointsTeamsTeamRegistrationFailureResponse": {
-        "type": "object",
-        "additionalProperties": false,
-        "properties": {
-          "code": {
-            "$ref": "#/components/schemas/NoCTFAPIEndpointsTeamsTeamRegistrationFailureCodeProtocol"
-          },
-          "message": {
-            "type": "string"
-          }
-        }
-      },
-      "NoCTFAPIEndpointsTeamsTeamRegistrationFailureCodeProtocol": {
-        "type": "string",
-        "description": "",
-        "x-enumNames": [
-          "InvalidTeamName",
-          "CompetitionNotFound",
-          "RegistrationClosed",
-          "UserAlreadyRegistered",
-          "TeamNameOrMembershipConflict",
-          "TeamNotFound",
-          "CompetitionFinished",
-          "TeamLocked",
-          "TeamBanned",
-          "TeamConflict",
-          "TeamReviewConflict",
-          "CompetitionActive",
-          "TrackNotFound",
-          "TrackNotPublicSelectable",
-          "TrackInvitationRequired",
-          "TrackInvitationInvalid",
-          "TrackSsoIdentityRequired"
-        ],
-        "enum": [
-          "InvalidTeamName",
-          "CompetitionNotFound",
-          "RegistrationClosed",
-          "UserAlreadyRegistered",
-          "TeamNameOrMembershipConflict",
-          "TeamNotFound",
-          "CompetitionFinished",
-          "TeamLocked",
-          "TeamBanned",
-          "TeamConflict",
-          "TeamReviewConflict",
-          "CompetitionActive",
-          "TrackNotFound",
-          "TrackNotPublicSelectable",
-          "TrackInvitationRequired",
-          "TrackInvitationInvalid",
-          "TrackSsoIdentityRequired"
         ]
       },
       "NoCTFAPIEndpointsTeamsCreateTeamRequest": {

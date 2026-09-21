@@ -10,6 +10,13 @@ export type NoCtfapiEndpointsHealthResponse = {
 
 export type NoCtfapiEndpointsHealthStatus = 'Ok';
 
+export type NoCtfapiEndpointsTeamsTeamRegistrationFailureResponse = {
+    code?: NoCtfapiEndpointsTeamsTeamRegistrationFailureCodeProtocol;
+    message?: string;
+};
+
+export type NoCtfapiEndpointsTeamsTeamRegistrationFailureCodeProtocol = 'InvalidTeamName' | 'CompetitionNotFound' | 'RegistrationClosed' | 'UserAlreadyRegistered' | 'TeamNameOrMembershipConflict' | 'TeamNotFound' | 'CompetitionFinished' | 'TeamLocked' | 'TeamBanned' | 'TeamConflict' | 'TeamReviewConflict' | 'CompetitionActive' | 'TrackNotFound' | 'TrackNotPublicSelectable' | 'TrackInvitationRequired' | 'TrackInvitationInvalid' | 'TrackSsoIdentityRequired';
+
 export type NoCtfapiEndpointsTeamsTeamResponse = {
     id?: string;
     competitionId?: string;
@@ -26,13 +33,6 @@ export type NoCtfapiEndpointsTeamsTeamResponse = {
 };
 
 export type NoCtfapiEndpointsTeamsTeamRegistrationStatusProtocol = 'Pending' | 'Approved' | 'Rejected';
-
-export type NoCtfapiEndpointsTeamsTeamRegistrationFailureResponse = {
-    code?: NoCtfapiEndpointsTeamsTeamRegistrationFailureCodeProtocol;
-    message?: string;
-};
-
-export type NoCtfapiEndpointsTeamsTeamRegistrationFailureCodeProtocol = 'InvalidTeamName' | 'CompetitionNotFound' | 'RegistrationClosed' | 'UserAlreadyRegistered' | 'TeamNameOrMembershipConflict' | 'TeamNotFound' | 'CompetitionFinished' | 'TeamLocked' | 'TeamBanned' | 'TeamConflict' | 'TeamReviewConflict' | 'CompetitionActive' | 'TrackNotFound' | 'TrackNotPublicSelectable' | 'TrackInvitationRequired' | 'TrackInvitationInvalid' | 'TrackSsoIdentityRequired';
 
 export type NoCtfapiEndpointsTeamsCreateTeamRequest = {
     trackKey?: string | null;
@@ -3032,7 +3032,10 @@ export type TeamAvatarClearErrors = {
      * Not Found
      */
     404: unknown;
+    409: NoCtfapiEndpointsTeamsTeamRegistrationFailureResponse;
 };
+
+export type TeamAvatarClearError = TeamAvatarClearErrors[keyof TeamAvatarClearErrors];
 
 export type TeamAvatarClearResponses = {
     /**
@@ -3087,6 +3090,7 @@ export type TeamAvatarReplaceErrors = {
      * Not Found
      */
     404: unknown;
+    409: NoCtfapiEndpointsTeamsTeamRegistrationFailureResponse;
     413: MicrosoftAspNetCoreMvcProblemDetails;
 };
 

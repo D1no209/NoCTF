@@ -8,7 +8,8 @@ namespace NoCTF.API.Endpoints.Teams;
 public sealed class ClearTeamAvatarEndpoint(
     ManageBusinessImages images,
     IUserContext user)
-    : EndpointWithoutRequest<Results<NoContent, NotFound, ForbidHttpResult>>
+    : EndpointWithoutRequest<Results<NoContent, NotFound, ForbidHttpResult,
+        Conflict<TeamRegistrationFailureResponse>>>
 {
     public override void Configure()
     {
@@ -18,7 +19,8 @@ public sealed class ClearTeamAvatarEndpoint(
         Summary(summary => summary.Summary = "Clears a team's avatar and queues unreferenced File cleanup.");
     }
 
-    public override async Task<Results<NoContent, NotFound, ForbidHttpResult>> ExecuteAsync(
+    public override async Task<Results<NoContent, NotFound, ForbidHttpResult,
+        Conflict<TeamRegistrationFailureResponse>>> ExecuteAsync(
         CancellationToken ct)
     {
         var result = await images.ClearTeamAvatarAsync(
@@ -32,6 +34,10 @@ public sealed class ClearTeamAvatarEndpoint(
             BusinessFileReferenceState.Cleared => TypedResults.NoContent(),
             BusinessFileReferenceState.NotFound => TypedResults.NotFound(),
             BusinessFileReferenceState.Forbidden => TypedResults.Forbid(),
+            BusinessFileReferenceState.Conflict => TypedResults.Conflict(
+                new TeamRegistrationFailureResponse(
+                    TeamMapper.ToProtocol(result.Failure!.Value),
+                    "Team avatar was not cleared.")),
             _ => throw new InvalidOperationException($"Unexpected avatar state {result.State}.")
         };
     }

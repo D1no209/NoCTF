@@ -75,16 +75,6 @@ public sealed class RotateTeamInvitation(ITeamMembershipStore store)
     }
 }
 
-public static class TeamMembershipPolicy
-{
-    public static bool IsInvitationJoinLocked(
-        CompetitionStatus status,
-        bool allowTeamRegistrationWhileRunning) =>
-        status is CompetitionStatus.Paused or CompetitionStatus.Finished
-        || status == CompetitionStatus.Running && !allowTeamRegistrationWhileRunning;
-
-}
-
 public sealed class RemoveTeamMember(ITeamMembershipStore store)
 {
     public async Task<OperationResult<TeamMembershipFailure>> ExecuteAsync(Guid competitionId, Guid teamId, Guid targetUserId, Guid actorId, CancellationToken ct = default)

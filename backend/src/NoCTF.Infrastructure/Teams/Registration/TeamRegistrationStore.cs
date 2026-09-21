@@ -507,25 +507,13 @@ public sealed class TeamRegistrationStore(
                 TrackKey: entity.TrackKey,
                 PreviousTrackKey: previousTrackKey), ct);
         }
-        var nextStatus = ParticipantTeamMutationPolicy.RegistrationStatusAfterChange(
-            competition.TeamRegistrationAutoApprove);
-        if (entity.RegistrationStatus != nextStatus)
-        {
-            entity.RegistrationStatus = nextStatus;
-            await events.RecordAsync(new(
-                entity.CompetitionId,
-                CompetitionEventKind.TeamRegistrationChanged,
-                CompetitionEventLevel.Information,
-                nextStatus == TeamRegistrationStatus.Approved && !nextTrack.IsInternal
-                    ? CompetitionEventVisibility.Public
-                    : CompetitionEventVisibility.Staff,
-                occurredAt,
-                ActorUserId: actorUserId,
-                RelatedUserId: actorUserId,
-                TeamId: entity.Id,
-                TeamRegistrationStatus: nextStatus,
-                TrackKey: entity.TrackKey), ct);
-        }
+        await ParticipantTeamRegistrationTransition.ApplyAsync(
+            competition,
+            entity,
+            actorUserId,
+            occurredAt,
+            events,
+            ct);
         try
         {
             await db.SaveChangesAsync(ct);
