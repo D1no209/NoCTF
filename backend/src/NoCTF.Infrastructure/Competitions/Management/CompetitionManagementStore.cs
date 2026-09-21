@@ -129,19 +129,6 @@ public sealed class CompetitionManagementStore(
         if (competition is null)
             return null;
         var previousAccessMode = competition.AccessMode;
-        var runtimeAccessChanged = competition.RuntimeAccessMode != command.RuntimeAccessMode
-            || competition.TrafficCaptureEnabled != command.TrafficCaptureEnabled
-            || competition.TrafficCaptureLimitBytes != command.TrafficCaptureLimitBytes;
-        if (runtimeAccessChanged
-            && await db.RuntimeInstances.AnyAsync(runtime =>
-                runtime.CompetitionId == competition.Id
-                && (runtime.State == NoCTF.Domain.Runtime.RuntimeState.Queued
-                    || runtime.State == NoCTF.Domain.Runtime.RuntimeState.Provisioning
-                    || runtime.State == NoCTF.Domain.Runtime.RuntimeState.Running
-                    || runtime.State == NoCTF.Domain.Runtime.RuntimeState.Stopping), ct))
-        {
-            return null;
-        }
         if (competition.PracticeModeEnabled
             && !command.PracticeModeEnabled
             && await db.RuntimeInstances.AnyAsync(runtime =>
