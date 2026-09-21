@@ -140,6 +140,7 @@ export const messages = {
   "ui.thereIsAnOngoingCompetitionReferenceAndTheModeCannot": "存在进行中的竞赛引用,无法修改模式",
   "ui.size": "大小",
   "ui.pending": "待处理",
+  "ui.returnToPendingReview": "退回待审核",
   "ui.theCurrentRoleIsReadOnlyAndCannotPerformLife": "当前角色为只读,无法执行生命周期操作",
   "ui.export": "导出",
   "ui.exportFailed": "导出失败",

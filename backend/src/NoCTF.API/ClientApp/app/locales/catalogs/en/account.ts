@@ -108,6 +108,7 @@ export const messages = {
   "sso.trackGateDescription": "Every member must have the selected identity provider when the team enters this track. Later unlinking does not revoke existing track admission.",
   "sso.trackGateConfigurationHint": "Create an identity provider and allow binding under Platform Administration, Authentication, then select it in each track's SSO identity gate column.",
   "sso.trackGateNoProviders": "No SSO identity provider is configured, so only No restriction is available.",
+  "sso.trackGateProvider": "Every current team member must bind {provider} before switching to this track.",
   "sso.manageIdentityProviders": "Manage identity providers",
   "sso.trackIdentityRequired": "Every team member must link the SSO provider required by this track. Link it from Account Security first.",
   "sso.trackProviderNotFound": "The SSO provider referenced by this track does not exist.",

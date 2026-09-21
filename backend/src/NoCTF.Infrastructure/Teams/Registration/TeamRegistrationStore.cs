@@ -447,12 +447,12 @@ public sealed class TeamRegistrationStore(
             nextTrack = configuration.Find(requestedKey);
             if (nextTrack is null)
                 return new(null, TeamRegistrationFailure.TrackNotFound);
-            if (nextTrack.IsInternal || !nextTrack.IsPublicSelectable)
-                return new(null, TeamRegistrationFailure.TrackNotPublicSelectable);
             trackChanged = !string.Equals(
                 entity.TrackKey,
                 nextTrack.Key,
                 StringComparison.OrdinalIgnoreCase);
+            if (trackChanged && (nextTrack.IsInternal || !nextTrack.IsPublicSelectable))
+                return new(null, TeamRegistrationFailure.TrackNotPublicSelectable);
             if (trackChanged && nextTrack.RequiresInvitationCode
                 && string.IsNullOrWhiteSpace(command.TrackInvitationCode))
                 return new(null, TeamRegistrationFailure.TrackInvitationRequired);
