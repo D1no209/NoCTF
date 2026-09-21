@@ -3,7 +3,7 @@ import { toRefs } from 'vue'
 import type { UsersByIdPageViewState } from '~/features/routes/users/useUsersByIdPage'
 
 const viewProps = defineProps<{ state: UsersByIdPageViewState }>()
-const { ImagePlus, UserRound, profile, loading, error, isOwnProfile, coverUrl, modes, directions, directionRows, recentCompetitions, modeChartOption, directionChartOption, coverInput, coverPending, setCoverInputRef, selectCover } = toRefs(viewProps.state)
+const { ImagePlus, UserRound, profile, loading, error, isOwnProfile, coverUrl, modes, directionRows, recentCompetitions, modeChartOption, directionChartOption, coverInput, coverPending, coverEditorOpen, coverSourceFile, setCoverInputRef, selectCover, setCoverEditorOpen, uploadCover, reportCoverError, ProfileCoverCropDialog } = toRefs(viewProps.state)
 </script>
 
 <template>
@@ -96,10 +96,7 @@ const { ImagePlus, UserRound, profile, loading, error, isOwnProfile, coverUrl, m
 
             <div class="order-3 min-h-0 min-w-0 md:order-none">
               <h2 id="profile-directions-title" class="font-semibold">{{ $t('profile.strongDirections') }}</h2>
-              <MiniChart v-if="directions.length" :option="directionChartOption" height="clamp(11rem, 23dvh, 14rem)" />
-              <Empty v-else class="mt-3 min-h-36">
-                <EmptyDescription>{{ $t('profile.noDirectionData') }}</EmptyDescription>
-              </Empty>
+              <MiniChart :option="directionChartOption" height="clamp(11rem, 23dvh, 14rem)" />
               <ul class="sr-only">
                 <li v-for="direction in directionRows" :key="direction.direction">
                   {{ direction.label }}: {{ direction.successfulChallengeCount ?? 0 }}
@@ -137,5 +134,16 @@ const { ImagePlus, UserRound, profile, loading, error, isOwnProfile, coverUrl, m
         </CardContent>
       </Card>
     </template>
+
+    <component
+      :is="ProfileCoverCropDialog"
+      variant="profile-cover"
+      :open="coverEditorOpen"
+      :file="coverSourceFile"
+      :saving="coverPending"
+      @update:open="setCoverEditorOpen"
+      @save="uploadCover"
+      @error="reportCoverError"
+    />
   </div>
 </template>

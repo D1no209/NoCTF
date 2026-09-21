@@ -2,13 +2,26 @@ import { toRefs } from 'vue'
 import type { ComponentPublicInstance } from 'vue'
 import { RotateCcw, RotateCw, Scan } from '@lucide/vue'
 import type { AvatarCropState } from './avatar-crop'
-import { AVATAR_CROP_SIZE, AVATAR_OUTPUT_SIZE, clampAvatarCropState, drawAvatarCrop, moveAvatarCrop, zoomAvatarCropAtPoint } from './avatar-crop'
+import {
+  AVATAR_CROP_SIZE,
+  AVATAR_OUTPUT_SIZE,
+  clampImageCropState,
+  drawImageCrop,
+  moveImageCrop,
+  zoomImageCropAtPoint,
+} from './avatar-crop'
+
+export const PROFILE_COVER_CROP_WIDTH = 720
+export const PROFILE_COVER_CROP_HEIGHT = 180
+export const PROFILE_COVER_OUTPUT_WIDTH = 1600
+export const PROFILE_COVER_OUTPUT_HEIGHT = 400
 
 /** Owns state, effects and commands for AvatarCropDialog. */
 export function useAvatarCropDialog(props: Readonly<{
   open: boolean
   file: File | null
   saving: boolean
+  variant?: 'avatar' | 'profile-cover'
 }>,
 emit: { (event: "update:open", ...args: [value: boolean]): void; (event: "save", ...args: [file: File]): void; (event: "error", ...args: [error: Error]): void }) {
   const previewFrame = ref<HTMLDivElement | null>(null)
@@ -22,6 +35,29 @@ emit: { (event: "update:open", ...args: [value: boolean]): void; (event: "save",
   const dragging = ref(false)
 
   const encoding = ref(false)
+
+  const profileCover = computed(() => props.variant === 'profile-cover')
+
+  const cropWidth = computed(() => profileCover.value
+    ? PROFILE_COVER_CROP_WIDTH
+    : AVATAR_CROP_SIZE)
+
+  const cropHeight = computed(() => profileCover.value
+    ? PROFILE_COVER_CROP_HEIGHT
+    : AVATAR_CROP_SIZE)
+
+  const outputWidth = computed(() => profileCover.value
+    ? PROFILE_COVER_OUTPUT_WIDTH
+    : AVATAR_OUTPUT_SIZE)
+
+  const outputHeight = computed(() => profileCover.value
+    ? PROFILE_COVER_OUTPUT_HEIGHT
+    : AVATAR_OUTPUT_SIZE)
+
+  const cropViewport = computed(() => ({
+    width: cropWidth.value,
+    height: cropHeight.value,
+  }))
 
   let sourceUrl: string | null = null
 
@@ -91,13 +127,13 @@ emit: { (event: "update:open", ...args: [value: boolean]): void; (event: "save",
   function renderPreview() {
     if (!preview.value || !sourceImage.value)
       return
-    drawAvatarCrop(preview.value, sourceImage.value, crop)
+    drawImageCrop(preview.value, sourceImage.value, cropViewport.value, crop)
   }
 
   function normalizedCrop(next: AvatarCropState) {
     const image = sourceImage.value
     return image
-      ? clampAvatarCropState(image.width, image.height, AVATAR_CROP_SIZE, next)
+      ? clampImageCropState(image.width, image.height, cropViewport.value, next)
       : next
   }
 
@@ -109,10 +145,11 @@ emit: { (event: "update:open", ...args: [value: boolean]): void; (event: "save",
     const bounds = previewFrame.value?.getBoundingClientRect()
     if (!bounds || bounds.width <= 0)
       return { x: 0, y: 0 }
-    const scale = AVATAR_CROP_SIZE / bounds.width
+    const scaleX = cropWidth.value / bounds.width
+    const scaleY = cropHeight.value / bounds.height
     return {
-      x: (event.clientX - bounds.left) * scale - AVATAR_CROP_SIZE / 2,
-      y: (event.clientY - bounds.top) * scale - AVATAR_CROP_SIZE / 2,
+      x: (event.clientX - bounds.left) * scaleX - cropWidth.value / 2,
+      y: (event.clientY - bounds.top) * scaleY - cropHeight.value / 2,
     }
   }
 
@@ -122,10 +159,10 @@ emit: { (event: "update:open", ...args: [value: boolean]): void; (event: "save",
       return
     const point = cropPoint(event)
     const requestedZoom = crop.zoom * Math.exp(-event.deltaY * 0.0015)
-    assignCrop(zoomAvatarCropAtPoint(
+    assignCrop(zoomImageCropAtPoint(
       image.width,
       image.height,
-      AVATAR_CROP_SIZE,
+      cropViewport.value,
       crop,
       requestedZoom,
       point.x,
@@ -152,14 +189,15 @@ emit: { (event: "update:open", ...args: [value: boolean]): void; (event: "save",
     const bounds = previewFrame.value?.getBoundingClientRect()
     if (!drag || drag.pointerId !== event.pointerId || !image || !bounds || bounds.width <= 0)
       return
-    const scale = AVATAR_CROP_SIZE / bounds.width
-    assignCrop(moveAvatarCrop(
+    const scaleX = cropWidth.value / bounds.width
+    const scaleY = cropHeight.value / bounds.height
+    assignCrop(moveImageCrop(
       image.width,
       image.height,
-      AVATAR_CROP_SIZE,
+      cropViewport.value,
       { ...crop, offsetX: drag.offsetX, offsetY: drag.offsetY },
-      (event.clientX - drag.clientX) * scale,
-      (event.clientY - drag.clientY) * scale,
+      (event.clientX - drag.clientX) * scaleX,
+      (event.clientY - drag.clientY) * scaleY,
     ))
   }
 
@@ -179,21 +217,26 @@ emit: { (event: "update:open", ...args: [value: boolean]): void; (event: "save",
     encoding.value = true
     try {
       const canvas = document.createElement('canvas')
-      canvas.width = AVATAR_OUTPUT_SIZE
-      canvas.height = AVATAR_OUTPUT_SIZE
-      drawAvatarCrop(canvas, sourceImage.value, crop)
+      canvas.width = outputWidth.value
+      canvas.height = outputHeight.value
+      drawImageCrop(canvas, sourceImage.value, cropViewport.value, crop)
       const webp = await new Promise<Blob | null>(resolve =>
         canvas.toBlob(resolve, 'image/webp', 0.9),
       )
       const blob = webp
         ?? (await new Promise<Blob | null>(resolve => canvas.toBlob(resolve, 'image/png')))
       if (!blob)
-        throw new Error(translate("ui.unableToEncodeCroppedAvatar"))
+        throw new Error(translate(profileCover.value
+          ? 'profile.unableToEncodeCover'
+          : 'ui.unableToEncodeCroppedAvatar'))
 
-      emit('save', new File([blob], webp ? 'avatar.webp' : 'avatar.png', { type: blob.type }))
+      const fileBase = profileCover.value ? 'profile-cover' : 'avatar'
+      emit('save', new File([blob], `${fileBase}.${webp ? 'webp' : 'png'}`, { type: blob.type }))
     }
     catch (error) {
-      emit('error', error instanceof Error ? error : new Error(translate("ui.avatarCroppingFailed")))
+      emit('error', error instanceof Error ? error : new Error(translate(profileCover.value
+        ? 'profile.coverCroppingFailed'
+        : 'ui.avatarCroppingFailed')))
     }
     finally {
       encoding.value = false
@@ -215,7 +258,9 @@ emit: { (event: "update:open", ...args: [value: boolean]): void; (event: "save",
       RotateCcw,
       RotateCw,
       Scan,
-      AVATAR_CROP_SIZE,
+      profileCover,
+      cropWidth,
+      cropHeight,
       emit,
       previewFrame,
       preview,

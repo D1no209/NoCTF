@@ -1,12 +1,14 @@
+import { markRaw } from 'vue'
 import type { ComponentPublicInstance } from 'vue'
 import { ImagePlus, UserRound } from '@lucide/vue'
 import { toast } from 'vue-sonner'
 import { authenticationUploadMyProfileCover, userProfileGet } from '../../../api'
 import type { NoCtfapiEndpointsAuthenticationPublicUserProfileResponse } from '../../../api'
 import type { echarts } from '../../../utils/echarts'
-import { directionLabel } from '../../../utils/directions'
+import { challengeDirectionOptions, directionKey, directionLabel } from '../../../utils/directions'
 import { competitionStatusLabel, gameModeLabel } from '../../../utils/labels'
 import { exceedsUploadLimit } from '../../account/upload-limits'
+import AvatarCropDialogComponent from '../../account/AvatarCropDialog.vue'
 
 /** Owns state, effects and commands for UsersByIdPage. */
 export function useUsersByIdPage() {
@@ -46,10 +48,19 @@ export function useUsersByIdPage() {
 
   const modes = computed(() => profile.value?.modes ?? [])
   const directions = computed(() => profile.value?.directions ?? [])
-  const directionRows = computed(() => directions.value.map(item => ({
-    ...item,
-    label: directionLabel(item.direction),
-  })))
+  const directionRows = computed(() => {
+    const counts = new Map<string, number>()
+    for (const item of directions.value) {
+      const key = directionKey(item.direction)
+      if (!key) continue
+      counts.set(key, (counts.get(key) ?? 0) + (item.successfulChallengeCount ?? 0))
+    }
+    return challengeDirectionOptions.map(direction => ({
+      direction,
+      label: directionLabel(direction),
+      successfulChallengeCount: counts.get(directionKey(direction)) ?? 0,
+    }))
+  })
   const recentCompetitions = computed(() => (profile.value?.recentCompetitions ?? []).map(item => ({
     ...item,
     modeLabel: gameModeLabel(item.mode),
@@ -88,22 +99,8 @@ export function useUsersByIdPage() {
   }))
 
   const directionChartOption = computed<echarts.EChartsCoreOption>(() => {
-    const values = directionRows.value.slice(0, 8)
+    const values = directionRows.value
     const maximum = Math.max(1, ...values.map(item => item.successfulChallengeCount ?? 0))
-    if (values.length < 3) {
-      return {
-        tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
-        grid: { top: 16, right: 24, bottom: 24, left: 72, containLabel: false },
-        xAxis: { type: 'value', minInterval: 1, max: Math.max(1, Math.ceil(maximum * 1.15)) },
-        yAxis: { type: 'category', data: values.map(item => item.label) },
-        series: [{
-          type: 'bar',
-          barMaxWidth: 28,
-          data: values.map(item => item.successfulChallengeCount ?? 0),
-          label: { show: true, position: 'right' },
-        }],
-      }
-    }
     return {
       tooltip: { trigger: 'item' },
       radar: {
@@ -112,8 +109,12 @@ export function useUsersByIdPage() {
           max: Math.max(1, Math.ceil(maximum * 1.15)),
         })),
         center: ['50%', '51%'],
-        radius: values.length > 6 ? '58%' : '66%',
+        radius: '56%',
         splitNumber: 4,
+        shape: 'polygon',
+        axisName: { fontSize: 10 },
+        axisLine: { lineStyle: { width: 1 } },
+        splitLine: { lineStyle: { width: 1 } },
         splitArea: { areaStyle: { color: 'transparent' } },
       },
       series: [{
@@ -132,13 +133,15 @@ export function useUsersByIdPage() {
 
   const coverInput = ref<HTMLInputElement | null>(null)
   const coverPending = ref(false)
+  const coverEditorOpen = ref(false)
+  const coverSourceFile = ref<File | null>(null)
   const maximumWallpaperBytes = computed(() =>
     configuration.value?.imageUploadLimits?.maximumWallpaperBytes ?? null)
   function setCoverInputRef(element: Element | ComponentPublicInstance | null) {
     coverInput.value = (element instanceof Element ? element : element?.$el ?? null) as typeof coverInput.value
   }
 
-  async function selectCover(event: Event) {
+  function selectCover(event: Event) {
     const input = event.target as HTMLInputElement
     const file = input.files?.[0] ?? null
     input.value = ''
@@ -147,6 +150,17 @@ export function useUsersByIdPage() {
       toast.error(translate('accountPanel.wallpaperFileInvalid'))
       return
     }
+    coverSourceFile.value = file
+    coverEditorOpen.value = true
+  }
+
+  function setCoverEditorOpen(value: boolean) {
+    if (coverPending.value) return
+    coverEditorOpen.value = value
+    if (!value) coverSourceFile.value = null
+  }
+
+  async function uploadCover(file: File) {
     if (exceedsUploadLimit(file.size, maximumWallpaperBytes.value)) {
       toast.error(maximumWallpaperBytes.value
         ? translate('accountPanel.fileExceedsUploadLimit', { limit: formatBytes(maximumWallpaperBytes.value) })
@@ -160,6 +174,8 @@ export function useUsersByIdPage() {
       if (uploadError) throw uploadError
       await fetchMe()
       await loadProfile()
+      coverEditorOpen.value = false
+      coverSourceFile.value = null
       toast.success(translate('profile.coverUpdated'))
     }
     catch (uploadError) {
@@ -169,6 +185,12 @@ export function useUsersByIdPage() {
       coverPending.value = false
     }
   }
+
+  function reportCoverError(cropError: Error) {
+    toast.error(cropError.message)
+  }
+
+  const ProfileCoverCropDialog = markRaw(AvatarCropDialogComponent)
 
   return {
     ImagePlus,
@@ -186,8 +208,14 @@ export function useUsersByIdPage() {
     directionChartOption,
     coverInput,
     coverPending,
+    coverEditorOpen,
+    coverSourceFile,
     setCoverInputRef,
     selectCover,
+    setCoverEditorOpen,
+    uploadCover,
+    reportCoverError,
+    ProfileCoverCropDialog,
   }
 }
 
