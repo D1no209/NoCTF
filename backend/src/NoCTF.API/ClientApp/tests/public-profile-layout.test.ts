@@ -5,6 +5,9 @@ test('public profile uses equal-width layers with a fixed golden-ratio height sp
   const profile = await sourceFile(
     new URL('../app/pages/users/[id].vue', import.meta.url),
   ).text()
+  const cropDialog = await sourceFile(
+    new URL('../app/features/account/AvatarCropDialog.vue', import.meta.url),
+  ).text()
   const main = await Bun.file(new URL('../app/assets/css/main.css', import.meta.url)).text()
 
   expect(profile).toContain('data-profile-identity-layer')
@@ -25,6 +28,16 @@ test('public profile uses equal-width layers with a fixed golden-ratio height sp
   expect(profile.match(/<MiniChart/g)).toHaveLength(2)
   expect(profile).toContain('modeChartOption')
   expect(profile).toContain('directionChartOption')
+  expect(profile).toContain('challengeDirectionOptions.map')
+  expect(profile).toContain('counts.get(directionKey(direction)) ?? 0')
+  expect(profile).not.toContain('directionRows.value.slice')
+  expect(profile).toContain('shape: \'polygon\'')
+  expect(profile).toContain('<MiniChart :option="directionChartOption"')
+  expect(profile).toContain('variant="profile-cover"')
+  expect(profile).toContain('@save="uploadCover"')
+  expect(profile).toContain('coverEditorOpen.value = true')
+  expect(profile).toContain('authenticationUploadMyProfileCover({ body: { file } })')
+  expect(cropDialog).toContain('data-profile-cover-crop')
   expect(main).toContain('[data-public-profile-avatar]')
   expect(main).toContain('box-shadow: var(--card-shadow)')
 })
