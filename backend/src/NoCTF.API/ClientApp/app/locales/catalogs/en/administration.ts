@@ -141,6 +141,7 @@ export const messages = {
   "ui.size": "size",
   "ui.pending": "Pending",
   "ui.returnToPendingReview": "Return to pending",
+  "ui.changeTeamRegistrationStatus": "Change registration status for {team}",
   "ui.theCurrentRoleIsReadOnlyAndCannotPerformLife": "The current role is read-only and cannot perform life cycle operations.",
   "ui.export": "Export",
   "ui.exportFailed": "Export failed",

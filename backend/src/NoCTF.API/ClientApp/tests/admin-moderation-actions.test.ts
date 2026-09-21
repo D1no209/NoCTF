@@ -39,7 +39,9 @@ describe('administrator destructive action wiring', () => {
 
     expect(page).toContain('const { competitionId, canJudge, canWrite } = useCompetitionAdmin()')
     expect(page).toContain('v-if="canWrite || canJudge"')
-    expect(page).toContain('v-if="canWrite && t.registrationStatus === \'Pending\'"')
+    expect(page).toContain('<DropdownMenu v-if="canWrite">')
+    expect(page).toContain('v-for="option in registrationStatusOptions"')
+    expect(page).toContain('@select="setRegistrationStatusValue(t, option.value)"')
     expect(page).toContain('v-if="canJudge && !t.isBanned"')
     expect(page).toContain('v-else-if="canWrite"')
     expect(page).toContain('v-if="canJudge && a.appeal?.status === \'Submitted\' && a.canResolve"')
