@@ -23,10 +23,14 @@ internal sealed class RuntimeInstanceConfiguration : IEntityTypeConfiguration<Ru
             table.HasCheckConstraint(
                 "ck_runtime_instances_test_flag",
                 "(purpose = 4) = (test_flag_delivery IS NOT NULL AND test_flag_state IS NOT NULL)");
+            table.HasCheckConstraint(
+                "ck_runtime_instances_traffic_capture",
+                "(traffic_capture_limit_bytes IS NULL OR traffic_capture_limit_bytes > 0) AND traffic_capture_reserved_bytes >= 0");
         });
         builder.HasKey(instance => instance.Id);
         builder.Property(instance => instance.RuntimeKind).HasConversion<short>();
         builder.Property(instance => instance.Purpose).HasConversion<short>();
+        builder.Property(instance => instance.AccessMode).HasConversion<short>();
         builder.Property(instance => instance.TestFlagDelivery).HasConversion<short>();
         builder.Property(instance => instance.TestFlagState).HasConversion<short>();
         builder.Property(instance => instance.RuntimeProvider).HasConversion<short>();
@@ -45,6 +49,13 @@ internal sealed class RuntimeInstanceConfiguration : IEntityTypeConfiguration<Ru
                 value => RuntimeCapacityAllocations.Serialize(value).GetHashCode(),
                 value => RuntimeCapacityAllocations.Deserialize(RuntimeCapacityAllocations.Serialize(value))));
         builder.Property(instance => instance.Urls).HasColumnType("text[]");
+        // PostgreSQL jsonb keeps the ordered, provider-resolved access endpoints on the
+        // owning Runtime row without introducing a forbidden runtime-artifacts table.
+        builder.OwnsMany(instance => instance.AccessEndpoints, endpoints =>
+        {
+            endpoints.ToJson("access_endpoints_json");
+            endpoints.Property(endpoint => endpoint.TargetHost).HasMaxLength(255);
+        });
         builder.HasIndex(instance => new
         {
             instance.CompetitionChallengeId,

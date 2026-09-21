@@ -411,6 +411,50 @@ public sealed class KubernetesContainerLifecycleTests
     }
 
     [Test]
+    public async Task Wsrx_only_persistent_runtime_creates_only_internal_service()
+    {
+        var (client, core, _) = CreateClient();
+        core.ReadNamespacedServiceWithHttpMessagesAsync(
+                Arg.Any<string>(), Arg.Any<string>(), Arg.Any<bool?>(),
+                Arg.Any<IReadOnlyDictionary<string, IReadOnlyList<string>>?>(),
+                Arg.Any<CancellationToken>())
+            .Returns(Task.FromException<HttpOperationResponse<V1Service>>(NotFound()));
+        var createdServices = new List<V1Service>();
+        core.CreateNamespacedServiceWithHttpMessagesAsync(
+                Arg.Do<V1Service>(service => createdServices.Add(service)),
+                Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<string?>(), Arg.Any<string?>(),
+                Arg.Any<bool?>(), Arg.Any<IReadOnlyDictionary<string, IReadOnlyList<string>>?>(),
+                Arg.Any<CancellationToken>())
+            .Returns(call =>
+            {
+                var service = call.Arg<V1Service>()!;
+                service.Spec.ClusterIP = "10.96.0.42";
+                return Task.FromResult(new HttpOperationResponse<V1Service> { Body = service });
+            });
+        var request = PersistentRequest() with
+        {
+            AccessMode = RuntimeAccessMode.WsrxOnly,
+            PortMappings = new Dictionary<int, int>(),
+            InternalPorts = [8080, 9090]
+        };
+        var lifecycle = new KubernetesContainerLifecycle(
+            client,
+            new KubernetesRuntimeOptions(
+                Namespace: "runtime",
+                PublicHost: "node.example",
+                ClusterDnsServiceAddress: "10.96.0.10"));
+
+        var receipt = await lifecycle.CreateAsync(request, CancellationToken.None);
+
+        await Assert.That(createdServices).HasSingleItem();
+        await Assert.That(createdServices[0].Spec.Type).IsEqualTo("ClusterIP");
+        await Assert.That(createdServices[0].Spec.Ports.Select(port => port.Port))
+            .IsEquivalentTo([8080, 9090]);
+        await Assert.That(receipt.PortMappings).IsEmpty();
+        await Assert.That(receipt.InternalHost).IsEqualTo("10.96.0.42");
+    }
+
+    [Test]
     public async Task Persistent_runtime_rejects_fixed_kubernetes_host_port_before_pod_create()
     {
         var (client, core, _) = CreateClient();
@@ -1130,6 +1174,54 @@ public sealed class KubernetesContainerLifecycleTests
                 rule.To.Any(peer => peer.IpBlock?.Cidr == "0.0.0.0/0"))
             .To.Single().IpBlock!.Except)
             .Contains("172.30.0.0/16");
+    }
+
+    [Test]
+    public async Task Wsrx_only_persistent_policy_allows_proxy_gateway_without_public_ingress()
+    {
+        var (client, _, networking) = CreateClient();
+        V1NetworkPolicy? createdPolicy = null;
+        networking.CreateNamespacedNetworkPolicyWithHttpMessagesAsync(
+                Arg.Do<V1NetworkPolicy>(policy => createdPolicy = policy),
+                Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<string?>(), Arg.Any<string?>(),
+                Arg.Any<bool?>(), Arg.Any<IReadOnlyDictionary<string, IReadOnlyList<string>>?>(),
+                Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult(new HttpOperationResponse<V1NetworkPolicy>
+            {
+                Body = new V1NetworkPolicy()
+            }));
+        var lifecycle = new KubernetesContainerLifecycle(
+            client,
+            new KubernetesRuntimeOptions(
+                Namespace: "runtime",
+                ClusterDnsServiceAddress: "10.96.0.10"));
+
+        _ = await lifecycle.CreateIsolatedNetworkAsync(
+            new ContainerNetworkPolicyRequest(
+                new RuntimeResourceIdentity(
+                    Guid.Parse("019be6f7-882e-7cae-9389-898a98fbfe22")),
+                ContainerNetworkPurpose.PersistentRuntime,
+                RuntimeEgressPolicy.Isolated,
+                [],
+                ProxyIngressPorts: [8080, 9090]),
+            CancellationToken.None);
+
+        await Assert.That(createdPolicy).IsNotNull();
+        await Assert.That(createdPolicy!.Spec.Ingress).Count().IsEqualTo(2);
+        await Assert.That(createdPolicy.Spec.Ingress.Any(rule =>
+            rule.FromProperty is null || rule.FromProperty.Count == 0)).IsFalse();
+        var proxy = createdPolicy.Spec.Ingress.Single(rule =>
+            rule.FromProperty?.Any(peer => peer.PodSelector?.MatchLabels?
+                .ContainsKey("noctf.io/runtime-proxy-gateway") == true) == true);
+        await Assert.That(proxy.Ports!.Select(port => port.Port.Value))
+            .IsEquivalentTo(["8080", "9090"]);
+        var peer = proxy.FromProperty!.Single();
+        await Assert.That(peer.PodSelector!.MatchLabels[
+                "noctf.io/runtime-proxy-gateway"])
+            .IsEqualTo("true");
+        await Assert.That(peer.NamespaceSelector!.MatchLabels[
+                "kubernetes.io/metadata.name"])
+            .IsEqualTo("noctf");
     }
 
     private static (IKubernetes Client, ICoreV1Operations Core, INetworkingV1Operations Networking)

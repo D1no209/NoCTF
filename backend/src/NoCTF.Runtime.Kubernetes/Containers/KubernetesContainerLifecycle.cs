@@ -773,7 +773,8 @@ public sealed class KubernetesContainerLifecycle(
             throw new ArgumentOutOfRangeException(nameof(request));
         if (!Enum.IsDefined(request.Purpose)
             || !Enum.IsDefined(request.EgressPolicy)
-            || request.PublicIngressPorts.Any(port => port is < 1 or > 65535))
+            || request.PublicIngressPorts.Any(port => port is < 1 or > 65535)
+            || request.ProxyIngressPorts?.Any(port => port is < 1 or > 65535) == true)
             throw new ArgumentOutOfRangeException(nameof(request));
         if (request.Purpose == ContainerNetworkPurpose.AwdpVerification
             && request.TargetPort is not (>= 1 and <= 65535))
@@ -831,6 +832,42 @@ public sealed class KubernetesContainerLifecycle(
             ingress.Add(new V1NetworkPolicyIngressRule
             {
                 Ports = request.PublicIngressPorts
+                    .Distinct()
+                    .Order()
+                    .Select(port => new V1NetworkPolicyPort
+                    {
+                        Protocol = "TCP",
+                        Port = port
+                    })
+                    .ToList()
+            });
+        }
+        if (request.Purpose == ContainerNetworkPurpose.PersistentRuntime
+            && request.ProxyIngressPorts is { Count: > 0 })
+        {
+            ingress.Add(new V1NetworkPolicyIngressRule
+            {
+                FromProperty =
+                [
+                    new V1NetworkPolicyPeer
+                    {
+                        NamespaceSelector = new V1LabelSelector
+                        {
+                            MatchLabels = new Dictionary<string, string>
+                            {
+                                ["kubernetes.io/metadata.name"] = "noctf"
+                            }
+                        },
+                        PodSelector = new V1LabelSelector
+                        {
+                            MatchLabels = new Dictionary<string, string>
+                            {
+                                ["noctf.io/runtime-proxy-gateway"] = "true"
+                            }
+                        }
+                    }
+                ],
+                Ports = request.ProxyIngressPorts
                     .Distinct()
                     .Order()
                     .Select(port => new V1NetworkPolicyPort
@@ -1360,6 +1397,10 @@ public sealed class KubernetesContainerLifecycle(
         if (identity.RuntimeInstanceId == Guid.Empty)
             throw new InvalidOperationException(
                 "A Kubernetes Container requires a valid Runtime identity.");
+        if (request.AccessMode == RuntimeAccessMode.WsrxOnly
+            && request.PortMappings.Count > 0)
+            throw new InvalidOperationException(
+                "WSRX-only Kubernetes runtimes cannot publish NodePorts.");
         if (request.ContainerPorts.Any(port => port is < 1 or > 65535)
             || request.PortMappings.Any(mapping => mapping.Value != 0))
             throw new InvalidOperationException(

@@ -143,6 +143,31 @@ spec:
           protocol: TCP
 
 ---
+# 5c. Allow the Runtime proxy gateway to reach WSRX-enabled targets.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: backend-to-runtime-proxy-targets
+  namespace: noctf
+  labels:
+    app.kubernetes.io/part-of: noctf
+spec:
+  podSelector:
+    matchLabels:
+      app: backend
+      noctf.io/runtime-proxy-gateway: "true"
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: runtime
+          podSelector:
+            matchLabels:
+              noctf.io/runtime-proxy-target: "true"
+
+---
 # 6. Allow backend to reach MinIO (S3 storage)
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy

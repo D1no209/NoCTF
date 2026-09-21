@@ -3,7 +3,7 @@ import { sourceFile } from './support/feature-source'
 
 test('participant challenge Flag submit is mounted in the fixed card dock', async () => {
   const [page, detail, ctf, awd, awdp, flag, runtime, css] = await Promise.all([
-    sourceFile(new URL('../app/pages/competitions/[id]/challenges/index.vue', import.meta.url)).text(),
+    sourceFile(new URL('../app/pages/competitions/[id]/challenges/[[ccId]].vue', import.meta.url)).text(),
     sourceFile(new URL('../app/features/challenges/CompetitionChallengeDetail.vue', import.meta.url)).text(),
     sourceFile(new URL('../app/features/challenges/panels/CtfPanel.vue', import.meta.url)).text(),
     sourceFile(new URL('../app/features/challenges/panels/AwdPanel.vue', import.meta.url)).text(),

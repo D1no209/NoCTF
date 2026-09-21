@@ -1777,6 +1777,44 @@
         ]
       }
     },
+    "/api/v1/runtime-proxies/{runtimeInstanceId}/{bindingIndex}": {
+      "get": {
+        "tags": [
+          "Runtime-Proxies"
+        ],
+        "summary": "Probes a Runtime TCP-over-WebSocket target.",
+        "description": "A valid running target returns no content; WebSocket upgrades are handled by the Runtime proxy transport.",
+        "operationId": "ProbeRuntimeProxy",
+        "parameters": [
+          {
+            "name": "runtimeInstanceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          },
+          {
+            "name": "bindingIndex",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "404": {
+            "description": "Not Found"
+          }
+        }
+      }
+    },
     "/api/v1/platform/logo": {
       "get": {
         "tags": [
@@ -5629,6 +5667,32 @@
         }
       }
     },
+    "/api/v1/users/{userId}/profile-cover": {
+      "get": {
+        "tags": [
+          "Users"
+        ],
+        "summary": "Returns a user's public profile cover image.",
+        "description": "Executes GET /api/v1/users/{userId}/profile-cover.",
+        "operationId": "UserProfileCover_Get",
+        "parameters": [
+          {
+            "name": "userId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          }
+        ],
+        "responses": {
+          "404": {
+            "description": "Not Found"
+          }
+        }
+      }
+    },
     "/api/v1/users/{userId}": {
       "get": {
         "tags": [
@@ -6128,6 +6192,75 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/NoCTFAPIEndpointsAuthenticationAvatarUploadFailureResponse"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/auth/me/profile-cover": {
+      "put": {
+        "tags": [
+          "Auth"
+        ],
+        "summary": "Replaces the current user's public profile cover image.",
+        "description": "Executes PUT /api/v1/auth/me/profile-cover.",
+        "operationId": "Authentication_UploadMyProfileCover",
+        "requestBody": {
+          "x-name": "UploadMyProfileCoverRequest",
+          "description": "",
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsAuthenticationUploadMyProfileCoverRequest"
+              }
+            }
+          },
+          "required": true,
+          "x-position": 1
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsAuthenticationCurrentUserResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsAuthenticationProfileCoverUploadFailureResponse"
                 }
               }
             }
@@ -6854,6 +6987,192 @@
         ]
       }
     },
+    "/api/v1/admin/competitions/{competitionId}/traffic-captures/{runtimeInstanceId}": {
+      "delete": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "Deletes one terminal Runtime capture.",
+        "description": "Executes DELETE /api/v1/admin/competitions/{competitionId}/traffic-captures/{runtimeInstanceId}.",
+        "operationId": "AdminDeleteRuntimeTrafficCapture",
+        "parameters": [
+          {
+            "name": "competitionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          },
+          {
+            "name": "runtimeInstanceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "409": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationRuntimeRuntimeTrafficCaptureConflictResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/admin/competitions/{competitionId}/traffic-captures/{runtimeInstanceId}/file": {
+      "get": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "Downloads one Runtime PCAPNG capture.",
+        "description": "Executes GET /api/v1/admin/competitions/{competitionId}/traffic-captures/{runtimeInstanceId}/file.",
+        "operationId": "AdminDownloadRuntimeTrafficCapture",
+        "parameters": [
+          {
+            "name": "competitionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          },
+          {
+            "name": "runtimeInstanceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          }
+        ],
+        "responses": {
+          "404": {
+            "description": "Not Found"
+          },
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/vnd.tcpdump.pcap": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/admin/competitions/{competitionId}/traffic-captures/export": {
+      "post": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "Exports selected Runtime captures as ZIP.",
+        "description": "Executes POST /api/v1/admin/competitions/{competitionId}/traffic-captures/export.",
+        "operationId": "AdminExportRuntimeTrafficCaptures",
+        "parameters": [
+          {
+            "name": "competitionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "x-name": "ExportRuntimeTrafficCapturesRequest",
+          "description": "",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationRuntimeExportRuntimeTrafficCapturesRequest"
+              }
+            }
+          },
+          "required": true,
+          "x-position": 1
+        },
+        "responses": {
+          "404": {
+            "description": "Not Found"
+          },
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/zip": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcValidationProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ]
+      }
+    },
     "/api/v1/admin/competitions/{competitionId}/teams/{teamId}/challenges/{competitionChallengeId}/runtimes/{runtimeInstanceId}": {
       "patch": {
         "tags": [
@@ -7274,6 +7593,120 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationRuntimeAdminRuntimeListResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcValidationProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/admin/competitions/{competitionId}/traffic-captures": {
+      "get": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "Lists Runtime traffic captures.",
+        "description": "Executes GET /api/v1/admin/competitions/{competitionId}/traffic-captures.",
+        "operationId": "AdminListRuntimeTrafficCaptures",
+        "parameters": [
+          {
+            "name": "competitionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "competitionChallengeId",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "guid",
+              "nullable": true
+            }
+          },
+          {
+            "name": "teamId",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "guid",
+              "nullable": true
+            }
+          },
+          {
+            "name": "runtimeInstanceId",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "guid",
+              "nullable": true
+            }
+          },
+          {
+            "name": "truncated",
+            "in": "query",
+            "schema": {
+              "type": "boolean",
+              "nullable": true
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "desc",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationRuntimeRuntimeTrafficCaptureListResponse"
                 }
               }
             }
@@ -15402,10 +15835,10 @@
               }
             ]
           },
-          "urls": {
+          "accesses": {
             "type": "array",
             "items": {
-              "type": "string"
+              "$ref": "#/components/schemas/NoCTFAPIEndpointsRuntimeRuntimeAccessResponse"
             }
           },
           "createdAt": {
@@ -15507,6 +15940,20 @@
           "UrlExpansionFailed"
         ]
       },
+      "NoCTFAPIEndpointsRuntimeRuntimeAccessResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "directAddress": {
+            "type": "string",
+            "nullable": true
+          },
+          "webSocketAddress": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
       "NoCTFAPIEndpointsRuntimeRunnerAdmissionFailureProtocol": {
         "type": "string",
         "description": "",
@@ -15558,13 +16005,17 @@
           "teamName": {
             "type": "string"
           },
-          "urls": {
+          "accesses": {
             "type": "array",
             "items": {
-              "type": "string"
+              "$ref": "#/components/schemas/NoCTFAPIEndpointsRuntimeRuntimeAccessResponse"
             }
           }
         }
+      },
+      "NoCTFAPIEndpointsRuntimeProbeRuntimeProxyRequest": {
+        "type": "object",
+        "additionalProperties": false
       },
       "NoCTFAPIEndpointsPlatformPublicPlatformConfigurationResponse": {
         "type": "object",
@@ -17095,6 +17546,17 @@
             "type": "string",
             "format": "date-time",
             "nullable": true
+          },
+          "runtimeAccessMode": {
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsCompetitionsRuntimeAccessModeProtocol"
+          },
+          "trafficCaptureEnabled": {
+            "type": "boolean"
+          },
+          "trafficCaptureLimitBytes": {
+            "type": "integer",
+            "format": "int64",
+            "nullable": true
           }
         }
       },
@@ -17174,6 +17636,20 @@
         "enum": [
           "Public",
           "StaffOnly"
+        ]
+      },
+      "NoCTFAPIEndpointsCompetitionsRuntimeAccessModeProtocol": {
+        "type": "string",
+        "description": "",
+        "x-enumNames": [
+          "Direct",
+          "DirectAndWsrx",
+          "WsrxOnly"
+        ],
+        "enum": [
+          "Direct",
+          "DirectAndWsrx",
+          "WsrxOnly"
         ]
       },
       "NoCTFAPIEndpointsCompetitionsGetCompetitionRequest": {
@@ -18363,7 +18839,9 @@
           "AwdpFixResolved",
           "GameplayFactPatchDownloaded",
           "CompetitionAudienceChanged",
-          "TeamWriteUpSubmitted"
+          "TeamWriteUpSubmitted",
+          "RuntimeTrafficCaptureStored",
+          "RuntimeTrafficCaptureDeleted"
         ],
         "enum": [
           "CompetitionCreated",
@@ -18426,7 +18904,9 @@
           "AwdpFixResolved",
           "GameplayFactPatchDownloaded",
           "CompetitionAudienceChanged",
-          "TeamWriteUpSubmitted"
+          "TeamWriteUpSubmitted",
+          "RuntimeTrafficCaptureStored",
+          "RuntimeTrafficCaptureDeleted"
         ]
       },
       "NoCTFAPIEndpointsCompetitionsEventsCompetitionEventLevelProtocol": {
@@ -18822,11 +19302,11 @@
             "type": "string",
             "nullable": true
           },
-          "urls": {
+          "accesses": {
             "type": "array",
             "nullable": true,
             "items": {
-              "type": "string"
+              "$ref": "#/components/schemas/NoCTFAPIEndpointsRuntimeRuntimeAccessResponse"
             }
           },
           "leaderboardVisibility": {
@@ -19442,6 +19922,10 @@
             "type": "string",
             "nullable": true
           },
+          "profileCoverUrl": {
+            "type": "string",
+            "nullable": true
+          },
           "wallpaperRevision": {
             "type": "string",
             "format": "guid",
@@ -19632,6 +20116,10 @@
         "type": "object",
         "additionalProperties": false
       },
+      "NoCTFAPIEndpointsAuthenticationGetUserProfileCoverRequest": {
+        "type": "object",
+        "additionalProperties": false
+      },
       "NoCTFAPIEndpointsAuthenticationPublicUserProfileResponse": {
         "type": "object",
         "additionalProperties": false,
@@ -19650,6 +20138,96 @@
           "avatarUrl": {
             "type": "string",
             "nullable": true
+          },
+          "profileCoverUrl": {
+            "type": "string",
+            "nullable": true
+          },
+          "competitionCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "finishedCompetitionCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "successfulChallengeCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "modes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NoCTFAPIEndpointsAuthenticationPublicUserModeSummaryResponse"
+            }
+          },
+          "directions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NoCTFAPIEndpointsAuthenticationPublicUserDirectionSummaryResponse"
+            }
+          },
+          "recentCompetitions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NoCTFAPIEndpointsAuthenticationPublicUserCompetitionSummaryResponse"
+            }
+          }
+        }
+      },
+      "NoCTFAPIEndpointsAuthenticationPublicUserModeSummaryResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "mode": {
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsCompetitionsGameModeProtocol"
+          },
+          "competitionCount": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
+      "NoCTFAPIEndpointsAuthenticationPublicUserDirectionSummaryResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "direction": {
+            "type": "string"
+          },
+          "successfulChallengeCount": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
+      "NoCTFAPIEndpointsAuthenticationPublicUserCompetitionSummaryResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "competitionId": {
+            "type": "string",
+            "format": "guid"
+          },
+          "title": {
+            "type": "string"
+          },
+          "teamName": {
+            "type": "string"
+          },
+          "mode": {
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsCompetitionsGameModeProtocol"
+          },
+          "status": {
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsCompetitionsCompetitionStatusProtocol"
+          },
+          "startAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "endAt": {
+            "type": "string",
+            "format": "date-time"
           }
         }
       },
@@ -20009,6 +20587,51 @@
         ]
       },
       "NoCTFAPIEndpointsAuthenticationUploadMyAvatarRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "file"
+        ],
+        "properties": {
+          "file": {
+            "type": "string",
+            "format": "binary",
+            "nullable": false
+          }
+        }
+      },
+      "NoCTFAPIEndpointsAuthenticationProfileCoverUploadFailureResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "code": {
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsAuthenticationProfileCoverUploadFailureCode"
+          }
+        }
+      },
+      "NoCTFAPIEndpointsAuthenticationProfileCoverUploadFailureCode": {
+        "type": "string",
+        "description": "",
+        "x-enumNames": [
+          "SizeInvalid",
+          "SourceMetadataMismatch",
+          "UnsupportedFormat",
+          "InvalidDimensions",
+          "PixelLimitExceeded",
+          "MultipleFrames",
+          "MalformedImage"
+        ],
+        "enum": [
+          "SizeInvalid",
+          "SourceMetadataMismatch",
+          "UnsupportedFormat",
+          "InvalidDimensions",
+          "PixelLimitExceeded",
+          "MultipleFrames",
+          "MalformedImage"
+        ]
+      },
+      "NoCTFAPIEndpointsAuthenticationUploadMyProfileCoverRequest": {
         "type": "object",
         "additionalProperties": false,
         "required": [
@@ -20383,6 +21006,41 @@
           }
         }
       },
+      "NoCTFAPIEndpointsAdministrationRuntimeRuntimeTrafficCaptureConflictResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "detail": {
+            "type": "string"
+          }
+        }
+      },
+      "NoCTFAPIEndpointsAdministrationRuntimeDeleteRuntimeTrafficCaptureRequest": {
+        "type": "object",
+        "additionalProperties": false
+      },
+      "NoCTFAPIEndpointsAdministrationRuntimeDownloadRuntimeTrafficCaptureRequest": {
+        "type": "object",
+        "additionalProperties": false
+      },
+      "NoCTFAPIEndpointsAdministrationRuntimeExportRuntimeTrafficCapturesRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "runtimeInstanceIds"
+        ],
+        "properties": {
+          "runtimeInstanceIds": {
+            "type": "array",
+            "minLength": 1,
+            "nullable": false,
+            "items": {
+              "type": "string",
+              "format": "guid"
+            }
+          }
+        }
+      },
       "NoCTFAPIEndpointsAdministrationRuntimeExtendTeamRuntimeRequest": {
         "type": "object",
         "additionalProperties": false,
@@ -20459,10 +21117,10 @@
               }
             ]
           },
-          "urls": {
+          "accesses": {
             "type": "array",
             "items": {
-              "type": "string"
+              "$ref": "#/components/schemas/NoCTFAPIEndpointsRuntimeRuntimeAccessResponse"
             }
           },
           "publishedPorts": {
@@ -20629,6 +21287,82 @@
         }
       },
       "NoCTFAPIEndpointsAdministrationRuntimeListAdminRuntimesRequest": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/NoCTFAPIPaginationPaginationRequest"
+          },
+          {
+            "type": "object",
+            "additionalProperties": false
+          }
+        ]
+      },
+      "NoCTFAPIEndpointsAdministrationRuntimeRuntimeTrafficCaptureListResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationRuntimeRuntimeTrafficCaptureResponse"
+            }
+          },
+          "total": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
+      "NoCTFAPIEndpointsAdministrationRuntimeRuntimeTrafficCaptureResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "runtimeInstanceId": {
+            "type": "string",
+            "format": "guid"
+          },
+          "competitionChallengeId": {
+            "type": "string",
+            "format": "guid"
+          },
+          "teamId": {
+            "type": "string",
+            "format": "guid",
+            "nullable": true
+          },
+          "runtimeState": {
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsRuntimeRuntimeStateProtocol"
+          },
+          "segmentCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "byteLength": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "startedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "truncated": {
+            "type": "boolean"
+          },
+          "teamName": {
+            "type": "string",
+            "nullable": true
+          },
+          "challengeTitle": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
+      "NoCTFAPIEndpointsAdministrationRuntimeListRuntimeTrafficCapturesRequest": {
         "allOf": [
           {
             "$ref": "#/components/schemas/NoCTFAPIPaginationPaginationRequest"
@@ -24515,6 +25249,19 @@
           },
           "accessMode": {
             "$ref": "#/components/schemas/NoCTFAPIEndpointsCompetitionsCompetitionAccessModeProtocol"
+          },
+          "runtimeAccessMode": {
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsCompetitionsRuntimeAccessModeProtocol"
+          },
+          "trafficCaptureEnabled": {
+            "type": "boolean"
+          },
+          "trafficCaptureLimitBytes": {
+            "type": "integer",
+            "format": "int64",
+            "maximum": 4294967296.0,
+            "minimum": 1048576.0,
+            "nullable": true
           }
         }
       },
@@ -25786,10 +26533,10 @@
             "type": "string",
             "nullable": true
           },
-          "urls": {
+          "accesses": {
             "type": "array",
             "items": {
-              "type": "string"
+              "$ref": "#/components/schemas/NoCTFAPIEndpointsRuntimeRuntimeAccessResponse"
             }
           },
           "createdAt": {

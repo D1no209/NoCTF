@@ -139,6 +139,8 @@ internal static class AuthenticationInfrastructure
         services.AddScoped<ReplaceCurrentUserWallpaper>();
         services.AddScoped<GetCurrentUserWallpaper>();
         services.AddScoped<UpdateCurrentUserWallpaperPreference>();
+        services.AddScoped<ReplaceCurrentUserProfileCover>();
+        services.AddScoped<GetPublicUserProfileCover>();
         services.AddScoped<ChangePassword>();
         services.AddScoped<LogoutAll>();
         services.AddScoped<IEmailVerificationStore, EmailVerificationStore>();

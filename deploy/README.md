@@ -16,6 +16,10 @@ environment、命名卷、tmpfs、group_add、cap、security_opt 或 read_only�
 数据库、Redis 和 NATS 只加入默认网络，不接入 1panel-network，也不发布宿主机端口。
 镜像自身的 EXPOSE 元数据不等于发布宿主机端口；Compose 不设置 ports/expose。
 TLS、域名、WebSocket/SignalR 转发及镜像上传请求大小/超时，由运维配置。
+启用比赛的 WSRX 访问后，反向代理还必须允许 `/api/v1/runtime-proxies/` 的 WebSocket Upgrade，
+并将该路径的读取、发送与空闲超时设置为大于 `RuntimeProxy__MaximumConnectionMinutes`；默认值为 30 分钟。
+流量捕获会先在 API 容器临时目录生成单连接 PCAPNG section，再写入已配置的对象存储；临时目录容量应至少
+覆盖允许的单 Runtime 抓包上限，并按并发比赛规模额外预留空间。
 
 ## 目录布局
 

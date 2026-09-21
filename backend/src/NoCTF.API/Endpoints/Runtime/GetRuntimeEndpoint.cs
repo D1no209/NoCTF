@@ -111,7 +111,7 @@ public sealed record RuntimeResponse(
     RuntimeProviderProtocol Provider,
     RuntimeStateProtocol State,
     RuntimeFailureCodeProtocol? FailureCode,
-    IReadOnlyList<string> Urls,
+    IReadOnlyList<RuntimeAccessResponse> Accesses,
     DateTimeOffset CreatedAt,
     DateTimeOffset? RunningAt,
     DateTimeOffset? ExpiresAt,
@@ -126,9 +126,15 @@ public sealed record RuntimeAcceptedResponse(
 
 public sealed record RuntimeConflictResponse(string Detail);
 
+public sealed record RuntimeAccessResponse(
+    string? DirectAddress,
+    string? WebSocketAddress);
+
 internal static class RuntimeEndpointMapping
 {
-    public static RuntimeResponse ToResponse(RuntimeInstanceView view) =>
+    public static RuntimeResponse ToResponse(
+        RuntimeInstanceView view,
+        HttpRequest request) =>
         new(
             view.Id,
             view.CompetitionId
@@ -142,7 +148,9 @@ internal static class RuntimeEndpointMapping
             view.FailureCode is null
                 ? null
                 : RuntimeProtocolMapper.ToProtocol(view.FailureCode.Value),
-            view.State == RuntimeState.Running ? view.Urls : [],
+            view.State == RuntimeState.Running
+                ? RuntimeAccessMapping.ToResponse(view, request)
+                : [],
             view.CreatedAt,
             view.RunningAt,
             view.ExpiresAt,
@@ -181,6 +189,61 @@ public sealed class GetRuntimeEndpoint(
             user.UserId,
             ct);
         if (view is null) return TypedResults.NotFound();
-        return TypedResults.Ok(RuntimeEndpointMapping.ToResponse(view));
+        return TypedResults.Ok(RuntimeEndpointMapping.ToResponse(
+            view,
+            HttpContext.Request));
     }
+}
+
+internal static class RuntimeAccessMapping
+{
+    public static IReadOnlyList<RuntimeAccessResponse> ToResponse(
+        RuntimeInstanceView view,
+        HttpRequest request) =>
+        ToResponse(
+            view.Id,
+            view.AccessMode,
+            view.Urls,
+            view.AccessEndpoints,
+            request);
+
+    public static IReadOnlyList<RuntimeAccessResponse> ToResponse(
+        Guid runtimeInstanceId,
+        RuntimeAccessMode accessMode,
+        IReadOnlyList<string> urls,
+        IReadOnlyList<RuntimeAccessEndpointView>? accessEndpoints,
+        HttpRequest request)
+    {
+        var endpoints = accessEndpoints is { Count: > 0 }
+            ? accessEndpoints
+            : urls.Select((address, index) => new RuntimeAccessEndpointView(
+                index,
+                address,
+                null,
+                null)).ToArray();
+        return endpoints
+            .OrderBy(endpoint => endpoint.BindingIndex)
+            .Select(endpoint => new RuntimeAccessResponse(
+                endpoint.DirectAddress,
+                SupportsWsrx(accessMode)
+                    && !string.IsNullOrWhiteSpace(endpoint.TargetHost)
+                    && endpoint.TargetPort is >= 1 and <= 65535
+                        ? WebSocketAddress(request, runtimeInstanceId, endpoint.BindingIndex)
+                        : null))
+            .Where(access => access.DirectAddress is not null
+                || access.WebSocketAddress is not null)
+            .ToArray();
+    }
+
+    public static string WebSocketAddress(
+        HttpRequest request,
+        Guid runtimeInstanceId,
+        int bindingIndex)
+    {
+        var scheme = request.IsHttps ? "wss" : "ws";
+        return $"{scheme}://{request.Host}{request.PathBase}/api/v1/runtime-proxies/{runtimeInstanceId:D}/{bindingIndex}";
+    }
+
+    private static bool SupportsWsrx(RuntimeAccessMode mode) =>
+        mode is RuntimeAccessMode.DirectAndWsrx or RuntimeAccessMode.WsrxOnly;
 }

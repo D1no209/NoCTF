@@ -96,7 +96,9 @@ public sealed class DataModelSchemaTests
             "20260920033821_AddSsoFoundation",
             "20260920150729_AllowBotAdministratorRole",
             "20260920151129_AddCompetitionWebhooks",
-            "20260921080056_RemovePublicGateway"
+            "20260921080056_RemovePublicGateway",
+            "20260921134131_AddRuntimeWsrxAccess",
+            "20260921144501_AddUserProfileCover"
         ]);
             await Assert.That(migrations[0]).EndsWith("_InitialBaseline");
 

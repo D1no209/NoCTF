@@ -95,8 +95,18 @@ public sealed class RuntimeTargetReader(
                 teamIds.Contains(instance.TeamId.Value))
             .Select(instance => new
             {
+                instance.Id,
                 TeamId = instance.TeamId!.Value,
-                instance.Urls
+                instance.Urls,
+                instance.AccessMode,
+                AccessEndpoints = instance.AccessEndpoints
+                    .OrderBy(endpoint => endpoint.BindingIndex)
+                    .Select(endpoint => new RuntimeAccessEndpointView(
+                        endpoint.BindingIndex,
+                        endpoint.DirectAddress,
+                        endpoint.TargetHost,
+                        endpoint.TargetPort))
+                    .ToArray()
             })
             .ToListAsync(ct);
         var byTeam = runtimes.ToDictionary(runtime => runtime.TeamId);
@@ -109,7 +119,18 @@ public sealed class RuntimeTargetReader(
                 GameMode.Awd,
                 challenge.DefinitionJson,
                 runtime.Urls);
-            return new RuntimeTargetView(team.Id, team.Name, urls);
+            var endpoints = RuntimeParticipantUrlProjection.Filter(
+                runtimeTemplates,
+                GameMode.Awd,
+                challenge.DefinitionJson,
+                runtime.AccessEndpoints);
+            return new RuntimeTargetView(
+                team.Id,
+                team.Name,
+                urls,
+                runtime.Id,
+                endpoints,
+                runtime.AccessMode);
         }).ToArray();
     }
 

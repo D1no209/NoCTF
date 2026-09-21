@@ -9,6 +9,7 @@ import { createTrailingRefresh } from '../../../lib/latest-page-refresh'
 import CompetitionCountdownComponent from '../../competitions/CompetitionCountdown.vue'
 import LifecycleBadgeComponent from '../../competitions/LifecycleBadge.vue'
 import { useCompetitionAnnouncementCatchUp } from '../../competition/useCompetitionAnnouncementCatchUp'
+import { competitionPath } from '../../../utils/app-routes'
 
 /** Owns state, effects and commands for CompetitionsByIdPage. */
 export function useCompetitionsByIdPage() {
@@ -16,6 +17,8 @@ export function useCompetitionsByIdPage() {
   const router = useRouter()
 
   const competitionId = computed(() => route.params.id as string)
+
+  const isOverview = computed(() => route.path === competitionPath(competitionId.value))
 
   const isControlScreen = computed(() => [
     `/competitions/${competitionId.value}/live`,
@@ -182,7 +185,7 @@ export function useCompetitionsByIdPage() {
       {
         label: translate("ui.competitions"),
         items: [
-          { to: `/competitions?competition=${competitionId.value}`, label: translate("ui.overview"), icon: LayoutDashboard, exact: true },
+          { to: competitionPath(competitionId.value), label: translate("ui.overview"), icon: LayoutDashboard, exact: true },
           ...(challengesVisible && canReadChallenges ? [{ to: `${base}/challenges`, label: translate("ui.challenge"), icon: Puzzle }] : []),
           { to: `${base}/leaderboard`, label: translate("ui.leaderboard"), icon: Trophy },
           { to: `${base}/questions`, label: translate("ui.questions"), icon: MessageCircleQuestion },
@@ -223,6 +226,7 @@ export function useCompetitionsByIdPage() {
 
   return {
       initialize,
+      isOverview,
       isControlScreen,
       isWriteUpReview,
       competition,

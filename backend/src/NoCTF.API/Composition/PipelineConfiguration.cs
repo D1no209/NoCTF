@@ -5,10 +5,12 @@ public static class PipelineConfiguration
     public static WebApplication UseNoCtfPipeline(this WebApplication app)
     {
         app.UseForwardedHeaders();
+        app.UseWebSockets();
         app.UseNoCtfStaticAssetDelivery();
         app.UseExceptionHandler();
         app.UseAuthentication();
-        if (app.Services.GetService<IServiceProviderIsService>() is { } serviceCatalog
+        var serviceCatalog = app.Services.GetService<IServiceProviderIsService>();
+        if (serviceCatalog is not null
             && serviceCatalog.IsService(typeof(NoCTF.Application.Competitions.Access.ICompetitionAudienceReader))
             && serviceCatalog.IsService(typeof(NoCTF.Application.Teams.Moderation.ICompetitionModerationAuthorizer)))
         {
@@ -16,11 +18,17 @@ public static class PipelineConfiguration
         }
         app.UseRateLimiter();
         app.UseAuthorization();
+        if (serviceCatalog?.IsService(typeof(NoCTF.Application.Runtime.Access.IRuntimeProxyTargetReader)) == true
+            && serviceCatalog.IsService(typeof(NoCTF.Application.Runtime.Access.IRuntimeProxyConnectionGate))
+            && serviceCatalog.IsService(typeof(NoCTF.Application.Runtime.Access.IRuntimeTrafficCaptureFactory)))
+        {
+            app.UseMiddleware<NoCTF.API.RuntimeProxy.RuntimeTcpProxyMiddleware>();
+        }
         // Isolated transport tests intentionally omit Infrastructure; production/combined hosts register admission.
-        if (app.Services.GetService<IServiceProviderIsService>()?.IsService(typeof(NoCTF.Application.Admission.IRequestAdmission)) == true)
+        if (serviceCatalog?.IsService(typeof(NoCTF.Application.Admission.IRequestAdmission)) == true)
             app.UseMiddleware<Security.RequestAdmissionMiddleware>();
         app.UseMiddleware<Security.EmailVerificationGateMiddleware>();
-        if (app.Services.GetService<IServiceProviderIsService>()?.IsService(typeof(NoCTF.Application.Admission.IHumanVerificationVerifier)) == true)
+        if (serviceCatalog?.IsService(typeof(NoCTF.Application.Admission.IHumanVerificationVerifier)) == true)
             app.UseMiddleware<Security.HumanVerificationMiddleware>();
         app.UseMiddleware<SpaDocumentMetadataMiddleware>();
         return app;

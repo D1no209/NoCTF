@@ -33,36 +33,47 @@ const { ShieldCheck, Swords, Users, directionGlyph, isAwdp, loading, error, data
       </span>
     </template>
     <template #item="{ item }">
-            <span class="relative isolate flex min-w-0 flex-1 flex-col">
-              <IconWatermark :name="directionGlyph(item.challenge.direction)" size="compact" :class="directionWatermarkClass(item.challenge.direction)" />
-              <span class="sr-only">{{ directionLabel(item.challenge.direction) }}</span>
-              <span class="relative z-10 flex min-w-0 items-baseline gap-2 font-sans text-sm font-bold italic text-primary">
-                <span class="min-w-0 flex-1 truncate">{{ item.challenge.title }}</span>
-                <Badge v-if="item.challenge.interactionKind === 'PatchVerification'" variant="secondary" class="shrink-0 text-[0.625rem] not-italic">
-                  {{ $t('ui.patchVerification') }}
-                </Badge>
-                <StatusIcon :name="progressIcon(item.challenge.id)" :label="progressIconLabel(item.challenge.id)" />
-              </span>
-              <span v-if="isAwdp && progressFor(item.challenge.id)" class="relative z-10 mt-1 flex items-center gap-2 text-[0.6875rem]">
-                <span class="flex items-center gap-1"><Swords class="size-3" /><span class="font-mono">{{ progressFor(item.challenge.id)?.attackCount ?? 0 }}</span></span>
-                <span class="flex items-center gap-1"><ShieldCheck class="size-3" /><span class="font-mono">{{ progressFor(item.challenge.id)?.defenseCount ?? 0 }}</span></span>
-                <span v-if="board.snapshot.value?.currentRoundId" class="truncate text-muted-foreground">{{ $t('ui.pendingRoundSettlement') }}</span>
-              </span>
-              <span v-else-if="progressFor(item.challenge.id)" class="relative z-10 mt-1 flex items-center gap-1 text-[0.6875rem]">
-                <Users class="size-3" />
-                <span>{{ $t('ui.solvedByTeams', { count: progressFor(item.challenge.id)?.solveCount ?? 0 }) }}</span>
-              </span>
-              <span v-if="bloodsFor(item.challenge.id).length || currentScore(item.challenge.id) !== null" class="relative z-10 mt-auto flex items-end justify-between gap-3 pt-3">
-                <span class="flex min-w-0 flex-wrap items-center gap-1.5">
-                  <Hint v-for="blood in bloodsFor(item.challenge.id)" :key="blood.rank" :content="bloodTooltip(blood)">
-                    <BloodMark :rank="blood.rank" :label="bloodTooltip(blood)" :highlighted="blood.earnedByMyTeam" />
-                  </Hint>
-                </span>
-                <span v-if="currentScore(item.challenge.id) !== null" data-challenge-score class="shrink-0 text-right font-sans text-xl leading-none font-bold italic tabular-nums text-primary whitespace-nowrap">
-                  {{ currentScore(item.challenge.id) }} <span class="text-xs">{{ $t('ui.pts2') }}</span>
-                </span>
-              </span>
+      <span
+        data-challenge-item
+        class="relative block h-28 min-w-0 flex-1"
+      >
+        <span data-challenge-item-panel class="relative isolate flex h-28 min-w-0 flex-col px-3 py-2">
+          <IconWatermark
+            :name="directionGlyph(item.challenge.direction)"
+            size="compact"
+            class="noctf-motion-challenge-watermark"
+            :class="directionWatermarkClass(item.challenge.direction)"
+          />
+          <span class="sr-only">{{ directionLabel(item.challenge.direction) }}</span>
+          <span data-challenge-item-summary class="relative z-10 flex h-6 min-w-0 items-center gap-2 font-sans text-sm font-bold italic text-primary">
+            <span class="min-w-0 flex-1 truncate">{{ item.challenge.title }}</span>
+            <Badge v-if="item.challenge.interactionKind === 'PatchVerification'" variant="secondary" class="shrink-0 text-[0.625rem] not-italic">
+              {{ $t('ui.patchVerification') }}
+            </Badge>
+            <StatusIcon :name="progressIcon(item.challenge.id)" :label="progressIconLabel(item.challenge.id)" />
+            <span v-if="currentScore(item.challenge.id) !== null" data-challenge-score class="shrink-0 whitespace-nowrap text-right font-sans text-sm leading-none font-bold italic tabular-nums text-primary">
+              {{ currentScore(item.challenge.id) }} <span class="text-[0.625rem]">{{ $t('ui.pts2') }}</span>
             </span>
+          </span>
+
+          <span data-challenge-item-details class="noctf-motion-challenge-details relative z-10 mt-2 flex min-h-0 flex-1 flex-col">
+            <span v-if="isAwdp && progressFor(item.challenge.id)" class="flex items-center gap-2 text-[0.6875rem]">
+              <span class="flex items-center gap-1"><Swords class="size-3" /><span class="font-mono">{{ progressFor(item.challenge.id)?.attackCount ?? 0 }}</span></span>
+              <span class="flex items-center gap-1"><ShieldCheck class="size-3" /><span class="font-mono">{{ progressFor(item.challenge.id)?.defenseCount ?? 0 }}</span></span>
+              <span v-if="board.snapshot.value?.currentRoundId" class="truncate text-muted-foreground">{{ $t('ui.pendingRoundSettlement') }}</span>
+            </span>
+            <span v-else-if="progressFor(item.challenge.id)" class="flex items-center gap-1 text-[0.6875rem]">
+              <Users class="size-3" />
+              <span>{{ $t('ui.solvedByTeams', { count: progressFor(item.challenge.id)?.solveCount ?? 0 }) }}</span>
+            </span>
+            <span v-if="bloodsFor(item.challenge.id).length" class="mt-auto flex min-w-0 flex-wrap items-center gap-1.5 pt-3">
+              <Hint v-for="blood in bloodsFor(item.challenge.id)" :key="blood.rank" :content="bloodTooltip(blood)">
+                <BloodMark :rank="blood.rank" :label="bloodTooltip(blood)" :highlighted="blood.earnedByMyTeam" />
+              </Hint>
+            </span>
+          </span>
+        </span>
+      </span>
 
     </template>
   </ChoiceSidebar>

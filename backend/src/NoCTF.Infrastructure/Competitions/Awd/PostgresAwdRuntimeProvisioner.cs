@@ -58,7 +58,10 @@ public sealed class PostgresAwdRuntimeProvisioner(
             .Select(competition => new
             {
                 competition.Mode,
-                competition.MaxConcurrentRuntimeInstancesPerTeam
+                competition.MaxConcurrentRuntimeInstancesPerTeam,
+                competition.RuntimeAccessMode,
+                competition.TrafficCaptureEnabled,
+                competition.TrafficCaptureLimitBytes
             })
             .SingleAsync(cancellationToken);
         if (competition.Mode != GameMode.Awd)
@@ -175,6 +178,9 @@ public sealed class PostgresAwdRuntimeProvisioner(
                         Purpose = RuntimePurpose.Player,
                         RuntimeKind = challenge.RuntimeKind,
                         RuntimeProvider = challenge.Placement.Provider,
+                        AccessMode = competition.RuntimeAccessMode,
+                        TrafficCaptureEnabled = competition.TrafficCaptureEnabled,
+                        TrafficCaptureLimitBytes = competition.TrafficCaptureLimitBytes,
                         State = RuntimeState.Queued,
                         CreatedAt = createdAt
                     };
@@ -206,6 +212,9 @@ public sealed class PostgresAwdRuntimeProvisioner(
                     Purpose = RuntimePurpose.Player,
                     RuntimeKind = challenge.RuntimeKind,
                     RuntimeProvider = challenge.Placement.Provider,
+                    AccessMode = competition.RuntimeAccessMode,
+                    TrafficCaptureEnabled = competition.TrafficCaptureEnabled,
+                    TrafficCaptureLimitBytes = competition.TrafficCaptureLimitBytes,
                     State = RuntimeState.Queued,
                     CreatedAt = createdAt
                 };

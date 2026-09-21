@@ -3,7 +3,7 @@ import { toRefs } from 'vue'
 import type { DefaultLayoutViewState } from '~/features/shell/useDefaultLayout'
 
 const viewProps = defineProps<{ state: DefaultLayoutViewState }>()
-const { Bell, ShieldAlert, isHome, wallpaperActive, wallpaperStyle, isLoggedIn, isAdministrator, impersonation, impersonationEnding, impersonationExpiresAt, endImpersonation, configuration, platformError, platformLoading, ensureLoaded, hasUnread, t, navItems, isActive, LanguageToggle, ThemeToggle, ThemePalettePanel, AccountPanel } = toRefs(viewProps.state)
+const { Bell, ShieldAlert, isHome, routePath, wallpaperActive, wallpaperStyle, isLoggedIn, isAdministrator, impersonation, impersonationEnding, impersonationExpiresAt, endImpersonation, configuration, platformError, platformLoading, ensureLoaded, hasUnread, t, navItems, isActive, LanguageToggle, ThemeToggle, ThemePalettePanel, AccountPanel } = toRefs(viewProps.state)
 </script>
 
 <template>
@@ -127,7 +127,7 @@ const { Bell, ShieldAlert, isHome, wallpaperActive, wallpaperStyle, isLoggedIn, 
         </Button>
       </AlertDescription>
     </Alert>
-    <ScrollSurface as="main" axis="y" data-slot="page-transition-viewport" class="min-h-0 flex-1 overflow-y-auto overscroll-contain">
+    <ScrollSurface as="main" axis="y" :reset-key="routePath" data-slot="page-transition-viewport" class="min-h-0 flex-1 overflow-y-auto overscroll-contain">
       <slot />
     </ScrollSurface>
     </div>

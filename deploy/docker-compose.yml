@@ -64,6 +64,7 @@ services:
       - ./env/noctf/.env
     labels:
       noctf.io/internal-role: scoring-callback-gateway
+      noctf.io/runtime-proxy-gateway: "true"
     depends_on: [postgres, redis, nats]
     volumes:
       - type: bind

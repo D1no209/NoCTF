@@ -45,6 +45,39 @@ public sealed class RuntimeClaimFactoryTests
     }
 
     [Test]
+    public async Task Wsrx_only_claim_keeps_internal_port_without_public_mapping()
+    {
+        var instance = CreateInstance(RuntimeKind.Container, RuntimeProvider.Docker);
+        instance.AccessMode = RuntimeAccessMode.WsrxOnly;
+        var template = new ChallengeRuntimeTemplate(
+            RuntimeAllocation.PerTeam,
+            new ContainerRuntimeDefinition(
+                "challenge:v1",
+                PortMappings: new Dictionary<int, int> { [31337] = 0 }),
+            UrlBindings:
+            [
+                new RuntimeUrlBinding(
+                    "tcp://{HOST}:{PORT}",
+                    RuntimeExposure.OwnerOnly,
+                    31337)
+            ]);
+
+        var claim = (ProvisionContainerRuntime)RuntimeClaimFactory.Create(
+            instance,
+            "runner-a",
+            GameMode.Ctf,
+            template,
+            "{}");
+
+        await Assert.That(claim.Definition.AccessMode)
+            .IsEqualTo(RuntimeAccessMode.WsrxOnly);
+        await Assert.That(claim.Definition.PortMappings).IsEmpty();
+        await Assert.That(claim.Definition.InternalPorts).Contains(31337);
+        await Assert.That(claim.Definition.Labels["noctf.io/runtime-proxy-target"])
+            .IsEqualTo("true");
+    }
+
+    [Test]
     public async Task Container_security_treats_null_cap_add_as_empty()
     {
         var instance = CreateInstance(RuntimeKind.Container, RuntimeProvider.Docker);

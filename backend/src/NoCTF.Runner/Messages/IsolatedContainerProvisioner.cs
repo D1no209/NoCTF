@@ -27,7 +27,16 @@ public static class IsolatedContainerProvisioner
                 request.PortMappings.Keys.Order().ToArray(),
                 request.NetworkPurpose == ContainerNetworkPurpose.AwdpVerification
                     ? request.InternalPorts?.SingleOrDefault()
-                    : null),
+                    : null,
+                request.AccessMode is NoCTF.Domain.Runtime.RuntimeAccessMode.DirectAndWsrx
+                    or NoCTF.Domain.Runtime.RuntimeAccessMode.WsrxOnly
+                    ? (request.UrlBindings ?? [])
+                        .Select(binding => binding.ContainerPort)
+                        .OfType<int>()
+                        .Distinct()
+                        .Order()
+                        .ToArray()
+                    : []),
             cancellationToken);
         try
         {

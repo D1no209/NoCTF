@@ -81,6 +81,10 @@ public sealed class GetPublicUserProfile(IUserAuthenticationStore store)
         Guid targetUserId,
         CancellationToken ct = default)
     {
+        var publicProfile = await store.GetPublicProfileAsync(targetUserId, ct);
+        if (publicProfile is not null)
+            return publicProfile;
+
         var profile = await store.GetProfileAsync(targetUserId, ct);
         if (profile is null)
             return null;
@@ -89,7 +93,8 @@ public sealed class GetPublicUserProfile(IUserAuthenticationStore store)
             profile.Id,
             profile.UserName,
             profile.Description,
-            profile.AvatarFileId);
+            profile.AvatarFileId,
+            profile.ProfileCoverFileId);
     }
 }
 

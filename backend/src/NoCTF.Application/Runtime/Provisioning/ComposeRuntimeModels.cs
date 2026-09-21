@@ -19,7 +19,8 @@ public sealed record ComposeRequest(
     IReadOnlyDictionary<string, IReadOnlyDictionary<string, string>>? ServiceEnvironment = null,
     RuntimeEgressPolicy EgressPolicy = RuntimeEgressPolicy.Isolated,
     IReadOnlyList<RuntimePublishedPortMapping>? PublishedPorts = null,
-    IReadOnlyDictionary<string, RuntimeResourceLimits>? ServiceBudgets = null);
+    IReadOnlyDictionary<string, RuntimeResourceLimits>? ServiceBudgets = null,
+    RuntimeAccessMode AccessMode = RuntimeAccessMode.Direct);
 
 public sealed record ComposeServiceStatus(
     string Name,

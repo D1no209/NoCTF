@@ -30,6 +30,9 @@ internal sealed class UserConfiguration : IEntityTypeConfiguration<User>
         builder.HasOne(user => user.AvatarFile).WithMany()
             .HasForeignKey(user => user.AvatarFileId)
             .OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne(user => user.ProfileCoverFile).WithMany()
+            .HasForeignKey(user => user.ProfileCoverFileId)
+            .OnDelete(DeleteBehavior.Restrict);
         builder.HasOne(user => user.WallpaperFile).WithMany()
             .HasForeignKey(user => user.WallpaperFileId)
             .OnDelete(DeleteBehavior.Restrict);

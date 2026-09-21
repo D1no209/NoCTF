@@ -1,0 +1,49 @@
+function routeSegment(value: string): string {
+  return encodeURIComponent(value)
+}
+
+export const competitionsPath = '/competitions'
+export const notificationsPath = '/notifications'
+
+export function competitionPath(competitionId: string): string {
+  return `${competitionsPath}/${routeSegment(competitionId)}`
+}
+
+export function competitionChallengesPath(competitionId: string): string {
+  return `${competitionPath(competitionId)}/challenges`
+}
+
+export function competitionChallengePath(
+  competitionId: string,
+  competitionChallengeId: string,
+): string {
+  return `${competitionChallengesPath(competitionId)}/${routeSegment(competitionChallengeId)}`
+}
+
+export function competitionEventsPath(competitionId: string): string {
+  return `${competitionPath(competitionId)}/events`
+}
+
+export function competitionQuestionsPath(competitionId: string): string {
+  return `${competitionPath(competitionId)}/questions`
+}
+
+export function competitionMyTeamPath(competitionId: string): string {
+  return `${competitionPath(competitionId)}/my/team`
+}
+
+export function competitionTeamsPath(competitionId: string): string {
+  return `${competitionPath(competitionId)}/teams`
+}
+
+export function adminCompetitionPath(competitionId: string): string {
+  return `/admin/competitions/${routeSegment(competitionId)}`
+}
+
+export function adminCompetitionCheatsPath(competitionId: string): string {
+  return `${adminCompetitionPath(competitionId)}/cheats`
+}
+
+export function adminCompetitionTeamsPath(competitionId: string): string {
+  return `${adminCompetitionPath(competitionId)}/teams`
+}

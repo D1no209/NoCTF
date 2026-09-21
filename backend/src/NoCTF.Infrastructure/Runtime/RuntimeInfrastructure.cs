@@ -11,6 +11,8 @@ using NoCTF.Infrastructure.Runtime.Placement;
 using StackExchange.Redis;
 using Microsoft.Extensions.Options;
 using NoCTF.Domain.Runtime;
+using NoCTF.Application.Runtime.Access;
+using NoCTF.Infrastructure.Runtime.Access;
 
 namespace NoCTF.Infrastructure.Runtime;
 
@@ -22,6 +24,22 @@ internal static class RuntimeInfrastructure
         bool development)
     {
         services.AddSingleton(new RuntimeResourceBudgetPolicy());
+        var proxyOptions = configuration.GetSection("RuntimeProxy")
+            .Get<RuntimeProxyOptions>() ?? new RuntimeProxyOptions();
+        if (proxyOptions.MaximumConnectionsPerRuntime is < 1 or > 512
+            || proxyOptions.MaximumConnectionMinutes is < 1 or > 1_440
+            || proxyOptions.ConnectTimeoutSeconds is < 1 or > 120
+            || proxyOptions.BufferSizeBytes is < 4_096 or > 1_048_576
+            || proxyOptions.DefaultCaptureLimitBytes
+                is < NoCTF.Application.Competitions.Management.RuntimeAccessPolicy.MinimumCaptureLimitBytes
+                    or > NoCTF.Application.Competitions.Management.RuntimeAccessPolicy.MaximumCaptureLimitBytes
+            || proxyOptions.MaximumCaptureLimitBytes < proxyOptions.DefaultCaptureLimitBytes
+            || proxyOptions.MaximumCaptureLimitBytes
+                > NoCTF.Application.Competitions.Management.RuntimeAccessPolicy.MaximumCaptureLimitBytes)
+        {
+            throw new InvalidOperationException("RuntimeProxy configuration is invalid.");
+        }
+        services.AddSingleton(proxyOptions);
         services.AddOptions<RuntimePlacementOptions>()
             .Configure(options =>
             {
@@ -77,6 +95,11 @@ internal static class RuntimeInfrastructure
         services.AddScoped<SharedRuntimeCriticalSection>();
 
         services.AddScoped<IRuntimeInstanceStore, RuntimeInstanceStore>();
+        services.AddScoped<IRuntimeProxyTargetReader, RuntimeProxyTargetReader>();
+        services.AddScoped<IRuntimeTrafficCaptureFactory, RuntimeTrafficCaptureFactory>();
+        services.AddScoped<IRuntimeTrafficCaptureStore, RuntimeTrafficCaptureStore>();
+        services.AddScoped<ManageRuntimeTrafficCaptures>();
+        services.AddSingleton<IRuntimeProxyConnectionGate, RuntimeProxyConnectionGate>();
         services.AddScoped<GetPlayerRuntime>();
         services.AddScoped<MutatePlayerRuntime>();
         services.AddScoped<IRuntimeTargetReader, RuntimeTargetReader>();

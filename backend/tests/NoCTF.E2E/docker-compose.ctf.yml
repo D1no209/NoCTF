@@ -95,6 +95,8 @@ services:
         HTTP_PROXY: ${NOCTF_E2E_BUILD_HTTP_PROXY:-}
         HTTPS_PROXY: ${NOCTF_E2E_BUILD_HTTPS_PROXY:-}
         ALL_PROXY: ${ALL_PROXY:-}
+    labels:
+      noctf.io/runtime-proxy-gateway: "true"
     environment:
       <<: *api-environment
       ASPNETCORE_HTTP_PORTS: "8080"

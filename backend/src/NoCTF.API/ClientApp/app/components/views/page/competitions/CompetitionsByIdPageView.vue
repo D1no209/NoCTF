@@ -3,11 +3,11 @@ import { toRefs } from 'vue'
 import type { CompetitionsByIdPageViewState } from '~/features/routes/competitions/useCompetitionsByIdPage'
 
 const viewProps = defineProps<{ state: CompetitionsByIdPageViewState }>()
-const { isControlScreen, isWriteUpReview, competition, myStanding, standingLoading, teamLoadError, standingError, error, refreshMyTeam, refreshMyStanding, CompetitionCountdown, LifecycleBadge } = toRefs(viewProps.state)
+const { isOverview, isControlScreen, isWriteUpReview, competition, myStanding, standingLoading, teamLoadError, standingError, error, refreshMyTeam, refreshMyStanding, CompetitionCountdown, LifecycleBadge } = toRefs(viewProps.state)
 </script>
 
 <template>
-  <NuxtPage v-if="isControlScreen" />
+  <NuxtPage v-if="isOverview || isControlScreen" />
 
   <div
     v-else-if="competition"

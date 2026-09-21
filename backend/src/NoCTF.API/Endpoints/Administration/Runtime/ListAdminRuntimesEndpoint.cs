@@ -51,7 +51,7 @@ public sealed record AdminRuntimeResponse(
     string? RunnerId,
     RuntimeStateProtocol State,
     RuntimeFailureCodeProtocol? FailureCode,
-    IReadOnlyList<string> Urls,
+    IReadOnlyList<RuntimeAccessResponse> Accesses,
     IReadOnlyList<RuntimePublishedPortView> PublishedPorts,
     DateTimeOffset CreatedAt,
     DateTimeOffset? RunningAt,
@@ -78,6 +78,7 @@ internal static class AdminRuntimeMapping
 {
     public static AdminRuntimeResponse ToResponse(
         RuntimeInstanceView view,
+        HttpRequest request,
         DateTimeOffset now,
         bool includeCapacity = false)
     {
@@ -91,7 +92,10 @@ internal static class AdminRuntimeMapping
             view.RunnerId,
             RuntimeProtocolMapper.ToProtocol(view.State),
             view.FailureCode is null ? null : RuntimeProtocolMapper.ToProtocol(view.FailureCode.Value),
-            view.Urls, view.PublishedPorts ?? [], view.CreatedAt,
+            view.State == RuntimeState.Running
+                ? RuntimeAccessMapping.ToResponse(view, request)
+                : [],
+            view.PublishedPorts ?? [], view.CreatedAt,
             view.RunningAt, view.ExpiresAt, view.StoppedAt,
             availableAt,
             availableAt is { } value && value <= now)
@@ -154,7 +158,10 @@ public sealed class ListAdminRuntimesEndpoint(
         {
             var page = await runtimes.ListPageAsync(filter, request.Offset, request.Limit, request.Desc, ct);
             return TypedResults.Ok(new AdminRuntimeListResponse(
-                page.Items.Select(item => AdminRuntimeMapping.ToResponse(item, timeProvider.GetUtcNow())).ToArray(),
+                page.Items.Select(item => AdminRuntimeMapping.ToResponse(
+                    item,
+                    HttpContext.Request,
+                    timeProvider.GetUtcNow())).ToArray(),
                 null,
                 page.Total));
         }
@@ -163,6 +170,9 @@ public sealed class ListAdminRuntimesEndpoint(
             ? cursors.Encode(CursorEndpoint, filterKey, new(items[^1].CreatedAt, items[^1].Id))
             : null;
         return TypedResults.Ok(new AdminRuntimeListResponse(
-            items.Select(item => AdminRuntimeMapping.ToResponse(item, timeProvider.GetUtcNow())).ToArray(), next));
+            items.Select(item => AdminRuntimeMapping.ToResponse(
+                item,
+                HttpContext.Request,
+                timeProvider.GetUtcNow())).ToArray(), next));
     }
 }

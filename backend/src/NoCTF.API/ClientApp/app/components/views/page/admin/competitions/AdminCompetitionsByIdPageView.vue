@@ -19,7 +19,7 @@ const { Megaphone, competition, role, loading, error, canAnnounce, announcementO
         <Button v-if="canAnnounce" variant="outline" @click="onClickAnnouncementOpen(true)">
           <Megaphone data-icon="inline-start" /> {{ $t('ui.postANotice') }} </Button>
       </div>
-      <ScrollSurface axis="y" class="min-h-0 flex-1 overscroll-contain pr-3" :aria-label="$t('ui.competitionAdmin')">
+      <ScrollSurface axis="y" :reset-key="activePath" class="min-h-0 flex-1 overscroll-contain pr-3" :aria-label="$t('ui.competitionAdmin')">
         <div class="px-1 pb-8">
           <MotionSwap :identity="activePath" preset="film-up">
             <NuxtPage />

@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using NoCTF.Domain.Runtime;
 
 namespace NoCTF.Domain.Competitions;
 
@@ -35,6 +36,9 @@ public sealed class Competition
     public int WriteUpSubmissionDeadlineHours { get; set; }
     public int MaxTeamMembers { get; set; } = 5;
     public int MaxConcurrentRuntimeInstancesPerTeam { get; set; }
+    public RuntimeAccessMode RuntimeAccessMode { get; set; }
+    public bool TrafficCaptureEnabled { get; set; }
+    public long? TrafficCaptureLimitBytes { get; set; }
     public int MaxActiveQuestionsPerTeam { get; set; } = 5;
     public int MaxParticipantMessagesBeforeHandlerReply { get; set; } = 3;
     public bool AllowChallengeOwnersToHandleQuestions { get; set; } = true;

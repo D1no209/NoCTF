@@ -39,10 +39,14 @@ public sealed record AwdpParticipantStateResponse(
 
 internal static class AwdpParticipantStateMapping
 {
-    internal static AwdpParticipantStateResponse ToResponse(AwdpParticipantStateView view) =>
+    internal static AwdpParticipantStateResponse ToResponse(
+        AwdpParticipantStateView view,
+        HttpRequest request) =>
         new(
             view.CurrentRound,
-            view.AttackRuntime is null ? null : RuntimeEndpointMapping.ToResponse(view.AttackRuntime),
+            view.AttackRuntime is null
+                ? null
+                : RuntimeEndpointMapping.ToResponse(view.AttackRuntime, request),
             view.LatestBreakAttempt is null
                 ? null
                 : GameplayFactMapper.ToStatusResponse(view.LatestBreakAttempt),
@@ -108,6 +112,8 @@ public sealed class GetAwdpParticipantStateEndpoint(
             timeProvider.GetUtcNow(),
             cancellationToken);
         if (view is null) return TypedResults.NotFound();
-        return TypedResults.Ok(AwdpParticipantStateMapping.ToResponse(view));
+        return TypedResults.Ok(AwdpParticipantStateMapping.ToResponse(
+            view,
+            HttpContext.Request));
     }
 }

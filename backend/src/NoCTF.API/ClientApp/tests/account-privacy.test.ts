@@ -14,7 +14,7 @@ test('account information uses its own private SDK and string input without bloc
   expect(source).toContain('identityFieldErrors')
 })
 
-test('the avatar popover replaces the account page with four compact card sections', async () => {
+test('the avatar popover replaces the account page with a two-by-two settings launcher', async () => {
   const panel = read('features/account/AccountPanel.vue')
   const layout = read('layouts/default.vue')
 
@@ -29,7 +29,7 @@ test('the avatar popover replaces the account page with four compact card sectio
   expect(panel).toContain("activeSection.value === section ? null : section")
   expect(panel).toContain('authenticationUploadMyWallpaper')
   expect(panel).toContain('authenticationPatchMyProfile')
-  expect(panel).toContain('grid grid-cols-4')
+  expect(panel).toContain('grid min-h-0 flex-1 grid-cols-2 grid-rows-2')
   expect(layout).toContain(':is="AccountPanel"')
   expect(layout).not.toContain('<DropdownMenu>')
   expect(layout).not.toContain('to="/account"')

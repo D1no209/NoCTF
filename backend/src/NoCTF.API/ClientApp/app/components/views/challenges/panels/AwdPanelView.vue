@@ -40,9 +40,9 @@ const { emit, targets, targetsError, targetsLoaded, FlagSubmit, RuntimeAccessUrl
               <TableCell>
                 <div class="flex flex-col gap-1">
                   <component :is="RuntimeAccessUrl"
-                    v-for="url in target.urls ?? []"
-                    :key="url"
-                    :url="url"
+                    v-for="access in target.accesses ?? []"
+                    :key="`${access.directAddress}:${access.webSocketAddress}`"
+                    :access="access"
                   />
                 </div>
               </TableCell>

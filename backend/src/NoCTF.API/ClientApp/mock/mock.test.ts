@@ -65,9 +65,9 @@ describe('isolated Mock API', () => {
       expect(await download.text()).toContain(`Direction: ${challenge.direction}`)
       const runtime = await (await send(`${competition}/challenges/${challenge.id}/runtimes/current`)).json()
       expect(runtime.state).toBe('Running')
-      expect(runtime.urls).toHaveLength(1)
-      expect(runtime.urls[0]).toMatch(/^tcp:\/\/challenge\.mock\.invalid:31\d{3}$/)
-      sockets.add(runtime.urls[0])
+      expect(runtime.accesses).toHaveLength(1)
+      expect(runtime.accesses[0].directAddress).toMatch(/^tcp:\/\/challenge\.mock\.invalid:31\d{3}$/)
+      sockets.add(runtime.accesses[0].directAddress)
     }
     expect(sockets.size).toBe(directions.length)
   })
@@ -390,6 +390,40 @@ describe('isolated Mock API', () => {
     expect((await (await send('/api/v1/auth/me')).json()).wallpaperRevision).toBe(current.wallpaperRevision)
   })
 
+  test('filters the challenge bank by direction and keeps the direction catalog', async () => {
+    const { send } = await setup()
+    const response = await send('/api/v1/admin/challenges?direction=Web&offset=0&limit=200')
+
+    expect(response.status).toBe(200)
+    const result = await response.json()
+    expect(result.items.length).toBeGreaterThan(0)
+    expect(result.items.every((item: Data) => item.direction === 'Web')).toBe(true)
+    expect(result.directions).toEqual(expect.arrayContaining(['Web', 'Crypto', 'Pwn']))
+  })
+
+  test('profile cover upload remains independent from the site wallpaper', async () => {
+    const { api, accessToken, send } = await setup()
+    const form = new FormData()
+    form.set('file', new File(['mock profile cover'], 'profile-cover.webp', { type: 'image/webp' }))
+    const uploaded = await api.handle(new Request(base + '/api/v1/auth/me/profile-cover', {
+      method: 'PUT',
+      headers: { Authorization: `Bearer ${accessToken}` },
+      body: form,
+    }))
+
+    expect(uploaded.status).toBe(200)
+    const current = await uploaded.json()
+    expect(current.profileCoverUrl).toContain(`/api/v1/users/${id(1)}/profile-cover?revision=`)
+    expect(current.wallpaperRevision).toBeNull()
+    expect(current.wallpaperEnabled).toBe(false)
+
+    const profile = await (await send(`/api/v1/users/${id(1)}`)).json()
+    expect(profile.profileCoverUrl).toBe(current.profileCoverUrl)
+    const image = await send('/api/v1/users/{userId}/profile-cover'.replace('{userId}', id(1)))
+    expect(image.status).toBe(200)
+    expect(image.headers.get('content-type')).toContain('image/webp')
+  })
+
   test('competition poster upload is available to the create-competition flow', async () => {
     const { api, accessToken, send } = await setup()
     const form = new FormData()
@@ -491,10 +525,10 @@ describe('isolated Mock API', () => {
     const started = await (await send(path, 'POST', { replacesRuntimeId: null })).json()
     const afterStart = await (await send(path + '/current')).json()
     expect(afterStart.state).toBe('Running')
-    expect(afterStart.urls).toEqual(['tcp://challenge.mock.invalid:31002'])
+    expect(afterStart.accesses).toEqual([{ directAddress: 'tcp://challenge.mock.invalid:31002', webSocketAddress: null }])
     const reset = await (await send(path, 'POST', { replacesRuntimeId: started.runtimeInstanceId })).json()
     expect(reset.runtimeInstanceId).not.toBe(started.runtimeInstanceId)
-    expect((await (await send(path + '/current')).json()).urls).toEqual(['tcp://challenge.mock.invalid:31002'])
+    expect((await (await send(path + '/current')).json()).accesses).toEqual([{ directAddress: 'tcp://challenge.mock.invalid:31002', webSocketAddress: null }])
     await send(path + `/${reset.runtimeInstanceId}`, 'DELETE', {})
     expect((await (await send(path + '/current')).json()).state).toBe('Stopped')
   })

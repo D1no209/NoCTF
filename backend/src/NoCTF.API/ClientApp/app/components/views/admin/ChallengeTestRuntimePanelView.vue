@@ -65,9 +65,9 @@ const { Check, Clipboard, FlaskConical, RefreshCw, runtime, loading, loadError, 
           <span class="text-muted-foreground">{{ $t('ui.failureReason') }}</span>
           <span class="text-destructive">{{ enumLabel(RuntimeFailureCodeLabel, runtime.failureCode) }}</span>
         </div>
-        <div v-if="runtime.state === 'Running' && runtime.urls?.length" class="grid gap-2 sm:col-span-2">
+        <div v-if="runtime.state === 'Running' && runtime.accesses?.length" class="grid gap-2 sm:col-span-2">
           <span class="text-muted-foreground">{{ $t('ui.accessAddress') }}</span>
-          <component :is="RuntimeAccessUrl" v-for="url in runtime.urls" :key="url" :url="url" />
+          <component :is="RuntimeAccessUrl" v-for="access in runtime.accesses" :key="`${access.directAddress}:${access.webSocketAddress}`" :access="access" />
         </div>
         <div v-if="runtime.testFlag" class="grid gap-2 sm:col-span-2">
           <span class="text-muted-foreground">{{ $t('ui.testFlagForThisInstance') }}</span>

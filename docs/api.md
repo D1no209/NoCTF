@@ -592,3 +592,24 @@ Runner 自身通过 Wolverine 读写，不需要 HTTP callback Endpoint。
 - 所有写入必须在返回前完成接入事务与 Outbox commit；commit 失败不得返回资源 Id。
 - 可变资源写采用 last-write-wins；状态机动作在事务内校验当前状态，并用业务唯一键与 Inbox/Outbox 保证幂等。
 - 每个具体 Endpoint 的 `Results<T...>` 只能声明其真实分支；不能为了省事统一声明 200/400/401/403/404/409/500 全家桶。
+
+## Runtime WSRX 与流量捕获
+
+```text
+GET /api/v1/runtime-proxies/{runtimeInstanceId}/{bindingIndex}
+GET /api/v1/admin/competitions/{competitionId}/traffic-captures
+GET /api/v1/admin/competitions/{competitionId}/traffic-captures/{runtimeInstanceId}/file
+POST /api/v1/admin/competitions/{competitionId}/traffic-captures/export
+DELETE /api/v1/admin/competitions/{competitionId}/traffic-captures/{runtimeInstanceId}
+```
+
+探测路由返回 204/404；同一路由的 WebSocket Upgrade 由 TCP 代理中间件接管。抓包管理接口按 Runtime 聚合
+PCAPNG section，观察权限可查看和下载，管理权限可删除终态 Runtime 的抓包。
+
+## 其他扩展路由
+
+```text
+GET /api/v1/admin/competitions/{competitionId}/teams/{teamId}/invitation-token
+GET /api/v1/users/{userId}/profile-cover
+PUT /api/v1/auth/me/profile-cover
+```

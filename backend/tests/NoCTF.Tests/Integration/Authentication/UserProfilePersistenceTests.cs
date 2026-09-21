@@ -5,8 +5,12 @@ using NoCTF.Application.Authentication.Account;
 using NoCTF.Application.Authentication.RefreshJwt;
 using NoCTF.Application.Messaging;
 using NoCTF.Application.Runtime.Instances;
+using NoCTF.Domain.Challenges;
+using NoCTF.Domain.Competitions;
+using NoCTF.Domain.Gameplay;
 using NoCTF.Domain.Identity;
 using NoCTF.Domain.Storage;
+using NoCTF.Domain.Teams;
 using NoCTF.Infrastructure.Authentication;
 using NoCTF.Infrastructure.Persistence;
 using Testcontainers.PostgreSql;
@@ -18,7 +22,84 @@ public sealed class UserProfilePersistenceTests
 {
     [Test]
     [Timeout(300_000)]
-    public async Task Description_avatar_and_wallpaper_preferences_survive_a_new_database_context(
+    public async Task Public_profile_aggregates_only_public_approved_competition_activity(
+        CancellationToken cancellationToken)
+    {
+        await DockerIntegrationTest.RunAsync(async () =>
+        {
+            await using var postgres = new PostgreSqlBuilder("postgres:17.10-alpine3.24@sha256:742f40ea20b9ff2ff31db5458d127452988a2164df9e17441e191f3b72252193")
+                .WithDatabase("noctf_public_user_profile")
+                .WithUsername("postgres")
+                .WithPassword("postgres")
+                .Build();
+            await postgres.StartAsync(cancellationToken);
+            var options = new DbContextOptionsBuilder<NoCtfDbContext>()
+                .UseNpgsql(postgres.GetConnectionString())
+                .UseSnakeCaseNamingConvention()
+                .Options;
+            var hasher = new PasswordHasher<User>(Options.Create(new PasswordHasherOptions
+            {
+                IterationCount = 10_000
+            }));
+            var now = DateTimeOffset.UtcNow;
+            var userId = Guid.CreateVersion7(now);
+            var publicCompetitionId = Guid.CreateVersion7(now.AddSeconds(1));
+            var privateCompetitionId = Guid.CreateVersion7(now.AddSeconds(2));
+            var publicTeamId = Guid.CreateVersion7(now.AddSeconds(3));
+            var privateTeamId = Guid.CreateVersion7(now.AddSeconds(4));
+            var publicChallengeId = Guid.CreateVersion7(now.AddSeconds(5));
+            var privateChallengeId = Guid.CreateVersion7(now.AddSeconds(6));
+            var publicCompetitionChallengeId = Guid.CreateVersion7(now.AddSeconds(7));
+            var privateCompetitionChallengeId = Guid.CreateVersion7(now.AddSeconds(8));
+
+            await using var db = new NoCtfDbContext(options);
+            await db.Database.EnsureCreatedAsync(cancellationToken);
+            var users = new AuthenticationStore(db, hasher);
+            await users.CreateAsync(
+                userId,
+                "PublicPlayer",
+                "public-player@example.test",
+                "eight888",
+                true,
+                now,
+                cancellationToken);
+
+            db.Competitions.AddRange(
+                Competition(publicCompetitionId, userId, CompetitionAccessMode.Public, "Public final", now),
+                Competition(privateCompetitionId, userId, CompetitionAccessMode.StaffOnly, "Private final", now));
+            db.Teams.AddRange(
+                Team(publicTeamId, publicCompetitionId, userId, "Public team", now),
+                Team(privateTeamId, privateCompetitionId, userId, "Private team", now));
+            db.Challenges.AddRange(
+                Challenge(publicChallengeId, userId, "Web", now),
+                Challenge(privateChallengeId, userId, "Crypto", now));
+            db.CompetitionChallenges.AddRange(
+                CompetitionChallenge(publicCompetitionChallengeId, publicCompetitionId, publicChallengeId, now),
+                CompetitionChallenge(privateCompetitionChallengeId, privateCompetitionId, privateChallengeId, now));
+            db.GameplayFacts.AddRange(
+                SuccessfulFact(publicCompetitionId, publicCompetitionChallengeId, publicTeamId, userId, now.AddMinutes(1)),
+                SuccessfulFact(publicCompetitionId, publicCompetitionChallengeId, publicTeamId, userId, now.AddMinutes(2)),
+                SuccessfulFact(privateCompetitionId, privateCompetitionChallengeId, privateTeamId, userId, now.AddMinutes(3)));
+            await db.SaveChangesAsync(cancellationToken);
+
+            var profile = await users.GetPublicProfileAsync(userId, cancellationToken);
+
+            await Assert.That(profile).IsNotNull();
+            await Assert.That(profile!.CompetitionCount).IsEqualTo(1);
+            await Assert.That(profile.FinishedCompetitionCount).IsEqualTo(1);
+            await Assert.That(profile.SuccessfulChallengeCount).IsEqualTo(1);
+            await Assert.That(profile.Modes!).HasSingleItem();
+            await Assert.That(profile.Modes![0]).IsEqualTo(new PublicUserModeSummary(GameMode.Ctf, 1));
+            await Assert.That(profile.Directions!).HasSingleItem();
+            await Assert.That(profile.Directions![0]).IsEqualTo(new PublicUserDirectionSummary("Web", 1));
+            await Assert.That(profile.RecentCompetitions!).HasSingleItem();
+            await Assert.That(profile.RecentCompetitions![0].CompetitionId).IsEqualTo(publicCompetitionId);
+        });
+    }
+
+    [Test]
+    [Timeout(300_000)]
+    public async Task Description_avatar_profile_cover_and_wallpaper_preferences_survive_a_new_database_context(
         CancellationToken cancellationToken)
     {
         await DockerIntegrationTest.RunAsync(async () =>
@@ -41,8 +122,10 @@ public sealed class UserProfilePersistenceTests
             var userId = Guid.CreateVersion7(now);
             var avatarFileId = Guid.CreateVersion7(now.AddMinutes(2));
             var wallpaperFileId = Guid.CreateVersion7(now.AddMinutes(3));
+            var profileCoverFileId = Guid.CreateVersion7(now.AddMinutes(4));
             const string avatarObjectKey = "users/profile/avatar.webp";
             const string wallpaperObjectKey = "users/profile/wallpaper.webp";
+            const string profileCoverObjectKey = "users/profile/profile-cover.webp";
 
             await using (var db = new NoCtfDbContext(options))
             {
@@ -83,6 +166,16 @@ public sealed class UserProfilePersistenceTests
                     Sha256 = new byte[32],
                     CreatedAt = now.AddMinutes(3)
                 });
+                db.Files.Add(new StoredFile
+                {
+                    Id = profileCoverFileId,
+                    ObjectKey = profileCoverObjectKey,
+                    FileName = "profile-cover.webp",
+                    ContentType = "image/webp",
+                    ByteLength = 4,
+                    Sha256 = new byte[32],
+                    CreatedAt = now.AddMinutes(4)
+                });
                 await db.SaveChangesAsync(cancellationToken);
                 await users.ReplaceAvatarAsync(
                     userId,
@@ -93,6 +186,11 @@ public sealed class UserProfilePersistenceTests
                     userId,
                     wallpaperFileId,
                     now.AddMinutes(3),
+                    cancellationToken);
+                await users.ReplaceProfileCoverAsync(
+                    userId,
+                    profileCoverFileId,
+                    now.AddMinutes(4),
                     cancellationToken);
                 await users.SetWallpaperEnabledAsync(
                     userId,
@@ -111,6 +209,7 @@ public sealed class UserProfilePersistenceTests
                 await Assert.That(profile.AvatarFileId).IsNotNull();
                 await Assert.That(profile.WallpaperFileId).IsEqualTo(wallpaperFileId);
                 await Assert.That(profile.WallpaperEnabled).IsFalse();
+                await Assert.That(profile.ProfileCoverFileId).IsEqualTo(profileCoverFileId);
                 var storedFile = await db.Files.SingleAsync(
                     file => file.Id == profile.AvatarFileId,
                     cancellationToken);
@@ -199,6 +298,96 @@ public sealed class UserProfilePersistenceTests
 
         public RefreshTokenPrincipal? ValidateRefresh(string token) => principal;
     }
+
+    private static Competition Competition(
+        Guid id,
+        Guid ownerId,
+        CompetitionAccessMode accessMode,
+        string title,
+        DateTimeOffset now) => new()
+    {
+        Id = id,
+        Title = title,
+        OwnerId = ownerId,
+        AccessMode = accessMode,
+        Mode = GameMode.Ctf,
+        ConfigurationJson = "{}",
+        FlagDerivationSecret = new byte[32],
+        StartAt = now.AddDays(-2),
+        EndAt = now.AddDays(-1),
+        Status = CompetitionStatus.Finished,
+        CreatedAt = now,
+        UpdatedAt = now
+    };
+
+    private static Team Team(
+        Guid id,
+        Guid competitionId,
+        Guid userId,
+        string name,
+        DateTimeOffset now) => new()
+    {
+        Id = id,
+        CompetitionId = competitionId,
+        Name = name,
+        CaptainId = userId,
+        MemberIds = [userId],
+        InvitationToken = id.ToString("N"),
+        RegistrationStatus = TeamRegistrationStatus.Approved,
+        RegisteredAt = now
+    };
+
+    private static Challenge Challenge(
+        Guid id,
+        Guid ownerId,
+        string direction,
+        DateTimeOffset now) => new()
+    {
+        Id = id,
+        OwnerId = ownerId,
+        Mode = GameMode.Ctf,
+        Visibility = ChallengeVisibility.Shared,
+        Title = $"{direction} challenge",
+        Direction = direction,
+        DefinitionJson = "{}",
+        CreatedAt = now,
+        UpdatedAt = now
+    };
+
+    private static CompetitionChallenge CompetitionChallenge(
+        Guid id,
+        Guid competitionId,
+        Guid challengeId,
+        DateTimeOffset now) => new()
+    {
+        Id = id,
+        CompetitionId = competitionId,
+        ChallengeId = challengeId,
+        IsPublished = true,
+        RulesJson = "{}",
+        UpdatedAt = now
+    };
+
+    private static GameplayFact SuccessfulFact(
+        Guid competitionId,
+        Guid competitionChallengeId,
+        Guid teamId,
+        Guid userId,
+        DateTimeOffset occurredAt) => new()
+    {
+        Id = Guid.CreateVersion7(occurredAt),
+        CompetitionId = competitionId,
+        CompetitionChallengeId = competitionChallengeId,
+        TeamId = teamId,
+        ActorUserId = userId,
+        Kind = GameplayFactKind.FlagAttempt,
+        OccurredAt = occurredAt,
+        Value = "flag{profile}",
+        ValueSha256 = new byte[32],
+        State = GameplayFactState.Completed,
+        Result = GameplayFactResult.Correct,
+        UpdatedAt = occurredAt
+    };
 
     private sealed class RecordingOutbox : ITransactionalMessageOutbox
     {

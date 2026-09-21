@@ -60,7 +60,10 @@ public sealed class AdminCompetitionStore(
                 competition.TracksEnabled,
                 competition.AccessMode,
                 competition.WriteUpSubmissionRequired,
-                competition.WriteUpSubmissionDeadlineHours))
+                competition.WriteUpSubmissionDeadlineHours,
+                competition.RuntimeAccessMode,
+                competition.TrafficCaptureEnabled,
+                competition.TrafficCaptureLimitBytes))
             .ToListAsync(ct);
     }
 
@@ -93,7 +96,10 @@ public sealed class AdminCompetitionStore(
                 competition.TracksEnabled,
                 competition.AccessMode,
                 competition.WriteUpSubmissionRequired,
-                competition.WriteUpSubmissionDeadlineHours))
+                competition.WriteUpSubmissionDeadlineHours,
+                competition.RuntimeAccessMode,
+                competition.TrafficCaptureEnabled,
+                competition.TrafficCaptureLimitBytes))
             .SingleOrDefaultAsync(ct);
     }
 
@@ -581,6 +587,13 @@ public sealed class AdminCompetitionStore(
         ids.AddRange(await db.PatchUploads
             .Where(item => item.CompetitionId == competitionId)
             .Select(item => item.FileId)
+            .ToArrayAsync(ct));
+        ids.AddRange(await db.CompetitionEvents
+            .Where(item => item.CompetitionId == competitionId
+                && item.Kind == CompetitionEventKind.RuntimeTrafficCaptureStored
+                && item.RelatedType == EntityReferenceKind.File
+                && item.RelatedId != null)
+            .Select(item => item.RelatedId!.Value)
             .ToArrayAsync(ct));
         return ids.Distinct().ToArray();
     }

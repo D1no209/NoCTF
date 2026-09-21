@@ -22,10 +22,16 @@ internal static class DockerRuntimeProviderRegistration
                 ?? 10_485_760,
             configuration.GetValue<int?>("Runtime:Docker:RuntimeLogMaxFiles") ?? 3,
             configuration.GetValue<int?>("Runtime:Docker:OneShotOutputLimitBytesPerStream")
-                ?? 1_048_576);
+                ?? 1_048_576,
+            configuration["Runtime:Docker:ProxyContainer"] ?? string.Empty,
+            configuration["Runtime:Docker:ProxyContainerLabelKey"]
+                ?? "noctf.io/runtime-proxy-gateway",
+            configuration["Runtime:Docker:ProxyContainerLabelValue"] ?? "true");
         if (options.RuntimeLogMaxSizeBytes <= 0
             || options.RuntimeLogMaxFiles <= 0
-            || options.OneShotOutputLimitBytesPerStream <= 0)
+            || options.OneShotOutputLimitBytesPerStream <= 0
+            || string.IsNullOrWhiteSpace(options.ProxyContainerLabelKey)
+            || string.IsNullOrWhiteSpace(options.ProxyContainerLabelValue))
         {
             throw new InvalidOperationException(
                 "Docker Runtime limits must be configured as positive integers.");

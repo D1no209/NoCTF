@@ -71,7 +71,21 @@ public sealed class RuntimeInstanceStore(
                 instance.State, instance.FailureCode, instance.Urls,
                 instance.CreatedAt, instance.RunningAt, instance.ExpiresAt, instance.StoppedAt,
                 instance.RunnerId, instance.PublishedPorts.Select(port => new RuntimePublishedPortView(
-                    port.ServiceName, port.ContainerPort, port.HostPort)).ToArray()))
+                    port.ServiceName, port.ContainerPort, port.HostPort)).ToArray(),
+                null,
+                null,
+                null,
+                null,
+                instance.AccessMode,
+                instance.AccessEndpoints.OrderBy(endpoint => endpoint.BindingIndex)
+                    .Select(endpoint => new RuntimeAccessEndpointView(
+                        endpoint.BindingIndex,
+                        endpoint.DirectAddress,
+                        endpoint.TargetHost,
+                        endpoint.TargetPort)).ToArray(),
+                instance.TrafficCaptureEnabled,
+                instance.TrafficCaptureLimitBytes,
+                instance.TrafficCaptureReservedBytes))
             .FirstOrDefaultAsync(ct);
         return runtime;
     }
@@ -315,6 +329,9 @@ public sealed class RuntimeInstanceStore(
             Purpose = PurposeFor(scope),
             RuntimeKind = template.RuntimeKind,
             RuntimeProvider = placement.Provider,
+            AccessMode = scope.RuntimeAccessMode,
+            TrafficCaptureEnabled = scope.TrafficCaptureEnabled,
+            TrafficCaptureLimitBytes = scope.TrafficCaptureLimitBytes,
             State = RuntimeState.Queued,
             CreatedAt = command.Now,
             ExpiresAt = null
@@ -360,6 +377,9 @@ public sealed class RuntimeInstanceStore(
                 item.Competition.Status,
                 item.Competition.PracticeModeEnabled,
                 item.Competition.MaxConcurrentRuntimeInstancesPerTeam,
+                item.Competition.RuntimeAccessMode,
+                item.Competition.TrafficCaptureEnabled,
+                item.Competition.TrafficCaptureLimitBytes,
                 item.Competition.ConfigurationJson,
                 item.Challenge.RulesJson,
                 item.Template.DefinitionJson,
@@ -416,7 +436,17 @@ public sealed class RuntimeInstanceStore(
             instance.Id, instance.CompetitionId, instance.CompetitionChallengeId, instance.ChallengeId, instance.TeamId,
             instance.Purpose, instance.RuntimeKind, instance.RuntimeProvider,
             instance.State, instance.FailureCode, instance.Urls,
-            instance.CreatedAt, instance.RunningAt, instance.ExpiresAt, instance.StoppedAt);
+            instance.CreatedAt, instance.RunningAt, instance.ExpiresAt, instance.StoppedAt,
+            AccessMode: instance.AccessMode,
+            AccessEndpoints: instance.AccessEndpoints.OrderBy(endpoint => endpoint.BindingIndex)
+                .Select(endpoint => new RuntimeAccessEndpointView(
+                    endpoint.BindingIndex,
+                    endpoint.DirectAddress,
+                    endpoint.TargetHost,
+                    endpoint.TargetPort)).ToArray(),
+            TrafficCaptureEnabled: instance.TrafficCaptureEnabled,
+            TrafficCaptureLimitBytes: instance.TrafficCaptureLimitBytes,
+            TrafficCaptureReservedBytes: instance.TrafficCaptureReservedBytes);
 
     private sealed record RuntimeScope(
         Guid TeamId,
@@ -424,6 +454,9 @@ public sealed class RuntimeInstanceStore(
         CompetitionStatus Status,
         bool PracticeModeEnabled,
         int MaxConcurrentRuntimeInstances,
+        RuntimeAccessMode RuntimeAccessMode,
+        bool TrafficCaptureEnabled,
+        long? TrafficCaptureLimitBytes,
         string CompetitionConfigurationJson,
         string RulesJson,
         string DefinitionJson,

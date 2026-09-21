@@ -29,6 +29,13 @@ public enum RuntimePurpose : short
     PatchVerificationTarget
 }
 
+public enum RuntimeAccessMode : short
+{
+    Direct,
+    DirectAndWsrx,
+    WsrxOnly
+}
+
 public enum RuntimeTestFlagDelivery : short
 {
     NotRequired,
@@ -73,6 +80,15 @@ public sealed class RuntimePublishedPort
     public int HostPort { get; set; }
 }
 
+public sealed class RuntimeAccessEndpoint
+{
+    public int BindingIndex { get; set; }
+    public string? DirectAddress { get; set; }
+    [MaxLength(255)]
+    public string? TargetHost { get; set; }
+    public int? TargetPort { get; set; }
+}
+
 public sealed class RuntimeInstance
 {
     public Guid Id { get; set; }
@@ -81,6 +97,10 @@ public sealed class RuntimeInstance
     public Guid? ChallengeId { get; set; }
     public Guid? TeamId { get; set; }
     public RuntimePurpose Purpose { get; set; }
+    public RuntimeAccessMode AccessMode { get; set; }
+    public bool TrafficCaptureEnabled { get; set; }
+    public long? TrafficCaptureLimitBytes { get; set; }
+    public long TrafficCaptureReservedBytes { get; set; }
     public RuntimeTestFlagDelivery? TestFlagDelivery { get; set; }
     public RuntimeTestFlagState? TestFlagState { get; set; }
     public Guid? GameplayFactId { get; set; }
@@ -93,6 +113,7 @@ public sealed class RuntimeInstance
     public string? ProviderReceiptJson { get; set; }
     public RuntimeCapacityAllocations CapacityAllocations { get; set; } = RuntimeCapacityAllocations.Empty;
     public string[] Urls { get; set; } = [];
+    public List<RuntimeAccessEndpoint> AccessEndpoints { get; set; } = [];
     public DateTimeOffset CreatedAt { get; set; }
     public DateTimeOffset? RunningAt { get; set; }
     public DateTimeOffset? ExpiresAt { get; set; }

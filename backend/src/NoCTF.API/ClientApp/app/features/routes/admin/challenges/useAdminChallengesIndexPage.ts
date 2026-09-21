@@ -12,30 +12,54 @@ import { useOffsetPagination } from '../../../../composables/useOffsetPagination
 type ChallengeTemplate = NoCtfapiEndpointsAdministrationChallengeBankChallengeTemplateResponse
 
 let lastIncludeDeleted = false
+interface ChallengeLibrarySnapshot {
+  includeDeleted: boolean
+  search: string
+  directionFilter: string
+  templates: ChallengeTemplate[]
+  directions: string[]
+  page: number
+  limit: number
+  total: number
+}
+let lastSnapshot: ChallengeLibrarySnapshot | null = null
+const directionCatalogs = new Map<boolean, string[]>()
 
 /** Owns state, effects and commands for AdminChallengesIndexPage. */
 export function useAdminChallengesIndexPage() {
   const route = useRoute()
+  const router = useRouter()
 
   const { canOrganize } = useAuth()
 
   const createOpen = ref(route.path === '/admin/challenges/new')
 
-  const includeDeleted = ref(lastIncludeDeleted)
+  const restored = lastSnapshot
 
-  const templates = ref<ChallengeTemplate[]>([])
+  const includeDeleted = ref(route.query.deleted === '1'
+    ? true
+    : restored?.includeDeleted ?? lastIncludeDeleted)
 
-  const directions = ref<string[]>([])
+  const templates = ref<ChallengeTemplate[]>([...(restored?.templates ?? [])])
+
+  const directions = ref<string[]>([...(restored?.directions
+    ?? directionCatalogs.get(includeDeleted.value)
+    ?? [])])
 
   const loadError = ref<string | null>(null)
 
-  const search = ref('')
+  const search = ref(typeof route.query.q === 'string'
+    ? route.query.q
+    : restored?.search ?? '')
 
-  const directionFilter = ref('all')
+  const directionFilter = ref(typeof route.query.direction === 'string'
+    ? route.query.direction
+    : restored?.directionFilter ?? 'all')
 
-  const directionOptions = computed(() => directions.value
-    .map(value => ({ value: directionKey(value), label: directionLabel(value) }))
-    .filter(option => option.value)
+  const directionOptions = computed(() => [...new Map(directions.value
+    .map(value => ({ key: directionKey(value), value, label: directionLabel(value) }))
+    .filter(option => option.key)
+    .map(option => [option.key, option] as const)).values()]
     .sort((left, right) => left.label.localeCompare(right.label)))
 
   const filteredTemplates = computed(() => templates.value)
@@ -53,21 +77,75 @@ export function useAdminChallengesIndexPage() {
     })
     if (error || !data) throw error ?? new Error('Failed to load challenge templates.')
     templates.value = data.items ?? []
-    directions.value = data.directions ?? []
+    const catalog = [...new Set([
+      ...(directionCatalogs.get(includeDeleted.value) ?? []),
+      ...directions.value,
+      ...(data.directions ?? []),
+    ])]
+    directionCatalogs.set(includeDeleted.value, catalog)
+    directions.value = catalog
     return { items: templates.value, total: data.total ?? 0 }
   }, { initialDesc: true })
 
+  if (restored) {
+    pagination.page.value = restored.page
+    pagination.limit.value = restored.limit
+    pagination.total.value = restored.total
+    pagination.items.value = [...restored.templates]
+    pagination.initialized.value = true
+    directionCatalogs.set(restored.includeDeleted, [...restored.directions])
+  }
+
   const loading = pagination.loading
 
-  async function load(): Promise<void> {
+  function rememberSnapshot(): void {
+    lastIncludeDeleted = includeDeleted.value
+    lastSnapshot = {
+      includeDeleted: includeDeleted.value,
+      search: search.value,
+      directionFilter: directionFilter.value,
+      templates: [...templates.value],
+      directions: [...directions.value],
+      page: pagination.page.value,
+      limit: pagination.limit.value,
+      total: pagination.total.value,
+    }
+  }
+
+  async function loadPage(targetPage = pagination.page.value): Promise<void> {
     loadError.value = null
-    await pagination.loadPage(pagination.page.value)
+    await pagination.loadPage(targetPage)
     loadError.value = pagination.error.value?.message ?? null
+    if (!pagination.error.value) rememberSnapshot()
+  }
+
+  async function load(): Promise<void> {
+    await loadPage(pagination.page.value)
+  }
+
+  async function setPageSize(value: number): Promise<void> {
+    loadError.value = null
+    await pagination.setPageSize(value)
+    loadError.value = pagination.error.value?.message ?? null
+    if (!pagination.error.value) rememberSnapshot()
   }
 
   let searchTimer: ReturnType<typeof setTimeout> | null = null
+  function syncFiltersToRoute(): void {
+    const query = { ...route.query }
+    const keyword = search.value.trim()
+    if (keyword) query.q = keyword
+    else delete query.q
+    if (directionFilter.value !== 'all') query.direction = directionFilter.value
+    else delete query.direction
+    if (includeDeleted.value) query.deleted = '1'
+    else delete query.deleted
+    void router.replace({ query })
+  }
+
   function reloadFromFirstPage(): void {
-    lastIncludeDeleted = includeDeleted.value
+    rememberSnapshot()
+    syncFiltersToRoute()
     pagination.reset()
     if (searchTimer) clearTimeout(searchTimer)
     searchTimer = setTimeout(() => { void load() }, 250)
@@ -81,6 +159,7 @@ export function useAdminChallengesIndexPage() {
 
   onBeforeUnmount(() => {
     if (searchTimer) clearTimeout(searchTimer)
+    rememberSnapshot()
     pagination.reset()
   })
 
@@ -129,8 +208,8 @@ export function useAdminChallengesIndexPage() {
       total: pagination.total,
       pageLimit: pagination.limit,
       pageLoading: pagination.loading,
-      loadPage: pagination.loadPage,
-      setPageSize: pagination.setPageSize,
+      loadPage,
+      setPageSize,
     }
 }
 

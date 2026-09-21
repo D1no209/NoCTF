@@ -421,7 +421,7 @@
   max-height: none; overflow: visible; border: 0; background: transparent; box-shadow: none; backdrop-filter: none;
 }
 [data-slot='account-panel-section-button'] {
-  position: relative; height: 3.5rem; min-height: 0; padding: 5px 3px;
+  position: relative; width: 100%; height: 100%; min-height: 0; padding: 8px 6px;
   flex-direction: column; gap: 3px; white-space: normal; border-radius: 12px;
   color: var(--muted-foreground); font-size: 0.6875rem; line-height: 1.15; text-align: center;
 }
@@ -437,7 +437,7 @@
   box-shadow: var(--card-shadow) !important;
 }
 [data-slot='account-panel-detail'] {
-  max-height: min(38rem, calc(var(--reka-popover-content-available-height, 90dvh) - 13rem));
+  max-height: min(38rem, max(12rem, calc(var(--reka-popover-content-available-height, 90dvh) - 21rem)));
 }
 [data-slot='platform-gear-icon'] {
   display: inline-block; background: currentColor;
@@ -632,12 +632,29 @@ body:has([data-modal-scroll-lock]) {
 [data-challenge-navigator-header] { gap: clamp(6px, 1.3dvh, 12px); }
 [data-challenge-navigator] [data-slot='wave-selection-list'],
 [data-challenge-navigator] [data-slot='wave-group-items'] { gap: clamp(2px, 0.7dvh, 6px); }
+[data-challenge-navigator] [data-slot='wave-group-items']:has([data-slot='wave-selection-item'][aria-selected='true']) { padding-block-end: 32px; }
 [data-challenge-navigator] [data-slot='wave-selection-item'] {
-  min-height: clamp(76px, 12dvh, 112px);
-  padding: clamp(8px, 1.6dvh, 16px);
+  z-index: 0; height: 40px; min-height: 0; padding: 0; overflow: visible;
 }
+[data-challenge-navigator] [data-slot='wave-selection-item']:is(:hover, :focus-visible),
+[data-challenge-navigator] [data-slot='wave-selection-item'][aria-selected='true'] {
+  z-index: 30; height: 112px;
+}
+[data-challenge-navigator] [data-slot='wave-selection-item'][aria-selected='true'] {
+  overflow: visible;
+}
+[data-challenge-item-panel] {
+  border-radius: 0 22px 22px 0;
+  background: transparent;
+  pointer-events: none;
+}
+[data-challenge-navigator] [data-slot='wave-selection-item']:is(:hover, :focus-visible, [aria-selected='true']) [data-challenge-item-panel] { pointer-events: auto; }
 [data-challenge-navigator] [data-slot='icon-watermark'][data-size='compact'] [data-slot='technical-icon'] {
   width: clamp(3.5rem, 8dvh, 5rem); height: clamp(3.5rem, 8dvh, 5rem);
+}
+[data-challenge-navigator] [data-challenge-item-summary] [data-slot='status-icon'],
+[data-challenge-navigator] [data-challenge-item-summary] [data-slot='status-icon'][data-status-icon] {
+  width: 1.5rem; height: 1.5rem;
 }
 [data-challenge-navigator] [data-challenge-score] { font-size: clamp(1rem, 2.5dvh, 1.25rem); }
 [data-slot='type-watermark'] {
@@ -653,6 +670,12 @@ body:has([data-modal-scroll-lock]) {
   position: absolute; inset-inline-end: 2px; top: 50%; z-index: 0;
   display: grid; place-items: center; pointer-events: none; user-select: none;
   transform: translateY(-50%) rotate(-7deg); opacity: 0.13;
+}
+[data-challenge-navigator] [data-slot='icon-watermark'].noctf-motion-challenge-watermark { opacity: 0; }
+[data-challenge-navigator] [data-slot='wave-selection-item']:is(:hover, :focus-visible) [data-slot='icon-watermark'].noctf-motion-challenge-watermark { opacity: 0.24; }
+[data-challenge-navigator] [data-slot='wave-selection-item'][aria-selected='true'] [data-slot='icon-watermark'].noctf-motion-challenge-watermark { opacity: 0.24; }
+@media (hover: none), (pointer: coarse) {
+  [data-challenge-navigator] [data-slot='wave-selection-item'][aria-selected='true'] [data-slot='icon-watermark'].noctf-motion-challenge-watermark { opacity: 0.24; }
 }
 [data-slot='icon-watermark'] [data-slot='technical-icon'] { width: 7rem; height: 7rem; }
 [data-slot='icon-watermark'][data-size='compact'] [data-slot='technical-icon'] { width: 5rem; height: 5rem; }
@@ -815,6 +838,9 @@ body:has([data-modal-scroll-lock]) {
   .challenge-workspace > div:first-child,
   .challenge-workspace > main,
   .challenge-workspace > aside { grid-column: 1; }
+  .challenge-workspace [data-slot='floating-sidebar'] {
+    position: relative; inset: auto; width: 100%; height: 24rem;
+  }
   [data-slot='default-layout-foreground']:has(> main [data-contained-workspace-page]) .challenge-workspace > div:first-child { min-height: 24rem; }
   [data-slot='default-layout-foreground']:has(> main [data-contained-workspace-page]) .challenge-workspace > main { min-height: 32rem; }
   [data-slot='default-layout-foreground']:has(> main [data-contained-workspace-page]) .challenge-workspace > aside { min-height: 24rem; }

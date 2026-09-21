@@ -31,7 +31,7 @@ describe('participant competition workspace layout', () => {
 
   test('only enables the challenge navigator when explicitly requested', async () => {
     const shell = await page('../app/features/competition/CompetitionParticipantWorkspace.vue')
-    const challenges = await page('../app/pages/competitions/[id]/challenges/index.vue')
+    const challenges = await page('../app/pages/competitions/[id]/challenges/[[ccId]].vue')
     const theme = await page('../app/assets/css/main.css')
 
     expect(shell).toContain('challenge-workspace')

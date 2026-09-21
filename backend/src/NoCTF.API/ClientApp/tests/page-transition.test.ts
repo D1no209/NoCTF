@@ -19,7 +19,7 @@ test('route transitions slide only the page content inside the persistent layout
   expect(root).toContain("name: 'noctf-page-slide'")
   expect(root).toContain("mode: 'out-in' as const")
   expect(app).toContain('<NuxtPage :transition="pageTransition" />')
-  expect(layout).toContain('<ScrollSurface as="main" axis="y" data-slot="page-transition-viewport"')
+  expect(layout).toContain('<ScrollSurface as="main" axis="y" :reset-key="routePath" data-slot="page-transition-viewport"')
   expect(layout).toContain('class="min-h-0 flex-1 overflow-y-auto overscroll-contain"')
   expect(layout).toContain('class="relative isolate flex h-dvh min-h-0 flex-col overflow-hidden"')
   expect(layout).toContain('<div data-slot="default-layout"')

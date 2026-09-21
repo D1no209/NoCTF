@@ -61,6 +61,7 @@ public sealed record CurrentUserResponse(
     UserKindProtocol Kind,
     bool EmailVerified,
     string? AvatarUrl,
+    string? ProfileCoverUrl,
     Guid? WallpaperRevision,
     bool WallpaperEnabled);
 
@@ -72,6 +73,11 @@ internal static class CurrentUserMapping
         HttpContext httpContext)
     {
         var avatarUrl = AvatarUrl(profile.Id, profile.AvatarFileId, links, httpContext);
+        var profileCoverUrl = ProfileCoverUrl(
+            profile.Id,
+            profile.ProfileCoverFileId,
+            links,
+            httpContext);
 
         return new(
             profile.Id,
@@ -81,6 +87,7 @@ internal static class CurrentUserMapping
             IdentityProtocolMapper.ToProtocol(profile.Kind),
             profile.EmailVerified,
             avatarUrl,
+            profileCoverUrl,
             profile.WallpaperFileId,
             profile.WallpaperEnabled);
     }
@@ -105,6 +112,24 @@ internal static class CurrentUserMapping
         }
 
         return avatarUrl;
+    }
+
+    public static string? ProfileCoverUrl(
+        Guid userId,
+        Guid? profileCoverFileId,
+        LinkGenerator links,
+        HttpContext httpContext)
+    {
+        if (profileCoverFileId is null)
+            return null;
+
+        var path = links.GetPathByName(
+            httpContext,
+            "UserProfileCover_Get",
+            new { userId });
+        return path is null
+            ? null
+            : $"{path}?revision={profileCoverFileId.Value:N}";
     }
 }
 

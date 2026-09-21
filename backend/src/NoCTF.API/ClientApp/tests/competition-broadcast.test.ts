@@ -89,7 +89,7 @@ describe('competition broadcast projection', () => {
   test('links challenge broadcasts to the matching challenge', () => {
     expect(competitionBroadcastTargetPath(event('HintPublished', {
       competitionChallengeId: 'challenge-1',
-    }))).toBe('/competitions/competition-1/challenges?challenge=challenge-1')
+    }))).toBe('/competitions/competition-1/challenges/challenge-1')
   })
 
   test('links published notices to their notification detail', () => {
@@ -162,7 +162,7 @@ describe('competition broadcast projection', () => {
 
   test('mounts the compact panel beside challenges and removes the overlapping tab', async () => {
     const challengePage = await sourceFile(
-      new URL('../app/pages/competitions/[id]/challenges/index.vue', import.meta.url),
+      new URL('../app/pages/competitions/[id]/challenges/[[ccId]].vue', import.meta.url),
     ).text()
     const participantWorkspace = await sourceFile(
       new URL('../app/features/competition/CompetitionParticipantWorkspace.vue', import.meta.url),

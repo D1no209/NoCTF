@@ -31,12 +31,12 @@ const { runnerFailureLabel, canStop, stopDisabled, runtime, loading, loadError, 
         </Alert>
 
         <template v-if="!loadError && runtime">
-          <div v-if="isRunning && runtime.urls?.length" class="flex flex-col gap-1">
+          <div v-if="isRunning && runtime.accesses?.length" class="flex flex-col gap-1">
             <span class="text-sm text-muted-foreground">{{ $t('ui.accessAddress') }}</span>
             <component :is="RuntimeAccessUrl"
-              v-for="url in runtime.urls"
-              :key="url"
-              :url="url"
+              v-for="access in runtime.accesses"
+              :key="`${access.directAddress}:${access.webSocketAddress}`"
+              :access="access"
             />
           </div>
 

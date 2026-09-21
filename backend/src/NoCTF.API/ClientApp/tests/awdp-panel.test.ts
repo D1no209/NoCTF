@@ -112,7 +112,7 @@ describe('AWDP participant panel', () => {
 
   test('keeps challenge details in the workspace and removes the duplicate Fix history surface', async () => {
     const challengePage = sourceFile(
-      new URL('../app/pages/competitions/[id]/challenges/[ccId]/index.vue', import.meta.url),
+      new URL('../app/pages/competitions/[id]/challenges/[[ccId]].vue', import.meta.url),
     )
     const historyPage = sourceFile(
       new URL('../app/pages/competitions/[id]/challenges/[ccId]/fix-history.vue', import.meta.url),

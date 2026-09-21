@@ -54,7 +54,7 @@ const { competitionId, challengeTitles, challengeTitlesError, items, loading, er
         <TableRow v-for="submission in items" :key="submission.id">
           <TableCell>
             <NuxtLink
-              :to="`/competitions/${competitionId}/challenges?challenge=${submission.competitionChallengeId}`"
+              :to="competitionChallengePath(competitionId, submission.competitionChallengeId!)"
               prefetch-on="interaction"
               class="font-medium hover:underline"
             >

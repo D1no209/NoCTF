@@ -23,7 +23,7 @@ const { ArrowLeft, Download, FileSearch, MessageCircleQuestion, MinusCircle, Ref
           <header class="flex flex-col gap-2 pr-10">
             <div class="flex items-center gap-2">
               <Button variant="ghost" size="icon-sm" as-child>
-                <NuxtLink :to="`/competitions?competition=${competitionId}`" :aria-label="$t('ui.backToCompetition')">
+                <NuxtLink :to="competitionPath(competitionId)" :aria-label="$t('ui.backToCompetition')">
                   <ArrowLeft />
                 </NuxtLink>
               </Button>

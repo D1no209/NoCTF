@@ -41,7 +41,7 @@ public sealed record ChallengeResponse(
     DateTimeOffset CreatedAt,
     DateTimeOffset UpdatedAt,
     string? ControlFlag = null,
-    IReadOnlyList<string>? Urls = null,
+    IReadOnlyList<RuntimeAccessResponse>? Accesses = null,
     LeaderboardVisibilityProtocol LeaderboardVisibility = LeaderboardVisibilityProtocol.Normal,
     LeaderboardDataScopeProtocol DataScope = LeaderboardDataScopeProtocol.Live,
     int? MaximumFlagAttempts = null,
@@ -83,7 +83,8 @@ internal static class ChallengeMapper
         LeaderboardDataScope dataScope = LeaderboardDataScope.Live,
         FlagAttemptState? attemptState = null,
         IReadOnlyList<ParticipantChallengeHintView>? hints = null,
-        PatchVerificationParticipantState? patchVerification = null) =>
+        PatchVerificationParticipantState? patchVerification = null,
+        HttpRequest? request = null) =>
         new(
             view.Id,
             view.CompetitionId,
@@ -99,7 +100,14 @@ internal static class ChallengeMapper
             view.CreatedAt,
             view.UpdatedAt,
             koh?.ControlFlag,
-            koh?.Urls,
+            koh is not null && request is not null
+                ? RuntimeAccessMapping.ToResponse(
+                    koh.RuntimeInstanceId,
+                    koh.AccessMode,
+                    koh.Urls,
+                    koh.AccessEndpoints,
+                    request)
+                : null,
             CompetitionProtocolMapper.ToProtocol(visibility),
             ScoreboardProtocolMapper.ToProtocol(dataScope),
             attemptState?.Maximum,
@@ -237,7 +245,8 @@ public sealed class GetChallengeEndpoint(
             visibility.DataScope,
             attemptState,
             await getHints.ExecuteAsync(item.CompetitionId, item.Id, user.UserId, timeProvider.GetUtcNow(), ct),
-            patchVerification);
+            patchVerification,
+            HttpContext.Request);
         return TypedResults.Ok(response);
     }
 

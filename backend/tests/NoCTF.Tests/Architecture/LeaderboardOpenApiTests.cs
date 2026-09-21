@@ -263,7 +263,7 @@ public sealed class LeaderboardOpenApiTests
         await Assert.That(challengeProperties.TryGetProperty("baseScore", out _)).IsFalse();
         await Assert.That(challengeProperties.TryGetProperty("title", out _)).IsTrue();
         await Assert.That(challengeProperties.TryGetProperty("description", out _)).IsTrue();
-        await Assert.That(challengeProperties.TryGetProperty("urls", out _)).IsTrue();
+        await Assert.That(challengeProperties.TryGetProperty("accesses", out _)).IsTrue();
     }
 
     private static string[] PropertyNames(JsonElement schema) =>
