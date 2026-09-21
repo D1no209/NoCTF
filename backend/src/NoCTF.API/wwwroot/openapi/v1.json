@@ -26025,6 +26025,14 @@
             "minLength": 0,
             "nullable": true
           },
+          "attachmentIds": {
+            "type": "array",
+            "nullable": true,
+            "items": {
+              "type": "string",
+              "format": "guid"
+            }
+          },
           "files": {
             "type": "array",
             "minLength": 1,

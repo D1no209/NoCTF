@@ -2991,6 +2991,7 @@ export type NoCtfapiEndpointsAdministrationChallengeBankAttachmentBatchFailureCo
 export type NoCtfapiEndpointsAdministrationChallengeBankUploadChallengeAttachmentsRequest = {
     deliveryPolicy: NoCtfapiEndpointsAdministrationChallengeBankAttachmentDeliveryPolicyProtocol;
     downloadFileName?: string | null;
+    attachmentIds?: Array<string> | null;
     files: Array<Blob | File>;
 };
 
