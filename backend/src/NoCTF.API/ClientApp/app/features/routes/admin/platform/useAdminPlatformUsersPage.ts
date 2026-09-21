@@ -28,8 +28,6 @@ export function useAdminPlatformUsersPage() {
 
   const users = ref<PlatformUser[]>([])
 
-  const loading = ref(true)
-
   const loadError = ref<string | null>(null)
 
   const search = ref('')
@@ -80,6 +78,8 @@ export function useAdminPlatformUsersPage() {
     users.value = data.items ?? []
     return { items: users.value, total: data.total ?? 0 }
   }, { initialDesc: false })
+
+  const loading = computed(() => pagination.loading.value && !pagination.initialized.value)
 
   const filteredUsers = computed(() => users.value)
 
