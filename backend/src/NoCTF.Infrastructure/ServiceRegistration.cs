@@ -46,7 +46,6 @@ public static class ServiceRegistration
         services.AddNoCtfPersistence(configuration, exporting, development);
         services.AddNoCtfMessaging(exporting, development);
         services.AddNoCtfRuntime(configuration, development);
-        NoCTF.Infrastructure.Runtime.PublicAccess.PublicGatewayInfrastructure.AddNoCtfPublicGateway(services, configuration);
         services.AddNoCtfSubmissions();
         services.AddNoCtfScoring(development);
         services.AddNoCtfNotifications(development);

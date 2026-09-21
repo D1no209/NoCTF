@@ -394,8 +394,7 @@ public sealed class CompetitionWebhookDeliveryStore(
             PatchVerificationResult = (string?)null,
             PatchVerificationFailureCode = (string?)null,
             PatchVerificationRuntimeInstanceId = (Guid?)null,
-            PatchVerificationRuntimeState = (string?)null,
-            PublicAccessFailure = (string?)null
+            PatchVerificationRuntimeState = (string?)null
         }, JsonOptions);
     }
 

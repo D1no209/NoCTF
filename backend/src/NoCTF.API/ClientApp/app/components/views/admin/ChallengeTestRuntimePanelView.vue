@@ -3,7 +3,7 @@ import { toRefs } from 'vue'
 import type { ChallengeTestRuntimePanelViewState } from '~/features/admin/useChallengeTestRuntimePanel'
 
 const viewProps = defineProps<{ state: ChallengeTestRuntimePanelViewState }>()
-const { Check, Clipboard, FlaskConical, RefreshCw, publicGatewayFailure, runtime, loading, loadError, copied, extendMinutes, timedOut, retryLoad, start, stop, reset, extend, copyTestFlag, active, canStart, busy, ttl, canExtend, stateVariant, flagVariant, flagStateLabel, RuntimeAccessUrl, definitionDirty } = toRefs(viewProps.state)
+const { Check, Clipboard, FlaskConical, RefreshCw, runtime, loading, loadError, copied, extendMinutes, timedOut, retryLoad, start, stop, reset, extend, copyTestFlag, active, canStart, busy, ttl, canExtend, stateVariant, flagVariant, flagStateLabel, RuntimeAccessUrl, definitionDirty } = toRefs(viewProps.state)
 </script>
 
 <template>
@@ -49,7 +49,6 @@ const { Check, Clipboard, FlaskConical, RefreshCw, publicGatewayFailure, runtime
     </Alert>
 
     <template v-if="!loading && !loadError">
-      <Alert v-if="runtime?.publicAccessFailure"><AlertDescription>{{ publicGatewayFailure(runtime.publicAccessFailure) }}</AlertDescription></Alert>
       <div v-if="runtime" class="grid gap-3 text-sm sm:grid-cols-2">
         <div class="grid gap-1">
           <span class="text-muted-foreground">{{ $t('ui.placement') }}</span>

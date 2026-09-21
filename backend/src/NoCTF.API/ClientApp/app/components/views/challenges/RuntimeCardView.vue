@@ -3,7 +3,7 @@ import { toRefs } from 'vue'
 import type { RuntimeCardViewState } from '~/features/challenges/useRuntimeCard'
 
 const viewProps = defineProps<{ state: RuntimeCardViewState }>()
-const { runnerFailureLabel, canStop, stopDisabled, publicGatewayFailure, publicGatewayState, runtime, loading, loadError, extendMinutes, polling, timedOut, retryLoad, start, stop, reset, extend, ttl, isRunning, busy, stateVariant, RuntimeAccessUrl, controls, dockTarget } = toRefs(viewProps.state)
+const { runnerFailureLabel, canStop, stopDisabled, runtime, loading, loadError, extendMinutes, polling, timedOut, retryLoad, start, stop, reset, extend, ttl, isRunning, busy, stateVariant, RuntimeAccessUrl, controls, dockTarget } = toRefs(viewProps.state)
 </script>
 
 <template>
@@ -31,11 +31,6 @@ const { runnerFailureLabel, canStop, stopDisabled, publicGatewayFailure, publicG
         </Alert>
 
         <template v-if="!loadError && runtime">
-          <div v-if="isRunning && (runtime.access?.route === 'Gateway' || runtime.access?.failure)" class="text-sm text-muted-foreground" role="status" aria-live="polite">
-              <span v-if="runtime.access?.route === 'Gateway'">{{ publicGatewayState(runtime.access.state) }}</span>
-              <span v-if="runtime.access?.failure"> {{ publicGatewayFailure(runtime.access.failure) }}</span>
-              <p v-if="runtime.access?.route === 'Gateway'" class="mt-1">{{ $t('ui.publicConnectionStatusDoesNotChangeTheRuntimeState') }}</p>
-          </div>
           <div v-if="isRunning && runtime.urls?.length" class="flex flex-col gap-1">
             <span class="text-sm text-muted-foreground">{{ $t('ui.accessAddress') }}</span>
             <component :is="RuntimeAccessUrl"

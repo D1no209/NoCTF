@@ -1,6 +1,5 @@
 /** Runtime locale chunk. Keep keys stable across languages. */
 export const messages = {
-  "ui.publicConnectionStatusDoesNotChangeTheRuntimeState": "Public connection status does not change the runtime state.",
   "ui.searchCompetitionChallengeOrTeam": "Search competition, challenge or team",
   "ui.allSources": "All sources",
   "ui.competitionContainers": "Competition containers",

@@ -333,14 +333,6 @@ public sealed class DeploymentTopologyTests
     {
         var ci = (await ReadAsync(".github", "workflows", "ci.yml"))
             .ReplaceLineEndings("\n");
-        var publicGateway = (await ReadAsync(
-                ".github", "workflows", "public-gateway-build.yml"))
-            .ReplaceLineEndings("\n");
-        var publicGatewayTriggers = System.Text.RegularExpressions.Regex.Match(
-            publicGateway,
-            "(?ms)^on:\n(?<body>.*?)(?=^\npermissions:)")
-            .Groups["body"]
-            .Value;
         var publishJob = System.Text.RegularExpressions.Regex.Match(
             ci,
             "(?ms)^  publish-images:\n(?<body>.*?)(?=^  deploy-test:)")
@@ -369,9 +361,6 @@ public sealed class DeploymentTopologyTests
             "cache-to: type=gha,mode=max,scope=noctf-host,ignore-error=true");
         await Assert.That(ci).DoesNotContain("matrix.image");
         await Assert.That(ci).DoesNotContain("matrix.target");
-        await Assert.That(publicGatewayTriggers).Contains("  workflow_dispatch:\n");
-        await Assert.That(publicGatewayTriggers).DoesNotContain("  push:\n");
-
     }
 
     [Test]

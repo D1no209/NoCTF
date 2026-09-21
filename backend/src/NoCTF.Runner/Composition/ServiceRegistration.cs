@@ -152,7 +152,6 @@ public static class ServiceRegistration
         services.AddSingleton<AwdpFixArchiveDownloader>();
         services.AddSingleton<FixArchivePreparer>();
         services.AddSingleton<IRuntimeNodeWorkReader, RuntimeNodeWorkReader>();
-        NoCTF.Runner.PublicAccess.PublicGatewayRegistration.AddPublicGatewayCoordinator(services, configuration);
         return services;
     }
 

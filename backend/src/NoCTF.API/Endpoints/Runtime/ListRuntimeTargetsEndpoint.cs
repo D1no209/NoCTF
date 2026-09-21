@@ -2,23 +2,17 @@ using FastEndpoints;
 using Microsoft.AspNetCore.Http.HttpResults;
 using NoCTF.API.Security;
 using NoCTF.Application.Runtime.Instances;
-using NoCTF.Application.Runtime.PublicAccess;
-using NoCTF.Domain.Platform;
 
 namespace NoCTF.API.Endpoints.Runtime;
 
 public sealed record RuntimeTargetResponse(Guid TeamId, string TeamName, IReadOnlyList<string> Urls);
-public sealed record RuntimeTargetListResponse(IReadOnlyList<RuntimeTargetResponse> Items)
-{
-    public PublicAccessFailureProtocol? PublicAccessFailure { get; init; }
-}
+public sealed record RuntimeTargetListResponse(IReadOnlyList<RuntimeTargetResponse> Items);
 
 public sealed class ListRuntimeTargetsEndpoint(
     ListRuntimeTargets list,
     IUserContext user,
-    TimeProvider timeProvider,
-    ReadRuntimePublicAccess access)
-    : EndpointWithoutRequest<Results<Ok<RuntimeTargetListResponse>, NotFound, ProblemHttpResult>>
+    TimeProvider timeProvider)
+    : EndpointWithoutRequest<Results<Ok<RuntimeTargetListResponse>, NotFound>>
 {
     public override void Configure()
     {
@@ -31,7 +25,7 @@ public sealed class ListRuntimeTargetsEndpoint(
         });
     }
 
-    public override async Task<Results<Ok<RuntimeTargetListResponse>, NotFound, ProblemHttpResult>> ExecuteAsync(
+    public override async Task<Results<Ok<RuntimeTargetListResponse>, NotFound>> ExecuteAsync(
         CancellationToken ct)
     {
         var items = await list.ExecuteAsync(
@@ -41,11 +35,10 @@ public sealed class ListRuntimeTargetsEndpoint(
             timeProvider.GetUtcNow(),
             ct);
         if (items is null) return TypedResults.NotFound();
-        var route = await access.RouteAsync($"{HttpContext.Request.Scheme}://{HttpContext.Request.Host}", ct);
-        if (route is null) return RuntimeEndpointMapping.UnknownOrigin();
         return TypedResults.Ok(new RuntimeTargetListResponse(
-            items.Select(item => new RuntimeTargetResponse(item.TeamId, item.TeamName,
-                route == RuntimeAccessRoute.Direct ? item.Urls : [])).ToArray())
-        { PublicAccessFailure = route == RuntimeAccessRoute.Gateway ? PublicAccessFailureProtocol.UnsupportedRuntimeKind : null });
+            items.Select(item => new RuntimeTargetResponse(
+                item.TeamId,
+                item.TeamName,
+                item.Urls)).ToArray()));
     }
 }

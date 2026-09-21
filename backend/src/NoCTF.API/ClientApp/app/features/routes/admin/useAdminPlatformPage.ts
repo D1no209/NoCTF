@@ -1,6 +1,6 @@
 import { markRaw } from 'vue'
 
-import { Activity, Beaker, Container, Globe, History, Info, KeyRound, MailCheck, ScrollText, Users } from '@lucide/vue'
+import { Activity, Beaker, Container, History, Info, KeyRound, MailCheck, ScrollText, Users } from '@lucide/vue'
 import type { WorkspaceNavGroup } from '../../app/workspace-nav'
 import AppWorkspaceNavComponent from '../../app/AppWorkspaceNav.vue'
 
@@ -26,7 +26,6 @@ export function useAdminPlatformPage() {
       items: [
         { to: '/admin/platform/monitoring', label: translate("ui.monitoring"), icon: Activity },
         { to: '/admin/platform/runtimes', label: translate("ui.runtimeContainers"), icon: Container },
-        { to: '/admin/platform/public-gateway', label: translate("ui.intranetTunneling"), icon: Globe },
         { to: '/admin/platform/logs', label: translate("ui.log"), icon: ScrollText },
         { to: '/admin/platform/audit', label: translate("ui.audit"), icon: History },
       ],

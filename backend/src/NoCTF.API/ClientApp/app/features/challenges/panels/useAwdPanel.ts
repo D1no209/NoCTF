@@ -1,7 +1,6 @@
 import { markRaw, toRefs } from 'vue'
 
 import { listRuntimeTargetsEndpoint } from '../../../api'
-import { publicGatewayFailure } from '../../../utils/public-gateway'
 import type { NoCtfapiEndpointsChallengesChallengeResponse, NoCtfapiEndpointsCompetitionsCompetitionResponse, NoCtfapiEndpointsRuntimeRuntimeTargetResponse } from '../../../api'
 import FlagSubmitComponent from '../FlagSubmit.vue'
 import RuntimeAccessUrlComponent from '../RuntimeAccessUrl.vue'
@@ -31,7 +30,6 @@ emit: { (event: "submitted", ...args: []): void; (event: "remainingChanged", ...
       return
     }
     targets.value = data.items ?? []
-    if (data.publicAccessFailure) targetsError.value = publicGatewayFailure(data.publicAccessFailure)
   })
 
   const FlagSubmit = markRaw(FlagSubmitComponent)

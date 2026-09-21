@@ -2,7 +2,6 @@ import { markRaw, toRefs } from 'vue'
 
 import { Check, Clipboard, FlaskConical, RefreshCw } from '@lucide/vue'
 import { toast } from 'vue-sonner'
-import { publicGatewayFailure } from '../../utils/public-gateway'
 import { adminChallengeBankCreateTestRuntime, adminChallengeBankExtendTestRuntime, adminChallengeBankGetTestRuntime, adminChallengeBankStopTestRuntime } from '../../api'
 import type { NoCtfapiEndpointsAdministrationChallengeBankChallengeTestRuntimeAcceptedResponse, NoCtfapiEndpointsAdministrationChallengeBankChallengeTestRuntimeResponse, NoCtfapiEndpointsAdministrationChallengeBankRuntimeTestFlagStateProtocol } from '../../api'
 import type { ChallengeTestRuntimeLoadOutcome, ChallengeTestRuntimeMutationKind, PendingChallengeTestRuntimeMutation } from '../../utils/challenge-test-runtime-polling'
@@ -251,7 +250,6 @@ export function useChallengeTestRuntimePanel(props: Readonly<{
       Clipboard,
       FlaskConical,
       RefreshCw,
-      publicGatewayFailure,
       runtime,
       loading,
       loadError,

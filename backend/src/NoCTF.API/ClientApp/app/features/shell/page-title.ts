@@ -40,7 +40,6 @@ const platformAdministrationTitles = {
   email: 'ui.emailAndHumanVerification',
   monitoring: 'ui.monitoring',
   runtimes: 'ui.runtimeContainers',
-  'public-gateway': 'ui.intranetTunneling',
   logs: 'ui.log',
   audit: 'ui.audit',
 } satisfies Record<string, MessageKey>
