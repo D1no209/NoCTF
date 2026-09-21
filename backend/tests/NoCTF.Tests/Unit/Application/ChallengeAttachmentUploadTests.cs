@@ -212,6 +212,110 @@ public sealed class ChallengeAttachmentUploadTests
     }
 
     [Test]
+    public async Task Ordinary_batch_preserves_requested_attachment_ids()
+    {
+        var harness = CreateHarness();
+        var requestedIds = new[] { Guid.NewGuid(), Guid.NewGuid() };
+        harness.Store.AddBatchAsync(
+                ChallengeId,
+                ActorId,
+                false,
+                Arg.Any<IReadOnlyList<ChallengeAttachmentBatchEntry>>(),
+                Arg.Any<CancellationToken>())
+            .Returns(AddChallengeAttachmentState.Added);
+        using var first = new MemoryStream([1]);
+        using var second = new MemoryStream([2]);
+
+        var result = await harness.UseCase.UploadBatchAsync(
+            ChallengeId,
+            ActorId,
+            false,
+            [
+                new("first.txt", "text/plain", first, requestedIds[0]),
+                new("second.txt", "text/plain", second, requestedIds[1])
+            ],
+            DateTimeOffset.Parse("2026-09-21T00:00:00Z"));
+
+        await Assert.That(result.Succeeded).IsTrue();
+        await Assert.That(result.Value!.Items.Select(item => item.Id))
+            .IsEquivalentTo(requestedIds);
+        await harness.Store.Received(1).AddBatchAsync(
+            ChallengeId,
+            ActorId,
+            false,
+            Arg.Is<IReadOnlyList<ChallengeAttachmentBatchEntry>>(entries =>
+                entries != null
+                && entries.Select(entry => entry.AttachmentId).SequenceEqual(requestedIds)),
+            Arg.Any<CancellationToken>());
+    }
+
+    [Test]
+    public async Task Random_batch_preserves_requested_attachment_ids()
+    {
+        var harness = CreateHarness();
+        var requestedIds = new[] { Guid.NewGuid(), Guid.NewGuid() };
+        harness.Store.AddRandomBatchAsync(
+                ChallengeId,
+                ActorId,
+                false,
+                "challenge.zip",
+                Arg.Any<IReadOnlyList<RandomAttachmentBatchEntry>>(),
+                Arg.Any<CancellationToken>())
+            .Returns(AddChallengeAttachmentState.Added);
+        using var first = new MemoryStream([1]);
+        using var second = new MemoryStream([2]);
+
+        var result = await harness.UseCase.UploadRandomBatchAsync(
+            ChallengeId,
+            ActorId,
+            false,
+            "challenge.zip",
+            [
+                new("flag{one}", "application/zip", first, requestedIds[0]),
+                new("flag{two}", "application/zip", second, requestedIds[1])
+            ],
+            DateTimeOffset.Parse("2026-09-21T00:00:00Z"));
+
+        await Assert.That(result.Succeeded).IsTrue();
+        await Assert.That(result.Value!.Items.Select(item => item.Id))
+            .IsEquivalentTo(requestedIds);
+    }
+
+    [Test]
+    [Arguments(false)]
+    [Arguments(true)]
+    public async Task Duplicate_or_empty_requested_ids_are_rejected_before_storage(bool useEmptyId)
+    {
+        var harness = CreateHarness();
+        var requestedId = useEmptyId ? Guid.Empty : Guid.NewGuid();
+        using var first = new MemoryStream([1]);
+        using var second = new MemoryStream([2]);
+
+        var result = await harness.UseCase.UploadBatchAsync(
+            ChallengeId,
+            ActorId,
+            false,
+            [
+                new("first.txt", "text/plain", first, requestedId),
+                new("second.txt", "text/plain", second, requestedId)
+            ],
+            DateTimeOffset.Parse("2026-09-21T00:00:00Z"));
+
+        await Assert.That(result.FailureCode)
+            .IsEqualTo(ChallengeAttachmentFailureCode.ResourceIdConflict);
+        await harness.Registry.DidNotReceiveWithAnyArgs().RegisterAsync(
+            default!,
+            default,
+            default);
+        await harness.Store.DidNotReceiveWithAnyArgs().AddBatchAsync(
+            default,
+            default,
+            default,
+            default!,
+            default);
+    }
+
+    [Test]
     public async Task Duplicate_random_batch_flag_is_rejected_before_storage()
     {
         var harness = CreateHarness();
