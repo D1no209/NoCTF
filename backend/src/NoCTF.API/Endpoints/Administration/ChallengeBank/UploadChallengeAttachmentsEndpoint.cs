@@ -15,7 +15,7 @@ public sealed class UploadChallengeAttachmentsRequest
 {
     public AttachmentDeliveryPolicyProtocol? DeliveryPolicy { get; set; }
     public string? DownloadFileName { get; set; }
-    public IReadOnlyList<Guid> AttachmentIds { get; set; } = [];
+    public IReadOnlyList<Guid>? AttachmentIds { get; set; }
     public IReadOnlyList<IFormFile> Files { get; set; } = [];
 }
 
@@ -26,12 +26,12 @@ public sealed class UploadChallengeAttachmentsValidator
     {
         RuleFor(request => request.DeliveryPolicy).NotNull().IsInEnum();
         RuleFor(request => request.AttachmentIds)
-            .NotNull()
-            .Must((request, ids) => ids.Count == 0 || ids.Count == request.Files.Count)
+            .Must((request, ids) => ids is null || ids.Count == 0 || ids.Count == request.Files.Count)
             .WithMessage("AttachmentIds must be empty or contain one ID for every file.")
-            .Must(ids => ids.Distinct().Count() == ids.Count)
+            .Must(ids => ids is null || ids.Distinct().Count() == ids.Count)
             .WithMessage("AttachmentIds cannot contain duplicates.");
-        RuleForEach(request => request.AttachmentIds).NotEmpty();
+        RuleForEach(request => request.AttachmentIds!).NotEmpty()
+            .When(request => request.AttachmentIds is not null);
         RuleFor(request => request.Files).NotEmpty().Must(files => files.Count <= 128);
         RuleFor(request => request.DownloadFileName).NotEmpty().MaximumLength(260)
             .When(request => request.DeliveryPolicy
@@ -166,7 +166,7 @@ public sealed class UploadChallengeAttachmentsEndpoint(
     private static Guid? RequestedAttachmentId(
         UploadChallengeAttachmentsRequest request,
         int index) =>
-        request.AttachmentIds.Count == 0 ? null : request.AttachmentIds[index];
+        request.AttachmentIds is not { Count: > 0 } ? null : request.AttachmentIds[index];
 
     private static AttachmentBatchFailureCodeProtocol MapFailure(
         ChallengeAttachmentFailureCode code) => code switch
