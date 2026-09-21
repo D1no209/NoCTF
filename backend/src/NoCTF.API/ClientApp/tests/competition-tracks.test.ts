@@ -94,6 +94,7 @@ describe('competition track pages', () => {
 
   test('uses generated SDK operations and keeps pending/error state explicit', async () => {
     const admin = await sourceFile(new URL('../app/pages/admin/competitions/[id]/tracks.vue', import.meta.url)).text()
+    const trackView = await sourceFile(new URL('../app/components/views/page/admin/competitions/[id]/AdminCompetitionsByIdTracksPageView.vue', import.meta.url)).text()
     const teams = await sourceFile(new URL('../app/pages/admin/competitions/[id]/teams.vue', import.meta.url)).text()
 
     expect(admin).toContain('adminGetCompetition')
@@ -122,8 +123,17 @@ describe('competition track pages', () => {
     expect(admin).toContain('track.invitationCode.trim() || null')
     expect(admin).toContain('requiredSsoProviderId: track.requiredSsoProviderId ?? null')
     expect(admin).toContain('updateRequiredSsoProvider')
+    expect(admin).toContain('configureSsoProviders')
     expect(admin).toContain('data.ssoProviders ?? []')
     expect(admin).toContain('error.value = competitionTrackErrorMessage')
+    expect(trackView.indexOf('v-model="track.name"')).toBeLessThan(
+      trackView.indexOf(':model-value="track.isDefault"'),
+    )
+    expect(trackView.indexOf(':model-value="track.requiredSsoProviderId ?? \'none\'"')).toBeGreaterThan(
+      trackView.indexOf(':id="`track-invitation-${track.clientId}`"'),
+    )
+    expect(trackView).toContain('sso.trackGateNoProviders')
+    expect(trackView).toContain('sso.trackGateConfigurationHint')
     expect(teams).toContain('patchCompetitionTeam')
     expect(teams).toContain('tracksEnabled')
     expect(teams).toContain('body: { administration: { trackKey, registrationStatus: team.registrationStatus } }')
