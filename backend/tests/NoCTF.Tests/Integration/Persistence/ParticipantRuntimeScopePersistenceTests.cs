@@ -92,6 +92,11 @@ public sealed class ParticipantRuntimeScopePersistenceTests
                     .Where(observation => observation.TargetsWereVisible)
                     .Select(observation => observation.Name))
                 .IsEmpty();
+            var pendingScope = fixture.InvalidScopes.Single(scope => scope.Name == "pending-team");
+            var retainedPendingRuntime = await db.RuntimeInstances.AsNoTracking().SingleAsync(
+                instance => instance.TeamId == pendingScope.TeamId,
+                cancellationToken);
+            await Assert.That(retainedPendingRuntime.State).IsEqualTo(RuntimeState.Running);
 
             var validRuntime = await instances.FindPlayerRuntimeAsync(
                 fixture.ValidScope.CompetitionId,
@@ -184,6 +189,22 @@ public sealed class ParticipantRuntimeScopePersistenceTests
                 teamDeletedAt: now),
             AddScope(
                 db,
+                "pending-team",
+                challengeDefinition,
+                challengeRules,
+                competitionConfiguration,
+                now,
+                registrationStatus: TeamRegistrationStatus.Pending),
+            AddScope(
+                db,
+                "banned-team",
+                challengeDefinition,
+                challengeRules,
+                competitionConfiguration,
+                now,
+                teamBanned: true),
+            AddScope(
+                db,
                 "deleted-competition",
                 challengeDefinition,
                 challengeRules,
@@ -226,6 +247,8 @@ public sealed class ParticipantRuntimeScopePersistenceTests
         DateTimeOffset? competitionChallengeDeletedAt = null,
         DateTimeOffset? challengeDeletedAt = null,
         DateTimeOffset? teamDeletedAt = null,
+        TeamRegistrationStatus registrationStatus = TeamRegistrationStatus.Approved,
+        bool teamBanned = false,
         string? runtimeUrl = null)
     {
         var userId = Guid.CreateVersion7(now);
@@ -274,11 +297,13 @@ public sealed class ParticipantRuntimeScopePersistenceTests
             competitionId,
             name,
             now,
-            deletedAt: teamDeletedAt,
             runtime: new(
                 competitionId,
                 competitionChallengeId,
-                runtimeUrl ?? $"https://{name}.example.test"));
+                runtimeUrl ?? $"https://{name}.example.test"),
+            deletedAt: teamDeletedAt,
+            registrationStatus: registrationStatus,
+            banned: teamBanned);
         return new(name, competitionId, competitionChallengeId, team.UserId, team.TeamId);
     }
 
@@ -287,8 +312,10 @@ public sealed class ParticipantRuntimeScopePersistenceTests
         Guid competitionId,
         string name,
         DateTimeOffset now,
-        DateTimeOffset? deletedAt,
-        RuntimeFixture runtime)
+        RuntimeFixture runtime,
+        DateTimeOffset? deletedAt = null,
+        TeamRegistrationStatus registrationStatus = TeamRegistrationStatus.Approved,
+        bool banned = false)
     {
         var userId = Guid.CreateVersion7(now);
         var teamId = Guid.CreateVersion7(now);
@@ -301,8 +328,9 @@ public sealed class ParticipantRuntimeScopePersistenceTests
             CaptainId = userId,
             MemberIds = [userId],
             InvitationToken = Guid.NewGuid().ToString("N"),
-            RegistrationStatus = TeamRegistrationStatus.Approved,
+            RegistrationStatus = registrationStatus,
             RegisteredAt = now,
+            IsBanned = banned,
             DeletedAt = deletedAt
         });
         db.RuntimeInstances.Add(new RuntimeInstance
