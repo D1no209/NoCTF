@@ -1,6 +1,7 @@
 import { markRaw } from 'vue'
 import type { ComponentPublicInstance } from 'vue'
 import { Image as ImageIcon, LockKeyhole, LogOut, ShieldCheck, UserRound } from '@lucide/vue'
+import { useMediaQuery } from '@vueuse/core'
 import { toast } from 'vue-sonner'
 import {
   authenticationGetMyProfile,
@@ -40,6 +41,7 @@ export function useAccountPanel() {
 
   const open = ref(false)
   const activeSection = ref<AccountPanelSection | null>(null)
+  const wideAccountPanel = useMediaQuery('(min-width: 1024px)')
 
   function uploadTooLarge(maximumBytes: number | null): string {
     return maximumBytes
@@ -441,6 +443,7 @@ export function useAccountPanel() {
     ImageIcon,
     LogOut,
     user,
+    wideAccountPanel,
     isImpersonating,
     fetchMe,
     open,

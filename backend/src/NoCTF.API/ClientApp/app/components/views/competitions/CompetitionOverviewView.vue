@@ -51,7 +51,7 @@ const { ArrowRight, Box, CalendarRange, Clock, EyeOff, FileText, KeyRound, LogIn
 
             <template v-else-if="!isLoggedIn">
               <Button as-child>
-                <NuxtLink :to="{ path: '/auth/login', query: { redirect: `/competitions?competition=${competitionId}` } }">
+                <NuxtLink :to="{ path: '/auth/login', query: { redirect: competitionPath(competitionId) } }">
                   <LogIn data-icon="inline-start" /> {{ practiceOpen ? $t('ui.signInToPractice') : $t('ui.signUpAfterLoginRegister') }} </NuxtLink>
               </Button>
             </template>

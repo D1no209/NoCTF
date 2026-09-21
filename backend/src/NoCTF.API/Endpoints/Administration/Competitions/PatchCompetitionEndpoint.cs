@@ -54,6 +54,9 @@ public sealed class CompetitionMetadataPatchRequest
     public required bool WriteUpSubmissionRequired { get; set; }
     public required int WriteUpSubmissionDeadlineHours { get; set; }
     public required CompetitionAccessModeProtocol AccessMode { get; set; }
+    public RuntimeAccessModeProtocol RuntimeAccessMode { get; set; } = RuntimeAccessModeProtocol.Direct;
+    public bool TrafficCaptureEnabled { get; set; }
+    public long? TrafficCaptureLimitBytes { get; set; }
 }
 
 public sealed class CompetitionConfigurationPatchRequest
@@ -166,6 +169,19 @@ public sealed class PatchCompetitionValidator : Validator<PatchCompetitionReques
             .When(request => request.Metadata is not null);
         RuleFor(request => request.Metadata!.AccessMode).IsInEnum()
             .When(request => request.Metadata is not null);
+        RuleFor(request => request.Metadata!.RuntimeAccessMode).IsInEnum()
+            .When(request => request.Metadata is not null);
+        RuleFor(request => request.Metadata!.TrafficCaptureLimitBytes)
+            .InclusiveBetween(
+                RuntimeAccessPolicy.MinimumCaptureLimitBytes,
+                RuntimeAccessPolicy.MaximumCaptureLimitBytes)
+            .When(request => request.Metadata?.TrafficCaptureLimitBytes is not null);
+        RuleFor(request => request.Metadata)
+            .Must(metadata => metadata is null
+                || !metadata.TrafficCaptureEnabled
+                || metadata.RuntimeAccessMode is RuntimeAccessModeProtocol.DirectAndWsrx
+                    or RuntimeAccessModeProtocol.WsrxOnly)
+            .WithMessage("Traffic capture requires a WSRX-enabled Runtime access mode.");
         RuleFor(request => request.ModeConfiguration!.Json).NotEmpty()
             .When(request => request.ModeConfiguration is not null);
         RuleFor(request => request.Tracks!.Tracks).NotNull()
@@ -208,7 +224,9 @@ public static partial class CompetitionPatchMapper
     [MapProperty(nameof(CompetitionMetadataPatchRequest.StartTime), nameof(Competition.StartAt))]
     [MapProperty(nameof(CompetitionMetadataPatchRequest.EndTime), nameof(Competition.EndAt))]
     [MapperIgnoreSource(nameof(CompetitionMetadataPatchRequest.AccessMode))]
+    [MapperIgnoreSource(nameof(CompetitionMetadataPatchRequest.RuntimeAccessMode))]
     [MapperIgnoreTarget(nameof(Competition.AccessMode))]
+    [MapperIgnoreTarget(nameof(Competition.RuntimeAccessMode))]
     [MapperIgnoreTarget(nameof(Competition.OwnerId))]
     [MapperIgnoreTarget(nameof(Competition.ManagerIds))]
     [MapperIgnoreTarget(nameof(Competition.JudgeIds))]
@@ -237,6 +255,9 @@ public static partial class CompetitionPatchMapper
     [MapperIgnoreTarget(nameof(Competition.Title))]
     [MapperIgnoreTarget(nameof(Competition.Description))]
     [MapperIgnoreTarget(nameof(Competition.AccessMode))]
+    [MapperIgnoreTarget(nameof(Competition.RuntimeAccessMode))]
+    [MapperIgnoreTarget(nameof(Competition.TrafficCaptureEnabled))]
+    [MapperIgnoreTarget(nameof(Competition.TrafficCaptureLimitBytes))]
     [MapperIgnoreTarget(nameof(Competition.OwnerId))]
     [MapperIgnoreTarget(nameof(Competition.ManagerIds))]
     [MapperIgnoreTarget(nameof(Competition.JudgeIds))]
@@ -277,6 +298,9 @@ public static partial class CompetitionPatchMapper
     [MapperIgnoreTarget(nameof(Competition.Title))]
     [MapperIgnoreTarget(nameof(Competition.Description))]
     [MapperIgnoreTarget(nameof(Competition.AccessMode))]
+    [MapperIgnoreTarget(nameof(Competition.RuntimeAccessMode))]
+    [MapperIgnoreTarget(nameof(Competition.TrafficCaptureEnabled))]
+    [MapperIgnoreTarget(nameof(Competition.TrafficCaptureLimitBytes))]
     [MapperIgnoreTarget(nameof(Competition.OwnerId))]
     [MapperIgnoreTarget(nameof(Competition.ManagerIds))]
     [MapperIgnoreTarget(nameof(Competition.JudgeIds))]
@@ -313,6 +337,9 @@ public static partial class CompetitionPatchMapper
     [MapperIgnoreTarget(nameof(Competition.Title))]
     [MapperIgnoreTarget(nameof(Competition.Description))]
     [MapperIgnoreTarget(nameof(Competition.AccessMode))]
+    [MapperIgnoreTarget(nameof(Competition.RuntimeAccessMode))]
+    [MapperIgnoreTarget(nameof(Competition.TrafficCaptureEnabled))]
+    [MapperIgnoreTarget(nameof(Competition.TrafficCaptureLimitBytes))]
     [MapperIgnoreTarget(nameof(Competition.ConfigurationJson))]
     [MapperIgnoreTarget(nameof(Competition.WebhookConfiguration))]
     [MapperIgnoreTarget(nameof(Competition.TracksEnabled))]
@@ -348,6 +375,9 @@ public static partial class CompetitionPatchMapper
     [MapperIgnoreTarget(nameof(Competition.Title))]
     [MapperIgnoreTarget(nameof(Competition.Description))]
     [MapperIgnoreTarget(nameof(Competition.AccessMode))]
+    [MapperIgnoreTarget(nameof(Competition.RuntimeAccessMode))]
+    [MapperIgnoreTarget(nameof(Competition.TrafficCaptureEnabled))]
+    [MapperIgnoreTarget(nameof(Competition.TrafficCaptureLimitBytes))]
     [MapperIgnoreTarget(nameof(Competition.OwnerId))]
     [MapperIgnoreTarget(nameof(Competition.ManagerIds))]
     [MapperIgnoreTarget(nameof(Competition.JudgeIds))]
@@ -469,12 +499,17 @@ public sealed class PatchCompetitionEndpoint(
             MaxActiveQuestionsPerTeam = current.MaxActiveQuestionsPerTeam,
             MaxParticipantMessagesBeforeHandlerReply = current.MaxParticipantMessagesBeforeHandlerReply,
             AllowChallengeOwnersToHandleQuestions = current.AllowChallengeOwnersToHandleQuestions,
+            RuntimeAccessMode = current.RuntimeAccessMode,
+            TrafficCaptureEnabled = current.TrafficCaptureEnabled,
+            TrafficCaptureLimitBytes = current.TrafficCaptureLimitBytes,
             DeletedAt = current.DeletedAt
         };
         if ((sections & CompetitionPatchSection.Metadata) != 0)
         {
             CompetitionPatchMapper.ApplyMetadataAsModerator(request.Metadata!, target);
             target.AccessMode = CompetitionProtocolMapper.ToDomain(request.Metadata!.AccessMode);
+            target.RuntimeAccessMode = CompetitionProtocolMapper.ToDomain(
+                request.Metadata.RuntimeAccessMode);
         }
         if ((sections & CompetitionPatchSection.ModeConfiguration) != 0)
             CompetitionPatchMapper.ApplyConfigurationAsModerator(request.ModeConfiguration!, target);
@@ -518,7 +553,10 @@ public sealed class PatchCompetitionEndpoint(
                     target.PracticeModeEnabled,
                     target.AccessMode,
                     target.WriteUpSubmissionRequired,
-                    target.WriteUpSubmissionDeadlineHours), transactionCt);
+                    target.WriteUpSubmissionDeadlineHours,
+                    target.RuntimeAccessMode,
+                    target.TrafficCaptureEnabled,
+                    target.TrafficCaptureLimitBytes), transactionCt);
                 if (!result.Succeeded)
                     return Reject(Failure(
                         result.ErrorMessage ?? "Competition metadata is invalid."));

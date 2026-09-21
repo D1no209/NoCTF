@@ -48,6 +48,7 @@ public sealed class UserAccountAdministrationStore(
         await ResourceManagerRoleGuard.AcquireAsync(db, [userId], ct);
         var user = await db.Users
             .Include(candidate => candidate.AvatarFile)
+            .Include(candidate => candidate.ProfileCoverFile)
             .Include(candidate => candidate.WallpaperFile)
             .SingleOrDefaultAsync(candidate => candidate.Id == userId, ct);
         if (user is null)
@@ -67,6 +68,7 @@ public sealed class UserAccountAdministrationStore(
             return new(UserDeletionState.HardDeleteBlocked, preview);
 
         var previousAvatarFileId = user.AvatarFileId;
+        var previousProfileCoverFileId = user.ProfileCoverFileId;
         var previousWallpaperFileId = user.WallpaperFileId;
         var originalUserName = user.UserName;
         await db.AccountTokens
@@ -105,6 +107,8 @@ public sealed class UserAccountAdministrationStore(
                 await outbox.PublishAsync(new CleanupFile(previous));
             if (previousWallpaperFileId is { } previousWallpaper)
                 await outbox.PublishAsync(new CleanupFile(previousWallpaper));
+            if (previousProfileCoverFileId is { } previousProfileCover)
+                await outbox.PublishAsync(new CleanupFile(previousProfileCover));
             await db.SaveChangesAsync(ct);
             await transaction.CommitAsync(ct);
             await outbox.FlushOutgoingMessagesAsync();
@@ -112,7 +116,8 @@ public sealed class UserAccountAdministrationStore(
                 UserDeletionState.PhysicallyDeleted,
                 preview,
                 previousAvatarFileId,
-                previousWallpaperFileId);
+                previousWallpaperFileId,
+                previousProfileCoverFileId);
         }
 
         await RemoveResourcePermissionsAsync(userId, ct);
@@ -134,6 +139,8 @@ public sealed class UserAccountAdministrationStore(
         user.SchoolStudentNumber = null;
         user.AvatarFileId = null;
         user.AvatarFile = null;
+        user.ProfileCoverFileId = null;
+        user.ProfileCoverFile = null;
         user.WallpaperFileId = null;
         user.WallpaperFile = null;
         user.WallpaperEnabled = false;
@@ -154,6 +161,8 @@ public sealed class UserAccountAdministrationStore(
             await outbox.PublishAsync(new CleanupFile(previousFileId));
         if (previousWallpaperFileId is { } wallpaperFileId)
             await outbox.PublishAsync(new CleanupFile(wallpaperFileId));
+        if (previousProfileCoverFileId is { } profileCoverFileId)
+            await outbox.PublishAsync(new CleanupFile(profileCoverFileId));
         await db.SaveChangesAsync(ct);
         await transaction.CommitAsync(ct);
         await outbox.FlushOutgoingMessagesAsync();
@@ -161,7 +170,8 @@ public sealed class UserAccountAdministrationStore(
             UserDeletionState.Anonymized,
             preview,
             previousAvatarFileId,
-            previousWallpaperFileId);
+            previousWallpaperFileId,
+            previousProfileCoverFileId);
     }
 
     private void RecordLifecycleFact(

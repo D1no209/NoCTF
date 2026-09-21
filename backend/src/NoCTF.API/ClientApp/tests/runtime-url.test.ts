@@ -28,9 +28,14 @@ describe('runtime access URL presentation', () => {
     }
 
     const renderer = await sourceFile(
-      new URL('../app/features/challenges/RuntimeAccessUrl.vue', import.meta.url),
+      new URL('../app/components/views/challenges/RuntimeAccessUrlView.vue', import.meta.url),
     ).text()
-    expect(renderer).toContain('v-if="clickable"')
-    expect(renderer).toContain('navigator.clipboard.writeText(props.url)')
+    expect(renderer).toContain('v-if="entry.clickable"')
+
+    const controller = await sourceFile(
+      new URL('../app/features/challenges/useRuntimeAccessUrl.ts', import.meta.url),
+    ).text()
+    expect(controller).toContain('navigator.clipboard.writeText(address)')
+    expect(controller).toContain('webSocketAddress')
   })
 })

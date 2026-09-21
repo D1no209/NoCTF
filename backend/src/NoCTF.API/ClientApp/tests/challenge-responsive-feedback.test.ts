@@ -7,10 +7,12 @@ describe('challenge workspace responsive feedback', () => {
     expect(theme).toContain('grid-template-columns: var(--floating-sidebar-width) minmax(0, 1fr) clamp(13rem, 18vw, 21rem);')
     expect(theme).toContain('.competition-participant-workspace.challenge-workspace {')
     expect(theme).toContain("[data-challenge-navigator] [data-slot='wave-selection-item']")
-    expect(theme).toContain('min-height: clamp(76px, 12dvh, 112px);')
+    expect(theme).toContain('height: 40px; min-height: 0; padding: 0; overflow: visible;')
+    expect(theme).toContain('z-index: 30; height: 112px;')
     expect(theme).toContain('padding: 4px 24px 4px 4px;')
-    expect(theme).toContain('@media (max-width: 899px)')
+    expect(theme).toContain('@media (max-width: 1023px)')
     expect(theme).toContain('grid-template-columns: minmax(0, 1fr); grid-template-rows: auto; flex: none;')
+    expect(theme).toContain('position: relative; inset: auto; width: 100%; height: 24rem;')
     expect(theme).toContain(
       '.competition-participant-workspace:not(.question-participant-workspace) { grid-template-rows: minmax(0, 2fr) minmax(0, 1fr); }',
     )
@@ -32,7 +34,7 @@ describe('challenge workspace responsive feedback', () => {
     expect(fix).toContain('v-else-if="validating || recycling || completedAndRecycled"')
     expect(fix).toContain('role="status" aria-live="polite"')
     expect(fix.match(/<Alert\b/g)).toHaveLength(1)
-    expect(runtime).not.toContain('runtime.access')
+    expect(runtime).not.toMatch(/runtime\.access(?!es)/)
     expect(awdp).not.toContain('<Alert v-if="state?.fixActivation"')
     expect(navigator).not.toContain('<Alert v-else-if="board.processing.value"')
     expect(root).toContain(':visible-toasts="2"')

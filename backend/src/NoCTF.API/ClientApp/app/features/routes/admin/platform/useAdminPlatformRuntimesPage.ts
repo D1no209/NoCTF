@@ -1,4 +1,4 @@
-import { proxyRefs } from 'vue'
+import { markRaw, proxyRefs } from 'vue'
 
 import { ExternalLink, RefreshCw } from '@lucide/vue'
 import { toast } from 'vue-sonner'
@@ -8,6 +8,7 @@ import { useOffsetPagination } from '../../../../composables/useOffsetPagination
 import { adminRuntimeTeamLabel } from '../../../../utils/admin-runtime'
 import { emptyPlatformRuntimeFilters, platformRuntimeQuery } from '../../../../utils/platform-runtime-filters'
 import { formatCapacityAmount, runnerFailureLabel } from '../../../shared/runner-capacity'
+import RuntimeAccessUrlComponent from '../../../challenges/RuntimeAccessUrl.vue'
 
 type PlatformRuntime = NoCtfapiEndpointsAdministrationPlatformPlatformRuntimeResponse
 
@@ -159,8 +160,10 @@ export function useAdminPlatformRuntimesPage() {
     if (refreshTimer) clearInterval(refreshTimer)
   })
 
+  const RuntimeAccessUrl = markRaw(RuntimeAccessUrlComponent)
+
   const viewBindings = {
-      formatCapacityAmount, runnerFailureLabel, ExternalLink,
+      formatCapacityAmount, runnerFailureLabel, ExternalLink, RuntimeAccessUrl,
       RefreshCw,
       filters,
       detailTarget,

@@ -82,7 +82,17 @@ public sealed class AdminRuntimeStore(
                     && eventItem.SubjectType == EntityReferenceKind.RuntimeInstance
                     && eventItem.SubjectId == item.Id)
                     .OrderByDescending(eventItem => eventItem.OccurredAt).ThenByDescending(eventItem => eventItem.Id)
-                    .Select(eventItem => (DateTimeOffset?)eventItem.OccurredAt).FirstOrDefault()) { Capacity = item.CapacityAllocations })
+                    .Select(eventItem => (DateTimeOffset?)eventItem.OccurredAt).FirstOrDefault(),
+                null,
+                null,
+                null,
+                item.AccessMode,
+                item.AccessEndpoints.OrderBy(endpoint => endpoint.BindingIndex)
+                    .Select(endpoint => new RuntimeAccessEndpointView(endpoint.BindingIndex,
+                        endpoint.DirectAddress, endpoint.TargetHost, endpoint.TargetPort)).ToArray(),
+                item.TrafficCaptureEnabled,
+                item.TrafficCaptureLimitBytes,
+                item.TrafficCaptureReservedBytes) { Capacity = item.CapacityAllocations })
             .ToListAsync(ct);
         return new RuntimeInstanceListPage(await AddTeamAttributionAsync(items, ct), total);
     }
@@ -146,7 +156,17 @@ public sealed class AdminRuntimeStore(
                     .OrderByDescending(eventItem => eventItem.OccurredAt)
                     .ThenByDescending(eventItem => eventItem.Id)
                     .Select(eventItem => (DateTimeOffset?)eventItem.OccurredAt)
-                    .FirstOrDefault()) { Capacity = item.CapacityAllocations })
+                    .FirstOrDefault(),
+                null,
+                null,
+                null,
+                item.AccessMode,
+                item.AccessEndpoints.OrderBy(endpoint => endpoint.BindingIndex)
+                    .Select(endpoint => new RuntimeAccessEndpointView(endpoint.BindingIndex,
+                        endpoint.DirectAddress, endpoint.TargetHost, endpoint.TargetPort)).ToArray(),
+                item.TrafficCaptureEnabled,
+                item.TrafficCaptureLimitBytes,
+                item.TrafficCaptureReservedBytes) { Capacity = item.CapacityAllocations })
             .ToListAsync(ct);
         return await AddTeamAttributionAsync(items, ct);
     }
@@ -199,7 +219,17 @@ public sealed class AdminRuntimeStore(
                 && eventItem.Kind == CompetitionEventKind.RuntimeStateChanged
                 && eventItem.SubjectType == EntityReferenceKind.RuntimeInstance && eventItem.SubjectId == item.Id)
                 .OrderByDescending(eventItem => eventItem.OccurredAt).ThenByDescending(eventItem => eventItem.Id)
-                .Select(eventItem => (DateTimeOffset?)eventItem.OccurredAt).FirstOrDefault()) { Capacity = item.CapacityAllocations })
+                .Select(eventItem => (DateTimeOffset?)eventItem.OccurredAt).FirstOrDefault(),
+            null,
+            null,
+            null,
+            item.AccessMode,
+            item.AccessEndpoints.OrderBy(endpoint => endpoint.BindingIndex)
+                .Select(endpoint => new RuntimeAccessEndpointView(endpoint.BindingIndex,
+                    endpoint.DirectAddress, endpoint.TargetHost, endpoint.TargetPort)).ToArray(),
+            item.TrafficCaptureEnabled,
+            item.TrafficCaptureLimitBytes,
+            item.TrafficCaptureReservedBytes) { Capacity = item.CapacityAllocations })
             .ToListAsync(ct);
         var attributed = await AddTeamAttributionAsync(items, ct);
         var competitionIdsForTitles = attributed.Select(item => item.CompetitionId).OfType<Guid>().Distinct().ToArray();
@@ -308,7 +338,17 @@ public sealed class AdminRuntimeStore(
                     .OrderByDescending(eventItem => eventItem.OccurredAt)
                     .ThenByDescending(eventItem => eventItem.Id)
                     .Select(eventItem => (DateTimeOffset?)eventItem.OccurredAt)
-                    .FirstOrDefault()) { Capacity = item.CapacityAllocations })
+                    .FirstOrDefault(),
+                null,
+                null,
+                null,
+                item.AccessMode,
+                item.AccessEndpoints.OrderBy(endpoint => endpoint.BindingIndex)
+                    .Select(endpoint => new RuntimeAccessEndpointView(endpoint.BindingIndex,
+                        endpoint.DirectAddress, endpoint.TargetHost, endpoint.TargetPort)).ToArray(),
+                item.TrafficCaptureEnabled,
+                item.TrafficCaptureLimitBytes,
+                item.TrafficCaptureReservedBytes) { Capacity = item.CapacityAllocations })
             .ToListAsync(ct);
         if (runtimes.Count == 0)
             return [];
@@ -420,7 +460,17 @@ public sealed class AdminRuntimeStore(
                     .OrderByDescending(eventItem => eventItem.OccurredAt)
                     .ThenByDescending(eventItem => eventItem.Id)
                     .Select(eventItem => (DateTimeOffset?)eventItem.OccurredAt)
-                    .FirstOrDefault()) { Capacity = item.CapacityAllocations })
+                    .FirstOrDefault(),
+                null,
+                null,
+                null,
+                item.AccessMode,
+                item.AccessEndpoints.OrderBy(endpoint => endpoint.BindingIndex)
+                    .Select(endpoint => new RuntimeAccessEndpointView(endpoint.BindingIndex,
+                        endpoint.DirectAddress, endpoint.TargetHost, endpoint.TargetPort)).ToArray(),
+                item.TrafficCaptureEnabled,
+                item.TrafficCaptureLimitBytes,
+                item.TrafficCaptureReservedBytes) { Capacity = item.CapacityAllocations })
             .SingleOrDefaultAsync(ct);
         if (item is null)
             return null;
@@ -964,6 +1014,9 @@ public sealed class AdminRuntimeStore(
                 Purpose = purpose,
                 RuntimeKind = template.RuntimeKind,
                 RuntimeProvider = placement.Provider,
+                AccessMode = scope.Competition.RuntimeAccessMode,
+                TrafficCaptureEnabled = scope.Competition.TrafficCaptureEnabled,
+                TrafficCaptureLimitBytes = scope.Competition.TrafficCaptureLimitBytes,
                 State = RuntimeState.Queued,
                 CreatedAt = now,
                 ExpiresAt = null
@@ -1065,7 +1118,14 @@ public sealed class AdminRuntimeStore(
                     port.ContainerPort,
                     port.HostPort))
                 .ToArray(),
-            stateChangedAt);
+            stateChangedAt,
+            AccessMode: item.AccessMode,
+            AccessEndpoints: item.AccessEndpoints.OrderBy(endpoint => endpoint.BindingIndex)
+                .Select(endpoint => new RuntimeAccessEndpointView(endpoint.BindingIndex,
+                    endpoint.DirectAddress, endpoint.TargetHost, endpoint.TargetPort)).ToArray(),
+            TrafficCaptureEnabled: item.TrafficCaptureEnabled,
+            TrafficCaptureLimitBytes: item.TrafficCaptureLimitBytes,
+            TrafficCaptureReservedBytes: item.TrafficCaptureReservedBytes);
 
     private async Task<IReadOnlyList<RuntimeInstanceView>> AddTeamAttributionAsync(
         IReadOnlyList<RuntimeInstanceView> runtimes,

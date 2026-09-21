@@ -2,7 +2,11 @@
 import type { ScrollbarsBinding } from './scrollbars'
 import { createScrollbars } from './scrollbars'
 
-const props = withDefaults(defineProps<{ as?: 'div' | 'section' | 'main' | 'nav' | 'ul' | 'ol' | 'pre' | 'code' | 'aside' | 'article'; axis?: 'x' | 'y' | 'both' }>(), { as: 'div', axis: 'both' })
+const props = withDefaults(defineProps<{
+  as?: 'div' | 'section' | 'main' | 'nav' | 'ul' | 'ol' | 'pre' | 'code' | 'aside' | 'article'
+  axis?: 'x' | 'y' | 'both'
+  resetKey?: string | number | null
+}>(), { as: 'div', axis: 'both', resetKey: null })
 const target = ref<HTMLElement | null>(null)
 let scrollbars: ScrollbarsBinding | undefined
 
@@ -11,6 +15,14 @@ onMounted(() => {
     scrollbars = createScrollbars(target.value, props.axis)
 })
 watch(() => props.axis, axis => scrollbars?.update(axis))
+watch(() => props.resetKey, async (value, previous) => {
+  if (value === previous) return
+  await nextTick()
+  if (!target.value) return
+  if (props.axis !== 'x') target.value.scrollTop = 0
+  if (props.axis !== 'y') target.value.scrollLeft = 0
+  scrollbars?.update(props.axis)
+})
 onBeforeUnmount(() => scrollbars?.dispose())
 </script>
 

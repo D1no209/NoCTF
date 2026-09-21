@@ -67,6 +67,8 @@ public static partial class PlatformUserPatchMapper
     [MapperIgnoreTarget(nameof(User.SchoolStudentNumber))]
     [MapperIgnoreTarget(nameof(User.AvatarFileId))]
     [MapperIgnoreTarget(nameof(User.AvatarFile))]
+    [MapperIgnoreTarget(nameof(User.ProfileCoverFileId))]
+    [MapperIgnoreTarget(nameof(User.ProfileCoverFile))]
     [MapperIgnoreTarget(nameof(User.WallpaperFileId))]
     [MapperIgnoreTarget(nameof(User.WallpaperFile))]
     [MapperIgnoreTarget(nameof(User.WallpaperEnabled))]

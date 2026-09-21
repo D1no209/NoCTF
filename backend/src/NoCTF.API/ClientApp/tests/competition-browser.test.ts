@@ -2,12 +2,37 @@ import { expect, test } from 'bun:test'
 import { resolveCompetitionBrowser } from '../app/features/competitions/competition-browser'
 import { motionAttributes } from '../app/motion/presets'
 import { useContentSwap } from '../app/motion/useContentSwap'
+import {
+  competitionChallengePath,
+  competitionPath,
+  competitionsPath,
+} from '../app/utils/app-routes'
 
 const items = [
   { id: 'live', title: 'Live', status: 'Running' as const, endTime: '2026-10-01' },
   { id: 'next', title: 'Next', status: 'Published' as const, startTime: '2026-11-01' },
   { id: 'past', title: 'Past', status: 'Finished' as const, endTime: '2026-01-01' },
 ]
+
+test('competition entities use canonical path segments', () => {
+  expect(competitionsPath).toBe('/competitions')
+  expect(competitionPath('competition 1')).toBe('/competitions/competition%201')
+  expect(competitionChallengePath('competition 1', 'challenge/1'))
+    .toBe('/competitions/competition%201/challenges/challenge%2F1')
+})
+
+test('competition overview and challenge routes render canonical pages', async () => {
+  const overview = await Bun.file(
+    new URL('../app/pages/competitions/[id]/index.vue', import.meta.url),
+  ).text()
+  const challenges = await Bun.file(
+    new URL('../app/pages/competitions/[id]/challenges/[[ccId]].vue', import.meta.url),
+  ).text()
+  expect(overview).toContain('CompetitionsIndexPage.vue')
+  expect(overview).not.toContain('redirect:')
+  expect(challenges).toContain('CompetitionsByIdChallengesIndexPage.vue')
+  expect(challenges).toContain('key: route => route.params.id as string')
+})
 
 test('competition deep links select the right category and details', () => {
   const view = resolveCompetitionBrowser(items, 'past', 'running')

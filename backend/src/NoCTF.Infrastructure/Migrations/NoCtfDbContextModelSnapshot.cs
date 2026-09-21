@@ -410,6 +410,12 @@ namespace NoCTF.Infrastructure.Migrations
                         .HasColumnType("boolean")
                         .HasColumnName("practice_mode_enabled");
 
+                    b.Property<short>("RuntimeAccessMode")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("smallint")
+                        .HasDefaultValue((short)0)
+                        .HasColumnName("runtime_access_mode");
+
                     b.Property<DateTimeOffset>("StartAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("start_at");
@@ -436,6 +442,16 @@ namespace NoCTF.Infrastructure.Migrations
                         .HasColumnType("boolean")
                         .HasDefaultValue(true)
                         .HasColumnName("tracks_enabled");
+
+                    b.Property<bool>("TrafficCaptureEnabled")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false)
+                        .HasColumnName("traffic_capture_enabled");
+
+                    b.Property<long?>("TrafficCaptureLimitBytes")
+                        .HasColumnType("bigint")
+                        .HasColumnName("traffic_capture_limit_bytes");
 
                     b.Property<DateTimeOffset>("UpdatedAt")
                         .HasColumnType("timestamp with time zone")
@@ -501,6 +517,8 @@ namespace NoCTF.Infrastructure.Migrations
                             t.HasCheckConstraint("ck_competitions_question_limits", "max_active_questions_per_team > 0 AND max_participant_messages_before_handler_reply > 0");
 
                             t.HasCheckConstraint("ck_competitions_schedule", "start_at < end_at");
+
+                            t.HasCheckConstraint("ck_competitions_traffic_capture_limit", "traffic_capture_limit_bytes IS NULL OR traffic_capture_limit_bytes > 0");
 
                             t.HasCheckConstraint("ck_competitions_webhook_configuration", "jsonb_typeof(webhook_configuration) = 'object' AND (webhook_configuration ->> 'schemaVersion')::integer = 1 AND jsonb_typeof(webhook_configuration -> 'targets') = 'array'");
 
@@ -910,6 +928,10 @@ namespace NoCTF.Infrastructure.Migrations
                         .HasColumnType("text")
                         .HasColumnName("password_hash");
 
+                    b.Property<Guid?>("ProfileCoverFileId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("profile_cover_file_id");
+
                     b.Property<short>("Role")
                         .HasColumnType("smallint")
                         .HasColumnName("role");
@@ -960,6 +982,9 @@ namespace NoCTF.Infrastructure.Migrations
                     b.HasIndex("NormalizedUserName")
                         .IsUnique()
                         .HasDatabaseName("ix_users_normalized_user_name");
+
+                    b.HasIndex("ProfileCoverFileId")
+                        .HasDatabaseName("ix_users_profile_cover_file_id");
 
                     b.HasIndex("WallpaperFileId")
                         .HasDatabaseName("ix_users_wallpaper_file_id");
@@ -1276,6 +1301,10 @@ namespace NoCTF.Infrastructure.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("id");
 
+                    b.Property<short>("AccessMode")
+                        .HasColumnType("smallint")
+                        .HasColumnName("access_mode");
+
                     b.Property<string>("CapacityAllocations")
                         .IsRequired()
                         .ValueGeneratedOnAdd()
@@ -1356,6 +1385,18 @@ namespace NoCTF.Infrastructure.Migrations
                         .HasColumnType("smallint")
                         .HasColumnName("test_flag_state");
 
+                    b.Property<bool>("TrafficCaptureEnabled")
+                        .HasColumnType("boolean")
+                        .HasColumnName("traffic_capture_enabled");
+
+                    b.Property<long?>("TrafficCaptureLimitBytes")
+                        .HasColumnType("bigint")
+                        .HasColumnName("traffic_capture_limit_bytes");
+
+                    b.Property<long>("TrafficCaptureReservedBytes")
+                        .HasColumnType("bigint")
+                        .HasColumnName("traffic_capture_reserved_bytes");
+
                     b.PrimitiveCollection<string[]>("Urls")
                         .IsRequired()
                         .HasColumnType("text[]")
@@ -1400,6 +1441,8 @@ namespace NoCTF.Infrastructure.Migrations
                             t.HasCheckConstraint("ck_runtime_instances_scope", "(purpose = 4 AND challenge_id IS NOT NULL AND competition_id IS NULL AND competition_challenge_id IS NULL AND team_id IS NULL AND gameplay_fact_id IS NULL) OR (purpose <> 4 AND challenge_id IS NULL AND competition_id IS NOT NULL AND competition_challenge_id IS NOT NULL)");
 
                             t.HasCheckConstraint("ck_runtime_instances_test_flag", "(purpose = 4) = (test_flag_delivery IS NOT NULL AND test_flag_state IS NOT NULL)");
+
+                            t.HasCheckConstraint("ck_runtime_instances_traffic_capture", "(traffic_capture_limit_bytes IS NULL OR traffic_capture_limit_bytes > 0) AND traffic_capture_reserved_bytes >= 0");
                         });
                 });
 
@@ -1823,6 +1866,12 @@ namespace NoCTF.Infrastructure.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .HasConstraintName("fk_users_files_avatar_file_id");
 
+                    b.HasOne("NoCTF.Domain.Storage.StoredFile", "ProfileCoverFile")
+                        .WithMany()
+                        .HasForeignKey("ProfileCoverFileId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_users_files_profile_cover_file_id");
+
                     b.HasOne("NoCTF.Domain.Storage.StoredFile", "WallpaperFile")
                         .WithMany()
                         .HasForeignKey("WallpaperFileId")
@@ -1830,6 +1879,8 @@ namespace NoCTF.Infrastructure.Migrations
                         .HasConstraintName("fk_users_files_wallpaper_file_id");
 
                     b.Navigation("AvatarFile");
+
+                    b.Navigation("ProfileCoverFile");
 
                     b.Navigation("WallpaperFile");
                 });
@@ -1892,6 +1943,36 @@ namespace NoCTF.Infrastructure.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .HasConstraintName("fk_runtime_instances_teams_team_id");
 
+                    b.OwnsMany("NoCTF.Domain.Runtime.RuntimeAccessEndpoint", "AccessEndpoints", b1 =>
+                        {
+                            b1.Property<Guid>("RuntimeInstanceId");
+
+                            b1.Property<int>("__synthesizedOrdinal")
+                                .ValueGeneratedOnAdd();
+
+                            b1.Property<int>("BindingIndex");
+
+                            b1.Property<string>("DirectAddress");
+
+                            b1.Property<string>("TargetHost")
+                                .HasMaxLength(255);
+
+                            b1.Property<int?>("TargetPort");
+
+                            b1.HasKey("RuntimeInstanceId", "__synthesizedOrdinal")
+                                .HasName("pk_runtime_instances");
+
+                            b1.ToTable("runtime_instances");
+
+                            b1
+                                .ToJson("access_endpoints_json")
+                                .HasColumnType("jsonb");
+
+                            b1.WithOwner()
+                                .HasForeignKey("RuntimeInstanceId")
+                                .HasConstraintName("fk_runtime_instances_runtime_instances_runtime_instance_id");
+                        });
+
                     b.OwnsMany("NoCTF.Domain.Runtime.RuntimePublishedPort", "PublishedPorts", b1 =>
                         {
                             b1.Property<Guid>("RuntimeInstanceId");
@@ -1919,6 +2000,8 @@ namespace NoCTF.Infrastructure.Migrations
                                 .HasForeignKey("RuntimeInstanceId")
                                 .HasConstraintName("fk_runtime_instances_runtime_instances_runtime_instance_id");
                         });
+
+                    b.Navigation("AccessEndpoints");
 
                     b.Navigation("PublishedPorts");
                 });

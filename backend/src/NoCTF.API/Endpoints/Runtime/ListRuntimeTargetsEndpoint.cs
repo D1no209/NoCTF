@@ -5,7 +5,10 @@ using NoCTF.Application.Runtime.Instances;
 
 namespace NoCTF.API.Endpoints.Runtime;
 
-public sealed record RuntimeTargetResponse(Guid TeamId, string TeamName, IReadOnlyList<string> Urls);
+public sealed record RuntimeTargetResponse(
+    Guid TeamId,
+    string TeamName,
+    IReadOnlyList<RuntimeAccessResponse> Accesses);
 public sealed record RuntimeTargetListResponse(IReadOnlyList<RuntimeTargetResponse> Items);
 
 public sealed class ListRuntimeTargetsEndpoint(
@@ -39,6 +42,13 @@ public sealed class ListRuntimeTargetsEndpoint(
             items.Select(item => new RuntimeTargetResponse(
                 item.TeamId,
                 item.TeamName,
-                item.Urls)).ToArray()));
+                item.RuntimeInstanceId is Guid runtimeInstanceId
+                    ? RuntimeAccessMapping.ToResponse(
+                        runtimeInstanceId,
+                        item.AccessMode,
+                        item.Urls,
+                        item.AccessEndpoints,
+                        HttpContext.Request)
+                    : [])).ToArray()));
     }
 }

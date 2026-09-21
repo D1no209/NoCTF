@@ -1,7 +1,7 @@
 import { proxyRefs } from 'vue'
 import { markRaw } from 'vue'
 
-import { Activity, Container, Download, FileCheck, GitBranch, KeyRound, LayoutDashboard, Megaphone, Orbit, Puzzle, Settings, ShieldAlert, Trophy, Users, Webhook } from '@lucide/vue'
+import { Activity, Container, Download, FileCheck, GitBranch, KeyRound, LayoutDashboard, Megaphone, Network, Orbit, Puzzle, Settings, ShieldAlert, Trophy, Users, Webhook } from '@lucide/vue'
 import { toast } from 'vue-sonner'
 import { adminCreateCompetitionAnnouncement, adminGetCompetition } from '../../../../api'
 import type { NoCtfapiEndpointsAdministrationCompetitionsAnnouncementAudience, NoCtfapiEndpointsCompetitionsCompetitionResponse } from '../../../../api'
@@ -147,6 +147,7 @@ export function useAdminCompetitionsByIdPage() {
         { to: `/competitions/${competitionId}/events`, label: translate("ui.activity"), icon: Activity },
         { to: `${base}/submissions`, label: translate("ui.submissions"), icon: FileCheck },
         { to: `${base}/runtimes`, label: translate("ui.runtime"), icon: Container },
+        { to: `${base}/traffic-captures`, label: translate("runtime.trafficCaptures"), icon: Network },
         { to: `${base}/cheats`, label: translate("ui.cheating"), icon: ShieldAlert },
         { to: `${base}/leaderboard`, label: translate("ui.leaderboard"), icon: Trophy },
       ],

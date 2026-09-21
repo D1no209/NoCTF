@@ -85,7 +85,8 @@ public sealed class RuntimeProviderHandler(
             {
                 expanded = RuntimeUrlExpander.ExpandContainer(
                     receipt,
-                    definition.UrlBindings);
+                    definition.UrlBindings,
+                    definition.AccessMode);
             }
             catch (InvalidOperationException)
             {
@@ -100,6 +101,8 @@ public sealed class RuntimeProviderHandler(
                     expanded.Urls,
                     definition.Ttl is { } ttl ? timeProvider.GetUtcNow().Add(ttl) : null,
                     definition.Provider == RuntimeProvider.Docker
+                        && definition.AccessMode is RuntimeAccessMode.Direct
+                            or RuntimeAccessMode.DirectAndWsrx
                         ? receipt.PortMappings
                             .OrderBy(mapping => mapping.Key)
                             .Select(mapping => new RuntimePublishedPortMapping(
@@ -107,7 +110,8 @@ public sealed class RuntimeProviderHandler(
                                 mapping.Key,
                                 mapping.Value))
                             .ToArray()
-                        : null);
+                        : null,
+                    expanded.AccessEndpoints);
         }
         catch (RuntimeConfigurationException)
         {
@@ -330,7 +334,8 @@ public sealed class RuntimeProviderHandler(
                     expanded = RuntimeUrlExpander.ExpandCompose(
                         receipt,
                         status,
-                        message.Definition.UrlBindings);
+                        message.Definition.UrlBindings,
+                        message.Definition.AccessMode);
                 }
                 catch (InvalidOperationException)
                 {
@@ -347,8 +352,11 @@ public sealed class RuntimeProviderHandler(
                             ? timeProvider.GetUtcNow().Add(ttl)
                             : null,
                         message.Definition.Provider == RuntimeProvider.Docker
+                            && message.Definition.AccessMode is RuntimeAccessMode.Direct
+                                or RuntimeAccessMode.DirectAndWsrx
                             ? ReadComposePublishedPorts(message.Definition, status)
-                            : null);
+                            : null,
+                        expanded.AccessEndpoints);
             }
         }
         catch (TimeoutException)
@@ -483,7 +491,8 @@ public sealed class RuntimeProviderHandler(
                     expanded.Urls,
                     message.Definition.Ttl is { } ttl
                         ? timeProvider.GetUtcNow().Add(ttl)
-                        : null);
+                        : null,
+                    AccessEndpoints: expanded.AccessEndpoints);
         }
         catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
         {
@@ -846,6 +855,7 @@ internal static class RuntimeWriteBackOperations
         var runningAt = timeProvider.GetUtcNow();
         instance.ProviderReceiptJson = message.ProviderReceiptJson;
         instance.Urls = accessDisplays;
+        ReplaceAccessEndpoints(instance, message.AccessEndpoints, accessDisplays);
         instance.State = RuntimeState.Running;
         instance.FailureCode = null;
         instance.RunningAt = runningAt;
@@ -1439,6 +1449,44 @@ internal static class RuntimeWriteBackOperations
                     RuntimeState: instance.State,
                     HostPort: mapping.HostPort), cancellationToken);
             }
+        }
+    }
+
+    private static void ReplaceAccessEndpoints(
+        RuntimeInstance instance,
+        IReadOnlyList<RuntimeAccessEndpointMapping>? endpoints,
+        IReadOnlyList<string> legacyUrls)
+    {
+        var mappings = endpoints ?? legacyUrls
+            .Select((address, index) => new RuntimeAccessEndpointMapping(
+                index,
+                address,
+                null,
+                null))
+            .ToArray();
+        var ordered = mappings.OrderBy(mapping => mapping.BindingIndex).ToArray();
+        if (ordered.Select(mapping => mapping.BindingIndex)
+                .SequenceEqual(Enumerable.Range(0, ordered.Length)) is false
+            || ordered.Any(mapping =>
+                mapping.DirectAddress is null
+                    && (string.IsNullOrWhiteSpace(mapping.TargetHost)
+                        || mapping.TargetPort is not (>= 1 and <= 65535))
+                || mapping.TargetHost?.Length > 255
+                || mapping.TargetPort is not null and not (>= 1 and <= 65535)))
+        {
+            throw new InvalidOperationException("Runtime access endpoint results are invalid.");
+        }
+
+        instance.AccessEndpoints.Clear();
+        foreach (var mapping in ordered)
+        {
+            instance.AccessEndpoints.Add(new RuntimeAccessEndpoint
+            {
+                BindingIndex = mapping.BindingIndex,
+                DirectAddress = mapping.DirectAddress,
+                TargetHost = mapping.TargetHost,
+                TargetPort = mapping.TargetPort
+            });
         }
     }
 

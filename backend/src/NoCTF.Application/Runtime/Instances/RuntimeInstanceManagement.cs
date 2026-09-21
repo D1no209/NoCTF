@@ -33,7 +33,12 @@ public sealed record RuntimeInstanceView(
     DateTimeOffset? StateChangedAt = null,
     Guid? SourceTeamId = null,
     string? SourceTeamName = null,
-    RunnerAdmissionFailure? WaitingReason = null)
+    RunnerAdmissionFailure? WaitingReason = null,
+    RuntimeAccessMode AccessMode = RuntimeAccessMode.Direct,
+    IReadOnlyList<RuntimeAccessEndpointView>? AccessEndpoints = null,
+    bool TrafficCaptureEnabled = false,
+    long? TrafficCaptureLimitBytes = null,
+    long TrafficCaptureReservedBytes = 0)
 {
     public RuntimeCapacityAllocations? Capacity { get; init; }
 }
@@ -42,6 +47,12 @@ public sealed record RuntimePublishedPortView(
     string? ServiceName,
     int ContainerPort,
     int HostPort);
+
+public sealed record RuntimeAccessEndpointView(
+    int BindingIndex,
+    string? DirectAddress,
+    string? TargetHost,
+    int? TargetPort);
 
 public sealed record RuntimeMutationCommand(
     Guid CompetitionId,
@@ -90,7 +101,13 @@ public interface IRuntimeInstanceStore
         CancellationToken cancellationToken);
 }
 
-public sealed record RuntimeTargetView(Guid TeamId, string TeamName, IReadOnlyList<string> Urls);
+public sealed record RuntimeTargetView(
+    Guid TeamId,
+    string TeamName,
+    IReadOnlyList<string> Urls,
+    Guid? RuntimeInstanceId = null,
+    IReadOnlyList<RuntimeAccessEndpointView>? AccessEndpoints = null,
+    RuntimeAccessMode AccessMode = RuntimeAccessMode.Direct);
 
 public interface IRuntimeTargetReader
 {

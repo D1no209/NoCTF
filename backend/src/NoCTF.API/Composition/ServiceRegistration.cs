@@ -141,6 +141,8 @@ public static class ServiceRegistration
             services.AddScoped<RegisterUser>();
             services.AddScoped<GetCurrentUser>();
             services.AddScoped<GetPublicUserProfile>();
+            services.AddScoped<GetPublicUserProfileCover>();
+            services.AddScoped<ReplaceCurrentUserProfileCover>();
             services.AddScoped<ChangePassword>();
             services.AddScoped<LogoutAll>();
             services.AddScoped<RequestEmailVerification>();
@@ -175,6 +177,8 @@ public static class ServiceRegistration
             services.AddScoped<ReplaceCurrentUserWallpaper>();
             services.AddScoped<GetCurrentUserWallpaper>();
             services.AddScoped<UpdateCurrentUserWallpaperPreference>();
+            services.AddScoped<ReplaceCurrentUserProfileCover>();
+            services.AddScoped<GetPublicUserProfileCover>();
             services.AddScoped<ChangePassword>();
             services.AddScoped<LogoutAll>();
             services.AddScoped<ModerateTeam>();

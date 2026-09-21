@@ -7,19 +7,49 @@ using NoCTF.Application.Observability;
 using NoCTF.Domain.Runtime;
 using NoCTF.Runtime.Docker.Compose;
 using NoCTF.Runtime.Docker.Containers;
+using System.Text.Json;
 
 namespace NoCTF.Runtime.Docker;
 
 public sealed class DockerRuntimeResourceReconciler(
     DockerRuntimeOptions options,
     DockerComposeRuntime compose) : IRuntimeManagedResourceReconciler,
-    IRuntimeProviderAvailabilityProbe, IDisposable
+    IRuntimeProviderAvailabilityProbe, IRuntimeProxyNetworkReconciler, IDisposable
 {
     private readonly DockerClient client = new DockerClientBuilder()
         .WithEndpoint(new Uri(options.Endpoint))
         .Build();
 
     public RuntimeProvider Provider => RuntimeProvider.Docker;
+
+    public async Task EnsureProxyNetworkAsync(
+        Guid runtimeInstanceId,
+        RuntimeKind runtimeKind,
+        string providerReceiptJson,
+        CancellationToken cancellationToken)
+    {
+        if (runtimeInstanceId == Guid.Empty
+            || string.IsNullOrWhiteSpace(providerReceiptJson))
+            throw new ArgumentOutOfRangeException(nameof(runtimeInstanceId));
+        if (runtimeKind == RuntimeKind.Compose)
+        {
+            var receipt = JsonSerializer.Deserialize<ComposeReceipt>(providerReceiptJson)
+                ?? throw new InvalidOperationException(
+                    "Docker Compose Runtime receipt is invalid.");
+            await compose.EnsureRuntimeProxyGatewaysAsync(receipt, cancellationToken);
+            return;
+        }
+        if (runtimeKind != RuntimeKind.Container)
+            throw new InvalidOperationException(
+                "Docker Runtime proxy reconciliation supports Container and Compose only.");
+        var container = JsonSerializer.Deserialize<ContainerReceipt>(providerReceiptJson)
+            ?? throw new InvalidOperationException("Docker Container Runtime receipt is invalid.");
+        if (container.RuntimeInstanceId != runtimeInstanceId
+            || string.IsNullOrWhiteSpace(container.NetworkId))
+            throw new InvalidOperationException(
+                "Docker Container Runtime receipt has no owned proxy network.");
+        await ConnectRuntimeProxyGatewaysAsync(container.NetworkId, cancellationToken);
+    }
 
     public async Task<bool?> WorkloadExistsAsync(RuntimeWorkloadIdentity identity, CancellationToken cancellationToken)
     {
@@ -163,6 +193,25 @@ public sealed class DockerRuntimeResourceReconciler(
             {
                 try
                 {
+                    var current = await client.Networks.InspectNetworkAsync(
+                        network.ID,
+                        networkCleanup.Token);
+                    var gateways = await ResolveRuntimeProxyGatewaysAsync(
+                        networkCleanup.Token,
+                        requireAny: false);
+                    foreach (var gateway in gateways)
+                    {
+                        if (current.Containers?.ContainsKey(gateway) != true)
+                            continue;
+                        await client.Networks.DisconnectNetworkAsync(
+                            current.ID,
+                            new NetworkDisconnectParameters
+                            {
+                                Container = gateway,
+                                Force = true
+                            },
+                            networkCleanup.Token);
+                    }
                     await client.Networks.DeleteNetworkAsync(network.ID, networkCleanup.Token);
                 }
                 catch (DockerApiException exception)
@@ -228,6 +277,69 @@ public sealed class DockerRuntimeResourceReconciler(
                 TimeSpan.FromMilliseconds(delays[Math.Min(attempt++, delays.Length - 1)]),
                 cancellationToken);
         }
+    }
+
+    private async Task ConnectRuntimeProxyGatewaysAsync(
+        string networkId,
+        CancellationToken cancellationToken)
+    {
+        var network = await client.Networks.InspectNetworkAsync(networkId, cancellationToken);
+        var gateways = await ResolveRuntimeProxyGatewaysAsync(cancellationToken);
+        foreach (var gateway in gateways)
+        {
+            if (network.Containers?.ContainsKey(gateway) == true)
+                continue;
+            await client.Networks.ConnectNetworkAsync(
+                network.ID,
+                new NetworkConnectParameters { Container = gateway },
+                cancellationToken);
+        }
+    }
+
+    private async Task<IReadOnlyList<string>> ResolveRuntimeProxyGatewaysAsync(
+        CancellationToken cancellationToken,
+        bool requireAny = true)
+    {
+        if (!string.IsNullOrWhiteSpace(options.ProxyContainerName))
+        {
+            var configured = await client.Containers.InspectContainerAsync(
+                options.ProxyContainerName,
+                cancellationToken);
+            EnsureProxyRole(configured.ID, configured.Config?.Labels);
+            return [configured.ID];
+        }
+        var containers = await client.Containers.ListContainersAsync(
+            new ContainersListParameters
+            {
+                Filters = new Dictionary<string, IDictionary<string, bool>>
+                {
+                    ["label"] = new Dictionary<string, bool>
+                    {
+                        [$"{options.ProxyContainerLabelKey}={options.ProxyContainerLabelValue}"] = true
+                    }
+                }
+            },
+            cancellationToken);
+        if (requireAny && containers.Count == 0)
+            throw new InvalidOperationException(
+                "No running Runtime proxy gateway carries the required role label.");
+        foreach (var container in containers)
+            EnsureProxyRole(container.ID, container.Labels);
+        return containers.Select(container => container.ID)
+            .Order(StringComparer.Ordinal)
+            .ToArray();
+    }
+
+    private void EnsureProxyRole(
+        string containerId,
+        IDictionary<string, string>? labels)
+    {
+        if (string.IsNullOrWhiteSpace(containerId)
+            || labels is null
+            || !labels.TryGetValue(options.ProxyContainerLabelKey, out var value)
+            || !string.Equals(value, options.ProxyContainerLabelValue, StringComparison.Ordinal))
+            throw new InvalidOperationException(
+                "The configured Runtime proxy gateway does not carry the required role label.");
     }
 
     private static CancellationTokenSource CreateStageToken(

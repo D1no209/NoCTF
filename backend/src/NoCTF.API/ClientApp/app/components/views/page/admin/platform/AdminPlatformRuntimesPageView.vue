@@ -3,7 +3,7 @@ import { toRefs } from 'vue'
 import type { AdminPlatformRuntimesPageViewState } from '~/features/routes/admin/platform/useAdminPlatformRuntimesPage'
 
 const viewProps = defineProps<{ state: AdminPlatformRuntimesPageViewState }>()
-const { formatCapacityAmount, runnerFailureLabel, ExternalLink, RefreshCw, filters, detailTarget, items, loading, error, initialized, refresh, page, pageCount, total, pageLimit, loadPage, setPageSize, detail, applyFilters, clearFilters, terminateTarget, terminatePending, terminationError, forceTerminateTarget, forceTerminateReason, forceTerminateConfirmed, forceTerminatePending, forceTerminationError, teamLabel, stateBadgeVariant, canTerminate, openTermination, openForceTermination, submitTermination, submitForceTermination, onClickDetailTarget, onUpdateOpenDetailTarget, onUpdateOpenTerminateTarget, onUpdateOpenForceTerminateTarget } = toRefs(viewProps.state)
+const { formatCapacityAmount, runnerFailureLabel, ExternalLink, RuntimeAccessUrl, RefreshCw, filters, detailTarget, items, loading, error, initialized, refresh, page, pageCount, total, pageLimit, loadPage, setPageSize, detail, applyFilters, clearFilters, terminateTarget, terminatePending, terminationError, forceTerminateTarget, forceTerminateReason, forceTerminateConfirmed, forceTerminatePending, forceTerminationError, teamLabel, stateBadgeVariant, canTerminate, openTermination, openForceTermination, submitTermination, submitForceTermination, onClickDetailTarget, onUpdateOpenDetailTarget, onUpdateOpenTerminateTarget, onUpdateOpenForceTerminateTarget } = toRefs(viewProps.state)
 </script>
 
 <template>
@@ -186,10 +186,10 @@ const { formatCapacityAmount, runnerFailureLabel, ExternalLink, RefreshCw, filte
               <dt>{{ $t('capacity.budget') }}</dt><dd class="font-mono tabular-nums">{{ formatCapacityAmount(allocation.budget) }}</dd>
             </dl>
           </template>
-          <template v-if="detail.runtime?.urls?.length">
+          <template v-if="detail.runtime?.accesses?.length">
             <Separator />
             <p class="font-medium">{{ $t('ui.accessEntrance') }}</p>
-            <code v-for="url in detail.runtime.urls" :key="url" class="whitespace-pre-wrap break-all text-xs">{{ url }}</code>
+            <component :is="RuntimeAccessUrl" v-for="access in detail.runtime.accesses" :key="`${access.directAddress}:${access.webSocketAddress}`" :access="access" />
           </template>
           <Separator />
           <Button v-if="detail.runtime?.competitionId" variant="outline" as-child>

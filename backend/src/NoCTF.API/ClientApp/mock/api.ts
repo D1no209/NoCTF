@@ -150,6 +150,7 @@ export function createMockApi() {
   const sessions = new Map<string, string>()
   const tokens = new Map<string, string>()
   const wallpapers = new Map<string, Blob>()
+  const profileCovers = new Map<string, Blob>()
   const competitionPosters = new Map<string, Blob | null>()
   const teamWriteUps = new Map<string, { metadata: Data; content: Blob }>()
   const writeUpPreviewTickets = new Map<string, string>()
@@ -215,7 +216,10 @@ export function createMockApi() {
     const search = (url.searchParams.get('search') ?? url.searchParams.get('query') ?? '').toLowerCase()
     const mode = url.searchParams.get('mode')
     const status = url.searchParams.get('status')
-    let filtered = items.filter(item => !item.deletedAt && (!search || JSON.stringify(item).toLowerCase().includes(search))
+    const direction = url.searchParams.get('direction')?.trim().toLowerCase()
+    const includeDeleted = url.searchParams.get('includeDeleted') === 'true'
+    let filtered = items.filter(item => (includeDeleted || !item.deletedAt) && (!search || JSON.stringify(item).toLowerCase().includes(search))
+      && (!direction || String(item.direction ?? '').trim().toLowerCase() === direction)
       && (!mode || item.mode === mode) && (!status || item.status === status))
     for (const key of ['competitionChallengeId', 'teamId', 'actorUserId', 'kind', 'state', 'result', 'trackKey', 'role']) {
       const selected = url.searchParams.get(key)
@@ -367,6 +371,13 @@ export function createMockApi() {
           headers: { 'Content-Type': wallpaper.type || 'image/png', 'Cache-Control': 'no-store', 'X-NoCTF-Mock': 'true' },
         })
       }
+      else if (route === '/users/{userId}/profile-cover') {
+        const cover = profileCovers.get(p.userId!)
+        if (!cover) return problem(404, '尚未上传个人标签装饰图 / No profile cover uploaded')
+        return new Response(cover, {
+          headers: { 'Content-Type': cover.type || 'image/png', 'Cache-Control': 'no-store', 'X-NoCTF-Mock': 'true' },
+        })
+      }
       if (route === '/competitions/{competitionId}/poster') {
         const storedPoster = competitionPosters.get(p.competitionId!)
         if (storedPoster === null) return problem(404, '演示海报不存在 / No poster')
@@ -414,7 +425,40 @@ export function createMockApi() {
         const identity = state.settings.get(`${user!.userId}/school-identity`) ?? { fullName: '演示用户', studentNumber: 'MOCK-2026' }
         value = { description: user!.description ?? null, schoolIdentity: identity, appearance: { wallpaperEnabled: Boolean(user!.wallpaperEnabled) }, privacy: { ipRetentionDays: 7 } }
       }
-      else if (route === '/users/{userId}') value = state.users.find(u => u.userId === p.userId)
+      else if (route === '/users/{userId}') {
+        const target = state.users.find(candidate => candidate.userId === p.userId)
+        if (!target) return problem(404, '演示账号不存在 / Mock user not found')
+        const participations = state.teams
+          .filter(team => team.memberIds?.includes(target.userId) && team.registrationStatus === 'Approved' && !team.isBanned)
+          .map(team => ({ team, competition: state.competitions.find(item => item.id === team.competitionId) }))
+          .filter(item => item.competition?.accessMode === 'Public')
+        const modeCounts = new Map<string, number>()
+        for (const item of participations)
+          modeCounts.set(item.competition!.mode, (modeCounts.get(item.competition!.mode) ?? 0) + 1)
+        const directionSeeds = ['Web', 'Crypto', 'Pwn', 'Reverse', 'Forensics', 'OSINT']
+        value = {
+          ...target,
+          profileCoverUrl: target.profileCoverUrl ?? null,
+          competitionCount: participations.length,
+          finishedCompetitionCount: participations.filter(item => item.competition?.status === 'Finished').length,
+          successfulChallengeCount: 27,
+          modes: [...modeCounts].map(([mode, competitionCount]) => ({ mode, competitionCount })),
+          directions: directionSeeds.map((direction, index) => ({ direction, successfulChallengeCount: 7 - index })),
+          recentCompetitions: participations
+            .slice()
+            .sort((left, right) => String(right.competition?.endTime).localeCompare(String(left.competition?.endTime)))
+            .slice(0, 5)
+            .map(item => ({
+              competitionId: item.competition!.id,
+              title: item.competition!.title,
+              teamName: item.team.name,
+              mode: item.competition!.mode,
+              status: item.competition!.status,
+              startAt: item.competition!.startTime,
+              endAt: item.competition!.endTime,
+            })),
+        }
+      }
       else if (route === '/admin/platform/users/{userId}') value = { user: state.users.find(u => u.userId === p.userId), schoolIdentity: state.settings.get(`${p.userId}/school-identity`) ?? { fullName: null, studentNumber: null } }
       else if (route === '/admin/platform/users') value = list(state.users.map(u => ({ ...u, id: u.userId, accountStatus: 'Active', createdAt: date(-720) })), url)
       else if (route === '/admin/platform/information') value = { version: 'MOCK / local-memory', contributors: [] }
@@ -453,7 +497,16 @@ export function createMockApi() {
         if (!user) return problem(401, '请先登录演示账号 / Sign in to list attachments')
         value = { deliveryPolicy: 'All', items: state.attachments.filter(item => item.challengeId === challenge!.challengeId && !item.deletedAt) }
       }
-      else if (route === '/admin/challenges') value = list(state.templates, url)
+      else if (route === '/admin/challenges') {
+        const page = list(state.templates, url)
+        const includeDeleted = url.searchParams.get('includeDeleted') === 'true'
+        const directions = [...new Set(state.templates
+          .filter(template => includeDeleted || !template.deletedAt)
+          .map(template => String(template.direction ?? '').trim())
+          .filter(Boolean))]
+          .sort((left, right) => left.localeCompare(right))
+        value = { ...page, directions }
+      }
       else if (route === '/admin/challenges/{challengeId}') value = template
       else if (route === '/admin/challenges/{challengeId}/attachments') value = { deliveryPolicy: 'All', items: state.attachments.filter(item => item.challengeId === template!.id && (!item.deletedAt || url.searchParams.get('includeDeleted') === 'true')) }
       else if (cleanRoute.endsWith('/invitation-token')) {
@@ -516,6 +569,16 @@ export function createMockApi() {
           return json({ code: 'UnsupportedFormat' }, 400)
         wallpapers.set(user!.userId, file)
         Object.assign(user!, { wallpaperRevision: crypto.randomUUID(), wallpaperEnabled: true })
+        value = user
+      }
+      else if (route === '/auth/me/profile-cover' && request.method === 'PUT') {
+        const form = await request.formData()
+        const file = form.get('file')
+        if (!(file instanceof Blob) || !file.type.startsWith('image/'))
+          return json({ code: 'UnsupportedFormat' }, 400)
+        profileCovers.set(user!.userId, file)
+        const revision = crypto.randomUUID().replaceAll('-', '')
+        user!.profileCoverUrl = `/api/v1/users/${user!.userId}/profile-cover?revision=${revision}`
         value = user
       }
       else if (route === '/admin/competitions/{competitionId}/poster' && request.method === 'PUT') {

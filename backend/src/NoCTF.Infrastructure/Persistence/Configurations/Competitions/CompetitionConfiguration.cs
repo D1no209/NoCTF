@@ -37,6 +37,11 @@ internal sealed class CompetitionEntityConfiguration : IEntityTypeConfiguration<
         builder.Property(competition => competition.ObserverIds).HasColumnType("uuid[]");
         builder.Property(competition => competition.Mode).HasConversion<short>();
         builder.Property(competition => competition.Status).HasConversion<short>();
+        builder.Property(competition => competition.RuntimeAccessMode)
+            .HasConversion<short>()
+            .HasDefaultValue(NoCTF.Domain.Runtime.RuntimeAccessMode.Direct);
+        builder.Property(competition => competition.TrafficCaptureEnabled)
+            .HasDefaultValue(false);
         // Existing competitions used tracks implicitly, so the schema default backfills true.
         // ValueGeneratedNever makes application inserts persist the explicit new default false.
         builder.Property(competition => competition.TracksEnabled)
@@ -81,6 +86,9 @@ internal sealed class CompetitionEntityConfiguration : IEntityTypeConfiguration<
             table.HasCheckConstraint(
                 "ck_competitions_write_up_submission_deadline_hours",
                 $"write_up_submission_deadline_hours BETWEEN 0 AND {CompetitionWriteUpPolicy.MaximumDeadlineHours}");
+            table.HasCheckConstraint(
+                "ck_competitions_traffic_capture_limit",
+                "traffic_capture_limit_bytes IS NULL OR traffic_capture_limit_bytes > 0");
             table.HasCheckConstraint(
                 "ck_competitions_webhook_configuration",
                 "jsonb_typeof(webhook_configuration) = 'object'"

@@ -196,6 +196,33 @@ public sealed class ComposeRuntimeDefinitionPolicyTests
     }
 
     [Test]
+    public async Task Docker_wsrx_only_compose_removes_public_ports()
+    {
+        var request = new ComposeRequest(
+            Guid.Parse("11111111-1111-1111-1111-111111111111"),
+            RuntimeProvider.Docker,
+            "noctf-runtime",
+            "services:\n  web:\n    image: registry.example/web:v1",
+            new Dictionary<string, string>(),
+            new Dictionary<string, string>(),
+            new Dictionary<string, RuntimeResourceLimits> { ["web"] = ServiceLimits },
+            ServiceLimits,
+            TimeSpan.FromHours(1),
+            TimeSpan.FromMinutes(2),
+            [new("tcp://{HOST}:{PORT}", RuntimeExposure.OwnerOnly, 31337, "web")],
+            AccessMode: RuntimeAccessMode.WsrxOnly);
+
+        var prepared = ComposeRuntimeDefinitionPolicy.PrepareForDocker(
+            request,
+            logMaxSizeBytes: 8_388_608,
+            logMaxFiles: 2);
+        var web = Mapping(Mapping(Load(prepared), "services"), "web");
+
+        await Assert.That(web.Children.ContainsKey(new YamlScalarNode("ports")))
+            .IsFalse();
+    }
+
+    [Test]
     public async Task Docker_preparation_rejects_InternetOnly_egress()
     {
         var request = new ComposeRequest(

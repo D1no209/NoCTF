@@ -162,10 +162,10 @@ const { canWrite, isAdministrator, challengeOptions, teamOptions, runtimeTeamLab
           <div class="flex justify-between"><span class="text-muted-foreground">{{ $t('ui.runningTime') }}</span><span class="font-mono tabular-nums">{{ adminFormatDateTime(detail.runningAt) }}</span></div>
           <div class="flex justify-between"><span class="text-muted-foreground">{{ $t('ui.expirationTime') }}</span><span class="font-mono tabular-nums">{{ adminFormatDateTime(detail.expiresAt) }}</span></div>
           <div class="flex justify-between"><span class="text-muted-foreground">{{ $t('ui.stopTime') }}</span><span class="font-mono tabular-nums">{{ adminFormatDateTime(detail.stoppedAt) }}</span></div>
-          <template v-if="detail.urls?.length">
+          <template v-if="detail.accesses?.length">
             <Separator />
             <p class="text-muted-foreground">{{ $t('ui.accessAddress') }}</p>
-            <component :is="RuntimeAccessUrl" v-for="url in detail.urls" :key="url" :url="url" />
+            <component :is="RuntimeAccessUrl" v-for="access in detail.accesses" :key="`${access.directAddress}:${access.webSocketAddress}`" :access="access" />
           </template>
           <template v-if="detail.publishedPorts?.length">
             <Separator />

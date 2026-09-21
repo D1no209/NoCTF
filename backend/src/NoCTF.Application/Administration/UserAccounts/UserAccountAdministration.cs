@@ -52,7 +52,8 @@ public sealed record UserDeletionStoreResult(
     UserDeletionState State,
     UserDeletionPreview? Preview = null,
     Guid? PreviousAvatarFileId = null,
-    Guid? PreviousWallpaperFileId = null);
+    Guid? PreviousWallpaperFileId = null,
+    Guid? PreviousProfileCoverFileId = null);
 
 public sealed record UserAccountLifecycleFact(
     int SchemaVersion,

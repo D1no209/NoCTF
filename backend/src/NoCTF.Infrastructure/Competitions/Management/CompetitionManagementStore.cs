@@ -61,6 +61,9 @@ public sealed class CompetitionManagementStore(
             AllowTeamRegistrationWhileRunning = command.AllowTeamRegistrationWhileRunning,
             MaxTeamMembers = command.MaxTeamMembers,
             MaxConcurrentRuntimeInstancesPerTeam = command.MaxConcurrentRuntimeInstancesPerTeam,
+            RuntimeAccessMode = command.RuntimeAccessMode,
+            TrafficCaptureEnabled = command.TrafficCaptureEnabled,
+            TrafficCaptureLimitBytes = command.TrafficCaptureLimitBytes,
             MaxActiveQuestionsPerTeam = command.MaxActiveQuestionsPerTeam,
             MaxParticipantMessagesBeforeHandlerReply =
                 command.MaxParticipantMessagesBeforeHandlerReply,
@@ -126,6 +129,19 @@ public sealed class CompetitionManagementStore(
         if (competition is null)
             return null;
         var previousAccessMode = competition.AccessMode;
+        var runtimeAccessChanged = competition.RuntimeAccessMode != command.RuntimeAccessMode
+            || competition.TrafficCaptureEnabled != command.TrafficCaptureEnabled
+            || competition.TrafficCaptureLimitBytes != command.TrafficCaptureLimitBytes;
+        if (runtimeAccessChanged
+            && await db.RuntimeInstances.AnyAsync(runtime =>
+                runtime.CompetitionId == competition.Id
+                && (runtime.State == NoCTF.Domain.Runtime.RuntimeState.Queued
+                    || runtime.State == NoCTF.Domain.Runtime.RuntimeState.Provisioning
+                    || runtime.State == NoCTF.Domain.Runtime.RuntimeState.Running
+                    || runtime.State == NoCTF.Domain.Runtime.RuntimeState.Stopping), ct))
+        {
+            return null;
+        }
         if (competition.PracticeModeEnabled
             && !command.PracticeModeEnabled
             && await db.RuntimeInstances.AnyAsync(runtime =>
@@ -147,6 +163,9 @@ public sealed class CompetitionManagementStore(
         competition.MaxTeamMembers = command.MaxTeamMembers;
         competition.MaxConcurrentRuntimeInstancesPerTeam =
             command.MaxConcurrentRuntimeInstancesPerTeam;
+        competition.RuntimeAccessMode = command.RuntimeAccessMode;
+        competition.TrafficCaptureEnabled = command.TrafficCaptureEnabled;
+        competition.TrafficCaptureLimitBytes = command.TrafficCaptureLimitBytes;
         competition.MaxActiveQuestionsPerTeam = command.MaxActiveQuestionsPerTeam;
         competition.MaxParticipantMessagesBeforeHandlerReply =
             command.MaxParticipantMessagesBeforeHandlerReply;
@@ -250,7 +269,10 @@ public sealed class CompetitionManagementStore(
             x.TracksEnabled,
             x.AccessMode,
             x.WriteUpSubmissionRequired,
-            x.WriteUpSubmissionDeadlineHours));
+            x.WriteUpSubmissionDeadlineHours,
+            x.RuntimeAccessMode,
+            x.TrafficCaptureEnabled,
+            x.TrafficCaptureLimitBytes));
 
     private static CompetitionView Map(Competition x) =>
         new(x.Id, x.Title, x.Description, x.Mode, x.StartAt, x.EndAt, x.Status,
@@ -267,7 +289,10 @@ public sealed class CompetitionManagementStore(
             x.TracksEnabled,
             x.AccessMode,
             x.WriteUpSubmissionRequired,
-            x.WriteUpSubmissionDeadlineHours);
+            x.WriteUpSubmissionDeadlineHours,
+            x.RuntimeAccessMode,
+            x.TrafficCaptureEnabled,
+            x.TrafficCaptureLimitBytes);
 
     private Task InvalidateReadModelsAsync(
         Guid competitionId,

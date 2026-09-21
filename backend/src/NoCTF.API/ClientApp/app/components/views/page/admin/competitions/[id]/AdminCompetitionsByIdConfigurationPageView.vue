@@ -3,7 +3,7 @@ import { toRefs } from 'vue'
 import type { AdminCompetitionsByIdConfigurationPageViewState } from '~/features/routes/admin/competitions/[id]/useAdminCompetitionsByIdConfigurationPage'
 
 const viewProps = defineProps<{ state: AdminCompetitionsByIdConfigurationPageViewState }>()
-const { competition, canWrite, title, description, startTime, endTime, teamRegistrationAutoApprove, allowTeamRegistrationWhileRunning, maxTeamMembers, maxConcurrentRuntimeInstancesPerTeam, maxActiveQuestionsPerTeam, maxParticipantMessagesBeforeHandlerReply, allowChallengeOwnersToHandleQuestions, practiceModeEnabled, writeUpSubmissionRequired, writeUpSubmissionDeadlineHours, maximumWriteUpDeadlineHours, staffOnly, savingMeta, metaError, saveMeta, config, configLoading, savingConfig, saveConfig, CompetitionModeConfigEditor } = toRefs(viewProps.state)
+const { competition, canWrite, title, description, startTime, endTime, teamRegistrationAutoApprove, allowTeamRegistrationWhileRunning, maxTeamMembers, maxConcurrentRuntimeInstancesPerTeam, runtimeAccessMode, trafficCaptureEnabled, trafficCaptureLimitMiB, trafficCaptureHasDirectBypass, maxActiveQuestionsPerTeam, maxParticipantMessagesBeforeHandlerReply, allowChallengeOwnersToHandleQuestions, practiceModeEnabled, writeUpSubmissionRequired, writeUpSubmissionDeadlineHours, maximumWriteUpDeadlineHours, staffOnly, savingMeta, metaError, saveMeta, config, configLoading, savingConfig, saveConfig, CompetitionModeConfigEditor } = toRefs(viewProps.state)
 </script>
 
 <template>
@@ -41,6 +41,47 @@ const { competition, canWrite, title, description, startTime, endTime, teamRegis
                 <DateTimePicker id="c-end" v-model="endTime"  :readonly="!canWrite" required />
               </Field>
             </div>
+            <Separator />
+            <div class="grid gap-4 sm:grid-cols-2">
+              <Field>
+                <FieldLabel for="c-runtime-access-mode">{{ $t('runtime.accessMode') }}</FieldLabel>
+                <Select v-model="runtimeAccessMode" :disabled="!canWrite">
+                  <SelectTrigger id="c-runtime-access-mode"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Direct">{{ $t('runtime.accessModeDirect') }}</SelectItem>
+                    <SelectItem value="DirectAndWsrx">{{ $t('runtime.accessModeDirectAndWsrx') }}</SelectItem>
+                    <SelectItem value="WsrxOnly">{{ $t('runtime.accessModeWsrxOnly') }}</SelectItem>
+                  </SelectContent>
+                </Select>
+                <FieldDescription>{{ $t('runtime.accessModeDescription') }}</FieldDescription>
+              </Field>
+              <Field>
+                <FieldLabel for="c-traffic-capture-limit">{{ $t('runtime.captureLimitMiB') }}</FieldLabel>
+                <NullableNumberInput
+                  id="c-traffic-capture-limit"
+                  v-model="trafficCaptureLimitMiB"
+                  :min="1"
+                  :max="4096"
+                  :readonly="!canWrite || !trafficCaptureEnabled"
+                  :placeholder="$t('runtime.captureLimitDefault')"
+                />
+                <FieldDescription>{{ $t('runtime.captureLimitDescription') }}</FieldDescription>
+              </Field>
+            </div>
+            <Field orientation="horizontal">
+              <Checkbox
+                id="c-traffic-capture"
+                v-model="trafficCaptureEnabled"
+                :disabled="!canWrite || runtimeAccessMode === 'Direct'"
+              />
+              <div class="grid gap-1.5 leading-none">
+                <FieldLabel for="c-traffic-capture" class="font-normal">{{ $t('runtime.captureTraffic') }}</FieldLabel>
+                <FieldDescription>{{ $t('runtime.captureTrafficDescription') }}</FieldDescription>
+              </div>
+            </Field>
+            <Alert v-if="trafficCaptureHasDirectBypass">
+              <AlertDescription>{{ $t('runtime.captureDirectBypassWarning') }}</AlertDescription>
+            </Alert>
             <Field orientation="horizontal">
               <Checkbox id="c-writeup-required" v-model="writeUpSubmissionRequired" :disabled="!canWrite" />
               <div class="grid gap-1.5 leading-none">

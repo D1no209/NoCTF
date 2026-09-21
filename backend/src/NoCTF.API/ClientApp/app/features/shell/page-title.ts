@@ -28,6 +28,7 @@ const competitionAdministrationTitles = {
   writeup: 'writeUp.myWriteUp',
   writeups: 'writeUp.review',
   runtimes: 'ui.runtime',
+  'traffic-captures': 'runtime.trafficCaptures',
   cheats: 'ui.cheating',
   leaderboard: 'ui.leaderboard',
   exports: 'ui.export',

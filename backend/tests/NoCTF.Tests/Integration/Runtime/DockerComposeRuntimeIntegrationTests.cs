@@ -15,6 +15,97 @@ public sealed class DockerComposeRuntimeIntegrationTests
 {
     [Test]
     [Timeout(300_000)]
+    public async Task Wsrx_only_compose_reconnects_gateway_without_publishing_ports(
+        CancellationToken cancellationToken)
+    {
+        await DockerIntegrationTest.RunAsync(async () =>
+        {
+            await using var imageProbe = new ContainerBuilder("busybox:1.36.1")
+                .WithCommand("true")
+                .Build();
+            await imageProbe.StartAsync(cancellationToken);
+            await using var gateway = new ContainerBuilder("busybox:1.36.1")
+                .WithCommand("sleep", "300")
+                .WithLabel("noctf.io/runtime-proxy-gateway", "true")
+                .Build();
+            await gateway.StartAsync(cancellationToken);
+            var operationId = Guid.NewGuid();
+            var request = Request(operationId) with
+            {
+                AccessMode = RuntimeAccessMode.WsrxOnly,
+                PublishedPorts = []
+            };
+            var workRoot = Path.Combine(
+                Path.GetTempPath(),
+                $"noctf-compose-wsrx-{operationId:N}");
+            var runtime = new DockerComposeRuntime(
+                new DockerRuntimeOptions(
+                    Endpoint: DockerEndpoint(),
+                    ProxyContainerName: gateway.Id),
+                workDirectory: workRoot);
+            using var docker = new DockerClientBuilder()
+                .WithEndpoint(new Uri(DockerEndpoint()))
+                .Build();
+            ComposeReceipt? receipt = null;
+            try
+            {
+                receipt = await runtime.UpAsync(request, cancellationToken);
+                var status = await runtime.GetStatusAsync(receipt, cancellationToken);
+                var web = status!.Services.Single(service => service.Name == "web");
+                await Assert.That(web.PublishedPorts).IsEmpty();
+                await Assert.That(web.InternalHost).IsNotNull().And.IsNotEmpty();
+                var projectNetwork = await docker.Networks.InspectNetworkAsync(
+                    $"{request.ProjectName}_default",
+                    cancellationToken);
+                await Assert.That(projectNetwork.Containers.Keys).Contains(gateway.Id);
+                var probe = await gateway.ExecAsync(
+                    [
+                        "/bin/sh",
+                        "-c",
+                        $"wget -T 5 -q -O- http://{web.InternalHost}:8080 | grep -q web"
+                    ],
+                    cancellationToken);
+                await Assert.That(probe.ExitCode).IsEqualTo(0);
+
+                await docker.Networks.DisconnectNetworkAsync(
+                    projectNetwork.ID,
+                    new NetworkDisconnectParameters
+                    {
+                        Container = gateway.Id,
+                        Force = true
+                    },
+                    cancellationToken);
+                await runtime.EnsureRuntimeProxyGatewaysAsync(
+                    receipt,
+                    cancellationToken);
+                await runtime.EnsureRuntimeProxyGatewaysAsync(
+                    receipt,
+                    cancellationToken);
+                projectNetwork = await docker.Networks.InspectNetworkAsync(
+                    projectNetwork.ID,
+                    cancellationToken);
+                await Assert.That(projectNetwork.Containers.Keys).Contains(gateway.Id);
+
+                await runtime.DownAsync(receipt, cancellationToken);
+                receipt = null;
+                var gatewayInspect = await docker.Containers.InspectContainerAsync(
+                    gateway.Id,
+                    cancellationToken);
+                await Assert.That(gatewayInspect.NetworkSettings!.Networks.Keys)
+                    .DoesNotContain($"{request.ProjectName}_default");
+            }
+            finally
+            {
+                if (receipt is not null)
+                    await runtime.DownAsync(receipt, CancellationToken.None);
+                if (Directory.Exists(workRoot))
+                    Directory.Delete(workRoot, recursive: true);
+            }
+        });
+    }
+
+    [Test]
+    [Timeout(300_000)]
     public async Task Force_down_removes_project_resources_when_the_work_directory_is_missing(
         CancellationToken cancellationToken)
     {

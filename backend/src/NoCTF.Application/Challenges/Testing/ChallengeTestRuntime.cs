@@ -17,7 +17,9 @@ public sealed record ChallengeTestRuntimeView(
     DateTimeOffset CreatedAt,
     DateTimeOffset? RunningAt,
     DateTimeOffset? ExpiresAt,
-    DateTimeOffset? StoppedAt);
+    DateTimeOffset? StoppedAt,
+    RuntimeAccessMode AccessMode = RuntimeAccessMode.Direct,
+    IReadOnlyList<RuntimeAccessEndpointView>? AccessEndpoints = null);
 
 public sealed record ChallengeTestRuntimeCommand(
     Guid ChallengeId,

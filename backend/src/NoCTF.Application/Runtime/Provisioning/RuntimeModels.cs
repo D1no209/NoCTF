@@ -131,6 +131,12 @@ public sealed record RuntimePublishedPortMapping(
     int ContainerPort,
     int HostPort);
 
+public sealed record RuntimeAccessEndpointMapping(
+    int BindingIndex,
+    string? DirectAddress,
+    string? TargetHost,
+    int? TargetPort);
+
 /// <summary>Resolves platform-owned Runtime placement independently of challenge definitions.</summary>
 public interface IRuntimePlacementPolicy
 {
@@ -160,7 +166,8 @@ public sealed record ContainerRequest(
     RuntimeInternalEndpointBinding? AwdCheckerTargetBinding = null,
     RuntimeEgressPolicy EgressPolicy = RuntimeEgressPolicy.Isolated,
     ContainerNetworkPurpose NetworkPurpose = ContainerNetworkPurpose.PersistentRuntime,
-    RuntimeResourceLimits? Budget = null)
+    RuntimeResourceLimits? Budget = null,
+    RuntimeAccessMode AccessMode = RuntimeAccessMode.Direct)
 {
     public IReadOnlyList<int> ContainerPorts =>
         [.. PortMappings.Keys.Concat(InternalPorts ?? []).Distinct().Order()];
@@ -300,7 +307,8 @@ public sealed record ContainerNetworkPolicyRequest(
     ContainerNetworkPurpose Purpose,
     RuntimeEgressPolicy EgressPolicy,
     IReadOnlyList<int> PublicIngressPorts,
-    int? TargetPort = null);
+    int? TargetPort = null,
+    IReadOnlyList<int>? ProxyIngressPorts = null);
 
 public abstract record AttachedRuntimeTarget(
     RuntimeResourceIdentity Identity);
@@ -344,6 +352,15 @@ public interface IRuntimeManagedResourceReconciler
         RuntimeTerminationPolicy policy,
         CancellationToken cancellationToken) =>
         DestroyByIdentityAsync(identity, cancellationToken);
+}
+
+public interface IRuntimeProxyNetworkReconciler
+{
+    Task EnsureProxyNetworkAsync(
+        Guid runtimeInstanceId,
+        RuntimeKind runtimeKind,
+        string providerReceiptJson,
+        CancellationToken cancellationToken);
 }
 
 public interface IRuntimeProviderAvailabilityProbe

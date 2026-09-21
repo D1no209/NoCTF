@@ -117,6 +117,7 @@ services:
         ALL_PROXY: ${ALL_PROXY:-}
     labels:
       noctf.io/internal-role: scoring-callback-gateway
+      noctf.io/runtime-proxy-gateway: "true"
     environment:
       <<: *api-environment
     depends_on:

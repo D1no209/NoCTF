@@ -23,6 +23,7 @@ export function useDefaultLayout() {
 
   const route = useRoute()
   const isHome = computed(() => route.path === '/')
+  const routePath = computed(() => route.path)
   const {
     wallpaperActive,
     wallpaperStyle,
@@ -100,6 +101,7 @@ export function useDefaultLayout() {
       Bell,
       ShieldAlert,
       isHome,
+      routePath,
       wallpaperActive,
       wallpaperStyle,
       isLoggedIn,

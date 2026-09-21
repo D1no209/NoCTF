@@ -67,7 +67,9 @@ public enum CompetitionEventKind : short
     GameplayFactPatchDownloaded,
     TrackRegistrationPolicyUpdated,
     CompetitionAudienceChanged,
-    TeamWriteUpSubmitted
+    TeamWriteUpSubmitted,
+    RuntimeTrafficCaptureStored,
+    RuntimeTrafficCaptureDeleted
 }
 
 public enum CompetitionEventLevel : short

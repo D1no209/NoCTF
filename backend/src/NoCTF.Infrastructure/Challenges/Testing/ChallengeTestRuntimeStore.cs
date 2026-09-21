@@ -197,6 +197,7 @@ public sealed class ChallengeTestRuntimeStore(
             Id = runtimeInstanceId,
             ChallengeId = challenge.Id,
             Purpose = RuntimePurpose.TemplateTest,
+            AccessMode = RuntimeAccessMode.DirectAndWsrx,
             TestFlagDelivery = flagPlan.Delivery,
             TestFlagState = flagPlan.InitialState,
             RuntimeKind = template.RuntimeKind,
@@ -328,7 +329,14 @@ public sealed class ChallengeTestRuntimeStore(
             runtime.CreatedAt,
             runtime.RunningAt,
             runtime.ExpiresAt,
-            runtime.StoppedAt);
+            runtime.StoppedAt,
+            runtime.AccessMode,
+            runtime.AccessEndpoints.OrderBy(endpoint => endpoint.BindingIndex)
+                .Select(endpoint => new RuntimeAccessEndpointView(
+                    endpoint.BindingIndex,
+                    endpoint.DirectAddress,
+                    endpoint.TargetHost,
+                    endpoint.TargetPort)).ToArray());
     }
 
     private static bool IsRunningOrStarting(RuntimeState state) =>

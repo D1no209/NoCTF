@@ -15,6 +15,14 @@ import type {
   NoCtfapiEndpointsCompetitionsEventsCompetitionEventKindProtocol,
   NoCtfapiEndpointsNotificationsNotificationKindProtocol,
 } from '../api'
+import {
+  adminCompetitionCheatsPath,
+  adminCompetitionTeamsPath,
+  competitionChallengePath,
+  competitionEventsPath,
+  competitionMyTeamPath,
+  competitionQuestionsPath,
+} from './app-routes'
 
 /** 竞赛上下文:由 pages/competitions/[id].vue provide,子路由 inject。 */
 export interface CompetitionContext {
@@ -176,6 +184,8 @@ export function competitionEventText(
     GameplayFactPatchDownloaded: translate("ui.downloadedThePatchArchiveForTeam", { actor, team }),
     CompetitionAudienceChanged: translate("competitionAccess.changed"),
     TeamWriteUpSubmitted: translate("writeUp.submittedEvent"),
+    RuntimeTrafficCaptureStored: translate("runtime.captureStoredEvent"),
+    RuntimeTrafficCaptureDeleted: translate("runtime.captureDeletedEvent"),
     CompetitionCreated: translate("ui.contestCreated"), CompetitionUpdated: translate("ui.competitionInformationHasBeenUpdated"), CompetitionLifecycleChanged: translate("ui.competitionLifeCycleChanges"),
     LeaderboardVisibilityChanged: translate("ui.leaderboardVisibilityChanged"), ChallengeCreated: translate("ui.challengeWasAddedToTheCompetition", { challenge }), ChallengeUpdated: translate("ui.challengeWasUpdated", { challenge }),
     ChallengePublished: translate("ui.challengeWasPublished", { challenge }), ChallengeDescriptionUpdated: translate("ui.challengeHasAnUpdatedDescription", { challenge }), ChallengeUnpublished: translate("ui.challengeWasUnpublished", { challenge }), HintPublished: translate("ui.challengeHasANewHint2", { challenge }),
@@ -243,53 +253,53 @@ function competitionEventTarget(
   kind: NoCtfapiEndpointsCompetitionsEventsCompetitionEventKindProtocol,
 ): string {
   return context.competitionId
-    ? `/competitions/${context.competitionId}/events?kind=${kind}`
+    ? `${competitionEventsPath(context.competitionId)}?kind=${kind}`
     : context.detailPath
 }
 
 const notificationTargetResolvers = {
   Message: context => context.competitionId && context.questionId
-    ? `/competitions/${context.competitionId}/questions?question=${context.questionId}`
+    ? `${competitionQuestionsPath(context.competitionId)}?question=${context.questionId}`
     : context.detailPath,
   CompetitionAnnouncement: context => context.detailPath,
   QuestionOpened: context => context.competitionId && context.questionId
-    ? `/competitions/${context.competitionId}/questions?question=${context.questionId}`
+    ? `${competitionQuestionsPath(context.competitionId)}?question=${context.questionId}`
     : context.detailPath,
   QuestionStatusChanged: context => context.competitionId && context.questionId
-    ? `/competitions/${context.competitionId}/questions?question=${context.questionId}`
+    ? `${competitionQuestionsPath(context.competitionId)}?question=${context.questionId}`
     : context.detailPath,
   CompetitionLifecycleChanged: context => competitionEventTarget(context, 'CompetitionLifecycleChanged'),
   TeamRegistrationChanged: context => context.competitionId
-    ? `/competitions/${context.competitionId}/my/team`
+    ? competitionMyTeamPath(context.competitionId)
     : context.detailPath,
   GameplayFactAdjudicated: context => context.competitionId && context.challengeId
-    ? `/competitions/${context.competitionId}/challenges?challenge=${context.challengeId}`
+    ? competitionChallengePath(context.competitionId, context.challengeId)
     : context.detailPath,
   RuntimeStateChanged: context => context.competitionId && context.challengeId
-    ? `/competitions/${context.competitionId}/challenges?challenge=${context.challengeId}`
+    ? competitionChallengePath(context.competitionId, context.challengeId)
     : context.detailPath,
   StartGateFailed: context => context.detailPath,
   ManagementFailure: context => context.detailPath,
   BloodAwarded: context => context.competitionId && context.challengeId
-    ? `/competitions/${context.competitionId}/challenges?challenge=${context.challengeId}`
+    ? competitionChallengePath(context.competitionId, context.challengeId)
     : context.detailPath,
   ChallengePublished: context => context.competitionId && context.challengeId
-    ? `/competitions/${context.competitionId}/challenges?challenge=${context.challengeId}`
+    ? competitionChallengePath(context.competitionId, context.challengeId)
     : context.detailPath,
   HintPublished: context => context.competitionId && context.challengeId
-    ? `/competitions/${context.competitionId}/challenges?challenge=${context.challengeId}`
+    ? competitionChallengePath(context.competitionId, context.challengeId)
     : context.detailPath,
   TeamBanned: context => context.competitionId
-    ? `/competitions/${context.competitionId}/my/team#ban-appeal`
+    ? `${competitionMyTeamPath(context.competitionId)}#ban-appeal`
     : context.detailPath,
   CheatIncidentDetected: context => context.competitionId && context.gameplayFactId
-    ? `/admin/competitions/${context.competitionId}/cheats?incident=${context.gameplayFactId}`
+    ? `${adminCompetitionCheatsPath(context.competitionId)}?incident=${context.gameplayFactId}`
     : context.detailPath,
   TeamBanCorrected: context => context.competitionId
-    ? `/competitions/${context.competitionId}/my/team#ban-appeal`
+    ? `${competitionMyTeamPath(context.competitionId)}#ban-appeal`
     : context.detailPath,
   TeamBanAppealSubmitted: context => context.competitionId
-    ? `/admin/competitions/${context.competitionId}/teams?appeal=${context.appealEventId ?? ''}#ban-appeals`
+    ? `${adminCompetitionTeamsPath(context.competitionId)}?appeal=${context.appealEventId ?? ''}#ban-appeals`
     : context.detailPath,
   PlatformAuditExported: context => context.detailPath,
   UserAccountLifecycleChanged: context => context.detailPath,

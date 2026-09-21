@@ -51,11 +51,17 @@ public sealed class PostgresKohRuntimeProvisioner(
         if (status != CompetitionStatus.Running)
             return KohRuntimeProvisioningOutcome.RejectedBusiness;
 
-        var mode = await db.Competitions.AsNoTracking()
+        var competition = await db.Competitions.AsNoTracking()
             .Where(competition => competition.Id == competitionId)
-            .Select(competition => competition.Mode)
+            .Select(competition => new
+            {
+                competition.Mode,
+                competition.RuntimeAccessMode,
+                competition.TrafficCaptureEnabled,
+                competition.TrafficCaptureLimitBytes
+            })
             .SingleAsync(cancellationToken);
-        if (mode != GameMode.Koh)
+        if (competition.Mode != GameMode.Koh)
             return KohRuntimeProvisioningOutcome.NotApplicable;
 
         var challengeDefinitions = await db.CompetitionChallenges.AsNoTracking()
@@ -132,6 +138,9 @@ public sealed class PostgresKohRuntimeProvisioner(
                     Purpose = RuntimePurpose.Player,
                     RuntimeKind = challenge.RuntimeKind,
                     RuntimeProvider = challenge.Placement.Provider,
+                    AccessMode = competition.RuntimeAccessMode,
+                    TrafficCaptureEnabled = competition.TrafficCaptureEnabled,
+                    TrafficCaptureLimitBytes = competition.TrafficCaptureLimitBytes,
                     State = RuntimeState.Queued,
                     CreatedAt = createdAt
                 };
@@ -152,6 +161,9 @@ public sealed class PostgresKohRuntimeProvisioner(
                     Purpose = RuntimePurpose.Player,
                     RuntimeKind = challenge.RuntimeKind,
                     RuntimeProvider = challenge.Placement.Provider,
+                    AccessMode = competition.RuntimeAccessMode,
+                    TrafficCaptureEnabled = competition.TrafficCaptureEnabled,
+                    TrafficCaptureLimitBytes = competition.TrafficCaptureLimitBytes,
                     State = RuntimeState.Queued,
                     CreatedAt = createdAt
                 };

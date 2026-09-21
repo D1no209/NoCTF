@@ -5,6 +5,7 @@ using NoCTF.API.Security;
 using NoCTF.Application.Competitions.Management;
 using NoCTF.Application.Teams.Moderation;
 using NoCTF.Domain.Competitions;
+using NoCTF.Domain.Runtime;
 using Riok.Mapperly.Abstractions;
 using System.Text.Json.Serialization;
 
@@ -35,6 +36,14 @@ public enum CompetitionAccessModeProtocol
 {
     Public,
     StaffOnly
+}
+
+[JsonConverter(typeof(StrictPascalCaseEnumConverter<RuntimeAccessModeProtocol>))]
+public enum RuntimeAccessModeProtocol
+{
+    Direct,
+    DirectAndWsrx,
+    WsrxOnly
 }
 
 [JsonConverter(typeof(StrictPascalCaseEnumConverter<LeaderboardVisibilityProtocol>))]
@@ -73,6 +82,12 @@ public static partial class CompetitionProtocolMapper
     public static partial CompetitionAccessMode ToDomain(CompetitionAccessModeProtocol value);
 
     [MapEnum(EnumMappingStrategy.ByName)]
+    public static partial RuntimeAccessModeProtocol ToProtocol(RuntimeAccessMode value);
+
+    [MapEnum(EnumMappingStrategy.ByName)]
+    public static partial RuntimeAccessMode ToDomain(RuntimeAccessModeProtocol value);
+
+    [MapEnum(EnumMappingStrategy.ByName)]
     public static partial LeaderboardVisibilityProtocol ToProtocol(
         CompetitionLeaderboardVisibility value);
 
@@ -106,7 +121,10 @@ public sealed record CompetitionResponse(
     CompetitionAccessModeProtocol AccessMode = CompetitionAccessModeProtocol.Public,
     bool WriteUpSubmissionRequired = false,
     int WriteUpSubmissionDeadlineHours = 0,
-    DateTimeOffset? WriteUpSubmissionDeadlineAt = null);
+    DateTimeOffset? WriteUpSubmissionDeadlineAt = null,
+    RuntimeAccessModeProtocol RuntimeAccessMode = RuntimeAccessModeProtocol.Direct,
+    bool TrafficCaptureEnabled = false,
+    long? TrafficCaptureLimitBytes = null);
 
 internal static class CompetitionMapper
 {
@@ -146,7 +164,10 @@ internal static class CompetitionMapper
             view.WriteUpSubmissionDeadlineHours,
             CompetitionWriteUpPolicy.DeadlineAt(
                 view.EndTime,
-                view.WriteUpSubmissionDeadlineHours));
+                view.WriteUpSubmissionDeadlineHours),
+            CompetitionProtocolMapper.ToProtocol(view.RuntimeAccessMode),
+            view.TrafficCaptureEnabled,
+            view.TrafficCaptureLimitBytes);
 
     internal static string PosterUrl(Guid competitionId, Guid posterFileId) =>
         $"/api/v1/competitions/{competitionId}/poster?revision={posterFileId:N}";

@@ -46,6 +46,31 @@ public sealed class RuntimeResourceReconciliationHandler(
                 candidate.Provider == configuredProvider)
             ?? throw new InvalidOperationException(
                 $"Runtime resource reconciliation is unavailable for '{configuredProvider}'.");
+        if (reconciler is IRuntimeProxyNetworkReconciler proxyNetworks)
+        {
+            var proxyRuntimes = await db.RuntimeInstances.AsNoTracking()
+                .Where(runtime => runtime.RunnerId == configuredRunnerId
+                    && runtime.RuntimeProvider == configuredProvider
+                    && runtime.State == RuntimeState.Running
+                    && (runtime.AccessMode == RuntimeAccessMode.DirectAndWsrx
+                        || runtime.AccessMode == RuntimeAccessMode.WsrxOnly)
+                    && runtime.ProviderReceiptJson != null)
+                .Select(runtime => new
+                {
+                    runtime.Id,
+                    runtime.RuntimeKind,
+                    ProviderReceiptJson = runtime.ProviderReceiptJson!
+                })
+                .ToArrayAsync(cancellationToken);
+            foreach (var runtime in proxyRuntimes)
+            {
+                await proxyNetworks.EnsureProxyNetworkAsync(
+                    runtime.Id,
+                    runtime.RuntimeKind,
+                    runtime.ProviderReceiptJson,
+                    cancellationToken);
+            }
+        }
         await ReconcileAuxiliaryAsync(reconciler, configuredRunnerId, cancellationToken);
         await ReconcileUnconfirmedAsync(reconciler, configuredRunnerId, cancellationToken);
         var managed = await reconciler.ListManagedAsync(cancellationToken);

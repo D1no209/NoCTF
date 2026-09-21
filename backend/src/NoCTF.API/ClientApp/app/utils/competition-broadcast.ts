@@ -3,6 +3,7 @@ import type {
   NoCtfapiEndpointsCompetitionsEventsCompetitionEventResponse,
 } from '../api'
 import { translate } from './i18n'
+import { competitionChallengePath, competitionTeamsPath } from './app-routes'
 
 export const competitionBroadcastKinds = [
   'FirstBloodAwarded',
@@ -122,10 +123,10 @@ export function competitionBroadcastTargetPath(
   event: NoCtfapiEndpointsCompetitionsEventsCompetitionEventResponse,
 ): string | null {
   if (event.competitionChallengeId) {
-    return `/competitions/${event.competitionId}/challenges?challenge=${event.competitionChallengeId}`
+    return competitionChallengePath(event.competitionId!, event.competitionChallengeId)
   }
   if (event.kind === 'TeamBanned' || event.kind === 'TeamBanCorrectionPublished')
-    return `/competitions/${event.competitionId}/teams`
+    return competitionTeamsPath(event.competitionId!)
   if (event.kind === 'AnnouncementPublished' && event.questionId)
     return `/notifications?notification=${event.questionId}`
   return null

@@ -40,13 +40,20 @@ public static class RuntimeClaimFactory
                         definition.Command ?? [],
                         ContainerEnvironment(definition, fixedFlag),
                         MergeLabels(definition.Labels, instance),
-                        ContainerPortMappings(instance.RuntimeProvider, definition.PortMappings),
+                        ContainerPortMappings(
+                            instance.RuntimeProvider,
+                            definition.PortMappings,
+                            instance.AccessMode),
                         limits,
                         NormalizeSecurity(definition.Security),
                         ttl,
                         OperationTimeout: operationTimeout,
                         NetworkIsolation: ContainerNetworkIsolation.Isolated,
-                        InternalPorts: InternalPorts(mode, template, definition),
+                        InternalPorts: InternalPorts(
+                            mode,
+                            template,
+                            definition,
+                            instance.AccessMode),
                         AllowInternalCallback: mode == GameMode.Koh,
                         RuntimeInstanceId: instance.Id,
                         UrlBindings: template.UrlBindings,
@@ -54,7 +61,8 @@ public static class RuntimeClaimFactory
                             ? template.ControlCheckUrlBinding
                             : null,
                         AwdCheckerTargetBinding: checkerTarget,
-                        EgressPolicy: definition.EgressPolicy)),
+                        EgressPolicy: definition.EgressPolicy,
+                        AccessMode: instance.AccessMode)),
             ComposeRuntimeDefinition definition
                 when instance.RuntimeProvider is RuntimeProvider.Docker or RuntimeProvider.Kubernetes =>
                 new ProvisionComposeRuntime(
@@ -75,7 +83,8 @@ public static class RuntimeClaimFactory
                         mode == GameMode.Koh ? template.ControlCheckUrlBinding : null,
                         checkerTarget,
                         ServiceEnvironment(definition, fixedFlag),
-                        definition.EgressPolicy)),
+                        definition.EgressPolicy,
+                        AccessMode: instance.AccessMode)),
             OvaRuntimeDefinition definition when instance.RuntimeProvider == RuntimeProvider.Libvirt =>
                 new ProvisionOvaRuntime(
                     instance.Id,
@@ -117,9 +126,16 @@ public static class RuntimeClaimFactory
     private static IReadOnlyList<int>? InternalPorts(
         GameMode mode,
         ChallengeRuntimeTemplate template,
-        ContainerRuntimeDefinition definition)
+        ContainerRuntimeDefinition definition,
+        RuntimeAccessMode accessMode)
     {
         var ports = new List<int>(definition.InternalPorts ?? []);
+        if (accessMode is RuntimeAccessMode.DirectAndWsrx or RuntimeAccessMode.WsrxOnly)
+        {
+            ports.AddRange((template.UrlBindings ?? [])
+                .Select(binding => binding.ContainerPort)
+                .OfType<int>());
+        }
         if (mode == GameMode.Koh
             && template.ControlCheckUrlBinding?.ContainerPort is int controlPort)
             ports.Add(controlPort);
@@ -128,9 +144,11 @@ public static class RuntimeClaimFactory
 
     private static IReadOnlyDictionary<int, int> ContainerPortMappings(
         RuntimeProvider provider,
-        IReadOnlyDictionary<int, int>? configured)
+        IReadOnlyDictionary<int, int>? configured,
+        RuntimeAccessMode accessMode)
     {
-        if (configured is null || configured.Count == 0)
+        if (configured is null || configured.Count == 0
+            || accessMode == RuntimeAccessMode.WsrxOnly)
             return new Dictionary<int, int>();
         return provider == RuntimeProvider.Docker
             ? configured.Keys.ToDictionary(port => port, _ => 0)
@@ -233,6 +251,11 @@ public static class RuntimeClaimFactory
             labels["noctf.io/challenge-id"] = challengeId.ToString("D");
         if (instance.TeamId is Guid teamId)
             labels["noctf.io/team-id"] = teamId.ToString("D");
+        if (instance.AccessMode is RuntimeAccessMode.DirectAndWsrx
+            or RuntimeAccessMode.WsrxOnly)
+        {
+            labels["noctf.io/runtime-proxy-target"] = "true";
+        }
         return labels;
     }
 }

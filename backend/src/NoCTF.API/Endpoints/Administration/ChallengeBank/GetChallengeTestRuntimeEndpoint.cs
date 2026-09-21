@@ -29,7 +29,7 @@ public sealed record ChallengeTestRuntimeResponse(
     RuntimeFailureCodeProtocol? FailureCode,
     RuntimeTestFlagStateProtocol FlagState,
     string? TestFlag,
-    IReadOnlyList<string> Urls,
+    IReadOnlyList<RuntimeAccessResponse> Accesses,
     DateTimeOffset CreatedAt,
     DateTimeOffset? RunningAt,
     DateTimeOffset? ExpiresAt,
@@ -37,7 +37,9 @@ public sealed record ChallengeTestRuntimeResponse(
 
 internal static class ChallengeTestRuntimeMapping
 {
-    public static ChallengeTestRuntimeResponse ToResponse(ChallengeTestRuntimeView view) =>
+    public static ChallengeTestRuntimeResponse ToResponse(
+        ChallengeTestRuntimeView view,
+        HttpRequest request) =>
         new(
             view.Id,
             view.ChallengeId,
@@ -57,7 +59,14 @@ internal static class ChallengeTestRuntimeMapping
                 _ => throw new ArgumentOutOfRangeException(nameof(view), view.FlagState, null)
             },
             view.TestFlag,
-            view.State == RuntimeState.Running ? view.Urls : [],
+            view.State == RuntimeState.Running
+                ? RuntimeAccessMapping.ToResponse(
+                    view.Id,
+                    view.AccessMode,
+                    view.Urls,
+                    view.AccessEndpoints,
+                    request)
+                : [],
             view.CreatedAt,
             view.RunningAt,
             view.ExpiresAt,
@@ -97,6 +106,8 @@ public sealed class GetChallengeTestRuntimeEndpoint(
             user.IsAdministrator,
             cancellationToken);
         if (runtime is null) return TypedResults.NotFound();
-        return TypedResults.Ok(ChallengeTestRuntimeMapping.ToResponse(runtime));
+        return TypedResults.Ok(ChallengeTestRuntimeMapping.ToResponse(
+            runtime,
+            HttpContext.Request));
     }
 }

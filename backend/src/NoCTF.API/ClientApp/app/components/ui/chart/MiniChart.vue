@@ -11,10 +11,13 @@ const props = withDefaults(
 
 const el = ref<HTMLElement | null>(null)
 const { isDark } = useTheme()
+const palette = useThemePalette()
 let chart: echarts.ECharts | null = null
 let resizeFrame = 0
+let renderFrame = 0
 let observedWidth = -1
 let observedHeight = -1
+let themeObserver: MutationObserver | null = null
 
 function render() {
   if (!chart || !el.value) return
@@ -33,13 +36,32 @@ function render() {
   )
 }
 
+function scheduleRender() {
+  if (renderFrame) cancelAnimationFrame(renderFrame)
+  renderFrame = requestAnimationFrame(() => {
+    renderFrame = requestAnimationFrame(() => {
+      renderFrame = 0
+      render()
+    })
+  })
+}
+
 onMounted(() => {
   chart = echarts.init(el.value!)
-  render()
+  scheduleRender()
+  void document.fonts.ready.then(scheduleRender)
+  themeObserver = new MutationObserver(scheduleRender)
+  themeObserver.observe(document.documentElement, {
+    attributes: true,
+    attributeFilter: ['class', 'style'],
+  })
 })
 
-watch(() => props.option, render, { deep: true })
-watch(isDark, () => void nextTick(render))
+watch(() => props.option, scheduleRender, { deep: true })
+watch([isDark, palette], async () => {
+  await nextTick()
+  scheduleRender()
+}, { deep: true })
 
 let observer: ResizeObserver | null = null
 onMounted(() => {
@@ -55,13 +77,16 @@ onMounted(() => {
     resizeFrame = requestAnimationFrame(() => {
       resizeFrame = 0
       chart?.resize()
+      scheduleRender()
     })
   })
   if (el.value) observer.observe(el.value)
 })
 onUnmounted(() => {
   observer?.disconnect()
+  themeObserver?.disconnect()
   if (resizeFrame) cancelAnimationFrame(resizeFrame)
+  if (renderFrame) cancelAnimationFrame(renderFrame)
   chart?.dispose()
   chart = null
 })

@@ -329,6 +329,8 @@ public static class ComposeRuntimeDefinitionPolicy
     private static IReadOnlyDictionary<string, RuntimePublishedPortMapping[]>
         DockerBindingsByService(ComposeRequest request)
     {
+        if (request.AccessMode == NoCTF.Domain.Runtime.RuntimeAccessMode.WsrxOnly)
+            return new Dictionary<string, RuntimePublishedPortMapping[]>();
         var targets = EndpointBindings(request)
             .Distinct()
             .OrderBy(binding => binding.ServiceName, StringComparer.Ordinal)

@@ -97,7 +97,7 @@ public static class KubernetesComposeManifestPolicy
             ["noctf.io/managed"] = "true",
             ["noctf.io/runtime-instance-id"] = request.OperationId.ToString("D")
         };
-        var publicPorts = (request.UrlBindings ?? [])
+        var accessPorts = (request.UrlBindings ?? [])
             .GroupBy(binding => binding.ServiceName!, StringComparer.Ordinal)
             .ToDictionary(
                 group => group.Key,
@@ -107,6 +107,9 @@ public static class KubernetesComposeManifestPolicy
                     .Order()
                     .ToArray(),
                 StringComparer.Ordinal);
+        var publicPorts = request.AccessMode == NoCTF.Domain.Runtime.RuntimeAccessMode.WsrxOnly
+            ? new Dictionary<string, int[]>(StringComparer.Ordinal)
+            : accessPorts;
         var controlPorts = request.ControlCheckUrlBinding is { } control
             ? new Dictionary<string, int[]>(StringComparer.Ordinal)
             {
@@ -264,6 +267,45 @@ public static class KubernetesComposeManifestPolicy
                     Port = port
                 }).ToList()
             });
+        }
+        if (request.AccessMode is NoCTF.Domain.Runtime.RuntimeAccessMode.DirectAndWsrx
+                or NoCTF.Domain.Runtime.RuntimeAccessMode.WsrxOnly)
+        {
+            var proxyPorts = accessPorts.Values.SelectMany(ports => ports)
+                .Distinct()
+                .Order()
+                .ToArray();
+            if (proxyPorts.Length > 0)
+            {
+                ingress.Add(new V1NetworkPolicyIngressRule
+                {
+                    FromProperty =
+                    [
+                        new V1NetworkPolicyPeer
+                        {
+                            NamespaceSelector = new V1LabelSelector
+                            {
+                                MatchLabels = new Dictionary<string, string>
+                                {
+                                    ["kubernetes.io/metadata.name"] = "noctf"
+                                }
+                            },
+                            PodSelector = new V1LabelSelector
+                            {
+                                MatchLabels = new Dictionary<string, string>
+                                {
+                                    ["noctf.io/runtime-proxy-gateway"] = "true"
+                                }
+                            }
+                        }
+                    ],
+                    Ports = proxyPorts.Select(port => new V1NetworkPolicyPort
+                    {
+                        Protocol = "TCP",
+                        Port = port
+                    }).ToList()
+                });
+            }
         }
         var networkPolicy = new V1NetworkPolicy
         {

@@ -336,7 +336,7 @@ export type NoCtfapiEndpointsRuntimeRuntimeResponse = {
     provider?: NoCtfapiEndpointsRuntimeRuntimeProviderProtocol;
     state?: NoCtfapiEndpointsRuntimeRuntimeStateProtocol;
     failureCode?: NoCtfapiEndpointsRuntimeRuntimeFailureCodeProtocol | null;
-    urls?: Array<string>;
+    accesses?: Array<NoCtfapiEndpointsRuntimeRuntimeAccessResponse>;
     createdAt?: string;
     runningAt?: string | null;
     expiresAt?: string | null;
@@ -352,6 +352,11 @@ export type NoCtfapiEndpointsRuntimeRuntimeStateProtocol = 'Queued' | 'Provision
 
 export type NoCtfapiEndpointsRuntimeRuntimeFailureCodeProtocol = 'InvalidConfiguration' | 'RunnerUnavailable' | 'ProviderUnavailable' | 'ProvisionTimeout' | 'ProviderRejected' | 'CleanupFailed' | 'UrlExpansionFailed';
 
+export type NoCtfapiEndpointsRuntimeRuntimeAccessResponse = {
+    directAddress?: string | null;
+    webSocketAddress?: string | null;
+};
+
 export type NoCtfapiEndpointsRuntimeRunnerAdmissionFailureProtocol = 'NoEligibleRunner' | 'CpuActualCapacityInsufficient' | 'MemoryActualCapacityInsufficient' | 'PidActualCapacityInsufficient' | 'NodePressureHigh' | 'ObservationStale' | 'LedgerRecovering' | 'StartupConcurrencyLimited' | 'ProviderUnavailable' | 'RequestExceedsNodeCapacity';
 
 export type NoCtfapiEndpointsRuntimeRuntimeTargetListResponse = {
@@ -361,7 +366,11 @@ export type NoCtfapiEndpointsRuntimeRuntimeTargetListResponse = {
 export type NoCtfapiEndpointsRuntimeRuntimeTargetResponse = {
     teamId?: string;
     teamName?: string;
-    urls?: Array<string>;
+    accesses?: Array<NoCtfapiEndpointsRuntimeRuntimeAccessResponse>;
+};
+
+export type NoCtfapiEndpointsRuntimeProbeRuntimeProxyRequest = {
+    [key: string]: never;
 };
 
 export type NoCtfapiEndpointsPlatformPublicPlatformConfigurationResponse = {
@@ -702,6 +711,9 @@ export type NoCtfapiEndpointsCompetitionsCompetitionResponse = {
     writeUpSubmissionRequired?: boolean;
     writeUpSubmissionDeadlineHours?: number;
     writeUpSubmissionDeadlineAt?: string | null;
+    runtimeAccessMode?: NoCtfapiEndpointsCompetitionsRuntimeAccessModeProtocol;
+    trafficCaptureEnabled?: boolean;
+    trafficCaptureLimitBytes?: number | null;
 };
 
 export type NoCtfapiEndpointsCompetitionsGameModeProtocol = 'Ctf' | 'Awd' | 'Awdp' | 'Koh';
@@ -713,6 +725,8 @@ export type NoCtfapiEndpointsCompetitionsLeaderboardVisibilityProtocol = 'Normal
 export type NoCtfapiEndpointsCompetitionsCompetitionAdministrationRoleProtocol = 'Owner' | 'Manager' | 'Judge' | 'Observer';
 
 export type NoCtfapiEndpointsCompetitionsCompetitionAccessModeProtocol = 'Public' | 'StaffOnly';
+
+export type NoCtfapiEndpointsCompetitionsRuntimeAccessModeProtocol = 'Direct' | 'DirectAndWsrx' | 'WsrxOnly';
 
 export type NoCtfapiEndpointsCompetitionsGetCompetitionRequest = {
     [key: string]: never;
@@ -1037,7 +1051,7 @@ export type NoCtfapiEndpointsCompetitionsEventsExportCompetitionEventsRequest = 
     [key: string]: never;
 };
 
-export type NoCtfapiEndpointsCompetitionsEventsCompetitionEventKindProtocol = 'CompetitionCreated' | 'CompetitionUpdated' | 'CompetitionDeleted' | 'CompetitionLifecycleChanged' | 'LeaderboardVisibilityChanged' | 'ChallengeCreated' | 'ChallengeUpdated' | 'ChallengePublished' | 'ChallengeUnpublished' | 'ChallengeDeleted' | 'HintPublished' | 'HintUnlocked' | 'TeamRegistered' | 'TeamRegistrationChanged' | 'TeamUpdated' | 'TeamDeleted' | 'TeamMemberJoined' | 'TeamMemberRemoved' | 'TeamCaptainTransferred' | 'TeamBanned' | 'TeamUnbanned' | 'GameplayFactReceived' | 'GameplayFactAdjudicated' | 'ScoringRecorded' | 'FirstBloodAwarded' | 'SecondBloodAwarded' | 'ThirdBloodAwarded' | 'RuntimeCreated' | 'RuntimeStateChanged' | 'RuntimeExtended' | 'RuntimeReset' | 'RuntimePortAllocated' | 'ProtectedGameplayFactValueAccessed' | 'CheatIncidentDetected' | 'CheatIncidentConfirmed' | 'CheatIncidentDismissed' | 'CheatIncidentSuperseded' | 'CheatIncidentCorrected' | 'CompetitionArchiveExported' | 'TeamBanAppealSubmitted' | 'TeamBanAppealUpheld' | 'TeamBanAppealAccepted' | 'TeamBanCorrectionPublished' | 'RuntimeForceTerminationRequested' | 'RuntimeForceTerminationCompleted' | 'RuntimeForceTerminationFailed' | 'AnnouncementPublished' | 'QuestionOpened' | 'QuestionReplied' | 'QuestionStatusChanged' | 'ChallengeDescriptionUpdated' | 'TrackConfigurationUpdated' | 'TeamTrackChanged' | 'TrackRegistrationPolicyUpdated' | 'AwdpBreakAttempted' | 'AwdpFixAttempted' | 'AwdpBreakResolved' | 'AwdpFixResolved' | 'GameplayFactPatchDownloaded' | 'CompetitionAudienceChanged' | 'TeamWriteUpSubmitted';
+export type NoCtfapiEndpointsCompetitionsEventsCompetitionEventKindProtocol = 'CompetitionCreated' | 'CompetitionUpdated' | 'CompetitionDeleted' | 'CompetitionLifecycleChanged' | 'LeaderboardVisibilityChanged' | 'ChallengeCreated' | 'ChallengeUpdated' | 'ChallengePublished' | 'ChallengeUnpublished' | 'ChallengeDeleted' | 'HintPublished' | 'HintUnlocked' | 'TeamRegistered' | 'TeamRegistrationChanged' | 'TeamUpdated' | 'TeamDeleted' | 'TeamMemberJoined' | 'TeamMemberRemoved' | 'TeamCaptainTransferred' | 'TeamBanned' | 'TeamUnbanned' | 'GameplayFactReceived' | 'GameplayFactAdjudicated' | 'ScoringRecorded' | 'FirstBloodAwarded' | 'SecondBloodAwarded' | 'ThirdBloodAwarded' | 'RuntimeCreated' | 'RuntimeStateChanged' | 'RuntimeExtended' | 'RuntimeReset' | 'RuntimePortAllocated' | 'ProtectedGameplayFactValueAccessed' | 'CheatIncidentDetected' | 'CheatIncidentConfirmed' | 'CheatIncidentDismissed' | 'CheatIncidentSuperseded' | 'CheatIncidentCorrected' | 'CompetitionArchiveExported' | 'TeamBanAppealSubmitted' | 'TeamBanAppealUpheld' | 'TeamBanAppealAccepted' | 'TeamBanCorrectionPublished' | 'RuntimeForceTerminationRequested' | 'RuntimeForceTerminationCompleted' | 'RuntimeForceTerminationFailed' | 'AnnouncementPublished' | 'QuestionOpened' | 'QuestionReplied' | 'QuestionStatusChanged' | 'ChallengeDescriptionUpdated' | 'TrackConfigurationUpdated' | 'TeamTrackChanged' | 'TrackRegistrationPolicyUpdated' | 'AwdpBreakAttempted' | 'AwdpFixAttempted' | 'AwdpBreakResolved' | 'AwdpFixResolved' | 'GameplayFactPatchDownloaded' | 'CompetitionAudienceChanged' | 'TeamWriteUpSubmitted' | 'RuntimeTrafficCaptureStored' | 'RuntimeTrafficCaptureDeleted';
 
 export type NoCtfapiEndpointsCompetitionsEventsCompetitionEventLevelProtocol = 'Information' | 'Warning' | 'Error';
 
@@ -1116,7 +1130,7 @@ export type NoCtfapiEndpointsChallengesChallengeResponse = {
     createdAt?: string;
     updatedAt?: string;
     controlFlag?: string | null;
-    urls?: Array<string> | null;
+    accesses?: Array<NoCtfapiEndpointsRuntimeRuntimeAccessResponse> | null;
     leaderboardVisibility?: NoCtfapiEndpointsCompetitionsLeaderboardVisibilityProtocol;
     dataScope?: NoCtfapiEndpointsCompetitionsLeaderboardDataScopeProtocol;
     maximumFlagAttempts?: number | null;
@@ -1293,6 +1307,7 @@ export type NoCtfapiEndpointsAuthenticationCurrentUserResponse = {
     kind?: NoCtfapiEndpointsAuthenticationUserKindProtocol;
     emailVerified?: boolean;
     avatarUrl?: string | null;
+    profileCoverUrl?: string | null;
     wallpaperRevision?: string | null;
     wallpaperEnabled?: boolean;
 };
@@ -1351,11 +1366,42 @@ export type NoCtfapiEndpointsAuthenticationGetSsoFlowRequest = {
     [key: string]: never;
 };
 
+export type NoCtfapiEndpointsAuthenticationGetUserProfileCoverRequest = {
+    [key: string]: never;
+};
+
 export type NoCtfapiEndpointsAuthenticationPublicUserProfileResponse = {
     userId?: string;
     userName?: string;
     description?: string | null;
     avatarUrl?: string | null;
+    profileCoverUrl?: string | null;
+    competitionCount?: number;
+    finishedCompetitionCount?: number;
+    successfulChallengeCount?: number;
+    modes?: Array<NoCtfapiEndpointsAuthenticationPublicUserModeSummaryResponse>;
+    directions?: Array<NoCtfapiEndpointsAuthenticationPublicUserDirectionSummaryResponse>;
+    recentCompetitions?: Array<NoCtfapiEndpointsAuthenticationPublicUserCompetitionSummaryResponse>;
+};
+
+export type NoCtfapiEndpointsAuthenticationPublicUserModeSummaryResponse = {
+    mode?: NoCtfapiEndpointsCompetitionsGameModeProtocol;
+    competitionCount?: number;
+};
+
+export type NoCtfapiEndpointsAuthenticationPublicUserDirectionSummaryResponse = {
+    direction?: string;
+    successfulChallengeCount?: number;
+};
+
+export type NoCtfapiEndpointsAuthenticationPublicUserCompetitionSummaryResponse = {
+    competitionId?: string;
+    title?: string;
+    teamName?: string;
+    mode?: NoCtfapiEndpointsCompetitionsGameModeProtocol;
+    status?: NoCtfapiEndpointsCompetitionsCompetitionStatusProtocol;
+    startAt?: string;
+    endAt?: string;
 };
 
 export type NoCtfapiEndpointsAuthenticationGetUserProfileRequest = {
@@ -1467,6 +1513,16 @@ export type NoCtfapiEndpointsAuthenticationUploadMyAvatarRequest = {
     file: Blob | File;
 };
 
+export type NoCtfapiEndpointsAuthenticationProfileCoverUploadFailureResponse = {
+    code?: NoCtfapiEndpointsAuthenticationProfileCoverUploadFailureCode;
+};
+
+export type NoCtfapiEndpointsAuthenticationProfileCoverUploadFailureCode = 'SizeInvalid' | 'SourceMetadataMismatch' | 'UnsupportedFormat' | 'InvalidDimensions' | 'PixelLimitExceeded' | 'MultipleFrames' | 'MalformedImage';
+
+export type NoCtfapiEndpointsAuthenticationUploadMyProfileCoverRequest = {
+    file: Blob | File;
+};
+
 export type NoCtfapiEndpointsAuthenticationWallpaperUploadFailureResponse = {
     code?: NoCtfapiEndpointsAuthenticationWallpaperUploadFailureCode;
 };
@@ -1574,6 +1630,22 @@ export type NoCtfapiEndpointsAdministrationRuntimeCreateTeamRuntimeRequest = {
     replacesRuntimeId?: string | null;
 };
 
+export type NoCtfapiEndpointsAdministrationRuntimeRuntimeTrafficCaptureConflictResponse = {
+    detail?: string;
+};
+
+export type NoCtfapiEndpointsAdministrationRuntimeDeleteRuntimeTrafficCaptureRequest = {
+    [key: string]: never;
+};
+
+export type NoCtfapiEndpointsAdministrationRuntimeDownloadRuntimeTrafficCaptureRequest = {
+    [key: string]: never;
+};
+
+export type NoCtfapiEndpointsAdministrationRuntimeExportRuntimeTrafficCapturesRequest = {
+    runtimeInstanceIds: Array<string>;
+};
+
 export type NoCtfapiEndpointsAdministrationRuntimeExtendTeamRuntimeRequest = {
     expiresAt: string;
 };
@@ -1592,7 +1664,7 @@ export type NoCtfapiEndpointsAdministrationRuntimeAdminRuntimeResponse = {
     runnerId?: string | null;
     state?: NoCtfapiEndpointsRuntimeRuntimeStateProtocol;
     failureCode?: NoCtfapiEndpointsRuntimeRuntimeFailureCodeProtocol | null;
-    urls?: Array<string>;
+    accesses?: Array<NoCtfapiEndpointsRuntimeRuntimeAccessResponse>;
     publishedPorts?: Array<NoCtfApplicationRuntimeInstancesRuntimePublishedPortView>;
     createdAt?: string;
     runningAt?: string | null;
@@ -1634,6 +1706,27 @@ export type NoCtfapiEndpointsAdministrationRuntimeAdminRuntimeListResponse = {
 };
 
 export type NoCtfapiEndpointsAdministrationRuntimeListAdminRuntimesRequest = NoCtfapiPaginationPaginationRequest & {};
+
+export type NoCtfapiEndpointsAdministrationRuntimeRuntimeTrafficCaptureListResponse = {
+    items?: Array<NoCtfapiEndpointsAdministrationRuntimeRuntimeTrafficCaptureResponse>;
+    total?: number;
+};
+
+export type NoCtfapiEndpointsAdministrationRuntimeRuntimeTrafficCaptureResponse = {
+    runtimeInstanceId?: string;
+    competitionChallengeId?: string;
+    teamId?: string | null;
+    runtimeState?: NoCtfapiEndpointsRuntimeRuntimeStateProtocol;
+    segmentCount?: number;
+    byteLength?: number;
+    startedAt?: string;
+    updatedAt?: string;
+    truncated?: boolean;
+    teamName?: string | null;
+    challengeTitle?: string | null;
+};
+
+export type NoCtfapiEndpointsAdministrationRuntimeListRuntimeTrafficCapturesRequest = NoCtfapiPaginationPaginationRequest & {};
 
 export type NoCtfapiEndpointsAdministrationPlatformPlatformUserResponse = {
     id?: string;
@@ -2576,6 +2669,9 @@ export type NoCtfapiEndpointsAdministrationCompetitionsCompetitionMetadataPatchR
     writeUpSubmissionRequired: boolean;
     writeUpSubmissionDeadlineHours: number;
     accessMode: NoCtfapiEndpointsCompetitionsCompetitionAccessModeProtocol;
+    runtimeAccessMode?: NoCtfapiEndpointsCompetitionsRuntimeAccessModeProtocol;
+    trafficCaptureEnabled?: boolean;
+    trafficCaptureLimitBytes?: number | null;
 };
 
 export type NoCtfapiEndpointsAdministrationCompetitionsCompetitionConfigurationPatchRequest = {
@@ -2934,7 +3030,7 @@ export type NoCtfapiEndpointsAdministrationChallengeBankChallengeTestRuntimeResp
     failureCode?: NoCtfapiEndpointsRuntimeRuntimeFailureCodeProtocol | null;
     flagState?: NoCtfapiEndpointsAdministrationChallengeBankRuntimeTestFlagStateProtocol;
     testFlag?: string | null;
-    urls?: Array<string>;
+    accesses?: Array<NoCtfapiEndpointsRuntimeRuntimeAccessResponse>;
     createdAt?: string;
     runningAt?: string | null;
     expiresAt?: string | null;
@@ -3999,6 +4095,32 @@ export type ListRuntimeTargetsEndpointResponses = {
 };
 
 export type ListRuntimeTargetsEndpointResponse = ListRuntimeTargetsEndpointResponses[keyof ListRuntimeTargetsEndpointResponses];
+
+export type ProbeRuntimeProxyData = {
+    body?: never;
+    path: {
+        runtimeInstanceId: string;
+        bindingIndex: number;
+    };
+    query?: never;
+    url: '/api/v1/runtime-proxies/{runtimeInstanceId}/{bindingIndex}';
+};
+
+export type ProbeRuntimeProxyErrors = {
+    /**
+     * Not Found
+     */
+    404: unknown;
+};
+
+export type ProbeRuntimeProxyResponses = {
+    /**
+     * No Content
+     */
+    204: void;
+};
+
+export type ProbeRuntimeProxyResponse = ProbeRuntimeProxyResponses[keyof ProbeRuntimeProxyResponses];
 
 export type PlatformLogoGetData = {
     body?: never;
@@ -6059,6 +6181,22 @@ export type UserAvatarGetErrors = {
     404: unknown;
 };
 
+export type UserProfileCoverGetData = {
+    body?: never;
+    path: {
+        userId: string;
+    };
+    query?: never;
+    url: '/api/v1/users/{userId}/profile-cover';
+};
+
+export type UserProfileCoverGetErrors = {
+    /**
+     * Not Found
+     */
+    404: unknown;
+};
+
 export type UserProfileGetData = {
     body?: never;
     path: {
@@ -6384,6 +6522,44 @@ export type AuthenticationUploadMyAvatarResponses = {
 };
 
 export type AuthenticationUploadMyAvatarResponse = AuthenticationUploadMyAvatarResponses[keyof AuthenticationUploadMyAvatarResponses];
+
+export type AuthenticationUploadMyProfileCoverData = {
+    body: NoCtfapiEndpointsAuthenticationUploadMyProfileCoverRequest;
+    path?: never;
+    query?: never;
+    url: '/api/v1/auth/me/profile-cover';
+};
+
+export type AuthenticationUploadMyProfileCoverErrors = {
+    /**
+     * Bad Request
+     */
+    400: NoCtfapiEndpointsAuthenticationProfileCoverUploadFailureResponse;
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+    /**
+     * Not Found
+     */
+    404: unknown;
+    413: MicrosoftAspNetCoreMvcProblemDetails;
+};
+
+export type AuthenticationUploadMyProfileCoverError = AuthenticationUploadMyProfileCoverErrors[keyof AuthenticationUploadMyProfileCoverErrors];
+
+export type AuthenticationUploadMyProfileCoverResponses = {
+    /**
+     * Success
+     */
+    200: NoCtfapiEndpointsAuthenticationCurrentUserResponse;
+};
+
+export type AuthenticationUploadMyProfileCoverResponse = AuthenticationUploadMyProfileCoverResponses[keyof AuthenticationUploadMyProfileCoverResponses];
 
 export type VerifyEmailEndpointData = {
     body: NoCtfapiEndpointsAuthenticationVerifyEmailRequest;
@@ -6753,6 +6929,116 @@ export type AdminCreateTeamRuntimeResponses = {
 
 export type AdminCreateTeamRuntimeResponse = AdminCreateTeamRuntimeResponses[keyof AdminCreateTeamRuntimeResponses];
 
+export type AdminDeleteRuntimeTrafficCaptureData = {
+    body?: never;
+    path: {
+        competitionId: string;
+        runtimeInstanceId: string;
+    };
+    query?: never;
+    url: '/api/v1/admin/competitions/{competitionId}/traffic-captures/{runtimeInstanceId}';
+};
+
+export type AdminDeleteRuntimeTrafficCaptureErrors = {
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+    /**
+     * Not Found
+     */
+    404: unknown;
+    409: NoCtfapiEndpointsAdministrationRuntimeRuntimeTrafficCaptureConflictResponse;
+};
+
+export type AdminDeleteRuntimeTrafficCaptureError = AdminDeleteRuntimeTrafficCaptureErrors[keyof AdminDeleteRuntimeTrafficCaptureErrors];
+
+export type AdminDeleteRuntimeTrafficCaptureResponses = {
+    /**
+     * No Content
+     */
+    204: void;
+};
+
+export type AdminDeleteRuntimeTrafficCaptureResponse = AdminDeleteRuntimeTrafficCaptureResponses[keyof AdminDeleteRuntimeTrafficCaptureResponses];
+
+export type AdminDownloadRuntimeTrafficCaptureData = {
+    body?: never;
+    path: {
+        competitionId: string;
+        runtimeInstanceId: string;
+    };
+    query?: never;
+    url: '/api/v1/admin/competitions/{competitionId}/traffic-captures/{runtimeInstanceId}/file';
+};
+
+export type AdminDownloadRuntimeTrafficCaptureErrors = {
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+    /**
+     * Not Found
+     */
+    404: unknown;
+};
+
+export type AdminDownloadRuntimeTrafficCaptureResponses = {
+    /**
+     * Success
+     */
+    200: Blob | File;
+};
+
+export type AdminDownloadRuntimeTrafficCaptureResponse = AdminDownloadRuntimeTrafficCaptureResponses[keyof AdminDownloadRuntimeTrafficCaptureResponses];
+
+export type AdminExportRuntimeTrafficCapturesData = {
+    body: NoCtfapiEndpointsAdministrationRuntimeExportRuntimeTrafficCapturesRequest;
+    path: {
+        competitionId: string;
+    };
+    query?: never;
+    url: '/api/v1/admin/competitions/{competitionId}/traffic-captures/export';
+};
+
+export type AdminExportRuntimeTrafficCapturesErrors = {
+    /**
+     * Bad Request
+     */
+    400: MicrosoftAspNetCoreMvcValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+    /**
+     * Not Found
+     */
+    404: unknown;
+};
+
+export type AdminExportRuntimeTrafficCapturesError = AdminExportRuntimeTrafficCapturesErrors[keyof AdminExportRuntimeTrafficCapturesErrors];
+
+export type AdminExportRuntimeTrafficCapturesResponses = {
+    /**
+     * Success
+     */
+    200: Blob | File;
+};
+
+export type AdminExportRuntimeTrafficCapturesResponse = AdminExportRuntimeTrafficCapturesResponses[keyof AdminExportRuntimeTrafficCapturesResponses];
+
 export type AdminStopTeamRuntimeData = {
     body?: never;
     path: {
@@ -6951,6 +7237,49 @@ export type AdminListRuntimesResponses = {
 };
 
 export type AdminListRuntimesResponse = AdminListRuntimesResponses[keyof AdminListRuntimesResponses];
+
+export type AdminListRuntimeTrafficCapturesData = {
+    body?: never;
+    path: {
+        competitionId: string;
+    };
+    query: {
+        competitionChallengeId?: string | null;
+        teamId?: string | null;
+        runtimeInstanceId?: string | null;
+        truncated?: boolean | null;
+        offset: number;
+        limit: number;
+        desc: boolean;
+    };
+    url: '/api/v1/admin/competitions/{competitionId}/traffic-captures';
+};
+
+export type AdminListRuntimeTrafficCapturesErrors = {
+    /**
+     * Bad Request
+     */
+    400: MicrosoftAspNetCoreMvcValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+};
+
+export type AdminListRuntimeTrafficCapturesError = AdminListRuntimeTrafficCapturesErrors[keyof AdminListRuntimeTrafficCapturesErrors];
+
+export type AdminListRuntimeTrafficCapturesResponses = {
+    /**
+     * Success
+     */
+    200: NoCtfapiEndpointsAdministrationRuntimeRuntimeTrafficCaptureListResponse;
+};
+
+export type AdminListRuntimeTrafficCapturesResponse = AdminListRuntimeTrafficCapturesResponses[keyof AdminListRuntimeTrafficCapturesResponses];
 
 export type AdminStopSharedRuntimeData = {
     body?: never;

@@ -211,6 +211,38 @@ public sealed class KubernetesComposeManifestPolicyTests
     }
 
     [Test]
+    public async Task Wsrx_only_policy_omits_node_ports_and_allows_only_the_proxy_gateway()
+    {
+        var manifests = KubernetesComposeManifestPolicy.ParseAndValidate(
+            SafeManifests,
+            new HashSet<string>(["web"], StringComparer.Ordinal));
+
+        var plan = KubernetesComposeManifestPolicy.ApplyPlatformPolicy(
+            manifests,
+            Request() with { AccessMode = RuntimeAccessMode.WsrxOnly },
+            new KubernetesRuntimeOptions(
+                Namespace: "runtime",
+                PodPidsLimit: 512,
+                ClusterDomain: "cluster.local",
+                ClusterDnsServiceAddress: "10.96.0.10",
+                NetworkPolicyRequired: true));
+
+        await Assert.That(plan.Services.Any(service => service.Spec.Type == "NodePort"))
+            .IsFalse();
+        var proxyIngress = plan.NetworkPolicy.Spec.Ingress.Single(rule =>
+            rule.FromProperty?.Any(peer =>
+                peer.PodSelector?.MatchLabels?.TryGetValue(
+                    "noctf.io/runtime-proxy-gateway",
+                    out var value) == true
+                && value == "true") == true);
+        await Assert.That(proxyIngress.Ports!.Single().Port.Value)
+            .IsEqualTo("8080");
+        await Assert.That(proxyIngress.FromProperty!.Single()
+                .NamespaceSelector!.MatchLabels["kubernetes.io/metadata.name"])
+            .IsEqualTo("noctf");
+    }
+
+    [Test]
     public async Task Platform_policy_refuses_a_pool_without_network_policy_enforcement()
     {
         var manifests = KubernetesComposeManifestPolicy.ParseAndValidate(

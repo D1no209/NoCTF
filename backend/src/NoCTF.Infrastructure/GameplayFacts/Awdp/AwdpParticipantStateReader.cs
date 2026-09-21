@@ -111,7 +111,18 @@ public sealed class AwdpParticipantStateReader(NoCtfDbContext db) : IAwdpPartici
                 runtime.RunningAt,
                 runtime.ExpiresAt,
                 runtime.StoppedAt, runtime.RunnerId,
-                runtime.PublishedPorts.Select(port => new RuntimePublishedPortView(port.ServiceName, port.ContainerPort, port.HostPort)).ToArray()))
+                runtime.PublishedPorts.Select(port => new RuntimePublishedPortView(port.ServiceName, port.ContainerPort, port.HostPort)).ToArray(),
+                null,
+                null,
+                null,
+                null,
+                runtime.AccessMode,
+                runtime.AccessEndpoints.OrderBy(endpoint => endpoint.BindingIndex)
+                    .Select(endpoint => new RuntimeAccessEndpointView(endpoint.BindingIndex,
+                        endpoint.DirectAddress, endpoint.TargetHost, endpoint.TargetPort)).ToArray(),
+                runtime.TrafficCaptureEnabled,
+                runtime.TrafficCaptureLimitBytes,
+                runtime.TrafficCaptureReservedBytes))
             .FirstOrDefaultAsync(cancellationToken);
         var fixRuntime = await db.RuntimeInstances.AsNoTracking()
             .Where(runtime => runtime.CompetitionId == competitionId

@@ -31,7 +31,9 @@ export function localeDomainsForPath(path: string): readonly LocaleDomain[] {
     domains.add('notifications')
   if (path.includes('/writeup'))
     domains.add('writeups')
-  if (path.startsWith('/users/'))
+  if (path.startsWith('/users/')) {
     domains.add('account')
+    domains.add('competitions')
+  }
   return [...domains]
 }

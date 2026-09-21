@@ -63,6 +63,13 @@ public sealed class DockerComposeRuntime(
                 "--wait-timeout",
                 Math.Max(1, (int)Math.Ceiling(request.OperationTimeout.TotalSeconds)).ToString(
                     System.Globalization.CultureInfo.InvariantCulture));
+            if (request.AccessMode is RuntimeAccessMode.DirectAndWsrx
+                or RuntimeAccessMode.WsrxOnly)
+            {
+                await ConnectRuntimeProxyGatewaysAsync(
+                    request.ProjectName,
+                    cancellationToken);
+            }
         }
         catch (Exception exception)
         {
@@ -90,6 +97,11 @@ public sealed class DockerComposeRuntime(
             cancellationToken);
     }
 
+    public Task EnsureRuntimeProxyGatewaysAsync(
+        ComposeReceipt receipt,
+        CancellationToken cancellationToken) =>
+        ConnectRuntimeProxyGatewaysAsync(receipt.ProjectName, cancellationToken);
+
     public async Task DownAsync(
         ComposeReceipt receipt,
         RuntimeTerminationMode mode,
@@ -98,6 +110,20 @@ public sealed class DockerComposeRuntime(
     {
         var directory = ResolveOwnedDirectory(receipt.Namespace);
         var warnings = new List<Exception>();
+        try
+        {
+            await DisconnectRuntimeProxyGatewaysAsync(
+                receipt.ProjectName,
+                cancellationToken);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception exception)
+        {
+            warnings.Add(exception);
+        }
         var gracefulSucceeded = false;
         if (mode == RuntimeTerminationMode.GracefulThenForce
             && Directory.Exists(directory))
@@ -353,8 +379,10 @@ public sealed class DockerComposeRuntime(
             "--format",
             "json");
         var entries = ParseProcesses(result);
-        var services = entries
-            .Select(entry => new ComposeServiceStatus(
+        var services = new List<ComposeServiceStatus>(entries.Count);
+        foreach (var entry in entries)
+        {
+            services.Add(new ComposeServiceStatus(
                 entry.Service,
                 entry.Id,
                 ToRuntimeStatus(entry.State),
@@ -367,12 +395,14 @@ public sealed class DockerComposeRuntime(
                     .ToDictionary(
                         group => group.Key,
                         group => group.First().PublishedPort),
-                entry.Service))
-            .ToArray();
+                await ReadContainerInternalAddressAsync(
+                    entry.Id,
+                    cancellationToken)));
+        }
         var resourceStatuses = entries
             .Select(entry => ToRuntimeStatus(entry.State))
             .ToArray();
-        var status = services.Length == 0
+        var status = services.Count == 0
             ? RuntimeStatus.Stopped
             : resourceStatuses.All(resourceStatus =>
                     resourceStatus == RuntimeStatus.Running)
@@ -462,6 +492,7 @@ public sealed class DockerComposeRuntime(
         try
         {
             using var cleanup = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+            await DisconnectRuntimeProxyGatewaysAsync(project, cleanup.Token);
             await RunDockerAsync(
                 directory,
                 project,
@@ -504,6 +535,139 @@ public sealed class DockerComposeRuntime(
             RuntimeTerminationMode.GracefulThenForce,
             RuntimeTerminationPolicy.Default,
             cancellationToken);
+    }
+
+    private async Task ConnectRuntimeProxyGatewaysAsync(
+        string projectName,
+        CancellationToken cancellationToken)
+    {
+        var networks = await ListProjectResourceIdsAsync(
+            ["network", "ls", "--quiet"],
+            projectName,
+            cancellationToken);
+        if (networks.Length == 0)
+            throw new InvalidOperationException(
+                "Docker Compose WSRX Runtime has no owned network.");
+        var gateways = await ResolveRuntimeProxyGatewaysAsync(cancellationToken);
+        foreach (var network in networks)
+        {
+            var attached = await ReadNetworkContainersAsync(network, cancellationToken);
+            foreach (var gateway in gateways)
+            {
+                if (attached.Contains(gateway))
+                    continue;
+                _ = await RunRawDockerAsync(
+                    cancellationToken,
+                    "network",
+                    "connect",
+                    network,
+                    gateway);
+            }
+        }
+    }
+
+    private async Task DisconnectRuntimeProxyGatewaysAsync(
+        string projectName,
+        CancellationToken cancellationToken)
+    {
+        var networks = await ListProjectResourceIdsAsync(
+            ["network", "ls", "--quiet"],
+            projectName,
+            cancellationToken);
+        if (networks.Length == 0)
+            return;
+        var gateways = await ResolveRuntimeProxyGatewaysAsync(
+            cancellationToken,
+            requireAny: false);
+        foreach (var network in networks)
+        {
+            var attached = await ReadNetworkContainersAsync(network, cancellationToken);
+            foreach (var gateway in gateways)
+            {
+                if (!attached.Contains(gateway))
+                    continue;
+                _ = await RunRawDockerAsync(
+                    cancellationToken,
+                    "network",
+                    "disconnect",
+                    "--force",
+                    network,
+                    gateway);
+            }
+        }
+    }
+
+    private async Task<IReadOnlyList<string>> ResolveRuntimeProxyGatewaysAsync(
+        CancellationToken cancellationToken,
+        bool requireAny = true)
+    {
+        string output;
+        if (!string.IsNullOrWhiteSpace(options.ProxyContainerName))
+        {
+            output = await RunRawDockerAsync(
+                cancellationToken,
+                "inspect",
+                "--format",
+                "{{.Id}}",
+                options.ProxyContainerName);
+        }
+        else
+        {
+            output = await RunRawDockerAsync(
+                cancellationToken,
+                "ps",
+                "--quiet",
+                "--filter",
+                $"label={options.ProxyContainerLabelKey}={options.ProxyContainerLabelValue}");
+        }
+        var gateways = output.Split(
+            ['\r', '\n'],
+            StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        if (requireAny && gateways.Length == 0)
+            throw new InvalidOperationException(
+                "No running Runtime proxy gateway carries the required role label.");
+        return gateways;
+    }
+
+    private async Task<HashSet<string>> ReadNetworkContainersAsync(
+        string networkId,
+        CancellationToken cancellationToken)
+    {
+        var json = await RunRawDockerAsync(
+            cancellationToken,
+            "network",
+            "inspect",
+            "--format",
+            "{{json .Containers}}",
+            networkId);
+        using var document = JsonDocument.Parse(json);
+        return document.RootElement.ValueKind == JsonValueKind.Object
+            ? document.RootElement.EnumerateObject()
+                .Select(property => property.Name)
+                .ToHashSet(StringComparer.Ordinal)
+            : [];
+    }
+
+    private async Task<string> ReadContainerInternalAddressAsync(
+        string containerId,
+        CancellationToken cancellationToken)
+    {
+        var json = await RunRawDockerAsync(
+            cancellationToken,
+            "inspect",
+            "--format",
+            "{{json .NetworkSettings.Networks}}",
+            containerId);
+        using var document = JsonDocument.Parse(json);
+        foreach (var network in document.RootElement.EnumerateObject()
+                     .OrderBy(property => property.Name, StringComparer.Ordinal))
+        {
+            if (network.Value.TryGetProperty("IPAddress", out var address)
+                && !string.IsNullOrWhiteSpace(address.GetString()))
+                return address.GetString()!;
+        }
+        throw new InvalidOperationException(
+            "Docker Compose service has no internal proxy address.");
     }
 
     public async Task DestroyByIdentityAsync(

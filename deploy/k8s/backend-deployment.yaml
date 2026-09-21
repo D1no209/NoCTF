@@ -16,6 +16,7 @@ spec:
       labels:
         app: backend
         noctf.io/internal-role: scoring-callback-gateway
+        noctf.io/runtime-proxy-gateway: "true"
     spec:
       automountServiceAccountToken: false
       securityContext:
@@ -126,7 +127,7 @@ spec:
       volumes:
         - name: tmp
           emptyDir:
-            sizeLimit: 256Mi
+            sizeLimit: 4Gi
       # Docker-backed testing may add this volume:
       #   - name: docker-sock
       #     hostPath:

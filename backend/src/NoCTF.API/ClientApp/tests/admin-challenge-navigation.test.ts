@@ -52,6 +52,22 @@ describe('admin competition challenge navigation', () => {
 })
 
 describe('challenge template list navigation', () => {
+  test('enforces organizer access at the route boundary', async () => {
+    const [indexRoute, newRoute, detailRoute, middleware, trafficCaptures] = await Promise.all([
+      Bun.file(new URL('../app/pages/admin/challenges/index.vue', import.meta.url)).text(),
+      Bun.file(new URL('../app/pages/admin/challenges/new.vue', import.meta.url)).text(),
+      Bun.file(new URL('../app/pages/admin/challenges/[id].vue', import.meta.url)).text(),
+      Bun.file(new URL('../app/middleware/organizer.ts', import.meta.url)).text(),
+      Bun.file(new URL('../app/pages/admin/competitions/[id]/traffic-captures.vue', import.meta.url)).text(),
+    ])
+
+    for (const route of [indexRoute, newRoute, detailRoute])
+      expect(route).toContain("middleware: 'organizer'")
+    expect(middleware).toContain('canOrganize')
+    expect(middleware).toContain("path: '/auth/login'")
+    expect(trafficCaptures).toContain("middleware: 'platform-admin'")
+  })
+
   test('uses server-side offset pagination and debounced filters', async () => {
     const source = await sourceFile(
       new URL('../app/pages/admin/challenges/index.vue', import.meta.url),
@@ -93,10 +109,23 @@ describe('challenge template list navigation', () => {
       new URL('../app/pages/admin/challenges/index.vue', import.meta.url),
     ).text()
 
-    expect(index).toContain("const directionFilter = ref('all')")
+    expect(index).toContain("const directionFilter = ref(typeof route.query.direction === 'string'")
     expect(index).toContain('const filteredTemplates = computed(')
     expect(index).toContain('v-model="directionFilter"')
     expect(index).toContain("$t('ui.allDirections')")
     expect(index).toContain('v-for="template in filteredTemplates"')
+    expect(index).toContain('interface ChallengeLibrarySnapshot')
+    expect(index).toContain("const directionFilter = ref(typeof route.query.direction === 'string'")
+    expect(index).toContain("const search = ref(typeof route.query.q === 'string'")
+    expect(index).toContain('templates: [...templates.value]')
+    expect(index).toContain('directions: [...directions.value]')
+    expect(index).toContain('directionCatalogs.set(includeDeleted.value, catalog)')
+    expect(index).toContain('if (!pagination.error.value) rememberSnapshot()')
+    expect(index).toContain('function syncFiltersToRoute(): void')
+    expect(index).toContain("query.direction = directionFilter.value")
+    expect(index).toContain("query.deleted = '1'")
+    expect(index).toContain('void router.replace({ query })')
+    expect(index).toContain('onBeforeUnmount(() => {')
+    expect(index).toContain('rememberSnapshot()')
   })
 })

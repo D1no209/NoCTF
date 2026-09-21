@@ -18,6 +18,7 @@ describe('locale feature catalogs', () => {
       'leaderboard',
     ])
     expect(localeDomainsForPath('/notifications')).toEqual(['account', 'notifications'])
+    expect(localeDomainsForPath('/users/user-1')).toEqual(['account', 'competitions'])
   })
 
   test('keeps complete catalogs out of the runtime i18n entry', async () => {
