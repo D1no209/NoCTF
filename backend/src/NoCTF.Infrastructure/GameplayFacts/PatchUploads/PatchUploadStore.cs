@@ -121,7 +121,7 @@ public sealed class PatchUploadStore(
         if (defenseAlreadySucceeded)
             return null;
         if (available.Mode == GameMode.Ctf
-            && CtfConfigurationUpgrader.ParseChallenge(available.DefinitionJson).InteractionKind
+            && CtfConfigurationParser.ParseDefinition(available.DefinitionJson).InteractionKind
                 != CtfInteractionKind.PatchVerification)
         {
             return null;

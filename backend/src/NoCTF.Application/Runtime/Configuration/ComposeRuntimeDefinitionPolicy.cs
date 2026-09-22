@@ -204,7 +204,6 @@ public static class ComposeRuntimeDefinitionPolicy
             var serviceName = ((YamlScalarNode)entry.Key).Value!;
             var service = (YamlMappingNode)entry.Value;
             var limits = request.ServiceResources[serviceName];
-            EnsureDeclaredPidsMatch(serviceName, service, limits.PidsLimit);
             Remove(service, "pids_limit");
             Remove(service, "deploy");
             SetScalar(service, "mem_limit", limits.MemoryBytes.ToString(CultureInfo.InvariantCulture));
@@ -274,7 +273,6 @@ public static class ComposeRuntimeDefinitionPolicy
         {
             var serviceName = ((YamlScalarNode)entry.Key).Value!;
             var service = (YamlMappingNode)entry.Value;
-            EnsureDeclaredPidsMatch(serviceName, service, podPidsLimit);
             Remove(service, "pids_limit");
             Remove(service, "deploy");
             MergeMappingValues(service, "environment", request.Environment);
@@ -462,7 +460,10 @@ public static class ComposeRuntimeDefinitionPolicy
             ValidateKeyValues(serviceName, "environment", environment, "NOCTF_", errors);
         if (TryGet(service, "labels", out var labels))
             ValidateKeyValues(serviceName, "labels", labels, "noctf.io/", errors);
-        _ = ReadDeclaredPids(serviceName, service, errors);
+        if (TryGet(service, "pids_limit", out _))
+            errors.Add($"Compose service '{serviceName}' must declare PID limits through ServiceResources, not pids_limit.");
+        if (TryGet(service, "deploy", out _))
+            errors.Add($"Compose service '{serviceName}' must not declare deploy; resources and replicas are platform-owned.");
     }
 
     private static void ValidateResources(
@@ -560,68 +561,6 @@ public static class ComposeRuntimeDefinitionPolicy
                 errors.Add(
                     $"Compose service '{serviceName}' field '{fieldName}' cannot use reserved key '{key}'.");
         }
-    }
-
-    private static void EnsureDeclaredPidsMatch(
-        string serviceName,
-        YamlMappingNode service,
-        long platformPidsLimit)
-    {
-        var errors = new List<string>();
-        var declared = ReadDeclaredPids(serviceName, service, errors);
-        if (errors.Count > 0)
-            throw new InvalidOperationException(string.Join(" ", errors));
-        if (declared.Any(value => value != platformPidsLimit))
-            throw new InvalidOperationException(
-                $"Compose service '{serviceName}' declares a PID limit that differs from the platform limit.");
-    }
-
-    private static IReadOnlyList<long> ReadDeclaredPids(
-        string serviceName,
-        YamlMappingNode service,
-        ICollection<string> errors)
-    {
-        var values = new List<long>();
-        if (TryGet(service, "pids_limit", out var direct))
-        {
-            if (!TryReadPositiveLong(direct, out var value))
-                errors.Add(
-                    $"Compose service '{serviceName}' pids_limit must be a positive integer.");
-            else
-                values.Add(value);
-        }
-
-        if (!TryGet(service, "deploy", out var deployNode))
-            return values;
-        if (deployNode is not YamlMappingNode deploy)
-        {
-            errors.Add(
-                $"Compose service '{serviceName}' deploy must be a mapping.");
-            return values;
-        }
-        if (deploy.Children.Keys.Any(key =>
-                key is not YamlScalarNode { Value: "replicas" or "resources" }))
-            errors.Add(
-                $"Compose service '{serviceName}' deploy may only declare replicas and resources.limits.pids.");
-        if (TryGet(deploy, "replicas", out var replicas)
-            && (!TryReadPositiveLong(replicas, out var replicaCount) || replicaCount != 1))
-            errors.Add($"Compose service '{serviceName}' must use exactly one replica.");
-        if (TryGet(deploy, "resources", out _))
-        {
-            if (!TryGetMapping(deploy, "resources", out var resources)
-                || resources.Children.Count != 1
-                || !TryGetMapping(resources, "limits", out var limits)
-                || limits.Children.Count != 1
-                || !TryGet(limits, "pids", out var pids)
-                || !TryReadPositiveLong(pids, out var deployedValue))
-                errors.Add(
-                    $"Compose service '{serviceName}' deploy resources may only declare limits.pids.");
-            else
-                values.Add(deployedValue);
-        }
-        if (values.Distinct().Count() > 1)
-            errors.Add($"Compose service '{serviceName}' declares conflicting PID limits.");
-        return values;
     }
 
     private static bool TryReadPositiveLong(YamlNode node, out long value)

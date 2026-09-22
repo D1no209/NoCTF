@@ -122,6 +122,7 @@ public sealed class ChallengeFlagRegularExpressionPersistenceTests
                         RuntimeAllocation.PerTeam,
                         new ContainerRuntimeDefinition(
                             "registry.example/challenge:v1",
+                            Security: new(false, false, false, ["ALL"], []),
                             FlagEnvironmentVariableName: "FLAG"),
                         FlagSource: RuntimeFlagSource.PerTeam)),
                 new JsonSerializerOptions(JsonSerializerDefaults.Web));

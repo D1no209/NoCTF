@@ -4,7 +4,7 @@ import { describe, expect, test } from 'bun:test'
 const page = (path: string) => sourceFile(new URL(path, import.meta.url)).text()
 
 describe('participant competition workspace layout', () => {
-  test('renders public competition pages without the legacy workspace sidebar', async () => {
+  test('renders public competition pages without a workspace sidebar', async () => {
     const parent = await page('../app/pages/competitions/[id].vue')
 
     expect(parent).not.toContain("<component :is=\"AppWorkspaceNav\"")
@@ -17,7 +17,8 @@ describe('participant competition workspace layout', () => {
     const adminParent = await page('../app/pages/admin/competitions/[id].vue')
 
     expect(parent).toContain('isControlScreen')
-    expect(parent).toContain('`/competitions/${competitionId.value}/live-`')
+    expect(parent).toContain('`/competitions/${competitionId.value}/live`')
+    expect(parent).not.toContain('`/competitions/${competitionId.value}/live-`')
     expect(parent).not.toContain("label: translate(\"ui.controlScreen\")")
     expect(parent).not.toContain("label: translate(\"ui.3dLiveScreen\")")
     expect(parent).not.toContain("label: translate(\"ui.team\")")
@@ -51,7 +52,6 @@ describe('participant competition workspace layout', () => {
     const sources = await Promise.all([
       page('../app/pages/competitions/[id]/questions.vue'),
       page('../app/pages/competitions/[id]/my/team.vue'),
-      page('../app/pages/competitions/[id]/my/submissions.vue'),
     ])
     const leaderboard = await page('../app/pages/competitions/[id]/leaderboard.vue')
     const writeUpReview = await page('../app/pages/competitions/[id]/writeups.vue')

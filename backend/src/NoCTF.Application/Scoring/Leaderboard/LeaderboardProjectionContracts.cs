@@ -101,7 +101,7 @@ public interface ILeaderboardProjectorCatalog
     IGameModeLeaderboardProjector Get(GameMode mode);
 }
 
-public sealed record LeaderboardProjectionResult(
+public sealed record LeaderboardAggregateProjection(
     IReadOnlyList<LeaderboardEntry> Entries,
     IReadOnlyList<LeaderboardChallengeInfo> Challenges,
     int? CurrentRound = null,
@@ -109,11 +109,7 @@ public sealed record LeaderboardProjectionResult(
     int? RoundDurationSeconds = null,
     int? CurrentRoundRemainingSeconds = null);
 
-public sealed record LeaderboardProjectionOutputs(
-    LeaderboardProjectionResult Legacy,
-    ScoreboardProjection Scoreboard);
-
 public interface ILeaderboardProjectionEngine
 {
-    LeaderboardProjectionOutputs ProjectOutputs(LeaderboardProjectionInput input);
+    ScoreboardProjection Project(LeaderboardProjectionInput input);
 }

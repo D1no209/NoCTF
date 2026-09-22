@@ -1,8 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using NoCTF.Application.Authentication.RefreshSession;
 using NoCTF.Infrastructure.Persistence;
-using NoCTF.Domain.Notifications;
-using NoCTF.Domain.Shared;
 
 namespace NoCTF.Infrastructure.Authentication;
 
@@ -11,29 +9,10 @@ public sealed class AccessTokenVersionReader(NoCtfDbContext db) : IAccessTokenVe
     public Task<bool> IsCurrentAsync(
         Guid userId,
         int tokenVersion,
-        CancellationToken cancellationToken,
-        LegacyAdministratorIssuedAccessToken? legacyAdministratorIssuedToken = null)
-    {
-        var users = db.Users.AsNoTracking().Where(
+        CancellationToken cancellationToken) =>
+        db.Users.AsNoTracking().AnyAsync(
             user => user.Id == userId
                 && user.AccountStatus == NoCTF.Domain.Identity.UserAccountStatus.Active
-                && user.TokenVersion == tokenVersion);
-        if (legacyAdministratorIssuedToken is null)
-            return users.AnyAsync(cancellationToken);
-
-        var issuedToken = legacyAdministratorIssuedToken;
-        return users.AnyAsync(
-            _ => db.Notifications.Any(notification =>
-                    notification.Id == issuedToken.JwtId
-                    && notification.Kind == NotificationKind.PlatformUserAccessTokenIssued
-                    && notification.SourceType == NotificationSourceType.User
-                    && notification.SourceId == issuedToken.AdministratorUserId
-                    && notification.RelatedType == EntityReferenceKind.User
-                    && notification.RelatedId == userId)
-                && !db.Notifications.Any(notification =>
-                    notification.Kind == NotificationKind.PlatformUserAccessTokenRevoked
-                    && notification.RelatedType == EntityReferenceKind.Notification
-                    && notification.RelatedId == issuedToken.JwtId),
+                && user.TokenVersion == tokenVersion,
             cancellationToken);
-    }
 }

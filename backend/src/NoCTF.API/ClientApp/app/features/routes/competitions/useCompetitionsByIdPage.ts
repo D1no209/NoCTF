@@ -22,7 +22,6 @@ export function useCompetitionsByIdPage() {
 
   const isControlScreen = computed(() => [
     `/competitions/${competitionId.value}/live`,
-    `/competitions/${competitionId.value}/live-`,
     `/competitions/${competitionId.value}/awdp-live`,
   ].includes(route.path))
 

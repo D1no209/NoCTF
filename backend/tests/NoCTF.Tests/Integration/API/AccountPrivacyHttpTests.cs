@@ -12,8 +12,6 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.EntityFrameworkCore.Infrastructure;
-using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -42,7 +40,7 @@ namespace NoCTF.Tests.Integration.API;
 public sealed class AccountPrivacyHttpTests
 {
     [Test, Timeout(300_000)]
-    public async Task Incremental_migration_private_endpoints_scope_retention_and_authentication_events(CancellationToken ct)
+    public async Task Current_baseline_private_endpoints_scope_retention_and_authentication_events(CancellationToken ct)
     {
         await DockerIntegrationTest.RunAsync(async () =>
         {
@@ -50,10 +48,22 @@ public sealed class AccountPrivacyHttpTests
             await postgres.StartAsync(ct);
             var options = new DbContextOptionsBuilder<NoCtfDbContext>().UseNpgsql(postgres.GetConnectionString()).UseSnakeCaseNamingConvention().Options;
             await using var db = new NoCtfDbContext(options);
-            await db.GetService<IMigrator>().MigrateAsync("20260904120421_ChallengeTemplateTestRuntimes", ct);
-            var existing = Guid.NewGuid();
-            await db.Database.ExecuteSqlInterpolatedAsync($"INSERT INTO users (id,user_name,normalized_user_name,email,password_hash,kind,role,account_status,token_version,created_at,updated_at) VALUES ({existing},'existing','EXISTING','existing@example.test','unused',0,0,0,0,now(),now())", ct);
             await db.Database.MigrateAsync(ct);
+            var existing = Guid.NewGuid();
+            db.Users.Add(new User
+            {
+                Id = existing,
+                UserName = "existing",
+                NormalizedUserName = "EXISTING",
+                Email = "existing@example.test",
+                PasswordHash = "unused",
+                Kind = UserKind.Human,
+                Role = UserRole.User,
+                AccountStatus = UserAccountStatus.Active,
+                CreatedAt = DateTimeOffset.UtcNow,
+                UpdatedAt = DateTimeOffset.UtcNow
+            });
+            await db.SaveChangesAsync(ct);
             var existingUser = await db.Users.SingleAsync(x => x.Id == existing, ct);
             await Assert.That(existingUser.SchoolFullName).IsNull();
             var providerId = Guid.NewGuid();

@@ -54,12 +54,13 @@ describe('participant action page wiring', () => {
     expect(page).toContain('@click="loadChallengeOptions"')
   })
 
-  test('accepts the password reset route emitted by email delivery', async () => {
+  test('uses only the canonical password reset route', async () => {
     const page = await sourceFile(
       new URL('../app/pages/auth/password-reset.vue', import.meta.url),
     ).text()
 
-    expect(page).toContain("alias: ['/reset-password']")
+    expect(page).toContain("definePageMeta({ middleware: 'guest' })")
+    expect(page).not.toContain('alias:')
   })
 
   test('offers an anonymous non-disclosing verification email resend flow', async () => {

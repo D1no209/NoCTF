@@ -76,8 +76,6 @@ dotnet test backend/tests/NoCTF.Tests/NoCTF.Tests.csproj -c Release --no-build -
   --treenode-filter "/*/*/WolverineTransactionalOutboxTests/Maintenance_ticks_are_single_active_and_fail_over_between_workers"
 dotnet test backend/tests/NoCTF.Tests/NoCTF.Tests.csproj -c Release --no-build -- `
   --treenode-filter "/*/*/WorkerRoleTests/*"
-dotnet test backend/tests/NoCTF.Tests/NoCTF.Tests.csproj -c Release --no-build -- `
-  --treenode-filter "/*/*/PlatformMonitoringTests/*"
 cd backend/src/NoCTF.API/ClientApp
 bun test
 bun run typecheck

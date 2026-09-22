@@ -59,18 +59,17 @@ public sealed class RedisRunnerCapacityGate(IConnectionMultiplexer redis, TimePr
             redis.call('ZREM', KEYS[5], ARGV[4])
             return 0
         end
-        local modern = schema3(KEYS[2])
-        local memory = tonumber(modern and ARGV[8] or ARGV[1])
-        local cpu = tonumber(modern and ARGV[9] or ARGV[2])
-        local pids = tonumber(modern and ARGV[10] or ARGV[3])
+        local memory = tonumber(ARGV[8])
+        local cpu = tonumber(ARGV[9])
+        local pids = tonumber(ARGV[10])
         if not fits(KEYS[2], memory, cpu, pids, ARGV[7] == '1') then
             redis.call('ZADD', KEYS[5], admission_pressure(KEYS[2], tonumber(ARGV[6])), ARGV[4])
             return 0
         end
-        redis.call('HINCRBY', KEYS[2], modern and 'admissionAvailableMemoryBytes' or 'availableMemoryBytes', -memory)
-        redis.call('HINCRBY', KEYS[2], modern and 'admissionAvailableNanoCpus' or 'availableNanoCpus', -cpu)
-        if not modern or redis.call('HGET', KEYS[2], 'pidsObserved') ~= '0' then
-            redis.call('HINCRBY', KEYS[2], modern and 'admissionAvailablePids' or 'availablePids', -pids)
+        redis.call('HINCRBY', KEYS[2], 'admissionAvailableMemoryBytes', -memory)
+        redis.call('HINCRBY', KEYS[2], 'admissionAvailableNanoCpus', -cpu)
+        if redis.call('HGET', KEYS[2], 'pidsObserved') ~= '0' then
+            redis.call('HINCRBY', KEYS[2], 'admissionAvailablePids', -pids)
         end
         redis.call('HSET', KEYS[3],
             'runnerId', ARGV[4],
@@ -103,10 +102,9 @@ public sealed class RedisRunnerCapacityGate(IConnectionMultiplexer redis, TimePr
                 local jitter = (tonumber(string.sub(hash, 1, 8), 16) / 4294967295) * 0.000001
                 local score = admission_pressure(capacityKey, jitter)
                 redis.call('ZADD', KEYS[2], score, runnerId)
-                local modern = schema3(capacityKey)
-                local requestedMemory = tonumber(modern and ARGV[7] or ARGV[1])
-                local requestedCpu = tonumber(modern and ARGV[8] or ARGV[2])
-                local requestedPids = tonumber(modern and ARGV[9] or ARGV[3])
+                local requestedMemory = tonumber(ARGV[7])
+                local requestedCpu = tonumber(ARGV[8])
+                local requestedPids = tonumber(ARGV[9])
                 if fits(capacityKey, requestedMemory, requestedCpu, requestedPids, ARGV[6] == '1')
                     and (not bestScore or score < bestScore) then
                     bestRunner = runnerId
@@ -120,21 +118,20 @@ public sealed class RedisRunnerCapacityGate(IConnectionMultiplexer redis, TimePr
         if existingRunner then return { 2, existingRunner } end
 
         local bestCapacityKey = 'runner:' .. bestRunner .. ':capacity'
-        local modern = schema3(bestCapacityKey)
-        local requestedMemory = tonumber(modern and ARGV[7] or ARGV[1])
-        local requestedCpu = tonumber(modern and ARGV[8] or ARGV[2])
-        local requestedPids = tonumber(modern and ARGV[9] or ARGV[3])
-        redis.call('HINCRBY', bestCapacityKey, modern and 'admissionAvailableMemoryBytes' or 'availableMemoryBytes', -requestedMemory)
-        redis.call('HINCRBY', bestCapacityKey, modern and 'admissionAvailableNanoCpus' or 'availableNanoCpus', -requestedCpu)
-        if not modern or redis.call('HGET', bestCapacityKey, 'pidsObserved') ~= '0' then
-            redis.call('HINCRBY', bestCapacityKey, modern and 'admissionAvailablePids' or 'availablePids', -requestedPids)
+        local requestedMemory = tonumber(ARGV[7])
+        local requestedCpu = tonumber(ARGV[8])
+        local requestedPids = tonumber(ARGV[9])
+        redis.call('HINCRBY', bestCapacityKey, 'admissionAvailableMemoryBytes', -requestedMemory)
+        redis.call('HINCRBY', bestCapacityKey, 'admissionAvailableNanoCpus', -requestedCpu)
+        if redis.call('HGET', bestCapacityKey, 'pidsObserved') ~= '0' then
+            redis.call('HINCRBY', bestCapacityKey, 'admissionAvailablePids', -requestedPids)
         end
         redis.call('HSET', KEYS[3],
             'runnerId', bestRunner,
             'pool', ARGV[4],
-            'memoryBytes', ARGV[1],
-            'nanoCpus', ARGV[2],
-            'pidsLimit', ARGV[3])
+            'memoryBytes', requestedMemory,
+            'nanoCpus', requestedCpu,
+            'pidsLimit', requestedPids)
         start_slot(bestCapacityKey, KEYS[3], ARGV[6] == '1', requestedMemory, requestedCpu, requestedPids)
         track_claim(KEYS[3], bestRunner)
         redis.call('ZADD', KEYS[2], admission_pressure(bestCapacityKey, 0), bestRunner)
@@ -151,8 +148,7 @@ public sealed class RedisRunnerCapacityGate(IConnectionMultiplexer redis, TimePr
         local cpu = redis.call('HGET', KEYS[2], 'nanoCpus')
         local pids = redis.call('HGET', KEYS[2], 'pidsLimit')
         if not memory or not cpu or not pids then return 0 end
-        local modern = schema3(KEYS[1])
-        if modern and redis.call('HGET', KEYS[2], 'starting') == '1' then
+        if redis.call('HGET', KEYS[2], 'starting') == '1' then
             local reserveFields = { 'MemoryBytes', 'NanoCpus', 'Pids' }
             local amounts = { tonumber(memory), tonumber(cpu), tonumber(pids) }
             for i, suffix in ipairs(reserveFields) do
@@ -172,22 +168,6 @@ public sealed class RedisRunnerCapacityGate(IConnectionMultiplexer redis, TimePr
                 'admissionAvailableMemoryBytes', math.max(0, baseMemory - tonumber(redis.call('HGET', KEYS[1], 'startupReservedMemoryBytes') or '0')),
                 'admissionAvailableNanoCpus', math.max(0, baseCpu - tonumber(redis.call('HGET', KEYS[1], 'startupReservedNanoCpus') or '0')),
                 'admissionAvailablePids', math.max(0, basePids - tonumber(redis.call('HGET', KEYS[1], 'startupReservedPids') or '0')))
-        elseif not modern then
-            local availableMemory = tonumber(redis.call('HGET', KEYS[1], 'availableMemoryBytes') or '0')
-            local availableCpu = tonumber(redis.call('HGET', KEYS[1], 'availableNanoCpus') or '0')
-            local availablePids = tonumber(redis.call('HGET', KEYS[1], 'availablePids') or '0')
-            local totalMemory = tonumber(redis.call('HGET', KEYS[1], 'totalMemoryBytes') or '-1')
-            local totalCpu = tonumber(redis.call('HGET', KEYS[1], 'totalNanoCpus') or '-1')
-            local totalPids = tonumber(redis.call('HGET', KEYS[1], 'totalPids') or '-1')
-            redis.call('HSET', KEYS[1],
-                'availableMemoryBytes', math.min(totalMemory, availableMemory + tonumber(memory)),
-                'availableNanoCpus', math.min(totalCpu, availableCpu + tonumber(cpu)),
-                'availablePids', math.min(totalPids, availablePids + tonumber(pids)))
-            if redis.call('HGET', KEYS[2], 'starting') == '1' then
-                local field = redis.call('HGET', KEYS[2], 'auxiliary') == '1' and 'activeAuxiliary' or 'startingPrimary'
-                local value = tonumber(redis.call('HGET', KEYS[1], field) or '0')
-                redis.call('HSET', KEYS[1], field, math.max(0, value - 1))
-            end
         end
         redis.call('DEL', KEYS[2])
         redis.call('ZREM', KEYS[6], KEYS[2])
@@ -391,18 +371,12 @@ public sealed class RedisRunnerCapacityGate(IConnectionMultiplexer redis, TimePr
             if redis.call('EXISTS', KEYS[1]) == 0 then return 0 end
             if redis.call('HGET', KEYS[2], 'auxiliary') == '1' then return 0 end
             if redis.call('HGET', KEYS[2], 'starting') == '1' then
-                if redis.call('HGET', KEYS[1], 'registrationSchema') == '3' then
-                    local completedAt = tonumber(redis.call('HGET', KEYS[2], 'completedAt') or '0')
-                    if completedAt == 0 then
-                        completedAt = tonumber(ARGV[2])
-                        redis.call('HSET', KEYS[2], 'completedAt', completedAt)
-                    end
-                    redis.call('ZADD', KEYS[3], completedAt, KEYS[2])
-                else
-                    local active = tonumber(redis.call('HGET', KEYS[1], 'startingPrimary') or '0')
-                    redis.call('HSET', KEYS[1], 'startingPrimary', math.max(0, active - 1))
-                    redis.call('HSET', KEYS[2], 'starting', 0)
+                local completedAt = tonumber(redis.call('HGET', KEYS[2], 'completedAt') or '0')
+                if completedAt == 0 then
+                    completedAt = tonumber(ARGV[2])
+                    redis.call('HSET', KEYS[2], 'completedAt', completedAt)
                 end
+                redis.call('ZADD', KEYS[3], completedAt, KEYS[2])
             end
             return 1
             """, [$"runner:{runnerId}:capacity", $"runner-claim:{identity.Key}",
@@ -415,10 +389,9 @@ public sealed class RedisRunnerCapacityGate(IConnectionMultiplexer redis, TimePr
         return (long)await redis.GetDatabase().ScriptEvaluateAsync(RunnerAdmissionLua.Functions + "\n" + """
             if not ready(KEYS[1], KEYS[2]) then return 0 end
             if redis.call('HGET', KEYS[3], 'runnerId') ~= ARGV[1] then return 0 end
-            local modern = schema3(KEYS[2])
-            if tonumber(redis.call('HGET', KEYS[3], 'memoryBytes') or '-1') ~= tonumber(modern and ARGV[5] or ARGV[2]) then return 0 end
-            if tonumber(redis.call('HGET', KEYS[3], 'nanoCpus') or '-1') ~= tonumber(modern and ARGV[6] or ARGV[3]) then return 0 end
-            if tonumber(redis.call('HGET', KEYS[3], 'pidsLimit') or '-1') ~= tonumber(modern and ARGV[7] or ARGV[4]) then return 0 end
+            if tonumber(redis.call('HGET', KEYS[3], 'memoryBytes') or '-1') ~= tonumber(ARGV[5]) then return 0 end
+            if tonumber(redis.call('HGET', KEYS[3], 'nanoCpus') or '-1') ~= tonumber(ARGV[6]) then return 0 end
+            if tonumber(redis.call('HGET', KEYS[3], 'pidsLimit') or '-1') ~= tonumber(ARGV[7]) then return 0 end
             return 1
             """, [$"runner:{allocation.RunnerId}:heartbeat", $"runner:{allocation.RunnerId}:capacity", $"runner-claim:{allocation.Identity.Key}"],
             [allocation.RunnerId, allocation.Budget.MemoryBytes, allocation.Budget.NanoCpus, allocation.Budget.PidsLimit,
@@ -442,15 +415,16 @@ public sealed class RedisRunnerCapacityGate(IConnectionMultiplexer redis, TimePr
         {
             var claimKey = new RedisKey($"runner-claim:{claimSuffix}");
             var pool = (string?)await database.HashGetAsync(claimKey, "pool");
-            var poolKey = string.IsNullOrWhiteSpace(pool) ? "__legacy__" : pool;
+            if (string.IsNullOrWhiteSpace(pool))
+                return RunnerCapacityReleaseOutcome.RecoveryRequired;
             var released = (long)await database.ScriptEvaluateAsync(
                 ReleaseScript,
                 [
                     new RedisKey($"runner:{runnerId}:capacity"),
                     claimKey,
                     new RedisKey($"runner:{runnerId}:heartbeat"),
-                    new RedisKey($"runner-pool:{poolKey}:members"),
-                    new RedisKey($"runner-pool:{poolKey}:candidates"),
+                    new RedisKey($"runner-pool:{pool}:members"),
+                    new RedisKey($"runner-pool:{pool}:candidates"),
                     new RedisKey($"runner:{runnerId}:completed-startups")
                 ],
                 [runnerId, NextJitter()]);
@@ -529,32 +503,25 @@ public sealed class RedisRunnerCapacityGate(IConnectionMultiplexer redis, TimePr
             return RunnerAdmissionFailure.ObservationStale;
         if (!await database.KeyExistsAsync($"runner:{runnerId}:heartbeat")) return RunnerAdmissionFailure.NoEligibleRunner;
         var auxiliary = request.Workload?.IsAuxiliary == true;
-        var modern = fields.GetValueOrDefault("registrationSchema") == "3";
-        var requested = modern && request.Limit is { } limit
-            ? limit : new RuntimeResourceAmount(request.MemoryBytes, request.NanoCpus, request.PidsLimit);
-        var memoryReserve = !modern && !auxiliary ? Read("reservedMemory") : 0;
-        var cpuReserve = !modern && !auxiliary ? Read("reservedCpu") : 0;
-        var pidReserve = !modern && !auxiliary ? Read("reservedPids") : 0;
-        var totalMemoryField = modern ? "observedTotalMemoryBytes" : "totalMemoryBytes";
-        var totalCpuField = modern ? "observedTotalNanoCpus" : "totalNanoCpus";
-        var totalPidsField = modern ? "observedTotalPids" : "totalPids";
-        if (requested.MemoryBytes > Read(totalMemoryField) - memoryReserve
-            || requested.NanoCpus > Read(totalCpuField) - cpuReserve
+        if (fields.GetValueOrDefault("registrationSchema") != "3")
+            return RunnerAdmissionFailure.LedgerRecovering;
+        var requested = request.Limit
+            ?? new RuntimeResourceAmount(request.MemoryBytes, request.NanoCpus, request.PidsLimit);
+        if (requested.MemoryBytes > Read("observedTotalMemoryBytes")
+            || requested.NanoCpus > Read("observedTotalNanoCpus")
             || (fields.GetValueOrDefault("pidsObserved") != "0"
-                && requested.PidsLimit > Read(totalPidsField) - pidReserve))
+                && requested.PidsLimit > Read("observedTotalPids")))
             return RunnerAdmissionFailure.RequestExceedsNodeCapacity;
         var maximum = Read(auxiliary ? "maxAuxiliary" : "maxPrimary");
-        var activeField = auxiliary ? modern ? "startingAuxiliary" : "activeAuxiliary" : "startingPrimary";
+        var activeField = auxiliary ? "startingAuxiliary" : "startingPrimary";
         if (maximum > 0 && Read(activeField) >= maximum)
             return RunnerAdmissionFailure.StartupConcurrencyLimited;
-        var availableMemoryField = modern ? "admissionAvailableMemoryBytes" : "availableMemoryBytes";
-        var availableCpuField = modern ? "admissionAvailableNanoCpus" : "availableNanoCpus";
-        var availablePidsField = modern ? "admissionAvailablePids" : "availablePids";
-        if (requested.MemoryBytes > Read(availableMemoryField) - memoryReserve)
+        if (requested.MemoryBytes > Read("admissionAvailableMemoryBytes"))
             return RunnerAdmissionFailure.MemoryActualCapacityInsufficient;
-        if (requested.NanoCpus > Read(availableCpuField) - cpuReserve)
+        if (requested.NanoCpus > Read("admissionAvailableNanoCpus"))
             return RunnerAdmissionFailure.CpuActualCapacityInsufficient;
-        if (fields.GetValueOrDefault("pidsObserved") != "0" && requested.PidsLimit > Read(availablePidsField) - pidReserve)
+        if (fields.GetValueOrDefault("pidsObserved") != "0"
+            && requested.PidsLimit > Read("admissionAvailablePids"))
             return RunnerAdmissionFailure.PidActualCapacityInsufficient;
         return RunnerAdmissionFailure.NoEligibleRunner;
     }

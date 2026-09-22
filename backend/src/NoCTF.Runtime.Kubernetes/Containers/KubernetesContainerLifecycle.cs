@@ -470,11 +470,6 @@ public sealed class KubernetesContainerLifecycle(
         return source;
     }
 
-    public Task<OneShotResult> RunAsync(
-        ContainerRequest request,
-        CancellationToken cancellationToken) =>
-        RunAsync(request, input: null, cancellationToken);
-
     public async Task<OneShotResult> RunAsync(
         ContainerRequest request,
         OneShotInputArchive? input,
@@ -709,6 +704,7 @@ public sealed class KubernetesContainerLifecycle(
                 RuntimeInstanceId = target.Identity.RuntimeInstanceId,
                 NetworkPurpose = ContainerNetworkPurpose.AwdChecker
             },
+            null,
             cancellationToken);
     }
 

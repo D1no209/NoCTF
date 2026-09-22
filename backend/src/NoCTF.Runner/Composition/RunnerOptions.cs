@@ -1,7 +1,7 @@
 using Microsoft.Extensions.Options;
+using NoCTF.Application.Runtime.Capacity;
 using NoCTF.Application.Runtime.Provisioning;
 using NoCTF.Domain.Runtime;
-using NoCTF.Application.Runtime.Capacity;
 
 namespace NoCTF.Runner.Composition;
 
@@ -12,24 +12,10 @@ public sealed class RunnerOptions
     public string Id { get; set; } = string.Empty;
     public string Pool { get; set; } = string.Empty;
     public RuntimeProvider? Provider { get; set; }
-    // Rolling-compatibility only. Actual-usage runners ignore this configured ceiling.
-    public RunnerCapacityOptions Capacity { get; set; } = new();
     public RunnerHeartbeatOptions Heartbeat { get; set; } = new();
     public RunnerCleanupOptions Cleanup { get; set; } = new();
     public RunnerAdmissionOptions Admission { get; set; } = new();
     public int ProviderFailureHoldSeconds { get; set; } = 120;
-
-    public RuntimeResourceLimits ResourceCapacity => new(
-        Capacity.MemoryBytes,
-        Capacity.NanoCpus,
-        Capacity.PidsLimit);
-}
-
-public sealed class RunnerCapacityOptions
-{
-    public long MemoryBytes { get; set; }
-    public long NanoCpus { get; set; }
-    public long PidsLimit { get; set; }
 }
 
 public sealed class RunnerCleanupOptions

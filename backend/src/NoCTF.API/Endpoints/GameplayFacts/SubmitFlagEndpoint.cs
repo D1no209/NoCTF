@@ -85,7 +85,6 @@ public enum GameplayFactFailureCodeProtocol
     AwdpPatchTimeout,
     AwdpServiceAbnormal,
     AwdpPlatformFailed,
-    AwdpViolation,
     ForeignTeamFlagDetected,
     InsufficientScore,
     HintUnavailable,

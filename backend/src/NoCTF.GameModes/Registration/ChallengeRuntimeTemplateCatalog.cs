@@ -80,12 +80,12 @@ internal static class ChallengeRuntimeTemplateValidator
                     errors.Add("Runtime internal ports must be between 1 and 65535.");
                 if (container.InternalPorts?.Distinct().Count() != container.InternalPorts?.Count)
                     errors.Add("Runtime internal ports cannot contain duplicates.");
-                if (container.Security is { } security)
-                {
-                    if (security.CapDrop is null
-                        || !security.CapDrop.Contains("ALL", StringComparer.OrdinalIgnoreCase))
-                        errors.Add("Runtime security must drop all capabilities.");
-                }
+                if (container.Security is not { } security)
+                    errors.Add("Runtime security is required.");
+                else if (security.CapDrop is null
+                    || security.CapAdd is null
+                    || !security.CapDrop.Contains("ALL", StringComparer.OrdinalIgnoreCase))
+                    errors.Add("Runtime security must declare capability lists and drop all capabilities.");
                 break;
             case ComposeRuntimeDefinition compose:
                 ValidateEgressPolicy(compose.EgressPolicy, errors);

@@ -14,7 +14,7 @@ describe('browser page titles', () => {
     expect(routeTitleKey('/competitions/competition-1/my/team')).toBe('ui.myTeam')
     expect(routeTitleKey('/admin/challenges/template-1')).toBe('ui.challengeLibrary')
     expect(routeTitleKey('/admin/competitions/competition-1/permissions')).toBe('ui.permissions')
-    expect(routeTitleKey('/admin/platform/monitoring')).toBe('ui.monitoring')
+    expect(routeTitleKey('/admin/platform/runtimes')).toBe('ui.runtimeContainers')
     expect(routeTitleKey('/auth/login')).toBe('ui.signIn')
   })
 })

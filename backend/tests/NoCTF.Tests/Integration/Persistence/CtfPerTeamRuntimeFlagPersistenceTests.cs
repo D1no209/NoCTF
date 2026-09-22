@@ -286,14 +286,14 @@ public sealed class CtfPerTeamRuntimeFlagPersistenceTests
             foreach (var runnerId in new[] { "runner-a", "runner-b" })
             {
                 var registered = await registry.RegisterAsync(
-                    new RunnerAvailabilityRegistration(
+                    CurrentRunnerRegistration.Create(
                         "tests",
                         runnerId,
-                        RuntimeProvider.Docker,
-                        "stage-5-test",
-                        runnerCapacity,
-                        TimeSpan.FromMinutes(2),
-                        HasActiveAssignments: false),
+                        new(
+                            runnerCapacity.MemoryBytes,
+                            runnerCapacity.NanoCpus,
+                            runnerCapacity.PidsLimit),
+                        timeToLive: TimeSpan.FromMinutes(2)),
                     cancellationToken);
                 await Assert.That(registered)
                     .IsEqualTo(RunnerAvailabilityRegistrationOutcome.Online);
@@ -402,6 +402,7 @@ public sealed class CtfPerTeamRuntimeFlagPersistenceTests
                 {
                     ["CHALLENGE_FLAG"] = "author-value"
                 },
+                Security: new(false, false, false, ["ALL"], []),
                 FlagEnvironmentVariableName: "CHALLENGE_FLAG"),
             Limits: new(268_435_456, 500_000_000, 128),
             FlagSource: RuntimeFlagSource.PerTeam);
@@ -485,7 +486,7 @@ public sealed class CtfPerTeamRuntimeFlagPersistenceTests
             IsPublished = true,
             RulesJson = JsonSerializer.Serialize(
                 new CtfChallengeConfiguration(
-                    CtfChallengeConfiguration.CurrentSchemaVersion,
+                    CtfConfiguration.CurrentSchemaVersion,
                     null,
                     null,
                     FlagTemplate: flagTemplate),

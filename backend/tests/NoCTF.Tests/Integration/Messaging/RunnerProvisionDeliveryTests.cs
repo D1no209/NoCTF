@@ -58,7 +58,6 @@ public sealed class RunnerProvisionDeliveryTests
             var configuration = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
             {
                 ["Runner:Id"] = runnerId, ["Runner:Pool"] = "default", ["Runner:Provider"] = "Docker",
-                ["Runner:Capacity:MemoryBytes"] = "67108864", ["Runner:Capacity:NanoCpus"] = "100000000", ["Runner:Capacity:PidsLimit"] = "64",
                 ["Runner:Heartbeat:IntervalSeconds"] = "5", ["Runner:Heartbeat:TtlSeconds"] = "15",
                 ["RunnerScoring:CallbackBaseUrl"] = "http://127.0.0.1:8080", ["RunnerScoring:SigningKey"] = new string('x', 64),
                 ["ConnectionStrings:PostgreSql"] = postgres.GetConnectionString()

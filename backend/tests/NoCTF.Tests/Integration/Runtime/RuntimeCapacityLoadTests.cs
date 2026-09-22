@@ -33,8 +33,8 @@ public sealed class RuntimeCapacityLoadTests
                     8L * 1024 * 1024 * 1024, 7_500_000_000,
                     4_000_000_000, .05, 700, 4096, 0);
                 var registration = new RunnerAvailabilityRegistration("production", "runner", RuntimeProvider.Docker,
-                    "test", new(0, 0, 0), TimeSpan.FromMinutes(1), publishCount++ > 0, true,
-                    new RunnerPressurePolicy(policy).Evaluate(observation, now), policy, ActualUsage: true);
+                    "test", TimeSpan.FromMinutes(1), publishCount++ > 0, true,
+                    new RunnerPressurePolicy(policy).Evaluate(observation, now), policy);
                 await Assert.That(await registry.RegisterAsync(registration, ct))
                     .IsEqualTo(RunnerAvailabilityRegistrationOutcome.Online);
             }
@@ -87,8 +87,8 @@ public sealed class RuntimeCapacityLoadTests
                 4L * 1024 * 1024 * 1024, 4L * 1024 * 1024 * 1024,
                 4_000_000_000, 0, 0, 4096, 0);
             var registration = new RunnerAvailabilityRegistration("parallel", "runner", RuntimeProvider.Docker,
-                "test", new(0, 0, 0), TimeSpan.FromMinutes(1), false, true,
-                new RunnerPressurePolicy(options).Evaluate(observation, now), options, ActualUsage: true);
+                "test", TimeSpan.FromMinutes(1), false, true,
+                new RunnerPressurePolicy(options).Evaluate(observation, now), options);
             await new RedisRunnerAvailabilityRegistry(redis).RegisterAsync(registration, ct);
             var gate = new RedisRunnerCapacityGate(redis);
             var duplicateId = Guid.NewGuid();

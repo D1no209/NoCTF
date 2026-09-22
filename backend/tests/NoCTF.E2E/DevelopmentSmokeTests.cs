@@ -5,7 +5,6 @@ using System.Text.Json;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.DependencyInjection;
-using NoCTF.API.Endpoints;
 using NoCTF.Application.Messaging;
 using Wolverine;
 
@@ -24,7 +23,7 @@ public sealed class DevelopmentSmokeTests
         var userName = Environment.GetEnvironmentVariable("NOCTF_E2E_ADMIN_USER")
             ?? "dev-admin";
         using var factory = baseUrl is null
-            ? new WebApplicationFactory<HealthEndpoint>().WithWebHostBuilder(builder =>
+            ? new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
                 builder.UseEnvironment("Development"))
             : null;
         using var client = factory?.CreateClient()

@@ -18,7 +18,6 @@ public sealed class ContainerRuntimeMessageHandler(RuntimeProviderHandler runtim
         CancellationToken cancellationToken) =>
         runtime.StopContainerAsync(message, cancellationToken);
 }
-
 [NonTransactional]
 public sealed class ComposeRuntimeMessageHandler(RuntimeProviderHandler runtime)
 {
@@ -51,51 +50,6 @@ public sealed class OvaRuntimeMessageHandler(RuntimeProviderHandler runtime)
 public sealed class RuntimeTerminationMessageHandler(RuntimeProviderHandler runtime)
 {
     public Task<object> Handle(
-        ForceTerminateRuntime message,
-        CancellationToken cancellationToken) =>
-        runtime.ForceTerminateAsync(message, cancellationToken);
-}
-
-internal static class RuntimeProviderHandlerCompatibilityExtensions
-{
-    public static Task<object?> Handle(
-        this RuntimeProviderHandler runtime,
-        ProvisionContainerRuntime message,
-        CancellationToken cancellationToken) =>
-        runtime.ProvisionContainerAsync(message, cancellationToken);
-
-    public static Task<object> Handle(
-        this RuntimeProviderHandler runtime,
-        StopContainerRuntime message,
-        CancellationToken cancellationToken) =>
-        runtime.StopContainerAsync(message, cancellationToken);
-
-    public static Task<object?> Handle(
-        this RuntimeProviderHandler runtime,
-        ProvisionComposeRuntime message,
-        CancellationToken cancellationToken) =>
-        runtime.ProvisionComposeAsync(message, cancellationToken);
-
-    public static Task<object> Handle(
-        this RuntimeProviderHandler runtime,
-        StopComposeRuntime message,
-        CancellationToken cancellationToken) =>
-        runtime.StopComposeAsync(message, cancellationToken);
-
-    public static Task<object?> Handle(
-        this RuntimeProviderHandler runtime,
-        ProvisionOvaRuntime message,
-        CancellationToken cancellationToken) =>
-        runtime.ProvisionOvaAsync(message, cancellationToken);
-
-    public static Task<object> Handle(
-        this RuntimeProviderHandler runtime,
-        StopOvaRuntime message,
-        CancellationToken cancellationToken) =>
-        runtime.StopOvaAsync(message, cancellationToken);
-
-    public static Task<object> Handle(
-        this RuntimeProviderHandler runtime,
         ForceTerminateRuntime message,
         CancellationToken cancellationToken) =>
         runtime.ForceTerminateAsync(message, cancellationToken);

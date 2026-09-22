@@ -17,11 +17,11 @@ public sealed class RunnerAvailabilityPublisher(
     IOptions<RunnerOptions> configuredOptions,
     ILogger<RunnerAvailabilityPublisher> logger,
     TimeProvider timeProvider,
-    RunnerProviderHealthState? providerHealth = null,
-    RedisRunnerCapacityLedger? ledger = null,
-    RunnerResourceMutationCoordinator? mutations = null,
-    IEnumerable<IRuntimeManagedResourceReconciler>? reconcilers = null,
-    RunnerResourceObserver? observer = null) : BackgroundService
+    RedisRunnerCapacityLedger ledger,
+    RunnerResourceMutationCoordinator mutations,
+    IEnumerable<IRuntimeManagedResourceReconciler> reconcilers,
+    RunnerResourceObserver observer,
+    RunnerProviderHealthState? providerHealth = null) : BackgroundService
 {
     private static readonly string Version =
         typeof(RunnerProgramMarker).Assembly
@@ -98,12 +98,7 @@ public sealed class RunnerAvailabilityPublisher(
     {
         await using var scope = scopeFactory.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<NoCtfDbContext>();
-        var admission = observer is null ? null : await observer.SampleAsync(cancellationToken);
-        var observedCapacity = admission?.Capacity?.ObservedTotal;
-        var compatibilityCapacity = observer is null ? options.ResourceCapacity : new RuntimeResourceLimits(
-            observedCapacity?.MemoryBytes ?? 0,
-            observedCapacity?.NanoCpus ?? 0,
-            observedCapacity?.PidsLimit ?? 0);
+        var admission = await observer.SampleAsync(cancellationToken);
         var hasActiveAssignments = await db.RuntimeInstances.AsNoTracking()
             .AnyAsync(
                 instance => instance.RunnerId == options.Id
@@ -120,18 +115,16 @@ public sealed class RunnerAvailabilityPublisher(
                 options.Id,
                 options.Provider!.Value,
                 Version,
-                compatibilityCapacity,
                 options.Heartbeat.Ttl,
                 hasActiveAssignments,
                 providerHealth?.IsReady(options.Provider.Value) ?? true,
-                admission, observer is null ? null : options.Admission,
-                ActualUsage: observer is not null);
-        if (!initialReconciliationComplete && ledger is not null)
+                admission,
+                options.Admission);
+        if (!initialReconciliationComplete)
             await ledger.PauseAsync(options.Id, options.Pool, cancellationToken);
         var result = await registry.RegisterAsync(registration, cancellationToken);
         if (result == RunnerAvailabilityRegistrationOutcome.OfflineCapacityUntrusted
-            && (admission?.Capacity is not null || observer is null)
-            && ledger is not null && mutations is not null && reconcilers is not null)
+            && admission.Capacity is not null)
         {
             await ledger.PauseAsync(options.Id, options.Pool, cancellationToken);
             using var exclusive = await mutations.ReconcileAsync(cancellationToken);
@@ -139,7 +132,6 @@ public sealed class RunnerAvailabilityPublisher(
             // External inventory reads happen outside the database transaction.
             var managed = await reconciler.ListManagedAsync(cancellationToken);
             var managedRuntimeIds = managed.Select(resource => resource.RuntimeInstanceId).ToHashSet();
-            var claimKeys = await ledger.ReadClaimKeysAsync(options.Id, cancellationToken);
             await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
             await RuntimeCapacityCriticalSection.AcquireAsync(db, cancellationToken);
             var ownerJson = JsonSerializer.Serialize(new { items = new[] { new { runnerId = options.Id } } });
@@ -147,24 +139,14 @@ public sealed class RunnerAvailabilityPublisher(
                     $"SELECT * FROM runtime_instances WHERE runner_id = {options.Id} OR capacity_allocations @> CAST({ownerJson} AS jsonb)")
                 .Where(runtime => runtime.RuntimeProvider == options.Provider)
                 .AsNoTracking().ToArrayAsync(cancellationToken);
-            foreach (var runtime in runtimes.Where(runtime => runtime.CapacityAllocations.Items.Count == 0
-                         && (runtime.State is RuntimeState.Provisioning or RuntimeState.Running or RuntimeState.Stopping
-                             || runtime.State == RuntimeState.Failed && runtime.ProviderReceiptJson != null)))
-            {
-                var legacy = await ledger.ReadLegacyAsync(runtime, options.Id, cancellationToken);
-                if (legacy is null)
-                    return RunnerAvailabilityRegistrationOutcome.OfflineCapacityUntrusted;
-                runtime.CapacityAllocations = runtime.CapacityAllocations.Add(legacy);
-                var document = runtime.CapacityAllocations;
-                await db.RuntimeInstances.Where(row => row.Id == runtime.Id).ExecuteUpdateAsync(
-                    update => update.SetProperty(row => row.CapacityAllocations, document), cancellationToken);
-            }
+            if (runtimes.Any(runtime => runtime.CapacityAllocations.Items.Count == 0
+                    && (runtime.State is RuntimeState.Provisioning or RuntimeState.Running or RuntimeState.Stopping
+                        || runtime.State == RuntimeState.Failed && runtime.ProviderReceiptJson != null)))
+                return RunnerAvailabilityRegistrationOutcome.OfflineCapacityUntrusted;
             var known = runtimes.Where(runtime => runtime.CapacityAllocations.Items.Count > 0)
                 .Select(runtime => runtime.Id).ToHashSet();
             if (managed.Any(resource => !known.Contains(resource.RuntimeInstanceId)))
                 return RunnerAvailabilityRegistrationOutcome.OfflineCapacityUntrusted;
-            // Persist legacy evidence before replacing its Redis keys. A failed commit
-            // must leave the old claim intact for the next recovery attempt.
             await transaction.CommitAsync(cancellationToken);
             var starting = runtimes.Where(runtime => runtime.State == RuntimeState.Provisioning)
                 .SelectMany(runtime => runtime.CapacityAllocations.Items)
@@ -189,12 +171,9 @@ public sealed class RunnerAvailabilityPublisher(
                 .ToArray();
             var allocations = ownedRows.SelectMany(runtime => runtime.CapacityAllocations.Items)
                 .Where(item => item.RunnerId == options.Id).ToArray();
-            if (admission?.Capacity is { } projection)
-                await ledger.RestoreAsync(options.Id, options.Pool, projection,
-                    admission.Observation!.ObservedAt, allocations, cancellationToken, starting, claimKeys);
-            else
-                await ledger.RestoreLegacyAsync(options.Id, options.Pool, options.ResourceCapacity,
-                    allocations, cancellationToken, starting, claimKeys);
+            var claimKeys = allocations.Select(allocation => $"runner-claim:{allocation.Identity.Key}").ToArray();
+            await ledger.RestoreAsync(options.Id, options.Pool, admission.Capacity,
+                admission.Observation!.ObservedAt, allocations, cancellationToken, starting, claimKeys);
             await restoreTransaction.CommitAsync(cancellationToken);
             initialReconciliationComplete = true;
             result = await registry.RegisterAsync(registration, cancellationToken);

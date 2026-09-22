@@ -112,7 +112,7 @@ public static class RuntimeClaimFactory
     {
         if (mode != GameMode.Awd)
             return null;
-        var checker = AwdConfigurationUpgrader.ParseChallenge(
+        var checker = AwdConfigurationParser.ParseChallenge(
             challengeConfigurationJson).Checker;
         if (checker is null)
             return null;
@@ -158,13 +158,9 @@ public static class RuntimeClaimFactory
     private static ContainerSecurityPolicy NormalizeSecurity(
         ContainerSecurityPolicy? security)
     {
-        var configured = security
-            ?? new ContainerSecurityPolicy(false, false, false, [], []);
-        return configured with
-        {
-            CapDrop = configured.CapDrop ?? [],
-            CapAdd = configured.CapAdd ?? []
-        };
+        if (security is null || security.CapDrop is null || security.CapAdd is null)
+            throw new InvalidOperationException("Container security is required and must declare capability lists.");
+        return security;
     }
 
     private static string? ResolvePerTeamFlag(

@@ -27,8 +27,6 @@ public sealed class RawSqlPersistenceRulesTests
         {
             // Bounded lateral evidence prefixes cannot be expressed by the mapped JSON model.
             ["backend/src/NoCTF.Infrastructure/GameplayFacts/AdjudicationPreview/HistoricalAdjudicationPreviewStore.cs"] = ["FromSqlInterpolated", ".SqlQuery<"],
-            // Parameterized JSONB aggregation returns at most one row per selected Runner.
-            ["backend/src/NoCTF.Infrastructure/Runtime/Capacity/RedisRunnerCapacityDiagnostics.cs"] = [".SqlQuery<"],
             // Short allocation/recovery transactions share one advisory lock; no provider calls inside.
             ["backend/src/NoCTF.Infrastructure/Runtime/Capacity/RuntimeCapacityCriticalSection.cs"] = ["ExecuteSqlInterpolated", "pg_advisory_"],
             // JSONB ownership containment includes auxiliary allocations after the primary is released.

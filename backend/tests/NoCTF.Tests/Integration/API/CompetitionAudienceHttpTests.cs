@@ -21,7 +21,7 @@ public sealed class CompetitionAudienceHttpTests
         CancellationToken cancellationToken)
     {
         var databaseName = $"noctf-hidden-http-{Guid.NewGuid():N}";
-        using var factory = new WebApplicationFactory<HealthEndpoint>()
+        using var factory = new WebApplicationFactory<Program>()
             .WithWebHostBuilder(builder =>
             {
                 builder.UseEnvironment("Development");

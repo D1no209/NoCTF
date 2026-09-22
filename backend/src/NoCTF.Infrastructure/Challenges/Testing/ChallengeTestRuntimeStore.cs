@@ -325,7 +325,6 @@ public sealed class ChallengeTestRuntimeStore(
             runtime.TestFlagDelivery ?? RuntimeTestFlagDelivery.NotRequired,
             runtime.TestFlagState ?? RuntimeTestFlagState.NotRequired,
             testFlag,
-            runtime.State == RuntimeState.Running ? runtime.Urls : [],
             runtime.CreatedAt,
             runtime.RunningAt,
             runtime.ExpiresAt,

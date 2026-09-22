@@ -11,6 +11,9 @@ namespace NoCTF.Tests.Unit.Worker;
 
 public sealed class RuntimeClaimFactoryTests
 {
+    private static readonly ContainerSecurityPolicy CurrentSecurity =
+        new(false, false, false, ["ALL"], []);
+
     [Test]
     public async Task Container_definition_creates_only_a_container_claim()
     {
@@ -20,6 +23,7 @@ public sealed class RuntimeClaimFactoryTests
             new ContainerRuntimeDefinition(
                 "challenge:v1",
                 PortMappings: new Dictionary<int, int> { [8080] = 0 },
+                Security: CurrentSecurity,
                 EgressPolicy: RuntimeEgressPolicy.Isolated),
             Limits: new(268_435_456, 500_000_000, 128));
 
@@ -38,7 +42,7 @@ public sealed class RuntimeClaimFactoryTests
         await Assert.That(container.Definition.Security.NoNewPrivileges).IsFalse();
         await Assert.That(container.Definition.Security.ReadonlyRootfs).IsFalse();
         await Assert.That(container.Definition.Security.RunAsNonRoot).IsFalse();
-        await Assert.That(container.Definition.Security.CapDrop).IsEmpty();
+        await Assert.That(container.Definition.Security.CapDrop).IsEquivalentTo(["ALL"]);
         await Assert.That(container.Definition.Security.CapAdd).IsEmpty();
         await Assert.That(container.Definition.Labels["noctf.io/job-kind"])
             .IsEqualTo("persistent-runtime");
@@ -53,7 +57,8 @@ public sealed class RuntimeClaimFactoryTests
             RuntimeAllocation.PerTeam,
             new ContainerRuntimeDefinition(
                 "challenge:v1",
-                PortMappings: new Dictionary<int, int> { [31337] = 0 }),
+                PortMappings: new Dictionary<int, int> { [31337] = 0 },
+                Security: CurrentSecurity),
             UrlBindings:
             [
                 new RuntimeUrlBinding(
@@ -78,7 +83,7 @@ public sealed class RuntimeClaimFactoryTests
     }
 
     [Test]
-    public async Task Container_security_treats_null_cap_add_as_empty()
+    public async Task Container_security_rejects_null_capability_lists()
     {
         var instance = CreateInstance(RuntimeKind.Container, RuntimeProvider.Docker);
         var template = new ChallengeRuntimeTemplate(
@@ -92,14 +97,14 @@ public sealed class RuntimeClaimFactoryTests
                     ["ALL"],
                     null!)));
 
-        var claim = (ProvisionContainerRuntime)RuntimeClaimFactory.Create(
+        var action = () => RuntimeClaimFactory.Create(
             instance,
             "runner-a",
             GameMode.Ctf,
             template,
             "{}");
 
-        await Assert.That(claim.Definition.Security.CapAdd).IsEmpty();
+        await Assert.That(action).Throws<InvalidOperationException>();
     }
 
     [Test]
@@ -111,6 +116,7 @@ public sealed class RuntimeClaimFactoryTests
             new ContainerRuntimeDefinition(
                 "challenge:v1",
                 Environment: new Dictionary<string, string> { ["FLAG"] = "author-value" },
+                Security: CurrentSecurity,
                 FlagEnvironmentVariableName: "FLAG"),
             FlagSource: RuntimeFlagSource.PerTeam);
 
@@ -141,6 +147,7 @@ public sealed class RuntimeClaimFactoryTests
                 "awdp-target:latest",
                 Environment: new Dictionary<string, string> { ["FLAG"] = "author-value" },
                 PortMappings: new Dictionary<int, int> { [31337] = 0 },
+                Security: CurrentSecurity,
                 FlagEnvironmentVariableName: "FLAG",
                 InternalPorts: [31337]),
             UrlBindings: [ownerOnlyUrl],
@@ -169,6 +176,7 @@ public sealed class RuntimeClaimFactoryTests
             RuntimeAllocation.PerTeam,
             new ContainerRuntimeDefinition(
                 "awdp-target:latest",
+                Security: CurrentSecurity,
                 FlagEnvironmentVariableName: "FLAG"),
             FlagSource: RuntimeFlagSource.PerTeam);
 
@@ -218,7 +226,7 @@ public sealed class RuntimeClaimFactoryTests
         var instance = CreateInstance(RuntimeKind.Container, RuntimeProvider.Docker);
         var template = new ChallengeRuntimeTemplate(
                         RuntimeAllocation.PerTeam,
-            new ContainerRuntimeDefinition("challenge:v1"));
+            new ContainerRuntimeDefinition("challenge:v1", Security: CurrentSecurity));
         var configuration = JsonSerializer.Serialize(
             new AwdChallengeConfiguration(
                 AwdChallengeConfiguration.CurrentSchemaVersion,
@@ -281,7 +289,7 @@ public sealed class RuntimeClaimFactoryTests
             ContainerPort: 8080);
         var template = new ChallengeRuntimeTemplate(
             RuntimeAllocation.Shared,
-            new ContainerRuntimeDefinition("challenge:v1"),
+            new ContainerRuntimeDefinition("challenge:v1", Security: CurrentSecurity),
             ControlCheckUrlBinding: control);
 
         var claim = (ProvisionContainerRuntime)RuntimeClaimFactory.Create(
@@ -344,6 +352,7 @@ public sealed class RuntimeClaimFactoryTests
                         RuntimeAllocation.PerTeam,
             new ContainerRuntimeDefinition(
                 "challenge:v1",
+                Security: CurrentSecurity,
                 FlagEnvironmentVariableName: "FLAG"),
             FlagSource: RuntimeFlagSource.PerTeam);
 

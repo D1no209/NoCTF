@@ -104,7 +104,6 @@ public enum GameplayFactFailureCode : short
     AwdpPatchFailed,
     AwdpPatchTimeout,
     AwdpServiceAbnormal,
-    AwdpViolation,
     ForeignTeamFlagDetected,
     InsufficientScore,
     HintUnavailable,

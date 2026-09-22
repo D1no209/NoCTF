@@ -74,12 +74,9 @@ public static class PatchVerificationTargetDefinitionFactory
             ? "awdp-verification"
             : "patch-verification";
         var security = definition.Security
-            ?? new ContainerSecurityPolicy(false, false, false, [], []);
-        security = security with
-        {
-            CapDrop = security.CapDrop ?? [],
-            CapAdd = security.CapAdd ?? []
-        };
+            ?? throw new InvalidOperationException("Container security is required.");
+        if (security.CapDrop is null || security.CapAdd is null)
+            throw new InvalidOperationException("Container capability lists are required.");
         return new ContainerRequest(
             operationId,
             provider,

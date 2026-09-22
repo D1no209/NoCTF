@@ -112,12 +112,15 @@ public sealed class CommandReceiptOutboxTests
                 competition.ConfigurationJson = """{"schemaVersion":2,"defaultScoreCurve":{"initialPoints":500,"minimumPoints":100,"decayTeamCount":10,"decayMode":2},"bloodRewards":[]}""";
                 template.DefinitionJson = System.Text.Json.JsonSerializer.Serialize(new CtfChallengeConfiguration(CtfChallengeConfiguration.CurrentSchemaVersion,
                     null, null, Runtime: new ChallengeRuntimeTemplate(RuntimeAllocation.PerTeam,
-                        new ContainerRuntimeDefinition("isolated-test:v1", FlagEnvironmentVariableName: "FLAG"),
+                        new ContainerRuntimeDefinition(
+                            "isolated-test:v1",
+                            Security: new(false, false, false, ["ALL"], []),
+                            FlagEnvironmentVariableName: "FLAG"),
                         new RuntimeResourceLimits(64 * 1024 * 1024, 100_000_000, 32), FlagSource: RuntimeFlagSource.PerTeam)),
                     new System.Text.Json.JsonSerializerOptions(System.Text.Json.JsonSerializerDefaults.Web));
                 var challenge = await setup.CompetitionChallenges.SingleAsync(x => x.CompetitionId == fixture.Id, ct);
                 challenge.RulesJson = System.Text.Json.JsonSerializer.Serialize(new NoCTF.GameModes.Ctf.Configuration.CtfChallengeConfiguration(
-                    NoCTF.GameModes.Ctf.Configuration.CtfChallengeConfiguration.CurrentSchemaVersion, null, null), new System.Text.Json.JsonSerializerOptions(System.Text.Json.JsonSerializerDefaults.Web));
+                    NoCTF.GameModes.Ctf.Configuration.CtfConfiguration.CurrentSchemaVersion, null, null), new System.Text.Json.JsonSerializerOptions(System.Text.Json.JsonSerializerDefaults.Web));
                 challenge.IsPublished = true; challengeId = challenge.Id;
                 teamId = await setup.Teams.Where(x => x.CompetitionId == fixture.Id).Select(x => x.Id).SingleAsync(ct);
                 await setup.SaveChangesAsync(ct);

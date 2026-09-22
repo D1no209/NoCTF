@@ -203,25 +203,16 @@ internal static class RuntimeAccessMapping
         ToResponse(
             view.Id,
             view.AccessMode,
-            view.Urls,
-            view.AccessEndpoints,
+            view.AccessEndpoints ?? [],
             request);
 
     public static IReadOnlyList<RuntimeAccessResponse> ToResponse(
         Guid runtimeInstanceId,
         RuntimeAccessMode accessMode,
-        IReadOnlyList<string> urls,
-        IReadOnlyList<RuntimeAccessEndpointView>? accessEndpoints,
+        IReadOnlyList<RuntimeAccessEndpointView> accessEndpoints,
         HttpRequest request)
     {
-        var endpoints = accessEndpoints is { Count: > 0 }
-            ? accessEndpoints
-            : urls.Select((address, index) => new RuntimeAccessEndpointView(
-                index,
-                address,
-                null,
-                null)).ToArray();
-        return endpoints
+        return accessEndpoints
             .OrderBy(endpoint => endpoint.BindingIndex)
             .Select(endpoint => new RuntimeAccessResponse(
                 endpoint.DirectAddress,

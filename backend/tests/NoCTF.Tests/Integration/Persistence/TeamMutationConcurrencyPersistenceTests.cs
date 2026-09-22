@@ -682,11 +682,6 @@ public sealed class TeamMutationConcurrencyPersistenceTests
 
     private sealed class EmptyLeaderboardCache : ILeaderboardCache
     {
-        public Task<LeaderboardResponse?> GetAsync(
-            Guid competitionId,
-            CancellationToken cancellationToken) =>
-            Task.FromResult<LeaderboardResponse?>(null);
-
         public Task RefreshAsync(Guid competitionId, CancellationToken cancellationToken) =>
             Task.CompletedTask;
 

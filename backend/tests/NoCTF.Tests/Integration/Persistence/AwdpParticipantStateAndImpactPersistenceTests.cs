@@ -184,7 +184,11 @@ public sealed class AwdpParticipantStatePersistenceTests
                 RunnerId = "runner-state",
                 State = RuntimeState.Running,
                 ProviderReceiptJson = "{}",
-                Urls = ["tcp://127.0.0.1:31000"],
+                AccessEndpoints = [new RuntimeAccessEndpoint
+                {
+                    BindingIndex = 0,
+                    DirectAddress = "tcp://127.0.0.1:31000"
+                }],
                 CreatedAt = now.AddMinutes(-2),
                 RunningAt = now.AddMinutes(-2),
                 ExpiresAt = now.AddMinutes(10)

@@ -11,7 +11,7 @@ import { translate } from './i18n'
 
 export type GameModeValue = NoCtfapiEndpointsCompetitionsGameModeProtocol
 
-/** 各 JSON 区域当前的 schemaVersion(更高的版本或无 upgrader 的旧版本会被后端拒绝)。 */
+/** 各 JSON 区域当前的 schemaVersion；任何其他版本都会被后端拒绝。 */
 export const DEFINITION_SCHEMA_VERSION = { Ctf: 3, Awd: 4, Awdp: 4, Koh: 1 } as const
 export const COMPETITION_CONFIG_SCHEMA_VERSION: Record<GameModeValue, number> = { Ctf: 2, Awd: 2, Awdp: 4, Koh: 1 }
 export const CHALLENGE_RULES_SCHEMA_VERSION: Record<GameModeValue, number> = { Ctf: 2, Awd: 4, Awdp: 4, Koh: 1 }
@@ -182,7 +182,7 @@ export function defaultContainerSecurity(): SecurityModel {
     noNewPrivileges: false,
     readonlyRootfs: false,
     runAsNonRoot: false,
-    capDrop: [],
+    capDrop: ['ALL'],
     capAdd: [],
   }
 }
@@ -316,8 +316,6 @@ export function parseJsonObject(json: string | null | undefined): JsonObject | n
 
 function parseSecurity(raw: unknown): SecurityModel {
   const obj = asObject(raw)
-  // Omitted security on a legacy template remains omitted after a read/write
-  // cycle. New container drafts use the same opt-in security defaults.
   const defaults = defaultContainerSecurity()
   return {
     noNewPrivileges: typeof obj?.noNewPrivileges === 'boolean' ? obj.noNewPrivileges : defaults.noNewPrivileges,
@@ -503,19 +501,9 @@ function serializeUrlBinding(binding: UrlBindingModel): JsonObject {
   return obj
 }
 
-function serializeSecurity(security: SecurityModel): JsonObject | null {
+function serializeSecurity(security: SecurityModel): JsonObject {
   const capDrop = security.capDrop.map(value => value.trim()).filter(Boolean)
   const capAdd = security.capAdd.map(value => value.trim()).filter(Boolean)
-  const hasExplicitSecurity = security.noNewPrivileges
-    || security.readonlyRootfs
-    || security.runAsNonRoot
-    || capDrop.length > 0
-    || capAdd.length > 0
-  if (!hasExplicitSecurity) return null
-
-  // The backend accepts an explicit security object only when the complete
-  // capability baseline is present. Keep the compatibility default omitted,
-  // but make every explicitly configured security draft valid by construction.
   if (!capDrop.some(value => value.toUpperCase() === 'ALL')) capDrop.unshift('ALL')
 
   const obj: JsonObject = {}
@@ -586,8 +574,7 @@ function serializeRuntimeDefinition(definition: RuntimeDefinitionModel): JsonObj
   if (containerPorts.length > 0) {
     obj.portMappings = Object.fromEntries(containerPorts.map(port => [String(port), 0]))
   }
-  const security = serializeSecurity(definition.security)
-  if (security) obj.security = security
+  obj.security = serializeSecurity(definition.security)
   putString(obj, 'flagEnvironmentVariableName', definition.flagEnvironmentVariableName)
   // 可移植模板只声明隔离网络(0)；InternetOnly 会被后端拒绝。
   obj.egressPolicy = EgressPolicy.Isolated

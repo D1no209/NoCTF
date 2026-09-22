@@ -63,8 +63,7 @@ internal static class ChallengeTestRuntimeMapping
                 ? RuntimeAccessMapping.ToResponse(
                     view.Id,
                     view.AccessMode,
-                    view.Urls,
-                    view.AccessEndpoints,
+                    view.AccessEndpoints ?? [],
                     request)
                 : [],
             view.CreatedAt,

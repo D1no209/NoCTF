@@ -139,39 +139,23 @@ public sealed class CompetitionEvent
 
     private T? PayloadValue<T>(string propertyName) where T : struct
     {
-        try
-        {
-            using var document = JsonDocument.Parse(PayloadJson);
-            if (!document.RootElement.TryGetProperty(propertyName, out var value)
-                || value.ValueKind is JsonValueKind.Null or JsonValueKind.Undefined)
-                return null;
-
-            var result = value.Deserialize<T>(new JsonSerializerOptions(JsonSerializerDefaults.Web)
-                { Converters = { new System.Text.Json.Serialization.JsonStringEnumConverter() } });
-
-            return typeof(T).IsEnum && !Enum.IsDefined(typeof(T), result)
-                ? null
-                : result;
-        }
-        catch (JsonException)
-        {
+        using var document = JsonDocument.Parse(PayloadJson);
+        if (!document.RootElement.TryGetProperty(propertyName, out var value)
+            || value.ValueKind is JsonValueKind.Null or JsonValueKind.Undefined)
             return null;
-        }
+        var result = value.Deserialize<T>(new JsonSerializerOptions(JsonSerializerDefaults.Web)
+            { Converters = { new System.Text.Json.Serialization.JsonStringEnumConverter() } });
+        if (typeof(T).IsEnum && !Enum.IsDefined(typeof(T), result))
+            throw new JsonException($"Competition event property '{propertyName}' contains an undefined enum value.");
+        return result;
     }
 
     private string? PayloadText(string propertyName)
     {
-        try
-        {
-            using var document = JsonDocument.Parse(PayloadJson);
-            return document.RootElement.TryGetProperty(propertyName, out var value)
-                && value.ValueKind == JsonValueKind.String
-                ? value.GetString()
-                : null;
-        }
-        catch (JsonException)
-        {
-            return null;
-        }
+        using var document = JsonDocument.Parse(PayloadJson);
+        return document.RootElement.TryGetProperty(propertyName, out var value)
+            && value.ValueKind == JsonValueKind.String
+            ? value.GetString()
+            : null;
     }
 }

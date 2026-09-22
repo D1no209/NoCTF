@@ -37,8 +37,9 @@ public sealed class PersistedRunnerCapacityGateTests
             var id = fixture.RuntimeIds[0];
             await db.RuntimeInstances.Where(row => row.Id == id).ExecuteUpdateAsync(update => update
                 .SetProperty(row => row.State, RuntimeState.Queued).SetProperty(row => row.StoppedAt, (DateTimeOffset?)null), ct);
-            await new RedisRunnerAvailabilityRegistry(redis).RegisterAsync(new("test", "runner", RuntimeProvider.Docker,
-                "test", new(1024, 100, 10), TimeSpan.FromMinutes(1), false), ct);
+            await new RedisRunnerAvailabilityRegistry(redis).RegisterAsync(
+                CurrentRunnerRegistration.Create("test", "runner", new(1024, 100, 10)),
+                ct);
             var raw = new RedisRunnerCapacityGate(redis);
             var outbox = new CapturedOutbox();
             var gate = new PersistedRunnerCapacityGate(db, raw, outbox);
@@ -62,11 +63,11 @@ public sealed class PersistedRunnerCapacityGateTests
                 Id = "runner", Pool = "test", Provider = RuntimeProvider.Docker
             }), gate, ledger: ledger, rawCapacity: raw, outbox: outbox);
             await audit.Handle(new("runner", DateTimeOffset.UtcNow), ct);
-            await Assert.That((long)await redis.GetDatabase().HashGetAsync("runner:runner:capacity", "availableMemoryBytes")).IsEqualTo(512);
+            await Assert.That((long)await redis.GetDatabase().HashGetAsync("runner:runner:capacity", "admissionAvailableMemoryBytes")).IsEqualTo(512);
             inventory.WorkloadExistsAsync(Arg.Any<RuntimeWorkloadIdentity>(), ct).Returns(Task.FromResult<bool?>(false));
             await audit.Handle(new("runner", DateTimeOffset.UtcNow), ct);
             await audit.Handle(new("runner", DateTimeOffset.UtcNow), ct);
-            await Assert.That((long)await redis.GetDatabase().HashGetAsync("runner:runner:capacity", "availableMemoryBytes")).IsEqualTo(commit ? 512 : 1024);
+            await Assert.That((long)await redis.GetDatabase().HashGetAsync("runner:runner:capacity", "admissionAvailableMemoryBytes")).IsEqualTo(commit ? 512 : 1024);
             await Assert.That((long)await redis.GetDatabase().HashGetAsync("runner:runner:capacity", "startingPrimary")).IsEqualTo(commit ? 1 : 0);
             await Assert.That(await ledger.ReadUnconfirmedAsync("runner", ct)).IsEmpty();
             await Assert.That(outbox.Messages.OfType<DispatchQueuedRuntimes>().Count()).IsEqualTo(commit ? 0 : 1);
@@ -98,8 +99,7 @@ public sealed class PersistedRunnerCapacityGateTests
             var admission = new RunnerPressurePolicy(admissionOptions).Evaluate(
                 new("test-domain", now, 1024, 1024, 100, .1, 0, 10, 0), now);
             var registration = new RunnerAvailabilityRegistration("test", "runner", RuntimeProvider.Docker,
-                "test", new(0, 0, 0), TimeSpan.FromMinutes(1), false, Admission: admission,
-                AdmissionOptions: admissionOptions, ActualUsage: true);
+                "test", TimeSpan.FromMinutes(1), false, true, admission, admissionOptions);
             var registry = new RedisRunnerAvailabilityRegistry(redis);
             await registry.RegisterAsync(registration, ct);
             var raw = new RedisRunnerCapacityGate(redis);
@@ -118,11 +118,11 @@ public sealed class PersistedRunnerCapacityGateTests
             await db.RuntimeInstances.Where(x => x.Id == id).ExecuteUpdateAsync(update =>
                 update.SetProperty(x => x.State, RuntimeState.Provisioning).SetProperty(x => x.RunnerId, "runner"), ct);
             await Assert.That(await gate.CanCreateAsync(id, "runner", ct)).IsEqualTo(!rollback);
-            var report = await new RedisRunnerCapacityDiagnostics(db, redis, TimeProvider.System).ReadAsync(ct);
-            await Assert.That(report.Available).IsTrue();
-            await Assert.That(report.Runners.Single().StartupReserved!.MemoryBytes).IsEqualTo(512);
-            if (rollback) await Assert.That(report.Runners.Single().DeclaredLimits).IsNull();
-            else await Assert.That(report.Runners.Single().DeclaredLimits!.MemoryBytes).IsEqualTo(512);
+            var startupReserved = (long)await redis.GetDatabase()
+                .HashGetAsync("runner:runner:capacity", "startupReservedMemoryBytes");
+            await Assert.That(startupReserved).IsEqualTo(512);
+            if (!rollback)
+                await Assert.That(document.Items.Single().Limit.MemoryBytes).IsEqualTo(512);
             // Redis failure occurs after allocation, before any provider command is consumed.
             await redis.GetDatabase().KeyDeleteAsync("runner:runner:capacity");
             await Assert.That(await gate.CanCreateAsync(id, "runner", ct)).IsFalse();
@@ -131,7 +131,9 @@ public sealed class PersistedRunnerCapacityGateTests
                 .IsEqualTo(RunnerCapacityReleaseOutcome.RecoveryRequired);
             var ledger = new RedisRunnerCapacityLedger(redis);
             await ledger.PauseAsync("runner", "test", ct);
-            var claimKeys = await ledger.ReadClaimKeysAsync("runner", ct);
+            var claimKeys = document.Items
+                .Select(item => $"runner-claim:{item.Identity.Key}")
+                .ToArray();
             await using (var transaction = await db.Database.BeginTransactionAsync(ct))
             {
                 await RuntimeCapacityCriticalSection.AcquireAsync(db, ct);
@@ -169,7 +171,7 @@ public sealed class PersistedRunnerCapacityGateTests
                     .IsEqualTo(281);
                 await Assert.That(await gate.ReleaseAsync(id, "wrong-owner", ct)).IsEqualTo(RunnerCapacityReleaseOutcome.OwnerMismatch);
                 await Assert.That(await gate.ReleaseAsync(id, "runner", ct)).IsEqualTo(RunnerCapacityReleaseOutcome.Released);
-                await Assert.That(await gate.ReleaseAsync(id, "runner", ct)).IsEqualTo(RunnerCapacityReleaseOutcome.AlreadyReleased);
+                await Assert.That(await gate.ReleaseAsync(id, "runner", ct)).IsEqualTo(RunnerCapacityReleaseOutcome.RecoveryRequired);
                 var retained = await db.RuntimeInstances.Where(x => x.Id == id).Select(x => x.CapacityAllocations).SingleAsync(ct);
                 await Assert.That(retained.Items.Single().Identity).IsEqualTo(checker);
                 await gate.ReleaseWorkloadAsync(checker, "runner", ct);

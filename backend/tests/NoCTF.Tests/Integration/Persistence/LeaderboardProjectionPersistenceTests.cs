@@ -94,17 +94,6 @@ public sealed class LeaderboardProjectionPersistenceTests
             await Assert.That(after.Snapshot.Teams.Single().TotalScore).IsEqualTo(100);
             await publisher.Received().PublishAsync(Arg.Is<ScoreboardProjection>(value =>
                 value != null && value.Schema.Revision == after.Schema.Revision), ct);
-            var legacyBundle = (await cache.CreateBundleAsync(fixture.Competition.Id, clock.GetUtcNow(), ct))!;
-            // Upgrade must repair old cached terminal payloads even without another business event.
-            await cacheServices.GetRequiredService<IFusionCacheProvider>().GetCache(NoCtfCacheNames.Leaderboards)
-                .SetAsync($"projection:v2:{fixture.Competition.Id:N}", legacyBundle with
-                {
-                    AwdpRoundProjectionFormat = 0,
-                    ValidUntil = null,
-                    Scoreboard = legacyBundle.Scoreboard with { Schema = legacyBundle.Scoreboard.Schema with { Columns = [] } }
-                }, token: ct);
-            var repaired = (await cache.GetScoreboardAsync(fixture.Competition.Id, ct))!;
-            await Assert.That(repaired.Schema.Columns).IsNotEmpty();
         });
     }
 
@@ -543,7 +532,7 @@ public sealed class LeaderboardProjectionPersistenceTests
                 ValueSha256 = new byte[32],
                 State = GameplayFactState.Completed,
                 Result = GameplayFactResult.Wrong,
-                FailureCode = GameplayFactFailureCode.AwdpViolation,
+                FailureCode = GameplayFactFailureCode.AwdpPatchFailed,
                 UpdatedAt = startedAt.AddSeconds(199)
             };
             var earlyAdjustment = CreateManualAdjustment(
@@ -1016,9 +1005,9 @@ public sealed class LeaderboardProjectionPersistenceTests
             await Assert.That(initialTeam.RankingState).IsEqualTo(ScoreboardRankingState.Eligible);
             await Assert.That(initialTeam.TotalScore).IsNotEqualTo(0L);
 
-            var projectionKey = $"projection:v2:{fixture.Competition.Id:N}";
+            var projectionKey = $"scoreboard:v1:{fixture.Competition.Id:N}";
             var namedCache = cacheProvider.GetCache(NoCtfCacheNames.Leaderboards);
-            var cachedBundle = await namedCache.GetOrDefaultAsync<LeaderboardProjectionBundle?>(
+            var cachedBundle = await namedCache.GetOrDefaultAsync<ScoreboardProjectionBundle?>(
                 projectionKey,
                 null,
                 token: cancellationToken);
@@ -1354,7 +1343,7 @@ public sealed class LeaderboardProjectionPersistenceTests
             flag.SpecificationId!.Value,
             flag.ValidStart!.Value,
             flag.ValidUntil!.Value)).ToArray();
-        return new LeaderboardProjectionEngine(new LeaderboardProjectorCatalog()).ProjectOutputs(new(
+        return new LeaderboardProjectionEngine(new LeaderboardProjectorCatalog()).Project(new(
             fixture.Competition.Id,
             fixture.Competition.Mode,
             [new LeaderboardTeamFact(team.Id, team.Name, false, false, team.RegisteredAt)],
@@ -1371,7 +1360,7 @@ public sealed class LeaderboardProjectionPersistenceTests
             fixture.Competition.StartAt,
             AwdRounds: rounds,
             ProjectedAt: projectedAt,
-            CompetitionStatus: fixture.Competition.Status)).Scoreboard;
+            CompetitionStatus: fixture.Competition.Status));
     }
 
     private static Fixture CreateFixture(
@@ -1386,6 +1375,7 @@ public sealed class LeaderboardProjectionPersistenceTests
         var teamId = Guid.CreateVersion7(projectedAt.AddMinutes(index + 30));
         var start = projectedAt.AddMinutes(-20);
         var rules = new GameModeChallengeConfigurationCatalog().GetDefaultJson(mode);
+        var definition = new GameModeChallengeConfigurationCatalog().GetDefaultDefinitionJson(mode);
         var competition = new Competition
         {
             Id = competitionId,
@@ -1409,7 +1399,7 @@ public sealed class LeaderboardProjectionPersistenceTests
             Visibility = ChallengeVisibility.Private,
             Title = $"{mode} challenge",
             Direction = "Pwn",
-            DefinitionJson = rules,
+            DefinitionJson = definition,
             CreatedAt = start,
             UpdatedAt = start
         };

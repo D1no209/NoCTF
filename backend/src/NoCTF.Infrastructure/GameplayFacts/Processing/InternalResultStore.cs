@@ -147,7 +147,7 @@ public sealed class InternalResultStore(
             && runtime.Purpose == RuntimePurpose.AwdpTarget
             || context.Competition.Mode == GameMode.Ctf
             && runtime.Purpose == RuntimePurpose.PatchVerificationTarget
-            && CtfConfigurationUpgrader.ParseChallenge(context.DefinitionJson).InteractionKind
+            && CtfConfigurationParser.ParseDefinition(context.DefinitionJson).InteractionKind
                 == CtfInteractionKind.PatchVerification;
         if (!validMode
             || fact.Kind != GameplayFactKind.FixAttempt

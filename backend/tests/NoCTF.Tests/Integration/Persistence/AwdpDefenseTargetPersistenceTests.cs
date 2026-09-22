@@ -530,6 +530,7 @@ public sealed class AwdpDefenseTargetPersistenceTests
                 new ContainerRuntimeDefinition(
                     "target:test",
                     PortMappings: new Dictionary<int, int> { [8080] = 0 },
+                    Security: new(false, false, false, ["ALL"], []),
                     FlagEnvironmentVariableName: "FLAG",
                     InternalPorts: [8080]),
                 new RuntimeResourceLimits(256 * 1024 * 1024, 250_000_000, 128),

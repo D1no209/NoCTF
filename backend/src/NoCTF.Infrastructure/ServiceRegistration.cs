@@ -56,9 +56,6 @@ public static class ServiceRegistration
         services.AddNoCtfAuthentication(configuration, development);
         services.AddNoCtfAdministration(configuration, exporting, development);
         services.AddNoCtfSynchronousArchives(configuration);
-        if (!exporting && configuration.GetValue("Observability:Enabled", true))
-            services.AddHostedService<OperationalMetricsCollector>();
-
         return services;
     }
 }

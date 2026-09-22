@@ -21,18 +21,15 @@ public sealed record RunnerAvailabilityRegistration(
     string RunnerId,
     RuntimeProvider Provider,
     string Version,
-    RuntimeResourceLimits Capacity,
     TimeSpan TimeToLive,
     bool HasActiveAssignments,
-    bool ProviderAvailable = true,
-    RunnerAdmissionSnapshot? Admission = null,
-    RunnerAdmissionOptions? AdmissionOptions = null,
-    bool ActualUsage = false);
+    bool ProviderAvailable,
+    RunnerAdmissionSnapshot Admission,
+    RunnerAdmissionOptions AdmissionOptions);
 
 public sealed class RedisRunnerAvailabilityRegistry(IConnectionMultiplexer redis)
 {
-    private const string LegacyRegistrationSchema = "2";
-    private const string ActualUsageRegistrationSchema = "3";
+    private const string RegistrationSchema = "3";
     private const double CandidateJitterMaximum = 0.000001d;
 
     private const string RegisterScript = RunnerAdmissionLua.Functions + "\n" + """
@@ -60,51 +57,23 @@ public sealed class RedisRunnerAvailabilityRegistry(IConnectionMultiplexer redis
             return { 2, 0, 0, 0 }
         end
 
-        local modern = ARGV[2] == '3'
         local trusted = redis.call('HGET', KEYS[2], 'registrationSchema') == ARGV[2]
-        if modern then
-            trusted = trusted and redis.call('HEXISTS', KEYS[2], 'observedTotalMemoryBytes') == 1
-                and redis.call('HEXISTS', KEYS[2], 'observedTotalNanoCpus') == 1
-                and redis.call('HEXISTS', KEYS[2], 'startupReservedMemoryBytes') == 1
-        else
-            trusted = trusted and redis.call('HEXISTS', KEYS[2], 'totalMemoryBytes') == 1
-                and redis.call('HEXISTS', KEYS[2], 'totalNanoCpus') == 1
-                and redis.call('HEXISTS', KEYS[2], 'totalPids') == 1
-        end
+        trusted = trusted and redis.call('HEXISTS', KEYS[2], 'observedTotalMemoryBytes') == 1
+            and redis.call('HEXISTS', KEYS[2], 'observedTotalNanoCpus') == 1
+            and redis.call('HEXISTS', KEYS[2], 'startupReservedMemoryBytes') == 1
 
         if not trusted then
             local wasOnline = redis.call('EXISTS', KEYS[3])
             redis.call('SET', KEYS[3], ARGV[7], 'PX', ARGV[6])
             redis.call('ZREM', KEYS[4], ARGV[1])
             if ARGV[8] == '1' or wasOnline == 1 then return { 0, 0, 0, 0 } end
-            if modern and ARGV[29] ~= '1' then return { 0, 0, 0, 0 } end
-            if modern then
-                redis.call('HSET', KEYS[2], 'registrationSchema', ARGV[2],
-                    'startupReservedMemoryBytes', 0, 'startupReservedNanoCpus', 0,
-                    'startupReservedPids', 0, 'startingPrimary', 0, 'startingAuxiliary', 0)
-            else
-                redis.call('HSET', KEYS[2],
-                    'registrationSchema', ARGV[2],
-                    'availableMemoryBytes', ARGV[3],
-                    'availableNanoCpus', ARGV[4],
-                    'availablePids', ARGV[5],
-                    'totalMemoryBytes', ARGV[3],
-                    'totalNanoCpus', ARGV[4],
-                    'totalPids', ARGV[5])
-            end
-        elseif not modern then
-            local fields = { 'MemoryBytes', 'NanoCpus', 'Pids' }
-            for i, suffix in ipairs(fields) do
-                local total = tonumber(ARGV[i + 2])
-                local previous = tonumber(redis.call('HGET', KEYS[2], 'total' .. suffix))
-                local available = tonumber(redis.call('HGET', KEYS[2], 'available' .. suffix))
-                if not available then return { 0, 0, 0, 0 } end
-                redis.call('HSET', KEYS[2], 'total' .. suffix, total,
-                    'available' .. suffix, available + total - previous)
-            end
+            if ARGV[29] ~= '1' then return { 0, 0, 0, 0 } end
+            redis.call('HSET', KEYS[2], 'registrationSchema', ARGV[2],
+                'startupReservedMemoryBytes', 0, 'startupReservedNanoCpus', 0,
+                'startupReservedPids', 0, 'startingPrimary', 0, 'startingAuxiliary', 0)
         end
 
-        if modern and ARGV[29] == '1' then
+        if ARGV[29] == '1' then
             local completed = redis.call('ZRANGEBYSCORE', KEYS[5], '-inf', tonumber(ARGV[17]))
             for _, claim in ipairs(completed) do
                 local owner = redis.call('HGET', claim, 'runnerId')
@@ -149,9 +118,9 @@ public sealed class RedisRunnerAvailabilityRegistry(IConnectionMultiplexer redis
         redis.call('ZADD', KEYS[4], admission_pressure(KEYS[2], tonumber(ARGV[10])), ARGV[1])
         return {
             1,
-            redis.call('HGET', KEYS[2], modern and 'admissionAvailableMemoryBytes' or 'availableMemoryBytes'),
-            redis.call('HGET', KEYS[2], modern and 'admissionAvailableNanoCpus' or 'availableNanoCpus'),
-            redis.call('HGET', KEYS[2], modern and 'admissionAvailablePids' or 'availablePids')
+            redis.call('HGET', KEYS[2], 'admissionAvailableMemoryBytes'),
+            redis.call('HGET', KEYS[2], 'admissionAvailableNanoCpus'),
+            redis.call('HGET', KEYS[2], 'admissionAvailablePids')
         }
         """;
 
@@ -162,18 +131,8 @@ public sealed class RedisRunnerAvailabilityRegistry(IConnectionMultiplexer redis
         ArgumentException.ThrowIfNullOrWhiteSpace(registration.RunnerPool);
         ArgumentException.ThrowIfNullOrWhiteSpace(registration.RunnerId);
         ArgumentException.ThrowIfNullOrWhiteSpace(registration.Version);
-        var projection = registration.Admission?.Capacity;
-        if (!registration.ActualUsage)
-        {
-            ArgumentOutOfRangeException.ThrowIfLessThanOrEqual(registration.Capacity.MemoryBytes, 0);
-            ArgumentOutOfRangeException.ThrowIfLessThanOrEqual(registration.Capacity.NanoCpus, 0);
-            ArgumentOutOfRangeException.ThrowIfLessThanOrEqual(registration.Capacity.PidsLimit, 0);
-        }
-        else if (registration.Admission is null)
-        {
-            throw new ArgumentException("Actual-usage registration requires an admission snapshot.", nameof(registration));
-        }
-        else if (projection is not null && (projection.ObservedTotal.MemoryBytes <= 0
+        var projection = registration.Admission.Capacity;
+        if (projection is not null && (projection.ObservedTotal.MemoryBytes <= 0
             || projection.ObservedTotal.NanoCpus <= 0
             || projection.ObservedAvailable.MemoryBytes < 0
             || projection.ObservedAvailable.NanoCpus < 0
@@ -203,22 +162,22 @@ public sealed class RedisRunnerAvailabilityRegistry(IConnectionMultiplexer redis
                 ],
                 [
                     registration.RunnerId,
-                    registration.ActualUsage ? ActualUsageRegistrationSchema : LegacyRegistrationSchema,
-                    registration.Capacity.MemoryBytes,
-                    registration.Capacity.NanoCpus,
-                    registration.Capacity.PidsLimit,
+                    RegistrationSchema,
+                    projection?.ObservedTotal.MemoryBytes ?? 0,
+                    projection?.ObservedTotal.NanoCpus ?? 0,
+                    projection?.ObservedTotal.PidsLimit ?? 0,
                     checked((long)registration.TimeToLive.TotalMilliseconds),
                     heartbeat,
                     registration.HasActiveAssignments ? 1 : 0,
                     registration.ProviderAvailable ? 1 : 0,
                     Random.Shared.NextDouble() * CandidateJitterMaximum,
                     JsonSerializer.Serialize(registration.Admission),
-                    AdmissionState(registration.Admission?.State ?? RunnerAdmissionState.Ready),
-                    registration.Admission?.Observation?.ObservedAt.AddSeconds(registration.AdmissionOptions?.FreshnessSeconds ?? 15).ToUnixTimeMilliseconds() ?? 0,
-                    registration.Admission?.Observation?.ResourceDomain ?? registration.RunnerId,
-                    registration.AdmissionOptions?.MainStartupConcurrency ?? 0,
-                    registration.AdmissionOptions?.AuxiliaryConcurrency ?? 0,
-                    registration.Admission?.Observation?.ObservedAt.ToUnixTimeMilliseconds() ?? 0,
+                    AdmissionState(registration.Admission.State),
+                    registration.Admission.Observation?.ObservedAt.AddSeconds(registration.AdmissionOptions.FreshnessSeconds).ToUnixTimeMilliseconds() ?? 0,
+                    registration.Admission.Observation?.ResourceDomain ?? registration.RunnerId,
+                    registration.AdmissionOptions.MainStartupConcurrency,
+                    registration.AdmissionOptions.AuxiliaryConcurrency,
+                    registration.Admission.Observation?.ObservedAt.ToUnixTimeMilliseconds() ?? 0,
                     projection?.ObservedTotal.MemoryBytes ?? 0,
                     projection?.ObservedTotal.NanoCpus ?? 0,
                     projection?.ObservedTotal.PidsLimit ?? 0,
@@ -229,7 +188,7 @@ public sealed class RedisRunnerAvailabilityRegistry(IConnectionMultiplexer redis
                     projection?.SafetyHeadroom.NanoCpus ?? 0,
                     projection?.SafetyHeadroom.PidsLimit ?? 0,
                     projection?.ObservedTotal.PidsLimit is null ? 0 : 1,
-                    registration.Admission is null ? 0 : 1,
+                    1,
                     projection is null ? 0 : 1
                 ]);
 
@@ -250,11 +209,11 @@ public sealed class RedisRunnerAvailabilityRegistry(IConnectionMultiplexer redis
                 registration.RunnerId,
                 online,
                 ReadCapacity(result, 1),
-                total?.MemoryBytes ?? registration.Capacity.MemoryBytes,
+                total?.MemoryBytes ?? 0,
                 ReadCapacity(result, 2),
-                total?.NanoCpus ?? registration.Capacity.NanoCpus,
+                total?.NanoCpus ?? 0,
                 ReadCapacity(result, 3),
-                total?.PidsLimit ?? registration.Capacity.PidsLimit);
+                total?.PidsLimit ?? 0);
             return registrationOutcome;
         }
         catch
@@ -265,11 +224,11 @@ public sealed class RedisRunnerAvailabilityRegistry(IConnectionMultiplexer redis
                 registration.RunnerId,
                 false,
                 0,
-                projection?.ObservedTotal.MemoryBytes ?? registration.Capacity.MemoryBytes,
+                projection?.ObservedTotal.MemoryBytes ?? 0,
                 0,
-                projection?.ObservedTotal.NanoCpus ?? registration.Capacity.NanoCpus,
+                projection?.ObservedTotal.NanoCpus ?? 0,
                 0,
-                projection?.ObservedTotal.PidsLimit ?? registration.Capacity.PidsLimit);
+                projection?.ObservedTotal.PidsLimit ?? 0);
             throw;
         }
         finally

@@ -529,11 +529,6 @@ public sealed class DockerContainerLifecycle : IContainerLifecycle, IOneShotJobR
         }
     }
 
-    public Task<OneShotResult> RunAsync(
-        ContainerRequest request,
-        CancellationToken cancellationToken) =>
-        RunAsync(request, input: null, cancellationToken);
-
     public async Task<OneShotResult> RunAsync(
         ContainerRequest request,
         OneShotInputArchive? input,
@@ -1278,6 +1273,7 @@ public sealed class DockerContainerLifecycle : IContainerLifecycle, IOneShotJobR
                 RuntimeInstanceId = target.Identity.RuntimeInstanceId,
                 NetworkPurpose = ContainerNetworkPurpose.AwdChecker
             },
+            null,
             cancellationToken);
     }
 

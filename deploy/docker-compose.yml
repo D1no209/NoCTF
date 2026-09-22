@@ -27,7 +27,7 @@ services:
   nats:
     image: ${NATS_IMAGE:?Set NATS_IMAGE in .env}
     restart: unless-stopped
-    command: [-js, -sd, /data]
+    command: [-js, -sd, /data, -m, "8222"]
     volumes:
       - type: bind
         source: ./data/nats

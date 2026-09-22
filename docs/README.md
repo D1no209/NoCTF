@@ -44,8 +44,7 @@
 ## 强制边界
 
 - 只支持 `Ctf`、`Awd`、`Awdp`、`Koh`。不存在 `Penetration` GameMode、多阶段题或静态容器群题型。
-- `Api`、`Worker`、`Runner` 是三个可组合角色；既可使用三个兼容独立入口，也可通过
-  `NoCTF.Host` 以任意非空组合运行，缺省为单进程全合一。
+- `Api`、`Worker`、`Runner` 是三个可组合角色；只通过 `NoCTF.Host` 以任意非空组合运行，缺省为单进程全合一。
 - PostgreSQL 是业务事实源；Redis 是可丢失的缓存、限流、SignalR backplane 与 Runner 心跳存储。
 - NATS JetStream 承载 Wolverine durable 消息、ack、重投与 DLQ；PostgreSQL 只保存业务事实。周期调度由集群 Singular Agent 从事实重建，业务任务不得使用进程内 Channel。
 - GameplayFact 不保存分值、分差或累计分，只保存当前结果。排行榜由事件驱动立即失效、500ms 合并并用当前配置全量投影；不存在 Dirty 列或快照列。

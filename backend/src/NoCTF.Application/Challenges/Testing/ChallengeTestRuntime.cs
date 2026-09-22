@@ -13,7 +13,6 @@ public sealed record ChallengeTestRuntimeView(
     RuntimeTestFlagDelivery FlagDelivery,
     RuntimeTestFlagState FlagState,
     string? TestFlag,
-    IReadOnlyList<string> Urls,
     DateTimeOffset CreatedAt,
     DateTimeOffset? RunningAt,
     DateTimeOffset? ExpiresAt,

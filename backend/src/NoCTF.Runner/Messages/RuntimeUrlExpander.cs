@@ -4,13 +4,18 @@ using NoCTF.Domain.Runtime;
 
 namespace NoCTF.Runner.Messages;
 
-public sealed record ExpandedRuntimeUrls(
-    IReadOnlyList<string> Urls,
-    IReadOnlyList<RuntimeAccessEndpointMapping> AccessEndpoints);
+public sealed record ExpandedRuntimeAccess(
+    IReadOnlyList<RuntimeAccessEndpointMapping> AccessEndpoints)
+{
+    public IReadOnlyList<string> DirectAddresses => AccessEndpoints
+        .Select(endpoint => endpoint.DirectAddress)
+        .OfType<string>()
+        .ToArray();
+}
 
 public static class RuntimeUrlExpander
 {
-    public static ExpandedRuntimeUrls ExpandContainer(
+    public static ExpandedRuntimeAccess ExpandContainer(
         ContainerReceipt receipt,
         IReadOnlyList<RuntimeUrlBinding>? bindings)
     {
@@ -30,7 +35,7 @@ public static class RuntimeUrlExpander
         return ToResult(endpoints);
     }
 
-    public static ExpandedRuntimeUrls ExpandContainer(
+    public static ExpandedRuntimeAccess ExpandContainer(
         ContainerReceipt receipt,
         IReadOnlyList<RuntimeUrlBinding>? bindings,
         RuntimeAccessMode accessMode)
@@ -54,7 +59,7 @@ public static class RuntimeUrlExpander
         return ToResult(endpoints);
     }
 
-    public static ExpandedRuntimeUrls ExpandCompose(
+    public static ExpandedRuntimeAccess ExpandCompose(
         ComposeReceipt receipt,
         ComposeStatus status,
         IReadOnlyList<RuntimeUrlBinding>? bindings)
@@ -77,7 +82,7 @@ public static class RuntimeUrlExpander
         return ToResult(endpoints);
     }
 
-    public static ExpandedRuntimeUrls ExpandCompose(
+    public static ExpandedRuntimeAccess ExpandCompose(
         ComposeReceipt receipt,
         ComposeStatus status,
         IReadOnlyList<RuntimeUrlBinding>? bindings,
@@ -113,19 +118,19 @@ public static class RuntimeUrlExpander
         return ToResult(endpoints);
     }
 
-    public static ExpandedRuntimeUrls ExpandOva(
+    public static ExpandedRuntimeAccess ExpandOva(
         OvaRuntimeReceipt receipt,
         IReadOnlyList<RuntimeUrlBinding>? bindings)
     {
-        var urls = new List<string>();
+        var addresses = new List<string>();
         foreach (var binding in bindings ?? [])
         {
             var machine = FindOvaVirtualMachine(receipt, binding);
-            var url = ExpandOvaBinding(machine, binding);
-            urls.Add(url);
+            var address = ExpandOvaBinding(machine, binding);
+            addresses.Add(address);
         }
-        return new(urls, urls.Select((url, index) =>
-            new RuntimeAccessEndpointMapping(index, url, null, null)).ToArray());
+        return new(addresses.Select((address, index) =>
+            new RuntimeAccessEndpointMapping(index, address, null, null)).ToArray());
     }
 
     private static ComposeServiceStatus FindComposeService(
@@ -212,13 +217,9 @@ public static class RuntimeUrlExpander
     private static string ExpandAccessUrl(string template, string? host, int port) =>
         Expand(template, host, port);
 
-    private static ExpandedRuntimeUrls ToResult(
+    private static ExpandedRuntimeAccess ToResult(
         IReadOnlyList<RuntimeAccessEndpointMapping> endpoints) =>
-        new(
-            endpoints.Select(endpoint => endpoint.DirectAddress)
-                .OfType<string>()
-                .ToArray(),
-            endpoints);
+        new(endpoints);
 
     private static string RequiredInternalHost(string? host) =>
         !string.IsNullOrWhiteSpace(host)

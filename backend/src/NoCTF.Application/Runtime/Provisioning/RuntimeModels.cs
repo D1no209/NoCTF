@@ -269,15 +269,10 @@ public interface IContainerLifecycle
 
 public interface IOneShotJobRunner
 {
-    Task<OneShotResult> RunAsync(ContainerRequest request, CancellationToken cancellationToken);
-
     Task<OneShotResult> RunAsync(
         ContainerRequest request,
         OneShotInputArchive? input,
-        CancellationToken cancellationToken) => input is null
-        ? RunAsync(request, cancellationToken)
-        : Task.FromException<OneShotResult>(new NotSupportedException(
-            "The selected one-shot Runtime provider does not support input archives."));
+        CancellationToken cancellationToken);
 }
 
 public sealed record ContainerExecResult(int ExitCode, bool TimedOut);

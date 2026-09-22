@@ -37,21 +37,13 @@ public sealed class FusionLeaderboardCache(
     private readonly IFusionCache cache = caches.GetCache(NoCtfCacheNames.Leaderboards);
     private readonly LeaderboardProjectionKeyedLock keyedLock = projectionKeyedLock ?? new();
     private readonly TimeProvider timeProvider = clock ?? TimeProvider.System;
-    private const int CurrentAwdpRoundProjectionFormat = 1;
-
-    public async Task<LeaderboardResponse?> GetAsync(Guid competitionId, CancellationToken ct) =>
-        (await GetOrRebuildPublishedBundleAsync(competitionId, ct))?.Legacy;
-
     public async Task<ScoreboardProjection?> GetScoreboardAsync(Guid competitionId, CancellationToken ct) =>
         (await GetOrRebuildPublishedBundleAsync(competitionId, ct))?.Scoreboard;
-
-    public async Task<LeaderboardResponse?> GetFrozenAsync(Guid competitionId, CancellationToken ct)
-        => (await GetFrozenBundleAsync(competitionId, ct))?.Legacy;
 
     public async Task<ScoreboardProjection?> GetFrozenScoreboardAsync(Guid competitionId, CancellationToken ct)
         => (await GetFrozenBundleAsync(competitionId, ct))?.Scoreboard;
 
-    private async Task<LeaderboardProjectionBundle?> GetFrozenBundleAsync(
+    private async Task<ScoreboardProjectionBundle?> GetFrozenBundleAsync(
         Guid competitionId,
         CancellationToken ct)
     {
@@ -64,13 +56,7 @@ public sealed class FusionLeaderboardCache(
             : await ProjectBundleAsync(competitionId, null, frozenAt.Value, null, ct);
     }
 
-    public async Task<LeaderboardResponse?> CreateAsync(
-        Guid competitionId,
-        DateTimeOffset projectedAt,
-        CancellationToken ct) =>
-        (await ProjectBundleAsync(competitionId, null, projectedAt, null, ct))?.Legacy;
-
-    public Task<LeaderboardProjectionBundle?> CreateBundleAsync(
+    public Task<ScoreboardProjectionBundle?> CreateBundleAsync(
         Guid competitionId,
         DateTimeOffset projectedAt,
         CancellationToken ct) =>
@@ -101,19 +87,7 @@ public sealed class FusionLeaderboardCache(
         return scoreboard;
     }
 
-    public async Task<LeaderboardResponse?> CreateWithConfigurationAsync(
-        Guid competitionId,
-        string competitionConfigurationJson,
-        DateTimeOffset projectedAt,
-        CancellationToken ct) =>
-        (await ProjectBundleAsync(
-            competitionId,
-            competitionConfigurationJson,
-            projectedAt,
-            null,
-            ct))?.Legacy;
-
-    private async Task<LeaderboardProjectionBundle?> ProjectBundleAsync(
+    private async Task<ScoreboardProjectionBundle?> ProjectBundleAsync(
         Guid competitionId,
         string? competitionConfigurationJson,
         DateTimeOffset projectedAt,
@@ -191,8 +165,8 @@ public sealed class FusionLeaderboardCache(
                 instance.IsPublished,
                 templates[instance.ChallengeId].DefinitionJson,
                 templates[instance.ChallengeId].Mode == GameMode.Ctf
-                    ? NoCTF.GameModes.Ctf.Configuration.CtfConfigurationUpgrader
-                        .ParseChallenge(templates[instance.ChallengeId].DefinitionJson)
+                    ? NoCTF.GameModes.Ctf.Configuration.CtfConfigurationParser
+                        .ParseDefinition(templates[instance.ChallengeId].DefinitionJson)
                         .InteractionKind
                     : CtfInteractionKind.FlagSubmission))
             .ToList();
@@ -248,7 +222,7 @@ public sealed class FusionLeaderboardCache(
             awdWindow.Rounds,
             challenges,
             ct);
-        var actorIds = factRows.Legacy
+        var actorIds = factRows.Aggregate
             .Concat(factRows.Scoreboard)
             .Where(fact => fact.ActorUserId is not null)
             .Select(fact => fact.ActorUserId!.Value)
@@ -265,7 +239,7 @@ public sealed class FusionLeaderboardCache(
                     : null
             })
             .ToArray();
-        var legacyFacts = EnrichActors(factRows.Legacy);
+        var aggregateFacts = EnrichActors(factRows.Aggregate);
         var scoreboardFacts = EnrichActors(factRows.Scoreboard);
 
         var selectedRoundWindowEnd = competition.Mode == GameMode.Awd
@@ -275,7 +249,7 @@ public sealed class FusionLeaderboardCache(
             competitionId,
             competition.Mode,
             teamFacts,
-            legacyFacts,
+            aggregateFacts,
             challenges,
             competitionConfigurationJson ?? competition.ConfigurationJson,
             competition.StartAt,
@@ -287,26 +261,7 @@ public sealed class FusionLeaderboardCache(
             selectedRoundWindowEnd,
             awdWindow.LatestRound,
             factRows.AwdAggregates);
-        var outputs = projectionEngine.ProjectOutputs(projectionInput);
-        var projection = outputs.Legacy;
-        var legacy = new LeaderboardResponse(competitionId, projectedAt, projection.Entries)
-        {
-            Challenges = projection.Challenges,
-            Tracks = trackConfiguration.Tracks.Select(track => new LeaderboardTrackInfo(
-                track.Key,
-                track.Name,
-                track.IsInternal,
-                track.VisibleOnLeaderboard)).ToArray(),
-            TracksEnabled = competition.TracksEnabled,
-            Visibility = CompetitionLeaderboardVisibility.Normal,
-            DataScope = LeaderboardDataScope.Live,
-            DataAsOf = projectedAt,
-            CurrentRound = projection.CurrentRound,
-            SettledThroughRound = projection.SettledThroughRound,
-            RoundDurationSeconds = projection.RoundDurationSeconds,
-            CurrentRoundRemainingSeconds = projection.CurrentRoundRemainingSeconds
-        };
-        var scoreboard = outputs.Scoreboard;
+        var scoreboard = projectionEngine.Project(projectionInput);
         ScoreboardProjection AddResponseMetadata(ScoreboardProjection value) => value with
         {
             Snapshot = value.Snapshot with
@@ -332,7 +287,7 @@ public sealed class FusionLeaderboardCache(
             || publishedChallengeIds.Contains(challengeId);
         ScoreboardProjection participantScoreboard;
         var participantProjectionMatchesFull = publishedChallengeIds.Count == challenges.Count
-            && legacyFacts.All(IsParticipantVisible)
+            && aggregateFacts.All(IsParticipantVisible)
             && scoreboardFacts.All(IsParticipantVisible)
             && awdWindow.Rounds.All(round =>
                 publishedChallengeIds.Contains(round.CompetitionChallengeId))
@@ -347,7 +302,7 @@ public sealed class FusionLeaderboardCache(
             var participantInput = projectionInput with
             {
                 Challenges = challenges.Where(challenge => challenge.IsPublished).ToArray(),
-                GameplayFacts = legacyFacts.Where(IsParticipantVisible).ToArray(),
+                GameplayFacts = aggregateFacts.Where(IsParticipantVisible).ToArray(),
                 ScoreboardGameplayFacts = scoreboardFacts.Where(IsParticipantVisible).ToArray(),
                 AwdRounds = awdWindow.Rounds
                     .Where(round => publishedChallengeIds.Contains(round.CompetitionChallengeId))
@@ -357,19 +312,17 @@ public sealed class FusionLeaderboardCache(
                     .ToArray()
             };
             participantScoreboard = AddResponseMetadata(
-                projectionEngine.ProjectOutputs(participantInput).Scoreboard);
+                projectionEngine.Project(participantInput));
         }
         scoreboard = scoreboard with
         {
             ParticipantView = ScoreboardAudienceView.From(participantScoreboard)
         };
-        return new(legacy, scoreboard)
+        return new(scoreboard)
         {
-            AwdpRoundProjectionFormat = competition.Mode == GameMode.Awdp ? CurrentAwdpRoundProjectionFormat : 0,
             ValidUntil = competition.Mode == GameMode.Awdp
                 && competitionStatusAtProjection == CompetitionStatus.Running
-                && projection.CurrentRoundRemainingSeconds is > 0
-                ? projectedAt.AddSeconds(projection.CurrentRoundRemainingSeconds.Value)
+                ? scoreboard.Schema.Rounds.SingleOrDefault(round => round.State == ScoreboardRoundState.Running)?.EndAt
                 : null
         };
     }
@@ -441,7 +394,7 @@ public sealed class FusionLeaderboardCache(
                 competitionId, null, timeProvider.GetUtcNow(), null, ct);
             if (developmentResponse is null)
                 return;
-            var previous = await cache.GetOrDefaultAsync<LeaderboardProjectionBundle?>(
+            var previous = await cache.GetOrDefaultAsync<ScoreboardProjectionBundle?>(
                 ProjectionKey(competitionId), null, token: ct);
             developmentResponse = AdvanceScoreboardVersion(developmentResponse, previous);
             await cache.SetAsync(ProjectionKey(competitionId), developmentResponse, token: ct);
@@ -452,7 +405,7 @@ public sealed class FusionLeaderboardCache(
         var closeConnection = db.Database.GetDbConnection().State != ConnectionState.Open;
         var projectionLockAcquired = false;
         var publicationPhase = false;
-        LeaderboardProjectionBundle? response = null;
+        ScoreboardProjectionBundle? response = null;
         long? publicationToken = null;
         try
         {
@@ -498,7 +451,7 @@ public sealed class FusionLeaderboardCache(
 
             if (publicationFence is null)
             {
-                var previous = await cache.GetOrDefaultAsync<LeaderboardProjectionBundle?>(
+                var previous = await cache.GetOrDefaultAsync<ScoreboardProjectionBundle?>(
                     ProjectionKey(competitionId), null, token: ct);
                 response = AdvanceScoreboardVersion(response, previous);
             }
@@ -594,10 +547,10 @@ public sealed class FusionLeaderboardCache(
         return new(failure);
     }
 
-    private static string ProjectionKey(Guid competitionId) => $"projection:v2:{competitionId:N}";
+    private static string ProjectionKey(Guid competitionId) => $"scoreboard:v1:{competitionId:N}";
     private static string FailureKey(Guid competitionId) => $"leaderboard:{competitionId:N}:last-failure";
 
-    private async Task<LeaderboardProjectionBundle?> GetOrRebuildPublishedBundleAsync(
+    private async Task<ScoreboardProjectionBundle?> GetOrRebuildPublishedBundleAsync(
         Guid competitionId,
         CancellationToken ct)
     {
@@ -629,13 +582,13 @@ public sealed class FusionLeaderboardCache(
         }
     }
 
-    private async Task<LeaderboardProjectionBundle?> GetPublishedBundleAsync(
+    private async Task<ScoreboardProjectionBundle?> GetPublishedBundleAsync(
         Guid competitionId,
         CancellationToken ct)
     {
         if (publicationFence is null)
         {
-            var unfenced = await cache.GetOrDefaultAsync<LeaderboardProjectionBundle?>(
+            var unfenced = await cache.GetOrDefaultAsync<ScoreboardProjectionBundle?>(
                 ProjectionKey(competitionId), null, token: ct);
             return IsExpired(unfenced) ? null : unfenced;
         }
@@ -643,7 +596,7 @@ public sealed class FusionLeaderboardCache(
         var published = await publicationFence.GetAsync(competitionId, ct);
         if (published is null)
             return null;
-        var bundle = JsonSerializer.Deserialize<LeaderboardProjectionBundle>(
+        var bundle = JsonSerializer.Deserialize<ScoreboardProjectionBundle>(
             published.Payload,
             JsonOptions);
         if (bundle is null || bundle.Scoreboard.Snapshot.Version != published.Fence)
@@ -651,19 +604,16 @@ public sealed class FusionLeaderboardCache(
         if (IsExpired(bundle))
             return null;
 
-        var cached = await cache.GetOrDefaultAsync<LeaderboardProjectionBundle?>(
+        var cached = await cache.GetOrDefaultAsync<ScoreboardProjectionBundle?>(
             ProjectionKey(competitionId), null, token: ct);
         if (cached?.Scoreboard.Snapshot.Version != published.Fence)
             await cache.SetAsync(ProjectionKey(competitionId), bundle, token: ct);
         return bundle;
     }
 
-    private bool IsExpired(LeaderboardProjectionBundle? bundle) =>
+    private bool IsExpired(ScoreboardProjectionBundle? bundle) =>
         bundle?.ValidUntil is { } validUntil && timeProvider.GetUtcNow() >= validUntil
-        || bundle is not null && bundle.Scoreboard.Schema.Mode == GameMode.Awdp
-            && bundle.AwdpRoundProjectionFormat != CurrentAwdpRoundProjectionFormat
         || bundle is not null && bundle.Scoreboard.Snapshot.DataScope == LeaderboardDataScope.Live
-            && bundle.Scoreboard.Schema.Mode is GameMode.Ctf or GameMode.Awdp
             && bundle.Scoreboard.Snapshot.Teams.Any(team => team.Achievements is null);
 
     private async Task RepairFusionCacheAsync(Guid competitionId, CancellationToken ct)
@@ -673,7 +623,7 @@ public sealed class FusionLeaderboardCache(
         var published = await publicationFence.GetAsync(competitionId, ct);
         if (published is null)
             return;
-        var bundle = JsonSerializer.Deserialize<LeaderboardProjectionBundle>(
+        var bundle = JsonSerializer.Deserialize<ScoreboardProjectionBundle>(
             published.Payload,
             JsonOptions);
         if (bundle is not null && bundle.Scoreboard.Snapshot.Version == published.Fence)
@@ -685,9 +635,9 @@ public sealed class FusionLeaderboardCache(
             $"SELECT pg_advisory_unlock(hashtextextended({competitionId.ToString("N")}, 0))",
             CancellationToken.None);
 
-    private static LeaderboardProjectionBundle AdvanceScoreboardVersion(
-        LeaderboardProjectionBundle candidate,
-        LeaderboardProjectionBundle? previous)
+    private static ScoreboardProjectionBundle AdvanceScoreboardVersion(
+        ScoreboardProjectionBundle candidate,
+        ScoreboardProjectionBundle? previous)
     {
         if (previous is null || candidate.Scoreboard.Snapshot.Version > previous.Scoreboard.Snapshot.Version)
             return candidate;
@@ -718,8 +668,8 @@ public sealed class FusionLeaderboardCache(
         public static AwdScoreboardWindow Empty { get; } = new([], null, null, null);
     }
 
-    private static LeaderboardProjectionBundle SetScoreboardVersion(
-        LeaderboardProjectionBundle candidate,
+    private static ScoreboardProjectionBundle SetScoreboardVersion(
+        ScoreboardProjectionBundle candidate,
         long version) => candidate with
         {
             Scoreboard = candidate.Scoreboard with

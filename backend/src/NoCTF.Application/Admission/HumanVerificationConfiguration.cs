@@ -59,7 +59,23 @@ public enum HumanVerificationConfigurationError
     TurnstileSiteKeyInvalid,
     TurnstileSecretRequired,
     TurnstileAllowedHostnamesInvalid,
-    SecretInvalid
+    SecretInvalid,
+    CapConfigurationInvalid,
+    CapProviderUnavailable
+}
+
+public enum CapHumanVerificationConfigurationProbeResult
+{
+    Succeeded,
+    ConfigurationInvalid,
+    ProviderUnavailable
+}
+
+public interface ICapHumanVerificationConfigurationProbe
+{
+    Task<CapHumanVerificationConfigurationProbeResult> ProbeAsync(
+        HumanVerificationRuntimeConfiguration configuration,
+        CancellationToken cancellationToken);
 }
 
 public enum HumanVerificationConfigurationUpdateState
@@ -103,7 +119,9 @@ public sealed record HumanVerificationValidationPolicy(bool Development);
 
 public sealed class ManageHumanVerificationConfiguration(
     IHumanVerificationConfigurationStore store,
-    HumanVerificationValidationPolicy policy)
+    HumanVerificationValidationPolicy policy,
+    IHumanVerificationConfigurationReader? configurationReader = null,
+    ICapHumanVerificationConfigurationProbe? capProbe = null)
 {
     public async Task<HumanVerificationConfigurationView> GetAsync(
         CancellationToken ct = default) =>
@@ -143,6 +161,21 @@ public sealed class ManageHumanVerificationConfiguration(
                 ValidationErrors: errors);
         }
 
+        if (candidate.Enabled && candidate.Provider == HumanVerificationProvider.Cap)
+        {
+            var probeError = await ProbeCapAsync(
+                normalized.CapServerUrl,
+                normalized.CapSiteKey,
+                secretOverride: null,
+                ct);
+            if (probeError is not null)
+            {
+                return new(
+                    HumanVerificationConfigurationUpdateState.Invalid,
+                    ValidationErrors: [probeError.Value]);
+            }
+        }
+
         var updated = await store.UpdateAsync(normalized, ct);
         return new(
             HumanVerificationConfigurationUpdateState.Updated,
@@ -163,6 +196,24 @@ public sealed class ManageHumanVerificationConfiguration(
             return new(
                 HumanVerificationConfigurationUpdateState.Invalid,
                 ValidationErrors: [HumanVerificationConfigurationError.SecretInvalid]);
+        }
+
+        var current = await GetAsync(ct);
+        if (provider == HumanVerificationProvider.Cap
+            && current.Enabled
+            && current.Provider == HumanVerificationProvider.Cap)
+        {
+            var probeError = await ProbeCapAsync(
+                current.CapServerUrl,
+                current.CapSiteKey,
+                secret,
+                ct);
+            if (probeError is not null)
+            {
+                return new(
+                    HumanVerificationConfigurationUpdateState.Invalid,
+                    ValidationErrors: [probeError.Value]);
+            }
         }
 
         var updated = await store.ReplaceSecretAsync(provider, secret, now, ct);
@@ -194,6 +245,40 @@ public sealed class ManageHumanVerificationConfiguration(
                 view with { Enabled = true },
                 validateInactiveProviderValues: false).Count == 0
         };
+
+    private async Task<HumanVerificationConfigurationError?> ProbeCapAsync(
+        string serverUrl,
+        string siteKey,
+        string? secretOverride,
+        CancellationToken ct)
+    {
+        if (configurationReader is null || capProbe is null)
+            return HumanVerificationConfigurationError.CapProviderUnavailable;
+
+        var current = await configurationReader.GetRuntimeConfigurationAsync(ct);
+        var cap = current.Options.Cap;
+        var candidate = new HumanVerificationRuntimeConfiguration(
+            true,
+            new HumanVerificationOptions
+            {
+                Provider = HumanVerificationProvider.Cap,
+                Cap = new CapHumanVerificationOptions
+                {
+                    ServerUrl = serverUrl,
+                    BackendServerUrl = cap.BackendServerUrl,
+                    SiteKey = siteKey,
+                    Secret = secretOverride ?? cap.Secret,
+                    ManagementApiKey = cap.ManagementApiKey
+                }
+            });
+        return await capProbe.ProbeAsync(candidate, ct) switch
+        {
+            CapHumanVerificationConfigurationProbeResult.Succeeded => null,
+            CapHumanVerificationConfigurationProbeResult.ConfigurationInvalid =>
+                HumanVerificationConfigurationError.CapConfigurationInvalid,
+            _ => HumanVerificationConfigurationError.CapProviderUnavailable
+        };
+    }
 
     private IReadOnlyList<HumanVerificationConfigurationError> Validate(
         HumanVerificationConfigurationView configuration,

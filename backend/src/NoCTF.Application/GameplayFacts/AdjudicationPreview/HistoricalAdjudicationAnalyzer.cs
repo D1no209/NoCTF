@@ -29,15 +29,7 @@ public static class HistoricalAdjudicationAnalyzer
             AdjudicationFindingSeverity severity, AdjudicationFindingClassification classification) =>
             issues.Add(new(kind, certainty, severity, classification));
 
-        if (evidence.GameMode == GameMode.Awdp && evidence.GameplayFactKind == GameplayFactKind.BreakAttempt
-            && evidence.CurrentResult == GameplayFactResult.Duplicate
-            && evidence.CurrentFailureCode == GameplayFactFailureCode.DuplicateAchievement)
-        {
-            expectedResult = GameplayFactResult.Correct;
-            Add(AdjudicationDifferenceKind.CurrentDuplicateShouldBeCorrect, AdjudicationDifferenceCertainty.Deterministic,
-                AdjudicationFindingSeverity.Error, AdjudicationFindingClassification.CurrentResultMismatch);
-        }
-        else if (latestTrusted && evidence.CurrentResult != latest!.Result)
+        if (latestTrusted && evidence.CurrentResult != latest!.Result)
         {
             expectedResult = latest.Result;
             Add(AdjudicationDifferenceKind.HistoricalResultChanged, AdjudicationDifferenceCertainty.Deterministic,

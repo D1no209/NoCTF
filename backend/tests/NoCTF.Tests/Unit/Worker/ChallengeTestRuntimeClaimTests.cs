@@ -29,6 +29,7 @@ public sealed class ChallengeTestRuntimeClaimTests
             RuntimeAllocation.PerTeam,
             new ContainerRuntimeDefinition(
                 "challenge:test",
+                Security: new(false, false, false, ["ALL"], []),
                 FlagEnvironmentVariableName: "CHALLENGE_FLAG"),
             new RuntimeResourceLimits(67_108_864, 100_000_000, 64),
             FlagSource: RuntimeFlagSource.PerTeam);

@@ -83,7 +83,6 @@ public sealed class PostgresKohChallengeAccessReader(
             {
                 instance.Id,
                 instance.AccessMode,
-                instance.Urls,
                 AccessEndpoints = instance.AccessEndpoints.OrderBy(endpoint => endpoint.BindingIndex)
                     .Select(endpoint => new NoCTF.Application.Runtime.Instances.RuntimeAccessEndpointView(
                         endpoint.BindingIndex,
@@ -94,11 +93,6 @@ public sealed class PostgresKohChallengeAccessReader(
             .FirstOrDefaultAsync(cancellationToken);
         if (runtime is null)
             return null;
-        var urls = RuntimeParticipantUrlProjection.Filter(
-            runtimeTemplates,
-            challenge.Mode,
-            challenge.DefinitionJson,
-            runtime.Urls);
         var accessEndpoints = RuntimeParticipantUrlProjection.Filter(
             runtimeTemplates,
             challenge.Mode,
@@ -106,7 +100,6 @@ public sealed class PostgresKohChallengeAccessReader(
             runtime.AccessEndpoints);
         return new(
             flag,
-            urls,
             runtime.Id,
             runtime.AccessMode,
             accessEndpoints);

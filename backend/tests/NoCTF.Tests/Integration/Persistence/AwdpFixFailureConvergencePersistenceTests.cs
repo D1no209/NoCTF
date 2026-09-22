@@ -31,7 +31,7 @@ public sealed class AwdpFixFailureConvergencePersistenceTests
 {
     [Test]
     [Timeout(300_000)]
-    public async Task Successful_Fix_events_expose_the_correct_result_for_new_and_legacy_payloads(
+    public async Task Successful_Fix_events_expose_the_current_result(
         CancellationToken cancellationToken)
     {
         await DockerIntegrationTest.RunAsync(async () =>
@@ -68,53 +68,6 @@ public sealed class AwdpFixFailureConvergencePersistenceTests
             await Assert.That(current.GameplayFactResult)
                 .IsEqualTo(GameplayFactResult.Correct);
 
-            var legacyId = Guid.CreateVersion7(fixture.Now);
-            db.CompetitionEvents.Add(new CompetitionEvent
-            {
-                Id = legacyId,
-                CompetitionId = fixture.CompetitionId,
-                Kind = CompetitionEventKind.AwdpFixResolved,
-                Level = CompetitionEventLevel.Information,
-                Visibility = CompetitionEventVisibility.Public,
-                SubjectType = NoCTF.Domain.Shared.EntityReferenceKind.GameplayFact,
-                SubjectId = Guid.CreateVersion7(),
-                RelatedType = NoCTF.Domain.Shared.EntityReferenceKind.Team,
-                RelatedId = fixture.TeamId,
-                PayloadJson = AwdpFixResolvedEventPayload.Create(
-                    Guid.CreateVersion7(),
-                    Guid.CreateVersion7(),
-                    operation.RuntimeInstanceId,
-                    fixture.TeamId,
-                    fixture.CompetitionChallengeId,
-                    AwdpFixOutcome.DefenseSucceeded,
-                    null,
-                    fixture.Now).Serialize(),
-                OccurredAt = fixture.Now
-            });
-            await db.SaveChangesAsync(cancellationToken);
-            db.ChangeTracker.Clear();
-
-            var history = await eventStore.QueryAsync(new(
-                fixture.CompetitionId,
-                fixture.UserId,
-                Kind: CompetitionEventKind.AwdpFixResolved,
-                MinimumLevel: null,
-                TeamId: null,
-                ActorUserId: null,
-                CompetitionChallengeId: null,
-                RuntimeInstanceId: null,
-                From: null,
-                To: null,
-                BeforeOccurredAt: null,
-                BeforeId: null,
-                Limit: 10), cancellationToken);
-            var legacy = history.Items!.Single(item => item.Id == legacyId);
-            await Assert.That(legacy.GameplayFactKind)
-                .IsEqualTo(GameplayFactKind.FixAttempt);
-            await Assert.That(legacy.GameplayFactState)
-                .IsEqualTo(GameplayFactState.Completed);
-            await Assert.That(legacy.GameplayFactResult)
-                .IsEqualTo(GameplayFactResult.Correct);
         });
     }
 

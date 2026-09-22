@@ -1397,11 +1397,6 @@ namespace NoCTF.Infrastructure.Migrations
                         .HasColumnType("bigint")
                         .HasColumnName("traffic_capture_reserved_bytes");
 
-                    b.PrimitiveCollection<string[]>("Urls")
-                        .IsRequired()
-                        .HasColumnType("text[]")
-                        .HasColumnName("urls");
-
                     b.HasKey("Id")
                         .HasName("pk_runtime_instances");
 

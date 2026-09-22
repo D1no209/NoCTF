@@ -21,7 +21,7 @@ Clone the official Cap repository, check out the pinned commit, and run `build-i
 
 The platform administrator page reads and updates the active Site Key through Cap's internal management API. It exposes Cap's native `difficulty` range 1–8 and `challengeCount` range 1–500, shows the expected average SHA-256 attempts, and keeps Cap's `saltSize` at its upstream-managed value of 32. Changes affect newly issued challenges; signed challenges already issued retain their original workload.
 
-The NoCTF API probes CORS, the local WASM asset, and `siteverify` once per minute. Cap is deliberately excluded from NoCTF readiness so a verifier outage cannot restart the API, Worker, or Runner.
+NoCTF validates CORS, the local WASM asset, and `siteverify` once before enabling Cap or replacing the secret of an enabled Cap configuration. Runtime availability is observed through real verification metrics and the independent Prometheus/Blackbox stack; Cap remains excluded from NoCTF readiness so an outage cannot restart the API, Worker, or Runner.
 
 ## Backup and upgrade
 

@@ -1,4 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk.Web">
+  <PropertyGroup>
+    <OutputType>Library</OutputType>
+  </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="../NoCTF.Application/NoCTF.Application.csproj" />
     <ProjectReference Include="../NoCTF.Domain/NoCTF.Domain.csproj" />

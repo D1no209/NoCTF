@@ -80,7 +80,7 @@ public sealed class RuntimeProviderHandler(
                 timeProvider.GetUtcNow(),
                 cancellationToken);
             providerHealth?.ReportSuccess(definition.Provider);
-            ExpandedRuntimeUrls? expanded = null;
+            ExpandedRuntimeAccess? expanded = null;
             try
             {
                 expanded = RuntimeUrlExpander.ExpandContainer(
@@ -98,7 +98,7 @@ public sealed class RuntimeProviderHandler(
                     message.RunnerId,
                     receipt.Provider,
                     JsonSerializer.Serialize(receipt),
-                    expanded.Urls,
+                    expanded.AccessEndpoints,
                     definition.Ttl is { } ttl ? timeProvider.GetUtcNow().Add(ttl) : null,
                     definition.Provider == RuntimeProvider.Docker
                         && definition.AccessMode is RuntimeAccessMode.Direct
@@ -110,8 +110,7 @@ public sealed class RuntimeProviderHandler(
                                 mapping.Key,
                                 mapping.Value))
                             .ToArray()
-                        : null,
-                    expanded.AccessEndpoints);
+                        : null);
         }
         catch (RuntimeConfigurationException)
         {
@@ -328,7 +327,7 @@ public sealed class RuntimeProviderHandler(
             else
             {
                 providerHealth?.ReportSuccess(message.Definition.Provider);
-                ExpandedRuntimeUrls? expanded = null;
+                ExpandedRuntimeAccess? expanded = null;
                 try
                 {
                     expanded = RuntimeUrlExpander.ExpandCompose(
@@ -347,16 +346,15 @@ public sealed class RuntimeProviderHandler(
                         message.RunnerId,
                         receipt.Provider,
                         JsonSerializer.Serialize(receipt),
-                        expanded.Urls,
+                        expanded.AccessEndpoints,
                         message.Definition.Ttl is { } ttl
                             ? timeProvider.GetUtcNow().Add(ttl)
                             : null,
                         message.Definition.Provider == RuntimeProvider.Docker
                             && message.Definition.AccessMode is RuntimeAccessMode.Direct
                                 or RuntimeAccessMode.DirectAndWsrx
-                            ? ReadComposePublishedPorts(message.Definition, status)
-                            : null,
-                        expanded.AccessEndpoints);
+                                ? ReadComposePublishedPorts(message.Definition, status)
+                                : null);
             }
         }
         catch (TimeoutException)
@@ -471,7 +469,7 @@ public sealed class RuntimeProviderHandler(
             var runtime = providers.Appliance(RuntimeProvider.Libvirt);
             var receipt = await runtime.ImportAsync(message.Definition, timeout.Token);
             providerHealth?.ReportSuccess(RuntimeProvider.Libvirt);
-            ExpandedRuntimeUrls? expanded = null;
+            ExpandedRuntimeAccess? expanded = null;
             try
             {
                 expanded = RuntimeUrlExpander.ExpandOva(
@@ -488,11 +486,10 @@ public sealed class RuntimeProviderHandler(
                     message.RunnerId,
                     receipt.Provider,
                     JsonSerializer.Serialize(receipt),
-                    expanded.Urls,
+                    expanded.AccessEndpoints,
                     message.Definition.Ttl is { } ttl
                         ? timeProvider.GetUtcNow().Add(ttl)
-                        : null,
-                    AccessEndpoints: expanded.AccessEndpoints);
+                        : null);
         }
         catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
         {
@@ -820,10 +817,9 @@ internal static class RuntimeWriteBackOperations
             || instance.RuntimeProvider != message.Provider)
             return;
 
-        if (!TryReadAccessDisplays(message.Urls, out var accessDisplays))
+        if (!TryReplaceAccessEndpoints(instance, message.AccessEndpoints))
         {
             instance.ProviderReceiptJson = message.ProviderReceiptJson;
-            instance.Urls = [];
             instance.State = RuntimeState.Stopping;
             await InvalidateAwdpAttackFlagAsync(db, instance, timeProvider.GetUtcNow(), cancellationToken);
             await EndChallengeTestFlagAsync(
@@ -854,8 +850,6 @@ internal static class RuntimeWriteBackOperations
 
         var runningAt = timeProvider.GetUtcNow();
         instance.ProviderReceiptJson = message.ProviderReceiptJson;
-        instance.Urls = accessDisplays;
-        ReplaceAccessEndpoints(instance, message.AccessEndpoints, accessDisplays);
         instance.State = RuntimeState.Running;
         instance.FailureCode = null;
         instance.RunningAt = runningAt;
@@ -1452,29 +1446,23 @@ internal static class RuntimeWriteBackOperations
         }
     }
 
-    private static void ReplaceAccessEndpoints(
+    private static bool TryReplaceAccessEndpoints(
         RuntimeInstance instance,
-        IReadOnlyList<RuntimeAccessEndpointMapping>? endpoints,
-        IReadOnlyList<string> legacyUrls)
+        IReadOnlyList<RuntimeAccessEndpointMapping> endpoints)
     {
-        var mappings = endpoints ?? legacyUrls
-            .Select((address, index) => new RuntimeAccessEndpointMapping(
-                index,
-                address,
-                null,
-                null))
-            .ToArray();
-        var ordered = mappings.OrderBy(mapping => mapping.BindingIndex).ToArray();
+        var ordered = endpoints.OrderBy(mapping => mapping.BindingIndex).ToArray();
         if (ordered.Select(mapping => mapping.BindingIndex)
                 .SequenceEqual(Enumerable.Range(0, ordered.Length)) is false
             || ordered.Any(mapping =>
+                mapping.DirectAddress is not null && string.IsNullOrWhiteSpace(mapping.DirectAddress)
+                ||
                 mapping.DirectAddress is null
                     && (string.IsNullOrWhiteSpace(mapping.TargetHost)
                         || mapping.TargetPort is not (>= 1 and <= 65535))
                 || mapping.TargetHost?.Length > 255
                 || mapping.TargetPort is not null and not (>= 1 and <= 65535)))
         {
-            throw new InvalidOperationException("Runtime access endpoint results are invalid.");
+            return false;
         }
 
         instance.AccessEndpoints.Clear();
@@ -1483,11 +1471,12 @@ internal static class RuntimeWriteBackOperations
             instance.AccessEndpoints.Add(new RuntimeAccessEndpoint
             {
                 BindingIndex = mapping.BindingIndex,
-                DirectAddress = mapping.DirectAddress,
+                DirectAddress = mapping.DirectAddress?.Trim(),
                 TargetHost = mapping.TargetHost,
                 TargetPort = mapping.TargetPort
             });
         }
+        return true;
     }
 
     private static ValueTask PublishRuntimeStopAsync(
@@ -1516,18 +1505,4 @@ internal static class RuntimeWriteBackOperations
                 $"Unsupported runtime kind '{instance.RuntimeKind}'.")
         };
 
-    private static bool TryReadAccessDisplays(
-        IReadOnlyList<string> values,
-        out string[] accessDisplays)
-    {
-        accessDisplays = new string[values.Count];
-        for (var index = 0; index < values.Count; index++)
-        {
-            if (string.IsNullOrWhiteSpace(values[index]))
-                return false;
-            accessDisplays[index] = values[index].Trim();
-        }
-
-        return true;
-    }
 }

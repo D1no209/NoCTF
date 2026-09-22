@@ -346,14 +346,14 @@ public sealed class GameplayFactProcessor(
         DateTimeOffset projectedAt,
         CancellationToken ct)
     {
-        var snapshot = await leaderboardSnapshots.CreateAsync(
+        var projection = await leaderboardSnapshots.CreateScoreboardAsync(
                 submission.CompetitionId,
                 projectedAt,
                 ct)
             ?? throw new InvalidOperationException(
                 $"Competition {submission.CompetitionId} has no leaderboard projection.");
-        var score = snapshot.Entries
-            .SingleOrDefault(entry => entry.TeamId == submission.TeamId)?.Score ?? 0;
+        var score = projection.Snapshot.Teams
+            .SingleOrDefault(entry => entry.TeamId == submission.TeamId)?.TotalScore ?? 0;
         var currentEventContributes = submission.Kind == GameplayFactKind.HintUnlock
             && submission.Result == GameplayFactResult.Unlocked;
         return currentEventContributes

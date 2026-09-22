@@ -140,7 +140,7 @@ describe('challenge definition defaults', () => {
       .toBe('题目定义版本或 JSON 格式无效')
     expect(challengeTemplateWriteErrorMessage({
       status: 400,
-      detail: 'CTF schemaVersion 1 has no registered upgrader.',
+      detail: 'schemaVersion 1 is unsupported; expected 3.',
     })).toBe('题目定义版本或 JSON 格式无效')
 
     expect(challengeTemplateWriteErrorMessages({
@@ -344,7 +344,7 @@ describe('challenge definition defaults', () => {
     })).toEqual([])
   })
 
-  test('localizes legacy start-gate schema failures and retains challenge navigation', async () => {
+  test('localizes unsupported schema failures and retains challenge navigation', async () => {
     expect(startGateErrorMessage({
       code: 'CompetitionConfigurationInvalid',
       message: 'schemaVersion 1 is unsupported; supported versions are 4.',

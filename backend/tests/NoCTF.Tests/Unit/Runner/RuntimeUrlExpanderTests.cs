@@ -26,7 +26,7 @@ public sealed class RuntimeUrlExpanderTests
             receipt,
             bindings);
 
-        await Assert.That(expanded.Urls).IsEquivalentTo(
+        await Assert.That(expanded.DirectAddresses).IsEquivalentTo(
             ["http://runner.example:32000/owner", "http://runner.example:32000/play"]);
     }
 
@@ -64,7 +64,7 @@ public sealed class RuntimeUrlExpanderTests
             receipt,
             [new("nc {HOST} {PORT}", RuntimeExposure.OwnerOnly, ContainerPort: 8080)]);
 
-        await Assert.That(expanded.Urls)
+        await Assert.That(expanded.DirectAddresses)
             .IsEquivalentTo(["nc runner.example 32000"]);
     }
 
@@ -102,7 +102,7 @@ public sealed class RuntimeUrlExpanderTests
             status,
             bindings);
 
-        await Assert.That(expanded.Urls)
+        await Assert.That(expanded.DirectAddresses)
             .IsEquivalentTo(["http://runner.example:32000/play"]);
     }
 
@@ -123,7 +123,7 @@ public sealed class RuntimeUrlExpanderTests
             [new("tcp://{HOST}:{PORT}", RuntimeExposure.OwnerOnly, ContainerPort: 31337)],
             RuntimeAccessMode.WsrxOnly);
 
-        await Assert.That(expanded.Urls).IsEmpty();
+        await Assert.That(expanded.DirectAddresses).IsEmpty();
         await Assert.That(expanded.AccessEndpoints).Count().IsEqualTo(1);
         await Assert.That(expanded.AccessEndpoints[0].DirectAddress).IsNull();
         await Assert.That(expanded.AccessEndpoints[0].TargetHost).IsEqualTo("10.42.0.5");

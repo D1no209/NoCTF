@@ -44,9 +44,6 @@ public sealed class RunnerOptionsTests
             ["Runner:Provider"] = nameof(RuntimeProvider.Docker),
             ["Runner:Pool"] = "docker",
             ["Runner:Id"] = "docker-1",
-            ["Runner:Capacity:MemoryBytes"] = "4294967296",
-            ["Runner:Capacity:NanoCpus"] = "2000000000",
-            ["Runner:Capacity:PidsLimit"] = "2048",
             ["Runner:Heartbeat:IntervalSeconds"] = "5",
             ["Runner:Heartbeat:TtlSeconds"] = "15"
         });
@@ -73,9 +70,6 @@ public sealed class RunnerOptionsTests
             ["Runner:Provider"] = nameof(RuntimeProvider.Docker),
             ["Runner:Pool"] = "docker",
             ["Runner:Id"] = "docker-1",
-            ["Runner:Capacity:MemoryBytes"] = "1024",
-            ["Runner:Capacity:NanoCpus"] = "100",
-            ["Runner:Capacity:PidsLimit"] = "10",
             ["Runner:Heartbeat:IntervalSeconds"] = "5",
             ["Runner:Heartbeat:TtlSeconds"] = "15",
             ["Runner:Cleanup:VerificationTimeoutSeconds"] = "0"
@@ -100,7 +94,7 @@ public sealed class RunnerOptionsTests
         var options = services.GetRequiredService<IOptions<RunnerOptions>>().Value;
 
         await Assert.That(options.Id).IsEqualTo("docker-1");
-        await Assert.That(options.Capacity.MemoryBytes).IsEqualTo(0);
+        await Assert.That(options.Admission.IsValid()).IsTrue();
     }
 
     [Test]
@@ -111,9 +105,6 @@ public sealed class RunnerOptionsTests
             ["Runner:Provider"] = nameof(RuntimeProvider.Docker),
             ["Runner:Pool"] = "docker",
             ["Runner:Id"] = "docker-1",
-            ["Runner:Capacity:MemoryBytes"] = "1024",
-            ["Runner:Capacity:NanoCpus"] = "100",
-            ["Runner:Capacity:PidsLimit"] = "10",
             ["Runner:Heartbeat:IntervalSeconds"] = "15",
             ["Runner:Heartbeat:TtlSeconds"] = "15"
         });
@@ -131,9 +122,6 @@ public sealed class RunnerOptionsTests
             ["Runner:Provider"] = "mystery",
             ["Runner:Pool"] = "pool-a",
             ["Runner:Id"] = "runner-a",
-            ["Runner:Capacity:MemoryBytes"] = "1024",
-            ["Runner:Capacity:NanoCpus"] = "100",
-            ["Runner:Capacity:PidsLimit"] = "10",
             ["Runner:Heartbeat:IntervalSeconds"] = "5",
             ["Runner:Heartbeat:TtlSeconds"] = "15"
         });
@@ -172,9 +160,6 @@ public sealed class RunnerOptionsTests
             ["Runner:Provider"] = nameof(RuntimeProvider.Docker),
             ["Runner:Pool"] = "docker",
             ["Runner:Id"] = "docker-1",
-            ["Runner:Capacity:MemoryBytes"] = "1024",
-            ["Runner:Capacity:NanoCpus"] = "100",
-            ["Runner:Capacity:PidsLimit"] = "10",
             ["Runner:Heartbeat:IntervalSeconds"] = "5",
             ["Runner:Heartbeat:TtlSeconds"] = "15",
             ["Storage:Provider"] = "S3",
@@ -196,9 +181,6 @@ public sealed class RunnerOptionsTests
             ["Runner:Provider"] = nameof(RuntimeProvider.Docker),
             ["Runner:Pool"] = "docker",
             ["Runner:Id"] = "docker-1",
-            ["Runner:Capacity:MemoryBytes"] = "1024",
-            ["Runner:Capacity:NanoCpus"] = "100",
-            ["Runner:Capacity:PidsLimit"] = "10",
             ["Runner:Heartbeat:IntervalSeconds"] = "5",
             ["Runner:Heartbeat:TtlSeconds"] = "15"
         });

@@ -26,7 +26,7 @@ public static class CtfPatchVerificationConfigurationResolver
 
     public static CtfPatchVerificationConfiguration? Resolve(string definitionJson, string rulesJson)
     {
-        var definition = CtfConfigurationUpgrader.ParseChallenge(definitionJson);
+        var definition = CtfConfigurationParser.ParseDefinition(definitionJson);
         if (definition.InteractionKind != CtfInteractionKind.PatchVerification
             || definition.Runtime is null
             || definition.Checker is null)
@@ -34,7 +34,7 @@ public static class CtfPatchVerificationConfigurationResolver
             return null;
         }
 
-        var rules = CtfConfigurationUpgrader.ParseChallenge(rulesJson);
+        var rules = CtfConfigurationParser.ParseRules(rulesJson);
         return new(
             definition.Runtime,
             definition.PatchEntrypoint ?? DefaultPatchEntrypoint,

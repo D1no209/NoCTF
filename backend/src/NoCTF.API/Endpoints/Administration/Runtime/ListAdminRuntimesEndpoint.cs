@@ -66,8 +66,13 @@ public sealed record AdminRuntimeResponse(
 
 public sealed record AdminRuntimeAllocationResponse(Guid OperationId,
     NoCTF.Domain.Runtime.RuntimeWorkloadKind Kind,
-    NoCTF.API.Endpoints.Administration.Platform.RunnerResourceAmountResponse Limit,
-    NoCTF.API.Endpoints.Administration.Platform.RunnerResourceAmountResponse Budget);
+    AdminRuntimeResourceAmountResponse Limit,
+    AdminRuntimeResourceAmountResponse Budget);
+
+public sealed record AdminRuntimeResourceAmountResponse(
+    long MemoryBytes,
+    long NanoCpus,
+    long PidsLimit);
 
 public sealed record AdminRuntimeListResponse(
     IReadOnlyList<AdminRuntimeResponse> Items,

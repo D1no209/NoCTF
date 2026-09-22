@@ -263,7 +263,7 @@ public sealed class ChallengeFlagManagementStore(
     {
         try
         {
-            return CtfConfigurationUpgrader.ParseChallenge(definitionJson).InteractionKind;
+            return CtfConfigurationParser.ParseDefinition(definitionJson).InteractionKind;
         }
         catch (GameModeConfigurationException)
         {

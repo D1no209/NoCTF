@@ -11,15 +11,15 @@ public sealed class LeaderboardProjectionEngine(
 {
     private readonly TimeProvider timeProvider = clock ?? TimeProvider.System;
 
-    public LeaderboardProjectionOutputs ProjectOutputs(LeaderboardProjectionInput input)
+    public ScoreboardProjection Project(LeaderboardProjectionInput input)
     {
         input = input with { ProjectedAt = input.ProjectedAt ?? timeProvider.GetUtcNow() };
         var projection = projectors.Get(input.Mode).Project(input);
-        var legacy = ProjectLegacy(input, projection);
-        return new(legacy, NormalizedScoreboardProjection.Project(input, legacy));
+        var aggregate = ProjectAggregate(input, projection);
+        return NormalizedScoreboardProjection.Project(input, aggregate);
     }
 
-    private static LeaderboardProjectionResult ProjectLegacy(
+    private static LeaderboardAggregateProjection ProjectAggregate(
         LeaderboardProjectionInput input,
         GameModeLeaderboardProjection projection)
     {
@@ -67,7 +67,7 @@ public sealed class LeaderboardProjectionEngine(
                 projection.CurrentBreakScores?.GetValueOrDefault(challenge.Id),
                 projection.CurrentFixScores?.GetValueOrDefault(challenge.Id)))
             .ToList();
-        return new LeaderboardProjectionResult(
+        return new LeaderboardAggregateProjection(
             entriesWithCells,
             challenges,
             projection.CurrentRound,

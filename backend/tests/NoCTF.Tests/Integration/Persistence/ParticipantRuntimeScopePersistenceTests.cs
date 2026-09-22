@@ -115,7 +115,7 @@ public sealed class ParticipantRuntimeScopePersistenceTests
             await Assert.That(validRuntime).IsNotNull();
             await Assert.That(visibleTargets).HasSingleItem();
             await Assert.That(visibleTargets[0].TeamId).IsEqualTo(fixture.ValidScope.TeamId);
-            await Assert.That(visibleTargets[0].Urls)
+            await Assert.That(visibleTargets[0].AccessEndpoints?.Select(endpoint => endpoint.DirectAddress).OfType<string>())
                 .IsEquivalentTo(["https://active-team.example.test"]);
         });
     }
@@ -134,7 +134,8 @@ public sealed class ParticipantRuntimeScopePersistenceTests
                     RuntimeAllocation.PerTeam,
                     new ContainerRuntimeDefinition(
                         "scope-test:latest",
-                        PortMappings: new Dictionary<int, int> { [31337] = 0 }),
+                        PortMappings: new Dictionary<int, int> { [31337] = 0 },
+                        Security: new(false, false, false, ["ALL"], [])),
                     new RuntimeResourceLimits(67_108_864, 100_000_000, 64),
                     UrlBindings:
                     [
@@ -351,7 +352,11 @@ public sealed class ParticipantRuntimeScopePersistenceTests
             RuntimeKind = RuntimeKind.Container,
             RuntimeProvider = RuntimeProvider.Docker,
             State = RuntimeState.Running,
-            Urls = [runtime.Url],
+            AccessEndpoints = [new RuntimeAccessEndpoint
+            {
+                BindingIndex = 0,
+                DirectAddress = runtime.Url
+            }],
             CreatedAt = now.AddMinutes(-1),
             RunningAt = now.AddSeconds(-30)
         });

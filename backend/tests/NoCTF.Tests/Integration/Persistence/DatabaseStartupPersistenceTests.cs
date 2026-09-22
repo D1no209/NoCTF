@@ -47,6 +47,43 @@ public sealed class DatabaseStartupPersistenceTests
                 originalHash = user.PasswordHash;
                 await Assert.That(user.Role).IsEqualTo(UserRole.Administrator);
                 await Assert.That(await db.Database.GetPendingMigrationsAsync(ct)).IsEmpty();
+                var appliedMigrations = (await db.Database.GetAppliedMigrationsAsync(ct)).ToArray();
+                await Assert.That(appliedMigrations).HasSingleItem();
+                await Assert.That(appliedMigrations[0]).EndsWith("_InitialBaseline");
+                var tables = await db.Database.SqlQuery<string>($"""
+                    SELECT table_name AS "Value"
+                    FROM information_schema.tables
+                    WHERE table_schema = 'public'
+                      AND table_name <> '__EFMigrationsHistory'
+                    ORDER BY table_name
+                    """).ToArrayAsync(ct);
+                await Assert.That(tables).IsEquivalentTo(
+                [
+                    "account_tokens",
+                    "challenge_attachments",
+                    "challenge_flags",
+                    "challenges",
+                    "competition_challenges",
+                    "competition_events",
+                    "competitions",
+                    "data_protection_keys",
+                    "files",
+                    "gameplay_facts",
+                    "notifications",
+                    "patch_uploads",
+                    "platform_settings",
+                    "runtime_instances",
+                    "teams",
+                    "users"
+                ]);
+                var oldRuntimeColumns = await db.Database.SqlQuery<string>($"""
+                    SELECT column_name AS "Value"
+                    FROM information_schema.columns
+                    WHERE table_schema = 'public'
+                      AND table_name = 'runtime_instances'
+                      AND column_name = 'urls'
+                    """).ToArrayAsync(ct);
+                await Assert.That(oldRuntimeColumns).IsEmpty();
             }
             await DatabaseStartup.InitializeAsync(provider, configuration, ct);
             await using var verification = provider.CreateAsyncScope();

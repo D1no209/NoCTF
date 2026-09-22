@@ -475,7 +475,6 @@ GET  /api/v1/admin/platform/configuration
 PATCH /api/v1/admin/platform/configuration
 PUT  /api/v1/admin/platform/configuration/logo
 GET  /api/v1/admin/platform/information
-GET  /api/v1/admin/platform/monitoring
 GET  /api/v1/admin/platform/runtimes
 GET  /api/v1/admin/platform/logs
 GET  /api/v1/admin/platform/logs/export

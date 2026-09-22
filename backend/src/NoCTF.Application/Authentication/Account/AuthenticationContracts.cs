@@ -18,13 +18,6 @@ public sealed record IssuedAccessToken(
     Guid JwtId = default);
 public sealed record IssuedRefreshToken(string Token, DateTimeOffset ExpiresAt);
 public sealed record RefreshTokenPrincipal(Guid UserId, int TokenVersion);
-
-/// <summary>Read-only compatibility for administrator-issued tokens created before ordinary JWT issuance.</summary>
-public static class LegacyAccessTokenClaims
-{
-    public const string Impersonation = "impersonation";
-    public const string ImpersonatorId = "impersonator_id";
-}
 public sealed record UserProfile(
     Guid Id,
     string UserName,

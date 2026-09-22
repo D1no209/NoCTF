@@ -48,7 +48,7 @@ internal static class LeaderboardFactProjectionReader
                 projectedAt,
                 competitionStatus,
                 endingRound);
-            var legacyRows = await ReadAwdpLegacyAsync(
+            var aggregateRows = await ReadAwdpAggregateAsync(
                 query,
                 window.SettledPenaltyCutoff,
                 window.IncludePenaltyCutoff,
@@ -58,11 +58,11 @@ internal static class LeaderboardFactProjectionReader
                     && fact.OccurredAt < window.EndAt),
                 BuildRoundSelector(competitionStart, lifecycle, window),
                 ct);
-            var carryRows = legacyRows.Where(row =>
+            var carryRows = aggregateRows.Where(row =>
                 row.Kind == GameplayFactKind.ManualAdjustment
                 || row.Result == GameplayFactResult.Correct && row.OccurredAt < window.StartAt);
             return new(
-                Map(legacyRows, hintCosts),
+                Map(aggregateRows, hintCosts),
                 Map(windowRows.Concat(carryRows)
                     .GroupBy(row => row.Id)
                     .Select(group => group.First()), hintCosts));
@@ -78,11 +78,11 @@ internal static class LeaderboardFactProjectionReader
                 teams,
                 projectedAt,
                 ct);
-            var legacyRows = await ReadAwdManualAdjustmentsAsync(query, ct);
+            var aggregateRows = await ReadAwdManualAdjustmentsAsync(query, ct);
             var windowRows = await ReadAwdWindowAsync(query, awdWindowRounds ?? [], ct);
             return new(
-                Map(legacyRows, hintCosts),
-                Map(windowRows.Concat(legacyRows), hintCosts),
+                Map(aggregateRows, hintCosts),
+                Map(windowRows.Concat(aggregateRows), hintCosts),
                 aggregates);
         }
 
@@ -537,7 +537,7 @@ internal static class LeaderboardFactProjectionReader
             group.Max(fact => fact.OccurredAt)))
         .ToListAsync(ct);
 
-    private static Task<List<FactSummary>> ReadAwdpLegacyAsync(
+    private static Task<List<FactSummary>> ReadAwdpAggregateAsync(
         IQueryable<GameplayFact> query,
         DateTimeOffset settledPenaltyCutoff,
         bool includePenaltyCutoff,
@@ -899,6 +899,6 @@ internal static class LeaderboardFactProjectionReader
 }
 
 internal sealed record LeaderboardFactProjectionRows(
-    IReadOnlyList<LeaderboardGameplayFact> Legacy,
+    IReadOnlyList<LeaderboardGameplayFact> Aggregate,
     IReadOnlyList<LeaderboardGameplayFact> Scoreboard,
     IReadOnlyList<LeaderboardAwdAggregateFact>? AwdAggregates = null);

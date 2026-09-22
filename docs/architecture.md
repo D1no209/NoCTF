@@ -6,19 +6,19 @@
 Browser/Client
      |
      v
-NoCTF.API  ---- Redis (cache/rate limit/SignalR/heartbeat)
+NoCTF.Host [Api]  ---- Redis (cache/rate limit/SignalR/heartbeat)
      |
      +---- PostgreSQL (business facts)
      +---- NATS JetStream (durable messages, consumers, retries, DLQ)
                          |
               +----------+----------+
               v                     v
-        NoCTF.Worker (N)      NoCTF.Runner (N/pools)
+        NoCTF.Host [Worker]   NoCTF.Host [Runner] (N/pools)
                                       |
                          Docker / Kubernetes / Libvirt
 ```
 
-平台包含三个运行角色：
+唯一可执行文件 `NoCTF.Host.dll` 包含三个运行角色；下列名称表示功能类库，不是独立进程入口：
 
 - `NoCTF.API`：FastEndpoints、认证、授权、接入事务、REST、SignalR、内部 Checker callback。
 - `NoCTF.Worker`：Submission 普通判定、生命周期、轮次、Flag、排行榜投影、通知与清理。
@@ -28,9 +28,9 @@ NoCTF.API  ---- Redis (cache/rate limit/SignalR/heartbeat)
 只向赛事负责人配置的目标发送带 HMAC 签名的公开 CloudEvents。浏览器继续通过 SignalR 接收
 失效提示并重读 REST。通用非交互自动化账户只负责 API 身份，不承担通知投递模型。
 
-角色可由兼容入口 `NoCTF.API`、`NoCTF.Worker`、`NoCTF.Runner` 分别承载，也可由
-`NoCTF.Host` 承载任意非空组合。统一宿主读取 `Hosting:Roles` 枚举数组，缺省启用
-`Api`、`Worker`、`Runner`；配置只在启动时解析，切换通过重启或滚动发布完成。
+`NoCTF.Host` 是唯一进程入口，可承载任意非空角色组合。统一宿主读取 `Hosting:Roles` 枚举数组，缺省启用
+`Api`、`Worker`、`Runner`；配置只在启动时解析。一次发布中的所有角色必须运行同一 Host 镜像，
+不支持新旧版本混跑或滚动兼容窗口。
 
 常见拓扑包括：
 
@@ -79,7 +79,7 @@ NoCTF.Worker -> signed competition Webhooks
 
 分数投影不写回 GameplayFact。影响排行榜的业务提交发布 NATS 失效消息；Worker 按比赛合并 500ms 内的失效并从 PostgreSQL 全量投影到命名 FusionCache。缓存丢失时由 PostgreSQL 重建，不扫描 Dirty 业务列。
 
-Flag、AWDP Break 与 Fix 只有在 GameplayFact 事务提交成功后才增加低基数 Prometheus counter；幂等重放与拒绝请求不重复计数。Flag/Break 首次判定终态另记录 `correct | incorrect | platform_error` 低基数结果和从接收到最终判定的完整处理耗时，重判不重复计数。平台监控将 Flag 与 Break 合并展示，提供五分钟正确率、处理 P95、平台错误率、Flag/Fix 平均速率与提交量；正确率排除平台失败，平台错误率以全部终态处理为分母。
+Flag、AWDP Break 与 Fix 只有在 GameplayFact 事务提交成功后才增加低基数 Prometheus counter；幂等重放与拒绝请求不重复计数。Flag/Break 首次判定终态另记录 `correct | incorrect | platform_error` 低基数结果和从接收到最终判定的完整处理耗时，重判不重复计数。外部 Prometheus recording rules 将 Flag 与 Break 合并，计算五分钟正确率、处理 P95、平台错误率、Flag/Fix 平均速率与提交量；正确率排除平台失败，平台错误率以全部终态处理为分母。平台不查询或呈现这些监控数据。
 
 ## Runner Pool
 

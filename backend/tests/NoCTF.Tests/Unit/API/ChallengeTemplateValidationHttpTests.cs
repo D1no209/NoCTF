@@ -75,7 +75,7 @@ public sealed class ChallengeTemplateValidationHttpTests
     }
 
     [Test]
-    [Arguments(GameModeProtocol.Ctf, "{\"schemaVersion\":2}")]
+    [Arguments(GameModeProtocol.Ctf, "{\"schemaVersion\":3}")]
     [Arguments(GameModeProtocol.Awd, "{\"schemaVersion\":4}")]
     [Arguments(GameModeProtocol.Awdp, "{\"schemaVersion\":4,\"maximumPatchUploadBytes\":268435456}")]
     [Arguments(GameModeProtocol.Koh, "{\"schemaVersion\":1}")]

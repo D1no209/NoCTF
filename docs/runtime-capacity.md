@@ -24,7 +24,7 @@ memory/PID pressure block new starts. Recovery still requires the configured hea
 sample window.
 
 Docker and Libvirt use the observed host/cgroup execution domain. They do not use
-`Runner:Capacity` as a scheduling ceiling. Kubernetes uses Node Allocatable and the
+configured scheduling ceilings. Kubernetes uses Node Allocatable and the
 Metrics API. Kubernetes PID usage remains unknown when the platform cannot observe
 it; admission then relies on PIDPressure and each workload's enforced PID limit
 instead of inventing a numeric PID balance.
@@ -43,9 +43,8 @@ They retain separate startup concurrency limits (`MainStartupConcurrency=2` and
 `AuxiliaryConcurrency=1` by default); no fixed Checker/Patch resource reserve exists.
 
 `RuntimeResourceLimits` remain provider hard limits. Kubernetes Requests equal Limits
-for new work. `capacity_allocations.budget` remains only as rolling-upgrade evidence
-for allocations written by older versions; schema 3 admission uses `limit` as the
-startup reservation.
+for new work. Persisted allocation limits and provider-effective budgets are current
+schema 3 facts; no older allocation or claim format is read or reconstructed.
 
 ## Redis schema and recovery
 
@@ -54,9 +53,9 @@ headroom, startup reservations, final admission availability, observation state 
 primary/auxiliary startup counts. Claim hashes retain ownership and declared limits.
 Claims with `starting=0` do not reduce admission availability.
 
-The Worker accepts schema 2 and schema 3 during rolling upgrades. Schema 2 keeps its
-legacy budget behavior until that Runner upgrades. A schema 3 Runner pauses admission,
-owns the execution domain, compares PostgreSQL allocations with provider resources and
+The Worker accepts only capacity registration schema 3. Any other schema is rejected.
+A current Runner pauses admission, owns
+the execution domain, compares PostgreSQL allocations with provider resources and
 rebuilds Redis before becoming Ready:
 
 - `Provisioning` restores a full startup reservation.
@@ -64,8 +63,10 @@ rebuilds Redis before becoming Ready:
 - `Failed` resources retain ownership until cleanup.
 - absent or stale Redis claims are removed during reconciliation.
 
-Existing provider resources are never recreated or stopped by the capacity upgrade.
-Queued Runtime rows remain PostgreSQL facts and are retried by the Singular Agent.
+Recovery assumes current PostgreSQL allocation documents and current provider labels.
+Old Redis claims, old Runner registrations and old allocation documents must be deleted
+before starting this version. Queued Runtime rows remain PostgreSQL facts and are
+retried by the Singular Agent.
 
 ## Monitoring contract
 

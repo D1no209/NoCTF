@@ -505,7 +505,7 @@ export type NoCtfapiEndpointsGameplayFactsGameplayFactStateProtocol = 'Pending' 
 
 export type NoCtfapiEndpointsGameplayFactsGameplayFactResultProtocol = 'Correct' | 'Wrong' | 'Duplicate' | 'AttemptsExhausted' | 'Rejected' | 'Unlocked' | 'Applied' | 'ServiceUp' | 'ServiceDown' | 'Controlled' | 'Uncontrolled';
 
-export type NoCtfapiEndpointsGameplayFactsGameplayFactFailureCodeProtocol = 'FlagNotSupported' | 'FixNotSupported' | 'BreakAttemptsExhausted' | 'FixAttemptsExhausted' | 'BreakRequired' | 'ArchiveValidationUnavailable' | 'FixArchiveMissing' | 'FixArchiveLengthMismatch' | 'FixArchiveContentTypeMismatch' | 'FixArchiveHashMismatch' | 'StorageTimeout' | 'StorageUnavailable' | 'CheckerPlatformError' | 'SelfAttackRejected' | 'DuplicateAttack' | 'DuplicateAchievement' | 'UnknownTeamIdentifier' | 'InvalidObservation' | 'ProducerTimeout' | 'ProducerUnavailable' | 'AmbiguousFlagMatch' | 'FlagExpired' | 'RoundOutOfRange' | 'HardeningActive' | 'AwdpExploitSucceeded' | 'AwdpPatchFailed' | 'AwdpPatchTimeout' | 'AwdpServiceAbnormal' | 'AwdpPlatformFailed' | 'AwdpViolation' | 'ForeignTeamFlagDetected' | 'InsufficientScore' | 'HintUnavailable' | 'PatchStillExploitable' | 'PatchExecutionFailed' | 'PatchServiceAbnormal' | 'PatchVerificationPlatformFailed';
+export type NoCtfapiEndpointsGameplayFactsGameplayFactFailureCodeProtocol = 'FlagNotSupported' | 'FixNotSupported' | 'BreakAttemptsExhausted' | 'FixAttemptsExhausted' | 'BreakRequired' | 'ArchiveValidationUnavailable' | 'FixArchiveMissing' | 'FixArchiveLengthMismatch' | 'FixArchiveContentTypeMismatch' | 'FixArchiveHashMismatch' | 'StorageTimeout' | 'StorageUnavailable' | 'CheckerPlatformError' | 'SelfAttackRejected' | 'DuplicateAttack' | 'DuplicateAchievement' | 'UnknownTeamIdentifier' | 'InvalidObservation' | 'ProducerTimeout' | 'ProducerUnavailable' | 'AmbiguousFlagMatch' | 'FlagExpired' | 'RoundOutOfRange' | 'HardeningActive' | 'AwdpExploitSucceeded' | 'AwdpPatchFailed' | 'AwdpPatchTimeout' | 'AwdpServiceAbnormal' | 'AwdpPlatformFailed' | 'ForeignTeamFlagDetected' | 'InsufficientScore' | 'HintUnavailable' | 'PatchStillExploitable' | 'PatchExecutionFailed' | 'PatchServiceAbnormal' | 'PatchVerificationPlatformFailed';
 
 export type NoCtfapiEndpointsGameplayFactsAwdpAchievementActivationResponse = {
     gameplayFactId?: string;
@@ -1687,13 +1687,13 @@ export type NoCtfApplicationRuntimeInstancesRuntimePublishedPortView = {
 export type NoCtfapiEndpointsAdministrationRuntimeAdminRuntimeAllocationResponse = {
     operationId?: string;
     kind?: NoCtfDomainRuntimeRuntimeWorkloadKind;
-    limit?: NoCtfapiEndpointsAdministrationPlatformRunnerResourceAmountResponse;
-    budget?: NoCtfapiEndpointsAdministrationPlatformRunnerResourceAmountResponse;
+    limit?: NoCtfapiEndpointsAdministrationRuntimeAdminRuntimeResourceAmountResponse;
+    budget?: NoCtfapiEndpointsAdministrationRuntimeAdminRuntimeResourceAmountResponse;
 };
 
 export type NoCtfDomainRuntimeRuntimeWorkloadKind = 0 | 1 | 2 | 3 | 4;
 
-export type NoCtfapiEndpointsAdministrationPlatformRunnerResourceAmountResponse = {
+export type NoCtfapiEndpointsAdministrationRuntimeAdminRuntimeResourceAmountResponse = {
     memoryBytes?: number;
     nanoCpus?: number;
     pidsLimit?: number;
@@ -1946,117 +1946,6 @@ export type NoCtfapiEndpointsAdministrationPlatformPlatformInformationResponse =
 export type NoCtfapiEndpointsAdministrationPlatformPlatformContributorResponse = {
     id?: string;
     avatarUrl?: string;
-};
-
-export type NoCtfapiEndpointsAdministrationPlatformPlatformMonitoringResponse = {
-    status?: NoCtfApplicationAdministrationMonitoringPlatformMonitoringStatus;
-    prometheusAvailable?: boolean;
-    natsAvailable?: boolean;
-    capturedAt?: string;
-    dashboardUrl?: string | null;
-    metrics?: Array<NoCtfapiEndpointsAdministrationPlatformPlatformMonitoringMetricResponse>;
-    latencyDetails?: Array<NoCtfApplicationAdministrationMonitoringPlatformMonitoringLatencyView>;
-    poolResources?: Array<NoCtfApplicationAdministrationMonitoringPlatformMonitoringPoolResource>;
-    latencySustainedWindowMinutes?: number;
-    humanVerification?: NoCtfapiEndpointsAdministrationPlatformHumanVerificationMonitoringResponse;
-    capacity?: NoCtfapiEndpointsAdministrationPlatformRunnerCapacityReportResponse | null;
-};
-
-export type NoCtfApplicationAdministrationMonitoringPlatformMonitoringStatus = 0 | 1 | 2 | 3 | 4 | 5 | 6;
-
-export type NoCtfapiEndpointsAdministrationPlatformPlatformMonitoringMetricResponse = {
-    kind?: NoCtfApplicationAdministrationMonitoringPlatformMonitoringMetricKind;
-    unit?: NoCtfApplicationAdministrationMonitoringPlatformMonitoringUnit;
-    value?: number | null;
-    status?: NoCtfApplicationAdministrationMonitoringPlatformMonitoringStatus;
-    sampleCount?: number | null;
-    minimumSamples?: number | null;
-    windowSeconds?: number | null;
-};
-
-export type NoCtfApplicationAdministrationMonitoringPlatformMonitoringMetricKind = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12 | 13 | 14 | 15 | 16 | 17 | 18 | 19 | 20 | 21 | 22 | 23 | 24 | 25 | 26 | 27 | 28 | 29;
-
-export type NoCtfApplicationAdministrationMonitoringPlatformMonitoringUnit = 0 | 1 | 2 | 3 | 4;
-
-export type NoCtfApplicationAdministrationMonitoringPlatformMonitoringLatencyView = {
-    kind?: NoCtfApplicationAdministrationMonitoringPlatformMonitoringLatencyKind;
-    endpoint?: string;
-    p95Milliseconds?: number | null;
-    p99Milliseconds?: number | null;
-    meanMilliseconds?: number | null;
-    requestsPerSecond?: number | null;
-    errorPercent?: number | null;
-    sampleCount?: number | null;
-    minimumSamples?: number;
-    windowSeconds?: number;
-    status?: NoCtfApplicationAdministrationMonitoringPlatformMonitoringStatus;
-};
-
-export type NoCtfApplicationAdministrationMonitoringPlatformMonitoringLatencyKind = 0 | 1 | 2 | 3 | 4;
-
-export type NoCtfApplicationAdministrationMonitoringPlatformMonitoringPoolResource = {
-    pool?: string;
-    resource?: NoCtfApplicationAdministrationMonitoringPlatformMonitoringResource;
-    available?: number | null;
-    total?: number | null;
-    onlineRunners?: number | null;
-};
-
-export type NoCtfApplicationAdministrationMonitoringPlatformMonitoringResource = 0 | 1 | 2;
-
-export type NoCtfapiEndpointsAdministrationPlatformHumanVerificationMonitoringResponse = {
-    provider?: NoCtfDomainPlatformHumanVerificationProvider;
-    enabled?: boolean;
-    state?: NoCtfApplicationAdmissionHumanVerificationMonitoringState;
-    checkedAt?: string | null;
-    latencyMilliseconds?: number | null;
-};
-
-export type NoCtfDomainPlatformHumanVerificationProvider = 0 | 1 | 2;
-
-export type NoCtfApplicationAdmissionHumanVerificationMonitoringState = 0 | 1 | 2 | 3 | 4;
-
-export type NoCtfapiEndpointsAdministrationPlatformRunnerCapacityReportResponse = {
-    available?: boolean;
-    runners?: Array<NoCtfapiEndpointsAdministrationPlatformRunnerCapacitySnapshotResponse>;
-    truncated?: boolean;
-};
-
-export type NoCtfapiEndpointsAdministrationPlatformRunnerCapacitySnapshotResponse = {
-    runnerId?: string;
-    alive?: boolean;
-    state?: NoCtfapiEndpointsRuntimeRunnerAdmissionStateProtocol;
-    failure?: NoCtfapiEndpointsRuntimeRunnerAdmissionFailureProtocol | null;
-    observedTotal?: NoCtfapiEndpointsAdministrationPlatformRunnerObservedResourceAmountResponse | null;
-    observedAvailable?: NoCtfapiEndpointsAdministrationPlatformRunnerObservedResourceAmountResponse | null;
-    safetyHeadroom?: NoCtfapiEndpointsAdministrationPlatformRunnerObservedResourceAmountResponse | null;
-    startupReserved?: NoCtfapiEndpointsAdministrationPlatformRunnerObservedResourceAmountResponse | null;
-    admissionAvailable?: NoCtfapiEndpointsAdministrationPlatformRunnerObservedResourceAmountResponse | null;
-    declaredLimits?: NoCtfapiEndpointsAdministrationPlatformRunnerResourceAmountResponse | null;
-    observation?: NoCtfapiEndpointsAdministrationPlatformRunnerObservationResponse | null;
-    startingPrimary?: number | null;
-    startingAuxiliary?: number | null;
-};
-
-export type NoCtfapiEndpointsRuntimeRunnerAdmissionStateProtocol = 'Starting' | 'Reconciling' | 'Ready' | 'PressureBlocked' | 'ProviderUnavailable' | 'Draining';
-
-export type NoCtfapiEndpointsAdministrationPlatformRunnerObservedResourceAmountResponse = {
-    memoryBytes?: number;
-    nanoCpus?: number;
-    pidsLimit?: number | null;
-};
-
-export type NoCtfapiEndpointsAdministrationPlatformRunnerObservationResponse = {
-    observedAt?: string;
-    cpuUsageRatio?: number;
-    memoryTotalBytes?: number;
-    memoryAvailableBytes?: number;
-    nanoCpus?: number;
-    pidsUsed?: number | null;
-    pidsCapacity?: number | null;
-    oomKills?: number;
-    providerPressure?: boolean;
-    pidPressureConditionAvailable?: boolean;
 };
 
 export type NoCtfapiEndpointsAdministrationPlatformPlatformUserDetailResponse = {
@@ -2392,7 +2281,7 @@ export type NoCtfapiEndpointsAdministrationGameplayFactsHistoricalAdjudicationDi
     classification?: NoCtfapiEndpointsAdministrationGameplayFactsAdjudicationFindingClassificationProtocol;
 };
 
-export type NoCtfapiEndpointsAdministrationGameplayFactsAdjudicationDifferenceKindProtocol = 'CurrentCorrectShouldBeDuplicate' | 'CurrentDuplicateShouldBeCorrect' | 'DuplicateWithoutCurrentPredecessor' | 'HistoricalResultChanged' | 'MissingAdjudicationRecord' | 'TeamEligibilityHistoryRequiresReview' | 'MissingBloodAward' | 'UnexpectedBloodAward' | 'WrongBloodRank' | 'DuplicateBloodAward';
+export type NoCtfapiEndpointsAdministrationGameplayFactsAdjudicationDifferenceKindProtocol = 'CurrentCorrectShouldBeDuplicate' | 'DuplicateWithoutCurrentPredecessor' | 'HistoricalResultChanged' | 'MissingAdjudicationRecord' | 'TeamEligibilityHistoryRequiresReview' | 'MissingBloodAward' | 'UnexpectedBloodAward' | 'WrongBloodRank' | 'DuplicateBloodAward';
 
 export type NoCtfapiEndpointsAdministrationGameplayFactsAdjudicationDifferenceCertaintyProtocol = 'Deterministic' | 'NeedsReview';
 
@@ -7816,33 +7705,6 @@ export type AdminPlatformGetInformationResponses = {
 };
 
 export type AdminPlatformGetInformationResponse = AdminPlatformGetInformationResponses[keyof AdminPlatformGetInformationResponses];
-
-export type AdminPlatformGetMonitoringData = {
-    body?: never;
-    path?: never;
-    query?: never;
-    url: '/api/v1/admin/platform/monitoring';
-};
-
-export type AdminPlatformGetMonitoringErrors = {
-    /**
-     * Unauthorized
-     */
-    401: unknown;
-    /**
-     * Forbidden
-     */
-    403: unknown;
-};
-
-export type AdminPlatformGetMonitoringResponses = {
-    /**
-     * Success
-     */
-    200: NoCtfapiEndpointsAdministrationPlatformPlatformMonitoringResponse;
-};
-
-export type AdminPlatformGetMonitoringResponse = AdminPlatformGetMonitoringResponses[keyof AdminPlatformGetMonitoringResponses];
 
 export type AdminGetPrivatePlatformUserData = {
     body?: never;

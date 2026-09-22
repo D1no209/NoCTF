@@ -349,7 +349,7 @@ public sealed class ComposeRuntimeDefinitionPolicyTests
     }
 
     [Test]
-    public async Task Kubernetes_accepts_legacy_matching_PID_fields_and_removes_them()
+    public async Task Kubernetes_rejects_author_supplied_PID_and_deploy_fields()
     {
         var request = KubernetesRequest(
             """
@@ -363,17 +363,19 @@ public sealed class ComposeRuntimeDefinitionPolicyTests
                       pids: 512
             """);
 
-        var prepared = ComposeRuntimeDefinitionPolicy.PrepareForKubernetes(
+        var action = () => ComposeRuntimeDefinitionPolicy.PrepareForKubernetes(
             request,
             podPidsLimit: 512);
-        var web = Mapping(Mapping(Load(prepared), "services"), "web");
 
-        await Assert.That(web.Children.ContainsKey(new YamlScalarNode("pids_limit"))).IsFalse();
-        await Assert.That(web.Children.ContainsKey(new YamlScalarNode("deploy"))).IsFalse();
+        var exception = await Assert.That(action).Throws<InvalidOperationException>();
+        await Assert.That(exception!.Message)
+            .Contains("must declare PID limits through ServiceResources, not pids_limit");
+        await Assert.That(exception.Message)
+            .Contains("must not declare deploy; resources and replicas are platform-owned");
     }
 
     [Test]
-    public async Task Kubernetes_accepts_one_replica_and_removes_the_deploy_field()
+    public async Task Kubernetes_rejects_author_supplied_single_replica()
     {
         var request = KubernetesRequest(
             """
@@ -384,16 +386,17 @@ public sealed class ComposeRuntimeDefinitionPolicyTests
                   replicas: 1
             """);
 
-        var prepared = ComposeRuntimeDefinitionPolicy.PrepareForKubernetes(
+        var action = () => ComposeRuntimeDefinitionPolicy.PrepareForKubernetes(
             request,
             podPidsLimit: 512);
-        var web = Mapping(Mapping(Load(prepared), "services"), "web");
 
-        await Assert.That(web.Children.ContainsKey(new YamlScalarNode("deploy"))).IsFalse();
+        var exception = await Assert.That(action).Throws<InvalidOperationException>();
+        await Assert.That(exception!.Message)
+            .Contains("must not declare deploy; resources and replicas are platform-owned");
     }
 
     [Test]
-    public async Task Kubernetes_rejects_more_than_one_replica()
+    public async Task Kubernetes_rejects_author_supplied_multiple_replicas()
     {
         var request = KubernetesRequest(
             """
@@ -409,11 +412,12 @@ public sealed class ComposeRuntimeDefinitionPolicyTests
             podPidsLimit: 512);
 
         var exception = await Assert.That(action).Throws<InvalidOperationException>();
-        await Assert.That(exception!.Message).Contains("must use exactly one replica");
+        await Assert.That(exception!.Message)
+            .Contains("must not declare deploy; resources and replicas are platform-owned");
     }
 
     [Test]
-    public async Task Kubernetes_rejects_a_legacy_PID_field_that_differs_from_the_pool()
+    public async Task Kubernetes_rejects_author_supplied_PID_field()
     {
         var request = KubernetesRequest(
             """
@@ -429,7 +433,7 @@ public sealed class ComposeRuntimeDefinitionPolicyTests
 
         var exception = await Assert.That(action).Throws<InvalidOperationException>();
         await Assert.That(exception!.Message)
-            .Contains("declares a PID limit that differs from the platform limit");
+            .Contains("must declare PID limits through ServiceResources, not pids_limit");
     }
 
     [Arguments("web_api")]

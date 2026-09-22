@@ -106,7 +106,7 @@ public sealed class AwdpAttackRuntimePersistenceTests
 
     [Test]
     [Timeout(300_000)]
-    public async Task Attack_provisioning_accepts_worker_injected_flag_without_legacy_flag_injection(
+    public async Task Attack_provisioning_accepts_worker_injected_flag(
         CancellationToken cancellationToken)
     {
         await DockerIntegrationTest.RunAsync(async () =>
@@ -387,7 +387,7 @@ public sealed class AwdpAttackRuntimePersistenceTests
                     "runner-1",
                     RuntimeProvider.Docker,
                     "{}",
-                    ["nc 127.0.0.1 30000"],
+                    [new RuntimeAccessEndpointMapping(0, "nc 127.0.0.1 30000", null, null)],
                     fixture.Now.AddMinutes(30),
                     [new RuntimePublishedPortMapping(null, 31337, 30000)]),
                 db,
@@ -397,7 +397,8 @@ public sealed class AwdpAttackRuntimePersistenceTests
             var provisioned = await db.RuntimeInstances.AsNoTracking().SingleAsync(
                 item => item.Id == runtime.Id,
                 cancellationToken);
-            await Assert.That(provisioned.Urls).IsEquivalentTo(["nc 127.0.0.1 30000"]);
+            await Assert.That(provisioned.AccessEndpoints.Select(endpoint => endpoint.DirectAddress).OfType<string>())
+                .IsEquivalentTo(["nc 127.0.0.1 30000"]);
             var reactivated = await db.ChallengeFlags.AsNoTracking().SingleAsync(
                 item => item.Id == flag.Id,
                 cancellationToken);
@@ -683,7 +684,7 @@ public sealed class AwdpAttackRuntimePersistenceTests
             "runner-1",
             RuntimeProvider.Docker,
             "{}",
-            ["tcp://127.0.0.1:30000"],
+            [new RuntimeAccessEndpointMapping(0, "tcp://127.0.0.1:30000", null, null)],
             DateTimeOffset.UtcNow.AddMinutes(15),
             [new RuntimePublishedPortMapping(null, 31337, 30000)]),
             db,
@@ -758,6 +759,7 @@ public sealed class AwdpAttackRuntimePersistenceTests
                     new ContainerRuntimeDefinition(
                         "awdp-target:latest",
                         PortMappings: new Dictionary<int, int> { [31337] = 0 },
+                        Security: new(false, false, false, ["ALL"], []),
                         FlagEnvironmentVariableName: "FLAG",
                         InternalPorts: [31337]),
                     new RuntimeResourceLimits(64 * 1024 * 1024, 100_000_000, 64),

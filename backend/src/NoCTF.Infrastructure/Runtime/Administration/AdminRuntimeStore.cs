@@ -73,7 +73,7 @@ public sealed class AdminRuntimeStore(
         var items = await ordered.Skip(offset).Take(limit)
             .Select(item => new RuntimeInstanceView(
                 item.Id, item.CompetitionId, item.CompetitionChallengeId, item.ChallengeId, item.TeamId,
-                item.Purpose, item.RuntimeKind, item.RuntimeProvider, item.State, item.FailureCode, item.Urls,
+                item.Purpose, item.RuntimeKind, item.RuntimeProvider, item.State, item.FailureCode,
                 item.CreatedAt, item.RunningAt, item.ExpiresAt, item.StoppedAt, item.RunnerId,
                 item.PublishedPorts.OrderBy(port => port.ServiceName).ThenBy(port => port.ContainerPort)
                     .Select(port => new RuntimePublishedPortView(port.ServiceName, port.ContainerPort, port.HostPort)).ToArray(),
@@ -136,7 +136,7 @@ public sealed class AdminRuntimeStore(
             .Select(item => new RuntimeInstanceView(
                 item.Id, item.CompetitionId, item.CompetitionChallengeId, item.ChallengeId, item.TeamId,
                 item.Purpose, item.RuntimeKind, item.RuntimeProvider,
-                item.State, item.FailureCode, item.Urls,
+                item.State, item.FailureCode,
                 item.CreatedAt, item.RunningAt, item.ExpiresAt, item.StoppedAt,
                 item.RunnerId,
                 item.PublishedPorts
@@ -211,7 +211,7 @@ public sealed class AdminRuntimeStore(
             : query.OrderBy(item => item.CreatedAt).ThenBy(item => item.Id);
         var items = await ordered.Skip(offset).Take(limit).Select(item => new RuntimeInstanceView(
             item.Id, item.CompetitionId, item.CompetitionChallengeId, item.ChallengeId, item.TeamId,
-            item.Purpose, item.RuntimeKind, item.RuntimeProvider, item.State, item.FailureCode, item.Urls,
+            item.Purpose, item.RuntimeKind, item.RuntimeProvider, item.State, item.FailureCode,
             item.CreatedAt, item.RunningAt, item.ExpiresAt, item.StoppedAt, item.RunnerId,
             item.PublishedPorts.OrderBy(port => port.ServiceName).ThenBy(port => port.ContainerPort)
                 .Select(port => new RuntimePublishedPortView(port.ServiceName, port.ContainerPort, port.HostPort)).ToArray(),
@@ -318,7 +318,7 @@ public sealed class AdminRuntimeStore(
             .Select(item => new RuntimeInstanceView(
                 item.Id, item.CompetitionId, item.CompetitionChallengeId, item.ChallengeId, item.TeamId,
                 item.Purpose, item.RuntimeKind, item.RuntimeProvider,
-                item.State, item.FailureCode, item.Urls,
+                item.State, item.FailureCode,
                 item.CreatedAt, item.RunningAt, item.ExpiresAt, item.StoppedAt,
                 item.RunnerId,
                 item.PublishedPorts
@@ -440,7 +440,7 @@ public sealed class AdminRuntimeStore(
             .Select(item => new RuntimeInstanceView(
                 item.Id, item.CompetitionId, item.CompetitionChallengeId, item.ChallengeId, item.TeamId,
                 item.Purpose, item.RuntimeKind, item.RuntimeProvider,
-                item.State, item.FailureCode, item.Urls,
+                item.State, item.FailureCode,
                 item.CreatedAt, item.RunningAt, item.ExpiresAt, item.StoppedAt,
                 item.RunnerId,
                 item.PublishedPorts
@@ -1107,7 +1107,7 @@ public sealed class AdminRuntimeStore(
         new(
             item.Id, item.CompetitionId, item.CompetitionChallengeId, item.ChallengeId, item.TeamId,
             item.Purpose, item.RuntimeKind, item.RuntimeProvider,
-            item.State, item.FailureCode, item.Urls,
+            item.State, item.FailureCode,
             item.CreatedAt, item.RunningAt, item.ExpiresAt, item.StoppedAt,
             item.RunnerId,
             item.PublishedPorts

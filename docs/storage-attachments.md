@@ -48,7 +48,10 @@ Runner 在消费后再次验证 Hash/长度/格式并安全解包，拒绝绝对
 
 ## FluentStorage 切换
 
-本次切换不迁移旧数据库和旧对象，也没有双读、fallback 或 `.metadata` 旁车兼容逻辑。发布时必须先停服，人工清空 PostgreSQL（包括 Wolverine schema）以及对应 bucket/local root，再以空数据库和空对象存储启动。应用启动不会自动执行这些破坏性操作，且本次切换不产生 EF migration。
+当前版本没有旧存储格式双读、fallback 或 `.metadata` 旁车兼容逻辑。新安装直接从唯一
+`InitialBaseline` 创建结构。已有部署若保留当前格式对象，必须在停服窗口由运维先完成数据库
+规范化与迁移基线重置；否则应清空 PostgreSQL、Wolverine、Redis 与对象存储后重建。
+应用不会自动猜测或转换旧对象元数据。
 
 平台进程不实现备份与恢复 API；外部运维使用统一加密恢复点备份 PostgreSQL、Wolverine schema
 和对象内容/元数据，具体停写、校验与隔离恢复流程见 [备份恢复](backup-recovery.md)。

@@ -46,8 +46,7 @@ public sealed class ListRuntimeTargetsEndpoint(
                     ? RuntimeAccessMapping.ToResponse(
                         runtimeInstanceId,
                         item.AccessMode,
-                        item.Urls,
-                        item.AccessEndpoints,
+                        item.AccessEndpoints ?? [],
                         HttpContext.Request)
                     : [])).ToArray()));
     }

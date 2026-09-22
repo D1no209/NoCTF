@@ -113,9 +113,8 @@ public sealed class PersistedRunnerCapacityGate(
         if (runtime is null)
             return RunnerCapacityReleaseOutcome.RecoveryRequired;
         var primary = runtime.CapacityAllocations.Items.SingleOrDefault(item => !item.Identity.IsAuxiliary);
-        // Legacy claims require provider reconciliation; never guess an amount from current template definitions.
         return primary is null
-            ? await redis.ReleaseAsync(runtimeId, runnerId, ct)
+            ? RunnerCapacityReleaseOutcome.RecoveryRequired
             : await ReleaseWorkloadAsync(primary.Identity, runnerId, ct);
     }
 

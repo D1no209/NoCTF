@@ -70,7 +70,7 @@ internal static class NormalizedScoreboardProjection
 
     public static ScoreboardProjection Project(
         LeaderboardProjectionInput input,
-        LeaderboardProjectionResult legacy)
+        LeaderboardAggregateProjection aggregate)
     {
         var projectedAt = input.ProjectedAt
             ?? throw new InvalidOperationException("Leaderboard projection time is required.");
@@ -103,7 +103,7 @@ internal static class NormalizedScoreboardProjection
                 challenge.Order,
                 challenge.IsPublished)).ToArray());
 
-        var roundProjection = BuildRounds(scoreboardInput, legacy, projectedAt);
+        var roundProjection = BuildRounds(scoreboardInput, aggregate, projectedAt);
         var columns = BuildColumns(input.Mode, challenges, roundProjection.Rounds);
         var schemaRevision = ScoreboardRevision.ForSchema(roundProjection.Rounds, columns);
         var schema = new ScoreboardSchema(
@@ -142,7 +142,7 @@ internal static class NormalizedScoreboardProjection
         switch (input.Mode)
         {
             case GameMode.Ctf:
-                ProjectCtf(scoreboardInput, legacy, challengeById, columnsByKey, actorIndexes, accumulators);
+                ProjectCtf(scoreboardInput, aggregate, challengeById, columnsByKey, actorIndexes, accumulators);
                 break;
             case GameMode.Awd:
                 ProjectAwd(scoreboardInput, challengeById, columnsByKey, roundById, actorIndexes, accumulators);
@@ -157,13 +157,13 @@ internal static class NormalizedScoreboardProjection
                     accumulators);
                 break;
             case GameMode.Koh:
-                ProjectKoh(scoreboardInput, legacy, columnsByKey, actorIndexes, accumulators);
+                ProjectKoh(scoreboardInput, aggregate, columnsByKey, actorIndexes, accumulators);
                 break;
             default:
                 throw new ArgumentOutOfRangeException(nameof(input), input.Mode, "Unsupported game mode.");
         }
 
-        var legacyByTeam = legacy.Entries.ToDictionary(entry => entry.TeamId);
+        var aggregateByTeam = aggregate.Entries.ToDictionary(entry => entry.TeamId);
         var slotsByTeam = accumulators
             .GroupBy(pair => pair.Key.TeamId)
             .ToDictionary(
@@ -192,7 +192,7 @@ internal static class NormalizedScoreboardProjection
                 item.Accumulator.Allocate(team.Id, item.Slot)));
             var slotNet = compactSlots.Aggregate(0L, (total, slot) =>
                 checked(total + slot.NetPoints.GetValueOrDefault()));
-            legacyByTeam.TryGetValue(team.Id, out var legacyRow);
+            aggregateByTeam.TryGetValue(team.Id, out var aggregateRow);
             var globalAdjustmentSummary = globalAdjustmentsByTeam.GetValueOrDefault(team.Id)
                 ?? GlobalAdjustmentSummary.Empty;
             var allGlobalAdjustments = globalAdjustmentSummary.Adjustments;
@@ -200,19 +200,19 @@ internal static class NormalizedScoreboardProjection
                 checked(total + adjustment.NetPoints));
             var usesRoundWindow = scoreboardInput.Mode is GameMode.Awd or GameMode.Awdp;
             var totalScore = usesRoundWindow
-                ? legacyRow?.Score ?? 0
+                ? aggregateRow?.Score ?? 0
                 : checked(slotNet + globalAdjustmentNet);
             var scoreOutsideWindow = usesRoundWindow
                 ? checked(totalScore - slotNet - globalAdjustmentNet)
                 : 0;
             var attackScore = scoreboardInput.Mode == GameMode.Awdp
-                ? legacyRow?.AttackScore ?? 0
+                ? aggregateRow?.AttackScore ?? 0
                 : (long?)null;
             var defenseScore = scoreboardInput.Mode == GameMode.Awdp
-                ? legacyRow?.DefenseScore ?? 0
+                ? aggregateRow?.DefenseScore ?? 0
                 : (long?)null;
-            var challengeScores = scoreboardInput.Mode == GameMode.Awdp && legacyRow is not null
-                ? legacyRow.Cells
+            var challengeScores = scoreboardInput.Mode == GameMode.Awdp && aggregateRow is not null
+                ? aggregateRow.Cells
                     .OrderBy(cell => cell.CompetitionChallengeId)
                     .Select(cell => new ScoreboardChallengeScore(
                         cell.CompetitionChallengeId,
@@ -243,7 +243,7 @@ internal static class NormalizedScoreboardProjection
                 team.Id,
                 team.Name,
                 team.TrackKey,
-                legacyRow?.Rank,
+                aggregateRow?.Rank,
                 team.IsBanned
                     ? ScoreboardRankingState.Banned
                     : team.IsDeleted || !team.AffectsCompetitiveResults
@@ -286,7 +286,7 @@ internal static class NormalizedScoreboardProjection
         {
             DataScope = LeaderboardDataScope.Live,
             DataAsOf = projectedAt,
-            CurrentChallengeScores = legacy.Challenges
+            CurrentChallengeScores = aggregate.Challenges
                 .OrderBy(challenge => challenge.CompetitionChallengeId)
                 .Select(challenge => new ScoreboardCurrentChallengeScore(
                     challenge.CompetitionChallengeId,
@@ -406,7 +406,7 @@ internal static class NormalizedScoreboardProjection
 
     private static RoundProjection BuildRounds(
         LeaderboardProjectionInput input,
-        LeaderboardProjectionResult legacy,
+        LeaderboardAggregateProjection aggregate,
         DateTimeOffset projectedAt)
     {
         if (input.Mode is GameMode.Ctf or GameMode.Koh)
@@ -445,10 +445,10 @@ internal static class NormalizedScoreboardProjection
                 input.ScoreboardLatestRound ?? (facts.Length == 0 ? null : awdWindowEnd));
         }
 
-        var duration = legacy.RoundDurationSeconds.GetValueOrDefault(300);
+        var duration = aggregate.RoundDurationSeconds.GetValueOrDefault(300);
         var runningTimeline = AwdEffectiveRunningClock.CreateTimeline(input.LifecycleAudits ?? []);
-        var currentRound = Math.Max(1, legacy.CurrentRound.GetValueOrDefault(1));
-        var settledThrough = Math.Max(0, legacy.SettledThroughRound.GetValueOrDefault());
+        var currentRound = Math.Max(1, aggregate.CurrentRound.GetValueOrDefault(1));
+        var settledThrough = Math.Max(0, aggregate.SettledThroughRound.GetValueOrDefault());
         var lastRound = Math.Max(currentRound, settledThrough);
         var windowEnd = Math.Clamp(input.ScoreboardRoundWindowEnd ?? lastRound, 1, lastRound);
         var windowStart = Math.Max(1, windowEnd - ScoreboardRoundWindow.DefaultSize + 1);
@@ -460,7 +460,7 @@ internal static class NormalizedScoreboardProjection
                 runningTimeline,
                 TimeSpan.FromSeconds((long)(number - 1) * duration));
             var end = number == currentRound && input.CompetitionStatus == CompetitionStatus.Paused
-                ? projectedAt.AddSeconds(Math.Max(0, legacy.CurrentRoundRemainingSeconds.GetValueOrDefault()))
+                ? projectedAt.AddSeconds(Math.Max(0, aggregate.CurrentRoundRemainingSeconds.GetValueOrDefault()))
                 : EffectiveClockToWallTime(
                     input,
                     runningTimeline,
@@ -488,13 +488,13 @@ internal static class NormalizedScoreboardProjection
 
     private static void ProjectCtf(
         LeaderboardProjectionInput input,
-        LeaderboardProjectionResult legacy,
+        LeaderboardAggregateProjection aggregate,
         IReadOnlyDictionary<Guid, LeaderboardChallengeFact> challenges,
         IReadOnlyDictionary<(Guid ChallengeId, Guid? RoundId), ScoreboardColumn> columns,
         IReadOnlyDictionary<Guid, int> actorIndexes,
         IDictionary<(Guid TeamId, int ColumnIndex), SlotAccumulator> slots)
     {
-        var legacyCells = legacy.Entries
+        var aggregateCells = aggregate.Entries
             .SelectMany(entry => entry.Cells.Select(cell => (entry.TeamId, Cell: cell)))
             .ToDictionary(item => (item.TeamId, item.Cell.CompetitionChallengeId), item => item.Cell);
         var factsByCell = input.GameplayFacts
@@ -506,7 +506,7 @@ internal static class NormalizedScoreboardProjection
         var challengeConfigurations = challenges.ToDictionary(
             pair => pair.Key,
             pair => ParseCtfChallenge(pair.Value.ConfigurationJson));
-        var currentScores = legacy.Challenges.ToDictionary(
+        var currentScores = aggregate.Challenges.ToDictionary(
             challenge => challenge.CompetitionChallengeId,
             challenge => challenge.CurrentScore);
 
@@ -514,7 +514,7 @@ internal static class NormalizedScoreboardProjection
         {
             var column = columns[(group.Key.Item2, null)];
             var slot = GetSlot(slots, group.Key.Item1, column, null);
-            legacyCells.TryGetValue(group.Key, out var legacyCell);
+            aggregateCells.TryGetValue(group.Key, out var aggregateCell);
             var challengeConfiguration = challengeConfigurations[group.Key.Item2];
             var interactionKind = challenges[group.Key.Item2].InteractionKind;
             var expectedKind = interactionKind == CtfInteractionKind.PatchVerification
@@ -526,7 +526,7 @@ internal static class NormalizedScoreboardProjection
                     && fact.Result == GameplayFactResult.Applied)
                 .Aggregate(0L, (total, fact) => checked(total
                     + ProjectionPenalties.ParseDelta(fact.Value) * fact.Multiplicity));
-            var solvePoints = checked((legacyCell?.Score ?? 0) - manualTotal);
+            var solvePoints = checked((aggregateCell?.Score ?? 0) - manualTotal);
             var firstCorrect = group
                 .Where(fact => fact.Kind == expectedKind
                     && fact.Result == GameplayFactResult.Correct)
@@ -546,7 +546,7 @@ internal static class NormalizedScoreboardProjection
                                 ? checked(wrongPenalty * fact.Multiplicity)
                                 : 0L;
                             var earned = isAwardedSolve ? Math.Max(0, solvePoints) : 0L;
-                            var award = isAwardedSolve ? AwardFrom(legacyCell?.BloodRank) : null;
+                            var award = isAwardedSolve ? AwardFrom(aggregateCell?.BloodRank) : null;
                             var basePoints = currentScores.GetValueOrDefault(group.Key.Item2) ?? earned;
                             var awardPoints = award is null ? 0L : Math.Max(0, earned - basePoints);
                             slot.AddFact(
@@ -925,12 +925,12 @@ internal static class NormalizedScoreboardProjection
 
     private static void ProjectKoh(
         LeaderboardProjectionInput input,
-        LeaderboardProjectionResult legacy,
+        LeaderboardAggregateProjection aggregate,
         IReadOnlyDictionary<(Guid ChallengeId, Guid? RoundId), ScoreboardColumn> columns,
         IReadOnlyDictionary<Guid, int> actorIndexes,
         IDictionary<(Guid TeamId, int ColumnIndex), SlotAccumulator> slots)
     {
-        var legacyCells = legacy.Entries
+        var aggregateCells = aggregate.Entries
             .SelectMany(entry => entry.Cells.Select(cell => (entry.TeamId, Cell: cell)))
             .ToDictionary(item => (item.TeamId, item.Cell.CompetitionChallengeId), item => item.Cell);
         foreach (var group in input.GameplayFacts
@@ -958,7 +958,7 @@ internal static class NormalizedScoreboardProjection
                     manual = checked(manual
                         + ProjectionPenalties.ParseDelta(fact.Value) * fact.Multiplicity);
             }
-            var control = checked((legacyCells.GetValueOrDefault(group.Key)?.Score ?? 0L) - manual);
+            var control = checked((aggregateCells.GetValueOrDefault(group.Key)?.Score ?? 0L) - manual);
             slot.AddBreakdownScore(
                 ScoreboardBreakdownKind.Control,
                 Math.Max(0, control),
@@ -1139,7 +1139,10 @@ internal static class NormalizedScoreboardProjection
         {
             challenge = new(AwdpChallengeConfiguration.CurrentSchemaVersion, null, null, null, null, null);
         }
-        return AwdpConfigurationResolver.Resolve(competition, challenge);
+        return AwdpConfigurationResolver.Resolve(
+            competition,
+            challenge,
+            AwdpChallengeConfiguration.Empty);
     }
 
     private static long AwdpPenalty(

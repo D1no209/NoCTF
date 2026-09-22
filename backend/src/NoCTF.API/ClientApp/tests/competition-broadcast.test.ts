@@ -244,14 +244,10 @@ describe('competition administration entry', () => {
     expect(page).not.toContain('probeRole')
   })
 
-  test('creates competitions in a dialog and keeps the old page URL as a redirect', async () => {
+  test('creates competitions in the canonical dialog flow', async () => {
     const dialog = await sourceFile(
       new URL('../app/features/competitions/CreateCompetitionDialog.vue', import.meta.url),
     ).text()
-    const legacyRoute = await Bun.file(
-      new URL('../app/pages/admin/competitions/new.vue', import.meta.url),
-    ).text()
-
     expect(dialog).toContain('<Dialog :open="open" @update:open="setOpen">')
     expect(dialog).toContain('sm:max-w-3xl')
     expect(dialog).toContain('<FileUpload')
@@ -261,6 +257,5 @@ describe('competition administration entry', () => {
     expect(dialog).toContain('completeCreation()')
     expect(dialog).toContain('<ScrollSurface axis="y"')
     expect(dialog).not.toContain('navigateTo(`/admin/competitions/')
-    expect(legacyRoute).toContain("redirect: '/competitions?create=1'")
   })
 })

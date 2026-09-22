@@ -2,8 +2,6 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.EntityFrameworkCore.Infrastructure;
-using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Time.Testing;
 using NSubstitute;
@@ -46,101 +44,6 @@ namespace NoCTF.Tests.Integration.Persistence;
 [NotInParallel]
 public sealed class CompetitionPracticeModePersistenceTests
 {
-    [Test, Timeout(300_000)]
-    public async Task Generated_marker_removal_migration_preserves_existing_teams(
-        CancellationToken cancellationToken)
-    {
-        await DockerIntegrationTest.RunAsync(async () =>
-        {
-            await using var postgres = CreatePostgres("noctf_practice_migration");
-            await postgres.StartAsync(cancellationToken);
-            var options = Options(postgres);
-            await using var db = new NoCtfDbContext(options);
-            await db.GetService<IMigrator>().MigrateAsync(
-                "20260910145118_UserWallpaperPreferences",
-                cancellationToken);
-            // The current EF model includes columns added after this historical target.
-            // Add the current column only for seeding, then remove it so the generated
-            // migration under test still owns its schema transition.
-            await db.Database.ExecuteSqlRawAsync(
-                "ALTER TABLE competitions ADD COLUMN tracks_enabled boolean NOT NULL DEFAULT TRUE",
-                cancellationToken);
-            await db.Database.ExecuteSqlRawAsync(
-                "ALTER TABLE competitions ADD COLUMN access_mode smallint NOT NULL DEFAULT 0",
-                cancellationToken);
-            await db.Database.ExecuteSqlRawAsync(
-                "ALTER TABLE competitions ADD COLUMN write_up_submission_required boolean NOT NULL DEFAULT FALSE, ADD COLUMN write_up_submission_deadline_hours integer NOT NULL DEFAULT 0",
-                cancellationToken);
-            await db.Database.ExecuteSqlRawAsync(
-                "ALTER TABLE competitions ADD COLUMN webhook_configuration jsonb NOT NULL DEFAULT '{{\"schemaVersion\":1,\"targets\":[]}}'::jsonb",
-                cancellationToken);
-            await db.Database.ExecuteSqlRawAsync(
-                "ALTER TABLE competitions ADD COLUMN runtime_access_mode smallint NOT NULL DEFAULT 0, ADD COLUMN traffic_capture_enabled boolean NOT NULL DEFAULT FALSE, ADD COLUMN traffic_capture_limit_bytes bigint NULL",
-                cancellationToken);
-            await db.Database.ExecuteSqlRawAsync(
-                "ALTER TABLE teams ADD COLUMN write_up_file_id uuid NULL, ADD COLUMN write_up_submitted_at timestamp with time zone NULL, ADD COLUMN write_up_submitted_by_user_id uuid NULL",
-                cancellationToken);
-            await db.Database.ExecuteSqlRawAsync(
-                "ALTER TABLE users ADD COLUMN external_identity_bound_at timestamp with time zone NULL, ADD COLUMN external_identity_namespace varchar(512) NULL, ADD COLUMN external_identity_protocol smallint NULL, ADD COLUMN external_identity_provider_id uuid NULL, ADD COLUMN external_identity_subject varchar(255) NULL, ADD COLUMN profile_cover_file_id uuid NULL",
-                cancellationToken);
-            var now = DateTimeOffset.UtcNow;
-            var user = User(Guid.CreateVersion7(now), "migration-team-owner", now);
-            var competition = Competition(
-                Guid.CreateVersion7(now.AddTicks(1)),
-                user.Id,
-                now,
-                now.AddHours(-1));
-            db.Users.Add(user);
-            db.Competitions.Add(competition);
-            db.Teams.Add(Team(
-                Guid.CreateVersion7(now.AddTicks(2)),
-                competition.Id,
-                user.Id,
-                "Existing team",
-                now.AddHours(-2)));
-            await db.SaveChangesAsync(cancellationToken);
-            await db.Database.ExecuteSqlRawAsync(
-                "ALTER TABLE competitions DROP COLUMN tracks_enabled",
-                cancellationToken);
-            await db.Database.ExecuteSqlRawAsync(
-                "ALTER TABLE competitions DROP COLUMN access_mode",
-                cancellationToken);
-            await db.Database.ExecuteSqlRawAsync(
-                "ALTER TABLE competitions DROP COLUMN write_up_submission_required, DROP COLUMN write_up_submission_deadline_hours",
-                cancellationToken);
-            await db.Database.ExecuteSqlRawAsync(
-                "ALTER TABLE competitions DROP COLUMN webhook_configuration",
-                cancellationToken);
-            await db.Database.ExecuteSqlRawAsync(
-                "ALTER TABLE competitions DROP COLUMN runtime_access_mode, DROP COLUMN traffic_capture_enabled, DROP COLUMN traffic_capture_limit_bytes",
-                cancellationToken);
-            await db.Database.ExecuteSqlRawAsync(
-                "ALTER TABLE teams DROP COLUMN write_up_file_id, DROP COLUMN write_up_submitted_at, DROP COLUMN write_up_submitted_by_user_id",
-                cancellationToken);
-            await db.Database.ExecuteSqlRawAsync(
-                "ALTER TABLE users DROP COLUMN external_identity_bound_at, DROP COLUMN external_identity_namespace, DROP COLUMN external_identity_protocol, DROP COLUMN external_identity_provider_id, DROP COLUMN external_identity_subject, DROP COLUMN profile_cover_file_id",
-                cancellationToken);
-            db.ChangeTracker.Clear();
-
-            await db.Database.MigrateAsync(cancellationToken);
-
-            await Assert.That(await db.Teams.AsNoTracking().CountAsync(cancellationToken))
-                .IsEqualTo(1);
-            await db.Database.OpenConnectionAsync(cancellationToken);
-            await using var command = db.Database.GetDbConnection().CreateCommand();
-            command.CommandText = """
-                SELECT EXISTS (
-                    SELECT 1
-                    FROM information_schema.columns
-                    WHERE table_schema = 'public'
-                      AND table_name = 'teams'
-                      AND column_name = 'is_practice_team')
-                """;
-            var markerExists = (bool)(await command.ExecuteScalarAsync(cancellationToken))!;
-            await Assert.That(markerExists).IsFalse();
-        });
-    }
-
     [Test, Timeout(300_000)]
     public async Task Standard_flag_intake_records_independent_unlimited_practice_without_changing_official_results(
         CancellationToken cancellationToken)
@@ -221,16 +124,17 @@ public sealed class CompetitionPracticeModePersistenceTests
                 new LeaderboardProjectionEngine(new LeaderboardProjectorCatalog()),
                 Substitute.For<ILeaderboardRefreshPublisher>(),
                 cacheServices.GetRequiredService<IFusionCacheProvider>());
-            var board = await cache.CreateAsync(
+            var board = await cache.CreateScoreboardAsync(
                 fixture.CompetitionId,
                 fixture.Now.AddMinutes(1),
                 cancellationToken);
             await Assert.That(board).IsNotNull();
-            await Assert.That(board!.Entries).HasSingleItem();
-            await Assert.That(board.Entries[0].TeamId).IsEqualTo(fixture.TeamId);
-            await Assert.That(board.Entries[0].SolveCount).IsEqualTo(1);
-            await Assert.That(board.Entries[0].Score).IsEqualTo(17);
-            await Assert.That(board.Challenges.Single().CurrentScore).IsEqualTo(10);
+            await Assert.That(board!.Snapshot.Teams).HasSingleItem();
+            await Assert.That(board.Snapshot.Teams[0].TeamId).IsEqualTo(fixture.TeamId);
+            await Assert.That(board.Snapshot.Teams[0].Slots.Sum(slot =>
+                slot.Entries.Count(entry => entry.Kind == ScoreboardEntryKind.Solve))).IsEqualTo(1);
+            await Assert.That(board.Snapshot.Teams[0].TotalScore).IsEqualTo(17);
+            await Assert.That(board.Snapshot.CurrentChallengeScores.Single().Score).IsEqualTo(10);
             var detail = await new ScoreboardDetailReader(db).ReadSlotAsync(new(
                 fixture.CompetitionId,
                 fixture.TeamId,
@@ -305,13 +209,13 @@ public sealed class CompetitionPracticeModePersistenceTests
                 new LeaderboardProjectionEngine(new LeaderboardProjectorCatalog()),
                 Substitute.For<ILeaderboardRefreshPublisher>(),
                 cacheServices.GetRequiredService<IFusionCacheProvider>());
-            var board = await cache.CreateAsync(
+            var board = await cache.CreateScoreboardAsync(
                 fixture.CompetitionId,
                 fixture.Now,
                 cancellationToken);
-            await Assert.That(board!.Entries.Select(entry => entry.TeamId))
+            await Assert.That(board!.Snapshot.Teams.Select(entry => entry.TeamId))
                 .IsEquivalentTo([fixture.TeamId]);
-            await Assert.That(board.Challenges.Single().CurrentScore).IsEqualTo(10);
+            await Assert.That(board.Snapshot.CurrentChallengeScores.Single().Score).IsEqualTo(10);
         });
     }
 
@@ -336,6 +240,7 @@ public sealed class CompetitionPracticeModePersistenceTests
                         RuntimeAllocation.PerTeam,
                         new ContainerRuntimeDefinition(
                             "registry.example/practice:v1",
+                            Security: new(false, false, false, ["ALL"], []),
                             FlagEnvironmentVariableName: "FLAG"),
                         new RuntimeResourceLimits(67_108_864, 100_000_000, 64),
                         FlagSource: RuntimeFlagSource.PerTeam)),
@@ -502,7 +407,7 @@ public sealed class CompetitionPracticeModePersistenceTests
             IsPublished = true,
             RulesJson = JsonSerializer.Serialize(
                 new CtfChallengeConfiguration(
-                    CtfChallengeConfiguration.CurrentSchemaVersion,
+                    CtfConfiguration.CurrentSchemaVersion,
                     null,
                     null,
                     MaxFlagAttempts: 1),

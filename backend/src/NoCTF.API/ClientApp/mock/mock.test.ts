@@ -333,36 +333,6 @@ describe('isolated Mock API', () => {
     expect((await (await fresh.send('/api/v1/platform/configuration')).json()).name).toBe('NoCTF · MOCK')
   })
 
-  test('monitoring demo exposes a complete and varied live snapshot', async () => {
-    const { send } = await setup()
-    const response = await send('/api/v1/admin/platform/monitoring')
-    expect(response.status).toBe(200)
-    const snapshot = await response.json()
-    expect(snapshot.status).toBe(1)
-    expect(snapshot.prometheusAvailable).toBe(true)
-    expect(snapshot.natsAvailable).toBe(true)
-    expect(snapshot.humanVerification).toEqual(expect.objectContaining({
-      provider: 1,
-      enabled: true,
-      state: 2,
-      latencyMilliseconds: 42,
-    }))
-    expect(snapshot.metrics).toHaveLength(30)
-    expect(snapshot.metrics.find((metric: { kind: number }) => metric.kind === 27)?.value).toBe(73.8)
-    expect(snapshot.metrics.find((metric: { kind: number }) => metric.kind === 28)?.value).toBe(342)
-    expect(snapshot.metrics.find((metric: { kind: number }) => metric.kind === 29)?.value).toBe(0.4)
-    expect(snapshot.metrics).toEqual(expect.arrayContaining([
-      expect.objectContaining({ kind: 23, unit: 1, value: 38.4, windowSeconds: 300 }),
-      expect.objectContaining({ kind: 24, unit: 0, value: 11_520, windowSeconds: 300 }),
-      expect.objectContaining({ kind: 25, unit: 1, value: 0.18, windowSeconds: 300 }),
-      expect.objectContaining({ kind: 26, unit: 0, value: 54, windowSeconds: 300 }),
-    ]))
-    expect(new Set(snapshot.metrics.map((item: Data) => item.kind)).size).toBe(30)
-    expect(snapshot.metrics.some((item: Data) => item.status === 1)).toBe(true)
-    expect(snapshot.latencyDetails).toHaveLength(5)
-    expect(snapshot.poolResources).toHaveLength(6)
-  })
-
   test('wallpaper upload, protected read and preference changes share account state', async () => {
     const { api, accessToken, send } = await setup()
     const before = await (await send('/api/v1/auth/me')).json()

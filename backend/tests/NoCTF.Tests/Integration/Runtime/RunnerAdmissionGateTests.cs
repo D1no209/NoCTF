@@ -10,39 +10,6 @@ namespace NoCTF.Tests.Integration.Runtime;
 public sealed class RunnerAdmissionGateTests
 {
     [Test, Timeout(300_000)]
-    public async Task Mixed_schema_pool_keeps_legacy_runner_compatible_and_selects_actual_headroom(CancellationToken ct)
-    {
-        await DockerIntegrationTest.RunAsync(async () =>
-        {
-            await using var container = new RedisBuilder("redis:7.4.10-alpine3.21@sha256:e7723ff73d963f5cc6d9c4643ea3d989527a402a319239054e9472a7fb9219a2").Build();
-            await container.StartAsync(ct);
-            await using var redis = await ConnectionMultiplexer.ConnectAsync(container.GetConnectionString());
-            var registry = new RedisRunnerAvailabilityRegistry(redis);
-            await registry.RegisterAsync(new("mixed", "legacy", RuntimeProvider.Docker, "old",
-                new(128, 100, 100), TimeSpan.FromMinutes(1), false), ct);
-            var now = DateTimeOffset.UtcNow;
-            var options = new RunnerAdmissionOptions();
-            var admission = new RunnerPressurePolicy(options).Evaluate(
-                new("actual-domain", now, 1024, 900, 100, .1, 1, 100, 0), now);
-            await registry.RegisterAsync(new("mixed", "actual", RuntimeProvider.Docker, "new",
-                new(0, 0, 0), TimeSpan.FromMinutes(1), false, true,
-                admission, options, ActualUsage: true), ct);
-
-            var id = Guid.NewGuid();
-            var identity = new RuntimeWorkloadIdentity(RuntimeWorkloadKind.Runtime, id, id);
-            var claim = await new RedisRunnerCapacityGate(redis).TryClaimAsync(
-                new(id, "mixed", 256, 5, 1, identity, Limit: new(256, 5, 1)), ct);
-
-            await Assert.That(claim.Availability).IsEqualTo(RunnerCapacityAvailability.Claimed);
-            await Assert.That(claim.RunnerId).IsEqualTo("actual");
-            await Assert.That((string?)await redis.GetDatabase().HashGetAsync(
-                "runner:legacy:capacity", "registrationSchema")).IsEqualTo("2");
-            await Assert.That((string?)await redis.GetDatabase().HashGetAsync(
-                "runner:actual:capacity", "registrationSchema")).IsEqualTo("3");
-        });
-    }
-
-    [Test, Timeout(300_000)]
     public async Task Startup_reservation_releases_only_after_an_observation_at_or_after_completion(CancellationToken ct)
     {
         await DockerIntegrationTest.RunAsync(async () =>
@@ -54,9 +21,9 @@ public sealed class RunnerAdmissionGateTests
             var observedAt = DateTimeOffset.UtcNow.AddSeconds(-1);
             var sample = new RunnerResourceObservation("domain", observedAt, 1024, 1024, 100, 0, 0, 100, 0);
             RunnerAvailabilityRegistration Registration(DateTimeOffset at) => new("test", "runner", RuntimeProvider.Docker,
-                "test", new(0, 0, 0), TimeSpan.FromMinutes(1), true, true,
+                "test", TimeSpan.FromMinutes(1), true, true,
                 new RunnerPressurePolicy(options).Evaluate(sample with { ObservedAt = at }, DateTimeOffset.UtcNow),
-                options, ActualUsage: true);
+                options);
             var registry = new RedisRunnerAvailabilityRegistry(redis);
             await registry.RegisterAsync(Registration(observedAt) with { HasActiveAssignments = false }, ct);
             var gate = new RedisRunnerCapacityGate(redis);
@@ -97,8 +64,8 @@ public sealed class RunnerAdmissionGateTests
                     ProviderPressure: blocked);
                 var admission = new RunnerPressurePolicy(policy).Evaluate(sample, now);
                 await registry.RegisterAsync(new("test", runner, RuntimeProvider.Docker, "test",
-                    new(0, 0, 0), TimeSpan.FromMinutes(1), false, true,
-                    admission, policy, ActualUsage: true), ct);
+                    TimeSpan.FromMinutes(1), false, true,
+                    admission, policy), ct);
             }
             var id = Guid.NewGuid();
             var claim = await new RedisRunnerCapacityGate(redis).TryClaimAsync(new(id, "test", 256, 5, 1,
@@ -121,8 +88,8 @@ public sealed class RunnerAdmissionGateTests
             var policy = new RunnerAdmissionOptions();
             var sample = new RunnerResourceObservation("domain", now, 1024, 900, 100, .1, 1, 100, 0);
             var registration = new RunnerAvailabilityRegistration("test", "runner", RuntimeProvider.Docker,
-                "test", new(0, 0, 0), TimeSpan.FromMinutes(1), false, true,
-                new RunnerPressurePolicy(policy).Evaluate(sample, now), policy, ActualUsage: true);
+                "test", TimeSpan.FromMinutes(1), false, true,
+                new RunnerPressurePolicy(policy).Evaluate(sample, now), policy);
             await registry.RegisterAsync(registration, ct);
             var gate = new RedisRunnerCapacityGate(redis);
             var requests = Enumerable.Range(0, parallelism).Select(_ =>

@@ -17,16 +17,7 @@ public static class WolverineHosting
         IConfiguration configuration,
         HostRoles roles)
     {
-        // Wolverine 6 defaults this to NotAllowed. NoCTF still has handler graphs
-        // that require service-location fallback; keep those paths observable while
-        // generated static handlers are introduced incrementally.
-        options.ServiceLocationPolicy = ServiceLocationPolicy.AllowedButWarn;
-        // Wolverine 6.30 can corrupt its generated frame chain when it partially
-        // constructs this use case and then falls back for ICompetitionLifecycleStore.
-        // Resolve the complete scoped graph through DI until static handlers replace
-        // the runtime code-generation path.
-        options.CodeGeneration
-            .AlwaysUseServiceLocationFor<AdvanceCompetitionLifecycleUseCase>();
+        options.ServiceLocationPolicy = ServiceLocationPolicy.NotAllowed;
 
         var postgres = configuration.GetConnectionString("PostgreSql")
             ?? throw new InvalidOperationException(

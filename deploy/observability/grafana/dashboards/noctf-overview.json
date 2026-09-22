@@ -1,0 +1,117 @@
+{
+  "annotations": { "list": [] },
+  "editable": false,
+  "graphTooltip": 1,
+  "panels": [
+    {
+      "id": 1,
+      "type": "stat",
+      "title": "NoCTF target",
+      "gridPos": { "h": 4, "w": 4, "x": 0, "y": 0 },
+      "targets": [{ "expr": "max(up{job=\"noctf\"})", "legendFormat": "up" }]
+    },
+    {
+      "id": 2,
+      "type": "timeseries",
+      "title": "API throughput and errors",
+      "gridPos": { "h": 8, "w": 10, "x": 4, "y": 0 },
+      "targets": [
+        { "expr": "noctf:api_requests:rate5m", "legendFormat": "requests/s" },
+        { "expr": "noctf:api_server_error:ratio5m * 100", "legendFormat": "5xx %" },
+        { "expr": "noctf:api_rate_limit_rejections:rate5m", "legendFormat": "rate limited/s" },
+        { "expr": "noctf:human_verification_unavailable:rate5m", "legendFormat": "verification unavailable/s" }
+      ]
+    },
+    {
+      "id": 3,
+      "type": "timeseries",
+      "title": "API and Redis latency",
+      "gridPos": { "h": 8, "w": 10, "x": 14, "y": 0 },
+      "targets": [
+        { "expr": "noctf:api_request_duration:p95_5m", "legendFormat": "API P95" },
+        { "expr": "noctf:redis_operation_duration:p99_5m", "legendFormat": "Redis P99" }
+      ]
+    },
+    {
+      "id": 4,
+      "type": "timeseries",
+      "title": "Gameplay submissions",
+      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 8 },
+      "targets": [
+        { "expr": "noctf:gameplay_submissions:rate5m", "legendFormat": "{{kind}}/s" },
+        { "expr": "noctf:gameplay_correct:ratio5m * 100", "legendFormat": "correct %" },
+        { "expr": "noctf:gameplay_platform_error:ratio5m * 100", "legendFormat": "platform error %" }
+      ]
+    },
+    {
+      "id": 5,
+      "type": "timeseries",
+      "title": "JetStream and Wolverine backlog",
+      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 8 },
+      "targets": [
+        { "expr": "noctf:jetstream_pending:sum", "legendFormat": "pending" },
+        { "expr": "noctf:jetstream_ack_pending:sum", "legendFormat": "ack pending" },
+        { "expr": "noctf:jetstream_redelivered:sum", "legendFormat": "redelivered" },
+        { "expr": "noctf:wolverine_outbox:sum", "legendFormat": "outbox" },
+        { "expr": "noctf:wolverine_inbox:sum", "legendFormat": "inbox" }
+      ]
+    },
+    {
+      "id": 6,
+      "type": "timeseries",
+      "title": "Runtime queue",
+      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 8 },
+      "targets": [
+        { "expr": "noctf:runtime_waiting:count", "legendFormat": "waiting" },
+        { "expr": "noctf:runtime_waiting_oldest_age:seconds", "legendFormat": "oldest age (s)" }
+      ]
+    },
+    {
+      "id": 7,
+      "type": "timeseries",
+      "title": "Runner capacity remaining",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 16 },
+      "targets": [
+        { "expr": "noctf:runner_capacity_available:ratio * 100", "legendFormat": "{{pool}} {{resource}}" }
+      ]
+    },
+    {
+      "id": 8,
+      "type": "timeseries",
+      "title": "Infrastructure saturation",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 16 },
+      "targets": [
+        { "expr": "noctf:postgres_connections:ratio * 100", "legendFormat": "PostgreSQL connections %" },
+        { "expr": "noctf:disk_available:ratio * 100", "legendFormat": "disk available %" }
+      ]
+    },
+    {
+      "id": 9,
+      "type": "timeseries",
+      "title": "Leaderboard",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 24 },
+      "targets": [
+        { "expr": "noctf:leaderboard_projection_duration:p95_5m", "legendFormat": "projection P95" },
+        { "expr": "noctf:leaderboard_failures:rate5m", "legendFormat": "failures/s" }
+      ]
+    },
+    {
+      "id": 10,
+      "type": "timeseries",
+      "title": "External probes",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 24 },
+      "targets": [
+        { "expr": "probe_success{job=\"blackbox\"}", "legendFormat": "{{instance}}" }
+      ]
+    }
+  ],
+  "refresh": "30s",
+  "schemaVersion": 41,
+  "tags": ["noctf", "operations"],
+  "templating": { "list": [] },
+  "time": { "from": "now-6h", "to": "now" },
+  "timezone": "browser",
+  "title": "NoCTF Operations",
+  "uid": "noctf-operations",
+  "version": 1
+}

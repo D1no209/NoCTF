@@ -25,10 +25,10 @@ public sealed class DockerOneShotInputArchiveTests
             using var lifecycle = CreateLifecycle();
             var request = Request(Guid.NewGuid(), "id -u; grep -E '^(CapEff|NoNewPrivs):' /proc/self/status");
             var secure = request with { Security = request.Security with { RunAsNonRoot = true } };
-            Func<Task> runDenied = async () => _ = await lifecycle.RunAsync(secure, cancellationToken);
+            Func<Task> runDenied = async () => _ = await lifecycle.RunAsync(secure, null, cancellationToken);
             await Assert.That(runDenied).Throws<RuntimeConfigurationException>();
 
-            var allowed = await lifecycle.RunAsync(request, cancellationToken);
+            var allowed = await lifecycle.RunAsync(request, null, cancellationToken);
             await Assert.That(allowed.ExitCode).IsEqualTo(0);
             await Assert.That(allowed.StandardOutput).StartsWith("0\n");
             await Assert.That(allowed.StandardOutput).Contains("CapEff:\t0000000000000000");

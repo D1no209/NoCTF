@@ -31,7 +31,7 @@ public sealed class GameModeGameplayFactAdmissionPolicy : IGameplayFactAdmission
 
     private static GameplayFactAdmissionRules CtfRules(string json)
     {
-        var configuration = Ctf.Configuration.CtfConfigurationUpgrader.ParseChallenge(json);
+        var configuration = Ctf.Configuration.CtfConfigurationParser.ParseRules(json);
         return configuration.InteractionKind == CtfInteractionKind.PatchVerification
             ? new(false, true, null,
                 configuration.MaxPatchAttempts
@@ -44,10 +44,10 @@ public sealed class GameModeGameplayFactAdmissionPolicy : IGameplayFactAdmission
         string? definitionJson)
     {
         if (!string.IsNullOrWhiteSpace(definitionJson)
-            && Ctf.Configuration.CtfConfigurationUpgrader.ParseChallenge(definitionJson)
+            && Ctf.Configuration.CtfConfigurationParser.ParseDefinition(definitionJson)
                 .InteractionKind == CtfInteractionKind.PatchVerification)
         {
-            var rules = Ctf.Configuration.CtfConfigurationUpgrader.ParseChallenge(rulesJson);
+            var rules = Ctf.Configuration.CtfConfigurationParser.ParseRules(rulesJson);
             return new(false, true, null,
                 rules.MaxPatchAttempts
                     ?? Ctf.Configuration.CtfPatchVerificationConfigurationResolver.DefaultMaxPatchAttempts);
@@ -57,7 +57,7 @@ public sealed class GameModeGameplayFactAdmissionPolicy : IGameplayFactAdmission
 
     private static GameplayFactAdmissionRules AwdRules(string json)
     {
-        _ = Awd.Configuration.AwdConfigurationUpgrader.ParseChallenge(json);
+        _ = Awd.Configuration.AwdConfigurationParser.ParseChallenge(json);
         return new(true, false, null, null);
     }
 
@@ -65,14 +65,13 @@ public sealed class GameModeGameplayFactAdmissionPolicy : IGameplayFactAdmission
         string competitionJson,
         string challengeJson)
     {
-        var configuration = Awdp.Configuration.AwdpConfigurationResolver.Resolve(
-            competitionJson,
-            challengeJson);
+        var competition = Awdp.Configuration.AwdpConfigurationParser.ParseCompetition(competitionJson);
+        var rules = Awdp.Configuration.AwdpConfigurationParser.ParseChallenge(challengeJson);
         return new(
             true,
             true,
-            configuration.MaxBreakSubmissions,
-            configuration.MaxFixSubmissions,
-            configuration.RequireBreakBeforeFix);
+            rules.MaxBreakSubmissions ?? competition.MaxBreakSubmissions,
+            rules.MaxFixSubmissions ?? competition.MaxFixSubmissions,
+            rules.RequireBreakBeforeFix ?? competition.RequireBreakBeforeFix);
     }
 }

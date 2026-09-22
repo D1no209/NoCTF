@@ -8,9 +8,9 @@ public static class AwdFlagTemplateResolver
         string competitionConfigurationJson,
         string challengeRulesJson)
     {
-        var competition = AwdConfigurationUpgrader.ParseCompetition(
+        var competition = AwdConfigurationParser.ParseCompetition(
             competitionConfigurationJson);
-        var challenge = AwdConfigurationUpgrader.ParseChallenge(
+        var challenge = AwdConfigurationParser.ParseChallenge(
             challengeRulesJson);
         return challenge.FlagTemplate
             ?? competition.FlagTemplate

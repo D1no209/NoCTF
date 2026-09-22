@@ -27,7 +27,7 @@ public sealed class CheckerRootConfigurationTests
         var rules = JsonSerializer.Serialize(new { schemaVersion = 4, checkerAllowRoot = !enabled });
         var options = new JsonSerializerOptions(JsonSerializerDefaults.Web);
         var roundTrip = mode == GameMode.Awd
-            ? JsonSerializer.Serialize(AwdConfigurationUpgrader.ParseChallenge(definition), options)
+            ? JsonSerializer.Serialize(AwdConfigurationParser.ParseChallenge(definition), options)
             : JsonSerializer.Serialize(AwdpConfigurationParser.ParseChallenge(definition), options);
 
         await Assert.That(Resolve(mode, rules, roundTrip)).IsEqualTo(enabled);

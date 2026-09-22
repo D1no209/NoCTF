@@ -76,11 +76,7 @@ public interface IAwdpCheckerExecutor
 {
     Task<AwdpCheckerExecutionOutcome> ExecuteAsync(
         AwdpCheckerWork work,
-        CancellationToken cancellationToken);
-
-    Task<AwdpCheckerExecutionOutcome> ExecuteAsync(
-        AwdpCheckerWork work,
-        OneShotInputArchive input,
+        OneShotInputArchive? input,
         CancellationToken cancellationToken);
 }
 
@@ -366,12 +362,7 @@ public sealed class AwdpCheckerExecutor(IOneShotRuntimeProviderCatalog providers
 {
     public Task<AwdpCheckerExecutionOutcome> ExecuteAsync(
         AwdpCheckerWork work,
-        CancellationToken cancellationToken) =>
-        ExecuteCoreAsync(work, input: null, cancellationToken);
-
-    public Task<AwdpCheckerExecutionOutcome> ExecuteAsync(
-        AwdpCheckerWork work,
-        OneShotInputArchive input,
+        OneShotInputArchive? input,
         CancellationToken cancellationToken) =>
         ExecuteCoreAsync(work, input, cancellationToken);
 
@@ -410,11 +401,11 @@ public sealed class AwdpCheckerExecutor(IOneShotRuntimeProviderCatalog providers
         {
             var runner = providers.OneShot(work.Provider);
             var result = capacity is null
-                ? input is null ? await runner.RunAsync(request, timeout.Token) : await runner.RunAsync(request, input, timeout.Token)
+                ? await runner.RunAsync(request, input, timeout.Token)
                 : await capacity.RunAsync(request,
                     new(RuntimeWorkloadKind.PatchChecker, work.RuntimeInstanceId, request.OperationId),
                     work.GameplayFactId ?? throw new InvalidOperationException("Checker capacity requires a gameplay fact."),
-                    (reserved, token) => input is null ? runner.RunAsync(reserved, token) : runner.RunAsync(reserved, input, token), timeout.Token);
+                    (reserved, token) => runner.RunAsync(reserved, input, token), timeout.Token);
             return result.ExitCode == 0
                 ? AwdpCheckerExecutionOutcome.Completed
                 : AwdpCheckerExecutionOutcome.AbnormalExit;
@@ -746,6 +737,7 @@ public sealed class AwdpFixVerificationHandler(
                     {
                         execution = await checker.ExecuteAsync(
                             work.Checker,
+                            null,
                             cancellationToken);
                     }
                     if (execution != AwdpCheckerExecutionOutcome.Completed)

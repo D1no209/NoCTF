@@ -13,8 +13,8 @@ public sealed class KohProducerConfigurationCatalog : IKohProducerConfigurationC
 {
     public KohProducerSettings Get(string competitionConfigurationJson, string challengeRulesJson)
     {
-        var competition = KohConfigurationUpgrader.ParseCompetition(competitionConfigurationJson);
-        var challenge = KohConfigurationUpgrader.ParseChallenge(challengeRulesJson);
+        var competition = KohConfigurationParser.ParseCompetition(competitionConfigurationJson);
+        var challenge = KohConfigurationParser.ParseChallenge(challengeRulesJson);
         return new(
             challenge.PollIntervalSeconds ?? competition.PollIntervalSeconds,
             challenge.ControlPointsPerInterval ?? competition.ControlPointsPerInterval);

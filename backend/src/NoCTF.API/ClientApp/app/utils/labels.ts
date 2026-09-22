@@ -108,7 +108,6 @@ export function gameplayFactFailureCodeLabel(code?: NoCtfapiEndpointsGameplayFac
     AwdpPatchTimeout: translate("ui.patchExecutionTimedOut"),
     AwdpServiceAbnormal: translate("ui.serviceException"),
     AwdpPlatformFailed: translate("ui.awdpPlatformError"),
-    AwdpViolation: translate("ui.legacyAwdpViolationRecord"),
     ForeignTeamFlagDetected: translate("ui.submittedAFlagAssignedToAnotherTeam"),
     InsufficientScore: translate("ui.insufficientScore"),
     HintUnavailable: translate("ui.hintIsUnavailable"),

@@ -8,7 +8,7 @@ namespace NoCTF.Tests.Unit.Hosting;
 public sealed class WolverineHostingTests
 {
     [Test]
-    public async Task Persistence_enables_observable_Wolverine_5_service_location_compatibility()
+    public async Task Persistence_forbids_service_location()
     {
         var configuration = new ConfigurationBuilder()
             .AddInMemoryCollection(new Dictionary<string, string?>
@@ -25,6 +25,6 @@ public sealed class WolverineHostingTests
             HostRoles.Only(HostRole.Worker));
 
         await Assert.That(options.ServiceLocationPolicy)
-            .IsEqualTo(ServiceLocationPolicy.AllowedButWarn);
+            .IsEqualTo(ServiceLocationPolicy.NotAllowed);
     }
 }
