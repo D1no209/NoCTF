@@ -8,7 +8,8 @@ namespace NoCTF.Infrastructure.Admission;
 
 public sealed record CapHumanVerificationValidationOptions(
     string PublicOrigin,
-    TimeSpan StageTimeout);
+    TimeSpan StageTimeout,
+    bool Development = false);
 
 public sealed class CapHumanVerificationConfigurationProbe(
     IHttpClientFactory clientFactory,
@@ -23,7 +24,7 @@ public sealed class CapHumanVerificationConfigurationProbe(
         CancellationToken cancellationToken)
     {
         if (!configuration.Enabled
-            || !configuration.Options.IsValid(development: false)
+            || !configuration.Options.IsValid(options.Development)
             || !TryPublicOrigin(options.PublicOrigin, out var publicOrigin))
         {
             return CapHumanVerificationConfigurationProbeResult.ConfigurationInvalid;

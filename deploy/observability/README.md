@@ -27,8 +27,8 @@ The base NoCTF Compose enables the NATS monitoring listener on internal port
    exporter DSN. URL-encode reserved password characters in the DSN.
 2. Create persistent directories:
 
-       install -d -m 0750 /opt/noctf-observability/data/prometheus
-       install -d -m 0750 /opt/noctf-observability/data/grafana
+       install -d -o 65534 -g 65534 -m 0750 /opt/noctf-observability/data/prometheus
+       install -d -o 472 -g 472 -m 0750 /opt/noctf-observability/data/grafana
 
 3. Confirm that NOCTF_NETWORK_NAME matches the network created by the NoCTF
    core deployment.
