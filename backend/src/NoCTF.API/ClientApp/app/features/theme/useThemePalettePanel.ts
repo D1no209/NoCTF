@@ -3,6 +3,7 @@ import { Palette } from '@lucide/vue'
 import { useThemePalette } from '../../composables/useThemePalette'
 import { normalizeHex } from '../../components/ui/color-picker/color'
 import { themeColor } from '../../utils/theme-color'
+import { defaultWallpaperOpacity } from './palette'
 
 export function useThemePalettePanel() {
   const { isDark, toggle } = useTheme()
@@ -11,18 +12,32 @@ export function useThemePalettePanel() {
   const defaultColor = ref('#39FF14')
   watch([isDark, palette], async () => { await nextTick(); defaultColor.value = themeColor('--primary') }, { immediate: true, deep: true })
   const color = computed(() => palette.value[mode.value] ?? defaultColor.value)
+  const wallpaperOpacityKey = computed(() => mode.value === 'dark' ? 'darkWallpaperOpacity' : 'lightWallpaperOpacity')
+  const wallpaperOpacity = computed(() => palette.value[wallpaperOpacityKey.value])
   function setColor(value: string) {
     const normalized = normalizeHex(value)
     if (normalized) palette.value = { ...palette.value, [mode.value]: normalized }
   }
+  function setWallpaperOpacity(value: number) {
+    palette.value = {
+      ...palette.value,
+      [wallpaperOpacityKey.value]: Math.round(Math.min(100, Math.max(0, value))),
+    }
+  }
   function setMode(value: 'light' | 'dark') { if (value !== mode.value) toggle() }
-  function reset() { palette.value = { ...palette.value, [mode.value]: null } }
+  function reset() {
+    palette.value = {
+      ...palette.value,
+      [mode.value]: null,
+      [wallpaperOpacityKey.value]: defaultWallpaperOpacity,
+    }
+  }
   const presets = [
     { color: '#0066FF', label: 'palette.blue' }, { color: '#00B8D9', label: 'palette.cyan' },
     { color: '#8B5CF6', label: 'palette.violet' }, { color: '#EC4899', label: 'palette.pink' },
     { color: '#F97316', label: 'palette.orange' }, { color: '#39FF14', label: 'palette.green' },
     { color: '#EF4444', label: 'palette.red' }, { color: '#64748B', label: 'palette.slate' },
   ]
-  return { Palette, mode, color, presets, setColor, setMode, reset }
+  return { Palette, mode, color, wallpaperOpacity, presets, setColor, setWallpaperOpacity, setMode, reset }
 }
 export type ThemePalettePanelViewState = import('vue').ShallowUnwrapRef<ReturnType<typeof useThemePalettePanel>>

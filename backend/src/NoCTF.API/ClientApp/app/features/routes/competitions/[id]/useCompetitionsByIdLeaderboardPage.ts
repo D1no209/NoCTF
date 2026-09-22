@@ -7,13 +7,23 @@ import type { NoCtfapiEndpointsCompetitionsScoreboardAdjustmentDetailResponse, N
 import { medalBloodRankClass, medalRankClass } from '../../../leaderboard/types'
 import type { TrendSeries } from '../../../leaderboard/types'
 import { scoreboardChallengeColumnGroups, scoreboardBloodAward, scoreboardBreakdown, scoreboardEntryKindLabel, scoreboardEntryOutcomeLabel, scoreboardRankingStateLabel, scoreboardSlot } from '../../../../utils/scoreboard'
+import { competitionChallengesPath } from '../../../../utils/app-routes'
 import ScoreboardSlotStatusComponent from '../../../leaderboard/ScoreboardSlotStatus.vue'
+
+export const leaderboardWheelDamping = 0.55
+
+export function dampenedLeaderboardWheelDelta(event: Pick<WheelEvent, 'deltaMode' | 'deltaY'>, viewportHeight: number, lineHeight = 16): number {
+  const unit = event.deltaMode === 1 ? lineHeight : event.deltaMode === 2 ? viewportHeight : 1
+  return event.deltaY * unit * leaderboardWheelDamping
+}
 
 /** Owns state, effects and commands for CompetitionsByIdLeaderboardPage. */
 export function useCompetitionsByIdLeaderboardPage() {
   const route = useRoute()
 
   const competitionId = route.params.id as string
+
+  const competitionReturnPath = competitionChallengesPath(competitionId)
 
   const ctx = inject(competitionContextKey)!
 
@@ -100,6 +110,18 @@ export function useCompetitionsByIdLeaderboardPage() {
 
   function showMoreTeams(): void {
     visibleTeamCount.value += 50
+  }
+
+  function dampenLeaderboardWheel(event: WheelEvent): void {
+    if (event.ctrlKey || event.shiftKey || Math.abs(event.deltaX) > Math.abs(event.deltaY)) return
+    const surface = event.currentTarget as HTMLElement | null
+    if (!surface || surface.scrollHeight <= surface.clientHeight) return
+    const lineHeight = Number.parseFloat(getComputedStyle(surface).lineHeight) || 16
+    const delta = dampenedLeaderboardWheelDelta(event, surface.clientHeight, lineHeight)
+    const next = Math.min(surface.scrollHeight - surface.clientHeight, Math.max(0, surface.scrollTop + delta))
+    if (next === surface.scrollTop) return
+    event.preventDefault()
+    surface.scrollTop = next
   }
 
   const teamDisplayNames = computed(() => buildTeamDisplayNames(teams.value))
@@ -514,6 +536,8 @@ export function useCompetitionsByIdLeaderboardPage() {
       scoreboardRankingStateLabel,
       scoreboardSlot,
       competitionId,
+      competitionReturnPath,
+      dampenLeaderboardWheel,
       board,
       allTracksKey,
       selectedTrackKey,

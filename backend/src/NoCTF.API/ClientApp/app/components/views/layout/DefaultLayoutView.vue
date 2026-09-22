@@ -3,7 +3,7 @@ import { toRefs } from 'vue'
 import type { DefaultLayoutViewState } from '~/features/shell/useDefaultLayout'
 
 const viewProps = defineProps<{ state: DefaultLayoutViewState }>()
-const { Bell, ShieldAlert, isHome, routePath, wallpaperActive, wallpaperStyle, isLoggedIn, isAdministrator, impersonation, impersonationEnding, impersonationExpiresAt, endImpersonation, configuration, platformError, platformLoading, ensureLoaded, hasUnread, t, navItems, isActive, LanguageToggle, ThemeToggle, ThemePalettePanel, AccountPanel } = toRefs(viewProps.state)
+const { ShieldAlert, isHome, routePath, wallpaperActive, wallpaperStyle, isLoggedIn, impersonation, impersonationEnding, impersonationExpiresAt, endImpersonation, configuration, platformError, platformLoading, ensureLoaded, t, navItems, isActive, LanguageToggle, ThemeToggle, ThemePalettePanel, AccountPanel } = toRefs(viewProps.state)
 </script>
 
 <template>
@@ -48,37 +48,19 @@ const { Bell, ShieldAlert, isHome, routePath, wallpaperActive, wallpaperStyle, i
                 :data-active="isActive(item.to) || undefined"
                 :class="isActive(item.to) ? 'text-foreground font-medium after:absolute after:inset-x-2.5 after:bottom-1 after:h-0.5 after:rounded-full after:bg-primary' : 'text-muted-foreground'"
               >
-                <NuxtLink :to="item.to" :aria-current="isActive(item.to) ? 'page' : undefined">
+                <NuxtLink :to="item.to" :aria-current="isActive(item.to) ? 'page' : undefined" :aria-label="item.unread ? t('ui.notificationsUnreadMessages') : item.label">
                   <span data-top-nav-content>
-                    <span data-top-nav-icon><component :is="item.icon" /></span>
+                    <span data-top-nav-icon class="relative">
+                      <component :is="item.icon" />
+                      <span v-if="item.unread" class="absolute top-1 right-1 size-2.5 rounded-full bg-destructive" aria-hidden="true" />
+                    </span>
                     <span data-top-nav-label>{{ item.label }}</span>
+                    <span v-if="item.unread" class="sr-only">{{ t('ui.unreadNotifications') }}</span>
                   </span>
                 </NuxtLink>
               </Button>
             </span>
           </ScrollSurface>
-          <template v-if="isLoggedIn">
-            <Button v-if="isAdministrator" variant="ghost" size="icon" as-child>
-              <NuxtLink to="/admin/platform" :aria-label="t('ui.platformAdmin')">
-                <PlatformGearIcon />
-              </NuxtLink>
-            </Button>
-            <Button variant="ghost" size="icon" as-child>
-              <NuxtLink
-                to="/notifications"
-                class="relative"
-                :aria-label="hasUnread ? t('ui.notificationsUnreadMessages') : t('ui.notifications')"
-              >
-                <Bell />
-                <span
-                  v-if="hasUnread"
-                  class="absolute top-1 right-1 size-2.5 rounded-full border-2 border-background bg-destructive"
-                  aria-hidden="true"
-                />
-                <span v-if="hasUnread" class="sr-only">{{ t('ui.unreadNotifications') }}</span>
-              </NuxtLink>
-            </Button>
-          </template>
           <component :is="LanguageToggle" />
         </div>
 

@@ -1,4 +1,9 @@
-import type { ThemePalette } from '../features/theme/palette'
+import { defaultWallpaperOpacity, type ThemePalette } from '../features/theme/palette'
 export function useThemePalette() {
-  return useState<ThemePalette>('theme-palette', () => ({ light: null, dark: null }))
+  return useState<ThemePalette>('theme-palette', () => ({
+    light: null,
+    dark: null,
+    lightWallpaperOpacity: defaultWallpaperOpacity,
+    darkWallpaperOpacity: defaultWallpaperOpacity,
+  }))
 }

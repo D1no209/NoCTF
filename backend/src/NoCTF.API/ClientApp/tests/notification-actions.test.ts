@@ -21,8 +21,8 @@ describe('notification unread state', () => {
       new URL('../app/features/notifications/NotificationCenter.vue', import.meta.url),
     ).text()
 
-    expect(layout).toContain(":aria-label=\"hasUnread ? t('ui.notificationsUnreadMessages') : t('ui.notifications')\"")
-    expect(layout).toContain("<span v-if=\"hasUnread\" class=\"sr-only\">{{ t('ui.unreadNotifications') }}</span>")
+    expect(layout).toContain(":aria-label=\"item.unread ? t('ui.notificationsUnreadMessages') : item.label\"")
+    expect(layout).toContain("<span v-if=\"item.unread\" class=\"sr-only\">{{ t('ui.unreadNotifications') }}</span>")
     expect(page).toContain("<component :is=\"NotificationCenter\" />")
     expect(center).toContain('markAllRead(items.value[0]?.id)')
     expect(center).toContain("scope: 'Inbox'")
@@ -36,6 +36,9 @@ describe('notification unread state', () => {
     const sidebar = await sourceFile(
       new URL('../app/components/ui/sidebar/ChoiceSidebar.vue', import.meta.url),
     ).text()
+    const theme = await sourceFile(
+      new URL('../app/assets/css/main.css', import.meta.url),
+    ).text()
 
     expect(view).toContain('<ChoiceSidebar')
     expect(view).toContain('<Card id="notification-center-detail"')
@@ -44,6 +47,7 @@ describe('notification unread state', () => {
     expect(view).toContain('class="notification-detail-card')
     expect(view).not.toContain('<ActionButton')
     expect(sidebar).toContain('<slot name="footer" />')
+    expect(theme).toContain('.notification-center-page [data-scroll-surface] { overscroll-behavior-y: contain; }')
   })
 })
 
