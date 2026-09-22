@@ -22,6 +22,12 @@ public sealed class RuntimeTrafficCaptureStore(
         RuntimeTrafficCaptureQuery query,
         CancellationToken cancellationToken)
     {
+        var truncatedRuntimeIds = ActiveSegments(query.CompetitionId)
+            .Where(capture => EF.Functions.JsonContains(
+                capture.PayloadJson,
+                "{\"truncated\":true}"))
+            .Select(capture => capture.SubjectId)
+            .Distinct();
         var source = ActiveSegments(query.CompetitionId)
             .Join(
                 db.RuntimeInstances.AsNoTracking(),
@@ -39,6 +45,11 @@ public sealed class RuntimeTrafficCaptureStore(
             source = source.Where(item => item.Runtime.TeamId == teamId);
         if (query.RuntimeInstanceId is Guid runtimeInstanceId)
             source = source.Where(item => item.Runtime.Id == runtimeInstanceId);
+        if (query.Truncated is bool truncated)
+        {
+            source = source.Where(item =>
+                truncatedRuntimeIds.Contains(item.Runtime.Id) == truncated);
+        }
         var grouped = source.GroupBy(item => new
         {
             item.Runtime.Id,
@@ -46,33 +57,32 @@ public sealed class RuntimeTrafficCaptureStore(
             item.Runtime.TeamId,
             item.Runtime.State
         });
-        if (query.Truncated is bool truncated)
-        {
-            grouped = grouped.Where(group => group.Any(item => EF.Functions.JsonContains(
-                    item.Capture.PayloadJson,
-                    "{\"truncated\":true}")) == truncated);
-        }
         var total = await grouped.CountAsync(cancellationToken);
         var page = await grouped
-            .Select(group => new RuntimeTrafficCaptureView(
-                group.Key.Id,
-                group.Key.CompetitionChallengeId!.Value,
+            .Select(group => new
+            {
+                RuntimeInstanceId = group.Key.Id,
+                CompetitionChallengeId = group.Key.CompetitionChallengeId!.Value,
                 group.Key.TeamId,
-                group.Key.State,
-                group.Count(),
-                group.Sum(item => item.File.ByteLength),
-                group.Min(item => item.Capture.OccurredAt),
-                group.Max(item => item.File.CreatedAt),
-                group.Any(item => EF.Functions.JsonContains(
-                    item.Capture.PayloadJson,
-                    "{\"truncated\":true}"))))
+                RuntimeState = group.Key.State,
+                SegmentCount = group.Count(),
+                ByteLength = group.Sum(item => item.File.ByteLength),
+                StartedAt = group.Min(item => item.Capture.OccurredAt),
+                UpdatedAt = group.Max(item => item.File.CreatedAt)
+            })
             .OrderByDescending(item => item.UpdatedAt)
             .ThenByDescending(item => item.RuntimeInstanceId)
             .Skip(query.Offset)
             .Take(query.Limit)
             .ToArrayAsync(cancellationToken);
         if (page.Length == 0)
-            return new(page, total);
+            return new([], total);
+
+        var pageRuntimeIds = page.Select(item => item.RuntimeInstanceId).ToArray();
+        var truncatedIds = (await truncatedRuntimeIds
+                .Where(runtimeId => pageRuntimeIds.Contains(runtimeId))
+                .ToArrayAsync(cancellationToken))
+            .ToHashSet();
 
         var teamIds = page.Select(item => item.TeamId).OfType<Guid>().Distinct().ToArray();
         var teamNames = await db.Teams.IgnoreQueryFilters().AsNoTracking()
@@ -92,14 +102,21 @@ public sealed class RuntimeTrafficCaptureStore(
                 })
             .ToDictionaryAsync(item => item.Id, item => item.Title, cancellationToken);
         return new(
-            page.Select(item => item with
-            {
-                TeamName = item.TeamId is Guid teamId
+            page.Select(item => new RuntimeTrafficCaptureView(
+                item.RuntimeInstanceId,
+                item.CompetitionChallengeId,
+                item.TeamId,
+                item.RuntimeState,
+                item.SegmentCount,
+                item.ByteLength,
+                item.StartedAt,
+                item.UpdatedAt,
+                truncatedIds.Contains(item.RuntimeInstanceId),
+                item.TeamId is Guid teamId
                     ? teamNames.GetValueOrDefault(teamId)
                     : null,
-                ChallengeTitle = challengeTitles.GetValueOrDefault(
-                    item.CompetitionChallengeId)
-            }).ToArray(),
+                challengeTitles.GetValueOrDefault(
+                    item.CompetitionChallengeId))).ToArray(),
             total);
     }
 
