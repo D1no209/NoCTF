@@ -131,7 +131,7 @@ public static class ServiceRegistration
         });
         if (includeInfrastructure)
         {
-            services.AddNoCtfHumanVerification(configuration);
+            services.AddNoCtfHumanVerification(configuration, development);
             services.AddNoCtfInfrastructure(configuration, development);
             services.AddScoped<SubmitFlag>();
             services.AddScoped<LoginUser>();

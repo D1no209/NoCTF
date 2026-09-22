@@ -54,7 +54,7 @@ public static class ServiceRegistration
         services.AddNoCtfStorage(configuration);
         services.AddNoCtfCompetitions(configuration, development || exporting);
         services.AddNoCtfAuthentication(configuration, development);
-        services.AddNoCtfAdministration(configuration, exporting, development);
+        services.AddNoCtfAdministration(exporting, development);
         services.AddNoCtfSynchronousArchives(configuration);
         return services;
     }

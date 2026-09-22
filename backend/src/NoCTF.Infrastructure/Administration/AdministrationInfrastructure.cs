@@ -1,4 +1,3 @@
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using NoCTF.Application.Challenges.Bank;
 using NoCTF.Application.Administration;
@@ -14,7 +13,6 @@ internal static class AdministrationInfrastructure
 {
     internal static IServiceCollection AddNoCtfAdministration(
         this IServiceCollection services,
-        IConfiguration configuration,
         bool exporting,
         bool development)
     {

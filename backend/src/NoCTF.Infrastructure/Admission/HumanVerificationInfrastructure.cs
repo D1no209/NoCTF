@@ -10,7 +10,8 @@ public static class HumanVerificationInfrastructure
 {
     public static IServiceCollection AddNoCtfHumanVerification(
         this IServiceCollection services,
-        IConfiguration configuration)
+        IConfiguration configuration,
+        bool development)
     {
         services.AddHttpClient(HttpHumanVerificationVerifier.ClientName, client =>
             {
@@ -72,7 +73,8 @@ public static class HumanVerificationInfrastructure
             TimeSpan.FromSeconds(Math.Max(
                 1,
                 configuration.GetValue(
-                    "HumanVerification:Validation:StageTimeoutSeconds", 3)))));
+                    "HumanVerification:Validation:StageTimeoutSeconds", 3))),
+            development));
         services.AddSingleton<ICapHumanVerificationConfigurationProbe,
             CapHumanVerificationConfigurationProbe>();
         return services;
