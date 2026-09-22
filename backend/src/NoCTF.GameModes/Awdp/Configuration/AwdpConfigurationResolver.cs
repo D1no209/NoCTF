@@ -9,11 +9,6 @@ public static class AwdpConfigurationResolver
 
     public static AwdpEffectiveConfiguration Resolve(
         string competitionJson,
-        string legacyChallengeJson) =>
-        Resolve(competitionJson, legacyChallengeJson, legacyChallengeJson);
-
-    public static AwdpEffectiveConfiguration Resolve(
-        string competitionJson,
         string challengeRulesJson,
         string challengeDefinitionJson) =>
         Resolve(
@@ -48,8 +43,4 @@ public static class AwdpConfigurationResolver
             definition.CheckerFixInput,
             definition.CheckerAllowRoot);
 
-    public static AwdpEffectiveConfiguration Resolve(
-        AwdpConfiguration competition,
-        AwdpChallengeConfiguration challenge) =>
-        Resolve(competition, challenge, challenge);
 }

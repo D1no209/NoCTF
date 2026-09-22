@@ -231,7 +231,7 @@ public sealed class HistoricalAdjudicationPreviewStore(NoCtfDbContext db) : IHis
 
     private static CtfInteractionKind? ReadInteraction(string json)
     {
-        try { return CtfConfigurationUpgrader.ParseChallenge(json).InteractionKind; }
+        try { return CtfConfigurationParser.ParseDefinition(json).InteractionKind; }
         catch (Exception exception) when (exception is JsonException or GameModeConfigurationException or InvalidOperationException) { return null; }
     }
 

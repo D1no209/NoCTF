@@ -133,29 +133,7 @@ describe('dynamic flag templates', () => {
 })
 
 describe('container security drafts', () => {
-  test('fills the platform security defaults when the definition omits security', () => {
-    const parsed = parseDefinition(JSON.stringify({
-      schemaVersion: 2,
-      runtime: {
-        allocation: 1,
-        definition: { kind: 'container', image: 'example/image:latest' },
-        flagSource: 0,
-      },
-    }))
-
-    expect(parsed?.runtime?.definition.kind).toBe('container')
-    if (parsed?.runtime?.definition.kind !== 'container') throw new Error('Expected parsed container definition')
-    expect(parsed.runtime.definition.security).toEqual({
-      noNewPrivileges: false,
-      readonlyRootfs: false,
-      runAsNonRoot: false,
-      capDrop: [],
-      capAdd: [],
-    })
-    expect(JSON.parse(serializeDefinition('Ctf', parsed)).runtime.definition.security).toBeUndefined()
-  })
-
-  test('keeps every security option disabled for new container drafts', () => {
+  test('creates every container draft with an explicit capability baseline', () => {
     const model = emptyDefinition('Ctf')
     model.runtime = emptyRuntimeTemplate('Ctf')
 
@@ -164,13 +142,13 @@ describe('container security drafts', () => {
       noNewPrivileges: false,
       readonlyRootfs: false,
       runAsNonRoot: false,
-      capDrop: [],
+      capDrop: ['ALL'],
       capAdd: [],
     })
 
     const json = JSON.parse(serializeDefinition('Ctf', model))
 
-    expect(json.runtime.definition.security).toBeUndefined()
+    expect(json.runtime.definition.security).toEqual({ capDrop: ['ALL'] })
   })
 
   test('starts a runtime draft with one public port row and one access entry', () => {
@@ -267,7 +245,7 @@ describe('AWDP patch upload limits', () => {
     expect(challengeRuleFields('Awdp').some(field => field.key === 'requireBreakBeforeFix')).toBeTrue()
   })
 
-  test('ignores legacy AWDP flag injection fields', () => {
+  test('does not emit unsupported AWDP flag injection fields', () => {
     const model = parseDefinition(JSON.stringify({
       schemaVersion: 4,
       flagInjection: { kind: 0, environmentVariableName: 'OLD_FLAG' },
@@ -289,30 +267,7 @@ describe('runtime resource and lifecycle defaults', () => {
     })
     expect(runtime.ttlSeconds).toBe(DEFAULT_RUNTIME_TTL_SECONDS)
     expect(runtime.operationTimeoutSeconds).toBe(DEFAULT_RUNTIME_OPERATION_TIMEOUT_SECONDS)
-  })
-
-  test('fills and persists defaults for legacy definitions with unset values', () => {
-    const parsed = parseDefinition(JSON.stringify({
-      schemaVersion: 2,
-      runtime: {
-        allocation: 1,
-        definition: { kind: 'container', image: 'example/image:latest' },
-        limits: {},
-        ttlSeconds: null,
-        operationTimeoutSeconds: null,
-        flagSource: 0,
-      },
-    }))
-    if (!parsed?.runtime) throw new Error('Expected parsed runtime')
-
-    const serialized = JSON.parse(serializeDefinition('Ctf', parsed))
-    expect(serialized.runtime.limits).toEqual({
-      memoryBytes: DEFAULT_RUNTIME_MEMORY_BYTES,
-      nanoCpus: DEFAULT_RUNTIME_NANO_CPUS,
-      pidsLimit: DEFAULT_RUNTIME_PIDS_LIMIT,
-    })
-    expect(serialized.runtime.ttlSeconds).toBe(DEFAULT_RUNTIME_TTL_SECONDS)
-    expect(serialized.runtime.operationTimeoutSeconds).toBe(DEFAULT_RUNTIME_OPERATION_TIMEOUT_SECONDS)
+    expect(runtime.definition.kind === 'container' ? runtime.definition.security.capDrop : []).toEqual(['ALL'])
   })
 
   test('uses defaults when cleared values are serialized', () => {

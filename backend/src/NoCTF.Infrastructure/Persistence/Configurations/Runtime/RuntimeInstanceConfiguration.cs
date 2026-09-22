@@ -48,7 +48,6 @@ internal sealed class RuntimeInstanceConfiguration : IEntityTypeConfiguration<Ru
                 (left, right) => RuntimeCapacityAllocations.Serialize(left!) == RuntimeCapacityAllocations.Serialize(right!),
                 value => RuntimeCapacityAllocations.Serialize(value).GetHashCode(),
                 value => RuntimeCapacityAllocations.Deserialize(RuntimeCapacityAllocations.Serialize(value))));
-        builder.Property(instance => instance.Urls).HasColumnType("text[]");
         // PostgreSQL jsonb keeps the ordered, provider-resolved access endpoints on the
         // owning Runtime row without introducing a forbidden runtime-artifacts table.
         builder.OwnsMany(instance => instance.AccessEndpoints, endpoints =>

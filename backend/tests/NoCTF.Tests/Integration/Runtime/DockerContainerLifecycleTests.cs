@@ -244,7 +244,7 @@ public sealed class DockerContainerLifecycleTests
                 new ContainerSecurityPolicy(true, false, false, ["ALL"], []),
                 TimeSpan.FromMinutes(2),
                 NetworkName: "none",
-                NetworkPurpose: ContainerNetworkPurpose.AwdpVerification), cancellationToken);
+                NetworkPurpose: ContainerNetworkPurpose.AwdpVerification), null, cancellationToken);
 
             await Assert.That(result.ExitCode).IsEqualTo(0);
             await Assert.That(result.StandardOutput).IsEqualTo(new string('A', outputLimit));
@@ -792,11 +792,11 @@ public sealed class DockerContainerLifecycleTests
                             "http://{HOST}:{PORT}/",
                             RuntimeExposure.OwnerOnly,
                             ContainerPort: 8080)]);
-                    await Assert.That(expanded.Urls.Single())
+                    await Assert.That(expanded.DirectAddresses.Single())
                         .IsEqualTo($"http://127.0.0.1:{receipt.PortMappings[8080]}/");
                     var response = await GetEventuallyAsync(
                         http,
-                        expanded.Urls.Single(),
+                        expanded.DirectAddresses.Single(),
                         cancellationToken);
                     await Assert.That(response.Trim()).IsEqualTo("target");
                 }

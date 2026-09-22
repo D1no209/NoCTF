@@ -51,7 +51,7 @@ public sealed class AwdpV2TemplateTests
 
         var json = await File.ReadAllTextAsync(DefinitionFixture());
         var parsed = AwdpConfigurationParser.ParseChallenge(json);
-        var errors = new GameModeChallengeConfigurationCatalog().Validate(GameMode.Awdp, json);
+        var errors = new GameModeChallengeConfigurationCatalog().ValidateDefinition(GameMode.Awdp, json);
 
         await Assert.That(parsed.SchemaVersion).IsEqualTo(4);
         await Assert.That(parsed.CheckerFixInput).IsTrue();

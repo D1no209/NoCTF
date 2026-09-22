@@ -25,7 +25,7 @@ spec:
         - name: migrate
           image: noctf-backend:latest
           imagePullPolicy: IfNotPresent
-          command: ["dotnet", "NoCTF.API.dll", "--migrate-only"]
+          command: ["dotnet", "NoCTF.Host.dll", "--migrate-only"]
           securityContext:
             allowPrivilegeEscalation: false
             readOnlyRootFilesystem: true

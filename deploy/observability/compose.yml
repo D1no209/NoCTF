@@ -1,0 +1,111 @@
+name: ${OBSERVABILITY_PROJECT_NAME:-noctf-observability}
+
+services:
+  prometheus:
+    image: ${PROMETHEUS_IMAGE:?Set PROMETHEUS_IMAGE in .env}
+    restart: unless-stopped
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+      - --storage.tsdb.retention.time=${PROMETHEUS_RETENTION_TIME:-7d}
+      - --storage.tsdb.retention.size=${PROMETHEUS_RETENTION_SIZE:-2GB}
+    volumes:
+      - type: bind
+        source: ./prometheus
+        target: /etc/prometheus
+        read_only: true
+      - type: bind
+        source: ${OBSERVABILITY_DATA_ROOT:?Set OBSERVABILITY_DATA_ROOT}/prometheus
+        target: /prometheus
+        bind:
+          create_host_path: false
+    ports:
+      - 127.0.0.1:${PROMETHEUS_PORT:-9090}:9090
+    networks: [observability, noctf]
+
+  grafana:
+    image: ${GRAFANA_IMAGE:?Set GRAFANA_IMAGE in .env}
+    restart: unless-stopped
+    environment:
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:?Set GRAFANA_ADMIN_PASSWORD}
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_ANALYTICS_REPORTING_ENABLED: "false"
+      GF_ANALYTICS_CHECK_FOR_UPDATES: "false"
+    volumes:
+      - type: bind
+        source: ./grafana/provisioning
+        target: /etc/grafana/provisioning
+        read_only: true
+      - type: bind
+        source: ./grafana/dashboards
+        target: /var/lib/grafana/dashboards
+        read_only: true
+      - type: bind
+        source: ${OBSERVABILITY_DATA_ROOT:?Set OBSERVABILITY_DATA_ROOT}/grafana
+        target: /var/lib/grafana
+        bind:
+          create_host_path: false
+    ports:
+      - 127.0.0.1:${GRAFANA_PORT:-3001}:3000
+    networks: [observability]
+
+  postgres-exporter:
+    image: ${POSTGRES_EXPORTER_IMAGE:?Set POSTGRES_EXPORTER_IMAGE in .env}
+    restart: unless-stopped
+    environment:
+      DATA_SOURCE_NAME: ${POSTGRES_EXPORTER_DSN:?Set POSTGRES_EXPORTER_DSN}
+      PG_EXPORTER_EXTEND_QUERY_PATH: /etc/postgres-exporter/queries.yml
+    volumes:
+      - type: bind
+        source: ./postgres-exporter/queries.yml
+        target: /etc/postgres-exporter/queries.yml
+        read_only: true
+    networks: [noctf]
+
+  redis-exporter:
+    image: ${REDIS_EXPORTER_IMAGE:?Set REDIS_EXPORTER_IMAGE in .env}
+    restart: unless-stopped
+    environment:
+      REDIS_ADDR: ${REDIS_EXPORTER_ADDR:-redis://redis:6379}
+    networks: [noctf]
+
+  nats-exporter:
+    image: ${NATS_EXPORTER_IMAGE:?Set NATS_EXPORTER_IMAGE in .env}
+    restart: unless-stopped
+    command:
+      - -varz
+      - -jsz=all
+      - http://nats:8222
+    networks: [noctf]
+
+  node-exporter:
+    image: ${NODE_EXPORTER_IMAGE:?Set NODE_EXPORTER_IMAGE in .env}
+    restart: unless-stopped
+    command:
+      - --path.rootfs=/host
+      - --collector.filesystem.mount-points-exclude=^/(dev|proc|sys|var/lib/docker/.+|var/lib/containers/storage/.+)($$|/)
+    volumes:
+      - type: bind
+        source: /
+        target: /host
+        read_only: true
+    networks: [observability]
+
+  blackbox-exporter:
+    image: ${BLACKBOX_EXPORTER_IMAGE:?Set BLACKBOX_EXPORTER_IMAGE in .env}
+    restart: unless-stopped
+    command:
+      - --config.file=/etc/blackbox-exporter/config.yml
+    volumes:
+      - type: bind
+        source: ./blackbox/config.yml
+        target: /etc/blackbox-exporter/config.yml
+        read_only: true
+    networks: [observability, noctf]
+
+networks:
+  observability:
+  noctf:
+    external: true
+    name: ${NOCTF_NETWORK_NAME:-noctf-network}

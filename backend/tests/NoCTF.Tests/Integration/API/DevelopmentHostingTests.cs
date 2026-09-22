@@ -32,7 +32,7 @@ public sealed class DevelopmentHostingTests
     public async Task Development_host_uses_single_process_in_memory_infrastructure(
         CancellationToken cancellationToken)
     {
-        using var factory = new WebApplicationFactory<HealthEndpoint>()
+        using var factory = new WebApplicationFactory<Program>()
             .WithWebHostBuilder(builder =>
             {
                 builder.UseEnvironment("Development");
@@ -132,9 +132,9 @@ public sealed class DevelopmentHostingTests
         {
             var leaderboard = await scope.ServiceProvider
                 .GetRequiredService<ILeaderboardCache>()
-                .GetAsync(competitionId, cancellationToken);
+                .GetScoreboardAsync(competitionId, cancellationToken);
             await Assert.That(leaderboard).IsNotNull();
-            await Assert.That(leaderboard!.CompetitionId).IsEqualTo(competitionId);
+            await Assert.That(leaderboard!.Snapshot.CompetitionId).IsEqualTo(competitionId);
         }
     }
 }

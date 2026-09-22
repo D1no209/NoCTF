@@ -36,13 +36,7 @@ FROM mcr.microsoft.com/dotnet/sdk:10.0.302@sha256:72dd743782f2ae7e5476fd64f6a460
 WORKDIR /src
 COPY backend/ ./backend/
 WORKDIR /src/backend
-RUN dotnet restore src/NoCTF.API/NoCTF.API.csproj
-RUN dotnet restore src/NoCTF.Worker/NoCTF.Worker.csproj
-RUN dotnet restore src/NoCTF.Runner/NoCTF.Runner.csproj
 RUN dotnet restore src/NoCTF.Host/NoCTF.Host.csproj
-RUN dotnet publish src/NoCTF.API/NoCTF.API.csproj -c Release -o /app/api /p:BuildSpaOnPublish=false
-RUN dotnet publish src/NoCTF.Worker/NoCTF.Worker.csproj -c Release -o /app/worker
-RUN dotnet publish src/NoCTF.Runner/NoCTF.Runner.csproj -c Release -o /app/runner
 RUN dotnet publish src/NoCTF.Host/NoCTF.Host.csproj -c Release -o /app/host /p:BuildSpaOnPublish=false
 
 FROM mcr.microsoft.com/dotnet/aspnet:10.0.10@sha256:f1126d438ccc359f51cc6d4701a8deae513856cf10f5fe645d29ea6403dcac6b AS runtime
@@ -53,31 +47,6 @@ RUN sed -i 's|http://archive.ubuntu.com/ubuntu|https://archive.ubuntu.com/ubuntu
     && rm -rf /var/lib/apt/lists/*
 COPY --chmod=0755 backend/docker/healthcheck.sh /usr/local/bin/noctf-healthcheck
 HEALTHCHECK --interval=10s --timeout=3s --start-period=120s --retries=12 CMD ["/usr/local/bin/noctf-healthcheck"]
-
-FROM runtime AS api
-WORKDIR /app
-COPY --from=build /app/api .
-COPY --from=frontend-build /src/ClientApp/.output/public ./wwwroot
-RUN mkdir -p /app/uploads && chown -R 1654:1654 /app/uploads
-USER 1654
-ENTRYPOINT ["dotnet", "NoCTF.API.dll"]
-
-FROM runtime AS worker
-WORKDIR /app
-COPY --from=build /app/worker .
-RUN mkdir -p /app/uploads && chown -R 1654:1654 /app/uploads
-USER 1654
-ENTRYPOINT ["dotnet", "NoCTF.Worker.dll"]
-
-FROM runtime AS runner
-WORKDIR /app
-COPY --from=build /app/runner .
-COPY --from=docker-cli /usr/local/bin/docker /usr/local/bin/docker
-COPY --from=docker-cli /usr/local/libexec/docker/cli-plugins/docker-compose /usr/local/libexec/docker/cli-plugins/docker-compose
-COPY --from=kompose-cli /usr/local/bin/kompose /usr/local/bin/kompose
-# Docker socket access already grants host-level authority; no host socket chmod/group patching.
-USER 0
-ENTRYPOINT ["dotnet", "NoCTF.Runner.dll"]
 
 FROM runtime AS host
 WORKDIR /app

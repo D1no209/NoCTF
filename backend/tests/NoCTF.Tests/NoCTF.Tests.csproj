@@ -22,6 +22,7 @@
     <ProjectReference Include="../../src/NoCTF.GameModes/NoCTF.GameModes.csproj" />
     <ProjectReference Include="../../src/NoCTF.Infrastructure/NoCTF.Infrastructure.csproj" />
     <ProjectReference Include="../../src/NoCTF.Hosting/NoCTF.Hosting.csproj" />
+    <ProjectReference Include="../../src/NoCTF.Host/NoCTF.Host.csproj" />
     <ProjectReference Include="../../src/NoCTF.Runtime.Libvirt/NoCTF.Runtime.Libvirt.csproj" />
     <ProjectReference Include="../../src/NoCTF.Worker/NoCTF.Worker.csproj" />
     <ProjectReference Include="../../src/NoCTF.Runtime.Docker/NoCTF.Runtime.Docker.csproj" />

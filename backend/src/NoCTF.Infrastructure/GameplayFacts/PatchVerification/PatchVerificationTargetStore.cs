@@ -75,7 +75,7 @@ public sealed class PatchVerificationTargetStore(
             ct);
         if (context is null)
             return new(PatchVerificationTargetRequestState.ScopeNotFound);
-        var interaction = CtfConfigurationUpgrader.ParseChallenge(
+        var interaction = CtfConfigurationParser.ParseDefinition(
             context.DefinitionJson).InteractionKind;
         if (interaction != CtfInteractionKind.PatchVerification)
             return new(PatchVerificationTargetRequestState.ScopeNotFound);
@@ -200,7 +200,7 @@ public sealed class PatchVerificationTargetStore(
             includeActiveCompetitionOnly: false,
             ct);
         if (context is null
-            || CtfConfigurationUpgrader.ParseChallenge(context.DefinitionJson).InteractionKind
+            || CtfConfigurationParser.ParseDefinition(context.DefinitionJson).InteractionKind
                 != CtfInteractionKind.PatchVerification)
         {
             return null;

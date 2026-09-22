@@ -15,109 +15,6 @@ function shape(schema: Data | undefined, value: any): any {
   return value
 }
 
-function mockMonitoringSnapshot(): Data {
-  const metric = (
-    kind: number,
-    unit: number,
-    value: number,
-    status = 0,
-    sampleCount: number | null = null,
-    windowSeconds: number | null = sampleCount === null ? null : 300,
-    minimumSamples: number | null = sampleCount === null ? null : 50,
-  ) => ({
-    kind,
-    unit,
-    value,
-    status,
-    sampleCount,
-    minimumSamples,
-    windowSeconds,
-  })
-  const latency = (kind: number, endpoint: string, p95: number, p99: number, mean: number, rate: number, errors: number, samples: number, status = 0) => ({
-    kind,
-    endpoint,
-    p95Milliseconds: p95,
-    p99Milliseconds: p99,
-    meanMilliseconds: mean,
-    requestsPerSecond: rate,
-    errorPercent: errors,
-    sampleCount: samples,
-    minimumSamples: 50,
-    windowSeconds: 300,
-    status,
-  })
-  const pool = (name: string, resource: number, available: number, total: number, onlineRunners: number) => ({
-    pool: name,
-    resource,
-    available,
-    total,
-    onlineRunners,
-  })
-
-  return {
-    status: 1,
-    prometheusAvailable: true,
-    natsAvailable: true,
-    capturedAt: now(),
-    dashboardUrl: null,
-    latencySustainedWindowMinutes: 3,
-    humanVerification: {
-      provider: 1,
-      enabled: true,
-      state: 2,
-      checkedAt: now(),
-      latencyMilliseconds: 42,
-    },
-    metrics: [
-      metric(0, 1, 148.6, 0, 44_580),
-      metric(1, 2, 186, 0, 44_580),
-      metric(2, 4, 0.36, 0, 44_580),
-      metric(3, 0, 324),
-      metric(4, 0, 1),
-      metric(5, 4, 72.4, 1),
-      metric(6, 0, 12),
-      metric(7, 0, 5),
-      metric(8, 0, 1, 1),
-      metric(9, 0, 24),
-      metric(10, 0, 8),
-      metric(11, 0, 4, 1),
-      metric(12, 3, 18, 1),
-      metric(13, 1, 0, 0, 300),
-      metric(14, 1, 0.02, 1, 300),
-      metric(15, 2, 240, 0, 300),
-      metric(16, 1, 0, 0, 300),
-      metric(17, 1, 0, 0, 300),
-      metric(18, 0, 6),
-      metric(19, 4, 23, 1),
-      metric(20, 4, 68, 1),
-      metric(21, 2, 44, 0, 1_820),
-      metric(22, 4, 31, 1),
-      metric(23, 1, 38.4, 0, null, 300),
-      metric(24, 0, 11_520, 0, null, 300),
-      metric(25, 1, 0.18, 0, null, 300),
-      metric(26, 0, 54, 0, null, 300),
-      metric(27, 4, 73.8, 0, 10_944, 300, 20),
-      metric(28, 2, 342, 0, 11_520, 300, 20),
-      metric(29, 4, 0.4, 0, 11_520, 300, 20),
-    ],
-    latencyDetails: [
-      latency(0, '/api/v1/competitions', 186, 342, 104, 88.4, 0.18, 26_520),
-      latency(1, '/hubs/v1/competitions', 41_200, 58_900, 17_800, 1.08, 0.04, 324),
-      latency(2, '/api/v1/auth/me/wallpaper', 580, 1_250, 312, 0.42, 1.2, 126, 1),
-      latency(3, '/api/v1/files/{fileId}', 210, 460, 128, 3.9, 0.08, 1_170),
-      latency(4, 'leaderboard:publish', 44, 86, 22, 6.07, 0.02, 1_820),
-    ],
-    poolResources: [
-      pool('default', 0, 18_790_481_920, 68_719_476_736, 4),
-      pool('default', 1, 3_200_000_000, 12_000_000_000, 4),
-      pool('default', 2, 1_536, 4_096, 4),
-      pool('burst', 0, 4_294_967_296, 17_179_869_184, 2),
-      pool('burst', 1, 1_150_000_000, 4_000_000_000, 2),
-      pool('burst', 2, 420, 2_048, 2),
-    ],
-  }
-}
-
 function mockWriteUpPdf(teamName: string): Blob {
   const safeName = teamName.replace(/[()\\]/g, '')
   const stream = `BT /F1 20 Tf 72 740 Td (NoCTF Mock WriteUp) Tj 0 -32 Td /F1 12 Tf (Team: ${safeName}) Tj 0 -24 Td (Challenge evidence and adjudication notes.) Tj ET`
@@ -462,7 +359,6 @@ export function createMockApi() {
       else if (route === '/admin/platform/users/{userId}') value = { user: state.users.find(u => u.userId === p.userId), schoolIdentity: state.settings.get(`${p.userId}/school-identity`) ?? { fullName: null, studentNumber: null } }
       else if (route === '/admin/platform/users') value = list(state.users.map(u => ({ ...u, id: u.userId, accountStatus: 'Active', createdAt: date(-720) })), url)
       else if (route === '/admin/platform/information') value = { version: 'MOCK / local-memory', contributors: [] }
-      else if (route === '/admin/platform/monitoring') value = mockMonitoringSnapshot()
       else if (route === '/admin/competitions/{competitionId}') value = {
         competition: { ...competition, administrationRole: user?.role === 'Administrator' ? 'Owner' : user?.role === 'Organizer' ? 'Manager' : null },
         modeConfiguration: { competitionId: competition!.id, mode: competition!.mode, competitionStatus: competition!.status, json: '{}', updatedAt: now() },

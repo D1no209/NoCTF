@@ -14,9 +14,9 @@ public sealed class AwdCheckerConfigurationCatalog
         string challengeRulesJson,
         string challengeDefinitionJson)
     {
-        var competition = AwdConfigurationUpgrader.ParseCompetition(competitionConfigurationJson);
-        var rules = AwdConfigurationUpgrader.ParseChallenge(challengeRulesJson);
-        var definition = AwdConfigurationUpgrader.ParseChallenge(challengeDefinitionJson);
+        var competition = AwdConfigurationParser.ParseCompetition(competitionConfigurationJson);
+        var rules = AwdConfigurationParser.ParseChallenge(challengeRulesJson);
+        var definition = AwdConfigurationParser.ParseChallenge(challengeDefinitionJson);
         return new(
             rules.CheckerIntervalSeconds ?? competition.CheckerIntervalSeconds,
             definition.Checker?.Job,

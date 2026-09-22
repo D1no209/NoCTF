@@ -400,7 +400,10 @@ internal static class AwdpDynamicLeaderboardProjection
     private static AwdpEffectiveConfiguration Effective(
         AwdpConfiguration competition,
         string? challengeJson) =>
-        AwdpConfigurationResolver.Resolve(competition, ParseChallenge(challengeJson));
+        AwdpConfigurationResolver.Resolve(
+            competition,
+            ParseChallenge(challengeJson),
+            AwdpChallengeConfiguration.Empty);
 
     private static long PenaltyFor(
         LeaderboardGameplayFact fact,

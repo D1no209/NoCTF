@@ -5,13 +5,12 @@ public sealed class DeploymentTopologyTests
     private static readonly string RepositoryRoot = FindRepositoryRoot();
 
     [Test]
-    public async Task Deployment_manifests_support_composable_and_legacy_process_topologies()
+    public async Task Deployment_manifests_use_only_the_unified_host_process()
     {
         var dockerfile = await ReadAsync("backend", "Dockerfile");
         var compose = await ReadAsync("deploy", "docker-compose.yml");
         var runtimeEnv = await ReadAsync("deploy", "env", "noctf", ".env.example");
         var healthcheck = await ReadAsync("backend", "docker", "healthcheck.sh");
-        var apiProgram = await ReadAsync("backend", "src", "NoCTF.API", "Program.cs");
         var hostProgram = await ReadAsync("backend", "src", "NoCTF.Host", "Program.cs");
         var roleModel = await ReadAsync("backend", "src", "NoCTF.Hosting", "HostRoles.cs");
         var routing = await ReadAsync("backend", "src", "NoCTF.Hosting", "MessageRouting.cs");
@@ -32,15 +31,13 @@ public sealed class DeploymentTopologyTests
             "worker-deployment.yaml");
         var kubernetesConfig = await ReadAsync("deploy", "k8s", "configmap.yaml");
 
-        await Assert.That(dockerfile).Contains("AS worker");
-        await Assert.That(dockerfile).Contains("NoCTF.Worker.dll");
         await Assert.That(dockerfile).Contains("AS runtime");
         await Assert.That(dockerfile).Contains("libgssapi-krb5-2");
-        await Assert.That(dockerfile).Contains("FROM runtime AS api");
-        await Assert.That(dockerfile).Contains("FROM runtime AS worker");
-        await Assert.That(dockerfile).Contains("FROM runtime AS runner");
         await Assert.That(dockerfile).Contains("FROM runtime AS host");
         await Assert.That(dockerfile).Contains("NoCTF.Host.dll");
+        await Assert.That(dockerfile).DoesNotContain("NoCTF.API.dll");
+        await Assert.That(dockerfile).DoesNotContain("NoCTF.Worker.dll");
+        await Assert.That(dockerfile).DoesNotContain("NoCTF.Runner.dll");
         await Assert.That(compose).Contains("  noctf:");
         await Assert.That(compose).DoesNotContain("build:");
         await Assert.That(compose).DoesNotContain("  migration:");
@@ -48,8 +45,8 @@ public sealed class DeploymentTopologyTests
         await Assert.That(runtimeEnv).Contains("Hosting__Roles__1=Worker");
         await Assert.That(runtimeEnv).Contains("Hosting__Roles__2=Runner");
         await Assert.That(hostProgram).Contains("DatabaseStartup.InitializeAsync");
-        await Assert.That(apiProgram).Contains("DatabaseStartup.InitializeAsync");
-        await Assert.That(apiProgram).Contains("Database:AutoMigrate");
+        await Assert.That(File.Exists(Path.Combine(
+            RepositoryRoot, "backend", "src", "NoCTF.API", "Program.cs"))).IsFalse();
         await Assert.That(healthcheck).Contains("GET /health/ready HTTP/1.1");
         await Assert.That(dockerfile).Contains("HEALTHCHECK");
         await Assert.That(File.Exists(workerDeployment)).IsTrue();
@@ -335,7 +332,7 @@ public sealed class DeploymentTopologyTests
             .ReplaceLineEndings("\n");
         var publishJob = System.Text.RegularExpressions.Regex.Match(
             ci,
-            "(?ms)^  publish-images:\n(?<body>.*?)(?=^  deploy-test:)")
+            "(?ms)^  publish-images:\n(?<body>.*)$")
             .Groups["body"]
             .Value;
 
@@ -352,8 +349,6 @@ public sealed class DeploymentTopologyTests
         await Assert.That(ci).Contains("CUSTOM_REGISTRY: ${{ vars.CUSTOM_REGISTRY }}");
         await Assert.That(ci).Contains("if: env.CUSTOM_REGISTRY != ''");
         await Assert.That(ci).Contains("target: host");
-        await Assert.That(ci).Contains("steps.build.outputs.digest");
-        await Assert.That(ci).Contains("deployment_repository");
         await Assert.That(ci).Contains("push: true");
         await Assert.That(ci).Contains("provenance: false");
         await Assert.That(ci).Contains("sbom: false");
@@ -364,46 +359,9 @@ public sealed class DeploymentTopologyTests
     }
 
     [Test]
-    public async Task Ci_deploys_the_exact_main_commit_after_image_publication()
-    {
-        var ci = (await ReadAsync(".github", "workflows", "ci.yml"))
-            .ReplaceLineEndings("\n");
-
-        await Assert.That(ci).Contains("  deploy-test:\n");
-        await Assert.That(ci).Contains("    name: Deploy test server\n");
-        await Assert.That(ci).Contains("    needs: publish-images\n");
-        await Assert.That(ci).Contains(
-            "    if: github.event_name == 'push' && github.ref == 'refs/heads/main'\n");
-        await Assert.That(ci).Contains("    environment: production\n");
-        await Assert.That(ci).Contains("      group: noctf-test-deploy\n");
-        await Assert.That(ci).Contains("      cancel-in-progress: false\n");
-        await Assert.That(ci).Contains("NOCTF_DEPLOY_HOST");
-        await Assert.That(ci).Contains("NOCTF_DEPLOY_SSH_KEY");
-        await Assert.That(ci).Contains("NOCTF_DEPLOY_KNOWN_HOSTS");
-        await Assert.That(ci).Contains("DEPLOY_IMAGE: ${{ needs.publish-images.outputs.deployment-image }}");
-        await Assert.That(ci).Contains("Authenticate deployment registry");
-        await Assert.That(ci).Contains("Deploy exact image");
-        await Assert.That(ci).Contains("git archive \\\n");
-        await Assert.That(ci).Contains("$GITHUB_SHA");
-        await Assert.That(ci).Contains("backend/Directory.Build.props");
-        await Assert.That(ci).Contains("deploy/ci/update_image.py");
-        await Assert.That(ci).DoesNotContain("            \"$GITHUB_SHA\"\n          tar -tzf");
-        await Assert.That(ci).Contains("deploy/ci/deploy.sh");
-        await Assert.That(ci).Contains("noctf-ci-upload-$GITHUB_SHA");
-        await Assert.That(ci).Contains("172.26.106.246|noctf.d1no.cn)");
-        await Assert.That(ci).Contains("remote_hostname=$(ssh noctf-deploy hostname)");
-        await Assert.That(ci).Contains("dino209|kmm4gtiu65fr1y)");
-        await Assert.That(ci).Contains("if: always() && steps.verify_test_target.outcome == 'success'");
-        await Assert.That(ci).DoesNotContain("kompose_version=1.38.0");
-        await Assert.That(ci).DoesNotContain("Reused the verified Kompose asset");
-    }
-
-    [Test]
     public async Task External_deployment_artifacts_are_immutable_and_verified()
     {
         var dockerfile = await ReadAsync("backend", "Dockerfile");
-        var deployScript = await ReadAsync("deploy", "ci", "deploy.sh")
-            + await ReadAsync("deploy", "ci", "update_image.py");
         var deploymentFiles = new[]
         {
             await ReadAsync("deploy", "docker-compose.yml"),
@@ -437,18 +395,6 @@ public sealed class DeploymentTopologyTests
         await Assert.That(dockerfile).Contains("--retry-all-errors");
         await Assert.That(dockerfile).Contains("--speed-time 30");
         await Assert.That(dockerfile).Contains("COPY backend/docker-assets/");
-        await Assert.That(deployScript).Contains(
-            "platform_image=${5:?published platform image is required}");
-        await Assert.That(deployScript).Contains("docker-compose.yml");
-        await Assert.That(deployScript).Contains("docker pull \"$platform_image\"");
-        await Assert.That(deployScript).Contains("--no-build");
-        await Assert.That(deployScript).DoesNotContain("run --rm migration");
-        await Assert.That(deployScript).Contains("def schema_fingerprint(postgres)");
-        await Assert.That(deployScript).Contains("validate_existing_config(config, apps)");
-        await Assert.That(deployScript).DoesNotContain("run --rm --pull");
-        await Assert.That(deployScript).DoesNotContain("kompose_asset_path");
-        await Assert.That(deployScript).DoesNotContain(
-            "\"${compose[@]}\" build migration backend worker runner");
 
         var externalRuntimeImages = deploymentFiles
             .SelectMany(content => content.Split('\n'))
@@ -472,25 +418,6 @@ public sealed class DeploymentTopologyTests
     }
 
     [Test]
-    public async Task Production_deployment_never_starts_exporters_or_changes_other_services()
-    {
-        var script = await ReadAsync("deploy", "ci", "deploy.sh")
-            + await ReadAsync("deploy", "ci", "update_image.py");
-        await Assert.That(script).Contains("docker pull \"$platform_image\"");
-        await Assert.That(script).Contains("\"--no-deps\", \"--no-build\", \"--pull\", \"never\"");
-        await Assert.That(script).DoesNotContain("prune --");
-        await Assert.That(script).DoesNotContain("ensure_observability_images");
-        await Assert.That(script).DoesNotContain("nginx -s");
-        await Assert.That(script).DoesNotContain("--remove-orphans");
-        await Assert.That(script).Contains("refusing a new empty deployment");
-        await Assert.That(script).Contains("No automatic database rollback");
-        await Assert.That(script).Contains("CI must never deploy to production");
-        await Assert.That(script).Contains("Network identity changed:");
-        await Assert.That(script).DoesNotContain("\"network\", \"create\"");
-        await Assert.That(script).DoesNotContain("\"network\", \"rm\"");
-    }
-
-    [Test]
     public async Task Production_defaults_disable_telemetry_and_remove_old_overlays()
     {
         var environment = await ReadAsync("deploy", "env", "noctf", ".env.example");
@@ -500,18 +427,49 @@ public sealed class DeploymentTopologyTests
         await Assert.That(registryEnvironment).Contains("OTEL_TRACES_EXPORTER=none");
         foreach (var obsolete in new[] { "docker-compose.single.yml", "docker-compose.ci.yml", "docker-compose.observability.yml" })
             await Assert.That(File.Exists(Path.Combine(RepositoryRoot, "deploy", obsolete))).IsFalse();
+        await Assert.That(File.Exists(Path.Combine(
+            RepositoryRoot, "deploy", "observability", "compose.yml"))).IsTrue();
     }
 
     [Test]
-    public async Task Optional_monitoring_code_does_not_enable_exporters_when_disabled()
+    public async Task External_observability_does_not_restore_an_application_monitoring_consumer()
     {
         var extension = await ReadAsync("backend", "src", "NoCTF.Hosting", "Observability", "ObservabilityExtensions.cs");
         var infrastructure = await ReadAsync("backend", "src", "NoCTF.Infrastructure", "ServiceRegistration.cs");
         var environment = await ReadAsync("deploy", "env", "noctf", ".env.example");
+        var externalCompose = await ReadAsync("deploy", "observability", "compose.yml");
         await Assert.That(extension).Contains("Observability:Enabled");
-        await Assert.That(infrastructure).Contains("Observability:Enabled");
-        await Assert.That(environment).Contains("Observability__PrometheusBaseUrl=");
-        await Assert.That(environment).DoesNotContain("http://prometheus");
+        await Assert.That(infrastructure).DoesNotContain("OperationalMetricsCollector");
+        await Assert.That(environment).DoesNotContain("PrometheusBaseUrl");
+        await Assert.That(externalCompose).Contains("prometheus:");
+        await Assert.That(externalCompose).Contains("grafana:");
+        await Assert.That(externalCompose).Contains("127.0.0.1:");
+        await Assert.That(File.Exists(Path.Combine(
+            RepositoryRoot,
+            "backend", "src", "NoCTF.API", "Endpoints", "Administration",
+            "Platform", "GetPlatformMonitoringEndpoint.cs"))).IsFalse();
+    }
+
+    [Test]
+    public async Task External_observability_is_isolated_private_and_digest_pinned()
+    {
+        var compose = await ReadAsync("deploy", "observability", "compose.yml");
+        var environment = await ReadAsync(
+            "deploy", "observability", ".env.example");
+        var images = environment.Split('\n')
+            .Select(line => line.Trim())
+            .Where(line => line.Contains("_IMAGE=", StringComparison.Ordinal))
+            .ToArray();
+
+        await Assert.That(images).Count().IsEqualTo(7);
+        await Assert.That(images.All(line =>
+            System.Text.RegularExpressions.Regex.IsMatch(
+                line,
+                "^[A-Z_]+_IMAGE=[^ ]+@sha256:[a-f0-9]{64}$"))).IsTrue();
+        await Assert.That(compose).Contains("external: true");
+        await Assert.That(compose).Contains("127.0.0.1:");
+        await Assert.That(compose).DoesNotContain("depends_on:");
+        await Assert.That(compose).DoesNotContain("Observability__PrometheusBaseUrl");
     }
 
     [Test]
@@ -522,14 +480,14 @@ public sealed class DeploymentTopologyTests
             .Select(line => line.Trim())
             .Where(line => line.StartsWith("- uses:", StringComparison.Ordinal))
             .ToArray();
-        await Assert.That(actionReferences).Count().IsEqualTo(2);
+        await Assert.That(actionReferences).Count().IsEqualTo(1);
         await Assert.That(actionReferences.All(line =>
             System.Text.RegularExpressions.Regex.IsMatch(
                 line,
                 "^- uses: [a-z0-9-]+/[a-z0-9-]+@[a-f0-9]{40} # v[0-9]+$"))).IsTrue();
 
         await Assert.That(actionReferences.Count(line =>
-            line.StartsWith("- uses: actions/checkout@", StringComparison.Ordinal))).IsEqualTo(2);
+            line.StartsWith("- uses: actions/checkout@", StringComparison.Ordinal))).IsEqualTo(1);
 
         var ciServiceImages = ci.Split('\n')
             .Select(line => line.Trim())
@@ -564,18 +522,6 @@ public sealed class DeploymentTopologyTests
             .ToArray();
         await Assert.That(e2eServiceImages).Count().IsEqualTo(16);
         await Assert.That(e2eServiceImages.All(IsImmutableTestImage)).IsTrue();
-
-        var e2eRunnerDockerfile = await ReadAsync(
-            "backend", "tests", "NoCTF.E2E", "Dockerfile.runner");
-        var e2eRunnerBaseImages = e2eRunnerDockerfile.Split('\n')
-            .Select(line => line.Trim())
-            .Where(line => line.StartsWith("FROM ", StringComparison.Ordinal))
-            .ToArray();
-        await Assert.That(e2eRunnerBaseImages).Count().IsEqualTo(3);
-        await Assert.That(e2eRunnerBaseImages.All(line =>
-            System.Text.RegularExpressions.Regex.IsMatch(
-                line,
-                "^FROM [^ ]+:[^ @]+@sha256:[a-f0-9]{64}(?: AS [^ ]+)?$"))).IsTrue();
 
         var testSourceFiles = Directory.GetFiles(
                 Path.Combine(RepositoryRoot, "backend", "tests", "NoCTF.Tests"),

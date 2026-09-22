@@ -1,5 +1,4 @@
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Http.Resilience;
 using NoCTF.Application.Admission;
@@ -11,8 +10,7 @@ public static class HumanVerificationInfrastructure
 {
     public static IServiceCollection AddNoCtfHumanVerification(
         this IServiceCollection services,
-        IConfiguration configuration,
-        bool enableMonitoring)
+        IConfiguration configuration)
     {
         services.AddHttpClient(HttpHumanVerificationVerifier.ClientName, client =>
             {
@@ -58,35 +56,25 @@ public static class HumanVerificationInfrastructure
         services.AddSingleton<ICapWorkloadConfigurationClient,
             CapWorkloadConfigurationClient>();
         services.AddScoped<ManageCapWorkloadConfiguration>();
-        if (enableMonitoring)
-        {
-            services.AddHttpClient(CapHumanVerificationMonitor.ClientName, client =>
+        services.AddHttpClient(CapHumanVerificationConfigurationProbe.ClientName,
+                client =>
                 {
                     client.Timeout = Timeout.InfiniteTimeSpan;
                     client.MaxResponseContentBufferSize = 16 * 1024;
                 })
-                .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler
-                {
-                    AllowAutoRedirect = false
-                });
-            services.TryAddSingleton(TimeProvider.System);
-            services.AddSingleton(new CapHumanVerificationMonitoringOptions(
-                configuration["HumanVerification:Monitoring:PublicOrigin"]
-                    ?? string.Empty,
-                TimeSpan.FromSeconds(Math.Max(
-                    5,
-                    configuration.GetValue(
-                        "HumanVerification:Monitoring:IntervalSeconds", 60))),
-                TimeSpan.FromSeconds(Math.Max(
-                    1,
-                    configuration.GetValue(
-                        "HumanVerification:Monitoring:StageTimeoutSeconds", 3)))));
-            services.AddSingleton<CapHumanVerificationMonitor>();
-            services.AddSingleton<IHumanVerificationMonitoringReader>(provider =>
-                provider.GetRequiredService<CapHumanVerificationMonitor>());
-            services.AddHostedService(provider =>
-                provider.GetRequiredService<CapHumanVerificationMonitor>());
-        }
+            .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler
+            {
+                AllowAutoRedirect = false
+            });
+        services.AddSingleton(new CapHumanVerificationValidationOptions(
+            configuration["HumanVerification:Validation:PublicOrigin"]
+                ?? string.Empty,
+            TimeSpan.FromSeconds(Math.Max(
+                1,
+                configuration.GetValue(
+                    "HumanVerification:Validation:StageTimeoutSeconds", 3)))));
+        services.AddSingleton<ICapHumanVerificationConfigurationProbe,
+            CapHumanVerificationConfigurationProbe>();
         return services;
     }
 }

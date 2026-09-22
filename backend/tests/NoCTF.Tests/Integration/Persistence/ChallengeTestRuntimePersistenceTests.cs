@@ -160,7 +160,7 @@ public sealed class ChallengeTestRuntimePersistenceTests
                     "runner-test",
                     RuntimeProvider.Docker,
                     "{}",
-                    ["tcp://127.0.0.1:31337"],
+                    [new RuntimeAccessEndpointMapping(0, "tcp://127.0.0.1:31337", null, null)],
                     runningAt.AddHours(1)),
                 db,
                 outbox,
@@ -177,7 +177,8 @@ public sealed class ChallengeTestRuntimePersistenceTests
                 false,
                 cancellationToken);
             await Assert.That(current?.TestFlag).IsEqualTo(flag.Flag);
-            await Assert.That(current?.Urls).IsEquivalentTo(["tcp://127.0.0.1:31337"]);
+            await Assert.That(current?.AccessEndpoints?.Select(endpoint => endpoint.DirectAddress).OfType<string>())
+                .IsEquivalentTo(["tcp://127.0.0.1:31337"]);
             await Assert.That(await store.FindAsync(
                     fixture.ChallengeId,
                     Guid.CreateVersion7(),
@@ -309,6 +310,7 @@ public sealed class ChallengeTestRuntimePersistenceTests
                         RuntimeAllocation.PerTeam,
                         new ContainerRuntimeDefinition(
                             "challenge:test",
+                            Security: new(false, false, false, ["ALL"], []),
                             FlagEnvironmentVariableName: "CHALLENGE_FLAG",
                             PortMappings: new Dictionary<int, int> { [31337] = 0 }),
                         new RuntimeResourceLimits(67_108_864, 100_000_000, 64),

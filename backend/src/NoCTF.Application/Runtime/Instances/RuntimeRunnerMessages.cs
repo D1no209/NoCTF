@@ -85,10 +85,9 @@ public sealed record RuntimeProvisioned(
     string RunnerId,
     RuntimeProvider Provider,
     string ProviderReceiptJson,
-    IReadOnlyList<string> Urls,
+    IReadOnlyList<RuntimeAccessEndpointMapping> AccessEndpoints,
     DateTimeOffset? ExpiresAt,
-    IReadOnlyList<RuntimePublishedPortMapping>? PublishedPorts = null,
-    IReadOnlyList<RuntimeAccessEndpointMapping>? AccessEndpoints = null);
+    IReadOnlyList<RuntimePublishedPortMapping>? PublishedPorts = null);
 
 public sealed record RuntimeProvisionFailed(
     Guid RuntimeInstanceId,

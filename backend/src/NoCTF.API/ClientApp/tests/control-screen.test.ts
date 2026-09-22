@@ -161,7 +161,7 @@ describe('CTF control screen projection', () => {
       new URL('../app/pages/competitions/[id]/screen.vue', import.meta.url),
     ).exists()
 
-    expect(page).toContain("alias: ['/competitions/:id/live-']")
+    expect(page).not.toContain('alias:')
     expect(page).toContain('useScoreboardMatrix(competitionId)')
     expect(page).toContain('scoreboardUpdated: () => void refreshLatest()')
     expect(page).toContain('refreshTimer = setInterval(() => void refreshLatest(), 15_000)')

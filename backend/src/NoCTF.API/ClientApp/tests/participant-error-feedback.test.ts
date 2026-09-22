@@ -24,34 +24,30 @@ describe('participant error feedback', () => {
   })
 
   test('keeps failed polling visible and recoverable', async () => {
-    const [history, submissions, flag, awdp] = await Promise.all([
+    const [history, flag, awdp] = await Promise.all([
       source('../app/features/challenges/ChallengeSubmissionHistory.vue'),
-      source('../app/pages/competitions/[id]/my/submissions.vue'),
       source('../app/features/challenges/FlagSubmit.vue'),
       source('../app/features/challenges/panels/AwdpPanel.vue'),
     ])
 
     expect(history).toContain('pendingPollingError')
     expect(history).toContain('pendingPollingTimedOut')
-    for (const component of [submissions, flag]) {
+    for (const component of [flag]) {
       expect(component).toContain('pollingError')
       expect(component).toContain('timedOut')
     }
     expect(flag).toContain("throw parseApiError(error, translate(\"ui.failedToRefreshSubmissionStatus\"))")
     expect(flag).toContain('void refreshOne(id).catch((error) => {')
     expect(history).toContain('@click="startPendingPolling"')
-    expect(submissions).toContain('@click="startPolling"')
-    expect(submissions).toContain('void refreshPending().catch((requestError) => {')
     expect(awdp).toContain('statePollingTimedOut')
     expect(awdp).toContain('@click="refreshAndPoll"')
   })
 
   test('reports secondary-data and browser capability failures', async () => {
-    const [layout, team, members, submissions, appLayout, live, awdpLive] = await Promise.all([
+    const [layout, team, members, appLayout, live, awdpLive] = await Promise.all([
       source('../app/pages/competitions/[id].vue'),
       source('../app/pages/competitions/[id]/my/team.vue'),
       source('../app/features/teams/TeamMembers.vue'),
-      source('../app/pages/competitions/[id]/my/submissions.vue'),
       source('../app/layouts/default.vue'),
       source('../app/pages/competitions/[id]/live.vue'),
       source('../app/pages/competitions/[id]/awdp-live.vue'),
@@ -62,7 +58,6 @@ describe('participant error feedback', () => {
     expect(team).toContain('banCaseError')
     expect(team).toContain("ui.thereAreNoOtherTeamMembersToTransferTheCaptain")
     expect(members).toContain('loadError')
-    expect(submissions).toContain('challengeTitlesError')
     expect(appLayout).toContain('platformError')
     expect(appLayout).toContain(':disabled="platformLoading"')
     expect(live).toContain("toast.error(translate(\"ui.theBrowserDeniedFullscreenAccessCheckSitePermissionsOrUse")

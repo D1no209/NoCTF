@@ -38,7 +38,7 @@ internal static class UserCredentialWrite
     {
         if (!db.Database.IsRelational())
         {
-            // Explicit single-process development compatibility, not a relational concurrency implementation.
+            // This development-only lock is not a relational concurrency implementation.
             using var lease = await DevelopmentLocks.LockAsync(observed.Id, ct);
             var current = await db.Users.AsNoTracking().SingleOrDefaultAsync(user => user.Id == observed.Id
                 && user.Kind == UserKind.Human && user.AccountStatus == UserAccountStatus.Active, ct);

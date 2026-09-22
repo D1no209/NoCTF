@@ -83,6 +83,8 @@ function stableCodeMessage(code: string | undefined): string | null {
     case 'HumanVerificationFailed': return translate('ui.humanVerificationFailedPleaseRetry')
     case 'HumanVerificationUnavailable': return translate('ui.humanVerificationProviderUnavailablePleaseRetry')
     case 'HumanVerificationSecretInvalid': return translate('ui.humanVerificationSecretInvalid')
+    case 'CapConfigurationInvalid': return translate('ui.capConfigurationValidationFailed')
+    case 'CapProviderUnavailable': return translate('ui.capProviderUnavailableDuringValidation')
     case 'CapWorkloadProviderNotCap': return translate('ui.capProviderMustBeSelected')
     case 'CapWorkloadDifficultyInvalid': return translate('ui.capDifficultyInvalid')
     case 'CapWorkloadChallengeCountInvalid': return translate('ui.capChallengeCountInvalid')

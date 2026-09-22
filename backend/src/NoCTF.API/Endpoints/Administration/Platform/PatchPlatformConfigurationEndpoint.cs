@@ -28,6 +28,8 @@ public enum SmtpSecurityModeProtocol
 public enum PlatformProblemCode
 {
     HumanVerificationSecretInvalid,
+    CapConfigurationInvalid,
+    CapProviderUnavailable,
     SmtpPasswordInvalid,
     EmailVerificationDisabled,
     EmailDeliveryNotConfigured,
@@ -325,7 +327,7 @@ public sealed class PatchPlatformConfigurationEndpoint(
                     return AtomicAggregatePatchDecision<Results<
                         Ok<AdminPlatformConfigurationResponse>,
                         ProblemHttpResult>>
-                        .Rollback(Invalid(string.Join(" ", result.Errors)));
+                        .Rollback(HumanVerificationInvalid(result.Errors));
                 }
             }
             if ((sections & PlatformConfigurationPatchSection.EmailVerification) != 0)
@@ -397,4 +399,27 @@ public sealed class PatchPlatformConfigurationEndpoint(
         statusCode: StatusCodes.Status400BadRequest,
         title: "Platform configuration is invalid.",
         detail: detail);
+
+    private static ProblemHttpResult HumanVerificationInvalid(
+        IReadOnlyList<HumanVerificationConfigurationError> errors)
+    {
+        var unavailable = errors.Contains(
+            HumanVerificationConfigurationError.CapProviderUnavailable);
+        var code = unavailable
+            ? PlatformProblemCode.CapProviderUnavailable
+            : errors.Contains(HumanVerificationConfigurationError.CapConfigurationInvalid)
+                ? PlatformProblemCode.CapConfigurationInvalid
+                : (PlatformProblemCode?)null;
+        return TypedResults.Problem(
+            statusCode: unavailable
+                ? StatusCodes.Status503ServiceUnavailable
+                : StatusCodes.Status400BadRequest,
+            title: unavailable
+                ? "Cap is unavailable."
+                : "Platform configuration is invalid.",
+            detail: string.Join(" ", errors),
+            extensions: code is null
+                ? null
+                : new Dictionary<string, object?> { ["code"] = code.Value });
+    }
 }

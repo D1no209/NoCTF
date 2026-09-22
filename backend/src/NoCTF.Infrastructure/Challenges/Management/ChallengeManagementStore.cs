@@ -407,7 +407,7 @@ public sealed class ChallengeManagementStore(
     {
         try
         {
-            return CtfConfigurationUpgrader.ParseChallenge(definitionJson).InteractionKind;
+            return CtfConfigurationParser.ParseDefinition(definitionJson).InteractionKind;
         }
         catch (GameModeConfigurationException)
         {

@@ -23,7 +23,6 @@ public sealed record RuntimeInstanceView(
     RuntimeProvider Provider,
     RuntimeState State,
     RuntimeFailureCode? FailureCode,
-    IReadOnlyList<string> Urls,
     DateTimeOffset CreatedAt,
     DateTimeOffset? RunningAt,
     DateTimeOffset? ExpiresAt,
@@ -104,7 +103,6 @@ public interface IRuntimeInstanceStore
 public sealed record RuntimeTargetView(
     Guid TeamId,
     string TeamName,
-    IReadOnlyList<string> Urls,
     Guid? RuntimeInstanceId = null,
     IReadOnlyList<RuntimeAccessEndpointView>? AccessEndpoints = null,
     RuntimeAccessMode AccessMode = RuntimeAccessMode.Direct);

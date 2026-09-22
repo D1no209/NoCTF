@@ -46,6 +46,13 @@ public sealed record AwdpChallengeConfiguration(
     bool CheckerAllowRoot = false)
 {
     public const int CurrentSchemaVersion = 4;
+    public static AwdpChallengeConfiguration Empty { get; } = new(
+        CurrentSchemaVersion,
+        null,
+        null,
+        null,
+        null,
+        null);
 }
 
 public sealed record AwdpEffectiveConfiguration(

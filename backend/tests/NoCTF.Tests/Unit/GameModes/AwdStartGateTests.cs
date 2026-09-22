@@ -51,7 +51,8 @@ public sealed class AwdStartGateTests
                     RuntimeAllocation.PerTeam,
                     new ContainerRuntimeDefinition(
                         "registry.example/awd:v1",
-                        PortMappings: new Dictionary<int, int> { [8080] = 0 }),
+                        PortMappings: new Dictionary<int, int> { [8080] = 0 },
+                        Security: new(false, false, false, ["ALL"], [])),
                     new RuntimeResourceLimits(67_108_864, 100_000_000, 64),
                     UrlBindings:
                     [

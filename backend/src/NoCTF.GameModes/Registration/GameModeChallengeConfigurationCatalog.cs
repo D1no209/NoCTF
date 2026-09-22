@@ -30,13 +30,15 @@ public sealed class GameModeChallengeConfigurationCatalog : IChallengeConfigurat
         int eligibleTeamCount) =>
         [
             .. ValidateOwnedProperties(mode, json, DefinitionProperties(mode), "RulesJson"),
-            .. Validate(mode, json, competitionConfigurationJson, eligibleTeamCount)
+            .. (mode == GameMode.Ctf
+                ? ValidateCtfRules(json, competitionConfigurationJson, eligibleTeamCount)
+                : ValidateSection(mode, json, competitionConfigurationJson, eligibleTeamCount))
         ];
 
     public IReadOnlyList<string> ValidateDefinition(GameMode mode, string json) =>
         [
             .. ValidateOwnedProperties(mode, json, RuleProperties(mode), "DefinitionJson"),
-            .. Validate(
+            .. ValidateSection(
                 mode,
                 json,
                 GameModeDefaultConfiguration.GetCompetitionJson(mode),
@@ -60,8 +62,8 @@ public sealed class GameModeChallengeConfigurationCatalog : IChallengeConfigurat
 
         try
         {
-            var definition = CtfConfigurationUpgrader.ParseChallenge(definitionJson);
-            var rules = CtfConfigurationUpgrader.ParseChallenge(rulesJson);
+            var definition = CtfConfigurationParser.ParseDefinition(definitionJson);
+            var rules = CtfConfigurationParser.ParseRules(rulesJson);
             if (definition.InteractionKind == CtfInteractionKind.PatchVerification)
             {
                 if (rules.MaxFlagAttempts is not null)
@@ -88,11 +90,11 @@ public sealed class GameModeChallengeConfigurationCatalog : IChallengeConfigurat
             return errors;
 
         if (mode == GameMode.Awd
-            && AwdConfigurationUpgrader.ParseChallenge(json).Runtime is null)
+            && AwdConfigurationParser.ParseChallenge(json).Runtime is null)
             errors.Add("Runtime is required before an AWD competition can start.");
         if (mode == GameMode.Ctf)
         {
-            var configuration = CtfConfigurationUpgrader.ParseChallenge(json);
+            var configuration = CtfConfigurationParser.ParseDefinition(json);
             if (configuration.InteractionKind == CtfInteractionKind.PatchVerification)
             {
                 if (configuration.Runtime is null)
@@ -129,6 +131,13 @@ public sealed class GameModeChallengeConfigurationCatalog : IChallengeConfigurat
         GameMode mode,
         string json,
         string competitionConfigurationJson,
+        int eligibleTeamCount) =>
+        ValidateRules(mode, json, competitionConfigurationJson, eligibleTeamCount);
+
+    private static IReadOnlyList<string> ValidateSection(
+        GameMode mode,
+        string json,
+        string competitionConfigurationJson,
         int eligibleTeamCount)
     {
         try
@@ -136,15 +145,15 @@ public sealed class GameModeChallengeConfigurationCatalog : IChallengeConfigurat
             return mode switch
             {
                 GameMode.Ctf => CtfConfigurationValidator.Validate(
-                    CtfConfigurationUpgrader.ParseChallenge(json),
-                    CtfConfigurationUpgrader.ParseCompetition(competitionConfigurationJson),
+                    CtfConfigurationParser.ParseDefinition(json),
+                    CtfConfigurationParser.ParseCompetition(competitionConfigurationJson),
                     eligibleTeamCount),
-                GameMode.Awd => AwdConfigurationValidator.Validate(AwdConfigurationUpgrader.ParseChallenge(json)),
+                GameMode.Awd => AwdConfigurationValidator.Validate(AwdConfigurationParser.ParseChallenge(json)),
                 GameMode.Awdp => ValidateAwdp(
                     json,
                     competitionConfigurationJson,
                     eligibleTeamCount),
-                GameMode.Koh => KohConfigurationValidator.Validate(KohConfigurationUpgrader.ParseChallenge(json)),
+                GameMode.Koh => KohConfigurationValidator.Validate(KohConfigurationParser.ParseChallenge(json)),
                 _ => ["Unsupported game mode."]
             };
         }
@@ -171,9 +180,30 @@ public sealed class GameModeChallengeConfigurationCatalog : IChallengeConfigurat
         [
             .. AwdpConfigurationValidator.Validate(challenge, eligibleTeamCount),
             .. AwdpConfigurationValidator.Validate(
-                AwdpConfigurationResolver.Resolve(competition, challenge),
+                AwdpConfigurationResolver.Resolve(
+                    competition,
+                    challenge,
+                    AwdpChallengeConfiguration.Empty),
                 eligibleTeamCount)
         ];
+    }
+
+    private static IReadOnlyList<string> ValidateCtfRules(
+        string json,
+        string competitionConfigurationJson,
+        int eligibleTeamCount)
+    {
+        try
+        {
+            return CtfConfigurationValidator.Validate(
+                CtfConfigurationParser.ParseRules(json),
+                CtfConfigurationParser.ParseCompetition(competitionConfigurationJson),
+                eligibleTeamCount);
+        }
+        catch (Exception exception) when (exception is GameModeConfigurationException or JsonException)
+        {
+            return [exception.Message];
+        }
     }
 
     private static IReadOnlyList<string> ValidateOwnedProperties(

@@ -26,7 +26,7 @@ Organizer，QQBOT 通常只需 User；这是最小权限部署选择，不是平
 - 客户端在内存持有，以 Bearer Header 使用。
 - Claims 至少含 sub、role、user_kind、token_version、CSPRNG jti、iat、exp、aud 与 `token_type=access`。
 - 管理员签发的 JWT 与登录 Access JWT 使用相同 Claims，不包含 impersonation 或签发管理员来源。
-- 新签发 JWT 不建立服务端会话、不记录签发事实且不支持单枚吊销；`jti` 仅作为普通唯一标识。旧版带 impersonation Claims 的存量 JWT 在最长一年兼容期内继续按历史签发/吊销事实校验，避免已吊销令牌重新生效。
+- 新签发 JWT 不建立服务端会话、不记录签发事实且不支持单枚吊销；`jti` 仅作为普通唯一标识。
 - 每个认证请求比较当前 TokenVersion：Redis 命中直接比较，未命中查 PostgreSQL 回填；Redis 故障回退数据库，不能绕过。
 - 角色/密码/全局退出修改 TokenVersion，并通过 Outbox 失效缓存。
 - 管理员对账号执行全量 Token 撤销同样递增 TokenVersion。

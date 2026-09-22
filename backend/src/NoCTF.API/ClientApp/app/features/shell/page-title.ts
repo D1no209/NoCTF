@@ -11,11 +11,9 @@ const competitionTitles = {
   challenges: 'ui.challenge',
   leaderboard: 'ui.leaderboard',
   questions: 'ui.questions',
-  notifications: 'ui.notifications',
   events: 'ui.activity',
   teams: 'ui.teams',
   live: 'ui.3dLiveScreen',
-  'live-': 'ui.3dLiveScreen',
   'awdp-live': 'ui.controlScreen',
 } satisfies Record<string, MessageKey>
 
@@ -39,7 +37,6 @@ const platformAdministrationTitles = {
   users: 'ui.user',
   bots: 'ui.bot',
   email: 'ui.emailAndHumanVerification',
-  monitoring: 'ui.monitoring',
   runtimes: 'ui.runtimeContainers',
   logs: 'ui.log',
   audit: 'ui.audit',

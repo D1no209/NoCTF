@@ -68,7 +68,7 @@ public sealed class RuntimeInstanceStore(
             .Select(instance => new RuntimeInstanceView(
                 instance.Id, instance.CompetitionId, instance.CompetitionChallengeId, instance.ChallengeId, instance.TeamId,
                 instance.Purpose, instance.RuntimeKind, instance.RuntimeProvider,
-                instance.State, instance.FailureCode, instance.Urls,
+                instance.State, instance.FailureCode,
                 instance.CreatedAt, instance.RunningAt, instance.ExpiresAt, instance.StoppedAt,
                 instance.RunnerId, instance.PublishedPorts.Select(port => new RuntimePublishedPortView(
                     port.ServiceName, port.ContainerPort, port.HostPort)).ToArray(),
@@ -435,7 +435,7 @@ public sealed class RuntimeInstanceStore(
         new(
             instance.Id, instance.CompetitionId, instance.CompetitionChallengeId, instance.ChallengeId, instance.TeamId,
             instance.Purpose, instance.RuntimeKind, instance.RuntimeProvider,
-            instance.State, instance.FailureCode, instance.Urls,
+            instance.State, instance.FailureCode,
             instance.CreatedAt, instance.RunningAt, instance.ExpiresAt, instance.StoppedAt,
             AccessMode: instance.AccessMode,
             AccessEndpoints: instance.AccessEndpoints.OrderBy(endpoint => endpoint.BindingIndex)

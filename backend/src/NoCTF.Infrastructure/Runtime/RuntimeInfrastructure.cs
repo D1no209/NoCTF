@@ -87,10 +87,6 @@ internal static class RuntimeInfrastructure
             services.AddScoped<IRunnerCapacityGate, PersistedRunnerCapacityGate>();
         }
         services.AddSingleton<IRuntimePlacementPolicy, ConfiguredRuntimePlacementPolicy>();
-        services.AddScoped<IRunnerCapacityDiagnostics>(provider => new RedisRunnerCapacityDiagnostics(
-            provider.GetRequiredService<NoCTF.Infrastructure.Persistence.NoCtfDbContext>(),
-            provider.GetService<IConnectionMultiplexer>(), provider.GetRequiredService<TimeProvider>()));
-        services.AddScoped<ObserveRunnerCapacity>();
         services.AddScoped<TeamRuntimeQuota>();
         services.AddScoped<SharedRuntimeCriticalSection>();
 

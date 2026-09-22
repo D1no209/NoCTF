@@ -21,11 +21,6 @@ public static class NoCtfTelemetry
         "noctf.api.rate_limit.rejections", unit: "{request}");
     private static readonly Counter<long> HumanVerifications = Meter.CreateCounter<long>(
         "noctf.api.human_verification", unit: "{verification}");
-    private static readonly Counter<long> HumanVerificationProbes = Meter.CreateCounter<long>(
-        "noctf.human_verification.probe", unit: "{probe}");
-    private static readonly Histogram<double> HumanVerificationProbeDuration =
-        Meter.CreateHistogram<double>(
-            "noctf.human_verification.probe.duration", unit: "s");
     private static readonly UpDownCounter<long> SignalRConnections = Meter.CreateUpDownCounter<long>(
         "noctf.signalr.connections", unit: "{connection}");
     private static readonly Histogram<double> SignalRPublishDuration = Meter.CreateHistogram<double>(
@@ -90,21 +85,11 @@ public static class NoCtfTelemetry
         "noctf.account_notification.issuances", unit: "{issuance}");
     private static readonly Counter<long> AccountNotificationDeliveries = Meter.CreateCounter<long>(
         "noctf.account_notification.deliveries", unit: "{delivery}");
-    private static long _waitingRuntimeCount;
-    private static long _oldestWaitingRuntimeAgeSeconds;
     private static readonly ConcurrentDictionary<string, RunnerCapacitySnapshot> RunnerCapacitySnapshots =
         new(StringComparer.Ordinal);
 
     static NoCtfTelemetry()
     {
-        Meter.CreateObservableGauge(
-            "noctf.runtime.waiting",
-            () => Interlocked.Read(ref _waitingRuntimeCount),
-            unit: "{runtime}");
-        Meter.CreateObservableGauge(
-            "noctf.runtime.waiting.oldest_age",
-            () => Interlocked.Read(ref _oldestWaitingRuntimeAgeSeconds),
-            unit: "s");
         Meter.CreateObservableGauge(
             "noctf.runner.online",
             ObserveRunnerOnline,
@@ -134,20 +119,6 @@ public static class NoCtfTelemetry
             { "action", action.ToLowerInvariant() },
             { "outcome", outcome.ToLowerInvariant() }
         });
-
-    public static void RecordHumanVerificationProbe(
-        string provider,
-        string outcome,
-        double elapsedSeconds)
-    {
-        var tags = new TagList
-        {
-            { "provider", provider.ToLowerInvariant() },
-            { "outcome", outcome.ToLowerInvariant() }
-        };
-        HumanVerificationProbes.Add(1, tags);
-        HumanVerificationProbeDuration.Record(Math.Max(0, elapsedSeconds), tags);
-    }
 
     public static void SignalRConnected(string endpoint) =>
         SignalRConnections.Add(1, new TagList { { "endpoint", endpoint } });
@@ -343,16 +314,6 @@ public static class NoCtfTelemetry
             { "kind", kind },
             { "outcome", outcome }
         });
-
-    public static void UpdateOperationalSnapshot(
-        long waitingRuntimeCount,
-        TimeSpan oldestWaitingRuntimeAge)
-    {
-        Interlocked.Exchange(ref _waitingRuntimeCount, Math.Max(0, waitingRuntimeCount));
-        Interlocked.Exchange(
-            ref _oldestWaitingRuntimeAgeSeconds,
-            Math.Max(0, (long)oldestWaitingRuntimeAge.TotalSeconds));
-    }
 
     public static void UpdateRunnerCapacitySnapshot(
         string pool,

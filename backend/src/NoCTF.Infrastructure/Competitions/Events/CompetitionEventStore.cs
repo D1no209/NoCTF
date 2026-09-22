@@ -558,51 +558,8 @@ public sealed class CompetitionEventStore(
             : null;
 
     internal static CompetitionEventPayload ParsePayload(CompetitionEvent item)
-    {
-        var payload = ParseLegacyPayload(item.PayloadJson);
-        if (item.Kind != CompetitionEventKind.AwdpFixResolved
-            || payload.GameplayFactState is not null)
-            return payload;
-
-        try
-        {
-            var resolved = AwdpFixResolvedEventPayload.Deserialize(item.PayloadJson);
-            if (resolved is null || !Enum.IsDefined(resolved.Outcome))
-                return payload;
-            if (resolved.Outcome == AwdpFixOutcome.PlatformFailed)
-            {
-                return payload with
-                {
-                    GameplayFactKind = GameplayFactKind.FixAttempt,
-                    GameplayFactState = GameplayFactState.PlatformFailed,
-                    GameplayFactResult = null
-                };
-            }
-
-            return payload with
-            {
-                GameplayFactKind = GameplayFactKind.FixAttempt,
-                GameplayFactState = GameplayFactState.Completed,
-                GameplayFactResult = AwdpFixOutcomeMapper.Map(resolved.Outcome).Result
-            };
-        }
-        catch (JsonException)
-        {
-            return payload;
-        }
-    }
-
-    private static CompetitionEventPayload ParseLegacyPayload(string json)
-    {
-        try
-        {
-            return JsonSerializer.Deserialize<CompetitionEventPayload>(json, ExportJsonOptions) ?? new();
-        }
-        catch (JsonException)
-        {
-            return new();
-        }
-    }
+        => JsonSerializer.Deserialize<CompetitionEventPayload>(item.PayloadJson, ExportJsonOptions)
+            ?? throw new JsonException("Competition event payload cannot be null.");
 
     internal sealed record CompetitionEventPayload(
         CompetitionStatus? CompetitionStatus = null,

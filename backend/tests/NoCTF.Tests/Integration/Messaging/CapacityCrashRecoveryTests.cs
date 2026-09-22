@@ -223,7 +223,10 @@ public sealed class CapacityCrashRecoveryTests
         {
             Id = challenge, OwnerId = owner, Mode = GameMode.Ctf, Title = "Fault fixture", CreatedAt = now, UpdatedAt = now,
             DefinitionJson = JsonSerializer.Serialize(new CtfChallengeConfiguration(CtfChallengeConfiguration.CurrentSchemaVersion, null, null,
-                Runtime: new ChallengeRuntimeTemplate(RuntimeAllocation.PerTeam, new ContainerRuntimeDefinition("busybox:1.36.1", ["sleep", "600"]),
+                Runtime: new ChallengeRuntimeTemplate(RuntimeAllocation.PerTeam, new ContainerRuntimeDefinition(
+                    "busybox:1.36.1",
+                    ["sleep", "600"],
+                    Security: new(false, false, false, ["ALL"], [])),
                     new(64 * 1024 * 1024, 200_000_000, 64))), new JsonSerializerOptions(JsonSerializerDefaults.Web))
         });
         db.RuntimeInstances.Add(new RuntimeInstance

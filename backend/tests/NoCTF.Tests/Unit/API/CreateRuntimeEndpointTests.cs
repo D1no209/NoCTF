@@ -92,7 +92,6 @@ public sealed class CreateRuntimeEndpointTests
             RuntimeProvider.Docker,
             state,
             null,
-            [],
             DateTimeOffset.UtcNow,
             null,
             null,

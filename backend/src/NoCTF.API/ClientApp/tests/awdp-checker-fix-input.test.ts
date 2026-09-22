@@ -10,7 +10,7 @@ import {
 import { validateChallengeTemplateDraft } from '../app/lib/challenge-template-validation'
 
 describe('AWDP Checker Fix input', () => {
-  test('loads old schemaVersion 4 JSON as disabled without normalized dirty drift', () => {
+  test('loads current schemaVersion 4 JSON without checkerFixInput as disabled', () => {
     const oldJson = JSON.stringify({ schemaVersion: 4 })
     const model = parseDefinition(oldJson, 'Awdp')
 

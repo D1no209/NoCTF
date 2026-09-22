@@ -12,15 +12,14 @@ S3-compatible object storage（LocalFileSystem 仅非 HA）
 Frontend/reverse proxy
 ```
 
-三个角色可以分别运行在兼容入口中，也可以由 `NoCTF.Host` 以任意非空组合承载。
-`NoCTF.Host` 缺省启用全部角色；使用 `Hosting__Roles__0=Api`、
+`NoCTF.Host` 是唯一可执行入口，并能以任意非空组合承载三个角色。它缺省启用全部角色；使用 `Hosting__Roles__0=Api`、
 `Hosting__Roles__1=Worker`、`Hosting__Roles__2=Runner` 明确配置。角色集合在进程启动后
 不可热切换。
 
 单机部署只提供 `deploy/docker-compose.yml`：五个服务为统一 Host、PostgreSQL、Redis、NATS、Registry。
 使用 CI 预构建镜像、目录 bind mount、分服务 `.env`；无宿主端口发布、Compose expose、迁移容器或
-exporter。HTTP 服务加入既有 `1panel-network`，代理由运维配置。完整目录与升级流程见
-[单机生产部署](../deploy/README.md)。代码与 Kubernetes 仍支持角色拆分；此处不再提供重复 Compose 拓扑。
+exporter。HTTP 服务加入既有 `1panel-network`，代理由运维配置。完整目录与部署流程见
+[单机生产部署](../deploy/README.md)。Kubernetes 角色拆分同样只运行 Host 镜像。
 
 ## CI 容器镜像
 
@@ -108,7 +107,7 @@ Docker/Kubernetes 节点或 Libvirt node CIDR 同时交给两个宿主。
 `Runner__Heartbeat__IntervalSeconds`、`Runner__Heartbeat__TtlSeconds` 和
 `Runner__ProviderFailureHoldSeconds`。周期必须为正，心跳 TTL 必须大于刷新周期。
 Docker/Libvirt 根据可信宿主/cgroup 实际观测自动使用整个执行资源域；不要配置
-`Runner__Capacity__*` 人工容量上限。Kubernetes 使用 Node Allocatable 与 Metrics API。
+Runner 容量完全来自实际资源观测；不得配置人工容量上限。Kubernetes 使用 Node Allocatable 与 Metrics API。
 Provider 创建资源被拒绝、超时或清理失败时，Runner 会在最后一次失败后的 hold 窗口内让
 readiness 失败、停止发布可接单 heartbeat，并记录不含题目配置或凭据的结构化 Warning；成功的
 Provider 创建会立即恢复，hold 到期后也会重新开放一次探测机会，默认窗口为 120 秒。Runner
@@ -119,7 +118,7 @@ Provider 创建会立即恢复，hold 到期后也会重新开放一次探测机
 Kubernetes 清单使用 StatefulSet Pod 名作为 RunnerId，使副本扩缩容和重启保持稳定身份。
 其他编排环境也必须为每个 Runner 副本提供唯一且可恢复的 RunnerId；不得让多个活动副本共享身份。
 
-`Runtime__Kubernetes__PodPidsLimit` 是 Runner 的容量与兼容校验值，必须与该 Pool
+`Runtime__Kubernetes__PodPidsLimit` 是 Runner 的容量与配置校验值，必须与该 Pool
 kubelet 实际统一配置的 `PodPidsLimit` 完全一致；应用配置本身不会修改 kubelet。运维核验节点配置后，
 必须给允许承载题目工作负载的节点设置精确的 `noctf.io/pod-pids-limit=<数值>` 标签。Runner 启动时以
 只读 Node 权限确认至少一个同值、Ready 且可调度的节点；所有单容器与 Compose Runtime Pod 同时强制

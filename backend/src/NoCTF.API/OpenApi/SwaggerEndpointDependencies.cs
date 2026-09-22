@@ -164,8 +164,7 @@ internal sealed class SwaggerAccessTokenVersionReader : IAccessTokenVersionReade
     public Task<bool> IsCurrentAsync(
         Guid userId,
         int tokenVersion,
-        CancellationToken cancellationToken,
-        LegacyAdministratorIssuedAccessToken? legacyAdministratorIssuedToken = null) =>
+        CancellationToken cancellationToken) =>
         Task.FromResult(false);
 }
 
@@ -262,8 +261,6 @@ internal sealed class SwaggerBackendMessagePublisher : IBackendMessagePublisher
 
 internal sealed class SwaggerLeaderboardCache : ILeaderboardCache
 {
-    public Task<LeaderboardResponse?> GetAsync(Guid competitionId, CancellationToken cancellationToken) => Task.FromResult<LeaderboardResponse?>(null);
-    public Task<LeaderboardResponse?> GetFrozenAsync(Guid competitionId, CancellationToken cancellationToken) => Task.FromResult<LeaderboardResponse?>(null);
     public Task RefreshAsync(Guid competitionId, CancellationToken cancellationToken) => Task.CompletedTask;
     public Task InvalidateAsync(Guid competitionId, CancellationToken cancellationToken) => Task.CompletedTask;
 }

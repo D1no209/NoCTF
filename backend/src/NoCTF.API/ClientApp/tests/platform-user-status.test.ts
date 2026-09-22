@@ -9,10 +9,6 @@ describe('platform user account status management', () => {
     const platform = await sourceFile(
       new URL('../app/pages/admin/platform.vue', import.meta.url),
     ).text()
-    const oldBotRoute = await sourceFile(
-      new URL('../app/pages/admin/platform/bots.vue', import.meta.url),
-    ).text()
-
     expect(source).toContain("kind: roleFilter.value === 'Bot' ? 'Bot'")
     expect(source).toContain('keyword: search.value.trim() || null')
     expect(source).toContain('<SelectItem value="Bot">')
@@ -21,7 +17,6 @@ describe('platform user account status management', () => {
     expect(source).toContain("$t('ui.createBot')")
     expect(source).toContain('validation="feature"')
     expect(platform).not.toContain("to: '/admin/platform/bots'")
-    expect(oldBotRoute).toContain("redirect: '/admin/platform/users?filter=Bot'")
   })
 
   test('leaves the initial skeleton after the first paged response', async () => {

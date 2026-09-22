@@ -1,6 +1,9 @@
 using Microsoft.AspNetCore.Http.Features;
+using Microsoft.AspNetCore.Mvc.ApiExplorer;
+using NSwag.AspNetCore;
 using NoCTF.API.Composition;
 using NoCTF.API.Endpoints;
+using NoCTF.API.OpenApi;
 using NoCTF.API.Security;
 using NoCTF.API.SignalR.Hubs;
 using NoCTF.Application.Administration.PlatformLogs;
@@ -16,6 +19,8 @@ using NoCTF.Worker;
 using Wolverine;
 
 var builder = WebApplication.CreateBuilder(args);
+var exportOpenApi = args.Contains("--export-openapi", StringComparer.OrdinalIgnoreCase)
+    || args.Contains("--export-swagger-docs", StringComparer.OrdinalIgnoreCase);
 var apiConfigurationRoot = Path.GetFullPath(Path.Combine(
     builder.Environment.ContentRootPath,
     "..",
@@ -37,10 +42,11 @@ if (Directory.Exists(apiConfigurationRoot))
         .AddCommandLine(args);
 }
 var migrateOnly = args.Contains("--migrate-only", StringComparer.OrdinalIgnoreCase);
-var roles = migrateOnly
+var roles = migrateOnly || exportOpenApi
     ? HostRoles.Only(HostRole.Api)
     : HostRoles.FromConfiguration(builder.Configuration);
 var development = builder.Environment.IsDevelopment();
+builder.Configuration["OpenApi:Exporting"] = exportOpenApi.ToString();
 builder.WebHost.ConfigureKestrel(options => options.Limits.MaxRequestBodySize = null);
 builder.Services.Configure<FormOptions>(options =>
     options.MultipartBodyLengthLimit = long.MaxValue);
@@ -52,7 +58,7 @@ if (roles.Has(HostRole.Api))
     builder.Services.AddNoCtfApi(
         builder.Configuration,
         includeInfrastructure: true,
-        development,
+        development || exportOpenApi,
         endpointAssemblies: [typeof(HealthEndpoint).Assembly]);
     builder.Services.AddNoCtfAuthentication(builder.Configuration);
 }
@@ -69,20 +75,21 @@ if (roles.Has(HostRole.Worker))
     builder.Services.AddNoCtfWorkerRole(
         builder.Configuration,
         collectQueueMetrics: !development && builder.Configuration.GetValue("Observability:Enabled", true),
-        validateMessageTopology: !development);
+        validateMessageTopology: !development,
+        enableClusterScheduling: !development);
 if (roles.Has(HostRole.Runner))
     builder.Services.AddNoCtfRunner(builder.Configuration, development);
-if (!development)
+if (!development && !exportOpenApi)
     builder.Services.AddNoCtfPlatformLogging(builder.Configuration, PlatformLogService.Host);
 
 builder.UseWolverine(options =>
 {
-    options.ConfigureNoCtfApiMessaging(development && roles.Has(HostRole.Api));
+    options.ConfigureNoCtfApiMessaging((development || exportOpenApi) && roles.Has(HostRole.Api));
     if (roles.Has(HostRole.Worker))
         options.ConfigureNoCtfWorkerMessaging(builder.Configuration, durable: !development);
     if (roles.Has(HostRole.Runner))
         options.ConfigureNoCtfRunnerMessaging(builder.Configuration, durable: !development);
-    if (development)
+    if (development || exportOpenApi)
     {
         options.StubAllExternalTransports();
     }
@@ -92,10 +99,14 @@ builder.UseWolverine(options =>
         options.ConfigureNoCtfMessageRouting(builder.Configuration, roles);
     }
 });
-builder.Services.AddNoCtfRoleHealthChecks(builder.Configuration, roles, development);
-builder.Services.AddNoCtfObservability(
+builder.Services.AddNoCtfRoleHealthChecks(
     builder.Configuration,
-    $"noctf-host-{string.Join('-', roles.Values).ToLowerInvariant()}");
+    roles,
+    development || exportOpenApi);
+if (!exportOpenApi)
+    builder.Services.AddNoCtfObservability(
+        builder.Configuration,
+        $"noctf-host-{string.Join('-', roles.Values).ToLowerInvariant()}");
 
 var app = builder.Build();
 if (migrateOnly)
@@ -105,7 +116,8 @@ if (migrateOnly)
     await app.StopAsync();
     return;
 }
-app.UseNoCtfObservability();
+if (!exportOpenApi)
+    app.UseNoCtfObservability();
 if ((development || app.Configuration.GetValue("Database:AutoMigrate", false))
     && (roles.Has(HostRole.Api) || roles.Has(HostRole.Worker)))
     await DatabaseStartup.InitializeAsync(app.Services, app.Configuration, app.Lifetime.ApplicationStopping);
@@ -118,6 +130,16 @@ if (roles.Has(HostRole.Api))
 }
 
 app.MapNoCtfHealthChecks();
+if (exportOpenApi)
+{
+    var registration = app.Services
+        .GetRequiredService<IEnumerable<OpenApiDocumentRegistration>>()
+        .Single(item => item.DocumentName == "v1");
+    var descriptions = app.Services
+        .GetRequiredService<IApiDescriptionGroupCollectionProvider>();
+    await OpenApiExporter.ExportAsync(app, registration, descriptions);
+    return;
+}
 app.Run();
 
 public partial class Program;

@@ -67,7 +67,7 @@ public class JwtIssuerTests
     [Arguments(UserKind.Human, UserRole.User)]
     [Arguments(UserKind.Bot, UserRole.Organizer)]
     [Arguments(UserKind.Bot, UserRole.Administrator)]
-    public async Task Issue_AlwaysOmitsLegacyImpersonationClaims(UserKind kind, UserRole role)
+    public async Task Issue_ContainsEmailVerificationAndJwtIdClaims(UserKind kind, UserRole role)
     {
         var options = Options.Create(new AuthenticationTokenOptions
         {
@@ -87,10 +87,6 @@ public class JwtIssuerTests
             TimeSpan.FromMinutes(10));
         var token = new JwtSecurityTokenHandler().ReadJwtToken(issued.Token);
 
-        await Assert.That(token.Claims.Any(claim =>
-            claim.Type == LegacyAccessTokenClaims.Impersonation)).IsFalse();
-        await Assert.That(token.Claims.Any(claim =>
-            claim.Type == LegacyAccessTokenClaims.ImpersonatorId)).IsFalse();
         await Assert.That(token.Claims.Single(claim => claim.Type == "email_verified").Value)
             .IsEqualTo("false");
         await Assert.That(Guid.Parse(token.Id)).IsEqualTo(issued.JwtId);

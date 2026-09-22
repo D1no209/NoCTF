@@ -64,7 +64,7 @@ dotnet ef migrations remove
 dotnet ef database update
 ```
 
-禁止编辑生成文件。本目标不兼容旧 schema，最终只有 EF 生成 InitialBaseline。
+禁止编辑生成文件。迁移链只描述当前契约；旧 schema 不提供解析、双读或回退路径。
 
 ## Bounded Concepts
 
@@ -111,7 +111,7 @@ OpenAPI 的源头是 API endpoint 元数据。导出命令会同时更新提交�
 `backend/src/NoCTF.API/wwwroot/openapi/v1.json`：
 
 ```powershell
-dotnet run --project backend/src/NoCTF.API/NoCTF.API.csproj -- --export-openapi
+dotnet run --project backend/src/NoCTF.Host/NoCTF.Host.csproj -- --export-openapi
 ```
 
 前端 SDK 由 `ClientApp/openapi-ts.config.ts` 从 `wwwroot/openapi/v1.json` 生成到

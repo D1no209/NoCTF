@@ -38,10 +38,17 @@ public sealed class CtfCompletionEligibilityTests
             [Fact(guest, 1), Fact(first, 2), Fact(first, 3), Fact(second, 4)],
             [new(challenge, "Web", "test", false, InteractionKind: interaction)], ProjectedAt: at.AddMinutes(1));
         var expected = new CtfLeaderboardProjector().Project(input);
-        var result = new LeaderboardProjectionEngine(new LeaderboardProjectorCatalog()).ProjectOutputs(input).Legacy;
-        await Assert.That(result.Entries.Single(team => team.TeamId == first).Cells!.Single().BloodRank).IsEqualTo(LeaderboardBloodRank.First);
-        await Assert.That(result.Entries.Single(team => team.TeamId == second).Cells!.Single().BloodRank).IsEqualTo(LeaderboardBloodRank.Second);
-        await Assert.That(result.Entries.Single(team => team.TeamId == guest).Cells!.Single().BloodRank).IsNull();
-        await Assert.That(result.Entries.Select(team => (team.TeamId, team.Score))).IsEquivalentTo(expected.Entries.Select(team => (team.TeamId, team.Score)));
+        var result = new LeaderboardProjectionEngine(new LeaderboardProjectorCatalog()).Project(input);
+        await Assert.That(result.Snapshot.Teams.Single(team => team.TeamId == first).Slots
+            .SelectMany(slot => slot.Entries)
+            .Any(entry => entry.Award == ScoreboardAward.FirstBlood)).IsTrue();
+        await Assert.That(result.Snapshot.Teams.Single(team => team.TeamId == second).Slots
+            .SelectMany(slot => slot.Entries)
+            .Any(entry => entry.Award == ScoreboardAward.SecondBlood)).IsTrue();
+        await Assert.That(result.Snapshot.Teams.Single(team => team.TeamId == guest).Slots
+            .SelectMany(slot => slot.Entries)
+            .All(entry => entry.Award is null)).IsTrue();
+        await Assert.That(result.Snapshot.Teams.Select(team => (team.TeamId, team.TotalScore)))
+            .IsEquivalentTo(expected.Entries.Select(team => (team.TeamId, TotalScore: team.Score)));
     }
 }

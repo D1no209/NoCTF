@@ -118,14 +118,6 @@ public sealed class HistoricalAdjudicationAnalyzerTests
         await Assert.That(result.Differences.Any(item => item.Classification == AdjudicationFindingClassification.EligibilityAdjustment)).IsTrue();
     }
 
-    [Test]
-    public async Task Legacy_events_without_processing_state_remain_incomplete_evidence()
-    {
-        var result = HistoricalAdjudicationAnalyzer.Analyze(Evidence(Decision(1, GameplayFactResult.Wrong, null)));
-        await Assert.That(result.EvidenceCompleteness).IsEqualTo(AdjudicationEvidenceCompleteness.MissingFields);
-        await Assert.That(result.Differences.All(item => item.Certainty == AdjudicationDifferenceCertainty.NeedsReview)).IsTrue();
-    }
-
     [Test, Arguments(GameplayFactResult.Correct), Arguments(GameplayFactResult.Wrong)]
     public async Task Ordinary_nonparticipants_without_awards_or_adjustments_do_not_need_review(GameplayFactResult result)
     {

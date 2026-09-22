@@ -1240,29 +1240,6 @@ public sealed class LeaderboardEndpointTests
     {
         public List<Guid> InvalidatedCompetitionIds { get; } = [];
 
-        public Task<LeaderboardResponse?> GetAsync(
-            Guid competitionId,
-            CancellationToken cancellationToken) =>
-            Task.FromResult<LeaderboardResponse?>(
-                missing
-                    ? null
-                    : new(competitionId, DateTimeOffset.UtcNow, []));
-
-        public Task<LeaderboardResponse?> GetFrozenAsync(
-            Guid competitionId,
-            CancellationToken cancellationToken) =>
-            Task.FromResult<LeaderboardResponse?>(frozen
-                ? new LeaderboardResponse(
-                    competitionId,
-                    DateTimeOffset.UtcNow.AddMinutes(-5),
-                    [])
-                {
-                    Visibility = CompetitionLeaderboardVisibility.Frozen,
-                    DataScope = LeaderboardDataScope.Frozen,
-                    DataAsOf = DateTimeOffset.UtcNow.AddMinutes(-5)
-                }
-                : null);
-
         public Task<ScoreboardProjection?> GetScoreboardAsync(
             Guid competitionId,
             CancellationToken cancellationToken) =>
@@ -1366,17 +1343,9 @@ public sealed class LeaderboardEndpointTests
                 ? first
                 : second));
 
-        public Task<LeaderboardResponse?> GetFrozenAsync(
-            Guid competitionId,
-            CancellationToken cancellationToken) => Task.FromResult<LeaderboardResponse?>(null);
-
         public Task<ScoreboardProjection?> GetScoreboardAsync(
             Guid competitionId,
             CancellationToken cancellationToken) => Task.FromResult<ScoreboardProjection?>(null);
-
-        public Task<LeaderboardResponse?> GetAsync(
-            Guid competitionId,
-            CancellationToken cancellationToken) => Task.FromResult<LeaderboardResponse?>(null);
 
         public Task RefreshAsync(Guid competitionId, CancellationToken cancellationToken) => Task.CompletedTask;
 

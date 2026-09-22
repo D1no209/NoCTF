@@ -97,7 +97,6 @@ public sealed class RuntimeTargetReader(
             {
                 instance.Id,
                 TeamId = instance.TeamId!.Value,
-                instance.Urls,
                 instance.AccessMode,
                 AccessEndpoints = instance.AccessEndpoints
                     .OrderBy(endpoint => endpoint.BindingIndex)
@@ -113,12 +112,7 @@ public sealed class RuntimeTargetReader(
         return teams.Select(team =>
         {
             if (!byTeam.TryGetValue(team.Id, out var runtime))
-                return new RuntimeTargetView(team.Id, team.Name, []);
-            var urls = RuntimeParticipantUrlProjection.Filter(
-                runtimeTemplates,
-                GameMode.Awd,
-                challenge.DefinitionJson,
-                runtime.Urls);
+                return new RuntimeTargetView(team.Id, team.Name);
             var endpoints = RuntimeParticipantUrlProjection.Filter(
                 runtimeTemplates,
                 GameMode.Awd,
@@ -127,7 +121,6 @@ public sealed class RuntimeTargetReader(
             return new RuntimeTargetView(
                 team.Id,
                 team.Name,
-                urls,
                 runtime.Id,
                 endpoints,
                 runtime.AccessMode);

@@ -21,9 +21,9 @@ public sealed class GameModeCompetitionConfigurationValidator : ICompetitionConf
             return mode switch
             {
                 GameMode.Ctf => ValidateCtf(json, eligibleTeamCount, challengeConfigurationJsons),
-                GameMode.Awd => Awd.Configuration.AwdConfigurationValidator.Validate(Awd.Configuration.AwdConfigurationUpgrader.ParseCompetition(json)),
+                GameMode.Awd => Awd.Configuration.AwdConfigurationValidator.Validate(Awd.Configuration.AwdConfigurationParser.ParseCompetition(json)),
                 GameMode.Awdp => ValidateAwdp(json, eligibleTeamCount, challengeConfigurationJsons),
-                GameMode.Koh => Koh.Configuration.KohConfigurationValidator.Validate(Koh.Configuration.KohConfigurationUpgrader.ParseCompetition(json)),
+                GameMode.Koh => Koh.Configuration.KohConfigurationValidator.Validate(Koh.Configuration.KohConfigurationParser.ParseCompetition(json)),
                 _ => ["Unsupported game mode."]
             };
         }
@@ -55,7 +55,8 @@ public sealed class GameModeCompetitionConfigurationValidator : ICompetitionConf
                     errors.AddRange(Awdp.Configuration.AwdpConfigurationValidator.ValidateForStart(
                         Awdp.Configuration.AwdpConfigurationResolver.Resolve(
                             competition,
-                            challenge)));
+                            challenge,
+                            Awdp.Configuration.AwdpChallengeConfiguration.Empty)));
                 }
             }
             else if (mode == GameMode.Koh)
@@ -63,7 +64,7 @@ public sealed class GameModeCompetitionConfigurationValidator : ICompetitionConf
                 foreach (var challengeJson in challengeConfigurationJsons)
                 {
                     errors.AddRange(Koh.Configuration.KohConfigurationValidator.ValidateForStart(
-                        Koh.Configuration.KohConfigurationUpgrader.ParseChallenge(
+                        Koh.Configuration.KohConfigurationParser.ParseChallenge(
                             challengeJson)));
                 }
             }
@@ -107,9 +108,9 @@ public sealed class GameModeCompetitionConfigurationValidator : ICompetitionConf
             {
                 foreach (var challenge in challenges)
                 {
-                    var definition = Ctf.Configuration.CtfConfigurationUpgrader.ParseChallenge(
+                    var definition = Ctf.Configuration.CtfConfigurationParser.ParseDefinition(
                         challenge.DefinitionJson);
-                    var rules = Ctf.Configuration.CtfConfigurationUpgrader.ParseChallenge(
+                    var rules = Ctf.Configuration.CtfConfigurationParser.ParseRules(
                         challenge.RulesJson);
                     if (definition.InteractionKind
                             == NoCTF.Domain.Challenges.CtfInteractionKind.PatchVerification)
@@ -130,7 +131,7 @@ public sealed class GameModeCompetitionConfigurationValidator : ICompetitionConf
                 foreach (var challenge in challenges)
                 {
                     errors.AddRange(Koh.Configuration.KohConfigurationValidator.ValidateForStart(
-                        Koh.Configuration.KohConfigurationUpgrader.ParseChallenge(
+                        Koh.Configuration.KohConfigurationParser.ParseChallenge(
                             challenge.DefinitionJson)));
                 }
             }
@@ -148,11 +149,11 @@ public sealed class GameModeCompetitionConfigurationValidator : ICompetitionConf
         int eligibleTeamCount,
         IReadOnlyList<string> challengeConfigurationJsons)
     {
-        var competition = Ctf.Configuration.CtfConfigurationUpgrader.ParseCompetition(json);
+        var competition = Ctf.Configuration.CtfConfigurationParser.ParseCompetition(json);
         var errors = Ctf.Configuration.CtfConfigurationValidator.Validate(competition, eligibleTeamCount).ToList();
         foreach (var challengeJson in challengeConfigurationJsons)
         {
-            var challenge = Ctf.Configuration.CtfConfigurationUpgrader.ParseChallenge(challengeJson);
+            var challenge = Ctf.Configuration.CtfConfigurationParser.ParseRules(challengeJson);
             errors.AddRange(Ctf.Configuration.CtfConfigurationValidator.Validate(
                 challenge, competition, eligibleTeamCount));
         }
@@ -180,7 +181,8 @@ public sealed class GameModeCompetitionConfigurationValidator : ICompetitionConf
             errors.AddRange(Awdp.Configuration.AwdpConfigurationValidator.Validate(
                 Awdp.Configuration.AwdpConfigurationResolver.Resolve(
                     competition,
-                    challenge),
+                    challenge,
+                    Awdp.Configuration.AwdpChallengeConfiguration.Empty),
                 eligibleTeamCount));
         }
         return errors;

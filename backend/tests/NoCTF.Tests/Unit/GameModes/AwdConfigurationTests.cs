@@ -23,7 +23,7 @@ public sealed class AwdConfigurationTests
             ServiceUnhealthyPenalty: 40);
 
         var json = JsonSerializer.Serialize(configuration, new JsonSerializerOptions(JsonSerializerDefaults.Web));
-        var parsed = AwdConfigurationUpgrader.ParseCompetition(json);
+        var parsed = AwdConfigurationParser.ParseCompetition(json);
 
         await Assert.That(parsed).IsEqualTo(configuration);
         await Assert.That(AwdConfigurationValidator.Validate(parsed)).IsEmpty();
@@ -47,7 +47,7 @@ public sealed class AwdConfigurationTests
             }
             """;
 
-        var parsed = AwdConfigurationUpgrader.ParseChallenge(json);
+        var parsed = AwdConfigurationParser.ParseChallenge(json);
 
         await Assert.That(parsed.AttackRewardMode).IsEqualTo(AttackRewardMode.SplitVictimDefensePool);
         await Assert.That(parsed.AttackPoints).IsEqualTo(0L);
@@ -95,7 +95,7 @@ public sealed class AwdConfigurationTests
             }
             """;
 
-        await Assert.That(() => AwdConfigurationUpgrader.ParseCompetition(json))
+        await Assert.That(() => AwdConfigurationParser.ParseCompetition(json))
             .Throws<GameModeConfigurationException>();
     }
 

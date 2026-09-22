@@ -124,7 +124,7 @@ public sealed class AwdCheckerWorkReader(
             target.Runtime.RuntimeProvider,
             target.Runtime.ProviderReceiptJson!,
             target.Runtime.Id,
-            AwdConfigurationUpgrader.ParseChallenge(target.ChallengeDefinition).Checker?.TargetServiceName,
+            AwdConfigurationParser.ParseChallenge(target.ChallengeDefinition).Checker?.TargetServiceName,
             providers,
             cancellationToken);
         if (targetHost is null)

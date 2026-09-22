@@ -63,13 +63,23 @@ public sealed class AuthenticationStore(
             ct);
         if (user is null || user.Kind != UserKind.Human)
             return false;
-        var result = passwordHasher.VerifyHashedPassword(user, user.PasswordHash, password);
-        if (result == PasswordVerificationResult.SuccessRehashNeeded)
+        if (!IsCurrentPasswordHash(user.PasswordHash))
+            return false;
+        return passwordHasher.VerifyHashedPassword(user, user.PasswordHash, password)
+            == PasswordVerificationResult.Success;
+    }
+
+    private static bool IsCurrentPasswordHash(string hash)
+    {
+        try
         {
-            return await UserCredentialWrite.ReplaceAsync(db, user, passwordHasher.HashPassword(user, password),
-                invalidateTokens: false, timeProvider.GetUtcNow(), ct);
+            var decoded = Convert.FromBase64String(hash);
+            return decoded.Length > 0 && decoded[0] == 0x01;
         }
-        return result != PasswordVerificationResult.Failed;
+        catch (FormatException)
+        {
+            return false;
+        }
     }
 
     public async Task<AuthenticatedUser?> FindByIdAsync(Guid userId, CancellationToken ct) =>

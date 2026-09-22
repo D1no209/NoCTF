@@ -58,12 +58,24 @@ public sealed class ReplaceHumanVerificationSecretEndpoint(
             ct);
         if (result.State != HumanVerificationConfigurationUpdateState.Updated)
         {
+            var unavailable = result.Errors.Contains(
+                HumanVerificationConfigurationError.CapProviderUnavailable);
+            var invalidConfiguration = result.Errors.Contains(
+                HumanVerificationConfigurationError.CapConfigurationInvalid);
             return TypedResults.Problem(
-                statusCode: StatusCodes.Status400BadRequest,
-                title: "Human verification secret is invalid.",
+                statusCode: unavailable
+                    ? StatusCodes.Status503ServiceUnavailable
+                    : StatusCodes.Status400BadRequest,
+                title: unavailable
+                    ? "Cap is unavailable."
+                    : "Human verification secret is invalid.",
                 extensions: new Dictionary<string, object?>
                 {
-                    ["code"] = PlatformProblemCode.HumanVerificationSecretInvalid
+                    ["code"] = unavailable
+                        ? PlatformProblemCode.CapProviderUnavailable
+                        : invalidConfiguration
+                            ? PlatformProblemCode.CapConfigurationInvalid
+                            : PlatformProblemCode.HumanVerificationSecretInvalid
                 });
         }
 

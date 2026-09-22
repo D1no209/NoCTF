@@ -26,9 +26,6 @@ public sealed class RunnerAwdpFixRegistrationTests
                 ["Runner:Provider"] = "Docker",
                 ["Runner:Pool"] = "runner-pool",
                 ["Runner:Id"] = "runner-1",
-                ["Runner:Capacity:MemoryBytes"] = "1073741824",
-                ["Runner:Capacity:NanoCpus"] = "1000000000",
-                ["Runner:Capacity:PidsLimit"] = "512",
                 ["Runner:Heartbeat:IntervalSeconds"] = "5",
                 ["Runner:Heartbeat:TtlSeconds"] = "15"
             })

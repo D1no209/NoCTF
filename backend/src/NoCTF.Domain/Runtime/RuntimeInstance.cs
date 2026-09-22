@@ -112,7 +112,6 @@ public sealed class RuntimeInstance
     public RuntimeFailureCode? FailureCode { get; set; }
     public string? ProviderReceiptJson { get; set; }
     public RuntimeCapacityAllocations CapacityAllocations { get; set; } = RuntimeCapacityAllocations.Empty;
-    public string[] Urls { get; set; } = [];
     public List<RuntimeAccessEndpoint> AccessEndpoints { get; set; } = [];
     public DateTimeOffset CreatedAt { get; set; }
     public DateTimeOffset? RunningAt { get; set; }

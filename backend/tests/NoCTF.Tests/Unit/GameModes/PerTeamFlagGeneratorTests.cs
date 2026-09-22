@@ -96,7 +96,7 @@ public sealed class PerTeamFlagGeneratorTests
             [],
             FlagTemplate: new("competition", "[TEAMHASH]", false));
         var inherited = new CtfChallengeConfiguration(
-            CtfChallengeConfiguration.CurrentSchemaVersion,
+            CtfConfiguration.CurrentSchemaVersion,
             null,
             null);
         var overridden = inherited with

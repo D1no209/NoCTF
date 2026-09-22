@@ -20,7 +20,7 @@ POST/PUT/DELETE。它不是服务端全量配置验证，也不保证后续写�
 
 | 内容 | 当前约定 |
 | --- | --- |
-| CTF Definition / Rules | schemaVersion 2；分值在 rules.scoreCurve |
+| CTF Definition / Rules | Definition 为 schemaVersion 3，Rules 为 schemaVersion 2；分值在 rules.scoreCurve |
 | AWD Definition / Rules | schemaVersion 4；分值在 attackPoints、serviceHealthyPoints 等规则中 |
 | AWDP Definition / Rules | schemaVersion 4；Break 与 Fix 分别配置曲线 |
 | KoH Definition / Rules | schemaVersion 1；controlPointsPerInterval |

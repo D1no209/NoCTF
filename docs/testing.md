@@ -83,7 +83,7 @@ skip；Release 的受控 Libvirt Runner 应设置该变量并使用专用 fixtur
 
 ### 无容器开发宿主
 
-`Development` 环境由 API 兼容入口单进程承载全部角色的 Wolverine handlers，使用
+`Development` 环境由 `NoCTF.Host` 单进程承载全部角色的 Wolverine handlers，使用
 EF Core InMemory、Wolverine 本地内存队列、FusionCache L1 和 Runner 容量门。生命周期、
 Runner assignment、AWD checker 的维护消息也由该进程启动；排行榜投影和 SignalR 通知
 仍执行真实应用逻辑，只省略 Redis L2、backplane 和通知中继。生产使用相同的排行榜与
@@ -101,7 +101,7 @@ FusionCache 按用途分为三个命名 profile：`leaderboards` 承载排行榜
 从 `backend` 目录启动：
 
 ```bash
-dotnet run --project src/NoCTF.API/NoCTF.API.csproj --launch-profile Development
+dotnet run --project src/NoCTF.Host/NoCTF.Host.csproj --launch-profile Development
 ```
 
 默认地址是 `http://localhost:5080`，开发管理员是 `dev-admin`，密码是
@@ -137,10 +137,9 @@ dotnet run --file backend/tests/e2e.cs -- --mode awd --keep-environment
 `--mode` 可取 `ctf`、`awd`、`awdp`、`koh`、`all`；`--suite` 可取 `smoke`、
 `full`。编排器从自身源文件位置定位仓库，为每个模式生成唯一 Compose project、
 network、volume、镜像、Runner pool 和随机凭据，以 Docker 分配的 backend host
-port 启动 API、Worker、Runner，等待健康检查与 Runner heartbeat 后在宿主机运行
-TUnit。失败时输出 Compose 状态以及 API、Worker、Runner 日志。默认总会清理；
-统一宿主测试还覆盖全部七种非空角色组合、单进程 durable routing，以及 Host 与兼容入口
-混合运行时的消费与 singular-agent 协调。
+port 启动三个只运行 `NoCTF.Host.dll` 的角色容器，等待健康检查与 Runner heartbeat 后在宿主机运行
+TUnit。失败时输出 Compose 状态以及各角色 Host 日志。默认总会清理；
+统一宿主测试还覆盖全部七种非空角色组合与单进程 durable routing。
 `--keep-environment` 会保留现场并打印精确清理命令。
 
 API、Worker 与 Runner 的部署配置共同指定 Docker placement。题目 Definition 和

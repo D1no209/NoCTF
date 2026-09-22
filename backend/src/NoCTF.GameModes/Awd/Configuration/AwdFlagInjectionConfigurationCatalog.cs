@@ -11,7 +11,7 @@ public sealed class AwdFlagInjectionConfigurationCatalog : IAwdFlagInjectionConf
 {
     public AwdFlagInjectionSettings? Get(string challengeConfigurationJson)
     {
-        var injection = AwdConfigurationUpgrader.ParseChallenge(challengeConfigurationJson).FlagInjection;
+        var injection = AwdConfigurationParser.ParseChallenge(challengeConfigurationJson).FlagInjection;
         return injection is null
             ? null
             : new(injection.Command, injection.TimeoutSeconds, injection.ServiceName);

@@ -56,7 +56,7 @@ public sealed class PlatformUserTokenHttpTests
     }
 
     [Test]
-    public async Task Role_controls_issuance_and_legacy_claims_do_not_reduce_administrator_permissions()
+    public async Task Role_controls_issuance()
     {
         var targetId = Guid.NewGuid();
         var store = ActiveTargetStore(targetId);
@@ -72,13 +72,13 @@ public sealed class PlatformUserTokenHttpTests
             $"/api/v1/admin/platform/users/{targetId}/tokens",
             new { expiresInSeconds = 3600 });
         client.DefaultRequestHeaders.Authorization =
-            new AuthenticationHeaderValue("Bearer", "ImpersonatedAdministrator");
-        using var legacyAdministrator = await client.PostAsJsonAsync(
+            new AuthenticationHeaderValue("Bearer", "Administrator");
+        using var administrator = await client.PostAsJsonAsync(
             $"/api/v1/admin/platform/users/{targetId}/tokens",
             new { expiresInSeconds = 3600 });
 
         await Assert.That(forbiddenRole.StatusCode).IsEqualTo(HttpStatusCode.Forbidden);
-        await Assert.That(legacyAdministrator.StatusCode).IsEqualTo(HttpStatusCode.OK);
+        await Assert.That(administrator.StatusCode).IsEqualTo(HttpStatusCode.OK);
         issuer.Received(1).Issue(Arg.Any<AuthenticatedUser>(), Arg.Any<DateTimeOffset>(), Arg.Any<TimeSpan>());
     }
 
@@ -222,11 +222,6 @@ public sealed class PlatformUserTokenHttpTests
                 new(ClaimTypes.Role, role),
                 new("user_kind", "Human")
             };
-            if (token.StartsWith("Impersonated", StringComparison.Ordinal))
-            {
-                claims.Add(new(LegacyAccessTokenClaims.Impersonation, "true"));
-                claims.Add(new(LegacyAccessTokenClaims.ImpersonatorId, Guid.NewGuid().ToString()));
-            }
             var identity = new ClaimsIdentity(claims, Scheme.Name);
             return Task.FromResult(AuthenticateResult.Success(new AuthenticationTicket(
                 new ClaimsPrincipal(identity),

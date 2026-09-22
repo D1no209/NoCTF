@@ -12,7 +12,10 @@ public sealed class AwdpTargetDefinitionFactoryTests
         var operationId = Guid.Parse("11111111-1111-1111-1111-111111111111");
         var template = new ChallengeRuntimeTemplate(
             RuntimeAllocation.PerTeam,
-            new ContainerRuntimeDefinition("target:latest", InternalPorts: [8080]));
+            new ContainerRuntimeDefinition(
+                "target:latest",
+                Security: new(false, false, false, ["ALL"], []),
+                InternalPorts: [8080]));
 
         var definition = AwdpTargetDefinitionFactory.Create(
             operationId,
@@ -33,7 +36,7 @@ public sealed class AwdpTargetDefinitionFactoryTests
         await Assert.That(definition.Security.ReadonlyRootfs).IsFalse();
         await Assert.That(definition.Security.RunAsNonRoot).IsFalse();
         await Assert.That(definition.Security.CapAdd).IsEmpty();
-        await Assert.That(definition.Security.CapDrop).IsEmpty();
+        await Assert.That(definition.Security.CapDrop).IsEquivalentTo(["ALL"]);
     }
 
     [Test]

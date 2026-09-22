@@ -44,7 +44,9 @@ public sealed class RuntimeDispatchAllocationTests
             string Definition(RuntimeResourceLimits resources) => JsonSerializer.Serialize(new CtfChallengeConfiguration(
                 CtfChallengeConfiguration.CurrentSchemaVersion, null, null, Runtime: new ChallengeRuntimeTemplate(RuntimeAllocation.PerTeam,
                     compose ? new ComposeRuntimeDefinition("services:\n  web:\n    image: busybox:1.36.1\n", new Dictionary<string, RuntimeResourceLimits> { ["web"] = resources })
-                        : new ContainerRuntimeDefinition("busybox:1.36.1"), resources)), new JsonSerializerOptions(JsonSerializerDefaults.Web));
+                        : new ContainerRuntimeDefinition(
+                            "busybox:1.36.1",
+                            Security: new(false, false, false, ["ALL"], [])), resources)), new JsonSerializerOptions(JsonSerializerDefaults.Web));
             db.Challenges.Add(new Challenge
             {
                 Id = challengeId, OwnerId = fixture.OwnerId, Mode = GameMode.Ctf, Title = "Allocation limits",
@@ -58,8 +60,12 @@ public sealed class RuntimeDispatchAllocationTests
                 TestFlagState = RuntimeTestFlagState.NotRequired, CreatedAt = fixture.Now
             });
             await db.SaveChangesAsync(ct);
-            await new RedisRunnerAvailabilityRegistry(redis).RegisterAsync(new("tests", "runner", RuntimeProvider.Docker,
-                "test", new(1024L * 1024 * 1024, 4_000_000_000, 2048), TimeSpan.FromMinutes(1), false), ct);
+            await new RedisRunnerAvailabilityRegistry(redis).RegisterAsync(
+                CurrentRunnerRegistration.Create(
+                    "tests",
+                    "runner",
+                    new(1024L * 1024 * 1024, 4_000_000_000, 2048)),
+                ct);
             var outbox = new Outbox();
             var raw = new RedisRunnerCapacityGate(redis);
             var capacity = new PersistedRunnerCapacityGate(db, raw, outbox);
@@ -98,7 +104,7 @@ public sealed class RuntimeDispatchAllocationTests
             await Assert.That(rejected.RunnerId).IsEqualTo("runner");
             await Assert.That(rejected.CapacityAllocations.Items.Single()).IsEqualTo(allocation);
             await Assert.That(outbox.Messages.OfType<IRuntimeProvisionMessage>().Count()).IsEqualTo(1);
-            await Assert.That((long)await redis.GetDatabase().HashGetAsync("runner:runner:capacity", "availableNanoCpus")).IsEqualTo(3_500_000_000);
+            await Assert.That((long)await redis.GetDatabase().HashGetAsync("runner:runner:capacity", "admissionAvailableNanoCpus")).IsEqualTo(3_500_000_000);
         });
     }
 

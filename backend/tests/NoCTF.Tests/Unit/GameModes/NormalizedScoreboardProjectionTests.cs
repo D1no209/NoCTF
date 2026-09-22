@@ -15,7 +15,7 @@ public sealed class NormalizedScoreboardProjectionTests
 {
     private static ScoreboardProjection ProjectNormalized(
         LeaderboardProjectionEngine engine,
-        LeaderboardProjectionInput input) => engine.ProjectOutputs(input).Scoreboard;
+        LeaderboardProjectionInput input) => engine.Project(input);
 
     private static readonly DateTimeOffset Start =
         DateTimeOffset.Parse("2026-08-19T00:00:00Z");

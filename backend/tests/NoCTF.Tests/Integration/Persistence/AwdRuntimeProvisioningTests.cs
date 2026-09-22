@@ -362,7 +362,9 @@ public sealed class AwdRuntimeProvisioningTests
                     AwdChallengeConfiguration.CurrentSchemaVersion,
                     Runtime: new ChallengeRuntimeTemplate(
                         RuntimeAllocation.PerTeam,
-                        new ContainerRuntimeDefinition("awd-runtime:fixture"),
+                        new ContainerRuntimeDefinition(
+                            "awd-runtime:fixture",
+                            Security: new(false, false, false, ["ALL"], [])),
                         new RuntimeResourceLimits(67_108_864, 100_000_000, 64),
                         FlagSource: RuntimeFlagSource.AwdRotation),
                     FlagInjection: new AwdFlagInjectionConfiguration(

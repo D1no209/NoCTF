@@ -50,7 +50,7 @@ services:
     build:
       context: ../../..
       dockerfile: backend/Dockerfile
-      target: api
+      target: host
       args:
         HTTP_PROXY: ${NOCTF_E2E_BUILD_HTTP_PROXY:-}
         HTTPS_PROXY: ${NOCTF_E2E_BUILD_HTTPS_PROXY:-}
@@ -90,7 +90,7 @@ services:
     build:
       context: ../../..
       dockerfile: backend/Dockerfile
-      target: api
+      target: host
       args:
         HTTP_PROXY: ${NOCTF_E2E_BUILD_HTTP_PROXY:-}
         HTTPS_PROXY: ${NOCTF_E2E_BUILD_HTTPS_PROXY:-}
@@ -99,6 +99,7 @@ services:
       noctf.io/runtime-proxy-gateway: "true"
     environment:
       <<: *api-environment
+      Hosting__Roles__0: Api
       ASPNETCORE_HTTP_PORTS: "8080"
       Storage__PublicBaseUrl: http://backend:8080
     ports:
@@ -111,13 +112,14 @@ services:
     build:
       context: ../../..
       dockerfile: backend/Dockerfile
-      target: worker
+      target: host
       args:
         HTTP_PROXY: ${NOCTF_E2E_BUILD_HTTP_PROXY:-}
         HTTPS_PROXY: ${NOCTF_E2E_BUILD_HTTPS_PROXY:-}
         ALL_PROXY: ${ALL_PROXY:-}
     environment:
       <<: *api-environment
+      Hosting__Roles__0: Worker
     depends_on:
       migration:
         condition: service_completed_successfully
@@ -125,12 +127,14 @@ services:
   runner:
     build:
       context: ../../..
-      dockerfile: backend/tests/NoCTF.E2E/Dockerfile.runner
+      dockerfile: backend/Dockerfile
+      target: host
       args:
         HTTP_PROXY: ${NOCTF_E2E_BUILD_HTTP_PROXY:-}
         HTTPS_PROXY: ${NOCTF_E2E_BUILD_HTTPS_PROXY:-}
         ALL_PROXY: ${ALL_PROXY:-}
     environment:
+      Hosting__Roles__0: Runner
       ASPNETCORE_HTTP_PORTS: "8080"
       ConnectionStrings__PostgreSql: Host=postgres;Port=5432;Database=noctf;Username=noctf;Password=${NOCTF_E2E_POSTGRES_PASSWORD}
       ConnectionStrings__Redis: redis:6379

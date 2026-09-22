@@ -74,32 +74,7 @@ public sealed class DataModelSchemaTests
                     migrations.Add(reader.GetString(0));
             }
 
-            await Assert.That(migrations).IsEquivalentTo(
-            [
-                "20260826172216_InitialBaseline",
-                "20260904120421_ChallengeTemplateTestRuntimes",
-                "20260907190934_PrivateSchoolIdentityAndSourceAddresses",
-                "20260908040028_OptionalPublicGateway",
-                "20260908161132_PracticeOnlyTeams",
-                "20260910145118_UserWallpaperPreferences",
-                "20260911081054_RemovePracticeTeamMarker",
-                "20260911144210_AddHumanVerificationToggle",
-                "20260911164825_AddManagedHumanVerificationProviders",
-                "20260911213004_AddCompetitionTracksEnabled",
-                "20260912074543_AddRuntimeHumanVerificationToggle",
-            "20260912130511_AddCompetitionAccessMode",
-            "20260912150416_AddTeamWriteUps",
-            "20260912182604_ConfigureTeamWriteUpSubmission",
-            "20260913172544_AddHumanVerificationEvaluationToggle",
-            "20260914154253_AddCtfPatchVerificationExperiment",
-            "20260918101546_AddRuntimeCapacityAllocations",
-            "20260920033821_AddSsoFoundation",
-            "20260920150729_AllowBotAdministratorRole",
-            "20260920151129_AddCompetitionWebhooks",
-            "20260921080056_RemovePublicGateway",
-            "20260921134131_AddRuntimeWsrxAccess",
-            "20260921144501_AddUserProfileCover"
-        ]);
+            await Assert.That(migrations).HasSingleItem();
             await Assert.That(migrations[0]).EndsWith("_InitialBaseline");
 
             await using var removedGatewayColumnsCommand = new NpgsqlCommand(

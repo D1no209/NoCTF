@@ -17,14 +17,12 @@ public sealed class CtfPatchVerificationExperimentTests
         new(JsonSerializerDefaults.Web);
 
     [Test]
-    public async Task V2_definition_upgrades_to_flag_submission()
+    public async Task V2_definition_is_rejected()
     {
-        var configuration = CtfConfigurationUpgrader.ParseChallenge(
+        var action = () => CtfConfigurationParser.ParseDefinition(
             """{"schemaVersion":2}""");
 
-        await Assert.That(configuration.SchemaVersion).IsEqualTo(3);
-        await Assert.That(configuration.InteractionKind)
-            .IsEqualTo(CtfInteractionKind.FlagSubmission);
+        await Assert.That(action).Throws<GameModeConfigurationException>();
     }
 
     [Test]
@@ -93,12 +91,11 @@ public sealed class CtfPatchVerificationExperimentTests
             CompetitionStatus: CompetitionStatus.Running);
         var engine = new LeaderboardProjectionEngine(new LeaderboardProjectorCatalog());
 
-        var output = engine.ProjectOutputs(input);
-        var currentScore = output.Legacy.Challenges.Single().CurrentScore;
-        var team = output.Scoreboard.Snapshot.Teams.Single();
+        var output = engine.Project(input);
+        var currentScore = output.Snapshot.CurrentChallengeScores.Single().Score;
+        var team = output.Snapshot.Teams.Single();
 
-        await Assert.That(output.Legacy.Entries.Single().SolveCount).IsEqualTo(1);
-        await Assert.That(output.Legacy.Entries.Single().Score).IsEqualTo(currentScore - 7);
+        await Assert.That(team.TotalScore).IsEqualTo(currentScore - 7);
         await Assert.That(team.Achievements).HasSingleItem();
         await Assert.That(team.Achievements![0].Kind).IsEqualTo(ScoreboardEntryKind.Solve);
         await Assert.That(team.Slots.Single().Entries.Count(entry =>
@@ -137,9 +134,9 @@ public sealed class CtfPatchVerificationExperimentTests
             CompetitionStatus: CompetitionStatus.Running);
 
         var output = new LeaderboardProjectionEngine(new LeaderboardProjectorCatalog())
-            .ProjectOutputs(input);
+            .Project(input);
 
-        await Assert.That(output.Legacy.Entries.Single().Score).IsEqualTo(0);
+        await Assert.That(output.Snapshot.Teams.Single().TotalScore).IsEqualTo(0);
     }
 
     private static LeaderboardGameplayFact Fact(

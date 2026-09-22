@@ -33,7 +33,7 @@ public sealed class PlatformRuntimeEndpointTests
         var id = Guid.NewGuid();
         var store = CreateStore();
         var view = new RuntimeInstanceView(id, Guid.NewGuid(), Guid.NewGuid(), null, null, RuntimePurpose.Player,
-            RuntimeKind.Container, RuntimeProvider.Docker, RuntimeState.Running, null, [], DateTimeOffset.UtcNow, null, null, null)
+            RuntimeKind.Container, RuntimeProvider.Docker, RuntimeState.Running, null, DateTimeOffset.UtcNow, null, null, null)
         {
             Capacity = RuntimeCapacityAllocations.Empty.Add(new(new(RuntimeWorkloadKind.Runtime, id, id), null,
                 "domain", "runner", new(1024, 250, 128), new(1024, 500, 128)))
@@ -103,7 +103,7 @@ public sealed class PlatformRuntimeEndpointTests
             Arg.Any<Guid?>(), Arg.Any<int>(), Arg.Any<CancellationToken>()).Returns(
             Task.FromResult<IReadOnlyList<PlatformRuntimeInstanceView>>([
                 new(new(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), null, null, RuntimePurpose.Player,
-                    RuntimeKind.Container, RuntimeProvider.Docker, RuntimeState.Running, null, [],
+                    RuntimeKind.Container, RuntimeProvider.Docker, RuntimeState.Running, null,
                     DateTimeOffset.UtcNow, null, null, null), PlatformRuntimeScope.Competition, "Contest", "soul")
             ]));
         store.ListActiveContainersPageAsync(
@@ -114,7 +114,7 @@ public sealed class PlatformRuntimeEndpointTests
                 Arg.Any<CancellationToken>())
             .Returns(Task.FromResult(new PlatformRuntimeListPage(
                 [new(new(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), null, null, RuntimePurpose.Player,
-                    RuntimeKind.Container, RuntimeProvider.Docker, RuntimeState.Running, null, [],
+                    RuntimeKind.Container, RuntimeProvider.Docker, RuntimeState.Running, null,
                     DateTimeOffset.UtcNow, null, null, null), PlatformRuntimeScope.Competition, "Contest", "soul")],
                 1)));
         return store;

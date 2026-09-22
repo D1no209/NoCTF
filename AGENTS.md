@@ -56,7 +56,7 @@
 ## Product scope
 
 - The only game modes are CTF, AWD, AWDP, and KoH. Penetration is ordinary CTF content, not a game mode, and multi-stage or static-container-fleet challenge types are out of scope.
-- Production roles are `Api`, `Worker`, and `Runner`. They may run in the legacy `NoCTF.API`, `NoCTF.Worker`, and `NoCTF.Runner` processes or in any non-empty combination through `NoCTF.Host`; the unified host defaults to all three roles. Role changes take effect only after restart or rolling deployment. Durable business work must still use Wolverine/PostgreSQL queues in combined-process deployments.
+- Production roles are `Api`, `Worker`, and `Runner`. `NoCTF.Host` is the only executable process and may run any non-empty role combination; it defaults to all three roles. `NoCTF.API`, `NoCTF.Worker`, and `NoCTF.Runner` are class-library feature modules and must not regain executable entry points. Role changes take effect only after restart. Durable business work must still use Wolverine/PostgreSQL queues in combined-process deployments.
 
 ## Frontend (ClientApp)
 

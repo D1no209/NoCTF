@@ -43,7 +43,7 @@ public sealed class ContainerRuntimeHandlerTests
                 new ContainerSecurityPolicy(false, false, true, [], []),
                 Ttl: null));
 
-        var result = await handler.Handle(message, CancellationToken.None);
+        var result = await handler.ProvisionContainerAsync(message, CancellationToken.None);
 
         await Assert.That(result).IsTypeOf<RuntimeProvisionTerminated>();
         await Assert.That(((RuntimeProvisionTerminated)result!).FailureCode)
@@ -84,7 +84,7 @@ public sealed class ContainerRuntimeHandlerTests
             reconciler);
         var message = new StopContainerRuntime(runtimeInstanceId, "runner-a");
 
-        var result = await handler.Handle(message, CancellationToken.None);
+        var result = await handler.StopContainerAsync(message, CancellationToken.None);
 
         await Assert.That(result).IsTypeOf<RuntimeStopFailed>();
         await Assert.That(result).IsNotTypeOf<RuntimeStopped>();
@@ -138,7 +138,7 @@ public sealed class ContainerRuntimeHandlerTests
                 new ContainerSecurityPolicy(false, false, false, [], []),
                 Ttl: null));
 
-        var result = await handler.Handle(message, CancellationToken.None);
+        var result = await handler.ProvisionContainerAsync(message, CancellationToken.None);
 
         await Assert.That(result).IsTypeOf<RuntimeProvisionTerminated>();
         await Assert.That(((RuntimeProvisionTerminated)result!).FailureCode)
@@ -171,7 +171,7 @@ public sealed class ContainerRuntimeHandlerTests
                 RuntimeProvider.Docker,
                 System.Text.Json.JsonSerializer.Serialize(receipt))));
 
-        var result = await handler.Handle(
+        var result = await handler.StopContainerAsync(
             new StopContainerRuntime(runtimeInstanceId, "runner-a"),
             CancellationToken.None);
 
@@ -198,7 +198,7 @@ public sealed class ContainerRuntimeHandlerTests
             reconciler);
         var message = new StopContainerRuntime(runtimeInstanceId, "runner-a");
 
-        var result = await handler.Handle(message, CancellationToken.None);
+        var result = await handler.StopContainerAsync(message, CancellationToken.None);
 
         await Assert.That(result).IsTypeOf<RuntimeStopped>();
         var acknowledgement = (RuntimeStopped)result;
@@ -229,7 +229,7 @@ public sealed class ContainerRuntimeHandlerTests
                 ProviderReceiptJson: null)),
             reconciler);
 
-        var result = await handler.Handle(
+        var result = await handler.StopContainerAsync(
             new StopContainerRuntime(runtimeInstanceId, "runner-a"),
             CancellationToken.None);
 
@@ -272,7 +272,7 @@ public sealed class ContainerRuntimeHandlerTests
             "The runtime exceeded the cleanup timeout.",
             DateTimeOffset.UtcNow.AddMinutes(-5));
 
-        var result = await handler.Handle(message, CancellationToken.None);
+        var result = await handler.ForceTerminateAsync(message, CancellationToken.None);
 
         await Assert.That(result).IsTypeOf<RuntimeForceTerminated>();
         await Assert.That(((RuntimeForceTerminated)result).CleanupResult)
@@ -302,7 +302,7 @@ public sealed class ContainerRuntimeHandlerTests
             "Retry an idempotent force-termination request.",
             DateTimeOffset.UtcNow.AddMinutes(-5));
 
-        var result = await handler.Handle(message, CancellationToken.None);
+        var result = await handler.ForceTerminateAsync(message, CancellationToken.None);
 
         await Assert.That(result).IsTypeOf<RuntimeForceTerminated>();
         await Assert.That(reconciler.Destroyed)

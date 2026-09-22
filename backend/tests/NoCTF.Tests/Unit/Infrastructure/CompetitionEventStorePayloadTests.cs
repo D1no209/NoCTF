@@ -48,32 +48,6 @@ public sealed class CompetitionEventStorePayloadTests
     }
 
     [Test]
-    public async Task Legacy_success_payload_recovers_the_verified_result_for_existing_events()
-    {
-        var ids = new EventIds();
-        var item = StoredEvent(ids, AwdpFixOutcome.DefenseSucceeded);
-
-        var payload = CompetitionEventStore.ParsePayload(item);
-
-        await Assert.That(payload.GameplayFactKind).IsEqualTo(GameplayFactKind.FixAttempt);
-        await Assert.That(payload.GameplayFactState).IsEqualTo(GameplayFactState.Completed);
-        await Assert.That(payload.GameplayFactResult).IsEqualTo(GameplayFactResult.Correct);
-    }
-
-    [Test]
-    public async Task Legacy_platform_failure_remains_distinct_from_a_verified_failure()
-    {
-        var ids = new EventIds();
-        var item = StoredEvent(ids, AwdpFixOutcome.PlatformFailed);
-
-        var payload = CompetitionEventStore.ParsePayload(item);
-
-        await Assert.That(payload.GameplayFactKind).IsEqualTo(GameplayFactKind.FixAttempt);
-        await Assert.That(payload.GameplayFactState).IsEqualTo(GameplayFactState.PlatformFailed);
-        await Assert.That(payload.GameplayFactResult).IsNull();
-    }
-
-    [Test]
     public async Task Audience_change_payload_preserves_typed_modes_and_reason()
     {
         var ids = new EventIds();
@@ -98,29 +72,6 @@ public sealed class CompetitionEventStorePayloadTests
                 .GetProperty("competitionAudienceChangeKind").GetString())
             .IsEqualTo("AccessMode");
     }
-
-    private static CompetitionEvent StoredEvent(EventIds ids, AwdpFixOutcome outcome) => new()
-    {
-        Id = Guid.CreateVersion7(),
-        CompetitionId = ids.CompetitionId,
-        Kind = CompetitionEventKind.AwdpFixResolved,
-        Level = CompetitionEventLevel.Information,
-        Visibility = CompetitionEventVisibility.Public,
-        SubjectType = EntityReferenceKind.GameplayFact,
-        SubjectId = ids.GameplayFactId,
-        PayloadJson = AwdpFixResolvedEventPayload.Create(
-            ids.GameplayFactId,
-            ids.PatchUploadId,
-            ids.RuntimeInstanceId,
-            ids.TeamId,
-            ids.CompetitionChallengeId,
-            outcome,
-            outcome == AwdpFixOutcome.PlatformFailed
-                ? GameplayFactFailureCode.AwdpPlatformFailed
-                : null,
-            ids.OccurredAt).Serialize(),
-        OccurredAt = ids.OccurredAt
-    };
 
     private sealed class EventIds
     {

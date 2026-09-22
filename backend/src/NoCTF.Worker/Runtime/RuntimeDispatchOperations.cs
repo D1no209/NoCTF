@@ -292,7 +292,7 @@ internal static partial class BackendMessageOperations
                 {
                     Definition = compose.Definition with
                     {
-                        ServiceBudgets = RuntimeResourceBudgetPolicy.RestoreComposeBudgets(
+                        ServiceBudgets = RuntimeResourceBudgetPolicy.RecreateComposeBudgets(
                             compose.Definition.ServiceResources, instance.RuntimeProvider, committed)
                     }
                 },

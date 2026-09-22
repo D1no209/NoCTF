@@ -35,7 +35,7 @@ public sealed class RuntimeResourceBudgetPolicyTests
         await Assert.That(resources.Limits["cpu"].ToDecimal()).IsEqualTo(.501m);
         await Assert.That(resources.Requests["cpu"].ToDecimal()).IsEqualTo(.501m);
         await Assert.That(resources.Requests["memory"].ToDecimal()).IsEqualTo(resources.Limits["memory"].ToDecimal());
-        var restored = RuntimeResourceBudgetPolicy.RestoreComposeBudgets(services, RuntimeProvider.Kubernetes,
+        var restored = RuntimeResourceBudgetPolicy.RecreateComposeBudgets(services, RuntimeProvider.Kubernetes,
             RuntimeResourceBudgetPolicy.ToAmount(aggregate));
         await Assert.That(restored["web"]).IsEqualTo(budgets["web"]);
         await Assert.That(restored["db"]).IsEqualTo(budgets["db"]);

@@ -40,7 +40,7 @@ public sealed class ChallengeAttachmentUploadContractTests
             .ValidateAsync(request);
 
         await Assert.That(result.IsValid).IsFalse();
-        await Assert.That(result.Errors.Any(error => error.PropertyName.StartsWith(
+        await Assert.That(result.Errors.Any(error => error.ErrorMessage.Contains(
             nameof(UploadChallengeAttachmentsRequest.AttachmentIds),
             StringComparison.Ordinal))).IsTrue();
     }
@@ -59,7 +59,7 @@ public sealed class ChallengeAttachmentUploadContractTests
             .ValidateAsync(request);
 
         await Assert.That(result.IsValid).IsFalse();
-        await Assert.That(result.Errors.Any(error => error.PropertyName.StartsWith(
+        await Assert.That(result.Errors.Any(error => error.ErrorMessage.Contains(
             nameof(UploadChallengeAttachmentsRequest.AttachmentIds),
             StringComparison.Ordinal))).IsTrue();
     }

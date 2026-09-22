@@ -131,14 +131,10 @@ describe('notificationTargetPath', () => {
       .toBe('/notifications?notification=notification-1')
   })
 
-  test('notification centers open readable detail and use the generated thread SDK', async () => {
+  test('the canonical notification center opens readable detail with the generated thread SDK', async () => {
     const component = await sourceFile(
       new URL('../app/features/notifications/NotificationCenter.vue', import.meta.url),
     ).text()
-    const competitionPage = await sourceFile(
-      new URL('../app/pages/competitions/[id]/notifications.vue', import.meta.url),
-    ).text()
-
     expect(component).toContain('readNotificationThreadEndpoint({')
     expect(component).toContain("scope: 'Inbox'")
     expect(component).toContain('notificationTargetPath(actionTarget.value)')
@@ -147,7 +143,5 @@ describe('notificationTargetPath', () => {
     expect(component).toContain('path: { notificationId: selectedId }')
     expect(component).toContain('data.items?.find(item => item.id === selectedId)')
     expect(component).toContain('routeError.value = parseApiError')
-    expect(competitionPage).toContain("path: '/notifications'")
-    expect(competitionPage).toContain('{ replace: true }')
   })
 })

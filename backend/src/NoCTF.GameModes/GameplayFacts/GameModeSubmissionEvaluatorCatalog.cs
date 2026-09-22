@@ -134,7 +134,7 @@ public sealed class CtfGameplayFactEvaluator(IGameplayFactEvaluator inner) : IGa
             return NoCTF.Domain.Challenges.CtfInteractionKind.FlagSubmission;
         try
         {
-            return CtfConfigurationUpgrader.ParseChallenge(definitionJson).InteractionKind;
+            return CtfConfigurationParser.ParseDefinition(definitionJson).InteractionKind;
         }
         catch (GameModeConfigurationException)
         {
@@ -148,7 +148,7 @@ public sealed class CtfGameplayFactEvaluator(IGameplayFactEvaluator inner) : IGa
             return false;
         try
         {
-            return CtfConfigurationUpgrader.ParseChallenge(definitionJson).Runtime?.FlagSource
+            return CtfConfigurationParser.ParseDefinition(definitionJson).Runtime?.FlagSource
                 == RuntimeFlagSource.PerTeam;
         }
         catch (GameModeConfigurationException)
@@ -166,7 +166,7 @@ public sealed class AwdGameplayFactEvaluator : IGameplayFactEvaluator
         if (submission.Kind != GameplayFactKind.FlagAttempt)
             return ModeGameplayFactEvaluatorRules.Reject(submission, GameplayFactFailureCode.FixNotSupported);
 
-        var configuration = AwdConfigurationUpgrader.ParseCompetition(context.CompetitionConfigurationJson);
+        var configuration = AwdConfigurationParser.ParseCompetition(context.CompetitionConfigurationJson);
         if (context.EffectiveRunningTime is TimeSpan effectiveRunningTime
             && effectiveRunningTime < TimeSpan.FromSeconds(configuration.HardeningDurationSeconds))
             return ModeGameplayFactEvaluatorRules.Reject(submission, GameplayFactFailureCode.HardeningActive);

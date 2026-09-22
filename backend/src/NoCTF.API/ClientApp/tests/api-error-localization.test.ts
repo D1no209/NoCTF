@@ -39,7 +39,7 @@ describe('api error localization', () => {
 
     expect(parseApiError({
       status: 400,
-      detail: 'Unexpected legacy payload value.',
+      detail: 'Unexpected payload value.',
       errors: {
         To: ['The incident query range must be between zero and 31 days.'],
         General: ['结束时间必须晚于开始时间。'],
@@ -76,7 +76,7 @@ describe('api error localization', () => {
 
     expect(parseApiError({
       status: 400,
-      detail: 'Unexpected legacy payload value.',
+      detail: 'Unexpected payload value.',
     }).message).toBe('请求参数有误,请检查输入')
 
     expect(parseApiError({
@@ -127,6 +127,14 @@ describe('api error localization', () => {
       status: 400,
       code: 'HumanVerificationSecretInvalid',
     }).message).toBe('请输入有效的 Provider 密钥。')
+    expect(parseApiError({
+      status: 400,
+      code: 'CapConfigurationInvalid',
+    }).message).toContain('Cap 配置校验失败')
+    expect(parseApiError({
+      status: 503,
+      code: 'CapProviderUnavailable',
+    }).message).toContain('无法连接 Cap')
   })
 
   test('explains that SMTP testing requires the saved registration switch', () => {

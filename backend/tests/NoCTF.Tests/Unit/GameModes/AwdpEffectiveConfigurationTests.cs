@@ -19,6 +19,8 @@ public sealed class AwdpEffectiveConfigurationTests
             GameModeDefaultConfiguration.GetCompetitionJson(
                 NoCTF.Domain.Competitions.GameMode.Awdp),
             new GameModeChallengeConfigurationCatalog().GetDefaultJson(
+                NoCTF.Domain.Competitions.GameMode.Awdp),
+            new GameModeChallengeConfigurationCatalog().GetDefaultDefinitionJson(
                 NoCTF.Domain.Competitions.GameMode.Awdp));
 
         await Assert.That(effective.Break.InitialPoints).IsEqualTo(500L);
@@ -47,7 +49,10 @@ public sealed class AwdpEffectiveConfigurationTests
         var challenge = AwdpConfigurationParser.ParseChallenge(
             new GameModeChallengeConfigurationCatalog().GetDefaultJson(
                 NoCTF.Domain.Competitions.GameMode.Awdp));
-        var effective = AwdpConfigurationResolver.Resolve(competition, challenge);
+        var effective = AwdpConfigurationResolver.Resolve(
+            competition,
+            challenge,
+            AwdpChallengeConfiguration.Empty);
 
         await Assert.That(AwdpConfigurationValidator.Validate(competition)).IsEmpty();
         await Assert.That(AwdpConfigurationValidator.Validate(challenge)).IsEmpty();
@@ -97,6 +102,7 @@ public sealed class AwdpEffectiveConfigurationTests
                 RuntimeAllocation.PerTeam,
                 new ContainerRuntimeDefinition(
                     "awdp-target:latest",
+                    Security: new(false, false, false, ["ALL"], []),
                     PortMappings: new Dictionary<int, int> { [31337] = 0 },
                     FlagEnvironmentVariableName: "FLAG",
                     InternalPorts: [31337]),
@@ -107,7 +113,13 @@ public sealed class AwdpEffectiveConfigurationTests
                     31337)],
                 FlagSource: RuntimeFlagSource.PerTeam),
             Checker: new RunnerJobConfiguration("awdp-checker:latest"));
-        var effective = AwdpConfigurationResolver.Resolve(competition, challenge);
+        var rules = challenge with { Runtime = null, Checker = null };
+        var definition = AwdpChallengeConfiguration.Empty with
+        {
+            Runtime = challenge.Runtime,
+            Checker = challenge.Checker
+        };
+        var effective = AwdpConfigurationResolver.Resolve(competition, rules, definition);
 
         await Assert.That(effective.RequireBreakBeforeFix).IsTrue();
         await Assert.That(effective.Break.DecayMode)

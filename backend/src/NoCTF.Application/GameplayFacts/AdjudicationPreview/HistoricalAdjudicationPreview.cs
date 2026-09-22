@@ -14,7 +14,6 @@ public enum AdjudicationDifferenceCertainty : short
 public enum AdjudicationDifferenceKind : short
 {
     CurrentCorrectShouldBeDuplicate,
-    CurrentDuplicateShouldBeCorrect,
     DuplicateWithoutCurrentPredecessor,
     HistoricalResultChanged,
     MissingAdjudicationRecord,

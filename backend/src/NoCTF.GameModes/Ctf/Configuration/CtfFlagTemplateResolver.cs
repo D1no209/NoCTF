@@ -8,9 +8,9 @@ public static class CtfFlagTemplateResolver
         string competitionConfigurationJson,
         string challengeRulesJson)
     {
-        var competition = CtfConfigurationUpgrader.ParseCompetition(
+        var competition = CtfConfigurationParser.ParseCompetition(
             competitionConfigurationJson);
-        var challenge = CtfConfigurationUpgrader.ParseChallenge(
+        var challenge = CtfConfigurationParser.ParseRules(
             challengeRulesJson);
         return challenge.FlagTemplate
             ?? competition.FlagTemplate

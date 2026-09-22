@@ -27,28 +27,14 @@ public class LeaderboardProjectionBenchmarks
     public void Setup()
     {
         input = Corpus.Create(Mode, TeamCount);
-        var separateLegacy = engine.ProjectOutputs(input).Legacy;
-        var separateScoreboard = engine.ProjectOutputs(input).Scoreboard;
-        var combined = engine.ProjectOutputs(input);
-        if (!EqualsByValue(separateLegacy, combined.Legacy)
-            || !EqualsByValue(separateScoreboard, combined.Scoreboard))
-            throw new InvalidOperationException("Combined projection changed output semantics.");
-        if (combined.Legacy.Entries.Count == 0
-            || combined.Scoreboard.Snapshot.Teams.Count == 0
-            || Mode != GameMode.Koh && combined.Scoreboard.EntryAllocations.Count == 0)
+        var projection = engine.Project(input);
+        if (projection.Snapshot.Teams.Count == 0
+            || Mode != GameMode.Koh && projection.EntryAllocations.Count == 0)
             throw new InvalidOperationException("The benchmark corpus did not exercise the leaderboard hot path.");
     }
 
-    [Benchmark(Baseline = true)]
-    public (LeaderboardProjectionResult Legacy, ScoreboardProjection Scoreboard) Separate() =>
-        (engine.ProjectOutputs(input).Legacy, engine.ProjectOutputs(input).Scoreboard);
-
     [Benchmark]
-    public LeaderboardProjectionOutputs Combined() => engine.ProjectOutputs(input);
-
-    private static bool EqualsByValue<T>(T left, T right) =>
-        System.Text.Json.JsonSerializer.Serialize(left)
-        == System.Text.Json.JsonSerializer.Serialize(right);
+    public ScoreboardProjection Project() => engine.Project(input);
 
     internal static LeaderboardProjectionInput CreateMixedCtfInput(int teamCount) =>
         Corpus.Create(GameMode.Ctf, teamCount, mixedCtf: true);
@@ -106,7 +92,7 @@ public class LeaderboardProjectionBenchmarks
                 competitionId,
                 mode,
                 teams,
-                corpus.LegacyFacts,
+                corpus.AggregateFacts,
                 challenges,
                 CompetitionConfiguration(mode),
                 CompetitionStartTime: Start,
@@ -153,7 +139,7 @@ public class LeaderboardProjectionBenchmarks
             IReadOnlyList<LeaderboardTeamFact> teams,
             IReadOnlyList<LeaderboardChallengeFact> challenges)
         {
-            var legacy = new List<LeaderboardGameplayFact>();
+            var aggregate = new List<LeaderboardGameplayFact>();
             var scoreboard = new List<LeaderboardGameplayFact>();
             var rounds = new List<LeaderboardAwdRoundFact>();
             var aggregates = new List<LeaderboardAwdAggregateFact>();
@@ -201,10 +187,10 @@ public class LeaderboardProjectionBenchmarks
                 var adjustment = Fact(sequence++, team.Id, challenges[0].Id,
                     GameplayFactKind.ManualAdjustment, Start.AddHours(5),
                     GameplayFactResult.Applied, actorId: StableGuid(900_000), value: "-5");
-                legacy.Add(adjustment);
+                aggregate.Add(adjustment);
                 scoreboard.Add(adjustment);
             }
-            return new(legacy, scoreboard, rounds, aggregates);
+            return new(aggregate, scoreboard, rounds, aggregates);
         }
 
         private static CorpusData CreateAwdp(
@@ -355,7 +341,7 @@ public class LeaderboardProjectionBenchmarks
             new(value, 0, 0, new byte[8]);
 
         private sealed record CorpusData(
-            IReadOnlyList<LeaderboardGameplayFact> LegacyFacts,
+            IReadOnlyList<LeaderboardGameplayFact> AggregateFacts,
             IReadOnlyList<LeaderboardGameplayFact> ScoreboardFacts,
             IReadOnlyList<LeaderboardAwdRoundFact>? AwdRounds,
             IReadOnlyList<LeaderboardAwdAggregateFact>? AwdAggregates);
@@ -375,11 +361,11 @@ public class CtfMixedLeaderboardProjectionBenchmarks
     public void Setup()
     {
         input = LeaderboardProjectionBenchmarks.CreateMixedCtfInput(TeamCount);
-        var output = engine.ProjectOutputs(input);
-        if (output.Legacy.Entries.Count == 0 || output.Scoreboard.EntryAllocations.Count == 0)
+        var output = engine.Project(input);
+        if (output.Snapshot.Teams.Count == 0 || output.EntryAllocations.Count == 0)
             throw new InvalidOperationException("The mixed CTF corpus did not exercise the leaderboard hot path.");
     }
 
     [Benchmark]
-    public LeaderboardProjectionOutputs Combined() => engine.ProjectOutputs(input);
+    public ScoreboardProjection Project() => engine.Project(input);
 }

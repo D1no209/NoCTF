@@ -104,7 +104,6 @@ internal static class ChallengeMapper
                 ? RuntimeAccessMapping.ToResponse(
                     koh.RuntimeInstanceId,
                     koh.AccessMode,
-                    koh.Urls,
                     koh.AccessEndpoints,
                     request)
                 : null,
