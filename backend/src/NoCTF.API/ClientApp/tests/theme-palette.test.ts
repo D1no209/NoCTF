@@ -6,8 +6,37 @@ test('palette accepts only complete HEX colors and isolates corrupt saved values
   expect(normalizeHex(' #3f1 ')).toBe('#33FF11')
   expect(normalizeHex('#39ff14')).toBe('#39FF14')
   expect(normalizeHex('red; color: transparent')).toBeNull()
-  expect(parseThemePalette('{bad')).toEqual({ light: null, dark: null })
-  expect(parseThemePalette('{"light":"#abc","dark":"url(test)"}')).toEqual({ light: '#AABBCC', dark: null })
+  expect(parseThemePalette('{bad')).toEqual({
+    light: null,
+    dark: null,
+    lightWallpaperOpacity: 35,
+    darkWallpaperOpacity: 35,
+  })
+  expect(parseThemePalette('{"light":"#abc","dark":"url(test)"}')).toEqual({
+    light: '#AABBCC',
+    dark: null,
+    lightWallpaperOpacity: 35,
+    darkWallpaperOpacity: 35,
+  })
+  expect(parseThemePalette('{"lightWallpaperOpacity":-5,"darkWallpaperOpacity":140}')).toMatchObject({
+    lightWallpaperOpacity: 0,
+    darkWallpaperOpacity: 100,
+  })
+})
+
+test('palette exposes a shared background opacity control and persists it as a theme-specific value', async () => {
+  const view = await Bun.file(new URL('../app/components/views/theme/ThemePalettePanelView.vue', import.meta.url)).text()
+  const feature = await Bun.file(new URL('../app/features/theme/useThemePalettePanel.ts', import.meta.url)).text()
+  const plugin = await Bun.file(new URL('../app/plugins/theme-palette.client.ts', import.meta.url)).text()
+  const css = await Bun.file(new URL('../app/assets/css/main.css', import.meta.url)).text()
+
+  expect(view).toContain('<OpacitySlider')
+  expect(view).toContain("$t('palette.wallpaperOpacity')")
+  expect(feature).toContain('lightWallpaperOpacity')
+  expect(feature).toContain('darkWallpaperOpacity')
+  expect(plugin).toContain('--user-page-wallpaper-overlay-${mode}')
+  expect(css).toContain('--page-wallpaper-overlay: var(--user-page-wallpaper-overlay-light, 65%);')
+  expect(css).toContain('--page-wallpaper-overlay: var(--user-page-wallpaper-overlay-dark, 65%);')
 })
 
 test('palette preserves representative colors through HSV conversion including achromatic colors', () => {

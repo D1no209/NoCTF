@@ -92,9 +92,18 @@ describe('leaderboard progressive display', () => {
     expect(page).toContain('data-scoreboard-page-scroll')
     expect(page).toContain('<ScrollSurface as="div" axis="y" data-scoreboard-page-scroll')
     expect(page).toContain('min-h-0 flex-1 overflow-y-auto overscroll-contain')
+    expect(page).toContain('@wheel.capture="dampenLeaderboardWheel"')
+    expect(page).toContain('leaderboardWheelDamping = 0.55')
+    expect(page).toContain('surface.scrollTop = next')
     expect(page).toContain('data-slot="leaderboard-trend-panel"')
     expect(page).not.toContain('md:sticky md:top-24 md:z-20')
     expect(theme).not.toContain(':has(> main [data-contained-workspace-page] > [data-scoreboard-page-scroll])')
+  })
+
+  test('returns from the leaderboard to the playable challenge workspace', () => {
+    expect(page).toContain('const competitionReturnPath = competitionChallengesPath(competitionId)')
+    expect(page).toContain(':to="competitionReturnPath"')
+    expect(page).not.toContain(':to="`/competitions/${competitionId}`"')
   })
 
   test('lets vertical wheel input escape the horizontal score matrix', () => {

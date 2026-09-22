@@ -1,6 +1,7 @@
 import { markRaw } from 'vue'
 
 import { Bell, Database, Flag, ShieldAlert } from '@lucide/vue'
+import PlatformGearIconComponent from '../../components/ui/icons/PlatformGearIcon.vue'
 import AccountPanelComponent from '../account/AccountPanel.vue'
 import LanguageToggleComponent from '../LanguageToggle.vue'
 import ThemeToggleComponent from '../ThemeToggle.vue'
@@ -58,8 +59,10 @@ export function useDefaultLayout() {
   }
 
   const navItems = computed(() => [
-    { to: '/competitions', label: t("ui.competitions"), icon: Flag, show: true },
-    { to: '/admin/challenges', label: t("ui.challengeLibrary2"), icon: Database, show: canOrganize.value },
+    { to: '/competitions', label: t("ui.competitions"), icon: Flag, show: true, unread: false },
+    { to: '/admin/challenges', label: t("ui.challengeLibrary2"), icon: Database, show: canOrganize.value, unread: false },
+    { to: '/admin/platform', label: t("ui.platformAdmin"), icon: markRaw(PlatformGearIconComponent), show: isLoggedIn.value && isAdministrator.value, unread: false },
+    { to: '/notifications', label: t("ui.notifications"), icon: Bell, show: isLoggedIn.value, unread: hasUnread.value },
   ])
 
   function isActive(to: string) {
@@ -98,14 +101,12 @@ export function useDefaultLayout() {
   const AccountPanel = markRaw(AccountPanelComponent)
 
   return {
-      Bell,
       ShieldAlert,
       isHome,
       routePath,
       wallpaperActive,
       wallpaperStyle,
       isLoggedIn,
-      isAdministrator,
       impersonation,
       impersonationEnding,
       impersonationExpiresAt,
@@ -114,7 +115,6 @@ export function useDefaultLayout() {
       platformError,
       platformLoading,
       ensureLoaded,
-      hasUnread,
       t,
       navItems,
       isActive,

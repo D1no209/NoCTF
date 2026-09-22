@@ -39,12 +39,12 @@ test('platform management uses the custom gear immediately before the message ce
   const layout = read('layouts/default.vue')
   const gear = read('components/ui/icons/PlatformGearIcon.vue')
   const gearAsset = read('assets/svg/navigation/platform-gear.svg')
-  const platformIndex = layout.indexOf('<PlatformGearIcon />')
-  const notificationsIndex = layout.indexOf('to="/notifications"')
+  const platformIndex = layout.indexOf("to: '/admin/platform'")
+  const notificationsIndex = layout.indexOf("to: '/notifications'")
 
   expect(platformIndex).toBeGreaterThan(0)
   expect(platformIndex).toBeLessThan(notificationsIndex)
-  expect(layout).toContain('to="/admin/platform"')
+  expect(layout).toContain('markRaw(PlatformGearIconComponent)')
   expect(gear).toContain('data-slot="platform-gear-icon"')
   expect(gearAsset).toContain('<svg')
   expect(gearAsset).toContain('<circle')
@@ -52,7 +52,7 @@ test('platform management uses the custom gear immediately before the message ce
   expect(gearAsset).toContain('rotate(315 12 12)')
 })
 
-test('light and dark non-home pages use local wallpapers at the same strength', async () => {
+test('light and dark non-home pages use local wallpapers with a configurable shared default', async () => {
   const layout = read('layouts/default.vue')
   const css = read('assets/css/main.css')
 
@@ -62,7 +62,7 @@ test('light and dark non-home pages use local wallpapers at the same strength', 
   expect(css).toContain("url('../images/backgrounds/dark-pages-wallpaper.jpg')")
   expect(layout).toContain(':data-personal-wallpaper="wallpaperActive || undefined"')
   expect(css).toContain("[data-page-wallpaper='true'][data-personal-wallpaper='true']")
-  expect(css.match(/var\(--background\) 65%/g)?.length).toBeGreaterThanOrEqual(4)
+  expect(css.match(/var\(--background\) var\(--page-wallpaper-overlay\)/g)?.length).toBeGreaterThanOrEqual(4)
   expect(await Bun.file(new URL('../app/assets/images/backgrounds/dark-pages-wallpaper.jpg', import.meta.url)).exists()).toBe(true)
 })
 
