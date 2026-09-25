@@ -138,6 +138,28 @@ public sealed class NotificationReaderDevelopmentTests
         await Assert.That(noticeThread!.Select(item => item.Id))
             .IsEquivalentTo([rootId, replyId]);
 
+        var authoredReplyId = Guid.CreateVersion7(now.AddSeconds(3));
+        db.Notifications.Add(new MessageNotification
+        {
+            Id = authoredReplyId,
+            SourceType = NotificationSourceType.User,
+            SourceId = ownerId,
+            TargetType = NotificationTargetType.CompetitionCollaborators,
+            TargetId = competitionId,
+            Body = "own reply",
+            RelatedType = EntityReferenceKind.Competition,
+            RelatedId = competitionId,
+            ThreadRootId = rootId,
+            SentAt = now.AddSeconds(3)
+        });
+        await db.SaveChangesAsync();
+        var ownerLatestInbox = await reader.ListAsync(
+            ownerId, null, null, 10, NotificationReadScope.Inbox, CancellationToken.None);
+        var askerLatestInbox = await reader.ListAsync(
+            askerId, null, null, 10, NotificationReadScope.Inbox, CancellationToken.None);
+        await Assert.That(ownerLatestInbox.Select(item => item.Id)).DoesNotContain(authoredReplyId);
+        await Assert.That(askerLatestInbox.Select(item => item.Id)).Contains(authoredReplyId);
+
         var competition = await db.Competitions.SingleAsync(
             candidate => candidate.Id == competitionId);
         competition.AccessMode = CompetitionAccessMode.StaffOnly;

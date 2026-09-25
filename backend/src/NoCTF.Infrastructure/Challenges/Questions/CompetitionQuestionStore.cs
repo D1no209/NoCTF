@@ -194,6 +194,7 @@ public sealed class CompetitionQuestionStore(
             await ResolveHandlerRecipientIdsAsync(
                 command.CompetitionId,
                 command.CompetitionChallengeId,
+                command.ActorUserId,
                 ct),
             NotificationKind.QuestionOpened,
             CompetitionQuestionNotificationEvent.Opened,
@@ -335,7 +336,7 @@ public sealed class CompetitionQuestionStore(
             command.CompetitionId,
             notification.Id,
             null,
-            await ResolveTeamRecipientIdsAsync(command.TeamId, ct),
+            await ResolveTeamRecipientIdsAsync(command.TeamId, command.ActorUserId, ct),
             NotificationKind.QuestionOpened,
             CompetitionQuestionNotificationEvent.Opened,
             root.Title,
@@ -505,8 +506,10 @@ public sealed class CompetitionQuestionStore(
                 ? await ResolveHandlerRecipientIdsAsync(
                     command.CompetitionId,
                     aggregate.Root.CompetitionChallengeId,
+                    command.ActorUserId,
                     ct)
-                : await ResolveTeamRecipientIdsAsync(aggregate.Root.TeamId, ct),
+                : await ResolveTeamRecipientIdsAsync(
+                    aggregate.Root.TeamId, command.ActorUserId, ct),
             NotificationKind.Message,
             CompetitionQuestionRules.IsParticipant(actorRole)
                 ? CompetitionQuestionNotificationEvent.AskerFollowedUp
@@ -586,8 +589,10 @@ public sealed class CompetitionQuestionStore(
                 ? await ResolveHandlerRecipientIdsAsync(
                     command.CompetitionId,
                     aggregate.Root.CompetitionChallengeId,
+                    command.ActorUserId,
                     ct)
-                : await ResolveTeamRecipientIdsAsync(aggregate.Root.TeamId, ct),
+                : await ResolveTeamRecipientIdsAsync(
+                    aggregate.Root.TeamId, command.ActorUserId, ct),
             NotificationKind.QuestionStatusChanged,
             CompetitionQuestionNotificationEvent.StatusChanged,
             aggregate.Root.Title,
@@ -613,6 +618,7 @@ public sealed class CompetitionQuestionStore(
     private async Task<Guid[]> ResolveHandlerRecipientIdsAsync(
         Guid competitionId,
         Guid? competitionChallengeId,
+        Guid excludedActorUserId,
         CancellationToken ct)
     {
         var competition = await db.Competitions.AsNoTracking()
@@ -665,6 +671,7 @@ public sealed class CompetitionQuestionStore(
         var distinctIds = candidateIds.Distinct().ToArray();
         return await db.Users.AsNoTracking()
             .Where(user => distinctIds.Contains(user.Id)
+                && user.Id != excludedActorUserId
                 && user.AccountStatus == UserAccountStatus.Active)
             .OrderBy(user => user.Id)
             .Select(user => user.Id)
@@ -673,6 +680,7 @@ public sealed class CompetitionQuestionStore(
 
     private async Task<Guid[]> ResolveTeamRecipientIdsAsync(
         Guid teamId,
+        Guid excludedActorUserId,
         CancellationToken ct)
     {
         var memberIds = await db.Teams.AsNoTracking()
@@ -681,6 +689,7 @@ public sealed class CompetitionQuestionStore(
             .SingleOrDefaultAsync(ct) ?? [];
         return await db.Users.AsNoTracking()
             .Where(user => memberIds.Contains(user.Id)
+                && user.Id != excludedActorUserId
                 && user.AccountStatus == UserAccountStatus.Active)
             .OrderBy(user => user.Id)
             .Select(user => user.Id)

@@ -9,6 +9,7 @@ import {
   scoreboardBloodAward,
   scoreboardBreakdown,
   scoreboardChallengeColumnGroups,
+  scoreboardChallengeColumnGroupsByDirection,
   scoreboardColumnsForChallenge,
   scoreboardCurrentChallengeScore,
   scoreboardDirectionGroups,
@@ -273,6 +274,33 @@ describe('normalized scoreboard matrix', () => {
       .toEqual([0, 1])
   })
 
+  test('groups displayed challenge columns by direction without changing schema slot indexes', () => {
+    const [webA, pwnA, webB, missing, pwnB] = Array.from({ length: 5 }, () => crypto.randomUUID())
+    const schema: NoCtfapiEndpointsCompetitionsScoreboardSchemaResponse = {
+      mode: 'Awdp',
+      columns: [
+        { index: 0, competitionChallengeId: webA },
+        { index: 1, competitionChallengeId: webA },
+        { index: 2, competitionChallengeId: pwnA },
+        { index: 3, competitionChallengeId: webB },
+        { index: 4, competitionChallengeId: missing },
+        { index: 5, competitionChallengeId: pwnB },
+      ],
+    }
+    const catalog = [
+      { id: webA, direction: 'Web' },
+      { id: pwnA, direction: 'Pwn' },
+      { id: webB, direction: 'web' },
+      { id: pwnB, direction: 'Pwn' },
+    ]
+
+    const displayed = scoreboardChallengeColumnGroupsByDirection(schema, catalog)
+    expect(displayed.map(group => group.competitionChallengeId))
+      .toEqual([webA, webB, pwnA, pwnB, missing])
+    expect(displayed.map(group => group.columns.map(column => column.index)))
+      .toEqual([[0, 1], [3], [2], [5], [4]])
+  })
+
   test('renders only protocol-aware flag and shield signals in matrix cells', () => {
     const ctfSignals = scoreboardSlotSignals({
       breakdown: [{ kind: 'Solve', successfulCount: 1, attemptCount: 2 }],
@@ -376,6 +404,8 @@ describe('normalized scoreboard matrix', () => {
     expect(leaderboardPage).toContain("<component :is=\"LazyScoreboardTeamDetailDialog\"")
     expect(scoreboardTeamDetailDialog).toContain("type: 'radar'")
     expect(scoreboardTeamDetailDialog).toContain("type: 'pie'")
+    expect(scoreboardTeamDetailDialog).toContain('label: { show: false }')
+    expect(scoreboardTeamDetailDialog).toContain('memberContributionRows')
     expect(scoreboardTeamDetailDialog).toContain('scoreboardMemberContributionSlices')
     expect(scoreboardTeamDetailDialog).toContain("radius: ['38%', '68%']")
     expect(scoreboardTeamDetailDialog).toContain('lg:grid-cols-2')
