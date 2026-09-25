@@ -786,7 +786,8 @@ public sealed class CompetitionQuestionStore(
         var rootIds = rootPayloads.Keys.ToArray();
         var descendants = await db.Notifications.AsNoTracking()
             .Where(notification => notification.ThreadRootId != null
-                && rootIds.Contains(notification.ThreadRootId.Value))
+                && rootIds.Contains(notification.ThreadRootId.Value)
+                && notification.TargetType == NotificationTargetType.CompetitionCollaborators)
             .ToArrayAsync(ct);
 
         var nodesByRoot = rootPayloads.Keys.ToDictionary(id => id, _ => new List<Notification>());
@@ -817,7 +818,8 @@ public sealed class CompetitionQuestionStore(
         CancellationToken ct)
     {
         var nodes = await db.Notifications.AsNoTracking()
-            .Where(notification => notification.ThreadRootId == root.Id)
+            .Where(notification => notification.ThreadRootId == root.Id
+                && notification.TargetType == NotificationTargetType.CompetitionCollaborators)
             .OrderBy(notification => notification.SentAt)
             .ThenBy(notification => notification.Id)
             .ToListAsync(ct);

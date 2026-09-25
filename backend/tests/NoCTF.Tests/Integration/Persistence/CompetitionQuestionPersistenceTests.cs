@@ -437,6 +437,23 @@ public sealed class CompetitionQuestionPersistenceTests
                 .Contains(created.Question.ThreadRootId);
             await Assert.That(administratorThread.Any(item =>
                 item.TargetType == NotificationTargetType.User)).IsFalse();
+            var questionAfterDelivery = await store.FindAsync(
+                ids.CompetitionId,
+                created.Question.ThreadRootId,
+                ids.AdministratorId,
+                ct);
+            await Assert.That(questionAfterDelivery).IsNotNull();
+            await Assert.That(questionAfterDelivery!.Entries.Count)
+                .IsEqualTo(closed.Question!.Entries.Count);
+            var questionPageAfterDelivery = await store.ListAsync(new(
+                ids.CompetitionId,
+                ids.AdministratorId,
+                null,
+                null,
+                null,
+                10), ct);
+            await Assert.That(questionPageAfterDelivery.Items.Select(item => item.ThreadRootId))
+                .Contains(created.Question.ThreadRootId);
             var notificationBodies = await db.Notifications.AsNoTracking()
                 .Where(notification => notification.TargetType == NotificationTargetType.User)
                 .Select(notification => notification.Body)
