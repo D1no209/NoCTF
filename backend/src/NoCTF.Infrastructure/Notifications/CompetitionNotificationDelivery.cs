@@ -216,6 +216,7 @@ public sealed class CompetitionNotificationDelivery(
                 return;
             case CompetitionQuestionActivityPayload value:
                 notification.CompetitionId = value.CompetitionId;
+                notification.ThreadRootId = value.ThreadRootId;
                 notification.EntryId = value.EntryId;
                 notification.ActionValue = (int)value.Event;
                 notification.Title = value.Title;
