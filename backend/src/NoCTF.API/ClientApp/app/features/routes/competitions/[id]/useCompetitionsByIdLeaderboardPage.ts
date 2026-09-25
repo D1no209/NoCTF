@@ -6,7 +6,7 @@ import { getLeaderboardTrendsEndpoint, getScoreboardAdjustmentDetailEndpoint, ge
 import type { NoCtfapiEndpointsCompetitionsScoreboardAdjustmentDetailResponse, NoCtfapiEndpointsCompetitionsScoreboardAdjustmentResponse, NoCtfapiEndpointsCompetitionsScoreboardColumnResponse, NoCtfapiEndpointsCompetitionsScoreboardEntryResponse, NoCtfapiEndpointsCompetitionsScoreboardSlotDetailResponse, NoCtfapiEndpointsCompetitionsScoreboardSlotResponse, NoCtfapiEndpointsCompetitionsScoreboardTeamResponse, NoCtfapiEndpointsCompetitionsScoreboardTrendsResponse } from '../../../../api'
 import { medalBloodRankClass, medalRankClass } from '../../../leaderboard/types'
 import type { TrendSeries } from '../../../leaderboard/types'
-import { scoreboardChallengeColumnGroups, scoreboardBloodAward, scoreboardBreakdown, scoreboardEntryKindLabel, scoreboardEntryOutcomeLabel, scoreboardRankingStateLabel, scoreboardSlot } from '../../../../utils/scoreboard'
+import { scoreboardChallengeColumnGroupsByDirection, scoreboardBloodAward, scoreboardBreakdown, scoreboardEntryKindLabel, scoreboardEntryOutcomeLabel, scoreboardRankingStateLabel, scoreboardSlot } from '../../../../utils/scoreboard'
 import { competitionChallengesPath } from '../../../../utils/app-routes'
 import ScoreboardSlotStatusComponent from '../../../leaderboard/ScoreboardSlotStatus.vue'
 
@@ -131,7 +131,7 @@ export function useCompetitionsByIdLeaderboardPage() {
 
   watch(teams, () => { visibleTeamCount.value = 50 })
 
-  const columnGroups = computed(() => scoreboardChallengeColumnGroups(
+  const columnGroups = computed(() => scoreboardChallengeColumnGroupsByDirection(
     board.schema.value,
     board.catalog.value?.items,
   ))

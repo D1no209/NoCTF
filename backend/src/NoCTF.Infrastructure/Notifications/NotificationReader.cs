@@ -19,7 +19,7 @@ public sealed class NotificationReader(NoCtfDbContext db) : INotificationReader
         NotificationReadScope scope,
         CancellationToken cancellationToken)
     {
-        var query = ApplyScope(await VisibleToAsync(userId, cancellationToken), scope);
+        var query = ApplyScope(await VisibleToAsync(userId, cancellationToken), scope, userId);
         if (competitionId is { } id)
             query = query.Where(notification =>
                 notification.RelatedType == EntityReferenceKind.Competition
@@ -54,7 +54,7 @@ public sealed class NotificationReader(NoCtfDbContext db) : INotificationReader
         CancellationToken ct)
     {
         var query = await VisibleToAsync(userId, ct);
-        query = ApplyScope(query, scope);
+        query = ApplyScope(query, scope, userId);
         return await ListPageAsync(query, beforeCreatedAt, beforeId, limit, ct);
     }
 
@@ -83,7 +83,7 @@ public sealed class NotificationReader(NoCtfDbContext db) : INotificationReader
         NotificationReadScope scope,
         CancellationToken ct)
     {
-        var query = ApplyScope(await VisibleToAsync(userId, ct), scope).Where(notification =>
+        var query = ApplyScope(await VisibleToAsync(userId, ct), scope, userId).Where(notification =>
             notification.RelatedType == EntityReferenceKind.Competition
             && notification.RelatedId == competitionId);
         return await ListPageAsync(query, beforeCreatedAt, beforeId, limit, ct);
@@ -91,12 +91,15 @@ public sealed class NotificationReader(NoCtfDbContext db) : INotificationReader
 
     private static IQueryable<Notification> ApplyScope(
         IQueryable<Notification> query,
-        NotificationReadScope scope) =>
+        NotificationReadScope scope,
+        Guid userId) =>
         scope == NotificationReadScope.Inbox
             ? query.Where(notification =>
-                notification.TargetType != NotificationTargetType.CompetitionParticipants
-                || notification.Kind == NotificationKind.CompetitionAnnouncement
-                    && notification.SourceType == NotificationSourceType.User)
+                (notification.TargetType != NotificationTargetType.CompetitionParticipants
+                    || notification.Kind == NotificationKind.CompetitionAnnouncement
+                        && notification.SourceType == NotificationSourceType.User)
+                && !(notification.SourceType == NotificationSourceType.User
+                    && notification.SourceId == userId))
             : query;
 
     private async Task<IReadOnlyList<NotificationView>> ListPageAsync(
