@@ -175,7 +175,7 @@ const { competition, canWrite, title, description, startTime, endTime, teamRegis
       <CardContent>
         <component :is="CompetitionModeConfigEditor"
           :mode="(config?.mode ?? competition?.mode ?? 'Ctf') as GameModeValue"
-          :json="config?.json"
+          :configuration="config?.configuration"
           :readonly="!canWrite"
           :loading="configLoading"
           :saving="savingConfig"

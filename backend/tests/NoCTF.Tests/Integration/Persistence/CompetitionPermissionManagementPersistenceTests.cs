@@ -276,7 +276,7 @@ public sealed class CompetitionPermissionManagementPersistenceTests
 
     [Test]
     [Timeout(300_000)]
-    public async Task Concurrent_full_replacements_use_last_write_wins_without_partial_state(
+    public async Task Concurrent_full_replacements_retry_serializably_without_partial_state(
         CancellationToken cancellationToken)
     {
         await RunAsync(
@@ -466,7 +466,7 @@ public sealed class CompetitionPermissionManagementPersistenceTests
 
     [Test]
     [Timeout(300_000)]
-    public async Task Permission_update_committed_after_owner_transfer_wins_last(
+    public async Task Permission_update_retries_after_owner_transfer(
         CancellationToken cancellationToken)
     {
         await RunAsync(
@@ -651,7 +651,7 @@ public sealed class CompetitionPermissionManagementPersistenceTests
         UserRole role,
         bool emailVerified,
         DateTimeOffset now) =>
-        new()
+        new User
         {
             Id = id,
             UserName = userName,
@@ -670,7 +670,7 @@ public sealed class CompetitionPermissionManagementPersistenceTests
         string userName,
         UserRole role,
         DateTimeOffset now) =>
-        new()
+        new User
         {
             Id = id,
             UserName = userName,
@@ -690,7 +690,7 @@ public sealed class CompetitionPermissionManagementPersistenceTests
         Guid[]? managerIds = null,
         Guid[]? judgeIds = null,
         Guid[]? observerIds = null) =>
-        new()
+        new CtfCompetition
         {
             Id = id,
             OwnerId = ownerId,
@@ -698,8 +698,7 @@ public sealed class CompetitionPermissionManagementPersistenceTests
             JudgeIds = judgeIds ?? [],
             ObserverIds = observerIds ?? [],
             Title = $"Competition {id:N}",
-            Mode = GameMode.Ctf,
-            ConfigurationJson = """{"schemaVersion":1}""",
+            ModeConfiguration = TestConfigurations.Competition(GameMode.Ctf),
             FlagDerivationSecret = new byte[32],
             StartAt = now.AddHours(1),
             EndAt = now.AddHours(2),

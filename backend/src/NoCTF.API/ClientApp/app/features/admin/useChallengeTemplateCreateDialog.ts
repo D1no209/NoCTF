@@ -1,11 +1,11 @@
 import { markRaw, proxyRefs, toRefs } from 'vue'
 import { toast } from 'vue-sonner'
 import { adminChallengeBankCreateTemplate } from '../../api'
-import type { NoCtfapiEndpointsAdministrationChallengeBankChallengeVisibilityProtocol, NoCtfapiEndpointsCompetitionsGameModeProtocol } from '../../api'
+import type { NoCtfapiEndpointsAdministrationChallengeBankChallengeDefinitionContract, NoCtfapiEndpointsAdministrationChallengeBankChallengeVisibilityProtocol, NoCtfapiEndpointsCompetitionsGameModeProtocol } from '../../api'
 import { challengeTemplateWriteErrorMessages } from '../../lib/challenge-template-error'
 import { validateChallengeTemplateDraft } from '../../lib/challenge-template-validation'
 import { challengeDirectionOptions, directionLabel } from '../../utils/directions'
-import { defaultDefinitionJson, normalizeDefinitionJson } from '../../utils/game-config'
+import { defaultDefinition, definitionContractToModel } from '../../utils/game-config'
 import DefinitionEditorComponent from './DefinitionEditor.vue'
 
 type Events = {
@@ -23,7 +23,9 @@ export function useChallengeTemplateCreateDialog(
   const visibility = ref<NoCtfapiEndpointsAdministrationChallengeBankChallengeVisibilityProtocol>('Private')
   const direction = ref<(typeof challengeDirectionOptions)[number]>('Misc')
   const description = ref('')
-  const definitionJson = ref(defaultDefinitionJson(mode.value))
+  const definition = ref<NoCtfapiEndpointsAdministrationChallengeBankChallengeDefinitionContract>(
+    defaultDefinition(mode.value),
+  )
   const saveErrors = ref<string[]>([])
   const saveAttempted = ref(false)
   const pending = ref(false)
@@ -38,7 +40,7 @@ export function useChallengeTemplateCreateDialog(
     visibility.value = 'Private'
     direction.value = 'Misc'
     description.value = ''
-    definitionJson.value = defaultDefinitionJson('Ctf')
+    definition.value = defaultDefinition('Ctf')
     saveErrors.value = []
     saveAttempted.value = false
   }
@@ -51,7 +53,7 @@ export function useChallengeTemplateCreateDialog(
 
   function changeMode(value: unknown): void {
     if (value !== 'Ctf' && value !== 'Awd' && value !== 'Awdp' && value !== 'Koh') return
-    definitionJson.value = defaultDefinitionJson(value)
+    definition.value = defaultDefinition(value)
     mode.value = value
   }
 
@@ -59,17 +61,11 @@ export function useChallengeTemplateCreateDialog(
     if (pending.value) return
     saveAttempted.value = true
     saveErrors.value = []
-    const normalizedDefinition = normalizeDefinitionJson(mode.value, definitionJson.value)
-    if (!normalizedDefinition) {
-      saveErrors.value = [translate('ui.theChallengeDefinitionCannotBeParsedResetOrCorrectIt')]
-      toast.error(saveErrors.value[0] ?? translate('ui.unableToSaveTheChallengeTemplate'))
-      return
-    }
     const validationErrors = validateChallengeTemplateDraft({
       mode: mode.value,
       title: title.value,
       direction: direction.value,
-      definitionJson: normalizedDefinition,
+      definition: definitionContractToModel(definition.value, mode.value),
     })
     if (validationErrors.length > 0) {
       saveErrors.value = validationErrors
@@ -86,7 +82,7 @@ export function useChallengeTemplateCreateDialog(
           visibility: visibility.value,
           direction: directionLabel(direction.value),
           description: description.value.trim() || null,
-          definitionJson: normalizedDefinition,
+          definition: definition.value,
         },
       })
       if (error || !data?.id) {
@@ -116,7 +112,7 @@ export function useChallengeTemplateCreateDialog(
     visibility,
     direction,
     description,
-    definitionJson,
+    definition,
     saveErrors,
     pending,
     titleInvalid,

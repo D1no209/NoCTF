@@ -304,14 +304,13 @@ public sealed class UserProfilePersistenceTests
         Guid ownerId,
         CompetitionAccessMode accessMode,
         string title,
-        DateTimeOffset now) => new()
+        DateTimeOffset now) => new CtfCompetition
     {
         Id = id,
         Title = title,
         OwnerId = ownerId,
         AccessMode = accessMode,
-        Mode = GameMode.Ctf,
-        ConfigurationJson = "{}",
+        ModeConfiguration = TestConfigurations.Competition(GameMode.Ctf),
         FlagDerivationSecret = new byte[32],
         StartAt = now.AddDays(-2),
         EndAt = now.AddDays(-1),
@@ -325,7 +324,7 @@ public sealed class UserProfilePersistenceTests
         Guid competitionId,
         Guid userId,
         string name,
-        DateTimeOffset now) => new()
+        DateTimeOffset now) => new Team
     {
         Id = id,
         CompetitionId = competitionId,
@@ -341,15 +340,14 @@ public sealed class UserProfilePersistenceTests
         Guid id,
         Guid ownerId,
         string direction,
-        DateTimeOffset now) => new()
+        DateTimeOffset now) => new CtfChallenge
     {
         Id = id,
         OwnerId = ownerId,
-        Mode = GameMode.Ctf,
         Visibility = ChallengeVisibility.Shared,
         Title = $"{direction} challenge",
         Direction = direction,
-        DefinitionJson = "{}",
+        Definition = TestConfigurations.Definition(GameMode.Ctf),
         CreatedAt = now,
         UpdatedAt = now
     };
@@ -358,13 +356,13 @@ public sealed class UserProfilePersistenceTests
         Guid id,
         Guid competitionId,
         Guid challengeId,
-        DateTimeOffset now) => new()
+        DateTimeOffset now) => new CtfCompetitionChallenge
     {
         Id = id,
         CompetitionId = competitionId,
         ChallengeId = challengeId,
         IsPublished = true,
-        RulesJson = "{}",
+        Rules = TestConfigurations.Rules(GameMode.Ctf),
         UpdatedAt = now
     };
 
@@ -373,14 +371,13 @@ public sealed class UserProfilePersistenceTests
         Guid competitionChallengeId,
         Guid teamId,
         Guid userId,
-        DateTimeOffset occurredAt) => new()
+        DateTimeOffset occurredAt) => new FlagAttemptGameplayFact
     {
         Id = Guid.CreateVersion7(occurredAt),
         CompetitionId = competitionId,
         CompetitionChallengeId = competitionChallengeId,
         TeamId = teamId,
         ActorUserId = userId,
-        Kind = GameplayFactKind.FlagAttempt,
         OccurredAt = occurredAt,
         Value = "flag{profile}",
         ValueSha256 = new byte[32],
@@ -389,7 +386,7 @@ public sealed class UserProfilePersistenceTests
         UpdatedAt = occurredAt
     };
 
-    private sealed class RecordingOutbox : ITransactionalMessageOutbox
+    private sealed class RecordingOutbox : IPostCommitMessagePublisher
     {
         public List<object> Messages { get; } = [];
 

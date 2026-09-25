@@ -32,6 +32,7 @@ public static class ObservabilityExtensions
                 .AddNoCtfDurationViews()
                 .AddMeter("Wolverine*")
                 .AddMeter("Npgsql")
+                .AddMeter("Microsoft.EntityFrameworkCore")
                 .AddAspNetCoreInstrumentation()
                 .AddHttpClientInstrumentation()
                 .AddRuntimeInstrumentation()
@@ -64,7 +65,9 @@ public static class ObservabilityExtensions
             "noctf.signalr.publish.duration", "noctf.runner.claim.duration",
             "noctf.leaderboard.projection.duration", "noctf.scheduler.rebuild.duration",
             "noctf.scheduler.dispatch.lateness",
-            "noctf.gameplay_fact.processing.duration"
+            "noctf.gameplay_fact.processing.duration",
+            "noctf.gameplay_fact.stage.duration",
+            "noctf.runtime.dispatch.stage.duration"
         })
         {
             var view = new ExplicitBucketHistogramConfiguration

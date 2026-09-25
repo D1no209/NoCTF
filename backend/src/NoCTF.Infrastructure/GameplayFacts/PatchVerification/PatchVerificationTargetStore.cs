@@ -1,6 +1,7 @@
 using System.Data;
 using Microsoft.EntityFrameworkCore;
 using NoCTF.Application.Commands.Idempotency;
+using NoCTF.Domain.Commands;
 using NoCTF.Application.Competitions.Events;
 using NoCTF.Application.GameplayFacts.PatchVerification;
 using NoCTF.Application.Messaging;
@@ -26,7 +27,7 @@ public sealed class PatchVerificationTargetStore(
     GameplayFactAttemptCriticalSection criticalSection,
     IRuntimePlacementPolicy placementPolicy,
     TeamRuntimeQuota runtimeQuota,
-    ITransactionalMessageOutbox outbox,
+    IPostCommitMessagePublisher outbox,
     ICompetitionEventRecorder? eventRecorder = null,
     IRequestReplay? replay = null,
     IExperimentalFeatureReader? experimentalFeatures = null) : IPatchVerificationTargetStore
@@ -63,7 +64,7 @@ public sealed class PatchVerificationTargetStore(
             ? null
             : await replay.FindAsync<PatchVerificationTargetRequestResult>(
                 new(userId, ReplayOperation.PatchVerificationTarget, competitionId, competitionChallengeId),
-                new { },
+                new EmptyReplayFingerprint(),
                 ct);
         if (prior is not null)
             return prior;
@@ -75,9 +76,8 @@ public sealed class PatchVerificationTargetStore(
             ct);
         if (context is null)
             return new(PatchVerificationTargetRequestState.ScopeNotFound);
-        var interaction = CtfConfigurationParser.ParseDefinition(
-            context.DefinitionJson).InteractionKind;
-        if (interaction != CtfInteractionKind.PatchVerification)
+        if (context.Definition is not CtfChallengeDefinition
+            { InteractionKind: CtfInteractionKind.PatchVerification })
             return new(PatchVerificationTargetRequestState.ScopeNotFound);
 
         var admission = await GameplayFactAdmissionPersistence.LoadAsync(
@@ -93,9 +93,9 @@ public sealed class PatchVerificationTargetStore(
 
         var configuration = PatchVerificationConfigurationResolver.Resolve(
             GameMode.Ctf,
-            context.CompetitionConfigurationJson,
-            context.RulesJson,
-            context.DefinitionJson);
+            context.CompetitionConfiguration,
+            context.Rules,
+            context.Definition);
         if (configuration is null)
             return new(PatchVerificationTargetRequestState.InvalidConfiguration);
         if (configuration.MaximumAttempts > 0
@@ -123,7 +123,7 @@ public sealed class PatchVerificationTargetStore(
                 || instance.State == RuntimeState.Running
                 || instance.State == RuntimeState.Stopping
                 || instance.State == RuntimeState.Failed
-                    && instance.ProviderReceiptJson != null),
+                    && instance.ProviderReceipt != null),
             ct);
         if (activeTargetExists)
             return new(PatchVerificationTargetRequestState.ActiveTargetExists);
@@ -200,8 +200,8 @@ public sealed class PatchVerificationTargetStore(
             includeActiveCompetitionOnly: false,
             ct);
         if (context is null
-            || CtfConfigurationParser.ParseDefinition(context.DefinitionJson).InteractionKind
-                != CtfInteractionKind.PatchVerification)
+            || context.Definition is not CtfChallengeDefinition
+                { InteractionKind: CtfInteractionKind.PatchVerification })
         {
             return null;
         }
@@ -212,9 +212,9 @@ public sealed class PatchVerificationTargetStore(
         }
         var configuration = PatchVerificationConfigurationResolver.Resolve(
             GameMode.Ctf,
-            context.CompetitionConfigurationJson,
-            context.RulesJson,
-            context.DefinitionJson);
+            context.CompetitionConfiguration,
+            context.Rules,
+            context.Definition);
         if (configuration is null)
             return null;
 
@@ -256,7 +256,7 @@ public sealed class PatchVerificationTargetStore(
                 && team.DeletedAt == null
                 && !team.IsBanned
                 && team.RegistrationStatus == TeamRegistrationStatus.Approved
-                && team.MemberIds.Contains(userId))
+                && team.Members.Any(member => member.UserId == userId))
             .Select(team => (Guid?)team.Id)
             .SingleOrDefaultAsync(ct);
 
@@ -296,9 +296,9 @@ public sealed class PatchVerificationTargetStore(
                 item => item.challenge.ChallengeId,
                 template => template.Id,
                 (item, template) => new PatchVerificationContext(
-                    item.competition.ConfigurationJson,
-                    item.challenge.RulesJson,
-                    template.DefinitionJson,
+                    item.competition.ModeConfiguration!,
+                    item.challenge.Rules!,
+                    template.Definition!,
                     item.competition.Status,
                     item.challenge.IsPublished,
                     item.competition.MaxConcurrentRuntimeInstancesPerTeam))
@@ -306,9 +306,9 @@ public sealed class PatchVerificationTargetStore(
     }
 
     private sealed record PatchVerificationContext(
-        string CompetitionConfigurationJson,
-        string RulesJson,
-        string DefinitionJson,
+        CompetitionModeConfiguration CompetitionConfiguration,
+        CompetitionChallengeRules Rules,
+        ChallengeDefinition Definition,
         CompetitionStatus Status,
         bool IsPublished,
         int MaxConcurrentRuntimeInstancesPerTeam);

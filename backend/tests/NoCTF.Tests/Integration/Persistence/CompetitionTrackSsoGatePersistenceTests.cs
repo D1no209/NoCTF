@@ -49,39 +49,33 @@ public sealed class CompetitionTrackSsoGatePersistenceTests
             {
                 await seed.Database.EnsureCreatedAsync(cancellationToken);
                 var settings = await seed.PlatformSettings.SingleAsync(cancellationToken);
-                settings.SsoConfiguration.Providers.Add(new SsoProviderConfiguration
+                settings.SsoConfiguration.Providers.Add(new CasSsoProviderConfiguration
                 {
                     Id = providerId,
                     Name = "School identity",
-                    Protocol = SsoProtocol.Cas,
                     Enabled = true,
                     AllowBinding = true,
                     AllowedHosts = ["cas.example.test"],
-                    Cas = new CasSsoProviderConfiguration
-                    {
-                        IdentityNamespace = "school",
-                        LoginUrl = "https://cas.example.test/login",
-                        ServiceValidateUrl = "https://cas.example.test/serviceValidate"
-                    }
+                    IdentityNamespace = "school",
+                    LoginUrl = "https://cas.example.test/login",
+                    ServiceValidateUrl = "https://cas.example.test/serviceValidate"
                 });
                 seed.Users.AddRange(
                     BoundUser(captainId, "race-captain", providerId, now),
                     User(joiningUserId, "race-joining", now));
-                seed.Competitions.Add(new Competition
+                seed.Competitions.Add(new CtfCompetition
                 {
                     Id = competitionId,
                     OwnerId = captainId,
                     Title = "Track join race",
-                    Mode = GameMode.Ctf,
                     Status = CompetitionStatus.Published,
                     StartAt = now.AddHours(1),
                     EndAt = now.AddHours(2),
                     MaxTeamMembers = 5,
-                    ConfigurationJson = "{}",
+                    ModeConfiguration = TestConfigurations.Competition(GameMode.Ctf),
                     FlagDerivationSecret = new byte[32],
                     TracksEnabled = true,
-                    TrackConfigurationJson = CompetitionTrackConfiguration.Serialize(new(
-                        1,
+                    Tracks = CompetitionTrackConfiguration.ToPersisted(new(
                         [Track("default", null, isDefault: true), Track("school", providerId)])),
                     TeamRegistrationAutoApprove = true,
                     CreatedAt = now,
@@ -90,7 +84,7 @@ public sealed class CompetitionTrackSsoGatePersistenceTests
                 await seed.SaveChangesAsync(cancellationToken);
                 var created = await new TeamRegistrationStore(
                     seed,
-                    new NoOpTransactionalMessageOutbox()).TryCreateAsync(new(
+                    new NoOpPostCommitMessagePublisher()).TryCreateAsync(new(
                         competitionId,
                         captainId,
                         "Race team",
@@ -110,7 +104,7 @@ public sealed class CompetitionTrackSsoGatePersistenceTests
                 await using var db = new NoCtfDbContext(options);
                 return await new TeamMembershipStore(
                     db,
-                    new NoOpTransactionalMessageOutbox()).JoinByInvitationAsync(
+                    new NoOpPostCommitMessagePublisher()).JoinByInvitationAsync(
                         competitionId,
                         invitationToken,
                         joiningUserId,
@@ -123,7 +117,7 @@ public sealed class CompetitionTrackSsoGatePersistenceTests
                 await using var db = new NoCtfDbContext(options);
                 return await new UpdateTeam(new TeamRegistrationStore(
                     db,
-                    new NoOpTransactionalMessageOutbox())).ExecuteAsync(new(
+                    new NoOpPostCommitMessagePublisher())).ExecuteAsync(new(
                         competitionId,
                         teamId,
                         "Race team",
@@ -145,7 +139,7 @@ public sealed class CompetitionTrackSsoGatePersistenceTests
                 .IsEqualTo(TeamRegistrationStatus.Unregistered);
             var submission = await new SubmitTeamRegistration(new TeamRegistrationStore(
                 verification,
-                new NoOpTransactionalMessageOutbox())).ExecuteAsync(
+                new NoOpPostCommitMessagePublisher())).ExecuteAsync(
                     competitionId,
                     teamId,
                     captainId,
@@ -183,41 +177,35 @@ public sealed class CompetitionTrackSsoGatePersistenceTests
             var captainId = Guid.CreateVersion7(now.AddMilliseconds(2));
             var memberId = Guid.CreateVersion7(now.AddMilliseconds(3));
             var settings = await db.PlatformSettings.SingleAsync(cancellationToken);
-            settings.SsoConfiguration.Providers.Add(new SsoProviderConfiguration
+            settings.SsoConfiguration.Providers.Add(new CasSsoProviderConfiguration
             {
                 Id = providerId,
                 Name = "School identity",
-                Protocol = SsoProtocol.Cas,
                 Enabled = true,
                 AllowBinding = true,
                 AllowedHosts = ["cas.example.test"],
-                Cas = new CasSsoProviderConfiguration
-                {
-                    IdentityNamespace = "school",
-                    LoginUrl = "https://cas.example.test/login",
-                    ServiceValidateUrl = "https://cas.example.test/serviceValidate"
-                }
+                IdentityNamespace = "school",
+                LoginUrl = "https://cas.example.test/login",
+                ServiceValidateUrl = "https://cas.example.test/serviceValidate"
             });
             db.Users.AddRange(
                 BoundUser(captainId, "captain", providerId, now),
                 User(memberId, "member", now));
             var defaultTrack = Track("default", null, isDefault: true);
             var gatedTrack = Track("school", providerId, invitationCode: "let-me-in");
-            db.Competitions.Add(new Competition
+            db.Competitions.Add(new CtfCompetition
             {
                 Id = competitionId,
                 OwnerId = captainId,
                 Title = "Participant track update",
-                Mode = GameMode.Ctf,
                 Status = CompetitionStatus.Published,
                 StartAt = now.AddHours(1),
                 EndAt = now.AddHours(2),
                 MaxTeamMembers = 5,
-                ConfigurationJson = "{}",
+                ModeConfiguration = TestConfigurations.Competition(GameMode.Ctf),
                 FlagDerivationSecret = new byte[32],
                 TracksEnabled = true,
-                TrackConfigurationJson = CompetitionTrackConfiguration.Serialize(new(
-                    1,
+                Tracks = CompetitionTrackConfiguration.ToPersisted(new(
                     [defaultTrack, gatedTrack])),
                 TeamRegistrationAutoApprove = false,
                 CreatedAt = now,
@@ -225,7 +213,7 @@ public sealed class CompetitionTrackSsoGatePersistenceTests
             });
             await db.SaveChangesAsync(cancellationToken);
 
-            var outbox = new NoOpTransactionalMessageOutbox();
+            var outbox = new NoOpPostCommitMessagePublisher();
             var events = new CompetitionEventStore(db, outbox);
             var registrations = new TeamRegistrationStore(db, outbox, eventRecorder: events);
             var created = await registrations.TryCreateAsync(new(
@@ -235,10 +223,13 @@ public sealed class CompetitionTrackSsoGatePersistenceTests
                 now,
                 defaultTrack.Key), TeamRegistrationStatus.Approved, cancellationToken);
             var teamId = created.Team!.Id;
-            await db.Teams.Where(team => team.Id == teamId)
-                .ExecuteUpdateAsync(setters => setters.SetProperty(
-                    team => team.MemberIds,
-                    new[] { captainId, memberId }), cancellationToken);
+            db.Set<TeamMember>().Add(new TeamMember
+            {
+                TeamId = teamId,
+                CompetitionId = competitionId,
+                UserId = memberId
+            });
+            await db.SaveChangesAsync(cancellationToken);
             db.ChangeTracker.Clear();
             var update = new UpdateTeam(registrations);
 
@@ -253,12 +244,16 @@ public sealed class CompetitionTrackSsoGatePersistenceTests
             var missingMemberIdentity = await submit.ExecuteAsync(
                 competitionId, teamId, captainId, "let-me-in", cancellationToken);
 
-            await db.Users.Where(user => user.Id == memberId).ExecuteUpdateAsync(setters => setters
-                .SetProperty(user => user.ExternalIdentityProviderId, providerId)
-                .SetProperty(user => user.ExternalIdentityProtocol, SsoProtocol.Cas)
-                .SetProperty(user => user.ExternalIdentityNamespace, "school")
-                .SetProperty(user => user.ExternalIdentitySubject, "member")
-                .SetProperty(user => user.ExternalIdentityBoundAt, now), cancellationToken);
+            db.Set<ExternalIdentity>().Add(new ExternalIdentity
+            {
+                UserId = memberId,
+                ProviderId = providerId,
+                Protocol = SsoProtocol.Cas,
+                IdentityNamespace = "school",
+                Subject = "member",
+                BoundAt = now
+            });
+            await db.SaveChangesAsync(cancellationToken);
             db.ChangeTracker.Clear();
             var submitted = await submit.ExecuteAsync(
                 competitionId, teamId, captainId, "let-me-in", cancellationToken);
@@ -349,20 +344,16 @@ public sealed class CompetitionTrackSsoGatePersistenceTests
             var secondUnboundUserId = Guid.CreateVersion7(now.AddMilliseconds(5));
             var thirdUnboundUserId = Guid.CreateVersion7(now.AddMilliseconds(6));
             var settings = await db.PlatformSettings.SingleAsync(cancellationToken);
-            settings.SsoConfiguration.Providers.Add(new SsoProviderConfiguration
+            settings.SsoConfiguration.Providers.Add(new CasSsoProviderConfiguration
             {
                 Id = providerId,
                 Name = "School identity",
-                Protocol = SsoProtocol.Cas,
                 Enabled = true,
                 AllowBinding = true,
                 AllowedHosts = ["cas.example.test"],
-                Cas = new CasSsoProviderConfiguration
-                {
-                    IdentityNamespace = "school",
-                    LoginUrl = "https://cas.example.test/login",
-                    ServiceValidateUrl = "https://cas.example.test/serviceValidate"
-                }
+                IdentityNamespace = "school",
+                LoginUrl = "https://cas.example.test/login",
+                ServiceValidateUrl = "https://cas.example.test/serviceValidate"
             });
             db.Users.AddRange(
                 BoundUser(eligibleCaptainId, "eligible-captain", providerId, now),
@@ -372,28 +363,26 @@ public sealed class CompetitionTrackSsoGatePersistenceTests
                 User(thirdUnboundUserId, "third-unbound", now));
             var gatedTrack = Track("school", providerId);
             var defaultTrack = Track("default", null, isDefault: true);
-            db.Competitions.Add(new Competition
+            db.Competitions.Add(new CtfCompetition
             {
                 Id = competitionId,
                 OwnerId = eligibleCaptainId,
                 Title = "SSO gate",
-                Mode = GameMode.Ctf,
                 Status = CompetitionStatus.Published,
                 StartAt = now.AddHours(1),
                 EndAt = now.AddHours(2),
                 MaxTeamMembers = 5,
-                ConfigurationJson = "{}",
+                ModeConfiguration = TestConfigurations.Competition(GameMode.Ctf),
                 FlagDerivationSecret = new byte[32],
                 TracksEnabled = true,
-                TrackConfigurationJson = CompetitionTrackConfiguration.Serialize(new(
-                    1,
+                Tracks = CompetitionTrackConfiguration.ToPersisted(new(
                     [defaultTrack, gatedTrack])),
                 CreatedAt = now,
                 UpdatedAt = now
             });
             await db.SaveChangesAsync(cancellationToken);
 
-            var outbox = new NoOpTransactionalMessageOutbox();
+            var outbox = new NoOpPostCommitMessagePublisher();
             var registrations = new TeamRegistrationStore(db, outbox);
             var eligibleTeam = await registrations.TryCreateAsync(new(
                 competitionId,
@@ -435,14 +424,9 @@ public sealed class CompetitionTrackSsoGatePersistenceTests
                 includeInternal: false,
                 includeInvitationCodes: false,
                 cancellationToken);
-            await db.Users.Where(user => user.Id == eligibleMemberId)
-                .ExecuteUpdateAsync(setters => setters
-                    .SetProperty(user => user.ExternalIdentityProviderId, (Guid?)null)
-                    .SetProperty(user => user.ExternalIdentityProtocol, (SsoProtocol?)null)
-                    .SetProperty(user => user.ExternalIdentityNamespace, (string?)null)
-                    .SetProperty(user => user.ExternalIdentitySubject, (string?)null)
-                    .SetProperty(user => user.ExternalIdentityBoundAt, (DateTimeOffset?)null),
-                    cancellationToken);
+            await db.Set<ExternalIdentity>()
+                .Where(identity => identity.UserId == eligibleMemberId)
+                .ExecuteDeleteAsync(cancellationToken);
             db.ChangeTracker.Clear();
             var teamNoLongerMeetsGate = await tracks.GetAsync(
                 competitionId,

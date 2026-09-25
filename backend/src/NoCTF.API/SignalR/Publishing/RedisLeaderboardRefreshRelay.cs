@@ -3,6 +3,7 @@ using System.Text.Json;
 using Microsoft.AspNetCore.SignalR;
 using NoCTF.API.SignalR.Hubs;
 using NoCTF.Application.Notifications;
+using NoCTF.Application.Messaging;
 using NoCTF.Application.Observability;
 using NoCTF.Infrastructure.Notifications;
 using StackExchange.Redis;
@@ -24,8 +25,9 @@ public sealed class RedisLeaderboardRefreshRelay(
             var started = Stopwatch.GetTimestamp();
             try
             {
-                var notification = JsonSerializer.Deserialize<ScoreboardUpdated>(
-                    message.Message.ToString());
+                var notification = JsonSerializer.Deserialize(
+                    message.Message.ToString(),
+                    NoCtfMessageJsonContext.Default.ScoreboardUpdated);
                 if (notification is null)
                     return;
                 var clients = await audiences.CurrentAsync(

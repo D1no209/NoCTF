@@ -34,7 +34,7 @@ Runtime UUID 的动态 Flag。Break 必须从本队 Player 实例中取得；Fix
 | TtlSeconds / OperationTimeoutSeconds | `180` / `90` |
 | EgressPolicy | `Isolated` |
 | NoNewPrivileges / ReadonlyRootfs / RunAsNonRoot | `true` / `false` / `true` |
-| CapDrop / CapAdd | `["ALL"]` / `[]` |
+| CapDrop / CapAdd | `[]` / `[]` |
 | PatchEntrypoint / PatchCommand | `fix.sh` / `["/bin/sh","{entrypoint}"]` |
 | PatchTimeoutSeconds / ReadyTimeoutSeconds | `60` / `20` |
 | MaximumPatchUploadBytes | `268435456` |

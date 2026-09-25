@@ -36,8 +36,11 @@ describe('participant error feedback', () => {
       expect(component).toContain('pollingError')
       expect(component).toContain('timedOut')
     }
-    expect(flag).toContain("throw parseApiError(error, translate(\"ui.failedToRefreshSubmissionStatus\"))")
+    expect(flag).toContain('await readStatus(props.competitionId, id)')
     expect(flag).toContain('void refreshOne(id).catch((error) => {')
+    expect(flag).toContain('delays: [350, 1500]')
+    expect(flag).toContain('pendingRefreshes.get(id)')
+    expect(flag).toContain('generation !== requestGeneration')
     expect(history).toContain('@click="startPendingPolling"')
     expect(awdp).toContain('statePollingTimedOut')
     expect(awdp).toContain('@click="refreshAndPoll"')

@@ -67,14 +67,15 @@ public sealed class IdentityNormalizationPersistenceTests
                 firstUserId = first.Value.Profile.Id;
                 secondUserId = second.Value!.Profile.Id;
 
-                db.Competitions.Add(new Competition
+                db.Competitions.Add(new CtfCompetition
                 {
                     Id = Guid.CreateVersion7(),
                     OwnerId = firstUserId,
                     Title = "Normalization",
-                    Mode = GameMode.Ctf,
                     Status = CompetitionStatus.Draft,
-                    ConfigurationJson = "{}",
+                    Tracks = CompetitionTrackConfiguration.ToPersisted(
+                        CompetitionTrackConfiguration.DefaultFor(GameMode.Ctf)),
+                    ModeConfiguration = TestConfigurations.Competition(GameMode.Ctf),
                     MaxTeamMembers = 5,
                     FlagDerivationSecret = new byte[32],
                     StartAt = now.AddHours(1),
@@ -131,7 +132,7 @@ public sealed class IdentityNormalizationPersistenceTests
         });
     }
 
-    private sealed class NoopOutbox : ITransactionalMessageOutbox
+    private sealed class NoopOutbox : IPostCommitMessagePublisher
     {
         public ValueTask PublishAsync<T>(T message) => ValueTask.CompletedTask;
         public ValueTask ScheduleAsync<T>(T message, DateTimeOffset scheduledAt) =>

@@ -1,8 +1,7 @@
 # Runtime 规范
 
-本文定义简化模型下的 Runtime 权威语义。若实现与本文冲突，按
-[数据模型与 Wolverine 调度简化规范](data-model-wolverine-simplification.md) 第 5.7 节迁移，
-不得增加兼容字段。
+本文定义当前强类型关系模型下的 Runtime 语义。旧版数据模型与消息传输规范仅作为历史记录，
+不得为其增加兼容字段。
 
 ## 题目定义与平台放置
 
@@ -11,24 +10,24 @@
 或具体 Runner。
 
 部署在平台配置中选择唯一活动的容器 Provider（Docker 或 Kubernetes）和可用 Runner。
-Worker 根据平台事实选择具体 `RunnerId`，随后把 durable 消息直接投递到该节点的命名
-PostgreSQL queue。Runner 不再从共享 pool queue 中竞争任务。
+Worker 根据平台事实选择具体 `RunnerId`，随后把消息投递到该节点的 JetStream subject。
+Runner 不从共享 pool queue 中竞争任务；节点所有权由 NATS KV 租约保护。
 
 公开 Docker 端口必须使用 host port `0`，由 Docker 随机分配。禁止为容器 Runtime 增加
 HAProxy 或入口代理。
 
 ## 最小持久化模型
 
-容量恢复扩展见 [Runtime capacity contract](runtime-capacity.md)：允许保存有界的活动工作负载分配
-身份、所属资源域、Runner 及 Limit/Budget 数额，用于恢复 Redis 账本；清理后删除对应项。
+容量恢复扩展见 [Runtime capacity contract](runtime-capacity.md)：关系化 Allocation 和 Ledger 保存
+活动工作负载分配、所属资源域、Runner 及额度；清理后删除对应分配。
 这不是题目定义快照、工作流阶段、调度游标或历史操作列表。
 
 `runtime_instances` 只保存恢复和清理外部资源所需事实：
 
 - 比赛/练习实例保存 Competition、CompetitionChallenge、Team 和可选 GameplayFact 关系；题目测试实例改用互斥的 Challenge 关系；
 - Runtime kind、purpose、provider、`RunnerId`；
-- 状态、稳定失败码、provider receipt；
-- 完整访问 URL 与已发布端口；
+- 状态、稳定失败码、类型化 provider receipt；
+- 关系化访问端点与已发布端口；
 - 创建、开始、到期、停止和更新时间。
 
 以下内容不得持久化：
@@ -59,34 +58,33 @@ Queued -> Provisioning -> Running -> Stopping -> Stopped
    +-----------+------------+-----------+-> Failed
 ```
 
-- Start：在业务唯一约束或 PostgreSQL 临界区内，保证同一作用域只有一个活动实例。
+- Start：通过活动 Runtime slot、普通唯一约束及 Serializable 事务保证同一作用域只有一个活动实例。
 - Stop：Queued 可直接收敛为 Stopped；已分配外部资源的实例进入 Stopping 并直投原 Runner。
 - Reset：停止旧 UUID、创建新 UUID；不得复用旧 ID。
 - Extend：只更新当前 Running 实例的 `ExpiresAt`。到期 Handler 重新读取事实；若当前尚未到期，
   即视为旧消息并安全返回。
 - Failed：失败事实保留；若 receipt 表明可能存在资源，仍须由原 Runner 幂等清理。
 
-同一 Wolverine `MessageId` 的重投必须由 durable inbox、业务唯一约束和状态检查幂等处理。
-不同消息遵循 last-write-wins，但终态、外部资源所有权和业务唯一约束仍是不可破坏的不变量。
-不得重新引入持久化版本栅栏。
+JetStream 至少一次投递的重投由业务唯一约束、状态检查和当前 `ConcurrencyStamp` 幂等处理。
+有限时间的 `Nats-Msg-Id` 去重只是辅助，不能替代业务幂等或并发校验。
 
 ## 创建、停止与恢复
 
 Worker 创建 Runtime 时：
 
-1. 在业务事务中创建 `Queued` 事实并经 EF transactional outbox 发送调度消息；
+1. 在业务事务中创建 `Queued` 事实，成功提交后发布 JetStream 调度消息；若提交后发布前崩溃，由当前 Pending 状态重新派发；
 2. 选择具体 Runner，持久化 `RunnerId`；
-3. 使用 `IdAndDestination` 直投该 Runner 的 Sticky PostgreSQL endpoint；
+3. 直投该 Runner 的命名 JetStream subject；
 4. Runner 幂等 claim 容量并创建 provider resource；
 5. receipt 先写回数据库，再把实例推进为 Running；
 6. 任何失败都保留足以对账和清理的 provider/runner/receipt 事实。
 
 Stop/cleanup 始终以 Runtime UUID、Runner、Provider 和 receipt 为依据。即使 receipt 为空，
 Runner 也必须按 Runtime UUID/平台标签检查节点资源，确认不存在后才释放容量并回写 Stopped。
-清理动作必须可重复执行；Redis 或 PostgreSQL 不可用时不得猜测资源不存在。
+清理动作必须可重复执行；关系数据库或 NATS KV 不可用时不得猜测资源不存在。
 
-集群 Singular Agent 只从 PostgreSQL 扫描需要恢复的业务事实并派发 durable 消息，不直接操作
-Provider。它不保存业务 next-run，也不使用 Wolverine Scheduled Message 补跑停机窗口。
+周期调度的 NATS KV Leader 从关系数据库扫描需要恢复的业务事实并派发消息，不直接操作
+Provider。接管者从当前事实重建调度；不保存业务 next-run 或依赖旧消息补跑停机窗口。
 
 ## 模式用途
 
@@ -104,6 +102,10 @@ Provider。它不保存业务 next-run，也不使用 Wolverine Scheduled Messag
 GameplayFact/PatchUpload 展示评测来源。TemplateTest 不绑定 Competition、CompetitionChallenge、
 Team 或 GameplayFact。
 
+KoH Worker 的 Control 检查通过该 Runtime 自身的 Docker 随机发布端口访问，
+因此部署的 `Runtime:Docker:PublicHost` 必须同时能从 Worker 容器解析和连接；
+它不依赖 Worker 加入 Runner 创建的隔离网络，也不新增入口代理。
+
 ## CTF 与 TTL
 
 CTF 队伍 Runtime 不预创建。首次 Start 创建新的 UUID，团队成员共享。进入 Running 后设置
@@ -112,11 +114,11 @@ CTF 队伍 Runtime 不预创建。首次 Start 创建新的 UUID，团队成员�
 创建作弊事实或改变状态。
 
 队伍并发额度统计活动 Runtime。Reset 的新旧实例在短暂交叠时按同一用户动作处理，避免错误
-占用两个长期配额；该规则通过查询和临界区实现，不增加 replacement 字段。
+占用两个长期配额；该规则通过关系约束和 Serializable 事务实现，不增加 replacement 字段。
 
 ## 动态 Flag
 
-动态 Flag 绑定具体 Runtime UUID。创建 Runtime 时，在 PostgreSQL 事务中幂等创建或绑定对应
+动态 Flag 绑定具体 Runtime UUID。创建 Runtime 时，在关系数据库事务中幂等创建或绑定对应
 `ChallengeFlag`，Worker 在 provider 请求中注入题目声明的环境变量或文件位置。只有 Runtime
 Running 后 Flag 才有效；Stop、Reset、失败或到期使旧 Runtime UUID 的 Flag 失效。
 
@@ -134,7 +136,7 @@ Queued、Provisioning 或 Running 时即可接收唯一 PatchUpload；成功上�
 平台失败和超时均派发幂等清理，回收 Checker、Target、网络、端口和容量。再次尝试必须创建
 新的 Runtime UUID。
 
-AWDP Target 的流程状态来自 GameplayFact、PatchUpload、Runtime state 和版本化事件 payload，
+AWDP Target 的流程状态来自 GameplayFact、PatchUpload、Runtime state 和类型化事件，
 不得写入 `awdp_fix_stage` 或 Checker 调度列。
 
 ## 节点标签、对账与清理
@@ -144,7 +146,7 @@ Docker/Kubernetes/Libvirt 资源必须至少带平台 managed 标记和 Runtime 
 
 - 数据库活动实例且归属本节点的精确 UUID 资源保留；
 - 终态、已改派或数据库不存在的 managed UUID 进入幂等清理；
-- 数据库/Redis 不可用时停止破坏性清理；
+- 数据库或租约状态不可用时停止破坏性清理；
 - 清理成功后再释放 claim 和容量；重复清理得到相同终态。
 
 ## API 与权限
@@ -154,17 +156,17 @@ Start/Stop/Reset/Extend 使用强类型 FastEndpoints，并返回 `202 Accepted`
 内部状态。Queued/Provisioning/Stopping 只返回状态；Running 才按权限返回 URL；终态返回稳定
 失败码。Receipt 和 provider 原始诊断仅向有权限工作人员展示。
 
-业务写入采用 last-write-wins；请求和响应不携带 ExpectedRevision 或 ProcessingVersion。
+可变聚合使用 `ConcurrencyStamp` 乐观并发；请求和响应不携带 ExpectedRevision 或 ProcessingVersion。
 
 ## 必测不变量
 
 - Start/Reset 使用新 UUID，迟到旧消息不能改变新实例；
 - 业务事务回滚时不发布创建/停止消息；
-- Worker 选定 Runner 后消息只到对应 Sticky PostgreSQL endpoint；
-- Sticky endpoint 缺失或退化为 local queue 时启动失败；
+- Worker 选定 Runner 后消息只到对应命名 JetStream subject；
+- Runner subject 缺失或退化为 local queue 时启动失败；
 - Runner/Worker 重投不重复创建、停止或释放容量；
 - receipt 为空的失联实例先由 Runner 对账，再收敛终态；
-- Provider/Worker/Runner 中断后可从 PostgreSQL、receipt 和 durable inbox/outbox 恢复；
+- Provider/Worker/Runner 中断后可从关系化业务事实、receipt 和 JetStream 重投恢复；
 - AWDP Target 完成、失败和超时后全部资源释放；
 - 动态 Flag 随 Runtime UUID 轮换，旧 UUID Flag 失效；
 - API、事件、日志和指标不泄露 Flag 或内部调度状态。

@@ -36,7 +36,7 @@ public sealed class AwdpBreakFlagJudge(NoCtfDbContext db) : IAwdpBreakFlagJudge
 
         var teamId = await db.Teams.AsNoTracking()
             .Where(team => team.CompetitionId == command.CompetitionId
-                && team.MemberIds.Contains(command.UserId)
+                && team.Members.Any(member => member.UserId == command.UserId)
                 && team.DeletedAt == null
                 && !team.IsBanned
                 && team.RegistrationStatus == TeamRegistrationStatus.Approved)

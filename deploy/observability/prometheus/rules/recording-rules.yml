@@ -20,15 +20,11 @@ groups:
       - record: noctf:human_verification_unavailable:rate5m
         expr: sum(rate(noctf_api_human_verification_total{outcome="unavailable"}[5m])) or vector(0)
       - record: noctf:jetstream_pending:sum
-        expr: sum(max by (stream_name,consumer_name) (jetstream_consumer_num_pending{is_consumer_leader="true",stream_name=~"NOCTF_CONTROL|NOCTF_GAMEPLAY"})) or vector(0)
+        expr: sum(max by (stream_name,consumer_name) (jetstream_consumer_num_pending{is_consumer_leader="true",stream_name=~"NOCTF_V2_.*"})) or vector(0)
       - record: noctf:jetstream_ack_pending:sum
-        expr: sum(max by (stream_name,consumer_name) (jetstream_consumer_num_ack_pending{is_consumer_leader="true",stream_name=~"NOCTF_CONTROL|NOCTF_GAMEPLAY"})) or vector(0)
+        expr: sum(max by (stream_name,consumer_name) (jetstream_consumer_num_ack_pending{is_consumer_leader="true",stream_name=~"NOCTF_V2_.*"})) or vector(0)
       - record: noctf:jetstream_redelivered:sum
-        expr: sum(max by (stream_name,consumer_name) (jetstream_consumer_num_redelivered{is_consumer_leader="true",stream_name=~"NOCTF_CONTROL|NOCTF_GAMEPLAY"})) or vector(0)
-      - record: noctf:wolverine_outbox:sum
-        expr: sum(wolverine_outbox_count_Messages) or vector(0)
-      - record: noctf:wolverine_inbox:sum
-        expr: sum(wolverine_inbox_count_Messages) or vector(0)
+        expr: sum(max by (stream_name,consumer_name) (jetstream_consumer_num_redelivered{is_consumer_leader="true",stream_name=~"NOCTF_V2_.*"})) or vector(0)
       - record: noctf:leaderboard_projection_duration:p95_5m
         expr: histogram_quantile(0.95, sum by (le) (rate(noctf_leaderboard_projection_duration_seconds_bucket[5m])))
       - record: noctf:leaderboard_failures:rate5m

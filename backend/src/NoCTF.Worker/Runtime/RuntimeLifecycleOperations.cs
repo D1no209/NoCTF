@@ -39,7 +39,7 @@ internal static partial class BackendMessageOperations
     public static async Task StopRuntimeAsync(
         StopRuntime message,
         NoCtfDbContext db,
-        ITransactionalMessageOutbox outbox,
+        IPostCommitMessagePublisher outbox,
         TimeProvider timeProvider,
         CancellationToken cancellationToken,
         ICompetitionEventRecorder? events = null)
@@ -57,7 +57,7 @@ internal static partial class BackendMessageOperations
             events,
             timeProvider,
             cancellationToken);
-        if (string.IsNullOrWhiteSpace(instance.ProviderReceiptJson))
+        if (instance.ProviderReceipt is null)
         {
             if (instance.RunnerId is { } runnerId)
             {
@@ -94,7 +94,7 @@ internal static partial class BackendMessageOperations
     public static async Task CleanupCompetitionRuntimesAsync(
         CleanupCompetitionRuntimes message,
         NoCtfDbContext db,
-        ITransactionalMessageOutbox outbox,
+        IPostCommitMessagePublisher outbox,
         TimeProvider timeProvider,
         CancellationToken cancellationToken,
         ICompetitionEventRecorder? events = null)
@@ -120,7 +120,7 @@ internal static partial class BackendMessageOperations
                 events,
                 timeProvider,
                 cancellationToken);
-            if (instance.State == RuntimeState.Queued && string.IsNullOrWhiteSpace(instance.ProviderReceiptJson))
+            if (instance.State == RuntimeState.Queued && instance.ProviderReceipt is null)
             {
                 instance.State = RuntimeState.Stopped;
                 instance.StoppedAt = now;
@@ -161,7 +161,7 @@ internal static partial class BackendMessageOperations
         IAwdRuntimeProvisioner awdRuntimes,
         IKohRuntimeProvisioner kohRuntimes,
         NoCtfDbContext db,
-        ITransactionalMessageOutbox outbox,
+        IPostCommitMessagePublisher outbox,
         TimeProvider timeProvider,
         CancellationToken cancellationToken)
     {
@@ -204,7 +204,7 @@ internal static partial class BackendMessageOperations
         NoCtfDbContext db,
         IRunnerCapacityGate capacity,
         IRuntimePlacementPolicy placementPolicy,
-        ITransactionalMessageOutbox outbox,
+        IPostCommitMessagePublisher outbox,
         TimeProvider timeProvider,
         CancellationToken cancellationToken)
     {
@@ -223,7 +223,7 @@ internal static partial class BackendMessageOperations
         NoCtfDbContext db,
         IRunnerCapacityGate capacity,
         IRuntimePlacementPolicy placementPolicy,
-        ITransactionalMessageOutbox outbox,
+        IPostCommitMessagePublisher outbox,
         TimeProvider timeProvider,
         CancellationToken cancellationToken)
     {
@@ -236,6 +236,9 @@ internal static partial class BackendMessageOperations
                 && (instance.RuntimeKind == RuntimeKind.Container
                     || instance.RuntimeKind == RuntimeKind.Compose)
                 && (instance.Purpose == RuntimePurpose.Player
+                    && db.Competitions.Any(competition =>
+                        competition.Id == instance.CompetitionId
+                        && competition.Mode == GameMode.Ctf)
                     && db.GameplayFacts.Any(fact =>
                         fact.CompetitionId == instance.CompetitionId
                         && fact.CompetitionChallengeId == instance.CompetitionChallengeId
@@ -260,7 +263,7 @@ internal static partial class BackendMessageOperations
         foreach (var instance in solvedRuntimes)
         {
             if (instance.State == RuntimeState.Queued
-                && string.IsNullOrWhiteSpace(instance.ProviderReceiptJson)
+                && instance.ProviderReceipt is null
                 && instance.RunnerId is null)
             {
                 instance.State = RuntimeState.Stopped;
@@ -286,7 +289,7 @@ internal static partial class BackendMessageOperations
         foreach (var instance in expiredRuntimes)
         {
             instance.State = RuntimeState.Stopping;
-            if (!string.IsNullOrWhiteSpace(instance.ProviderReceiptJson)
+            if (instance.ProviderReceipt is not null
                 || instance.RunnerId is not null)
                 await outbox.PublishAsync(new StopRuntime(instance.Id));
             else
@@ -303,7 +306,7 @@ internal static partial class BackendMessageOperations
                     || instance.State == RuntimeState.Running
                     || instance.State == RuntimeState.Stopping
                     || (instance.State == RuntimeState.Failed
-                        && instance.ProviderReceiptJson == null))
+                        && instance.ProviderReceipt == null))
                 && (message.AfterRuntimeInstanceId == null
                     || instance.Id.CompareTo(message.AfterRuntimeInstanceId.Value) > 0))
             .OrderBy(instance => instance.Id)
@@ -429,7 +432,7 @@ internal static partial class BackendMessageOperations
     }
 
     private static ValueTask PublishRuntimeProvisionAsync(
-        ITransactionalMessageOutbox outbox,
+        IPostCommitMessagePublisher outbox,
         IRuntimeProvisionMessage provision) =>
         provision switch
         {
@@ -466,7 +469,7 @@ internal static partial class BackendMessageOperations
     }
 
     private static ValueTask PublishRuntimeStopAsync(
-        ITransactionalMessageOutbox outbox,
+        IPostCommitMessagePublisher outbox,
         RuntimeInstance instance,
         string runnerId,
         DateTimeOffset requestedAt) =>

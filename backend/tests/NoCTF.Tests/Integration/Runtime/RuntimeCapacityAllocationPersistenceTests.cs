@@ -18,7 +18,9 @@ public sealed class RuntimeCapacityAllocationPersistenceTests
                 "postgres:17.10-alpine3.24@sha256:742f40ea20b9ff2ff31db5458d127452988a2164df9e17441e191f3b72252193").Build();
             await postgres.StartAsync(ct);
             var options = new DbContextOptionsBuilder<NoCtfDbContext>()
-                .UseNpgsql(postgres.GetConnectionString()).UseSnakeCaseNamingConvention().Options;
+                .UseNpgsql(postgres.GetConnectionString(), npgsql => npgsql.MigrationsAssembly(
+                    typeof(NoCTF.Persistence.PostgreSql.PostgreSqlPersistence).Assembly.FullName))
+                .UseSnakeCaseNamingConvention().Options;
             await using var db = new NoCtfDbContext(options);
             await db.Database.MigrateAsync(ct);
             var fixture = new CompetitionForceDeleteFixture();
@@ -28,12 +30,15 @@ public sealed class RuntimeCapacityAllocationPersistenceTests
             var allocation = new RuntimeCapacityAllocation(
                 new(RuntimeWorkloadKind.VerificationTarget, runtime.Id, runtime.Id), runtime.GameplayFactId,
                 "docker-domain", "runner", new(1024, 250, 128), new(1024, 500, 128));
-            runtime.CapacityAllocations = runtime.CapacityAllocations.Add(allocation);
+            var allocationEntry = RuntimeCapacityAllocationEntry.FromValue(allocation);
+            runtime.CapacityAllocationEntries.Add(allocationEntry);
+            db.Entry(allocationEntry).State = EntityState.Added;
             await db.SaveChangesAsync(ct);
             db.ChangeTracker.Clear();
             runtime = await db.RuntimeInstances.SingleAsync(x => x.Id == fixture.RuntimeIds[0], ct);
             await Assert.That(runtime.CapacityAllocations.Items).IsEquivalentTo([allocation]);
-            runtime.CapacityAllocations = runtime.CapacityAllocations.Remove(allocation.Identity);
+            runtime.CapacityAllocationEntries.RemoveAll(
+                entry => entry.ToValue().Identity == allocation.Identity);
             await db.SaveChangesAsync(ct);
             db.ChangeTracker.Clear();
             await Assert.That((await db.RuntimeInstances.SingleAsync(x => x.Id == fixture.RuntimeIds[0], ct))

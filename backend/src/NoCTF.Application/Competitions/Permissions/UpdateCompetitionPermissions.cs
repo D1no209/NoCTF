@@ -65,6 +65,7 @@ public interface ICompetitionPermissionStore
 public enum CompetitionPermissionUpdateState
 {
     Updated,
+    Conflict,
     NotFound,
     Forbidden,
     RolesOverlap,

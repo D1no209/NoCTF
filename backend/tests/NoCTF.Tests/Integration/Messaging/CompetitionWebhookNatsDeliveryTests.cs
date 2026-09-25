@@ -7,7 +7,6 @@ using NoCTF.Hosting;
 using Testcontainers.PostgreSql;
 using Wolverine;
 using Wolverine.Nats;
-using Wolverine.Postgresql;
 
 namespace NoCTF.Tests.Integration.Messaging;
 
@@ -41,10 +40,6 @@ public sealed class CompetitionWebhookNatsDeliveryTests
                 {
                     options.Discovery.DisableConventionalDiscovery();
                     options.Discovery.IncludeType(typeof(WebhookDeliveryProbeHandler));
-                    options.PersistMessagesWithPostgresql(
-                        postgres.GetConnectionString(),
-                        "webhook_delivery_test");
-                    options.AutoBuildMessageStorageOnStartup = AutoCreate.All;
                     options.UseNats(
                             $"nats://{nats.Hostname}:{nats.GetMappedPublicPort(4222)}")
                         .AutoProvision()
@@ -58,12 +53,10 @@ public sealed class CompetitionWebhookNatsDeliveryTests
                     options.PublishMessage<DeliverCompetitionWebhook>()
                         .ToNatsSubject(NatsSubjects.Subject(
                             NoCTF.Application.Messaging.WorkerQueue.Webhook))
-                        .UseJetStream(NatsSubjects.WebhookStream)
-                        .UseDurableOutbox();
+                        .UseJetStream(NatsSubjects.WebhookStream);
                     options.ListenToNatsSubject(NatsSubjects.Subject(
                             NoCTF.Application.Messaging.WorkerQueue.Webhook))
-                        .UseJetStream(NatsSubjects.WebhookStream, "webhook-delivery-test")
-                        .UseDurableInbox();
+                        .UseJetStream(NatsSubjects.WebhookStream, "webhook-delivery-test");
                 })
                 .Build();
             await host.StartAsync(cancellationToken);

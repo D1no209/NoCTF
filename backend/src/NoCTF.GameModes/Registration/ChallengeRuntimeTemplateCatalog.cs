@@ -1,31 +1,15 @@
-using System.Text.Json;
 using NoCTF.Application.Runtime.Configuration;
 using NoCTF.Application.Runtime.Provisioning;
+using NoCTF.Domain.Challenges;
 using NoCTF.Domain.Competitions;
 using NoCTF.Domain.Runtime;
-using NoCTF.GameModes.Awd.Configuration;
-using NoCTF.GameModes.Awdp.Configuration;
-using NoCTF.GameModes.Ctf.Configuration;
-using NoCTF.GameModes.Koh.Configuration;
 
 namespace NoCTF.GameModes.Registration;
 
 public sealed class ChallengeRuntimeTemplateCatalog : IChallengeRuntimeTemplateCatalog
 {
-    private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
-
-    public ChallengeRuntimeTemplate? Get(GameMode mode, string challengeConfigurationJson) => mode switch
-    {
-        GameMode.Ctf => Parse<CtfChallengeConfiguration>(challengeConfigurationJson).Runtime,
-        GameMode.Awd => Parse<AwdChallengeConfiguration>(challengeConfigurationJson).Runtime,
-        GameMode.Awdp => Parse<AwdpChallengeConfiguration>(challengeConfigurationJson).Runtime,
-        GameMode.Koh => Parse<KohChallengeConfiguration>(challengeConfigurationJson).Runtime,
-        _ => throw new ArgumentOutOfRangeException(nameof(mode), mode, "Unsupported game mode.")
-    };
-
-    private static T Parse<T>(string json) where T : class =>
-        JsonSerializer.Deserialize<T>(json, JsonOptions)
-        ?? throw new GameModeConfigurationException($"{typeof(T).Name} is required.");
+    public ChallengeRuntimeTemplate? Get(ChallengeDefinition? definition) =>
+        TypedGameModeConfiguration.Runtime(definition?.Runtime);
 }
 
 internal static class ChallengeRuntimeTemplateValidator
@@ -64,6 +48,11 @@ internal static class ChallengeRuntimeTemplateValidator
         {
             case ContainerRuntimeDefinition container:
                 ValidateEgressPolicy(container.EgressPolicy, errors);
+                if (container.Security is null)
+                    errors.Add("Container security is required.");
+                else if (container.Security.CapDrop is null
+                    || container.Security.CapAdd is null)
+                    errors.Add("Container security capDrop and capAdd are required.");
                 if (string.IsNullOrWhiteSpace(container.Image))
                     errors.Add("Runtime image is required.");
                 else if (container.Image.Length > 512)
@@ -80,12 +69,6 @@ internal static class ChallengeRuntimeTemplateValidator
                     errors.Add("Runtime internal ports must be between 1 and 65535.");
                 if (container.InternalPorts?.Distinct().Count() != container.InternalPorts?.Count)
                     errors.Add("Runtime internal ports cannot contain duplicates.");
-                if (container.Security is not { } security)
-                    errors.Add("Runtime security is required.");
-                else if (security.CapDrop is null
-                    || security.CapAdd is null
-                    || !security.CapDrop.Contains("ALL", StringComparer.OrdinalIgnoreCase))
-                    errors.Add("Runtime security must declare capability lists and drop all capabilities.");
                 break;
             case ComposeRuntimeDefinition compose:
                 ValidateEgressPolicy(compose.EgressPolicy, errors);

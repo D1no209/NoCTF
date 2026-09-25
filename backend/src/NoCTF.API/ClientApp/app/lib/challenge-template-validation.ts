@@ -4,7 +4,6 @@ import {
   CtfInteraction,
   FlagSource,
   HARD_MAXIMUM_PATCH_UPLOAD_BYTES,
-  parseDefinition,
   RuntimeAllocation,
   UrlExposure,
 } from '../utils/game-config'
@@ -114,7 +113,7 @@ export interface ChallengeTemplateDraft {
   mode: NoCtfapiEndpointsCompetitionsGameModeProtocol
   title: string
   direction: string
-  definitionJson: string
+  definition: DefinitionModel
 }
 
 /** Mirrors the save-time invariants that can be checked without server state. */
@@ -127,11 +126,7 @@ export function validateChallengeTemplateDraft(draft: ChallengeTemplateDraft): s
   if (!direction) addIssue(issues, translate("ui.directionIsRequired"))
   else if (direction.length > 96) addIssue(issues, translate("ui.directionCannotExceed96Characters"))
 
-  const model = parseDefinition(draft.definitionJson, draft.mode)
-  if (!model) {
-    addIssue(issues, translate("ui.theChallengeDefinitionCannotBeParsedResetOrCorrectIt"))
-    return issues
-  }
+  const model = draft.definition
   if (draft.mode === 'Awdp' && model.checkerFixInput && !model.checkerJob)
     addIssue(issues, translate("ui.enableTheCheckerBeforeProvidingItWithTheFixPackage"))
   const usesPatchChecker = draft.mode === 'Awdp'
@@ -188,9 +183,14 @@ export function validateChallengeTemplateDraft(draft: ChallengeTemplateDraft): s
         addIssue(issues, translate("ui.theFlagEnvironmentVariableNameCannotUseTheNoctfPrefix"))
     }
   }
-  else {
+  else if (definition.kind === 'compose') {
     if (!definition.composeYaml.trim()) addIssue(issues, translate("ui.dockerComposeContentIsRequired"))
     validateEnvironment(issues, definition.environment, translate("ui.runtimeEnvironment"))
+  }
+  else {
+    if (!definition.sourceUrl.trim()) addIssue(issues, 'OVA URL is required.')
+    if (!/^[a-f0-9]{64}$/i.test(definition.sha256.trim()))
+      addIssue(issues, 'OVA SHA-256 must contain 64 hexadecimal characters.')
   }
 
   for (const binding of runtime.urlBindings) {

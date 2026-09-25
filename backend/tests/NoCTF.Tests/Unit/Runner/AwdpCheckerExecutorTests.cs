@@ -45,7 +45,7 @@ public sealed class AwdpCheckerExecutorTests
         await Assert.That(request.Security.RunAsNonRoot).IsEqualTo(!allowRoot);
         await Assert.That(request.Security.NoNewPrivileges).IsTrue();
         await Assert.That(request.Security.ReadonlyRootfs).IsTrue();
-        await Assert.That(request.Security.CapDrop).IsEquivalentTo(["ALL"]);
+        await Assert.That(request.Security.CapDrop).IsEmpty();
         await Assert.That(request.Security.CapAdd).IsEmpty();
         await Assert.That(request.NetworkPurpose)
             .IsEqualTo(ContainerNetworkPurpose.AwdpVerification);

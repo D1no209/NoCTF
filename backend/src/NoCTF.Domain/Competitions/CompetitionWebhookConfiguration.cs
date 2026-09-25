@@ -2,15 +2,13 @@ namespace NoCTF.Domain.Competitions;
 
 public sealed class CompetitionWebhookConfiguration
 {
-    public const int CurrentSchemaVersion = 1;
-
-    public int SchemaVersion { get; set; } = CurrentSchemaVersion;
     public List<CompetitionWebhookTarget> Targets { get; set; } = [];
 }
 
 public sealed class CompetitionWebhookTarget
 {
     public Guid Id { get; set; }
+    public Guid CompetitionId { get; set; }
     public string Name { get; set; } = string.Empty;
     public string EndpointUrl { get; set; } = string.Empty;
     public bool Enabled { get; set; }

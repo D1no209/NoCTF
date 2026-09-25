@@ -1,6 +1,7 @@
 using System.Text.Json;
 using Microsoft.AspNetCore.SignalR;
 using NoCTF.Application.Notifications;
+using NoCTF.Application.Messaging;
 using NoCTF.Infrastructure.Notifications;
 using StackExchange.Redis;
 using NoCTF.API.SignalR.Hubs;
@@ -22,7 +23,9 @@ public sealed class RedisGameplayFactStateRelay(
             {
                 try
                 {
-                    var notification = JsonSerializer.Deserialize<GameplayFactStateChangedNotification>(value.ToString());
+                    var notification = JsonSerializer.Deserialize(
+                        value.ToString(),
+                        NoCtfMessageJsonContext.Default.GameplayFactStateChangedNotification);
                     if (notification is null) return;
                     _ = hub.Clients.User(notification.UserId.ToString()).GameplayFactStateChanged(
                         GameplayFactMapper.ToStatusResponse(notification.Result),

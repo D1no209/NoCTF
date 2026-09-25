@@ -153,14 +153,13 @@ public sealed class TeamBanAppealPersistenceTests
             User(ownerId, "appeal-owner", UserRole.Organizer, now),
             User(captainId, "appeal-captain", UserRole.User, now),
             User(memberId, "appeal-member", UserRole.User, now));
-        db.Competitions.Add(new Competition
+        db.Competitions.Add(new CtfCompetition
         {
             Id = competitionId,
             Title = "Finished appeal competition",
             OwnerId = ownerId,
-            Mode = GameMode.Ctf,
             Status = CompetitionStatus.Finished,
-            ConfigurationJson = "{}",
+            ModeConfiguration = TestConfigurations.Competition(GameMode.Ctf),
             FlagDerivationSecret = new byte[32],
             StartAt = now.AddHours(-2),
             EndAt = now.AddHours(-1),
@@ -182,17 +181,16 @@ public sealed class TeamBanAppealPersistenceTests
             BannedById = ownerId,
             BanReason = "Private staff evidence"
         });
-        db.CompetitionEvents.Add(new CompetitionEvent
+        db.CompetitionEvents.Add(new TeamBannedEvent
         {
             Id = banEventId,
             CompetitionId = competitionId,
-            Kind = CompetitionEventKind.TeamBanned,
             Level = CompetitionEventLevel.Warning,
             Visibility = CompetitionEventVisibility.Staff,
             ActorUserId = ownerId,
             SubjectType = EntityReferenceKind.Team,
             SubjectId = teamId,
-            PayloadJson = """{"schemaVersion":1,"reason":"Private staff evidence"}""",
+            Reason = "Private staff evidence",
             OccurredAt = now
         });
         await db.SaveChangesAsync(cancellationToken);
@@ -219,7 +217,7 @@ public sealed class TeamBanAppealPersistenceTests
             UpdatedAt = now
         };
 
-    private sealed class RecordingOutbox : ITransactionalMessageOutbox
+    private sealed class RecordingOutbox : IPostCommitMessagePublisher
     {
         public ConcurrentQueue<object> Published { get; } = new();
 

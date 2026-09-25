@@ -1,6 +1,7 @@
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using NoCTF.Application.Authentication.Sso;
 using StackExchange.Redis;
 
@@ -62,8 +63,6 @@ public sealed class RedisSsoFlowStore(IConnectionMultiplexer? redis = null) : IS
         redis.call('DEL', KEYS[1])
         return {0, encoded}
         """;
-    private static readonly JsonSerializerOptions JsonOptions =
-        new(JsonSerializerDefaults.Web);
 
     public async Task<bool> CreateAsync(SsoFlowRecord flow, CancellationToken ct)
     {
@@ -130,7 +129,8 @@ public sealed class RedisSsoFlowStore(IConnectionMultiplexer? redis = null) : IS
         flowId,
         processingToken,
         SsoFlowState.Authenticated,
-        JsonSerializer.Serialize(identity, JsonOptions),
+        JsonSerializer.Serialize(identity,
+            SsoFlowJsonContext.Default.SsoExternalIdentity),
         null,
         ct);
 
@@ -225,11 +225,16 @@ public sealed class RedisSsoFlowStore(IConnectionMultiplexer? redis = null) : IS
     private static RedisKey CorrelationKey(string token) =>
         $"{Prefix}:correlation:{Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(token)))}";
     private static string Serialize(SsoFlowRecord flow) =>
-        JsonSerializer.Serialize(flow, JsonOptions);
+        JsonSerializer.Serialize(flow, SsoFlowJsonContext.Default.SsoFlowRecord);
     private static SsoFlowRecord Deserialize(string value) =>
-        JsonSerializer.Deserialize<SsoFlowRecord>(value, JsonOptions)
+        JsonSerializer.Deserialize(value, SsoFlowJsonContext.Default.SsoFlowRecord)
         ?? throw new InvalidOperationException("The stored SSO flow is invalid.");
     private static string RandomToken() =>
         Convert.ToBase64String(RandomNumberGenerator.GetBytes(32))
             .TrimEnd('=').Replace('+', '-').Replace('/', '_');
 }
+
+[JsonSourceGenerationOptions(JsonSerializerDefaults.Web)]
+[JsonSerializable(typeof(SsoFlowRecord))]
+[JsonSerializable(typeof(SsoExternalIdentity))]
+internal partial class SsoFlowJsonContext : JsonSerializerContext;

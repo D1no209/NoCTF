@@ -260,7 +260,7 @@ public sealed class DockerContainerLifecycleTests
         await DockerIntegrationTest.RunAsync(async () =>
         {
             var operationId = Guid.NewGuid();
-            const string image = "busybox:1.37.0-glibc";
+            const string image = "docker.m.daocloud.io/library/busybox:1.37.0-glibc";
             await using (var sourceProbe = new ContainerBuilder(image)
                 .WithCommand("true")
                 .Build())
@@ -278,7 +278,9 @@ public sealed class DockerContainerLifecycleTests
                 _ = await docker.Images.InspectImageAsync(image, cancellationToken);
             await Assert.That(inspectMissing).Throws<DockerImageNotFoundException>();
 
-            using var lifecycle = CreateLifecycle();
+            using var lifecycle = CreateLifecycle(Path.Combine(
+                Path.GetTempPath(),
+                $"noctf-empty-docker-config-{operationId:N}"));
             ContainerReceipt? receipt = null;
             try
             {
@@ -598,7 +600,7 @@ public sealed class DockerContainerLifecycleTests
                     new DockerOnlyProviderCatalog(lifecycle),
                     identity,
                     RuntimeProvider.Docker,
-                    JsonSerializer.Serialize(receipt),
+                    ContainerRuntimeReceiptData.From(receipt),
                     cancellationToken);
 
                 var remaining = await lifecycle.GetAsync(
@@ -1179,7 +1181,10 @@ public sealed class DockerContainerLifecycleTests
         });
     }
 
-    private static DockerContainerLifecycle CreateLifecycle() => new(new DockerRuntimeOptions(DockerEndpoint()));
+    private static DockerContainerLifecycle CreateLifecycle(
+        string? registryConfigDirectory = null) => new(new DockerRuntimeOptions(
+        DockerEndpoint(),
+        RegistryConfigDirectory: registryConfigDirectory));
 
     private static async Task<string> GetEventuallyAsync(
         HttpClient client,

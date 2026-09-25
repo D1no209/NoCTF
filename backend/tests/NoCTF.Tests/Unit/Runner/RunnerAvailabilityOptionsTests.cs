@@ -6,6 +6,7 @@ using NoCTF.Application.Storage;
 using NoCTF.Domain.Runtime;
 using NoCTF.GameModes.Awd.Configuration;
 using NoCTF.Infrastructure.Caching;
+using NoCTF.Infrastructure.Messaging;
 using NoCTF.Runner.Composition;
 using NoCTF.Runtime.Docker.Containers;
 using ZiggyCreatures.Caching.Fusion;
@@ -14,6 +15,27 @@ namespace NoCTF.Tests.Unit.Runner;
 
 public sealed class RunnerOptionsTests
 {
+    [Test]
+    public async Task Runner_registration_provides_the_KV_lease_for_a_combined_host()
+    {
+        var configuration = new ConfigurationBuilder().AddInMemoryCollection(
+            new Dictionary<string, string?>
+            {
+                ["ConnectionStrings:Redis"] = "localhost:6379",
+                ["RunnerScoring:CallbackBaseUrl"] = "https://api.internal",
+                ["Runner:Provider"] = nameof(RuntimeProvider.Docker),
+                ["Runner:Id"] = "runner-1",
+                ["Runner:Pool"] = "docker"
+            }).Build();
+        var services = new ServiceCollection();
+        services.AddLogging();
+        services.AddNoCtfRunner(configuration);
+
+        await Assert.That(services.Any(descriptor =>
+            descriptor.ServiceType == typeof(IClusterLeaseManager)
+            && descriptor.ImplementationType == typeof(NatsClusterLeaseManager))).IsTrue();
+    }
+
     [Test]
     public async Task Docker_runtime_log_limits_are_configurable()
     {

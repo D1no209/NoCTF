@@ -5,10 +5,17 @@
     <NoWarn>$(NoWarn);NU1608</NoWarn>
   </PropertyGroup>
   <ItemGroup>
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" PrivateAssets="all" />
+  </ItemGroup>
+  <ItemGroup Condition="'$(NoCtfGenerateWolverineHandlers)' == 'true'">
+    <Compile Remove="Internal/Generated/WolverineHandlers/**/*.cs" />
+  </ItemGroup>
+  <ItemGroup>
     <ProjectReference Include="../NoCTF.API/NoCTF.API.csproj" />
     <ProjectReference Include="../NoCTF.Hosting/NoCTF.Hosting.csproj" />
     <ProjectReference Include="../NoCTF.Worker/NoCTF.Worker.csproj" />
     <ProjectReference Include="../NoCTF.Runner/NoCTF.Runner.csproj" />
+    <ProjectReference Include="../NoCTF.Persistence.PostgreSql/NoCTF.Persistence.PostgreSql.csproj" />
   </ItemGroup>
   <Target Name="PublishRunNuxt"
           AfterTargets="ComputeFilesToPublish"

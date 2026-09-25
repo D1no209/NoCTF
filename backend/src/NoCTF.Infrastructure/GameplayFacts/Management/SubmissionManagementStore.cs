@@ -9,7 +9,7 @@ namespace NoCTF.Infrastructure.GameplayFacts.Management;
 
 public sealed class GameplayFactManagementStore(
     NoCtfDbContext db,
-    ITransactionalMessageOutbox outbox) : IGameplayFactManagementStore
+    IPostCommitMessagePublisher outbox) : IGameplayFactManagementStore
 {
     public async Task<GameplayFactListPage> ListAdminPageAsync(
         GameplayFactListFilter filter,
@@ -68,7 +68,7 @@ public sealed class GameplayFactManagementStore(
         CancellationToken ct)
     {
         var teamId = await db.Teams.AsNoTracking()
-            .Where(team => team.CompetitionId == competitionId && team.MemberIds.Contains(userId))
+            .Where(team => team.CompetitionId == competitionId && team.Members.Any(member => member.UserId == userId))
             .Select(team => (Guid?)team.Id)
             .SingleOrDefaultAsync(ct);
         if (teamId is null)
@@ -155,7 +155,7 @@ public sealed class GameplayFactManagementStore(
         CancellationToken ct)
     {
         var teamId = await db.Teams.AsNoTracking()
-            .Where(team => team.CompetitionId == competitionId && team.MemberIds.Contains(userId))
+            .Where(team => team.CompetitionId == competitionId && team.Members.Any(member => member.UserId == userId))
             .Select(team => (Guid?)team.Id)
             .SingleOrDefaultAsync(ct);
         if (teamId is null)
@@ -201,7 +201,7 @@ public sealed class GameplayFactManagementStore(
             .Join(
                 db.Teams.AsNoTracking()
                     .Where(team => team.CompetitionId == competitionId
-                        && team.MemberIds.Contains(userId)),
+                        && team.Members.Any(member => member.UserId == userId)),
                 fact => fact.TeamId,
                 team => (Guid?)team.Id,
                 (fact, _) => new PlayerGameplayFactValue(
@@ -227,7 +227,7 @@ public sealed class GameplayFactManagementStore(
                 competitionId, competitionChallengeId, cutoff, gameplayFactId));
         await db.SaveChangesAsync(ct);
         await transaction.CommitAsync(ct);
-        await outbox.FlushOutgoingMessagesAsync();
+        await outbox.FlushCommittedMessagesAsync();
     }
 
     private static IQueryable<GameplayFact> Page(

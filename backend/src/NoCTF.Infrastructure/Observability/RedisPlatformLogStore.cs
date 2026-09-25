@@ -161,7 +161,8 @@ public sealed class RedisPlatformLoggerProvider(
                     gameplayFactId);
                 redis.GetSubscriber().Publish(
                     RedisChannel.Literal(Channel),
-                    System.Text.Json.JsonSerializer.Serialize(notification, JsonOptions));
+                    System.Text.Json.JsonSerializer.Serialize(notification,
+                        NoCTF.Application.Messaging.NoCtfWebMessageJsonContext.Default.PlatformLogView));
             }
             catch (RedisException)
             {

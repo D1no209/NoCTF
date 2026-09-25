@@ -17,9 +17,7 @@ using NoCTF.Infrastructure.Persistence;
 using NoCTF.Worker;
 using Testcontainers.PostgreSql;
 using Wolverine;
-using Wolverine.EntityFrameworkCore;
 using Wolverine.Nats;
-using Wolverine.Postgresql;
 
 namespace NoCTF.Tests.Integration.Messaging;
 
@@ -75,12 +73,39 @@ public sealed class AccountNotificationDeliveryEndToEndTests
             var configuration = new FixedEmailConfiguration(
                 mailpit.Hostname,
                 mailpit.GetMappedPublicPort(MailpitSmtpPort));
+            var secretProtector = new PlatformSecretProtector(Options.Create(
+                new EmailVerificationProtectionOptions
+                {
+                    EncryptionKey = Convert.ToBase64String(new byte[32])
+                }));
             var dbOptions = new DbContextOptionsBuilder<NoCtfDbContext>()
                 .UseNpgsql(connectionString)
                 .UseSnakeCaseNamingConvention()
                 .Options;
             await using (var setup = new NoCtfDbContext(dbOptions))
+            {
                 await setup.Database.EnsureCreatedAsync(cancellationToken);
+                var settings = await setup.PlatformSettings.SingleAsync(cancellationToken);
+                settings.EmailVerificationEnabled = true;
+                settings.EmailPublicBaseUrl = configuration.Delivery.PublicBaseUrl;
+                settings.EmailVerificationTokenLifetimeMinutes = 1440;
+                settings.EmailVerificationResendCooldownSeconds = 60;
+                settings.EmailPasswordResetTokenLifetimeMinutes = 30;
+                settings.EmailPasswordResetCooldownSeconds = 60;
+                settings.EmailPasswordResetMaxRequestsPerHour = 3;
+                settings.EmailSmtpHost = configuration.Delivery.SmtpHost;
+                settings.EmailSmtpPort = configuration.Delivery.SmtpPort;
+                settings.EmailSmtpSecurityMode = configuration.Delivery.SmtpSecurityMode;
+                settings.EmailSmtpUserName = configuration.Delivery.SmtpUserName;
+                settings.EmailSmtpPasswordCiphertext = secretProtector.Protect(
+                    configuration.Delivery.SmtpPassword!,
+                    PlatformSecretPurpose.EmailSmtpPassword);
+                settings.EmailSmtpFromAddress = configuration.Delivery.SmtpFromAddress;
+                settings.EmailSmtpFromName = configuration.Delivery.SmtpFromName;
+                settings.EmailSmtpTimeoutSeconds = configuration.Delivery.SmtpTimeoutSeconds;
+                settings.UpdatedAt = DateTimeOffset.UtcNow;
+                await setup.SaveChangesAsync(cancellationToken);
+            }
 
             using var host = Host.CreateDefaultBuilder()
                 .ConfigureServices(services =>
@@ -89,22 +114,23 @@ public sealed class AccountNotificationDeliveryEndToEndTests
                     services.AddSingleton<IEmailVerificationDeliveryConfigurationReader>(configuration);
                     services.AddSingleton<IEmailVerificationSmtpClientFactory,
                         EmailVerificationSmtpClientFactory>();
+                    services.AddSingleton(secretProtector);
                     services.AddSingleton<IPasswordHasher<User>>(
                         new PasswordHasher<User>(Options.Create(new PasswordHasherOptions
                         {
                             IterationCount = 10_000
                         })));
-                    services.AddDbContextWithWolverineIntegration<NoCtfDbContext>(options =>
+                    services.AddDbContextFactory<NoCtfDbContext>(options =>
                         options.UseNpgsql(connectionString).UseSnakeCaseNamingConvention());
-                    services.AddScoped<ITransactionalMessageOutbox,
-                        WolverineTransactionalMessageOutbox>();
+                    services.AddScoped<IPostCommitMessagePublisher,
+                        WolverinePostCommitMessagePublisher>();
                     services.AddScoped<IUserAuthenticationStore, AuthenticationStore>();
                     services.AddScoped<IUserRegistrationStore, AuthenticationStore>();
                     services.AddScoped<IEmailVerificationStore, EmailVerificationStore>();
                     services.AddScoped<IPasswordResetStore, PasswordResetStore>();
-                    services.AddScoped<IEmailVerificationDelivery,
+                    services.AddSingleton<IEmailVerificationDelivery,
                         SmtpEmailVerificationDelivery>();
-                    services.AddScoped<IPasswordResetEmailDelivery,
+                    services.AddSingleton<IPasswordResetEmailDelivery,
                         SmtpEmailVerificationDelivery>();
                     services.AddTransient<AccountNotificationMessageHandler>();
                 })
@@ -112,11 +138,6 @@ public sealed class AccountNotificationDeliveryEndToEndTests
                 {
                     options.Discovery.DisableConventionalDiscovery();
                     options.Discovery.IncludeType(typeof(AccountNotificationMessageHandler));
-                    options.PersistMessagesWithPostgresql(
-                        connectionString,
-                        "wolverine_account_email");
-                    options.UseEntityFrameworkCoreTransactions();
-                    options.AutoBuildMessageStorageOnStartup = AutoCreate.All;
                     options.UseNats(natsConnectionString)
                         .AutoProvision()
                         .UseJetStream(_ => { })
@@ -127,8 +148,7 @@ public sealed class AccountNotificationDeliveryEndToEndTests
                     options.ListenToNatsSubject(subject)
                         .UseJetStream(stream, consumer)
                         .Named(consumer)
-                        .MaximumParallelMessages(1)
-                        .UseDurableInbox();
+                        .MaximumParallelMessages(1);
                     options.PublishMessage<SendEmailVerification>().ToNatsSubject(subject);
                     options.PublishMessage<SendPasswordReset>().ToNatsSubject(subject);
                     options.PublishMessage<SendPasswordChangedNotification>().ToNatsSubject(subject);
@@ -253,7 +273,7 @@ public sealed class AccountNotificationDeliveryEndToEndTests
         : IEmailVerificationConfigurationStore,
             IEmailVerificationDeliveryConfigurationReader
     {
-        private readonly EmailVerificationDeliveryConfiguration delivery = new(
+        public EmailVerificationDeliveryConfiguration Delivery { get; } = new(
             Enabled: true,
             PublicBaseUrl: "https://noctf.test",
             SmtpHost: smtpHost,
@@ -269,26 +289,26 @@ public sealed class AccountNotificationDeliveryEndToEndTests
             CancellationToken cancellationToken) =>
             Task.FromResult(new EmailVerificationConfigurationView(
                 Enabled: true,
-                PublicBaseUrl: delivery.PublicBaseUrl,
+                PublicBaseUrl: Delivery.PublicBaseUrl,
                 TokenLifetimeMinutes: 1440,
                 ResendCooldownSeconds: 60,
                 PasswordResetTokenLifetimeMinutes: 30,
                 PasswordResetCooldownSeconds: 60,
                 PasswordResetMaxRequestsPerHour: 3,
-                SmtpHost: delivery.SmtpHost,
-                SmtpPort: delivery.SmtpPort,
-                SmtpSecurityMode: delivery.SmtpSecurityMode,
-                SmtpUserName: delivery.SmtpUserName,
+                SmtpHost: Delivery.SmtpHost,
+                SmtpPort: Delivery.SmtpPort,
+                SmtpSecurityMode: Delivery.SmtpSecurityMode,
+                SmtpUserName: Delivery.SmtpUserName,
                 SmtpPasswordConfigured: true,
-                SmtpFromAddress: delivery.SmtpFromAddress,
-                SmtpFromName: delivery.SmtpFromName,
-                SmtpTimeoutSeconds: delivery.SmtpTimeoutSeconds,
+                SmtpFromAddress: Delivery.SmtpFromAddress,
+                SmtpFromName: Delivery.SmtpFromName,
+                SmtpTimeoutSeconds: Delivery.SmtpTimeoutSeconds,
                 UpdatedAt: DateTimeOffset.UnixEpoch));
 
         public Task<EmailVerificationDeliveryConfiguration?> GetDeliveryConfigurationAsync(
             bool requireEnabled,
             CancellationToken cancellationToken) =>
-            Task.FromResult<EmailVerificationDeliveryConfiguration?>(delivery);
+            Task.FromResult<EmailVerificationDeliveryConfiguration?>(Delivery);
 
         public Task<EmailVerificationConfigurationView> UpdateAsync(
             UpdateEmailVerificationConfigurationCommand command,

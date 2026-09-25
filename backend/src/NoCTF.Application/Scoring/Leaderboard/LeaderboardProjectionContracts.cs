@@ -10,7 +10,7 @@ public sealed record LeaderboardProjectionInput(
     IReadOnlyList<LeaderboardTeamFact> Teams,
     IReadOnlyList<LeaderboardGameplayFact> GameplayFacts,
     IReadOnlyList<LeaderboardChallengeFact>? Challenges = null,
-    string? CompetitionConfigurationJson = null,
+    CompetitionModeConfiguration? CompetitionConfiguration = null,
     DateTimeOffset? CompetitionStartTime = null,
     IReadOnlyList<CompetitionLifecycleTransition>? LifecycleAudits = null,
     IReadOnlyList<LeaderboardAwdRoundFact>? AwdRounds = null,
@@ -38,10 +38,10 @@ public sealed record LeaderboardChallengeFact(
     string Direction,
     string Title,
     bool IsDeleted,
-    string? ConfigurationJson = null,
+    CompetitionChallengeRules? Rules = null,
     int Order = 0,
     bool IsPublished = true,
-    string? DefinitionJson = null,
+    ChallengeDefinition? Definition = null,
     CtfInteractionKind InteractionKind = CtfInteractionKind.FlagSubmission);
 
 public sealed record LeaderboardGameplayFact(

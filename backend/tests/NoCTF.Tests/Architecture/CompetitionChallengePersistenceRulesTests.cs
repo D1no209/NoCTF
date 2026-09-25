@@ -16,10 +16,12 @@ public sealed class CompetitionChallengePersistenceRulesTests
         var competitionChallenge = db.Model.FindEntityType(typeof(CompetitionChallenge));
         await Assert.That(competitionChallenge).IsNotNull();
         await Assert.That(competitionChallenge!.GetForeignKeys()
-            .Any(key => key.Properties.Single().Name == nameof(CompetitionChallenge.CompetitionId)
+            .Any(key => key.Properties.Any(property =>
+                            property.Name == nameof(CompetitionChallenge.CompetitionId))
                         && key.PrincipalEntityType.ClrType.Name == "Competition")).IsTrue();
         await Assert.That(competitionChallenge.GetForeignKeys()
-            .Any(key => key.Properties.Single().Name == nameof(CompetitionChallenge.ChallengeId)
+            .Any(key => key.Properties.Any(property =>
+                            property.Name == nameof(CompetitionChallenge.ChallengeId))
                         && key.PrincipalEntityType.ClrType == typeof(Challenge))).IsTrue();
         var hintType = db.Model.FindEntityType(typeof(CompetitionChallengeHint));
         await Assert.That(hintType).IsNotNull();

@@ -28,22 +28,30 @@ PasswordHash。Bot 是否能密码登录由 UserKind 规则决定，而不是由
 `Competition` 是比赛聚合根，拥有：
 
 - Mode、标题、说明、StartAt、EndAt、Status；
-- 公共列与带 `schemaVersion` 的 Mode Configuration JSON；
-- OwnerId、ManagerIds、JudgeIds、ObserverIds；
+- 与具体 sealed Competition leaf 同模式的 typed TPH configuration；
+- OwnerId 与带 Role 的 CompetitionCollaborator 关联；
 - TeamRegistrationAutoApprove、MaxTeamMembers、MaxConcurrentRuntimeInstancesPerTeam；
 - 32-byte `FlagDerivationSecret`；
-- 显式 TracksEnabled 开关与版本化的跨模式赛道配置 JSON；
-- 生命周期审计。
+- 显式 TracksEnabled 开关与有 Position 的关系化赛道集合；
+- sealed CompetitionEvent TPH 生命周期审计。
 
-协作者直接存为三个互斥 UUID 数组，不存在 Collaborator 实体。Owner 不得同时出现在数组中。
+`(CompetitionId, UserId)` 唯一约束保证 Manager、Judge、Observer 角色互斥。OwnerId 是唯一 Owner
+来源，且 Owner 不得同时出现在 Collaborator 关联中。
 
 ### Team
 
-Team 只属于一个 Competition。字段包含当前、大小写不敏感的 `TrackKey`、`CaptainId` 与无顺序语义的 `MemberIds uuid[]`。数组不得为空、不得重复、必须包含 CaptainId，且长度不超过 Competition.MaxTeamMembers。不存在 TeamMember 或赛道成员表；队伍改道后，其全部历史 GameplayFact 按当前赛道重新投影。
+Team 只属于一个 Competition。字段包含当前、大小写不敏感的 `TrackKey`、`CaptainId` 与
+`team_members` 关系。`(CompetitionId, UserId)` 唯一约束保证用户在同一比赛只能加入一个队；
+`team_captains` 的复合外键保证 Captain 必须是本队 TeamMember。队伍改道后，其全部历史
+GameplayFact 按当前赛道重新投影。
 
 ### Competition Track
 
-Competition 以普通列 `TracksEnabled` 显式启停赛道，并以 `TrackConfigurationJson` 保存 1–32 条跨模式赛道；赛道不是业务表，GameplayFact 也不复制赛道。每场比赛始终恰有一个公开、非内部的默认赛道，旧比赛的空配置按唯一 `default` 赛道解释。新比赛默认关闭赛道，旧数据由迁移保持开启。Running 与 Paused 允许启停、修改定义和调整归属；Finished 只读。删除使用中赛道必须在同一事务指定目标赛道并迁移全部受影响队伍；关闭赛道会把所有队伍原子归并到当前默认赛道，再次开启不会恢复旧归属。
+Competition 以普通列 `TracksEnabled` 显式启停赛道，并以带 `Position` 的 `competition_tracks`
+保存 1–32 条跨模式赛道；GameplayFact 不复制赛道。每场比赛必须显式持久化且恰有一个公开、
+非内部的默认赛道；不存在空配置回退或旧版本推断。Running 与 Paused 允许启停、修改定义和调整
+归属；Finished 只读。删除使用中赛道必须在 Serializable 事务中指定目标赛道并迁移全部受影响队伍；
+关闭赛道会把所有队伍原子归并到当前默认赛道，再次开启不会恢复旧归属。
 
 每条赛道独立声明是否允许公开选择、计分、参与 CTF 血榜、影响 CTF 动态分值、出现在公开排行榜以及影响 AWD/AWDP/KoH 的竞争性结果，并可选用一个 SSO Provider UUID 作为身份门禁。内部赛道必须关闭所有公开与竞争开关，但仍可正常查看题目、运行 Runtime/Checker 并产生永久 GameplayFact 和工作人员事件。Administrator、Owner、Manager 可配置赛道；Judge、Observer 只读。内部赛道及队伍只对平台 Administrator 与比赛 Owner、Manager、Judge 可见，Observer 与普通用户均不得通过排行榜或详情协议读取。赛道开启时，普通参赛者必须显式选择公开可报名赛道并同时满足邀请码与 SSO 门禁；建队检查创建者，邀请加入检查新成员，管理员改道检查全体成员。门禁只在入场时校验，新增门禁与成员后续解绑均不追溯既有队伍。赛道关闭时门禁被忽略，协议允许省略 TrackKey，服务端忽略多传的赛道信息并在比赛行锁内写入默认赛道。
 
@@ -53,7 +61,7 @@ Competition 以普通列 `TracksEnabled` 显式启停赛道，并以 `TrackConfi
 
 `Challenge` 是且只属于一个 GameMode 的全局可复用题库模板，拥有题面、方向、模板 Attachment、明文模板静态 Flag，以及 provider-neutral 的 Runtime、Checker、动态 Flag 生成/注入定义。它不包含比赛排序、发布状态、分数、Hint、RuntimeProvider 或 RunnerPool。
 
-`CompetitionChallenge` 是比赛内实例，链接 CompetitionId 与 ChallengeId，拥有可选的比赛内展示名称、Order、IsPublished、Rules JSON 和 Hint。题目分值完全由模式专属 Rules JSON 决定，不保存独立基础分。展示名称为空时实时回退到 Challenge.Title；比赛内改名不修改全局题库模板。引用时 Challenge.Mode 必须等于 Competition.Mode。模板定义修改不改动正在运行的 Runtime；下一次 Start 或新 UUID Reset 读取最新定义，不保存题目定义版本，也不自动更新存量 Runtime。
+`CompetitionChallenge` 是比赛内实例，链接 CompetitionId 与 ChallengeId，拥有可选的比赛内展示名称、Order、IsPublished、typed mode-specific rules TPH 和关系化 Hint。题目分值完全由 Rules leaf 与其关系子项决定，不保存独立基础分。展示名称为空时实时回退到 Challenge.Title；比赛内改名不修改全局题库模板。引用时 Challenge.Mode 必须等于 Competition.Mode。模板定义修改不改动正在运行的 Runtime；下一次 Start 或新 UUID Reset 读取最新定义，不保存题目定义版本，也不自动更新存量 Runtime。
 
 ### GameplayFact
 
@@ -61,7 +69,10 @@ GameplayFact 是玩家、管理员或系统在比赛中的客观行为及其当�
 
 ### RuntimeInstance
 
-RuntimeInstance 表示一个具体 UUID 标识的外部 Runtime。Reset 会停止旧实例并创建全新 Runtime UUID。异步状态保存在 RuntimeInstance/GameplayFact/ChallengeFlag 自身，Wolverine 保存投递状态；不存在 RuntimeOperation 表。
+RuntimeInstance 表示一个具体 UUID 标识的外部 Runtime。Reset 会停止旧实例并创建全新 Runtime UUID。
+结构化 AccessEndpoint、PublishedPort、capacity allocation 使用关系行；Container、Compose、OVA receipt
+使用一对一 RuntimeReceipt TPH。异步状态保存在 RuntimeInstance/GameplayFact/ChallengeFlag 自身，
+JetStream 保存至少一次投递状态；不存在 RuntimeOperation 或 provider receipt JSON。
 
 ## Competition 生命周期
 
@@ -90,17 +101,18 @@ Visible | Published | Running | Paused -> Finished
 
 ### Start Gate 原子流程
 
-Owner/Manager 手动 Start 与 StartAt 调度共用一个 Application 用例，并在 Competition advisory lock 的单事务内：
+Owner/Manager 手动 Start 与 StartAt 调度共用一个 Application 用例，并在带 concurrency stamp 的
+Competition 聚合与必要的 Serializable 事务内：
 
 1. 重读状态与 StartAt/EndAt；只接受 Visible/Published，EndAt 必须仍在未来；
-2. 校验 Competition 配置 schema、至少一个已发布且未删除的 CompetitionChallenge、所有实例模板存在且未删除；
-3. 校验每个已发布题的 Challenge.Mode、Definition/Rules schema、Flag/Attachment/Runtime/Checker/逻辑 URL 组合；
-4. 校验所有 Approved Team 未删除/未 Ban且成员数组有效；
+2. 校验 typed Competition configuration、至少一个已发布且未删除的 CompetitionChallenge、所有实例模板存在且未删除；
+3. 校验每个已发布题的 leaf mode、typed Definition/Rules、Flag/Attachment/Runtime/Checker/逻辑 URL 组合；
+4. 校验所有 Approved Team 未删除/未 Ban 且 TeamMember/Captain 关系有效；
 5. CTF：Static 题至少有一个可用通用 Flag或合法 RandomOne 候选；PerTeam 只验证模板，Flag 仍在各队 Runtime Start 前按需确认/生成；
 6. AWD：仅 Container/Compose，平台部署的 Runtime provider/runner pool 可用，按队 Runtime 额度足以覆盖全部 AWD 题，注入与 Checker 定义有效；此时只建启动任务，不提前生成 Round Flag；
 7. AWDP：Container target/Checker/Patch 定义完整，ObjectStorage 与平台 Runtime placement 可用；
 8. KoH：共享 Runtime/Control URL 有效，为所有队生成缺失 Control Flag；
-9. 无错误时设置 Running/RunningSince、追加 lifecycle owned audit，并在同事务写 Runtime/调度 Outbox；有任一错误则零状态变更、零启动消息。
+9. 无错误时设置 Running/RunningSince、追加 typed lifecycle event；提交成功后发布 Runtime/调度消息。Pending 状态可重建未发布任务；有任一错误则零状态变更、零启动消息。
 
 稳定 gate code 至少包含 `CompetitionStateInvalid`、`CompetitionAlreadyEnded`、`NoPublishedChallenge`、`TemplateUnavailable`、`ConfigurationSchemaInvalid`、`FlagMissing`、`AttachmentSelectionInvalid`、`RuntimeDefinitionInvalid`、`RunnerPoolUnavailable`、`RuntimeQuotaInsufficient`、`CheckerDefinitionInvalid`、`ObjectStorageUnavailable` 与 `TeamInvariantInvalid`。错误数组完整返回，不遇到第一项即停止；同一资源/路径只返回一项。
 
@@ -113,7 +125,7 @@ Owner/Manager 手动 Start 与 StartAt 调度共用一个 Application 用例，�
 - 队名、头像、赛道、成员加入/退出/移除和队长转让有实际变化时一律退回 Unregistered；无实际变化与邀请 Token 轮换不改变状态。
 - 组织变更窗口与报名窗口相同；Paused、Finished 禁止，Running 受 AllowTeamRegistrationWhileRunning 控制。
 - Unregistered/Pending/Rejected 不能获得题目、附件、提示、咨询、Flag、Runtime 或新 GameplayFact 权限。退出 Approved 后已有 Runtime 保留至正常生命周期结束，但所有选手读取与操作 API 都拒绝访问。
-- CaptainId 是唯一队长来源。转让队长原子更新 CaptainId；成员数组无顺序。
+- CaptainId 是唯一队长来源。转让队长原子更新 TeamCaptain 复合外键；成员关系无顺序。
 - Ban 立即拒绝私有数据、Runtime 与 GameplayFact，回收该队 CTF/AWD Runtime，并把该队及与其相关的攻防事实从投影排除。Unban 恢复当前事实；CTF Runtime 由选手重新启动，AWD 由系统重新配置。
 - 每次 Ban 对应一个不可变事件。队长可提交一次私密申诉，全队可读；Judge/Observer 只读，Administrator、Owner、Manager 裁决。接受申诉或主动纠错允许赛后恢复历史投影，但 Finished 比赛不重新配置 Runtime。申诉、裁决和公开纠错都保留原始事件关联，不公开工作人员原因或证据。
 
@@ -122,18 +134,18 @@ Owner/Manager 手动 Start 与 StartAt 调度共用一个 Application 用例，�
 | 主体 | 权限 |
 |---|---|
 | Administrator | 全平台全部权限 |
-| Competition Owner | 比赛全部权限、权限数组、所有权转让、软/硬删除 |
+| Competition Owner | 比赛全部权限、Collaborator 角色、所有权转让、软/硬删除 |
 | Manager | 比赛/题目实例/Flag/附件/配置/团队/生命周期/Runtime/判题与重判；不能管理权限数组或所有权 |
 | Judge | 管理查询、GameplayFact 原始 Flag/当前结果、运行诊断、批量判题与重判；不能改配置/团队/生命周期 |
 | Observer | 与 Judge 相同的读取范围；无写权限 |
 | Player | 公开数据与本队 GameplayFact；绝不能访问其他队 Value、系统事实、管理员事实或内部诊断 |
 
 Owner/Manager 必须是 Organizer 或 Administrator；Judge/Observer 必须完成邮箱验证。Owner
-转让后，旧 Owner 自动进入 ManagerIds。权限数组全量替换与 Owner transfer 使用 last-write-wins；
-服务端仍在单事务中校验角色、数组互斥和 Owner 不变量。
+转让后，旧 Owner 自动成为 Manager。Collaborator 全量替换与 Owner transfer 使用 Serializable
+事务、普通唯一约束和 bounded retry；服务端在同一事务校验角色互斥和 Owner 不变量。
 
-Challenge 自身由 OwnerId/ManagerIds 控制。Shared 模板可被其他 Organizer 查看题面并引用，但其原始 Flag、对象键与内部 Runtime 配置只对模板管理者可见；Private 改为 Shared/反向修改不破坏既有引用。
+Challenge 自身由 OwnerId 与 ChallengeManager 关联控制。Shared 模板可被其他 Organizer 查看题面并引用，但其原始 Flag、对象键与内部 Runtime 配置只对模板管理者可见；Private 改为 Shared/反向修改不破坏既有引用。
 
 ## 删除
 
-软删除只使用 nullable `DeletedAt`。Running/Paused Competition 必须先 Finish。最终硬删除由 Owner/Admin 明确确认；已软删除 Competition 本身就是清理锚点，在删除最后一行前通过 Outbox 完成 Runtime 与对象清理，不另建 tombstone 表。Challenge 存在未删除 CompetitionChallenge 引用时不得删除。
+软删除只使用 nullable `DeletedAt`。Running/Paused Competition 必须先 Finish。最终硬删除由 Owner/Admin 明确确认；已软删除 Competition 本身就是清理锚点，数据库提交后发布幂等 Runtime 与对象清理消息，不另建 tombstone 表。Challenge 存在未删除 CompetitionChallenge 引用时不得删除。

@@ -153,7 +153,6 @@ export function useAdminCompetitionsByIdSubmissionsPage() {
   let previewGeneration = 0
 
   const differenceLabels: Record<NoCtfapiEndpointsAdministrationGameplayFactsAdjudicationDifferenceKindProtocol, string> = {
-    CurrentCorrectShouldBeDuplicate: "ui.theCurrentCorrectResultShouldBeDuplicateUnderAuthoritativeOrdering",
     DuplicateWithoutCurrentPredecessor: "ui.theCurrentDuplicateResultHasNoPrecedingFactThatRemains",
     HistoricalResultChanged: "ui.historicalAdjudicationConflictsWithTheCurrentResultOrChangedOver",
     MissingAdjudicationRecord: "ui.theCurrentResultHasNoImmutableAdjudicationEvent",

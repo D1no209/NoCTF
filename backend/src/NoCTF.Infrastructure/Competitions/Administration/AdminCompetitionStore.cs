@@ -1,5 +1,6 @@
 using NoCTF.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
+using System.Data;
 using NoCTF.Application.Competitions.Management;
 using NoCTF.Domain.Competitions;
 using NoCTF.Domain.Notifications;
@@ -19,7 +20,7 @@ namespace NoCTF.Infrastructure.Competitions.Administration;
 public sealed class AdminCompetitionStore(
     NoCtfDbContext db,
     NoCTF.Infrastructure.Competitions.Management.CompetitionReadModelCache? readModels = null,
-    ITransactionalMessageOutbox? messageOutbox = null,
+    IPostCommitMessagePublisher? messageOutbox = null,
     ILogger<AdminCompetitionStore>? logger = null,
     ICompetitionEventRecorder? eventRecorder = null,
     AggregatePatchPostCommitActions? postCommitActions = null)
@@ -27,8 +28,8 @@ public sealed class AdminCompetitionStore(
 {
     private static readonly JsonSerializerOptions JsonOptions =
         new(JsonSerializerDefaults.Web);
-    private readonly ITransactionalMessageOutbox outbox =
-        messageOutbox ?? new NoOpTransactionalMessageOutbox();
+    private readonly IPostCommitMessagePublisher outbox =
+        messageOutbox ?? new NoOpPostCommitMessagePublisher();
     private readonly ICompetitionEventRecorder events =
         eventRecorder ?? NullCompetitionEventRecorder.Instance;
     public async Task<IReadOnlyList<CompetitionView>> ListAsync(
@@ -112,6 +113,7 @@ public sealed class AdminCompetitionStore(
     {
         await using var transaction = await AggregateCompatibleTransaction.BeginAsync(db, ct);
         var entity = await db.Competitions.IgnoreQueryFilters()
+            .Include(competition => competition.Collaborators)
             .SingleOrDefaultAsync(competition =>
                 competition.Id == competitionId &&
                 competition.DeletedAt != null &&
@@ -136,6 +138,7 @@ public sealed class AdminCompetitionStore(
         }
         entity.DeletedAt = null;
         entity.UpdatedAt = now;
+        entity.ConcurrencyStamp = Guid.NewGuid();
         try
         {
             await db.SaveChangesAsync(ct);
@@ -188,21 +191,53 @@ public sealed class AdminCompetitionStore(
         bool isAdministrator,
         CancellationToken ct)
     {
-        await using var transaction = await AggregateCompatibleTransaction.BeginAsync(db, ct);
+        try
+        {
+            return await HardDeleteOnceAsync(
+                competitionId, actorId, isAdministrator, ct);
+        }
+        catch (Exception exception) when (RelationalRetry.IsTransientConcurrency(exception))
+        {
+            db.ChangeTracker.Clear();
+            return new(CompetitionHardDeleteState.NotFound);
+        }
+        catch (DbUpdateException)
+        {
+            db.ChangeTracker.Clear();
+            var preview = await PreviewHardDeleteAsync(
+                competitionId,
+                actorId,
+                isAdministrator,
+                ct);
+            return preview is null
+                ? new(CompetitionHardDeleteState.NotFound)
+                : new(CompetitionHardDeleteState.Blocked, preview);
+        }
+    }
+
+    private async Task<CompetitionHardDeleteResult> HardDeleteOnceAsync(
+        Guid competitionId,
+        Guid actorId,
+        bool isAdministrator,
+        CancellationToken ct)
+    {
+        await using var transaction = await AggregateCompatibleTransaction.BeginAsync(
+            db,
+            IsolationLevel.ReadCommitted,
+            ct);
         var observed = await db.Competitions.IgnoreQueryFilters()
             .AsNoTracking()
             .Where(competition =>
                 competition.Id == competitionId
                 && (isAdministrator || competition.OwnerId == actorId))
-            .Select(competition => new { competition.DeletedAt })
+            .Select(competition => new
+            {
+                competition.DeletedAt,
+                competition.ConcurrencyStamp
+            })
             .SingleOrDefaultAsync(ct);
         if (observed is null)
             return new(CompetitionHardDeleteState.NotFound);
-        await LockForHardDeleteAsync(
-            competitionId,
-            actorId,
-            isAdministrator,
-            ct);
         var entity = await db.Competitions.IgnoreQueryFilters()
             .SingleOrDefaultAsync(competition =>
                 competition.Id == competitionId &&
@@ -221,17 +256,15 @@ public sealed class AdminCompetitionStore(
             ct);
         if (!preview.CanHardDelete)
             return new(CompetitionHardDeleteState.Blocked, preview);
-        var expectedDeletedAt = observed.DeletedAt;
-        db.Entry(entity).State = EntityState.Detached;
-        var deleted = await db.Competitions
-            .IgnoreQueryFilters()
-            .Where(competition =>
-                competition.Id == competitionId
-                && competition.DeletedAt == expectedDeletedAt
-                && (isAdministrator || competition.OwnerId == actorId))
-            .ExecuteDeleteAsync(ct);
-        if (deleted == 0)
+        db.Competitions.Remove(entity);
+        try
+        {
+            await db.SaveChangesAsync(ct);
+        }
+        catch (DbUpdateConcurrencyException)
+        {
             return new(CompetitionHardDeleteState.NotFound);
+        }
         await transaction.CommitAsync(ct);
         if (readModels is not null)
             await readModels.InvalidateAsync(competitionId, CancellationToken.None);
@@ -247,11 +280,6 @@ public sealed class AdminCompetitionStore(
             return new(CompetitionForceDeleteState.NotFound);
 
         await using var transaction = await AggregateCompatibleTransaction.BeginAsync(db, ct);
-        await LockForHardDeleteAsync(
-            command.CompetitionId,
-            command.ActorId,
-            isAdministrator: true,
-            ct);
         var competition = await db.Competitions.IgnoreQueryFilters()
             .AsNoTracking()
             .Where(item => item.Id == command.CompetitionId)
@@ -299,24 +327,29 @@ public sealed class AdminCompetitionStore(
             command.CompetitionId,
             competition.PosterFileId,
             ct);
-        var audit = new Notification
+        var audit = new CompetitionForceDeletedNotification
         {
             Id = Guid.CreateVersion7(command.OccurredAt),
             SourceType = NotificationSourceType.User,
             SourceId = command.ActorId,
             TargetType = NotificationTargetType.PlatformAdministrators,
             TargetId = Notification.PlatformAdministratorsTargetId,
-            Kind = NotificationKind.CompetitionForceDeleted,
-            ContentJson = JsonSerializer.Serialize(new CompetitionForceDeletionFact(
-                SchemaVersion: 1,
-                competition.Id,
-                competition.Title,
-                command.Reason,
-                preview.References), JsonOptions),
+            CompetitionId = competition.Id,
+            Title = competition.Title,
+            Reason = command.Reason,
+            ReferenceCounts = preview.References.Select(reference =>
+                new NotificationReferenceCount
+                {
+                    NotificationId = Guid.Empty,
+                    ReferenceKind = (short)reference.Kind,
+                    Count = reference.Count
+                }).ToList(),
             SentAt = command.OccurredAt,
             RelatedType = EntityReferenceKind.Competition,
             RelatedId = competition.Id
         };
+        foreach (var reference in audit.ReferenceCounts)
+            reference.NotificationId = audit.Id;
         await DeleteCompetitionScopeAsync(command.CompetitionId, notificationScope.Ids, ct);
         db.Notifications.Add(audit);
         foreach (var fileId in fileIds)
@@ -328,43 +361,15 @@ public sealed class AdminCompetitionStore(
         await transaction.CommitAsync(ct);
         try
         {
-            await outbox.FlushOutgoingMessagesAsync();
+            await transaction.FlushMessagesAsync(outbox);
         }
         catch (Exception exception)
         {
-            // The deletion has committed. Wolverine's persisted outbox owns delivery retries.
             (logger ?? NullLogger<AdminCompetitionStore>.Instance).LogError(exception,
-                "Competition {CompetitionId} was permanently deleted; committed outbox delivery will be retried.",
+                "Competition {CompetitionId} was permanently deleted; post-commit publication failed and recovery must rebuild cleanup work from database facts.",
                 command.CompetitionId);
         }
         return new(CompetitionForceDeleteState.Deleted, preview);
-    }
-
-    private Task LockForHardDeleteAsync(
-        Guid competitionId,
-        Guid actorId,
-        bool isAdministrator,
-        CancellationToken ct)
-    {
-        // PostgreSQL's row lock serializes the impact check with foreign-key inserts.
-        // A committed competition event is therefore visible before deletion is decided.
-        return isAdministrator
-            ? db.Database.ExecuteSqlInterpolatedAsync(
-                $"""
-                 SELECT 1
-                 FROM competitions
-                 WHERE id = {competitionId}
-                 FOR UPDATE
-                 """,
-                ct)
-            : db.Database.ExecuteSqlInterpolatedAsync(
-                $"""
-                 SELECT 1
-                 FROM competitions
-                 WHERE id = {competitionId} AND owner_id = {actorId}
-                 FOR UPDATE
-                 """,
-                ct);
     }
 
     public async Task<CompetitionOwnerTransferResult> TransferOwnerAsync(
@@ -375,11 +380,39 @@ public sealed class AdminCompetitionStore(
         DateTimeOffset now,
         CancellationToken ct)
     {
-        await using var transaction = await AggregateCompatibleTransaction.BeginAsync(db, ct);
+        for (var attempt = 0; ; attempt++)
+        {
+            try
+            {
+                return await TransferOwnerOnceAsync(
+                    competitionId, actorId, isAdministrator, ownerId, now, ct);
+            }
+            catch (Exception exception) when (attempt < 2
+                && (exception is DbUpdateException
+                    || RelationalRetry.IsTransientConcurrency(exception)))
+            {
+                db.ChangeTracker.Clear();
+                await Task.Delay(TimeSpan.FromMilliseconds(Random.Shared.Next(5, 31)), ct);
+            }
+        }
+    }
+
+    private async Task<CompetitionOwnerTransferResult> TransferOwnerOnceAsync(
+        Guid competitionId,
+        Guid actorId,
+        bool isAdministrator,
+        Guid ownerId,
+        DateTimeOffset now,
+        CancellationToken ct)
+    {
+        await using var transaction = await AggregateCompatibleTransaction.BeginAsync(
+            db,
+            System.Data.IsolationLevel.Serializable,
+            ct);
         var entity = await db.Competitions
-            .FromSqlInterpolated($"SELECT * FROM competitions WHERE id = {competitionId} FOR UPDATE")
             .IgnoreQueryFilters()
-            .SingleOrDefaultAsync(ct);
+            .Include(competition => competition.Collaborators)
+            .SingleOrDefaultAsync(competition => competition.Id == competitionId, ct);
         if (entity is null
             || entity.DeletedAt is not null
             || !(isAdministrator || entity.OwnerId == actorId))
@@ -439,7 +472,7 @@ public sealed class AdminCompetitionStore(
         await transaction.CommitAsync(ct);
         await InvalidateReadModelsAsync(entity.Id, CancellationToken.None);
         if (previousOwnerId != ownerId)
-            await outbox.FlushOutgoingMessagesAsync();
+            await transaction.FlushMessagesAsync(outbox);
         return new(CompetitionOwnerTransferState.Transferred, Map(entity));
     }
 
@@ -451,9 +484,9 @@ public sealed class AdminCompetitionStore(
             ? query
             : query.Where(competition =>
                 competition.OwnerId == actorId ||
-                competition.ManagerIds.Contains(actorId) ||
-                competition.JudgeIds.Contains(actorId) ||
-                competition.ObserverIds.Contains(actorId));
+                competition.Collaborators.Any(collaborator => collaborator.Role == NoCTF.Domain.Competitions.CompetitionCollaboratorRole.Manager && collaborator.UserId == actorId) ||
+                competition.Collaborators.Any(collaborator => collaborator.Role == NoCTF.Domain.Competitions.CompetitionCollaboratorRole.Judge && collaborator.UserId == actorId) ||
+                competition.Collaborators.Any(collaborator => collaborator.Role == NoCTF.Domain.Competitions.CompetitionCollaboratorRole.Observer && collaborator.UserId == actorId));
 
     private static CompetitionView Map(Competition competition) =>
         new(
@@ -553,7 +586,7 @@ public sealed class AdminCompetitionStore(
                     || item.State == RuntimeState.Running
                     || item.State == RuntimeState.Stopping
                     || item.State == RuntimeState.Failed
-                    && (item.ProviderReceiptJson != null
+                    && (item.ProviderReceipt != null
                         || item.RunnerId != null)), ct));
         return new(
             competitionId,
@@ -605,22 +638,28 @@ public sealed class AdminCompetitionStore(
     {
         await db.Notifications.Where(n => notificationIds.Contains(n.Id)).ExecuteDeleteAsync(ct);
         // Restrict FKs: PatchUpload -> RuntimeInstance -> GameplayFact.
-        await db.Database.ExecuteSqlInterpolatedAsync(
-            $"DELETE FROM patch_uploads WHERE competition_id = {competitionId}", ct);
-        await db.Database.ExecuteSqlInterpolatedAsync(
-            $"DELETE FROM runtime_instances WHERE competition_id = {competitionId}", ct);
-        await db.Database.ExecuteSqlInterpolatedAsync(
-            $"DELETE FROM gameplay_facts WHERE competition_id = {competitionId}", ct);
-        await db.Database.ExecuteSqlInterpolatedAsync(
-            $"DELETE FROM challenge_flags WHERE competition_challenge_id IN (SELECT id FROM competition_challenges WHERE competition_id = {competitionId})", ct);
-        await db.Database.ExecuteSqlInterpolatedAsync(
-            $"DELETE FROM competition_events WHERE competition_id = {competitionId}", ct);
-        await db.Database.ExecuteSqlInterpolatedAsync(
-            $"DELETE FROM competition_challenges WHERE competition_id = {competitionId}", ct);
-        await db.Database.ExecuteSqlInterpolatedAsync(
-            $"DELETE FROM teams WHERE competition_id = {competitionId}", ct);
-        await db.Database.ExecuteSqlInterpolatedAsync(
-            $"DELETE FROM competitions WHERE id = {competitionId}", ct);
+        await db.PatchUploads.Where(item => item.CompetitionId == competitionId)
+            .ExecuteDeleteAsync(ct);
+        await db.RuntimeInstances.Where(item => item.CompetitionId == competitionId)
+            .ExecuteDeleteAsync(ct);
+        await db.GameplayFacts.Where(item => item.CompetitionId == competitionId)
+            .ExecuteDeleteAsync(ct);
+        var competitionChallengeIds = db.CompetitionChallenges.IgnoreQueryFilters()
+            .Where(item => item.CompetitionId == competitionId)
+            .Select(item => item.Id);
+        await db.ChallengeFlags.Where(flag =>
+                flag.CompetitionChallengeId != null
+                && competitionChallengeIds.Contains(flag.CompetitionChallengeId.Value))
+            .ExecuteDeleteAsync(ct);
+        await db.CompetitionEvents.Where(item => item.CompetitionId == competitionId)
+            .ExecuteDeleteAsync(ct);
+        await db.CompetitionChallenges.IgnoreQueryFilters()
+            .Where(item => item.CompetitionId == competitionId)
+            .ExecuteDeleteAsync(ct);
+        await db.Teams.IgnoreQueryFilters().Where(item => item.CompetitionId == competitionId)
+            .ExecuteDeleteAsync(ct);
+        await db.Competitions.IgnoreQueryFilters().Where(item => item.Id == competitionId)
+            .ExecuteDeleteAsync(ct);
     }
 
     private static void AddReference(

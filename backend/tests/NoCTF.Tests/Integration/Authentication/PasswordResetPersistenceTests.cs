@@ -65,7 +65,7 @@ public sealed class PasswordResetPersistenceTests
             await Assert.That(new[] { firstOutbox, secondOutbox }
                     .Single(outbox => outbox.Messages.OfType<SendPasswordReset>().Any())
                     .TokenWasPendingWhenPublished)
-                .IsTrue();
+                .IsFalse();
 
             await using (var inspectionDb = new NoCtfDbContext(options))
             {
@@ -101,7 +101,7 @@ public sealed class PasswordResetPersistenceTests
             await Assert.That(new[] { firstCompletionOutbox, secondCompletionOutbox }
                     .Single(outbox => outbox.Messages.OfType<SendPasswordChangedNotification>().Any())
                     .TokenWasPendingWhenPasswordChangedWasPublished)
-                .IsTrue();
+                .IsFalse();
 
             await using var verificationDb = new NoCtfDbContext(options);
             var users = new AuthenticationStore(verificationDb, hasher);
@@ -215,7 +215,7 @@ public sealed class PasswordResetPersistenceTests
     private static PasswordResetStore CreateStore(
         NoCtfDbContext db,
         IPasswordHasher<User> hasher,
-        ITransactionalMessageOutbox outbox) =>
+        IPostCommitMessagePublisher outbox) =>
         new(
             db,
             hasher,
@@ -295,7 +295,7 @@ public sealed class PasswordResetPersistenceTests
                 SmtpTimeoutSeconds: 10));
     }
 
-    private sealed class RecordingOutbox(NoCtfDbContext? db = null) : ITransactionalMessageOutbox
+    private sealed class RecordingOutbox(NoCtfDbContext? db = null) : IPostCommitMessagePublisher
     {
         private readonly ConcurrentQueue<object> messages = new();
 

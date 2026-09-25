@@ -1,4 +1,3 @@
-using System.Text.Json;
 using System.Text.Json.Serialization;
 
 namespace NoCTF.Domain.Runtime;
@@ -92,11 +91,10 @@ public sealed record RuntimeCapacityAllocation(
 }
 
 /// <summary>Only allocations whose resources may still exist; never an operation history.</summary>
-public sealed record RuntimeCapacityAllocations(int SchemaVersion, IReadOnlyList<RuntimeCapacityAllocation> Items)
+public sealed record RuntimeCapacityAllocations(IReadOnlyList<RuntimeCapacityAllocation> Items)
 {
-    private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
     public const int MaximumItems = 32;
-    public static RuntimeCapacityAllocations Empty { get; } = new(1, Array.Empty<RuntimeCapacityAllocation>());
+    public static RuntimeCapacityAllocations Empty { get; } = new(Array.Empty<RuntimeCapacityAllocation>());
 
     public RuntimeCapacityAllocations Add(RuntimeCapacityAllocation allocation)
     {
@@ -108,18 +106,18 @@ public sealed record RuntimeCapacityAllocations(int SchemaVersion, IReadOnlyList
                 throw new InvalidOperationException("An existing allocation cannot change owner or resource amounts.");
             return this;
         }
-        var next = new RuntimeCapacityAllocations(1, [.. Items, allocation]);
+        var next = new RuntimeCapacityAllocations([.. Items, allocation]);
         next.Validate();
         return next;
     }
 
     public RuntimeCapacityAllocations Remove(RuntimeWorkloadIdentity identity) =>
-        new(1, Items.Where(item => item.Identity != identity).ToArray());
+        new(Items.Where(item => item.Identity != identity).ToArray());
 
     public void Validate()
     {
-        if (SchemaVersion != 1 || Items is null || Items.Count > MaximumItems)
-            throw new InvalidOperationException("Unsupported or oversized capacity allocation document.");
+        if (Items is null || Items.Count > MaximumItems)
+            throw new InvalidOperationException("Capacity allocations are missing or oversized.");
         foreach (var item in Items)
             item.Validate();
         if (Items.Select(item => item.Identity).Distinct().Count() != Items.Count
@@ -128,17 +126,4 @@ public sealed record RuntimeCapacityAllocations(int SchemaVersion, IReadOnlyList
             throw new InvalidOperationException("Capacity allocations must have unique identities and one Runtime owner.");
     }
 
-    public static string Serialize(RuntimeCapacityAllocations value)
-    {
-        value.Validate();
-        return JsonSerializer.Serialize(value, JsonOptions);
-    }
-
-    public static RuntimeCapacityAllocations Deserialize(string json)
-    {
-        var value = JsonSerializer.Deserialize<RuntimeCapacityAllocations>(json, JsonOptions)
-            ?? throw new InvalidOperationException("Capacity allocation metadata cannot be null.");
-        value.Validate();
-        return value;
-    }
 }

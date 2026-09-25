@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using NoCTF.Application.Challenges.Testing;
 using NoCTF.Application.Messaging;
+using NoCTF.Application.Runtime.Provisioning;
 using NoCTF.Domain.Challenges;
 using NoCTF.Domain.Runtime;
 using NoCTF.Infrastructure.Persistence;
@@ -23,15 +24,15 @@ public interface IChallengeTestFlagInjectionStore
 }
 
 public sealed class ChallengeTestFlagInjectionStore(
-    IServiceScopeFactory scopes,
+    IDbContextFactory<NoCtfDbContext> contexts,
+    NoCTF.GameModes.Awd.Configuration.IAwdFlagInjectionConfigurationCatalog configurations,
     TimeProvider timeProvider) : IChallengeTestFlagInjectionStore
 {
     public async Task<AwdFlagInjectionWork?> ReadAsync(
         InjectChallengeTestFlag message,
         CancellationToken cancellationToken)
     {
-        await using var scope = scopes.CreateAsyncScope();
-        var db = scope.ServiceProvider.GetRequiredService<NoCtfDbContext>();
+        await using var db = await contexts.CreateDbContextAsync(cancellationToken);
         var target = await db.RuntimeInstances.AsNoTracking()
             .Where(runtime => runtime.Id == message.RuntimeInstanceId
                 && runtime.ChallengeId == message.ChallengeId
@@ -40,7 +41,7 @@ public sealed class ChallengeTestFlagInjectionStore(
                 && runtime.TestFlagState == RuntimeTestFlagState.Pending
                 && runtime.State == RuntimeState.Running
                 && runtime.RunnerId == message.RunnerId
-                && runtime.ProviderReceiptJson != null)
+                && runtime.ProviderReceipt != null)
             .Join(
                 db.Challenges.AsNoTracking(),
                 runtime => runtime.ChallengeId,
@@ -60,24 +61,25 @@ public sealed class ChallengeTestFlagInjectionStore(
             {
                 target.Runtime.RuntimeKind,
                 target.Runtime.RuntimeProvider,
-                ProviderReceiptJson = target.Runtime.ProviderReceiptJson!,
+                ProviderReceipt = target.Runtime.ProviderReceipt!,
                 target.Flag.Flag,
-                target.Challenge.DefinitionJson
+                target.Challenge.Definition
             })
+            .AsSplitQuery()
             .SingleOrDefaultAsync(cancellationToken);
         if (target is null)
             return null;
 
-        var configurations = scope.ServiceProvider
-            .GetRequiredService<NoCTF.GameModes.Awd.Configuration.IAwdFlagInjectionConfigurationCatalog>();
-        var injection = configurations.Get(target.DefinitionJson);
+        if (target.Definition is not AwdChallengeDefinition definition)
+            return null;
+        var injection = configurations.Get(definition);
         if (injection is null)
             return null;
         return new(
             message.RuntimeInstanceId,
             target.RuntimeKind,
             target.RuntimeProvider,
-            target.ProviderReceiptJson,
+            target.ProviderReceipt.ToData(),
             target.Flag,
             injection.Command,
             injection.ServiceName,
@@ -89,8 +91,7 @@ public sealed class ChallengeTestFlagInjectionStore(
         RuntimeTestFlagState state,
         CancellationToken cancellationToken)
     {
-        await using var scope = scopes.CreateAsyncScope();
-        var db = scope.ServiceProvider.GetRequiredService<NoCtfDbContext>();
+        await using var db = await contexts.CreateDbContextAsync(cancellationToken);
         var runtime = await db.RuntimeInstances.SingleOrDefaultAsync(
             candidate => candidate.Id == message.RuntimeInstanceId
                 && candidate.ChallengeId == message.ChallengeId
@@ -123,7 +124,7 @@ public sealed class ChallengeTestFlagInjectionStore(
 public sealed class ChallengeTestFlagInjectionHandler(
     IChallengeTestFlagInjectionStore store,
     IAwdFlagInjectionExecutor executor,
-    ITransactionalMessageOutbox outbox,
+    IPostCommitMessagePublisher outbox,
     IOptions<RunnerOptions> runnerOptions,
     TimeProvider timeProvider)
 {

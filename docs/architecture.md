@@ -39,7 +39,7 @@ NoCTF.Host [Api]  ---- Redis (cache/rate limit/SignalR/heartbeat)
 - 混合：API+Worker 与独立 Runner，或 API+Runner 与独立 Worker。
 
 Worker、Runner 与 API 均可多副本。每个进程中的每种角色至多一份，每个 Runner 进程
-只拥有一个稳定唯一 RunnerId。组合部署仍通过 PostgreSQL/Wolverine durable queue 传递业务
+只拥有一个稳定唯一 RunnerId。组合部署仍通过 NATS JetStream durable consumer 传递业务
 工作，不使用内存 Channel 或 fire-and-forget 代替持久投递。
 
 ## 数据依赖
@@ -83,15 +83,13 @@ Flag、AWDP Break 与 Fix 只有在 GameplayFact 事务提交成功后才增加�
 
 ## Runner Pool
 
-平台部署配置一个活动 RuntimeProvider（Docker 或 Kubernetes）与 RunnerPool；Challenge/Competition 不引用 Provider 或 RunnerPool。节点通过 Redis TTL heartbeat 发布容量，Worker 从 Registry 原子选择具体 RunnerId，并将 durable 命令直接投递到该节点的 `runner-node-{runnerId}` PostgreSQL queue。RuntimeInstance 只持久化本次调度实际使用的 RunnerId、RuntimeProvider、ProviderReceiptJson 与展开 URL，不保存 pool 路由状态。
+平台部署配置一个活动 RuntimeProvider（Docker 或 Kubernetes）与 RunnerPool；Challenge/Competition 不引用 Provider 或 RunnerPool。节点只使用 Runner registration schema 3 发布 TTL heartbeat；Worker 通过关系化 capacity ledger/allocation 与乐观并发选择具体 RunnerId，并将 durable 命令投递到该节点的 JetStream subject。RuntimeInstance 只持久化本次调度实际使用的 RunnerId、RuntimeProvider、结构化 AccessEndpoint 以及一对一 typed receipt，不保存 pool 路由状态或 JSON receipt。
 
-每次心跳同时维护 `runner-pool:{pool}:candidates` 有序集合。候选分数采用内存、CPU 与 PID
-三者中最高的已用比例，并加入不超过 `1e-6` 的随机扰动避免同分节点长期固定成为首选。
-调度热路径只读取压力最低的前 8 个候选，Lua 脚本原子校验成员资格、心跳、容量和
-`runner-claim:{runtimeInstanceId}` 幂等所有权，再扣减容量并更新分数。前 8 个候选均不可用时，
-只执行一次池索引重建与原子兜底选择，避免池中后续可用节点被误判为容量不足。释放 Claim
-会在同一脚本内恢复容量并更新候选分数；过期心跳在分配时从候选集合剔除。Runner/Runtime ID
-仅进入 Trace 与结构化日志，不作为 Prometheus 标签。
+Runner resource-domain 所有权使用 NATS KV CAS 租约：租约 30 秒、每 10 秒续租，KV revision
+作为 fencing token。连续两次续租失败时 Runner 进入 draining 并终止进程；接管者从关系数据库
+中的 ledger、allocation 与 Runtime 事实重建容量。分配以唯一约束和 concurrency stamp 保证幂等，
+不读取旧 Redis Claim、不使用 `__legacy__` pool。Runner/Runtime ID 仅进入 Trace 与结构化日志，
+不作为 Prometheus 标签。
 
 `file://` OVA URL 必须在部署所选 Runner 节点可访问。平台 API 不下载或管理 OVA；配置固定
 预期 SHA-256，Libvirt Provider 负责读取/下载、校验、内容寻址缓存以及多 VM Appliance

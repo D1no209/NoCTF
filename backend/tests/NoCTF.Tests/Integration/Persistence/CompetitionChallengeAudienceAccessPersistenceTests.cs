@@ -1,4 +1,6 @@
+using System.Data.Common;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 using NoCTF.Domain.Competitions;
 using NoCTF.Domain.Identity;
 using NoCTF.Domain.Teams;
@@ -32,23 +34,52 @@ public sealed class CompetitionChallengeAudienceAccessPersistenceTests
             var ids = await SeedAsync(options, ct);
 
             await using var db = new NoCtfDbContext(options);
-            var access = new CompetitionChallengeAudienceAccess(db);
+            var access = new CompetitionChallengeReadAccess(db);
+            async Task<bool> CanReadAsync(Guid userId) =>
+                await access.ResolveAsync(userId, ids.CompetitionId, DateTimeOffset.UtcNow, ct) is not null;
 
-            await Assert.That(await access.CanReadAsync(Guid.Empty, ids.CompetitionId, ct)).IsFalse();
-            await Assert.That(await access.CanReadAsync(ids.UnregisteredId, ids.CompetitionId, ct)).IsFalse();
-            await Assert.That(await access.CanReadAsync(ids.PendingId, ids.CompetitionId, ct)).IsFalse();
-            await Assert.That(await access.CanReadAsync(ids.RejectedId, ids.CompetitionId, ct)).IsFalse();
-            await Assert.That(await access.CanReadAsync(ids.BannedId, ids.CompetitionId, ct)).IsFalse();
-            await Assert.That(await access.CanReadAsync(ids.DeletedTeamId, ids.CompetitionId, ct)).IsFalse();
-            await Assert.That(await access.CanReadAsync(ids.InactiveAdministratorId, ids.CompetitionId, ct)).IsFalse();
+            await Assert.That(await CanReadAsync(Guid.Empty)).IsFalse();
+            await Assert.That(await CanReadAsync(ids.UnregisteredId)).IsFalse();
+            await Assert.That(await CanReadAsync(ids.PendingId)).IsFalse();
+            await Assert.That(await CanReadAsync(ids.RejectedId)).IsFalse();
+            await Assert.That(await CanReadAsync(ids.BannedId)).IsFalse();
+            await Assert.That(await CanReadAsync(ids.DeletedTeamId)).IsFalse();
+            await Assert.That(await CanReadAsync(ids.InactiveAdministratorId)).IsFalse();
 
-            await Assert.That(await access.CanReadAsync(ids.ApprovedId, ids.CompetitionId, ct)).IsTrue();
-            await Assert.That(await access.CanReadAsync(ids.OwnerId, ids.CompetitionId, ct)).IsTrue();
-            await Assert.That(await access.CanReadAsync(ids.ManagerId, ids.CompetitionId, ct)).IsTrue();
-            await Assert.That(await access.CanReadAsync(ids.JudgeId, ids.CompetitionId, ct)).IsTrue();
-            await Assert.That(await access.CanReadAsync(ids.ObserverId, ids.CompetitionId, ct)).IsTrue();
-            await Assert.That(await access.CanReadAsync(ids.AdministratorId, ids.CompetitionId, ct)).IsTrue();
+            await Assert.That(await CanReadAsync(ids.ApprovedId)).IsTrue();
+            await Assert.That(await CanReadAsync(ids.OwnerId)).IsTrue();
+            await Assert.That(await CanReadAsync(ids.ManagerId)).IsTrue();
+            await Assert.That(await CanReadAsync(ids.JudgeId)).IsTrue();
+            await Assert.That(await CanReadAsync(ids.ObserverId)).IsTrue();
+            await Assert.That(await CanReadAsync(ids.AdministratorId)).IsTrue();
+
+            var counter = new QueryCounter();
+            var measuredOptions = new DbContextOptionsBuilder<NoCtfDbContext>()
+                .UseNpgsql(postgres.GetConnectionString())
+                .UseSnakeCaseNamingConvention()
+                .AddInterceptors(counter)
+                .Options;
+            await using var measuredDb = new NoCtfDbContext(measuredOptions);
+            var participantDecision = await new CompetitionChallengeReadAccess(measuredDb)
+                .ResolveAsync(ids.ApprovedId, ids.CompetitionId, DateTimeOffset.UtcNow, ct);
+            await Assert.That(participantDecision?.TeamId).IsNotNull();
+            await Assert.That(counter.ReaderCount).IsLessThanOrEqualTo(3);
         });
+    }
+
+    private sealed class QueryCounter : DbCommandInterceptor
+    {
+        public int ReaderCount { get; private set; }
+
+        public override ValueTask<DbDataReader> ReaderExecutedAsync(
+            DbCommand command,
+            CommandExecutedEventData eventData,
+            DbDataReader result,
+            CancellationToken cancellationToken = default)
+        {
+            ReaderCount++;
+            return ValueTask.FromResult(result);
+        }
     }
 
     private static async Task<Ids> SeedAsync(
@@ -77,7 +108,7 @@ public sealed class CompetitionChallengeAudienceAccessPersistenceTests
             User(ids.BannedId, "challenge-banned", now),
             User(ids.DeletedTeamId, "challenge-deleted-team", now),
             User(ids.UnregisteredId, "challenge-unregistered", now));
-        db.Competitions.Add(new Competition
+        db.Competitions.Add(new CtfCompetition
         {
             Id = ids.CompetitionId,
             Title = "Challenge audience",
@@ -85,9 +116,8 @@ public sealed class CompetitionChallengeAudienceAccessPersistenceTests
             ManagerIds = [ids.ManagerId],
             JudgeIds = [ids.JudgeId],
             ObserverIds = [ids.ObserverId],
-            Mode = GameMode.Ctf,
             Status = CompetitionStatus.Running,
-            ConfigurationJson = "{}",
+            ModeConfiguration = TestConfigurations.Competition(GameMode.Ctf),
             FlagDerivationSecret = new byte[32],
             StartAt = now.AddHours(-1),
             EndAt = now.AddHours(1),

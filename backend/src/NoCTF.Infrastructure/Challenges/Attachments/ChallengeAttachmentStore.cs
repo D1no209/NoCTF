@@ -233,7 +233,7 @@ public sealed class ChallengeAttachmentStore(
             FileId = entry.FileId,
             CreatedAt = entry.CreatedAt
         }));
-        db.ChallengeFlags.AddRange(entries.Select(entry => new ChallengeFlag
+        db.ChallengeFlags.AddRange(entries.Select(entry => new TemplateChallengeFlag
         {
             Id = Guid.CreateVersion7(entry.CreatedAt),
             ChallengeId = challengeId,
@@ -415,7 +415,7 @@ public sealed class ChallengeAttachmentStore(
                 var selectionPool = unused.Length > 0 ? unused : candidates.ToArray();
                 var selected = selectionPool[RandomNumberGenerator.GetInt32(selectionPool.Length)];
                 selectedId = selected.SpecificationId!.Value;
-                pendingAssignment = new ChallengeFlag
+                pendingAssignment = new TeamChallengeFlag
                 {
                     Id = Guid.CreateVersion7(),
                     CompetitionChallengeId = competitionChallengeId,
@@ -443,7 +443,36 @@ public sealed class ChallengeAttachmentStore(
         if (pendingAssignment is not null)
         {
             db.ChallengeFlags.Add(pendingAssignment);
-            await db.SaveChangesAsync(ct);
+            try
+            {
+                await db.SaveChangesAsync(ct);
+            }
+            catch (DbUpdateException)
+            {
+                db.Entry(pendingAssignment).State = EntityState.Detached;
+                await transaction.RollbackAsync(ct);
+                var winningAttachmentId = await db.ChallengeFlags.AsNoTracking()
+                    .Where(flag =>
+                        flag.CompetitionChallengeId == competitionChallengeId
+                        && flag.TeamId == scope.TeamId
+                        && flag.SpecificationKind == SpecificationKind.Attachment
+                        && flag.SpecificationId != null)
+                    .Select(flag => flag.SpecificationId!.Value)
+                    .SingleOrDefaultAsync(ct);
+                if (winningAttachmentId == Guid.Empty)
+                    throw;
+                var winningAttachment = await db.Set<ChallengeAttachment>()
+                    .IgnoreQueryFilters()
+                    .AsNoTracking()
+                    .Include(item => item.File)
+                    .SingleOrDefaultAsync(item =>
+                        item.Id == winningAttachmentId
+                        && item.ChallengeId == scope.ChallengeId, ct);
+                if (winningAttachment is null
+                    || !await objectExistsAsync(winningAttachment.File.ObjectKey, ct))
+                    return null;
+                return new(Map(winningAttachment), winningAttachment.File.ObjectKey);
+            }
         }
         await transaction.CommitAsync(ct);
         return new(Map(attachment), attachment.File.ObjectKey);
@@ -459,7 +488,7 @@ public sealed class ChallengeAttachmentStore(
         isAdministrator
             ? source
             : source.Where(challenge =>
-                challenge.OwnerId == actorId || challenge.ManagerIds.Contains(actorId));
+                challenge.OwnerId == actorId || challenge.Managers.Any(manager => manager.UserId == actorId));
     }
 
     private async Task<PlayerScope?> ResolvePlayerScopeAsync(
@@ -470,7 +499,7 @@ public sealed class ChallengeAttachmentStore(
         await db.Teams.AsNoTracking()
             .Where(team =>
                 team.CompetitionId == competitionId &&
-                team.MemberIds.Contains(userId) &&
+                team.Members.Any(member => member.UserId == userId) &&
                 !team.IsBanned &&
                 team.RegistrationStatus == TeamRegistrationStatus.Approved)
             .Join(
@@ -514,7 +543,7 @@ public sealed class ChallengeAttachmentStore(
             && challenge.DeletedAt is null
             && (isAdministrator
                 || challenge.OwnerId == actorId
-                || challenge.ManagerIds.Contains(actorId))
+                || challenge.Managers.Any(manager => manager.UserId == actorId))
             ? challenge
             : null;
     }
@@ -528,10 +557,9 @@ public sealed class ChallengeAttachmentStore(
         try
         {
             var exists = await db.CompetitionChallenges
-                .FromSqlInterpolated($"SELECT * FROM competition_challenges WHERE id = {competitionChallengeId} FOR UPDATE")
                 .IgnoreQueryFilters()
                 .AsNoTracking()
-                .AnyAsync(budget.Token);
+                .AnyAsync(item => item.Id == competitionChallengeId, budget.Token);
             if (!exists)
                 throw new DbUpdateConcurrencyException("The attachment assignment scope no longer exists.");
         }

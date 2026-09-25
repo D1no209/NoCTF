@@ -1,0 +1,10 @@
+[Unit]
+Description=Daily NoCTF Grafana TLS certificate renewal check
+
+[Timer]
+OnCalendar=*-*-* 03:17:00 UTC
+RandomizedDelaySec=3600
+Persistent=true
+
+[Install]
+WantedBy=timers.target

@@ -84,7 +84,7 @@ public sealed class OvaRuntimeHandlerTests
                 RuntimeProvisionWorkStatus.Current,
                 new(
                     RuntimeProvider.Libvirt,
-                    System.Text.Json.JsonSerializer.Serialize(receipt))));
+                    OvaRuntimeReceiptData.From(receipt))));
         var message = new StopOvaRuntime(
             receipt.OperationId,
             "runner-a");
@@ -111,7 +111,7 @@ public sealed class OvaRuntimeHandlerTests
                 RuntimeProvisionWorkStatus.Current,
                 new(
                     RuntimeProvider.Libvirt,
-                    System.Text.Json.JsonSerializer.Serialize(receipt))));
+                    OvaRuntimeReceiptData.From(receipt))));
         var message = new StopOvaRuntime(
             receipt.OperationId,
             "runner-a");

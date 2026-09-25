@@ -11,13 +11,70 @@ using NoCTF.API.Endpoints.Competitions.Tracks;
 using NoCTF.Application.Teams.Moderation;
 using NoCTF.Application.Authentication.Sso;
 using NoCTF.API.Endpoints.Authentication;
+using NoCTF.Domain.Competitions;
+using System.Text.Json.Serialization;
 
 namespace NoCTF.API.Endpoints.Administration.Competitions;
+
+[JsonConverter(typeof(NoCTF.API.Serialization.StrictPascalCaseEnumConverter<ScoreDecayModeProtocol>))]
+public enum ScoreDecayModeProtocol { Fixed, Linear, Quadratic, Exponential, Logarithmic, Custom }
+[JsonConverter(typeof(NoCTF.API.Serialization.StrictPascalCaseEnumConverter<BloodRewardPolicyProtocol>))]
+public enum BloodRewardPolicyProtocol { FixedPoints, InitialPointsPercentage, SolveTimePointsPercentage, CurrentPointsPercentage }
+[JsonConverter(typeof(NoCTF.API.Serialization.StrictPascalCaseEnumConverter<AwdAttackRewardModeProtocol>))]
+public enum AwdAttackRewardModeProtocol { FixedPerAttack, SplitVictimDefensePool }
+[JsonConverter(typeof(NoCTF.API.Serialization.StrictPascalCaseEnumConverter<EvaluationDispatchModeProtocol>))]
+public enum EvaluationDispatchModeProtocol { Automatic, Manual }
+
+public sealed record ScoreCurveContract(
+    long InitialPoints,
+    long MinimumPoints,
+    int DecayTeamCount,
+    ScoreDecayModeProtocol DecayMode,
+    string? CustomExpression);
+public sealed record FlagTemplateContract(string Header, string BodyTemplate, bool LeetLiteralText);
+public sealed record BloodRewardContract(BloodRewardPolicyProtocol Policy, decimal Value);
+
+public sealed class CompetitionModeConfigurationContract
+{
+    public required GameModeProtocol Mode { get; set; }
+    public required FlagTemplateContract FlagTemplate { get; set; }
+    public CtfCompetitionModeConfigurationContract? Ctf { get; set; }
+    public AwdCompetitionModeConfigurationContract? Awd { get; set; }
+    public AwdpCompetitionModeConfigurationContract? Awdp { get; set; }
+    public KohCompetitionModeConfigurationContract? Koh { get; set; }
+}
+public sealed record CtfCompetitionModeConfigurationContract(
+    ScoreCurveContract DefaultScoreCurve,
+    IReadOnlyList<BloodRewardContract> BloodRewards,
+    long WrongSubmissionPenalty);
+public sealed record AwdCompetitionModeConfigurationContract(
+    int HardeningDurationSeconds,
+    int RoundDurationSeconds,
+    AwdAttackRewardModeProtocol AttackRewardMode,
+    long AttackPoints,
+    long VictimDefensePoolPoints,
+    int CheckerIntervalSeconds,
+    long ServiceHealthyPoints,
+    long ServiceUnhealthyPenalty);
+public sealed record AwdpCompetitionModeConfigurationContract(
+    int RoundDurationSeconds,
+    ScoreCurveContract BreakScoreCurve,
+    ScoreCurveContract FixScoreCurve,
+    long FlagWrongPenalty,
+    long ExploitSucceededPenalty,
+    long ServiceAbnormalPenalty,
+    bool RequireBreakBeforeFix,
+    int MaxBreakSubmissions,
+    int MaxFixSubmissions,
+    EvaluationDispatchModeProtocol EvaluationDispatchMode);
+public sealed record KohCompetitionModeConfigurationContract(
+    int PollIntervalSeconds,
+    long ControlPointsPerInterval);
 
 public sealed record CompetitionConfigurationResponse(
     Guid CompetitionId,
     GameModeProtocol Mode,
-    string Json,
+    CompetitionModeConfigurationContract Configuration,
     CompetitionStatusProtocol CompetitionStatus,
     DateTimeOffset UpdatedAt);
 
@@ -27,9 +84,167 @@ internal static class CompetitionConfigurationMapping
         CompetitionConfigurationView view) => new(
         view.CompetitionId,
         CompetitionProtocolMapper.ToProtocol(view.Mode),
-        view.Json,
+        CompetitionModeConfigurationContractMapper.FromDomain(view.Configuration),
         CompetitionProtocolMapper.ToProtocol(view.CompetitionStatus),
         view.UpdatedAt);
+}
+
+public static class CompetitionModeConfigurationContractMapper
+{
+    public static bool HasValidShape(CompetitionModeConfigurationContract? contract)
+    {
+        if (contract is null || !Enum.IsDefined(contract.Mode)
+            || contract.FlagTemplate is not { Header: not null, BodyTemplate: not null })
+            return false;
+        var count = (contract.Ctf is not null ? 1 : 0)
+            + (contract.Awd is not null ? 1 : 0)
+            + (contract.Awdp is not null ? 1 : 0)
+            + (contract.Koh is not null ? 1 : 0);
+        return count == 1 && (contract.Mode switch
+        {
+            GameModeProtocol.Ctf => contract.Ctf is
+                { DefaultScoreCurve: not null, BloodRewards: not null }
+                && contract.Ctf.BloodRewards.All(item => item is not null),
+            GameModeProtocol.Awd => contract.Awd is not null,
+            GameModeProtocol.Awdp => contract.Awdp is
+                { BreakScoreCurve: not null, FixScoreCurve: not null },
+            GameModeProtocol.Koh => contract.Koh is not null,
+            _ => false
+        });
+    }
+
+    public static CompetitionModeConfiguration ToDomain(
+        Guid competitionId,
+        GameMode expectedMode,
+        CompetitionModeConfigurationContract contract)
+    {
+        if (!HasValidShape(contract))
+            throw new ArgumentException("Configuration mode and branch must match exactly.", nameof(contract));
+        var configuration = CreateDomain(competitionId, contract);
+        if (configuration.Mode != expectedMode)
+            throw new InvalidOperationException(
+                $"Configuration mode {configuration.Mode} does not match competition mode {expectedMode}.");
+        return configuration;
+    }
+
+    public static CompetitionModeConfigurationContract FromDomain(
+        CompetitionModeConfiguration value)
+    {
+        var result = new CompetitionModeConfigurationContract
+        {
+            Mode = (GameModeProtocol)value.Mode,
+            FlagTemplate = Flag(value.FlagTemplate)
+        };
+        switch (value)
+        {
+            case CtfCompetitionModeConfiguration ctf:
+                result.Ctf = new(
+                    Curve(ctf.DefaultScoreCurve),
+                    ctf.BloodRewards.OrderBy(item => item.Position)
+                        .Select(item => new BloodRewardContract(
+                            (BloodRewardPolicyProtocol)item.Policy, item.Value)).ToArray(),
+                    ctf.WrongSubmissionPenalty);
+                break;
+            case AwdCompetitionModeConfiguration awd:
+                result.Awd = new(
+                    awd.HardeningDurationSeconds, awd.RoundDurationSeconds,
+                    (AwdAttackRewardModeProtocol)awd.AttackRewardMode, awd.AttackPoints,
+                    awd.VictimDefensePoolPoints, awd.CheckerIntervalSeconds,
+                    awd.ServiceHealthyPoints, awd.ServiceUnhealthyPenalty);
+                break;
+            case AwdpCompetitionModeConfiguration awdp:
+                result.Awdp = new(
+                    awdp.RoundDurationSeconds,
+                    Curve(awdp.BreakScoreCurve), Curve(awdp.FixScoreCurve), awdp.FlagWrongPenalty,
+                    awdp.ExploitSucceededPenalty, awdp.ServiceAbnormalPenalty,
+                    awdp.RequireBreakBeforeFix, awdp.MaxBreakSubmissions,
+                    awdp.MaxFixSubmissions,
+                    (EvaluationDispatchModeProtocol)awdp.EvaluationDispatchMode);
+                break;
+            case KohCompetitionModeConfiguration koh:
+                result.Koh = new(koh.PollIntervalSeconds, koh.ControlPointsPerInterval);
+                break;
+            default:
+                throw new InvalidOperationException(
+                    $"Unsupported competition configuration {value.GetType().Name}.");
+        }
+        return result;
+    }
+
+    private static CompetitionModeConfiguration CreateDomain(
+        Guid competitionId,
+        CompetitionModeConfigurationContract value)
+    {
+        CompetitionModeConfiguration result = value.Mode switch
+        {
+            GameModeProtocol.Ctf => new CtfCompetitionModeConfiguration
+            {
+                DefaultScoreCurve = Curve(value.Ctf!.DefaultScoreCurve),
+                BloodRewards = value.Ctf.BloodRewards.Select((reward, position) =>
+                    new CompetitionBloodReward
+                    {
+                        CompetitionId = competitionId,
+                        Position = position,
+                        Policy = (CompetitionBloodRewardPolicy)reward.Policy,
+                        Value = reward.Value
+                    }).ToList(),
+                WrongSubmissionPenalty = value.Ctf.WrongSubmissionPenalty
+            },
+            GameModeProtocol.Awd => new AwdCompetitionModeConfiguration
+            {
+                HardeningDurationSeconds = value.Awd!.HardeningDurationSeconds,
+                RoundDurationSeconds = value.Awd.RoundDurationSeconds,
+                AttackRewardMode = (AwdAttackRewardMode)value.Awd.AttackRewardMode,
+                AttackPoints = value.Awd.AttackPoints,
+                VictimDefensePoolPoints = value.Awd.VictimDefensePoolPoints,
+                CheckerIntervalSeconds = value.Awd.CheckerIntervalSeconds,
+                ServiceHealthyPoints = value.Awd.ServiceHealthyPoints,
+                ServiceUnhealthyPenalty = value.Awd.ServiceUnhealthyPenalty
+            },
+            GameModeProtocol.Awdp => new AwdpCompetitionModeConfiguration
+            {
+                RoundDurationSeconds = value.Awdp!.RoundDurationSeconds,
+                BreakScoreCurve = Curve(value.Awdp.BreakScoreCurve),
+                FixScoreCurve = Curve(value.Awdp.FixScoreCurve),
+                FlagWrongPenalty = value.Awdp.FlagWrongPenalty,
+                ExploitSucceededPenalty = value.Awdp.ExploitSucceededPenalty,
+                ServiceAbnormalPenalty = value.Awdp.ServiceAbnormalPenalty,
+                RequireBreakBeforeFix = value.Awdp.RequireBreakBeforeFix,
+                MaxBreakSubmissions = value.Awdp.MaxBreakSubmissions,
+                MaxFixSubmissions = value.Awdp.MaxFixSubmissions,
+                EvaluationDispatchMode = (CompetitionEvaluationDispatchMode)value.Awdp.EvaluationDispatchMode
+            },
+            GameModeProtocol.Koh => new KohCompetitionModeConfiguration
+            {
+                PollIntervalSeconds = value.Koh!.PollIntervalSeconds,
+                ControlPointsPerInterval = value.Koh.ControlPointsPerInterval
+            },
+            _ => throw new InvalidOperationException(
+                $"Unsupported competition configuration contract {value.GetType().Name}.")
+        };
+        result.CompetitionId = competitionId;
+        result.FlagTemplate = new FlagTemplateValue
+        {
+            Header = value.FlagTemplate.Header,
+            BodyTemplate = value.FlagTemplate.BodyTemplate,
+            LeetLiteralText = value.FlagTemplate.LeetLiteralText
+        };
+        return result;
+    }
+
+    private static FlagTemplateContract Flag(FlagTemplateValue value) =>
+        new(value.Header, value.BodyTemplate, value.LeetLiteralText);
+    private static ScoreCurveContract Curve(ScoreCurveValue value) => new(
+        value.InitialPoints, value.MinimumPoints, value.DecayTeamCount,
+        (ScoreDecayModeProtocol)value.DecayMode, value.CustomExpression);
+    private static ScoreCurveValue Curve(ScoreCurveContract value) => new()
+    {
+        InitialPoints = value.InitialPoints,
+        MinimumPoints = value.MinimumPoints,
+        DecayTeamCount = value.DecayTeamCount,
+        DecayMode = (PersistedScoreDecayMode)value.DecayMode,
+        CustomExpression = value.CustomExpression
+    };
 }
 
 public sealed record CompetitionPermissionsResponse(

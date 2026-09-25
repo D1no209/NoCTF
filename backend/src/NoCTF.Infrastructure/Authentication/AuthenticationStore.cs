@@ -23,7 +23,7 @@ namespace NoCTF.Infrastructure.Authentication;
 public sealed class AuthenticationStore(
     NoCtfDbContext db,
     IPasswordHasher<User> passwordHasher,
-    ITransactionalMessageOutbox? messageOutbox = null,
+    IPostCommitMessagePublisher? messageOutbox = null,
     FileReferenceLock? fileReferenceLock = null,
     TimeProvider? clock = null,
     IEmailVerificationConfigurationStore? emailVerificationConfiguration = null,
@@ -34,8 +34,8 @@ public sealed class AuthenticationStore(
         ICurrentUserProfilePatchStore
 {
     private readonly TimeProvider timeProvider = clock ?? TimeProvider.System;
-    private readonly ITransactionalMessageOutbox outbox =
-        messageOutbox ?? new NoOpTransactionalMessageOutbox();
+    private readonly IPostCommitMessagePublisher outbox =
+        messageOutbox ?? new NoOpPostCommitMessagePublisher();
     private readonly FileReferenceLock fileLock = fileReferenceLock ?? new FileReferenceLock();
     public async Task<AuthenticatedUser?> FindByLoginAsync(
         string login,
@@ -129,7 +129,7 @@ public sealed class AuthenticationStore(
                 && competition.Status != CompetitionStatus.Draft
                 && competition.DeletedAt == null);
         var eligibleTeams = db.Teams.AsNoTracking()
-            .Where(team => team.MemberIds.Contains(userId)
+            .Where(team => team.Members.Any(member => member.UserId == userId)
                 && team.RegistrationStatus == TeamRegistrationStatus.Approved
                 && !team.IsBanned
                 && team.DeletedAt == null);
@@ -538,6 +538,7 @@ public sealed class AuthenticationStore(
             ct);
         if (user is null
             || user.Kind != UserKind.Human
+            || !IsCurrentPasswordHash(user.PasswordHash)
             || passwordHasher.VerifyHashedPassword(
                 user, user.PasswordHash, currentPassword) == PasswordVerificationResult.Failed)
             return ChangePasswordState.CurrentPasswordInvalid;

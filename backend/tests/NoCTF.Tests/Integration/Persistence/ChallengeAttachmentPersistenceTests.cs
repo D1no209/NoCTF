@@ -50,12 +50,12 @@ public sealed class ChallengeAttachmentPersistenceTests
                 CreatedAt = now,
                 UpdatedAt = now
             });
-            db.Challenges.Add(new Challenge
+            db.Challenges.Add(new CtfChallenge
             {
                 Id = challengeId,
                 OwnerId = administratorId,
                 Title = "Attachment persistence",
-                DefinitionJson = "{}",
+                Definition = TestConfigurations.Definition(GameMode.Ctf),
                 CreatedAt = now,
                 UpdatedAt = now
             });
@@ -128,13 +128,12 @@ public sealed class ChallengeAttachmentPersistenceTests
                 CreatedAt = now,
                 UpdatedAt = now
             });
-            db.Challenges.Add(new Challenge
+            db.Challenges.Add(new CtfChallenge
             {
                 Id = challengeId,
                 OwnerId = administratorId,
                 Title = "Random batch",
-                Mode = GameMode.Ctf,
-                DefinitionJson = "{}",
+                Definition = TestConfigurations.Definition(GameMode.Ctf),
                 CreatedAt = now,
                 UpdatedAt = now
             });
@@ -221,14 +220,13 @@ public sealed class ChallengeAttachmentPersistenceTests
                     CreatedAt = now,
                     UpdatedAt = now
                 }));
-                seed.Competitions.Add(new Competition
+                seed.Competitions.Add(new CtfCompetition
                 {
                     Id = competitionId,
                     OwnerId = users[0],
                     Title = "Random attachment assignment",
-                    Mode = GameMode.Ctf,
                     Status = CompetitionStatus.Running,
-                    ConfigurationJson = "{}",
+                    ModeConfiguration = TestConfigurations.Competition(GameMode.Ctf),
                     FlagDerivationSecret = new byte[32],
                     StartAt = now.AddHours(-1),
                     EndAt = now.AddHours(1),
@@ -246,24 +244,23 @@ public sealed class ChallengeAttachmentPersistenceTests
                     RegistrationStatus = TeamRegistrationStatus.Approved,
                     RegisteredAt = now
                 }));
-                seed.Challenges.Add(new Challenge
+                seed.Challenges.Add(new CtfChallenge
                 {
                     Id = challengeId,
                     OwnerId = users[0],
                     Title = "Random delivery",
-                    Mode = GameMode.Ctf,
-                    DefinitionJson = "{}",
+                    Definition = TestConfigurations.Definition(GameMode.Ctf),
                     CreatedAt = now,
                     UpdatedAt = now
                 });
-                seed.CompetitionChallenges.Add(new CompetitionChallenge
+                seed.CompetitionChallenges.Add(new CtfCompetitionChallenge
                 {
                     Id = competitionChallengeId,
                     CompetitionId = competitionId,
                     ChallengeId = challengeId,
                     Order = 1,
                     IsPublished = true,
-                    RulesJson = "{\"schemaVersion\":1}",
+                    Rules = TestConfigurations.Rules(GameMode.Ctf),
                     UpdatedAt = now
                 });
                 foreach (var (attachmentId, index) in attachments.Select((id, index) => (id, index)))
@@ -287,7 +284,7 @@ public sealed class ChallengeAttachmentPersistenceTests
                         FileId = fileId,
                         CreatedAt = now
                     });
-                    seed.ChallengeFlags.Add(new ChallengeFlag
+                    seed.ChallengeFlags.Add(new TemplateChallengeFlag
                     {
                         Id = Guid.CreateVersion7(),
                         ChallengeId = challengeId,

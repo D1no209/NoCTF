@@ -17,6 +17,7 @@ using NoCTF.Domain.Teams;
 using NoCTF.GameModes.Awdp.Configuration;
 using NoCTF.GameModes.Scoring;
 using NoCTF.Infrastructure.GameplayFacts.Awdp;
+using NoCTF.Infrastructure.GameplayFacts.Intake;
 using NoCTF.Infrastructure.Persistence;
 using NoCTF.Worker;
 using Testcontainers.PostgreSql;
@@ -63,6 +64,13 @@ public sealed class AwdpParticipantStatePersistenceTests
             await Assert.That(state.MaximumFixAttempts).IsEqualTo(10);
             await Assert.That(state.AcceptedFixAttempts).IsEqualTo(1);
             await Assert.That(state.RemainingFixAttempts).IsEqualTo(9);
+            var attempts = await new FlagAttemptStateReader(db).ReadAsync(
+                fixture.CompetitionId, fixture.CompetitionChallengeId, fixture.TeamId,
+                GameMode.Awdp, CompetitionStatus.Running, cancellationToken);
+            await Assert.That(attempts?.Maximum).IsEqualTo(10);
+            await Assert.That(attempts?.Accepted).IsEqualTo(2);
+            await Assert.That(attempts?.Remaining).IsEqualTo(8);
+            await Assert.That(attempts?.Solved).IsFalse();
 
             var outsider = await new AwdpParticipantStateReader(db).FindAsync(
                 fixture.CompetitionId,
@@ -100,14 +108,15 @@ public sealed class AwdpParticipantStatePersistenceTests
         var fixRuntimeId = Guid.CreateVersion7(now.AddMilliseconds(9));
         var platformFailedFixFactId = Guid.CreateVersion7(now.AddMilliseconds(10));
         db.Users.Add(User(userId, "participant", now));
-        db.Competitions.Add(new Competition
+        db.Competitions.Add(new AwdpCompetition
         {
             Id = competitionId,
             Title = "AWDP participant state",
             OwnerId = userId,
-            Mode = GameMode.Awdp,
             Status = CompetitionStatus.Running,
-            ConfigurationJson = RoundConfiguration(roundDurationSeconds: 60),
+            ModeConfiguration = TestConfigurations.Competition(
+                GameMode.Awdp,
+                RoundConfiguration(roundDurationSeconds: 60)),
             StartAt = now.AddMinutes(-10),
             EndAt = now.AddHours(1),
             FlagDerivationSecret = RandomNumberGenerator.GetBytes(32),
@@ -115,23 +124,22 @@ public sealed class AwdpParticipantStatePersistenceTests
             CreatedAt = now,
             UpdatedAt = now
         });
-        db.Challenges.Add(new Challenge
+        db.Challenges.Add(new AwdpChallenge
         {
             Id = challengeId,
             OwnerId = userId,
-            Mode = GameMode.Awdp,
             Title = "AWDP state",
-            DefinitionJson = "{\"schemaVersion\":4}",
+            Definition = TestConfigurations.Definition(GameMode.Awdp),
             CreatedAt = now,
             UpdatedAt = now
         });
-        db.CompetitionChallenges.Add(new CompetitionChallenge
+        db.CompetitionChallenges.Add(new AwdpCompetitionChallenge
         {
             Id = competitionChallengeId,
             CompetitionId = competitionId,
             ChallengeId = challengeId,
             IsPublished = true,
-            RulesJson = "{\"schemaVersion\":4}",
+            Rules = TestConfigurations.Rules(GameMode.Awdp),
             UpdatedAt = now
         });
         db.Teams.Add(new Team
@@ -156,14 +164,13 @@ public sealed class AwdpParticipantStatePersistenceTests
             Fact(fixFactId, competitionId, competitionChallengeId, teamId, userId,
                 GameplayFactKind.FixAttempt, GameplayFactResult.Correct, now.AddSeconds(-70),
                 GameplayFactReferenceKind.PatchUpload, Guid.CreateVersion7(now.AddMilliseconds(11))),
-            new GameplayFact
+            new FixAttemptGameplayFact
             {
                 Id = platformFailedFixFactId,
                 CompetitionId = competitionId,
                 CompetitionChallengeId = competitionChallengeId,
                 TeamId = teamId,
                 ActorUserId = userId,
-                Kind = GameplayFactKind.FixAttempt,
                 ReferenceKind = GameplayFactReferenceKind.PatchUpload,
                 ReferenceId = Guid.CreateVersion7(now.AddMilliseconds(12)),
                 State = GameplayFactState.PlatformFailed,
@@ -172,18 +179,17 @@ public sealed class AwdpParticipantStatePersistenceTests
                 UpdatedAt = now.AddSeconds(-20)
             });
         db.RuntimeInstances.AddRange(
-            new RuntimeInstance
+            new AwdpAttackRuntimeInstance
             {
                 Id = attackRuntimeId,
                 CompetitionId = competitionId,
                 CompetitionChallengeId = competitionChallengeId,
                 TeamId = teamId,
-                Purpose = RuntimePurpose.AwdpAttack,
                 RuntimeKind = RuntimeKind.Container,
                 RuntimeProvider = RuntimeProvider.Docker,
                 RunnerId = "runner-state",
                 State = RuntimeState.Running,
-                ProviderReceiptJson = "{}",
+                ProviderReceipt = RuntimeReceiptTestData.ContainerEntity(),
                 AccessEndpoints = [new RuntimeAccessEndpoint
                 {
                     BindingIndex = 0,
@@ -193,13 +199,12 @@ public sealed class AwdpParticipantStatePersistenceTests
                 RunningAt = now.AddMinutes(-2),
                 ExpiresAt = now.AddMinutes(10)
             },
-            new RuntimeInstance
+            new AwdpTargetRuntimeInstance
             {
                 Id = fixRuntimeId,
                 CompetitionId = competitionId,
                 CompetitionChallengeId = competitionChallengeId,
                 TeamId = teamId,
-                Purpose = RuntimePurpose.AwdpTarget,
                 GameplayFactId = fixFactId,
                 RuntimeKind = RuntimeKind.Container,
                 RuntimeProvider = RuntimeProvider.Docker,
@@ -240,25 +245,26 @@ public sealed class AwdpParticipantStatePersistenceTests
         GameplayFactResult result,
         DateTimeOffset occurredAt,
         GameplayFactReferenceKind? referenceKind = null,
-        Guid? referenceId = null) => new()
+        Guid? referenceId = null)
     {
-        Id = id,
-        CompetitionId = competitionId,
-        CompetitionChallengeId = competitionChallengeId,
-        TeamId = teamId,
-        ActorUserId = actorUserId,
-        Kind = kind,
-        ReferenceKind = referenceKind,
-        ReferenceId = referenceId,
-        State = GameplayFactState.Completed,
-        Result = result,
-        Value = kind == GameplayFactKind.BreakAttempt ? $"flag{{{id:N}}}" : null,
-        ValueSha256 = kind == GameplayFactKind.BreakAttempt
+        var fact = GameplayFactGeneratedCatalog.Create(kind);
+        fact.Id = id;
+        fact.CompetitionId = competitionId;
+        fact.CompetitionChallengeId = competitionChallengeId;
+        fact.TeamId = teamId;
+        fact.ActorUserId = actorUserId;
+        fact.ReferenceKind = referenceKind;
+        fact.ReferenceId = referenceId;
+        fact.State = GameplayFactState.Completed;
+        fact.Result = result;
+        fact.Value = kind == GameplayFactKind.BreakAttempt ? $"flag{{{id:N}}}" : null;
+        fact.ValueSha256 = kind == GameplayFactKind.BreakAttempt
             ? SHA256.HashData(Encoding.UTF8.GetBytes($"flag{{{id:N}}}"))
-            : null,
-        OccurredAt = occurredAt,
-        UpdatedAt = occurredAt
-    };
+            : null;
+        fact.OccurredAt = occurredAt;
+        fact.UpdatedAt = occurredAt;
+        return fact;
+    }
 
     private static void AddLifecycle(
         NoCtfDbContext db,
@@ -266,29 +272,22 @@ public sealed class AwdpParticipantStatePersistenceTests
         CompetitionStatus from,
         CompetitionStatus to,
         DateTimeOffset occurredAt) =>
-        db.CompetitionEvents.Add(new CompetitionEvent
+        db.CompetitionEvents.Add(new CompetitionLifecycleChangedEvent
         {
             Id = Guid.CreateVersion7(occurredAt),
             CompetitionId = competitionId,
-            Kind = CompetitionEventKind.CompetitionLifecycleChanged,
             Level = CompetitionEventLevel.Information,
             Visibility = CompetitionEventVisibility.Public,
             SubjectType = EntityReferenceKind.Competition,
             SubjectId = competitionId,
-            PayloadJson = JsonSerializer.Serialize(new
-            {
-                schemaVersion = 1,
-                from,
-                to,
-                automatic = false,
-                reason = (string?)null
-            }, JsonOptions),
+            PreviousCompetitionStatus = from,
+            CompetitionStatus = to,
+            Automatic = false,
             OccurredAt = occurredAt
         });
 
     private static string RoundConfiguration(int roundDurationSeconds) => JsonSerializer.Serialize(
         new AwdpConfiguration(
-            AwdpConfiguration.CurrentSchemaVersion,
             roundDurationSeconds,
             new(100, 100, 2, ScoreDecayMode.Fixed),
             new(50, 50, 2, ScoreDecayMode.Fixed),

@@ -4,10 +4,11 @@ using NoCTF.Application.Messaging;
 using NoCTF.Domain.Gameplay;
 using NoCTF.Domain.Runtime;
 using NoCTF.Infrastructure.Persistence;
+using NoCTF.Application.Runtime.Provisioning;
 
 namespace NoCTF.Infrastructure.GameplayFacts.Processing;
 
-public sealed class PostgresAwdpFixExecutionFence(
+public sealed class AwdpFixExecutionFence(
     NoCtfDbContext db,
     TimeProvider timeProvider) : IAwdpFixExecutionFence
 {
@@ -16,14 +17,9 @@ public sealed class PostgresAwdpFixExecutionFence(
         CancellationToken cancellationToken)
     {
         await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
-        var runtime = await db.RuntimeInstances
-            .FromSqlInterpolated($"""
-                SELECT *
-                FROM runtime_instances
-                WHERE id = {request.RuntimeInstanceId}
-                FOR UPDATE
-                """)
-            .SingleOrDefaultAsync(cancellationToken);
+        var runtime = await db.RuntimeInstances.SingleOrDefaultAsync(
+            item => item.Id == request.RuntimeInstanceId,
+            cancellationToken);
         var fact = await db.GameplayFacts.SingleOrDefaultAsync(
             candidate => candidate.Id == request.GameplayFactId,
             cancellationToken);
@@ -75,6 +71,6 @@ public sealed class PostgresAwdpFixExecutionFence(
             disposition,
             runtime.Id,
             runtime.RuntimeProvider,
-            runtime.ProviderReceiptJson,
+            runtime.ProviderReceipt?.ToData(),
             runtime.RunnerId!);
 }

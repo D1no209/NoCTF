@@ -36,18 +36,6 @@ namespace NoCTF.Worker;
 
 internal static partial class BackendMessageOperations
 {
-    public static async Task AdvanceAwdRoundAsync(
-        AdvanceAwdRound message,
-        IAwdRoundCoordinator coordinator,
-        CancellationToken cancellationToken) =>
-        _ = await coordinator.AdvanceAsync(message, cancellationToken);
-
-    public static async Task GenerateAwdFlagsAsync(
-        GenerateAwdFlags message,
-        IAwdRoundCoordinator coordinator,
-        CancellationToken cancellationToken) =>
-        _ = await coordinator.GenerateFlagsAsync(message, cancellationToken);
-
     public static async Task AwdFlagInjectionFailedAsync(
         AwdFlagInjectionFailed message,
         NoCtfDbContext db,
@@ -69,21 +57,15 @@ internal static partial class BackendMessageOperations
             ;
         if (existing)
             return;
-        var payload = JsonSerializer.Serialize(new
-        {
-            schemaVersion = 1,
-            code = "awd_flag_injection_failed",
-            message.CompetitionChallengeId,
-            message.ChallengeFlagId
-        });
-        db.Notifications.Add(new Notification
+        db.Notifications.Add(new RuntimeStateChangedNotification
         {
             Id = Guid.CreateVersion7(message.OccurredAt),
             SourceType = NotificationSourceType.System,
             TargetType = NotificationTargetType.CompetitionCollaborators,
             TargetId = message.CompetitionId,
-            Kind = NotificationKind.RuntimeStateChanged,
-            ContentJson = payload,
+            Code = "awd_flag_injection_failed",
+            CompetitionChallengeId = message.CompetitionChallengeId,
+            ChallengeFlagId = message.ChallengeFlagId,
             RelatedType = EntityReferenceKind.CompetitionChallenge,
             RelatedId = message.CompetitionChallengeId,
             SentAt = message.OccurredAt
@@ -121,22 +103,16 @@ internal static partial class BackendMessageOperations
             ;
         if (existing)
             return;
-        var payload = JsonSerializer.Serialize(new
-        {
-            schemaVersion = 1,
-            code = "awd_checker_callback_missing",
-            message.CompetitionChallengeId,
-            message.RuntimeInstanceId,
-            message.GameplayFactId
-        });
-        db.Notifications.Add(new Notification
+        db.Notifications.Add(new ManagementFailureNotification
         {
             Id = Guid.CreateVersion7(message.OccurredAt),
             SourceType = NotificationSourceType.System,
             TargetType = NotificationTargetType.CompetitionCollaborators,
             TargetId = message.CompetitionId,
-            Kind = NotificationKind.ManagementFailure,
-            ContentJson = payload,
+            Code = "awd_checker_callback_missing",
+            CompetitionChallengeId = message.CompetitionChallengeId,
+            RuntimeInstanceId = message.RuntimeInstanceId,
+            GameplayFactId = message.GameplayFactId,
             RelatedType = EntityReferenceKind.GameplayFact,
             RelatedId = message.GameplayFactId,
             SentAt = message.OccurredAt

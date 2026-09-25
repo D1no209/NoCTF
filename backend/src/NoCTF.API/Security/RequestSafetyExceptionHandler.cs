@@ -20,15 +20,15 @@ public sealed class RequestSafetyExceptionHandler(ILogger<RequestSafetyException
         }
         var cause = exception;
         while (cause.InnerException is not null) cause = cause.InnerException;
-        if (exception is not FeatureCriticalSectionTimeoutException
-            && cause is not System.Data.Common.DbException { SqlState: "40P01" or "55P03" or "40001" })
+        if (!TransactionFailureClassifier.IsRetryable(exception))
             return false;
-        logger.LogWarning("Transactional request contention: {ExceptionType}, SQLSTATE {SqlState}; request {TraceId}.",
-            exception.GetType().Name, (cause as System.Data.Common.DbException)?.SqlState, context.TraceIdentifier);
+        logger.LogWarning("Transactional request contention: {ExceptionType}, cause {CauseType}; request {TraceId}.",
+            exception.GetType().Name, cause.GetType().Name, context.TraceIdentifier);
         context.Response.Headers.RetryAfter = "1";
         await TypedResults.Problem(statusCode: 503, title: "操作正在竞争资源",
             detail: "本次事务未完成，请稍后使用相同的请求标识重试。",
             extensions: new Dictionary<string, object?> { ["code"] = "TransactionBusy" }).ExecuteAsync(context);
         return true;
     }
+
 }

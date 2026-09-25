@@ -15,7 +15,7 @@ public sealed class RuntimeTrafficCaptureStore(
     NoCtfDbContext db,
     IStore objects,
     ICompetitionEventRecorder events,
-    ITransactionalMessageOutbox outbox,
+    IPostCommitMessagePublisher outbox,
     TimeProvider timeProvider) : IRuntimeTrafficCaptureStore
 {
     public async Task<RuntimeTrafficCapturePage> ListAsync(
@@ -23,9 +23,7 @@ public sealed class RuntimeTrafficCaptureStore(
         CancellationToken cancellationToken)
     {
         var truncatedRuntimeIds = ActiveSegments(query.CompetitionId)
-            .Where(capture => EF.Functions.JsonContains(
-                capture.PayloadJson,
-                "{\"truncated\":true}"))
+            .Where(capture => capture.TrafficTruncated == true)
             .Select(capture => capture.SubjectId)
             .Distinct();
         var source = ActiveSegments(query.CompetitionId)

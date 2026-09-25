@@ -12,21 +12,27 @@ internal sealed class TeamConfiguration : IEntityTypeConfiguration<Team>
         builder.HasKey(team => team.Id);
         builder.HasQueryFilter(team => team.DeletedAt == null);
         builder.Property(team => team.Name).HasMaxLength(128);
+        builder.HasIndex(team => team.NormalizedName);
         builder.Property(team => team.TrackKey)
             .HasMaxLength(64)
             .HasDefaultValue(NoCTF.Domain.Competitions.CompetitionTrackConfiguration.DefaultTrackKey);
-        builder.Property(team => team.MemberIds).HasColumnType("uuid[]");
+        builder.HasMany(team => team.Members)
+            .WithOne()
+            .HasForeignKey(member => member.TeamId)
+            .OnDelete(DeleteBehavior.Cascade);
+        builder.Navigation(team => team.Members).AutoInclude();
+        builder.HasOne(team => team.CaptainMembership)
+            .WithOne()
+            .HasForeignKey<TeamCaptain>(captain => captain.TeamId)
+            .OnDelete(DeleteBehavior.Cascade);
+        builder.Navigation(team => team.CaptainMembership).AutoInclude();
         builder.Property(team => team.RegistrationStatus).HasConversion<short>();
         builder.Property(team => team.InvitationToken).HasMaxLength(32);
         builder.HasIndex(team => new { team.CompetitionId, team.RegistrationStatus });
         builder.HasIndex(team => new { team.CompetitionId, team.TrackKey });
         builder.HasIndex(team => team.InvitationToken).IsUnique();
-        builder.HasIndex(team => team.MemberIds).HasMethod("gin");
         builder.HasOne<NoCTF.Domain.Competitions.Competition>().WithMany()
             .HasForeignKey(team => team.CompetitionId)
-            .OnDelete(DeleteBehavior.Restrict);
-        builder.HasOne<NoCTF.Domain.Identity.User>().WithMany()
-            .HasForeignKey(team => team.CaptainId)
             .OnDelete(DeleteBehavior.Restrict);
         builder.HasOne(team => team.AvatarFile).WithMany()
             .HasForeignKey(team => team.AvatarFileId)
@@ -34,20 +40,32 @@ internal sealed class TeamConfiguration : IEntityTypeConfiguration<Team>
         builder.HasOne(team => team.WriteUpFile).WithMany()
             .HasForeignKey(team => team.WriteUpFileId)
             .OnDelete(DeleteBehavior.Restrict);
-        builder.ToTable(table =>
-        {
-            table.HasCheckConstraint(
-                "ck_teams_captain_is_member",
-                "captain_id = ANY(member_ids)");
-            table.HasCheckConstraint(
-                "ck_teams_members_not_empty",
-                "cardinality(member_ids) > 0");
-            table.HasCheckConstraint(
-                "ck_teams_invitation_token_length",
-                "char_length(invitation_token) = 32");
-            table.HasCheckConstraint(
-                "ck_teams_write_up_metadata_complete",
-                "(write_up_file_id IS NULL AND write_up_submitted_by_user_id IS NULL AND write_up_submitted_at IS NULL) OR (write_up_file_id IS NOT NULL AND write_up_submitted_by_user_id IS NOT NULL AND write_up_submitted_at IS NOT NULL)");
-        });
+    }
+}
+
+internal sealed class TeamMemberConfiguration : IEntityTypeConfiguration<TeamMember>
+{
+    public void Configure(EntityTypeBuilder<TeamMember> builder)
+    {
+        builder.ToTable("team_members");
+        builder.HasKey(member => new { member.TeamId, member.UserId });
+        builder.HasIndex(member => member.UserId);
+        builder.HasIndex(member => new { member.CompetitionId, member.UserId }).IsUnique();
+        builder.HasOne<NoCTF.Domain.Identity.User>().WithMany()
+            .HasForeignKey(member => member.UserId)
+            .OnDelete(DeleteBehavior.Restrict);
+    }
+}
+
+internal sealed class TeamCaptainConfiguration : IEntityTypeConfiguration<TeamCaptain>
+{
+    public void Configure(EntityTypeBuilder<TeamCaptain> builder)
+    {
+        builder.ToTable("team_captains");
+        builder.HasKey(captain => captain.TeamId);
+        builder.HasOne<TeamMember>().WithMany()
+            .HasForeignKey(captain => new { captain.TeamId, captain.UserId })
+            .HasPrincipalKey(member => new { member.TeamId, member.UserId })
+            .OnDelete(DeleteBehavior.Restrict);
     }
 }

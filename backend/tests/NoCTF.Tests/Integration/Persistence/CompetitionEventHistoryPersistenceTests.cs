@@ -50,7 +50,7 @@ public sealed class CompetitionEventHistoryPersistenceTests
                     Human(observerId, "history-observer", UserRole.Organizer, now),
                     Human(administratorId, "history-admin", UserRole.Administrator, now),
                     Human(participantId, "history-participant", UserRole.User, now));
-                setup.Competitions.Add(new Competition
+                setup.Competitions.Add(new CtfCompetition
                 {
                     Id = competitionId,
                     OwnerId = ownerId,
@@ -58,8 +58,7 @@ public sealed class CompetitionEventHistoryPersistenceTests
                     JudgeIds = [judgeId],
                     ObserverIds = [observerId],
                     Title = "Permanent event history",
-                    Mode = GameMode.Ctf,
-                    ConfigurationJson = """{"schemaVersion":1}""",
+                    ModeConfiguration = TestConfigurations.Competition(GameMode.Ctf),
                     FlagDerivationSecret = new byte[32],
                     StartAt = now.AddDays(-200),
                     EndAt = now.AddDays(1),
@@ -238,7 +237,7 @@ public sealed class CompetitionEventHistoryPersistenceTests
             UpdatedAt = now
         };
 
-    private sealed class NullOutbox : ITransactionalMessageOutbox
+    private sealed class NullOutbox : IPostCommitMessagePublisher
     {
         public ValueTask PublishAsync<T>(T message) => ValueTask.CompletedTask;
         public ValueTask ScheduleAsync<T>(T message, DateTimeOffset scheduledAt) =>

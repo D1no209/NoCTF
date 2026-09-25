@@ -15,6 +15,7 @@ public sealed class SsoConfigurationStore(
     SsoNetworkOptions networkOptions) : ISsoConfigurationStore
 {
     private const short SettingsId = 1;
+    private static readonly AsyncKeyedLock.AsyncKeyedLocker<string> LocalMutationLocks = new();
     private static readonly JsonSerializerOptions JsonOptions =
         new(JsonSerializerDefaults.Web);
 
@@ -77,7 +78,9 @@ public sealed class SsoConfigurationStore(
                 && (provider.AllowLogin || provider.AllowBinding))
                 return Mutation.Invalid(SsoConfigurationMutationState.SecretRequired);
 
-            configuration.Providers.Add(ToConfiguration(providerId, provider, secret: null));
+            var entity = ToConfiguration(providerId, provider, secret: null);
+            configuration.Providers.Add(entity);
+            db.Add(entity);
             return Mutation.Success(
                 new SsoProviderAuditFact(
                     1,
@@ -107,7 +110,8 @@ public sealed class SsoConfigurationStore(
                 return Mutation.Invalid(SsoConfigurationMutationState.ProviderNotFound);
             var current = configuration.Providers[index];
             var hasBindings = await db.Users.AsNoTracking().AnyAsync(
-                user => user.ExternalIdentityProviderId == providerId,
+                user => user.ExternalIdentity != null
+                    && user.ExternalIdentity.ProviderId == providerId,
                 ct);
             if (hasBindings && !SameTrustBoundary(current, provider))
                 return Mutation.Invalid(SsoConfigurationMutationState.TrustBoundaryImmutable);
@@ -178,68 +182,156 @@ public sealed class SsoConfigurationStore(
         CancellationToken ct,
         Func<SsoConfiguration, Task<Mutation>> mutate)
     {
-        await using var transaction = db.Database.IsRelational()
-            ? await db.Database.BeginTransactionAsync(IsolationLevel.ReadCommitted, ct)
-            : null;
-        var settings = db.Database.IsRelational()
-            ? await db.PlatformSettings
-                .FromSqlInterpolated($"SELECT * FROM platform_settings WHERE id = {SettingsId} FOR UPDATE")
-                .SingleAsync(ct)
-            : await db.PlatformSettings.SingleAsync(item => item.Id == SettingsId, ct);
-        var configuration = Clone(settings.SsoConfiguration);
-        var mutation = await mutate(configuration);
-        if (mutation.State != SsoConfigurationMutationState.Updated)
-            return new(mutation.State);
+        using var localLease = await LocalMutationLocks.LockAsync("platform-sso", ct);
+        for (var attempt = 0; attempt < 3; attempt++)
+        {
+            await using var transaction = db.Database.IsRelational()
+                ? await db.Database.BeginTransactionAsync(IsolationLevel.Serializable, ct)
+                : null;
+            try
+            {
+                var settings = await db.PlatformSettings.SingleAsync(
+                    item => item.Id == SettingsId,
+                    ct);
+                var configuration = settings.SsoConfiguration;
+                var persistedProviderIds = configuration.Providers
+                    .Select(provider => provider.Id)
+                    .ToHashSet();
+                var mutation = await mutate(configuration);
+                if (mutation.State != SsoConfigurationMutationState.Updated)
+                    return new(mutation.State);
 
-        settings.SsoConfiguration = configuration;
-        settings.UpdatedAt = now;
-        db.Notifications.Add(ToAuditNotification(actorUserId, mutation.Audit!, now));
-        await db.SaveChangesAsync(ct);
-        if (transaction is not null)
-            await transaction.CommitAsync(ct);
-        return new(
-            SsoConfigurationMutationState.Updated,
-            ToView(configuration, now),
-            mutation.ProviderId);
+                settings.SsoConfiguration = configuration;
+                foreach (var provider in configuration.Providers.Where(provider =>
+                             !persistedProviderIds.Contains(provider.Id)))
+                {
+                    db.Add(provider);
+                    foreach (var host in provider.AllowedHostEntries)
+                        db.Entry(host).State = EntityState.Added;
+                    if (provider is OidcSsoProviderConfiguration oidc)
+                    {
+                        foreach (var scope in oidc.ScopeEntries)
+                            db.Entry(scope).State = EntityState.Added;
+                    }
+                }
+                settings.UpdatedAt = now;
+                db.Notifications.Add(ToAuditNotification(actorUserId, mutation.Audit!, now));
+                await db.SaveChangesAsync(ct);
+                if (transaction is not null)
+                    await transaction.CommitAsync(ct);
+                return new(
+                    SsoConfigurationMutationState.Updated,
+                    ToView(configuration, now),
+                    mutation.ProviderId);
+            }
+            catch (Exception exception) when (exception is DbUpdateConcurrencyException
+                || TransactionFailureClassifier.IsRetryable(exception))
+            {
+                if (attempt == 2)
+                {
+                    if (exception is DbUpdateConcurrencyException concurrency)
+                    {
+                        throw new DbUpdateConcurrencyException(
+                            $"SSO configuration concurrency persisted for: {string.Join(", ", concurrency.Entries.Select(entry => entry.Metadata.DisplayName()))}",
+                            concurrency);
+                    }
+                    throw;
+                }
+                db.ChangeTracker.Clear();
+                await Task.Delay(
+                    TimeSpan.FromMilliseconds(Random.Shared.Next(15, 51)),
+                    ct);
+            }
+        }
+        throw new InvalidOperationException("SSO configuration retry budget was exhausted.");
     }
 
-    private static SsoConfiguration Clone(SsoConfiguration configuration) =>
-        JsonSerializer.Deserialize<SsoConfiguration>(
-            JsonSerializer.Serialize(configuration, JsonOptions),
-            JsonOptions) ?? new SsoConfiguration();
+    private static SsoConfiguration Clone(SsoConfiguration configuration) => new()
+    {
+        Enabled = configuration.Enabled,
+        PublicBaseUrl = configuration.PublicBaseUrl,
+        Providers = configuration.Providers.Select(CloneProvider).ToList()
+    };
+
+    private static SsoProviderConfiguration CloneProvider(
+        SsoProviderConfiguration provider) => provider switch
+    {
+        OidcSsoProviderConfiguration oidc => Common(new OidcSsoProviderConfiguration
+        {
+            Issuer = oidc.Issuer,
+            DiscoveryUrl = oidc.DiscoveryUrl,
+            ClientId = oidc.ClientId,
+            ClientSecretCiphertext = oidc.ClientSecretCiphertext?.ToArray(),
+            Scopes = oidc.Scopes.ToArray(),
+            ReadUserInfo = oidc.ReadUserInfo,
+            DisplayNameClaim = oidc.DisplayNameClaim
+        }, provider),
+        CasSsoProviderConfiguration cas => Common(new CasSsoProviderConfiguration
+        {
+            IdentityNamespace = cas.IdentityNamespace,
+            LoginUrl = cas.LoginUrl,
+            ServiceValidateUrl = cas.ServiceValidateUrl,
+            DisplayNameAttribute = cas.DisplayNameAttribute
+        }, provider),
+        _ => throw new InvalidOperationException(
+            $"Unsupported SSO provider type {provider.GetType().Name}.")
+    };
+
+    private static T Common<T>(T target, SsoProviderConfiguration source)
+        where T : SsoProviderConfiguration
+    {
+        target.Id = source.Id;
+        target.PlatformSettingsId = source.PlatformSettingsId;
+        target.Name = source.Name;
+        target.IconUrl = source.IconUrl;
+        target.Enabled = source.Enabled;
+        target.AllowLogin = source.AllowLogin;
+        target.AllowBinding = source.AllowBinding;
+        target.TimeoutSeconds = source.TimeoutSeconds;
+        target.AllowedHosts = source.AllowedHosts.ToArray();
+        return target;
+    }
 
     private static SsoProviderConfiguration ToConfiguration(
         Guid id,
         SsoProviderDraft provider,
-        byte[]? secret) => new()
+        byte[]? secret) => provider.Protocol switch
     {
-        Id = id,
-        Name = provider.Name,
-        IconUrl = provider.IconUrl,
-        Protocol = provider.Protocol,
-        Enabled = provider.Enabled,
-        AllowLogin = provider.AllowLogin,
-        AllowBinding = provider.AllowBinding,
-        TimeoutSeconds = provider.TimeoutSeconds,
-        AllowedHosts = provider.AllowedHosts.ToArray(),
-        Oidc = provider.Oidc is null ? null : new OidcSsoProviderConfiguration
-        {
-            Issuer = provider.Oidc.Issuer,
-            DiscoveryUrl = provider.Oidc.DiscoveryUrl,
-            ClientId = provider.Oidc.ClientId,
-            ClientSecretCiphertext = secret,
-            Scopes = provider.Oidc.Scopes.ToArray(),
-            ReadUserInfo = provider.Oidc.ReadUserInfo,
-            DisplayNameClaim = provider.Oidc.DisplayNameClaim
-        },
-        Cas = provider.Cas is null ? null : new CasSsoProviderConfiguration
-        {
-            IdentityNamespace = provider.Cas.IdentityNamespace,
-            LoginUrl = provider.Cas.LoginUrl,
-            ServiceValidateUrl = provider.Cas.ServiceValidateUrl,
-            DisplayNameAttribute = provider.Cas.DisplayNameAttribute
-        }
+        SsoProtocol.Oidc when provider.Oidc is not null => Common(
+            new OidcSsoProviderConfiguration
+            {
+                Issuer = provider.Oidc.Issuer,
+                DiscoveryUrl = provider.Oidc.DiscoveryUrl,
+                ClientId = provider.Oidc.ClientId,
+                ClientSecretCiphertext = secret,
+                Scopes = provider.Oidc.Scopes.ToArray(),
+                ReadUserInfo = provider.Oidc.ReadUserInfo,
+                DisplayNameClaim = provider.Oidc.DisplayNameClaim
+            }, id, provider),
+        SsoProtocol.Cas when provider.Cas is not null => Common(
+            new CasSsoProviderConfiguration
+            {
+                IdentityNamespace = provider.Cas.IdentityNamespace,
+                LoginUrl = provider.Cas.LoginUrl,
+                ServiceValidateUrl = provider.Cas.ServiceValidateUrl,
+                DisplayNameAttribute = provider.Cas.DisplayNameAttribute
+            }, id, provider),
+        _ => throw new InvalidOperationException("The SSO provider draft is incomplete.")
     };
+
+    private static T Common<T>(T target, Guid id, SsoProviderDraft source)
+        where T : SsoProviderConfiguration
+    {
+        target.Id = id;
+        target.Name = source.Name;
+        target.IconUrl = source.IconUrl;
+        target.Enabled = source.Enabled;
+        target.AllowLogin = source.AllowLogin;
+        target.AllowBinding = source.AllowBinding;
+        target.TimeoutSeconds = source.TimeoutSeconds;
+        target.AllowedHosts = source.AllowedHosts.ToArray();
+        return target;
+    }
 
     private static bool SameTrustBoundary(
         SsoProviderConfiguration current,
@@ -291,17 +383,22 @@ public sealed class SsoConfigurationStore(
     private static Notification ToAuditNotification(
         Guid actorUserId,
         SsoProviderAuditFact fact,
-        DateTimeOffset now) => new()
+        DateTimeOffset now)
     {
-        Id = Guid.CreateVersion7(now),
-        SourceType = NotificationSourceType.User,
-        SourceId = actorUserId,
-        TargetType = NotificationTargetType.PlatformAdministrators,
-        TargetId = Notification.PlatformAdministratorsTargetId,
-        Kind = NotificationKind.SsoProviderConfigurationChanged,
-        ContentJson = JsonSerializer.Serialize(fact, JsonOptions),
-        SentAt = now
-    };
+        return new SsoProviderConfigurationChangedNotification
+        {
+            Id = Guid.CreateVersion7(now),
+            SourceType = NotificationSourceType.User,
+            SourceId = actorUserId,
+            TargetType = NotificationTargetType.PlatformAdministrators,
+            TargetId = Notification.PlatformAdministratorsTargetId,
+            ActionValue = (int)fact.Action,
+            SsoProviderId = fact.ProviderId,
+            ProviderName = fact.ProviderName,
+            SsoProtocol = fact.Protocol,
+            SentAt = now
+        };
+    }
 
     private sealed record Mutation(
         SsoConfigurationMutationState State,

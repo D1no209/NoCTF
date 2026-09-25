@@ -173,7 +173,7 @@ public sealed class AwdpFixFailureConvergencePersistenceTests
                 db,
                 new ChallengeRuntimeTemplateCatalog(),
                 new FixedRuntimePlacementPolicy(),
-                new PostgresPerTeamRuntimeFlagStore(db),
+                new PerTeamRuntimeFlagStore(db),
                 outbox,
                 events);
             var terminated = await admin.TerminateAsync(
@@ -307,13 +307,12 @@ public sealed class AwdpFixFailureConvergencePersistenceTests
             Sha256 = new byte[32],
             CreatedAt = fixture.Now
         });
-        db.RuntimeInstances.Add(new RuntimeInstance
+        db.RuntimeInstances.Add(new AwdpTargetRuntimeInstance
         {
             Id = runtimeId,
             CompetitionId = fixture.CompetitionId,
             CompetitionChallengeId = fixture.CompetitionChallengeId,
             TeamId = fixture.TeamId,
-            Purpose = RuntimePurpose.AwdpTarget,
             RuntimeKind = RuntimeKind.Container,
             RuntimeProvider = RuntimeProvider.Docker,
             RunnerId = "runner-a",
@@ -321,7 +320,7 @@ public sealed class AwdpFixFailureConvergencePersistenceTests
             FailureCode = runtimeState == RuntimeState.Failed
                 ? RuntimeFailureCode.ProviderUnavailable
                 : null,
-            ProviderReceiptJson = "{}",
+            ProviderReceipt = RuntimeReceiptTestData.ContainerEntity(),
             GameplayFactId = factId,
             CreatedAt = fixture.Now,
             RunningAt = fixture.Now,
@@ -339,14 +338,13 @@ public sealed class AwdpFixFailureConvergencePersistenceTests
             FileId = fileId,
             UploadedAt = fixture.Now
         });
-        db.GameplayFacts.Add(new GameplayFact
+        db.GameplayFacts.Add(new FixAttemptGameplayFact
         {
             Id = factId,
             CompetitionId = fixture.CompetitionId,
             CompetitionChallengeId = fixture.CompetitionChallengeId,
             TeamId = fixture.TeamId,
             ActorUserId = fixture.UserId,
-            Kind = GameplayFactKind.FixAttempt,
             ReferenceKind = GameplayFactReferenceKind.PatchUpload,
             ReferenceId = patchId,
             OccurredAt = fixture.Now,
@@ -382,39 +380,37 @@ public sealed class AwdpFixFailureConvergencePersistenceTests
             CreatedAt = now,
             UpdatedAt = now
         });
-        db.Competitions.Add(new Competition
+        db.Competitions.Add(new AwdpCompetition
         {
             Id = competitionId,
             OwnerId = userId,
             Title = "AWDP convergence",
-            Mode = GameMode.Awdp,
             Status = CompetitionStatus.Running,
-            ConfigurationJson = GameModeDefaultConfiguration.GetCompetitionJson(GameMode.Awdp),
+            ModeConfiguration = TestConfigurations.Competition(GameMode.Awdp),
             FlagDerivationSecret = new byte[32],
             StartAt = now.AddMinutes(-1),
             EndAt = now.AddHours(1),
             CreatedAt = now,
             UpdatedAt = now
         });
-        db.Challenges.Add(new Challenge
+        db.Challenges.Add(new AwdpChallenge
         {
             Id = challengeId,
             OwnerId = userId,
-            Mode = GameMode.Awdp,
             Title = "AWDP convergence challenge",
             Visibility = ChallengeVisibility.Private,
-            DefinitionJson = new GameModeChallengeConfigurationCatalog()
-                .GetDefaultJson(GameMode.Awdp),
+            Definition = new GameModeChallengeConfigurationCatalog()
+                .CreateDefaultDefinitionForTest(GameMode.Awdp),
             CreatedAt = now,
             UpdatedAt = now
         });
-        db.CompetitionChallenges.Add(new CompetitionChallenge
+        db.CompetitionChallenges.Add(new AwdpCompetitionChallenge
         {
             Id = competitionChallengeId,
             CompetitionId = competitionId,
             ChallengeId = challengeId,
             IsPublished = true,
-            RulesJson = new GameModeChallengeConfigurationCatalog().GetDefaultJson(GameMode.Awdp),
+            Rules = new GameModeChallengeConfigurationCatalog().CreateDefaultRulesForTest(GameMode.Awdp),
             UpdatedAt = now
         });
         db.Teams.Add(new Team
@@ -450,7 +446,7 @@ public sealed class AwdpFixFailureConvergencePersistenceTests
             .UseSnakeCaseNamingConvention()
             .Options;
 
-    private sealed class RecordingOutbox : ITransactionalMessageOutbox
+    private sealed class RecordingOutbox : IPostCommitMessagePublisher
     {
         public ConcurrentQueue<object> Messages { get; } = [];
         public ValueTask PublishAsync<T>(T message) => Add(message);

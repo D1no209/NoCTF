@@ -1,10 +1,11 @@
-import { toRefs } from 'vue'
+import { inject, toRefs } from 'vue'
 
 import { PartyPopper } from '@lucide/vue'
 import { toast } from 'vue-sonner'
-import { getGameplayFactStatusEndpoint, judgeAwdpBreakFlag, submitFlagEndpoint } from '../../api'
+import { judgeAwdpBreakFlag, submitFlagEndpoint } from '../../api'
 import type { NoCtfapiEndpointsGameplayFactsGameplayFactAdmissionFailureCodeProtocol, NoCtfapiEndpointsGameplayFactsGameplayFactStatusResponse } from '../../api'
 import { useHumanVerification } from '~/features/security/useHumanVerification'
+import { challengeGameplayFactStatusKey, createChallengeGameplayFactStatusReader } from './challenge-gameplay-fact-status'
 
 type TrackedSubmission = Pick<
   NoCtfapiEndpointsGameplayFactsGameplayFactStatusResponse,
@@ -44,6 +45,7 @@ export function useFlagSubmit(props: Readonly<Omit<{
     initiallySolved?: boolean
   }, "multiple" | "title" | "description" | "practice" | "readOnlyJudgement" | "dockTarget" | "initiallySolved">>>,
 emit: { (event: "evaluated", ...args: [result: TrackedSubmission['result']]): void; (event: "submitted", ...args: [gameplayFactIds: string[]]): void; (event: "remainingChanged", ...args: [remaining: number | null]): void }) {
+  const readStatus = inject(challengeGameplayFactStatusKey) ?? createChallengeGameplayFactStatusReader()
   const { user } = useAuth()
   const { request: requestHumanVerification } = useHumanVerification()
   const challengeKey = () =>
@@ -57,6 +59,8 @@ emit: { (event: "evaluated", ...args: [result: TrackedSubmission['result']]): vo
   const tracked = ref<TrackedSubmission[]>([])
 
   const toasted = new Set<string>()
+
+  const pendingRefreshes = new Map<string, Promise<void>>()
 
   const celebrating = ref(false)
 
@@ -119,7 +123,7 @@ emit: { (event: "evaluated", ...args: [result: TrackedSubmission['result']]): vo
       await refreshPending()
       return !tracked.value.some((t) => isGameplayFactPending(t.state))
     },
-    { interval: 1500, timeout: 120_000 },
+    { interval: 1500, delays: [350, 1500], timeout: 120_000 },
   )
 
   const pollingErrorMessage = computed(() => pollingError.value
@@ -127,11 +131,22 @@ emit: { (event: "evaluated", ...args: [result: TrackedSubmission['result']]): vo
     : null)
 
   async function refreshOne(id: string): Promise<void> {
-    const { data, error } = await getGameplayFactStatusEndpoint({
-      path: { competitionId: props.competitionId, gameplayFactId: id },
-    })
-    if (error || !data)
-      throw parseApiError(error, translate("ui.failedToRefreshSubmissionStatus"))
+    const active = pendingRefreshes.get(id)
+    if (active) return active
+    const generation = requestGeneration
+    const refresh = loadOne(id, generation)
+    pendingRefreshes.set(id, refresh)
+    try {
+      await refresh
+    }
+    finally {
+      if (pendingRefreshes.get(id) === refresh) pendingRefreshes.delete(id)
+    }
+  }
+
+  async function loadOne(id: string, generation: number): Promise<void> {
+    const data = await readStatus(props.competitionId, id)
+    if (generation !== requestGeneration) return
     const item = tracked.value.find((t) => t.id === id)
     const wasPending = item ? isGameplayFactPending(item.state) : true
     if (item) {
@@ -165,6 +180,7 @@ emit: { (event: "evaluated", ...args: [result: TrackedSubmission['result']]): vo
       }
       emit('evaluated', data.result)
       tracked.value = tracked.value.filter(item => item.id !== id)
+      if (!tracked.value.some(item => isGameplayFactPending(item.state))) stopPolling()
     }
   }
 
@@ -274,6 +290,7 @@ emit: { (event: "evaluated", ...args: [result: TrackedSubmission['result']]): vo
     solved.value = props.initiallySolved || solvedChallengeKeys.has(challengeKey())
     input.value = ''
     tracked.value = []
+    pendingRefreshes.clear()
 
     stopPolling()
   })
@@ -297,6 +314,7 @@ emit: { (event: "evaluated", ...args: [result: TrackedSubmission['result']]): vo
   onUnmounted(() => {
     unwatch?.()
     stopPolling()
+    pendingRefreshes.clear()
     if (celebrationTimer) clearTimeout(celebrationTimer)
 
   })

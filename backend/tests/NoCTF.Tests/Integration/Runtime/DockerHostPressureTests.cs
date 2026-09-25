@@ -34,7 +34,7 @@ public sealed class DockerHostPressureTests
         await using var observer = new RunnerResourceObserver(
             Options.Create(new RunnerOptions { Id = "host-pressure-test", Provider = RuntimeProvider.Docker }),
             new DockerRuntimeOptions(Endpoint: "unix:///var/run/docker.sock"), new KubernetesRuntimeOptions(),
-            Substitute.For<IKubernetes>(), configuration, lifetime, TimeProvider.System, NullLogger<RunnerResourceObserver>.Instance);
+            Substitute.For<IKubernetes>(), new InMemoryClusterLeaseManager(), lifetime, TimeProvider.System, NullLogger<RunnerResourceObserver>.Instance);
         var observations = new List<object>();
         async Task<RunnerAdmissionState> SampleAsync()
         {

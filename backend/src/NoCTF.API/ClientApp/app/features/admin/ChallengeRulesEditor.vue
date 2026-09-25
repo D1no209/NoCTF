@@ -1,29 +1,28 @@
 <script setup lang="ts">
 import { bindViewState } from '~/features/shared/view-state'
 import type { GameModeValue } from '~/utils/game-config'
+import type { NoCtfapiEndpointsAdministrationChallengesCompetitionChallengeRulesContract, NoCtfapiEndpointsAdministrationCompetitionsCompetitionModeConfigurationContract } from '~/api'
 
 import { useChallengeRulesEditor } from './useChallengeRulesEditor'
 import View from '~/components/views/admin/ChallengeRulesEditorView.vue'
 
 const props = withDefaults(defineProps<{
   mode: GameModeValue
-  /** 服务器端当前规则 JSON。 */
-  json?: string | null
-  /** 当前竞赛配置 JSON，用于展示继承后的具体值。 */
-  inheritedJson?: string | null
+  rules?: NoCtfapiEndpointsAdministrationChallengesCompetitionChallengeRulesContract | null
+  inheritedConfiguration?: NoCtfapiEndpointsAdministrationCompetitionsCompetitionModeConfigurationContract | null
   readonly?: boolean
   loading?: boolean
   saving?: boolean
   hiddenKeys?: string[]
 }>(), {
-  json: null,
-  inheritedJson: null,
+  rules: null,
+  inheritedConfiguration: null,
   readonly: false,
   loading: false,
   saving: false,
   hiddenKeys: () => [],
 })
-const emit = defineEmits<{ save: [json: string] }>()
+const emit = defineEmits<{ save: [rules: NoCtfapiEndpointsAdministrationChallengesCompetitionChallengeRulesContract] }>()
 const state = bindViewState(useChallengeRulesEditor(props, emit))
 
 </script>

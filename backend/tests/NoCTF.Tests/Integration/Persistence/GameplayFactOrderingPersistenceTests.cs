@@ -112,9 +112,10 @@ public sealed class GameplayFactOrderingPersistenceTests
 
     [Test]
     [Arguments(GameMode.Ctf, GameplayFactKind.FlagAttempt, RuntimePurpose.Player)]
+    [Arguments(GameMode.Awd, GameplayFactKind.FlagAttempt, RuntimePurpose.Player)]
     [Arguments(GameMode.Awdp, GameplayFactKind.BreakAttempt, RuntimePurpose.AwdpAttack)]
     [Timeout(300_000)]
-    public async Task Wrong_result_keeps_current_runtime_running_and_reconciliation_recovers_only_current_correct_results(
+    public async Task Reconciliation_stops_only_modes_whose_correct_result_ends_the_runtime(
         GameMode mode, GameplayFactKind kind, RuntimePurpose purpose, CancellationToken ct)
     {
         await DockerIntegrationTest.RunAsync(async () =>
@@ -144,8 +145,11 @@ public sealed class GameplayFactOrderingPersistenceTests
             await ReconcileAsync(options, outbox, fixture.Now.AddSeconds(2), ct);
             await ReconcileAsync(options, outbox, fixture.Now.AddSeconds(3), ct);
             await using var final = new NoCtfDbContext(options);
-            await Assert.That((await final.RuntimeInstances.SingleAsync(x => x.Id == runtimeId, ct)).State).IsEqualTo(RuntimeState.Stopping);
-            await Assert.That(outbox.Messages.OfType<StopRuntime>().Count(x => x.RuntimeInstanceId == runtimeId)).IsEqualTo(1);
+            var stopOnSolve = mode is GameMode.Ctf or GameMode.Awdp;
+            await Assert.That((await final.RuntimeInstances.SingleAsync(x => x.Id == runtimeId, ct)).State)
+                .IsEqualTo(stopOnSolve ? RuntimeState.Stopping : RuntimeState.Running);
+            await Assert.That(outbox.Messages.OfType<StopRuntime>().Count(x => x.RuntimeInstanceId == runtimeId))
+                .IsEqualTo(stopOnSolve ? 1 : 0);
         });
     }
 
@@ -248,7 +252,7 @@ public sealed class GameplayFactOrderingPersistenceTests
                     .IsEqualTo(fixture.CompetitionChallengeId);
                 await Assert.That(resolutionEvents[0].GameplayFactId).IsEqualTo(factId);
                 await Assert.That(resolutionEvents[0].Reason).IsNull();
-                await Assert.That(resolutionEvents[0].PayloadJson).DoesNotContain(fixture.Flag);
+                await Assert.That(resolutionEvents[0].Reason ?? string.Empty).DoesNotContain(fixture.Flag);
             }
             else
                 await Assert.That(resolutionEvents).IsEmpty();
@@ -412,8 +416,7 @@ public sealed class GameplayFactOrderingPersistenceTests
             {
                 var competition = configure.Competitions.Single();
                 competition.TracksEnabled = true;
-                competition.TrackConfigurationJson = CompetitionTrackConfiguration.Serialize(new(
-                        CompetitionTrackConfiguration.CurrentSchemaVersion,
+                competition.Tracks = CompetitionTrackConfiguration.ToPersisted(new(
                         [
                             new("default", "Official", true, true, false, true, true, true, true, true),
                             new("internal", "Internal", false, false, true, false, false, false, false, false)
@@ -512,26 +515,25 @@ public sealed class GameplayFactOrderingPersistenceTests
             var otherChallengeId = Guid.CreateVersion7();
             await using (var setup = new NoCtfDbContext(options))
             {
-                setup.Challenges.Add(new Challenge
+                setup.Challenges.Add(new CtfChallenge
                 {
                     Id = otherTemplateId,
                     OwnerId = fixture.OwnerId,
-                    Mode = GameMode.Ctf,
                     Visibility = ChallengeVisibility.Private,
                     Title = "Irrelevant history challenge",
                     Direction = "Web",
-                    DefinitionJson = """{"schemaVersion":1}""",
+                    Definition = TestConfigurations.Definition(GameMode.Ctf),
                     CreatedAt = fixture.Now,
                     UpdatedAt = fixture.Now
                 });
-                setup.CompetitionChallenges.Add(new CompetitionChallenge
+                setup.CompetitionChallenges.Add(new CtfCompetitionChallenge
                 {
                     Id = otherChallengeId,
                     CompetitionId = fixture.CompetitionId,
                     ChallengeId = otherTemplateId,
                     Order = 1,
                     IsPublished = true,
-                    RulesJson = """{"schemaVersion":2}""",
+                    Rules = TestConfigurations.Rules(GameMode.Ctf),
                     UpdatedAt = fixture.Now
                 });
                 setup.GameplayFacts.Add(Fact(
@@ -644,56 +646,45 @@ public sealed class GameplayFactOrderingPersistenceTests
                 RegisteredAt = now
             });
         }
-        db.Competitions.Add(new Competition
-        {
-            Id = competitionId,
-            OwnerId = ownerId,
-            Title = "Gameplay fact ordering",
-            Mode = mode,
-            ConfigurationJson = mode == GameMode.Awdp
-                ? """{"schemaVersion":4,"roundDurationSeconds":300,"break":{"initialPoints":500,"minimumPoints":100,"decayTeamCount":10,"decayMode":2},"fix":{"initialPoints":500,"minimumPoints":100,"decayTeamCount":10,"decayMode":2},"exploitSucceededPenalty":100,"serviceAbnormalPenalty":50,"requireBreakBeforeFix":false}"""
-                : """{"schemaVersion":2,"defaultScoreCurve":{"initialPoints":500,"minimumPoints":100,"decayTeamCount":10,"decayMode":2},"bloodRewards":[]}""",
-            FlagDerivationSecret = new byte[32],
-            StartAt = now.AddMinutes(-5),
-            EndAt = now.AddHours(1),
-            Status = CompetitionStatus.Running,
-            CreatedAt = now,
-            UpdatedAt = now
-        });
-        db.Challenges.Add(new Challenge
-        {
-            Id = challengeId,
-            OwnerId = ownerId,
-            Mode = mode,
-            Visibility = ChallengeVisibility.Private,
-            Title = "Stable challenge",
-            Direction = "Web",
-            DefinitionJson = mode == GameMode.Awdp
-                ? """{"schemaVersion":4}"""
-                : """{"schemaVersion":1}""",
-            CreatedAt = now,
-            UpdatedAt = now
-        });
-        db.CompetitionChallenges.Add(new CompetitionChallenge
-        {
-            Id = competitionChallengeId,
-            CompetitionId = competitionId,
-            ChallengeId = challengeId,
-            IsPublished = true,
-            RulesJson = mode == GameMode.Awdp
-                ? """{"schemaVersion":4}"""
-                : """{"schemaVersion":2}""",
-            UpdatedAt = now
-        });
-        db.ChallengeFlags.Add(new ChallengeFlag
-        {
-            Id = Guid.CreateVersion7(),
-            CompetitionChallengeId = competitionChallengeId,
-            TeamId = mode == GameMode.Awdp ? teamIds[0] : null,
-            Flag = flag,
-            FlagSha256 = SHA256.HashData(Encoding.UTF8.GetBytes(flag)),
-            CreatedAt = now
-        });
+        var competition = CompetitionGeneratedCatalog.Create(mode);
+        competition.Id = competitionId;
+        competition.OwnerId = ownerId;
+        competition.Title = "Gameplay fact ordering";
+        competition.ModeConfiguration = TestConfigurations.Competition(mode);
+        competition.FlagDerivationSecret = new byte[32];
+        competition.StartAt = now.AddMinutes(-5);
+        competition.EndAt = now.AddHours(1);
+        competition.Status = CompetitionStatus.Running;
+        competition.CreatedAt = now;
+        competition.UpdatedAt = now;
+        db.Competitions.Add(competition);
+        var challenge = ChallengeGeneratedCatalog.Create(mode);
+        challenge.Id = challengeId;
+        challenge.OwnerId = ownerId;
+        challenge.Visibility = ChallengeVisibility.Private;
+        challenge.Title = "Stable challenge";
+        challenge.Direction = "Web";
+        challenge.Definition = TestConfigurations.Definition(mode);
+        challenge.CreatedAt = now;
+        challenge.UpdatedAt = now;
+        db.Challenges.Add(challenge);
+        var competitionChallenge = CompetitionChallengeGeneratedCatalog.Create(mode);
+        competitionChallenge.Id = competitionChallengeId;
+        competitionChallenge.CompetitionId = competitionId;
+        competitionChallenge.ChallengeId = challengeId;
+        competitionChallenge.IsPublished = true;
+        competitionChallenge.Rules = TestConfigurations.Rules(mode);
+        competitionChallenge.UpdatedAt = now;
+        db.CompetitionChallenges.Add(competitionChallenge);
+        var challengeFlag = ChallengeFlagGeneratedCatalog.Create(
+            mode == GameMode.Awdp ? ChallengeFlagType.Team : ChallengeFlagType.Competition);
+        challengeFlag.Id = Guid.CreateVersion7();
+        challengeFlag.CompetitionChallengeId = competitionChallengeId;
+        challengeFlag.TeamId = mode == GameMode.Awdp ? teamIds[0] : null;
+        challengeFlag.Flag = flag;
+        challengeFlag.FlagSha256 = SHA256.HashData(Encoding.UTF8.GetBytes(flag));
+        challengeFlag.CreatedAt = now;
+        db.ChallengeFlags.Add(challengeFlag);
         await db.SaveChangesAsync(cancellationToken);
         return new(
             now,
@@ -723,45 +714,46 @@ public sealed class GameplayFactOrderingPersistenceTests
         DateTimeOffset occurredAt,
         GameplayFactState state = GameplayFactState.Queued,
         GameplayFactResult? result = null,
-        GameplayFactKind kind = GameplayFactKind.FlagAttempt) =>
-        new()
-        {
-            Id = id,
-            CompetitionId = fixture.CompetitionId,
-            CompetitionChallengeId = fixture.CompetitionChallengeId,
-            TeamId = teamId,
-            ActorUserId = fixture.MemberIds[Array.IndexOf(fixture.TeamIds, teamId)],
-            Kind = kind,
-            Value = fixture.Flag,
-            ValueSha256 = SHA256.HashData(Encoding.UTF8.GetBytes(fixture.Flag)),
-            OccurredAt = occurredAt,
-            State = state,
-            Result = result,
-            UpdatedAt = occurredAt
-        };
+        GameplayFactKind kind = GameplayFactKind.FlagAttempt)
+    {
+        var fact = GameplayFactGeneratedCatalog.Create(kind);
+        fact.Id = id;
+        fact.CompetitionId = fixture.CompetitionId;
+        fact.CompetitionChallengeId = fixture.CompetitionChallengeId;
+        fact.TeamId = teamId;
+        fact.ActorUserId = fixture.MemberIds[Array.IndexOf(fixture.TeamIds, teamId)];
+        fact.Value = fixture.Flag;
+        fact.ValueSha256 = SHA256.HashData(Encoding.UTF8.GetBytes(fixture.Flag));
+        fact.OccurredAt = occurredAt;
+        fact.State = state;
+        fact.Result = result;
+        fact.UpdatedAt = occurredAt;
+        return fact;
+    }
 
     private static RuntimeInstance Runtime(
         Fixture fixture,
         Guid id,
         Guid teamId,
         RuntimePurpose purpose,
-        Guid? gameplayFactId = null) => new()
-        {
-            Id = id,
-            CompetitionId = fixture.CompetitionId,
-            CompetitionChallengeId = fixture.CompetitionChallengeId,
-            TeamId = teamId,
-            Purpose = purpose,
-            GameplayFactId = gameplayFactId,
-            RuntimeKind = RuntimeKind.Container,
-            RuntimeProvider = RuntimeProvider.Docker,
-            RunnerId = "runner-fact-tests",
-            State = RuntimeState.Running,
-            ProviderReceiptJson = "{}",
-            CreatedAt = fixture.Now.AddMinutes(-1),
-            RunningAt = fixture.Now.AddMinutes(-1),
-            ExpiresAt = fixture.Now.AddMinutes(30)
-        };
+        Guid? gameplayFactId = null)
+    {
+        var runtime = RuntimeInstanceGeneratedCatalog.Create(purpose);
+        runtime.Id = id;
+        runtime.CompetitionId = fixture.CompetitionId;
+        runtime.CompetitionChallengeId = fixture.CompetitionChallengeId;
+        runtime.TeamId = teamId;
+        runtime.GameplayFactId = gameplayFactId;
+        runtime.RuntimeKind = RuntimeKind.Container;
+        runtime.RuntimeProvider = RuntimeProvider.Docker;
+        runtime.RunnerId = "runner-fact-tests";
+        runtime.State = RuntimeState.Running;
+        runtime.ProviderReceipt = RuntimeReceiptTestData.ContainerEntity();
+        runtime.CreatedAt = fixture.Now.AddMinutes(-1);
+        runtime.RunningAt = fixture.Now.AddMinutes(-1);
+        runtime.ExpiresAt = fixture.Now.AddMinutes(30);
+        return runtime;
+    }
 
     private static User User(
         Guid id,
@@ -801,13 +793,14 @@ public sealed class GameplayFactOrderingPersistenceTests
             .UseSnakeCaseNamingConvention()
             .Options;
 
-    private sealed class RecordingOutbox : ITransactionalMessageOutbox
+    private sealed class RecordingOutbox : IPostCommitMessagePublisher
     {
+        private readonly AsyncLocal<List<object>?> pending = new();
         public ConcurrentQueue<object> Messages { get; } = [];
 
         public ValueTask PublishAsync<T>(T message)
         {
-            Messages.Enqueue(message!);
+            (pending.Value ??= []).Add(message!);
             return ValueTask.CompletedTask;
         }
 
@@ -822,7 +815,17 @@ public sealed class GameplayFactOrderingPersistenceTests
             where T : NoCTF.Application.Runtime.Instances.IRunnerNodeMessage =>
             ValueTask.CompletedTask;
 
-        public Task FlushOutgoingMessagesAsync() => Task.CompletedTask;
+        public Task FlushOutgoingMessagesAsync()
+        {
+            foreach (var message in pending.Value ?? [])
+                Messages.Enqueue(message);
+            pending.Value = null;
+            return Task.CompletedTask;
+        }
+
+        public Task FlushCommittedMessagesAsync() => FlushOutgoingMessagesAsync();
+
+        public void DiscardPendingMessages() => pending.Value = null;
     }
 
     private sealed class CapturingEvaluatorCatalog(CapturingEvaluator evaluator)

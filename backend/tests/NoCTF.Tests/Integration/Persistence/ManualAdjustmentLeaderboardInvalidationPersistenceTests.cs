@@ -57,13 +57,12 @@ public sealed class ManualAdjustmentLeaderboardInvalidationPersistenceTests
                 CreatedAt = now,
                 UpdatedAt = now
             });
-            db.Competitions.Add(new Competition
+            db.Competitions.Add(new CtfCompetition
             {
                 Id = competitionId,
                 OwnerId = actorId,
                 Title = "Manual adjustment invalidation",
-                Mode = GameMode.Ctf,
-                ConfigurationJson = """{"schemaVersion":2}""",
+                ModeConfiguration = TestConfigurations.Competition(GameMode.Ctf),
                 FlagDerivationSecret = new byte[32],
                 StartAt = now.AddHours(-1),
                 EndAt = now.AddHours(1),
@@ -71,25 +70,24 @@ public sealed class ManualAdjustmentLeaderboardInvalidationPersistenceTests
                 CreatedAt = now,
                 UpdatedAt = now
             });
-            db.Challenges.Add(new Challenge
+            db.Challenges.Add(new CtfChallenge
             {
                 Id = challengeId,
                 OwnerId = actorId,
-                Mode = GameMode.Ctf,
                 Visibility = ChallengeVisibility.Private,
                 Title = "Manual adjustment challenge",
                 Direction = "PWN",
-                DefinitionJson = """{"schemaVersion":2}""",
+                Definition = TestConfigurations.Definition(GameMode.Ctf),
                 CreatedAt = now,
                 UpdatedAt = now
             });
-            db.CompetitionChallenges.Add(new CompetitionChallenge
+            db.CompetitionChallenges.Add(new CtfCompetitionChallenge
             {
                 Id = competitionChallengeId,
                 CompetitionId = competitionId,
                 ChallengeId = challengeId,
                 IsPublished = true,
-                RulesJson = """{"schemaVersion":2}""",
+                Rules = TestConfigurations.Rules(GameMode.Ctf),
                 UpdatedAt = now
             });
             db.Teams.Add(new Team
@@ -131,7 +129,7 @@ public sealed class ManualAdjustmentLeaderboardInvalidationPersistenceTests
         });
     }
 
-    private sealed class RecordingOutbox : ITransactionalMessageOutbox
+    private sealed class RecordingOutbox : IPostCommitMessagePublisher
     {
         public ConcurrentQueue<object> Messages { get; } = [];
         public int FlushCount { get; private set; }

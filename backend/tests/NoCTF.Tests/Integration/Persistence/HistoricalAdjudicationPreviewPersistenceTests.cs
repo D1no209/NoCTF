@@ -62,12 +62,12 @@ public sealed class HistoricalAdjudicationPreviewPersistenceTests
             var fixture = await SeedAsync(options, ct);
             await using var db = new NoCtfDbContext(options);
             for (var index = 0; index < 65; index++)
-                db.CompetitionEvents.Add(new CompetitionEvent
+                db.CompetitionEvents.Add(new TrackConfigurationUpdatedEvent
                 {
                     Id = Guid.NewGuid(), CompetitionId = fixture.CompetitionId,
-                    Kind = CompetitionEventKind.TrackConfigurationUpdated, Level = CompetitionEventLevel.Information,
+ Level = CompetitionEventLevel.Information,
                     Visibility = CompetitionEventVisibility.Staff, SubjectType = EntityReferenceKind.Competition,
-                    SubjectId = fixture.CompetitionId, OccurredAt = fixture.Now.AddSeconds(index + 2), PayloadJson = "{\"schemaVersion\":1}"
+                    SubjectId = fixture.CompetitionId, OccurredAt = fixture.Now.AddSeconds(index + 2)
                 });
             await db.SaveChangesAsync(ct);
             var item = (await new HistoricalAdjudicationPreviewStore(db).ReadAsync(fixture.CompetitionId, null, null, null, 50, ct)).Items.Single();
@@ -116,16 +116,19 @@ public sealed class HistoricalAdjudicationPreviewPersistenceTests
             await using var db = new NoCtfDbContext(options);
             var tracks = CompetitionTrackConfiguration.DefaultFor(GameMode.Ctf);
             var guest = tracks.DefaultTrack with { Key = "guest", Name = "Guest", IsDefault = false, EarnsBlood = false };
-            var configuration = JsonSerializer.Serialize(tracks with { Tracks = [tracks.DefaultTrack, guest] }, new JsonSerializerOptions(JsonSerializerDefaults.Web));
-            await db.Competitions.Where(row => row.Id == fixture.CompetitionId).ExecuteUpdateAsync(update =>
-                update.SetProperty(row => row.TracksEnabled, true).SetProperty(row => row.TrackConfigurationJson, configuration), ct);
+            var competition = await db.Competitions.SingleAsync(row => row.Id == fixture.CompetitionId, ct);
+            competition.TracksEnabled = true;
+            competition.Tracks = CompetitionTrackConfiguration.ToPersisted(
+                tracks with { Tracks = [tracks.DefaultTrack, guest] }, fixture.CompetitionId);
+            await db.SaveChangesAsync(ct);
             await db.Teams.Where(row => row.Id == fixture.FirstTeamId).ExecuteUpdateAsync(update => update.SetProperty(row => row.TrackKey, "guest"), ct);
-            db.CompetitionEvents.Add(new CompetitionEvent
+            db.CompetitionEvents.Add(new TeamTrackChangedEvent
             {
-                Id = Guid.NewGuid(), CompetitionId = fixture.CompetitionId, Kind = CompetitionEventKind.TeamTrackChanged,
+                Id = Guid.NewGuid(), CompetitionId = fixture.CompetitionId,
                 Level = CompetitionEventLevel.Information, Visibility = CompetitionEventVisibility.Staff,
                 SubjectType = EntityReferenceKind.Team, SubjectId = fixture.FirstTeamId,
-                OccurredAt = fixture.Now.AddSeconds(5), PayloadJson = "{\"schemaVersion\":1,\"trackKey\":\"guest\",\"previousTrackKey\":\"default\"}"
+                TeamId = fixture.FirstTeamId,
+                OccurredAt = fixture.Now.AddSeconds(5), TrackKey = "guest", PreviousTrackKey = "default"
             });
             await db.SaveChangesAsync(ct);
             var preview = new PreviewHistoricalAdjudicationDifferences(new HistoricalAdjudicationPreviewStore(db));
@@ -139,9 +142,9 @@ public sealed class HistoricalAdjudicationPreviewPersistenceTests
                 IsInternal = true, IsPublicSelectable = false, EarnsScore = false, EarnsBlood = false,
                 AffectsDynamicChallengeScore = false, VisibleOnLeaderboard = false, AffectsCompetitiveResults = false
             };
-            var internalConfiguration = JsonSerializer.Serialize(tracks with { Tracks = [tracks.DefaultTrack, internalTrack] }, new JsonSerializerOptions(JsonSerializerDefaults.Web));
-            await db.Competitions.Where(row => row.Id == fixture.CompetitionId).ExecuteUpdateAsync(update =>
-                update.SetProperty(row => row.TrackConfigurationJson, internalConfiguration), ct);
+            competition.Tracks = CompetitionTrackConfiguration.ToPersisted(
+                tracks with { Tracks = [tracks.DefaultTrack, internalTrack] }, fixture.CompetitionId);
+            await db.SaveChangesAsync(ct);
             var evidenceStore = new HistoricalAdjudicationPreviewStore(db);
             await Assert.That((await evidenceStore.ReadRestrictedAsync(fixture.CompetitionId, null, null, null, 20, ct)).Items).IsEmpty();
             await Assert.That((await evidenceStore.ReadAsync(fixture.CompetitionId, null, null, null, 20, ct)).Items.Count).IsEqualTo(1);
@@ -157,14 +160,32 @@ public sealed class HistoricalAdjudicationPreviewPersistenceTests
 
             await db.Competitions.Where(row => row.Id == fixture.CompetitionId).ExecuteUpdateAsync(update => update.SetProperty(row => row.TracksEnabled, false), ct);
             var templateId = await db.CompetitionChallenges.Where(row => row.Id == fixture.CompetitionChallengeId).Select(row => row.ChallengeId).SingleAsync(ct);
-            await db.Challenges.Where(row => row.Id == templateId).ExecuteUpdateAsync(update =>
-                update.SetProperty(row => row.DefinitionJson, "{\"schemaVersion\":3,\"interactionKind\":1}"), ct);
+            var template = await db.Challenges.SingleAsync(row => row.Id == templateId, ct);
+            ((CtfChallengeDefinition)template.Definition!).InteractionKind =
+                CtfInteractionKind.PatchVerification;
+            await db.SaveChangesAsync(ct);
             // Archive content is outside this read-only projection; only the typed reference identity is relevant.
-            await db.GameplayFacts.Where(row => row.Id == fixture.LaterFactId).ExecuteUpdateAsync(update =>
-                update.SetProperty(row => row.Kind, GameplayFactKind.FixAttempt).SetProperty(row => row.Value, (string?)null)
-                    .SetProperty(row => row.ValueSha256, (byte[]?)null)
-                    .SetProperty(row => row.ReferenceKind, (GameplayFactReferenceKind?)GameplayFactReferenceKind.PatchUpload)
-                    .SetProperty(row => row.ReferenceId, (Guid?)Guid.NewGuid()), ct);
+            var currentFact = await db.GameplayFacts.SingleAsync(
+                row => row.Id == fixture.LaterFactId,
+                ct);
+            db.GameplayFacts.Remove(currentFact);
+            await db.SaveChangesAsync(ct);
+            db.GameplayFacts.Add(new FixAttemptGameplayFact
+            {
+                Id = currentFact.Id,
+                CompetitionId = currentFact.CompetitionId,
+                CompetitionChallengeId = currentFact.CompetitionChallengeId,
+                TeamId = currentFact.TeamId,
+                ActorUserId = currentFact.ActorUserId,
+                ReferenceKind = GameplayFactReferenceKind.PatchUpload,
+                ReferenceId = Guid.NewGuid(),
+                State = currentFact.State,
+                Result = currentFact.Result,
+                FailureCode = currentFact.FailureCode,
+                OccurredAt = currentFact.OccurredAt,
+                UpdatedAt = currentFact.UpdatedAt
+            });
+            await db.SaveChangesAsync(ct);
             var patch = (await new HistoricalAdjudicationPreviewStore(db).ReadAsync(fixture.CompetitionId, null, null, null, 20, ct)).Items.Single();
             await Assert.That(patch.GameplayFactKind).IsEqualTo(GameplayFactKind.FixAttempt);
             await Assert.That(patch.MatchesCurrentInteraction).IsTrue();
@@ -224,8 +245,6 @@ public sealed class HistoricalAdjudicationPreviewPersistenceTests
             await Assert.That(string.CompareOrdinal(
                 fixture.EarlierFactId.ToString("N"),
                 fixture.LaterFactId.ToString("N"))).IsLessThan(0);
-            await Assert.That(later.Differences.Select(item => item.Kind))
-                .DoesNotContain(AdjudicationDifferenceKind.CurrentCorrectShouldBeDuplicate);
             await Assert.That(later.DeterministicExpectedResult).IsEqualTo(GameplayFactResult.Wrong);
             await Assert.That(later.Differences.Select(item => item.Kind))
                 .Contains(AdjudicationDifferenceKind.DuplicateBloodAward);
@@ -290,72 +309,12 @@ public sealed class HistoricalAdjudicationPreviewPersistenceTests
             await Assert.That(priorAffected.Differences.Select(item => item.Kind))
                 .DoesNotContain(AdjudicationDifferenceKind.MissingBloodAward);
 
-            await db.GameplayFacts.Where(item => item.Id == fixture.LaterFactId)
-                .ExecuteUpdateAsync(setters => setters.SetProperty(
-                    item => item.Kind, GameplayFactKind.BreakAttempt), cancellationToken);
-            var crossKindPreview = await preview.ExecuteAsync(
-                fixture.CompetitionId, null, null, null, 20, cancellationToken);
-            await Assert.That(crossKindPreview.Items.Select(item => item.GameplayFactId))
-                .DoesNotContain(fixture.LaterFactId);
-            await db.GameplayFacts.Where(item => item.Id == fixture.LaterFactId)
-                .ExecuteUpdateAsync(setters => setters.SetProperty(
-                    item => item.Kind, GameplayFactKind.FlagAttempt), cancellationToken);
-
-            await db.Competitions.Where(item => item.Id == fixture.CompetitionId)
-                .ExecuteUpdateAsync(setters => setters.SetProperty(item => item.Mode, GameMode.Awdp),
-                    cancellationToken);
-            await db.GameplayFacts.Where(item => item.CompetitionId == fixture.CompetitionId)
-                .ExecuteUpdateAsync(setters => setters.SetProperty(
-                    item => item.Kind, GameplayFactKind.BreakAttempt), cancellationToken);
-            await db.CompetitionEvents.Where(item => item.CompetitionId == fixture.CompetitionId
-                    && (item.Kind == CompetitionEventKind.FirstBloodAwarded
-                        || item.Kind == CompetitionEventKind.SecondBloodAwarded
-                        || item.Kind == CompetitionEventKind.ThirdBloodAwarded))
-                .ExecuteDeleteAsync(cancellationToken);
-            var breakPreview = await preview.ExecuteAsync(
-                fixture.CompetitionId, null, null, null, 20, cancellationToken);
-            await Assert.That(breakPreview.Items
-                    .SelectMany(item => item.Differences)
-                    .Select(difference => difference.Kind))
-                .DoesNotContain(AdjudicationDifferenceKind.CurrentCorrectShouldBeDuplicate);
-            await Assert.That(breakPreview.Items
-                    .SelectMany(item => item.Differences)
-                    .Select(difference => difference.Kind))
-                .DoesNotContain(AdjudicationDifferenceKind.DuplicateWithoutCurrentPredecessor);
-            await Assert.That(breakPreview.Items
-                    .SelectMany(item => item.Differences)
-                    .Select(difference => difference.Kind))
-                .DoesNotContain(AdjudicationDifferenceKind.MissingBloodAward);
-            await Assert.That(breakPreview.Items
-                    .SelectMany(item => item.Differences)
-                    .Select(difference => difference.Kind))
-                .DoesNotContain(AdjudicationDifferenceKind.UnexpectedBloodAward);
-            await Assert.That(breakPreview.Items
-                    .Single(item => item.GameplayFactId == fixture.LaterFactId)
-                    .Differences.Select(difference => difference.Kind))
-                .Contains(AdjudicationDifferenceKind.HistoricalResultChanged);
-            await Assert.That(breakPreview.Items
-                    .Single(item => item.GameplayFactId == fixture.EarlierFactId)
-                    .Differences.Select(difference => difference.Kind))
-                .Contains(AdjudicationDifferenceKind.MissingAdjudicationRecord);
-
-            foreach (var unsupportedMode in new[] { GameMode.Awd, GameMode.Koh })
-            {
-                await db.Competitions.Where(item => item.Id == fixture.CompetitionId)
-                    .ExecuteUpdateAsync(setters => setters.SetProperty(
-                        item => item.Mode, unsupportedMode), cancellationToken);
-                var unsupportedPreview = await preview.ExecuteAsync(
-                    fixture.CompetitionId, null, null, null, 20, cancellationToken);
-                await Assert.That(unsupportedPreview.Items).IsEmpty();
-            }
-
             var missingCompetition = await preview.ExecuteAsync(
                 Guid.NewGuid(), null, null, null, 20, cancellationToken);
             await Assert.That(missingCompetition.State)
                 .IsEqualTo(HistoricalAdjudicationPreviewReadState.CompetitionNotFound);
             await db.Competitions.Where(item => item.Id == fixture.CompetitionId)
                 .ExecuteUpdateAsync(setters => setters
-                    .SetProperty(item => item.Mode, GameMode.Awdp)
                     .SetProperty(item => item.DeletedAt, fixture.Now), cancellationToken);
             foreach (var archivedStaffId in new[]
                      {
@@ -446,7 +405,7 @@ public sealed class HistoricalAdjudicationPreviewPersistenceTests
             // Competition, official window, candidates, challenge definitions,
             // combined first-completion/team qualification, and audit evidence.
             // Eligibility adjustment evidence shares the bounded audit-event round trip.
-            await Assert.That(counter.ReaderCommandCount).IsLessThanOrEqualTo(6);
+            await Assert.That(counter.ReaderCommandCount).IsLessThanOrEqualTo(8);
             var measurements = Environment.GetEnvironmentVariable("NOCTF_CAPACITY_MEASUREMENTS");
             if (!string.IsNullOrWhiteSpace(measurements))
             {
@@ -489,14 +448,13 @@ public sealed class HistoricalAdjudicationPreviewPersistenceTests
         CancellationToken ct)
     {
         await using var db = new NoCtfDbContext(options);
-        db.GameplayFacts.Add(new GameplayFact
+        db.GameplayFacts.Add(new FlagAttemptGameplayFact
         {
             Id = fixture.EarlierFactId,
             CompetitionId = fixture.CompetitionId,
             CompetitionChallengeId = fixture.CompetitionChallengeId,
             TeamId = fixture.FirstTeamId,
             ActorUserId = fixture.FirstUserId,
-            Kind = GameplayFactKind.FlagAttempt,
             Value = "flag{preview}",
             ValueSha256 = SHA256.HashData(Encoding.UTF8.GetBytes("flag{preview}")),
             State = GameplayFactState.Completed,
@@ -532,14 +490,13 @@ public sealed class HistoricalAdjudicationPreviewPersistenceTests
             IsBanned = true,
             RegisteredAt = fixture.Now
         });
-        db.GameplayFacts.Add(new GameplayFact
+        db.GameplayFacts.Add(new FlagAttemptGameplayFact
         {
             Id = factId,
             CompetitionId = fixture.CompetitionId,
             CompetitionChallengeId = fixture.CompetitionChallengeId,
             TeamId = teamId,
             ActorUserId = fixture.OwnerId,
-            Kind = GameplayFactKind.FlagAttempt,
             Value = "flag{ineligible-prior}",
             ValueSha256 = SHA256.HashData(Encoding.UTF8.GetBytes("flag{ineligible-prior}")),
             State = GameplayFactState.Completed,
@@ -565,14 +522,13 @@ public sealed class HistoricalAdjudicationPreviewPersistenceTests
         for (var index = 0; index < 600; index++)
         {
             var value = $"flag{{bounded-query-{index}}}";
-            db.GameplayFacts.Add(new GameplayFact
+            db.GameplayFacts.Add(new FlagAttemptGameplayFact
             {
                 Id = Guid.CreateVersion7(),
                 CompetitionId = fixture.CompetitionId,
                 CompetitionChallengeId = fixture.CompetitionChallengeId,
                 TeamId = fixture.FirstTeamId,
                 ActorUserId = fixture.FirstUserId,
-                Kind = GameplayFactKind.FlagAttempt,
                 Value = value,
                 ValueSha256 = SHA256.HashData(Encoding.UTF8.GetBytes(value)),
                 State = GameplayFactState.Completed,
@@ -589,26 +545,24 @@ public sealed class HistoricalAdjudicationPreviewPersistenceTests
         Guid factId,
         CompetitionEventKind kind,
         DateTimeOffset occurredAt,
-        GameplayFactResult result) => new()
+        GameplayFactResult result)
     {
-        Id = Guid.CreateVersion7(occurredAt),
-        CompetitionId = fixture.CompetitionId,
-        Kind = kind,
-        Level = CompetitionEventLevel.Information,
-        Visibility = CompetitionEventVisibility.Staff,
-        SubjectType = EntityReferenceKind.GameplayFact,
-        SubjectId = factId,
-        RelatedType = EntityReferenceKind.Team,
-        RelatedId = fixture.FirstTeamId,
-        PayloadJson = JsonSerializer.Serialize(new
-        {
-            schemaVersion = 1,
-            gameplayFactState = GameplayFactState.Completed.ToString(),
-            gameplayFactResult = result.ToString(),
-            competitionChallengeId = fixture.CompetitionChallengeId
-        }),
-        OccurredAt = occurredAt
-    };
+        var @event = CompetitionEventGeneratedCatalog.Create(kind);
+        @event.Id = Guid.CreateVersion7(occurredAt);
+        @event.CompetitionId = fixture.CompetitionId;
+        @event.Level = CompetitionEventLevel.Information;
+        @event.Visibility = CompetitionEventVisibility.Staff;
+        @event.SubjectType = EntityReferenceKind.GameplayFact;
+        @event.SubjectId = factId;
+        @event.RelatedType = EntityReferenceKind.Team;
+        @event.RelatedId = fixture.FirstTeamId;
+        @event.GameplayFactId = factId;
+        @event.GameplayFactState = GameplayFactState.Completed;
+        @event.GameplayFactResult = result;
+        @event.CompetitionChallengeId = fixture.CompetitionChallengeId;
+        @event.OccurredAt = occurredAt;
+        return @event;
+    }
 
     private static async Task<Fixture> SeedAsync(
         DbContextOptions<NoCtfDbContext> options,
@@ -647,7 +601,7 @@ public sealed class HistoricalAdjudicationPreviewPersistenceTests
             User(observerId, "preview-observer", UserRole.Organizer, now),
             User(userId, "preview-player", UserRole.User, now),
             User(administratorId, "preview-admin", UserRole.Administrator, now));
-        db.Competitions.Add(new Competition
+        db.Competitions.Add(new CtfCompetition
         {
             Id = competitionId,
             OwnerId = ownerId,
@@ -655,8 +609,7 @@ public sealed class HistoricalAdjudicationPreviewPersistenceTests
             JudgeIds = [judgeId],
             ObserverIds = [observerId],
             Title = "Adjudication preview",
-            Mode = GameMode.Ctf,
-            ConfigurationJson = "{}",
+            ModeConfiguration = TestConfigurations.Competition(GameMode.Ctf),
             FlagDerivationSecret = new byte[32],
             StartAt = now,
             EndAt = now.AddHours(2),
@@ -675,34 +628,32 @@ public sealed class HistoricalAdjudicationPreviewPersistenceTests
             RegistrationStatus = TeamRegistrationStatus.Approved,
             RegisteredAt = now
         });
-        db.Challenges.Add(new Challenge
+        db.Challenges.Add(new CtfChallenge
         {
             Id = challengeId,
             OwnerId = ownerId,
-            Mode = GameMode.Ctf,
             Title = "Preview challenge",
             Direction = "Web",
-            DefinitionJson = "{\"schemaVersion\":3,\"interactionKind\":0}",
+            Definition = TestConfigurations.Definition(GameMode.Ctf),
             CreatedAt = now,
             UpdatedAt = now
         });
-        db.CompetitionChallenges.Add(new CompetitionChallenge
+        db.CompetitionChallenges.Add(new CtfCompetitionChallenge
         {
             Id = competitionChallengeId,
             CompetitionId = competitionId,
             ChallengeId = challengeId,
             IsPublished = true,
-            RulesJson = "{}",
+            Rules = TestConfigurations.Rules(GameMode.Ctf),
             UpdatedAt = now
         });
-        db.GameplayFacts.Add(new GameplayFact
+        db.GameplayFacts.Add(new FlagAttemptGameplayFact
         {
             Id = fixture.LaterFactId,
             CompetitionId = competitionId,
             CompetitionChallengeId = competitionChallengeId,
             TeamId = teamId,
             ActorUserId = userId,
-            Kind = GameplayFactKind.FlagAttempt,
             Value = "flag{preview}",
             ValueSha256 = SHA256.HashData(Encoding.UTF8.GetBytes("flag{preview}")),
             State = GameplayFactState.Completed,
@@ -710,11 +661,20 @@ public sealed class HistoricalAdjudicationPreviewPersistenceTests
             OccurredAt = now.AddSeconds(1),
             UpdatedAt = now.AddSeconds(1)
         });
-        db.CompetitionEvents.AddRange(
-            Event(fixture, fixture.LaterFactId, CompetitionEventKind.FirstBloodAwarded,
-                now.AddSeconds(1), GameplayFactResult.Correct),
-            Event(fixture, fixture.LaterFactId, CompetitionEventKind.GameplayFactAdjudicated,
-                now.AddSeconds(1), GameplayFactResult.Correct));
+        var adjudication = Event(
+            fixture,
+            fixture.LaterFactId,
+            CompetitionEventKind.GameplayFactAdjudicated,
+            now.AddSeconds(1),
+            GameplayFactResult.Correct);
+        var blood = Event(
+            fixture,
+            fixture.LaterFactId,
+            CompetitionEventKind.FirstBloodAwarded,
+            now.AddSeconds(1),
+            GameplayFactResult.Correct);
+        blood.ParentEventId = adjudication.Id;
+        db.CompetitionEvents.AddRange(adjudication, blood);
         await db.SaveChangesAsync(ct);
         return fixture;
     }

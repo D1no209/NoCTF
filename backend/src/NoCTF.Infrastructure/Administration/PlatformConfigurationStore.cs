@@ -16,15 +16,15 @@ namespace NoCTF.Infrastructure.Administration;
 public sealed class PlatformConfigurationStore(
     NoCtfDbContext db,
     IFusionCacheProvider? cacheProvider = null,
-    ITransactionalMessageOutbox? messageOutbox = null,
+    IPostCommitMessagePublisher? messageOutbox = null,
     FileReferenceLock? fileReferenceLock = null)
     : IPlatformConfigurationStore, IExperimentalFeatureReader
 {
     private const short SettingsId = 1;
     private const string CacheKey = "platform-configuration";
     private readonly IFusionCache? cache = cacheProvider?.GetCache(NoCtfCacheNames.ReadModels);
-    private readonly ITransactionalMessageOutbox outbox =
-        messageOutbox ?? new NoOpTransactionalMessageOutbox();
+    private readonly IPostCommitMessagePublisher outbox =
+        messageOutbox ?? new NoOpPostCommitMessagePublisher();
     private readonly FileReferenceLock fileLock = fileReferenceLock ?? new FileReferenceLock();
 
     public Task<PlatformConfigurationView> GetAsync(CancellationToken ct) =>
@@ -87,7 +87,7 @@ public sealed class PlatformConfigurationStore(
         await transaction.CommitAsync(ct);
         if (cache is not null)
             await cache.SetAsync(CacheKey, updated, token: ct);
-        await outbox.FlushOutgoingMessagesAsync();
+        await transaction.FlushMessagesAsync(outbox);
         return new(updated, previousFileId);
     }
 

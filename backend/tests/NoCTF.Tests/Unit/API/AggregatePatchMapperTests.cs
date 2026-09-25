@@ -78,11 +78,10 @@ public sealed class AggregatePatchMapperTests
     {
         var id = Guid.NewGuid();
         var secret = new byte[] { 1, 2, 3 };
-        var competition = new Competition
+        var competition = new CtfCompetition
         {
             Id = id,
             OwnerId = Guid.NewGuid(),
-            Mode = GameMode.Ctf,
             Status = CompetitionStatus.Running,
             FlagDerivationSecret = secret
         };
@@ -135,16 +134,15 @@ public sealed class AggregatePatchMapperTests
     public async Task Template_content_and_competition_challenge_rules_keep_scope_identifiers()
     {
         var ownerId = Guid.NewGuid();
-        var template = new Challenge
+        var template = new CtfChallenge
         {
             Id = Guid.NewGuid(),
             OwnerId = ownerId,
             ManagerIds = [],
-            Mode = GameMode.Ctf,
             Visibility = ChallengeVisibility.Private,
             Title = "old",
             Direction = "Web",
-            DefinitionJson = "{}"
+            Definition = TestConfigurations.Definition(GameMode.Ctf)
         };
         ChallengeTemplatePatchMapper.ApplyContentAsTemplateManager(new()
         {
@@ -153,25 +151,36 @@ public sealed class AggregatePatchMapperTests
             Title = "new",
             Description = null,
             Direction = "Pwn",
-            DefinitionJson = "{}"
+            Definition = new ChallengeDefinitionContract
+            {
+                Mode = GameModeProtocol.Awd,
+                Awd = new AwdChallengeDefinitionContract { FlagInjection = null },
+                PatchCommand = []
+            }
         }, template);
 
         var competitionId = Guid.NewGuid();
         var challengeId = Guid.NewGuid();
-        var instance = new CompetitionChallenge
+        var instance = new CtfCompetitionChallenge
         {
             Id = Guid.NewGuid(),
             CompetitionId = competitionId,
             ChallengeId = challengeId,
-            RulesJson = "{}"
+            Rules = TestConfigurations.Rules(GameMode.Ctf)
         };
-        CompetitionChallengePatchMapper.ApplyRulesAsCompetitionModerator(
-            new() { Json = "{\"schemaVersion\":2}" }, instance);
+        instance.Rules = CompetitionChallengeRulesContractMapper.ToDomain(
+            instance.Id,
+            GameMode.Ctf,
+            new CompetitionChallengeRulesContract
+            {
+                Mode = GameModeProtocol.Ctf,
+                Ctf = new CtfCompetitionChallengeRulesContract()
+            });
 
         await Assert.That(template.OwnerId).IsEqualTo(ownerId);
         await Assert.That(instance.CompetitionId).IsEqualTo(competitionId);
         await Assert.That(instance.ChallengeId).IsEqualTo(challengeId);
-        await Assert.That(instance.RulesJson).Contains("schemaVersion");
+        await Assert.That(instance.Rules).IsTypeOf<CtfCompetitionChallengeRules>();
     }
 
     [Test]
@@ -227,7 +236,7 @@ public sealed class AggregatePatchMapperTests
     [Test]
     public async Task Section_null_clears_nullable_fields_and_arrays_are_deep_cloned()
     {
-        var competition = new Competition
+        var competition = new CtfCompetition
         {
             Description = "clear me",
             OwnerId = Guid.NewGuid(),
@@ -366,23 +375,31 @@ public sealed class AggregatePatchMapperTests
     {
         var ownerId = Guid.NewGuid();
         var secret = new byte[] { 4, 5, 6 };
-        var competition = new Competition
+        var competition = new CtfCompetition
         {
             Id = Guid.NewGuid(),
             OwnerId = ownerId,
             ManagerIds = [Guid.NewGuid()],
-            Mode = GameMode.Ctf,
             Status = CompetitionStatus.Running,
             FlagDerivationSecret = secret,
-            ConfigurationJson = "{}"
+            ModeConfiguration = TestConfigurations.Competition(GameMode.Ctf)
         };
-        CompetitionPatchMapper.ApplyConfigurationAsModerator(
-            new() { Json = "{\"schemaVersion\":2}" }, competition);
+        competition.ModeConfiguration = CompetitionModeConfigurationContractMapper.ToDomain(
+            competition.Id,
+            competition.Mode,
+            new CompetitionModeConfigurationContract
+            {
+                Mode = GameModeProtocol.Ctf,
+                FlagTemplate = new FlagTemplateContract("flag", "[GUID]", false),
+                Ctf = new CtfCompetitionModeConfigurationContract(
+                    new ScoreCurveContract(500, 100, 10, ScoreDecayModeProtocol.Quadratic, null),
+                    [],
+                    0)
+            });
         CompetitionPatchMapper.ApplyTracksAsModerator(new()
         {
             Enabled = true,
-            Tracks = [],
-            TrackConfigurationJson = "{\"schemaVersion\":1}"
+            Tracks = []
         }, competition);
         CompetitionPatchMapper.ApplyLeaderboardAsModerator(new()
         {
@@ -394,21 +411,21 @@ public sealed class AggregatePatchMapperTests
         await Assert.That(competition.OwnerId).IsEqualTo(ownerId);
         await Assert.That(competition.Status).IsEqualTo(CompetitionStatus.Running);
         await Assert.That(competition.FlagDerivationSecret).IsSameReferenceAs(secret);
-        await Assert.That(competition.ConfigurationJson).Contains("schemaVersion");
-        await Assert.That(competition.TrackConfigurationJson).Contains("schemaVersion");
+        await Assert.That(competition.ModeConfiguration)
+            .IsTypeOf<CtfCompetitionModeConfiguration>();
+        await Assert.That(competition.Tracks).IsEmpty();
     }
 
     [Test]
     public async Task Template_permissions_and_competition_presentation_preserve_owned_content_and_links()
     {
-        var template = new Challenge
+        var template = new CtfChallenge
         {
             Id = Guid.NewGuid(),
             OwnerId = Guid.NewGuid(),
-            Mode = GameMode.Ctf,
             Title = "Protected title",
             Direction = "Web",
-            DefinitionJson = "{}"
+            Definition = TestConfigurations.Definition(GameMode.Ctf)
         };
         var managers = new[] { Guid.NewGuid() };
         ChallengeTemplatePatchMapper.ApplyPermissionsAsTemplateOwner(new()
@@ -420,12 +437,12 @@ public sealed class AggregatePatchMapperTests
 
         var competitionId = Guid.NewGuid();
         var challengeId = Guid.NewGuid();
-        var instance = new CompetitionChallenge
+        var instance = new CtfCompetitionChallenge
         {
             Id = Guid.NewGuid(),
             CompetitionId = competitionId,
             ChallengeId = challengeId,
-            RulesJson = "protected"
+            Rules = new CtfCompetitionChallengeRules { WrongSubmissionPenalty = 7 }
         };
         CompetitionChallengePatchMapper.ApplyPresentationAsCompetitionModerator(new()
         {
@@ -438,7 +455,7 @@ public sealed class AggregatePatchMapperTests
         await Assert.That(template.ManagerIds[0]).IsNotEqualTo(managers[0]);
         await Assert.That(instance.CompetitionId).IsEqualTo(competitionId);
         await Assert.That(instance.ChallengeId).IsEqualTo(challengeId);
-        await Assert.That(instance.RulesJson).IsEqualTo("protected");
+        await Assert.That(instance.Rules!.WrongSubmissionPenalty).IsEqualTo(7);
     }
 
     [Test]

@@ -25,9 +25,8 @@ public sealed class CompetitionVisibilityAccess(NoCtfDbContext db)
                 candidate.AccessMode,
                 candidate.TracksEnabled,
                 candidate.OwnerId,
-                candidate.ManagerIds,
-                candidate.JudgeIds,
-                candidate.ObserverIds,
+                IsCollaborator = candidate.Collaborators.Any(collaborator =>
+                    collaborator.UserId == userId),
                 candidate.FrozenStartAt,
                 candidate.HiddenStartAt
             })
@@ -44,9 +43,7 @@ public sealed class CompetitionVisibilityAccess(NoCtfDbContext db)
         var isCollaborator = identity is not null
             && (identity.Role == UserRole.Administrator
                 || competition.OwnerId == userId
-                || competition.ManagerIds.Contains(userId)
-                || competition.JudgeIds.Contains(userId)
-                || competition.ObserverIds.Contains(userId));
+                || competition.IsCollaborator);
         if ((competition.Status == CompetitionStatus.Draft
                 || competition.AccessMode == CompetitionAccessMode.StaffOnly)
             && !isCollaborator)

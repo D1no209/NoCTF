@@ -97,7 +97,7 @@ public sealed class RuntimeProviderHandler(
                     message.RuntimeInstanceId,
                     message.RunnerId,
                     receipt.Provider,
-                    JsonSerializer.Serialize(receipt),
+                    ContainerRuntimeReceiptData.From(receipt),
                     expanded.AccessEndpoints,
                     definition.Ttl is { } ttl ? timeProvider.GetUtcNow().Add(ttl) : null,
                     definition.Provider == RuntimeProvider.Docker
@@ -153,7 +153,7 @@ public sealed class RuntimeProviderHandler(
             if (work is null)
                 return StopSucceeded(message, work);
             RecordStopQueueDelay(message, work);
-            if (work.ProviderReceiptJson is { } receiptJson)
+            if (work.ProviderReceipt is { } receiptJson)
             {
                 await RuntimeReceiptCleanup.CleanupContainerAsync(
                     providers,
@@ -213,14 +213,14 @@ public sealed class RuntimeProviderHandler(
             var identity = new RuntimeResourceIdentity(message.RuntimeInstanceId);
             if (work is not null)
                 RecordStopQueueDelay(message, work);
-            if (work?.ProviderReceiptJson is { } providerReceiptJson)
+            if (work?.ProviderReceipt is { } providerReceipt)
             {
                 await RuntimeReceiptCleanup.CleanupAsync(
                     providers,
                     work.RuntimeKind,
                     identity,
                     message.Provider,
-                    providerReceiptJson,
+                    providerReceipt,
                     RuntimeTerminationMode.Force,
                     runnerOptions.Value.Cleanup.ToPolicy(),
                     cancellationToken);
@@ -345,7 +345,7 @@ public sealed class RuntimeProviderHandler(
                         message.RuntimeInstanceId,
                         message.RunnerId,
                         receipt.Provider,
-                        JsonSerializer.Serialize(receipt),
+                        ComposeRuntimeReceiptData.From(receipt),
                         expanded.AccessEndpoints,
                         message.Definition.Ttl is { } ttl
                             ? timeProvider.GetUtcNow().Add(ttl)
@@ -394,7 +394,7 @@ public sealed class RuntimeProviderHandler(
             if (work is null)
                 return StopSucceeded(message, work);
             RecordStopQueueDelay(message, work);
-            if (work.ProviderReceiptJson is { } receiptJson)
+            if (work.ProviderReceipt is { } receiptJson)
             {
                 await RuntimeReceiptCleanup.CleanupComposeAsync(
                     providers,
@@ -485,7 +485,7 @@ public sealed class RuntimeProviderHandler(
                     message.RuntimeInstanceId,
                     message.RunnerId,
                     receipt.Provider,
-                    JsonSerializer.Serialize(receipt),
+                    OvaRuntimeReceiptData.From(receipt),
                     expanded.AccessEndpoints,
                     message.Definition.Ttl is { } ttl
                         ? timeProvider.GetUtcNow().Add(ttl)
@@ -538,10 +538,9 @@ public sealed class RuntimeProviderHandler(
             RecordStopQueueDelay(message, work);
             if (work.Provider != RuntimeProvider.Libvirt)
                 throw new InvalidOperationException("OVA Runtime receipt provider is invalid.");
-            if (work.ProviderReceiptJson is { } receiptJson)
+            if (work.ProviderReceipt is OvaRuntimeReceiptData receiptData)
             {
-                var receipt = JsonSerializer.Deserialize<OvaRuntimeReceipt>(receiptJson)
-                    ?? throw new InvalidOperationException("Provider receipt is invalid.");
+                var receipt = receiptData.ToReceipt();
                 await providers.Appliance(work.Provider).DestroyAsync(
                     receipt,
                     RuntimeTerminationMode.GracefulThenForce,
@@ -767,7 +766,7 @@ public sealed class RuntimeProviderHandler(
 
 internal static class RuntimeWriteBackOperations
 {
-    public static Task ProvisionedAsync(RuntimeProvisioned message, NoCtfDbContext db, ITransactionalMessageOutbox outbox,
+    public static Task ProvisionedAsync(RuntimeProvisioned message, NoCtfDbContext db, IPostCommitMessagePublisher outbox,
         ICompetitionEventRecorder events, TimeProvider timeProvider, CancellationToken ct) =>
         WithProvisionLockAsync(message.RuntimeInstanceId, db, outbox,
             () => ProvisionedCoreAsync(message, db, outbox, events, timeProvider, ct), ct);
@@ -775,13 +774,14 @@ internal static class RuntimeWriteBackOperations
     private static async Task ProvisionedCoreAsync(
         RuntimeProvisioned message,
         NoCtfDbContext db,
-        ITransactionalMessageOutbox outbox,
+        IPostCommitMessagePublisher outbox,
         ICompetitionEventRecorder events,
         TimeProvider timeProvider,
         CancellationToken cancellationToken)
     {
         var instance = await db.RuntimeInstances
             .Include(candidate => candidate.PublishedPorts)
+            .Include(candidate => candidate.ProviderReceipt)
             .SingleOrDefaultAsync(
             candidate => candidate.Id == message.RuntimeInstanceId,
             cancellationToken);
@@ -789,7 +789,7 @@ internal static class RuntimeWriteBackOperations
             return;
         if (IsLateProvisionSuccessAwaitingCleanup(instance, message))
         {
-            instance.ProviderReceiptJson ??= message.ProviderReceiptJson;
+            AttachProviderReceipt(db, instance, message.ProviderReceipt);
             await ReplacePublishedPortsAsync(
                 instance, message, events, timeProvider.GetUtcNow(), cancellationToken);
             await InvalidateAwdpAttackFlagAsync(db, instance, timeProvider.GetUtcNow(), cancellationToken);
@@ -819,7 +819,7 @@ internal static class RuntimeWriteBackOperations
 
         if (!TryReplaceAccessEndpoints(instance, message.AccessEndpoints))
         {
-            instance.ProviderReceiptJson = message.ProviderReceiptJson;
+            AttachProviderReceipt(db, instance, message.ProviderReceipt);
             instance.State = RuntimeState.Stopping;
             await InvalidateAwdpAttackFlagAsync(db, instance, timeProvider.GetUtcNow(), cancellationToken);
             await EndChallengeTestFlagAsync(
@@ -849,7 +849,7 @@ internal static class RuntimeWriteBackOperations
         }
 
         var runningAt = timeProvider.GetUtcNow();
-        instance.ProviderReceiptJson = message.ProviderReceiptJson;
+        AttachProviderReceipt(db, instance, message.ProviderReceipt);
         instance.State = RuntimeState.Running;
         instance.FailureCode = null;
         instance.RunningAt = runningAt;
@@ -889,7 +889,7 @@ internal static class RuntimeWriteBackOperations
         await outbox.FlushOutgoingMessagesAsync();
     }
 
-    public static Task ProvisionFailedAsync(RuntimeProvisionFailed message, NoCtfDbContext db, ITransactionalMessageOutbox? outbox,
+    public static Task ProvisionFailedAsync(RuntimeProvisionFailed message, NoCtfDbContext db, IPostCommitMessagePublisher? outbox,
         ICompetitionEventRecorder events, TimeProvider timeProvider, CancellationToken ct) =>
         WithProvisionLockAsync(message.RuntimeInstanceId, db, outbox,
             () => ProvisionFailedCoreAsync(message, db, outbox, events, timeProvider, ct), ct);
@@ -897,7 +897,7 @@ internal static class RuntimeWriteBackOperations
     private static async Task ProvisionFailedCoreAsync(
         RuntimeProvisionFailed message,
         NoCtfDbContext db,
-        ITransactionalMessageOutbox? outbox,
+        IPostCommitMessagePublisher? outbox,
         ICompetitionEventRecorder events,
         TimeProvider timeProvider,
         CancellationToken cancellationToken)
@@ -926,7 +926,7 @@ internal static class RuntimeWriteBackOperations
     public static async Task ProvisionTerminatedAsync(
         RuntimeProvisionTerminated message,
         NoCtfDbContext db,
-        ITransactionalMessageOutbox outbox,
+        IPostCommitMessagePublisher outbox,
         ICompetitionEventRecorder events,
         TimeProvider timeProvider,
         CancellationToken cancellationToken)
@@ -936,7 +936,7 @@ internal static class RuntimeWriteBackOperations
             cancellationToken);
         if (instance is null
             || !string.Equals(instance.RunnerId, message.RunnerId, StringComparison.Ordinal)
-            || instance.ProviderReceiptJson is not null)
+            || instance.ProviderReceipt is not null)
             return;
 
         if (instance.State == RuntimeState.Provisioning)
@@ -982,7 +982,7 @@ internal static class RuntimeWriteBackOperations
         RuntimeFailureCode failureCode,
         NoCtfDbContext db,
         ICompetitionEventRecorder events,
-        ITransactionalMessageOutbox? outbox,
+        IPostCommitMessagePublisher? outbox,
         TimeProvider timeProvider,
         CancellationToken cancellationToken)
     {
@@ -992,7 +992,7 @@ internal static class RuntimeWriteBackOperations
         await InvalidateAwdpAttackFlagAsync(db, instance, failedAt, cancellationToken);
         await EndChallengeTestFlagAsync(
             db, instance, RuntimeTestFlagState.Failed, failedAt, cancellationToken);
-        var effectiveOutbox = outbox ?? new NoOpTransactionalMessageOutbox();
+        var effectiveOutbox = outbox ?? new NoOpPostCommitMessagePublisher();
         await AwdpFixFailureConvergence.ConvergeAwdpFixFailureAsync(
             instance,
             db,
@@ -1015,7 +1015,7 @@ internal static class RuntimeWriteBackOperations
     public static async Task StoppedAsync(
         RuntimeStopped message,
         NoCtfDbContext db,
-        ITransactionalMessageOutbox outbox,
+        IPostCommitMessagePublisher outbox,
         ICompetitionEventRecorder events,
         TimeProvider timeProvider,
         CancellationToken cancellationToken)
@@ -1054,7 +1054,7 @@ internal static class RuntimeWriteBackOperations
     public static async Task ForceTerminatedAsync(
         RuntimeForceTerminated message,
         NoCtfDbContext db,
-        ITransactionalMessageOutbox outbox,
+        IPostCommitMessagePublisher outbox,
         ICompetitionEventRecorder events,
         TimeProvider timeProvider,
         CancellationToken cancellationToken)
@@ -1103,7 +1103,7 @@ internal static class RuntimeWriteBackOperations
     public static async Task ForceTerminationFailedAsync(
         RuntimeForceTerminationFailed message,
         NoCtfDbContext db,
-        ITransactionalMessageOutbox outbox,
+        IPostCommitMessagePublisher outbox,
         ICompetitionEventRecorder events,
         CancellationToken cancellationToken)
     {
@@ -1149,7 +1149,7 @@ internal static class RuntimeWriteBackOperations
     public static async Task StopFailedAsync(
         RuntimeStopFailed message,
         NoCtfDbContext db,
-        ITransactionalMessageOutbox outbox,
+        IPostCommitMessagePublisher outbox,
         ICompetitionEventRecorder events,
         TimeProvider timeProvider,
         CancellationToken cancellationToken)
@@ -1189,7 +1189,7 @@ internal static class RuntimeWriteBackOperations
     public static async Task ProvisionCanceledAsync(
         RuntimeProvisionCanceled message,
         NoCtfDbContext db,
-        ITransactionalMessageOutbox outbox,
+        IPostCommitMessagePublisher outbox,
         ICompetitionEventRecorder events,
         TimeProvider timeProvider,
         CancellationToken cancellationToken)
@@ -1200,7 +1200,7 @@ internal static class RuntimeWriteBackOperations
         if (instance is null
             || instance.State != RuntimeState.Stopping
             || !string.Equals(instance.RunnerId, message.RunnerId, StringComparison.Ordinal)
-            || instance.ProviderReceiptJson is not null)
+            || instance.ProviderReceipt is not null)
             return;
 
         instance.State = RuntimeState.Stopped;
@@ -1251,7 +1251,7 @@ internal static class RuntimeWriteBackOperations
             cancellationToken);
     }
 
-    private static async Task WithProvisionLockAsync(Guid runtimeId, NoCtfDbContext db, ITransactionalMessageOutbox? outbox,
+    private static async Task WithProvisionLockAsync(Guid runtimeId, NoCtfDbContext db, IPostCommitMessagePublisher? outbox,
         Func<Task> apply, CancellationToken ct)
     {
         await using var transaction = db.Database.IsRelational() && db.Database.CurrentTransaction is null
@@ -1259,8 +1259,7 @@ internal static class RuntimeWriteBackOperations
         if (db.Database.IsRelational())
         {
             var tracked = db.ChangeTracker.Entries<RuntimeInstance>().SingleOrDefault(entry => entry.Entity.Id == runtimeId);
-            _ = await db.RuntimeInstances.FromSqlInterpolated($"SELECT * FROM runtime_instances WHERE id = {runtimeId} FOR UPDATE")
-                .SingleOrDefaultAsync(ct);
+            _ = await db.RuntimeInstances.SingleOrDefaultAsync(item => item.Id == runtimeId, ct);
             if (tracked is not null) await tracked.ReloadAsync(ct);
         }
         await apply();
@@ -1273,7 +1272,7 @@ internal static class RuntimeWriteBackOperations
 
     private static async Task StartChallengeTestFlagDeliveryAsync(
         NoCtfDbContext db,
-        ITransactionalMessageOutbox outbox,
+        IPostCommitMessagePublisher outbox,
         RuntimeInstance instance,
         string runnerId,
         DateTimeOffset runningAt,
@@ -1390,9 +1389,22 @@ internal static class RuntimeWriteBackOperations
         RuntimeInstance instance,
         RuntimeProvisioned message) =>
         instance.State == RuntimeState.Stopping
-        && instance.ProviderReceiptJson is null
+        && instance.ProviderReceipt is null
         && instance.RuntimeProvider == message.Provider
         && string.Equals(instance.RunnerId, message.RunnerId, StringComparison.Ordinal);
+
+    private static void AttachProviderReceipt(
+        NoCtfDbContext db,
+        RuntimeInstance instance,
+        RuntimeReceiptData receiptData)
+    {
+        if (instance.ProviderReceipt is not null)
+            return;
+
+        var receipt = receiptData.ToEntity(instance.Id);
+        instance.ProviderReceipt = receipt;
+        db.Set<RuntimeReceipt>().Add(receipt);
+    }
 
     private static async Task ReplacePublishedPortsAsync(
         RuntimeInstance instance,
@@ -1480,7 +1492,7 @@ internal static class RuntimeWriteBackOperations
     }
 
     private static ValueTask PublishRuntimeStopAsync(
-        ITransactionalMessageOutbox outbox,
+        IPostCommitMessagePublisher outbox,
         RuntimeInstance instance,
         string runnerId,
         DateTimeOffset requestedAt) =>

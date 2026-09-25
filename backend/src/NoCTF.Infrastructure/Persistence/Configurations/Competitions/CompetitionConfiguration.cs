@@ -1,54 +1,62 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using NoCTF.Domain.Competitions;
-using Microsoft.EntityFrameworkCore.ChangeTracking;
-using System.Text.Json;
 
 namespace NoCTF.Infrastructure.Persistence.Configurations.Competitions;
 
 internal sealed class CompetitionEntityConfiguration : IEntityTypeConfiguration<Competition>
 {
-    private static readonly JsonSerializerOptions WebhookJsonOptions =
-        new(JsonSerializerDefaults.Web);
-
     public void Configure(EntityTypeBuilder<Competition> builder)
     {
         builder.ToTable("competitions");
         builder.HasKey(competition => competition.Id);
+        builder.HasAlternateKey(competition => new { competition.Id, competition.Mode });
         builder.Property(competition => competition.Title).HasMaxLength(160);
-        builder.Property(competition => competition.ConfigurationJson).HasColumnType("jsonb");
-        builder.Property(competition => competition.WebhookConfiguration)
-            .HasColumnType("jsonb")
-            .HasDefaultValueSql("'{\"schemaVersion\":1,\"targets\":[]}'::jsonb")
-            .HasConversion(
-                value => JsonSerializer.Serialize(value, WebhookJsonOptions),
-                value => JsonSerializer.Deserialize<CompetitionWebhookConfiguration>(
-                        value,
-                        WebhookJsonOptions)
-                    ?? new CompetitionWebhookConfiguration(),
-                new ValueComparer<CompetitionWebhookConfiguration>(
-                    (left, right) => SerializeWebhook(left) == SerializeWebhook(right),
-                    value => SerializeWebhook(value).GetHashCode(StringComparison.Ordinal),
-                    value => DeserializeWebhook(SerializeWebhook(value))));
-        builder.Property(competition => competition.TrackConfigurationJson)
-            .HasColumnType("jsonb");
-        builder.Property(competition => competition.ManagerIds).HasColumnType("uuid[]");
-        builder.Property(competition => competition.JudgeIds).HasColumnType("uuid[]");
-        builder.Property(competition => competition.ObserverIds).HasColumnType("uuid[]");
-        builder.Property(competition => competition.Mode).HasConversion<short>();
+        builder.HasIndex(competition => competition.NormalizedTitle);
+        builder.HasOne(competition => competition.ModeConfiguration)
+            .WithOne()
+            .HasForeignKey<CompetitionModeConfiguration>(configuration => configuration.CompetitionId)
+            .OnDelete(DeleteBehavior.Cascade);
+        builder.Navigation(competition => competition.ModeConfiguration).AutoInclude();
+        builder.OwnsMany(competition => competition.WebhookTargets, targets =>
+        {
+            targets.ToTable("competition_webhook_targets");
+            targets.WithOwner().HasForeignKey(target => target.CompetitionId);
+            targets.HasKey(target => target.Id);
+            targets.Property(target => target.Name).HasMaxLength(160).IsRequired();
+            targets.Property(target => target.EndpointUrl).HasMaxLength(2048).IsRequired();
+            targets.Property(target => target.DisabledReason).HasConversion<short>();
+        });
+        builder.OwnsMany(competition => competition.Tracks, tracks =>
+        {
+            tracks.ToTable("competition_tracks");
+            tracks.WithOwner().HasForeignKey(track => track.CompetitionId);
+            tracks.HasKey(track => new { track.CompetitionId, track.Key });
+            tracks.HasIndex(track => new { track.CompetitionId, track.Position }).IsUnique();
+            tracks.HasIndex(track => track.RequiredSsoProviderId);
+        });
+        builder.HasMany(competition => competition.Collaborators)
+            .WithOne()
+            .HasForeignKey(collaborator => collaborator.CompetitionId)
+            .OnDelete(DeleteBehavior.Cascade);
+        builder.Navigation(competition => competition.Collaborators).AutoInclude();
+        builder.HasDiscriminator(competition => competition.Mode)
+            .HasValue<CtfCompetition>(GameMode.Ctf)
+            .HasValue<AwdCompetition>(GameMode.Awd)
+            .HasValue<AwdpCompetition>(GameMode.Awdp)
+            .HasValue<KohCompetition>(GameMode.Koh);
+        builder.Property(competition => competition.Mode)
+            .HasConversion<GameModeStringConverter>()
+            .HasMaxLength(4);
         builder.Property(competition => competition.Status).HasConversion<short>();
         builder.Property(competition => competition.RuntimeAccessMode)
             .HasConversion<short>()
             .HasDefaultValue(NoCTF.Domain.Runtime.RuntimeAccessMode.Direct);
         builder.Property(competition => competition.TrafficCaptureEnabled)
             .HasDefaultValue(false);
-        // Existing competitions used tracks implicitly, so the schema default backfills true.
-        // ValueGeneratedNever makes application inserts persist the explicit new default false.
         builder.Property(competition => competition.TracksEnabled)
-            .HasDefaultValue(true)
             .ValueGeneratedNever();
-        // Schema defaults preserve the documented cross-mode question policy when an existing
-        // competition row is upgraded; Data Annotations cannot express database defaults.
+        // Data Annotations cannot express these current database defaults.
         builder.Property(competition => competition.MaxActiveQuestionsPerTeam).HasDefaultValue(5);
         builder.Property(competition => competition.MaxParticipantMessagesBeforeHandlerReply).HasDefaultValue(3);
         builder.Property(competition => competition.AllowChallengeOwnersToHandleQuestions).HasDefaultValue(true);
@@ -57,50 +65,100 @@ internal sealed class CompetitionEntityConfiguration : IEntityTypeConfiguration<
         builder.HasQueryFilter(competition => competition.DeletedAt == null);
         builder.HasIndex(competition => new { competition.Status, competition.StartAt });
         builder.HasIndex(competition => new { competition.FrozenStartAt, competition.HiddenStartAt });
-        builder.HasIndex(competition => competition.ManagerIds).HasMethod("gin");
-        builder.HasIndex(competition => competition.JudgeIds).HasMethod("gin");
-        builder.HasIndex(competition => competition.ObserverIds).HasMethod("gin");
         builder.HasOne<NoCTF.Domain.Identity.User>().WithMany()
             .HasForeignKey(competition => competition.OwnerId)
             .OnDelete(DeleteBehavior.Restrict);
         builder.HasOne(competition => competition.PosterFile).WithMany()
             .HasForeignKey(competition => competition.PosterFileId)
             .OnDelete(DeleteBehavior.Restrict);
-        builder.ToTable(table => table.HasCheckConstraint(
-            "ck_competitions_schedule",
-            "start_at < end_at"));
-        builder.ToTable(table =>
+    }
+}
+
+internal sealed class CompetitionModeConfigurationEntityConfiguration
+    : IEntityTypeConfiguration<CompetitionModeConfiguration>
+{
+    public void Configure(EntityTypeBuilder<CompetitionModeConfiguration> builder)
+    {
+        builder.ToTable("competition_mode_configurations");
+        builder.HasKey(configuration => configuration.CompetitionId);
+        builder.HasDiscriminator(configuration => configuration.Mode)
+            .HasValue<CtfCompetitionModeConfiguration>(GameMode.Ctf)
+            .HasValue<AwdCompetitionModeConfiguration>(GameMode.Awd)
+            .HasValue<AwdpCompetitionModeConfiguration>(GameMode.Awdp)
+            .HasValue<KohCompetitionModeConfiguration>(GameMode.Koh);
+        builder.Property(configuration => configuration.Mode)
+            .HasConversion<GameModeStringConverter>()
+            .HasMaxLength(4);
+        builder.ComplexProperty(configuration => configuration.FlagTemplate);
+    }
+}
+
+internal sealed class CtfCompetitionModeConfigurationEntityConfiguration
+    : IEntityTypeConfiguration<CtfCompetitionModeConfiguration>
+{
+    public void Configure(EntityTypeBuilder<CtfCompetitionModeConfiguration> builder)
+    {
+        builder.ComplexProperty(configuration => configuration.DefaultScoreCurve,
+            curve => curve.Property(value => value.DecayMode).HasConversion<short>());
+        builder.HasMany(configuration => configuration.BloodRewards)
+            .WithOne()
+            .HasForeignKey(reward => reward.CompetitionId)
+            .OnDelete(DeleteBehavior.Cascade);
+        builder.Navigation(configuration => configuration.BloodRewards).AutoInclude();
+    }
+}
+
+internal sealed class AwdCompetitionModeConfigurationEntityConfiguration
+    : IEntityTypeConfiguration<AwdCompetitionModeConfiguration>
+{
+    public void Configure(EntityTypeBuilder<AwdCompetitionModeConfiguration> builder)
+    {
+        builder.Property(configuration => configuration.AttackRewardMode).HasConversion<short>();
+    }
+}
+
+internal sealed class AwdpCompetitionModeConfigurationEntityConfiguration
+    : IEntityTypeConfiguration<AwdpCompetitionModeConfiguration>
+{
+    public void Configure(EntityTypeBuilder<AwdpCompetitionModeConfiguration> builder)
+    {
+        builder.Property(configuration => configuration.EvaluationDispatchMode).HasConversion<short>();
+        builder.ComplexProperty(configuration => configuration.BreakScoreCurve,
+            curve => curve.Property(value => value.DecayMode).HasConversion<short>());
+        builder.ComplexProperty(configuration => configuration.FixScoreCurve,
+            curve => curve.Property(value => value.DecayMode).HasConversion<short>());
+    }
+}
+
+internal sealed class CompetitionBloodRewardConfiguration
+    : IEntityTypeConfiguration<CompetitionBloodReward>
+{
+    public void Configure(EntityTypeBuilder<CompetitionBloodReward> builder)
+    {
+        builder.ToTable("competition_blood_rewards");
+        builder.HasKey(reward => new { reward.CompetitionId, reward.Position });
+        builder.Property(reward => reward.Position).ValueGeneratedNever();
+        builder.Property(reward => reward.Policy).HasConversion<short>();
+        builder.Property(reward => reward.Value).HasPrecision(18, 6);
+    }
+}
+
+internal sealed class CompetitionCollaboratorConfiguration
+    : IEntityTypeConfiguration<CompetitionCollaborator>
+{
+    public void Configure(EntityTypeBuilder<CompetitionCollaborator> builder)
+    {
+        builder.ToTable("competition_collaborators");
+        builder.HasKey(collaborator => new
         {
-            table.HasCheckConstraint(
-                "ck_competitions_permission_roles_exclusive",
-                "NOT (manager_ids && judge_ids) AND NOT (manager_ids && observer_ids) AND NOT (judge_ids && observer_ids)");
-            table.HasCheckConstraint(
-                "ck_competitions_owner_not_permission",
-                "NOT (owner_id = ANY(manager_ids)) AND NOT (owner_id = ANY(judge_ids)) AND NOT (owner_id = ANY(observer_ids))");
-            table.HasCheckConstraint(
-                "ck_competitions_flag_secret_length",
-                "octet_length(flag_derivation_secret) = 32");
-            table.HasCheckConstraint(
-                "ck_competitions_question_limits",
-                "max_active_questions_per_team > 0 AND max_participant_messages_before_handler_reply > 0");
-            table.HasCheckConstraint(
-                "ck_competitions_write_up_submission_deadline_hours",
-                $"write_up_submission_deadline_hours BETWEEN 0 AND {CompetitionWriteUpPolicy.MaximumDeadlineHours}");
-            table.HasCheckConstraint(
-                "ck_competitions_traffic_capture_limit",
-                "traffic_capture_limit_bytes IS NULL OR traffic_capture_limit_bytes > 0");
-            table.HasCheckConstraint(
-                "ck_competitions_webhook_configuration",
-                "jsonb_typeof(webhook_configuration) = 'object'"
-                + " AND (webhook_configuration ->> 'schemaVersion')::integer = 1"
-                + " AND jsonb_typeof(webhook_configuration -> 'targets') = 'array'");
+            collaborator.CompetitionId,
+            collaborator.UserId
+        });
+        builder.Property(collaborator => collaborator.Role).HasConversion<short>();
+        builder.HasIndex(collaborator => new
+        {
+            collaborator.CompetitionId,
+            collaborator.Role
         });
     }
-
-    private static string SerializeWebhook(CompetitionWebhookConfiguration? value) =>
-        JsonSerializer.Serialize(value ?? new CompetitionWebhookConfiguration(), WebhookJsonOptions);
-
-    private static CompetitionWebhookConfiguration DeserializeWebhook(string value) =>
-        JsonSerializer.Deserialize<CompetitionWebhookConfiguration>(value, WebhookJsonOptions)
-        ?? new CompetitionWebhookConfiguration();
 }

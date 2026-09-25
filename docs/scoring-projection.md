@@ -16,12 +16,12 @@
 
 ## 事件驱动失效与 500 ms 合并
 
-任何影响计分、资格或可见性的事务都通过 EF transactional outbox 发布强类型失效事件。每个订阅者
-使用独立 Sticky PostgreSQL endpoint；排行榜订阅者收到事件后：
+任何影响计分、资格或可见性的事务在数据库提交成功后发布强类型 NATS 失效事件。每个订阅者
+使用独立命名的 JetStream consumer；排行榜订阅者收到事件后：
 
 1. 立即删除该比赛的 FusionCache/Redis 榜单键；
-2. 把 CompetitionId 加入 Singular Agent 的进程内合并集合；
-3. 固定等待 500 ms，同一窗口只派发一次 durable 全量投影消息；
+2. 把 CompetitionId 加入接收该 JetStream 事件的 Worker 进程内合并集合；
+3. 固定等待 500 ms，同一进程窗口只派发一次 durable 全量投影消息；
 4. Handler 从 PostgreSQL 计算完整不可变响应；
 5. 成功后原子替换缓存，再发布强类型 SignalR 刷新通知；
 6. 失败时保持 cache miss 并按 durable 消息策略重试。
@@ -83,5 +83,5 @@ Payload 不包含邀请码。
 
 ## 验证要求
 
-必须用真实 PostgreSQL/Redis/Wolverine 覆盖：500 ms 合并、多个失效只投影一次、缓存全失重建、晚到
+必须用真实 PostgreSQL/Redis/NATS/Wolverine 覆盖：500 ms 合并、多个失效只投影一次、缓存全失重建、晚到
 发布不能覆盖新结果、投影失败保持 miss、Worker 重投幂等，以及封禁/解封/重判后的全量重盘。

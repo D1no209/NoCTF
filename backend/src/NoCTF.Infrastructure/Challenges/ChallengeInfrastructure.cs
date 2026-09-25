@@ -30,8 +30,8 @@ internal static class ChallengeInfrastructure
         services.AddSingleton<ChallengeRuntimeTemplateCatalog>();
         services.AddSingleton<IChallengeRuntimeTemplateCatalog,
             FusionChallengeRuntimeTemplateCatalog>();
-        services.AddScoped<IPerTeamRuntimeFlagStore, PostgresPerTeamRuntimeFlagStore>();
-        services.AddScoped<ICompetitionChallengeAudienceAccess, CompetitionChallengeAudienceAccess>();
+        services.AddScoped<IPerTeamRuntimeFlagStore, PerTeamRuntimeFlagStore>();
+        services.AddScoped<ICompetitionChallengeReadAccess, CompetitionChallengeReadAccess>();
         services.AddScoped<IChallengeManagementStore, ChallengeManagementStore>();
         services.AddScoped<IChallengeBankStore, ChallengeBankStore>();
         services.AddScoped<CreateChallengeTemplate>();
@@ -50,7 +50,7 @@ internal static class ChallengeInfrastructure
         services.AddScoped<GetChallengeAttachments>();
         services.AddScoped<IChallengeFlagStore, ChallengeFlagManagementStore>();
         services.AddScoped<ManageChallengeFlags>();
-        services.AddScoped<IMissingFlagGenerator, PostgresMissingFlagGenerator>();
+        services.AddScoped<IMissingFlagGenerator, MissingFlagGenerator>();
         services.AddScoped<GenerateMissingFlags>();
         services.AddScoped<IChallengeHintStore, ChallengeHintStore>();
         services.AddScoped<ManageChallengeHints>();

@@ -13,7 +13,7 @@ const { fields, overridden, parseFailed, updateField, setOverride, displayedValu
     </div>
     <Skeleton v-if="loading" class="h-64 w-full" />
     <Alert v-else-if="parseFailed" variant="destructive">
-      <AlertDescription>{{ $t('ui.theConfigurationJsonCannotBeParsedPleaseContactThePlatform') }}</AlertDescription>
+      <AlertDescription>{{ $t('ui.typedConfigurationUnavailable') }}</AlertDescription>
     </Alert>
     <template v-else>
       <FieldGroup>

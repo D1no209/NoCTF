@@ -1,4 +1,3 @@
-using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using NoCTF.Application.Notifications;
 using NoCTF.Domain.Competitions;
@@ -12,9 +11,6 @@ namespace NoCTF.Infrastructure.Notifications;
 public sealed class PublicCompetitionAnnouncementReader(NoCtfDbContext db)
     : IPublicCompetitionAnnouncementReader
 {
-    private static readonly JsonSerializerOptions JsonOptions =
-        new(JsonSerializerDefaults.Web);
-
     public async Task<PublicCompetitionAnnouncementPage> ListAsync(
         Guid competitionId,
         DateTimeOffset? beforePublishedAt,
@@ -59,34 +55,25 @@ public sealed class PublicCompetitionAnnouncementReader(NoCtfDbContext db)
             .Select(notification => new
             {
                 notification.Id,
-                notification.ContentJson,
+                notification.Title,
+                notification.Body,
                 notification.SentAt
             })
             .ToArrayAsync(ct);
         var items = rows.Select(row =>
         {
-            var content = JsonSerializer.Deserialize<AnnouncementContent>(
-                row.ContentJson,
-                JsonOptions) ?? throw new InvalidOperationException(
-                "Competition announcement content is invalid.");
-            if (content.SchemaVersion != 1
-                || string.IsNullOrWhiteSpace(content.Title)
-                || string.IsNullOrWhiteSpace(content.Body))
+            if (string.IsNullOrWhiteSpace(row.Title)
+                || string.IsNullOrWhiteSpace(row.Body))
             {
                 throw new InvalidOperationException(
-                    "Competition announcement content uses an unsupported schema.");
+                    "Competition announcement content is incomplete.");
             }
             return new PublicCompetitionAnnouncementView(
                 row.Id,
-                content.Title,
-                content.Body,
+                row.Title,
+                row.Body,
                 row.SentAt);
         }).ToArray();
         return new(PublicCompetitionAnnouncementReadState.Available, items);
     }
-
-    private sealed record AnnouncementContent(
-        int SchemaVersion,
-        string Title,
-        string Body);
 }

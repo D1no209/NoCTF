@@ -47,13 +47,12 @@ public sealed class AwdRuntimeProvisioningTests
                 item => item.Id == fixture.CompetitionId,
                 cancellationToken);
             competition.MaxConcurrentRuntimeInstancesPerTeam = 1;
-            var stoppingRuntime = new RuntimeInstance
+            var stoppingRuntime = new PlayerRuntimeInstance
             {
                 Id = Guid.CreateVersion7(fixture.Now.AddSeconds(1)),
                 CompetitionId = fixture.CompetitionId,
                 CompetitionChallengeId = fixture.CompetitionChallengeId,
                 TeamId = stoppingTeamId,
-                Purpose = RuntimePurpose.Player,
                 RuntimeKind = RuntimeKind.Container,
                 RuntimeProvider = RuntimeProvider.Docker,
                 State = RuntimeState.Stopping,
@@ -62,7 +61,7 @@ public sealed class AwdRuntimeProvisioningTests
             db.RuntimeInstances.Add(stoppingRuntime);
             await db.SaveChangesAsync(cancellationToken);
 
-            var provisioner = new PostgresAwdRuntimeProvisioner(
+            var provisioner = new AwdRuntimeProvisioner(
                 db,
                 new ChallengeRuntimeTemplateCatalog(),
                 new FixedRuntimePlacementPolicy(runnerPool: "awd-tests"),
@@ -101,31 +100,28 @@ public sealed class AwdRuntimeProvisioningTests
 
             var secondTemplateId = Guid.CreateVersion7(fixture.Now.AddSeconds(2));
             var secondCompetitionChallengeId = Guid.CreateVersion7(fixture.Now.AddSeconds(2));
-            var definitionJson = await db.Challenges.AsNoTracking()
+            var definition = (await db.Challenges.AsNoTracking()
                 .Where(challenge => challenge.Mode == GameMode.Awd)
-                .Select(challenge => challenge.DefinitionJson)
-                .SingleAsync(cancellationToken);
-            db.Challenges.Add(new Challenge
+                .SingleAsync(cancellationToken)).Definition!;
+            ChallengeDefinitionGraph.AssignChallengeId(definition, secondTemplateId);
+            db.Challenges.Add(new AwdChallenge
             {
                 Id = secondTemplateId,
                 OwnerId = fixture.OwnerId,
-                Mode = GameMode.Awd,
                 Title = "Second AWD service",
-                DefinitionJson = definitionJson,
+                Definition = definition,
                 CreatedAt = fixture.Now,
                 UpdatedAt = fixture.Now
             });
-            db.CompetitionChallenges.Add(new CompetitionChallenge
+            db.CompetitionChallenges.Add(new AwdCompetitionChallenge
             {
                 Id = secondCompetitionChallengeId,
                 CompetitionId = fixture.CompetitionId,
                 ChallengeId = secondTemplateId,
                 Order = 2,
                 IsPublished = true,
-                RulesJson = JsonSerializer.Serialize(
-                    new AwdChallengeConfiguration(
-                        AwdChallengeConfiguration.CurrentSchemaVersion),
-                    new JsonSerializerOptions(JsonSerializerDefaults.Web)),
+                Rules = new GameModeChallengeConfigurationCatalog()
+                    .CreateDefaultRulesForTest(GameMode.Awd),
                 UpdatedAt = fixture.Now
             });
             await db.SaveChangesAsync(cancellationToken);
@@ -174,25 +170,24 @@ public sealed class AwdRuntimeProvisioningTests
             await using var db = new NoCtfDbContext(options);
             foreach (var teamId in fixture.ActiveTeamIds)
             {
-                db.RuntimeInstances.Add(new RuntimeInstance
+                db.RuntimeInstances.Add(new PlayerRuntimeInstance
                 {
                     Id = Guid.CreateVersion7(fixture.Now.AddSeconds(initialVersions[teamId])),
                     CompetitionId = fixture.CompetitionId,
                     CompetitionChallengeId = fixture.CompetitionChallengeId,
                     TeamId = teamId,
-                    Purpose = RuntimePurpose.Player,
                     RuntimeKind = RuntimeKind.Container,
                     RuntimeProvider = RuntimeProvider.Docker,
                     RunnerId = $"runner-{teamId:N}",
                     State = RuntimeState.Failed,
                     FailureCode = RuntimeFailureCode.ProviderUnavailable,
-                    ProviderReceiptJson = JsonSerializer.Serialize(new { teamId }),
+                    ProviderReceipt = RuntimeReceiptTestData.ContainerEntity(),
                     CreatedAt = fixture.Now
                 });
             }
             await db.SaveChangesAsync(cancellationToken);
             var firstOutbox = new RecordingOutbox();
-            var provisioner = new PostgresAwdRuntimeProvisioner(
+            var provisioner = new AwdRuntimeProvisioner(
                 db,
                 new ChallengeRuntimeTemplateCatalog(),
                 new FixedRuntimePlacementPolicy(runnerPool: "awd-tests"),
@@ -214,9 +209,9 @@ public sealed class AwdRuntimeProvisioningTests
             foreach (var teamId in fixture.ActiveTeamIds)
             {
                 var old = firstPass.Single(runtime => runtime.TeamId == teamId
-                    && runtime.ProviderReceiptJson != null);
+                    && runtime.ProviderReceipt != null);
                 var replacement = firstPass.Single(runtime => runtime.TeamId == teamId
-                    && runtime.ProviderReceiptJson == null);
+                    && runtime.ProviderReceipt == null);
                 await Assert.That(old.State).IsEqualTo(RuntimeState.Stopping);
                 await Assert.That(old.FailureCode).IsNull();
                 await Assert.That(replacement.State).IsEqualTo(RuntimeState.Queued);
@@ -228,9 +223,9 @@ public sealed class AwdRuntimeProvisioningTests
             var acknowledgedTeamId = fixture.ActiveTeamIds[0];
             var failedTeamId = fixture.ActiveTeamIds[1];
             var acknowledgedOld = firstPass.Single(runtime => runtime.TeamId == acknowledgedTeamId
-                && runtime.ProviderReceiptJson != null);
+                && runtime.ProviderReceipt != null);
             var failedOld = firstPass.Single(runtime => runtime.TeamId == failedTeamId
-                && runtime.ProviderReceiptJson != null);
+                && runtime.ProviderReceipt != null);
             var acknowledgementOutbox = new RecordingOutbox();
             await RuntimeWriteBackHandler.Handle(
                 new RuntimeStopped(
@@ -284,7 +279,7 @@ public sealed class AwdRuntimeProvisioningTests
             var outbox = new RecordingOutbox();
 
             await using var db = new NoCtfDbContext(options);
-            var provisioner = new PostgresAwdRuntimeProvisioner(
+            var provisioner = new AwdRuntimeProvisioner(
                 db,
                 new ChallengeRuntimeTemplateCatalog(),
                 new FixedRuntimePlacementPolicy(runnerPool: "awd-tests"),
@@ -335,31 +330,30 @@ public sealed class AwdRuntimeProvisioningTests
             User(ownerId, "awd-red", now),
             User(blueUserId, "awd-blue", now),
             User(bannedUserId, "awd-banned", now));
-        db.Competitions.Add(new Competition
+        db.Competitions.Add(new AwdCompetition
         {
             Id = competitionId,
             Title = "AWD runtime provisioning",
             OwnerId = ownerId,
-            Mode = GameMode.Awd,
             Status = CompetitionStatus.Running,
-            ConfigurationJson = JsonSerializer.Serialize(
-                AwdConfiguration.Default,
-                new JsonSerializerOptions(JsonSerializerDefaults.Web)),
+            ModeConfiguration = TestConfigurations.Competition(
+                GameMode.Awd,
+                JsonSerializer.Serialize(
+                    AwdConfiguration.Default,
+                    new JsonSerializerOptions(JsonSerializerDefaults.Web))),
             StartAt = now.AddMinutes(-1),
             EndAt = now.AddHours(1),
             FlagDerivationSecret = Enumerable.Range(1, 32).Select(value => (byte)value).ToArray(),
             CreatedAt = now,
             UpdatedAt = now,
         });
-        db.Challenges.Add(new Challenge
+        db.Challenges.Add(new AwdChallenge
         {
             Id = challengeId,
             OwnerId = ownerId,
-            Mode = GameMode.Awd,
             Title = "AWD service",
-            DefinitionJson = JsonSerializer.Serialize(
+            Definition = TestConfigurations.Definition(GameMode.Awd, JsonSerializer.Serialize(
                 new AwdChallengeConfiguration(
-                    AwdChallengeConfiguration.CurrentSchemaVersion,
                     Runtime: new ChallengeRuntimeTemplate(
                         RuntimeAllocation.PerTeam,
                         new ContainerRuntimeDefinition(
@@ -369,20 +363,18 @@ public sealed class AwdRuntimeProvisioningTests
                         FlagSource: RuntimeFlagSource.AwdRotation),
                     FlagInjection: new AwdFlagInjectionConfiguration(
                         "printf '%s' '${FLAG}' > /dev/shm/flag")),
-                new JsonSerializerOptions(JsonSerializerDefaults.Web)),
+                new JsonSerializerOptions(JsonSerializerDefaults.Web))),
             CreatedAt = now,
             UpdatedAt = now
         });
-        db.CompetitionChallenges.Add(new CompetitionChallenge
+        db.CompetitionChallenges.Add(new AwdCompetitionChallenge
         {
             Id = competitionChallengeId,
             CompetitionId = competitionId,
             ChallengeId = challengeId,
             IsPublished = true,
-            RulesJson = JsonSerializer.Serialize(
-                new AwdChallengeConfiguration(
-                    AwdChallengeConfiguration.CurrentSchemaVersion),
-                new JsonSerializerOptions(JsonSerializerDefaults.Web)),
+            Rules = new GameModeChallengeConfigurationCatalog()
+                .CreateDefaultRulesForTest(GameMode.Awd),
             UpdatedAt = now
         });
         db.Teams.AddRange(
@@ -435,7 +427,7 @@ public sealed class AwdRuntimeProvisioningTests
         Guid CompetitionChallengeId,
         IReadOnlyList<Guid> ActiveTeamIds);
 
-    private sealed class RecordingOutbox : ITransactionalMessageOutbox
+    private sealed class RecordingOutbox : IPostCommitMessagePublisher
     {
         public List<object> Published { get; } = [];
 

@@ -63,7 +63,7 @@ public sealed class AwdCheckerHandlerTests
         await Assert.That(request.Security.RunAsNonRoot).IsEqualTo(!allowRoot);
         await Assert.That(request.Security.NoNewPrivileges).IsTrue();
         await Assert.That(request.Security.ReadonlyRootfs).IsTrue();
-        await Assert.That(request.Security.CapDrop).IsEquivalentTo(["ALL"]);
+        await Assert.That(request.Security.CapDrop).IsEmpty();
         await Assert.That(request.Security.CapAdd).IsEmpty();
         await Assert.That(request.NetworkPurpose)
             .IsEqualTo(ContainerNetworkPurpose.AwdChecker);
@@ -129,8 +129,8 @@ public sealed class AwdCheckerHandlerTests
         await Assert.That(runner.Request).IsNull();
     }
 
-    private static string ContainerReceiptJson(Guid runtimeInstanceId) =>
-        JsonSerializer.Serialize(new ContainerReceipt(
+    private static ContainerRuntimeReceiptData ContainerReceiptJson(Guid runtimeInstanceId) =>
+        ContainerRuntimeReceiptData.From(new ContainerReceipt(
             runtimeInstanceId,
             RuntimeProvider.Docker,
             "target-container",

@@ -14,7 +14,7 @@ const { RotateCcw, fields, values, parseFailed, updateField, resetToCurrentDefau
     <Skeleton v-if="loading" class="h-64 w-full" />
     <Alert v-else-if="parseFailed" variant="destructive">
       <AlertDescription class="flex flex-col items-start gap-3">
-        <span>{{ $t('ui.theConfigurationJsonCannotBeParsedPleaseContactThePlatform') }}</span>
+        <span>{{ $t('ui.typedConfigurationUnavailable') }}</span>
         <Button v-if="!readonly" type="button" variant="outline" size="sm" @click="resetToCurrentDefaults">
           <RotateCcw data-icon="inline-start" /> {{ $t('ui.resetToCurrentModeDefaults') }}
         </Button>

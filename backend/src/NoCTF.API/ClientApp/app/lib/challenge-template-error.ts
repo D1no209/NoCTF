@@ -6,7 +6,6 @@ const definitionDiagnostics: Record<string, string> = {
   'Runtime image cannot exceed 512 characters.': "ui.containerImageCannotExceed512Characters",
   'Runtime internal ports must be between 1 and 65535.': "ui.internalPortsMustBeIntegersBetween1And65535",
   'Runtime internal ports cannot contain duplicates.': "ui.internalPortsCannotContainDuplicates",
-  'Runtime security must drop all capabilities.': "ui.capDropAll",
   'Runtime TtlSeconds must be between 1 and 604800 when configured.': "ui.runtimeLifetimeMustBeBetween1And604800Seconds",
   'Runtime OperationTimeoutSeconds must be between 1 and 300 when configured.': "ui.runtimeOperationTimeoutMustBeBetween1And300Seconds",
   'Runtime resource limits are required.': "ui.message4",
@@ -72,7 +71,7 @@ function splitDiagnostics(message: string): string[] {
 function localizeDiagnostic(message: string): string {
   const direct = definitionDiagnostics[message]
   if (direct) return translate(direct)
-  if (/definition|schemaVersion|JSON/i.test(message))
+  if (/definition/i.test(message))
     return translate("ui.theChallengeDefinitionVersionOrJsonFormatIsInvalid")
   if (currentLocale() === 'en') return message
   return translate("ui.theServerReturnedAnUnrecognizedValidationReason", { reason: message })

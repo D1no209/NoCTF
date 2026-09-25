@@ -3,7 +3,7 @@ import { toRefs } from 'vue'
 import type { ChallengeTemplateCreateDialogViewState } from '~/features/admin/useChallengeTemplateCreateDialog'
 
 const viewProps = defineProps<{ state: ChallengeTemplateCreateDialogViewState }>()
-const { open, title, mode, visibility, direction, description, definitionJson, saveErrors, pending, titleInvalid, directionInvalid, directionOptions, changeMode, setOpen, submit, DefinitionEditor } = toRefs(viewProps.state)
+const { open, title, mode, visibility, direction, description, definition, saveErrors, pending, titleInvalid, directionInvalid, directionOptions, changeMode, setOpen, submit, DefinitionEditor } = toRefs(viewProps.state)
 </script>
 
 <template>
@@ -78,7 +78,7 @@ const { open, title, mode, visibility, direction, description, definitionJson, s
               </FieldGroup>
             </TabsContent>
             <TabsContent value="definition" class="mt-0 pb-5">
-              <component :is="DefinitionEditor" v-model="definitionJson" :mode="mode" />
+              <component :is="DefinitionEditor" v-model="definition" :mode="mode" />
             </TabsContent>
             </div>
           </ScrollSurface>

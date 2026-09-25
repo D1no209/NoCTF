@@ -49,18 +49,15 @@ public sealed class AdminPatchDownloadStore(NoCtfDbContext db, IStore objects, I
         {
             // Append audit before any bytes leave the API, including for platform administrators.
             // This is an access audit, not a public competition broadcast or a scoring event.
-            db.CompetitionEvents.Add(new CompetitionEvent
+            db.CompetitionEvents.Add(new GameplayFactPatchDownloadedEvent
             {
                 Id = Guid.CreateVersion7(now), CompetitionId = competitionId,
-                Kind = CompetitionEventKind.GameplayFactPatchDownloaded,
                 Level = CompetitionEventLevel.Information, Visibility = CompetitionEventVisibility.Staff,
                 ActorUserId = actorId, SubjectType = EntityReferenceKind.GameplayFact, SubjectId = gameplayFactId,
                 RelatedType = EntityReferenceKind.File, RelatedId = lookup.Metadata!.FileId, OccurredAt = now,
-                PayloadJson = JsonSerializer.Serialize(new
-                {
-                    schemaVersion = 1, teamId = lookup.TeamId, gameplayFactId,
-                    competitionChallengeId = lookup.CompetitionChallengeId, fileId = lookup.Metadata.FileId
-                })
+                TeamId = lookup.TeamId,
+                GameplayFactId = gameplayFactId,
+                CompetitionChallengeId = lookup.CompetitionChallengeId
             });
             await db.SaveChangesAsync(ct);
         }

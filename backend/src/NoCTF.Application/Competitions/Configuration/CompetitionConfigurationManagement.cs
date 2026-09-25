@@ -1,18 +1,21 @@
 using NoCTF.Application.Common;
 using NoCTF.Domain.Competitions;
+using NoCTF.Domain.Challenges;
 
 namespace NoCTF.Application.Competitions.Configuration;
 
-public sealed record CompetitionChallengeConfigurationSnapshot(Guid Id, string Json);
+public sealed record CompetitionChallengeConfigurationSnapshot(
+    Guid Id,
+    CompetitionChallengeRules Rules);
 
 public sealed record ChallengeConfigurationSections(
-    string RulesJson,
-    string DefinitionJson);
+    CompetitionChallengeRules Rules,
+    ChallengeDefinition Definition);
 
 public sealed record CompetitionConfigurationView(
     Guid CompetitionId,
     GameMode Mode,
-    string Json,
+    CompetitionModeConfiguration Configuration,
     CompetitionStatus CompetitionStatus,
     int EligibleTeamCount,
     IReadOnlyList<CompetitionChallengeConfigurationSnapshot> ChallengeConfigurations,
@@ -22,27 +25,27 @@ public interface ICompetitionConfigurationValidator
 {
     IReadOnlyList<string> Validate(
         GameMode mode,
-        string json,
+        CompetitionModeConfiguration configuration,
         int eligibleTeamCount,
-        IReadOnlyList<string> challengeConfigurationJsons);
+        IReadOnlyList<CompetitionChallengeRules> challengeRules);
 
     IReadOnlyList<string> ValidateForStart(
         GameMode mode,
-        string json,
+        CompetitionModeConfiguration configuration,
         int eligibleTeamCount,
-        IReadOnlyList<string> challengeConfigurationJsons) =>
-        Validate(mode, json, eligibleTeamCount, challengeConfigurationJsons);
+        IReadOnlyList<CompetitionChallengeRules> challengeRules) =>
+        Validate(mode, configuration, eligibleTeamCount, challengeRules);
 
     IReadOnlyList<string> ValidateForStart(
         GameMode mode,
-        string json,
+        CompetitionModeConfiguration configuration,
         int eligibleTeamCount,
         IReadOnlyList<ChallengeConfigurationSections> challenges) =>
         ValidateForStart(
             mode,
-            json,
+            configuration,
             eligibleTeamCount,
-            challenges.Select(challenge => challenge.RulesJson).ToArray());
+            challenges.Select(challenge => challenge.Rules).ToArray());
 }
 
 public interface ICompetitionConfigurationStore
@@ -50,7 +53,7 @@ public interface ICompetitionConfigurationStore
     Task<CompetitionConfigurationView?> FindAsync(Guid competitionId, CancellationToken cancellationToken);
     Task<CompetitionConfigurationUpdateResult> TryUpdateAsync(
         Guid competitionId,
-        string json,
+        CompetitionModeConfiguration configuration,
         bool allowWhileRunning,
         DateTimeOffset now,
         CancellationToken cancellationToken);
@@ -82,7 +85,10 @@ public sealed class UpdateCompetitionConfiguration(
     ICompetitionConfigurationValidator validator)
 {
     public async Task<OperationResult<CompetitionConfigurationView, CompetitionConfigurationFailureCode>> ExecuteAsync(
-        Guid competitionId, string json, DateTimeOffset now, CancellationToken ct = default)
+        Guid competitionId,
+        CompetitionModeConfiguration configuration,
+        DateTimeOffset now,
+        CancellationToken ct = default)
     {
         var current = await store.FindAsync(competitionId, ct);
         if (current is null)
@@ -91,9 +97,9 @@ public sealed class UpdateCompetitionConfiguration(
                 "Competition was not found.");
         var errors = validator.Validate(
             current.Mode,
-            json,
+            configuration,
             current.EligibleTeamCount,
-            current.ChallengeConfigurations.Select(challenge => challenge.Json).ToArray());
+            current.ChallengeConfigurations.Select(challenge => challenge.Rules).ToArray());
         if (errors.Count > 0)
             return OperationResult<CompetitionConfigurationView, CompetitionConfigurationFailureCode>.Failure(
                 CompetitionConfigurationFailureCode.InvalidConfiguration,
@@ -101,7 +107,7 @@ public sealed class UpdateCompetitionConfiguration(
         const bool allowWhileRunning = true;
         var result = await store.TryUpdateAsync(
             competitionId,
-            json,
+            configuration,
             allowWhileRunning,
             now,
             ct);

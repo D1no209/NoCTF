@@ -64,7 +64,7 @@ public sealed class CtfFullBoundaryTests
                 title = "Injected Flag Runtime",
                 description = "Reads a generated per-team Flag from a real Docker runtime.",
                 direction = "Web",
-                definitionJson = BuildContainerDefinition(runtimeImage)
+                definition = BuildContainerDefinition(runtimeImage)
             },
             HttpStatusCode.Created,
             cancellationToken);
@@ -95,13 +95,13 @@ public sealed class CtfFullBoundaryTests
             cancellationToken);
         var competitionChallengeId = challenge.GetProperty("id").GetGuid();
 
-        var configurationJson = JsonSerializer.Serialize(new
+        var configuration = new
         {
-            schemaVersion = 2,
-            scoreCurve = new { initialPoints = 500, minimumPoints = 100, decayTeamCount = 10, decayMode = 2 },
-            bloodRewards = new[] { new { policy = 0, value = 25m } },
+            mode = "Ctf",
+            scoreCurve = new { initialPoints = 500L, minimumPoints = 100L, decayTeamCount = 10, decayMode = "Quadratic", customExpression = (string?)null },
+            bloodRewards = new[] { new { policy = "FixedPoints", value = 25m } },
             maxFlagAttempts = 5
-        }, JsonOptions);
+        };
         await SendJsonAsync(
             admin,
             HttpMethod.Patch,
@@ -114,7 +114,7 @@ public sealed class CtfFullBoundaryTests
                     order = 0,
                     isPublished = true
                 },
-                rules = new { json = configurationJson }
+                rules = new { configuration }
             },
             HttpStatusCode.OK,
             cancellationToken);
@@ -139,7 +139,7 @@ public sealed class CtfFullBoundaryTests
                 title = "Compose Injected Flag Runtime",
                 description = "Reads a generated per-team Flag from a real multi-service Docker Compose runtime.",
                 direction = "Web",
-                definitionJson = BuildComposeDefinition(runtimeImage)
+                definition = BuildComposeDefinition(runtimeImage)
             },
             HttpStatusCode.Created,
             cancellationToken);
@@ -155,13 +155,13 @@ public sealed class CtfFullBoundaryTests
             HttpStatusCode.Created,
             cancellationToken);
         var composeCompetitionChallengeId = composeChallenge.GetProperty("id").GetGuid();
-        var composeConfigurationJson = JsonSerializer.Serialize(new
+        var composeConfiguration = new
         {
-            schemaVersion = 2,
-            scoreCurve = new { initialPoints = 250, minimumPoints = 100, decayTeamCount = 10, decayMode = 2 },
+            mode = "Ctf",
+            scoreCurve = new { initialPoints = 250L, minimumPoints = 100L, decayTeamCount = 10, decayMode = "Quadratic", customExpression = (string?)null },
             bloodRewards = Array.Empty<object>(),
             maxFlagAttempts = 5
-        }, JsonOptions);
+        };
         await SendJsonAsync(
             admin,
             HttpMethod.Patch,
@@ -174,7 +174,7 @@ public sealed class CtfFullBoundaryTests
                     order = 1,
                     isPublished = true
                 },
-                rules = new { json = composeConfigurationJson }
+                rules = new { configuration = composeConfiguration }
             },
             HttpStatusCode.OK,
             cancellationToken);
@@ -270,6 +270,8 @@ public sealed class CtfFullBoundaryTests
         await Assert.That(memberIds.Length).IsEqualTo(2);
         var teammateId = memberIds.Single(id => id != captainId);
 
+        await E2ELifecycle.SubmitTeamRegistrationAsync(
+            player, competitionId, teamId, cancellationToken);
         await E2ELifecycle.MakeScheduleDueAsync(admin, competitionId, cancellationToken);
         await E2ELifecycle.SetStatusAsync(
             admin, competitionId, "Published", cancellationToken);
@@ -284,6 +286,20 @@ public sealed class CtfFullBoundaryTests
             $"/api/v1/competitions/{competitionId}/challenges/{competitionChallengeId}/attachments/{attachmentId}",
             cancellationToken);
         await Assert.That(downloadedAttachment).IsEquivalentTo(attachmentBytes);
+
+        using (var missingRuntime = await player.GetAsync(
+                   $"/api/v1/competitions/{competitionId}/challenges/{competitionChallengeId}/runtimes/current",
+                   cancellationToken))
+        {
+            await Assert.That(missingRuntime.StatusCode).IsEqualTo(HttpStatusCode.NotFound);
+        }
+        var detailWithoutRuntime = await GetJsonAsync(
+            player,
+            $"/api/v1/competitions/{competitionId}/challenges/{competitionChallengeId}",
+            cancellationToken);
+        await Assert.That(detailWithoutRuntime.GetProperty("id").GetGuid())
+            .IsEqualTo(competitionChallengeId);
+        await Assert.That(detailWithoutRuntime.GetProperty("hasRuntime").GetBoolean()).IsTrue();
 
         Guid? runtimeInstanceId = null;
         Guid? composeRuntimeInstanceId = null;
@@ -303,8 +319,7 @@ public sealed class CtfFullBoundaryTests
                 value => value.GetProperty("state").GetString() == "Running",
                 TimeSpan.FromSeconds(90),
                 cancellationToken);
-            var runtimeUrl = runtime.GetProperty("urls")[0].GetString()
-                ?? throw new InvalidOperationException("The running runtime did not expose a URL.");
+            var runtimeUrl = E2ELifecycle.FirstDirectAddress(runtime);
             var flag = await PollTextAsync(runtimeUrl, TimeSpan.FromSeconds(30), cancellationToken);
             await Assert.That(flag).StartsWith("flag{");
 
@@ -324,9 +339,7 @@ public sealed class CtfFullBoundaryTests
                 value => value.GetProperty("state").GetString() == "Running",
                 TimeSpan.FromSeconds(90),
                 cancellationToken);
-            var composeRuntimeUrl = composeRuntime.GetProperty("urls")[0].GetString()
-                ?? throw new InvalidOperationException(
-                    "The running Compose runtime did not expose a URL.");
+            var composeRuntimeUrl = E2ELifecycle.FirstDirectAddress(composeRuntime);
             var composeFlag = await PollTextAsync(
                 composeRuntimeUrl,
                 TimeSpan.FromSeconds(30),
@@ -539,29 +552,29 @@ public sealed class CtfFullBoundaryTests
         return client;
     }
 
-    private static string BuildContainerDefinition(string runtimeImage) =>
-        JsonSerializer.Serialize(new
+    private static object BuildContainerDefinition(string runtimeImage) =>
+        new
         {
-            schemaVersion = 2,
+            mode = "Ctf",
+            interactionKind = "FlagSubmission",
             runtime = new
             {
-                allocation = 1,
-                definition = new
-                {
-                    kind = "container",
-                    image = runtimeImage,
-                    environment = new Dictionary<string, string>(),
-                    labels = new Dictionary<string, string>(),
-                    portMappings = new Dictionary<string, int> { ["8080"] = 0 },
-                    security = SecureContainerPolicy(),
-                    flagEnvironmentVariableName = "FLAG",
-                    egressPolicy = 0
-                },
+                kind = "Container",
+                allocation = "PerTeam",
+                image = runtimeImage,
+                command = Array.Empty<string>(),
+                environment = new Dictionary<string, string>(),
+                labels = new Dictionary<string, string>(),
+                portMappings = new[] { new { containerPort = 8080, hostPort = 0 } },
+                security = SecureContainerPolicy(),
+                flagEnvironmentVariableName = "FLAG",
+                internalPorts = Array.Empty<int>(),
+                egressPolicy = "Isolated",
                 limits = new
                 {
-                    memoryBytes = 67_108_864,
-                    nanoCpus = 100_000_000,
-                    pidsLimit = 64
+                    memoryBytes = 67_108_864L,
+                    nanoCpus = 100_000_000L,
+                    pidsLimit = 64L
                 },
                 ttlSeconds = 300,
                 operationTimeoutSeconds = 60,
@@ -570,25 +583,28 @@ public sealed class CtfFullBoundaryTests
                     new
                     {
                         urlTemplate = "http://{HOST}:{PORT}/",
-                        exposure = 0,
-                        containerPort = 8080
+                        exposure = "OwnerOnly",
+                        containerPort = 8080,
+                        serviceName = (string?)null,
+                        vmId = (string?)null,
+                        guestPort = (int?)null,
+                        isControlCheck = false
                     }
                 },
-                flagSource = 1
+                flagSource = "PerTeam"
             }
-        }, JsonOptions);
+        };
 
-    private static string BuildComposeDefinition(string runtimeImage) =>
-        JsonSerializer.Serialize(new
+    private static object BuildComposeDefinition(string runtimeImage) =>
+        new
         {
-            schemaVersion = 2,
+            mode = "Ctf",
+            interactionKind = "FlagSubmission",
             runtime = new
             {
-                allocation = 1,
-                definition = new
-                {
-                    kind = "compose",
-                    composeYaml = $$"""
+                kind = "Compose",
+                allocation = "PerTeam",
+                composeYaml = $$"""
                         services:
                           web:
                             image: "{{runtimeImage}}"
@@ -598,34 +614,38 @@ public sealed class CtfFullBoundaryTests
                               - sleep
                               - "300"
                         """,
-                    serviceResources = new Dictionary<string, object>
+                serviceResources = new object[]
+                {
+                    new
                     {
-                        ["web"] = new
+                        serviceName = "web",
+                        limits = new
                         {
-                            memoryBytes = 67_108_864,
-                            nanoCpus = 100_000_000,
-                            pidsLimit = 64
-                        },
-                        ["db"] = new
-                        {
-                            memoryBytes = 67_108_864,
-                            nanoCpus = 100_000_000,
-                            pidsLimit = 64
+                            memoryBytes = 67_108_864L,
+                            nanoCpus = 100_000_000L,
+                            pidsLimit = 64L
                         }
                     },
-                    environment = new Dictionary<string, string>(),
-                    labels = new Dictionary<string, string>(),
-                    flagEnvironmentVariables = new Dictionary<string, string>
+                    new
                     {
-                        ["web"] = "FLAG"
-                    },
-                    egressPolicy = 0
+                        serviceName = "db",
+                        limits = new
+                        {
+                            memoryBytes = 67_108_864L,
+                            nanoCpus = 100_000_000L,
+                            pidsLimit = 64L
+                        }
+                    }
                 },
+                environment = new Dictionary<string, string>(),
+                labels = new Dictionary<string, string>(),
+                flagEnvironmentVariables = new Dictionary<string, string> { ["web"] = "FLAG" },
+                egressPolicy = "Isolated",
                 limits = new
                 {
-                    memoryBytes = 134_217_728,
-                    nanoCpus = 200_000_000,
-                    pidsLimit = 128
+                    memoryBytes = 134_217_728L,
+                    nanoCpus = 200_000_000L,
+                    pidsLimit = 128L
                 },
                 ttlSeconds = 300,
                 operationTimeoutSeconds = 60,
@@ -634,21 +654,24 @@ public sealed class CtfFullBoundaryTests
                     new
                     {
                         urlTemplate = "http://{HOST}:{PORT}/",
-                        exposure = 0,
+                        exposure = "OwnerOnly",
                         containerPort = 8080,
-                        serviceName = "web"
+                        serviceName = "web",
+                        vmId = (string?)null,
+                        guestPort = (int?)null,
+                        isControlCheck = false
                     }
                 },
-                flagSource = 1
+                flagSource = "PerTeam"
             }
-        }, JsonOptions);
+        };
 
     private static object SecureContainerPolicy() => new
     {
         noNewPrivileges = true,
         readonlyRootfs = true,
         runAsNonRoot = true,
-        capDrop = new[] { "ALL" },
+        capDrop = Array.Empty<string>(),
         capAdd = Array.Empty<string>()
     };
 
@@ -695,6 +718,7 @@ public sealed class CtfFullBoundaryTests
         {
             Content = JsonContent.Create(body, options: JsonOptions)
         };
+        E2ELifecycle.AddIdempotencyKey(request);
         using var response = await client.SendAsync(request, cancellationToken);
         return await ReadExpectedJsonAsync(response, expected, cancellationToken);
     }
@@ -707,6 +731,7 @@ public sealed class CtfFullBoundaryTests
         CancellationToken cancellationToken)
     {
         using var request = new HttpRequestMessage(method, path);
+        E2ELifecycle.AddIdempotencyKey(request);
         using var response = await client.SendAsync(request, cancellationToken);
         if (response.StatusCode != expected)
             throw await UnexpectedResponseAsync(response, expected, cancellationToken);
@@ -724,6 +749,7 @@ public sealed class CtfFullBoundaryTests
         {
             Content = JsonContent.Create(body, options: JsonOptions)
         };
+        E2ELifecycle.AddIdempotencyKey(request);
         using var response = await client.SendAsync(request, cancellationToken);
         if (response.StatusCode != expected)
             throw await UnexpectedResponseAsync(response, expected, cancellationToken);
@@ -737,6 +763,7 @@ public sealed class CtfFullBoundaryTests
         CancellationToken cancellationToken)
     {
         using var request = new HttpRequestMessage(method, path);
+        E2ELifecycle.AddIdempotencyKey(request);
         using var response = await client.SendAsync(request, cancellationToken);
         return await ReadExpectedJsonAsync(response, expected, cancellationToken);
     }

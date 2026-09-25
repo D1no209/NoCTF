@@ -1,6 +1,7 @@
 using NoCTF.Application.Challenges.Configuration;
 using NoCTF.Application.Challenges.Management;
 using NoCTF.Domain.Competitions;
+using NoCTF.Domain.Challenges;
 
 namespace NoCTF.Tests.Unit.Application;
 
@@ -246,7 +247,7 @@ public class ChallengeManagementTests
 
         public Task<ChallengeMutationResult> CreateAsync(
             CreateCompetitionChallengeCommand command,
-            string configurationJson,
+            CompetitionChallengeRules rules,
             CancellationToken cancellationToken)
         {
             CreateCalls++;
@@ -265,14 +266,19 @@ public class ChallengeManagementTests
             return Task.FromResult<ChallengeView?>(challenge);
         }
 
-        public Task<IReadOnlyList<ChallengeView>> ListAsync(
+        public Task<IReadOnlyList<CompetitionChallengeSummaryView>> ListAsync(
             Guid competitionId,
             bool includeUnpublished,
             bool includeDeleted,
             CancellationToken cancellationToken)
         {
             LastIncludeUnpublished = includeUnpublished;
-            return Task.FromResult<IReadOnlyList<ChallengeView>>([challenge]);
+            return Task.FromResult<IReadOnlyList<CompetitionChallengeSummaryView>>([
+                new(challenge.Id, challenge.CompetitionId, challenge.ChallengeId,
+                    challenge.Title, challenge.CustomTitle, challenge.Direction,
+                    challenge.Order, challenge.IsPublished, challenge.DeletedAt,
+                    challenge.InteractionKind)
+            ]);
         }
 
         public Task<ChallengeMutationResult> UpdateAsync(
@@ -309,13 +315,19 @@ public class ChallengeManagementTests
 
     private sealed class Catalog : IChallengeConfigurationCatalog
     {
-        public string GetDefaultJson(GameMode mode) => """{"schemaVersion":1}""";
+        public CompetitionChallengeRules CreateDefaultRules(GameMode mode, Guid id) =>
+            new CtfCompetitionChallengeRules { CompetitionChallengeId = id };
+        public ChallengeDefinition CreateDefaultDefinition(GameMode mode, Guid id) =>
+            new CtfChallengeDefinition { ChallengeId = id };
 
         public IReadOnlyList<string> Validate(
             GameMode mode,
-            string json,
-            string competitionConfigurationJson,
+            CompetitionChallengeRules rules,
+            CompetitionModeConfiguration competitionConfiguration,
             int eligibleTeamCount) => [];
+        public IReadOnlyList<string> ValidateDefinition(
+            GameMode mode,
+            ChallengeDefinition definition) => [];
     }
 
 }

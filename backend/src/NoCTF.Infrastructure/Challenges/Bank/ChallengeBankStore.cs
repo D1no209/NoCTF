@@ -11,21 +11,18 @@ using NoCTF.Domain.Competitions;
 using NoCTF.Infrastructure.Messaging;
 using NoCTF.Application.Runtime.Provisioning;
 using NoCTF.GameModes.Registration;
-using System.Text.Json;
-using System.Text.Json.Nodes;
-using NoCTF.GameModes.Ctf.Configuration;
 
 namespace NoCTF.Infrastructure.Challenges.Bank;
 
 public sealed class ChallengeBankStore(
     NoCtfDbContext db,
-    ITransactionalMessageOutbox? messageOutbox = null,
+    IPostCommitMessagePublisher? messageOutbox = null,
     ICompetitionEventRecorder? eventRecorder = null) : IChallengeBankStore
 {
     private static readonly IChallengeRuntimeTemplateCatalog RuntimeTemplates =
         new ChallengeRuntimeTemplateCatalog();
-    private readonly ITransactionalMessageOutbox outbox =
-        messageOutbox ?? new NoOpTransactionalMessageOutbox();
+    private readonly IPostCommitMessagePublisher outbox =
+        messageOutbox ?? new NoOpPostCommitMessagePublisher();
     private readonly ICompetitionEventRecorder events =
         eventRecorder ?? NullCompetitionEventRecorder.Instance;
 
@@ -52,19 +49,17 @@ public sealed class ChallengeBankStore(
                 UserIds: eligibility.RoleIneligibleUserIds);
         }
 
-        var entity = new Challenge
-        {
-            Id = challengeId,
-            OwnerId = command.OwnerId,
-            Mode = command.Mode,
-            Visibility = command.Visibility,
-            Title = command.Title,
-            Description = command.Description,
-            Direction = command.Direction,
-            DefinitionJson = command.DefinitionJson,
-            CreatedAt = command.CreatedAt,
-            UpdatedAt = command.CreatedAt
-        };
+        ChallengeDefinitionGraph.AssignChallengeId(command.Definition, challengeId);
+        var entity = ChallengeGeneratedCatalog.Create(command.Mode);
+        entity.Id = challengeId;
+        entity.OwnerId = command.OwnerId;
+        entity.Visibility = command.Visibility;
+        entity.Title = command.Title;
+        entity.Description = command.Description;
+        entity.Direction = command.Direction;
+        entity.Definition = command.Definition;
+        entity.CreatedAt = command.CreatedAt;
+        entity.UpdatedAt = command.CreatedAt;
         db.Challenges.Add(entity);
         try
         {
@@ -86,27 +81,11 @@ public sealed class ChallengeBankStore(
         }
     }
 
-    public async Task<IReadOnlyList<ChallengeTemplateView>> ListAsync(
-        Guid actorId,
-        bool isAdministrator,
-        bool includeDeleted,
-        CancellationToken ct)
-    {
-        var source = db.Challenges.IgnoreQueryFilters().AsNoTracking();
-        if (!includeDeleted)
-            source = source.Where(challenge => challenge.DeletedAt == null);
-
-        return await Project(Authorized(source, actorId, isAdministrator)
-                .OrderByDescending(challenge => challenge.UpdatedAt)
-                .ThenBy(challenge => challenge.Id))
-            .ToListAsync(ct);
-    }
-
     public async Task<ChallengeTemplateListPage> ListPageAsync(
         ChallengeTemplateListQuery query,
         CancellationToken ct)
     {
-        var source = db.Challenges.IgnoreQueryFilters().AsNoTracking();
+        var source = db.Challenges.IgnoreQueryFilters().AsNoTracking().IgnoreAutoIncludes();
         if (!query.IncludeDeleted)
             source = source.Where(challenge => challenge.DeletedAt == null);
 
@@ -114,10 +93,10 @@ public sealed class ChallengeBankStore(
         var keyword = string.IsNullOrWhiteSpace(query.Keyword) ? null : query.Keyword.Trim();
         if (keyword is not null)
         {
-            var pattern = $"%{keyword}%";
+            var normalized = keyword.ToUpperInvariant();
             authorized = authorized.Where(challenge =>
-                EF.Functions.ILike(challenge.Title, pattern)
-                || EF.Functions.ILike(challenge.Direction, pattern));
+                challenge.NormalizedTitle.Contains(normalized)
+                || challenge.NormalizedDirection.Contains(normalized));
         }
         if (!string.IsNullOrWhiteSpace(query.Direction))
             authorized = authorized.Where(challenge => challenge.Direction == query.Direction);
@@ -128,7 +107,7 @@ public sealed class ChallengeBankStore(
                 .ThenByDescending(challenge => challenge.Id)
             : authorized.OrderBy(challenge => challenge.UpdatedAt)
                 .ThenBy(challenge => challenge.Id);
-        var items = await Project(ordered)
+        var items = await ProjectSummary(ordered)
             .Skip(query.Offset)
             .Take(query.Limit)
             .ToListAsync(ct);
@@ -178,21 +157,10 @@ public sealed class ChallengeBankStore(
             await transaction.CommitAsync(ct);
             return new(ChallengeTemplateWriteState.Succeeded, unchanged);
         }
-        if (entity.Mode != command.Mode
-            && await db.CompetitionChallenges.IgnoreQueryFilters().AsNoTracking()
-                .AnyAsync(item =>
-                    item.ChallengeId == command.ChallengeId
-                    && item.DeletedAt == null,
-                    ct))
-        {
+        if (entity.Mode != command.Mode)
             return new(ChallengeTemplateWriteState.ActiveCompetitionModeConflict);
-        }
-        var currentInteraction = entity.Mode == GameMode.Ctf
-            ? GetInteractionKind(entity.DefinitionJson)
-            : CtfInteractionKind.FlagSubmission;
-        var requestedInteraction = command.Mode == GameMode.Ctf
-            ? GetInteractionKind(command.DefinitionJson)
-            : CtfInteractionKind.FlagSubmission;
+        var currentInteraction = GetInteractionKind(entity.Definition);
+        var requestedInteraction = GetInteractionKind(command.Definition);
         if (requestedInteraction == CtfInteractionKind.PatchVerification
             && await db.ChallengeFlags.IgnoreQueryFilters().AsNoTracking()
                 .AnyAsync(flag => flag.ChallengeId == command.ChallengeId, ct))
@@ -221,9 +189,9 @@ public sealed class ChallengeBankStore(
                     Detail: "The CTF interaction kind can change only before the template is referenced or used.");
             }
         }
-        var definitionChanged = !JsonEquals(
-            entity.DefinitionJson,
-            command.DefinitionJson);
+        var definitionChanged = !ChallengeDefinitionStructuralComparer.Equals(
+            entity.Definition,
+            command.Definition);
         if (definitionChanged
             && await db.RuntimeInstances.AsNoTracking().AnyAsync(runtime =>
                 (runtime.State == NoCTF.Domain.Runtime.RuntimeState.Queued
@@ -243,7 +211,7 @@ public sealed class ChallengeBankStore(
                     "Stop every active Runtime created from this template before changing its technical definition.");
         }
         var supportsRegularExpression = command.Mode == GameMode.Ctf
-            && RuntimeTemplates.Get(command.Mode, command.DefinitionJson)?.FlagSource
+            && RuntimeTemplates.Get(command.Definition)?.FlagSource
                 is null or RuntimeFlagSource.Static;
         if (!supportsRegularExpression)
         {
@@ -281,12 +249,21 @@ public sealed class ChallengeBankStore(
                 .Select(item => new PublishedChallengeReference(item.CompetitionId, item.Id))
                 .ToArrayAsync(ct)
             : Array.Empty<PublishedChallengeReference>();
-        entity.Mode = command.Mode;
         entity.Visibility = command.Visibility;
         entity.Title = command.Title;
         entity.Description = command.Description;
         entity.Direction = command.Direction;
-        entity.DefinitionJson = command.DefinitionJson;
+        if (definitionChanged)
+        {
+            if (entity.Definition is not null)
+            {
+                db.Remove(entity.Definition);
+                await db.SaveChangesAsync(ct);
+            }
+            ChallengeDefinitionGraph.AssignChallengeId(command.Definition, entity.Id);
+            entity.Definition = command.Definition;
+            db.Add(command.Definition);
+        }
         entity.UpdatedAt = command.UpdatedAt;
         foreach (var reference in publishedReferences)
         {
@@ -304,7 +281,7 @@ public sealed class ChallengeBankStore(
                 .Where(challenge => challenge.Id == entity.Id))
             .SingleAsync(ct);
         await transaction.CommitAsync(ct);
-        await outbox.FlushOutgoingMessagesAsync();
+        await transaction.FlushMessagesAsync(outbox);
         return new(ChallengeTemplateWriteState.Succeeded, result);
     }
 
@@ -315,7 +292,33 @@ public sealed class ChallengeBankStore(
         DateTimeOffset now,
         CancellationToken ct)
     {
-        await using var transaction = await AggregateCompatibleTransaction.BeginAsync(db, ct);
+        for (var attempt = 0; ; attempt++)
+        {
+            try
+            {
+                return await SoftDeleteOnceAsync(
+                    challengeId, actorId, isAdministrator, now, ct);
+            }
+            catch (Exception exception) when (attempt < 2
+                && RelationalRetry.IsTransientConcurrency(exception))
+            {
+                db.ChangeTracker.Clear();
+                await Task.Delay(TimeSpan.FromMilliseconds(Random.Shared.Next(5, 31)), ct);
+            }
+        }
+    }
+
+    private async Task<ChallengeTemplateDeleteFailure?> SoftDeleteOnceAsync(
+        Guid challengeId,
+        Guid actorId,
+        bool isAdministrator,
+        DateTimeOffset now,
+        CancellationToken ct)
+    {
+        await using var transaction = await AggregateCompatibleTransaction.BeginAsync(
+            db,
+            System.Data.IsolationLevel.Serializable,
+            ct);
         var entity = await ChallengeTemplateCriticalSection.AcquireAsync(db, challengeId, ct);
         if (entity is null
             || entity.DeletedAt is not null
@@ -437,7 +440,35 @@ public sealed class ChallengeBankStore(
         DateTimeOffset now,
         CancellationToken ct)
     {
-        await using var transaction = await AggregateCompatibleTransaction.BeginAsync(db, ct);
+        for (var attempt = 0; ; attempt++)
+        {
+            try
+            {
+                return await TransferOwnerOnceAsync(
+                    challengeId, actorId, isAdministrator, ownerId, now, ct);
+            }
+            catch (Exception exception) when (attempt < 2
+                && (exception is DbUpdateException
+                    || RelationalRetry.IsTransientConcurrency(exception)))
+            {
+                db.ChangeTracker.Clear();
+                await Task.Delay(TimeSpan.FromMilliseconds(Random.Shared.Next(5, 31)), ct);
+            }
+        }
+    }
+
+    private async Task<ChallengeTemplateWriteResult> TransferOwnerOnceAsync(
+        Guid challengeId,
+        Guid actorId,
+        bool isAdministrator,
+        Guid ownerId,
+        DateTimeOffset now,
+        CancellationToken ct)
+    {
+        await using var transaction = await AggregateCompatibleTransaction.BeginAsync(
+            db,
+            System.Data.IsolationLevel.Serializable,
+            ct);
         var entity = await ChallengeTemplateCriticalSection.AcquireAsync(db, challengeId, ct);
         if (entity is null
             || entity.DeletedAt is not null
@@ -485,33 +516,12 @@ public sealed class ChallengeBankStore(
         && string.Equals(entity.Title, command.Title, StringComparison.Ordinal)
         && string.Equals(entity.Description, command.Description, StringComparison.Ordinal)
         && string.Equals(entity.Direction, command.Direction, StringComparison.OrdinalIgnoreCase)
-        && JsonEquals(entity.DefinitionJson, command.DefinitionJson);
+        && ChallengeDefinitionStructuralComparer.Equals(entity.Definition, command.Definition);
 
-    private static bool JsonEquals(string current, string updated)
-    {
-        if (string.Equals(current, updated, StringComparison.Ordinal))
-            return true;
-        try
-        {
-            return JsonNode.DeepEquals(JsonNode.Parse(current), JsonNode.Parse(updated));
-        }
-        catch (JsonException)
-        {
-            return false;
-        }
-    }
-
-    private static CtfInteractionKind GetInteractionKind(string definitionJson)
-    {
-        try
-        {
-            return CtfConfigurationParser.ParseDefinition(definitionJson).InteractionKind;
-        }
-        catch (GameModeConfigurationException)
-        {
-            return CtfInteractionKind.FlagSubmission;
-        }
-    }
+    private static CtfInteractionKind GetInteractionKind(ChallengeDefinition? definition) =>
+        definition is CtfChallengeDefinition ctf
+            ? ctf.InteractionKind
+            : CtfInteractionKind.FlagSubmission;
 
     private static IQueryable<Challenge> Authorized(
         IQueryable<Challenge> query,
@@ -521,7 +531,7 @@ public sealed class ChallengeBankStore(
             ? query
             : query.Where(challenge =>
                 challenge.OwnerId == actorId ||
-                challenge.ManagerIds.Contains(actorId) ||
+                challenge.Managers.Any(manager => manager.UserId == actorId) ||
                 challenge.Visibility == ChallengeVisibility.Shared);
 
     private static IQueryable<Challenge> WriteAuthorized(
@@ -532,7 +542,7 @@ public sealed class ChallengeBankStore(
             ? query
             : query.Where(challenge =>
                 challenge.OwnerId == actorId ||
-                challenge.ManagerIds.Contains(actorId));
+                challenge.Managers.Any(manager => manager.UserId == actorId));
 
     private static bool CanWrite(
         Challenge challenge,
@@ -540,24 +550,40 @@ public sealed class ChallengeBankStore(
         bool isAdministrator) =>
         isAdministrator
         || challenge.OwnerId == actorId
-        || challenge.ManagerIds.Contains(actorId);
+        || challenge.Managers.Any(manager => manager.UserId == actorId);
 
     private IQueryable<ChallengeTemplateView> Project(IQueryable<Challenge> source) =>
         source.Select(challenge => new ChallengeTemplateView(
             challenge.Id,
             challenge.OwnerId,
-            challenge.ManagerIds,
+            challenge.Managers.Select(manager => manager.UserId).ToArray(),
             challenge.Mode,
             challenge.Visibility,
             challenge.Title,
             challenge.Description,
             challenge.Direction,
-            challenge.DefinitionJson,
+            challenge.Definition!,
             challenge.DeletedAt,
             db.CompetitionChallenges.IgnoreQueryFilters().Count(item =>
                 item.ChallengeId == challenge.Id && item.DeletedAt == null),
             challenge.CreatedAt,
-            challenge.UpdatedAt));
+            challenge.UpdatedAt)).AsSplitQuery();
+
+    private IQueryable<ChallengeTemplateSummaryView> ProjectSummary(IQueryable<Challenge> source) =>
+        source.Select(challenge => new ChallengeTemplateSummaryView(
+            challenge.Id,
+            challenge.Mode,
+            challenge.Visibility,
+            challenge.Title,
+            challenge.Direction,
+            challenge.DeletedAt,
+            db.CompetitionChallenges.IgnoreQueryFilters().Count(item =>
+                item.ChallengeId == challenge.Id && item.DeletedAt == null),
+            challenge.UpdatedAt,
+            db.Set<CtfChallengeDefinition>().AsNoTracking()
+                .Where(definition => definition.ChallengeId == challenge.Id)
+                .Select(definition => definition.InteractionKind)
+                .FirstOrDefault()));
 
     private sealed record PublishedChallengeReference(
         Guid CompetitionId,

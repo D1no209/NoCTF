@@ -99,7 +99,7 @@ public sealed class ChallengeTestFlagInjectionHandlerTests
             Guid.Empty,
             RuntimeKind.Container,
             RuntimeProvider.Docker,
-            "{}",
+            RuntimeReceiptTestData.ContainerData(),
             "flag{test}",
             "set-flag ${FLAG}",
             null,
@@ -133,7 +133,7 @@ public sealed class ChallengeTestFlagInjectionHandlerTests
             Task.FromResult(result);
     }
 
-    private sealed class RecordingOutbox : ITransactionalMessageOutbox
+    private sealed class RecordingOutbox : IPostCommitMessagePublisher
     {
         public List<(InjectChallengeTestFlag Message, DateTimeOffset At)> Scheduled { get; } = [];
 

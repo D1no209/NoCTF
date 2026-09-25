@@ -60,7 +60,7 @@ public sealed class CompetitionChallengePresentationPatchRequest
 
 public sealed class CompetitionChallengeRulesPatchRequest
 {
-    public required string Json { get; set; }
+    public required CompetitionChallengeRulesContract Configuration { get; set; }
 }
 
 public sealed class PatchCompetitionChallengeRequest
@@ -89,8 +89,12 @@ public sealed class PatchCompetitionChallengeValidator
             .When(request => request.Presentation is not null);
         RuleFor(request => request.Presentation!.Order).GreaterThanOrEqualTo(0)
             .When(request => request.Presentation is not null);
-        RuleFor(request => request.Rules!.Json).NotEmpty()
+        RuleFor(request => request.Rules!.Configuration).NotNull()
             .When(request => request.Rules is not null);
+        RuleFor(request => request.Rules!.Configuration)
+            .Must(CompetitionChallengeRulesContractMapper.HasValidShape)
+            .When(request => request.Rules is not null)
+            .WithMessage("Rules must contain exactly the branch matching their mode.");
     }
 }
 
@@ -100,18 +104,24 @@ public sealed class PatchCompetitionChallengeValidator
 public static partial class CompetitionChallengePatchMapper
 {
     [MapperIgnoreTarget(nameof(CompetitionChallenge.Id))]
+    [MapperIgnoreTarget(nameof(CompetitionChallenge.ConcurrencyStamp))]
     [MapperIgnoreTarget(nameof(CompetitionChallenge.CompetitionId))]
     [MapperIgnoreTarget(nameof(CompetitionChallenge.ChallengeId))]
-    [MapperIgnoreTarget(nameof(CompetitionChallenge.RulesJson))]
+    [MapperIgnoreTarget(nameof(CompetitionChallenge.Rules))]
+    [MapperIgnoreTarget(nameof(CompetitionChallenge.Mode))]
     [MapperIgnoreTarget(nameof(CompetitionChallenge.UpdatedAt))]
     [MapperIgnoreTarget(nameof(CompetitionChallenge.DeletedAt))]
     [MapperIgnoreTarget(nameof(CompetitionChallenge.Hints))]
+    [MapperIgnoreTarget(nameof(CompetitionChallenge.NormalizedCustomTitle))]
     public static partial void ApplyPresentationAsCompetitionModerator(
         CompetitionChallengePresentationPatchRequest request,
         [MappingTarget] CompetitionChallenge target);
 
-    [MapProperty(nameof(CompetitionChallengeRulesPatchRequest.Json), nameof(CompetitionChallenge.RulesJson))]
+    [MapperIgnoreSource(nameof(CompetitionChallengeRulesPatchRequest.Configuration))]
+    [MapperIgnoreTarget(nameof(CompetitionChallenge.Rules))]
+    [MapperIgnoreTarget(nameof(CompetitionChallenge.Mode))]
     [MapperIgnoreTarget(nameof(CompetitionChallenge.Id))]
+    [MapperIgnoreTarget(nameof(CompetitionChallenge.ConcurrencyStamp))]
     [MapperIgnoreTarget(nameof(CompetitionChallenge.CompetitionId))]
     [MapperIgnoreTarget(nameof(CompetitionChallenge.ChallengeId))]
     [MapperIgnoreTarget(nameof(CompetitionChallenge.CustomTitle))]
@@ -120,6 +130,7 @@ public static partial class CompetitionChallengePatchMapper
     [MapperIgnoreTarget(nameof(CompetitionChallenge.UpdatedAt))]
     [MapperIgnoreTarget(nameof(CompetitionChallenge.DeletedAt))]
     [MapperIgnoreTarget(nameof(CompetitionChallenge.Hints))]
+    [MapperIgnoreTarget(nameof(CompetitionChallenge.NormalizedCustomTitle))]
     public static partial void ApplyRulesAsCompetitionModerator(
         CompetitionChallengeRulesPatchRequest request,
         [MappingTarget] CompetitionChallenge target);
@@ -168,24 +179,31 @@ public sealed class PatchCompetitionChallengeEndpoint(
             ct);
         if (current is null || configuration is null)
             return TypedResults.NotFound();
+        if ((sections & CompetitionChallengePatchSection.Rules) != 0
+            && request.Rules!.Configuration.Mode != (GameModeProtocol)configuration.Mode)
+            return TypedResults.Problem(
+                statusCode: StatusCodes.Status400BadRequest,
+                title: "Challenge rules were not updated.",
+                detail: "Rules mode must match the competition mode.");
 
-        var target = new CompetitionChallenge
-        {
-            Id = current.Id,
-            CompetitionId = current.CompetitionId,
-            ChallengeId = current.ChallengeId,
-            CustomTitle = current.CustomTitle,
-            Order = current.Order,
-            IsPublished = current.IsPublished,
-            RulesJson = configuration.Json,
-            UpdatedAt = current.UpdatedAt,
-            DeletedAt = current.DeletedAt
-        };
+        var target = CompetitionChallengeGeneratedCatalog.Create(configuration.Mode);
+        target.Id = current.Id;
+        target.CompetitionId = current.CompetitionId;
+        target.ChallengeId = current.ChallengeId;
+        target.CustomTitle = current.CustomTitle;
+        target.Order = current.Order;
+        target.IsPublished = current.IsPublished;
+        target.Rules = configuration.Rules;
+        target.UpdatedAt = current.UpdatedAt;
+        target.DeletedAt = current.DeletedAt;
         if ((sections & CompetitionChallengePatchSection.Presentation) != 0)
             CompetitionChallengePatchMapper.ApplyPresentationAsCompetitionModerator(
                 request.Presentation!, target);
         if ((sections & CompetitionChallengePatchSection.Rules) != 0)
-            CompetitionChallengePatchMapper.ApplyRulesAsCompetitionModerator(request.Rules!, target);
+            target.Rules = CompetitionChallengeRulesContractMapper.ToDomain(
+                competitionChallengeId,
+                target.Mode,
+                request.Rules!.Configuration);
 
         return await atomicPatch.ExecuteAsync(ApplyAsync, ct);
 
@@ -229,7 +247,7 @@ public sealed class PatchCompetitionChallengeEndpoint(
                 var result = await updateConfiguration.ExecuteAsync(
                     competitionId,
                     competitionChallengeId,
-                    target.RulesJson,
+                    target.Rules!,
                     timeProvider.GetUtcNow(),
                     transactionCt);
                 if (!result.Succeeded)
@@ -280,7 +298,8 @@ public sealed class PatchCompetitionChallengeEndpoint(
                         CompetitionProtocolMapper.ToProtocol(refreshedConfiguration.Mode),
                         CompetitionProtocolMapper.ToProtocol(
                             refreshedConfiguration.CompetitionStatus),
-                        refreshedConfiguration.Json));
+                        CompetitionChallengeRulesContractMapper.FromDomain(
+                            refreshedConfiguration.Rules)));
             return AtomicAggregatePatchDecision<Results<Ok<AdminCompetitionChallengeResponse>,
                 NotFound, ForbidHttpResult, Conflict<CompetitionChallengeConflictResponse>,
                 ProblemHttpResult>>.Commit(response);

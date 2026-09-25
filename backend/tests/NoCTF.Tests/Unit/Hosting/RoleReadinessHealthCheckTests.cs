@@ -87,7 +87,7 @@ public sealed class RoleReadinessHealthCheckTests
         await Assert.That(workerDependencies.OfType<RedisReadinessDependency>().Single()
                 .FailureIsCritical)
             .IsTrue();
-        await Assert.That(workerDependencies.OfType<PostgreSqlReadinessDependency>())
+        await Assert.That(workerDependencies.OfType<DatabaseReadinessDependency>())
             .HasSingleItem();
         await Assert.That(workerDependencies.OfType<WolverineReadinessDependency>())
             .HasSingleItem();

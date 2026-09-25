@@ -8,6 +8,8 @@
     <PackageReference Include="AsyncKeyedLock" />
     <PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" />
     <PackageReference Include="Microsoft.Extensions.TimeProvider.Testing" />
+    <PackageReference Include="Microsoft.CodeAnalysis.CSharp" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.InMemory" />
     <PackageReference Include="NSubstitute" />
     <PackageReference Include="Testcontainers.PostgreSql" />
     <PackageReference Include="Testcontainers.Redis" />
@@ -19,8 +21,11 @@
     <ProjectReference Include="../../src/NoCTF.API/NoCTF.API.csproj" />
     <ProjectReference Include="../../src/NoCTF.Application/NoCTF.Application.csproj" />
     <ProjectReference Include="../../src/NoCTF.Domain/NoCTF.Domain.csproj" />
+    <ProjectReference Include="../../src/NoCTF.Modeling.Generators/NoCTF.Modeling.Generators.csproj" ReferenceOutputAssembly="true" OutputItemType="Reference" />
     <ProjectReference Include="../../src/NoCTF.GameModes/NoCTF.GameModes.csproj" />
     <ProjectReference Include="../../src/NoCTF.Infrastructure/NoCTF.Infrastructure.csproj" />
+    <ProjectReference Include="../../src/NoCTF.Persistence.PostgreSql/NoCTF.Persistence.PostgreSql.csproj" />
+    <ProjectReference Include="../../src/NoCTF.Persistence.Sqlite/NoCTF.Persistence.Sqlite.csproj" />
     <ProjectReference Include="../../src/NoCTF.Hosting/NoCTF.Hosting.csproj" />
     <ProjectReference Include="../../src/NoCTF.Host/NoCTF.Host.csproj" />
     <ProjectReference Include="../../src/NoCTF.Runtime.Libvirt/NoCTF.Runtime.Libvirt.csproj" />

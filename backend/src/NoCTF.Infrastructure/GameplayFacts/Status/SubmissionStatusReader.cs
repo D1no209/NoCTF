@@ -16,12 +16,12 @@ public sealed class GameplayFactStatusReader(NoCtfDbContext db) : IGameplayFactS
         var isStaff = await db.Competitions.AsNoTracking().AnyAsync(
                 competition => competition.Id == competitionId
                     && (competition.OwnerId == userId
-                        || competition.ManagerIds.Contains(userId)
-                        || competition.JudgeIds.Contains(userId)
-                        || competition.ObserverIds.Contains(userId)),
+                        || competition.Collaborators.Any(collaborator => collaborator.Role == NoCTF.Domain.Competitions.CompetitionCollaboratorRole.Manager && collaborator.UserId == userId)
+                        || competition.Collaborators.Any(collaborator => collaborator.Role == NoCTF.Domain.Competitions.CompetitionCollaboratorRole.Judge && collaborator.UserId == userId)
+                        || competition.Collaborators.Any(collaborator => collaborator.Role == NoCTF.Domain.Competitions.CompetitionCollaboratorRole.Observer && collaborator.UserId == userId)),
                 cancellationToken);
         var teamId = await db.Teams.AsNoTracking()
-            .Where(team => team.CompetitionId == competitionId && team.MemberIds.Contains(userId))
+            .Where(team => team.CompetitionId == competitionId && team.Members.Any(member => member.UserId == userId))
             .Select(team => (Guid?)team.Id)
             .SingleOrDefaultAsync(cancellationToken);
         if (!isStaff && teamId is null)

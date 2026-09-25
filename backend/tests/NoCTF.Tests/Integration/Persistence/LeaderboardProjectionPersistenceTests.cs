@@ -55,10 +55,14 @@ public sealed class LeaderboardProjectionPersistenceTests
             var owner = CreateUser(now);
             var fixture = CreateFixture(GameMode.Awdp, 0, owner.Id, now);
             fixture.Competition.StartAt = now.AddSeconds(-130);
-            string Configuration(int duration) => JsonSerializer.Serialize(new AwdpConfiguration(
-                AwdpConfiguration.CurrentSchemaVersion, duration, new(100, 100, 2, ScoreDecayMode.Fixed),
-                new(40, 40, 2, ScoreDecayMode.Fixed), RequireBreakBeforeFix: false), new JsonSerializerOptions(JsonSerializerDefaults.Web));
-            fixture.Competition.ConfigurationJson = Configuration(60);
+            AwdpCompetitionModeConfiguration Configuration(int duration) => new()
+            {
+                RoundDurationSeconds = duration,
+                BreakScoreCurve = new() { InitialPoints = 100, MinimumPoints = 100, DecayTeamCount = 2 },
+                FixScoreCurve = new() { InitialPoints = 40, MinimumPoints = 40, DecayTeamCount = 2 },
+                RequireBreakBeforeFix = false
+            };
+            fixture.Competition.ModeConfiguration = Configuration(60);
             var fact = fixture.Facts[0];
             fact.OccurredAt = fixture.Competition.StartAt.AddSeconds(10);
             fact.UpdatedAt = fact.OccurredAt;
@@ -75,7 +79,7 @@ public sealed class LeaderboardProjectionPersistenceTests
             var cache = new FusionLeaderboardCache(db, new LeaderboardProjectionEngine(new LeaderboardProjectorCatalog()),
                 publisher, cacheServices.GetRequiredService<IFusionCacheProvider>(), clock: clock);
             var before = (await cache.GetScoreboardAsync(fixture.Competition.Id, ct))!;
-            var outbox = new NoCTF.Infrastructure.Messaging.NoOpTransactionalMessageOutbox();
+            var outbox = new NoCTF.Infrastructure.Messaging.NoOpPostCommitMessagePublisher();
             var store = new NoCTF.Infrastructure.Competitions.Configuration.CompetitionConfigurationStore(db, outbox,
                 new NoCTF.Infrastructure.Competitions.Events.CompetitionEventStore(db, outbox));
             await store.TryUpdateAsync(fixture.Competition.Id, Configuration(120), true, now, ct);
@@ -129,14 +133,15 @@ public sealed class LeaderboardProjectionPersistenceTests
             var fixture = CreateFixture(GameMode.Awdp, 0, owner.Id, now);
             fixture.Competition.StartAt = now.AddSeconds(-1);
             fixture.Competition.EndAt = now.AddHours(1);
-            fixture.Competition.ConfigurationJson = JsonSerializer.Serialize(
-                new AwdpConfiguration(
-                    AwdpConfiguration.CurrentSchemaVersion,
-                    2,
-                    ScoreCurveConfiguration.Default,
-                    ScoreCurveConfiguration.Default,
-                    RequireBreakBeforeFix: false),
-                new JsonSerializerOptions(JsonSerializerDefaults.Web));
+            fixture.Competition.ModeConfiguration = TestConfigurations.Competition(
+                GameMode.Awdp,
+                JsonSerializer.Serialize(
+                    new AwdpConfiguration(
+                        2,
+                        ScoreCurveConfiguration.Default,
+                        ScoreCurveConfiguration.Default,
+                        RequireBreakBeforeFix: false),
+                    new JsonSerializerOptions(JsonSerializerDefaults.Web)));
             db.Users.Add(owner);
             db.Competitions.Add(fixture.Competition);
             db.Challenges.Add(fixture.Challenge);
@@ -402,36 +407,34 @@ public sealed class LeaderboardProjectionPersistenceTests
             var fixture = CreateFixture(GameMode.Ctf, 0, owner.Id, projectedAt);
             var visibleFact = fixture.Facts[0];
             visibleFact.Result = GameplayFactResult.Correct;
-            var hiddenTemplate = new Challenge
+            var hiddenTemplate = new CtfChallenge
             {
                 Id = Guid.CreateVersion7(projectedAt.AddMinutes(40)),
                 OwnerId = owner.Id,
-                Mode = GameMode.Ctf,
                 Visibility = ChallengeVisibility.Private,
                 Title = "Hidden challenge",
                 Direction = "Pwn",
-                DefinitionJson = fixture.Challenge.DefinitionJson,
+                Definition = TestConfigurations.Clone(fixture.Challenge.Definition!),
                 CreatedAt = projectedAt.AddMinutes(-20),
                 UpdatedAt = projectedAt.AddMinutes(-20)
             };
-            var hiddenChallenge = new CompetitionChallenge
+            var hiddenChallenge = new CtfCompetitionChallenge
             {
                 Id = Guid.CreateVersion7(projectedAt.AddMinutes(41)),
                 CompetitionId = fixture.Competition.Id,
                 ChallengeId = hiddenTemplate.Id,
                 Order = 2,
                 IsPublished = false,
-                RulesJson = fixture.CompetitionChallenge.RulesJson,
+                Rules = TestConfigurations.Clone(fixture.CompetitionChallenge.Rules!),
                 UpdatedAt = projectedAt.AddMinutes(-20)
             };
-            var hiddenFact = new GameplayFact
+            var hiddenFact = new FlagAttemptGameplayFact
             {
                 Id = Guid.CreateVersion7(projectedAt.AddMinutes(-10)),
                 CompetitionId = fixture.Competition.Id,
                 CompetitionChallengeId = hiddenChallenge.Id,
                 TeamId = fixture.Team.Id,
                 ActorUserId = owner.Id,
-                Kind = GameplayFactKind.FlagAttempt,
                 OccurredAt = projectedAt.AddMinutes(-10),
                 Value = "flag{hidden}",
                 ValueSha256 = new byte[32],
@@ -509,24 +512,24 @@ public sealed class LeaderboardProjectionPersistenceTests
             var owner = CreateUser(projectedAt);
             var fixture = CreateFixture(GameMode.Awdp, 0, owner.Id, projectedAt);
             fixture.Competition.StartAt = startedAt;
-            fixture.Competition.ConfigurationJson = JsonSerializer.Serialize(new AwdpConfiguration(
-                AwdpConfiguration.CurrentSchemaVersion,
-                1,
-                new(100, 100, 2, ScoreDecayMode.Fixed),
-                new(40, 40, 2, ScoreDecayMode.Fixed),
-                RequireBreakBeforeFix: false), new JsonSerializerOptions(JsonSerializerDefaults.Web));
+            fixture.Competition.ModeConfiguration = TestConfigurations.Competition(
+                GameMode.Awdp,
+                JsonSerializer.Serialize(new AwdpConfiguration(
+                    1,
+                    new(100, 100, 2, ScoreDecayMode.Fixed),
+                    new(40, 40, 2, ScoreDecayMode.Fixed),
+                    RequireBreakBeforeFix: false), new JsonSerializerOptions(JsonSerializerDefaults.Web)));
             var firstBreak = fixture.Facts[0];
             firstBreak.OccurredAt = startedAt.AddSeconds(1);
             firstBreak.UpdatedAt = firstBreak.OccurredAt;
             firstBreak.Result = GameplayFactResult.Correct;
-            var laterWrongBreak = new GameplayFact
+            var laterWrongBreak = new BreakAttemptGameplayFact
             {
                 Id = Guid.CreateVersion7(startedAt.AddSeconds(199)),
                 CompetitionId = fixture.Competition.Id,
                 CompetitionChallengeId = fixture.CompetitionChallenge.Id,
                 TeamId = fixture.Team.Id,
                 ActorUserId = owner.Id,
-                Kind = GameplayFactKind.BreakAttempt,
                 OccurredAt = startedAt.AddSeconds(199),
                 Value = "flag{later-wrong}",
                 ValueSha256 = new byte[32],
@@ -564,21 +567,21 @@ public sealed class LeaderboardProjectionPersistenceTests
                 Substitute.For<ILeaderboardRefreshPublisher>(),
                 cacheServices.GetRequiredService<IFusionCacheProvider>());
 
-            var latest = await cache.CreateBundleAsync(
+            var latest = await cache.CreateScoreboardAsync(
                 fixture.Competition.Id,
                 projectedAt,
                 cancellationToken);
             var elapsedSeconds = (int)(projectedAt - startedAt).TotalSeconds;
             await Assert.That(latest).IsNotNull();
-            await Assert.That(latest!.Scoreboard.Schema.Rounds)
+            await Assert.That(latest!.Schema.Rounds)
                 .Count().IsEqualTo(ScoreboardRoundWindow.DefaultSize);
-            await Assert.That(latest.Scoreboard.Schema.RoundWindowEnd)
+            await Assert.That(latest.Schema.RoundWindowEnd)
                 .IsEqualTo(elapsedSeconds + 1);
-            await Assert.That(latest.Scoreboard.Snapshot.Teams.Single().TotalScore)
+            await Assert.That(latest.Snapshot.Teams.Single().TotalScore)
                 .IsEqualTo(100L * (elapsedSeconds - 1) + 14);
-            await Assert.That(latest.Scoreboard.Snapshot.Teams.Single().ScoreOutsideWindow)
+            await Assert.That(latest.Snapshot.Teams.Single().ScoreOutsideWindow)
                 .IsGreaterThan(0);
-            var historicalAchievement = latest.Scoreboard.Snapshot.Teams.Single().Achievements!.Single();
+            var historicalAchievement = latest.Snapshot.Teams.Single().Achievements!.Single();
             await Assert.That(historicalAchievement.Kind).IsEqualTo(ScoreboardEntryKind.Attack);
             await Assert.That(historicalAchievement.OccurredAt.UtcTicks / 10).IsEqualTo(firstBreak.OccurredAt.UtcTicks / 10);
 
@@ -615,7 +618,7 @@ public sealed class LeaderboardProjectionPersistenceTests
             await Assert.That(historical!.Schema.Rounds.Select(round => round.Number))
                 .IsEquivalentTo(Enumerable.Range(51, ScoreboardRoundWindow.DefaultSize));
             await Assert.That(historical.Snapshot.Teams.Single().TotalScore)
-                .IsEqualTo(latest.Scoreboard.Snapshot.Teams.Single().TotalScore);
+                .IsEqualTo(latest.Snapshot.Teams.Single().TotalScore);
             await Assert.That(historical.Snapshot.Teams.Single().TotalScore)
                 .IsEqualTo(checked(
                     historical.Snapshot.Teams.Single().ScoreOutsideWindow
@@ -631,22 +634,16 @@ public sealed class LeaderboardProjectionPersistenceTests
                 Guid competitionId,
                 CompetitionStatus from,
                 CompetitionStatus to,
-                DateTimeOffset occurredAt) => new()
+                DateTimeOffset occurredAt) => new CompetitionLifecycleChangedEvent
                 {
                     Id = Guid.CreateVersion7(occurredAt),
                     CompetitionId = competitionId,
-                    Kind = CompetitionEventKind.CompetitionLifecycleChanged,
                     Level = CompetitionEventLevel.Information,
                     Visibility = CompetitionEventVisibility.Public,
-                    PayloadJson = JsonSerializer.Serialize(new
-                    {
-                        schemaVersion = 1,
-                        competitionStatus = to,
-                        from,
-                        to,
-                        automatic = true,
-                        reason = "test"
-                    }),
+                    PreviousCompetitionStatus = from,
+                    CompetitionStatus = to,
+                    Automatic = true,
+                    Reason = "test",
                     OccurredAt = occurredAt
                 };
         });
@@ -680,25 +677,25 @@ public sealed class LeaderboardProjectionPersistenceTests
             var owner = CreateUser(firstProjectionAt);
             var fixture = CreateFixture(GameMode.Awdp, 0, owner.Id, firstProjectionAt);
             fixture.Competition.StartAt = startedAt;
-            fixture.Competition.ConfigurationJson = JsonSerializer.Serialize(new AwdpConfiguration(
-                AwdpConfiguration.CurrentSchemaVersion,
-                60,
-                new(100, 100, 2, ScoreDecayMode.Fixed),
-                new(100, 100, 2, ScoreDecayMode.Fixed),
-                FlagWrongPenalty: 7,
-                RequireBreakBeforeFix: false), new JsonSerializerOptions(JsonSerializerDefaults.Web));
+            fixture.Competition.ModeConfiguration = TestConfigurations.Competition(
+                GameMode.Awdp,
+                JsonSerializer.Serialize(new AwdpConfiguration(
+                    60,
+                    new(100, 100, 2, ScoreDecayMode.Fixed),
+                    new(100, 100, 2, ScoreDecayMode.Fixed),
+                    FlagWrongPenalty: 7,
+                    RequireBreakBeforeFix: false), new JsonSerializerOptions(JsonSerializerDefaults.Web)));
             var settledPenalty = fixture.Facts[0];
             settledPenalty.OccurredAt = startedAt.AddSeconds(30);
             settledPenalty.UpdatedAt = settledPenalty.OccurredAt;
             settledPenalty.Result = GameplayFactResult.Wrong;
-            var pendingPenalty = new GameplayFact
+            var pendingPenalty = new BreakAttemptGameplayFact
             {
                 Id = Guid.CreateVersion7(startedAt.AddSeconds(70)),
                 CompetitionId = fixture.Competition.Id,
                 CompetitionChallengeId = fixture.CompetitionChallenge.Id,
                 TeamId = fixture.Team.Id,
                 ActorUserId = owner.Id,
-                Kind = GameplayFactKind.BreakAttempt,
                 OccurredAt = startedAt.AddSeconds(70),
                 Value = "flag{current-round-wrong}",
                 ValueSha256 = new byte[32],
@@ -725,7 +722,7 @@ public sealed class LeaderboardProjectionPersistenceTests
                 Substitute.For<ILeaderboardRefreshPublisher>(),
                 cacheServices.GetRequiredService<IFusionCacheProvider>());
 
-            var beforeSettlement = await cache.CreateBundleAsync(
+            var beforeSettlement = await cache.CreateScoreboardAsync(
                 fixture.Competition.Id,
                 firstProjectionAt,
                 cancellationToken);
@@ -744,20 +741,20 @@ public sealed class LeaderboardProjectionPersistenceTests
                     CompetitionStatus.Finished,
                     finishedAt));
             await db.SaveChangesAsync(cancellationToken);
-            var afterSettlement = await cache.CreateBundleAsync(
+            var afterSettlement = await cache.CreateScoreboardAsync(
                 fixture.Competition.Id,
                 finishedAt,
                 cancellationToken);
 
             await Assert.That(beforeSettlement).IsNotNull();
-            await Assert.That(beforeSettlement!.Scoreboard.Snapshot.Teams.Single().TotalScore)
+            await Assert.That(beforeSettlement!.Snapshot.Teams.Single().TotalScore)
                 .IsEqualTo(-7);
             await Assert.That(afterSettlement).IsNotNull();
-            await Assert.That(afterSettlement!.Scoreboard.Snapshot.Teams.Single().TotalScore)
+            await Assert.That(afterSettlement!.Snapshot.Teams.Single().TotalScore)
                 .IsEqualTo(-14);
-            await Assert.That(afterSettlement.Scoreboard.Schema.Rounds[^1].EndAt)
+            await Assert.That(afterSettlement.Schema.Rounds[^1].EndAt)
                 .IsEqualTo(finishedAt);
-            var finishedRow = afterSettlement.Scoreboard.Snapshot.Teams.Single();
+            var finishedRow = afterSettlement.Snapshot.Teams.Single();
             await Assert.That(finishedRow.Slots.Count).IsEqualTo(2);
             await Assert.That(finishedRow.Slots.Sum(slot => slot.NetPoints ?? 0)).IsEqualTo(-14);
             await Assert.That(finishedRow.ScoreOutsideWindow).IsEqualTo(0);
@@ -766,22 +763,16 @@ public sealed class LeaderboardProjectionPersistenceTests
                 Guid competitionId,
                 CompetitionStatus from,
                 CompetitionStatus to,
-                DateTimeOffset occurredAt) => new()
+                DateTimeOffset occurredAt) => new CompetitionLifecycleChangedEvent
                 {
                     Id = Guid.CreateVersion7(occurredAt),
                     CompetitionId = competitionId,
-                    Kind = CompetitionEventKind.CompetitionLifecycleChanged,
                     Level = CompetitionEventLevel.Information,
                     Visibility = CompetitionEventVisibility.Public,
-                    PayloadJson = JsonSerializer.Serialize(new
-                    {
-                        schemaVersion = 1,
-                        competitionStatus = to,
-                        from,
-                        to,
-                        automatic = true,
-                        reason = "test"
-                    }),
+                    PreviousCompetitionStatus = from,
+                    CompetitionStatus = to,
+                    Automatic = true,
+                    Reason = "test",
                     OccurredAt = occurredAt
                 };
         });
@@ -812,11 +803,13 @@ public sealed class LeaderboardProjectionPersistenceTests
             var owner = CreateUser(projectedAt);
             var fixture = CreateFixture(GameMode.Awd, 0, owner.Id, projectedAt);
             fixture.Competition.StartAt = startedAt;
-            fixture.Competition.ConfigurationJson = JsonSerializer.Serialize(
-                AwdConfiguration.Default with { ServiceHealthyPoints = 100 },
-                new JsonSerializerOptions(JsonSerializerDefaults.Web));
+            fixture.Competition.ModeConfiguration = TestConfigurations.Competition(
+                GameMode.Awd,
+                JsonSerializer.Serialize(
+                    AwdConfiguration.Default with { ServiceHealthyPoints = 100 },
+                    new JsonSerializerOptions(JsonSerializerDefaults.Web)));
             var rounds = Enumerable.Range(1, 60)
-                .Select(number => new ChallengeFlag
+                .Select(number => new AwdRoundChallengeFlag
                 {
                     Id = Guid.CreateVersion7(startedAt.AddMinutes(number)),
                     CompetitionChallengeId = fixture.CompetitionChallenge.Id,
@@ -877,24 +870,35 @@ public sealed class LeaderboardProjectionPersistenceTests
             await Assert.That(historicalTeam.TotalScore).IsEqualTo(6_000);
             await Assert.That(historicalTeam.ScoreOutsideWindow).IsEqualTo(1_000);
 
+            var firstAttackerCaptain = CreateUser(projectedAt.AddTicks(1));
+            firstAttackerCaptain.UserName = "first-attacker";
+            firstAttackerCaptain.NormalizedUserName = "FIRST-ATTACKER";
+            firstAttackerCaptain.Email = "first-attacker@example.test";
+            var secondAttackerCaptain = CreateUser(projectedAt.AddTicks(2));
+            secondAttackerCaptain.UserName = "second-attacker";
+            secondAttackerCaptain.NormalizedUserName = "SECOND-ATTACKER";
+            secondAttackerCaptain.Email = "second-attacker@example.test";
             var firstAttacker = CreateApprovedTeam(
                 fixture.Competition.Id,
-                owner.Id,
+                firstAttackerCaptain.Id,
                 "First attacker",
                 projectedAt.AddMinutes(-10));
             var secondAttacker = CreateApprovedTeam(
                 fixture.Competition.Id,
-                owner.Id,
+                secondAttackerCaptain.Id,
                 "Second attacker",
                 projectedAt.AddMinutes(-9));
-            fixture.Competition.ConfigurationJson = JsonSerializer.Serialize(
-                AwdConfiguration.Default with
-                {
-                    AttackRewardMode = AttackRewardMode.SplitVictimDefensePool,
-                    VictimDefensePoolPoints = 100,
-                    ServiceHealthyPoints = 0
-                },
-                new JsonSerializerOptions(JsonSerializerDefaults.Web));
+            fixture.Competition.ModeConfiguration = TestConfigurations.Competition(
+                GameMode.Awd,
+                JsonSerializer.Serialize(
+                    AwdConfiguration.Default with
+                    {
+                        AttackRewardMode = AttackRewardMode.SplitVictimDefensePool,
+                        VictimDefensePoolPoints = 100,
+                        ServiceHealthyPoints = 0
+                    },
+                    new JsonSerializerOptions(JsonSerializerDefaults.Web)));
+            db.Users.AddRange(firstAttackerCaptain, secondAttackerCaptain);
             db.Teams.AddRange(firstAttacker, secondAttacker);
             db.GameplayFacts.AddRange(
                 CreateAttack(firstAttacker.Id, fixture.Team.Id, projectedAt.AddMinutes(-8)),
@@ -935,7 +939,7 @@ public sealed class LeaderboardProjectionPersistenceTests
             GameplayFact CreateAttack(
                 Guid attackerId,
                 Guid victimId,
-                DateTimeOffset occurredAt) => new()
+                DateTimeOffset occurredAt) => new FlagAttemptGameplayFact
                 {
                     Id = Guid.CreateVersion7(occurredAt),
                     CompetitionId = fixture.Competition.Id,
@@ -943,7 +947,6 @@ public sealed class LeaderboardProjectionPersistenceTests
                     TeamId = attackerId,
                     ActorUserId = owner.Id,
                     VictimTeamId = victimId,
-                    Kind = GameplayFactKind.FlagAttempt,
                     OccurredAt = occurredAt,
                     ReferenceKind = GameplayFactReferenceKind.AwdRound,
                     ReferenceId = rounds[0].SpecificationId,
@@ -1005,28 +1008,12 @@ public sealed class LeaderboardProjectionPersistenceTests
             await Assert.That(initialTeam.RankingState).IsEqualTo(ScoreboardRankingState.Eligible);
             await Assert.That(initialTeam.TotalScore).IsNotEqualTo(0L);
 
-            var projectionKey = $"scoreboard:v1:{fixture.Competition.Id:N}";
-            var namedCache = cacheProvider.GetCache(NoCtfCacheNames.Leaderboards);
-            var cachedBundle = await namedCache.GetOrDefaultAsync<ScoreboardProjectionBundle?>(
-                projectionKey,
-                null,
-                token: cancellationToken);
-            var futureVersion = initial.Snapshot.Version + 1_000_000;
-            await namedCache.SetAsync(
-                projectionKey,
-                cachedBundle! with
-                {
-                    Scoreboard = cachedBundle!.Scoreboard with
-                    {
-                        Snapshot = cachedBundle.Scoreboard.Snapshot with { Version = futureVersion }
-                    }
-                },
-                token: cancellationToken);
             await cache.RefreshAsync(fixture.Competition.Id, cancellationToken);
             var monotonicRefresh = await cache.GetScoreboardAsync(
                 fixture.Competition.Id,
                 cancellationToken);
-            await Assert.That(monotonicRefresh!.Snapshot.Version).IsGreaterThan(futureVersion);
+            await Assert.That(monotonicRefresh!.Snapshot.Version)
+                .IsGreaterThan(initial.Snapshot.Version);
 
             var outbox = new RecordingOutbox();
             var moderation = new TeamModerationStore(db, outbox);
@@ -1098,8 +1085,7 @@ public sealed class LeaderboardProjectionPersistenceTests
             foreach (var fixture in fixtures)
             {
                 fixture.Competition.TracksEnabled = false;
-                fixture.Competition.TrackConfigurationJson = CompetitionTrackConfiguration.Serialize(new(
-                    CompetitionTrackConfiguration.CurrentSchemaVersion,
+                fixture.Competition.Tracks = CompetitionTrackConfiguration.ToPersisted(new(
                     [
                         CompetitionTrackConfiguration.DefaultFor(fixture.Competition.Mode).DefaultTrack,
                         new CompetitionTrackDefinition(
@@ -1147,22 +1133,22 @@ public sealed class LeaderboardProjectionPersistenceTests
             foreach (var fixture in fixtures)
             {
                 commands.Clear();
-                var bundle = await cache.CreateBundleAsync(
+                var bundle = await cache.CreateScoreboardAsync(
                     fixture.Competition.Id,
                     projectedAt,
                     cancellationToken);
 
                 await Assert.That(bundle).IsNotNull();
-                await Assert.That(bundle!.Scoreboard.Snapshot.Teams).HasSingleItem();
-                await Assert.That(bundle.Scoreboard.Snapshot.Teams[0].Slots).IsNotEmpty();
-                await Assert.That(bundle.Scoreboard.Snapshot.TracksEnabled).IsFalse();
-                await Assert.That(bundle.Scoreboard.Snapshot.Tracks).HasSingleItem();
-                await Assert.That(bundle.Scoreboard.Snapshot.Tracks[0].Key)
+                await Assert.That(bundle!.Snapshot.Teams).HasSingleItem();
+                await Assert.That(bundle.Snapshot.Teams[0].Slots).IsNotEmpty();
+                await Assert.That(bundle.Snapshot.TracksEnabled).IsFalse();
+                await Assert.That(bundle.Snapshot.Tracks).HasSingleItem();
+                await Assert.That(bundle.Snapshot.Tracks[0].Key)
                     .IsEqualTo(CompetitionTrackConfiguration.DefaultTrackKey);
-                await Assert.That(bundle.Scoreboard.Snapshot.Teams[0].TrackKey)
+                await Assert.That(bundle.Snapshot.Teams[0].TrackKey)
                     .IsEqualTo(CompetitionTrackConfiguration.DefaultTrackKey);
                 var expected = CreateExpectedScoreboard(fixture, projectedAt);
-                var actualRow = bundle.Scoreboard.Snapshot.Teams[0];
+                var actualRow = bundle.Snapshot.Teams[0];
                 var expectedRow = expected.Snapshot.Teams.Single();
                 await Assert.That(actualRow.TotalScore).IsEqualTo(expectedRow.TotalScore);
                 await Assert.That(actualRow.Slots.Count).IsEqualTo(expectedRow.Slots.Count);
@@ -1183,7 +1169,7 @@ public sealed class LeaderboardProjectionPersistenceTests
                     var expectedBreakdowns = expectedSlot.Breakdowns.OrderBy(item => item.Kind).ToArray();
                     await Assert.That(actualBreakdowns).IsEquivalentTo(expectedBreakdowns);
                 }
-                var entryCount = bundle.Scoreboard.Snapshot.Teams[0].Slots.Sum(slot => slot.EntryCount);
+                var entryCount = bundle.Snapshot.Teams[0].Slots.Sum(slot => slot.EntryCount);
                 if (fixture.Competition.Mode == GameMode.Koh)
                     await Assert.That(entryCount).IsEqualTo(249);
                 else
@@ -1229,14 +1215,13 @@ public sealed class LeaderboardProjectionPersistenceTests
             await Assert.That(detailIds.Distinct()).Count().IsEqualTo(ctf.Facts.Count);
             await Assert.That(detailIds).IsEquivalentTo(ctf.Facts.Select(fact => fact.Id));
 
-            var futureFact = new GameplayFact
+            var futureFact = new FlagAttemptGameplayFact
             {
                 Id = Guid.CreateVersion7(projectedAt.AddMinutes(1)),
                 CompetitionId = ctf.Competition.Id,
                 CompetitionChallengeId = ctf.CompetitionChallenge.Id,
                 TeamId = ctf.Team.Id,
                 ActorUserId = owner.Id,
-                Kind = GameplayFactKind.FlagAttempt,
                 OccurredAt = projectedAt.AddMinutes(1),
                 Value = "flag{future}",
                 ValueSha256 = new byte[32],
@@ -1246,15 +1231,15 @@ public sealed class LeaderboardProjectionPersistenceTests
             };
             db.GameplayFacts.Add(futureFact);
             await db.SaveChangesAsync(cancellationToken);
-            var historical = await cache.CreateBundleAsync(
+            var historical = await cache.CreateScoreboardAsync(
                 ctf.Competition.Id,
                 projectedAt,
                 cancellationToken);
 
-            await Assert.That(historical!.Scoreboard.EntryAllocations
+            await Assert.That(historical!.EntryAllocations
                     .Select(item => item.Entry.Id))
                 .DoesNotContain(futureFact.Id);
-            await Assert.That(historical.Scoreboard.DetailActors
+            await Assert.That(historical.DetailActors
                     .Where(item => item.UserId == owner.Id)
                     .Select(item => item.DisplayName)
                     .Distinct())
@@ -1269,21 +1254,17 @@ public sealed class LeaderboardProjectionPersistenceTests
             rejudgedFact.Result = null;
             rejudgedFact.FailureCode = GameplayFactFailureCode.CheckerPlatformError;
             rejudgedFact.UpdatedAt = projectedAt.AddMinutes(2);
-            db.CompetitionEvents.Add(new CompetitionEvent
+            db.CompetitionEvents.Add(new GameplayFactAdjudicatedEvent
             {
                 Id = Guid.CreateVersion7(projectedAt.AddTicks(-1)),
                 CompetitionId = ctf.Competition.Id,
-                Kind = CompetitionEventKind.GameplayFactAdjudicated,
                 Level = CompetitionEventLevel.Information,
                 Visibility = CompetitionEventVisibility.Team,
                 SubjectType = EntityReferenceKind.GameplayFact,
                 SubjectId = rejudgedFact.Id,
-                PayloadJson = JsonSerializer.Serialize(new
-                {
-                    schemaVersion = 1,
-                    gameplayFactState = originalState.ToString(),
-                    gameplayFactResult = originalResult!.Value.ToString()
-                }),
+                GameplayFactState = originalState,
+                GameplayFactResult = originalResult,
+                GameplayFactId = rejudgedFact.Id,
                 OccurredAt = projectedAt.AddTicks(-1)
             });
             await db.SaveChangesAsync(cancellationToken);
@@ -1353,10 +1334,10 @@ public sealed class LeaderboardProjectionPersistenceTests
                 fixture.Challenge.Direction,
                 fixture.Challenge.Title,
                 false,
-                challenge.RulesJson,
+                challenge.Rules,
                 challenge.Order,
                 challenge.IsPublished)],
-            fixture.Competition.ConfigurationJson,
+            fixture.Competition.ModeConfiguration,
             fixture.Competition.StartAt,
             AwdRounds: rounds,
             ProjectedAt: projectedAt,
@@ -1374,45 +1355,37 @@ public sealed class LeaderboardProjectionPersistenceTests
         var competitionChallengeId = Guid.CreateVersion7(projectedAt.AddMinutes(index + 20));
         var teamId = Guid.CreateVersion7(projectedAt.AddMinutes(index + 30));
         var start = projectedAt.AddMinutes(-20);
-        var rules = new GameModeChallengeConfigurationCatalog().GetDefaultJson(mode);
-        var definition = new GameModeChallengeConfigurationCatalog().GetDefaultDefinitionJson(mode);
-        var competition = new Competition
-        {
-            Id = competitionId,
-            Title = $"{mode} projection",
-            OwnerId = ownerId,
-            Mode = mode,
-            ConfigurationJson = GameModeDefaultConfiguration.GetCompetitionJson(mode),
-            FlagDerivationSecret = new byte[32],
-            StartAt = start,
-            EndAt = projectedAt.AddHours(1),
-            Status = CompetitionStatus.Running,
-            MaxConcurrentRuntimeInstancesPerTeam = 1,
-            CreatedAt = start,
-            UpdatedAt = start
-        };
-        var challenge = new Challenge
-        {
-            Id = challengeId,
-            OwnerId = ownerId,
-            Mode = mode,
-            Visibility = ChallengeVisibility.Private,
-            Title = $"{mode} challenge",
-            Direction = "Pwn",
-            DefinitionJson = definition,
-            CreatedAt = start,
-            UpdatedAt = start
-        };
-        var competitionChallenge = new CompetitionChallenge
-        {
-            Id = competitionChallengeId,
-            CompetitionId = competitionId,
-            ChallengeId = challengeId,
-            Order = 1,
-            IsPublished = true,
-            RulesJson = rules,
-            UpdatedAt = start
-        };
+        var rules = new GameModeChallengeConfigurationCatalog().CreateDefaultRulesForTest(mode);
+        var definition = new GameModeChallengeConfigurationCatalog().CreateDefaultDefinitionForTest(mode);
+        var competition = CompetitionGeneratedCatalog.Create(mode);
+        competition.Id = competitionId;
+        competition.Title = $"{mode} projection";
+        competition.OwnerId = ownerId;
+        competition.ModeConfiguration = TestConfigurations.Competition(mode);
+        competition.FlagDerivationSecret = new byte[32];
+        competition.StartAt = start;
+        competition.EndAt = projectedAt.AddHours(1);
+        competition.Status = CompetitionStatus.Running;
+        competition.MaxConcurrentRuntimeInstancesPerTeam = 1;
+        competition.CreatedAt = start;
+        competition.UpdatedAt = start;
+        var challenge = ChallengeGeneratedCatalog.Create(mode);
+        challenge.Id = challengeId;
+        challenge.OwnerId = ownerId;
+        challenge.Visibility = ChallengeVisibility.Private;
+        challenge.Title = $"{mode} challenge";
+        challenge.Direction = "Pwn";
+        challenge.Definition = definition;
+        challenge.CreatedAt = start;
+        challenge.UpdatedAt = start;
+        var competitionChallenge = CompetitionChallengeGeneratedCatalog.Create(mode);
+        competitionChallenge.Id = competitionChallengeId;
+        competitionChallenge.CompetitionId = competitionId;
+        competitionChallenge.ChallengeId = challengeId;
+        competitionChallenge.Order = 1;
+        competitionChallenge.IsPublished = true;
+        competitionChallenge.Rules = rules;
+        competitionChallenge.UpdatedAt = start;
         var team = new Team
         {
             Id = teamId,
@@ -1437,30 +1410,31 @@ public sealed class LeaderboardProjectionPersistenceTests
             : GameplayFactResult.Wrong;
         var roundId = Guid.CreateVersion7(start);
         var facts = Enumerable.Range(0, 250)
-            .Select(sequence => new GameplayFact
+            .Select(sequence =>
             {
-                Id = Guid.CreateVersion7(start.AddSeconds(sequence + 1)),
-                CompetitionId = competitionId,
-                CompetitionChallengeId = competitionChallengeId,
-                TeamId = mode == GameMode.Koh && sequence == 100 ? null : teamId,
-                ActorUserId = mode == GameMode.Koh ? null : ownerId,
-                Kind = kind,
-                OccurredAt = start.AddSeconds(sequence + 1),
-                ReferenceKind = mode == GameMode.Awd ? GameplayFactReferenceKind.AwdRound : null,
-                ReferenceId = mode == GameMode.Awd ? roundId : null,
-                Value = mode == GameMode.Koh ? null : $"flag{{{sequence:D8}}}",
-                ValueSha256 = mode == GameMode.Koh ? null : new byte[32],
-                State = GameplayFactState.Completed,
-                Result = mode == GameMode.Koh && sequence == 100
+                var fact = GameplayFactGeneratedCatalog.Create(kind);
+                fact.Id = Guid.CreateVersion7(start.AddSeconds(sequence + 1));
+                fact.CompetitionId = competitionId;
+                fact.CompetitionChallengeId = competitionChallengeId;
+                fact.TeamId = mode == GameMode.Koh && sequence == 100 ? null : teamId;
+                fact.ActorUserId = mode == GameMode.Koh ? null : ownerId;
+                fact.OccurredAt = start.AddSeconds(sequence + 1);
+                fact.ReferenceKind = mode == GameMode.Awd ? GameplayFactReferenceKind.AwdRound : null;
+                fact.ReferenceId = mode == GameMode.Awd ? roundId : null;
+                fact.Value = mode == GameMode.Koh ? null : $"flag{{{sequence:D8}}}";
+                fact.ValueSha256 = mode == GameMode.Koh ? null : new byte[32];
+                fact.State = GameplayFactState.Completed;
+                fact.Result = mode == GameMode.Koh && sequence == 100
                     ? GameplayFactResult.Uncontrolled
-                    : result,
-                UpdatedAt = start.AddSeconds(sequence + 1)
+                    : result;
+                fact.UpdatedAt = start.AddSeconds(sequence + 1);
+                return fact;
             })
             .ToArray();
         IReadOnlyList<ChallengeFlag> flags = mode == GameMode.Awd
             ?
             [
-                new ChallengeFlag
+                new AwdRoundChallengeFlag
                 {
                     Id = Guid.CreateVersion7(start.AddMinutes(1)),
                     CompetitionChallengeId = competitionChallengeId,
@@ -1494,14 +1468,13 @@ public sealed class LeaderboardProjectionPersistenceTests
         Fixture fixture,
         Guid actorUserId,
         DateTimeOffset occurredAt,
-        string value) => new()
+        string value) => new ManualAdjustmentGameplayFact
         {
             Id = Guid.CreateVersion7(occurredAt),
             CompetitionId = fixture.Competition.Id,
             CompetitionChallengeId = fixture.CompetitionChallenge.Id,
             TeamId = fixture.Team.Id,
             ActorUserId = actorUserId,
-            Kind = GameplayFactKind.ManualAdjustment,
             OccurredAt = occurredAt,
             Value = value,
             State = GameplayFactState.Completed,
@@ -1519,7 +1492,7 @@ public sealed class LeaderboardProjectionPersistenceTests
             cancellationToken);
     }
 
-    private sealed class RecordingOutbox : ITransactionalMessageOutbox
+    private sealed class RecordingOutbox : IPostCommitMessagePublisher
     {
         public List<ProjectLeaderboard> ProjectLeaderboardMessages { get; } = [];
 

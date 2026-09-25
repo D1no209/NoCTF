@@ -24,7 +24,7 @@ public static class AwdpFixFailureConvergence
     public static async Task<AwdpFixFailureConvergenceResult> ConvergeAwdpFixFailureAsync(
         RuntimeInstance runtime,
         NoCtfDbContext db,
-        ITransactionalMessageOutbox outbox,
+        IPostCommitMessagePublisher outbox,
         ICompetitionEventRecorder events,
         DateTimeOffset failedAt,
         AwdpFixRuntimeCleanupMode cleanupMode,
@@ -123,15 +123,6 @@ public static class AwdpFixFailureConvergence
         if (fact.ReferenceId is not Guid patchUploadId
             || fact.TeamId is not Guid teamId)
             return;
-        var payload = AwdpFixResolvedEventPayload.Create(
-            fact.Id,
-            patchUploadId,
-            runtime.Id,
-            teamId,
-            fact.CompetitionChallengeId,
-            AwdpFixOutcome.PlatformFailed,
-            fact.FailureCode,
-            failedAt);
         await events.RecordAsync(new(
             fact.CompetitionId,
             CompetitionEventKind.AwdpFixResolved,
@@ -144,13 +135,16 @@ public static class AwdpFixFailureConvergence
             GameplayFactId: fact.Id,
             GameplayFactKind: fact.Kind,
             GameplayFactState: fact.State,
-            PayloadJson: payload.Serialize()), cancellationToken);
+            PatchUploadId: patchUploadId,
+            AwdpFixOutcome: AwdpFixOutcome.PlatformFailed,
+            GameplayFactFailureCode: fact.FailureCode,
+            ResolvedAt: failedAt), cancellationToken);
     }
 
     private static async Task QueueNextFixAsync(
         GameplayFact failed,
         NoCtfDbContext db,
-        ITransactionalMessageOutbox outbox,
+        IPostCommitMessagePublisher outbox,
         CancellationToken cancellationToken)
     {
         var nextGameplayFactId = await db.GameplayFacts.AsNoTracking()
@@ -165,6 +159,6 @@ public static class AwdpFixFailureConvergence
             .Select(candidate => (Guid?)candidate.Id)
             .FirstOrDefaultAsync(cancellationToken);
         if (nextGameplayFactId is Guid id)
-            await outbox.PublishAsync(new EvaluateGameplayFact(id));
+            await outbox.PublishAsync(new EvaluateGameplayFact(id, Guid.CreateVersion7()));
     }
 }

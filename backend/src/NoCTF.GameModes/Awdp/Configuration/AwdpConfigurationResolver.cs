@@ -1,20 +1,14 @@
 using NoCTF.GameModes.Flags;
 using NoCTF.Application.GameplayFacts.Awdp;
+using NoCTF.Domain.Challenges;
+using NoCTF.Domain.Competitions;
+using NoCTF.GameModes.Registration;
 
 namespace NoCTF.GameModes.Awdp.Configuration;
 
 public static class AwdpConfigurationResolver
 {
     private const string DefaultPatchEntrypoint = "fix.sh";
-
-    public static AwdpEffectiveConfiguration Resolve(
-        string competitionJson,
-        string challengeRulesJson,
-        string challengeDefinitionJson) =>
-        Resolve(
-            AwdpConfigurationParser.ParseCompetition(competitionJson),
-            AwdpConfigurationParser.ParseChallenge(challengeRulesJson),
-            AwdpConfigurationParser.ParseChallenge(challengeDefinitionJson));
 
     public static AwdpEffectiveConfiguration Resolve(
         AwdpConfiguration competition,
@@ -43,4 +37,11 @@ public static class AwdpConfigurationResolver
             definition.CheckerFixInput,
             definition.CheckerAllowRoot);
 
+    public static AwdpEffectiveConfiguration Resolve(
+        AwdpCompetitionModeConfiguration competition,
+        AwdpCompetitionChallengeRules rules,
+        AwdpChallengeDefinition definition) => Resolve(
+        TypedGameModeConfiguration.Awdp(competition),
+        TypedGameModeConfiguration.Awdp(rules),
+        TypedGameModeConfiguration.Awdp(definition));
 }

@@ -1,4 +1,3 @@
-using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using NoCTF.Application.Authentication.Privacy;
@@ -29,7 +28,7 @@ public sealed class AccountPrivacyStore(NoCtfDbContext db, IOptions<AccountPriva
     public Task<bool> IsTeamMemberAsync(Guid competitionId, Guid teamId, Guid memberId, CancellationToken ct) =>
         db.Teams.AnyAsync(team => team.Id == teamId && team.CompetitionId == competitionId
             && team.DeletedAt == null
-            && team.MemberIds.Contains(memberId), ct);
+            && team.Members.Any(member => member.UserId == memberId), ct);
 
     public async Task<PrivateAccountDetails?> ReadAsync(Guid userId, Guid? competitionId, CancellationToken ct)
     {
@@ -38,10 +37,18 @@ public sealed class AccountPrivacyStore(NoCtfDbContext db, IOptions<AccountPriva
             {
                 item.SchoolFullName,
                 item.SchoolStudentNumber,
-                item.ExternalIdentityProviderId,
-                item.ExternalIdentityProtocol,
-                item.ExternalIdentitySubject,
-                item.ExternalIdentityBoundAt
+                ExternalIdentityProviderId = item.ExternalIdentity == null
+                    ? (Guid?)null
+                    : item.ExternalIdentity.ProviderId,
+                ExternalIdentityProtocol = item.ExternalIdentity == null
+                    ? (SsoProtocol?)null
+                    : item.ExternalIdentity.Protocol,
+                ExternalIdentitySubject = item.ExternalIdentity == null
+                    ? null
+                    : item.ExternalIdentity.Subject,
+                ExternalIdentityBoundAt = item.ExternalIdentity == null
+                    ? (DateTimeOffset?)null
+                    : item.ExternalIdentity.BoundAt
             }).SingleOrDefaultAsync(ct);
         if (user is null) return null;
         var identity = new SchoolIdentity(user.SchoolFullName, user.SchoolStudentNumber);
@@ -79,8 +86,16 @@ public sealed class AccountPrivacyStore(NoCtfDbContext db, IOptions<AccountPriva
                     item.Kind == NotificationKind.AuthenticationSecurityActivity && item.SourceId == userId
                     && item.SentAt >= cutoff).OrderByDescending(item => item.SentAt).ThenByDescending(item => item.Id)
                 .Take(50).ToListAsync(ct);
-            facts.AddRange(logins.Select(item => JsonSerializer.Deserialize<AccountActivity>(item.ContentJson)!)
-                .Where(item => item is not null));
+            facts.AddRange(logins.Select(item => new AccountActivity(
+                item.Id,
+                (AccountActivityKind)(item.ActionValue
+                    ?? throw new InvalidOperationException(
+                        $"Authentication activity {item.Id} has no kind.")),
+                item.PayloadOccurredAt ?? item.SentAt,
+                item.IpAddress,
+                item.CompetitionId,
+                item.GameplayFactId,
+                item.SsoProviderId)));
         }
         return new(identity, facts.OrderByDescending(item => item.OccurredAt).ThenByDescending(item => item.Id).Take(50).ToArray(),
             options.Value.IpRetentionDays, ssoBinding);
@@ -125,13 +140,15 @@ internal static class AuthenticationActivity
     internal static Notification Create(Guid? userId, AccountActivityKind kind, string? address, DateTimeOffset now)
     {
         var id = Guid.CreateVersion7(now);
-        return new Notification
+        return new AuthenticationSecurityActivityNotification
         {
             Id = id, SourceType = userId is null ? NotificationSourceType.System : NotificationSourceType.User,
             SourceId = userId, TargetType = NotificationTargetType.PlatformAdministrators,
             TargetId = Notification.PlatformAdministratorsTargetId,
-            Kind = NotificationKind.AuthenticationSecurityActivity, SentAt = now,
-            ContentJson = JsonSerializer.Serialize(new AccountActivity(id, kind, now, address))
+            SentAt = now,
+            ActionValue = (int)kind,
+            PayloadOccurredAt = now,
+            IpAddress = address
         };
     }
 
@@ -143,21 +160,20 @@ internal static class AuthenticationActivity
         DateTimeOffset now)
     {
         var id = Guid.CreateVersion7(now);
-        return new Notification
+        return new AuthenticationSecurityActivityNotification
         {
             Id = id,
             SourceType = userId is null ? NotificationSourceType.System : NotificationSourceType.User,
             SourceId = userId,
             TargetType = NotificationTargetType.PlatformAdministrators,
             TargetId = Notification.PlatformAdministratorsTargetId,
-            Kind = NotificationKind.AuthenticationSecurityActivity,
             SentAt = now,
-            ContentJson = JsonSerializer.Serialize(new AccountActivity(
-                id,
-                succeeded ? AccountActivityKind.SsoLoggedIn : AccountActivityKind.SsoLoginFailed,
-                now,
-                address,
-                SsoProviderId: providerId))
+            ActionValue = (int)(succeeded
+                ? AccountActivityKind.SsoLoggedIn
+                : AccountActivityKind.SsoLoginFailed),
+            PayloadOccurredAt = now,
+            IpAddress = address,
+            SsoProviderId = providerId
         };
     }
 }

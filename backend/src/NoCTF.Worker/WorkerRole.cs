@@ -12,7 +12,6 @@ using NoCTF.Hosting.Messaging;
 using Wolverine;
 using Wolverine.ErrorHandling;
 using Wolverine.Nats;
-using Wolverine.Runtime.Agents;
 using NoCTF.Application.Competitions.Webhooks;
 
 namespace NoCTF.Worker;
@@ -44,15 +43,20 @@ public static class WorkerRole
         services.AddTransient<FileCleanupMessageHandler>();
         services.AddTransient<Competitions.CompetitionDeletionMessageHandler>();
         services.AddTransient<AwdMessageHandler>();
+        services.AddTransient<KohPollingHandler>();
+        services.AddTransient<KohObservationHandler>();
         services.AddTransient<CompetitionLifecycleMessageHandler>();
         services.AddTransient<AwdpMessageHandler>();
         services.AddTransient<RuntimeDispatchMessageHandler>();
         services.AddTransient<QueuedRuntimeDispatchHandler>();
+        services.AddTransient<PendingGameplayFactDispatchHandler>();
         services.AddSingleton<NoCTF.Infrastructure.Runtime.Capacity.RuntimeDispatchWakeupGate>();
         services.AddTransient<ReleaseRunnerCapacityHandler>();
         services.AddTransient<GameplayFactDrainMessageHandler>();
         services.AddTransient<CompetitionWebhookMessageHandler>();
         services.AddSingleton<LeaderboardProjectionMergeQueue>();
+        if (WorkerQueues.GetEnabled(configuration).Contains(WorkerQueue.Projection))
+            services.AddHostedService<LeaderboardProjectionDispatchAgent>();
         if (WorkerQueues.GetEnabled(configuration).Contains(WorkerQueue.Background))
         {
             services.AddScoped<IReadinessDependency,
@@ -64,9 +68,10 @@ public static class WorkerRole
             services.AddSingleton(new ClusterSchedulerNodeIdentity(
                 $"{Environment.MachineName}:{Environment.ProcessId}"));
             services.AddSingleton<IClusterSchedulerStatusStore, RedisClusterSchedulerStatusStore>();
-            services.AddScoped<IClusterScheduleSource, PostgresClusterScheduleSource>();
+            services.AddScoped<IClusterScheduleSource, ClusterScheduleSource>();
             services.AddSingleton<IReadinessDependency, ClusterSchedulingReadinessDependency>();
-            services.AddSingularAgent<MaintenanceTickAgent>();
+            services.AddSingleton<NatsClusterLeaseManager>();
+            services.AddHostedService<MaintenanceTickAgent>();
         }
         // Queue depth is now observed from JetStream consumer metrics. The old
         // PostgreSQL table poller must not be registered in a NATS deployment.
@@ -89,10 +94,14 @@ public static class WorkerRole
         options.Discovery.IncludeType(typeof(FileCleanupMessageHandler));
         options.Discovery.IncludeType(typeof(Competitions.CompetitionDeletionMessageHandler));
         options.Discovery.IncludeType(typeof(AwdMessageHandler));
+        options.Discovery.IncludeType(typeof(KohPollingHandler));
+        options.Discovery.IncludeType(typeof(KohObservationHandler));
         options.Discovery.IncludeType(typeof(CompetitionLifecycleMessageHandler));
         options.Discovery.IncludeType(typeof(AwdpMessageHandler));
         options.Discovery.IncludeType(typeof(RuntimeDispatchMessageHandler));
         options.Discovery.IncludeType(typeof(QueuedRuntimeDispatchHandler));
+        options.Discovery.IncludeType(typeof(PendingGameplayFactDispatchHandler));
+        options.Discovery.IncludeType(typeof(ExpireAccountSourceAddressesHandler));
         options.Discovery.IncludeType(typeof(ReleaseRunnerCapacityHandler));
         options.Discovery.IncludeType(typeof(GameplayFactDrainMessageHandler));
         options.Discovery.IncludeType(typeof(AccountNotificationMessageHandler));
@@ -155,8 +164,7 @@ public static class WorkerRole
             options.ListenToNatsSubject(NatsSubjects.Subject(queue))
                 .UseJetStream(NatsSubjects.Stream(queue), queueName)
                 .Named(queueName)
-                .MaximumParallelMessages(WorkerQueues.GetConcurrency(configuration, queue))
-                .UseDurableInbox();
+                .MaximumParallelMessages(WorkerQueues.GetConcurrency(configuration, queue));
         }
 
         if (enabledQueues.Contains(WorkerQueue.Background))
@@ -166,19 +174,16 @@ public static class WorkerRole
                 .Named(CompetitionEventFanoutQueueNames.Realtime)
                 .MaximumParallelMessages(WorkerQueues.GetConcurrency(
                     configuration,
-                    WorkerQueue.Background))
-                .UseDurableInbox();
+                    WorkerQueue.Background));
         }
         if (enabledQueues.Contains(WorkerQueue.Projection))
         {
             options.ListenToNatsSubject(NatsSubjects.LeaderboardEvents)
                 .UseJetStream(NatsSubjects.EventsStream, "noctf-leaderboard")
                 .Named(CompetitionEventFanoutQueueNames.Leaderboard)
-                .ListenOnlyAtLeader()
                 .MaximumParallelMessages(WorkerQueues.GetConcurrency(
                     configuration,
-                    WorkerQueue.Projection))
-                .UseDurableInbox();
+                    WorkerQueue.Projection));
         }
         if (enabledQueues.Contains(WorkerQueue.Webhook))
         {
@@ -187,8 +192,7 @@ public static class WorkerRole
                 .Named(CompetitionEventFanoutQueueNames.Webhook)
                 .MaximumParallelMessages(WorkerQueues.GetConcurrency(
                     configuration,
-                    WorkerQueue.Webhook))
-                .UseDurableInbox();
+                    WorkerQueue.Webhook));
         }
     }
 

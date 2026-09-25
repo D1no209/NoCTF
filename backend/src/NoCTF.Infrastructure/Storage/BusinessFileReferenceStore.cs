@@ -14,7 +14,7 @@ namespace NoCTF.Infrastructure.Storage;
 
 public sealed class BusinessFileReferenceStore(
     NoCtfDbContext db,
-    ITransactionalMessageOutbox outbox,
+    IPostCommitMessagePublisher outbox,
     FileReferenceLock fileLock,
     CompetitionReadModelCache readModels,
     TimeProvider? clock = null,
@@ -69,7 +69,7 @@ public sealed class BusinessFileReferenceStore(
         if (previousFileId is { } previous && previous != file.Id)
             await outbox.PublishAsync(new CleanupFile(previous));
         await transaction.CommitAsync(ct);
-        await outbox.FlushOutgoingMessagesAsync();
+        await outbox.FlushCommittedMessagesAsync();
         return new(BusinessFileReferenceState.Updated, Map(file));
     }
 
@@ -120,7 +120,7 @@ public sealed class BusinessFileReferenceStore(
         if (previousFileId is { } previous)
             await outbox.PublishAsync(new CleanupFile(previous));
         await transaction.CommitAsync(ct);
-        await outbox.FlushOutgoingMessagesAsync();
+        await outbox.FlushCommittedMessagesAsync();
         return new(BusinessFileReferenceState.Cleared);
     }
 
@@ -152,7 +152,7 @@ public sealed class BusinessFileReferenceStore(
         if (competition is null)
             return new(BusinessFileReferenceState.NotFound);
         if (!isAdministrator && competition.OwnerId != actorUserId
-            && !competition.ManagerIds.Contains(actorUserId))
+            && !competition.Collaborators.Any(collaborator => collaborator.Role == NoCTF.Domain.Competitions.CompetitionCollaboratorRole.Manager && collaborator.UserId == actorUserId))
             return new(BusinessFileReferenceState.Forbidden);
         if (!await fileLock.AcquireAsync(db, fileId, ct))
             return new(BusinessFileReferenceState.NotFound);
@@ -166,7 +166,7 @@ public sealed class BusinessFileReferenceStore(
             await outbox.PublishAsync(new CleanupFile(previous));
         await transaction.CommitAsync(ct);
         await readModels.InvalidateAsync(competition.Id, ct);
-        await outbox.FlushOutgoingMessagesAsync();
+        await outbox.FlushCommittedMessagesAsync();
         return new(BusinessFileReferenceState.Updated, Map(file));
     }
 
@@ -182,7 +182,7 @@ public sealed class BusinessFileReferenceStore(
         if (competition is null)
             return new(BusinessFileReferenceState.NotFound);
         if (!isAdministrator && competition.OwnerId != actorUserId
-            && !competition.ManagerIds.Contains(actorUserId))
+            && !competition.Collaborators.Any(collaborator => collaborator.Role == NoCTF.Domain.Competitions.CompetitionCollaboratorRole.Manager && collaborator.UserId == actorUserId))
             return new(BusinessFileReferenceState.Forbidden);
 
         var previousFileId = competition.PosterFileId;
@@ -193,7 +193,7 @@ public sealed class BusinessFileReferenceStore(
             await outbox.PublishAsync(new CleanupFile(previous));
         await transaction.CommitAsync(ct);
         await readModels.InvalidateAsync(competition.Id, ct);
-        await outbox.FlushOutgoingMessagesAsync();
+        await outbox.FlushCommittedMessagesAsync();
         return new(BusinessFileReferenceState.Cleared);
     }
 
@@ -217,7 +217,7 @@ public sealed class BusinessFileReferenceStore(
             competition.Id == competitionId
             && competition.DeletedAt == null
             && (competition.OwnerId == actorUserId
-                || competition.ManagerIds.Contains(actorUserId)), ct);
+                || competition.Collaborators.Any(collaborator => collaborator.Role == NoCTF.Domain.Competitions.CompetitionCollaboratorRole.Manager && collaborator.UserId == actorUserId)), ct);
 
     private static NoCTF.Application.Teams.Registration.TeamRegistrationFailure?
         ValidateParticipantChange(

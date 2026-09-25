@@ -57,7 +57,7 @@ describe('competition challenge deletion', () => {
 
     expect(deleteSection).toContain('function closeDeleteDialog(open: boolean)')
     expect(deleteSection).toContain('if (!open && !deletePending.value)')
-    expect(deleteSection).toContain('function beginDeleteChallenge(c: NoCtfapiEndpointsChallengesChallengeResponse)')
+    expect(deleteSection).toContain('function beginDeleteChallenge(c: NoCtfapiEndpointsChallengesChallengeSummaryResponse)')
     expect(deleteSection).toContain('@click="beginDeleteChallenge(c)"')
     expect(deleteSection).toContain('const target = deleteTarget.value')
     expect(deleteSection).toContain('if (!target?.id || deletePending.value) return')

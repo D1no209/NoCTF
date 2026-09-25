@@ -4,7 +4,7 @@ import { markRaw } from 'vue'
 import { Plus } from '@lucide/vue'
 import { toast } from 'vue-sonner'
 import { adminCreateManualAdjustment, adminCreateCompetitionChallengeHint, adminDeleteCompetitionChallengeHint, adminGetCompetition, adminGetCompetitionChallenge, adminListGameplayFacts, adminListCompetitionChallengeHints, adminListTeams, adminPatchCompetitionChallenge, adminRestoreCompetitionChallengeHint, adminUpdateCompetitionChallengeHint, getLeaderboardEndpoint, getScoreboardSchemaEndpoint } from '../../../../../../api'
-import type { NoCtfapiEndpointsAdministrationChallengesChallengeHintResponse, NoCtfapiEndpointsChallengesChallengeResponse, NoCtfapiEndpointsCompetitionsGameModeProtocol, NoCtfapiEndpointsCompetitionsScoreboardSchemaResponse, NoCtfapiEndpointsCompetitionsScoreboardSnapshotResponse, NoCtfapiEndpointsGameplayFactsGameplayFactListResponse, NoCtfapiEndpointsGameplayFactsGameplayFactListItemResponse, NoCtfapiEndpointsTeamsTeamResponse } from '../../../../../../api'
+import type { NoCtfapiEndpointsAdministrationChallengesChallengeHintResponse, NoCtfapiEndpointsAdministrationChallengesCompetitionChallengeRulesContract, NoCtfapiEndpointsAdministrationCompetitionsCompetitionModeConfigurationContract, NoCtfapiEndpointsChallengesChallengeResponse, NoCtfapiEndpointsCompetitionsGameModeProtocol, NoCtfapiEndpointsCompetitionsScoreboardSchemaResponse, NoCtfapiEndpointsCompetitionsScoreboardSnapshotResponse, NoCtfapiEndpointsGameplayFactsGameplayFactListResponse, NoCtfapiEndpointsGameplayFactsGameplayFactListItemResponse, NoCtfapiEndpointsTeamsTeamResponse } from '../../../../../../api'
 import { useOffsetPagination } from '../../../../../../composables/useOffsetPagination'
 import { useCompetitionAdmin } from '../../../../../../lib/admin-competition'
 
@@ -20,7 +20,7 @@ interface ChallengeTeamScoringRow {
 
 interface ChallengeConfiguration {
   mode?: NoCtfapiEndpointsCompetitionsGameModeProtocol
-  json?: string
+  rules?: NoCtfapiEndpointsAdministrationChallengesCompetitionChallengeRulesContract
 }
 
 /** Owns state, effects and commands for AdminCompetitionsByIdChallengesByCcIdPage. */
@@ -110,7 +110,7 @@ export function useAdminCompetitionsByIdChallengesByCcIdPage() {
 
   const savingConfig = ref(false)
 
-  const inheritedConfigJson = ref<string | null>(null)
+  const inheritedConfiguration = ref<NoCtfapiEndpointsAdministrationCompetitionsCompetitionModeConfigurationContract | null>(null)
 
   async function loadConfig() {
     configLoading.value = true
@@ -124,26 +124,26 @@ export function useAdminCompetitionsByIdChallengesByCcIdPage() {
     if (!challengeResult.error && challengeResult.data) {
       config.value = {
         mode: challengeResult.data.mode,
-        json: challengeResult.data.rulesJson,
+        rules: challengeResult.data.rules,
       }
     }
     if (!competitionResult.error && competitionResult.data) {
-      inheritedConfigJson.value = competitionResult.data.modeConfiguration?.json ?? null
+      inheritedConfiguration.value = competitionResult.data.modeConfiguration?.configuration ?? null
     }
     configLoading.value = false
   }
 
-  async function saveConfig(json: string) {
+  async function saveConfig(rules: NoCtfapiEndpointsAdministrationChallengesCompetitionChallengeRulesContract) {
     if (!config.value) return
     savingConfig.value = true
     try {
       const { data, error } = await adminPatchCompetitionChallenge({
         path: { competitionId, competitionChallengeId: ccId },
-        body: { rules: { json } },
+        body: { rules: { configuration: rules } },
       })
       if (error) throw error
       config.value = data
-        ? { mode: data.mode, json: data.rulesJson }
+        ? { mode: data.mode, rules: data.rules }
         : config.value
       toast.success(translate("ui.questionConfigurationHasBeenSaved"))
     }
@@ -517,7 +517,7 @@ export function useAdminCompetitionsByIdChallengesByCcIdPage() {
       config,
       configLoading,
       savingConfig,
-      inheritedConfigJson,
+      inheritedConfiguration,
       saveConfig,
       hints,
       hintsLoading,

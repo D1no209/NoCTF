@@ -84,7 +84,10 @@ public class GameplayFactAdmissionPolicyTests
     }
 
     private static GameplayFactAdmissionSnapshot Snapshot(CompetitionStatus status) => new(
-        Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), GameMode.Ctf, "{}", "{}", 0, 0, status,
+        Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), GameMode.Ctf,
+        CompetitionModeConfigurationDefaults.Create(GameMode.Ctf, Guid.NewGuid()),
+        new NoCTF.GameModes.Registration.GameModeChallengeConfigurationCatalog()
+            .CreateDefaultRules(GameMode.Ctf, Guid.NewGuid()), 0, 0, status,
         DateTimeOffset.UtcNow.AddMinutes(-1),
         DateTimeOffset.UtcNow.AddMinutes(1),
         false, false, true, false, false, true, true);

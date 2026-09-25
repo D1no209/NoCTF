@@ -14,4 +14,5 @@ public sealed record DockerRuntimeOptions(
     int OneShotOutputLimitBytesPerStream = 1_048_576,
     string ProxyContainerName = "",
     string ProxyContainerLabelKey = "noctf.io/runtime-proxy-gateway",
-    string ProxyContainerLabelValue = "true");
+    string ProxyContainerLabelValue = "true",
+    string? RegistryConfigDirectory = null);

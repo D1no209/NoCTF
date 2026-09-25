@@ -50,7 +50,7 @@ public sealed class CtfPatchVerificationTargetPersistenceTests
             var quota = new TeamRuntimeQuota(new());
             var store = new PatchVerificationTargetStore(
                 db,
-                new GameplayFactAttemptCriticalSection(new()),
+                new GameplayFactAttemptCriticalSection(),
                 new FixedRuntimePlacementPolicy(),
                 quota,
                 outbox);
@@ -76,7 +76,7 @@ public sealed class CtfPatchVerificationTargetPersistenceTests
                 instance.Id == created.RuntimeInstanceId, ct);
             target.State = RuntimeState.Running;
             target.RunnerId = "runner-1";
-            target.ProviderReceiptJson = "{}";
+            target.ProviderReceipt = RuntimeReceiptTestData.ContainerEntity();
             target.RunningAt = fixture.Now;
             target.ExpiresAt = fixture.Now.AddMinutes(10);
             await db.SaveChangesAsync(ct);
@@ -148,7 +148,6 @@ public sealed class CtfPatchVerificationTargetPersistenceTests
             ],
             FlagSource: RuntimeFlagSource.Static);
         var definition = new CtfChallengeConfiguration(
-            CtfChallengeConfiguration.CurrentSchemaVersion,
             null,
             null,
             Runtime: runtime,
@@ -175,13 +174,12 @@ public sealed class CtfPatchVerificationTargetPersistenceTests
             CreatedAt = now,
             UpdatedAt = now
         });
-        db.Competitions.Add(new Competition
+        db.Competitions.Add(new CtfCompetition
         {
             Id = competitionId,
             Title = "CTF Patch Verification",
             OwnerId = userId,
-            Mode = GameMode.Ctf,
-            ConfigurationJson = GameModeDefaultConfiguration.GetCompetitionJson(GameMode.Ctf),
+            ModeConfiguration = TestConfigurations.Competition(GameMode.Ctf),
             FlagDerivationSecret = RandomNumberGenerator.GetBytes(32),
             MaxConcurrentRuntimeInstancesPerTeam = 1,
             StartAt = now.AddMinutes(-1),
@@ -190,29 +188,31 @@ public sealed class CtfPatchVerificationTargetPersistenceTests
             CreatedAt = now,
             UpdatedAt = now
         });
-        db.Challenges.Add(new Challenge
+        db.Challenges.Add(new CtfChallenge
         {
             Id = challengeId,
             OwnerId = userId,
-            Mode = GameMode.Ctf,
             Title = "Patch target",
             Direction = "Pwn",
             Visibility = ChallengeVisibility.Private,
-            DefinitionJson = JsonSerializer.Serialize(definition, JsonOptions),
+            Definition = TestConfigurations.Definition(
+                GameMode.Ctf,
+                JsonSerializer.Serialize(definition, JsonOptions)),
             CreatedAt = now,
             UpdatedAt = now
         });
-        db.CompetitionChallenges.Add(new CompetitionChallenge
+        db.CompetitionChallenges.Add(new CtfCompetitionChallenge
         {
             Id = competitionChallengeId,
             CompetitionId = competitionId,
             ChallengeId = challengeId,
             IsPublished = true,
-            RulesJson = JsonSerializer.Serialize(new CtfChallengeConfiguration(
-                CtfConfiguration.CurrentSchemaVersion,
-                null,
-                null,
-                MaxPatchAttempts: 2), JsonOptions),
+            Rules = TestConfigurations.Rules(
+                GameMode.Ctf,
+                JsonSerializer.Serialize(new CtfChallengeConfiguration(
+                    null,
+                    null,
+                    MaxPatchAttempts: 2), JsonOptions)),
             UpdatedAt = now
         });
         db.Teams.Add(new Team
@@ -226,18 +226,17 @@ public sealed class CtfPatchVerificationTargetPersistenceTests
             RegistrationStatus = TeamRegistrationStatus.Approved,
             RegisteredAt = now
         });
-        db.RuntimeInstances.Add(new RuntimeInstance
+        db.RuntimeInstances.Add(new PlayerRuntimeInstance
         {
             Id = Guid.CreateVersion7(),
             CompetitionId = competitionId,
             CompetitionChallengeId = competitionChallengeId,
             TeamId = teamId,
-            Purpose = RuntimePurpose.Player,
             RuntimeKind = RuntimeKind.Container,
             RuntimeProvider = RuntimeProvider.Docker,
             RunnerId = "runner-1",
             State = RuntimeState.Running,
-            ProviderReceiptJson = "{}",
+            ProviderReceipt = RuntimeReceiptTestData.ContainerEntity(),
             CreatedAt = now,
             RunningAt = now,
             ExpiresAt = now.AddMinutes(15)
@@ -258,7 +257,7 @@ public sealed class CtfPatchVerificationTargetPersistenceTests
         return postgres;
     }
 
-    private sealed class RecordingOutbox : ITransactionalMessageOutbox
+    private sealed class RecordingOutbox : IPostCommitMessagePublisher
     {
         public ConcurrentQueue<object> Messages { get; } = [];
         public ValueTask PublishAsync<T>(T message)

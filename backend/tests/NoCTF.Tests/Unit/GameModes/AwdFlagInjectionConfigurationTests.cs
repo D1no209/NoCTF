@@ -9,7 +9,6 @@ public sealed class AwdFlagInjectionConfigurationTests
     public async Task Validate_FlagInjectionTimeoutOutsideExecutionBudget_ReturnsExplicitError()
     {
         var configuration = new AwdChallengeConfiguration(
-            AwdChallengeConfiguration.CurrentSchemaVersion,
             FlagInjection: new(
                 "set-flag ${FLAG}",
                 AwdFlagInjectionExecutionBudget.MaximumCommandTimeoutSeconds + 1));

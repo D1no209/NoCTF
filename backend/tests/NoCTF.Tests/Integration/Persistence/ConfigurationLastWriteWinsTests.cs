@@ -1,4 +1,3 @@
-using System.Text.Json.Nodes;
 using Microsoft.EntityFrameworkCore;
 using NoCTF.Application.Challenges.Configuration;
 using NoCTF.Application.Competitions.Configuration;
@@ -40,10 +39,19 @@ public sealed class ConfigurationLastWriteWinsTests
             {
                 var result = await new CompetitionConfigurationStore(
                     updateDb,
-                    new NoOpTransactionalMessageOutbox(),
-                    new CompetitionEventStore(updateDb, new NoOpTransactionalMessageOutbox())).TryUpdateAsync(
+                    new NoOpPostCommitMessagePublisher(),
+                    new CompetitionEventStore(updateDb, new NoOpPostCommitMessagePublisher())).TryUpdateAsync(
                     ids.CompetitionId,
-                    """{"schemaVersion":2,"defaultScoreCurve":{"initialPoints":600,"minimumPoints":100,"decayTeamCount":10,"decayMode":2},"bloodRewards":[]}""",
+                    new CtfCompetitionModeConfiguration
+                    {
+                        DefaultScoreCurve = new()
+                        {
+                            InitialPoints = 600,
+                            MinimumPoints = 100,
+                            DecayTeamCount = 10,
+                            DecayMode = PersistedScoreDecayMode.Quadratic
+                        }
+                    },
                     true,
                     DateTimeOffset.UtcNow,
                     cancellationToken);
@@ -55,11 +63,21 @@ public sealed class ConfigurationLastWriteWinsTests
             {
                 var result = await new ChallengeConfigurationStore(
                     updateDb,
-                    new NoOpTransactionalMessageOutbox(),
-                    new CompetitionEventStore(updateDb, new NoOpTransactionalMessageOutbox())).TryUpdateAsync(
+                    new NoOpPostCommitMessagePublisher(),
+                    new CompetitionEventStore(updateDb, new NoOpPostCommitMessagePublisher())).TryUpdateAsync(
                     ids.CompetitionId,
                     ids.CompetitionChallengeId,
-                    """{"schemaVersion":2,"scoreCurve":{"initialPoints":700,"minimumPoints":100,"decayTeamCount":10,"decayMode":2},"bloodRewards":[]}""",
+                    new CtfCompetitionChallengeRules
+                    {
+                        HasScoreCurve = true,
+                        ScoreCurve = new()
+                        {
+                            InitialPoints = 700,
+                            MinimumPoints = 100,
+                            DecayTeamCount = 10,
+                            DecayMode = PersistedScoreDecayMode.Quadratic
+                        }
+                    },
                     DateTimeOffset.UtcNow,
                     cancellationToken);
                 await Assert.That(result.Failure).IsNull();
@@ -69,14 +87,11 @@ public sealed class ConfigurationLastWriteWinsTests
             await using var verifyDb = new NoCtfDbContext(options);
             var persisted = await verifyDb.CompetitionChallenges.AsNoTracking()
                 .SingleAsync(challenge => challenge.Id == ids.CompetitionChallengeId, cancellationToken);
-            await Assert.That(JsonNode.DeepEquals(
-                JsonNode.Parse(persisted.RulesJson),
-                JsonNode.Parse("""{"schemaVersion":2,"scoreCurve":{"initialPoints":700,"minimumPoints":100,"decayTeamCount":10,"decayMode":2},"bloodRewards":[]}"""))).IsTrue();
+            await Assert.That(persisted.Rules!.ScoreCurve.InitialPoints).IsEqualTo(700);
             var persistedCompetition = await verifyDb.Competitions.AsNoTracking()
                 .SingleAsync(competition => competition.Id == ids.CompetitionId, cancellationToken);
-            await Assert.That(JsonNode.DeepEquals(
-                JsonNode.Parse(persistedCompetition.ConfigurationJson),
-                JsonNode.Parse("""{"schemaVersion":2,"defaultScoreCurve":{"initialPoints":600,"minimumPoints":100,"decayTeamCount":10,"decayMode":2},"bloodRewards":[]}"""))).IsTrue();
+            await Assert.That(((CtfCompetitionModeConfiguration)persistedCompetition.ModeConfiguration!)
+                .DefaultScoreCurve.InitialPoints).IsEqualTo(600);
         });
     }
 
@@ -101,13 +116,12 @@ public sealed class ConfigurationLastWriteWinsTests
             CreatedAt = now,
             UpdatedAt = now
         });
-        db.Competitions.Add(new Competition
+        db.Competitions.Add(new CtfCompetition
         {
             Id = competitionId,
             Title = "Configuration fences",
             OwnerId = ownerId,
-            Mode = GameMode.Ctf,
-            ConfigurationJson = """{"schemaVersion":2}""",
+            ModeConfiguration = TestConfigurations.Competition(GameMode.Ctf),
             FlagDerivationSecret = new byte[32],
             StartAt = now.AddHours(1),
             EndAt = now.AddHours(2),
@@ -115,21 +129,21 @@ public sealed class ConfigurationLastWriteWinsTests
             CreatedAt = now,
             UpdatedAt = now,
         });
-        db.Challenges.Add(new Challenge
+        db.Challenges.Add(new CtfChallenge
         {
             Id = challengeId,
             OwnerId = ownerId,
             Title = "Challenge",
-            DefinitionJson = "{}",
+            Definition = TestConfigurations.Definition(GameMode.Ctf),
             CreatedAt = now,
             UpdatedAt = now
         });
-        db.CompetitionChallenges.Add(new CompetitionChallenge
+        db.CompetitionChallenges.Add(new CtfCompetitionChallenge
         {
             Id = competitionChallengeId,
             CompetitionId = competitionId,
             ChallengeId = challengeId,
-            RulesJson = """{"schemaVersion":2}""",
+            Rules = TestConfigurations.Rules(GameMode.Ctf),
             UpdatedAt = now
         });
         await db.SaveChangesAsync(cancellationToken);

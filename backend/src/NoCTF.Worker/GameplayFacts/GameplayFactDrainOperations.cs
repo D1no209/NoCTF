@@ -10,7 +10,7 @@ internal static partial class BackendMessageOperations
     public static Task DrainGameplayFactEvaluationAsync(
         DrainGameplayFactEvaluation message,
         NoCtfDbContext db,
-        ITransactionalMessageOutbox outbox,
+        IPostCommitMessagePublisher outbox,
         TimeProvider timeProvider,
         CancellationToken cancellationToken) =>
         DrainGameplayFactsAsync(
@@ -28,7 +28,7 @@ internal static partial class BackendMessageOperations
     public static Task DrainGameplayFactRejudgeAsync(
         DrainGameplayFactRejudge message,
         NoCtfDbContext db,
-        ITransactionalMessageOutbox outbox,
+        IPostCommitMessagePublisher outbox,
         TimeProvider timeProvider,
         CancellationToken cancellationToken) =>
         DrainGameplayFactsAsync(
@@ -51,7 +51,7 @@ internal static partial class BackendMessageOperations
         Guid? requestedGameplayFactId,
         object continuationMessage,
         NoCtfDbContext db,
-        ITransactionalMessageOutbox outbox,
+        IPostCommitMessagePublisher outbox,
         TimeProvider timeProvider,
         CancellationToken cancellationToken)
     {
@@ -107,7 +107,9 @@ internal static partial class BackendMessageOperations
             .ThenBy(submission => submission.Id)
             .ToArrayAsync(cancellationToken);
         foreach (var submission in submissions)
-            await outbox.PublishAsync(new EvaluateGameplayFact(submission.Id));
+            await outbox.PublishAsync(new EvaluateGameplayFact(
+                submission.Id,
+                Guid.CreateVersion7(now)));
         if (candidateIds.Length == batchSize && requestedGameplayFactId is null)
             await outbox.PublishAsync(continuationMessage);
         await db.SaveChangesAsync(cancellationToken);

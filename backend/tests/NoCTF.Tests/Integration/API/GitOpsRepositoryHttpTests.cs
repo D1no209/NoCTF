@@ -82,10 +82,9 @@ public sealed class GitOpsRepositoryHttpTests
                         Email = "owner@example.test", PasswordHash = "test-only", Role = UserRole.Administrator,
                         CreatedAt = now, UpdatedAt = now
                     });
-                    db.Competitions.Add(new Competition
+                    db.Competitions.Add(new CtfCompetition
                     {
-                        Id = competitionId, OwnerId = ownerId, ManagerIds = [botId], Title = "GitOps HTTP contract", Mode = GameMode.Ctf,
-                        Status = CompetitionStatus.Draft, ConfigurationJson = GameModeDefaultConfiguration.GetCompetitionJson(GameMode.Ctf),
+                        Id = competitionId, OwnerId = ownerId, ManagerIds = [botId], Title = "GitOps HTTP contract", Status = CompetitionStatus.Draft, ModeConfiguration = TestConfigurations.Competition(GameMode.Ctf),
                         FlagDerivationSecret = new byte[32], StartAt = now.AddHours(1), EndAt = now.AddHours(2),
                         CreatedAt = now, UpdatedAt = now
                     });

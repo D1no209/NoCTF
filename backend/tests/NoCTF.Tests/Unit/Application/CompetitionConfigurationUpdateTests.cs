@@ -1,5 +1,6 @@
 using NoCTF.Application.Competitions.Configuration;
 using NoCTF.Domain.Competitions;
+using NoCTF.Domain.Challenges;
 
 namespace NoCTF.Tests.Unit.Application;
 
@@ -12,7 +13,7 @@ public sealed class CompetitionConfigurationUpdateTests
         var useCase = new UpdateCompetitionConfiguration(
             store, new Validator());
 
-        var result = await useCase.ExecuteAsync(store.CompetitionId, "{\"value\":2}", DateTimeOffset.UtcNow);
+        var result = await useCase.ExecuteAsync(store.CompetitionId, Configuration(2), DateTimeOffset.UtcNow);
 
         await Assert.That(result.Succeeded).IsTrue();
         await Assert.That(store.AllowWhileRunning).IsTrue();
@@ -25,7 +26,7 @@ public sealed class CompetitionConfigurationUpdateTests
         var useCase = new UpdateCompetitionConfiguration(
             store, new Validator());
 
-        var result = await useCase.ExecuteAsync(store.CompetitionId, "{\"value\":2}", DateTimeOffset.UtcNow);
+        var result = await useCase.ExecuteAsync(store.CompetitionId, Configuration(2), DateTimeOffset.UtcNow);
 
         await Assert.That(result.Succeeded).IsTrue();
         await Assert.That(store.UpdateCalls).IsEqualTo(1);
@@ -38,7 +39,7 @@ public sealed class CompetitionConfigurationUpdateTests
         var useCase = new UpdateCompetitionConfiguration(
             store, new Validator());
 
-        var result = await useCase.ExecuteAsync(store.CompetitionId, "{\"value\":2}", DateTimeOffset.UtcNow);
+        var result = await useCase.ExecuteAsync(store.CompetitionId, Configuration(2), DateTimeOffset.UtcNow);
 
         await Assert.That(result.Succeeded).IsTrue();
         await Assert.That(store.UpdateCalls).IsEqualTo(1);
@@ -52,11 +53,11 @@ public sealed class CompetitionConfigurationUpdateTests
 
         public Task<CompetitionConfigurationView?> FindAsync(Guid competitionId, CancellationToken cancellationToken) =>
             Task.FromResult<CompetitionConfigurationView?>(new(
-                CompetitionId, GameMode.Ctf, "{\"value\":1}", status, 2, [], DateTimeOffset.UtcNow));
+                CompetitionId, GameMode.Ctf, Configuration(1), status, 2, [], DateTimeOffset.UtcNow));
 
         public Task<CompetitionConfigurationUpdateResult> TryUpdateAsync(
             Guid competitionId,
-            string json,
+            CompetitionModeConfiguration configuration,
             bool allowWhileRunning,
             DateTimeOffset now,
             CancellationToken cancellationToken)
@@ -64,7 +65,7 @@ public sealed class CompetitionConfigurationUpdateTests
             UpdateCalls++;
             AllowWhileRunning = allowWhileRunning;
             return Task.FromResult(new CompetitionConfigurationUpdateResult(
-                new(competitionId, GameMode.Ctf, json, status, 2, [], now)));
+                new(competitionId, GameMode.Ctf, configuration, status, 2, [], now)));
         }
     }
 
@@ -72,9 +73,14 @@ public sealed class CompetitionConfigurationUpdateTests
     {
         public IReadOnlyList<string> Validate(
             GameMode mode,
-            string json,
+            CompetitionModeConfiguration configuration,
             int eligibleTeamCount,
-            IReadOnlyList<string> challengeConfigurationJsons) => [];
+            IReadOnlyList<CompetitionChallengeRules> challengeRules) => [];
     }
+
+    private static CtfCompetitionModeConfiguration Configuration(long penalty) => new()
+    {
+        WrongSubmissionPenalty = penalty
+    };
 
 }

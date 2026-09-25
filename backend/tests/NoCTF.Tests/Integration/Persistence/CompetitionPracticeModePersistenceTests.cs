@@ -1,7 +1,11 @@
 using System.Security.Cryptography;
+using System.Data.Common;
+using System.Diagnostics;
+using System.Globalization;
 using System.Text;
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Time.Testing;
 using NSubstitute;
@@ -44,6 +48,149 @@ namespace NoCTF.Tests.Integration.Persistence;
 [NotInParallel]
 public sealed class CompetitionPracticeModePersistenceTests
 {
+    [Test, Timeout(300_000)]
+    public async Task Challenge_attempt_state_uses_fewer_commands_than_full_admission(
+        CancellationToken cancellationToken)
+    {
+        await DockerIntegrationTest.RunAsync(async () =>
+        {
+            await using var postgres = CreatePostgres("noctf_attempt_state_read");
+            await postgres.StartAsync(cancellationToken);
+            var fixture = await SeedAsync(Options(postgres), earlyFinish: true, cancellationToken);
+            var counter = new QueryCounter();
+            var measuredOptions = new DbContextOptionsBuilder<NoCtfDbContext>()
+                .UseNpgsql(postgres.GetConnectionString())
+                .UseSnakeCaseNamingConvention()
+                .AddInterceptors(counter)
+                .Options;
+            await using var db = new NoCtfDbContext(measuredOptions);
+            var full = await GameplayFactAdmissionPersistence.LoadAsync(
+                db, fixture.CompetitionId, fixture.CompetitionChallengeId,
+                fixture.UserId, cancellationToken);
+            var fullCommands = counter.ReaderCount;
+            var state = await new FlagAttemptStateReader(db).ReadAsync(
+                fixture.CompetitionId, fixture.CompetitionChallengeId,
+                fixture.TeamId, GameMode.Ctf, CompetitionStatus.Finished,
+                cancellationToken);
+            var narrowCommands = counter.ReaderCount - fullCommands;
+
+            await Assert.That(full).IsNotNull();
+            await Assert.That(state).IsEqualTo(new FlagAttemptState(null, 0, null, false));
+            await Assert.That(narrowCommands).IsLessThan(fullCommands);
+            await Assert.That(narrowCommands).IsLessThanOrEqualTo(4);
+
+            var samples = new List<string> { "iteration,full_ms,narrow_ms" };
+            var fullDurations = new List<double>();
+            var narrowDurations = new List<double>();
+            for (var iteration = 0; iteration < 50; iteration++)
+            {
+                await using var requestDb = new NoCtfDbContext(Options(postgres));
+                var started = Stopwatch.GetTimestamp();
+                await GameplayFactAdmissionPersistence.LoadAsync(
+                    requestDb, fixture.CompetitionId, fixture.CompetitionChallengeId,
+                    fixture.UserId, cancellationToken);
+                var fullMs = Stopwatch.GetElapsedTime(started).TotalMilliseconds;
+                started = Stopwatch.GetTimestamp();
+                await new FlagAttemptStateReader(requestDb).ReadAsync(
+                    fixture.CompetitionId, fixture.CompetitionChallengeId, fixture.TeamId,
+                    GameMode.Ctf, CompetitionStatus.Finished, cancellationToken);
+                var narrowMs = Stopwatch.GetElapsedTime(started).TotalMilliseconds;
+                fullDurations.Add(fullMs);
+                narrowDurations.Add(narrowMs);
+                samples.Add($"{iteration + 1},{fullMs.ToString(CultureInfo.InvariantCulture)},{narrowMs.ToString(CultureInfo.InvariantCulture)}");
+            }
+            var artifactDirectory = Path.Combine(Environment.CurrentDirectory,
+                "TestResults", "performance");
+            Directory.CreateDirectory(artifactDirectory);
+            await File.WriteAllLinesAsync(Path.Combine(artifactDirectory,
+                "challenge-attempt-state-current.csv"), samples, cancellationToken);
+            Console.WriteLine($"ChallengeAttemptState full p95={Percentile(fullDurations):F2}ms "
+                + $"narrow p95={Percentile(narrowDurations):F2}ms "
+                + $"commands {fullCommands}->{narrowCommands}");
+        });
+    }
+
+    private static double Percentile(IReadOnlyList<double> samples) =>
+        samples.Order().ElementAt((int)Math.Ceiling(samples.Count * 0.95) - 1);
+
+    private sealed class QueryCounter : DbCommandInterceptor
+    {
+        public int ReaderCount { get; private set; }
+
+        public override ValueTask<DbDataReader> ReaderExecutedAsync(
+            DbCommand command,
+            CommandExecutedEventData eventData,
+            DbDataReader result,
+            CancellationToken cancellationToken = default)
+        {
+            ReaderCount++;
+            return ValueTask.FromResult(result);
+        }
+    }
+
+    [Test, Timeout(300_000)]
+    public async Task Flag_recheck_rejects_rules_changed_after_initial_admission(
+        CancellationToken cancellationToken)
+    {
+        await DockerIntegrationTest.RunAsync(async () =>
+        {
+            await using var postgres = CreatePostgres("noctf_flag_rules_recheck");
+            await postgres.StartAsync(cancellationToken);
+            var options = Options(postgres);
+            var fixture = await SeedAsync(options, earlyFinish: false, cancellationToken);
+            await using (var setup = new NoCtfDbContext(options))
+            {
+                var competition = await setup.Competitions.SingleAsync(
+                    item => item.Id == fixture.CompetitionId, cancellationToken);
+                competition.Status = CompetitionStatus.Running;
+                competition.EndAt = fixture.Now.AddHours(1);
+                competition.PracticeModeEnabled = false;
+                await setup.SaveChangesAsync(cancellationToken);
+            }
+
+            await using var intakeDb = new NoCtfDbContext(options);
+            var visibleAttempts = await new FlagAttemptStateReader(intakeDb).ReadAsync(
+                fixture.CompetitionId, fixture.CompetitionChallengeId, fixture.TeamId,
+                GameMode.Ctf, CompetitionStatus.Running, cancellationToken);
+            await Assert.That(visibleAttempts)
+                .IsEqualTo(new FlagAttemptState(1, 1, 0, true));
+            var intake = new GameplayFactIntakeStore(
+                intakeDb, new RecordingOutbox(), new GameplayFactAttemptCriticalSection());
+            var admission = await intake.LoadAdmissionAsync(
+                fixture.CompetitionId, fixture.CompetitionChallengeId, fixture.UserId,
+                cancellationToken);
+            await Assert.That(admission).IsNotNull();
+            await Assert.That(admission!.ChallengeRules.MaxFlagAttempts).IsEqualTo(1);
+            var rootStampBefore = await intakeDb.CompetitionChallenges.AsNoTracking()
+                .Where(item => item.Id == fixture.CompetitionChallengeId)
+                .Select(item => item.ConcurrencyStamp)
+                .SingleAsync(cancellationToken);
+
+            await using (var update = new NoCtfDbContext(options))
+            {
+                var challenge = await update.CompetitionChallenges.SingleAsync(
+                    item => item.Id == fixture.CompetitionChallengeId, cancellationToken);
+                ((CtfCompetitionChallengeRules)challenge.Rules!).MaxFlagAttempts = 2;
+                await update.SaveChangesAsync(cancellationToken);
+            }
+
+            var rootStampAfter = await intakeDb.CompetitionChallenges.AsNoTracking()
+                .Where(item => item.Id == fixture.CompetitionChallengeId)
+                .Select(item => item.ConcurrencyStamp)
+                .SingleAsync(cancellationToken);
+            await Assert.That(rootStampAfter).IsEqualTo(rootStampBefore);
+
+            var factCountBefore = await intakeDb.GameplayFacts.CountAsync(cancellationToken);
+            var result = await intake.TryAcceptFlagAsync(new(
+                Guid.CreateVersion7(fixture.Now), fixture.CompetitionId, fixture.TeamId,
+                fixture.CompetitionChallengeId, fixture.UserId, GameplayFactKind.FlagAttempt,
+                fixture.Flag, SHA256.HashData(Encoding.UTF8.GetBytes(fixture.Flag)), fixture.Now),
+                admission, maxAttempts: 1, cancellationToken);
+            await Assert.That(result.State).IsEqualTo(GameplayFactAcceptanceState.AdmissionRejected);
+            await Assert.That(await intakeDb.GameplayFacts.CountAsync(cancellationToken)).IsEqualTo(factCountBefore);
+        });
+    }
+
     [Test, Timeout(300_000)]
     public async Task Standard_flag_intake_records_independent_unlimited_practice_without_changing_official_results(
         CancellationToken cancellationToken)
@@ -90,24 +237,24 @@ public sealed class CompetitionPracticeModePersistenceTests
                     GameplayFactResult.Correct
                 ]);
             var progress = await new GetFlagAttemptState(
-                    intake,
-                    new GameModeGameplayFactAdmissionPolicy())
+                    new FlagAttemptStateReader(db))
                 .ExecuteAsync(
                     fixture.CompetitionId,
                     fixture.CompetitionChallengeId,
-                    fixture.UserId,
+                    fixture.TeamId,
+                    GameMode.Ctf,
+                    CompetitionStatus.Finished,
                     cancellationToken);
             await Assert.That(progress)
                 .IsEqualTo(new FlagAttemptState(null, 2, null, true));
             await Assert.That(outbox.Published.OfType<BloodAwarded>()).IsEmpty();
-            db.GameplayFacts.Add(new GameplayFact
+            db.GameplayFacts.Add(new ManualAdjustmentGameplayFact
             {
                 Id = Guid.CreateVersion7(fixture.Now.AddSeconds(2)),
                 CompetitionId = fixture.CompetitionId,
                 CompetitionChallengeId = fixture.CompetitionChallengeId,
                 TeamId = fixture.TeamId,
                 ActorUserId = fixture.OwnerId,
-                Kind = GameplayFactKind.ManualAdjustment,
                 Value = "7",
                 OccurredAt = fixture.Now.AddSeconds(2),
                 State = GameplayFactState.Completed,
@@ -231,9 +378,10 @@ public sealed class CompetitionPracticeModePersistenceTests
             var fixture = await SeedAsync(options, earlyFinish: false, cancellationToken);
             await using var db = new NoCtfDbContext(options);
             var template = await db.Challenges.SingleAsync(cancellationToken);
-            template.DefinitionJson = JsonSerializer.Serialize(
+            template.Definition = TestConfigurations.Definition(
+                GameMode.Ctf,
+                JsonSerializer.Serialize(
                 new CtfChallengeConfiguration(
-                    CtfChallengeConfiguration.CurrentSchemaVersion,
                     null,
                     null,
                     Runtime: new(
@@ -244,7 +392,7 @@ public sealed class CompetitionPracticeModePersistenceTests
                             FlagEnvironmentVariableName: "FLAG"),
                         new RuntimeResourceLimits(67_108_864, 100_000_000, 64),
                         FlagSource: RuntimeFlagSource.PerTeam)),
-                new JsonSerializerOptions(JsonSerializerDefaults.Web));
+                new JsonSerializerOptions(JsonSerializerDefaults.Web)));
             await db.SaveChangesAsync(cancellationToken);
             var outbox = new RecordingOutbox();
             var events = new CompetitionEventStore(db, outbox);
@@ -262,13 +410,12 @@ public sealed class CompetitionPracticeModePersistenceTests
             await Assert.That(missing.FailureCode)
                 .IsEqualTo(GameplayFactAdmissionFailureCode.RuntimeNotRunning);
 
-            db.RuntimeInstances.Add(new RuntimeInstance
+            db.RuntimeInstances.Add(new PracticeRuntimeInstance
             {
                 Id = Guid.CreateVersion7(fixture.Now),
                 CompetitionId = fixture.CompetitionId,
                 CompetitionChallengeId = fixture.CompetitionChallengeId,
                 TeamId = fixture.TeamId,
-                Purpose = RuntimePurpose.Practice,
                 RuntimeKind = RuntimeKind.Container,
                 RuntimeProvider = RuntimeProvider.Docker,
                 State = RuntimeState.Running,
@@ -293,8 +440,7 @@ public sealed class CompetitionPracticeModePersistenceTests
         new(
             db,
             outbox,
-            new GameplayFactAttemptCriticalSection(
-                new AsyncKeyedLock.AsyncKeyedLocker<string>()),
+            new GameplayFactAttemptCriticalSection(),
             events,
             runtimeTemplates: new ChallengeRuntimeTemplateCatalog(),
             clock: clock);
@@ -337,18 +483,18 @@ public sealed class CompetitionPracticeModePersistenceTests
         db.Users.AddRange(
             User(ownerId, "practice-owner", now),
             User(userId, "practice-player", now));
-        db.Competitions.Add(new Competition
+        db.Competitions.Add(new CtfCompetition
         {
             Id = competitionId,
             OwnerId = ownerId,
             Title = "Finished practice competition",
-            Mode = GameMode.Ctf,
             Status = CompetitionStatus.Finished,
             PracticeModeEnabled = true,
             MaxConcurrentRuntimeInstancesPerTeam = 1,
-            ConfigurationJson = JsonSerializer.Serialize(
+            ModeConfiguration = TestConfigurations.Competition(
+                GameMode.Ctf,
+                JsonSerializer.Serialize(
                 new CtfConfiguration(
-                    CtfConfiguration.CurrentSchemaVersion,
                     new ScoreCurveConfiguration(
                         500,
                         0,
@@ -356,7 +502,7 @@ public sealed class CompetitionPracticeModePersistenceTests
                         ScoreDecayMode.Custom,
                         "eligibleTeamCount * 10m"),
                     []),
-                new JsonSerializerOptions(JsonSerializerDefaults.Web)),
+                new JsonSerializerOptions(JsonSerializerDefaults.Web))),
             FlagDerivationSecret = new byte[32],
             StartAt = startAt,
             EndAt = scheduledEndAt,
@@ -365,53 +511,47 @@ public sealed class CompetitionPracticeModePersistenceTests
         });
         if (earlyFinish)
         {
-            db.CompetitionEvents.Add(new CompetitionEvent
+            db.CompetitionEvents.Add(new CompetitionLifecycleChangedEvent
             {
                 Id = Guid.CreateVersion7(finishedAt),
                 CompetitionId = competitionId,
-                Kind = CompetitionEventKind.CompetitionLifecycleChanged,
                 Level = CompetitionEventLevel.Information,
                 Visibility = CompetitionEventVisibility.Public,
                 SubjectType = EntityReferenceKind.Competition,
                 SubjectId = competitionId,
-                PayloadJson = JsonSerializer.Serialize(new
-                {
-                    schemaVersion = 1,
-                    competitionStatus = CompetitionStatus.Finished,
-                    from = CompetitionStatus.Running,
-                    to = CompetitionStatus.Finished,
-                    automatic = false,
-                    reason = "test"
-                }),
+                PreviousCompetitionStatus = CompetitionStatus.Running,
+                CompetitionStatus = CompetitionStatus.Finished,
+                Automatic = false,
+                Reason = "test",
                 OccurredAt = finishedAt
             });
         }
-        db.Challenges.Add(new Challenge
+        db.Challenges.Add(new CtfChallenge
         {
             Id = challengeId,
             OwnerId = ownerId,
-            Mode = GameMode.Ctf,
             Visibility = ChallengeVisibility.Private,
             Title = "Practice challenge",
             Direction = "Web",
-            DefinitionJson = new GameModeChallengeConfigurationCatalog()
-                .GetDefaultDefinitionJson(GameMode.Ctf),
+            Definition = new GameModeChallengeConfigurationCatalog()
+                .CreateDefaultDefinitionForTest(GameMode.Ctf),
             CreatedAt = startAt,
             UpdatedAt = now
         });
-        db.CompetitionChallenges.Add(new CompetitionChallenge
+        db.CompetitionChallenges.Add(new CtfCompetitionChallenge
         {
             Id = competitionChallengeId,
             CompetitionId = competitionId,
             ChallengeId = challengeId,
             IsPublished = true,
-            RulesJson = JsonSerializer.Serialize(
+            Rules = TestConfigurations.Rules(
+                GameMode.Ctf,
+                JsonSerializer.Serialize(
                 new CtfChallengeConfiguration(
-                    CtfConfiguration.CurrentSchemaVersion,
                     null,
                     null,
                     MaxFlagAttempts: 1),
-                new JsonSerializerOptions(JsonSerializerDefaults.Web)),
+                new JsonSerializerOptions(JsonSerializerDefaults.Web))),
             UpdatedAt = now
         });
         db.Teams.Add(Team(
@@ -420,7 +560,7 @@ public sealed class CompetitionPracticeModePersistenceTests
             userId,
             "Formal team",
             startAt.AddMinutes(-30)));
-        db.ChallengeFlags.Add(new ChallengeFlag
+        db.ChallengeFlags.Add(new CompetitionChallengeFlag
         {
             Id = Guid.CreateVersion7(startAt),
             CompetitionChallengeId = competitionChallengeId,
@@ -428,14 +568,13 @@ public sealed class CompetitionPracticeModePersistenceTests
             FlagSha256 = SHA256.HashData(Encoding.UTF8.GetBytes(flag)),
             CreatedAt = startAt
         });
-        db.GameplayFacts.Add(new GameplayFact
+        db.GameplayFacts.Add(new FlagAttemptGameplayFact
         {
             Id = Guid.CreateVersion7(finishedAt.AddMinutes(-30)),
             CompetitionId = competitionId,
             CompetitionChallengeId = competitionChallengeId,
             TeamId = teamId,
             ActorUserId = userId,
-            Kind = GameplayFactKind.FlagAttempt,
             Value = flag,
             ValueSha256 = SHA256.HashData(Encoding.UTF8.GetBytes(flag)),
             OccurredAt = finishedAt.AddMinutes(-30),
@@ -474,14 +613,13 @@ public sealed class CompetitionPracticeModePersistenceTests
         Guid id,
         Guid ownerId,
         DateTimeOffset now,
-        DateTimeOffset endAt) => new()
+        DateTimeOffset endAt) => new CtfCompetition
     {
         Id = id,
         OwnerId = ownerId,
         Title = "Existing competition",
-        Mode = GameMode.Ctf,
         Status = CompetitionStatus.Finished,
-        ConfigurationJson = "{}",
+        ModeConfiguration = TestConfigurations.Competition(GameMode.Ctf),
         FlagDerivationSecret = new byte[32],
         StartAt = endAt.AddHours(-1),
         EndAt = endAt,
@@ -528,7 +666,7 @@ public sealed class CompetitionPracticeModePersistenceTests
         Guid TeamId,
         string Flag);
 
-    private sealed class RecordingOutbox : ITransactionalMessageOutbox
+    private sealed class RecordingOutbox : IPostCommitMessagePublisher
     {
         public List<object> Published { get; } = [];
 

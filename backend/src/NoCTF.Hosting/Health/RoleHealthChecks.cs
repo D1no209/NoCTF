@@ -7,7 +7,8 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Logging;
-using Npgsql;
+using Microsoft.EntityFrameworkCore;
+using NoCTF.Infrastructure.Persistence;
 using StackExchange.Redis;
 using Wolverine.Configuration;
 using Wolverine.Runtime;
@@ -162,19 +163,18 @@ public sealed partial class RoleReadinessHealthCheck(
         IReadOnlyDictionary<string, object> Data);
 }
 
-public sealed class PostgreSqlReadinessDependency(string connectionString)
+public sealed class DatabaseReadinessDependency(IServiceScopeFactory scopeFactory)
     : IReadinessDependency
 {
-    public string Name => "postgresql";
+    public string Name => "database";
     public bool FailureIsCritical => true;
 
     public async Task CheckAsync(CancellationToken cancellationToken)
     {
-        await using var connection = new NpgsqlConnection(connectionString);
-        await connection.OpenAsync(cancellationToken);
-        await using var command = connection.CreateCommand();
-        command.CommandText = "SELECT 1";
-        _ = await command.ExecuteScalarAsync(cancellationToken);
+        await using var scope = scopeFactory.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<NoCtfDbContext>();
+        if (!await db.Database.CanConnectAsync(cancellationToken))
+            throw new InvalidOperationException("The configured database is unavailable.");
     }
 }
 
@@ -237,11 +237,7 @@ public static class RoleHealthCheckRegistration
         services.AddSingleton<RoleReadinessLogState>();
         if (!development)
         {
-            var postgres = configuration.GetConnectionString("PostgreSql")
-                ?? throw new InvalidOperationException(
-                    "ConnectionStrings:PostgreSql is required for readiness checks.");
-            services.AddSingleton<IReadinessDependency>(
-                new PostgreSqlReadinessDependency(postgres));
+            services.AddSingleton<IReadinessDependency, DatabaseReadinessDependency>();
             services.AddSingleton<IReadinessDependency, WolverineReadinessDependency>();
             if (roles.Has(HostRole.Api)
                 || roles.Has(HostRole.Worker)

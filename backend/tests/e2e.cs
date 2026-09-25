@@ -8,6 +8,7 @@ using System.Net.Http.Json;
 using System.Net.Sockets;
 using System.Runtime.CompilerServices;
 using System.Security.Cryptography;
+using System.Text.Json;
 
 return await E2EProgram.RunAsync(args);
 
@@ -99,14 +100,21 @@ internal sealed class ModeEnvironment(
             networkName,
             runnerPool,
             dockerSocketGroupId);
+        var prebuiltHostImage = Environment.GetEnvironmentVariable("NOCTF_E2E_HOST_IMAGE");
+        environment["NOCTF_E2E_HOST_IMAGE"] = string.IsNullOrWhiteSpace(prebuiltHostImage)
+            ? $"{projectName.Replace('_', '-')}-host:latest"
+            : prebuiltHostImage;
         var compose = new ComposeRunner(runner, projectName, composeFile, environment);
         var succeeded = false;
 
         Console.WriteLine($"=== {mode} {options.Suite} E2E: {projectName} ===");
         try
         {
+            var buildServices = string.IsNullOrWhiteSpace(prebuiltHostImage)
+                ? [.. FixtureServices(mode), "migration", "backend", "worker", "runner"]
+                : FixtureServices(mode);
             await compose.RequireSuccessAsync(
-                ["build", "--quiet", .. FixtureServices(mode), "migration", "backend", "worker", "runner"],
+                ["build", "--quiet", .. buildServices],
                 cancellationToken);
             await compose.RequireSuccessAsync(
                 [
@@ -114,6 +122,7 @@ internal sealed class ModeEnvironment(
                     "-d",
                     "postgres",
                     "redis",
+                    "nats",
                     "minio",
                     "minio-init",
                     "migration",
@@ -196,6 +205,8 @@ internal sealed class ModeEnvironment(
             ["NOCTF_E2E_MINIO_USER"] = $"e2e{RandomToken(6)}",
             ["NOCTF_E2E_MINIO_PASSWORD"] = $"minio-{RandomToken(20)}",
             ["NOCTF_E2E_JWT_SECRET"] = $"jwt-{RandomToken(40)}",
+            ["NOCTF_E2E_ENCRYPTION_KEY"] = Convert.ToBase64String(
+                RandomNumberGenerator.GetBytes(32)),
             ["NOCTF_E2E_ADMIN_PASSWORD"] = $"admin-{RandomToken(20)}",
             ["NOCTF_E2E_SUITE"] = options.Suite.ToString().ToLowerInvariant(),
             ["NOCTF_E2E_BUILD_HTTP_PROXY"] = string.Empty,
@@ -355,9 +366,22 @@ internal sealed class ModeEnvironment(
         await WaitForAuthorizedMeAsync(http, token, cancellationToken);
 
         await compose.RequireSuccessAsync(["stop", "redis"], cancellationToken);
-        _ = await LoginAsync(http, $"{modeName}-e2e-admin", adminPassword, cancellationToken);
+        using (var outageHttp = new HttpClient
+               {
+                   BaseAddress = new Uri(baseUrl),
+                   Timeout = TimeSpan.FromSeconds(15)
+               })
+        {
+            await WaitForAuthorizedMeAsync(outageHttp, token, cancellationToken);
+            await AssertLoginFailsClosedAsync(
+                outageHttp,
+                $"{modeName}-e2e-admin",
+                adminPassword,
+                cancellationToken);
+        }
         await compose.RequireSuccessAsync(["start", "redis"], cancellationToken);
         await WaitUntilReadyAsync(compose, baseUrl, runnerPool, cancellationToken);
+        _ = await LoginAsync(http, $"{modeName}-e2e-admin", adminPassword, cancellationToken);
 
         await compose.RequireSuccessAsync(["restart", "postgres"], cancellationToken);
         await WaitUntilReadyAsync(compose, baseUrl, runnerPool, cancellationToken);
@@ -396,6 +420,29 @@ internal sealed class ModeEnvironment(
             await Task.Delay(TimeSpan.FromSeconds(1), cancellationToken);
         }
         throw new TimeoutException($"Admin login did not recover: {last}");
+    }
+
+    private static async Task AssertLoginFailsClosedAsync(
+        HttpClient http,
+        string login,
+        string password,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            using var response = await http.PostAsJsonAsync(
+                "/api/v1/auth/login",
+                new { login, password },
+                cancellationToken);
+            if (response.IsSuccessStatusCode)
+                throw new InvalidOperationException(
+                    "Login bypassed shared admission protection while Redis was unavailable.");
+        }
+        catch (Exception exception) when (
+            exception is HttpRequestException or TaskCanceledException)
+        {
+            // A transport timeout is also fail-closed; recovery is checked after Redis restarts.
+        }
     }
 
     private static async Task WaitForAuthorizedMeAsync(
@@ -449,6 +496,69 @@ internal sealed class ModeEnvironment(
         using var timeout = new CancellationTokenSource(TimeSpan.FromMinutes(2));
         try
         {
+            var managed = await runner.RunAsync(
+                "docker",
+                ["ps", "-aq", "--filter", "label=noctf.io/managed=true"],
+                timeout.Token,
+                displayOutput: false);
+            var candidates = managed.StandardOutput
+                .Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries);
+            var managedIds = new HashSet<string>(StringComparer.Ordinal);
+            var runtimeIds = new HashSet<Guid>();
+            var runtimeNetworks = new HashSet<string>(StringComparer.Ordinal);
+            var imagePrefix = projectName.Replace('_', '-');
+            foreach (var id in candidates)
+            {
+                var image = await runner.RunAsync(
+                    "docker",
+                    ["inspect", "--format", "{{.Config.Image}}", id],
+                    timeout.Token,
+                    displayOutput: false);
+                if (!image.StandardOutput.Trim().StartsWith(
+                        imagePrefix + "-", StringComparison.Ordinal))
+                    continue;
+                var runtimeId = await runner.RunAsync(
+                    "docker",
+                    ["inspect", "--format",
+                        "{{index .Config.Labels \"noctf.io/runtime-instance-id\"}}", id],
+                    timeout.Token,
+                    displayOutput: false);
+                if (!Guid.TryParse(runtimeId.StandardOutput.Trim(), out var parsedId))
+                    continue;
+                runtimeIds.Add(parsedId);
+            }
+            foreach (var runtimeId in runtimeIds)
+            {
+                var group = await runner.RunAsync(
+                    "docker",
+                    ["ps", "-aq", "--filter",
+                        $"label=noctf.io/runtime-instance-id={runtimeId:D}"],
+                    timeout.Token,
+                    displayOutput: false);
+                foreach (var id in group.StandardOutput.Split(
+                             (char[]?)null, StringSplitOptions.RemoveEmptyEntries))
+                {
+                    managedIds.Add(id);
+                    var networkResult = await runner.RunAsync(
+                        "docker",
+                        ["inspect", "--format", "{{json .NetworkSettings.Networks}}", id],
+                        timeout.Token,
+                        displayOutput: false);
+                    using var networks = JsonDocument.Parse(networkResult.StandardOutput);
+                    foreach (var network in networks.RootElement.EnumerateObject())
+                    {
+                        if (network.Name.StartsWith("noctf-", StringComparison.Ordinal)
+                            && network.Name.Contains(runtimeId.ToString("N"),
+                                StringComparison.OrdinalIgnoreCase))
+                            runtimeNetworks.Add(network.Name);
+                    }
+                }
+            }
+            if (managedIds.Count > 0)
+                await runner.RunAsync("docker", ["rm", "-f", .. managedIds], timeout.Token);
+            foreach (var network in runtimeNetworks)
+                await runner.RunAsync("docker", ["network", "rm", network], timeout.Token);
+
             var resources = await runner.RunAsync(
                 "docker",
                 [

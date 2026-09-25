@@ -1,5 +1,6 @@
 using NoCTF.Application.Common;
 using NoCTF.Domain.Competitions;
+using NoCTF.Domain.Challenges;
 
 namespace NoCTF.Application.Challenges.Configuration;
 
@@ -7,48 +8,47 @@ public sealed record ChallengeConfigurationView(
     Guid CompetitionId,
     Guid CompetitionChallengeId,
     GameMode Mode,
-    string Json,
-    string CompetitionConfigurationJson,
+    CompetitionChallengeRules Rules,
+    CompetitionModeConfiguration CompetitionConfiguration,
     CompetitionStatus CompetitionStatus,
     int EligibleTeamCount,
     DateTimeOffset UpdatedAt,
-    string DefinitionJson = "{}");
+    ChallengeDefinition Definition);
 
 public interface IChallengeConfigurationCatalog
 {
-    string GetDefaultJson(GameMode mode);
-    string GetDefaultDefinitionJson(GameMode mode) => GetDefaultJson(mode);
+    CompetitionChallengeRules CreateDefaultRules(GameMode mode, Guid competitionChallengeId);
+    ChallengeDefinition CreateDefaultDefinition(GameMode mode, Guid challengeId);
 
     IReadOnlyList<string> Validate(
         GameMode mode,
-        string json,
-        string competitionConfigurationJson,
+        CompetitionChallengeRules rules,
+        CompetitionModeConfiguration competitionConfiguration,
         int eligibleTeamCount);
 
     IReadOnlyList<string> ValidateRules(
         GameMode mode,
-        string json,
-        string competitionConfigurationJson,
+        CompetitionChallengeRules rules,
+        CompetitionModeConfiguration competitionConfiguration,
         int eligibleTeamCount) =>
-        Validate(mode, json, competitionConfigurationJson, eligibleTeamCount);
+        Validate(mode, rules, competitionConfiguration, eligibleTeamCount);
 
     IReadOnlyList<string> ValidateDefinition(
         GameMode mode,
-        string json) =>
-        Validate(mode, json, "{}", 1);
+        ChallengeDefinition definition);
 
     IReadOnlyList<string> ValidateDefinitionForStart(
         GameMode mode,
-        string json) =>
-        ValidateDefinition(mode, json);
+        ChallengeDefinition definition) =>
+        ValidateDefinition(mode, definition);
 
     IReadOnlyList<string> ValidateRulesForDefinition(
         GameMode mode,
-        string rulesJson,
-        string definitionJson,
-        string competitionConfigurationJson,
+        CompetitionChallengeRules rules,
+        ChallengeDefinition definition,
+        CompetitionModeConfiguration competitionConfiguration,
         int eligibleTeamCount) =>
-        ValidateRules(mode, rulesJson, competitionConfigurationJson, eligibleTeamCount);
+        ValidateRules(mode, rules, competitionConfiguration, eligibleTeamCount);
 }
 
 public interface IChallengeConfigurationStore
@@ -61,7 +61,7 @@ public interface IChallengeConfigurationStore
     Task<ChallengeConfigurationUpdateResult> TryUpdateAsync(
         Guid competitionId,
         Guid competitionChallengeId,
-        string json,
+        CompetitionChallengeRules rules,
         DateTimeOffset updatedAt,
         CancellationToken cancellationToken);
 }
@@ -100,15 +100,10 @@ public sealed class UpdateChallengeConfiguration(
     public async Task<OperationResult<ChallengeConfigurationView, ChallengeConfigurationFailureCode>> ExecuteAsync(
         Guid competitionId,
         Guid competitionChallengeId,
-        string json,
+        CompetitionChallengeRules rules,
         DateTimeOffset updatedAt,
         CancellationToken ct = default)
     {
-        if (string.IsNullOrWhiteSpace(json))
-            return OperationResult<ChallengeConfigurationView, ChallengeConfigurationFailureCode>.Failure(
-                ChallengeConfigurationFailureCode.InvalidConfiguration,
-                "Challenge configuration is required.");
-
         var current = await store.FindAsync(competitionId, competitionChallengeId, ct);
         if (current is null)
             return OperationResult<ChallengeConfigurationView, ChallengeConfigurationFailureCode>.Failure(
@@ -116,9 +111,9 @@ public sealed class UpdateChallengeConfiguration(
                 "Challenge was not found.");
         var errors = catalog.ValidateRulesForDefinition(
             current.Mode,
-            json,
-            current.DefinitionJson,
-            current.CompetitionConfigurationJson,
+            rules,
+            current.Definition,
+            current.CompetitionConfiguration,
             current.EligibleTeamCount);
         if (errors.Count > 0)
             return OperationResult<ChallengeConfigurationView, ChallengeConfigurationFailureCode>.Failure(
@@ -128,7 +123,7 @@ public sealed class UpdateChallengeConfiguration(
         var result = await store.TryUpdateAsync(
             competitionId,
             competitionChallengeId,
-            json,
+            rules,
             updatedAt,
             ct);
         if (result.Configuration is null)

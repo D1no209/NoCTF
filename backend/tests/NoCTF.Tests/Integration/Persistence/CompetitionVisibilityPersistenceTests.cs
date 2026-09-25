@@ -59,11 +59,8 @@ public sealed class CompetitionVisibilityPersistenceTests
             var audit = await verify.CompetitionEvents.AsNoTracking()
                 .SingleAsync(@event => @event.CompetitionId == fixture.CompetitionId
                     && @event.Kind == CompetitionEventKind.LeaderboardVisibilityChanged, ct);
-            using var payload = JsonDocument.Parse(audit.PayloadJson);
-            await Assert.That(payload.RootElement.GetProperty("frozenStartAt").GetDateTimeOffset())
-                .IsEqualTo(frozenAt);
-            await Assert.That(payload.RootElement.GetProperty("hiddenStartAt").GetDateTimeOffset())
-                .IsEqualTo(hiddenAt);
+            await Assert.That(audit.FrozenStartAt).IsEqualTo(frozenAt);
+            await Assert.That(audit.HiddenStartAt).IsEqualTo(hiddenAt);
         });
     }
 
@@ -181,13 +178,12 @@ public sealed class CompetitionVisibilityPersistenceTests
             User(humanObserverId, "visibility-observer", UserKind.Human),
             User(observerBotId, "visibility-bot", UserKind.Bot),
             User(participantId, "visibility-participant", UserKind.Human));
-        db.Competitions.Add(new Competition
+        db.Competitions.Add(new CtfCompetition
         {
             Id = competitionId,
             Title = "Visibility",
             OwnerId = ownerId,
             ObserverIds = [humanObserverId, observerBotId],
-            Mode = GameMode.Ctf,
             Status = CompetitionStatus.Running,
             FrozenStartAt = visibility == CompetitionLeaderboardVisibility.Frozen
                 ? now.AddMinutes(-1)
@@ -195,7 +191,7 @@ public sealed class CompetitionVisibilityPersistenceTests
             HiddenStartAt = visibility == CompetitionLeaderboardVisibility.Blackout
                 ? now.AddMinutes(-1)
                 : null,
-            ConfigurationJson = "{}",
+            ModeConfiguration = TestConfigurations.Competition(GameMode.Ctf),
             FlagDerivationSecret = new byte[32],
             StartAt = now.AddHours(-1),
             EndAt = now.AddHours(1),
@@ -232,7 +228,7 @@ public sealed class CompetitionVisibilityPersistenceTests
         Guid ObserverBotId,
         Guid ParticipantId);
 
-    private sealed class RecordingOutbox : ITransactionalMessageOutbox
+    private sealed class RecordingOutbox : IPostCommitMessagePublisher
     {
         public List<object> Published { get; } = [];
         public List<(object Message, DateTimeOffset At)> Scheduled { get; } = [];

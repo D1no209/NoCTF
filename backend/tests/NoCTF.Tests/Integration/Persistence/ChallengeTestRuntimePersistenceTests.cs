@@ -43,7 +43,8 @@ public sealed class ChallengeTestRuntimePersistenceTests
                 .Build();
             await postgres.StartAsync(cancellationToken);
             var options = new DbContextOptionsBuilder<NoCtfDbContext>()
-                .UseNpgsql(postgres.GetConnectionString())
+                .UseNpgsql(postgres.GetConnectionString(), npgsql => npgsql.MigrationsAssembly(
+                    typeof(NoCTF.Persistence.PostgreSql.PostgreSqlPersistence).Assembly.FullName))
                 .UseSnakeCaseNamingConvention()
                 .Options;
             var fixture = await SeedAsync(options, cancellationToken);
@@ -75,7 +76,7 @@ public sealed class ChallengeTestRuntimePersistenceTests
             await Assert.That(entity.ChallengeId).IsEqualTo(fixture.ChallengeId);
             await Assert.That(entity.Purpose).IsEqualTo(RuntimePurpose.TemplateTest);
             var inventory = new AdminRuntimeStore(db, templates, new FixedRuntimePlacementPolicy(),
-                new PostgresPerTeamRuntimeFlagStore(db), outbox);
+                new PerTeamRuntimeFlagStore(db), outbox);
             var globalTests = await inventory.ListActiveContainersAsync(
                 new(Scope: PlatformRuntimeScope.ChallengeTest), null, null, 50, cancellationToken);
             await Assert.That(globalTests).HasSingleItem();
@@ -86,6 +87,11 @@ public sealed class ChallengeTestRuntimePersistenceTests
             await Assert.That(entity.TestFlagDelivery).IsEqualTo(RuntimeTestFlagDelivery.Environment);
             await Assert.That(entity.TestFlagState).IsEqualTo(RuntimeTestFlagState.Pending);
 
+            var updatedDefinition = (CtfChallengeDefinition)(await db.Challenges.AsNoTracking()
+                .SingleAsync(challenge => challenge.Id == fixture.ChallengeId, cancellationToken))
+                .Definition!;
+            ((ContainerChallengeRuntimeTemplate)updatedDefinition.Runtime!).Image =
+                "challenge:test-v2";
             var definitionBlocked = await new ChallengeBankStore(db).UpdateAsync(new(
                 fixture.ChallengeId,
                 fixture.OwnerId,
@@ -95,11 +101,7 @@ public sealed class ChallengeTestRuntimePersistenceTests
                 "Template test runtime",
                 null,
                 "PWN",
-                (await db.Challenges.AsNoTracking()
-                    .Where(challenge => challenge.Id == fixture.ChallengeId)
-                    .Select(challenge => challenge.DefinitionJson)
-                    .SingleAsync(cancellationToken))
-                    .Replace("challenge:test", "challenge:test-v2", StringComparison.Ordinal),
+                updatedDefinition,
                 fixture.Now.AddMilliseconds(1)), cancellationToken);
             await Assert.That(definitionBlocked.State)
                 .IsEqualTo(ChallengeTemplateWriteState.ActiveRuntimeDefinitionConflict);
@@ -159,7 +161,7 @@ public sealed class ChallengeTestRuntimePersistenceTests
                     runtimeId,
                     "runner-test",
                     RuntimeProvider.Docker,
-                    "{}",
+                    RuntimeReceiptTestData.ContainerData(runtimeId),
                     [new RuntimeAccessEndpointMapping(0, "tcp://127.0.0.1:31337", null, null)],
                     runningAt.AddHours(1)),
                 db,
@@ -293,17 +295,15 @@ public sealed class ChallengeTestRuntimePersistenceTests
             CreatedAt = now,
             UpdatedAt = now
         });
-        db.Challenges.Add(new Challenge
+        db.Challenges.Add(new CtfChallenge
         {
             Id = challengeId,
             OwnerId = ownerId,
-            Mode = GameMode.Ctf,
             Visibility = ChallengeVisibility.Private,
             Title = "Template test runtime",
             Direction = "PWN",
-            DefinitionJson = JsonSerializer.Serialize(
+            Definition = TestConfigurations.Definition(GameMode.Ctf, JsonSerializer.Serialize(
                 new CtfChallengeConfiguration(
-                    CtfChallengeConfiguration.CurrentSchemaVersion,
                     null,
                     null,
                     Runtime: new ChallengeRuntimeTemplate(
@@ -324,7 +324,7 @@ public sealed class ChallengeTestRuntimePersistenceTests
                         ],
                         FlagSource: RuntimeFlagSource.PerTeam),
                     FlagTemplate: new PerTeamFlagTemplate("test", "[GUID:N]", false)),
-                new JsonSerializerOptions(JsonSerializerDefaults.Web)),
+                new JsonSerializerOptions(JsonSerializerDefaults.Web))),
             CreatedAt = now,
             UpdatedAt = now
         });
@@ -334,7 +334,7 @@ public sealed class ChallengeTestRuntimePersistenceTests
 
     private sealed record Fixture(DateTimeOffset Now, Guid OwnerId, Guid ChallengeId);
 
-    private sealed class RecordingOutbox : ITransactionalMessageOutbox
+    private sealed class RecordingOutbox : IPostCommitMessagePublisher
     {
         public List<object> Published { get; } = [];
         public List<object> RunnerNodeMessages { get; } = [];

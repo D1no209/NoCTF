@@ -8,6 +8,7 @@ using NoCTF.GameModes.Awdp.Configuration;
 using NoCTF.GameModes.Ctf.Configuration;
 using NoCTF.GameModes.Leaderboard;
 using NoCTF.GameModes.Scoring;
+using NoCTF.GameModes.Registration;
 
 namespace NoCTF.Benchmarks;
 
@@ -43,8 +44,6 @@ public class LeaderboardProjectionBenchmarks
     {
         private const int ChallengeCount = 12;
         private const int RoundCount = 20;
-        private static readonly System.Text.Json.JsonSerializerOptions JsonOptions =
-            new(System.Text.Json.JsonSerializerDefaults.Web);
         private static readonly DateTimeOffset Start =
             DateTimeOffset.Parse("2026-08-28T00:00:00Z");
 
@@ -274,47 +273,69 @@ public class LeaderboardProjectionBenchmarks
                 multiplicity,
                 lastOccurredAt);
 
-        private static string? CompetitionConfiguration(GameMode mode) => mode switch
+        private static CompetitionModeConfiguration CompetitionConfiguration(GameMode mode)
         {
-            GameMode.Ctf => System.Text.Json.JsonSerializer.Serialize(new CtfConfiguration(
-                CtfConfiguration.CurrentSchemaVersion,
-                new ScoreCurveConfiguration(500, 100, 50),
-                [new(BloodRewardPolicy.CurrentPointsPercentage, 10)],
-                WrongSubmissionPenalty: 2), JsonOptions),
-            GameMode.Awd => System.Text.Json.JsonSerializer.Serialize(AwdConfiguration.Default, JsonOptions),
-            GameMode.Awdp => System.Text.Json.JsonSerializer.Serialize(new AwdpConfiguration(
-                AwdpConfiguration.CurrentSchemaVersion,
-                300,
-                new ScoreCurveConfiguration(500, 100, 50),
-                new ScoreCurveConfiguration(400, 100, 50),
-                FlagWrongPenalty: 2,
-                ExploitSucceededPenalty: 3,
-                ServiceAbnormalPenalty: 5,
-                RequireBreakBeforeFix: true), JsonOptions),
-            GameMode.Koh => "{\"schemaVersion\":1,\"pollIntervalSeconds\":30,\"controlPointsPerInterval\":5}",
-            _ => null
-        };
+            var configuration = CompetitionModeConfigurationDefaults.Create(mode, Guid.Empty);
+            switch (configuration)
+            {
+                case CtfCompetitionModeConfiguration ctf:
+                    ctf.DefaultScoreCurve = Curve(500, 100, 50);
+                    ctf.WrongSubmissionPenalty = 2;
+                    ctf.BloodRewards =
+                    [
+                        new CompetitionBloodReward
+                        {
+                            Policy = CompetitionBloodRewardPolicy.CurrentPointsPercentage,
+                            Value = 10
+                        }
+                    ];
+                    break;
+                case AwdpCompetitionModeConfiguration awdp:
+                    awdp.BreakScoreCurve = Curve(500, 100, 50);
+                    awdp.FixScoreCurve = Curve(400, 100, 50);
+                    awdp.FlagWrongPenalty = 2;
+                    awdp.ExploitSucceededPenalty = 3;
+                    awdp.ServiceAbnormalPenalty = 5;
+                    break;
+                case KohCompetitionModeConfiguration koh:
+                    koh.PollIntervalSeconds = 30;
+                    koh.ControlPointsPerInterval = 5;
+                    break;
+            }
+            return configuration;
+        }
 
-        private static string? ChallengeConfiguration(GameMode mode, int index) => mode switch
+        private static CompetitionChallengeRules ChallengeConfiguration(GameMode mode, int index)
         {
-            GameMode.Ctf => System.Text.Json.JsonSerializer.Serialize(new CtfChallengeConfiguration(
-                CtfChallengeConfiguration.CurrentSchemaVersion,
-                index % 3 == 0 ? new ScoreCurveConfiguration(600, 120, 60) : null,
-                null,
-                WrongSubmissionPenalty: index % 4 == 0 ? 3 : null), JsonOptions),
-            GameMode.Awd => System.Text.Json.JsonSerializer.Serialize(new AwdChallengeConfiguration(
-                AwdChallengeConfiguration.CurrentSchemaVersion,
-                ServiceHealthyPoints: index % 3 == 0 ? 110 : null), JsonOptions),
-            GameMode.Awdp => System.Text.Json.JsonSerializer.Serialize(new AwdpChallengeConfiguration(
-                AwdpChallengeConfiguration.CurrentSchemaVersion,
-                null,
-                null,
-                RequireBreakBeforeFix: index % 4 != 0,
-                null,
-                null,
-                FlagWrongPenalty: index % 3 == 0 ? 4 : null), JsonOptions),
-            GameMode.Koh => $"{{\"schemaVersion\":1,\"controlPointsPerInterval\":{5 + index % 3}}}",
-            _ => null
+            var rules = new GameModeChallengeConfigurationCatalog()
+                .CreateDefaultRules(mode, Guid.Empty);
+            switch (rules)
+            {
+                case CtfCompetitionChallengeRules ctf:
+                    ctf.HasScoreCurve = index % 3 == 0;
+                    ctf.ScoreCurve = Curve(600, 120, 60);
+                    ctf.WrongSubmissionPenalty = index % 4 == 0 ? 3 : null;
+                    break;
+                case AwdCompetitionChallengeRules awd:
+                    awd.ServiceHealthyPoints = index % 3 == 0 ? 110 : null;
+                    break;
+                case AwdpCompetitionChallengeRules awdp:
+                    awdp.RequireBreakBeforeFix = index % 4 != 0;
+                    awdp.FlagWrongPenalty = index % 3 == 0 ? 4 : null;
+                    break;
+                case KohCompetitionChallengeRules koh:
+                    koh.ControlPointsPerInterval = 5 + index % 3;
+                    break;
+            }
+            return rules;
+        }
+
+        private static ScoreCurveValue Curve(long initial, long minimum, int teams) => new()
+        {
+            InitialPoints = initial,
+            MinimumPoints = minimum,
+            DecayTeamCount = teams,
+            DecayMode = PersistedScoreDecayMode.Quadratic
         };
 
         private static IReadOnlyList<CompetitionLifecycleTransition> Lifecycle(Guid competitionId) =>

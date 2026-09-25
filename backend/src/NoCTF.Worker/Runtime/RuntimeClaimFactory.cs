@@ -1,6 +1,7 @@
 using NoCTF.Application.Runtime.Instances;
 using NoCTF.Application.Runtime.Provisioning;
 using NoCTF.Domain.Competitions;
+using NoCTF.Domain.Challenges;
 using NoCTF.Domain.Runtime;
 using NoCTF.GameModes.Awd.Configuration;
 
@@ -13,11 +14,11 @@ public static class RuntimeClaimFactory
         string runnerId,
         GameMode mode,
         ChallengeRuntimeTemplate template,
-        string challengeConfigurationJson,
+        ChallengeDefinition? challengeDefinition,
         string? perTeamFlag = null)
     {
         var fixedFlag = ResolvePerTeamFlag(mode, template, perTeamFlag);
-        var checkerTarget = ResolveAwdCheckerTarget(mode, challengeConfigurationJson);
+        var checkerTarget = ResolveAwdCheckerTarget(mode, challengeDefinition);
         var limits = template.Limits
             ?? new RuntimeResourceLimits(512 * 1024 * 1024, 500_000_000, 256);
         TimeSpan? ttl = template.TtlSeconds is > 0
@@ -108,15 +109,14 @@ public static class RuntimeClaimFactory
 
     private static RuntimeInternalEndpointBinding? ResolveAwdCheckerTarget(
         GameMode mode,
-        string challengeConfigurationJson)
+        ChallengeDefinition? challengeDefinition)
     {
         if (mode != GameMode.Awd)
             return null;
-        var checker = AwdConfigurationParser.ParseChallenge(
-            challengeConfigurationJson).Checker;
+        var checker = challengeDefinition as AwdChallengeDefinition;
         if (checker is null)
             return null;
-        return checker.TargetServiceName switch
+        return checker.Checker?.TargetServiceName switch
         {
             { Length: > 0 } serviceName => new(serviceName),
             _ => new()
@@ -156,12 +156,7 @@ public static class RuntimeClaimFactory
     }
 
     private static ContainerSecurityPolicy NormalizeSecurity(
-        ContainerSecurityPolicy? security)
-    {
-        if (security is null || security.CapDrop is null || security.CapAdd is null)
-            throw new InvalidOperationException("Container security is required and must declare capability lists.");
-        return security;
-    }
+        ContainerSecurityPolicy security) => security.NormalizeCapabilities();
 
     private static string? ResolvePerTeamFlag(
         GameMode mode,

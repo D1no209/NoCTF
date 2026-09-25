@@ -64,7 +64,7 @@ public sealed class GitOpsApiOpenApiContractTests
             "/api/v1/admin/competitions/{competitionId}/challenges/{competitionChallengeId}",
             "get", "200");
         await Assert.That(PropertyNames(challenge))
-            .IsEquivalentTo(["challenge", "mode", "competitionStatus", "rulesJson"]);
+            .IsEquivalentTo(["challenge", "mode", "competitionStatus", "rules"]);
     }
 
     [Test]

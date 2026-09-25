@@ -35,7 +35,10 @@ public sealed class CtfPatchVerificationFeatureGateTests
             "Patch me",
             null,
             "Pwn",
-            """{"schemaVersion":3,"interactionKind":1}""",
+            new CtfChallengeDefinition
+            {
+                InteractionKind = CtfInteractionKind.PatchVerification
+            },
             DateTimeOffset.UtcNow));
 
         await Assert.That(result.State)
@@ -51,30 +54,26 @@ public sealed class CtfPatchVerificationFeatureGateTests
         experiments.IsCtfPatchVerificationEnabledAsync(Arg.Any<CancellationToken>())
             .Returns(false);
         var actorId = Guid.NewGuid();
-        store.ListAsync(actorId, false, false, Arg.Any<CancellationToken>())
-            .Returns([
-                Template("Flag", """{"schemaVersion":2}"""),
-                Template("Patch", """{"schemaVersion":3,"interactionKind":1}""")
-            ]);
+        store.ListPageAsync(Arg.Any<ChallengeTemplateListQuery>(), Arg.Any<CancellationToken>())
+            .Returns(new ChallengeTemplateListPage([
+                Template("Flag", CtfInteractionKind.FlagSubmission),
+                Template("Patch", CtfInteractionKind.PatchVerification)
+            ], 2, ["Pwn"]));
 
         var result = await new ListChallengeTemplates(store, experiments)
-            .ExecuteAsync(actorId, false);
+            .ExecutePageAsync(new(actorId, false, false, null, null, 0, 10, false));
 
-        await Assert.That(result.Select(item => item.Title)).IsEquivalentTo(["Flag"]);
+        await Assert.That(result.Items.Select(item => item.Title)).IsEquivalentTo(["Flag"]);
     }
 
-    private static ChallengeTemplateView Template(string title, string definitionJson) => new(
+    private static ChallengeTemplateSummaryView Template(string title, CtfInteractionKind interactionKind) => new(
         Guid.NewGuid(),
-        Guid.NewGuid(),
-        [],
         GameMode.Ctf,
         ChallengeVisibility.Private,
         title,
-        null,
         "Pwn",
-        definitionJson,
         null,
         0,
         DateTimeOffset.UtcNow,
-        DateTimeOffset.UtcNow);
+        interactionKind);
 }

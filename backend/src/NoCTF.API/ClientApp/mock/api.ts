@@ -1,4 +1,4 @@
-import { accounts, createFixtures } from './data/fixtures'
+import { accounts, createFixtures, mockModeConfiguration, mockRules } from './data/fixtures'
 import { date, id, matchOperation, model, now, resolve, responseSchema, sample, type Data } from './schema'
 import { leaderboardRead } from './leaderboard'
 import { questionActorRole, questionView } from './questions'
@@ -109,6 +109,35 @@ export function createMockApi() {
     tokens.set(accessToken, user.userId)
     return json({ accessToken }, 200, { 'Set-Cookie': `noctf_mock_session=${session}; Path=/; HttpOnly; SameSite=Strict` })
   }
+  function challengeSummary(item: Data) {
+    return {
+      id: item.id,
+      competitionId: item.competitionId,
+      challengeId: item.challengeId,
+      title: item.title,
+      customTitle: item.customTitle ?? null,
+      direction: item.direction,
+      order: item.order,
+      isPublished: item.isPublished,
+      deletedAt: item.deletedAt ?? null,
+      interactionKind: item.interactionKind ?? 'FlagSubmission',
+    }
+  }
+
+  function templateSummary(item: Data) {
+    return {
+      id: item.id,
+      mode: item.mode,
+      visibility: item.visibility,
+      title: item.title,
+      direction: item.direction,
+      deletedAt: item.deletedAt ?? null,
+      activeCompetitionReferenceCount: item.activeCompetitionReferenceCount,
+      updatedAt: item.updatedAt,
+      interactionKind: item.interactionKind ?? 'FlagSubmission',
+    }
+  }
+
   function list(items: Data[], url: URL) {
     const search = (url.searchParams.get('search') ?? url.searchParams.get('query') ?? '').toLowerCase()
     const mode = url.searchParams.get('mode')
@@ -361,7 +390,7 @@ export function createMockApi() {
       else if (route === '/admin/platform/information') value = { version: 'MOCK / local-memory', contributors: [] }
       else if (route === '/admin/competitions/{competitionId}') value = {
         competition: { ...competition, administrationRole: user?.role === 'Administrator' ? 'Owner' : user?.role === 'Organizer' ? 'Manager' : null },
-        modeConfiguration: { competitionId: competition!.id, mode: competition!.mode, competitionStatus: competition!.status, json: '{}', updatedAt: now() },
+        modeConfiguration: { competitionId: competition!.id, mode: competition!.mode, competitionStatus: competition!.status, configuration: mockModeConfiguration(String(competition!.mode)), updatedAt: now() },
         tracks: state.settings.get(`/competitions/{competitionId}/tracks${p.competitionId}`) ?? { mode: competition!.mode, enabled: competition!.tracksEnabled ?? false, canUpdate: competition!.status !== 'Finished', items: [] },
         permissions: { competitionId: competition!.id, ownerId: competition!.ownerId, managerIds: [], judgeIds: [], observerIds: [] },
         leaderboardVisibility: { competitionId: competition!.id, effectiveVisibility: 'Normal', frozenStartAt: null, hiddenStartAt: null },
@@ -371,7 +400,7 @@ export function createMockApi() {
         challenge,
         mode: competition!.mode,
         competitionStatus: competition!.status,
-        rulesJson: '{}',
+        rules: mockRules(String(competition!.mode)),
       }
       else if (cleanRoute === '/competitions') {
         const visibleCompetitions = route.startsWith('/admin') || competitionStaff
@@ -380,7 +409,10 @@ export function createMockApi() {
         value = list(visibleCompetitions.map(c => ({ ...c, administrationRole: user?.role === 'Administrator' ? 'Owner' : user?.role === 'Organizer' ? 'Manager' : null })), url)
       }
       else if (cleanRoute === '/competitions/{competitionId}') value = { ...competition, administrationRole: user?.role === 'Administrator' ? 'Owner' : user?.role === 'Organizer' ? 'Manager' : null }
-      else if (cleanRoute === '/competitions/{competitionId}/challenges') value = { ...list(state.challenges.filter(c => c.competitionId === p.competitionId), url), leaderboardVisibility: 'Normal', dataScope: 'Live' }
+      else if (cleanRoute === '/competitions/{competitionId}/challenges') {
+        const page = list(state.challenges.filter(c => c.competitionId === p.competitionId), url)
+        value = { ...page, items: page.items.map(challengeSummary), leaderboardVisibility: 'Normal', dataScope: 'Live' }
+      }
       else if (cleanRoute === '/competitions/{competitionId}/challenges/{competitionChallengeId}') value = {
         ...challenge,
         solvedByMyTeam: competition?.mode === 'Ctf' && Boolean(myTeam && state.facts.some(fact =>
@@ -401,7 +433,7 @@ export function createMockApi() {
           .map(template => String(template.direction ?? '').trim())
           .filter(Boolean))]
           .sort((left, right) => left.localeCompare(right))
-        value = { ...page, directions }
+        value = { ...page, items: page.items.map(templateSummary), directions }
       }
       else if (route === '/admin/challenges/{challengeId}') value = template
       else if (route === '/admin/challenges/{challengeId}/attachments') value = { deliveryPolicy: 'All', items: state.attachments.filter(item => item.challengeId === template!.id && (!item.deletedAt || url.searchParams.get('includeDeleted') === 'true')) }
@@ -439,7 +471,7 @@ export function createMockApi() {
       else if (route.endsWith('/runtimes')) value = list(state.runtimes.filter(r => !p.competitionId || r.competitionId === p.competitionId).map(r => route.startsWith('/admin/platform') ? { runtime: r, scope: 'Competition', competitionTitle: competition?.title ?? state.competitions[0]!.title, challengeTitle: 'Mock runtime' } : r), url)
       else if (route.endsWith('/permissions') && competition) value = { competitionId: competition.id, ownerId: competition.ownerId, managerIds: [id(1, 2)], judgeIds: [], observerIds: [] }
       else if (route.endsWith('/permission-candidates')) value = { items: state.users }
-      else if (route.endsWith('/configuration') && competition) value = { competitionId: competition.id, mode: competition.mode, competitionStatus: competition.status, json: JSON.stringify({ schemaVersion: { Ctf: 2, Awd: 2, Awdp: 4, Koh: 1 }[competition.mode as string] }), updatedAt: now() }
+      else if (route.endsWith('/configuration') && competition) value = { competitionId: competition.id, mode: competition.mode, competitionStatus: competition.status, configuration: mockModeConfiguration(String(competition.mode)), updatedAt: now() }
       else if (/\/(avatar|poster|logo|attachment)$/.test(route)) return new Response(null, { status: 404 })
       const saved = state.settings.get(path)
       if (saved) value = saved
@@ -609,7 +641,7 @@ export function createMockApi() {
           competition!.tracksEnabled = body.tracks.enabled
           state.settings.set(`/competitions/{competitionId}/tracks${p.competitionId}`, { mode: competition!.mode, enabled: body.tracks.enabled, canUpdate: competition!.status !== 'Finished', items: body.tracks.tracks })
         }
-        value = { competition, modeConfiguration: body.modeConfiguration ?? { json: '{}' }, tracks: state.settings.get(`/competitions/{competitionId}/tracks${p.competitionId}`) ?? { enabled: competition!.tracksEnabled ?? false, canUpdate: competition!.status !== 'Finished', items: [] }, permissions: body.permissions ?? null, leaderboardVisibility: body.leaderboardVisibility ?? { effectiveVisibility: 'Normal' }, capabilities: { canObserve: true, canModerate: true, canManagePermissions: true } }
+        value = { competition, modeConfiguration: body.modeConfiguration ?? { competitionId: competition!.id, mode: competition!.mode, competitionStatus: competition!.status, configuration: mockModeConfiguration(String(competition!.mode)), updatedAt: now() }, tracks: state.settings.get(`/competitions/{competitionId}/tracks${p.competitionId}`) ?? { enabled: competition!.tracksEnabled ?? false, canUpdate: competition!.status !== 'Finished', items: [] }, permissions: body.permissions ?? null, leaderboardVisibility: body.leaderboardVisibility ?? { effectiveVisibility: 'Normal' }, capabilities: { canObserve: true, canModerate: true, canManagePermissions: true } }
       }
       else if (route === '/admin/competitions/{competitionId}/status' && request.method === 'PUT') { competition!.status = body.status; value = {} }
       else if (route === '/admin/competitions/{competitionId}/gameplay-facts/manual-adjustments') {
@@ -632,7 +664,7 @@ export function createMockApi() {
         if (!source) return problem(400, '选择同赛制的演示模板 / Select a template in the same mode')
         value = { ...state.challenges[0], ...body, id: body.id ?? crypto.randomUUID(), competitionId: competition!.id, title: body.customTitle ?? source.title, description: source.description, direction: source.direction, challengeId: source.id }; state.challenges.push(value)
       }
-      else if (route === '/admin/competitions/{competitionId}/challenges/{competitionChallengeId}' && request.method === 'PATCH') { if (body.presentation) Object.assign(challenge!, body.presentation, { title: body.presentation.customTitle ?? challenge!.title }); value = { challenge, mode: competition!.mode, competitionStatus: competition!.status, rulesJson: body.rules?.json ?? '{}' } }
+      else if (route === '/admin/competitions/{competitionId}/challenges/{competitionChallengeId}' && request.method === 'PATCH') { if (body.presentation) Object.assign(challenge!, body.presentation, { title: body.presentation.customTitle ?? challenge!.title }); value = { challenge, mode: competition!.mode, competitionStatus: competition!.status, rules: body.rules?.configuration ?? mockRules(String(competition!.mode)) } }
       else if (cleanRoute === '/competitions/{competitionId}/teams' && request.method === 'POST') {
         if (myTeam) return problem(409, '已加入队伍，请先退出 / Already in a team')
         value = { ...state.teams[0], ...body, id: body.id ?? crypto.randomUUID(), competitionId: p.competitionId, captainId: user!.userId, memberIds: [user!.userId], registrationStatus: 'Unregistered', registeredAt: now() }; state.teams.push(value); invitationTokens.set(value.id, crypto.randomUUID().replaceAll('-', ''))

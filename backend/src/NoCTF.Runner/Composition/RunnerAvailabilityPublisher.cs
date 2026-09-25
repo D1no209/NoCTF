@@ -6,13 +6,13 @@ using NoCTF.Infrastructure.Runtime.Capacity;
 using NoCTF.Infrastructure.Persistence;
 using NoCTF.Application.Runtime.Provisioning;
 using System.Text.Json;
-using Npgsql;
+using System.Data.Common;
 using StackExchange.Redis;
 
 namespace NoCTF.Runner.Composition;
 
 public sealed class RunnerAvailabilityPublisher(
-    IServiceScopeFactory scopeFactory,
+    IDbContextFactory<NoCtfDbContext> contexts,
     RedisRunnerAvailabilityRegistry registry,
     IOptions<RunnerOptions> configuredOptions,
     ILogger<RunnerAvailabilityPublisher> logger,
@@ -80,7 +80,7 @@ public sealed class RunnerAvailabilityPublisher(
                     "Runner {RunnerId} could not publish availability to Redis.",
                     options.Id);
             }
-            catch (NpgsqlException exception)
+            catch (DbException exception)
             {
                 logger.LogWarning(
                     exception,
@@ -96,8 +96,7 @@ public sealed class RunnerAvailabilityPublisher(
     public async Task<RunnerAvailabilityRegistrationOutcome> PublishOnceAsync(
         CancellationToken cancellationToken)
     {
-        await using var scope = scopeFactory.CreateAsyncScope();
-        var db = scope.ServiceProvider.GetRequiredService<NoCtfDbContext>();
+        await using var db = await contexts.CreateDbContextAsync(cancellationToken);
         var admission = await observer.SampleAsync(cancellationToken);
         var hasActiveAssignments = await db.RuntimeInstances.AsNoTracking()
             .AnyAsync(
@@ -107,7 +106,7 @@ public sealed class RunnerAvailabilityPublisher(
                         || instance.State == RuntimeState.Running
                         || instance.State == RuntimeState.Stopping
                         || (instance.State == RuntimeState.Failed
-                            && instance.ProviderReceiptJson != null)),
+                            && instance.ProviderReceipt != null)),
                 cancellationToken);
 
         var registration = new RunnerAvailabilityRegistration(
@@ -132,16 +131,19 @@ public sealed class RunnerAvailabilityPublisher(
             // External inventory reads happen outside the database transaction.
             var managed = await reconciler.ListManagedAsync(cancellationToken);
             var managedRuntimeIds = managed.Select(resource => resource.RuntimeInstanceId).ToHashSet();
-            await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
-            await RuntimeCapacityCriticalSection.AcquireAsync(db, cancellationToken);
-            var ownerJson = JsonSerializer.Serialize(new { items = new[] { new { runnerId = options.Id } } });
-            var runtimes = await db.RuntimeInstances.FromSqlInterpolated(
-                    $"SELECT * FROM runtime_instances WHERE runner_id = {options.Id} OR capacity_allocations @> CAST({ownerJson} AS jsonb)")
-                .Where(runtime => runtime.RuntimeProvider == options.Provider)
+            await using var transaction = await db.Database.BeginTransactionAsync(
+                System.Data.IsolationLevel.RepeatableRead,
+                cancellationToken);
+            var runtimes = await db.RuntimeInstances
+                .Include(runtime => runtime.CapacityAllocationEntries)
+                .Where(runtime => runtime.RuntimeProvider == options.Provider
+                    && (runtime.RunnerId == options.Id
+                        || runtime.CapacityAllocationEntries.Any(allocation =>
+                            allocation.RunnerId == options.Id)))
                 .AsNoTracking().ToArrayAsync(cancellationToken);
             if (runtimes.Any(runtime => runtime.CapacityAllocations.Items.Count == 0
                     && (runtime.State is RuntimeState.Provisioning or RuntimeState.Running or RuntimeState.Stopping
-                        || runtime.State == RuntimeState.Failed && runtime.ProviderReceiptJson != null)))
+                        || runtime.State == RuntimeState.Failed && runtime.ProviderReceipt != null)))
                 return RunnerAvailabilityRegistrationOutcome.OfflineCapacityUntrusted;
             var known = runtimes.Where(runtime => runtime.CapacityAllocations.Items.Count > 0)
                 .Select(runtime => runtime.Id).ToHashSet();
@@ -158,23 +160,20 @@ public sealed class RunnerAvailabilityPublisher(
                 if (await reconciler.WorkloadExistsAsync(identity, cancellationToken) != true)
                     starting.Add(identity);
             }
-            await using var restoreTransaction = await db.Database.BeginTransactionAsync(cancellationToken);
-            await RuntimeCapacityCriticalSection.AcquireAsync(db, cancellationToken);
-            var recoveryRows = await db.RuntimeInstances.AsNoTracking().Where(runtime =>
-                    runtimes.Select(item => item.Id).Contains(runtime.Id))
-                .Select(runtime => new { runtime.Id, runtime.State, runtime.ProviderReceiptJson, runtime.CapacityAllocations })
+            var recoveryRows = await db.RuntimeInstances.AsNoTracking()
+                .Include(runtime => runtime.CapacityAllocationEntries)
+                .Where(runtime => runtimes.Select(item => item.Id).Contains(runtime.Id))
                 .ToArrayAsync(cancellationToken);
             var ownedRows = recoveryRows.Where(runtime => runtime.State == RuntimeState.Provisioning
                     || managedRuntimeIds.Contains(runtime.Id)
                         && (runtime.State is RuntimeState.Running or RuntimeState.Stopping
-                            || runtime.State == RuntimeState.Failed && runtime.ProviderReceiptJson != null))
+                            || runtime.State == RuntimeState.Failed && runtime.ProviderReceipt != null))
                 .ToArray();
             var allocations = ownedRows.SelectMany(runtime => runtime.CapacityAllocations.Items)
                 .Where(item => item.RunnerId == options.Id).ToArray();
             var claimKeys = allocations.Select(allocation => $"runner-claim:{allocation.Identity.Key}").ToArray();
             await ledger.RestoreAsync(options.Id, options.Pool, admission.Capacity,
                 admission.Observation!.ObservedAt, allocations, cancellationToken, starting, claimKeys);
-            await restoreTransaction.CommitAsync(cancellationToken);
             initialReconciliationComplete = true;
             result = await registry.RegisterAsync(registration, cancellationToken);
         }

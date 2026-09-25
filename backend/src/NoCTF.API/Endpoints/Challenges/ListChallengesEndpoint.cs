@@ -16,8 +16,7 @@ public sealed class ListChallengesRequest
 
 public sealed class ListChallengesEndpoint(
     ListChallenges list,
-    ICompetitionChallengeAudienceAccess audienceAccess,
-    ICompetitionVisibilityAccess visibilityAccess,
+    ICompetitionChallengeReadAccess readAccess,
     IUserContext user,
     TimeProvider timeProvider,
     IExperimentalFeatureReader? experimentalFeatures = null) : Endpoint<ListChallengesRequest, Results<Ok<ChallengeListResponse>, NotFound>>
@@ -34,17 +33,16 @@ public sealed class ListChallengesEndpoint(
         CancellationToken ct)
     {
         var competitionId = Route<Guid>("competitionId");
-        if (!await audienceAccess.CanReadAsync(user.UserId, competitionId, ct))
-            return TypedResults.NotFound();
-        var visibility = await visibilityAccess.ResolveAsync(
+        var decision = await readAccess.ResolveAsync(
             user.UserId,
             competitionId,
             timeProvider.GetUtcNow(),
             ct);
-        if (visibility is null
+        if (decision is null
             || !ParticipantChallengeVisibilityPolicy.CanView(
-                visibility.CompetitionStatus))
+                decision.Visibility.CompetitionStatus))
             return TypedResults.NotFound();
+        var visibility = decision.Visibility;
         var items = await list.ExecuteAsync(
             competitionId,
             includeUnpublished: false,

@@ -2,7 +2,7 @@ import { proxyRefs } from 'vue'
 import { markRaw, toRefs } from 'vue'
 
 import type { GameModeValue, RuntimeTemplateModel } from '../../utils/game-config'
-import { bytesToMib, coresToNanoCpus, CtfInteraction, DEFAULT_RUNTIME_MEMORY_BYTES, DEFAULT_RUNTIME_NANO_CPUS, DEFAULT_RUNTIME_OPERATION_TIMEOUT_SECONDS, DEFAULT_RUNTIME_PIDS_LIMIT, DEFAULT_RUNTIME_TTL_SECONDS, emptyContainerDefinition, emptyComposeDefinition, FlagSource, mibToBytes, nanoCpusToCores, RuntimeAllocation, UrlExposure } from '../../utils/game-config'
+import { bytesToMib, coresToNanoCpus, CtfInteraction, DEFAULT_RUNTIME_MEMORY_BYTES, DEFAULT_RUNTIME_NANO_CPUS, DEFAULT_RUNTIME_OPERATION_TIMEOUT_SECONDS, DEFAULT_RUNTIME_PIDS_LIMIT, DEFAULT_RUNTIME_TTL_SECONDS, emptyContainerDefinition, emptyComposeDefinition, emptyOvaDefinition, FlagSource, mibToBytes, nanoCpusToCores, RuntimeAllocation, UrlExposure } from '../../utils/game-config'
 import DefinitionComposeComponent from './DefinitionCompose.vue'
 import DefinitionContainerComponent from './DefinitionContainer.vue'
 import UrlBindingListComponent from './UrlBindingList.vue'
@@ -37,6 +37,7 @@ export function useDefinitionRuntime(props: Readonly<Omit<{
       : [
           { value: 'container', label: translate("ui.singleContainer") },
           { value: 'compose', label: 'Docker Compose' },
+          { value: 'ova', label: 'OVA VM' },
         ],
   )
 
@@ -44,7 +45,9 @@ export function useDefinitionRuntime(props: Readonly<Omit<{
     if (kind === props.runtime.definition.kind) return
     props.runtime.definition = kind === 'compose'
       ? emptyComposeDefinition()
-      : emptyContainerDefinition(
+      : kind === 'ova'
+        ? emptyOvaDefinition()
+        : emptyContainerDefinition(
           props.mode === 'Awdp'
           || props.mode === 'Ctf' && !isPatchVerification.value,
         )
@@ -194,7 +197,8 @@ function synchronizeFlagInjection(runtime: RuntimeTemplateModel): void {
       : ''
     return
   }
-  if (!enabled) runtime.definition.flagEnvironmentVariables = {}
+  if (runtime.definition.kind === 'compose' && !enabled)
+    runtime.definition.flagEnvironmentVariables = {}
 }
 
 export type DefinitionRuntimeViewState = import('vue').ShallowUnwrapRef<Awaited<ReturnType<typeof useDefinitionRuntime>>>

@@ -10,22 +10,30 @@ using NoCTF.API.Endpoints;
 using NoCTF.Domain.Competitions;
 using NoCTF.Infrastructure.Competitions.Management;
 using NoCTF.Infrastructure.Persistence;
+using Testcontainers.PostgreSql;
 
 namespace NoCTF.Tests.Integration.API;
 
 public sealed class CompetitionAudienceHttpTests
 {
     [Test]
-    [Category("DevelopmentIntegration")]
+    [Category("Integration")]
+    [NotInParallel]
+    [Timeout(300_000)]
     public async Task Hidden_competition_is_absent_from_catalog_and_rejects_known_routes(
         CancellationToken cancellationToken)
     {
-        var databaseName = $"noctf-hidden-http-{Guid.NewGuid():N}";
+        await using var postgres = new PostgreSqlBuilder("postgres:17.10-alpine3.24@sha256:742f40ea20b9ff2ff31db5458d127452988a2164df9e17441e191f3b72252193")
+            .WithDatabase("noctf_hidden_http")
+            .WithUsername("postgres")
+            .WithPassword("postgres")
+            .Build();
+        await postgres.StartAsync(cancellationToken);
         using var factory = new WebApplicationFactory<Program>()
             .WithWebHostBuilder(builder =>
             {
                 builder.UseEnvironment("Development");
-                builder.UseSetting("Development:DatabaseName", databaseName);
+                builder.UseSetting("ConnectionStrings:PostgreSql", postgres.GetConnectionString());
                 builder.UseSetting("SeedAdmin:UserName", "hidden-http-admin");
                 builder.UseSetting("SeedAdmin:Email", "hidden-http-admin@noctf.local");
                 builder.UseSetting("SeedAdmin:Password", "integration-password");

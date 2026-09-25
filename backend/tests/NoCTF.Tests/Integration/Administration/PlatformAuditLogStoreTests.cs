@@ -44,89 +44,70 @@ public sealed class PlatformAuditLogStoreTests
                 seed.Users.AddRange(
                     CreateUser(actorId, "audit-actor", now),
                     CreateUser(targetId, "audit-target", now));
-                seed.Competitions.Add(new Competition
+                seed.Competitions.Add(new CtfCompetition
                 {
                     Id = competitionId,
                     Title = "Audit competition",
                     OwnerId = actorId,
-                    Mode = GameMode.Ctf,
                     Status = CompetitionStatus.Running,
-                    ConfigurationJson = "{}",
+                    ModeConfiguration = TestConfigurations.Competition(GameMode.Ctf),
                     FlagDerivationSecret = new byte[32],
                     StartAt = now.AddHours(-1),
                     EndAt = now.AddHours(1),
                     CreatedAt = now,
                     UpdatedAt = now
                 });
-                seed.Notifications.Add(new Notification
+                seed.Notifications.Add(new UserAccountLifecycleChangedNotification
                 {
                     Id = Guid.CreateVersion7(now.AddMilliseconds(4)),
                     SourceType = NotificationSourceType.User,
                     SourceId = actorId,
                     TargetType = NotificationTargetType.PlatformAdministrators,
                     TargetId = Notification.PlatformAdministratorsTargetId,
-                    Kind = NotificationKind.UserAccountLifecycleChanged,
-                    ContentJson = JsonSerializer.Serialize(new UserAccountLifecycleFact(
-                        1,
-                        targetId,
-                        "audit-target",
-                        UserAccountLifecycleAction.Disabled,
-                        "policy",
-                        false), new JsonSerializerOptions(JsonSerializerDefaults.Web)),
+                    UserId = targetId,
+                    UserName = "audit-target",
+                    UserLifecycleAction = UserAccountLifecycleAction.Disabled,
+                    Reason = "policy",
+                    Automatic = false,
                     RelatedType = EntityReferenceKind.User,
                     RelatedId = targetId,
                     SentAt = now.AddMinutes(2)
                 });
-                seed.CompetitionEvents.Add(new CompetitionEvent
+                seed.CompetitionEvents.Add(new CompetitionLifecycleChangedEvent
                 {
                     Id = Guid.CreateVersion7(now.AddMilliseconds(5)),
                     CompetitionId = competitionId,
-                    Kind = CompetitionEventKind.CompetitionLifecycleChanged,
                     Level = CompetitionEventLevel.Information,
                     Visibility = CompetitionEventVisibility.Public,
                     ActorUserId = actorId,
                     SubjectType = EntityReferenceKind.Competition,
                     SubjectId = competitionId,
-                    PayloadJson = JsonSerializer.Serialize(new
-                    {
-                        schemaVersion = 1,
-                        competitionStatus = CompetitionStatus.Running,
-                        reason = "started from immutable event"
-                    }, new JsonSerializerOptions(JsonSerializerDefaults.Web)),
+                    CompetitionStatus = CompetitionStatus.Running,
+                    Reason = "started from immutable event",
                     OccurredAt = now.AddMinutes(1)
                 });
-                seed.CompetitionEvents.Add(new CompetitionEvent
+                seed.CompetitionEvents.Add(new RuntimeStateChangedEvent
                 {
                     Id = Guid.CreateVersion7(now.AddMilliseconds(6)),
                     CompetitionId = competitionId,
-                    Kind = CompetitionEventKind.RuntimeStateChanged,
                     Level = CompetitionEventLevel.Warning,
                     Visibility = CompetitionEventVisibility.Staff,
                     ActorUserId = actorId,
                     SubjectType = EntityReferenceKind.Competition,
                     SubjectId = competitionId,
-                    PayloadJson = JsonSerializer.Serialize(new
-                    {
-                        schemaVersion = 1,
-                        reason = "runtime state changed"
-                    }, new JsonSerializerOptions(JsonSerializerDefaults.Web)),
+                    Reason = "runtime state changed",
                     OccurredAt = now.AddMinutes(1.5)
                 });
-                seed.CompetitionEvents.Add(new CompetitionEvent
+                seed.CompetitionEvents.Add(new CompetitionCreatedEvent
                 {
                     Id = Guid.CreateVersion7(now.AddMilliseconds(7)),
                     CompetitionId = competitionId,
-                    Kind = CompetitionEventKind.CompetitionCreated,
                     Level = CompetitionEventLevel.Information,
                     Visibility = CompetitionEventVisibility.Staff,
                     ActorUserId = actorId,
                     SubjectType = EntityReferenceKind.Competition,
                     SubjectId = competitionId,
-                    PayloadJson = JsonSerializer.Serialize(new
-                    {
-                        schemaVersion = 1,
-                        competitionStatus = CompetitionStatus.Draft
-                    }, new JsonSerializerOptions(JsonSerializerDefaults.Web)),
+                    CompetitionStatus = CompetitionStatus.Draft,
                     OccurredAt = now.AddMinutes(1.75)
                 });
                 await seed.SaveChangesAsync(cancellationToken);

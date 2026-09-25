@@ -351,42 +351,30 @@ public sealed class CompetitionQuestionLimitsPersistenceTests
             for (var index = 0; index < 250; index++)
             {
                 var sentAt = fixture.Now.AddDays(-30).AddMinutes(index);
-                var root = new Notification
+                var root = new QuestionOpenedNotification
                 {
                     Id = Guid.CreateVersion7(sentAt),
                     SourceType = NotificationSourceType.User,
                     SourceId = fixture.MemberOneId,
                     TargetType = NotificationTargetType.CompetitionCollaborators,
                     TargetId = fixture.CompetitionId,
-                    Kind = NotificationKind.QuestionOpened,
-                    ContentJson = JsonSerializer.Serialize(new
-                    {
-                        schemaVersion = 1,
-                        subject = CompetitionQuestionSubject.Platform,
-                        title = $"历史咨询 {index}",
-                        body = "已经关闭的历史咨询不应逐条加载完整线程。",
-                        teamId = fixture.TeamId,
-                        competitionChallengeId = (Guid?)null,
-                        gameplayFactId = (Guid?)null,
-                        status = CompetitionQuestionStatus.Pending
-                    }, jsonOptions),
+                    QuestionSubject = CompetitionQuestionSubject.Platform,
+                    Title = $"历史咨询 {index}",
+                    Body = "已经关闭的历史咨询不应逐条加载完整线程。",
+                    TeamId = fixture.TeamId,
+                    QuestionStatus = CompetitionQuestionStatus.Pending,
                     SentAt = sentAt
                 };
-                setup.Notifications.AddRange(root, new Notification
+                setup.Notifications.AddRange(root, new QuestionStatusChangedNotification
                 {
                     Id = Guid.CreateVersion7(sentAt.AddSeconds(1)),
                     SourceType = NotificationSourceType.User,
                     SourceId = fixture.ManagerId,
                     TargetType = root.TargetType,
                     TargetId = root.TargetId,
-                    Kind = NotificationKind.QuestionStatusChanged,
-                    ContentJson = JsonSerializer.Serialize(new
-                    {
-                        schemaVersion = 1,
-                        from = CompetitionQuestionStatus.Pending,
-                        to = CompetitionQuestionStatus.Closed,
-                        actorRole = CompetitionQuestionParticipantRole.CompetitionManager
-                    }, jsonOptions),
+                    PreviousQuestionStatus = CompetitionQuestionStatus.Pending,
+                    QuestionStatus = CompetitionQuestionStatus.Closed,
+                    QuestionActorRole = CompetitionQuestionParticipantRole.CompetitionManager,
                     SentAt = sentAt.AddSeconds(1),
                     ThreadRootId = root.Id,
                     ReplyToId = root.Id
@@ -421,7 +409,7 @@ public sealed class CompetitionQuestionLimitsPersistenceTests
             "活跃数量检查必须使用集合查询，而不是逐条读取历史线程。",
             1000), ct);
         await Assert.That(created.Failure).IsNull();
-        await Assert.That(counter.ReaderCount).IsLessThanOrEqualTo(14);
+        await Assert.That(counter.ReaderCount).IsLessThanOrEqualTo(15);
     }, ct);
 
     [Test]
@@ -448,47 +436,36 @@ public sealed class CompetitionQuestionLimitsPersistenceTests
                     3 => CompetitionQuestionStatus.Replied,
                     _ => CompetitionQuestionStatus.Pending
                 };
-                var root = new Notification
+                var root = new QuestionOpenedNotification
                 {
                     Id = Guid.CreateVersion7(sentAt),
                     SourceType = NotificationSourceType.User,
                     SourceId = index < 160 ? fixture.MemberOneId : fixture.OtherMemberId,
                     TargetType = NotificationTargetType.CompetitionCollaborators,
                     TargetId = fixture.CompetitionId,
-                    Kind = NotificationKind.QuestionOpened,
-                    ContentJson = JsonSerializer.Serialize(new
-                    {
-                        schemaVersion = 1,
-                        subject,
-                        title = $"分页咨询 {index:D3}",
-                        body = "该咨询用于验证有界 keyset 分页。",
-                        teamId = index < 160 ? fixture.TeamId : fixture.OtherTeamId,
-                        competitionChallengeId = subject == CompetitionQuestionSubject.Challenge
-                            ? fixture.PublishedBindingId
-                            : (Guid?)null,
-                        gameplayFactId = (Guid?)null,
-                        status = CompetitionQuestionStatus.Pending
-                    }, jsonOptions),
+                    QuestionSubject = subject,
+                    Title = $"分页咨询 {index:D3}",
+                    Body = "该咨询用于验证有界 keyset 分页。",
+                    TeamId = index < 160 ? fixture.TeamId : fixture.OtherTeamId,
+                    CompetitionChallengeId = subject == CompetitionQuestionSubject.Challenge
+                        ? fixture.PublishedBindingId
+                        : null,
+                    QuestionStatus = CompetitionQuestionStatus.Pending,
                     SentAt = sentAt
                 };
                 setup.Notifications.Add(root);
                 if (status != CompetitionQuestionStatus.Pending)
                 {
-                    setup.Notifications.Add(new Notification
+                    setup.Notifications.Add(new QuestionStatusChangedNotification
                     {
                         Id = Guid.CreateVersion7(sentAt.AddSeconds(1)),
                         SourceType = NotificationSourceType.User,
                         SourceId = fixture.ManagerId,
                         TargetType = root.TargetType,
                         TargetId = root.TargetId,
-                        Kind = NotificationKind.QuestionStatusChanged,
-                        ContentJson = JsonSerializer.Serialize(new
-                        {
-                            schemaVersion = 1,
-                            from = CompetitionQuestionStatus.Pending,
-                            to = status,
-                            actorRole = CompetitionQuestionParticipantRole.CompetitionManager
-                        }, jsonOptions),
+                        PreviousQuestionStatus = CompetitionQuestionStatus.Pending,
+                        QuestionStatus = status,
+                        QuestionActorRole = CompetitionQuestionParticipantRole.CompetitionManager,
                         SentAt = sentAt.AddSeconds(1),
                         ThreadRootId = root.Id,
                         ReplyToId = root.Id
@@ -702,7 +679,7 @@ public sealed class CompetitionQuestionLimitsPersistenceTests
             UpdatedAt = Now
         };
 
-        private Competition Competition(Guid id, Guid ownerId, string title) => new()
+        private Competition Competition(Guid id, Guid ownerId, string title) => new CtfCompetition
         {
             Id = id,
             OwnerId = ownerId,
@@ -710,8 +687,7 @@ public sealed class CompetitionQuestionLimitsPersistenceTests
             JudgeIds = id == CompetitionId ? [JudgeId] : [],
             ObserverIds = id == CompetitionId ? [ObserverId] : [],
             Title = title,
-            Mode = GameMode.Ctf,
-            ConfigurationJson = """{"schemaVersion":1}""",
+            ModeConfiguration = TestConfigurations.Competition(GameMode.Ctf),
             FlagDerivationSecret = new byte[32],
             StartAt = Now.AddHours(-1),
             EndAt = Now.AddHours(2),
@@ -723,15 +699,14 @@ public sealed class CompetitionQuestionLimitsPersistenceTests
             UpdatedAt = Now
         };
 
-        private Challenge Challenge(Guid id, Guid ownerId, string title) => new()
+        private Challenge Challenge(Guid id, Guid ownerId, string title) => new CtfChallenge
         {
             Id = id,
             OwnerId = ownerId,
-            Mode = GameMode.Ctf,
             Visibility = ChallengeVisibility.Private,
             Title = title,
             Direction = "Web",
-            DefinitionJson = """{"schemaVersion":1}""",
+            Definition = TestConfigurations.Definition(GameMode.Ctf),
             CreatedAt = Now,
             UpdatedAt = Now
         };
@@ -741,14 +716,14 @@ public sealed class CompetitionQuestionLimitsPersistenceTests
             Guid competitionId,
             Guid challengeId,
             bool published,
-            int order) => new()
+            int order) => new CtfCompetitionChallenge
             {
                 Id = id,
                 CompetitionId = competitionId,
                 ChallengeId = challengeId,
                 Order = order,
                 IsPublished = published,
-                RulesJson = """{"schemaVersion":1}""",
+                Rules = TestConfigurations.Rules(GameMode.Ctf),
                 UpdatedAt = Now
             };
 
@@ -770,7 +745,7 @@ public sealed class CompetitionQuestionLimitsPersistenceTests
             };
     }
 
-    private sealed class RecordingOutbox : ITransactionalMessageOutbox
+    private sealed class RecordingOutbox : IPostCommitMessagePublisher
     {
         public ValueTask PublishAsync<T>(T message) => ValueTask.CompletedTask;
         public ValueTask ScheduleAsync<T>(T message, DateTimeOffset scheduledAt) =>

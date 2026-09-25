@@ -1,4 +1,3 @@
-using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using NoCTF.Domain.Competitions;
 using NoCTF.Domain.Competitions.Events;
@@ -8,8 +7,6 @@ namespace NoCTF.Infrastructure.Competitions.Lifecycle;
 
 internal static class CompetitionOfficialWindowReader
 {
-    private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
-
     public static async Task<CompetitionOfficialWindow> ReadAsync(
         NoCtfDbContext db,
         Guid competitionId,
@@ -22,27 +19,12 @@ internal static class CompetitionOfficialWindowReader
                 && @event.Kind == CompetitionEventKind.CompetitionLifecycleChanged)
             .OrderBy(@event => @event.OccurredAt)
             .ThenBy(@event => @event.Id)
-            .Select(@event => new { @event.OccurredAt, @event.PayloadJson })
+            .Select(@event => new { @event.OccurredAt, @event.CompetitionStatus })
             .ToArrayAsync(ct);
         var finishedAt = lifecycleEvents
-            .Where(@event => IsFinished(@event.PayloadJson))
+            .Where(@event => @event.CompetitionStatus == CompetitionStatus.Finished)
             .Select(@event => (DateTimeOffset?)@event.OccurredAt)
             .FirstOrDefault();
         return CompetitionOfficialWindow.Resolve(startAt, scheduledEndAt, finishedAt);
     }
-
-    private static bool IsFinished(string payloadJson)
-    {
-        try
-        {
-            return JsonSerializer.Deserialize<LifecyclePayload>(payloadJson, JsonOptions)?.To
-                == CompetitionStatus.Finished;
-        }
-        catch (JsonException)
-        {
-            return false;
-        }
-    }
-
-    private sealed record LifecyclePayload(CompetitionStatus To);
 }

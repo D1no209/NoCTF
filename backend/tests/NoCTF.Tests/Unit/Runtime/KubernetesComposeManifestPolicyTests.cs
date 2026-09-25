@@ -188,7 +188,7 @@ public sealed class KubernetesComposeManifestPolicyTests
             .IsEqualTo("512");
         var container = deployment.Spec.Template.Spec.Containers.Single();
         await Assert.That(container.SecurityContext!.AllowPrivilegeEscalation).IsFalse();
-        await Assert.That(container.SecurityContext.Capabilities!.Drop).IsEquivalentTo(["ALL"]);
+        await Assert.That(container.SecurityContext.Capabilities!.Drop).IsEmpty();
         await Assert.That(container.Resources!.Limits!["cpu"].ToString()).IsEqualTo("500m");
         await Assert.That(container.Resources.Limits["memory"].ToString())
             .IsEqualTo("268435456");

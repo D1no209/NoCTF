@@ -1,6 +1,53 @@
 import { date, id, model, now, type Data } from '../schema'
 import { mockRuntimeEndpoint } from '../runtime'
 
+export function mockDefinition(mode: string) {
+  const common = {
+    mode,
+    runtime: null,
+    checker: null,
+    patchEntrypoint: null,
+    patchCommand: [],
+    patchTimeoutSeconds: null,
+    readyTimeoutSeconds: null,
+    maximumPatchUploadBytes: mode === 'Awdp' ? 268_435_456 : null,
+    checkerFixInput: false,
+    checkerAllowRoot: false,
+  }
+  if (mode === 'Ctf') return { ...common, interactionKind: 'FlagSubmission' }
+  if (mode === 'Awd') return { ...common, flagInjection: null }
+  return common
+}
+
+export function mockModeConfiguration(mode: string) {
+  const flagTemplate = { header: 'flag', bodyTemplate: '[GUID]', leetLiteralText: false }
+  if (mode === 'Ctf') return {
+    mode,
+    flagTemplate,
+    defaultScoreCurve: { initialPoints: 500, minimumPoints: 100, decayTeamCount: 10, decayMode: 'Quadratic', customExpression: null },
+    bloodRewards: [],
+    wrongSubmissionPenalty: 0,
+  }
+  if (mode === 'Awd') return {
+    mode, flagTemplate, hardeningDurationSeconds: 0, roundDurationSeconds: 300,
+    attackRewardMode: 'FixedPerAttack', attackPoints: 50, victimDefensePoolPoints: 100,
+    checkerIntervalSeconds: 30, serviceHealthyPoints: 100, serviceUnhealthyPenalty: 50,
+  }
+  if (mode === 'Awdp') return {
+    mode, flagTemplate, roundDurationSeconds: 300,
+    breakScoreCurve: { initialPoints: 500, minimumPoints: 100, decayTeamCount: 10, decayMode: 'Quadratic', customExpression: null },
+    fixScoreCurve: { initialPoints: 500, minimumPoints: 100, decayTeamCount: 10, decayMode: 'Quadratic', customExpression: null },
+    flagWrongPenalty: 0, exploitSucceededPenalty: 0, serviceAbnormalPenalty: 0,
+    requireBreakBeforeFix: true, maxBreakSubmissions: 10, maxFixSubmissions: 10,
+    evaluationDispatchMode: 'Automatic',
+  }
+  return { mode, flagTemplate, pollIntervalSeconds: 5, controlPointsPerInterval: 10 }
+}
+
+export function mockRules(mode: string) {
+  return { mode }
+}
+
 // Fictional seed data only. No production database, credentials, or external URLs.
 export const accounts = [
   { login: 'admin', password: 'Mock123!', role: 'Administrator', userId: id(1), userName: 'Mock Admin' },
@@ -59,7 +106,7 @@ export function createFixtures() {
   const templates = competitions.slice(0, 4).flatMap((competition, ci) => challengeCatalog.map(({ title, direction }, i) => model('ChallengeBankChallengeTemplateResponse', {
     id: id(3, ci * 100 + i + 1), ownerId: id(1), managerIds: [], mode: competition.mode, visibility: 'Shared',
     title, direction, description: `## ${title}\n\n这是 ${competition.mode} 模式的 ${direction} 方向本地演示题目。\n\n输入 \`flag{mock_success}\` 可体验正确提交；其他内容将产生错误结果。\n\n此环境不会运行真实容器或处理真实 Flag。`,
-    definitionJson: JSON.stringify({ schemaVersion: { Ctf: 2, Awd: 4, Awdp: 4, Koh: 1 }[competition.mode as string], runtime: null }),
+    definition: mockDefinition(String(competition.mode)),
     activeCompetitionReferenceCount: 1, createdAt: date(-168), updatedAt: date(-3),
   })))
   const attachments = templates.map((template, index) => {

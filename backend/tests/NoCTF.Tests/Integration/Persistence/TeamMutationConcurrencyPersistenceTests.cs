@@ -89,7 +89,7 @@ public sealed class TeamMutationConcurrencyPersistenceTests
         await using var verification = new NoCtfDbContext(options);
         await Assert.That(await verification.Teams.CountAsync(
             team => team.CompetitionId == competition.Id
-                && team.MemberIds.Contains(participant.Id),
+                && team.Members.Any(member => member.UserId == participant.Id),
             ct)).IsEqualTo(1);
     }
 
@@ -605,14 +605,15 @@ public sealed class TeamMutationConcurrencyPersistenceTests
         Guid id,
         Guid ownerId,
         string title,
-        DateTimeOffset now) => new()
+        DateTimeOffset now) => new CtfCompetition
     {
         Id = id,
         OwnerId = ownerId,
         Title = title,
-        Mode = GameMode.Ctf,
         Status = CompetitionStatus.Visible,
-        ConfigurationJson = "{}",
+        ModeConfiguration = TestConfigurations.Competition(GameMode.Ctf),
+        Tracks = CompetitionTrackConfiguration.ToPersisted(
+            CompetitionTrackConfiguration.DefaultFor(GameMode.Ctf), id),
         MaxTeamMembers = 5,
         FlagDerivationSecret = new byte[32],
         StartAt = now.AddHours(1),
@@ -661,7 +662,7 @@ public sealed class TeamMutationConcurrencyPersistenceTests
         }
     }
 
-    private sealed class NoopOutbox : ITransactionalMessageOutbox
+    private sealed class NoopOutbox : IPostCommitMessagePublisher
     {
         public int FlushCount { get; private set; }
 

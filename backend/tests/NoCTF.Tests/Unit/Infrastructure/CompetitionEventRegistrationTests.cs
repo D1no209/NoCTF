@@ -4,6 +4,7 @@ using NoCTF.Application.Competitions.Events;
 using NoCTF.Infrastructure;
 using NoCTF.Infrastructure.Competitions.Events;
 using NoCTF.Runner.Composition;
+using NoCTF.Persistence.Sqlite;
 
 namespace NoCTF.Tests.Unit.Infrastructure;
 
@@ -21,6 +22,7 @@ public sealed class CompetitionEventRegistrationTests
             .Build();
         var services = new ServiceCollection();
 
+        services.AddNoCtfSqliteDevelopmentDatabase("event-registration-" + Guid.NewGuid().ToString("N"));
         services.AddNoCtfInfrastructure(configuration);
 
         foreach (var serviceType in new[]

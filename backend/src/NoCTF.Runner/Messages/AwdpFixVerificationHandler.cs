@@ -64,7 +64,7 @@ public sealed record AwdpFixRecoveryWork(
     Guid GameplayFactId,
     Guid RuntimeInstanceId,
     RuntimeProvider Provider,
-    string? ProviderReceiptJson,
+    RuntimeReceiptData? ProviderReceipt,
     string RunnerId);
 
 public sealed record AwdpFixWorkClaim(
@@ -169,7 +169,8 @@ public static class AwdpPatchCommand
 }
 
 public sealed class AwdpFixWorkReader(
-    IServiceScopeFactory scopes,
+    IDbContextFactory<NoCtfDbContext> contexts,
+    IAwdpFixExecutionFence fence,
     IRunnerScoringTokenIssuer tokens,
     IOptions<RunnerScoringOptions> scoringOptions,
     TimeProvider timeProvider) : IAwdpFixWorkReader
@@ -178,8 +179,6 @@ public sealed class AwdpFixWorkReader(
         RunAwdpFixVerification message,
         CancellationToken cancellationToken)
     {
-        await using var scope = scopes.CreateAsyncScope();
-        var fence = scope.ServiceProvider.GetRequiredService<IAwdpFixExecutionFence>();
         var fenceResult = await fence.AcquireAsync(new(
             message.GameplayFactId,
             message.CompetitionChallengeId,
@@ -197,11 +196,11 @@ public sealed class AwdpFixWorkReader(
                     message.GameplayFactId,
                     fenceResult.RuntimeInstanceId,
                     fenceResult.Provider,
-                    fenceResult.ProviderReceiptJson,
+                    fenceResult.ProviderReceipt,
                     fenceResult.RunnerId));
         }
 
-        var db = scope.ServiceProvider.GetRequiredService<NoCtfDbContext>();
+        await using var db = await contexts.CreateDbContextAsync(cancellationToken);
         var target = await db.GameplayFacts.AsNoTracking()
             .Where(submission => submission.Id == message.GameplayFactId
                 && submission.CompetitionChallengeId == message.CompetitionChallengeId
@@ -246,7 +245,7 @@ public sealed class AwdpFixWorkReader(
                     item.Upload,
                     item.File,
                     item.Runtime,
-                    ChallengeRulesJson = challenge.RulesJson,
+                    ChallengeRules = challenge.Rules!,
                     challenge.ChallengeId
                 })
             .Join(
@@ -258,8 +257,8 @@ public sealed class AwdpFixWorkReader(
                     item.Upload,
                     item.File,
                     item.Runtime,
-                    item.ChallengeRulesJson,
-                    ChallengeDefinitionJson = challenge.DefinitionJson,
+                    item.ChallengeRules,
+                    ChallengeDefinition = challenge.Definition!,
                     item.GameplayFact
                 })
             .Join(
@@ -271,27 +270,28 @@ public sealed class AwdpFixWorkReader(
                     item.Upload,
                     item.File,
                     item.Runtime,
-                    item.ChallengeRulesJson,
-                    item.ChallengeDefinitionJson,
-                    CompetitionConfigurationJson = competition.ConfigurationJson,
+                    item.ChallengeRules,
+                    item.ChallengeDefinition,
+                    CompetitionConfiguration = competition.ModeConfiguration!,
                     competition.Mode
                 })
+            .AsSplitQuery()
             .SingleOrDefaultAsync(cancellationToken);
         if (target is null
             || timeProvider.GetUtcNow() >= message.Deadline
-            || string.IsNullOrWhiteSpace(target.Runtime.ProviderReceiptJson))
+            || target.Runtime.ProviderReceipt is null)
             return new(AwdpFixExecutionFenceDisposition.Superseded);
 
         var settings = PatchVerificationConfigurationResolver.Resolve(
             target.Mode,
-            target.CompetitionConfigurationJson,
-            target.ChallengeRulesJson,
-            target.ChallengeDefinitionJson);
+            target.CompetitionConfiguration,
+            target.ChallengeRules,
+            target.ChallengeDefinition);
         if (settings is null)
             return new(AwdpFixExecutionFenceDisposition.Superseded);
         var checker = settings.Checker;
-        var receipt = JsonSerializer.Deserialize<ContainerReceipt>(
-            target.Runtime.ProviderReceiptJson);
+        var receipt = (target.Runtime.ProviderReceipt?.ToData()
+            as ContainerRuntimeReceiptData)?.ToReceipt();
         if (receipt?.NetworkId is not { Length: > 0 } networkId
             || receipt.InternalHost is not { Length: > 0 } targetHost)
             return new(AwdpFixExecutionFenceDisposition.Superseded);
@@ -388,7 +388,7 @@ public sealed class AwdpCheckerExecutor(IOneShotRuntimeProviderCatalog providers
             new Dictionary<string, string>(),
             new Dictionary<int, int>(),
             new RuntimeResourceLimits(256 * 1024 * 1024, 250_000_000, 128),
-            new ContainerSecurityPolicy(true, input is null, !work.AllowRoot, ["ALL"], []),
+            new ContainerSecurityPolicy(true, input is null, !work.AllowRoot, [], []),
             work.Timeout,
             NetworkName: work.NetworkId,
             OperationTimeout: work.Timeout,
@@ -473,7 +473,7 @@ public sealed class AwdpFixVerificationHandler(
     IAwdpCheckerExecutor checker,
     IEnumerable<IRuntimeManagedResourceReconciler> resourceReconcilers,
     IRunnerCapacityGate capacity,
-    ITransactionalMessageOutbox outbox,
+    IPostCommitMessagePublisher outbox,
     IOptions<RunnerOptions> runnerOptions,
     IHostApplicationLifetime applicationLifetime,
     TimeProvider timeProvider,
@@ -788,13 +788,13 @@ public sealed class AwdpFixVerificationHandler(
     {
         using var mutation = mutations is null ? null : await mutations.EnterAsync(cancellationToken);
         var identity = new RuntimeResourceIdentity(recovery.RuntimeInstanceId);
-        if (!string.IsNullOrWhiteSpace(recovery.ProviderReceiptJson))
+        if (recovery.ProviderReceipt is not null)
         {
             await RuntimeReceiptCleanup.CleanupContainerAsync(
                 providers,
                 identity,
                 recovery.Provider,
-                recovery.ProviderReceiptJson,
+                recovery.ProviderReceipt,
                 cancellationToken);
         }
         else

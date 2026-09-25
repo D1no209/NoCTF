@@ -23,7 +23,6 @@ using NoCTF.Infrastructure.Persistence;
 using NoCTF.Worker;
 using Testcontainers.PostgreSql;
 using Wolverine;
-using Wolverine.EntityFrameworkCore;
 using Wolverine.Nats;
 
 namespace NoCTF.Tests.Integration.Messaging;
@@ -35,7 +34,6 @@ public sealed class CompetitionLifecycleDeliveryTests
 {
     private const string NatsImage =
         "docker.m.daocloud.io/library/nats:2.12.2-alpine@sha256:2d5fce3229ae5741f4ef9225aff95dc4dc036455931eaf77a3eec33fddaa192d";
-    private const string PersistenceSchema = "wolverine_worker";
     private const string ConsumerName = "lifecycle-delivery-test";
 
     [Test]
@@ -86,11 +84,13 @@ public sealed class CompetitionLifecycleDeliveryTests
                 {
                     services.AddSingleton(probe);
                     services.AddSingleton<IQueueServiceLocationProbe>(_ => queueProbe);
-                    services.AddDbContextWithWolverineIntegration<NoCtfDbContext>(options =>
+                    services.AddDbContext<NoCtfDbContext>(options =>
                         options.UseNpgsql(postgres.GetConnectionString())
-                            .UseSnakeCaseNamingConvention());
-                    services.AddScoped<ITransactionalMessageOutbox,
-                        WolverineTransactionalMessageOutbox>();
+                            .UseSnakeCaseNamingConvention(),
+                        contextLifetime: ServiceLifetime.Scoped,
+                        optionsLifetime: ServiceLifetime.Singleton);
+                    services.AddScoped<IPostCommitMessagePublisher,
+                        WolverinePostCommitMessagePublisher>();
                     services.AddScoped<ICompetitionStartGateStore,
                         CompetitionStartGateStore>();
                     services.AddSingleton<ICompetitionConfigurationValidator,
@@ -115,8 +115,7 @@ public sealed class CompetitionLifecycleDeliveryTests
                     options.Durability.MessageIdentity = MessageIdentity.IdAndDestination;
                     options.ListenToNatsSubject(NatsSubjects.Subject(WorkerQueue.Control))
                         .UseJetStream(NatsSubjects.ControlStream, ConsumerName)
-                        .Named(ConsumerName)
-                        .UseDurableInbox();
+                        .Named(ConsumerName);
                     foreach (var queue in new[]
                              {
                                  WorkerQueue.Gameplay,
@@ -126,13 +125,11 @@ public sealed class CompetitionLifecycleDeliveryTests
                     {
                         options.ListenToNatsSubject(NatsSubjects.Subject(queue))
                             .UseJetStream(NatsSubjects.Stream(queue),
-                                $"{ConsumerName}-{queue.ToString().ToLowerInvariant()}")
-                            .UseDurableInbox();
+                                $"{ConsumerName}-{queue.ToString().ToLowerInvariant()}");
                     }
                     options.ListenToNatsSubject(NatsSubjects.Runner(ConsumerName))
                         .UseJetStream(NatsSubjects.RunnerStream,
-                            $"{ConsumerName}-runner")
-                        .UseDurableInbox();
+                            $"{ConsumerName}-runner");
                     Route<AdvanceCompetitionLifecycle>(options);
                     Route<ProvisionCompetitionRuntimes>(options);
                     Route<CleanupCompetitionRuntimes>(options);
@@ -144,8 +141,7 @@ public sealed class CompetitionLifecycleDeliveryTests
                     Route<BackgroundServiceLocationProbe>(options, WorkerQueue.Background);
                     options.PublishMessage<RunnerServiceLocationProbe>()
                         .ToNatsSubject(NatsSubjects.Runner(ConsumerName))
-                        .UseJetStream(NatsSubjects.RunnerStream)
-                        .UseDurableOutbox();
+                        .UseJetStream(NatsSubjects.RunnerStream);
                 })
                 .Build();
 
@@ -176,12 +172,6 @@ public sealed class CompetitionLifecycleDeliveryTests
                     expectedEvents: 2,
                     cancellationToken);
 
-                await using var scope = host.Services.CreateAsyncScope();
-                var db = scope.ServiceProvider.GetRequiredService<NoCtfDbContext>();
-                var deadLetters = await db.Database.SqlQueryRaw<int>(
-                        $"SELECT count(*)::integer AS \"Value\" FROM {PersistenceSchema}.wolverine_dead_letters")
-                    .SingleAsync(cancellationToken);
-                await Assert.That(deadLetters).IsEqualTo(0);
             }
             finally
             {
@@ -199,8 +189,7 @@ public sealed class CompetitionLifecycleDeliveryTests
     {
         options.PublishMessage<TMessage>()
             .ToNatsSubject(NatsSubjects.Subject(queue))
-            .UseJetStream(NatsSubjects.Stream(queue))
-            .UseDurableOutbox();
+            .UseJetStream(NatsSubjects.Stream(queue));
     }
 
     private static async Task WaitForReconciliationAsync(
@@ -258,7 +247,8 @@ public sealed class CompetitionLifecycleDeliveryTests
         CancellationToken cancellationToken)
     {
         var options = new DbContextOptionsBuilder<NoCtfDbContext>()
-            .UseNpgsql(connectionString)
+            .UseNpgsql(connectionString, npgsql => npgsql.MigrationsAssembly(
+                typeof(NoCTF.Persistence.PostgreSql.PostgreSqlPersistence).Assembly.FullName))
             .UseSnakeCaseNamingConvention()
             .Options;
         await using var db = new NoCtfDbContext(options);
@@ -288,24 +278,23 @@ public sealed class CompetitionLifecycleDeliveryTests
                 now.AddMinutes(-1), now.AddHours(1), now),
             Competition(runningId, ownerId, CompetitionStatus.Running,
                 now.AddHours(-1), now.AddMinutes(-1), now));
-        db.Challenges.Add(new Challenge
+        db.Challenges.Add(new CtfChallenge
         {
             Id = challengeId,
             OwnerId = ownerId,
-            Mode = GameMode.Ctf,
             Direction = "Pwn",
             Title = "Lifecycle delivery",
-            DefinitionJson = configurations.GetDefaultDefinitionJson(GameMode.Ctf),
+            Definition = configurations.CreateDefaultDefinitionForTest(GameMode.Ctf),
             CreatedAt = now.AddMinutes(-9),
             UpdatedAt = now.AddMinutes(-9)
         });
-        db.CompetitionChallenges.Add(new CompetitionChallenge
+        db.CompetitionChallenges.Add(new CtfCompetitionChallenge
         {
             Id = competitionChallengeId,
             CompetitionId = publishedId,
             ChallengeId = challengeId,
             IsPublished = true,
-            RulesJson = configurations.GetDefaultJson(GameMode.Ctf),
+            Rules = configurations.CreateDefaultRulesForTest(GameMode.Ctf),
             UpdatedAt = now.AddMinutes(-8)
         });
         db.Teams.Add(new Team
@@ -329,14 +318,13 @@ public sealed class CompetitionLifecycleDeliveryTests
         CompetitionStatus status,
         DateTimeOffset start,
         DateTimeOffset end,
-        DateTimeOffset now) => new()
+        DateTimeOffset now) => new CtfCompetition
     {
         Id = id,
         OwnerId = ownerId,
         Title = status + " lifecycle delivery",
-        Mode = GameMode.Ctf,
         Status = status,
-        ConfigurationJson = GameModeDefaultConfiguration.GetCompetitionJson(GameMode.Ctf),
+        ModeConfiguration = TestConfigurations.Competition(GameMode.Ctf),
         StartAt = start,
         EndAt = end,
         FlagDerivationSecret = Enumerable.Range(1, 32).Select(value => (byte)value).ToArray(),

@@ -43,7 +43,7 @@ public sealed record TeamRegistrationPolicy(
     bool CompetitionDeleted,
     bool AllowWhileRunning = false,
     GameMode Mode = GameMode.Ctf,
-    string? TrackConfigurationJson = null,
+    IReadOnlyList<CompetitionTrackDefinition>? Tracks = null,
     bool TracksEnabled = false,
     bool PracticeModeEnabled = false)
 {
@@ -139,9 +139,9 @@ public sealed class CreateTeam(ITeamRegistrationStore store)
             return OperationResult<TeamView, TeamRegistrationFailure>.Failure(TeamRegistrationFailure.CompetitionNotFound, "Competition was not found.");
         if (RegistrationIsClosed(policy))
             return OperationResult<TeamView, TeamRegistrationFailure>.Failure(TeamRegistrationFailure.RegistrationClosed, "Team registration is closed.");
-        var tracks = CompetitionTrackConfiguration.ParseOrDefault(
+        var tracks = CompetitionTrackConfiguration.FromPersisted(
             policy.Mode,
-            policy.TrackConfigurationJson);
+            policy.Tracks);
         var requestedTrack = tracks.DefaultTrack;
         if (policy.TracksEnabled)
         {

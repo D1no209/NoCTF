@@ -19,8 +19,6 @@ public sealed partial class TargetArchitectureRulesTests
             "RuntimeOperation",
             "ChallengeInstance",
             "FixSubmissionRecord",
-            "CompetitionCollaborator",
-            "TeamMember",
             "AuditEntry"
         };
         var violations = domain.GetTypes()
@@ -42,6 +40,9 @@ public sealed partial class TargetArchitectureRulesTests
                 StringComparison.Ordinal)
                 && !path.Contains(
                     $"{Path.DirectorySeparatorChar}bin{Path.DirectorySeparatorChar}",
+                    StringComparison.Ordinal)
+                && !path.Contains(
+                    $"{Path.DirectorySeparatorChar}Internal{Path.DirectorySeparatorChar}Generated{Path.DirectorySeparatorChar}",
                     StringComparison.Ordinal))
             .ToArray();
         var violations = new List<string>();
@@ -200,10 +201,10 @@ public sealed partial class TargetArchitectureRulesTests
     }
 
     [Test]
-    public async Task Initial_baseline_has_only_restrict_foreign_keys_and_no_legacy_schema()
+    public async Task Initial_baseline_is_provider_scoped_relational_and_has_no_legacy_storage()
     {
         var migrationRoot = Path.Combine(
-            BackendRoot, "src", "NoCTF.Infrastructure", "Migrations");
+            BackendRoot, "src", "NoCTF.Persistence.PostgreSql", "Migrations");
         var baselines = Directory.EnumerateFiles(
                 migrationRoot, "*_InitialBaseline.cs", SearchOption.TopDirectoryOnly)
             .Where(path => !path.EndsWith(".Designer.cs", StringComparison.Ordinal))
@@ -211,12 +212,17 @@ public sealed partial class TargetArchitectureRulesTests
 
         await Assert.That(baselines).Count().IsEqualTo(1);
         var migration = await File.ReadAllTextAsync(baselines[0]);
-        await Assert.That(migration).DoesNotContain("ReferentialAction.Cascade");
+        await Assert.That(migration).DoesNotContain("jsonb");
+        await Assert.That(migration).DoesNotContain("text[]");
+        await Assert.That(migration).DoesNotContain("uuid[]");
+        await Assert.That(migration).DoesNotContain("filter:");
+        await Assert.That(migration).Contains("competition_collaborators");
+        await Assert.That(migration).Contains("team_members");
+        await Assert.That(migration).Contains("challenge_definitions");
+        await Assert.That(migration).Contains("competition_challenge_rules");
         foreach (var removedTable in new[]
                  {
                      "runtime_operations",
-                     "competition_collaborators",
-                     "team_members",
                      "challenge_instances",
                      "fix_submission_records"
                  })

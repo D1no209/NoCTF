@@ -1,0 +1,8 @@
+[Unit]
+Description=Renew NoCTF Grafana TLS certificate
+Wants=network-online.target docker.service
+After=network-online.target docker.service
+
+[Service]
+Type=oneshot
+ExecStart=/opt/noctf-observability/renew-grafana-cert.sh

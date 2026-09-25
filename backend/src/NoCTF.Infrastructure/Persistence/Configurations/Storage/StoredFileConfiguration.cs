@@ -8,11 +8,7 @@ internal sealed class StoredFileConfiguration : IEntityTypeConfiguration<StoredF
 {
     public void Configure(EntityTypeBuilder<StoredFile> builder)
     {
-        builder.ToTable("files", table =>
-        {
-            table.HasCheckConstraint("ck_files_byte_length", "byte_length >= 0");
-            table.HasCheckConstraint("ck_files_sha256_length", "octet_length(sha256) = 32");
-        });
+        builder.ToTable("files");
         builder.HasKey(file => file.Id);
         builder.HasIndex(file => file.ObjectKey).IsUnique();
     }

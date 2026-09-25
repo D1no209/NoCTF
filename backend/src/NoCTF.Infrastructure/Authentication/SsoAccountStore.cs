@@ -62,10 +62,11 @@ public sealed class SsoAccountStore(NoCtfDbContext db) : ISsoAccountStore
         CancellationToken ct)
     {
         var user = await db.Users.AsNoTracking().SingleOrDefaultAsync(item =>
-            item.ExternalIdentityProviderId == identity.ProviderId
-            && item.ExternalIdentityProtocol == identity.Protocol
-            && item.ExternalIdentityNamespace == identity.IdentityNamespace
-            && item.ExternalIdentitySubject == identity.Subject,
+            item.ExternalIdentity != null
+            && item.ExternalIdentity.ProviderId == identity.ProviderId
+            && item.ExternalIdentity.Protocol == identity.Protocol
+            && item.ExternalIdentity.IdentityNamespace == identity.IdentityNamespace
+            && item.ExternalIdentity.Subject == identity.Subject,
             ct);
         if (user is null)
             return new(SsoExternalAccountLookupState.NotLinked);
@@ -91,18 +92,7 @@ public sealed class SsoAccountStore(NoCtfDbContext db) : ISsoAccountStore
         await using var transaction = db.Database.IsRelational()
             ? await db.Database.BeginTransactionAsync(IsolationLevel.ReadCommitted, ct)
             : null;
-        if (db.Database.IsRelational())
-        {
-            var identityKey = $"{identity.ProviderId:N}\n{identity.Subject}";
-            await db.Database.ExecuteSqlInterpolatedAsync(
-                $"SELECT pg_advisory_xact_lock(hashtextextended({identityKey}, 0))",
-                ct);
-        }
-        var user = db.Database.IsRelational()
-            ? await db.Users.FromSqlInterpolated(
-                    $"SELECT * FROM users WHERE id = {userId} FOR UPDATE")
-                .SingleOrDefaultAsync(ct)
-            : await db.Users.SingleOrDefaultAsync(item => item.Id == userId, ct);
+        var user = await db.Users.SingleOrDefaultAsync(item => item.Id == userId, ct);
         if (user is null || user.Kind != UserKind.Human
             || user.AccountStatus != UserAccountStatus.Active
             || user.TokenVersion != tokenVersion)
@@ -110,8 +100,9 @@ public sealed class SsoAccountStore(NoCtfDbContext db) : ISsoAccountStore
         if (user.ExternalIdentityProviderId is not null)
             return new(SsoBindState.AccountAlreadyLinked);
         if (await db.Users.AsNoTracking().AnyAsync(item =>
-                item.ExternalIdentityProviderId == identity.ProviderId
-                && item.ExternalIdentitySubject == identity.Subject,
+                item.ExternalIdentity != null
+                && item.ExternalIdentity.ProviderId == identity.ProviderId
+                && item.ExternalIdentity.Subject == identity.Subject,
                 ct))
             return new(SsoBindState.IdentityAlreadyLinked);
 
@@ -141,8 +132,9 @@ public sealed class SsoAccountStore(NoCtfDbContext db) : ISsoAccountStore
                 await transaction.RollbackAsync(ct);
             db.ChangeTracker.Clear();
             if (await db.Users.AsNoTracking().AnyAsync(item =>
-                    item.ExternalIdentityProviderId == identity.ProviderId
-                    && item.ExternalIdentitySubject == identity.Subject,
+                    item.ExternalIdentity != null
+                    && item.ExternalIdentity.ProviderId == identity.ProviderId
+                    && item.ExternalIdentity.Subject == identity.Subject,
                     ct))
                 return new(SsoBindState.IdentityAlreadyLinked);
             throw;
@@ -165,11 +157,7 @@ public sealed class SsoAccountStore(NoCtfDbContext db) : ISsoAccountStore
         await using var transaction = db.Database.IsRelational()
             ? await db.Database.BeginTransactionAsync(IsolationLevel.ReadCommitted, ct)
             : null;
-        var user = db.Database.IsRelational()
-            ? await db.Users.FromSqlInterpolated(
-                    $"SELECT * FROM users WHERE id = {userId} FOR UPDATE")
-                .SingleOrDefaultAsync(ct)
-            : await db.Users.SingleOrDefaultAsync(item => item.Id == userId, ct);
+        var user = await db.Users.SingleOrDefaultAsync(item => item.Id == userId, ct);
         if (user is null || user.Kind != UserKind.Human
             || user.AccountStatus != UserAccountStatus.Active)
             return SsoUnbindState.AccountUnavailable;
@@ -210,11 +198,7 @@ public sealed class SsoAccountStore(NoCtfDbContext db) : ISsoAccountStore
         await using var transaction = db.Database.IsRelational()
             ? await db.Database.BeginTransactionAsync(IsolationLevel.ReadCommitted, ct)
             : null;
-        var user = db.Database.IsRelational()
-            ? await db.Users.FromSqlInterpolated(
-                    $"SELECT * FROM users WHERE id = {userId} FOR UPDATE")
-                .SingleOrDefaultAsync(ct)
-            : await db.Users.SingleOrDefaultAsync(item => item.Id == userId, ct);
+        var user = await db.Users.SingleOrDefaultAsync(item => item.Id == userId, ct);
         if (user is null || user.Kind != UserKind.Human)
             return AdminSsoUnbindState.UserNotFound;
         if (user.ExternalIdentityProviderId is not Guid providerId
@@ -252,16 +236,18 @@ public sealed class SsoAccountStore(NoCtfDbContext db) : ISsoAccountStore
         string providerName,
         SsoProtocol protocol,
         SsoBindingAuditAction action,
-        DateTimeOffset now) => new()
+        DateTimeOffset now) => new SsoExternalIdentityBindingChangedNotification
     {
         Id = Guid.CreateVersion7(now),
         SourceType = NotificationSourceType.User,
         SourceId = actorUserId,
         TargetType = NotificationTargetType.PlatformAdministrators,
         TargetId = Notification.PlatformAdministratorsTargetId,
-        Kind = NotificationKind.SsoExternalIdentityBindingChanged,
-        ContentJson = JsonSerializer.Serialize(new SsoBindingAuditFact(
-            1, action, userId, providerId, providerName, protocol), JsonOptions),
+        ActionValue = (int)action,
+        UserId = userId,
+        SsoProviderId = providerId,
+        ProviderName = providerName,
+        SsoProtocol = protocol,
         SentAt = now,
         RelatedType = EntityReferenceKind.User,
         RelatedId = userId

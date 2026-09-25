@@ -25,7 +25,10 @@ public sealed class DatabaseStartupPersistenceTests
             var services = new ServiceCollection();
             services.AddLogging();
             services.AddSingleton(TimeProvider.System);
-            services.AddDbContext<NoCtfDbContext>(options => options.UseNpgsql(postgres.GetConnectionString()).UseSnakeCaseNamingConvention());
+            services.AddDbContext<NoCtfDbContext>(options => options
+                .UseNpgsql(postgres.GetConnectionString(), npgsql => npgsql.MigrationsAssembly(
+                    typeof(NoCTF.Persistence.PostgreSql.PostgreSqlPersistence).Assembly.FullName))
+                .UseSnakeCaseNamingConvention());
             services.AddSingleton<IOptions<SeedAdministratorOptions>>(Options.Create(new SeedAdministratorOptions
             {
                 UserName = "startup-admin",
@@ -57,25 +60,18 @@ public sealed class DatabaseStartupPersistenceTests
                       AND table_name <> '__EFMigrationsHistory'
                     ORDER BY table_name
                     """).ToArrayAsync(ct);
-                await Assert.That(tables).IsEquivalentTo(
-                [
-                    "account_tokens",
-                    "challenge_attachments",
-                    "challenge_flags",
-                    "challenges",
-                    "competition_challenges",
-                    "competition_events",
-                    "competitions",
-                    "data_protection_keys",
-                    "files",
-                    "gameplay_facts",
-                    "notifications",
-                    "patch_uploads",
-                    "platform_settings",
-                    "runtime_instances",
-                    "teams",
-                    "users"
-                ]);
+                await Assert.That(tables).Contains("competition_collaborators");
+                await Assert.That(tables).Contains("team_members");
+                await Assert.That(tables).Contains("team_captains");
+                await Assert.That(tables).Contains("challenge_definitions");
+                await Assert.That(tables).Contains("competition_mode_configurations");
+                await Assert.That(tables).Contains("competition_challenge_rules");
+                await Assert.That(tables).Contains("runtime_capacity_allocations");
+                await Assert.That(tables).Contains("runtime_access_endpoints");
+                await Assert.That(tables).Contains("command_receipts");
+                await Assert.That(tables).Contains("external_identities");
+                await Assert.That(tables.Any(table =>
+                    table.Contains("wolverine", StringComparison.OrdinalIgnoreCase))).IsFalse();
                 var oldRuntimeColumns = await db.Database.SqlQuery<string>($"""
                     SELECT column_name AS "Value"
                     FROM information_schema.columns

@@ -1,4 +1,3 @@
-using System.Text.Json;
 using NoCTF.Application.Runtime.Provisioning;
 using NoCTF.Domain.Runtime;
 using NoCTF.Runner.Composition;
@@ -12,13 +11,13 @@ public static class RuntimeReceiptCleanup
         RuntimeKind runtimeKind,
         RuntimeResourceIdentity identity,
         RuntimeProvider provider,
-        string providerReceiptJson,
+        RuntimeReceiptData providerReceipt,
         CancellationToken cancellationToken) => CleanupAsync(
             providers,
             runtimeKind,
             identity,
             provider,
-            providerReceiptJson,
+            providerReceipt,
             RuntimeTerminationMode.GracefulThenForce,
             RuntimeTerminationPolicy.Default,
             cancellationToken);
@@ -28,17 +27,17 @@ public static class RuntimeReceiptCleanup
         RuntimeKind runtimeKind,
         RuntimeResourceIdentity identity,
         RuntimeProvider provider,
-        string providerReceiptJson,
+        RuntimeReceiptData providerReceipt,
         RuntimeTerminationMode mode,
         RuntimeTerminationPolicy policy,
         CancellationToken cancellationToken) => runtimeKind switch
         {
             RuntimeKind.Container => CleanupContainerAsync(
-                providers, identity, provider, providerReceiptJson, mode, policy, cancellationToken),
+                providers, identity, provider, providerReceipt, mode, policy, cancellationToken),
             RuntimeKind.Compose => CleanupComposeAsync(
-                providers, identity, provider, providerReceiptJson, mode, policy, cancellationToken),
+                providers, identity, provider, providerReceipt, mode, policy, cancellationToken),
             RuntimeKind.OvaVm => CleanupOvaAsync(
-                providers, identity, provider, providerReceiptJson, mode, policy, cancellationToken),
+                providers, identity, provider, providerReceipt, mode, policy, cancellationToken),
             _ => throw new ArgumentOutOfRangeException(nameof(runtimeKind), runtimeKind, null)
         };
 
@@ -46,14 +45,14 @@ public static class RuntimeReceiptCleanup
         IRuntimeProviderCatalog providers,
         RuntimeResourceIdentity identity,
         RuntimeProvider provider,
-        string providerReceiptJson,
+        RuntimeReceiptData providerReceipt,
         CancellationToken cancellationToken)
     {
         await CleanupContainerAsync(
             providers,
             identity,
             provider,
-            providerReceiptJson,
+            providerReceipt,
             RuntimeTerminationMode.GracefulThenForce,
             RuntimeTerminationPolicy.Default,
             cancellationToken);
@@ -63,12 +62,13 @@ public static class RuntimeReceiptCleanup
         IRuntimeProviderCatalog providers,
         RuntimeResourceIdentity identity,
         RuntimeProvider provider,
-        string providerReceiptJson,
+        RuntimeReceiptData providerReceipt,
         RuntimeTerminationMode mode,
         RuntimeTerminationPolicy policy,
         CancellationToken cancellationToken)
     {
-        var receipt = Deserialize<ContainerReceipt>(providerReceiptJson);
+        var receipt = (providerReceipt as ContainerRuntimeReceiptData)?.ToReceipt()
+            ?? throw new InvalidOperationException("Container receipt type is invalid.");
         if (receipt.Provider != provider
             || receipt.RuntimeInstanceId != identity.RuntimeInstanceId
             || string.IsNullOrWhiteSpace(receipt.ResourceId))
@@ -92,14 +92,14 @@ public static class RuntimeReceiptCleanup
         IRuntimeProviderCatalog providers,
         RuntimeResourceIdentity identity,
         RuntimeProvider provider,
-        string providerReceiptJson,
+        RuntimeReceiptData providerReceipt,
         CancellationToken cancellationToken)
     {
         await CleanupComposeAsync(
             providers,
             identity,
             provider,
-            providerReceiptJson,
+            providerReceipt,
             RuntimeTerminationMode.GracefulThenForce,
             RuntimeTerminationPolicy.Default,
             cancellationToken);
@@ -109,12 +109,13 @@ public static class RuntimeReceiptCleanup
         IRuntimeProviderCatalog providers,
         RuntimeResourceIdentity identity,
         RuntimeProvider provider,
-        string providerReceiptJson,
+        RuntimeReceiptData providerReceipt,
         RuntimeTerminationMode mode,
         RuntimeTerminationPolicy policy,
         CancellationToken cancellationToken)
     {
-        var receipt = Deserialize<ComposeReceipt>(providerReceiptJson);
+        var receipt = (providerReceipt as ComposeRuntimeReceiptData)?.ToReceipt()
+            ?? throw new InvalidOperationException("Compose receipt type is invalid.");
         if (receipt.Provider != provider
             || receipt.OperationId != identity.RuntimeInstanceId
             || string.IsNullOrWhiteSpace(receipt.ProjectName)
@@ -132,14 +133,14 @@ public static class RuntimeReceiptCleanup
         IRuntimeProviderCatalog providers,
         RuntimeResourceIdentity identity,
         RuntimeProvider provider,
-        string providerReceiptJson,
+        RuntimeReceiptData providerReceipt,
         CancellationToken cancellationToken)
     {
         await CleanupOvaAsync(
             providers,
             identity,
             provider,
-            providerReceiptJson,
+            providerReceipt,
             RuntimeTerminationMode.GracefulThenForce,
             RuntimeTerminationPolicy.Default,
             cancellationToken);
@@ -149,12 +150,13 @@ public static class RuntimeReceiptCleanup
         IRuntimeProviderCatalog providers,
         RuntimeResourceIdentity identity,
         RuntimeProvider provider,
-        string providerReceiptJson,
+        RuntimeReceiptData providerReceipt,
         RuntimeTerminationMode mode,
         RuntimeTerminationPolicy policy,
         CancellationToken cancellationToken)
     {
-        var receipt = Deserialize<OvaRuntimeReceipt>(providerReceiptJson);
+        var receipt = (providerReceipt as OvaRuntimeReceiptData)?.ToReceipt()
+            ?? throw new InvalidOperationException("OVA receipt type is invalid.");
         if (provider != RuntimeProvider.Libvirt
             || receipt.Provider != provider
             || receipt.OperationId != identity.RuntimeInstanceId)
@@ -165,18 +167,5 @@ public static class RuntimeReceiptCleanup
 
         var runtime = providers.Appliance(provider);
         await runtime.DestroyAsync(receipt, mode, policy, cancellationToken);
-    }
-
-    private static TReceipt Deserialize<TReceipt>(string providerReceiptJson)
-    {
-        try
-        {
-            return JsonSerializer.Deserialize<TReceipt>(providerReceiptJson)
-                ?? throw new InvalidOperationException("Provider receipt is invalid.");
-        }
-        catch (JsonException exception)
-        {
-            throw new InvalidOperationException("Provider receipt is invalid.", exception);
-        }
     }
 }

@@ -7,38 +7,27 @@ using NoCTF.Domain.Gameplay;
 
 namespace NoCTF.Application.GameplayFacts.Intake;
 
-public sealed class GetFlagAttemptState(
-    IGameplayFactIntakeStore store,
-    IGameplayFactAdmissionModePolicy modePolicy)
+public interface IFlagAttemptStateReader
 {
-    public async Task<FlagAttemptState?> ExecuteAsync(
+    Task<FlagAttemptState?> ReadAsync(
         Guid competitionId,
         Guid competitionChallengeId,
-        Guid userId,
-        CancellationToken cancellationToken = default)
-    {
-        var snapshot = await store.LoadAdmissionAsync(
-            competitionId, competitionChallengeId, userId, cancellationToken);
-        if (snapshot is null)
-            return null;
-        var rules = modePolicy.GetRules(
-            snapshot.Mode,
-            snapshot.CompetitionConfigurationJson,
-            snapshot.ChallengeConfigurationJson);
-        var practice = snapshot.Mode == GameMode.Ctf
-            && snapshot.CompetitionStatus == CompetitionStatus.Finished
-            && snapshot.PracticeModeEnabled;
-        var maximum = !practice && rules.MaxFlagAttempts is > 0
-            ? rules.MaxFlagAttempts
-            : null;
-        return new(
-            maximum,
-            snapshot.AcceptedFlagAttempts,
-            maximum is { } limit
-                ? Math.Max(0, limit - snapshot.AcceptedFlagAttempts)
-                : null,
-            snapshot.Mode == GameMode.Ctf && snapshot.HasCorrectFlag);
-    }
+        Guid teamId,
+        GameMode mode,
+        CompetitionStatus status,
+        CancellationToken cancellationToken);
+}
+
+public sealed class GetFlagAttemptState(IFlagAttemptStateReader reader)
+{
+    public Task<FlagAttemptState?> ExecuteAsync(
+        Guid competitionId,
+        Guid competitionChallengeId,
+        Guid teamId,
+        GameMode mode,
+        CompetitionStatus status,
+        CancellationToken cancellationToken = default) =>
+        reader.ReadAsync(competitionId, competitionChallengeId, teamId, mode, status, cancellationToken);
 }
 
 public sealed class SubmitFlag(IGameplayFactIntakeStore store, IGameplayFactAdmissionModePolicy modePolicy)
@@ -62,8 +51,8 @@ public sealed class SubmitFlag(IGameplayFactIntakeStore store, IGameplayFactAdmi
 
         var kind = snapshot.Mode == GameMode.Awdp ? GameplayFactKind.BreakAttempt : GameplayFactKind.FlagAttempt;
         var rules = modePolicy.GetRules(
-            snapshot.Mode, snapshot.CompetitionConfigurationJson, snapshot.ChallengeConfigurationJson,
-            snapshot.ChallengeDefinitionJson);
+            snapshot.Mode, snapshot.CompetitionConfiguration, snapshot.ChallengeRules,
+            snapshot.ChallengeDefinition);
         var admission = GameplayFactAdmissionPolicy.Check(snapshot, kind, rules, command.OccurredAt);
         if (!admission.Succeeded)
             return OperationResult<GameplayFactAccepted, GameplayFactAdmissionFailureCode>.Failure(
@@ -121,8 +110,8 @@ public sealed class SubmitFlag(IGameplayFactIntakeStore store, IGameplayFactAdmi
 
         var kind = snapshot.Mode == GameMode.Awdp ? GameplayFactKind.BreakAttempt : GameplayFactKind.FlagAttempt;
         var rules = modePolicy.GetRules(
-            snapshot.Mode, snapshot.CompetitionConfigurationJson, snapshot.ChallengeConfigurationJson,
-            snapshot.ChallengeDefinitionJson);
+            snapshot.Mode, snapshot.CompetitionConfiguration, snapshot.ChallengeRules,
+            snapshot.ChallengeDefinition);
         var admission = GameplayFactAdmissionPolicy.Check(snapshot, kind, rules, receivedAt);
         if (!admission.Succeeded)
             return OperationResult<IReadOnlyList<GameplayFactAccepted>, GameplayFactAdmissionFailureCode>.Failure(

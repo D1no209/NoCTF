@@ -13,7 +13,7 @@ namespace NoCTF.Infrastructure.Teams.Registration;
 
 public sealed class TeamRegistrationStore(
     NoCtfDbContext db,
-    ITransactionalMessageOutbox outbox,
+    IPostCommitMessagePublisher outbox,
     TimeProvider? clock = null,
     ICompetitionEventRecorder? eventRecorder = null) : ITeamRegistrationStore
 {
@@ -29,16 +29,40 @@ public sealed class TeamRegistrationStore(
                 x.DeletedAt != null,
                 x.AllowTeamRegistrationWhileRunning,
                 x.Mode,
-                x.TrackConfigurationJson,
+                x.Tracks,
                 x.TracksEnabled,
                 x.PracticeModeEnabled))
             .SingleOrDefaultAsync(ct);
 
-    public async Task<TeamCreateStoreResult> TryCreateAsync(CreateTeamCommand command, TeamRegistrationStatus status, CancellationToken ct)
+    public async Task<TeamCreateStoreResult> TryCreateAsync(
+        CreateTeamCommand command,
+        TeamRegistrationStatus status,
+        CancellationToken ct)
+    {
+        for (var attempt = 0; attempt < 3; attempt++)
+        {
+            try
+            {
+                return await TryCreateOnceAsync(command, status, ct);
+            }
+            catch (Exception exception) when (attempt < 2
+                && RelationalRetry.IsTransientConcurrency(exception))
+            {
+                db.ChangeTracker.Clear();
+                await Task.Delay(TimeSpan.FromMilliseconds(Random.Shared.Next(5, 31)), ct);
+            }
+        }
+        return new(null, TeamRegistrationFailure.TeamNameOrMembershipConflict);
+    }
+
+    private async Task<TeamCreateStoreResult> TryCreateOnceAsync(
+        CreateTeamCommand command,
+        TeamRegistrationStatus status,
+        CancellationToken ct)
     {
         var name = command.Name.Trim();
         await using var transaction = await AggregateCompatibleTransaction.BeginAsync(db,
-            System.Data.IsolationLevel.ReadCommitted,
+            System.Data.IsolationLevel.Serializable,
             ct);
         var competition = await CompetitionTeamMutationCriticalSection.AcquireAsync(
             db,
@@ -50,9 +74,9 @@ public sealed class TeamRegistrationStore(
             || competition.Status == CompetitionStatus.Running
                 && !competition.AllowTeamRegistrationWhileRunning))
             return new(null, TeamRegistrationFailure.RegistrationClosed);
-        var tracks = CompetitionTrackConfiguration.ParseOrDefault(
+        var tracks = CompetitionTrackConfiguration.FromPersisted(
             competition.Mode,
-            competition.TrackConfigurationJson);
+            competition.Tracks);
         var track = tracks.DefaultTrack;
         if (competition.TracksEnabled)
         {
@@ -67,13 +91,19 @@ public sealed class TeamRegistrationStore(
         }
         var userIdentity = await db.Users.AsNoTracking()
             .Where(user => user.Id == command.UserId)
-            .Select(user => new { user.Id, user.ExternalIdentityProviderId })
+            .Select(user => new
+            {
+                user.Id,
+                ExternalIdentityProviderId = user.ExternalIdentity == null
+                    ? (Guid?)null
+                    : user.ExternalIdentity.ProviderId
+            })
             .SingleOrDefaultAsync(ct);
         if (userIdentity is null)
             return new(null, TeamRegistrationFailure.TeamNameOrMembershipConflict);
         if (await db.Teams.AnyAsync(x => x.CompetitionId == command.CompetitionId
             && x.DeletedAt == null
-            && x.MemberIds.Contains(command.UserId), ct))
+            && x.Members.Any(member => member.UserId == command.UserId), ct))
             return new(null, TeamRegistrationFailure.UserAlreadyRegistered);
         var id = Guid.CreateVersion7(command.RegisteredAt);
         var team = new Team
@@ -109,10 +139,16 @@ public sealed class TeamRegistrationStore(
         catch (DbUpdateException)
         {
             await transaction.RollbackAsync(ct);
+            db.ChangeTracker.Clear();
+            if (await db.Set<TeamMember>().AsNoTracking().AnyAsync(member =>
+                    member.CompetitionId == command.CompetitionId
+                    && member.UserId == command.UserId,
+                    ct))
+                return new(null, TeamRegistrationFailure.UserAlreadyRegistered);
             return new(null, TeamRegistrationFailure.TeamNameOrMembershipConflict);
         }
         await transaction.CommitAsync(ct);
-        await outbox.FlushOutgoingMessagesAsync();
+        await transaction.FlushMessagesAsync(outbox);
         return new(Map(team), null);
     }
 
@@ -141,7 +177,7 @@ public sealed class TeamRegistrationStore(
             {
                 item.Mode,
                 item.TracksEnabled,
-                item.TrackConfigurationJson
+                item.Tracks
             })
             .SingleOrDefaultAsync(ct);
         if (competition is null)
@@ -150,7 +186,7 @@ public sealed class TeamRegistrationStore(
         var configuration = CompetitionTrackConfiguration.EffectiveFor(
             competition.Mode,
             competition.TracksEnabled,
-            competition.TrackConfigurationJson);
+            competition.Tracks);
         var internalKeys = configuration.Tracks.Where(track => track.IsInternal)
             .Select(track => track.Key)
             .ToArray();
@@ -161,7 +197,10 @@ public sealed class TeamRegistrationStore(
                 && (query.IncludeInternal || !internalKeys.Contains(team.TrackKey)));
         var keyword = string.IsNullOrWhiteSpace(query.Keyword) ? null : query.Keyword.Trim();
         if (keyword is not null)
-            source = source.Where(team => EF.Functions.ILike(team.Name, $"%{keyword}%"));
+        {
+            var normalized = keyword.ToUpperInvariant();
+            source = source.Where(team => team.NormalizedName.Contains(normalized));
+        }
 
         var total = await source.CountAsync(ct);
         var ordered = query.Desc
@@ -186,7 +225,7 @@ public sealed class TeamRegistrationStore(
             {
                 item.Mode,
                 item.TracksEnabled,
-                item.TrackConfigurationJson
+                item.Tracks
             })
             .SingleOrDefaultAsync(ct);
         if (competition is null)
@@ -194,7 +233,7 @@ public sealed class TeamRegistrationStore(
         var configuration = CompetitionTrackConfiguration.EffectiveFor(
             competition.Mode,
             competition.TracksEnabled,
-            competition.TrackConfigurationJson);
+            competition.Tracks);
         var internalKeys = configuration.Tracks.Where(track => track.IsInternal)
             .Select(track => track.Key)
             .ToArray();
@@ -217,7 +256,7 @@ public sealed class TeamRegistrationStore(
                 item.Status,
                 item.Mode,
                 item.TracksEnabled,
-                item.TrackConfigurationJson
+                item.Tracks
             })
             .SingleOrDefaultAsync(ct);
         if (competition is null) return new(false, TeamRegistrationFailure.CompetitionNotFound);
@@ -230,7 +269,7 @@ public sealed class TeamRegistrationStore(
         var track = CompetitionTrackConfiguration.EffectiveFor(
             competition.Mode,
             competition.TracksEnabled,
-            competition.TrackConfigurationJson).Find(team.TrackKey);
+            competition.Tracks).Find(team.TrackKey);
         var changed = await db.Teams.Where(x => x.Id == teamId && x.CompetitionId == competitionId
                 && x.RegistrationStatus != status)
             .ExecuteUpdateAsync(setters => setters.SetProperty(x => x.RegistrationStatus, status), ct);
@@ -252,7 +291,7 @@ public sealed class TeamRegistrationStore(
             await db.SaveChangesAsync(ct);
         }
         await transaction.CommitAsync(ct);
-        await outbox.FlushOutgoingMessagesAsync();
+        await transaction.FlushMessagesAsync(outbox);
         return changed == 1 ? new(true) : new(false, TeamRegistrationFailure.TeamReviewConflict);
     }
 
@@ -290,9 +329,9 @@ public sealed class TeamRegistrationStore(
             return new(false, TeamRegistrationFailure.TeamBanned);
         if (team.IsLocked)
             return new(false, TeamRegistrationFailure.TeamLocked);
-        var configuration = CompetitionTrackConfiguration.ParseOrDefault(
+        var configuration = CompetitionTrackConfiguration.FromPersisted(
             competition.Mode,
-            competition.TrackConfigurationJson);
+            competition.Tracks);
         var track = configuration.Find(team.TrackKey);
         if (track is null)
             return new(false, TeamRegistrationFailure.TrackNotFound);
@@ -306,11 +345,18 @@ public sealed class TeamRegistrationStore(
             return new(false, TeamRegistrationFailure.TrackInvitationInvalid);
         if (competition.TracksEnabled
             && track.RequiredSsoProviderId is Guid requiredProviderId
-            && await db.Users.AsNoTracking().CountAsync(user =>
-                team.MemberIds.Contains(user.Id)
-                && user.ExternalIdentityProviderId == requiredProviderId,
-                ct) != team.MemberIds.Length)
-            return new(false, TeamRegistrationFailure.TrackSsoIdentityRequired);
+            )
+        {
+            var memberIds = await db.Set<TeamMember>().AsNoTracking()
+                .Where(member => member.TeamId == team.Id)
+                .Select(member => member.UserId)
+                .ToArrayAsync(ct);
+            var eligibleMemberCount = await db.Set<ExternalIdentity>().AsNoTracking()
+                .CountAsync(identity => memberIds.Contains(identity.UserId)
+                    && identity.ProviderId == requiredProviderId, ct);
+            if (eligibleMemberCount != memberIds.Length)
+                return new(false, TeamRegistrationFailure.TrackSsoIdentityRequired);
+        }
 
         var nextStatus = competition.TeamRegistrationAutoApprove
             ? TeamRegistrationStatus.Approved
@@ -331,7 +377,7 @@ public sealed class TeamRegistrationStore(
             TrackKey: team.TrackKey), ct);
         await db.SaveChangesAsync(ct);
         await transaction.CommitAsync(ct);
-        await outbox.FlushOutgoingMessagesAsync();
+        await transaction.FlushMessagesAsync(outbox);
         return new(true);
     }
 
@@ -362,7 +408,7 @@ public sealed class TeamRegistrationStore(
             {
                 item.Mode,
                 item.TracksEnabled,
-                item.TrackConfigurationJson
+                item.Tracks
             })
             .SingleOrDefaultAsync(ct);
         if (competition is null)
@@ -370,7 +416,7 @@ public sealed class TeamRegistrationStore(
         var configuration = CompetitionTrackConfiguration.EffectiveFor(
             competition.Mode,
             competition.TracksEnabled,
-            competition.TrackConfigurationJson);
+            competition.Tracks);
         var team = await db.Teams.AsNoTracking().SingleOrDefaultAsync(item =>
             item.Id == teamId
             && item.CompetitionId == competitionId
@@ -393,13 +439,13 @@ public sealed class TeamRegistrationStore(
             {
                 item.Mode,
                 item.TracksEnabled,
-                item.TrackConfigurationJson
+                item.Tracks
             })
             .SingleOrDefaultAsync(ct);
         if (competition is null)
             return null;
         var team = await db.Teams.AsNoTracking().Where(team => team.CompetitionId == competitionId
-                && team.MemberIds.Contains(userId)
+                && team.Members.Any(member => member.UserId == userId)
                 && team.DeletedAt == null
                 && (includePending || team.RegistrationStatus == TeamRegistrationStatus.Approved))
             .SingleOrDefaultAsync(ct);
@@ -408,7 +454,7 @@ public sealed class TeamRegistrationStore(
             : Map(team, CompetitionTrackConfiguration.EffectiveFor(
                 competition.Mode,
                 competition.TracksEnabled,
-                competition.TrackConfigurationJson));
+                competition.Tracks));
     }
 
     public async Task<bool> CanManageAsync(Guid actorId, Guid competitionId, Guid teamId, CancellationToken ct) =>
@@ -418,9 +464,31 @@ public sealed class TeamRegistrationStore(
         || await db.Competitions.AsNoTracking().AnyAsync(x => x.Id == competitionId
             && x.OwnerId == actorId && x.DeletedAt == null, ct)
         || await db.Competitions.AsNoTracking().AnyAsync(x => x.Id == competitionId
-            && x.ManagerIds.Contains(actorId), ct);
+            && x.Collaborators.Any(collaborator =>
+                collaborator.Role == CompetitionCollaboratorRole.Manager
+                && collaborator.UserId == actorId), ct);
 
     public async Task<TeamUpdateStoreResult> UpdateAsync(UpdateTeamCommand command, CancellationToken ct)
+    {
+        for (var attempt = 0; attempt < 3; attempt++)
+        {
+            try
+            {
+                return await UpdateOnceAsync(command, ct);
+            }
+            catch (Exception exception) when (attempt < 2
+                && RelationalRetry.IsTransientConcurrency(exception))
+            {
+                db.ChangeTracker.Clear();
+                await Task.Delay(TimeSpan.FromMilliseconds(Random.Shared.Next(5, 31)), ct);
+            }
+        }
+        return new(null, TeamRegistrationFailure.TeamConflict);
+    }
+
+    private async Task<TeamUpdateStoreResult> UpdateOnceAsync(
+        UpdateTeamCommand command,
+        CancellationToken ct)
     {
         var name = command.Name.Trim();
         await using var transaction = await AggregateCompatibleTransaction.BeginAsync(
@@ -442,9 +510,9 @@ public sealed class TeamRegistrationStore(
         if (entity.IsBanned) return new(null, TeamRegistrationFailure.TeamBanned);
         if (entity.IsLocked) return new(null, TeamRegistrationFailure.TeamLocked);
 
-        var configuration = CompetitionTrackConfiguration.ParseOrDefault(
+        var configuration = CompetitionTrackConfiguration.FromPersisted(
             competition.Mode,
-            competition.TrackConfigurationJson);
+            competition.Tracks);
         var nextTrack = configuration.Find(entity.TrackKey) ?? configuration.DefaultTrack;
         var trackChanged = false;
         if (command.TrackKey is not null)
@@ -511,9 +579,12 @@ public sealed class TeamRegistrationStore(
         {
             await db.SaveChangesAsync(ct);
             await transaction.CommitAsync(ct);
-            await outbox.FlushOutgoingMessagesAsync();
+            await transaction.FlushMessagesAsync(outbox);
         }
-        catch (DbUpdateException) { return new(null, TeamRegistrationFailure.TeamConflict); }
+        catch (DbUpdateException exception) when (!RelationalRetry.IsTransientConcurrency(exception))
+        {
+            return new(null, TeamRegistrationFailure.TeamConflict);
+        }
         return new(Map(entity, configuration));
     }
 
@@ -540,7 +611,7 @@ public sealed class TeamRegistrationStore(
             TeamRegistrationStatus: entity.RegistrationStatus), ct);
         await db.SaveChangesAsync(ct);
         await transaction.CommitAsync(ct);
-        await outbox.FlushOutgoingMessagesAsync();
+        await transaction.FlushMessagesAsync(outbox);
         return null;
     }
 

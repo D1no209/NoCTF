@@ -70,15 +70,17 @@ public sealed class CompetitionTrackPersistenceTests
                     CreatedAt = now,
                     UpdatedAt = now
                 });
-                seed.Competitions.Add(new Competition
+                seed.Competitions.Add(new CtfCompetition
                 {
                     Id = competitionId,
                     Title = "Track persistence",
                     OwnerId = ownerId,
-                    Mode = GameMode.Ctf,
                     Status = CompetitionStatus.Published,
                     TracksEnabled = true,
-                    ConfigurationJson = GameModeDefaultConfiguration.GetCompetitionJson(GameMode.Ctf),
+                    Tracks = CompetitionTrackConfiguration.ToPersisted(
+                        CompetitionTrackConfiguration.DefaultFor(GameMode.Ctf),
+                        competitionId),
+                    ModeConfiguration = TestConfigurations.Competition(GameMode.Ctf),
                     StartAt = now.AddHours(1),
                     EndAt = now.AddHours(2),
                     FlagDerivationSecret = Enumerable.Range(1, 32).Select(value => (byte)value).ToArray(),
@@ -116,9 +118,9 @@ public sealed class CompetitionTrackPersistenceTests
 
                 var createdCompetition = await createDb.Competitions.AsNoTracking()
                     .SingleAsync(item => item.Id == created.Competition!.Id, cancellationToken);
-                var defaultConfiguration = CompetitionTrackConfiguration.ParseOrDefault(
+                var defaultConfiguration = CompetitionTrackConfiguration.FromPersisted(
                     createdCompetition.Mode,
-                    createdCompetition.TrackConfigurationJson);
+                    createdCompetition.Tracks);
                 await Assert.That(defaultConfiguration.Tracks).HasSingleItem();
                 await Assert.That(defaultConfiguration.DefaultTrack.Key)
                     .IsEqualTo(CompetitionTrackConfiguration.DefaultTrackKey);
@@ -226,9 +228,9 @@ public sealed class CompetitionTrackPersistenceTests
                     .SingleAsync(item => item.Id == competitionId, cancellationToken);
                 var migratedTeam = await migratedVerify.Teams.AsNoTracking()
                     .SingleAsync(item => item.Id == teamId, cancellationToken);
-                var migratedConfiguration = CompetitionTrackConfiguration.ParseOrDefault(
+                var migratedConfiguration = CompetitionTrackConfiguration.FromPersisted(
                     migratedCompetition.Mode,
-                    migratedCompetition.TrackConfigurationJson);
+                    migratedCompetition.Tracks);
                 await Assert.That(migratedConfiguration.Find("internal")).IsNull();
                 await Assert.That(migratedTeam.TrackKey).IsEqualTo("default");
             }
@@ -271,7 +273,7 @@ public sealed class CompetitionTrackPersistenceTests
 
                 var registration = await new CreateTeam(new TeamRegistrationStore(
                         restoreAndDisableDb,
-                        Substitute.For<ITransactionalMessageOutbox>()))
+                        Substitute.For<IPostCommitMessagePublisher>()))
                     .ExecuteAsync(new(
                         competitionId,
                         participantId,
@@ -351,9 +353,9 @@ public sealed class CompetitionTrackPersistenceTests
             {
                 var competition = await raceVerifyDb.Competitions.AsNoTracking()
                     .SingleAsync(item => item.Id == competitionId, cancellationToken);
-                var configuredKeys = CompetitionTrackConfiguration.ParseOrDefault(
+                var configuredKeys = CompetitionTrackConfiguration.FromPersisted(
                         competition.Mode,
-                        competition.TrackConfigurationJson)
+                        competition.Tracks)
                     .Tracks.Select(track => track.Key)
                     .ToHashSet(StringComparer.OrdinalIgnoreCase);
                 var assignedKeys = await raceVerifyDb.Teams.AsNoTracking()
@@ -482,8 +484,7 @@ public sealed class CompetitionTrackPersistenceTests
                     kind == NoCTF.Domain.Competitions.Events.CompetitionEventKind.TeamTrackChanged))
                 .IsGreaterThanOrEqualTo(9);
             var payloads = await verify.CompetitionEvents.AsNoTracking()
-                .Where(item => item.PayloadJson != null)
-                .Select(item => item.PayloadJson!)
+                .SelectMany(item => item.TrackKeys.Select(key => key.Value))
                 .ToArrayAsync(cancellationToken);
             await Assert.That(payloads.Any(payload => payload.Contains(
                 "a-new-secret",
@@ -493,7 +494,7 @@ public sealed class CompetitionTrackPersistenceTests
 
     private static CompetitionTrackStore CreateStore(NoCtfDbContext db)
     {
-        var outbox = Substitute.For<ITransactionalMessageOutbox>();
+        var outbox = Substitute.For<IPostCommitMessagePublisher>();
         ICompetitionEventRecorder events = new CompetitionEventStore(db, outbox);
         return new CompetitionTrackStore(db, outbox, events);
     }

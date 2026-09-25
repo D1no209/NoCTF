@@ -40,18 +40,6 @@ groups:
         labels: { severity: critical }
         annotations:
           summary: Critical JetStream consumers have more than 10 redeliveries
-      - alert: NoCtfWolverineOutboxBacklog
-        expr: noctf:wolverine_outbox:sum > 100
-        for: 3m
-        labels: { severity: critical }
-        annotations:
-          summary: Wolverine Outbox backlog exceeds 100 messages
-      - alert: NoCtfWolverineInboxBacklog
-        expr: noctf:wolverine_inbox:sum > 100
-        for: 3m
-        labels: { severity: critical }
-        annotations:
-          summary: Wolverine Inbox backlog exceeds 100 messages
 
   - name: noctf-performance
     rules:

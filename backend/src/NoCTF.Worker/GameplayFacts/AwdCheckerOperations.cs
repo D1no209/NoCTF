@@ -40,7 +40,7 @@ internal static partial class BackendMessageOperations
         DispatchAwdCheckers message,
         NoCtfDbContext db,
         AwdCheckerConfigurationCatalog configurations,
-        ITransactionalMessageOutbox outbox,
+        IPostCommitMessagePublisher outbox,
         CancellationToken cancellationToken) =>
         _ = await ExecuteAwdCheckerDispatchAsync(
             message,
@@ -53,14 +53,14 @@ internal static partial class BackendMessageOperations
         DispatchAwdCheckers message,
         NoCtfDbContext db,
         AwdCheckerConfigurationCatalog configurations,
-        ITransactionalMessageOutbox outbox,
+        IPostCommitMessagePublisher outbox,
         CancellationToken cancellationToken)
     {
         const int batchSize = 500;
         var targets = await db.RuntimeInstances
             .Where(runtime => runtime.State == RuntimeState.Running
                 && runtime.RunnerId != null
-                && runtime.ProviderReceiptJson != null
+                && runtime.ProviderReceipt != null
                 && (message.AfterRuntimeInstanceId == null
                     || runtime.Id.CompareTo(message.AfterRuntimeInstanceId.Value) > 0))
             .Join(
@@ -93,15 +93,17 @@ internal static partial class BackendMessageOperations
                 && target.Competition.Status == NoCTF.Domain.Competitions.CompetitionStatus.Running)
             .OrderBy(target => target.Runtime.Id)
             .Take(batchSize)
+            .AsSplitQuery()
             .ToListAsync(cancellationToken);
 
         var applied = false;
         foreach (var target in targets)
         {
-            var settings = configurations.Get(
-                target.Competition.ConfigurationJson,
-                target.Challenge.RulesJson,
-                target.Template.DefinitionJson);
+            if (target.Competition.ModeConfiguration is not AwdCompetitionModeConfiguration competition
+                || target.Challenge.Rules is not AwdCompetitionChallengeRules rules
+                || target.Template.Definition is not AwdChallengeDefinition definition)
+                continue;
+            var settings = configurations.Get(competition, rules, definition);
             if (settings.Checker is not { } checker)
                 continue;
 
@@ -122,13 +124,12 @@ internal static partial class BackendMessageOperations
                 continue;
 
             var deadline = message.At.AddSeconds(checker.TimeoutSeconds);
-            db.GameplayFacts.Add(new GameplayFact
+            db.GameplayFacts.Add(new AwdServiceTransitionGameplayFact
             {
                 Id = factId,
                 CompetitionId = target.Runtime.CompetitionId!.Value,
                 CompetitionChallengeId = target.Runtime.CompetitionChallengeId!.Value,
                 TeamId = target.Runtime.TeamId,
-                Kind = GameplayFactKind.AwdServiceTransition,
                 OccurredAt = message.At,
                 State = GameplayFactState.Processing,
                 UpdatedAt = message.At

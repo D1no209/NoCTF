@@ -1,9 +1,9 @@
-using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using NoCTF.Application.GameplayFacts.Awdp;
 using NoCTF.Application.GameplayFacts.Status;
 using NoCTF.Application.Runtime.Instances;
 using NoCTF.Domain.Competitions;
+using NoCTF.Domain.Challenges;
 using NoCTF.Domain.Competitions.Events;
 using NoCTF.Domain.Gameplay;
 using NoCTF.Domain.Runtime;
@@ -16,8 +16,6 @@ namespace NoCTF.Infrastructure.GameplayFacts.Awdp;
 
 public sealed class AwdpParticipantStateReader(NoCtfDbContext db) : IAwdpParticipantStateReader
 {
-    private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
-
     public async Task<AwdpParticipantStateView?> FindAsync(
         Guid competitionId,
         Guid competitionChallengeId,
@@ -27,7 +25,7 @@ public sealed class AwdpParticipantStateReader(NoCtfDbContext db) : IAwdpPartici
     {
         var scope = await db.Teams.AsNoTracking()
             .Where(team => team.CompetitionId == competitionId
-                && team.MemberIds.Contains(userId)
+                && team.Members.Any(member => member.UserId == userId)
                 && team.DeletedAt == null
                 && !team.IsBanned
                 && team.RegistrationStatus == TeamRegistrationStatus.Approved)
@@ -50,9 +48,8 @@ public sealed class AwdpParticipantStateReader(NoCtfDbContext db) : IAwdpPartici
                 (item, challenge) => new
                 {
                     TeamId = item.Team.Id,
-                    item.Competition.ConfigurationJson,
-                    item.Competition.Status,
-                    challenge.RulesJson,
+                    item.Competition,
+                    Challenge = challenge,
                     TemplateId = challenge.ChallengeId
                 })
             .Join(
@@ -63,19 +60,22 @@ public sealed class AwdpParticipantStateReader(NoCtfDbContext db) : IAwdpPartici
                 (item, template) => new
                 {
                     item.TeamId,
-                    item.ConfigurationJson,
-                    item.Status,
-                    item.RulesJson,
-                    template.DefinitionJson
+                    item.Competition,
+                    item.Challenge,
+                    Template = template
                 })
             .SingleOrDefaultAsync(cancellationToken);
         if (scope is null)
             return null;
 
+        if (scope.Competition.ModeConfiguration is not AwdpCompetitionModeConfiguration competitionConfiguration
+            || scope.Challenge.Rules is not AwdpCompetitionChallengeRules challengeRules
+            || scope.Template.Definition is not AwdpChallengeDefinition definition)
+            return null;
         var configuration = AwdpConfigurationResolver.Resolve(
-            scope.ConfigurationJson,
-            scope.RulesJson,
-            scope.DefinitionJson);
+            competitionConfiguration,
+            challengeRules,
+            definition);
 
         var facts = await db.GameplayFacts.AsNoTracking()
             .Where(fact => fact.CompetitionId == competitionId
@@ -156,16 +156,33 @@ public sealed class AwdpParticipantStateReader(NoCtfDbContext db) : IAwdpPartici
                 && @event.Kind == CompetitionEventKind.CompetitionLifecycleChanged)
             .OrderBy(@event => @event.OccurredAt)
             .ThenBy(@event => @event.Id)
-            .Select(@event => new { @event.Id, @event.OccurredAt, @event.PayloadJson })
+            .Select(@event => new
+            {
+                @event.Id,
+                @event.OccurredAt,
+                From = @event.PreviousCompetitionStatus,
+                To = @event.CompetitionStatus,
+                @event.Automatic,
+                @event.Reason
+            })
             .ToListAsync(cancellationToken);
         var lifecycle = lifecycleEvents
-            .Select(@event => ParseLifecycle(@event.Id, competitionId, @event.OccurredAt, @event.PayloadJson))
-            .Where(transition => transition is not null)
-            .Select(transition => transition!)
+            .Where(@event => @event.From is not null && @event.To is not null)
+            .Select(@event => new CompetitionLifecycleTransition
+            {
+                Id = @event.Id,
+                CompetitionId = competitionId,
+                From = @event.From!.Value,
+                To = @event.To!.Value,
+                Automatic = @event.Automatic,
+                Reason = @event.Reason,
+                OccurredAt = @event.OccurredAt
+            })
             .ToArray();
         var hasStarted = lifecycle.Any(transition => transition.To == CompetitionStatus.Running);
         var currentRound = hasStarted
-            ? Round(lifecycle, now, configuration.RoundDurationSeconds, scope.Status == CompetitionStatus.Finished)
+            ? Round(lifecycle, now, configuration.RoundDurationSeconds,
+                scope.Competition.Status == CompetitionStatus.Finished)
             : (int?)null;
 
         var firstBreak = facts.FirstOrDefault(fact => fact is
@@ -250,38 +267,4 @@ public sealed class AwdpParticipantStateReader(NoCtfDbContext db) : IAwdpPartici
             : checked((int)(seconds / durationSeconds) + 1);
     }
 
-    private static CompetitionLifecycleTransition? ParseLifecycle(
-        Guid id,
-        Guid competitionId,
-        DateTimeOffset occurredAt,
-        string payloadJson)
-    {
-        try
-        {
-            var payload = JsonSerializer.Deserialize<LifecyclePayload>(payloadJson, JsonOptions);
-            return payload is null
-                ? null
-                : new()
-                {
-                    Id = id,
-                    CompetitionId = competitionId,
-                    From = payload.From,
-                    To = payload.To,
-                    Automatic = payload.Automatic,
-                    Reason = payload.Reason,
-                    OccurredAt = occurredAt
-                };
-        }
-        catch (JsonException)
-        {
-            return null;
-        }
-    }
-
-    private sealed record LifecyclePayload(
-        int SchemaVersion,
-        CompetitionStatus From,
-        CompetitionStatus To,
-        bool Automatic,
-        string? Reason);
 }

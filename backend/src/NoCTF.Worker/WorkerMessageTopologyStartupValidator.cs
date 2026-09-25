@@ -112,22 +112,6 @@ public sealed class WorkerMessageTopologyStartupValidator(
                     + $"brokerRole={endpoint.BrokerRole}, mode={endpoint.Mode}).");
             }
 
-            if (string.Equals(
-                    queueName,
-                    CompetitionEventFanoutQueueNames.Leaderboard,
-                    StringComparison.Ordinal))
-            {
-                ValidateLeaderboardListenerScope(endpoint.ListenerScope);
-            }
-        }
-    }
-
-    internal static void ValidateLeaderboardListenerScope(ListenerScope listenerScope)
-    {
-        if (listenerScope != ListenerScope.PinnedToLeader)
-        {
-            throw new InvalidOperationException(
-                "Leaderboard fan-out must be pinned to the Wolverine leader so its process-local merge queue is owned by the active Singular Agent.");
         }
     }
 
@@ -216,7 +200,7 @@ public sealed class WorkerMessageTopologyStartupValidator(
         $"nats://subject/{NatsSubjects.Subject(WorkerQueue.Background)}";
 
     internal static string NatsEndpointAddress(string queueName) =>
-        $"nats://subject/noctf.events.{(queueName.Contains("leaderboard", StringComparison.Ordinal)
+        $"nats://subject/noctf.v2.events.{(queueName.Contains("leaderboard", StringComparison.Ordinal)
             ? "leaderboard"
             : queueName.Contains("webhook", StringComparison.Ordinal)
                 ? "webhook"

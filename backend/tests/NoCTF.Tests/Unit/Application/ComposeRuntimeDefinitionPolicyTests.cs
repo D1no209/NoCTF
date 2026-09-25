@@ -173,9 +173,8 @@ public sealed class ComposeRuntimeDefinitionPolicyTests
         await Assert.That(ports.Children.Cast<YamlScalarNode>().Single().Value)
             .IsEqualTo("0:8080");
         await Assert.That(worker.Children.ContainsKey(new YamlScalarNode("ports"))).IsFalse();
-        await Assert.That(
-                Sequence(web, "cap_drop").Children.Cast<YamlScalarNode>().Single().Value)
-            .IsEqualTo("ALL");
+        await Assert.That(Sequence(web, "cap_drop").Children).IsEmpty();
+        await Assert.That(Sequence(web, "cap_add").Children).IsEmpty();
         await Assert.That(
                 Sequence(web, "security_opt").Children.Cast<YamlScalarNode>().Single().Value)
             .IsEqualTo("no-new-privileges:true");

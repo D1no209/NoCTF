@@ -21,9 +21,9 @@ internal static class ParticipantTeamRegistrationTransition
             return;
 
         team.RegistrationStatus = nextStatus;
-        var track = CompetitionTrackConfiguration.ParseOrDefault(
+        var track = CompetitionTrackConfiguration.FromPersisted(
             competition.Mode,
-            competition.TrackConfigurationJson).Find(team.TrackKey);
+            competition.Tracks).Find(team.TrackKey);
         await events.RecordAsync(new(
             competition.Id,
             CompetitionEventKind.TeamRegistrationChanged,

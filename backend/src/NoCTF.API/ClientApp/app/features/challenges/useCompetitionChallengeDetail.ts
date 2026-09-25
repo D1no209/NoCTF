@@ -1,4 +1,4 @@
-import { markRaw, toRefs } from 'vue'
+import { markRaw, provide, toRefs } from 'vue'
 
 import { toast } from 'vue-sonner'
 import { Dice5, FileDown, History } from '@lucide/vue'
@@ -11,6 +11,7 @@ import AwdPanelComponent from './panels/AwdPanel.vue'
 import AwdpPanelComponent from './panels/AwdpPanel.vue'
 import CtfPanelComponent from './panels/CtfPanel.vue'
 import KohPanelComponent from './panels/KohPanel.vue'
+import { challengeGameplayFactStatusKey, createChallengeGameplayFactStatusReader } from './challenge-gameplay-fact-status'
 
 /** Owns state, effects and commands for CompetitionChallengeDetail. */
 export function useCompetitionChallengeDetail(props: Readonly<{
@@ -43,6 +44,7 @@ export function useCompetitionChallengeDetail(props: Readonly<{
 
   let loadSequence = 0
   const reads = new AbortController()
+  provide(challengeGameplayFactStatusKey, createChallengeGameplayFactStatusReader(reads.signal))
   onBeforeUnmount(() => { loadSequence++; reads.abort() })
 
   function refreshSubmissionHistory(): void {

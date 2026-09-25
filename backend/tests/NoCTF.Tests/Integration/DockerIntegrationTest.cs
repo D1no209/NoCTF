@@ -1,4 +1,5 @@
 using DotNet.Testcontainers.Builders;
+using Npgsql;
 
 namespace NoCTF.Tests.Integration;
 
@@ -22,6 +23,10 @@ internal static class DockerIntegrationTest
                     StringComparison.OrdinalIgnoreCase))
                 throw;
             Skip.Test(UnavailableReason);
+        }
+        finally
+        {
+            NpgsqlConnection.ClearAllPools();
         }
     }
 }

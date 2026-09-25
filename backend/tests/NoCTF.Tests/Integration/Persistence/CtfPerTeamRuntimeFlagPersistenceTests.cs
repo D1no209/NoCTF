@@ -50,7 +50,7 @@ public sealed class CtfPerTeamRuntimeFlagPersistenceTests
             var outbox = new RecordingOutbox();
 
             await using var db = new NoCtfDbContext(options);
-            var runtimeFlags = new PostgresPerTeamRuntimeFlagStore(db);
+            var runtimeFlags = new PerTeamRuntimeFlagStore(db);
             var runtimes = new RuntimeInstanceStore(
                 db,
                 templates,
@@ -92,7 +92,7 @@ public sealed class CtfPerTeamRuntimeFlagPersistenceTests
             await Assert.That(claim.Definition.Environment["CHALLENGE_FLAG"])
                 .IsEqualTo(initialFlag.Flag);
 
-            var generator = new PostgresMissingFlagGenerator(
+            var generator = new MissingFlagGenerator(
                 db,
                 templates,
                 runtimeFlags);
@@ -128,13 +128,14 @@ public sealed class CtfPerTeamRuntimeFlagPersistenceTests
             var competition = await db.Competitions.SingleAsync(
                 item => item.Id == fixture.CompetitionId,
                 cancellationToken);
-            competition.ConfigurationJson = JsonSerializer.Serialize(
+            competition.ModeConfiguration = TestConfigurations.Competition(
+                GameMode.Ctf,
+                JsonSerializer.Serialize(
                 new CtfConfiguration(
-                    CtfConfiguration.CurrentSchemaVersion,
                     new(500, 100, 10),
                     [],
                     FlagTemplate: new("changed", "[TEAMHASH]", false)),
-                new JsonSerializerOptions(JsonSerializerDefaults.Web));
+                new JsonSerializerOptions(JsonSerializerDefaults.Web)));
             var futureUserId = Guid.CreateVersion7();
             var futureTeamId = Guid.CreateVersion7();
             db.Users.Add(new User
@@ -255,7 +256,7 @@ public sealed class CtfPerTeamRuntimeFlagPersistenceTests
                 db,
                 templates,
                 new FixedRuntimePlacementPolicy(),
-                new PostgresPerTeamRuntimeFlagStore(db),
+                new PerTeamRuntimeFlagStore(db),
                 outbox);
             var first = await runtimes.MutatePlayerRuntimeAsync(
                 new(
@@ -362,25 +363,25 @@ public sealed class CtfPerTeamRuntimeFlagPersistenceTests
             CreatedAt = now,
             UpdatedAt = now
         });
-        db.Competitions.Add(new Competition
+        db.Competitions.Add(new CtfCompetition
         {
             Id = competitionId,
             Title = "CTF runtime flags",
             OwnerId = userId,
-            Mode = GameMode.Ctf,
             Status = CompetitionStatus.Running,
             StartAt = now.AddHours(-1),
             EndAt = now.AddHours(1),
             FlagDerivationSecret = Enumerable.Range(1, 32).Select(value => (byte)value).ToArray(),
             CreatedAt = now,
             UpdatedAt = now,
-            ConfigurationJson = JsonSerializer.Serialize(
+            ModeConfiguration = TestConfigurations.Competition(
+                GameMode.Ctf,
+                JsonSerializer.Serialize(
                 new CtfConfiguration(
-                    CtfConfiguration.CurrentSchemaVersion,
                     new(500, 100, 10),
                     [],
                     FlagTemplate: new("competition", "[TEAMHASH]", false)),
-                new JsonSerializerOptions(JsonSerializerDefaults.Web))
+                new JsonSerializerOptions(JsonSerializerDefaults.Web)))
         });
         db.Teams.Add(new Team
         {
@@ -462,35 +463,35 @@ public sealed class CtfPerTeamRuntimeFlagPersistenceTests
         Guid competitionChallengeId,
         string title,
         int order,
-        string configurationJson,
+        string configurationFixture,
         NoCTF.GameModes.Flags.PerTeamFlagTemplate? flagTemplate,
         DateTimeOffset now)
     {
         var challengeId = Guid.CreateVersion7(now);
-        db.Challenges.Add(new Challenge
+        db.Challenges.Add(new CtfChallenge
         {
             Id = challengeId,
             OwnerId = ownerId,
-            Mode = GameMode.Ctf,
             Title = title,
-            DefinitionJson = configurationJson,
+            Definition = TestConfigurations.Definition(GameMode.Ctf, configurationFixture),
             CreatedAt = now,
             UpdatedAt = now
         });
-        db.CompetitionChallenges.Add(new CompetitionChallenge
+        db.CompetitionChallenges.Add(new CtfCompetitionChallenge
         {
             Id = competitionChallengeId,
             CompetitionId = competitionId,
             ChallengeId = challengeId,
             Order = order,
             IsPublished = true,
-            RulesJson = JsonSerializer.Serialize(
+            Rules = TestConfigurations.Rules(
+                GameMode.Ctf,
+                JsonSerializer.Serialize(
                 new CtfChallengeConfiguration(
-                    CtfConfiguration.CurrentSchemaVersion,
                     null,
                     null,
                     FlagTemplate: flagTemplate),
-                new JsonSerializerOptions(JsonSerializerDefaults.Web)),
+                new JsonSerializerOptions(JsonSerializerDefaults.Web))),
             UpdatedAt = now
         });
     }
@@ -498,7 +499,6 @@ public sealed class CtfPerTeamRuntimeFlagPersistenceTests
     private static string RuntimeConfiguration(ChallengeRuntimeTemplate runtime) =>
         JsonSerializer.Serialize(
             new CtfChallengeConfiguration(
-                CtfChallengeConfiguration.CurrentSchemaVersion,
                 null,
                 null,
                 Runtime: runtime),
@@ -529,7 +529,7 @@ public sealed class CtfPerTeamRuntimeFlagPersistenceTests
             CancellationToken cancellationToken) => Task.FromResult(outcome);
     }
 
-    private sealed class RecordingOutbox : ITransactionalMessageOutbox
+    private sealed class RecordingOutbox : IPostCommitMessagePublisher
     {
         public List<object> Published { get; } = [];
         public List<object> RunnerNodeMessages { get; } = [];

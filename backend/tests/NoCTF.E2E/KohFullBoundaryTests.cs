@@ -52,12 +52,13 @@ public sealed class KohFullBoundaryTests
             {
                 modeConfiguration = new
                 {
-                    json = JsonSerializer.Serialize(new
+                    configuration = new
                     {
-                        schemaVersion = 1,
+                        mode = "Koh",
+                        flagTemplate = new { header = "flag", bodyTemplate = "[GUID]", leetLiteralText = false },
                         pollIntervalSeconds = 2,
-                        controlPointsPerInterval = 10
-                    }, JsonOptions)
+                        controlPointsPerInterval = 10L
+                    }
                 }
             },
             HttpStatusCode.OK,
@@ -74,7 +75,7 @@ public sealed class KohFullBoundaryTests
                 description = "Returns the current controlling Team Flag as a raw response body.",
                 direction = "Pwn",
                 mode = "Koh",
-                definitionJson = BuildDefinition(runtimeImage)
+                definition = BuildDefinition(runtimeImage)
             },
             HttpStatusCode.Created,
             cancellationToken);
@@ -86,12 +87,12 @@ public sealed class KohFullBoundaryTests
             HttpStatusCode.Created,
             cancellationToken);
         var competitionChallengeId = challenge.GetProperty("id").GetGuid();
-        var configuration = JsonSerializer.Serialize(new
+        var configuration = new
         {
-            schemaVersion = 1,
+            mode = "Koh",
             pollIntervalSeconds = 2,
-            controlPointsPerInterval = 10
-        }, JsonOptions);
+            controlPointsPerInterval = 10L
+        };
         await SendJsonAsync(
             admin,
             HttpMethod.Patch,
@@ -104,7 +105,7 @@ public sealed class KohFullBoundaryTests
                     order = 0,
                     isPublished = true
                 },
-                rules = new { json = configuration }
+                rules = new { configuration }
             },
             HttpStatusCode.OK,
             cancellationToken);
@@ -155,8 +156,8 @@ public sealed class KohFullBoundaryTests
         var runtime = runtimeList.GetProperty("items")[0];
         var runtimeId = runtime.GetProperty("id").GetGuid();
         await Assert.That(runtime.GetProperty("teamId").ValueKind).IsEqualTo(JsonValueKind.Null);
-        await Assert.That(runtime.GetProperty("urls").GetArrayLength()).IsEqualTo(1);
-        await Assert.That(runtime.GetProperty("urls")[0].GetString()).Contains("/play");
+        await Assert.That(runtime.GetProperty("accesses").GetArrayLength()).IsEqualTo(1);
+        await Assert.That(E2ELifecycle.FirstDirectAddress(runtime)).Contains("/play");
         await Assert.That(runtime.ToString()).DoesNotContain("controlCheckUrl");
 
         var detailPath = $"/api/v1/competitions/{competitionId}/challenges/{competitionChallengeId}";
@@ -170,10 +171,10 @@ public sealed class KohFullBoundaryTests
         var blueDetail = await GetJsonAsync(blue.Client, detailPath, cancellationToken);
         await Assert.That(redDetail.GetProperty("controlFlag").GetString()).IsEqualTo(redFlag);
         await Assert.That(blueDetail.GetProperty("controlFlag").GetString()).IsEqualTo(blueFlag);
-        await Assert.That(redDetail.GetProperty("urls").GetArrayLength()).IsEqualTo(1);
-        await Assert.That(redDetail.GetProperty("urls")[0].GetString()).Contains("/play");
+        await Assert.That(redDetail.GetProperty("accesses").GetArrayLength()).IsEqualTo(1);
+        await Assert.That(E2ELifecycle.FirstDirectAddress(redDetail)).Contains("/play");
         await Assert.That(redDetail.ToString()).DoesNotContain("controlCheckUrl");
-        var fixtureUrl = ToHostUrl(redDetail.GetProperty("urls")[0].GetString()!);
+        var fixtureUrl = ToHostUrl(E2ELifecycle.FirstDirectAddress(redDetail));
 
         await SetFixtureAsync(fixtureUrl, "wrong", null, cancellationToken);
         await AssertScoresStableAsync(
@@ -250,35 +251,35 @@ public sealed class KohFullBoundaryTests
             cancellationToken);
     }
 
-    private static string BuildDefinition(string runtimeImage) =>
-        JsonSerializer.Serialize(new
+    private static object BuildDefinition(string runtimeImage) =>
+        new
         {
-            schemaVersion = 1,
+            mode = "Koh",
             runtime = new
             {
-                allocation = 0,
-                definition = new
+                kind = "Container",
+                allocation = "Shared",
+                image = runtimeImage,
+                command = Array.Empty<string>(),
+                environment = new Dictionary<string, string>(),
+                labels = new Dictionary<string, string>(),
+                portMappings = new[] { new { containerPort = 8080, hostPort = 0 } },
+                flagEnvironmentVariableName = (string?)null,
+                internalPorts = Array.Empty<int>(),
+                security = new
                 {
-                    kind = "container",
-                    image = runtimeImage,
-                    environment = new Dictionary<string, string>(),
-                    labels = new Dictionary<string, string>(),
-                    portMappings = new Dictionary<string, int> { ["8080"] = 0 },
-                    security = new
-                    {
-                        noNewPrivileges = true,
-                        readonlyRootfs = true,
-                        runAsNonRoot = true,
-                        capDrop = new[] { "ALL" },
-                        capAdd = Array.Empty<string>()
-                    },
-                    egressPolicy = 0
+                    noNewPrivileges = true,
+                    readonlyRootfs = true,
+                    runAsNonRoot = true,
+                    capDrop = Array.Empty<string>(),
+                    capAdd = Array.Empty<string>()
                 },
+                egressPolicy = "Isolated",
                 limits = new
                 {
-                    memoryBytes = 67_108_864,
-                    nanoCpus = 100_000_000,
-                    pidsLimit = 64
+                    memoryBytes = 67_108_864L,
+                    nanoCpus = 100_000_000L,
+                    pidsLimit = 64L
                 },
                 operationTimeoutSeconds = 60,
                 urlBindings = new[]
@@ -286,19 +287,27 @@ public sealed class KohFullBoundaryTests
                     new
                     {
                         urlTemplate = "http://{HOST}:{PORT}/play",
-                        exposure = 1,
-                        containerPort = 8080
+                        exposure = "Participants",
+                        containerPort = 8080,
+                        serviceName = (string?)null,
+                        vmId = (string?)null,
+                        guestPort = (int?)null,
+                        isControlCheck = false
+                    },
+                    new
+                    {
+                        urlTemplate = "http://{HOST}:{PORT}/control",
+                        exposure = "OwnerOnly",
+                        containerPort = 8080,
+                        serviceName = (string?)null,
+                        vmId = (string?)null,
+                        guestPort = (int?)null,
+                        isControlCheck = true
                     }
                 },
-                flagSource = 0,
-                controlCheckUrlBinding = new
-                {
-                    urlTemplate = "http://{HOST}:{PORT}/control",
-                    exposure = 0,
-                    containerPort = 8080
-                }
+                flagSource = "Static"
             }
-        }, JsonOptions);
+        };
 
     private static async Task AssertCompetitionFlagMutationUnavailableAsync(
         HttpClient admin,
@@ -312,7 +321,10 @@ public sealed class KohFullBoundaryTests
             new { flag = "flag{koh-manual-replacement}", matchKind = "Exact" },
             JsonOptions,
             cancellationToken);
-        await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.NotFound);
+        if (response.StatusCode != HttpStatusCode.MethodNotAllowed)
+            throw new InvalidOperationException(
+                $"Expected 405 for unsupported KoH Flag mutation, received {(int)response.StatusCode}: "
+                + await response.Content.ReadAsStringAsync(cancellationToken));
     }
 
     private static async Task SetFixtureAsync(
@@ -430,7 +442,10 @@ public sealed class KohFullBoundaryTests
         var team = await SendJsonAsync(
             client, HttpMethod.Post, $"/api/v1/competitions/{competitionId}/teams",
             new { name = teamName, trackKey = "default" }, HttpStatusCode.Created, cancellationToken);
-        return new(client, team.GetProperty("id").GetGuid());
+        var teamId = team.GetProperty("id").GetGuid();
+        await E2ELifecycle.SubmitTeamRegistrationAsync(
+            client, competitionId, teamId, cancellationToken);
+        return new(client, teamId);
     }
 
     private static async Task<JsonElement> PollJsonAsync(
@@ -480,6 +495,7 @@ public sealed class KohFullBoundaryTests
         {
             Content = JsonContent.Create(body, options: JsonOptions)
         };
+        E2ELifecycle.AddIdempotencyKey(request);
         using var response = await client.SendAsync(request, cancellationToken);
         return await ReadExpectedJsonAsync(response, expected, cancellationToken);
     }
@@ -492,6 +508,7 @@ public sealed class KohFullBoundaryTests
         CancellationToken cancellationToken)
     {
         using var request = new HttpRequestMessage(method, path);
+        E2ELifecycle.AddIdempotencyKey(request);
         using var response = await client.SendAsync(request, cancellationToken);
         if (response.StatusCode != expected)
             throw await UnexpectedResponseAsync(response, expected, cancellationToken);
@@ -505,6 +522,7 @@ public sealed class KohFullBoundaryTests
         CancellationToken cancellationToken)
     {
         using var request = new HttpRequestMessage(method, path);
+        E2ELifecycle.AddIdempotencyKey(request);
         using var response = await client.SendAsync(request, cancellationToken);
         return await ReadExpectedJsonAsync(response, expected, cancellationToken);
     }

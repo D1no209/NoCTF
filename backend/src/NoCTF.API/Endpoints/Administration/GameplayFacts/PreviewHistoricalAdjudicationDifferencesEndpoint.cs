@@ -39,7 +39,6 @@ public enum AdjudicationDifferenceCertaintyProtocol
 [JsonConverter(typeof(StrictPascalCaseEnumConverter<AdjudicationDifferenceKindProtocol>))]
 public enum AdjudicationDifferenceKindProtocol
 {
-    CurrentCorrectShouldBeDuplicate,
     DuplicateWithoutCurrentPredecessor,
     HistoricalResultChanged,
     MissingAdjudicationRecord,
@@ -210,8 +209,6 @@ public sealed class PreviewHistoricalAdjudicationDifferencesEndpoint(
     private static AdjudicationDifferenceKindProtocol ToProtocol(AdjudicationDifferenceKind kind) =>
         kind switch
         {
-            AdjudicationDifferenceKind.CurrentCorrectShouldBeDuplicate =>
-                AdjudicationDifferenceKindProtocol.CurrentCorrectShouldBeDuplicate,
             AdjudicationDifferenceKind.DuplicateWithoutCurrentPredecessor =>
                 AdjudicationDifferenceKindProtocol.DuplicateWithoutCurrentPredecessor,
             AdjudicationDifferenceKind.HistoricalResultChanged =>

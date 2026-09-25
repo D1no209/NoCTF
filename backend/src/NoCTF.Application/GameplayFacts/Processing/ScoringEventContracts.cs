@@ -17,11 +17,11 @@ public sealed record GameplayFactProcessingContext(
     IReadOnlyList<GameplayFact> PriorFacts,
     IReadOnlyList<ChallengeFlag> ApplicableFlags,
     PatchUpload? PatchUpload,
-    string CompetitionConfigurationJson,
-    string ChallengeConfigurationJson,
+    CompetitionModeConfiguration CompetitionConfiguration,
+    CompetitionChallengeRules ChallengeRules,
     DateTimeOffset? CompetitionStartTime = null,
     TimeSpan? EffectiveRunningTime = null,
-    string? ChallengeDefinitionJson = null);
+    ChallengeDefinition? ChallengeDefinition = null);
 
 public interface IGameplayFactEvaluator
 {

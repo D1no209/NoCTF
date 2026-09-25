@@ -50,7 +50,36 @@ public sealed record CompetitionEventDraft(
     Guid? SubjectId = null,
     EntityReferenceKind? RelatedType = null,
     Guid? RelatedId = null,
-    string? PayloadJson = null);
+    CompetitionStatus? PreviousCompetitionStatus = null,
+    CompetitionLeaderboardVisibility? PreviousLeaderboardVisibility = null,
+    bool Automatic = false,
+    Guid? PatchUploadId = null,
+    AwdpFixOutcome? AwdpFixOutcome = null,
+    GameplayFactFailureCode? GameplayFactFailureCode = null,
+    DateTimeOffset? ResolvedAt = null,
+    bool? TrackConfigurationEnabled = null,
+    string? DefaultTrackKey = null,
+    IReadOnlyList<string>? TrackKeys = null,
+    int? ReassignedTeamCount = null,
+    bool? IncludesProtectedFlags = null,
+    DateTimeOffset? FrozenStartAt = null,
+    DateTimeOffset? HiddenStartAt = null,
+    RuntimeTrafficCaptureEventData? TrafficCapture = null);
+
+public sealed record RuntimeTrafficCaptureEventData(
+    Guid SegmentId,
+    int BindingIndex,
+    string ConnectionId,
+    DateTimeOffset StartedAt,
+    DateTimeOffset EndedAt,
+    string ClientAddress,
+    int ClientPort,
+    string DestinationAddress,
+    int DestinationPort,
+    long ClientToRuntimeBytes,
+    long RuntimeToClientBytes,
+    long CapturedBytes,
+    bool Truncated);
 
 public sealed record CompetitionEventCommitted(
     Guid CompetitionId,

@@ -46,7 +46,10 @@ public sealed class AccountPrivacyHttpTests
         {
             await using var postgres = new PostgreSqlBuilder("postgres:17.10-alpine3.24@sha256:742f40ea20b9ff2ff31db5458d127452988a2164df9e17441e191f3b72252193").Build();
             await postgres.StartAsync(ct);
-            var options = new DbContextOptionsBuilder<NoCtfDbContext>().UseNpgsql(postgres.GetConnectionString()).UseSnakeCaseNamingConvention().Options;
+            var options = new DbContextOptionsBuilder<NoCtfDbContext>()
+                .UseNpgsql(postgres.GetConnectionString(), npgsql => npgsql.MigrationsAssembly(
+                    typeof(NoCTF.Persistence.PostgreSql.PostgreSqlPersistence).Assembly.FullName))
+                .UseSnakeCaseNamingConvention().Options;
             await using var db = new NoCtfDbContext(options);
             await db.Database.MigrateAsync(ct);
             var existing = Guid.NewGuid();
@@ -73,21 +76,17 @@ public sealed class AccountPrivacyHttpTests
             existingUser.ExternalIdentitySubject = "student-001";
             existingUser.ExternalIdentityBoundAt = DateTimeOffset.UtcNow;
             var platformSettings = await db.PlatformSettings.SingleAsync(ct);
-            platformSettings.SsoConfiguration.Providers.Add(new SsoProviderConfiguration
+            platformSettings.SsoConfiguration.Providers.Add(new CasSsoProviderConfiguration
             {
                 Id = providerId,
                 Name = "School SSO",
                 IconUrl = "https://sso.example.test/icon.png",
-                Protocol = SsoProtocol.Cas,
                 Enabled = true,
                 AllowBinding = true,
                 AllowedHosts = ["sso.example.test"],
-                Cas = new CasSsoProviderConfiguration
-                {
-                    IdentityNamespace = "school",
-                    LoginUrl = "https://sso.example.test/login",
-                    ServiceValidateUrl = "https://sso.example.test/serviceValidate"
-                }
+                IdentityNamespace = "school",
+                LoginUrl = "https://sso.example.test/login",
+                ServiceValidateUrl = "https://sso.example.test/serviceValidate"
             });
             var fixture = new CompetitionForceDeleteFixture();
             await fixture.SeedAsync(db, ct);
@@ -109,7 +108,8 @@ public sealed class AccountPrivacyHttpTests
             await store.RecordLoginAsync(null, fixture.Now, ct);
             var failure = await db.Notifications.SingleAsync(x => x.Kind == NotificationKind.AuthenticationSecurityActivity && x.SourceId == null, ct);
             await Assert.That(failure.SourceType).IsEqualTo(NotificationSourceType.System);
-            await Assert.That(JsonSerializer.Deserialize<AccountActivity>(failure.ContentJson)!.Kind).IsEqualTo(AccountActivityKind.LoginFailed);
+            await Assert.That((AccountActivityKind)failure.ActionValue!.Value)
+                .IsEqualTo(AccountActivityKind.LoginFailed);
             var registrationId = Guid.NewGuid();
             var auth = new AuthenticationStore(db, new PasswordHasher<User>(), source: source);
             await auth.RegisterAsync(registrationId, "new-user", "new@example.test", "long-password", fixture.Now, ct);

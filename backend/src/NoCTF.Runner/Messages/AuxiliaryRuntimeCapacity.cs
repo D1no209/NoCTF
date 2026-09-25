@@ -25,7 +25,7 @@ public sealed class AuxiliaryRuntimeCapacity(
     IEnumerable<IRuntimeManagedResourceReconciler> reconcilers,
     RunnerResourceMutationCoordinator mutations,
     NoCtfDbContext db,
-    ITransactionalMessageOutbox outbox,
+    IPostCommitMessagePublisher outbox,
     ICompetitionEventRecorder events,
     TimeProvider clock,
     ILogger<AuxiliaryRuntimeCapacity> logger)
@@ -69,8 +69,7 @@ public sealed class AuxiliaryRuntimeCapacity(
     public async Task RecordAwdAdmissionFailureAsync(Guid factId, CancellationToken ct)
     {
         await using var transaction = await db.Database.BeginTransactionAsync(ct);
-        var fact = await db.GameplayFacts.FromSqlInterpolated(
-            $"SELECT * FROM gameplay_facts WHERE id = {factId} FOR UPDATE").SingleOrDefaultAsync(ct);
+        var fact = await db.GameplayFacts.SingleOrDefaultAsync(item => item.Id == factId, ct);
         if (fact is null || fact.Kind != GameplayFactKind.AwdServiceTransition
             || fact.State != GameplayFactState.Processing)
             return;

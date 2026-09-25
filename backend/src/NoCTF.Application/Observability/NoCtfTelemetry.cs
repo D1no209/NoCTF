@@ -5,6 +5,28 @@ using NoCTF.Domain.Gameplay;
 
 namespace NoCTF.Application.Observability;
 
+public enum GameplayFactPerformanceStage
+{
+    ChallengeAttemptStateRead,
+    AdmissionLoad,
+    AdmissionRecheck,
+    PersistenceCommit,
+    MessagePublish,
+    DispatchAge,
+    WorkerEvaluation,
+    WorkerCompletion
+}
+
+public enum RuntimeDispatchPerformanceStage
+{
+    TargetRead,
+    DefinitionPreparation,
+    CapacityClaim,
+    Persistence,
+    TransactionCommit,
+    PostCommitPublish
+}
+
 public static class NoCtfTelemetry
 {
     public const string MeterName = "NoCTF";
@@ -39,6 +61,8 @@ public static class NoCtfTelemetry
         "noctf.runtime.operations", unit: "{operation}");
     private static readonly Histogram<double> RuntimeStopDuration = Meter.CreateHistogram<double>(
         "noctf.runtime.stop.duration", unit: "s");
+    private static readonly Histogram<double> RuntimeDispatchStageDuration = Meter.CreateHistogram<double>(
+        "noctf.runtime.dispatch.stage.duration", unit: "s");
     private static readonly Histogram<double> RuntimeStopQueueDelay = Meter.CreateHistogram<double>(
         "noctf.runtime.stop.queue_delay", unit: "s");
     private static readonly Counter<long> RuntimeStopForces = Meter.CreateCounter<long>(
@@ -53,6 +77,8 @@ public static class NoCtfTelemetry
         Meter.CreateHistogram<double>(
             "noctf.gameplay_fact.processing.duration",
             unit: "s");
+    private static readonly Histogram<double> GameplayFactStageDuration =
+        Meter.CreateHistogram<double>("noctf.gameplay_fact.stage.duration", unit: "s");
     private static readonly Histogram<double> LeaderboardProjectionDuration = Meter.CreateHistogram<double>(
         "noctf.leaderboard.projection.duration", unit: "s");
     private static readonly Histogram<long> LeaderboardProjectionFacts = Meter.CreateHistogram<long>(
@@ -232,6 +258,20 @@ public static class NoCtfTelemetry
         GameplayFactProcessing.Add(1, tags);
         GameplayFactProcessingDuration.Record(Math.Max(0, elapsedSeconds), tags);
     }
+
+    public static void RecordGameplayFactStage(
+        GameplayFactPerformanceStage stage,
+        double elapsedSeconds) =>
+        GameplayFactStageDuration.Record(
+            Math.Max(0, elapsedSeconds),
+            new TagList { { "stage", stage.ToString() } });
+
+    public static void RecordRuntimeDispatchStage(
+        RuntimeDispatchPerformanceStage stage,
+        double elapsedSeconds) =>
+        RuntimeDispatchStageDuration.Record(
+            Math.Max(0, elapsedSeconds),
+            new TagList { { "stage", stage.ToString() } });
 
     private static string? SubmissionKind(GameplayFactKind kind) => kind switch
     {

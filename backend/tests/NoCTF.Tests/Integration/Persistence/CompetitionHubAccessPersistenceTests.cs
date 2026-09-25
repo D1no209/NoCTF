@@ -174,7 +174,7 @@ public sealed class CompetitionHubAccessPersistenceTests
         Guid[]? managerIds = null,
         Guid[]? judgeIds = null,
         Guid[]? observerIds = null,
-        CompetitionAccessMode accessMode = CompetitionAccessMode.Public) => new()
+        CompetitionAccessMode accessMode = CompetitionAccessMode.Public) => new CtfCompetition
         {
             Id = id,
             Title = $"Hub access {status}",
@@ -183,9 +183,8 @@ public sealed class CompetitionHubAccessPersistenceTests
             JudgeIds = judgeIds ?? [],
             ObserverIds = observerIds ?? [],
             AccessMode = accessMode,
-            Mode = GameMode.Ctf,
             Status = status,
-            ConfigurationJson = "{}",
+            ModeConfiguration = TestConfigurations.Competition(GameMode.Ctf),
             FlagDerivationSecret = new byte[32],
             StartAt = now.AddHours(1),
             EndAt = now.AddHours(2),

@@ -73,6 +73,14 @@ public sealed class EmailVerificationConfigurationStore(
     {
         var settings = await db.PlatformSettings.AsNoTracking()
             .SingleAsync(candidate => candidate.Id == SettingsId, ct);
+        return ToDeliveryConfiguration(settings, secrets, requireEnabled);
+    }
+
+    internal static EmailVerificationDeliveryConfiguration? ToDeliveryConfiguration(
+        PlatformSettings settings,
+        PlatformSecretProtector secrets,
+        bool requireEnabled)
+    {
         var usesAuthentication = !string.IsNullOrWhiteSpace(settings.EmailSmtpUserName);
         if ((requireEnabled && !settings.EmailVerificationEnabled)
             || (usesAuthentication && settings.EmailSmtpPasswordCiphertext is null)

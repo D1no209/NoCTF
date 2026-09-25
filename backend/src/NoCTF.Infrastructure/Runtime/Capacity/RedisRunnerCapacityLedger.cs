@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using NoCTF.Application.Runtime.Capacity;
 using NoCTF.Application.Runtime.Provisioning;
 using NoCTF.Domain.Runtime;
@@ -66,13 +67,13 @@ public sealed class RedisRunnerCapacityLedger(IConnectionMultiplexer redis, Time
         var database = redis.GetDatabase();
         var keys = claimKeys
             ?? throw new ArgumentNullException(nameof(claimKeys));
-        var rows = allocations.Select(item => new
-        {
-            key = $"runner-claim:{item.Identity.Key}", memory = item.Limit.MemoryBytes,
-            cpu = item.Limit.NanoCpus, pids = item.Limit.PidsLimit,
-            auxiliary = item.Identity.IsAuxiliary,
-            starting = starting?.Contains(item.Identity) == true
-        }).ToArray();
+        var rows = allocations.Select(item => new RunnerRestoreRow(
+            $"runner-claim:{item.Identity.Key}",
+            item.Limit.MemoryBytes,
+            item.Limit.NanoCpus,
+            item.Limit.PidsLimit,
+            item.Identity.IsAuxiliary,
+            starting?.Contains(item.Identity) == true)).ToArray();
         var restored = (long)await database.ScriptEvaluateAsync("""
             if redis.call('HGET', KEYS[1], 'admissionState') ~= 'reconciling' then return 0 end
             local old = cjson.decode(ARGV[6])
@@ -116,7 +117,9 @@ public sealed class RedisRunnerCapacityLedger(IConnectionMultiplexer redis, Time
             return 1
             """, [$"runner:{runnerId}:capacity", $"runner-pool:{pool}:candidates"],
             [runnerId, pool, projection.ObservedTotal.MemoryBytes, projection.ObservedTotal.NanoCpus,
-                projection.ObservedTotal.PidsLimit ?? 0, JsonSerializer.Serialize(keys), JsonSerializer.Serialize(rows),
+                projection.ObservedTotal.PidsLimit ?? 0,
+                JsonSerializer.Serialize(keys.ToArray(), RunnerCapacityRecoveryJsonContext.Default.StringArray),
+                JsonSerializer.Serialize(rows, RunnerCapacityRecoveryJsonContext.Default.RunnerRestoreRowArray),
                 0, 0, projection.ObservedAvailable.MemoryBytes, projection.ObservedAvailable.NanoCpus,
                 projection.ObservedAvailable.PidsLimit ?? 0, projection.SafetyHeadroom.MemoryBytes,
                 projection.SafetyHeadroom.NanoCpus, projection.SafetyHeadroom.PidsLimit ?? 0,
@@ -126,3 +129,16 @@ public sealed class RedisRunnerCapacityLedger(IConnectionMultiplexer redis, Time
     }
 
 }
+
+internal sealed record RunnerRestoreRow(
+    string Key,
+    long Memory,
+    long Cpu,
+    long? Pids,
+    bool Auxiliary,
+    bool Starting);
+
+[JsonSourceGenerationOptions(JsonSerializerDefaults.Web)]
+[JsonSerializable(typeof(string[]))]
+[JsonSerializable(typeof(RunnerRestoreRow[]))]
+internal partial class RunnerCapacityRecoveryJsonContext : JsonSerializerContext;

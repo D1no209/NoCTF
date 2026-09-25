@@ -199,9 +199,9 @@ public sealed class CompetitionWebhookDeliveryStore(
         CancellationToken cancellationToken)
     {
         await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
-        var competition = await db.Competitions
-            .FromSqlInterpolated($"SELECT * FROM competitions WHERE id = {competitionId} FOR UPDATE")
-            .SingleOrDefaultAsync(cancellationToken);
+        var competition = await db.Competitions.SingleOrDefaultAsync(
+            item => item.Id == competitionId,
+            cancellationToken);
         var target = competition?.WebhookConfiguration.Targets
             .SingleOrDefault(item => item.Id == targetId);
         if (target is null
@@ -408,16 +408,15 @@ public sealed class CompetitionWebhookDeliveryStore(
             .Where(item => item.Id == id
                 && item.Kind == NotificationKind.CompetitionAnnouncement
                 && item.TargetType == NotificationTargetType.CompetitionParticipants)
-            .Select(item => new { item.Id, item.ContentJson, item.SentAt })
+            .Select(item => new { item.Id, item.Title, item.Body, item.SentAt })
             .SingleOrDefaultAsync(cancellationToken);
         if (row is null)
             return null;
-        using var content = JsonDocument.Parse(row.ContentJson);
         return JsonSerializer.SerializeToElement(new
         {
             row.Id,
-            Title = content.RootElement.GetProperty("title").GetString(),
-            Body = content.RootElement.GetProperty("body").GetString(),
+            row.Title,
+            row.Body,
             PublishedAt = row.SentAt
         }, JsonOptions);
     }

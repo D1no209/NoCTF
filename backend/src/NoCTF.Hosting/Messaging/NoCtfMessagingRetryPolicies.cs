@@ -1,6 +1,6 @@
 using JasperFx;
 using JasperFx.CodeGeneration;
-using Npgsql;
+using System.Data.Common;
 using NoCTF.Application.Competitions.Events;
 using NoCTF.Application.Messaging;
 using Wolverine;
@@ -88,7 +88,7 @@ public static class NoCtfMessagingRetryPolicies
             .RetryWithCooldown(TimeSpan.FromMilliseconds(250))
             .Then.ScheduleRetry(RunnerRetryDelays)
             .WithFullJitter();
-        options.Policies.OnException<NpgsqlException>()
+        options.Policies.OnException<DbException>()
             .RetryWithCooldown(TimeSpan.FromMilliseconds(250))
             .Then.ScheduleRetry(RunnerRetryDelays)
             .WithFullJitter();
@@ -121,7 +121,7 @@ public static class NoCtfMessagingRetryPolicies
                     .RetryWithCooldown(TimeSpan.FromMilliseconds(250))
                     .Then.ScheduleRetry(delays)
                     .WithFullJitter();
-                chain.OnException<NpgsqlException>()
+                chain.OnException<DbException>()
                     .RetryWithCooldown(TimeSpan.FromMilliseconds(250))
                     .Then.ScheduleRetry(delays)
                     .WithFullJitter();
@@ -151,11 +151,11 @@ public static class NoCtfMessagingRetryPolicies
             endpointName switch
             {
                 CompetitionEventFanoutQueueNames.Realtime =>
-                    "nats://subject/noctf.events.realtime",
+                    "nats://subject/noctf.v2.events.realtime",
                 CompetitionEventFanoutQueueNames.Leaderboard =>
-                    "nats://subject/noctf.events.leaderboard",
+                    "nats://subject/noctf.v2.events.leaderboard",
                 CompetitionEventFanoutQueueNames.Webhook =>
-                    "nats://subject/noctf.events.webhook",
+                    "nats://subject/noctf.v2.events.webhook",
                 _ => $"nats://subject/noctf.{endpointName.Replace("-", ".", StringComparison.Ordinal)}"
             };
     }

@@ -90,14 +90,9 @@ public sealed class PlatformUserAccountStatusPersistenceTests
                 .Where(notification =>
                     notification.Kind == NotificationKind.UserAccountLifecycleChanged)
                 .OrderBy(notification => notification.SentAt)
-                .Select(notification => notification.ContentJson)
+                .Select(notification => notification.UserLifecycleAction!.Value)
                 .ToArrayAsync(cancellationToken);
-            var actions = facts.Select(content =>
-                    JsonSerializer.Deserialize<UserAccountLifecycleFact>(
-                        content,
-                        new JsonSerializerOptions(JsonSerializerDefaults.Web))!.Action)
-                .ToArray();
-            await Assert.That(actions).IsEquivalentTo([
+            await Assert.That(facts).IsEquivalentTo([
                 UserAccountLifecycleAction.EmailVerified,
                 UserAccountLifecycleAction.EmailUnverified
             ]);
@@ -186,18 +181,14 @@ public sealed class PlatformUserAccountStatusPersistenceTests
             var facts = (await verification.Notifications.AsNoTracking()
                     .Where(notification => notification.Kind == NotificationKind.UserAccountLifecycleChanged)
                     .OrderBy(notification => notification.SentAt)
-                    .Select(notification => new { notification.SourceId, notification.ContentJson })
-                    .ToArrayAsync(cancellationToken))
-                .Select(item => new
-                {
-                    item.SourceId,
-                    Fact = JsonSerializer.Deserialize<UserAccountLifecycleFact>(
-                        item.ContentJson,
-                        new JsonSerializerOptions(JsonSerializerDefaults.Web))!
-                })
-                .ToArray();
+                    .Select(notification => new
+                    {
+                        notification.SourceId,
+                        Action = notification.UserLifecycleAction!.Value
+                    })
+                    .ToArrayAsync(cancellationToken));
             await Assert.That(facts).Count().IsEqualTo(4);
-            await Assert.That(facts.Select(item => item.Fact.Action).ToArray())
+            await Assert.That(facts.Select(item => item.Action).ToArray())
                 .IsEquivalentTo([
                     UserAccountLifecycleAction.Disabled,
                     UserAccountLifecycleAction.Activated,

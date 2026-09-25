@@ -1,4 +1,3 @@
-using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Security.Cryptography;
 using System.Text;
@@ -19,6 +18,9 @@ public sealed record CompetitionTrackDefinition(
     string? InvitationCode = null,
     Guid? RequiredSsoProviderId = null)
 {
+    public Guid CompetitionId { get; init; }
+    public int Position { get; init; }
+
     [JsonIgnore]
     public bool RequiresInvitationCode => !string.IsNullOrWhiteSpace(InvitationCode);
 }
@@ -36,15 +38,10 @@ public static class CompetitionTrackInvitationCode
 }
 
 public sealed record CompetitionTrackConfiguration(
-    int SchemaVersion,
     IReadOnlyList<CompetitionTrackDefinition> Tracks)
 {
-    public const int CurrentSchemaVersion = 1;
     public const string DefaultTrackKey = "default";
-    private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
-
     public static CompetitionTrackConfiguration DefaultFor(GameMode mode) => new(
-        CurrentSchemaVersion,
         [new(
             DefaultTrackKey,
             "Default",
@@ -70,29 +67,30 @@ public sealed record CompetitionTrackConfiguration(
                 string.Equals(track.Key, normalized, StringComparison.OrdinalIgnoreCase));
     }
 
-    public static CompetitionTrackConfiguration ParseOrDefault(GameMode mode, string? json)
+    public static CompetitionTrackConfiguration FromPersisted(
+        GameMode mode,
+        IReadOnlyList<CompetitionTrackDefinition>? tracks)
     {
-        if (string.IsNullOrWhiteSpace(json))
-            return DefaultFor(mode);
-        return TryParse(json, out var configuration)
-            && configuration.SchemaVersion == CurrentSchemaVersion
-            && configuration.Tracks is { Count: > 0 }
-            && configuration.Tracks.Count(track => track.IsDefault) == 1
-            ? configuration
-            : DefaultFor(mode);
+        if (tracks is null or { Count: 0 })
+            throw new InvalidOperationException(
+                "Persisted track configuration must contain at least one track.");
+        if (tracks.Count(track => track.IsDefault) != 1)
+            throw new InvalidOperationException(
+                "Persisted track configuration must contain exactly one default track.");
+        return new(tracks.OrderBy(track => track.Position).ToArray());
     }
 
     public static CompetitionTrackConfiguration EffectiveFor(
         GameMode mode,
         bool tracksEnabled,
-        string? json)
+        IReadOnlyList<CompetitionTrackDefinition>? tracks)
     {
-        var saved = ParseOrDefault(mode, json);
         if (tracksEnabled)
-            return saved;
-        var defaultTrack = saved.DefaultTrack;
+            return FromPersisted(mode, tracks);
+        var defaultTrack = tracks is { Count: > 0 }
+            ? FromPersisted(mode, tracks).DefaultTrack
+            : DefaultFor(mode).DefaultTrack;
         return new(
-            CurrentSchemaVersion,
             [defaultTrack with
             {
                 IsDefault = true,
@@ -108,31 +106,15 @@ public sealed record CompetitionTrackConfiguration(
             }]);
     }
 
-    public static bool TryParse(
-        string json,
-        out CompetitionTrackConfiguration configuration)
-    {
-        try
+    public static List<CompetitionTrackDefinition> ToPersisted(
+        CompetitionTrackConfiguration configuration,
+        Guid competitionId = default) => configuration.Tracks
+        .Select((track, position) => track with
         {
-            var parsed = JsonSerializer.Deserialize<CompetitionTrackConfiguration>(json, JsonOptions);
-            if (parsed?.Tracks is null)
-            {
-                configuration = DefaultFor(GameMode.Ctf);
-                return false;
-            }
-
-            configuration = parsed;
-            return true;
-        }
-        catch (JsonException)
-        {
-            configuration = DefaultFor(GameMode.Ctf);
-            return false;
-        }
-    }
-
-    public static string Serialize(CompetitionTrackConfiguration configuration) =>
-        JsonSerializer.Serialize(configuration, JsonOptions);
+            CompetitionId = competitionId,
+            Position = position
+        })
+        .ToList();
 
     public static string? NormalizeKey(string? value)
     {

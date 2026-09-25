@@ -2,14 +2,14 @@ import { markRaw } from 'vue'
 
 import { Plus } from '@lucide/vue'
 import { adminChallengeBankListTemplates } from '../../../../api'
-import type { NoCtfapiEndpointsAdministrationChallengeBankChallengeTemplateResponse } from '../../../../api'
+import type { NoCtfapiEndpointsAdministrationChallengeBankChallengeTemplateSummaryResponse } from '../../../../api'
 import AdminDateTimeComponent from '../../../admin/AdminDateTime.vue'
 import AdminGameModeBadgeComponent from '../../../admin/AdminGameModeBadge.vue'
 import ChallengeTemplateCreateDialogComponent from '../../../admin/ChallengeTemplateCreateDialog.vue'
 import { directionKey, directionLabel } from '../../../../utils/directions'
 import { useOffsetPagination } from '../../../../composables/useOffsetPagination'
 
-type ChallengeTemplate = NoCtfapiEndpointsAdministrationChallengeBankChallengeTemplateResponse
+type ChallengeTemplate = NoCtfapiEndpointsAdministrationChallengeBankChallengeTemplateSummaryResponse
 
 let lastIncludeDeleted = false
 interface ChallengeLibrarySnapshot {

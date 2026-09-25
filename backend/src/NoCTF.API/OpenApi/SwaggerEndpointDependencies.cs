@@ -11,6 +11,7 @@ using NoCTF.Application.GameplayFacts.PatchUploads;
 using NoCTF.Application.GameplayFacts.Awdp;
 using NoCTF.Domain.Runtime;
 using NoCTF.Domain.Competitions;
+using NoCTF.Domain.Challenges;
 using NoCTF.Application.Storage;
 
 namespace NoCTF.API.OpenApi;
@@ -91,8 +92,9 @@ internal sealed class SwaggerGameplayFactAdmissionModePolicy : IGameplayFactAdmi
 {
     public GameplayFactAdmissionRules GetRules(
         GameMode mode,
-        string competitionConfigurationJson,
-        string challengeConfigurationJson) => new(true, true, null, null);
+        CompetitionModeConfiguration competitionConfiguration,
+        CompetitionChallengeRules challengeRules,
+        ChallengeDefinition? challengeDefinition = null) => new(true, true, null, null);
 }
 
 internal sealed class SwaggerStatusReader : IGameplayFactStatusReader

@@ -35,6 +35,8 @@ using NoCTF.Application.Competitions.Events;
 using NoCTF.Domain.Competitions.Events;
 using NoCTF.Domain.Shared;
 using NoCTF.Domain.Gameplay;
+using NoCTF.Application.Observability;
+using System.Diagnostics;
 
 namespace NoCTF.Worker;
 
@@ -46,32 +48,63 @@ internal static partial class BackendMessageOperations
         IChallengeRuntimeTemplateCatalog templates,
         IRuntimePlacementPolicy placementPolicy,
         IRunnerCapacityGate capacity,
-        ITransactionalMessageOutbox outbox,
+        IPostCommitMessagePublisher outbox,
         TimeProvider timeProvider,
         CancellationToken cancellationToken,
         ICompetitionEventRecorder? events = null,
         RuntimeResourceBudgetPolicy? budgets = null)
     {
-        await using var transaction = db.Database.IsRelational() && db.Database.CurrentTransaction is null
-            ? await db.Database.BeginTransactionAsync(cancellationToken) : null;
-        if (db.Database.IsRelational())
-            await NoCTF.Infrastructure.Runtime.Capacity.RuntimeCapacityCriticalSection.AcquireAsync(db, cancellationToken);
-        await DispatchRuntimeCoreAsync(message, db, templates, placementPolicy, capacity, outbox,
-            timeProvider, cancellationToken, events, budgets ?? new());
-        if (transaction is not null)
+        for (var attempt = 0; attempt < 3; attempt++)
         {
-            await transaction.CommitAsync(cancellationToken);
-            await outbox.FlushCommittedMessagesAsync();
+            try
+            {
+                await using var transaction = db.Database.IsRelational() && db.Database.CurrentTransaction is null
+                    ? await db.Database.BeginTransactionAsync(
+                        System.Data.IsolationLevel.Serializable,
+                        cancellationToken) : null;
+                await DispatchRuntimeCoreAsync(message, db, templates, placementPolicy, capacity, outbox,
+                    timeProvider, cancellationToken, events, budgets ?? new());
+                if (transaction is not null)
+                {
+                    var commitStarted = Stopwatch.GetTimestamp();
+                    await transaction.CommitAsync(cancellationToken);
+                    NoCtfTelemetry.RecordRuntimeDispatchStage(
+                        RuntimeDispatchPerformanceStage.TransactionCommit,
+                        Stopwatch.GetElapsedTime(commitStarted).TotalSeconds);
+                    var publishStarted = Stopwatch.GetTimestamp();
+                    try
+                    {
+                        await outbox.FlushCommittedMessagesAsync();
+                    }
+                    finally
+                    {
+                        NoCtfTelemetry.RecordRuntimeDispatchStage(
+                            RuntimeDispatchPerformanceStage.PostCommitPublish,
+                            Stopwatch.GetElapsedTime(publishStarted).TotalSeconds);
+                    }
+                }
+                return;
+            }
+            catch (Exception exception) when (attempt < 2
+                && TransactionFailureClassifier.IsRetryable(exception))
+            {
+                outbox.DiscardPendingMessages();
+                db.ChangeTracker.Clear();
+                await Task.Delay(TimeSpan.FromMilliseconds(
+                    Random.Shared.Next(25, 76) * (attempt + 1)), cancellationToken);
+            }
         }
+        throw new InvalidOperationException("Runtime dispatch retry loop did not complete.");
     }
 
     private static async Task DispatchRuntimeCoreAsync(
         DispatchRuntime message, NoCtfDbContext db, IChallengeRuntimeTemplateCatalog templates,
         IRuntimePlacementPolicy placementPolicy, IRunnerCapacityGate capacity,
-        ITransactionalMessageOutbox outbox, TimeProvider timeProvider, CancellationToken cancellationToken,
+        IPostCommitMessagePublisher outbox, TimeProvider timeProvider, CancellationToken cancellationToken,
         ICompetitionEventRecorder? events, RuntimeResourceBudgetPolicy budgets)
     {
         events ??= NullCompetitionEventRecorder.Instance;
+        var targetReadStarted = Stopwatch.GetTimestamp();
         var runtimeScope = await db.RuntimeInstances.AsNoTracking()
             .Where(candidate => candidate.Id == message.RuntimeInstanceId)
             .Select(candidate => new { candidate.Purpose, candidate.ChallengeId })
@@ -97,6 +130,9 @@ internal static partial class BackendMessageOperations
             return;
 
         var target = await ResolveRuntimeDispatchTargetAsync(instance, db, cancellationToken);
+        NoCtfTelemetry.RecordRuntimeDispatchStage(
+            RuntimeDispatchPerformanceStage.TargetRead,
+            Stopwatch.GetElapsedTime(targetReadStarted).TotalSeconds);
         if (target is null)
         {
             await RejectInvalidConfigurationAsync(
@@ -104,18 +140,19 @@ internal static partial class BackendMessageOperations
             return;
         }
 
+        var definitionStarted = Stopwatch.GetTimestamp();
         ChallengeRuntimeTemplate? template;
         try
         {
             var patchVerificationConfiguration = IsPatchVerificationTarget(instance.Purpose)
                 ? PatchVerificationConfigurationResolver.Resolve(
                     target.Mode,
-                    target.CompetitionConfigurationJson!,
-                    target.RulesJson!,
-                    target.DefinitionJson)
+                    target.CompetitionConfiguration!,
+                    target.Rules!,
+                    target.Definition!)
                 : null;
             template = patchVerificationConfiguration?.Runtime
-                ?? templates.Get(target.Mode, target.DefinitionJson);
+                ?? templates.Get(target.Definition);
         }
         catch (Exception exception) when (exception is InvalidOperationException
             or GameModeConfigurationException
@@ -220,6 +257,10 @@ internal static partial class BackendMessageOperations
             await RejectInvalidConfigurationAsync(instance, db, outbox, events, timeProvider, cancellationToken);
             return;
         }
+        NoCtfTelemetry.RecordRuntimeDispatchStage(
+            RuntimeDispatchPerformanceStage.DefinitionPreparation,
+            Stopwatch.GetElapsedTime(definitionStarted).TotalSeconds);
+        var claimStarted = Stopwatch.GetTimestamp();
         var capacityClaim = await capacity.TryClaimAsync(new RunnerCapacityRequest(
             instance.Id,
             placement.RunnerPool,
@@ -227,6 +268,9 @@ internal static partial class BackendMessageOperations
             budget.NanoCpus,
             budget.PidsLimit,
             Limit: RuntimeResourceBudgetPolicy.ToAmount(limits)), cancellationToken);
+        NoCtfTelemetry.RecordRuntimeDispatchStage(
+            RuntimeDispatchPerformanceStage.CapacityClaim,
+            Stopwatch.GetElapsedTime(claimStarted).TotalSeconds);
         if (capacityClaim.Availability != RunnerCapacityAvailability.Claimed
             || string.IsNullOrWhiteSpace(capacityClaim.RunnerId))
         {
@@ -237,6 +281,7 @@ internal static partial class BackendMessageOperations
         }
         await capacity.RecordWaitingAsync(instance.Id, null, cancellationToken);
 
+        var persistenceStarted = Stopwatch.GetTimestamp();
         var runnerId = capacityClaim.RunnerId;
         IRuntimeProvisionMessage provision;
         try
@@ -269,7 +314,7 @@ internal static partial class BackendMessageOperations
                     runnerId,
                     target.Mode,
                     template,
-                    target.DefinitionJson,
+                    target.Definition,
                     perTeamFlag);
             }
             var stored = await db.RuntimeInstances.AsNoTracking().Where(runtime => runtime.Id == instance.Id)
@@ -314,21 +359,27 @@ internal static partial class BackendMessageOperations
         if (!db.Database.IsRelational())
         {
             var amount = RuntimeResourceBudgetPolicy.ToAmount(limits);
-            instance.CapacityAllocations = instance.CapacityAllocations.Add(new(
+            var allocationEntry = RuntimeCapacityAllocationEntry.FromValue(new(
                 NoCTF.Infrastructure.Runtime.Capacity.PersistedRunnerCapacityGate.PrimaryIdentity(instance),
-                instance.GameplayFactId, runnerId, runnerId, RuntimeResourceBudgetPolicy.ToAmount(budget), amount));
+                instance.GameplayFactId, runnerId, runnerId,
+                RuntimeResourceBudgetPolicy.ToAmount(budget), amount));
+            instance.CapacityAllocationEntries.Add(allocationEntry);
+            db.Entry(allocationEntry).State = EntityState.Added;
         }
         instance.State = RuntimeState.Provisioning;
         instance.FailureCode = null;
         await PublishRuntimeProvisionAsync(outbox, provision);
         await db.SaveChangesAsync(cancellationToken);
         await outbox.FlushOutgoingMessagesAsync();
+        NoCtfTelemetry.RecordRuntimeDispatchStage(
+            RuntimeDispatchPerformanceStage.Persistence,
+            Stopwatch.GetElapsedTime(persistenceStarted).TotalSeconds);
     }
 
     private static async Task FailAwdpSubmissionAsync(
         RuntimeInstance instance,
         NoCtfDbContext db,
-        ITransactionalMessageOutbox outbox,
+        IPostCommitMessagePublisher outbox,
         ICompetitionEventRecorder events,
         TimeProvider timeProvider,
         CancellationToken cancellationToken)
@@ -360,7 +411,7 @@ internal static partial class BackendMessageOperations
                     instance,
                     challenge.Id,
                     challenge.Mode,
-                    challenge.DefinitionJson,
+                    challenge.Definition,
                     null,
                     null);
         }
@@ -384,9 +435,9 @@ internal static partial class BackendMessageOperations
                 {
                     ChallengeId = challenge.Id,
                     item.Competition.Mode,
-                    challenge.DefinitionJson,
-                    CompetitionConfigurationJson = item.Competition.ConfigurationJson,
-                    RulesJson = item.Challenge.RulesJson
+                    challenge.Definition,
+                    CompetitionConfiguration = item.Competition.ModeConfiguration,
+                    Rules = item.Challenge.Rules
                 })
             .SingleOrDefaultAsync(cancellationToken);
         return scope is null
@@ -395,15 +446,15 @@ internal static partial class BackendMessageOperations
                 instance,
                 scope.ChallengeId,
                 scope.Mode,
-                scope.DefinitionJson,
-                scope.CompetitionConfigurationJson,
-                scope.RulesJson);
+                scope.Definition,
+                scope.CompetitionConfiguration,
+                scope.Rules);
     }
 
     private static async Task RejectInvalidConfigurationAsync(
         RuntimeInstance instance,
         NoCtfDbContext db,
-        ITransactionalMessageOutbox outbox,
+        IPostCommitMessagePublisher outbox,
         ICompetitionEventRecorder events,
         TimeProvider timeProvider,
         CancellationToken cancellationToken)
@@ -439,9 +490,9 @@ internal static partial class BackendMessageOperations
         RuntimeInstance Instance,
         Guid ChallengeId,
         GameMode Mode,
-        string DefinitionJson,
-        string? CompetitionConfigurationJson,
-        string? RulesJson);
+        ChallengeDefinition? Definition,
+        CompetitionModeConfiguration? CompetitionConfiguration,
+        CompetitionChallengeRules? Rules);
 
     private static bool IsPatchVerificationTarget(RuntimePurpose purpose) =>
         purpose is RuntimePurpose.AwdpTarget or RuntimePurpose.PatchVerificationTarget;

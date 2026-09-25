@@ -1,6 +1,7 @@
 using System.Data;
 using System.Diagnostics;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using Microsoft.EntityFrameworkCore;
 using NoCTF.Application.Notifications;
 using NoCTF.Application.Observability;
@@ -26,14 +27,6 @@ public sealed class FusionLeaderboardCache(
     LeaderboardProjectionKeyedLock? projectionKeyedLock = null,
     TimeProvider? clock = null) : ILeaderboardCache, ILeaderboardSnapshotFactory
 {
-    private sealed record LifecyclePayload(
-        int SchemaVersion,
-        CompetitionStatus From,
-        CompetitionStatus To,
-        bool Automatic,
-        string? Reason);
-
-    private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
     private readonly IFusionCache cache = caches.GetCache(NoCtfCacheNames.Leaderboards);
     private readonly LeaderboardProjectionKeyedLock keyedLock = projectionKeyedLock ?? new();
     private readonly TimeProvider timeProvider = clock ?? TimeProvider.System;
@@ -43,7 +36,7 @@ public sealed class FusionLeaderboardCache(
     public async Task<ScoreboardProjection?> GetFrozenScoreboardAsync(Guid competitionId, CancellationToken ct)
         => (await GetFrozenBundleAsync(competitionId, ct))?.Scoreboard;
 
-    private async Task<ScoreboardProjectionBundle?> GetFrozenBundleAsync(
+    private async Task<CachedScoreboardProjection?> GetFrozenBundleAsync(
         Guid competitionId,
         CancellationToken ct)
     {
@@ -55,12 +48,6 @@ public sealed class FusionLeaderboardCache(
             ? null
             : await ProjectBundleAsync(competitionId, null, frozenAt.Value, null, ct);
     }
-
-    public Task<ScoreboardProjectionBundle?> CreateBundleAsync(
-        Guid competitionId,
-        DateTimeOffset projectedAt,
-        CancellationToken ct) =>
-        ProjectBundleAsync(competitionId, null, projectedAt, null, ct);
 
     public async Task<ScoreboardProjection?> CreateScoreboardAsync(
         Guid competitionId,
@@ -87,9 +74,9 @@ public sealed class FusionLeaderboardCache(
         return scoreboard;
     }
 
-    private async Task<ScoreboardProjectionBundle?> ProjectBundleAsync(
+    private async Task<CachedScoreboardProjection?> ProjectBundleAsync(
         Guid competitionId,
-        string? competitionConfigurationJson,
+        CompetitionModeConfiguration? competitionConfiguration,
         DateTimeOffset projectedAt,
         int? scoreboardRoundWindowEnd,
         CancellationToken ct)
@@ -112,7 +99,7 @@ public sealed class FusionLeaderboardCache(
         var trackConfiguration = CompetitionTrackConfiguration.EffectiveFor(
             competition.Mode,
             competition.TracksEnabled,
-            competition.TrackConfigurationJson);
+            competition.Tracks);
         var teams = await db.Teams.AsNoTracking()
             .Where(team => team.CompetitionId == competitionId
                 && (competition.Mode != GameMode.Ctf
@@ -160,14 +147,12 @@ public sealed class FusionLeaderboardCache(
                 templates[instance.ChallengeId].Direction,
                 instance.CustomTitle ?? templates[instance.ChallengeId].Title,
                 false,
-                instance.RulesJson,
+                instance.Rules,
                 instance.Order,
                 instance.IsPublished,
-                templates[instance.ChallengeId].DefinitionJson,
-                templates[instance.ChallengeId].Mode == GameMode.Ctf
-                    ? NoCTF.GameModes.Ctf.Configuration.CtfConfigurationParser
-                        .ParseDefinition(templates[instance.ChallengeId].DefinitionJson)
-                        .InteractionKind
+                templates[instance.ChallengeId].Definition,
+                templates[instance.ChallengeId].Definition is CtfChallengeDefinition ctf
+                    ? ctf.InteractionKind
                     : CtfInteractionKind.FlagSubmission))
             .ToList();
 
@@ -183,16 +168,17 @@ public sealed class FusionLeaderboardCache(
             .ToListAsync(ct);
         var lifecycle = lifecycleEvents.Select(@event =>
         {
-            var payload = JsonSerializer.Deserialize<LifecyclePayload>(@event.PayloadJson, JsonOptions)!;
             return new CompetitionLifecycleTransition
             {
                 Id = @event.Id,
                 CompetitionId = @event.CompetitionId,
-                From = payload.From,
-                To = payload.To,
+                From = @event.PreviousCompetitionStatus
+                    ?? throw new InvalidOperationException("Lifecycle event has no previous status."),
+                To = @event.CompetitionStatus
+                    ?? throw new InvalidOperationException("Lifecycle event has no current status."),
                 ActorId = @event.ActorUserId,
-                Reason = payload.Reason,
-                Automatic = payload.Automatic,
+                Reason = @event.Reason,
+                Automatic = @event.Automatic,
                 OccurredAt = @event.OccurredAt
             };
         }).ToList();
@@ -211,7 +197,7 @@ public sealed class FusionLeaderboardCache(
             competitionId,
             competition.Mode,
             competitionStatusAtProjection,
-            competitionConfigurationJson ?? competition.ConfigurationJson,
+            competitionConfiguration ?? competition.ModeConfiguration,
             competition.StartAt,
             competition.EndAt,
             lifecycle,
@@ -251,7 +237,7 @@ public sealed class FusionLeaderboardCache(
             teamFacts,
             aggregateFacts,
             challenges,
-            competitionConfigurationJson ?? competition.ConfigurationJson,
+            competitionConfiguration ?? competition.ModeConfiguration,
             competition.StartAt,
             lifecycle,
             awdWindow.Rounds,
@@ -318,13 +304,12 @@ public sealed class FusionLeaderboardCache(
         {
             ParticipantView = ScoreboardAudienceView.From(participantScoreboard)
         };
-        return new(scoreboard)
-        {
-            ValidUntil = competition.Mode == GameMode.Awdp
+        return new(
+            scoreboard,
+            competition.Mode == GameMode.Awdp
                 && competitionStatusAtProjection == CompetitionStatus.Running
                 ? scoreboard.Schema.Rounds.SingleOrDefault(round => round.State == ScoreboardRoundState.Running)?.EndAt
-                : null
-        };
+                : null);
     }
 
     private async Task<AwdScoreboardWindow> ReadAwdScoreboardWindowAsync(
@@ -388,33 +373,11 @@ public sealed class FusionLeaderboardCache(
 
     public async Task RefreshAsync(Guid competitionId, CancellationToken ct)
     {
-        if (db.Database.IsInMemory())
-        {
-            var developmentResponse = await ProjectBundleAsync(
-                competitionId, null, timeProvider.GetUtcNow(), null, ct);
-            if (developmentResponse is null)
-                return;
-            var previous = await cache.GetOrDefaultAsync<ScoreboardProjectionBundle?>(
-                ProjectionKey(competitionId), null, token: ct);
-            developmentResponse = AdvanceScoreboardVersion(developmentResponse, previous);
-            await cache.SetAsync(ProjectionKey(competitionId), developmentResponse, token: ct);
-            await cache.RemoveAsync(FailureKey(competitionId), token: ct);
-            await publisher.PublishAsync(developmentResponse.Scoreboard, ct);
-            return;
-        }
-        var closeConnection = db.Database.GetDbConnection().State != ConnectionState.Open;
-        var projectionLockAcquired = false;
         var publicationPhase = false;
-        ScoreboardProjectionBundle? response = null;
+        CachedScoreboardProjection? response = null;
         long? publicationToken = null;
         try
         {
-            if (closeConnection)
-                await db.Database.OpenConnectionAsync(ct);
-            await db.Database.ExecuteSqlInterpolatedAsync(
-                $"SELECT pg_advisory_lock(hashtextextended({competitionId.ToString("N")}, 0))",
-                ct);
-            projectionLockAcquired = true;
             await using var transaction = await db.Database.BeginTransactionAsync(
                 IsolationLevel.RepeatableRead,
                 ct);
@@ -451,7 +414,7 @@ public sealed class FusionLeaderboardCache(
 
             if (publicationFence is null)
             {
-                var previous = await cache.GetOrDefaultAsync<ScoreboardProjectionBundle?>(
+                var previous = await cache.GetOrDefaultAsync<CachedScoreboardProjection?>(
                     ProjectionKey(competitionId), null, token: ct);
                 response = AdvanceScoreboardVersion(response, previous);
             }
@@ -464,14 +427,10 @@ public sealed class FusionLeaderboardCache(
                 response = SetScoreboardVersion(response, publicationToken.Value);
             }
 
-            await ReleaseProjectionLockAsync(competitionId);
-            projectionLockAcquired = false;
-            if (closeConnection)
-                await db.Database.CloseConnectionAsync();
-
             if (publicationFence is not null)
             {
-                var payload = JsonSerializer.Serialize(response, JsonOptions);
+                var payload = JsonSerializer.Serialize(response,
+                    CachedScoreboardJsonContext.Default.CachedScoreboardProjection);
                 var accepted = await publicationFence.TryCommitAsync(
                     competitionId,
                     publicationToken!.Value,
@@ -505,13 +464,6 @@ public sealed class FusionLeaderboardCache(
                 NoCtfTelemetry.RecordLeaderboardPublishFailure("projection");
             await cache.SetAsync(FailureKey(competitionId), timeProvider.GetUtcNow(), token: CancellationToken.None);
             throw;
-        }
-        finally
-        {
-            if (projectionLockAcquired)
-                await ReleaseProjectionLockAsync(competitionId);
-            if (closeConnection && db.Database.GetDbConnection().State == ConnectionState.Open)
-                await db.Database.CloseConnectionAsync();
         }
     }
 
@@ -547,10 +499,10 @@ public sealed class FusionLeaderboardCache(
         return new(failure);
     }
 
-    private static string ProjectionKey(Guid competitionId) => $"scoreboard:v1:{competitionId:N}";
+    private static string ProjectionKey(Guid competitionId) => $"scoreboard:v2:{competitionId:N}";
     private static string FailureKey(Guid competitionId) => $"leaderboard:{competitionId:N}:last-failure";
 
-    private async Task<ScoreboardProjectionBundle?> GetOrRebuildPublishedBundleAsync(
+    private async Task<CachedScoreboardProjection?> GetOrRebuildPublishedBundleAsync(
         Guid competitionId,
         CancellationToken ct)
     {
@@ -582,13 +534,13 @@ public sealed class FusionLeaderboardCache(
         }
     }
 
-    private async Task<ScoreboardProjectionBundle?> GetPublishedBundleAsync(
+    private async Task<CachedScoreboardProjection?> GetPublishedBundleAsync(
         Guid competitionId,
         CancellationToken ct)
     {
         if (publicationFence is null)
         {
-            var unfenced = await cache.GetOrDefaultAsync<ScoreboardProjectionBundle?>(
+            var unfenced = await cache.GetOrDefaultAsync<CachedScoreboardProjection?>(
                 ProjectionKey(competitionId), null, token: ct);
             return IsExpired(unfenced) ? null : unfenced;
         }
@@ -596,22 +548,21 @@ public sealed class FusionLeaderboardCache(
         var published = await publicationFence.GetAsync(competitionId, ct);
         if (published is null)
             return null;
-        var bundle = JsonSerializer.Deserialize<ScoreboardProjectionBundle>(
-            published.Payload,
-            JsonOptions);
+        var bundle = JsonSerializer.Deserialize(published.Payload,
+            CachedScoreboardJsonContext.Default.CachedScoreboardProjection);
         if (bundle is null || bundle.Scoreboard.Snapshot.Version != published.Fence)
             throw new InvalidOperationException("The fenced leaderboard payload is invalid.");
         if (IsExpired(bundle))
             return null;
 
-        var cached = await cache.GetOrDefaultAsync<ScoreboardProjectionBundle?>(
+        var cached = await cache.GetOrDefaultAsync<CachedScoreboardProjection?>(
             ProjectionKey(competitionId), null, token: ct);
         if (cached?.Scoreboard.Snapshot.Version != published.Fence)
             await cache.SetAsync(ProjectionKey(competitionId), bundle, token: ct);
         return bundle;
     }
 
-    private bool IsExpired(ScoreboardProjectionBundle? bundle) =>
+    private bool IsExpired(CachedScoreboardProjection? bundle) =>
         bundle?.ValidUntil is { } validUntil && timeProvider.GetUtcNow() >= validUntil
         || bundle is not null && bundle.Scoreboard.Snapshot.DataScope == LeaderboardDataScope.Live
             && bundle.Scoreboard.Snapshot.Teams.Any(team => team.Achievements is null);
@@ -623,21 +574,15 @@ public sealed class FusionLeaderboardCache(
         var published = await publicationFence.GetAsync(competitionId, ct);
         if (published is null)
             return;
-        var bundle = JsonSerializer.Deserialize<ScoreboardProjectionBundle>(
-            published.Payload,
-            JsonOptions);
+        var bundle = JsonSerializer.Deserialize(published.Payload,
+            CachedScoreboardJsonContext.Default.CachedScoreboardProjection);
         if (bundle is not null && bundle.Scoreboard.Snapshot.Version == published.Fence)
             await cache.SetAsync(ProjectionKey(competitionId), bundle, token: ct);
     }
 
-    private async Task ReleaseProjectionLockAsync(Guid competitionId) =>
-        _ = await db.Database.ExecuteSqlInterpolatedAsync(
-            $"SELECT pg_advisory_unlock(hashtextextended({competitionId.ToString("N")}, 0))",
-            CancellationToken.None);
-
-    private static ScoreboardProjectionBundle AdvanceScoreboardVersion(
-        ScoreboardProjectionBundle candidate,
-        ScoreboardProjectionBundle? previous)
+    private static CachedScoreboardProjection AdvanceScoreboardVersion(
+        CachedScoreboardProjection candidate,
+        CachedScoreboardProjection? previous)
     {
         if (previous is null || candidate.Scoreboard.Snapshot.Version > previous.Scoreboard.Snapshot.Version)
             return candidate;
@@ -668,8 +613,8 @@ public sealed class FusionLeaderboardCache(
         public static AwdScoreboardWindow Empty { get; } = new([], null, null, null);
     }
 
-    private static ScoreboardProjectionBundle SetScoreboardVersion(
-        ScoreboardProjectionBundle candidate,
+    private static CachedScoreboardProjection SetScoreboardVersion(
+        CachedScoreboardProjection candidate,
         long version) => candidate with
         {
             Scoreboard = candidate.Scoreboard with
@@ -684,3 +629,11 @@ public sealed class FusionLeaderboardCache(
             }
         };
 }
+
+internal sealed record CachedScoreboardProjection(
+    ScoreboardProjection Scoreboard,
+    DateTimeOffset? ValidUntil = null);
+
+[JsonSourceGenerationOptions(JsonSerializerDefaults.Web)]
+[JsonSerializable(typeof(CachedScoreboardProjection))]
+internal partial class CachedScoreboardJsonContext : JsonSerializerContext;

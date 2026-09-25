@@ -48,6 +48,7 @@ try {
         Write-Host '[RUN] Integration tests (Docker available)'
         dotnet $testAssembly `
             --treenode-filter '/*/*/*/*[Category=Integration]' `
+            --maximum-parallel-tests 1 `
             --minimum-expected-tests 38
         Complete-NativeStep 'Integration tests'
         $integrationResult = 'PASSED'
@@ -61,13 +62,12 @@ try {
 
     Write-Host '[RUN] EF migration drift check'
     dotnet ef migrations has-pending-model-changes `
-        --project .\src\NoCTF.Infrastructure\NoCTF.Infrastructure.csproj `
-        --startup-project .\src\NoCTF.API\NoCTF.API.csproj
+        --project .\src\NoCTF.Persistence.PostgreSql\NoCTF.Persistence.PostgreSql.csproj
     Complete-NativeStep 'EF migration drift check'
 
     if (-not $SkipOpenApi) {
         Write-Host '[RUN] OpenAPI export'
-        dotnet run --project .\src\NoCTF.API\NoCTF.API.csproj `
+        dotnet run --project .\src\NoCTF.Host\NoCTF.Host.csproj `
             --no-launch-profile `
             -- `
             --export-openapi

@@ -58,7 +58,7 @@ public interface IRuntimeStopMessage : IRunnerNodeMessage
 
 public sealed record RuntimeStopWork(
     RuntimeProvider Provider,
-    string? ProviderReceiptJson,
+    RuntimeReceiptData? ProviderReceipt,
     RuntimeKind RuntimeKind = RuntimeKind.Container);
 
 public enum RuntimeProvisionWorkStatus
@@ -84,7 +84,7 @@ public sealed record RuntimeProvisioned(
     Guid RuntimeInstanceId,
     string RunnerId,
     RuntimeProvider Provider,
-    string ProviderReceiptJson,
+    RuntimeReceiptData ProviderReceipt,
     IReadOnlyList<RuntimeAccessEndpointMapping> AccessEndpoints,
     DateTimeOffset? ExpiresAt,
     IReadOnlyList<RuntimePublishedPortMapping>? PublishedPorts = null);

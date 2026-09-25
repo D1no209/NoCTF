@@ -22,16 +22,6 @@ public sealed record LeaderboardProcessingResponse(
     string StatusUrl);
 public sealed record LeaderboardCacheStatus(DateTimeOffset? LastFailureAt);
 
-public sealed record ScoreboardProjectionBundle(ScoreboardProjection Scoreboard)
-{
-    /// <summary>
-    /// The first wall-clock boundary after which this time-derived projection must be
-    /// rebuilt even when no business event has been committed. This is cache metadata,
-    /// not persisted scheduling state.
-    /// </summary>
-    public DateTimeOffset? ValidUntil { get; init; }
-}
-
 public interface ILeaderboardCache
 {
     Task<ScoreboardProjection?> GetScoreboardAsync(Guid competitionId, CancellationToken cancellationToken) =>
@@ -48,11 +38,6 @@ public interface ILeaderboardCache
 
 public interface ILeaderboardSnapshotFactory
 {
-    Task<ScoreboardProjectionBundle?> CreateBundleAsync(
-        Guid competitionId,
-        DateTimeOffset projectedAt,
-        CancellationToken cancellationToken);
-
     Task<ScoreboardProjection?> CreateScoreboardAsync(
         Guid competitionId,
         DateTimeOffset projectedAt,

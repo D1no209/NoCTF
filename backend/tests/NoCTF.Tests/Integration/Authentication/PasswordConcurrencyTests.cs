@@ -31,7 +31,7 @@ public sealed class PasswordConcurrencyTests
             await using var changeDb = new NoCtfDbContext(options); await using var resetDb = new NoCtfDbContext(options);
             var change = new AuthenticationStore(changeDb, hasher).ChangePasswordAsync(user.Id, "old-password", "changed-password", DateTimeOffset.UtcNow, ct);
             var reset = new PasswordResetStore(resetDb, hasher, Substitute.For<IEmailVerificationConfigurationStore>(),
-                Substitute.For<IEmailVerificationDeliveryConfigurationReader>(), new NoOpTransactionalMessageOutbox())
+                Substitute.For<IEmailVerificationDeliveryConfigurationReader>(), new NoOpPostCommitMessagePublisher())
                 .CompleteAsync(token, "reset-password", DateTimeOffset.UtcNow, ct);
             await Task.WhenAll(change, reset);
             await Assert.That((await change == ChangePasswordState.Changed ? 1 : 0) + (await reset == PasswordResetCompletionState.Reset ? 1 : 0)).IsEqualTo(1);

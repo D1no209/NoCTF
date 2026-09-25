@@ -172,8 +172,9 @@ public sealed class AdminPatchDownloadHttpTests
                     .Where(x => x.Key is Role.Administrator or Role.Owner or Role.Manager or Role.Judge).Select(x => (Guid?)x.Value));
                 await Assert.That(events.All(x => x.Visibility == CompetitionEventVisibility.Staff && x.GameplayFactId == fixture.FactId
                     && x.TeamId == fixture.TeamId && x.RelatedId == fixture.FileId && x.OccurredAt >= fixture.Scope.Now)).IsTrue();
-                await Assert.That(events.All(x => !x.PayloadJson.Contains(fixture.ObjectKey, StringComparison.Ordinal)
-                    && !x.PayloadJson.Contains("sensitive-patch-content", StringComparison.Ordinal))).IsTrue();
+                await Assert.That(events.All(x => x.Reason is null
+                    || !x.Reason.Contains(fixture.ObjectKey, StringComparison.Ordinal)
+                    && !x.Reason.Contains("sensitive-patch-content", StringComparison.Ordinal))).IsTrue();
                 var audits = await new PlatformAuditLogStore(verify).QueryAsync(new(PlatformAuditKind.CompetitionEvent, null, null,
                     fixture.Scope.Id, null, null, null, 100), ct);
                 await Assert.That(audits.Count).IsEqualTo(successful);
@@ -248,8 +249,8 @@ public sealed class AdminPatchDownloadHttpTests
             ByteLength = content.Length, Sha256 = SHA256.HashData(content), CreatedAt = scope.Now });
         patch.FileId = fileId;
         var flagId = Guid.NewGuid();
-        db.GameplayFacts.Add(new GameplayFact { Id = flagId, CompetitionId = scope.Id, CompetitionChallengeId = fact.CompetitionChallengeId,
-            TeamId = fact.TeamId, ActorUserId = roles[Role.Participant], Kind = GameplayFactKind.FlagAttempt, State = GameplayFactState.Completed,
+        db.GameplayFacts.Add(new FlagAttemptGameplayFact { Id = flagId, CompetitionId = scope.Id, CompetitionChallengeId = fact.CompetitionChallengeId,
+            TeamId = fact.TeamId, ActorUserId = roles[Role.Participant], State = GameplayFactState.Completed,
             Result = GameplayFactResult.Wrong, Value = "flag{test}", ValueSha256 = new byte[32], OccurredAt = scope.Now, UpdatedAt = scope.Now });
         await db.SaveChangesAsync(ct);
         await using var bytes = new MemoryStream(content);

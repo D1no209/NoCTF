@@ -215,8 +215,9 @@ public static class ComposeRuntimeDefinitionPolicy
                     CultureInfo.InvariantCulture));
             SetScalar(service, "pids_limit", limits.PidsLimit.ToString(CultureInfo.InvariantCulture));
             SetScalar(service, "privileged", "false");
-            SetSequence(service, "cap_drop", ["ALL"]);
             SetSequence(service, "security_opt", ["no-new-privileges:true"]);
+            SetSequence(service, "cap_drop", []);
+            SetSequence(service, "cap_add", []);
             SetDockerLogging(service, logMaxSizeBytes, logMaxFiles);
             MergeMappingValues(service, "environment", request.Environment);
             MergeServiceEnvironment(serviceName, service, request.ServiceEnvironment);

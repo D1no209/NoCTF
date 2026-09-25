@@ -12,7 +12,6 @@ public sealed class SsoContractTests
     {
         var configuration = new SsoConfiguration();
 
-        await Assert.That(configuration.SchemaVersion).IsEqualTo(1);
         await Assert.That(configuration.Enabled).IsFalse();
         await Assert.That(configuration.Providers).IsEmpty();
     }
@@ -27,24 +26,20 @@ public sealed class SsoContractTests
             PublicBaseUrl = "https://ctf.example.test",
             Providers =
             [
-                new SsoProviderConfiguration
+                new OidcSsoProviderConfiguration
                 {
                     Id = providerId,
                     Name = "Example OIDC",
                     IconUrl = "https://cdn.example.test/identity/example.png",
-                    Protocol = SsoProtocol.Oidc,
                     Enabled = true,
                     AllowLogin = true,
                     AllowBinding = true,
                     AllowedHosts = ["id.example.test"],
-                    Oidc = new OidcSsoProviderConfiguration
-                    {
-                        Issuer = "https://id.example.test",
-                        DiscoveryUrl = "https://id.example.test/.well-known/openid-configuration",
-                        ClientId = "noctf",
-                        ClientSecretCiphertext = [1, 2, 3],
-                        Scopes = ["openid", "profile"]
-                    }
+                    Issuer = "https://id.example.test",
+                    DiscoveryUrl = "https://id.example.test/.well-known/openid-configuration",
+                    ClientId = "noctf",
+                    ClientSecretCiphertext = [1, 2, 3],
+                    Scopes = ["openid", "profile"]
                 }
             ]
         };

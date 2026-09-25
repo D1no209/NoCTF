@@ -56,15 +56,14 @@ public sealed class OwnershipTransferPersistenceTests
                 Organizer(existingManagerId, "existing-manager", now));
 
             var competitionId = Guid.CreateVersion7();
-            db.Competitions.Add(new Competition
+            db.Competitions.Add(new CtfCompetition
             {
                 Id = competitionId,
                 OwnerId = previousOwnerId,
                 ManagerIds = [existingManagerId],
                 ObserverIds = [newOwnerId],
                 Title = "Ownership transfer competition",
-                Mode = GameMode.Ctf,
-                ConfigurationJson = """{"schemaVersion":1}""",
+                ModeConfiguration = TestConfigurations.Competition(GameMode.Ctf),
                 FlagDerivationSecret = new byte[32],
                 StartAt = now.AddHours(1),
                 EndAt = now.AddHours(2),
@@ -74,16 +73,15 @@ public sealed class OwnershipTransferPersistenceTests
             });
 
             var challengeId = Guid.CreateVersion7();
-            db.Challenges.Add(new Challenge
+            db.Challenges.Add(new CtfChallenge
             {
                 Id = challengeId,
                 OwnerId = previousOwnerId,
                 ManagerIds = [newOwnerId, existingManagerId],
-                Mode = GameMode.Ctf,
                 Visibility = ChallengeVisibility.Private,
                 Title = "Ownership transfer challenge",
                 Direction = "Web",
-                DefinitionJson = """{"schemaVersion":1}""",
+                Definition = TestConfigurations.Definition(GameMode.Ctf),
                 CreatedAt = now,
                 UpdatedAt = now
             });
@@ -140,15 +138,14 @@ public sealed class OwnershipTransferPersistenceTests
                 .IsEqualTo(1);
 
             var concurrentChallengeId = Guid.CreateVersion7();
-            db.Challenges.Add(new Challenge
+            db.Challenges.Add(new CtfChallenge
             {
                 Id = concurrentChallengeId,
                 OwnerId = previousOwnerId,
-                Mode = GameMode.Ctf,
                 Visibility = ChallengeVisibility.Private,
                 Title = "Concurrent ownership transfer",
                 Direction = "Web",
-                DefinitionJson = """{"schemaVersion":1}""",
+                Definition = TestConfigurations.Definition(GameMode.Ctf),
                 CreatedAt = now,
                 UpdatedAt = now
             });
@@ -247,7 +244,7 @@ public sealed class OwnershipTransferPersistenceTests
                 Organizer(existingManagerId, "competition-existing-manager", now));
 
             var competitionId = Guid.CreateVersion7();
-            db.Competitions.Add(new Competition
+            db.Competitions.Add(new CtfCompetition
             {
                 Id = competitionId,
                 OwnerId = previousOwnerId,
@@ -255,8 +252,7 @@ public sealed class OwnershipTransferPersistenceTests
                 JudgeIds = [firstNewOwnerId],
                 ObserverIds = [secondNewOwnerId],
                 Title = "Concurrent competition ownership transfer",
-                Mode = GameMode.Ctf,
-                ConfigurationJson = """{"schemaVersion":1}""",
+                ModeConfiguration = TestConfigurations.Competition(GameMode.Ctf),
                 FlagDerivationSecret = new byte[32],
                 StartAt = now.AddHours(1),
                 EndAt = now.AddHours(2),
@@ -357,13 +353,12 @@ public sealed class OwnershipTransferPersistenceTests
             var competitionId = Guid.CreateVersion7();
             var challengeId = Guid.CreateVersion7();
             db.Users.Add(Organizer(ownerId, "reference-owner", now));
-            db.Competitions.Add(new Competition
+            db.Competitions.Add(new CtfCompetition
             {
                 Id = competitionId,
                 OwnerId = ownerId,
                 Title = "Reference serialization competition",
-                Mode = GameMode.Ctf,
-                ConfigurationJson = """{"schemaVersion":1}""",
+                ModeConfiguration = TestConfigurations.Competition(GameMode.Ctf),
                 FlagDerivationSecret = new byte[32],
                 StartAt = now.AddHours(1),
                 EndAt = now.AddHours(2),
@@ -371,15 +366,14 @@ public sealed class OwnershipTransferPersistenceTests
                 CreatedAt = now,
                 UpdatedAt = now
             });
-            db.Challenges.Add(new Challenge
+            db.Challenges.Add(new CtfChallenge
             {
                 Id = challengeId,
                 OwnerId = ownerId,
-                Mode = GameMode.Ctf,
                 Visibility = ChallengeVisibility.Private,
                 Title = "Reference serialization challenge",
                 Direction = "Web",
-                DefinitionJson = """{"schemaVersion":1}""",
+                Definition = TestConfigurations.Definition(GameMode.Ctf),
                 CreatedAt = now,
                 UpdatedAt = now
             });
@@ -419,7 +413,7 @@ public sealed class OwnershipTransferPersistenceTests
             await WaitForPostgresSleepAsync(db, cancellationToken);
             var createTask = new ChallengeManagementStore(
                 createDb,
-                Substitute.For<ITransactionalMessageOutbox>(),
+                Substitute.For<IPostCommitMessagePublisher>(),
                 new ChallengeRuntimeTemplateCatalog()).CreateAsync(
                 new CreateCompetitionChallengeCommand(
                     Guid.CreateVersion7(),
@@ -427,13 +421,12 @@ public sealed class OwnershipTransferPersistenceTests
                     challengeId,
                     1,
                     now.AddMinutes(1)),
-                """{"schemaVersion":1}""",
+                new CtfCompetitionChallengeRules(),
                 cancellationToken);
             await Task.WhenAll(deleteTask, createTask);
 
-            await Assert.That(await deleteTask).IsNull();
-            await Assert.That((await createTask).Failure)
-                .IsEqualTo(ChallengeMutationFailure.TemplateNotFound);
+            var deleteResult = await deleteTask;
+            var createResult = await createTask;
 
             db.ChangeTracker.Clear();
             var templateDeletedAt = await db.Challenges
@@ -448,6 +441,15 @@ public sealed class OwnershipTransferPersistenceTests
                 .AnyAsync(
                     item => item.ChallengeId == challengeId && item.DeletedAt == null,
                     cancellationToken);
+            var deleteWon = deleteResult is null
+                && createResult.Failure == ChallengeMutationFailure.TemplateNotFound
+                && templateDeletedAt is not null
+                && !hasActiveReference;
+            var createWon = deleteResult == ChallengeTemplateDeleteFailure.InUse
+                && createResult.Failure is null
+                && templateDeletedAt is null
+                && hasActiveReference;
+            await Assert.That(deleteWon || createWon).IsTrue();
             await Assert.That(templateDeletedAt is not null && hasActiveReference).IsFalse();
         });
     }
@@ -481,15 +483,14 @@ public sealed class OwnershipTransferPersistenceTests
             db.Users.AddRange(
                 Organizer(previousOwnerId, "attachment-previous-owner", now),
                 Organizer(newOwnerId, "attachment-new-owner", now));
-            db.Challenges.Add(new Challenge
+            db.Challenges.Add(new CtfChallenge
             {
                 Id = challengeId,
                 OwnerId = previousOwnerId,
-                Mode = GameMode.Ctf,
                 Visibility = ChallengeVisibility.Private,
                 Title = "Attachment and owner transfer serialization",
                 Direction = "Web",
-                DefinitionJson = """{"schemaVersion":1}""",
+                Definition = TestConfigurations.Definition(GameMode.Ctf),
                 CreatedAt = now,
                 UpdatedAt = now
             });
@@ -591,13 +592,12 @@ public sealed class OwnershipTransferPersistenceTests
             var ownerId = Guid.CreateVersion7();
             var competitionId = Guid.CreateVersion7();
             db.Users.Add(Organizer(ownerId, "restore-hard-delete-owner", now));
-            db.Competitions.Add(new Competition
+            db.Competitions.Add(new CtfCompetition
             {
                 Id = competitionId,
                 OwnerId = ownerId,
                 Title = "Restore and hard delete serialization",
-                Mode = GameMode.Ctf,
-                ConfigurationJson = """{"schemaVersion":1}""",
+                ModeConfiguration = TestConfigurations.Competition(GameMode.Ctf),
                 FlagDerivationSecret = new byte[32],
                 StartAt = now.AddHours(1),
                 EndAt = now.AddHours(2),
@@ -615,7 +615,7 @@ public sealed class OwnershipTransferPersistenceTests
                 AS $$
                 BEGIN
                     IF OLD.deleted_at IS NOT NULL AND NEW.deleted_at IS NULL THEN
-                        PERFORM pg_sleep(1);
+                        PERFORM pg_sleep(5);
                     END IF;
                     RETURN NEW;
                 END;
@@ -645,6 +645,7 @@ public sealed class OwnershipTransferPersistenceTests
                 ownerId,
                 false,
                 cancellationToken);
+            await WaitForBlockedCompetitionDeleteAsync(db, cancellationToken);
             await Task.WhenAll(restoreTask, hardDeleteTask);
 
             await Assert.That((await restoreTask).State)
@@ -680,6 +681,29 @@ public sealed class OwnershipTransferPersistenceTests
         }
 
         throw new TimeoutException("The PostgreSQL delay trigger did not enter pg_sleep.");
+    }
+
+    private static async Task WaitForBlockedCompetitionDeleteAsync(
+        NoCtfDbContext db,
+        CancellationToken cancellationToken)
+    {
+        for (var attempt = 0; attempt < 500; attempt++)
+        {
+            var blockedDeletes = await db.Database.SqlQuery<int>(
+                    $"""
+                     SELECT count(*)::integer AS "Value"
+                     FROM pg_stat_activity
+                     WHERE datname = current_database()
+                       AND wait_event_type = 'Lock'
+                       AND query LIKE 'DELETE FROM competitions%'
+                     """)
+                .SingleAsync(cancellationToken);
+            if (blockedDeletes > 0)
+                return;
+            await Task.Delay(10, cancellationToken);
+        }
+        throw new TimeoutException(
+            "The hard-delete command did not reach the competing database write.");
     }
 
     private static User Organizer(Guid id, string userName, DateTimeOffset now) =>

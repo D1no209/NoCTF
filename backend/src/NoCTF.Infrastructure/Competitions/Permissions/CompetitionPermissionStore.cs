@@ -14,12 +14,12 @@ namespace NoCTF.Infrastructure.Competitions.Permissions;
 public sealed class CompetitionPermissionStore(
     NoCtfDbContext db,
     TimeProvider? clock = null,
-    ITransactionalMessageOutbox? messageOutbox = null,
+    IPostCommitMessagePublisher? messageOutbox = null,
     ICompetitionEventRecorder? eventRecorder = null) : ICompetitionPermissionStore
 {
     private readonly TimeProvider timeProvider = clock ?? TimeProvider.System;
-    private readonly ITransactionalMessageOutbox outbox =
-        messageOutbox ?? new NoOpTransactionalMessageOutbox();
+    private readonly IPostCommitMessagePublisher outbox =
+        messageOutbox ?? new NoOpPostCommitMessagePublisher();
     private readonly ICompetitionEventRecorder events =
         eventRecorder ?? NullCompetitionEventRecorder.Instance;
     public async Task<CompetitionPermissionSnapshotResult> GetSnapshotAsync(
@@ -35,9 +35,15 @@ public sealed class CompetitionPermissionStore(
             .Select(competition => new CompetitionPermissionSnapshot(
                 competition.Id,
                 competition.OwnerId,
-                competition.ManagerIds,
-                competition.JudgeIds,
-                competition.ObserverIds))
+                competition.Collaborators.Where(item =>
+                        item.Role == CompetitionCollaboratorRole.Manager)
+                    .Select(item => item.UserId).ToArray(),
+                competition.Collaborators.Where(item =>
+                        item.Role == CompetitionCollaboratorRole.Judge)
+                    .Select(item => item.UserId).ToArray(),
+                competition.Collaborators.Where(item =>
+                        item.Role == CompetitionCollaboratorRole.Observer)
+                    .Select(item => item.UserId).ToArray()))
             .SingleOrDefaultAsync(ct);
         if (snapshot is null)
             return new(CompetitionPermissionSnapshotState.NotFound);
@@ -91,9 +97,34 @@ public sealed class CompetitionPermissionStore(
         UpdateCompetitionPermissionsCommand command,
         CancellationToken ct)
     {
-        await using var transaction = await AggregateCompatibleTransaction.BeginAsync(db, ct);
+        for (var attempt = 0; ; attempt++)
+        {
+            try
+            {
+                return await UpdateOnceAsync(command, ct);
+            }
+            catch (Exception exception) when (attempt < 2
+                && exception is not DbUpdateConcurrencyException
+                && RelationalRetry.IsTransientConcurrency(exception))
+            {
+                db.ChangeTracker.Clear();
+                await Task.Delay(TimeSpan.FromMilliseconds(Random.Shared.Next(5, 31)), ct);
+            }
+        }
+    }
+
+    private async Task<CompetitionPermissionUpdateResult> UpdateOnceAsync(
+        UpdateCompetitionPermissionsCommand command,
+        CancellationToken ct)
+    {
+        await using var transaction = await AggregateCompatibleTransaction.BeginAsync(
+            db,
+            System.Data.IsolationLevel.Serializable,
+            ct);
         await CompetitionStateReader.ReadAsync(db, command.CompetitionId, ct);
-        var competition = await db.Competitions.SingleOrDefaultAsync(
+        var competition = await db.Competitions
+            .Include(item => item.Collaborators)
+            .SingleOrDefaultAsync(
             item => item.Id == command.CompetitionId && item.DeletedAt == null,
             ct);
         if (competition is null)
@@ -176,10 +207,18 @@ public sealed class CompetitionPermissionStore(
                 PreviousCompetitionAccessMode: competition.AccessMode,
                 CompetitionAudienceChangeKind: CompetitionAudienceChangeKind.Collaborators), ct);
         }
-        await db.SaveChangesAsync(ct);
+        try
+        {
+            await db.SaveChangesAsync(ct);
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            await transaction.RollbackAsync(ct);
+            return new(CompetitionPermissionUpdateState.Conflict);
+        }
         await transaction.CommitAsync(ct);
         if (audienceChanged)
-            await outbox.FlushOutgoingMessagesAsync();
+            await transaction.FlushMessagesAsync(outbox);
         return new(CompetitionPermissionUpdateState.Updated);
     }
 }
