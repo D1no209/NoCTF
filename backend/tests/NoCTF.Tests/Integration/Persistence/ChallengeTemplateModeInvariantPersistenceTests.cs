@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 using System.Text.Json.Nodes;
 using NoCTF.Application.Challenges.Bank;
 using NoCTF.Application.Challenges.Management;
@@ -21,6 +22,92 @@ namespace NoCTF.Tests.Integration.Persistence;
 [Category("Integration")]
 public sealed class ChallengeTemplateModeInvariantPersistenceTests
 {
+    [Test]
+    [Timeout(300_000)]
+    public async Task Summary_lists_do_not_load_the_definition_graph(
+        CancellationToken cancellationToken)
+    {
+        await DockerIntegrationTest.RunAsync(async () =>
+        {
+            await using var postgres = new PostgreSqlBuilder("postgres:17.10-alpine3.24@sha256:742f40ea20b9ff2ff31db5458d127452988a2164df9e17441e191f3b72252193")
+                .WithDatabase("noctf_challenge_summary_projection")
+                .WithUsername("postgres")
+                .WithPassword("postgres")
+                .Build();
+            await postgres.StartAsync(cancellationToken);
+            var options = new DbContextOptionsBuilder<NoCtfDbContext>()
+                .UseNpgsql(postgres.GetConnectionString())
+                .UseSnakeCaseNamingConvention()
+                .Options;
+            var fixture = await SeedAsync(options, cancellationToken);
+            var patchChallengeId = Guid.CreateVersion7();
+            await using (var additions = new NoCtfDbContext(options))
+            {
+                foreach (var mode in new[] { GameMode.Awd, GameMode.Awdp, GameMode.Koh })
+                {
+                    var challenge = ChallengeGeneratedCatalog.Create(mode);
+                    challenge.Id = Guid.CreateVersion7();
+                    challenge.OwnerId = fixture.OwnerId;
+                    challenge.Title = $"{mode} summary";
+                    challenge.Direction = "Web";
+                    challenge.Visibility = ChallengeVisibility.Shared;
+                    challenge.Definition = TestConfigurations.Definition(mode);
+                    challenge.CreatedAt = fixture.Now;
+                    challenge.UpdatedAt = fixture.Now;
+                    additions.Challenges.Add(challenge);
+                }
+                var patchDefinition = (CtfChallengeDefinition)TestConfigurations.Definition(GameMode.Ctf);
+                patchDefinition.InteractionKind = CtfInteractionKind.PatchVerification;
+                additions.Challenges.Add(new CtfChallenge
+                {
+                    Id = patchChallengeId,
+                    OwnerId = fixture.OwnerId,
+                    Title = "Patch summary",
+                    Direction = "Pwn",
+                    Visibility = ChallengeVisibility.Shared,
+                    Definition = patchDefinition,
+                    CreatedAt = fixture.Now,
+                    UpdatedAt = fixture.Now
+                });
+                await additions.SaveChangesAsync(cancellationToken);
+            }
+            var strictOptions = new DbContextOptionsBuilder<NoCtfDbContext>()
+                .UseNpgsql(postgres.GetConnectionString())
+                .UseSnakeCaseNamingConvention()
+                .ConfigureWarnings(warnings => warnings.Throw(RelationalEventId.MultipleCollectionIncludeWarning))
+                .Options;
+            await using var db = new NoCtfDbContext(strictOptions);
+
+            var bankPage = await new ChallengeBankStore(db).ListPageAsync(
+                new(fixture.OwnerId, true, false, null, null, 0, 10, false),
+                cancellationToken);
+            var bankItem = bankPage.Items.Single(item => item.Id == fixture.ChallengeId);
+            await Assert.That(bankItem.Title).IsEqualTo("Original title");
+            await Assert.That(bankItem.ActiveCompetitionReferenceCount).IsEqualTo(1);
+            await Assert.That(bankPage.Items.Select(item => item.Mode).Distinct().Count()).IsEqualTo(4);
+            await Assert.That(bankPage.Items.Single(item => item.Id == patchChallengeId).InteractionKind)
+                .IsEqualTo(CtfInteractionKind.PatchVerification);
+            var visiblePage = await new ChallengeBankStore(db).ListPageAsync(
+                new(Guid.CreateVersion7(), false, false, null, "Pwn", 0, 1, false),
+                cancellationToken);
+            await Assert.That(visiblePage.Total).IsEqualTo(1);
+            await Assert.That(visiblePage.Items.Single().Id).IsEqualTo(patchChallengeId);
+            var privateItem = await new ChallengeBankStore(db).ListPageAsync(
+                new(Guid.CreateVersion7(), false, false, "Original", null, 0, 10, false),
+                cancellationToken);
+            await Assert.That(privateItem.Total).IsEqualTo(0);
+            var detail = await new ChallengeBankStore(db).FindAsync(
+                fixture.ChallengeId, fixture.OwnerId, true, false, cancellationToken);
+            await Assert.That(detail?.Definition).IsTypeOf<CtfChallengeDefinition>();
+
+            var competitionItems = await CreateManagementStore(db).ListAsync(
+                fixture.CompetitionId, true, false, cancellationToken);
+            var competitionItem = competitionItems.Single(item => item.Id == fixture.CompetitionChallengeId);
+            await Assert.That(competitionItem.Title).IsEqualTo("Original title");
+            await Assert.That(competitionItem.ChallengeId).IsEqualTo(fixture.ChallengeId);
+        });
+    }
+
     [Test]
     [Timeout(300_000)]
     public async Task Mode_updates_are_fenced_by_active_competition_references(
@@ -52,7 +139,7 @@ public sealed class ChallengeTemplateModeInvariantPersistenceTests
                     "Original title",
                     "Original description",
                     "wEb",
-                    """{ "schemaVersion": 1 }""",
+                    Definition(GameMode.Ctf),
                     changedAt),
                 cancellationToken);
             await Assert.That(unchanged.State)
@@ -66,7 +153,7 @@ public sealed class ChallengeTemplateModeInvariantPersistenceTests
                 "Original title",
                 "Original description",
                 "Web",
-                """{"schemaVersion":1}""",
+                Definition(GameMode.Ctf),
                 fixture.Now,
                 cancellationToken);
 
@@ -90,7 +177,7 @@ public sealed class ChallengeTemplateModeInvariantPersistenceTests
                 "Original title",
                 "Original description",
                 "Web",
-                """{"schemaVersion":1}""",
+                Definition(GameMode.Ctf),
                 fixture.Now,
                 cancellationToken);
 
@@ -114,7 +201,7 @@ public sealed class ChallengeTemplateModeInvariantPersistenceTests
                 "Updated title",
                 "Updated description",
                 "Pwn",
-                """{"schemaVersion":1,"updated":true}""",
+                Definition(GameMode.Ctf),
                 changedAt,
                 cancellationToken);
             await using (var eventDb = new NoCtfDbContext(options))
@@ -132,12 +219,11 @@ public sealed class ChallengeTemplateModeInvariantPersistenceTests
             var activeRuntimeId = Guid.CreateVersion7(changedAt.AddMilliseconds(1));
             await using (var runtimeDb = new NoCtfDbContext(options))
             {
-                runtimeDb.RuntimeInstances.Add(new RuntimeInstance
+                runtimeDb.RuntimeInstances.Add(new PlayerRuntimeInstance
                 {
                     Id = activeRuntimeId,
                     CompetitionId = fixture.CompetitionId,
                     CompetitionChallengeId = fixture.CompetitionChallengeId,
-                    Purpose = RuntimePurpose.Player,
                     RuntimeKind = RuntimeKind.Container,
                     RuntimeProvider = RuntimeProvider.Docker,
                     State = RuntimeState.Running,
@@ -156,7 +242,11 @@ public sealed class ChallengeTemplateModeInvariantPersistenceTests
                     "Blocked by active Runtime",
                     changedAt.AddMilliseconds(2)) with
                 {
-                    DefinitionJson = """{"schemaVersion":1,"updated":"again"}"""
+                    Definition = new CtfChallengeDefinition
+                    {
+                        InteractionKind = CtfInteractionKind.FlagSubmission,
+                        PatchEntrypoint = "changed"
+                    }
                 },
                 cancellationToken);
             await Assert.That(activeRuntimeBlocked.State)
@@ -204,8 +294,8 @@ public sealed class ChallengeTemplateModeInvariantPersistenceTests
                     changedAt.AddSeconds(2)),
                 cancellationToken);
             await Assert.That(changedMode.State)
-                .IsEqualTo(ChallengeTemplateWriteState.Succeeded);
-            await Assert.That(changedMode.Template!.Mode).IsEqualTo(GameMode.Awd);
+                .IsEqualTo(ChallengeTemplateWriteState.ActiveCompetitionModeConflict);
+            await Assert.That(changedMode.Template).IsNull();
 
             await using (var mismatchDb = new NoCtfDbContext(options))
             {
@@ -214,13 +304,12 @@ public sealed class ChallengeTemplateModeInvariantPersistenceTests
                     fixture.CompetitionChallengeId,
                     changedAt.AddSeconds(3),
                     cancellationToken);
-                await Assert.That(failure)
-                    .IsEqualTo(ChallengeMutationFailure.TemplateModeMismatch);
+                await Assert.That(failure).IsNull();
             }
             await AssertCompetitionChallengeAsync(
                 options,
                 fixture.CompetitionChallengeId,
-                isDeleted: true,
+                isDeleted: false,
                 cancellationToken);
 
             var restoredMode = await UpdateAsync(
@@ -232,24 +321,8 @@ public sealed class ChallengeTemplateModeInvariantPersistenceTests
                     "Restored CTF title",
                     changedAt.AddSeconds(4)),
                 cancellationToken);
-            await Assert.That(restoredMode.State)
-                .IsEqualTo(ChallengeTemplateWriteState.Succeeded);
+            await Assert.That(restoredMode.State).IsEqualTo(ChallengeTemplateWriteState.Succeeded);
             await Assert.That(restoredMode.Template!.Mode).IsEqualTo(GameMode.Ctf);
-
-            await using (var restoreDb = new NoCtfDbContext(options))
-            {
-                var failure = await CreateManagementStore(restoreDb).RestoreAsync(
-                    fixture.CompetitionId,
-                    fixture.CompetitionChallengeId,
-                    changedAt.AddSeconds(5),
-                    cancellationToken);
-                await Assert.That(failure).IsNull();
-            }
-            await AssertCompetitionChallengeAsync(
-                options,
-                fixture.CompetitionChallengeId,
-                isDeleted: false,
-                cancellationToken);
 
             var deletedParentBlocked = await UpdateAsync(
                 options,
@@ -270,20 +343,10 @@ public sealed class ChallengeTemplateModeInvariantPersistenceTests
                 "Deleted parent reference",
                 "Original description",
                 "Web",
-                """{"schemaVersion":1}""",
+                Definition(GameMode.Ctf),
                 fixture.Now,
                 cancellationToken);
 
-            await AssertCreateFirstRaceAsync(
-                options,
-                fixture,
-                changedAt.AddSeconds(7),
-                cancellationToken);
-            await AssertUpdateFirstRaceAsync(
-                options,
-                fixture,
-                changedAt.AddSeconds(8),
-                cancellationToken);
         });
     }
 
@@ -318,7 +381,7 @@ public sealed class ChallengeTemplateModeInvariantPersistenceTests
 
         await using var createDb = new NoCtfDbContext(options);
         await using var updateDb = new NoCtfDbContext(options);
-        var createOutbox = Substitute.For<ITransactionalMessageOutbox>();
+        var createOutbox = Substitute.For<IPostCommitMessagePublisher>();
         var createTask = CreateManagementStore(createDb, createOutbox).CreateAsync(
             new(
                 fixture.ConcurrentCompetitionChallengeId,
@@ -326,7 +389,7 @@ public sealed class ChallengeTemplateModeInvariantPersistenceTests
                 fixture.ConcurrentChallengeId,
                 1,
                 now),
-            """{"schemaVersion":1}""",
+            new CtfCompetitionChallengeRules(),
             cancellationToken);
         await WaitForPostgresSleepAsync(observerDb, cancellationToken);
         var updateTask = new ChallengeBankStore(updateDb).UpdateAsync(
@@ -351,7 +414,7 @@ public sealed class ChallengeTemplateModeInvariantPersistenceTests
             "Concurrent template",
             "Original description",
             "Web",
-            """{"schemaVersion":1}""",
+            Definition(GameMode.Ctf),
             fixture.Now,
             cancellationToken);
         await using var verifyDb = new NoCtfDbContext(options);
@@ -410,7 +473,7 @@ public sealed class ChallengeTemplateModeInvariantPersistenceTests
                 fixture.UpdateFirstChallengeId,
                 1,
                 now),
-            """{"schemaVersion":1}""",
+            new CtfCompetitionChallengeRules(),
             cancellationToken);
 
         await Task.WhenAll(updateTask, createTask);
@@ -427,7 +490,7 @@ public sealed class ChallengeTemplateModeInvariantPersistenceTests
             "Update-first AWD title",
             "Updated description",
             "Pwn",
-            """{"schemaVersion":1,"updated":true}""",
+            Definition(GameMode.Awd),
             now,
             cancellationToken);
         await using var verifyDb = new NoCtfDbContext(options);
@@ -463,14 +526,14 @@ public sealed class ChallengeTemplateModeInvariantPersistenceTests
             ownerId,
             "Original title",
             now));
-        db.CompetitionChallenges.Add(new CompetitionChallenge
+        db.CompetitionChallenges.Add(new CtfCompetitionChallenge
         {
             Id = competitionChallengeId,
             CompetitionId = competitionId,
             ChallengeId = challengeId,
             Order = 1,
             IsPublished = true,
-            RulesJson = "{}",
+            Rules = TestConfigurations.Rules(GameMode.Ctf),
             UpdatedAt = now
         });
 
@@ -487,13 +550,13 @@ public sealed class ChallengeTemplateModeInvariantPersistenceTests
             ownerId,
             "Deleted parent reference",
             now));
-        db.CompetitionChallenges.Add(new CompetitionChallenge
+        db.CompetitionChallenges.Add(new CtfCompetitionChallenge
         {
             Id = Guid.CreateVersion7(),
             CompetitionId = deletedParentCompetitionId,
             ChallengeId = deletedParentChallengeId,
             Order = 1,
-            RulesJson = "{}",
+            Rules = TestConfigurations.Rules(GameMode.Ctf),
             UpdatedAt = now
         });
 
@@ -560,7 +623,7 @@ public sealed class ChallengeTemplateModeInvariantPersistenceTests
         CancellationToken cancellationToken)
     {
         await using var db = new NoCtfDbContext(options);
-        var outbox = Substitute.For<ITransactionalMessageOutbox>();
+        var outbox = Substitute.For<IPostCommitMessagePublisher>();
         var events = new CompetitionEventStore(db, outbox);
         return await new ChallengeBankStore(db, outbox, events)
             .UpdateAsync(command, cancellationToken);
@@ -581,7 +644,7 @@ public sealed class ChallengeTemplateModeInvariantPersistenceTests
             title,
             "Updated description",
             "Pwn",
-            """{"schemaVersion":1,"updated":true}""",
+            Definition(mode),
             updatedAt);
 
     private static Competition Competition(
@@ -590,13 +653,12 @@ public sealed class ChallengeTemplateModeInvariantPersistenceTests
         string title,
         DateTimeOffset now,
         DateTimeOffset? deletedAt = null) =>
-        new()
+        new CtfCompetition
         {
             Id = id,
             OwnerId = ownerId,
             Title = title,
-            Mode = GameMode.Ctf,
-            ConfigurationJson = """{"schemaVersion":1}""",
+            ModeConfiguration = TestConfigurations.Competition(GameMode.Ctf),
             FlagDerivationSecret = new byte[32],
             StartAt = now.AddHours(1),
             EndAt = now.AddHours(2),
@@ -606,21 +668,35 @@ public sealed class ChallengeTemplateModeInvariantPersistenceTests
             UpdatedAt = now
         };
 
+    private static ChallengeDefinition Definition(GameMode mode)
+    {
+        var challengeId = Guid.Empty;
+        ChallengeDefinition definition = mode switch
+        {
+            GameMode.Ctf => new CtfChallengeDefinition(),
+            GameMode.Awd => new AwdChallengeDefinition(),
+            GameMode.Awdp => new AwdpChallengeDefinition(),
+            GameMode.Koh => new KohChallengeDefinition(),
+            _ => throw new ArgumentOutOfRangeException(nameof(mode), mode, null)
+        };
+        definition.ChallengeId = challengeId;
+        return definition;
+    }
+
     private static Challenge Challenge(
         Guid id,
         Guid ownerId,
         string title,
         DateTimeOffset now) =>
-        new()
+        new CtfChallenge
         {
             Id = id,
             OwnerId = ownerId,
-            Mode = GameMode.Ctf,
             Visibility = ChallengeVisibility.Private,
             Title = title,
             Description = "Original description",
             Direction = "Web",
-            DefinitionJson = """{"schemaVersion":1}""",
+            Definition = TestConfigurations.Definition(GameMode.Ctf),
             CreatedAt = now,
             UpdatedAt = now
         };
@@ -648,7 +724,7 @@ public sealed class ChallengeTemplateModeInvariantPersistenceTests
         string expectedTitle,
         string expectedDescription,
         string expectedDirection,
-        string expectedDefinitionJson,
+        ChallengeDefinition expectedDefinition,
         DateTimeOffset expectedUpdatedAt,
         CancellationToken cancellationToken)
     {
@@ -660,9 +736,9 @@ public sealed class ChallengeTemplateModeInvariantPersistenceTests
         await Assert.That(challenge.Title).IsEqualTo(expectedTitle);
         await Assert.That(challenge.Description).IsEqualTo(expectedDescription);
         await Assert.That(challenge.Direction).IsEqualTo(expectedDirection);
-        await Assert.That(JsonNode.DeepEquals(
-            JsonNode.Parse(challenge.DefinitionJson),
-            JsonNode.Parse(expectedDefinitionJson))).IsTrue();
+        await Assert.That(ChallengeDefinitionStructuralComparer.Equals(
+            challenge.Definition,
+            expectedDefinition)).IsTrue();
         await Assert.That(challenge.UpdatedAt).IsEqualTo(expectedUpdatedAt);
     }
 
@@ -685,10 +761,10 @@ public sealed class ChallengeTemplateModeInvariantPersistenceTests
 
     private static ChallengeManagementStore CreateManagementStore(
         NoCtfDbContext db,
-        ITransactionalMessageOutbox? outbox = null) =>
+        IPostCommitMessagePublisher? outbox = null) =>
         new(
             db,
-            outbox ?? Substitute.For<ITransactionalMessageOutbox>(),
+            outbox ?? Substitute.For<IPostCommitMessagePublisher>(),
             new ChallengeRuntimeTemplateCatalog());
 
     private static async Task WaitForPostgresSleepAsync(

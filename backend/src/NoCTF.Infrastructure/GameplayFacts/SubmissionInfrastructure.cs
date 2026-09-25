@@ -29,6 +29,7 @@ internal static class GameplayFactInfrastructure
     {
         services.AddScoped<GameplayFactAttemptCriticalSection>();
         services.AddScoped<IGameplayFactIntakeStore, GameplayFactIntakeStore>();
+        services.AddScoped<IFlagAttemptStateReader, FlagAttemptStateReader>();
         services.AddScoped<GetFlagAttemptState>();
         services.AddScoped<IAwdpParticipantStateReader, AwdpParticipantStateReader>();
         services.AddScoped<GetAwdpParticipantState>();
@@ -62,7 +63,7 @@ internal static class GameplayFactInfrastructure
         services.AddScoped<IGameplayFactProcessor, GameplayFactProcessor>();
         services.AddScoped<BloodRankCriticalSection>();
         services.AddScoped<IInternalResultStore, InternalResultStore>();
-        services.AddScoped<IAwdpFixExecutionFence, PostgresAwdpFixExecutionFence>();
+        services.AddScoped<IAwdpFixExecutionFence, AwdpFixExecutionFence>();
         services.AddScoped<RecordInternalResult>();
         services.AddSingleton<IGameplayFactEvaluatorCatalog, GameModeGameplayFactEvaluatorCatalog>();
         services.AddSingleton<IGameplayFactAdmissionModePolicy, GameModeGameplayFactAdmissionPolicy>();

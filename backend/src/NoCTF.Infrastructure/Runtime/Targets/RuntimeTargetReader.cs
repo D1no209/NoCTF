@@ -1,8 +1,8 @@
 using NoCTF.Infrastructure.Persistence;
-using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using NoCTF.Application.Runtime.Instances;
 using NoCTF.Application.Runtime.Provisioning;
+using NoCTF.Domain.Challenges;
 using NoCTF.Domain.Competitions;
 using NoCTF.Domain.Runtime;
 using NoCTF.Domain.Teams;
@@ -10,9 +10,7 @@ using NoCTF.Infrastructure.Competitions.Lifecycle;
 
 namespace NoCTF.Infrastructure.Runtime.Targets;
 
-public sealed class RuntimeTargetReader(
-    NoCtfDbContext db,
-    IChallengeRuntimeTemplateCatalog runtimeTemplates) : IRuntimeTargetReader
+public sealed class RuntimeTargetReader(NoCtfDbContext db) : IRuntimeTargetReader
 {
     public async Task<IReadOnlyList<RuntimeTargetView>?> ListAsync(
         Guid competitionId,
@@ -26,36 +24,39 @@ public sealed class RuntimeTargetReader(
                 item.Id == competitionId &&
                 item.Mode == GameMode.Awd &&
                 item.DeletedAt == null)
-            .Select(item => new
-            {
-                item.Status,
-                item.ConfigurationJson,
-                item.StartAt,
-                item.EndAt
-            })
             .SingleOrDefaultAsync(ct);
         if (competition is null || competition.Status != CompetitionStatus.Running)
             return null;
-        var challenge = await db.CompetitionChallenges.AsNoTracking()
-                .Where(item =>
-                    item.Id == competitionChallengeId &&
-                    item.CompetitionId == competitionId &&
-                    item.IsPublished &&
-                    item.DeletedAt == null)
-                .Join(
-                    db.Challenges.AsNoTracking()
-                        .Where(template => template.DeletedAt == null),
-                    challenge => challenge.ChallengeId,
-                    template => template.Id,
-                    (challenge, template) => new { template.DefinitionJson })
-                .SingleOrDefaultAsync(ct);
-        if (challenge is null)
+        var challengeId = await db.CompetitionChallenges.AsNoTracking()
+            .Where(item =>
+                item.Id == competitionChallengeId &&
+                item.CompetitionId == competitionId &&
+                item.IsPublished &&
+                item.DeletedAt == null)
+            .Select(item => (Guid?)item.ChallengeId)
+            .SingleOrDefaultAsync(ct);
+        if (challengeId is null)
             return null;
+        var template = await db.Challenges.AsNoTracking()
+            .Include(item => item.Definition)
+                .ThenInclude(definition => definition!.Runtime)
+                    .ThenInclude(runtime => runtime!.UrlBindings)
+            .SingleOrDefaultAsync(item => item.Id == challengeId.Value
+                && item.DeletedAt == null, ct);
+        if (template?.Definition is null)
+            return null;
+        var participantBindingIndexes = await db.Set<ChallengeRuntimeUrlBinding>()
+            .AsNoTracking()
+            .Where(binding => binding.ChallengeId == challengeId.Value
+                && !binding.IsControlCheck
+                && binding.Exposure == PersistedRuntimeExposure.Participants)
+            .Select(binding => binding.Position)
+            .ToArrayAsync(ct);
 
         var ownTeamId = await db.Teams.AsNoTracking()
             .Where(team =>
                 team.CompetitionId == competitionId &&
-                team.MemberIds.Contains(userId) &&
+                team.Members.Any(member => member.UserId == userId) &&
                 team.RegistrationStatus == TeamRegistrationStatus.Approved &&
                 team.DeletedAt == null &&
                 !team.IsBanned)
@@ -72,7 +73,8 @@ public sealed class RuntimeTargetReader(
             now,
             ct);
         var effectiveSeconds = Math.Max(0, (long)effectiveRuntime.Elapsed.TotalSeconds);
-        var hardeningSeconds = ReadHardeningSeconds(competition.ConfigurationJson);
+        var hardeningSeconds = (competition.ModeConfiguration as AwdCompetitionModeConfiguration)
+            ?.HardeningDurationSeconds ?? 0;
         var exposeAll = effectiveSeconds >= hardeningSeconds;
 
         var teams = await db.Teams.AsNoTracking()
@@ -87,37 +89,28 @@ public sealed class RuntimeTargetReader(
             .Select(team => new { team.Id, team.Name })
             .ToListAsync(ct);
         var teamIds = teams.Select(team => team.Id).ToArray();
-        var runtimes = await db.RuntimeInstances.AsNoTracking()
+        var runtimeEntities = await db.RuntimeInstances.AsNoTracking()
+            .Include(instance => instance.AccessEndpoints)
             .Where(instance =>
                 instance.CompetitionChallengeId == competitionChallengeId &&
                 instance.State == RuntimeState.Running &&
                 instance.TeamId != null &&
                 teamIds.Contains(instance.TeamId.Value))
-            .Select(instance => new
-            {
-                instance.Id,
-                TeamId = instance.TeamId!.Value,
-                instance.AccessMode,
-                AccessEndpoints = instance.AccessEndpoints
-                    .OrderBy(endpoint => endpoint.BindingIndex)
-                    .Select(endpoint => new RuntimeAccessEndpointView(
-                        endpoint.BindingIndex,
-                        endpoint.DirectAddress,
-                        endpoint.TargetHost,
-                        endpoint.TargetPort))
-                    .ToArray()
-            })
             .ToListAsync(ct);
-        var byTeam = runtimes.ToDictionary(runtime => runtime.TeamId);
+        var byTeam = runtimeEntities.ToDictionary(runtime => runtime.TeamId!.Value);
         return teams.Select(team =>
         {
             if (!byTeam.TryGetValue(team.Id, out var runtime))
                 return new RuntimeTargetView(team.Id, team.Name);
-            var endpoints = RuntimeParticipantUrlProjection.Filter(
-                runtimeTemplates,
-                GameMode.Awd,
-                challenge.DefinitionJson,
-                runtime.AccessEndpoints);
+            var endpoints = runtime.AccessEndpoints
+                .Where(endpoint => participantBindingIndexes.Contains(endpoint.BindingIndex))
+                .OrderBy(endpoint => endpoint.BindingIndex)
+                .Select(endpoint => new RuntimeAccessEndpointView(
+                    endpoint.BindingIndex,
+                    endpoint.DirectAddress,
+                    endpoint.TargetHost,
+                    endpoint.TargetPort))
+                .ToArray();
             return new RuntimeTargetView(
                 team.Id,
                 team.Name,
@@ -127,13 +120,4 @@ public sealed class RuntimeTargetReader(
         }).ToArray();
     }
 
-    private static long ReadHardeningSeconds(string json)
-    {
-        using var document = JsonDocument.Parse(json);
-        return document.RootElement.TryGetProperty("hardeningDurationSeconds", out var value)
-            ? value.GetInt64()
-            : document.RootElement.TryGetProperty("HardeningDurationSeconds", out value)
-                ? value.GetInt64()
-                : 0;
-    }
 }

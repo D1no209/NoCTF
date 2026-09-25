@@ -45,7 +45,7 @@ describe('isolated Mock API', () => {
     const directions = ['Misc', 'Web', 'Crypto', 'Pwn', 'Reverse', 'Penetration', 'Forensics', 'OSINT', 'AI', 'Mobile', 'IoT', 'Hardware', 'Cloud', 'Blockchain']
     expect(catalog.items).toHaveLength(directions.length)
     expect(new Set(catalog.items.map((item: Data) => item.direction))).toEqual(new Set(directions))
-    expect(catalog.items.every((item: Data) => item.hasRuntime)).toBe(true)
+    expect(catalog.items.every((item: Data) => !('hasRuntime' in item))).toBe(true)
     const sockets = new Set<string>()
     for (const challenge of catalog.items) {
       const path = `${competition}/challenges/${challenge.id}/attachments`
@@ -368,6 +368,7 @@ describe('isolated Mock API', () => {
     const result = await response.json()
     expect(result.items.length).toBeGreaterThan(0)
     expect(result.items.every((item: Data) => item.direction === 'Web')).toBe(true)
+    expect(result.items.every((item: Data) => !('definition' in item))).toBe(true)
     expect(result.directions).toEqual(expect.arrayContaining(['Web', 'Crypto', 'Pwn']))
   })
 

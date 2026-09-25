@@ -15,23 +15,11 @@ internal static class UserCredentialWrite
         if (db.Database.IsRelational()) await tokens.ExecuteUpdateAsync(setters => setters.SetProperty(token => token.InvalidatedAt, now), ct);
         else foreach (var token in await tokens.ToArrayAsync(ct)) token.InvalidatedAt = now;
     }
-    public static async Task InvalidateTokensAsync(NoCtfDbContext db, User trackedUser, CancellationToken ct)
+    public static Task InvalidateTokensAsync(NoCtfDbContext db, User trackedUser, CancellationToken ct)
     {
-        if (!db.Database.IsRelational())
-        {
-            using var lease = await DevelopmentLocks.LockAsync(trackedUser.Id, ct);
-            var version = await db.Users.AsNoTracking().Where(user => user.Id == trackedUser.Id).Select(user => user.TokenVersion).SingleAsync(ct);
-            trackedUser.TokenVersion = checked(version + 1);
-            await db.SaveChangesAsync(ct);
-            return;
-        }
-        await db.Users.Where(user => user.Id == trackedUser.Id)
-            .ExecuteUpdateAsync(setters => setters.SetProperty(user => user.TokenVersion, user => user.TokenVersion + 1), ct);
-        var current = await db.Users.AsNoTracking().Where(user => user.Id == trackedUser.Id).Select(user => user.TokenVersion).SingleAsync(ct);
-        var property = db.Entry(trackedUser).Property(user => user.TokenVersion);
-        property.CurrentValue = current;
-        property.OriginalValue = current;
-        property.IsModified = false;
+        ct.ThrowIfCancellationRequested();
+        trackedUser.TokenVersion = checked(trackedUser.TokenVersion + 1);
+        return Task.CompletedTask;
     }
     public static async Task<bool> ReplaceAsync(NoCtfDbContext db, User observed, string passwordHash,
         bool invalidateTokens, DateTimeOffset now, CancellationToken ct)

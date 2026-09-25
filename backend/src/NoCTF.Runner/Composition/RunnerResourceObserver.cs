@@ -3,19 +3,21 @@ using System.Text.Json;
 using Docker.DotNet;
 using k8s;
 using Microsoft.Extensions.Options;
+using Microsoft.Extensions.DependencyInjection;
 using NoCTF.Application.Runtime.Capacity;
 using NoCTF.Domain.Runtime;
 using NoCTF.Runtime.Docker.Containers;
-using Npgsql;
+using NoCTF.Infrastructure.Messaging;
 
 namespace NoCTF.Runner.Composition;
 
+[method: ActivatorUtilitiesConstructor]
 public sealed class RunnerResourceObserver(
     IOptions<RunnerOptions> options,
     DockerRuntimeOptions dockerOptions,
     NoCTF.Runtime.Kubernetes.Configuration.KubernetesRuntimeOptions kubernetesOptions,
     IKubernetes kubernetes,
-    IConfiguration configuration,
+    IClusterLeaseManager leases,
     IHostApplicationLifetime lifetime,
     TimeProvider clock,
     ILogger<RunnerResourceObserver> logger) : IAsyncDisposable
@@ -27,8 +29,10 @@ public sealed class RunnerResourceObserver(
     private (long Microseconds, DateTimeOffset At)? previousCgroupCpu;
     private DateTimeOffset? lastAttempt;
     private volatile RunnerAdmissionSnapshot snapshot = new(RunnerAdmissionState.Starting, RunnerAdmissionFailure.ObservationStale, null);
-    private NpgsqlConnection? ownership;
+    private IClusterLease? ownership;
     private string? resourceDomain;
+    private DateTimeOffset nextOwnershipRenewalAt;
+    private int ownershipRenewalFailures;
     private string? lastFailure;
 
     public RunnerAdmissionSnapshot Current => snapshot;
@@ -63,7 +67,8 @@ public sealed class RunnerResourceObserver(
         catch (OperationCanceledException) when (ct.IsCancellationRequested) { throw; }
         catch (Exception exception)
         {
-            snapshot = new(RunnerAdmissionState.Starting, RunnerAdmissionFailure.ObservationStale, null);
+            if (snapshot.State != RunnerAdmissionState.Draining)
+                snapshot = new(RunnerAdmissionState.Starting, RunnerAdmissionFailure.ObservationStale, null);
             if (lastFailure != exception.GetType().Name)
                 logger.LogWarning("Runner observation unavailable after {FailureType}.", exception.GetType().Name);
             lastFailure = exception.GetType().Name;
@@ -76,28 +81,50 @@ public sealed class RunnerResourceObserver(
     {
         if (ownership is null)
         {
-            ownership = new NpgsqlConnection(configuration.GetConnectionString("PostgreSql"));
-            await ownership.OpenAsync(ct);
-            await using var command = new NpgsqlCommand("SELECT pg_try_advisory_lock(hashtextextended(@domain, 0))", ownership);
-            command.Parameters.AddWithValue("domain", "noctf:resource-domain:" + domain);
-            if (await command.ExecuteScalarAsync(ct) is not true)
+            ownership = await leases.TryAcquireAsync(
+                "resource-domain-" + Convert.ToHexString(
+                    System.Security.Cryptography.SHA256.HashData(
+                        System.Text.Encoding.UTF8.GetBytes(domain))).ToLowerInvariant(),
+                options.Value.Id,
+                ct);
+            if (ownership is null)
             {
-                await ownership.DisposeAsync();
-                ownership = null;
+                snapshot = new(
+                    RunnerAdmissionState.Draining,
+                    RunnerAdmissionFailure.LedgerRecovering,
+                    null);
                 lifetime.StopApplication();
                 throw new InvalidOperationException("Another Runner owns this provider resource domain.");
             }
             resourceDomain = domain;
+            nextOwnershipRenewalAt = clock.GetUtcNow().Add(
+                NatsClusterLeaseManager.RenewalInterval);
         }
         else
         {
+            if (clock.GetUtcNow() < nextOwnershipRenewalAt)
+                return;
             try
             {
                 if (resourceDomain != domain) throw new InvalidOperationException("The resource domain changed.");
-                await using var heartbeat = new NpgsqlCommand("SELECT 1", ownership);
-                await heartbeat.ExecuteScalarAsync(ct);
+                await ownership.RenewAsync(ct);
+                ownershipRenewalFailures = 0;
+                nextOwnershipRenewalAt = clock.GetUtcNow().Add(
+                    NatsClusterLeaseManager.RenewalInterval);
             }
-            catch { lifetime.StopApplication(); throw; }
+            catch
+            {
+                ownershipRenewalFailures++;
+                if (ownershipRenewalFailures >= 2)
+                {
+                    snapshot = new(
+                        RunnerAdmissionState.Draining,
+                        RunnerAdmissionFailure.LedgerRecovering,
+                        null);
+                    lifetime.StopApplication();
+                }
+                throw;
+            }
         }
     }
 

@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.SignalR;
 using NoCTF.API.Endpoints.Administration.Platform;
 using NoCTF.API.SignalR.Hubs;
 using NoCTF.Application.Administration.PlatformLogs;
+using NoCTF.Application.Messaging;
 using NoCTF.Infrastructure.Observability;
 using StackExchange.Redis;
 
@@ -13,9 +14,6 @@ public sealed class RedisPlatformLogRelay(
     IHubContext<PlatformLogHub, IPlatformLogHubClient> hub,
     ILogger<RedisPlatformLogRelay> logger) : BackgroundService
 {
-    private static readonly JsonSerializerOptions JsonOptions =
-        new(JsonSerializerDefaults.Web);
-
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         var queue = await redis.GetSubscriber().SubscribeAsync(
@@ -24,9 +22,8 @@ public sealed class RedisPlatformLogRelay(
         {
             try
             {
-                var view = JsonSerializer.Deserialize<PlatformLogView>(
-                    message.Message.ToString(),
-                    JsonOptions);
+                var view = JsonSerializer.Deserialize(message.Message.ToString(),
+                    NoCtfWebMessageJsonContext.Default.PlatformLogView);
                 if (view is null)
                     return;
                 await hub.Clients.Group(PlatformLogHub.AdministratorsGroup).PlatformLogReceived(

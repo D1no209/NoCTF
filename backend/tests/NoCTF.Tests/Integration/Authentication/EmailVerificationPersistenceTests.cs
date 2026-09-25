@@ -127,7 +127,7 @@ public sealed class EmailVerificationPersistenceTests
             await Assert.That(new[] { firstOutbox, secondOutbox }
                     .Single(outbox => outbox.Messages.OfType<SendEmailVerification>().Any())
                     .TokenWasPendingWhenPublished)
-                .IsTrue();
+                .IsFalse();
 
             await using var inspectionDb = new NoCtfDbContext(options);
             var tokens = await inspectionDb.AccountTokens.AsNoTracking()
@@ -185,7 +185,7 @@ public sealed class EmailVerificationPersistenceTests
 
     private static EmailVerificationStore CreateStore(
         NoCtfDbContext db,
-        ITransactionalMessageOutbox outbox) =>
+        IPostCommitMessagePublisher outbox) =>
         new(db, new FixedConfigurationStore(), outbox);
 
     private static async Task<PostgreSqlContainer> StartPostgresAsync(
@@ -241,7 +241,7 @@ public sealed class EmailVerificationPersistenceTests
             CancellationToken cancellationToken) => throw new NotSupportedException();
     }
 
-    private sealed class RecordingOutbox(NoCtfDbContext db) : ITransactionalMessageOutbox
+    private sealed class RecordingOutbox(NoCtfDbContext db) : IPostCommitMessagePublisher
     {
         private readonly ConcurrentQueue<object> messages = new();
 

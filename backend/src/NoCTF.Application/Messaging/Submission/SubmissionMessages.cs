@@ -1,6 +1,8 @@
 namespace NoCTF.Application.Messaging;
 
-public sealed record EvaluateGameplayFact(Guid GameplayFactId);
+public sealed record EvaluateGameplayFact(
+    Guid GameplayFactId,
+    Guid DispatchAttemptId = default);
 
 public sealed record GameplayFactStateChanged(Guid GameplayFactId, NoCTF.Domain.Gameplay.GameplayFactState State);
 

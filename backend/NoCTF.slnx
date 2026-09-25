@@ -1,9 +1,12 @@
 <Solution>
   <Folder Name="/src/">
     <Project Path="src/NoCTF.Domain/NoCTF.Domain.csproj" />
+    <Project Path="src/NoCTF.Modeling.Generators/NoCTF.Modeling.Generators.csproj" />
     <Project Path="src/NoCTF.Application/NoCTF.Application.csproj" />
     <Project Path="src/NoCTF.GameModes/NoCTF.GameModes.csproj" />
     <Project Path="src/NoCTF.Infrastructure/NoCTF.Infrastructure.csproj" />
+    <Project Path="src/NoCTF.Persistence.PostgreSql/NoCTF.Persistence.PostgreSql.csproj" />
+    <Project Path="src/NoCTF.Persistence.Sqlite/NoCTF.Persistence.Sqlite.csproj" />
     <Project Path="src/NoCTF.Hosting/NoCTF.Hosting.csproj" />
     <Project Path="src/NoCTF.Runtime.Docker/NoCTF.Runtime.Docker.csproj" />
     <Project Path="src/NoCTF.Runtime.Kubernetes/NoCTF.Runtime.Kubernetes.csproj" />

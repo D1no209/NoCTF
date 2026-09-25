@@ -13,11 +13,10 @@ public sealed class ChallengeTestRuntimeClaimTests
     {
         var runtimeId = Guid.CreateVersion7();
         var challengeId = Guid.CreateVersion7();
-        var instance = new RuntimeInstance
+        var instance = new TemplateTestRuntimeInstance
         {
             Id = runtimeId,
             ChallengeId = challengeId,
-            Purpose = RuntimePurpose.TemplateTest,
             TestFlagDelivery = RuntimeTestFlagDelivery.Environment,
             TestFlagState = RuntimeTestFlagState.Pending,
             RuntimeKind = RuntimeKind.Container,
@@ -39,7 +38,7 @@ public sealed class ChallengeTestRuntimeClaimTests
             "runner-test",
             GameMode.Ctf,
             template,
-            "{}",
+            null,
             "flag{template-test}");
         var provision = message as ProvisionContainerRuntime
             ?? throw new InvalidOperationException("Expected a Container provision message.");

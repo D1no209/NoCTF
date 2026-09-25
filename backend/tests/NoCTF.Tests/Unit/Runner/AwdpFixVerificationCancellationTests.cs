@@ -101,7 +101,7 @@ public sealed class AwdpFixVerificationCancellationTests
         DateTimeOffset.UtcNow.AddMinutes(5),
         "runner-a");
 
-    private sealed class RecordingOutbox : ITransactionalMessageOutbox
+    private sealed class RecordingOutbox : IPostCommitMessagePublisher
     {
         public List<object> Messages { get; } = [];
         public ValueTask PublishAsync<T>(T message) => Add(message);

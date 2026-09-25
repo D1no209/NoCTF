@@ -7,7 +7,6 @@ using NoCTF.Application.Observability;
 using NoCTF.Domain.Runtime;
 using NoCTF.Runtime.Docker.Compose;
 using NoCTF.Runtime.Docker.Containers;
-using System.Text.Json;
 
 namespace NoCTF.Runtime.Docker;
 
@@ -25,15 +24,14 @@ public sealed class DockerRuntimeResourceReconciler(
     public async Task EnsureProxyNetworkAsync(
         Guid runtimeInstanceId,
         RuntimeKind runtimeKind,
-        string providerReceiptJson,
+        RuntimeReceiptData providerReceipt,
         CancellationToken cancellationToken)
     {
-        if (runtimeInstanceId == Guid.Empty
-            || string.IsNullOrWhiteSpace(providerReceiptJson))
+        if (runtimeInstanceId == Guid.Empty)
             throw new ArgumentOutOfRangeException(nameof(runtimeInstanceId));
         if (runtimeKind == RuntimeKind.Compose)
         {
-            var receipt = JsonSerializer.Deserialize<ComposeReceipt>(providerReceiptJson)
+            var receipt = (providerReceipt as ComposeRuntimeReceiptData)?.ToReceipt()
                 ?? throw new InvalidOperationException(
                     "Docker Compose Runtime receipt is invalid.");
             await compose.EnsureRuntimeProxyGatewaysAsync(receipt, cancellationToken);
@@ -42,7 +40,7 @@ public sealed class DockerRuntimeResourceReconciler(
         if (runtimeKind != RuntimeKind.Container)
             throw new InvalidOperationException(
                 "Docker Runtime proxy reconciliation supports Container and Compose only.");
-        var container = JsonSerializer.Deserialize<ContainerReceipt>(providerReceiptJson)
+        var container = (providerReceipt as ContainerRuntimeReceiptData)?.ToReceipt()
             ?? throw new InvalidOperationException("Docker Container Runtime receipt is invalid.");
         if (container.RuntimeInstanceId != runtimeInstanceId
             || string.IsNullOrWhiteSpace(container.NetworkId))

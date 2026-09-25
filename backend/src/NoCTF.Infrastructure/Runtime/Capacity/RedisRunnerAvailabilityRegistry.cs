@@ -3,6 +3,7 @@ using NoCTF.Application.Observability;
 using NoCTF.Application.Runtime.Provisioning;
 using NoCTF.Application.Runtime.Capacity;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using NoCTF.Domain.Runtime;
 using StackExchange.Redis;
 
@@ -15,6 +16,9 @@ public enum RunnerAvailabilityRegistrationOutcome
     OfflineProviderUnavailable,
     OfflineAdmissionBlocked
 }
+
+[JsonSerializable(typeof(RunnerAdmissionSnapshot))]
+internal partial class RunnerAdmissionJsonContext : JsonSerializerContext;
 
 public sealed record RunnerAvailabilityRegistration(
     string RunnerPool,
@@ -171,7 +175,8 @@ public sealed class RedisRunnerAvailabilityRegistry(IConnectionMultiplexer redis
                     registration.HasActiveAssignments ? 1 : 0,
                     registration.ProviderAvailable ? 1 : 0,
                     Random.Shared.NextDouble() * CandidateJitterMaximum,
-                    JsonSerializer.Serialize(registration.Admission),
+                    JsonSerializer.Serialize(registration.Admission,
+                        RunnerAdmissionJsonContext.Default.RunnerAdmissionSnapshot),
                     AdmissionState(registration.Admission.State),
                     registration.Admission.Observation?.ObservedAt.AddSeconds(registration.AdmissionOptions.FreshnessSeconds).ToUnixTimeMilliseconds() ?? 0,
                     registration.Admission.Observation?.ResourceDomain ?? registration.RunnerId,

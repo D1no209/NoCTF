@@ -1,5 +1,6 @@
 using NoCTF.Infrastructure.Persistence;
 using System.Data;
+using System.Diagnostics;
 using Microsoft.EntityFrameworkCore;
 using NoCTF.Application.Messaging;
 using NoCTF.Application.GameplayFacts.Intake;
@@ -8,6 +9,7 @@ using NoCTF.Domain.Gameplay;
 using NoCTF.Application.Competitions.Events;
 using NoCTF.Domain.Competitions.Events;
 using NoCTF.Application.Commands.Idempotency;
+using NoCTF.Domain.Commands;
 using NoCTF.Application.Runtime.Provisioning;
 using NoCTF.Application.Observability;
 using NoCTF.GameModes.Registration;
@@ -16,23 +18,23 @@ namespace NoCTF.Infrastructure.GameplayFacts.Intake;
 
 public sealed class GameplayFactIntakeStore(
     NoCtfDbContext db,
-    ITransactionalMessageOutbox outbox,
+    IPostCommitMessagePublisher outbox,
     GameplayFactAttemptCriticalSection attemptCriticalSection,
     ICompetitionEventRecorder? eventRecorder = null,
     NoCTF.Application.Authentication.Privacy.IRequestSourceAddress? source = null,
     IRequestReplay? replay = null,
     IChallengeRuntimeTemplateCatalog? runtimeTemplates = null,
-    TimeProvider? clock = null) : IGameplayFactIntakeStore
+    TimeProvider? clock = null,
+    IGameplayFactAdmissionModePolicy? admissionModePolicy = null) : IGameplayFactIntakeStore
 {
     public GameplayFactIntakeStore(
         NoCtfDbContext db,
-        ITransactionalMessageOutbox outbox,
+        IPostCommitMessagePublisher outbox,
         ICompetitionEventRecorder? eventRecorder = null)
         : this(
             db,
             outbox,
-            new GameplayFactAttemptCriticalSection(
-                new AsyncKeyedLock.AsyncKeyedLocker<string>()),
+            new GameplayFactAttemptCriticalSection(),
             eventRecorder)
     { }
 
@@ -41,26 +43,41 @@ public sealed class GameplayFactIntakeStore(
     private readonly IChallengeRuntimeTemplateCatalog templates =
         runtimeTemplates ?? new ChallengeRuntimeTemplateCatalog();
     private readonly TimeProvider timeProvider = clock ?? TimeProvider.System;
+    private readonly IGameplayFactAdmissionModePolicy modePolicy =
+        admissionModePolicy ?? new GameModeGameplayFactAdmissionPolicy();
 
     public Task<GameplayFactAcceptanceResult[]?> FindFlagReplayAsync(Guid competitionId, Guid challengeId, Guid userId,
         IReadOnlyList<string> flags, CancellationToken ct) => replay is null
             ? Task.FromResult<GameplayFactAcceptanceResult[]?>(null)
             : replay.FindAsync<GameplayFactAcceptanceResult[]>(new(userId, ReplayOperation.FlagSubmission, competitionId, challengeId),
-                new { Flags = flags }, ct);
+                new FlagReplayFingerprint(flags), ct);
 
-    public Task<GameplayFactAdmissionSnapshot?> LoadAdmissionAsync(
+    public async Task<GameplayFactAdmissionSnapshot?> LoadAdmissionAsync(
         Guid competitionId,
         Guid competitionChallengeId,
         Guid userId,
-        CancellationToken cancellationToken) =>
-        GameplayFactAdmissionPersistence.LoadAsync(
-            db,
-            competitionId,
-            competitionChallengeId,
-            userId,
-            timeProvider.GetUtcNow(),
-            templates,
-            cancellationToken);
+        CancellationToken cancellationToken)
+    {
+        var started = Stopwatch.GetTimestamp();
+        using var activity = NoCtfTelemetry.ActivitySource.StartActivity("GameplayFact.AdmissionLoad");
+        try
+        {
+            return await GameplayFactAdmissionPersistence.LoadAsync(
+                db,
+                competitionId,
+                competitionChallengeId,
+                userId,
+                timeProvider.GetUtcNow(),
+                templates,
+                cancellationToken);
+        }
+        finally
+        {
+            NoCtfTelemetry.RecordGameplayFactStage(
+                GameplayFactPerformanceStage.AdmissionLoad,
+                Stopwatch.GetElapsedTime(started).TotalSeconds);
+        }
+    }
 
     public async Task<GameplayFactAcceptanceResult> TryAcceptFlagAsync(
         FlagGameplayFactReceived received,
@@ -92,11 +109,28 @@ public sealed class GameplayFactIntakeStore(
         var previous = await FindFlagReplayAsync(received[0].CompetitionId, received[0].CompetitionChallengeId,
             received[0].UserId, received.Select(item => item.Value).ToArray(), cancellationToken);
         if (previous is not null) return previous;
-        var current = await LoadAdmissionAsync(
-            received[0].CompetitionId,
-            received[0].CompetitionChallengeId,
-            received[0].UserId,
-            cancellationToken);
+        var recheckStarted = Stopwatch.GetTimestamp();
+        GameplayFactAdmissionSnapshot? current;
+        using (NoCtfTelemetry.ActivitySource.StartActivity("GameplayFact.AdmissionRecheck"))
+        {
+            try
+            {
+                current = await GameplayFactAdmissionPersistence.LoadAsync(
+                    db,
+                    received[0].CompetitionId,
+                    received[0].CompetitionChallengeId,
+                    received[0].UserId,
+                    timeProvider.GetUtcNow(),
+                    templates,
+                    cancellationToken);
+            }
+            finally
+            {
+                NoCtfTelemetry.RecordGameplayFactStage(
+                    GameplayFactPerformanceStage.AdmissionRecheck,
+                    Stopwatch.GetElapsedTime(recheckStarted).TotalSeconds);
+            }
+        }
         if (current is not null
             && current.Mode == GameMode.Awdp
             && received[0].Kind == GameplayFactKind.BreakAttempt
@@ -110,7 +144,16 @@ public sealed class GameplayFactIntakeStore(
                 current,
                 received[0].Kind,
                 received[0].OccurredAt);
+        var currentRules = current is null
+            ? null
+            : modePolicy.GetRules(current.Mode, current.CompetitionConfiguration,
+                current.ChallengeRules, current.ChallengeDefinition);
+        var expectedRules = modePolicy.GetRules(snapshot.Mode, snapshot.CompetitionConfiguration,
+            snapshot.ChallengeRules, snapshot.ChallengeDefinition);
         if (!GameplayFactAdmissionPersistence.Matches(snapshot, current)
+            || currentRules is null
+            || currentRules.AllowsFlag != expectedRules.AllowsFlag
+            || currentRules.MaxFlagAttempts != expectedRules.MaxFlagAttempts
             || current!.CompetitionStatus != CompetitionStatus.Running && !practice)
             return received.Select(_ => new GameplayFactAcceptanceResult(
                 GameplayFactAcceptanceState.AdmissionRejected)).ToArray();
@@ -119,20 +162,21 @@ public sealed class GameplayFactIntakeStore(
             return received.Select(_ => new GameplayFactAcceptanceResult(
                 GameplayFactAcceptanceState.AttemptsExhausted)).ToArray();
 
-        var entities = received.Select(item => new GameplayFact
+        var entities = received.Select(item =>
         {
-            Id = item.GameplayFactId,
-            CompetitionId = item.CompetitionId,
-            CompetitionChallengeId = item.CompetitionChallengeId,
-            TeamId = item.TeamId,
-                ActorUserId = item.UserId,
-                SourceIpAddress = source?.Address,
-            Kind = item.Kind,
-            Value = item.Value,
-            ValueSha256 = item.ValueSha256,
-            OccurredAt = item.OccurredAt,
-            State = GameplayFactState.Queued,
-            UpdatedAt = item.OccurredAt
+            var entity = GameplayFactGeneratedCatalog.Create(item.Kind);
+            entity.Id = item.GameplayFactId;
+            entity.CompetitionId = item.CompetitionId;
+            entity.CompetitionChallengeId = item.CompetitionChallengeId;
+            entity.TeamId = item.TeamId;
+            entity.ActorUserId = item.UserId;
+            entity.SourceIpAddress = source?.Address;
+            entity.Value = item.Value;
+            entity.ValueSha256 = item.ValueSha256;
+            entity.OccurredAt = item.OccurredAt;
+            entity.State = GameplayFactState.Queued;
+            entity.UpdatedAt = item.OccurredAt;
+            return entity;
         }).ToArray();
         db.GameplayFacts.AddRange(entities);
         foreach (var entity in entities)
@@ -169,12 +213,20 @@ public sealed class GameplayFactIntakeStore(
         var response = entities.Select(entity => new GameplayFactAcceptanceResult(
             GameplayFactAcceptanceState.Created, entity.Id, entity.OccurredAt)).ToArray();
         replay?.Store(response);
+        var commitStarted = Stopwatch.GetTimestamp();
         await db.SaveChangesAsync(cancellationToken);
         await transaction.CommitAsync(cancellationToken);
+        NoCtfTelemetry.RecordGameplayFactStage(
+            GameplayFactPerformanceStage.PersistenceCommit,
+            Stopwatch.GetElapsedTime(commitStarted).TotalSeconds);
         NoCtfTelemetry.RecordGameplayFactSubmissions(
             entities[0].Kind,
             entities.LongLength);
+        var publishStarted = Stopwatch.GetTimestamp();
         await outbox.FlushCommittedMessagesAsync();
+        NoCtfTelemetry.RecordGameplayFactStage(
+            GameplayFactPerformanceStage.MessagePublish,
+            Stopwatch.GetElapsedTime(publishStarted).TotalSeconds);
         return entities.Select(entity => new GameplayFactAcceptanceResult(
             GameplayFactAcceptanceState.Created,
             entity.Id,
@@ -195,17 +247,16 @@ public sealed class GameplayFactIntakeStore(
             && await db.Teams.AnyAsync(item =>
                 item.Id == received.TeamId
                 && item.CompetitionId == received.CompetitionId
-                && item.MemberIds.Contains(received.UserId), cancellationToken);
+                && item.Members.Any(member => member.UserId == received.UserId), cancellationToken);
         if (!valid)
             return new(GameplayFactAcceptanceState.AdmissionRejected);
-        var entity = new GameplayFact
+        var entity = new HintUnlockGameplayFact
         {
             Id = received.GameplayFactId,
             CompetitionId = received.CompetitionId,
             CompetitionChallengeId = received.CompetitionChallengeId,
             TeamId = received.TeamId,
             ActorUserId = received.UserId,
-            Kind = GameplayFactKind.HintUnlock,
             ReferenceKind = GameplayFactReferenceKind.Hint,
             ReferenceId = received.HintId,
             OccurredAt = received.OccurredAt,
@@ -230,7 +281,7 @@ public sealed class GameplayFactIntakeStore(
             received.CompetitionChallengeId, GameplayFactKind.ManualAdjustment, cancellationToken);
         var previous = replay is null ? null : await replay.FindAsync<GameplayFactAcceptanceResult>(
             new(received.UserId, ReplayOperation.ManualAdjustment, received.CompetitionId, received.CompetitionChallengeId),
-            new { received.TeamId, received.Delta }, cancellationToken);
+            new ManualAdjustmentReplayFingerprint(received.TeamId, received.Delta), cancellationToken);
         if (previous is not null) return previous;
         var valid = await db.CompetitionChallenges.AnyAsync(item =>
             item.Id == received.CompetitionChallengeId
@@ -240,14 +291,13 @@ public sealed class GameplayFactIntakeStore(
                 && item.CompetitionId == received.CompetitionId, cancellationToken);
         if (!valid)
             return new(GameplayFactAcceptanceState.AdmissionRejected);
-        var entity = new GameplayFact
+        var entity = new ManualAdjustmentGameplayFact
         {
             Id = received.GameplayFactId,
             CompetitionId = received.CompetitionId,
             CompetitionChallengeId = received.CompetitionChallengeId,
             TeamId = received.TeamId,
             ActorUserId = received.UserId,
-            Kind = GameplayFactKind.ManualAdjustment,
             Value = received.Delta.ToString(System.Globalization.CultureInfo.InvariantCulture),
             OccurredAt = received.OccurredAt,
             State = GameplayFactState.Completed,

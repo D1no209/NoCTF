@@ -51,6 +51,7 @@ public static partial class PlatformUserPatchMapper
     [MapProperty(nameof(PatchPlatformUserRequest.AccountStatus), nameof(User.AccountStatus))]
     [MapperIgnoreSource(nameof(PatchPlatformUserRequest.EmailVerified))]
     [MapperIgnoreTarget(nameof(User.Id))]
+    [MapperIgnoreTarget(nameof(User.ConcurrencyStamp))]
     [MapperIgnoreTarget(nameof(User.UserName))]
     [MapperIgnoreTarget(nameof(User.NormalizedUserName))]
     [MapperIgnoreTarget(nameof(User.Email))]
@@ -58,6 +59,7 @@ public static partial class PlatformUserPatchMapper
     [MapperIgnoreTarget(nameof(User.Kind))]
     [MapperIgnoreTarget(nameof(User.TokenVersion))]
     [MapperIgnoreTarget(nameof(User.ExternalIdentityProviderId))]
+    [MapperIgnoreTarget(nameof(User.ExternalIdentity))]
     [MapperIgnoreTarget(nameof(User.ExternalIdentityProtocol))]
     [MapperIgnoreTarget(nameof(User.ExternalIdentityNamespace))]
     [MapperIgnoreTarget(nameof(User.ExternalIdentitySubject))]
@@ -75,6 +77,7 @@ public static partial class PlatformUserPatchMapper
     [MapperIgnoreTarget(nameof(User.EmailVerifiedAt))]
     [MapperIgnoreTarget(nameof(User.CreatedAt))]
     [MapperIgnoreTarget(nameof(User.UpdatedAt))]
+    [MapperIgnoreTarget(nameof(User.NormalizedEmail))]
     public static partial void ApplyAsPlatformAdministrator(
         PatchPlatformUserRequest request,
         [MappingTarget] User target);

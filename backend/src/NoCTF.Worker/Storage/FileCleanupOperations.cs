@@ -43,9 +43,6 @@ internal static partial class BackendMessageOperations
         CancellationToken cancellationToken)
     {
         await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
-        await db.Database.ExecuteSqlInterpolatedAsync(
-            $"SELECT 1 FROM files WHERE id = {message.FileId} FOR UPDATE",
-            cancellationToken);
         var file = await db.Files.SingleOrDefaultAsync(item => item.Id == message.FileId, cancellationToken);
         if (file is null)
             return;

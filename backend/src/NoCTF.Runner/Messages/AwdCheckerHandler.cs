@@ -14,6 +14,8 @@ using NoCTF.Runner.Composition;
 using NoCTF.GameModes.Awd.Configuration;
 using NoCTF.Infrastructure.Persistence;
 using NoCTF.Infrastructure.Authentication;
+using NoCTF.Domain.Challenges;
+using NoCTF.Domain.Competitions;
 using Wolverine.Attributes;
 
 namespace NoCTF.Runner.Messages;
@@ -23,7 +25,7 @@ public sealed record AwdCheckerWork(
     Guid GameplayFactId,
     RuntimeProvider Provider,
     RuntimeKind RuntimeKind,
-    string ProviderReceiptJson,
+    RuntimeReceiptData ProviderReceipt,
     string TargetHost,
     string Image,
     IReadOnlyList<string> Command,
@@ -55,7 +57,7 @@ public enum AwdCheckerExecutionOutcome
 }
 
 public sealed class AwdCheckerWorkReader(
-    IServiceScopeFactory scopes,
+    IDbContextFactory<NoCtfDbContext> contexts,
     AwdCheckerConfigurationCatalog configurations,
     IRunnerScoringTokenIssuer tokens,
     IRuntimeProviderCatalog providers,
@@ -66,14 +68,13 @@ public sealed class AwdCheckerWorkReader(
         RunAwdChecker message,
         CancellationToken cancellationToken)
     {
-        await using var scope = scopes.CreateAsyncScope();
-        var db = scope.ServiceProvider.GetRequiredService<NoCtfDbContext>();
+        await using var db = await contexts.CreateDbContextAsync(cancellationToken);
         var target = await db.RuntimeInstances.AsNoTracking()
             .Where(runtime => runtime.Id == message.RuntimeInstanceId
                 && runtime.CompetitionChallengeId == message.CompetitionChallengeId
                 && runtime.State == RuntimeState.Running
                 && runtime.RunnerId == message.RunnerId
-                && runtime.ProviderReceiptJson != null)
+                && runtime.ProviderReceipt != null)
             .Join(
                 db.CompetitionChallenges.AsNoTracking(),
                 runtime => runtime.CompetitionChallengeId,
@@ -81,7 +82,7 @@ public sealed class AwdCheckerWorkReader(
                 (runtime, challenge) => new
                 {
                     Runtime = runtime,
-                    ChallengeRules = challenge.RulesJson,
+                    Challenge = challenge,
                     challenge.ChallengeId
                 })
             .Join(
@@ -91,8 +92,8 @@ public sealed class AwdCheckerWorkReader(
                 (pair, challenge) => new
                 {
                     pair.Runtime,
-                    pair.ChallengeRules,
-                    ChallengeDefinition = challenge.DefinitionJson
+                    pair.Challenge,
+                    Template = challenge
                 })
             .Join(
                 db.Competitions.AsNoTracking(),
@@ -101,30 +102,29 @@ public sealed class AwdCheckerWorkReader(
                 (pair, competition) => new
                 {
                     pair.Runtime,
-                    pair.ChallengeRules,
-                    pair.ChallengeDefinition,
-                    CompetitionConfiguration = competition.ConfigurationJson,
-                    competition.Status,
-                    competition.Mode
+                    pair.Challenge,
+                    pair.Template,
+                    Competition = competition
                 })
+            .AsSplitQuery()
             .SingleOrDefaultAsync(cancellationToken);
         if (target is null
-            || target.Mode != NoCTF.Domain.Competitions.GameMode.Awd
-            || target.Status != NoCTF.Domain.Competitions.CompetitionStatus.Running)
+            || target.Competition.Mode != GameMode.Awd
+            || target.Competition.Status != CompetitionStatus.Running
+            || target.Competition.ModeConfiguration is not AwdCompetitionModeConfiguration competition
+            || target.Challenge.Rules is not AwdCompetitionChallengeRules rules
+            || target.Template.Definition is not AwdChallengeDefinition definition)
             return null;
-        var settings = configurations.Get(
-            target.CompetitionConfiguration,
-            target.ChallengeRules,
-            target.ChallengeDefinition);
+        var settings = configurations.Get(competition, rules, definition);
         if (settings.Checker is not { } checker
             || target.Runtime.RuntimeKind is not (RuntimeKind.Container or RuntimeKind.Compose))
             return null;
         var targetHost = await ResolveTargetHostAsync(
             target.Runtime.RuntimeKind,
             target.Runtime.RuntimeProvider,
-            target.Runtime.ProviderReceiptJson!,
+            target.Runtime.ProviderReceipt!.ToData(),
             target.Runtime.Id,
-            AwdConfigurationParser.ParseChallenge(target.ChallengeDefinition).Checker?.TargetServiceName,
+            settings.TargetServiceName,
             providers,
             cancellationToken);
         if (targetHost is null)
@@ -148,7 +148,7 @@ public sealed class AwdCheckerWorkReader(
             message.GameplayFactId,
             target.Runtime.RuntimeProvider,
             target.Runtime.RuntimeKind,
-            target.Runtime.ProviderReceiptJson!,
+            target.Runtime.ProviderReceipt!.ToData(),
             targetHost,
             checker.Image,
             checker.Command ?? [],
@@ -165,44 +165,37 @@ public sealed class AwdCheckerWorkReader(
     private static async Task<string?> ResolveTargetHostAsync(
         RuntimeKind kind,
         RuntimeProvider provider,
-        string providerReceiptJson,
+        RuntimeReceiptData providerReceipt,
         Guid runtimeInstanceId,
         string? targetServiceName,
         IRuntimeProviderCatalog providers,
         CancellationToken cancellationToken)
     {
-        try
+        if (kind == RuntimeKind.Container)
         {
-            if (kind == RuntimeKind.Container)
-            {
-                var receipt = JsonSerializer.Deserialize<ContainerReceipt>(providerReceiptJson);
-                return receipt is not null
-                    && receipt.Provider == provider
-                    && receipt.RuntimeInstanceId == runtimeInstanceId
-                    ? receipt.InternalHost
-                    : null;
-            }
+            var receipt = (providerReceipt as ContainerRuntimeReceiptData)?.ToReceipt();
+            return receipt is not null
+                && receipt.Provider == provider
+                && receipt.RuntimeInstanceId == runtimeInstanceId
+                ? receipt.InternalHost
+                : null;
+        }
 
-            var composeReceipt = JsonSerializer.Deserialize<ComposeReceipt>(providerReceiptJson);
-            if (composeReceipt is null
-                || composeReceipt.Provider != provider
-                || composeReceipt.OperationId != runtimeInstanceId)
-                return null;
-            var status = await providers.Compose(provider).GetStatusAsync(
-                composeReceipt,
-                cancellationToken);
-            if (status is null)
-                return null;
-            return status.Services.SingleOrDefault(service =>
-                string.Equals(service.Name, targetServiceName, StringComparison.Ordinal))?.InternalHost
-                ?? (targetServiceName is null && status.Services.Count == 1
-                    ? status.Services[0].InternalHost
-                    : null);
-        }
-        catch (JsonException)
-        {
+        var composeReceipt = (providerReceipt as ComposeRuntimeReceiptData)?.ToReceipt();
+        if (composeReceipt is null
+            || composeReceipt.Provider != provider
+            || composeReceipt.OperationId != runtimeInstanceId)
             return null;
-        }
+        var status = await providers.Compose(provider).GetStatusAsync(
+            composeReceipt,
+            cancellationToken);
+        if (status is null)
+            return null;
+        return status.Services.SingleOrDefault(service =>
+            string.Equals(service.Name, targetServiceName, StringComparison.Ordinal))?.InternalHost
+            ?? (targetServiceName is null && status.Services.Count == 1
+                ? status.Services[0].InternalHost
+                : null);
     }
 }
 
@@ -231,7 +224,7 @@ public sealed class AwdCheckerExecutor(
             new Dictionary<string, string>(),
             new Dictionary<int, int>(),
             new RuntimeResourceLimits(256 * 1024 * 1024, 250_000_000, 128),
-            new ContainerSecurityPolicy(true, true, !work.AllowRoot, ["ALL"], []),
+            new ContainerSecurityPolicy(true, true, !work.AllowRoot, [], []),
             work.Timeout,
             OperationTimeout: work.Timeout,
             AllowInternalCallback: true,
@@ -309,7 +302,7 @@ public sealed class AwdCheckerExecutor(
         AwdCheckerWork work,
         RuntimeResourceIdentity identity)
     {
-        var receipt = JsonSerializer.Deserialize<ContainerReceipt>(work.ProviderReceiptJson);
+        var receipt = (work.ProviderReceipt as ContainerRuntimeReceiptData)?.ToReceipt();
         return receipt is not null
             && receipt.Provider == work.Provider
             && receipt.RuntimeInstanceId == identity.RuntimeInstanceId
@@ -322,7 +315,7 @@ public sealed class AwdCheckerExecutor(
         AwdCheckerWork work,
         RuntimeResourceIdentity identity)
     {
-        var receipt = JsonSerializer.Deserialize<ComposeReceipt>(work.ProviderReceiptJson);
+        var receipt = (work.ProviderReceipt as ComposeRuntimeReceiptData)?.ToReceipt();
         return receipt is not null
             && receipt.Provider == work.Provider
             && receipt.OperationId == identity.RuntimeInstanceId
@@ -349,10 +342,7 @@ public sealed class AwdCheckerHandler(
     IOptions<RunnerOptions> runnerOptions,
     TimeProvider timeProvider)
 {
-    public Task Handle(RunAwdChecker message, CancellationToken cancellationToken) =>
-        ExecuteAsync(message, cancellationToken);
-
-    public async Task<MessageExecutionOutcome> ExecuteAsync(
+    public async Task<MessageExecutionOutcome> Handle(
         RunAwdChecker message,
         CancellationToken cancellationToken)
     {

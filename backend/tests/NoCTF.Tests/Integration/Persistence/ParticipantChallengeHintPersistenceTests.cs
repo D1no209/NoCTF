@@ -32,26 +32,25 @@ public sealed class ParticipantChallengeHintPersistenceTests
             var now = DateTimeOffset.UtcNow;
             var userA = User("hint-a", now);
             var userB = User("hint-b", now);
-            var competition = new Competition
+            var competition = new CtfCompetition
             {
-                Id = Guid.NewGuid(), OwnerId = userA.Id, Title = "Hints", Mode = GameMode.Ctf,
-                ConfigurationJson = """{"schemaVersion":2}""", FlagDerivationSecret = new byte[32],
+                Id = Guid.NewGuid(), OwnerId = userA.Id, Title = "Hints", ModeConfiguration = TestConfigurations.Competition(GameMode.Ctf), FlagDerivationSecret = new byte[32],
                 StartAt = now.AddHours(-1), EndAt = now.AddHours(1), Status = CompetitionStatus.Running,
                 CreatedAt = now, UpdatedAt = now
             };
-            var template = new Challenge
+            var template = new CtfChallenge
             {
-                Id = Guid.NewGuid(), OwnerId = userA.Id, Mode = GameMode.Ctf, Title = "Hint source", Direction = "Web",
-                DefinitionJson = """{"schemaVersion":2}""", CreatedAt = now, UpdatedAt = now
+                Id = Guid.NewGuid(), OwnerId = userA.Id, Title = "Hint source", Direction = "Web",
+                Definition = TestConfigurations.Definition(GameMode.Ctf), CreatedAt = now, UpdatedAt = now
             };
             var free = Hint(0, now);
             var paid = Hint(20, now);
             var hidden = Hint(0, now);
             hidden.HiddenAt = now;
-            var challenge = new CompetitionChallenge
+            var challenge = new CtfCompetitionChallenge
             {
                 Id = Guid.NewGuid(), CompetitionId = competition.Id, ChallengeId = template.Id,
-                IsPublished = true, RulesJson = """{"schemaVersion":2}""", UpdatedAt = now,
+                IsPublished = true, Rules = TestConfigurations.Rules(GameMode.Ctf), UpdatedAt = now,
                 Hints = [free, paid, Hint(0, null), Hint(0, now.AddHours(1)), hidden]
             };
             var teamA = Team(userA.Id, competition.Id, 'a', now);
@@ -69,24 +68,24 @@ public sealed class ParticipantChallengeHintPersistenceTests
             var store = new ParticipantChallengeHintStore(db);
             var reader = new ReadParticipantChallengeHints(store);
 
-            var first = await reader.ExecuteAsync(competition.Id, challenge.Id, userA.Id, now, ct);
+            var first = await reader.ExecuteAsync(competition.Id, challenge.Id, competition.Status, teamA.Id, now, ct);
             await Assert.That(first.Count).IsEqualTo(2);
             await Assert.That(first.Single(item => item.Id == paid.Id).Content).IsNull();
             await Assert.That(first.Single(item => item.Id == paid.Id).CanUnlock).IsTrue();
-            var other = await reader.ExecuteAsync(competition.Id, challenge.Id, userB.Id, now, ct);
+            var other = await reader.ExecuteAsync(competition.Id, challenge.Id, competition.Status, teamB.Id, now, ct);
             await Assert.That(other.Single(item => item.Id == paid.Id).Content).IsEqualTo(paid.Content);
-            var anonymous = await reader.ExecuteAsync(competition.Id, challenge.Id, Guid.Empty, now, ct);
+            var anonymous = await reader.ExecuteAsync(competition.Id, challenge.Id, competition.Status, null, now, ct);
             await Assert.That(anonymous.Single(item => item.Id == paid.Id).Content).IsNull();
             await Assert.That(anonymous.Single(item => item.Id == paid.Id).CanUnlock).IsFalse();
 
             pendingA.State = GameplayFactState.Completed;
             await db.SaveChangesAsync(ct);
-            var unlocked = await reader.ExecuteAsync(competition.Id, challenge.Id, userA.Id, now, ct);
+            var unlocked = await reader.ExecuteAsync(competition.Id, challenge.Id, competition.Status, teamA.Id, now, ct);
             await Assert.That(unlocked.Single(item => item.Id == paid.Id).Content).IsEqualTo(paid.Content);
             pendingA.Result = GameplayFactResult.Rejected;
             pendingA.FailureCode = GameplayFactFailureCode.InsufficientScore;
             await db.SaveChangesAsync(ct);
-            var unlockStore = new ChallengeHintStore(db, Substitute.For<ITransactionalMessageOutbox>());
+            var unlockStore = new ChallengeHintStore(db, Substitute.For<IPostCommitMessagePublisher>());
             var retry = await unlockStore.UnlockAsync(competition.Id, challenge.Id, paid.Id, userA.Id, now, ct);
             await Assert.That(retry.Result!.Created).IsTrue();
             await Assert.That(retry.Result.GameplayFactId).IsNotEqualTo(pendingA.Id);
@@ -95,15 +94,15 @@ public sealed class ParticipantChallengeHintPersistenceTests
             await Assert.That(duplicate.Result.GameplayFactId).IsEqualTo(retry.Result.GameplayFactId);
             competition.Status = CompetitionStatus.Finished;
             await db.SaveChangesAsync(ct);
-            await Assert.That((await store.ReadAsync(competition.Id, challenge.Id, userA.Id, ct))!.CanUnlock).IsFalse();
+            await Assert.That((await store.ReadAsync(competition.Id, challenge.Id, competition.Status, teamA.Id, ct))!.CanUnlock).IsFalse();
             teamA.IsBanned = true;
             await db.SaveChangesAsync(ct);
-            var banned = await reader.ExecuteAsync(competition.Id, challenge.Id, userA.Id, now, ct);
+            var banned = await reader.ExecuteAsync(competition.Id, challenge.Id, competition.Status, null, now, ct);
             await Assert.That(banned.Single(item => item.Id == paid.Id).Content).IsNull();
-            await Assert.That(await reader.ExecuteAsync(Guid.NewGuid(), challenge.Id, userA.Id, now, ct)).IsEmpty();
+            await Assert.That(await reader.ExecuteAsync(Guid.NewGuid(), challenge.Id, competition.Status, teamA.Id, now, ct)).IsEmpty();
             challenge.IsPublished = false;
             await db.SaveChangesAsync(ct);
-            await Assert.That(await reader.ExecuteAsync(competition.Id, challenge.Id, userA.Id, now, ct)).IsEmpty();
+            await Assert.That(await reader.ExecuteAsync(competition.Id, challenge.Id, competition.Status, teamA.Id, now, ct)).IsEmpty();
         });
     }
 
@@ -125,10 +124,10 @@ public sealed class ParticipantChallengeHintPersistenceTests
         Id = Guid.NewGuid(), Content = "Hint body " + cost, Cost = cost, PublishedAt = published
     };
 
-    private static GameplayFact Unlock(Guid competitionId, Guid challengeId, Guid teamId, Guid userId, Guid hintId, DateTimeOffset now) => new()
+    private static GameplayFact Unlock(Guid competitionId, Guid challengeId, Guid teamId, Guid userId, Guid hintId, DateTimeOffset now) => new HintUnlockGameplayFact
     {
         Id = Guid.NewGuid(), CompetitionId = competitionId, CompetitionChallengeId = challengeId, TeamId = teamId,
-        ActorUserId = userId, Kind = GameplayFactKind.HintUnlock, State = GameplayFactState.Completed, Result = GameplayFactResult.Unlocked,
+        ActorUserId = userId, State = GameplayFactState.Completed, Result = GameplayFactResult.Unlocked,
         ReferenceKind = GameplayFactReferenceKind.Hint, ReferenceId = hintId, OccurredAt = now, UpdatedAt = now
     };
 }

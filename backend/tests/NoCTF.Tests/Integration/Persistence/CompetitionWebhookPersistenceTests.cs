@@ -60,14 +60,13 @@ public sealed class CompetitionWebhookPersistenceTests
                     CreatedAt = now,
                     UpdatedAt = now
                 });
-                seed.Competitions.Add(new Competition
+                seed.Competitions.Add(new CtfCompetition
                 {
                     Id = competitionId,
                     Title = "Webhook persistence",
                     OwnerId = ownerId,
-                    Mode = GameMode.Ctf,
                     Status = CompetitionStatus.Published,
-                    ConfigurationJson = GameModeDefaultConfiguration.GetCompetitionJson(GameMode.Ctf),
+                    ModeConfiguration = TestConfigurations.Competition(GameMode.Ctf),
                     StartAt = now,
                     EndAt = now.AddHours(2),
                     FlagDerivationSecret = Enumerable.Range(1, 32).Select(value => (byte)value).ToArray(),
@@ -92,7 +91,7 @@ public sealed class CompetitionWebhookPersistenceTests
                     createDb,
                     protector,
                     NullCompetitionEventRecorder.Instance,
-                    new NoOpTransactionalMessageOutbox(),
+                    new NoOpPostCommitMessagePublisher(),
                     TimeProvider.System);
                 var result = await store.CreateAsync(new(
                     competitionId,
@@ -108,16 +107,16 @@ public sealed class CompetitionWebhookPersistenceTests
 
             await using (var eventDb = new NoCtfDbContext(options))
             {
-                eventDb.CompetitionEvents.Add(new CompetitionEvent
+                eventDb.CompetitionEvents.Add(new CompetitionLifecycleChangedEvent
                 {
                     Id = eventId,
                     CompetitionId = competitionId,
-                    Kind = CompetitionEventKind.CompetitionLifecycleChanged,
                     Level = CompetitionEventLevel.Information,
                     Visibility = CompetitionEventVisibility.Public,
                     SubjectType = EntityReferenceKind.Competition,
                     SubjectId = competitionId,
-                    PayloadJson = "{\"schemaVersion\":1,\"competitionStatus\":\"Running\",\"from\":\"Published\"}",
+                    PreviousCompetitionStatus = CompetitionStatus.Published,
+                    CompetitionStatus = CompetitionStatus.Running,
                     OccurredAt = now.AddSeconds(1)
                 });
                 await eventDb.SaveChangesAsync(cancellationToken);
@@ -164,7 +163,7 @@ public sealed class CompetitionWebhookPersistenceTests
                     cancellationToken);
                 for (var index = 0; index < 1_000; index++)
                 {
-                    competition.WebhookConfiguration.Targets.Add(new CompetitionWebhookTarget
+                    var target = new CompetitionWebhookTarget
                     {
                         Id = Guid.CreateVersion7(now.AddTicks(index + 10)),
                         Name = $"Target {index}",
@@ -174,7 +173,9 @@ public sealed class CompetitionWebhookPersistenceTests
                         CurrentSecretCiphertext = [1, 2, 3],
                         CreatedAt = now,
                         UpdatedAt = now
-                    });
+                    };
+                    competition.WebhookConfiguration.Targets.Add(target);
+                    expandDb.Entry(target).State = EntityState.Added;
                 }
                 await expandDb.SaveChangesAsync(cancellationToken);
             }
@@ -215,7 +216,7 @@ public sealed class CompetitionWebhookPersistenceTests
                     rotateDb,
                     protector,
                     NullCompetitionEventRecorder.Instance,
-                    new NoOpTransactionalMessageOutbox(),
+                    new NoOpPostCommitMessagePublisher(),
                     TimeProvider.System);
                 var page = await store.ListAsync(
                     competitionId,

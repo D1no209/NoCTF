@@ -3,7 +3,7 @@ import { proxyRefs } from 'vue'
 import { Plus } from '@lucide/vue'
 import { toast } from 'vue-sonner'
 import { adminChallengeBankListTemplates, adminCreateCompetitionChallenge, adminDeleteCompetitionChallenge, adminListCompetitionChallenges, adminPatchCompetitionChallenge, adminRestoreCompetitionChallenge } from '../../../../../../api'
-import type { NoCtfapiEndpointsAdministrationChallengeBankChallengeTemplateResponse, NoCtfapiEndpointsChallengesChallengeResponse } from '../../../../../../api'
+import type { NoCtfapiEndpointsAdministrationChallengeBankChallengeTemplateSummaryResponse, NoCtfapiEndpointsChallengesChallengeSummaryResponse } from '../../../../../../api'
 import { useCompetitionAdmin } from '../../../../../../lib/admin-competition'
 import { competitionChallengeConflictMessage } from '../../../../../../lib/competition-challenge-conflict'
 
@@ -13,7 +13,7 @@ type ChallengeStatusFilter = 'all' | 'published' | 'unpublished' | 'deleted'
 export function useAdminCompetitionsByIdChallengesIndexPage() {
   const { competitionId, competition, canWrite } = useCompetitionAdmin()
 
-  const items = ref<NoCtfapiEndpointsChallengesChallengeResponse[]>([])
+  const items = ref<NoCtfapiEndpointsChallengesChallengeSummaryResponse[]>([])
 
   const loading = ref(true)
 
@@ -76,7 +76,7 @@ export function useAdminCompetitionsByIdChallengesIndexPage() {
 
   const addOpen = ref(false)
 
-  const templates = ref<NoCtfapiEndpointsAdministrationChallengeBankChallengeTemplateResponse[]>([])
+  const templates = ref<NoCtfapiEndpointsAdministrationChallengeBankChallengeTemplateSummaryResponse[]>([])
 
   const templatesLoading = ref(false)
 
@@ -165,7 +165,7 @@ export function useAdminCompetitionsByIdChallengesIndexPage() {
     }
   }
 
-  const deleteTarget = ref<NoCtfapiEndpointsChallengesChallengeResponse | null>(null)
+  const deleteTarget = ref<NoCtfapiEndpointsChallengesChallengeSummaryResponse | null>(null)
 
   const deletePending = ref(false)
 
@@ -178,7 +178,7 @@ export function useAdminCompetitionsByIdChallengesIndexPage() {
     }
   }
 
-  function beginDeleteChallenge(c: NoCtfapiEndpointsChallengesChallengeResponse) {
+  function beginDeleteChallenge(c: NoCtfapiEndpointsChallengesChallengeSummaryResponse) {
     deleteTarget.value = c
     deleteError.value = null
   }
@@ -209,7 +209,7 @@ export function useAdminCompetitionsByIdChallengesIndexPage() {
     }
   }
 
-  async function restoreChallenge(c: NoCtfapiEndpointsChallengesChallengeResponse) {
+  async function restoreChallenge(c: NoCtfapiEndpointsChallengesChallengeSummaryResponse) {
     if (!c.id) return
     pendingId.value = c.id
     try {
@@ -229,7 +229,7 @@ export function useAdminCompetitionsByIdChallengesIndexPage() {
   }
 
   async function setChallengePublished(
-    challenge: NoCtfapiEndpointsChallengesChallengeResponse,
+    challenge: NoCtfapiEndpointsChallengesChallengeSummaryResponse,
     published: boolean,
   ) {
     if (!challenge.id || challenge.deletedAt || pendingId.value !== null) return

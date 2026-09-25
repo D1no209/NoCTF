@@ -40,10 +40,10 @@ internal static class CompetitionInfrastructure
         bool development)
     {
         services.AddScoped<ICompetitionLifecycleStore, CompetitionLifecycleStore>();
-        services.AddScoped<IAwdRoundCoordinator, PostgresAwdRoundCoordinator>();
-        services.AddScoped<IAwdRuntimeProvisioner, PostgresAwdRuntimeProvisioner>();
-        services.AddScoped<IKohRuntimeProvisioner, PostgresKohRuntimeProvisioner>();
-        services.AddScoped<IKohChallengeAccessReader, PostgresKohChallengeAccessReader>();
+        services.AddScoped<IAwdRoundCoordinator, AwdRoundCoordinator>();
+        services.AddScoped<IAwdRuntimeProvisioner, AwdRuntimeProvisioner>();
+        services.AddScoped<IKohRuntimeProvisioner, KohRuntimeProvisioner>();
+        services.AddScoped<IKohChallengeAccessReader, KohChallengeAccessReader>();
         services.AddSingleton<AwdRoundConfigurationCatalog>();
         services.AddSingleton<IAwdRoundConfigurationCatalog,
             FusionAwdRoundConfigurationCatalog>();
@@ -152,8 +152,12 @@ internal static class CompetitionInfrastructure
             services.AddSingleton<ICompetitionWebhookTestStatusStore,
                 RedisCompetitionWebhookTestStatusStore>();
         }
-        if (!development)
-            services.AddSingleton<RedisCompetitionEventRefreshPublisher>();
+        if (development)
+            services.AddSingleton<ICompetitionEventRefreshPublisher,
+                NoOpCompetitionEventRefreshPublisher>();
+        else
+            services.AddSingleton<ICompetitionEventRefreshPublisher,
+                RedisCompetitionEventRefreshPublisher>();
         return services;
     }
 

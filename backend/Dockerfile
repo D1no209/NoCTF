@@ -37,6 +37,20 @@ WORKDIR /src
 COPY backend/ ./backend/
 WORKDIR /src/backend
 RUN dotnet restore src/NoCTF.Host/NoCTF.Host.csproj
+RUN dotnet build src/NoCTF.Host/NoCTF.Host.csproj -c Release --no-restore -p:NoCtfGenerateWolverineHandlers=true
+RUN ASPNETCORE_ENVIRONMENT=Production \
+    ConnectionStrings__Redis=localhost:6379 \
+    ConnectionStrings__Nats=nats://localhost:4222 \
+    ConnectionStrings__PostgreSql='Host=localhost;Database=noctf_codegen;Username=postgres;Password=unused' \
+    RunnerScoring__CallbackBaseUrl=http://localhost:5080 \
+    Webhooks__PublicBaseUrl=https://noctf.invalid \
+    Runner__Id=codegen-runner \
+    Runner__Pool=codegen \
+    Runner__Provider=Docker \
+    dotnet run --no-build -c Release --project src/NoCTF.Host/NoCTF.Host.csproj -- codegen write \
+    > /tmp/noctf-codegen.log 2>&1 \
+    && cat /tmp/noctf-codegen.log \
+    && ! grep -q '^ERROR:' /tmp/noctf-codegen.log
 RUN dotnet publish src/NoCTF.Host/NoCTF.Host.csproj -c Release -o /app/host /p:BuildSpaOnPublish=false
 
 FROM mcr.microsoft.com/dotnet/aspnet:10.0.10@sha256:f1126d438ccc359f51cc6d4701a8deae513856cf10f5fe645d29ea6403dcac6b AS runtime

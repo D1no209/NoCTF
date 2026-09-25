@@ -6,6 +6,42 @@ namespace NoCTF.E2E;
 
 internal static class E2ELifecycle
 {
+    public static void AddIdempotencyKey(HttpRequestMessage request)
+    {
+        if (request.Method != HttpMethod.Get)
+            request.Headers.Add("Idempotency-Key", Guid.NewGuid().ToString("D"));
+    }
+
+    public static string FirstDirectAddress(JsonElement runtime)
+    {
+        var accesses = runtime.GetProperty("accesses");
+        if (accesses.GetArrayLength() == 0
+            || accesses[0].GetProperty("directAddress").GetString() is not { Length: > 0 } address)
+        {
+            throw new InvalidOperationException(
+                "The running Runtime did not expose a direct AccessEndpoint.");
+        }
+        return address;
+    }
+
+    public static async Task SubmitTeamRegistrationAsync(
+        HttpClient captain,
+        Guid competitionId,
+        Guid teamId,
+        CancellationToken cancellationToken)
+    {
+        using var response = await captain.PatchAsJsonAsync(
+            $"/api/v1/competitions/{competitionId}/teams/{teamId}",
+            new { registration = new { status = "Pending" } },
+            cancellationToken);
+        if (response.StatusCode != HttpStatusCode.OK)
+        {
+            var body = await response.Content.ReadAsStringAsync(cancellationToken);
+            throw new InvalidOperationException(
+                $"Expected 200 while submitting team registration, but received {(int)response.StatusCode}: {body}");
+        }
+    }
+
     public static async Task MakeScheduleDueAsync(
         HttpClient admin,
         Guid competitionId,
@@ -46,7 +82,13 @@ internal static class E2ELifecycle
                     maxActiveQuestionsPerTeam = root.GetProperty("maxActiveQuestionsPerTeam").GetInt32(),
                     maxParticipantMessagesBeforeHandlerReply = root.GetProperty("maxParticipantMessagesBeforeHandlerReply").GetInt32(),
                     allowChallengeOwnersToHandleQuestions = root.GetProperty("allowChallengeOwnersToHandleQuestions").GetBoolean(),
-                    practiceModeEnabled = root.GetProperty("practiceModeEnabled").GetBoolean()
+                    practiceModeEnabled = root.GetProperty("practiceModeEnabled").GetBoolean(),
+                    writeUpSubmissionRequired = root.GetProperty("writeUpSubmissionRequired").GetBoolean(),
+                    writeUpSubmissionDeadlineHours = root.GetProperty("writeUpSubmissionDeadlineHours").GetInt32(),
+                    accessMode = root.GetProperty("accessMode"),
+                    runtimeAccessMode = root.GetProperty("runtimeAccessMode"),
+                    trafficCaptureEnabled = root.GetProperty("trafficCaptureEnabled").GetBoolean(),
+                    trafficCaptureLimitBytes = root.GetProperty("trafficCaptureLimitBytes")
                 }
             },
             cancellationToken);

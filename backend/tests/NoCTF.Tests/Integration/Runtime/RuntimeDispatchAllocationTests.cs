@@ -41,20 +41,21 @@ public sealed class RuntimeDispatchAllocationTests
             var id = Guid.NewGuid();
             var challengeId = Guid.NewGuid();
             var initial = new RuntimeResourceLimits(64 * 1024 * 1024, 500_000_000, 64);
-            string Definition(RuntimeResourceLimits resources) => JsonSerializer.Serialize(new CtfChallengeConfiguration(
-                CtfChallengeConfiguration.CurrentSchemaVersion, null, null, Runtime: new ChallengeRuntimeTemplate(RuntimeAllocation.PerTeam,
-                    compose ? new ComposeRuntimeDefinition("services:\n  web:\n    image: busybox:1.36.1\n", new Dictionary<string, RuntimeResourceLimits> { ["web"] = resources })
-                        : new ContainerRuntimeDefinition(
-                            "busybox:1.36.1",
-                            Security: new(false, false, false, ["ALL"], [])), resources)), new JsonSerializerOptions(JsonSerializerDefaults.Web));
-            db.Challenges.Add(new Challenge
+            ChallengeDefinition Definition(RuntimeResourceLimits resources) =>
+                TestConfigurations.Definition(GameMode.Ctf, JsonSerializer.Serialize(new CtfChallengeConfiguration(
+                    null, null, Runtime: new ChallengeRuntimeTemplate(RuntimeAllocation.PerTeam,
+                        compose ? new ComposeRuntimeDefinition("services:\n  web:\n    image: busybox:1.36.1\n", new Dictionary<string, RuntimeResourceLimits> { ["web"] = resources })
+                            : new ContainerRuntimeDefinition(
+                                "busybox:1.36.1",
+                                Security: new(false, false, false, ["ALL"], [])), resources)), new JsonSerializerOptions(JsonSerializerDefaults.Web)));
+            db.Challenges.Add(new CtfChallenge
             {
-                Id = challengeId, OwnerId = fixture.OwnerId, Mode = GameMode.Ctf, Title = "Allocation limits",
-                DefinitionJson = Definition(initial), CreatedAt = fixture.Now, UpdatedAt = fixture.Now
+                Id = challengeId, OwnerId = fixture.OwnerId, Title = "Allocation limits",
+                Definition = Definition(initial), CreatedAt = fixture.Now, UpdatedAt = fixture.Now
             });
-            db.RuntimeInstances.Add(new RuntimeInstance
+            db.RuntimeInstances.Add(new TemplateTestRuntimeInstance
             {
-                Id = id, ChallengeId = challengeId, Purpose = RuntimePurpose.TemplateTest,
+                Id = id, ChallengeId = challengeId,
                 RuntimeKind = compose ? RuntimeKind.Compose : RuntimeKind.Container, RuntimeProvider = RuntimeProvider.Docker,
                 State = RuntimeState.Queued, TestFlagDelivery = RuntimeTestFlagDelivery.NotRequired,
                 TestFlagState = RuntimeTestFlagState.NotRequired, CreatedAt = fixture.Now
@@ -77,10 +78,11 @@ public sealed class RuntimeDispatchAllocationTests
             db.ChangeTracker.Clear();
             var allocation = (await db.RuntimeInstances.SingleAsync(row => row.Id == id, ct)).CapacityAllocations.Items.Single();
             await Assert.That(RuntimeProvisionCapacity.Matches(allocation, request)).IsTrue();
-            var services = new ServiceCollection().AddDbContext<NoCtfDbContext>(builder => builder
-                .UseNpgsql(postgres.GetConnectionString()).UseSnakeCaseNamingConvention());
-            await using var provider = services.BuildServiceProvider();
-            var reader = new RuntimeNodeWorkReader(provider.GetRequiredService<IServiceScopeFactory>());
+            var reader = new RuntimeNodeWorkReader(new TestDbContextFactory(
+                new DbContextOptionsBuilder<NoCtfDbContext>()
+                    .UseNpgsql(postgres.GetConnectionString())
+                    .UseSnakeCaseNamingConvention()
+                    .Options));
             await Assert.That(await reader.ReadProvisionStatusAsync(request, ct)).IsEqualTo(RuntimeProvisionWorkStatus.Current);
             var tampered = request switch
             {
@@ -92,8 +94,20 @@ public sealed class RuntimeDispatchAllocationTests
             };
             await Assert.That(await reader.ReadProvisionStatusAsync(tampered, ct)).IsEqualTo(RuntimeProvisionWorkStatus.AssignmentRetained);
             // Changing a hard limit must never match a previously committed allocation.
-            await db.Challenges.Where(row => row.Id == challengeId).ExecuteUpdateAsync(update => update
-                .SetProperty(row => row.DefinitionJson, Definition(initial with { NanoCpus = 1_000_000_000 })), ct);
+            if (compose)
+            {
+                await db.Set<ComposeServiceResource>()
+                    .Where(row => row.ChallengeId == challengeId && row.ServiceName == "web")
+                    .ExecuteUpdateAsync(update => update
+                        .SetProperty(row => row.Limits.NanoCpus, 1_000_000_000), ct);
+            }
+            else
+            {
+                await db.Set<ChallengeRuntimeTemplateEntity>()
+                    .Where(row => row.ChallengeId == challengeId)
+                    .ExecuteUpdateAsync(update => update
+                        .SetProperty(row => row.Limits.NanoCpus, 1_000_000_000), ct);
+            }
             db.ChangeTracker.Clear();
             await BackendMessageOperations.DispatchRuntimeAsync(new(id), db, templates, new FixedRuntimePlacementPolicy(),
                 capacity, outbox, TimeProvider.System, ct, budgets: new());
@@ -108,7 +122,7 @@ public sealed class RuntimeDispatchAllocationTests
         });
     }
 
-    private sealed class Outbox : ITransactionalMessageOutbox
+    private sealed class Outbox : IPostCommitMessagePublisher
     {
         public List<object> Messages { get; } = [];
         public ValueTask PublishAsync<T>(T message) { Messages.Add(message!); return ValueTask.CompletedTask; }

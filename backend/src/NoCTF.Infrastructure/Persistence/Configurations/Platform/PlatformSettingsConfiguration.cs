@@ -1,17 +1,12 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using NoCTF.Domain.Platform;
-using Microsoft.EntityFrameworkCore.ChangeTracking;
-using System.Text.Json;
 
 namespace NoCTF.Infrastructure.Persistence.Configurations.Platform;
 
 internal sealed class PlatformSettingsConfiguration
     : IEntityTypeConfiguration<PlatformSettings>
 {
-    private static readonly JsonSerializerOptions SsoJsonOptions =
-        new(JsonSerializerDefaults.Web);
-
     public void Configure(EntityTypeBuilder<PlatformSettings> builder)
     {
         builder.ToTable("platform_settings");
@@ -20,6 +15,7 @@ internal sealed class PlatformSettingsConfiguration
         builder.HasData(new PlatformSettings
         {
             Id = 1,
+            ConcurrencyStamp = Guid.Parse("00000000-0000-0000-0000-000000000001"),
             Name = "NoCTF",
             Description = null,
             LogoFileId = null,
@@ -33,7 +29,6 @@ internal sealed class PlatformSettingsConfiguration
             HumanVerificationCapSecretCiphertext = null,
             HumanVerificationTurnstileSiteKey = string.Empty,
             HumanVerificationTurnstileSecretCiphertext = null,
-            HumanVerificationTurnstileAllowedHostnames = [],
             EmailVerificationEnabled = false,
             EmailPublicBaseUrl = "http://localhost:5000",
             EmailVerificationTokenLifetimeMinutes = 1440,
@@ -49,7 +44,8 @@ internal sealed class PlatformSettingsConfiguration
             EmailSmtpFromAddress = string.Empty,
             EmailSmtpFromName = "NoCTF",
             EmailSmtpTimeoutSeconds = 30,
-            SsoConfiguration = new SsoConfiguration(),
+            SsoEnabled = false,
+            SsoPublicBaseUrl = string.Empty,
             UpdatedAt = DateTimeOffset.UnixEpoch
         });
         // Existing deployments required verification for Runtime and Evaluation operations.
@@ -66,34 +62,100 @@ internal sealed class PlatformSettingsConfiguration
         builder.Property(settings => settings.HumanVerificationProvider)
             .HasConversion<short>();
         builder.Property(settings => settings.EmailSmtpSecurityMode).HasConversion<short>();
-        builder.Property(settings => settings.SsoConfiguration)
-            .HasColumnType("jsonb")
-            .HasConversion(
-                value => JsonSerializer.Serialize(value, SsoJsonOptions),
-                value => JsonSerializer.Deserialize<SsoConfiguration>(value, SsoJsonOptions)
-                    ?? new SsoConfiguration(),
-                new ValueComparer<SsoConfiguration>(
-                    (left, right) => Serialize(left) == Serialize(right),
-                    value => Serialize(value).GetHashCode(StringComparison.Ordinal),
-                    value => Deserialize(Serialize(value))));
+        builder.HasMany(settings => settings.SsoProviders)
+            .WithOne()
+            .HasForeignKey(provider => provider.PlatformSettingsId)
+            .OnDelete(DeleteBehavior.Cascade);
+        builder.Navigation(settings => settings.SsoProviders).AutoInclude();
+        builder.HasMany(settings => settings.HumanVerificationTurnstileHostnames)
+            .WithOne()
+            .HasForeignKey(hostname => hostname.PlatformSettingsId)
+            .OnDelete(DeleteBehavior.Cascade);
+        builder.Navigation(settings => settings.HumanVerificationTurnstileHostnames).AutoInclude();
         builder.HasOne(settings => settings.LogoFile).WithMany()
             .HasForeignKey(settings => settings.LogoFileId).OnDelete(DeleteBehavior.Restrict);
-        builder.ToTable(table =>
-        {
-            table.HasCheckConstraint("ck_platform_settings_singleton", "id = 1");
-            table.HasCheckConstraint(
-                "ck_platform_settings_sso_configuration",
-                "jsonb_typeof(\"sso_configuration\") = 'object'"
-                + " AND (\"sso_configuration\" ->> 'schemaVersion')::integer = 1"
-                + " AND jsonb_typeof(\"sso_configuration\" -> 'providers') = 'array'"
-                + " AND jsonb_array_length(\"sso_configuration\" -> 'providers') <= 16");
-        });
     }
+}
 
-    private static string Serialize(SsoConfiguration? value) =>
-        JsonSerializer.Serialize(value ?? new SsoConfiguration(), SsoJsonOptions);
+internal sealed class SsoProviderConfigurationEntityConfiguration
+    : IEntityTypeConfiguration<SsoProviderConfiguration>
+{
+    public void Configure(EntityTypeBuilder<SsoProviderConfiguration> builder)
+    {
+        builder.ToTable("sso_providers");
+        builder.HasKey(provider => provider.Id);
+        builder.Property(provider => provider.Id).ValueGeneratedNever();
+        builder.HasDiscriminator(provider => provider.Protocol)
+            .HasValue<OidcSsoProviderConfiguration>(NoCTF.Domain.Identity.SsoProtocol.Oidc)
+            .HasValue<CasSsoProviderConfiguration>(NoCTF.Domain.Identity.SsoProtocol.Cas);
+        builder.Property(provider => provider.Name).HasMaxLength(160).IsRequired();
+        builder.Property(provider => provider.IconUrl).HasMaxLength(2048);
+        builder.HasMany(provider => provider.AllowedHostEntries)
+            .WithOne()
+            .HasForeignKey(host => host.SsoProviderId)
+            .OnDelete(DeleteBehavior.Cascade);
+        builder.Navigation(provider => provider.AllowedHostEntries).AutoInclude();
+    }
+}
 
-    private static SsoConfiguration Deserialize(string value) =>
-        JsonSerializer.Deserialize<SsoConfiguration>(value, SsoJsonOptions)
-        ?? new SsoConfiguration();
+internal sealed class OidcSsoProviderConfigurationEntityConfiguration
+    : IEntityTypeConfiguration<OidcSsoProviderConfiguration>
+{
+    public void Configure(EntityTypeBuilder<OidcSsoProviderConfiguration> builder)
+    {
+        builder.Property(value => value.Issuer).HasMaxLength(2048);
+        builder.Property(value => value.DiscoveryUrl).HasMaxLength(2048);
+        builder.Property(value => value.ClientId).HasMaxLength(512);
+        builder.HasMany(value => value.ScopeEntries)
+            .WithOne()
+            .HasForeignKey(scope => scope.SsoProviderId)
+            .OnDelete(DeleteBehavior.Cascade);
+        builder.Navigation(value => value.ScopeEntries).AutoInclude();
+    }
+}
+
+internal sealed class CasSsoProviderConfigurationEntityConfiguration
+    : IEntityTypeConfiguration<CasSsoProviderConfiguration>
+{
+    public void Configure(EntityTypeBuilder<CasSsoProviderConfiguration> builder)
+    {
+        builder.Property(value => value.IdentityNamespace).HasMaxLength(512);
+        builder.Property(value => value.LoginUrl).HasMaxLength(2048);
+        builder.Property(value => value.ServiceValidateUrl).HasMaxLength(2048);
+        builder.Property(value => value.DisplayNameAttribute).HasMaxLength(256);
+    }
+}
+
+internal sealed class SsoProviderAllowedHostConfiguration
+    : IEntityTypeConfiguration<SsoProviderAllowedHost>
+{
+    public void Configure(EntityTypeBuilder<SsoProviderAllowedHost> builder)
+    {
+        builder.ToTable("sso_provider_allowed_hosts");
+        builder.HasKey(host => new { host.SsoProviderId, host.Position });
+        builder.Property(host => host.Position).ValueGeneratedNever();
+    }
+}
+
+internal sealed class OidcSsoScopeConfiguration : IEntityTypeConfiguration<OidcSsoScope>
+{
+    public void Configure(EntityTypeBuilder<OidcSsoScope> builder)
+    {
+        builder.ToTable("sso_provider_oidc_scopes");
+        builder.HasKey(scope => new { scope.SsoProviderId, scope.Position });
+        builder.Property(scope => scope.Position).ValueGeneratedNever();
+    }
+}
+
+internal sealed class HumanVerificationTurnstileHostnameConfiguration
+    : IEntityTypeConfiguration<HumanVerificationTurnstileHostname>
+{
+    public void Configure(EntityTypeBuilder<HumanVerificationTurnstileHostname> builder)
+    {
+        builder.ToTable("human_verification_turnstile_hostnames");
+        builder.HasKey(hostname => new { hostname.PlatformSettingsId, hostname.Position });
+        builder.Property(hostname => hostname.Position).ValueGeneratedNever();
+        builder.HasIndex(hostname => new { hostname.PlatformSettingsId, hostname.Hostname })
+            .IsUnique();
+    }
 }

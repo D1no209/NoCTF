@@ -83,6 +83,7 @@ public sealed record CurrentUserProfilePatchFailureResponse(
 public static partial class CurrentUserProfilePatchMapper
 {
     [MapperIgnoreTarget(nameof(User.Id))]
+    [MapperIgnoreTarget(nameof(User.ConcurrencyStamp))]
     [MapperIgnoreTarget(nameof(User.UserName))]
     [MapperIgnoreTarget(nameof(User.NormalizedUserName))]
     [MapperIgnoreTarget(nameof(User.Email))]
@@ -92,6 +93,7 @@ public static partial class CurrentUserProfilePatchMapper
     [MapperIgnoreTarget(nameof(User.AccountStatus))]
     [MapperIgnoreTarget(nameof(User.TokenVersion))]
     [MapperIgnoreTarget(nameof(User.ExternalIdentityProviderId))]
+    [MapperIgnoreTarget(nameof(User.ExternalIdentity))]
     [MapperIgnoreTarget(nameof(User.ExternalIdentityProtocol))]
     [MapperIgnoreTarget(nameof(User.ExternalIdentityNamespace))]
     [MapperIgnoreTarget(nameof(User.ExternalIdentitySubject))]
@@ -108,6 +110,7 @@ public static partial class CurrentUserProfilePatchMapper
     [MapperIgnoreTarget(nameof(User.EmailVerifiedAt))]
     [MapperIgnoreTarget(nameof(User.CreatedAt))]
     [MapperIgnoreTarget(nameof(User.UpdatedAt))]
+    [MapperIgnoreTarget(nameof(User.NormalizedEmail))]
     public static partial void ApplyProfileAsSelf(
         CurrentUserBasicProfilePatchRequest request,
         [MappingTarget] User target);
@@ -119,6 +122,7 @@ public static partial class CurrentUserProfilePatchMapper
         nameof(CurrentUserSchoolIdentityPatchRequest.StudentNumber),
         nameof(User.SchoolStudentNumber))]
     [MapperIgnoreTarget(nameof(User.Id))]
+    [MapperIgnoreTarget(nameof(User.ConcurrencyStamp))]
     [MapperIgnoreTarget(nameof(User.UserName))]
     [MapperIgnoreTarget(nameof(User.NormalizedUserName))]
     [MapperIgnoreTarget(nameof(User.Email))]
@@ -128,6 +132,7 @@ public static partial class CurrentUserProfilePatchMapper
     [MapperIgnoreTarget(nameof(User.AccountStatus))]
     [MapperIgnoreTarget(nameof(User.TokenVersion))]
     [MapperIgnoreTarget(nameof(User.ExternalIdentityProviderId))]
+    [MapperIgnoreTarget(nameof(User.ExternalIdentity))]
     [MapperIgnoreTarget(nameof(User.ExternalIdentityProtocol))]
     [MapperIgnoreTarget(nameof(User.ExternalIdentityNamespace))]
     [MapperIgnoreTarget(nameof(User.ExternalIdentitySubject))]
@@ -143,6 +148,7 @@ public static partial class CurrentUserProfilePatchMapper
     [MapperIgnoreTarget(nameof(User.EmailVerifiedAt))]
     [MapperIgnoreTarget(nameof(User.CreatedAt))]
     [MapperIgnoreTarget(nameof(User.UpdatedAt))]
+    [MapperIgnoreTarget(nameof(User.NormalizedEmail))]
     public static partial void ApplySchoolIdentityAsSelf(
         CurrentUserSchoolIdentityPatchRequest request,
         [MappingTarget] User target);
@@ -151,6 +157,7 @@ public static partial class CurrentUserProfilePatchMapper
         nameof(CurrentUserAppearancePatchRequest.WallpaperEnabled),
         nameof(User.WallpaperEnabled))]
     [MapperIgnoreTarget(nameof(User.Id))]
+    [MapperIgnoreTarget(nameof(User.ConcurrencyStamp))]
     [MapperIgnoreTarget(nameof(User.UserName))]
     [MapperIgnoreTarget(nameof(User.NormalizedUserName))]
     [MapperIgnoreTarget(nameof(User.Email))]
@@ -160,6 +167,7 @@ public static partial class CurrentUserProfilePatchMapper
     [MapperIgnoreTarget(nameof(User.AccountStatus))]
     [MapperIgnoreTarget(nameof(User.TokenVersion))]
     [MapperIgnoreTarget(nameof(User.ExternalIdentityProviderId))]
+    [MapperIgnoreTarget(nameof(User.ExternalIdentity))]
     [MapperIgnoreTarget(nameof(User.ExternalIdentityProtocol))]
     [MapperIgnoreTarget(nameof(User.ExternalIdentityNamespace))]
     [MapperIgnoreTarget(nameof(User.ExternalIdentitySubject))]
@@ -176,6 +184,7 @@ public static partial class CurrentUserProfilePatchMapper
     [MapperIgnoreTarget(nameof(User.EmailVerifiedAt))]
     [MapperIgnoreTarget(nameof(User.CreatedAt))]
     [MapperIgnoreTarget(nameof(User.UpdatedAt))]
+    [MapperIgnoreTarget(nameof(User.NormalizedEmail))]
     public static partial void ApplyAppearanceAsSelf(
         CurrentUserAppearancePatchRequest request,
         [MappingTarget] User target);

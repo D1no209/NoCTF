@@ -13,7 +13,7 @@ namespace NoCTF.Worker;
 
 [StickyHandler(CompetitionEventFanoutQueueNames.Realtime)]
 public sealed class CompetitionEventRealtimeMessageHandler(
-    RedisCompetitionEventRefreshPublisher publisher)
+    ICompetitionEventRefreshPublisher publisher)
 {
     public Task Handle(
         CompetitionEventCommitted message,

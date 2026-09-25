@@ -163,7 +163,7 @@ describe('participant challenge progress', () => {
     expect(history).toContain('valueRequestGeneration += 1')
     expect(history).toContain('competitionChallengeId: props.competitionChallengeId')
     expect(history).toContain('createLatestPageRefresh')
-    expect(history).toContain('getGameplayFactStatusEndpoint({')
+    expect(history).toContain('await readStatus(props.competitionId, submission.id!)')
     expect(history).toContain('if (!applyStatus(payload)) void refreshLatest()')
     expect(history).toContain('isGameplayFactPending(item.state)')
     expect(history).toContain('{ interval: 1500, timeout: 300_000 }')

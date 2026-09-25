@@ -3,6 +3,7 @@ using System.Text.Json;
 using Microsoft.AspNetCore.SignalR;
 using NoCTF.API.SignalR.Hubs;
 using NoCTF.Application.Competitions.Events;
+using NoCTF.Application.Messaging;
 using NoCTF.Application.Observability;
 using NoCTF.Infrastructure.Competitions.Events;
 using StackExchange.Redis;
@@ -26,8 +27,9 @@ public sealed class RedisCompetitionEventRefreshRelay(
             var started = Stopwatch.GetTimestamp();
             try
             {
-                var notification = JsonSerializer.Deserialize<CompetitionEventCommitted>(
-                    message.Message.ToString());
+                var notification = JsonSerializer.Deserialize(
+                    message.Message.ToString(),
+                    NoCtfMessageJsonContext.Default.CompetitionEventCommitted);
                 if (notification is null)
                     return;
                 var clients = notification.Kind == CompetitionEventKind.CompetitionAudienceChanged

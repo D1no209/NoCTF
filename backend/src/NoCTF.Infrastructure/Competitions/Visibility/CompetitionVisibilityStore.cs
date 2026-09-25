@@ -69,19 +69,12 @@ public sealed class CompetitionVisibilityStore(
             CompetitionEventVisibility.Public,
             command.Now,
             ActorUserId: command.ActorId,
-            PayloadJson: JsonSerializer.Serialize(new
-            {
-                schemaVersion = 1,
-                from = before,
-                to = after,
-                frozenStartAt = competition.FrozenStartAt,
-                hiddenStartAt = competition.HiddenStartAt,
-                actorUserId = command.ActorId,
-                operatedAt = command.Now,
-                reason = NormalizeReason(command.Reason)
-            }, JsonOptions),
             CompetitionStatus: competition.Status,
-            LeaderboardVisibility: after), ct);
+            LeaderboardVisibility: after,
+            PreviousLeaderboardVisibility: before,
+            FrozenStartAt: competition.FrozenStartAt,
+            HiddenStartAt: competition.HiddenStartAt,
+            Reason: NormalizeReason(command.Reason)), ct);
 
         await db.SaveChangesAsync(ct);
         await transaction.CommitAsync(ct);

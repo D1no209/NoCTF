@@ -60,11 +60,21 @@ const { bytesToMib, nanoCpusToCores, RuntimeAllocation, UrlExposure, isCompose, 
       :disabled="disabled"
     />
     <component :is="DefinitionCompose"
-      v-else
+      v-else-if="runtime.definition.kind === 'compose'"
       :definition="runtime.definition"
       :flag-source="runtime.flagSource"
       :disabled="disabled"
     />
+    <DefinitionSection v-else :title="$t('ui.operatingEnvironmentType')" :collapsible="false">
+      <Field>
+        <FieldLabel>{{ $t('ui.ovaSourceUrl') }}</FieldLabel>
+        <Input v-model="runtime.definition.sourceUrl" :disabled="disabled" />
+      </Field>
+      <Field>
+        <FieldLabel>{{ $t('ui.sha256') }}</FieldLabel>
+        <Input v-model="runtime.definition.sha256" :disabled="disabled" />
+      </Field>
+    </DefinitionSection>
 
     <DefinitionSection :title="$t('ui.accessEntrance')" :collapsible="false" accent-title>
       <Field v-if="mode !== 'Ctf' && mode !== 'Awdp'">

@@ -42,7 +42,7 @@ NoCTF 接受可信的 tag 或 digest，不强制固定 digest。正式 Break 流
 | OperationTimeoutSeconds | `90` |
 | EgressPolicy | `Isolated` |
 | Security | NNP=`true`，Readonly=`false`，NonRoot=`true` |
-| CapDrop / CapAdd | `["ALL"]` / `[]` |
+| CapDrop / CapAdd | `[]` / `[]` |
 | PatchEntrypoint | `fix.sh` |
 | PatchCommand | `["/bin/sh","{entrypoint}"]` |
 | PatchTimeoutSeconds | `60` |

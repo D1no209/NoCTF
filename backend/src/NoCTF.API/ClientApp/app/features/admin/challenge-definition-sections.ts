@@ -1,34 +1,29 @@
 import type { DefinitionModel, GameModeValue } from '../../utils/game-config'
 import {
   applyCtfInteraction,
-  parseDefinition,
-  serializeDefinition,
 } from '../../utils/game-config'
 
 /** Replaces only the Runtime portion of the persisted challenge definition. */
 export function mergeChallengeRuntimeDefinition(
-  mode: GameModeValue,
-  persistedJson: string,
+  persisted: DefinitionModel,
   draft: DefinitionModel,
-): string | null {
-  const persisted = parseDefinition(persistedJson, mode)
-  if (!persisted) return null
-  persisted.runtime = draft.runtime
-  return serializeDefinition(mode, persisted)
+): DefinitionModel {
+  const merged = structuredClone(persisted)
+  merged.runtime = structuredClone(draft.runtime)
+  return merged
 }
 
 /** Replaces mode-owned fields while retaining the last persisted Runtime. */
 export function mergeChallengeModeDefinition(
   persistedMode: GameModeValue,
-  persistedJson: string,
+  persistedDefinition: DefinitionModel,
   draftMode: GameModeValue,
   draft: DefinitionModel,
-): string | null {
+): DefinitionModel {
   if (draftMode !== persistedMode)
-    return serializeDefinition(draftMode, draft)
+    return structuredClone(draft)
 
-  const persisted = parseDefinition(persistedJson, persistedMode)
-  if (!persisted) return null
+  const persisted = structuredClone(persistedDefinition)
   persisted.interactionKind = draft.interactionKind
   persisted.checker = draft.checker
   persisted.checkerJob = draft.checkerJob
@@ -43,15 +38,26 @@ export function mergeChallengeModeDefinition(
   persisted.checkerAllowRoot = draft.checkerAllowRoot
   if (draftMode === 'Ctf')
     applyCtfInteraction(persisted, draft.interactionKind)
-  return serializeDefinition(draftMode, persisted)
+  return persisted
 }
 
 export function challengeRuntimeDefinitionsEqual(
-  mode: GameModeValue,
+  _mode: GameModeValue,
   left: DefinitionModel,
   right: DefinitionModel,
 ): boolean {
-  const leftJson = JSON.parse(serializeDefinition(mode, left)) as { runtime?: unknown }
-  const rightJson = JSON.parse(serializeDefinition(mode, right)) as { runtime?: unknown }
-  return JSON.stringify(leftJson.runtime ?? null) === JSON.stringify(rightJson.runtime ?? null)
+  return deepEqual(left.runtime, right.runtime)
+}
+
+function deepEqual(left: unknown, right: unknown): boolean {
+  if (Object.is(left, right)) return true
+  if (Array.isArray(left) && Array.isArray(right))
+    return left.length === right.length && left.every((value, index) => deepEqual(value, right[index]))
+  if (left === null || right === null || typeof left !== 'object' || typeof right !== 'object')
+    return false
+  const leftEntries = Object.entries(left as Record<string, unknown>).sort(([a], [b]) => a.localeCompare(b))
+  const rightEntries = Object.entries(right as Record<string, unknown>).sort(([a], [b]) => a.localeCompare(b))
+  return leftEntries.length === rightEntries.length
+    && leftEntries.every(([key, value], index) =>
+      key === rightEntries[index]?.[0] && deepEqual(value, rightEntries[index]?.[1]))
 }

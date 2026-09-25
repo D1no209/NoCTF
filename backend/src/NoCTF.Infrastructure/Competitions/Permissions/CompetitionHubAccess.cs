@@ -21,9 +21,8 @@ public sealed class CompetitionHubAccess(NoCtfDbContext db) : ICompetitionHubAcc
                 candidate.Status,
                 candidate.AccessMode,
                 candidate.OwnerId,
-                candidate.ManagerIds,
-                candidate.JudgeIds,
-                candidate.ObserverIds
+                IsCollaborator = candidate.Collaborators.Any(collaborator =>
+                    collaborator.UserId == userId)
             })
             .SingleOrDefaultAsync(cancellationToken);
         if (competition is null)
@@ -39,9 +38,7 @@ public sealed class CompetitionHubAccess(NoCtfDbContext db) : ICompetitionHubAcc
 
         var isStaff = identity.Role == UserRole.Administrator
             || competition.OwnerId == userId
-            || competition.ManagerIds.Contains(userId)
-            || competition.JudgeIds.Contains(userId)
-            || competition.ObserverIds.Contains(userId);
+            || competition.IsCollaborator;
         if ((competition.Status == CompetitionStatus.Draft
                 || competition.AccessMode == CompetitionAccessMode.StaffOnly)
             && !isStaff)

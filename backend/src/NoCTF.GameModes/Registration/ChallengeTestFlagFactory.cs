@@ -1,11 +1,7 @@
 using System.Security.Cryptography;
-using System.Text.Json;
 using NoCTF.Application.Runtime.Provisioning;
 using NoCTF.Domain.Competitions;
 using NoCTF.Domain.Runtime;
-using NoCTF.GameModes.Awd.Configuration;
-using NoCTF.GameModes.Awdp.Configuration;
-using NoCTF.GameModes.Ctf.Configuration;
 using NoCTF.GameModes.Flags;
 
 namespace NoCTF.GameModes.Registration;
@@ -21,14 +17,12 @@ public sealed record ChallengeTestFlagPlan(
 
 public static class ChallengeTestFlagFactory
 {
-    private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
-
     public static ChallengeTestFlagPlan Create(
         GameMode mode,
-        string definitionJson,
         ChallengeRuntimeTemplate runtime,
         Guid challengeId,
-        Guid runtimeInstanceId)
+        Guid runtimeInstanceId,
+        FlagTemplateValue? flagTemplate = null)
     {
         var delivery = runtime.FlagSource switch
         {
@@ -40,9 +34,13 @@ public static class ChallengeTestFlagFactory
         if (delivery == RuntimeTestFlagDelivery.NotRequired)
             return new(null, delivery);
 
-        var template = ResolveTemplate(mode, definitionJson) ?? PerTeamFlagTemplate.Default;
         var flag = PerTeamFlagGenerator.Generate(
-            template,
+            flagTemplate is null
+                ? PerTeamFlagTemplate.Default
+                : new PerTeamFlagTemplate(
+                    flagTemplate.Header,
+                    flagTemplate.BodyTemplate,
+                    flagTemplate.LeetLiteralText),
             new(
                 RandomNumberGenerator.GetBytes(32),
                 runtimeInstanceId,
@@ -53,18 +51,4 @@ public static class ChallengeTestFlagFactory
         return new(flag, delivery);
     }
 
-    private static PerTeamFlagTemplate? ResolveTemplate(
-        GameMode mode,
-        string definitionJson) => mode switch
-    {
-        GameMode.Ctf => Deserialize<CtfChallengeConfiguration>(definitionJson).FlagTemplate,
-        GameMode.Awd => Deserialize<AwdChallengeConfiguration>(definitionJson).FlagTemplate,
-        GameMode.Awdp => Deserialize<AwdpChallengeConfiguration>(definitionJson).FlagTemplate,
-        GameMode.Koh => null,
-        _ => throw new ArgumentOutOfRangeException(nameof(mode), mode, "Unsupported game mode.")
-    };
-
-    private static T Deserialize<T>(string json) where T : class =>
-        JsonSerializer.Deserialize<T>(json, JsonOptions)
-        ?? throw new InvalidOperationException($"{typeof(T).Name} is required.");
 }

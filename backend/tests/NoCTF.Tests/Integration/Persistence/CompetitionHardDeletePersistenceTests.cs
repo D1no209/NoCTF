@@ -73,25 +73,24 @@ public sealed class CompetitionHardDeletePersistenceTests
                         now,
                         deletedAt: now,
                         posterFileId));
-                setup.Challenges.Add(new Challenge
+                setup.Challenges.Add(new CtfChallenge
                 {
                     Id = challengeId,
                     OwnerId = ownerId,
-                    Mode = GameMode.Ctf,
                     Visibility = ChallengeVisibility.Private,
                     Title = "Historical challenge",
                     Direction = "Web",
-                    DefinitionJson = "{}",
+                    Definition = TestConfigurations.Definition(GameMode.Ctf),
                     CreatedAt = now,
                     UpdatedAt = now
                 });
-                setup.CompetitionChallenges.Add(new CompetitionChallenge
+                setup.CompetitionChallenges.Add(new CtfCompetitionChallenge
                 {
                     Id = competitionChallengeId,
                     CompetitionId = historicalCompetitionId,
                     ChallengeId = challengeId,
                     IsPublished = true,
-                    RulesJson = "{}",
+                    Rules = TestConfigurations.Rules(GameMode.Ctf),
                     UpdatedAt = now
                 });
                 setup.Teams.Add(new Team
@@ -105,14 +104,13 @@ public sealed class CompetitionHardDeletePersistenceTests
                     RegistrationStatus = TeamRegistrationStatus.Approved,
                     RegisteredAt = now
                 });
-                setup.GameplayFacts.Add(new GameplayFact
+                setup.GameplayFacts.Add(new FixAttemptGameplayFact
                 {
                     Id = gameplayFactId,
                     CompetitionId = historicalCompetitionId,
                     CompetitionChallengeId = competitionChallengeId,
                     TeamId = teamId,
                     ActorUserId = ownerId,
-                    Kind = GameplayFactKind.FixAttempt,
                     ReferenceKind = GameplayFactReferenceKind.PatchUpload,
                     ReferenceId = patchUploadId,
                     OccurredAt = now,
@@ -120,14 +118,13 @@ public sealed class CompetitionHardDeletePersistenceTests
                     Result = GameplayFactResult.Correct,
                     UpdatedAt = now
                 });
-                setup.RuntimeInstances.Add(new RuntimeInstance
+                setup.RuntimeInstances.Add(new AwdpTargetRuntimeInstance
                 {
                     Id = runtimeId,
                     GameplayFactId = gameplayFactId,
                     CompetitionId = historicalCompetitionId,
                     CompetitionChallengeId = competitionChallengeId,
                     TeamId = teamId,
-                    Purpose = RuntimePurpose.AwdpTarget,
                     RuntimeKind = RuntimeKind.Container,
                     RuntimeProvider = RuntimeProvider.Docker,
                     State = RuntimeState.Stopped,
@@ -145,11 +142,10 @@ public sealed class CompetitionHardDeletePersistenceTests
                     FileId = patchFileId,
                     UploadedAt = now
                 });
-                setup.CompetitionEvents.Add(new CompetitionEvent
+                setup.CompetitionEvents.Add(new CompetitionCreatedEvent
                 {
                     Id = eventId,
                     CompetitionId = historicalCompetitionId,
-                    Kind = CompetitionEventKind.CompetitionCreated,
                     Level = CompetitionEventLevel.Information,
                     Visibility = CompetitionEventVisibility.Staff,
                     ActorUserId = ownerId,
@@ -158,27 +154,23 @@ public sealed class CompetitionHardDeletePersistenceTests
                     OccurredAt = now
                 });
                 setup.Notifications.AddRange(
-                    new Notification
+                    new CompetitionLifecycleChangedNotification
                     {
                         Id = notificationId,
                         SourceType = NotificationSourceType.System,
                         TargetType = NotificationTargetType.User,
                         TargetId = ownerId,
-                        Kind = NotificationKind.CompetitionLifecycleChanged,
-                        ContentJson = "{\"schemaVersion\":1}",
                         RelatedType = EntityReferenceKind.Competition,
                         RelatedId = historicalCompetitionId,
                         SentAt = now
                     },
-                    new Notification
+                    new TeamRegistrationChangedNotification
                     {
                         Id = teamNotificationId,
                         SourceType = NotificationSourceType.Team,
                         SourceId = teamId,
                         TargetType = NotificationTargetType.TeamMembers,
                         TargetId = teamId,
-                        Kind = NotificationKind.TeamRegistrationChanged,
-                        ContentJson = "{\"schemaVersion\":1}",
                         RelatedType = EntityReferenceKind.Team,
                         RelatedId = teamId,
                         SentAt = now.AddTicks(1)
@@ -314,9 +306,9 @@ public sealed class CompetitionHardDeletePersistenceTests
                 await Assert.That(audit.SourceId).IsEqualTo(ownerId);
                 await Assert.That(audit.TargetType)
                     .IsEqualTo(NotificationTargetType.PlatformAdministrators);
-                await Assert.That(audit.ContentJson).Contains(historicalCompetitionId.ToString());
-                await Assert.That(audit.ContentJson)
-                    .Contains("Remove the disposable integration competition.");
+                await Assert.That(audit.CompetitionId).IsEqualTo(historicalCompetitionId);
+                await Assert.That(audit.Reason)
+                    .IsEqualTo("Remove the disposable integration competition.");
                 var auditItems = await new PlatformAuditLogStore(verification)
                     .QueryAsync(new(
                         PlatformAuditKind.CompetitionAdministration,
@@ -371,11 +363,10 @@ public sealed class CompetitionHardDeletePersistenceTests
 
             await using var eventDb = new NoCtfDbContext(options);
             await using var eventTransaction = await eventDb.Database.BeginTransactionAsync(ct);
-            eventDb.CompetitionEvents.Add(new CompetitionEvent
+            eventDb.CompetitionEvents.Add(new CompetitionCreatedEvent
             {
                 Id = eventId,
                 CompetitionId = competitionId,
-                Kind = CompetitionEventKind.CompetitionCreated,
                 Level = CompetitionEventLevel.Information,
                 Visibility = CompetitionEventVisibility.Staff,
                 ActorUserId = ownerId,
@@ -502,7 +493,7 @@ public sealed class CompetitionHardDeletePersistenceTests
     }
 
     private static User User(Guid id, DateTimeOffset now) =>
-        new()
+        new User
         {
             Id = id,
             UserName = "competition-owner",
@@ -522,7 +513,7 @@ public sealed class CompetitionHardDeletePersistenceTests
         string fileName,
         string contentType,
         DateTimeOffset now) =>
-        new()
+        new StoredFile
         {
             Id = id,
             ObjectKey = $"hard-delete-tests/{id:N}",
@@ -540,14 +531,13 @@ public sealed class CompetitionHardDeletePersistenceTests
         DateTimeOffset now,
         DateTimeOffset? deletedAt = null,
         Guid? posterFileId = null) =>
-        new()
+        new CtfCompetition
         {
             Id = id,
             OwnerId = ownerId,
             Title = title,
             PosterFileId = posterFileId,
-            Mode = GameMode.Ctf,
-            ConfigurationJson = "{\"schemaVersion\":1}",
+            ModeConfiguration = TestConfigurations.Competition(GameMode.Ctf),
             FlagDerivationSecret = new byte[32],
             StartAt = now.AddHours(1),
             EndAt = now.AddHours(2),
@@ -557,7 +547,7 @@ public sealed class CompetitionHardDeletePersistenceTests
             DeletedAt = deletedAt
         };
 
-    private sealed class RecordingOutbox : ITransactionalMessageOutbox
+    private sealed class RecordingOutbox : IPostCommitMessagePublisher
     {
         public List<object> Published { get; } = [];
         public ValueTask PublishAsync<T>(T message)

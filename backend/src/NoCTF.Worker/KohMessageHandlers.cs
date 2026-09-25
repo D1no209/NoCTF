@@ -11,6 +11,7 @@ using NoCTF.Domain.Competitions;
 using NoCTF.Domain.Competitions.Events;
 using NoCTF.Domain.Runtime;
 using NoCTF.Domain.Gameplay;
+using NoCTF.Domain.Challenges;
 using NoCTF.GameModes.Koh.Configuration;
 using NoCTF.Infrastructure.Persistence;
 using Wolverine.Attributes;
@@ -41,22 +42,25 @@ public sealed class KohPollingHandler(
                 challenge => challenge.CompetitionId,
                 competition => competition.Id,
                 (challenge, competition) => new { Challenge = challenge, Competition = competition })
+            .AsSplitQuery()
             .SingleOrDefaultAsync(cancellationToken);
         if (target is null
             || target.Competition.Mode != GameMode.Koh
-            || target.Competition.Status != CompetitionStatus.Running)
+            || target.Competition.Status != CompetitionStatus.Running
+            || target.Competition.ModeConfiguration is not KohCompetitionModeConfiguration competitionConfiguration
+            || target.Challenge.Rules is not KohCompetitionChallengeRules challengeRules)
             return null;
 
         var settings = configurations.Get(
-            target.Competition.ConfigurationJson,
-            target.Challenge.RulesJson);
+            competitionConfiguration,
+            challengeRules);
         var timeout = TimeSpan.FromSeconds(Math.Min(settings.PollIntervalSeconds, 30));
         var runtime = await db.RuntimeInstances.AsNoTracking()
             .Where(runtime => runtime.CompetitionId == message.CompetitionId
                 && runtime.CompetitionChallengeId == message.CompetitionChallengeId
                 && runtime.TeamId == null
                 && runtime.State == RuntimeState.Running
-                && runtime.ProviderReceiptJson != null)
+                && runtime.ProviderReceipt != null)
             .Join(
                 db.CompetitionChallenges.AsNoTracking(),
                 instance => instance.CompetitionChallengeId,
@@ -69,18 +73,19 @@ public sealed class KohPollingHandler(
                 (pair, challenge) => new
                 {
                     Runtime = pair.instance,
-                    challenge.DefinitionJson
+                    Template = challenge
                 })
             .OrderByDescending(item => item.Runtime.CreatedAt)
+            .AsSplitQuery()
             .FirstOrDefaultAsync(cancellationToken);
         var controlUrl = runtime is null
             ? null
             : ResolveControlUrl(
                 runtimeTemplates,
-                runtime.DefinitionJson,
+                runtime.Template.Definition,
                 runtime.Runtime.RuntimeKind,
                 runtime.Runtime.RuntimeProvider,
-                runtime.Runtime.ProviderReceiptJson!);
+                runtime.Runtime.ProviderReceipt!);
 
         KohControlResponse response;
         if (controlUrl is null
@@ -113,31 +118,27 @@ public sealed class KohPollingHandler(
 
     private static Uri? ResolveControlUrl(
         IChallengeRuntimeTemplateCatalog templates,
-        string definitionJson,
+        ChallengeDefinition? definition,
         RuntimeKind runtimeKind,
         RuntimeProvider provider,
-        string providerReceiptJson)
+        RuntimeReceipt providerReceipt)
     {
-        var binding = templates.Get(GameMode.Koh, definitionJson)?.ControlCheckUrlBinding;
+        var binding = templates.Get(definition)?.ControlCheckUrlBinding;
         if (binding is null || runtimeKind != RuntimeKind.Container)
             return null;
-        try
-        {
-            var receipt = JsonSerializer.Deserialize<ContainerReceipt>(providerReceiptJson);
-            if (receipt is null
-                || receipt.Provider != provider
-                || string.IsNullOrWhiteSpace(receipt.InternalHost)
-                || binding.ContainerPort is not int port)
-                return null;
-            var expanded = binding.UrlTemplate
-                .Replace("{HOST}", receipt.InternalHost, StringComparison.Ordinal)
-                .Replace("{PORT}", port.ToString(CultureInfo.InvariantCulture), StringComparison.Ordinal);
-            return Uri.TryCreate(expanded, UriKind.Absolute, out var uri) ? uri : null;
-        }
-        catch (JsonException)
-        {
+        if (providerReceipt is not ContainerRuntimeReceipt receipt
+            || receipt.Provider != provider
+            || string.IsNullOrWhiteSpace(receipt.PublicHost)
+            || binding.ContainerPort is not int port)
             return null;
-        }
+        var published = receipt.PortMappings.SingleOrDefault(mapping =>
+            mapping.ContainerPort == port)?.HostPort;
+        if (published is not > 0)
+            return null;
+        var expanded = binding.UrlTemplate
+            .Replace("{HOST}", receipt.PublicHost, StringComparison.Ordinal)
+            .Replace("{PORT}", published.Value.ToString(CultureInfo.InvariantCulture), StringComparison.Ordinal);
+        return Uri.TryCreate(expanded, UriKind.Absolute, out var uri) ? uri : null;
     }
 
     private async Task<KohDecision> DecideAsync(
@@ -194,7 +195,7 @@ public sealed class KohPollingHandler(
 
 public sealed class KohObservationHandler(
     NoCtfDbContext db,
-    ITransactionalMessageOutbox outbox,
+    IPostCommitMessagePublisher outbox,
     ICompetitionEventRecorder events,
     TimeProvider timeProvider)
 {
@@ -203,33 +204,38 @@ public sealed class KohObservationHandler(
         CancellationToken cancellationToken)
     {
         await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
-        var target = await db.CompetitionChallenges
+        var target = await db.CompetitionChallenges.AsNoTracking()
             .Where(challenge => challenge.Id == message.CompetitionChallengeId
                 && challenge.CompetitionId == message.CompetitionId
                 && challenge.IsPublished
                 && challenge.DeletedAt == null)
             .Join(
-                db.Competitions,
+                db.Competitions.AsNoTracking(),
                 challenge => challenge.CompetitionId,
                 competition => competition.Id,
-                (challenge, competition) => new { Challenge = challenge, Competition = competition })
+                (challenge, competition) => new
+                {
+                    ChallengePublished = challenge.IsPublished,
+                    competition.Mode,
+                    competition.Status
+                })
             .SingleOrDefaultAsync(cancellationToken);
         if (target is null
-            || target.Competition.Mode != GameMode.Koh
-            || target.Competition.Status != CompetitionStatus.Running)
+            || target.Mode != GameMode.Koh
+            || target.Status != CompetitionStatus.Running
+            || !target.ChallengePublished)
             return;
 
         if (await db.GameplayFacts.AsNoTracking()
             .AnyAsync(fact => fact.Id == message.GameplayFactId, cancellationToken))
             return;
 
-        db.GameplayFacts.Add(new GameplayFact
+        db.GameplayFacts.Add(new KohControlObservationGameplayFact
         {
             Id = message.GameplayFactId,
             CompetitionId = message.CompetitionId,
             CompetitionChallengeId = message.CompetitionChallengeId,
             TeamId = message.TeamId,
-            Kind = GameplayFactKind.KohControlObservation,
             State = message.Result is null
                 ? GameplayFactState.PlatformFailed
                 : GameplayFactState.Completed,
@@ -258,6 +264,6 @@ public sealed class KohObservationHandler(
         // Do not persist recursive scheduled messages as a second scheduler.
         await db.SaveChangesAsync(cancellationToken);
         await transaction.CommitAsync(cancellationToken);
-        await outbox.FlushOutgoingMessagesAsync();
+        await outbox.FlushCommittedMessagesAsync();
     }
 }

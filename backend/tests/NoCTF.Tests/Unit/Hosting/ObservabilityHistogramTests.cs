@@ -2,6 +2,7 @@ using System.Globalization;
 using System.Text.RegularExpressions;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.TestHost;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using NoCTF.Application.Observability;
 using NoCTF.Domain.Gameplay;
@@ -51,6 +52,16 @@ public sealed class ObservabilityHistogramTests
             GameplayFactState.PlatformFailed,
             null,
             0.8);
+        NoCtfTelemetry.RecordGameplayFactStage(
+            GameplayFactPerformanceStage.ChallengeAttemptStateRead, 0.012);
+        NoCtfTelemetry.RecordGameplayFactStage(
+            GameplayFactPerformanceStage.AdmissionLoad, 0.04);
+        NoCtfTelemetry.RecordRuntimeDispatchStage(
+            RuntimeDispatchPerformanceStage.TargetRead, 0.012);
+        using var db = new DbContext(new DbContextOptionsBuilder<DbContext>()
+            .UseNpgsql("Host=localhost;Database=telemetry_test;Username=unused;Password=unused")
+            .Options);
+        _ = db.ChangeTracker.HasChanges();
         app.Services.GetRequiredService<MeterProvider>().ForceFlush();
         using var client = app.GetTestClient();
         var exported = await client.GetStringAsync("/metrics");
@@ -104,6 +115,14 @@ public sealed class ObservabilityHistogramTests
             StringComparison.Ordinal))).IsTrue();
         await Assert.That(exported).Contains(
             "noctf_gameplay_fact_processing_duration_seconds_bucket");
+        await Assert.That(exported.Split('\n').Any(line =>
+            line.StartsWith("noctf_gameplay_fact_stage_duration_seconds_bucket{", StringComparison.Ordinal)
+            && line.Contains("stage=\"ChallengeAttemptStateRead\"", StringComparison.Ordinal))).IsTrue();
+        await Assert.That(exported.Split('\n').Any(line =>
+            line.StartsWith("noctf_runtime_dispatch_stage_duration_seconds_bucket{", StringComparison.Ordinal)
+            && line.Contains("stage=\"TargetRead\"", StringComparison.Ordinal))).IsTrue();
+        await Assert.That(exported).Contains(
+            "microsoft_entityframeworkcore_active_dbcontexts");
     }
 
     private static SortedDictionary<double, double> Buckets(string text, string metric)

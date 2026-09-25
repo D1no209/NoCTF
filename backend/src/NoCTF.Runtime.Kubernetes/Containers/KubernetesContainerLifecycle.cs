@@ -561,7 +561,7 @@ public sealed class KubernetesContainerLifecycle(
                     AllowPrivilegeEscalation = false,
                     ReadOnlyRootFilesystem = true,
                     RunAsNonRoot = request.Security.RunAsNonRoot,
-                    Capabilities = new V1Capabilities { Drop = ["ALL"], Add = [] }
+                    Capabilities = new V1Capabilities { Drop = [], Add = [] }
                 },
                 Resources = checker.Resources,
                 VolumeMounts =

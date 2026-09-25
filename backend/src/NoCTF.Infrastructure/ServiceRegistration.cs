@@ -27,10 +27,7 @@ public static class ServiceRegistration
     {
         await using var scope = services.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<NoCtfDbContext>();
-        if (db.Database.IsRelational())
-            await db.Database.MigrateAsync(cancellationToken);
-        else
-            await db.Database.EnsureCreatedAsync(cancellationToken);
+        await db.Database.MigrateAsync(cancellationToken);
         await scope.ServiceProvider.GetRequiredService<AdministratorBootstrapper>()
             .SeedAsync(cancellationToken);
     }
@@ -44,7 +41,7 @@ public static class ServiceRegistration
 
         services.AddNoCtfCaching(configuration, development);
         services.AddNoCtfPersistence(configuration, exporting, development);
-        services.AddNoCtfMessaging(exporting, development);
+        services.AddNoCtfMessaging(configuration, exporting, development);
         services.AddNoCtfRuntime(configuration, development);
         services.AddNoCtfSubmissions();
         services.AddNoCtfScoring(development);

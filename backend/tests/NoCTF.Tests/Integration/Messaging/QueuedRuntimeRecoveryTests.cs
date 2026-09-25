@@ -11,9 +11,7 @@ using NoCTF.Tests.Integration.Persistence;
 using NoCTF.Worker;
 using Testcontainers.PostgreSql;
 using Wolverine;
-using Wolverine.EntityFrameworkCore;
 using Wolverine.Nats;
-using Wolverine.Postgresql;
 
 namespace NoCTF.Tests.Integration.Messaging;
 
@@ -43,7 +41,7 @@ public sealed class QueuedRuntimeRecoveryTests
                 var runtime = await db.RuntimeInstances.SingleAsync(x => x.Id == fixture.RuntimeIds[0], ct);
                 runtime.State = RuntimeState.Queued;
                 runtime.StoppedAt = null;
-                runtime.CreatedAt = fixture.Now.AddHours(-2);
+                runtime.CreatedAt = fixture.Now.AddSeconds(-1);
                 await db.SaveChangesAsync(ct);
             }
             var probe = new RecoveryProbe(fixture.RuntimeIds[0]);
@@ -51,39 +49,37 @@ public sealed class QueuedRuntimeRecoveryTests
                 .ConfigureServices(services =>
                 {
                     services.AddSingleton(probe);
+                    services.AddSingleton(TimeProvider.System);
                     services.AddSingleton(new NoCTF.Infrastructure.Runtime.Capacity.RuntimeDispatchWakeupGate(null));
-                    services.AddDbContextWithWolverineIntegration<NoCtfDbContext>(builder =>
-                        builder.UseNpgsql(connection).UseSnakeCaseNamingConvention());
-                    services.AddScoped<ITransactionalMessageOutbox, WolverineTransactionalMessageOutbox>();
+                    services.AddDbContext<NoCtfDbContext>(builder =>
+                            builder.UseNpgsql(connection).UseSnakeCaseNamingConvention(),
+                        contextLifetime: ServiceLifetime.Scoped,
+                        optionsLifetime: ServiceLifetime.Singleton);
+                    services.AddScoped<IPostCommitMessagePublisher, WolverinePostCommitMessagePublisher>();
                 })
                 .UseWolverine(wolverine =>
                 {
                     wolverine.Discovery.DisableConventionalDiscovery();
                     wolverine.Discovery.IncludeType(typeof(QueuedRuntimeDispatchHandler));
                     wolverine.Discovery.IncludeType(typeof(RecoveryDispatchHandler));
-                    wolverine.PersistMessagesWithPostgresql(connection, "wolverine_queued_recovery");
-                    wolverine.UseEntityFrameworkCoreTransactions();
-                    wolverine.AutoBuildMessageStorageOnStartup = AutoCreate.All;
-                    wolverine.Durability.Mode = DurabilityMode.Solo;
                     wolverine.UseNats($"nats://{nats.Hostname}:{nats.GetMappedPublicPort(4222)}")
                         .AutoProvision().UseJetStream(_ => { })
                         .DefineWorkQueueStream("RECOVERY", stream => stream.WithSubjects("recovery.control"), "recovery.control");
-                    wolverine.ListenToNatsSubject("recovery.control").UseJetStream("RECOVERY", "recovery")
-                        .UseDurableInbox();
+                    wolverine.ListenToNatsSubject("recovery.control").UseJetStream("RECOVERY", "recovery");
                     wolverine.PublishMessage<DispatchQueuedRuntimes>().ToNatsSubject("recovery.control")
-                        .UseJetStream("RECOVERY").UseDurableOutbox();
+                        .UseJetStream("RECOVERY");
                     wolverine.PublishMessage<DispatchRuntime>().ToNatsSubject("recovery.control")
-                        .UseJetStream("RECOVERY").UseDurableOutbox();
+                        .UseJetStream("RECOVERY");
                 }).Build();
             await host.StartAsync(ct);
             try
             {
                 var bus = host.Services.GetRequiredService<IMessageBus>();
-                await bus.PublishAsync(new DispatchQueuedRuntimes(fixture.Now));
+                await bus.PublishAsync(new DispatchQueuedRuntimes(fixture.Now.AddMinutes(-10)));
                 await probe.Blocked.Task.WaitAsync(TimeSpan.FromSeconds(30), ct);
                 // No retry was scheduled by the capacity-blocked consumer.
                 probe.CapacityAvailable = true;
-                await bus.PublishAsync(new DispatchQueuedRuntimes(fixture.Now.AddSeconds(5)));
+                await bus.PublishAsync(new DispatchQueuedRuntimes(fixture.Now.AddMinutes(-9)));
                 await probe.Recovered.Task.WaitAsync(TimeSpan.FromSeconds(30), ct);
                 await using var observer = new NoCtfDbContext(options);
                 await Assert.That(await observer.RuntimeInstances.Where(x => x.Id == probe.RuntimeId)

@@ -59,7 +59,7 @@ public sealed class KubernetesCapacityObservationTests
                 var config = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
                     { ["ConnectionStrings:PostgreSql"] = postgres.GetConnectionString() }).Build();
                 var runner = Options.Create(new RunnerOptions { Id = "kube-capacity-test", Provider = RuntimeProvider.Kubernetes });
-                await using var observer = new RunnerResourceObserver(runner, new DockerRuntimeOptions(), options, client, config,
+                await using var observer = new RunnerResourceObserver(runner, new DockerRuntimeOptions(), options, client, new InMemoryClusterLeaseManager(),
                     Substitute.For<IHostApplicationLifetime>(), TimeProvider.System, NullLogger<RunnerResourceObserver>.Instance);
                 RunnerAdmissionSnapshot snapshot = await observer.SampleAsync(ct);
                 for (var attempt = 0; attempt < 10 && snapshot.State != RunnerAdmissionState.Ready; attempt++)
@@ -90,7 +90,7 @@ public sealed class KubernetesCapacityObservationTests
                 using var restricted = new Kubernetes(new KubernetesClientConfiguration
                 { Host = clientConfiguration.Host, SslCaCerts = clientConfiguration.SslCaCerts, AccessToken = token.Status.Token });
                 await Assert.That((await restricted.CoreV1.ListNodeAsync(cancellationToken: ct)).Items.Count).IsGreaterThan(0);
-                await using var denied = new RunnerResourceObserver(runner, new DockerRuntimeOptions(), options, restricted, config,
+                await using var denied = new RunnerResourceObserver(runner, new DockerRuntimeOptions(), options, restricted, new InMemoryClusterLeaseManager(),
                     Substitute.For<IHostApplicationLifetime>(), TimeProvider.System, NullLogger<RunnerResourceObserver>.Instance);
                 var blocked = await denied.SampleAsync(ct);
                 await Assert.That(blocked.State).IsEqualTo(RunnerAdmissionState.Starting);

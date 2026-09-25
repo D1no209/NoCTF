@@ -89,7 +89,10 @@ backend/
     NoCTF.Host/            configurable unified process
     NoCTF.Domain/          domain model and policies
     NoCTF.Application/     capability-oriented use cases
-    NoCTF.Infrastructure/  persistence and infrastructure adapters
+    NoCTF.Infrastructure/  provider-neutral relational model and infrastructure adapters
+    NoCTF.Persistence.PostgreSql/ production provider and EF-generated InitialBaseline
+    NoCTF.Persistence.Sqlite/     isolated test-only provider
+    NoCTF.Modeling.Generators/    TPH leaf/catalog compile-time generation and diagnostics
   tests/NoCTF.Tests/       unit, architecture, and integration tests
 deploy/                    local Compose and Kubernetes manifests
 docs/                      authoritative product and engineering specifications

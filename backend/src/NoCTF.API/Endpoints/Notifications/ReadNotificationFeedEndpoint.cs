@@ -100,7 +100,7 @@ public sealed class ReadNotificationFeedEndpoint(
                 item.TargetType,
                 item.TargetId,
                 NotificationProtocolMapper.ToProtocol(item.Kind),
-                JsonSerializer.Deserialize<JsonElement>(item.ContentJson),
+                item.Content,
                 item.RelatedType,
                 item.RelatedId,
                 item.ThreadRootId,

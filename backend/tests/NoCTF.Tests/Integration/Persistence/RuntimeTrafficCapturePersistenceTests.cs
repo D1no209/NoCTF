@@ -59,39 +59,37 @@ public sealed class RuntimeTrafficCapturePersistenceTests
                 CreatedAt = now,
                 UpdatedAt = now
             });
-            db.Competitions.Add(new Competition
+            db.Competitions.Add(new CtfCompetition
             {
                 Id = competitionId,
                 OwnerId = ownerId,
                 Title = "Traffic captures",
-                Mode = GameMode.Ctf,
                 StartAt = now.AddHours(-1),
                 EndAt = now.AddHours(1),
                 Status = CompetitionStatus.Running,
                 MaxTeamMembers = 5,
-                ConfigurationJson = "{}",
+                ModeConfiguration = TestConfigurations.Competition(GameMode.Ctf),
                 FlagDerivationSecret = new byte[32],
                 CreatedAt = now,
                 UpdatedAt = now
             });
-            db.Challenges.Add(new Challenge
+            db.Challenges.Add(new CtfChallenge
             {
                 Id = challengeId,
                 OwnerId = ownerId,
-                Mode = GameMode.Ctf,
                 Title = "Capture target",
-                DefinitionJson = "{}",
+                Definition = TestConfigurations.Definition(GameMode.Ctf),
                 CreatedAt = now,
                 UpdatedAt = now
             });
-            db.CompetitionChallenges.Add(new CompetitionChallenge
+            db.CompetitionChallenges.Add(new CtfCompetitionChallenge
             {
                 Id = competitionChallengeId,
                 CompetitionId = competitionId,
                 ChallengeId = challengeId,
                 Order = 1,
                 IsPublished = true,
-                RulesJson = "{}",
+                Rules = TestConfigurations.Rules(GameMode.Ctf),
                 UpdatedAt = now
             });
             db.RuntimeInstances.AddRange(
@@ -128,7 +126,7 @@ public sealed class RuntimeTrafficCapturePersistenceTests
                 db,
                 Substitute.For<IStore>(),
                 Substitute.For<ICompetitionEventRecorder>(),
-                Substitute.For<ITransactionalMessageOutbox>(),
+                Substitute.For<IPostCommitMessagePublisher>(),
                 TimeProvider.System);
             var all = await store.ListAsync(
                 Query(competitionId, truncated: null),
@@ -165,12 +163,11 @@ public sealed class RuntimeTrafficCapturePersistenceTests
         Guid competitionId,
         Guid competitionChallengeId,
         DateTimeOffset now) =>
-        new()
+        new PlayerRuntimeInstance
         {
             Id = runtimeId,
             CompetitionId = competitionId,
             CompetitionChallengeId = competitionChallengeId,
-            Purpose = RuntimePurpose.Player,
             AccessMode = RuntimeAccessMode.DirectAndWsrx,
             RuntimeKind = RuntimeKind.Container,
             RuntimeProvider = RuntimeProvider.Docker,
@@ -200,24 +197,19 @@ public sealed class RuntimeTrafficCapturePersistenceTests
             Sha256 = new byte[32],
             CreatedAt = occurredAt
         });
-        db.CompetitionEvents.Add(new CompetitionEvent
+        db.CompetitionEvents.Add(new RuntimeTrafficCaptureStoredEvent
         {
             Id = Guid.CreateVersion7(),
             CompetitionId = competitionId,
-            Kind = CompetitionEventKind.RuntimeTrafficCaptureStored,
             Level = CompetitionEventLevel.Warning,
             Visibility = CompetitionEventVisibility.Staff,
             SubjectType = EntityReferenceKind.RuntimeInstance,
             SubjectId = runtimeId,
             RelatedType = EntityReferenceKind.File,
             RelatedId = fileId,
-            PayloadJson = System.Text.Json.JsonSerializer.Serialize(new
-            {
-                schemaVersion = 1,
-                competitionChallengeId,
-                runtimeInstanceId = runtimeId,
-                truncated
-            }),
+            CompetitionChallengeId = competitionChallengeId,
+            RuntimeInstanceId = runtimeId,
+            TrafficTruncated = truncated,
             OccurredAt = occurredAt
         });
     }

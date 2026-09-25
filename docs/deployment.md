@@ -56,9 +56,9 @@ GHCR 使用工作流内置的 `GITHUB_TOKEN`。若仓库配置了以下 Actions 
 
 ## 进程权限
 
-- API：业务 DB、Wolverine Outbox、Redis、ObjectStorage、公开/内部 HTTP；无 Docker/Kubernetes/Libvirt 权限。
-- Worker：业务 DB、Wolverine queues、Redis、ObjectStorage；无宿主 Runtime socket。
-- Runner：所需业务表和 Wolverine runner queues、Redis heartbeat、内部 archive 读取 API，以及特定 Provider 权限；数据库 role 不授予 User/认证配置写权限，也不需要对象存储通用凭据。
+- API：业务 DB、NATS JetStream、Redis、ObjectStorage、公开/内部 HTTP；无 Docker/Kubernetes/Libvirt 权限。
+- Worker：业务 DB、NATS JetStream/KV、Redis、ObjectStorage；无宿主 Runtime socket。
+- Runner：所需业务表、NATS runner subjects/KV、schema 3 heartbeat、内部 archive 读取 API，以及特定 Provider 权限；数据库 role 不授予 User/认证配置写权限，也不需要对象存储通用凭据。
 - Host：权限是其全部启用角色权限的并集。包含 Runner 的组合进程必须获得 Provider 权限，
   因此全合一适合本地或受控小型部署；需要最小权限隔离时应拆分角色。
 
@@ -184,7 +184,7 @@ Liveness 只表示进程事件循环；Readiness 检查进程所需 PostgreSQL�
 不可用报告为降级；Worker 和 Runner 将 Redis 视为必要依赖，因为排行榜投影、通知、平台日志及
 Runner 容量事实均依赖 Redis。Runtime 题目本身不使用平台 Health Probe。
 
-优雅关闭先停止接收/claim 新消息，等待当前短事务/Provider 操作到部署超时；未完成消息依 Wolverine lease 恢复。不得依赖内存 drain 状态。
+优雅关闭先停止接收新消息并停止续租，等待当前短事务/Provider 操作到部署超时；未 ack 消息依 JetStream 重投，resource-domain 由新 fencing revision 接管。不得依赖内存 drain 状态。
 
 ## 运维边界
 

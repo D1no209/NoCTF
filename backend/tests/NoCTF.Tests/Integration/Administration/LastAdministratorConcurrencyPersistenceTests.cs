@@ -468,17 +468,17 @@ public sealed class LastAdministratorConcurrencyPersistenceTests
         UserAccountLifecycleAction expectedAction,
         CancellationToken ct)
     {
-        var contents = await db.Notifications.AsNoTracking()
+        var facts = await db.Notifications.AsNoTracking()
             .Where(notification => notification.Kind == NotificationKind.UserAccountLifecycleChanged)
-            .Select(notification => notification.ContentJson)
+            .Select(notification => new
+            {
+                notification.UserId,
+                notification.UserLifecycleAction
+            })
             .ToArrayAsync(ct);
-        await Assert.That(contents).Count().IsEqualTo(1);
-        var fact = JsonSerializer.Deserialize<UserAccountLifecycleFact>(
-            contents[0],
-            new JsonSerializerOptions(JsonSerializerDefaults.Web));
-        await Assert.That(fact).IsNotNull();
-        await Assert.That(fact!.TargetUserId).IsEqualTo(targetUserId);
-        await Assert.That(fact.Action).IsEqualTo(expectedAction);
+        await Assert.That(facts).Count().IsEqualTo(1);
+        await Assert.That(facts[0].UserId).IsEqualTo(targetUserId);
+        await Assert.That(facts[0].UserLifecycleAction).IsEqualTo(expectedAction);
     }
 
     private static User User(

@@ -29,7 +29,7 @@
             "noNewPrivileges": false,
             "readonlyRootfs": false,
             "runAsNonRoot": false,
-            "capDrop": ["ALL"],
+            "capDrop": [],
             "capAdd": []
           },
           "flagEnvironmentVariableName": "FLAG",
@@ -130,7 +130,7 @@
             "noNewPrivileges": false,
             "readonlyRootfs": false,
             "runAsNonRoot": false,
-            "capDrop": ["ALL"],
+            "capDrop": [],
             "capAdd": []
           },
           "environment": {},
@@ -240,7 +240,7 @@
             "noNewPrivileges": false,
             "readonlyRootfs": false,
             "runAsNonRoot": false,
-            "capDrop": ["ALL"],
+            "capDrop": [],
             "capAdd": []
           },
           "internalPorts": [
@@ -307,7 +307,7 @@
             "noNewPrivileges": false,
             "readonlyRootfs": false,
             "runAsNonRoot": false,
-            "capDrop": ["ALL"],
+            "capDrop": [],
             "capAdd": []
           },
           "environment": {},
@@ -357,7 +357,7 @@
             "noNewPrivileges": false,
             "readonlyRootfs": false,
             "runAsNonRoot": false,
-            "capDrop": ["ALL"],
+            "capDrop": [],
             "capAdd": []
           },
           "internalPorts": [

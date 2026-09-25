@@ -50,8 +50,9 @@ public sealed class RunnerResourceObserverTests
                     ["ConnectionStrings:PostgreSql"] = postgres.GetConnectionString()
                 }).Build();
                 var lifetime = Substitute.For<IHostApplicationLifetime>();
+                var leases = new InMemoryClusterLeaseManager();
                 await using var first = new RunnerResourceObserver(options, new DockerRuntimeOptions(), new KubernetesRuntimeOptions(),
-                    Substitute.For<IKubernetes>(), config, lifetime, clock, NullLogger<RunnerResourceObserver>.Instance);
+                    Substitute.For<IKubernetes>(), leases, lifetime, clock, NullLogger<RunnerResourceObserver>.Instance);
                 await Assert.That((await first.SampleAsync(ct)).State).IsEqualTo(RunnerAdmissionState.Starting);
                 clock.Advance(TimeSpan.FromSeconds(5));
                 await File.WriteAllTextAsync(Path.Combine(root, "proc/stat"), "cpu 15 0 15 170 0 0 0 0\ncpu0 15 0 15 170 0 0 0 0", ct);
@@ -60,11 +61,11 @@ public sealed class RunnerResourceObserverTests
                 await Assert.That(ready.Observation!.MemoryTotalBytes).IsEqualTo(1073741824);
                 await Assert.That(ready.Observation.PidsUsed).IsEqualTo(20);
                 await using var duplicate = new RunnerResourceObserver(options, new DockerRuntimeOptions(), new KubernetesRuntimeOptions(),
-                    Substitute.For<IKubernetes>(), config, lifetime, clock, NullLogger<RunnerResourceObserver>.Instance);
+                    Substitute.For<IKubernetes>(), leases, lifetime, clock, NullLogger<RunnerResourceObserver>.Instance);
                 await duplicate.SampleAsync(ct);
                 clock.Advance(TimeSpan.FromSeconds(5));
                 await File.WriteAllTextAsync(Path.Combine(root, "proc/stat"), "cpu 20 0 20 260 0 0 0 0\ncpu0 20 0 20 260 0 0 0 0", ct);
-                await Assert.That((await duplicate.SampleAsync(ct)).State).IsEqualTo(RunnerAdmissionState.Starting);
+                await Assert.That((await duplicate.SampleAsync(ct)).State).IsEqualTo(RunnerAdmissionState.Draining);
                 lifetime.Received(1).StopApplication();
             }
             finally { Directory.Delete(root, recursive: true); }

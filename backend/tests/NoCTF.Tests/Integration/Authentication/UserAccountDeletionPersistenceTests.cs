@@ -54,52 +54,45 @@ public sealed class UserAccountDeletionPersistenceTests
                     User(unusedUserId, "Unused", "unused@example.test", UserRole.User, now),
                     User(auditedUserId, "Auditor", "auditor@example.test", UserRole.User, now),
                     User(detachableUserId, "Detachable", "detachable@example.test", UserRole.User, now));
-                db.Notifications.Add(new Notification
+                db.Notifications.Add(new MessageNotification
                 {
                     Id = Guid.CreateVersion7(now.AddTicks(5)),
                     SourceType = NotificationSourceType.System,
                     SourceId = null,
                     TargetType = NotificationTargetType.User,
                     TargetId = auditedUserId,
-                    Kind = NotificationKind.Message,
-                    ContentJson = "{\"schemaVersion\":1}",
                     SentAt = now
                 });
-                db.Notifications.Add(new Notification
+                db.Notifications.Add(new AuthenticationSecurityActivityNotification
                 {
                     Id = Guid.CreateVersion7(now.AddTicks(6)),
                     SourceType = NotificationSourceType.User,
                     SourceId = detachableUserId,
                     TargetType = NotificationTargetType.PlatformAdministrators,
                     TargetId = Notification.PlatformAdministratorsTargetId,
-                    Kind = NotificationKind.AuthenticationSecurityActivity,
-                    ContentJson = "{\"schemaVersion\":1}",
                     SentAt = now
                 });
-                db.Notifications.Add(new Notification
+                db.Notifications.Add(new MessageNotification
                 {
                     Id = Guid.CreateVersion7(now.AddTicks(7)),
                     SourceType = NotificationSourceType.System,
                     SourceId = null,
                     TargetType = NotificationTargetType.PlatformAdministrators,
                     TargetId = Notification.PlatformAdministratorsTargetId,
-                    Kind = NotificationKind.Message,
-                    ContentJson = "{\"schemaVersion\":1}",
                     RelatedType = EntityReferenceKind.User,
                     RelatedId = detachableUserId,
                     SentAt = now
                 });
                 var challengeId = Guid.CreateVersion7(now.AddTicks(8));
                 var competitionChallengeId = Guid.CreateVersion7(now.AddTicks(9));
-                db.Competitions.Add(new Competition
+                db.Competitions.Add(new CtfCompetition
                 {
                     Id = competitionId,
                     OwnerId = referencedUserId,
                     ManagerIds = [detachableUserId],
                     Title = "Historical competition",
-                    Mode = GameMode.Ctf,
                     Status = CompetitionStatus.Finished,
-                    ConfigurationJson = "{}",
+                    ModeConfiguration = TestConfigurations.Competition(GameMode.Ctf),
                     MaxTeamMembers = 5,
                     FlagDerivationSecret = new byte[32],
                     StartAt = now.AddHours(-2),
@@ -107,25 +100,24 @@ public sealed class UserAccountDeletionPersistenceTests
                     CreatedAt = now.AddHours(-3),
                     UpdatedAt = now
                 });
-                db.Challenges.Add(new Challenge
+                db.Challenges.Add(new CtfChallenge
                 {
                     Id = challengeId,
                     OwnerId = referencedUserId,
                     ManagerIds = [detachableUserId],
-                    Mode = GameMode.Ctf,
                     Title = "Historical challenge",
                     Visibility = ChallengeVisibility.Private,
-                    DefinitionJson = "{\"schemaVersion\":1}",
+                    Definition = TestConfigurations.Definition(GameMode.Ctf),
                     CreatedAt = now,
                     UpdatedAt = now
                 });
-                db.CompetitionChallenges.Add(new CompetitionChallenge
+                db.CompetitionChallenges.Add(new CtfCompetitionChallenge
                 {
                     Id = competitionChallengeId,
                     CompetitionId = competitionId,
                     ChallengeId = challengeId,
                     IsPublished = true,
-                    RulesJson = "{}",
+                    Rules = TestConfigurations.Rules(GameMode.Ctf),
                     UpdatedAt = now
                 });
                 var teamId = Guid.CreateVersion7(now.AddTicks(10));
@@ -140,14 +132,13 @@ public sealed class UserAccountDeletionPersistenceTests
                     RegistrationStatus = TeamRegistrationStatus.Approved,
                     RegisteredAt = now
                 });
-                db.GameplayFacts.Add(new GameplayFact
+                db.GameplayFacts.Add(new ManualAdjustmentGameplayFact
                 {
                     Id = Guid.CreateVersion7(now.AddTicks(11)),
                     CompetitionId = competitionId,
                     CompetitionChallengeId = competitionChallengeId,
                     TeamId = teamId,
                     ActorUserId = referencedUserId,
-                    Kind = GameplayFactKind.ManualAdjustment,
                     State = GameplayFactState.Completed,
                     Result = GameplayFactResult.Applied,
                     Value = "25",
@@ -245,13 +236,17 @@ public sealed class UserAccountDeletionPersistenceTests
                     user => user.Id == detachableUserId,
                     cancellationToken)).IsFalse();
                 await Assert.That(await db.Competitions.IgnoreQueryFilters().AnyAsync(
-                    competition => competition.ManagerIds.Contains(detachableUserId),
+                    competition => competition.Collaborators.Any(collaborator =>
+                        collaborator.Role == CompetitionCollaboratorRole.Manager
+                        && collaborator.UserId == detachableUserId),
                     cancellationToken)).IsFalse();
                 await Assert.That(await db.Challenges.IgnoreQueryFilters().AnyAsync(
-                    challenge => challenge.ManagerIds.Contains(detachableUserId),
+                    challenge => challenge.Managers.Any(manager =>
+                        manager.UserId == detachableUserId),
                     cancellationToken)).IsFalse();
                 await Assert.That(await db.Teams.IgnoreQueryFilters().AnyAsync(
-                    team => team.MemberIds.Contains(detachableUserId),
+                    team => team.Members.Any(member =>
+                        member.UserId == detachableUserId),
                     cancellationToken)).IsFalse();
                 await Assert.That(await db.Notifications.CountAsync(cancellationToken))
                     .IsEqualTo(4);

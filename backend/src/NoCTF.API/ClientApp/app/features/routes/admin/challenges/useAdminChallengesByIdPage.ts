@@ -4,11 +4,11 @@ import type { ComponentPublicInstance } from 'vue'
 import { Paperclip, RotateCcw, Trash2, Upload } from '@lucide/vue'
 import { toast } from 'vue-sonner'
 import { adminChallengeBankCreateFlag, adminChallengeBankDeleteAttachment, adminChallengeBankDeleteFlag, adminChallengeBankDeleteTemplate, adminChallengeBankGetTemplate, adminChallengeBankListAttachments, adminChallengeBankListFlags, adminChallengeBankPatchTemplate, adminChallengeBankRestoreAttachment, adminChallengeBankRestoreFlag, adminChallengeBankRestoreTemplate, adminChallengeBankUploadAttachments } from '../../../../api'
-import type { NoCtfapiEndpointsAdministrationChallengeBankChallengeAttachmentResponse, NoCtfapiEndpointsAdministrationChallengeBankChallengeFlagResponse, NoCtfapiEndpointsAdministrationChallengeBankChallengeFlagMatchKindProtocol, NoCtfapiEndpointsAdministrationChallengeBankChallengeTemplateContentPatchRequest, NoCtfapiEndpointsAdministrationChallengeBankChallengeTemplateResponse, NoCtfapiEndpointsAdministrationChallengeBankChallengeVisibilityProtocol, NoCtfapiEndpointsCompetitionsGameModeProtocol, NoCtfapiEndpointsAdministrationChallengeBankAttachmentDeliveryPolicyProtocol, NoCtfapiEndpointsAdministrationChallengeBankChallengeFlagFailureResponse, NoCtfapiEndpointsAdministrationChallengeBankAttachmentBatchFailureResponse } from '../../../../api'
+import type { NoCtfapiEndpointsAdministrationChallengeBankChallengeAttachmentResponse, NoCtfapiEndpointsAdministrationChallengeBankChallengeDefinitionContract, NoCtfapiEndpointsAdministrationChallengeBankChallengeFlagResponse, NoCtfapiEndpointsAdministrationChallengeBankChallengeFlagMatchKindProtocol, NoCtfapiEndpointsAdministrationChallengeBankChallengeTemplateContentPatchRequest, NoCtfapiEndpointsAdministrationChallengeBankChallengeTemplateResponse, NoCtfapiEndpointsAdministrationChallengeBankChallengeVisibilityProtocol, NoCtfapiEndpointsCompetitionsGameModeProtocol, NoCtfapiEndpointsAdministrationChallengeBankAttachmentDeliveryPolicyProtocol, NoCtfapiEndpointsAdministrationChallengeBankChallengeFlagFailureResponse, NoCtfapiEndpointsAdministrationChallengeBankAttachmentBatchFailureResponse } from '../../../../api'
 import { challengeTemplateWriteErrorMessages } from '../../../../lib/challenge-template-error'
 import { validateChallengeTemplateDraft } from '../../../../lib/challenge-template-validation'
 import type { DefinitionModel } from '../../../../utils/game-config'
-import { applyCtfInteraction, CtfInteraction, defaultDefinitionJson, FlagSource, normalizeDefinitionJson, parseDefinition } from '../../../../utils/game-config'
+import { applyCtfInteraction, CtfInteraction, defaultDefinition, definitionContractToModel, definitionModelToContract, FlagSource } from '../../../../utils/game-config'
 import AdminDateTimeComponent from '../../../admin/AdminDateTime.vue'
 import AdminGameModeBadgeComponent from '../../../admin/AdminGameModeBadge.vue'
 import ChallengeTestRuntimePanelComponent from '../../../admin/ChallengeTestRuntimePanel.vue'
@@ -46,7 +46,7 @@ export function useAdminChallengesByIdPage() {
     visibility: 'Private' as NoCtfapiEndpointsAdministrationChallengeBankChallengeVisibilityProtocol,
     direction: '',
     description: '',
-    definitionJson: '{}',
+    definition: defaultDefinition('Ctf') as NoCtfapiEndpointsAdministrationChallengeBankChallengeDefinitionContract,
   })
 
   type SaveSection = 'basic' | 'runtime' | 'definition'
@@ -76,9 +76,9 @@ export function useAdminChallengesByIdPage() {
     && (!form.direction.trim() || form.direction.trim().length > 96))
 
   const { model: definitionModel, parseFailed: definitionParseFailed } = useDefinitionModel(
-    () => form.definitionJson,
+    () => form.definition,
     () => form.mode,
-    (json) => { form.definitionJson = json },
+    (definition) => { form.definition = definition },
   )
 
   const runtimeDefinitionModel = ref<DefinitionModel | null>(null)
@@ -95,7 +95,8 @@ export function useAdminChallengesByIdPage() {
   const persistedDefinitionModel = computed(() => {
     const value = template.value
     return value?.mode
-      ? parseDefinition(value.definitionJson ?? '{}', value.mode)
+      && value.definition
+      ? definitionContractToModel(value.definition, value.mode)
       : null
   })
 
@@ -140,22 +141,20 @@ export function useAdminChallengesByIdPage() {
 
   function changeMode(value: unknown): void {
     if (value !== 'Ctf' && value !== 'Awd' && value !== 'Awdp' && value !== 'Koh') return
-    form.definitionJson = defaultDefinitionJson(value)
+    form.definition = defaultDefinition(value)
     form.mode = value
   }
 
   function resetRuntimeDefinition(): void {
     const mode = template.value?.mode
     if (!mode) return
-    const defaults = parseDefinition(defaultDefinitionJson(mode), mode)
-    if (!defaults) return
-    runtimeDefinitionModel.value = defaults
+    runtimeDefinitionModel.value = definitionContractToModel(defaultDefinition(mode), mode)
     runtimeDefinitionParseFailed.value = false
     toast.info(translate("ui.loadedTheCurrentModeSDefaultChallengeDefinitionSaveYour"))
   }
 
   function resetModeDefinition(): void {
-    form.definitionJson = defaultDefinitionJson(form.mode)
+    form.definition = defaultDefinition(form.mode)
     toast.info(translate("ui.loadedTheCurrentModeSDefaultChallengeDefinitionSaveYour"))
   }
 
@@ -167,19 +166,16 @@ export function useAdminChallengesByIdPage() {
   }
 
   function syncModeDefinition(value: Template): void {
-    // Keep definitionJson ahead of mode while loading existing templates.
-    // useDefinitionModel watches mode and serializes the current parsed model;
-    // setting mode first can briefly serialize the empty initial CTF model as the
-    // loaded mode and hide persisted runtime/checker settings in the editor.
-    form.definitionJson = value.definitionJson ?? '{}'
     form.mode = value.mode ?? 'Ctf'
+    form.definition = value.definition ?? defaultDefinition(form.mode)
   }
 
   function syncRuntimeDefinition(value: Template): void {
     const mode = value.mode ?? 'Ctf'
-    const parsed = parseDefinition(value.definitionJson ?? '{}', mode)
-    runtimeDefinitionModel.value = parsed
-    runtimeDefinitionParseFailed.value = parsed === null
+    runtimeDefinitionModel.value = value.definition
+      ? definitionContractToModel(value.definition, mode)
+      : null
+    runtimeDefinitionParseFailed.value = runtimeDefinitionModel.value === null
   }
 
   function syncForm(value: Template): void {
@@ -198,7 +194,7 @@ export function useAdminChallengesByIdPage() {
       title: value.title ?? '',
       description: value.description ?? null,
       direction: directionLabel(value.direction),
-      definitionJson: value.definitionJson ?? defaultDefinitionJson(value.mode ?? 'Ctf'),
+      definition: value.definition ?? defaultDefinition(value.mode ?? 'Ctf'),
       ...overrides,
     }
   }
@@ -228,28 +224,22 @@ export function useAdminChallengesByIdPage() {
 
   function validateDefinitionForSave(
     mode: NoCtfapiEndpointsCompetitionsGameModeProtocol,
-    definitionJson: string,
+    definition: DefinitionModel,
     errors: { value: string[] },
-  ): string | null {
+  ): NoCtfapiEndpointsAdministrationChallengeBankChallengeDefinitionContract | null {
     const value = template.value
-    const normalized = normalizeDefinitionJson(mode, definitionJson)
-    if (!normalized) {
-      errors.value = [translate("ui.theChallengeDefinitionCannotBeParsedResetOrCorrectIt")]
-      toast.error(errors.value[0] ?? translate("ui.unableToSaveTheChallengeTemplate"))
-      return null
-    }
     const validationErrors = validateChallengeTemplateDraft({
       mode,
       title: value?.title ?? '',
       direction: value?.direction ?? '',
-      definitionJson: normalized,
+      definition,
     })
     if (validationErrors.length > 0) {
       errors.value = validationErrors
       toast.error(validationErrors[0] ?? translate("ui.unableToSaveTheChallengeTemplate"))
       return null
     }
-    return normalized
+    return definitionModelToContract(mode, definition)
   }
 
   async function loadTemplate(): Promise<void> {
@@ -308,10 +298,10 @@ export function useAdminChallengesByIdPage() {
       return
     }
     const mode = value.mode ?? 'Ctf'
-    const merged = runtimeDefinitionModel.value
+    const persisted = persistedDefinitionModel.value
+    const merged = runtimeDefinitionModel.value && persisted
       ? mergeChallengeRuntimeDefinition(
-          mode,
-          value.definitionJson ?? '{}',
+          persisted,
           runtimeDefinitionModel.value,
         )
       : null
@@ -320,7 +310,7 @@ export function useAdminChallengesByIdPage() {
       : null
     if (!normalized) return
     const updated = await updateContent('runtime', contentFromTemplate(value, {
-      definitionJson: normalized,
+      definition: normalized,
     }), runtimeSaveErrors)
     if (updated) syncRuntimeDefinition(updated)
   }
@@ -335,10 +325,11 @@ export function useAdminChallengesByIdPage() {
     }
     const previousMode = value.mode ?? 'Ctf'
     const runtimeWasDirty = runtimeDefinitionDirty.value
-    const merged = definitionModel.value
+    const persisted = persistedDefinitionModel.value
+    const merged = definitionModel.value && persisted
       ? mergeChallengeModeDefinition(
           previousMode,
-          value.definitionJson ?? '{}',
+          persisted,
           form.mode,
           definitionModel.value,
         )
@@ -349,7 +340,7 @@ export function useAdminChallengesByIdPage() {
     if (!normalized) return
     const updated = await updateContent('definition', contentFromTemplate(value, {
       mode: form.mode,
-      definitionJson: normalized,
+      definition: normalized,
     }), definitionSaveErrors)
     if (!updated) return
     syncModeDefinition(updated)

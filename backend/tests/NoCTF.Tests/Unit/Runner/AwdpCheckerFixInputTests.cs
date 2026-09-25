@@ -44,7 +44,7 @@ public sealed class AwdpCheckerFixInputTests
         await Assert.That(runner.Request!.Security.ReadonlyRootfs).IsFalse();
         await Assert.That(runner.Request.Security.RunAsNonRoot).IsEqualTo(!allowRoot);
         await Assert.That(runner.Request.Security.NoNewPrivileges).IsTrue();
-        await Assert.That(runner.Request.Security.CapDrop).IsEquivalentTo(["ALL"]);
+        await Assert.That(runner.Request.Security.CapDrop).IsEmpty();
         await Assert.That(runner.Request.Security.CapAdd).IsEmpty();
     }
 

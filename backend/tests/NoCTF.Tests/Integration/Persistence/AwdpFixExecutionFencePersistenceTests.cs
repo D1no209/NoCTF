@@ -36,7 +36,8 @@ public sealed class AwdpFixExecutionFencePersistenceTests
                 .IsEqualTo(AwdpFixExecutionFenceDisposition.Execute);
             await Assert.That(execute.RuntimeInstanceId).IsEqualTo(fixture.RuntimeInstanceId);
             await Assert.That(execute.RunnerId).IsEqualTo(fixture.RunnerId);
-            await Assert.That(execute.ProviderReceiptJson).IsEqualTo("{}");
+            await Assert.That(execute.ProviderReceipt)
+                .IsTypeOf<NoCTF.Application.Runtime.Provisioning.ContainerRuntimeReceiptData>();
 
             await SetRuntimeStateAsync(
                 options,
@@ -118,7 +119,7 @@ public sealed class AwdpFixExecutionFencePersistenceTests
         CancellationToken cancellationToken)
     {
         await using var db = new NoCtfDbContext(options);
-        return await new PostgresAwdpFixExecutionFence(db, TimeProvider.System)
+        return await new AwdpFixExecutionFence(db, TimeProvider.System)
             .AcquireAsync(request, cancellationToken);
     }
 
@@ -179,13 +180,12 @@ public sealed class AwdpFixExecutionFencePersistenceTests
             CreatedAt = now,
             UpdatedAt = now
         });
-        db.Competitions.Add(new Competition
+        db.Competitions.Add(new AwdpCompetition
         {
             Id = competitionId,
             Title = "AWDP fence",
             OwnerId = ownerId,
-            Mode = GameMode.Awdp,
-            ConfigurationJson = GameModeDefaultConfiguration.GetCompetitionJson(GameMode.Awdp),
+            ModeConfiguration = TestConfigurations.Competition(GameMode.Awdp),
             FlagDerivationSecret = RandomNumberGenerator.GetBytes(32),
             StartAt = now.AddMinutes(-1),
             EndAt = now.AddHours(1),
@@ -193,26 +193,25 @@ public sealed class AwdpFixExecutionFencePersistenceTests
             CreatedAt = now,
             UpdatedAt = now
         });
-        db.Challenges.Add(new Challenge
+        db.Challenges.Add(new AwdpChallenge
         {
             Id = challengeId,
             OwnerId = ownerId,
-            Mode = GameMode.Awdp,
             Title = "Fence target",
             Visibility = ChallengeVisibility.Private,
-            DefinitionJson = new GameModeChallengeConfigurationCatalog()
-                .GetDefaultJson(GameMode.Awdp),
+            Definition = new GameModeChallengeConfigurationCatalog()
+                .CreateDefaultDefinitionForTest(GameMode.Awdp),
             CreatedAt = now,
             UpdatedAt = now
         });
-        db.CompetitionChallenges.Add(new CompetitionChallenge
+        db.CompetitionChallenges.Add(new AwdpCompetitionChallenge
         {
             Id = competitionChallengeId,
             CompetitionId = competitionId,
             ChallengeId = challengeId,
             IsPublished = true,
-            RulesJson = new GameModeChallengeConfigurationCatalog()
-                .GetDefaultJson(GameMode.Awdp),
+            Rules = new GameModeChallengeConfigurationCatalog()
+                .CreateDefaultRulesForTest(GameMode.Awdp),
             UpdatedAt = now
         });
         db.Teams.Add(new Team
@@ -249,33 +248,31 @@ public sealed class AwdpFixExecutionFencePersistenceTests
             File = file,
             UploadedAt = now
         });
-        db.GameplayFacts.Add(new GameplayFact
+        db.GameplayFacts.Add(new FixAttemptGameplayFact
         {
             Id = factId,
             CompetitionId = competitionId,
             CompetitionChallengeId = competitionChallengeId,
             TeamId = teamId,
             ActorUserId = ownerId,
-            Kind = GameplayFactKind.FixAttempt,
             ReferenceKind = GameplayFactReferenceKind.PatchUpload,
             ReferenceId = patchUploadId,
             State = GameplayFactState.Processing,
             OccurredAt = now,
             UpdatedAt = now
         });
-        db.RuntimeInstances.Add(new RuntimeInstance
+        db.RuntimeInstances.Add(new AwdpTargetRuntimeInstance
         {
             Id = runtimeId,
             CompetitionId = competitionId,
             CompetitionChallengeId = competitionChallengeId,
             TeamId = teamId,
-            Purpose = RuntimePurpose.AwdpTarget,
             GameplayFactId = factId,
             RuntimeKind = RuntimeKind.Container,
             RuntimeProvider = RuntimeProvider.Docker,
             RunnerId = runnerId,
             State = RuntimeState.Running,
-            ProviderReceiptJson = "{}",
+            ProviderReceipt = RuntimeReceiptTestData.ContainerEntity(),
             CreatedAt = now,
             RunningAt = now,
             ExpiresAt = now.AddMinutes(15)

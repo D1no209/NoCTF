@@ -11,33 +11,44 @@ namespace NoCTF.Infrastructure.Competitions.Configuration;
 
 public sealed class CompetitionConfigurationStore(
     NoCtfDbContext db,
-    ITransactionalMessageOutbox outbox,
+    IPostCommitMessagePublisher outbox,
     ICompetitionEventRecorder events) : ICompetitionConfigurationStore
 {
-    public Task<CompetitionConfigurationView?> FindAsync(Guid competitionId, CancellationToken ct) =>
-        db.Competitions.AsNoTracking()
-            .Where(competition => competition.Id == competitionId && competition.DeletedAt == null)
-            .Select(competition => new CompetitionConfigurationView(
-                competition.Id,
-                competition.Mode,
-                competition.ConfigurationJson,
-                competition.Status,
-                db.Teams.Count(team => team.CompetitionId == competition.Id
-                    && team.RegistrationStatus == TeamRegistrationStatus.Approved
-                    && !team.IsBanned
-                    && team.DeletedAt == null),
-                db.CompetitionChallenges
-                    .Where(challenge => challenge.CompetitionId == competition.Id && challenge.DeletedAt == null)
-                    .OrderBy(challenge => challenge.Id)
-                    .Select(challenge => new CompetitionChallengeConfigurationSnapshot(
-                        challenge.Id, challenge.RulesJson))
-                    .ToArray(),
-                competition.UpdatedAt))
-            .SingleOrDefaultAsync(ct);
+    public async Task<CompetitionConfigurationView?> FindAsync(
+        Guid competitionId,
+        CancellationToken ct)
+    {
+        var competition = await db.Competitions.AsNoTracking().SingleOrDefaultAsync(
+            item => item.Id == competitionId && item.DeletedAt == null, ct);
+        if (competition?.ModeConfiguration is null)
+            return null;
+        var eligibleTeamCount = await db.Teams.CountAsync(team =>
+            team.CompetitionId == competition.Id
+            && team.RegistrationStatus == TeamRegistrationStatus.Approved
+            && !team.IsBanned
+            && team.DeletedAt == null, ct);
+        var challengeEntities = await db.CompetitionChallenges.AsNoTracking()
+            .Where(challenge => challenge.CompetitionId == competition.Id
+                && challenge.DeletedAt == null)
+            .OrderBy(challenge => challenge.Id)
+            .ToArrayAsync(ct);
+        return new(
+            competition.Id,
+            competition.Mode,
+            competition.ModeConfiguration,
+            competition.Status,
+            eligibleTeamCount,
+            challengeEntities.Select(challenge =>
+                new CompetitionChallengeConfigurationSnapshot(
+                    challenge.Id,
+                    challenge.Rules ?? throw new InvalidOperationException(
+                        $"Competition challenge {challenge.Id} has no rules."))).ToArray(),
+            competition.UpdatedAt);
+    }
 
     public async Task<CompetitionConfigurationUpdateResult> TryUpdateAsync(
         Guid competitionId,
-        string json,
+        CompetitionModeConfiguration configuration,
         bool allowWhileRunning,
         DateTimeOffset now,
         CancellationToken ct)
@@ -45,34 +56,30 @@ public sealed class CompetitionConfigurationStore(
         await using var transaction = await AggregateCompatibleTransaction.BeginAsync(db, ct);
         var status = await CompetitionStateReader.ReadAsync(db, competitionId, ct);
         if (status is null) return new(null, CompetitionConfigurationUpdateFailure.CompetitionNotFound);
-        var mode = await db.Competitions.AsNoTracking()
-            .Where(competition => competition.Id == competitionId)
-            .Select(competition => competition.Mode)
-            .SingleAsync(ct);
-        int changed;
-        if (db.Database.IsRelational())
+        var tracked = await db.Competitions.SingleOrDefaultAsync(
+            competition => competition.Id == competitionId, ct);
+        if (tracked?.ModeConfiguration is null)
+            return new(null, CompetitionConfigurationUpdateFailure.CompetitionNotFound);
+        if (tracked.Mode != configuration.Mode
+            || tracked.ModeConfiguration.GetType() != configuration.GetType())
+            throw new InvalidOperationException("Competition configuration type does not match its mode.");
+        configuration.CompetitionId = competitionId;
+        db.Entry(tracked.ModeConfiguration).CurrentValues.SetValues(configuration);
+        if (tracked.ModeConfiguration is CtfCompetitionModeConfiguration currentCtf
+            && configuration is CtfCompetitionModeConfiguration nextCtf)
         {
-            changed = await db.Competitions
-                .Where(x => x.Id == competitionId)
-                .ExecuteUpdateAsync(setters => setters
-                    .SetProperty(x => x.ConfigurationJson, json)
-                    .SetProperty(x => x.UpdatedAt, now), ct);
+            db.Set<CompetitionBloodReward>().RemoveRange(currentCtf.BloodRewards);
+            currentCtf.BloodRewards = nextCtf.BloodRewards.Select((reward, position) =>
+                new CompetitionBloodReward
+                {
+                    CompetitionId = competitionId,
+                    Position = position,
+                    Policy = reward.Policy,
+                    Value = reward.Value
+                }).ToList();
         }
-        else
-        {
-            // EF Core InMemory does not support ExecuteUpdateAsync; apply the same
-            // last-write-wins update through the change tracker.
-            var tracked = await db.Competitions.SingleOrDefaultAsync(
-                x => x.Id == competitionId, ct);
-            if (tracked is not null)
-            {
-                tracked.ConfigurationJson = json;
-                tracked.UpdatedAt = now;
-            }
-            changed = tracked is null ? 0 : 1;
-        }
-        if (changed != 1) return new(null, CompetitionConfigurationUpdateFailure.CompetitionNotFound);
-        if (mode == GameMode.Awd && status == CompetitionStatus.Running)
+        tracked.UpdatedAt = now;
+        if (tracked.Mode == GameMode.Awd && status == CompetitionStatus.Running)
         {
             var challenges = await db.CompetitionChallenges.AsNoTracking()
                 .Where(challenge => challenge.CompetitionId == competitionId
@@ -95,11 +102,10 @@ public sealed class CompetitionConfigurationStore(
             CompetitionEventVisibility.Staff,
             now,
             CompetitionStatus: status), ct);
-        // ExecuteUpdate does not persist the event or pending Outbox envelopes.
         await db.SaveChangesAsync(ct);
         var result = await FindAsync(competitionId, ct);
         await transaction.CommitAsync(ct);
-        await outbox.FlushCommittedMessagesAsync();
+        await transaction.FlushMessagesAsync(outbox);
         return new(result);
     }
 }

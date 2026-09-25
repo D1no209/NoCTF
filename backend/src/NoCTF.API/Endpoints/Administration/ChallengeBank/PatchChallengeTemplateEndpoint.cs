@@ -21,7 +21,7 @@ public sealed class ChallengeTemplateContentPatchRequest
     public required string Title { get; set; }
     public required string? Description { get; set; }
     public required string Direction { get; set; }
-    public required string DefinitionJson { get; set; }
+    public required ChallengeDefinitionContract Definition { get; set; }
 }
 
 public sealed class ChallengeTemplatePermissionsPatchRequest
@@ -60,6 +60,14 @@ public sealed class PatchChallengeTemplateValidator
             .When(request => request.Content is not null);
         RuleFor(request => request.Content!.Direction).NotEmpty().MaximumLength(96)
             .When(request => request.Content is not null);
+        RuleFor(request => request.Content!.Definition).NotNull()
+            .When(request => request.Content is not null);
+        RuleFor(request => request.Content!.Definition)
+            .Must((request, definition) =>
+                ChallengeDefinitionContractMapper.HasValidShape(definition)
+                && definition!.Mode == request.Content!.Mode)
+            .When(request => request.Content is not null)
+            .WithMessage("Definition must contain exactly the branch matching the challenge mode.");
         RuleFor(request => request.Permissions!.OwnerId).NotEmpty()
             .When(request => request.Permissions is not null);
         RuleFor(request => request.Permissions!.ManagerIds).NotNull()
@@ -76,33 +84,44 @@ public sealed class PatchChallengeTemplateValidator
 public static partial class ChallengeTemplatePatchMapper
 {
     [MapperIgnoreTarget(nameof(Challenge.Id))]
+    [MapperIgnoreTarget(nameof(Challenge.Managers))]
+    [MapperIgnoreTarget(nameof(Challenge.ConcurrencyStamp))]
     [MapperIgnoreTarget(nameof(Challenge.OwnerId))]
     [MapperIgnoreTarget(nameof(Challenge.ManagerIds))]
     [MapperIgnoreTarget(nameof(Challenge.CreatedAt))]
     [MapperIgnoreTarget(nameof(Challenge.UpdatedAt))]
     [MapperIgnoreTarget(nameof(Challenge.DeletedAt))]
     [MapperIgnoreTarget(nameof(Challenge.Attachments))]
-    public static partial void ApplyContentAsTemplateManager(
+    [MapperIgnoreTarget(nameof(Challenge.Definition))]
+    [MapperIgnoreTarget(nameof(Challenge.Mode))]
+    public static void ApplyContentAsTemplateManager(
         ChallengeTemplateContentPatchRequest request,
-        [MappingTarget] Challenge target);
+        [MappingTarget] Challenge target)
+    {
+        target.Visibility = ToDomain(request.Visibility);
+        target.Title = request.Title;
+        target.Description = request.Description;
+        target.Direction = request.Direction;
+    }
 
     [MapperIgnoreTarget(nameof(Challenge.Mode))]
     [MapperIgnoreTarget(nameof(Challenge.Visibility))]
     [MapperIgnoreTarget(nameof(Challenge.Title))]
     [MapperIgnoreTarget(nameof(Challenge.Description))]
     [MapperIgnoreTarget(nameof(Challenge.Direction))]
-    [MapperIgnoreTarget(nameof(Challenge.DefinitionJson))]
+    [MapperIgnoreTarget(nameof(Challenge.Definition))]
     [MapperIgnoreTarget(nameof(Challenge.Id))]
+    [MapperIgnoreTarget(nameof(Challenge.Managers))]
+    [MapperIgnoreTarget(nameof(Challenge.ConcurrencyStamp))]
     [MapperIgnoreTarget(nameof(Challenge.CreatedAt))]
     [MapperIgnoreTarget(nameof(Challenge.UpdatedAt))]
     [MapperIgnoreTarget(nameof(Challenge.DeletedAt))]
     [MapperIgnoreTarget(nameof(Challenge.Attachments))]
+    [MapperIgnoreTarget(nameof(Challenge.NormalizedTitle))]
+    [MapperIgnoreTarget(nameof(Challenge.NormalizedDirection))]
     public static partial void ApplyPermissionsAsTemplateOwner(
         ChallengeTemplatePermissionsPatchRequest request,
         [MappingTarget] Challenge target);
-
-    [MapEnum(EnumMappingStrategy.ByName)]
-    private static partial GameMode ToDomain(GameModeProtocol value);
 
     [MapEnum(EnumMappingStrategy.ByName)]
     private static partial ChallengeVisibility ToDomain(ChallengeVisibilityProtocol value);
@@ -148,23 +167,26 @@ public sealed class PatchChallengeTemplateEndpoint(
             && current.OwnerId != user.UserId)
             return TypedResults.Forbid();
 
-        var target = new Challenge
-        {
-            Id = current.Id,
-            OwnerId = current.OwnerId,
-            ManagerIds = current.ManagerIds.ToArray(),
-            Mode = current.Mode,
-            Visibility = current.Visibility,
-            Title = current.Title,
-            Description = current.Description,
-            Direction = current.Direction,
-            DefinitionJson = current.DefinitionJson,
-            CreatedAt = current.CreatedAt,
-            UpdatedAt = current.UpdatedAt,
-            DeletedAt = current.DeletedAt
-        };
+        var target = ChallengeGeneratedCatalog.Create(current.Mode);
+        target.Id = current.Id;
+        target.OwnerId = current.OwnerId;
+        target.ManagerIds = current.ManagerIds.ToArray();
+        target.Visibility = current.Visibility;
+        target.Title = current.Title;
+        target.Description = current.Description;
+        target.Direction = current.Direction;
+        target.Definition = current.Definition;
+        target.CreatedAt = current.CreatedAt;
+        target.UpdatedAt = current.UpdatedAt;
+        target.DeletedAt = current.DeletedAt;
         if ((sections & ChallengeTemplatePatchSection.Content) != 0)
+        {
             ChallengeTemplatePatchMapper.ApplyContentAsTemplateManager(request.Content!, target);
+            target.Definition = ChallengeDefinitionContractMapper.ToDomain(
+                challengeId,
+                target.Mode,
+                request.Content!.Definition);
+        }
         if ((sections & ChallengeTemplatePatchSection.Permissions) != 0)
             ChallengeTemplatePatchMapper.ApplyPermissionsAsTemplateOwner(
                 request.Permissions!, target);
@@ -231,7 +253,7 @@ public sealed class PatchChallengeTemplateEndpoint(
                     target.Title,
                     target.Description,
                     target.Direction,
-                    target.DefinitionJson,
+                    target.Definition!,
                     timeProvider.GetUtcNow()), transactionCt);
                 if (!result.Succeeded)
                     return AtomicAggregatePatchDecision<Results<Ok<ChallengeTemplateResponse>,
@@ -279,7 +301,7 @@ public sealed class PatchChallengeTemplateEndpoint(
                     [
                         new ValidationFailure(
                             result.State == ChallengeTemplateWriteState.InvalidDefinition
-                                ? "Content.DefinitionJson"
+                                ? "Content.Definition"
                                 : "Request",
                             result.Detail ?? "Challenge template update is invalid.")
                     ],

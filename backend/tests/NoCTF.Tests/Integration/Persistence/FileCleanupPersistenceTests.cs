@@ -67,10 +67,12 @@ public sealed class FileCleanupPersistenceTests
                 var scheduled = outbox.Scheduled.Single();
                 await Assert.That(scheduled.Message).IsEqualTo(new CleanupFile(fileId));
                 await Assert.That(scheduled.At).IsEqualTo(now.AddHours(24));
+                await Assert.That(outbox.CommittedFlushCount).IsEqualTo(1);
 
                 await registry.AbandonAsync(fileId, cancellationToken);
                 await Assert.That(outbox.Published.Single())
                     .IsEqualTo(new CleanupFile(fileId));
+                await Assert.That(outbox.CommittedFlushCount).IsEqualTo(2);
             }
         });
     }
@@ -176,10 +178,10 @@ public sealed class FileCleanupPersistenceTests
                 var teamId = Guid.NewGuid();
                 await using (var db = new NoCtfDbContext(options))
                 {
-                    db.Competitions.Add(new Competition
+                    db.Competitions.Add(new CtfCompetition
                     {
                         Id = competitionId, OwnerId = userId, Title = "Soft-deleted file owner",
-                        Mode = GameMode.Ctf, ConfigurationJson = "{\"schemaVersion\":1}", FlagDerivationSecret = new byte[32],
+                        ModeConfiguration = TestConfigurations.Competition(GameMode.Ctf), FlagDerivationSecret = new byte[32],
                         StartAt = now, EndAt = now.AddHours(1), Status = CompetitionStatus.Finished,
                         CreatedAt = now, UpdatedAt = now, DeletedAt = now, PosterFileId = fileId
                     });
@@ -286,10 +288,11 @@ public sealed class FileCleanupPersistenceTests
         }
     }
 
-    private sealed class RecordingOutbox : ITransactionalMessageOutbox
+    private sealed class RecordingOutbox : IPostCommitMessagePublisher
     {
         public List<object> Published { get; } = [];
         public List<(object Message, DateTimeOffset At)> Scheduled { get; } = [];
+        public int CommittedFlushCount { get; private set; }
 
         public ValueTask PublishAsync<T>(T message)
         {
@@ -312,5 +315,11 @@ public sealed class FileCleanupPersistenceTests
             ValueTask.CompletedTask;
 
         public Task FlushOutgoingMessagesAsync() => Task.CompletedTask;
+
+        public Task FlushCommittedMessagesAsync()
+        {
+            CommittedFlushCount++;
+            return Task.CompletedTask;
+        }
     }
 }

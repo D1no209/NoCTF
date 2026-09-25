@@ -46,14 +46,12 @@
     {
       "id": 5,
       "type": "timeseries",
-      "title": "JetStream and Wolverine backlog",
+      "title": "JetStream backlog",
       "gridPos": { "h": 8, "w": 8, "x": 8, "y": 8 },
       "targets": [
         { "expr": "noctf:jetstream_pending:sum", "legendFormat": "pending" },
         { "expr": "noctf:jetstream_ack_pending:sum", "legendFormat": "ack pending" },
-        { "expr": "noctf:jetstream_redelivered:sum", "legendFormat": "redelivered" },
-        { "expr": "noctf:wolverine_outbox:sum", "legendFormat": "outbox" },
-        { "expr": "noctf:wolverine_inbox:sum", "legendFormat": "inbox" }
+        { "expr": "noctf:jetstream_redelivered:sum", "legendFormat": "redelivered" }
       ]
     },
     {
@@ -102,6 +100,36 @@
       "gridPos": { "h": 8, "w": 12, "x": 12, "y": 24 },
       "targets": [
         { "expr": "probe_success{job=\"blackbox\"}", "legendFormat": "{{instance}}" }
+      ]
+    },
+    {
+      "id": 11,
+      "type": "timeseries",
+      "title": "Slow HTTP routes (P95, 5m)",
+      "gridPos": { "h": 9, "w": 12, "x": 0, "y": 32 },
+      "fieldConfig": { "defaults": { "unit": "s" } },
+      "targets": [
+        { "expr": "topk(10, histogram_quantile(0.95, sum by (le, endpoint) (rate(noctf_api_request_duration_seconds_bucket{request_kind=\"rest\"}[5m]))) > 0)", "legendFormat": "{{endpoint}}" }
+      ]
+    },
+    {
+      "id": 12,
+      "type": "timeseries",
+      "title": "Flag pipeline stages (P95, 5m)",
+      "gridPos": { "h": 9, "w": 12, "x": 12, "y": 32 },
+      "fieldConfig": { "defaults": { "unit": "s" } },
+      "targets": [
+        { "expr": "histogram_quantile(0.95, sum by (le, stage) (rate(noctf_gameplay_fact_stage_duration_seconds_bucket[5m])))", "legendFormat": "{{stage}}" }
+      ]
+    },
+    {
+      "id": 13,
+      "type": "timeseries",
+      "title": "HTTP requests per route",
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 41 },
+      "fieldConfig": { "defaults": { "unit": "reqps" } },
+      "targets": [
+        { "expr": "topk(10, sum by (endpoint) (rate(noctf_api_requests_total{request_kind=\"rest\"}[5m])))", "legendFormat": "{{endpoint}}" }
       ]
     }
   ],

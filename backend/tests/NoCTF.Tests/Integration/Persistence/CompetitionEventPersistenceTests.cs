@@ -51,7 +51,7 @@ public sealed class CompetitionEventPersistenceTests
                     Human(ids.TeamBUserId, "team-b-user", UserRole.User, now),
                     Human(ids.ParticipantId, "participant", UserRole.User, now),
                     Bot(ids.BotId, now));
-                setup.Competitions.Add(new Competition
+                setup.Competitions.Add(new CtfCompetition
                 {
                     Id = ids.CompetitionId,
                     OwnerId = ids.OwnerId,
@@ -59,8 +59,7 @@ public sealed class CompetitionEventPersistenceTests
                     JudgeIds = [ids.JudgeId, ids.BotId],
                     ObserverIds = [ids.ObserverId],
                     Title = "Event feed competition",
-                    Mode = GameMode.Ctf,
-                    ConfigurationJson = """{"schemaVersion":1}""",
+                    ModeConfiguration = TestConfigurations.Competition(GameMode.Ctf),
                     FlagDerivationSecret = new byte[32],
                     StartAt = now.AddHours(-1),
                     EndAt = now.AddHours(1),
@@ -68,25 +67,24 @@ public sealed class CompetitionEventPersistenceTests
                     CreatedAt = now,
                     UpdatedAt = now
                 });
-                setup.Challenges.Add(new Challenge
+                setup.Challenges.Add(new CtfChallenge
                 {
                     Id = ids.ChallengeId,
                     OwnerId = ids.OwnerId,
-                    Mode = GameMode.Ctf,
                     Visibility = ChallengeVisibility.Shared,
                     Title = "Event challenge",
                     Direction = "Web",
-                    DefinitionJson = "{}",
+                    Definition = TestConfigurations.Definition(GameMode.Ctf),
                     CreatedAt = now,
                     UpdatedAt = now
                 });
-                setup.CompetitionChallenges.Add(new CompetitionChallenge
+                setup.CompetitionChallenges.Add(new CtfCompetitionChallenge
                 {
                     Id = ids.CompetitionChallengeId,
                     CompetitionId = ids.CompetitionId,
                     ChallengeId = ids.ChallengeId,
                     IsPublished = true,
-                    RulesJson = "{}",
+                    Rules = TestConfigurations.Rules(GameMode.Ctf),
                     UpdatedAt = now,
                     Hints =
                     [
@@ -101,14 +99,13 @@ public sealed class CompetitionEventPersistenceTests
                 setup.Teams.AddRange(
                     ApprovedTeam(ids.TeamAId, ids.CompetitionId, "Team A", ids.TeamAUserId, now),
                     ApprovedTeam(ids.TeamBId, ids.CompetitionId, "Team B", ids.TeamBUserId, now));
-                setup.GameplayFacts.Add(new GameplayFact
+                setup.GameplayFacts.Add(new FlagAttemptGameplayFact
                 {
                     Id = ids.GameplayFactId,
                     CompetitionId = ids.CompetitionId,
                     CompetitionChallengeId = ids.CompetitionChallengeId,
                     TeamId = ids.TeamAId,
                     ActorUserId = ids.TeamAUserId,
-                    Kind = GameplayFactKind.FlagAttempt,
                     Value = "flag{competition-event-secret}",
                     ValueSha256 = SHA256.HashData(
                         Encoding.UTF8.GetBytes("flag{competition-event-secret}")),
@@ -230,7 +227,6 @@ public sealed class CompetitionEventPersistenceTests
             await Assert.That(nextPage.Items![0].Level).IsEqualTo(CompetitionEventLevel.Warning);
 
             var internalTracks = new CompetitionTrackConfiguration(
-                CompetitionTrackConfiguration.CurrentSchemaVersion,
                 [
                     CompetitionTrackConfiguration.DefaultFor(GameMode.Ctf).DefaultTrack,
                     new CompetitionTrackDefinition(
@@ -245,12 +241,12 @@ public sealed class CompetitionEventPersistenceTests
                         VisibleOnLeaderboard: false,
                         AffectsCompetitiveResults: false)
                 ]);
-            await db.Competitions.Where(item => item.Id == ids.CompetitionId)
-                .ExecuteUpdateAsync(setters => setters
-                    .SetProperty(item => item.TracksEnabled, true)
-                    .SetProperty(
-                        item => item.TrackConfigurationJson,
-                        CompetitionTrackConfiguration.Serialize(internalTracks)), ct);
+            var trackedCompetition = await db.Competitions.SingleAsync(
+                item => item.Id == ids.CompetitionId, ct);
+            trackedCompetition.TracksEnabled = true;
+            trackedCompetition.Tracks = CompetitionTrackConfiguration.ToPersisted(
+                internalTracks, ids.CompetitionId);
+            await db.SaveChangesAsync(ct);
             await db.Teams.Where(team => team.Id == ids.TeamBId)
                 .ExecuteUpdateAsync(setters => setters.SetProperty(
                     team => team.TrackKey,
@@ -371,7 +367,7 @@ public sealed class CompetitionEventPersistenceTests
 
             var immutable = await db.CompetitionEvents.SingleAsync(
                 item => item.Id == eventIds[0], ct);
-            immutable.PayloadJson = """{"schemaVersion":1,"reason":"attempted mutation"}""";
+            immutable.Reason = "attempted mutation";
             await Assert.That(async () => await db.SaveChangesAsync(ct))
                 .Throws<InvalidOperationException>();
         });
@@ -449,7 +445,7 @@ public sealed class CompetitionEventPersistenceTests
             RegisteredAt = now
         };
 
-    private sealed class RecordingOutbox : ITransactionalMessageOutbox
+    private sealed class RecordingOutbox : IPostCommitMessagePublisher
     {
         public List<object> Messages { get; } = [];
 

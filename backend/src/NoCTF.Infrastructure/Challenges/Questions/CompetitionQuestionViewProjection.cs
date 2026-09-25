@@ -1,19 +1,9 @@
-using System.Text.Json;
-using System.Text.Json.Serialization;
 using NoCTF.Application.Challenges.Questions;
 using NoCTF.Domain.Challenges.Questions;
 using NoCTF.Domain.Notifications;
 using static NoCTF.Infrastructure.Challenges.Questions.CompetitionQuestionStore;
 
 namespace NoCTF.Infrastructure.Challenges.Questions;
-
-internal static class CompetitionQuestionSerialization
-{
-    internal static readonly JsonSerializerOptions Options = new(JsonSerializerDefaults.Web)
-    {
-        Converters = { new JsonStringEnumConverter() }
-    };
-}
 
 internal static class CompetitionQuestionViewProjection
 {
@@ -83,16 +73,15 @@ internal static class CompetitionQuestionViewProjection
     {
         var messages = question.Nodes
             .Where(node => node.Kind == NotificationKind.Message)
-            .Select(node => JsonSerializer.Deserialize<QuestionMessagePayload>(
-                node.ContentJson,
-                CompetitionQuestionSerialization.Options)!)
             .ToArray();
         var lastHandlerIndex = Array.FindLastIndex(
             messages,
-            message => CompetitionQuestionRules.IsHandler(message.ActorRole));
+            message => CompetitionQuestionRules.IsHandler(
+                message.QuestionActorRole!.Value));
         var participantMessages = messages
             .Skip(lastHandlerIndex + 1)
-            .Count(message => CompetitionQuestionRules.IsParticipant(message.ActorRole));
+            .Count(message => CompetitionQuestionRules.IsParticipant(
+                message.QuestionActorRole!.Value));
 
         var rootIsParticipant = CompetitionQuestionRules.IsParticipant(
             question.Root.ActorRole ?? CompetitionQuestionParticipantRole.Participant);
@@ -108,27 +97,19 @@ internal static class CompetitionQuestionViewProjection
         var actorId = node.SourceId ?? Guid.Empty;
         if (node.Kind == NotificationKind.Message)
         {
-            var payload = JsonSerializer.Deserialize<QuestionMessagePayload>(
-                node.ContentJson,
-                CompetitionQuestionSerialization.Options)!;
-            return new(node.Id, CompetitionQuestionEntryKind.Message, payload.ActorRole,
-                node.SourceId, names.GetValueOrDefault(actorId, "已删除用户"), payload.Body,
-                payload.From, payload.To, null, node.SentAt);
+            return new(node.Id, CompetitionQuestionEntryKind.Message,
+                node.QuestionActorRole!.Value,
+                node.SourceId, names.GetValueOrDefault(actorId, "已删除用户"), node.Body,
+                node.PreviousQuestionStatus, node.QuestionStatus, null, node.SentAt);
         }
-        var status = JsonSerializer.Deserialize<QuestionStatusPayload>(
-            node.ContentJson,
-            CompetitionQuestionSerialization.Options)!;
-        return new(node.Id, CompetitionQuestionEntryKind.StatusTransition, status.ActorRole,
+        return new(node.Id, CompetitionQuestionEntryKind.StatusTransition,
+            node.QuestionActorRole!.Value,
             node.SourceId, names.GetValueOrDefault(actorId, "已删除用户"), null,
-            status.From, status.To, null, node.SentAt);
+            node.PreviousQuestionStatus, node.QuestionStatus, null, node.SentAt);
     }
 
     internal static CompetitionQuestionParticipantRole ReadActorRole(Notification node) =>
-        node.Kind == NotificationKind.Message
-            ? JsonSerializer.Deserialize<QuestionMessagePayload>(
-                node.ContentJson,
-                CompetitionQuestionSerialization.Options)!.ActorRole
-            : JsonSerializer.Deserialize<QuestionStatusPayload>(
-                node.ContentJson,
-                CompetitionQuestionSerialization.Options)!.ActorRole;
+        node.QuestionActorRole
+            ?? throw new InvalidOperationException(
+                $"Question node {node.Id} has no actor role.");
 }

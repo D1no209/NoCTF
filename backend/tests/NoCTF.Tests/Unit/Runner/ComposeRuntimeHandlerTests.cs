@@ -219,7 +219,7 @@ public sealed class ComposeRuntimeHandlerTests
                 RuntimeProvisionWorkStatus.Current,
                 new(
                     RuntimeProvider.Docker,
-                    System.Text.Json.JsonSerializer.Serialize(receipt),
+                    ComposeRuntimeReceiptData.From(receipt),
                     RuntimeKind.Compose)));
         var message = new StopComposeRuntime(
             receipt.OperationId,
@@ -247,7 +247,7 @@ public sealed class ComposeRuntimeHandlerTests
                 RuntimeProvisionWorkStatus.Current,
                 new(
                     RuntimeProvider.Docker,
-                    System.Text.Json.JsonSerializer.Serialize(receipt),
+                    ComposeRuntimeReceiptData.From(receipt),
                     RuntimeKind.Compose)));
         var message = new StopComposeRuntime(
             receipt.OperationId,

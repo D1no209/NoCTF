@@ -1,5 +1,6 @@
 using NoCTF.Infrastructure.Persistence;
 using System.Data;
+using System.Diagnostics;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using NoCTF.Application.Messaging;
@@ -26,7 +27,7 @@ public sealed class GameplayFactProcessor(
     NoCtfDbContext db,
     IGameplayFactEvaluatorCatalog evaluatorCatalog,
     IGameplayFactAdmissionModePolicy admissionModePolicy,
-    ITransactionalMessageOutbox outbox,
+    IPostCommitMessagePublisher outbox,
     ILeaderboardSnapshotFactory leaderboardSnapshots,
     BloodRankCriticalSection bloodRankCriticalSection,
     TeamChallengeCriticalSection teamChallengeCriticalSection,
@@ -42,7 +43,7 @@ public sealed class GameplayFactProcessor(
         NoCtfDbContext db,
         IGameplayFactEvaluatorCatalog evaluatorCatalog,
         IGameplayFactAdmissionModePolicy admissionModePolicy,
-        ITransactionalMessageOutbox outbox,
+        IPostCommitMessagePublisher outbox,
         ILeaderboardSnapshotFactory leaderboardSnapshots,
         ICompetitionEventRecorder? eventRecorder = null,
         ILogger<GameplayFactProcessor>? logger = null)
@@ -52,8 +53,8 @@ public sealed class GameplayFactProcessor(
             admissionModePolicy,
             outbox,
             leaderboardSnapshots,
-            new BloodRankCriticalSection(new AsyncKeyedLock.AsyncKeyedLocker<string>()),
-            new TeamChallengeCriticalSection(new AsyncKeyedLock.AsyncKeyedLocker<string>()),
+            new BloodRankCriticalSection(),
+            new TeamChallengeCriticalSection(),
             eventRecorder,
             logger)
     { }
@@ -75,12 +76,85 @@ public sealed class GameplayFactProcessor(
         Guid gameplayFactId,
         CancellationToken cancellationToken)
     {
-        var claimedGameplayFactId = await ClaimAsync(gameplayFactId, cancellationToken);
+        Guid? claimedGameplayFactId = null;
+        for (var attempt = 0; attempt < 3 && claimedGameplayFactId is null; attempt++)
+        {
+            try
+            {
+                claimedGameplayFactId = await ClaimAsync(
+                    gameplayFactId,
+                    cancellationToken);
+            }
+            catch (Exception exception) when (exception is DbUpdateConcurrencyException
+                || TransactionFailureClassifier.IsRetryable(exception))
+            {
+                db.ChangeTracker.Clear();
+            }
+
+            if (claimedGameplayFactId is null && attempt < 2)
+            {
+                await Task.Delay(
+                    TimeSpan.FromMilliseconds(Random.Shared.Next(15, 51)),
+                    cancellationToken);
+            }
+        }
         if (claimedGameplayFactId is null)
             return;
 
-        var evaluation = await EvaluateAsync(claimedGameplayFactId.Value, cancellationToken);
-        await CompleteAsync(claimedGameplayFactId.Value, evaluation, cancellationToken);
+        log.LogDebug("Evaluating GameplayFact {GameplayFactId}.", claimedGameplayFactId.Value);
+        for (var attempt = 0; attempt < 3; attempt++)
+        {
+            try
+            {
+                var evaluationStarted = Stopwatch.GetTimestamp();
+                Evaluation evaluation;
+                using (NoCtfTelemetry.ActivitySource.StartActivity("GameplayFact.WorkerEvaluation"))
+                {
+                    try
+                    {
+                        evaluation = await EvaluateAsync(
+                            claimedGameplayFactId.Value, cancellationToken);
+                    }
+                    finally
+                    {
+                        NoCtfTelemetry.RecordGameplayFactStage(
+                            GameplayFactPerformanceStage.WorkerEvaluation,
+                            Stopwatch.GetElapsedTime(evaluationStarted).TotalSeconds);
+                    }
+                }
+                log.LogDebug("GameplayFact {GameplayFactId} evaluated with {Result}.",
+                    claimedGameplayFactId.Value, evaluation.Decision.Result);
+                var completionStarted = Stopwatch.GetTimestamp();
+                using (NoCtfTelemetry.ActivitySource.StartActivity("GameplayFact.WorkerCompletion"))
+                {
+                    try
+                    {
+                        await CompleteAsync(claimedGameplayFactId.Value, evaluation, cancellationToken);
+                    }
+                    finally
+                    {
+                        NoCtfTelemetry.RecordGameplayFactStage(
+                            GameplayFactPerformanceStage.WorkerCompletion,
+                            Stopwatch.GetElapsedTime(completionStarted).TotalSeconds);
+                    }
+                }
+                log.LogDebug("GameplayFact {GameplayFactId} completion persisted.",
+                    claimedGameplayFactId.Value);
+                return;
+            }
+            catch (Exception exception) when (attempt < 2
+                && TransactionFailureClassifier.IsRetryable(exception))
+            {
+                log.LogWarning(exception,
+                    "Retrying GameplayFact {GameplayFactId} after transient persistence failure ({Attempt}/3).",
+                    claimedGameplayFactId.Value, attempt + 1);
+                outbox.DiscardPendingMessages();
+                db.ChangeTracker.Clear();
+                await Task.Delay(TimeSpan.FromMilliseconds(
+                    Random.Shared.Next(25, 76) * (attempt + 1)), cancellationToken);
+            }
+        }
+        throw new InvalidOperationException("GameplayFact evaluation retry loop did not complete.");
     }
 
     private async Task<Guid?> ClaimAsync(
@@ -91,7 +165,15 @@ public sealed class GameplayFactProcessor(
             IsolationLevel.ReadCommitted, cancellationToken);
         var requested = await db.GameplayFacts.AsNoTracking().SingleOrDefaultAsync(
             item => item.Id == requestedGameplayFactId, cancellationToken);
-        if (requested is null || requested.State != GameplayFactState.Queued)
+        if (requested is null)
+            return null;
+        if (requested.State == GameplayFactState.Queued)
+            NoCtfTelemetry.RecordGameplayFactStage(
+                GameplayFactPerformanceStage.DispatchAge,
+                (timeProvider.GetUtcNow() - requested.OccurredAt).TotalSeconds);
+        if (requested.State == GameplayFactState.Processing)
+            return requested.Id;
+        if (requested.State != GameplayFactState.Queued)
             return null;
         var scope = await ResolveProcessingScopeAsync(requested, cancellationToken);
         using var processingLease = await AcquireProcessingScopeAsync(
@@ -141,11 +223,13 @@ public sealed class GameplayFactProcessor(
                     scope.CompetitionChallenge,
                     Challenge = challenge
                 })
+            .AsSplitQuery()
             .SingleAsync(cancellationToken);
         var rules = admissionModePolicy.GetRules(
             configuration.Competition.Mode,
-            configuration.Competition.ConfigurationJson,
-            configuration.CompetitionChallenge.RulesJson);
+            configuration.Competition.ModeConfiguration!,
+            configuration.CompetitionChallenge.Rules!,
+            configuration.Challenge.Definition);
         var officialWindow = configuration.Competition.Mode == GameMode.Ctf
             ? await CompetitionOfficialWindowReader.ReadAsync(
                 db,
@@ -241,15 +325,14 @@ public sealed class GameplayFactProcessor(
             effectiveRunningTime = AwdEffectiveRunningClock.Calculate(
                 lifecycleEvents.Select(@event =>
                 {
-                    var payload = JsonSerializer.Deserialize<LifecyclePayload>(
-                        @event.PayloadJson,
-                        JsonOptions)!;
                     return new CompetitionLifecycleTransition
                     {
                         Id = @event.Id,
                         CompetitionId = @event.CompetitionId,
-                        From = payload.From,
-                        To = payload.To,
+                        From = @event.PreviousCompetitionStatus
+                            ?? throw new InvalidOperationException("Lifecycle event has no previous status."),
+                        To = @event.CompetitionStatus
+                            ?? throw new InvalidOperationException("Lifecycle event has no current status."),
                         ActorId = @event.ActorUserId,
                         OccurredAt = @event.OccurredAt
                     };
@@ -261,11 +344,11 @@ public sealed class GameplayFactProcessor(
             priorSubmissions,
             flags,
             patch,
-            configuration.Competition.ConfigurationJson,
-            configuration.CompetitionChallenge.RulesJson,
+            configuration.Competition.ModeConfiguration!,
+            configuration.CompetitionChallenge.Rules!,
             configuration.Competition.StartAt,
             effectiveRunningTime,
-            configuration.Challenge.DefinitionJson));
+            configuration.Challenge.Definition));
         return new(decision, officialWindow);
     }
 
@@ -395,6 +478,7 @@ public sealed class GameplayFactProcessor(
                     competition => competition.Id,
                     challenge => challenge.CompetitionId,
                     (competition, challenge) => new { Competition = competition, Challenge = challenge })
+                .AsSplitQuery()
                 .SingleAsync(cancellationToken);
             evaluation = evaluation with
             {
@@ -433,7 +517,7 @@ public sealed class GameplayFactProcessor(
             await transaction.CommitAsync(cancellationToken);
             if (firstAdjudication)
                 RecordProcessingTelemetry(submission, now);
-            await outbox.FlushOutgoingMessagesAsync();
+            await outbox.FlushCommittedMessagesAsync();
             return;
         }
 
@@ -570,7 +654,7 @@ public sealed class GameplayFactProcessor(
         await transaction.CommitAsync(cancellationToken);
         if (firstAdjudication)
             RecordProcessingTelemetry(submission, now);
-        await outbox.FlushOutgoingMessagesAsync();
+        await outbox.FlushCommittedMessagesAsync();
     }
 
     private static void RecordProcessingTelemetry(
@@ -656,7 +740,7 @@ public sealed class GameplayFactProcessor(
                     || instance.State == RuntimeState.Provisioning
                     || instance.State == RuntimeState.Running
                     || instance.State == RuntimeState.Failed
-                        && instance.ProviderReceiptJson != null))
+                        && instance.ProviderReceipt != null))
             .OrderBy(instance => instance.CreatedAt)
             .ThenBy(instance => instance.Id)
             .ToListAsync(ct);
@@ -688,13 +772,16 @@ public sealed class GameplayFactProcessor(
         }
     }
 
-    private Task AcquireTeamScoringLockAsync(
+    private async Task AcquireTeamScoringLockAsync(
         Guid competitionId,
         Guid teamId,
-        CancellationToken ct) =>
-        db.Database.ExecuteSqlInterpolatedAsync(
-            $"SELECT 1 FROM pg_advisory_xact_lock(hashtextextended({competitionId.ToString() + ":" + teamId}, 0))",
-            ct);
+        CancellationToken ct)
+    {
+        if (!await db.Teams.AsNoTracking().AnyAsync(
+                team => team.Id == teamId && team.CompetitionId == competitionId,
+                ct))
+            throw new DbUpdateConcurrencyException("The scoring team no longer exists.");
+    }
 
     private async Task<GameplayFactProcessingScope> ResolveProcessingScopeAsync(
         GameplayFact submission,
@@ -749,7 +836,9 @@ public sealed class GameplayFactProcessor(
             .Select(item => (Guid?)item.Id)
             .FirstOrDefaultAsync(ct);
         if (nextGameplayFactId is Guid id)
-            await outbox.PublishAsync(new EvaluateGameplayFact(id));
+            await outbox.PublishAsync(new EvaluateGameplayFact(
+                id,
+                Guid.CreateVersion7(timeProvider.GetUtcNow())));
     }
 
     private async Task<BloodAwarded?> TryCreateBloodAwardAsync(
@@ -770,7 +859,7 @@ public sealed class GameplayFactProcessor(
             {
                 competition.Mode,
                 competition.TracksEnabled,
-                competition.TrackConfigurationJson
+                competition.Tracks
             })
             .SingleAsync(ct);
         if (competition.Mode != GameMode.Ctf)
@@ -779,7 +868,7 @@ public sealed class GameplayFactProcessor(
         var tracks = CompetitionTrackConfiguration.EffectiveFor(
             competition.Mode,
             competition.TracksEnabled,
-            competition.TrackConfigurationJson);
+            competition.Tracks);
         var currentTrackKey = await db.Teams.AsNoTracking().Where(CtfCompletionEligibility.ParticipatingTeams)
             .Where(team => team.Id == submission.TeamId)
             .Select(team => team.TrackKey)
@@ -804,7 +893,7 @@ public sealed class GameplayFactProcessor(
                 && candidate.Id != submission.Id)
             .Join(
                 db.Teams.AsNoTracking().Where(CtfCompletionEligibility.ParticipatingTeams).Where(team => (!competition.TracksEnabled
-                        || bloodTrackKeys.Contains(team.TrackKey.ToLower()))
+                        || bloodTrackKeys.Contains(team.TrackKey))
                     && team.RegisteredAt < officialWindow.EndAt),
                 candidate => candidate.TeamId,
                 team => (Guid?)team.Id,
@@ -852,10 +941,4 @@ public sealed class GameplayFactProcessor(
         Guid? TeamId,
         bool ChallengeWide);
 
-    private sealed record LifecyclePayload(
-        int SchemaVersion,
-        CompetitionStatus From,
-        CompetitionStatus To,
-        bool Automatic,
-        string? Reason);
 }

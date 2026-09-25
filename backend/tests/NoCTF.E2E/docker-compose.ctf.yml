@@ -19,6 +19,15 @@ services:
       timeout: 2s
       retries: 30
 
+  nats:
+    image: nats:2.12.2-alpine@sha256:2d5fce3229ae5741f4ef9225aff95dc4dc036455931eaf77a3eec33fddaa192d
+    command: ["-js", "-m", "8222"]
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8222/healthz"]
+      interval: 2s
+      timeout: 2s
+      retries: 30
+
   minio:
     image: minio/minio:RELEASE.2025-09-07T16-13-09Z@sha256:14cea493d9a34af32f524e538b8346cf79f3321eff8e708c1e2960462bd8936e
     command: server /data
@@ -47,6 +56,7 @@ services:
         condition: service_healthy
 
   migration:
+    image: ${NOCTF_E2E_HOST_IMAGE:-noctf-e2e-host:latest}
     build:
       context: ../../..
       dockerfile: backend/Dockerfile
@@ -59,6 +69,9 @@ services:
     environment: &api-environment
       ConnectionStrings__PostgreSql: Host=postgres;Port=5432;Database=noctf;Username=noctf;Password=${NOCTF_E2E_POSTGRES_PASSWORD}
       ConnectionStrings__Redis: redis:6379
+      ConnectionStrings__Nats: nats://nats:4222
+      Webhooks__PublicBaseUrl: https://e2e.invalid
+      EmailVerification__EncryptionKey: ${NOCTF_E2E_ENCRYPTION_KEY}
       Authentication__SigningKey: ${NOCTF_E2E_JWT_SECRET}
       Authentication__Issuer: NoCTF.E2E
       Authentication__Audience: NoCTF.E2E.Api
@@ -83,10 +96,13 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+      nats:
+        condition: service_healthy
       minio-init:
         condition: service_completed_successfully
 
   backend:
+    image: ${NOCTF_E2E_HOST_IMAGE:-noctf-e2e-host:latest}
     build:
       context: ../../..
       dockerfile: backend/Dockerfile
@@ -109,6 +125,7 @@ services:
         condition: service_completed_successfully
 
   worker:
+    image: ${NOCTF_E2E_HOST_IMAGE:-noctf-e2e-host:latest}
     build:
       context: ../../..
       dockerfile: backend/Dockerfile
@@ -125,6 +142,7 @@ services:
         condition: service_completed_successfully
 
   runner:
+    image: ${NOCTF_E2E_HOST_IMAGE:-noctf-e2e-host:latest}
     build:
       context: ../../..
       dockerfile: backend/Dockerfile
@@ -138,6 +156,7 @@ services:
       ASPNETCORE_HTTP_PORTS: "8080"
       ConnectionStrings__PostgreSql: Host=postgres;Port=5432;Database=noctf;Username=noctf;Password=${NOCTF_E2E_POSTGRES_PASSWORD}
       ConnectionStrings__Redis: redis:6379
+      ConnectionStrings__Nats: nats://nats:4222
       Runner__Provider: ${NOCTF_E2E_RUNTIME_PROVIDER}
       Runner__Pool: ${NOCTF_E2E_RUNNER_POOL}
       Runner__Id: ctf-e2e-runner-1
@@ -160,6 +179,8 @@ services:
     depends_on:
       migration:
         condition: service_completed_successfully
+      nats:
+        condition: service_healthy
 
   runtime-fixture:
     image: ${NOCTF_E2E_RUNTIME_IMAGE}

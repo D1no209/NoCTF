@@ -16121,7 +16121,9 @@
           "kind": {
             "$ref": "#/components/schemas/NoCTFAPIEndpointsNotificationsNotificationKindProtocol"
           },
-          "content": {},
+          "content": {
+            "$ref": "#/components/schemas/NoCTFApplicationNotificationsNotificationContent"
+          },
           "relatedType": {
             "nullable": true,
             "oneOf": [
@@ -16238,6 +16240,1052 @@
           "UserAccountLifecycleChanged",
           "CompetitionForceDeleted"
         ]
+      },
+      "NoCTFApplicationNotificationsNotificationContent": {
+        "type": "object",
+        "discriminator": {
+          "propertyName": "type",
+          "mapping": {
+            "message": "#/components/schemas/NoCTFApplicationNotificationsMessageNotificationContent",
+            "competition-announcement": "#/components/schemas/NoCTFApplicationNotificationsCompetitionAnnouncementNotificationContent",
+            "question-opened": "#/components/schemas/NoCTFApplicationNotificationsQuestionOpenedNotificationContent",
+            "question-status-changed": "#/components/schemas/NoCTFApplicationNotificationsQuestionStatusChangedNotificationContent",
+            "competition-lifecycle-changed": "#/components/schemas/NoCTFApplicationNotificationsCompetitionLifecycleChangedNotificationContent",
+            "team-registration-changed": "#/components/schemas/NoCTFApplicationNotificationsTeamRegistrationChangedNotificationContent",
+            "gameplay-fact-adjudicated": "#/components/schemas/NoCTFApplicationNotificationsGameplayFactAdjudicatedNotificationContent",
+            "runtime-state-changed": "#/components/schemas/NoCTFApplicationNotificationsRuntimeStateChangedNotificationContent",
+            "start-gate-failed": "#/components/schemas/NoCTFApplicationNotificationsStartGateFailedNotificationContent",
+            "management-failure": "#/components/schemas/NoCTFApplicationNotificationsManagementFailureNotificationContent",
+            "blood-awarded": "#/components/schemas/NoCTFApplicationNotificationsBloodAwardedNotificationContent",
+            "challenge-published": "#/components/schemas/NoCTFApplicationNotificationsChallengePublishedNotificationContent",
+            "hint-published": "#/components/schemas/NoCTFApplicationNotificationsHintPublishedNotificationContent",
+            "team-banned": "#/components/schemas/NoCTFApplicationNotificationsTeamBannedNotificationContent",
+            "cheat-incident-detected": "#/components/schemas/NoCTFApplicationNotificationsCheatIncidentDetectedNotificationContent",
+            "team-ban-corrected": "#/components/schemas/NoCTFApplicationNotificationsTeamBanCorrectedNotificationContent",
+            "team-ban-appeal-submitted": "#/components/schemas/NoCTFApplicationNotificationsTeamBanAppealSubmittedNotificationContent",
+            "platform-audit-exported": "#/components/schemas/NoCTFApplicationNotificationsPlatformAuditExportedNotificationContent",
+            "user-account-lifecycle-changed": "#/components/schemas/NoCTFApplicationNotificationsUserAccountLifecycleChangedNotificationContent",
+            "competition-force-deleted": "#/components/schemas/NoCTFApplicationNotificationsCompetitionForceDeletedNotificationContent"
+          }
+        },
+        "x-abstract": true,
+        "additionalProperties": false,
+        "required": [
+          "type"
+        ],
+        "properties": {
+          "type": {
+            "type": "string"
+          }
+        }
+      },
+      "NoCTFApplicationNotificationsMessageNotificationContent": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/NoCTFApplicationNotificationsNotificationContent"
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "body": {
+                "type": "string",
+                "nullable": true
+              },
+              "from": {
+                "nullable": true,
+                "oneOf": [
+                  {
+                    "$ref": "#/components/schemas/NoCTFDomainChallengesQuestionsCompetitionQuestionStatus"
+                  }
+                ]
+              },
+              "to": {
+                "nullable": true,
+                "oneOf": [
+                  {
+                    "$ref": "#/components/schemas/NoCTFDomainChallengesQuestionsCompetitionQuestionStatus"
+                  }
+                ]
+              },
+              "actorRole": {
+                "nullable": true,
+                "oneOf": [
+                  {
+                    "$ref": "#/components/schemas/NoCTFDomainChallengesQuestionsCompetitionQuestionParticipantRole"
+                  }
+                ]
+              }
+            }
+          }
+        ]
+      },
+      "NoCTFDomainChallengesQuestionsCompetitionQuestionStatus": {
+        "type": "integer",
+        "description": "",
+        "x-enumNames": [
+          "Pending",
+          "Replied",
+          "Resolved",
+          "Closed"
+        ],
+        "enum": [
+          0,
+          1,
+          2,
+          3
+        ]
+      },
+      "NoCTFDomainChallengesQuestionsCompetitionQuestionParticipantRole": {
+        "type": "integer",
+        "description": "",
+        "x-enumNames": [
+          "Asker",
+          "Handler",
+          "Participant",
+          "Judge",
+          "ChallengeOwner",
+          "CompetitionManager",
+          "PlatformAdministrator"
+        ],
+        "enum": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5,
+          6
+        ]
+      },
+      "NoCTFApplicationNotificationsCompetitionAnnouncementNotificationContent": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/NoCTFApplicationNotificationsNotificationContent"
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "title": {
+                "type": "string",
+                "nullable": true
+              },
+              "body": {
+                "type": "string",
+                "nullable": true
+              },
+              "teamId": {
+                "type": "string",
+                "format": "guid",
+                "nullable": true
+              },
+              "teamName": {
+                "type": "string",
+                "nullable": true
+              },
+              "announcementKind": {
+                "nullable": true,
+                "oneOf": [
+                  {
+                    "$ref": "#/components/schemas/NoCTFApplicationMessagingTeamBanAnnouncementKind"
+                  }
+                ]
+              }
+            }
+          }
+        ]
+      },
+      "NoCTFApplicationMessagingTeamBanAnnouncementKind": {
+        "type": "integer",
+        "description": "",
+        "x-enumNames": [
+          "RuleViolation",
+          "ConfirmedCheating"
+        ],
+        "enum": [
+          0,
+          1
+        ]
+      },
+      "NoCTFApplicationNotificationsQuestionOpenedNotificationContent": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/NoCTFApplicationNotificationsNotificationContent"
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "subject": {
+                "nullable": true,
+                "oneOf": [
+                  {
+                    "$ref": "#/components/schemas/NoCTFDomainChallengesQuestionsCompetitionQuestionSubject"
+                  }
+                ]
+              },
+              "title": {
+                "type": "string",
+                "nullable": true
+              },
+              "body": {
+                "type": "string",
+                "nullable": true
+              },
+              "teamId": {
+                "type": "string",
+                "format": "guid",
+                "nullable": true
+              },
+              "competitionChallengeId": {
+                "type": "string",
+                "format": "guid",
+                "nullable": true
+              },
+              "gameplayFactId": {
+                "type": "string",
+                "format": "guid",
+                "nullable": true
+              },
+              "status": {
+                "nullable": true,
+                "oneOf": [
+                  {
+                    "$ref": "#/components/schemas/NoCTFDomainChallengesQuestionsCompetitionQuestionStatus"
+                  }
+                ]
+              },
+              "actorRole": {
+                "nullable": true,
+                "oneOf": [
+                  {
+                    "$ref": "#/components/schemas/NoCTFDomainChallengesQuestionsCompetitionQuestionParticipantRole"
+                  }
+                ]
+              }
+            }
+          }
+        ]
+      },
+      "NoCTFDomainChallengesQuestionsCompetitionQuestionSubject": {
+        "type": "integer",
+        "description": "",
+        "x-enumNames": [
+          "Challenge",
+          "Platform"
+        ],
+        "enum": [
+          0,
+          1
+        ]
+      },
+      "NoCTFApplicationNotificationsQuestionStatusChangedNotificationContent": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/NoCTFApplicationNotificationsNotificationContent"
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "from": {
+                "nullable": true,
+                "oneOf": [
+                  {
+                    "$ref": "#/components/schemas/NoCTFDomainChallengesQuestionsCompetitionQuestionStatus"
+                  }
+                ]
+              },
+              "to": {
+                "nullable": true,
+                "oneOf": [
+                  {
+                    "$ref": "#/components/schemas/NoCTFDomainChallengesQuestionsCompetitionQuestionStatus"
+                  }
+                ]
+              },
+              "actorRole": {
+                "nullable": true,
+                "oneOf": [
+                  {
+                    "$ref": "#/components/schemas/NoCTFDomainChallengesQuestionsCompetitionQuestionParticipantRole"
+                  }
+                ]
+              }
+            }
+          }
+        ]
+      },
+      "NoCTFApplicationNotificationsCompetitionLifecycleChangedNotificationContent": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/NoCTFApplicationNotificationsNotificationContent"
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "state": {
+                "type": "integer",
+                "format": "int32",
+                "nullable": true
+              },
+              "reason": {
+                "type": "string",
+                "nullable": true
+              }
+            }
+          }
+        ]
+      },
+      "NoCTFApplicationNotificationsTeamRegistrationChangedNotificationContent": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/NoCTFApplicationNotificationsNotificationContent"
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "teamId": {
+                "type": "string",
+                "format": "guid",
+                "nullable": true
+              },
+              "state": {
+                "type": "integer",
+                "format": "int32",
+                "nullable": true
+              },
+              "reason": {
+                "type": "string",
+                "nullable": true
+              }
+            }
+          }
+        ]
+      },
+      "NoCTFApplicationNotificationsGameplayFactAdjudicatedNotificationContent": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/NoCTFApplicationNotificationsNotificationContent"
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "gameplayFactId": {
+                "type": "string",
+                "format": "guid",
+                "nullable": true
+              },
+              "state": {
+                "nullable": true,
+                "oneOf": [
+                  {
+                    "$ref": "#/components/schemas/NoCTFDomainGameplayGameplayFactState"
+                  }
+                ]
+              },
+              "result": {
+                "nullable": true,
+                "oneOf": [
+                  {
+                    "$ref": "#/components/schemas/NoCTFDomainGameplayGameplayFactResult"
+                  }
+                ]
+              },
+              "failureCode": {
+                "nullable": true,
+                "oneOf": [
+                  {
+                    "$ref": "#/components/schemas/NoCTFDomainGameplayGameplayFactFailureCode"
+                  }
+                ]
+              }
+            }
+          }
+        ]
+      },
+      "NoCTFDomainGameplayGameplayFactState": {
+        "type": "integer",
+        "description": "",
+        "x-enumNames": [
+          "Pending",
+          "Queued",
+          "Processing",
+          "Completed",
+          "PlatformFailed"
+        ],
+        "enum": [
+          0,
+          1,
+          2,
+          3,
+          4
+        ]
+      },
+      "NoCTFDomainGameplayGameplayFactResult": {
+        "type": "integer",
+        "description": "",
+        "x-enumNames": [
+          "Correct",
+          "Wrong",
+          "Duplicate",
+          "AttemptsExhausted",
+          "Rejected",
+          "Unlocked",
+          "Applied",
+          "ServiceUp",
+          "ServiceDown",
+          "Controlled",
+          "Uncontrolled"
+        ],
+        "enum": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7,
+          8,
+          9,
+          10
+        ]
+      },
+      "NoCTFDomainGameplayGameplayFactFailureCode": {
+        "type": "integer",
+        "description": "",
+        "x-enumNames": [
+          "FlagNotSupported",
+          "FixNotSupported",
+          "BreakAttemptsExhausted",
+          "FixAttemptsExhausted",
+          "BreakRequired",
+          "ArchiveValidationUnavailable",
+          "FixArchiveMissing",
+          "FixArchiveLengthMismatch",
+          "FixArchiveContentTypeMismatch",
+          "FixArchiveHashMismatch",
+          "StorageTimeout",
+          "StorageUnavailable",
+          "CheckerPlatformError",
+          "SelfAttackRejected",
+          "DuplicateAttack",
+          "DuplicateAchievement",
+          "UnknownTeamIdentifier",
+          "InvalidObservation",
+          "ProducerTimeout",
+          "ProducerUnavailable",
+          "AmbiguousFlagMatch",
+          "FlagExpired",
+          "RoundOutOfRange",
+          "HardeningActive",
+          "AwdpExploitSucceeded",
+          "AwdpPatchFailed",
+          "AwdpPatchTimeout",
+          "AwdpServiceAbnormal",
+          "ForeignTeamFlagDetected",
+          "InsufficientScore",
+          "HintUnavailable",
+          "AwdpPlatformFailed",
+          "PatchStillExploitable",
+          "PatchExecutionFailed",
+          "PatchServiceAbnormal",
+          "PatchVerificationPlatformFailed"
+        ],
+        "enum": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7,
+          8,
+          9,
+          10,
+          11,
+          12,
+          13,
+          14,
+          15,
+          16,
+          17,
+          18,
+          19,
+          20,
+          21,
+          22,
+          23,
+          24,
+          25,
+          26,
+          27,
+          28,
+          29,
+          30,
+          31,
+          32,
+          33,
+          34,
+          35
+        ]
+      },
+      "NoCTFApplicationNotificationsRuntimeStateChangedNotificationContent": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/NoCTFApplicationNotificationsNotificationContent"
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "code": {
+                "type": "string",
+                "nullable": true
+              },
+              "competitionChallengeId": {
+                "type": "string",
+                "format": "guid",
+                "nullable": true
+              },
+              "runtimeInstanceId": {
+                "type": "string",
+                "format": "guid",
+                "nullable": true
+              },
+              "challengeFlagId": {
+                "type": "string",
+                "format": "guid",
+                "nullable": true
+              },
+              "state": {
+                "nullable": true,
+                "oneOf": [
+                  {
+                    "$ref": "#/components/schemas/NoCTFDomainRuntimeRuntimeState"
+                  }
+                ]
+              }
+            }
+          }
+        ]
+      },
+      "NoCTFDomainRuntimeRuntimeState": {
+        "type": "integer",
+        "description": "",
+        "x-enumNames": [
+          "Queued",
+          "Provisioning",
+          "Running",
+          "Stopping",
+          "Stopped",
+          "Failed"
+        ],
+        "enum": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5
+        ]
+      },
+      "NoCTFApplicationNotificationsStartGateFailedNotificationContent": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/NoCTFApplicationNotificationsNotificationContent"
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "code": {
+                "type": "string",
+                "nullable": true
+              },
+              "reason": {
+                "type": "string",
+                "nullable": true
+              }
+            }
+          }
+        ]
+      },
+      "NoCTFApplicationNotificationsManagementFailureNotificationContent": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/NoCTFApplicationNotificationsNotificationContent"
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "code": {
+                "type": "string",
+                "nullable": true
+              },
+              "competitionChallengeId": {
+                "type": "string",
+                "format": "guid",
+                "nullable": true
+              },
+              "runtimeInstanceId": {
+                "type": "string",
+                "format": "guid",
+                "nullable": true
+              },
+              "gameplayFactId": {
+                "type": "string",
+                "format": "guid",
+                "nullable": true
+              }
+            }
+          }
+        ]
+      },
+      "NoCTFApplicationNotificationsBloodAwardedNotificationContent": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/NoCTFApplicationNotificationsNotificationContent"
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "competitionId": {
+                "type": "string",
+                "format": "guid",
+                "nullable": true
+              },
+              "competitionChallengeId": {
+                "type": "string",
+                "format": "guid",
+                "nullable": true
+              },
+              "challengeTitle": {
+                "type": "string",
+                "nullable": true
+              },
+              "bloodRank": {
+                "nullable": true,
+                "oneOf": [
+                  {
+                    "$ref": "#/components/schemas/NoCTFApplicationScoringLeaderboardLeaderboardBloodRank"
+                  }
+                ]
+              },
+              "teamId": {
+                "type": "string",
+                "format": "guid",
+                "nullable": true
+              },
+              "teamName": {
+                "type": "string",
+                "nullable": true
+              },
+              "occurredAt": {
+                "type": "string",
+                "format": "date-time",
+                "nullable": true
+              }
+            }
+          }
+        ]
+      },
+      "NoCTFApplicationScoringLeaderboardLeaderboardBloodRank": {
+        "type": "integer",
+        "description": "",
+        "x-enumNames": [
+          "First",
+          "Second",
+          "Third"
+        ],
+        "enum": [
+          1,
+          2,
+          3
+        ]
+      },
+      "NoCTFApplicationNotificationsChallengePublishedNotificationContent": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/NoCTFApplicationNotificationsNotificationContent"
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "competitionId": {
+                "type": "string",
+                "format": "guid",
+                "nullable": true
+              },
+              "competitionChallengeId": {
+                "type": "string",
+                "format": "guid",
+                "nullable": true
+              },
+              "challengeTitle": {
+                "type": "string",
+                "nullable": true
+              },
+              "direction": {
+                "type": "string",
+                "nullable": true
+              },
+              "publishedAt": {
+                "type": "string",
+                "format": "date-time",
+                "nullable": true
+              }
+            }
+          }
+        ]
+      },
+      "NoCTFApplicationNotificationsHintPublishedNotificationContent": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/NoCTFApplicationNotificationsNotificationContent"
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "competitionId": {
+                "type": "string",
+                "format": "guid",
+                "nullable": true
+              },
+              "competitionChallengeId": {
+                "type": "string",
+                "format": "guid",
+                "nullable": true
+              },
+              "hintId": {
+                "type": "string",
+                "format": "guid",
+                "nullable": true
+              },
+              "challengeTitle": {
+                "type": "string",
+                "nullable": true
+              },
+              "cost": {
+                "type": "integer",
+                "format": "int64",
+                "nullable": true
+              },
+              "publishedAt": {
+                "type": "string",
+                "format": "date-time",
+                "nullable": true
+              }
+            }
+          }
+        ]
+      },
+      "NoCTFApplicationNotificationsTeamBannedNotificationContent": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/NoCTFApplicationNotificationsNotificationContent"
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "competitionId": {
+                "type": "string",
+                "format": "guid",
+                "nullable": true
+              },
+              "teamId": {
+                "type": "string",
+                "format": "guid",
+                "nullable": true
+              },
+              "teamName": {
+                "type": "string",
+                "nullable": true
+              },
+              "bannedAt": {
+                "type": "string",
+                "format": "date-time",
+                "nullable": true
+              }
+            }
+          }
+        ]
+      },
+      "NoCTFApplicationNotificationsCheatIncidentDetectedNotificationContent": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/NoCTFApplicationNotificationsNotificationContent"
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "competitionId": {
+                "type": "string",
+                "format": "guid",
+                "nullable": true
+              },
+              "gameplayFactId": {
+                "type": "string",
+                "format": "guid",
+                "nullable": true
+              },
+              "sourceTeamId": {
+                "type": "string",
+                "format": "guid",
+                "nullable": true
+              },
+              "ownerTeamId": {
+                "type": "string",
+                "format": "guid",
+                "nullable": true
+              },
+              "actorUserId": {
+                "type": "string",
+                "format": "guid",
+                "nullable": true
+              },
+              "competitionChallengeId": {
+                "type": "string",
+                "format": "guid",
+                "nullable": true
+              },
+              "detectedAt": {
+                "type": "string",
+                "format": "date-time",
+                "nullable": true
+              }
+            }
+          }
+        ]
+      },
+      "NoCTFApplicationNotificationsTeamBanCorrectedNotificationContent": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/NoCTFApplicationNotificationsNotificationContent"
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "competitionId": {
+                "type": "string",
+                "format": "guid",
+                "nullable": true
+              },
+              "teamId": {
+                "type": "string",
+                "format": "guid",
+                "nullable": true
+              },
+              "teamName": {
+                "type": "string",
+                "nullable": true
+              },
+              "correctedAt": {
+                "type": "string",
+                "format": "date-time",
+                "nullable": true
+              }
+            }
+          }
+        ]
+      },
+      "NoCTFApplicationNotificationsTeamBanAppealSubmittedNotificationContent": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/NoCTFApplicationNotificationsNotificationContent"
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "competitionId": {
+                "type": "string",
+                "format": "guid",
+                "nullable": true
+              },
+              "appealEventId": {
+                "type": "string",
+                "format": "guid",
+                "nullable": true
+              },
+              "teamId": {
+                "type": "string",
+                "format": "guid",
+                "nullable": true
+              },
+              "teamName": {
+                "type": "string",
+                "nullable": true
+              },
+              "submittedAt": {
+                "type": "string",
+                "format": "date-time",
+                "nullable": true
+              }
+            }
+          }
+        ]
+      },
+      "NoCTFApplicationNotificationsPlatformAuditExportedNotificationContent": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/NoCTFApplicationNotificationsNotificationContent"
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "auditKind": {
+                "type": "integer",
+                "format": "int32",
+                "nullable": true
+              },
+              "competitionId": {
+                "type": "string",
+                "format": "guid",
+                "nullable": true
+              },
+              "actorId": {
+                "type": "string",
+                "format": "guid",
+                "nullable": true
+              },
+              "from": {
+                "type": "string",
+                "format": "date-time",
+                "nullable": true
+              },
+              "to": {
+                "type": "string",
+                "format": "date-time",
+                "nullable": true
+              },
+              "recordCount": {
+                "type": "integer",
+                "format": "int64",
+                "nullable": true
+              }
+            }
+          }
+        ]
+      },
+      "NoCTFApplicationNotificationsUserAccountLifecycleChangedNotificationContent": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/NoCTFApplicationNotificationsNotificationContent"
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "targetUserId": {
+                "type": "string",
+                "format": "guid",
+                "nullable": true
+              },
+              "targetUserName": {
+                "type": "string",
+                "nullable": true
+              },
+              "action": {
+                "nullable": true,
+                "oneOf": [
+                  {
+                    "$ref": "#/components/schemas/NoCTFDomainIdentityUserAccountLifecycleAction"
+                  }
+                ]
+              },
+              "reason": {
+                "type": "string",
+                "nullable": true
+              },
+              "automatic": {
+                "type": "boolean",
+                "nullable": true
+              }
+            }
+          }
+        ]
+      },
+      "NoCTFDomainIdentityUserAccountLifecycleAction": {
+        "type": "integer",
+        "description": "",
+        "x-enumNames": [
+          "Activated",
+          "Banned",
+          "Disabled",
+          "EmailVerified",
+          "EmailUnverified",
+          "Anonymized",
+          "PhysicallyDeleted"
+        ],
+        "enum": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5,
+          6
+        ]
+      },
+      "NoCTFApplicationNotificationsCompetitionForceDeletedNotificationContent": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/NoCTFApplicationNotificationsNotificationContent"
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "competitionId": {
+                "type": "string",
+                "format": "guid",
+                "nullable": true
+              },
+              "competitionTitle": {
+                "type": "string",
+                "nullable": true
+              },
+              "reason": {
+                "type": "string",
+                "nullable": true
+              },
+              "deletedReferences": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/NoCTFApplicationNotificationsCompetitionForceDeletedReference"
+                }
+              }
+            }
+          }
+        ]
+      },
+      "NoCTFApplicationNotificationsCompetitionForceDeletedReference": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "kind": {
+            "type": "integer"
+          },
+          "count": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
       },
       "NoCTFDomainSharedEntityReferenceKind": {
         "type": "integer",
@@ -19484,7 +20532,7 @@
           "items": {
             "type": "array",
             "items": {
-              "$ref": "#/components/schemas/NoCTFAPIEndpointsChallengesChallengeResponse"
+              "$ref": "#/components/schemas/NoCTFAPIEndpointsChallengesChallengeSummaryResponse"
             }
           },
           "leaderboardVisibility": {
@@ -19492,6 +20540,49 @@
           },
           "dataScope": {
             "$ref": "#/components/schemas/NoCTFAPIEndpointsCompetitionsLeaderboardDataScopeProtocol"
+          }
+        }
+      },
+      "NoCTFAPIEndpointsChallengesChallengeSummaryResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "guid"
+          },
+          "competitionId": {
+            "type": "string",
+            "format": "guid"
+          },
+          "challengeId": {
+            "type": "string",
+            "format": "guid"
+          },
+          "title": {
+            "type": "string"
+          },
+          "customTitle": {
+            "type": "string",
+            "nullable": true
+          },
+          "direction": {
+            "type": "string"
+          },
+          "order": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "isPublished": {
+            "type": "boolean"
+          },
+          "deletedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "interactionKind": {
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsChallengesCtfInteractionKindProtocol"
           }
         }
       },
@@ -23559,7 +24650,6 @@
         "type": "string",
         "description": "",
         "x-enumNames": [
-          "CurrentCorrectShouldBeDuplicate",
           "DuplicateWithoutCurrentPredecessor",
           "HistoricalResultChanged",
           "MissingAdjudicationRecord",
@@ -23570,7 +24660,6 @@
           "DuplicateBloodAward"
         ],
         "enum": [
-          "CurrentCorrectShouldBeDuplicate",
           "DuplicateWithoutCurrentPredecessor",
           "HistoricalResultChanged",
           "MissingAdjudicationRecord",
@@ -24222,8 +25311,8 @@
           "mode": {
             "$ref": "#/components/schemas/NoCTFAPIEndpointsCompetitionsGameModeProtocol"
           },
-          "json": {
-            "type": "string"
+          "configuration": {
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationCompetitionsCompetitionModeConfigurationContract"
           },
           "competitionStatus": {
             "$ref": "#/components/schemas/NoCTFAPIEndpointsCompetitionsCompetitionStatusProtocol"
@@ -24231,6 +25320,279 @@
           "updatedAt": {
             "type": "string",
             "format": "date-time"
+          }
+        }
+      },
+      "NoCTFAPIEndpointsAdministrationCompetitionsCompetitionModeConfigurationContract": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "mode",
+          "flagTemplate"
+        ],
+        "properties": {
+          "mode": {
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsCompetitionsGameModeProtocol"
+          },
+          "flagTemplate": {
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationCompetitionsFlagTemplateContract"
+          },
+          "ctf": {
+            "nullable": true,
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationCompetitionsCtfCompetitionModeConfigurationContract"
+              }
+            ]
+          },
+          "awd": {
+            "nullable": true,
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationCompetitionsAwdCompetitionModeConfigurationContract"
+              }
+            ]
+          },
+          "awdp": {
+            "nullable": true,
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationCompetitionsAwdpCompetitionModeConfigurationContract"
+              }
+            ]
+          },
+          "koh": {
+            "nullable": true,
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationCompetitionsKohCompetitionModeConfigurationContract"
+              }
+            ]
+          }
+        }
+      },
+      "NoCTFAPIEndpointsAdministrationCompetitionsFlagTemplateContract": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "header": {
+            "type": "string"
+          },
+          "bodyTemplate": {
+            "type": "string"
+          },
+          "leetLiteralText": {
+            "type": "boolean"
+          }
+        }
+      },
+      "NoCTFAPIEndpointsAdministrationCompetitionsCtfCompetitionModeConfigurationContract": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "defaultScoreCurve": {
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationCompetitionsScoreCurveContract"
+          },
+          "bloodRewards": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationCompetitionsBloodRewardContract"
+            }
+          },
+          "wrongSubmissionPenalty": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
+      "NoCTFAPIEndpointsAdministrationCompetitionsScoreCurveContract": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "initialPoints": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "minimumPoints": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "decayTeamCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "decayMode": {
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationCompetitionsScoreDecayModeProtocol"
+          },
+          "customExpression": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
+      "NoCTFAPIEndpointsAdministrationCompetitionsScoreDecayModeProtocol": {
+        "type": "string",
+        "description": "",
+        "x-enumNames": [
+          "Fixed",
+          "Linear",
+          "Quadratic",
+          "Exponential",
+          "Logarithmic",
+          "Custom"
+        ],
+        "enum": [
+          "Fixed",
+          "Linear",
+          "Quadratic",
+          "Exponential",
+          "Logarithmic",
+          "Custom"
+        ]
+      },
+      "NoCTFAPIEndpointsAdministrationCompetitionsBloodRewardContract": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "policy": {
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationCompetitionsBloodRewardPolicyProtocol"
+          },
+          "value": {
+            "type": "number",
+            "format": "decimal"
+          }
+        }
+      },
+      "NoCTFAPIEndpointsAdministrationCompetitionsBloodRewardPolicyProtocol": {
+        "type": "string",
+        "description": "",
+        "x-enumNames": [
+          "FixedPoints",
+          "InitialPointsPercentage",
+          "SolveTimePointsPercentage",
+          "CurrentPointsPercentage"
+        ],
+        "enum": [
+          "FixedPoints",
+          "InitialPointsPercentage",
+          "SolveTimePointsPercentage",
+          "CurrentPointsPercentage"
+        ]
+      },
+      "NoCTFAPIEndpointsAdministrationCompetitionsAwdCompetitionModeConfigurationContract": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "hardeningDurationSeconds": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "roundDurationSeconds": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "attackRewardMode": {
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationCompetitionsAwdAttackRewardModeProtocol"
+          },
+          "attackPoints": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "victimDefensePoolPoints": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "checkerIntervalSeconds": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "serviceHealthyPoints": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "serviceUnhealthyPenalty": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
+      "NoCTFAPIEndpointsAdministrationCompetitionsAwdAttackRewardModeProtocol": {
+        "type": "string",
+        "description": "",
+        "x-enumNames": [
+          "FixedPerAttack",
+          "SplitVictimDefensePool"
+        ],
+        "enum": [
+          "FixedPerAttack",
+          "SplitVictimDefensePool"
+        ]
+      },
+      "NoCTFAPIEndpointsAdministrationCompetitionsAwdpCompetitionModeConfigurationContract": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "roundDurationSeconds": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "breakScoreCurve": {
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationCompetitionsScoreCurveContract"
+          },
+          "fixScoreCurve": {
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationCompetitionsScoreCurveContract"
+          },
+          "flagWrongPenalty": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "exploitSucceededPenalty": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "serviceAbnormalPenalty": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "requireBreakBeforeFix": {
+            "type": "boolean"
+          },
+          "maxBreakSubmissions": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "maxFixSubmissions": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "evaluationDispatchMode": {
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationCompetitionsEvaluationDispatchModeProtocol"
+          }
+        }
+      },
+      "NoCTFAPIEndpointsAdministrationCompetitionsEvaluationDispatchModeProtocol": {
+        "type": "string",
+        "description": "",
+        "x-enumNames": [
+          "Automatic",
+          "Manual"
+        ],
+        "enum": [
+          "Automatic",
+          "Manual"
+        ]
+      },
+      "NoCTFAPIEndpointsAdministrationCompetitionsKohCompetitionModeConfigurationContract": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "pollIntervalSeconds": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "controlPointsPerInterval": {
+            "type": "integer",
+            "format": "int64"
           }
         }
       },
@@ -24670,11 +26032,11 @@
         "type": "object",
         "additionalProperties": false,
         "required": [
-          "json"
+          "configuration"
         ],
         "properties": {
-          "json": {
-            "type": "string"
+          "configuration": {
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationCompetitionsCompetitionModeConfigurationContract"
           }
         }
       },
@@ -25412,8 +26774,226 @@
           "competitionStatus": {
             "$ref": "#/components/schemas/NoCTFAPIEndpointsCompetitionsCompetitionStatusProtocol"
           },
-          "rulesJson": {
-            "type": "string"
+          "rules": {
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationChallengesCompetitionChallengeRulesContract"
+          }
+        }
+      },
+      "NoCTFAPIEndpointsAdministrationChallengesCompetitionChallengeRulesContract": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "mode"
+        ],
+        "properties": {
+          "mode": {
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsCompetitionsGameModeProtocol"
+          },
+          "ctf": {
+            "nullable": true,
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationChallengesCtfCompetitionChallengeRulesContract"
+              }
+            ]
+          },
+          "awd": {
+            "nullable": true,
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationChallengesAwdCompetitionChallengeRulesContract"
+              }
+            ]
+          },
+          "awdp": {
+            "nullable": true,
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationChallengesAwdpCompetitionChallengeRulesContract"
+              }
+            ]
+          },
+          "koh": {
+            "nullable": true,
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationChallengesKohCompetitionChallengeRulesContract"
+              }
+            ]
+          }
+        }
+      },
+      "NoCTFAPIEndpointsAdministrationChallengesCtfCompetitionChallengeRulesContract": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "scoreCurve": {
+            "nullable": true,
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationCompetitionsScoreCurveContract"
+              }
+            ]
+          },
+          "bloodRewards": {
+            "type": "array",
+            "nullable": true,
+            "items": {
+              "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationCompetitionsBloodRewardContract"
+            }
+          },
+          "maxFlagAttempts": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "maxPatchAttempts": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "wrongSubmissionPenalty": {
+            "type": "integer",
+            "format": "int64",
+            "nullable": true
+          },
+          "flagTemplate": {
+            "nullable": true,
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationCompetitionsFlagTemplateContract"
+              }
+            ]
+          }
+        }
+      },
+      "NoCTFAPIEndpointsAdministrationChallengesAwdCompetitionChallengeRulesContract": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "attackRewardMode": {
+            "nullable": true,
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationCompetitionsAwdAttackRewardModeProtocol"
+              }
+            ]
+          },
+          "attackPoints": {
+            "type": "integer",
+            "format": "int64",
+            "nullable": true
+          },
+          "victimDefensePoolPoints": {
+            "type": "integer",
+            "format": "int64",
+            "nullable": true
+          },
+          "checkerIntervalSeconds": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "serviceHealthyPoints": {
+            "type": "integer",
+            "format": "int64",
+            "nullable": true
+          },
+          "serviceUnhealthyPenalty": {
+            "type": "integer",
+            "format": "int64",
+            "nullable": true
+          },
+          "flagTemplate": {
+            "nullable": true,
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationCompetitionsFlagTemplateContract"
+              }
+            ]
+          }
+        }
+      },
+      "NoCTFAPIEndpointsAdministrationChallengesAwdpCompetitionChallengeRulesContract": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "breakScoreCurve": {
+            "nullable": true,
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationCompetitionsScoreCurveContract"
+              }
+            ]
+          },
+          "fixScoreCurve": {
+            "nullable": true,
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationCompetitionsScoreCurveContract"
+              }
+            ]
+          },
+          "maxBreakSubmissions": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "maxFixSubmissions": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "requireBreakBeforeFix": {
+            "type": "boolean",
+            "nullable": true
+          },
+          "flagWrongPenalty": {
+            "type": "integer",
+            "format": "int64",
+            "nullable": true
+          },
+          "exploitSucceededPenalty": {
+            "type": "integer",
+            "format": "int64",
+            "nullable": true
+          },
+          "serviceAbnormalPenalty": {
+            "type": "integer",
+            "format": "int64",
+            "nullable": true
+          },
+          "evaluationDispatchMode": {
+            "nullable": true,
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationCompetitionsEvaluationDispatchModeProtocol"
+              }
+            ]
+          },
+          "flagTemplate": {
+            "nullable": true,
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationCompetitionsFlagTemplateContract"
+              }
+            ]
+          }
+        }
+      },
+      "NoCTFAPIEndpointsAdministrationChallengesKohCompetitionChallengeRulesContract": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "pollIntervalSeconds": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "controlPointsPerInterval": {
+            "type": "integer",
+            "format": "int64",
+            "nullable": true
           }
         }
       },
@@ -25615,11 +27195,11 @@
         "type": "object",
         "additionalProperties": false,
         "required": [
-          "json"
+          "configuration"
         ],
         "properties": {
-          "json": {
-            "type": "string"
+          "configuration": {
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationChallengesCompetitionChallengeRulesContract"
           }
         }
       },
@@ -25725,8 +27305,8 @@
           "direction": {
             "type": "string"
           },
-          "definitionJson": {
-            "type": "string"
+          "definition": {
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationChallengeBankChallengeDefinitionContract"
           },
           "deletedAt": {
             "type": "string",
@@ -25761,6 +27341,533 @@
           "Private",
           "Shared"
         ]
+      },
+      "NoCTFAPIEndpointsAdministrationChallengeBankChallengeDefinitionContract": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "mode"
+        ],
+        "properties": {
+          "mode": {
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsCompetitionsGameModeProtocol"
+          },
+          "flagTemplate": {
+            "nullable": true,
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationCompetitionsFlagTemplateContract"
+              }
+            ]
+          },
+          "runtime": {
+            "nullable": true,
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationChallengeBankChallengeRuntimeContract"
+              }
+            ]
+          },
+          "checker": {
+            "nullable": true,
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationChallengeBankRunnerJobContract"
+              }
+            ]
+          },
+          "patchEntrypoint": {
+            "type": "string",
+            "nullable": true
+          },
+          "patchCommand": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "patchTimeoutSeconds": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "readyTimeoutSeconds": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "maximumPatchUploadBytes": {
+            "type": "integer",
+            "format": "int64",
+            "nullable": true
+          },
+          "checkerFixInput": {
+            "type": "boolean"
+          },
+          "checkerAllowRoot": {
+            "type": "boolean"
+          },
+          "ctf": {
+            "nullable": true,
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationChallengeBankCtfChallengeDefinitionContract"
+              }
+            ]
+          },
+          "awd": {
+            "nullable": true,
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationChallengeBankAwdChallengeDefinitionContract"
+              }
+            ]
+          },
+          "awdp": {
+            "nullable": true,
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationChallengeBankAwdpChallengeDefinitionContract"
+              }
+            ]
+          },
+          "koh": {
+            "nullable": true,
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationChallengeBankKohChallengeDefinitionContract"
+              }
+            ]
+          }
+        }
+      },
+      "NoCTFAPIEndpointsAdministrationChallengeBankChallengeRuntimeContract": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "kind"
+        ],
+        "properties": {
+          "kind": {
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationChallengeBankChallengeRuntimeKindProtocol"
+          },
+          "allocation": {
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationChallengeBankRuntimeAllocationProtocol"
+          },
+          "limits": {
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationChallengeBankRuntimeResourceLimitsContract"
+          },
+          "ttlSeconds": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "operationTimeoutSeconds": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "flagSource": {
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationChallengeBankRuntimeFlagSourceProtocol"
+          },
+          "egressPolicy": {
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationChallengeBankRuntimeEgressPolicyProtocol"
+          },
+          "urlBindings": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationChallengeBankRuntimeUrlBindingContract"
+            }
+          },
+          "container": {
+            "nullable": true,
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationChallengeBankContainerChallengeRuntimeContract"
+              }
+            ]
+          },
+          "compose": {
+            "nullable": true,
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationChallengeBankComposeChallengeRuntimeContract"
+              }
+            ]
+          },
+          "ova": {
+            "nullable": true,
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationChallengeBankOvaChallengeRuntimeContract"
+              }
+            ]
+          }
+        }
+      },
+      "NoCTFAPIEndpointsAdministrationChallengeBankChallengeRuntimeKindProtocol": {
+        "type": "string",
+        "description": "",
+        "x-enumNames": [
+          "Container",
+          "Compose",
+          "Ova"
+        ],
+        "enum": [
+          "Container",
+          "Compose",
+          "Ova"
+        ]
+      },
+      "NoCTFAPIEndpointsAdministrationChallengeBankRuntimeAllocationProtocol": {
+        "type": "string",
+        "description": "",
+        "x-enumNames": [
+          "Shared",
+          "PerTeam"
+        ],
+        "enum": [
+          "Shared",
+          "PerTeam"
+        ]
+      },
+      "NoCTFAPIEndpointsAdministrationChallengeBankRuntimeResourceLimitsContract": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "memoryBytes": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "nanoCpus": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "pidsLimit": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
+      "NoCTFAPIEndpointsAdministrationChallengeBankRuntimeFlagSourceProtocol": {
+        "type": "string",
+        "description": "",
+        "x-enumNames": [
+          "Static",
+          "PerTeam",
+          "AwdRotation"
+        ],
+        "enum": [
+          "Static",
+          "PerTeam",
+          "AwdRotation"
+        ]
+      },
+      "NoCTFAPIEndpointsAdministrationChallengeBankRuntimeEgressPolicyProtocol": {
+        "type": "string",
+        "description": "",
+        "x-enumNames": [
+          "Isolated",
+          "InternetOnly"
+        ],
+        "enum": [
+          "Isolated",
+          "InternetOnly"
+        ]
+      },
+      "NoCTFAPIEndpointsAdministrationChallengeBankRuntimeUrlBindingContract": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "urlTemplate": {
+            "type": "string"
+          },
+          "exposure": {
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationChallengeBankRuntimeExposureProtocol"
+          },
+          "containerPort": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "serviceName": {
+            "type": "string",
+            "nullable": true
+          },
+          "vmId": {
+            "type": "string",
+            "nullable": true
+          },
+          "guestPort": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "isControlCheck": {
+            "type": "boolean"
+          }
+        }
+      },
+      "NoCTFAPIEndpointsAdministrationChallengeBankRuntimeExposureProtocol": {
+        "type": "string",
+        "description": "",
+        "x-enumNames": [
+          "OwnerOnly",
+          "Participants"
+        ],
+        "enum": [
+          "OwnerOnly",
+          "Participants"
+        ]
+      },
+      "NoCTFAPIEndpointsAdministrationChallengeBankContainerChallengeRuntimeContract": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "image",
+          "command",
+          "environment",
+          "labels",
+          "portMappings",
+          "security",
+          "flagEnvironmentVariableName",
+          "internalPorts"
+        ],
+        "properties": {
+          "image": {
+            "type": "string"
+          },
+          "command": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "environment": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            }
+          },
+          "labels": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            }
+          },
+          "portMappings": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationChallengeBankRuntimePortMappingContract"
+            }
+          },
+          "security": {
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationChallengeBankContainerSecurityContract"
+          },
+          "flagEnvironmentVariableName": {
+            "type": "string",
+            "nullable": true
+          },
+          "internalPorts": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        }
+      },
+      "NoCTFAPIEndpointsAdministrationChallengeBankRuntimePortMappingContract": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "containerPort": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "hostPort": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
+      "NoCTFAPIEndpointsAdministrationChallengeBankContainerSecurityContract": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "noNewPrivileges": {
+            "type": "boolean"
+          },
+          "readonlyRootfs": {
+            "type": "boolean"
+          },
+          "runAsNonRoot": {
+            "type": "boolean"
+          },
+          "capDrop": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "capAdd": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "NoCTFAPIEndpointsAdministrationChallengeBankComposeChallengeRuntimeContract": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "composeYaml",
+          "environment",
+          "labels",
+          "flagEnvironmentVariables",
+          "serviceResources"
+        ],
+        "properties": {
+          "composeYaml": {
+            "type": "string"
+          },
+          "environment": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            }
+          },
+          "labels": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            }
+          },
+          "flagEnvironmentVariables": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            }
+          },
+          "serviceResources": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationChallengeBankComposeServiceResourceContract"
+            }
+          }
+        }
+      },
+      "NoCTFAPIEndpointsAdministrationChallengeBankComposeServiceResourceContract": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "serviceName": {
+            "type": "string"
+          },
+          "limits": {
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationChallengeBankRuntimeResourceLimitsContract"
+          }
+        }
+      },
+      "NoCTFAPIEndpointsAdministrationChallengeBankOvaChallengeRuntimeContract": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "sourceUrl",
+          "sha256"
+        ],
+        "properties": {
+          "sourceUrl": {
+            "type": "string"
+          },
+          "sha256": {
+            "type": "string"
+          }
+        }
+      },
+      "NoCTFAPIEndpointsAdministrationChallengeBankRunnerJobContract": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "image": {
+            "type": "string"
+          },
+          "command": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "environment": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            }
+          },
+          "timeoutSeconds": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "targetServiceName": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
+      "NoCTFAPIEndpointsAdministrationChallengeBankCtfChallengeDefinitionContract": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "interactionKind"
+        ],
+        "properties": {
+          "interactionKind": {
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsChallengesCtfInteractionKindProtocol"
+          }
+        }
+      },
+      "NoCTFAPIEndpointsAdministrationChallengeBankAwdChallengeDefinitionContract": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "flagInjection"
+        ],
+        "properties": {
+          "flagInjection": {
+            "nullable": true,
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationChallengeBankFlagInjectionContract"
+              }
+            ]
+          }
+        }
+      },
+      "NoCTFAPIEndpointsAdministrationChallengeBankFlagInjectionContract": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "command": {
+            "type": "string"
+          },
+          "timeoutSeconds": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "serviceName": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
+      "NoCTFAPIEndpointsAdministrationChallengeBankAwdpChallengeDefinitionContract": {
+        "type": "object",
+        "additionalProperties": false
+      },
+      "NoCTFAPIEndpointsAdministrationChallengeBankKohChallengeDefinitionContract": {
+        "type": "object",
+        "additionalProperties": false
       },
       "NoCTFAPIEndpointsAdministrationChallengeBankChallengeTemplateConflictResponse": {
         "type": "object",
@@ -25815,6 +27922,7 @@
         "type": "object",
         "additionalProperties": false,
         "required": [
+          "definition",
           "title",
           "direction"
         ],
@@ -25846,8 +27954,8 @@
             "minLength": 0,
             "nullable": false
           },
-          "definitionJson": {
-            "type": "string"
+          "definition": {
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationChallengeBankChallengeDefinitionContract"
           }
         }
       },
@@ -25990,7 +28098,7 @@
       "NoCTFAPIEndpointsAdministrationChallengeBankChallengeTemplateListResponse": {
         "allOf": [
           {
-            "$ref": "#/components/schemas/NoCTFAPIPaginationArrayResultOfChallengeTemplateResponse"
+            "$ref": "#/components/schemas/NoCTFAPIPaginationArrayResultOfChallengeTemplateSummaryResponse"
           },
           {
             "type": "object",
@@ -26006,7 +28114,7 @@
           }
         ]
       },
-      "NoCTFAPIPaginationArrayResultOfChallengeTemplateResponse": {
+      "NoCTFAPIPaginationArrayResultOfChallengeTemplateSummaryResponse": {
         "type": "object",
         "additionalProperties": false,
         "properties": {
@@ -26017,8 +28125,46 @@
           "items": {
             "type": "array",
             "items": {
-              "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationChallengeBankChallengeTemplateResponse"
+              "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationChallengeBankChallengeTemplateSummaryResponse"
             }
+          }
+        }
+      },
+      "NoCTFAPIEndpointsAdministrationChallengeBankChallengeTemplateSummaryResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "guid"
+          },
+          "mode": {
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsCompetitionsGameModeProtocol"
+          },
+          "visibility": {
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationChallengeBankChallengeVisibilityProtocol"
+          },
+          "title": {
+            "type": "string"
+          },
+          "direction": {
+            "type": "string"
+          },
+          "deletedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "activeCompetitionReferenceCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "interactionKind": {
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsChallengesCtfInteractionKindProtocol"
           }
         }
       },
@@ -26064,7 +28210,7 @@
           "title",
           "description",
           "direction",
-          "definitionJson"
+          "definition"
         ],
         "properties": {
           "mode": {
@@ -26087,8 +28233,8 @@
             "maxLength": 96,
             "minLength": 0
           },
-          "definitionJson": {
-            "type": "string"
+          "definition": {
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationChallengeBankChallengeDefinitionContract"
           }
         }
       },

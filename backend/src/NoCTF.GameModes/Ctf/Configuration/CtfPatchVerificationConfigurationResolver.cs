@@ -3,6 +3,7 @@ using NoCTF.Application.GameplayFacts.PatchVerification;
 using NoCTF.Application.Runtime.Configuration;
 using NoCTF.Application.Runtime.Provisioning;
 using NoCTF.Domain.Challenges;
+using NoCTF.GameModes.Registration;
 
 namespace NoCTF.GameModes.Ctf.Configuration;
 
@@ -24,28 +25,28 @@ public static class CtfPatchVerificationConfigurationResolver
     public const long DefaultMaximumPatchUploadBytes = 64L * 1024 * 1024;
     private const string DefaultPatchEntrypoint = "fix.sh";
 
-    public static CtfPatchVerificationConfiguration? Resolve(string definitionJson, string rulesJson)
+    public static CtfPatchVerificationConfiguration? Resolve(
+        CtfChallengeDefinition definition,
+        CtfCompetitionChallengeRules rules)
     {
-        var definition = CtfConfigurationParser.ParseDefinition(definitionJson);
-        if (definition.InteractionKind != CtfInteractionKind.PatchVerification
-            || definition.Runtime is null
-            || definition.Checker is null)
-        {
+        if (definition.InteractionKind != CtfInteractionKind.PatchVerification)
             return null;
-        }
-
-        var rules = CtfConfigurationParser.ParseRules(rulesJson);
+        var runtime = TypedGameModeConfiguration.Runtime(definition.Runtime);
+        var checker = TypedGameModeConfiguration.Checker(definition);
+        if (runtime is null || checker is null) return null;
         return new(
-            definition.Runtime,
+            runtime,
             definition.PatchEntrypoint ?? DefaultPatchEntrypoint,
-            definition.PatchCommand,
+            definition.StringItems
+                .Where(item => item.Kind == ChallengeDefinitionStringKind.PatchCommand)
+                .OrderBy(item => item.Position)
+                .Select(item => item.Value).ToArray(),
             definition.PatchTimeoutSeconds
                 ?? PatchVerificationExecutionBudget.DefaultPatchTimeoutSeconds,
-            definition.Checker,
+            checker,
             definition.ReadyTimeoutSeconds
                 ?? PatchVerificationExecutionBudget.DefaultReadyTimeoutSeconds,
-            definition.MaximumPatchUploadBytes
-                ?? DefaultMaximumPatchUploadBytes,
+            definition.MaximumPatchUploadBytes ?? DefaultMaximumPatchUploadBytes,
             rules.MaxPatchAttempts ?? DefaultMaxPatchAttempts,
             definition.CheckerFixInput,
             definition.CheckerAllowRoot);

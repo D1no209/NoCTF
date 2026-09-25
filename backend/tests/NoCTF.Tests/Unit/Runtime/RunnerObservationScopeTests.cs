@@ -22,7 +22,7 @@ public sealed class RunnerObservationScopeTests
         await using var observer = new RunnerResourceObserver(
             Options.Create(new RunnerOptions { Provider = RuntimeProvider.Kubernetes }),
             new DockerRuntimeOptions(), new KubernetesRuntimeOptions(PodPidsLimit: 512), client,
-            new ConfigurationBuilder().Build(), Substitute.For<IHostApplicationLifetime>(), TimeProvider.System,
+            new InMemoryClusterLeaseManager(), Substitute.For<IHostApplicationLifetime>(), TimeProvider.System,
             NullLogger<RunnerResourceObserver>.Instance);
         // Missing metrics/permissions must remain closed, after requesting the correct domain.
         var snapshot = await observer.SampleAsync(CancellationToken.None);

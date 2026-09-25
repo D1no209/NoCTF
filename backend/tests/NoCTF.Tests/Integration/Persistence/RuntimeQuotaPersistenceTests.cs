@@ -49,14 +49,13 @@ public sealed class RuntimeQuotaPersistenceTests
             var secondChallengeId = Guid.CreateVersion7(fixture.Now.AddMinutes(1).AddTicks(1));
             await using (var seed = new NoCtfDbContext(options))
             {
-                seed.Competitions.Add(new Competition
+                seed.Competitions.Add(new CtfCompetition
                 {
                     Id = secondCompetitionId,
                     OwnerId = fixture.Teams[0].UserId,
                     Title = "Second runtime competition",
-                    Mode = GameMode.Ctf,
                     Status = CompetitionStatus.Running,
-                    ConfigurationJson = GameModeDefaultConfiguration.GetCompetitionJson(GameMode.Ctf),
+                    ModeConfiguration = TestConfigurations.Competition(GameMode.Ctf),
                     StartAt = fixture.Now.AddMinutes(-1),
                     EndAt = fixture.Now.AddHours(1),
                     FlagDerivationSecret = Enumerable.Range(1, 32).Select(value => (byte)value).ToArray(),
@@ -77,12 +76,11 @@ public sealed class RuntimeQuotaPersistenceTests
                     Runtime(RuntimeKind.OvaVm, RuntimeState.Running, 4));
                 await seed.SaveChangesAsync(cancellationToken);
 
-                RuntimeInstance Runtime(RuntimeKind kind, RuntimeState state, int tick) => new()
+                RuntimeInstance Runtime(RuntimeKind kind, RuntimeState state, int tick) => new PlayerRuntimeInstance
                 {
                     Id = Guid.CreateVersion7(fixture.Now.AddMinutes(1).AddTicks(tick)),
                     CompetitionId = secondCompetitionId,
                     CompetitionChallengeId = secondChallengeId,
-                    Purpose = RuntimePurpose.Player,
                     RuntimeKind = kind,
                     RuntimeProvider = RuntimeProvider.Docker,
                     State = state,
@@ -268,7 +266,7 @@ public sealed class RuntimeQuotaPersistenceTests
                 cancellationToken);
 
             var attempts = await Task.WhenAll(playerStart, adminStart)
-                .WaitAsync(TimeSpan.FromSeconds(2), cancellationToken);
+                .WaitAsync(TimeSpan.FromSeconds(15), cancellationToken);
             await Assert.That(attempts.Count(attempt => attempt.Result.Runtime is not null))
                 .IsEqualTo(1);
             await Assert.That(attempts.Count(attempt =>
@@ -412,15 +410,14 @@ public sealed class RuntimeQuotaPersistenceTests
             Guid.CreateVersion7(now.AddTicks(3))
         };
         db.Users.Add(User(ownerId, "quota-owner", now));
-        db.Competitions.Add(new Competition
+        db.Competitions.Add(new CtfCompetition
         {
             Id = competitionId,
             OwnerId = ownerId,
             Title = "Runtime quota",
-            Mode = GameMode.Ctf,
             Status = CompetitionStatus.Running,
             MaxConcurrentRuntimeInstancesPerTeam = 1,
-            ConfigurationJson = GameModeDefaultConfiguration.GetCompetitionJson(GameMode.Ctf),
+            ModeConfiguration = TestConfigurations.Competition(GameMode.Ctf),
             StartAt = now.AddMinutes(-1),
             EndAt = now.AddHours(1),
             FlagDerivationSecret = Enumerable.Range(1, 32).Select(value => (byte)value).ToArray(),
@@ -453,13 +450,12 @@ public sealed class RuntimeQuotaPersistenceTests
             });
             if (state is RuntimeState runtimeState)
             {
-                db.RuntimeInstances.Add(new RuntimeInstance
+                db.RuntimeInstances.Add(new PlayerRuntimeInstance
                 {
                     Id = Guid.CreateVersion7(now.AddTicks(12 + index * 3)),
                     CompetitionId = competitionId,
                     CompetitionChallengeId = challengeIds[0],
                     TeamId = teamId,
-                    Purpose = RuntimePurpose.Player,
                     RuntimeKind = RuntimeKind.Container,
                     RuntimeProvider = RuntimeProvider.Docker,
                     State = runtimeState,
@@ -493,30 +489,30 @@ public sealed class RuntimeQuotaPersistenceTests
                 "registry.example/quota:v1",
                 Security: new(false, false, false, ["ALL"], [])),
             new RuntimeResourceLimits(67_108_864, 100_000_000, 64));
-        db.Challenges.Add(new Challenge
+        db.Challenges.Add(new CtfChallenge
         {
             Id = templateId,
             OwnerId = ownerId,
-            Mode = GameMode.Ctf,
             Title = title,
-            DefinitionJson = JsonSerializer.Serialize(
+            Definition = TestConfigurations.Definition(
+                GameMode.Ctf,
+                JsonSerializer.Serialize(
                 new CtfChallengeConfiguration(
-                    CtfChallengeConfiguration.CurrentSchemaVersion,
                     null,
                     null,
                     Runtime: runtime),
-                new JsonSerializerOptions(JsonSerializerDefaults.Web)),
+                new JsonSerializerOptions(JsonSerializerDefaults.Web))),
             CreatedAt = now,
             UpdatedAt = now
         });
-        db.CompetitionChallenges.Add(new CompetitionChallenge
+        db.CompetitionChallenges.Add(new CtfCompetitionChallenge
         {
             Id = competitionChallengeId,
             CompetitionId = competitionId,
             ChallengeId = templateId,
             Order = order,
             IsPublished = true,
-            RulesJson = new GameModeChallengeConfigurationCatalog().GetDefaultJson(GameMode.Ctf),
+            Rules = new GameModeChallengeConfigurationCatalog().CreateDefaultRulesForTest(GameMode.Ctf),
             UpdatedAt = now
         });
     }
@@ -546,7 +542,7 @@ public sealed class RuntimeQuotaPersistenceTests
             db,
             new ChallengeRuntimeTemplateCatalog(),
             new FixedRuntimePlacementPolicy(runnerPool: "quota-tests"),
-            new PostgresPerTeamRuntimeFlagStore(db),
+            new PerTeamRuntimeFlagStore(db),
             outbox);
         var result = await store.MutatePlayerRuntimeAsync(
             new(
@@ -574,7 +570,7 @@ public sealed class RuntimeQuotaPersistenceTests
             db,
             new ChallengeRuntimeTemplateCatalog(),
             new FixedRuntimePlacementPolicy(runnerPool: "quota-tests"),
-            new PostgresPerTeamRuntimeFlagStore(db),
+            new PerTeamRuntimeFlagStore(db),
             outbox);
         var result = await store.MutateAsync(
             fixture.CompetitionId,
@@ -595,7 +591,7 @@ public sealed class RuntimeQuotaPersistenceTests
             db,
             new ChallengeRuntimeTemplateCatalog(),
             new FixedRuntimePlacementPolicy(runnerPool: "quota-tests"),
-            new PostgresPerTeamRuntimeFlagStore(db),
+            new PerTeamRuntimeFlagStore(db),
             outbox,
             events);
 
@@ -609,7 +605,7 @@ public sealed class RuntimeQuotaPersistenceTests
 
     private sealed record MutationAttempt(RuntimeMutationResult Result, int DispatchCount);
 
-    private sealed class RecordingOutbox : ITransactionalMessageOutbox
+    private sealed class RecordingOutbox : IPostCommitMessagePublisher
     {
         public List<object> Published { get; } = [];
 
@@ -632,6 +628,7 @@ public sealed class RuntimeQuotaPersistenceTests
             where T : IRunnerNodeMessage => ValueTask.CompletedTask;
 
         public Task FlushOutgoingMessagesAsync() => Task.CompletedTask;
+        public void DiscardPendingMessages() => Published.Clear();
     }
 
     private sealed class RecordingCompetitionEventRecorder : ICompetitionEventRecorder

@@ -19,9 +19,15 @@ public sealed class CompetitionNotificationAudienceResolver(NoCtfDbContext db)
             .Select(candidate => new
             {
                 candidate.OwnerId,
-                candidate.ManagerIds,
-                candidate.JudgeIds,
-                candidate.ObserverIds,
+                ManagerIds = candidate.Collaborators.Where(item =>
+                        item.Role == CompetitionCollaboratorRole.Manager)
+                    .Select(item => item.UserId).ToArray(),
+                JudgeIds = candidate.Collaborators.Where(item =>
+                        item.Role == CompetitionCollaboratorRole.Judge)
+                    .Select(item => item.UserId).ToArray(),
+                ObserverIds = candidate.Collaborators.Where(item =>
+                        item.Role == CompetitionCollaboratorRole.Observer)
+                    .Select(item => item.UserId).ToArray(),
                 candidate.AccessMode
             })
             .SingleOrDefaultAsync(ct);
@@ -35,7 +41,11 @@ public sealed class CompetitionNotificationAudienceResolver(NoCtfDbContext db)
                 && (team.RegistrationStatus == TeamRegistrationStatus.Approved
                     && !team.IsBanned
                     || requiredTeamId != null && team.Id == requiredTeamId))
-            .Select(team => new { team.CaptainId, team.MemberIds })
+            .Select(team => new
+            {
+                team.CaptainId,
+                MemberIds = team.Members.Select(member => member.UserId).ToArray()
+            })
             .ToArrayAsync(ct);
         var collaborators = competition.ManagerIds
             .Concat(competition.JudgeIds)

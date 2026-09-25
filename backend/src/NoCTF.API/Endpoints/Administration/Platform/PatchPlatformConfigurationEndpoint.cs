@@ -169,6 +169,7 @@ public static partial class PlatformSettingsPatchMapper
     [MapperIgnoreTarget(nameof(PlatformSettings.HumanVerificationTurnstileSiteKey))]
     [MapperIgnoreTarget(nameof(PlatformSettings.HumanVerificationTurnstileSecretCiphertext))]
     [MapperIgnoreTarget(nameof(PlatformSettings.HumanVerificationTurnstileAllowedHostnames))]
+    [MapperIgnoreTarget(nameof(PlatformSettings.HumanVerificationTurnstileHostnames))]
     [MapperIgnoreTarget(nameof(PlatformSettings.EmailVerificationEnabled))]
     [MapperIgnoreTarget(nameof(PlatformSettings.EmailPublicBaseUrl))]
     [MapperIgnoreTarget(nameof(PlatformSettings.EmailVerificationTokenLifetimeMinutes))]
@@ -184,11 +185,15 @@ public static partial class PlatformSettingsPatchMapper
     [MapperIgnoreTarget(nameof(PlatformSettings.EmailSmtpFromName))]
     [MapperIgnoreTarget(nameof(PlatformSettings.EmailSmtpTimeoutSeconds))]
     [MapperIgnoreTarget(nameof(PlatformSettings.Id))]
+    [MapperIgnoreTarget(nameof(PlatformSettings.ConcurrencyStamp))]
     [MapperIgnoreTarget(nameof(PlatformSettings.LogoFileId))]
     [MapperIgnoreTarget(nameof(PlatformSettings.LogoFile))]
     [MapperIgnoreTarget(nameof(PlatformSettings.EmailSmtpPasswordCiphertext))]
     [MapperIgnoreTarget(nameof(PlatformSettings.UpdatedAt))]
     [MapperIgnoreTarget(nameof(PlatformSettings.SsoConfiguration))]
+    [MapperIgnoreTarget(nameof(PlatformSettings.SsoEnabled))]
+    [MapperIgnoreTarget(nameof(PlatformSettings.SsoPublicBaseUrl))]
+    [MapperIgnoreTarget(nameof(PlatformSettings.SsoProviders))]
     public static partial void ApplyBrandingAsAdministrator(
         PlatformBrandingPatchRequest request,
         [MappingTarget] PlatformSettings target);
@@ -220,12 +225,17 @@ public static partial class PlatformSettingsPatchMapper
     [MapperIgnoreTarget(nameof(PlatformSettings.HumanVerificationTurnstileSiteKey))]
     [MapperIgnoreTarget(nameof(PlatformSettings.HumanVerificationTurnstileSecretCiphertext))]
     [MapperIgnoreTarget(nameof(PlatformSettings.HumanVerificationTurnstileAllowedHostnames))]
+    [MapperIgnoreTarget(nameof(PlatformSettings.HumanVerificationTurnstileHostnames))]
     [MapperIgnoreTarget(nameof(PlatformSettings.Id))]
+    [MapperIgnoreTarget(nameof(PlatformSettings.ConcurrencyStamp))]
     [MapperIgnoreTarget(nameof(PlatformSettings.LogoFileId))]
     [MapperIgnoreTarget(nameof(PlatformSettings.LogoFile))]
     [MapperIgnoreTarget(nameof(PlatformSettings.EmailSmtpPasswordCiphertext))]
     [MapperIgnoreTarget(nameof(PlatformSettings.UpdatedAt))]
     [MapperIgnoreTarget(nameof(PlatformSettings.SsoConfiguration))]
+    [MapperIgnoreTarget(nameof(PlatformSettings.SsoEnabled))]
+    [MapperIgnoreTarget(nameof(PlatformSettings.SsoPublicBaseUrl))]
+    [MapperIgnoreTarget(nameof(PlatformSettings.SsoProviders))]
     public static partial void ApplyEmailAsAdministrator(
         PlatformEmailVerificationPatchRequest request,
         [MappingTarget] PlatformSettings target);

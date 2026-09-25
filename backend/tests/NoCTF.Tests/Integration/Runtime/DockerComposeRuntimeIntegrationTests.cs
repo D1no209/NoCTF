@@ -313,7 +313,7 @@ public sealed class DockerComposeRuntimeIntegrationTests
                 await Assert.That(webInspect.HostConfig.NanoCPUs).IsEqualTo(100_000_000);
                 await Assert.That(webInspect.HostConfig.PidsLimit).IsEqualTo(64);
                 await Assert.That(webInspect.HostConfig.Privileged).IsFalse();
-                await Assert.That(webInspect.HostConfig.CapDrop).Contains("ALL");
+                await Assert.That(webInspect.HostConfig.CapDrop ?? []).IsEmpty();
                 await Assert.That(webInspect.HostConfig.SecurityOpt)
                     .Contains("no-new-privileges:true");
 

@@ -28,10 +28,18 @@ services:
     restart: unless-stopped
     environment:
       GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}
-      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:?Set GRAFANA_ADMIN_PASSWORD}
+      GF_SECURITY_ADMIN_PASSWORD__FILE: /run/secrets/grafana-admin-password
       GF_USERS_ALLOW_SIGN_UP: "false"
       GF_ANALYTICS_REPORTING_ENABLED: "false"
       GF_ANALYTICS_CHECK_FOR_UPDATES: "false"
+      GF_AUTH_ANONYMOUS_ENABLED: "false"
+      GF_SECURITY_COOKIE_SECURE: "true"
+      GF_SECURITY_COOKIE_SAMESITE: strict
+      GF_SECURITY_ALLOW_EMBEDDING: "false"
+      GF_SERVER_DOMAIN: noctf.grafana.fa1lsnow.com
+      GF_SERVER_ROOT_URL: https://noctf.grafana.fa1lsnow.com/
+      GF_SERVER_ENFORCE_DOMAIN: "true"
+      GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH: /var/lib/grafana/dashboards/noctf-performance.json
     volumes:
       - type: bind
         source: ./grafana/provisioning
@@ -46,21 +54,38 @@ services:
         target: /var/lib/grafana
         bind:
           create_host_path: false
+      - type: bind
+        source: ${OBSERVABILITY_SECRET_ROOT:?Set OBSERVABILITY_SECRET_ROOT}/grafana-admin-password
+        target: /run/secrets/grafana-admin-password
+        read_only: true
+        bind:
+          create_host_path: false
     ports:
       - 127.0.0.1:${GRAFANA_PORT:-3001}:3000
-    networks: [observability]
+    networks:
+      observability:
+      panel:
+        aliases: [noctf-grafana]
 
   postgres-exporter:
     image: ${POSTGRES_EXPORTER_IMAGE:?Set POSTGRES_EXPORTER_IMAGE in .env}
     restart: unless-stopped
     environment:
-      DATA_SOURCE_NAME: ${POSTGRES_EXPORTER_DSN:?Set POSTGRES_EXPORTER_DSN}
+      DATA_SOURCE_URI: ${POSTGRES_EXPORTER_URI:?Set POSTGRES_EXPORTER_URI}
+      DATA_SOURCE_USER: ${POSTGRES_EXPORTER_USER:?Set POSTGRES_EXPORTER_USER}
+      DATA_SOURCE_PASS_FILE: /run/secrets/postgres-exporter-password
       PG_EXPORTER_EXTEND_QUERY_PATH: /etc/postgres-exporter/queries.yml
     volumes:
       - type: bind
         source: ./postgres-exporter/queries.yml
         target: /etc/postgres-exporter/queries.yml
         read_only: true
+      - type: bind
+        source: ${OBSERVABILITY_SECRET_ROOT:?Set OBSERVABILITY_SECRET_ROOT}/postgres-exporter-password
+        target: /run/secrets/postgres-exporter-password
+        read_only: true
+        bind:
+          create_host_path: false
     networks: [noctf]
 
   redis-exporter:
@@ -109,3 +134,6 @@ networks:
   noctf:
     external: true
     name: ${NOCTF_NETWORK_NAME:-noctf-network}
+  panel:
+    external: true
+    name: 1panel-network

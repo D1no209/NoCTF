@@ -17,7 +17,7 @@ public sealed class RunnerLivenessPublisher(
             {
                 var runner = options.Value;
                 await redis.GetDatabase().StringSetAsync($"runner:{runner.Id}:heartbeat",
-                    $"provider={runner.Provider};version=capacity-v2", runner.Heartbeat.Ttl);
+                    $"provider={runner.Provider};version=capacity-v3", runner.Heartbeat.Ttl);
             }
             catch (RedisException exception)
             {

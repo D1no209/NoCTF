@@ -3,6 +3,7 @@ import { markRaw } from 'vue'
 import { toast } from 'vue-sonner'
 import { adminGetCompetition, adminPatchCompetition } from '../../../../../api'
 import type { NoCtfapiEndpointsAdministrationCompetitionsCompetitionConfigurationResponse } from '../../../../../api'
+import type { NoCtfapiEndpointsAdministrationCompetitionsCompetitionModeConfigurationContract } from '../../../../../api'
 import type { NoCtfapiEndpointsCompetitionsRuntimeAccessModeProtocol } from '../../../../../api'
 
 import { useCompetitionAdmin } from '../../../../../lib/admin-competition'
@@ -166,13 +167,13 @@ export function useAdminCompetitionsByIdConfigurationPage() {
     configLoading.value = false
   }
 
-  async function saveConfig(json: string) {
+  async function saveConfig(configuration: NoCtfapiEndpointsAdministrationCompetitionsCompetitionModeConfigurationContract) {
     if (!config.value) return
     savingConfig.value = true
     try {
       const { data, error } = await adminPatchCompetition({
         path: { competitionId },
-        body: { modeConfiguration: { json } },
+        body: { modeConfiguration: { configuration } },
       })
       if (error) throw error
       config.value = data?.modeConfiguration ?? config.value

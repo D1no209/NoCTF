@@ -1,4 +1,3 @@
-using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using NoCTF.Domain.Notifications;
 using NoCTF.Application.Notifications;
@@ -16,8 +15,6 @@ public sealed class CompetitionNotificationDelivery(
     : ICompetitionAnnouncementPublisher
 {
     private readonly TimeProvider timeProvider = clock ?? TimeProvider.System;
-    private static readonly JsonSerializerOptions JsonOptions =
-        new(JsonSerializerDefaults.Web);
     private readonly ICompetitionEventRecorder events =
         eventRecorder ?? NullCompetitionEventRecorder.Instance;
 
@@ -35,29 +32,27 @@ public sealed class CompetitionNotificationDelivery(
             ? NotificationTargetType.CompetitionParticipants
             : NotificationTargetType.TeamMembers;
         var targetId = requiredTeamId ?? competitionId;
-        var contentJson = EnsureObjectPayload(payload, sourceEventKey);
         var alreadyDelivered = await db.Notifications.AsNoTracking().AnyAsync(
             item => item.TargetType == targetType
                 && item.TargetId == targetId
                 && item.Kind == kind
-                && item.ContentJson == contentJson
+                && item.SourceEventKey == sourceEventKey
                 && item.RelatedType == EntityReferenceKind.Competition
                 && item.RelatedId == competitionId,
             ct);
         if (alreadyDelivered)
             return;
-        db.Notifications.Add(new Notification
-        {
-            Id = Guid.CreateVersion7(),
-            SourceType = NotificationSourceType.System,
-            TargetType = targetType,
-            TargetId = targetId,
-            Kind = kind,
-            ContentJson = contentJson,
-            RelatedType = NoCTF.Domain.Shared.EntityReferenceKind.Competition,
-            RelatedId = competitionId,
-            SentAt = timeProvider.GetUtcNow()
-        });
+        var notification = NotificationGeneratedCatalog.Create(kind);
+        notification.Id = Guid.CreateVersion7();
+        notification.SourceType = NotificationSourceType.System;
+        notification.TargetType = targetType;
+        notification.TargetId = targetId;
+        notification.SourceEventKey = sourceEventKey;
+        ApplyPayload(notification, payload);
+        notification.RelatedType = NoCTF.Domain.Shared.EntityReferenceKind.Competition;
+        notification.RelatedId = competitionId;
+        notification.SentAt = timeProvider.GetUtcNow();
+        db.Notifications.Add(notification);
         await db.SaveChangesAsync(ct);
     }
 
@@ -83,28 +78,29 @@ public sealed class CompetitionNotificationDelivery(
 
         _ = entityId;
         var sentAt = timeProvider.GetUtcNow();
-        var contentJson = EnsureObjectPayload(payload, sourceEventKey);
         var alreadyDelivered = await db.Notifications.AsNoTracking()
             .Where(item => item.TargetType == NotificationTargetType.User
                 && recipients.Contains(item.TargetId)
                 && item.Kind == kind
-                && item.ContentJson == contentJson
+                && item.SourceEventKey == sourceEventKey
                 && item.RelatedType == EntityReferenceKind.Competition
                 && item.RelatedId == competitionId)
             .Select(item => item.TargetId)
             .ToArrayAsync(ct);
         var pendingRecipients = recipients.Except(alreadyDelivered).ToArray();
-        db.Notifications.AddRange(pendingRecipients.Select((userId, index) => new Notification
+        db.Notifications.AddRange(pendingRecipients.Select((userId, index) =>
         {
-            Id = Guid.CreateVersion7(sentAt.AddTicks(index)),
-            SourceType = NotificationSourceType.System,
-            TargetType = NotificationTargetType.User,
-            TargetId = userId,
-            Kind = kind,
-            ContentJson = contentJson,
-            RelatedType = NoCTF.Domain.Shared.EntityReferenceKind.Competition,
-            RelatedId = competitionId,
-            SentAt = sentAt
+            var pending = NotificationGeneratedCatalog.Create(kind);
+            pending.Id = Guid.CreateVersion7(sentAt.AddTicks(index));
+            pending.SourceType = NotificationSourceType.System;
+            pending.TargetType = NotificationTargetType.User;
+            pending.TargetId = userId;
+            pending.SourceEventKey = sourceEventKey;
+            ApplyPayload(pending, payload);
+            pending.RelatedType = NoCTF.Domain.Shared.EntityReferenceKind.Competition;
+            pending.RelatedId = competitionId;
+            pending.SentAt = sentAt;
+            return pending;
         }));
         await db.SaveChangesAsync(ct);
     }
@@ -117,7 +113,7 @@ public sealed class CompetitionNotificationDelivery(
             .AnyAsync(competition => competition.Id == command.CompetitionId, ct);
         if (!exists)
             return null;
-        var notification = new Notification
+        var notification = new CompetitionAnnouncementNotification
         {
             Id = Guid.CreateVersion7(command.PublishedAt),
             SourceType = NotificationSourceType.User,
@@ -126,14 +122,10 @@ public sealed class CompetitionNotificationDelivery(
                 ? NotificationTargetType.CompetitionParticipants
                 : NotificationTargetType.CompetitionCollaborators,
             TargetId = command.CompetitionId,
-            Kind = NotificationKind.CompetitionAnnouncement,
-            ContentJson = JsonSerializer.Serialize(new
-            {
-                schemaVersion = 1,
-                subject = command.Title,
-                title = command.Title,
-                body = command.Body
-            }, JsonOptions),
+            Subject = command.Title,
+            Title = command.Title,
+            Body = command.Body,
+            CompetitionId = command.CompetitionId,
             RelatedType = EntityReferenceKind.Competition,
             RelatedId = command.CompetitionId,
             SentAt = command.PublishedAt
@@ -157,7 +149,7 @@ public sealed class CompetitionNotificationDelivery(
             notification.TargetType,
             notification.TargetId,
             notification.Kind,
-            notification.ContentJson,
+            NotificationContentProjection.Create(notification),
             notification.RelatedType,
             notification.RelatedId,
             notification.ThreadRootId,
@@ -165,20 +157,84 @@ public sealed class CompetitionNotificationDelivery(
             notification.SentAt);
     }
 
-    private static string EnsureObjectPayload<TPayload>(
-        TPayload payload,
-        string sourceEventKey)
+    private static void ApplyPayload<TPayload>(Notification notification, TPayload payload)
     {
-        var element = JsonSerializer.SerializeToElement(payload, JsonOptions);
-        if (element.ValueKind != JsonValueKind.Object)
+        switch (payload)
         {
-            return JsonSerializer.Serialize(
-                new { schemaVersion = 1, sourceEventKey, value = element },
-                JsonOptions);
+            case BloodAwardedPayload value:
+                notification.CompetitionId = value.CompetitionId;
+                notification.CompetitionChallengeId = value.CompetitionChallengeId;
+                notification.ChallengeTitle = value.ChallengeTitle;
+                notification.ActionValue = (int)value.BloodRank;
+                notification.TeamId = value.TeamId;
+                notification.TeamName = value.TeamName;
+                notification.PayloadOccurredAt = value.OccurredAt;
+                return;
+            case ChallengePublishedPayload value:
+                notification.CompetitionId = value.CompetitionId;
+                notification.CompetitionChallengeId = value.CompetitionChallengeId;
+                notification.ChallengeTitle = value.ChallengeTitle;
+                notification.Direction = value.Direction;
+                notification.PayloadOccurredAt = value.PublishedAt;
+                return;
+            case HintPublishedPayload value:
+                notification.CompetitionId = value.CompetitionId;
+                notification.CompetitionChallengeId = value.CompetitionChallengeId;
+                notification.HintId = value.HintId;
+                notification.ChallengeTitle = value.ChallengeTitle;
+                notification.Value = value.Cost;
+                notification.PayloadOccurredAt = value.PublishedAt;
+                return;
+            case TeamBannedPayload value:
+                notification.CompetitionId = value.CompetitionId;
+                notification.TeamId = value.TeamId;
+                notification.TeamName = value.TeamName;
+                notification.PayloadOccurredAt = value.BannedAt;
+                return;
+            case TeamBanAnnouncementPayload value:
+                notification.CompetitionId = value.CompetitionId;
+                notification.TeamId = value.TeamId;
+                notification.TeamName = value.TeamName;
+                notification.ActionValue = (int)value.Kind;
+                notification.Title = value.Title;
+                notification.Subject = value.Title;
+                notification.Body = value.Body;
+                notification.PayloadOccurredAt = value.BannedAt;
+                return;
+            case TeamBanCorrectedPayload value:
+                notification.CompetitionId = value.CompetitionId;
+                notification.TeamId = value.TeamId;
+                notification.TeamName = value.TeamName;
+                notification.PayloadOccurredAt = value.CorrectedAt;
+                return;
+            case TeamBanAppealSubmittedPayload value:
+                notification.CompetitionId = value.CompetitionId;
+                notification.AppealEventId = value.AppealEventId;
+                notification.TeamId = value.TeamId;
+                notification.TeamName = value.TeamName;
+                notification.PayloadOccurredAt = value.SubmittedAt;
+                return;
+            case CompetitionQuestionActivityPayload value:
+                notification.CompetitionId = value.CompetitionId;
+                notification.EntryId = value.EntryId;
+                notification.ActionValue = (int)value.Event;
+                notification.Title = value.Title;
+                notification.PayloadOccurredAt = value.OccurredAt;
+                return;
+            case CheatIncidentDetectedPayload value:
+                notification.CompetitionId = value.CompetitionId;
+                notification.GameplayFactId = value.GameplayFactId;
+                notification.SourceTeamId = value.SourceTeamId;
+                notification.OwnerTeamId = value.OwnerTeamId;
+                notification.ActorUserId = value.ActorUserId;
+                notification.CompetitionChallengeId = value.CompetitionChallengeId;
+                notification.PayloadOccurredAt = value.DetectedAt;
+                return;
+            default:
+                throw new ArgumentOutOfRangeException(
+                    nameof(payload),
+                    payload?.GetType(),
+                    "Unsupported notification payload type.");
         }
-        var values = element.EnumerateObject().ToDictionary(property => property.Name, property => property.Value);
-        values.TryAdd("schemaVersion", JsonSerializer.SerializeToElement(1));
-        values["sourceEventKey"] = JsonSerializer.SerializeToElement(sourceEventKey);
-        return JsonSerializer.Serialize(values, JsonOptions);
     }
 }

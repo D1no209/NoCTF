@@ -17,7 +17,7 @@ public sealed record AwdFlagInjectionWork(
     Guid CompetitionId,
     RuntimeKind RuntimeKind,
     RuntimeProvider RuntimeProvider,
-    string ProviderReceiptJson,
+    RuntimeReceiptData ProviderReceipt,
     string Flag,
     string CommandTemplate,
     string? ServiceName,
@@ -34,21 +34,20 @@ public interface IAwdFlagInjectionExecutor
 }
 
 public sealed class AwdFlagInjectionWorkReader(
-    IServiceScopeFactory scopes,
+    IDbContextFactory<NoCtfDbContext> contexts,
     IAwdFlagInjectionConfigurationCatalog configurations) : IAwdFlagInjectionWorkReader
 {
     public async Task<AwdFlagInjectionWork?> ReadAsync(
         InjectAwdFlag message,
         CancellationToken cancellationToken)
     {
-        await using var scope = scopes.CreateAsyncScope();
-        var db = scope.ServiceProvider.GetRequiredService<NoCtfDbContext>();
+        await using var db = await contexts.CreateDbContextAsync(cancellationToken);
         var target = await db.RuntimeInstances.AsNoTracking()
             .Where(runtime => runtime.Id == message.RuntimeInstanceId
                 && runtime.CompetitionChallengeId == message.CompetitionChallengeId
                 && runtime.State == RuntimeState.Running
                 && runtime.RunnerId == message.RunnerId
-                && runtime.ProviderReceiptJson != null)
+                && runtime.ProviderReceipt != null)
             .Join(
                 db.CompetitionChallenges.AsNoTracking(),
                 runtime => runtime.CompetitionChallengeId,
@@ -74,21 +73,24 @@ public sealed class AwdFlagInjectionWorkReader(
                 target.Runtime.CompetitionId,
                 target.Runtime.RuntimeKind,
                 target.Runtime.RuntimeProvider,
-                ProviderReceiptJson = target.Runtime.ProviderReceiptJson!,
+                ProviderReceipt = target.Runtime.ProviderReceipt!,
                 target.Flag.Flag,
-                target.Template.DefinitionJson
+                target.Template.Definition
             })
+            .AsSplitQuery()
             .SingleOrDefaultAsync(cancellationToken);
         if (target is null)
             return null;
-        var injection = configurations.Get(target.DefinitionJson);
+        if (target.Definition is not AwdChallengeDefinition definition)
+            return null;
+        var injection = configurations.Get(definition);
         if (injection is null)
             return null;
         return new(
             target.CompetitionId!.Value,
             target.RuntimeKind,
             target.RuntimeProvider,
-            target.ProviderReceiptJson,
+            target.ProviderReceipt.ToData(),
             target.Flag,
             injection.Command,
             injection.ServiceName,
@@ -111,13 +113,13 @@ public sealed class AwdFlagInjectionExecutor(IRuntimeProviderCatalog providers)
         return work.RuntimeKind switch
         {
             RuntimeKind.Container => providers.Sandbox(work.RuntimeProvider).ExecAsync(
-                JsonSerializer.Deserialize<ContainerReceipt>(work.ProviderReceiptJson)
+                (work.ProviderReceipt as ContainerRuntimeReceiptData)?.ToReceipt()
                     ?? throw new InvalidDataException("Container receipt is invalid."),
                 command,
                 work.Timeout,
                 cancellationToken),
             RuntimeKind.Compose => providers.Compose(work.RuntimeProvider).ExecAsync(
-                JsonSerializer.Deserialize<ComposeReceipt>(work.ProviderReceiptJson)
+                (work.ProviderReceipt as ComposeRuntimeReceiptData)?.ToReceipt()
                     ?? throw new InvalidDataException("Compose receipt is invalid."),
                 work.ServiceName
                     ?? throw new InvalidDataException("Compose flag injection requires a service name."),
@@ -134,14 +136,11 @@ public sealed class AwdFlagInjectionExecutor(IRuntimeProviderCatalog providers)
 public sealed class AwdFlagInjectionHandler(
     IAwdFlagInjectionWorkReader reader,
     IAwdFlagInjectionExecutor executor,
-    ITransactionalMessageOutbox outbox,
+    IPostCommitMessagePublisher outbox,
     IOptions<RunnerOptions> runnerOptions,
     TimeProvider timeProvider)
 {
-    public Task Handle(InjectAwdFlag message, CancellationToken cancellationToken) =>
-        ExecuteAsync(message, cancellationToken);
-
-    public async Task<MessageExecutionOutcome> ExecuteAsync(
+    public async Task<MessageExecutionOutcome> Handle(
         InjectAwdFlag message,
         CancellationToken cancellationToken)
     {

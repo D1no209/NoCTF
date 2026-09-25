@@ -6,7 +6,6 @@ using System.Text.Json.Serialization;
 namespace NoCTF.GameModes.Awd.Configuration;
 
 public sealed record AwdConfiguration(
-    int SchemaVersion,
     int HardeningDurationSeconds,
     int RoundDurationSeconds,
     AttackRewardMode AttackRewardMode,
@@ -17,10 +16,7 @@ public sealed record AwdConfiguration(
     long ServiceUnhealthyPenalty,
     PerTeamFlagTemplate? FlagTemplate = null)
 {
-    public const int CurrentSchemaVersion = 2;
-
     public static AwdConfiguration Default { get; } = new(
-        CurrentSchemaVersion,
         HardeningDurationSeconds: 0,
         RoundDurationSeconds: 300,
         AttackRewardMode: AttackRewardMode.FixedPerAttack,
@@ -42,7 +38,6 @@ public sealed class AttackRewardModeJsonConverter()
     : JsonStringEnumConverter<AttackRewardMode>(namingPolicy: null, allowIntegerValues: false);
 
 public sealed record AwdChallengeConfiguration(
-    int SchemaVersion,
     AttackRewardMode? AttackRewardMode = null,
     long? AttackPoints = null,
     long? VictimDefensePoolPoints = null,
@@ -54,9 +49,7 @@ public sealed record AwdChallengeConfiguration(
     AwdFlagInjectionConfiguration? FlagInjection = null,
     PerTeamFlagTemplate? FlagTemplate = null,
     bool CheckerAllowRoot = false)
-{
-    public const int CurrentSchemaVersion = 4;
-}
+;
 
 public sealed record AwdCheckerConfiguration(
     RunnerJobConfiguration Job,

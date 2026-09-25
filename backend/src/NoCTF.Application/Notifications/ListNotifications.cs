@@ -10,7 +10,7 @@ public sealed record NotificationView(
     NotificationTargetType TargetType,
     Guid TargetId,
     NotificationKind Kind,
-    string ContentJson,
+    NotificationContent Content,
     EntityReferenceKind? RelatedType,
     Guid? RelatedId,
     Guid? ThreadRootId,

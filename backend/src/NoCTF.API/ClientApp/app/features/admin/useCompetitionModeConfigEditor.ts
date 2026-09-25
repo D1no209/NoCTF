@@ -1,27 +1,26 @@
 import { markRaw, toRefs } from 'vue'
 
 import { RotateCcw } from '@lucide/vue'
+import type { NoCtfapiEndpointsAdministrationCompetitionsCompetitionModeConfigurationContract } from '../../api'
 import type { ConfigValues, GameModeValue } from '../../utils/game-config'
-import { competitionConfigFields, fieldDefaultValue, parseConfigValues, serializeConfigValues } from '../../utils/game-config'
+import { buildConfigValues, competitionConfigFields, fieldDefaultValue, readConfigValues } from '../../utils/game-config'
 import ConfigFieldInputComponent from './ConfigFieldInput.vue'
 
 /** Owns state, effects and commands for CompetitionModeConfigEditor. */
 export function useCompetitionModeConfigEditor(props: Readonly<Omit<{
   mode: GameModeValue
-  /** 服务器端当前配置 JSON。 */
-  json?: string | null
+  configuration?: NoCtfapiEndpointsAdministrationCompetitionsCompetitionModeConfigurationContract | null
   readonly?: boolean
   loading?: boolean
   saving?: boolean
-}, "json" | "readonly" | "loading" | "saving"> & Required<Pick<{
+}, "configuration" | "readonly" | "loading" | "saving"> & Required<Pick<{
   mode: GameModeValue
-  /** 服务器端当前配置 JSON。 */
-  json?: string | null
+  configuration?: NoCtfapiEndpointsAdministrationCompetitionsCompetitionModeConfigurationContract | null
   readonly?: boolean
   loading?: boolean
   saving?: boolean
-}, "json" | "readonly" | "loading" | "saving">>>,
-emit: { (event: "save", ...args: [json: string]): void }) {
+}, "configuration" | "readonly" | "loading" | "saving">>>,
+emit: { (event: "save", ...args: [configuration: NoCtfapiEndpointsAdministrationCompetitionsCompetitionModeConfigurationContract]): void }) {
   const fields = computed(() => competitionConfigFields(props.mode))
 
   const values = ref<ConfigValues>({})
@@ -29,9 +28,13 @@ emit: { (event: "save", ...args: [json: string]): void }) {
   const parseFailed = ref(false)
 
   watch(
-    [() => props.json, () => props.mode],
+    [() => props.configuration, () => props.mode],
     () => {
-      const parsed = parseConfigValues(props.json, fields.value)
+      const parsed = readConfigValues(
+        props.configuration as Record<string, unknown> | null,
+        fields.value,
+        { rules: false },
+      )
       if (parsed) {
         values.value = parsed.values
         parseFailed.value = false
@@ -60,6 +63,7 @@ emit: { (event: "save", ...args: [json: string]): void }) {
     if (value !== null && typeof value === 'object') {
       return Object.fromEntries(
         Object.entries(value as Record<string, unknown>)
+          .filter(([, entry]) => entry !== null && entry !== undefined)
           .sort(([a], [b]) => a.localeCompare(b))
           .map(([k, v]) => [k, canonicalize(v)]),
       )
@@ -67,21 +71,20 @@ emit: { (event: "save", ...args: [json: string]): void }) {
     return value
   }
 
-  function normalize(json: string): string | null {
-    try {
-      return JSON.stringify(canonicalize(JSON.parse(json)))
-    }
-    catch {
-      return null
-    }
+  function normalize(value: unknown): string {
+    return JSON.stringify(canonicalize(value))
   }
 
-  const serialized = computed(() => serializeConfigValues(props.mode, fields.value, values.value, { rules: false }))
+  const serialized = computed(() => buildConfigValues(
+    props.mode,
+    fields.value,
+    values.value,
+    { rules: false },
+  ) as NoCtfapiEndpointsAdministrationCompetitionsCompetitionModeConfigurationContract)
 
   const dirty = computed(() => {
     if (parseFailed.value) return false
-    const original = normalize(props.json ?? '')
-    if (original === null) return true
+    const original = normalize(props.configuration)
     return normalize(serialized.value) !== original
   })
 

@@ -20,7 +20,7 @@ namespace NoCTF.Infrastructure.GameplayFacts.Processing;
 
 public sealed class InternalResultStore(
     NoCtfDbContext db,
-    ITransactionalMessageOutbox outbox,
+    IPostCommitMessagePublisher outbox,
     ICompetitionEventRecorder? eventRecorder = null) : IInternalResultStore
 {
     private readonly ICompetitionEventRecorder events =
@@ -31,10 +31,9 @@ public sealed class InternalResultStore(
         CancellationToken ct)
     {
         await using var transaction = await db.Database.BeginTransactionAsync(ct);
-        var fact = await db.GameplayFacts
-            .FromSqlInterpolated(
-                $"SELECT * FROM gameplay_facts WHERE id = {result.GameplayFactId} FOR UPDATE")
-            .SingleOrDefaultAsync(ct);
+        var fact = await db.GameplayFacts.SingleOrDefaultAsync(
+            item => item.Id == result.GameplayFactId,
+            ct);
         if (fact is null)
             return InternalResultDisposition.NotFound;
         var runtime = await db.RuntimeInstances.SingleOrDefaultAsync(
@@ -88,10 +87,25 @@ public sealed class InternalResultStore(
             GameplayFactState: fact.State,
             GameplayFactResult: fact.Result,
             RuntimeState: runtime.State), ct);
-        await db.SaveChangesAsync(ct);
-        await transaction.CommitAsync(ct);
-        await outbox.FlushOutgoingMessagesAsync();
-        return InternalResultDisposition.Applied;
+        try
+        {
+            await db.SaveChangesAsync(ct);
+            await transaction.CommitAsync(ct);
+            await outbox.FlushCommittedMessagesAsync();
+            return InternalResultDisposition.Applied;
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            await transaction.RollbackAsync(ct);
+            outbox.DiscardPendingMessages();
+            db.ChangeTracker.Clear();
+            if (await db.GameplayFacts.AsNoTracking().AnyAsync(item =>
+                    item.Id == result.GameplayFactId
+                    && (item.State == GameplayFactState.Completed
+                        || item.State == GameplayFactState.PlatformFailed), ct))
+                return InternalResultDisposition.Duplicate;
+            throw;
+        }
     }
 
     public async Task<InternalResultDisposition> RecordAwdpAsync(
@@ -109,10 +123,9 @@ public sealed class InternalResultStore(
         CancellationToken ct)
     {
         await using var transaction = await db.Database.BeginTransactionAsync(ct);
-        var fact = await db.GameplayFacts
-            .FromSqlInterpolated(
-                $"SELECT * FROM gameplay_facts WHERE id = {result.GameplayFactId} FOR UPDATE")
-            .SingleOrDefaultAsync(ct);
+        var fact = await db.GameplayFacts.SingleOrDefaultAsync(
+            item => item.Id == result.GameplayFactId,
+            ct);
         if (fact is null)
             return InternalResultDisposition.NotFound;
         var runtime = await db.RuntimeInstances.SingleOrDefaultAsync(
@@ -140,15 +153,15 @@ public sealed class InternalResultStore(
                 {
                     scope.Challenge,
                     scope.Competition,
-                    template.DefinitionJson
+                    Template = template
                 })
             .SingleAsync(ct);
         var validMode = context.Competition.Mode == GameMode.Awdp
             && runtime.Purpose == RuntimePurpose.AwdpTarget
             || context.Competition.Mode == GameMode.Ctf
             && runtime.Purpose == RuntimePurpose.PatchVerificationTarget
-            && CtfConfigurationParser.ParseDefinition(context.DefinitionJson).InteractionKind
-                == CtfInteractionKind.PatchVerification;
+            && context.Template.Definition is CtfChallengeDefinition
+                { InteractionKind: CtfInteractionKind.PatchVerification };
         if (!validMode
             || fact.Kind != GameplayFactKind.FixAttempt
             || fact.ReferenceKind != GameplayFactReferenceKind.PatchUpload
@@ -169,7 +182,7 @@ public sealed class InternalResultStore(
                     ct);
             await db.SaveChangesAsync(ct);
             await transaction.CommitAsync(ct);
-            await outbox.FlushOutgoingMessagesAsync();
+            await outbox.FlushCommittedMessagesAsync();
             return convergence.FactConverged
                 ? InternalResultDisposition.Applied
                 : InternalResultDisposition.Duplicate;
@@ -265,15 +278,6 @@ public sealed class InternalResultStore(
         }
         if (context.Competition.Mode == GameMode.Awdp)
         {
-            var payload = AwdpFixResolvedEventPayload.Create(
-                fact.Id,
-                fact.ReferenceId.Value,
-                runtime.Id,
-                fact.TeamId.Value,
-                fact.CompetitionChallengeId,
-                result.Outcome,
-                fact.FailureCode,
-                resolvedAt);
             await events.RecordAsync(new(
                 fact.CompetitionId,
                 CompetitionEventKind.AwdpFixResolved,
@@ -289,7 +293,10 @@ public sealed class InternalResultStore(
                 GameplayFactKind: fact.Kind,
                 GameplayFactState: fact.State,
                 GameplayFactResult: fact.Result,
-                PayloadJson: payload.Serialize()), ct);
+                PatchUploadId: fact.ReferenceId.Value,
+                AwdpFixOutcome: result.Outcome,
+                GameplayFactFailureCode: fact.FailureCode,
+                ResolvedAt: resolvedAt), ct);
         }
         await events.RecordAsync(new(
             runtime.CompetitionId!.Value,
@@ -310,7 +317,7 @@ public sealed class InternalResultStore(
         await QueueNextAwdpFixAttemptAsync(fact, ct);
         await db.SaveChangesAsync(ct);
         await transaction.CommitAsync(ct);
-        await outbox.FlushOutgoingMessagesAsync();
+        await outbox.FlushCommittedMessagesAsync();
         return InternalResultDisposition.Applied;
     }
 
@@ -330,7 +337,7 @@ public sealed class InternalResultStore(
             .Select(candidate => (Guid?)candidate.Id)
             .FirstOrDefaultAsync(ct);
         if (nextGameplayFactId is Guid id)
-            await outbox.PublishAsync(new EvaluateGameplayFact(id));
+            await outbox.PublishAsync(new EvaluateGameplayFact(id, Guid.CreateVersion7()));
     }
 
     private static DateTimeOffset ToPostgresPrecision(DateTimeOffset value) =>
@@ -355,7 +362,7 @@ public sealed class InternalResultStore(
                 item.StartAt,
                 item.EndAt,
                 item.TracksEnabled,
-                item.TrackConfigurationJson
+                item.Tracks
             })
             .SingleAsync(ct);
         if (competition.Mode != GameMode.Ctf)
@@ -371,7 +378,7 @@ public sealed class InternalResultStore(
         var tracks = CompetitionTrackConfiguration.EffectiveFor(
             competition.Mode,
             competition.TracksEnabled,
-            competition.TrackConfigurationJson);
+            competition.Tracks);
         var currentTrackKey = await db.Teams.AsNoTracking().Where(CtfCompletionEligibility.ParticipatingTeams)
             .Where(team => team.Id == fact.TeamId)
             .Select(team => team.TrackKey)
@@ -394,7 +401,7 @@ public sealed class InternalResultStore(
                 && candidate.Id != fact.Id)
             .Join(
                 db.Teams.AsNoTracking().Where(CtfCompletionEligibility.ParticipatingTeams).Where(team => (!competition.TracksEnabled
-                        || bloodTrackKeys.Contains(team.TrackKey.ToLower()))
+                        || bloodTrackKeys.Contains(team.TrackKey))
                     && team.RegisteredAt < officialWindow.EndAt),
                 candidate => candidate.TeamId,
                 team => (Guid?)team.Id,

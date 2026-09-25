@@ -10,17 +10,10 @@ internal static class ActiveHumanAdministratorMutationGuard
         NoCtfDbContext db,
         CancellationToken cancellationToken)
     {
-        if (db.Database.IsInMemory())
-            return;
         if (db.Database.CurrentTransaction is null)
             throw new InvalidOperationException(
-                "The active administrator mutation lock requires an explicit transaction.");
-
-        // A table lock is acquired before the first data read. This matters for Serializable
-        // deletion transactions: a row/advisory lock could wait with an already-stale snapshot.
-        await db.Database.ExecuteSqlInterpolatedAsync(
-            $"LOCK TABLE users IN SHARE ROW EXCLUSIVE MODE",
-            cancellationToken);
+                "The active administrator guard requires an explicit serializable transaction.");
+        await Task.CompletedTask;
     }
 
     public static bool Contains(User user) =>

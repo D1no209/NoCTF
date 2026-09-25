@@ -80,7 +80,7 @@ public sealed class ContainerRuntimeHandlerTests
             capacity,
             new FixedWorkReader(new(
                 RuntimeProvider.Docker,
-                System.Text.Json.JsonSerializer.Serialize(receipt))),
+                ContainerRuntimeReceiptData.From(receipt))),
             reconciler);
         var message = new StopContainerRuntime(runtimeInstanceId, "runner-a");
 
@@ -169,7 +169,7 @@ public sealed class ContainerRuntimeHandlerTests
             capacity,
             new FixedWorkReader(new(
                 RuntimeProvider.Docker,
-                System.Text.Json.JsonSerializer.Serialize(receipt))));
+                ContainerRuntimeReceiptData.From(receipt))));
 
         var result = await handler.StopContainerAsync(
             new StopContainerRuntime(runtimeInstanceId, "runner-a"),
@@ -194,7 +194,7 @@ public sealed class ContainerRuntimeHandlerTests
             capacity,
             new FixedWorkReader(new(
                 RuntimeProvider.Docker,
-                ProviderReceiptJson: null)),
+                ProviderReceipt: null)),
             reconciler);
         var message = new StopContainerRuntime(runtimeInstanceId, "runner-a");
 
@@ -226,7 +226,7 @@ public sealed class ContainerRuntimeHandlerTests
             capacity,
             new FixedWorkReader(new(
                 RuntimeProvider.Docker,
-                ProviderReceiptJson: null)),
+                ProviderReceipt: null)),
             reconciler);
 
         var result = await handler.StopContainerAsync(
@@ -261,7 +261,7 @@ public sealed class ContainerRuntimeHandlerTests
             capacity,
             new FixedWorkReader(new(
                 RuntimeProvider.Docker,
-                System.Text.Json.JsonSerializer.Serialize(receipt),
+                ContainerRuntimeReceiptData.From(receipt),
                 RuntimeKind.Container)),
             reconciler);
         var message = new ForceTerminateRuntime(

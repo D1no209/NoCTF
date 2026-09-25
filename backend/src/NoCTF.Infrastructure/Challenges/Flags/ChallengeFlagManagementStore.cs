@@ -28,8 +28,9 @@ public sealed class ChallengeFlagManagementStore(
         if (challenge.Mode == GameMode.Awdp)
             return true;
         return challenge.Mode == GameMode.Ctf
-            && InteractionKind(challenge.DefinitionJson) == CtfInteractionKind.FlagSubmission
-            && runtimeTemplates.Get(challenge.Mode, challenge.DefinitionJson)?.FlagSource
+            && challenge.Definition is CtfChallengeDefinition
+                { InteractionKind: CtfInteractionKind.FlagSubmission }
+            && runtimeTemplates.Get(challenge.Definition)?.FlagSource
                 is null or RuntimeFlagSource.Static;
     }
 
@@ -43,8 +44,9 @@ public sealed class ChallengeFlagManagementStore(
         if (challenge is null)
             return null;
         return challenge.Mode == GameMode.Ctf
-            && InteractionKind(challenge.DefinitionJson) == CtfInteractionKind.FlagSubmission
-            && runtimeTemplates.Get(challenge.Mode, challenge.DefinitionJson)?.FlagSource
+            && challenge.Definition is CtfChallengeDefinition
+                { InteractionKind: CtfInteractionKind.FlagSubmission }
+            && runtimeTemplates.Get(challenge.Definition)?.FlagSource
                 is null or RuntimeFlagSource.Static;
     }
 
@@ -118,13 +120,19 @@ public sealed class ChallengeFlagManagementStore(
             if (await db.ChallengeFlags.IgnoreQueryFilters().AsNoTracking()
                     .AnyAsync(flag => flag.Id == requestedId, ct))
                 return new(null, ChallengeFlagSaveFailure.ResourceIdConflict);
-            entity = new ChallengeFlag
+            var type = command.SpecificationKind switch
             {
-                Id = requestedId,
-                ChallengeId = command.Scope.ChallengeId,
-                CompetitionChallengeId = command.Scope.CompetitionChallengeId,
-                CreatedAt = command.Now
+                SpecificationKind.AwdRound => ChallengeFlagType.AwdRound,
+                SpecificationKind.RuntimeInstance => ChallengeFlagType.RuntimeInstance,
+                _ when command.TeamId is not null => ChallengeFlagType.Team,
+                _ when command.Scope.ChallengeId is not null => ChallengeFlagType.Template,
+                _ => ChallengeFlagType.Competition
             };
+            entity = ChallengeFlagGeneratedCatalog.Create(type);
+            entity.Id = requestedId;
+            entity.ChallengeId = command.Scope.ChallengeId;
+            entity.CompetitionChallengeId = command.Scope.CompetitionChallengeId;
+            entity.CreatedAt = command.Now;
             db.ChallengeFlags.Add(entity);
         }
         entity.TeamId = command.TeamId;
@@ -215,7 +223,7 @@ public sealed class ChallengeFlagManagementStore(
                 challenge.Id == challengeId &&
                 (isAdministrator ||
                  challenge.OwnerId == actorId ||
-                 (actorId != null && challenge.ManagerIds.Contains(actorId.Value))), ct);
+                 (actorId != null && challenge.Managers.Any(manager => manager.UserId == actorId.Value))), ct);
         return db.CompetitionChallenges.AnyAsync(
             challenge =>
                 challenge.Id == scope.CompetitionChallengeId &&
@@ -233,7 +241,7 @@ public sealed class ChallengeFlagManagementStore(
         return scope.ChallengeId is Guid challengeId
             ? await db.Challenges.AsNoTracking()
                 .Where(item => item.Id == challengeId)
-                .Select(item => new ChallengeFlagSupport(item.Mode, item.DefinitionJson))
+                .Select(item => new ChallengeFlagSupport(item.Mode, item.Definition))
                 .SingleAsync(ct)
             : await db.CompetitionChallenges.AsNoTracking()
                 .Where(item => item.Id == scope.CompetitionChallengeId
@@ -242,7 +250,7 @@ public sealed class ChallengeFlagManagementStore(
                     db.Challenges.AsNoTracking(),
                     item => item.ChallengeId,
                     template => template.Id,
-                    (_, template) => new ChallengeFlagSupport(template.Mode, template.DefinitionJson))
+                    (_, template) => new ChallengeFlagSupport(template.Mode, template.Definition))
                 .SingleAsync(ct);
     }
 
@@ -259,18 +267,6 @@ public sealed class ChallengeFlagManagementStore(
         || flag.ValidStart is not null
         || flag.ValidUntil is not null;
 
-    private static CtfInteractionKind InteractionKind(string definitionJson)
-    {
-        try
-        {
-            return CtfConfigurationParser.ParseDefinition(definitionJson).InteractionKind;
-        }
-        catch (GameModeConfigurationException)
-        {
-            return CtfInteractionKind.FlagSubmission;
-        }
-    }
-
-    private sealed record ChallengeFlagSupport(GameMode Mode, string DefinitionJson);
+    private sealed record ChallengeFlagSupport(GameMode Mode, ChallengeDefinition? Definition);
 
 }

@@ -13,7 +13,7 @@ namespace NoCTF.Infrastructure.Teams.Moderation;
 
 public sealed class TeamModerationStore(
     NoCtfDbContext db,
-    ITransactionalMessageOutbox outbox,
+    IPostCommitMessagePublisher outbox,
     ICompetitionEventRecorder? eventRecorder = null) : ITeamModerationStore
 {
     private readonly ICompetitionEventRecorder events =
@@ -84,7 +84,7 @@ public sealed class TeamModerationStore(
                 .ToListAsync(cancellationToken);
             foreach (var runtime in practiceRuntimes)
             {
-                if (runtime.State == RuntimeState.Queued && runtime.RunnerId is null && runtime.ProviderReceiptJson is null)
+                if (runtime.State == RuntimeState.Queued && runtime.RunnerId is null && runtime.ProviderReceipt is null)
                 {
                     runtime.State = RuntimeState.Stopped;
                     runtime.StoppedAt = command.OccurredAt;
@@ -106,7 +106,7 @@ public sealed class TeamModerationStore(
         }
         await db.SaveChangesAsync(cancellationToken);
         await transaction.CommitAsync(cancellationToken);
-        await outbox.FlushCommittedMessagesAsync();
+        await transaction.FlushMessagesAsync(outbox);
         return new();
     }
 }

@@ -1,6 +1,8 @@
 using System.Text;
 using NoCTF.Application.GameplayFacts.Intake;
 using NoCTF.Domain.Competitions;
+using NoCTF.Domain.Challenges;
+using NoCTF.GameModes.Registration;
 
 namespace NoCTF.Tests.Unit.Application;
 
@@ -113,8 +115,9 @@ public sealed class FlagSubmissionBatchTests
                 Guid.NewGuid(),
                 competitionChallengeId,
                 mode,
-                "{}",
-                "{}",
+                CompetitionModeConfigurationDefaults.Create(mode, competitionId),
+                new GameModeChallengeConfigurationCatalog().CreateDefaultRules(
+                    mode, competitionChallengeId),
                 0,
                 0,
                 CompetitionStatus.Running,
@@ -156,8 +159,9 @@ public sealed class FlagSubmissionBatchTests
     {
         public GameplayFactAdmissionRules GetRules(
             GameMode mode,
-            string competitionConfigurationJson,
-            string challengeConfigurationJson) =>
+            CompetitionModeConfiguration competitionConfiguration,
+            CompetitionChallengeRules challengeRules,
+            ChallengeDefinition? challengeDefinition = null) =>
             new(true, false, null, null);
     }
 }

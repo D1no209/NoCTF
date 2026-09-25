@@ -3,6 +3,7 @@ using System.IO.Compression;
 using NoCTF.Application.Common;
 using NoCTF.Application.Storage;
 using NoCTF.Application.Commands.Idempotency;
+using NoCTF.Domain.Commands;
 using NoCTF.Domain.Runtime;
 
 namespace NoCTF.Application.GameplayFacts.PatchUploads;
@@ -101,7 +102,8 @@ public sealed class CreatePatchUpload(
             content.Position = 0;
             var previous = await replay.FindAsync<AcceptedAwdpFix>(
                 new(userId, ReplayOperation.PatchUpload, competitionId, runtimeInstanceId),
-                new { competitionChallengeId, fileName, contentType, content.Length, Sha256 = Convert.ToHexString(hash) }, ct);
+                new PatchUploadReplayFingerprint(competitionChallengeId, fileName, contentType,
+                    content.Length, Convert.ToHexString(hash)), ct);
             if (previous is not null) return OperationResult<AcceptedAwdpFix, PatchUploadFailureCode>.Success(previous);
         }
         var scope = await store.ResolveScopeAsync(

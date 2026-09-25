@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using StackExchange.Redis;
 
 namespace NoCTF.Infrastructure.Messaging;
@@ -85,9 +86,14 @@ public sealed class RedisClusterSchedulerStatusStore(
             .WaitAsync(cancellationToken);
         return value.IsNullOrEmpty
             ? null
-            : JsonSerializer.Deserialize<ClusterSchedulerStatus>((string)value!);
+            : JsonSerializer.Deserialize(
+                (string)value!, ClusterSchedulerStatusJsonContext.Default.ClusterSchedulerStatus);
     }
 
     private static string Serialize(ClusterSchedulerStatus status) =>
-        JsonSerializer.Serialize(status);
+        JsonSerializer.Serialize(status,
+            ClusterSchedulerStatusJsonContext.Default.ClusterSchedulerStatus);
 }
+
+[JsonSerializable(typeof(ClusterSchedulerStatus))]
+internal partial class ClusterSchedulerStatusJsonContext : JsonSerializerContext;

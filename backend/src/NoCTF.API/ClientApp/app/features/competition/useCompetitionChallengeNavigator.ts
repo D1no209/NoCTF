@@ -2,14 +2,14 @@ import { toRefs } from 'vue'
 
 import { ShieldCheck, Swords, Users } from '@lucide/vue'
 import { getMyTeamEndpoint, listChallengesEndpoint } from '../../api'
-import type { NoCtfapiEndpointsChallengesChallengeResponse, NoCtfapiEndpointsCompetitionsLeaderboardDataScopeProtocol } from '../../api'
+import type { NoCtfapiEndpointsChallengesChallengeSummaryResponse, NoCtfapiEndpointsCompetitionsLeaderboardDataScopeProtocol } from '../../api'
 import { bloodRankLabel } from '../leaderboard/types'
 import { directionGlyph } from '../../utils/directions'
 import { challengeProgressIcon } from './challenge-progress-icon'
 import { scoreboardBreakdown, scoreboardColumnsForChallenge, scoreboardCurrentChallengeScore, scoreboardSlot } from '../../utils/scoreboard'
 import { createTrailingRefresh } from '../../lib/latest-page-refresh'
 
-type Challenge = NoCtfapiEndpointsChallengesChallengeResponse
+type Challenge = NoCtfapiEndpointsChallengesChallengeSummaryResponse
 type BloodRank = 'First' | 'Second' | 'Third'
 const bloodOrder: Record<BloodRank, number> = { First: 0, Second: 1, Third: 2 }
 

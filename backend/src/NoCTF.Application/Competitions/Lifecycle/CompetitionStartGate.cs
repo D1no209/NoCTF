@@ -11,8 +11,8 @@ namespace NoCTF.Application.Competitions.Lifecycle;
 public sealed record StartGateChallenge(
     Guid CompetitionChallengeId,
     GameMode ChallengeMode,
-    string RulesJson,
-    string DefinitionJson,
+    CompetitionChallengeRules Rules,
+    ChallengeDefinition Definition,
     bool Published,
     IReadOnlyList<long> HintCosts);
 
@@ -20,11 +20,11 @@ public sealed record CompetitionStartGateSnapshot(
     Guid CompetitionId,
     GameMode Mode,
     CompetitionStatus Status,
-    string ConfigurationJson,
+    CompetitionModeConfiguration Configuration,
     IReadOnlyList<StartGateChallenge> Challenges,
     int ApprovedTeamCount,
     int MaxConcurrentRuntimeInstancesPerTeam,
-    string? TrackConfigurationJson = null,
+    IReadOnlyList<CompetitionTrackDefinition>? Tracks = null,
     IReadOnlyList<string>? ApprovedTeamTrackKeys = null,
     bool TracksEnabled = false);
 
@@ -76,8 +76,8 @@ public sealed class CompetitionStartGate(
                 "The competition must be Published before it can start."));
         var hasPatchVerification = snapshot.Mode == GameMode.Ctf
             && snapshot.Challenges.Any(challenge => challenge.Published
-                && CtfInteractionDefinition.Parse(challenge.DefinitionJson)
-                    == CtfInteractionKind.PatchVerification);
+                && challenge.Definition is CtfChallengeDefinition
+                    { InteractionKind: CtfInteractionKind.PatchVerification });
         if (hasPatchVerification
             && !(await IsPatchVerificationEnabledAsync(ct)))
         {
@@ -89,28 +89,21 @@ public sealed class CompetitionStartGate(
         var publishedChallengeConfigurations = snapshot.Challenges
             .Where(challenge => challenge.Published)
             .Select(challenge => new ChallengeConfigurationSections(
-                challenge.RulesJson,
-                challenge.DefinitionJson))
+                challenge.Rules,
+                challenge.Definition))
             .ToArray();
         foreach (var message in competitionConfigurations.ValidateForStart(
                      snapshot.Mode,
-                     snapshot.ConfigurationJson,
+                     snapshot.Configuration,
                      snapshot.ApprovedTeamCount,
                      publishedChallengeConfigurations))
             errors.Add(new(StartGateFailureCode.CompetitionConfigurationInvalid, null, message));
-        var trackConfiguration = CompetitionTrackConfiguration.DefaultFor(snapshot.Mode);
-        if (!string.IsNullOrWhiteSpace(snapshot.TrackConfigurationJson)
-            && !CompetitionTrackConfiguration.TryParse(
-                snapshot.TrackConfigurationJson,
-                out trackConfiguration))
+        CompetitionTrackConfiguration trackConfiguration;
+        try
         {
-            errors.Add(new(
-                StartGateFailureCode.TrackConfigurationInvalid,
-                null,
-                "Track configuration is not valid JSON."));
-        }
-        else
-        {
+            trackConfiguration = CompetitionTrackConfiguration.FromPersisted(
+                snapshot.Mode,
+                snapshot.Tracks);
             foreach (var message in CompetitionTrackPolicy.Validate(snapshot.Mode, trackConfiguration))
                 errors.Add(new(StartGateFailureCode.TrackConfigurationInvalid, null, message));
             foreach (var trackKey in snapshot.TracksEnabled
@@ -125,6 +118,13 @@ public sealed class CompetitionStartGate(
                         $"Approved team references missing track '{trackKey}'."));
                 }
             }
+        }
+        catch (InvalidOperationException exception)
+        {
+            errors.Add(new(
+                StartGateFailureCode.TrackConfigurationInvalid,
+                null,
+                exception.Message));
         }
         if (!snapshot.Challenges.Any(challenge => challenge.Published))
             errors.Add(new(
@@ -166,8 +166,8 @@ public sealed class CompetitionStartGate(
             }
             foreach (var message in challengeConfigurations.ValidateRules(
                          snapshot.Mode,
-                         challenge.RulesJson,
-                         snapshot.ConfigurationJson,
+                         challenge.Rules,
+                         snapshot.Configuration,
                          snapshot.ApprovedTeamCount))
                 errors.Add(new(
                     StartGateFailureCode.ChallengeRulesInvalid,
@@ -175,7 +175,7 @@ public sealed class CompetitionStartGate(
                     message));
             foreach (var message in challengeConfigurations.ValidateDefinitionForStart(
                          snapshot.Mode,
-                         challenge.DefinitionJson))
+                         challenge.Definition))
                 errors.Add(new(
                     StartGateFailureCode.RuntimeDefinitionInvalid,
                     challenge.CompetitionChallengeId,

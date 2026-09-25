@@ -24,7 +24,7 @@ public sealed class RuntimeResourceReconciliationHandler(
     NoCTF.Infrastructure.Runtime.Capacity.RunnerResourceMutationCoordinator? mutations = null,
     RedisRunnerCapacityLedger? ledger = null,
     RedisRunnerCapacityGate? rawCapacity = null,
-    ITransactionalMessageOutbox? outbox = null,
+    IPostCommitMessagePublisher? outbox = null,
     TimeProvider? clock = null)
 {
     private readonly TimeProvider timeProvider = clock ?? TimeProvider.System;
@@ -54,12 +54,12 @@ public sealed class RuntimeResourceReconciliationHandler(
                     && runtime.State == RuntimeState.Running
                     && (runtime.AccessMode == RuntimeAccessMode.DirectAndWsrx
                         || runtime.AccessMode == RuntimeAccessMode.WsrxOnly)
-                    && runtime.ProviderReceiptJson != null)
+                    && runtime.ProviderReceipt != null)
                 .Select(runtime => new
                 {
                     runtime.Id,
                     runtime.RuntimeKind,
-                    ProviderReceiptJson = runtime.ProviderReceiptJson!
+                    ProviderReceipt = runtime.ProviderReceipt!
                 })
                 .ToArrayAsync(cancellationToken);
             foreach (var runtime in proxyRuntimes)
@@ -67,7 +67,7 @@ public sealed class RuntimeResourceReconciliationHandler(
                 await proxyNetworks.EnsureProxyNetworkAsync(
                     runtime.Id,
                     runtime.RuntimeKind,
-                    runtime.ProviderReceiptJson,
+                    runtime.ProviderReceipt.ToData(),
                     cancellationToken);
             }
         }
@@ -87,7 +87,7 @@ public sealed class RuntimeResourceReconciliationHandler(
         foreach (var instance in failedAssignments)
         {
             var identity = new RuntimeResourceIdentity(instance.Id);
-            if (instance.ProviderReceiptJson is { } providerReceiptJson)
+            if (instance.ProviderReceipt is { } providerReceipt)
             {
                 var catalog = providers
                     ?? throw new InvalidOperationException(
@@ -97,7 +97,7 @@ public sealed class RuntimeResourceReconciliationHandler(
                     instance.RuntimeKind,
                     identity,
                     instance.RuntimeProvider,
-                    providerReceiptJson,
+                    providerReceipt.ToData(),
                     cancellationToken);
             }
             else
@@ -116,7 +116,7 @@ public sealed class RuntimeResourceReconciliationHandler(
                 throw new InvalidOperationException(
                     "Failed Runtime capacity belongs to a different Runner assignment.");
 
-            instance.ProviderReceiptJson = null;
+            instance.ProviderReceipt = null;
             instance.RunnerId = null;
             await db.SaveChangesAsync(cancellationToken);
         }
@@ -201,10 +201,13 @@ public sealed class RuntimeResourceReconciliationHandler(
             await ledger.DeferConfirmationAsync(runnerId, identity, ct);
             // No database lock crosses the provider call; unknown resources retain their claim.
             if (await reconciler.WorkloadExistsAsync(identity, ct) != false) continue;
-            await using var transaction = await db.Database.BeginTransactionAsync(ct);
-            await RuntimeCapacityCriticalSection.AcquireAsync(db, ct);
-            document = await db.RuntimeInstances.AsNoTracking().Where(row => row.Id == identity.RuntimeInstanceId)
-                .Select(row => row.CapacityAllocations).SingleOrDefaultAsync(ct);
+            await using var transaction = await db.Database.BeginTransactionAsync(
+                System.Data.IsolationLevel.Serializable,
+                ct);
+            var current = await db.RuntimeInstances.AsNoTracking()
+                .Include(row => row.CapacityAllocationEntries)
+                .SingleOrDefaultAsync(row => row.Id == identity.RuntimeInstanceId, ct);
+            document = current?.CapacityAllocations;
             if (document?.Items.Any(item => item.Identity == identity) == true) continue;
             var released = await rawCapacity.ReleaseWorkloadAsync(identity, runnerId, ct);
             if (released == RunnerCapacityReleaseOutcome.AlreadyReleased) await ledger.ConfirmAsync(runnerId, identity, ct);
@@ -219,15 +222,15 @@ public sealed class RuntimeResourceReconciliationHandler(
     private async Task ReconcileAuxiliaryAsync(IRuntimeManagedResourceReconciler reconciler, string runnerId, CancellationToken ct)
     {
         if (providers is null || !db.Database.IsRelational()) return;
-        var awdOwner = JsonSerializer.Serialize(new { items = new[] { new { runnerId, identity = new { kind = RuntimeWorkloadKind.AwdChecker } } } });
-        var patchOwner = JsonSerializer.Serialize(new { items = new[] { new { runnerId, identity = new { kind = RuntimeWorkloadKind.PatchChecker } } } });
-        var rows = await db.RuntimeInstances.FromSqlInterpolated($"""
-            SELECT * FROM runtime_instances
-            WHERE runtime_provider = {(short)reconciler.Provider}
-              AND (capacity_allocations @> CAST({awdOwner} AS jsonb)
-                OR capacity_allocations @> CAST({patchOwner} AS jsonb))
-            ORDER BY id LIMIT 500
-            """).AsNoTracking().ToArrayAsync(ct);
+        var rows = await db.RuntimeInstances.AsNoTracking()
+            .Where(runtime => runtime.RuntimeProvider == reconciler.Provider
+                && runtime.CapacityAllocationEntries.Any(allocation =>
+                    allocation.RunnerId == runnerId
+                    && (allocation.WorkloadKind == RuntimeWorkloadKind.AwdChecker
+                        || allocation.WorkloadKind == RuntimeWorkloadKind.PatchChecker)))
+            .OrderBy(runtime => runtime.Id)
+            .Take(500)
+            .ToArrayAsync(ct);
         foreach (var runtime in rows.Where(row => row.RuntimeProvider == reconciler.Provider))
         foreach (var allocation in runtime.CapacityAllocations.Items.Where(item => item.Identity.IsAuxiliary && item.RunnerId == runnerId))
         {

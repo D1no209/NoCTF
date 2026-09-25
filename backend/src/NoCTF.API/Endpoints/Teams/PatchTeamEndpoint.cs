@@ -113,6 +113,8 @@ public sealed class PatchTeamValidator : Validator<PatchTeamRequest>
 public static partial class TeamPatchMapper
 {
     [MapperIgnoreTarget(nameof(Team.Id))]
+    [MapperIgnoreTarget(nameof(Team.Members))]
+    [MapperIgnoreTarget(nameof(Team.ConcurrencyStamp))]
     [MapperIgnoreTarget(nameof(Team.CompetitionId))]
     [MapperIgnoreTarget(nameof(Team.TrackKey))]
     [MapperIgnoreTarget(nameof(Team.AvatarFileId))]
@@ -134,11 +136,15 @@ public static partial class TeamPatchMapper
     [MapperIgnoreTarget(nameof(Team.DeletedAt))]
     [MapperIgnoreSource(nameof(TeamProfilePatchRequest.TrackKey))]
     [MapperIgnoreSource(nameof(TeamProfilePatchRequest.TrackInvitationCode))]
+    [MapperIgnoreTarget(nameof(Team.NormalizedName))]
+    [MapperIgnoreTarget(nameof(Team.CaptainMembership))]
     public static partial void ApplyProfileAsCaptain(
         TeamProfilePatchRequest request,
         [MappingTarget] Team target);
 
     [MapperIgnoreTarget(nameof(Team.Id))]
+    [MapperIgnoreTarget(nameof(Team.Members))]
+    [MapperIgnoreTarget(nameof(Team.ConcurrencyStamp))]
     [MapperIgnoreTarget(nameof(Team.CompetitionId))]
     [MapperIgnoreTarget(nameof(Team.TrackKey))]
     [MapperIgnoreTarget(nameof(Team.Name))]
@@ -157,12 +163,16 @@ public static partial class TeamPatchMapper
     [MapperIgnoreTarget(nameof(Team.BannedById))]
     [MapperIgnoreTarget(nameof(Team.BanReason))]
     [MapperIgnoreTarget(nameof(Team.DeletedAt))]
+    [MapperIgnoreTarget(nameof(Team.NormalizedName))]
+    [MapperIgnoreTarget(nameof(Team.CaptainMembership))]
     public static partial void ApplyMembershipAsCaptain(
         TeamMembershipPatchRequest request,
         [MappingTarget] Team target);
 
     [MapProperty(nameof(TeamRegistrationPatchRequest.Status), nameof(Team.RegistrationStatus))]
     [MapperIgnoreTarget(nameof(Team.Id))]
+    [MapperIgnoreTarget(nameof(Team.Members))]
+    [MapperIgnoreTarget(nameof(Team.ConcurrencyStamp))]
     [MapperIgnoreTarget(nameof(Team.CompetitionId))]
     [MapperIgnoreTarget(nameof(Team.TrackKey))]
     [MapperIgnoreTarget(nameof(Team.Name))]
@@ -183,6 +193,8 @@ public static partial class TeamPatchMapper
     [MapperIgnoreTarget(nameof(Team.BanReason))]
     [MapperIgnoreTarget(nameof(Team.DeletedAt))]
     [MapperIgnoreSource(nameof(TeamRegistrationPatchRequest.TrackInvitationCode))]
+    [MapperIgnoreTarget(nameof(Team.NormalizedName))]
+    [MapperIgnoreTarget(nameof(Team.CaptainMembership))]
     public static partial void ApplyRegistrationAsCaptain(
         TeamRegistrationPatchRequest request,
         [MappingTarget] Team target);
@@ -190,6 +202,8 @@ public static partial class TeamPatchMapper
     [MapProperty(nameof(TeamAdministrationPatchRequest.RegistrationStatus),
         nameof(Team.RegistrationStatus))]
     [MapperIgnoreTarget(nameof(Team.Id))]
+    [MapperIgnoreTarget(nameof(Team.Members))]
+    [MapperIgnoreTarget(nameof(Team.ConcurrencyStamp))]
     [MapperIgnoreTarget(nameof(Team.CompetitionId))]
     [MapperIgnoreTarget(nameof(Team.Name))]
     [MapperIgnoreTarget(nameof(Team.AvatarFileId))]
@@ -208,6 +222,8 @@ public static partial class TeamPatchMapper
     [MapperIgnoreTarget(nameof(Team.BannedById))]
     [MapperIgnoreTarget(nameof(Team.BanReason))]
     [MapperIgnoreTarget(nameof(Team.DeletedAt))]
+    [MapperIgnoreTarget(nameof(Team.NormalizedName))]
+    [MapperIgnoreTarget(nameof(Team.CaptainMembership))]
     public static partial void ApplyAdministrationAsModerator(
         TeamAdministrationPatchRequest request,
         [MappingTarget] Team target);
@@ -215,6 +231,8 @@ public static partial class TeamPatchMapper
     [MapProperty(nameof(TeamBanPatchRequest.Reason), nameof(Team.BanReason))]
     [MapperIgnoreSource(nameof(TeamBanPatchRequest.AnnouncePublicly))]
     [MapperIgnoreTarget(nameof(Team.Id))]
+    [MapperIgnoreTarget(nameof(Team.Members))]
+    [MapperIgnoreTarget(nameof(Team.ConcurrencyStamp))]
     [MapperIgnoreTarget(nameof(Team.CompetitionId))]
     [MapperIgnoreTarget(nameof(Team.TrackKey))]
     [MapperIgnoreTarget(nameof(Team.Name))]
@@ -233,6 +251,8 @@ public static partial class TeamPatchMapper
     [MapperIgnoreTarget(nameof(Team.BannedAt))]
     [MapperIgnoreTarget(nameof(Team.BannedById))]
     [MapperIgnoreTarget(nameof(Team.DeletedAt))]
+    [MapperIgnoreTarget(nameof(Team.NormalizedName))]
+    [MapperIgnoreTarget(nameof(Team.CaptainMembership))]
     public static partial void ApplyBanAsJudge(
         TeamBanPatchRequest request,
         [MappingTarget] Team target);
@@ -240,6 +260,8 @@ public static partial class TeamPatchMapper
     [MapProperty(nameof(TeamBanPatchRequest.Reason), nameof(Team.BanReason))]
     [MapperIgnoreSource(nameof(TeamBanPatchRequest.AnnouncePublicly))]
     [MapperIgnoreTarget(nameof(Team.Id))]
+    [MapperIgnoreTarget(nameof(Team.Members))]
+    [MapperIgnoreTarget(nameof(Team.ConcurrencyStamp))]
     [MapperIgnoreTarget(nameof(Team.CompetitionId))]
     [MapperIgnoreTarget(nameof(Team.TrackKey))]
     [MapperIgnoreTarget(nameof(Team.Name))]
@@ -258,6 +280,8 @@ public static partial class TeamPatchMapper
     [MapperIgnoreTarget(nameof(Team.BannedAt))]
     [MapperIgnoreTarget(nameof(Team.BannedById))]
     [MapperIgnoreTarget(nameof(Team.DeletedAt))]
+    [MapperIgnoreTarget(nameof(Team.NormalizedName))]
+    [MapperIgnoreTarget(nameof(Team.CaptainMembership))]
     public static partial void ApplyUnbanAsModerator(
         TeamBanPatchRequest request,
         [MappingTarget] Team target);
@@ -354,7 +378,7 @@ public sealed class PatchTeamEndpoint(
         }
 
         if ((sections & TeamPatchSection.Membership) != 0
-            && (!target.MemberIds.Contains(target.CaptainId)
+            && (!target.Members.Any(member => member.UserId == target.CaptainId)
                 || target.MemberIds.Except(current.MemberIds).Any()))
         {
             return Conflict("Team membership update is invalid.");

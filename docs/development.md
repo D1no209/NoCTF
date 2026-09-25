@@ -4,7 +4,7 @@
 
 - .NET 10 / C# current；
 - FastEndpoints 8.2 StronglyTyped；
-- EF Core 10 + Npgsql/PostgreSQL；
+- EF Core 10 Relational 公共模型；运行时仅注册 PostgreSQL provider，SQLite 仅供隔离的模型测试使用；
 - Wolverine NATS JetStream transport；PostgreSQL 仅保存业务事实。
 - FluentStorage 8（Disk 与通用 S3 文件存储）；
 - Redis/SignalR backplane；
@@ -52,7 +52,7 @@ NoCTF.Infrastructure/
 
 ## EF Core
 
-Data Annotations 优先。只有 jsonb、uuid[]、GIN、部分索引、复杂 check/value conversion 等必要内容用小型 IEntityTypeConfiguration/ModelBuilder，并说明原因。
+Data Annotations 优先；TPH discriminator、Complex Types、关系集合和 converter 等注解无法表达的内容使用小型 `IEntityTypeConfiguration`。公共模型禁止 provider column type、JSON/数组列、filtered index、collation、方言 check constraint、原生锁与业务 Raw SQL；provider 注册和 migration 必须留在独立 provider project。
 
 不使用 LINQ query syntax；全部 method syntax。只读查询 AsNoTracking/投影所需列；避免 N+1。异步 I/O 传 CancellationToken。
 
@@ -68,11 +68,21 @@ dotnet ef database update
 
 ## Bounded Concepts
 
-状态、Kind、Provider、FailureCode、Permission、Result 等必须 enum/value object；开放文本才使用 string。协议文本转换只在边界。Runtime Config/Message/Callback 使用强类型 DTO 与 schemaVersion。
+状态、Kind、Provider、FailureCode、Permission、Result 等必须 enum/value object；开放文本才使用 string。协议文本转换只在边界。配置、事件、通知、Runtime message/callback 使用带 `mode` 或 `type` discriminator 的强类型 DTO；不得引入 schema upgrader、自由 JSON 或 `*Json` 合约。
 
 ## 消息
 
-业务写+Outbox 同事务。Handler 假设至少一次投递；GameplayFact 与 Runtime 依靠状态、唯一约束、自然键和 durable inbox 幂等，不引入持久化 Revision/ProcessingVersion。禁止 fire-and-forget、业务 Channel、同步阻塞 async 或在数据库事务中调用外部 Provider。
+Wolverine 只使用 NATS JetStream，不启用数据库 Message Store、Inbox 或 Outbox。业务提交成功后通过 `IPostCommitMessagePublisher` 发布；关键 Pending 状态必须可重新派发。Handler 假设至少一次投递，并依靠状态转换、唯一约束、自然业务键和稳定 `Nats-Msg-Id` 幂等。禁止 fire-and-forget、业务 Channel、同步阻塞 async 或在数据库事务中调用外部 Provider。
+
+生产 Host 使用 Wolverine 静态 Handler 代码，不在启动时动态编译。修改 Handler 签名或依赖图后运行
+`backend/scripts/Generate-WolverineHandlers.ps1`，提交 `NoCTF.Host/Internal/Generated/WolverineHandlers/`
+中的生成文件；生成失败即阻止发布。该 PowerShell 文件只是本地调用包装，真正的生成器是
+Wolverine/JasperFx 的 `dotnet run -- codegen write`，Docker 构建直接调用此命令。它与
+`NoCTF.Modeling.Generators` 的 Roslyn 增量生成器（领域 TPH 类型与判别器）职责不同。
+Handler 依赖必须可由 DI 显式解析，不能依赖 service-location 回退。
+签名游标、Redis 消息、容量恢复和幂等指纹等明确的类型化 JSON 边界使用内置
+`JsonSerializerContext` 源生成，并以线格式等价测试约束；Wolverine Handler 代码生成
+不能替代 STJ 序列化源生成。
 
 ## 日志
 
@@ -102,7 +112,7 @@ token；`Provider=None` 始终停用验证。
 
 ## 文档同步
 
-修改领域契约必须同时更新 docs、OpenAPI 和测试。不得以代码现状为理由恢复已废弃的 Penetration 模式、RuntimeOperation、Artifact、TeamMember 或 Collaborator 表。
+修改领域契约必须同时更新 docs、OpenAPI 和测试。不得以代码现状为理由恢复已废弃的 Penetration 模式、RuntimeOperation、Artifact、JSON/数组持久化、旧 schema upgrader 或独立 API/Worker/Runner 进程。TeamMember 与 CompetitionCollaborator 是当前关系实体，不得退回数组。
 
 ## OpenAPI 与前端构建门禁
 

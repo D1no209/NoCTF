@@ -81,8 +81,9 @@ public sealed class GameplayFactPracticeAdmissionTests
         Guid.NewGuid(),
         Guid.NewGuid(),
         mode,
-        "{}",
-        "{}",
+        CompetitionModeConfigurationDefaults.Create(mode, Guid.NewGuid()),
+        new NoCTF.GameModes.Registration.GameModeChallengeConfigurationCatalog()
+            .CreateDefaultRules(mode, Guid.NewGuid()),
         0,
         0,
         status,

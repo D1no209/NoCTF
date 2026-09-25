@@ -88,7 +88,7 @@ internal static class AuthenticationInfrastructure
         if (!string.IsNullOrWhiteSpace(
                 configuration[$"{EmailVerificationProtectionOptions.SectionName}:EncryptionKey"]))
         {
-            services.AddSingleton<IXmlRepository, PostgresEncryptedDataProtectionKeyRepository>();
+            services.AddSingleton<IXmlRepository, EncryptedDataProtectionKeyRepository>();
             services.AddOptions<KeyManagementOptions>()
                 .Configure<IXmlRepository>((options, repository) =>
                     options.XmlRepository = repository);
@@ -154,10 +154,10 @@ internal static class AuthenticationInfrastructure
         services.AddSingleton<
             IEmailVerificationSmtpClientFactory,
             EmailVerificationSmtpClientFactory>();
-        services.AddScoped<
+        services.AddSingleton<
             IEmailVerificationDelivery,
             SmtpEmailVerificationDelivery>();
-        services.AddScoped<
+        services.AddSingleton<
             IPasswordResetEmailDelivery,
             SmtpEmailVerificationDelivery>();
         services.AddScoped<IPasswordResetStore, PasswordResetStore>();

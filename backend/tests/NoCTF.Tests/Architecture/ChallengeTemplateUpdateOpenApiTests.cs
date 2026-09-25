@@ -71,7 +71,7 @@ public sealed class ChallengeTemplateUpdateOpenApiTests
             request.GetProperty("properties").GetProperty("content")
                 .GetProperty("oneOf").EnumerateArray().First());
         await Assert.That(PropertyNames(content)).IsEquivalentTo([
-            "mode", "visibility", "title", "description", "direction", "definitionJson"
+            "mode", "visibility", "title", "description", "direction", "definition"
         ]);
         await AssertNamedStringEnumAsync(
             root,

@@ -28,7 +28,7 @@ public interface IAwdpAttackProvisioningPlanReader
         CancellationToken cancellationToken);
 }
 
-public sealed class AwdpAttackProvisioningPlanReader(IServiceScopeFactory scopes)
+public sealed class AwdpAttackProvisioningPlanReader(IDbContextFactory<NoCtfDbContext> contexts)
     : IAwdpAttackProvisioningPlanReader
 {
     private static readonly ChallengeRuntimeTemplateCatalog RuntimeTemplates = new();
@@ -37,8 +37,7 @@ public sealed class AwdpAttackProvisioningPlanReader(IServiceScopeFactory scopes
         ProvisionContainerRuntime message,
         CancellationToken cancellationToken)
     {
-        await using var scope = scopes.CreateAsyncScope();
-        var db = scope.ServiceProvider.GetRequiredService<NoCtfDbContext>();
+        await using var db = await contexts.CreateDbContextAsync(cancellationToken);
         var runtime = await db.RuntimeInstances.AsNoTracking()
             .Where(candidate => candidate.Id == message.RuntimeInstanceId
                 && candidate.State == RuntimeState.Provisioning
@@ -73,8 +72,9 @@ public sealed class AwdpAttackProvisioningPlanReader(IServiceScopeFactory scopes
                 challenge => challenge.Id,
                 (target, challenge) => new
                 {
-                    challenge.DefinitionJson
+                    Template = challenge
                 })
+            .AsSplitQuery()
             .SingleOrDefaultAsync(cancellationToken);
         if (target is null)
             return new(AwdpAttackProvisioningPlanState.Invalid);
@@ -96,7 +96,7 @@ public sealed class AwdpAttackProvisioningPlanReader(IServiceScopeFactory scopes
         ChallengeRuntimeTemplate? template;
         try
         {
-            template = RuntimeTemplates.Get(GameMode.Awdp, target.DefinitionJson);
+            template = RuntimeTemplates.Get(target.Template.Definition);
         }
         catch (Exception exception) when (exception is JsonException
             or GameModeConfigurationException

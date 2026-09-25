@@ -4,15 +4,28 @@ using Microsoft.AspNetCore.Http.HttpResults;
 using NoCTF.API.Pagination;
 using NoCTF.API.Security;
 using NoCTF.Application.Challenges.Bank;
+using NoCTF.API.Endpoints.Challenges;
+using NoCTF.API.Endpoints.Competitions;
 
 namespace NoCTF.API.Endpoints.Administration.ChallengeBank;
 
-public sealed class ChallengeTemplateListResponse : ArrayResult<ChallengeTemplateResponse>
+public sealed record ChallengeTemplateSummaryResponse(
+    Guid Id,
+    GameModeProtocol Mode,
+    ChallengeVisibilityProtocol Visibility,
+    string Title,
+    string Direction,
+    DateTimeOffset? DeletedAt,
+    int ActiveCompetitionReferenceCount,
+    DateTimeOffset UpdatedAt,
+    CtfInteractionKindProtocol InteractionKind);
+
+public sealed class ChallengeTemplateListResponse : ArrayResult<ChallengeTemplateSummaryResponse>
 {
     public ChallengeTemplateListResponse() { }
 
     public ChallengeTemplateListResponse(
-        ChallengeTemplateResponse[] items,
+        ChallengeTemplateSummaryResponse[] items,
         int total,
         IReadOnlyList<string> directions)
         : base(items, total) =>
@@ -59,7 +72,7 @@ public sealed class ListChallengeTemplatesEndpoint(
     public override async Task<Ok<ChallengeTemplateListResponse>> ExecuteAsync(
         ListChallengeTemplatesRequest request,
         CancellationToken ct) =>
-        TypedResults.Ok(ChallengeTemplateMapper.ToListResponse(
+        TypedResults.Ok(ToListResponse(
             await list.ExecutePageAsync(new(
                 user.UserId,
                 user.IsAdministrator,
@@ -69,4 +82,18 @@ public sealed class ListChallengeTemplatesEndpoint(
                 request.Offset,
                 request.Limit,
                 request.Desc), ct)));
+
+    private static ChallengeTemplateListResponse ToListResponse(ChallengeTemplateListPage page) =>
+        new(page.Items.Select(item => new ChallengeTemplateSummaryResponse(
+            item.Id,
+            CompetitionProtocolMapper.ToProtocol(item.Mode),
+            ChallengeTemplateMapper.ToProtocol(item.Visibility),
+            item.Title,
+            item.Direction,
+            item.DeletedAt,
+            item.ActiveCompetitionReferenceCount,
+            item.UpdatedAt,
+            ChallengeMapper.ToProtocol(item.InteractionKind))).ToArray(),
+            page.Total,
+            page.Directions);
 }

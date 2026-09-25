@@ -70,9 +70,21 @@ public sealed record ParticipantChallengeHintResponse(
     bool CanUnlock);
 
 public sealed record ChallengeListResponse(
-    IReadOnlyList<ChallengeResponse> Items,
+    IReadOnlyList<ChallengeSummaryResponse> Items,
     LeaderboardVisibilityProtocol LeaderboardVisibility = LeaderboardVisibilityProtocol.Normal,
     LeaderboardDataScopeProtocol DataScope = LeaderboardDataScopeProtocol.Live);
+
+public sealed record ChallengeSummaryResponse(
+    Guid Id,
+    Guid CompetitionId,
+    Guid ChallengeId,
+    string Title,
+    string? CustomTitle,
+    string Direction,
+    int Order,
+    bool IsPublished,
+    DateTimeOffset? DeletedAt,
+    CtfInteractionKindProtocol InteractionKind);
 
 internal static class ChallengeMapper
 {
@@ -144,14 +156,21 @@ internal static class ChallengeMapper
     };
 
     public static ChallengeListResponse ToListResponse(
-        IReadOnlyList<ChallengeView> views,
+        IReadOnlyList<CompetitionChallengeSummaryView> views,
         CompetitionLeaderboardVisibility visibility = CompetitionLeaderboardVisibility.Normal,
         LeaderboardDataScope dataScope = LeaderboardDataScope.Live) =>
         new(
-            views.Select(view => ToResponse(
-                view,
-                visibility: visibility,
-                dataScope: dataScope)).ToArray(),
+            views.Select(view => new ChallengeSummaryResponse(
+                view.Id,
+                view.CompetitionId,
+                view.ChallengeId,
+                view.Title,
+                view.CustomTitle,
+                view.Direction,
+                view.Order,
+                view.IsPublished,
+                view.DeletedAt,
+                ToProtocol(view.InteractionKind))).ToArray(),
             CompetitionProtocolMapper.ToProtocol(visibility),
             ScoreboardProtocolMapper.ToProtocol(dataScope));
 }
@@ -165,8 +184,7 @@ public sealed class GetChallengeRequest
 public sealed class GetChallengeEndpoint(
     GetChallenge get,
     IKohChallengeAccessReader kohAccess,
-    ICompetitionChallengeAudienceAccess audienceAccess,
-    ICompetitionVisibilityAccess visibilityAccess,
+    ICompetitionChallengeReadAccess readAccess,
     GetFlagAttemptState getAttemptState,
     ReadParticipantChallengeHints getHints,
     IUserContext user,
@@ -188,17 +206,16 @@ public sealed class GetChallengeEndpoint(
         // The hint bodies are personalized by the viewer's team and must not enter shared caches.
         HttpContext.Response.Headers.CacheControl = "private, no-store";
         var competitionId = Route<Guid>("competitionId");
-        if (!await audienceAccess.CanReadAsync(user.UserId, competitionId, ct))
-            return TypedResults.NotFound();
-        var visibility = await visibilityAccess.ResolveAsync(
+        var decision = await readAccess.ResolveAsync(
             user.UserId,
             competitionId,
             timeProvider.GetUtcNow(),
             ct);
-        if (visibility is null
+        if (decision is null
             || !ParticipantChallengeVisibilityPolicy.CanView(
-                visibility.CompetitionStatus))
+                decision.Visibility.CompetitionStatus))
             return TypedResults.NotFound();
+        var visibility = decision.Visibility;
         var item = await get.ExecuteAsync(
             competitionId,
             Route<Guid>("competitionChallengeId"),
@@ -214,18 +231,22 @@ public sealed class GetChallengeEndpoint(
         {
             return TypedResults.NotFound();
         }
-        var access = await kohAccess.FindAsync(
-            item.CompetitionId,
-            item.Id,
-            user.UserId,
-            ct);
-        var attemptState = user.UserId == Guid.Empty
+        var access = visibility.GameMode == GameMode.Koh
+            ? await kohAccess.FindAsync(
+                item.CompetitionId,
+                item.Id,
+                user.UserId,
+                ct)
+            : null;
+        var attemptState = decision.TeamId is not Guid teamId
                 || item.InteractionKind == CtfInteractionKind.PatchVerification
             ? null
             : await getAttemptState.ExecuteAsync(
                 item.CompetitionId,
                 item.Id,
-                user.UserId,
+                teamId,
+                visibility.GameMode,
+                visibility.CompetitionStatus,
                 ct);
         var patchVerification = user.UserId == Guid.Empty
                 || item.InteractionKind != CtfInteractionKind.PatchVerification
@@ -243,7 +264,9 @@ public sealed class GetChallengeEndpoint(
             visibility.Visibility,
             visibility.DataScope,
             attemptState,
-            await getHints.ExecuteAsync(item.CompetitionId, item.Id, user.UserId, timeProvider.GetUtcNow(), ct),
+            await getHints.ExecuteAsync(
+                item.CompetitionId, item.Id, visibility.CompetitionStatus,
+                decision.TeamId, timeProvider.GetUtcNow(), ct),
             patchVerification,
             HttpContext.Request);
         return TypedResults.Ok(response);

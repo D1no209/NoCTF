@@ -1,6 +1,7 @@
 using NoCTF.Application.Runtime.Configuration;
 using NoCTF.Application.Runtime.Provisioning;
 using NoCTF.Domain.Competitions;
+using NoCTF.Domain.Challenges;
 using NoCTF.GameModes.Awdp.Configuration;
 using NoCTF.GameModes.Ctf.Configuration;
 
@@ -23,27 +24,27 @@ public static class PatchVerificationConfigurationResolver
 {
     public static PatchVerificationConfiguration? Resolve(
         GameMode mode,
-        string competitionConfigurationJson,
-        string challengeRulesJson,
-        string challengeDefinitionJson) => mode switch
+        CompetitionModeConfiguration competitionConfiguration,
+        CompetitionChallengeRules rules,
+        ChallengeDefinition definition) => (mode, competitionConfiguration, rules, definition) switch
         {
-            GameMode.Awdp => ResolveAwdp(
-                competitionConfigurationJson,
-                challengeRulesJson,
-                challengeDefinitionJson),
-            GameMode.Ctf => ResolveCtf(challengeRulesJson, challengeDefinitionJson),
+            (GameMode.Awdp, AwdpCompetitionModeConfiguration competition,
+                AwdpCompetitionChallengeRules awdpRules,
+                AwdpChallengeDefinition awdpDefinition) =>
+                ResolveAwdp(competition, awdpRules, awdpDefinition),
+            (GameMode.Ctf, CtfCompetitionModeConfiguration,
+                CtfCompetitionChallengeRules ctfRules,
+                CtfChallengeDefinition ctfDefinition) =>
+                ResolveCtf(ctfRules, ctfDefinition),
             _ => null
         };
 
     private static PatchVerificationConfiguration? ResolveAwdp(
-        string competitionConfigurationJson,
-        string challengeRulesJson,
-        string challengeDefinitionJson)
+        AwdpCompetitionModeConfiguration competition,
+        AwdpCompetitionChallengeRules rules,
+        AwdpChallengeDefinition definition)
     {
-        var configuration = AwdpConfigurationResolver.Resolve(
-            competitionConfigurationJson,
-            challengeRulesJson,
-            challengeDefinitionJson);
+        var configuration = AwdpConfigurationResolver.Resolve(competition, rules, definition);
         return configuration.Runtime is null || configuration.Checker is null
             ? null
             : new(
@@ -61,12 +62,10 @@ public static class PatchVerificationConfigurationResolver
     }
 
     private static PatchVerificationConfiguration? ResolveCtf(
-        string challengeRulesJson,
-        string challengeDefinitionJson)
+        CtfCompetitionChallengeRules rules,
+        CtfChallengeDefinition definition)
     {
-        var configuration = CtfPatchVerificationConfigurationResolver.Resolve(
-            challengeDefinitionJson,
-            challengeRulesJson);
+        var configuration = CtfPatchVerificationConfigurationResolver.Resolve(definition, rules);
         return configuration is null
             ? null
             : new(
@@ -82,4 +81,5 @@ public static class PatchVerificationConfigurationResolver
                 configuration.CheckerFixInput,
                 configuration.CheckerAllowRoot);
     }
+
 }

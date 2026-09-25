@@ -166,15 +166,12 @@ public static partial class CompetitionTrackPolicy
         CompetitionTrackConfiguration configuration)
     {
         var errors = new List<string>();
-        if (configuration.SchemaVersion != CompetitionTrackConfiguration.CurrentSchemaVersion)
-            errors.Add($"Track configuration schema version must be {CompetitionTrackConfiguration.CurrentSchemaVersion}.");
         errors.AddRange(Validate(mode, configuration.Tracks));
         return errors.Distinct().ToArray();
     }
 
     public static CompetitionTrackConfiguration Normalize(
         IReadOnlyList<CompetitionTrackDefinition> tracks) => new(
-        CompetitionTrackConfiguration.CurrentSchemaVersion,
         tracks.Select(track => track with
         {
             Key = CompetitionTrackConfiguration.NormalizeKey(track.Key) ?? string.Empty,

@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.Text.Json;
 using NoCTF.Application.Notifications;
+using NoCTF.Application.Messaging;
 using NoCTF.Application.Observability;
 using NoCTF.Application.Scoring.Leaderboard;
 using StackExchange.Redis;
@@ -22,7 +23,8 @@ public sealed class RedisLeaderboardRefreshPublisher(IConnectionMultiplexer redi
         {
             await redis.GetSubscriber().PublishAsync(
                 RedisChannel.Literal(Channel),
-                JsonSerializer.Serialize(ScoreboardUpdated.From(projection)));
+                JsonSerializer.Serialize(ScoreboardUpdated.From(projection),
+                    NoCtfMessageJsonContext.Default.ScoreboardUpdated));
         }
         catch
         {

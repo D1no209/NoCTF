@@ -22,20 +22,30 @@ using ZiggyCreatures.Caching.Fusion;
 using NoCTF.Infrastructure.Caching;
 using NoCTF.Infrastructure.Scoring.Leaderboard;
 using NoCTF.Infrastructure.Messaging;
+using Testcontainers.PostgreSql;
 
 namespace NoCTF.Tests.Integration.API;
 
 public sealed class DevelopmentHostingTests
 {
     [Test]
-    [Category("DevelopmentIntegration")]
-    public async Task Development_host_uses_single_process_in_memory_infrastructure(
+    [Category("Integration")]
+    [NotInParallel]
+    [Timeout(300_000)]
+    public async Task Development_host_uses_single_process_PostgreSql_infrastructure(
         CancellationToken cancellationToken)
     {
+        await using var postgres = new PostgreSqlBuilder("postgres:17.10-alpine3.24@sha256:742f40ea20b9ff2ff31db5458d127452988a2164df9e17441e191f3b72252193")
+            .WithDatabase("noctf_development_host")
+            .WithUsername("postgres")
+            .WithPassword("postgres")
+            .Build();
+        await postgres.StartAsync(cancellationToken);
         using var factory = new WebApplicationFactory<Program>()
             .WithWebHostBuilder(builder =>
             {
                 builder.UseEnvironment("Development");
+                builder.UseSetting("ConnectionStrings:PostgreSql", postgres.GetConnectionString());
                 builder.UseSetting("SeedAdmin:UserName", "integration-admin");
                 builder.UseSetting("SeedAdmin:Email", "integration-admin@noctf.local");
                 builder.UseSetting("SeedAdmin:Password", "integration-password");
@@ -46,7 +56,7 @@ public sealed class DevelopmentHostingTests
         {
             var db = scope.ServiceProvider.GetRequiredService<NoCtfDbContext>();
             await Assert.That(db.Database.ProviderName)
-                .IsEqualTo("Microsoft.EntityFrameworkCore.InMemory");
+                .IsEqualTo("Npgsql.EntityFrameworkCore.PostgreSQL");
             var caches = scope.ServiceProvider.GetRequiredService<IFusionCacheProvider>();
             await Assert.That(caches.GetCache(NoCtfCacheNames.Leaderboards)).IsNotNull();
             await Assert.That(caches.GetCache(NoCtfCacheNames.ReadModels)).IsNotNull();
@@ -109,7 +119,7 @@ public sealed class DevelopmentHostingTests
             new
             {
                 title = "Development integration",
-                description = "EF Core InMemory HTTP integration",
+                description = "PostgreSQL HTTP integration",
                 mode = "Ctf",
                 startTime = now.AddMinutes(10),
                 endTime = now.AddHours(2),

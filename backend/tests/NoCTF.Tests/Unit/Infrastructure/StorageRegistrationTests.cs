@@ -2,6 +2,7 @@ using FluentStorage.Storage;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using NoCTF.Infrastructure;
+using NoCTF.Persistence.Sqlite;
 
 namespace NoCTF.Tests.Unit.Infrastructure;
 
@@ -79,9 +80,11 @@ public sealed class StorageRegistrationTests
         var configuration = new ConfigurationBuilder()
             .AddInMemoryCollection(configurationValues)
             .Build();
-        return new ServiceCollection()
-            .AddLogging()
-            .AddNoCtfInfrastructure(configuration, development: true)
-            .BuildServiceProvider();
+        var services = new ServiceCollection();
+        services.AddLogging();
+        services.AddNoCtfSqliteDevelopmentDatabase(
+            "storage-registration-" + Guid.NewGuid().ToString("N"));
+        services.AddNoCtfInfrastructure(configuration, development: true);
+        return services.BuildServiceProvider();
     }
 }

@@ -2,24 +2,24 @@
 import { bindViewState } from '~/features/shared/view-state'
 
 import type { GameModeValue } from '~/utils/game-config'
+import type { NoCtfapiEndpointsAdministrationCompetitionsCompetitionModeConfigurationContract } from '~/api'
 
 import { useCompetitionModeConfigEditor } from './useCompetitionModeConfigEditor'
 import View from '~/components/views/admin/CompetitionModeConfigEditorView.vue'
 
 const props = withDefaults(defineProps<{
   mode: GameModeValue
-  /** 服务器端当前配置 JSON。 */
-  json?: string | null
+  configuration?: NoCtfapiEndpointsAdministrationCompetitionsCompetitionModeConfigurationContract | null
   readonly?: boolean
   loading?: boolean
   saving?: boolean
 }>(), {
-  json: null,
+  configuration: null,
   readonly: false,
   loading: false,
   saving: false,
 })
-const emit = defineEmits<{ save: [json: string] }>()
+const emit = defineEmits<{ save: [configuration: NoCtfapiEndpointsAdministrationCompetitionsCompetitionModeConfigurationContract] }>()
 const state = bindViewState(useCompetitionModeConfigEditor(props, emit))
 
 </script>

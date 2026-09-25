@@ -5,12 +5,14 @@ using Microsoft.AspNetCore.Http.HttpResults;
 using System.ComponentModel.DataAnnotations;
 using System.Text.Json.Serialization;
 using NoCTF.API.Endpoints.Competitions;
+using NoCTF.API.Endpoints.Administration.Competitions;
 using NoCTF.API.Pagination;
 using NoCTF.API.Security;
 using NoCTF.API.Serialization;
 using NoCTF.Application.Challenges.Bank;
 using NoCTF.Domain.Challenges;
 using NoCTF.Domain.Competitions;
+using NoCTF.Domain.Runtime;
 using Riok.Mapperly.Abstractions;
 
 namespace NoCTF.API.Endpoints.Administration.ChallengeBank;
@@ -32,6 +34,118 @@ public enum SpecificationKindProtocol
     RuntimeInstance
 }
 
+[JsonConverter(typeof(StrictPascalCaseEnumConverter<RuntimeAllocationProtocol>))]
+public enum RuntimeAllocationProtocol { Shared, PerTeam }
+[JsonConverter(typeof(StrictPascalCaseEnumConverter<RuntimeFlagSourceProtocol>))]
+public enum RuntimeFlagSourceProtocol { Static, PerTeam, AwdRotation }
+[JsonConverter(typeof(StrictPascalCaseEnumConverter<RuntimeEgressPolicyProtocol>))]
+public enum RuntimeEgressPolicyProtocol { Isolated, InternetOnly }
+[JsonConverter(typeof(StrictPascalCaseEnumConverter<RuntimeExposureProtocol>))]
+public enum RuntimeExposureProtocol { OwnerOnly, Participants }
+
+public sealed record RuntimeResourceLimitsContract(long MemoryBytes, long NanoCpus, long PidsLimit);
+public sealed record RuntimeUrlBindingContract(
+    string UrlTemplate,
+    RuntimeExposureProtocol Exposure,
+    int? ContainerPort,
+    string? ServiceName,
+    string? VmId,
+    int? GuestPort,
+    bool IsControlCheck);
+public sealed record ContainerSecurityContract(
+    bool NoNewPrivileges,
+    bool ReadonlyRootfs,
+    bool RunAsNonRoot,
+    IReadOnlyList<string> CapDrop,
+    IReadOnlyList<string> CapAdd);
+public sealed record RuntimePortMappingContract(int ContainerPort, int HostPort);
+public sealed record ComposeServiceResourceContract(
+    string ServiceName,
+    RuntimeResourceLimitsContract Limits);
+
+[JsonConverter(typeof(StrictPascalCaseEnumConverter<ChallengeRuntimeKindProtocol>))]
+public enum ChallengeRuntimeKindProtocol { Container, Compose, Ova }
+
+public sealed class ChallengeRuntimeContract
+{
+    public required ChallengeRuntimeKindProtocol Kind { get; set; }
+    public RuntimeAllocationProtocol Allocation { get; set; }
+    public RuntimeResourceLimitsContract Limits { get; set; } = new(0, 0, 0);
+    public int? TtlSeconds { get; set; }
+    public int? OperationTimeoutSeconds { get; set; }
+    public RuntimeFlagSourceProtocol FlagSource { get; set; }
+    public RuntimeEgressPolicyProtocol EgressPolicy { get; set; }
+    public IReadOnlyList<RuntimeUrlBindingContract> UrlBindings { get; set; } = [];
+    public ContainerChallengeRuntimeContract? Container { get; set; }
+    public ComposeChallengeRuntimeContract? Compose { get; set; }
+    public OvaChallengeRuntimeContract? Ova { get; set; }
+}
+
+public sealed class ContainerChallengeRuntimeContract
+{
+    public required string Image { get; set; }
+    public required IReadOnlyList<string> Command { get; set; }
+    public required IReadOnlyDictionary<string, string> Environment { get; set; }
+    public required IReadOnlyDictionary<string, string> Labels { get; set; }
+    public required IReadOnlyList<RuntimePortMappingContract> PortMappings { get; set; }
+    public required ContainerSecurityContract Security { get; set; }
+    public required string? FlagEnvironmentVariableName { get; set; }
+    public required IReadOnlyList<int> InternalPorts { get; set; }
+}
+
+public sealed class ComposeChallengeRuntimeContract
+{
+    public required string ComposeYaml { get; set; }
+    public required IReadOnlyDictionary<string, string> Environment { get; set; }
+    public required IReadOnlyDictionary<string, string> Labels { get; set; }
+    public required IReadOnlyDictionary<string, string> FlagEnvironmentVariables { get; set; }
+    public required IReadOnlyList<ComposeServiceResourceContract> ServiceResources { get; set; }
+}
+
+public sealed class OvaChallengeRuntimeContract
+{
+    public required string SourceUrl { get; set; }
+    public required string Sha256 { get; set; }
+}
+
+public sealed record RunnerJobContract(
+    string Image,
+    IReadOnlyList<string> Command,
+    IReadOnlyDictionary<string, string> Environment,
+    int TimeoutSeconds,
+    string? TargetServiceName);
+public sealed record FlagInjectionContract(string Command, int TimeoutSeconds, string? ServiceName);
+
+public sealed class ChallengeDefinitionContract
+{
+    public required GameModeProtocol Mode { get; set; }
+    public FlagTemplateContract? FlagTemplate { get; set; }
+    public ChallengeRuntimeContract? Runtime { get; set; }
+    public RunnerJobContract? Checker { get; set; }
+    public string? PatchEntrypoint { get; set; }
+    public IReadOnlyList<string> PatchCommand { get; set; } = [];
+    public int? PatchTimeoutSeconds { get; set; }
+    public int? ReadyTimeoutSeconds { get; set; }
+    public long? MaximumPatchUploadBytes { get; set; }
+    public bool CheckerFixInput { get; set; }
+    public bool CheckerAllowRoot { get; set; }
+    public CtfChallengeDefinitionContract? Ctf { get; set; }
+    public AwdChallengeDefinitionContract? Awd { get; set; }
+    public AwdpChallengeDefinitionContract? Awdp { get; set; }
+    public KohChallengeDefinitionContract? Koh { get; set; }
+}
+
+public sealed class CtfChallengeDefinitionContract
+{
+    public required NoCTF.API.Endpoints.Challenges.CtfInteractionKindProtocol InteractionKind { get; set; }
+}
+public sealed class AwdChallengeDefinitionContract
+{
+    public required FlagInjectionContract? FlagInjection { get; set; }
+}
+public sealed class AwdpChallengeDefinitionContract;
+public sealed class KohChallengeDefinitionContract;
+
 public sealed class CreateChallengeTemplateRequest
 {
     public Guid? Id { get; set; }
@@ -40,7 +154,7 @@ public sealed class CreateChallengeTemplateRequest
     public string Title { get; set; } = string.Empty;
     public string? Description { get; set; }
     public string Direction { get; set; } = string.Empty;
-    public string DefinitionJson { get; set; } = string.Empty;
+    public required ChallengeDefinitionContract Definition { get; set; }
 }
 
 public sealed record ChallengeTemplateResponse(
@@ -52,7 +166,7 @@ public sealed record ChallengeTemplateResponse(
     string Title,
     string? Description,
     string Direction,
-    string DefinitionJson,
+    ChallengeDefinitionContract Definition,
     DateTimeOffset? DeletedAt,
     int ActiveCompetitionReferenceCount,
     DateTimeOffset CreatedAt,
@@ -137,6 +251,11 @@ public sealed class CreateChallengeTemplateValidator : Validator<CreateChallenge
         RuleFor(request => request.Visibility).IsInEnum();
         RuleFor(request => request.Title).NotEmpty().MaximumLength(160);
         RuleFor(request => request.Direction).NotEmpty().MaximumLength(96);
+        RuleFor(request => request.Definition)
+            .Must((request, definition) =>
+                ChallengeDefinitionContractMapper.HasValidShape(definition)
+                && definition!.Mode == request.Mode)
+            .WithMessage("Definition must contain exactly the branch matching the challenge mode.");
     }
 }
 
@@ -155,13 +274,26 @@ internal static partial class ChallengeTemplateMapper
             request.Title,
             request.Description,
             request.Direction,
-            request.DefinitionJson,
+            ChallengeDefinitionContractMapper.ToDomain(
+                request.Id ?? Guid.Empty,
+                CompetitionProtocolMapper.ToDomain(request.Mode),
+                request.Definition),
             createdAt);
-    public static partial ChallengeTemplateResponse ToResponse(ChallengeTemplateView source);
-    private static partial IReadOnlyList<ChallengeTemplateResponse> ToResponses(
-        IReadOnlyList<ChallengeTemplateView> source);
-    public static ChallengeTemplateListResponse ToListResponse(ChallengeTemplateListPage page) =>
-        new(ToResponses(page.Items).ToArray(), page.Total, page.Directions);
+    public static ChallengeTemplateResponse ToResponse(ChallengeTemplateView source) => new(
+        source.Id,
+        source.OwnerId,
+        source.ManagerIds,
+        ToProtocol(source.Mode),
+        ToProtocol(source.Visibility),
+        source.Title,
+        source.Description,
+        source.Direction,
+        ChallengeDefinitionContractMapper.FromDomain(source.Definition),
+        source.DeletedAt,
+        source.ActiveCompetitionReferenceCount,
+        source.CreatedAt,
+        source.UpdatedAt,
+        ToProtocol(source.InteractionKind));
 
     [MapEnum(EnumMappingStrategy.ByName)]
     public static partial ChallengeVisibility ToDomain(ChallengeVisibilityProtocol value);
@@ -181,6 +313,430 @@ internal static partial class ChallengeTemplateMapper
     [MapEnum(EnumMappingStrategy.ByName)]
     private static partial NoCTF.API.Endpoints.Challenges.CtfInteractionKindProtocol ToProtocol(
         CtfInteractionKind value);
+}
+
+public static class ChallengeDefinitionContractMapper
+{
+    public static bool HasValidShape(ChallengeDefinitionContract? contract)
+    {
+        if (contract is null || !Enum.IsDefined(contract.Mode)
+            || contract.PatchCommand is null
+            || contract.Checker is { Command: null } or { Environment: null } or { Image: null }
+            || contract.FlagTemplate is { Header: null } or { BodyTemplate: null })
+            return false;
+        var count = (contract.Ctf is not null ? 1 : 0)
+            + (contract.Awd is not null ? 1 : 0)
+            + (contract.Awdp is not null ? 1 : 0)
+            + (contract.Koh is not null ? 1 : 0);
+        return count == 1
+            && (contract.Mode switch
+            {
+                GameModeProtocol.Ctf => contract.Ctf is not null,
+                GameModeProtocol.Awd => contract.Awd is not null,
+                GameModeProtocol.Awdp => contract.Awdp is not null,
+                GameModeProtocol.Koh => contract.Koh is not null,
+                _ => false
+            })
+            && (contract.Runtime is null || HasValidRuntimeShape(contract.Runtime));
+    }
+
+    public static bool HasValidRuntimeShape(ChallengeRuntimeContract? contract)
+    {
+        if (contract is null || !Enum.IsDefined(contract.Kind)
+            || contract.Limits is null || contract.UrlBindings is null
+            || contract.UrlBindings.Any(binding => binding is null || binding.UrlTemplate is null))
+            return false;
+        var count = (contract.Container is not null ? 1 : 0)
+            + (contract.Compose is not null ? 1 : 0)
+            + (contract.Ova is not null ? 1 : 0);
+        return count == 1
+            && (contract.Kind switch
+            {
+                ChallengeRuntimeKindProtocol.Container => contract.Container is
+                    { Image: not null, Command: not null, Environment: not null,
+                      Labels: not null, PortMappings: not null, InternalPorts: not null,
+                      Security: { CapDrop: not null, CapAdd: not null } }
+                    && contract.Container.PortMappings.All(item => item is not null),
+                ChallengeRuntimeKindProtocol.Compose => contract.Compose is
+                    { ComposeYaml: not null, Environment: not null, Labels: not null,
+                      FlagEnvironmentVariables: not null, ServiceResources: not null }
+                    && contract.Compose.ServiceResources.All(item =>
+                        item is { ServiceName: not null, Limits: not null }),
+                ChallengeRuntimeKindProtocol.Ova => contract.Ova is
+                    { SourceUrl: not null, Sha256: not null },
+                _ => false
+            });
+    }
+
+    public static ChallengeDefinition ToDomain(
+        Guid challengeId,
+        GameMode expectedMode,
+        ChallengeDefinitionContract contract)
+    {
+        if (!HasValidShape(contract))
+            throw new ArgumentException("Definition mode and branch must match exactly.", nameof(contract));
+        var definition = CreateDomain(challengeId, contract);
+        if (definition.Mode != expectedMode)
+            throw new InvalidOperationException(
+                $"Definition mode {definition.Mode} does not match challenge mode {expectedMode}.");
+        return definition;
+    }
+
+    public static ChallengeDefinitionContract FromDomain(ChallengeDefinition value)
+    {
+        ChallengeDefinitionContract result = value switch
+        {
+            CtfChallengeDefinition ctf => new ChallengeDefinitionContract
+            {
+                Mode = GameModeProtocol.Ctf,
+                Ctf = new CtfChallengeDefinitionContract
+                {
+                    InteractionKind = (NoCTF.API.Endpoints.Challenges.CtfInteractionKindProtocol)ctf.InteractionKind
+                }
+            },
+            AwdChallengeDefinition awd => new ChallengeDefinitionContract
+            {
+                Mode = GameModeProtocol.Awd,
+                Awd = new AwdChallengeDefinitionContract
+                {
+                    FlagInjection = awd.FlagInjectionCommand is null
+                        ? null
+                        : new FlagInjectionContract(
+                            awd.FlagInjectionCommand,
+                            awd.FlagInjectionTimeoutSeconds ?? 30,
+                            awd.FlagInjectionServiceName)
+                }
+            },
+            AwdpChallengeDefinition => new ChallengeDefinitionContract
+            {
+                Mode = GameModeProtocol.Awdp,
+                Awdp = new AwdpChallengeDefinitionContract()
+            },
+            KohChallengeDefinition => new ChallengeDefinitionContract
+            {
+                Mode = GameModeProtocol.Koh,
+                Koh = new KohChallengeDefinitionContract()
+            },
+            _ => throw new InvalidOperationException(
+                $"Unsupported challenge definition {value.GetType().Name}.")
+        };
+        result.Runtime = value.Runtime is null ? null : FromDomain(value.Runtime);
+        result.Checker = value.Checker is null
+            ? null
+            : new RunnerJobContract(
+                value.Checker.Image,
+                Strings(value, ChallengeDefinitionStringKind.CheckerCommand),
+                KeyValues(value, ChallengeDefinitionStringKind.CheckerEnvironment),
+                value.Checker.TimeoutSeconds,
+                value.Checker.TargetServiceName);
+        result.PatchEntrypoint = value.PatchEntrypoint;
+        result.PatchCommand = Strings(value, ChallengeDefinitionStringKind.PatchCommand);
+        result.PatchTimeoutSeconds = value.PatchTimeoutSeconds;
+        result.ReadyTimeoutSeconds = value.ReadyTimeoutSeconds;
+        result.MaximumPatchUploadBytes = value.MaximumPatchUploadBytes;
+        result.CheckerFixInput = value.CheckerFixInput;
+        result.CheckerAllowRoot = value.CheckerAllowRoot;
+        result.FlagTemplate = value.HasFlagTemplate
+            ? new FlagTemplateContract(
+                value.FlagTemplate.Header,
+                value.FlagTemplate.BodyTemplate,
+                value.FlagTemplate.LeetLiteralText)
+            : null;
+        return result;
+    }
+
+    private static ChallengeDefinition CreateDomain(Guid challengeId, ChallengeDefinitionContract value)
+    {
+        ChallengeDefinition result = value.Mode switch
+        {
+            GameModeProtocol.Ctf => new CtfChallengeDefinition
+            {
+                InteractionKind = (CtfInteractionKind)value.Ctf!.InteractionKind
+            },
+            GameModeProtocol.Awd => new AwdChallengeDefinition
+            {
+                FlagInjectionCommand = value.Awd!.FlagInjection?.Command,
+                FlagInjectionTimeoutSeconds = value.Awd.FlagInjection?.TimeoutSeconds,
+                FlagInjectionServiceName = value.Awd.FlagInjection?.ServiceName
+            },
+            GameModeProtocol.Awdp => new AwdpChallengeDefinition(),
+            GameModeProtocol.Koh => new KohChallengeDefinition(),
+            _ => throw new InvalidOperationException(
+                $"Unsupported challenge definition contract {value.GetType().Name}.")
+        };
+        result.ChallengeId = challengeId;
+        result.Runtime = value.Runtime is null ? null : ToDomain(challengeId, value.Runtime);
+        result.PatchEntrypoint = value.PatchEntrypoint;
+        result.PatchTimeoutSeconds = value.PatchTimeoutSeconds;
+        result.ReadyTimeoutSeconds = value.ReadyTimeoutSeconds;
+        result.MaximumPatchUploadBytes = value.MaximumPatchUploadBytes;
+        result.CheckerFixInput = value.CheckerFixInput;
+        result.CheckerAllowRoot = value.CheckerAllowRoot;
+        result.HasFlagTemplate = value.FlagTemplate is not null;
+        if (value.FlagTemplate is not null)
+        {
+            result.FlagTemplate = new FlagTemplateValue
+            {
+                Header = value.FlagTemplate.Header,
+                BodyTemplate = value.FlagTemplate.BodyTemplate,
+                LeetLiteralText = value.FlagTemplate.LeetLiteralText
+            };
+        }
+        result.Checker = value.Checker is null
+            ? null
+            : new ChallengeCheckerDefinition
+            {
+                ChallengeId = challengeId,
+                Image = value.Checker.Image,
+                TimeoutSeconds = value.Checker.TimeoutSeconds,
+                TargetServiceName = value.Checker.TargetServiceName
+            };
+        result.StringItems = value.PatchCommand.Select((item, position) =>
+                new ChallengeDefinitionStringItem
+                {
+                    ChallengeId = challengeId,
+                    Kind = ChallengeDefinitionStringKind.PatchCommand,
+                    Position = position,
+                    Value = item
+                })
+            .Concat((value.Checker?.Command ?? []).Select((item, position) =>
+                new ChallengeDefinitionStringItem
+                {
+                    ChallengeId = challengeId,
+                    Kind = ChallengeDefinitionStringKind.CheckerCommand,
+                    Position = position,
+                    Value = item
+                }))
+            .Concat((value.Checker?.Environment ?? new Dictionary<string, string>())
+                .OrderBy(item => item.Key, StringComparer.Ordinal)
+                .Select((item, position) => new ChallengeDefinitionStringItem
+                {
+                    ChallengeId = challengeId,
+                    Kind = ChallengeDefinitionStringKind.CheckerEnvironment,
+                    Position = position,
+                    Key = item.Key,
+                    Value = item.Value
+                }))
+            .ToList();
+        return result;
+    }
+
+    private static ChallengeRuntimeContract FromDomain(ChallengeRuntimeTemplateEntity value)
+    {
+        ChallengeRuntimeContract result = value switch
+        {
+            ContainerChallengeRuntimeTemplate container => new ChallengeRuntimeContract
+            {
+                Kind = ChallengeRuntimeKindProtocol.Container,
+                Container = new ContainerChallengeRuntimeContract
+                {
+                    Image = container.Image,
+                    Command = container.CommandItems.OrderBy(item => item.Position)
+                        .Select(item => item.Value).ToArray(),
+                    Environment = RuntimeValues(container, ChallengeRuntimeKeyValueKind.Environment),
+                    Labels = RuntimeValues(container, ChallengeRuntimeKeyValueKind.Label),
+                    PortMappings = container.PortMappings.Select(item =>
+                        new RuntimePortMappingContract(item.ContainerPort, item.HostPort)).ToArray(),
+                    Security = new ContainerSecurityContract(
+                        container.Security.NoNewPrivileges,
+                        container.Security.ReadonlyRootfs,
+                        container.Security.RunAsNonRoot,
+                        container.Capabilities.Where(item => !item.Add).Select(item => item.Name).ToArray(),
+                        container.Capabilities.Where(item => item.Add).Select(item => item.Name).ToArray()),
+                    FlagEnvironmentVariableName = container.FlagEnvironmentVariableName,
+                    InternalPorts = container.InternalPorts.Select(item => item.Port).ToArray()
+                }
+            },
+            ComposeChallengeRuntimeTemplate compose => new ChallengeRuntimeContract
+            {
+                Kind = ChallengeRuntimeKindProtocol.Compose,
+                Compose = new ComposeChallengeRuntimeContract
+                {
+                    ComposeYaml = compose.ComposeYaml,
+                    Environment = RuntimeValues(compose, ChallengeRuntimeKeyValueKind.Environment),
+                    Labels = RuntimeValues(compose, ChallengeRuntimeKeyValueKind.Label),
+                    FlagEnvironmentVariables = RuntimeValues(
+                        compose, ChallengeRuntimeKeyValueKind.FlagEnvironmentVariable),
+                    ServiceResources = compose.ServiceResources.Select(item =>
+                        new ComposeServiceResourceContract(
+                            item.ServiceName,
+                            new RuntimeResourceLimitsContract(
+                                item.Limits.MemoryBytes,
+                                item.Limits.NanoCpus,
+                                item.Limits.PidsLimit))).ToArray()
+                }
+            },
+            OvaChallengeRuntimeTemplate ova => new ChallengeRuntimeContract
+            {
+                Kind = ChallengeRuntimeKindProtocol.Ova,
+                Ova = new OvaChallengeRuntimeContract
+                {
+                    SourceUrl = ova.OvaSourceUrl,
+                    Sha256 = ova.Sha256
+                }
+            },
+            _ => throw new InvalidOperationException(
+                $"Unsupported challenge Runtime {value.GetType().Name}.")
+        };
+        result.Allocation = (RuntimeAllocationProtocol)value.Allocation;
+        result.Limits = new RuntimeResourceLimitsContract(
+            value.Limits.MemoryBytes, value.Limits.NanoCpus, value.Limits.PidsLimit);
+        result.TtlSeconds = value.TtlSeconds;
+        result.OperationTimeoutSeconds = value.OperationTimeoutSeconds;
+        result.FlagSource = (RuntimeFlagSourceProtocol)value.FlagSource;
+        result.EgressPolicy = (RuntimeEgressPolicyProtocol)value.EgressPolicy;
+        result.UrlBindings = value.UrlBindings.OrderBy(item => item.Position).Select(item =>
+            new RuntimeUrlBindingContract(
+                item.UrlTemplate,
+                (RuntimeExposureProtocol)item.Exposure,
+                item.ContainerPort,
+                item.ServiceName,
+                item.VmId,
+                item.GuestPort,
+                item.IsControlCheck)).ToArray();
+        return result;
+    }
+
+    private static ChallengeRuntimeTemplateEntity ToDomain(
+        Guid challengeId,
+        ChallengeRuntimeContract value)
+    {
+        if (!HasValidRuntimeShape(value))
+            throw new ArgumentException("Runtime kind and branch must match exactly.", nameof(value));
+        ChallengeRuntimeTemplateEntity result = value.Kind switch
+        {
+            ChallengeRuntimeKindProtocol.Container => new ContainerChallengeRuntimeTemplate
+            {
+                Image = value.Container!.Image,
+                CommandItems = value.Container.Command.Select((item, position) =>
+                    new ChallengeRuntimeCommandItem
+                    {
+                        ChallengeId = challengeId,
+                        Position = position,
+                        Value = item
+                    }).ToList(),
+                KeyValues = RuntimeValues(challengeId, value.Container.Environment,
+                        ChallengeRuntimeKeyValueKind.Environment)
+                    .Concat(RuntimeValues(challengeId, value.Container.Labels,
+                        ChallengeRuntimeKeyValueKind.Label)).ToList(),
+                PortMappings = value.Container.PortMappings.Select(item =>
+                    new ChallengeRuntimePortMapping
+                    {
+                        ChallengeId = challengeId,
+                        ContainerPort = item.ContainerPort,
+                        HostPort = item.HostPort
+                    }).ToList(),
+                Security = new ContainerSecurityPolicyValue
+                {
+                    NoNewPrivileges = value.Container.Security.NoNewPrivileges,
+                    ReadonlyRootfs = value.Container.Security.ReadonlyRootfs,
+                    RunAsNonRoot = value.Container.Security.RunAsNonRoot
+                },
+                Capabilities = value.Container.Security.CapDrop.Select(name =>
+                        new ChallengeRuntimeCapability
+                        {
+                            ChallengeId = challengeId,
+                            Add = false,
+                            Name = name
+                        })
+                    .Concat(value.Container.Security.CapAdd.Select(name =>
+                        new ChallengeRuntimeCapability
+                        {
+                            ChallengeId = challengeId,
+                            Add = true,
+                            Name = name
+                        })).ToList(),
+                FlagEnvironmentVariableName = value.Container.FlagEnvironmentVariableName,
+                InternalPorts = value.Container.InternalPorts.Select(port =>
+                    new ChallengeRuntimeInternalPort
+                    {
+                        ChallengeId = challengeId,
+                        Port = port
+                    }).ToList()
+            },
+            ChallengeRuntimeKindProtocol.Compose => new ComposeChallengeRuntimeTemplate
+            {
+                ComposeYaml = value.Compose!.ComposeYaml,
+                KeyValues = RuntimeValues(challengeId, value.Compose.Environment,
+                        ChallengeRuntimeKeyValueKind.Environment)
+                    .Concat(RuntimeValues(challengeId, value.Compose.Labels,
+                        ChallengeRuntimeKeyValueKind.Label))
+                    .Concat(RuntimeValues(challengeId, value.Compose.FlagEnvironmentVariables,
+                        ChallengeRuntimeKeyValueKind.FlagEnvironmentVariable)).ToList(),
+                ServiceResources = value.Compose.ServiceResources.Select(item =>
+                    new ComposeServiceResource
+                    {
+                        ChallengeId = challengeId,
+                        ServiceName = item.ServiceName,
+                        Limits = new RuntimeResourceLimitsValue
+                        {
+                            MemoryBytes = item.Limits.MemoryBytes,
+                            NanoCpus = item.Limits.NanoCpus,
+                            PidsLimit = item.Limits.PidsLimit
+                        }
+                    }).ToList()
+            },
+            ChallengeRuntimeKindProtocol.Ova => new OvaChallengeRuntimeTemplate
+            {
+                OvaSourceUrl = value.Ova!.SourceUrl,
+                Sha256 = value.Ova.Sha256
+            },
+            _ => throw new InvalidOperationException(
+                $"Unsupported challenge Runtime contract {value.GetType().Name}.")
+        };
+        result.ChallengeId = challengeId;
+        result.Allocation = (PersistedRuntimeAllocation)value.Allocation;
+        result.Limits = new RuntimeResourceLimitsValue
+        {
+            MemoryBytes = value.Limits.MemoryBytes,
+            NanoCpus = value.Limits.NanoCpus,
+            PidsLimit = value.Limits.PidsLimit
+        };
+        result.HasExplicitLimits = true;
+        result.TtlSeconds = value.TtlSeconds;
+        result.OperationTimeoutSeconds = value.OperationTimeoutSeconds;
+        result.FlagSource = (PersistedRuntimeFlagSource)value.FlagSource;
+        result.EgressPolicy = (PersistedRuntimeEgressPolicy)value.EgressPolicy;
+        result.UrlBindings = value.UrlBindings.Select((item, position) =>
+            new ChallengeRuntimeUrlBinding
+            {
+                ChallengeId = challengeId,
+                Position = position,
+                IsControlCheck = item.IsControlCheck,
+                UrlTemplate = item.UrlTemplate,
+                Exposure = (PersistedRuntimeExposure)item.Exposure,
+                ContainerPort = item.ContainerPort,
+                ServiceName = item.ServiceName,
+                VmId = item.VmId,
+                GuestPort = item.GuestPort
+            }).ToList();
+        return result;
+    }
+
+    private static string[] Strings(ChallengeDefinition value, ChallengeDefinitionStringKind kind) =>
+        value.StringItems.Where(item => item.Kind == kind).OrderBy(item => item.Position)
+            .Select(item => item.Value).ToArray();
+    private static IReadOnlyDictionary<string, string> KeyValues(
+        ChallengeDefinition value,
+        ChallengeDefinitionStringKind kind) =>
+        value.StringItems.Where(item => item.Kind == kind)
+            .ToDictionary(item => item.Key!, item => item.Value, StringComparer.Ordinal);
+    private static IReadOnlyDictionary<string, string> RuntimeValues(
+        ChallengeRuntimeTemplateEntity value,
+        ChallengeRuntimeKeyValueKind kind) =>
+        value.KeyValues.Where(item => item.Kind == kind)
+            .ToDictionary(item => item.Key, item => item.Value, StringComparer.Ordinal);
+    private static IEnumerable<ChallengeRuntimeKeyValue> RuntimeValues(
+        Guid challengeId,
+        IReadOnlyDictionary<string, string> values,
+        ChallengeRuntimeKeyValueKind kind) => values.OrderBy(item => item.Key, StringComparer.Ordinal)
+            .Select(item => new ChallengeRuntimeKeyValue
+            {
+                ChallengeId = challengeId,
+                Kind = kind,
+                Key = item.Key,
+                Value = item.Value
+            });
 }
 
 public sealed class CreateChallengeTemplateEndpoint(

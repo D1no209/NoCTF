@@ -37,16 +37,20 @@ public sealed class ScoreboardTrendFactReaderPersistenceTests
             var competitionChallengeId = Guid.CreateVersion7();
             var requestedTeamId = Guid.CreateVersion7();
             var otherTeamId = Guid.CreateVersion7();
+            var requestedCaptainId = Guid.CreateVersion7();
+            var otherCaptainId = Guid.CreateVersion7();
             await using var db = new NoCtfDbContext(options);
             await db.Database.EnsureCreatedAsync(cancellationToken);
-            db.Users.Add(User(ownerId, now));
-            db.Competitions.Add(new Competition
+            db.Users.AddRange(
+                User(ownerId, "trend-owner", now),
+                User(requestedCaptainId, "requested-captain", now),
+                User(otherCaptainId, "other-captain", now));
+            db.Competitions.Add(new CtfCompetition
             {
                 Id = competitionId,
                 OwnerId = ownerId,
                 Title = "Trend test",
-                Mode = GameMode.Ctf,
-                ConfigurationJson = """{"schemaVersion":2}""",
+                ModeConfiguration = TestConfigurations.Competition(GameMode.Ctf),
                 FlagDerivationSecret = new byte[32],
                 StartAt = now.AddHours(-1),
                 EndAt = now.AddHours(1),
@@ -54,42 +58,40 @@ public sealed class ScoreboardTrendFactReaderPersistenceTests
                 CreatedAt = now,
                 UpdatedAt = now
             });
-            db.Challenges.Add(new Challenge
+            db.Challenges.Add(new CtfChallenge
             {
                 Id = challengeId,
                 OwnerId = ownerId,
-                Mode = GameMode.Ctf,
                 Visibility = ChallengeVisibility.Private,
                 Title = "Trend challenge",
                 Direction = "PWN",
-                DefinitionJson = """{"schemaVersion":2}""",
+                Definition = TestConfigurations.Definition(GameMode.Ctf),
                 CreatedAt = now,
                 UpdatedAt = now
             });
-            db.CompetitionChallenges.Add(new CompetitionChallenge
+            db.CompetitionChallenges.Add(new CtfCompetitionChallenge
             {
                 Id = competitionChallengeId,
                 CompetitionId = competitionId,
                 ChallengeId = challengeId,
                 IsPublished = true,
-                RulesJson = """{"schemaVersion":2}""",
+                Rules = TestConfigurations.Rules(GameMode.Ctf),
                 UpdatedAt = now
             });
             db.Teams.AddRange(
-                Team(requestedTeamId, competitionId, ownerId, "Requested", now),
-                Team(otherTeamId, competitionId, ownerId, "Other", now));
+                Team(requestedTeamId, competitionId, requestedCaptainId, "Requested", now),
+                Team(otherTeamId, competitionId, otherCaptainId, "Other", now));
             db.GameplayFacts.AddRange(
                 Adjustment(competitionId, competitionChallengeId, requestedTeamId, ownerId, now, "25"),
                 Adjustment(competitionId, competitionChallengeId, otherTeamId, ownerId, now, "40"),
                 Adjustment(competitionId, competitionChallengeId, requestedTeamId, ownerId, now.AddHours(1), "50"),
-                new GameplayFact
+                new ManualAdjustmentGameplayFact
                 {
                     Id = Guid.CreateVersion7(),
                     CompetitionId = competitionId,
                     CompetitionChallengeId = competitionChallengeId,
                     TeamId = requestedTeamId,
                     ActorUserId = ownerId,
-                    Kind = GameplayFactKind.ManualAdjustment,
                     OccurredAt = now.AddMinutes(-1),
                     Value = "10",
                     State = GameplayFactState.Queued,
@@ -109,12 +111,12 @@ public sealed class ScoreboardTrendFactReaderPersistenceTests
         });
     }
 
-    private static User User(Guid id, DateTimeOffset now) => new()
+    private static User User(Guid id, string name, DateTimeOffset now) => new()
     {
         Id = id,
-        UserName = "trend-owner",
-        NormalizedUserName = "TREND-OWNER",
-        Email = "trend-owner@example.test",
+        UserName = name,
+        NormalizedUserName = name.ToUpperInvariant(),
+        Email = $"{name}@example.test",
         PasswordHash = "test",
         Kind = UserKind.Human,
         Role = UserRole.Organizer,
@@ -146,14 +148,13 @@ public sealed class ScoreboardTrendFactReaderPersistenceTests
         Guid teamId,
         Guid actorId,
         DateTimeOffset occurredAt,
-        string value) => new()
+        string value) => new ManualAdjustmentGameplayFact
         {
             Id = Guid.CreateVersion7(),
             CompetitionId = competitionId,
             CompetitionChallengeId = competitionChallengeId,
             TeamId = teamId,
             ActorUserId = actorId,
-            Kind = GameplayFactKind.ManualAdjustment,
             OccurredAt = occurredAt,
             Value = value,
             State = GameplayFactState.Completed,

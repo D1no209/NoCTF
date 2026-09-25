@@ -55,14 +55,13 @@ public sealed class CompetitionQuestionPersistenceTests
                     Human(managerId, "thread-manager", UserRole.Organizer, now),
                     Human(askerId, "thread-asker", UserRole.User, now),
                     Human(otherParticipantId, "thread-outsider", UserRole.User, now));
-                setup.Competitions.Add(new Competition
+                setup.Competitions.Add(new CtfCompetition
                 {
                     Id = competitionId,
                     OwnerId = ownerId,
                     ManagerIds = [managerId],
                     Title = "Question thread competition",
-                    Mode = GameMode.Ctf,
-                    ConfigurationJson = """{"schemaVersion":1}""",
+                    ModeConfiguration = TestConfigurations.Competition(GameMode.Ctf),
                     FlagDerivationSecret = new byte[32],
                     StartAt = now.AddMinutes(-10),
                     EndAt = now.AddHours(1),
@@ -214,7 +213,7 @@ public sealed class CompetitionQuestionPersistenceTests
                     Human(ids.AskerId, "question-asker", UserRole.User, now),
                     Human(ids.OtherParticipantId, "other-participant", UserRole.User, now),
                     Bot(ids.BotId, now));
-                setup.Competitions.Add(new Competition
+                setup.Competitions.Add(new CtfCompetition
                 {
                     Id = ids.CompetitionId,
                     OwnerId = ids.OwnerId,
@@ -222,8 +221,7 @@ public sealed class CompetitionQuestionPersistenceTests
                     JudgeIds = [ids.JudgeId],
                     ObserverIds = [ids.ObserverId],
                     Title = "Question competition",
-                    Mode = GameMode.Ctf,
-                    ConfigurationJson = """{"schemaVersion":1}""",
+                    ModeConfiguration = TestConfigurations.Competition(GameMode.Ctf),
                     FlagDerivationSecret = new byte[32],
                     StartAt = now.AddMinutes(-10),
                     EndAt = now.AddHours(1),
@@ -231,27 +229,26 @@ public sealed class CompetitionQuestionPersistenceTests
                     CreatedAt = now,
                     UpdatedAt = now
                 });
-                setup.Challenges.Add(new Challenge
+                setup.Challenges.Add(new CtfChallenge
                 {
                     Id = ids.ChallengeId,
                     OwnerId = ids.AuthorId,
                     ManagerIds = [ids.AuthorManagerId],
-                    Mode = GameMode.Ctf,
                     Visibility = ChallengeVisibility.Private,
                     Title = "Question template",
                     Direction = "Web",
-                    DefinitionJson = """{"schemaVersion":1}""",
+                    Definition = TestConfigurations.Definition(GameMode.Ctf),
                     CreatedAt = now,
                     UpdatedAt = now
                 });
-                setup.CompetitionChallenges.Add(new CompetitionChallenge
+                setup.CompetitionChallenges.Add(new CtfCompetitionChallenge
                 {
                     Id = ids.CompetitionChallengeId,
                     CompetitionId = ids.CompetitionId,
                     ChallengeId = ids.ChallengeId,
                     Order = 1,
                     IsPublished = true,
-                    RulesJson = """{"schemaVersion":1}""",
+                    Rules = TestConfigurations.Rules(GameMode.Ctf),
                     UpdatedAt = now
                 });
                 var otherTeam = ApprovedTeam(
@@ -415,12 +412,12 @@ public sealed class CompetitionQuestionPersistenceTests
                 notification.Kind == NotificationKind.QuestionOpened
                     && notification.TargetType == NotificationTargetType.User, ct))
                 .IsEqualTo(opened.RecipientUserIds.Length);
-            var notificationPayloads = await db.Notifications.AsNoTracking()
+            var notificationBodies = await db.Notifications.AsNoTracking()
                 .Where(notification => notification.TargetType == NotificationTargetType.User)
-                .Select(notification => notification.ContentJson)
+                .Select(notification => notification.Body)
                 .ToArrayAsync(ct);
-            await Assert.That(notificationPayloads.All(payload =>
-                !payload.Contains("health check", StringComparison.Ordinal))).IsTrue();
+            await Assert.That(notificationBodies.All(body =>
+                body is null || !body.Contains("health check", StringComparison.Ordinal))).IsTrue();
 
             var permanentEvents = await db.CompetitionEvents.AsNoTracking()
                 .Where(@event => @event.CompetitionId == ids.CompetitionId)
@@ -433,8 +430,8 @@ public sealed class CompetitionQuestionPersistenceTests
                 .Contains(CompetitionEventKind.QuestionStatusChanged);
             await Assert.That(permanentEvents.All(@event =>
                 @event.Visibility == CompetitionEventVisibility.Staff
-                && !@event.PayloadJson.Contains("health check", StringComparison.Ordinal)
-                && !@event.PayloadJson.Contains("runtime reset", StringComparison.Ordinal)))
+                && !(@event.Reason ?? string.Empty).Contains("health check", StringComparison.Ordinal)
+                && !(@event.Reason ?? string.Empty).Contains("runtime reset", StringComparison.Ordinal)))
                 .IsTrue();
         });
     }
@@ -492,7 +489,7 @@ public sealed class CompetitionQuestionPersistenceTests
             RegisteredAt = now
         };
 
-    private sealed class RecordingOutbox : ITransactionalMessageOutbox
+    private sealed class RecordingOutbox : IPostCommitMessagePublisher
     {
         public List<object> Messages { get; } = [];
         public ValueTask PublishAsync<T>(T message)

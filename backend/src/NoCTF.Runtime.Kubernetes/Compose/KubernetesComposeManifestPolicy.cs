@@ -140,7 +140,7 @@ public static class KubernetesComposeManifestPolicy
             {
                 AllowPrivilegeEscalation = false,
                 Privileged = false,
-                Capabilities = new V1Capabilities { Drop = ["ALL"], Add = [] },
+                Capabilities = new V1Capabilities { Drop = [], Add = [] },
                 SeccompProfile = new V1SeccompProfile { Type = "RuntimeDefault" }
             };
             pod.AutomountServiceAccountToken = false;

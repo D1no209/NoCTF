@@ -13,15 +13,15 @@ namespace NoCTF.Infrastructure.Competitions.Management;
 
 public sealed class CompetitionManagementStore(
     NoCtfDbContext db,
-    ITransactionalMessageOutbox? messageOutbox = null,
+    IPostCommitMessagePublisher? messageOutbox = null,
     ICompetitionEventRecorder? eventRecorder = null,
     CompetitionReadModelCache? readModels = null,
     AggregatePatchPostCommitActions? postCommitActions = null) : ICompetitionManagementStore
 {
     private readonly ICompetitionEventRecorder events =
         eventRecorder ?? NullCompetitionEventRecorder.Instance;
-    private readonly ITransactionalMessageOutbox outbox =
-        messageOutbox ?? new NoOpTransactionalMessageOutbox();
+    private readonly IPostCommitMessagePublisher outbox =
+        messageOutbox ?? new NoOpPostCommitMessagePublisher();
 
     public async Task<CompetitionCreationResult> CreateAsync(
         CreateCompetitionCommand command,
@@ -46,38 +46,42 @@ public sealed class CompetitionManagementStore(
         }
 
         var id = Guid.CreateVersion7(command.CreatedAt);
-        var competition = new Competition
-        {
-            Id = id,
-            Title = command.Title.Trim(),
-            Description = command.Description?.Trim(),
-            OwnerId = command.OwnerId,
-            AccessMode = command.AccessMode,
-            Mode = command.Mode,
-            StartAt = command.StartTime,
-            EndAt = command.EndTime,
-            Status = CompetitionStatus.Draft,
-            TeamRegistrationAutoApprove = command.TeamRegistrationAutoApprove,
-            AllowTeamRegistrationWhileRunning = command.AllowTeamRegistrationWhileRunning,
-            MaxTeamMembers = command.MaxTeamMembers,
-            MaxConcurrentRuntimeInstancesPerTeam = command.MaxConcurrentRuntimeInstancesPerTeam,
-            RuntimeAccessMode = command.RuntimeAccessMode,
-            TrafficCaptureEnabled = command.TrafficCaptureEnabled,
-            TrafficCaptureLimitBytes = command.TrafficCaptureLimitBytes,
-            MaxActiveQuestionsPerTeam = command.MaxActiveQuestionsPerTeam,
-            MaxParticipantMessagesBeforeHandlerReply =
-                command.MaxParticipantMessagesBeforeHandlerReply,
-            AllowChallengeOwnersToHandleQuestions =
-                command.AllowChallengeOwnersToHandleQuestions,
-            PracticeModeEnabled = command.PracticeModeEnabled,
-            TracksEnabled = command.TracksEnabled,
-            CreatedAt = command.CreatedAt,
-            UpdatedAt = command.CreatedAt,
-            ConfigurationJson = GameModeDefaultConfiguration.GetCompetitionJson(command.Mode),
-            TrackConfigurationJson = CompetitionTrackConfiguration.Serialize(
-                CompetitionTrackConfiguration.DefaultFor(command.Mode)),
-            FlagDerivationSecret = System.Security.Cryptography.RandomNumberGenerator.GetBytes(32)
-        };
+        var competition = CompetitionGeneratedCatalog.Create(command.Mode);
+        competition.Id = id;
+        competition.Title = command.Title.Trim();
+        competition.Description = command.Description?.Trim();
+        competition.OwnerId = command.OwnerId;
+        competition.AccessMode = command.AccessMode;
+        competition.StartAt = command.StartTime;
+        competition.EndAt = command.EndTime;
+        competition.Status = CompetitionStatus.Draft;
+        competition.TeamRegistrationAutoApprove = command.TeamRegistrationAutoApprove;
+        competition.AllowTeamRegistrationWhileRunning = command.AllowTeamRegistrationWhileRunning;
+        competition.MaxTeamMembers = command.MaxTeamMembers;
+        competition.MaxConcurrentRuntimeInstancesPerTeam = command.MaxConcurrentRuntimeInstancesPerTeam;
+        competition.RuntimeAccessMode = command.RuntimeAccessMode;
+        competition.TrafficCaptureEnabled = command.TrafficCaptureEnabled;
+        competition.TrafficCaptureLimitBytes = command.TrafficCaptureLimitBytes;
+        competition.MaxActiveQuestionsPerTeam = command.MaxActiveQuestionsPerTeam;
+        competition.MaxParticipantMessagesBeforeHandlerReply =
+            command.MaxParticipantMessagesBeforeHandlerReply;
+        competition.AllowChallengeOwnersToHandleQuestions =
+            command.AllowChallengeOwnersToHandleQuestions;
+        competition.PracticeModeEnabled = command.PracticeModeEnabled;
+        competition.TracksEnabled = command.TracksEnabled;
+        competition.CreatedAt = command.CreatedAt;
+        competition.UpdatedAt = command.CreatedAt;
+        competition.ModeConfiguration = CompetitionModeConfigurationDefaults.Create(
+            command.Mode,
+            id);
+        competition.Tracks = CompetitionTrackConfiguration.DefaultFor(command.Mode).Tracks
+            .Select((track, position) => track with
+            {
+                CompetitionId = id,
+                Position = position
+            }).ToList();
+        competition.FlagDerivationSecret =
+            System.Security.Cryptography.RandomNumberGenerator.GetBytes(32);
         db.Competitions.Add(competition);
         await events.RecordAsync(new(
             competition.Id,
@@ -91,7 +95,7 @@ public sealed class CompetitionManagementStore(
         await db.SaveChangesAsync(ct);
         await transaction.CommitAsync(ct);
         await InvalidateReadModelsAsync(competition.Id, CancellationToken.None);
-        await outbox.FlushOutgoingMessagesAsync();
+        await transaction.FlushMessagesAsync(outbox);
         return new(CompetitionCreationState.Created, Map(competition));
     }
 
@@ -120,8 +124,8 @@ public sealed class CompetitionManagementStore(
         CancellationToken ct)
     {
         await using var transaction = await AggregateCompatibleTransaction.BeginAsync(db, ct);
-        await db.Database.ExecuteSqlInterpolatedAsync(
-            $"SELECT 1 FROM competitions WHERE id = {command.CompetitionId} FOR UPDATE",
+        _ = await db.Competitions.AsNoTracking().AnyAsync(
+            competition => competition.Id == command.CompetitionId,
             ct);
         var competition = await db.Competitions
             .SingleOrDefaultAsync(x => x.Id == command.CompetitionId
@@ -188,7 +192,7 @@ public sealed class CompetitionManagementStore(
         await db.SaveChangesAsync(ct);
         await transaction.CommitAsync(ct);
         await InvalidateReadModelsAsync(competition.Id, CancellationToken.None);
-        await outbox.FlushOutgoingMessagesAsync();
+        await transaction.FlushMessagesAsync(outbox);
         return Map(competition);
     }
 
@@ -222,7 +226,7 @@ public sealed class CompetitionManagementStore(
         await db.SaveChangesAsync(ct);
         await transaction.CommitAsync(ct);
         await InvalidateReadModelsAsync(competition.Id, CancellationToken.None);
-        await outbox.FlushOutgoingMessagesAsync();
+        await transaction.FlushMessagesAsync(outbox);
         return true;
     }
 

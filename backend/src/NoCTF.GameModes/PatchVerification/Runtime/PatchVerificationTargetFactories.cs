@@ -22,19 +22,22 @@ public static class PatchVerificationTargetRuntimeFactory
             throw new InvalidOperationException(
                 "Patch verification targets require a Docker or Kubernetes Container runtime.");
         }
-        return new RuntimeInstance
+        RuntimeInstance runtime = purpose switch
         {
-            Id = runtimeInstanceId,
-            CompetitionId = competitionId,
-            CompetitionChallengeId = competitionChallengeId,
-            TeamId = teamId,
-            Purpose = purpose,
-            GameplayFactId = gameplayFactId,
-            RuntimeKind = RuntimeKind.Container,
-            RuntimeProvider = placement.Provider,
-            State = RuntimeState.Queued,
-            CreatedAt = now
+            RuntimePurpose.AwdpTarget => new AwdpTargetRuntimeInstance(),
+            RuntimePurpose.PatchVerificationTarget => new PatchVerificationTargetRuntimeInstance(),
+            _ => throw new ArgumentOutOfRangeException(nameof(purpose), purpose, null)
         };
+        runtime.Id = runtimeInstanceId;
+        runtime.CompetitionId = competitionId;
+        runtime.CompetitionChallengeId = competitionChallengeId;
+        runtime.TeamId = teamId;
+        runtime.GameplayFactId = gameplayFactId;
+        runtime.RuntimeKind = RuntimeKind.Container;
+        runtime.RuntimeProvider = placement.Provider;
+        runtime.State = RuntimeState.Queued;
+        runtime.CreatedAt = now;
+        return runtime;
     }
 }
 
@@ -73,10 +76,7 @@ public static class PatchVerificationTargetDefinitionFactory
         labels["noctf.io/job-kind"] = purpose == RuntimePurpose.AwdpTarget
             ? "awdp-verification"
             : "patch-verification";
-        var security = definition.Security
-            ?? throw new InvalidOperationException("Container security is required.");
-        if (security.CapDrop is null || security.CapAdd is null)
-            throw new InvalidOperationException("Container capability lists are required.");
+        var security = definition.Security.NormalizeCapabilities();
         return new ContainerRequest(
             operationId,
             provider,

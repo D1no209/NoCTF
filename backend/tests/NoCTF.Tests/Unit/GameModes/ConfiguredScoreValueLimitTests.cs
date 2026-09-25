@@ -16,7 +16,6 @@ public sealed class ConfiguredScoreValueLimitTests
     public async Task Competition_score_values_accept_the_configured_maximum()
     {
         var ctf = new CtfConfiguration(
-            CtfConfiguration.CurrentSchemaVersion,
             new(Maximum, Maximum, 10),
             [new(BloodRewardPolicy.FixedPoints, Maximum)],
             WrongSubmissionPenalty: Maximum);
@@ -29,7 +28,6 @@ public sealed class ConfiguredScoreValueLimitTests
         };
         var awdp = CreateAwdpCompetition(Maximum);
         var koh = new KohConfiguration(
-            KohConfiguration.CurrentSchemaVersion,
             PollIntervalSeconds: 5,
             ControlPointsPerInterval: Maximum);
 
@@ -43,7 +41,6 @@ public sealed class ConfiguredScoreValueLimitTests
     public async Task Competition_score_values_reject_each_value_above_the_maximum()
     {
         var ctfBase = new CtfConfiguration(
-            CtfConfiguration.CurrentSchemaVersion,
             new(500, 100, 10),
             []);
         foreach (var configuration in new[]
@@ -93,7 +90,6 @@ public sealed class ConfiguredScoreValueLimitTests
         }
 
         await Assert.That(KohConfigurationValidator.Validate(new KohConfiguration(
-                KohConfiguration.CurrentSchemaVersion,
                 PollIntervalSeconds: 5,
                 ControlPointsPerInterval: OverMaximum)))
             .IsNotEmpty();
@@ -103,19 +99,16 @@ public sealed class ConfiguredScoreValueLimitTests
     public async Task Challenge_score_overrides_accept_the_configured_maximum()
     {
         var ctf = new CtfChallengeConfiguration(
-            CtfChallengeConfiguration.CurrentSchemaVersion,
             new((int)Maximum, (int)Maximum, 10),
             [new(BloodRewardPolicy.FixedPoints, Maximum)],
             WrongSubmissionPenalty: Maximum);
         var awd = new AwdChallengeConfiguration(
-            AwdChallengeConfiguration.CurrentSchemaVersion,
             AttackPoints: Maximum,
             VictimDefensePoolPoints: Maximum,
             ServiceHealthyPoints: Maximum,
             ServiceUnhealthyPenalty: Maximum);
         var awdp = CreateAwdpChallenge(Maximum);
         var koh = new KohChallengeConfiguration(
-            KohChallengeConfiguration.CurrentSchemaVersion,
             ControlPointsPerInterval: Maximum);
 
         await Assert.That(CtfConfigurationValidator.Validate(ctf)).IsEmpty();
@@ -128,7 +121,6 @@ public sealed class ConfiguredScoreValueLimitTests
     public async Task Challenge_score_overrides_reject_each_value_above_the_maximum()
     {
         var ctfBase = new CtfChallengeConfiguration(
-            CtfChallengeConfiguration.CurrentSchemaVersion,
             ScoreCurve: null,
             BloodRewards: null);
         foreach (var configuration in new[]
@@ -150,7 +142,7 @@ public sealed class ConfiguredScoreValueLimitTests
         }
 
         var awdBase = new AwdChallengeConfiguration(
-            AwdChallengeConfiguration.CurrentSchemaVersion);
+            );
         foreach (var configuration in new[]
                  {
                      awdBase with { AttackPoints = OverMaximum },
@@ -179,7 +171,6 @@ public sealed class ConfiguredScoreValueLimitTests
         }
 
         await Assert.That(KohConfigurationValidator.Validate(new KohChallengeConfiguration(
-                KohChallengeConfiguration.CurrentSchemaVersion,
                 ControlPointsPerInterval: OverMaximum)))
             .IsNotEmpty();
     }
@@ -197,7 +188,6 @@ public sealed class ConfiguredScoreValueLimitTests
             RoundDurationSeconds = (int)OverMaximum
         };
         var percentageConfiguration = new CtfConfiguration(
-            CtfConfiguration.CurrentSchemaVersion,
             new(500, 100, 10),
             [new(BloodRewardPolicy.CurrentPointsPercentage, 100)]);
 
@@ -207,7 +197,6 @@ public sealed class ConfiguredScoreValueLimitTests
     }
 
     private static AwdpConfiguration CreateAwdpCompetition(long value) => new(
-        AwdpConfiguration.CurrentSchemaVersion,
         RoundDurationSeconds: 300,
         Break: new(value, value, 2, ScoreDecayMode.Fixed),
         Fix: new(value, value, 2, ScoreDecayMode.Fixed),
@@ -219,7 +208,6 @@ public sealed class ConfiguredScoreValueLimitTests
         MaxFixSubmissions: 10);
 
     private static AwdpChallengeConfiguration CreateAwdpChallenge(long value) => new(
-        AwdpChallengeConfiguration.CurrentSchemaVersion,
         Break: new(value, value, 2, ScoreDecayMode.Fixed),
         Fix: new(value, value, 2, ScoreDecayMode.Fixed),
         RequireBreakBeforeFix: null,

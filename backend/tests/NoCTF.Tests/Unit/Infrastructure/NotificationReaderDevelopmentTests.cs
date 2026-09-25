@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Data.Sqlite;
 using NoCTF.Domain.Competitions;
 using NoCTF.Domain.Identity;
 using NoCTF.Domain.Notifications;
@@ -11,10 +12,12 @@ namespace NoCTF.Tests.Unit.Infrastructure;
 public sealed class NotificationReaderDevelopmentTests
 {
     [Test]
-    public async Task InMemory_development_provider_preserves_competition_visibility_and_threads()
+    public async Task Sqlite_development_provider_preserves_competition_visibility_and_threads()
     {
+        await using var connection = new SqliteConnection("Data Source=:memory:");
+        await connection.OpenAsync();
         var options = new DbContextOptionsBuilder<NoCtfDbContext>()
-            .UseInMemoryDatabase(Guid.NewGuid().ToString("N"))
+            .UseSqlite(connection)
             .Options;
         var now = DateTimeOffset.Parse("2026-08-10T01:00:00Z");
         var ownerId = Guid.CreateVersion7(now);
@@ -24,16 +27,16 @@ public sealed class NotificationReaderDevelopmentTests
         var replyId = Guid.CreateVersion7(now.AddMilliseconds(4));
 
         await using var db = new NoCtfDbContext(options);
+        await db.Database.EnsureCreatedAsync();
         db.Users.AddRange(
             User(ownerId, "development-owner", UserRole.Organizer, now),
             User(askerId, "development-asker", UserRole.User, now));
-        db.Competitions.Add(new Competition
+        db.Competitions.Add(new CtfCompetition
         {
             Id = competitionId,
             OwnerId = ownerId,
             Title = "Development notification reader",
-            Mode = GameMode.Ctf,
-            ConfigurationJson = """{"schemaVersion":1}""",
+            ModeConfiguration = TestConfigurations.Competition(GameMode.Ctf),
             FlagDerivationSecret = new byte[32],
             StartAt = now.AddHours(-1),
             EndAt = now.AddHours(1),
@@ -42,27 +45,25 @@ public sealed class NotificationReaderDevelopmentTests
             UpdatedAt = now
         });
         db.Notifications.AddRange(
-            new Notification
+            new CompetitionAnnouncementNotification
             {
                 Id = rootId,
                 SourceType = NotificationSourceType.User,
                 SourceId = askerId,
                 TargetType = NotificationTargetType.CompetitionCollaborators,
                 TargetId = competitionId,
-                Kind = NotificationKind.CompetitionAnnouncement,
-                ContentJson = """{"schemaVersion":1,"title":"announcement"}""",
+                Title = "announcement",
                 RelatedType = EntityReferenceKind.Competition,
                 RelatedId = competitionId,
                 SentAt = now
             },
-            new Notification
+            new MessageNotification
             {
                 Id = replyId,
                 SourceType = NotificationSourceType.System,
                 TargetType = NotificationTargetType.TeamMembers,
                 TargetId = Guid.CreateVersion7(now.AddMilliseconds(4)),
-                Kind = NotificationKind.Message,
-                ContentJson = """{"schemaVersion":1,"body":"follow-up"}""",
+                Body = "follow-up",
                 RelatedType = EntityReferenceKind.Competition,
                 RelatedId = competitionId,
                 ThreadRootId = rootId,

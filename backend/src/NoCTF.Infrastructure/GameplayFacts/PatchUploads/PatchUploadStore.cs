@@ -22,7 +22,7 @@ namespace NoCTF.Infrastructure.GameplayFacts.PatchUploads;
 
 public sealed class PatchUploadStore(
     NoCtfDbContext db,
-    ITransactionalMessageOutbox outbox,
+    IPostCommitMessagePublisher outbox,
     GameplayFactAttemptCriticalSection attemptCriticalSection,
     FileReferenceLock fileLock,
     ILogger<PatchUploadStore> logger,
@@ -39,7 +39,7 @@ public sealed class PatchUploadStore(
                 && (target.Purpose == RuntimePurpose.AwdpTarget
                     || target.Purpose == RuntimePurpose.PatchVerificationTarget))
             .Join(db.Teams.Where(team => team.DeletedAt == null && !team.IsBanned && team.RegistrationStatus == TeamRegistrationStatus.Approved
-                    && team.CompetitionId == competitionId && team.MemberIds.Contains(userId)), target => target.TeamId, team => (Guid?)team.Id,
+                    && team.CompetitionId == competitionId && team.Members.Any(member => member.UserId == userId)), target => target.TeamId, team => (Guid?)team.Id,
                 (target, team) => target.Id).AnyAsync(ct);
 
     public Task<bool> IsTargetUnconsumedAsync(PatchUploadScope scope, CancellationToken ct) =>
@@ -53,13 +53,12 @@ public sealed class PatchUploadStore(
 
     public PatchUploadStore(
         NoCtfDbContext db,
-        ITransactionalMessageOutbox outbox,
+        IPostCommitMessagePublisher outbox,
         ILogger<PatchUploadStore> logger)
         : this(
             db,
             outbox,
-            new GameplayFactAttemptCriticalSection(
-                new AsyncKeyedLock.AsyncKeyedLocker<string>()),
+            new GameplayFactAttemptCriticalSection(),
             new FileReferenceLock(),
             logger,
             null)
@@ -77,7 +76,7 @@ public sealed class PatchUploadStore(
                 && item.DeletedAt == null
                 && !item.IsBanned
                 && item.RegistrationStatus == TeamRegistrationStatus.Approved
-                && item.MemberIds.Contains(userId))
+                && item.Members.Any(member => member.UserId == userId))
             .Select(item => new { item.Id })
             .SingleOrDefaultAsync(ct);
         if (team is null)
@@ -101,13 +100,6 @@ public sealed class PatchUploadStore(
                     || item.competition.Mode == GameMode.Ctf
                     && (item.competition.Status == CompetitionStatus.Running
                         || item.competition.Status == CompetitionStatus.Paused)))
-            .Select(item => new
-            {
-                item.competition.ConfigurationJson,
-                item.competition.Mode,
-                item.challenge.RulesJson,
-                item.template.DefinitionJson
-            })
             .SingleOrDefaultAsync(ct);
         if (available is null)
             return null;
@@ -120,20 +112,20 @@ public sealed class PatchUploadStore(
             ct);
         if (defenseAlreadySucceeded)
             return null;
-        if (available.Mode == GameMode.Ctf
-            && CtfConfigurationParser.ParseDefinition(available.DefinitionJson).InteractionKind
-                != CtfInteractionKind.PatchVerification)
+        if (available.competition.Mode == GameMode.Ctf
+            && available.template.Definition is not CtfChallengeDefinition
+                { InteractionKind: CtfInteractionKind.PatchVerification })
         {
             return null;
         }
         var configuration = PatchVerificationConfigurationResolver.Resolve(
-            available.Mode,
-            available.ConfigurationJson,
-            available.RulesJson,
-            available.DefinitionJson);
+            available.competition.Mode,
+            available.competition.ModeConfiguration!,
+            available.challenge.Rules!,
+            available.template.Definition!);
         if (configuration is null)
             return null;
-        var expectedPurpose = available.Mode == GameMode.Ctf
+        var expectedPurpose = available.competition.Mode == GameMode.Ctf
             ? RuntimePurpose.PatchVerificationTarget
             : RuntimePurpose.AwdpTarget;
         var targetExists = await db.RuntimeInstances.AsNoTracking().AnyAsync(instance =>
@@ -230,13 +222,13 @@ public sealed class PatchUploadStore(
                 db.Challenges.AsNoTracking(),
                 challenge => challenge.ChallengeId,
                 template => template.Id,
-                (challenge, template) => new { challenge.RulesJson, template.DefinitionJson })
+                (challenge, template) => new { Challenge = challenge, Template = template })
             .SingleAsync(ct);
         var configuration = PatchVerificationConfigurationResolver.Resolve(
             admission.Mode,
-            admission.CompetitionConfigurationJson,
-            context.RulesJson,
-            context.DefinitionJson);
+            admission.CompetitionConfiguration,
+            context.Challenge.Rules!,
+            context.Template.Definition!);
         if (configuration is null)
             return new(PatchUploadSaveState.DefenseTargetNotReady);
         if (configuration.MaximumAttempts > 0
@@ -257,7 +249,7 @@ public sealed class PatchUploadStore(
             FileId = fileId,
             UploadedAt = uploadedAt
         });
-        var fact = new GameplayFact
+        var fact = new FixAttemptGameplayFact
         {
             Id = gameplayFactId,
             CompetitionId = scope.CompetitionId,
@@ -265,7 +257,6 @@ public sealed class PatchUploadStore(
             TeamId = scope.TeamId,
             ActorUserId = scope.UserId,
             SourceIpAddress = source?.Address,
-            Kind = GameplayFactKind.FixAttempt,
             ReferenceKind = GameplayFactReferenceKind.PatchUpload,
             ReferenceId = patchUploadId,
             OccurredAt = uploadedAt,
@@ -327,6 +318,15 @@ public sealed class PatchUploadStore(
         }
         catch (DbUpdateException exception) when (!TransactionFailureClassifier.IsRetryable(exception))
         {
+            await transaction.RollbackAsync(ct);
+            outbox.DiscardPendingMessages();
+            db.ChangeTracker.Clear();
+            if (await db.RuntimeInstances.AsNoTracking().AnyAsync(instance =>
+                    instance.Id == scope.RuntimeInstanceId
+                    && instance.GameplayFactId != null, ct)
+                || await db.PatchUploads.AsNoTracking().AnyAsync(upload =>
+                    upload.RuntimeInstanceId == scope.RuntimeInstanceId, ct))
+                return new(PatchUploadSaveState.DefenseTargetConsumed);
             return new(PatchUploadSaveState.ConcurrencyConflict);
         }
     }

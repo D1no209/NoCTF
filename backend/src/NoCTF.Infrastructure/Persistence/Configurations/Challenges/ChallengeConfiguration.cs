@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using NoCTF.Domain.Challenges;
+using NoCTF.Domain.Competitions;
 
 namespace NoCTF.Infrastructure.Persistence.Configurations.Challenges;
 
@@ -10,25 +11,47 @@ internal sealed class ChallengeEntityConfiguration : IEntityTypeConfiguration<Ch
     {
         builder.ToTable("challenges");
         builder.HasKey(challenge => challenge.Id);
+        builder.HasAlternateKey(challenge => new { challenge.Id, challenge.Mode });
         builder.HasQueryFilter(challenge => challenge.DeletedAt == null);
         builder.Property(challenge => challenge.Title).HasMaxLength(160);
+        builder.HasIndex(challenge => challenge.NormalizedTitle);
+        builder.HasIndex(challenge => challenge.NormalizedDirection);
         builder.Property(challenge => challenge.Direction).HasMaxLength(96);
-        builder.Property(challenge => challenge.ManagerIds).HasColumnType("uuid[]");
-        builder.Property(challenge => challenge.Mode).HasConversion<short>();
-        // PostgreSQL jsonb is required for versioned, mode-specific executable definitions.
-        builder.Property(challenge => challenge.DefinitionJson).HasColumnType("jsonb");
+        builder.HasMany(challenge => challenge.Managers)
+            .WithOne()
+            .HasForeignKey(manager => manager.ChallengeId)
+            .OnDelete(DeleteBehavior.Cascade);
+        builder.Navigation(challenge => challenge.Managers).AutoInclude();
+        builder.HasDiscriminator(challenge => challenge.Mode)
+            .HasValue<CtfChallenge>(GameMode.Ctf)
+            .HasValue<AwdChallenge>(GameMode.Awd)
+            .HasValue<AwdpChallenge>(GameMode.Awdp)
+            .HasValue<KohChallenge>(GameMode.Koh);
+        builder.Property(challenge => challenge.Mode)
+            .HasConversion<GameModeStringConverter>()
+            .HasMaxLength(4);
+        builder.HasOne(challenge => challenge.Definition)
+            .WithOne()
+            .HasForeignKey<ChallengeDefinition>(definition => definition.ChallengeId)
+            .OnDelete(DeleteBehavior.Cascade);
+        builder.Navigation(challenge => challenge.Definition).AutoInclude();
         builder.Property(challenge => challenge.Visibility).HasConversion<short>();
-        builder.HasIndex(challenge => challenge.ManagerIds).HasMethod("gin");
         builder.HasOne<NoCTF.Domain.Identity.User>().WithMany()
             .HasForeignKey(challenge => challenge.OwnerId)
             .OnDelete(DeleteBehavior.Restrict);
-        builder.ToTable(table => table.HasCheckConstraint(
-            "ck_challenges_owner_not_manager",
-            "NOT (owner_id = ANY(manager_ids))"));
         builder.HasMany(challenge => challenge.Attachments)
             .WithOne()
             .HasForeignKey(attachment => attachment.ChallengeId)
             .OnDelete(DeleteBehavior.Restrict);
+    }
+}
+
+internal sealed class ChallengeManagerConfiguration : IEntityTypeConfiguration<ChallengeManager>
+{
+    public void Configure(EntityTypeBuilder<ChallengeManager> builder)
+    {
+        builder.ToTable("challenge_managers");
+        builder.HasKey(manager => new { manager.ChallengeId, manager.UserId });
     }
 }
 

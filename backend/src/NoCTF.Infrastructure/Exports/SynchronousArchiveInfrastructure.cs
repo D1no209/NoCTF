@@ -10,6 +10,7 @@ using Microsoft.Extensions.Options;
 using NoCTF.Application.Administration.PlatformLogs;
 using NoCTF.Application.Exports;
 using NoCTF.Domain.Challenges;
+using NoCTF.Domain.Competitions;
 using NoCTF.Domain.Competitions.Events;
 using NoCTF.Domain.Notifications;
 using NoCTF.Domain.Shared;
@@ -48,19 +49,19 @@ internal static class SynchronousArchiveInfrastructure
                     && options.MaxDurationSeconds > 0,
                 "SynchronousExports limits and temporary directory must be configured.")
             .ValidateOnStart();
-        services.AddScoped<ISynchronousArchiveGenerator, PostgresSynchronousArchiveGenerator>();
+        services.AddScoped<ISynchronousArchiveGenerator, SynchronousArchiveGenerator>();
         services.AddScoped<ExportCompetitionArchive>();
         services.AddScoped<ExportPlatformAuditArchive>();
         return services;
     }
 }
 
-public sealed class PostgresSynchronousArchiveGenerator(
+public sealed class SynchronousArchiveGenerator(
     NoCtfDbContext db,
     IPlatformAuditLogStore platformAudits,
     IOptions<SynchronousArchiveOptions> configuredOptions,
     TimeProvider timeProvider,
-    ILogger<PostgresSynchronousArchiveGenerator> log) : ISynchronousArchiveGenerator
+    ILogger<SynchronousArchiveGenerator> log) : ISynchronousArchiveGenerator
 {
     private const string ZipContentType = "application/zip";
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web)
@@ -194,7 +195,9 @@ public sealed class PostgresSynchronousArchiveGenerator(
                 Competition = item,
                 CanExport = command.RequesterIsAdministrator
                     || item.OwnerId == command.RequestedByUserId
-                    || item.ManagerIds.Contains(command.RequestedByUserId)
+                    || item.Collaborators.Any(collaborator =>
+                        collaborator.Role == CompetitionCollaboratorRole.Manager
+                        && collaborator.UserId == command.RequestedByUserId)
             })
             .SingleOrDefaultAsync(cancellationToken);
         if (access is null)
@@ -218,9 +221,9 @@ public sealed class PostgresSynchronousArchiveGenerator(
                 competition.ObserverIds,
                 competition.AccessMode,
                 competition.Mode,
-                competition.ConfigurationJson,
+                competition.ModeConfiguration,
                 competition.TracksEnabled,
-                competition.TrackConfigurationJson,
+                competition.Tracks,
                 competition.FrozenStartAt,
                 competition.HiddenStartAt,
                 competition.StartAt,
@@ -444,11 +447,10 @@ public sealed class PostgresSynchronousArchiveGenerator(
             appendNewline: false);
         await transaction.CommitAsync(cancellationToken);
 
-        db.CompetitionEvents.Add(new CompetitionEvent
+        db.CompetitionEvents.Add(new CompetitionArchiveExportedEvent
         {
             Id = Guid.CreateVersion7(timeProvider.GetUtcNow()),
             CompetitionId = command.CompetitionId,
-            Kind = CompetitionEventKind.CompetitionArchiveExported,
             Level = command.IncludeProtectedFlags
                 ? CompetitionEventLevel.Warning
                 : CompetitionEventLevel.Information,
@@ -456,12 +458,8 @@ public sealed class PostgresSynchronousArchiveGenerator(
             ActorUserId = command.RequestedByUserId,
             SubjectType = EntityReferenceKind.Competition,
             SubjectId = command.CompetitionId,
-            PayloadJson = JsonSerializer.Serialize(new
-            {
-                schemaVersion = 1,
-                command.IncludeProtectedFlags,
-                reason = command.IncludeProtectedFlags ? command.Reason : null
-            }, JsonOptions),
+            IncludesProtectedFlags = command.IncludeProtectedFlags,
+            Reason = command.IncludeProtectedFlags ? command.Reason : null,
             OccurredAt = timeProvider.GetUtcNow()
         });
         await db.SaveChangesAsync(cancellationToken);
@@ -478,7 +476,9 @@ public sealed class PostgresSynchronousArchiveGenerator(
             {
                 CanExport = command.RequesterIsAdministrator
                     || item.OwnerId == command.RequestedByUserId
-                    || item.ManagerIds.Contains(command.RequestedByUserId)
+                    || item.Collaborators.Any(collaborator =>
+                        collaborator.Role == CompetitionCollaboratorRole.Manager
+                        && collaborator.UserId == command.RequestedByUserId)
             })
             .SingleOrDefaultAsync(cancellationToken);
         if (access is null)
@@ -550,22 +550,19 @@ public sealed class PostgresSynchronousArchiveGenerator(
             appendNewline: false);
         await transaction.CommitAsync(cancellationToken);
 
-        db.Notifications.Add(new Notification
+        db.Notifications.Add(new PlatformAuditExportedNotification
         {
             Id = Guid.CreateVersion7(timeProvider.GetUtcNow()),
             SourceType = NotificationSourceType.User,
             SourceId = command.RequestedByUserId,
             TargetType = NotificationTargetType.PlatformAdministrators,
             TargetId = Notification.PlatformAdministratorsTargetId,
-            Kind = NotificationKind.PlatformAuditExported,
-            ContentJson = JsonSerializer.Serialize(new PlatformAuditArchiveExportedFact(
-                SchemaVersion: 1,
-                command.Kind,
-                command.CompetitionId,
-                command.ActorId,
-                command.From,
-                command.To,
-                RecordCount: count), JsonOptions),
+            ActionValue = command.Kind is null ? null : (int)command.Kind.Value,
+            CompetitionId = command.CompetitionId,
+            ActorUserId = command.ActorId,
+            RangeFrom = command.From,
+            RangeTo = command.To,
+            Value = count,
             RelatedType = command.CompetitionId is null
                 ? EntityReferenceKind.Platform
                 : EntityReferenceKind.Competition,

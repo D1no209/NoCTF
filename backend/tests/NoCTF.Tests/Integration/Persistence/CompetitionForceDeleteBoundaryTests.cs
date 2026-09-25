@@ -48,10 +48,12 @@ public sealed class CompetitionForceDeleteBoundaryTests
     [Arguments(0)] [Arguments(1)] [Arguments(2)] [Arguments(3)] [Arguments(4)]
     public Task Cross_scope_notifications_block_without_deleting_other_threads(int scenario, CancellationToken ct) => RunAsync(async (db, fixture) =>
     {
-        var conflict = fixture.Notification(Guid.NewGuid(), scenario is 0 or 1 ? fixture.OtherId : null);
+        var conflict = fixture.Notification(
+            Guid.NewGuid(),
+            scenario is 0 or 1 ? fixture.OtherId : null,
+            scenario == 4 ? NotificationKind.CompetitionForceDeleted : NotificationKind.Message);
         if (scenario is 0 or 2 or 4) conflict.ReplyToId = fixture.RootId;
         if (scenario == 1) conflict.ThreadRootId = fixture.RootId;
-        if (scenario == 4) conflict.Kind = NotificationKind.CompetitionForceDeleted;
         db.Notifications.Add(conflict);
         await db.SaveChangesAsync(ct);
         if (scenario == 3)
@@ -118,16 +120,14 @@ public sealed class CompetitionForceDeleteBoundaryTests
     }, ct);
 
     [Test, Timeout(300_000)]
-    public Task An_inconsistent_team_reference_never_deletes_a_global_template_flag(CancellationToken ct) => RunAsync(async (db, fixture) =>
+    public Task An_inconsistent_team_reference_is_rejected_before_delete(CancellationToken ct) => RunAsync(async (db, fixture) =>
     {
         var team = await db.Teams.SingleAsync(ct);
         var templateFlag = await db.ChallengeFlags.SingleAsync(ct);
         templateFlag.TeamId = team.Id;
-        await db.SaveChangesAsync(ct);
+        await Assert.That(async () => await db.SaveChangesAsync(ct))
+            .Throws<InvalidOperationException>();
         db.ChangeTracker.Clear();
-        // Invalid cross-scope historical data is blocked by RESTRICT, not silently erased by team ownership.
-        await Assert.That(async () => await new AdminCompetitionStore(db).ForceDeleteAsync(fixture.Command, true, ct))
-            .Throws<PostgresException>();
         await AssertIntactAsync(db, fixture, ct);
         await Assert.That(await db.ChallengeFlags.AnyAsync(x => x.ChallengeId == fixture.TemplateId, ct)).IsTrue();
     }, ct);

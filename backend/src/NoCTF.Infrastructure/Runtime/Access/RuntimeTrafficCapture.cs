@@ -18,7 +18,7 @@ public sealed class RuntimeTrafficCaptureFactory(
     NoCtfDbContext db,
     ManagedFileUploads uploads,
     ICompetitionEventRecorder events,
-    ITransactionalMessageOutbox outbox,
+    IPostCommitMessagePublisher outbox,
     RuntimeProxyOptions options,
     TimeProvider timeProvider,
     ILogger<RuntimeTrafficCaptureFactory> logger) : IRuntimeTrafficCaptureFactory
@@ -61,7 +61,7 @@ public sealed class RuntimeTrafficCaptureFactory(
         private readonly NoCtfDbContext db;
         private readonly ManagedFileUploads uploads;
         private readonly ICompetitionEventRecorder events;
-        private readonly ITransactionalMessageOutbox outbox;
+        private readonly IPostCommitMessagePublisher outbox;
         private readonly TimeProvider timeProvider;
         private readonly ILogger logger;
         private readonly RuntimeProxyTarget target;
@@ -91,7 +91,7 @@ public sealed class RuntimeTrafficCaptureFactory(
             NoCtfDbContext db,
             ManagedFileUploads uploads,
             ICompetitionEventRecorder events,
-            ITransactionalMessageOutbox outbox,
+            IPostCommitMessagePublisher outbox,
             TimeProvider timeProvider,
             ILogger logger,
             RuntimeProxyTarget target,
@@ -193,23 +193,6 @@ public sealed class RuntimeTrafficCaptureFactory(
                     stream,
                     now,
                     CancellationToken.None);
-                var payload = JsonSerializer.Serialize(new
-                {
-                    schemaVersion = 1,
-                    segmentId,
-                    target.BindingIndex,
-                    connectionId,
-                    startedAt,
-                    endedAt = now,
-                    clientAddress = client.Address.ToString(),
-                    clientPort = client.Port,
-                    destinationAddress = destination.Address.ToString(),
-                    destinationPort = destination.Port,
-                    clientToRuntimeBytes,
-                    runtimeToClientBytes,
-                    capturedBytes = upload.ByteLength,
-                    truncated = Volatile.Read(ref truncated) != 0
-                });
                 await events.RecordAsync(new(
                     target.CompetitionId.Value,
                     CompetitionEventKind.RuntimeTrafficCaptureStored,
@@ -225,7 +208,20 @@ public sealed class RuntimeTrafficCaptureFactory(
                     SubjectId: target.RuntimeInstanceId,
                     RelatedType: EntityReferenceKind.File,
                     RelatedId: fileId,
-                    PayloadJson: payload), CancellationToken.None);
+                    TrafficCapture: new(
+                        segmentId,
+                        target.BindingIndex,
+                        connectionId,
+                        startedAt,
+                        now,
+                        client.Address.ToString(),
+                        client.Port,
+                        destination.Address.ToString(),
+                        destination.Port,
+                        clientToRuntimeBytes,
+                        runtimeToClientBytes,
+                        upload.ByteLength,
+                        Volatile.Read(ref truncated) != 0)), CancellationToken.None);
                 await db.SaveChangesAsync(CancellationToken.None);
                 await outbox.FlushOutgoingMessagesAsync();
             }

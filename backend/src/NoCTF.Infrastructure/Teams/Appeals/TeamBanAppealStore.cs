@@ -11,7 +11,7 @@ namespace NoCTF.Infrastructure.Teams.Appeals;
 
 public sealed class TeamBanAppealStore(
     NoCtfDbContext db,
-    ITransactionalMessageOutbox outbox,
+    IPostCommitMessagePublisher outbox,
     ICompetitionEventRecorder events) : ITeamBanAppealStore
 {
     private static readonly CompetitionEventKind[] ResolutionKinds =
@@ -28,7 +28,7 @@ public sealed class TeamBanAppealStore(
         var team = await db.Teams.AsNoTracking()
             .Where(candidate =>
                 candidate.CompetitionId == competitionId
-                && candidate.MemberIds.Contains(userId))
+                && candidate.Members.Any(member => member.UserId == userId))
             .Select(candidate => new TeamFact(
                 candidate.Id,
                 candidate.CompetitionId,
@@ -139,7 +139,7 @@ public sealed class TeamBanAppealStore(
         var team = await db.Teams.IgnoreQueryFilters()
             .SingleOrDefaultAsync(item =>
                 item.CompetitionId == command.CompetitionId
-                && item.MemberIds.Contains(command.ActorUserId)
+                && item.Members.Any(member => member.UserId == command.ActorUserId)
                 && item.DeletedAt == null,
                 cancellationToken);
         if (team is null)
@@ -180,7 +180,7 @@ public sealed class TeamBanAppealStore(
             command.SubmittedAt));
         await db.SaveChangesAsync(cancellationToken);
         await transaction.CommitAsync(cancellationToken);
-        await outbox.FlushOutgoingMessagesAsync();
+        await outbox.FlushCommittedMessagesAsync();
         return new();
     }
 
@@ -281,7 +281,7 @@ public sealed class TeamBanAppealStore(
 
         await db.SaveChangesAsync(cancellationToken);
         await transaction.CommitAsync(cancellationToken);
-        await outbox.FlushOutgoingMessagesAsync();
+        await outbox.FlushCommittedMessagesAsync();
         return new();
     }
 
@@ -347,7 +347,7 @@ public sealed class TeamBanAppealStore(
             cancellationToken);
         await db.SaveChangesAsync(cancellationToken);
         await transaction.CommitAsync(cancellationToken);
-        await outbox.FlushOutgoingMessagesAsync();
+        await outbox.FlushCommittedMessagesAsync();
         return new();
     }
 

@@ -82,7 +82,10 @@ internal sealed record CompetitionNotificationDeletionScope(Guid[] Ids, Guid[] C
         return new(ids, conflicts.Distinct().Order().ToArray());
     }
 
-    private static Task LockAsync(NoCtfDbContext db, Guid[] ids, CancellationToken ct) =>
-        db.Database.ExecuteSqlInterpolatedAsync(
-            $"SELECT id FROM notifications WHERE id = ANY({ids}) ORDER BY id FOR UPDATE", ct);
+    private static async Task LockAsync(NoCtfDbContext db, Guid[] ids, CancellationToken ct) =>
+        _ = await db.Notifications.AsNoTracking()
+            .Where(notification => ids.Contains(notification.Id))
+            .OrderBy(notification => notification.Id)
+            .Select(notification => notification.Id)
+            .ToArrayAsync(ct);
 }

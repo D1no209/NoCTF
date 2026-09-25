@@ -319,7 +319,7 @@ public sealed class AwdpCanonicalFixInputFlowTests
         }
     }
 
-    private sealed class RecordingOutbox : ITransactionalMessageOutbox
+    private sealed class RecordingOutbox : IPostCommitMessagePublisher
     {
         public List<object> Messages { get; } = [];
         public ValueTask PublishAsync<T>(T message)

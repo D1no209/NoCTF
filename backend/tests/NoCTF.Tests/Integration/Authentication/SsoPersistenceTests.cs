@@ -34,7 +34,6 @@ public sealed class SsoPersistenceTests
 
             var settings = await db.PlatformSettings.AsNoTracking().SingleAsync(cancellationToken);
             await Assert.That(settings.SsoConfiguration.Enabled).IsFalse();
-            await Assert.That(settings.SsoConfiguration.SchemaVersion).IsEqualTo(1);
 
             var now = DateTimeOffset.UtcNow;
             var providerId = Guid.CreateVersion7(now);
@@ -88,7 +87,7 @@ public sealed class SsoPersistenceTests
             incomplete.ExternalIdentityProviderId = providerId;
             db.Users.Add(incomplete);
             await Assert.That(async () => await db.SaveChangesAsync(cancellationToken))
-                .Throws<DbUpdateException>();
+                .Throws<InvalidOperationException>();
         });
     }
 
@@ -279,12 +278,11 @@ public sealed class SsoPersistenceTests
             var adminUpdated = await db.Users.AsNoTracking().SingleAsync(
                 user => user.Id == second.Id,
                 cancellationToken);
-            var administrativeAudit = (await db.Notifications.AsNoTracking()
+            var administrativeAudit = await db.Notifications.AsNoTracking()
                     .Where(notification =>
                         notification.Kind == NotificationKind.SsoExternalIdentityBindingChanged
                         && notification.SourceId == administratorId)
-                    .SingleAsync(cancellationToken))
-                .ContentJson;
+                    .SingleAsync(cancellationToken);
 
             await Assert.That(bound.State).IsEqualTo(SsoBindState.Bound);
             await Assert.That(duplicate.State).IsEqualTo(SsoBindState.IdentityAlreadyLinked);
@@ -305,9 +303,7 @@ public sealed class SsoPersistenceTests
             await Assert.That(administrativelyUnbound).IsEqualTo(AdminSsoUnbindState.Unbound);
             await Assert.That(adminUpdated.ExternalIdentityProviderId).IsNull();
             await Assert.That(adminUpdated.TokenVersion).IsEqualTo(secondTokenVersion + 1);
-            await Assert.That(JsonSerializer.Deserialize<SsoBindingAuditFact>(
-                    administrativeAudit,
-                    new JsonSerializerOptions(JsonSerializerDefaults.Web))!.Action)
+            await Assert.That((SsoBindingAuditAction)administrativeAudit.ActionValue!.Value)
                 .IsEqualTo(SsoBindingAuditAction.AdministrativelyUnbound);
             await Assert.That(await db.Notifications.CountAsync(notification =>
                 notification.Kind == NotificationKind.SsoExternalIdentityBindingChanged,
@@ -329,7 +325,7 @@ public sealed class SsoPersistenceTests
                 EncryptionKey = encryptionKey
             }));
         services.AddSingleton<PlatformSecretProtector>();
-        services.AddSingleton<IXmlRepository, PostgresEncryptedDataProtectionKeyRepository>();
+        services.AddSingleton<IXmlRepository, EncryptedDataProtectionKeyRepository>();
         services.AddDataProtection()
             .SetApplicationName("NoCTF");
         services.AddOptions<KeyManagementOptions>()
@@ -418,7 +414,8 @@ public sealed class SsoPersistenceTests
 
     private static DbContextOptions<NoCtfDbContext> OptionsFor(string connectionString) =>
         new DbContextOptionsBuilder<NoCtfDbContext>()
-            .UseNpgsql(connectionString)
+            .UseNpgsql(connectionString, npgsql => npgsql.MigrationsAssembly(
+                typeof(NoCTF.Persistence.PostgreSql.PostgreSqlPersistence).Assembly.FullName))
             .UseSnakeCaseNamingConvention()
             .Options;
 

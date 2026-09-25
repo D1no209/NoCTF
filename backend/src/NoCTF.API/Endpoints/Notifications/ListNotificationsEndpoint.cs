@@ -1,4 +1,3 @@
-using System.Text.Json;
 using FastEndpoints;
 using FluentValidation;
 using Microsoft.AspNetCore.Http;
@@ -57,7 +56,6 @@ internal static partial class NotificationProtocolMapper
 {
     [MapEnum(EnumMappingStrategy.ByName)]
     [MapperIgnoreSourceValue(NotificationKind.AuthenticationSecurityActivity)]
-    [MapperIgnoreSourceValue(NotificationKind.HttpCommandReceipt)]
     [MapperIgnoreSourceValue(NotificationKind.PlatformUserAccessTokenIssued)]
     [MapperIgnoreSourceValue(NotificationKind.PlatformUserAccessTokenRevoked)]
     [MapperIgnoreSourceValue(NotificationKind.PlatformUserTokensInvalidated)]
@@ -90,7 +88,7 @@ public sealed record NotificationResponse(
     NotificationTargetType TargetType,
     Guid TargetId,
     NotificationKindProtocol Kind,
-    JsonElement Content,
+    NotificationContent Content,
     EntityReferenceKind? RelatedType,
     Guid? RelatedId,
     Guid? ThreadRootId,
@@ -141,7 +139,7 @@ public sealed class ListNotificationsEndpoint(
             item.TargetType,
             item.TargetId,
             NotificationProtocolMapper.ToProtocol(item.Kind),
-            JsonSerializer.Deserialize<JsonElement>(item.ContentJson),
+            item.Content,
             item.RelatedType,
             item.RelatedId,
             item.ThreadRootId,

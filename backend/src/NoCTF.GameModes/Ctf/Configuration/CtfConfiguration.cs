@@ -17,17 +17,13 @@ public enum BloodRewardPolicy
 public sealed record BloodReward(BloodRewardPolicy Policy, decimal Value);
 
 public sealed record CtfConfiguration(
-    int SchemaVersion,
     ScoreCurveConfiguration DefaultScoreCurve,
     IReadOnlyList<BloodReward> BloodRewards,
     long WrongSubmissionPenalty = 0,
     PerTeamFlagTemplate? FlagTemplate = null)
-{
-    public const int CurrentSchemaVersion = 2;
-}
+;
 
 public sealed record CtfChallengeConfiguration(
-    int SchemaVersion,
     ScoreCurveConfiguration? ScoreCurve,
     IReadOnlyList<BloodReward>? BloodRewards,
     int? MaxFlagAttempts = null,
@@ -44,6 +40,4 @@ public sealed record CtfChallengeConfiguration(
     long? MaximumPatchUploadBytes = null,
     bool CheckerFixInput = false,
     bool CheckerAllowRoot = false)
-{
-    public const int CurrentSchemaVersion = 3;
-}
+;

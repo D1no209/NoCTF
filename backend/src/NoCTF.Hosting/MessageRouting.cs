@@ -20,6 +20,7 @@ public static class MessageRouting
         options.Durability.MessageIdentity = MessageIdentity.IdAndDestination;
         options.Policies.Add(new DurableRunnerCommandPolicy());
         Route<EvaluateGameplayFact>(options, WorkerQueue.Gameplay);
+        Route<DispatchPendingGameplayFacts>(options, WorkerQueue.Control);
         Route<GameplayFactStateChanged>(options, WorkerQueue.Gameplay);
         Route<ProjectLeaderboard>(options, WorkerQueue.Projection);
         Route<ApplyCompetitionVisibility>(options, WorkerQueue.Control);
@@ -29,7 +30,7 @@ public static class MessageRouting
         Route<AdvanceAwdRound>(options, WorkerQueue.Control);
         Route<GenerateAwdFlags>(options, WorkerQueue.Control);
         Route<AwdFlagInjectionFailed>(options, WorkerQueue.Gameplay);
-        Route<DispatchAwdCheckers>(options, WorkerQueue.Control);
+        Route<DispatchAwdCheckers>(options, WorkerQueue.Gameplay);
         Route<AwdCheckerCallbackMissing>(options, WorkerQueue.Control);
         Route<PollKohChallenge>(options, WorkerQueue.Control);
         Route<RecordKohObservation>(options, WorkerQueue.Gameplay);
@@ -68,18 +69,19 @@ public static class MessageRouting
     {
         var queueName = WorkerQueues.GetName(queue);
         var route = options.PublishMessage<TMessage>().ToNatsSubject(NatsSubjects.Subject(queue));
-        // Business queues must be durable senders or EF SaveChanges cannot persist their envelopes.
+        // JetStream is the durable transport. Publishing happens only after the owning EF
+        // transaction commits; there is intentionally no database-backed Wolverine outbox.
         if (durableOutbox)
-            route.UseJetStream(NatsSubjects.Stream(queue)).UseDurableOutbox();
+            route.UseJetStream(NatsSubjects.Stream(queue));
         options.ConfigureNoCtfInfrastructureRetriesFor<TMessage>(queue, queueName);
     }
 
     private static void FanOutCompetitionEvents(WolverineOptions options)
     {
         var route = options.PublishMessage<CompetitionEventCommitted>();
-        route.ToNatsSubject(NatsSubjects.RealtimeEvents).UseJetStream(NatsSubjects.EventsStream).UseDurableOutbox();
-        route.ToNatsSubject(NatsSubjects.LeaderboardEvents).UseJetStream(NatsSubjects.EventsStream).UseDurableOutbox();
-        route.ToNatsSubject(NatsSubjects.WebhookEvents).UseJetStream(NatsSubjects.EventsStream).UseDurableOutbox();
+        route.ToNatsSubject(NatsSubjects.RealtimeEvents).UseJetStream(NatsSubjects.EventsStream);
+        route.ToNatsSubject(NatsSubjects.LeaderboardEvents).UseJetStream(NatsSubjects.EventsStream);
+        route.ToNatsSubject(NatsSubjects.WebhookEvents).UseJetStream(NatsSubjects.EventsStream);
         options.ConfigureNoCtfInfrastructureRetriesFor<CompetitionEventCommitted>(
             WorkerQueue.Background,
             CompetitionEventFanoutQueueNames.Realtime);

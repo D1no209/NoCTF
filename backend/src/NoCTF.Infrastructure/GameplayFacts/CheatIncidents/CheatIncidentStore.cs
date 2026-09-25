@@ -13,7 +13,7 @@ namespace NoCTF.Infrastructure.GameplayFacts.CheatIncidents;
 
 public sealed class CheatIncidentStore(
     NoCtfDbContext db,
-    ITransactionalMessageOutbox outbox,
+    IPostCommitMessagePublisher outbox,
     ICompetitionEventRecorder events) : ICheatIncidentStore
 {
     private static readonly CompetitionEventKind[] ResolutionKinds =
@@ -114,7 +114,7 @@ public sealed class CheatIncidentStore(
         }
         await transaction.CommitAsync(cancellationToken);
         if (command.ShouldAuditAccess)
-            await outbox.FlushOutgoingMessagesAsync();
+            await outbox.FlushCommittedMessagesAsync();
         return MapDetail(fact, resolution, resolverNames);
     }
 
@@ -326,7 +326,7 @@ public sealed class CheatIncidentStore(
 
         await db.SaveChangesAsync(cancellationToken);
         await transaction.CommitAsync(cancellationToken);
-        await outbox.FlushOutgoingMessagesAsync();
+        await outbox.FlushCommittedMessagesAsync();
         return new();
     }
 

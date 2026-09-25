@@ -134,14 +134,9 @@ public sealed class PersistedRunnerCapacityGateTests
             var claimKeys = document.Items
                 .Select(item => $"runner-claim:{item.Identity.Key}")
                 .ToArray();
-            await using (var transaction = await db.Database.BeginTransactionAsync(ct))
-            {
-                await RuntimeCapacityCriticalSection.AcquireAsync(db, ct);
-                await ledger.RestoreAsync("runner", "test", admission.Capacity!, admission.Observation!.ObservedAt,
-                    document.Items, ct,
-                    starting: document.Items.Select(item => item.Identity).ToHashSet(), claimKeys: claimKeys);
-                await transaction.CommitAsync(ct);
-            }
+            await ledger.RestoreAsync("runner", "test", admission.Capacity!, admission.Observation!.ObservedAt,
+                document.Items, ct,
+                starting: document.Items.Select(item => item.Identity).ToHashSet(), claimKeys: claimKeys);
             await registry.RegisterAsync(registration with { HasActiveAssignments = !rollback }, ct);
             var available = (long)await redis.GetDatabase().HashGetAsync("runner:runner:capacity", "admissionAvailableMemoryBytes");
             await Assert.That(available).IsEqualTo(rollback ? 921 : 409);
@@ -188,7 +183,7 @@ public sealed class PersistedRunnerCapacityGateTests
         });
     }
 
-    private sealed class CapturedOutbox : ITransactionalMessageOutbox
+    private sealed class CapturedOutbox : IPostCommitMessagePublisher
     {
         public List<object> Messages { get; } = [];
         public ValueTask PublishAsync<T>(T message) { Messages.Add(message!); return ValueTask.CompletedTask; }

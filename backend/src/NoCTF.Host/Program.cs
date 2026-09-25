@@ -1,3 +1,5 @@
+using JasperFx;
+using JasperFx.CodeGeneration;
 using Microsoft.AspNetCore.Http.Features;
 using Microsoft.AspNetCore.Mvc.ApiExplorer;
 using NSwag.AspNetCore;
@@ -13,6 +15,7 @@ using NoCTF.Hosting.Observability;
 using NoCTF.Infrastructure;
 using NoCTF.Infrastructure.Persistence;
 using NoCTF.Infrastructure.Observability;
+using NoCTF.Persistence.PostgreSql;
 using NoCTF.Runner;
 using NoCTF.Runner.Composition;
 using NoCTF.Worker;
@@ -21,6 +24,7 @@ using Wolverine;
 var builder = WebApplication.CreateBuilder(args);
 var exportOpenApi = args.Contains("--export-openapi", StringComparer.OrdinalIgnoreCase)
     || args.Contains("--export-swagger-docs", StringComparer.OrdinalIgnoreCase);
+var generateHandlers = args.Contains("codegen", StringComparer.OrdinalIgnoreCase);
 var apiConfigurationRoot = Path.GetFullPath(Path.Combine(
     builder.Environment.ContentRootPath,
     "..",
@@ -50,6 +54,7 @@ builder.Configuration["OpenApi:Exporting"] = exportOpenApi.ToString();
 builder.WebHost.ConfigureKestrel(options => options.Limits.MaxRequestBodySize = null);
 builder.Services.Configure<FormOptions>(options =>
     options.MultipartBodyLengthLimit = long.MaxValue);
+builder.Services.AddNoCtfDatabaseProvider(builder.Configuration);
 
 if (roles.Has(HostRole.Api))
 {
@@ -84,6 +89,9 @@ if (!development && !exportOpenApi)
 
 builder.UseWolverine(options =>
 {
+    options.ServiceLocationPolicy = JasperFx.CodeGeneration.Model.ServiceLocationPolicy.NotAllowed;
+    if (!development && !exportOpenApi && !generateHandlers)
+        options.CodeGeneration.TypeLoadMode = TypeLoadMode.Static;
     options.ConfigureNoCtfApiMessaging((development || exportOpenApi) && roles.Has(HostRole.Api));
     if (roles.Has(HostRole.Worker))
         options.ConfigureNoCtfWorkerMessaging(builder.Configuration, durable: !development);
@@ -97,6 +105,8 @@ builder.UseWolverine(options =>
     {
         options.ConfigureNoCtfPersistence(builder.Configuration, roles);
         options.ConfigureNoCtfMessageRouting(builder.Configuration, roles);
+        if (generateHandlers)
+            options.StubAllExternalTransports();
     }
 });
 builder.Services.AddNoCtfRoleHealthChecks(
@@ -109,16 +119,19 @@ if (!exportOpenApi)
         $"noctf-host-{string.Join('-', roles.Values).ToLowerInvariant()}");
 
 var app = builder.Build();
+if (generateHandlers)
+{
+    await app.RunJasperFxCommands(args);
+    return;
+}
 if (migrateOnly)
 {
     await app.Services.InitializeNoCtfAsync();
-    await app.StartAsync();
-    await app.StopAsync();
     return;
 }
 if (!exportOpenApi)
     app.UseNoCtfObservability();
-if ((development || app.Configuration.GetValue("Database:AutoMigrate", false))
+if (!exportOpenApi && (development || app.Configuration.GetValue("Database:AutoMigrate", false))
     && (roles.Has(HostRole.Api) || roles.Has(HostRole.Worker)))
     await DatabaseStartup.InitializeAsync(app.Services, app.Configuration, app.Lifetime.ApplicationStopping);
 if (roles.Has(HostRole.Api))

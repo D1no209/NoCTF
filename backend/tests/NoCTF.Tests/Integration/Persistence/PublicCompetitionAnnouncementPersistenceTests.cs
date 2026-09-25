@@ -94,13 +94,12 @@ public sealed class PublicCompetitionAnnouncementPersistenceTests
         string title,
         CompetitionStatus status,
         CompetitionAccessMode accessMode,
-        DateTimeOffset now) => new()
+        DateTimeOffset now) => new CtfCompetition
         {
             Id = id,
             OwnerId = ownerId,
             Title = title,
-            Mode = GameMode.Ctf,
-            ConfigurationJson = """{"schemaVersion":1}""",
+            ModeConfiguration = TestConfigurations.Competition(GameMode.Ctf),
             FlagDerivationSecret = new byte[32],
             StartAt = now.AddHours(-1),
             EndAt = now.AddHours(1),
@@ -121,7 +120,7 @@ public sealed class PublicCompetitionAnnouncementPersistenceTests
         string body)
     {
         var notificationId = Guid.CreateVersion7(sentAt);
-        db.Notifications.Add(new Notification
+        db.Notifications.Add(new CompetitionAnnouncementNotification
         {
             Id = notificationId,
             SourceType = NotificationSourceType.User,
@@ -130,24 +129,25 @@ public sealed class PublicCompetitionAnnouncementPersistenceTests
                 ? NotificationTargetType.CompetitionParticipants
                 : NotificationTargetType.CompetitionCollaborators,
             TargetId = competitionId,
-            Kind = NotificationKind.CompetitionAnnouncement,
-            ContentJson = $$"""{"schemaVersion":1,"title":"{{title}}","body":"{{body}}"}""",
+            Title = title,
+            Subject = title,
+            Body = body,
+            CompetitionId = competitionId,
             RelatedType = EntityReferenceKind.Competition,
             RelatedId = competitionId,
             SentAt = sentAt
         });
-        db.CompetitionEvents.Add(new CompetitionEvent
+        db.CompetitionEvents.Add(new AnnouncementPublishedEvent
         {
             Id = Guid.CreateVersion7(sentAt.AddTicks(1)),
             CompetitionId = competitionId,
-            Kind = CompetitionEventKind.AnnouncementPublished,
             Level = CompetitionEventLevel.Information,
             Visibility = publicEvent
                 ? CompetitionEventVisibility.Public
                 : CompetitionEventVisibility.Staff,
             SubjectType = EntityReferenceKind.Notification,
             SubjectId = notificationId,
-            PayloadJson = $$"""{"schemaVersion":1,"questionId":"{{notificationId}}"}""",
+            QuestionId = notificationId,
             OccurredAt = sentAt
         });
     }

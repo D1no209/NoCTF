@@ -47,13 +47,12 @@ public sealed class CompetitionNotificationDeliveryPersistenceTests
             await using var db = new NoCtfDbContext(options);
             await db.Database.EnsureCreatedAsync(ct);
             db.Users.Add(Human(ownerId, "announcement-owner", UserRole.Organizer, now));
-            db.Competitions.Add(new Competition
+            db.Competitions.Add(new CtfCompetition
             {
                 Id = competitionId,
                 OwnerId = ownerId,
                 Title = "Announcement competition",
-                Mode = GameMode.Ctf,
-                ConfigurationJson = "{}",
+                ModeConfiguration = TestConfigurations.Competition(GameMode.Ctf),
                 FlagDerivationSecret = new byte[32],
                 StartAt = now.AddHours(-1),
                 EndAt = now.AddHours(1),
@@ -77,7 +76,7 @@ public sealed class CompetitionNotificationDeliveryPersistenceTests
 
             await Assert.That(published).IsNotNull();
             var notification = await db.Notifications.AsNoTracking().SingleAsync(ct);
-            await Assert.That(notification.ContentJson).Contains("完整公告正文");
+            await Assert.That(notification.Body).Contains("完整公告正文");
             var permanentEvent = await db.CompetitionEvents.AsNoTracking().SingleAsync(ct);
             await Assert.That(permanentEvent.Kind)
                 .IsEqualTo(CompetitionEventKind.AnnouncementPublished);
@@ -86,7 +85,7 @@ public sealed class CompetitionNotificationDeliveryPersistenceTests
             await Assert.That(permanentEvent.SubjectType)
                 .IsEqualTo(EntityReferenceKind.Notification);
             await Assert.That(permanentEvent.SubjectId).IsEqualTo(notification.Id);
-            await Assert.That(permanentEvent.PayloadJson)
+            await Assert.That(permanentEvent.Reason ?? string.Empty)
                 .DoesNotContain("完整公告正文");
         });
     }
@@ -126,7 +125,7 @@ public sealed class CompetitionNotificationDeliveryPersistenceTests
                 Human(judgeId, "incident-judge", UserRole.Organizer, now),
                 Human(observerId, "incident-observer", UserRole.Organizer, now),
                 Human(participantId, "incident-participant", UserRole.User, now));
-            db.Competitions.Add(new Competition
+            db.Competitions.Add(new CtfCompetition
             {
                 Id = competitionId,
                 OwnerId = ownerId,
@@ -134,8 +133,7 @@ public sealed class CompetitionNotificationDeliveryPersistenceTests
                 JudgeIds = [judgeId],
                 ObserverIds = [observerId],
                 Title = "Cheat incident notifications",
-                Mode = GameMode.Ctf,
-                ConfigurationJson = "{}",
+                ModeConfiguration = TestConfigurations.Competition(GameMode.Ctf),
                 FlagDerivationSecret = new byte[32],
                 StartAt = now.AddHours(-1),
                 EndAt = now.AddHours(1),
@@ -170,8 +168,8 @@ public sealed class CompetitionNotificationDeliveryPersistenceTests
             await Assert.That(notifications.All(item =>
                 item.Kind == NotificationKind.CheatIncidentDetected
                 && item.TargetType == NotificationTargetType.User
-                && item.ContentJson.Contains($"cheat-incident:{message.GameplayFactId:N}")
-                && !item.ContentJson.Contains("flag", StringComparison.OrdinalIgnoreCase)))
+                && item.SourceEventKey == $"cheat-incident:{message.GameplayFactId:N}"
+                && item.Body == null))
                 .IsTrue();
 
             var appeal = new TeamBanAppealSubmitted(
@@ -193,7 +191,7 @@ public sealed class CompetitionNotificationDeliveryPersistenceTests
                 judgeId
             ]);
             await Assert.That(appealNotifications.All(item =>
-                item.ContentJson.Contains($"team-ban-appeal:{appeal.AppealEventId:N}")))
+                item.SourceEventKey == $"team-ban-appeal:{appeal.AppealEventId:N}"))
                 .IsTrue();
         });
     }
@@ -238,15 +236,14 @@ public sealed class CompetitionNotificationDeliveryPersistenceTests
                     Human(approvedMemberId, "notification-approved", UserRole.User, now),
                     Human(pendingMemberId, "notification-pending", UserRole.User, now),
                     Human(bannedMemberId, "notification-banned", UserRole.User, now));
-                setup.Competitions.Add(new Competition
+                setup.Competitions.Add(new CtfCompetition
                 {
                     Id = competitionId,
                     OwnerId = ownerId,
                     ManagerIds = [managerAndMemberId],
                     ObserverIds = [observerBotId],
                     Title = "Notification audience",
-                    Mode = GameMode.Ctf,
-                    ConfigurationJson = """{"schemaVersion":1}""",
+                    ModeConfiguration = TestConfigurations.Competition(GameMode.Ctf),
                     FlagDerivationSecret = new byte[32],
                     StartAt = now,
                     EndAt = now.AddHours(1),
@@ -369,8 +366,8 @@ public sealed class CompetitionNotificationDeliveryPersistenceTests
             await Assert.That(notifications[0].TargetType)
                 .IsEqualTo(NotificationTargetType.TeamMembers);
             await Assert.That(notifications[0].TargetId).IsEqualTo(bannedTeamId);
-            await Assert.That(notifications[0].ContentJson)
-                .Contains($"team-banned:{bannedTeamId:N}:1");
+            await Assert.That(notifications[0].SourceEventKey)
+                .IsEqualTo($"team-banned:{bannedTeamId:N}:1");
 
             var announcedBan = new TeamBanned(
                 competitionId,
@@ -400,9 +397,9 @@ public sealed class CompetitionNotificationDeliveryPersistenceTests
             await Assert.That(announcements).Count().IsEqualTo(1);
             await Assert.That(announcements[0].TargetType)
                 .IsEqualTo(NotificationTargetType.CompetitionParticipants);
-            await Assert.That(announcements[0].ContentJson).Contains("赛事纪律公告");
-            await Assert.That(announcements[0].ContentJson).Contains("作弊行为");
-            await Assert.That(announcements[0].ContentJson).Contains("Banned");
+            await Assert.That(announcements[0].Title).IsEqualTo("赛事纪律公告");
+            await Assert.That(announcements[0].Body).Contains("作弊行为");
+            await Assert.That(announcements[0].TeamName).IsEqualTo("Banned");
 
             var publicBanEvents = await db.CompetitionEvents.AsNoTracking()
                 .Where(item =>
@@ -415,7 +412,6 @@ public sealed class CompetitionNotificationDeliveryPersistenceTests
             await Assert.That(publicBanEvents).Count().IsEqualTo(1);
 
             var internalTracks = new CompetitionTrackConfiguration(
-                CompetitionTrackConfiguration.CurrentSchemaVersion,
                 [
                     CompetitionTrackConfiguration.DefaultFor(GameMode.Ctf).DefaultTrack,
                     new CompetitionTrackDefinition(
@@ -430,12 +426,12 @@ public sealed class CompetitionNotificationDeliveryPersistenceTests
                         VisibleOnLeaderboard: false,
                         AffectsCompetitiveResults: false)
                 ]);
-            await db.Competitions.Where(item => item.Id == competitionId)
-                .ExecuteUpdateAsync(setters => setters
-                    .SetProperty(item => item.TracksEnabled, true)
-                    .SetProperty(
-                        item => item.TrackConfigurationJson,
-                        CompetitionTrackConfiguration.Serialize(internalTracks)), ct);
+            var trackedCompetition = await db.Competitions.SingleAsync(
+                item => item.Id == competitionId, ct);
+            trackedCompetition.TracksEnabled = true;
+            trackedCompetition.Tracks = CompetitionTrackConfiguration.ToPersisted(
+                internalTracks, competitionId);
+            await db.SaveChangesAsync(ct);
             await db.Teams.Where(team => team.Id == bannedTeamId)
                 .ExecuteUpdateAsync(setters => setters.SetProperty(
                     team => team.TrackKey,
@@ -535,13 +531,12 @@ public sealed class CompetitionNotificationDeliveryPersistenceTests
                 setup.Users.AddRange(
                     Human(ownerId, "hint-owner", UserRole.Organizer, now),
                     Human(memberId, "hint-member", UserRole.User, now));
-                setup.Competitions.Add(new Competition
+                setup.Competitions.Add(new CtfCompetition
                 {
                     Id = competitionId,
                     OwnerId = ownerId,
                     Title = "Hint notifications",
-                    Mode = GameMode.Ctf,
-                    ConfigurationJson = """{"schemaVersion":1}""",
+                    ModeConfiguration = TestConfigurations.Competition(GameMode.Ctf),
                     FlagDerivationSecret = new byte[32],
                     StartAt = now.AddHours(-1),
                     EndAt = now.AddHours(2),
@@ -558,25 +553,24 @@ public sealed class CompetitionNotificationDeliveryPersistenceTests
                     TeamRegistrationStatus.Approved,
                     false,
                     now));
-                setup.Challenges.Add(new Challenge
+                setup.Challenges.Add(new CtfChallenge
                 {
                     Id = challengeId,
                     OwnerId = ownerId,
-                    Mode = GameMode.Ctf,
                     Visibility = ChallengeVisibility.Private,
                     Title = "Paid hint challenge",
                     Direction = "Web",
-                    DefinitionJson = """{"schemaVersion":1}""",
+                    Definition = TestConfigurations.Definition(GameMode.Ctf),
                     CreatedAt = now,
                     UpdatedAt = now
                 });
-                setup.CompetitionChallenges.Add(new CompetitionChallenge
+                setup.CompetitionChallenges.Add(new CtfCompetitionChallenge
                 {
                     Id = competitionChallengeId,
                     CompetitionId = competitionId,
                     ChallengeId = challengeId,
                     IsPublished = true,
-                    RulesJson = "{}",
+                    Rules = TestConfigurations.Rules(GameMode.Ctf),
                     UpdatedAt = now,
                     Hints =
                     [
@@ -664,19 +658,16 @@ public sealed class CompetitionNotificationDeliveryPersistenceTests
                 .ToArrayAsync(ct);
             await Assert.That(notifications).Count().IsEqualTo(1);
             var notification = notifications.Single();
-            var payload = JsonSerializer.Deserialize<JsonElement>(notification.ContentJson);
             await Assert.That(notification.Kind).IsEqualTo(NotificationKind.HintPublished);
             await Assert.That(notification.TargetType)
                 .IsEqualTo(NotificationTargetType.CompetitionParticipants);
             await Assert.That(notification.TargetId).IsEqualTo(competitionId);
-            await Assert.That(payload.GetProperty("sourceEventKey").GetString())
+            await Assert.That(notification.SourceEventKey)
                 .IsEqualTo($"hint-published:{hintId:N}:{publishedAt.UtcTicks}");
-            await Assert.That(payload.GetProperty("hintId").GetGuid()).IsEqualTo(hintId);
-            await Assert.That(payload.GetProperty("publishedAt").GetDateTimeOffset())
+            await Assert.That(notification.HintId).IsEqualTo(hintId);
+            await Assert.That(notification.PayloadOccurredAt)
                 .IsEqualTo(publishedAt);
-            await Assert.That(notification.ContentJson.Contains(
-                "paid secret",
-                StringComparison.Ordinal)).IsFalse();
+            await Assert.That(notification.Body).IsNull();
             var reader = new NotificationReader(db);
             var start = new KeysetNotificationPosition(now.AddDays(-1), Guid.Empty);
             await Assert.That(await reader.ReadFeedAsync(memberId, start, 10, ct))
@@ -742,7 +733,7 @@ public sealed class CompetitionNotificationDeliveryPersistenceTests
             BannedAt = isBanned ? now : null
         };
 
-    private sealed class RecordingOutbox : ITransactionalMessageOutbox
+    private sealed class RecordingOutbox : IPostCommitMessagePublisher
     {
         public ValueTask PublishAsync<T>(T message) => ValueTask.CompletedTask;
         public ValueTask ScheduleAsync<T>(T message, DateTimeOffset scheduledAt) =>

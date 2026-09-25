@@ -1,10 +1,12 @@
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.EntityFrameworkCore;
 using NoCTF.API.Composition;
 using NoCTF.Application.Authentication.Account;
 using NoCTF.Application.Authentication.EmailVerification;
 using NoCTF.Application.Authentication.PasswordReset;
 using NoCTF.Infrastructure.Authentication;
+using NoCTF.Infrastructure.Persistence;
 
 namespace NoCTF.Tests.Unit.API;
 
@@ -22,6 +24,8 @@ public sealed class EmailVerificationServiceRegistrationTests
             })
             .Build();
         var services = new ServiceCollection();
+        services.AddDbContext<NoCtfDbContext>(options =>
+            options.UseInMemoryDatabase("email-verification-registration"));
 
         services.AddNoCtfApi(configuration, includeInfrastructure: true);
 

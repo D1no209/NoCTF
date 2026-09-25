@@ -17,6 +17,7 @@ using NoCTF.Infrastructure.Authentication;
 using NoCTF.Infrastructure.Runtime.Capacity;
 using NoCTF.Runtime.Kubernetes.Networking;
 using Microsoft.Extensions.Options;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Http.Resilience;
 using Polly;
 using StackExchange.Redis;
@@ -27,6 +28,7 @@ using NoCTF.Infrastructure.Competitions.Events;
 using NoCTF.Hosting.Health;
 using NoCTF.Application.GameplayFacts.Processing;
 using NoCTF.Infrastructure.GameplayFacts.Processing;
+using NoCTF.Infrastructure.Messaging;
 
 namespace NoCTF.Runner.Composition;
 
@@ -57,7 +59,7 @@ public static class ServiceRegistration
                 "RunnerScoring:CallbackBaseUrl must be configured as an absolute HTTP(S) URI.")
             .ValidateOnStart();
         services.AddScoped<ICompetitionEventRecorder, CompetitionEventStore>();
-        services.AddScoped<IAwdpFixExecutionFence, PostgresAwdpFixExecutionFence>();
+        services.AddScoped<IAwdpFixExecutionFence, AwdpFixExecutionFence>();
         services.AddNoCtfLocalComputationCaching(configuration);
         services.AddHttpClient();
         services.AddHttpClient(
@@ -84,6 +86,7 @@ public static class ServiceRegistration
             .ValidateOnStart();
         if (!development)
         {
+            services.TryAddSingleton<IClusterLeaseManager, NatsClusterLeaseManager>();
             var redis = configuration.GetConnectionString("Redis");
             if (string.IsNullOrWhiteSpace(redis))
                 throw new InvalidOperationException(
@@ -145,7 +148,7 @@ public static class ServiceRegistration
         services.AddScoped<RuntimeProvisionWriteBackMessageHandler>();
         services.AddScoped<RuntimeStopWriteBackMessageHandler>();
         services.AddScoped<IAwdCheckerExecutor, AwdCheckerExecutor>();
-        services.AddSingleton<IAwdpFixWorkReader, AwdpFixWorkReader>();
+        services.AddScoped<IAwdpFixWorkReader, AwdpFixWorkReader>();
         services.AddScoped<IAwdpCheckerExecutor, AwdpCheckerExecutor>();
         services.AddSingleton<IAwdpAttackProvisioningPlanReader,
             AwdpAttackProvisioningPlanReader>();

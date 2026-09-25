@@ -12,6 +12,8 @@ using NoCTF.Domain.Competitions.Events;
 using NoCTF.GameModes.Awdp.Configuration;
 using NoCTF.GameModes.Registration;
 using NoCTF.Application.Commands.Idempotency;
+using NoCTF.Domain.Commands;
+using NoCTF.Domain.Challenges;
 
 namespace NoCTF.Infrastructure.Runtime.Instances;
 
@@ -20,7 +22,7 @@ public sealed class RuntimeInstanceStore(
     IChallengeRuntimeTemplateCatalog templates,
     IRuntimePlacementPolicy placementPolicy,
     IPerTeamRuntimeFlagStore runtimeFlags,
-    ITransactionalMessageOutbox outbox,
+    IPostCommitMessagePublisher outbox,
     TeamRuntimeQuota runtimeQuota,
     ICompetitionEventRecorder? eventRecorder = null,
     IRequestReplay? replay = null) : IRuntimeInstanceStore
@@ -30,7 +32,7 @@ public sealed class RuntimeInstanceStore(
         IChallengeRuntimeTemplateCatalog templates,
         IRuntimePlacementPolicy placementPolicy,
         IPerTeamRuntimeFlagStore runtimeFlags,
-        ITransactionalMessageOutbox outbox,
+        IPostCommitMessagePublisher outbox,
         ICompetitionEventRecorder? eventRecorder = null)
         : this(
             db,
@@ -51,12 +53,20 @@ public sealed class RuntimeInstanceStore(
         Guid userId,
         CancellationToken ct)
     {
-        var scope = await ResolveScopeAsync(competitionId, competitionChallengeId, userId, ct);
+        var scope = await ResolveReadScopeAsync(competitionId, competitionChallengeId, userId, ct);
         if (scope is null
-            || !AllowsRuntimeActions(scope)
+            || !(scope.Status == CompetitionStatus.Running
+                && (scope.Mode != GameMode.Awdp || scope.ValidAwdpConfiguration)
+                || scope.Mode == GameMode.Ctf
+                    && scope.Status == CompetitionStatus.Finished
+                    && scope.PracticeModeEnabled)
             || scope.Mode == GameMode.Koh)
             return null;
-        var purpose = PurposeFor(scope);
+        var purpose = scope.Status == CompetitionStatus.Finished
+            ? RuntimePurpose.Practice
+            : scope.Mode == GameMode.Awdp
+                ? RuntimePurpose.AwdpAttack
+                : RuntimePurpose.Player;
         var runtime = await db.RuntimeInstances.AsNoTracking()
             .Where(instance =>
                 instance.CompetitionId == competitionId &&
@@ -94,8 +104,29 @@ public sealed class RuntimeInstanceStore(
         RuntimeMutationCommand command,
         CancellationToken ct)
     {
-        await using var transaction = await db.Database.BeginTransactionAsync(ct);
-        await LockCompetitionAsync(command.CompetitionId, ct);
+        for (var attempt = 0; ; attempt++)
+        {
+            try
+            {
+                return await MutatePlayerRuntimeOnceAsync(command, ct);
+            }
+            catch (Exception exception) when (attempt < 2
+                && RelationalRetry.IsTransientConcurrency(exception))
+            {
+                outbox.DiscardPendingMessages();
+                db.ChangeTracker.Clear();
+                await Task.Delay(TimeSpan.FromMilliseconds(Random.Shared.Next(5, 31)), ct);
+            }
+        }
+    }
+
+    private async Task<RuntimeMutationResult> MutatePlayerRuntimeOnceAsync(
+        RuntimeMutationCommand command,
+        CancellationToken ct)
+    {
+        await using var transaction = await db.Database.BeginTransactionAsync(
+            System.Data.IsolationLevel.Serializable,
+            ct);
         var scope = await ResolveScopeAsync(
             command.CompetitionId,
             command.CompetitionChallengeId,
@@ -119,7 +150,7 @@ public sealed class RuntimeInstanceStore(
             ct);
         var prior = replay is null ? null : await replay.FindAsync<RuntimeCommandReceipt>(
             new(command.UserId, ReplayOperation.RuntimeMutation, command.CompetitionId, command.CompetitionChallengeId),
-            new { command.Action, command.Extension }, ct);
+            new RuntimeReplayFingerprint(command.Action, command.Extension), ct);
         if (prior is not null)
         {
             var original = await db.RuntimeInstances.AsNoTracking().SingleOrDefaultAsync(item => item.Id == prior.RuntimeInstanceId, ct);
@@ -281,6 +312,27 @@ public sealed class RuntimeInstanceStore(
         }
         catch (DbUpdateException exception) when (!TransactionFailureClassifier.IsRetryable(exception))
         {
+            await transaction.RollbackAsync(ct);
+            outbox.DiscardPendingMessages();
+            db.ChangeTracker.Clear();
+            if (command.Action == RuntimeAction.Start && scope.Mode == GameMode.Awdp)
+            {
+                var winner = await db.RuntimeInstances.AsNoTracking()
+                    .Where(instance =>
+                        instance.CompetitionId == command.CompetitionId
+                        && instance.CompetitionChallengeId == command.CompetitionChallengeId
+                        && instance.Purpose == purpose
+                        && instance.TeamId == scope.TeamId
+                        && (instance.State == RuntimeState.Queued
+                            || instance.State == RuntimeState.Provisioning
+                            || instance.State == RuntimeState.Running
+                            || instance.State == RuntimeState.Stopping))
+                    .OrderByDescending(instance => instance.CreatedAt)
+                    .ThenByDescending(instance => instance.Id)
+                    .FirstOrDefaultAsync(ct);
+                if (winner is not null)
+                    return new(Map(winner));
+            }
             return new(null, RuntimeMutationFailure.Conflict);
         }
     }
@@ -290,7 +342,7 @@ public sealed class RuntimeInstanceStore(
         RuntimeMutationCommand command,
         CancellationToken cancellationToken)
     {
-        var template = templates.Get(scope.Mode, scope.DefinitionJson)
+        var template = templates.Get(scope.Definition)
             ?? throw new InvalidOperationException("The challenge does not define a runtime template.");
         if (PurposeFor(scope) == RuntimePurpose.Practice
             && template.RuntimeKind is not RuntimeKind.Container and not RuntimeKind.Compose)
@@ -320,23 +372,59 @@ public sealed class RuntimeInstanceStore(
                 cancellationToken);
         }
         var placement = placementPolicy.Resolve(template.RuntimeKind);
-        return new RuntimeInstance
-        {
-            Id = id,
-            CompetitionId = command.CompetitionId,
-            CompetitionChallengeId = command.CompetitionChallengeId,
-            TeamId = scope.TeamId,
-            Purpose = PurposeFor(scope),
-            RuntimeKind = template.RuntimeKind,
-            RuntimeProvider = placement.Provider,
-            AccessMode = scope.RuntimeAccessMode,
-            TrafficCaptureEnabled = scope.TrafficCaptureEnabled,
-            TrafficCaptureLimitBytes = scope.TrafficCaptureLimitBytes,
-            State = RuntimeState.Queued,
-            CreatedAt = command.Now,
-            ExpiresAt = null
-        };
+        var runtime = RuntimeInstanceGeneratedCatalog.Create(PurposeFor(scope));
+        runtime.Id = id;
+        runtime.CompetitionId = command.CompetitionId;
+        runtime.CompetitionChallengeId = command.CompetitionChallengeId;
+        runtime.TeamId = scope.TeamId;
+        runtime.RuntimeKind = template.RuntimeKind;
+        runtime.RuntimeProvider = placement.Provider;
+        runtime.AccessMode = scope.RuntimeAccessMode;
+        runtime.TrafficCaptureEnabled = scope.TrafficCaptureEnabled;
+        runtime.TrafficCaptureLimitBytes = scope.TrafficCaptureLimitBytes;
+        runtime.State = RuntimeState.Queued;
+        runtime.CreatedAt = command.Now;
+        runtime.ExpiresAt = null;
+        return runtime;
     }
+
+    private async Task<RuntimeReadScope?> ResolveReadScopeAsync(
+        Guid competitionId,
+        Guid competitionChallengeId,
+        Guid userId,
+        CancellationToken ct) =>
+        await db.Teams.AsNoTracking()
+            .Where(team => team.CompetitionId == competitionId
+                && team.Members.Any(member => member.UserId == userId)
+                && team.DeletedAt == null
+                && !team.IsBanned
+                && team.RegistrationStatus == TeamRegistrationStatus.Approved)
+            .Join(db.CompetitionChallenges.AsNoTracking()
+                    .Where(challenge => challenge.IsPublished && challenge.DeletedAt == null),
+                team => team.CompetitionId,
+                challenge => challenge.CompetitionId,
+                (team, challenge) => new { Team = team, Challenge = challenge })
+            .Join(db.Competitions.AsNoTracking().Where(competition => competition.DeletedAt == null),
+                pair => pair.Team.CompetitionId,
+                competition => competition.Id,
+                (pair, competition) => new { pair.Team, pair.Challenge, Competition = competition })
+            .Join(db.Challenges.AsNoTracking().Where(template => template.DeletedAt == null),
+                item => item.Challenge.ChallengeId,
+                template => template.Id,
+                (item, template) => new { item.Team, item.Challenge, item.Competition, Template = template })
+            .Where(item => item.Challenge.Id == competitionChallengeId)
+            .Select(item => new RuntimeReadScope(
+                item.Team.Id,
+                item.Competition.Mode,
+                item.Competition.Status,
+                item.Competition.PracticeModeEnabled,
+                db.Set<AwdpCompetitionModeConfiguration>().Any(configuration =>
+                    configuration.CompetitionId == item.Competition.Id)
+                && db.Set<AwdpCompetitionChallengeRules>().Any(rules =>
+                    rules.CompetitionChallengeId == item.Challenge.Id)
+                && db.Set<AwdpChallengeDefinition>().Any(definition =>
+                    definition.ChallengeId == item.Template.Id)))
+            .SingleOrDefaultAsync(ct);
 
     private async Task<RuntimeScope?> ResolveScopeAsync(
         Guid competitionId,
@@ -346,7 +434,7 @@ public sealed class RuntimeInstanceStore(
         await db.Teams.AsNoTracking()
             .Where(team =>
                 team.CompetitionId == competitionId &&
-                team.MemberIds.Contains(userId) &&
+                team.Members.Any(member => member.UserId == userId) &&
                 team.DeletedAt == null &&
                 !team.IsBanned &&
                 team.RegistrationStatus == TeamRegistrationStatus.Approved)
@@ -380,9 +468,9 @@ public sealed class RuntimeInstanceStore(
                 item.Competition.RuntimeAccessMode,
                 item.Competition.TrafficCaptureEnabled,
                 item.Competition.TrafficCaptureLimitBytes,
-                item.Competition.ConfigurationJson,
-                item.Challenge.RulesJson,
-                item.Template.DefinitionJson,
+                item.Competition.ModeConfiguration!,
+                item.Challenge.Rules!,
+                item.Template.Definition,
                 db.GameplayFacts.Any(fact =>
                     fact.CompetitionId == competitionId
                     && fact.CompetitionChallengeId == competitionChallengeId
@@ -391,9 +479,6 @@ public sealed class RuntimeInstanceStore(
                     && fact.State == NoCTF.Domain.Gameplay.GameplayFactState.Completed
                     && fact.Result == NoCTF.Domain.Gameplay.GameplayFactResult.Correct)))
             .SingleOrDefaultAsync(ct);
-
-    private Task LockCompetitionAsync(Guid competitionId, CancellationToken ct) =>
-        NoCTF.Infrastructure.Competitions.Participation.CompetitionParticipationLock.AcquireAsync(db, competitionId, ct);
 
     private static bool IsActive(RuntimeState state) =>
         state is RuntimeState.Queued or RuntimeState.Provisioning or RuntimeState.Running or RuntimeState.Stopping;
@@ -415,18 +500,10 @@ public sealed class RuntimeInstanceStore(
                 ? RuntimePurpose.AwdpAttack
                 : RuntimePurpose.Player;
 
-    private static bool IsValidAwdpConfiguration(RuntimeScope scope)
-    {
-        try
-        {
-            _ = AwdpConfigurationParser.ParseCompetition(scope.CompetitionConfigurationJson);
-            return true;
-        }
-        catch (GameModeConfigurationException)
-        {
-            return false;
-        }
-    }
+    private static bool IsValidAwdpConfiguration(RuntimeScope scope) =>
+        scope.CompetitionConfiguration is AwdpCompetitionModeConfiguration
+        && scope.Rules is AwdpCompetitionChallengeRules
+        && scope.Definition is AwdpChallengeDefinition;
 
     private static bool CanReset(RuntimeInstance instance) =>
         instance.State is RuntimeState.Queued or RuntimeState.Provisioning or RuntimeState.Running;
@@ -457,8 +534,15 @@ public sealed class RuntimeInstanceStore(
         RuntimeAccessMode RuntimeAccessMode,
         bool TrafficCaptureEnabled,
         long? TrafficCaptureLimitBytes,
-        string CompetitionConfigurationJson,
-        string RulesJson,
-        string DefinitionJson,
+        CompetitionModeConfiguration CompetitionConfiguration,
+        CompetitionChallengeRules Rules,
+        ChallengeDefinition? Definition,
         bool HasCorrectBreak);
+
+    private sealed record RuntimeReadScope(
+        Guid TeamId,
+        GameMode Mode,
+        CompetitionStatus Status,
+        bool PracticeModeEnabled,
+        bool ValidAwdpConfiguration);
 }

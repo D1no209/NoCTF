@@ -120,7 +120,7 @@ public sealed class CompetitionRuntimeProvisioningHandlerTests
         }
     }
 
-    private sealed class RecordingOutbox : ITransactionalMessageOutbox
+    private sealed class RecordingOutbox : IPostCommitMessagePublisher
     {
         public List<(object Message, DateTimeOffset At)> Scheduled { get; } = [];
         public int FlushCount { get; private set; }

@@ -2,7 +2,7 @@
 
 ## 框架
 
-统一 TUnit；NSubstitute 可用于纯单元测试。关系约束、事务、锁、Wolverine、Redis 不能用 Substitute/EF InMemory 证明，使用 Testcontainers PostgreSQL/Redis 与真实 Wolverine persistence。
+统一 TUnit；NSubstitute 可用于纯单元测试。关系约束、事务、乐观并发、JetStream、NATS KV 与 Redis 不能用 Substitute/EF InMemory 证明，使用 Testcontainers PostgreSQL/NATS/Redis 与真实 Wolverine transport。
 
 ## 单元测试
 
@@ -14,13 +14,13 @@
 - CTF DynamicExpresso 默认/覆盖/边界/异常、assignment 禁用、Reflection 不可达、未知 identifier/额外类型拒绝、decimal rounding/overflow；
 - 四模式投影、血奖、罚分、所有 tie-break；
 - GameplayFact 次数、预占释放、当前结果覆盖和重判平台失败保留结果；
-- 权限矩阵、Team/Competition UUID 数组不变量；
+- 权限矩阵、TeamMember/Captain/CompetitionCollaborator 关系不变量；
 - 逻辑 URL 与 provider-neutral Runtime 配置验证、Runtime Queued/Reset 新 UUID、每次 Checker 独立事实及异常退出/超时；
 - Problem code/result mapping。
 
 ## PostgreSQL 集成
 
-验证真实：GameplayFact 字段矩阵 check、PatchUpload Reference 部分唯一索引、uuid[]/GIN、jsonb、advisory lock 并发、尝试次数竞争、Dirty competition 领取、500 条 SKIP LOCKED drain、当前结果覆盖、Hint 并发扣分、Wolverine Inbox/Outbox/DLQ。禁止 EF InMemory 证明关系行为。
+验证真实：TPH discriminator、Complex Types、关系集合、普通唯一索引、UTC ticks、concurrency stamp、Serializable 重试、当前结果覆盖、Hint 并发扣分，以及没有 JSON/数组列、filtered index、方言 check constraint 或业务 Raw SQL。JetStream 集成验证至少一次重投、稳定业务幂等键、scheduled delivery、DLQ 和提交后重新派发；NATS KV 验证租约续期、接管与 fencing。
 
 不得使用 EF InMemory 替代这些测试。
 
@@ -84,18 +84,18 @@ skip；Release 的受控 Libvirt Runner 应设置该变量并使用专用 fixtur
 ### 无容器开发宿主
 
 `Development` 环境由 `NoCTF.Host` 单进程承载全部角色的 Wolverine handlers，使用
-EF Core InMemory、Wolverine 本地内存队列、FusionCache L1 和 Runner 容量门。生命周期、
+共享内存 SQLite、NATS JetStream、FusionCache L1 和 Runner 容量门。生命周期、
 Runner assignment、AWD checker 的维护消息也由该进程启动；排行榜投影和 SignalR 通知
 仍执行真实应用逻辑，只省略 Redis L2、backplane 和通知中继。生产使用相同的排行榜与
-订阅实现，仅通过配置为 FusionCache 附加 Redis。它不会连接 PostgreSQL 或 Redis，也不要求任何
-依赖容器；若本机 Docker Engine 可用，内置 Runner 会通过 Docker 的 `bridge` 网络直接
+订阅实现，仅通过配置为 FusionCache 附加 Redis。它不会连接 PostgreSQL 或 Redis，但必须连接
+NATS 2.12+；若本机 Docker Engine 可用，内置 Runner 会通过 Docker 的 `bridge` 网络直接
 创建题目 Runtime，否则只有 Runtime 操作不可用，API 仍可启动。数据只在进程生命周期内
-存在，且该模式不证明 PostgreSQL 约束、事务、锁或 Wolverine durable inbox/outbox 行为。
+存在，且该模式不证明 PostgreSQL provider 的迁移、事务或并发行为。
 
 FusionCache 按用途分为三个命名 profile：`leaderboards` 承载排行榜，`read-models` 缓存平台配置与
 公开比赛查询，`local-computation` 缓存 Runtime/AWD/KoH 配置 JSON 的解析结果。生产环境中
 前两者使用 Redis L2 与 backplane 进行跨进程失效；纯计算结果只保留进程内 L1，避免把可由
-输入稳定重建的数据写入 Redis。排行榜快照由 Dirty 刷新替换，不使用短逻辑 TTL；其他 TTL
+输入稳定重建的数据写入 Redis。排行榜快照由事件失效后的完整投影替换，不使用短逻辑 TTL；其他 TTL
 可通过 `Caching:ReadModelsTtlSeconds` 与 `Caching:LocalComputationTtlMinutes` 调整。
 
 从 `backend` 目录启动：
@@ -134,6 +134,14 @@ dotnet run --file backend/tests/e2e.cs -- --mode all --suite full
 dotnet run --file backend/tests/e2e.cs -- --mode awd --keep-environment
 ```
 
+已有同一源码构建的 Host 镜像时，可设置 `NOCTF_E2E_HOST_IMAGE` 跳过 Host 镜像重建；
+题目与 Checker fixture 仍由编排器构建。例如：
+
+```bash
+NOCTF_E2E_HOST_IMAGE=noctf-host:0.2.1-alpha.37 \
+  dotnet run --file backend/tests/e2e.cs -- --mode all --suite full
+```
+
 `--mode` 可取 `ctf`、`awd`、`awdp`、`koh`、`all`；`--suite` 可取 `smoke`、
 `full`。编排器从自身源文件位置定位仓库，为每个模式生成唯一 Compose project、
 network、volume、镜像、Runner pool 和随机凭据，以 Docker 分配的 backend host
@@ -153,8 +161,8 @@ Smoke 覆盖每种模式至少一条真实依赖流程：
 - AWDP：两队独立 Attack Runtime/端口、真实动态 Flag、错误/外队/旧 Runtime Break、无需 Break 的 Fix、一次 Checker、Break/Fix 持续按轮叠加、Pause/Resume/Finish 冻结、页面状态恢复；
 - KoH：共享 Runtime/Control Flag、正确/错误/不可用/超时/歧义行为、暂停恢复。
 
-Full 在模式业务流程之后还会验证 API 重启后原 JWT 有效、Redis 停止时认证回退
-PostgreSQL、Redis 恢复后 Runner heartbeat 重建，以及 PostgreSQL 重启后三进程重新
+Full 在模式业务流程之后还会验证 API 重启后原 JWT 有效、Redis 停止时现有 JWT 的
+TokenVersion 检查回退 PostgreSQL 且新登录不会绕过共享准入保护、Redis 恢复后登录与 Runner heartbeat 重建，以及 PostgreSQL 重启后三进程重新
 连接。服务停止和重启由编排器负责，成功条件只通过 HTTP 与 heartbeat 判断。
 
 E2E 只通过 HTTP、排行榜、GameplayFact、Runtime 管理 API 和 Runtime 对外行为判断

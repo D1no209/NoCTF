@@ -14,7 +14,7 @@ public sealed class CompetitionWebhookStore(
     NoCtfDbContext db,
     PlatformSecretProtector secrets,
     ICompetitionEventRecorder events,
-    ITransactionalMessageOutbox outbox,
+    IPostCommitMessagePublisher outbox,
     TimeProvider timeProvider) : ICompetitionWebhookStore
 {
     private static readonly TimeSpan PreviousSecretLifetime = TimeSpan.FromHours(24);
@@ -81,6 +81,7 @@ public sealed class CompetitionWebhookStore(
             UpdatedAt = command.Now
         };
         competition.WebhookConfiguration.Targets.Add(target);
+        db.Entry(target).State = EntityState.Added;
         competition.UpdatedAt = command.Now;
         await RecordChangeAsync(competition.Id, "WebhookTargetCreated", command.Now, cancellationToken);
         await db.SaveChangesAsync(cancellationToken);
@@ -199,13 +200,9 @@ public sealed class CompetitionWebhookStore(
     private Task<Competition?> LockCompetitionAsync(
         Guid competitionId,
         CancellationToken cancellationToken) =>
-        db.Database.IsRelational()
-            ? db.Competitions.FromSqlInterpolated(
-                    $"SELECT * FROM competitions WHERE id = {competitionId} FOR UPDATE")
-                .SingleOrDefaultAsync(cancellationToken)
-            : db.Competitions.SingleOrDefaultAsync(
-                item => item.Id == competitionId,
-                cancellationToken);
+        db.Competitions.SingleOrDefaultAsync(
+            item => item.Id == competitionId,
+            cancellationToken);
 
     private async Task RecordChangeAsync(
         Guid competitionId,

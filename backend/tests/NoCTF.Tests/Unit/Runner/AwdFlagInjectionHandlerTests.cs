@@ -35,7 +35,7 @@ public sealed class AwdFlagInjectionHandlerTests
             new FixedTimeProvider(now));
         var message = CreateMessage(now.AddMinutes(1));
 
-        var outcome = await handler.ExecuteAsync(message, CancellationToken.None);
+        var outcome = await handler.Handle(message, CancellationToken.None);
 
         await Assert.That(outcome).IsEqualTo(MessageExecutionOutcome.DeferredSchedule);
         var retry = outbox.ScheduledNodes.Single();
@@ -56,7 +56,7 @@ public sealed class AwdFlagInjectionHandlerTests
             RunnerConfiguration().ToRunnerOptions(),
             new FixedTimeProvider(now));
 
-        var outcome = await handler.ExecuteAsync(
+        var outcome = await handler.Handle(
             CreateMessage(now.AddMilliseconds(500)),
             CancellationToken.None);
 
@@ -82,7 +82,7 @@ public sealed class AwdFlagInjectionHandlerTests
         var work = CreateWork() with
         {
             RuntimeKind = RuntimeKind.Compose,
-            ProviderReceiptJson = JsonSerializer.Serialize(receipt),
+            ProviderReceipt = ComposeRuntimeReceiptData.From(receipt),
             Flag = "flag{a'b}",
             CommandTemplate = "set-flag ${FLAG}",
             ServiceName = "web"
@@ -109,7 +109,7 @@ public sealed class AwdFlagInjectionHandlerTests
             RunnerConfiguration().ToRunnerOptions(),
             new FixedTimeProvider(now));
 
-        await handler.ExecuteAsync(CreateMessage(now), CancellationToken.None);
+        await handler.Handle(CreateMessage(now), CancellationToken.None);
 
         await Assert.That(executor.CallCount).IsEqualTo(0);
         await Assert.That(outbox.Published).HasSingleItem();
@@ -129,7 +129,7 @@ public sealed class AwdFlagInjectionHandlerTests
             RunnerConfiguration().ToRunnerOptions(),
             clock);
 
-        await handler.ExecuteAsync(CreateMessage(deadline), CancellationToken.None);
+        await handler.Handle(CreateMessage(deadline), CancellationToken.None);
 
         await Assert.That(outbox.ScheduledNodes).IsEmpty();
         var failure = outbox.Published.OfType<AwdFlagInjectionFailed>().Single();
@@ -140,7 +140,7 @@ public sealed class AwdFlagInjectionHandlerTests
         Guid.Parse("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"),
         RuntimeKind.Container,
         RuntimeProvider.Docker,
-        "{}",
+        RuntimeReceiptTestData.ContainerData(),
         "flag{value}",
         "set-flag ${FLAG}",
         null,
@@ -202,7 +202,7 @@ public sealed class AwdFlagInjectionHandlerTests
         public override DateTimeOffset GetUtcNow() => UtcNow;
     }
 
-    private sealed class RecordingOutbox : ITransactionalMessageOutbox
+    private sealed class RecordingOutbox : IPostCommitMessagePublisher
     {
         public List<object> Published { get; } = [];
         public List<(object Message, DateTimeOffset At)> ScheduledNodes { get; } = [];

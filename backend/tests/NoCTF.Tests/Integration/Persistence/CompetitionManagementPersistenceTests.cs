@@ -26,7 +26,7 @@ public sealed class CompetitionManagementPersistenceTests
 {
     [Test]
     [Timeout(300_000)]
-    public async Task Create_competition_persists_the_current_configuration_schema_for_every_mode(
+    public async Task Create_competition_persists_the_matching_typed_configuration_for_every_mode(
         CancellationToken cancellationToken)
     {
         await DockerIntegrationTest.RunAsync(async () =>
@@ -60,12 +60,12 @@ public sealed class CompetitionManagementPersistenceTests
             await db.SaveChangesAsync(cancellationToken);
 
             var store = new CompetitionManagementStore(db);
-            foreach (var descriptor in GameModeCatalog.All)
+            foreach (var mode in Enum.GetValues<GameMode>())
             {
                 var result = await store.CreateAsync(new(
-                    $"{descriptor.Mode} defaults",
+                    $"{mode} defaults",
                     null,
-                    descriptor.Mode,
+                    mode,
                     now.AddHours(1),
                     now.AddHours(2),
                     true,
@@ -74,17 +74,10 @@ public sealed class CompetitionManagementPersistenceTests
                     ownerId,
                     now), cancellationToken);
                 var competitionId = result.Competition!.Id;
-                var persistedJson = await db.Competitions
+                var persisted = await db.Competitions
                     .AsNoTracking()
-                    .Where(competition => competition.Id == competitionId)
-                    .Select(competition => competition.ConfigurationJson)
-                    .SingleAsync(cancellationToken);
-                using var document = System.Text.Json.JsonDocument.Parse(persistedJson);
-
-                await Assert.That(document.RootElement
-                        .GetProperty("schemaVersion")
-                        .GetInt32())
-                    .IsEqualTo(descriptor.CurrentSchemaVersion);
+                    .SingleAsync(competition => competition.Id == competitionId, cancellationToken);
+                await Assert.That(persisted.ModeConfiguration!.Mode).IsEqualTo(mode);
             }
         });
     }
@@ -140,7 +133,7 @@ public sealed class CompetitionManagementPersistenceTests
                     CompetitionStatus.Draft));
             await db.SaveChangesAsync(cancellationToken);
 
-            var outbox = new NoOpTransactionalMessageOutbox();
+            var outbox = new NoOpPostCommitMessagePublisher();
             var store = new CompetitionManagementStore(
                 db,
                 outbox,
@@ -220,32 +213,30 @@ public sealed class CompetitionManagementPersistenceTests
             var challengeId = Guid.CreateVersion7();
             var competitionChallengeId = Guid.CreateVersion7();
             var runtimeId = Guid.CreateVersion7();
-            db.Challenges.Add(new Challenge
+            db.Challenges.Add(new CtfChallenge
             {
                 Id = challengeId,
                 OwnerId = ownerId,
-                Mode = GameMode.Ctf,
                 Title = "Runtime access test",
-                DefinitionJson = "{}",
+                Definition = TestConfigurations.Definition(GameMode.Ctf),
                 CreatedAt = now,
                 UpdatedAt = now
             });
-            db.CompetitionChallenges.Add(new CompetitionChallenge
+            db.CompetitionChallenges.Add(new CtfCompetitionChallenge
             {
                 Id = competitionChallengeId,
                 CompetitionId = competitionId,
                 ChallengeId = challengeId,
                 Order = 1,
                 IsPublished = true,
-                RulesJson = "{}",
+                Rules = TestConfigurations.Rules(GameMode.Ctf),
                 UpdatedAt = now
             });
-            db.RuntimeInstances.Add(new RuntimeInstance
+            db.RuntimeInstances.Add(new PlayerRuntimeInstance
             {
                 Id = runtimeId,
                 CompetitionId = competitionId,
                 CompetitionChallengeId = competitionChallengeId,
-                Purpose = RuntimePurpose.Player,
                 AccessMode = RuntimeAccessMode.Direct,
                 RuntimeKind = RuntimeKind.Container,
                 RuntimeProvider = RuntimeProvider.Docker,
@@ -294,7 +285,7 @@ public sealed class CompetitionManagementPersistenceTests
 
             var registrations = new TeamRegistrationStore(
                 db,
-                new NoOpTransactionalMessageOutbox());
+                new NoOpPostCommitMessagePublisher());
             var allowed = await registrations.TryCreateAsync(
                 new(competitionId, ownerId, "Running team", now.AddMinutes(2), "default"),
                 TeamRegistrationStatus.Approved,
@@ -318,17 +309,16 @@ public sealed class CompetitionManagementPersistenceTests
         string title,
         DateTimeOffset startAt,
         CompetitionStatus status) =>
-        new()
+        new CtfCompetition
         {
             Id = id,
             OwnerId = ownerId,
             Title = title,
-            Mode = GameMode.Ctf,
             StartAt = startAt,
             EndAt = startAt.AddHours(1),
             Status = status,
             MaxTeamMembers = 5,
-            ConfigurationJson = "{}",
+            ModeConfiguration = TestConfigurations.Competition(GameMode.Ctf),
             FlagDerivationSecret = new byte[32],
             CreatedAt = startAt,
             UpdatedAt = startAt,

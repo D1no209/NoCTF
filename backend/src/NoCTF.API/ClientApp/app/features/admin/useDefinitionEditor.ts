@@ -1,6 +1,7 @@
 import { markRaw, toRefs } from 'vue'
 
 import type { GameModeValue } from '../../utils/game-config'
+import type { NoCtfapiEndpointsAdministrationChallengeBankChallengeDefinitionContract } from '../../api'
 import { applyCtfInteraction, CtfInteraction } from '../../utils/game-config'
 import DefinitionCheckerSectionComponent from './DefinitionCheckerSection.vue'
 import DefinitionFlagInjectionSectionComponent from './DefinitionFlagInjectionSection.vue'
@@ -9,21 +10,19 @@ import DefinitionRuntimeSectionComponent from './DefinitionRuntimeSection.vue'
 
 /** Owns state, effects and commands for DefinitionEditor. */
 export function useDefinitionEditor(props: Readonly<Omit<{
-  /** definitionJson 字符串(v-model)。 */
-  modelValue: string
+  modelValue: NoCtfapiEndpointsAdministrationChallengeBankChallengeDefinitionContract
   mode: GameModeValue
   disabled?: boolean
 }, "disabled"> & Required<Pick<{
-  /** definitionJson 字符串(v-model)。 */
-  modelValue: string
+  modelValue: NoCtfapiEndpointsAdministrationChallengeBankChallengeDefinitionContract
   mode: GameModeValue
   disabled?: boolean
 }, "disabled">>>,
-emit: { (event: "update:modelValue", ...args: [json: string]): void }) {
+emit: { (event: "update:modelValue", ...args: [definition: NoCtfapiEndpointsAdministrationChallengeBankChallengeDefinitionContract]): void }) {
   const { model, parseFailed } = useDefinitionModel(
     () => props.modelValue,
     () => props.mode,
-    json => emit('update:modelValue', json),
+    definition => emit('update:modelValue', definition),
   )
 
   const DefinitionCheckerSection = markRaw(DefinitionCheckerSectionComponent)

@@ -12,16 +12,18 @@ public sealed class DeploymentTopologyTests
         var runtimeEnv = await ReadAsync("deploy", "env", "noctf", ".env.example");
         var healthcheck = await ReadAsync("backend", "docker", "healthcheck.sh");
         var hostProgram = await ReadAsync("backend", "src", "NoCTF.Host", "Program.cs");
+        var hostProject = await ReadAsync("backend", "src", "NoCTF.Host", "NoCTF.Host.csproj");
         var roleModel = await ReadAsync("backend", "src", "NoCTF.Hosting", "HostRoles.cs");
         var routing = await ReadAsync("backend", "src", "NoCTF.Hosting", "MessageRouting.cs");
         var persistence = await ReadAsync(
             "backend", "src", "NoCTF.Hosting", "WolverineHosting.cs");
         var outbox = await ReadAsync(
             "backend", "src", "NoCTF.Infrastructure", "Messaging",
-            "WolverineTransactionalMessageOutbox.cs");
+            "WolverinePostCommitMessagePublisher.cs");
         var workerTopology = await ReadAsync(
             "backend", "src", "NoCTF.Worker",
             "WorkerMessageTopologyStartupValidator.cs");
+        var workerRole = await ReadAsync("backend", "src", "NoCTF.Worker", "WorkerRole.cs");
         var runnerTopology = await ReadAsync(
             "backend", "src", "NoCTF.Runner", "RunnerRole.cs");
         var workerDeployment = Path.Combine(
@@ -35,6 +37,7 @@ public sealed class DeploymentTopologyTests
         await Assert.That(dockerfile).Contains("libgssapi-krb5-2");
         await Assert.That(dockerfile).Contains("FROM runtime AS host");
         await Assert.That(dockerfile).Contains("NoCTF.Host.dll");
+        await Assert.That(dockerfile).Contains("codegen write");
         await Assert.That(dockerfile).DoesNotContain("NoCTF.API.dll");
         await Assert.That(dockerfile).DoesNotContain("NoCTF.Worker.dll");
         await Assert.That(dockerfile).DoesNotContain("NoCTF.Runner.dll");
@@ -53,6 +56,25 @@ public sealed class DeploymentTopologyTests
         await Assert.That(roleModel).Contains("public enum HostRole");
         await Assert.That(roleModel).Contains("HostRole.Api, HostRole.Worker, HostRole.Runner");
         await Assert.That(hostProgram).Contains("HostRoles.FromConfiguration");
+        await Assert.That(hostProgram).DoesNotContain("NoCTF.Persistence.Sqlite");
+        await Assert.That(hostProject).DoesNotContain("NoCTF.Persistence.Sqlite");
+        await Assert.That(hostProgram).Contains("TypeLoadMode.Static");
+        await Assert.That(hostProgram).Contains("ServiceLocationPolicy.NotAllowed");
+        await Assert.That(File.Exists(Path.Combine(
+            RepositoryRoot, "backend", "src", "NoCTF.Host", "Internal",
+            "Generated", "WolverineHandlers", "GeneratedHandlerRegistry.cs"))).IsTrue();
+        var generatedRegistry = await ReadAsync("backend", "src", "NoCTF.Host",
+            "Internal", "Generated", "WolverineHandlers", "GeneratedHandlerRegistry.cs");
+        await Assert.That(generatedRegistry).Contains("typeof(NoCTF.Worker.KohPollingHandler)");
+        await Assert.That(generatedRegistry).Contains("typeof(NoCTF.Worker.KohObservationHandler)");
+        await Assert.That(generatedRegistry).Contains(
+            "typeof(NoCTF.Worker.ExpireAccountSourceAddressesHandler)");
+        var generatedHandlers = Path.Combine(RepositoryRoot, "backend", "src",
+            "NoCTF.Host", "Internal", "Generated", "WolverineHandlers");
+        var runtimeDispatchHandler = await File.ReadAllTextAsync(
+            Directory.GetFiles(generatedHandlers, "DispatchRuntimeHandler*.cs").Single());
+        await Assert.That(runtimeDispatchHandler).Contains("PersistedRunnerCapacityGate");
+        await Assert.That(runtimeDispatchHandler).DoesNotContain("jasperfx-enumerable-singleton-0");
         await Assert.That(hostProgram).Contains("ConfigureNoCtfWorkerMessaging");
         await Assert.That(hostProgram).Contains("ConfigureNoCtfRunnerMessaging");
         await Assert.That(routing)
@@ -61,22 +83,34 @@ public sealed class DeploymentTopologyTests
             .Contains("route.ToNatsSubject(NatsSubjects.RealtimeEvents)");
         await Assert.That(routing)
             .Contains("route.ToNatsSubject(NatsSubjects.LeaderboardEvents)");
-        await Assert.That(persistence).Contains("PersistMessagesWithPostgresql");
-        await Assert.That(persistence).Contains("UseEntityFrameworkCoreTransactions");
+        await Assert.That(persistence).DoesNotContain("PersistMessagesWithPostgresql");
+        await Assert.That(persistence).DoesNotContain("UseEntityFrameworkCoreTransactions");
         await Assert.That(persistence)
             .Contains("new AwdpFixVerificationExecutionTimeoutPolicy()")
             .And.DoesNotContain("ExecutionTimeoutInSeconds = 60");
         await Assert.That(persistence).Contains("options.UseNats(nats)");
-        await Assert.That(outbox).Contains("IDbContextOutbox<NoCtfDbContext>");
-        await Assert.That(outbox).Contains("MultiFlushMode.AllowMultiples");
-        await Assert.That(outbox).Contains("nats://subject/noctf.runner.");
+        foreach (var scheduledQueue in new[]
+                 {
+                     "WorkerQueue.Control",
+                     "WorkerQueue.Gameplay",
+                     "WorkerQueue.Background"
+                 })
+            await Assert.That(persistence)
+                .Contains($"NatsSubjects.ScheduledSubject({scheduledQueue})");
+        await Assert.That(outbox).Contains("IMessageBus bus");
+        await Assert.That(outbox).DoesNotContain("IDbContextOutbox<NoCtfDbContext>");
+        await Assert.That(outbox).Contains("nats://subject/noctf.v2.runner.");
         await Assert.That(workerTopology)
             .Contains("endpoint.BrokerRole, \"stream\"");
+        await Assert.That(workerRole).Contains("IncludeType(typeof(KohPollingHandler))");
+        await Assert.That(workerRole).Contains("IncludeType(typeof(KohObservationHandler))");
         await Assert.That(workerTopology)
             .Contains("typeof(SendEmailVerification)")
             .And.Contains("BackgroundEndpointAddress()");
         await Assert.That(routing)
             .Contains("Route<CompleteAwdpFixRecovery>(options, WorkerQueue.Control)");
+        await Assert.That(routing)
+            .Contains("Route<DispatchPendingGameplayFacts>(options, WorkerQueue.Control)");
         await Assert.That(routing)
             .Contains("Route<StartAwdpFixVerification>(options, WorkerQueue.Gameplay)");
         await Assert.That(routing)

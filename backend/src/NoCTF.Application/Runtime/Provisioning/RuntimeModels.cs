@@ -9,7 +9,23 @@ public sealed record ContainerSecurityPolicy(
     bool ReadonlyRootfs,
     bool RunAsNonRoot,
     IReadOnlyList<string> CapDrop,
-    IReadOnlyList<string> CapAdd);
+    IReadOnlyList<string> CapAdd)
+{
+    public static ContainerSecurityPolicy Default { get; } =
+        new(false, false, false, [], []);
+
+    public ContainerSecurityPolicy NormalizeCapabilities() => this with
+    {
+        CapDrop = Normalize(CapDrop),
+        CapAdd = Normalize(CapAdd)
+    };
+
+    private static IReadOnlyList<string> Normalize(IReadOnlyList<string>? capabilities) =>
+        capabilities?
+            .Where(capability => !string.IsNullOrWhiteSpace(capability))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray() ?? [];
+}
 
 public sealed class RuntimeConfigurationException(string message) : Exception(message);
 
@@ -73,11 +89,11 @@ public abstract record ChallengeRuntimeDefinition
 
 public sealed record ContainerRuntimeDefinition(
     string Image,
+    ContainerSecurityPolicy Security,
     IReadOnlyList<string>? Command = null,
     IReadOnlyDictionary<string, string>? Environment = null,
     IReadOnlyDictionary<string, string>? Labels = null,
     IReadOnlyDictionary<int, int>? PortMappings = null,
-    ContainerSecurityPolicy? Security = null,
     string? FlagEnvironmentVariableName = null,
     RuntimeEgressPolicy EgressPolicy = RuntimeEgressPolicy.Isolated,
     IReadOnlyList<int>? InternalPorts = null) : ChallengeRuntimeDefinition
@@ -121,7 +137,7 @@ public sealed record ChallengeRuntimeTemplate(
 
 public interface IChallengeRuntimeTemplateCatalog
 {
-    ChallengeRuntimeTemplate? Get(NoCTF.Domain.Competitions.GameMode mode, string challengeConfigurationJson);
+    ChallengeRuntimeTemplate? Get(NoCTF.Domain.Challenges.ChallengeDefinition? definition);
 }
 
 public sealed record RuntimePlacement(RuntimeProvider Provider, string RunnerPool);
@@ -354,7 +370,7 @@ public interface IRuntimeProxyNetworkReconciler
     Task EnsureProxyNetworkAsync(
         Guid runtimeInstanceId,
         RuntimeKind runtimeKind,
-        string providerReceiptJson,
+        RuntimeReceiptData providerReceipt,
         CancellationToken cancellationToken);
 }
 

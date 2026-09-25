@@ -135,12 +135,12 @@ public static class CompetitionNotificationMessageHandlers
             .SingleOrDefaultAsync(ct);
         var competition = await db.Competitions.AsNoTracking()
             .Where(item => item.Id == message.CompetitionId)
-            .Select(item => new { item.Mode, item.TrackConfigurationJson })
+            .Select(item => new { item.Mode, item.Tracks })
             .SingleOrDefaultAsync(ct);
         if (competition is null
-            || CompetitionTrackConfiguration.ParseOrDefault(
+            || CompetitionTrackConfiguration.FromPersisted(
                 competition.Mode,
-                competition.TrackConfigurationJson).Find(teamTrack)?.IsInternal == true)
+                competition.Tracks).Find(teamTrack)?.IsInternal == true)
             return;
 
         if (message.AnnouncementKind is not { } announcementKind)

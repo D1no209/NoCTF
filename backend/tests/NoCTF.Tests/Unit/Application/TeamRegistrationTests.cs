@@ -63,7 +63,7 @@ public class TeamRegistrationTests
     [Test]
     public async Task CreateTeam_Requires_an_explicit_publicly_selectable_track()
     {
-        var configuration = new CompetitionTrackConfiguration(1,
+        var configuration = new CompetitionTrackConfiguration(
         [
             Track("formal", isDefault: true, publicSelectable: true),
             Track("invite", publicSelectable: false),
@@ -74,7 +74,7 @@ public class TeamRegistrationTests
             AutoApprove: true,
             CompetitionDeleted: false,
             Mode: GameMode.Ctf,
-            TrackConfigurationJson: CompetitionTrackConfiguration.Serialize(configuration),
+            Tracks: CompetitionTrackConfiguration.ToPersisted(configuration),
             TracksEnabled: true);
         var store = new Store(policy);
         var create = new CreateTeam(store);
@@ -99,7 +99,7 @@ public class TeamRegistrationTests
     [Test]
     public async Task CreateTeam_Defers_protected_track_requirements_until_submission()
     {
-        var configuration = new CompetitionTrackConfiguration(1,
+        var configuration = new CompetitionTrackConfiguration(
         [
             Track("formal", isDefault: true),
             Track("invite", invitationCode: "let-me-in")
@@ -109,7 +109,7 @@ public class TeamRegistrationTests
             AutoApprove: true,
             CompetitionDeleted: false,
             Mode: GameMode.Ctf,
-            TrackConfigurationJson: CompetitionTrackConfiguration.Serialize(configuration),
+            Tracks: CompetitionTrackConfiguration.ToPersisted(configuration),
             TracksEnabled: true);
         var store = new Store(policy);
         var create = new CreateTeam(store);
@@ -130,7 +130,7 @@ public class TeamRegistrationTests
     [Test]
     public async Task CreateTeam_Disabled_tracks_allow_omitted_track_and_ignore_invitation_data()
     {
-        var configuration = new CompetitionTrackConfiguration(1,
+        var configuration = new CompetitionTrackConfiguration(
         [
             Track("formal", isDefault: true),
             Track("invite", invitationCode: "let-me-in")
@@ -140,7 +140,7 @@ public class TeamRegistrationTests
             AutoApprove: true,
             CompetitionDeleted: false,
             Mode: GameMode.Ctf,
-            TrackConfigurationJson: CompetitionTrackConfiguration.Serialize(configuration),
+            Tracks: CompetitionTrackConfiguration.ToPersisted(configuration),
             TracksEnabled: false));
 
         var result = await new CreateTeam(store).ExecuteAsync(new(
@@ -212,8 +212,21 @@ public class TeamRegistrationTests
         await Assert.That(store.LastFindForUserIncludedPending).IsTrue();
     }
 
-    private sealed class Store(TeamRegistrationPolicy policy) : ITeamRegistrationStore
+    private sealed class Store : ITeamRegistrationStore
     {
+        private readonly TeamRegistrationPolicy policy;
+
+        public Store(TeamRegistrationPolicy policy)
+        {
+            this.policy = policy.Tracks is null or { Count: 0 }
+                ? policy with
+                {
+                    Tracks = CompetitionTrackConfiguration.ToPersisted(
+                        CompetitionTrackConfiguration.DefaultFor(policy.Mode))
+                }
+                : policy;
+        }
+
         public TeamRegistrationStatus? Status { get; private set; }
         public int ReviewWriteCount { get; private set; }
         public bool? LastFindForUserIncludedPending { get; private set; }

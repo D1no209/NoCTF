@@ -1,5 +1,4 @@
 using System.Linq.Expressions;
-using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using NoCTF.Application.Scoring.Leaderboard;
 using NoCTF.Domain.Challenges;
@@ -8,6 +7,7 @@ using NoCTF.Domain.Gameplay;
 using NoCTF.Infrastructure.Persistence;
 using NoCTF.GameModes.Awd.Configuration;
 using NoCTF.GameModes.Awd.Scheduling;
+using NoCTF.GameModes.Registration;
 
 namespace NoCTF.Infrastructure.Scoring.Leaderboard;
 
@@ -18,14 +18,12 @@ namespace NoCTF.Infrastructure.Scoring.Leaderboard;
 /// </summary>
 internal static class LeaderboardFactProjectionReader
 {
-    private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
-
     public static async Task<LeaderboardFactProjectionRows> ReadAsync(
         NoCtfDbContext db,
         Guid competitionId,
         GameMode mode,
         CompetitionStatus competitionStatus,
-        string? competitionConfigurationJson,
+        CompetitionModeConfiguration? competitionConfiguration,
         DateTimeOffset? competitionStart,
         DateTimeOffset? competitionEnd,
         IReadOnlyList<CompetitionLifecycleTransition> lifecycle,
@@ -42,7 +40,7 @@ internal static class LeaderboardFactProjectionReader
         if (mode == GameMode.Awdp)
         {
             var window = BuildAwdpWindow(
-                competitionConfigurationJson,
+                competitionConfiguration,
                 competitionStart,
                 lifecycle,
                 projectedAt,
@@ -73,7 +71,7 @@ internal static class LeaderboardFactProjectionReader
             var aggregates = await ReadAwdAggregatesAsync(
                 db,
                 competitionId,
-                competitionConfigurationJson,
+                competitionConfiguration,
                 challenges,
                 teams,
                 projectedAt,
@@ -209,7 +207,7 @@ internal static class LeaderboardFactProjectionReader
     private static async Task<IReadOnlyList<LeaderboardAwdAggregateFact>> ReadAwdAggregatesAsync(
         NoCtfDbContext db,
         Guid competitionId,
-        string? competitionConfigurationJson,
+        CompetitionModeConfiguration? competitionConfiguration,
         IReadOnlyList<LeaderboardChallengeFact> challenges,
         IReadOnlyList<LeaderboardTeamFact> teams,
         DateTimeOffset projectedAt,
@@ -237,12 +235,14 @@ internal static class LeaderboardFactProjectionReader
         if (accumulators.Count == 0)
             return [];
 
-        var configuration = ParseAwdConfiguration(competitionConfigurationJson);
+        var configuration = competitionConfiguration is AwdCompetitionModeConfiguration awd
+            ? TypedGameModeConfiguration.Awd(awd)
+            : AwdConfiguration.Default;
         var settingsByChallenge = challenges
             .Where(challenge => activeChallengeIds.Contains(challenge.Id))
             .ToDictionary(
                 challenge => challenge.Id,
-                challenge => Effective(configuration, challenge.ConfigurationJson));
+                challenge => Effective(configuration, challenge.Rules));
         var attackFacts = db.GameplayFacts.AsNoTracking()
             .Where(fact => fact.CompetitionId == competitionId
                 && fact.OccurredAt <= projectedAt
@@ -395,29 +395,13 @@ internal static class LeaderboardFactProjectionReader
             .ToArray();
     }
 
-    private static AwdConfiguration ParseAwdConfiguration(string? json)
+    private static AwdScoringSettings Effective(
+        AwdConfiguration competition,
+        CompetitionChallengeRules? challengeRules)
     {
-        if (string.IsNullOrWhiteSpace(json))
-            return AwdConfiguration.Default;
-        try
-        {
-            return JsonSerializer.Deserialize<AwdConfiguration>(json, JsonOptions)
-                ?? AwdConfiguration.Default;
-        }
-        catch (JsonException)
-        {
-            return AwdConfiguration.Default;
-        }
-    }
-
-    private static AwdScoringSettings Effective(AwdConfiguration competition, string? challengeJson)
-    {
-        AwdChallengeConfiguration? challenge = null;
-        if (!string.IsNullOrWhiteSpace(challengeJson))
-        {
-            try { challenge = JsonSerializer.Deserialize<AwdChallengeConfiguration>(challengeJson, JsonOptions); }
-            catch (JsonException) { }
-        }
+        var challenge = challengeRules is AwdCompetitionChallengeRules awd
+            ? TypedGameModeConfiguration.Awd(awd)
+            : null;
         return new(
             challenge?.AttackRewardMode ?? competition.AttackRewardMode,
             challenge?.AttackPoints ?? competition.AttackPoints,
@@ -738,14 +722,14 @@ internal static class LeaderboardFactProjectionReader
     }
 
     private static AwdpProjectionWindow BuildAwdpWindow(
-        string? configurationJson,
+        CompetitionModeConfiguration? configuration,
         DateTimeOffset? competitionStart,
         IReadOnlyList<CompetitionLifecycleTransition> lifecycle,
         DateTimeOffset projectedAt,
         CompetitionStatus competitionStatus,
         int? endingRound)
     {
-        var duration = ReadRoundDuration(configurationJson);
+        var duration = ReadRoundDuration(configuration);
         var elapsed = EffectiveElapsed(lifecycle, competitionStart, projectedAt);
         var elapsedSeconds = Math.Max(0, elapsed.TotalSeconds);
         var completedRounds = checked((int)(elapsedSeconds / duration));
@@ -778,24 +762,10 @@ internal static class LeaderboardFactProjectionReader
             IncludePenaltyCutoff: competitionFinished);
     }
 
-    private static int ReadRoundDuration(string? json)
-    {
-        if (string.IsNullOrWhiteSpace(json))
-            return 300;
-        try
-        {
-            using var document = JsonDocument.Parse(json);
-            return document.RootElement.TryGetProperty("roundDurationSeconds", out var value)
-                && value.TryGetInt32(out var duration)
-                && duration > 0
-                    ? duration
-                    : 300;
-        }
-        catch (JsonException)
-        {
-            return 300;
-        }
-    }
+    private static int ReadRoundDuration(CompetitionModeConfiguration? configuration) =>
+        configuration is AwdpCompetitionModeConfiguration { RoundDurationSeconds: > 0 } awdp
+            ? awdp.RoundDurationSeconds
+            : 300;
 
     private static TimeSpan EffectiveElapsed(
         IReadOnlyList<CompetitionLifecycleTransition> lifecycle,

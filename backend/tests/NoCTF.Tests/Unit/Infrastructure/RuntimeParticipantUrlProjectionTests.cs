@@ -1,6 +1,6 @@
-using System.Text.Json;
 using NoCTF.Application.Runtime.Provisioning;
 using NoCTF.Application.Runtime.Instances;
+using NoCTF.Domain.Challenges;
 using NoCTF.Domain.Competitions;
 using NoCTF.GameModes.Ctf.Configuration;
 using NoCTF.GameModes.Registration;
@@ -28,12 +28,10 @@ public sealed class RuntimeParticipantUrlProjectionTests
 
         var before = RuntimeParticipantUrlProjection.Filter(
             catalog,
-            GameMode.Ctf,
             original,
             endpoints);
         var after = RuntimeParticipantUrlProjection.Filter(
             catalog,
-            GameMode.Ctf,
             updated,
             endpoints);
 
@@ -43,17 +41,24 @@ public sealed class RuntimeParticipantUrlProjectionTests
             .IsEquivalentTo(["tcp://host:30001"]);
     }
 
-    private static string Definition(params RuntimeUrlBinding[] bindings) =>
-        JsonSerializer.Serialize(
-            new CtfChallengeConfiguration(
-                CtfChallengeConfiguration.CurrentSchemaVersion,
-                null,
-                null,
-                Runtime: new ChallengeRuntimeTemplate(
-                    RuntimeAllocation.PerTeam,
-                    new ContainerRuntimeDefinition(
-                        "example.invalid/runtime:test",
-                        Security: new(false, false, false, ["ALL"], [])),
-                    UrlBindings: bindings)),
-            new JsonSerializerOptions(JsonSerializerDefaults.Web));
+    private static ChallengeDefinition Definition(params RuntimeUrlBinding[] bindings) =>
+        new CtfChallengeDefinition
+        {
+            Runtime = new ContainerChallengeRuntimeTemplate
+            {
+                Allocation = PersistedRuntimeAllocation.PerTeam,
+                Image = "example.invalid/runtime:test",
+                Capabilities = [new() { Add = false, Name = "ALL" }],
+                UrlBindings = bindings.Select((binding, position) => new ChallengeRuntimeUrlBinding
+                {
+                    Position = position,
+                    UrlTemplate = binding.UrlTemplate,
+                    Exposure = (PersistedRuntimeExposure)binding.Exposure,
+                    ContainerPort = binding.ContainerPort,
+                    ServiceName = binding.ServiceName,
+                    VmId = binding.VmId,
+                    GuestPort = binding.GuestPort
+                }).ToList()
+            }
+        };
 }

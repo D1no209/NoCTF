@@ -3,13 +3,15 @@ using System.Net.Sockets;
 using MailKit;
 using MailKit.Net.Smtp;
 using MailKit.Security;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using MimeKit;
 using MimeKit.Utils;
-using NoCTF.Application.Authentication.Account;
 using NoCTF.Application.Authentication.EmailVerification;
 using NoCTF.Application.Authentication.PasswordReset;
 using NoCTF.Domain.Identity;
+using NoCTF.Domain.Platform;
+using NoCTF.Infrastructure.Persistence;
 
 namespace NoCTF.Infrastructure.Authentication;
 
@@ -24,9 +26,8 @@ public sealed class EmailVerificationSmtpClientFactory : IEmailVerificationSmtpC
 }
 
 public sealed class SmtpEmailVerificationDelivery(
-    IEmailVerificationConfigurationStore configurationStore,
-    IEmailVerificationDeliveryConfigurationReader deliveryConfiguration,
-    IUserAuthenticationStore users,
+    IDbContextFactory<NoCtfDbContext> dbContextFactory,
+    PlatformSecretProtector secrets,
     IEmailVerificationSmtpClientFactory clientFactory,
     ILogger<SmtpEmailVerificationDelivery> logger)
     : IEmailVerificationDelivery,
@@ -37,17 +38,15 @@ public sealed class SmtpEmailVerificationDelivery(
         string token,
         CancellationToken ct)
     {
-        var publicConfiguration = await configurationStore.GetAsync(ct);
-        if (!publicConfiguration.Enabled)
-            return EmailVerificationDeliveryState.Disabled;
-
-        var configuration = await deliveryConfiguration.GetDeliveryConfigurationAsync(
+        var (enabled, configuration) = await LoadConfigurationAsync(
             requireEnabled: true,
             ct);
+        if (!enabled)
+            return EmailVerificationDeliveryState.Disabled;
         if (configuration is null)
             return EmailVerificationDeliveryState.NotConfigured;
 
-        var user = await users.GetProfileAsync(userId, ct);
+        var user = await LoadRecipientAsync(userId, ct);
         if (user is null)
             return EmailVerificationDeliveryState.RecipientNotFound;
 
@@ -81,17 +80,15 @@ public sealed class SmtpEmailVerificationDelivery(
         Guid userId,
         CancellationToken ct)
     {
-        var publicConfiguration = await configurationStore.GetAsync(ct);
-        if (!publicConfiguration.Enabled)
-            return EmailVerificationDeliveryState.Disabled;
-
-        var configuration = await deliveryConfiguration.GetDeliveryConfigurationAsync(
+        var (enabled, configuration) = await LoadConfigurationAsync(
             requireEnabled: true,
             ct);
+        if (!enabled)
+            return EmailVerificationDeliveryState.Disabled;
         if (configuration is null)
             return EmailVerificationDeliveryState.NotConfigured;
 
-        var user = await users.GetProfileAsync(userId, ct);
+        var user = await LoadRecipientAsync(userId, ct);
         if (user is null)
             return EmailVerificationDeliveryState.RecipientNotFound;
 
@@ -112,13 +109,13 @@ public sealed class SmtpEmailVerificationDelivery(
         string token,
         CancellationToken ct)
     {
-        var configuration = await deliveryConfiguration.GetDeliveryConfigurationAsync(
+        var (_, configuration) = await LoadConfigurationAsync(
             requireEnabled: false,
             ct);
         if (configuration is null)
             return PasswordResetEmailDeliveryState.NotConfigured;
 
-        var user = await users.GetProfileAsync(userId, ct);
+        var user = await LoadRecipientAsync(userId, ct);
         if (user is null)
             return PasswordResetEmailDeliveryState.RecipientNotFound;
 
@@ -149,13 +146,13 @@ public sealed class SmtpEmailVerificationDelivery(
         Guid userId,
         CancellationToken ct)
     {
-        var configuration = await deliveryConfiguration.GetDeliveryConfigurationAsync(
+        var (_, configuration) = await LoadConfigurationAsync(
             requireEnabled: false,
             ct);
         if (configuration is null)
             return PasswordResetEmailDeliveryState.NotConfigured;
 
-        var user = await users.GetProfileAsync(userId, ct);
+        var user = await LoadRecipientAsync(userId, ct);
         if (user is null)
             return PasswordResetEmailDeliveryState.RecipientNotFound;
 
@@ -170,6 +167,29 @@ public sealed class SmtpEmailVerificationDelivery(
         await SendAsync(configuration, message, ct);
         logger.LogInformation("Sent a password change notice to user {UserId}.", userId);
         return PasswordResetEmailDeliveryState.Sent;
+    }
+
+    private async Task<(bool Enabled, EmailVerificationDeliveryConfiguration? Configuration)>
+        LoadConfigurationAsync(bool requireEnabled, CancellationToken ct)
+    {
+        await using var db = await dbContextFactory.CreateDbContextAsync(ct);
+        var settings = await db.PlatformSettings.AsNoTracking()
+            .SingleAsync(candidate => candidate.Id == 1, ct);
+        return (
+            settings.EmailVerificationEnabled,
+            EmailVerificationConfigurationStore.ToDeliveryConfiguration(
+                settings,
+                secrets,
+                requireEnabled));
+    }
+
+    private async Task<EmailRecipient?> LoadRecipientAsync(Guid userId, CancellationToken ct)
+    {
+        await using var db = await dbContextFactory.CreateDbContextAsync(ct);
+        return await db.Users.AsNoTracking()
+            .Where(user => user.Id == userId)
+            .Select(user => new EmailRecipient(user.UserName, user.Email))
+            .SingleOrDefaultAsync(ct);
     }
 
     private static MimeMessage CreateMessage(
@@ -370,4 +390,6 @@ public sealed class SmtpEmailVerificationDelivery(
         : Exception(smtpStatusCode is null
             ? $"SMTP phase failed with {exceptionType}."
             : $"SMTP phase failed with {exceptionType}; status={smtpStatusCode}.");
+
+    private sealed record EmailRecipient(string UserName, string Email);
 }
