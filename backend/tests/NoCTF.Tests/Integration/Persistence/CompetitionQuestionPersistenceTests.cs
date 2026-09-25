@@ -407,11 +407,36 @@ public sealed class CompetitionQuestionPersistenceTests
             await Assert.That(botQuestion.Question.TeamId).IsEqualTo(ids.OtherTeamId);
 
             var delivery = new CompetitionNotificationDelivery(db);
-            await CompetitionNotificationMessageHandlers.Handle(opened, delivery, ct);
+            foreach (var activity in outbox.Messages
+                .OfType<DeliverCompetitionQuestionNotification>()
+                .Where(message => message.ThreadRootId == created.Question.ThreadRootId))
+                await CompetitionNotificationMessageHandlers.Handle(activity, delivery, ct);
             await Assert.That(await db.Notifications.CountAsync(notification =>
                 notification.Kind == NotificationKind.QuestionOpened
                     && notification.TargetType == NotificationTargetType.User, ct))
                 .IsEqualTo(opened.RecipientUserIds.Length);
+            var deliveredRoots = await db.Notifications.AsNoTracking()
+                .Where(notification => notification.TargetType == NotificationTargetType.User
+                    && notification.SourceEventKey != null
+                    && notification.SourceEventKey.StartsWith("competition-question:"))
+                .Select(notification => notification.ThreadRootId)
+                .ToArrayAsync(ct);
+            await Assert.That(deliveredRoots.Length).IsGreaterThan(opened.RecipientUserIds.Length);
+            await Assert.That(deliveredRoots.All(rootId =>
+                rootId == opened.ThreadRootId)).IsTrue();
+            var administratorNoticeId = await db.Notifications.AsNoTracking()
+                .Where(notification => notification.TargetType == NotificationTargetType.User
+                    && notification.TargetId == ids.AdministratorId
+                    && notification.Kind == NotificationKind.QuestionOpened)
+                .Select(notification => notification.Id)
+                .SingleAsync(ct);
+            var administratorThread = await new NotificationReader(db).ReadThreadAsync(
+                ids.AdministratorId, administratorNoticeId, ct);
+            await Assert.That(administratorThread).IsNotNull();
+            await Assert.That(administratorThread!.Select(item => item.Id))
+                .Contains(created.Question.ThreadRootId);
+            await Assert.That(administratorThread.Any(item =>
+                item.TargetType == NotificationTargetType.User)).IsFalse();
             var notificationBodies = await db.Notifications.AsNoTracking()
                 .Where(notification => notification.TargetType == NotificationTargetType.User)
                 .Select(notification => notification.Body)

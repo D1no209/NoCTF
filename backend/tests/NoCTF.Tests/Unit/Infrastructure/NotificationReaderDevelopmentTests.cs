@@ -1,5 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Data.Sqlite;
+using NoCTF.Application.Messaging;
+using NoCTF.Application.Notifications;
 using NoCTF.Domain.Competitions;
 using NoCTF.Domain.Identity;
 using NoCTF.Domain.Notifications;
@@ -95,6 +97,46 @@ public sealed class NotificationReaderDevelopmentTests
         await Assert.That(threadFromReply!.Select(item => item.Id))
             .IsEquivalentTo([rootId, replyId]);
         await Assert.That(askerThread).IsNotNull();
+
+        await new CompetitionNotificationDelivery(db).DeliverToUsersAsync(
+            competitionId,
+            rootId,
+            NotificationKind.QuestionOpened,
+            $"competition-question:{rootId:N}:root:opened",
+            new CompetitionQuestionActivityPayload(
+                competitionId,
+                rootId,
+                null,
+                CompetitionQuestionNotificationEvent.Opened,
+                "private question",
+                now.AddSeconds(2)),
+            [ownerId, askerId],
+            CancellationToken.None);
+        var ownerNoticeId = await db.Notifications.AsNoTracking()
+            .Where(notification => notification.TargetType == NotificationTargetType.User
+                && notification.TargetId == ownerId)
+            .Select(notification => notification.Id)
+            .SingleAsync();
+        var askerNoticeId = await db.Notifications.AsNoTracking()
+            .Where(notification => notification.TargetType == NotificationTargetType.User
+                && notification.TargetId == askerId)
+            .Select(notification => notification.Id)
+            .SingleAsync();
+        await Assert.That(await db.Notifications.AsNoTracking()
+            .Where(notification => notification.Id == ownerNoticeId
+                || notification.Id == askerNoticeId)
+            .AllAsync(notification => notification.ThreadRootId == rootId)).IsTrue();
+
+        var ownerInbox = await reader.ListAsync(ownerId, null, null, 10, CancellationToken.None);
+        var askerInbox = await reader.ListAsync(askerId, null, null, 10, CancellationToken.None);
+        await Assert.That(ownerInbox.Select(item => item.Id)).Contains(ownerNoticeId);
+        await Assert.That(ownerInbox.Select(item => item.Id)).DoesNotContain(askerNoticeId);
+        await Assert.That(askerInbox.Select(item => item.Id)).Contains(askerNoticeId);
+        await Assert.That(askerInbox.Select(item => item.Id)).DoesNotContain(ownerNoticeId);
+        var noticeThread = await reader.ReadThreadAsync(ownerId, ownerNoticeId, CancellationToken.None);
+        await Assert.That(noticeThread).IsNotNull();
+        await Assert.That(noticeThread!.Select(item => item.Id))
+            .IsEquivalentTo([rootId, replyId]);
 
         var competition = await db.Competitions.SingleAsync(
             candidate => candidate.Id == competitionId);

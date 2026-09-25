@@ -159,7 +159,8 @@ public sealed class NotificationReader(NoCtfDbContext db) : INotificationReader
         var rootId = selected.ThreadRootId ?? selected.Id;
         var thread = db.Notifications.AsNoTracking()
             .Where(notification => notification.Id == rootId
-                || notification.ThreadRootId == rootId)
+                || notification.ThreadRootId == rootId
+                    && notification.TargetType != NotificationTargetType.User)
             .OrderBy(notification => notification.SentAt)
             .ThenBy(notification => notification.Id);
         return await ProjectAsync(thread, ct);
@@ -221,7 +222,9 @@ public sealed class NotificationReader(NoCtfDbContext db) : INotificationReader
             .Select(competition => competition.Id);
 
         var audienceVisible = db.Notifications.AsNoTracking().Where(notification =>
-            !(notification.RelatedType == EntityReferenceKind.Competition
+            !(notification.TargetType == NotificationTargetType.User
+                && notification.TargetId != userId)
+            && !(notification.RelatedType == EntityReferenceKind.Competition
                 && notification.RelatedId != null
                 && inaccessibleStaffCompetitionIds.Contains(notification.RelatedId.Value))
             && !((notification.TargetType == NotificationTargetType.CompetitionCollaborators
@@ -316,6 +319,9 @@ public sealed class NotificationReader(NoCtfDbContext db) : INotificationReader
 
         bool IsAudienceVisible(Notification notification)
         {
+            if (notification.TargetType == NotificationTargetType.User
+                && notification.TargetId != userId)
+                return false;
             var competitionId = AudienceCompetitionId(notification);
             if (competitionId is null
                 || !competitions.TryGetValue(competitionId.Value, out var competition)
