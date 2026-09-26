@@ -3,12 +3,12 @@ import { toRefs } from 'vue'
 import type { AdminCompetitionsByIdPageViewState } from '~/features/routes/admin/competitions/useAdminCompetitionsByIdPage'
 
 const viewProps = defineProps<{ state: AdminCompetitionsByIdPageViewState }>()
-const { Megaphone, competition, role, loading, error, canAnnounce, announcementOpen, announcementTitle, announcementBody, announcementAudience, announcementPending, announcementError, RoleLabel, publishAnnouncement, setAnnouncementOpen, navGroups, activePath, CompetitionStatusBadge, GameModeBadge, AppWorkspaceNav, onClickAnnouncementOpen, onInputAnnouncementError } = toRefs(viewProps.state)
+const { Megaphone, competition, role, loading, error, canAnnounce, announcementOpen, announcementTitle, announcementBody, announcementAudience, announcementPending, announcementError, RoleLabel, publishAnnouncement, setAnnouncementOpen, navGroups, activePath, isProgressionPage, CompetitionStatusBadge, GameModeBadge, AppWorkspaceNav, onClickAnnouncementOpen, onInputAnnouncementError } = toRefs(viewProps.state)
 </script>
 
 <template>
   <component :is="AppWorkspaceNav" v-if="competition" :groups="navGroups" :title="competition.title">
-    <div data-workspace-scroll-content data-competition-management-workspace class="mx-auto flex h-full min-h-0 w-full max-w-6xl flex-col gap-6 px-4 pt-8 md:px-6">
+    <div data-workspace-scroll-content data-competition-management-workspace class="mx-auto flex h-full min-h-0 w-full flex-col gap-6 px-4 pt-8 md:px-6" :class="isProgressionPage ? 'max-w-none' : 'max-w-6xl'">
       <div class="flex shrink-0 flex-wrap items-center justify-between gap-3">
         <div class="flex flex-wrap items-center gap-3">
           <h1 class="text-display text-2xl">{{ competition.title }}</h1>

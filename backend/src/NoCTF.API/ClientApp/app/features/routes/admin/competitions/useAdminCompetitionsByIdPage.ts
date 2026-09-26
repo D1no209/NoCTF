@@ -20,6 +20,9 @@ export function useAdminCompetitionsByIdPage() {
 
   const competitionId = route.params.id as string
 
+  const isProgressionPage = computed(() => activePath.value ===
+    `/admin/competitions/${competitionId}/progression`)
+
   const { user, isAdministrator } = useAuth()
 
   const competition = ref<NoCtfapiEndpointsCompetitionsCompetitionResponse | null>(null)
@@ -157,6 +160,9 @@ export function useAdminCompetitionsByIdPage() {
       items: [
         { to: `${base}/exports`, label: translate("ui.export"), icon: Download },
         { to: `${base}/webhooks`, label: translate("webhook.title"), icon: Webhook },
+        ...(competition.value?.mode === 'Ctf'
+          ? [{ to: `${base}/progression`, label: translate('progression.title'), icon: GitBranch }]
+          : []),
         ...(canManagePermissions.value
           ? [{ to: `${base}/permissions`, label: translate("ui.permissions"), icon: KeyRound }]
           : []),
@@ -195,6 +201,7 @@ export function useAdminCompetitionsByIdPage() {
       setAnnouncementOpen,
       navGroups,
       activePath,
+      isProgressionPage,
       CompetitionStatusBadge,
       GameModeBadge,
       AppWorkspaceNav

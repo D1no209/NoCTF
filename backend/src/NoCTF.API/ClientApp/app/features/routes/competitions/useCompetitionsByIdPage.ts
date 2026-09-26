@@ -1,7 +1,7 @@
 import { markRaw } from 'vue'
 
-import { ClipboardCheck, FileText, LayoutDashboard, MessageCircleQuestion, Puzzle, Trophy, UserRound } from '@lucide/vue'
-import { getCompetitionEndpoint, getLeaderboardEndpoint, getMyTeamEndpoint } from '../../../api'
+import { ClipboardCheck, FileText, GitBranch, LayoutDashboard, MessageCircleQuestion, Puzzle, Trophy, UserRound } from '@lucide/vue'
+import { getCompetitionEndpoint, getLeaderboardEndpoint, getMyTeamEndpoint, getPlayerCompetitionProgression } from '../../../api'
 import type { NoCtfapiEndpointsCompetitionsCompetitionResponse, NoCtfapiEndpointsCompetitionsScoreboardTeamResponse, NoCtfapiEndpointsTeamsTeamResponse } from '../../../api'
 import { competitionWorkspaceNavigationKey } from '../../app/workspace-nav'
 import type { WorkspaceNavGroup } from '../../app/workspace-nav'
@@ -54,6 +54,28 @@ export function useCompetitionsByIdPage() {
   const hasParticipantChallengeAccess = computed(() =>
     myTeam.value?.registrationStatus === 'Approved' && !myTeam.value.isBanned,
   )
+
+  const progressionEnabled = ref(false)
+
+  let progressionRequestId = 0
+
+  async function refreshProgressionEnabled() {
+    const requestId = ++progressionRequestId
+    if (competition.value?.mode !== 'Ctf'
+      || (!hasCompetitionStaffAccess.value && !hasParticipantChallengeAccess.value)) {
+      progressionEnabled.value = false
+      return
+    }
+    const { data } = await getPlayerCompetitionProgression({
+      path: { competitionId: competitionId.value },
+    })
+    if (requestId === progressionRequestId)
+      progressionEnabled.value = data?.enabled === true
+  }
+
+  watch([competition, myTeam, () => user.value?.userId], () => {
+    void refreshProgressionEnabled()
+  }, { immediate: true })
 
   async function refreshMyTeam() {
     if (!user.value) {
@@ -116,6 +138,7 @@ export function useCompetitionsByIdPage() {
     loading.value = false
     if (err || !data) {
       error.value = parseApiError(err, translate("ui.loadingCompetitionFailed")).message
+      progressionEnabled.value = false
       return response?.status === 404 ? 'not-found' : 'failed'
     }
     error.value = null
@@ -152,6 +175,8 @@ export function useCompetitionsByIdPage() {
       competitionEventChanged: event => {
         if (event.kind === 'CompetitionAudienceChanged')
           void handleAudienceChanged()
+        if (event.kind === 'CompetitionUpdated')
+          void refreshProgressionEnabled()
         if (event.kind === 'AnnouncementPublished')
           void refreshMissedAnnouncements()
       },
@@ -160,12 +185,16 @@ export function useCompetitionsByIdPage() {
       },
       onReconnected: () => {
         if (!isWriteUpReview.value) void refreshStandingLatest()
+        void refreshProgressionEnabled()
         void refreshMissedAnnouncements()
       },
     })
   })
 
-  onUnmounted(() => unwatch?.())
+  onUnmounted(() => {
+    progressionRequestId++
+    unwatch?.()
+  })
 
   provide(competitionContextKey, {
     competition,
@@ -186,6 +215,9 @@ export function useCompetitionsByIdPage() {
         items: [
           { to: competitionPath(competitionId.value), label: translate("ui.overview"), icon: LayoutDashboard, exact: true },
           ...(challengesVisible && canReadChallenges ? [{ to: `${base}/challenges`, label: translate("ui.challenge"), icon: Puzzle }] : []),
+          ...(competition.value?.mode === 'Ctf' && canReadChallenges && progressionEnabled.value
+            ? [{ to: `${base}/progression`, label: translate('progression.title'), icon: GitBranch }]
+            : []),
           { to: `${base}/leaderboard`, label: translate("ui.leaderboard"), icon: Trophy },
           { to: `${base}/questions`, label: translate("ui.questions"), icon: MessageCircleQuestion },
         ],
