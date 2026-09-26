@@ -254,7 +254,7 @@ BOT 可以直接使用仓库生成的 TypeScript 类型，也可以从实例的 
 
 公开投影遵守：
 
-- `Blackout`：排行榜 `dataScope=Hidden`，队伍和成绩集合为空；
+- `Blackout`：不发送血榜播报；其他事件携带的排行榜为 `dataScope=Hidden`，队伍和成绩集合为空；
 - `Frozen`：返回冻结快照及 `dataAsOf`；
 - 内部赛道和不可见队伍不会出现在公开排行榜；
 - Hint 正文只有公开投影允许时才非空；
@@ -666,7 +666,7 @@ Webhooks__InsecureHttpHostAllowList__0=bot.internal.example
 | --- | --- |
 | 始终 `401` | 是否使用原始 Body；是否去掉 `whsec_` 后 Base64 解码；是否尝试 Header 中全部签名 |
 | 测试显示永久失败 | 查看 BOT 返回的 `3xx/4xx`；NoCTF 不跟随重定向 |
-| 测试长期 Pending | 检查 `NOCTF_WEBHOOK` stream、`noctf-webhook` consumer、Redis 与 Worker 日志 |
+| 测试长期 Pending | 检查赛事管理页的投递诊断、Webhook Outbox、`NOCTF_WEBHOOK` consumer 和 Worker 日志 |
 | 重复群消息 | Inbox 是否用 `(source,id)` 唯一键；是否在本地事务提交前返回了 `2xx` |
 | 事件乱序 | 按 `(time,id)` 展示；不要依赖 HTTP 到达顺序 |
 | 黑榜期间仍显示旧分数 | BOT 是否错误复用本地旧榜；`dataScope=Hidden` 时必须清空公开分数展示 |

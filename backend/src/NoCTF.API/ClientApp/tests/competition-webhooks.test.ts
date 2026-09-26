@@ -28,4 +28,15 @@ describe('competition webhook administration', () => {
     expect(view).toContain("$t('webhook.deliveryModelDescription')")
     expect(view).not.toMatch(/QQ|Milky/i)
   })
+
+  test('shows paged delivery diagnostics without rendering protected payloads or secrets', () => {
+    expect(feature).toContain('adminListCompetitionWebhookDeliveries')
+    expect(view).toContain("$t('webhook.diagnosticsTitle')")
+    expect(view).toContain('delivery.queueAgeSeconds')
+    expect(view).toContain('delivery.projectionWaitSeconds')
+    expect(view).toContain('delivery.lastHttpStatusCode')
+    expect(view).toContain('delivery.deadLetterReason')
+    expect(view).not.toContain('delivery.body')
+    expect(view).not.toContain('delivery.signingSecret')
+  })
 })

@@ -21,9 +21,26 @@ public sealed record LeaderboardProcessingResponse(
     LeaderboardProjectionState State,
     string StatusUrl);
 public sealed record LeaderboardCacheStatus(DateTimeOffset? LastFailureAt);
+public sealed record WebhookScoreboardProjection(
+    ScoreboardProjection Projection,
+    long SourceEventSequenceThrough);
 
 public interface ILeaderboardCache
 {
+    async Task<WebhookScoreboardProjection?> GetWebhookScoreboardAsync(
+        Guid competitionId, bool frozen, CancellationToken cancellationToken)
+    {
+        var projection = frozen
+            ? await GetFrozenScoreboardAsync(competitionId, cancellationToken)
+            : await GetScoreboardAsync(competitionId, cancellationToken);
+        return projection is null ? null : new(projection, long.MaxValue);
+    }
+
+    Task<WebhookScoreboardProjection?> GetFrozenWebhookScoreboardAsync(
+        Guid competitionId, DateTimeOffset frozenAt,
+        CancellationToken cancellationToken) =>
+        GetWebhookScoreboardAsync(competitionId, frozen: true, cancellationToken);
+
     Task<ScoreboardProjection?> GetScoreboardAsync(Guid competitionId, CancellationToken cancellationToken) =>
         Task.FromResult<ScoreboardProjection?>(null);
     Task<ScoreboardProjection?> GetFrozenScoreboardAsync(Guid competitionId, CancellationToken cancellationToken) =>

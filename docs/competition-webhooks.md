@@ -19,17 +19,22 @@ Owner 和 Manager 可以创建、编辑、启停、删除、轮换密钥和发�
 `/schemas/webhooks/competition-events-v1.schema.json`，事件类型包括赛事生命周期、题目发布或
 更新、提示、公告、公开封禁或纠正、血榜以及 AWDP Break/Fix 结果。
 
-`data.resources` 使用投递尝试时的完整、非个性化公开 API 表示：
+`data.resources` 使用投递尝试时的非个性化公开表示：
 
 - `competition` 始终存在；
 - 题目、提示、血榜和 AWDP 事件包含 `challenge`；
 - 公告事件包含完整公开公告正文；
 - 队伍、血榜和 AWDP 事件包含公开排行榜；
-- Blackout 返回空排行榜，Frozen 返回冻结快照；
+- 血榜的 `teamId`、`competitionChallengeId`、`award`、`challenge`、`leaderboard` 不得缺失；Live/Frozen 的题名和队名取自同一公开排行榜投影，题目 ID 必须匹配事件，榜单必须包含该队伍；
+- Blackout 期间不产生或投递血榜播报；其他需要排行榜的事件只返回 `dataScope=Hidden` 和空队伍集合，Frozen 血榜只使用冻结投影；
 - 不包含个人尝试、已解锁付费提示正文、Flag、Patch、Token、Runtime Receipt 或内部失败详情。
 
-`capturedAt` 是资源快照生成时间，CloudEvent 的 `time` 是业务事件发生时间。资源是当前公开投影，
-不是历史定义快照。
+`capturedAt` 是本次资源捕获时间，CloudEvent 的 `id` 和 `time` 在重试中保持不变；重试可以重新捕获资源。
+事件同时带有 `eventSequence`、`requiredProjectionVersion` 和 `competitionRevision` 以便核对投影检查点。
+Live 血榜只有在公开投影包含所需事件序号、题目和队伍后才能发送；投影尚未就绪不会退化为
+`challenge=null` 或缺失队伍的成功投递。
+Frozen 血榜读取按冻结时间持久化的公开快照；冻结后题目或队伍改名不会改变该快照。快照尚未捕获时
+投递保持未就绪并重试，不回退到实时排行榜。
 
 ## 验签
 
@@ -52,12 +57,28 @@ webhook-id + "." + webhook-timestamp + "." + rawBody
 
 ## 投递与恢复
 
-投递为至少一次且不保证顺序。`2xx` 确认成功；`408`、`429`、`5xx`、网络错误和超时以抖动退避
-重试约 24 小时；`3xx` 不跟随；`410` 自动停用目标；其他 `4xx` 进入 Wolverine 错误队列。
+投递为至少一次且不保证顺序。`2xx` 确认成功；`408`、`429`、`5xx`、网络错误和超时按目标独立
+退避重试，`429` 遵守 `Retry-After`；`3xx` 不跟随；`410` 自动停用目标；其他 `4xx` 标记为 DeadLetter。
+公开投影未就绪与网络失败分开处理，前者按 100ms、250ms、500ms、1s、2s、5s 快速重试，
+超过次数后标记可查询的 DeadLetter，绝不发送不完整资源。
 
-业务事件先由 PostgreSQL 事务 Outbox 写入 JetStream。Webhook fan-out 每次最多扫描 100 个目标，
-再向独立 `noctf.webhook` 工作队列发送只含 ID 的命令。Worker 重启、消息重复或 Redis 丢失不会丢失
-正式投递；Redis 只保存十分钟的测试投递状态。
+公开业务事件与 PostgreSQL Webhook Outbox 在同一事务提交。JetStream 是快速唤醒和并行投递通道；
+Webhook Worker 每 250ms 扫描未完成的 Outbox 与到期目标记录，覆盖提交后消息尚未发布、Worker 重启、
+消息丢失等窗口。每个目标保留独立状态、HTTP 码、投影等待、重试时间和 DeadLetter 原因，不保存
+完整受保护正文或签名密钥。网络超时后的重投仍可能到达接收方两次，接收方必须按 `webhook-id` 幂等。
+测试投递状态是短期状态，不代表正式 Outbox。
+
+## 观测与 SLO
+
+赛事管理的 Webhook 页面可分页查看事件 ID/类型、目标、业务事件时间、Outbox 写入、Worker 出队、
+公开投影就绪、资源捕获、首次/最近 HTTP 尝试与完成时间、HTTP 状态码、阶段性重试次数、下次重试、
+资源完整性和 DeadLetter 原因；不会返回签名密钥或受保护正文。
+
+首个 HTTP 尝试的目标为业务事件产生后 p95 小于 2 秒、p99 小于 5 秒。Prometheus 记录
+`noctf_webhook_queue_age_seconds` 的 p50/p95/p99、`noctf_webhook_oldest_pending_age_seconds`、
+`noctf_webhook_consumer_lag`、Webhook JetStream pending、投影等待、HTTP 耗时、重试及 DeadLetter。
+p99 排队超过 5 秒触发告警，最老待投递超过 10 秒触发严重告警。网络不可用时单个目标进入独立退避，
+不能使其他目标或比赛的首轮分发停顿。
 
 默认只允许公开 HTTPS 目标，不跟随重定向，并阻止回环、链路本地、私网、云元数据地址和 DNS
 重绑定。必须访问内网时，由运维设置 `Webhooks__PrivateNetworkAllowList__N`；开发 HTTP 目标还必须

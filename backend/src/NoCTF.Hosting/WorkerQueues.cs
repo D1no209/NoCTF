@@ -67,7 +67,7 @@ public static class WorkerQueues
             WorkerQueue.Gameplay => 8,
             WorkerQueue.Projection => 2,
             WorkerQueue.Background => 2,
-            WorkerQueue.Webhook => 8,
+            WorkerQueue.Webhook => 32,
             _ => throw new ArgumentOutOfRangeException(nameof(queue), queue, null)
         };
         var configured = configuration[$"Worker:Concurrency:{queue}"];

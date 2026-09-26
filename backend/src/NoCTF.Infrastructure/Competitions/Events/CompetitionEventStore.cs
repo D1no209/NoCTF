@@ -11,6 +11,7 @@ using NoCTF.Domain.Identity;
 using NoCTF.Domain.Teams;
 using NoCTF.Domain.Shared;
 using NoCTF.Infrastructure.Observability;
+using NoCTF.Infrastructure.Competitions.Webhooks;
 using NoCTF.Infrastructure.Persistence;
 using NoCTF.GameModes.Awdp.Scoring;
 
@@ -18,7 +19,8 @@ namespace NoCTF.Infrastructure.Competitions.Events;
 
 public sealed class CompetitionEventStore(
     NoCtfDbContext db,
-    IPostCommitMessagePublisher outbox)
+    IPostCommitMessagePublisher outbox,
+    TimeProvider? clock = null)
     : ICompetitionEventStore, ICompetitionEventRecorder
 {
     private static readonly JsonSerializerOptions ExportJsonOptions = new(JsonSerializerDefaults.Web)
@@ -106,6 +108,26 @@ public sealed class CompetitionEventStore(
             entity.TrafficTruncated = traffic.Truncated;
         }
         db.CompetitionEvents.Add(entity);
+        if (draft.Visibility == CompetitionEventVisibility.Public
+            && CompetitionWebhookEventTypes.From(draft.Kind) is not null)
+        {
+            var revision = db.Competitions.Local
+                .FirstOrDefault(item => item.Id == draft.CompetitionId)?.ConcurrencyStamp
+                ?? await db.Competitions.AsNoTracking()
+                    .Where(item => item.Id == draft.CompetitionId)
+                    .Select(item => item.ConcurrencyStamp)
+                    .SingleOrDefaultAsync(cancellationToken);
+            var persistedAt = (clock ?? TimeProvider.System).GetUtcNow();
+            db.CompetitionWebhookOutboxEvents.Add(new CompetitionWebhookOutboxEvent
+            {
+                EventId = id,
+                CompetitionId = draft.CompetitionId,
+                CompetitionRevision = revision,
+                DomainEventCreatedAt = draft.OccurredAt,
+                OutboxPersistedAt = persistedAt,
+                NextDispatchAt = persistedAt
+            });
+        }
         await outbox.PublishAsync(new CompetitionEventCommitted(
             draft.CompetitionId,
             id,

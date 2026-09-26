@@ -203,7 +203,19 @@ public sealed class InternalResultStore(
                 && decision.Result == GameplayFactResult.Correct
             ? await TryCreateCtfPatchBloodAwardAsync(fact, resolvedAt, ct)
             : null;
-        if (bloodAward is not null)
+        var bloodVisibility = bloodAward is null
+            ? (CompetitionLeaderboardVisibility?)null
+            : CompetitionLeaderboardVisibilityPolicy.EffectiveAt(
+                context.Competition.FrozenStartAt,
+                context.Competition.HiddenStartAt,
+                bloodAward.OccurredAt);
+        var announceBlood = bloodAward is not null
+            && bloodVisibility != CompetitionLeaderboardVisibility.Blackout
+            && CompetitionLeaderboardVisibilityPolicy.CanAnnounceBlood(
+                context.Competition.FrozenStartAt,
+                context.Competition.HiddenStartAt,
+                resolvedAt);
+        if (announceBlood && bloodAward is not null)
             await outbox.PublishAsync(bloodAward);
         if (context.Competition.Mode == GameMode.Ctf
             && decision.Result == GameplayFactResult.Correct)
@@ -257,7 +269,7 @@ public sealed class InternalResultStore(
             GameplayFactState: fact.State,
             GameplayFactResult: fact.Result,
             RuntimeState: runtime.State), ct);
-        if (bloodAward is not null)
+        if (announceBlood && bloodAward is not null)
         {
             var bloodKind = bloodAward.BloodRank switch
             {
@@ -277,6 +289,8 @@ public sealed class InternalResultStore(
                 GameplayFactId: fact.Id,
                 GameplayFactKind: fact.Kind,
                 GameplayFactResult: fact.Result,
+                LeaderboardVisibility: bloodVisibility,
+                FrozenStartAt: context.Competition.FrozenStartAt,
                 ParentEventId: adjudicationEventId == Guid.Empty ? null : adjudicationEventId), ct);
         }
         if (context.Competition.Mode == GameMode.Awdp)

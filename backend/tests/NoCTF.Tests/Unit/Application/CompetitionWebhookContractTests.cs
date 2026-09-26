@@ -55,6 +55,41 @@ public sealed class CompetitionWebhookContractTests
             .IsEqualTo("application/json");
     }
 
+    [Test]
+    public async Task Blood_variant_requires_identity_award_and_non_null_resources()
+    {
+        var path = Path.Combine(
+            FindRepositoryRoot(), "backend", "artifacts", "webhooks",
+            "competition-events-v1.schema.json");
+        using var schema = JsonDocument.Parse(await File.ReadAllTextAsync(path));
+        var variant = schema.RootElement.GetProperty("allOf")[0].GetProperty("then")
+            .GetProperty("properties").GetProperty("data").GetProperty("properties");
+        var dataRequired = schema.RootElement.GetProperty("allOf")[0]
+            .GetProperty("then").GetProperty("properties").GetProperty("data")
+            .GetProperty("required").EnumerateArray()
+            .Select(value => value.GetString()!).ToArray();
+        var eventRequired = variant.GetProperty("event").GetProperty("required")
+            .EnumerateArray().Select(value => value.GetString()!).ToArray();
+        var resourceRequired = variant.GetProperty("resources").GetProperty("required")
+            .EnumerateArray().Select(value => value.GetString()!).ToArray();
+
+        await Assert.That(eventRequired).IsEquivalentTo([
+            "competitionId", "teamId", "competitionChallengeId", "award"
+        ]);
+        await Assert.That(resourceRequired).IsEquivalentTo([
+            "competition", "challenge", "leaderboard"
+        ]);
+        await Assert.That(dataRequired).IsEquivalentTo([
+            "capturedAt", "eventSequence", "requiredProjectionVersion",
+            "publicProjectionVersion",
+            "competitionRevision", "event", "resources"
+        ]);
+        await Assert.That(variant.GetProperty("resources").GetProperty("properties")
+            .GetProperty("leaderboard").GetProperty("properties")
+            .GetProperty("dataScope").GetProperty("enum").GetArrayLength())
+            .IsEqualTo(2);
+    }
+
     private static string FindRepositoryRoot()
     {
         var directory = new DirectoryInfo(AppContext.BaseDirectory);

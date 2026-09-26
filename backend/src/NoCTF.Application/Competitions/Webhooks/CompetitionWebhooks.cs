@@ -1,4 +1,5 @@
 using NoCTF.Domain.Competitions;
+using NoCTF.Domain.Competitions.Events;
 
 namespace NoCTF.Application.Competitions.Webhooks;
 
@@ -71,6 +72,66 @@ public sealed record CompetitionWebhookDispatchBatch(
     IReadOnlyList<DeliverCompetitionWebhook> Deliveries,
     Guid? NextAfterTargetId = null);
 
+public sealed record CompetitionWebhookOutboxWakeup(
+    Guid CompetitionId,
+    Guid EventId);
+
+public enum CompetitionWebhookDeliveryState : short
+{
+    Pending,
+    InFlight,
+    Delivered,
+    Suppressed,
+    DeadLetter
+}
+
+public enum CompetitionWebhookPayloadState : short
+{
+    Unknown,
+    Complete,
+    ProjectionNotReady,
+    Invalid
+}
+
+public enum CompetitionWebhookDeadLetterReason : short
+{
+    InvalidPayload,
+    ProjectionUnavailable,
+    HttpRetryLimitExceeded,
+    PermanentHttpFailure
+}
+
+public sealed record CompetitionWebhookPendingSnapshot(
+    long PendingDeliveries,
+    long UndispatchedEvents,
+    long OldestPendingAgeSeconds);
+
+public sealed record CompetitionWebhookDeliveryDiagnostic(
+    Guid EventId,
+    Guid TargetId,
+    CompetitionEventKind EventKind,
+    CompetitionWebhookDeliveryState State,
+    CompetitionWebhookPayloadState PayloadState,
+    long EventSequence,
+    Guid CompetitionRevision,
+    DateTimeOffset DomainEventCreatedAt,
+    DateTimeOffset OutboxPersistedAt,
+    DateTimeOffset? WorkerDequeuedAt,
+    DateTimeOffset? PublicProjectionReadyAt,
+    DateTimeOffset? CapturedAt,
+    DateTimeOffset? FirstHttpAttemptStartedAt,
+    DateTimeOffset? LastHttpAttemptStartedAt,
+    DateTimeOffset? LastHttpAttemptCompletedAt,
+    int? LastHttpStatusCode,
+    int ProjectionRetryCount,
+    int HttpRetryCount,
+    DateTimeOffset? NextRetryAt,
+    CompetitionWebhookDeadLetterReason? DeadLetterReason);
+
+public sealed record CompetitionWebhookDeliveryDiagnosticPage(
+    IReadOnlyList<CompetitionWebhookDeliveryDiagnostic> Items,
+    int Total);
+
 public enum CompetitionWebhookDeliveryReadState : short
 {
     Ready,
@@ -90,6 +151,39 @@ public sealed record CompetitionWebhookDelivery(
 
 public interface ICompetitionWebhookDeliveryStore
 {
+    Task<IReadOnlyList<CompetitionWebhookOutboxWakeup>> ClaimPendingOutboxAsync(
+        DateTimeOffset now,
+        int limit,
+        CancellationToken cancellationToken);
+
+    Task<CompetitionWebhookPendingSnapshot> ReadPendingSnapshotAsync(
+        DateTimeOffset now, CancellationToken cancellationToken);
+
+    Task<CompetitionWebhookDeliveryDiagnosticPage?> ListDiagnosticsAsync(
+        Guid competitionId, int offset, int limit, bool descending,
+        CancellationToken cancellationToken);
+
+    Task MarkDispatchCompletedAsync(Guid eventId, DateTimeOffset completedAt,
+        CancellationToken cancellationToken);
+
+    Task<IReadOnlyList<DeliverCompetitionWebhook>> ClaimDueDeliveriesAsync(
+        DateTimeOffset now, int limit, CancellationToken cancellationToken);
+
+    Task RecordProjectionWaitAsync(DeliverCompetitionWebhook delivery,
+        CompetitionWebhookProjectionFailure failure, DateTimeOffset now,
+        CancellationToken cancellationToken);
+
+    Task RecordHttpStartedAsync(DeliverCompetitionWebhook delivery,
+        DateTimeOffset startedAt, CancellationToken cancellationToken);
+
+    Task RecordHttpCompletedAsync(DeliverCompetitionWebhook delivery,
+        CompetitionWebhookSendOutcome outcome, DateTimeOffset completedAt,
+        CancellationToken cancellationToken);
+
+    Task RecordHttpFailureAsync(DeliverCompetitionWebhook delivery,
+        int? statusCode, DateTimeOffset? retryAfter, bool permanent,
+        DateTimeOffset completedAt, CancellationToken cancellationToken);
+
     Task<CompetitionWebhookDispatchBatch> PrepareBatchAsync(
         DispatchCompetitionWebhooks command,
         int batchSize,
@@ -117,19 +211,49 @@ public enum CompetitionWebhookSendResult : short
     ReceiverGone
 }
 
+public sealed record CompetitionWebhookSendOutcome(
+    CompetitionWebhookSendResult Result,
+    int HttpStatusCode);
+
 public interface ICompetitionWebhookSender
 {
-    Task<CompetitionWebhookSendResult> SendAsync(
+    Task<CompetitionWebhookSendOutcome> SendAsync(
         CompetitionWebhookDelivery delivery,
         CancellationToken cancellationToken);
 }
 
 public sealed class CompetitionWebhookTransientException(
     string message,
-    Exception? innerException = null) : Exception(message, innerException);
+    Exception? innerException = null,
+    int? httpStatusCode = null,
+    DateTimeOffset? retryAfter = null) : Exception(message, innerException)
+{
+    public int? HttpStatusCode { get; } = httpStatusCode;
+    public DateTimeOffset? RetryAfter { get; } = retryAfter;
+}
 
 public sealed class CompetitionWebhookPermanentException(
-    string message) : Exception(message);
+    string message, int? httpStatusCode = null) : Exception(message)
+{
+    public int? HttpStatusCode { get; } = httpStatusCode;
+}
+
+public enum CompetitionWebhookProjectionFailure : short
+{
+    MissingEventIdentity,
+    MissingPublicProjection,
+    MissingPublicChallenge,
+    MissingPublicTeam,
+    MissingPublicAnnouncement,
+    BlackoutSuppressed
+}
+
+public sealed class CompetitionWebhookProjectionNotReadyException(
+    CompetitionWebhookProjectionFailure failure)
+    : Exception($"Webhook public projection is not ready: {failure}.")
+{
+    public CompetitionWebhookProjectionFailure Failure { get; } = failure;
+}
 
 public enum CompetitionWebhookTestState : short
 {

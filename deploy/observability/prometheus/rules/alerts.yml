@@ -79,6 +79,24 @@ groups:
         labels: { severity: warning }
         annotations:
           summary: Leaderboard projection P95 exceeds two seconds
+      - alert: NoCtfWebhookFirstAttemptP95Slow
+        expr: noctf:webhook_queue_age:p95_5m > 2
+        for: 2m
+        labels: { severity: warning }
+        annotations:
+          summary: Webhook event-to-first-HTTP P95 exceeds two seconds
+      - alert: NoCtfWebhookQueueAgeHigh
+        expr: noctf:webhook_queue_age:p99_5m > 5
+        for: 1m
+        labels: { severity: warning }
+        annotations:
+          summary: Webhook event-to-first-HTTP P99 exceeds five seconds
+      - alert: NoCtfWebhookOldestPendingHigh
+        expr: noctf:webhook_oldest_pending_age:seconds > 10
+        for: 1m
+        labels: { severity: critical }
+        annotations:
+          summary: Oldest pending webhook event is more than ten seconds old
       - alert: NoCtfPostgresConnectionsHigh
         expr: noctf:postgres_connections:ratio > 0.8
         for: 5m

@@ -71,7 +71,8 @@ public sealed class CompetitionWebhookSenderTests
             CancellationToken.None);
         var request = await receiver.Request;
 
-        await Assert.That(result).IsEqualTo(CompetitionWebhookSendResult.Delivered);
+        await Assert.That(result.Result).IsEqualTo(CompetitionWebhookSendResult.Delivered);
+        await Assert.That(result.HttpStatusCode).IsEqualTo(204);
         await Assert.That(request).Contains("POST /hook HTTP/1.1");
         await Assert.That(request).Contains("Content-Type: application/cloudevents+json; charset=utf-8");
         await Assert.That(request).Contains($"webhook-id: {receiver.Delivery.EventId}");
@@ -89,7 +90,8 @@ public sealed class CompetitionWebhookSenderTests
             CancellationToken.None);
         _ = await receiver.Request;
 
-        await Assert.That(result).IsEqualTo(CompetitionWebhookSendResult.ReceiverGone);
+        await Assert.That(result.Result).IsEqualTo(CompetitionWebhookSendResult.ReceiverGone);
+        await Assert.That(result.HttpStatusCode).IsEqualTo(410);
     }
 
     [Test]
@@ -109,6 +111,26 @@ public sealed class CompetitionWebhookSenderTests
     }
 
     [Test]
+    public async Task Too_many_requests_preserves_retry_after()
+    {
+        var receiver = StartReceiver(429, "20");
+        CompetitionWebhookTransientException? failure = null;
+        try
+        {
+            _ = await receiver.Sender.SendAsync(receiver.Delivery, CancellationToken.None);
+        }
+        catch (CompetitionWebhookTransientException exception)
+        {
+            failure = exception;
+        }
+        _ = await receiver.Request;
+        await Assert.That(failure).IsNotNull();
+        await Assert.That(failure!.HttpStatusCode).IsEqualTo(429);
+        await Assert.That(failure.RetryAfter is { } retry && retry > DateTimeOffset.UtcNow)
+            .IsTrue();
+    }
+
+    [Test]
     [Arguments(300)]
     [Arguments(302)]
     [Arguments(400)]
@@ -125,12 +147,12 @@ public sealed class CompetitionWebhookSenderTests
         _ = await receiver.Request;
     }
 
-    private static ReceiverFixture StartReceiver(int status)
+    private static ReceiverFixture StartReceiver(int status, string? retryAfter = null)
     {
         var listener = new TcpListener(IPAddress.Loopback, 0);
         listener.Start();
         var port = ((IPEndPoint)listener.LocalEndpoint).Port;
-        var request = ReceiveOnceAsync(listener, status);
+        var request = ReceiveOnceAsync(listener, status, retryAfter);
         var options = new CompetitionWebhookOptions(
             new Uri("https://noctf.example.test/"),
             3,
@@ -149,7 +171,8 @@ public sealed class CompetitionWebhookSenderTests
         return new(new CompetitionWebhookSender(options, TimeProvider.System), delivery, request);
     }
 
-    private static async Task<string> ReceiveOnceAsync(TcpListener listener, int status)
+    private static async Task<string> ReceiveOnceAsync(
+        TcpListener listener, int status, string? retryAfter)
     {
         try
         {
@@ -182,8 +205,10 @@ public sealed class CompetitionWebhookSenderTests
                 if (headerEnd >= 0 && received.Length >= headerEnd + 4L + contentLength)
                     break;
             }
+            var retryHeader = retryAfter is null ? string.Empty
+                : $"Retry-After: {retryAfter}\r\n";
             var response = Encoding.ASCII.GetBytes(
-                $"HTTP/1.1 {status} Test\r\nContent-Length: 0\r\nConnection: close\r\n\r\n");
+                $"HTTP/1.1 {status} Test\r\n{retryHeader}Content-Length: 0\r\nConnection: close\r\n\r\n");
             await stream.WriteAsync(response);
             await stream.FlushAsync();
             return Encoding.UTF8.GetString(received.ToArray());

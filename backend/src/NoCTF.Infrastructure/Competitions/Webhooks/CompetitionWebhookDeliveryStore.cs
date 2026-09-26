@@ -6,6 +6,7 @@ using NoCTF.Application.Challenges.Management;
 using NoCTF.Application.Competitions.Webhooks;
 using NoCTF.Application.Competitions.Tracks;
 using NoCTF.Application.Scoring.Leaderboard;
+using NoCTF.Application.Observability;
 using NoCTF.Domain.Competitions;
 using NoCTF.Domain.Competitions.Events;
 using NoCTF.Domain.Notifications;
@@ -33,6 +34,298 @@ public sealed class CompetitionWebhookDeliveryStore(
     {
         Converters = { new JsonStringEnumConverter() }
     };
+    private static readonly TimeSpan[] ProjectionRetryDelays =
+    [
+        TimeSpan.FromMilliseconds(100), TimeSpan.FromMilliseconds(250),
+        TimeSpan.FromMilliseconds(500), TimeSpan.FromSeconds(1),
+        TimeSpan.FromSeconds(2), TimeSpan.FromSeconds(5)
+    ];
+    private static readonly TimeSpan[] HttpRetryDelays =
+    [
+        TimeSpan.FromSeconds(5), TimeSpan.FromSeconds(30),
+        TimeSpan.FromMinutes(2), TimeSpan.FromMinutes(10),
+        TimeSpan.FromMinutes(30), TimeSpan.FromHours(2),
+        TimeSpan.FromHours(8), TimeSpan.FromHours(24)
+    ];
+
+    public async Task<CompetitionWebhookPendingSnapshot> ReadPendingSnapshotAsync(
+        DateTimeOffset now, CancellationToken cancellationToken)
+    {
+        var pending = db.CompetitionWebhookDeliveries.AsNoTracking()
+            .Where(item => item.State == CompetitionWebhookDeliveryState.Pending
+                || item.State == CompetitionWebhookDeliveryState.InFlight);
+        var outbox = db.CompetitionWebhookOutboxEvents.AsNoTracking()
+            .Where(item => item.DispatchCompletedAt == null);
+        var pendingCount = await pending.LongCountAsync(cancellationToken);
+        var undispatchedCount = await outbox.LongCountAsync(cancellationToken);
+        var oldestDelivery = await pending
+            .Select(item => (DateTimeOffset?)item.DomainEventCreatedAt)
+            .MinAsync(cancellationToken);
+        var oldestOutbox = await outbox
+            .Select(item => (DateTimeOffset?)item.DomainEventCreatedAt)
+            .MinAsync(cancellationToken);
+        var oldest = new[] { oldestDelivery, oldestOutbox }
+            .Where(item => item is not null)
+            .Min();
+        return new(pendingCount, undispatchedCount,
+            oldest is { } occurredAt
+                ? Math.Max(0, (long)(now - occurredAt).TotalSeconds)
+                : 0);
+    }
+
+    public async Task<CompetitionWebhookDeliveryDiagnosticPage?> ListDiagnosticsAsync(
+        Guid competitionId, int offset, int limit, bool descending,
+        CancellationToken cancellationToken)
+    {
+        if (!await db.Competitions.AsNoTracking()
+                .AnyAsync(item => item.Id == competitionId, cancellationToken))
+            return null;
+        var query = db.CompetitionWebhookDeliveries.AsNoTracking()
+            .Where(item => item.CompetitionId == competitionId);
+        var total = await query.CountAsync(cancellationToken);
+        var ordered = descending
+            ? query.OrderByDescending(item => item.DomainEventCreatedAt)
+                .ThenByDescending(item => item.EventId)
+            : query.OrderBy(item => item.DomainEventCreatedAt)
+                .ThenBy(item => item.EventId);
+        var rows = await ordered.Skip(offset).Take(limit)
+            .Join(db.CompetitionEvents.AsNoTracking(), delivery => delivery.EventId,
+                competitionEvent => competitionEvent.Id,
+                (delivery, competitionEvent) => new { delivery, competitionEvent.Kind })
+            .Join(db.CompetitionWebhookOutboxEvents.AsNoTracking(),
+                item => item.delivery.EventId, outbox => outbox.EventId,
+                (item, outbox) => new
+                {
+                    item.delivery,
+                    item.Kind,
+                    outbox.Sequence,
+                    outbox.CompetitionRevision
+                })
+            .ToArrayAsync(cancellationToken);
+        return new(rows.Select(item =>
+        {
+            var row = item.delivery;
+            return new CompetitionWebhookDeliveryDiagnostic(
+                row.EventId, row.TargetId, item.Kind, row.State,
+                row.PayloadState, item.Sequence, item.CompetitionRevision,
+                row.DomainEventCreatedAt, row.OutboxPersistedAt,
+                row.WorkerDequeuedAt, row.PublicProjectionReadyAt,
+                row.CapturedAt, row.FirstHttpAttemptStartedAt,
+                row.LastHttpAttemptStartedAt, row.LastHttpAttemptCompletedAt,
+                row.LastHttpStatusCode, row.ProjectionRetryCount,
+                row.HttpRetryCount,
+                row.State is CompetitionWebhookDeliveryState.Pending
+                    or CompetitionWebhookDeliveryState.InFlight
+                    ? row.NextRetryAt : null,
+                row.DeadLetterReason);
+        }).ToArray(), total);
+    }
+
+    public async Task<IReadOnlyList<CompetitionWebhookOutboxWakeup>> ClaimPendingOutboxAsync(
+        DateTimeOffset now,
+        int limit,
+        CancellationToken cancellationToken)
+    {
+        var candidates = await db.CompetitionWebhookOutboxEvents.AsNoTracking()
+            .Where(item => item.DispatchCompletedAt == null && item.NextDispatchAt <= now)
+            .OrderBy(item => item.Sequence)
+            .Take(limit)
+            .Select(item => new CompetitionWebhookOutboxWakeup(
+                item.CompetitionId, item.EventId))
+            .ToArrayAsync(cancellationToken);
+        var claimed = new List<CompetitionWebhookOutboxWakeup>(candidates.Length);
+        var retryAt = now.AddSeconds(3);
+        foreach (var candidate in candidates)
+        {
+            var updated = await db.CompetitionWebhookOutboxEvents
+                .Where(item => item.EventId == candidate.EventId
+                    && item.DispatchCompletedAt == null
+                    && item.NextDispatchAt <= now)
+                .ExecuteUpdateAsync(setters => setters
+                    .SetProperty(item => item.NextDispatchAt, retryAt)
+                    .SetProperty(item => item.WorkerDequeuedAt, now), cancellationToken);
+            if (updated == 1)
+                claimed.Add(candidate);
+        }
+        return claimed;
+    }
+
+    public async Task MarkDispatchCompletedAsync(Guid eventId, DateTimeOffset completedAt,
+        CancellationToken cancellationToken)
+    {
+        _ = await db.CompetitionWebhookOutboxEvents
+            .Where(item => item.EventId == eventId && item.DispatchCompletedAt == null)
+            .ExecuteUpdateAsync(setters => setters
+                .SetProperty(item => item.DispatchCompletedAt, completedAt), cancellationToken);
+    }
+
+    public async Task<IReadOnlyList<DeliverCompetitionWebhook>> ClaimDueDeliveriesAsync(
+        DateTimeOffset now, int limit, CancellationToken cancellationToken)
+    {
+        var due = await db.CompetitionWebhookDeliveries.AsNoTracking()
+            .Where(item => item.State == CompetitionWebhookDeliveryState.Pending
+                    && item.NextRetryAt <= now
+                    && (item.EnqueueLeaseUntil == null || item.EnqueueLeaseUntil <= now)
+                || item.State == CompetitionWebhookDeliveryState.InFlight
+                    && item.LeaseExpiresAt <= now)
+            .OrderBy(item => item.DomainEventCreatedAt).ThenBy(item => item.EventId)
+            .Take(limit)
+            .Select(item => new DeliverCompetitionWebhook(
+                item.CompetitionId, item.EventId, item.TargetId,
+                item.DomainEventCreatedAt))
+            .ToArrayAsync(cancellationToken);
+        var claimed = new List<DeliverCompetitionWebhook>(due.Length);
+        foreach (var item in due)
+        {
+            var updated = await db.CompetitionWebhookDeliveries
+                .Where(row => row.EventId == item.EventId && row.TargetId == item.TargetId
+                    && (row.State == CompetitionWebhookDeliveryState.Pending
+                            && row.NextRetryAt <= now
+                            && (row.EnqueueLeaseUntil == null || row.EnqueueLeaseUntil <= now)
+                        || row.State == CompetitionWebhookDeliveryState.InFlight
+                            && row.LeaseExpiresAt <= now))
+                .ExecuteUpdateAsync(setters => setters
+                    .SetProperty(row => row.State, CompetitionWebhookDeliveryState.Pending)
+                    .SetProperty(row => row.EnqueueLeaseUntil, now.AddSeconds(5))
+                    .SetProperty(row => row.LeaseExpiresAt, (DateTimeOffset?)null),
+                    cancellationToken);
+            if (updated == 1)
+                claimed.Add(item);
+        }
+        return claimed;
+    }
+
+    public async Task RecordProjectionWaitAsync(DeliverCompetitionWebhook delivery,
+        CompetitionWebhookProjectionFailure failure, DateTimeOffset now,
+        CancellationToken cancellationToken)
+    {
+        var row = await FindDeliveryAsync(delivery, cancellationToken);
+        if (row is null)
+            throw new CompetitionWebhookProjectionNotReadyException(failure);
+        if (failure == CompetitionWebhookProjectionFailure.BlackoutSuppressed)
+        {
+            row.State = CompetitionWebhookDeliveryState.Suppressed;
+            row.LeaseExpiresAt = null;
+            row.EnqueueLeaseUntil = null;
+            row.CompletedAt = now;
+            await db.SaveChangesAsync(cancellationToken);
+            return;
+        }
+        row.ProjectionRetryCount++;
+        row.PayloadState = failure == CompetitionWebhookProjectionFailure.MissingEventIdentity
+            ? CompetitionWebhookPayloadState.Invalid
+            : CompetitionWebhookPayloadState.ProjectionNotReady;
+        row.LeaseExpiresAt = null;
+        row.EnqueueLeaseUntil = null;
+        if (row.ProjectionRetryCount > ProjectionRetryDelays.Length)
+        {
+            row.State = CompetitionWebhookDeliveryState.DeadLetter;
+            row.CompletedAt = now;
+            row.DeadLetterReason = failure == CompetitionWebhookProjectionFailure.MissingEventIdentity
+                ? CompetitionWebhookDeadLetterReason.InvalidPayload
+                : CompetitionWebhookDeadLetterReason.ProjectionUnavailable;
+            NoCtfTelemetry.RecordWebhookDeadLetter(row.DeadLetterReason.Value.ToString());
+        }
+        else
+        {
+            row.State = CompetitionWebhookDeliveryState.Pending;
+            row.NextRetryAt = now.Add(ProjectionRetryDelays[row.ProjectionRetryCount - 1]);
+            NoCtfTelemetry.RecordWebhookRetry("projection");
+        }
+        await db.SaveChangesAsync(cancellationToken);
+    }
+
+    public async Task RecordHttpStartedAsync(DeliverCompetitionWebhook delivery,
+        DateTimeOffset startedAt, CancellationToken cancellationToken)
+    {
+        var row = await FindDeliveryAsync(delivery, cancellationToken);
+        if (row is null) return;
+        if (row.FirstHttpAttemptStartedAt is null)
+            NoCtfTelemetry.RecordWebhookQueueAge(
+                (startedAt - row.DomainEventCreatedAt).TotalSeconds);
+        row.FirstHttpAttemptStartedAt ??= startedAt;
+        row.LastHttpAttemptStartedAt = startedAt;
+        await db.SaveChangesAsync(cancellationToken);
+    }
+
+    public async Task RecordHttpCompletedAsync(DeliverCompetitionWebhook delivery,
+        CompetitionWebhookSendOutcome outcome, DateTimeOffset completedAt,
+        CancellationToken cancellationToken)
+    {
+        var row = await FindDeliveryAsync(delivery, cancellationToken);
+        if (row is null) return;
+        row.LastHttpStatusCode = outcome.HttpStatusCode;
+        row.LastHttpAttemptCompletedAt = completedAt;
+        if (row.LastHttpAttemptStartedAt is { } startedAt)
+            NoCtfTelemetry.RecordWebhookHttpAttempt(
+                (completedAt - startedAt).TotalSeconds,
+                outcome.Result == CompetitionWebhookSendResult.Delivered
+                    ? "delivered" : "receiver_gone");
+        row.CompletedAt = completedAt;
+        row.LeaseExpiresAt = null;
+        row.EnqueueLeaseUntil = null;
+        row.State = outcome.Result == CompetitionWebhookSendResult.Delivered
+            ? CompetitionWebhookDeliveryState.Delivered
+            : CompetitionWebhookDeliveryState.Suppressed;
+        await db.SaveChangesAsync(cancellationToken);
+    }
+
+    public async Task RecordHttpFailureAsync(DeliverCompetitionWebhook delivery,
+        int? statusCode, DateTimeOffset? retryAfter, bool permanent,
+        DateTimeOffset completedAt, CancellationToken cancellationToken)
+    {
+        var row = await FindDeliveryAsync(delivery, cancellationToken);
+        if (row is null)
+        {
+            if (permanent)
+                throw new CompetitionWebhookPermanentException(
+                    "Legacy webhook delivery failed permanently.", statusCode);
+            throw new CompetitionWebhookTransientException(
+                "Legacy webhook delivery failed transiently.",
+                httpStatusCode: statusCode, retryAfter: retryAfter);
+        }
+        row.HttpRetryCount++;
+        row.LastHttpStatusCode = statusCode;
+        row.LastHttpAttemptCompletedAt = completedAt;
+        if (row.LastHttpAttemptStartedAt is { } startedAt)
+            NoCtfTelemetry.RecordWebhookHttpAttempt(
+                (completedAt - startedAt).TotalSeconds, "failed");
+        row.LeaseExpiresAt = null;
+        row.EnqueueLeaseUntil = null;
+        if (permanent || row.HttpRetryCount > HttpRetryDelays.Length)
+        {
+            row.State = CompetitionWebhookDeliveryState.DeadLetter;
+            row.CompletedAt = completedAt;
+            row.DeadLetterReason = permanent
+                ? CompetitionWebhookDeadLetterReason.PermanentHttpFailure
+                : CompetitionWebhookDeadLetterReason.HttpRetryLimitExceeded;
+            NoCtfTelemetry.RecordWebhookDeadLetter(row.DeadLetterReason.Value.ToString());
+        }
+        else
+        {
+            row.State = CompetitionWebhookDeliveryState.Pending;
+            var backoff = completedAt.Add(HttpRetryDelays[row.HttpRetryCount - 1]);
+            row.NextRetryAt = retryAfter is { } requested && requested > backoff
+                ? requested : backoff;
+            NoCtfTelemetry.RecordWebhookRetry("http");
+        }
+        await db.SaveChangesAsync(cancellationToken);
+    }
+
+    private async Task<CompetitionWebhookDeliveryRecord?> FindDeliveryAsync(
+        DeliverCompetitionWebhook delivery, CancellationToken cancellationToken)
+    {
+        var tracked = db.CompetitionWebhookDeliveries.Local.FirstOrDefault(item =>
+            item.EventId == delivery.EventId && item.TargetId == delivery.TargetId);
+        if (tracked is not null)
+        {
+            await db.Entry(tracked).ReloadAsync(cancellationToken);
+            return db.Entry(tracked).State == EntityState.Detached ? null : tracked;
+        }
+        return await db.CompetitionWebhookDeliveries.SingleOrDefaultAsync(item =>
+            item.EventId == delivery.EventId && item.TargetId == delivery.TargetId,
+            cancellationToken);
+    }
 
     public async Task<CompetitionWebhookDispatchBatch> PrepareBatchAsync(
         DispatchCompetitionWebhooks command,
@@ -42,7 +335,11 @@ public sealed class CompetitionWebhookDeliveryStore(
         var source = await db.CompetitionEvents.AsNoTracking()
             .Where(item => item.Id == command.EventId
                 && item.CompetitionId == command.CompetitionId)
-            .Select(item => new { item.Visibility, item.Kind, item.OccurredAt })
+            .Select(item => new
+            {
+                item.Visibility, item.Kind, item.OccurredAt,
+                item.LeaderboardVisibility
+            })
             .SingleOrDefaultAsync(cancellationToken);
         if (source is null
             || source.Visibility != CompetitionEventVisibility.Public
@@ -51,12 +348,28 @@ public sealed class CompetitionWebhookDeliveryStore(
 
         var configuration = await db.Competitions.IgnoreQueryFilters().AsNoTracking()
             .Where(item => item.Id == command.CompetitionId && item.DeletedAt == null)
-            .Select(item => item.WebhookConfiguration)
+            .Select(item => new
+            {
+                item.WebhookConfiguration,
+                item.FrozenStartAt,
+                item.HiddenStartAt
+            })
             .SingleOrDefaultAsync(cancellationToken);
         if (configuration is null)
             return new([]);
+        if (CompetitionWebhookEventTypes.IsBloodAward(source.Kind)
+            && (source.LeaderboardVisibility == CompetitionLeaderboardVisibility.Blackout
+                || !CompetitionLeaderboardVisibilityPolicy.CanAnnounceBlood(
+                    configuration.FrozenStartAt,
+                    configuration.HiddenStartAt,
+                    timeProvider.GetUtcNow())
+                || !CompetitionLeaderboardVisibilityPolicy.CanAnnounceBlood(
+                    configuration.FrozenStartAt,
+                    configuration.HiddenStartAt,
+                    source.OccurredAt)))
+            return new([]);
 
-        var page = configuration.Targets
+        var page = configuration.WebhookConfiguration.Targets
             .Where(item => command.AfterTargetId is null
                 || item.Id.CompareTo(command.AfterTargetId.Value) > 0)
             .OrderBy(item => item.Id)
@@ -72,6 +385,52 @@ public sealed class CompetitionWebhookDeliveryStore(
                 item.Id,
                 source.OccurredAt))
             .ToArray();
+        var outbox = await db.CompetitionWebhookOutboxEvents.AsNoTracking()
+            .Where(item => item.EventId == command.EventId)
+            .Select(item => new { item.OutboxPersistedAt })
+            .SingleOrDefaultAsync(cancellationToken);
+        if (outbox is not null && deliveries.Length > 0)
+        {
+            var targetIds = deliveries.Select(item => item.TargetId).ToArray();
+            var existing = (await db.CompetitionWebhookDeliveries.AsNoTracking()
+                .Where(item => item.EventId == command.EventId
+                    && targetIds.Contains(item.TargetId))
+                .Select(item => item.TargetId)
+                .ToArrayAsync(cancellationToken)).ToHashSet();
+            var createdAt = timeProvider.GetUtcNow();
+            foreach (var delivery in deliveries.Where(item => !existing.Contains(item.TargetId)))
+                db.CompetitionWebhookDeliveries.Add(new CompetitionWebhookDeliveryRecord
+                {
+                    EventId = delivery.EventId,
+                    TargetId = delivery.TargetId,
+                    CompetitionId = delivery.CompetitionId,
+                    State = CompetitionWebhookDeliveryState.Pending,
+                    PayloadState = CompetitionWebhookPayloadState.Unknown,
+                    DomainEventCreatedAt = source.OccurredAt,
+                    OutboxPersistedAt = outbox.OutboxPersistedAt,
+                    CreatedAt = createdAt,
+                    NextRetryAt = createdAt,
+                    EnqueueLeaseUntil = createdAt.AddMilliseconds(500)
+                });
+            try
+            {
+                await db.SaveChangesAsync(cancellationToken);
+            }
+            catch (DbUpdateException)
+            {
+                // The JetStream wakeup and the PostgreSQL recovery scanner may race.
+                // Treat an already materialized complete batch as idempotent.
+                db.ChangeTracker.Clear();
+                var persisted = await db.CompetitionWebhookDeliveries.AsNoTracking()
+                    .Where(item => item.EventId == command.EventId
+                        && targetIds.Contains(item.TargetId))
+                    .Select(item => item.TargetId)
+                    .Distinct()
+                    .CountAsync(cancellationToken);
+                if (persisted != targetIds.Length)
+                    throw;
+            }
+        }
         return new(
             deliveries,
             page.Length > batchSize ? page[batchSize - 1].Id : null);
@@ -84,24 +443,54 @@ public sealed class CompetitionWebhookDeliveryStore(
         var competition = await db.Competitions.IgnoreQueryFilters().AsNoTracking()
             .SingleOrDefaultAsync(item => item.Id == command.CompetitionId, cancellationToken);
         if (competition is null || competition.DeletedAt is not null)
+        {
+            await MarkSuppressedAsync(command, cancellationToken);
             return Missing(command);
+        }
         var target = competition.WebhookConfiguration.Targets
             .SingleOrDefault(item => item.Id == command.TargetId);
         if (target is null)
+        {
+            await MarkSuppressedAsync(command, cancellationToken);
             return Missing(command);
+        }
         if (!target.Enabled
             || target.EnabledAt is not DateTimeOffset enabledAt
             || command.OccurredAt < enabledAt)
+        {
+            await MarkSuppressedAsync(command, cancellationToken);
             return Suppressed(command);
+        }
 
         var competitionEvent = await db.CompetitionEvents.AsNoTracking()
             .SingleOrDefaultAsync(item => item.Id == command.EventId
                 && item.CompetitionId == command.CompetitionId, cancellationToken);
         if (competitionEvent is null)
+        {
+            await MarkSuppressedAsync(command, cancellationToken);
             return Missing(command);
+        }
         var eventType = CompetitionWebhookEventTypes.From(competitionEvent.Kind);
         if (competitionEvent.Visibility != CompetitionEventVisibility.Public
             || eventType is null)
+        {
+            await MarkSuppressedAsync(command, cancellationToken);
+            return Suppressed(command);
+        }
+        if (CompetitionWebhookEventTypes.IsBloodAward(competitionEvent.Kind)
+            && (competitionEvent.LeaderboardVisibility == CompetitionLeaderboardVisibility.Blackout
+                || !CompetitionLeaderboardVisibilityPolicy.CanAnnounceBlood(
+                    competition.FrozenStartAt, competition.HiddenStartAt,
+                    timeProvider.GetUtcNow())
+                || !CompetitionLeaderboardVisibilityPolicy.CanAnnounceBlood(
+                    competition.FrozenStartAt, competition.HiddenStartAt,
+                    competitionEvent.OccurredAt)))
+        {
+            await MarkSuppressedAsync(command, cancellationToken);
+            return Suppressed(command);
+        }
+
+        if (!await TryClaimDeliveryAsync(command, cancellationToken))
             return Suppressed(command);
 
         var body = await BuildBodyAsync(
@@ -109,6 +498,7 @@ public sealed class CompetitionWebhookDeliveryStore(
             competitionEvent,
             eventType,
             cancellationToken);
+        await RecordPayloadReadyAsync(command, body, cancellationToken);
         var previousSecret = target.PreviousSecretCiphertext is { Length: > 0 }
             && target.PreviousSecretValidUntil > timeProvider.GetUtcNow()
                 ? secrets.Unprotect(
@@ -130,6 +520,67 @@ public sealed class CompetitionWebhookDeliveryStore(
                 competition.Id,
                 target.Id),
             previousSecret);
+    }
+
+    private async Task<bool> TryClaimDeliveryAsync(
+        DeliverCompetitionWebhook command, CancellationToken cancellationToken)
+    {
+        var exists = await db.CompetitionWebhookDeliveries.AsNoTracking()
+            .AnyAsync(item => item.EventId == command.EventId
+                && item.TargetId == command.TargetId, cancellationToken);
+        if (!exists) return true; // Legacy events created before the transactional outbox.
+        var now = timeProvider.GetUtcNow();
+        var claimed = await db.CompetitionWebhookDeliveries
+            .Where(item => item.EventId == command.EventId
+                && item.TargetId == command.TargetId
+                && (item.State == CompetitionWebhookDeliveryState.Pending
+                        && item.NextRetryAt <= now
+                    || item.State == CompetitionWebhookDeliveryState.InFlight
+                        && item.LeaseExpiresAt <= now))
+            .ExecuteUpdateAsync(setters => setters
+                .SetProperty(item => item.State, CompetitionWebhookDeliveryState.InFlight)
+                .SetProperty(item => item.LeaseExpiresAt, now.AddMinutes(1))
+                .SetProperty(item => item.WorkerDequeuedAt, now), cancellationToken);
+        return claimed == 1;
+    }
+
+    private async Task MarkSuppressedAsync(
+        DeliverCompetitionWebhook command, CancellationToken cancellationToken)
+    {
+        _ = await db.CompetitionWebhookDeliveries
+            .Where(item => item.EventId == command.EventId
+                && item.TargetId == command.TargetId
+                && item.State != CompetitionWebhookDeliveryState.Delivered)
+            .ExecuteUpdateAsync(setters => setters
+                .SetProperty(item => item.State, CompetitionWebhookDeliveryState.Suppressed)
+                .SetProperty(item => item.CompletedAt, timeProvider.GetUtcNow()),
+                cancellationToken);
+    }
+
+    private async Task RecordPayloadReadyAsync(
+        DeliverCompetitionWebhook command, byte[] body,
+        CancellationToken cancellationToken)
+    {
+        using var document = JsonDocument.Parse(body);
+        var capturedAt = document.RootElement.GetProperty("data")
+            .GetProperty("capturedAt").GetDateTimeOffset();
+        var readyAt = timeProvider.GetUtcNow();
+        var waitStarted = await db.CompetitionWebhookDeliveries.AsNoTracking()
+            .Where(item => item.EventId == command.EventId
+                && item.TargetId == command.TargetId)
+            .Select(item => item.WorkerDequeuedAt)
+            .SingleOrDefaultAsync(cancellationToken);
+        _ = await db.CompetitionWebhookDeliveries
+            .Where(item => item.EventId == command.EventId
+                && item.TargetId == command.TargetId
+                && item.State == CompetitionWebhookDeliveryState.InFlight)
+            .ExecuteUpdateAsync(setters => setters
+                .SetProperty(item => item.PayloadState, CompetitionWebhookPayloadState.Complete)
+                .SetProperty(item => item.PublicProjectionReadyAt, readyAt)
+                .SetProperty(item => item.CapturedAt, capturedAt), cancellationToken);
+        if (waitStarted is { } startedAt)
+            NoCtfTelemetry.RecordWebhookProjectionWait(
+                (readyAt - startedAt).TotalSeconds);
     }
 
     public async Task<CompetitionWebhookDelivery> PrepareTestDeliveryAsync(
@@ -224,17 +675,52 @@ public sealed class CompetitionWebhookDeliveryStore(
         CancellationToken cancellationToken)
     {
         var challengeId = competitionEvent.CompetitionChallengeId;
-        var competitionResource = BuildCompetitionResource(competition);
-        JsonElement? challengeResource = challengeId is Guid id
-            ? await BuildChallengeResourceAsync(competition, id, cancellationToken)
+        var competitionResource = BuildCompetitionResource(competition,
+            CompetitionWebhookEventTypes.IsBloodAward(competitionEvent.Kind)
+                ? competitionEvent.LeaderboardVisibility : null);
+        var outbox = await db.CompetitionWebhookOutboxEvents.AsNoTracking()
+            .Where(item => item.EventId == competitionEvent.Id)
+            .Select(item => new { item.Sequence, item.CompetitionRevision })
+            .SingleOrDefaultAsync(cancellationToken);
+        var leaderboardData = CompetitionWebhookEventTypes.RequiresLeaderboard(
+                competitionEvent.Kind)
+            ? await BuildLeaderboardResourceAsync(competition,
+                CompetitionWebhookEventTypes.IsBloodAward(competitionEvent.Kind)
+                    ? competitionEvent.LeaderboardVisibility : null,
+                competitionEvent.FrozenStartAt ?? competition.FrozenStartAt,
+                cancellationToken)
             : null;
+        if (leaderboardData is { Scope: LeaderboardDataScope.Live }
+            && outbox is not null
+            && (leaderboardData.Projection is null
+                || leaderboardData.SourceEventSequenceThrough < outbox.Sequence))
+            throw new CompetitionWebhookProjectionNotReadyException(
+                CompetitionWebhookProjectionFailure.MissingPublicProjection);
+        if (leaderboardData is { Scope: LeaderboardDataScope.Frozen, Projection: null }
+            && outbox is not null)
+            throw new CompetitionWebhookProjectionNotReadyException(
+                CompetitionWebhookProjectionFailure.MissingPublicProjection);
+        JsonElement? challengeResource = CompetitionWebhookEventTypes.IsBloodAward(
+                competitionEvent.Kind)
+            ? BuildBloodChallengeResource(competition, competitionEvent, leaderboardData,
+                outbox?.Sequence ?? 0,
+                competitionEvent.FrozenStartAt ?? competition.FrozenStartAt)
+            : challengeId is Guid id
+                ? await BuildChallengeResourceAsync(competition, id, cancellationToken)
+                : null;
         JsonElement? announcementResource = competitionEvent.Kind == CompetitionEventKind.AnnouncementPublished
             ? await BuildAnnouncementResourceAsync(competitionEvent.QuestionId, cancellationToken)
             : null;
-        JsonElement? leaderboardResource = CompetitionWebhookEventTypes.RequiresLeaderboard(
-                competitionEvent.Kind)
-            ? await BuildLeaderboardResourceAsync(competition, cancellationToken)
-            : null;
+        if (competitionEvent.Kind == CompetitionEventKind.AnnouncementPublished
+            && announcementResource is null)
+            throw new CompetitionWebhookProjectionNotReadyException(
+                CompetitionWebhookProjectionFailure.MissingPublicAnnouncement);
+        if (competitionEvent.Kind is CompetitionEventKind.ChallengePublished
+                or CompetitionEventKind.ChallengeDescriptionUpdated
+                or CompetitionEventKind.HintPublished
+            && challengeResource is null)
+            throw new CompetitionWebhookProjectionNotReadyException(
+                CompetitionWebhookProjectionFailure.MissingPublicChallenge);
         var capturedAt = timeProvider.GetUtcNow();
         var source = new Uri(
             options.PublicBaseUrl,
@@ -255,6 +741,13 @@ public sealed class CompetitionWebhookDeliveryStore(
             data = new
             {
                 capturedAt,
+                eventSequence = outbox?.Sequence,
+                requiredProjectionVersion = leaderboardData?.Scope == LeaderboardDataScope.Frozen
+                    ? leaderboardData.SourceEventSequenceThrough
+                    : outbox?.Sequence,
+                publicProjectionVersion = leaderboardData?.SourceEventSequenceThrough
+                    ?? outbox?.Sequence,
+                competitionRevision = outbox?.CompetitionRevision,
                 @event = new
                 {
                     competitionId = competition.Id,
@@ -273,17 +766,81 @@ public sealed class CompetitionWebhookDeliveryStore(
                     competition = competitionResource,
                     challenge = challengeResource,
                     announcement = announcementResource,
-                    leaderboard = leaderboardResource
+                    leaderboard = leaderboardData?.Resource
                 }
             }
         };
-        return JsonSerializer.SerializeToUtf8Bytes(payload, JsonOptions);
+        var body = JsonSerializer.SerializeToUtf8Bytes(payload, JsonOptions);
+        if (CompetitionWebhookEventTypes.IsBloodAward(competitionEvent.Kind))
+            BloodWebhookContract.Validate(body, competitionEvent, leaderboardData!.Scope);
+        return body;
     }
 
-    private JsonElement BuildCompetitionResource(Competition value)
+    private static JsonElement BuildBloodChallengeResource(
+        Competition competition,
+        CompetitionEvent competitionEvent,
+        PreparedLeaderboardResource? leaderboardData,
+        long requiredProjectionVersion,
+        DateTimeOffset? frozenAt)
+    {
+        if (competitionEvent.TeamId is not Guid { } teamId || teamId == Guid.Empty
+            || competitionEvent.CompetitionChallengeId is not Guid { } challengeId
+            || challengeId == Guid.Empty
+            || CompetitionWebhookEventTypes.Award(competitionEvent.Kind) is null)
+            throw new CompetitionWebhookProjectionNotReadyException(
+                CompetitionWebhookProjectionFailure.MissingEventIdentity);
+        if (leaderboardData is null)
+            throw new CompetitionWebhookProjectionNotReadyException(
+                CompetitionWebhookProjectionFailure.MissingPublicProjection);
+
+        if (leaderboardData.Scope == LeaderboardDataScope.Hidden)
+            throw new CompetitionWebhookProjectionNotReadyException(
+                CompetitionWebhookProjectionFailure.BlackoutSuppressed);
+
+        var projection = leaderboardData.Projection
+            ?? throw new CompetitionWebhookProjectionNotReadyException(
+                CompetitionWebhookProjectionFailure.MissingPublicProjection);
+        if (leaderboardData.Scope == LeaderboardDataScope.Live
+            && leaderboardData.SourceEventSequenceThrough < requiredProjectionVersion)
+            throw new CompetitionWebhookProjectionNotReadyException(
+                CompetitionWebhookProjectionFailure.MissingPublicProjection);
+        if (leaderboardData.Scope == LeaderboardDataScope.Frozen
+            && (frozenAt is null || projection.Snapshot.DataAsOf != frozenAt))
+            throw new CompetitionWebhookProjectionNotReadyException(
+                CompetitionWebhookProjectionFailure.MissingPublicProjection);
+        var challenge = projection.ChallengeCatalog.Challenges.SingleOrDefault(
+            item => item.CompetitionChallengeId == challengeId && item.IsPublished);
+        if (challenge is null || string.IsNullOrWhiteSpace(challenge.Title))
+            throw new CompetitionWebhookProjectionNotReadyException(
+                CompetitionWebhookProjectionFailure.MissingPublicChallenge);
+        var team = projection.Snapshot.Teams.SingleOrDefault(item => item.TeamId == teamId);
+        if (team is null || string.IsNullOrWhiteSpace(team.TeamName))
+            throw new CompetitionWebhookProjectionNotReadyException(
+                CompetitionWebhookProjectionFailure.MissingPublicTeam);
+
+        // The public challenge and team names come from the same published projection.
+        // In Frozen scope this is the frozen projection, never the live challenge reader.
+        return JsonSerializer.SerializeToElement(new
+        {
+            Id = challenge.CompetitionChallengeId,
+            CompetitionId = competition.Id,
+            challenge.Title,
+            challenge.Direction,
+            challenge.Order,
+            challenge.IsPublished,
+            DataScope = leaderboardData.Scope,
+            LeaderboardVisibility = leaderboardData.Visibility,
+            ProjectionVersion = leaderboardData.SourceEventSequenceThrough
+                .ToString(CultureInfo.InvariantCulture)
+        }, JsonOptions);
+    }
+
+    private JsonElement BuildCompetitionResource(
+        Competition value,
+        CompetitionLeaderboardVisibility? eventVisibility = null)
     {
         var now = timeProvider.GetUtcNow();
-        var visibility = CompetitionLeaderboardVisibilityPolicy.EffectiveAt(
+        var visibility = eventVisibility ?? CompetitionLeaderboardVisibilityPolicy.EffectiveAt(
             value.FrozenStartAt,
             value.HiddenStartAt,
             now);
@@ -421,12 +978,14 @@ public sealed class CompetitionWebhookDeliveryStore(
         }, JsonOptions);
     }
 
-    private async Task<JsonElement> BuildLeaderboardResourceAsync(
+    private async Task<PreparedLeaderboardResource> BuildLeaderboardResourceAsync(
         Competition competition,
+        CompetitionLeaderboardVisibility? eventVisibility,
+        DateTimeOffset? frozenAt,
         CancellationToken cancellationToken)
     {
         var now = timeProvider.GetUtcNow();
-        var visibility = CompetitionLeaderboardVisibilityPolicy.EffectiveAt(
+        var visibility = eventVisibility ?? CompetitionLeaderboardVisibilityPolicy.EffectiveAt(
             competition.FrozenStartAt,
             competition.HiddenStartAt,
             now);
@@ -436,6 +995,8 @@ public sealed class CompetitionWebhookDeliveryStore(
             CompetitionLeaderboardVisibility.Frozen => LeaderboardDataScope.Frozen,
             _ => LeaderboardDataScope.Live
         };
+        ScoreboardProjection? projection = null;
+        long sourceEventSequenceThrough = 0;
         ScoreboardSnapshot snapshot;
         if (dataScope == LeaderboardDataScope.Hidden)
         {
@@ -443,9 +1004,15 @@ public sealed class CompetitionWebhookDeliveryStore(
         }
         else
         {
-            var projection = dataScope == LeaderboardDataScope.Frozen
-                ? await leaderboard.GetFrozenScoreboardAsync(competition.Id, cancellationToken)
-                : await leaderboard.GetScoreboardAsync(competition.Id, cancellationToken);
+            var published = dataScope == LeaderboardDataScope.Frozen
+                ? frozenAt is { } boundary
+                    ? await leaderboard.GetFrozenWebhookScoreboardAsync(
+                        competition.Id, boundary, cancellationToken)
+                    : null
+                : await leaderboard.GetWebhookScoreboardAsync(
+                    competition.Id, frozen: false, cancellationToken);
+            projection = published?.Projection;
+            sourceEventSequenceThrough = published?.SourceEventSequenceThrough ?? 0;
             if (projection is not null)
             {
                 projection = ScoreboardAudienceProjection.Filter(
@@ -476,18 +1043,28 @@ public sealed class CompetitionWebhookDeliveryStore(
                     : snapshot.GeneratedAt
             };
         }
-        return SerializeScoreboard(snapshot with
+        return new(SerializeScoreboard(snapshot with
         {
             Visibility = visibility,
             DataScope = dataScope
-        });
+        }, sourceEventSequenceThrough), dataScope, visibility, projection,
+            sourceEventSequenceThrough);
     }
 
-    private static JsonElement SerializeScoreboard(ScoreboardSnapshot snapshot) =>
+    private sealed record PreparedLeaderboardResource(
+        JsonElement Resource,
+        LeaderboardDataScope Scope,
+        CompetitionLeaderboardVisibility Visibility,
+        ScoreboardProjection? Projection,
+        long SourceEventSequenceThrough);
+
+    private static JsonElement SerializeScoreboard(
+        ScoreboardSnapshot snapshot, long sourceEventSequenceThrough) =>
         JsonSerializer.SerializeToElement(new
         {
             snapshot.CompetitionId,
             Version = snapshot.Version.ToString(CultureInfo.InvariantCulture),
+            ProjectionVersion = sourceEventSequenceThrough.ToString(CultureInfo.InvariantCulture),
             SchemaRevision = snapshot.SchemaRevision.ToString(CultureInfo.InvariantCulture),
             snapshot.GeneratedAt,
             snapshot.CurrentRoundId,
@@ -516,6 +1093,11 @@ public sealed class CompetitionWebhookDeliveryStore(
 
 public static class CompetitionWebhookEventTypes
 {
+    public static bool IsBloodAward(CompetitionEventKind kind) => kind is
+        CompetitionEventKind.FirstBloodAwarded
+        or CompetitionEventKind.SecondBloodAwarded
+        or CompetitionEventKind.ThirdBloodAwarded;
+
     public static string? From(CompetitionEventKind kind) => kind switch
     {
         CompetitionEventKind.CompetitionLifecycleChanged =>
@@ -552,11 +1134,102 @@ public static class CompetitionWebhookEventTypes
         or CompetitionEventKind.AwdpBreakResolved
         or CompetitionEventKind.AwdpFixResolved;
 
-    public static string? Award(CompetitionEventKind kind) => kind switch
+    public static LeaderboardBloodRank? Award(CompetitionEventKind kind) => kind switch
     {
-        CompetitionEventKind.FirstBloodAwarded => "First",
-        CompetitionEventKind.SecondBloodAwarded => "Second",
-        CompetitionEventKind.ThirdBloodAwarded => "Third",
+        CompetitionEventKind.FirstBloodAwarded => LeaderboardBloodRank.First,
+        CompetitionEventKind.SecondBloodAwarded => LeaderboardBloodRank.Second,
+        CompetitionEventKind.ThirdBloodAwarded => LeaderboardBloodRank.Third,
         _ => null
     };
+}
+
+internal static class BloodWebhookContract
+{
+    public static void Validate(
+        ReadOnlyMemory<byte> body,
+        CompetitionEvent source,
+        LeaderboardDataScope expectedScope)
+    {
+        if (expectedScope == LeaderboardDataScope.Hidden)
+            throw new CompetitionWebhookProjectionNotReadyException(
+                CompetitionWebhookProjectionFailure.BlackoutSuppressed);
+        using var document = JsonDocument.Parse(body);
+        var data = document.RootElement.GetProperty("data");
+        if (!data.TryGetProperty("eventSequence", out var eventSequence)
+            || eventSequence.ValueKind != JsonValueKind.Number
+            || eventSequence.GetInt64() <= 0
+            || !data.TryGetProperty("requiredProjectionVersion", out var requiredVersion)
+            || requiredVersion.ValueKind != JsonValueKind.Number
+            || requiredVersion.GetInt64() < 0
+            || !data.TryGetProperty("publicProjectionVersion", out var publicVersion)
+            || publicVersion.ValueKind != JsonValueKind.Number
+            || publicVersion.GetInt64() < 0
+            || !data.TryGetProperty("competitionRevision", out var revision)
+            || revision.ValueKind != JsonValueKind.String
+            || revision.GetGuid() == Guid.Empty)
+            throw new CompetitionWebhookProjectionNotReadyException(
+                CompetitionWebhookProjectionFailure.MissingEventIdentity);
+        var eventResource = data.GetProperty("event");
+        var resources = data.GetProperty("resources");
+        if (source.TeamId is not Guid teamId || teamId == Guid.Empty
+            || source.CompetitionChallengeId is not Guid challengeId
+            || challengeId == Guid.Empty
+            || !eventResource.TryGetProperty("teamId", out var eventTeam)
+            || eventTeam.ValueKind != JsonValueKind.String
+            || eventTeam.GetGuid() != teamId
+            || !eventResource.TryGetProperty("competitionChallengeId", out var eventChallenge)
+            || eventChallenge.ValueKind != JsonValueKind.String
+            || eventChallenge.GetGuid() != challengeId
+            || !eventResource.TryGetProperty("award", out var award)
+            || award.ValueKind != JsonValueKind.String
+            || award.GetString() != CompetitionWebhookEventTypes.Award(source.Kind)?.ToString())
+            throw new CompetitionWebhookProjectionNotReadyException(
+                CompetitionWebhookProjectionFailure.MissingEventIdentity);
+
+        if (!resources.TryGetProperty("challenge", out var challenge)
+            || challenge.ValueKind != JsonValueKind.Object
+            || !challenge.TryGetProperty("id", out var resourceId)
+            || resourceId.ValueKind != JsonValueKind.String
+            || resourceId.GetGuid() != challengeId)
+            throw new CompetitionWebhookProjectionNotReadyException(
+                CompetitionWebhookProjectionFailure.MissingPublicChallenge);
+        if (!resources.TryGetProperty("leaderboard", out var leaderboard)
+            || leaderboard.ValueKind != JsonValueKind.Object
+            || !leaderboard.TryGetProperty("dataScope", out var scope)
+            || scope.GetString() != expectedScope.ToString()
+            || !leaderboard.TryGetProperty("teams", out var teams)
+            || teams.ValueKind != JsonValueKind.Array)
+            throw new CompetitionWebhookProjectionNotReadyException(
+                CompetitionWebhookProjectionFailure.MissingPublicProjection);
+
+        if (!challenge.TryGetProperty("title", out var title)
+            || string.IsNullOrWhiteSpace(title.GetString()))
+            throw new CompetitionWebhookProjectionNotReadyException(
+                CompetitionWebhookProjectionFailure.MissingPublicChallenge);
+        if (!leaderboard.TryGetProperty("projectionVersion", out var projectionVersion)
+            || projectionVersion.ValueKind != JsonValueKind.String
+            || !long.TryParse(projectionVersion.GetString(),
+                NumberStyles.None, CultureInfo.InvariantCulture,
+                out var publishedVersion)
+            || publicVersion.GetInt64() != publishedVersion
+            || !challenge.TryGetProperty("projectionVersion", out var challengeVersion)
+            || challengeVersion.GetString() != projectionVersion.GetString()
+            || expectedScope == LeaderboardDataScope.Live
+                && publishedVersion < requiredVersion.GetInt64())
+            throw new CompetitionWebhookProjectionNotReadyException(
+                CompetitionWebhookProjectionFailure.MissingPublicProjection);
+        if (!teams.EnumerateArray().Any(team =>
+                team.TryGetProperty("teamId", out var id)
+                && id.ValueKind == JsonValueKind.String
+                && id.GetGuid() == teamId
+                && team.TryGetProperty("teamName", out var name)
+                && !string.IsNullOrWhiteSpace(name.GetString())))
+            throw new CompetitionWebhookProjectionNotReadyException(
+                CompetitionWebhookProjectionFailure.MissingPublicTeam);
+        if (expectedScope == LeaderboardDataScope.Frozen
+            && (!leaderboard.TryGetProperty("dataAsOf", out var dataAsOf)
+                || dataAsOf.ValueKind != JsonValueKind.String))
+            throw new CompetitionWebhookProjectionNotReadyException(
+                CompetitionWebhookProjectionFailure.MissingPublicProjection);
+    }
 }

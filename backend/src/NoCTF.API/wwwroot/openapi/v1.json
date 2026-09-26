@@ -12129,6 +12129,89 @@
         ]
       }
     },
+    "/api/v1/admin/competitions/{competitionId}/webhook-deliveries": {
+      "get": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "Admin List Competition Webhook Deliveries",
+        "description": "Executes GET /api/v1/admin/competitions/{competitionId}/webhook-deliveries.",
+        "operationId": "AdminListCompetitionWebhookDeliveries",
+        "parameters": [
+          {
+            "name": "competitionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "desc",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationCompetitionsCompetitionWebhookDeliveryListResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcValidationProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ]
+      }
+    },
     "/api/v1/admin/competitions/{competitionId}/hard-delete-preview": {
       "get": {
         "tags": [
@@ -26632,6 +26715,149 @@
             "type": "boolean"
           }
         }
+      },
+      "NoCTFAPIEndpointsAdministrationCompetitionsCompetitionWebhookDeliveryListResponse": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/NoCTFAPIPaginationArrayResultOfCompetitionWebhookDeliveryDiagnosticResponse"
+          },
+          {
+            "type": "object",
+            "additionalProperties": false
+          }
+        ]
+      },
+      "NoCTFAPIPaginationArrayResultOfCompetitionWebhookDeliveryDiagnosticResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "total": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationCompetitionsCompetitionWebhookDeliveryDiagnosticResponse"
+            }
+          }
+        }
+      },
+      "NoCTFAPIEndpointsAdministrationCompetitionsCompetitionWebhookDeliveryDiagnosticResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "eventId": {
+            "type": "string",
+            "format": "guid"
+          },
+          "targetId": {
+            "type": "string",
+            "format": "guid"
+          },
+          "eventType": {
+            "type": "string"
+          },
+          "state": {
+            "type": "string"
+          },
+          "payloadState": {
+            "type": "string"
+          },
+          "eventSequence": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "competitionRevision": {
+            "type": "string",
+            "format": "guid"
+          },
+          "domainEventCreatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "outboxPersistedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "workerDequeuedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "publicProjectionReadyAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "capturedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "queueAgeSeconds": {
+            "type": "number",
+            "format": "double"
+          },
+          "projectionWaitSeconds": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "firstHttpAttemptStartedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "lastHttpAttemptStartedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "lastHttpAttemptCompletedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "lastHttpAttemptDurationSeconds": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "lastHttpStatusCode": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "projectionRetryCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "httpRetryCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "nextRetryAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "deadLetterReason": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
+      "NoCTFAPIEndpointsAdministrationCompetitionsListCompetitionWebhookDeliveriesRequest": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/NoCTFAPIPaginationPaginationRequest"
+          },
+          {
+            "type": "object",
+            "additionalProperties": false
+          }
+        ]
       },
       "NoCTFAPIEndpointsAdministrationCompetitionsCompetitionWebhookTargetListResponse": {
         "allOf": [

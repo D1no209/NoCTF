@@ -22,6 +22,9 @@ public sealed class DataModelSchemaTests
         "competition_progression_nodes",
         "competition_progression_edges",
         "competition_badges",
+        "competition_webhook_outbox_events",
+        "competition_webhook_deliveries",
+        "competition_webhook_frozen_projections",
         "competition_events",
         "competition_mode_configurations",
         "competitions",
@@ -89,11 +92,12 @@ public sealed class DataModelSchemaTests
                     migrations.Add(reader.GetString(0));
             }
 
-            await Assert.That(migrations).Count().IsEqualTo(4);
+            await Assert.That(migrations).Count().IsEqualTo(5);
             await Assert.That(migrations[0]).EndsWith("_InitialBaseline");
             await Assert.That(migrations[1]).EndsWith("_CompetitionProgression");
             await Assert.That(migrations[2]).EndsWith("_PersistedSsoFlows");
             await Assert.That(migrations[3]).EndsWith("_PersistedRequestAdmission");
+            await Assert.That(migrations[4]).EndsWith("_CompetitionWebhookOutbox");
 
             await using var removedGatewayColumnsCommand = new NpgsqlCommand(
                 "SELECT count(*) FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'platform_settings' AND column_name LIKE 'public_gateway_%'",

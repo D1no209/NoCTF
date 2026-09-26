@@ -26,24 +26,53 @@ public sealed class CompetitionWebhookMessageHandler(
         {
             await bus.PublishAsync(message with { AfterTargetId = cursor });
         }
+        else
+        {
+            await deliveries.MarkDispatchCompletedAsync(
+                message.EventId, timeProvider.GetUtcNow(), cancellationToken);
+        }
     }
 
     public async Task Handle(
         DeliverCompetitionWebhook message,
         CancellationToken cancellationToken)
     {
-        var delivery = await deliveries.PrepareDeliveryAsync(message, cancellationToken);
+        CompetitionWebhookDelivery delivery;
+        try
+        {
+            delivery = await deliveries.PrepareDeliveryAsync(message, cancellationToken);
+        }
+        catch (CompetitionWebhookProjectionNotReadyException exception)
+        {
+            await deliveries.RecordProjectionWaitAsync(message, exception.Failure,
+                timeProvider.GetUtcNow(), cancellationToken);
+            return;
+        }
         if (delivery.State != CompetitionWebhookDeliveryReadState.Ready)
             return;
-        var result = await sender.SendAsync(delivery, cancellationToken);
-        if (result == CompetitionWebhookSendResult.ReceiverGone)
+        await deliveries.RecordHttpStartedAsync(
+            message, timeProvider.GetUtcNow(), cancellationToken);
+        try
         {
-            await deliveries.DisableGoneAsync(
-                delivery.CompetitionId,
-                delivery.TargetId,
-                delivery.Endpoint!,
-                timeProvider.GetUtcNow(),
-                cancellationToken);
+            var outcome = await sender.SendAsync(delivery, cancellationToken);
+            await deliveries.RecordHttpCompletedAsync(
+                message, outcome, timeProvider.GetUtcNow(), cancellationToken);
+            if (outcome.Result == CompetitionWebhookSendResult.ReceiverGone)
+                await deliveries.DisableGoneAsync(
+                    delivery.CompetitionId, delivery.TargetId, delivery.Endpoint!,
+                    timeProvider.GetUtcNow(), cancellationToken);
+        }
+        catch (CompetitionWebhookTransientException exception)
+        {
+            await deliveries.RecordHttpFailureAsync(message,
+                exception.HttpStatusCode, exception.RetryAfter, permanent: false,
+                timeProvider.GetUtcNow(), cancellationToken);
+        }
+        catch (CompetitionWebhookPermanentException exception)
+        {
+            await deliveries.RecordHttpFailureAsync(message,
+                exception.HttpStatusCode, null, permanent: true,
+                timeProvider.GetUtcNow(), cancellationToken);
         }
     }
 
@@ -65,7 +94,7 @@ public sealed class CompetitionWebhookMessageHandler(
         try
         {
             var result = await sender.SendAsync(delivery, cancellationToken);
-            if (result == CompetitionWebhookSendResult.ReceiverGone)
+            if (result.Result == CompetitionWebhookSendResult.ReceiverGone)
             {
                 await deliveries.DisableGoneAsync(
                     delivery.CompetitionId,

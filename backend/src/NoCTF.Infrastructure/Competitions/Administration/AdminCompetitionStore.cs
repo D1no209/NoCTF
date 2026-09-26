@@ -680,6 +680,12 @@ public sealed class AdminCompetitionStore(
                 flag.CompetitionChallengeId != null
                 && competitionChallengeIds.Contains(flag.CompetitionChallengeId.Value))
             .ExecuteDeleteAsync(ct);
+        await db.CompetitionWebhookDeliveries.Where(item => item.CompetitionId == competitionId)
+            .ExecuteDeleteAsync(ct);
+        await db.CompetitionWebhookOutboxEvents.Where(item => item.CompetitionId == competitionId)
+            .ExecuteDeleteAsync(ct);
+        await db.CompetitionWebhookFrozenProjections.Where(item => item.CompetitionId == competitionId)
+            .ExecuteDeleteAsync(ct);
         await db.CompetitionEvents.Where(item => item.CompetitionId == competitionId)
             .ExecuteDeleteAsync(ct);
         await db.CompetitionChallenges.IgnoreQueryFilters()

@@ -524,6 +524,7 @@ DLQ，只能从 Competition/GameplayFact/Runtime 领域 API 重新触发。
 
 ```text
 GET    /api/v1/admin/competitions/{competitionId}/webhooks
+GET    /api/v1/admin/competitions/{competitionId}/webhook-deliveries
 GET    /api/v1/admin/competitions/{competitionId}/progression
 PUT    /api/v1/admin/competitions/{competitionId}/progression
 GET    /api/v1/admin/competitions/{competitionId}/badges
@@ -539,8 +540,9 @@ GET    /api/v1/admin/competitions/{competitionId}/webhooks/{targetId}/test-deliv
 ```
 
 目标列表使用 `offset/limit/total` 页码分页，不设置产品数量上限。Administrator、Owner、Manager 可写；Judge 与
-Observer 只能读取名称、主机和启停状态。创建及轮换只显示一次 HMAC 密钥。正式事件在事务提交后发布、
-独立 NATS Webhook fan-out 和 Worker 工作队列异步发送；详细事件、签名、重试和网络限制见
+Observer 只能读取名称、主机和状态；投递诊断不包含密钥或正文。创建及轮换只显示一次 HMAC 密钥。
+正式事件与 Webhook Outbox 同事务提交，Worker 扫描未投递记录并向独立 NATS 队列发送首轮尝试；
+目标重试与 DeadLetter 状态保存在 PostgreSQL。详细事件、签名、重试和网络限制见
 [赛事 Webhook](competition-webhooks.md)。
 
 平台运行日志经脱敏的 OpenTelemetry 批量写入私有 Loki，并通过 NATS Core 和管理员专用
