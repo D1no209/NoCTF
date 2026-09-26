@@ -99,7 +99,7 @@ public sealed class GameplayFactIntakeStore(
         if (received.Count == 0)
             return [];
         await using var transaction = await db.Database.BeginTransactionAsync(
-            IsolationLevel.ReadCommitted, cancellationToken);
+            IsolationLevel.Serializable, cancellationToken);
         using var attemptLease = await attemptCriticalSection.AcquireAsync(
             db,
             received[0].TeamId,

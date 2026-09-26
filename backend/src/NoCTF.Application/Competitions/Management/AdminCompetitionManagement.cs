@@ -33,7 +33,10 @@ public enum CompetitionHardDeleteReferenceKind
     PosterFile,
     TeamWriteUp,
     ActiveRuntimeResource,
-    NotificationScopeConflict
+    NotificationScopeConflict,
+    ProgressionGraph,
+    Badge,
+    BadgeGrant
 }
 
 public sealed record CompetitionHardDeleteReference(

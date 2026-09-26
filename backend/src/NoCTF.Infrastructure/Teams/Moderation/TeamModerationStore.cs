@@ -8,13 +8,15 @@ using NoCTF.Domain.Competitions.Events;
 using NoCTF.Domain.Shared;
 using NoCTF.Infrastructure.Observability;
 using NoCTF.Domain.Runtime;
+using NoCTF.Infrastructure.Competitions.Progression;
 
 namespace NoCTF.Infrastructure.Teams.Moderation;
 
 public sealed class TeamModerationStore(
     NoCtfDbContext db,
     IPostCommitMessagePublisher outbox,
-    ICompetitionEventRecorder? eventRecorder = null) : ITeamModerationStore
+    ICompetitionEventRecorder? eventRecorder = null,
+    ProgressionReconciler? progressionReconciler = null) : ITeamModerationStore
 {
     private readonly ICompetitionEventRecorder events =
         eventRecorder ?? NullCompetitionEventRecorder.Instance;
@@ -105,6 +107,9 @@ public sealed class TeamModerationStore(
                     : null));
         }
         await db.SaveChangesAsync(cancellationToken);
+        await (progressionReconciler ?? new ProgressionReconciler(db))
+            .ReconcilePersistedTeamAsync(command.CompetitionId, team.Id,
+                command.OccurredAt, cancellationToken);
         await transaction.CommitAsync(cancellationToken);
         await transaction.FlushMessagesAsync(outbox);
         return new();

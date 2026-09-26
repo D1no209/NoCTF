@@ -12,6 +12,7 @@ using NoCTF.Application.Challenges.Management;
 using NoCTF.Application.Challenges.Hints;
 using NoCTF.Application.Competitions.Koh;
 using NoCTF.Application.Competitions.Visibility;
+using NoCTF.Application.Competitions.Progression;
 using NoCTF.Domain.Challenges;
 using NoCTF.Application.Scoring.Leaderboard;
 using NoCTF.Application.GameplayFacts.Intake;
@@ -111,6 +112,13 @@ public sealed class ChallengeAudienceEndpointTests
         builder.Services.AddSingleton<IKohChallengeAccessReader>(new UnexpectedKohAccess());
         builder.Services.AddSingleton<IChallengeManagementStore>(store);
         builder.Services.AddSingleton(attemptReader ?? Substitute.For<IFlagAttemptStateReader>());
+        var progression = Substitute.For<IProgressionChallengeAccess>();
+        progression.IsActiveAsync(Arg.Any<Guid>(), Arg.Any<Guid>(), Arg.Any<Guid?>(),
+            Arg.Any<CancellationToken>()).Returns(true);
+        progression.ReadStatusesAsync(Arg.Any<Guid>(), Arg.Any<Guid?>(),
+            Arg.Any<CancellationToken>()).Returns(
+                new Dictionary<Guid, ProgressionChallengeStatus>());
+        builder.Services.AddSingleton(progression);
         builder.Services.AddScoped<ListChallenges>();
         builder.Services.AddScoped<GetChallenge>();
         builder.Services.AddScoped<GetFlagAttemptState>();

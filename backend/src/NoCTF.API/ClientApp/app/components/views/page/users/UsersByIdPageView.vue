@@ -60,6 +60,16 @@ const { ImagePlus, UserRound, profile, loading, error, isOwnProfile, coverUrl, m
             <p v-else class="mt-2 text-sm text-muted-foreground">{{ $t('ui.thisUserHasNotFilledOutAProfileYet') }}</p>
           </div>
 
+          <ScrollSurface v-if="profile.badges?.length" axis="x" class="max-w-3xl" :aria-label="$t('progression.publicBadges')">
+            <div class="flex items-center gap-2 py-1">
+            <div v-for="badge in profile.badges" :key="`${badge.competitionId}:${badge.id}`"
+              class="flex shrink-0 items-center gap-2 rounded-lg border bg-background/75 px-2 py-1.5">
+              <img :src="badge.imageUrl" :alt="badge.name" class="size-8 rounded object-cover" />
+              <span class="max-w-36 truncate text-xs font-medium">{{ badge.name }}</span>
+            </div>
+            </div>
+          </ScrollSurface>
+
           <div class="grid max-w-3xl grid-cols-3 gap-2 rounded-2xl bg-background/65 p-1.5 sm:gap-3 sm:p-2">
             <div class="px-2 py-1.5 sm:px-3">
               <p class="text-xs text-muted-foreground">{{ $t('profile.competitionsJoined') }}</p>

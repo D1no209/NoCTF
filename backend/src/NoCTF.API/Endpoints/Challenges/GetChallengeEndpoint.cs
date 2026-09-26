@@ -6,6 +6,7 @@ using NoCTF.Application.Competitions.Koh;
 using NoCTF.Application.Competitions.Visibility;
 using NoCTF.Application.Scoring.Leaderboard;
 using NoCTF.Domain.Competitions;
+using NoCTF.Application.Competitions.Progression;
 using NoCTF.API.Endpoints.Competitions;
 using NoCTF.Application.GameplayFacts.Intake;
 using NoCTF.Application.Challenges.Hints;
@@ -84,7 +85,10 @@ public sealed record ChallengeSummaryResponse(
     int Order,
     bool IsPublished,
     DateTimeOffset? DeletedAt,
-    CtfInteractionKindProtocol InteractionKind);
+    CtfInteractionKindProtocol InteractionKind,
+    bool Locked = false,
+    int PrerequisitesSatisfied = 0,
+    int PrerequisitesTotal = 0);
 
 internal static class ChallengeMapper
 {
@@ -185,6 +189,7 @@ public sealed class GetChallengeEndpoint(
     GetChallenge get,
     IKohChallengeAccessReader kohAccess,
     ICompetitionChallengeReadAccess readAccess,
+    IProgressionChallengeAccess progressionAccess,
     GetFlagAttemptState getAttemptState,
     ReadParticipantChallengeHints getHints,
     IUserContext user,
@@ -216,9 +221,14 @@ public sealed class GetChallengeEndpoint(
                 decision.Visibility.CompetitionStatus))
             return TypedResults.NotFound();
         var visibility = decision.Visibility;
+        var challengeInstanceId = Route<Guid>("competitionChallengeId");
+        if (visibility.GameMode == GameMode.Ctf
+            && !await progressionAccess.IsActiveAsync(
+                competitionId, challengeInstanceId, decision.TeamId, ct))
+            return TypedResults.NotFound();
         var item = await get.ExecuteAsync(
             competitionId,
-            Route<Guid>("competitionChallengeId"),
+            challengeInstanceId,
             includeUnpublished: false,
             includeDeleted: false,
             ct);

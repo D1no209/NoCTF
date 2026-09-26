@@ -14,6 +14,7 @@ using NoCTF.GameModes.Registration;
 using NoCTF.Application.Commands.Idempotency;
 using NoCTF.Domain.Commands;
 using NoCTF.Domain.Challenges;
+using NoCTF.Infrastructure.Competitions.Progression;
 
 namespace NoCTF.Infrastructure.Runtime.Instances;
 
@@ -133,6 +134,12 @@ public sealed class RuntimeInstanceStore(
             command.UserId,
             ct);
         if (scope is null || !AllowsRuntimeActions(scope))
+            return new(null, RuntimeMutationFailure.NotFound);
+        if (scope.Mode == GameMode.Ctf
+            && command.Action is RuntimeAction.Start or RuntimeAction.Reset or RuntimeAction.Extend
+            && !await new ProgressionChallengeAccess(db).IsActiveAsync(
+                command.CompetitionId, command.CompetitionChallengeId,
+                scope.TeamId, ct))
             return new(null, RuntimeMutationFailure.NotFound);
         if (scope.Mode == GameMode.Koh)
             return new(null, RuntimeMutationFailure.Unsupported);

@@ -23,6 +23,7 @@
     "@nuxt/scripts": "1.3.9",
     "@nuxtjs/turnstile": "1.1.3",
     "@tanstack/vue-table": "^9.0.0",
+    "@vue-flow/core": "1.48.2",
     "@vueuse/core": "^14.4.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",

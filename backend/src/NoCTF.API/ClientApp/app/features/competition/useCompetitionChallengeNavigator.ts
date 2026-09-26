@@ -25,6 +25,8 @@ export function affectsCompetitionChallengeList(kind: string): boolean {
     || kind === 'TeamBanned'
     || kind === 'TeamUnbanned'
     || kind === 'TeamBanCorrectionPublished'
+    || kind === 'CompetitionUpdated'
+    || kind === 'GameplayFactAdjudicated'
 }
 
 interface ChallengeBloodMark {
@@ -268,13 +270,17 @@ emit: { (event: "ready", ...args: [challengeId: string | null]): void; (event: "
       .map(challenge => ({ value: challenge.id!, label: challenge.title ?? '', challenge })),
   })))
   const listOptions = computed(() => groupOptions.value.flatMap(group => group.items))
-  const visibleChallengeIds = computed(() => listOptions.value.map(item => item.value))
+  const visibleChallengeIds = computed(() => listOptions.value
+    .filter(item => !item.challenge.locked).map(item => item.value))
 
   watch([visibleChallengeIds, () => props.selectedChallengeId], ([ids, selectedId]) => {
     if (!loading.value && ids.length && !ids.includes(selectedId ?? '')) emit('ready', ids[0]!)
   }, { flush: 'post' })
 
-  function selectChallenge(challengeId: string) { emit('select', challengeId) }
+  function selectChallenge(challengeId: string) {
+    if (items.value.find(item => item.id === challengeId)?.locked) return
+    emit('select', challengeId)
+  }
 
   return {
       directionGlyph,

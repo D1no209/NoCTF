@@ -8,6 +8,7 @@ using NoCTF.Domain.Identity;
 using NoCTF.Application.Competitions.Events;
 using NoCTF.Domain.Competitions.Events;
 using NoCTF.Infrastructure.Teams;
+using NoCTF.Infrastructure.Competitions.Progression;
 
 namespace NoCTF.Infrastructure.Teams.Registration;
 
@@ -15,7 +16,8 @@ public sealed class TeamRegistrationStore(
     NoCtfDbContext db,
     IPostCommitMessagePublisher outbox,
     TimeProvider? clock = null,
-    ICompetitionEventRecorder? eventRecorder = null) : ITeamRegistrationStore
+    ICompetitionEventRecorder? eventRecorder = null,
+    ProgressionReconciler? progressionReconciler = null) : ITeamRegistrationStore
 {
     private readonly ICompetitionEventRecorder events =
         eventRecorder ?? NullCompetitionEventRecorder.Instance;
@@ -147,6 +149,7 @@ public sealed class TeamRegistrationStore(
                 return new(null, TeamRegistrationFailure.UserAlreadyRegistered);
             return new(null, TeamRegistrationFailure.TeamNameOrMembershipConflict);
         }
+        await SyncProgressionAsync(team.CompetitionId, team.Id, command.RegisteredAt, ct);
         await transaction.CommitAsync(ct);
         await transaction.FlushMessagesAsync(outbox);
         return new(Map(team), null);
@@ -289,6 +292,7 @@ public sealed class TeamRegistrationStore(
                 TeamRegistrationStatus: status,
                 TrackKey: team.TrackKey), ct);
             await db.SaveChangesAsync(ct);
+            await SyncProgressionAsync(competitionId, teamId, timeProvider.GetUtcNow(), ct);
         }
         await transaction.CommitAsync(ct);
         await transaction.FlushMessagesAsync(outbox);
@@ -376,6 +380,7 @@ public sealed class TeamRegistrationStore(
             TeamRegistrationStatus: nextStatus,
             TrackKey: team.TrackKey), ct);
         await db.SaveChangesAsync(ct);
+        await SyncProgressionAsync(competitionId, teamId, timeProvider.GetUtcNow(), ct);
         await transaction.CommitAsync(ct);
         await transaction.FlushMessagesAsync(outbox);
         return new(true);
@@ -578,6 +583,7 @@ public sealed class TeamRegistrationStore(
         try
         {
             await db.SaveChangesAsync(ct);
+            await SyncProgressionAsync(entity.CompetitionId, entity.Id, occurredAt, ct);
             await transaction.CommitAsync(ct);
             await transaction.FlushMessagesAsync(outbox);
         }
@@ -610,6 +616,7 @@ public sealed class TeamRegistrationStore(
             TeamId: teamId,
             TeamRegistrationStatus: entity.RegistrationStatus), ct);
         await db.SaveChangesAsync(ct);
+        await SyncProgressionAsync(competitionId, teamId, deletedAt, ct);
         await transaction.CommitAsync(ct);
         await transaction.FlushMessagesAsync(outbox);
         return null;
@@ -632,6 +639,11 @@ public sealed class TeamRegistrationStore(
         team.RegisteredAt,
         team.TrackKey,
         configuration.Find(team.TrackKey)?.Name ?? team.TrackKey);
+
+    private Task SyncProgressionAsync(
+        Guid competitionId, Guid teamId, DateTimeOffset now, CancellationToken ct) =>
+        (progressionReconciler ?? new ProgressionReconciler(db))
+            .ReconcilePersistedTeamAsync(competitionId, teamId, now, ct);
 
     private static string CreateInvitationToken()
     {

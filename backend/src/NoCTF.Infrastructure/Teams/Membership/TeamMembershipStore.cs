@@ -8,6 +8,7 @@ using NoCTF.Domain.Competitions;
 using NoCTF.Domain.Competitions.Events;
 using NoCTF.Infrastructure.Teams;
 using NoCTF.Infrastructure.Teams.Registration;
+using NoCTF.Infrastructure.Competitions.Progression;
 
 namespace NoCTF.Infrastructure.Teams.Membership;
 
@@ -15,7 +16,8 @@ public sealed class TeamMembershipStore(
     NoCtfDbContext db,
     IPostCommitMessagePublisher outbox,
     TimeProvider? clock = null,
-    ICompetitionEventRecorder? eventRecorder = null) : ITeamMembershipStore
+    ICompetitionEventRecorder? eventRecorder = null,
+    ProgressionReconciler? progressionReconciler = null) : ITeamMembershipStore
 {
     private readonly ICompetitionEventRecorder events =
         eventRecorder ?? NullCompetitionEventRecorder.Instance;
@@ -116,6 +118,7 @@ public sealed class TeamMembershipStore(
             events,
             ct);
         await db.SaveChangesAsync(ct);
+        await SyncProgressionAsync(competitionId, team.Id, now, ct);
         await transaction.CommitAsync(ct);
         await transaction.FlushMessagesAsync(outbox);
         return null;
@@ -238,6 +241,7 @@ public sealed class TeamMembershipStore(
             events,
             ct);
         await db.SaveChangesAsync(ct);
+        await SyncProgressionAsync(competitionId, team.Id, timeProvider.GetUtcNow(), ct);
         await transaction.CommitAsync(ct);
         await transaction.FlushMessagesAsync(outbox);
         return null;
@@ -291,6 +295,7 @@ public sealed class TeamMembershipStore(
             events,
             ct);
         await db.SaveChangesAsync(ct);
+        await SyncProgressionAsync(competitionId, team.Id, timeProvider.GetUtcNow(), ct);
         await transaction.CommitAsync(ct);
         await transaction.FlushMessagesAsync(outbox);
         return null;
@@ -344,10 +349,16 @@ public sealed class TeamMembershipStore(
             events,
             ct);
         await db.SaveChangesAsync(ct);
+        await SyncProgressionAsync(competitionId, team.Id, timeProvider.GetUtcNow(), ct);
         await transaction.CommitAsync(ct);
         await transaction.FlushMessagesAsync(outbox);
         return null;
     }
+
+    private Task SyncProgressionAsync(
+        Guid competitionId, Guid teamId, DateTimeOffset now, CancellationToken ct) =>
+        (progressionReconciler ?? new ProgressionReconciler(db))
+            .ReconcilePersistedTeamAsync(competitionId, teamId, now, ct);
 
     private Task<NoCTF.Domain.Teams.Team?> LoadAsync(
         Guid competitionId,

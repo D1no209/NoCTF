@@ -3323,6 +3323,41 @@
         ]
       }
     },
+    "/api/v1/competitions/{competitionId}/badges/{badgeId}/image": {
+      "get": {
+        "tags": [
+          "Competitions"
+        ],
+        "summary": "Get Competition Badge Image",
+        "description": "Executes GET /api/v1/competitions/{competitionId}/badges/{badgeId}/image.",
+        "operationId": "GetCompetitionBadgeImage",
+        "parameters": [
+          {
+            "name": "competitionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          },
+          {
+            "name": "badgeId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          }
+        ],
+        "responses": {
+          "404": {
+            "description": "Not Found"
+          }
+        }
+      }
+    },
     "/api/v1/competitions/{competitionId}": {
       "get": {
         "tags": [
@@ -3493,6 +3528,53 @@
             "description": "Not Found"
           }
         }
+      }
+    },
+    "/api/v1/competitions/{competitionId}/progression": {
+      "get": {
+        "tags": [
+          "Competitions"
+        ],
+        "summary": "Get Player Competition Progression",
+        "description": "Executes GET /api/v1/competitions/{competitionId}/progression.",
+        "operationId": "GetPlayerCompetitionProgression",
+        "parameters": [
+          {
+            "name": "competitionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsCompetitionsPlayerProgressionContract"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ]
       }
     },
     "/api/v1/competitions/{competitionId}/leaderboard/teams/{teamId}/adjustments": {
@@ -10754,6 +10836,121 @@
         ]
       }
     },
+    "/api/v1/admin/competitions/{competitionId}/badges": {
+      "post": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "Admin Create Competition Badge",
+        "description": "Executes POST /api/v1/admin/competitions/{competitionId}/badges.",
+        "operationId": "AdminCreateCompetitionBadge",
+        "parameters": [
+          {
+            "name": "competitionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          }
+        ],
+        "requestBody": {
+          "x-name": "CreateCompetitionBadgeRequest",
+          "description": "",
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationCompetitionsCreateCompetitionBadgeRequest"
+              }
+            }
+          },
+          "required": true,
+          "x-position": 1
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationCompetitionsCompetitionBadgeContract"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MicrosoftAspNetCoreHttpHttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ]
+      },
+      "get": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "Admin List Competition Badges",
+        "description": "Executes GET /api/v1/admin/competitions/{competitionId}/badges.",
+        "operationId": "AdminListCompetitionBadges",
+        "parameters": [
+          {
+            "name": "competitionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationCompetitionsCompetitionBadgeListContract"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ]
+      }
+    },
     "/api/v1/admin/competitions": {
       "post": {
         "tags": [
@@ -11060,6 +11257,152 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationCompetitionsCompetitionWebhookTestAcceptedResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/admin/competitions/{competitionId}/badges/{badgeId}": {
+      "delete": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "Admin Delete Competition Badge",
+        "description": "Executes DELETE /api/v1/admin/competitions/{competitionId}/badges/{badgeId}.",
+        "operationId": "AdminDeleteCompetitionBadge",
+        "parameters": [
+          {
+            "name": "competitionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          },
+          {
+            "name": "badgeId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "409": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationCompetitionsCompetitionBadgeConflictResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ]
+      },
+      "put": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "Admin Update Competition Badge",
+        "description": "Executes PUT /api/v1/admin/competitions/{competitionId}/badges/{badgeId}.",
+        "operationId": "AdminUpdateCompetitionBadge",
+        "parameters": [
+          {
+            "name": "competitionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          },
+          {
+            "name": "badgeId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          }
+        ],
+        "requestBody": {
+          "x-name": "UpdateCompetitionBadgeRequest",
+          "description": "",
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationCompetitionsUpdateCompetitionBadgeRequest"
+              }
+            }
+          },
+          "required": true,
+          "x-position": 1
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationCompetitionsCompetitionBadgeContract"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MicrosoftAspNetCoreHttpHttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationCompetitionsCompetitionBadgeConflictResponse"
                 }
               }
             }
@@ -11483,6 +11826,131 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationCompetitionsGenerateMissingFlagsResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/admin/competitions/{competitionId}/progression": {
+      "get": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "Admin Get Competition Progression",
+        "description": "Executes GET /api/v1/admin/competitions/{competitionId}/progression.",
+        "operationId": "AdminGetCompetitionProgression",
+        "parameters": [
+          {
+            "name": "competitionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationCompetitionsCompetitionProgressionContract"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ]
+      },
+      "put": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "Admin Save Competition Progression",
+        "description": "Executes PUT /api/v1/admin/competitions/{competitionId}/progression.",
+        "operationId": "AdminSaveCompetitionProgression",
+        "parameters": [
+          {
+            "name": "competitionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          }
+        ],
+        "requestBody": {
+          "x-name": "SaveCompetitionProgressionRequest",
+          "description": "",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationCompetitionsSaveCompetitionProgressionRequest"
+              }
+            }
+          },
+          "required": true,
+          "x-position": 1
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationCompetitionsCompetitionProgressionContract"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "409": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationCompetitionsProgressionSaveProblem"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MicrosoftAspNetCoreHttpHttpValidationProblemDetails"
                 }
               }
             }
@@ -18459,6 +18927,10 @@
           }
         }
       },
+      "NoCTFAPIEndpointsCompetitionsGetCompetitionBadgeImageRequest": {
+        "type": "object",
+        "additionalProperties": false
+      },
       "NoCTFAPIEndpointsCompetitionsCompetitionResponse": {
         "type": "object",
         "additionalProperties": false,
@@ -19352,6 +19824,158 @@
         }
       },
       "NoCTFAPIEndpointsCompetitionsGetLeaderboardTrendsRequest": {
+        "type": "object",
+        "additionalProperties": false
+      },
+      "NoCTFAPIEndpointsCompetitionsPlayerProgressionContract": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "enabled": {
+            "type": "boolean"
+          },
+          "showPlayerMap": {
+            "type": "boolean"
+          },
+          "revision": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "nodes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NoCTFAPIEndpointsCompetitionsPlayerProgressionNodeContract"
+            }
+          },
+          "edges": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationCompetitionsProgressionEdgeContract"
+            }
+          },
+          "badges": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NoCTFAPIEndpointsCompetitionsProgressionBadgeDisplayContract"
+            }
+          }
+        }
+      },
+      "NoCTFAPIEndpointsCompetitionsPlayerProgressionNodeContract": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "guid"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/NoCTFDomainCompetitionsProgressionProgressionNodeKind"
+          },
+          "resourceId": {
+            "type": "string",
+            "format": "guid"
+          },
+          "title": {
+            "type": "string"
+          },
+          "direction": {
+            "type": "string",
+            "nullable": true
+          },
+          "positionX": {
+            "type": "number",
+            "format": "double"
+          },
+          "positionY": {
+            "type": "number",
+            "format": "double"
+          },
+          "active": {
+            "type": "boolean"
+          },
+          "complete": {
+            "type": "boolean"
+          },
+          "imageUrl": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
+      "NoCTFDomainCompetitionsProgressionProgressionNodeKind": {
+        "type": "integer",
+        "description": "",
+        "x-enumNames": [
+          "Challenge",
+          "Badge"
+        ],
+        "enum": [
+          0,
+          1
+        ]
+      },
+      "NoCTFAPIEndpointsAdministrationCompetitionsProgressionEdgeContract": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "guid"
+          },
+          "sourceNodeId": {
+            "type": "string",
+            "format": "guid"
+          },
+          "targetNodeId": {
+            "type": "string",
+            "format": "guid"
+          },
+          "condition": {
+            "$ref": "#/components/schemas/NoCTFDomainCompetitionsProgressionProgressionPrerequisiteCondition"
+          }
+        }
+      },
+      "NoCTFDomainCompetitionsProgressionProgressionPrerequisiteCondition": {
+        "type": "integer",
+        "description": "",
+        "x-enumNames": [
+          "Completed",
+          "Incomplete"
+        ],
+        "enum": [
+          0,
+          1
+        ]
+      },
+      "NoCTFAPIEndpointsCompetitionsProgressionBadgeDisplayContract": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "guid"
+          },
+          "competitionId": {
+            "type": "string",
+            "format": "guid"
+          },
+          "competitionTitle": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string",
+            "nullable": true
+          },
+          "imageUrl": {
+            "type": "string"
+          }
+        }
+      },
+      "NoCTFAPIEndpointsCompetitionsGetPlayerProgressionRequest": {
         "type": "object",
         "additionalProperties": false
       },
@@ -20583,6 +21207,17 @@
           },
           "interactionKind": {
             "$ref": "#/components/schemas/NoCTFAPIEndpointsChallengesCtfInteractionKindProtocol"
+          },
+          "locked": {
+            "type": "boolean"
+          },
+          "prerequisitesSatisfied": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "prerequisitesTotal": {
+            "type": "integer",
+            "format": "int32"
           }
         }
       },
@@ -21225,6 +21860,12 @@
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/NoCTFAPIEndpointsAuthenticationPublicUserCompetitionSummaryResponse"
+            }
+          },
+          "badges": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NoCTFAPIEndpointsCompetitionsProgressionBadgeDisplayContract"
             }
           }
         }
@@ -24807,6 +25448,69 @@
           "Participants"
         ]
       },
+      "NoCTFAPIEndpointsAdministrationCompetitionsCompetitionBadgeContract": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "guid"
+          },
+          "competitionId": {
+            "type": "string",
+            "format": "guid"
+          },
+          "name": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string",
+            "nullable": true
+          },
+          "imageFileId": {
+            "type": "string",
+            "format": "guid"
+          },
+          "imageUrl": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "NoCTFAPIEndpointsAdministrationCompetitionsCreateCompetitionBadgeRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "name",
+          "image"
+        ],
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 160,
+            "minLength": 0,
+            "nullable": false
+          },
+          "description": {
+            "type": "string",
+            "maxLength": 1000,
+            "minLength": 0,
+            "nullable": true
+          },
+          "image": {
+            "type": "string",
+            "format": "binary",
+            "nullable": false
+          }
+        }
+      },
       "NoCTFAPIEndpointsAdministrationCompetitionsCompetitionResourceManagerConflictResponse": {
         "type": "object",
         "additionalProperties": false,
@@ -25075,6 +25779,22 @@
         "type": "object",
         "additionalProperties": false
       },
+      "NoCTFAPIEndpointsAdministrationCompetitionsCompetitionBadgeConflictResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "detail": {
+            "type": "string"
+          }
+        }
+      },
+      "NoCTFAPIEndpointsAdministrationCompetitionsDeleteCompetitionBadgeRequest": {
+        "type": "object",
+        "additionalProperties": false
+      },
       "NoCTFAPIEndpointsAdministrationCompetitionsDeleteCompetitionWebhookRequest": {
         "type": "object",
         "additionalProperties": false
@@ -25181,7 +25901,10 @@
           "PosterFile",
           "TeamWriteUp",
           "ActiveRuntimeResource",
-          "NotificationScopeConflict"
+          "NotificationScopeConflict",
+          "ProgressionGraph",
+          "Badge",
+          "BadgeGrant"
         ],
         "enum": [
           "HistoricalEvent",
@@ -25194,7 +25917,10 @@
           "PosterFile",
           "TeamWriteUp",
           "ActiveRuntimeResource",
-          "NotificationScopeConflict"
+          "NotificationScopeConflict",
+          "ProgressionGraph",
+          "Badge",
+          "BadgeGrant"
         ]
       },
       "NoCTFAPIEndpointsAdministrationCompetitionsForceDeleteCompetitionRequest": {
@@ -25695,6 +26421,104 @@
           }
         }
       },
+      "NoCTFAPIEndpointsAdministrationCompetitionsCompetitionProgressionContract": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "competitionId": {
+            "type": "string",
+            "format": "guid"
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "showPlayerMap": {
+            "type": "boolean"
+          },
+          "concurrencyStamp": {
+            "type": "string",
+            "format": "guid",
+            "nullable": true
+          },
+          "revision": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "nodes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationCompetitionsProgressionNodeContract"
+            }
+          },
+          "edges": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationCompetitionsProgressionEdgeContract"
+            }
+          }
+        }
+      },
+      "NoCTFAPIEndpointsAdministrationCompetitionsProgressionNodeContract": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "guid"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/NoCTFDomainCompetitionsProgressionProgressionNodeKind"
+          },
+          "challenge": {
+            "nullable": true,
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationCompetitionsProgressionChallengeNodeContract"
+              }
+            ]
+          },
+          "badge": {
+            "nullable": true,
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationCompetitionsProgressionBadgeNodeContract"
+              }
+            ]
+          },
+          "positionX": {
+            "type": "number",
+            "format": "double"
+          },
+          "positionY": {
+            "type": "number",
+            "format": "double"
+          }
+        }
+      },
+      "NoCTFAPIEndpointsAdministrationCompetitionsProgressionChallengeNodeContract": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "competitionChallengeId": {
+            "type": "string",
+            "format": "guid"
+          }
+        }
+      },
+      "NoCTFAPIEndpointsAdministrationCompetitionsProgressionBadgeNodeContract": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "competitionBadgeId": {
+            "type": "string",
+            "format": "guid"
+          }
+        }
+      },
+      "NoCTFAPIEndpointsAdministrationCompetitionsGetCompetitionProgressionRequest": {
+        "type": "object",
+        "additionalProperties": false
+      },
       "NoCTFAPIEndpointsAdministrationCompetitionsCompetitionWebhookTestStatusResponse": {
         "type": "object",
         "additionalProperties": false,
@@ -25756,6 +26580,22 @@
         }
       },
       "NoCTFAPIEndpointsAdministrationCompetitionsListAdminCompetitionsRequest": {
+        "type": "object",
+        "additionalProperties": false
+      },
+      "NoCTFAPIEndpointsAdministrationCompetitionsCompetitionBadgeListContract": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationCompetitionsCompetitionBadgeContract"
+            }
+          }
+        }
+      },
+      "NoCTFAPIEndpointsAdministrationCompetitionsListCompetitionBadgesRequest": {
         "type": "object",
         "additionalProperties": false
       },
@@ -26223,6 +27063,74 @@
       "NoCTFAPIEndpointsAdministrationCompetitionsRotateCompetitionWebhookSecretRequest": {
         "type": "object",
         "additionalProperties": false
+      },
+      "NoCTFAPIEndpointsAdministrationCompetitionsProgressionSaveProblem": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "detail": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
+      "NoCTFAPIEndpointsAdministrationCompetitionsSaveCompetitionProgressionRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "expectedConcurrencyStamp": {
+            "type": "string",
+            "format": "guid",
+            "nullable": true
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "showPlayerMap": {
+            "type": "boolean"
+          },
+          "nodes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationCompetitionsProgressionNodeContract"
+            }
+          },
+          "edges": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationCompetitionsProgressionEdgeContract"
+            }
+          }
+        }
+      },
+      "NoCTFAPIEndpointsAdministrationCompetitionsUpdateCompetitionBadgeRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "name"
+        ],
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 160,
+            "minLength": 0,
+            "nullable": false
+          },
+          "description": {
+            "type": "string",
+            "maxLength": 1000,
+            "minLength": 0,
+            "nullable": true
+          },
+          "image": {
+            "type": "string",
+            "format": "binary",
+            "nullable": true
+          }
+        }
       },
       "NoCTFAPIEndpointsAdministrationCompetitionsUpdateCompetitionStatusRequest": {
         "type": "object",

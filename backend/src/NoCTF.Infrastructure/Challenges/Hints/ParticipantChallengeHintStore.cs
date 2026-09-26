@@ -17,6 +17,9 @@ public sealed class ParticipantChallengeHintStore(NoCtfDbContext db) : IParticip
     {
         if (competitionStatus is not (CompetitionStatus.Running or CompetitionStatus.Paused or CompetitionStatus.Finished))
             return null;
+        if (!await new NoCTF.Infrastructure.Competitions.Progression.ProgressionChallengeAccess(db)
+                .IsActiveAsync(competitionId, competitionChallengeId, teamId, cancellationToken))
+            return null;
         var challenge = await db.CompetitionChallenges.AsNoTracking().IgnoreAutoIncludes()
             .Where(item => item.Id == competitionChallengeId
                 && item.CompetitionId == competitionId && item.IsPublished)

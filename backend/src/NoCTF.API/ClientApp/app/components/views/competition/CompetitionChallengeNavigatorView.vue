@@ -47,7 +47,10 @@ const { ShieldCheck, Swords, Users, directionGlyph, isAwdp, loading, error, data
           <span class="sr-only">{{ directionLabel(item.challenge.direction) }}</span>
           <span data-challenge-item-summary class="relative z-10 flex h-6 min-w-0 items-center gap-2 font-sans text-sm font-bold italic text-primary">
             <span class="min-w-0 flex-1 truncate">{{ item.challenge.title }}</span>
-            <Badge v-if="item.challenge.interactionKind === 'PatchVerification'" variant="secondary" class="shrink-0 text-[0.625rem] not-italic">
+            <Badge v-if="item.challenge.locked" variant="outline" class="shrink-0 text-[0.625rem] not-italic">
+              {{ $t('progression.locked') }}
+            </Badge>
+            <Badge v-else-if="item.challenge.interactionKind === 'PatchVerification'" variant="secondary" class="shrink-0 text-[0.625rem] not-italic">
               {{ $t('ui.patchVerification') }}
             </Badge>
             <StatusIcon :name="progressIcon(item.challenge.id)" :label="progressIconLabel(item.challenge.id)" />
@@ -57,6 +60,9 @@ const { ShieldCheck, Swords, Users, directionGlyph, isAwdp, loading, error, data
           </span>
 
           <span data-challenge-item-details class="noctf-motion-challenge-details relative z-10 mt-2 flex min-h-0 flex-1 flex-col">
+            <span v-if="item.challenge.locked" class="mt-1 text-[0.6875rem] text-muted-foreground">
+              {{ $t('progression.prerequisiteProgress', { satisfied: item.challenge.prerequisitesSatisfied ?? 0, total: item.challenge.prerequisitesTotal ?? 0 }) }}
+            </span>
             <span v-if="isAwdp && progressFor(item.challenge.id)" class="flex items-center gap-2 text-[0.6875rem]">
               <span class="flex items-center gap-1"><Swords class="size-3" /><span class="font-mono">{{ progressFor(item.challenge.id)?.attackCount ?? 0 }}</span></span>
               <span class="flex items-center gap-1"><ShieldCheck class="size-3" /><span class="font-mono">{{ progressFor(item.challenge.id)?.defenseCount ?? 0 }}</span></span>

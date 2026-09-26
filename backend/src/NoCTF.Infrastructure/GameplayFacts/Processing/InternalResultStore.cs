@@ -15,13 +15,15 @@ using NoCTF.Domain.Challenges;
 using NoCTF.Application.Scoring.Leaderboard;
 using NoCTF.Infrastructure.Competitions.Lifecycle;
 using NoCTF.GameModes.PatchVerification.Scoring;
+using NoCTF.Infrastructure.Competitions.Progression;
 
 namespace NoCTF.Infrastructure.GameplayFacts.Processing;
 
 public sealed class InternalResultStore(
     NoCtfDbContext db,
     IPostCommitMessagePublisher outbox,
-    ICompetitionEventRecorder? eventRecorder = null) : IInternalResultStore
+    ICompetitionEventRecorder? eventRecorder = null,
+    ProgressionReconciler? progressionReconciler = null) : IInternalResultStore
 {
     private readonly ICompetitionEventRecorder events =
         eventRecorder ?? NullCompetitionEventRecorder.Instance;
@@ -122,7 +124,8 @@ public sealed class InternalResultStore(
         AwdpFixResult result,
         CancellationToken ct)
     {
-        await using var transaction = await db.Database.BeginTransactionAsync(ct);
+        await using var transaction = await db.Database.BeginTransactionAsync(
+            System.Data.IsolationLevel.Serializable, ct);
         var fact = await db.GameplayFacts.SingleOrDefaultAsync(
             item => item.Id == result.GameplayFactId,
             ct);
@@ -315,6 +318,9 @@ public sealed class InternalResultStore(
                 ?? throw new InvalidOperationException("AWDP target has no owning Runner."),
             resolvedAt));
         await QueueNextAwdpFixAttemptAsync(fact, ct);
+        if (context.Competition.Mode == GameMode.Ctf)
+            await (progressionReconciler ?? new ProgressionReconciler(db))
+                .ReconcileCompletedFactAsync(fact, resolvedAt, ct);
         await db.SaveChangesAsync(ct);
         await transaction.CommitAsync(ct);
         await outbox.FlushCommittedMessagesAsync();

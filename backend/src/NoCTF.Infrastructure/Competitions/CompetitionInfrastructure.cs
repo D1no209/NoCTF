@@ -29,6 +29,8 @@ using NoCTF.Application.Competitions.Access;
 using NoCTF.Infrastructure.Competitions.Access;
 using NoCTF.Application.Competitions.Webhooks;
 using NoCTF.Infrastructure.Competitions.Webhooks;
+using NoCTF.Application.Competitions.Progression;
+using NoCTF.Infrastructure.Competitions.Progression;
 
 namespace NoCTF.Infrastructure.Competitions;
 
@@ -40,6 +42,15 @@ internal static class CompetitionInfrastructure
         bool development)
     {
         services.AddScoped<ICompetitionLifecycleStore, CompetitionLifecycleStore>();
+        services.AddScoped<ICompetitionProgressionStore, CompetitionProgressionStore>();
+        services.AddSingleton<ProgressionGraphReadCache>();
+        services.AddScoped<GetCompetitionProgression>();
+        services.AddScoped<SaveCompetitionProgression>();
+        services.AddScoped<ProgressionReconciler>();
+        services.AddScoped<IProgressionChallengeAccess, ProgressionChallengeAccess>();
+        services.AddScoped<ICompetitionBadgeStore, CompetitionBadgeStore>();
+        services.AddScoped<ManageCompetitionBadges>();
+        services.AddScoped<IProgressionPlayerReader, ProgressionPlayerReader>();
         services.AddScoped<IAwdRoundCoordinator, AwdRoundCoordinator>();
         services.AddScoped<IAwdRuntimeProvisioner, AwdRuntimeProvisioner>();
         services.AddScoped<IKohRuntimeProvisioner, KohRuntimeProvisioner>();

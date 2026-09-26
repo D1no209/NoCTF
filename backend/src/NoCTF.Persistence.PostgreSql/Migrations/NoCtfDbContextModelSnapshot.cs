@@ -1614,6 +1614,360 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
                     b.UseTphMappingStrategy();
                 });
 
+            modelBuilder.Entity("NoCTF.Domain.Competitions.Progression.CompetitionBadge", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("CompetitionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("competition_id");
+
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .IsConcurrencyToken()
+                        .HasColumnType("uuid")
+                        .HasColumnName("concurrency_stamp");
+
+                    b.Property<long>("CreatedAt")
+                        .HasColumnType("bigint")
+                        .HasColumnName("created_at");
+
+                    b.Property<long?>("DeletedAt")
+                        .HasColumnType("bigint")
+                        .HasColumnName("deleted_at");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)")
+                        .HasColumnName("description");
+
+                    b.Property<Guid>("ImageFileId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("image_file_id");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(160)
+                        .HasColumnType("character varying(160)")
+                        .HasColumnName("name");
+
+                    b.Property<long>("UpdatedAt")
+                        .HasColumnType("bigint")
+                        .HasColumnName("updated_at");
+
+                    b.HasKey("Id")
+                        .HasName("pk_competition_badges");
+
+                    b.HasIndex("CompetitionId")
+                        .HasDatabaseName("ix_competition_badges_competition_id");
+
+                    b.HasIndex("ImageFileId")
+                        .HasDatabaseName("ix_competition_badges_image_file_id");
+
+                    b.ToTable("competition_badges", (string)null);
+                });
+
+            modelBuilder.Entity("NoCTF.Domain.Competitions.Progression.CompetitionProgression", b =>
+                {
+                    b.Property<Guid>("CompetitionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("competition_id");
+
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .IsConcurrencyToken()
+                        .HasColumnType("uuid")
+                        .HasColumnName("concurrency_stamp");
+
+                    b.Property<bool>("Enabled")
+                        .HasColumnType("boolean")
+                        .HasColumnName("enabled");
+
+                    b.Property<long>("Revision")
+                        .HasColumnType("bigint")
+                        .HasColumnName("revision");
+
+                    b.Property<bool>("ShowPlayerMap")
+                        .HasColumnType("boolean")
+                        .HasColumnName("show_player_map");
+
+                    b.HasKey("CompetitionId")
+                        .HasName("pk_competition_progressions");
+
+                    b.ToTable("competition_progressions", (string)null);
+                });
+
+            modelBuilder.Entity("NoCTF.Domain.Competitions.Progression.ProgressionEdge", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("CompetitionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("competition_id");
+
+                    b.Property<short>("Condition")
+                        .HasColumnType("smallint")
+                        .HasColumnName("condition");
+
+                    b.Property<Guid>("SourceNodeId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("source_node_id");
+
+                    b.Property<Guid>("TargetNodeId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("target_node_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_competition_progression_edges");
+
+                    b.HasIndex("SourceNodeId")
+                        .HasDatabaseName("ix_competition_progression_edges_source_node_id");
+
+                    b.HasIndex("TargetNodeId")
+                        .HasDatabaseName("ix_competition_progression_edges_target_node_id");
+
+                    b.HasIndex("CompetitionId", "SourceNodeId", "TargetNodeId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_competition_progression_edges_competition_id_source_node_id");
+
+                    b.ToTable("competition_progression_edges", (string)null);
+                });
+
+            modelBuilder.Entity("NoCTF.Domain.Competitions.Progression.ProgressionNode", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("CompetitionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("competition_id");
+
+                    b.Property<double>("PositionX")
+                        .HasColumnType("double precision")
+                        .HasColumnName("position_x");
+
+                    b.Property<double>("PositionY")
+                        .HasColumnType("double precision")
+                        .HasColumnName("position_y");
+
+                    b.Property<string>("kind")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("kind");
+
+                    b.HasKey("Id")
+                        .HasName("pk_competition_progression_nodes");
+
+                    b.HasIndex("CompetitionId")
+                        .HasDatabaseName("ix_competition_progression_nodes_competition_id");
+
+                    b.ToTable("competition_progression_nodes", (string)null);
+
+                    b.HasDiscriminator<string>("kind").HasValue("ProgressionNode");
+
+                    b.UseTphMappingStrategy();
+                });
+
+            modelBuilder.Entity("NoCTF.Domain.Competitions.Progression.TeamProgressionBadgeState", b =>
+                {
+                    b.Property<Guid>("TeamId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("team_id");
+
+                    b.Property<Guid>("BadgeId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("badge_id");
+
+                    b.Property<bool>("Active")
+                        .HasColumnType("boolean")
+                        .HasColumnName("active");
+
+                    b.Property<Guid>("CompetitionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("competition_id");
+
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .IsConcurrencyToken()
+                        .HasColumnType("uuid")
+                        .HasColumnName("concurrency_stamp");
+
+                    b.Property<long>("EvaluatedAt")
+                        .HasColumnType("bigint")
+                        .HasColumnName("evaluated_at");
+
+                    b.Property<long>("GraphRevision")
+                        .HasColumnType("bigint")
+                        .HasColumnName("graph_revision");
+
+                    b.HasKey("TeamId", "BadgeId")
+                        .HasName("pk_team_progression_badge_states");
+
+                    b.HasIndex("BadgeId")
+                        .HasDatabaseName("ix_team_progression_badge_states_badge_id");
+
+                    b.HasIndex("CompetitionId", "BadgeId")
+                        .HasDatabaseName("ix_team_progression_badge_states_competition_id_badge_id");
+
+                    b.ToTable("team_progression_badge_states", (string)null);
+                });
+
+            modelBuilder.Entity("NoCTF.Domain.Competitions.Progression.TeamProgressionNodeState", b =>
+                {
+                    b.Property<Guid>("TeamId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("team_id");
+
+                    b.Property<Guid>("NodeId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("node_id");
+
+                    b.Property<bool>("Active")
+                        .HasColumnType("boolean")
+                        .HasColumnName("active");
+
+                    b.Property<Guid>("CompetitionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("competition_id");
+
+                    b.Property<bool>("Complete")
+                        .HasColumnType("boolean")
+                        .HasColumnName("complete");
+
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .IsConcurrencyToken()
+                        .HasColumnType("uuid")
+                        .HasColumnName("concurrency_stamp");
+
+                    b.Property<long>("EvaluatedAt")
+                        .HasColumnType("bigint")
+                        .HasColumnName("evaluated_at");
+
+                    b.Property<long>("GraphRevision")
+                        .HasColumnType("bigint")
+                        .HasColumnName("graph_revision");
+
+                    b.HasKey("TeamId", "NodeId")
+                        .HasName("pk_team_progression_node_states");
+
+                    b.HasIndex("NodeId")
+                        .HasDatabaseName("ix_team_progression_node_states_node_id");
+
+                    b.HasIndex("CompetitionId", "TeamId")
+                        .HasDatabaseName("ix_team_progression_node_states_competition_id_team_id");
+
+                    b.ToTable("team_progression_node_states", (string)null);
+                });
+
+            modelBuilder.Entity("NoCTF.Domain.Competitions.Progression.UserBadgeGrant", b =>
+                {
+                    b.Property<Guid>("TeamId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("team_id");
+
+                    b.Property<Guid>("BadgeId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("badge_id");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("user_id");
+
+                    b.Property<bool>("Active")
+                        .HasColumnType("boolean")
+                        .HasColumnName("active");
+
+                    b.Property<long>("AwardedAt")
+                        .HasColumnType("bigint")
+                        .HasColumnName("awarded_at");
+
+                    b.Property<Guid>("CompetitionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("competition_id");
+
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .IsConcurrencyToken()
+                        .HasColumnType("uuid")
+                        .HasColumnName("concurrency_stamp");
+
+                    b.Property<long?>("RevokedAt")
+                        .HasColumnType("bigint")
+                        .HasColumnName("revoked_at");
+
+                    b.HasKey("TeamId", "BadgeId", "UserId")
+                        .HasName("pk_user_badge_grants");
+
+                    b.HasIndex("BadgeId")
+                        .HasDatabaseName("ix_user_badge_grants_badge_id");
+
+                    b.HasIndex("UserId")
+                        .HasDatabaseName("ix_user_badge_grants_user_id");
+
+                    b.HasIndex("CompetitionId", "UserId", "Active")
+                        .HasDatabaseName("ix_user_badge_grants_competition_id_user_id_active");
+
+                    b.ToTable("user_badge_grants", (string)null);
+                });
+
+            modelBuilder.Entity("NoCTF.Domain.Competitions.Progression.UserBadgeTransition", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("BadgeId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("badge_id");
+
+                    b.Property<Guid>("CompetitionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("competition_id");
+
+                    b.Property<long>("GraphRevision")
+                        .HasColumnType("bigint")
+                        .HasColumnName("graph_revision");
+
+                    b.Property<short>("Kind")
+                        .HasColumnType("smallint")
+                        .HasColumnName("kind");
+
+                    b.Property<long>("OccurredAt")
+                        .HasColumnType("bigint")
+                        .HasColumnName("occurred_at");
+
+                    b.Property<Guid>("TeamId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("team_id");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("user_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_user_badge_transitions");
+
+                    b.HasIndex("BadgeId")
+                        .HasDatabaseName("ix_user_badge_transitions_badge_id");
+
+                    b.HasIndex("TeamId")
+                        .HasDatabaseName("ix_user_badge_transitions_team_id");
+
+                    b.HasIndex("CompetitionId", "TeamId", "OccurredAt")
+                        .HasDatabaseName("ix_user_badge_transitions_competition_id_team_id_occurred_at");
+
+                    b.HasIndex("UserId", "BadgeId", "OccurredAt")
+                        .HasDatabaseName("ix_user_badge_transitions_user_id_badge_id_occurred_at");
+
+                    b.ToTable("user_badge_transitions", (string)null);
+                });
+
             modelBuilder.Entity("NoCTF.Domain.Gameplay.GameplayFact", b =>
                 {
                     b.Property<Guid>("Id")
@@ -4169,6 +4523,39 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
                     b.HasDiscriminator().HasValue((short)58);
                 });
 
+            modelBuilder.Entity("NoCTF.Domain.Competitions.Progression.BadgeProgressionNode", b =>
+                {
+                    b.HasBaseType("NoCTF.Domain.Competitions.Progression.ProgressionNode");
+
+                    b.Property<Guid>("CompetitionBadgeId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("competition_badge_id");
+
+                    b.HasIndex("CompetitionBadgeId")
+                        .HasDatabaseName("ix_competition_progression_nodes_competition_badge_id");
+
+                    b.ToTable("competition_progression_nodes", (string)null);
+
+                    b.HasDiscriminator().HasValue("badge");
+                });
+
+            modelBuilder.Entity("NoCTF.Domain.Competitions.Progression.ChallengeProgressionNode", b =>
+                {
+                    b.HasBaseType("NoCTF.Domain.Competitions.Progression.ProgressionNode");
+
+                    b.Property<Guid>("CompetitionChallengeId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("competition_challenge_id");
+
+                    b.HasIndex("CompetitionChallengeId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_competition_progression_nodes_competition_challenge_id");
+
+                    b.ToTable("competition_progression_nodes", (string)null);
+
+                    b.HasDiscriminator().HasValue("challenge");
+                });
+
             modelBuilder.Entity("NoCTF.Domain.Gameplay.AwdServiceTransitionGameplayFact", b =>
                 {
                     b.HasBaseType("NoCTF.Domain.Gameplay.GameplayFact");
@@ -5212,6 +5599,151 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
                     b.Navigation("TrackKeys");
                 });
 
+            modelBuilder.Entity("NoCTF.Domain.Competitions.Progression.CompetitionBadge", b =>
+                {
+                    b.HasOne("NoCTF.Domain.Competitions.Competition", null)
+                        .WithMany()
+                        .HasForeignKey("CompetitionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_competition_badges_competitions_competition_id");
+
+                    b.HasOne("NoCTF.Domain.Storage.StoredFile", "ImageFile")
+                        .WithMany()
+                        .HasForeignKey("ImageFileId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_competition_badges_files_image_file_id");
+
+                    b.Navigation("ImageFile");
+                });
+
+            modelBuilder.Entity("NoCTF.Domain.Competitions.Progression.CompetitionProgression", b =>
+                {
+                    b.HasOne("NoCTF.Domain.Competitions.Competition", null)
+                        .WithOne()
+                        .HasForeignKey("NoCTF.Domain.Competitions.Progression.CompetitionProgression", "CompetitionId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_competition_progressions_competitions_competition_id");
+                });
+
+            modelBuilder.Entity("NoCTF.Domain.Competitions.Progression.ProgressionEdge", b =>
+                {
+                    b.HasOne("NoCTF.Domain.Competitions.Progression.CompetitionProgression", null)
+                        .WithMany("Edges")
+                        .HasForeignKey("CompetitionId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_competition_progression_edges_competition_progressions_comp");
+
+                    b.HasOne("NoCTF.Domain.Competitions.Progression.ProgressionNode", null)
+                        .WithMany()
+                        .HasForeignKey("SourceNodeId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_competition_progression_edges_progression_nodes_source_node");
+
+                    b.HasOne("NoCTF.Domain.Competitions.Progression.ProgressionNode", null)
+                        .WithMany()
+                        .HasForeignKey("TargetNodeId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_competition_progression_edges_progression_nodes_target_node");
+                });
+
+            modelBuilder.Entity("NoCTF.Domain.Competitions.Progression.ProgressionNode", b =>
+                {
+                    b.HasOne("NoCTF.Domain.Competitions.Progression.CompetitionProgression", null)
+                        .WithMany("Nodes")
+                        .HasForeignKey("CompetitionId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_competition_progression_nodes_competition_progressions_comp");
+                });
+
+            modelBuilder.Entity("NoCTF.Domain.Competitions.Progression.TeamProgressionBadgeState", b =>
+                {
+                    b.HasOne("NoCTF.Domain.Competitions.Progression.CompetitionBadge", null)
+                        .WithMany()
+                        .HasForeignKey("BadgeId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_team_progression_badge_states_competition_badges_badge_id");
+
+                    b.HasOne("NoCTF.Domain.Teams.Team", null)
+                        .WithMany()
+                        .HasForeignKey("TeamId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_team_progression_badge_states_teams_team_id");
+                });
+
+            modelBuilder.Entity("NoCTF.Domain.Competitions.Progression.TeamProgressionNodeState", b =>
+                {
+                    b.HasOne("NoCTF.Domain.Competitions.Progression.ProgressionNode", null)
+                        .WithMany()
+                        .HasForeignKey("NodeId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_team_progression_node_states_competition_progression_nodes_");
+
+                    b.HasOne("NoCTF.Domain.Teams.Team", null)
+                        .WithMany()
+                        .HasForeignKey("TeamId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_team_progression_node_states_teams_team_id");
+                });
+
+            modelBuilder.Entity("NoCTF.Domain.Competitions.Progression.UserBadgeGrant", b =>
+                {
+                    b.HasOne("NoCTF.Domain.Competitions.Progression.CompetitionBadge", null)
+                        .WithMany()
+                        .HasForeignKey("BadgeId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_user_badge_grants_competition_badges_badge_id");
+
+                    b.HasOne("NoCTF.Domain.Teams.Team", null)
+                        .WithMany()
+                        .HasForeignKey("TeamId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_user_badge_grants_teams_team_id");
+
+                    b.HasOne("NoCTF.Domain.Identity.User", null)
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_user_badge_grants_users_user_id");
+                });
+
+            modelBuilder.Entity("NoCTF.Domain.Competitions.Progression.UserBadgeTransition", b =>
+                {
+                    b.HasOne("NoCTF.Domain.Competitions.Progression.CompetitionBadge", null)
+                        .WithMany()
+                        .HasForeignKey("BadgeId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_user_badge_transitions_competition_badges_badge_id");
+
+                    b.HasOne("NoCTF.Domain.Teams.Team", null)
+                        .WithMany()
+                        .HasForeignKey("TeamId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_user_badge_transitions_teams_team_id");
+
+                    b.HasOne("NoCTF.Domain.Identity.User", null)
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_user_badge_transitions_users_user_id");
+                });
+
             modelBuilder.Entity("NoCTF.Domain.Gameplay.GameplayFact", b =>
                 {
                     b.HasOne("NoCTF.Domain.Identity.User", null)
@@ -5763,6 +6295,26 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
                         .HasConstraintName("fk_team_members_users_user_id");
                 });
 
+            modelBuilder.Entity("NoCTF.Domain.Competitions.Progression.BadgeProgressionNode", b =>
+                {
+                    b.HasOne("NoCTF.Domain.Competitions.Progression.CompetitionBadge", null)
+                        .WithMany()
+                        .HasForeignKey("CompetitionBadgeId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_competition_progression_nodes_competition_badges_competitio");
+                });
+
+            modelBuilder.Entity("NoCTF.Domain.Competitions.Progression.ChallengeProgressionNode", b =>
+                {
+                    b.HasOne("NoCTF.Domain.Challenges.CompetitionChallenge", null)
+                        .WithMany()
+                        .HasForeignKey("CompetitionChallengeId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_competition_progression_nodes_competition_challenges_compet");
+                });
+
             modelBuilder.Entity("NoCTF.Domain.Challenges.Challenge", b =>
                 {
                     b.Navigation("Attachments");
@@ -5810,6 +6362,13 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
                     b.Navigation("Collaborators");
 
                     b.Navigation("ModeConfiguration");
+                });
+
+            modelBuilder.Entity("NoCTF.Domain.Competitions.Progression.CompetitionProgression", b =>
+                {
+                    b.Navigation("Edges");
+
+                    b.Navigation("Nodes");
                 });
 
             modelBuilder.Entity("NoCTF.Domain.Identity.User", b =>

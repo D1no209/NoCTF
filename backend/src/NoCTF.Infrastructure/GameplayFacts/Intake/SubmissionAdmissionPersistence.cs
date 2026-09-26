@@ -9,6 +9,7 @@ using NoCTF.Domain.Runtime;
 using NoCTF.Domain.Challenges;
 using NoCTF.Infrastructure.Competitions.Lifecycle;
 using NoCTF.GameModes.Registration;
+using NoCTF.Infrastructure.Competitions.Progression;
 
 namespace NoCTF.Infrastructure.GameplayFacts.Intake;
 
@@ -79,6 +80,11 @@ internal static class GameplayFactAdmissionPersistence
             .AsSplitQuery()
             .SingleOrDefaultAsync(cancellationToken);
         if (scope is null)
+            return null;
+        if (scope.Mode == GameMode.Ctf
+            && !await new ProgressionChallengeAccess(db).IsActiveAsync(
+                competitionId, competitionChallengeId, scope.TeamId,
+                cancellationToken))
             return null;
 
         var officialWindow = scope.Mode == GameMode.Ctf
