@@ -8,7 +8,8 @@ const {
   availableChallenges, filteredChallenges, challengeSearch, challengeDirection,
   challengeDirections, loading, saving, badgeSaving, error,
   selectedNode, selectedEdge, selectedCount, newBadgeName, newBadgeDescription, newBadgeImage,
-  editingBadgeId, editBadgeName, editBadgeDescription,
+  newBadgeUploadKey, editingBadgeId, editBadgeName, editBadgeDescription,
+  editBadgeUploadKey,
   load, addChallenge, addBadge, connect, removeSelected, changeNodeSelection,
   changeEdgeSelection, updateNodePositions, setEdgeCondition, save,
   onBadgeFileChange, createBadge, deleteBadge, ProgressionCanvas,
@@ -82,20 +83,40 @@ const {
                 <Button type="button" size="icon-sm" variant="ghost" :disabled="!canWrite" :aria-label="$t('progression.deleteBadge')" @click="deleteBadge(badge.id!)">×</Button>
               </div>
             </ScrollSurface>
-            <div v-if="editingBadgeId && canWrite" class="mt-3 space-y-2 rounded border p-2">
-              <Input v-model="editBadgeName" maxlength="160" :placeholder="$t('progression.badgeName')" />
-              <Textarea v-model="editBadgeDescription" maxlength="1000" :placeholder="$t('progression.badgeDescription')" rows="2" />
-              <FileInput accept="image/png,image/jpeg,image/webp" class="w-full text-xs" :aria-label="$t('progression.badgeImage')" @change="onEditBadgeFileChange($event)" />
+            <FieldGroup v-if="editingBadgeId && canWrite" class="mt-3 gap-2 rounded border p-2">
+              <Field>
+                <FieldLabel for="edit-badge-name">{{ $t('progression.badgeName') }}</FieldLabel>
+                <Input id="edit-badge-name" v-model="editBadgeName" maxlength="160" />
+              </Field>
+              <Field>
+                <FieldLabel for="edit-badge-description">{{ $t('progression.badgeDescription') }}</FieldLabel>
+                <Textarea id="edit-badge-description" v-model="editBadgeDescription" maxlength="1000" rows="2" />
+              </Field>
+              <Field>
+                <FieldLabel for="edit-badge-image">{{ $t('progression.badgeImage') }}</FieldLabel>
+                <FileUpload :key="editBadgeUploadKey" id="edit-badge-image" accept="image/png,image/jpeg,image/webp"
+                  :pending="badgeSaving" @change="onEditBadgeFileChange($event)" />
+              </Field>
               <Button size="sm" :disabled="badgeSaving || !editBadgeName.trim()" @click="updateBadge">{{ $t('progression.updateBadge') }}</Button>
-            </div>
-            <div v-if="canWrite" class="mt-3 space-y-2 border-t pt-3">
-              <Input v-model="newBadgeName" maxlength="160" :placeholder="$t('progression.badgeName')" />
-              <Textarea v-model="newBadgeDescription" maxlength="1000" :placeholder="$t('progression.badgeDescription')" rows="2" />
-              <FileInput accept="image/png,image/jpeg,image/webp" class="w-full text-xs" :aria-label="$t('progression.badgeImage')" @change="onBadgeFileChange($event)" />
+            </FieldGroup>
+            <FieldGroup v-if="canWrite" class="mt-3 gap-2 border-t pt-3">
+              <Field>
+                <FieldLabel for="new-badge-name">{{ $t('progression.badgeName') }}</FieldLabel>
+                <Input id="new-badge-name" v-model="newBadgeName" maxlength="160" />
+              </Field>
+              <Field>
+                <FieldLabel for="new-badge-description">{{ $t('progression.badgeDescription') }}</FieldLabel>
+                <Textarea id="new-badge-description" v-model="newBadgeDescription" maxlength="1000" rows="2" />
+              </Field>
+              <Field>
+                <FieldLabel for="new-badge-image">{{ $t('progression.badgeImage') }}</FieldLabel>
+                <FileUpload :key="newBadgeUploadKey" id="new-badge-image" accept="image/png,image/jpeg,image/webp"
+                  :pending="badgeSaving" @change="onBadgeFileChange($event)" />
+              </Field>
               <Button size="sm" class="w-full" :disabled="badgeSaving || !newBadgeName.trim() || !newBadgeImage" @click="createBadge">
                 {{ $t('progression.createBadge') }}
               </Button>
-            </div>
+            </FieldGroup>
           </div>
         </aside>
 
