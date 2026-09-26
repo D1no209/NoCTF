@@ -131,3 +131,25 @@ describe('progression canvas viewport', () => {
     expect(calls).toEqual([['set', { x: 0, y: 0, zoom: 1 }]])
   })
 })
+
+describe('progression badge image upload', () => {
+  test('create and edit expose the shared visible uploader instead of an unreachable file input', () => {
+    const view = readFileSync(new URL('../app/components/views/page/admin/competitions/[id]/AdminCompetitionsByIdProgressionPageView.vue', import.meta.url), 'utf8')
+    const upload = readFileSync(new URL('../app/components/ui/upload/FileUpload.vue', import.meta.url), 'utf8')
+    expect(view.match(/<FileUpload /g)).toHaveLength(2)
+    expect(view).not.toContain('<FileInput')
+    expect(view).toContain(':key="newBadgeUploadKey"')
+    expect(view).toContain(':key="editBadgeUploadKey"')
+    expect(view).toContain(':disabled="badgeSaving || !newBadgeName.trim() || !newBadgeImage"')
+    expect(upload).toContain('@click="choose"')
+    expect(upload).toContain('@drop.prevent="drop"')
+  })
+
+  test('successful creation and switching the edited badge clear the previous file selection', () => {
+    const feature = readFileSync(new URL('../app/features/routes/admin/competitions/[id]/useAdminCompetitionsByIdProgressionPage.ts', import.meta.url), 'utf8')
+    expect(feature).toContain('newBadgeUploadKey.value++')
+    expect(feature).toContain('editBadgeUploadKey.value++')
+    expect(feature).toContain('newBadgeImage.value = null')
+    expect(feature).toContain('editBadgeImage.value = null')
+  })
+})

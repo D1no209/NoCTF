@@ -52,10 +52,12 @@ export function useAdminCompetitionsByIdProgressionPage() {
   const newBadgeName = ref('')
   const newBadgeDescription = ref('')
   const newBadgeImage = ref<File | null>(null)
+  const newBadgeUploadKey = ref(0)
   const editingBadgeId = ref<string | null>(null)
   const editBadgeName = ref('')
   const editBadgeDescription = ref('')
   const editBadgeImage = ref<File | null>(null)
+  const editBadgeUploadKey = ref(0)
 
   const selection = computed(() => getProgressionSelection(
     nodes.value, edges.value, selectedNodeIds.value, selectedEdgeIds.value))
@@ -230,6 +232,7 @@ export function useAdminCompetitionsByIdProgressionPage() {
     editBadgeName.value = badge.name ?? ''
     editBadgeDescription.value = badge.description ?? ''
     editBadgeImage.value = null
+    editBadgeUploadKey.value++
   }
 
   async function updateBadge() {
@@ -277,6 +280,7 @@ export function useAdminCompetitionsByIdProgressionPage() {
     newBadgeName.value = ''
     newBadgeDescription.value = ''
     newBadgeImage.value = null
+    newBadgeUploadKey.value++
     toast.success(translate('progression.badgeCreated'))
   }
 
@@ -302,7 +306,8 @@ export function useAdminCompetitionsByIdProgressionPage() {
     challenges, availableChallenges, filteredChallenges, challengeSearch,
     challengeDirection, challengeDirections, loading, saving, badgeSaving, error,
     selectedNode, selectedEdge, selectedCount, newBadgeName, newBadgeDescription, newBadgeImage,
-    editingBadgeId, editBadgeName, editBadgeDescription, editBadgeImage,
+    newBadgeUploadKey, editingBadgeId, editBadgeName, editBadgeDescription, editBadgeImage,
+    editBadgeUploadKey,
     load, addChallenge, addBadge, connect, removeSelected, changeNodeSelection,
     changeEdgeSelection, updateNodePositions, setEdgeCondition, save,
     onBadgeFileChange, createBadge, deleteBadge,
