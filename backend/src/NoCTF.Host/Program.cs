@@ -8,13 +8,11 @@ using NoCTF.API.Endpoints;
 using NoCTF.API.OpenApi;
 using NoCTF.API.Security;
 using NoCTF.API.SignalR.Hubs;
-using NoCTF.Application.Administration.PlatformLogs;
 using NoCTF.Hosting;
 using NoCTF.Hosting.Health;
 using NoCTF.Hosting.Observability;
 using NoCTF.Infrastructure;
 using NoCTF.Infrastructure.Persistence;
-using NoCTF.Infrastructure.Observability;
 using NoCTF.Persistence.PostgreSql;
 using NoCTF.Runner;
 using NoCTF.Runner.Composition;
@@ -84,9 +82,6 @@ if (roles.Has(HostRole.Worker))
         enableClusterScheduling: !development);
 if (roles.Has(HostRole.Runner))
     builder.Services.AddNoCtfRunner(builder.Configuration, development);
-if (!development && !exportOpenApi)
-    builder.Services.AddNoCtfPlatformLogging(builder.Configuration, PlatformLogService.Host);
-
 builder.UseWolverine(options =>
 {
     options.ServiceLocationPolicy = JasperFx.CodeGeneration.Model.ServiceLocationPolicy.NotAllowed;

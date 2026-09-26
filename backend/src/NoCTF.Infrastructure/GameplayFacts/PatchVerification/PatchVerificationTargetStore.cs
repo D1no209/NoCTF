@@ -47,7 +47,7 @@ public sealed class PatchVerificationTargetStore(
             return new(PatchVerificationTargetRequestState.ScopeNotFound);
 
         await using var transaction = await db.Database.BeginTransactionAsync(
-            IsolationLevel.ReadCommitted,
+            IsolationLevel.Serializable,
             ct);
         using var quotaLease = await runtimeQuota.AcquireLockAsync(
             db,

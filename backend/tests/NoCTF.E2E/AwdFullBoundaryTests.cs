@@ -49,14 +49,17 @@ public sealed class AwdFullBoundaryTests
         {
             mode = "Awd",
             flagTemplate = new { header = "flag", bodyTemplate = "[GUID]", leetLiteralText = false },
-            hardeningDurationSeconds = 20,
-            roundDurationSeconds = 30,
-            attackRewardMode = "FixedPerAttack",
-            attackPoints = 13L,
-            victimDefensePoolPoints = 17L,
-            checkerIntervalSeconds = 2,
-            serviceHealthyPoints = 11L,
-            serviceUnhealthyPenalty = 7L
+            awd = new
+            {
+                hardeningDurationSeconds = 20,
+                roundDurationSeconds = 30,
+                attackRewardMode = "FixedPerAttack",
+                attackPoints = 13L,
+                victimDefensePoolPoints = 17L,
+                checkerIntervalSeconds = 2,
+                serviceHealthyPoints = 11L,
+                serviceUnhealthyPenalty = 7L
+            }
         };
         await SendJsonAsync(
             admin,
@@ -104,7 +107,7 @@ public sealed class AwdFullBoundaryTests
                     order = 0,
                     isPublished = true
                 },
-                rules = new { configuration = new { mode = "Awd" } }
+                rules = new { configuration = new { mode = "Awd", awd = new { } } }
             },
             HttpStatusCode.OK,
             cancellationToken);
@@ -388,25 +391,37 @@ public sealed class AwdFullBoundaryTests
         new
         {
             mode = "Awd",
+            awd = new
+            {
+                flagInjection = new
+                {
+                    command = "printf '%s' '${FLAG}' > /dev/shm/flag",
+                    timeoutSeconds = 5,
+                    serviceName = (string?)null
+                }
+            },
             runtime = new
             {
                 kind = "Container",
                 allocation = "PerTeam",
-                image = runtimeImage,
-                command = Array.Empty<string>(),
-                environment = new Dictionary<string, string>(),
-                labels = new Dictionary<string, string>(),
-                portMappings = new[] { new { containerPort = 8080, hostPort = 0 } },
-                security = new
+                container = new
                 {
-                    noNewPrivileges = true,
-                    readonlyRootfs = true,
-                    runAsNonRoot = true,
-                    capDrop = Array.Empty<string>(),
-                    capAdd = Array.Empty<string>()
+                    image = runtimeImage,
+                    command = Array.Empty<string>(),
+                    environment = new Dictionary<string, string>(),
+                    labels = new Dictionary<string, string>(),
+                    portMappings = new[] { new { containerPort = 8080, hostPort = 0 } },
+                    security = new
+                    {
+                        noNewPrivileges = true,
+                        readonlyRootfs = true,
+                        runAsNonRoot = true,
+                        capDrop = Array.Empty<string>(),
+                        capAdd = Array.Empty<string>()
+                    },
+                    flagEnvironmentVariableName = (string?)null,
+                    internalPorts = Array.Empty<int>()
                 },
-                flagEnvironmentVariableName = (string?)null,
-                internalPorts = Array.Empty<int>(),
                 egressPolicy = "Isolated",
                 limits = new
                 {
@@ -437,12 +452,6 @@ public sealed class AwdFullBoundaryTests
                 environment = new Dictionary<string, string>(),
                 timeoutSeconds = 15,
                 targetServiceName = (string?)null
-            },
-            flagInjection = new
-            {
-                command = "printf '%s' '${FLAG}' > /dev/shm/flag",
-                timeoutSeconds = 5,
-                serviceName = (string?)null
             }
         };
 

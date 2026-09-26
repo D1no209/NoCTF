@@ -29,9 +29,9 @@ using NoCTF.Infrastructure.Teams.Moderation;
 using NoCTF.Worker;
 using Npgsql;
 using NSubstitute;
-using StackExchange.Redis;
+using DotNet.Testcontainers.Builders;
+using NATS.Client.Core;
 using Testcontainers.PostgreSql;
-using Testcontainers.Redis;
 using ZiggyCreatures.Caching.Fusion;
 
 namespace NoCTF.Tests.Integration.Persistence;
@@ -113,13 +113,19 @@ public sealed class LeaderboardProjectionPersistenceTests
                 .WithUsername("postgres")
                 .WithPassword("postgres")
                 .Build();
-            await using var redisContainer = new RedisBuilder(
-                "redis:7.4.10-alpine3.21@sha256:e7723ff73d963f5cc6d9c4643ea3d989527a402a319239054e9472a7fb9219a2").Build();
+            await using var nats = new ContainerBuilder(
+                    "docker.m.daocloud.io/library/nats:2.12.2-alpine@sha256:2d5fce3229ae5741f4ef9225aff95dc4dc036455931eaf77a3eec33fddaa192d")
+                .WithPortBinding(4222, assignRandomHostPort: true)
+                .WithCommand("-js")
+                .WithWaitStrategy(Wait.ForUnixContainer().UntilInternalTcpPortIsAvailable(4222))
+                .Build();
             await Task.WhenAll(
                 postgres.StartAsync(cancellationToken),
-                redisContainer.StartAsync(cancellationToken));
-            await using var redis = await ConnectionMultiplexer.ConnectAsync(
-                redisContainer.GetConnectionString());
+                nats.StartAsync(cancellationToken));
+            await using var connection = new NatsConnection(new NatsOpts
+            {
+                Url = $"nats://{nats.Hostname}:{nats.GetMappedPublicPort(4222)}"
+            });
 
             var options = new DbContextOptionsBuilder<NoCtfDbContext>()
                 .UseNpgsql(postgres.GetConnectionString())
@@ -160,7 +166,8 @@ public sealed class LeaderboardProjectionPersistenceTests
                 new LeaderboardProjectionEngine(new LeaderboardProjectorCatalog()),
                 publisher,
                 cacheServices.GetRequiredService<IFusionCacheProvider>(),
-                new RedisLeaderboardPublicationFence(redis),
+                new NatsLeaderboardPublicationFence(connection,
+                    cacheServices.GetRequiredService<IFusionCacheProvider>()),
                 new LeaderboardProjectionKeyedLock(),
                 clock);
 
@@ -195,13 +202,19 @@ public sealed class LeaderboardProjectionPersistenceTests
                 .WithUsername("postgres")
                 .WithPassword("postgres")
                 .Build();
-            await using var redisContainer = new RedisBuilder(
-                "redis:7.4.10-alpine3.21@sha256:e7723ff73d963f5cc6d9c4643ea3d989527a402a319239054e9472a7fb9219a2").Build();
+            await using var nats = new ContainerBuilder(
+                    "docker.m.daocloud.io/library/nats:2.12.2-alpine@sha256:2d5fce3229ae5741f4ef9225aff95dc4dc036455931eaf77a3eec33fddaa192d")
+                .WithPortBinding(4222, assignRandomHostPort: true)
+                .WithCommand("-js")
+                .WithWaitStrategy(Wait.ForUnixContainer().UntilInternalTcpPortIsAvailable(4222))
+                .Build();
             await Task.WhenAll(
                 postgres.StartAsync(cancellationToken),
-                redisContainer.StartAsync(cancellationToken));
-            await using var redis = await ConnectionMultiplexer.ConnectAsync(
-                redisContainer.GetConnectionString());
+                nats.StartAsync(cancellationToken));
+            await using var connection = new NatsConnection(new NatsOpts
+            {
+                Url = $"nats://{nats.Hostname}:{nats.GetMappedPublicPort(4222)}"
+            });
 
             var options = new DbContextOptionsBuilder<NoCtfDbContext>()
                 .UseNpgsql(postgres.GetConnectionString())
@@ -231,7 +244,7 @@ public sealed class LeaderboardProjectionPersistenceTests
                 new LeaderboardProjectionEngine(new LeaderboardProjectorCatalog()),
                 publisher,
                 cacheProvider,
-                new RedisLeaderboardPublicationFence(redis),
+                new NatsLeaderboardPublicationFence(connection, cacheProvider),
                 new LeaderboardProjectionKeyedLock());
 
             var initialReads = await Task.WhenAll(
@@ -245,9 +258,9 @@ public sealed class LeaderboardProjectionPersistenceTests
                 Arg.Any<ScoreboardProjection>(),
                 Arg.Any<CancellationToken>());
 
-            await redis.GetDatabase().ExecuteAsync("FLUSHDB");
             await cacheProvider.GetCache(NoCtfCacheNames.Leaderboards).RemoveAsync(
-                $"projection:v2:{fixture.Competition.Id:N}",
+                $"scoreboard:published:{fixture.Competition.Id:N}:" +
+                initialReads[0]!.Snapshot.Version,
                 token: cancellationToken);
 
             var rebuilt = await cache.GetScoreboardAsync(

@@ -85,12 +85,12 @@ groups:
         labels: { severity: warning }
         annotations:
           summary: PostgreSQL connection usage exceeds 80 percent
-      - alert: NoCtfRedisP99High
-        expr: noctf:redis_operation_duration:p99_5m > 0.05
+      - alert: NoCtfNatsP99High
+        expr: noctf:nats_operation_duration:p99_5m > 0.05
         for: 5m
         labels: { severity: warning }
         annotations:
-          summary: Redis operation P99 exceeds 50ms
+          summary: NATS coordination operation P99 exceeds 50ms
       - alert: NoCtfRunnerCapacityLow
         expr: min(noctf:runner_capacity_available:ratio) < 0.15
         for: 2m
@@ -109,3 +109,15 @@ groups:
         labels: { severity: critical }
         annotations:
           summary: Host disk availability is below 15 percent
+      - alert: NoCtfLokiUnavailable
+        expr: up{job="loki"} == 0
+        for: 2m
+        labels: { severity: warning }
+        annotations:
+          summary: Private Loki metrics endpoint is unavailable
+      - alert: NoCtfLokiDiscardingLogs
+        expr: sum(increase(loki_discarded_samples_total[5m])) > 0
+        for: 5m
+        labels: { severity: warning }
+        annotations:
+          summary: Loki rejected log samples in the last five minutes

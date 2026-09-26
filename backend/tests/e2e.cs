@@ -266,13 +266,14 @@ internal sealed class ModeEnvironment(
 
     private static async Task<string> ResolveBaseUrlAsync(
         ComposeRunner compose,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        string service = "backend")
     {
         var result = await compose.RunAsync(
-            ["port", "backend", "8080"],
+            ["port", service, "8080"],
             cancellationToken,
             displayOutput: false);
-        result.EnsureSuccess("Resolving the Docker-assigned API port");
+        result.EnsureSuccess($"Resolving the Docker-assigned {service} port");
         var endpoint = result.StandardOutput.Trim();
         var separator = endpoint.LastIndexOf(':');
         if (separator < 0
@@ -280,7 +281,7 @@ internal sealed class ModeEnvironment(
             || port is < IPEndPoint.MinPort or > IPEndPoint.MaxPort)
         {
             throw new InvalidOperationException(
-                $"Docker returned an invalid backend port mapping: '{endpoint}'.");
+                $"Docker returned an invalid {service} port mapping: '{endpoint}'.");
         }
         return $"http://127.0.0.1:{port}";
     }
@@ -292,16 +293,17 @@ internal sealed class ModeEnvironment(
         CancellationToken cancellationToken)
     {
         using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(3) };
+        var runnerUrl = await ResolveBaseUrlAsync(compose, cancellationToken, "runner");
         var deadline = DateTimeOffset.UtcNow.AddMinutes(3);
         string lastHealth = "not requested";
-        string lastHeartbeat = "not requested";
+        string lastRunnerHealth = "not requested";
         while (DateTimeOffset.UtcNow < deadline)
         {
             cancellationToken.ThrowIfCancellationRequested();
             try
             {
                 using var response = await http.GetAsync(
-                    $"{baseUrl}/health",
+                    $"{baseUrl}/health/ready",
                     cancellationToken);
                 lastHealth = ((int)response.StatusCode).ToString(
                     System.Globalization.CultureInfo.InvariantCulture);
@@ -312,21 +314,19 @@ internal sealed class ModeEnvironment(
                 lastHealth = exception.Message;
             }
 
-            var heartbeat = await compose.RunAsync(
-                [
-                    "exec",
-                    "-T",
-                    "redis",
-                    "redis-cli",
-                    "EXISTS",
-                    $"runner-pool:{runnerPool}:members"
-                ],
-                cancellationToken,
-                displayOutput: false);
-            lastHeartbeat = heartbeat.StandardOutput.Trim();
-            if (lastHealth == "200"
-                && heartbeat.ExitCode == 0
-                && lastHeartbeat == "1")
+            try
+            {
+                using var runnerResponse = await http.GetAsync(
+                    $"{runnerUrl}/health/ready", cancellationToken);
+                lastRunnerHealth = ((int)runnerResponse.StatusCode).ToString(
+                    System.Globalization.CultureInfo.InvariantCulture);
+            }
+            catch (Exception exception) when (
+                exception is HttpRequestException or TaskCanceledException)
+            {
+                lastRunnerHealth = exception.Message;
+            }
+            if (lastHealth == "200" && lastRunnerHealth == "200")
             {
                 return;
             }
@@ -334,7 +334,7 @@ internal sealed class ModeEnvironment(
         }
 
         throw new TimeoutException(
-            $"API/Runner readiness timed out. health={lastHealth}, heartbeat={lastHeartbeat}");
+            $"API/Runner readiness timed out. api={lastHealth}, runner={lastRunnerHealth}, pool={runnerPool}");
     }
 
     private async Task RunFullResilienceAsync(
@@ -373,11 +373,12 @@ internal sealed class ModeEnvironment(
                })
         {
             await WaitForAuthorizedMeAsync(outageHttp, token, cancellationToken);
-            await AssertLoginFailsClosedAsync(
+            _ = await LoginAsync(
                 outageHttp,
                 $"{modeName}-e2e-admin",
                 adminPassword,
                 cancellationToken);
+            await WaitUntilReadyAsync(compose, baseUrl, runnerPool, cancellationToken);
         }
         await compose.RequireSuccessAsync(["start", "redis"], cancellationToken);
         await WaitUntilReadyAsync(compose, baseUrl, runnerPool, cancellationToken);
@@ -420,29 +421,6 @@ internal sealed class ModeEnvironment(
             await Task.Delay(TimeSpan.FromSeconds(1), cancellationToken);
         }
         throw new TimeoutException($"Admin login did not recover: {last}");
-    }
-
-    private static async Task AssertLoginFailsClosedAsync(
-        HttpClient http,
-        string login,
-        string password,
-        CancellationToken cancellationToken)
-    {
-        try
-        {
-            using var response = await http.PostAsJsonAsync(
-                "/api/v1/auth/login",
-                new { login, password },
-                cancellationToken);
-            if (response.IsSuccessStatusCode)
-                throw new InvalidOperationException(
-                    "Login bypassed shared admission protection while Redis was unavailable.");
-        }
-        catch (Exception exception) when (
-            exception is HttpRequestException or TaskCanceledException)
-        {
-            // A transport timeout is also fail-closed; recovery is checked after Redis restarts.
-        }
     }
 
     private static async Task WaitForAuthorizedMeAsync(

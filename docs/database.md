@@ -45,8 +45,9 @@ dead-letter。Wolverine 只使用 NATS JetStream。业务提交成功后通过
 `IPostCommitMessagePublisher` 发布；关键 Pending 状态必须可由数据库事实重新派发，以覆盖提交后、
 发布前崩溃。所有消费者按至少一次投递和业务幂等键设计。
 
-Redis 只保存可丢失缓存、限流、SignalR backplane 与 Runner presence。排行榜和容量状态都必须能从
-关系数据与在线 Runner 重建。
+Redis 仅承载 FusionCache 的可丢弃 L2 与失效 backplane。请求配额、SSO 流程和容量分配
+使用 EF Core 关系记录；Runner 在线状态、短租约与排行榜发布版本使用 NATS KV。
+排行榜正文与其他读模型缓存丢失后从关系事实重建。
 
 ## Migration
 

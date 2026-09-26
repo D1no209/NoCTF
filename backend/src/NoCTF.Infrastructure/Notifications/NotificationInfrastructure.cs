@@ -24,8 +24,8 @@ internal static class NotificationInfrastructure
         services.AddScoped<PublishCompetitionAnnouncement>();
         if (!development)
         {
-            services.AddSingleton<ILeaderboardRefreshPublisher, RedisLeaderboardRefreshPublisher>();
-            services.AddSingleton<IGameplayFactStateChangedNotification, RedisGameplayFactStateChangedNotification>();
+            services.AddSingleton<ILeaderboardRefreshPublisher, NatsLeaderboardRefreshPublisher>();
+            services.AddSingleton<IGameplayFactStateChangedNotification, NatsGameplayFactStateChangedNotification>();
         }
         else
         {

@@ -20,7 +20,6 @@ using Microsoft.Extensions.Options;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Http.Resilience;
 using Polly;
-using StackExchange.Redis;
 using NoCTF.Domain.Runtime;
 using NoCTF.Infrastructure.Caching;
 using NoCTF.Application.Competitions.Events;
@@ -60,7 +59,7 @@ public static class ServiceRegistration
             .ValidateOnStart();
         services.AddScoped<ICompetitionEventRecorder, CompetitionEventStore>();
         services.AddScoped<IAwdpFixExecutionFence, AwdpFixExecutionFence>();
-        services.AddNoCtfLocalComputationCaching(configuration);
+        services.AddNoCtfCaching(configuration, development);
         services.AddHttpClient();
         services.AddHttpClient(
                 AwdpFixArchiveDownloader.ClientName,
@@ -87,20 +86,8 @@ public static class ServiceRegistration
         if (!development)
         {
             services.TryAddSingleton<IClusterLeaseManager, NatsClusterLeaseManager>();
-            var redis = configuration.GetConnectionString("Redis");
-            if (string.IsNullOrWhiteSpace(redis))
-                throw new InvalidOperationException(
-                    "ConnectionStrings:Redis is required for the Runner host.");
-            services.AddSingleton<IConnectionMultiplexer>(_ =>
-            {
-                var redisOptions = ConfigurationOptions.Parse(redis);
-                redisOptions.AbortOnConnectFail = false;
-                return ConnectionMultiplexer.Connect(redisOptions);
-            });
-            services.AddScoped<RedisRunnerCapacityGate>();
             services.AddScoped<IRunnerCapacityGate, PersistedRunnerCapacityGate>();
-            services.AddSingleton<RedisRunnerAvailabilityRegistry>();
-            services.AddSingleton<RedisRunnerCapacityLedger>();
+            services.TryAddSingleton<NatsRunnerAvailabilityRegistry>();
             services.AddSingleton<RunnerResourceObserver>();
             services.AddSingleton<IReadinessDependency, RunnerAdmissionReadinessDependency>();
             services.AddHostedService<RunnerLivenessPublisher>();

@@ -21,7 +21,7 @@ internal static class ScoringInfrastructure
         services.AddScoped<IScoreboardTrendFactReader, ScoreboardTrendFactReader>();
         services.AddScoped<BuildScoreboardTrends>();
         if (!development)
-            services.AddSingleton<ILeaderboardPublicationFence, RedisLeaderboardPublicationFence>();
+            services.AddSingleton<ILeaderboardPublicationFence, NatsLeaderboardPublicationFence>();
         return services;
     }
 }

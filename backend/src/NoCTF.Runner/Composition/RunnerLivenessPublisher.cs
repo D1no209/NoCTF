@@ -1,11 +1,12 @@
 using Microsoft.Extensions.Options;
-using StackExchange.Redis;
+using NATS.Client.Core;
+using NoCTF.Infrastructure.Runtime.Capacity;
 
 namespace NoCTF.Runner.Composition;
 
 /// <summary>Keep cleanup routing alive while provider inventory or resource observation is blocked.</summary>
 public sealed class RunnerLivenessPublisher(
-    IConnectionMultiplexer redis, IOptions<RunnerOptions> options, TimeProvider clock,
+    NatsRunnerAvailabilityRegistry registry, IOptions<RunnerOptions> options, TimeProvider clock,
     ILogger<RunnerLivenessPublisher> logger) : BackgroundService
 {
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -16,12 +17,12 @@ public sealed class RunnerLivenessPublisher(
             try
             {
                 var runner = options.Value;
-                await redis.GetDatabase().StringSetAsync($"runner:{runner.Id}:heartbeat",
-                    $"provider={runner.Provider};version=capacity-v3", runner.Heartbeat.Ttl);
+                await registry.PublishHeartbeatAsync(runner.Pool, runner.Id,
+                    runner.Provider!.Value, runner.Heartbeat.Ttl, stoppingToken);
             }
-            catch (RedisException exception)
+            catch (NatsException exception)
             {
-                logger.LogWarning("Runner liveness publication failed after {FailureType}.", exception.GetType().Name);
+                logger.LogWarning("Runner NATS liveness publication failed after {FailureType}.", exception.GetType().Name);
             }
         } while (await timer.WaitForNextTickAsync(stoppingToken));
     }

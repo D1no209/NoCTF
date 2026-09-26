@@ -51,16 +51,16 @@ public sealed class DatabaseStartupPersistenceTests
                 await Assert.That(user.Role).IsEqualTo(UserRole.Administrator);
                 await Assert.That(await db.Database.GetPendingMigrationsAsync(ct)).IsEmpty();
                 var appliedMigrations = (await db.Database.GetAppliedMigrationsAsync(ct)).ToArray();
-                await Assert.That(appliedMigrations).Count().IsEqualTo(2);
-                await Assert.That(appliedMigrations[1]).EndsWith("_CompetitionProgression");
+                await Assert.That(appliedMigrations).Count().IsEqualTo(4);
                 await Assert.That(appliedMigrations[0]).EndsWith("_InitialBaseline");
-                var tables = await db.Database.SqlQuery<string>($"""
-                    SELECT table_name AS "Value"
-                    FROM information_schema.tables
-                    WHERE table_schema = 'public'
-                      AND table_name <> '__EFMigrationsHistory'
-                    ORDER BY table_name
-                    """).ToArrayAsync(ct);
+                await Assert.That(appliedMigrations[1]).EndsWith("_CompetitionProgression");
+                await Assert.That(appliedMigrations[2]).EndsWith("_PersistedSsoFlows");
+                await Assert.That(appliedMigrations[3]).EndsWith("_PersistedRequestAdmission");
+                var tables = db.Model.GetEntityTypes()
+                    .Select(entity => entity.GetTableName())
+                    .Where(name => name is not null)
+                    .Select(name => name!)
+                    .Distinct().ToArray();
                 await Assert.That(tables).Contains("competition_collaborators");
                 await Assert.That(tables).Contains("team_members");
                 await Assert.That(tables).Contains("team_captains");
@@ -71,16 +71,14 @@ public sealed class DatabaseStartupPersistenceTests
                 await Assert.That(tables).Contains("runtime_access_endpoints");
                 await Assert.That(tables).Contains("command_receipts");
                 await Assert.That(tables).Contains("external_identities");
+                await Assert.That(tables).Contains("sso_flows");
+                await Assert.That(tables).Contains("request_admission_windows");
+                await Assert.That(tables).Contains("request_admission_leases");
                 await Assert.That(tables.Any(table =>
                     table.Contains("wolverine", StringComparison.OrdinalIgnoreCase))).IsFalse();
-                var oldRuntimeColumns = await db.Database.SqlQuery<string>($"""
-                    SELECT column_name AS "Value"
-                    FROM information_schema.columns
-                    WHERE table_schema = 'public'
-                      AND table_name = 'runtime_instances'
-                      AND column_name = 'urls'
-                    """).ToArrayAsync(ct);
-                await Assert.That(oldRuntimeColumns).IsEmpty();
+                await Assert.That(db.Model.FindEntityType(typeof(NoCTF.Domain.Runtime.RuntimeInstance))!
+                    .GetProperties().Any(property => property.Name == "Urls")).IsFalse();
+                await Assert.That(await db.SsoFlows.AnyAsync(ct)).IsFalse();
             }
             await DatabaseStartup.InitializeAsync(provider, configuration, ct);
             await using var verification = provider.CreateAsyncScope();

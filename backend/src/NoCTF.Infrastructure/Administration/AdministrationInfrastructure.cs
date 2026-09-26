@@ -1,4 +1,5 @@
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Configuration;
 using NoCTF.Application.Challenges.Bank;
 using NoCTF.Application.Administration;
 using NoCTF.Application.Administration.PlatformConfiguration;
@@ -13,6 +14,7 @@ internal static class AdministrationInfrastructure
 {
     internal static IServiceCollection AddNoCtfAdministration(
         this IServiceCollection services,
+        IConfiguration configuration,
         bool exporting,
         bool development)
     {
@@ -45,7 +47,24 @@ internal static class AdministrationInfrastructure
             services.AddScoped<IUserAccountAdministrationStore, UserAccountAdministrationStore>();
             services.AddScoped<IPlatformConfigurationStore, PlatformConfigurationStore>();
             services.AddScoped<IExperimentalFeatureReader, PlatformConfigurationStore>();
-            services.AddSingleton<IPlatformLogReader, RedisPlatformLogStore>();
+            var origin = configuration["Observability:LokiBaseUrl"];
+            if (string.IsNullOrWhiteSpace(origin))
+            {
+                if (configuration.GetValue("Observability:RequireLoki", false))
+                    throw new InvalidOperationException(
+                        "Observability:LokiBaseUrl is required for platform logs.");
+                services.AddSingleton<IPlatformLogReader, UnavailablePlatformLogReader>();
+            }
+            else
+            {
+                services.AddHttpClient<LokiPlatformLogReader>(client =>
+                {
+                    client.BaseAddress = new Uri(origin, UriKind.Absolute);
+                    client.Timeout = TimeSpan.FromSeconds(10);
+                });
+                services.AddSingleton<IPlatformLogReader>(provider =>
+                    provider.GetRequiredService<LokiPlatformLogReader>());
+            }
             services.AddScoped<IPlatformAuditLogStore, PlatformAuditLogStore>();
             AddHumanVerificationConfigurationStore(services);
         }
@@ -70,4 +89,15 @@ internal static class AdministrationInfrastructure
             HumanVerificationConfigurationStore>();
     }
 
+}
+
+internal sealed class UnavailablePlatformLogReader : IPlatformLogReader
+{
+    public Task<PlatformLogQueryResult> QueryAsync(
+        PlatformLogQuery query, CancellationToken cancellationToken) =>
+        Task.FromResult(new PlatformLogQueryResult(PlatformLogReadState.Unavailable, []));
+
+    public Task<PlatformLogExportResult> ExportAsync(
+        PlatformLogQuery query, CancellationToken cancellationToken) =>
+        Task.FromResult(new PlatformLogExportResult(PlatformLogReadState.Unavailable));
 }

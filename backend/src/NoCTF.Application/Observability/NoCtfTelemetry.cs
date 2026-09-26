@@ -49,10 +49,12 @@ public static class NoCtfTelemetry
         "noctf.signalr.publish.duration", unit: "s");
     private static readonly Counter<long> SignalRPublishes = Meter.CreateCounter<long>(
         "noctf.signalr.publishes", unit: "{message}");
-    private static readonly Histogram<double> RedisOperationDuration = Meter.CreateHistogram<double>(
-        "noctf.redis.operation.duration", unit: "s");
-    private static readonly Counter<long> RedisFailures = Meter.CreateCounter<long>(
-        "noctf.redis.failures", unit: "{operation}");
+    private static readonly Histogram<double> NatsOperationDuration = Meter.CreateHistogram<double>(
+        "noctf.nats.operation.duration", unit: "s");
+    private static readonly Counter<long> NatsFailures = Meter.CreateCounter<long>(
+        "noctf.nats.failures", unit: "{operation}");
+    private static readonly Counter<long> PlatformLogLiveDrops = Meter.CreateCounter<long>(
+        "noctf.platform_log.live_drops", unit: "{log}");
     private static readonly Histogram<double> RunnerClaimDuration = Meter.CreateHistogram<double>(
         "noctf.runner.claim.duration", unit: "s");
     private static readonly Counter<long> RunnerClaimAttempts = Meter.CreateCounter<long>(
@@ -95,6 +97,8 @@ public static class NoCtfTelemetry
         "noctf.leaderboard.merge.dispatches", unit: "{projection}");
     private static readonly Counter<long> LeaderboardCacheMissRebuilds = Meter.CreateCounter<long>(
         "noctf.leaderboard.cache_miss.rebuilds", unit: "{rebuild}");
+    private static readonly Counter<long> FusionCacheReads = Meter.CreateCounter<long>(
+        "noctf.fusion_cache.reads", unit: "{read}");
     private static readonly Counter<long> SchedulerTakeovers = Meter.CreateCounter<long>(
         "noctf.scheduler.takeovers", unit: "{takeover}");
     private static readonly Histogram<double> SchedulerRebuildDuration = Meter.CreateHistogram<double>(
@@ -113,6 +117,8 @@ public static class NoCtfTelemetry
         "noctf.account_notification.deliveries", unit: "{delivery}");
     private static readonly ConcurrentDictionary<string, RunnerCapacitySnapshot> RunnerCapacitySnapshots =
         new(StringComparer.Ordinal);
+    private static long runtimeWaitingCount;
+    private static long runtimeWaitingOldestAgeSeconds;
 
     static NoCtfTelemetry()
     {
@@ -126,6 +132,16 @@ public static class NoCtfTelemetry
         Meter.CreateObservableGauge(
             "noctf.runner.capacity.total",
             ObserveRunnerCapacityTotal);
+        Meter.CreateObservableGauge("noctf.runtime.waiting",
+            () => Volatile.Read(ref runtimeWaitingCount), unit: "{runtime}");
+        Meter.CreateObservableGauge("noctf.runtime.waiting.oldest_age",
+            () => Volatile.Read(ref runtimeWaitingOldestAgeSeconds), unit: "s");
+    }
+
+    public static void SetRuntimeWaitingSnapshot(long count, long oldestAgeSeconds)
+    {
+        Volatile.Write(ref runtimeWaitingCount, Math.Max(0, count));
+        Volatile.Write(ref runtimeWaitingOldestAgeSeconds, Math.Max(0, oldestAgeSeconds));
     }
 
     public static void RecordApiRequest(string endpoint, string outcome, double elapsedSeconds, ApiRequestKind kind = ApiRequestKind.Rest)
@@ -157,14 +173,6 @@ public static class NoCtfTelemetry
         var tags = new TagList { { "endpoint", endpoint }, { "outcome", outcome } };
         SignalRPublishes.Add(1, tags);
         SignalRPublishDuration.Record(elapsedSeconds, tags);
-    }
-
-    public static void RecordRedisOperation(string endpoint, string outcome, double elapsedSeconds)
-    {
-        var tags = new TagList { { "endpoint", endpoint }, { "outcome", outcome } };
-        RedisOperationDuration.Record(elapsedSeconds, tags);
-        if (!string.Equals(outcome, "success", StringComparison.Ordinal))
-            RedisFailures.Add(1, tags);
     }
 
     public static void RecordRunnerClaim(string pool, string outcome, int attempts, double elapsedSeconds)
@@ -229,6 +237,16 @@ public static class NoCtfTelemetry
                 new TagList { { "kind", submissionKind } });
         }
     }
+
+    public static void RecordNatsOperation(string operation, string outcome, double elapsedSeconds)
+    {
+        var tags = new TagList { { "operation", operation }, { "outcome", outcome } };
+        NatsOperationDuration.Record(elapsedSeconds, tags);
+        if (!string.Equals(outcome, "success", StringComparison.Ordinal))
+            NatsFailures.Add(1, tags);
+    }
+
+    public static void RecordPlatformLogLiveDrop() => PlatformLogLiveDrops.Add(1);
 
     public static void RecordGameplayFactProcessing(
         GameplayFactKind kind,
@@ -311,6 +329,14 @@ public static class NoCtfTelemetry
 
     public static void RecordLeaderboardCacheMissRebuild(string outcome) =>
         LeaderboardCacheMissRebuilds.Add(1, new TagList { { "outcome", outcome } });
+
+    public static void RecordFusionCacheRead(string cache, string tier, bool hit) =>
+        FusionCacheReads.Add(1, new TagList
+        {
+            { "cache", cache },
+            { "tier", tier },
+            { "result", hit ? "hit" : "miss" }
+        });
 
     public static void RecordSchedulerTakeover() => SchedulerTakeovers.Add(1);
 

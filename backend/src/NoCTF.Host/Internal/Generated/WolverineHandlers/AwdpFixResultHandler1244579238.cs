@@ -27,9 +27,10 @@ namespace Internal.Generated.WolverineHandlers
         {
             var postCommitDispatchStatus = new NoCTF.Application.Messaging.PostCommitDispatchStatus();
             await using var noCtfDbContext = new NoCTF.Infrastructure.Persistence.NoCtfDbContext(_dbContextOptionsOfNoCtfDbContext);
+            var progressionReconciler = new NoCTF.Infrastructure.Competitions.Progression.ProgressionReconciler(noCtfDbContext);
             var wolverinePostCommitMessagePublisher = new NoCTF.Infrastructure.Messaging.WolverinePostCommitMessagePublisher(context, noCtfDbContext, _loggerOfWolverinePostCommitMessagePublisher, postCommitDispatchStatus);
             var competitionEventStore = new NoCTF.Infrastructure.Competitions.Events.CompetitionEventStore(noCtfDbContext, wolverinePostCommitMessagePublisher);
-            var internalResultStore = new NoCTF.Infrastructure.GameplayFacts.Processing.InternalResultStore(noCtfDbContext, wolverinePostCommitMessagePublisher, competitionEventStore);
+            var internalResultStore = new NoCTF.Infrastructure.GameplayFacts.Processing.InternalResultStore(noCtfDbContext, wolverinePostCommitMessagePublisher, competitionEventStore, progressionReconciler);
             // The actual message body
             var awdpFixResult = (NoCTF.Application.GameplayFacts.Processing.AwdpFixResult)context.Envelope.Message;
 

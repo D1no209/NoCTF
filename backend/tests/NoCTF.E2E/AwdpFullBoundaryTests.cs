@@ -54,30 +54,33 @@ public sealed class AwdpFullBoundaryTests
         {
             mode = "Awdp",
             flagTemplate = new { header = "flag", bodyTemplate = "[GUID]", leetLiteralText = false },
-            roundDurationSeconds = 30,
-            breakScoreCurve = new
+            awdp = new
             {
-                initialPoints = 40L,
-                minimumPoints = 20L,
-                decayTeamCount = 10,
-                decayMode = "Linear",
-                customExpression = (string?)null
-            },
-            fixScoreCurve = new
-            {
-                initialPoints = 60L,
-                minimumPoints = 30L,
-                decayTeamCount = 10,
-                decayMode = "Linear",
-                customExpression = (string?)null
-            },
-            serviceAbnormalPenalty = 13L,
-            requireBreakBeforeFix = false,
-            flagWrongPenalty = 7L,
-            exploitSucceededPenalty = 11L,
-            maxBreakSubmissions = 5,
-            maxFixSubmissions = 20,
-            evaluationDispatchMode = "Automatic"
+                roundDurationSeconds = 30,
+                breakScoreCurve = new
+                {
+                    initialPoints = 40L,
+                    minimumPoints = 20L,
+                    decayTeamCount = 10,
+                    decayMode = "Linear",
+                    customExpression = (string?)null
+                },
+                fixScoreCurve = new
+                {
+                    initialPoints = 60L,
+                    minimumPoints = 30L,
+                    decayTeamCount = 10,
+                    decayMode = "Linear",
+                    customExpression = (string?)null
+                },
+                serviceAbnormalPenalty = 13L,
+                requireBreakBeforeFix = false,
+                flagWrongPenalty = 7L,
+                exploitSucceededPenalty = 11L,
+                maxBreakSubmissions = 5,
+                maxFixSubmissions = 20,
+                evaluationDispatchMode = "Automatic"
+            }
         };
         await SendJsonAsync(
             admin,
@@ -115,14 +118,17 @@ public sealed class AwdpFullBoundaryTests
         var challengeConfiguration = new
         {
             mode = "Awdp",
-            requireBreakBeforeFix = false,
-            maxBreakSubmissions = 5,
-            maxFixSubmissions = 20,
-            flagTemplate = new
+            awdp = new
             {
-                header = "flag",
-                bodyTemplate = "[GUID]",
-                leetLiteralText = false
+                requireBreakBeforeFix = false,
+                maxBreakSubmissions = 5,
+                maxFixSubmissions = 20,
+                flagTemplate = new
+                {
+                    header = "flag",
+                    bodyTemplate = "[GUID]",
+                    leetLiteralText = false
+                }
             }
         };
         await SendJsonAsync(
@@ -692,26 +698,30 @@ public sealed class AwdpFullBoundaryTests
         new
         {
             mode = "Awdp",
+            awdp = new { },
             runtime = new
             {
                 kind = "Container",
                 allocation = "PerTeam",
-                image = targetImage,
-                command = Array.Empty<string>(),
-                environment = new Dictionary<string, string>(),
-                labels = new Dictionary<string, string>(),
-                portMappings = new[] { new { containerPort = 8080, hostPort = 0 } },
-                flagEnvironmentVariableName = "FLAG",
-                security = new
+                container = new
                 {
-                    noNewPrivileges = true,
-                    readonlyRootfs = false,
-                    runAsNonRoot = true,
-                    capDrop = Array.Empty<string>(),
-                    capAdd = Array.Empty<string>()
+                    image = targetImage,
+                    command = Array.Empty<string>(),
+                    environment = new Dictionary<string, string>(),
+                    labels = new Dictionary<string, string>(),
+                    portMappings = new[] { new { containerPort = 8080, hostPort = 0 } },
+                    flagEnvironmentVariableName = "FLAG",
+                    security = new
+                    {
+                        noNewPrivileges = true,
+                        readonlyRootfs = false,
+                        runAsNonRoot = true,
+                        capDrop = Array.Empty<string>(),
+                        capAdd = Array.Empty<string>()
+                    },
+                    internalPorts = new[] { 8080 }
                 },
                 egressPolicy = "Isolated",
-                internalPorts = new[] { 8080 },
                 limits = new
                 {
                     memoryBytes = 67_108_864L,

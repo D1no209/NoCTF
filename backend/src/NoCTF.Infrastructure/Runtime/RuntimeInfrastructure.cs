@@ -1,5 +1,6 @@
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using NoCTF.Application.Runtime.Capacity;
 using NoCTF.Application.Runtime.Instances;
 using NoCTF.Application.Runtime.Provisioning;
@@ -8,11 +9,11 @@ using NoCTF.Infrastructure.Runtime.Capacity;
 using NoCTF.Infrastructure.Runtime.Instances;
 using NoCTF.Infrastructure.Runtime.Targets;
 using NoCTF.Infrastructure.Runtime.Placement;
-using StackExchange.Redis;
 using Microsoft.Extensions.Options;
 using NoCTF.Domain.Runtime;
 using NoCTF.Application.Runtime.Access;
 using NoCTF.Infrastructure.Runtime.Access;
+using NATS.Client.Core;
 
 namespace NoCTF.Infrastructure.Runtime;
 
@@ -74,16 +75,7 @@ internal static class RuntimeInfrastructure
         }
         else
         {
-            var redis = configuration.GetConnectionString("Redis");
-            if (string.IsNullOrWhiteSpace(redis))
-                throw new InvalidOperationException("ConnectionStrings:Redis is required for the API host.");
-            services.AddSingleton<IConnectionMultiplexer>(_ =>
-            {
-                var redisOptions = ConfigurationOptions.Parse(redis);
-                redisOptions.AbortOnConnectFail = false;
-                return ConnectionMultiplexer.Connect(redisOptions);
-            });
-            services.AddScoped<RedisRunnerCapacityGate>();
+            services.TryAddSingleton<NatsRunnerAvailabilityRegistry>();
             services.AddScoped<IRunnerCapacityGate, PersistedRunnerCapacityGate>();
         }
         services.AddSingleton<IRuntimePlacementPolicy, ConfiguredRuntimePlacementPolicy>();
@@ -95,7 +87,11 @@ internal static class RuntimeInfrastructure
         services.AddScoped<IRuntimeTrafficCaptureFactory, RuntimeTrafficCaptureFactory>();
         services.AddScoped<IRuntimeTrafficCaptureStore, RuntimeTrafficCaptureStore>();
         services.AddScoped<ManageRuntimeTrafficCaptures>();
-        services.AddSingleton<IRuntimeProxyConnectionGate, RuntimeProxyConnectionGate>();
+        services.AddSingleton<IRuntimeProxyConnectionGate>(provider =>
+            new RuntimeProxyConnectionGate(
+                provider.GetRequiredService<RuntimeProxyOptions>(),
+                development ? null : provider.GetRequiredService<INatsConnection>(),
+                provider.GetService<TimeProvider>()));
         services.AddScoped<GetPlayerRuntime>();
         services.AddScoped<MutatePlayerRuntime>();
         services.AddScoped<IRuntimeTargetReader, RuntimeTargetReader>();

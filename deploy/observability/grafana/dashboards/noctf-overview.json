@@ -25,11 +25,11 @@
     {
       "id": 3,
       "type": "timeseries",
-      "title": "API and Redis latency",
+      "title": "API and NATS latency",
       "gridPos": { "h": 8, "w": 10, "x": 14, "y": 0 },
       "targets": [
         { "expr": "noctf:api_request_duration:p95_5m", "legendFormat": "API P95" },
-        { "expr": "noctf:redis_operation_duration:p99_5m", "legendFormat": "Redis P99" }
+        { "expr": "noctf:nats_operation_duration:p99_5m", "legendFormat": "NATS P99" }
       ]
     },
     {

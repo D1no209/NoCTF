@@ -43,30 +43,31 @@ They retain separate startup concurrency limits (`MainStartupConcurrency=2` and
 `AuxiliaryConcurrency=1` by default); no fixed Checker/Patch resource reserve exists.
 
 `RuntimeResourceLimits` remain provider hard limits. Kubernetes Requests equal Limits
-for new work. Persisted allocation limits and provider-effective budgets are current
-schema 3 facts; no older allocation or claim format is read or reconstructed.
+for new work. EF Core allocation rows and provider-effective budgets are the current
+capacity facts; no Redis Claim or earlier registration schema is read.
 
-## Redis schema and recovery
+## NATS registration and EF recovery
 
-Capacity registration schema 3 stores observed total/free resources, safety
-headroom, startup reservations, final admission availability, observation state and
-primary/auxiliary startup counts. Claim hashes retain ownership and declared limits.
-Claims with `starting=0` do not reduce admission availability.
+Runner publishes schema-3 availability and heartbeat records to NATS KV, with a TTL
+and resource-domain fencing revision. The registration carries observed total/free
+resources, safety headroom and admission state; NATS does not own allocations or a
+capacity ledger. The Worker chooses a fresh online candidate, then reserves capacity
+through EF Core in a serializable transaction. Allocation rows retain ownership and
+declared limits. A Running Runtime's reservation is released only after an observation
+at or after `RunningAt` confirms its resource usage was sampled.
 
-The Worker accepts only capacity registration schema 3. Any other schema is rejected.
-A current Runner pauses admission, owns
-the execution domain, compares PostgreSQL allocations with provider resources and
-rebuilds Redis before becoming Ready:
+The Worker accepts only schema-3 registrations. A Runner pauses admission, owns the
+execution domain, compares EF allocations with provider resources and republishes
+NATS availability before becoming Ready:
 
 - `Provisioning` restores a full startup reservation.
 - `Running` and `Stopping` restore ownership without a startup reservation.
 - `Failed` resources retain ownership until cleanup.
-- absent or stale Redis claims are removed during reconciliation.
+- stale NATS registration keys expire; no Redis Claim recovery runs.
 
-Recovery assumes current PostgreSQL allocation documents and current provider labels.
-Old Redis claims, old Runner registrations and old allocation documents must be deleted
-before starting this version. Queued Runtime rows remain PostgreSQL facts and are
-retried by the Singular Agent.
+Recovery assumes current EF allocation records and provider labels. Queued Runtime
+rows remain relational facts and are redispatched by the Singular Agent. Redis is used
+only by FusionCache and can be lost without changing capacity ownership.
 
 ## Monitoring contract
 
@@ -94,6 +95,6 @@ backend/scripts/Measure-CoreCapacity.ps1
 ```
 
 The production-equivalent fixture models a 4 CPU / approximately 8 GiB node with
-three idle Runtime claims at 0.5 CPU / 256 MiB / 128 PID each. The fourth Runtime must
-be admitted, while 64 concurrent claims remain atomic and never produce negative
+three idle Runtime allocations at 0.5 CPU / 256 MiB / 128 PID each. The fourth Runtime must
+be admitted, while concurrent EF reservations remain atomic and never produce negative
 availability.

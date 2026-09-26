@@ -4,8 +4,9 @@ using NoCTF.Application.Authentication.Privacy;
 using NoCTF.Application.Authentication.Sso;
 using NoCTF.Domain.Identity;
 using NoCTF.Infrastructure.Authentication;
-using StackExchange.Redis;
-using Testcontainers.Redis;
+using NoCTF.Infrastructure.Persistence;
+using Microsoft.EntityFrameworkCore;
+using Testcontainers.PostgreSql;
 
 namespace NoCTF.Tests.Integration.Authentication;
 
@@ -19,9 +20,21 @@ public sealed class SsoFlowStoreTests
     {
         await DockerIntegrationTest.RunAsync(async () =>
         {
-            await using var target = await StartRedisAsync(cancellationToken);
-            await using var redis = await ConnectionMultiplexer.ConnectAsync(target.ConnectionString);
-            var store = new RedisSsoFlowStore(redis);
+            await using var postgres = new PostgreSqlBuilder(
+                    "postgres:17.10-alpine3.24@sha256:742f40ea20b9ff2ff31db5458d127452988a2164df9e17441e191f3b72252193")
+                .WithDatabase("noctf_sso")
+                .WithUsername("postgres")
+                .WithPassword("postgres")
+                .Build();
+            await postgres.StartAsync(cancellationToken);
+            var options = new DbContextOptionsBuilder<NoCtfDbContext>()
+                .UseNpgsql(postgres.GetConnectionString(), npgsql => npgsql.MigrationsAssembly(
+                    typeof(NoCTF.Persistence.PostgreSql.PostgreSqlPersistence).Assembly.FullName))
+                .UseSnakeCaseNamingConvention().Options;
+            await using (var db = new NoCtfDbContext(options))
+                await db.Database.MigrateAsync(cancellationToken);
+            var store = new PersistedSsoFlowStore(
+                new TestDbContextFactory(options), TimeProvider.System);
             var now = DateTimeOffset.UtcNow;
             var providerId = Guid.CreateVersion7(now);
             var flow = new SsoFlowRecord(
@@ -136,21 +149,4 @@ public sealed class SsoFlowStoreTests
             "name"),
         null);
 
-    private static async Task<RedisLease> StartRedisAsync(CancellationToken ct)
-    {
-        var external = Environment.GetEnvironmentVariable("NOCTF_TEST_REDIS");
-        if (!string.IsNullOrWhiteSpace(external))
-            return new(external, null);
-        var container = new RedisBuilder(
-            "redis:7.4.10-alpine3.21@sha256:e7723ff73d963f5cc6d9c4643ea3d989527a402a319239054e9472a7fb9219a2").Build();
-        await container.StartAsync(ct);
-        return new(container.GetConnectionString(), container);
-    }
-
-    private sealed class RedisLease(string connectionString, RedisContainer? container)
-        : IAsyncDisposable
-    {
-        public string ConnectionString { get; } = connectionString;
-        public ValueTask DisposeAsync() => container?.DisposeAsync() ?? ValueTask.CompletedTask;
-    }
 }

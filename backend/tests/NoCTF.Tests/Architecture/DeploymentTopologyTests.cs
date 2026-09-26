@@ -495,12 +495,13 @@ public sealed class DeploymentTopologyTests
             .Where(line => line.Contains("_IMAGE=", StringComparison.Ordinal))
             .ToArray();
 
-        await Assert.That(images).Count().IsEqualTo(7);
+        await Assert.That(images).Count().IsEqualTo(8);
         await Assert.That(images.All(line =>
             System.Text.RegularExpressions.Regex.IsMatch(
                 line,
                 "^[A-Z_]+_IMAGE=[^ ]+@sha256:[a-f0-9]{64}$"))).IsTrue();
         await Assert.That(compose).Contains("external: true");
+        await Assert.That(compose).Contains("loki:");
         await Assert.That(compose).Contains("127.0.0.1:");
         await Assert.That(compose).DoesNotContain("depends_on:");
         await Assert.That(compose).DoesNotContain("Observability__PrometheusBaseUrl");
@@ -594,10 +595,10 @@ public sealed class DeploymentTopologyTests
         await Assert.That(orchestrator).Contains("[CallerFilePath]");
         await Assert.That(orchestrator).Contains("ProcessStartInfo");
         await Assert.That(orchestrator).Contains("ArgumentList.Add");
-        await Assert.That(orchestrator).Contains("[\"port\", \"backend\", \"8080\"]");
+        await Assert.That(orchestrator).Contains("ResolveBaseUrlAsync(compose, cancellationToken, \"runner\")");
         await Assert.That(orchestrator).Contains("API/Runner readiness timed out");
-        await Assert.That(orchestrator).Contains("health={lastHealth}");
-        await Assert.That(orchestrator).Contains("heartbeat={lastHeartbeat}");
+        await Assert.That(orchestrator).Contains("api={lastHealth}");
+        await Assert.That(orchestrator).Contains("runner={lastRunnerHealth}");
         await Assert.That(orchestrator).DoesNotContain("wsl");
         await Assert.That(orchestrator).DoesNotContain(".ps1");
         await Assert.That(compose).Contains("\"127.0.0.1::8080\"");

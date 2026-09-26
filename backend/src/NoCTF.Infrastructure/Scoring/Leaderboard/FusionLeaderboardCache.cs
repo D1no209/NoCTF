@@ -378,6 +378,9 @@ public sealed class FusionLeaderboardCache(
         long? publicationToken = null;
         try
         {
+            if (publicationFence is not null)
+                publicationToken = await publicationFence.IssueAsync(
+                    competitionId, timeProvider.GetUtcNow().UtcTicks, ct);
             await using var transaction = await db.Database.BeginTransactionAsync(
                 IsolationLevel.RepeatableRead,
                 ct);
@@ -420,11 +423,9 @@ public sealed class FusionLeaderboardCache(
             }
             else
             {
-                publicationToken = await publicationFence.IssueAsync(
-                    competitionId,
-                    response.Scoreboard.Snapshot.Version,
-                    ct);
-                response = SetScoreboardVersion(response, publicationToken.Value);
+                response = SetScoreboardVersion(response,
+                    publicationToken ?? throw new InvalidOperationException(
+                        "Scoreboard publication has no fencing token."));
             }
 
             if (publicationFence is not null)
@@ -440,14 +441,11 @@ public sealed class FusionLeaderboardCache(
                     return;
             }
 
-            await cache.SetAsync(ProjectionKey(competitionId), response, token: ct);
-            if (publicationFence is not null
-                && !await publicationFence.IsCurrentAsync(
-                    competitionId,
-                    publicationToken!.Value,
-                    ct))
+            if (publicationFence is null)
+                await cache.SetAsync(ProjectionKey(competitionId), response, token: ct);
+            else if (!await publicationFence.IsCurrentAsync(
+                competitionId, publicationToken!.Value, ct))
             {
-                await RepairFusionCacheAsync(competitionId, ct);
                 return;
             }
 
@@ -479,7 +477,8 @@ public sealed class FusionLeaderboardCache(
                     timeProvider.GetUtcNow().UtcTicks,
                     ct);
             }
-            await cache.RemoveAsync(ProjectionKey(competitionId), token: ct);
+            if (publicationFence is null)
+                await cache.RemoveAsync(ProjectionKey(competitionId), token: ct);
         }
         catch
         {
@@ -499,8 +498,8 @@ public sealed class FusionLeaderboardCache(
         return new(failure);
     }
 
-    private static string ProjectionKey(Guid competitionId) => $"scoreboard:v2:{competitionId:N}";
-    private static string FailureKey(Guid competitionId) => $"leaderboard:{competitionId:N}:last-failure";
+    private static string ProjectionKey(Guid competitionId) => $"scoreboard:v3:{competitionId:N}";
+    private static string FailureKey(Guid competitionId) => $"leaderboard:v3:{competitionId:N}:last-failure";
 
     private async Task<CachedScoreboardProjection?> GetOrRebuildPublishedBundleAsync(
         Guid competitionId,
@@ -555,10 +554,6 @@ public sealed class FusionLeaderboardCache(
         if (IsExpired(bundle))
             return null;
 
-        var cached = await cache.GetOrDefaultAsync<CachedScoreboardProjection?>(
-            ProjectionKey(competitionId), null, token: ct);
-        if (cached?.Scoreboard.Snapshot.Version != published.Fence)
-            await cache.SetAsync(ProjectionKey(competitionId), bundle, token: ct);
         return bundle;
     }
 
@@ -566,19 +561,6 @@ public sealed class FusionLeaderboardCache(
         bundle?.ValidUntil is { } validUntil && timeProvider.GetUtcNow() >= validUntil
         || bundle is not null && bundle.Scoreboard.Snapshot.DataScope == LeaderboardDataScope.Live
             && bundle.Scoreboard.Snapshot.Teams.Any(team => team.Achievements is null);
-
-    private async Task RepairFusionCacheAsync(Guid competitionId, CancellationToken ct)
-    {
-        if (publicationFence is null)
-            return;
-        var published = await publicationFence.GetAsync(competitionId, ct);
-        if (published is null)
-            return;
-        var bundle = JsonSerializer.Deserialize(published.Payload,
-            CachedScoreboardJsonContext.Default.CachedScoreboardProjection);
-        if (bundle is not null && bundle.Scoreboard.Snapshot.Version == published.Fence)
-            await cache.SetAsync(ProjectionKey(competitionId), bundle, token: ct);
-    }
 
     private static CachedScoreboardProjection AdvanceScoreboardVersion(
         CachedScoreboardProjection candidate,

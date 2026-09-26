@@ -122,13 +122,12 @@ NoCTF SDK 拉取单容器/Checker 与 Compose CLI 共用挂载的 `config/docker
 
 CI 只构建并发布统一的 `NoCTF.Host` 镜像，不登录服务器、不执行原地升级，也不识别拆分进程布局。
 所有环境必须使用 `noctf` 服务和 `NoCTF.Host.dll`，角色通过 `Hosting__Roles__*` 明确配置；默认启用
-Api、Worker、Runner 三个角色。发布前由运维停止当前写入者并备份数据库、Redis、NATS、上传文件和配置，
-再使用 `NoCTF.Host.dll --migrate-only` 应用 EF migration。仓库只保留一个当前 `InitialBaseline`：已有实例
-若迁移历史不是该基线，不能直接运行 migrate-only。运维必须在停服且完成备份后，先验证现有业务表与当前
-模型一致，完成明确的数据规范化和废弃列删除，再把 `__EFMigrationsHistory` 原子重置为镜像内唯一基线；
-或者清空数据库后由 Host 建库。应用不包含旧迁移链或自动升级器。旧 Redis、NATS/Wolverine 消息与 Runner
-Claim 必须在新 Host 启动前清空，不得混跑旧进程。切换后检查 readiness、业务记录数量、网络 ID、
-Runner schema 与消息端点。平台不提供旧消息、旧 Runner Claim、旧缓存或旧进程的回退路径。
+Api、Worker、Runner 三个角色。本次发布前停止旧写入者，备份 PostgreSQL、上传目录、配置和旧平台日志，
+再用 `NoCTF.Host.dll --migrate-only` 对现有数据库应用仓库内 EF CLI 生成的加法迁移；不得重置迁移历史、
+清空业务库或手动修改 PostgreSQL。Redis 只保留 FusionCache 后端数据，新 key 前缀避免读取旧缓存；
+旧 NATS namespace 在回滚窗口内冻结，不导入旧消息或 Runner Claim，新 Runner 从 EF Allocation 与资源
+清单重建容量。停机切换前等待短期 SSO/Webhook 状态完成或到期，不混跑旧 Host/Runner。切换后核对
+readiness、业务记录数量、文件、NATS KV 注册/租约及消息端点；回退使用旧镜像和切换前完整备份。
 
 `/health/ready` 保持 fail-closed，但相同故障只在状态变化时写一次结构化日志。排查 503 时读取响应中的
 `data`：每个依赖都有 `<dependency>.status`；账户邮件还提供
@@ -139,7 +138,7 @@ readiness 掩盖。
 生产服务器禁止通过 CI 部署。人工部署必须使用 CI 发布的精确 digest、仓库当前 Compose 和独立变更单；
 不得恢复已删除的原地升级脚本或拆分进程入口。既有外部网络（包括 `1panel-network`）由运维显式核对。
 
-默认关闭 OpenTelemetry 与 Prometheus exporter，不影响普通业务与日志。需要监控时按
-`observability/README.md` 显式启用私有 `9464` 指标监听器，并独立部署 Prometheus/Grafana；
+默认关闭 OpenTelemetry 与 Prometheus exporter，不影响普通业务。启用监控时按
+`observability/README.md` 配置私有 `9464` 指标监听器及 Loki OTLP 日志接收端，并独立部署 Prometheus/Grafana/Loki；
 平台本身不查询 Prometheus，也不提供内嵌监控页面。
 本文件只约束平台部署栈；题目运行时的 Docker 随机端口发布与沙箱规则不因此更改。

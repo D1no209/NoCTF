@@ -2,6 +2,9 @@ using DotNet.Testcontainers.Builders;
 using NATS.Client.Core;
 using NATS.Client.KeyValueStore;
 using NoCTF.Infrastructure.Messaging;
+using NoCTF.Infrastructure.Runtime.Capacity;
+using NoCTF.Infrastructure.Runtime.Access;
+using NoCTF.Application.Runtime.Access;
 
 namespace NoCTF.Tests.Integration.Messaging;
 
@@ -45,6 +48,48 @@ public sealed class NatsClusterLeaseTests
             await Assert.That(() => first.RenewAsync(cancellationToken))
                 .Throws<NatsKVException>();
             await replacement.DisposeAsync();
+
+            var statusStore = new NatsClusterSchedulerStatusStore(connection);
+            var status = new ClusterSchedulerStatus("worker-a", DateTimeOffset.UtcNow);
+            await statusStore.TakeOverAsync(status, cancellationToken);
+            await Assert.That(await statusStore.ReadAsync(cancellationToken))
+                .IsEqualTo(status);
+            await statusStore.RenewAsync(status, cancellationToken);
+            await statusStore.ReleaseAsync(status, cancellationToken);
+            await Assert.That(await statusStore.ReadAsync(cancellationToken)).IsNull();
+
+            var wakeups = new RuntimeDispatchWakeupGate(connection);
+            await Assert.That(await wakeups.TryBeginAsync(cancellationToken)).IsTrue();
+            await Assert.That(await wakeups.TryBeginAsync(cancellationToken)).IsFalse();
+
+            var proxyRuntimeId = Guid.NewGuid();
+            var proxyGate = new RuntimeProxyConnectionGate(
+                new RuntimeProxyOptions(MaximumConnectionsPerRuntime: 1), connection);
+            var firstProxy = await proxyGate.TryAcquireAsync(
+                proxyRuntimeId, cancellationToken);
+            await Assert.That(firstProxy).IsNotNull();
+            await Assert.That(await proxyGate.TryAcquireAsync(
+                proxyRuntimeId, cancellationToken)).IsNull();
+            await firstProxy!.DisposeAsync();
+            var nextProxy = await proxyGate.TryAcquireAsync(
+                proxyRuntimeId, cancellationToken);
+            await Assert.That(nextProxy).IsNotNull();
+            await nextProxy!.DisposeAsync();
+
+            var subject = "noctf.v3.ui.test." + Guid.NewGuid().ToString("N");
+            var payload = new byte[] { 1, 2, 3, 4 };
+            var received = Task.Run(async () =>
+            {
+                await foreach (var message in connection.SubscribeAsync<byte[]>(
+                    subject, cancellationToken: cancellationToken))
+                    return message.Data;
+                return null;
+            }, cancellationToken);
+            await Task.Delay(100, cancellationToken);
+            await connection.PublishAsync(subject, data: payload,
+                cancellationToken: cancellationToken);
+            await Assert.That(await received.WaitAsync(
+                TimeSpan.FromSeconds(5), cancellationToken)).IsEquivalentTo(payload);
         });
     }
 }

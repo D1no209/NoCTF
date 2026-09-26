@@ -1,184 +1,273 @@
+using DotNet.Testcontainers.Builders;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
+using NATS.Client.Core;
 using NoCTF.Application.Messaging;
 using NoCTF.Application.Runtime.Capacity;
 using NoCTF.Application.Runtime.Instances;
 using NoCTF.Application.Runtime.Provisioning;
 using NoCTF.Domain.Runtime;
+using NoCTF.Domain.Gameplay;
+using NoCTF.Domain.Challenges;
+using NoCTF.Domain.Competitions;
+using NoCTF.Infrastructure.Caching;
 using NoCTF.Infrastructure.Persistence;
 using NoCTF.Infrastructure.Runtime.Capacity;
+using NoCTF.Infrastructure.Messaging;
 using NoCTF.Tests.Integration.Persistence;
-using StackExchange.Redis;
 using Testcontainers.PostgreSql;
-using Testcontainers.Redis;
-using Microsoft.Extensions.Options;
-using NoCTF.Runner.Composition;
-using NoCTF.Runner.Messages;
-using NSubstitute;
+using ZiggyCreatures.Caching.Fusion;
 
 namespace NoCTF.Tests.Integration.Runtime;
 
-[Category("Integration")]
+[Category("Integration"), NotInParallel]
 public sealed class PersistedRunnerCapacityGateTests
 {
-    [Test, Arguments(false), Arguments(true), Timeout(300_000)]
-    public async Task Background_audit_recovers_rolled_back_then_cancelled_claim_without_restart(bool commit, CancellationToken ct)
-    {
-        await DockerIntegrationTest.RunAsync(async () =>
-        {
-            await using var postgres = new PostgreSqlBuilder("postgres:17.10-alpine3.24@sha256:742f40ea20b9ff2ff31db5458d127452988a2164df9e17441e191f3b72252193").Build();
-            await using var cache = new RedisBuilder("redis:7.4.10-alpine3.21@sha256:e7723ff73d963f5cc6d9c4643ea3d989527a402a319239054e9472a7fb9219a2").Build();
-            await Task.WhenAll(postgres.StartAsync(ct), cache.StartAsync(ct));
-            await using var redis = await ConnectionMultiplexer.ConnectAsync(cache.GetConnectionString());
-            await using var db = new NoCtfDbContext(new DbContextOptionsBuilder<NoCtfDbContext>()
-                .UseNpgsql(postgres.GetConnectionString()).UseSnakeCaseNamingConvention().Options);
-            await db.Database.EnsureCreatedAsync(ct);
-            var fixture = new CompetitionForceDeleteFixture();
-            await fixture.SeedAsync(db, ct);
-            var id = fixture.RuntimeIds[0];
-            await db.RuntimeInstances.Where(row => row.Id == id).ExecuteUpdateAsync(update => update
-                .SetProperty(row => row.State, RuntimeState.Queued).SetProperty(row => row.StoppedAt, (DateTimeOffset?)null), ct);
-            await new RedisRunnerAvailabilityRegistry(redis).RegisterAsync(
-                CurrentRunnerRegistration.Create("test", "runner", new(1024, 100, 10)),
-                ct);
-            var raw = new RedisRunnerCapacityGate(redis);
-            var outbox = new CapturedOutbox();
-            var gate = new PersistedRunnerCapacityGate(db, raw, outbox);
-            await using (var transaction = await db.Database.BeginTransactionAsync(ct))
-            {
-                await Assert.That((await gate.TryClaimAsync(new(id, "test", 512, 40, 2), ct)).Availability)
-                    .IsEqualTo(RunnerCapacityAvailability.Claimed);
-                if (commit) await transaction.CommitAsync(ct);
-                else await transaction.RollbackAsync(ct);
-            }
-            db.ChangeTracker.Clear();
-            await db.RuntimeInstances.Where(row => row.Id == id).ExecuteUpdateAsync(update => update
-                .SetProperty(row => row.State, RuntimeState.Stopped).SetProperty(row => row.RunnerId, (string?)null), ct);
-            var inventory = Substitute.For<IRuntimeManagedResourceReconciler>();
-            inventory.Provider.Returns(RuntimeProvider.Docker);
-            inventory.ListManagedAsync(ct).Returns(Task.FromResult<IReadOnlyList<RuntimeResourceIdentity>>([]));
-            inventory.WorkloadExistsAsync(Arg.Any<RuntimeWorkloadIdentity>(), ct).Returns(Task.FromResult<bool?>(null));
-            var ledger = new RedisRunnerCapacityLedger(redis);
-            var audit = new RuntimeResourceReconciliationHandler(db, [inventory], Options.Create(new RunnerOptions
-            {
-                Id = "runner", Pool = "test", Provider = RuntimeProvider.Docker
-            }), gate, ledger: ledger, rawCapacity: raw, outbox: outbox);
-            await audit.Handle(new("runner", DateTimeOffset.UtcNow), ct);
-            await Assert.That((long)await redis.GetDatabase().HashGetAsync("runner:runner:capacity", "admissionAvailableMemoryBytes")).IsEqualTo(512);
-            inventory.WorkloadExistsAsync(Arg.Any<RuntimeWorkloadIdentity>(), ct).Returns(Task.FromResult<bool?>(false));
-            await audit.Handle(new("runner", DateTimeOffset.UtcNow), ct);
-            await audit.Handle(new("runner", DateTimeOffset.UtcNow), ct);
-            await Assert.That((long)await redis.GetDatabase().HashGetAsync("runner:runner:capacity", "admissionAvailableMemoryBytes")).IsEqualTo(commit ? 512 : 1024);
-            await Assert.That((long)await redis.GetDatabase().HashGetAsync("runner:runner:capacity", "startingPrimary")).IsEqualTo(commit ? 1 : 0);
-            await Assert.That(await ledger.ReadUnconfirmedAsync("runner", ct)).IsEmpty();
-            await Assert.That(outbox.Messages.OfType<DispatchQueuedRuntimes>().Count()).IsEqualTo(commit ? 0 : 1);
-        });
-    }
-
-    [Test, Arguments(false), Arguments(true), Timeout(300_000)]
-    public async Task Database_commit_decides_which_claims_survive_Redis_reconstruction(bool rollback, CancellationToken ct)
+    [Test, Timeout(300_000)]
+    public async Task Parallel_claims_never_exceed_startup_or_observed_capacity(
+        CancellationToken ct)
     {
         await DockerIntegrationTest.RunAsync(async () =>
         {
             await using var postgres = new PostgreSqlBuilder(
-                "postgres:17.10-alpine3.24@sha256:742f40ea20b9ff2ff31db5458d127452988a2164df9e17441e191f3b72252193").Build();
-            await using var redisContainer = new RedisBuilder(
-                "redis:7.4.10-alpine3.21@sha256:e7723ff73d963f5cc6d9c4643ea3d989527a402a319239054e9472a7fb9219a2").Build();
-            await Task.WhenAll(postgres.StartAsync(ct), redisContainer.StartAsync(ct));
-            await using var redis = await ConnectionMultiplexer.ConnectAsync(redisContainer.GetConnectionString());
-            var options = new DbContextOptionsBuilder<NoCtfDbContext>()
-                .UseNpgsql(postgres.GetConnectionString()).UseSnakeCaseNamingConvention().Options;
-            var fixture = new CompetitionForceDeleteFixture();
-            await using var db = new NoCtfDbContext(options);
-            await db.Database.EnsureCreatedAsync(ct);
-            await fixture.SeedAsync(db, ct);
-            var id = fixture.RuntimeIds[0];
-            await db.RuntimeInstances.Where(x => x.Id == id).ExecuteUpdateAsync(update =>
-                update.SetProperty(x => x.State, RuntimeState.Queued).SetProperty(x => x.StoppedAt, (DateTimeOffset?)null), ct);
-            var now = DateTimeOffset.UtcNow;
-            var admissionOptions = new RunnerAdmissionOptions();
-            var admission = new RunnerPressurePolicy(admissionOptions).Evaluate(
-                new("test-domain", now, 1024, 1024, 100, .1, 0, 10, 0), now);
-            var registration = new RunnerAvailabilityRegistration("test", "runner", RuntimeProvider.Docker,
-                "test", TimeSpan.FromMinutes(1), false, true, admission, admissionOptions);
-            var registry = new RedisRunnerAvailabilityRegistry(redis);
-            await registry.RegisterAsync(registration, ct);
-            var raw = new RedisRunnerCapacityGate(redis);
-            var outbox = new CapturedOutbox();
-            var gate = new PersistedRunnerCapacityGate(db, raw, outbox);
-            await using (var transaction = await db.Database.BeginTransactionAsync(ct))
+                    "postgres:17.10-alpine3.24@sha256:742f40ea20b9ff2ff31db5458d127452988a2164df9e17441e191f3b72252193")
+                .Build();
+            await using var nats = new ContainerBuilder(
+                    "docker.m.daocloud.io/library/nats:2.12.2-alpine@sha256:2d5fce3229ae5741f4ef9225aff95dc4dc036455931eaf77a3eec33fddaa192d")
+                .WithPortBinding(4222, assignRandomHostPort: true)
+                .WithCommand("-js")
+                .WithWaitStrategy(Wait.ForUnixContainer()
+                    .UntilInternalTcpPortIsAvailable(4222))
+                .Build();
+            await Task.WhenAll(postgres.StartAsync(ct), nats.StartAsync(ct));
+            await using var connection = new NatsConnection(new NatsOpts
             {
-                var claim = await gate.TryClaimAsync(new(id, "test", 512, 40, 2), ct);
-                await Assert.That(claim.Availability).IsEqualTo(RunnerCapacityAvailability.Claimed);
-                if (rollback) await transaction.RollbackAsync(ct);
-                else await transaction.CommitAsync(ct);
-            }
-            db.ChangeTracker.Clear();
-            var document = await db.RuntimeInstances.Where(x => x.Id == id).Select(x => x.CapacityAllocations).SingleAsync(ct);
-            await Assert.That(document.Items.Count).IsEqualTo(rollback ? 0 : 1);
-            await db.RuntimeInstances.Where(x => x.Id == id).ExecuteUpdateAsync(update =>
-                update.SetProperty(x => x.State, RuntimeState.Provisioning).SetProperty(x => x.RunnerId, "runner"), ct);
-            await Assert.That(await gate.CanCreateAsync(id, "runner", ct)).IsEqualTo(!rollback);
-            var startupReserved = (long)await redis.GetDatabase()
-                .HashGetAsync("runner:runner:capacity", "startupReservedMemoryBytes");
-            await Assert.That(startupReserved).IsEqualTo(512);
-            if (!rollback)
-                await Assert.That(document.Items.Single().Limit.MemoryBytes).IsEqualTo(512);
-            // Redis failure occurs after allocation, before any provider command is consumed.
-            await redis.GetDatabase().KeyDeleteAsync("runner:runner:capacity");
-            await Assert.That(await gate.CanCreateAsync(id, "runner", ct)).IsFalse();
-            var identity = new RuntimeWorkloadIdentity(RuntimeWorkloadKind.VerificationTarget, id, id);
-            await Assert.That(await raw.ReleaseWorkloadAsync(identity, "runner", ct))
-                .IsEqualTo(RunnerCapacityReleaseOutcome.RecoveryRequired);
-            var ledger = new RedisRunnerCapacityLedger(redis);
-            await ledger.PauseAsync("runner", "test", ct);
-            var claimKeys = document.Items
-                .Select(item => $"runner-claim:{item.Identity.Key}")
-                .ToArray();
-            await ledger.RestoreAsync("runner", "test", admission.Capacity!, admission.Observation!.ObservedAt,
-                document.Items, ct,
-                starting: document.Items.Select(item => item.Identity).ToHashSet(), claimKeys: claimKeys);
-            await registry.RegisterAsync(registration with { HasActiveAssignments = !rollback }, ct);
-            var available = (long)await redis.GetDatabase().HashGetAsync("runner:runner:capacity", "admissionAvailableMemoryBytes");
-            await Assert.That(available).IsEqualTo(rollback ? 921 : 409);
-            if (!rollback)
+                Url = $"nats://{nats.Hostname}:{nats.GetMappedPublicPort(4222)}"
+            });
+            var registry = new NatsRunnerAvailabilityRegistry(connection, TimeProvider.System);
+            await using var owner = await new NatsClusterLeaseManager(connection)
+                .TryAcquireAsync(NatsClusterLeaseManager.ResourceDomainKey("runner"),
+                    "runner", ct);
+            await Assert.That(owner).IsNotNull();
+            var registration = CurrentRunnerRegistration.Create("parallel", "runner",
+                new(1024, 100, 100),
+                resourceDomainFencingToken: owner!.FencingToken) with
             {
-                // Replays retain the committed budget, even when a caller's current policy differs.
-                var replay = await gate.TryClaimAsync(new(id, "test", 1024, 100, 10), ct);
-                await Assert.That(replay.State).IsEqualTo(RunnerCapacityClaimState.AlreadyOwned);
-                var factId = await db.RuntimeInstances.Where(x => x.Id == id).Select(x => x.GameplayFactId).SingleAsync(ct);
-                await db.GameplayFacts.Where(fact => fact.Id == factId).ExecuteUpdateAsync(update =>
-                    update.SetProperty(fact => fact.State, NoCTF.Domain.Gameplay.GameplayFactState.Processing), ct);
-                var checker = new RuntimeWorkloadIdentity(RuntimeWorkloadKind.PatchChecker, id, Guid.NewGuid());
-                var checkerRequest = new RunnerCapacityRequest(id, "test", 128, 10, 1, checker, factId);
-                await db.RuntimeInstances.Where(row => row.Id == id).ExecuteUpdateAsync(update =>
-                    update.SetProperty(row => row.State, RuntimeState.Running).SetProperty(row => row.RunnerId, "runner"), ct);
-                await Assert.That((await gate.TryClaimForRunnerAsync(checkerRequest, "wrong-owner", ct)).Availability)
-                    .IsEqualTo(RunnerCapacityAvailability.Unavailable);
-                await Assert.That((await gate.TryClaimForRunnerAsync(checkerRequest, "runner", ct)).Availability)
-                    .IsEqualTo(RunnerCapacityAvailability.Claimed);
-                await Assert.That((await gate.TryClaimForRunnerAsync(checkerRequest, "runner", ct)).State)
-                    .IsEqualTo(RunnerCapacityClaimState.AlreadyOwned);
-                await Assert.That(await gate.CanCreateWorkloadAsync(checker, factId!.Value, "runner", ct)).IsTrue();
-                await db.GameplayFacts.Where(fact => fact.Id == factId).ExecuteUpdateAsync(update =>
-                    update.SetProperty(fact => fact.State, NoCTF.Domain.Gameplay.GameplayFactState.Completed), ct);
-                await Assert.That(await gate.CanCreateWorkloadAsync(checker, factId.Value, "runner", ct)).IsFalse();
-                await Assert.That((long)await redis.GetDatabase().HashGetAsync("runner:runner:capacity", "admissionAvailableMemoryBytes"))
-                    .IsEqualTo(281);
-                await Assert.That(await gate.ReleaseAsync(id, "wrong-owner", ct)).IsEqualTo(RunnerCapacityReleaseOutcome.OwnerMismatch);
-                await Assert.That(await gate.ReleaseAsync(id, "runner", ct)).IsEqualTo(RunnerCapacityReleaseOutcome.Released);
-                await Assert.That(await gate.ReleaseAsync(id, "runner", ct)).IsEqualTo(RunnerCapacityReleaseOutcome.RecoveryRequired);
-                var retained = await db.RuntimeInstances.Where(x => x.Id == id).Select(x => x.CapacityAllocations).SingleAsync(ct);
-                await Assert.That(retained.Items.Single().Identity).IsEqualTo(checker);
-                await gate.ReleaseWorkloadAsync(checker, "runner", ct);
-                foreach (var release in outbox.Messages.OfType<ReleaseRunnerCapacity>())
+                AdmissionOptions = new RunnerAdmissionOptions
                 {
-                    await raw.ReleaseWorkloadAsync(release.Identity, release.RunnerId, ct);
-                    await raw.ReleaseWorkloadAsync(release.Identity, release.RunnerId, ct);
+                    MainStartupConcurrency = 8
                 }
-                await Assert.That((long)await redis.GetDatabase().HashGetAsync("runner:runner:capacity", "admissionAvailableMemoryBytes"))
-                    .IsEqualTo(921);
-                await Assert.That((long)await redis.GetDatabase().HashGetAsync("runner:runner:capacity", "startupReservedMemoryBytes"))
-                    .IsEqualTo(0);
+            };
+            await registry.PublishHeartbeatAsync("parallel", "runner",
+                RuntimeProvider.Docker, TimeSpan.FromMinutes(1), ct);
+            await registry.RegisterAsync(registration, ct);
+            using var cacheServices = new ServiceCollection()
+                .AddFusionCache(NoCtfCacheNames.ReadModels)
+                .Services.BuildServiceProvider();
+            var caches = cacheServices.GetRequiredService<IFusionCacheProvider>();
+            var options = new DbContextOptionsBuilder<NoCtfDbContext>()
+                .UseNpgsql(postgres.GetConnectionString())
+                .UseSnakeCaseNamingConvention().Options;
+            var fixture = new CompetitionForceDeleteFixture();
+            var ids = Enumerable.Range(0, 16).Select(_ => Guid.NewGuid()).ToArray();
+            await using (var setup = new NoCtfDbContext(options))
+            {
+                await setup.Database.EnsureCreatedAsync(ct);
+                await fixture.SeedAsync(setup, ct);
+                for (var index = 0; index < ids.Length; index++)
+                {
+                    var challengeId = Guid.NewGuid();
+                    setup.Challenges.Add(new AwdpChallenge
+                    {
+                        Id = challengeId,
+                        OwnerId = fixture.OwnerId,
+                        Title = "Capacity " + index,
+                        Direction = "Pwn",
+                        Definition = TestConfigurations.Definition(GameMode.Awdp),
+                        CreatedAt = fixture.Now,
+                        UpdatedAt = fixture.Now
+                    });
+                    setup.RuntimeInstances.Add(new TemplateTestRuntimeInstance
+                    {
+                        Id = ids[index], ChallengeId = challengeId,
+                        RuntimeKind = RuntimeKind.Container,
+                        RuntimeProvider = RuntimeProvider.Docker,
+                        State = RuntimeState.Queued,
+                        TestFlagDelivery = RuntimeTestFlagDelivery.NotRequired,
+                        TestFlagState = RuntimeTestFlagState.NotRequired,
+                        CreatedAt = fixture.Now
+                    });
+                }
+                await setup.SaveChangesAsync(ct);
+            }
+            var results = await Task.WhenAll(ids.Select(async id =>
+            {
+                for (var attempt = 0; attempt < 3; attempt++)
+                {
+                    await using var db = new NoCtfDbContext(options);
+                    var gate = new PersistedRunnerCapacityGate(db, registry,
+                        caches, new CapturedOutbox());
+                    try
+                    {
+                        return await gate.TryClaimAsync(
+                            new(id, "parallel", 128, 10, 1), ct);
+                    }
+                    catch (Exception exception) when (attempt < 2
+                        && (exception is DbUpdateException
+                            || exception is InvalidOperationException
+                                { InnerException: DbUpdateException }
+                            || TransactionFailureClassifier.IsRetryable(exception)))
+                    {
+                        await Task.Delay(Random.Shared.Next(2, 20), ct);
+                    }
+                    catch (Exception exception) when (exception is DbUpdateException
+                        || exception is InvalidOperationException
+                            { InnerException: DbUpdateException }
+                        || TransactionFailureClassifier.IsRetryable(exception))
+                    {
+                        return new RunnerCapacityClaim(RunnerCapacityAvailability.Unavailable);
+                    }
+                }
+                return new RunnerCapacityClaim(RunnerCapacityAvailability.Unavailable);
+            }));
+            await using var verify = new NoCtfDbContext(options);
+            var allocated = await verify.RuntimeInstances.AsNoTracking()
+                .Where(item => ids.Contains(item.Id))
+                .SelectMany(item => item.CapacityAllocationEntries)
+                .CountAsync(ct);
+            await Assert.That(allocated).IsLessThanOrEqualTo(8);
+            await Assert.That(allocated).IsEqualTo(results.Count(result =>
+                result.Availability == RunnerCapacityAvailability.Claimed));
+            await Assert.That(allocated * 128).IsLessThanOrEqualTo(1024);
+        });
+    }
+
+    [Test, Timeout(300_000)]
+    public async Task Rollback_leaves_no_claim_and_restart_recovers_from_EF_allocations(
+        CancellationToken ct)
+    {
+        await DockerIntegrationTest.RunAsync(async () =>
+        {
+            await using var postgres = new PostgreSqlBuilder(
+                    "postgres:17.10-alpine3.24@sha256:742f40ea20b9ff2ff31db5458d127452988a2164df9e17441e191f3b72252193")
+                .Build();
+            await using var nats = new ContainerBuilder(
+                    "docker.m.daocloud.io/library/nats:2.12.2-alpine@sha256:2d5fce3229ae5741f4ef9225aff95dc4dc036455931eaf77a3eec33fddaa192d")
+                .WithPortBinding(4222, assignRandomHostPort: true)
+                .WithCommand("-js")
+                .WithWaitStrategy(Wait.ForUnixContainer()
+                    .UntilInternalTcpPortIsAvailable(4222))
+                .Build();
+            await Task.WhenAll(postgres.StartAsync(ct), nats.StartAsync(ct));
+            await using var connection = new NatsConnection(new NatsOpts
+            {
+                Url = $"nats://{nats.Hostname}:{nats.GetMappedPublicPort(4222)}"
+            });
+            var registry = new NatsRunnerAvailabilityRegistry(connection, TimeProvider.System);
+            await using var owner = await new NatsClusterLeaseManager(connection)
+                .TryAcquireAsync(NatsClusterLeaseManager.ResourceDomainKey("runner"),
+                    "runner", ct);
+            await Assert.That(owner).IsNotNull();
+            await registry.PublishHeartbeatAsync("test", "runner", RuntimeProvider.Docker,
+                TimeSpan.FromMinutes(1), ct);
+            await registry.RegisterAsync(CurrentRunnerRegistration.Create(
+                "test", "runner", new(1024, 100, 10),
+                resourceDomainFencingToken: owner!.FencingToken), ct);
+            using var cacheServices = new ServiceCollection()
+                .AddFusionCache(NoCtfCacheNames.ReadModels)
+                .Services.BuildServiceProvider();
+            var caches = cacheServices.GetRequiredService<IFusionCacheProvider>();
+            var outbox = new CapturedOutbox();
+            var options = new DbContextOptionsBuilder<NoCtfDbContext>()
+                .UseNpgsql(postgres.GetConnectionString())
+                .UseSnakeCaseNamingConvention().Options;
+            var fixture = new CompetitionForceDeleteFixture();
+            await using (var setup = new NoCtfDbContext(options))
+            {
+                await setup.Database.EnsureCreatedAsync(ct);
+                await fixture.SeedAsync(setup, ct);
+                await setup.RuntimeInstances.Where(item => item.Id == fixture.RuntimeIds[0])
+                    .ExecuteUpdateAsync(update => update
+                        .SetProperty(item => item.State, RuntimeState.Queued)
+                        .SetProperty(item => item.StoppedAt, (DateTimeOffset?)null), ct);
+            }
+            var id = fixture.RuntimeIds[0];
+            await using (var db = new NoCtfDbContext(options))
+            {
+                var gate = new PersistedRunnerCapacityGate(db, registry, caches, outbox);
+                await using var transaction = await db.Database.BeginTransactionAsync(ct);
+                var claim = await gate.TryClaimAsync(new(id, "test", 512, 40, 2), ct);
+                await Assert.That(claim.Availability)
+                    .IsEqualTo(RunnerCapacityAvailability.Claimed);
+                await transaction.RollbackAsync(ct);
+            }
+            await using (var db = new NoCtfDbContext(options))
+            {
+                var runtime = await db.RuntimeInstances.AsNoTracking()
+                    .Include(item => item.CapacityAllocationEntries)
+                    .SingleAsync(item => item.Id == id, ct);
+                await Assert.That(runtime.CapacityAllocations.Items).IsEmpty();
+                var gate = new PersistedRunnerCapacityGate(db, registry, caches, outbox);
+                var claim = await gate.TryClaimAsync(new(id, "test", 512, 40, 2), ct);
+                await Assert.That(claim.Availability)
+                    .IsEqualTo(RunnerCapacityAvailability.Claimed);
+                await Assert.That(claim.RunnerId).IsEqualTo("runner");
+                var replay = await gate.TryClaimAsync(new(id, "test", 900, 90, 9), ct);
+                await Assert.That(replay.State)
+                    .IsEqualTo(RunnerCapacityClaimState.AlreadyOwned);
+                await db.RuntimeInstances.Where(item => item.Id == id)
+                    .ExecuteUpdateAsync(update => update
+                        .SetProperty(item => item.State, RuntimeState.Provisioning)
+                        .SetProperty(item => item.RunnerId, "runner"), ct);
+                await Assert.That(await gate.CanCreateAsync(id, "runner", ct)).IsTrue();
+                await Assert.That(await gate.ReleaseAsync(id, "wrong-runner", ct))
+                    .IsEqualTo(RunnerCapacityReleaseOutcome.OwnerMismatch);
+                await Assert.That(await gate.ReleaseAsync(id, "runner", ct))
+                    .IsEqualTo(RunnerCapacityReleaseOutcome.Released);
+            }
+            await using (var verify = new NoCtfDbContext(options))
+            {
+                var runtime = await verify.RuntimeInstances.AsNoTracking()
+                    .Include(item => item.CapacityAllocationEntries)
+                    .SingleAsync(item => item.Id == id, ct);
+                await Assert.That(runtime.CapacityAllocations.Items).IsEmpty();
+                var factId = runtime.GameplayFactId!.Value;
+                await verify.RuntimeInstances.Where(item => item.Id == id)
+                    .ExecuteUpdateAsync(update => update
+                        .SetProperty(item => item.State, RuntimeState.Running), ct);
+                await verify.GameplayFacts.Where(fact => fact.Id == factId)
+                    .ExecuteUpdateAsync(update => update
+                        .SetProperty(fact => fact.State, GameplayFactState.Processing), ct);
+                var gate = new PersistedRunnerCapacityGate(verify, registry, caches, outbox);
+                var firstIdentity = new RuntimeWorkloadIdentity(
+                    RuntimeWorkloadKind.PatchChecker, id, Guid.NewGuid());
+                var secondIdentity = new RuntimeWorkloadIdentity(
+                    RuntimeWorkloadKind.PatchChecker, id, Guid.NewGuid());
+                var firstRequest = new RunnerCapacityRequest(id, "test", 128, 10, 1,
+                    firstIdentity, factId);
+                var secondRequest = firstRequest with { Workload = secondIdentity };
+                await Assert.That((await gate.TryClaimForRunnerAsync(
+                    firstRequest, "runner", ct)).Availability)
+                    .IsEqualTo(RunnerCapacityAvailability.Claimed);
+                await Assert.That((await gate.TryClaimForRunnerAsync(
+                    firstRequest, "runner", ct)).State)
+                    .IsEqualTo(RunnerCapacityClaimState.AlreadyOwned);
+                await Assert.That((await gate.TryClaimForRunnerAsync(
+                    secondRequest, "runner", ct)).Failure)
+                    .IsEqualTo(RunnerAdmissionFailure.StartupConcurrencyLimited);
+                await Assert.That(await gate.CanCreateWorkloadAsync(
+                    firstIdentity, factId, "runner", ct)).IsTrue();
+                await Assert.That(await gate.ReleaseWorkloadAsync(
+                    firstIdentity, "runner", ct))
+                    .IsEqualTo(RunnerCapacityReleaseOutcome.Released);
+                await Assert.That((await gate.TryClaimForRunnerAsync(
+                    secondRequest, "runner", ct)).Availability)
+                    .IsEqualTo(RunnerCapacityAvailability.Claimed);
+                await verify.GameplayFacts.Where(fact => fact.Id == factId)
+                    .ExecuteUpdateAsync(update => update
+                        .SetProperty(fact => fact.State, GameplayFactState.Completed), ct);
+                await Assert.That(await gate.CanCreateWorkloadAsync(
+                    secondIdentity, factId, "runner", ct)).IsFalse();
             }
         });
     }
@@ -186,10 +275,17 @@ public sealed class PersistedRunnerCapacityGateTests
     private sealed class CapturedOutbox : IPostCommitMessagePublisher
     {
         public List<object> Messages { get; } = [];
-        public ValueTask PublishAsync<T>(T message) { Messages.Add(message!); return ValueTask.CompletedTask; }
-        public ValueTask ScheduleAsync<T>(T message, DateTimeOffset at) => throw new NotSupportedException();
-        public ValueTask PublishToRunnerNodeAsync<T>(T message) where T : IRunnerNodeMessage => PublishAsync(message);
-        public ValueTask ScheduleToRunnerNodeAsync<T>(T message, DateTimeOffset at) where T : IRunnerNodeMessage => throw new NotSupportedException();
+        public ValueTask PublishAsync<T>(T message)
+        {
+            Messages.Add(message!);
+            return ValueTask.CompletedTask;
+        }
+        public ValueTask PublishToRunnerNodeAsync<T>(T message)
+            where T : IRunnerNodeMessage => PublishAsync(message);
+        public ValueTask ScheduleAsync<T>(T message, DateTimeOffset at) =>
+            throw new NotSupportedException();
+        public ValueTask ScheduleToRunnerNodeAsync<T>(T message, DateTimeOffset at)
+            where T : IRunnerNodeMessage => throw new NotSupportedException();
         public Task FlushOutgoingMessagesAsync() => Task.CompletedTask;
     }
 }

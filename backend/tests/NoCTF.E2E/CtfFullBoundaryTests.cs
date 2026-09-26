@@ -98,9 +98,12 @@ public sealed class CtfFullBoundaryTests
         var configuration = new
         {
             mode = "Ctf",
-            scoreCurve = new { initialPoints = 500L, minimumPoints = 100L, decayTeamCount = 10, decayMode = "Quadratic", customExpression = (string?)null },
-            bloodRewards = new[] { new { policy = "FixedPoints", value = 25m } },
-            maxFlagAttempts = 5
+            ctf = new
+            {
+                scoreCurve = new { initialPoints = 500L, minimumPoints = 100L, decayTeamCount = 10, decayMode = "Quadratic", customExpression = (string?)null },
+                bloodRewards = new[] { new { policy = "FixedPoints", value = 25m } },
+                maxFlagAttempts = 5
+            }
         };
         await SendJsonAsync(
             admin,
@@ -158,9 +161,12 @@ public sealed class CtfFullBoundaryTests
         var composeConfiguration = new
         {
             mode = "Ctf",
-            scoreCurve = new { initialPoints = 250L, minimumPoints = 100L, decayTeamCount = 10, decayMode = "Quadratic", customExpression = (string?)null },
-            bloodRewards = Array.Empty<object>(),
-            maxFlagAttempts = 5
+            ctf = new
+            {
+                scoreCurve = new { initialPoints = 250L, minimumPoints = 100L, decayTeamCount = 10, decayMode = "Quadratic", customExpression = (string?)null },
+                bloodRewards = Array.Empty<object>(),
+                maxFlagAttempts = 5
+            }
         };
         await SendJsonAsync(
             admin,
@@ -638,19 +644,22 @@ public sealed class CtfFullBoundaryTests
         new
         {
             mode = "Ctf",
-            interactionKind = "FlagSubmission",
+            ctf = new { interactionKind = "FlagSubmission" },
             runtime = new
             {
                 kind = "Container",
                 allocation = "PerTeam",
-                image = runtimeImage,
-                command = Array.Empty<string>(),
-                environment = new Dictionary<string, string>(),
-                labels = new Dictionary<string, string>(),
-                portMappings = new[] { new { containerPort = 8080, hostPort = 0 } },
-                security = SecureContainerPolicy(),
-                flagEnvironmentVariableName = "FLAG",
-                internalPorts = Array.Empty<int>(),
+                container = new
+                {
+                    image = runtimeImage,
+                    command = Array.Empty<string>(),
+                    environment = new Dictionary<string, string>(),
+                    labels = new Dictionary<string, string>(),
+                    portMappings = new[] { new { containerPort = 8080, hostPort = 0 } },
+                    security = SecureContainerPolicy(),
+                    flagEnvironmentVariableName = "FLAG",
+                    internalPorts = Array.Empty<int>()
+                },
                 egressPolicy = "Isolated",
                 limits = new
                 {
@@ -681,12 +690,14 @@ public sealed class CtfFullBoundaryTests
         new
         {
             mode = "Ctf",
-            interactionKind = "FlagSubmission",
+            ctf = new { interactionKind = "FlagSubmission" },
             runtime = new
             {
                 kind = "Compose",
                 allocation = "PerTeam",
-                composeYaml = $$"""
+                compose = new
+                {
+                    composeYaml = $$"""
                         services:
                           web:
                             image: "{{runtimeImage}}"
@@ -696,7 +707,7 @@ public sealed class CtfFullBoundaryTests
                               - sleep
                               - "300"
                         """,
-                serviceResources = new object[]
+                    serviceResources = new object[]
                 {
                     new
                     {
@@ -718,10 +729,11 @@ public sealed class CtfFullBoundaryTests
                             pidsLimit = 64L
                         }
                     }
+                    },
+                    environment = new Dictionary<string, string>(),
+                    labels = new Dictionary<string, string>(),
+                    flagEnvironmentVariables = new Dictionary<string, string> { ["web"] = "FLAG" }
                 },
-                environment = new Dictionary<string, string>(),
-                labels = new Dictionary<string, string>(),
-                flagEnvironmentVariables = new Dictionary<string, string> { ["web"] = "FLAG" },
                 egressPolicy = "Isolated",
                 limits = new
                 {

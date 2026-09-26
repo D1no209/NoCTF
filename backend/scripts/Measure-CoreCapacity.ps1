@@ -18,7 +18,7 @@ try {
     dotnet build NoCTF.slnx -c Release --no-restore -m:1 -v:q
     if ($LASTEXITCODE -ne 0) { throw 'Release build failed.' }
     $env:NOCTF_CAPACITY_MEASUREMENTS = $destination
-    dotnet tests/NoCTF.Tests/bin/Release/net10.0/NoCTF.Tests.dll --treenode-filter '/*/*/RuntimeCapacityLoadTests/*' --minimum-expected-tests 2
+    dotnet tests/NoCTF.Tests/bin/Release/net10.0/NoCTF.Tests.dll --treenode-filter '/*/*/PersistedRunnerCapacityGateTests/*' --minimum-expected-tests 2
     if ($LASTEXITCODE -ne 0) { throw 'Capacity load verification failed.' }
     if ($HostPressure) {
         # Docker-host bind sources intentionally refer to the daemon's Linux filesystem.

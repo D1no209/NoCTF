@@ -6,10 +6,11 @@
 Browser/Client
      |
      v
-NoCTF.Host [Api]  ---- Redis (cache/rate limit/SignalR/heartbeat)
+NoCTF.Host [Api]  ---- Redis (FusionCache L2/backplane only)
      |
      +---- PostgreSQL (business facts)
-     +---- NATS JetStream (durable messages, consumers, retries, DLQ)
+     +---- NATS JetStream/KV (durable messages and short coordination leases)
+     +---- Loki (redacted OTLP platform logs)
                          |
               +----------+----------+
               v                     v
@@ -46,7 +47,9 @@ Worker、Runner 与 API 均可多副本。每个进程中的每种角色至多�
 
 - PostgreSQL：唯一业务事实源；不承载 Wolverine message transport。
 - NATS JetStream：跨角色 durable transport、consumer group、重投和 DLQ。
-- Redis：FusionCache 排行榜 L2、TokenVersion 缓存、分布式限流、SignalR backplane 和 Runner heartbeat/capacity。Redis 丢失不丢业务事实，也不决定排行榜是否刷新。
+- Redis：仅作为 FusionCache 的可重建 L2 与跨实例失效 backplane；不保存业务配额、Runner 在线状态、租约或 SignalR 广播。
+- NATS KV：短期竞争状态、Runner 在线注册和资源域租约；容量分配与请求配额的权威状态仍在 EF Core。
+- Loki：接收 Host 脱敏后的 OTLP 日志并供管理员查询；不可用时日志接口报告不可用。
 - Object Storage：Challenge Attachment 与 AWDP Patch archive；支持 S3Compatible 和开发用 LocalFileSystem。
 - Runtime Provider：Docker、Kubernetes、Libvirt/QEMU/KVM。Provider 隐藏资源创建、查询、销毁与 receipt 细节。
 
@@ -83,7 +86,7 @@ Flag、AWDP Break 与 Fix 只有在 GameplayFact 事务提交成功后才增加�
 
 ## Runner Pool
 
-平台部署配置一个活动 RuntimeProvider（Docker 或 Kubernetes）与 RunnerPool；Challenge/Competition 不引用 Provider 或 RunnerPool。节点只使用 Runner registration schema 3 发布 TTL heartbeat；Worker 通过关系化 capacity ledger/allocation 与乐观并发选择具体 RunnerId，并将 durable 命令投递到该节点的 JetStream subject。RuntimeInstance 只持久化本次调度实际使用的 RunnerId、RuntimeProvider、结构化 AccessEndpoint 以及一对一 typed receipt，不保存 pool 路由状态或 JSON receipt。
+平台部署配置一个活动 RuntimeProvider（Docker 或 Kubernetes）与 RunnerPool；Challenge/Competition 不引用 Provider 或 RunnerPool。节点只使用 NATS KV Runner registration schema 3 发布有效期心跳；Worker 通过 EF Core Serializable 事务、capacity ledger/allocation 和当前观测选择具体 RunnerId，并将 durable 命令投递到该节点的 JetStream subject。RuntimeInstance 只持久化本次调度实际使用的 RunnerId、RuntimeProvider、结构化 AccessEndpoint 以及一对一 typed receipt，不保存 pool 路由状态或 JSON receipt。
 
 Runner resource-domain 所有权使用 NATS KV CAS 租约：租约 30 秒、每 10 秒续租，KV revision
 作为 fencing token。连续两次续租失败时 Runner 进入 draining 并终止进程；接管者从关系数据库

@@ -43,7 +43,7 @@ public readonly record struct RuntimeWorkloadIdentity(
     [JsonIgnore]
     public bool IsAuxiliary => Kind is RuntimeWorkloadKind.AwdChecker or RuntimeWorkloadKind.PatchChecker;
 
-    // Text is used only at the Redis/provider metadata boundary.
+    // Text is used only at external provider and diagnostic boundaries.
     [JsonIgnore]
     public string Key => $"{(short)Kind}:{RuntimeInstanceId:N}:{OperationId:N}";
 

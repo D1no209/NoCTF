@@ -67,6 +67,23 @@ services:
       panel:
         aliases: [noctf-grafana]
 
+  loki:
+    image: ${LOKI_IMAGE:?Set LOKI_IMAGE in .env}
+    restart: unless-stopped
+    command:
+      - -config.file=/etc/loki/loki.yml
+    volumes:
+      - type: bind
+        source: ./loki/loki.yml
+        target: /etc/loki/loki.yml
+        read_only: true
+      - type: bind
+        source: ${OBSERVABILITY_DATA_ROOT:?Set OBSERVABILITY_DATA_ROOT}/loki
+        target: /loki
+        bind:
+          create_host_path: false
+    networks: [observability, noctf]
+
   postgres-exporter:
     image: ${POSTGRES_EXPORTER_IMAGE:?Set POSTGRES_EXPORTER_IMAGE in .env}
     restart: unless-stopped
@@ -74,12 +91,7 @@ services:
       DATA_SOURCE_URI: ${POSTGRES_EXPORTER_URI:?Set POSTGRES_EXPORTER_URI}
       DATA_SOURCE_USER: ${POSTGRES_EXPORTER_USER:?Set POSTGRES_EXPORTER_USER}
       DATA_SOURCE_PASS_FILE: /run/secrets/postgres-exporter-password
-      PG_EXPORTER_EXTEND_QUERY_PATH: /etc/postgres-exporter/queries.yml
     volumes:
-      - type: bind
-        source: ./postgres-exporter/queries.yml
-        target: /etc/postgres-exporter/queries.yml
-        read_only: true
       - type: bind
         source: ${OBSERVABILITY_SECRET_ROOT:?Set OBSERVABILITY_SECRET_ROOT}/postgres-exporter-password
         target: /run/secrets/postgres-exporter-password

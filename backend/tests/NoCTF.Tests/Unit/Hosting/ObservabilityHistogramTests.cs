@@ -27,7 +27,7 @@ public sealed class ObservabilityHistogramTests
         foreach (var sample in new[] { 0.001, 0.002, 0.004, 0.012, 0.04 })
         {
             NoCtfTelemetry.RecordApiRequest("histogram-test", "success", sample);
-            NoCtfTelemetry.RecordRedisOperation("histogram-test", "success", sample);
+            NoCtfTelemetry.RecordNatsOperation("histogram-test", "success", sample);
         }
         NoCtfTelemetry.RecordSignalRPublish("histogram-test", "success", 0.012);
         NoCtfTelemetry.RecordRunnerClaim("histogram-test", "success", 2, 0.012);
@@ -66,7 +66,7 @@ public sealed class ObservabilityHistogramTests
         using var client = app.GetTestClient();
         var exported = await client.GetStringAsync("/metrics");
 
-        foreach (var prefix in new[] { "api_request", "redis_operation", "signalr_publish", "runner_claim",
+        foreach (var prefix in new[] { "api_request", "nats_operation", "signalr_publish", "runner_claim",
             "leaderboard_projection", "scheduler_rebuild", "scheduler_dispatch" })
         {
             var suffix = prefix == "scheduler_dispatch" ? "lateness" : "duration";
@@ -75,7 +75,7 @@ public sealed class ObservabilityHistogramTests
             await Assert.That(buckets.Keys).Contains(0.05);
             await Assert.That(buckets.Keys).Contains(0.8);
             await Assert.That(buckets.Keys).Contains(300);
-            if (prefix is "api_request" or "redis_operation")
+            if (prefix is "api_request" or "nats_operation")
             {
                 await Assert.That(buckets[0.005]).IsEqualTo(3);
                 await Assert.That(buckets[0.05]).IsEqualTo(5);

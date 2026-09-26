@@ -169,6 +169,8 @@ services:
       Runtime__Docker__Endpoint: unix:///var/run/docker.sock
       Runtime__Docker__Network: ${NOCTF_E2E_NETWORK}
       Runtime__Docker__PublicHost: 127.0.0.1
+    ports:
+      - "127.0.0.1::8080"
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - /proc:/host/proc:ro

@@ -21,13 +21,8 @@ public sealed class RuntimeResourceReconciliationHandler(
     IOptions<RunnerOptions> runnerOptions,
     IRunnerCapacityGate capacity,
     IRuntimeProviderCatalog? providers = null,
-    NoCTF.Infrastructure.Runtime.Capacity.RunnerResourceMutationCoordinator? mutations = null,
-    RedisRunnerCapacityLedger? ledger = null,
-    RedisRunnerCapacityGate? rawCapacity = null,
-    IPostCommitMessagePublisher? outbox = null,
-    TimeProvider? clock = null)
+    NoCTF.Infrastructure.Runtime.Capacity.RunnerResourceMutationCoordinator? mutations = null)
 {
-    private readonly TimeProvider timeProvider = clock ?? TimeProvider.System;
     public async Task Handle(
         ReconcileRuntimeResources message,
         CancellationToken cancellationToken)
@@ -72,7 +67,6 @@ public sealed class RuntimeResourceReconciliationHandler(
             }
         }
         await ReconcileAuxiliaryAsync(reconciler, configuredRunnerId, cancellationToken);
-        await ReconcileUnconfirmedAsync(reconciler, configuredRunnerId, cancellationToken);
         var managed = await reconciler.ListManagedAsync(cancellationToken);
 
         var failedAssignments = await db.RuntimeInstances
@@ -184,39 +178,6 @@ public sealed class RuntimeResourceReconciliationHandler(
         if (failures > 0)
             throw new InvalidOperationException(
                 $"{failures} orphaned Runtime resource groups could not be removed.");
-    }
-
-    private async Task ReconcileUnconfirmedAsync(IRuntimeManagedResourceReconciler reconciler, string runnerId, CancellationToken ct)
-    {
-        if (ledger is null || rawCapacity is null || !db.Database.IsRelational()) return;
-        foreach (var identity in await ledger.ReadUnconfirmedAsync(runnerId, ct))
-        {
-            var document = await db.RuntimeInstances.AsNoTracking().Where(row => row.Id == identity.RuntimeInstanceId)
-                .Select(row => row.CapacityAllocations).SingleOrDefaultAsync(ct);
-            if (document?.Items.Any(item => item.Identity == identity && item.RunnerId == runnerId) == true)
-            {
-                await ledger.ConfirmAsync(runnerId, identity, ct);
-                continue;
-            }
-            await ledger.DeferConfirmationAsync(runnerId, identity, ct);
-            // No database lock crosses the provider call; unknown resources retain their claim.
-            if (await reconciler.WorkloadExistsAsync(identity, ct) != false) continue;
-            await using var transaction = await db.Database.BeginTransactionAsync(
-                System.Data.IsolationLevel.Serializable,
-                ct);
-            var current = await db.RuntimeInstances.AsNoTracking()
-                .Include(row => row.CapacityAllocationEntries)
-                .SingleOrDefaultAsync(row => row.Id == identity.RuntimeInstanceId, ct);
-            document = current?.CapacityAllocations;
-            if (document?.Items.Any(item => item.Identity == identity) == true) continue;
-            var released = await rawCapacity.ReleaseWorkloadAsync(identity, runnerId, ct);
-            if (released == RunnerCapacityReleaseOutcome.AlreadyReleased) await ledger.ConfirmAsync(runnerId, identity, ct);
-            if (released == RunnerCapacityReleaseOutcome.Released && outbox is not null)
-                await outbox.PublishAsync(new DispatchQueuedRuntimes(timeProvider.GetUtcNow()));
-            await db.SaveChangesAsync(ct);
-            await transaction.CommitAsync(ct);
-            if (outbox is not null) await outbox.FlushCommittedMessagesAsync();
-        }
     }
 
     private async Task ReconcileAuxiliaryAsync(IRuntimeManagedResourceReconciler reconciler, string runnerId, CancellationToken ct)

@@ -36,6 +36,7 @@ public sealed class RunnerResourceObserver(
     private string? lastFailure;
 
     public RunnerAdmissionSnapshot Current => snapshot;
+    public ulong ResourceDomainFencingToken => ownership?.FencingToken ?? 0;
 
     public void EnsureFreshAdmission()
     {
@@ -82,9 +83,7 @@ public sealed class RunnerResourceObserver(
         if (ownership is null)
         {
             ownership = await leases.TryAcquireAsync(
-                "resource-domain-" + Convert.ToHexString(
-                    System.Security.Cryptography.SHA256.HashData(
-                        System.Text.Encoding.UTF8.GetBytes(domain))).ToLowerInvariant(),
+                NatsClusterLeaseManager.ResourceDomainKey(domain),
                 options.Value.Id,
                 ct);
             if (ownership is null)

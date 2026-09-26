@@ -4,10 +4,20 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Logging;
 using NoCTF.Application.Observability;
 using OpenTelemetry.Metrics;
 using OpenTelemetry.Resources;
 using OpenTelemetry.Trace;
+using OpenTelemetry.Logs;
+using OpenTelemetry.Exporter;
+using NoCTF.Application.Administration.PlatformLogs;
+using NoCTF.Infrastructure.Observability;
+using NoCTF.Infrastructure.Caching;
+using ZiggyCreatures.Caching.Fusion;
+using NoCTF.Infrastructure.Persistence;
+using Microsoft.EntityFrameworkCore;
 
 namespace NoCTF.Hosting.Observability;
 
@@ -20,6 +30,12 @@ public static class ObservabilityExtensions
     {
         if (!configuration.GetValue("Observability:Enabled", true))
             return services;
+        services.TryAddSingleton(TimeProvider.System);
+        if (services.Any(descriptor => descriptor.ServiceType == typeof(IFusionCacheProvider)))
+            services.AddHostedService<FusionCacheMetricsAgent>();
+        if (services.Any(descriptor => descriptor.ServiceType
+                == typeof(IDbContextFactory<NoCtfDbContext>)))
+            services.AddHostedService<RuntimeWaitingMetricsAgent>();
         var openTelemetry = services.AddOpenTelemetry()
             .ConfigureResource(resource => resource
                 .AddService(serviceName, serviceVersion: ThisAssemblyVersion.Value)
@@ -53,6 +69,51 @@ public static class ObservabilityExtensions
         if (!string.IsNullOrWhiteSpace(configuration["OTEL_EXPORTER_OTLP_ENDPOINT"]))
             openTelemetry.WithTracing(tracing => tracing.AddOtlpExporter());
 
+        var lokiBaseUrl = configuration["Observability:LokiBaseUrl"];
+        if (string.IsNullOrWhiteSpace(lokiBaseUrl))
+        {
+            if (configuration.GetValue("Observability:RequireLoki", false))
+                throw new InvalidOperationException("Observability:LokiBaseUrl is required.");
+            return services;
+        }
+        if (!Uri.TryCreate(lokiBaseUrl, UriKind.Absolute, out var loki)
+            || loki.Scheme != Uri.UriSchemeHttp
+            || loki.UserInfo.Length > 0 || loki.Query.Length > 0
+            || loki.Fragment.Length > 0 || loki.AbsolutePath != "/")
+            throw new InvalidOperationException("Observability:LokiBaseUrl must be a private HTTP origin.");
+
+        var defaultService = serviceName.EndsWith("-api", StringComparison.Ordinal)
+            ? PlatformLogService.Api
+            : serviceName.EndsWith("-worker", StringComparison.Ordinal)
+                ? PlatformLogService.Worker
+                : serviceName.EndsWith("-runner", StringComparison.Ordinal)
+                    ? PlatformLogService.Runner : PlatformLogService.Host;
+        services.AddSingleton<PlatformLogBroadcastQueue>();
+        services.TryAddSingleton<PlatformLogUserIdProtector>();
+        services.AddHostedService<PlatformLogBroadcastAgent>();
+        services.Configure<OpenTelemetryLoggerOptions>(options =>
+        {
+            options.IncludeFormattedMessage = true;
+            options.ParseStateValues = true;
+            options.IncludeScopes = false;
+        });
+        services.AddLogging(logging => logging.AddFilter<OpenTelemetryLoggerProvider>(
+            (category, level) => category is not null
+                && category.StartsWith("NoCTF.", StringComparison.Ordinal)
+                && level >= Microsoft.Extensions.Logging.LogLevel.Information));
+        openTelemetry.WithLogging(logging => logging
+            .AddProcessor(provider => new RedactedPlatformLogProcessor(
+                provider.GetRequiredService<PlatformLogBroadcastQueue>(), defaultService,
+                provider.GetRequiredService<PlatformLogUserIdProtector>()))
+            .AddOtlpExporter((exporter, processor) =>
+            {
+                exporter.Endpoint = new Uri(loki, "otlp/v1/logs");
+                exporter.Protocol = OtlpExportProtocol.HttpProtobuf;
+                processor.ExportProcessorType = OpenTelemetry.ExportProcessorType.Batch;
+                processor.BatchExportProcessorOptions.MaxQueueSize = 4096;
+                processor.BatchExportProcessorOptions.MaxExportBatchSize = 512;
+            }));
+
         return services;
     }
 
@@ -61,7 +122,8 @@ public static class ObservabilityExtensions
         // Instrument names, not the names rewritten by the Prometheus exporter. All values are seconds.
         foreach (var name in new[]
         {
-            "noctf.api.request.duration", "noctf.redis.operation.duration",
+            "noctf.api.request.duration",
+            "noctf.nats.operation.duration",
             "noctf.signalr.publish.duration", "noctf.runner.claim.duration",
             "noctf.leaderboard.projection.duration", "noctf.scheduler.rebuild.duration",
             "noctf.scheduler.dispatch.lateness",
