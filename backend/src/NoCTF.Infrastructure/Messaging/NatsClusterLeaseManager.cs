@@ -27,6 +27,11 @@ public sealed class NatsClusterLeaseManager(
     public static readonly TimeSpan RenewalInterval = TimeSpan.FromSeconds(10);
     private const string Bucket = "NOCTF_LEASES_V2";
 
+    public static string ResourceDomainKey(string domain) =>
+        "resource-domain-" + Convert.ToHexString(
+            System.Security.Cryptography.SHA256.HashData(
+                System.Text.Encoding.UTF8.GetBytes(domain))).ToLowerInvariant();
+
     async Task<IClusterLease?> IClusterLeaseManager.TryAcquireAsync(
         string key,
         string owner,

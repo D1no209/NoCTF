@@ -6,10 +6,10 @@ using Microsoft.Extensions.Options;
 using NoCTF.Infrastructure.Runtime.Capacity;
 using NoCTF.Runner.Composition;
 using NoCTF.Runner.Messages;
-using StackExchange.Redis;
 using System;
 using System.Collections.Generic;
 using System.Net.Http;
+using ZiggyCreatures.Caching.Fusion;
 
 namespace Internal.Generated.WolverineHandlers
 {
@@ -21,27 +21,29 @@ namespace Internal.Generated.WolverineHandlers
         private readonly Microsoft.Extensions.Logging.ILogger<NoCTF.Infrastructure.Messaging.WolverinePostCommitMessagePublisher> _loggerOfWolverinePostCommitMessagePublisher;
         private readonly Microsoft.Extensions.Logging.ILogger<NoCTF.Runner.Messages.AuxiliaryRuntimeCapacity> _loggerOfAuxiliaryRuntimeCapacity;
         private readonly Microsoft.Extensions.Options.IOptions<NoCTF.Runner.Composition.RunnerOptions> _optionsOfRunnerOptions;
+        private readonly NoCTF.Infrastructure.Runtime.Capacity.NatsRunnerAvailabilityRegistry _natsRunnerAvailabilityRegistry;
         private readonly NoCTF.Infrastructure.Runtime.Capacity.RunnerResourceMutationCoordinator _runnerResourceMutationCoordinator;
         private readonly NoCTF.Runner.Composition.IOneShotRuntimeProviderCatalog _oneShotRuntimeProviderCatalog;
         private readonly NoCTF.Runner.Messages.IAwdCheckerWorkReader _awdCheckerWorkReader;
-        private readonly StackExchange.Redis.IConnectionMultiplexer _connectionMultiplexer;
         private readonly System.Collections.Generic.IEnumerable<NoCTF.Application.Runtime.Provisioning.IRuntimeManagedResourceReconciler> _runtimeManagedResourceReconcilerIEnumerable;
         private readonly System.Net.Http.IHttpClientFactory _httpClientFactory;
         private readonly System.TimeProvider _timeProvider;
+        private readonly ZiggyCreatures.Caching.Fusion.IFusionCacheProvider _fusionCacheProvider;
 
-        public RunAwdCheckerHandler1000325858(Microsoft.EntityFrameworkCore.DbContextOptions<NoCTF.Infrastructure.Persistence.NoCtfDbContext> dbContextOptionsOfNoCtfDbContext, Microsoft.Extensions.Logging.ILogger<NoCTF.Infrastructure.Messaging.WolverinePostCommitMessagePublisher> loggerOfWolverinePostCommitMessagePublisher, Microsoft.Extensions.Logging.ILogger<NoCTF.Runner.Messages.AuxiliaryRuntimeCapacity> loggerOfAuxiliaryRuntimeCapacity, Microsoft.Extensions.Options.IOptions<NoCTF.Runner.Composition.RunnerOptions> optionsOfRunnerOptions, NoCTF.Infrastructure.Runtime.Capacity.RunnerResourceMutationCoordinator runnerResourceMutationCoordinator, NoCTF.Runner.Composition.IOneShotRuntimeProviderCatalog oneShotRuntimeProviderCatalog, NoCTF.Runner.Messages.IAwdCheckerWorkReader awdCheckerWorkReader, StackExchange.Redis.IConnectionMultiplexer connectionMultiplexer, System.Collections.Generic.IEnumerable<NoCTF.Application.Runtime.Provisioning.IRuntimeManagedResourceReconciler> runtimeManagedResourceReconcilerIEnumerable, System.Net.Http.IHttpClientFactory httpClientFactory, System.TimeProvider timeProvider)
+        public RunAwdCheckerHandler1000325858(Microsoft.EntityFrameworkCore.DbContextOptions<NoCTF.Infrastructure.Persistence.NoCtfDbContext> dbContextOptionsOfNoCtfDbContext, Microsoft.Extensions.Logging.ILogger<NoCTF.Infrastructure.Messaging.WolverinePostCommitMessagePublisher> loggerOfWolverinePostCommitMessagePublisher, Microsoft.Extensions.Logging.ILogger<NoCTF.Runner.Messages.AuxiliaryRuntimeCapacity> loggerOfAuxiliaryRuntimeCapacity, Microsoft.Extensions.Options.IOptions<NoCTF.Runner.Composition.RunnerOptions> optionsOfRunnerOptions, NoCTF.Infrastructure.Runtime.Capacity.NatsRunnerAvailabilityRegistry natsRunnerAvailabilityRegistry, NoCTF.Infrastructure.Runtime.Capacity.RunnerResourceMutationCoordinator runnerResourceMutationCoordinator, NoCTF.Runner.Composition.IOneShotRuntimeProviderCatalog oneShotRuntimeProviderCatalog, NoCTF.Runner.Messages.IAwdCheckerWorkReader awdCheckerWorkReader, System.Collections.Generic.IEnumerable<NoCTF.Application.Runtime.Provisioning.IRuntimeManagedResourceReconciler> runtimeManagedResourceReconcilerIEnumerable, System.Net.Http.IHttpClientFactory httpClientFactory, System.TimeProvider timeProvider, ZiggyCreatures.Caching.Fusion.IFusionCacheProvider fusionCacheProvider)
         {
             _dbContextOptionsOfNoCtfDbContext = dbContextOptionsOfNoCtfDbContext;
             _loggerOfWolverinePostCommitMessagePublisher = loggerOfWolverinePostCommitMessagePublisher;
             _loggerOfAuxiliaryRuntimeCapacity = loggerOfAuxiliaryRuntimeCapacity;
             _optionsOfRunnerOptions = optionsOfRunnerOptions;
+            _natsRunnerAvailabilityRegistry = natsRunnerAvailabilityRegistry;
             _runnerResourceMutationCoordinator = runnerResourceMutationCoordinator;
             _oneShotRuntimeProviderCatalog = oneShotRuntimeProviderCatalog;
             _awdCheckerWorkReader = awdCheckerWorkReader;
-            _connectionMultiplexer = connectionMultiplexer;
             _runtimeManagedResourceReconcilerIEnumerable = runtimeManagedResourceReconcilerIEnumerable;
             _httpClientFactory = httpClientFactory;
             _timeProvider = timeProvider;
+            _fusionCacheProvider = fusionCacheProvider;
         }
 
 
@@ -49,11 +51,10 @@ namespace Internal.Generated.WolverineHandlers
         public override async System.Threading.Tasks.Task HandleAsync(Wolverine.Runtime.MessageContext context, System.Threading.CancellationToken cancellation)
         {
             var postCommitDispatchStatus = new NoCTF.Application.Messaging.PostCommitDispatchStatus();
-            var redisRunnerCapacityGate = new NoCTF.Infrastructure.Runtime.Capacity.RedisRunnerCapacityGate(_connectionMultiplexer, _timeProvider);
             await using var noCtfDbContext = new NoCTF.Infrastructure.Persistence.NoCtfDbContext(_dbContextOptionsOfNoCtfDbContext);
             var wolverinePostCommitMessagePublisher = new NoCTF.Infrastructure.Messaging.WolverinePostCommitMessagePublisher(context, noCtfDbContext, _loggerOfWolverinePostCommitMessagePublisher, postCommitDispatchStatus);
             var competitionEventStore = new NoCTF.Infrastructure.Competitions.Events.CompetitionEventStore(noCtfDbContext, wolverinePostCommitMessagePublisher);
-            var persistedRunnerCapacityGate = new NoCTF.Infrastructure.Runtime.Capacity.PersistedRunnerCapacityGate(noCtfDbContext, redisRunnerCapacityGate, wolverinePostCommitMessagePublisher);
+            var persistedRunnerCapacityGate = new NoCTF.Infrastructure.Runtime.Capacity.PersistedRunnerCapacityGate(noCtfDbContext, _natsRunnerAvailabilityRegistry, _fusionCacheProvider, wolverinePostCommitMessagePublisher);
             var auxiliaryRuntimeCapacity = new NoCTF.Runner.Messages.AuxiliaryRuntimeCapacity(persistedRunnerCapacityGate, _optionsOfRunnerOptions, _runtimeManagedResourceReconcilerIEnumerable, _runnerResourceMutationCoordinator, noCtfDbContext, wolverinePostCommitMessagePublisher, competitionEventStore, _timeProvider, _loggerOfAuxiliaryRuntimeCapacity);
             var awdCheckerExecutor = new NoCTF.Runner.Messages.AwdCheckerExecutor(_oneShotRuntimeProviderCatalog, _httpClientFactory, auxiliaryRuntimeCapacity);
             // The actual message body

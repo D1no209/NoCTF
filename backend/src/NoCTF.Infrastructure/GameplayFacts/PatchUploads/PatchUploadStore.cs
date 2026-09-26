@@ -156,7 +156,7 @@ public sealed class PatchUploadStore(
         CancellationToken ct)
     {
         await using var transaction = await db.Database.BeginTransactionAsync(
-            IsolationLevel.ReadCommitted,
+            IsolationLevel.Serializable,
             ct);
         using var attemptLease = await attemptCriticalSection.AcquireAsync(
             db,
@@ -316,7 +316,9 @@ public sealed class PatchUploadStore(
             }
             return new(PatchUploadSaveState.Accepted, fact.Id, fact.State);
         }
-        catch (DbUpdateException exception) when (!TransactionFailureClassifier.IsRetryable(exception))
+        catch (Exception exception) when (exception is DbUpdateException
+            or InvalidOperationException { InnerException: DbUpdateException }
+            || TransactionFailureClassifier.IsRetryable(exception))
         {
             await transaction.RollbackAsync(ct);
             outbox.DiscardPendingMessages();

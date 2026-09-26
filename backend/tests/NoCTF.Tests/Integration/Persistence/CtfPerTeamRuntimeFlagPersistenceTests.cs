@@ -1,5 +1,8 @@
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
+using DotNet.Testcontainers.Builders;
+using NATS.Client.Core;
 using NoCTF.Application.Challenges.Flags;
 using NoCTF.Application.Competitions.Awd;
 using NoCTF.Application.Competitions.Koh;
@@ -15,13 +18,14 @@ using NoCTF.Domain.Teams;
 using NoCTF.GameModes.Ctf.Configuration;
 using NoCTF.GameModes.Registration;
 using NoCTF.Infrastructure.Persistence;
+using NoCTF.Infrastructure.Caching;
 using NoCTF.Infrastructure.Challenges.Flags;
 using NoCTF.Infrastructure.Runtime.Capacity;
+using NoCTF.Infrastructure.Messaging;
 using NoCTF.Infrastructure.Runtime.Instances;
 using NoCTF.Worker;
-using StackExchange.Redis;
 using Testcontainers.PostgreSql;
-using Testcontainers.Redis;
+using ZiggyCreatures.Caching.Fusion;
 
 namespace NoCTF.Tests.Integration.Persistence;
 
@@ -213,12 +217,17 @@ public sealed class CtfPerTeamRuntimeFlagPersistenceTests
                 .WithUsername("postgres")
                 .WithPassword("postgres")
                 .Build();
-            await using var redisContainer = new RedisBuilder("redis:7.4.10-alpine3.21@sha256:e7723ff73d963f5cc6d9c4643ea3d989527a402a319239054e9472a7fb9219a2")
+            await using var nats = new ContainerBuilder(
+                    "docker.m.daocloud.io/library/nats:2.12.2-alpine@sha256:2d5fce3229ae5741f4ef9225aff95dc4dc036455931eaf77a3eec33fddaa192d")
+                .WithPortBinding(4222, assignRandomHostPort: true).WithCommand("-js")
+                .WithWaitStrategy(Wait.ForUnixContainer().UntilInternalTcpPortIsAvailable(4222))
                 .Build();
-            await postgres.StartAsync(cancellationToken);
-            await redisContainer.StartAsync(cancellationToken);
-            await using var redis = await ConnectionMultiplexer.ConnectAsync(
-                redisContainer.GetConnectionString());
+            await Task.WhenAll(postgres.StartAsync(cancellationToken),
+                nats.StartAsync(cancellationToken));
+            await using var connection = new NatsConnection(new NatsOpts
+            {
+                Url = $"nats://{nats.Hostname}:{nats.GetMappedPublicPort(4222)}"
+            });
             var options = new DbContextOptionsBuilder<NoCtfDbContext>()
                 .UseNpgsql(postgres.GetConnectionString())
                 .UseSnakeCaseNamingConvention()
@@ -279,13 +288,23 @@ public sealed class CtfPerTeamRuntimeFlagPersistenceTests
             await Assert.That(first.Failure).IsNull();
             await Assert.That(second.Failure).IsNull();
 
-            var registry = new RedisRunnerAvailabilityRegistry(redis);
+            var registry = new NatsRunnerAvailabilityRegistry(connection, TimeProvider.System);
+            await using var ownerA = await new NatsClusterLeaseManager(connection)
+                .TryAcquireAsync(NatsClusterLeaseManager.ResourceDomainKey("runner-a"),
+                    "runner-a", cancellationToken);
+            await using var ownerB = await new NatsClusterLeaseManager(connection)
+                .TryAcquireAsync(NatsClusterLeaseManager.ResourceDomainKey("runner-b"),
+                    "runner-b", cancellationToken);
+            await Assert.That(ownerA).IsNotNull();
+            await Assert.That(ownerB).IsNotNull();
             var runnerCapacity = new RuntimeResourceLimits(
                 512 * 1024 * 1024,
                 500_000_000,
                 256);
             foreach (var runnerId in new[] { "runner-a", "runner-b" })
             {
+                await registry.PublishHeartbeatAsync("tests", runnerId,
+                    RuntimeProvider.Docker, TimeSpan.FromMinutes(2), cancellationToken);
                 var registered = await registry.RegisterAsync(
                     CurrentRunnerRegistration.Create(
                         "tests",
@@ -294,13 +313,18 @@ public sealed class CtfPerTeamRuntimeFlagPersistenceTests
                             runnerCapacity.MemoryBytes,
                             runnerCapacity.NanoCpus,
                             runnerCapacity.PidsLimit),
-                        timeToLive: TimeSpan.FromMinutes(2)),
+                        timeToLive: TimeSpan.FromMinutes(2),
+                        resourceDomainFencingToken: runnerId == "runner-a"
+                            ? ownerA!.FencingToken : ownerB!.FencingToken),
                     cancellationToken);
                 await Assert.That(registered)
                     .IsEqualTo(RunnerAvailabilityRegistrationOutcome.Online);
             }
 
-            var capacity = new RedisRunnerCapacityGate(redis);
+            using var cacheServices = new ServiceCollection()
+                .AddFusionCache(NoCtfCacheNames.ReadModels).Services.BuildServiceProvider();
+            var capacity = new PersistedRunnerCapacityGate(db, registry,
+                cacheServices.GetRequiredService<IFusionCacheProvider>(), outbox);
             var dispatches = outbox.Published.OfType<DispatchRuntime>().ToArray();
             await Assert.That(dispatches).Count().IsEqualTo(2);
             foreach (var dispatch in dispatches)

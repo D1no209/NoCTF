@@ -56,8 +56,7 @@ public sealed class KohFullBoundaryTests
                     {
                         mode = "Koh",
                         flagTemplate = new { header = "flag", bodyTemplate = "[GUID]", leetLiteralText = false },
-                        pollIntervalSeconds = 2,
-                        controlPointsPerInterval = 10L
+                        koh = new { pollIntervalSeconds = 2, controlPointsPerInterval = 10L }
                     }
                 }
             },
@@ -90,8 +89,7 @@ public sealed class KohFullBoundaryTests
         var configuration = new
         {
             mode = "Koh",
-            pollIntervalSeconds = 2,
-            controlPointsPerInterval = 10L
+            koh = new { pollIntervalSeconds = 2, controlPointsPerInterval = 10L }
         };
         await SendJsonAsync(
             admin,
@@ -255,24 +253,28 @@ public sealed class KohFullBoundaryTests
         new
         {
             mode = "Koh",
+            koh = new { },
             runtime = new
             {
                 kind = "Container",
                 allocation = "Shared",
-                image = runtimeImage,
-                command = Array.Empty<string>(),
-                environment = new Dictionary<string, string>(),
-                labels = new Dictionary<string, string>(),
-                portMappings = new[] { new { containerPort = 8080, hostPort = 0 } },
-                flagEnvironmentVariableName = (string?)null,
-                internalPorts = Array.Empty<int>(),
-                security = new
+                container = new
                 {
-                    noNewPrivileges = true,
-                    readonlyRootfs = true,
-                    runAsNonRoot = true,
-                    capDrop = Array.Empty<string>(),
-                    capAdd = Array.Empty<string>()
+                    image = runtimeImage,
+                    command = Array.Empty<string>(),
+                    environment = new Dictionary<string, string>(),
+                    labels = new Dictionary<string, string>(),
+                    portMappings = new[] { new { containerPort = 8080, hostPort = 0 } },
+                    flagEnvironmentVariableName = (string?)null,
+                    internalPorts = Array.Empty<int>(),
+                    security = new
+                    {
+                        noNewPrivileges = true,
+                        readonlyRootfs = true,
+                        runAsNonRoot = true,
+                        capDrop = Array.Empty<string>(),
+                        capAdd = Array.Empty<string>()
+                    }
                 },
                 egressPolicy = "Isolated",
                 limits = new

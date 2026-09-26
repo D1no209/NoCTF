@@ -15,6 +15,8 @@ using NoCTF.Domain.Gameplay;
 using NoCTF.Domain.Shared;
 using NoCTF.Domain.Commands;
 using Microsoft.AspNetCore.DataProtection.EntityFrameworkCore;
+using NoCTF.Infrastructure.Authentication;
+using NoCTF.Infrastructure.Admission;
 
 namespace NoCTF.Infrastructure.Persistence;
 
@@ -43,6 +45,9 @@ public sealed class NoCtfDbContext(DbContextOptions<NoCtfDbContext> options)
     public DbSet<RuntimeCapacityLedger> RuntimeCapacityLedgers => Set<RuntimeCapacityLedger>();
     public DbSet<PatchUpload> PatchUploads => Set<PatchUpload>();
     public DbSet<AccountToken> AccountTokens => Set<AccountToken>();
+    public DbSet<SsoFlowEntity> SsoFlows => Set<SsoFlowEntity>();
+    public DbSet<RequestAdmissionWindow> RequestAdmissionWindows => Set<RequestAdmissionWindow>();
+    public DbSet<RequestAdmissionLease> RequestAdmissionLeases => Set<RequestAdmissionLease>();
     public DbSet<PlatformSettings> PlatformSettings => Set<PlatformSettings>();
     public DbSet<Notification> Notifications => Set<Notification>();
     public DbSet<CommandReceipt> CommandReceipts => Set<CommandReceipt>();
@@ -158,6 +163,7 @@ public sealed class NoCtfDbContext(DbContextOptions<NoCtfDbContext> options)
             entry.Entity.NormalizedTitle = Normalize(entry.Entity.Title);
             entry.Entity.NormalizedDirection = Normalize(entry.Entity.Direction);
         }
+
         foreach (var entry in ChangeTracker.Entries<CompetitionChallenge>()
                      .Where(entry => entry.State is EntityState.Added or EntityState.Modified))
             entry.Entity.NormalizedCustomTitle = entry.Entity.CustomTitle is null

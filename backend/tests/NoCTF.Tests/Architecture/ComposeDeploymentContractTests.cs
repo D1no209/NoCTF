@@ -71,7 +71,9 @@ public sealed class ComposeDeploymentContractTests
             await Assert.That(services.GetProperty("noctf").GetProperty("environment").GetProperty("Database__AutoMigrate").GetString()).IsEqualTo("true");
             await Assert.That(services.GetProperty("noctf").GetProperty("environment").GetProperty("Observability__Enabled").GetString()).IsEqualTo("false");
             var raw = await File.ReadAllTextAsync(Path.Combine(source, "docker-compose.yml"));
-            await Assert.That(raw).DoesNotContain("environment:");
+            await Assert.That(raw).Contains("Observability__LokiBaseUrl: http://loki:3100/");
+            await Assert.That(raw).Contains("Observability__RequireLoki: \"true\"");
+            await Assert.That(raw).DoesNotContain("POSTGRES_PASSWORD:");
         }
         finally { Directory.Delete(root, true); }
     }

@@ -27,6 +27,7 @@ public static partial class PlatformLogRedactor
 
         result = BearerTokenRegex().Replace(result, "Bearer " + Redacted);
         result = JwtRegex().Replace(result, Redacted);
+        result = FlagPayloadRegex().Replace(result, Redacted);
         result = UriUserInfoRegex().Replace(result, match =>
             match.Groups[1].Value + Redacted + "@");
         result = SecretAssignmentRegex().Replace(result, match =>
@@ -41,6 +42,7 @@ public static partial class PlatformLogRedactor
             .Select(char.ToLowerInvariant)
             .ToArray());
         return normalized.Contains("password", StringComparison.Ordinal)
+            || normalized.Contains("flag", StringComparison.Ordinal)
             || normalized.Contains("passwd", StringComparison.Ordinal)
             || normalized.Equals("pwd", StringComparison.Ordinal)
             || normalized.Contains("token", StringComparison.Ordinal)
@@ -48,6 +50,7 @@ public static partial class PlatformLogRedactor
             || normalized.Contains("credential", StringComparison.Ordinal)
             || normalized.Contains("authorization", StringComparison.Ordinal)
             || normalized.Contains("cookie", StringComparison.Ordinal)
+            || normalized.Contains("userid", StringComparison.Ordinal)
             || normalized.Contains("smtpuser", StringComparison.Ordinal);
     }
 
@@ -60,6 +63,11 @@ public static partial class PlatformLogRedactor
         "\\beyJ[A-Za-z0-9_-]{8,}\\.[A-Za-z0-9_-]{8,}\\.[A-Za-z0-9_-]{8,}\\b",
         RegexOptions.CultureInvariant | RegexOptions.NonBacktracking)]
     private static partial Regex JwtRegex();
+
+    [GeneratedRegex(
+        "(?i)\\b(?:[a-z0-9_]*ctf|flag)\\{[^{}\\r\\n]{1,256}\\}",
+        RegexOptions.CultureInvariant | RegexOptions.NonBacktracking)]
+    private static partial Regex FlagPayloadRegex();
 
     [GeneratedRegex(
         "(?i)\\b(smtps?://)[^@\\s]+@",

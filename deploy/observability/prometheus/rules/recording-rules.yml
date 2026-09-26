@@ -35,11 +35,11 @@ groups:
         expr: sum by (pool,resource) (noctf_runner_capacity_available) / clamp_min(sum by (pool,resource) (noctf_runner_capacity_total), 1)
       - record: noctf:postgres_connections:ratio
         expr: sum(pg_stat_activity_count) / clamp_min(max(pg_settings_max_connections), 1)
-      - record: noctf:redis_operation_duration:p99_5m
-        expr: histogram_quantile(0.99, sum by (le) (rate(noctf_redis_operation_duration_seconds_bucket[5m])))
+      - record: noctf:nats_operation_duration:p99_5m
+        expr: histogram_quantile(0.99, sum by (le) (rate(noctf_nats_operation_duration_seconds_bucket[5m])))
       - record: noctf:runtime_waiting:count
-        expr: pg_noctf_runtime_waiting
+        expr: max(noctf_runtime_waiting) or vector(0)
       - record: noctf:runtime_waiting_oldest_age:seconds
-        expr: pg_noctf_runtime_waiting_oldest_age_seconds
+        expr: max(noctf_runtime_waiting_oldest_age_seconds) or vector(0)
       - record: noctf:disk_available:ratio
         expr: min(node_filesystem_avail_bytes{fstype!~"tmpfs|overlay"} / node_filesystem_size_bytes{fstype!~"tmpfs|overlay"})

@@ -72,7 +72,7 @@ internal static class AuthenticationInfrastructure
         services.AddScoped<ISsoAccountStore, SsoAccountStore>();
         services.AddSingleton<ISsoProtocolAdapter, OidcSsoProtocolAdapter>();
         services.AddSingleton<ISsoProtocolAdapter, CasSsoProtocolAdapter>();
-        services.AddSingleton<ISsoFlowStore, RedisSsoFlowStore>();
+        services.AddSingleton<ISsoFlowStore, PersistedSsoFlowStore>();
         services.TryAddSingleton(TimeProvider.System);
         services.AddScoped<ManageSsoProviders>();
         services.AddScoped<BeginSsoFlow>();
@@ -98,9 +98,11 @@ internal static class AuthenticationInfrastructure
         services.AddScoped<IUserRegistrationStore, AuthenticationStore>();
         services.AddScoped<ICurrentUserProfilePatchStore, AuthenticationStore>();
         services.AddScoped<NoCTF.Application.Commands.Idempotency.IRequestReplay, NoCTF.Infrastructure.Commands.Idempotency.TransactionalRequestReplay>();
-        services.AddSingleton<NoCTF.Application.Admission.IRequestAdmission, NoCTF.Infrastructure.Admission.RedisRequestAdmission>();
+        services.AddSingleton<NoCTF.Application.Admission.IRequestAdmission, NoCTF.Infrastructure.Admission.PersistedRequestAdmission>();
         if (development)
             services.AddSingleton<NoCTF.Application.Admission.IRequestAdmission, NoCTF.Infrastructure.Admission.DevelopmentRequestAdmission>();
+        else if (!exporting)
+            services.AddHostedService<NoCTF.Infrastructure.Admission.RequestAdmissionCleanupAgent>();
         services.AddSingleton<NoCTF.Application.Admission.ICredentialWorkAdmission, NoCTF.Infrastructure.Admission.CredentialWorkAdmission>();
         services.AddOptions<NoCTF.Application.Admission.RequestAdmissionOptions>()
             .Bind(configuration.GetSection("RequestAdmission"))

@@ -12,7 +12,8 @@ internal static class CurrentRunnerRegistration
         RuntimeResourceAmount capacity,
         bool hasActiveAssignments = false,
         bool providerAvailable = true,
-        TimeSpan? timeToLive = null)
+        TimeSpan? timeToLive = null,
+        ulong resourceDomainFencingToken = 0)
     {
         var now = DateTimeOffset.UtcNow;
         var options = new RunnerAdmissionOptions();
@@ -45,6 +46,8 @@ internal static class CurrentRunnerRegistration
             hasActiveAssignments,
             providerAvailable,
             snapshot,
-            options);
+            options,
+            Reconciled: true,
+            ResourceDomainFencingToken: resourceDomainFencingToken);
     }
 }

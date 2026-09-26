@@ -201,8 +201,7 @@ public static class ServiceRegistration
         var requestAdmissionLimits = configuration
             .GetSection("RequestAdmission")
             .Get<RequestAdmissionOptions>() ?? new RequestAdmissionOptions();
-        var redis = configuration.GetConnectionString("Redis");
-        var signalR = services.AddSignalR();
+        services.AddSignalR();
         services.AddSingleton<CompetitionHubSubscriptionRegistry>();
         services.AddSingleton<ICompetitionHubAudienceAccess, CompetitionHubAudienceAccess>();
         services.AddSingleton<ICompetitionHubAudienceRouter, CompetitionHubAudienceRouter>();
@@ -220,14 +219,12 @@ public static class ServiceRegistration
         services.AddScoped<ICompetitionLifecycleNotificationPublisher, SignalRCompetitionLifecyclePublisher>();
         if (includeInfrastructure
             && !development
-            && !configuration.GetValue<bool>("OpenApi:Exporting")
-            && !string.IsNullOrWhiteSpace(redis))
+            && !configuration.GetValue<bool>("OpenApi:Exporting"))
         {
-            signalR.AddStackExchangeRedis(redis);
-            services.AddHostedService<NoCTF.API.SignalR.Publishing.RedisGameplayFactStateRelay>();
-            services.AddHostedService<NoCTF.API.SignalR.Publishing.RedisLeaderboardRefreshRelay>();
-            services.AddHostedService<NoCTF.API.SignalR.Publishing.RedisPlatformLogRelay>();
-            services.AddHostedService<NoCTF.API.SignalR.Publishing.RedisCompetitionEventRefreshRelay>();
+            services.AddHostedService<NoCTF.API.SignalR.Publishing.NatsGameplayFactStateRelay>();
+            services.AddHostedService<NoCTF.API.SignalR.Publishing.NatsLeaderboardRefreshRelay>();
+            services.AddHostedService<NoCTF.API.SignalR.Publishing.NatsPlatformLogRelay>();
+            services.AddHostedService<NoCTF.API.SignalR.Publishing.NatsCompetitionEventRefreshRelay>();
         }
         services.AddRateLimiter(options =>
         {

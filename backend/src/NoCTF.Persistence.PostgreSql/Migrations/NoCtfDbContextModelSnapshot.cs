@@ -3384,6 +3384,195 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
                     b.ToTable("team_members", (string)null);
                 });
 
+            modelBuilder.Entity("NoCTF.Infrastructure.Admission.RequestAdmissionLease", b =>
+                {
+                    b.Property<string>("KeyHash")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("key_hash");
+
+                    b.Property<Guid>("LeaseId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("lease_id");
+
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .IsConcurrencyToken()
+                        .HasColumnType("uuid")
+                        .HasColumnName("concurrency_stamp");
+
+                    b.Property<long>("ExpiresAt")
+                        .HasColumnType("bigint")
+                        .HasColumnName("expires_at");
+
+                    b.HasKey("KeyHash", "LeaseId")
+                        .HasName("pk_request_admission_leases");
+
+                    b.HasIndex("ExpiresAt")
+                        .HasDatabaseName("ix_request_admission_leases_expires_at");
+
+                    b.HasIndex("LeaseId")
+                        .HasDatabaseName("ix_request_admission_leases_lease_id");
+
+                    b.ToTable("request_admission_leases", (string)null);
+                });
+
+            modelBuilder.Entity("NoCTF.Infrastructure.Admission.RequestAdmissionWindow", b =>
+                {
+                    b.Property<string>("KeyHash")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("key_hash");
+
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .IsConcurrencyToken()
+                        .HasColumnType("uuid")
+                        .HasColumnName("concurrency_stamp");
+
+                    b.Property<int>("Count")
+                        .HasColumnType("integer")
+                        .HasColumnName("count");
+
+                    b.Property<long>("ExpiresAt")
+                        .HasColumnType("bigint")
+                        .HasColumnName("expires_at");
+
+                    b.HasKey("KeyHash")
+                        .HasName("pk_request_admission_windows");
+
+                    b.HasIndex("ExpiresAt")
+                        .HasDatabaseName("ix_request_admission_windows_expires_at");
+
+                    b.ToTable("request_admission_windows", (string)null);
+                });
+
+            modelBuilder.Entity("NoCTF.Infrastructure.Authentication.SsoFlowEntity", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("BrowserIdHash")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("browser_id_hash");
+
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .IsConcurrencyToken()
+                        .HasColumnType("uuid")
+                        .HasColumnName("concurrency_stamp");
+
+                    b.Property<string>("CorrelationHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("correlation_hash");
+
+                    b.Property<long>("CreatedAt")
+                        .HasColumnType("bigint")
+                        .HasColumnName("created_at");
+
+                    b.Property<long>("ExpiresAt")
+                        .HasColumnType("bigint")
+                        .HasColumnName("expires_at");
+
+                    b.Property<string>("ExternalDisplayName")
+                        .HasMaxLength(512)
+                        .HasColumnType("character varying(512)")
+                        .HasColumnName("external_display_name");
+
+                    b.Property<string>("ExternalNamespace")
+                        .HasMaxLength(512)
+                        .HasColumnType("character varying(512)")
+                        .HasColumnName("external_namespace");
+
+                    b.Property<short?>("ExternalProtocol")
+                        .HasColumnType("smallint")
+                        .HasColumnName("external_protocol");
+
+                    b.Property<Guid?>("ExternalProviderId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("external_provider_id");
+
+                    b.Property<string>("ExternalSubject")
+                        .HasMaxLength(255)
+                        .HasColumnType("character varying(255)")
+                        .HasColumnName("external_subject");
+
+                    b.Property<int?>("FailureCode")
+                        .HasColumnType("integer")
+                        .HasColumnName("failure_code");
+
+                    b.Property<short>("Intent")
+                        .HasColumnType("smallint")
+                        .HasColumnName("intent");
+
+                    b.Property<string>("Nonce")
+                        .HasMaxLength(2048)
+                        .HasColumnType("character varying(2048)")
+                        .HasColumnName("nonce");
+
+                    b.Property<string>("PkceVerifier")
+                        .HasMaxLength(2048)
+                        .HasColumnType("character varying(2048)")
+                        .HasColumnName("pkce_verifier");
+
+                    b.Property<string>("ProcessingTokenHash")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("processing_token_hash");
+
+                    b.Property<short>("Protocol")
+                        .HasColumnType("smallint")
+                        .HasColumnName("protocol");
+
+                    b.Property<string>("ProviderFingerprint")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)")
+                        .HasColumnName("provider_fingerprint");
+
+                    b.Property<Guid>("ProviderId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("provider_id");
+
+                    b.Property<string>("ReturnPath")
+                        .IsRequired()
+                        .HasMaxLength(2048)
+                        .HasColumnType("character varying(2048)")
+                        .HasColumnName("return_path");
+
+                    b.Property<string>("ServiceUrl")
+                        .HasMaxLength(2048)
+                        .HasColumnType("character varying(2048)")
+                        .HasColumnName("service_url");
+
+                    b.Property<short>("State")
+                        .HasColumnType("smallint")
+                        .HasColumnName("state");
+
+                    b.Property<int?>("TokenVersion")
+                        .HasColumnType("integer")
+                        .HasColumnName("token_version");
+
+                    b.Property<Guid?>("UserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("user_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_sso_flows");
+
+                    b.HasIndex("CorrelationHash")
+                        .IsUnique()
+                        .HasDatabaseName("ix_sso_flows_correlation_hash");
+
+                    b.HasIndex("ExpiresAt")
+                        .HasDatabaseName("ix_sso_flows_expires_at");
+
+                    b.ToTable("sso_flows", (string)null);
+                });
+
             modelBuilder.Entity("NoCTF.Domain.Challenges.AwdChallenge", b =>
                 {
                     b.HasBaseType("NoCTF.Domain.Challenges.Challenge");

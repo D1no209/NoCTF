@@ -153,22 +153,14 @@ internal static class CompetitionInfrastructure
                 "Webhooks:InsecureHttpHostAllowList").Get<string[]>())));
         services.AddScoped<ICompetitionWebhookDeliveryStore, CompetitionWebhookDeliveryStore>();
         services.AddSingleton<ICompetitionWebhookSender, CompetitionWebhookSender>();
-        if (development)
-        {
-            services.AddSingleton<ICompetitionWebhookTestStatusStore,
-                DevelopmentCompetitionWebhookTestStatusStore>();
-        }
-        else
-        {
-            services.AddSingleton<ICompetitionWebhookTestStatusStore,
-                RedisCompetitionWebhookTestStatusStore>();
-        }
+        services.AddSingleton<ICompetitionWebhookTestStatusStore,
+            FusionCompetitionWebhookTestStatusStore>();
         if (development)
             services.AddSingleton<ICompetitionEventRefreshPublisher,
                 NoOpCompetitionEventRefreshPublisher>();
         else
             services.AddSingleton<ICompetitionEventRefreshPublisher,
-                RedisCompetitionEventRefreshPublisher>();
+                NatsCompetitionEventRefreshPublisher>();
         return services;
     }
 

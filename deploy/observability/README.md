@@ -12,6 +12,8 @@ environment file, then restart NoCTF:
     ASPNETCORE_HTTP_PORTS=8080;9464
     Observability__Enabled=true
     Observability__MetricsPort=9464
+    Observability__LokiBaseUrl=http://loki:3100/
+    Observability__RequireLoki=true
     OTEL_SDK_DISABLED=false
 
 Port 9464 is not published to the host. The middleware serves only the exact
@@ -32,6 +34,7 @@ The base NoCTF Compose enables the NATS monitoring listener on internal port
 
        install -d -o 65534 -g 65534 -m 0750 /opt/noctf-observability/data/prometheus
        install -d -o 472 -g 472 -m 0750 /opt/noctf-observability/data/grafana
+       install -d -o 10001 -g 10001 -m 0750 /opt/noctf-observability/data/loki
        install -d -o root -g root -m 0700 /opt/noctf-observability/secrets
 
 3. Confirm that NOCTF_NETWORK_NAME matches the network created by the NoCTF
@@ -43,7 +46,8 @@ The base NoCTF Compose enables the NATS monitoring listener on internal port
        docker compose --env-file deploy/observability/.env \
          -f deploy/observability/compose.yml up -d
 
-Prometheus and Grafana bind only to 127.0.0.1 by default. Grafana also joins
+Prometheus and Grafana bind only to 127.0.0.1 by default. Loki has no published
+port and is reachable only on the private Compose networks. Grafana also joins
 the existing `1panel-network` as `noctf-grafana` so an independently configured
 TLS reverse proxy can reach it. Require Grafana login; do not publish Prometheus,
 exporters or the NoCTF metrics listener.
@@ -66,12 +70,28 @@ the current `NOCTF_V2_*` JetStream namespace and never displays SQL text,
 Flag values, tokens or user IDs. Production exports metrics; without an OTLP
 receiver, distributed traces are not retained.
 
+The provisioned `NoCTF · 日志诊断` dashboard is available at `/d/noctf-logs`.
+Loki receives redacted OTLP logs from Host over the private Docker network and
+retains them for 14 days. The admin log API queries the same Loki data; old
+Redis Stream logs are not imported and must be exported to an offline read-only
+archive before cutover. Verify that the Loki bind directory is owned by UID
+10001 before starting the stack; the official image runs as that user.
+UserId values in Loki documents are encrypted with a purpose-separated key
+derived from the existing shared `RunnerScoring:SigningKey`; the admin reader
+decrypts them for the unchanged UserId filter. All Host roles must use the same
+signing key. Rotating that key makes retained log UserIds unreadable, so export
+the required audit window before rotation. Database exception payloads and EF
+command text are not exported to Loki.
+
 For slow requests, first select the route and check sample count, P95/P99 and
-5xx rate. Compare the same time window with Npgsql command duration, Redis
-latency, EF Core query-cache hit rate and ThreadPool queue length. For Flag
+5xx rate. Compare the same time window with Npgsql command duration, NATS
+coordination latency, EF Core query-cache hit rate and ThreadPool queue length. For Flag
 completion, compare intake stages, Wolverine execution/effective time and
 JetStream pending. Correlation suggests where to investigate; aggregate
 histograms alone do not identify an individual SQL statement or prove a cause.
+FusionCache panels show memory and distributed hit/miss rates by one of four fixed
+cache profiles; cache keys are never metric labels. A memory miss followed by a
+distributed hit is one read path, not two failed requests.
 Widen the window when natural traffic is sparse, and expect Flag panels to be
 empty when no submissions completed in that window.
 
@@ -84,8 +104,8 @@ does not mean it was fast: dispatch may have exited early, failed or retried.
 
 - Prometheus keeps seven days and at most 2 GB by default.
 - Recording and alert rules live under prometheus/rules.
-- The PostgreSQL exporter performs the Runtime waiting aggregation that was
-  removed from the application background services.
+- The standard PostgreSQL and Redis exporters report infrastructure health only.
+  Runtime waiting metrics are computed by the Host through EF Core.
 - Add public NoCTF or Cap URLs to prometheus/targets/blackbox.yml when external
   probing is required. Never put Cap secrets or a siteverify request body in
   monitoring configuration.

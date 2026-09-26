@@ -49,7 +49,10 @@ public sealed partial class TargetArchitectureRulesTests
         foreach (var file in files)
         {
             var source = await File.ReadAllTextAsync(file);
+            // The bounded, best-effort log relay is not a durable business queue.
             if (source.Contains("System.Threading.Channels", StringComparison.Ordinal)
+                    && !file.EndsWith($"{Path.DirectorySeparatorChar}PlatformLogBroadcastQueue.cs",
+                        StringComparison.Ordinal)
                 || source.Contains("Task.Run(", StringComparison.Ordinal)
                 || Regex.IsMatch(source, @"\bHandleAsync\(")
                 || LegacyDimensionRegex().IsMatch(source)

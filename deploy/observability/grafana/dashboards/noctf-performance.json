@@ -98,16 +98,16 @@
       ]
     },
     {
-      "id": 15, "type": "timeseries", "title": "Redis P99", "description": "NoCTF 对 Redis 操作耗时的 P99；与连接/线程池排队结合分析。",
+      "id": 15, "type": "timeseries", "title": "NATS 协调 P99", "description": "NATS KV 与轻量通知操作耗时的 P99；与排队和数据库提交耗时对照。",
       "gridPos": { "x": 0, "y": 36, "w": 6, "h": 8 }, "datasource": { "type": "prometheus", "uid": "prometheus" },
       "fieldConfig": { "defaults": { "unit": "s" } },
-      "targets": [{ "refId": "A", "expr": "histogram_quantile(0.99, sum by (le) (rate(noctf_redis_operation_duration_seconds_bucket[$window])))" }]
+      "targets": [{ "refId": "A", "expr": "histogram_quantile(0.99, sum by (le) (rate(noctf_nats_operation_duration_seconds_bucket[$window])))" }]
     },
     {
-      "id": 16, "type": "timeseries", "title": "Redis 错误速率", "description": "NoCTF Redis 操作失败/秒；与日志超时和 ThreadPool 排队对照。",
+      "id": 16, "type": "timeseries", "title": "NATS 协调错误速率", "description": "NATS KV 与轻量通知失败/秒；与 JetStream 和 ThreadPool 指标对照。",
       "gridPos": { "x": 6, "y": 36, "w": 6, "h": 8 }, "datasource": { "type": "prometheus", "uid": "prometheus" },
       "fieldConfig": { "defaults": { "unit": "reqps" } },
-      "targets": [{ "refId": "A", "expr": "sum(rate(noctf_redis_failures_total[$window])) or vector(0)" }]
+      "targets": [{ "refId": "A", "expr": "sum(rate(noctf_nats_failures_total[$window])) or vector(0)" }]
     },
     {
       "id": 17, "type": "timeseries", "title": "Runtime 排队数", "description": "数据库事实中的 Queued Runtime 数量；不把等待时间与数量放在同一坐标轴。",
@@ -285,6 +285,18 @@
       "gridPos": { "x": 12, "y": 124, "w": 12, "h": 8 }, "datasource": { "type": "prometheus", "uid": "prometheus" },
       "fieldConfig": { "defaults": { "unit": "short" } },
       "targets": [{ "refId": "A", "expr": "sum by (stage) (increase(noctf_runtime_dispatch_stage_duration_seconds_count[$window]))", "legendFormat": "{{stage}}" }]
+    },
+    {
+      "id": 45, "type": "timeseries", "title": "FusionCache 命中率", "description": "按固定缓存用途和内存/分布式层区分；层级 Miss 可在同一次读取中连续发生，不等于业务请求失败。",
+      "gridPos": { "x": 0, "y": 132, "w": 12, "h": 8 }, "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "unit": "percentunit" } },
+      "targets": [{ "refId": "A", "expr": "sum by (cache, tier) (rate(noctf_fusion_cache_reads_total{result=\"hit\"}[$window])) / clamp_min(sum by (cache, tier) (rate(noctf_fusion_cache_reads_total[$window])), 0.001)", "legendFormat": "{{cache}} / {{tier}}" }]
+    },
+    {
+      "id": 46, "type": "timeseries", "title": "FusionCache 读取速率", "description": "固定 cache/tier/result 标签；不记录缓存 key，辅助判断失效后是否持续穿透。",
+      "gridPos": { "x": 12, "y": 132, "w": 12, "h": 8 }, "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "unit": "reqps" } },
+      "targets": [{ "refId": "A", "expr": "sum by (cache, tier, result) (rate(noctf_fusion_cache_reads_total[$window]))", "legendFormat": "{{cache}} / {{tier}} / {{result}}" }]
     }
   ],
   "refresh": "30s",

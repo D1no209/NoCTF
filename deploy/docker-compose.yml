@@ -62,6 +62,9 @@ services:
     restart: unless-stopped
     env_file:
       - ./env/noctf/.env
+    environment:
+      Observability__LokiBaseUrl: http://loki:3100/
+      Observability__RequireLoki: "true"
     labels:
       noctf.io/internal-role: scoring-callback-gateway
       noctf.io/runtime-proxy-gateway: "true"

@@ -92,10 +92,10 @@ NATS 2.12+；若本机 Docker Engine 可用，内置 Runner 会通过 Docker 的
 创建题目 Runtime，否则只有 Runtime 操作不可用，API 仍可启动。数据只在进程生命周期内
 存在，且该模式不证明 PostgreSQL provider 的迁移、事务或并发行为。
 
-FusionCache 按用途分为三个命名 profile：`leaderboards` 承载排行榜，`read-models` 缓存平台配置与
-公开比赛查询，`local-computation` 缓存 Runtime/AWD/KoH 配置 JSON 的解析结果。生产环境中
-前两者使用 Redis L2 与 backplane 进行跨进程失效；纯计算结果只保留进程内 L1，避免把可由
-输入稳定重建的数据写入 Redis。排行榜快照由事件失效后的完整投影替换，不使用短逻辑 TTL；其他 TTL
+FusionCache 按用途分为四个命名 profile：`leaderboards` 承载排行榜，`read-models` 缓存平台配置与
+公开比赛查询，`webhook-test-statuses` 保存短期测试结果，`local-computation` 保存可重建计算结果。生产环境中
+前三者使用 Redis L2 与 backplane 进行跨进程失效；纯计算结果只保留进程内 L1。
+排行榜快照由事件失效后的完整投影替换，不使用短逻辑 TTL；其他 TTL
 可通过 `Caching:ReadModelsTtlSeconds` 与 `Caching:LocalComputationTtlMinutes` 调整。
 
 从 `backend` 目录启动：
@@ -161,9 +161,9 @@ Smoke 覆盖每种模式至少一条真实依赖流程：
 - AWDP：两队独立 Attack Runtime/端口、真实动态 Flag、错误/外队/旧 Runtime Break、无需 Break 的 Fix、一次 Checker、Break/Fix 持续按轮叠加、Pause/Resume/Finish 冻结、页面状态恢复；
 - KoH：共享 Runtime/Control Flag、正确/错误/不可用/超时/歧义行为、暂停恢复。
 
-Full 在模式业务流程之后还会验证 API 重启后原 JWT 有效、Redis 停止时现有 JWT 的
-TokenVersion 检查回退 PostgreSQL 且新登录不会绕过共享准入保护、Redis 恢复后登录与 Runner heartbeat 重建，以及 PostgreSQL 重启后三进程重新
-连接。服务停止和重启由编排器负责，成功条件只通过 HTTP 与 heartbeat 判断。
+Full 在模式业务流程之后还会验证 API 重启后原 JWT 有效、Redis 停止时认证和 EF Core
+共享准入继续工作、Runner 的 NATS KV 心跳与资源观测不受影响，以及 Redis/PostgreSQL
+重启后三进程恢复。服务停止和重启由编排器负责，成功条件只通过 HTTP readiness 判断。
 
 E2E 只通过 HTTP、排行榜、GameplayFact、Runtime 管理 API 和 Runtime 对外行为判断
 业务结果。不查询 PostgreSQL，不使用 Docker inspect/资源列表证明业务成功。

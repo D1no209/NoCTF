@@ -1,11 +1,9 @@
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
-using NoCTF.Application.Administration.PlatformLogs;
 using NoCTF.Application.Authentication.EmailVerification;
 using NoCTF.Application.Messaging;
 using NoCTF.Infrastructure.Messaging;
-using NoCTF.Infrastructure.Observability;
 using NoCTF.Hosting;
 using NoCTF.Hosting.Health;
 using NoCTF.Hosting.Messaging;
@@ -13,6 +11,7 @@ using Wolverine;
 using Wolverine.ErrorHandling;
 using Wolverine.Nats;
 using NoCTF.Application.Competitions.Webhooks;
+using NoCTF.Worker.Composition;
 
 namespace NoCTF.Worker;
 
@@ -50,7 +49,7 @@ public static class WorkerRole
         services.AddTransient<RuntimeDispatchMessageHandler>();
         services.AddTransient<QueuedRuntimeDispatchHandler>();
         services.AddTransient<PendingGameplayFactDispatchHandler>();
-        services.AddSingleton<NoCTF.Infrastructure.Runtime.Capacity.RuntimeDispatchWakeupGate>();
+        services.AddRuntimeDispatchWakeupGate(enableClusterScheduling);
         services.AddTransient<ReleaseRunnerCapacityHandler>();
         services.AddTransient<GameplayFactDrainMessageHandler>();
         services.AddTransient<CompetitionWebhookMessageHandler>();
@@ -67,7 +66,7 @@ public static class WorkerRole
             services.AddSingleton<ClusterSchedulingState>();
             services.AddSingleton(new ClusterSchedulerNodeIdentity(
                 $"{Environment.MachineName}:{Environment.ProcessId}"));
-            services.AddSingleton<IClusterSchedulerStatusStore, RedisClusterSchedulerStatusStore>();
+            services.AddSingleton<IClusterSchedulerStatusStore, NatsClusterSchedulerStatusStore>();
             services.AddScoped<IClusterScheduleSource, ClusterScheduleSource>();
             services.AddSingleton<IReadinessDependency, ClusterSchedulingReadinessDependency>();
             services.AddSingleton<NatsClusterLeaseManager>();
@@ -79,12 +78,6 @@ public static class WorkerRole
             services.AddHostedService<WorkerMessageTopologyStartupValidator>();
         return services;
     }
-
-    public static IServiceCollection AddNoCtfWorkerLogging(
-        this IServiceCollection services,
-        IConfiguration configuration,
-        PlatformLogService service = PlatformLogService.Worker) =>
-        services.AddNoCtfPlatformLogging(configuration, service);
 
     public static void ConfigureNoCtfWorkerMessaging(
         this WolverineOptions options,

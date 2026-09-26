@@ -1,7 +1,11 @@
+using System.Text.Json;
+using Microsoft.Extensions.DependencyInjection;
 using NoCTF.Application.Competitions.Webhooks;
 using NoCTF.Infrastructure.Competitions.Webhooks;
-using StackExchange.Redis;
+using NoCTF.Infrastructure.Caching;
 using Testcontainers.Redis;
+using ZiggyCreatures.Caching.Fusion;
+using ZiggyCreatures.Caching.Fusion.Backplane.StackExchangeRedis;
 
 namespace NoCTF.Tests.Integration.Messaging;
 
@@ -19,9 +23,22 @@ public sealed class CompetitionWebhookTestStatusTests
             await using var container = new RedisBuilder(
                 "redis:7.4.10-alpine3.21@sha256:e7723ff73d963f5cc6d9c4643ea3d989527a402a319239054e9472a7fb9219a2").Build();
             await container.StartAsync(cancellationToken);
-            await using var redis = await ConnectionMultiplexer.ConnectAsync(
-                container.GetConnectionString());
-            var store = new RedisCompetitionWebhookTestStatusStore(redis);
+            var services = new ServiceCollection();
+            services.AddLogging();
+            services.AddFusionCacheSystemTextJsonSerializer(
+                new JsonSerializerOptions(JsonSerializerDefaults.Web));
+            services.AddStackExchangeRedisCache(options =>
+                options.Configuration = container.GetConnectionString());
+            services.AddFusionCache(NoCtfCacheNames.WebhookTestStatuses)
+                .WithDefaultEntryOptions(options => options.Duration = TimeSpan.FromMinutes(10))
+                .WithRegisteredDistributedCache()
+                .WithBackplane(new RedisBackplane(new RedisBackplaneOptions
+                {
+                    Configuration = container.GetConnectionString()
+                }));
+            using var provider = services.BuildServiceProvider();
+            var store = new FusionCompetitionWebhookTestStatusStore(
+                provider.GetRequiredService<IFusionCacheProvider>());
             var now = DateTimeOffset.UtcNow;
             var status = new CompetitionWebhookTestStatus(
                 Guid.CreateVersion7(now),

@@ -7,8 +7,8 @@ Push-Location $backendRoot
 try {
     dotnet build NoCTF.slnx -c $Configuration --no-restore -m:1 -v:q
     if ($LASTEXITCODE -ne 0) { throw 'Core recovery build failed.' }
-    foreach ($testClass in @('RedisRunnerCapacityGateTests', 'PersistedRunnerCapacityGateTests',
-        'RuntimeCapacityAllocationPersistenceTests', 'RunnerAdmissionGateTests', 'RunnerResourceObserverTests',
+    foreach ($testClass in @('NatsRunnerAvailabilityTests', 'PersistedRunnerCapacityGateTests',
+        'RuntimeCapacityAllocationPersistenceTests', 'RunnerResourceObserverTests',
         'RunnerObservationScopeTests', 'RunnerAvailabilityPublisherTests', 'RunnerProvisionDeliveryTests',
         'DockerBudgetLimitTests', '*HistoricalAdjudication*')) {
         $started = [System.Diagnostics.Stopwatch]::StartNew()

@@ -22,7 +22,6 @@
     <PackageReference Include="NATS.Client.KeyValueStore" />
     <PackageReference Include="NATS.Net" />
     <PackageReference Include="SixLabors.ImageSharp" />
-    <PackageReference Include="StackExchange.Redis" />
     <PackageReference Include="System.IdentityModel.Tokens.Jwt" />
     <PackageReference Include="WolverineFx" />
     <PackageReference Include="WolverineFx.Nats" />

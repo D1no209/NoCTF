@@ -1,0 +1,76 @@
+{
+  "uid": "noctf-logs",
+  "title": "NoCTF · 日志诊断",
+  "tags": ["noctf", "logs", "operations"],
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "30s",
+  "time": { "from": "now-6h", "to": "now" },
+  "panels": [
+    {
+      "id": 1,
+      "type": "stat",
+      "title": "最近 5 分钟日志量",
+      "description": "从 Loki 统计最近五分钟的 NoCTF 日志；用于判断日志导出是否持续工作。",
+      "gridPos": { "x": 0, "y": 0, "w": 6, "h": 4 },
+      "datasource": { "type": "loki", "uid": "loki" },
+      "targets": [{ "refId": "A", "expr": "sum(count_over_time({service_name=~\"noctf-host-.*\"}[5m]))", "queryType": "instant" }],
+      "fieldConfig": { "defaults": { "unit": "short" } },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "textMode": "value" }
+    },
+    {
+      "id": 2,
+      "type": "stat",
+      "title": "最近 5 分钟错误日志",
+      "description": "Level 4/5 分别表示 Error/Critical；没有样本时不要推断接口健康。",
+      "gridPos": { "x": 6, "y": 0, "w": 6, "h": 4 },
+      "datasource": { "type": "loki", "uid": "loki" },
+      "targets": [{ "refId": "A", "expr": "sum(count_over_time({service_name=~\"noctf-host-.*\"} | json | view_level=~\"4|5\" [5m]))", "queryType": "instant" }],
+      "fieldConfig": { "defaults": { "unit": "short" } },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "textMode": "value" }
+    },
+    {
+      "id": 5,
+      "type": "stat",
+      "title": "Loki 在线",
+      "description": "Prometheus 最近一次抓取 Loki 成功记为 1；Loki 不可用时管理日志接口返回不可用。",
+      "gridPos": { "x": 0, "y": 4, "w": 6, "h": 4 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [{ "refId": "A", "expr": "max(up{job=\"loki\"})", "instant": true }],
+      "fieldConfig": { "defaults": { "unit": "short", "thresholds": { "mode": "absolute", "steps": [{ "color": "red", "value": null }, { "color": "green", "value": 1 }] } } },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "textMode": "value" }
+    },
+    {
+      "id": 6,
+      "type": "stat",
+      "title": "实时提示丢弃/秒",
+      "description": "仅指管理员 SignalR 实时提示；Loki 已接收的日志不因此丢失。",
+      "gridPos": { "x": 6, "y": 4, "w": 6, "h": 4 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [{ "refId": "A", "expr": "sum(rate(noctf_platform_log_live_drops_total[5m])) or vector(0)", "instant": true }],
+      "fieldConfig": { "defaults": { "unit": "ops" } },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "textMode": "value" }
+    },
+    {
+      "id": 3,
+      "type": "timeseries",
+      "title": "服务日志速率",
+      "description": "按 Host 角色观察日志速率；突增时与请求错误率及依赖指标对照。",
+      "gridPos": { "x": 12, "y": 0, "w": 12, "h": 8 },
+      "datasource": { "type": "loki", "uid": "loki" },
+      "targets": [{ "refId": "A", "expr": "sum by (service_name) (rate({service_name=~\"noctf-host-.*\"}[5m]))", "legendFormat": "{{service_name}}" }],
+      "fieldConfig": { "defaults": { "unit": "ops" } }
+    },
+    {
+      "id": 4,
+      "type": "logs",
+      "title": "最新平台日志",
+      "description": "仅展示后端已脱敏的日志；旧 Redis 日志保存在离线只读归档，不在此查询。",
+      "gridPos": { "x": 0, "y": 8, "w": 24, "h": 14 },
+      "datasource": { "type": "loki", "uid": "loki" },
+      "targets": [{ "refId": "A", "expr": "{service_name=~\"noctf-host-.*\"} | json", "queryType": "range" }],
+      "options": { "showTime": true, "showLabels": true, "showCommonLabels": false, "wrapLogMessage": true, "prettifyLogMessage": true, "enableLogDetails": true }
+    }
+  ]
+}

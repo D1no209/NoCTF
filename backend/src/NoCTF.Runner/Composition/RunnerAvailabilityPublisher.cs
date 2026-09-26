@@ -7,17 +7,16 @@ using NoCTF.Infrastructure.Persistence;
 using NoCTF.Application.Runtime.Provisioning;
 using System.Text.Json;
 using System.Data.Common;
-using StackExchange.Redis;
+using NATS.Client.Core;
 
 namespace NoCTF.Runner.Composition;
 
 public sealed class RunnerAvailabilityPublisher(
     IDbContextFactory<NoCtfDbContext> contexts,
-    RedisRunnerAvailabilityRegistry registry,
+    NatsRunnerAvailabilityRegistry registry,
     IOptions<RunnerOptions> configuredOptions,
     ILogger<RunnerAvailabilityPublisher> logger,
     TimeProvider timeProvider,
-    RedisRunnerCapacityLedger ledger,
     RunnerResourceMutationCoordinator mutations,
     IEnumerable<IRuntimeManagedResourceReconciler> reconcilers,
     RunnerResourceObserver observer,
@@ -55,7 +54,7 @@ public sealed class RunnerAvailabilityPublisher(
                     else if (outcome == RunnerAvailabilityRegistrationOutcome.OfflineCapacityUntrusted)
                     {
                         logger.LogWarning(
-                            "Runner {RunnerId} in pool {RunnerPool} remains offline because its Redis capacity is untrusted while assignments may still be active.",
+                            "Runner {RunnerId} in pool {RunnerPool} remains offline until EF capacity assignments are reconciled.",
                             options.Id,
                             options.Pool);
                     }
@@ -73,24 +72,36 @@ public sealed class RunnerAvailabilityPublisher(
                     lastOutcome = outcome;
                 }
             }
-            catch (RedisException exception)
+            catch (NatsException exception)
             {
                 logger.LogWarning(
                     exception,
-                    "Runner {RunnerId} could not publish availability to Redis.",
+                    "Runner {RunnerId} could not publish availability to NATS.",
                     options.Id);
+                lastOutcome = null;
             }
-            catch (DbException exception)
+            catch (Exception exception) when (ContainsDatabaseFailure(exception))
             {
                 logger.LogWarning(
-                    exception,
-                    "Runner {RunnerId} could not verify active assignments before publishing availability.",
-                    options.Id);
+                    "Runner {RunnerId} could not verify active assignments after {FailureType}; availability will expire until the next successful sample.",
+                    options.Id, exception.GetType().Name);
+                lastOutcome = null;
             }
 
             if (!await timer.WaitForNextTickAsync(stoppingToken))
                 break;
         }
+    }
+
+    private static bool ContainsDatabaseFailure(Exception exception)
+    {
+        for (Exception? current = exception; current is not null;
+            current = current.InnerException)
+        {
+            if (current is DbException)
+                return true;
+        }
+        return false;
     }
 
     public async Task<RunnerAvailabilityRegistrationOutcome> PublishOnceAsync(
@@ -118,19 +129,17 @@ public sealed class RunnerAvailabilityPublisher(
                 hasActiveAssignments,
                 providerHealth?.IsReady(options.Provider.Value) ?? true,
                 admission,
-                options.Admission);
-        if (!initialReconciliationComplete)
-            await ledger.PauseAsync(options.Id, options.Pool, cancellationToken);
+                options.Admission,
+                initialReconciliationComplete,
+                observer.ResourceDomainFencingToken);
         var result = await registry.RegisterAsync(registration, cancellationToken);
         if (result == RunnerAvailabilityRegistrationOutcome.OfflineCapacityUntrusted
             && admission.Capacity is not null)
         {
-            await ledger.PauseAsync(options.Id, options.Pool, cancellationToken);
             using var exclusive = await mutations.ReconcileAsync(cancellationToken);
             var reconciler = reconcilers.Single(x => x.Provider == options.Provider);
             // External inventory reads happen outside the database transaction.
             var managed = await reconciler.ListManagedAsync(cancellationToken);
-            var managedRuntimeIds = managed.Select(resource => resource.RuntimeInstanceId).ToHashSet();
             await using var transaction = await db.Database.BeginTransactionAsync(
                 System.Data.IsolationLevel.RepeatableRead,
                 cancellationToken);
@@ -150,32 +159,9 @@ public sealed class RunnerAvailabilityPublisher(
             if (managed.Any(resource => !known.Contains(resource.RuntimeInstanceId)))
                 return RunnerAvailabilityRegistrationOutcome.OfflineCapacityUntrusted;
             await transaction.CommitAsync(cancellationToken);
-            var starting = runtimes.Where(runtime => runtime.State == RuntimeState.Provisioning)
-                .SelectMany(runtime => runtime.CapacityAllocations.Items)
-                .Select(item => item.Identity)
-                .ToHashSet();
-            foreach (var identity in runtimes.SelectMany(runtime => runtime.CapacityAllocations.Items)
-                         .Select(item => item.Identity).Where(identity => identity.IsAuxiliary))
-            {
-                if (await reconciler.WorkloadExistsAsync(identity, cancellationToken) != true)
-                    starting.Add(identity);
-            }
-            var recoveryRows = await db.RuntimeInstances.AsNoTracking()
-                .Include(runtime => runtime.CapacityAllocationEntries)
-                .Where(runtime => runtimes.Select(item => item.Id).Contains(runtime.Id))
-                .ToArrayAsync(cancellationToken);
-            var ownedRows = recoveryRows.Where(runtime => runtime.State == RuntimeState.Provisioning
-                    || managedRuntimeIds.Contains(runtime.Id)
-                        && (runtime.State is RuntimeState.Running or RuntimeState.Stopping
-                            || runtime.State == RuntimeState.Failed && runtime.ProviderReceipt != null))
-                .ToArray();
-            var allocations = ownedRows.SelectMany(runtime => runtime.CapacityAllocations.Items)
-                .Where(item => item.RunnerId == options.Id).ToArray();
-            var claimKeys = allocations.Select(allocation => $"runner-claim:{allocation.Identity.Key}").ToArray();
-            await ledger.RestoreAsync(options.Id, options.Pool, admission.Capacity,
-                admission.Observation!.ObservedAt, allocations, cancellationToken, starting, claimKeys);
             initialReconciliationComplete = true;
-            result = await registry.RegisterAsync(registration, cancellationToken);
+            result = await registry.RegisterAsync(
+                registration with { Reconciled = true }, cancellationToken);
         }
         return result;
     }

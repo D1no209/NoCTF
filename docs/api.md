@@ -539,21 +539,24 @@ GET    /api/v1/admin/competitions/{competitionId}/webhooks/{targetId}/test-deliv
 ```
 
 目标列表使用 `offset/limit/total` 页码分页，不设置产品数量上限。Administrator、Owner、Manager 可写；Judge 与
-Observer 只能读取名称、主机和启停状态。创建及轮换只显示一次 HMAC 密钥。正式事件经事务 Outbox、
+Observer 只能读取名称、主机和启停状态。创建及轮换只显示一次 HMAC 密钥。正式事件在事务提交后发布、
 独立 NATS Webhook fan-out 和 Worker 工作队列异步发送；详细事件、签名、重试和网络限制见
 [赛事 Webhook](competition-webhooks.md)。
 
-平台运行日志使用每日 Redis Stream 分片聚合 API、Worker、Runner、Host 的结构化诊断日志，并通过
-管理员专用 SignalR Hub `/hubs/v1/admin/platform-logs` 实时推送。每个 UTC 日分片精确保留最多
-50,000 条，保留 14 天后由 Redis TTL 删除，不自动归档。历史查询默认从 Warning 开始，使用
+平台运行日志经脱敏的 OpenTelemetry 批量写入私有 Loki，并通过 NATS Core 和管理员专用
+SignalR Hub `/hubs/v1/admin/platform-logs` 实时推送。Loki 保留 14 天，不自动归档；旧 Redis
+日志只在切换前导出为离线只读档案，不进入新查询。历史查询默认从 Warning 开始，使用
 与筛选条件绑定的签名游标，支持按服务、最低级别、UTC 时间、Category、Competition、
 RuntimeInstance、Team、User、CompetitionChallenge、GameplayFact 以及有界全文摘要筛选；全文
 搜索不区分大小写，覆盖 Category、Event、Message 和 Exception。JSONL 导出沿用相同筛选，
 范围最多 14 天且最多 50,000 条。
 
 日志入口与读取投影都会保留结构化作用域；密码、Token、Authorization/Cookie、SMTP 凭据和
-通用 Secret 必须在写入 Redis 前脱敏。无论调用者角色，Flag 原文都不得进入普通日志层，
-业务代码也不得为调试目的主动打印 Flag。管理审计使用签名 keyset 分页，从用户账号生命周期
+通用 Secret 与 Flag 属性必须在 OTLP 导出前脱敏。无论调用者角色，Flag 原文都不得进入普通日志层，
+业务代码也不得为调试目的主动打印 Flag。Loki 文档中的 UserId 使用由现有
+`RunnerScoring:SigningKey` 派生的独立用途密钥加密；管理员日志读取时解密，故 User 筛选及响应保持不变，
+Grafana 原始日志不含明文 UserId。数据库异常的原始文本与 SQL 命令不导出至 Loki。
+管理审计使用签名 keyset 分页，从用户账号生命周期
 审计和工作人员可见的 PostgreSQL `competition_events` 投影，不复制事实、不设置 TTL 或新增
 审计业务表。`competition_events` 默认永久、append-only，普通物理删除在存在历史事件时必须拒绝；
 比赛结束、队伍解散和用户匿名化注销不会清理事件关系。唯一显式例外是平台 Administrator 的强制
