@@ -3,7 +3,7 @@ import { toRefs } from 'vue'
 import type { AdminCompetitionsByIdChallengesIndexPageViewState } from '~/features/routes/admin/competitions/[id]/challenges/useAdminCompetitionsByIdChallengesIndexPage'
 
 const viewProps = defineProps<{ state: AdminCompetitionsByIdChallengesIndexPageViewState }>()
-const { Plus, competitionId, competition, canWrite, items, loading, error, includeDeleted, search, directionFilter, directionOptions, statusFilter, filteredItems, pendingId, addOpen, templatesLoading, selectedTemplateId, templateSearch, hideAddedTemplates, newCustomTitle, newOrder, adding, addError, modeTemplates, visibleModeTemplates, openAdd, addChallenge, deleteTarget, deletePending, deleteError, closeDeleteDialog, beginDeleteChallenge, removeChallenge, restoreChallenge, setChallengePublished, onClickAddOpen } = toRefs(viewProps.state)
+const { Plus, competitionId, competition, canWrite, items, loading, error, includeDeleted, search, directionFilter, directionOptions, statusFilter, filteredItems, pageItems, page, pageLimit, pageCount, total, loadPage, setPageSize, pendingId, addOpen, templatesLoading, selectedTemplateId, templateSearch, hideAddedTemplates, newCustomTitle, newOrder, adding, addError, modeTemplates, visibleModeTemplates, openAdd, addChallenge, deleteTarget, deletePending, deleteError, closeDeleteDialog, beginDeleteChallenge, removeChallenge, restoreChallenge, setChallengePublished, onClickAddOpen } = toRefs(viewProps.state)
 </script>
 
 <template>
@@ -89,7 +89,7 @@ const { Plus, competitionId, competition, canWrite, items, loading, error, inclu
         </TableRow>
       </TableHeader>
       <TableBody>
-        <TableRow v-for="c in filteredItems" :key="c.id" :class="{ 'opacity-60': c.deletedAt }">
+        <TableRow v-for="c in pageItems" :key="c.id" :class="{ 'opacity-60': c.deletedAt }">
           <TableCell class="font-mono tabular-nums">{{ c.order }}</TableCell>
           <TableCell>
             <NuxtLink
@@ -149,6 +149,17 @@ const { Plus, competitionId, competition, canWrite, items, loading, error, inclu
         </TableRow>
       </TableBody>
     </Table>
+
+    <OffsetPagination
+      v-if="filteredItems.length > 0"
+      :page="page"
+      :page-count="pageCount"
+      :total="total"
+      :limit="pageLimit"
+      :loading="loading"
+      @update:page="loadPage"
+      @update:limit="setPageSize"
+    />
 
     <Dialog v-model:open="addOpen">
       <DialogContent>

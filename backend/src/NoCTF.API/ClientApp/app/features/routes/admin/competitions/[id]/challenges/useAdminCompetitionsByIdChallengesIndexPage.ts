@@ -46,6 +46,33 @@ export function useAdminCompetitionsByIdChallengesIndexPage() {
     })
   })
 
+  const page = ref(1)
+
+  const pageLimit = ref(10)
+
+  const total = computed(() => filteredItems.value.length)
+
+  const pageCount = computed(() => Math.max(1, Math.ceil(total.value / pageLimit.value)))
+
+  const pageItems = computed(() => filteredItems.value.slice(
+    (page.value - 1) * pageLimit.value,
+    page.value * pageLimit.value,
+  ))
+
+  function loadPage(targetPage: number): void {
+    if (!Number.isFinite(targetPage)) return
+    page.value = Math.min(pageCount.value, Math.max(1, Math.floor(targetPage)))
+  }
+
+  function setPageSize(value: number): void {
+    if (!Number.isInteger(value) || value < 1 || value === pageLimit.value) return
+    pageLimit.value = value
+    page.value = 1
+  }
+
+  watch([search, directionFilter, statusFilter, includeDeleted], () => { page.value = 1 })
+  watch(pageCount, count => { if (page.value > count) page.value = count })
+
   const pendingId = ref<string | null>(null)
 
   async function load() {
@@ -280,6 +307,13 @@ export function useAdminCompetitionsByIdChallengesIndexPage() {
       directionOptions,
       statusFilter,
       filteredItems,
+      pageItems,
+      page,
+      pageLimit,
+      pageCount,
+      total,
+      loadPage,
+      setPageSize,
       pendingId,
       addOpen,
       templatesLoading,
