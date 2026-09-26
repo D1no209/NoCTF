@@ -25,7 +25,7 @@ describe('route loading boundaries', () => {
     const teams = await sourceFile('app/components/views/page/competitions/[id]/teams/CompetitionsByIdTeamsIndexPageView.vue').text()
 
     expect(challengeLibrary).toMatch(/v-for="template in filteredTemplates"[\s\S]+prefetch-on="interaction"/)
-    expect(competitionChallenges).toMatch(/v-for="c in filteredItems"[\s\S]+prefetch-on="interaction"/)
+    expect(competitionChallenges).toMatch(/v-for="c in pageItems"[\s\S]+prefetch-on="interaction"/)
     expect(teams).toMatch(/v-for="team in teams"[\s\S]+prefetch-on="interaction"/)
   })
 })

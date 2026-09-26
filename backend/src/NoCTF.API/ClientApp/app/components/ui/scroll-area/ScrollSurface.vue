@@ -5,15 +5,23 @@ import { createScrollbars } from './scrollbars'
 const props = withDefaults(defineProps<{
   as?: 'div' | 'section' | 'main' | 'nav' | 'ul' | 'ol' | 'pre' | 'code' | 'aside' | 'article'
   axis?: 'x' | 'y' | 'both'
+  enabled?: boolean
   resetKey?: string | number | null
-}>(), { as: 'div', axis: 'both', resetKey: null })
+}>(), { as: 'div', axis: 'both', enabled: true, resetKey: null })
 const target = ref<HTMLElement | null>(null)
 let scrollbars: ScrollbarsBinding | undefined
 
-onMounted(() => {
-  if (target.value)
-    scrollbars = createScrollbars(target.value, props.axis)
-})
+function updateEnabled(enabled: boolean) {
+  if (!target.value) return
+  if (enabled) scrollbars ??= createScrollbars(target.value, props.axis)
+  else {
+    scrollbars?.dispose()
+    scrollbars = undefined
+  }
+}
+
+onMounted(() => updateEnabled(props.enabled))
+watch(() => props.enabled, updateEnabled, { flush: 'post' })
 watch(() => props.axis, axis => scrollbars?.update(axis))
 watch(() => props.resetKey, async (value, previous) => {
   if (value === previous) return
@@ -27,5 +35,6 @@ onBeforeUnmount(() => scrollbars?.dispose())
 </script>
 
 <template>
-  <component :is="as" ref="target" tabindex="0" data-slot="scroll-surface" data-scroll-surface :data-scroll-axis="axis"><slot /></component>
+  <component :is="as" ref="target" :tabindex="enabled ? 0 : undefined" data-slot="scroll-surface"
+    :data-scroll-surface="enabled ? '' : undefined" :data-scroll-axis="enabled ? axis : undefined"><slot /></component>
 </template>

@@ -44,8 +44,23 @@ describe('competition challenge deletion', () => {
     expect(page).toContain('v-model="search"')
     expect(page).toContain('v-model="directionFilter"')
     expect(page).toContain('v-model="statusFilter"')
-    expect(page).toContain('v-for="c in filteredItems"')
+    expect(page).toContain('v-for="c in pageItems"')
     expect(page).toContain("$t('ui.noMatchingCompetitionChallenges')")
+  })
+
+  test('paginates matching rows and resets the page when filters change', async () => {
+    const page = await sourceFile(
+      new URL('../app/pages/admin/competitions/[id]/challenges/index.vue', import.meta.url),
+    ).text()
+
+    expect(page).toContain('const pageLimit = ref(10)')
+    expect(page).toContain('const total = computed(() => filteredItems.value.length)')
+    expect(page).toContain('const pageItems = computed(() => filteredItems.value.slice(')
+    expect(page).toContain('watch([search, directionFilter, statusFilter, includeDeleted]')
+    expect(page).toContain('watch(pageCount, count => { if (page.value > count) page.value = count })')
+    expect(page).toContain('<OffsetPagination')
+    expect(page).toContain('@update:page="loadPage"')
+    expect(page).toContain('@update:limit="setPageSize"')
   })
 
   test('keeps the selected challenge while deletion is pending or fails', async () => {

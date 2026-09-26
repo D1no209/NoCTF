@@ -20,8 +20,15 @@ export function useAdminCompetitionsByIdPage() {
 
   const competitionId = route.params.id as string
 
+  const base = `/admin/competitions/${competitionId}`
+
   const isProgressionPage = computed(() => activePath.value ===
-    `/admin/competitions/${competitionId}/progression`)
+    `${base}/progression`)
+
+  const usesPageScroll = computed(() => activePath.value === `${base}/teams`
+    || activePath.value === `${base}/challenges`
+    || activePath.value.startsWith(`${base}/challenges/`)
+    || isProgressionPage.value)
 
   const { user, isAdministrator } = useAuth()
 
@@ -128,8 +135,6 @@ export function useAdminCompetitionsByIdPage() {
     refresh,
   })
 
-  const base = `/admin/competitions/${competitionId}`
-
   const navGroups = computed<WorkspaceNavGroup[]>(() => [
     {
       label: translate("ui.operations"),
@@ -202,6 +207,7 @@ export function useAdminCompetitionsByIdPage() {
       navGroups,
       activePath,
       isProgressionPage,
+      usesPageScroll,
       CompetitionStatusBadge,
       GameModeBadge,
       AppWorkspaceNav

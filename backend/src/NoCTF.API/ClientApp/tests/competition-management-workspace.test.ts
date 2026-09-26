@@ -19,6 +19,33 @@ test('competition management keeps navigation fixed and scrolls animated content
   expect(workspace).toContain('grid-template-rows: minmax(10rem, 32dvh) minmax(0, 1fr)')
 })
 
+test('challenge, team and progression management use page scroll instead of nested workspace scroll', async () => {
+  const shell = await sourceFile(
+    new URL('../app/pages/admin/competitions/[id].vue', import.meta.url),
+  ).text()
+  const scrollSurface = await Bun.file(
+    new URL('../app/components/ui/scroll-area/ScrollSurface.vue', import.meta.url),
+  ).text()
+  const layout = await sourceFile(
+    new URL('../app/layouts/default.vue', import.meta.url),
+  ).text()
+  const workspace = await Bun.file(
+    new URL('../app/components/views/app/settings-workspace.css', import.meta.url),
+  ).text()
+
+  expect(shell).toContain('activePath.value === `${base}/teams`')
+  expect(shell).toContain('activePath.value === `${base}/challenges`')
+  expect(shell).toContain('activePath.value.startsWith(`${base}/challenges/`)')
+  expect(shell).toContain(":data-workspace-scroll-content=\"usesPageScroll ? undefined : ''\"")
+  expect(shell).toContain(':enabled="!usesPageScroll"')
+  expect(shell).toContain("usesPageScroll ? 'overflow-visible'")
+  expect(layout).toContain('<ScrollSurface as="main" axis="y"')
+  expect(workspace).toContain(":has([data-workspace-scroll-content])")
+  expect(scrollSurface).toContain('enabled?: boolean')
+  expect(scrollSurface).toContain('watch(() => props.enabled, updateEnabled')
+  expect(scrollSurface).toContain('scrollbars?.dispose()')
+})
+
 test('related competition settings share continuous cards', async () => {
   const pages = await Promise.all([
     'index',
