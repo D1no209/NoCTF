@@ -2,7 +2,7 @@ import { markRaw, provide, toRefs } from 'vue'
 
 import { toast } from 'vue-sonner'
 import { Dice5, FileDown, History } from '@lucide/vue'
-import { downloadChallengeAttachmentEndpoint, downloadRandomChallengeAttachmentEndpoint, getChallengeEndpoint, listChallengeAttachmentsEndpoint } from '../../api'
+import { downloadChallengeAttachmentEndpoint, downloadRandomChallengeAttachmentEndpoint, getChallengeEndpoint, listChallengeAttachmentsEndpoint, startProgressionChallenge } from '../../api'
 import type { NoCtfapiEndpointsAdministrationChallengeBankAttachmentDeliveryPolicyProtocol, NoCtfapiEndpointsAdministrationChallengeBankChallengeAttachmentResponse, NoCtfapiEndpointsChallengesChallengeResponse } from '../../api'
 import { downloadSdkFileToDisk } from '../../utils/download'
 import ChallengeHintsComponent from './ChallengeHints.vue'
@@ -21,7 +21,7 @@ export function useCompetitionChallengeDetail(props: Readonly<{
 }>) {
   const ctx = inject(competitionContextKey)!
 
-  const { isLoggedIn, user } = useAuth()
+  const { isLoggedIn, ready: authReady, user } = useAuth()
 
   const challenge = ref<NoCtfapiEndpointsChallengesChallengeResponse | null>(null)
 
@@ -65,6 +65,34 @@ export function useCompetitionChallengeDetail(props: Readonly<{
     challenge.value = null
     attachments.value = []
     attachmentDeliveryPolicy.value = 'All'
+
+    if (isLoggedIn.value && ctx.competition.value?.mode === 'Ctf') {
+      const entry = useState<{ competitionId: string, challengeId: string, revision: number } | null>(
+        'progression-entry', () => null)
+      const expectedRevision = entry.value?.competitionId === props.competitionId
+        && entry.value.challengeId === props.competitionChallengeId
+        ? entry.value.revision : undefined
+      entry.value = null
+      const started = await startProgressionChallenge({
+        signal: reads.signal,
+        path: {
+          competitionId: props.competitionId,
+          competitionChallengeId: props.competitionChallengeId,
+        },
+        body: { expectedRevision },
+      })
+      if (sequence !== loadSequence) return
+      if (started.error) {
+        loading.value = false
+        if (started.response?.status === 409 || started.response?.status === 404) {
+          await navigateTo({ path: `/competitions/${props.competitionId}/progression`,
+            query: { blocked: props.competitionChallengeId } })
+          return
+        }
+        error.value = parseApiError(started.error, translate('progression.startFailed')).message
+        return
+      }
+    }
 
     const { data, error: requestError } = await getChallengeEndpoint({
       signal: reads.signal,
@@ -111,8 +139,10 @@ export function useCompetitionChallengeDetail(props: Readonly<{
   }
 
   watch(
-    () => [props.competitionId, props.competitionChallengeId] as const,
+    () => [props.competitionId, props.competitionChallengeId, ctx.competition.value?.mode,
+      user.value?.userId, authReady.value] as const,
     () => {
+      if (!ctx.competition.value?.mode || !authReady.value) return
       void loadChallenge()
       void loadAttachments()
     },
@@ -120,8 +150,6 @@ export function useCompetitionChallengeDetail(props: Readonly<{
   )
 
   watch(isLoggedIn, () => void loadAttachments())
-
-  watch(() => user.value?.userId, () => void loadChallenge())
 
   watch(() => ctx.competition.value?.status, (status, previousStatus) => {
     if (previousStatus && status !== previousStatus)

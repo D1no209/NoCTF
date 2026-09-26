@@ -658,6 +658,8 @@ public sealed class AdminCompetitionStore(
             .ExecuteDeleteAsync(ct);
         await db.TeamProgressionNodeStates.Where(item => item.CompetitionId == competitionId)
             .ExecuteDeleteAsync(ct);
+        await db.TeamProgressionNodeVisits.Where(item => item.CompetitionId == competitionId)
+            .ExecuteDeleteAsync(ct);
         await db.ProgressionEdges.Where(item => item.CompetitionId == competitionId)
             .ExecuteDeleteAsync(ct);
         await db.ProgressionNodes.Where(item => item.CompetitionId == competitionId)

@@ -18,10 +18,14 @@ import {
   applyProgressionSelectionChanges,
   canConnectProgression,
   getProgressionSelection,
+  maximumProgressionEdges,
+  progressionBatchIssue,
+  progressionConnectionIssue,
   removeProgressionSelection,
   updateProgressionNodePositions,
 } from '../../../../../lib/progression-graph'
 import type { ProgressionSelectionChange } from '../../../../../lib/progression-graph'
+import { buildProgressionLayout as calculateProgressionLayout } from '../../../../../lib/progression-layout'
 import { directionKey, directionLabel } from '../../../../../utils/directions'
 import ProgressionCanvasComponent from '~/components/ui/progression/ProgressionCanvas.vue'
 import { markRaw } from 'vue'
@@ -41,6 +45,9 @@ export function useAdminCompetitionsByIdProgressionPage() {
   const edges = shallowRef<GateEdge[]>([])
   const selectedNodeIds = shallowRef<Set<string>>(new Set())
   const selectedEdgeIds = shallowRef<Set<string>>(new Set())
+  const batch = shallowRef<{ sourceId: string, condition: 0 | 1, targets: Set<string> } | null>(null)
+  const layoutRevision = ref(0)
+  let layoutGeneration = 0
   const badges = ref<NoCtfapiEndpointsAdministrationCompetitionsCompetitionBadgeContract[]>([])
   const challenges = ref<NoCtfapiEndpointsChallengesChallengeSummaryResponse[]>([])
   const challengeSearch = ref('')
@@ -64,6 +71,29 @@ export function useAdminCompetitionsByIdProgressionPage() {
   const selectedEdge = computed(() => selection.value.edge)
   const selectedNode = computed(() => selection.value.node)
   const selectedCount = computed(() => selection.value.count)
+  const batchTargets = computed(() => batch.value?.targets ?? new Set<string>())
+  const batchSourceId = computed(() => batch.value?.sourceId ?? null)
+  const batchCondition = computed(() => batch.value?.condition ?? 0)
+  const batchDisabledReasons = computed(() => {
+    const reasons: Record<string, string> = {}
+    if (!batch.value) return reasons
+    for (const node of nodes.value) {
+      if (batch.value.targets.has(node.id)) continue
+      const issue = progressionConnectionIssue(edges.value, batch.value.sourceId, node.id)
+        ?? (edges.value.length + batch.value.targets.size >= maximumProgressionEdges ? 'limit' : null)
+      if (issue) reasons[node.id] = translate(`progression.connectionIssue.${issue}`)
+    }
+    return reasons
+  })
+  const previewEdges = computed<GateEdge[]>(() => !batch.value ? []
+    : [...batch.value.targets].map(target => ({
+      id: `preview-${batch.value!.sourceId}-${target}`,
+      source: batch.value!.sourceId, target,
+      type: 'smoothstep', selectable: false,
+      class: 'progression-preview-edge',
+      label: batch.value!.condition === 1 ? translate('progression.incomplete') : undefined,
+      data: { condition: batch.value!.condition },
+    })))
   const availableChallenges = computed(() => challenges.value.filter(challenge =>
     !nodes.value.some(node => node.data?.kind === 0 && node.data.resourceId === challenge.id),
   ))
@@ -82,20 +112,30 @@ export function useAdminCompetitionsByIdProgressionPage() {
   })
 
   async function load() {
+    cancelBatch()
+    const currentLayout = ++layoutGeneration
     loading.value = true
     const [graphResult, badgeResult, challengeResult] = await Promise.all([
       adminGetCompetitionProgression({ path: { competitionId } }),
       adminListCompetitionBadges({ path: { competitionId } }),
       adminListCompetitionChallenges({ path: { competitionId }, query: { includeDeleted: false } }),
     ])
-    loading.value = false
     if (!graphResult.data || !badgeResult.data || !challengeResult.data) {
+      loading.value = false
       error.value = translate('progression.loadFailed')
       return
     }
     badges.value = badgeResult.data.items ?? []
     challenges.value = challengeResult.data.items ?? []
     const graph = graphResult.data
+    if (graph.nodes?.some(node => !node.id || (node.kind !== 0 && node.kind !== 1)
+      || !(node.kind === 0 ? node.challenge?.competitionChallengeId : node.badge?.competitionBadgeId))
+      || graph.edges?.some(edge => !edge.id || !edge.sourceNodeId || !edge.targetNodeId
+        || (edge.condition !== 0 && edge.condition !== 1))) {
+      loading.value = false
+      error.value = translate('progression.loadFailed')
+      return
+    }
     enabled.value = graph.enabled ?? false
     showPlayerMap.value = graph.showPlayerMap ?? false
     stamp.value = graph.concurrencyStamp ?? null
@@ -107,9 +147,9 @@ export function useAdminCompetitionsByIdProgressionPage() {
       const badge = badges.value.find(item => item.id === resourceId)
       const challenge = challenges.value.find(item => item.id === resourceId)
       return {
-        id: node.id ?? crypto.randomUUID(),
+        id: node.id!,
         type: 'progression',
-        position: { x: node.positionX ?? 0, y: node.positionY ?? 0 },
+        position: { x: 0, y: 0 },
         data: {
           kind,
           resourceId,
@@ -119,37 +159,67 @@ export function useAdminCompetitionsByIdProgressionPage() {
       }
     })
     edges.value = (graph.edges ?? []).map(edge => ({
-      id: edge.id ?? crypto.randomUUID(),
-      source: edge.sourceNodeId ?? '', target: edge.targetNodeId ?? '',
+      id: edge.id!,
+      source: edge.sourceNodeId!, target: edge.targetNodeId!,
       type: 'smoothstep',
-      label: edge.condition === 1 ? translate('progression.incomplete') : translate('progression.completed'),
+      label: edge.condition === 1 ? translate('progression.incomplete') : undefined,
       data: { condition: edge.condition === 1 ? 1 : 0 },
     }))
     selectedNodeIds.value = new Set()
     selectedEdgeIds.value = new Set()
     error.value = null
+    await arrange(currentLayout)
+    loading.value = false
+  }
+
+  async function arrange(expectedGeneration?: number) {
+    if (batch.value || !nodes.value.length) return
+    const generation = expectedGeneration ?? ++layoutGeneration
+    try {
+      const positions = await calculateProgressionLayout(
+        nodes.value.map(node => ({ id: node.id, kind: node.data!.kind })),
+        edges.value.map(edge => ({ source: edge.source, target: edge.target })), 'RIGHT')
+      if (generation !== layoutGeneration || batch.value) return
+      nodes.value = updateProgressionNodePositions(nodes.value, positions)
+      layoutRevision.value++
+    }
+    catch {
+      toast.error(translate('progression.layoutFailed'))
+    }
+  }
+
+  function autoArrange() { return arrange() }
+
+  function nextNodePosition() {
+    return {
+      x: nodes.value.length ? Math.max(...nodes.value.map(node => node.position.x)) + 280 : 60,
+      y: 60,
+    }
   }
 
   function addChallenge(challenge: NoCtfapiEndpointsChallengesChallengeSummaryResponse) {
-    if (!challenge.id || nodes.value.some(node => node.data?.kind === 0 && node.data.resourceId === challenge.id))
+    if (batch.value || !challenge.id || nodes.value.some(node => node.data?.kind === 0 && node.data.resourceId === challenge.id))
       return
+    layoutGeneration++
     nodes.value = [...nodes.value, {
       id: crypto.randomUUID(), type: 'progression',
-      position: { x: 60 + nodes.value.length * 35, y: 60 + nodes.value.length * 30 },
+      position: nextNodePosition(),
       data: { kind: 0, resourceId: challenge.id, title: challenge.customTitle || challenge.title || challenge.id },
     }]
   }
 
   function addBadge(badge: NoCtfapiEndpointsAdministrationCompetitionsCompetitionBadgeContract) {
-    if (!badge.id) return
+    if (batch.value || !badge.id) return
+    layoutGeneration++
     nodes.value = [...nodes.value, {
       id: crypto.randomUUID(), type: 'progression',
-      position: { x: 100 + nodes.value.length * 35, y: 80 + nodes.value.length * 30 },
+      position: nextNodePosition(),
       data: { kind: 1, resourceId: badge.id, title: badge.name ?? badge.id, imageUrl: badge.imageUrl },
     }]
   }
 
   function connect(connection: Connection) {
+    if (batch.value) return
     const source = connection.source
     const target = connection.target
     if (!canConnectProgression(edges.value, source, target)) {
@@ -158,13 +228,14 @@ export function useAdminCompetitionsByIdProgressionPage() {
     }
     const edge: GateEdge = {
       id: crypto.randomUUID(), source, target, type: 'smoothstep',
-      label: translate('progression.completed'), data: { condition: 0 },
+      data: { condition: 0 },
     }
     edges.value = [...edges.value, edge]
   }
 
   function removeSelected() {
-    if (!canWrite.value || !selectedCount.value) return
+    if (batch.value || !canWrite.value || !selectedCount.value) return
+    layoutGeneration++
     const remaining = removeProgressionSelection(
       nodes.value, edges.value, selectedNodeIds.value, selectedEdgeIds.value)
     nodes.value = remaining.nodes
@@ -179,18 +250,66 @@ export function useAdminCompetitionsByIdProgressionPage() {
     selectedEdgeIds.value = applyProgressionSelectionChanges(selectedEdgeIds.value, changes)
   }
   function updateNodePositions(positions: { id: string, x: number, y: number }[]) {
+    if (batch.value) return
+    layoutGeneration++
     nodes.value = updateProgressionNodePositions(nodes.value, positions)
   }
   function setEdgeCondition(condition: 0 | 1) {
     const edge = selectedEdge.value
-    if (!edge) return
+    if (!edge || batch.value) return
     edges.value = edges.value.map(item => item.id === edge.id
-      ? { ...item, data: { condition }, label: translate(condition === 0 ? 'progression.completed' : 'progression.incomplete') }
+      ? { ...item, data: { condition }, label: condition === 1 ? translate('progression.incomplete') : undefined }
       : item)
   }
 
+  function beginBatch() {
+    if (!canWrite.value || !selectedNode.value || batch.value) return
+    batch.value = { sourceId: selectedNode.value.id, condition: 0, targets: new Set() }
+  }
+
+  function cancelBatch() { batch.value = null }
+
+  function setBatchCondition(condition: 0 | 1) {
+    if (batch.value) batch.value = { ...batch.value, condition }
+  }
+
+  function toggleBatchTarget(targetId: string) {
+    if (!batch.value || !nodes.value.some(node => node.id === targetId)) return
+    const targets = new Set(batch.value.targets)
+    if (targets.has(targetId)) targets.delete(targetId)
+    else {
+      const reason = batchDisabledReasons.value[targetId]
+      if (reason) { toast.error(reason); return }
+      targets.add(targetId)
+    }
+    batch.value = { ...batch.value, targets }
+  }
+
+  function applyBatch() {
+    const currentBatch = batch.value
+    if (!currentBatch || !currentBatch.targets.size || !canWrite.value) return
+    const targets = [...currentBatch.targets].sort()
+    const issue = progressionBatchIssue(edges.value, currentBatch.sourceId, targets)
+    if (issue) {
+      toast.error(translate(`progression.connectionIssue.${issue}`))
+      return
+    }
+    const next: GateEdge[] = targets.map(target => ({
+        id: crypto.randomUUID(), source: currentBatch.sourceId, target,
+        type: 'smoothstep',
+        label: currentBatch.condition === 1 ? translate('progression.incomplete') : undefined,
+        data: { condition: currentBatch.condition },
+      }))
+    edges.value = [...edges.value, ...next]
+    batch.value = null
+  }
+
+  function onKeyDown(event: KeyboardEvent) {
+    if (event.key === 'Escape' && batch.value) cancelBatch()
+  }
+
   async function save() {
-    if (!canWrite.value || saving.value) return
+    if (!canWrite.value || saving.value || batch.value) return
     saving.value = true
     const { data, error: saveError } = await adminSaveCompetitionProgression({
       path: { competitionId },
@@ -201,7 +320,6 @@ export function useAdminCompetitionsByIdProgressionPage() {
           id: node.id, kind: node.data!.kind,
           challenge: node.data!.kind === 0 ? { competitionChallengeId: node.data!.resourceId } : null,
           badge: node.data!.kind === 1 ? { competitionBadgeId: node.data!.resourceId } : null,
-          positionX: node.position.x, positionY: node.position.y,
         })),
         edges: edges.value.map(edge => ({
           id: edge.id, sourceNodeId: edge.source,
@@ -299,17 +417,27 @@ export function useAdminCompetitionsByIdProgressionPage() {
     badges.value = badges.value.filter(badge => badge.id !== badgeId)
   }
 
-  onMounted(load)
+  onMounted(() => {
+    document.addEventListener('keydown', onKeyDown)
+    void load()
+  })
+  onBeforeUnmount(() => {
+    layoutGeneration++
+    document.removeEventListener('keydown', onKeyDown)
+  })
   const ProgressionCanvas = markRaw(ProgressionCanvasComponent)
   return {
     competition, canWrite, enabled, showPlayerMap, nodes, edges, badges,
     challenges, availableChallenges, filteredChallenges, challengeSearch,
     challengeDirection, challengeDirections, loading, saving, badgeSaving, error,
     selectedNode, selectedEdge, selectedCount, newBadgeName, newBadgeDescription, newBadgeImage,
+    batch, batchTargets, batchSourceId, batchCondition, batchDisabledReasons, previewEdges,
+    layoutRevision,
     newBadgeUploadKey, editingBadgeId, editBadgeName, editBadgeDescription, editBadgeImage,
     editBadgeUploadKey,
     load, addChallenge, addBadge, connect, removeSelected, changeNodeSelection,
-    changeEdgeSelection, updateNodePositions, setEdgeCondition, save,
+    changeEdgeSelection, updateNodePositions, setEdgeCondition, save, autoArrange,
+    beginBatch, cancelBatch, setBatchCondition, toggleBatchTarget, applyBatch,
     onBadgeFileChange, createBadge, deleteBadge,
     onEditBadgeFileChange, beginEditBadge, updateBadge,
     ProgressionCanvas,

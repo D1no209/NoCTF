@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { Handle, Panel, Position, VueFlow } from '@vue-flow/core'
 import type { Connection, Edge, EdgeChange, Node, NodeChange, NodeDragEvent, VueFlowStore } from '@vue-flow/core'
-import { Scan } from '@lucide/vue'
-import { nextTick, shallowRef } from 'vue'
+import { LockKeyhole, LocateFixed, Scan } from '@lucide/vue'
+import { computed, nextTick, shallowRef, watch } from 'vue'
 import { restoreProgressionViewport } from './progression-viewport'
 import '@vue-flow/core/dist/style.css'
 import '@vue-flow/core/dist/theme-default.css'
@@ -10,16 +10,33 @@ import '@vue-flow/core/dist/theme-default.css'
 const props = withDefaults(defineProps<{
   readOnly?: boolean
   height?: string
+  batchMode?: boolean
+  batchSourceId?: string | null
+  batchSelectedIds?: ReadonlySet<string>
+  batchDisabledReasons?: Record<string, string>
+  previewEdges?: Edge[]
+  focusNodeId?: string | null
+  currentProgressNodeId?: string | null
+  highlightedNodeIds?: ReadonlySet<string>
+  highlightedEdgeIds?: ReadonlySet<string>
+  showProgressControls?: boolean
+  direction?: 'RIGHT' | 'DOWN'
+  layoutRevision?: number
 }>(), { readOnly: false, height: '38rem' })
 const nodes = defineModel<Node[]>('nodes', { required: true })
 const edges = defineModel<Edge[]>('edges', { required: true })
-const fitViewOnInit = nodes.value.length > 0
-const viewport = shallowRef<Pick<VueFlowStore, 'fitView' | 'setViewport'> | null>(null)
+const viewport = shallowRef<Pick<VueFlowStore, 'fitView' | 'setViewport' | 'setCenter'> | null>(null)
+const displayEdges = computed(() => [...edges.value.map(edge => ({
+  ...edge,
+  class: [edge.class, props.highlightedEdgeIds?.has(edge.id) ? 'progression-blocked-edge' : '']
+    .filter(Boolean).join(' '),
+})), ...(props.previewEdges ?? [])])
 const emit = defineEmits<{
   connect: [connection: Connection]
   nodeSelectionChange: [changes: { id: string, selected: boolean }[]]
   edgeSelectionChange: [changes: { id: string, selected: boolean }[]]
   nodePositionsChange: [positions: { id: string, x: number, y: number }[]]
+  nodeClick: [id: string]
 }>()
 
 function onNodesChange(changes: NodeChange[]) {
@@ -44,6 +61,25 @@ function onNodeDragStop(event: NodeDragEvent) {
 
 function onInit(instance: VueFlowStore) {
   viewport.value = instance
+  if (props.focusNodeId) void focusNode(props.focusNodeId)
+}
+
+watch(() => props.focusNodeId, id => { if (id) void focusNode(id) })
+watch(() => props.layoutRevision, revision => {
+  if (revision && !props.showProgressControls) void restoreView()
+})
+watch(() => props.highlightedNodeIds, ids => {
+  if (!ids?.size || !viewport.value) return
+  void viewport.value.fitView({ nodes: [...ids], padding: 0.4, minZoom: 0.65, maxZoom: 1 })
+})
+
+async function focusNode(id: string) {
+  const node = nodes.value.find(item => item.id === id)
+  if (!node || !viewport.value) return
+  await nextTick()
+  const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+  await viewport.value.setCenter(node.position.x + 100, node.position.y + 40,
+    { zoom: 1, duration: reduced ? 0 : 180 })
 }
 
 async function restoreView() {
@@ -54,18 +90,26 @@ async function restoreView() {
 </script>
 
 <template>
-  <VueFlow v-model:nodes="nodes" v-model:edges="edges"
-    :fit-view-on-init="fitViewOnInit"
+  <VueFlow v-model:nodes="nodes" :edges="displayEdges"
+    :fit-view-on-init="!props.showProgressControls && nodes.length > 0"
     :default-viewport="{ x: 0, y: 0, zoom: 1 }"
     :min-zoom="0.001"
-    :nodes-draggable="!props.readOnly" :nodes-connectable="!props.readOnly"
-    :elements-selectable="!props.readOnly" :multi-selection-key-code="props.readOnly ? null : 'Control'"
-    :edges-updatable="!props.readOnly" :delete-key-code="props.readOnly ? null : ['Backspace', 'Delete']"
+    :nodes-draggable="!props.readOnly && !props.batchMode" :nodes-connectable="!props.readOnly && !props.batchMode"
+    :elements-selectable="!props.readOnly && !props.batchMode" :multi-selection-key-code="props.readOnly || props.batchMode ? null : 'Control'"
+    :edges-updatable="!props.readOnly && !props.batchMode" :delete-key-code="props.readOnly || props.batchMode ? null : ['Backspace', 'Delete']"
     :style="{ height: props.height }"
     @init="onInit" @connect="emit('connect', $event)"
+    @node-click="emit('nodeClick', $event.node.id)"
     @nodes-change="onNodesChange" @edges-change="onEdgesChange"
     @node-drag-stop="onNodeDragStop" @selection-drag-stop="onNodeDragStop">
-    <Panel position="top-right">
+    <Panel position="top-right" class="flex gap-2">
+      <Hint v-if="props.showProgressControls" :content="$t('progression.returnToProgress')">
+        <Button type="button" variant="secondary" size="icon" class="size-11"
+          :disabled="!viewport || !props.currentProgressNodeId" :aria-label="$t('progression.returnToProgress')"
+          @click="props.currentProgressNodeId && focusNode(props.currentProgressNodeId)">
+          <LocateFixed data-icon="inline-start" />
+        </Button>
+      </Hint>
       <Hint :content="$t('progression.fitView')">
         <Button type="button" variant="secondary" size="icon" class="size-11" :disabled="!viewport"
           :aria-label="$t('progression.fitView')" @click="restoreView">
@@ -73,23 +117,37 @@ async function restoreView() {
         </Button>
       </Hint>
     </Panel>
-    <template #node-progression="{ data }">
-      <div class="progression-node-card flex min-w-44 max-w-56 items-center gap-2 rounded-lg border border-border bg-background px-3 py-2 shadow-sm">
-        <Handle type="target" :position="Position.Left" :connectable="!props.readOnly" />
+    <template #node-progression="{ id, data }">
+      <Hint :content="props.batchDisabledReasons?.[id] || data.title">
+        <div class="progression-node-card flex w-[200px] min-h-[76px] items-center gap-2 rounded-lg bg-background px-3 py-2 shadow-sm"
+          :class="props.batchSelectedIds?.has(id) ? 'bg-primary/15 shadow-md' : props.batchSourceId === id ? 'bg-primary/10' : props.batchDisabledReasons?.[id] ? 'opacity-55' : ''"
+          :aria-disabled="props.batchDisabledReasons?.[id] ? true : undefined" tabindex="0"
+          @keydown.enter.prevent="emit('nodeClick', id)">
+          <Handle type="target" :position="props.direction === 'DOWN' ? Position.Top : Position.Left" :connectable="!props.readOnly && !props.batchMode" />
         <img v-if="data.imageUrl" :src="data.imageUrl" alt="" class="size-9 rounded object-cover" />
-        <span class="min-w-0 break-words text-sm font-medium">{{ data.title }}</span>
-        <Handle type="source" :position="Position.Right" :connectable="!props.readOnly" />
-      </div>
+          <span class="min-w-0 line-clamp-2 break-words text-sm font-medium">{{ data.title }}</span>
+          <Handle type="source" :position="props.direction === 'DOWN' ? Position.Bottom : Position.Right" :connectable="!props.readOnly && !props.batchMode" />
+        </div>
+      </Hint>
     </template>
-    <template #node-read-progression="{ data }">
-      <div class="min-w-36 max-w-52 rounded-lg border px-3 py-2 text-sm shadow-sm"
-        :class="data.active ? 'border-primary bg-card' : 'border-border bg-muted text-muted-foreground'">
-        <Handle type="target" :position="Position.Left" :connectable="false" />
-        <img v-if="data.imageUrl" :src="data.imageUrl" alt="" class="mb-1 size-9 rounded object-cover" />
-        <p class="font-medium">{{ data.title }}</p>
-        <p class="mt-1 text-xs">{{ data.complete ? $t('progression.completed') : data.active ? $t('progression.available') : $t('progression.locked') }}</p>
-        <Handle type="source" :position="Position.Right" :connectable="false" />
-      </div>
+    <template #node-read-progression="{ id, data }">
+      <Hint :content="data.title">
+        <div class="flex w-[200px] min-h-[76px] cursor-pointer items-center gap-2 rounded-lg px-3 py-2 text-sm shadow-sm"
+          :class="[data.complete ? 'bg-success/15 text-success' : !data.active ? 'bg-muted text-muted-foreground' : data.visited ? 'bg-warning/15 text-warning' : 'bg-card text-primary', props.highlightedNodeIds?.has(id) ? 'progression-blocked-node' : '']"
+          tabindex="0" @keydown.enter.prevent="emit('nodeClick', id)">
+          <Handle type="target" :position="props.direction === 'DOWN' ? Position.Top : Position.Left" :connectable="false" />
+          <img v-if="data.imageUrl" :src="data.imageUrl" alt="" class="size-9 rounded object-cover" />
+          <div class="min-w-0 flex-1">
+            <p class="line-clamp-2 break-words font-medium">{{ data.title }}</p>
+            <p class="mt-1 flex items-center gap-1 text-xs">
+              <LockKeyhole v-if="!data.active" class="size-3" aria-hidden="true" />
+              {{ data.complete ? $t('progression.completed') : data.active ? data.visited ? $t('progression.inProgress') : $t('progression.available') : $t('progression.locked') }}
+              <span v-if="data.complete && !data.active">· {{ $t('progression.locked') }}</span>
+            </p>
+          </div>
+          <Handle type="source" :position="props.direction === 'DOWN' ? Position.Bottom : Position.Right" :connectable="false" />
+        </div>
+      </Hint>
     </template>
   </VueFlow>
 </template>

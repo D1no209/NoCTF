@@ -35,6 +35,7 @@ public sealed class CompetitionProgressionPersistenceTests
                 .UseSnakeCaseNamingConvention().Options;
             var now = DateTimeOffset.Parse("2026-09-25T00:00:00Z");
             var ownerId = Guid.NewGuid();
+            var otherUserId = Guid.NewGuid();
             var competitionId = Guid.NewGuid();
             var challengeId = Guid.NewGuid();
             var instanceId = Guid.NewGuid();
@@ -43,13 +44,22 @@ public sealed class CompetitionProgressionPersistenceTests
             var badgeNodeId = Guid.NewGuid();
             var imageId = Guid.NewGuid();
             var teamId = Guid.NewGuid();
+            var otherTeamId = Guid.NewGuid();
             await using (var setup = new NoCtfDbContext(options))
             {
                 await setup.Database.MigrateAsync(ct);
                 await Assert.That(await setup.Database.GetPendingMigrationsAsync(ct)).IsEmpty();
                 setup.Users.Add(new User
                 {
-                    Id = ownerId, UserName = "owner", Email = "owner@example.test",
+                    Id = ownerId, UserName = "owner", NormalizedUserName = "OWNER",
+                    Email = "owner@example.test",
+                    PasswordHash = "test", Kind = UserKind.Human,
+                    CreatedAt = now, UpdatedAt = now
+                });
+                setup.Users.Add(new User
+                {
+                    Id = otherUserId, UserName = "other", NormalizedUserName = "OTHER",
+                    Email = "other@example.test",
                     PasswordHash = "test", Kind = UserKind.Human,
                     CreatedAt = now, UpdatedAt = now
                 });
@@ -92,6 +102,14 @@ public sealed class CompetitionProgressionPersistenceTests
                     RegistrationStatus = TeamRegistrationStatus.Approved,
                     RegisteredAt = now
                 });
+                setup.Teams.Add(new Team
+                {
+                    Id = otherTeamId, CompetitionId = competitionId, Name = "Other team",
+                    CaptainId = otherUserId, MemberIds = [otherUserId],
+                    InvitationToken = Guid.NewGuid().ToString("N"),
+                    RegistrationStatus = TeamRegistrationStatus.Approved,
+                    RegisteredAt = now
+                });
                 await setup.SaveChangesAsync(ct);
             }
             await using (var db = new NoCtfDbContext(options))
@@ -103,8 +121,8 @@ public sealed class CompetitionProgressionPersistenceTests
                 db.ChangeTracker.Clear();
                 var result = await store.SaveAsync(new(
                     competitionId, empty.Progression!.ConcurrencyStamp, true, true,
-                    [new(nodeId, ProgressionNodeKind.Challenge, instanceId, 10, 20),
-                     new(badgeNodeId, ProgressionNodeKind.Badge, badgeId, 200, 20)],
+                    [new(nodeId, ProgressionNodeKind.Challenge, instanceId),
+                     new(badgeNodeId, ProgressionNodeKind.Badge, badgeId)],
                     [new(Guid.NewGuid(), nodeId, badgeNodeId,
                         ProgressionPrerequisiteCondition.Completed)], now), ct);
                 await Assert.That(result.Failure).IsNull();
@@ -113,11 +131,49 @@ public sealed class CompetitionProgressionPersistenceTests
                     .CountAsync(ct)).IsEqualTo(1);
                 await Assert.That(await db.ProgressionNodes.OfType<BadgeProgressionNode>()
                     .CountAsync(ct)).IsEqualTo(1);
+                var starter = new ProgressionChallengeStarter(new TestContextFactory(options));
+                await Assert.That(await starter.StartAsync(competitionId, instanceId, ownerId,
+                    result.Progression.Revision, now.AddMinutes(1), ct))
+                    .IsEqualTo(StartProgressionChallengeResult.Started);
+                await Assert.That(await starter.StartAsync(competitionId, instanceId, ownerId,
+                    result.Progression.Revision, now.AddMinutes(2), ct))
+                    .IsEqualTo(StartProgressionChallengeResult.Started);
+                await Assert.That(await db.TeamProgressionNodeVisits.AsNoTracking()
+                    .Where(visit => visit.TeamId == teamId && visit.NodeId == nodeId)
+                    .Select(visit => visit.FirstOpenedAt).SingleAsync(ct))
+                    .IsEqualTo(now.AddMinutes(1));
+                var player = await new ProgressionPlayerReader(db).ReadAsync(
+                    competitionId, teamId, ct);
+                await Assert.That(player.Nodes.Single(node => node.Id == nodeId).Visited).IsTrue();
+                var other = await new ProgressionPlayerReader(db).ReadAsync(
+                    competitionId, otherTeamId, ct);
+                await Assert.That(other.Nodes.Single(node => node.Id == nodeId).Visited).IsFalse();
+                var concurrentStarts = await Task.WhenAll(Enumerable.Range(0, 8)
+                    .Select(_ => starter.StartAsync(competitionId, instanceId, otherUserId,
+                        result.Progression.Revision, now.AddMinutes(2), ct)));
+                await Assert.That(concurrentStarts.All(start =>
+                    start == StartProgressionChallengeResult.Started)).IsTrue();
+                await Assert.That(await db.TeamProgressionNodeVisits.AsNoTracking()
+                    .CountAsync(visit => visit.TeamId == otherTeamId && visit.NodeId == nodeId, ct))
+                    .IsEqualTo(1);
+                await Assert.That(await starter.StartAsync(competitionId, instanceId, ownerId,
+                    result.Progression.Revision - 1, now.AddMinutes(3), ct))
+                    .IsEqualTo(StartProgressionChallengeResult.GraphChanged);
                 var stale = await store.SaveAsync(new(
                     competitionId, Guid.NewGuid(), false, false, [], [], now), ct);
                 await Assert.That(stale.Failure)
                     .IsEqualTo(CompetitionProgressionSaveFailure.ConcurrencyConflict);
             }
         });
+    }
+
+    private sealed class TestContextFactory(DbContextOptions<NoCtfDbContext> options)
+        : IDbContextFactory<NoCtfDbContext>
+    {
+        public NoCtfDbContext CreateDbContext() => new(options);
+
+        public Task<NoCtfDbContext> CreateDbContextAsync(
+            CancellationToken cancellationToken = default) =>
+            Task.FromResult(CreateDbContext());
     }
 }

@@ -175,3 +175,10 @@ html[data-theme-transition='down']::view-transition-new(root) {
   .noctf-film-up-enter-active, .noctf-film-up-leave-active { transition: none; }
   .noctf-film-up-enter-from, .noctf-film-up-leave-to { transform: none; opacity: 1; }
 }
+@keyframes progression-blocked-pulse {
+  50% { transform: scale(1.025); }
+}
+.progression-blocked-node { animation: progression-blocked-pulse 650ms ease-out 2; }
+@media (prefers-reduced-motion: reduce) {
+  .progression-blocked-node { animation: none; }
+}

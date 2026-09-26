@@ -3,6 +3,47 @@ export interface ProgressionConnection {
   target: string
 }
 
+export type ProgressionConnectionIssue = 'missing' | 'self' | 'duplicate' | 'cycle' | 'limit'
+export const maximumProgressionEdges = 4096
+
+export interface ProgressionFocusCandidate {
+  id: string
+  kind: 0 | 1
+  active: boolean
+  complete: boolean
+  visited: boolean
+  firstOpenedAt?: string | null
+  x: number
+  y: number
+}
+
+export function chooseProgressionFocus(nodes: readonly ProgressionFocusCandidate[]): string | null {
+  const challenges = nodes.filter(node => node.kind === 0)
+  const available = challenges.filter(node => node.active && !node.complete)
+  const visited = available.filter(node => node.visited)
+    .sort((a, b) => (Date.parse(b.firstOpenedAt ?? '') || 0)
+      - (Date.parse(a.firstOpenedAt ?? '') || 0) || a.id.localeCompare(b.id))
+  return visited[0]?.id ?? [...available].sort((a, b) =>
+    a.x - b.x || a.y - b.y || a.id.localeCompare(b.id))[0]?.id
+    ?? [...challenges].sort((a, b) => a.id.localeCompare(b.id))[0]?.id
+    ?? nodes[0]?.id ?? null
+}
+
+export interface ProgressionConditionalEdge extends ProgressionConnection {
+  id: string
+  condition: 0 | 1
+}
+
+export function unsatisfiedProgressionEdges(
+  completeByNodeId: ReadonlyMap<string, boolean>,
+  edges: readonly ProgressionConditionalEdge[], targetId: string,
+): ProgressionConditionalEdge[] {
+  return edges.filter(edge => edge.target === targetId
+    && (edge.condition === 1
+      ? completeByNodeId.get(edge.source) === true
+      : completeByNodeId.get(edge.source) !== true))
+}
+
 interface SelectableElement {
   id: string
 }
@@ -66,9 +107,17 @@ export function updateProgressionNodePositions<
 export function canConnectProgression(
   edges: readonly ProgressionConnection[], source: string, target: string,
 ): boolean {
-  if (!source || !target || source === target
-    || edges.some(edge => edge.source === source && edge.target === target))
-    return false
+  return progressionConnectionIssue(edges, source, target) === null
+}
+
+export function progressionConnectionIssue(
+  edges: readonly ProgressionConnection[], source: string, target: string,
+): ProgressionConnectionIssue | null {
+  if (!source || !target) return 'missing'
+  if (source === target) return 'self'
+  if (edges.some(edge => edge.source === source && edge.target === target))
+    return 'duplicate'
+  if (edges.length >= maximumProgressionEdges) return 'limit'
 
   const seen = new Set<string>()
   const reachesSource = (current: string): boolean => {
@@ -77,5 +126,18 @@ export function canConnectProgression(
     seen.add(current)
     return edges.some(edge => edge.source === current && reachesSource(edge.target))
   }
-  return !reachesSource(target)
+  return reachesSource(target) ? 'cycle' : null
+}
+
+export function progressionBatchIssue(
+  edges: readonly ProgressionConnection[], source: string,
+  targets: readonly string[],
+): ProgressionConnectionIssue | null {
+  const checked = [...edges]
+  for (const target of targets) {
+    const issue = progressionConnectionIssue(checked, source, target)
+    if (issue) return issue
+    checked.push({ source, target })
+  }
+  return null
 }

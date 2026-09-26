@@ -8,8 +8,9 @@ public sealed record ProgressionBadgeDisplay(
 
 public sealed record PlayerProgressionNode(
     Guid Id, ProgressionNodeKind Kind, Guid ResourceId,
-    string Title, string? Direction, double PositionX, double PositionY,
-    bool Active, bool Complete, Guid? ImageFileId);
+    string Title, string? Description, string? Direction,
+    bool Active, bool Complete, bool Visited,
+    DateTimeOffset? FirstOpenedAt, Guid? ImageFileId);
 
 public sealed record PlayerProgressionMap(
     bool Enabled, bool ShowPlayerMap, long Revision,

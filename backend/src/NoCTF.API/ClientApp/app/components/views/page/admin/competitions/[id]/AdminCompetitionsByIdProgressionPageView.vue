@@ -8,10 +8,13 @@ const {
   availableChallenges, filteredChallenges, challengeSearch, challengeDirection,
   challengeDirections, loading, saving, badgeSaving, error,
   selectedNode, selectedEdge, selectedCount, newBadgeName, newBadgeDescription, newBadgeImage,
+  batch, batchTargets, batchSourceId, batchCondition, batchDisabledReasons, previewEdges,
+  layoutRevision,
   newBadgeUploadKey, editingBadgeId, editBadgeName, editBadgeDescription,
   editBadgeUploadKey,
   load, addChallenge, addBadge, connect, removeSelected, changeNodeSelection,
-  changeEdgeSelection, updateNodePositions, setEdgeCondition, save,
+  changeEdgeSelection, updateNodePositions, setEdgeCondition, save, autoArrange,
+  beginBatch, cancelBatch, setBatchCondition, toggleBatchTarget, applyBatch,
   onBadgeFileChange, createBadge, deleteBadge, ProgressionCanvas,
   onEditBadgeFileChange, beginEditBadge, updateBadge,
 } = toRefs(props.state)
@@ -24,9 +27,14 @@ const {
         <h2 class="text-xl font-semibold">{{ $t('progression.title') }}</h2>
         <p class="mt-1 text-sm text-muted-foreground">{{ $t('progression.description') }}</p>
       </div>
-      <Button :disabled="!canWrite || saving || loading || competition?.mode !== 'Ctf'" @click="save">
-        {{ saving ? $t('progression.saving') : $t('progression.save') }}
-      </Button>
+      <div class="flex flex-wrap gap-2">
+        <Button type="button" variant="secondary" :disabled="loading || batch || !nodes.length" @click="autoArrange">
+          {{ $t('progression.autoArrange') }}
+        </Button>
+        <Button :disabled="!canWrite || saving || loading || batch || competition?.mode !== 'Ctf'" @click="save">
+          {{ saving ? $t('progression.saving') : $t('progression.save') }}
+        </Button>
+      </div>
     </header>
     <Alert v-if="competition?.mode !== 'Ctf'"><AlertDescription>{{ $t('progression.ctfOnly') }}</AlertDescription></Alert>
     <Alert v-if="error" variant="destructive">
@@ -61,7 +69,7 @@ const {
             </div>
             <ScrollSurface axis="y" class="max-h-[26rem]" :aria-label="$t('progression.challengeCatalog')">
               <Button v-for="challenge in filteredChallenges" :key="challenge.id"
-                type="button" variant="ghost" :disabled="!canWrite"
+                type="button" variant="ghost" :disabled="!canWrite || !!batch"
                 class="flex w-full items-center justify-between gap-2 px-2 text-left text-sm"
                 @click="addChallenge(challenge)">
                 <span class="truncate">{{ challenge.customTitle || challenge.title }}</span>
@@ -78,7 +86,7 @@ const {
               <div v-for="badge in badges" :key="badge.id" class="flex items-center gap-2 rounded border p-2">
                 <img :src="badge.imageUrl" :alt="badge.name" class="size-9 rounded object-cover" />
                 <span class="min-w-0 flex-1 truncate text-sm">{{ badge.name }}</span>
-                <Button type="button" size="icon-sm" variant="ghost" :disabled="!canWrite" :aria-label="$t('progression.importBadge')" @click="addBadge(badge)">+</Button>
+                <Button type="button" size="icon-sm" variant="ghost" :disabled="!canWrite || !!batch" :aria-label="$t('progression.importBadge')" @click="addBadge(badge)">+</Button>
                 <Button type="button" size="icon-sm" variant="ghost" :disabled="!canWrite" :aria-label="$t('progression.editBadge')" @click="beginEditBadge(badge)">✎</Button>
                 <Button type="button" size="icon-sm" variant="ghost" :disabled="!canWrite" :aria-label="$t('progression.deleteBadge')" @click="deleteBadge(badge.id!)">×</Button>
               </div>
@@ -122,9 +130,12 @@ const {
 
         <div class="relative min-h-[46rem] overflow-hidden rounded-lg border bg-card">
           <component :is="ProgressionCanvas" v-model:nodes="nodes" v-model:edges="edges"
-            :read-only="!canWrite" height="46rem" @connect="connect"
+            :read-only="!canWrite" :batch-mode="!!batch" :batch-source-id="batchSourceId"
+            :batch-selected-ids="batchTargets" :batch-disabled-reasons="batchDisabledReasons"
+            :preview-edges="previewEdges" :layout-revision="layoutRevision"
+            height="46rem" @connect="connect"
             @node-selection-change="changeNodeSelection" @edge-selection-change="changeEdgeSelection"
-            @node-positions-change="updateNodePositions" />
+            @node-positions-change="updateNodePositions" @node-click="toggleBatchTarget" />
           <div v-if="!nodes.length" class="pointer-events-none absolute inset-0 flex items-center justify-center text-sm text-muted-foreground">
             {{ $t('progression.emptyCanvas') }}
           </div>
@@ -132,7 +143,18 @@ const {
 
         <aside class="rounded-lg border bg-card p-4">
           <h3 class="font-semibold">{{ $t('progression.inspector') }}</h3>
-          <div v-if="selectedCount > 1" class="mt-4 space-y-3">
+          <div v-if="batch" class="mt-4 flex flex-col gap-3">
+            <p class="text-sm font-medium">{{ $t('progression.batchSuccessors') }}</p>
+            <p class="text-xs text-muted-foreground">{{ $t('progression.batchInstruction') }}</p>
+            <p class="text-sm">{{ $t('progression.predecessorCondition') }}</p>
+            <div class="flex flex-wrap gap-2">
+              <Button size="sm" :variant="batchCondition === 0 ? 'default' : 'outline'" @click="setBatchCondition(0)">{{ $t('progression.completed') }}</Button>
+              <Button size="sm" :variant="batchCondition === 1 ? 'default' : 'outline'" @click="setBatchCondition(1)">{{ $t('progression.incomplete') }}</Button>
+            </div>
+            <Button :disabled="!batchTargets.size" @click="applyBatch">{{ $t('progression.addConnections', { count: batchTargets.size }) }}</Button>
+            <Button variant="secondary" @click="cancelBatch">{{ $t('ui.cancel') }}</Button>
+          </div>
+          <div v-else-if="selectedCount > 1" class="mt-4 flex flex-col gap-3">
             <p class="text-sm font-medium">{{ $t('progression.selectedCount', { count: selectedCount }) }}</p>
             <Button v-if="canWrite" size="sm" variant="destructive" @click="removeSelected">{{ $t('progression.removeSelected') }}</Button>
           </div>
@@ -145,6 +167,7 @@ const {
           <div v-else-if="selectedNode" class="mt-4 space-y-3">
             <p class="break-words text-sm font-medium">{{ selectedNode.data?.title }}</p>
             <p class="text-xs text-muted-foreground">{{ selectedNode.data?.kind === 0 ? $t('progression.challengeNode') : $t('progression.badgeNode') }}</p>
+            <Button v-if="canWrite" size="sm" @click="beginBatch">{{ $t('progression.batchSuccessors') }}</Button>
             <Button v-if="canWrite" size="sm" variant="destructive" @click="removeSelected">{{ $t('progression.removeNode') }}</Button>
           </div>
           <p v-else class="mt-4 text-sm text-muted-foreground">{{ $t('progression.selectHint') }}</p>

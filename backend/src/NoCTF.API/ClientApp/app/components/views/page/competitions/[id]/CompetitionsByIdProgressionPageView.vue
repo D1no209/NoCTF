@@ -3,7 +3,11 @@ import { toRefs } from 'vue'
 import type { CompetitionsByIdProgressionPageViewState } from '~/features/routes/competitions/[id]/useCompetitionsByIdProgressionPage'
 
 const props = defineProps<{ state: CompetitionsByIdProgressionPageViewState }>()
-const { data, loading, error, nodes, edges, load, ProgressionCanvas } = toRefs(props.state)
+const {
+  data, loading, error, nodes, edges, direction, initialFocusNodeId,
+  currentProgressNodeId, highlightedNodeIds, highlightedEdgeIds,
+  blockedMessage, selectedBadge, load, onNodeClick, ProgressionCanvas,
+} = toRefs(props.state)
 </script>
 
 <template>
@@ -27,7 +31,20 @@ const { data, loading, error, nodes, edges, load, ProgressionCanvas } = toRefs(p
       </section>
       <section v-if="data.showPlayerMap" class="overflow-hidden rounded-lg border bg-card">
         <h3 class="border-b px-4 py-3 font-semibold">{{ $t('progression.map') }}</h3>
-        <component :is="ProgressionCanvas" v-model:nodes="nodes" v-model:edges="edges" read-only height="35rem" />
+        <component :is="ProgressionCanvas" v-model:nodes="nodes" v-model:edges="edges"
+          read-only show-progress-controls :direction="direction"
+          :focus-node-id="initialFocusNodeId" :current-progress-node-id="currentProgressNodeId"
+          :highlighted-node-ids="highlightedNodeIds" :highlighted-edge-ids="highlightedEdgeIds"
+          height="35rem" @node-click="onNodeClick" />
+        <p v-if="blockedMessage" role="status" class="px-4 py-3 text-sm text-warning">{{ blockedMessage }}</p>
+        <div v-if="selectedBadge" class="flex items-center gap-3 px-4 py-3 text-sm">
+          <img v-if="selectedBadge.imageUrl" :src="selectedBadge.imageUrl" alt="" class="size-12 rounded object-cover" />
+          <div>
+            <p class="font-semibold">{{ selectedBadge.title }}</p>
+            <p v-if="selectedBadge.description" class="text-muted-foreground">{{ selectedBadge.description }}</p>
+            <p>{{ selectedBadge.complete ? $t('progression.completed') : $t('progression.locked') }}</p>
+          </div>
+        </div>
       </section>
     </template>
   </div>

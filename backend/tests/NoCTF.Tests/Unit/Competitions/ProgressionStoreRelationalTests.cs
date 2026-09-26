@@ -128,9 +128,9 @@ public sealed class ProgressionStoreRelationalTests
         var draft = new SaveCompetitionProgressionCommand(
             competitionId, null, true, false,
             [new(challengeNodeId, ProgressionNodeKind.Challenge,
-                competitionChallengeId, 0, 0),
-                new(badgeNodeId, ProgressionNodeKind.Badge, badgeId, 200, 0),
-                new(secondNodeId, ProgressionNodeKind.Challenge, secondInstanceId, 400, 0)],
+                competitionChallengeId),
+                new(badgeNodeId, ProgressionNodeKind.Badge, badgeId),
+                new(secondNodeId, ProgressionNodeKind.Challenge, secondInstanceId)],
             [new(edgeId, challengeNodeId, badgeNodeId,
                 ProgressionPrerequisiteCondition.Completed),
              new(Guid.NewGuid(), badgeNodeId, secondNodeId,

@@ -120,6 +120,23 @@ internal sealed class TeamProgressionNodeStateConfiguration
     }
 }
 
+internal sealed class TeamProgressionNodeVisitConfiguration
+    : IEntityTypeConfiguration<TeamProgressionNodeVisit>
+{
+    public void Configure(EntityTypeBuilder<TeamProgressionNodeVisit> builder)
+    {
+        builder.ToTable("team_progression_node_visits");
+        builder.HasKey(item => new { item.TeamId, item.NodeId });
+        builder.HasIndex(item => new { item.CompetitionId, item.TeamId });
+        builder.HasOne<Team>().WithMany()
+            .HasForeignKey(item => item.TeamId)
+            .OnDelete(DeleteBehavior.Cascade);
+        builder.HasOne<ProgressionNode>().WithMany()
+            .HasForeignKey(item => item.NodeId)
+            .OnDelete(DeleteBehavior.Cascade);
+    }
+}
+
 internal sealed class UserBadgeGrantConfiguration : IEntityTypeConfiguration<UserBadgeGrant>
 {
     public void Configure(EntityTypeBuilder<UserBadgeGrant> builder)

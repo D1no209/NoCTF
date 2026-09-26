@@ -29,8 +29,6 @@ public abstract class ProgressionNode
     public Guid Id { get; set; }
     public Guid CompetitionId { get; set; }
     public ProgressionNodeKind Kind { get; private set; }
-    public double PositionX { get; set; }
-    public double PositionY { get; set; }
 }
 
 [PersistentDiscriminator("challenge")]
@@ -86,6 +84,14 @@ public sealed class TeamProgressionNodeState : IConcurrencyTracked
     public bool Active { get; set; }
     public bool Complete { get; set; }
     public DateTimeOffset EvaluatedAt { get; set; }
+}
+
+public sealed class TeamProgressionNodeVisit
+{
+    public Guid TeamId { get; set; }
+    public Guid NodeId { get; set; }
+    public Guid CompetitionId { get; set; }
+    public DateTimeOffset FirstOpenedAt { get; set; }
 }
 
 public sealed class TeamProgressionBadgeState : IConcurrencyTracked

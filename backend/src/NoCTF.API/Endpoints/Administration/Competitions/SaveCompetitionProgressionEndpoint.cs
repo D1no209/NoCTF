@@ -33,8 +33,6 @@ public sealed class SaveCompetitionProgressionValidator
         RuleForEach(request => request.Nodes).Must(node =>
             node is not null && node.Id != Guid.Empty
             && Enum.IsDefined(node.Kind)
-            && double.IsFinite(node.PositionX)
-            && double.IsFinite(node.PositionY)
             && (node.Kind == ProgressionNodeKind.Challenge
                 ? node.Challenge is not null
                     && node.Challenge.CompetitionChallengeId != Guid.Empty
@@ -78,8 +76,7 @@ public sealed class SaveCompetitionProgressionEndpoint(
                 node.Id, node.Kind,
                 node.Kind == ProgressionNodeKind.Challenge
                     ? node.Challenge!.CompetitionChallengeId
-                    : node.Badge!.CompetitionBadgeId,
-                node.PositionX, node.PositionY)).ToArray(),
+                    : node.Badge!.CompetitionBadgeId)).ToArray(),
             request.Edges.Select(edge => new ProgressionEdgeDraft(
                 edge.Id, edge.SourceNodeId, edge.TargetNodeId, edge.Condition)).ToArray(),
             clock.GetUtcNow()), ct);

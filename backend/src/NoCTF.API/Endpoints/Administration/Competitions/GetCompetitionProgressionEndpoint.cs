@@ -17,8 +17,7 @@ public sealed record ProgressionBadgeNodeContract(Guid CompetitionBadgeId);
 public sealed record ProgressionNodeContract(
     Guid Id, ProgressionNodeKind Kind,
     ProgressionChallengeNodeContract? Challenge,
-    ProgressionBadgeNodeContract? Badge,
-    double PositionX, double PositionY);
+    ProgressionBadgeNodeContract? Badge);
 public sealed record ProgressionEdgeContract(
     Guid Id, Guid SourceNodeId, Guid TargetNodeId,
     ProgressionPrerequisiteCondition Condition);
@@ -62,8 +61,7 @@ internal static class ProgressionProtocol
             node.Kind == ProgressionNodeKind.Challenge
                 ? new(node.ResourceId) : null,
             node.Kind == ProgressionNodeKind.Badge
-                ? new(node.ResourceId) : null,
-            node.PositionX, node.PositionY)).ToArray(),
+                ? new(node.ResourceId) : null)).ToArray(),
         view.Edges.Select(edge => new ProgressionEdgeContract(
             edge.Id, edge.SourceNodeId, edge.TargetNodeId, edge.Condition)).ToArray());
 }
