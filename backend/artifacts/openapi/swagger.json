@@ -4590,6 +4590,88 @@
         }
       }
     },
+    "/api/v1/competitions/{competitionId}/challenges/{competitionChallengeId}/start": {
+      "post": {
+        "tags": [
+          "Competitions"
+        ],
+        "summary": "Start Progression Challenge",
+        "description": "Executes POST /api/v1/competitions/{competitionId}/challenges/{competitionChallengeId}/start.",
+        "operationId": "StartProgressionChallenge",
+        "parameters": [
+          {
+            "name": "competitionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          },
+          {
+            "name": "competitionChallengeId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          }
+        ],
+        "requestBody": {
+          "x-name": "StartProgressionChallengeRequest",
+          "description": "",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsChallengesStartProgressionChallengeRequest"
+              }
+            }
+          },
+          "required": true,
+          "x-position": 1
+        },
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "409": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsChallengesProgressionStartConflict"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcValidationProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ]
+      }
+    },
     "/api/v1/competitions/{competitionId}/challenges/{competitionChallengeId}/hints/{hintId}/unlock": {
       "post": {
         "tags": [
@@ -19962,23 +20044,27 @@
           "title": {
             "type": "string"
           },
-          "direction": {
+          "description": {
             "type": "string",
             "nullable": true
           },
-          "positionX": {
-            "type": "number",
-            "format": "double"
-          },
-          "positionY": {
-            "type": "number",
-            "format": "double"
+          "direction": {
+            "type": "string",
+            "nullable": true
           },
           "active": {
             "type": "boolean"
           },
           "complete": {
             "type": "boolean"
+          },
+          "visited": {
+            "type": "boolean"
+          },
+          "firstOpenedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
           },
           "imageUrl": {
             "type": "string",
@@ -21307,6 +21393,30 @@
       "NoCTFAPIEndpointsChallengesListChallengesRequest": {
         "type": "object",
         "additionalProperties": false
+      },
+      "NoCTFAPIEndpointsChallengesProgressionStartConflict": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "detail": {
+            "type": "string"
+          }
+        }
+      },
+      "NoCTFAPIEndpointsChallengesStartProgressionChallengeRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "expectedRevision": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0.0,
+            "nullable": true
+          }
+        }
       },
       "NoCTFAPIEndpointsGameplayFactsAcceptedGameplayFactResponse": {
         "type": "object",
@@ -26567,14 +26677,6 @@
                 "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationCompetitionsProgressionBadgeNodeContract"
               }
             ]
-          },
-          "positionX": {
-            "type": "number",
-            "format": "double"
-          },
-          "positionY": {
-            "type": "number",
-            "format": "double"
           }
         }
       },

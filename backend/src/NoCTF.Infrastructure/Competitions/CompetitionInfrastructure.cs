@@ -48,6 +48,7 @@ internal static class CompetitionInfrastructure
         services.AddScoped<SaveCompetitionProgression>();
         services.AddScoped<ProgressionReconciler>();
         services.AddScoped<IProgressionChallengeAccess, ProgressionChallengeAccess>();
+        services.AddScoped<IProgressionChallengeStarter, ProgressionChallengeStarter>();
         services.AddScoped<ICompetitionBadgeStore, CompetitionBadgeStore>();
         services.AddScoped<ManageCompetitionBadges>();
         services.AddScoped<IProgressionPlayerReader, ProgressionPlayerReader>();

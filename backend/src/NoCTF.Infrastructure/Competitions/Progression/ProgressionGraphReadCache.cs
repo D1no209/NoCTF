@@ -44,7 +44,7 @@ public sealed class ProgressionGraphReadCache(IFusionCacheProvider caches)
         cache.RemoveAsync(BadgeKey(competitionId), token: ct).AsTask();
 
     private static string Key(Guid competitionId) =>
-        $"progression:graph:{competitionId:N}";
+        $"progression:graph:v2:{competitionId:N}";
 
     private static string BadgeKey(Guid competitionId) =>
         $"progression:badges:{competitionId:N}";
@@ -62,11 +62,9 @@ public sealed record ProgressionGraphSnapshot(
         graph.Nodes.Select(node => node switch
         {
             ChallengeProgressionNode challenge => new ProgressionGraphNodeSnapshot(
-                node.Id, node.Kind, challenge.CompetitionChallengeId,
-                node.PositionX, node.PositionY),
+                node.Id, node.Kind, challenge.CompetitionChallengeId),
             BadgeProgressionNode badge => new ProgressionGraphNodeSnapshot(
-                node.Id, node.Kind, badge.CompetitionBadgeId,
-                node.PositionX, node.PositionY),
+                node.Id, node.Kind, badge.CompetitionBadgeId),
             _ => throw new InvalidOperationException("Unsupported progression node.")
         }).ToArray(),
         graph.Edges.Select(edge => new ProgressionGraphEdgeSnapshot(
@@ -76,13 +74,11 @@ public sealed record ProgressionGraphSnapshot(
     {
         ProgressionNodeKind.Challenge => (ProgressionNode)new ChallengeProgressionNode
         {
-            Id = node.Id, CompetitionChallengeId = node.ResourceId,
-            PositionX = node.PositionX, PositionY = node.PositionY
+            Id = node.Id, CompetitionChallengeId = node.ResourceId
         },
         ProgressionNodeKind.Badge => new BadgeProgressionNode
         {
-            Id = node.Id, CompetitionBadgeId = node.ResourceId,
-            PositionX = node.PositionX, PositionY = node.PositionY
+            Id = node.Id, CompetitionBadgeId = node.ResourceId
         },
         _ => throw new InvalidOperationException("Unsupported progression node kind.")
     }).ToArray();
@@ -95,8 +91,7 @@ public sealed record ProgressionGraphSnapshot(
 }
 
 public sealed record ProgressionGraphNodeSnapshot(
-    Guid Id, ProgressionNodeKind Kind, Guid ResourceId,
-    double PositionX, double PositionY);
+    Guid Id, ProgressionNodeKind Kind, Guid ResourceId);
 
 public sealed record ProgressionGraphEdgeSnapshot(
     Guid Id, Guid SourceNodeId, Guid TargetNodeId,

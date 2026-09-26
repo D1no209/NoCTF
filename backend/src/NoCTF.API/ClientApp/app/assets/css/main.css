@@ -1046,6 +1046,14 @@ body:has([data-modal-scroll-lock]) {
   box-shadow: 0 0 0 2px var(--primary);
 }
 .vue-flow__edge.selected .vue-flow__edge-path { stroke: var(--primary); }
+.vue-flow__edge.progression-incomplete-edge .vue-flow__edge-path { stroke-dasharray: 6 5; }
+.vue-flow__edge.progression-preview-edge .vue-flow__edge-path {
+  stroke: var(--primary);
+  stroke-dasharray: 6 5;
+  opacity: .65;
+}
+.vue-flow__edge.progression-blocked-edge .vue-flow__edge-path { stroke: var(--warning); stroke-width: 3; }
+.progression-blocked-node { box-shadow: 0 0 0 3px var(--warning), 0 0 18px color-mix(in oklch, var(--warning) 30%, transparent); }
 :is([data-slot='checkbox'], [data-slot='radio-group-item']):not([data-state='checked']) { background: var(--control-hover); }
 :is([data-slot], button, a, input, textarea, [tabindex]):focus-visible,
 [data-slot='input-group']:focus-within {

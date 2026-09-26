@@ -180,17 +180,13 @@ public sealed class CompetitionProgressionStore(
             {
                 Id = draft.Id,
                 CompetitionId = competitionId,
-                CompetitionChallengeId = draft.ResourceId,
-                PositionX = draft.PositionX,
-                PositionY = draft.PositionY
+                CompetitionChallengeId = draft.ResourceId
             },
             ProgressionNodeKind.Badge => new BadgeProgressionNode
             {
                 Id = draft.Id,
                 CompetitionId = competitionId,
-                CompetitionBadgeId = draft.ResourceId,
-                PositionX = draft.PositionX,
-                PositionY = draft.PositionY
+                CompetitionBadgeId = draft.ResourceId
             },
             _ => throw new ArgumentOutOfRangeException(nameof(draft), draft.Kind, null)
         };
@@ -204,12 +200,7 @@ public sealed class CompetitionProgressionStore(
         var existingById = graph.Nodes.ToDictionary(item => item.Id);
         foreach (var node in desired)
         {
-            if (existingById.TryGetValue(node.Id, out var existing))
-            {
-                existing.PositionX = node.PositionX;
-                existing.PositionY = node.PositionY;
-            }
-            else
+            if (!existingById.ContainsKey(node.Id))
             {
                 graph.Nodes.Add(node);
                 db.ProgressionNodes.Add(node);
@@ -249,11 +240,9 @@ public sealed class CompetitionProgressionStore(
         graph.Nodes.Select(node => node switch
         {
             ChallengeProgressionNode challenge => new ProgressionNodeDraft(
-                challenge.Id, challenge.Kind, challenge.CompetitionChallengeId,
-                challenge.PositionX, challenge.PositionY),
+                challenge.Id, challenge.Kind, challenge.CompetitionChallengeId),
             BadgeProgressionNode badge => new ProgressionNodeDraft(
-                badge.Id, badge.Kind, badge.CompetitionBadgeId,
-                badge.PositionX, badge.PositionY),
+                badge.Id, badge.Kind, badge.CompetitionBadgeId),
             _ => throw new InvalidOperationException("Unsupported progression node type.")
         }).ToArray(),
         graph.Edges.Select(edge => new ProgressionEdgeDraft(

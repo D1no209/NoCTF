@@ -52,6 +52,13 @@ public sealed class FusionCacheMetricsAgentTests
             _ = await cache.GetOrDefaultAsync<string>(key, null, token: ct);
             await cache.SetAsync(key, "value", token: ct);
             _ = await cache.GetOrDefaultAsync<string>(key, null, token: ct);
+            var deadline = DateTimeOffset.UtcNow.AddSeconds(2);
+            while (DateTimeOffset.UtcNow < deadline
+                && (!observed.Any(item => item ==
+                        (NoCtfCacheNames.ReadModels, "memory", "miss"))
+                    || !observed.Any(item => item ==
+                        (NoCtfCacheNames.ReadModels, "memory", "hit"))))
+                await Task.Delay(10, ct);
         }
         finally
         {

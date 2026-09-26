@@ -694,6 +694,10 @@ export function createMockApi() {
         if (myTeam) return problem(409, '已加入队伍 / Already in a team')
         value = invitedTeam; value.memberIds.push(user!.userId); value.registrationStatus = 'Unregistered'
       }
+      else if (route === '/competitions/{competitionId}/challenges/{competitionChallengeId}/start') {
+        if (!challenge || !challenge.isPublished) return problem(404, '演示题目不可访问 / Mock challenge unavailable')
+        return new Response(null, { status: 204, headers: { 'X-NoCTF-Mock': 'true' } })
+      }
       else if (route.endsWith('/flag-submissions')) {
         if (!myTeam) return problem(409, '先加入演示队伍 / Join a team first')
         const correct = (body.flag ?? body.flags?.[0]) === 'flag{mock_success}'

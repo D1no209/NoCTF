@@ -1,10 +1,17 @@
 import { describe, expect, test } from 'bun:test'
 import { readFileSync } from 'node:fs'
 import { restoreProgressionViewport } from '../app/components/ui/progression/progression-viewport'
+import { buildProgressionLayout, progressionTopologyKey } from '../app/lib/progression-layout'
+import type { ElkNode } from 'elkjs/lib/elk-api.js'
 import type { ProgressionViewport } from '../app/components/ui/progression/progression-viewport'
 import {
   applyProgressionSelectionChanges,
   canConnectProgression,
+  chooseProgressionFocus,
+  maximumProgressionEdges,
+  progressionBatchIssue,
+  progressionConnectionIssue,
+  unsatisfiedProgressionEdges,
   getProgressionSelection,
   removeProgressionSelection,
   updateProgressionNodePositions,
@@ -25,13 +32,33 @@ describe('progression editor connections', () => {
     expect(canConnectProgression(edges, 'a', 'b')).toBe(false)
     expect(canConnectProgression(edges, 'c', 'a')).toBe(false)
     expect(canConnectProgression(edges, 'c', 'd')).toBe(true)
+    expect(progressionConnectionIssue(edges, 'a', 'a')).toBe('self')
+    expect(progressionConnectionIssue(edges, 'a', 'b')).toBe('duplicate')
+    expect(progressionConnectionIssue(edges, 'c', 'a')).toBe('cycle')
+  })
+
+  test('a batch may add independent successors but not provisional duplicate targets', () => {
+    const edges = [{ source: 'source', target: 'first' }]
+    expect(progressionConnectionIssue(edges, 'source', 'second')).toBeNull()
+    expect(progressionConnectionIssue([...edges, { source: 'source', target: 'second' }],
+      'source', 'second')).toBe('duplicate')
+    expect(progressionBatchIssue(edges, 'source', ['second', 'third'])).toBeNull()
+    expect(progressionBatchIssue(edges, 'source', ['second', 'second'])).toBe('duplicate')
+    expect(progressionBatchIssue(edges, 'source', ['second', 'first'])).toBe('duplicate')
+  })
+
+  test('disables additional targets at the server edge limit', () => {
+    const edges = Array.from({ length: maximumProgressionEdges }, (_, index) => ({
+      source: `s${index}`, target: `t${index}`,
+    }))
+    expect(progressionConnectionIssue(edges, 'new-source', 'new-target')).toBe('limit')
   })
 })
 
 describe('progression editor selection', () => {
   test('the canvas uses Ctrl multi-select and forwards Vue Flow selection and drag events', () => {
     const canvas = readFileSync(new URL('../app/components/ui/progression/ProgressionCanvas.vue', import.meta.url), 'utf8')
-    expect(canvas).toContain(":multi-selection-key-code=\"props.readOnly ? null : 'Control'\"")
+    expect(canvas).toContain(":multi-selection-key-code=\"props.readOnly || props.batchMode ? null : 'Control'\"")
     expect(canvas).toContain('@nodes-change="onNodesChange"')
     expect(canvas).toContain('@edges-change="onEdgesChange"')
     expect(canvas).toContain('@node-drag-stop="onNodeDragStop"')
@@ -86,7 +113,7 @@ describe('progression editor selection', () => {
     ])]).toEqual(['b'])
   })
 
-  test('a group drag stores every selected node position in the save draft', () => {
+  test('a group drag updates only the temporary editor positions', () => {
     const nodes = [
       { id: 'a', position: { x: 0, y: 0 } },
       { id: 'b', position: { x: 20, y: 10 } },
@@ -129,6 +156,68 @@ describe('progression canvas viewport', () => {
     }
     await restoreProgressionViewport(viewport, false)
     expect(calls).toEqual([['set', { x: 0, y: 0, zoom: 1 }]])
+  })
+})
+
+describe('progression automatic layout', () => {
+  const graphNodes = [
+    { id: 'first', kind: 0 as const },
+    { id: 'second', kind: 0 as const },
+    { id: 'third', kind: 1 as const },
+  ]
+  const graphEdges = [{ source: 'first', target: 'second' }]
+
+  test('the same topology yields the same positions regardless of input ordering', async () => {
+    const deterministic = async (graph: ElkNode) => ({
+      ...graph, children: graph.children?.map((node, index) => ({
+        ...node, x: index * 300, y: 0,
+      })),
+    })
+    const first = await buildProgressionLayout(graphNodes, graphEdges, 'RIGHT', deterministic)
+    const second = await buildProgressionLayout([...graphNodes].reverse(), graphEdges, 'RIGHT', deterministic)
+    expect(first).toEqual(second)
+    expect(first.find(node => node.id === 'first')!.x)
+      .toBeLessThan(first.find(node => node.id === 'second')!.x)
+  })
+
+  test('narrow layouts put successors below predecessors', async () => {
+    let input: ElkNode | null = null
+    await buildProgressionLayout(graphNodes, graphEdges, 'DOWN', async graph => {
+      input = graph
+      return graph
+    })
+    expect(input!.layoutOptions?.['elk.direction']).toBe('DOWN')
+    expect(input!.layoutOptions?.['elk.layered.spacing.nodeNodeBetweenLayers']).toBe('110')
+  })
+
+  test('completion and condition changes do not change the topology key', () => {
+    expect(progressionTopologyKey(graphNodes, graphEdges, 'RIGHT'))
+      .toBe(progressionTopologyKey([...graphNodes].reverse(), graphEdges, 'RIGHT'))
+    expect(progressionTopologyKey(graphNodes, graphEdges, 'RIGHT'))
+      .not.toBe(progressionTopologyKey(graphNodes, graphEdges, 'DOWN'))
+  })
+})
+
+describe('player progression state', () => {
+  test('focuses the most recently started available challenge without depending on completion color', () => {
+    const base = { kind: 0 as const, active: true, complete: false, visited: true, x: 0, y: 0 }
+    expect(chooseProgressionFocus([
+      { ...base, id: 'older', firstOpenedAt: '2026-09-01T00:00:00Z' },
+      { ...base, id: 'newer', firstOpenedAt: '2026-09-02T00:00:00Z' },
+      { ...base, id: 'locked', active: false, firstOpenedAt: '2026-09-03T00:00:00Z' },
+    ])).toBe('newer')
+  })
+
+  test('both completed and incomplete edge conditions report only unmet direct predecessors', () => {
+    const edges = [
+      { id: 'completed', source: 'a', target: 'destination', condition: 0 as const },
+      { id: 'incomplete', source: 'b', target: 'destination', condition: 1 as const },
+      { id: 'unrelated', source: 'a', target: 'other', condition: 0 as const },
+    ]
+    expect(unsatisfiedProgressionEdges(new Map([['a', false], ['b', true]]),
+      edges, 'destination').map(edge => edge.id)).toEqual(['completed', 'incomplete'])
+    expect(unsatisfiedProgressionEdges(new Map([['a', true], ['b', false]]),
+      edges, 'destination')).toEqual([])
   })
 })
 

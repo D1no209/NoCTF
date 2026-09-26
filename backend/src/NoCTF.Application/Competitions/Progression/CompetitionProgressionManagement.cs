@@ -5,9 +5,7 @@ namespace NoCTF.Application.Competitions.Progression;
 public sealed record ProgressionNodeDraft(
     Guid Id,
     ProgressionNodeKind Kind,
-    Guid ResourceId,
-    double PositionX,
-    double PositionY);
+    Guid ResourceId);
 
 public sealed record ProgressionEdgeDraft(
     Guid Id,

@@ -6,7 +6,6 @@ public enum ProgressionGraphFailure : short
     TooManyEdges,
     DuplicateNode,
     DuplicateChallenge,
-    InvalidPosition,
     InvalidCondition,
     MissingEndpoint,
     SelfReference,
@@ -24,7 +23,6 @@ public static class ProgressionGraphRules
 {
     public const int MaximumNodes = 512;
     public const int MaximumEdges = 4096;
-    public const double MaximumCoordinate = 100_000;
 
     public static ProgressionGraphFailure? Validate(
         IReadOnlyCollection<ProgressionNode> nodes,
@@ -38,12 +36,6 @@ public static class ProgressionGraphRules
                 .Select(node => node.CompetitionChallengeId).Distinct().Count()
             != nodes.Count(node => node is ChallengeProgressionNode))
             return ProgressionGraphFailure.DuplicateChallenge;
-        if (nodes.Any(node => !double.IsFinite(node.PositionX)
-            || !double.IsFinite(node.PositionY)
-            || Math.Abs(node.PositionX) > MaximumCoordinate
-            || Math.Abs(node.PositionY) > MaximumCoordinate))
-            return ProgressionGraphFailure.InvalidPosition;
-
         var nodeIds = nodes.Select(node => node.Id).ToHashSet();
         if (edges.Any(edge => !Enum.IsDefined(edge.Condition)))
             return ProgressionGraphFailure.InvalidCondition;

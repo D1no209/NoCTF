@@ -39,6 +39,12 @@ function validate(schema: Data | undefined, value: any, path = '$') {
 }
 
 describe('isolated Mock API', () => {
+  test('starting a visible CTF challenge is an idempotent no-content operation', async () => {
+    const { send } = await setup()
+    const path = `${competition}/challenges/${id(4)}/start`
+    expect((await send(path, 'POST', {})).status).toBe(204)
+    expect((await send(path, 'POST', {})).status).toBe(204)
+  })
   test('seeds one downloadable challenge for every supported direction', async () => {
     const { send } = await setup()
     const catalog = await (await send(`${competition}/challenges`)).json()

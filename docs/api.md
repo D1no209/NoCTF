@@ -153,11 +153,17 @@ GET  /api/v1/competitions/{competitionId}/challenges
 GET  /api/v1/competitions/{competitionId}/progression
 GET  /api/v1/competitions/{competitionId}/badges/{badgeId}/image
 GET  /api/v1/competitions/{competitionId}/challenges/{competitionChallengeId}
+POST /api/v1/competitions/{competitionId}/challenges/{competitionChallengeId}/start
 GET  /api/v1/competitions/{competitionId}/challenges/{competitionChallengeId}/attachments
 GET  /api/v1/competitions/{competitionId}/challenges/{competitionChallengeId}/attachments/{attachmentId}
 GET  /api/v1/competitions/{competitionId}/challenges/{competitionChallengeId}/attachment
 POST /api/v1/competitions/{competitionId}/challenges/{competitionChallengeId}/hints/{hintId}/unlock
 ```
+
+CTF 闯关图只传节点、边、条件与本队状态，不传画布坐标；布局由客户端生成。
+`start` 在读取题目详情前调用，可选提交地图修订 `expectedRevision`，成功为 `204`，
+图修订变化为带 `GraphChanged` 原因的 `409`。它只幂等记录本队首次打开已解锁节点，
+不改变解锁资格；题目详情 GET 始终只读，仍独立执行权限检查。
 
 `attachments` 列表与带 Id 下载只用于 `All`；`attachment` 单数路由只用于 `RandomOnePerTeam`，抽取发生在该 GET 内且请求没有 AttachmentId。策略不匹配返回 404。KoH 详情在 Running 时对本队返回 Control Flag 与 shared Hill 的公开 urls，不返回 ControlCheckUrl；CTF PerTeamRuntime Flag 不单独返回，注入 Runtime 环境。
 

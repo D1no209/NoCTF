@@ -38,6 +38,7 @@ public sealed class NoCtfDbContext(
     public DbSet<ProgressionEdge> ProgressionEdges => Set<ProgressionEdge>();
     public DbSet<CompetitionBadge> CompetitionBadges => Set<CompetitionBadge>();
     public DbSet<TeamProgressionNodeState> TeamProgressionNodeStates => Set<TeamProgressionNodeState>();
+    public DbSet<TeamProgressionNodeVisit> TeamProgressionNodeVisits => Set<TeamProgressionNodeVisit>();
     public DbSet<TeamProgressionBadgeState> TeamProgressionBadgeStates => Set<TeamProgressionBadgeState>();
     public DbSet<UserBadgeGrant> UserBadgeGrants => Set<UserBadgeGrant>();
     public DbSet<UserBadgeTransition> UserBadgeTransitions => Set<UserBadgeTransition>();

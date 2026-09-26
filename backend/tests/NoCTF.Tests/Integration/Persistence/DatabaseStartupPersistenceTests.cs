@@ -51,12 +51,13 @@ public sealed class DatabaseStartupPersistenceTests
                 await Assert.That(user.Role).IsEqualTo(UserRole.Administrator);
                 await Assert.That(await db.Database.GetPendingMigrationsAsync(ct)).IsEmpty();
                 var appliedMigrations = (await db.Database.GetAppliedMigrationsAsync(ct)).ToArray();
-                await Assert.That(appliedMigrations).Count().IsEqualTo(5);
+                await Assert.That(appliedMigrations).Count().IsEqualTo(6);
                 await Assert.That(appliedMigrations[0]).EndsWith("_InitialBaseline");
                 await Assert.That(appliedMigrations[1]).EndsWith("_CompetitionProgression");
                 await Assert.That(appliedMigrations[2]).EndsWith("_PersistedSsoFlows");
                 await Assert.That(appliedMigrations[3]).EndsWith("_PersistedRequestAdmission");
                 await Assert.That(appliedMigrations[4]).EndsWith("_CompetitionWebhookOutbox");
+                await Assert.That(appliedMigrations[5]).EndsWith("_ProgressionReadableMap");
                 var tables = db.Model.GetEntityTypes()
                     .Select(entity => entity.GetTableName())
                     .Where(name => name is not null)

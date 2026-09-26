@@ -1128,11 +1128,12 @@ export type NoCtfapiEndpointsCompetitionsPlayerProgressionNodeContract = {
     kind?: NoCtfDomainCompetitionsProgressionProgressionNodeKind;
     resourceId?: string;
     title?: string;
+    description?: string | null;
     direction?: string | null;
-    positionX?: number;
-    positionY?: number;
     active?: boolean;
     complete?: boolean;
+    visited?: boolean;
+    firstOpenedAt?: string | null;
     imageUrl?: string | null;
 };
 
@@ -1461,6 +1462,15 @@ export type NoCtfapiEndpointsChallengesChallengeSummaryResponse = {
 
 export type NoCtfapiEndpointsChallengesListChallengesRequest = {
     [key: string]: never;
+};
+
+export type NoCtfapiEndpointsChallengesProgressionStartConflict = {
+    code?: string;
+    detail?: string;
+};
+
+export type NoCtfapiEndpointsChallengesStartProgressionChallengeRequest = {
+    expectedRevision?: number | null;
 };
 
 export type NoCtfapiEndpointsGameplayFactsAcceptedGameplayFactResponse = {
@@ -2862,8 +2872,6 @@ export type NoCtfapiEndpointsAdministrationCompetitionsProgressionNodeContract =
     kind?: NoCtfDomainCompetitionsProgressionProgressionNodeKind;
     challenge?: NoCtfapiEndpointsAdministrationCompetitionsProgressionChallengeNodeContract | null;
     badge?: NoCtfapiEndpointsAdministrationCompetitionsProgressionBadgeNodeContract | null;
-    positionX?: number;
-    positionY?: number;
 };
 
 export type NoCtfapiEndpointsAdministrationCompetitionsProgressionChallengeNodeContract = {
@@ -6085,6 +6093,47 @@ export type ListChallengesEndpointResponses = {
 };
 
 export type ListChallengesEndpointResponse = ListChallengesEndpointResponses[keyof ListChallengesEndpointResponses];
+
+export type StartProgressionChallengeData = {
+    body: NoCtfapiEndpointsChallengesStartProgressionChallengeRequest;
+    path: {
+        competitionId: string;
+        competitionChallengeId: string;
+    };
+    query?: never;
+    url: '/api/v1/competitions/{competitionId}/challenges/{competitionChallengeId}/start';
+};
+
+export type StartProgressionChallengeErrors = {
+    /**
+     * Bad Request
+     */
+    400: MicrosoftAspNetCoreMvcValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+    /**
+     * Not Found
+     */
+    404: unknown;
+    409: NoCtfapiEndpointsChallengesProgressionStartConflict;
+};
+
+export type StartProgressionChallengeError = StartProgressionChallengeErrors[keyof StartProgressionChallengeErrors];
+
+export type StartProgressionChallengeResponses = {
+    /**
+     * No Content
+     */
+    204: void;
+};
+
+export type StartProgressionChallengeResponse = StartProgressionChallengeResponses[keyof StartProgressionChallengeResponses];
 
 export type UnlockChallengeHintEndpointData = {
     body?: never;
