@@ -150,6 +150,8 @@ AWDP 队伍行额外返回完整已结算历史的 `attackScore`、`defenseScore
 
 ```text
 GET  /api/v1/competitions/{competitionId}/challenges
+GET  /api/v1/competitions/{competitionId}/progression
+GET  /api/v1/competitions/{competitionId}/badges/{badgeId}/image
 GET  /api/v1/competitions/{competitionId}/challenges/{competitionChallengeId}
 GET  /api/v1/competitions/{competitionId}/challenges/{competitionChallengeId}/attachments
 GET  /api/v1/competitions/{competitionId}/challenges/{competitionChallengeId}/attachments/{attachmentId}
@@ -522,6 +524,12 @@ DLQ，只能从 Competition/GameplayFact/Runtime 领域 API 重新触发。
 
 ```text
 GET    /api/v1/admin/competitions/{competitionId}/webhooks
+GET    /api/v1/admin/competitions/{competitionId}/progression
+PUT    /api/v1/admin/competitions/{competitionId}/progression
+GET    /api/v1/admin/competitions/{competitionId}/badges
+POST   /api/v1/admin/competitions/{competitionId}/badges
+PUT    /api/v1/admin/competitions/{competitionId}/badges/{badgeId}
+DELETE /api/v1/admin/competitions/{competitionId}/badges/{badgeId}
 POST   /api/v1/admin/competitions/{competitionId}/webhooks
 PUT    /api/v1/admin/competitions/{competitionId}/webhooks/{targetId}
 DELETE /api/v1/admin/competitions/{competitionId}/webhooks/{targetId}

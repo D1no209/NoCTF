@@ -20,6 +20,7 @@ using System.Globalization;
 using System.Text.Json;
 using NoCTF.Infrastructure.Competitions.Lifecycle;
 using NoCTF.Application.Observability;
+using NoCTF.Infrastructure.Competitions.Progression;
 
 namespace NoCTF.Infrastructure.GameplayFacts.Processing;
 
@@ -33,7 +34,8 @@ public sealed class GameplayFactProcessor(
     TeamChallengeCriticalSection teamChallengeCriticalSection,
     ICompetitionEventRecorder? eventRecorder = null,
     ILogger<GameplayFactProcessor>? logger = null,
-    TimeProvider? clock = null) : IGameplayFactProcessor
+    TimeProvider? clock = null,
+    ProgressionReconciler? progressionReconciler = null) : IGameplayFactProcessor
 {
     private readonly TimeProvider timeProvider = clock ?? TimeProvider.System;
     private static readonly JsonSerializerOptions JsonOptions =
@@ -450,7 +452,7 @@ public sealed class GameplayFactProcessor(
         CancellationToken cancellationToken)
     {
         await using var transaction = await db.Database.BeginTransactionAsync(
-            IsolationLevel.ReadCommitted, cancellationToken);
+            IsolationLevel.Serializable, cancellationToken);
         var submission = await db.GameplayFacts.SingleOrDefaultAsync(
             item => item.Id == gameplayFactId, cancellationToken);
         if (submission is null
@@ -650,6 +652,8 @@ public sealed class GameplayFactProcessor(
                 ParentEventId: adjudicationEventId == Guid.Empty ? null : adjudicationEventId), cancellationToken);
         }
         await QueueNextGameplayFactAsync(processingScope, cancellationToken);
+        await (progressionReconciler ?? new ProgressionReconciler(db))
+            .ReconcileCompletedFactAsync(submission, now, cancellationToken);
         await db.SaveChangesAsync(cancellationToken);
         await transaction.CommitAsync(cancellationToken);
         if (firstAdjudication)

@@ -188,7 +188,8 @@ public sealed class ChallengeHintStore(
         DateTimeOffset now,
         CancellationToken ct)
     {
-        await using var transaction = await db.Database.BeginTransactionAsync(ct);
+        await using var transaction = await db.Database.BeginTransactionAsync(
+            System.Data.IsolationLevel.Serializable, ct);
         var competitionIsRunning = await db.Competitions.AsNoTracking().AnyAsync(
             competition => competition.Id == competitionId
                 && competition.Status == CompetitionStatus.Running,
@@ -204,6 +205,9 @@ public sealed class ChallengeHintStore(
             .Select(team => (Guid?)team.Id)
             .SingleOrDefaultAsync(ct);
         if (teamId is null)
+            return HintUnlockAttempt.Failed(HintUnlockFailure.NotFound);
+        if (!await new NoCTF.Infrastructure.Competitions.Progression.ProgressionChallengeAccess(db)
+                .IsActiveAsync(competitionId, competitionChallengeId, teamId, ct))
             return HintUnlockAttempt.Failed(HintUnlockFailure.NotFound);
         using var unlockLease = await criticalSection.AcquireAsync(
             db,

@@ -550,6 +550,15 @@ public sealed class AdminCompetitionStore(
             await db.GameplayFacts.IgnoreQueryFilters().CountAsync(
                 item => item.CompetitionId == competitionId,
                 ct));
+        AddReference(references, CompetitionHardDeleteReferenceKind.ProgressionGraph,
+            await db.CompetitionProgressions.CountAsync(item =>
+                item.CompetitionId == competitionId, ct));
+        AddReference(references, CompetitionHardDeleteReferenceKind.Badge,
+            await db.CompetitionBadges.CountAsync(item =>
+                item.CompetitionId == competitionId, ct));
+        AddReference(references, CompetitionHardDeleteReferenceKind.BadgeGrant,
+            await db.UserBadgeGrants.CountAsync(item =>
+                item.CompetitionId == competitionId, ct));
         AddReference(
             references,
             CompetitionHardDeleteReferenceKind.RuntimeInstance,
@@ -621,6 +630,10 @@ public sealed class AdminCompetitionStore(
             .Where(item => item.CompetitionId == competitionId)
             .Select(item => item.FileId)
             .ToArrayAsync(ct));
+        ids.AddRange(await db.CompetitionBadges
+            .Where(item => item.CompetitionId == competitionId)
+            .Select(item => item.ImageFileId)
+            .ToArrayAsync(ct));
         ids.AddRange(await db.CompetitionEvents
             .Where(item => item.CompetitionId == competitionId
                 && item.Kind == CompetitionEventKind.RuntimeTrafficCaptureStored
@@ -637,6 +650,22 @@ public sealed class AdminCompetitionStore(
         CancellationToken ct)
     {
         await db.Notifications.Where(n => notificationIds.Contains(n.Id)).ExecuteDeleteAsync(ct);
+        await db.UserBadgeTransitions.Where(item => item.CompetitionId == competitionId)
+            .ExecuteDeleteAsync(ct);
+        await db.UserBadgeGrants.Where(item => item.CompetitionId == competitionId)
+            .ExecuteDeleteAsync(ct);
+        await db.TeamProgressionBadgeStates.Where(item => item.CompetitionId == competitionId)
+            .ExecuteDeleteAsync(ct);
+        await db.TeamProgressionNodeStates.Where(item => item.CompetitionId == competitionId)
+            .ExecuteDeleteAsync(ct);
+        await db.ProgressionEdges.Where(item => item.CompetitionId == competitionId)
+            .ExecuteDeleteAsync(ct);
+        await db.ProgressionNodes.Where(item => item.CompetitionId == competitionId)
+            .ExecuteDeleteAsync(ct);
+        await db.CompetitionProgressions.Where(item => item.CompetitionId == competitionId)
+            .ExecuteDeleteAsync(ct);
+        await db.CompetitionBadges.Where(item => item.CompetitionId == competitionId)
+            .ExecuteDeleteAsync(ct);
         // Restrict FKs: PatchUpload -> RuntimeInstance -> GameplayFact.
         await db.PatchUploads.Where(item => item.CompetitionId == competitionId)
             .ExecuteDeleteAsync(ct);

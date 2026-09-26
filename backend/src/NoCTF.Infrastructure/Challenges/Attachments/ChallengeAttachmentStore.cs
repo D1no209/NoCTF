@@ -495,8 +495,9 @@ public sealed class ChallengeAttachmentStore(
         Guid competitionId,
         Guid competitionChallengeId,
         Guid userId,
-        CancellationToken ct) =>
-        await db.Teams.AsNoTracking()
+        CancellationToken ct)
+    {
+        var scope = await db.Teams.AsNoTracking()
             .Where(team =>
                 team.CompetitionId == competitionId &&
                 team.Members.Any(member => member.UserId == userId) &&
@@ -523,6 +524,12 @@ public sealed class ChallengeAttachmentStore(
                 item.Team.Id,
                 item.Challenge.ChallengeId))
             .SingleOrDefaultAsync(ct);
+        if (scope is not null
+            && !await new NoCTF.Infrastructure.Competitions.Progression.ProgressionChallengeAccess(db)
+                .IsActiveAsync(competitionId, competitionChallengeId, scope.TeamId, ct))
+            return null;
+        return scope;
+    }
 
     private Task<bool> HasRandomCandidatesAsync(Guid challengeId, CancellationToken ct) =>
         db.ChallengeFlags.AsNoTracking().AnyAsync(flag =>

@@ -6,6 +6,7 @@ using NoCTF.Application.Competitions.Visibility;
 using NoCTF.Application.Challenges.Bank;
 using NoCTF.Domain.Challenges;
 using NoCTF.Domain.Competitions;
+using NoCTF.Application.Competitions.Progression;
 
 namespace NoCTF.API.Endpoints.Challenges;
 
@@ -17,6 +18,7 @@ public sealed class ListChallengesRequest
 public sealed class ListChallengesEndpoint(
     ListChallenges list,
     ICompetitionChallengeReadAccess readAccess,
+    IProgressionChallengeAccess progressionAccess,
     IUserContext user,
     TimeProvider timeProvider,
     IExperimentalFeatureReader? experimentalFeatures = null) : Endpoint<ListChallengesRequest, Results<Ok<ChallengeListResponse>, NotFound>>
@@ -54,10 +56,25 @@ public sealed class ListChallengesEndpoint(
             items = items.Where(item =>
                 item.InteractionKind != CtfInteractionKind.PatchVerification).ToArray();
         }
-        return TypedResults.Ok(ChallengeMapper.ToListResponse(
-            items,
-            visibility.Visibility,
-            visibility.DataScope));
+        var response = ChallengeMapper.ToListResponse(
+            items, visibility.Visibility, visibility.DataScope);
+        if (visibility.GameMode != GameMode.Ctf)
+            return TypedResults.Ok(response);
+        var statuses = await progressionAccess.ReadStatusesAsync(
+            competitionId, decision.TeamId, ct);
+        return TypedResults.Ok(response with
+        {
+            Items = response.Items.Select(item =>
+            {
+                if (!statuses.TryGetValue(item.Id, out var status)) return item;
+                return item with
+                {
+                    Locked = !status.Active,
+                    PrerequisitesSatisfied = status.PrerequisitesSatisfied,
+                    PrerequisitesTotal = status.PrerequisitesTotal
+                };
+            }).ToArray()
+        });
     }
 
     private Task<bool> IsPatchVerificationEnabledAsync(CancellationToken ct) =>

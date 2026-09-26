@@ -272,6 +272,56 @@ public sealed class CtfFullBoundaryTests
 
         await E2ELifecycle.SubmitTeamRegistrationAsync(
             player, competitionId, teamId, cancellationToken);
+        var badgeBytes = Convert.FromBase64String(
+            "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/YxQAAAAASUVORK5CYII=");
+        using var badgeUpload = new MultipartFormDataContent();
+        badgeUpload.Add(new StringContent("First solve"), "Name");
+        badgeUpload.Add(new StringContent("Earned by the current team members."), "Description");
+        using var badgeImage = new ByteArrayContent(badgeBytes);
+        badgeImage.Headers.ContentType = new MediaTypeHeaderValue("image/png");
+        badgeUpload.Add(badgeImage, "Image", "first-solve.png");
+        using var badgeResponse = await admin.PostAsync(
+            $"/api/v1/admin/competitions/{competitionId}/badges",
+            badgeUpload, cancellationToken);
+        var badge = await ReadExpectedJsonAsync(
+            badgeResponse, HttpStatusCode.Created, cancellationToken);
+        var badgeId = badge.GetProperty("id").GetGuid();
+        var challengeNodeId = Guid.NewGuid();
+        var badgeNodeId = Guid.NewGuid();
+        object[] graphNodes =
+        [
+            new
+            {
+                id = challengeNodeId, kind = 0,
+                challenge = new { competitionChallengeId },
+                positionX = 0.0, positionY = 0.0
+            },
+            new
+            {
+                id = badgeNodeId, kind = 1,
+                badge = new { competitionBadgeId = badgeId },
+                positionX = 240.0, positionY = 0.0
+            }
+        ];
+        var graphEdges = new[]
+        {
+            new
+            {
+                id = Guid.NewGuid(), sourceNodeId = challengeNodeId,
+                targetNodeId = badgeNodeId, condition = 0
+            }
+        };
+        var savedGraph = await SendJsonAsync(
+            admin, HttpMethod.Put,
+            $"/api/v1/admin/competitions/{competitionId}/progression",
+            new
+            {
+                expectedConcurrencyStamp = (Guid?)null,
+                enabled = true, showPlayerMap = true,
+                nodes = graphNodes, edges = graphEdges
+            },
+            HttpStatusCode.OK, cancellationToken);
+        await Assert.That(savedGraph.GetProperty("revision").GetInt64()).IsEqualTo(1);
         await E2ELifecycle.MakeScheduleDueAsync(admin, competitionId, cancellationToken);
         await E2ELifecycle.SetStatusAsync(
             admin, competitionId, "Published", cancellationToken);
@@ -393,6 +443,38 @@ public sealed class CtfFullBoundaryTests
                 cancellationToken);
             await Assert.That(submission.GetProperty("result").GetString()).IsEqualTo("Correct");
             var evaluatedAt = submission.GetProperty("updatedAt").GetDateTimeOffset();
+            var activeProgression = await PollJsonAsync(
+                player,
+                $"/api/v1/competitions/{competitionId}/progression",
+                value => value.GetProperty("badges").GetArrayLength() == 1,
+                TimeSpan.FromSeconds(30), cancellationToken);
+            await Assert.That(activeProgression.GetProperty("showPlayerMap").GetBoolean())
+                .IsTrue();
+            await Assert.That(activeProgression.GetProperty("badges")[0]
+                .GetProperty("id").GetGuid()).IsEqualTo(badgeId);
+            var captainProfile = await GetJsonAsync(
+                anonymous, $"/api/v1/users/{captainId}", cancellationToken);
+            var teammateProfile = await GetJsonAsync(
+                anonymous, $"/api/v1/users/{teammateId}", cancellationToken);
+            await Assert.That(captainProfile.GetProperty("badges").GetArrayLength())
+                .IsEqualTo(1);
+            await Assert.That(teammateProfile.GetProperty("badges").GetArrayLength())
+                .IsEqualTo(1);
+            await SendJsonAsync(
+                admin, HttpMethod.Put,
+                $"/api/v1/admin/competitions/{competitionId}/progression",
+                new
+                {
+                    expectedConcurrencyStamp = savedGraph.GetProperty("concurrencyStamp").GetGuid(),
+                    enabled = false, showPlayerMap = false,
+                    nodes = graphNodes, edges = graphEdges
+                },
+                HttpStatusCode.OK, cancellationToken);
+            var disabledProgression = await GetJsonAsync(
+                player, $"/api/v1/competitions/{competitionId}/progression",
+                cancellationToken);
+            await Assert.That(disabledProgression.GetProperty("badges").GetArrayLength())
+                .IsEqualTo(0);
 
             var solvedLeaderboard = await PollLeaderboardAsync(
                 anonymous,

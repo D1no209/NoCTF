@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Routing;
 using NoCTF.API.Endpoints.Competitions;
 using NoCTF.Application.Authentication.Account;
+using NoCTF.Application.Competitions.Progression;
 
 namespace NoCTF.API.Endpoints.Authentication;
 
@@ -22,7 +23,8 @@ public sealed record PublicUserProfileResponse(
     int SuccessfulChallengeCount,
     IReadOnlyList<PublicUserModeSummaryResponse> Modes,
     IReadOnlyList<PublicUserDirectionSummaryResponse> Directions,
-    IReadOnlyList<PublicUserCompetitionSummaryResponse> RecentCompetitions);
+    IReadOnlyList<PublicUserCompetitionSummaryResponse> RecentCompetitions,
+    IReadOnlyList<NoCTF.API.Endpoints.Competitions.ProgressionBadgeDisplayContract> Badges);
 
 public sealed record PublicUserModeSummaryResponse(
     GameModeProtocol Mode,
@@ -43,6 +45,7 @@ public sealed record PublicUserCompetitionSummaryResponse(
 
 public sealed class GetUserProfileEndpoint(
     GetPublicUserProfile getProfile,
+    IProgressionPlayerReader progression,
     LinkGenerator links)
     : Endpoint<GetUserProfileRequest, Results<Ok<PublicUserProfileResponse>, NotFound>>
 {
@@ -94,7 +97,10 @@ public sealed class GetUserProfileEndpoint(
                 CompetitionProtocolMapper.ToProtocol(item.Mode),
                 CompetitionProtocolMapper.ToProtocol(item.Status),
                 item.StartAt,
-                item.EndAt)).ToList()));
+                item.EndAt)).ToList(),
+            (await progression.ReadPublicUserBadgesAsync(request.UserId, ct))
+                .Select(NoCTF.API.Endpoints.Competitions.ProgressionBadgeDisplayProtocol.ToContract)
+                .ToArray()));
     }
 
 }

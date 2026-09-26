@@ -53,6 +53,8 @@ internal static partial class BackendMessageOperations
                 item.AvatarFileId == file.Id || item.WriteUpFileId == file.Id,
                 cancellationToken)
             || await db.Competitions.IgnoreQueryFilters().AnyAsync(item => item.PosterFileId == file.Id, cancellationToken)
+            || await db.CompetitionBadges.AnyAsync(item => item.ImageFileId == file.Id
+                && item.DeletedAt == null, cancellationToken)
             || await db.PlatformSettings.AnyAsync(item => item.LogoFileId == file.Id, cancellationToken)
             || await db.Set<ChallengeAttachment>().AnyAsync(item => item.FileId == file.Id, cancellationToken)
             || await db.PatchUploads.AnyAsync(item => item.FileId == file.Id, cancellationToken)

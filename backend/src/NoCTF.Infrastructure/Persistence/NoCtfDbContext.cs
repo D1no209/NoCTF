@@ -4,6 +4,7 @@ using NoCTF.Domain.Identity;
 using NoCTF.Domain.Notifications;
 using NoCTF.Domain.Runtime;
 using NoCTF.Domain.Competitions;
+using NoCTF.Domain.Competitions.Progression;
 using NoCTF.Domain.Teams;
 using NoCTF.Domain.Challenges;
 using NoCTF.Domain.Platform;
@@ -23,6 +24,14 @@ public sealed class NoCtfDbContext(DbContextOptions<NoCtfDbContext> options)
 {
     public DbSet<User> Users => Set<User>();
     public DbSet<Competition> Competitions => Set<Competition>();
+    public DbSet<CompetitionProgression> CompetitionProgressions => Set<CompetitionProgression>();
+    public DbSet<ProgressionNode> ProgressionNodes => Set<ProgressionNode>();
+    public DbSet<ProgressionEdge> ProgressionEdges => Set<ProgressionEdge>();
+    public DbSet<CompetitionBadge> CompetitionBadges => Set<CompetitionBadge>();
+    public DbSet<TeamProgressionNodeState> TeamProgressionNodeStates => Set<TeamProgressionNodeState>();
+    public DbSet<TeamProgressionBadgeState> TeamProgressionBadgeStates => Set<TeamProgressionBadgeState>();
+    public DbSet<UserBadgeGrant> UserBadgeGrants => Set<UserBadgeGrant>();
+    public DbSet<UserBadgeTransition> UserBadgeTransitions => Set<UserBadgeTransition>();
     public DbSet<CompetitionEvent> CompetitionEvents => Set<CompetitionEvent>();
     public DbSet<Team> Teams => Set<Team>();
     public DbSet<Challenge> Challenges => Set<Challenge>();
@@ -121,6 +130,11 @@ public sealed class NoCtfDbContext(DbContextOptions<NoCtfDbContext> options)
             throw new InvalidOperationException(
                 "Notifications are immutable and cannot be updated or deleted.");
         }
+
+        if (ChangeTracker.Entries<UserBadgeTransition>().Any(entry =>
+                entry.State is EntityState.Modified or EntityState.Deleted))
+            throw new InvalidOperationException(
+                "Badge transitions are immutable and cannot be updated or deleted.");
 
         if (ChangeTracker.Entries<StoredFile>().Any(entry => entry.State == EntityState.Modified))
             throw new InvalidOperationException("Stored file metadata is immutable.");

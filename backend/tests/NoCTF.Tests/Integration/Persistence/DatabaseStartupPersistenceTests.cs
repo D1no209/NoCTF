@@ -51,7 +51,8 @@ public sealed class DatabaseStartupPersistenceTests
                 await Assert.That(user.Role).IsEqualTo(UserRole.Administrator);
                 await Assert.That(await db.Database.GetPendingMigrationsAsync(ct)).IsEmpty();
                 var appliedMigrations = (await db.Database.GetAppliedMigrationsAsync(ct)).ToArray();
-                await Assert.That(appliedMigrations).HasSingleItem();
+                await Assert.That(appliedMigrations).Count().IsEqualTo(2);
+                await Assert.That(appliedMigrations[1]).EndsWith("_CompetitionProgression");
                 await Assert.That(appliedMigrations[0]).EndsWith("_InitialBaseline");
                 var tables = await db.Database.SqlQuery<string>($"""
                     SELECT table_name AS "Value"

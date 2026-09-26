@@ -18,6 +18,10 @@ public sealed class DataModelSchemaTests
         "competition_challenge_rules",
         "competition_challenges",
         "competition_collaborators",
+        "competition_progressions",
+        "competition_progression_nodes",
+        "competition_progression_edges",
+        "competition_badges",
         "competition_events",
         "competition_mode_configurations",
         "competitions",
@@ -30,6 +34,10 @@ public sealed class DataModelSchemaTests
         "runtime_capacity_allocations",
         "runtime_instances",
         "team_members",
+        "team_progression_node_states",
+        "team_progression_badge_states",
+        "user_badge_grants",
+        "user_badge_transitions",
         "teams",
         "users"
     ];
@@ -81,7 +89,8 @@ public sealed class DataModelSchemaTests
                     migrations.Add(reader.GetString(0));
             }
 
-            await Assert.That(migrations).HasSingleItem();
+            await Assert.That(migrations).Count().IsEqualTo(2);
+            await Assert.That(migrations[1]).EndsWith("_CompetitionProgression");
             await Assert.That(migrations[0]).EndsWith("_InitialBaseline");
 
             await using var removedGatewayColumnsCommand = new NpgsqlCommand(
@@ -150,8 +159,9 @@ public sealed class DataModelSchemaTests
                 WHERE table_schema = 'public'
                   AND (
                     table_name = 'data_exports'
+                    OR (column_name = 'revision'
+                        AND table_name <> 'competition_progressions')
                     OR column_name IN (
-                        'revision',
                         'expected_revision',
                         'concurrency_token',
                         'leaderboard_dirty',
