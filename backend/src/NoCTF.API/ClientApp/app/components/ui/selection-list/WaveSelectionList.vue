@@ -10,7 +10,7 @@ import { useDisclosureGroups } from './useDisclosureGroups'
 import WaveSelectionItem from './WaveSelectionItem.vue'
 
 defineOptions({ inheritAttrs: false })
-const props = defineProps<{ items: T[]; groups?: { value: string; label: string; items: T[] }[]; modelValue: string | null; label: string; controls?: string }>()
+const props = defineProps<{ items: T[]; groups?: { value: string; label: string; items: T[] }[]; modelValue: string | null; label: string; controls?: string; compact?: boolean }>()
 const emit = defineEmits<{ 'update:modelValue': [value: string] }>()
 const surface = ref<HTMLElement | null>(null)
 const wave = useWaveMotion(surface, () => props.modelValue)
@@ -32,7 +32,7 @@ const { isOpen, setOpen } = useDisclosureGroups(() => props.groups, () => props.
             </CollapsibleTrigger>
             <CollapsibleContent class="noctf-disclosure-content" role="listbox" :aria-label="group.label">
               <div data-slot="wave-group-items">
-                <WaveSelectionItem v-for="item in group.items" :key="item.value" :value="item.value" :label="item.label" :selected="modelValue === item.value" :controls="controls" @select="emit('update:modelValue', $event)">
+                <WaveSelectionItem v-for="item in group.items" :key="item.value" :value="item.value" :label="item.label" :selected="modelValue === item.value" :controls="controls" :hint="compact ? item.label : undefined" @select="emit('update:modelValue', $event)">
                   <slot :item="item"><span>{{ item.label }}</span></slot>
                 </WaveSelectionItem>
               </div>
@@ -40,7 +40,7 @@ const { isOpen, setOpen } = useDisclosureGroups(() => props.groups, () => props.
           </Collapsible>
         </template>
         <template v-else>
-          <WaveSelectionItem v-for="item in items" :key="item.value" :value="item.value" :label="item.label" :selected="modelValue === item.value" :controls="controls" @select="emit('update:modelValue', $event)">
+          <WaveSelectionItem v-for="item in items" :key="item.value" :value="item.value" :label="item.label" :selected="modelValue === item.value" :controls="controls" :hint="compact ? item.label : undefined" @select="emit('update:modelValue', $event)">
             <slot :item="item"><span>{{ item.label }}</span></slot>
           </WaveSelectionItem>
         </template>

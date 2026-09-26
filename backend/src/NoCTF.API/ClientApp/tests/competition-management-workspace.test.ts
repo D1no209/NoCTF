@@ -41,9 +41,38 @@ test('challenge, team and progression management use page scroll instead of nest
   expect(shell).toContain("usesPageScroll ? 'overflow-visible'")
   expect(layout).toContain('<ScrollSurface as="main" axis="y"')
   expect(workspace).toContain(":has([data-workspace-scroll-content])")
+  expect(workspace).toContain("[data-slot='app-workspace-nav']:not(:has([data-workspace-scroll-content])) .settings-workspace-layout > div:first-child {\n    position: sticky; top: 0")
+  expect(workspace).toContain(".settings-workspace-layout > div:first-child > [data-slot='floating-sidebar'] {\n    position: relative; inset: auto")
   expect(scrollSurface).toContain('enabled?: boolean')
   expect(scrollSurface).toContain('watch(() => props.enabled, updateEnabled')
   expect(scrollSurface).toContain('scrollbars?.dispose()')
+})
+
+test('workspace navigation collapses to an accessible desktop icon rail without changing its route selection', async () => {
+  const feature = await sourceFile(
+    new URL('../app/features/app/useAppWorkspaceNav.ts', import.meta.url),
+  ).text()
+  const view = await sourceFile(
+    new URL('../app/components/views/app/AppWorkspaceNavView.vue', import.meta.url),
+  ).text()
+  const workspace = await Bun.file(
+    new URL('../app/components/views/app/settings-workspace.css', import.meta.url),
+  ).text()
+  const item = await sourceFile(
+    new URL('../app/components/ui/selection-list/WaveSelectionItem.vue', import.meta.url),
+  ).text()
+
+  expect(feature).toContain("useMediaQuery('(min-width: 1024px)')")
+  expect(feature).toContain('isDesktop.value && collapsed.value')
+  expect(view).toContain(':data-collapsed="isCollapsed ? \'true\' : undefined"')
+  expect(view).toContain(':groups="isCollapsed ? undefined : groupOptions"')
+  expect(view).toContain(':compact="isCollapsed"')
+  expect(view).toContain(':aria-expanded="!isCollapsed"')
+  expect(view).toContain('v-if="!isCollapsed"')
+  expect(item).toContain('<Hint :content="hint">')
+  expect(item).toContain(':aria-label="label"')
+  expect(workspace).toContain("grid-template-columns: 4rem minmax(0, 1fr)")
+  expect(workspace).toContain("[data-slot='app-workspace-nav']:not(:has([data-workspace-scroll-content])) .settings-workspace-layout > div:first-child {")
 })
 
 test('related competition settings share continuous cards', async () => {

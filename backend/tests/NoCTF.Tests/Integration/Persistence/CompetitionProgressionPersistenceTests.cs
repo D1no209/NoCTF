@@ -5,6 +5,7 @@ using NoCTF.Domain.Competitions;
 using NoCTF.Domain.Competitions.Progression;
 using NoCTF.Domain.Identity;
 using NoCTF.Domain.Storage;
+using NoCTF.Domain.Teams;
 using NoCTF.Infrastructure.Competitions.Progression;
 using NoCTF.Infrastructure.Persistence;
 using Testcontainers.PostgreSql;
@@ -41,6 +42,7 @@ public sealed class CompetitionProgressionPersistenceTests
             var nodeId = Guid.NewGuid();
             var badgeNodeId = Guid.NewGuid();
             var imageId = Guid.NewGuid();
+            var teamId = Guid.NewGuid();
             await using (var setup = new NoCtfDbContext(options))
             {
                 await setup.Database.MigrateAsync(ct);
@@ -82,19 +84,31 @@ public sealed class CompetitionProgressionPersistenceTests
                     Id = badgeId, CompetitionId = competitionId, Name = "Badge",
                     ImageFileId = imageId, CreatedAt = now, UpdatedAt = now
                 });
+                setup.Teams.Add(new Team
+                {
+                    Id = teamId, CompetitionId = competitionId, Name = "Team",
+                    CaptainId = ownerId, MemberIds = [ownerId],
+                    InvitationToken = Guid.NewGuid().ToString("N"),
+                    RegistrationStatus = TeamRegistrationStatus.Approved,
+                    RegisteredAt = now
+                });
                 await setup.SaveChangesAsync(ct);
             }
             await using (var db = new NoCtfDbContext(options))
             {
                 var store = new CompetitionProgressionStore(db, new ProgressionReconciler(db));
+                var empty = await store.SaveAsync(new(
+                    competitionId, null, false, false, [], [], now), ct);
+                await Assert.That(empty.Failure).IsNull();
+                db.ChangeTracker.Clear();
                 var result = await store.SaveAsync(new(
-                    competitionId, null, true, true,
+                    competitionId, empty.Progression!.ConcurrencyStamp, true, true,
                     [new(nodeId, ProgressionNodeKind.Challenge, instanceId, 10, 20),
                      new(badgeNodeId, ProgressionNodeKind.Badge, badgeId, 200, 20)],
                     [new(Guid.NewGuid(), nodeId, badgeNodeId,
                         ProgressionPrerequisiteCondition.Completed)], now), ct);
                 await Assert.That(result.Failure).IsNull();
-                await Assert.That(result.Progression!.Revision).IsEqualTo(1);
+                await Assert.That(result.Progression!.Revision).IsEqualTo(2);
                 await Assert.That(await db.ProgressionNodes.OfType<ChallengeProgressionNode>()
                     .CountAsync(ct)).IsEqualTo(1);
                 await Assert.That(await db.ProgressionNodes.OfType<BadgeProgressionNode>()

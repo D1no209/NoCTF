@@ -1041,6 +1041,11 @@ body:has([data-modal-scroll-lock]) {
 .competition-sidebar-menu [data-slot='select-item']:is([data-state='checked'], :focus, [data-highlighted]) { background: transparent; }
 [data-slot='floating-sidebar'] [data-slot='select-trigger'] { opacity: 1; }
 .competition-sidebar-menu[data-slot='select-content'] { box-shadow: none; }
+.vue-flow__node-progression.selected .progression-node-card {
+  background: color-mix(in oklch, var(--primary) 12%, var(--background));
+  box-shadow: 0 0 0 2px var(--primary);
+}
+.vue-flow__edge.selected .vue-flow__edge-path { stroke: var(--primary); }
 :is([data-slot='checkbox'], [data-slot='radio-group-item']):not([data-state='checked']) { background: var(--control-hover); }
 :is([data-slot], button, a, input, textarea, [tabindex]):focus-visible,
 [data-slot='input-group']:focus-within {

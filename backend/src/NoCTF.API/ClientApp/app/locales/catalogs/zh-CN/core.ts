@@ -1190,6 +1190,8 @@ export const messages = {
   "ui.resourceCleanupFailed": "资源清理失败",
   "ui.accessUrlExpansionFailed": "访问地址生成失败",
   "ui.mainNavigation": "主导航",
+  "ui.collapseMenu": "收起菜单",
+  "ui.expandMenu": "展开菜单",
   "ui.free": "免费",
   "ui.lowestRemainingPoolQuota": "资源池最低剩余配额",
   "ui.platformRedisOperationP99Duration": "平台 Redis 操作 P99 耗时",

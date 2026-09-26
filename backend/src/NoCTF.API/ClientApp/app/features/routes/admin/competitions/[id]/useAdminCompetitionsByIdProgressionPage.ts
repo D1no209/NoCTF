@@ -14,7 +14,14 @@ import type {
   NoCtfapiEndpointsChallengesChallengeSummaryResponse,
 } from '../../../../../api'
 import { useCompetitionAdmin } from '../../../../../lib/admin-competition'
-import { canConnectProgression } from '../../../../../lib/progression-graph'
+import {
+  applyProgressionSelectionChanges,
+  canConnectProgression,
+  getProgressionSelection,
+  removeProgressionSelection,
+  updateProgressionNodePositions,
+} from '../../../../../lib/progression-graph'
+import type { ProgressionSelectionChange } from '../../../../../lib/progression-graph'
 import { directionKey, directionLabel } from '../../../../../utils/directions'
 import ProgressionCanvasComponent from '~/components/ui/progression/ProgressionCanvas.vue'
 import { markRaw } from 'vue'
@@ -32,6 +39,8 @@ export function useAdminCompetitionsByIdProgressionPage() {
   const stamp = ref<string | null>(null)
   const nodes = shallowRef<CanvasNode[]>([])
   const edges = shallowRef<GateEdge[]>([])
+  const selectedNodeIds = shallowRef<Set<string>>(new Set())
+  const selectedEdgeIds = shallowRef<Set<string>>(new Set())
   const badges = ref<NoCtfapiEndpointsAdministrationCompetitionsCompetitionBadgeContract[]>([])
   const challenges = ref<NoCtfapiEndpointsChallengesChallengeSummaryResponse[]>([])
   const challengeSearch = ref('')
@@ -40,8 +49,6 @@ export function useAdminCompetitionsByIdProgressionPage() {
   const saving = ref(false)
   const badgeSaving = ref(false)
   const error = ref<string | null>(null)
-  const selectedNodeId = ref<string | null>(null)
-  const selectedEdgeId = ref<string | null>(null)
   const newBadgeName = ref('')
   const newBadgeDescription = ref('')
   const newBadgeImage = ref<File | null>(null)
@@ -50,8 +57,11 @@ export function useAdminCompetitionsByIdProgressionPage() {
   const editBadgeDescription = ref('')
   const editBadgeImage = ref<File | null>(null)
 
-  const selectedEdge = computed(() => edges.value.find(edge => edge.id === selectedEdgeId.value) ?? null)
-  const selectedNode = computed(() => nodes.value.find(node => node.id === selectedNodeId.value) ?? null)
+  const selection = computed(() => getProgressionSelection(
+    nodes.value, edges.value, selectedNodeIds.value, selectedEdgeIds.value))
+  const selectedEdge = computed(() => selection.value.edge)
+  const selectedNode = computed(() => selection.value.node)
+  const selectedCount = computed(() => selection.value.count)
   const availableChallenges = computed(() => challenges.value.filter(challenge =>
     !nodes.value.some(node => node.data?.kind === 0 && node.data.resourceId === challenge.id),
   ))
@@ -113,8 +123,8 @@ export function useAdminCompetitionsByIdProgressionPage() {
       label: edge.condition === 1 ? translate('progression.incomplete') : translate('progression.completed'),
       data: { condition: edge.condition === 1 ? 1 : 0 },
     }))
-    selectedNodeId.value = null
-    selectedEdgeId.value = null
+    selectedNodeIds.value = new Set()
+    selectedEdgeIds.value = new Set()
     error.value = null
   }
 
@@ -149,20 +159,25 @@ export function useAdminCompetitionsByIdProgressionPage() {
       label: translate('progression.completed'), data: { condition: 0 },
     }
     edges.value = [...edges.value, edge]
-    selectedEdgeId.value = edge.id
   }
 
-  function selectNode(id: string) { selectedNodeId.value = id; selectedEdgeId.value = null }
-  function selectEdge(id: string) { selectedEdgeId.value = id; selectedNodeId.value = null }
-  function removeSelectedNode() {
-    if (!selectedNodeId.value) return
-    edges.value = edges.value.filter(edge => edge.source !== selectedNodeId.value && edge.target !== selectedNodeId.value)
-    nodes.value = nodes.value.filter(node => node.id !== selectedNodeId.value)
-    selectedNodeId.value = null
+  function removeSelected() {
+    if (!canWrite.value || !selectedCount.value) return
+    const remaining = removeProgressionSelection(
+      nodes.value, edges.value, selectedNodeIds.value, selectedEdgeIds.value)
+    nodes.value = remaining.nodes
+    edges.value = remaining.edges
+    selectedNodeIds.value = new Set()
+    selectedEdgeIds.value = new Set()
   }
-  function removeSelectedEdge() {
-    edges.value = edges.value.filter(edge => edge.id !== selectedEdgeId.value)
-    selectedEdgeId.value = null
+  function changeNodeSelection(changes: ProgressionSelectionChange[]) {
+    selectedNodeIds.value = applyProgressionSelectionChanges(selectedNodeIds.value, changes)
+  }
+  function changeEdgeSelection(changes: ProgressionSelectionChange[]) {
+    selectedEdgeIds.value = applyProgressionSelectionChanges(selectedEdgeIds.value, changes)
+  }
+  function updateNodePositions(positions: { id: string, x: number, y: number }[]) {
+    nodes.value = updateProgressionNodePositions(nodes.value, positions)
   }
   function setEdgeCondition(condition: 0 | 1) {
     const edge = selectedEdge.value
@@ -286,10 +301,10 @@ export function useAdminCompetitionsByIdProgressionPage() {
     competition, canWrite, enabled, showPlayerMap, nodes, edges, badges,
     challenges, availableChallenges, filteredChallenges, challengeSearch,
     challengeDirection, challengeDirections, loading, saving, badgeSaving, error,
-    selectedNode, selectedEdge, newBadgeName, newBadgeDescription, newBadgeImage,
+    selectedNode, selectedEdge, selectedCount, newBadgeName, newBadgeDescription, newBadgeImage,
     editingBadgeId, editBadgeName, editBadgeDescription, editBadgeImage,
-    load, addChallenge, addBadge, connect, selectNode, selectEdge,
-    removeSelectedNode, removeSelectedEdge, setEdgeCondition, save,
+    load, addChallenge, addBadge, connect, removeSelected, changeNodeSelection,
+    changeEdgeSelection, updateNodePositions, setEdgeCondition, save,
     onBadgeFileChange, createBadge, deleteBadge,
     onEditBadgeFileChange, beginEditBadge, updateBadge,
     ProgressionCanvas,
