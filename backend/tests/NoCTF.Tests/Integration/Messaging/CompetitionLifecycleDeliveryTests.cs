@@ -82,6 +82,7 @@ public sealed class CompetitionLifecycleDeliveryTests
                 .UseEnvironment(Environments.Production)
                 .ConfigureServices(services =>
                 {
+                    services.AddSingleton(TimeProvider.System);
                     services.AddSingleton(probe);
                     services.AddSingleton<IQueueServiceLocationProbe>(_ => queueProbe);
                     services.AddDbContext<NoCtfDbContext>(options =>
