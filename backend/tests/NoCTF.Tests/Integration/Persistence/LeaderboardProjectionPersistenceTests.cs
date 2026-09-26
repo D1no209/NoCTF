@@ -40,6 +40,87 @@ namespace NoCTF.Tests.Integration.Persistence;
 public sealed class LeaderboardProjectionPersistenceTests
 {
     [Test, Timeout(300_000)]
+    public async Task Frozen_webhook_projection_keeps_team_and_challenge_names_after_live_edits(
+        CancellationToken ct)
+    {
+        await DockerIntegrationTest.RunAsync(async () =>
+        {
+            await using var postgres = new PostgreSqlBuilder("postgres:17.10-alpine3.24@sha256:742f40ea20b9ff2ff31db5458d127452988a2164df9e17441e191f3b72252193")
+                .Build();
+            await postgres.StartAsync(ct);
+            var options = new DbContextOptionsBuilder<NoCtfDbContext>()
+                .UseNpgsql(postgres.GetConnectionString())
+                .UseSnakeCaseNamingConvention()
+                .Options;
+            var frozenAt = DateTimeOffset.Parse("2026-09-26T12:00:00Z");
+            var clock = new FakeTimeProvider(frozenAt);
+            var fixture = CreateFixture(GameMode.Ctf, 0, Guid.CreateVersion7(frozenAt), frozenAt);
+            fixture.Competition.FrozenStartAt = frozenAt;
+            await using (var db = new NoCtfDbContext(options))
+            {
+                await db.Database.EnsureCreatedAsync(ct);
+                var owner = CreateUser(frozenAt);
+                fixture.Competition.OwnerId = owner.Id;
+                fixture.Challenge.OwnerId = owner.Id;
+                fixture.Team.CaptainId = owner.Id;
+                fixture.Team.MemberIds = [owner.Id];
+                db.Users.Add(owner);
+                db.Competitions.Add(fixture.Competition);
+                db.Challenges.Add(fixture.Challenge);
+                db.CompetitionChallenges.Add(fixture.CompetitionChallenge);
+                db.Teams.Add(fixture.Team);
+                await db.SaveChangesAsync(ct);
+                using var cacheServices = new ServiceCollection()
+                    .AddFusionCache(NoCtfCacheNames.Leaderboards).Services.BuildServiceProvider();
+                var cache = new FusionLeaderboardCache(
+                    db,
+                    new LeaderboardProjectionEngine(new LeaderboardProjectorCatalog()),
+                    Substitute.For<ILeaderboardRefreshPublisher>(),
+                    cacheServices.GetRequiredService<IFusionCacheProvider>(),
+                    clock: clock);
+                var captured = await cache.GetFrozenWebhookScoreboardAsync(
+                    fixture.Competition.Id, frozenAt, ct);
+                await Assert.That(captured).IsNotNull();
+                await Assert.That(captured!.Projection.ChallengeCatalog.Challenges.Single().Title)
+                    .IsEqualTo("Ctf challenge");
+                await Assert.That(captured.Projection.Snapshot.Teams.Single().TeamName)
+                    .IsEqualTo("Ctf team");
+            }
+
+            await using (var db = new NoCtfDbContext(options))
+            {
+                var challenge = await db.Challenges.SingleAsync(ct);
+                var team = await db.Teams.SingleAsync(ct);
+                challenge.Title = "renamed challenge";
+                team.Name = "renamed team";
+                await db.SaveChangesAsync(ct);
+            }
+
+            clock.Advance(TimeSpan.FromMinutes(10));
+            await using (var db = new NoCtfDbContext(options))
+            {
+                using var cacheServices = new ServiceCollection()
+                    .AddFusionCache(NoCtfCacheNames.Leaderboards).Services.BuildServiceProvider();
+                var cache = new FusionLeaderboardCache(
+                    db,
+                    new LeaderboardProjectionEngine(new LeaderboardProjectorCatalog()),
+                    Substitute.For<ILeaderboardRefreshPublisher>(),
+                    cacheServices.GetRequiredService<IFusionCacheProvider>(),
+                    clock: clock);
+                var frozen = await cache.GetFrozenWebhookScoreboardAsync(
+                    fixture.Competition.Id, frozenAt, ct);
+                await Assert.That(frozen).IsNotNull();
+                await Assert.That(frozen!.Projection.ChallengeCatalog.Challenges.Single().Title)
+                    .IsEqualTo("Ctf challenge");
+                await Assert.That(frozen.Projection.Snapshot.Teams.Single().TeamName)
+                    .IsEqualTo("Ctf team");
+                await Assert.That(await db.CompetitionWebhookFrozenProjections.CountAsync(ct))
+                    .IsEqualTo(1);
+            }
+        });
+    }
+
+    [Test, Timeout(300_000)]
     public async Task Awdp_configuration_event_invalidates_cached_schema_and_publishes_recomputed_rounds(CancellationToken ct)
     {
         await DockerIntegrationTest.RunAsync(async () =>

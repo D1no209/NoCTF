@@ -5,13 +5,18 @@ import {
   adminCreateCompetitionWebhookTestDelivery,
   adminDeleteCompetitionWebhook,
   adminGetCompetitionWebhookTestDelivery,
+  adminListCompetitionWebhookDeliveries,
   adminListCompetitionWebhooks,
   adminRotateCompetitionWebhookSecret,
   adminUpdateCompetitionWebhook,
 } from '../../../../../api'
-import type { NoCtfapiEndpointsAdministrationCompetitionsCompetitionWebhookTargetResponse } from '../../../../../api'
+import type {
+  NoCtfapiEndpointsAdministrationCompetitionsCompetitionWebhookDeliveryDiagnosticResponse,
+  NoCtfapiEndpointsAdministrationCompetitionsCompetitionWebhookTargetResponse,
+} from '../../../../../api'
 import { useOffsetPagination } from '../../../../../composables/useOffsetPagination'
 import { useCompetitionAdmin } from '../../../../../lib/admin-competition'
+import { adminFormatDateTime } from '../../../../../utils/admin-format'
 
 interface WebhookForm {
   name: string
@@ -49,6 +54,53 @@ export function useAdminCompetitionsByIdWebhooksPage() {
   const targets = pagination.items
   const loading = pagination.loading
   const error = computed(() => pagination.error.value?.message ?? null)
+
+  const deliveryPagination = useOffsetPagination<NoCtfapiEndpointsAdministrationCompetitionsCompetitionWebhookDeliveryDiagnosticResponse>(async ({ offset, limit, desc }) => {
+    const { data, error: requestError } = await adminListCompetitionWebhookDeliveries({
+      path: { competitionId },
+      query: { offset, limit, desc },
+    })
+    if (requestError || !data)
+      throw requestError ?? new Error(translate('webhook.diagnosticsLoadFailed'))
+    return { items: data.items ?? [], total: data.total ?? 0 }
+  }, { initialPageSize: 20, initialDesc: true })
+
+  const deliveryStateKeys: Record<string, string> = {
+    Pending: 'webhook.statePending',
+    InFlight: 'webhook.stateInFlight',
+    Delivered: 'webhook.stateDelivered',
+    Suppressed: 'webhook.stateSuppressed',
+    DeadLetter: 'webhook.stateDeadLetter',
+  }
+  const payloadStateKeys: Record<string, string> = {
+    Unknown: 'webhook.payloadUnknown',
+    Complete: 'webhook.payloadComplete',
+    ProjectionNotReady: 'webhook.payloadProjectionNotReady',
+    Invalid: 'webhook.payloadInvalid',
+  }
+
+  function deliveryStateLabel(state?: string) {
+    return translate(deliveryStateKeys[state ?? ''] ?? 'webhook.statePending')
+  }
+
+  function payloadStateLabel(state?: string) {
+    return translate(payloadStateKeys[state ?? ''] ?? 'webhook.payloadUnknown')
+  }
+
+  function deliveryStateVariant(state?: string): 'default' | 'secondary' | 'outline' | 'destructive' {
+    if (state === 'Delivered') return 'default'
+    if (state === 'DeadLetter') return 'destructive'
+    if (state === 'InFlight') return 'outline'
+    return 'secondary'
+  }
+
+  function formatSeconds(value?: number | null) {
+    return value == null ? '—' : `${value.toFixed(2)}s`
+  }
+
+  async function refreshDeliveries() {
+    await deliveryPagination.loadPage(deliveryPagination.page.value)
+  }
 
   async function load() {
     await pagination.loadPage(pagination.page.value)
@@ -209,7 +261,10 @@ export function useAdminCompetitionsByIdWebhooksPage() {
     toast.error(translate('webhook.testTimedOut'))
   }
 
-  onMounted(() => load())
+  onMounted(() => {
+    void load()
+    void refreshDeliveries()
+  })
 
   return {
     Webhook,
@@ -237,6 +292,21 @@ export function useAdminCompetitionsByIdWebhooksPage() {
     signingSecret,
     secretOpen,
     testStates,
+    deliveries: deliveryPagination.items,
+    deliveriesLoading: deliveryPagination.loading,
+    deliveriesError: computed(() => deliveryPagination.error.value?.message ?? null),
+    deliveriesPage: deliveryPagination.page,
+    deliveriesPageCount: deliveryPagination.pageCount,
+    deliveriesTotal: deliveryPagination.total,
+    deliveriesPageLimit: deliveryPagination.limit,
+    loadDeliveriesPage: deliveryPagination.loadPage,
+    setDeliveriesPageSize: deliveryPagination.setPageSize,
+    refreshDeliveries,
+    deliveryStateLabel,
+    deliveryStateVariant,
+    payloadStateLabel,
+    formatSeconds,
+    adminFormatDateTime,
     load,
     createTarget,
     editTarget,

@@ -40,6 +40,78 @@
     "dataschema": { "type": "string", "format": "uri" },
     "data": { "$ref": "#/$defs/data" }
   },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "type": { "const": "com.noctf.competition.blood.awarded.v1" }
+        },
+        "required": ["type"]
+      },
+      "then": {
+        "properties": {
+          "data": {
+            "required": ["capturedAt", "eventSequence", "requiredProjectionVersion", "publicProjectionVersion", "competitionRevision", "event", "resources"],
+            "properties": {
+              "eventSequence": { "type": "integer", "minimum": 1 },
+              "requiredProjectionVersion": { "type": "integer", "minimum": 0 },
+              "publicProjectionVersion": { "type": "integer", "minimum": 0 },
+              "competitionRevision": { "type": "string", "format": "uuid" },
+              "event": {
+                "required": ["competitionId", "teamId", "competitionChallengeId", "award"],
+                "properties": {
+                  "teamId": { "type": "string", "format": "uuid" },
+                  "competitionChallengeId": { "type": "string", "format": "uuid" },
+                  "award": { "enum": ["First", "Second", "Third"] }
+                }
+              },
+              "resources": {
+                "required": ["competition", "challenge", "leaderboard"],
+                "properties": {
+                  "challenge": {
+                    "type": "object",
+                    "required": ["id"],
+                    "properties": {
+                      "id": { "type": "string", "format": "uuid" },
+                      "dataScope": { "enum": ["Live", "Frozen"] },
+                      "projectionVersion": { "type": "string", "pattern": "^[0-9]+$" }
+                    },
+                    "allOf": [
+                      {
+                        "if": {
+                          "properties": { "dataScope": { "enum": ["Live", "Frozen"] } },
+                          "required": ["dataScope"]
+                        },
+                        "then": { "required": ["title", "projectionVersion"] }
+                      }
+                    ]
+                  },
+                  "leaderboard": {
+                    "type": "object",
+                    "required": ["dataScope", "teams", "projectionVersion"],
+                    "properties": {
+                      "dataScope": { "enum": ["Live", "Frozen"] },
+                      "teams": { "type": "array" },
+                      "projectionVersion": { "type": "string", "pattern": "^[0-9]+$" }
+                    },
+                    "allOf": [
+                      {
+                        "if": {
+                          "properties": { "dataScope": { "const": "Frozen" } },
+                          "required": ["dataScope"]
+                        },
+                        "then": { "required": ["dataAsOf"] }
+                      }
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  ],
   "$defs": {
     "data": {
       "type": "object",
@@ -47,6 +119,10 @@
       "required": ["capturedAt", "event", "resources"],
       "properties": {
         "capturedAt": { "type": "string", "format": "date-time" },
+        "eventSequence": { "type": ["integer", "null"], "minimum": 1 },
+        "requiredProjectionVersion": { "type": ["integer", "null"], "minimum": 0 },
+        "publicProjectionVersion": { "type": ["integer", "null"], "minimum": 0 },
+        "competitionRevision": { "type": ["string", "null"], "format": "uuid" },
         "event": {
           "type": "object",
           "required": ["competitionId"],

@@ -44,6 +44,22 @@ public sealed class CompetitionVisibilityTests
     }
 
     [Test]
+    public async Task Blood_is_not_announced_while_blackout_is_effective()
+    {
+        var now = DateTimeOffset.UtcNow;
+        await Assert.That(CompetitionLeaderboardVisibilityPolicy.CanAnnounceBlood(
+            null, null, now)).IsTrue();
+        await Assert.That(CompetitionLeaderboardVisibilityPolicy.CanAnnounceBlood(
+            now.AddMinutes(-1), null, now)).IsTrue();
+        await Assert.That(CompetitionLeaderboardVisibilityPolicy.CanAnnounceBlood(
+            null, now.AddMinutes(-1), now)).IsFalse();
+        await Assert.That(CompetitionLeaderboardVisibilityPolicy.CanAnnounceBlood(
+            now.AddMinutes(-2), now.AddMinutes(-1), now)).IsFalse();
+        await Assert.That(CompetitionLeaderboardVisibilityPolicy.CanAnnounceBlood(
+            now.AddMinutes(-1), now.AddMinutes(-2), now)).IsTrue();
+    }
+
+    [Test]
     public async Task Visibility_timestamps_must_be_inside_competition_window()
     {
         var now = DateTimeOffset.UtcNow;

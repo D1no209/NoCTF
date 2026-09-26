@@ -2920,6 +2920,41 @@ export type NoCtfapiEndpointsAdministrationCompetitionsCompetitionPermissionCand
     emailVerified?: boolean;
 };
 
+export type NoCtfapiEndpointsAdministrationCompetitionsCompetitionWebhookDeliveryListResponse = NoCtfapiPaginationArrayResultOfCompetitionWebhookDeliveryDiagnosticResponse & {};
+
+export type NoCtfapiPaginationArrayResultOfCompetitionWebhookDeliveryDiagnosticResponse = {
+    total?: number;
+    items?: Array<NoCtfapiEndpointsAdministrationCompetitionsCompetitionWebhookDeliveryDiagnosticResponse>;
+};
+
+export type NoCtfapiEndpointsAdministrationCompetitionsCompetitionWebhookDeliveryDiagnosticResponse = {
+    eventId?: string;
+    targetId?: string;
+    eventType?: string;
+    state?: string;
+    payloadState?: string;
+    eventSequence?: number;
+    competitionRevision?: string;
+    domainEventCreatedAt?: string;
+    outboxPersistedAt?: string;
+    workerDequeuedAt?: string | null;
+    publicProjectionReadyAt?: string | null;
+    capturedAt?: string | null;
+    queueAgeSeconds?: number;
+    projectionWaitSeconds?: number | null;
+    firstHttpAttemptStartedAt?: string | null;
+    lastHttpAttemptStartedAt?: string | null;
+    lastHttpAttemptCompletedAt?: string | null;
+    lastHttpAttemptDurationSeconds?: number | null;
+    lastHttpStatusCode?: number | null;
+    projectionRetryCount?: number;
+    httpRetryCount?: number;
+    nextRetryAt?: string | null;
+    deadLetterReason?: string | null;
+};
+
+export type NoCtfapiEndpointsAdministrationCompetitionsListCompetitionWebhookDeliveriesRequest = NoCtfapiPaginationPaginationRequest & {};
+
 export type NoCtfapiEndpointsAdministrationCompetitionsCompetitionWebhookTargetListResponse = NoCtfapiPaginationArrayResultOfCompetitionWebhookTargetResponse & {
     canManage?: boolean;
 };
@@ -10098,6 +10133,49 @@ export type AdminListCompetitionPermissionCandidatesResponses = {
 };
 
 export type AdminListCompetitionPermissionCandidatesResponse = AdminListCompetitionPermissionCandidatesResponses[keyof AdminListCompetitionPermissionCandidatesResponses];
+
+export type AdminListCompetitionWebhookDeliveriesData = {
+    body?: never;
+    path: {
+        competitionId: string;
+    };
+    query: {
+        offset: number;
+        limit: number;
+        desc: boolean;
+    };
+    url: '/api/v1/admin/competitions/{competitionId}/webhook-deliveries';
+};
+
+export type AdminListCompetitionWebhookDeliveriesErrors = {
+    /**
+     * Bad Request
+     */
+    400: MicrosoftAspNetCoreMvcValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+    /**
+     * Not Found
+     */
+    404: unknown;
+};
+
+export type AdminListCompetitionWebhookDeliveriesError = AdminListCompetitionWebhookDeliveriesErrors[keyof AdminListCompetitionWebhookDeliveriesErrors];
+
+export type AdminListCompetitionWebhookDeliveriesResponses = {
+    /**
+     * Success
+     */
+    200: NoCtfapiEndpointsAdministrationCompetitionsCompetitionWebhookDeliveryListResponse;
+};
+
+export type AdminListCompetitionWebhookDeliveriesResponse = AdminListCompetitionWebhookDeliveriesResponses[keyof AdminListCompetitionWebhookDeliveriesResponses];
 
 export type AdminPreviewCompetitionHardDeleteData = {
     body?: never;

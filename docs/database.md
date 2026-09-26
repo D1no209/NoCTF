@@ -40,8 +40,9 @@
 
 ## 消息与缓存
 
-PostgreSQL 只保存业务事实，不保存 Wolverine Message Store、Inbox、Outbox、scheduled message 或
-dead-letter。Wolverine 只使用 NATS JetStream。业务提交成功后通过
+PostgreSQL 保存业务事实，以及与公开比赛事件同事务写入的 Webhook 专用 Outbox 和逐目标投递状态；
+不保存 Wolverine Message Store、Inbox 或 scheduled message。Wolverine 仍使用 NATS JetStream。
+其他业务提交成功后通过
 `IPostCommitMessagePublisher` 发布；关键 Pending 状态必须可由数据库事实重新派发，以覆盖提交后、
 发布前崩溃。所有消费者按至少一次投递和业务幂等键设计。
 

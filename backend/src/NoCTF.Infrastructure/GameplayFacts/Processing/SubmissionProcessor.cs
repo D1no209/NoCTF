@@ -606,12 +606,36 @@ public sealed class GameplayFactProcessor(
                 submission,
                 evaluation,
                 cancellationToken);
+        var announceBlood = false;
+        CompetitionLeaderboardVisibility? bloodVisibility = null;
+        DateTimeOffset? bloodFrozenAt = null;
+        if (bloodAward is not null)
+        {
+            var visibilityTimes = await db.Competitions.AsNoTracking()
+                .Where(competition => competition.Id == submission.CompetitionId)
+                .Select(competition => new
+                {
+                    competition.FrozenStartAt,
+                    competition.HiddenStartAt
+                })
+                .SingleAsync(cancellationToken);
+            bloodFrozenAt = visibilityTimes.FrozenStartAt;
+            bloodVisibility = CompetitionLeaderboardVisibilityPolicy.EffectiveAt(
+                visibilityTimes.FrozenStartAt,
+                visibilityTimes.HiddenStartAt,
+                bloodAward.OccurredAt);
+            announceBlood = bloodVisibility != CompetitionLeaderboardVisibility.Blackout
+                && CompetitionLeaderboardVisibilityPolicy.CanAnnounceBlood(
+                    visibilityTimes.FrozenStartAt,
+                    visibilityTimes.HiddenStartAt,
+                    now);
+        }
         await StopSolvedChallengeRuntimesAsync(
             submission,
             submission,
             now,
             cancellationToken);
-        if (bloodAward is not null)
+        if (announceBlood && bloodAward is not null)
             await outbox.PublishAsync(bloodAward);
         var adjudicationEventId = await events.RecordAsync(new(
             submission.CompetitionId,
@@ -629,7 +653,7 @@ public sealed class GameplayFactProcessor(
             GameplayFactState: submission.State,
             GameplayFactResult: submission.Result), cancellationToken);
         await RecordAwdpBreakResolutionAsync(submission, now, cancellationToken);
-        if (bloodAward is not null)
+        if (announceBlood && bloodAward is not null)
         {
             var bloodKind = bloodAward.BloodRank switch
             {
@@ -649,6 +673,8 @@ public sealed class GameplayFactProcessor(
                 GameplayFactId: submission.Id,
                 GameplayFactKind: submission.Kind,
                 GameplayFactResult: submission.Result,
+                LeaderboardVisibility: bloodVisibility,
+                FrozenStartAt: bloodFrozenAt,
                 ParentEventId: adjudicationEventId == Guid.Empty ? null : adjudicationEventId), cancellationToken);
         }
         await QueueNextGameplayFactAsync(processingScope, cancellationToken);

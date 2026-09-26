@@ -115,10 +115,23 @@ public static class NoCtfTelemetry
         "noctf.account_notification.issuances", unit: "{issuance}");
     private static readonly Counter<long> AccountNotificationDeliveries = Meter.CreateCounter<long>(
         "noctf.account_notification.deliveries", unit: "{delivery}");
+    private static readonly Histogram<double> WebhookQueueAge = Meter.CreateHistogram<double>(
+        "noctf.webhook.queue.age", unit: "s");
+    private static readonly Histogram<double> WebhookProjectionWait = Meter.CreateHistogram<double>(
+        "noctf.webhook.projection.wait", unit: "s");
+    private static readonly Histogram<double> WebhookHttpAttemptDuration = Meter.CreateHistogram<double>(
+        "noctf.webhook.http.attempt.duration", unit: "s");
+    private static readonly Counter<long> WebhookRetries = Meter.CreateCounter<long>(
+        "noctf.webhook.retries", unit: "{retry}");
+    private static readonly Counter<long> WebhookDeadLetters = Meter.CreateCounter<long>(
+        "noctf.webhook.dead_letters", unit: "{delivery}");
     private static readonly ConcurrentDictionary<string, RunnerCapacitySnapshot> RunnerCapacitySnapshots =
         new(StringComparer.Ordinal);
     private static long runtimeWaitingCount;
     private static long runtimeWaitingOldestAgeSeconds;
+    private static long webhookPendingCount;
+    private static long webhookOldestPendingAgeSeconds;
+    private static long webhookConsumerLag;
 
     static NoCtfTelemetry()
     {
@@ -136,6 +149,12 @@ public static class NoCtfTelemetry
             () => Volatile.Read(ref runtimeWaitingCount), unit: "{runtime}");
         Meter.CreateObservableGauge("noctf.runtime.waiting.oldest_age",
             () => Volatile.Read(ref runtimeWaitingOldestAgeSeconds), unit: "s");
+        Meter.CreateObservableGauge("noctf.webhook.pending",
+            () => Volatile.Read(ref webhookPendingCount), unit: "{delivery}");
+        Meter.CreateObservableGauge("noctf.webhook.oldest_pending.age",
+            () => Volatile.Read(ref webhookOldestPendingAgeSeconds), unit: "s");
+        Meter.CreateObservableGauge("noctf.webhook.consumer.lag",
+            () => Volatile.Read(ref webhookConsumerLag), unit: "{event}");
     }
 
     public static void SetRuntimeWaitingSnapshot(long count, long oldestAgeSeconds)
@@ -143,6 +162,30 @@ public static class NoCtfTelemetry
         Volatile.Write(ref runtimeWaitingCount, Math.Max(0, count));
         Volatile.Write(ref runtimeWaitingOldestAgeSeconds, Math.Max(0, oldestAgeSeconds));
     }
+
+    public static void SetWebhookPendingSnapshot(
+        long count, long oldestAgeSeconds, long consumerLag)
+    {
+        Volatile.Write(ref webhookPendingCount, Math.Max(0, count));
+        Volatile.Write(ref webhookOldestPendingAgeSeconds, Math.Max(0, oldestAgeSeconds));
+        Volatile.Write(ref webhookConsumerLag, Math.Max(0, consumerLag));
+    }
+
+    public static void RecordWebhookQueueAge(double seconds) =>
+        WebhookQueueAge.Record(Math.Max(0, seconds));
+
+    public static void RecordWebhookProjectionWait(double seconds) =>
+        WebhookProjectionWait.Record(Math.Max(0, seconds));
+
+    public static void RecordWebhookHttpAttempt(double seconds, string outcome) =>
+        WebhookHttpAttemptDuration.Record(Math.Max(0, seconds),
+            new TagList { { "outcome", outcome } });
+
+    public static void RecordWebhookRetry(string stage) =>
+        WebhookRetries.Add(1, new TagList { { "stage", stage } });
+
+    public static void RecordWebhookDeadLetter(string reason) =>
+        WebhookDeadLetters.Add(1, new TagList { { "reason", reason } });
 
     public static void RecordApiRequest(string endpoint, string outcome, double elapsedSeconds, ApiRequestKind kind = ApiRequestKind.Rest)
     {

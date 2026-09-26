@@ -11,6 +11,11 @@ const {
   signingSecret, secretOpen, testStates, createTarget, editTarget,
   setFormOpen, save, setEnabled, requestDelete, setDeleteOpen,
   rotate, copySecret, remove, test,
+  deliveries, deliveriesLoading, deliveriesError, deliveriesPage,
+  deliveriesPageCount, deliveriesTotal, deliveriesPageLimit,
+  loadDeliveriesPage, setDeliveriesPageSize, refreshDeliveries,
+  deliveryStateLabel, deliveryStateVariant, payloadStateLabel,
+  formatSeconds, adminFormatDateTime,
 } = toRefs(viewProps.state)
 </script>
 
@@ -115,6 +120,68 @@ const {
             @update:limit="setPageSize"
           />
         </div>
+      </CardContent>
+    </Card>
+
+    <Card class="gap-0">
+      <CardHeader class="flex-row items-start justify-between gap-4">
+        <CardTitle>{{ $t('webhook.diagnosticsTitle') }}</CardTitle>
+        <Button variant="secondary" size="sm" :disabled="deliveriesLoading" @click="refreshDeliveries">
+          <component :is="RotateCw" data-icon="inline-start" />
+          {{ $t('webhook.refreshDiagnostics') }}
+        </Button>
+      </CardHeader>
+      <CardContent class="flex flex-col gap-4">
+        <Skeleton v-if="deliveriesLoading && !deliveries.length" class="h-36 w-full" />
+        <Alert v-else-if="deliveriesError" variant="destructive">
+          <AlertTitle>{{ $t('webhook.diagnosticsLoadFailed') }}</AlertTitle>
+          <AlertDescription>{{ deliveriesError }}</AlertDescription>
+        </Alert>
+        <Empty v-else-if="!deliveries.length">
+          <EmptyHeader>
+            <EmptyTitle>{{ $t('webhook.diagnosticsEmpty') }}</EmptyTitle>
+          </EmptyHeader>
+        </Empty>
+        <template v-else>
+          <div v-for="(delivery, index) in deliveries" :key="`${delivery.eventId}:${delivery.targetId}`" class="flex flex-col gap-3">
+            <Separator v-if="index" />
+            <div class="flex flex-wrap items-start justify-between gap-3">
+              <div class="min-w-0">
+                <p class="break-all font-mono text-sm font-medium">{{ delivery.eventType }}</p>
+                <p class="break-all font-mono text-xs text-muted-foreground">{{ $t('webhook.eventId') }}: {{ delivery.eventId }}</p>
+                <p class="break-all font-mono text-xs text-muted-foreground">{{ $t('webhook.targetId') }}: {{ delivery.targetId }}</p>
+              </div>
+              <div class="flex flex-wrap items-center gap-2">
+                <Badge :variant="deliveryStateVariant(delivery.state)">{{ deliveryStateLabel(delivery.state) }}</Badge>
+                <Badge variant="outline">{{ payloadStateLabel(delivery.payloadState) }}</Badge>
+              </div>
+            </div>
+            <dl class="grid gap-x-6 gap-y-3 text-xs sm:grid-cols-2 xl:grid-cols-4">
+              <div><dt class="text-muted-foreground">{{ $t('webhook.domainEventTime') }}</dt><dd class="font-mono tabular-nums">{{ adminFormatDateTime(delivery.domainEventCreatedAt) }}</dd></div>
+              <div><dt class="text-muted-foreground">{{ $t('webhook.outboxTime') }}</dt><dd class="font-mono tabular-nums">{{ adminFormatDateTime(delivery.outboxPersistedAt) }}</dd></div>
+              <div><dt class="text-muted-foreground">{{ $t('webhook.workerDequeuedAt') }}</dt><dd class="font-mono tabular-nums">{{ adminFormatDateTime(delivery.workerDequeuedAt) }}</dd></div>
+              <div><dt class="text-muted-foreground">{{ $t('webhook.projectionReadyAt') }}</dt><dd class="font-mono tabular-nums">{{ adminFormatDateTime(delivery.publicProjectionReadyAt) }}</dd></div>
+              <div><dt class="text-muted-foreground">{{ $t('webhook.capturedAt') }}</dt><dd class="font-mono tabular-nums">{{ adminFormatDateTime(delivery.capturedAt) }}</dd></div>
+              <div><dt class="text-muted-foreground">{{ $t('webhook.queueAge') }}</dt><dd class="font-mono tabular-nums">{{ formatSeconds(delivery.queueAgeSeconds) }}</dd></div>
+              <div><dt class="text-muted-foreground">{{ $t('webhook.projectionWait') }}</dt><dd class="font-mono tabular-nums">{{ formatSeconds(delivery.projectionWaitSeconds) }}</dd></div>
+              <div><dt class="text-muted-foreground">{{ $t('webhook.firstHttpAttempt') }}</dt><dd class="font-mono tabular-nums">{{ adminFormatDateTime(delivery.firstHttpAttemptStartedAt) }}</dd></div>
+              <div><dt class="text-muted-foreground">{{ $t('webhook.lastHttpAttempt') }}</dt><dd class="font-mono tabular-nums">{{ adminFormatDateTime(delivery.lastHttpAttemptStartedAt) }}</dd></div>
+              <div><dt class="text-muted-foreground">{{ $t('webhook.lastHttpCompleted') }}</dt><dd class="font-mono tabular-nums">{{ adminFormatDateTime(delivery.lastHttpAttemptCompletedAt) }}</dd></div>
+              <div><dt class="text-muted-foreground">{{ $t('webhook.httpDuration') }}</dt><dd class="font-mono tabular-nums">{{ formatSeconds(delivery.lastHttpAttemptDurationSeconds) }}</dd></div>
+              <div><dt class="text-muted-foreground">{{ $t('webhook.httpStatus') }}</dt><dd class="font-mono tabular-nums">{{ delivery.lastHttpStatusCode ?? '—' }}</dd></div>
+              <div><dt class="text-muted-foreground">{{ $t('webhook.retryCounts') }}</dt><dd class="font-mono tabular-nums">{{ delivery.projectionRetryCount ?? 0 }} / {{ delivery.httpRetryCount ?? 0 }}</dd></div>
+              <div><dt class="text-muted-foreground">{{ $t('webhook.nextRetryAt') }}</dt><dd class="font-mono tabular-nums">{{ adminFormatDateTime(delivery.nextRetryAt) }}</dd></div>
+              <div v-if="delivery.deadLetterReason"><dt class="text-muted-foreground">{{ $t('webhook.deadLetterReason') }}</dt><dd class="font-mono text-destructive">{{ delivery.deadLetterReason }}</dd></div>
+            </dl>
+          </div>
+          <OffsetPagination
+            :page="deliveriesPage" :page-count="deliveriesPageCount"
+            :total="deliveriesTotal" :limit="deliveriesPageLimit"
+            :loading="deliveriesLoading"
+            @update:page="loadDeliveriesPage"
+            @update:limit="setDeliveriesPageSize"
+          />
+        </template>
       </CardContent>
     </Card>
 

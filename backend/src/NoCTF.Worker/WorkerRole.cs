@@ -12,6 +12,7 @@ using Wolverine.ErrorHandling;
 using Wolverine.Nats;
 using NoCTF.Application.Competitions.Webhooks;
 using NoCTF.Worker.Composition;
+using NoCTF.Worker.Competitions.Webhooks;
 
 namespace NoCTF.Worker;
 
@@ -53,6 +54,11 @@ public static class WorkerRole
         services.AddTransient<ReleaseRunnerCapacityHandler>();
         services.AddTransient<GameplayFactDrainMessageHandler>();
         services.AddTransient<CompetitionWebhookMessageHandler>();
+        if (WorkerQueues.GetEnabled(configuration).Contains(WorkerQueue.Webhook))
+        {
+            services.AddHostedService<CompetitionWebhookOutboxAgent>();
+            services.AddHostedService<CompetitionWebhookRetryAgent>();
+        }
         services.AddSingleton<LeaderboardProjectionMergeQueue>();
         if (WorkerQueues.GetEnabled(configuration).Contains(WorkerQueue.Projection))
             services.AddHostedService<LeaderboardProjectionDispatchAgent>();
@@ -146,6 +152,15 @@ public static class WorkerRole
                 TimeSpan.FromHours(24)
             ])
             .WithFullJitter();
+        options.Policies.OnException<CompetitionWebhookProjectionNotReadyException>()
+            .ScheduleRetry([
+                TimeSpan.FromMilliseconds(100),
+                TimeSpan.FromMilliseconds(250),
+                TimeSpan.FromMilliseconds(500),
+                TimeSpan.FromSeconds(1),
+                TimeSpan.FromSeconds(2),
+                TimeSpan.FromSeconds(5)
+            ]);
         options.Policies.OnException<CompetitionWebhookPermanentException>()
             .MoveToErrorQueue();
         if (!durable)

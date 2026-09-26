@@ -403,6 +403,45 @@ public sealed class GameplayFactOrderingPersistenceTests
 
     [Test]
     [Timeout(300_000)]
+    public async Task Blackout_solve_is_scored_without_blood_event_or_broadcast(
+        CancellationToken cancellationToken)
+    {
+        await DockerIntegrationTest.RunAsync(async () =>
+        {
+            await using var postgres = await StartPostgresAsync(
+                "noctf_fact_blackout_blood", cancellationToken);
+            var options = Options(postgres);
+            var fixture = await SeedAsync(options, 1, cancellationToken);
+            await using (var configure = new NoCtfDbContext(options))
+            {
+                var competition = await configure.Competitions.SingleAsync(cancellationToken);
+                competition.HiddenStartAt = fixture.Now.AddSeconds(-1);
+                await configure.SaveChangesAsync(cancellationToken);
+            }
+            var factId = Guid.Parse("32000000-0000-0000-0000-000000000001");
+            await AddFactsAsync(options,
+                [Fact(fixture, factId, fixture.TeamIds[0], fixture.Now.AddSeconds(-2))],
+                cancellationToken);
+            var outbox = new RecordingOutbox();
+
+            await ProcessAsync(options, factId, outbox, cancellationToken);
+
+            await using var verification = new NoCtfDbContext(options);
+            var fact = await verification.GameplayFacts.AsNoTracking()
+                .SingleAsync(item => item.Id == factId, cancellationToken);
+            await Assert.That(fact.Result).IsEqualTo(GameplayFactResult.Correct);
+            await Assert.That(outbox.Messages.OfType<BloodAwarded>()).IsEmpty();
+            var bloodEvents = await verification.CompetitionEvents.AsNoTracking()
+                .CountAsync(item => item.Kind == CompetitionEventKind.FirstBloodAwarded
+                    || item.Kind == CompetitionEventKind.SecondBloodAwarded
+                    || item.Kind == CompetitionEventKind.ThirdBloodAwarded,
+                    cancellationToken);
+            await Assert.That(bloodEvents).IsEqualTo(0);
+        });
+    }
+
+    [Test]
+    [Timeout(300_000)]
     public async Task Earlier_internal_solve_is_retained_without_consuming_public_blood(
         CancellationToken cancellationToken)
     {

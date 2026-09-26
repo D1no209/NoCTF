@@ -51,11 +51,12 @@ public sealed class DatabaseStartupPersistenceTests
                 await Assert.That(user.Role).IsEqualTo(UserRole.Administrator);
                 await Assert.That(await db.Database.GetPendingMigrationsAsync(ct)).IsEmpty();
                 var appliedMigrations = (await db.Database.GetAppliedMigrationsAsync(ct)).ToArray();
-                await Assert.That(appliedMigrations).Count().IsEqualTo(4);
+                await Assert.That(appliedMigrations).Count().IsEqualTo(5);
                 await Assert.That(appliedMigrations[0]).EndsWith("_InitialBaseline");
                 await Assert.That(appliedMigrations[1]).EndsWith("_CompetitionProgression");
                 await Assert.That(appliedMigrations[2]).EndsWith("_PersistedSsoFlows");
                 await Assert.That(appliedMigrations[3]).EndsWith("_PersistedRequestAdmission");
+                await Assert.That(appliedMigrations[4]).EndsWith("_CompetitionWebhookOutbox");
                 var tables = db.Model.GetEntityTypes()
                     .Select(entity => entity.GetTableName())
                     .Where(name => name is not null)
@@ -74,6 +75,9 @@ public sealed class DatabaseStartupPersistenceTests
                 await Assert.That(tables).Contains("sso_flows");
                 await Assert.That(tables).Contains("request_admission_windows");
                 await Assert.That(tables).Contains("request_admission_leases");
+                await Assert.That(tables).Contains("competition_webhook_outbox_events");
+                await Assert.That(tables).Contains("competition_webhook_deliveries");
+                await Assert.That(tables).Contains("competition_webhook_frozen_projections");
                 await Assert.That(tables.Any(table =>
                     table.Contains("wolverine", StringComparison.OrdinalIgnoreCase))).IsFalse();
                 await Assert.That(db.Model.FindEntityType(typeof(NoCTF.Domain.Runtime.RuntimeInstance))!

@@ -5,6 +5,7 @@ using NoCTF.Domain.Notifications;
 using NoCTF.Domain.Runtime;
 using NoCTF.Domain.Competitions;
 using NoCTF.Domain.Competitions.Progression;
+using NoCTF.Infrastructure.Competitions.Webhooks;
 using NoCTF.Domain.Teams;
 using NoCTF.Domain.Challenges;
 using NoCTF.Domain.Platform;
@@ -21,12 +22,18 @@ using NoCTF.Infrastructure.Admission;
 namespace NoCTF.Infrastructure.Persistence;
 
 /// <summary>Relational persistence for all NoCTF business facts and current state.</summary>
-public sealed class NoCtfDbContext(DbContextOptions<NoCtfDbContext> options)
+public sealed class NoCtfDbContext(
+    DbContextOptions<NoCtfDbContext> options,
+    TimeProvider? clock = null)
     : DbContext(options), IDataProtectionKeyContext
 {
+    private readonly TimeProvider timeProvider = clock ?? TimeProvider.System;
     public DbSet<User> Users => Set<User>();
     public DbSet<Competition> Competitions => Set<Competition>();
     public DbSet<CompetitionProgression> CompetitionProgressions => Set<CompetitionProgression>();
+    public DbSet<CompetitionWebhookOutboxEvent> CompetitionWebhookOutboxEvents => Set<CompetitionWebhookOutboxEvent>();
+    public DbSet<CompetitionWebhookDeliveryRecord> CompetitionWebhookDeliveries => Set<CompetitionWebhookDeliveryRecord>();
+    public DbSet<CompetitionWebhookFrozenProjection> CompetitionWebhookFrozenProjections => Set<CompetitionWebhookFrozenProjection>();
     public DbSet<ProgressionNode> ProgressionNodes => Set<ProgressionNode>();
     public DbSet<ProgressionEdge> ProgressionEdges => Set<ProgressionEdge>();
     public DbSet<CompetitionBadge> CompetitionBadges => Set<CompetitionBadge>();
@@ -120,6 +127,17 @@ public sealed class NoCtfDbContext(DbContextOptions<NoCtfDbContext> options)
                      .Where(entry => entry.State is EntityState.Added or EntityState.Modified))
         {
             entry.Entity.ConcurrencyStamp = Guid.NewGuid();
+        }
+        foreach (var entry in ChangeTracker.Entries<CompetitionWebhookOutboxEvent>()
+                     .Where(entry => entry.State == EntityState.Added))
+        {
+            var persistedAt = timeProvider.GetUtcNow();
+            entry.Entity.OutboxPersistedAt = persistedAt;
+            entry.Entity.NextDispatchAt = persistedAt;
+            entry.Entity.CompetitionRevision = ChangeTracker.Entries<Competition>()
+                .FirstOrDefault(competition =>
+                    competition.Entity.Id == entry.Entity.CompetitionId)
+                ?.Entity.ConcurrencyStamp ?? entry.Entity.CompetitionRevision;
         }
 
         if (ChangeTracker.Entries<CompetitionEvent>().Any(entry =>

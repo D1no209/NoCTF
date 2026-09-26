@@ -14,6 +14,7 @@ using NoCTF.Domain.Teams;
 using NoCTF.Infrastructure.Caching;
 using NoCTF.Infrastructure.Persistence;
 using NoCTF.Infrastructure.Competitions.Lifecycle;
+using NoCTF.Infrastructure.Competitions.Webhooks;
 using ZiggyCreatures.Caching.Fusion;
 
 namespace NoCTF.Infrastructure.Scoring.Leaderboard;
@@ -35,6 +36,76 @@ public sealed class FusionLeaderboardCache(
 
     public async Task<ScoreboardProjection?> GetFrozenScoreboardAsync(Guid competitionId, CancellationToken ct)
         => (await GetFrozenBundleAsync(competitionId, ct))?.Scoreboard;
+
+    public async Task<WebhookScoreboardProjection?> GetWebhookScoreboardAsync(
+        Guid competitionId, bool frozen, CancellationToken ct)
+    {
+        var bundle = frozen
+            ? await GetFrozenBundleAsync(competitionId, ct)
+            : await GetOrRebuildPublishedBundleAsync(competitionId, ct);
+        return bundle is null ? null : new(
+            bundle.Scoreboard, bundle.SourceEventSequenceThrough);
+    }
+
+    public async Task<WebhookScoreboardProjection?> GetFrozenWebhookScoreboardAsync(
+        Guid competitionId, DateTimeOffset frozenAt, CancellationToken ct)
+    {
+        var frozen = await db.CompetitionWebhookFrozenProjections.AsNoTracking()
+            .SingleOrDefaultAsync(item => item.CompetitionId == competitionId
+                && item.FrozenAt == frozenAt, ct);
+        if (frozen is not null)
+            return ReadFrozen(frozen);
+
+        var configuredFreeze = await db.Competitions.AsNoTracking()
+            .Where(item => item.Id == competitionId)
+            .Select(item => item.FrozenStartAt)
+            .SingleOrDefaultAsync(ct);
+        // An explicit visibility change captures its frozen view in the same
+        // transaction, including when an organizer chooses a past freeze time.
+        // Background recovery must not reconstruct an old snapshot from live names.
+        if (configuredFreeze != frozenAt
+            || (db.Database.CurrentTransaction is null
+                && timeProvider.GetUtcNow() - frozenAt > TimeSpan.FromSeconds(5)))
+            return null;
+
+        var projection = await ProjectBundleAsync(
+            competitionId, null, frozenAt, null, ct);
+        if (projection is null)
+            return null;
+        var row = new CompetitionWebhookFrozenProjection
+        {
+            CompetitionId = competitionId,
+            FrozenAt = frozenAt,
+            CapturedAt = timeProvider.GetUtcNow(),
+            SourceEventSequenceThrough = projection.SourceEventSequenceThrough,
+            Payload = JsonSerializer.SerializeToUtf8Bytes(projection,
+                CachedScoreboardJsonContext.Default.CachedScoreboardProjection)
+        };
+        db.CompetitionWebhookFrozenProjections.Add(row);
+        try
+        {
+            await db.SaveChangesAsync(ct);
+            return new(projection.Scoreboard, projection.SourceEventSequenceThrough);
+        }
+        catch (DbUpdateException) when (db.Database.CurrentTransaction is null)
+        {
+            db.Entry(row).State = EntityState.Detached;
+            frozen = await db.CompetitionWebhookFrozenProjections.AsNoTracking()
+                .SingleOrDefaultAsync(item => item.CompetitionId == competitionId
+                    && item.FrozenAt == frozenAt, ct);
+            if (frozen is null) throw;
+            return ReadFrozen(frozen);
+        }
+    }
+
+    private static WebhookScoreboardProjection ReadFrozen(
+        CompetitionWebhookFrozenProjection row)
+    {
+        var projection = JsonSerializer.Deserialize(row.Payload,
+            CachedScoreboardJsonContext.Default.CachedScoreboardProjection)
+            ?? throw new InvalidOperationException("Frozen webhook projection is invalid.");
+        return new(projection.Scoreboard, row.SourceEventSequenceThrough);
+    }
 
     private async Task<CachedScoreboardProjection?> GetFrozenBundleAsync(
         Guid competitionId,
@@ -85,6 +156,17 @@ public sealed class FusionLeaderboardCache(
             .SingleOrDefaultAsync(candidate => candidate.Id == competitionId, ct);
         if (competition is null)
             return null;
+        // Capture the checkpoint before reading projection inputs. A later
+        // checkpoint could acknowledge a newly committed event whose facts
+        // were not included by the earlier queries.
+        var sourceEventSequenceThrough = await db.CompetitionWebhookOutboxEvents
+            .AsNoTracking()
+            .Where(item => item.CompetitionId == competitionId
+                && (competition.FrozenStartAt == null
+                    || projectedAt != competition.FrozenStartAt.Value
+                    || item.DomainEventCreatedAt <= projectedAt))
+            .Select(item => (long?)item.Sequence)
+            .MaxAsync(ct) ?? 0;
         var officialWindow = competition.Mode == GameMode.Ctf
             ? await CompetitionOfficialWindowReader.ReadAsync(
                 db,
@@ -309,7 +391,8 @@ public sealed class FusionLeaderboardCache(
             competition.Mode == GameMode.Awdp
                 && competitionStatusAtProjection == CompetitionStatus.Running
                 ? scoreboard.Schema.Rounds.SingleOrDefault(round => round.State == ScoreboardRoundState.Running)?.EndAt
-                : null);
+                : null,
+            sourceEventSequenceThrough);
     }
 
     private async Task<AwdScoreboardWindow> ReadAwdScoreboardWindowAsync(
@@ -614,7 +697,8 @@ public sealed class FusionLeaderboardCache(
 
 internal sealed record CachedScoreboardProjection(
     ScoreboardProjection Scoreboard,
-    DateTimeOffset? ValidUntil = null);
+    DateTimeOffset? ValidUntil = null,
+    long SourceEventSequenceThrough = 0);
 
 [JsonSourceGenerationOptions(JsonSerializerDefaults.Web)]
 [JsonSerializable(typeof(CachedScoreboardProjection))]

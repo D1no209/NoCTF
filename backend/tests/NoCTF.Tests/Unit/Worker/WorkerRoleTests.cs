@@ -40,7 +40,7 @@ public sealed class WorkerRoleTests
         await Assert.That(WorkerQueues.GetConcurrency(configuration, WorkerQueue.Gameplay)).IsEqualTo(8);
         await Assert.That(WorkerQueues.GetConcurrency(configuration, WorkerQueue.Projection)).IsEqualTo(2);
         await Assert.That(WorkerQueues.GetConcurrency(configuration, WorkerQueue.Background)).IsEqualTo(2);
-        await Assert.That(WorkerQueues.GetConcurrency(configuration, WorkerQueue.Webhook)).IsEqualTo(8);
+        await Assert.That(WorkerQueues.GetConcurrency(configuration, WorkerQueue.Webhook)).IsEqualTo(32);
     }
 
     [Test]

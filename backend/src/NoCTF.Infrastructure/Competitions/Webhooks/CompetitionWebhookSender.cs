@@ -10,7 +10,7 @@ public sealed class CompetitionWebhookSender(
     CompetitionWebhookOptions options,
     TimeProvider timeProvider) : ICompetitionWebhookSender
 {
-    public async Task<CompetitionWebhookSendResult> SendAsync(
+    public async Task<CompetitionWebhookSendOutcome> SendAsync(
         CompetitionWebhookDelivery delivery,
         CancellationToken cancellationToken)
     {
@@ -82,18 +82,24 @@ public sealed class CompetitionWebhookSender(
         {
             var code = (int)response.StatusCode;
             if (code is >= 200 and <= 299)
-                return CompetitionWebhookSendResult.Delivered;
+                return new(CompetitionWebhookSendResult.Delivered, code);
             if (response.StatusCode == HttpStatusCode.Gone)
-                return CompetitionWebhookSendResult.ReceiverGone;
+                return new(CompetitionWebhookSendResult.ReceiverGone, code);
             if (response.StatusCode is HttpStatusCode.RequestTimeout
                 or HttpStatusCode.TooManyRequests
                 || code >= 500)
             {
+                var retryAfter = response.Headers.RetryAfter?.Date
+                    ?? (response.Headers.RetryAfter?.Delta is TimeSpan delta
+                        ? timeProvider.GetUtcNow().Add(delta)
+                        : (DateTimeOffset?)null);
                 throw new CompetitionWebhookTransientException(
-                    $"Webhook receiver returned transient HTTP status {code}.");
+                    $"Webhook receiver returned transient HTTP status {code}.",
+                    httpStatusCode: code,
+                    retryAfter: retryAfter);
             }
             throw new CompetitionWebhookPermanentException(
-                $"Webhook receiver returned permanent HTTP status {code}.");
+                $"Webhook receiver returned permanent HTTP status {code}.", code);
         }
     }
 
