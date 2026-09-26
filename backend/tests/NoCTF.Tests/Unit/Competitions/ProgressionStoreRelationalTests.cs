@@ -135,14 +135,25 @@ public sealed class ProgressionStoreRelationalTests
                 ProgressionPrerequisiteCondition.Completed),
              new(Guid.NewGuid(), badgeNodeId, secondNodeId,
                 ProgressionPrerequisiteCondition.Completed)], now);
-        var first = await store.SaveAsync(draft, CancellationToken.None);
+        var empty = await store.SaveAsync(draft with
+        {
+            Enabled = false, Nodes = [], Edges = []
+        }, CancellationToken.None);
+        await Assert.That(empty.Failure).IsNull();
+        await Assert.That((await store.ReadAsync(competitionId, CancellationToken.None))!
+            .ConcurrencyStamp).IsEqualTo(empty.Progression!.ConcurrencyStamp);
+        db.ChangeTracker.Clear();
+        var first = await store.SaveAsync(draft with
+        {
+            ExpectedConcurrencyStamp = empty.Progression!.ConcurrencyStamp
+        }, CancellationToken.None);
         await Assert.That(first.Failure).IsNull();
         await Assert.That(await db.TeamProgressionNodeStates.CountAsync())
             .IsEqualTo(6);
         await Assert.That(await db.UserBadgeGrants.CountAsync()).IsEqualTo(0);
         var access = new ProgressionChallengeAccess(db, graphCache);
         await Assert.That((await graphCache.ReadAsync(db, competitionId,
-            CancellationToken.None))!.Revision).IsEqualTo(1);
+            CancellationToken.None))!.Revision).IsEqualTo(2);
         await Assert.That(await access.IsActiveAsync(
             competitionId, secondInstanceId, teamId, CancellationToken.None)).IsFalse();
 

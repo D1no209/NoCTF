@@ -7,10 +7,10 @@ const {
   competition, canWrite, enabled, showPlayerMap, nodes, edges, badges,
   availableChallenges, filteredChallenges, challengeSearch, challengeDirection,
   challengeDirections, loading, saving, badgeSaving, error,
-  selectedNode, selectedEdge, newBadgeName, newBadgeDescription, newBadgeImage,
+  selectedNode, selectedEdge, selectedCount, newBadgeName, newBadgeDescription, newBadgeImage,
   editingBadgeId, editBadgeName, editBadgeDescription,
-  load, addChallenge, addBadge, connect, selectNode, selectEdge,
-  removeSelectedNode, removeSelectedEdge, setEdgeCondition, save,
+  load, addChallenge, addBadge, connect, removeSelected, changeNodeSelection,
+  changeEdgeSelection, updateNodePositions, setEdgeCondition, save,
   onBadgeFileChange, createBadge, deleteBadge, ProgressionCanvas,
   onEditBadgeFileChange, beginEditBadge, updateBadge,
 } = toRefs(props.state)
@@ -101,7 +101,9 @@ const {
 
         <div class="relative min-h-[46rem] overflow-hidden rounded-lg border bg-card">
           <component :is="ProgressionCanvas" v-model:nodes="nodes" v-model:edges="edges"
-            :read-only="!canWrite" height="46rem" @connect="connect" @node-select="selectNode" @edge-select="selectEdge" />
+            :read-only="!canWrite" height="46rem" @connect="connect"
+            @node-selection-change="changeNodeSelection" @edge-selection-change="changeEdgeSelection"
+            @node-positions-change="updateNodePositions" />
           <div v-if="!nodes.length" class="pointer-events-none absolute inset-0 flex items-center justify-center text-sm text-muted-foreground">
             {{ $t('progression.emptyCanvas') }}
           </div>
@@ -109,16 +111,20 @@ const {
 
         <aside class="rounded-lg border bg-card p-4">
           <h3 class="font-semibold">{{ $t('progression.inspector') }}</h3>
-          <div v-if="selectedEdge" class="mt-4 space-y-4">
+          <div v-if="selectedCount > 1" class="mt-4 space-y-3">
+            <p class="text-sm font-medium">{{ $t('progression.selectedCount', { count: selectedCount }) }}</p>
+            <Button v-if="canWrite" size="sm" variant="destructive" @click="removeSelected">{{ $t('progression.removeSelected') }}</Button>
+          </div>
+          <div v-else-if="selectedEdge" class="mt-4 space-y-4">
             <p class="text-sm">{{ $t('progression.predecessorCondition') }}</p>
             <Button size="sm" :variant="selectedEdge.data?.condition === 0 ? 'default' : 'outline'" :disabled="!canWrite" @click="setEdgeCondition(0)">{{ $t('progression.completed') }}</Button>
             <Button size="sm" :variant="selectedEdge.data?.condition === 1 ? 'default' : 'outline'" :disabled="!canWrite" @click="setEdgeCondition(1)">{{ $t('progression.incomplete') }}</Button>
-            <Button v-if="canWrite" size="sm" variant="destructive" @click="removeSelectedEdge">{{ $t('progression.removeEdge') }}</Button>
+            <Button v-if="canWrite" size="sm" variant="destructive" @click="removeSelected">{{ $t('progression.removeEdge') }}</Button>
           </div>
           <div v-else-if="selectedNode" class="mt-4 space-y-3">
             <p class="break-words text-sm font-medium">{{ selectedNode.data?.title }}</p>
             <p class="text-xs text-muted-foreground">{{ selectedNode.data?.kind === 0 ? $t('progression.challengeNode') : $t('progression.badgeNode') }}</p>
-            <Button v-if="canWrite" size="sm" variant="destructive" @click="removeSelectedNode">{{ $t('progression.removeNode') }}</Button>
+            <Button v-if="canWrite" size="sm" variant="destructive" @click="removeSelected">{{ $t('progression.removeNode') }}</Button>
           </div>
           <p v-else class="mt-4 text-sm text-muted-foreground">{{ $t('progression.selectHint') }}</p>
           <p class="mt-6 text-xs leading-5 text-muted-foreground">{{ $t('progression.ruleHint') }}</p>

@@ -122,33 +122,43 @@ public sealed class CompetitionProgressionStore(
         graph.ShowPlayerMap = command.ShowPlayerMap;
         graph.Revision++;
 
-        var teamIds = await db.Teams.IgnoreQueryFilters().AsNoTracking()
-            .Where(team => team.CompetitionId == command.CompetitionId)
-            .Select(team => team.Id)
-            .ToArrayAsync(ct);
-        await reconciler.ReconcileTeamsAsync(
-            command.CompetitionId, teamIds, graph, command.Now, ct);
-
-        if (eventRecorder is not null)
-            await eventRecorder.RecordAsync(new(
-                command.CompetitionId,
-                CompetitionEventKind.CompetitionUpdated,
-                CompetitionEventLevel.Information,
-                CompetitionEventVisibility.Staff,
-                command.Now,
-                Reason: "Competition progression graph updated."), ct);
-
         try
         {
+            // Persist graph nodes before inserting team states that reference them.
+            // Both saves share the same transaction; a failed reconciliation rolls back the graph.
+            await db.SaveChangesAsync(ct);
+
+            var teamIds = await db.Teams.IgnoreQueryFilters().AsNoTracking()
+                .Where(team => team.CompetitionId == command.CompetitionId)
+                .Select(team => team.Id)
+                .ToArrayAsync(ct);
+            await reconciler.ReconcileTeamsAsync(
+                command.CompetitionId, teamIds, graph, command.Now, ct);
+
+            if (eventRecorder is not null)
+                await eventRecorder.RecordAsync(new(
+                    command.CompetitionId,
+                    CompetitionEventKind.CompetitionUpdated,
+                    CompetitionEventLevel.Information,
+                    CompetitionEventVisibility.Staff,
+                    command.Now,
+                    Reason: "Competition progression graph updated."), ct);
+
             await db.SaveChangesAsync(ct);
             await transaction.CommitAsync(ct);
         }
         catch (Exception exception) when (exception is DbUpdateConcurrencyException
-            or DbUpdateException || TransactionFailureClassifier.IsRetryable(exception))
+            || TransactionFailureClassifier.IsRetryable(exception))
         {
-            await transaction.RollbackAsync(ct);
+            await transaction.RollbackAsync(CancellationToken.None);
             publisher?.DiscardPendingMessages();
             return new(null, CompetitionProgressionSaveFailure.ConcurrencyConflict);
+        }
+        catch
+        {
+            await transaction.RollbackAsync(CancellationToken.None);
+            publisher?.DiscardPendingMessages();
+            throw;
         }
         try
         {
@@ -185,7 +195,7 @@ public sealed class CompetitionProgressionStore(
             _ => throw new ArgumentOutOfRangeException(nameof(draft), draft.Kind, null)
         };
 
-    private static void ApplyNodes(
+    private void ApplyNodes(
         CompetitionProgression graph,
         IReadOnlyCollection<ProgressionNode> desired)
     {
@@ -199,11 +209,15 @@ public sealed class CompetitionProgressionStore(
                 existing.PositionX = node.PositionX;
                 existing.PositionY = node.PositionY;
             }
-            else graph.Nodes.Add(node);
+            else
+            {
+                graph.Nodes.Add(node);
+                db.ProgressionNodes.Add(node);
+            }
         }
     }
 
-    private static void ApplyEdges(
+    private void ApplyEdges(
         CompetitionProgression graph,
         IReadOnlyCollection<ProgressionEdge> desired)
     {
@@ -218,7 +232,11 @@ public sealed class CompetitionProgressionStore(
                 existing.TargetNodeId = edge.TargetNodeId;
                 existing.Condition = edge.Condition;
             }
-            else graph.Edges.Add(edge);
+            else
+            {
+                graph.Edges.Add(edge);
+                db.ProgressionEdges.Add(edge);
+            }
         }
     }
 

@@ -1,4 +1,6 @@
-import { toRefs } from 'vue'
+import { PanelLeftClose, PanelLeftOpen } from '@lucide/vue'
+import { useMediaQuery } from '@vueuse/core'
+import { markRaw, toRefs } from 'vue'
 
 import type { WorkspaceNavGroup, WorkspaceNavItem } from './workspace-nav'
 
@@ -8,6 +10,13 @@ export function useAppWorkspaceNav(props: Readonly<{
   title?: string
 }>) {
   const route = useRoute()
+  const isDesktop = useMediaQuery('(min-width: 1024px)')
+  const collapsed = ref(false)
+  const isCollapsed = computed(() => isDesktop.value && collapsed.value)
+
+  function toggleCollapsed() {
+    collapsed.value = !collapsed.value
+  }
 
   function isActive(item: WorkspaceNavItem) {
     return item.exact
@@ -36,7 +45,12 @@ export function useAppWorkspaceNav(props: Readonly<{
       groupOptions,
       options,
       selectedPath,
-      selectPath
+      selectPath,
+      isDesktop,
+      isCollapsed,
+      toggleCollapsed,
+      CollapseIcon: markRaw(PanelLeftClose),
+      ExpandIcon: markRaw(PanelLeftOpen)
     }
 }
 

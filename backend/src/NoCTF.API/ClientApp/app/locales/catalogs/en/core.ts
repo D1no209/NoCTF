@@ -1190,6 +1190,8 @@ export const messages = {
   "ui.resourceCleanupFailed": "Resource cleanup failed",
   "ui.accessUrlExpansionFailed": "Access URL expansion failed",
   "ui.mainNavigation": "Main navigation",
+  "ui.collapseMenu": "Collapse menu",
+  "ui.expandMenu": "Expand menu",
   "ui.free": "Free",
   "ui.lowestRemainingPoolQuota": "Lowest remaining pool quota",
   "ui.platformRedisOperationP99Duration": "Platform Redis operation P99 duration",
