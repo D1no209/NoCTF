@@ -12,6 +12,35 @@ namespace NoCTF.Tests.Unit.Infrastructure;
 public sealed class RedactedPlatformLogProcessorTests
 {
     [Test]
+    public async Task Framework_database_command_is_exported_without_sql_or_parameters()
+    {
+        var queue = new PlatformLogBroadcastQueue();
+        var exporter = new CaptureExporter();
+        using var factory = LoggerFactory.Create(builder => builder.AddOpenTelemetry(options =>
+        {
+            options.IncludeFormattedMessage = true;
+            options.ParseStateValues = true;
+            options.AddProcessor(new RedactedPlatformLogProcessor(
+                queue, PlatformLogService.Host, NewProtector()));
+            options.AddProcessor(new SimpleLogRecordExportProcessor(exporter));
+        }));
+        factory.CreateLogger("Microsoft.EntityFrameworkCore.Database.Command")
+            .LogError("Failed executing SELECT secret_column FROM users WHERE id = {UserId}.",
+                Guid.NewGuid());
+
+        await Assert.That(exporter.Body).IsNotNull();
+        await Assert.That(exporter.Body!).DoesNotContain("SELECT");
+        await Assert.That(exporter.Body!).DoesNotContain("secret_column");
+        await Assert.That(exporter.Body!).DoesNotContain("users");
+        var stored = JsonSerializer.Deserialize(exporter.Body!,
+            StoredPlatformLogJsonContext.Default.StoredPlatformLog);
+        await Assert.That(stored!.View.Category)
+            .IsEqualTo("Microsoft.EntityFrameworkCore.Database.Command");
+        await Assert.That(stored.View.Message)
+            .IsEqualTo("Database command details were suppressed before log export.");
+    }
+
+    [Test]
     public async Task Exception_text_and_sql_are_not_exported()
     {
         var queue = new PlatformLogBroadcastQueue();

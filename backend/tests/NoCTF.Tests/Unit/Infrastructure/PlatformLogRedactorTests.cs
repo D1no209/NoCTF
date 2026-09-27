@@ -41,9 +41,11 @@ public sealed class PlatformLogRedactorTests
     {
         const string jwt =
             "eyJabcdefghijk.eyJabcdefghijklmnop.abcdefghijklmnopqrstu";
+        const string authorizationCode = "sensitive-authorization-code";
         var redacted = PlatformLogRedactor.Redact(
             $"Bearer {jwt} smtps://mailer:password@mail.example.test secret='value' cookie=session "
-                + "{\"access_token\":\"json-token\"}",
+                + $"{{\"access_token\":\"json-token\"}} "
+                + $"https://identity.example.test/callback?code={authorizationCode}&state=value",
             []);
 
         await Assert.That(redacted).DoesNotContain(jwt);
@@ -51,5 +53,7 @@ public sealed class PlatformLogRedactorTests
         await Assert.That(redacted).DoesNotContain("'value'");
         await Assert.That(redacted).DoesNotContain("session");
         await Assert.That(redacted).DoesNotContain("json-token");
+        await Assert.That(redacted).DoesNotContain(authorizationCode);
+        await Assert.That(redacted).Contains("https://identity.example.test/callback?[REDACTED]");
     }
 }
