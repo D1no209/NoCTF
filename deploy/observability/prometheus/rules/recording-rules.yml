@@ -6,7 +6,7 @@ groups:
       - record: noctf:api_request_duration:p95_5m
         expr: histogram_quantile(0.95, sum by (le) (rate(noctf_api_request_duration_seconds_bucket{request_kind="rest"}[5m])))
       - record: noctf:api_server_error:ratio5m
-        expr: (sum(rate(noctf_api_requests_total{request_kind="rest",outcome="server_error"}[5m])) or vector(0)) / clamp_min(sum(rate(noctf_api_requests_total{request_kind="rest"}[5m])), 1)
+        expr: (sum(rate(noctf_api_requests_total{request_kind="rest",outcome="server_error"}[5m])) or vector(0)) / clamp_min(sum(rate(noctf_api_requests_total{request_kind="rest"}[5m])), 0.001)
       - record: noctf:api_rate_limit_rejections:rate5m
         expr: sum(rate(noctf_api_rate_limit_rejections_total[5m])) or vector(0)
       - record: noctf:gameplay_submissions:rate5m

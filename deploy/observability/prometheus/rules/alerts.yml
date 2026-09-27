@@ -44,13 +44,13 @@ groups:
   - name: noctf-performance
     rules:
       - alert: NoCtfApiP95High
-        expr: noctf:api_request_duration:p95_5m > 0.8
+        expr: noctf:api_request_duration:p95_5m > 0.8 and sum(increase(noctf_api_request_duration_seconds_count{request_kind="rest"}[5m])) >= 100
         for: 5m
         labels: { severity: warning }
         annotations:
           summary: API P95 latency exceeds 800ms
       - alert: NoCtfApiServerErrorRateHigh
-        expr: noctf:api_server_error:ratio5m > 0.02
+        expr: noctf:api_server_error:ratio5m > 0.02 and sum(increase(noctf_api_requests_total{request_kind="rest"}[5m])) >= 100
         for: 5m
         labels: { severity: critical }
         annotations:
@@ -80,13 +80,13 @@ groups:
         annotations:
           summary: Leaderboard projection P95 exceeds two seconds
       - alert: NoCtfWebhookFirstAttemptP95Slow
-        expr: noctf:webhook_queue_age:p95_5m > 2
+        expr: noctf:webhook_queue_age:p95_5m > 2 and sum(increase(noctf_webhook_queue_age_seconds_count[5m])) >= 20
         for: 2m
         labels: { severity: warning }
         annotations:
           summary: Webhook event-to-first-HTTP P95 exceeds two seconds
       - alert: NoCtfWebhookQueueAgeHigh
-        expr: noctf:webhook_queue_age:p99_5m > 5
+        expr: noctf:webhook_queue_age:p99_5m > 5 and sum(increase(noctf_webhook_queue_age_seconds_count[5m])) >= 20
         for: 1m
         labels: { severity: warning }
         annotations:
@@ -104,7 +104,7 @@ groups:
         annotations:
           summary: PostgreSQL connection usage exceeds 80 percent
       - alert: NoCtfNatsP99High
-        expr: noctf:nats_operation_duration:p99_5m > 0.05
+        expr: noctf:nats_operation_duration:p99_5m > 0.05 and sum(increase(noctf_nats_operation_duration_seconds_count[5m])) >= 20
         for: 5m
         labels: { severity: warning }
         annotations:

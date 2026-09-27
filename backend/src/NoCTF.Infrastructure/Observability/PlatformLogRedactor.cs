@@ -28,6 +28,8 @@ public static partial class PlatformLogRedactor
         result = BearerTokenRegex().Replace(result, "Bearer " + Redacted);
         result = JwtRegex().Replace(result, Redacted);
         result = FlagPayloadRegex().Replace(result, Redacted);
+        result = HttpUriQueryRegex().Replace(result, match =>
+            match.Groups[1].Value + "?" + Redacted);
         result = UriUserInfoRegex().Replace(result, match =>
             match.Groups[1].Value + Redacted + "@");
         result = SecretAssignmentRegex().Replace(result, match =>
@@ -68,6 +70,11 @@ public static partial class PlatformLogRedactor
         "(?i)\\b(?:[a-z0-9_]*ctf|flag)\\{[^{}\\r\\n]{1,256}\\}",
         RegexOptions.CultureInvariant | RegexOptions.NonBacktracking)]
     private static partial Regex FlagPayloadRegex();
+
+    [GeneratedRegex(
+        "(?i)\\b(https?://[^\\s?#]+)\\?[^\\s#]*",
+        RegexOptions.CultureInvariant | RegexOptions.NonBacktracking)]
+    private static partial Regex HttpUriQueryRegex();
 
     [GeneratedRegex(
         "(?i)\\b(smtps?://)[^@\\s]+@",

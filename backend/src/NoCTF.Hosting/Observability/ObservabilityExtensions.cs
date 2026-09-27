@@ -98,9 +98,7 @@ public static class ObservabilityExtensions
             options.IncludeScopes = false;
         });
         services.AddLogging(logging => logging.AddFilter<OpenTelemetryLoggerProvider>(
-            (category, level) => category is not null
-                && category.StartsWith("NoCTF.", StringComparison.Ordinal)
-                && level >= Microsoft.Extensions.Logging.LogLevel.Information));
+            ShouldExportPlatformLog));
         openTelemetry.WithLogging(logging => logging
             .AddProcessor(provider => new RedactedPlatformLogProcessor(
                 provider.GetRequiredService<PlatformLogBroadcastQueue>(), defaultService,
@@ -117,6 +115,12 @@ public static class ObservabilityExtensions
         return services;
     }
 
+    internal static bool ShouldExportPlatformLog(string? category, LogLevel level) =>
+        level >= LogLevel.Warning
+        || category is not null
+            && category.StartsWith("NoCTF.", StringComparison.Ordinal)
+            && level >= LogLevel.Information;
+
     internal static MeterProviderBuilder AddNoCtfDurationViews(this MeterProviderBuilder metrics)
     {
         // Instrument names, not the names rewritten by the Prometheus exporter. All values are seconds.
@@ -129,7 +133,10 @@ public static class ObservabilityExtensions
             "noctf.scheduler.dispatch.lateness",
             "noctf.gameplay_fact.processing.duration",
             "noctf.gameplay_fact.stage.duration",
-            "noctf.runtime.dispatch.stage.duration"
+            "noctf.runtime.dispatch.stage.duration",
+            "noctf.webhook.queue.age",
+            "noctf.webhook.projection.wait",
+            "noctf.webhook.http.attempt.duration"
         })
         {
             var view = new ExplicitBucketHistogramConfiguration

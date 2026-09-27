@@ -45,7 +45,7 @@ public sealed class RedactedPlatformLogProcessor(
             Microsoft.Extensions.Logging.LogLevel.Critical => PlatformLogLevel.Critical,
             _ => PlatformLogLevel.Information
         };
-        var message = Limit(PlatformLogRedactor.Redact(
+        var message = Limit(SanitizeMessage(category,
             record.FormattedMessage ?? record.Body, properties), 16_384);
         // Exception.ToString() can embed EF command text, parameters, or provider
         // details. Preserve the type for diagnostics without exporting that payload.
@@ -98,4 +98,17 @@ public sealed class RedactedPlatformLogProcessor(
 
     private static string Limit(string value, int maximum) =>
         value.Length <= maximum ? value : value[..maximum];
+
+    private static string SanitizeMessage(
+        string category,
+        string? message,
+        IEnumerable<KeyValuePair<string, object?>> properties)
+    {
+        if (category.Equals("Microsoft.EntityFrameworkCore.Database.Command",
+                StringComparison.Ordinal)
+            || category.StartsWith("Npgsql.Command", StringComparison.Ordinal))
+            return "Database command details were suppressed before log export.";
+
+        return PlatformLogRedactor.Redact(message, properties);
+    }
 }

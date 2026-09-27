@@ -1,10 +1,28 @@
 using Microsoft.AspNetCore.Http;
+using Microsoft.Extensions.Logging;
 using NoCTF.Hosting.Observability;
 
 namespace NoCTF.Tests.Unit.Hosting;
 
 public sealed class ObservabilityExtensionsTests
 {
+    [Test]
+    [Arguments("NoCTF.Infrastructure.Persistence.DatabaseStartup", LogLevel.Information, true)]
+    [Arguments("NoCTF.Infrastructure.Persistence.DatabaseStartup", LogLevel.Debug, false)]
+    [Arguments("Microsoft.EntityFrameworkCore.Query", LogLevel.Warning, true)]
+    [Arguments("Microsoft.EntityFrameworkCore.Update", LogLevel.Error, true)]
+    [Arguments("Microsoft.EntityFrameworkCore.Query", LogLevel.Information, false)]
+    [Arguments(null, LogLevel.Warning, true)]
+    public async Task Platform_log_filter_keeps_application_information_and_all_warnings(
+        string? category,
+        LogLevel level,
+        bool expected)
+    {
+        var exported = ObservabilityExtensions.ShouldExportPlatformLog(category, level);
+
+        await Assert.That(exported).IsEqualTo(expected);
+    }
+
     [Test]
     [Arguments("/metrics", 9464, 9464, true)]
     [Arguments("/metrics", 8080, 9464, false)]
