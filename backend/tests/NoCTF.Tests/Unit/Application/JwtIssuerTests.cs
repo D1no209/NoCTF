@@ -116,7 +116,7 @@ public class JwtIssuerTests
         });
         var user = new AuthenticatedUser(
             Guid.NewGuid(), "alice", UserRole.Administrator, UserKind.Human, 7);
-        var now = DateTimeOffset.Parse("2026-08-28T00:00:00Z");
+        var now = TimeProvider.System.GetUtcNow();
         var issuer = new JwtIssuer(options, new FakeTimeProvider(now));
         var issued = issuer.IssueRefresh(user);
         var token = new JwtSecurityTokenHandler().ReadJwtToken(issued.Token);
