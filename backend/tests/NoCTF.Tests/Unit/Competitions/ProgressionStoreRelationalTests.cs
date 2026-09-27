@@ -128,9 +128,9 @@ public sealed class ProgressionStoreRelationalTests
         var draft = new SaveCompetitionProgressionCommand(
             competitionId, null, true, false,
             [new(challengeNodeId, ProgressionNodeKind.Challenge,
-                competitionChallengeId),
-                new(badgeNodeId, ProgressionNodeKind.Badge, badgeId),
-                new(secondNodeId, ProgressionNodeKind.Challenge, secondInstanceId)],
+                competitionChallengeId, true),
+                new(badgeNodeId, ProgressionNodeKind.Badge, badgeId, true),
+                new(secondNodeId, ProgressionNodeKind.Challenge, secondInstanceId, true)],
             [new(edgeId, challengeNodeId, badgeNodeId,
                 ProgressionPrerequisiteCondition.Completed),
              new(Guid.NewGuid(), badgeNodeId, secondNodeId,
@@ -157,6 +157,31 @@ public sealed class ProgressionStoreRelationalTests
         await Assert.That(await access.IsActiveAsync(
             competitionId, secondInstanceId, teamId, CancellationToken.None)).IsFalse();
 
+        var ungated = await store.SaveAsync(draft with
+        {
+            ExpectedConcurrencyStamp = first.Progression!.ConcurrencyStamp,
+            Nodes = draft.Nodes.Select(node => node.Id == badgeNodeId || node.Id == secondNodeId
+                ? node with { RequiresPrerequisites = false } : node).ToArray(),
+            Now = now.AddSeconds(1)
+        }, CancellationToken.None);
+        await Assert.That(ungated.Failure).IsNull();
+        await Assert.That((await store.ReadAsync(competitionId, CancellationToken.None))!
+            .Nodes.Count(node => !node.RequiresPrerequisites)).IsEqualTo(2);
+        await Assert.That(await access.IsActiveAsync(
+            competitionId, secondInstanceId, teamId, CancellationToken.None)).IsTrue();
+        await Assert.That(await db.UserBadgeGrants.CountAsync(grant => grant.Active))
+            .IsEqualTo(2);
+        var regated = await store.SaveAsync(draft with
+        {
+            ExpectedConcurrencyStamp = ungated.Progression!.ConcurrencyStamp,
+            Now = now.AddSeconds(2)
+        }, CancellationToken.None);
+        await Assert.That(regated.Failure).IsNull();
+        await Assert.That(await access.IsActiveAsync(
+            competitionId, secondInstanceId, teamId, CancellationToken.None)).IsFalse();
+        await Assert.That(await db.UserBadgeGrants.CountAsync(grant => grant.Active))
+            .IsEqualTo(0);
+
         db.GameplayFacts.Add(new FlagAttemptGameplayFact
         {
             Id = Guid.NewGuid(), CompetitionId = competitionId,
@@ -177,13 +202,13 @@ public sealed class ProgressionStoreRelationalTests
             await LoadGraphAsync(db, competitionId), now.AddMinutes(1), null,
             CancellationToken.None);
         await db.SaveChangesAsync();
-        await Assert.That(await db.UserBadgeTransitions.CountAsync()).IsEqualTo(1);
+        await Assert.That(await db.UserBadgeTransitions.CountAsync()).IsEqualTo(5);
         await Assert.That(await access.IsActiveAsync(
             competitionId, secondInstanceId, teamId, CancellationToken.None)).IsTrue();
 
         var disabled = await store.SaveAsync(draft with
         {
-            ExpectedConcurrencyStamp = first.Progression!.ConcurrencyStamp,
+            ExpectedConcurrencyStamp = regated.Progression!.ConcurrencyStamp,
             Enabled = false,
             Now = now.AddMinutes(2)
         }, CancellationToken.None);
@@ -202,7 +227,7 @@ public sealed class ProgressionStoreRelationalTests
         await Assert.That(reenabled.Failure).IsNull();
         await Assert.That(await db.UserBadgeGrants.CountAsync(grant => grant.Active))
             .IsEqualTo(1);
-        await Assert.That(await db.UserBadgeTransitions.CountAsync()).IsEqualTo(3);
+        await Assert.That(await db.UserBadgeTransitions.CountAsync()).IsEqualTo(7);
         var lateMemberId = Guid.NewGuid();
         db.Users.Add(new User
         {
@@ -240,7 +265,7 @@ public sealed class ProgressionStoreRelationalTests
         await Assert.That(removed.Failure).IsNull();
         await Assert.That(await db.UserBadgeGrants.CountAsync(grant => grant.Active))
             .IsEqualTo(0);
-        await Assert.That(await db.UserBadgeTransitions.CountAsync()).IsEqualTo(8);
+        await Assert.That(await db.UserBadgeTransitions.CountAsync()).IsEqualTo(12);
     }
 
     private static Task<CompetitionProgression> LoadGraphAsync(

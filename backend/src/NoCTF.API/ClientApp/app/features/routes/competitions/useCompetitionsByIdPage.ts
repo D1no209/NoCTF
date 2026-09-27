@@ -29,6 +29,10 @@ export function useCompetitionsByIdPage() {
     route.path === `/competitions/${competitionId.value}/writeups`,
   )
 
+  const isProgression = computed(() =>
+    route.path === `/competitions/${competitionId.value}/progression`,
+  )
+
   const competition = ref<NoCtfapiEndpointsCompetitionsCompetitionResponse | null>(null)
 
   const myTeam = ref<NoCtfapiEndpointsTeamsTeamResponse | null>(null)
@@ -260,6 +264,7 @@ export function useCompetitionsByIdPage() {
       isOverview,
       isControlScreen,
       isWriteUpReview,
+      isProgression,
       competition,
       myStanding,
       standingLoading,

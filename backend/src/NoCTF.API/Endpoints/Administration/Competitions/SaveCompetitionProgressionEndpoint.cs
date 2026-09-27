@@ -76,7 +76,8 @@ public sealed class SaveCompetitionProgressionEndpoint(
                 node.Id, node.Kind,
                 node.Kind == ProgressionNodeKind.Challenge
                     ? node.Challenge!.CompetitionChallengeId
-                    : node.Badge!.CompetitionBadgeId)).ToArray(),
+                    : node.Badge!.CompetitionBadgeId,
+                node.RequiresPrerequisites)).ToArray(),
             request.Edges.Select(edge => new ProgressionEdgeDraft(
                 edge.Id, edge.SourceNodeId, edge.TargetNodeId, edge.Condition)).ToArray(),
             clock.GetUtcNow()), ct);

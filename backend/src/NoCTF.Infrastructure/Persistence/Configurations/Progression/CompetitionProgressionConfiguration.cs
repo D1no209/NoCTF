@@ -34,6 +34,8 @@ internal sealed class ProgressionNodeConfiguration : IEntityTypeConfiguration<Pr
     {
         builder.ToTable("competition_progression_nodes");
         builder.HasKey(item => item.Id);
+        builder.Property(item => item.RequiresPrerequisites)
+            .HasDefaultValue(true).HasSentinel(true);
         builder.Ignore(item => item.Kind);
         builder.HasDiscriminator<string>("kind")
             .HasValue<ChallengeProgressionNode>("challenge")

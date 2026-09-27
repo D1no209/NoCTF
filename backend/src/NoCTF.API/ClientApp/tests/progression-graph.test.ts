@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test'
 import { readFileSync } from 'node:fs'
-import { restoreProgressionViewport } from '../app/components/ui/progression/progression-viewport'
+import { progressionFocusTransform, restoreProgressionViewport } from '../app/components/ui/progression/progression-viewport'
 import { buildProgressionLayout, progressionTopologyKey } from '../app/lib/progression-layout'
 import type { ElkNode } from 'elkjs/lib/elk-api.js'
 import type { ProgressionViewport } from '../app/components/ui/progression/progression-viewport'
@@ -52,6 +52,24 @@ describe('progression editor connections', () => {
       source: `s${index}`, target: `t${index}`,
     }))
     expect(progressionConnectionIssue(edges, 'new-source', 'new-target')).toBe('limit')
+  })
+})
+
+describe('per-node prerequisite policy', () => {
+  test('the inspector edits the selected node and the save request carries its policy', () => {
+    const view = readFileSync(new URL('../app/components/views/page/admin/competitions/[id]/AdminCompetitionsByIdProgressionPageView.vue', import.meta.url), 'utf8')
+    const feature = readFileSync(new URL('../app/features/routes/admin/competitions/[id]/useAdminCompetitionsByIdProgressionPage.ts', import.meta.url), 'utf8')
+    expect(view).toContain("$t('progression.challengeRequiresPrerequisites')")
+    expect(view).toContain("$t('progression.badgeRequiresPrerequisites')")
+    expect(view).toContain('@update:model-value="setSelectedNodeRequiresPrerequisites($event)"')
+    expect(feature).toContain('requiresPrerequisites: node.data!.requiresPrerequisites')
+    expect(feature).toContain('requiresPrerequisites: true')
+  })
+
+  test('player map shows why a node with unmet edges is already active', () => {
+    const view = readFileSync(new URL('../app/components/views/page/competitions/[id]/CompetitionsByIdProgressionPageView.vue', import.meta.url), 'utf8')
+    expect(view).toContain("$t('progression.challengeAlwaysOpen')")
+    expect(view).toContain("$t('progression.badgeAlwaysActive')")
   })
 })
 
@@ -157,6 +175,17 @@ describe('progression canvas viewport', () => {
     await restoreProgressionViewport(viewport, false)
     expect(calls).toEqual([['set', { x: 0, y: 0, zoom: 1 }]])
   })
+
+  test('places the current node ahead of center so successors remain visible', () => {
+    const node = { x: 500, y: 200, width: 240, height: 96 }
+    const viewport = { width: 1200, height: 800 }
+    expect(progressionFocusTransform(node, viewport, 'RIGHT')).toEqual({
+      x: -260, y: 152, zoom: 1,
+    })
+    expect(progressionFocusTransform(node, viewport, 'DOWN')).toEqual({
+      x: -20, y: -8, zoom: 1,
+    })
+  })
 })
 
 describe('progression automatic layout', () => {
@@ -190,11 +219,49 @@ describe('progression automatic layout', () => {
     expect(input!.layoutOptions?.['elk.layered.spacing.nodeNodeBetweenLayers']).toBe('110')
   })
 
+  test('player nodes can request larger dimensions without changing saved graph data', async () => {
+    let input: ElkNode | null = null
+    await buildProgressionLayout([{ id: 'player', kind: 0, width: 240, height: 96 }], [],
+      'RIGHT', async graph => { input = graph; return graph })
+    expect(input!.children?.[0]?.width).toBe(240)
+    expect(input!.children?.[0]?.height).toBe(96)
+  })
+
   test('completion and condition changes do not change the topology key', () => {
     expect(progressionTopologyKey(graphNodes, graphEdges, 'RIGHT'))
       .toBe(progressionTopologyKey([...graphNodes].reverse(), graphEdges, 'RIGHT'))
     expect(progressionTopologyKey(graphNodes, graphEdges, 'RIGHT'))
       .not.toBe(progressionTopologyKey(graphNodes, graphEdges, 'DOWN'))
+  })
+})
+
+describe('player progression workspace', () => {
+  test('the map fills its route and moves to the viewport without remounting', () => {
+    const view = readFileSync(new URL('../app/components/views/page/competitions/[id]/CompetitionsByIdProgressionPageView.vue', import.meta.url), 'utf8')
+    const parent = readFileSync(new URL('../app/components/views/page/competitions/CompetitionsByIdPageView.vue', import.meta.url), 'utf8')
+    expect(view).toContain('<Teleport to="body" :disabled="!isExpanded">')
+    expect(view).toContain('height="100%"')
+    expect(view).not.toContain('height="35rem"')
+    expect(parent).toContain(':data-progression-route="isProgression"')
+  })
+
+  test('badges and node details open on demand instead of preceding the canvas', () => {
+    const view = readFileSync(new URL('../app/components/views/page/competitions/[id]/CompetitionsByIdProgressionPageView.vue', import.meta.url), 'utf8')
+    expect(view).toContain('<Sheet v-model:open="badgeSheetOpen">')
+    expect(view).toContain('data-progression-inspector')
+    expect(view).toContain('@click="enterSelectedChallenge"')
+  })
+
+  test('badge rows show only image and name until their details are opened', () => {
+    const view = readFileSync(new URL('../app/components/views/page/competitions/[id]/CompetitionsByIdProgressionPageView.vue', import.meta.url), 'utf8')
+    const feature = readFileSync(new URL('../app/features/routes/competitions/[id]/useCompetitionsByIdProgressionPage.ts', import.meta.url), 'utf8')
+    const badgeRow = view.split('v-for="badge in data.badges"')[1]!.split('v-show="selectedBadgeId === badge.id"')[0]!
+    expect(badgeRow).toContain(':src="badge.imageUrl"')
+    expect(badgeRow).toContain('{{ badge.name }}')
+    expect(badgeRow).not.toContain('badge.description')
+    expect(view).toContain(':aria-expanded="selectedBadgeId === badge.id"')
+    expect(feature).toContain('selectedBadgeId.value = selectedBadgeId.value === badgeId ? null : badgeId')
+    expect(feature).toContain('selectedBadgeId.value = null\n    badgeSheetOpen.value = true')
   })
 })
 

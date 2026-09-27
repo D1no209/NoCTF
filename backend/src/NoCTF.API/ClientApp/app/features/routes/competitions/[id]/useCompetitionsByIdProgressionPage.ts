@@ -6,11 +6,12 @@ import { progressionTopologyKey } from '../../../../lib/progression-layout'
 import { chooseProgressionFocus, unsatisfiedProgressionEdges } from '../../../../lib/progression-graph'
 import type { ProgressionLayoutDirection } from '../../../../lib/progression-layout'
 import ProgressionCanvasComponent from '~/components/ui/progression/ProgressionCanvas.vue'
-import { markRaw } from 'vue'
+import { markRaw, nextTick } from 'vue'
 
 type ReadData = {
   title: string, description?: string | null, kind: 0 | 1, resourceId: string
   active: boolean, complete: boolean, visited: boolean, firstOpenedAt?: string | null
+  requiresPrerequisites: boolean
   imageUrl?: string | null
 }
 type ReadNode = Node<ReadData>
@@ -26,7 +27,10 @@ export function useCompetitionsByIdProgressionPage() {
   const edges = shallowRef<ReadEdge[]>([])
   const direction = ref<ProgressionLayoutDirection>('RIGHT')
   const initialFocusNodeId = ref<string | null>(null)
+  const selectedNodeId = ref<string | null>(null)
+  const badgeSheetOpen = ref(false)
   const selectedBadgeId = ref<string | null>(null)
+  const isExpanded = ref(false)
   const highlightedNodeIds = shallowRef<ReadonlySet<string>>(new Set())
   const highlightedEdgeIds = shallowRef<ReadonlySet<string>>(new Set())
   const blockedMessage = ref<string | null>(null)
@@ -35,8 +39,27 @@ export function useCompetitionsByIdProgressionPage() {
   let blockedTimer: ReturnType<typeof setTimeout> | undefined
   let media: MediaQueryList | undefined
 
-  const selectedBadge = computed(() => nodes.value.find(node =>
-    node.id === selectedBadgeId.value && node.data?.kind === 1)?.data ?? null)
+  const selectedNode = computed(() => nodes.value.find(node =>
+    node.id === selectedNodeId.value) ?? null)
+  const selectedRequirements = computed(() => {
+    if (!selectedNode.value) return []
+    const byId = new Map(nodes.value.map(node => [node.id, node]))
+    return edges.value.filter(edge => edge.target === selectedNode.value!.id)
+      .map(edge => {
+        const predecessor = byId.get(edge.source)
+        const condition = edge.data?.condition ?? 0
+        return {
+          id: edge.id,
+          title: predecessor?.data?.title ?? '',
+          condition,
+          satisfied: condition === 1
+            ? predecessor?.data?.complete !== true
+            : predecessor?.data?.complete === true,
+        }
+      })
+  })
+  const challengeNodes = computed(() => nodes.value.filter(node => node.data?.kind === 0))
+  const completedChallenges = computed(() => challengeNodes.value.filter(node => node.data?.complete).length)
   const currentProgressNodeId = computed(() => chooseProgressionFocus(nodes.value.map(node => ({
     id: node.id, kind: node.data!.kind, active: node.data!.active,
     complete: node.data!.complete, visited: node.data!.visited,
@@ -55,6 +78,7 @@ export function useCompetitionsByIdProgressionPage() {
       return
     }
     if (result.data.nodes?.some(node => !node.id || !node.resourceId
+      || typeof node.requiresPrerequisites !== 'boolean'
       || (node.kind !== 0 && node.kind !== 1))
       || result.data.edges?.some(edge => !edge.id || !edge.sourceNodeId || !edge.targetNodeId
         || (edge.condition !== 0 && edge.condition !== 1))) {
@@ -71,6 +95,7 @@ export function useCompetitionsByIdProgressionPage() {
         kind: node.kind === 1 ? 1 : 0, resourceId: node.resourceId!,
         active: node.active ?? false, complete: node.complete ?? false,
         visited: node.visited ?? false, firstOpenedAt: node.firstOpenedAt,
+        requiresPrerequisites: node.requiresPrerequisites!,
         imageUrl: node.imageUrl,
       },
     }))
@@ -93,7 +118,8 @@ export function useCompetitionsByIdProgressionPage() {
     if (changed) {
       try {
         const positions = await calculateProgressionLayout(
-          incomingNodes.map(node => ({ id: node.id, kind: node.data!.kind })),
+          incomingNodes.map(node => ({ id: node.id, kind: node.data!.kind,
+            width: 240, height: 96 })),
           incomingEdges.map(edge => ({ source: edge.source, target: edge.target })),
           direction.value)
         if (generation !== loadGeneration) return
@@ -102,18 +128,31 @@ export function useCompetitionsByIdProgressionPage() {
           ...node, position: byId.get(node.id) ?? node.position,
         }))
         currentTopology = topology
-        initialFocusNodeId.value = currentProgressNodeId.value
+        initialFocusNodeId.value = null
+        await nextTick()
+        if (generation !== loadGeneration) return
+        initialFocusNodeId.value = selectedNodeId.value ?? currentProgressNodeId.value
       }
       catch {
         error.value = translate('progression.layoutFailed')
       }
     }
     loading.value = false
+    if (selectedNodeId.value && !nodes.value.some(node => node.id === selectedNodeId.value))
+      closeSelectedNode()
+    else if (selectedNode.value?.data?.active && blockedMessage.value) {
+      blockedMessage.value = null
+      highlightedNodeIds.value = new Set()
+      highlightedEdgeIds.value = new Set()
+    }
     const blockedResource = route.query.blocked
     if (typeof blockedResource === 'string') {
       const blocked = nodes.value.find(node => node.data?.kind === 0
         && node.data.resourceId === blockedResource && !node.data.active)
-      if (blocked) showBlockers(blocked.id)
+      if (blocked) {
+        selectedNodeId.value = blocked.id
+        showBlockers(blocked.id)
+      }
     }
   }
 
@@ -140,23 +179,53 @@ export function useCompetitionsByIdProgressionPage() {
       }, 3500)
   }
 
-  async function onNodeClick(id: string) {
+  function closeSelectedNode() {
+    selectedNodeId.value = null
+    blockedMessage.value = null
+    highlightedNodeIds.value = new Set()
+    highlightedEdgeIds.value = new Set()
+    if (blockedTimer) clearTimeout(blockedTimer)
+  }
+
+  function onNodeClick(id: string) {
     const node = nodes.value.find(item => item.id === id)
     if (!node?.data) return
-    if (node.data.kind === 1) {
-      selectedBadgeId.value = id
-      return
-    }
-    selectedBadgeId.value = null
+    selectedNodeId.value = id
     if (!node.data.active) {
       showBlockers(id)
       return
     }
+    blockedMessage.value = null
+    highlightedNodeIds.value = new Set()
+    highlightedEdgeIds.value = new Set()
+    if (blockedTimer) clearTimeout(blockedTimer)
+  }
+
+  async function enterSelectedChallenge() {
+    const node = selectedNode.value
+    if (!node?.data || node.data.kind !== 0 || !node.data.active) return
     useState<{ competitionId: string, challengeId: string, revision: number } | null>(
       'progression-entry', () => null).value = {
       competitionId, challengeId: node.data.resourceId, revision: data.value?.revision ?? 0,
     }
     await navigateTo(`/competitions/${competitionId}/challenges/${node.data.resourceId}`)
+  }
+
+  function toggleExpanded() { isExpanded.value = !isExpanded.value }
+
+  function openBadges() {
+    selectedBadgeId.value = null
+    badgeSheetOpen.value = true
+  }
+
+  function toggleBadgeDetails(badgeId: string) {
+    selectedBadgeId.value = selectedBadgeId.value === badgeId ? null : badgeId
+  }
+
+  function onKeyDown(event: KeyboardEvent) {
+    if (event.key !== 'Escape' || badgeSheetOpen.value) return
+    if (selectedNodeId.value) closeSelectedNode()
+    else if (isExpanded.value) isExpanded.value = false
   }
 
   function onViewportWidthChange() {
@@ -168,6 +237,7 @@ export function useCompetitionsByIdProgressionPage() {
 
   let unwatch: (() => void) | undefined
   onMounted(() => {
+    document.addEventListener('keydown', onKeyDown)
     media = window.matchMedia('(max-width: 720px)')
     direction.value = media.matches ? 'DOWN' : 'RIGHT'
     media.addEventListener('change', onViewportWidthChange)
@@ -179,6 +249,7 @@ export function useCompetitionsByIdProgressionPage() {
   })
   onUnmounted(() => {
     loadGeneration++
+    document.removeEventListener('keydown', onKeyDown)
     if (blockedTimer) clearTimeout(blockedTimer)
     media?.removeEventListener('change', onViewportWidthChange)
     unwatch?.()
@@ -187,7 +258,10 @@ export function useCompetitionsByIdProgressionPage() {
   return {
     data, loading, error, nodes, edges, direction, initialFocusNodeId,
     currentProgressNodeId, highlightedNodeIds, highlightedEdgeIds,
-    blockedMessage, selectedBadge, load, onNodeClick, ProgressionCanvas,
+    blockedMessage, selectedNode, selectedRequirements, challengeNodes,
+    completedChallenges, badgeSheetOpen, selectedBadgeId, isExpanded,
+    load, onNodeClick, closeSelectedNode, enterSelectedChallenge,
+    toggleExpanded, openBadges, toggleBadgeDetails, ProgressionCanvas,
   }
 }
 

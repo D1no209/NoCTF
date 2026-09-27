@@ -20,7 +20,8 @@ public sealed record ProgressionBadgeDisplayContract(
 public sealed record PlayerProgressionNodeContract(
     Guid Id, ProgressionNodeKind Kind, Guid ResourceId,
     string Title, string? Description, string? Direction,
-    bool Active, bool Complete, bool Visited, DateTimeOffset? FirstOpenedAt,
+    bool Active, bool Complete, bool Visited, bool RequiresPrerequisites,
+    DateTimeOffset? FirstOpenedAt,
     string? ImageUrl);
 public sealed record PlayerProgressionContract(
     bool Enabled, bool ShowPlayerMap, long Revision,
@@ -59,7 +60,8 @@ public sealed class GetPlayerProgressionEndpoint(
             view.Nodes.Select(node => new PlayerProgressionNodeContract(
                 node.Id, node.Kind, node.ResourceId,
                 node.Title, node.Description, node.Direction,
-                node.Active, node.Complete, node.Visited, node.FirstOpenedAt,
+                node.Active, node.Complete, node.Visited,
+                node.RequiresPrerequisites, node.FirstOpenedAt,
                 node.ImageFileId is null ? null
                     : $"/api/v1/competitions/{request.CompetitionId}/badges/{node.ResourceId}/image?revision={node.ImageFileId.Value:N}"))
                 .ToArray(),

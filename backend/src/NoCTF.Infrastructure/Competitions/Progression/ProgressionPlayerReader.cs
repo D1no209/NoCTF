@@ -88,13 +88,15 @@ public sealed class ProgressionPlayerReader(
                         ?? string.Empty,
                     null, challengeDetails.GetValueOrDefault(node.ResourceId)?.Direction,
                     state.Active, state.Complete, visited.ContainsKey(node.Id),
+                    node.RequiresPrerequisites,
                     visited.GetValueOrDefault(node.Id), null),
                 ProgressionNodeKind.Badge => new PlayerProgressionNode(
                     node.Id, node.Kind, node.ResourceId,
                     badgeDetails.GetValueOrDefault(node.ResourceId)?.Name
                         ?? string.Empty,
                     badgeDetails.GetValueOrDefault(node.ResourceId)?.Description,
-                    null, state.Active, state.Complete, false, null,
+                    null, state.Active, state.Complete, false,
+                    node.RequiresPrerequisites, null,
                     badgeDetails.GetValueOrDefault(node.ResourceId)?.ImageFileId),
                 _ => throw new InvalidOperationException("Unsupported progression node type.")
             };

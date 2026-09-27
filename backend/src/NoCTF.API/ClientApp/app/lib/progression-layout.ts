@@ -3,7 +3,7 @@ import type { ElkNode } from 'elkjs/lib/elk-api.js'
 import elkWorkerUrl from 'elkjs/lib/elk-worker.min.js?url'
 
 export type ProgressionLayoutDirection = 'RIGHT' | 'DOWN'
-export interface ProgressionLayoutNode { id: string, kind: 0 | 1 }
+export interface ProgressionLayoutNode { id: string, kind: 0 | 1, width?: number, height?: number }
 export interface ProgressionLayoutEdge { source: string, target: string }
 export interface ProgressionPosition { id: string, x: number, y: number }
 
@@ -45,7 +45,8 @@ export async function buildProgressionLayout(
       'elk.randomizationSeed': '1',
     },
     children: [...nodes].sort((a, b) => a.id.localeCompare(b.id)).map(node => ({
-      id: node.id, width: 200, height: node.kind === 1 ? 88 : 76,
+      id: node.id, width: node.width ?? 200,
+      height: node.height ?? (node.kind === 1 ? 88 : 76),
     })),
     edges: [...edges].sort((a, b) =>
       a.source.localeCompare(b.source) || a.target.localeCompare(b.target))
