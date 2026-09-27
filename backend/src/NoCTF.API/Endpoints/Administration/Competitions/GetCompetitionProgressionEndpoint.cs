@@ -1,3 +1,5 @@
+using System.ComponentModel.DataAnnotations;
+using System.Text.Json.Serialization;
 using FastEndpoints;
 using Microsoft.AspNetCore.Http.HttpResults;
 using NoCTF.API.Security;
@@ -16,6 +18,7 @@ public sealed record ProgressionChallengeNodeContract(Guid CompetitionChallengeI
 public sealed record ProgressionBadgeNodeContract(Guid CompetitionBadgeId);
 public sealed record ProgressionNodeContract(
     Guid Id, ProgressionNodeKind Kind,
+    [property: Required, JsonRequired] bool RequiresPrerequisites,
     ProgressionChallengeNodeContract? Challenge,
     ProgressionBadgeNodeContract? Badge);
 public sealed record ProgressionEdgeContract(
@@ -57,7 +60,7 @@ internal static class ProgressionProtocol
         view.CompetitionId, view.Enabled, view.ShowPlayerMap,
         view.ConcurrencyStamp, view.Revision,
         view.Nodes.Select(node => new ProgressionNodeContract(
-            node.Id, node.Kind,
+            node.Id, node.Kind, node.RequiresPrerequisites,
             node.Kind == ProgressionNodeKind.Challenge
                 ? new(node.ResourceId) : null,
             node.Kind == ProgressionNodeKind.Badge

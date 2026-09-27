@@ -413,6 +413,26 @@ export function createMockApi() {
         const page = list(state.challenges.filter(c => c.competitionId === p.competitionId), url)
         value = { ...page, items: page.items.map(challengeSummary), leaderboardVisibility: 'Normal', dataScope: 'Live' }
       }
+      else if (cleanRoute === '/competitions/{competitionId}/progression') {
+        const challenges = state.challenges.filter(item => item.competitionId === p.competitionId).slice(0, 8)
+        const links = [[0, 2], [1, 2], [2, 3], [3, 4], [2, 5], [5, 6], [4, 7], [6, 7]]
+        value = {
+          enabled: competition?.mode === 'Ctf', showPlayerMap: competition?.mode === 'Ctf',
+          revision: 1, badges: [],
+          nodes: competition?.mode === 'Ctf' ? challenges.map((item, index) => ({
+            id: item.id, kind: 0, resourceId: item.id,
+            title: item.customTitle || item.title, description: null, direction: item.direction,
+            active: index < 2, complete: index === 0, visited: index === 0,
+            requiresPrerequisites: true,
+            firstOpenedAt: index === 0 ? now() : null, imageUrl: null,
+          })) : [],
+          edges: competition?.mode === 'Ctf' ? links.filter(([from, to]) => challenges[from] && challenges[to])
+            .map(([from, to], index) => ({
+              id: id(31, index + 1), sourceNodeId: challenges[from]!.id,
+              targetNodeId: challenges[to]!.id, condition: 0,
+            })) : [],
+        }
+      }
       else if (cleanRoute === '/competitions/{competitionId}/challenges/{competitionChallengeId}') value = {
         ...challenge,
         solvedByMyTeam: competition?.mode === 'Ctf' && Boolean(myTeam && state.facts.some(fact =>

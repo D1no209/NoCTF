@@ -29,6 +29,7 @@ public abstract class ProgressionNode
     public Guid Id { get; set; }
     public Guid CompetitionId { get; set; }
     public ProgressionNodeKind Kind { get; private set; }
+    public bool RequiresPrerequisites { get; set; } = true;
 }
 
 [PersistentDiscriminator("challenge")]

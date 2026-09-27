@@ -45,6 +45,17 @@ describe('isolated Mock API', () => {
     expect((await send(path, 'POST', {})).status).toBe(204)
     expect((await send(path, 'POST', {})).status).toBe(204)
   })
+
+  test('the local CTF progression map exposes a readable route fixture', async () => {
+    const { send } = await setup()
+    const response = await send(`${competition}/progression`)
+    expect(response.status).toBe(200)
+    const graph = await response.json()
+    expect(graph.showPlayerMap).toBe(true)
+    expect(graph.nodes).toHaveLength(8)
+    expect(graph.edges).toHaveLength(8)
+    expect(graph.nodes[0].positionX).toBeUndefined()
+  })
   test('seeds one downloadable challenge for every supported direction', async () => {
     const { send } = await setup()
     const catalog = await (await send(`${competition}/challenges`)).json()

@@ -1133,6 +1133,7 @@ export type NoCtfapiEndpointsCompetitionsPlayerProgressionNodeContract = {
     active?: boolean;
     complete?: boolean;
     visited?: boolean;
+    requiresPrerequisites?: boolean;
     firstOpenedAt?: string | null;
     imageUrl?: string | null;
 };
@@ -2870,6 +2871,7 @@ export type NoCtfapiEndpointsAdministrationCompetitionsCompetitionProgressionCon
 export type NoCtfapiEndpointsAdministrationCompetitionsProgressionNodeContract = {
     id?: string;
     kind?: NoCtfDomainCompetitionsProgressionProgressionNodeKind;
+    requiresPrerequisites: boolean;
     challenge?: NoCtfapiEndpointsAdministrationCompetitionsProgressionChallengeNodeContract | null;
     badge?: NoCtfapiEndpointsAdministrationCompetitionsProgressionBadgeNodeContract | null;
 };

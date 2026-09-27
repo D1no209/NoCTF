@@ -121,12 +121,16 @@ public sealed class CompetitionProgressionPersistenceTests
                 db.ChangeTracker.Clear();
                 var result = await store.SaveAsync(new(
                     competitionId, empty.Progression!.ConcurrencyStamp, true, true,
-                    [new(nodeId, ProgressionNodeKind.Challenge, instanceId),
-                     new(badgeNodeId, ProgressionNodeKind.Badge, badgeId)],
+                    [new(nodeId, ProgressionNodeKind.Challenge, instanceId, true),
+                     new(badgeNodeId, ProgressionNodeKind.Badge, badgeId, false)],
                     [new(Guid.NewGuid(), nodeId, badgeNodeId,
                         ProgressionPrerequisiteCondition.Completed)], now), ct);
                 await Assert.That(result.Failure).IsNull();
                 await Assert.That(result.Progression!.Revision).IsEqualTo(2);
+                await Assert.That((await store.ReadAsync(competitionId, ct))!.Nodes
+                    .Single(node => node.Id == badgeNodeId).RequiresPrerequisites).IsFalse();
+                await Assert.That(await db.UserBadgeGrants.AsNoTracking()
+                    .CountAsync(grant => grant.Active, ct)).IsEqualTo(2);
                 await Assert.That(await db.ProgressionNodes.OfType<ChallengeProgressionNode>()
                     .CountAsync(ct)).IsEqualTo(1);
                 await Assert.That(await db.ProgressionNodes.OfType<BadgeProgressionNode>()

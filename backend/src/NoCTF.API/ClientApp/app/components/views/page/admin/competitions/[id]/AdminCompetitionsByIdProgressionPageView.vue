@@ -13,7 +13,8 @@ const {
   newBadgeUploadKey, editingBadgeId, editBadgeName, editBadgeDescription,
   editBadgeUploadKey,
   load, addChallenge, addBadge, connect, removeSelected, changeNodeSelection,
-  changeEdgeSelection, updateNodePositions, setEdgeCondition, save, autoArrange,
+  changeEdgeSelection, updateNodePositions, setEdgeCondition,
+  setSelectedNodeRequiresPrerequisites, save, autoArrange,
   beginBatch, cancelBatch, setBatchCondition, toggleBatchTarget, applyBatch,
   onBadgeFileChange, createBadge, deleteBadge, ProgressionCanvas,
   onEditBadgeFileChange, beginEditBadge, updateBadge,
@@ -167,6 +168,21 @@ const {
           <div v-else-if="selectedNode" class="mt-4 space-y-3">
             <p class="break-words text-sm font-medium">{{ selectedNode.data?.title }}</p>
             <p class="text-xs text-muted-foreground">{{ selectedNode.data?.kind === 0 ? $t('progression.challengeNode') : $t('progression.badgeNode') }}</p>
+            <Field orientation="horizontal">
+              <Switch :id="`progression-node-gate-${selectedNode.id}`"
+                :model-value="selectedNode.data?.requiresPrerequisites ?? true"
+                :disabled="!canWrite" @update:model-value="setSelectedNodeRequiresPrerequisites($event)" />
+              <FieldLabel :for="`progression-node-gate-${selectedNode.id}`">
+                {{ selectedNode.data?.kind === 0
+                  ? $t('progression.challengeRequiresPrerequisites')
+                  : $t('progression.badgeRequiresPrerequisites') }}
+              </FieldLabel>
+            </Field>
+            <p class="text-xs leading-5 text-muted-foreground">
+              {{ selectedNode.data?.kind === 0
+                ? $t('progression.challengeGateHint')
+                : $t('progression.badgeGateHint') }}
+            </p>
             <Button v-if="canWrite" size="sm" @click="beginBatch">{{ $t('progression.batchSuccessors') }}</Button>
             <Button v-if="canWrite" size="sm" variant="destructive" @click="removeSelected">{{ $t('progression.removeNode') }}</Button>
           </div>

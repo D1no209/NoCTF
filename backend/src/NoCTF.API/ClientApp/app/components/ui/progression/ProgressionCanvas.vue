@@ -3,7 +3,7 @@ import { Handle, Panel, Position, VueFlow } from '@vue-flow/core'
 import type { Connection, Edge, EdgeChange, Node, NodeChange, NodeDragEvent, VueFlowStore } from '@vue-flow/core'
 import { LockKeyhole, LocateFixed, Scan } from '@lucide/vue'
 import { computed, nextTick, shallowRef, watch } from 'vue'
-import { restoreProgressionViewport } from './progression-viewport'
+import { progressionFocusTransform, restoreProgressionViewport } from './progression-viewport'
 import '@vue-flow/core/dist/style.css'
 import '@vue-flow/core/dist/theme-default.css'
 
@@ -25,7 +25,7 @@ const props = withDefaults(defineProps<{
 }>(), { readOnly: false, height: '38rem' })
 const nodes = defineModel<Node[]>('nodes', { required: true })
 const edges = defineModel<Edge[]>('edges', { required: true })
-const viewport = shallowRef<Pick<VueFlowStore, 'fitView' | 'setViewport' | 'setCenter'> | null>(null)
+const viewport = shallowRef<Pick<VueFlowStore, 'fitView' | 'setViewport' | 'setCenter' | 'dimensions'> | null>(null)
 const displayEdges = computed(() => [...edges.value.map(edge => ({
   ...edge,
   class: [edge.class, props.highlightedEdgeIds?.has(edge.id) ? 'progression-blocked-edge' : '']
@@ -78,8 +78,20 @@ async function focusNode(id: string) {
   if (!node || !viewport.value) return
   await nextTick()
   const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches
-  await viewport.value.setCenter(node.position.x + 100, node.position.y + 40,
-    { zoom: 1, duration: reduced ? 0 : 180 })
+  const dimensions = viewport.value.dimensions.value
+  const nodeWidth = props.readOnly ? 240 : 200
+  const nodeHeight = props.readOnly ? 96 : 76
+  if (dimensions.width && dimensions.height) {
+    await viewport.value.setViewport(progressionFocusTransform({
+      x: node.position.x, y: node.position.y,
+      width: nodeWidth, height: nodeHeight,
+    }, dimensions, props.direction ?? 'RIGHT'), { duration: reduced ? 0 : 180 })
+  }
+  else {
+    await viewport.value.setCenter(node.position.x + nodeWidth / 2,
+      node.position.y + nodeHeight / 2,
+      { zoom: 1, duration: reduced ? 0 : 180 })
+  }
 }
 
 async function restoreView() {
@@ -132,14 +144,14 @@ async function restoreView() {
     </template>
     <template #node-read-progression="{ id, data }">
       <Hint :content="data.title">
-        <div class="flex w-[200px] min-h-[76px] cursor-pointer items-center gap-2 rounded-lg px-3 py-2 text-sm shadow-sm"
+        <div class="flex w-[240px] min-h-[96px] cursor-pointer items-center gap-3 rounded-lg px-4 py-3 text-sm shadow-sm"
           :class="[data.complete ? 'bg-success/15 text-success' : !data.active ? 'bg-muted text-muted-foreground' : data.visited ? 'bg-warning/15 text-warning' : 'bg-card text-primary', props.highlightedNodeIds?.has(id) ? 'progression-blocked-node' : '']"
           tabindex="0" @keydown.enter.prevent="emit('nodeClick', id)">
           <Handle type="target" :position="props.direction === 'DOWN' ? Position.Top : Position.Left" :connectable="false" />
           <img v-if="data.imageUrl" :src="data.imageUrl" alt="" class="size-9 rounded object-cover" />
           <div class="min-w-0 flex-1">
-            <p class="line-clamp-2 break-words font-medium">{{ data.title }}</p>
-            <p class="mt-1 flex items-center gap-1 text-xs">
+            <p class="line-clamp-2 break-words text-base font-semibold">{{ data.title }}</p>
+            <p class="mt-1 flex items-center gap-1 text-sm">
               <LockKeyhole v-if="!data.active" class="size-3" aria-hidden="true" />
               {{ data.complete ? $t('progression.completed') : data.active ? data.visited ? $t('progression.inProgress') : $t('progression.available') : $t('progression.locked') }}
               <span v-if="data.complete && !data.active">· {{ $t('progression.locked') }}</span>

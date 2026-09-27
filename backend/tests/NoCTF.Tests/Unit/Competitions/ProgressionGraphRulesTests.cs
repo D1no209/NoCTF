@@ -61,6 +61,44 @@ public sealed class ProgressionGraphRulesTests
     }
 
     [Test]
+    public async Task Challenge_can_ignore_unmet_predecessors_without_completing_itself()
+    {
+        var source = Challenge();
+        var target = Challenge();
+        target.RequiresPrerequisites = false;
+        var edge = Edge(source, target, ProgressionPrerequisiteCondition.Completed);
+
+        var evaluation = ProgressionGraphRules.Evaluate(
+            [source, target], [edge], new HashSet<Guid>());
+
+        await Assert.That(evaluation.Nodes[target.Id].Active).IsTrue();
+        await Assert.That(evaluation.Nodes[target.Id].Complete).IsFalse();
+    }
+
+    [Test]
+    public async Task Unconditional_badge_activates_its_specific_node_and_successors()
+    {
+        var source = Challenge();
+        var badgeId = Guid.NewGuid();
+        var badge = Badge(badgeId);
+        badge.RequiresPrerequisites = false;
+        var successor = Challenge();
+        var edges = new[]
+        {
+            Edge(source, badge, ProgressionPrerequisiteCondition.Completed),
+            Edge(badge, successor, ProgressionPrerequisiteCondition.Completed)
+        };
+
+        var evaluation = ProgressionGraphRules.Evaluate(
+            [source, badge, successor], edges, new HashSet<Guid>());
+
+        await Assert.That(evaluation.Nodes[badge.Id].Active).IsTrue();
+        await Assert.That(evaluation.Nodes[badge.Id].Complete).IsTrue();
+        await Assert.That(evaluation.Nodes[successor.Id].Active).IsTrue();
+        await Assert.That(evaluation.ActiveBadgeIds.Contains(badgeId)).IsTrue();
+    }
+
+    [Test]
     public async Task Badge_predecessor_refers_to_the_specific_instance()
     {
         var solved = Challenge();

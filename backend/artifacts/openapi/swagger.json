@@ -20061,6 +20061,9 @@
           "visited": {
             "type": "boolean"
           },
+          "requiresPrerequisites": {
+            "type": "boolean"
+          },
           "firstOpenedAt": {
             "type": "string",
             "format": "date-time",
@@ -26654,6 +26657,9 @@
       "NoCTFAPIEndpointsAdministrationCompetitionsProgressionNodeContract": {
         "type": "object",
         "additionalProperties": false,
+        "required": [
+          "requiresPrerequisites"
+        ],
         "properties": {
           "id": {
             "type": "string",
@@ -26661,6 +26667,9 @@
           },
           "kind": {
             "$ref": "#/components/schemas/NoCTFDomainCompetitionsProgressionProgressionNodeKind"
+          },
+          "requiresPrerequisites": {
+            "type": "boolean"
           },
           "challenge": {
             "nullable": true,

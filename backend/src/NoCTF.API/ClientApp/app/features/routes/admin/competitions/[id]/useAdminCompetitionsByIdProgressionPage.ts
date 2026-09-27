@@ -30,7 +30,7 @@ import { directionKey, directionLabel } from '../../../../../utils/directions'
 import ProgressionCanvasComponent from '~/components/ui/progression/ProgressionCanvas.vue'
 import { markRaw } from 'vue'
 
-type CanvasData = { kind: 0 | 1, resourceId: string, title: string, imageUrl?: string }
+type CanvasData = { kind: 0 | 1, resourceId: string, title: string, requiresPrerequisites: boolean, imageUrl?: string }
 type GateData = { condition: 0 | 1 }
 type CanvasNode = Node<CanvasData>
 type GateEdge = Edge<GateData>
@@ -129,6 +129,7 @@ export function useAdminCompetitionsByIdProgressionPage() {
     challenges.value = challengeResult.data.items ?? []
     const graph = graphResult.data
     if (graph.nodes?.some(node => !node.id || (node.kind !== 0 && node.kind !== 1)
+      || typeof node.requiresPrerequisites !== 'boolean'
       || !(node.kind === 0 ? node.challenge?.competitionChallengeId : node.badge?.competitionBadgeId))
       || graph.edges?.some(edge => !edge.id || !edge.sourceNodeId || !edge.targetNodeId
         || (edge.condition !== 0 && edge.condition !== 1))) {
@@ -153,6 +154,7 @@ export function useAdminCompetitionsByIdProgressionPage() {
         data: {
           kind,
           resourceId,
+          requiresPrerequisites: node.requiresPrerequisites!,
           title: kind === 0 ? (challenge?.customTitle || challenge?.title || resourceId) : (badge?.name || resourceId),
           imageUrl: badge?.imageUrl,
         },
@@ -204,7 +206,8 @@ export function useAdminCompetitionsByIdProgressionPage() {
     nodes.value = [...nodes.value, {
       id: crypto.randomUUID(), type: 'progression',
       position: nextNodePosition(),
-      data: { kind: 0, resourceId: challenge.id, title: challenge.customTitle || challenge.title || challenge.id },
+      data: { kind: 0, resourceId: challenge.id, title: challenge.customTitle || challenge.title || challenge.id,
+        requiresPrerequisites: true },
     }]
   }
 
@@ -214,7 +217,8 @@ export function useAdminCompetitionsByIdProgressionPage() {
     nodes.value = [...nodes.value, {
       id: crypto.randomUUID(), type: 'progression',
       position: nextNodePosition(),
-      data: { kind: 1, resourceId: badge.id, title: badge.name ?? badge.id, imageUrl: badge.imageUrl },
+      data: { kind: 1, resourceId: badge.id, title: badge.name ?? badge.id, imageUrl: badge.imageUrl,
+        requiresPrerequisites: true },
     }]
   }
 
@@ -260,6 +264,14 @@ export function useAdminCompetitionsByIdProgressionPage() {
     edges.value = edges.value.map(item => item.id === edge.id
       ? { ...item, data: { condition }, label: condition === 1 ? translate('progression.incomplete') : undefined }
       : item)
+  }
+
+  function setSelectedNodeRequiresPrerequisites(value: boolean) {
+    const selected = selectedNode.value
+    if (!canWrite.value || !selected || batch.value) return
+    nodes.value = nodes.value.map(node => node.id === selected.id
+      ? { ...node, data: { ...node.data!, requiresPrerequisites: value } }
+      : node)
   }
 
   function beginBatch() {
@@ -318,6 +330,7 @@ export function useAdminCompetitionsByIdProgressionPage() {
         enabled: enabled.value, showPlayerMap: showPlayerMap.value,
         nodes: nodes.value.map(node => ({
           id: node.id, kind: node.data!.kind,
+          requiresPrerequisites: node.data!.requiresPrerequisites,
           challenge: node.data!.kind === 0 ? { competitionChallengeId: node.data!.resourceId } : null,
           badge: node.data!.kind === 1 ? { competitionBadgeId: node.data!.resourceId } : null,
         })),
@@ -436,7 +449,8 @@ export function useAdminCompetitionsByIdProgressionPage() {
     newBadgeUploadKey, editingBadgeId, editBadgeName, editBadgeDescription, editBadgeImage,
     editBadgeUploadKey,
     load, addChallenge, addBadge, connect, removeSelected, changeNodeSelection,
-    changeEdgeSelection, updateNodePositions, setEdgeCondition, save, autoArrange,
+    changeEdgeSelection, updateNodePositions, setEdgeCondition,
+    setSelectedNodeRequiresPrerequisites, save, autoArrange,
     beginBatch, cancelBatch, setBatchCondition, toggleBatchTarget, applyBatch,
     onBadgeFileChange, createBadge, deleteBadge,
     onEditBadgeFileChange, beginEditBadge, updateBadge,

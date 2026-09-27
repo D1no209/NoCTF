@@ -67,7 +67,8 @@ public static class ProgressionGraphRules
         var activeBadges = new HashSet<Guid>();
         foreach (var node in order)
         {
-            var active = !incoming.TryGetValue(node.Id, out var requirements)
+            var active = !node.RequiresPrerequisites
+                || !incoming.TryGetValue(node.Id, out var requirements)
                 || requirements.All(edge => edge.Condition == ProgressionPrerequisiteCondition.Completed
                     ? states[edge.SourceNodeId].Complete
                     : !states[edge.SourceNodeId].Complete);
