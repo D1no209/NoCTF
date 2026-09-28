@@ -40,10 +40,10 @@ const { PartyPopper, input, submitting, celebrating, persistentResult, solved, c
     <p v-if="description" class="text-xs text-muted-foreground">{{ description }}</p>
     <p v-else-if="practice" class="text-xs text-muted-foreground">{{ $t('ui.practiceModeOnlyChecksWhetherAFlagIsCorrectIt') }}</p>
     <div>
-      <Alert v-if="solved" class="mb-4" role="status">
+      <Alert v-if="persistentResult?.correct === true" class="mb-4" role="status">
         <PartyPopper class="size-5 shrink-0 text-primary" aria-hidden="true" />
         <AlertTitle>{{ $t('ui.flagCorrect') }}</AlertTitle>
-        <AlertDescription>{{ persistentResult?.correct === true ? $message(persistentResult.message) : $t('terminal.challengeSolved') }}</AlertDescription>
+        <AlertDescription>{{ $message(persistentResult.message) }}</AlertDescription>
       </Alert>
       <TerminalCommand :id="`flag-input-${competitionChallengeId}`" v-model="input" :label="multiple ? $t('ui.flagListOnePerLine') : $t('ui.flag4')" :multiple="multiple" :pending="submitting" :disabled="inputDisabled" :placeholder="solved ? $t('terminal.challengeSolved') : $t('terminal.flagPlaceholder')" :hint="multiple ? $t('terminal.multipleHint') : $t('terminal.submitHint')" @submit="submit" />
 

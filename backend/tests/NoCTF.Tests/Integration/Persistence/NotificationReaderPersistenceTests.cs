@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 using NoCTF.Application.Notifications;
 using NoCTF.Domain.Competitions;
 using NoCTF.Domain.Identity;
@@ -32,6 +33,8 @@ public sealed class NotificationReaderPersistenceTests
             var options = new DbContextOptionsBuilder<NoCtfDbContext>()
                 .UseNpgsql(postgres.GetConnectionString())
                 .UseSnakeCaseNamingConvention()
+                .ConfigureWarnings(warnings => warnings.Throw(
+                    RelationalEventId.MultipleCollectionIncludeWarning))
                 .Options;
             var now = DateTimeOffset.Parse("2026-08-08T12:00:00Z");
             var ids = new TestIds(now);
@@ -136,7 +139,7 @@ public sealed class NotificationReaderPersistenceTests
 
             await using (var mutate = new NoCtfDbContext(options))
             {
-                var competition = await mutate.Competitions.SingleAsync(
+                var competition = await mutate.Competitions.AsSplitQuery().SingleAsync(
                     candidate => candidate.Id == ids.CompetitionId,
                     cancellationToken);
                 competition.ManagerIds = [ids.CurrentManagerId];

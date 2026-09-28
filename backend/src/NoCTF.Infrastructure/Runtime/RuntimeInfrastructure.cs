@@ -94,6 +94,7 @@ internal static class RuntimeInfrastructure
                 development ? null : provider.GetRequiredService<INatsConnection>(),
                 provider.GetService<TimeProvider>()));
         services.AddScoped<GetPlayerRuntime>();
+        services.AddScoped<ListTeamRuntimes>();
         services.AddScoped<MutatePlayerRuntime>();
         services.AddScoped<IRuntimeTargetReader, RuntimeTargetReader>();
         services.AddScoped<ListRuntimeTargets>();

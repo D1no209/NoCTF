@@ -127,7 +127,7 @@ public sealed class CompetitionManagementStore(
         _ = await db.Competitions.AsNoTracking().AnyAsync(
             competition => competition.Id == command.CompetitionId,
             ct);
-        var competition = await db.Competitions
+        var competition = await db.Competitions.AsSplitQuery()
             .SingleOrDefaultAsync(x => x.Id == command.CompetitionId
                 && x.DeletedAt == null, ct);
         if (competition is null)
@@ -204,7 +204,7 @@ public sealed class CompetitionManagementStore(
         CancellationToken ct)
     {
         await using var transaction = await AggregateCompatibleTransaction.BeginAsync(db, ct);
-        var competition = await db.Competitions
+        var competition = await db.Competitions.AsSplitQuery()
             .SingleOrDefaultAsync(x => x.Id == competitionId
                 && x.DeletedAt == null
                 && x.Status == expectedStatus

@@ -1,5 +1,6 @@
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.DependencyInjection;
 using DotNet.Testcontainers.Builders;
 using NATS.Client.Core;
@@ -43,7 +44,12 @@ public sealed class RuntimeDispatchAllocationTests
             {
                 Url = $"nats://{nats.Hostname}:{nats.GetMappedPublicPort(4222)}"
             });
-            var options = new DbContextOptionsBuilder<NoCtfDbContext>().UseNpgsql(postgres.GetConnectionString()).UseSnakeCaseNamingConvention().Options;
+            var options = new DbContextOptionsBuilder<NoCtfDbContext>()
+                .UseNpgsql(postgres.GetConnectionString())
+                .UseSnakeCaseNamingConvention()
+                .ConfigureWarnings(warnings => warnings.Throw(
+                    RelationalEventId.MultipleCollectionIncludeWarning))
+                .Options;
             await using var db = new NoCtfDbContext(options);
             await db.Database.EnsureCreatedAsync(ct);
             var fixture = new CompetitionForceDeleteFixture();
@@ -97,12 +103,18 @@ public sealed class RuntimeDispatchAllocationTests
                 capacity, outbox, TimeProvider.System, ct);
             var request = outbox.Messages.OfType<IRuntimeProvisionMessage>().Single();
             db.ChangeTracker.Clear();
-            var allocation = (await db.RuntimeInstances.SingleAsync(row => row.Id == id, ct)).CapacityAllocations.Items.Single();
+            var allocationEntry = await db.RuntimeInstances
+                .Where(row => row.Id == id)
+                .SelectMany(row => row.CapacityAllocationEntries)
+                .SingleAsync(ct);
+            var allocation = allocationEntry.ToValue();
             await Assert.That(RuntimeProvisionCapacity.Matches(allocation, request)).IsTrue();
             var reader = new RuntimeNodeWorkReader(new TestDbContextFactory(
                 new DbContextOptionsBuilder<NoCtfDbContext>()
                     .UseNpgsql(postgres.GetConnectionString())
                     .UseSnakeCaseNamingConvention()
+                    .ConfigureWarnings(warnings => warnings.Throw(
+                        RelationalEventId.MultipleCollectionIncludeWarning))
                     .Options));
             await Assert.That(await reader.ReadProvisionStatusAsync(request, ct)).IsEqualTo(RuntimeProvisionWorkStatus.Current);
             var tampered = request switch
@@ -133,7 +145,8 @@ public sealed class RuntimeDispatchAllocationTests
             await BackendMessageOperations.DispatchRuntimeAsync(new(id), db, templates, new FixedRuntimePlacementPolicy(),
                 capacity, outbox, TimeProvider.System, ct, budgets: new());
             db.ChangeTracker.Clear();
-            var rejected = await db.RuntimeInstances.SingleAsync(row => row.Id == id, ct);
+            var rejected = await db.RuntimeInstances.AsSplitQuery()
+                .SingleAsync(row => row.Id == id, ct);
             await Assert.That(rejected.State).IsEqualTo(RuntimeState.Failed);
             await Assert.That(rejected.FailureCode).IsEqualTo(RuntimeFailureCode.InvalidConfiguration);
             await Assert.That(rejected.RunnerId).IsEqualTo("runner");

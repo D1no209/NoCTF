@@ -1,7 +1,7 @@
 import { sourceFile } from './support/feature-source'
 import { describe, expect, test } from 'bun:test'
 import { challengeProgressIcon } from '../app/features/competition/challenge-progress-icon'
-import { affectsCompetitionChallengeList } from '../app/features/competition/useCompetitionChallengeNavigator'
+import { affectsCompetitionChallengeList, isChallengeVisible } from '../app/features/competition/useCompetitionChallengeNavigator'
 
 describe('participant challenge progress', () => {
   test('shows solve counts and a color-independent solved marker', async () => {
@@ -31,19 +31,23 @@ describe('participant challenge progress', () => {
     expect(navigator).not.toContain('<Flag')
     expect(navigator).toContain('useScoreboardMatrix(props.competitionId)')
     expect(navigator).toContain('const hideSolved = ref(false)')
+    expect(navigator).toContain('const hideLocked = ref(false)')
     expect(navigator).toContain("const search = ref('')")
-    expect(navigator).toContain("(challenge.title ?? '').toLocaleLowerCase().includes(normalizedSearch.value)")
+    expect(navigator).toContain("(challenge.title ?? '').toLocaleLowerCase().includes(filters.search)")
     expect(navigator).toContain('challengeNavigator.searchPlaceholder')
     expect(navigator).toContain('<div class="flex min-w-0 items-center gap-3">')
     expect(navigator).toContain('<h2 class="shrink-0 text-base font-semibold">')
     expect(navigator).toContain('class="min-w-0 flex-1"')
     expect(navigator).toContain('const groupOptions = computed(')
-    expect(navigator).toContain('!hideSolved.value || !progressFor(challenge.id)?.solvedByMyTeam')
+    expect(navigator).toContain('isChallengeVisible(challenge, {')
+    expect(navigator).toContain('hideLocked: hidesLockedChallenges.value')
     expect(navigator).toContain('progress.attackSucceeded && progress.defenseSucceeded')
     expect(navigator).toContain(':groups="groupOptions"')
     expect(navigator).toContain('@update:model-value="selectChallenge"')
     expect(navigator).toContain('groupOptions.value.flatMap(group => group.items)')
     expect(navigator).toContain('<Switch :id="`hide-solved-${competitionId}`" v-model="hideSolved" />')
+    expect(navigator).toContain('v-if="isCtf"')
+    expect(navigator).toContain('<Switch :id="`hide-locked-${competitionId}`" v-model="hideLocked" />')
     expect(navigator).toContain("translate('ui.noUnsolvedChallenges')")
     expect(navigator).toContain('scoreboardCurrentChallengeScore(board.snapshot.value, challengeId)')
     expect(navigator).toContain('{{ currentScore(item.challenge.id) }}')
@@ -60,6 +64,20 @@ describe('participant challenge progress', () => {
     expect(navigator).toContain('competitionEventChanged: notification => {')
     expect(navigator).toContain('onReconnected: () => void refreshChallenges()')
     expect(navigator).toContain('const refreshChallenges = createTrailingRefresh(loadChallenges)')
+  })
+
+  test('can hide locked challenges independently or together with solved and search filters', () => {
+    const challenge = { title: 'Orbiting Headers', locked: true }
+    const filters = { hideSolved: false, hideLocked: false, solvedByMyTeam: false, search: '' }
+    expect(isChallengeVisible(challenge, filters)).toBeTrue()
+    expect(isChallengeVisible(challenge, { ...filters, hideLocked: true })).toBeFalse()
+    expect(isChallengeVisible({ ...challenge, locked: false }, { ...filters, hideLocked: true })).toBeTrue()
+    expect(isChallengeVisible(challenge, { ...filters, hideSolved: true, solvedByMyTeam: true })).toBeFalse()
+    expect(isChallengeVisible({ ...challenge, locked: false }, {
+      ...filters, hideSolved: true, hideLocked: true, solvedByMyTeam: true,
+    })).toBeFalse()
+    expect(isChallengeVisible({ ...challenge, locked: false }, { ...filters, search: 'headers' })).toBeTrue()
+    expect(isChallengeVisible({ ...challenge, locked: false }, { ...filters, search: 'crypto' })).toBeFalse()
   })
 
   test('refreshes the challenge list for every event that can change participant visibility', () => {
@@ -109,15 +127,29 @@ describe('participant challenge progress', () => {
     expect(submit).toContain("emit('remainingChanged', remainingAttempts.value)")
     expect(submit).toContain(':pending="submitting" :disabled="inputDisabled"')
     expect(submit).toContain(":placeholder=\"solved ? $t('terminal.challengeSolved') : $t('terminal.flagPlaceholder')\"")
-    expect(submit).not.toContain("showResult(true, translate('terminal.challengeSolved'))")
+    expect(submit).toContain("showResult(true, translate('terminal.challengeSolved'))")
     expect(submit).toContain('solved.value = true')
     expect(submit).toContain('solvedChallengeKeys.add(challengeKey())')
     expect(submit).toContain('props.initiallySolved || solvedChallengeKeys.has(challengeKey())')
     expect(submit).toContain('watch(() => props.initiallySolved')
     expect(panel).toContain(':initially-solved="challenge.solvedByMyTeam"')
     expect(submit).toContain('const inputDisabled = computed(() => solved.value || attemptsExhausted.value)')
-    expect(submit).toContain('<Alert v-if="solved"')
+    expect(submit).toContain('<Alert v-if="persistentResult?.correct === true"')
+    expect(submit).toContain('if (persistentResult.value?.correct !== true) persistentResult.value = null')
     expect(submit).not.toContain('v-for="item in tracked"')
+  })
+
+  test('announces a solve only for the current successful submission, not restored solved state', async () => {
+    const submit = await sourceFile(
+      new URL('../app/features/challenges/FlagSubmit.vue', import.meta.url),
+    ).text()
+
+    expect(submit).toContain('const persistentResult = ref<{ correct: boolean | null; message: string } | null>(null)')
+    expect(submit).toContain('const solved = ref(props.initiallySolved || solvedChallengeKeys.has(challengeKey()))')
+    expect(submit).toContain("showResult(true, translate('terminal.challengeSolved'))")
+    expect(submit).toContain('<Alert v-if="persistentResult?.correct === true"')
+    expect(submit).not.toContain('<Alert v-if="solved"')
+    expect(submit).toContain('persistentResult.value = null')
   })
 
   test('uses the standard fact submission flow after a CTF competition finishes', async () => {

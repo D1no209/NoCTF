@@ -2,6 +2,7 @@ using System.Collections.Concurrent;
 using System.Security.Cryptography;
 using System.Text;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 using NSubstitute;
 using NoCTF.Application.Competitions.Events;
 using NoCTF.Application.GameplayFacts.Processing;
@@ -72,7 +73,8 @@ public sealed class GameplayFactOrderingPersistenceTests
             {
                 await ProcessAsync(options, factId, outbox, ct, new FixedResultEvaluatorCatalog(new(GameplayFactResult.Correct)));
                 await using var stopped = new NoCtfDbContext(options);
-                var original = await stopped.RuntimeInstances.SingleAsync(x => x.Id == originalId, ct);
+                var original = await stopped.RuntimeInstances.AsSplitQuery()
+                    .SingleAsync(x => x.Id == originalId, ct);
                 await Assert.That(original.State).IsEqualTo(RuntimeState.Stopping);
                 await Assert.That(outbox.Messages.OfType<StopRuntime>().Select(x => x.RuntimeInstanceId)).IsEquivalentTo([originalId]);
                 original.State = RuntimeState.Stopped;
@@ -92,20 +94,20 @@ public sealed class GameplayFactOrderingPersistenceTests
             await ProcessAsync(options, factId, outbox, ct, new FixedResultEvaluatorCatalog(new(GameplayFactResult.Correct)));
             await using (var verify = new NoCtfDbContext(options))
             {
-                await Assert.That((await verify.RuntimeInstances.SingleAsync(x => x.Id == reopenedId, ct)).State).IsEqualTo(RuntimeState.Running);
-                await Assert.That((await verify.RuntimeInstances.SingleAsync(x => x.Id == unrelatedId, ct)).State).IsEqualTo(RuntimeState.Running);
+                await Assert.That((await verify.RuntimeInstances.AsSplitQuery().SingleAsync(x => x.Id == reopenedId, ct)).State).IsEqualTo(RuntimeState.Running);
+                await Assert.That((await verify.RuntimeInstances.AsSplitQuery().SingleAsync(x => x.Id == unrelatedId, ct)).State).IsEqualTo(RuntimeState.Running);
                 await Assert.That((await verify.GameplayFacts.SingleAsync(x => x.Id == factId, ct)).Result).IsEqualTo(GameplayFactResult.Correct);
             }
             await ReconcileAsync(options, outbox, fixture.Now.AddSeconds(10), ct);
             await ReconcileAsync(options, outbox, fixture.Now.AddSeconds(11), ct);
             await using (var verify = new NoCtfDbContext(options))
-                await Assert.That((await verify.RuntimeInstances.SingleAsync(x => x.Id == reopenedId, ct)).State).IsEqualTo(RuntimeState.Running);
+                await Assert.That((await verify.RuntimeInstances.AsSplitQuery().SingleAsync(x => x.Id == reopenedId, ct)).State).IsEqualTo(RuntimeState.Running);
             await Assert.That(outbox.Messages.OfType<StopRuntime>().Any(x => x.RuntimeInstanceId == reopenedId)).IsFalse();
 
             await ReconcileAsync(options, outbox, fixture.Now.AddMinutes(31), ct);
             await ReconcileAsync(options, outbox, fixture.Now.AddMinutes(32), ct);
             await using (var verify = new NoCtfDbContext(options))
-                await Assert.That((await verify.RuntimeInstances.SingleAsync(x => x.Id == reopenedId, ct)).State).IsEqualTo(RuntimeState.Stopping);
+                await Assert.That((await verify.RuntimeInstances.AsSplitQuery().SingleAsync(x => x.Id == reopenedId, ct)).State).IsEqualTo(RuntimeState.Stopping);
             await Assert.That(outbox.Messages.OfType<StopRuntime>().Count(x => x.RuntimeInstanceId == reopenedId)).IsEqualTo(1);
         });
     }
@@ -136,7 +138,7 @@ public sealed class GameplayFactOrderingPersistenceTests
             await ReconcileAsync(options, outbox, fixture.Now.AddSeconds(1), ct);
             await using (var verify = new NoCtfDbContext(options))
             {
-                await Assert.That((await verify.RuntimeInstances.SingleAsync(x => x.Id == runtimeId, ct)).State).IsEqualTo(RuntimeState.Running);
+                await Assert.That((await verify.RuntimeInstances.AsSplitQuery().SingleAsync(x => x.Id == runtimeId, ct)).State).IsEqualTo(RuntimeState.Running);
                 // Model recovery of a persisted correct result whose stop command was not yet applied.
                 var fact = await verify.GameplayFacts.SingleAsync(x => x.Id == factId, ct);
                 fact.Result = GameplayFactResult.Correct;
@@ -146,7 +148,7 @@ public sealed class GameplayFactOrderingPersistenceTests
             await ReconcileAsync(options, outbox, fixture.Now.AddSeconds(3), ct);
             await using var final = new NoCtfDbContext(options);
             var stopOnSolve = mode is GameMode.Ctf or GameMode.Awdp;
-            await Assert.That((await final.RuntimeInstances.SingleAsync(x => x.Id == runtimeId, ct)).State)
+            await Assert.That((await final.RuntimeInstances.AsSplitQuery().SingleAsync(x => x.Id == runtimeId, ct)).State)
                 .IsEqualTo(stopOnSolve ? RuntimeState.Stopping : RuntimeState.Running);
             await Assert.That(outbox.Messages.OfType<StopRuntime>().Count(x => x.RuntimeInstanceId == runtimeId))
                 .IsEqualTo(stopOnSolve ? 1 : 0);
@@ -830,6 +832,8 @@ public sealed class GameplayFactOrderingPersistenceTests
         new DbContextOptionsBuilder<NoCtfDbContext>()
             .UseNpgsql(postgres.GetConnectionString())
             .UseSnakeCaseNamingConvention()
+            .ConfigureWarnings(warnings => warnings.Throw(
+                RelationalEventId.MultipleCollectionIncludeWarning))
             .Options;
 
     private sealed class RecordingOutbox : IPostCommitMessagePublisher

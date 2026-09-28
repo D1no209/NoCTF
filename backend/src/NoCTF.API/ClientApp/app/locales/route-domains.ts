@@ -25,6 +25,8 @@ export function localeDomainsForPath(path: string): readonly LocaleDomain[] {
     domains.add('challenges')
     domains.add('runtime')
   }
+  if (path.endsWith('/my/team'))
+    domains.add('runtime')
   if (path.includes('/leaderboard'))
     domains.add('leaderboard')
   if (path.includes('/notifications') || path.includes('/questions') || path === '/notifications')

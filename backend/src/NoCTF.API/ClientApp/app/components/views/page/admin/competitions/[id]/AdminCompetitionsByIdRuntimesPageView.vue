@@ -3,7 +3,7 @@ import { toRefs } from 'vue'
 import type { AdminCompetitionsByIdRuntimesPageViewState } from '~/features/routes/admin/competitions/[id]/useAdminCompetitionsByIdRuntimesPage'
 
 const viewProps = defineProps<{ state: AdminCompetitionsByIdRuntimesPageViewState }>()
-const { canWrite, isAdministrator, challengeOptions, teamOptions, runtimeTeamLabel, isPlayerManagedRuntime, challengeTitle, filterChallenge, filterTeam, filterState, filterKind, items, loading, listError, hasMore, initialized, loadMore, applyFilters, detail, detailOpen, detailLoading, openDetail, opMessage, isRuntimePending, isRuntimeOperationPending, runRuntimeOp, terminateDialog, terminatePending, canTerminate, submitTermination, forceTerminateDialog, forceTerminateReason, forceTerminateConfirmed, forceTerminatePending, openForceTermination, submitForceTermination, extendDialog, extendSeconds, extendPending, submitExtend, RuntimeAccessUrl, onClickFilterChallenge, onClickTerminateDialog, onClickExtendDialog, onUpdateOpenExtendDialog, onClickExtendDialog2, onUpdateOpenTerminateDialog, onUpdateOpenForceTerminateDialog } = toRefs(viewProps.state)
+const { canWrite, isAdministrator, challengeOptions, teamOptions, runtimeTeamLabel, isPlayerManagedRuntime, challengeTitle, filterChallenge, filterTeam, filterState, filterKind, items, loading, listError, initialized, page, pageCount, total, pageLimit, loadPage, setPageSize, applyFilters, detail, detailOpen, detailLoading, openDetail, opMessage, isRuntimePending, isRuntimeOperationPending, runRuntimeOp, terminateDialog, terminatePending, canTerminate, submitTermination, forceTerminateDialog, forceTerminateReason, forceTerminateConfirmed, forceTerminatePending, openForceTermination, submitForceTermination, extendDialog, extendSeconds, extendPending, submitExtend, RuntimeAccessUrl, onClickFilterChallenge, onClickTerminateDialog, onClickExtendDialog, onUpdateOpenExtendDialog, onClickExtendDialog2, onUpdateOpenTerminateDialog, onUpdateOpenForceTerminateDialog } = toRefs(viewProps.state)
 </script>
 
 <template>
@@ -137,11 +137,8 @@ const { canWrite, isAdministrator, challengeOptions, teamOptions, runtimeTeamLab
           </TableRow>
         </TableBody>
       </Table>
-      <div v-if="hasMore" class="flex justify-center">
-        <Button variant="outline" :disabled="loading" @click="loadMore">
-          <Spinner v-if="loading" data-icon="inline-start" /> {{ $t('ui.loadMore') }} </Button>
-      </div>
     </template>
+    <OffsetPagination v-if="initialized" :page="page" :page-count="pageCount" :total="total" :limit="pageLimit" :loading="loading" @update:page="loadPage" @update:limit="setPageSize" />
 
     <Sheet v-model:open="detailOpen">
       <SheetContent data-scroll-surface class="overflow-y-auto">

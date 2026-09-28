@@ -48,6 +48,85 @@ public sealed class RuntimeInstanceStore(
     private readonly ICompetitionEventRecorder events =
         eventRecorder ?? NullCompetitionEventRecorder.Instance;
 
+    public async Task<TeamRuntimeListPage?> ListTeamRuntimesAsync(
+        Guid competitionId,
+        Guid userId,
+        int offset,
+        int limit,
+        bool desc,
+        CancellationToken ct)
+    {
+        var teamId = await db.Teams.AsNoTracking()
+            .Where(team => team.CompetitionId == competitionId
+                && team.Members.Any(member => member.UserId == userId)
+                && team.DeletedAt == null
+                && !team.IsBanned
+                && team.RegistrationStatus == TeamRegistrationStatus.Approved)
+            .Select(team => (Guid?)team.Id)
+            .SingleOrDefaultAsync(ct);
+        if (teamId is null) return null;
+
+        var query = db.RuntimeInstances.IgnoreAutoIncludes().AsNoTracking()
+            .Where(instance => instance.CompetitionId == competitionId
+                && instance.TeamId == teamId
+                && instance.ActiveSlot != null
+                && (instance.Purpose == RuntimePurpose.Player
+                    || instance.Purpose == RuntimePurpose.Practice
+                    || instance.Purpose == RuntimePurpose.AwdpAttack)
+                && (instance.State == RuntimeState.Queued
+                    || instance.State == RuntimeState.Provisioning
+                    || instance.State == RuntimeState.Running
+                    || instance.State == RuntimeState.Stopping))
+            .Join(db.CompetitionChallenges.IgnoreAutoIncludes().AsNoTracking(),
+                instance => instance.CompetitionChallengeId,
+                challenge => (Guid?)challenge.Id,
+                (instance, challenge) => new { Instance = instance, Challenge = challenge })
+            .Join(db.Challenges.IgnoreAutoIncludes().AsNoTracking(),
+                pair => pair.Challenge.ChallengeId,
+                template => template.Id,
+                (pair, template) => new { pair.Instance, pair.Challenge, Template = template });
+        var total = await query.CountAsync(ct);
+        var ordered = desc
+            ? query.OrderByDescending(item => item.Instance.CreatedAt)
+                .ThenByDescending(item => item.Instance.Id)
+            : query.OrderBy(item => item.Instance.CreatedAt)
+                .ThenBy(item => item.Instance.Id);
+        var items = await ordered.Skip(offset)
+            .Take(limit)
+            .Select(item => new TeamRuntimeItemView(
+                item.Challenge.CustomTitle ?? item.Template.Title,
+                new RuntimeInstanceView(
+                    item.Instance.Id,
+                    item.Instance.CompetitionId,
+                    item.Instance.CompetitionChallengeId,
+                    item.Instance.ChallengeId,
+                    item.Instance.TeamId,
+                    item.Instance.Purpose,
+                    item.Instance.RuntimeKind,
+                    item.Instance.RuntimeProvider,
+                    item.Instance.State,
+                    item.Instance.FailureCode,
+                    item.Instance.CreatedAt,
+                    item.Instance.RunningAt,
+                    item.Instance.ExpiresAt,
+                    item.Instance.StoppedAt,
+                    item.Instance.RunnerId,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    item.Instance.AccessMode,
+                    item.Instance.AccessEndpoints.OrderBy(endpoint => endpoint.BindingIndex)
+                        .Select(endpoint => new RuntimeAccessEndpointView(
+                            endpoint.BindingIndex,
+                            endpoint.DirectAddress,
+                            endpoint.TargetHost,
+                            endpoint.TargetPort)).ToArray())))
+            .ToListAsync(ct);
+        return new TeamRuntimeListPage(items, total);
+    }
+
     public async Task<RuntimeInstanceView?> FindPlayerRuntimeAsync(
         Guid competitionId,
         Guid competitionChallengeId,

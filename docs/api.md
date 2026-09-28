@@ -242,6 +242,7 @@ AWDP Break 首次正确后，普通 Flag 提交不再创建新 GameplayFact、�
 
 ```text
 GET  /api/v1/competitions/{competitionId}/challenges/{competitionChallengeId}/runtimes/current
+GET  /api/v1/competitions/{competitionId}/teams/me/runtimes
 POST /api/v1/competitions/{competitionId}/challenges/{competitionChallengeId}/runtimes
 PATCH /api/v1/competitions/{competitionId}/challenges/{competitionChallengeId}/runtimes/{runtimeInstanceId}
 DELETE /api/v1/competitions/{competitionId}/challenges/{competitionChallengeId}/runtimes/{runtimeInstanceId}
@@ -249,7 +250,12 @@ GET  /api/v1/competitions/{competitionId}/challenges/{competitionChallengeId}/ta
 GET  /api/v1/competitions/{competitionId}/challenges/{competitionChallengeId}/awdp-state
 ```
 
-变更返回 202、RuntimeInstanceId 与 status URL。只有 Running 返回展开后的 `urls: string[]`。
+本队实例列表只向已审核、未封禁的当前队员返回活动槽位中的题目 Runtime，按
+`offset/limit/total` 分页。列表不返回其他队伍、历史已停机实例或一次性防御 Target；
+只有 Running 项包含可访问地址。列表中的重置、停止和续期仍调用对应题目 Runtime 命令，
+保留原有权限、人机验证和状态重验。
+
+变更返回 202、RuntimeInstanceId 与 status URL。只有 Running 返回展开后的 `accesses`。
 
 CTF 开放四个动作；AWD 玩家 GET/Reset，Start/Stop 由平台生命周期控制且 Extend 不支持；KoH 不开放普通玩家 Runtime 动作。AWDP schema v4 的玩家 `Player/AwdpAttack` Runtime 是长期攻击靶机，可通过统一 Runtime 路由启停、重置和续期；一次性 `AwdpTarget` 防御验证环境只通过申请与 Fix 上传路由管理，不通过普通玩家 Runtime 动作暴露。路由保留统一形状，但每个 Endpoint 的 Application policy 必须按 GameMode/RuntimePurpose 拒绝不支持动作。
 

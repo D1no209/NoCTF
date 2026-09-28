@@ -4,8 +4,9 @@ import { markRaw } from 'vue'
 import { toast } from 'vue-sonner'
 import { adminCreateRuntimeForceTermination, adminCreateSharedRuntime, adminCreateTeamRuntime, adminExtendTeamRuntime, adminGetRuntime, adminListCompetitionChallenges, adminListRuntimes, adminListTeams, adminTerminateRuntime } from '../../../../../api'
 import type { NoCtfapiEndpointsAdministrationRuntimeAdminRuntimeResponse, NoCtfapiEndpointsRuntimeRuntimeKindProtocol, NoCtfapiEndpointsRuntimeRuntimeStateProtocol } from '../../../../../api'
+import { useOffsetPagination } from '../../../../../composables/useOffsetPagination'
 import { useCompetitionAdmin } from '../../../../../lib/admin-competition'
-import { createLatestPageRefresh } from '../../../../../lib/latest-page-refresh'
+import { createTrailingRefresh } from '../../../../../lib/latest-page-refresh'
 import { adminRuntimeTeamLabel } from '../../../../../utils/admin-runtime'
 import { createRuntimeOperationCoordinator, type RuntimeOperationKind, type RuntimeOperationToken } from '../../../../../lib/runtime-operation-coordinator'
 import { RUNTIME_STOP_POLL_DELAYS_MS, RUNTIME_STOP_POLL_MAX_INTERVAL_MS, RUNTIME_STOP_POLL_TIMEOUT_MS } from '../../../../../lib/runtime-stop-polling'
@@ -54,36 +55,38 @@ export function useAdminCompetitionsByIdRuntimesPage() {
 
   const filterKind = ref('')
 
-  const { items, loading, error: listError, hasMore, loadMore: loadRuntimePage, reset, initialized } = useCursorPagination<
-    NoCtfapiEndpointsAdministrationRuntimeAdminRuntimeResponse
-  >(async (cursor) => {
+  const appliedFilters = ref({ challengeId: '', teamId: '', state: '', kind: '' })
+
+  const pagination = useOffsetPagination<NoCtfapiEndpointsAdministrationRuntimeAdminRuntimeResponse>(async ({ offset, limit, desc }) => {
+    const filters = appliedFilters.value
     const { data, error } = await adminListRuntimes({
       path: { competitionId },
       query: {
-        competitionChallengeId: filterChallenge.value || null,
-        teamId: filterTeam.value || null,
-        state: filterState.value === '' ? null : filterState.value as NoCtfapiEndpointsRuntimeRuntimeStateProtocol,
-        runtimeKind: filterKind.value === '' ? null : filterKind.value as NoCtfapiEndpointsRuntimeRuntimeKindProtocol,
-        cursor,
-        offset: 0,
-        limit: 30,
-        desc: true,
+        competitionChallengeId: filters.challengeId || null,
+        teamId: filters.teamId || null,
+        state: filters.state === '' ? null : filters.state as NoCtfapiEndpointsRuntimeRuntimeStateProtocol,
+        runtimeKind: filters.kind === '' ? null : filters.kind as NoCtfapiEndpointsRuntimeRuntimeKindProtocol,
+        offset,
+        limit,
+        desc,
       },
     })
     if (error || !data) throw parseApiError(error)
-    return data
-  })
+    return { items: data.items ?? [], total: data.total ?? 0 }
+  }, { initialPageSize: 10, initialDesc: true })
 
-  const {
-    loadNextPage: loadMore,
-    refreshLatest: refreshRuntimeList,
-  } = createLatestPageRefresh({
-    loadMore: loadRuntimePage,
-    reset: () => reset({ preserveItems: true }),
-  })
+  const { items, loading, error: listError, initialized } = pagination
+  const refreshRuntimeList = createTrailingRefresh(() => pagination.loadPage())
 
-  function applyFilters() {
-    void refreshRuntimeList()
+  async function applyFilters() {
+    appliedFilters.value = {
+      challengeId: filterChallenge.value,
+      teamId: filterTeam.value,
+      state: filterState.value,
+      kind: filterKind.value,
+    }
+    pagination.reset()
+    await pagination.loadPage(1)
   }
 
   function refreshList() {
@@ -321,7 +324,7 @@ export function useAdminCompetitionsByIdRuntimesPage() {
 
   onMounted(() => {
     void loadRefs()
-    void loadMore()
+    void pagination.loadPage(1)
   })
 
   onBeforeUnmount(() => runtimeOperations.cancelAll())
@@ -343,10 +346,13 @@ export function useAdminCompetitionsByIdRuntimesPage() {
       items,
       loading,
       listError,
-      hasMore,
-      reset,
       initialized,
-      loadMore,
+      page: pagination.page,
+      pageCount: pagination.pageCount,
+      total: pagination.total,
+      pageLimit: pagination.limit,
+      loadPage: pagination.loadPage,
+      setPageSize: pagination.setPageSize,
       applyFilters,
       detail,
       detailOpen,

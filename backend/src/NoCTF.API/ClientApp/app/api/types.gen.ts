@@ -369,6 +369,22 @@ export type NoCtfapiEndpointsRuntimeRuntimeTargetResponse = {
     accesses?: Array<NoCtfapiEndpointsRuntimeRuntimeAccessResponse>;
 };
 
+export type NoCtfapiPaginationArrayResultOfTeamRuntimeListItemResponse = {
+    total?: number;
+    items?: Array<NoCtfapiEndpointsRuntimeTeamRuntimeListItemResponse>;
+};
+
+export type NoCtfapiEndpointsRuntimeTeamRuntimeListItemResponse = {
+    challengeTitle?: string;
+    runtime?: NoCtfapiEndpointsRuntimeRuntimeResponse;
+};
+
+export type NoCtfapiEndpointsRuntimeListTeamRuntimesRequest = NoCtfapiPaginationPaginationRequest & {};
+
+export type NoCtfapiPaginationPaginationRequest = {
+    [key: string]: never;
+};
+
 export type NoCtfapiEndpointsRuntimeProbeRuntimeProxyRequest = {
     [key: string]: never;
 };
@@ -637,10 +653,6 @@ export type NoCtfDomainSharedEntityReferenceKind = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7
 export type NoCtfapiEndpointsNotificationsListNotificationsRequest = NoCtfapiPaginationPaginationRequest & {};
 
 export type NoCtfapiEndpointsNotificationsNotificationListScopeProtocol = 'All' | 'Inbox';
-
-export type NoCtfapiPaginationPaginationRequest = {
-    [key: string]: never;
-};
 
 export type NoCtfapiEndpointsNotificationsNotificationFeedResponse = {
     items?: Array<NoCtfapiEndpointsNotificationsNotificationResponse>;
@@ -4652,6 +4664,49 @@ export type ListRuntimeTargetsEndpointResponses = {
 };
 
 export type ListRuntimeTargetsEndpointResponse = ListRuntimeTargetsEndpointResponses[keyof ListRuntimeTargetsEndpointResponses];
+
+export type ListMyTeamRuntimesData = {
+    body?: never;
+    path: {
+        competitionId: string;
+    };
+    query: {
+        offset: number;
+        limit: number;
+        desc: boolean;
+    };
+    url: '/api/v1/competitions/{competitionId}/teams/me/runtimes';
+};
+
+export type ListMyTeamRuntimesErrors = {
+    /**
+     * Bad Request
+     */
+    400: MicrosoftAspNetCoreMvcValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+    /**
+     * Not Found
+     */
+    404: unknown;
+};
+
+export type ListMyTeamRuntimesError = ListMyTeamRuntimesErrors[keyof ListMyTeamRuntimesErrors];
+
+export type ListMyTeamRuntimesResponses = {
+    /**
+     * Success
+     */
+    200: NoCtfapiPaginationArrayResultOfTeamRuntimeListItemResponse;
+};
+
+export type ListMyTeamRuntimesResponse = ListMyTeamRuntimesResponses[keyof ListMyTeamRuntimesResponses];
 
 export type ProbeRuntimeProxyData = {
     body?: never;

@@ -189,6 +189,9 @@ public static class ObservabilityExtensions
 
             var started = Stopwatch.GetTimestamp();
             var outcome = "success";
+            var route = (context.GetEndpoint() as RouteEndpoint)?.RoutePattern.RawText
+                ?? "unmatched";
+            Activity.Current?.SetTag("noctf.endpoint", route);
             try
             {
                 await next();
@@ -206,8 +209,6 @@ public static class ObservabilityExtensions
             }
             finally
             {
-                var route = (context.GetEndpoint() as RouteEndpoint)?.RoutePattern.RawText
-                    ?? "unmatched";
                 if (ClassifyRequest(context) is { } kind)
                     NoCtfTelemetry.RecordApiRequest(route, outcome, Stopwatch.GetElapsedTime(started).TotalSeconds, kind);
                 var operation = context.GetEndpoint()?.Metadata

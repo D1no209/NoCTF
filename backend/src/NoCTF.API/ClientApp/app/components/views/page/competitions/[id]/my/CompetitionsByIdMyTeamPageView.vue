@@ -3,7 +3,7 @@ import { toRefs } from 'vue'
 import type { CompetitionsByIdMyTeamPageViewState } from '~/features/routes/competitions/[id]/my/useCompetitionsByIdMyTeamPage'
 
 const viewProps = defineProps<{ state: CompetitionsByIdMyTeamPageViewState }>()
-const { Copy, RefreshCw, maximumAppealStatementLength, minimumAppealStatementLength, competitionId, competition, tracksEnabled, canEditOrganization, selectableTracks, tracksLoading, tracksError, loadTracks, team, loading, loadError, load, isCaptain, invitationToken, invitationLoading, invitationError, loadInvitationToken, rotating, rotate, copyToken, renameOpen, renameValue, renameTrackKey, selectedRenameTrack, renameValid, renamePending, openRename, submitRename, maximumAvatarBytes, avatarInputKey, avatarPending, replaceTeamAvatar, clearTeamAvatar, transferOpen, transferTarget, transferPending, transferableMembers, submitTransfer, acting, disband, leave, banCase, appealOpen, appealStatement, appealPending, appealError, banCaseError, loadBanCase, appealStatusLabel, submitAppeal, setAppealOpen, CompetitionParticipantWorkspace, TeamMembers, onInputAppealError } = toRefs(viewProps.state)
+const { Copy, RefreshCw, maximumAppealStatementLength, minimumAppealStatementLength, competitionId, competition, tracksEnabled, canEditOrganization, selectableTracks, tracksLoading, tracksError, loadTracks, team, loading, loadError, load, isCaptain, invitationToken, invitationLoading, invitationError, loadInvitationToken, rotating, rotate, copyToken, renameOpen, renameValue, renameTrackKey, selectedRenameTrack, renameValid, renamePending, openRename, submitRename, maximumAvatarBytes, avatarInputKey, avatarPending, replaceTeamAvatar, clearTeamAvatar, transferOpen, transferTarget, transferPending, transferableMembers, submitTransfer, acting, disband, leave, banCase, appealOpen, appealStatement, appealPending, appealError, banCaseError, loadBanCase, appealStatusLabel, submitAppeal, setAppealOpen, CompetitionParticipantWorkspace, TeamMembers, TeamRuntimeManager, onInputAppealError } = toRefs(viewProps.state)
 </script>
 
 <template>
@@ -140,6 +140,11 @@ const { Copy, RefreshCw, maximumAppealStatementLength, minimumAppealStatementLen
           />
         </CardContent>
       </section>
+
+      <template v-if="team.registrationStatus === 'Approved' && !team.isBanned">
+        <Separator />
+        <component :is="TeamRuntimeManager" :key="team.id" :competition-id="competitionId" />
+      </template>
 
       <template v-if="isCaptain && !team.isBanned">
       <Separator />
