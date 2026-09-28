@@ -1,5 +1,6 @@
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 using NoCTF.Application.Competitions.Events;
 using NoCTF.Application.Competitions.Lifecycle;
 using NoCTF.Application.Messaging;
@@ -40,6 +41,8 @@ public sealed class CompetitionLifecyclePersistenceTests
             var options = new DbContextOptionsBuilder<NoCtfDbContext>()
                 .UseNpgsql(postgres.GetConnectionString())
                 .UseSnakeCaseNamingConvention()
+                .ConfigureWarnings(warnings => warnings.Throw(
+                    RelationalEventId.MultipleCollectionIncludeWarning))
                 .Options;
             var now = DateTimeOffset.UtcNow;
             var ownerId = Guid.CreateVersion7(now);
@@ -147,6 +150,8 @@ public sealed class CompetitionLifecyclePersistenceTests
             var options = new DbContextOptionsBuilder<NoCtfDbContext>()
                 .UseNpgsql(postgres.GetConnectionString())
                 .UseSnakeCaseNamingConvention()
+                .ConfigureWarnings(warnings => warnings.Throw(
+                    RelationalEventId.MultipleCollectionIncludeWarning))
                 .Options;
             var fixture = await SeedIncompleteAwdAsync(options, cancellationToken);
             var outbox = new RecordingOutbox();
@@ -218,6 +223,8 @@ public sealed class CompetitionLifecyclePersistenceTests
             var options = new DbContextOptionsBuilder<NoCtfDbContext>()
                 .UseNpgsql(postgres.GetConnectionString())
                 .UseSnakeCaseNamingConvention()
+                .ConfigureWarnings(warnings => warnings.Throw(
+                    RelationalEventId.MultipleCollectionIncludeWarning))
                 .Options;
             var fixture = await SeedAsync(options, cancellationToken);
             var outbox = new RecordingOutbox();
@@ -263,11 +270,11 @@ public sealed class CompetitionLifecyclePersistenceTests
             }
 
             await using var verify = new NoCtfDbContext(options);
-            var competition = await verify.Competitions.AsNoTracking().SingleAsync(
+            var competition = await verify.Competitions.AsNoTracking().AsSplitQuery().SingleAsync(
                 item => item.Id == fixture.CompetitionId,
                 cancellationToken);
             await Assert.That(competition.Status).IsEqualTo(CompetitionStatus.Running);
-            var runtime = await verify.RuntimeInstances.AsNoTracking().SingleAsync(
+            var runtime = await verify.RuntimeInstances.AsNoTracking().AsSplitQuery().SingleAsync(
                 item => item.Id == fixture.RuntimeId,
                 cancellationToken);
             await Assert.That(runtime.State).IsEqualTo(RuntimeState.Running);
