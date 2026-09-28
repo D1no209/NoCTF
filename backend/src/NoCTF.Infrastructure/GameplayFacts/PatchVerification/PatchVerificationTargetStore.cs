@@ -302,6 +302,7 @@ public sealed class PatchVerificationTargetStore(
                     item.competition.Status,
                     item.challenge.IsPublished,
                     item.competition.MaxConcurrentRuntimeInstancesPerTeam))
+            .AsSplitQuery()
             .SingleOrDefaultAsync(ct);
     }
 

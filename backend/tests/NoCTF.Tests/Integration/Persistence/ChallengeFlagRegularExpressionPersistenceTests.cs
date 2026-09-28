@@ -1,5 +1,6 @@
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 using NoCTF.Application.Challenges.Bank;
 using NoCTF.Application.Challenges.Flags;
 using NoCTF.Application.Runtime.Provisioning;
@@ -33,6 +34,8 @@ public sealed class ChallengeFlagRegularExpressionPersistenceTests
             var options = new DbContextOptionsBuilder<NoCtfDbContext>()
                 .UseNpgsql(postgres.GetConnectionString())
                 .UseSnakeCaseNamingConvention()
+                .ConfigureWarnings(warnings => warnings.Throw(
+                    RelationalEventId.MultipleCollectionIncludeWarning))
                 .Options;
             var now = DateTimeOffset.UtcNow;
             var ownerId = Guid.CreateVersion7(now);

@@ -152,7 +152,7 @@ public sealed class FusionLeaderboardCache(
         int? scoreboardRoundWindowEnd,
         CancellationToken ct)
     {
-        var competition = await db.Competitions.AsNoTracking()
+        var competition = await db.Competitions.AsNoTracking().AsSplitQuery()
             .SingleOrDefaultAsync(candidate => candidate.Id == competitionId, ct);
         if (competition is null)
             return null;
@@ -217,10 +217,12 @@ public sealed class FusionLeaderboardCache(
             .Where(instance => instance.CompetitionId == competitionId)
             .OrderBy(instance => instance.Order)
             .ThenBy(instance => instance.Id)
+            .AsSplitQuery()
             .ToListAsync(ct);
         var templateIds = challengeEntities.Select(instance => instance.ChallengeId).ToArray();
         var templates = await db.Challenges.AsNoTracking()
             .Where(template => templateIds.Contains(template.Id))
+            .AsSplitQuery()
             .ToDictionaryAsync(template => template.Id, ct);
         var challenges = challengeEntities
             .Where(instance => templates.ContainsKey(instance.ChallengeId))

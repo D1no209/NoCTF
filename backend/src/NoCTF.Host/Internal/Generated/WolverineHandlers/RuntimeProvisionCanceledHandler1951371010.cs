@@ -15,14 +15,16 @@ namespace Internal.Generated.WolverineHandlers
         private readonly Microsoft.EntityFrameworkCore.DbContextOptions<NoCTF.Infrastructure.Persistence.NoCtfDbContext> _dbContextOptionsOfNoCtfDbContext;
         private readonly Microsoft.Extensions.Logging.ILogger<NoCTF.Infrastructure.Messaging.WolverinePostCommitMessagePublisher> _loggerOfWolverinePostCommitMessagePublisher;
         private readonly NoCTF.Infrastructure.Runtime.Capacity.NatsRunnerAvailabilityRegistry _natsRunnerAvailabilityRegistry;
+        private readonly NoCTF.Infrastructure.Runtime.Capacity.RunnerCapacityLedgerCoordinator _runnerCapacityLedgerCoordinator;
         private readonly System.TimeProvider _timeProvider;
         private readonly ZiggyCreatures.Caching.Fusion.IFusionCacheProvider _fusionCacheProvider;
 
-        public RuntimeProvisionCanceledHandler1951371010(Microsoft.EntityFrameworkCore.DbContextOptions<NoCTF.Infrastructure.Persistence.NoCtfDbContext> dbContextOptionsOfNoCtfDbContext, Microsoft.Extensions.Logging.ILogger<NoCTF.Infrastructure.Messaging.WolverinePostCommitMessagePublisher> loggerOfWolverinePostCommitMessagePublisher, NoCTF.Infrastructure.Runtime.Capacity.NatsRunnerAvailabilityRegistry natsRunnerAvailabilityRegistry, System.TimeProvider timeProvider, ZiggyCreatures.Caching.Fusion.IFusionCacheProvider fusionCacheProvider)
+        public RuntimeProvisionCanceledHandler1951371010(Microsoft.EntityFrameworkCore.DbContextOptions<NoCTF.Infrastructure.Persistence.NoCtfDbContext> dbContextOptionsOfNoCtfDbContext, Microsoft.Extensions.Logging.ILogger<NoCTF.Infrastructure.Messaging.WolverinePostCommitMessagePublisher> loggerOfWolverinePostCommitMessagePublisher, NoCTF.Infrastructure.Runtime.Capacity.NatsRunnerAvailabilityRegistry natsRunnerAvailabilityRegistry, NoCTF.Infrastructure.Runtime.Capacity.RunnerCapacityLedgerCoordinator runnerCapacityLedgerCoordinator, System.TimeProvider timeProvider, ZiggyCreatures.Caching.Fusion.IFusionCacheProvider fusionCacheProvider)
         {
             _dbContextOptionsOfNoCtfDbContext = dbContextOptionsOfNoCtfDbContext;
             _loggerOfWolverinePostCommitMessagePublisher = loggerOfWolverinePostCommitMessagePublisher;
             _natsRunnerAvailabilityRegistry = natsRunnerAvailabilityRegistry;
+            _runnerCapacityLedgerCoordinator = runnerCapacityLedgerCoordinator;
             _timeProvider = timeProvider;
             _fusionCacheProvider = fusionCacheProvider;
         }
@@ -32,10 +34,10 @@ namespace Internal.Generated.WolverineHandlers
         public override async System.Threading.Tasks.Task HandleAsync(Wolverine.Runtime.MessageContext context, System.Threading.CancellationToken cancellation)
         {
             var postCommitDispatchStatus = new NoCTF.Application.Messaging.PostCommitDispatchStatus();
-            await using var noCtfDbContext = new NoCTF.Infrastructure.Persistence.NoCtfDbContext(_dbContextOptionsOfNoCtfDbContext);
+            await using var noCtfDbContext = new NoCTF.Infrastructure.Persistence.NoCtfDbContext(_dbContextOptionsOfNoCtfDbContext, _timeProvider);
             var wolverinePostCommitMessagePublisher = new NoCTF.Infrastructure.Messaging.WolverinePostCommitMessagePublisher(context, noCtfDbContext, _loggerOfWolverinePostCommitMessagePublisher, postCommitDispatchStatus);
-            var persistedRunnerCapacityGate = new NoCTF.Infrastructure.Runtime.Capacity.PersistedRunnerCapacityGate(noCtfDbContext, _natsRunnerAvailabilityRegistry, _fusionCacheProvider, wolverinePostCommitMessagePublisher);
-            var competitionEventStore = new NoCTF.Infrastructure.Competitions.Events.CompetitionEventStore(noCtfDbContext, wolverinePostCommitMessagePublisher);
+            var persistedRunnerCapacityGate = new NoCTF.Infrastructure.Runtime.Capacity.PersistedRunnerCapacityGate(noCtfDbContext, _natsRunnerAvailabilityRegistry, _fusionCacheProvider, wolverinePostCommitMessagePublisher, _runnerCapacityLedgerCoordinator);
+            var competitionEventStore = new NoCTF.Infrastructure.Competitions.Events.CompetitionEventStore(noCtfDbContext, wolverinePostCommitMessagePublisher, _timeProvider);
             // The actual message body
             var runtimeProvisionCanceled = (NoCTF.Application.Runtime.Instances.RuntimeProvisionCanceled)context.Envelope.Message;
 

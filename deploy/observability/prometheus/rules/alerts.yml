@@ -74,7 +74,7 @@ groups:
         annotations:
           summary: Leaderboard projection or publication is failing
       - alert: NoCtfLeaderboardProjectionSlow
-        expr: noctf:leaderboard_projection_duration:p95_5m > 2
+        expr: noctf:leaderboard_projection_duration:p95_5m > 2 and noctf:leaderboard_projection_samples:count5m >= 3
         for: 5m
         labels: { severity: warning }
         annotations:
@@ -121,6 +121,18 @@ groups:
         labels: { severity: critical }
         annotations:
           summary: No Runner is online
+      - alert: NoCtfRunnerCapacityTransactionExhausted
+        expr: sum(increase(noctf_runner_capacity_transaction_exhaustions_total[5m])) > 0
+        for: 1m
+        labels: { severity: critical }
+        annotations:
+          summary: Runner capacity transaction retries were exhausted
+      - alert: NoCtfDiskSpaceWarning
+        expr: noctf:disk_available:ratio < 0.25 and noctf:disk_available:ratio >= 0.15
+        for: 10m
+        labels: { severity: warning }
+        annotations:
+          summary: Host disk availability is below 25 percent
       - alert: NoCtfDiskSpaceLow
         expr: noctf:disk_available:ratio < 0.15
         for: 5m

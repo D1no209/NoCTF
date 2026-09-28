@@ -773,6 +773,7 @@ public sealed class GameplayFactProcessor(
                         && instance.ProviderReceipt != null))
             .OrderBy(instance => instance.CreatedAt)
             .ThenBy(instance => instance.Id)
+            .AsSplitQuery()
             .ToListAsync(ct);
         foreach (var runtime in runtimes)
         {

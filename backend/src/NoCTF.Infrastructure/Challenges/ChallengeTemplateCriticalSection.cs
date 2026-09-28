@@ -12,5 +12,6 @@ public static class ChallengeTemplateCriticalSection
         CancellationToken cancellationToken) =>
         db.Challenges
             .IgnoreQueryFilters()
+            .AsSplitQuery()
             .SingleOrDefaultAsync(challenge => challenge.Id == challengeId, cancellationToken);
 }

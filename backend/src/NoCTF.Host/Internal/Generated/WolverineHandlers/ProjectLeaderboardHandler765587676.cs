@@ -18,17 +18,19 @@ namespace Internal.Generated.WolverineHandlers
         private readonly NoCTF.Application.Scoring.Leaderboard.ILeaderboardProjectionEngine _leaderboardProjectionEngine;
         private readonly NoCTF.Infrastructure.Scoring.Leaderboard.ILeaderboardPublicationFence _leaderboardPublicationFence;
         private readonly NoCTF.Infrastructure.Scoring.Leaderboard.LeaderboardProjectionKeyedLock _leaderboardProjectionKeyedLock;
-        private readonly System.TimeProvider _timeProvider;
+        private readonly System.TimeProvider _timeProvider1;
+        private readonly System.TimeProvider _timeProvider2;
         private readonly ZiggyCreatures.Caching.Fusion.IFusionCacheProvider _fusionCacheProvider;
 
-        public ProjectLeaderboardHandler765587676(Microsoft.EntityFrameworkCore.DbContextOptions<NoCTF.Infrastructure.Persistence.NoCtfDbContext> dbContextOptionsOfNoCtfDbContext, NoCTF.Application.Notifications.ILeaderboardRefreshPublisher leaderboardRefreshPublisher, NoCTF.Application.Scoring.Leaderboard.ILeaderboardProjectionEngine leaderboardProjectionEngine, NoCTF.Infrastructure.Scoring.Leaderboard.ILeaderboardPublicationFence leaderboardPublicationFence, NoCTF.Infrastructure.Scoring.Leaderboard.LeaderboardProjectionKeyedLock leaderboardProjectionKeyedLock, System.TimeProvider timeProvider, ZiggyCreatures.Caching.Fusion.IFusionCacheProvider fusionCacheProvider)
+        public ProjectLeaderboardHandler765587676(Microsoft.EntityFrameworkCore.DbContextOptions<NoCTF.Infrastructure.Persistence.NoCtfDbContext> dbContextOptionsOfNoCtfDbContext, NoCTF.Application.Notifications.ILeaderboardRefreshPublisher leaderboardRefreshPublisher, NoCTF.Application.Scoring.Leaderboard.ILeaderboardProjectionEngine leaderboardProjectionEngine, NoCTF.Infrastructure.Scoring.Leaderboard.ILeaderboardPublicationFence leaderboardPublicationFence, NoCTF.Infrastructure.Scoring.Leaderboard.LeaderboardProjectionKeyedLock leaderboardProjectionKeyedLock, System.TimeProvider __timeProvider1, System.TimeProvider __timeProvider2, ZiggyCreatures.Caching.Fusion.IFusionCacheProvider fusionCacheProvider)
         {
             _dbContextOptionsOfNoCtfDbContext = dbContextOptionsOfNoCtfDbContext;
             _leaderboardRefreshPublisher = leaderboardRefreshPublisher;
             _leaderboardProjectionEngine = leaderboardProjectionEngine;
             _leaderboardPublicationFence = leaderboardPublicationFence;
             _leaderboardProjectionKeyedLock = leaderboardProjectionKeyedLock;
-            _timeProvider = timeProvider;
+            _timeProvider1 = __timeProvider1;
+            _timeProvider2 = __timeProvider2;
             _fusionCacheProvider = fusionCacheProvider;
         }
 
@@ -36,8 +38,8 @@ namespace Internal.Generated.WolverineHandlers
 
         public override async System.Threading.Tasks.Task HandleAsync(Wolverine.Runtime.MessageContext context, System.Threading.CancellationToken cancellation)
         {
-            await using var noCtfDbContext = new NoCTF.Infrastructure.Persistence.NoCtfDbContext(_dbContextOptionsOfNoCtfDbContext);
-            var fusionLeaderboardCache = new NoCTF.Infrastructure.Scoring.Leaderboard.FusionLeaderboardCache(noCtfDbContext, _leaderboardProjectionEngine, _leaderboardRefreshPublisher, _fusionCacheProvider, _leaderboardPublicationFence, _leaderboardProjectionKeyedLock, _timeProvider);
+            await using var noCtfDbContext = new NoCTF.Infrastructure.Persistence.NoCtfDbContext(_dbContextOptionsOfNoCtfDbContext, _timeProvider1);
+            var fusionLeaderboardCache = new NoCTF.Infrastructure.Scoring.Leaderboard.FusionLeaderboardCache(noCtfDbContext, _leaderboardProjectionEngine, _leaderboardRefreshPublisher, _fusionCacheProvider, _leaderboardPublicationFence, _leaderboardProjectionKeyedLock, _timeProvider2);
             // The actual message body
             var projectLeaderboard = (NoCTF.Application.Messaging.ProjectLeaderboard)context.Envelope.Message;
 

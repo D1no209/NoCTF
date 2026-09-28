@@ -26,6 +26,9 @@ public sealed class CreateTeamRuntimeEndpoint(
         Post("/admin/competitions/{competitionId}/teams/{teamId}/challenges/{competitionChallengeId}/runtimes");
         AuthSchemes("Bearer");
         Options(builder => builder.WithMetadata(new ProtectedEntryMetadata(ProtectedEntry.RuntimeCommand)));
+        Options(builder => builder.WithMetadata(
+            new NoCTF.Hosting.Observability.RuntimeOperationMetricsMetadata(
+                NoCTF.Application.Observability.RuntimeOperationMetricKind.TeamCreate)));
         Description(builder => builder.WithName("AdminCreateTeamRuntime")
             .ProducesProblemFE(StatusCodes.Status409Conflict));
         Summary(summary => summary.Summary = "Creates or replaces a team runtime.");

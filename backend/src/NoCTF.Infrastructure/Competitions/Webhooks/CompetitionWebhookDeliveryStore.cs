@@ -2,6 +2,7 @@ using System.Globalization;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 using NoCTF.Application.Challenges.Management;
 using NoCTF.Application.Competitions.Webhooks;
 using NoCTF.Application.Competitions.Tracks;
@@ -28,7 +29,8 @@ public sealed class CompetitionWebhookDeliveryStore(
     GetCompetitionTracks getTracks,
     ILeaderboardCache leaderboard,
     CompetitionWebhookOptions options,
-    TimeProvider timeProvider) : ICompetitionWebhookDeliveryStore
+    TimeProvider timeProvider,
+    ILogger<CompetitionWebhookDeliveryStore> logger) : ICompetitionWebhookDeliveryStore
 {
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web)
     {
@@ -429,6 +431,10 @@ public sealed class CompetitionWebhookDeliveryStore(
                     .CountAsync(cancellationToken);
                 if (persisted != targetIds.Length)
                     throw;
+                NoCtfTelemetry.RecordWebhookMaterializationRace();
+                logger.LogInformation(
+                    "Webhook delivery materialization race recovered for event {EventId}.",
+                    command.EventId);
             }
         }
         return new(

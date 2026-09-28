@@ -210,11 +210,11 @@ public static class ObservabilityExtensions
                     ?? "unmatched";
                 if (ClassifyRequest(context) is { } kind)
                     NoCtfTelemetry.RecordApiRequest(route, outcome, Stopwatch.GetElapsedTime(started).TotalSeconds, kind);
-                if (TryClassifyRuntimeOperation(
-                        context.Request.Method,
-                        route,
-                        out var operation))
-                    NoCtfTelemetry.RecordRuntimeOperation(operation, outcome);
+                var operation = context.GetEndpoint()?.Metadata
+                    .GetMetadata<RuntimeOperationMetricsMetadata>()?.Operation
+                    ?? ClassifyGameplayOperation(context.Request.Method, route);
+                if (operation is not null)
+                    NoCtfTelemetry.RecordRuntimeOperation(operation.Value, outcome);
             }
         });
         app.UseOpenTelemetryPrometheusScrapingEndpoint(context =>
@@ -239,65 +239,35 @@ public static class ObservabilityExtensions
         return context.GetEndpoint()?.Metadata.GetMetadata<ApiRequestMetricsMetadata>()?.Kind ?? ApiRequestKind.Rest;
     }
 
-    internal static bool TryClassifyRuntimeOperation(
+    internal static RuntimeOperationMetricKind? ClassifyGameplayOperation(
         string method,
-        string route,
-        out string operation)
+        string route)
     {
         if (!HttpMethods.IsPost(method))
-        {
-            operation = string.Empty;
-            return false;
-        }
+            return null;
 
         if (route.EndsWith("/flag-submissions", StringComparison.OrdinalIgnoreCase)
             || route.EndsWith("/awdp-break-flag-judgement", StringComparison.OrdinalIgnoreCase))
         {
-            operation = "flag";
-            return true;
+            return RuntimeOperationMetricKind.Flag;
         }
         if (route.EndsWith("/awdp-defense-targets", StringComparison.OrdinalIgnoreCase))
         {
-            operation = "fix_request";
-            return true;
+            return RuntimeOperationMetricKind.FixRequest;
         }
         if (route.Contains("/awdp-defense-targets/", StringComparison.OrdinalIgnoreCase)
             && route.EndsWith("/fix", StringComparison.OrdinalIgnoreCase))
         {
-            operation = "fix_upload";
-            return true;
+            return RuntimeOperationMetricKind.FixUpload;
         }
 
-        var runtimeAction = RuntimeActions.FirstOrDefault(action =>
-            route.EndsWith(action.Suffix, StringComparison.OrdinalIgnoreCase));
-        if (runtimeAction is not null)
-        {
-            operation = runtimeAction.Operation;
-            return true;
-        }
-
-        operation = string.Empty;
-        return false;
+        return null;
     }
-
-    private static readonly RuntimeAction[] RuntimeActions =
-    [
-        new("/test-runtime/start", "runtime_test_start"),
-        new("/test-runtime/stop", "runtime_test_stop"),
-        new("/test-runtime/reset", "runtime_test_reset"),
-        new("/test-runtime/extend", "runtime_test_extend"),
-        new("/runtime/start", "runtime_start"),
-        new("/runtime/stop", "runtime_stop"),
-        new("/runtime/reset", "runtime_reset"),
-        new("/runtime/extend", "runtime_extend"),
-        new("/force-terminate", "runtime_force_terminate"),
-        new("/terminate", "runtime_terminate")
-    ];
-
-    private sealed record RuntimeAction(string Suffix, string Operation);
 }
 
 public sealed record ApiRequestMetricsMetadata(ApiRequestKind Kind);
+
+public sealed record RuntimeOperationMetricsMetadata(RuntimeOperationMetricKind Operation);
 
 file static class ThisAssemblyVersion
 {

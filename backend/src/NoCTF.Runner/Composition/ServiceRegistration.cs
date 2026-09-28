@@ -86,6 +86,7 @@ public static class ServiceRegistration
         if (!development)
         {
             services.TryAddSingleton<IClusterLeaseManager, NatsClusterLeaseManager>();
+            services.TryAddSingleton<RunnerCapacityLedgerCoordinator>();
             services.AddScoped<IRunnerCapacityGate, PersistedRunnerCapacityGate>();
             services.TryAddSingleton<NatsRunnerAvailabilityRegistry>();
             services.AddSingleton<RunnerResourceObserver>();

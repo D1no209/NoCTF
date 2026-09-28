@@ -69,7 +69,7 @@ public sealed class PersistedRunnerCapacityGateTests
                 .UseNpgsql(postgres.GetConnectionString())
                 .UseSnakeCaseNamingConvention().Options;
             var fixture = new CompetitionForceDeleteFixture();
-            var ids = Enumerable.Range(0, 16).Select(_ => Guid.NewGuid()).ToArray();
+            var ids = Enumerable.Range(0, 64).Select(_ => Guid.NewGuid()).ToArray();
             await using (var setup = new NoCtfDbContext(options))
             {
                 await setup.Database.EnsureCreatedAsync(ct);
@@ -100,35 +100,14 @@ public sealed class PersistedRunnerCapacityGateTests
                 }
                 await setup.SaveChangesAsync(ct);
             }
+            var coordinator = new RunnerCapacityLedgerCoordinator();
             var results = await Task.WhenAll(ids.Select(async id =>
             {
-                for (var attempt = 0; attempt < 3; attempt++)
-                {
-                    await using var db = new NoCtfDbContext(options);
-                    var gate = new PersistedRunnerCapacityGate(db, registry,
-                        caches, new CapturedOutbox());
-                    try
-                    {
-                        return await gate.TryClaimAsync(
-                            new(id, "parallel", 128, 10, 1), ct);
-                    }
-                    catch (Exception exception) when (attempt < 2
-                        && (exception is DbUpdateException
-                            || exception is InvalidOperationException
-                                { InnerException: DbUpdateException }
-                            || TransactionFailureClassifier.IsRetryable(exception)))
-                    {
-                        await Task.Delay(Random.Shared.Next(2, 20), ct);
-                    }
-                    catch (Exception exception) when (exception is DbUpdateException
-                        || exception is InvalidOperationException
-                            { InnerException: DbUpdateException }
-                        || TransactionFailureClassifier.IsRetryable(exception))
-                    {
-                        return new RunnerCapacityClaim(RunnerCapacityAvailability.Unavailable);
-                    }
-                }
-                return new RunnerCapacityClaim(RunnerCapacityAvailability.Unavailable);
+                await using var db = new NoCtfDbContext(options);
+                var gate = new PersistedRunnerCapacityGate(db, registry,
+                    caches, new CapturedOutbox(), coordinator);
+                return await gate.TryClaimAsync(
+                    new(id, "parallel", 128, 10, 1), ct);
             }));
             await using var verify = new NoCtfDbContext(options);
             var allocated = await verify.RuntimeInstances.AsNoTracking()
@@ -194,7 +173,8 @@ public sealed class PersistedRunnerCapacityGateTests
             var id = fixture.RuntimeIds[0];
             await using (var db = new NoCtfDbContext(options))
             {
-                var gate = new PersistedRunnerCapacityGate(db, registry, caches, outbox);
+                var gate = new PersistedRunnerCapacityGate(db, registry, caches, outbox,
+                    new RunnerCapacityLedgerCoordinator());
                 await using var transaction = await db.Database.BeginTransactionAsync(ct);
                 var claim = await gate.TryClaimAsync(new(id, "test", 512, 40, 2), ct);
                 await Assert.That(claim.Availability)
@@ -207,7 +187,8 @@ public sealed class PersistedRunnerCapacityGateTests
                     .Include(item => item.CapacityAllocationEntries)
                     .SingleAsync(item => item.Id == id, ct);
                 await Assert.That(runtime.CapacityAllocations.Items).IsEmpty();
-                var gate = new PersistedRunnerCapacityGate(db, registry, caches, outbox);
+                var gate = new PersistedRunnerCapacityGate(db, registry, caches, outbox,
+                    new RunnerCapacityLedgerCoordinator());
                 var claim = await gate.TryClaimAsync(new(id, "test", 512, 40, 2), ct);
                 await Assert.That(claim.Availability)
                     .IsEqualTo(RunnerCapacityAvailability.Claimed);
@@ -238,7 +219,8 @@ public sealed class PersistedRunnerCapacityGateTests
                 await verify.GameplayFacts.Where(fact => fact.Id == factId)
                     .ExecuteUpdateAsync(update => update
                         .SetProperty(fact => fact.State, GameplayFactState.Processing), ct);
-                var gate = new PersistedRunnerCapacityGate(verify, registry, caches, outbox);
+                var gate = new PersistedRunnerCapacityGate(verify, registry, caches, outbox,
+                    new RunnerCapacityLedgerCoordinator());
                 var firstIdentity = new RuntimeWorkloadIdentity(
                     RuntimeWorkloadKind.PatchChecker, id, Guid.NewGuid());
                 var secondIdentity = new RuntimeWorkloadIdentity(

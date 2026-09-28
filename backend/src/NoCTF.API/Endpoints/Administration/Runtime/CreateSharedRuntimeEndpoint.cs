@@ -26,6 +26,9 @@ public sealed class CreateSharedRuntimeEndpoint(
         Post("/admin/competitions/{competitionId}/challenges/{competitionChallengeId}/runtimes");
         AuthSchemes("Bearer");
         Options(builder => builder.WithMetadata(new ProtectedEntryMetadata(ProtectedEntry.RuntimeCommand)));
+        Options(builder => builder.WithMetadata(
+            new NoCTF.Hosting.Observability.RuntimeOperationMetricsMetadata(
+                NoCTF.Application.Observability.RuntimeOperationMetricKind.SharedCreate)));
         Description(builder => builder.WithName("AdminCreateSharedRuntime")
             .ProducesProblemFE(StatusCodes.Status409Conflict));
         Summary(summary => summary.Summary = "Creates or replaces a KoH shared runtime.");

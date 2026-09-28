@@ -383,7 +383,8 @@ public sealed class CtfPerTeamRuntimeFlagPersistenceTests
             using var cacheServices = new ServiceCollection()
                 .AddFusionCache(NoCtfCacheNames.ReadModels).Services.BuildServiceProvider();
             var capacity = new PersistedRunnerCapacityGate(db, registry,
-                cacheServices.GetRequiredService<IFusionCacheProvider>(), outbox);
+                cacheServices.GetRequiredService<IFusionCacheProvider>(), outbox,
+                new RunnerCapacityLedgerCoordinator());
             var dispatches = outbox.Published.OfType<DispatchRuntime>().ToArray();
             await Assert.That(dispatches).Count().IsEqualTo(2);
             foreach (var dispatch in dispatches)

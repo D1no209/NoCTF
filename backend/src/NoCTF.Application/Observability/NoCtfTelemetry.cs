@@ -27,6 +27,32 @@ public enum RuntimeDispatchPerformanceStage
     PostCommitPublish
 }
 
+public enum RunnerCapacityTransactionOperation
+{
+    Claim,
+    Release
+}
+
+public enum RuntimeOperationMetricKind
+{
+    Flag,
+    FixRequest,
+    FixUpload,
+    PlayerCreate,
+    PlayerExtend,
+    PlayerStop,
+    SharedCreate,
+    SharedStop,
+    TeamCreate,
+    TeamExtend,
+    TeamStop,
+    TestCreate,
+    TestExtend,
+    TestStop,
+    Terminate,
+    ForceTerminate
+}
+
 public static class NoCtfTelemetry
 {
     public const string MeterName = "NoCTF";
@@ -59,8 +85,16 @@ public static class NoCtfTelemetry
         "noctf.runner.claim.duration", unit: "s");
     private static readonly Counter<long> RunnerClaimAttempts = Meter.CreateCounter<long>(
         "noctf.runner.claim.attempts", unit: "{attempt}");
+    private static readonly Counter<long> RunnerCapacityTransactionRetries =
+        Meter.CreateCounter<long>(
+            "noctf.runner.capacity.transaction_retries", unit: "{retry}");
+    private static readonly Counter<long> RunnerCapacityTransactionExhaustions =
+        Meter.CreateCounter<long>(
+            "noctf.runner.capacity.transaction_exhaustions", unit: "{exhaustion}");
     private static readonly Counter<long> RuntimeOperations = Meter.CreateCounter<long>(
         "noctf.runtime.operations", unit: "{operation}");
+    private static readonly Counter<long> RuntimeMutationFailures = Meter.CreateCounter<long>(
+        "noctf.runtime.mutation.failures", unit: "{failure}");
     private static readonly Histogram<double> RuntimeStopDuration = Meter.CreateHistogram<double>(
         "noctf.runtime.stop.duration", unit: "s");
     private static readonly Histogram<double> RuntimeDispatchStageDuration = Meter.CreateHistogram<double>(
@@ -125,6 +159,9 @@ public static class NoCtfTelemetry
         "noctf.webhook.retries", unit: "{retry}");
     private static readonly Counter<long> WebhookDeadLetters = Meter.CreateCounter<long>(
         "noctf.webhook.dead_letters", unit: "{delivery}");
+    private static readonly Counter<long> WebhookMaterializationRaces =
+        Meter.CreateCounter<long>(
+            "noctf.webhook.materialization_races", unit: "{race}");
     private static readonly ConcurrentDictionary<string, RunnerCapacitySnapshot> RunnerCapacitySnapshots =
         new(StringComparer.Ordinal);
     private static long runtimeWaitingCount;
@@ -187,6 +224,9 @@ public static class NoCtfTelemetry
     public static void RecordWebhookDeadLetter(string reason) =>
         WebhookDeadLetters.Add(1, new TagList { { "reason", reason } });
 
+    public static void RecordWebhookMaterializationRace() =>
+        WebhookMaterializationRaces.Add(1);
+
     public static void RecordApiRequest(string endpoint, string outcome, double elapsedSeconds, ApiRequestKind kind = ApiRequestKind.Rest)
     {
         var tags = new TagList { { "endpoint", endpoint }, { "outcome", outcome }, { "request_kind", kind.ToString().ToLowerInvariant() } };
@@ -225,8 +265,34 @@ public static class NoCtfTelemetry
         RunnerClaimDuration.Record(elapsedSeconds, tags);
     }
 
-    public static void RecordRuntimeOperation(string endpoint, string outcome) =>
-        RuntimeOperations.Add(1, new TagList { { "endpoint", endpoint }, { "outcome", outcome } });
+    public static void RecordRunnerCapacityTransactionRetry(
+        RunnerCapacityTransactionOperation operation) =>
+        RunnerCapacityTransactionRetries.Add(1,
+            new TagList { { "operation", MetricName(operation) } });
+
+    public static void RecordRunnerCapacityTransactionExhaustion(
+        RunnerCapacityTransactionOperation operation) =>
+        RunnerCapacityTransactionExhaustions.Add(1,
+            new TagList { { "operation", MetricName(operation) } });
+
+    public static void RecordRuntimeOperation(
+        RuntimeOperationMetricKind operation,
+        string outcome) =>
+        RuntimeOperations.Add(1, new TagList
+        {
+            { "operation", MetricName(operation) },
+            { "outcome", outcome }
+        });
+
+    public static void RecordRuntimeMutationFailure<TFailure>(
+        RuntimeOperationMetricKind operation,
+        TFailure failure)
+        where TFailure : struct, Enum =>
+        RuntimeMutationFailures.Add(1, new TagList
+        {
+            { "operation", MetricName(operation) },
+            { "failure", MetricName(failure) }
+        });
 
     public static void RecordRuntimeStopDuration(
         string provider,
@@ -341,6 +407,9 @@ public static class NoCtfTelemetry
         GameplayFactKind.FixAttempt => "fix",
         _ => null
     };
+
+    private static string MetricName<T>(T value) where T : struct, Enum =>
+        System.Text.Json.JsonNamingPolicy.SnakeCaseLower.ConvertName(value.ToString());
 
     public static void RecordLeaderboardProjection(
         string mode,

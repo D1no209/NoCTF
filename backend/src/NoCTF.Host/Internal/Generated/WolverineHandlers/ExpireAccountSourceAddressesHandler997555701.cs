@@ -14,14 +14,16 @@ namespace Internal.Generated.WolverineHandlers
         private readonly Microsoft.AspNetCore.Http.IHttpContextAccessor _httpContextAccessor;
         private readonly Microsoft.EntityFrameworkCore.DbContextOptions<NoCTF.Infrastructure.Persistence.NoCtfDbContext> _dbContextOptionsOfNoCtfDbContext;
         private readonly Microsoft.Extensions.Options.IOptions<NoCTF.Application.Authentication.Privacy.AccountPrivacyOptions> _optionsOfAccountPrivacyOptions;
-        private readonly System.TimeProvider _timeProvider;
+        private readonly System.TimeProvider _timeProvider1;
+        private readonly System.TimeProvider _timeProvider2;
 
-        public ExpireAccountSourceAddressesHandler997555701(Microsoft.AspNetCore.Http.IHttpContextAccessor httpContextAccessor, Microsoft.EntityFrameworkCore.DbContextOptions<NoCTF.Infrastructure.Persistence.NoCtfDbContext> dbContextOptionsOfNoCtfDbContext, Microsoft.Extensions.Options.IOptions<NoCTF.Application.Authentication.Privacy.AccountPrivacyOptions> optionsOfAccountPrivacyOptions, System.TimeProvider timeProvider)
+        public ExpireAccountSourceAddressesHandler997555701(Microsoft.AspNetCore.Http.IHttpContextAccessor httpContextAccessor, Microsoft.EntityFrameworkCore.DbContextOptions<NoCTF.Infrastructure.Persistence.NoCtfDbContext> dbContextOptionsOfNoCtfDbContext, Microsoft.Extensions.Options.IOptions<NoCTF.Application.Authentication.Privacy.AccountPrivacyOptions> optionsOfAccountPrivacyOptions, System.TimeProvider __timeProvider1, System.TimeProvider __timeProvider2)
         {
             _httpContextAccessor = httpContextAccessor;
             _dbContextOptionsOfNoCtfDbContext = dbContextOptionsOfNoCtfDbContext;
             _optionsOfAccountPrivacyOptions = optionsOfAccountPrivacyOptions;
-            _timeProvider = timeProvider;
+            _timeProvider1 = __timeProvider1;
+            _timeProvider2 = __timeProvider2;
         }
 
 
@@ -29,8 +31,8 @@ namespace Internal.Generated.WolverineHandlers
         public override async System.Threading.Tasks.Task HandleAsync(Wolverine.Runtime.MessageContext context, System.Threading.CancellationToken cancellation)
         {
             var requestSourceAddress = new NoCTF.API.Security.RequestSourceAddress(_httpContextAccessor);
-            await using var noCtfDbContext = new NoCTF.Infrastructure.Persistence.NoCtfDbContext(_dbContextOptionsOfNoCtfDbContext);
-            var accountPrivacyStore = new NoCTF.Infrastructure.Authentication.Privacy.AccountPrivacyStore(noCtfDbContext, _optionsOfAccountPrivacyOptions, _timeProvider, requestSourceAddress);
+            await using var noCtfDbContext = new NoCTF.Infrastructure.Persistence.NoCtfDbContext(_dbContextOptionsOfNoCtfDbContext, _timeProvider1);
+            var accountPrivacyStore = new NoCTF.Infrastructure.Authentication.Privacy.AccountPrivacyStore(noCtfDbContext, _optionsOfAccountPrivacyOptions, _timeProvider2, requestSourceAddress);
             // The actual message body
             var expireAccountSourceAddresses = (NoCTF.Application.Messaging.ExpireAccountSourceAddresses)context.Envelope.Message;
 

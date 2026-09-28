@@ -35,6 +35,9 @@ public sealed class ExtendChallengeTestRuntimeEndpoint(
         Patch("/admin/challenges/{challengeId}/test-runtimes/{runtimeInstanceId}");
         AuthSchemes("Bearer");
         Options(builder => builder.WithMetadata(new NoCTF.API.Security.ProtectedEntryMetadata(NoCTF.API.Security.ProtectedEntry.RuntimeCommand)));
+        Options(builder => builder.WithMetadata(
+            new NoCTF.Hosting.Observability.RuntimeOperationMetricsMetadata(
+                NoCTF.Application.Observability.RuntimeOperationMetricKind.TestExtend)));
         Roles("Organizer", "Administrator");
         Description(builder => builder.WithName("AdminChallengeBankExtendTestRuntime")
             .ProducesProblemFE(StatusCodes.Status409Conflict)

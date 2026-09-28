@@ -76,11 +76,16 @@ public sealed class HistoricalAdjudicationPreviewStore(NoCtfDbContext db) : IHis
             .Where(challenge => challengeIds.Contains(challenge.Id))
             .Join(db.Challenges.IgnoreQueryFilters().AsNoTracking(), instance => instance.ChallengeId, template => template.Id,
                 (instance, template) => new { instance.Id, Title = instance.CustomTitle ?? template.Title,
-                    template.Definition, Deleted = instance.DeletedAt != null || template.DeletedAt != null })
+                    InteractionKind = db.Set<CtfChallengeDefinition>()
+                        .IgnoreQueryFilters().AsNoTracking().IgnoreAutoIncludes()
+                        .Where(definition => definition.ChallengeId == template.Id)
+                        .Select(definition => (CtfInteractionKind?)definition.InteractionKind)
+                        .FirstOrDefault(),
+                    Deleted = instance.DeletedAt != null || template.DeletedAt != null })
             .ToDictionaryAsync(row => row.Id, ct);
         var interactions = competition.Mode == GameMode.Ctf
             ? challenges.ToDictionary(pair => pair.Key,
-                pair => pair.Value.Deleted ? null : ReadInteraction(pair.Value.Definition))
+                pair => pair.Value.Deleted ? null : pair.Value.InteractionKind)
             : new Dictionary<Guid, CtfInteractionKind?>();
         var flagIds = interactions.Where(pair => pair.Value == CtfInteractionKind.FlagSubmission).Select(pair => pair.Key).ToArray();
         var patchIds = interactions.Where(pair => pair.Value == CtfInteractionKind.PatchVerification).Select(pair => pair.Key).ToArray();
@@ -230,9 +235,6 @@ public sealed class HistoricalAdjudicationPreviewStore(NoCtfDbContext db) : IHis
         await transaction.CommitAsync(ct);
         return new(page.Select(ReadEvent).ToArray(), more ? page[^1].OccurredAt : null, more ? page[^1].Id : null);
     }
-
-    private static CtfInteractionKind? ReadInteraction(ChallengeDefinition? definition) =>
-        (definition as CtfChallengeDefinition)?.InteractionKind;
 
     private static LeaderboardBloodRank ToBloodRank(CompetitionEventKind kind) => kind switch
     {

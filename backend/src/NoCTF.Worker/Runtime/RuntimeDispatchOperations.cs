@@ -404,6 +404,7 @@ internal static partial class BackendMessageOperations
             if (instance.ChallengeId is not Guid challengeId)
                 return null;
             var challenge = await db.Challenges.AsNoTracking()
+                .AsSplitQuery()
                 .SingleOrDefaultAsync(candidate => candidate.Id == challengeId, cancellationToken);
             return challenge is null
                 ? null
@@ -439,6 +440,7 @@ internal static partial class BackendMessageOperations
                     CompetitionConfiguration = item.Competition.ModeConfiguration,
                     Rules = item.Challenge.Rules
                 })
+            .AsSplitQuery()
             .SingleOrDefaultAsync(cancellationToken);
         return scope is null
             ? null

@@ -32,7 +32,7 @@ namespace Internal.Generated.WolverineHandlers
         public override async System.Threading.Tasks.Task HandleAsync(Wolverine.Runtime.MessageContext context, System.Threading.CancellationToken cancellation)
         {
             var httpKohControlClient = new NoCTF.Infrastructure.Competitions.Koh.HttpKohControlClient(_httpClientFactory);
-            await using var noCtfDbContext = new NoCTF.Infrastructure.Persistence.NoCtfDbContext(_dbContextOptionsOfNoCtfDbContext);
+            await using var noCtfDbContext = new NoCTF.Infrastructure.Persistence.NoCtfDbContext(_dbContextOptionsOfNoCtfDbContext, _timeProvider);
             // The actual message body
             var pollKohChallenge = (NoCTF.Application.Messaging.PollKohChallenge)context.Envelope.Message;
 

@@ -18,7 +18,8 @@ public sealed class PersistedRunnerCapacityGate(
     NoCtfDbContext db,
     NatsRunnerAvailabilityRegistry runners,
     IFusionCacheProvider caches,
-    IPostCommitMessagePublisher outbox) : IRunnerCapacityGate
+    IPostCommitMessagePublisher outbox,
+    RunnerCapacityLedgerCoordinator ledgerCoordinator) : IRunnerCapacityGate
 {
     private readonly IFusionCache waiting = caches.GetCache(NoCtfCacheNames.ReadModels);
 
@@ -117,13 +118,19 @@ public sealed class PersistedRunnerCapacityGate(
         {
             try { return await ClaimAsync(request, runnerId, ct); }
             catch (Exception exception) when (!hasAmbientTransaction && attempt < 2
-                && (exception is DbUpdateException
-                    || exception is InvalidOperationException
-                        { InnerException: DbUpdateException }
-                    || TransactionFailureClassifier.IsRetryable(exception)))
+                && IsTransactionFailure(exception))
             {
+                NoCtfTelemetry.RecordRunnerCapacityTransactionRetry(
+                    RunnerCapacityTransactionOperation.Claim);
                 db.ChangeTracker.Clear();
                 await Task.Delay(Random.Shared.Next(2, 18), ct);
+            }
+            catch (Exception exception) when (!hasAmbientTransaction
+                && IsTransactionFailure(exception))
+            {
+                NoCtfTelemetry.RecordRunnerCapacityTransactionExhaustion(
+                    RunnerCapacityTransactionOperation.Claim);
+                throw;
             }
         }
         throw new InvalidOperationException("Runner capacity retries were exhausted.");
@@ -152,6 +159,7 @@ public sealed class PersistedRunnerCapacityGate(
                 return new(RunnerCapacityAvailability.Unavailable);
             }
 
+            using var ledgerLease = await ledgerCoordinator.EnterAsync(ct);
             await using var transaction = db.Database.CurrentTransaction is null
                 ? await db.Database.BeginTransactionAsync(IsolationLevel.Serializable, ct)
                 : null;
@@ -367,6 +375,37 @@ public sealed class PersistedRunnerCapacityGate(
     public async Task<RunnerCapacityReleaseOutcome> ReleaseWorkloadAsync(
         RuntimeWorkloadIdentity identity, string runnerId, CancellationToken ct)
     {
+        var hasAmbientTransaction = db.Database.CurrentTransaction is not null;
+        for (var attempt = 0; ; attempt++)
+        {
+            try
+            {
+                return await ReleaseWorkloadOnceAsync(identity, runnerId, ct);
+            }
+            catch (Exception exception) when (!hasAmbientTransaction && attempt < 2
+                && IsTransactionFailure(exception))
+            {
+                outbox.DiscardPendingMessages();
+                db.ChangeTracker.Clear();
+                NoCtfTelemetry.RecordRunnerCapacityTransactionRetry(
+                    RunnerCapacityTransactionOperation.Release);
+                await Task.Delay(Random.Shared.Next(2, 18), ct);
+            }
+            catch (Exception exception) when (!hasAmbientTransaction
+                && IsTransactionFailure(exception))
+            {
+                outbox.DiscardPendingMessages();
+                NoCtfTelemetry.RecordRunnerCapacityTransactionExhaustion(
+                    RunnerCapacityTransactionOperation.Release);
+                throw;
+            }
+        }
+    }
+
+    private async Task<RunnerCapacityReleaseOutcome> ReleaseWorkloadOnceAsync(
+        RuntimeWorkloadIdentity identity, string runnerId, CancellationToken ct)
+    {
+        using var ledgerLease = await ledgerCoordinator.EnterAsync(ct);
         await using var transaction = db.Database.CurrentTransaction is null
             ? await db.Database.BeginTransactionAsync(IsolationLevel.Serializable, ct) : null;
         var ledger = await db.RuntimeCapacityLedgers.SingleAsync(item => item.Id == 1, ct);
@@ -386,10 +425,14 @@ public sealed class PersistedRunnerCapacityGate(
         if (transaction is not null)
         {
             await transaction.CommitAsync(ct);
+            ledgerLease.Dispose();
             await outbox.FlushCommittedMessagesAsync();
         }
         return RunnerCapacityReleaseOutcome.Released;
     }
+
+    private static bool IsTransactionFailure(Exception exception) =>
+        TransactionFailureClassifier.IsRetryable(exception);
 
     public static RuntimeWorkloadIdentity PrimaryIdentity(RuntimeInstance runtime) => new(
         runtime.Purpose is RuntimePurpose.AwdpTarget or RuntimePurpose.PatchVerificationTarget

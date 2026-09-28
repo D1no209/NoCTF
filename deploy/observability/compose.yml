@@ -32,6 +32,7 @@ services:
       GF_USERS_ALLOW_SIGN_UP: "false"
       GF_ANALYTICS_REPORTING_ENABLED: "false"
       GF_ANALYTICS_CHECK_FOR_UPDATES: "false"
+      GF_PLUGINS_PREINSTALL_AUTO_UPDATE: "false"
       GF_AUTH_ANONYMOUS_ENABLED: "false"
       GF_SECURITY_COOKIE_SECURE: "true"
       GF_SECURITY_COOKIE_SAMESITE: strict
@@ -87,6 +88,8 @@ services:
   postgres-exporter:
     image: ${POSTGRES_EXPORTER_IMAGE:?Set POSTGRES_EXPORTER_IMAGE in .env}
     restart: unless-stopped
+    command:
+      - --config.file=
     environment:
       DATA_SOURCE_URI: ${POSTGRES_EXPORTER_URI:?Set POSTGRES_EXPORTER_URI}
       DATA_SOURCE_USER: ${POSTGRES_EXPORTER_USER:?Set POSTGRES_EXPORTER_USER}
@@ -121,6 +124,7 @@ services:
     restart: unless-stopped
     command:
       - --path.rootfs=/host
+      - --path.udev.data=/host/run/udev/data
       - --collector.filesystem.mount-points-exclude=^/(dev|proc|sys|var/lib/docker/.+|var/lib/containers/storage/.+)($$|/)
     volumes:
       - type: bind

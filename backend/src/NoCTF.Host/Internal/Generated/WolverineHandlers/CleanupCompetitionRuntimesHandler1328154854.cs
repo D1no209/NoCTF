@@ -21,10 +21,11 @@ namespace Internal.Generated.WolverineHandlers
         private readonly NoCTF.Application.Runtime.Provisioning.IChallengeRuntimeTemplateCatalog _challengeRuntimeTemplateCatalog;
         private readonly NoCTF.Application.Runtime.Provisioning.IRuntimePlacementPolicy _runtimePlacementPolicy;
         private readonly NoCTF.Infrastructure.Runtime.Capacity.NatsRunnerAvailabilityRegistry _natsRunnerAvailabilityRegistry;
+        private readonly NoCTF.Infrastructure.Runtime.Capacity.RunnerCapacityLedgerCoordinator _runnerCapacityLedgerCoordinator;
         private readonly System.TimeProvider _timeProvider;
         private readonly ZiggyCreatures.Caching.Fusion.IFusionCacheProvider _fusionCacheProvider;
 
-        public CleanupCompetitionRuntimesHandler1328154854(Microsoft.EntityFrameworkCore.DbContextOptions<NoCTF.Infrastructure.Persistence.NoCtfDbContext> dbContextOptionsOfNoCtfDbContext, Microsoft.Extensions.Logging.ILogger<NoCTF.Infrastructure.Messaging.WolverinePostCommitMessagePublisher> loggerOfWolverinePostCommitMessagePublisher, Microsoft.Extensions.Logging.ILogger<NoCTF.Worker.RuntimeDispatchMessageHandler> loggerOfRuntimeDispatchMessageHandler, NoCTF.Application.Runtime.Capacity.RuntimeResourceBudgetPolicy runtimeResourceBudgetPolicy, NoCTF.Application.Runtime.Provisioning.IChallengeRuntimeTemplateCatalog challengeRuntimeTemplateCatalog, NoCTF.Application.Runtime.Provisioning.IRuntimePlacementPolicy runtimePlacementPolicy, NoCTF.Infrastructure.Runtime.Capacity.NatsRunnerAvailabilityRegistry natsRunnerAvailabilityRegistry, System.TimeProvider timeProvider, ZiggyCreatures.Caching.Fusion.IFusionCacheProvider fusionCacheProvider)
+        public CleanupCompetitionRuntimesHandler1328154854(Microsoft.EntityFrameworkCore.DbContextOptions<NoCTF.Infrastructure.Persistence.NoCtfDbContext> dbContextOptionsOfNoCtfDbContext, Microsoft.Extensions.Logging.ILogger<NoCTF.Infrastructure.Messaging.WolverinePostCommitMessagePublisher> loggerOfWolverinePostCommitMessagePublisher, Microsoft.Extensions.Logging.ILogger<NoCTF.Worker.RuntimeDispatchMessageHandler> loggerOfRuntimeDispatchMessageHandler, NoCTF.Application.Runtime.Capacity.RuntimeResourceBudgetPolicy runtimeResourceBudgetPolicy, NoCTF.Application.Runtime.Provisioning.IChallengeRuntimeTemplateCatalog challengeRuntimeTemplateCatalog, NoCTF.Application.Runtime.Provisioning.IRuntimePlacementPolicy runtimePlacementPolicy, NoCTF.Infrastructure.Runtime.Capacity.NatsRunnerAvailabilityRegistry natsRunnerAvailabilityRegistry, NoCTF.Infrastructure.Runtime.Capacity.RunnerCapacityLedgerCoordinator runnerCapacityLedgerCoordinator, System.TimeProvider timeProvider, ZiggyCreatures.Caching.Fusion.IFusionCacheProvider fusionCacheProvider)
         {
             _dbContextOptionsOfNoCtfDbContext = dbContextOptionsOfNoCtfDbContext;
             _loggerOfWolverinePostCommitMessagePublisher = loggerOfWolverinePostCommitMessagePublisher;
@@ -33,6 +34,7 @@ namespace Internal.Generated.WolverineHandlers
             _challengeRuntimeTemplateCatalog = challengeRuntimeTemplateCatalog;
             _runtimePlacementPolicy = runtimePlacementPolicy;
             _natsRunnerAvailabilityRegistry = natsRunnerAvailabilityRegistry;
+            _runnerCapacityLedgerCoordinator = runnerCapacityLedgerCoordinator;
             _timeProvider = timeProvider;
             _fusionCacheProvider = fusionCacheProvider;
         }
@@ -42,12 +44,12 @@ namespace Internal.Generated.WolverineHandlers
         public override async System.Threading.Tasks.Task HandleAsync(Wolverine.Runtime.MessageContext context, System.Threading.CancellationToken cancellation)
         {
             var postCommitDispatchStatus = new NoCTF.Application.Messaging.PostCommitDispatchStatus();
-            await using var noCtfDbContext = new NoCTF.Infrastructure.Persistence.NoCtfDbContext(_dbContextOptionsOfNoCtfDbContext);
+            await using var noCtfDbContext = new NoCTF.Infrastructure.Persistence.NoCtfDbContext(_dbContextOptionsOfNoCtfDbContext, _timeProvider);
             var wolverinePostCommitMessagePublisher = new NoCTF.Infrastructure.Messaging.WolverinePostCommitMessagePublisher(context, noCtfDbContext, _loggerOfWolverinePostCommitMessagePublisher, postCommitDispatchStatus);
-            var competitionEventStore = new NoCTF.Infrastructure.Competitions.Events.CompetitionEventStore(noCtfDbContext, wolverinePostCommitMessagePublisher);
+            var competitionEventStore = new NoCTF.Infrastructure.Competitions.Events.CompetitionEventStore(noCtfDbContext, wolverinePostCommitMessagePublisher, _timeProvider);
             var kohRuntimeProvisioner = new NoCTF.Infrastructure.Competitions.Koh.KohRuntimeProvisioner(noCtfDbContext, _challengeRuntimeTemplateCatalog, _runtimePlacementPolicy, wolverinePostCommitMessagePublisher, _timeProvider, competitionEventStore);
             var awdRuntimeProvisioner = new NoCTF.Infrastructure.Competitions.Awd.AwdRuntimeProvisioner(noCtfDbContext, _challengeRuntimeTemplateCatalog, _runtimePlacementPolicy, wolverinePostCommitMessagePublisher, _timeProvider, competitionEventStore);
-            var persistedRunnerCapacityGate = new NoCTF.Infrastructure.Runtime.Capacity.PersistedRunnerCapacityGate(noCtfDbContext, _natsRunnerAvailabilityRegistry, _fusionCacheProvider, wolverinePostCommitMessagePublisher);
+            var persistedRunnerCapacityGate = new NoCTF.Infrastructure.Runtime.Capacity.PersistedRunnerCapacityGate(noCtfDbContext, _natsRunnerAvailabilityRegistry, _fusionCacheProvider, wolverinePostCommitMessagePublisher, _runnerCapacityLedgerCoordinator);
             // The actual message body
             var cleanupCompetitionRuntimes = (NoCTF.Application.Messaging.CleanupCompetitionRuntimes)context.Envelope.Message;
 

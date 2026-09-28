@@ -7,6 +7,35 @@ public sealed class ObservabilityDashboardContractTests
     private static readonly string RepositoryRoot = FindRepositoryRoot();
 
     [Test]
+    public async Task Runtime_mutation_endpoints_declare_typed_metrics_metadata()
+    {
+        var endpointRoot = Path.Combine(
+            RepositoryRoot, "backend", "src", "NoCTF.API", "Endpoints");
+        foreach (var path in new[]
+                 {
+                     "Runtime/CreateRuntimeEndpoint.cs",
+                     "Runtime/ExtendRuntimeEndpoint.cs",
+                     "Runtime/StopRuntimeEndpoint.cs",
+                     "Administration/Runtime/CreateSharedRuntimeEndpoint.cs",
+                     "Administration/Runtime/CreateTeamRuntimeEndpoint.cs",
+                     "Administration/Runtime/StopSharedRuntimeEndpoint.cs",
+                     "Administration/Runtime/StopTeamRuntimeEndpoint.cs",
+                     "Administration/Runtime/ExtendTeamRuntimeEndpoint.cs",
+                     "Administration/Runtime/TerminateRuntimeEndpoint.cs",
+                     "Administration/Runtime/CreateForceTerminationEndpoint.cs",
+                     "Administration/ChallengeBank/CreateChallengeTestRuntimeEndpoint.cs",
+                     "Administration/ChallengeBank/ExtendChallengeTestRuntimeEndpoint.cs",
+                     "Administration/ChallengeBank/StopChallengeTestRuntimeEndpoint.cs"
+                 })
+        {
+            var source = await File.ReadAllTextAsync(Path.Combine(
+                endpointRoot,
+                path.Replace('/', Path.DirectorySeparatorChar)));
+            await Assert.That(source).Contains("RuntimeOperationMetricsMetadata");
+        }
+    }
+
+    [Test]
     public async Task Performance_dashboard_uses_available_metrics_and_stable_ranked_tables()
     {
         using var document = JsonDocument.Parse(await File.ReadAllTextAsync(Path.Combine(
@@ -33,9 +62,16 @@ public sealed class ObservabilityDashboardContractTests
             await Assert.That(target.GetProperty("range").GetBoolean()).IsFalse();
         }
 
-        foreach (var panelId in Enumerable.Range(47, 8))
+        foreach (var panelId in Enumerable.Range(47, 15))
             await Assert.That(panels.Any(panel =>
                 panel.GetProperty("id").GetInt32() == panelId)).IsTrue();
+
+        await Assert.That(Query(Panel(panels, 57)))
+            .Contains("noctf_runner_capacity_transaction_retries_total");
+        await Assert.That(Query(Panel(panels, 58)))
+            .Contains("noctf_runtime_mutation_failures_total");
+        await Assert.That(Query(Panel(panels, 60)))
+            .Contains("noctf_webhook_materialization_races_total");
 
         await Assert.That(root.GetProperty("links").EnumerateArray().Any(link =>
             link.GetProperty("url").GetString() == "/d/noctf-logs")).IsTrue();
@@ -61,6 +97,11 @@ public sealed class ObservabilityDashboardContractTests
             "noctf_nats_operation_duration_seconds_count[5m])) >= 20");
         await Assert.That(alerts).Contains(
             "noctf_webhook_queue_age_seconds_count[5m])) >= 20");
+        await Assert.That(alerts).Contains(
+            "noctf:leaderboard_projection_samples:count5m >= 3");
+        await Assert.That(alerts).Contains(
+            "noctf_runner_capacity_transaction_exhaustions_total[5m]");
+        await Assert.That(alerts).Contains("NoCtfDiskSpaceWarning");
     }
 
     private static JsonElement Panel(JsonElement[] panels, int id) =>

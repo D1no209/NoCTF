@@ -61,6 +61,8 @@ public sealed class CompetitionPracticeModePersistenceTests
             var measuredOptions = new DbContextOptionsBuilder<NoCtfDbContext>()
                 .UseNpgsql(postgres.GetConnectionString())
                 .UseSnakeCaseNamingConvention()
+                .ConfigureWarnings(warnings => warnings.Throw(
+                    RelationalEventId.MultipleCollectionIncludeWarning))
                 .AddInterceptors(counter)
                 .Options;
             await using var db = new NoCtfDbContext(measuredOptions);
@@ -140,7 +142,7 @@ public sealed class CompetitionPracticeModePersistenceTests
             var fixture = await SeedAsync(options, earlyFinish: false, cancellationToken);
             await using (var setup = new NoCtfDbContext(options))
             {
-                var competition = await setup.Competitions.SingleAsync(
+                var competition = await setup.Competitions.AsSplitQuery().SingleAsync(
                     item => item.Id == fixture.CompetitionId, cancellationToken);
                 competition.Status = CompetitionStatus.Running;
                 competition.EndAt = fixture.Now.AddHours(1);
@@ -168,7 +170,7 @@ public sealed class CompetitionPracticeModePersistenceTests
 
             await using (var update = new NoCtfDbContext(options))
             {
-                var challenge = await update.CompetitionChallenges.SingleAsync(
+                var challenge = await update.CompetitionChallenges.AsSplitQuery().SingleAsync(
                     item => item.Id == fixture.CompetitionChallengeId, cancellationToken);
                 ((CtfCompetitionChallengeRules)challenge.Rules!).MaxFlagAttempts = 2;
                 await update.SaveChangesAsync(cancellationToken);
@@ -312,7 +314,8 @@ public sealed class CompetitionPracticeModePersistenceTests
             var joinerId = Guid.CreateVersion7(fixture.Now.AddTicks(20));
             await using var db = new NoCtfDbContext(options);
             db.Users.Add(User(joinerId, "practice-joiner", fixture.Now));
-            (await db.Competitions.SingleAsync(cancellationToken)).MaxTeamMembers = 3;
+            (await db.Competitions.AsSplitQuery().SingleAsync(cancellationToken))
+                .MaxTeamMembers = 3;
             await db.SaveChangesAsync(cancellationToken);
             var outbox = new RecordingOutbox();
             var events = new CompetitionEventStore(db, outbox);
@@ -377,7 +380,8 @@ public sealed class CompetitionPracticeModePersistenceTests
             var options = Options(postgres);
             var fixture = await SeedAsync(options, earlyFinish: false, cancellationToken);
             await using var db = new NoCtfDbContext(options);
-            var template = await db.Challenges.SingleAsync(cancellationToken);
+            var template = await db.Challenges.AsSplitQuery()
+                .SingleAsync(cancellationToken);
             template.Definition = TestConfigurations.Definition(
                 GameMode.Ctf,
                 JsonSerializer.Serialize(
@@ -607,6 +611,8 @@ public sealed class CompetitionPracticeModePersistenceTests
         new DbContextOptionsBuilder<NoCtfDbContext>()
             .UseNpgsql(postgres.GetConnectionString())
             .UseSnakeCaseNamingConvention()
+            .ConfigureWarnings(warnings => warnings.Throw(
+                RelationalEventId.MultipleCollectionIncludeWarning))
             .Options;
 
     private static Competition Competition(

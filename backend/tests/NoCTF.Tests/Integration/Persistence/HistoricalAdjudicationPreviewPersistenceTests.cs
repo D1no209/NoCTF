@@ -116,7 +116,8 @@ public sealed class HistoricalAdjudicationPreviewPersistenceTests
             await using var db = new NoCtfDbContext(options);
             var tracks = CompetitionTrackConfiguration.DefaultFor(GameMode.Ctf);
             var guest = tracks.DefaultTrack with { Key = "guest", Name = "Guest", IsDefault = false, EarnsBlood = false };
-            var competition = await db.Competitions.SingleAsync(row => row.Id == fixture.CompetitionId, ct);
+            var competition = await db.Competitions.AsSplitQuery()
+                .SingleAsync(row => row.Id == fixture.CompetitionId, ct);
             competition.TracksEnabled = true;
             competition.Tracks = CompetitionTrackConfiguration.ToPersisted(
                 tracks with { Tracks = [tracks.DefaultTrack, guest] }, fixture.CompetitionId);
@@ -160,7 +161,8 @@ public sealed class HistoricalAdjudicationPreviewPersistenceTests
 
             await db.Competitions.Where(row => row.Id == fixture.CompetitionId).ExecuteUpdateAsync(update => update.SetProperty(row => row.TracksEnabled, false), ct);
             var templateId = await db.CompetitionChallenges.Where(row => row.Id == fixture.CompetitionChallengeId).Select(row => row.ChallengeId).SingleAsync(ct);
-            var template = await db.Challenges.SingleAsync(row => row.Id == templateId, ct);
+            var template = await db.Challenges.AsSplitQuery()
+                .SingleAsync(row => row.Id == templateId, ct);
             ((CtfChallengeDefinition)template.Definition!).InteractionKind =
                 CtfInteractionKind.PatchVerification;
             await db.SaveChangesAsync(ct);
@@ -717,7 +719,9 @@ public sealed class HistoricalAdjudicationPreviewPersistenceTests
     {
         var builder = new DbContextOptionsBuilder<NoCtfDbContext>()
             .UseNpgsql(postgres.GetConnectionString())
-            .UseSnakeCaseNamingConvention();
+            .UseSnakeCaseNamingConvention()
+            .ConfigureWarnings(warnings => warnings.Throw(
+                RelationalEventId.MultipleCollectionIncludeWarning));
         if (interceptors.Length > 0)
             builder.AddInterceptors(interceptors);
         return builder.Options;

@@ -2,6 +2,7 @@ using System.Collections.Concurrent;
 using System.Security.Cryptography;
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.Logging.Abstractions;
 using NoCTF.Application.GameplayFacts.PatchUploads;
 using NoCTF.Application.GameplayFacts.PatchVerification;
@@ -43,6 +44,8 @@ public sealed class CtfPatchVerificationTargetPersistenceTests
             var options = new DbContextOptionsBuilder<NoCtfDbContext>()
                 .UseNpgsql(postgres.GetConnectionString())
                 .UseSnakeCaseNamingConvention()
+                .ConfigureWarnings(warnings => warnings.Throw(
+                    RelationalEventId.MultipleCollectionIncludeWarning))
                 .Options;
             var fixture = await SeedAsync(options, ct);
             await using var db = new NoCtfDbContext(options);
@@ -72,7 +75,7 @@ public sealed class CtfPatchVerificationTargetPersistenceTests
                 fixture.CompetitionChallengeId,
                 fixture.UserId,
                 ct);
-            var target = await db.RuntimeInstances.SingleAsync(instance =>
+            var target = await db.RuntimeInstances.AsSplitQuery().SingleAsync(instance =>
                 instance.Id == created.RuntimeInstanceId, ct);
             target.State = RuntimeState.Running;
             target.RunnerId = "runner-1";

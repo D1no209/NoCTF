@@ -89,7 +89,8 @@ public sealed class RuntimeDispatchAllocationTests
             using var cacheServices = new ServiceCollection()
                 .AddFusionCache(NoCtfCacheNames.ReadModels).Services.BuildServiceProvider();
             var capacity = new PersistedRunnerCapacityGate(db, registry,
-                cacheServices.GetRequiredService<IFusionCacheProvider>(), outbox);
+                cacheServices.GetRequiredService<IFusionCacheProvider>(), outbox,
+                new RunnerCapacityLedgerCoordinator());
             var templates = new ChallengeRuntimeTemplateCatalog();
             db.ChangeTracker.Clear();
             await BackendMessageOperations.DispatchRuntimeAsync(new(id), db, templates, new FixedRuntimePlacementPolicy(),

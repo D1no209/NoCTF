@@ -26,10 +26,12 @@ namespace Internal.Generated.WolverineHandlers
         private readonly NoCTF.Application.Scoring.Leaderboard.ILeaderboardProjectionEngine _leaderboardProjectionEngine;
         private readonly NoCTF.Infrastructure.Scoring.Leaderboard.ILeaderboardPublicationFence _leaderboardPublicationFence;
         private readonly NoCTF.Infrastructure.Scoring.Leaderboard.LeaderboardProjectionKeyedLock _leaderboardProjectionKeyedLock;
-        private readonly System.TimeProvider _timeProvider;
+        private readonly System.TimeProvider _timeProvider1;
+        private readonly System.TimeProvider _timeProvider2;
+        private readonly System.TimeProvider _timeProvider3;
         private readonly ZiggyCreatures.Caching.Fusion.IFusionCacheProvider _fusionCacheProvider;
 
-        public EvaluateGameplayFactHandler1608375311(Microsoft.EntityFrameworkCore.DbContextOptions<NoCTF.Infrastructure.Persistence.NoCtfDbContext> dbContextOptionsOfNoCtfDbContext, Microsoft.Extensions.Logging.ILogger<NoCTF.Infrastructure.GameplayFacts.Processing.GameplayFactProcessor> loggerOfGameplayFactProcessor, Microsoft.Extensions.Logging.ILogger<NoCTF.Infrastructure.Messaging.WolverinePostCommitMessagePublisher> loggerOfWolverinePostCommitMessagePublisher, NoCTF.Application.GameplayFacts.Intake.IGameplayFactAdmissionModePolicy gameplayFactAdmissionModePolicy, NoCTF.Application.GameplayFacts.Processing.IGameplayFactEvaluatorCatalog gameplayFactEvaluatorCatalog, NoCTF.Application.Notifications.IGameplayFactStateChangedNotification gameplayFactStateChangedNotification, NoCTF.Application.Notifications.ILeaderboardRefreshPublisher leaderboardRefreshPublisher, NoCTF.Application.Scoring.Leaderboard.ILeaderboardProjectionEngine leaderboardProjectionEngine, NoCTF.Infrastructure.Scoring.Leaderboard.ILeaderboardPublicationFence leaderboardPublicationFence, NoCTF.Infrastructure.Scoring.Leaderboard.LeaderboardProjectionKeyedLock leaderboardProjectionKeyedLock, System.TimeProvider timeProvider, ZiggyCreatures.Caching.Fusion.IFusionCacheProvider fusionCacheProvider)
+        public EvaluateGameplayFactHandler1608375311(Microsoft.EntityFrameworkCore.DbContextOptions<NoCTF.Infrastructure.Persistence.NoCtfDbContext> dbContextOptionsOfNoCtfDbContext, Microsoft.Extensions.Logging.ILogger<NoCTF.Infrastructure.GameplayFacts.Processing.GameplayFactProcessor> loggerOfGameplayFactProcessor, Microsoft.Extensions.Logging.ILogger<NoCTF.Infrastructure.Messaging.WolverinePostCommitMessagePublisher> loggerOfWolverinePostCommitMessagePublisher, NoCTF.Application.GameplayFacts.Intake.IGameplayFactAdmissionModePolicy gameplayFactAdmissionModePolicy, NoCTF.Application.GameplayFacts.Processing.IGameplayFactEvaluatorCatalog gameplayFactEvaluatorCatalog, NoCTF.Application.Notifications.IGameplayFactStateChangedNotification gameplayFactStateChangedNotification, NoCTF.Application.Notifications.ILeaderboardRefreshPublisher leaderboardRefreshPublisher, NoCTF.Application.Scoring.Leaderboard.ILeaderboardProjectionEngine leaderboardProjectionEngine, NoCTF.Infrastructure.Scoring.Leaderboard.ILeaderboardPublicationFence leaderboardPublicationFence, NoCTF.Infrastructure.Scoring.Leaderboard.LeaderboardProjectionKeyedLock leaderboardProjectionKeyedLock, System.TimeProvider __timeProvider1, System.TimeProvider __timeProvider2, System.TimeProvider __timeProvider3, ZiggyCreatures.Caching.Fusion.IFusionCacheProvider fusionCacheProvider)
         {
             _dbContextOptionsOfNoCtfDbContext = dbContextOptionsOfNoCtfDbContext;
             _loggerOfGameplayFactProcessor = loggerOfGameplayFactProcessor;
@@ -41,7 +43,9 @@ namespace Internal.Generated.WolverineHandlers
             _leaderboardProjectionEngine = leaderboardProjectionEngine;
             _leaderboardPublicationFence = leaderboardPublicationFence;
             _leaderboardProjectionKeyedLock = leaderboardProjectionKeyedLock;
-            _timeProvider = timeProvider;
+            _timeProvider1 = __timeProvider1;
+            _timeProvider2 = __timeProvider2;
+            _timeProvider3 = __timeProvider3;
             _fusionCacheProvider = fusionCacheProvider;
         }
 
@@ -50,10 +54,10 @@ namespace Internal.Generated.WolverineHandlers
         public override async System.Threading.Tasks.Task HandleAsync(Wolverine.Runtime.MessageContext context, System.Threading.CancellationToken cancellation)
         {
             var postCommitDispatchStatus = new NoCTF.Application.Messaging.PostCommitDispatchStatus();
-            await using var noCtfDbContext = new NoCTF.Infrastructure.Persistence.NoCtfDbContext(_dbContextOptionsOfNoCtfDbContext);
+            await using var noCtfDbContext = new NoCTF.Infrastructure.Persistence.NoCtfDbContext(_dbContextOptionsOfNoCtfDbContext, _timeProvider1);
             var wolverinePostCommitMessagePublisher = new NoCTF.Infrastructure.Messaging.WolverinePostCommitMessagePublisher(context, noCtfDbContext, _loggerOfWolverinePostCommitMessagePublisher, postCommitDispatchStatus);
-            var competitionEventStore = new NoCTF.Infrastructure.Competitions.Events.CompetitionEventStore(noCtfDbContext, wolverinePostCommitMessagePublisher);
-            var fusionLeaderboardCache = new NoCTF.Infrastructure.Scoring.Leaderboard.FusionLeaderboardCache(noCtfDbContext, _leaderboardProjectionEngine, _leaderboardRefreshPublisher, _fusionCacheProvider, _leaderboardPublicationFence, _leaderboardProjectionKeyedLock, _timeProvider);
+            var competitionEventStore = new NoCTF.Infrastructure.Competitions.Events.CompetitionEventStore(noCtfDbContext, wolverinePostCommitMessagePublisher, _timeProvider3);
+            var fusionLeaderboardCache = new NoCTF.Infrastructure.Scoring.Leaderboard.FusionLeaderboardCache(noCtfDbContext, _leaderboardProjectionEngine, _leaderboardRefreshPublisher, _fusionCacheProvider, _leaderboardPublicationFence, _leaderboardProjectionKeyedLock, _timeProvider2);
             var gameplayFactProcessor = new NoCTF.Infrastructure.GameplayFacts.Processing.GameplayFactProcessor(noCtfDbContext, _gameplayFactEvaluatorCatalog, _gameplayFactAdmissionModePolicy, wolverinePostCommitMessagePublisher, fusionLeaderboardCache, competitionEventStore, _loggerOfGameplayFactProcessor);
             // The actual message body
             var evaluateGameplayFact = (NoCTF.Application.Messaging.EvaluateGameplayFact)context.Envelope.Message;

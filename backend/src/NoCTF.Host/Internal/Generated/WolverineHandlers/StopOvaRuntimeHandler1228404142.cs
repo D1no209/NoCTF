@@ -22,29 +22,33 @@ namespace Internal.Generated.WolverineHandlers
         private readonly Microsoft.Extensions.Options.IOptions<NoCTF.Runner.Composition.RunnerOptions> _optionsOfRunnerOptions;
         private readonly NoCTF.Application.Runtime.Instances.IRuntimeNodeWorkReader _runtimeNodeWorkReader;
         private readonly NoCTF.Infrastructure.Runtime.Capacity.NatsRunnerAvailabilityRegistry _natsRunnerAvailabilityRegistry;
+        private readonly NoCTF.Infrastructure.Runtime.Capacity.RunnerCapacityLedgerCoordinator _runnerCapacityLedgerCoordinator;
         private readonly NoCTF.Infrastructure.Runtime.Capacity.RunnerResourceMutationCoordinator _runnerResourceMutationCoordinator;
         private readonly NoCTF.Runner.Composition.IRuntimeProviderCatalog _runtimeProviderCatalog;
         private readonly NoCTF.Runner.Composition.RunnerProviderHealthState _runnerProviderHealthState;
         private readonly NoCTF.Runner.Composition.RunnerResourceObserver _runnerResourceObserver;
         private readonly NoCTF.Runner.Messages.IAwdpAttackProvisioningPlanReader _awdpAttackProvisioningPlanReader;
         private readonly System.Collections.Generic.IEnumerable<NoCTF.Application.Runtime.Provisioning.IRuntimeManagedResourceReconciler> _runtimeManagedResourceReconcilerIEnumerable;
-        private readonly System.TimeProvider _timeProvider;
+        private readonly System.TimeProvider _timeProvider1;
+        private readonly System.TimeProvider _timeProvider2;
         private readonly ZiggyCreatures.Caching.Fusion.IFusionCacheProvider _fusionCacheProvider;
 
-        public StopOvaRuntimeHandler1228404142(Microsoft.EntityFrameworkCore.DbContextOptions<NoCTF.Infrastructure.Persistence.NoCtfDbContext> dbContextOptionsOfNoCtfDbContext, Microsoft.Extensions.Logging.ILogger<NoCTF.Infrastructure.Messaging.WolverinePostCommitMessagePublisher> loggerOfWolverinePostCommitMessagePublisher, Microsoft.Extensions.Options.IOptions<NoCTF.Runner.Composition.RunnerOptions> optionsOfRunnerOptions, NoCTF.Application.Runtime.Instances.IRuntimeNodeWorkReader runtimeNodeWorkReader, NoCTF.Infrastructure.Runtime.Capacity.NatsRunnerAvailabilityRegistry natsRunnerAvailabilityRegistry, NoCTF.Infrastructure.Runtime.Capacity.RunnerResourceMutationCoordinator runnerResourceMutationCoordinator, NoCTF.Runner.Composition.IRuntimeProviderCatalog runtimeProviderCatalog, NoCTF.Runner.Composition.RunnerProviderHealthState runnerProviderHealthState, NoCTF.Runner.Composition.RunnerResourceObserver runnerResourceObserver, NoCTF.Runner.Messages.IAwdpAttackProvisioningPlanReader awdpAttackProvisioningPlanReader, System.Collections.Generic.IEnumerable<NoCTF.Application.Runtime.Provisioning.IRuntimeManagedResourceReconciler> runtimeManagedResourceReconcilerIEnumerable, System.TimeProvider timeProvider, ZiggyCreatures.Caching.Fusion.IFusionCacheProvider fusionCacheProvider)
+        public StopOvaRuntimeHandler1228404142(Microsoft.EntityFrameworkCore.DbContextOptions<NoCTF.Infrastructure.Persistence.NoCtfDbContext> dbContextOptionsOfNoCtfDbContext, Microsoft.Extensions.Logging.ILogger<NoCTF.Infrastructure.Messaging.WolverinePostCommitMessagePublisher> loggerOfWolverinePostCommitMessagePublisher, Microsoft.Extensions.Options.IOptions<NoCTF.Runner.Composition.RunnerOptions> optionsOfRunnerOptions, NoCTF.Application.Runtime.Instances.IRuntimeNodeWorkReader runtimeNodeWorkReader, NoCTF.Infrastructure.Runtime.Capacity.NatsRunnerAvailabilityRegistry natsRunnerAvailabilityRegistry, NoCTF.Infrastructure.Runtime.Capacity.RunnerCapacityLedgerCoordinator runnerCapacityLedgerCoordinator, NoCTF.Infrastructure.Runtime.Capacity.RunnerResourceMutationCoordinator runnerResourceMutationCoordinator, NoCTF.Runner.Composition.IRuntimeProviderCatalog runtimeProviderCatalog, NoCTF.Runner.Composition.RunnerProviderHealthState runnerProviderHealthState, NoCTF.Runner.Composition.RunnerResourceObserver runnerResourceObserver, NoCTF.Runner.Messages.IAwdpAttackProvisioningPlanReader awdpAttackProvisioningPlanReader, System.Collections.Generic.IEnumerable<NoCTF.Application.Runtime.Provisioning.IRuntimeManagedResourceReconciler> runtimeManagedResourceReconcilerIEnumerable, System.TimeProvider __timeProvider1, System.TimeProvider __timeProvider2, ZiggyCreatures.Caching.Fusion.IFusionCacheProvider fusionCacheProvider)
         {
             _dbContextOptionsOfNoCtfDbContext = dbContextOptionsOfNoCtfDbContext;
             _loggerOfWolverinePostCommitMessagePublisher = loggerOfWolverinePostCommitMessagePublisher;
             _optionsOfRunnerOptions = optionsOfRunnerOptions;
             _runtimeNodeWorkReader = runtimeNodeWorkReader;
             _natsRunnerAvailabilityRegistry = natsRunnerAvailabilityRegistry;
+            _runnerCapacityLedgerCoordinator = runnerCapacityLedgerCoordinator;
             _runnerResourceMutationCoordinator = runnerResourceMutationCoordinator;
             _runtimeProviderCatalog = runtimeProviderCatalog;
             _runnerProviderHealthState = runnerProviderHealthState;
             _runnerResourceObserver = runnerResourceObserver;
             _awdpAttackProvisioningPlanReader = awdpAttackProvisioningPlanReader;
             _runtimeManagedResourceReconcilerIEnumerable = runtimeManagedResourceReconcilerIEnumerable;
-            _timeProvider = timeProvider;
+            _timeProvider1 = __timeProvider1;
+            _timeProvider2 = __timeProvider2;
             _fusionCacheProvider = fusionCacheProvider;
         }
 
@@ -53,10 +57,10 @@ namespace Internal.Generated.WolverineHandlers
         public override async System.Threading.Tasks.Task HandleAsync(Wolverine.Runtime.MessageContext context, System.Threading.CancellationToken cancellation)
         {
             var postCommitDispatchStatus = new NoCTF.Application.Messaging.PostCommitDispatchStatus();
-            await using var noCtfDbContext = new NoCTF.Infrastructure.Persistence.NoCtfDbContext(_dbContextOptionsOfNoCtfDbContext);
+            await using var noCtfDbContext = new NoCTF.Infrastructure.Persistence.NoCtfDbContext(_dbContextOptionsOfNoCtfDbContext, _timeProvider1);
             var wolverinePostCommitMessagePublisher = new NoCTF.Infrastructure.Messaging.WolverinePostCommitMessagePublisher(context, noCtfDbContext, _loggerOfWolverinePostCommitMessagePublisher, postCommitDispatchStatus);
-            var persistedRunnerCapacityGate = new NoCTF.Infrastructure.Runtime.Capacity.PersistedRunnerCapacityGate(noCtfDbContext, _natsRunnerAvailabilityRegistry, _fusionCacheProvider, wolverinePostCommitMessagePublisher);
-            var runtimeProviderHandler = new NoCTF.Runner.Messages.RuntimeProviderHandler(_runtimeProviderCatalog, _runtimeManagedResourceReconcilerIEnumerable, _optionsOfRunnerOptions, persistedRunnerCapacityGate, _runtimeNodeWorkReader, _timeProvider, _awdpAttackProvisioningPlanReader, _runnerProviderHealthState, _runnerResourceMutationCoordinator, _runnerResourceObserver);
+            var persistedRunnerCapacityGate = new NoCTF.Infrastructure.Runtime.Capacity.PersistedRunnerCapacityGate(noCtfDbContext, _natsRunnerAvailabilityRegistry, _fusionCacheProvider, wolverinePostCommitMessagePublisher, _runnerCapacityLedgerCoordinator);
+            var runtimeProviderHandler = new NoCTF.Runner.Messages.RuntimeProviderHandler(_runtimeProviderCatalog, _runtimeManagedResourceReconcilerIEnumerable, _optionsOfRunnerOptions, persistedRunnerCapacityGate, _runtimeNodeWorkReader, _timeProvider2, _awdpAttackProvisioningPlanReader, _runnerProviderHealthState, _runnerResourceMutationCoordinator, _runnerResourceObserver);
             // The actual message body
             var stopOvaRuntime = (NoCTF.Application.Runtime.Instances.StopOvaRuntime)context.Envelope.Message;
 

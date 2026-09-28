@@ -32,6 +32,9 @@ public sealed class CreateForceTerminationEndpoint(
         Post("/admin/runtimes/{runtimeInstanceId}/force-terminations");
         AuthSchemes("Bearer");
         Roles("Administrator");
+        Options(builder => builder.WithMetadata(
+            new NoCTF.Hosting.Observability.RuntimeOperationMetricsMetadata(
+                NoCTF.Application.Observability.RuntimeOperationMetricKind.ForceTerminate)));
         Description(builder => builder.WithName("AdminCreateRuntimeForceTermination"));
         Summary(summary => summary.Summary = "Creates a force-termination request for a stuck Runtime.");
     }

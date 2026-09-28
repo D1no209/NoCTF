@@ -37,9 +37,16 @@ The base NoCTF Compose enables the NATS monitoring listener on internal port
        install -d -o 10001 -g 10001 -m 0750 /opt/noctf-observability/data/loki
        install -d -o root -g root -m 0700 /opt/noctf-observability/secrets
 
-3. Confirm that NOCTF_NETWORK_NAME matches the network created by the NoCTF
+3. Apply the Redis host prerequisite and persist it across reboot:
+
+       printf 'vm.overcommit_memory = 1\n' >/etc/sysctl.d/99-noctf-redis.conf
+       sysctl --system
+
+   This changes only the Linux memory-allocation policy. It does not modify
+   Redis data and does not require a PostgreSQL restart.
+4. Confirm that NOCTF_NETWORK_NAME matches the network created by the NoCTF
    core deployment.
-4. Validate and start the independent stack:
+5. Validate and start the independent stack:
 
        docker compose --env-file deploy/observability/.env \
          -f deploy/observability/compose.yml config --quiet
@@ -111,6 +118,13 @@ does not mean it was fast: dispatch may have exited early, failed or retried.
   monitoring configuration.
 - Alert rules create Prometheus alerts. Configure Grafana Alerting or an
   external Alertmanager and its credentials outside this repository.
+- A one-time Loki `empty ring`, Redis exporter connection failure, Prometheus
+  graceful shutdown, Grafana session-token rotation, or canceled data-source
+  query during startup/navigation is not an incident if the corresponding
+  target becomes healthy and no alert remains active.
+- Grafana plugin de-duplication warnings are expected with the pinned Grafana
+  13 image and an existing data volume. Do not delete plugin directories
+  automatically; verify each duplicate against the pinned image first.
 
 ## Validation
 
@@ -120,5 +134,12 @@ Run Docker Compose config validation, then use the pinned Prometheus image from
     promtool check config /etc/prometheus/prometheus.yml
 
 After startup, confirm that the noctf, postgres, redis, nats, node,
-blackbox-exporter and blackbox targets are up. Grafana should provision the
+blackbox-exporter, blackbox and loki targets are up. Grafana should provision the
 NoCTF Operations dashboard without requiring application API access.
+
+When an operator needs an interactive PostgreSQL shell, expand environment
+variables inside the PostgreSQL container rather than passing Compose-style
+defaults as literal user names:
+
+    docker compose exec -T postgres sh -lc \
+      'exec psql -U "$POSTGRES_USER" -d "$POSTGRES_DB"'
