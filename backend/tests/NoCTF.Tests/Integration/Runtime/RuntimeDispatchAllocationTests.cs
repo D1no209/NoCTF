@@ -103,7 +103,7 @@ public sealed class RuntimeDispatchAllocationTests
                 capacity, outbox, TimeProvider.System, ct);
             var request = outbox.Messages.OfType<IRuntimeProvisionMessage>().Single();
             db.ChangeTracker.Clear();
-            var allocationEntry = await db.RuntimeInstances
+            var allocationEntry = await db.RuntimeInstances.AsNoTracking()
                 .Where(row => row.Id == id)
                 .SelectMany(row => row.CapacityAllocationEntries)
                 .SingleAsync(ct);
