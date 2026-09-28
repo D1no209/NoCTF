@@ -58,7 +58,8 @@ Nuxt 4 SPA(`ssr: false`),Bun 管理依赖,TypeScript strict,Vue 用 `<script set
 - 咨询页使用 ConversationPanel / MessageBubble 共享原语，消息与输入区按 3:1 分配并独立滚动，自己的消息按当前用户 ID 判定后靠右。发送位于输入区右下，解决和关闭操作位于左侧当前咨询条目下方；权限、消息与状态请求由功能层处理。
 - 顶部主题调色板由 features/theme 控制浏览器本地偏好，亮暗主题分别保存；共享 ColorPicker / ColorSwatch 原语负责颜色编辑交互，不使用原生 color/range 控件。主题插件校验 HEX 后设置 user-primary token，语义 token 派生强调色与按钮前景，恢复默认时移除覆盖。新增用色继续使用主题 token。
 - 人机验证总开关下的 Runtime 与 Evaluation 策略相互独立；Evaluation 控制 Flag 提交及只读 Break 判定。客户端只根据公共 `evaluationRequired` capability 决定是否弹出 HumanVerificationGate，服务端中间件继续执行最终策略，管理端保存 `evaluationEnabled`。
-- 顶部栏使用 80px 透明承载层及三个按内容宽度自适应的腰圆。左侧为平台 Logo 锁定；中间依次容纳竞赛、题库管理、平台设置、消息中心和中英切换；右侧容纳主题调色板、明暗切换和头像。腰圆使用主题 Card 表面、12px 模糊和统一投影。导航入口保留固定宽度槽位和展开动效。32px 无框头像触发 AccountPanel Popover，不使用 DropdownMenu；桌面端正方形主 Card 以头像为水平中线显示，窄屏保留末端对齐。账户摘要区直接进入个人页；设置详情以同宽但不定高的子 Card 在主 Card 下方向下展开并通过 ScrollSurface 滚动，不显示上传规格、字符计数或解释性注释。
+- 顶部栏使用 80px 透明承载层及三个按内容宽度自适应的腰圆。左侧为平台 Logo 锁定；中间依次容纳竞赛、题库管理、平台设置和消息中心；右侧依次容纳中英切换、主题调色板、明暗切换和头像。腰圆使用主题 Card 表面、12px 模糊和统一投影。导航入口保留固定宽度槽位和展开动效。32px 无框头像触发 AccountPanel Popover，不使用 DropdownMenu；桌面端正方形主 Card 以头像为水平中线显示，窄屏保留末端对齐。账户摘要区直接进入个人页；设置详情以同宽但不定高的子 Card 在主 Card 下方向下展开并通过 ScrollSurface 滚动，不显示上传规格、字符计数或解释性注释。
+- 中间顶栏导航项的悬停和键盘焦点仅使用胶囊内侧柔光；不要叠加 `ghost` 底色或会被横向滚动面裁成矩形的外阴影。保留活动项的主题色下划线。
 - 登录与注册使用 `/auth/login`、`/auth/register` 独立页面，顶部栏、首页与鉴权拦截直接指向对应路由。认证表单 Card 使用 `max-w-xl` 预留横向扩展空间；鉴权中间件携带安全的站内 `redirect`，登录成功后返回原目标。
 - 除首页 `/` 外，浅色与深色模式页面分别使用本地 `assets/images/backgrounds/light-pages-wallpaper.jpg` 和 `dark-pages-wallpaper.jpg` 固定壁纸；两者均以 35% 图像强度叠在各自 background token 上，只影响布局背景。页面内容与卡片不继承壁纸透明度，壁纸必须与普通页面 Card 保持在同一可采样合成上下文中。
 - Nuxt 保持 `ssr: false`；搜索与分享平台所需的全局平台名称、描述、Logo、Open Graph 与 JSON-LD 由 API 的 SPA HTML fallback 从平台配置动态注入，不能只依赖客户端 `useHead`。元数据必须安全转义并生成绝对 URL，API/Hub/健康检查/静态资源不得被 fallback 接管。

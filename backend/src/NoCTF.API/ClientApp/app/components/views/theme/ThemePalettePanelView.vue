@@ -6,7 +6,7 @@ const { Palette, mode, color, wallpaperOpacity, presets, setColor, setWallpaperO
 </script>
 <template>
   <Popover>
-    <PopoverTrigger as-child><Button variant="ghost" size="icon" :aria-label="$t('palette.title')"><Palette /></Button></PopoverTrigger>
+    <PopoverTrigger as-child><Button variant="ghost" size="icon" class="rounded-full" :aria-label="$t('palette.title')"><Palette /></Button></PopoverTrigger>
     <PopoverContent align="end" class="w-80 max-h-[calc(100dvh-6rem)]">
       <div class="flex flex-col gap-4">
         <PopoverHeader><PopoverTitle>{{ $t('palette.title') }}</PopoverTitle><PopoverDescription>{{ $t('palette.description') }}</PopoverDescription></PopoverHeader>

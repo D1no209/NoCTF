@@ -10,6 +10,7 @@ const { Moon, Sun, isDark, themeTransitioning, toggle, t } = toRefs(viewProps.st
   <Button
     variant="ghost"
     size="icon"
+    class="rounded-full"
     :aria-label="isDark ? t('ui.switchToLightTheme') : t('ui.switchToDarkTheme')"
     :aria-busy="themeTransitioning || undefined"
     :disabled="themeTransitioning"

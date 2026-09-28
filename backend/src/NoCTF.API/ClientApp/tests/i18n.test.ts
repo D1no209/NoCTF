@@ -97,14 +97,17 @@ describe('platform locale', () => {
 })
 
 describe('locale switch placement', () => {
-  test('renders the language switch in the center capsule', async () => {
+  test('renders the language switch in the right capsule', async () => {
     const layout = await sourceFile(
       new URL('../app/layouts/default.vue', import.meta.url),
     ).text()
 
     const center = layout.slice(layout.indexOf('data-position="center"'), layout.indexOf('data-position="right"'))
-    expect(center).toContain('<component :is="LanguageToggle" />')
+    const right = layout.slice(layout.indexOf('data-position="right"'))
+    expect(center).not.toContain('<component :is="LanguageToggle" />')
     expect(center).not.toContain('<component :is="ThemeToggle" />')
+    expect(right).toContain('<component :is="LanguageToggle" />')
+    expect(right).toContain('<component :is="ThemeToggle" />')
   })
 
   test('switches the selected locale without reloading or remounting the SPA page', async () => {

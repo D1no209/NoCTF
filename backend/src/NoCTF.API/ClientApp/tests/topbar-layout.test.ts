@@ -15,7 +15,9 @@ test('the top bar uses three content-sized capsules with the requested controls'
   expect(left).toContain('data-slot="topbar-brand-name"')
   expect(center).toContain('v-for="item in navItems.filter((i) => i.show)"')
   expect(center).toContain('item.unread')
-  expect(center).toContain('<component :is="LanguageToggle" />')
+  expect(center).not.toContain('<component :is="LanguageToggle" />')
+  expect(right).toContain('<component :is="LanguageToggle" />')
+  expect(right.indexOf('<component :is="LanguageToggle" />')).toBeLessThan(right.indexOf('<component :is="ThemePalettePanel" />'))
   expect(right).toContain('<component :is="ThemePalettePanel" />')
   expect(right).toContain('<component :is="ThemeToggle" />')
   expect(right).toContain(':is="AccountPanel"')
@@ -26,6 +28,27 @@ test('the top bar uses three content-sized capsules with the requested controls'
   expect(css).toContain('display: flex; width: max-content; max-width: 100%; min-height: 3rem;')
   expect(css).toContain('border-radius: 9999px;')
   expect(css).toContain("[data-slot='topbar-capsule'] [data-slot='button']")
+  expect(css).toContain("[data-slot='topbar-capsule'][data-position='center'] [data-top-nav-item][data-slot='button'] {")
+  expect(css).toContain('box-shadow: inset 0 0 18px color-mix(in oklch, var(--primary) 13%, transparent);')
+  expect(css).toContain('box-shadow: inset 0 0 18px color-mix(in oklch, var(--primary) 28%, transparent);')
+  const centerNavStyle = css.slice(
+    css.indexOf("[data-slot='topbar-capsule'][data-position='center'] [data-top-nav-item][data-slot='button']"),
+    css.indexOf('@media (max-width: 639px)'),
+  )
+  expect(centerNavStyle).toContain('background: transparent;')
+  expect(centerNavStyle).toContain('box-shadow: none;')
+  expect(centerNavStyle).not.toContain('0 0 14px')
+  expect(css).toContain("[data-slot='topbar-capsule'][data-position='right'] :is([data-slot='button'], [data-slot='popover-trigger'])[data-size='icon'] {")
+  expect(css).toContain('border-radius: 50%;')
+  expect(css).toContain("[data-slot='topbar-capsule'] :is([data-slot='button'], [data-slot='popover-trigger']):hover")
+  const language = await Bun.file(new URL('../app/components/views/LanguageToggleView.vue', import.meta.url)).text()
+  const palette = await Bun.file(new URL('../app/components/views/theme/ThemePalettePanelView.vue', import.meta.url)).text()
+  const theme = await Bun.file(new URL('../app/components/views/ThemeToggleView.vue', import.meta.url)).text()
+  for (const control of [language, palette, theme]) {
+    expect(control).toContain('size="icon"')
+    expect(control).toContain('class="rounded-full"')
+  }
+  expect(language).toContain(':aria-label="isEnglish ? t(')
   expect(css).toContain('inset 0 0 18px')
   const topNavMotion = await Bun.file(new URL('../app/motion/top-nav-width.ts', import.meta.url)).text()
   expect(layout).toContain('v-top-nav-motion')
