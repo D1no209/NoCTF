@@ -16,7 +16,7 @@ export default defineNuxtPlugin(nuxtApp => {
     for (const mode of ['light', 'dark'] as const) {
       const color = value[mode]
       const style = document.documentElement.style
-      const wallpaperOpacity = value[mode === 'light' ? 'lightWallpaperOpacity' : 'darkWallpaperOpacity']
+      const wallpaperBlur = value[mode === 'light' ? 'lightWallpaperBlur' : 'darkWallpaperBlur']
       if (color) {
         style.setProperty(`--user-primary-${mode}`, color)
         style.setProperty(`--user-primary-foreground-${mode}`, colorInk(color))
@@ -24,7 +24,7 @@ export default defineNuxtPlugin(nuxtApp => {
         style.removeProperty(`--user-primary-${mode}`)
         style.removeProperty(`--user-primary-foreground-${mode}`)
       }
-      style.setProperty(`--user-page-wallpaper-overlay-${mode}`, `${100 - wallpaperOpacity}%`)
+      style.setProperty(`--user-page-wallpaper-blur-${mode}`, `${wallpaperBlur}px`)
     }
     if (timer !== undefined) clearTimeout(timer)
     timer = setTimeout(save, 200)

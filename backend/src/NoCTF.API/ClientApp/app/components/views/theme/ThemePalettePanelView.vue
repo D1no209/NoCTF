@@ -2,7 +2,7 @@
 import { toRefs } from 'vue'
 import type { ThemePalettePanelViewState } from '~/features/theme/useThemePalettePanel'
 const props = defineProps<{ state: ThemePalettePanelViewState }>()
-const { Palette, mode, color, wallpaperOpacity, presets, setColor, setWallpaperOpacity, setMode, reset } = toRefs(props.state)
+const { Palette, mode, color, wallpaperBlur, maximumWallpaperBlur, presets, setColor, setWallpaperBlur, setMode, reset } = toRefs(props.state)
 </script>
 <template>
   <Popover>
@@ -15,7 +15,7 @@ const { Palette, mode, color, wallpaperOpacity, presets, setColor, setWallpaperO
           <Button size="sm" :variant="mode === 'dark' ? 'default' : 'ghost'" :aria-pressed="mode === 'dark'" @click="setMode('dark')">{{ $t('palette.dark') }}</Button>
         </div>
         <ColorPicker id="theme-color" :model-value="color" @update:model-value="setColor" />
-        <OpacitySlider id="theme-wallpaper-opacity" :label="$t('palette.wallpaperOpacity')" :model-value="wallpaperOpacity" @update:model-value="setWallpaperOpacity" />
+        <BlurSlider id="theme-wallpaper-blur" :label="$t('palette.wallpaperBlur')" :model-value="wallpaperBlur" :maximum="maximumWallpaperBlur" @update:model-value="setWallpaperBlur" />
         <div class="grid grid-cols-8 gap-1" :aria-label="$t('palette.presets')">
           <ColorSwatch v-for="preset in presets" :key="preset.color" :color="preset.color" :label="$t(preset.label)" :selected="color === preset.color" class="size-8" @select="setColor" />
         </div>

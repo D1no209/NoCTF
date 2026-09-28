@@ -3,7 +3,7 @@ import { Palette } from '@lucide/vue'
 import { useThemePalette } from '../../composables/useThemePalette'
 import { normalizeHex } from '../../components/ui/color-picker/color'
 import { themeColor } from '../../utils/theme-color'
-import { defaultWallpaperOpacity } from './palette'
+import { defaultWallpaperBlur, maximumWallpaperBlur } from './palette'
 
 export function useThemePalettePanel() {
   const { isDark, toggle } = useTheme()
@@ -12,16 +12,17 @@ export function useThemePalettePanel() {
   const defaultColor = ref('#39FF14')
   watch([isDark, palette], async () => { await nextTick(); defaultColor.value = themeColor('--primary') }, { immediate: true, deep: true })
   const color = computed(() => palette.value[mode.value] ?? defaultColor.value)
-  const wallpaperOpacityKey = computed(() => mode.value === 'dark' ? 'darkWallpaperOpacity' : 'lightWallpaperOpacity')
-  const wallpaperOpacity = computed(() => palette.value[wallpaperOpacityKey.value])
+  const wallpaperBlurKey = computed(() => mode.value === 'dark' ? 'darkWallpaperBlur' : 'lightWallpaperBlur')
+  const wallpaperBlur = computed(() => palette.value[wallpaperBlurKey.value])
   function setColor(value: string) {
     const normalized = normalizeHex(value)
     if (normalized) palette.value = { ...palette.value, [mode.value]: normalized }
   }
-  function setWallpaperOpacity(value: number) {
+  function setWallpaperBlur(value: number) {
+    if (!Number.isFinite(value)) return
     palette.value = {
       ...palette.value,
-      [wallpaperOpacityKey.value]: Math.round(Math.min(100, Math.max(0, value))),
+      [wallpaperBlurKey.value]: Math.round(Math.min(maximumWallpaperBlur, Math.max(0, value))),
     }
   }
   function setMode(value: 'light' | 'dark') { if (value !== mode.value) toggle() }
@@ -29,7 +30,7 @@ export function useThemePalettePanel() {
     palette.value = {
       ...palette.value,
       [mode.value]: null,
-      [wallpaperOpacityKey.value]: defaultWallpaperOpacity,
+      [wallpaperBlurKey.value]: defaultWallpaperBlur,
     }
   }
   const presets = [
@@ -38,6 +39,6 @@ export function useThemePalettePanel() {
     { color: '#F97316', label: 'palette.orange' }, { color: '#39FF14', label: 'palette.green' },
     { color: '#EF4444', label: 'palette.red' }, { color: '#64748B', label: 'palette.slate' },
   ]
-  return { Palette, mode, color, wallpaperOpacity, presets, setColor, setWallpaperOpacity, setMode, reset }
+  return { Palette, mode, color, wallpaperBlur, maximumWallpaperBlur, presets, setColor, setWallpaperBlur, setMode, reset }
 }
 export type ThemePalettePanelViewState = import('vue').ShallowUnwrapRef<ReturnType<typeof useThemePalettePanel>>

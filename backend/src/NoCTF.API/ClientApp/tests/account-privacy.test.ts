@@ -62,7 +62,9 @@ test('light and dark non-home pages use local wallpapers with a configurable sha
   expect(css).toContain("url('../images/backgrounds/dark-pages-wallpaper.jpg')")
   expect(layout).toContain(':data-personal-wallpaper="wallpaperActive || undefined"')
   expect(css).toContain("[data-page-wallpaper='true'][data-personal-wallpaper='true']")
-  expect(css.match(/var\(--background\) var\(--page-wallpaper-overlay\)/g)?.length).toBeGreaterThanOrEqual(4)
+  expect(css).toContain("[data-page-wallpaper='true']::before")
+  expect(css).toContain("[data-page-wallpaper='true']::after")
+  expect(css).toContain('filter: blur(var(--page-wallpaper-blur));')
   expect(await Bun.file(new URL('../app/assets/images/backgrounds/dark-pages-wallpaper.jpg', import.meta.url)).exists()).toBe(true)
 })
 
