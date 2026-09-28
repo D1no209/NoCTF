@@ -16,7 +16,8 @@ public sealed class SsoProviderRuntimeReader(
         Guid providerId,
         CancellationToken ct)
     {
-        var settings = await db.PlatformSettings.AsNoTracking().SingleAsync(ct);
+        var settings = await db.PlatformSettings.AsNoTracking().AsSplitQuery()
+            .SingleAsync(ct);
         var provider = settings.SsoConfiguration.Providers
             .SingleOrDefault(item => item.Id == providerId);
         if (provider is null)

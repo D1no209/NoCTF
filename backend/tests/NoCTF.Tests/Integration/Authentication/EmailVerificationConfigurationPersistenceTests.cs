@@ -1,5 +1,6 @@
 using System.Text;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Options;
 using NoCTF.Application.Authentication.EmailVerification;
@@ -29,6 +30,8 @@ public sealed class EmailVerificationConfigurationPersistenceTests
             var options = new DbContextOptionsBuilder<NoCtfDbContext>()
                 .UseNpgsql(postgres.GetConnectionString())
                 .UseSnakeCaseNamingConvention()
+                .ConfigureWarnings(warnings => warnings.Throw(
+                    RelationalEventId.MultipleCollectionIncludeWarning))
                 .Options;
             var configuration = new ConfigurationBuilder()
                 .AddInMemoryCollection(new Dictionary<string, string?>
@@ -60,6 +63,7 @@ public sealed class EmailVerificationConfigurationPersistenceTests
             await Assert.That(typeof(EmailVerificationConfigurationView).GetProperty("SmtpPassword"))
                 .IsNull();
             var persistedSettings = await db.PlatformSettings.AsNoTracking()
+                .AsSplitQuery()
                 .SingleAsync(cancellationToken);
             await Assert.That(persistedSettings.EmailSmtpPasswordCiphertext)
                 .IsNotNull();

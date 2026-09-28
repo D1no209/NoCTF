@@ -58,7 +58,8 @@ public sealed class AccountPrivacyStore(NoCtfDbContext db, IOptions<AccountPriva
             && user.ExternalIdentitySubject is { } subject
             && user.ExternalIdentityBoundAt is { } boundAt)
         {
-            var settings = await db.PlatformSettings.AsNoTracking().SingleAsync(ct);
+            var settings = await db.PlatformSettings.AsNoTracking().AsSplitQuery()
+                .SingleAsync(ct);
             var provider = settings.SsoConfiguration.Providers.FirstOrDefault(
                 candidate => candidate.Id == providerId);
             ssoBinding = new(

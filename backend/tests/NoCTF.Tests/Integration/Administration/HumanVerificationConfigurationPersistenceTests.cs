@@ -1,5 +1,6 @@
 using System.Text;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.Options;
 using Microsoft.Extensions.DependencyInjection;
 using NoCTF.Application.Admission;
@@ -34,6 +35,8 @@ public sealed class HumanVerificationConfigurationPersistenceTests
             var options = new DbContextOptionsBuilder<NoCtfDbContext>()
                 .UseNpgsql(postgres.GetConnectionString())
                 .UseSnakeCaseNamingConvention()
+                .ConfigureWarnings(warnings => warnings.Throw(
+                    RelationalEventId.MultipleCollectionIncludeWarning))
                 .Options;
             var protector = new PlatformSecretProtector(Options.Create(
                 new EmailVerificationProtectionOptions
@@ -103,6 +106,7 @@ public sealed class HumanVerificationConfigurationPersistenceTests
             await Assert.That(typeof(HumanVerificationConfigurationView)
                 .GetProperty("TurnstileSecret")).IsNull();
             var persisted = await db.PlatformSettings.AsNoTracking()
+                .AsSplitQuery()
                 .SingleAsync(cancellationToken);
             await Assert.That(persisted.HumanVerificationRuntimeEnabled).IsFalse();
             await Assert.That(persisted.HumanVerificationEvaluationEnabled).IsFalse();

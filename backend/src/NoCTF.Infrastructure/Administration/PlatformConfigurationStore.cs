@@ -44,7 +44,7 @@ public sealed class PlatformConfigurationStore(
         DateTimeOffset now,
         CancellationToken ct)
     {
-        var settings = await db.PlatformSettings.SingleAsync(
+        var settings = await db.PlatformSettings.AsSplitQuery().SingleAsync(
             candidate => candidate.Id == SettingsId,
             ct);
         settings.Name = name;
@@ -58,7 +58,7 @@ public sealed class PlatformConfigurationStore(
         DateTimeOffset now,
         CancellationToken ct)
     {
-        var settings = await db.PlatformSettings.SingleAsync(
+        var settings = await db.PlatformSettings.AsSplitQuery().SingleAsync(
             candidate => candidate.Id == SettingsId,
             ct);
         settings.CtfPatchVerificationEnabled = ctfPatchVerificationEnabled;
@@ -72,7 +72,7 @@ public sealed class PlatformConfigurationStore(
         CancellationToken ct)
     {
         await using var transaction = await AggregateCompatibleTransaction.BeginAsync(db, ct);
-        var settings = await db.PlatformSettings.SingleAsync(
+        var settings = await db.PlatformSettings.AsSplitQuery().SingleAsync(
             candidate => candidate.Id == SettingsId,
             ct);
         if (!await fileLock.AcquireAsync(db, fileId, ct))
@@ -113,6 +113,7 @@ public sealed class PlatformConfigurationStore(
 
     private async Task<PlatformConfigurationView> LoadAsync(CancellationToken ct) =>
         ToView(await db.PlatformSettings.AsNoTracking().Include(item => item.LogoFile)
+            .AsSplitQuery()
             .SingleAsync(settings => settings.Id == SettingsId, ct));
 
     private static PlatformConfigurationView ToView(PlatformSettings settings) =>

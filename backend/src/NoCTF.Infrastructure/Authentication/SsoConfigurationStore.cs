@@ -22,6 +22,7 @@ public sealed class SsoConfigurationStore(
     public async Task<SsoConfigurationView> GetAsync(CancellationToken ct)
     {
         var settings = await db.PlatformSettings.AsNoTracking()
+            .AsSplitQuery()
             .SingleAsync(item => item.Id == SettingsId, ct);
         return ToView(settings.SsoConfiguration, settings.UpdatedAt);
     }
@@ -190,7 +191,7 @@ public sealed class SsoConfigurationStore(
                 : null;
             try
             {
-                var settings = await db.PlatformSettings.SingleAsync(
+                var settings = await db.PlatformSettings.AsSplitQuery().SingleAsync(
                     item => item.Id == SettingsId,
                     ct);
                 var configuration = settings.SsoConfiguration;
