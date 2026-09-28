@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Diagnostics;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Configuration;
 using NoCTF.Application.Administration.PlatformLogs;
@@ -11,6 +12,31 @@ namespace NoCTF.Tests.Unit.Infrastructure;
 
 public sealed class RedactedPlatformLogProcessorTests
 {
+    [Test]
+    public async Task Multiple_collection_warning_includes_only_the_bounded_query_source()
+    {
+        var queue = new PlatformLogBroadcastQueue();
+        var exporter = new CaptureExporter();
+        using var factory = LoggerFactory.Create(builder => builder.AddOpenTelemetry(options =>
+        {
+            options.IncludeFormattedMessage = true;
+            options.AddProcessor(new RedactedPlatformLogProcessor(
+                queue, PlatformLogService.Api, NewProtector()));
+            options.AddProcessor(new SimpleLogRecordExportProcessor(exporter));
+        }));
+        using var activity = new Activity("request").Start();
+        activity.SetTag("noctf.endpoint", "/api/v1/competitions/{competitionId}");
+
+        factory.CreateLogger("Microsoft.EntityFrameworkCore.Query").LogWarning(
+            new EventId(20504, "MultipleCollectionIncludeWarning"),
+            "Compiling a query with multiple collections.");
+
+        var stored = JsonSerializer.Deserialize(exporter.Body!,
+            StoredPlatformLogJsonContext.Default.StoredPlatformLog);
+        await Assert.That(stored!.View.Message)
+            .Contains("Query source: /api/v1/competitions/{competitionId}.");
+    }
+
     [Test]
     public async Task Framework_database_command_is_exported_without_sql_or_parameters()
     {

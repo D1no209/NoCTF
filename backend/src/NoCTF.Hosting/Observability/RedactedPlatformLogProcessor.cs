@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Diagnostics;
 using System.Text.Json;
 using OpenTelemetry;
 using OpenTelemetry.Logs;
@@ -47,6 +48,8 @@ public sealed class RedactedPlatformLogProcessor(
         };
         var message = Limit(SanitizeMessage(category,
             record.FormattedMessage ?? record.Body, properties), 16_384);
+        if (record.EventId.Id == 20504 && ReadDiagnosticSource() is { } source)
+            message = Limit($"{message} Query source: {source}.", 16_384);
         // Exception.ToString() can embed EF command text, parameters, or provider
         // details. Preserve the type for diagnostics without exporting that payload.
         string? exceptionMessage = null;
@@ -94,6 +97,21 @@ public sealed class RedactedPlatformLogProcessor(
                 return guid;
         }
         return null;
+    }
+
+    private static string? ReadDiagnosticSource()
+    {
+        var activity = Activity.Current;
+        if (activity is null)
+            return null;
+        var source = activity.GetTagItem("noctf.endpoint")?.ToString()
+            ?? activity.GetTagItem("messaging.message.type")?.ToString();
+        if (string.IsNullOrWhiteSpace(source)
+            && activity.DisplayName.StartsWith("NoCTF.", StringComparison.Ordinal))
+            source = activity.DisplayName;
+        if (string.IsNullOrWhiteSpace(source))
+            return null;
+        return Limit(source, 512);
     }
 
     private static string Limit(string value, int maximum) =>

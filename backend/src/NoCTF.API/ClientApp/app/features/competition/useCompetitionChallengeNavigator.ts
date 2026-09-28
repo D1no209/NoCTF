@@ -13,6 +13,15 @@ type Challenge = NoCtfapiEndpointsChallengesChallengeSummaryResponse
 type BloodRank = 'First' | 'Second' | 'Third'
 const bloodOrder: Record<BloodRank, number> = { First: 0, Second: 1, Third: 2 }
 
+export function isChallengeVisible(
+  challenge: Pick<Challenge, 'title' | 'locked'>,
+  filters: { hideSolved: boolean; hideLocked: boolean; solvedByMyTeam: boolean; search: string },
+): boolean {
+  return (!filters.hideSolved || !filters.solvedByMyTeam)
+    && (!filters.hideLocked || !challenge.locked)
+    && (!filters.search || (challenge.title ?? '').toLocaleLowerCase().includes(filters.search))
+}
+
 export function affectsCompetitionChallengeList(kind: string): boolean {
   return kind === 'ChallengeCreated'
     || kind === 'ChallengeUpdated'
@@ -57,6 +66,8 @@ emit: { (event: "ready", ...args: [challengeId: string | null]): void; (event: "
 
   const { isLoggedIn } = useAuth()
 
+  const isCtf = computed(() => ctx.competition.value?.mode === 'Ctf')
+
   const isAwdp = computed(() => ctx.competition.value?.mode === 'Awdp')
 
   const items = ref<Challenge[]>([])
@@ -70,6 +81,10 @@ emit: { (event: "ready", ...args: [challengeId: string | null]): void; (event: "
   const myTeamId = ref<string | null>(null)
 
   const hideSolved = ref(false)
+
+  const hideLocked = ref(false)
+
+  const hidesLockedChallenges = computed(() => isCtf.value && hideLocked.value)
 
   const search = ref('')
 
@@ -253,15 +268,19 @@ emit: { (event: "ready", ...args: [challengeId: string | null]): void; (event: "
   const visibleGroups = computed(() => groups.value
     .map(group => ({
       ...group,
-      challenges: group.challenges.filter(challenge =>
-        (!hideSolved.value || !progressFor(challenge.id)?.solvedByMyTeam)
-        && (!normalizedSearch.value || (challenge.title ?? '').toLocaleLowerCase().includes(normalizedSearch.value))),
+      challenges: group.challenges.filter(challenge => isChallengeVisible(challenge, {
+        hideSolved: hideSolved.value,
+        hideLocked: hidesLockedChallenges.value,
+        solvedByMyTeam: hideSolved.value && !!progressFor(challenge.id)?.solvedByMyTeam,
+        search: normalizedSearch.value,
+      })),
     }))
     .filter(group => group.challenges.length > 0))
 
-  const emptyLabel = computed(() => normalizedSearch.value
+  const emptyLabel = computed(() => normalizedSearch.value || (hideSolved.value && hidesLockedChallenges.value)
     ? translate('challengeNavigator.noMatches')
-    : hideSolved.value ? translate('ui.noUnsolvedChallenges') : translate('ui.thereAreNoPublishedTopicsYet'))
+    : hidesLockedChallenges.value ? translate('challengeNavigator.noUnlockedChallenges')
+      : hideSolved.value ? translate('ui.noUnsolvedChallenges') : translate('ui.thereAreNoPublishedTopicsYet'))
 
   const groupOptions = computed(() => visibleGroups.value.map(group => ({
     value: group.direction,
@@ -290,12 +309,14 @@ emit: { (event: "ready", ...args: [challengeId: string | null]): void; (event: "
       Users,
       bloodRankLabel,
       emit,
+      isCtf,
       isAwdp,
       items,
       loading,
       error,
       dataScope,
       hideSolved,
+      hideLocked,
       search,
       board,
       progressFor,

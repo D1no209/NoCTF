@@ -25,7 +25,7 @@ export function useRuntimeCard(props: Readonly<Omit<{
     /** full = CTF 全操作;reset-only = AWD 仅重置;readonly = 只显示最终状态 */
     controls?: 'full' | 'reset-only' | 'readonly'
     dockTarget?: string
-  }, "controls" | "dockTarget">>>) {
+  }, "controls" | "dockTarget">>>, emit: { (event: 'changed'): void }) {
   const runtime = ref<Runtime | null>(null)
   const { request: requestHumanVerification } = useHumanVerification()
 
@@ -43,14 +43,19 @@ export function useRuntimeCard(props: Readonly<Omit<{
 
   const forceUntilStopped = ref(false)
 
+  let hasLoaded = false
+
   async function load(): Promise<PlayerRuntimeLookupOutcome> {
     const { data, error, response } = await getRuntimeEndpoint({
       path: { competitionId: props.competitionId, competitionChallengeId: props.competitionChallengeId },
     })
     const outcome = classifyPlayerRuntimeLookup(response?.status, Boolean(error), Boolean(data))
     if (outcome === 'missing') {
+      const hadRuntime = runtime.value !== null
       runtime.value = null
       loadError.value = null
+      if (hasLoaded && hadRuntime) emit('changed')
+      hasLoaded = true
       return outcome
     }
     if (outcome === 'failed') {
@@ -58,8 +63,14 @@ export function useRuntimeCard(props: Readonly<Omit<{
       return outcome
     }
 
+    const previous = runtime.value
     runtime.value = normalizePlayerRuntime(data ?? null)
     loadError.value = null
+    if (hasLoaded && previous && runtime.value
+      && (previous.id !== runtime.value.id
+        || previous.state !== runtime.value.state
+        || previous.expiresAt !== runtime.value.expiresAt)) emit('changed')
+    hasLoaded = true
     return outcome
   }
 

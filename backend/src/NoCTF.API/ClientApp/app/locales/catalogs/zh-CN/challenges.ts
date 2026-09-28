@@ -1,6 +1,8 @@
 /** Runtime locale chunk. Keep keys stable across languages. */
 export const messages = {
   "challengeNavigator.noMatches": "没有匹配的题目",
+  "challengeNavigator.hideLocked": "隐藏未解锁",
+  "challengeNavigator.noUnlockedChallenges": "没有已解锁的题目",
   "challengeNavigator.searchPlaceholder": "搜索题目名称",
   "terminal.challengeSolved": "Challenge is Solved ！",
   "terminal.flagPlaceholder": "Type Your Flag ~~",

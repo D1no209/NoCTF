@@ -10,6 +10,7 @@ import { teamRegistrationErrorMessage } from '../../../../../lib/competition-tra
 import { exceedsUploadLimit } from '../../../../account/upload-limits'
 import CompetitionParticipantWorkspaceComponent from '../../../../competition/CompetitionParticipantWorkspace.vue'
 import TeamMembersComponent from '../../../../teams/TeamMembers.vue'
+import TeamRuntimeManagerComponent from '../../../../teams/TeamRuntimeManager.vue'
 
 /** Owns state, effects and commands for CompetitionsByIdMyTeamPage. */
 export function useCompetitionsByIdMyTeamPage() {
@@ -415,6 +416,8 @@ export function useCompetitionsByIdMyTeamPage() {
 
   const TeamMembers = markRaw(TeamMembersComponent)
 
+  const TeamRuntimeManager = markRaw(TeamRuntimeManagerComponent)
+
   const viewBindings = {
       Copy,
       RefreshCw,
@@ -473,7 +476,8 @@ export function useCompetitionsByIdMyTeamPage() {
       submitAppeal,
       setAppealOpen,
       CompetitionParticipantWorkspace,
-      TeamMembers
+      TeamMembers,
+      TeamRuntimeManager
     }
   const viewState = proxyRefs(viewBindings)
 

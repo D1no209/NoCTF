@@ -14,7 +14,8 @@ const props = withDefaults(
   }>(),
   { controls: 'full', dockTarget: '' },
 )
-const state = bindViewState(useRuntimeCard(props))
+const emit = defineEmits<{ changed: [] }>()
+const state = bindViewState(useRuntimeCard(props, emit))
 defineExpose({ refreshUntilStopped: state.refreshUntilStopped })
 </script>
 

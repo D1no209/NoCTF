@@ -1,5 +1,9 @@
 /** Runtime locale chunk. Keep keys stable across languages. */
 export const messages = {
+  "runtime.teamInstancesTitle": "队伍实例",
+  "runtime.noActiveTeamInstances": "本队目前没有活动中的题目容器",
+  "runtime.expiresAt": "到期：{time}",
+  "runtime.openChallenge": "打开题目",
   "ui.searchCompetitionChallengeOrTeam": "搜索赛事、题目或队伍",
   "ui.allSources": "来源(全部)",
   "ui.competitionContainers": "赛事容器",

@@ -498,6 +498,19 @@ export function createMockApi() {
       else if (cleanRoute.endsWith('/gameplay-facts')) value = list(state.facts.filter(f => f.competitionId === p.competitionId), url)
       else if (cleanRoute.endsWith('/gameplay-facts/{gameplayFactId}')) value = state.facts.find(f => f.id === p.gameplayFactId)
       else if (cleanRoute.endsWith('/gameplay-facts/{gameplayFactId}/value')) value = { gameplayFactId: p.gameplayFactId, value: state.facts.find(f => f.id === p.gameplayFactId)?.value ?? '' }
+      else if (route === '/competitions/{competitionId}/teams/me/runtimes') {
+        if (!myTeam || myTeam.registrationStatus !== 'Approved' || myTeam.isBanned)
+          return problem(404, '演示队伍不可访问 / Mock team unavailable')
+        value = list(state.runtimes
+          .filter(runtime => runtime.competitionId === p.competitionId
+            && runtime.teamId === myTeam.id
+            && ['Queued', 'Provisioning', 'Running', 'Stopping'].includes(runtime.state))
+          .sort((left, right) => String(right.createdAt).localeCompare(String(left.createdAt)))
+          .map(runtime => ({
+            runtime,
+            challengeTitle: state.challenges.find(challenge => challenge.id === runtime.competitionChallengeId)?.title ?? '',
+          })), url)
+      }
       else if (cleanRoute.endsWith('/runtimes/current') || route.endsWith('/test-runtimes/current')) {
         value = [...state.runtimes].reverse().find(r => r.competitionChallengeId === challenge?.id && r.challengeId === template?.id)
         if (!value) return problem(404, '演示实例未启动 / No active Mock runtime')
@@ -761,7 +774,14 @@ export function createMockApi() {
         }
         if (!runtime) return problem(404, '演示实例未启动 / No runtime')
         if (action === 'stop') Object.assign(runtime, { state: 'Stopped', stoppedAt: now() })
-        if (action === 'extend') runtime.expiresAt = date(2)
+        if (action === 'extend') {
+          const requestedExpiry = Date.parse(body.expiresAt)
+          const currentExpiry = Date.parse(runtime.expiresAt)
+          if (runtime.state !== 'Running' || !Number.isFinite(requestedExpiry)
+            || !Number.isFinite(currentExpiry) || requestedExpiry <= currentExpiry)
+            return problem(409, '演示实例当前无法续期 / Mock runtime cannot be extended')
+          runtime.expiresAt = new Date(requestedExpiry).toISOString()
+        }
         value = { ...runtime, runtimeInstanceId: runtime.id, statusUrl: path.replace(/\/{runtimeInstanceId}$/, '/current') }
       }
       else if (route === '/competitions/{competitionId}/teams/{teamId}/writeup/consultations') {

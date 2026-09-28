@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.DependencyInjection;
 using NoCTF.Domain.Competitions;
 using NoCTF.Domain.Competitions.Events;
@@ -40,6 +41,8 @@ public sealed class CompetitionManagementPersistenceTests
             var options = new DbContextOptionsBuilder<NoCtfDbContext>()
                 .UseNpgsql(postgres.GetConnectionString())
                 .UseSnakeCaseNamingConvention()
+                .ConfigureWarnings(warnings => warnings.Throw(
+                    RelationalEventId.MultipleCollectionIncludeWarning))
                 .Options;
             var now = DateTimeOffset.UtcNow;
             var ownerId = Guid.CreateVersion7();
@@ -76,6 +79,7 @@ public sealed class CompetitionManagementPersistenceTests
                 var competitionId = result.Competition!.Id;
                 var persisted = await db.Competitions
                     .AsNoTracking()
+                    .AsSplitQuery()
                     .SingleAsync(competition => competition.Id == competitionId, cancellationToken);
                 await Assert.That(persisted.ModeConfiguration!.Mode).IsEqualTo(mode);
             }
@@ -98,6 +102,8 @@ public sealed class CompetitionManagementPersistenceTests
             var options = new DbContextOptionsBuilder<NoCtfDbContext>()
                 .UseNpgsql(postgres.GetConnectionString())
                 .UseSnakeCaseNamingConvention()
+                .ConfigureWarnings(warnings => warnings.Throw(
+                    RelationalEventId.MultipleCollectionIncludeWarning))
                 .Options;
             var now = DateTimeOffset.UtcNow;
             var ownerId = Guid.CreateVersion7();
@@ -205,7 +211,7 @@ public sealed class CompetitionManagementPersistenceTests
             await Assert.That(audienceEvent.CompetitionAudienceChangeKind)
                 .IsEqualTo(CompetitionAudienceChangeKind.AccessMode);
 
-            var runningCompetition = await db.Competitions.SingleAsync(
+            var runningCompetition = await db.Competitions.AsSplitQuery().SingleAsync(
                 item => item.Id == competitionId,
                 cancellationToken);
             runningCompetition.Status = CompetitionStatus.Running;
@@ -278,6 +284,7 @@ public sealed class CompetitionManagementPersistenceTests
             await Assert.That(accessUpdated.TrafficCaptureLimitBytes)
                 .IsEqualTo(16 * 1_048_576);
             var existingRuntime = await db.RuntimeInstances.AsNoTracking()
+                .AsSplitQuery()
                 .SingleAsync(runtime => runtime.Id == runtimeId, cancellationToken);
             await Assert.That(existingRuntime.AccessMode)
                 .IsEqualTo(RuntimeAccessMode.Direct);

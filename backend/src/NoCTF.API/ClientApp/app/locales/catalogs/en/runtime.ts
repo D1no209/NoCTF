@@ -1,5 +1,9 @@
 /** Runtime locale chunk. Keep keys stable across languages. */
 export const messages = {
+  "runtime.teamInstancesTitle": "Team instances",
+  "runtime.noActiveTeamInstances": "Your team has no active challenge containers",
+  "runtime.expiresAt": "Expires: {time}",
+  "runtime.openChallenge": "Open challenge",
   "ui.searchCompetitionChallengeOrTeam": "Search competition, challenge or team",
   "ui.allSources": "All sources",
   "ui.competitionContainers": "Competition containers",

@@ -42,6 +42,10 @@ public sealed record RuntimeInstanceView(
     public RuntimeCapacityAllocations? Capacity { get; init; }
 }
 
+public sealed record TeamRuntimeItemView(string ChallengeTitle, RuntimeInstanceView Runtime);
+
+public sealed record TeamRuntimeListPage(IReadOnlyList<TeamRuntimeItemView> Items, int Total);
+
 public sealed record RuntimePublishedPortView(
     string? ServiceName,
     int ContainerPort,
@@ -90,6 +94,13 @@ public sealed record RuntimeMutationResult(
 
 public interface IRuntimeInstanceStore
 {
+    Task<TeamRuntimeListPage?> ListTeamRuntimesAsync(
+        Guid competitionId,
+        Guid userId,
+        int offset,
+        int limit,
+        bool desc,
+        CancellationToken cancellationToken);
     Task<RuntimeInstanceView?> FindPlayerRuntimeAsync(
         Guid competitionId,
         Guid competitionChallengeId,
@@ -141,6 +152,18 @@ public sealed class GetPlayerRuntime(IRuntimeInstanceStore store, NoCTF.Applicat
         var waiting = await capacity.ReadWaitingAsync([view.Id], ct);
         return view with { WaitingReason = waiting.TryGetValue(view.Id, out var reason) ? reason : null };
     }
+}
+
+public sealed class ListTeamRuntimes(IRuntimeInstanceStore store)
+{
+    public Task<TeamRuntimeListPage?> ExecuteAsync(
+        Guid competitionId,
+        Guid userId,
+        int offset,
+        int limit,
+        bool desc,
+        CancellationToken ct = default) =>
+        store.ListTeamRuntimesAsync(competitionId, userId, offset, limit, desc, ct);
 }
 
 public sealed class MutatePlayerRuntime(IRuntimeInstanceStore store)

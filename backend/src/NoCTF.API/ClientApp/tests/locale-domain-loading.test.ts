@@ -6,6 +6,9 @@ describe('locale feature catalogs', () => {
   test('loads only the feature domains required by public routes', () => {
     expect(localeDomainsForPath('/')).toEqual(['account'])
     expect(localeDomainsForPath('/competitions')).toEqual(['account', 'competitions'])
+    expect(localeDomainsForPath('/competitions/c1/my/team')).toEqual([
+      'account', 'competitions', 'runtime',
+    ])
     expect(localeDomainsForPath('/competitions/c1/challenges/c2')).toEqual([
       'account',
       'competitions',

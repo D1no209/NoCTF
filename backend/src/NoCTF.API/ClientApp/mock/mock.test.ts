@@ -39,6 +39,27 @@ function validate(schema: Data | undefined, value: any, path = '$') {
 }
 
 describe('isolated Mock API', () => {
+  test('lists only the signed-in team active runtimes with pagination', async () => {
+    const { send } = await setup('player')
+    const path = `${competition}/teams/me/runtimes?offset=0&limit=5&desc=true`
+    const response = await send(path)
+    expect(response.status).toBe(200)
+    const page = await response.json()
+    expect(page.total).toBe(14)
+    expect(page.items).toHaveLength(5)
+    expect(page.items.every((item: Data) => item.runtime.teamId === id(5))).toBeTrue()
+    expect(page.items.every((item: Data) => Boolean(item.challengeTitle))).toBeTrue()
+    const runtime = page.items[0].runtime
+    const extendedExpiry = new Date(Date.parse(runtime.expiresAt) + 30 * 60_000).toISOString()
+    expect((await send(`${competition}/challenges/${runtime.competitionChallengeId}/runtimes/${runtime.id}`,
+      'PATCH', { expiresAt: extendedExpiry })).status).toBe(202)
+    const afterExtend = await (await send(path)).json()
+    expect(afterExtend.items.find((item: Data) => item.runtime.id === runtime.id).runtime.expiresAt).toBe(extendedExpiry)
+    expect((await send(`${competition}/challenges/${runtime.competitionChallengeId}/runtimes/${runtime.id}`, 'DELETE')).status).toBe(202)
+    const afterStop = await (await send(path)).json()
+    expect(afterStop.total).toBe(13)
+  })
+
   test('starting a visible CTF challenge is an idempotent no-content operation', async () => {
     const { send } = await setup()
     const path = `${competition}/challenges/${id(4)}/start`

@@ -95,7 +95,7 @@ emit: { (event: "evaluated", ...args: [result: TrackedSubmission['result']]): vo
     solvedChallengeKeys.add(challengeKey())
     solved.value = true
     input.value = ''
-    persistentResult.value = null
+    if (persistentResult.value?.correct !== true) persistentResult.value = null
   })
 
   const attemptsExhausted = computed(() =>
@@ -169,6 +169,8 @@ emit: { (event: "evaluated", ...args: [result: TrackedSubmission['result']]): vo
         solved.value = true
         if (props.practice)
           showResult(true, translate("ui.correctFlagPracticeAttemptsDoNotAwardPoints"))
+        else
+          showResult(true, translate('terminal.challengeSolved'))
         celebrateCorrectFlag()
       }
       else {

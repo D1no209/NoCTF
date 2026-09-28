@@ -2,7 +2,7 @@
 import { toRefs } from 'vue'
 import type { CompetitionChallengeNavigatorViewState } from '~/features/competition/useCompetitionChallengeNavigator'
 const viewProps = defineProps<{ state: CompetitionChallengeNavigatorViewState }>()
-const { ShieldCheck, Swords, Users, directionGlyph, isAwdp, loading, error, dataScope, hideSolved, search, board, progressFor, currentScore, bloodsFor, bloodTooltip, progressIcon, progressIconLabel, emptyLabel, groupOptions, listOptions, selectChallenge, competitionId, selectedChallengeId } = toRefs(viewProps.state)
+const { ShieldCheck, Swords, Users, directionGlyph, isCtf, isAwdp, loading, error, dataScope, hideSolved, hideLocked, search, board, progressFor, currentScore, bloodsFor, bloodTooltip, progressIcon, progressIconLabel, emptyLabel, groupOptions, listOptions, selectChallenge, competitionId, selectedChallengeId } = toRefs(viewProps.state)
 </script>
 
 <template>
@@ -16,6 +16,10 @@ const { ShieldCheck, Swords, Users, directionGlyph, isAwdp, loading, error, data
         <div class="flex items-center justify-between gap-3">
           <Label :for="`hide-solved-${competitionId}`" class="cursor-pointer text-xs font-medium">{{ $t('ui.hideSolved') }}</Label>
           <Switch :id="`hide-solved-${competitionId}`" v-model="hideSolved" />
+        </div>
+        <div v-if="isCtf" class="flex items-center justify-between gap-3">
+          <Label :for="`hide-locked-${competitionId}`" class="cursor-pointer text-xs font-medium">{{ $t('challengeNavigator.hideLocked') }}</Label>
+          <Switch :id="`hide-locked-${competitionId}`" v-model="hideLocked" />
         </div>
 
       </header>

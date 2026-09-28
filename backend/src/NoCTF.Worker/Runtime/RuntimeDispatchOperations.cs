@@ -318,7 +318,9 @@ internal static partial class BackendMessageOperations
                     perTeamFlag);
             }
             var stored = await db.RuntimeInstances.AsNoTracking().Where(runtime => runtime.Id == instance.Id)
-                .Select(runtime => runtime.CapacityAllocations).SingleAsync(cancellationToken);
+                .Select(runtime => runtime.CapacityAllocations)
+                .AsSplitQuery()
+                .SingleAsync(cancellationToken);
             var allocation = stored.Items.SingleOrDefault(item => !item.Identity.IsAuxiliary) ?? new RuntimeCapacityAllocation(
                 NoCTF.Infrastructure.Runtime.Capacity.PersistedRunnerCapacityGate.PrimaryIdentity(instance), instance.GameplayFactId,
                 runnerId, runnerId, RuntimeResourceBudgetPolicy.ToAmount(budget), RuntimeResourceBudgetPolicy.ToAmount(limits));

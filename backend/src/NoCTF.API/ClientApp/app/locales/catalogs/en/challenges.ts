@@ -1,6 +1,8 @@
 /** Runtime locale chunk. Keep keys stable across languages. */
 export const messages = {
   "challengeNavigator.noMatches": "No matching challenges",
+  "challengeNavigator.hideLocked": "Hide locked",
+  "challengeNavigator.noUnlockedChallenges": "No unlocked challenges",
   "challengeNavigator.searchPlaceholder": "Search challenge names",
   "terminal.challengeSolved": "Challenge is Solved ！",
   "terminal.flagPlaceholder": "Type Your Flag ~~",

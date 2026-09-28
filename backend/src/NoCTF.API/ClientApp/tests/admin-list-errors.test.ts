@@ -10,7 +10,6 @@ describe('admin list error presentation', () => {
     'admin/platform/audit.vue',
     'admin/platform/logs.vue',
     'admin/competitions/[id]/submissions.vue',
-    'admin/competitions/[id]/runtimes.vue',
   ])('%s exposes cursor failures without replacing them with an empty state', async (path) => {
     const source = await pageSource(path)
 
@@ -19,6 +18,17 @@ describe('admin list error presentation', () => {
     expect(source).toContain('!listError && initialized && items.length === 0')
     expect(source).toMatch(/(?:Card|template) v-else-if="items\.length > 0"/)
     expect(source).toContain('reset({ preserveItems: true })')
+  })
+
+  test('competition runtimes keep the current offset page visible after a refresh failure', async () => {
+    const source = await pageSource('admin/competitions/[id]/runtimes.vue')
+
+    expect(source).toContain('error: listError')
+    expect(source).toContain('<Alert v-if="listError" variant="destructive">')
+    expect(source).toContain('!listError && initialized && items.length === 0')
+    expect(source).toContain('v-else-if="items.length > 0"')
+    expect(source).toContain('createTrailingRefresh(() => pagination.loadPage())')
+    expect(source).toContain('<OffsetPagination v-if="initialized"')
   })
 
   test('team appeals preserve the previous result and expose refresh failures', async () => {

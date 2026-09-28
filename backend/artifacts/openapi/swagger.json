@@ -1777,6 +1777,88 @@
         ]
       }
     },
+    "/api/v1/competitions/{competitionId}/teams/me/runtimes": {
+      "get": {
+        "tags": [
+          "Competitions"
+        ],
+        "summary": "Lists the current team's active challenge runtimes.",
+        "description": "Executes GET /api/v1/competitions/{competitionId}/teams/me/runtimes.",
+        "operationId": "ListMyTeamRuntimes",
+        "parameters": [
+          {
+            "name": "competitionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "desc",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIPaginationArrayResultOfTeamRuntimeListItemResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcValidationProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ]
+      }
+    },
     "/api/v1/runtime-proxies/{runtimeInstanceId}/{bindingIndex}": {
       "get": {
         "tags": [
@@ -16611,6 +16693,49 @@
           }
         }
       },
+      "NoCTFAPIPaginationArrayResultOfTeamRuntimeListItemResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "total": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NoCTFAPIEndpointsRuntimeTeamRuntimeListItemResponse"
+            }
+          }
+        }
+      },
+      "NoCTFAPIEndpointsRuntimeTeamRuntimeListItemResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "challengeTitle": {
+            "type": "string"
+          },
+          "runtime": {
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsRuntimeRuntimeResponse"
+          }
+        }
+      },
+      "NoCTFAPIEndpointsRuntimeListTeamRuntimesRequest": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/NoCTFAPIPaginationPaginationRequest"
+          },
+          {
+            "type": "object",
+            "additionalProperties": false
+          }
+        ]
+      },
+      "NoCTFAPIPaginationPaginationRequest": {
+        "type": "object",
+        "additionalProperties": false
+      },
       "NoCTFAPIEndpointsRuntimeProbeRuntimeProxyRequest": {
         "type": "object",
         "additionalProperties": false
@@ -17974,10 +18099,6 @@
           "All",
           "Inbox"
         ]
-      },
-      "NoCTFAPIPaginationPaginationRequest": {
-        "type": "object",
-        "additionalProperties": false
       },
       "NoCTFAPIEndpointsNotificationsNotificationFeedResponse": {
         "type": "object",
