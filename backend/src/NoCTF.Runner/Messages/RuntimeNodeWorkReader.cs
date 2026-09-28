@@ -16,6 +16,7 @@ public sealed class RuntimeNodeWorkReader(IDbContextFactory<NoCtfDbContext> cont
     {
         await using var db = await contexts.CreateDbContextAsync(cancellationToken);
         var assignment = await db.RuntimeInstances.AsNoTracking()
+            .AsSplitQuery()
             .SingleOrDefaultAsync(
                 candidate => candidate.Id == message.RuntimeInstanceId,
                 cancellationToken);
@@ -39,6 +40,7 @@ public sealed class RuntimeNodeWorkReader(IDbContextFactory<NoCtfDbContext> cont
     {
         await using var db = await contexts.CreateDbContextAsync(cancellationToken);
         var candidate = await db.RuntimeInstances.AsNoTracking()
+            .AsSplitQuery()
             .SingleOrDefaultAsync(candidate => candidate.Id == message.RuntimeInstanceId
                 && candidate.State == RuntimeState.Stopping
                 && candidate.RunnerId == message.RunnerId,
