@@ -362,8 +362,6 @@ public sealed class GetLeaderboardEndpoint(
         }
         if (projection is not null)
         {
-            var canObserve = user.UserId != Guid.Empty
-                && await authorizer.CanObserveAsync(user.UserId, request.CompetitionId, cancellationToken);
             var canViewInternalTracks = user.UserId != Guid.Empty
                 && await authorizer.CanJudgeAsync(user.UserId, request.CompetitionId, cancellationToken);
             var tracks = await getTracks.ExecuteAsync(
@@ -374,7 +372,7 @@ public sealed class GetLeaderboardEndpoint(
                 cancellationToken);
             if (tracks is null)
                 return TypedResults.NotFound();
-            projection = ScoreboardAudienceProjection.Filter(projection, canObserve);
+            projection = ScoreboardAudienceProjection.ForPublishedChallenges(projection);
             projection = ScoreboardAudienceProjection.FilterTracks(
                 projection,
                 tracks,

@@ -1015,9 +1015,7 @@ public sealed class CompetitionWebhookDeliveryStore(
             sourceEventSequenceThrough = published?.SourceEventSequenceThrough ?? 0;
             if (projection is not null)
             {
-                projection = ScoreboardAudienceProjection.Filter(
-                    projection,
-                    canObserve: false);
+                projection = ScoreboardAudienceProjection.ForPublishedChallenges(projection);
                 var tracks = await getTracks.ExecuteAsync(
                     competition.Id,
                     viewerUserId: null,

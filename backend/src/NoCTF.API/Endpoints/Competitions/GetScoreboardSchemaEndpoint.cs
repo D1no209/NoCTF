@@ -7,7 +7,6 @@ using NoCTF.API.Security;
 using NoCTF.API.Serialization;
 using NoCTF.Application.Competitions.Visibility;
 using NoCTF.Application.Scoring.Leaderboard;
-using NoCTF.Application.Teams.Moderation;
 using NoCTF.Domain.Competitions;
 using Riok.Mapperly.Abstractions;
 
@@ -67,7 +66,6 @@ public sealed class GetScoreboardSchemaEndpoint(
     ILeaderboardCache leaderboard,
     ILeaderboardSnapshotFactory snapshots,
     ICompetitionVisibilityAccess access,
-    ICompetitionModerationAuthorizer authorizer,
     IUserContext user,
     TimeProvider timeProvider)
     : Endpoint<GetScoreboardSchemaRequest, Results<Ok<ScoreboardSchemaResponse>, Accepted<LeaderboardProcessingProtocolResponse>, NotFound>>
@@ -119,9 +117,7 @@ public sealed class GetScoreboardSchemaEndpoint(
         }
         if (projection is null)
             return Processing(request.CompetitionId);
-        var canObserve = user.UserId != Guid.Empty
-            && await authorizer.CanObserveAsync(user.UserId, request.CompetitionId, cancellationToken);
-        var schema = ScoreboardAudienceProjection.Filter(projection, canObserve).Schema;
+        var schema = ScoreboardAudienceProjection.ForPublishedChallenges(projection).Schema;
         return TypedResults.Ok(new ScoreboardSchemaResponse(
             schema.CompetitionId,
             CompetitionProtocolMapper.ToProtocol(schema.Mode),

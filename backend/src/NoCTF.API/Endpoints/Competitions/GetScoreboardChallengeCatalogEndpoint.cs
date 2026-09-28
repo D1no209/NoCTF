@@ -4,7 +4,6 @@ using Microsoft.AspNetCore.Http.HttpResults;
 using NoCTF.API.Security;
 using NoCTF.Application.Competitions.Visibility;
 using NoCTF.Application.Scoring.Leaderboard;
-using NoCTF.Application.Teams.Moderation;
 
 namespace NoCTF.API.Endpoints.Competitions;
 
@@ -29,7 +28,6 @@ public sealed class GetScoreboardChallengeCatalogRequest
 public sealed class GetScoreboardChallengeCatalogEndpoint(
     ILeaderboardCache leaderboard,
     ICompetitionVisibilityAccess access,
-    ICompetitionModerationAuthorizer authorizer,
     IUserContext user,
     TimeProvider timeProvider)
     : Endpoint<GetScoreboardChallengeCatalogRequest, Results<Ok<ScoreboardChallengeCatalogResponse>, Accepted<LeaderboardProcessingProtocolResponse>, NotFound>>
@@ -57,9 +55,7 @@ public sealed class GetScoreboardChallengeCatalogEndpoint(
             : await leaderboard.GetScoreboardAsync(request.CompetitionId, cancellationToken);
         if (projection is null)
             return Processing(request.CompetitionId);
-        var canObserve = user.UserId != Guid.Empty
-            && await authorizer.CanObserveAsync(user.UserId, request.CompetitionId, cancellationToken);
-        var catalog = ScoreboardAudienceProjection.Filter(projection, canObserve).ChallengeCatalog;
+        var catalog = ScoreboardAudienceProjection.ForPublishedChallenges(projection).ChallengeCatalog;
         return TypedResults.Ok(new ScoreboardChallengeCatalogResponse(
             catalog.CompetitionId,
             catalog.Revision.ToString(CultureInfo.InvariantCulture),

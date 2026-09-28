@@ -27,10 +27,10 @@ public static class ScoreboardAudienceProjection
         };
     }
 
-    public static ScoreboardProjection Filter(ScoreboardProjection projection, bool canObserve)
+    public static ScoreboardProjection ForPublishedChallenges(ScoreboardProjection projection)
     {
-        if (canObserve)
-            return projection;
+        // Participant-facing leaderboard routes must not expose unpublished
+        // challenges merely because the viewer also has staff permissions.
         if (projection.ParticipantView is { } participantView)
             return participantView.ToProjection();
 
