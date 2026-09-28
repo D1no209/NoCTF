@@ -56,6 +56,7 @@ public sealed class RuntimeResourceReconciliationHandler(
                     runtime.RuntimeKind,
                     ProviderReceipt = runtime.ProviderReceipt!
                 })
+                .AsSplitQuery()
                 .ToArrayAsync(cancellationToken);
             foreach (var runtime in proxyRuntimes)
             {
