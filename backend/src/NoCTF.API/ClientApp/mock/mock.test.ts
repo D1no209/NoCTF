@@ -567,4 +567,19 @@ describe('isolated Mock API', () => {
     expect(await (await hub(request(path))).text()).toContain('scoreboardUpdated')
     expect((await hub(request(path, 'DELETE'))).status).toBe(202)
   })
+
+  test('authenticated notification SignalR receives a content-free invalidation', async () => {
+    const { api, request, send } = await setup('admin')
+    const hub = createMockRealtime(api)
+    const negotiation = await (await hub(request('/hubs/v1/notifications/negotiate', 'POST', {}))).json()
+    const path = '/hubs/v1/notifications?id=' + negotiation.connectionToken
+    expect(await (await hub(request(path))).text()).toBe('')
+    const post = (value: any) => hub(new Request(base + path, { method: 'POST', body: JSON.stringify(value) + '\x1e' }))
+    await post({ protocol: 'json', version: 1 })
+    expect(await (await hub(request(path))).text()).toBe('{}\x1e')
+    await send(`/api/v1/admin/competitions/${id(2)}/announcements`, 'POST', { title: 'Update', body: 'Body', audience: 'Participants' })
+    const signal = (await hub(request(path))).text()
+    expect(await signal).toContain('notificationChanged')
+    expect(await signal).not.toContain('Body')
+  })
 })

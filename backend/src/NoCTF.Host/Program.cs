@@ -134,6 +134,7 @@ if (roles.Has(HostRole.Api))
     app.UseNoCtfPipeline();
     app.UseNoCtfEndpoints();
     app.MapHub<CompetitionHub>("/hubs/v1/competitions");
+    app.MapHub<NotificationHub>("/hubs/v1/notifications");
     app.MapHub<PlatformLogHub>("/hubs/v1/admin/platform-logs");
 }
 

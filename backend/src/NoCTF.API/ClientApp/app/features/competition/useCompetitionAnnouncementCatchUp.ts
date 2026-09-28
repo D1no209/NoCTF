@@ -49,7 +49,6 @@ function announcementStorageKey(userId: string, competitionId: string): string {
 
 export function useCompetitionAnnouncementCatchUp(competitionId: Readonly<Ref<string>>) {
   const { user } = useAuth()
-  let enteredCompetitionId: string | null = null
 
   async function loadMissedAnnouncements(): Promise<void> {
     const userId = user.value?.userId
@@ -72,13 +71,8 @@ export function useCompetitionAnnouncementCatchUp(competitionId: Readonly<Ref<st
     const seenIds = parseSeenCompetitionAnnouncementIds(safeLocalStorage.getItem(key))
     const notifications = data.items ?? []
     const missed = missedCompetitionAnnouncements(notifications, seenIds)
-    const isEntryCatchUp = enteredCompetitionId !== requestedCompetitionId
     for (const notification of missed)
-      showNotificationNotice(notification, {
-        idPrefix: isEntryCatchUp ? 'competition-announcement' : 'notification',
-      })
-
-    enteredCompetitionId = requestedCompetitionId
+      showNotificationNotice(notification)
 
     if (missed.length > 0) {
       safeLocalStorage.setItem(

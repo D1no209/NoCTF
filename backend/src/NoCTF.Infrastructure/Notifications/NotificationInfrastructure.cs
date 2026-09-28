@@ -1,5 +1,6 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using NATS.Client.Core;
 using NoCTF.Application.Notifications;
 using NoCTF.Infrastructure.Competitions.Permissions;
 
@@ -18,10 +19,15 @@ internal static class NotificationInfrastructure
         services.AddScoped<ListPublicCompetitionAnnouncements>();
         services.AddScoped<ReadNotificationFeed>();
         services.AddScoped<CompetitionNotificationAudienceResolver>();
+        services.AddScoped<NotificationChangeAudienceResolver>();
         services.AddScoped<CompetitionNotificationDelivery>();
         services.AddScoped<ICompetitionAnnouncementPublisher>(provider =>
             provider.GetRequiredService<CompetitionNotificationDelivery>());
         services.AddScoped<PublishCompetitionAnnouncement>();
+        if (!development && services.Any(descriptor => descriptor.ServiceType == typeof(INatsConnection)))
+            services.AddSingleton<INotificationChangePublisher, NatsNotificationChangePublisher>();
+        else
+            services.AddSingleton<INotificationChangePublisher, NoOpNotificationChangePublisher>();
         if (!development)
         {
             services.AddSingleton<ILeaderboardRefreshPublisher, NatsLeaderboardRefreshPublisher>();

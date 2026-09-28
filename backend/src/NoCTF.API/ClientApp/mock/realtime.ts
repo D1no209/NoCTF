@@ -2,7 +2,7 @@ import type { createMockApi } from './api'
 
 /** Minimal SignalR JSON/LongPolling transport for the existing frontend client. */
 export function createMockRealtime(api: ReturnType<typeof createMockApi>) {
-  type Connection = { queue: string[]; groups: Set<string>; wake?: () => void; fresh: boolean }
+  type Connection = { queue: string[]; groups: Set<string>; hub: string; wake?: () => void; fresh: boolean }
   const connections = new Map<string, Connection>()
   const send = (client: Connection, message: unknown) => {
     client.queue.push(JSON.stringify(message) + '\x1e')
@@ -13,13 +13,17 @@ export function createMockRealtime(api: ReturnType<typeof createMockApi>) {
       send(client, { type: 1, target: 'scoreboardUpdated', arguments: [{ competitionId, version: String(api.state.facts.length + 1), schemaRevision: 'mock-1', challengeCatalogRevision: 'mock-1' }] })
     }
   })
+  api.notificationChanges.add(() => {
+    for (const client of connections.values()) if (client.hub === 'notifications')
+      send(client, { type: 1, target: 'notificationChanged', arguments: [] })
+  })
   return async function handle(request: Request) {
     const url = new URL(request.url)
-    if (!/^\/hubs\/v1\/(competitions|admin\/platform-logs)(\/negotiate)?$/.test(url.pathname)) return new Response(null, { status: 404 })
+    if (!/^\/hubs\/v1\/(competitions|notifications|admin\/platform-logs)(\/negotiate)?$/.test(url.pathname)) return new Response(null, { status: 404 })
     if (url.pathname.endsWith('/negotiate') && request.method === 'POST') {
       if (!api.userFor(request)) return new Response(null, { status: 401 })
       const token = crypto.randomUUID()
-      connections.set(token, { queue: [], groups: new Set(), fresh: true })
+      connections.set(token, { queue: [], groups: new Set(), hub: url.pathname.split('/')[3]!, fresh: true })
       return Response.json({ negotiateVersion: 1, connectionId: token, connectionToken: token, availableTransports: [{ transport: 'LongPolling', transferFormats: ['Text'] }] })
     }
     const token = url.searchParams.get('id') ?? ''

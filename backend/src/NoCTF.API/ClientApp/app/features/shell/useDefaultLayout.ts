@@ -7,6 +7,9 @@ import LanguageToggleComponent from '../LanguageToggle.vue'
 import ThemeToggleComponent from '../ThemeToggle.vue'
 import ThemePalettePanelComponent from '../theme/ThemePalettePanel.vue'
 import { showNotificationNotice } from '../notifications/showNotificationNotice'
+import { watchNotifications } from '../../composables/useNotificationHub'
+import { createTrailingRefresh } from '../../lib/latest-page-refresh'
+import { newNotificationNotices } from '../../composables/useNotificationUnread'
 
 /** Owns state, effects and commands for DefaultLayout. */
 export function useDefaultLayout() {
@@ -45,17 +48,35 @@ export function useDefaultLayout() {
   })
 
   let notificationTimer: ReturnType<typeof setInterval> | undefined
+  let unwatchNotifications: (() => void) | undefined
   let notificationBaselineReady = false
   let lastNotificationId: string | null = null
 
   async function refreshNotifications(showNotice: boolean): Promise<void> {
-    const latest = await refreshUnread()
-    if (latest === undefined) return
-    const latestId = latest?.id ?? null
-    if (showNotice && notificationBaselineReady && latest && latestId && latestId !== lastNotificationId)
-      showNotificationNotice(latest)
+    const notifications = await refreshUnread()
+    if (notifications === undefined) return
+    const latestId = notifications[0]?.id ?? null
+    if (showNotice && notificationBaselineReady && latestId !== lastNotificationId)
+      for (const notification of newNotificationNotices(notifications, lastNotificationId))
+        showNotificationNotice(notification)
     lastNotificationId = latestId
     notificationBaselineReady = true
+  }
+
+  const refreshOnSignal = createTrailingRefresh(() => refreshNotifications(true))
+
+  function refreshWhenVisible(): void {
+    if (document.visibilityState === 'visible') void refreshOnSignal()
+  }
+
+  function subscribeNotifications(): void {
+    unwatchNotifications?.()
+    unwatchNotifications = user.value?.userId
+      ? watchNotifications({
+          notificationChanged: () => void refreshOnSignal(),
+          onReconnected: () => void refreshOnSignal(),
+        })
+      : undefined
   }
 
   const navItems = computed(() => [
@@ -71,7 +92,11 @@ export function useDefaultLayout() {
 
   onMounted(() => {
     void refreshNotifications(false)
-    notificationTimer = setInterval(() => void refreshNotifications(true), 20_000)
+    subscribeNotifications()
+    document.addEventListener('visibilitychange', refreshWhenVisible)
+    window.addEventListener('focus', refreshWhenVisible)
+    // SignalR is best-effort; reconcile missed changes after long disconnects.
+    notificationTimer = setInterval(() => void refreshOnSignal(), 300_000)
   })
 
   watch(
@@ -80,6 +105,7 @@ export function useDefaultLayout() {
       notificationBaselineReady = false
       lastNotificationId = null
       void refreshNotifications(false)
+      subscribeNotifications()
     },
   )
 
@@ -91,6 +117,9 @@ export function useDefaultLayout() {
 
   onBeforeUnmount(() => {
     if (notificationTimer) clearInterval(notificationTimer)
+    document.removeEventListener('visibilitychange', refreshWhenVisible)
+    window.removeEventListener('focus', refreshWhenVisible)
+    unwatchNotifications?.()
     clearWallpaper()
   })
 
